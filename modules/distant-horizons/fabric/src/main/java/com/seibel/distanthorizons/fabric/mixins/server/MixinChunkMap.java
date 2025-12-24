@@ -1,6 +1,6 @@
 package com.seibel.distanthorizons.fabric.mixins.server;
 
-import net.distant_horizons.common.commonMixins.MixinChunkMapCommon;
+import com.seibel.distanthorizons.common.commonMixins.MixinChunkMapCommon;
 import net.minecraft.server.level.ChunkMap;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.chunk.ChunkAccess;

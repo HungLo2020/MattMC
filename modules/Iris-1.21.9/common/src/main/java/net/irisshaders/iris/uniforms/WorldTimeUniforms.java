@@ -1,14 +1,14 @@
 package net.irisshaders.iris.uniforms;
 
-import net.iris.Iris;
-import net.iris.gl.uniform.UniformHolder;
-import net.iris.shaderpack.DimensionId;
+import net.irisshaders.iris.Iris;
+import net.irisshaders.iris.gl.uniform.UniformHolder;
+import net.irisshaders.iris.shaderpack.DimensionId;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 
 import java.util.Objects;
 
-import static net.iris.gl.uniform.UniformUpdateFrequency.PER_TICK;
+import static net.irisshaders.iris.gl.uniform.UniformUpdateFrequency.PER_TICK;
 
 public final class WorldTimeUniforms {
 	private WorldTimeUniforms() {

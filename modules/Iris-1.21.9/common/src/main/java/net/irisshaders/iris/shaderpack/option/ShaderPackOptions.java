@@ -2,9 +2,9 @@ package net.irisshaders.iris.shaderpack.option;
 
 import com.google.common.collect.ImmutableMap;
 import net.iris.shaderpack.include.AbsolutePackPath;
-import net.iris.shaderpack.include.IncludeGraph;
-import net.iris.shaderpack.option.values.MutableOptionValues;
-import net.iris.shaderpack.option.values.OptionValues;
+import net.irisshaders.iris.shaderpack.include.IncludeGraph;
+import net.irisshaders.iris.shaderpack.option.values.MutableOptionValues;
+import net.irisshaders.iris.shaderpack.option.values.OptionValues;
 
 import java.util.Collections;
 import java.util.HashMap;

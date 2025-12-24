@@ -1,8 +1,8 @@
 package com.seibel.distanthorizons.core.util.objects.dataStreams;
 
-import net.distant_horizons.core.logging.DhLoggerBuilder;
+import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
 import it.unimi.dsi.fastutil.ints.Int2ReferenceArrayMap;
-import net.distant_horizons.core.logging.DhLogger;
+import com.seibel.distanthorizons.core.logging.DhLogger;
 import org.tukaani.xz.ArrayCache;
 
 import java.util.ArrayList;

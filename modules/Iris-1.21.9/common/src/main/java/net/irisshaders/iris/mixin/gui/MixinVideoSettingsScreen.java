@@ -1,7 +1,7 @@
 package net.irisshaders.iris.mixin.gui;
 
-import net.iris.gui.option.IrisVideoSettings;
-import net.iris.gui.screen.ShaderPackScreen;
+import net.irisshaders.iris.gui.option.IrisVideoSettings;
+import net.irisshaders.iris.gui.screen.ShaderPackScreen;
 import net.minecraft.client.OptionInstance;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.options.VideoSettingsScreen;

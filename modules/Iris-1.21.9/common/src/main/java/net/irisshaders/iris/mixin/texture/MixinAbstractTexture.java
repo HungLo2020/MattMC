@@ -1,9 +1,9 @@
 package net.irisshaders.iris.mixin.texture;
 
 import com.mojang.blaze3d.textures.GpuTexture;
-import net.iris.Iris;
+import net.irisshaders.iris.Iris;
 import net.iris.mixinterface.AbstractTextureExtended;
-import net.iris.pbr.TextureTracker;
+import net.irisshaders.iris.pbr.TextureTracker;
 import net.minecraft.client.renderer.texture.AbstractTexture;
 import net.minecraft.client.renderer.texture.ReloadableTexture;
 import net.minecraft.client.renderer.texture.TextureAtlas;

@@ -19,7 +19,7 @@
 
 package com.seibel.distanthorizons.api.methods.events.abstractEvents;
 
-import net.distant_horizons.api.interfaces.render.IDhApiRenderProxy;
+import com.seibel.distanthorizons.api.interfaces.render.IDhApiRenderProxy;
 
 /**
  * Called before Distant Horizons starts rendering the deferred rendering pass. <br>

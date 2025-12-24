@@ -24,7 +24,7 @@ import net.distant_horizons.core.network.exceptions.RateLimitedException;
 import net.distant_horizons.core.network.exceptions.RequestOutOfRangeException;
 import net.distant_horizons.core.network.exceptions.RequestRejectedException;
 import net.distant_horizons.core.network.exceptions.SectionRequiresSplittingException;
-import net.distant_horizons.core.network.messages.AbstractTrackableMessage;
+import com.seibel.distanthorizons.core.network.messages.AbstractTrackableMessage;
 import io.netty.buffer.ByteBuf;
 
 import java.util.ArrayList;

@@ -19,25 +19,25 @@
 
 package com.seibel.distanthorizons.core.logging.f3;
 
-import net.distant_horizons.core.api.internal.ClientApi;
-import net.distant_horizons.core.api.internal.SharedApi;
-import net.distant_horizons.core.config.Config;
-import net.distant_horizons.core.dependencyInjection.SingletonInjector;
-import net.distant_horizons.core.jar.ModJarInfo;
-import net.distant_horizons.core.level.IDhLevel;
-import net.distant_horizons.core.logging.DhLoggerBuilder;
-import net.distant_horizons.core.pooling.PhantomArrayListPool;
-import net.distant_horizons.core.pos.DhSectionPos;
-import net.distant_horizons.core.render.RenderBufferHandler;
-import net.distant_horizons.core.render.renderer.generic.GenericObjectRenderer;
-import net.distant_horizons.core.util.threading.PriorityTaskPicker;
-import net.distant_horizons.core.util.threading.ThreadPoolUtil;
-import net.distant_horizons.core.world.AbstractDhWorld;
-import net.distant_horizons.core.wrapperInterfaces.minecraft.IMinecraftClientWrapper;
+import com.seibel.distanthorizons.core.api.internal.ClientApi;
+import com.seibel.distanthorizons.core.api.internal.SharedApi;
+import com.seibel.distanthorizons.core.config.Config;
+import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
+import com.seibel.distanthorizons.core.jar.ModJarInfo;
+import com.seibel.distanthorizons.core.level.IDhLevel;
+import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
+import com.seibel.distanthorizons.core.pooling.PhantomArrayListPool;
+import com.seibel.distanthorizons.core.pos.DhSectionPos;
+import com.seibel.distanthorizons.core.render.RenderBufferHandler;
+import com.seibel.distanthorizons.core.render.renderer.generic.GenericObjectRenderer;
+import com.seibel.distanthorizons.core.util.threading.PriorityTaskPicker;
+import com.seibel.distanthorizons.core.util.threading.ThreadPoolUtil;
+import com.seibel.distanthorizons.core.world.AbstractDhWorld;
+import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftClientWrapper;
 import net.distant_horizons.coreapi.ModInfo;
 import net.distant_horizons.coreapi.util.StringUtil;
 import org.apache.logging.log4j.LogManager;
-import net.distant_horizons.core.logging.DhLogger;
+import com.seibel.distanthorizons.core.logging.DhLogger;
 
 import java.text.NumberFormat;
 import java.util.*;

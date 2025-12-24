@@ -19,8 +19,8 @@
 
 package com.seibel.distanthorizons.core.util.math;
 
-import net.distant_horizons.api.objects.math.DhApiVec3f;
-import net.distant_horizons.coreapi.util.MathUtil;
+import com.seibel.distanthorizons.api.objects.math.DhApiVec3f;
+import net.sodium.api.util.MathUtil;
 
 /**
  * A (almost) exact copy of Minecraft's 1.16.5

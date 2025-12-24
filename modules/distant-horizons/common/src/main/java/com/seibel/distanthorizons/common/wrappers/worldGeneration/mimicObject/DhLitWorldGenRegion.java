@@ -22,13 +22,13 @@ package com.seibel.distanthorizons.common.wrappers.worldGeneration.mimicObject;
 import java.lang.invoke.MethodHandles;
 import java.util.List;
 import java.util.concurrent.locks.ReentrantLock;
-import net.distant_horizons.common.wrappers.chunk.ChunkWrapper;
-import net.distant_horizons.common.wrappers.worldGeneration.BatchGenerationEnvironment;
-import net.distant_horizons.core.logging.DhLoggerBuilder;
-import net.distant_horizons.core.util.LodUtil;
+import com.seibel.distanthorizons.common.wrappers.chunk.ChunkWrapper;
+import com.seibel.distanthorizons.common.wrappers.worldGeneration.BatchGenerationEnvironment;
+import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
+import com.seibel.distanthorizons.core.util.LodUtil;
 import net.minecraft.world.level.block.EntityBlock;
 import net.minecraft.world.level.block.SpawnerBlock;
-import net.distant_horizons.core.logging.DhLogger;
+import com.seibel.distanthorizons.core.logging.DhLogger;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 

@@ -20,9 +20,9 @@
 package com.seibel.distanthorizons.api.interfaces.override.levelHandling;
 
 import net.distant_horizons.api.enums.EDhApiDetailLevel;
-import net.distant_horizons.api.interfaces.override.IDhApiOverrideable;
-import net.distant_horizons.api.interfaces.world.IDhApiLevelWrapper;
-import net.distant_horizons.api.objects.math.DhApiMat4f;
+import com.seibel.distanthorizons.api.interfaces.override.IDhApiOverrideable;
+import com.seibel.distanthorizons.api.interfaces.world.IDhApiLevelWrapper;
+import com.seibel.distanthorizons.api.objects.math.DhApiMat4f;
 
 import java.io.File;
 

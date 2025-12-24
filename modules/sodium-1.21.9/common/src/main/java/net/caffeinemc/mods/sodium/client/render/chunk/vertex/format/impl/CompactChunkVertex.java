@@ -1,10 +1,10 @@
 package net.caffeinemc.mods.sodium.client.render.chunk.vertex.format.impl;
 
 import net.sodium.api.util.ColorARGB;
-import net.sodium.client.gl.attribute.GlVertexFormat;
+import net.caffeinemc.mods.sodium.client.gl.attribute.GlVertexFormat;
 import net.sodium.client.render.chunk.shader.ChunkShaderBindingPoints;
 import net.sodium.client.render.chunk.vertex.format.ChunkVertexEncoder;
-import net.sodium.client.render.chunk.vertex.format.ChunkVertexType;
+import net.caffeinemc.mods.sodium.client.render.chunk.vertex.format.ChunkVertexType;
 import net.minecraft.util.Mth;
 import org.lwjgl.system.MemoryUtil;
 

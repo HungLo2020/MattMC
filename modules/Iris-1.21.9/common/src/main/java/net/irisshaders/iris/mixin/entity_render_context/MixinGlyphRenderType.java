@@ -2,8 +2,8 @@ package net.irisshaders.iris.mixin.entity_render_context;
 
 import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
-import net.iris.layer.BlockEntityRenderStateShard;
-import net.iris.layer.OuterWrappedRenderType;
+import net.irisshaders.iris.layer.BlockEntityRenderStateShard;
+import net.irisshaders.iris.layer.OuterWrappedRenderType;
 import net.iris.vertices.ImmediateState;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.font.GlyphRenderTypes;

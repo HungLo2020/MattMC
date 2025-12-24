@@ -2,7 +2,7 @@ package net.irisshaders.iris.pipeline.programs;
 
 import com.mojang.blaze3d.opengl.GlStateManager;
 import net.sodium.client.gl.shader.uniform.GlUniform;
-import net.iris.gl.IrisRenderSystem;
+import net.irisshaders.iris.gl.IrisRenderSystem;
 import org.joml.Matrix3fc;
 import org.lwjgl.opengl.GL30C;
 import org.lwjgl.system.MemoryStack;

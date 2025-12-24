@@ -1,14 +1,14 @@
 package com.seibel.distanthorizons.core.render.renderer.generic;
 
-import net.distant_horizons.api.interfaces.render.IDhApiRenderableBoxGroup;
-import net.distant_horizons.api.methods.events.sharedParameterObjects.DhApiRenderParam;
+import com.seibel.distanthorizons.api.interfaces.render.IDhApiRenderableBoxGroup;
+import com.seibel.distanthorizons.api.methods.events.sharedParameterObjects.DhApiRenderParam;
 import net.distant_horizons.api.objects.math.DhApiVec3d;
-import net.distant_horizons.api.objects.render.DhApiRenderableBox;
-import net.distant_horizons.api.objects.render.DhApiRenderableBoxGroupShading;
-import net.distant_horizons.core.dependencyInjection.SingletonInjector;
-import net.distant_horizons.core.render.glObject.GLProxy;
-import net.distant_horizons.core.util.LodUtil;
-import net.distant_horizons.core.wrapperInterfaces.minecraft.IMinecraftGLWrapper;
+import com.seibel.distanthorizons.api.objects.render.DhApiRenderableBox;
+import com.seibel.distanthorizons.api.objects.render.DhApiRenderableBoxGroupShading;
+import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
+import com.seibel.distanthorizons.core.render.glObject.GLProxy;
+import com.seibel.distanthorizons.core.util.LodUtil;
+import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftGLWrapper;
 import org.jetbrains.annotations.Nullable;
 import org.lwjgl.opengl.GL32;
 

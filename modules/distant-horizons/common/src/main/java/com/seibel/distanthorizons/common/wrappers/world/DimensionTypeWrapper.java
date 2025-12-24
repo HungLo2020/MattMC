@@ -22,7 +22,7 @@ package com.seibel.distanthorizons.common.wrappers.world;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
-import net.distant_horizons.core.wrapperInterfaces.world.IDimensionTypeWrapper;
+import com.seibel.distanthorizons.core.wrapperInterfaces.world.IDimensionTypeWrapper;
 
 import net.minecraft.world.level.dimension.DimensionType;
 

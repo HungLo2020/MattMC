@@ -1,18 +1,18 @@
 package com.seibel.distanthorizons.core.render.renderer.generic;
 
-import net.distant_horizons.api.interfaces.override.rendering.IDhApiGenericObjectShaderProgram;
-import net.distant_horizons.api.interfaces.render.IDhApiRenderableBoxGroup;
-import net.distant_horizons.api.methods.events.sharedParameterObjects.DhApiRenderParam;
+import com.seibel.distanthorizons.api.interfaces.override.rendering.IDhApiGenericObjectShaderProgram;
+import com.seibel.distanthorizons.api.interfaces.render.IDhApiRenderableBoxGroup;
+import com.seibel.distanthorizons.api.methods.events.sharedParameterObjects.DhApiRenderParam;
 import net.distant_horizons.api.objects.math.DhApiVec3d;
 import net.distant_horizons.api.objects.math.DhApiVec3i;
-import net.distant_horizons.api.objects.render.DhApiRenderableBox;
-import net.distant_horizons.api.objects.render.DhApiRenderableBoxGroupShading;
-import net.distant_horizons.core.render.glObject.shader.ShaderProgram;
-import net.distant_horizons.core.render.glObject.vertexAttribute.AbstractVertexAttribute;
-import net.distant_horizons.core.render.glObject.vertexAttribute.VertexPointer;
-import net.distant_horizons.core.util.LodUtil;
-import net.distant_horizons.core.util.math.Mat4f;
-import net.distant_horizons.core.util.math.Vec3f;
+import com.seibel.distanthorizons.api.objects.render.DhApiRenderableBox;
+import com.seibel.distanthorizons.api.objects.render.DhApiRenderableBoxGroupShading;
+import com.seibel.distanthorizons.core.render.glObject.shader.ShaderProgram;
+import com.seibel.distanthorizons.core.render.glObject.vertexAttribute.AbstractVertexAttribute;
+import com.seibel.distanthorizons.core.render.glObject.vertexAttribute.VertexPointer;
+import com.seibel.distanthorizons.core.util.LodUtil;
+import com.seibel.distanthorizons.core.util.math.Mat4f;
+import com.seibel.distanthorizons.core.util.math.Vec3f;
 
 public class GenericObjectShaderProgram extends ShaderProgram implements IDhApiGenericObjectShaderProgram
 {

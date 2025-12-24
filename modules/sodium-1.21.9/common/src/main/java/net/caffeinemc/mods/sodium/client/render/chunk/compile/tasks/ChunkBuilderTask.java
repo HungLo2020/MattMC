@@ -1,15 +1,15 @@
 package net.caffeinemc.mods.sodium.client.render.chunk.compile.tasks;
 
-import net.sodium.client.render.chunk.compile.estimation.JobDurationEstimator;
-import net.sodium.client.render.chunk.compile.estimation.MeshTaskSizeEstimator;
-import net.sodium.client.render.chunk.compile.estimation.UploadDurationEstimator;
+import net.caffeinemc.mods.sodium.client.render.chunk.compile.estimation.JobDurationEstimator;
+import net.caffeinemc.mods.sodium.client.render.chunk.compile.estimation.MeshTaskSizeEstimator;
+import net.caffeinemc.mods.sodium.client.render.chunk.compile.estimation.UploadDurationEstimator;
 import org.joml.Vector3dc;
 import org.joml.Vector3f;
 import org.joml.Vector3fc;
 
-import net.sodium.client.render.chunk.RenderSection;
-import net.sodium.client.render.chunk.compile.BuilderTaskOutput;
-import net.sodium.client.render.chunk.compile.ChunkBuildContext;
+import net.caffeinemc.mods.sodium.client.render.chunk.RenderSection;
+import net.caffeinemc.mods.sodium.client.render.chunk.compile.BuilderTaskOutput;
+import net.caffeinemc.mods.sodium.client.render.chunk.compile.ChunkBuildContext;
 import net.sodium.client.render.chunk.translucent_sorting.data.CombinedCameraPos;
 import net.sodium.client.util.task.CancellationToken;
 

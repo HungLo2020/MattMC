@@ -1,8 +1,8 @@
 package net.irisshaders.iris.uniforms.custom.cached;
 
-import net.iris.gl.IrisRenderSystem;
+import net.irisshaders.iris.gl.IrisRenderSystem;
 import net.iris.gl.uniform.UniformUpdateFrequency;
-import net.iris.parsing.MatrixType;
+import net.irisshaders.iris.parsing.MatrixType;
 import org.joml.Matrix4f;
 import org.joml.Matrix4fc;
 

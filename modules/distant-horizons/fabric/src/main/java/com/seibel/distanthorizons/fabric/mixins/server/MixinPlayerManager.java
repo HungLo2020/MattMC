@@ -19,7 +19,7 @@
 
 package com.seibel.distanthorizons.fabric.mixins.server;
 
-import net.distant_horizons.core.logging.DhLoggerBuilder;
+import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.fabricmc.fabric.api.networking.v1.PacketSender;
 import net.minecraft.network.Connection;
@@ -33,7 +33,7 @@ import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
-import net.distant_horizons.core.logging.DhLogger;
+import com.seibel.distanthorizons.core.logging.DhLogger;
 
 /**
  * Mixin to fire ServerPlayConnectionEvents.JOIN when a player connects to the server.

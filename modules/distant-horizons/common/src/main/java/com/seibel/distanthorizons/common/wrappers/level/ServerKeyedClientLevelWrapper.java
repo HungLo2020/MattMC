@@ -1,7 +1,7 @@
 package com.seibel.distanthorizons.common.wrappers.level;
 
-import net.distant_horizons.common.wrappers.world.ClientLevelWrapper;
-import net.distant_horizons.core.level.IServerKeyedClientLevel;
+import com.seibel.distanthorizons.common.wrappers.world.ClientLevelWrapper;
+import com.seibel.distanthorizons.core.level.IServerKeyedClientLevel;
 import net.minecraft.client.multiplayer.ClientLevel;
 
 public class ServerKeyedClientLevelWrapper extends ClientLevelWrapper implements IServerKeyedClientLevel

@@ -21,11 +21,11 @@ package com.seibel.distanthorizons.core.wrapperInterfaces.world;
 
 import com.google.common.io.BaseEncoding;
 import com.google.common.primitives.Longs;
-import net.distant_horizons.api.DhApi;
-import net.distant_horizons.api.interfaces.world.IDhApiLevelWrapper;
-import net.distant_horizons.core.level.IDhLevel;
-import net.distant_horizons.core.pos.DhChunkPos;
-import net.distant_horizons.core.wrapperInterfaces.chunk.IChunkWrapper;
+import com.seibel.distanthorizons.api.DhApi;
+import com.seibel.distanthorizons.api.interfaces.world.IDhApiLevelWrapper;
+import com.seibel.distanthorizons.core.level.IDhLevel;
+import com.seibel.distanthorizons.core.pos.DhChunkPos;
+import com.seibel.distanthorizons.core.wrapperInterfaces.chunk.IChunkWrapper;
 import net.distant_horizons.coreapi.interfaces.dependencyInjection.IBindable;
 import org.jetbrains.annotations.Nullable;
 

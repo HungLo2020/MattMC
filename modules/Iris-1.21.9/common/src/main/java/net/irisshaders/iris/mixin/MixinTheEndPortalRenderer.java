@@ -2,10 +2,10 @@ package net.irisshaders.iris.mixin;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
-import net.iris.Iris;
-import net.iris.layer.BlockEntityRenderStateShard;
-import net.iris.layer.OuterWrappedRenderType;
-import net.iris.uniforms.SystemTimeUniforms;
+import net.irisshaders.iris.Iris;
+import net.irisshaders.iris.layer.BlockEntityRenderStateShard;
+import net.irisshaders.iris.layer.OuterWrappedRenderType;
+import net.irisshaders.iris.uniforms.SystemTimeUniforms;
 import net.minecraft.client.renderer.LightTexture;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;

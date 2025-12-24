@@ -20,14 +20,14 @@
 package com.seibel.distanthorizons.fabric;
 
 import com.mojang.brigadier.CommandDispatcher;
-import net.distant_horizons.common.AbstractModInitializer;
-import net.distant_horizons.core.config.Config;
-import net.distant_horizons.core.dependencyInjection.ModAccessorInjector;
-import net.distant_horizons.core.dependencyInjection.SingletonInjector;
-import net.distant_horizons.core.logging.DhLoggerBuilder;
+import com.seibel.distanthorizons.common.AbstractModInitializer;
+import com.seibel.distanthorizons.core.config.Config;
+import com.seibel.distanthorizons.core.dependencyInjection.ModAccessorInjector;
+import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
+import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
 import net.distant_horizons.core.util.NativeDialogUtil;
-import net.distant_horizons.core.wrapperInterfaces.minecraft.IMinecraftClientWrapper;
-import net.distant_horizons.core.wrapperInterfaces.misc.IPluginPacketSender;
+import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftClientWrapper;
+import com.seibel.distanthorizons.core.wrapperInterfaces.misc.IPluginPacketSender;
 import com.seibel.distanthorizons.core.wrapperInterfaces.modAccessor.*;
 import net.distant_horizons.coreapi.ModInfo;
 import com.seibel.distanthorizons.fabric.wrappers.modAccessor.*;
@@ -38,7 +38,7 @@ import net.fabricmc.fabric.api.event.Event;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.server.MinecraftServer;
-import net.distant_horizons.core.logging.DhLogger;
+import com.seibel.distanthorizons.core.logging.DhLogger;
 
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 

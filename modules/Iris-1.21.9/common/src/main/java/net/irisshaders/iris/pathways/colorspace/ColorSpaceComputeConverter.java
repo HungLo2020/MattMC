@@ -2,12 +2,12 @@ package net.irisshaders.iris.pathways.colorspace;
 
 import com.google.common.collect.ImmutableSet;
 import com.mojang.blaze3d.opengl.GlTexture;
-import net.iris.gl.IrisRenderSystem;
-import net.iris.gl.program.ComputeProgram;
-import net.iris.gl.program.ProgramBuilder;
-import net.iris.gl.texture.InternalTextureFormat;
+import net.irisshaders.iris.gl.IrisRenderSystem;
+import net.irisshaders.iris.gl.program.ComputeProgram;
+import net.irisshaders.iris.gl.program.ProgramBuilder;
+import net.irisshaders.iris.gl.texture.InternalTextureFormat;
 import net.iris.helpers.StringPair;
-import net.iris.shaderpack.preprocessor.JcppProcessor;
+import net.irisshaders.iris.shaderpack.preprocessor.JcppProcessor;
 import org.apache.commons.io.IOUtils;
 import org.lwjgl.opengl.GL43C;
 

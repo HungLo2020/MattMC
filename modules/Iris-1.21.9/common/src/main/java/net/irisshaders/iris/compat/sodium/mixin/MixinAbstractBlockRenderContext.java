@@ -1,11 +1,11 @@
 package net.irisshaders.iris.compat.sodium.mixin;
 
 import com.llamalad7.mixinextras.sugar.Local;
-import net.sodium.client.render.chunk.compile.pipeline.BlockRenderer;
-import net.sodium.client.render.frapi.render.AbstractBlockRenderContext;
-import net.iris.compat.general.IrisModSupport;
-import net.iris.platform.IrisPlatformHelpers;
-import net.iris.shaderpack.materialmap.WorldRenderingSettings;
+import net.caffeinemc.mods.sodium.client.render.chunk.compile.pipeline.BlockRenderer;
+import net.caffeinemc.mods.sodium.client.render.frapi.render.AbstractBlockRenderContext;
+import net.irisshaders.iris.compat.general.IrisModSupport;
+import net.irisshaders.iris.platform.IrisPlatformHelpers;
+import net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings;
 import net.iris.vertices.BlockSensitiveBufferBuilder;
 import net.minecraft.client.renderer.block.model.BlockModelPart;
 import net.minecraft.client.renderer.block.model.BlockStateModel;

@@ -19,7 +19,7 @@
 
 package com.seibel.distanthorizons.api.enums.config;
 
-import net.distant_horizons.coreapi.util.MathUtil;
+import net.sodium.api.util.MathUtil;
 
 /**
  * HEIGHT_MAP <br>

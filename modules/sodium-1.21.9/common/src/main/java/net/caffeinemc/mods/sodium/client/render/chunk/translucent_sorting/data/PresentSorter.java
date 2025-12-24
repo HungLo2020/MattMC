@@ -1,6 +1,6 @@
 package net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.data;
 
-import net.sodium.client.util.NativeBuffer;
+import net.caffeinemc.mods.sodium.client.util.NativeBuffer;
 
 public abstract class PresentSorter implements Sorter {
     private NativeBuffer indexBuffer;

@@ -19,9 +19,9 @@
 
 package com.seibel.distanthorizons.core.render.renderer.shaders;
 
-import net.distant_horizons.core.dependencyInjection.SingletonInjector;
-import net.distant_horizons.core.render.glObject.shader.ShaderProgram;
-import net.distant_horizons.core.wrapperInterfaces.minecraft.IMinecraftRenderWrapper;
+import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
+import com.seibel.distanthorizons.core.render.glObject.shader.ShaderProgram;
+import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftRenderWrapper;
 import org.lwjgl.opengl.GL32;
 
 public abstract class AbstractShaderRenderer

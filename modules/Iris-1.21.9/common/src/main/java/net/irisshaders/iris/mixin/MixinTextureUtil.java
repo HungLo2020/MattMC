@@ -1,7 +1,7 @@
 package net.irisshaders.iris.mixin;
 
 import com.mojang.blaze3d.platform.TextureUtil;
-import net.iris.gl.IrisRenderSystem;
+import net.irisshaders.iris.gl.IrisRenderSystem;
 import org.lwjgl.opengl.GL46C;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;

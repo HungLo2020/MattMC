@@ -20,9 +20,9 @@
 package com.seibel.distanthorizons.core.config.api;
 
 import net.distant_horizons.api.interfaces.config.IDhApiConfigValue;
-import net.distant_horizons.core.config.types.ConfigEntry;
+import com.seibel.distanthorizons.core.config.types.ConfigEntry;
 import net.distant_horizons.coreapi.interfaces.config.IConverter;
-import net.distant_horizons.core.config.api.converters.DefaultConverter;
+import com.seibel.distanthorizons.core.config.api.converters.DefaultConverter;
 
 import java.util.function.Consumer;
 

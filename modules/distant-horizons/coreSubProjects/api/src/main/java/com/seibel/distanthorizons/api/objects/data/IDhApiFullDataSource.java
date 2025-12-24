@@ -1,6 +1,6 @@
 package com.seibel.distanthorizons.api.objects.data;
 
-import net.distant_horizons.api.interfaces.override.worldGenerator.IDhApiWorldGenerator;
+import com.seibel.distanthorizons.api.interfaces.override.worldGenerator.IDhApiWorldGenerator;
 
 import java.util.List;
 

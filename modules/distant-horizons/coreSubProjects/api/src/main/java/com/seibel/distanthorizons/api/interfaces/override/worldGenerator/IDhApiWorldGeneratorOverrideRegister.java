@@ -19,7 +19,7 @@
 
 package com.seibel.distanthorizons.api.interfaces.override.worldGenerator;
 
-import net.distant_horizons.api.interfaces.world.IDhApiLevelWrapper;
+import com.seibel.distanthorizons.api.interfaces.world.IDhApiLevelWrapper;
 import net.distant_horizons.api.objects.DhApiResult;
 
 /**

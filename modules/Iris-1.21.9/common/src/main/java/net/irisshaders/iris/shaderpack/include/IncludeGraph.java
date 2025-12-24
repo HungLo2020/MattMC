@@ -2,9 +2,9 @@ package net.irisshaders.iris.shaderpack.include;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import net.iris.Iris;
+import net.irisshaders.iris.Iris;
 import net.iris.shaderpack.error.RusticError;
-import net.iris.shaderpack.transform.line.LineTransform;
+import net.irisshaders.iris.shaderpack.transform.line.LineTransform;
 
 import java.io.IOException;
 import java.nio.file.Files;

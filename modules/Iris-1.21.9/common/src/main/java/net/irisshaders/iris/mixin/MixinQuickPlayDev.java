@@ -1,6 +1,6 @@
 package net.irisshaders.iris.mixin;
 
-import net.iris.platform.IrisPlatformHelpers;
+import net.irisshaders.iris.platform.IrisPlatformHelpers;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.TitleScreen;
 import net.minecraft.client.quickplay.QuickPlay;

@@ -1,6 +1,6 @@
 package net.irisshaders.iris.gl.image;
 
-import net.iris.gl.IrisRenderSystem;
+import net.irisshaders.iris.gl.IrisRenderSystem;
 
 public class ImageLimits {
 	private static ImageLimits instance;

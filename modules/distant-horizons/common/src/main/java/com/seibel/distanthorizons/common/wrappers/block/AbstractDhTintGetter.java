@@ -1,15 +1,15 @@
 package com.seibel.distanthorizons.common.wrappers.block;
 
-import net.distant_horizons.core.config.Config;
-import net.distant_horizons.core.dataObjects.BlockBiomeWrapperPair;
-import net.distant_horizons.core.dataObjects.fullData.sources.FullDataSourceV2;
-import net.distant_horizons.core.logging.DhLoggerBuilder;
-import net.distant_horizons.core.pos.DhSectionPos;
-import net.distant_horizons.core.pos.blockPos.DhBlockPosMutable;
+import com.seibel.distanthorizons.core.config.Config;
+import com.seibel.distanthorizons.core.dataObjects.BlockBiomeWrapperPair;
+import com.seibel.distanthorizons.core.dataObjects.fullData.sources.FullDataSourceV2;
+import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
+import com.seibel.distanthorizons.core.pos.DhSectionPos;
+import com.seibel.distanthorizons.core.pos.blockPos.DhBlockPosMutable;
 import net.distant_horizons.core.util.ColorUtil;
-import net.distant_horizons.core.util.FullDataPointUtil;
+import com.seibel.distanthorizons.core.util.FullDataPointUtil;
 
-import net.distant_horizons.core.wrapperInterfaces.world.IClientLevelWrapper;
+import com.seibel.distanthorizons.core.wrapperInterfaces.world.IClientLevelWrapper;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
@@ -21,7 +21,7 @@ import net.minecraft.world.level.biome.Biome;
 import java.io.IOException;
 import java.util.concurrent.ConcurrentHashMap;
 
-import net.distant_horizons.core.logging.DhLogger;
+import com.seibel.distanthorizons.core.logging.DhLogger;
 
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;

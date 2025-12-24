@@ -1,7 +1,7 @@
 package net.caffeinemc.mods.sodium.mixin.features.render.frapi;
 
 import com.mojang.blaze3d.vertex.PoseStack;
-import net.sodium.client.render.frapi.render.OrderedSubmitNodeCollectorExtension;
+import net.caffeinemc.mods.sodium.client.render.frapi.render.OrderedSubmitNodeCollectorExtension;
 import net.fabricmc.fabric.api.renderer.v1.mesh.MeshView;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.SubmitNodeCollection;

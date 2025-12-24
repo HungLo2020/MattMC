@@ -1,9 +1,9 @@
 package net.irisshaders.iris.pbr.format;
 
-import net.iris.pbr.mipmap.ChannelMipmapGenerator;
-import net.iris.pbr.mipmap.CustomMipmapGenerator;
-import net.iris.pbr.mipmap.DiscreteBlendFunction;
-import net.iris.pbr.mipmap.LinearBlendFunction;
+import net.irisshaders.iris.pbr.mipmap.ChannelMipmapGenerator;
+import net.irisshaders.iris.pbr.mipmap.CustomMipmapGenerator;
+import net.irisshaders.iris.pbr.mipmap.DiscreteBlendFunction;
+import net.irisshaders.iris.pbr.mipmap.LinearBlendFunction;
 import net.iris.pbr.texture.PBRType;
 import org.jetbrains.annotations.Nullable;
 

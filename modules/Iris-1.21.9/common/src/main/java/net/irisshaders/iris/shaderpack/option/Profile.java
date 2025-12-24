@@ -2,7 +2,7 @@ package net.irisshaders.iris.shaderpack.option;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import net.iris.shaderpack.option.values.OptionValues;
+import net.irisshaders.iris.shaderpack.option.values.OptionValues;
 
 import java.util.ArrayList;
 import java.util.HashMap;

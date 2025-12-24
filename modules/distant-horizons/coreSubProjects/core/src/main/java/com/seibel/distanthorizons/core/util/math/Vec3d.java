@@ -20,8 +20,8 @@
 package com.seibel.distanthorizons.core.util.math;
 
 import net.distant_horizons.api.objects.math.DhApiVec3d;
-import net.distant_horizons.api.objects.math.DhApiVec3f;
-import net.distant_horizons.coreapi.util.MathUtil;
+import com.seibel.distanthorizons.api.objects.math.DhApiVec3f;
+import net.sodium.api.util.MathUtil;
 
 /**
  * This is closer to MC's implementation of a

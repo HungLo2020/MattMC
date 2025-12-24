@@ -1,11 +1,11 @@
 package com.seibel.distanthorizons.core.file.fullDatafile;
 
-import net.distant_horizons.core.dataObjects.fullData.sources.FullDataSourceV2;
-import net.distant_horizons.core.logging.DhLoggerBuilder;
-import net.distant_horizons.core.pos.DhSectionPos;
+import com.seibel.distanthorizons.core.dataObjects.fullData.sources.FullDataSourceV2;
+import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
+import com.seibel.distanthorizons.core.pos.DhSectionPos;
 import net.distant_horizons.core.util.KeyedLockContainer;
-import net.distant_horizons.core.util.ThreadUtil;
-import net.distant_horizons.core.logging.DhLogger;
+import com.seibel.distanthorizons.core.util.ThreadUtil;
+import com.seibel.distanthorizons.core.logging.DhLogger;
 import org.jetbrains.annotations.NotNull;
 
 import java.lang.ref.WeakReference;

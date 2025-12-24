@@ -1,6 +1,6 @@
 package net.caffeinemc.mods.sodium.client.gl.device;
 
-import net.sodium.client.gl.functions.DeviceFunctions;
+import net.caffeinemc.mods.sodium.client.gl.functions.DeviceFunctions;
 import org.lwjgl.opengl.GLCapabilities;
 
 public interface RenderDevice {

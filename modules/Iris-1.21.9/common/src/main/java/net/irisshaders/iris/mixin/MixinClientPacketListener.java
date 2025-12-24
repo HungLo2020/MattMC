@@ -1,6 +1,6 @@
 package net.irisshaders.iris.mixin;
 
-import net.iris.Iris;
+import net.irisshaders.iris.Iris;
 import net.iris.gl.shader.ShaderCompileException;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;

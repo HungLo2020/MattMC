@@ -1,6 +1,6 @@
 package com.seibel.distanthorizons.core.wrapperInterfaces.misc;
 
-import net.distant_horizons.core.network.messages.AbstractNetworkMessage;
+import com.seibel.distanthorizons.core.network.messages.AbstractNetworkMessage;
 import net.distant_horizons.coreapi.interfaces.dependencyInjection.IBindable;
 
 public interface IPluginPacketSender extends IBindable

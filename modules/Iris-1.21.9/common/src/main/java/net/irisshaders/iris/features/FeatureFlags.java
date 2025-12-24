@@ -1,6 +1,6 @@
 package net.irisshaders.iris.features;
 
-import net.iris.gl.IrisRenderSystem;
+import net.irisshaders.iris.gl.IrisRenderSystem;
 import net.minecraft.client.resources.language.I18n;
 import org.apache.commons.lang3.StringUtils;
 

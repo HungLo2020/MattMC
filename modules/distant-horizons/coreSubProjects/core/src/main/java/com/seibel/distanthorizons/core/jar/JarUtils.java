@@ -19,12 +19,12 @@
 
 package com.seibel.distanthorizons.core.jar;
 
-import net.distant_horizons.core.dependencyInjection.SingletonInjector;
-import net.distant_horizons.core.logging.DhLoggerBuilder;
-import net.distant_horizons.core.wrapperInterfaces.modAccessor.IModChecker;
+import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
+import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
+import com.seibel.distanthorizons.core.wrapperInterfaces.modAccessor.IModChecker;
 import net.distant_horizons.coreapi.ModInfo;
 import org.apache.logging.log4j.LogManager;
-import net.distant_horizons.core.logging.DhLogger;
+import com.seibel.distanthorizons.core.logging.DhLogger;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.*;

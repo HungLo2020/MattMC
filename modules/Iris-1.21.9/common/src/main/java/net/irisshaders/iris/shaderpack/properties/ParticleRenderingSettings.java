@@ -1,6 +1,6 @@
 package net.irisshaders.iris.shaderpack.properties;
 
-import net.iris.Iris;
+import net.irisshaders.iris.Iris;
 
 public enum ParticleRenderingSettings {
 	UNSET,

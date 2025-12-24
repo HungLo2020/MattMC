@@ -1,8 +1,8 @@
 package net.irisshaders.iris.gui.element.widget;
 
-import net.iris.gui.NavigationController;
-import net.iris.gui.screen.ShaderPackScreen;
-import net.iris.shaderpack.option.menu.OptionMenuElement;
+import net.irisshaders.iris.gui.NavigationController;
+import net.irisshaders.iris.gui.screen.ShaderPackScreen;
+import net.irisshaders.iris.shaderpack.option.menu.OptionMenuElement;
 import net.minecraft.client.gui.ComponentPath;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.events.GuiEventListener;

@@ -19,21 +19,21 @@
 
 package com.seibel.distanthorizons.core.render.renderer;
 
-import net.distant_horizons.api.interfaces.override.rendering.IDhApiShaderProgram;
-import net.distant_horizons.api.methods.events.sharedParameterObjects.DhApiRenderParam;
-import net.distant_horizons.api.objects.math.DhApiVec3f;
-import net.distant_horizons.core.config.Config;
-import net.distant_horizons.core.render.glObject.GLProxy;
-import net.distant_horizons.core.render.glObject.shader.Shader;
-import net.distant_horizons.core.render.glObject.shader.ShaderProgram;
-import net.distant_horizons.core.render.glObject.vertexAttribute.AbstractVertexAttribute;
-import net.distant_horizons.core.render.glObject.vertexAttribute.VertexAttributePostGL43;
-import net.distant_horizons.core.render.glObject.vertexAttribute.VertexAttributePreGL43;
-import net.distant_horizons.core.render.glObject.vertexAttribute.VertexPointer;
-import net.distant_horizons.core.util.LodUtil;
-import net.distant_horizons.core.util.RenderUtil;
-import net.distant_horizons.core.util.math.Mat4f;
-import net.distant_horizons.core.util.math.Vec3f;
+import com.seibel.distanthorizons.api.interfaces.override.rendering.IDhApiShaderProgram;
+import com.seibel.distanthorizons.api.methods.events.sharedParameterObjects.DhApiRenderParam;
+import com.seibel.distanthorizons.api.objects.math.DhApiVec3f;
+import com.seibel.distanthorizons.core.config.Config;
+import com.seibel.distanthorizons.core.render.glObject.GLProxy;
+import com.seibel.distanthorizons.core.render.glObject.shader.Shader;
+import com.seibel.distanthorizons.core.render.glObject.shader.ShaderProgram;
+import com.seibel.distanthorizons.core.render.glObject.vertexAttribute.AbstractVertexAttribute;
+import com.seibel.distanthorizons.core.render.glObject.vertexAttribute.VertexAttributePostGL43;
+import com.seibel.distanthorizons.core.render.glObject.vertexAttribute.VertexAttributePreGL43;
+import com.seibel.distanthorizons.core.render.glObject.vertexAttribute.VertexPointer;
+import com.seibel.distanthorizons.core.util.LodUtil;
+import com.seibel.distanthorizons.core.util.RenderUtil;
+import com.seibel.distanthorizons.core.util.math.Mat4f;
+import com.seibel.distanthorizons.core.util.math.Vec3f;
 
 /**
  * Handles rendering the normal LOD terrain.

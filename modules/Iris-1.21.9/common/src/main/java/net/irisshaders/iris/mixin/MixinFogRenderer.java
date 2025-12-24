@@ -1,6 +1,6 @@
 package net.irisshaders.iris.mixin;
 
-import net.iris.uniforms.CapturedRenderingState;
+import net.irisshaders.iris.uniforms.CapturedRenderingState;
 import net.minecraft.client.Camera;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.multiplayer.ClientLevel;

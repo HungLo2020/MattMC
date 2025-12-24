@@ -21,9 +21,9 @@ package com.seibel.distanthorizons.api.interfaces.override.worldGenerator;
 
 import net.distant_horizons.api.enums.EDhApiDetailLevel;
 import net.distant_horizons.api.enums.worldGeneration.EDhApiDistantGeneratorMode;
-import net.distant_horizons.api.interfaces.override.IDhApiOverrideable;
-import net.distant_horizons.api.objects.data.DhApiChunk;
-import net.distant_horizons.api.objects.data.DhApiTerrainDataPoint;
+import com.seibel.distanthorizons.api.interfaces.override.IDhApiOverrideable;
+import com.seibel.distanthorizons.api.objects.data.DhApiChunk;
+import com.seibel.distanthorizons.api.objects.data.DhApiTerrainDataPoint;
 import net.distant_horizons.coreapi.util.BitShiftUtil;
 
 import java.io.Closeable;

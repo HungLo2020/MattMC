@@ -19,8 +19,8 @@
 
 package com.seibel.distanthorizons.core.util.gridList;
 
-import net.distant_horizons.core.pos.Pos2D;
-import net.distant_horizons.core.util.LodUtil;
+import com.seibel.distanthorizons.core.pos.Pos2D;
+import com.seibel.distanthorizons.core.util.LodUtil;
 
 import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;

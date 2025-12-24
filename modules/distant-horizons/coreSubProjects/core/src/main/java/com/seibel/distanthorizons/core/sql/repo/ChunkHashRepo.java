@@ -19,10 +19,10 @@
 
 package com.seibel.distanthorizons.core.sql.repo;
 
-import net.distant_horizons.core.logging.DhLoggerBuilder;
-import net.distant_horizons.core.pos.DhChunkPos;
-import net.distant_horizons.core.sql.dto.ChunkHashDTO;
-import net.distant_horizons.core.logging.DhLogger;
+import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
+import com.seibel.distanthorizons.core.pos.DhChunkPos;
+import com.seibel.distanthorizons.core.sql.dto.ChunkHashDTO;
+import com.seibel.distanthorizons.core.logging.DhLogger;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.File;

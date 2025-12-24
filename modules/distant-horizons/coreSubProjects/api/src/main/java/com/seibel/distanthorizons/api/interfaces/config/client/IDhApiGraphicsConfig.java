@@ -23,7 +23,7 @@ import com.seibel.distanthorizons.api.enums.config.*;
 import net.distant_horizons.api.enums.rendering.EDhApiRendererMode;
 import net.distant_horizons.api.enums.rendering.EDhApiTransparency;
 import net.distant_horizons.api.interfaces.config.IDhApiConfigValue;
-import net.distant_horizons.api.interfaces.config.IDhApiConfigGroup;
+import com.seibel.distanthorizons.api.interfaces.config.IDhApiConfigGroup;
 
 /**
  * Distant Horizons' graphics/rendering configuration.

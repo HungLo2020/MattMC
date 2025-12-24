@@ -1,12 +1,12 @@
 package com.seibel.distanthorizons.common.wrappers.gui.updater;
 
-import net.distant_horizons.common.wrappers.gui.DhScreen;
-import net.distant_horizons.core.dependencyInjection.SingletonInjector;
-import net.distant_horizons.core.logging.DhLoggerBuilder;
-import net.distant_horizons.core.wrapperInterfaces.IVersionConstants;
+import com.seibel.distanthorizons.common.wrappers.gui.DhScreen;
+import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
+import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
+import com.seibel.distanthorizons.core.wrapperInterfaces.IVersionConstants;
 import net.distant_horizons.coreapi.ModInfo;
 import net.distant_horizons.core.jar.installer.MarkdownFormatter;
-import net.distant_horizons.core.jar.installer.ModrinthGetter;
+import com.seibel.distanthorizons.core.jar.installer.ModrinthGetter;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.components.AbstractWidget;
@@ -14,7 +14,7 @@ import net.minecraft.client.gui.components.ContainerObjectSelectionList;
 import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
-import net.distant_horizons.core.logging.DhLogger;
+import com.seibel.distanthorizons.core.logging.DhLogger;
 
 import net.minecraft.client.gui.narration.NarratableEntry;
 

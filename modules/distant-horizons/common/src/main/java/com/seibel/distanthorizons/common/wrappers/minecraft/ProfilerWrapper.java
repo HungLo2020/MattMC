@@ -19,7 +19,7 @@
 
 package com.seibel.distanthorizons.common.wrappers.minecraft;
 
-import net.distant_horizons.core.wrapperInterfaces.minecraft.IProfilerWrapper;
+import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IProfilerWrapper;
 
 import net.minecraft.util.profiling.ProfilerFiller;
 

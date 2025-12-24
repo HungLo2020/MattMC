@@ -1,7 +1,7 @@
 package com.seibel.distanthorizons.core.sql.dto.util;
 
-import net.distant_horizons.core.dataObjects.fullData.sources.FullDataSourceV2;
-import net.distant_horizons.core.enums.EDhDirection;
+import com.seibel.distanthorizons.core.dataObjects.fullData.sources.FullDataSourceV2;
+import com.seibel.distanthorizons.core.enums.EDhDirection;
 
 /**
  * Handles encoding/decoding of min/max X/Z relative {@link FullDataSourceV2#dataPoints}

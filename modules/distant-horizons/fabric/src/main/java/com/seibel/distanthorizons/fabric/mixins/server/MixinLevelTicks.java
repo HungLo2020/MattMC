@@ -1,7 +1,7 @@
 package com.seibel.distanthorizons.fabric.mixins.server;
 
 
-import net.distant_horizons.common.wrappers.worldGeneration.BatchGenerationEnvironment;
+import com.seibel.distanthorizons.common.wrappers.worldGeneration.BatchGenerationEnvironment;
 import net.minecraft.world.ticks.LevelTicks;
 import net.minecraft.world.ticks.ScheduledTick;
 

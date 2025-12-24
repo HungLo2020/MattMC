@@ -1,9 +1,9 @@
 package com.seibel.distanthorizons.common.commonMixins;
 
-import net.distant_horizons.common.wrappers.chunk.ChunkWrapper;
-import net.distant_horizons.common.wrappers.world.ServerLevelWrapper;
-import net.distant_horizons.core.api.internal.ServerApi;
-import net.distant_horizons.core.api.internal.SharedApi;
+import com.seibel.distanthorizons.common.wrappers.chunk.ChunkWrapper;
+import com.seibel.distanthorizons.common.wrappers.world.ServerLevelWrapper;
+import com.seibel.distanthorizons.core.api.internal.ServerApi;
+import com.seibel.distanthorizons.core.api.internal.SharedApi;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.chunk.ChunkAccess;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;

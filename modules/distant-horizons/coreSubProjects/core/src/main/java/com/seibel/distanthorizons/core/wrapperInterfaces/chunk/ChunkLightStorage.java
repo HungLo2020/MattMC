@@ -19,11 +19,11 @@
 
 package com.seibel.distanthorizons.core.wrapperInterfaces.chunk;
 
-import net.distant_horizons.core.logging.DhLoggerBuilder;
-import net.distant_horizons.core.util.LodUtil;
+import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
+import com.seibel.distanthorizons.core.util.LodUtil;
 import net.distant_horizons.coreapi.util.BitShiftUtil;
 import org.apache.logging.log4j.LogManager;
-import net.distant_horizons.core.logging.DhLogger;
+import com.seibel.distanthorizons.core.logging.DhLogger;
 
 import java.util.ArrayList;
 import java.util.Arrays;

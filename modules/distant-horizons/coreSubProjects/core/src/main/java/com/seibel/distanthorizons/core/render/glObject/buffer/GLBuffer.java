@@ -20,14 +20,14 @@
 package com.seibel.distanthorizons.core.render.glObject.buffer;
 
 import net.distant_horizons.api.enums.config.EDhApiGpuUploadMethod;
-import net.distant_horizons.core.config.Config;
-import net.distant_horizons.core.dependencyInjection.SingletonInjector;
-import net.distant_horizons.core.logging.DhLogger;
-import net.distant_horizons.core.logging.DhLoggerBuilder;
-import net.distant_horizons.core.render.glObject.GLProxy;
-import net.distant_horizons.core.util.LodUtil;
-import net.distant_horizons.core.util.ThreadUtil;
-import net.distant_horizons.core.wrapperInterfaces.minecraft.IMinecraftGLWrapper;
+import com.seibel.distanthorizons.core.config.Config;
+import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
+import com.seibel.distanthorizons.core.logging.DhLogger;
+import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
+import com.seibel.distanthorizons.core.render.glObject.GLProxy;
+import com.seibel.distanthorizons.core.util.LodUtil;
+import com.seibel.distanthorizons.core.util.ThreadUtil;
+import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftGLWrapper;
 import org.lwjgl.opengl.GL32;
 import org.lwjgl.opengl.GL44;
 

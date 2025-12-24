@@ -1,8 +1,8 @@
 package net.irisshaders.iris.layer;
 
 import net.iris.shaderpack.materialmap.NamespacedId;
-import net.iris.shaderpack.materialmap.WorldRenderingSettings;
-import net.iris.uniforms.CapturedRenderingState;
+import net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings;
+import net.irisshaders.iris.uniforms.CapturedRenderingState;
 import net.minecraft.client.renderer.RenderStateShard;
 
 public class LightningRenderStateShard extends RenderStateShard {

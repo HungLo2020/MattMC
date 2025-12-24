@@ -3,7 +3,7 @@ package net.caffeinemc.mods.sodium.client.util;
 import it.unimi.dsi.fastutil.objects.Reference2ReferenceMap;
 import it.unimi.dsi.fastutil.objects.Reference2ReferenceMaps;
 import it.unimi.dsi.fastutil.objects.Reference2ReferenceOpenHashMap;
-import net.sodium.client.SodiumClientMod;
+import net.caffeinemc.mods.sodium.client.SodiumClientMod;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.lwjgl.system.MemoryUtil;

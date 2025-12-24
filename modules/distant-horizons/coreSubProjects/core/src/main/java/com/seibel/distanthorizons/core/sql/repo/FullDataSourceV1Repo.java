@@ -20,9 +20,9 @@
 package com.seibel.distanthorizons.core.sql.repo;
 
 import net.distant_horizons.api.enums.worldGeneration.EDhApiWorldGenerationStep;
-import net.distant_horizons.core.pos.DhSectionPos;
-import net.distant_horizons.core.sql.dto.ChunkHashDTO;
-import net.distant_horizons.core.sql.dto.FullDataSourceV1DTO;
+import com.seibel.distanthorizons.core.pos.DhSectionPos;
+import com.seibel.distanthorizons.core.sql.dto.ChunkHashDTO;
+import com.seibel.distanthorizons.core.sql.dto.FullDataSourceV1DTO;
 import net.distant_horizons.coreapi.util.StringUtil;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 import org.jetbrains.annotations.Nullable;

@@ -20,14 +20,14 @@
 package com.seibel.distanthorizons.core.file.fullDatafile;
 
 import com.google.common.cache.CacheBuilder;
-import net.distant_horizons.core.dataObjects.fullData.sources.FullDataSourceV2;
-import net.distant_horizons.core.file.structure.ISaveStructure;
-import net.distant_horizons.core.generation.RemoteWorldRetrievalQueue;
-import net.distant_horizons.core.level.IDhLevel;
-import net.distant_horizons.core.level.LodRequestModule;
-import net.distant_horizons.core.logging.DhLoggerBuilder;
-import net.distant_horizons.core.multiplayer.client.SyncOnLoadRequestQueue;
-import net.distant_horizons.core.logging.DhLogger;
+import com.seibel.distanthorizons.core.dataObjects.fullData.sources.FullDataSourceV2;
+import com.seibel.distanthorizons.core.file.structure.ISaveStructure;
+import com.seibel.distanthorizons.core.generation.RemoteWorldRetrievalQueue;
+import com.seibel.distanthorizons.core.level.IDhLevel;
+import com.seibel.distanthorizons.core.level.LodRequestModule;
+import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
+import com.seibel.distanthorizons.core.multiplayer.client.SyncOnLoadRequestQueue;
+import com.seibel.distanthorizons.core.logging.DhLogger;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.File;

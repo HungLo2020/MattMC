@@ -1,6 +1,6 @@
 package net.caffeinemc.mods.sodium.client.model.quad.properties;
 
-import net.sodium.client.model.quad.ModelQuadView;
+import net.caffeinemc.mods.sodium.client.model.quad.ModelQuadView;
 import net.minecraft.core.Direction;
 
 public class ModelQuadFlags {

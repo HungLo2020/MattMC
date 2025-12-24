@@ -1,11 +1,11 @@
 package net.irisshaders.iris.gui.element.widget;
 
-import net.iris.Iris;
-import net.iris.gui.GuiUtil;
-import net.iris.gui.NavigationController;
-import net.iris.gui.screen.ShaderPackScreen;
-import net.iris.shaderpack.option.BooleanOption;
-import net.iris.shaderpack.option.menu.OptionMenuBooleanOptionElement;
+import net.irisshaders.iris.Iris;
+import net.irisshaders.iris.gui.GuiUtil;
+import net.irisshaders.iris.gui.NavigationController;
+import net.irisshaders.iris.gui.screen.ShaderPackScreen;
+import net.irisshaders.iris.shaderpack.option.BooleanOption;
+import net.irisshaders.iris.shaderpack.option.menu.OptionMenuBooleanOptionElement;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;

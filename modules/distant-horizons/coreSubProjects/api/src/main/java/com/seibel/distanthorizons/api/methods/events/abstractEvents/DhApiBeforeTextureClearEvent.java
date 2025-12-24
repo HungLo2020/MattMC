@@ -19,9 +19,9 @@
 
 package com.seibel.distanthorizons.api.methods.events.abstractEvents;
 
-import net.distant_horizons.api.methods.events.interfaces.IDhApiCancelableEvent;
-import net.distant_horizons.api.methods.events.sharedParameterObjects.DhApiCancelableEventParam;
-import net.distant_horizons.api.methods.events.sharedParameterObjects.DhApiRenderParam;
+import com.seibel.distanthorizons.api.methods.events.interfaces.IDhApiCancelableEvent;
+import com.seibel.distanthorizons.api.methods.events.sharedParameterObjects.DhApiCancelableEventParam;
+import com.seibel.distanthorizons.api.methods.events.sharedParameterObjects.DhApiRenderParam;
 
 /**
  * Called during Distant Horizons rendering setup and immediately <br>

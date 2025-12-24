@@ -1,12 +1,12 @@
 package net.irisshaders.iris.samplers;
 
 import com.google.common.collect.ImmutableSet;
-import net.iris.gl.image.GlImage;
-import net.iris.gl.image.ImageHolder;
-import net.iris.gl.texture.InternalTextureFormat;
-import net.iris.shadows.ShadowRenderTargets;
-import net.iris.targets.RenderTarget;
-import net.iris.targets.RenderTargets;
+import net.irisshaders.iris.gl.image.GlImage;
+import net.irisshaders.iris.gl.image.ImageHolder;
+import net.irisshaders.iris.gl.texture.InternalTextureFormat;
+import net.irisshaders.iris.shadows.ShadowRenderTargets;
+import net.irisshaders.iris.targets.RenderTarget;
+import net.irisshaders.iris.targets.RenderTargets;
 
 import java.util.Set;
 import java.util.function.IntSupplier;

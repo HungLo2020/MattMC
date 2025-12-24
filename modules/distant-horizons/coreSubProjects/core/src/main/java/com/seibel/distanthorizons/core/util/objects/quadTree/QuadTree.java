@@ -19,19 +19,19 @@
 
 package com.seibel.distanthorizons.core.util.objects.quadTree;
 
-import net.distant_horizons.core.logging.DhLogger;
-import net.distant_horizons.core.logging.DhLoggerBuilder;
-import net.distant_horizons.core.pos.blockPos.DhBlockPos2D;
-import net.distant_horizons.core.pos.DhLodPos;
-import net.distant_horizons.core.pos.DhSectionPos;
-import net.distant_horizons.core.pos.Pos2D;
-import net.distant_horizons.core.util.LodUtil;
+import com.seibel.distanthorizons.core.logging.DhLogger;
+import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
+import com.seibel.distanthorizons.core.pos.blockPos.DhBlockPos2D;
+import com.seibel.distanthorizons.core.pos.DhLodPos;
+import com.seibel.distanthorizons.core.pos.DhSectionPos;
+import com.seibel.distanthorizons.core.pos.Pos2D;
+import com.seibel.distanthorizons.core.util.LodUtil;
 import net.distant_horizons.coreapi.util.BitShiftUtil;
-import net.distant_horizons.coreapi.util.MathUtil;
-import net.distant_horizons.core.util.gridList.MovableGridRingList;
+import net.sodium.api.util.MathUtil;
+import com.seibel.distanthorizons.core.util.gridList.MovableGridRingList;
 import it.unimi.dsi.fastutil.longs.LongArrayFIFOQueue;
 import it.unimi.dsi.fastutil.longs.LongIterator;
-import net.distant_horizons.core.logging.DhLogger;
+import com.seibel.distanthorizons.core.logging.DhLogger;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.*;

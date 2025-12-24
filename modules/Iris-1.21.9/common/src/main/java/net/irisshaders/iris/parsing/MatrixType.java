@@ -1,6 +1,6 @@
 package net.irisshaders.iris.parsing;
 
-import net.iris.stareval.function.Type;
+import kroppeb.stareval.function.Type;
 import org.joml.Matrix2f;
 import org.joml.Matrix3f;
 import org.joml.Matrix4f;

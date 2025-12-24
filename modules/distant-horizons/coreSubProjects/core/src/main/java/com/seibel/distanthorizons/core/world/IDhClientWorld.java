@@ -19,8 +19,8 @@
 
 package com.seibel.distanthorizons.core.world;
 
-import net.distant_horizons.core.level.IDhClientLevel;
-import net.distant_horizons.core.wrapperInterfaces.world.ILevelWrapper;
+import com.seibel.distanthorizons.core.level.IDhClientLevel;
+import com.seibel.distanthorizons.core.wrapperInterfaces.world.ILevelWrapper;
 
 public interface IDhClientWorld extends IDhWorld
 {

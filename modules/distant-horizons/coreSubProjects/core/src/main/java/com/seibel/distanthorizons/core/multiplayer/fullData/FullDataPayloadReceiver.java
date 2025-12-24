@@ -1,13 +1,13 @@
 package com.seibel.distanthorizons.core.multiplayer.fullData;
 
 import com.google.common.cache.CacheBuilder;
-import net.distant_horizons.core.config.Config;
-import net.distant_horizons.core.logging.DhLogger;
-import net.distant_horizons.core.logging.DhLoggerBuilder;
+import com.seibel.distanthorizons.core.config.Config;
+import com.seibel.distanthorizons.core.logging.DhLogger;
+import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
 import net.distant_horizons.core.network.INetworkObject;
-import net.distant_horizons.core.network.messages.fullData.FullDataSplitMessage;
-import net.distant_horizons.core.sql.dto.FullDataSourceV2DTO;
-import net.distant_horizons.core.util.LodUtil;
+import com.seibel.distanthorizons.core.network.messages.fullData.FullDataSplitMessage;
+import com.seibel.distanthorizons.core.sql.dto.FullDataSourceV2DTO;
+import com.seibel.distanthorizons.core.util.LodUtil;
 import io.netty.buffer.CompositeByteBuf;
 import io.netty.buffer.UnpooledByteBufAllocator;
 

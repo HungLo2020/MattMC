@@ -1,6 +1,6 @@
 package net.irisshaders.iris.pipeline.transform;
 
-import net.iris.gl.shader.ShaderType;
+import net.sodium.client.gl.shader.ShaderType;
 
 public enum PatchShaderType {
 	VERTEX(ShaderType.VERTEX, ".vsh"),

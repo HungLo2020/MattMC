@@ -19,7 +19,7 @@
 
 package com.seibel.distanthorizons.core.config;
 
-import net.distant_horizons.api.DhApi;
+import com.seibel.distanthorizons.api.DhApi;
 import com.seibel.distanthorizons.api.enums.config.*;
 import com.seibel.distanthorizons.api.enums.config.quickOptions.*;
 import com.seibel.distanthorizons.api.enums.rendering.*;
@@ -27,17 +27,17 @@ import net.distant_horizons.api.enums.worldGeneration.EDhApiDistantGeneratorMode
 import net.distant_horizons.api.enums.worldGeneration.EDhApiDistantGeneratorProgressDisplayLocation;
 import com.seibel.distanthorizons.core.config.eventHandlers.*;
 import com.seibel.distanthorizons.core.config.eventHandlers.presets.*;
-import net.distant_horizons.core.config.listeners.ConfigChangeListener;
+import com.seibel.distanthorizons.core.config.listeners.ConfigChangeListener;
 import com.seibel.distanthorizons.core.config.types.*;
 import com.seibel.distanthorizons.core.config.types.enums.*;
-import net.distant_horizons.core.dependencyInjection.SingletonInjector;
-import net.distant_horizons.core.logging.DhLoggerBuilder;
-import net.distant_horizons.core.pos.DhSectionPos;
+import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
+import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
+import com.seibel.distanthorizons.core.pos.DhSectionPos;
 import net.distant_horizons.core.util.NativeDialogUtil;
-import net.distant_horizons.core.wrapperInterfaces.IWrapperFactory;
-import net.distant_horizons.core.wrapperInterfaces.minecraft.IMinecraftSharedWrapper;
+import com.seibel.distanthorizons.core.wrapperInterfaces.IWrapperFactory;
+import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftSharedWrapper;
 import net.distant_horizons.coreapi.ModInfo;
-import net.distant_horizons.core.logging.DhLogger;
+import com.seibel.distanthorizons.core.logging.DhLogger;
 
 import java.io.File;
 import java.util.*;

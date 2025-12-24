@@ -19,13 +19,13 @@
 
 package com.seibel.distanthorizons.api.methods.events.abstractEvents;
 
-import net.distant_horizons.api.interfaces.block.IDhApiBiomeWrapper;
-import net.distant_horizons.api.interfaces.block.IDhApiBlockStateWrapper;
-import net.distant_horizons.api.interfaces.factories.IDhApiWrapperFactory;
-import net.distant_horizons.api.interfaces.world.IDhApiLevelWrapper;
-import net.distant_horizons.api.methods.events.interfaces.IDhApiEvent;
-import net.distant_horizons.api.methods.events.interfaces.IDhApiEventParam;
-import net.distant_horizons.api.methods.events.sharedParameterObjects.DhApiEventParam;
+import com.seibel.distanthorizons.api.interfaces.block.IDhApiBiomeWrapper;
+import com.seibel.distanthorizons.api.interfaces.block.IDhApiBlockStateWrapper;
+import com.seibel.distanthorizons.api.interfaces.factories.IDhApiWrapperFactory;
+import com.seibel.distanthorizons.api.interfaces.world.IDhApiLevelWrapper;
+import com.seibel.distanthorizons.api.methods.events.interfaces.IDhApiEvent;
+import com.seibel.distanthorizons.api.methods.events.interfaces.IDhApiEventParam;
+import com.seibel.distanthorizons.api.methods.events.sharedParameterObjects.DhApiEventParam;
 
 /**
  * Used to override which blocks may be stored in a given chunk.

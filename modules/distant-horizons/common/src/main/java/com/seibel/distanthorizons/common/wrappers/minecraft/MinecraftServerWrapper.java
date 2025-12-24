@@ -1,6 +1,6 @@
 package com.seibel.distanthorizons.common.wrappers.minecraft;
 
-import net.distant_horizons.core.wrapperInterfaces.minecraft.IMinecraftSharedWrapper;
+import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftSharedWrapper;
 import net.minecraft.server.dedicated.DedicatedServer;
 import org.jetbrains.annotations.Nullable;
 

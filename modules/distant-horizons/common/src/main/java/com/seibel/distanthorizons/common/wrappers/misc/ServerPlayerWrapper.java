@@ -2,10 +2,10 @@ package com.seibel.distanthorizons.common.wrappers.misc;
 
 import com.google.common.base.Objects;
 import com.google.common.collect.MapMaker;
-import net.distant_horizons.common.wrappers.world.ServerLevelWrapper;
-import net.distant_horizons.core.wrapperInterfaces.misc.IServerPlayerWrapper;
-import net.distant_horizons.core.wrapperInterfaces.world.IServerLevelWrapper;
-import net.distant_horizons.core.util.math.Vec3d;
+import com.seibel.distanthorizons.common.wrappers.world.ServerLevelWrapper;
+import com.seibel.distanthorizons.core.wrapperInterfaces.misc.IServerPlayerWrapper;
+import com.seibel.distanthorizons.core.wrapperInterfaces.world.IServerLevelWrapper;
+import com.seibel.distanthorizons.core.util.math.Vec3d;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.network.ServerGamePacketListenerImpl;

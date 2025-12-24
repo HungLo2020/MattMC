@@ -1,6 +1,6 @@
 package com.seibel.distanthorizons.core.pooling;
 
-import net.distant_horizons.core.util.ListUtil;
+import net.sodium.api.util.ListUtil;
 import net.distant_horizons.coreapi.util.StringUtil;
 import it.unimi.dsi.fastutil.bytes.ByteArrayList;
 import it.unimi.dsi.fastutil.longs.LongArrayList;

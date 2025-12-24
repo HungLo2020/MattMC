@@ -21,21 +21,21 @@ package com.seibel.distanthorizons.core.dataObjects.render.bufferBuilding;
 
 import net.distant_horizons.api.enums.rendering.EDhApiBlockMaterial;
 import net.distant_horizons.api.enums.rendering.EDhApiDebugRendering;
-import net.distant_horizons.core.enums.EDhDirection;
-import net.distant_horizons.core.config.Config;
-import net.distant_horizons.core.dataObjects.render.ColumnRenderSource;
-import net.distant_horizons.core.level.IDhClientLevel;
-import net.distant_horizons.core.logging.DhLogger;
-import net.distant_horizons.core.logging.DhLoggerBuilder;
-import net.distant_horizons.core.pooling.PhantomArrayListCheckout;
-import net.distant_horizons.core.pooling.PhantomArrayListPool;
-import net.distant_horizons.core.pos.blockPos.DhBlockPos;
-import net.distant_horizons.core.pos.DhSectionPos;
-import net.distant_horizons.core.render.glObject.GLProxy;
+import com.seibel.distanthorizons.core.enums.EDhDirection;
+import com.seibel.distanthorizons.core.config.Config;
+import com.seibel.distanthorizons.core.dataObjects.render.ColumnRenderSource;
+import com.seibel.distanthorizons.core.level.IDhClientLevel;
+import com.seibel.distanthorizons.core.logging.DhLogger;
+import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
+import com.seibel.distanthorizons.core.pooling.PhantomArrayListCheckout;
+import com.seibel.distanthorizons.core.pooling.PhantomArrayListPool;
+import com.seibel.distanthorizons.core.pos.blockPos.DhBlockPos;
+import com.seibel.distanthorizons.core.pos.DhSectionPos;
+import com.seibel.distanthorizons.core.render.glObject.GLProxy;
 import net.distant_horizons.core.util.ColorUtil;
-import net.distant_horizons.core.util.LodUtil;
-import net.distant_horizons.core.util.RenderDataPointUtil;
-import net.distant_horizons.core.dataObjects.render.columnViews.ColumnArrayView;
+import com.seibel.distanthorizons.core.util.LodUtil;
+import com.seibel.distanthorizons.core.util.RenderDataPointUtil;
+import com.seibel.distanthorizons.core.dataObjects.render.columnViews.ColumnArrayView;
 
 import java.util.concurrent.CompletableFuture;
 

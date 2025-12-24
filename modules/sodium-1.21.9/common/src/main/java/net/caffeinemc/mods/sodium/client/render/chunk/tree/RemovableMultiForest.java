@@ -2,9 +2,9 @@ package net.caffeinemc.mods.sodium.client.render.chunk.tree;
 
 import it.unimi.dsi.fastutil.longs.Long2ReferenceLinkedOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ReferenceArrayList;
-import net.sodium.client.render.chunk.RenderSection;
+import net.caffeinemc.mods.sodium.client.render.chunk.RenderSection;
 import net.sodium.client.render.chunk.lists.CoordinateSectionVisitor;
-import net.sodium.client.render.viewport.Viewport;
+import net.caffeinemc.mods.sodium.client.render.viewport.Viewport;
 import net.minecraft.core.SectionPos;
 
 import java.util.Comparator;

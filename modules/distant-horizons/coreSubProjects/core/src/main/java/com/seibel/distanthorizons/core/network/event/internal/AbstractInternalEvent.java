@@ -1,6 +1,6 @@
 package com.seibel.distanthorizons.core.network.event.internal;
 
-import net.distant_horizons.core.network.messages.AbstractNetworkMessage;
+import com.seibel.distanthorizons.core.network.messages.AbstractNetworkMessage;
 import io.netty.buffer.ByteBuf;
 
 /** internal events are messages sent from the client/sever back to themselves. */

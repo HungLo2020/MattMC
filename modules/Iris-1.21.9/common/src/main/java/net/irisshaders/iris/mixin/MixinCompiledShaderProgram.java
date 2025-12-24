@@ -2,16 +2,16 @@ package net.irisshaders.iris.mixin;
 
 import com.google.common.collect.ImmutableSet;
 import com.mojang.blaze3d.opengl.GlProgram;
-import net.iris.Iris;
-import net.iris.gl.blending.DepthColorStorage;
-import net.iris.mixinterface.ShaderInstanceInterface;
-import net.iris.pipeline.IrisRenderingPipeline;
-import net.iris.pipeline.ShaderRenderingPipeline;
-import net.iris.pipeline.WorldRenderingPipeline;
-import net.iris.pipeline.programs.ExtendedShader;
-import net.iris.pipeline.programs.FallbackShader;
+import net.irisshaders.iris.Iris;
+import net.irisshaders.iris.gl.blending.DepthColorStorage;
+import net.irisshaders.iris.mixinterface.ShaderInstanceInterface;
+import net.irisshaders.iris.pipeline.IrisRenderingPipeline;
+import net.irisshaders.iris.pipeline.ShaderRenderingPipeline;
+import net.irisshaders.iris.pipeline.WorldRenderingPipeline;
+import net.irisshaders.iris.pipeline.programs.ExtendedShader;
+import net.irisshaders.iris.pipeline.programs.FallbackShader;
 import net.iris.pipeline.programs.IrisProgram;
-import net.iris.shadows.ShadowRenderer;
+import net.irisshaders.iris.shadows.ShadowRenderer;
 import net.iris.vertices.ImmediateState;
 import net.minecraft.client.Minecraft;
 import org.lwjgl.opengl.GL31C;
@@ -24,9 +24,9 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import java.lang.invoke.MethodHandle;
 
-import static net.iris.compat.SkipList.ALWAYS;
-import static net.iris.compat.SkipList.NONE;
-import static net.iris.compat.SkipList.shouldSkipList;
+import static net.irisshaders.iris.compat.SkipList.ALWAYS;
+import static net.irisshaders.iris.compat.SkipList.NONE;
+import static net.irisshaders.iris.compat.SkipList.shouldSkipList;
 
 @Mixin(GlProgram.class)
 public abstract class MixinCompiledShaderProgram implements ShaderInstanceInterface {

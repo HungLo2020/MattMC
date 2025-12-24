@@ -19,7 +19,7 @@
 
 package com.seibel.distanthorizons.core.util.math;
 
-import net.distant_horizons.coreapi.util.MathUtil;
+import net.sodium.api.util.MathUtil;
 import net.distant_horizons.api.objects.math.DhApiVec3i;
 
 /**

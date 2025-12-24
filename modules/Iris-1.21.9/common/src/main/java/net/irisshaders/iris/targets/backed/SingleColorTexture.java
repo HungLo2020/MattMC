@@ -1,10 +1,10 @@
 package net.irisshaders.iris.targets.backed;
 
 import com.mojang.blaze3d.opengl.GlStateManager;
-import net.iris.gl.GLDebug;
+import net.irisshaders.iris.gl.GLDebug;
 import net.iris.gl.GlResource;
-import net.iris.gl.IrisRenderSystem;
-import net.iris.gl.texture.TextureUploadHelper;
+import net.irisshaders.iris.gl.IrisRenderSystem;
+import net.irisshaders.iris.gl.texture.TextureUploadHelper;
 import org.lwjgl.BufferUtils;
 import org.lwjgl.opengl.GL11C;
 import org.lwjgl.opengl.GL13C;

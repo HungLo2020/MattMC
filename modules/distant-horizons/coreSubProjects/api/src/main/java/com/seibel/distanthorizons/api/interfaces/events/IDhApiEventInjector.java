@@ -19,8 +19,8 @@
 
 package com.seibel.distanthorizons.api.interfaces.events;
 
-import net.distant_horizons.api.methods.events.interfaces.IDhApiEvent;
-import net.distant_horizons.coreapi.interfaces.dependencyInjection.IDependencyInjector;
+import com.seibel.distanthorizons.api.methods.events.interfaces.IDhApiEvent;
+import com.seibel.distanthorizons.coreapi.interfaces.dependencyInjection.IDependencyInjector;
 
 /**
  * This class takes care of dependency injection for API events.

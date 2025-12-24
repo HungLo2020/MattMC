@@ -1,11 +1,11 @@
 package net.irisshaders.iris.gl.program;
 
 import com.mojang.blaze3d.opengl.GlStateManager;
-import net.iris.Iris;
+import net.irisshaders.iris.Iris;
 import net.iris.gl.GlResource;
-import net.iris.gl.IrisRenderSystem;
-import net.iris.pipeline.WorldRenderingPipeline;
-import net.iris.shaderpack.FilledIndirectPointer;
+import net.irisshaders.iris.gl.IrisRenderSystem;
+import net.irisshaders.iris.pipeline.WorldRenderingPipeline;
+import net.irisshaders.iris.shaderpack.FilledIndirectPointer;
 import org.joml.Vector2f;
 import org.joml.Vector3i;
 import org.lwjgl.opengl.GL43C;

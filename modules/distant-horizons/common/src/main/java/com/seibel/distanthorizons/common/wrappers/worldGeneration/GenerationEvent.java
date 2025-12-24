@@ -25,13 +25,13 @@ import java.util.function.Consumer;
 
 import net.distant_horizons.api.enums.worldGeneration.EDhApiDistantGeneratorMode;
 import net.distant_horizons.api.enums.worldGeneration.EDhApiWorldGenerationStep;
-import net.distant_horizons.common.wrappers.worldGeneration.params.ThreadWorldGenParams;
-import net.distant_horizons.core.util.ExceptionUtil;
-import net.distant_horizons.core.logging.DhLoggerBuilder;
-import net.distant_horizons.core.pos.DhChunkPos;
-import net.distant_horizons.core.wrapperInterfaces.chunk.IChunkWrapper;
+import com.seibel.distanthorizons.common.wrappers.worldGeneration.params.ThreadWorldGenParams;
+import com.seibel.distanthorizons.core.util.ExceptionUtil;
+import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
+import com.seibel.distanthorizons.core.pos.DhChunkPos;
+import com.seibel.distanthorizons.core.wrapperInterfaces.chunk.IChunkWrapper;
 
-import net.distant_horizons.core.logging.DhLogger;
+import com.seibel.distanthorizons.core.logging.DhLogger;
 
 public final class GenerationEvent
 {

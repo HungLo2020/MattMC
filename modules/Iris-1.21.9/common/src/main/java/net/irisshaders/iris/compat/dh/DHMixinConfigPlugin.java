@@ -1,6 +1,6 @@
 package net.irisshaders.iris.compat.dh;
 
-import net.iris.platform.IrisPlatformHelpers;
+import net.irisshaders.iris.platform.IrisPlatformHelpers;
 import org.objectweb.asm.tree.ClassNode;
 import org.spongepowered.asm.mixin.extensibility.IMixinConfigPlugin;
 import org.spongepowered.asm.mixin.extensibility.IMixinInfo;

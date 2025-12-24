@@ -1,8 +1,8 @@
 package net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.bsp_tree;
 
 import it.unimi.dsi.fastutil.objects.ReferenceArrayList;
-import net.sodium.client.render.chunk.translucent_sorting.quad.FullTQuad;
-import net.sodium.client.render.chunk.vertex.builder.ChunkMeshBufferBuilder;
+import net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.quad.FullTQuad;
+import net.caffeinemc.mods.sodium.client.render.chunk.vertex.builder.ChunkMeshBufferBuilder;
 
 import java.nio.ByteBuffer;
 

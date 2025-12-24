@@ -19,11 +19,11 @@
 
 package com.seibel.distanthorizons.api.methods.override;
 
-import net.distant_horizons.api.interfaces.override.worldGenerator.IDhApiWorldGenerator;
-import net.distant_horizons.api.interfaces.override.worldGenerator.IDhApiWorldGeneratorOverrideRegister;
-import net.distant_horizons.api.interfaces.world.IDhApiLevelWrapper;
+import com.seibel.distanthorizons.api.interfaces.override.worldGenerator.IDhApiWorldGenerator;
+import com.seibel.distanthorizons.api.interfaces.override.worldGenerator.IDhApiWorldGeneratorOverrideRegister;
+import com.seibel.distanthorizons.api.interfaces.world.IDhApiLevelWrapper;
 import net.distant_horizons.api.objects.DhApiResult;
-import net.distant_horizons.coreapi.DependencyInjection.WorldGeneratorInjector;
+import com.seibel.distanthorizons.coreapi.DependencyInjection.WorldGeneratorInjector;
 
 /**
  * Handles adding world generator overrides.

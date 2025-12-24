@@ -1,8 +1,8 @@
 package net.caffeinemc.mods.sodium.client.render.chunk.tree;
 
 import net.sodium.client.render.chunk.lists.CoordinateSectionVisitor;
-import net.sodium.client.render.chunk.occlusion.OcclusionCuller;
-import net.sodium.client.render.viewport.Viewport;
+import net.caffeinemc.mods.sodium.client.render.chunk.occlusion.OcclusionCuller;
+import net.caffeinemc.mods.sodium.client.render.viewport.Viewport;
 import org.joml.FrustumIntersection;
 
 /**

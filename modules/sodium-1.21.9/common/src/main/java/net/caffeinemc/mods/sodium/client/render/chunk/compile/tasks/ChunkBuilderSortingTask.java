@@ -1,15 +1,15 @@
 package net.caffeinemc.mods.sodium.client.render.chunk.compile.tasks;
 
-import net.sodium.client.render.chunk.compile.estimation.MeshTaskSizeEstimator;
-import net.sodium.client.render.chunk.translucent_sorting.data.DynamicSorter;
+import net.caffeinemc.mods.sodium.client.render.chunk.compile.estimation.MeshTaskSizeEstimator;
+import net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.data.DynamicSorter;
 import net.minecraft.util.profiling.Profiler;
 import net.minecraft.util.profiling.ProfilerFiller;
 import org.joml.Vector3dc;
 
-import net.sodium.client.render.chunk.RenderSection;
-import net.sodium.client.render.chunk.compile.ChunkBuildContext;
-import net.sodium.client.render.chunk.compile.ChunkSortOutput;
-import net.sodium.client.render.chunk.translucent_sorting.data.DynamicData;
+import net.caffeinemc.mods.sodium.client.render.chunk.RenderSection;
+import net.caffeinemc.mods.sodium.client.render.chunk.compile.ChunkBuildContext;
+import net.caffeinemc.mods.sodium.client.render.chunk.compile.ChunkSortOutput;
+import net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.data.DynamicData;
 import net.sodium.client.util.task.CancellationToken;
 
 public class ChunkBuilderSortingTask extends ChunkBuilderTask<ChunkSortOutput> {

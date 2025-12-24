@@ -1,9 +1,9 @@
 package com.seibel.distanthorizons.core.util.threading;
 
-import net.distant_horizons.core.logging.DhLoggerBuilder;
-import net.distant_horizons.core.pos.DhSectionPos;
-import net.distant_horizons.core.util.ThreadUtil;
-import net.distant_horizons.core.logging.DhLogger;
+import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
+import com.seibel.distanthorizons.core.pos.DhSectionPos;
+import com.seibel.distanthorizons.core.util.ThreadUtil;
+import com.seibel.distanthorizons.core.logging.DhLogger;
 
 import java.util.Iterator;
 import java.util.NoSuchElementException;

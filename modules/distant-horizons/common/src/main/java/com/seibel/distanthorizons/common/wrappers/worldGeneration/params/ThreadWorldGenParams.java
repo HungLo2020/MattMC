@@ -20,7 +20,7 @@
 
 package com.seibel.distanthorizons.common.wrappers.worldGeneration.params;
 
-import net.distant_horizons.common.wrappers.worldGeneration.mimicObject.WorldGenStructFeatManager;
+import com.seibel.distanthorizons.common.wrappers.worldGeneration.mimicObject.WorldGenStructFeatManager;
 
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.WorldGenLevel;

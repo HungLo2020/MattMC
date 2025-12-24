@@ -19,10 +19,10 @@
 
 package com.seibel.distanthorizons.core.pos;
 
-import net.distant_horizons.core.dataObjects.fullData.sources.FullDataSourceV2;
-import net.distant_horizons.core.pos.blockPos.DhBlockPos2D;
+import com.seibel.distanthorizons.core.dataObjects.fullData.sources.FullDataSourceV2;
+import com.seibel.distanthorizons.core.pos.blockPos.DhBlockPos2D;
 import net.distant_horizons.coreapi.util.BitShiftUtil;
-import net.distant_horizons.core.util.LodUtil;
+import com.seibel.distanthorizons.core.util.LodUtil;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Objects;

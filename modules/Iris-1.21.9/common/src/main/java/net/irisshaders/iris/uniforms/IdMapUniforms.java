@@ -2,9 +2,9 @@ package net.irisshaders.iris.uniforms;
 
 import it.unimi.dsi.fastutil.objects.Object2IntFunction;
 import net.iris.api.v0.item.IrisItemLightProvider;
-import net.iris.gl.uniform.UniformHolder;
+import net.irisshaders.iris.gl.uniform.UniformHolder;
 import net.iris.gl.uniform.UniformUpdateFrequency;
-import net.iris.shaderpack.IdMap;
+import net.irisshaders.iris.shaderpack.IdMap;
 import net.iris.shaderpack.materialmap.NamespacedId;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
@@ -17,7 +17,7 @@ import net.minecraft.world.item.ItemStack;
 import org.jetbrains.annotations.NotNull;
 import org.joml.Vector3f;
 
-import static net.iris.gl.uniform.UniformUpdateFrequency.PER_FRAME;
+import static net.irisshaders.iris.gl.uniform.UniformUpdateFrequency.PER_FRAME;
 
 public final class IdMapUniforms {
 

@@ -1,6 +1,6 @@
 package net.irisshaders.iris.mixin;
 
-import net.iris.compat.general.IrisModelPart;
+import net.irisshaders.iris.compat.general.IrisModelPart;
 import net.minecraft.client.renderer.block.model.BlockModelPart;
 import org.spongepowered.asm.mixin.Mixin;
 

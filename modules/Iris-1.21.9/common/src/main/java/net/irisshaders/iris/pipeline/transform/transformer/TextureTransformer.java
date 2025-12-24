@@ -8,7 +8,7 @@ import io.github.douira.glsl_transformer.ast.node.type.specifier.BuiltinFixedTyp
 import io.github.douira.glsl_transformer.ast.query.Root;
 import io.github.douira.glsl_transformer.ast.transform.ASTParser;
 import it.unimi.dsi.fastutil.objects.Object2ObjectMap;
-import net.iris.gl.texture.TextureType;
+import net.irisshaders.iris.gl.texture.TextureType;
 import net.iris.helpers.Tri;
 import net.iris.shaderpack.texture.TextureStage;
 

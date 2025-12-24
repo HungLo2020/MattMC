@@ -19,7 +19,7 @@
 
 package com.seibel.distanthorizons.core.network.event;
 
-import net.distant_horizons.core.network.messages.AbstractNetworkMessage;
+import com.seibel.distanthorizons.core.network.messages.AbstractNetworkMessage;
 
 import java.util.function.Consumer;
 

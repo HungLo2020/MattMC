@@ -3,9 +3,9 @@ package net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.data;
 import java.nio.IntBuffer;
 
 import net.sodium.client.render.chunk.translucent_sorting.SortType;
-import net.sodium.client.render.chunk.translucent_sorting.bsp_tree.UpdatedQuadsList;
-import net.sodium.client.render.chunk.translucent_sorting.quad.TQuad;
-import net.sodium.client.render.chunk.translucent_sorting.TranslucentGeometryCollector;
+import net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.bsp_tree.UpdatedQuadsList;
+import net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.quad.TQuad;
+import net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.TranslucentGeometryCollector;
 import net.minecraft.core.SectionPos;
 
 /**

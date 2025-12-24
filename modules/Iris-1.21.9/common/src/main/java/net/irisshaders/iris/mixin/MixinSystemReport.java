@@ -1,6 +1,6 @@
 package net.irisshaders.iris.mixin;
 
-import net.iris.Iris;
+import net.irisshaders.iris.Iris;
 import net.minecraft.SystemReport;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;

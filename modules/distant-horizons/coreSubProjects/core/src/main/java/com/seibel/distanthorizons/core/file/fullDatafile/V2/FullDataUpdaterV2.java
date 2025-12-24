@@ -1,17 +1,17 @@
 package com.seibel.distanthorizons.core.file.fullDatafile.V2;
 
-import net.distant_horizons.api.enums.config.EDhApiDataCompressionMode;
-import net.distant_horizons.core.config.Config;
-import net.distant_horizons.core.dataObjects.fullData.sources.FullDataSourceV2;
+import com.seibel.distanthorizons.api.enums.config.EDhApiDataCompressionMode;
+import com.seibel.distanthorizons.core.config.Config;
+import com.seibel.distanthorizons.core.dataObjects.fullData.sources.FullDataSourceV2;
 import net.distant_horizons.core.file.fullDatafile.IDataSourceUpdateListenerFunc;
-import net.distant_horizons.core.logging.DhLogger;
-import net.distant_horizons.core.logging.DhLoggerBuilder;
-import net.distant_horizons.core.pos.DhSectionPos;
-import net.distant_horizons.core.render.renderer.DebugRenderer;
-import net.distant_horizons.core.render.renderer.IDebugRenderable;
-import net.distant_horizons.core.sql.dto.FullDataSourceV2DTO;
-import net.distant_horizons.core.util.threading.PositionalLockProvider;
-import net.distant_horizons.core.util.threading.ThreadPoolUtil;
+import com.seibel.distanthorizons.core.logging.DhLogger;
+import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
+import com.seibel.distanthorizons.core.pos.DhSectionPos;
+import com.seibel.distanthorizons.core.render.renderer.DebugRenderer;
+import com.seibel.distanthorizons.core.render.renderer.IDebugRenderable;
+import com.seibel.distanthorizons.core.sql.dto.FullDataSourceV2DTO;
+import com.seibel.distanthorizons.core.util.threading.PositionalLockProvider;
+import com.seibel.distanthorizons.core.util.threading.ThreadPoolUtil;
 import org.jetbrains.annotations.NotNull;
 
 import java.awt.*;

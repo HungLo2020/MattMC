@@ -1,8 +1,8 @@
 package com.seibel.distanthorizons.core.api.internal.rendering;
 
-import net.distant_horizons.core.api.internal.ClientApi;
-import net.distant_horizons.core.util.math.Mat4f;
-import net.distant_horizons.core.wrapperInterfaces.world.IClientLevelWrapper;
+import com.seibel.distanthorizons.core.api.internal.ClientApi;
+import com.seibel.distanthorizons.core.util.math.Mat4f;
+import com.seibel.distanthorizons.core.wrapperInterfaces.world.IClientLevelWrapper;
 
 /**
  * Used to track the rendering state for the current frame.

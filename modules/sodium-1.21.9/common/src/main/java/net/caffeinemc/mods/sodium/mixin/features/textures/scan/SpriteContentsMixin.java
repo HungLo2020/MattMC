@@ -5,7 +5,7 @@ import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.mojang.blaze3d.platform.NativeImage;
 import net.sodium.api.util.ColorABGR;
 import net.sodium.client.render.chunk.compile.pipeline.SpriteContentsExtension;
-import net.sodium.client.util.NativeImageHelper;
+import net.caffeinemc.mods.sodium.client.util.NativeImageHelper;
 import net.minecraft.client.renderer.texture.SpriteContents;
 import org.lwjgl.system.MemoryUtil;
 import org.objectweb.asm.Opcodes;

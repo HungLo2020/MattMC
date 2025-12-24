@@ -4,7 +4,7 @@ import com.mojang.blaze3d.pipeline.RenderPipeline;
 import com.mojang.blaze3d.pipeline.RenderTarget;
 import com.mojang.blaze3d.vertex.MeshData;
 import com.mojang.blaze3d.vertex.VertexFormat;
-import net.iris.mixin.rendertype.RenderTypeAccessor;
+import net.irisshaders.iris.mixin.rendertype.RenderTypeAccessor;
 import net.minecraft.client.renderer.RenderStateShard;
 import net.minecraft.client.renderer.RenderType;
 import org.jetbrains.annotations.Nullable;

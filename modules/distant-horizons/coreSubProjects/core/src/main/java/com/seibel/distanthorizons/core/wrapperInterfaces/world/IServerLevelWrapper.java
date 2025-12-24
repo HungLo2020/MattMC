@@ -19,9 +19,9 @@
 
 package com.seibel.distanthorizons.core.wrapperInterfaces.world;
 
-import net.distant_horizons.core.api.internal.SharedApi;
-import net.distant_horizons.core.config.Config;
-import net.distant_horizons.core.network.messages.base.LevelInitMessage;
+import com.seibel.distanthorizons.core.api.internal.SharedApi;
+import com.seibel.distanthorizons.core.config.Config;
+import com.seibel.distanthorizons.core.network.messages.base.LevelInitMessage;
 import net.distant_horizons.core.world.EWorldEnvironment;
 
 import java.io.File;

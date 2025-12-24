@@ -3,8 +3,8 @@ package net.irisshaders.iris.targets.backed;
 import com.mojang.blaze3d.platform.NativeImage;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.textures.FilterMode;
-import net.iris.gl.texture.TextureAccess;
-import net.iris.gl.texture.TextureType;
+import net.irisshaders.iris.gl.texture.TextureAccess;
+import net.irisshaders.iris.gl.texture.TextureType;
 import net.minecraft.client.renderer.texture.DynamicTexture;
 
 import java.util.Objects;

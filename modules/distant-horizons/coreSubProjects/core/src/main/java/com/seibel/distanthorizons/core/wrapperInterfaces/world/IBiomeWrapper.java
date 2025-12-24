@@ -19,7 +19,7 @@
 
 package com.seibel.distanthorizons.core.wrapperInterfaces.world;
 
-import net.distant_horizons.api.interfaces.block.IDhApiBiomeWrapper;
+import com.seibel.distanthorizons.api.interfaces.block.IDhApiBiomeWrapper;
 import net.distant_horizons.coreapi.interfaces.dependencyInjection.IBindable;
 
 /**

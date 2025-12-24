@@ -1,6 +1,6 @@
 package net.irisshaders.iris.gui.debug;
 
-import net.iris.Iris;
+import net.irisshaders.iris.Iris;
 import net.minecraft.client.gui.components.debug.DebugScreenDisplayer;
 import net.minecraft.client.gui.components.debug.DebugScreenEntry;
 import net.minecraft.world.level.Level;

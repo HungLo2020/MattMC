@@ -3,13 +3,13 @@ package net.irisshaders.iris.pipeline.programs;
 import com.mojang.blaze3d.pipeline.RenderPipeline;
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.VertexFormat;
-import net.iris.Iris;
-import net.iris.gl.blending.AlphaTest;
+import net.irisshaders.iris.Iris;
+import net.irisshaders.iris.gl.blending.AlphaTest;
 import net.iris.gl.blending.AlphaTestFunction;
-import net.iris.gl.blending.AlphaTests;
+import net.irisshaders.iris.gl.blending.AlphaTests;
 import net.iris.gl.state.FogMode;
-import net.iris.shaderpack.loading.ProgramId;
-import net.iris.vertices.IrisVertexFormats;
+import net.irisshaders.iris.shaderpack.loading.ProgramId;
+import net.irisshaders.iris.vertices.IrisVertexFormats;
 
 import java.util.Locale;
 

@@ -1,8 +1,8 @@
 package com.seibel.distanthorizons.common.wrappers.level;
 
-import net.distant_horizons.core.level.IServerKeyedClientLevel;
-import net.distant_horizons.core.level.IKeyedClientLevelManager;
-import net.distant_horizons.core.wrapperInterfaces.world.IClientLevelWrapper;
+import com.seibel.distanthorizons.core.level.IServerKeyedClientLevel;
+import com.seibel.distanthorizons.core.level.IKeyedClientLevelManager;
+import com.seibel.distanthorizons.core.wrapperInterfaces.world.IClientLevelWrapper;
 import net.minecraft.client.multiplayer.ClientLevel;
 import org.jetbrains.annotations.Nullable;
 

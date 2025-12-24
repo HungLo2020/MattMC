@@ -1,6 +1,6 @@
 package net.caffeinemc.mods.sodium.client.render.chunk.terrain.material;
 
-import net.sodium.client.render.chunk.terrain.DefaultTerrainRenderPasses;
+import net.caffeinemc.mods.sodium.client.render.chunk.terrain.DefaultTerrainRenderPasses;
 import net.sodium.client.render.chunk.terrain.material.parameters.AlphaCutoffParameter;
 import net.minecraft.client.renderer.ItemBlockRenderTypes;
 import net.minecraft.client.renderer.RenderType;

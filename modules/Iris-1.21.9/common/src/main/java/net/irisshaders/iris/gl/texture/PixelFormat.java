@@ -1,6 +1,6 @@
 package net.irisshaders.iris.gl.texture;
 
-import net.iris.Iris;
+import net.irisshaders.iris.Iris;
 import net.iris.gl.GlVersion;
 import org.lwjgl.opengl.GL11C;
 import org.lwjgl.opengl.GL12C;

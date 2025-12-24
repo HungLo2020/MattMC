@@ -1,6 +1,6 @@
 package net.caffeinemc.mods.sodium.client.gl.shader.uniform;
 
-import net.sodium.client.gl.buffer.GlBuffer;
+import net.caffeinemc.mods.sodium.client.gl.buffer.GlBuffer;
 import org.lwjgl.opengl.GL32C;
 
 public class GlUniformBlock {

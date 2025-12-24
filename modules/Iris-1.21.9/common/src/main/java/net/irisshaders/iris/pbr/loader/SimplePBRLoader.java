@@ -1,6 +1,6 @@
 package net.irisshaders.iris.pbr.loader;
 
-import net.iris.mixin.texture.ReloadableTextureAccessor;
+import net.irisshaders.iris.mixin.texture.ReloadableTextureAccessor;
 import net.iris.pbr.texture.PBRType;
 import net.iris.vertices.ImmediateState;
 import net.minecraft.client.renderer.texture.AbstractTexture;

@@ -19,23 +19,23 @@
 
 package com.seibel.distanthorizons.common.wrappers;
 
-import net.distant_horizons.common.wrappers.gui.ClassicConfigGUI;
-import net.distant_horizons.common.wrappers.gui.LangWrapper;
-import net.distant_horizons.common.wrappers.level.KeyedClientLevelManager;
-import net.distant_horizons.common.wrappers.minecraft.MinecraftGLWrapper;
-import net.distant_horizons.common.wrappers.minecraft.MinecraftServerWrapper;
-import net.distant_horizons.core.level.IKeyedClientLevelManager;
-import net.distant_horizons.core.wrapperInterfaces.config.IConfigGui;
-import net.distant_horizons.core.wrapperInterfaces.config.ILangWrapper;
-import net.distant_horizons.common.wrappers.minecraft.MinecraftClientWrapper;
-import net.distant_horizons.common.wrappers.minecraft.MinecraftRenderWrapper;
-import net.distant_horizons.core.dependencyInjection.SingletonInjector;
-import net.distant_horizons.core.wrapperInterfaces.IVersionConstants;
-import net.distant_horizons.core.wrapperInterfaces.IWrapperFactory;
-import net.distant_horizons.core.wrapperInterfaces.minecraft.IMinecraftClientWrapper;
-import net.distant_horizons.core.wrapperInterfaces.minecraft.IMinecraftGLWrapper;
-import net.distant_horizons.core.wrapperInterfaces.minecraft.IMinecraftRenderWrapper;
-import net.distant_horizons.core.wrapperInterfaces.minecraft.IMinecraftSharedWrapper;
+import com.seibel.distanthorizons.common.wrappers.gui.ClassicConfigGUI;
+import com.seibel.distanthorizons.common.wrappers.gui.LangWrapper;
+import com.seibel.distanthorizons.common.wrappers.level.KeyedClientLevelManager;
+import com.seibel.distanthorizons.common.wrappers.minecraft.MinecraftGLWrapper;
+import com.seibel.distanthorizons.common.wrappers.minecraft.MinecraftServerWrapper;
+import com.seibel.distanthorizons.core.level.IKeyedClientLevelManager;
+import com.seibel.distanthorizons.core.wrapperInterfaces.config.IConfigGui;
+import com.seibel.distanthorizons.core.wrapperInterfaces.config.ILangWrapper;
+import com.seibel.distanthorizons.common.wrappers.minecraft.MinecraftClientWrapper;
+import com.seibel.distanthorizons.common.wrappers.minecraft.MinecraftRenderWrapper;
+import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
+import com.seibel.distanthorizons.core.wrapperInterfaces.IVersionConstants;
+import com.seibel.distanthorizons.core.wrapperInterfaces.IWrapperFactory;
+import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftClientWrapper;
+import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftGLWrapper;
+import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftRenderWrapper;
+import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftSharedWrapper;
 
 /**
  * Binds all necessary dependencies, so we

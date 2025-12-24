@@ -1,7 +1,7 @@
 package net.irisshaders.iris.compat.sodium.mixin;
 
-import net.sodium.client.render.chunk.compile.buffers.ChunkModelBuilder;
-import net.sodium.client.render.chunk.compile.buffers.ChunkVertexConsumer;
+import net.caffeinemc.mods.sodium.client.render.chunk.compile.buffers.ChunkModelBuilder;
+import net.caffeinemc.mods.sodium.client.render.chunk.compile.buffers.ChunkVertexConsumer;
 import net.iris.vertices.BlockSensitiveBufferBuilder;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;

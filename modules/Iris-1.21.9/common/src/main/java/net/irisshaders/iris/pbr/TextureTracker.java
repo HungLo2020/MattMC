@@ -3,11 +3,11 @@ package net.irisshaders.iris.pbr;
 import com.mojang.blaze3d.textures.GpuTextureView;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
-import net.iris.Iris;
-import net.iris.gl.IrisRenderSystem;
-import net.iris.gl.state.StateUpdateNotifiers;
-import net.iris.gl.texture.TextureType;
-import net.iris.pipeline.WorldRenderingPipeline;
+import net.irisshaders.iris.Iris;
+import net.irisshaders.iris.gl.IrisRenderSystem;
+import net.irisshaders.iris.gl.state.StateUpdateNotifiers;
+import net.irisshaders.iris.gl.texture.TextureType;
+import net.irisshaders.iris.pipeline.WorldRenderingPipeline;
 import net.minecraft.client.renderer.texture.AbstractTexture;
 import org.jetbrains.annotations.Nullable;
 

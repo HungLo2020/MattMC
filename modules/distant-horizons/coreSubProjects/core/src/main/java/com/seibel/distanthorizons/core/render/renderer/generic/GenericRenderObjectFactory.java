@@ -19,16 +19,16 @@
 
 package com.seibel.distanthorizons.core.render.renderer.generic;
 
-import net.distant_horizons.api.interfaces.render.IDhApiCustomRenderObjectFactory;
-import net.distant_horizons.api.interfaces.render.IDhApiCustomRenderRegister;
-import net.distant_horizons.api.interfaces.render.IDhApiRenderableBoxGroup;
+import com.seibel.distanthorizons.api.interfaces.render.IDhApiCustomRenderObjectFactory;
+import com.seibel.distanthorizons.api.interfaces.render.IDhApiCustomRenderRegister;
+import com.seibel.distanthorizons.api.interfaces.render.IDhApiRenderableBoxGroup;
 import net.distant_horizons.api.objects.math.DhApiVec3d;
-import net.distant_horizons.api.objects.math.DhApiVec3f;
-import net.distant_horizons.api.objects.render.DhApiRenderableBox;
-import net.distant_horizons.core.logging.DhLoggerBuilder;
-import net.distant_horizons.core.util.math.Vec3d;
-import net.distant_horizons.core.util.math.Vec3f;
-import net.distant_horizons.core.logging.DhLogger;
+import com.seibel.distanthorizons.api.objects.math.DhApiVec3f;
+import com.seibel.distanthorizons.api.objects.render.DhApiRenderableBox;
+import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
+import com.seibel.distanthorizons.core.util.math.Vec3d;
+import com.seibel.distanthorizons.core.util.math.Vec3f;
+import com.seibel.distanthorizons.core.logging.DhLogger;
 
 import java.util.List;
 import java.util.*;

@@ -19,21 +19,21 @@
 
 package com.seibel.distanthorizons.core.generation;
 
-import net.distant_horizons.core.dataObjects.fullData.sources.FullDataSourceV2;
-import net.distant_horizons.core.enums.EDhDirection;
-import net.distant_horizons.core.logging.DhLoggerBuilder;
-import net.distant_horizons.core.pos.blockPos.DhBlockPos;
-import net.distant_horizons.core.pos.blockPos.DhBlockPosMutable;
-import net.distant_horizons.core.pos.DhChunkPos;
-import net.distant_horizons.core.pos.DhSectionPos;
-import net.distant_horizons.core.render.renderer.DebugRenderer;
-import net.distant_horizons.core.util.FullDataPointUtil;
-import net.distant_horizons.core.util.LodUtil;
-import net.distant_horizons.core.wrapperInterfaces.block.IBlockStateWrapper;
-import net.distant_horizons.core.wrapperInterfaces.chunk.IChunkWrapper;
-import net.distant_horizons.core.wrapperInterfaces.misc.IMutableBlockPosWrapper;
+import com.seibel.distanthorizons.core.dataObjects.fullData.sources.FullDataSourceV2;
+import com.seibel.distanthorizons.core.enums.EDhDirection;
+import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
+import com.seibel.distanthorizons.core.pos.blockPos.DhBlockPos;
+import com.seibel.distanthorizons.core.pos.blockPos.DhBlockPosMutable;
+import com.seibel.distanthorizons.core.pos.DhChunkPos;
+import com.seibel.distanthorizons.core.pos.DhSectionPos;
+import com.seibel.distanthorizons.core.render.renderer.DebugRenderer;
+import com.seibel.distanthorizons.core.util.FullDataPointUtil;
+import com.seibel.distanthorizons.core.util.LodUtil;
+import com.seibel.distanthorizons.core.wrapperInterfaces.block.IBlockStateWrapper;
+import com.seibel.distanthorizons.core.wrapperInterfaces.chunk.IChunkWrapper;
+import com.seibel.distanthorizons.core.wrapperInterfaces.misc.IMutableBlockPosWrapper;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
-import net.distant_horizons.core.logging.DhLogger;
+import com.seibel.distanthorizons.core.logging.DhLogger;
 
 import java.awt.*;
 import java.util.*;

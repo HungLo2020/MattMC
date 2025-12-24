@@ -1,11 +1,11 @@
 package net.caffeinemc.mods.sodium.client.render.chunk.occlusion;
 
 import it.unimi.dsi.fastutil.longs.Long2ReferenceMap;
-import net.sodium.client.render.chunk.RenderSection;
-import net.sodium.client.render.chunk.lists.RenderSectionVisitor;
-import net.sodium.client.render.viewport.CameraTransform;
-import net.sodium.client.render.viewport.Viewport;
-import net.sodium.client.util.collections.DoubleBufferedQueue;
+import net.caffeinemc.mods.sodium.client.render.chunk.RenderSection;
+import net.caffeinemc.mods.sodium.client.render.chunk.lists.RenderSectionVisitor;
+import net.caffeinemc.mods.sodium.client.render.viewport.CameraTransform;
+import net.caffeinemc.mods.sodium.client.render.viewport.Viewport;
+import net.caffeinemc.mods.sodium.client.util.collections.DoubleBufferedQueue;
 import net.sodium.client.util.collections.ReadQueue;
 import net.sodium.client.util.collections.WriteQueue;
 import net.minecraft.core.SectionPos;

@@ -1,8 +1,8 @@
 package net.irisshaders.iris.compat.dh.mixin;
 
-import net.distant_horizons.api.interfaces.override.rendering.IDhApiShadowCullingFrustum;
-import net.distant_horizons.api.objects.math.DhApiMat4f;
-import net.iris.shadows.frustum.advanced.AdvancedShadowCullingFrustum;
+import com.seibel.distanthorizons.api.interfaces.override.rendering.IDhApiShadowCullingFrustum;
+import com.seibel.distanthorizons.api.objects.math.DhApiMat4f;
+import net.irisshaders.iris.shadows.frustum.advanced.AdvancedShadowCullingFrustum;
 import net.minecraft.client.renderer.culling.Frustum;
 import org.joml.Matrix4f;
 import org.spongepowered.asm.mixin.Mixin;

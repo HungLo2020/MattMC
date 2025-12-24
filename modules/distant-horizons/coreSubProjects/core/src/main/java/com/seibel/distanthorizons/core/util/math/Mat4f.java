@@ -19,7 +19,7 @@
 
 package com.seibel.distanthorizons.core.util.math;
 
-import net.distant_horizons.api.objects.math.DhApiMat4f;
+import com.seibel.distanthorizons.api.objects.math.DhApiMat4f;
 import org.joml.Matrix4f;
 import org.joml.Matrix4fc;
 

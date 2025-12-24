@@ -1,15 +1,15 @@
 package net.irisshaders.iris.compat.sodium.mixin;
 
 import com.llamalad7.mixinextras.sugar.Local;
-import net.sodium.client.model.quad.ModelQuadView;
-import net.sodium.client.model.quad.properties.ModelQuadFacing;
-import net.sodium.client.render.chunk.compile.buffers.ChunkModelBuilder;
-import net.sodium.client.render.chunk.compile.pipeline.DefaultFluidRenderer;
-import net.sodium.client.render.chunk.terrain.material.Material;
-import net.sodium.client.render.chunk.translucent_sorting.TranslucentGeometryCollector;
+import net.caffeinemc.mods.sodium.client.model.quad.ModelQuadView;
+import net.caffeinemc.mods.sodium.client.model.quad.properties.ModelQuadFacing;
+import net.caffeinemc.mods.sodium.client.render.chunk.compile.buffers.ChunkModelBuilder;
+import net.caffeinemc.mods.sodium.client.render.chunk.compile.pipeline.DefaultFluidRenderer;
+import net.caffeinemc.mods.sodium.client.render.chunk.terrain.material.Material;
+import net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.TranslucentGeometryCollector;
 import net.sodium.client.render.chunk.vertex.format.ChunkVertexEncoder;
-import net.sodium.client.render.frapi.mesh.MutableQuadViewImpl;
-import net.iris.shaderpack.materialmap.WorldRenderingSettings;
+import net.caffeinemc.mods.sodium.client.render.frapi.mesh.MutableQuadViewImpl;
+import net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings;
 import net.iris.vertices.sodium.terrain.ChunkVertexExtension;
 import net.iris.vertices.sodium.terrain.VertexEncoderInterface;
 import net.minecraft.core.BlockPos;

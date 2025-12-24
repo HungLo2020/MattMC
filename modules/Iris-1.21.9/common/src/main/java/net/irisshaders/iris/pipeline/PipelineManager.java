@@ -1,10 +1,10 @@
 package net.irisshaders.iris.pipeline;
 
 import com.mojang.blaze3d.opengl.GlStateManager;
-import net.iris.Iris;
+import net.irisshaders.iris.Iris;
 import net.iris.shaderpack.materialmap.NamespacedId;
-import net.iris.shaderpack.materialmap.WorldRenderingSettings;
-import net.iris.uniforms.SystemTimeUniforms;
+import net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings;
+import net.irisshaders.iris.uniforms.SystemTimeUniforms;
 import net.minecraft.client.Minecraft;
 import org.jetbrains.annotations.Nullable;
 import org.lwjgl.opengl.GL20C;

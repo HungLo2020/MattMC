@@ -2,7 +2,7 @@ package net.irisshaders.iris.mixin.entity_render_context;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import net.iris.mixinterface.ModelStorage;
-import net.iris.uniforms.CapturedRenderingState;
+import net.irisshaders.iris.uniforms.CapturedRenderingState;
 import net.iris.vertices.ImmediateState;
 import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.client.renderer.SubmitNodeStorage;

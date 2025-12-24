@@ -1,9 +1,9 @@
 package net.irisshaders.iris.pipeline.transform.parameter;
 
 import it.unimi.dsi.fastutil.objects.Object2ObjectMap;
-import net.iris.gl.blending.AlphaTest;
-import net.iris.gl.state.ShaderAttributeInputs;
-import net.iris.gl.texture.TextureType;
+import net.irisshaders.iris.gl.blending.AlphaTest;
+import net.irisshaders.iris.gl.state.ShaderAttributeInputs;
+import net.irisshaders.iris.gl.texture.TextureType;
 import net.iris.helpers.Tri;
 import net.iris.pipeline.transform.Patch;
 import net.iris.shaderpack.texture.TextureStage;

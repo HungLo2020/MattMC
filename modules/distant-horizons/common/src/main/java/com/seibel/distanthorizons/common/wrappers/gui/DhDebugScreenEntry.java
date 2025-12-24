@@ -1,6 +1,6 @@
 package com.seibel.distanthorizons.common.wrappers.gui;
 
-import net.distant_horizons.core.logging.f3.F3Screen;
+import com.seibel.distanthorizons.core.logging.f3.F3Screen;
 import net.distant_horizons.coreapi.ModInfo;
 
 import org.jetbrains.annotations.NotNull;

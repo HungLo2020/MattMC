@@ -22,11 +22,11 @@ package com.seibel.distanthorizons.core.util.objects.dataStreams;
 import com.github.luben.zstd.RecyclingBufferPool;
 import com.github.luben.zstd.Zstd;
 import com.github.luben.zstd.ZstdInputStream;
-import net.distant_horizons.api.enums.config.EDhApiDataCompressionMode;
-import net.distant_horizons.core.logging.DhLoggerBuilder;
+import com.seibel.distanthorizons.api.enums.config.EDhApiDataCompressionMode;
+import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
 import it.unimi.dsi.fastutil.bytes.ByteArrayList;
 import net.jpountz.lz4.LZ4FrameInputStream;
-import net.distant_horizons.core.logging.DhLogger;
+import com.seibel.distanthorizons.core.logging.DhLogger;
 import org.tukaani.xz.ResettableArrayCache;
 import org.tukaani.xz.XZInputStream;
 

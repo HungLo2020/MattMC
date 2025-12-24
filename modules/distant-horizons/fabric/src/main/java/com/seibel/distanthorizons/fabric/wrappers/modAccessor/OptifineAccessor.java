@@ -21,8 +21,8 @@ package com.seibel.distanthorizons.fabric.wrappers.modAccessor;
 
 import java.util.HashSet;
 
-import net.distant_horizons.core.pos.DhChunkPos;
-import net.distant_horizons.core.wrapperInterfaces.modAccessor.AbstractOptifineAccessor;
+import com.seibel.distanthorizons.core.pos.DhChunkPos;
+import com.seibel.distanthorizons.core.wrapperInterfaces.modAccessor.AbstractOptifineAccessor;
 
 public class OptifineAccessor extends AbstractOptifineAccessor
 {

@@ -21,7 +21,7 @@ package com.seibel.distanthorizons.api.interfaces.config.both;
 
 import net.distant_horizons.api.enums.worldGeneration.EDhApiDistantGeneratorMode;
 import net.distant_horizons.api.interfaces.config.IDhApiConfigValue;
-import net.distant_horizons.api.interfaces.config.IDhApiConfigGroup;
+import com.seibel.distanthorizons.api.interfaces.config.IDhApiConfigGroup;
 
 /**
  * Distant Horizons' world generation configuration. <br><br>

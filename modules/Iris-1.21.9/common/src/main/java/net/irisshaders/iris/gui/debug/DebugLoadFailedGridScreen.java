@@ -1,6 +1,6 @@
 package net.irisshaders.iris.gui.debug;
 
-import net.iris.Iris;
+import net.irisshaders.iris.Iris;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.layouts.FrameLayout;

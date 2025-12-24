@@ -19,7 +19,7 @@
 
 package com.seibel.distanthorizons.fabric.mixins.server;
 
-import net.distant_horizons.common.wrappers.worldGeneration.BatchGenerationEnvironment;
+import com.seibel.distanthorizons.common.wrappers.worldGeneration.BatchGenerationEnvironment;
 import org.spongepowered.asm.mixin.Mixin;
 
 

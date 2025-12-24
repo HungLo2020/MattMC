@@ -2,7 +2,7 @@ package net.irisshaders.iris.uniforms;
 
 import com.mojang.blaze3d.opengl.GlStateManager;
 import com.mojang.blaze3d.systems.RenderSystem;
-import net.iris.gl.uniform.DynamicUniformHolder;
+import net.irisshaders.iris.gl.uniform.DynamicUniformHolder;
 import net.minecraft.client.Minecraft;
 import org.joml.Vector2f;
 

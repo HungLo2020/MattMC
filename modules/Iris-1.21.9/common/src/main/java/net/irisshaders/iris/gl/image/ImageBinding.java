@@ -1,6 +1,6 @@
 package net.irisshaders.iris.gl.image;
 
-import net.iris.gl.IrisRenderSystem;
+import net.irisshaders.iris.gl.IrisRenderSystem;
 import org.lwjgl.opengl.GL42C;
 
 import java.util.function.IntSupplier;

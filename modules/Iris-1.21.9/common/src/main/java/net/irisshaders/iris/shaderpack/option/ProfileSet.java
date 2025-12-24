@@ -1,8 +1,8 @@
 package net.irisshaders.iris.shaderpack.option;
 
-import net.iris.Iris;
+import net.irisshaders.iris.Iris;
 import net.iris.IrisLogging;
-import net.iris.shaderpack.option.values.OptionValues;
+import net.irisshaders.iris.shaderpack.option.values.OptionValues;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;

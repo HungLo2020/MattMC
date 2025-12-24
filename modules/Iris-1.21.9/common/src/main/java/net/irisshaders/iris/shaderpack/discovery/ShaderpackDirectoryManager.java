@@ -1,6 +1,6 @@
 package net.irisshaders.iris.shaderpack.discovery;
 
-import net.iris.Iris;
+import net.irisshaders.iris.Iris;
 
 import java.io.IOException;
 import java.net.URI;

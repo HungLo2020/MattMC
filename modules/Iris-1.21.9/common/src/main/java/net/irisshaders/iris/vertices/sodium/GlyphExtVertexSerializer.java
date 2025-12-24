@@ -4,10 +4,10 @@ import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.VertexFormatElement;
 import net.sodium.api.memory.MemoryIntrinsics;
 import net.sodium.api.vertex.serializer.VertexSerializer;
-import net.iris.uniforms.CapturedRenderingState;
-import net.iris.vertices.IrisVertexFormats;
-import net.iris.vertices.NormI8;
-import net.iris.vertices.NormalHelper;
+import net.irisshaders.iris.uniforms.CapturedRenderingState;
+import net.irisshaders.iris.vertices.IrisVertexFormats;
+import net.sodium.api.util.NormI8;
+import net.irisshaders.iris.vertices.NormalHelper;
 import org.joml.Vector3f;
 import org.lwjgl.system.MemoryUtil;
 

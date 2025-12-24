@@ -1,8 +1,8 @@
 package net.irisshaders.iris.shadows.frustum.fallback;
 
-import net.sodium.client.render.viewport.Viewport;
-import net.sodium.client.render.viewport.ViewportProvider;
-import net.iris.shadows.frustum.BoxCuller;
+import net.caffeinemc.mods.sodium.client.render.viewport.Viewport;
+import net.caffeinemc.mods.sodium.client.render.viewport.ViewportProvider;
+import net.irisshaders.iris.shadows.frustum.BoxCuller;
 import net.minecraft.client.renderer.culling.Frustum;
 import net.minecraft.world.phys.AABB;
 import org.joml.Matrix4f;

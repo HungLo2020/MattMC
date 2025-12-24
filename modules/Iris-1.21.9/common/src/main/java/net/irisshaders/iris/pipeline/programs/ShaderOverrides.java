@@ -1,10 +1,10 @@
 package net.irisshaders.iris.pipeline.programs;
 
-import net.iris.Iris;
-import net.iris.pipeline.IrisRenderingPipeline;
-import net.iris.pipeline.WorldRenderingPhase;
-import net.iris.pipeline.WorldRenderingPipeline;
-import net.iris.shadows.ShadowRenderer;
+import net.irisshaders.iris.Iris;
+import net.irisshaders.iris.pipeline.IrisRenderingPipeline;
+import net.irisshaders.iris.pipeline.WorldRenderingPhase;
+import net.irisshaders.iris.pipeline.WorldRenderingPipeline;
+import net.irisshaders.iris.shadows.ShadowRenderer;
 
 public class ShaderOverrides {
 	public static ShaderKey getSkyShader(IrisRenderingPipeline pipeline) {

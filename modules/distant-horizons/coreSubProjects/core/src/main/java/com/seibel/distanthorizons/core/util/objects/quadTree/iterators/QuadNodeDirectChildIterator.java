@@ -19,7 +19,7 @@
 
 package com.seibel.distanthorizons.core.util.objects.quadTree.iterators;
 
-import net.distant_horizons.core.util.objects.quadTree.QuadNode;
+import com.seibel.distanthorizons.core.util.objects.quadTree.QuadNode;
 
 import java.util.Iterator;
 import java.util.NoSuchElementException;

@@ -26,18 +26,18 @@ import java.util.Map;
 import java.util.WeakHashMap;
 
 import net.distant_horizons.api.enums.worldGeneration.EDhApiLevelType;
-import net.distant_horizons.api.interfaces.render.IDhApiCustomRenderRegister;
-import net.distant_horizons.common.wrappers.chunk.ChunkWrapper;
-import net.distant_horizons.core.api.internal.SharedApi;
-import net.distant_horizons.core.config.Config;
-import net.distant_horizons.core.level.IDhLevel;
-import net.distant_horizons.core.logging.DhLoggerBuilder;
-import net.distant_horizons.core.network.messages.base.LevelInitMessage;
-import net.distant_horizons.core.pos.DhChunkPos;
+import com.seibel.distanthorizons.api.interfaces.render.IDhApiCustomRenderRegister;
+import com.seibel.distanthorizons.common.wrappers.chunk.ChunkWrapper;
+import com.seibel.distanthorizons.core.api.internal.SharedApi;
+import com.seibel.distanthorizons.core.config.Config;
+import com.seibel.distanthorizons.core.level.IDhLevel;
+import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
+import com.seibel.distanthorizons.core.network.messages.base.LevelInitMessage;
+import com.seibel.distanthorizons.core.pos.DhChunkPos;
 import net.distant_horizons.core.world.EWorldEnvironment;
-import net.distant_horizons.core.wrapperInterfaces.chunk.IChunkWrapper;
+import com.seibel.distanthorizons.core.wrapperInterfaces.chunk.IChunkWrapper;
 
-import net.distant_horizons.core.wrapperInterfaces.world.IServerLevelWrapper;
+import com.seibel.distanthorizons.core.wrapperInterfaces.world.IServerLevelWrapper;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.chunk.ChunkAccess;
@@ -46,7 +46,7 @@ import net.minecraft.world.level.chunk.ChunkSource;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
 
 
-import net.distant_horizons.core.logging.DhLogger;
+import com.seibel.distanthorizons.core.logging.DhLogger;
 import org.jetbrains.annotations.Nullable;
 
 public class ServerLevelWrapper implements IServerLevelWrapper

@@ -19,9 +19,9 @@
 
 package com.seibel.distanthorizons.core.jar.gui;
 
-import net.distant_horizons.core.jar.JarUtils;
-import net.distant_horizons.core.dependencyInjection.SingletonInjector;
-import net.distant_horizons.core.wrapperInterfaces.config.ILangWrapper;
+import com.seibel.distanthorizons.core.jar.JarUtils;
+import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
+import com.seibel.distanthorizons.core.wrapperInterfaces.config.ILangWrapper;
 
 import javax.imageio.ImageIO;
 import javax.swing.*;

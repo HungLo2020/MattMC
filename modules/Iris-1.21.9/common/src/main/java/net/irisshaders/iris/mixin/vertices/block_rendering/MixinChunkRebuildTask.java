@@ -1,7 +1,7 @@
 package net.irisshaders.iris.mixin.vertices.block_rendering;
 
 import it.unimi.dsi.fastutil.objects.Object2IntMap;
-import net.iris.shaderpack.materialmap.WorldRenderingSettings;
+import net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings;
 import net.minecraft.client.renderer.chunk.SectionRenderDispatcher;
 import net.minecraft.world.level.block.state.BlockState;
 import org.spongepowered.asm.mixin.Mixin;

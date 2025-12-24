@@ -1,8 +1,8 @@
 package net.caffeinemc.mods.sodium.client.render.chunk.vertex.builder;
 
-import net.sodium.client.render.chunk.terrain.material.Material;
+import net.caffeinemc.mods.sodium.client.render.chunk.terrain.material.Material;
 import net.sodium.client.render.chunk.vertex.format.ChunkVertexEncoder;
-import net.sodium.client.render.chunk.vertex.format.ChunkVertexType;
+import net.caffeinemc.mods.sodium.client.render.chunk.vertex.format.ChunkVertexType;
 import org.lwjgl.system.MemoryUtil;
 
 import java.nio.ByteBuffer;

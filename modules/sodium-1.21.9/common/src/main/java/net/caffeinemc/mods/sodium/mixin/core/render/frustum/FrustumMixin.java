@@ -1,9 +1,9 @@
 package net.caffeinemc.mods.sodium.mixin.core.render.frustum;
 
-import net.sodium.client.render.viewport.frustum.SimpleFrustum;
+import net.caffeinemc.mods.sodium.client.render.viewport.frustum.SimpleFrustum;
 import net.minecraft.client.renderer.culling.Frustum;
-import net.sodium.client.render.viewport.Viewport;
-import net.sodium.client.render.viewport.ViewportProvider;
+import net.caffeinemc.mods.sodium.client.render.viewport.Viewport;
+import net.caffeinemc.mods.sodium.client.render.viewport.ViewportProvider;
 import org.joml.FrustumIntersection;
 import org.joml.Vector3d;
 import org.spongepowered.asm.mixin.Final;

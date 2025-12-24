@@ -1,8 +1,8 @@
 package net.caffeinemc.mods.sodium.client.gui.options.control;
 
 import com.mojang.blaze3d.platform.cursor.CursorTypes;
-import net.sodium.client.gui.options.Option;
-import net.sodium.client.gui.widgets.AbstractWidget;
+import net.caffeinemc.mods.sodium.client.gui.options.Option;
+import net.caffeinemc.mods.sodium.client.gui.widgets.AbstractWidget;
 import net.sodium.client.util.Dim2i;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.gui.ComponentPath;

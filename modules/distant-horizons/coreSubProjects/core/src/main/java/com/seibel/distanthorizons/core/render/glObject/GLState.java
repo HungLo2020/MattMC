@@ -19,8 +19,8 @@
 
 package com.seibel.distanthorizons.core.render.glObject;
 
-import net.distant_horizons.core.dependencyInjection.SingletonInjector;
-import net.distant_horizons.core.wrapperInterfaces.minecraft.IMinecraftGLWrapper;
+import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
+import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftGLWrapper;
 import org.lwjgl.opengl.GL32;
 
 // TODO make this Closable or AutoClosable so it can be used with try-resource blocks

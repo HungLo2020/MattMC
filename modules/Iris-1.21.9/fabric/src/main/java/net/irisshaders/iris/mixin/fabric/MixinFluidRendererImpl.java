@@ -1,7 +1,7 @@
 package net.irisshaders.iris.mixin.fabric;
 
-import net.sodium.client.render.chunk.compile.pipeline.DefaultFluidRenderer;
-import net.sodium.fabric.render.FluidRendererImpl;
+import net.caffeinemc.mods.sodium.client.render.chunk.compile.pipeline.DefaultFluidRenderer;
+import net.caffeinemc.mods.sodium.fabric.render.FluidRendererImpl;
 import net.iris.vertices.sodium.terrain.VertexEncoderInterface;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;

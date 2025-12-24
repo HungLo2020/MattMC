@@ -19,8 +19,8 @@
 
 package com.seibel.distanthorizons.common.wrappers.worldGeneration.mimicObject;
 
-import net.distant_horizons.core.dependencyInjection.ModAccessorInjector;
-import net.distant_horizons.core.wrapperInterfaces.modAccessor.IStarlightAccessor;
+import com.seibel.distanthorizons.core.dependencyInjection.ModAccessorInjector;
+import com.seibel.distanthorizons.core.wrapperInterfaces.modAccessor.IStarlightAccessor;
 
 import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.chunk.LightChunkGetter;

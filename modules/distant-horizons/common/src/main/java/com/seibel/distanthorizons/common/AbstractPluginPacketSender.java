@@ -1,15 +1,15 @@
 package com.seibel.distanthorizons.common;
 
-import net.distant_horizons.core.config.Config;
-import net.distant_horizons.core.logging.DhLogger;
-import net.distant_horizons.core.logging.DhLoggerBuilder;
-import net.distant_horizons.core.network.event.internal.IncompatibleMessageInternalEvent;
-import net.distant_horizons.core.network.event.internal.ProtocolErrorInternalEvent;
-import net.distant_horizons.core.network.messages.MessageRegistry;
-import net.distant_horizons.core.network.messages.AbstractNetworkMessage;
-import net.distant_horizons.core.network.messages.base.CloseReasonMessage;
-import net.distant_horizons.core.wrapperInterfaces.misc.IPluginPacketSender;
-import net.distant_horizons.core.wrapperInterfaces.misc.IServerPlayerWrapper;
+import com.seibel.distanthorizons.core.config.Config;
+import com.seibel.distanthorizons.core.logging.DhLogger;
+import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
+import com.seibel.distanthorizons.core.network.event.internal.IncompatibleMessageInternalEvent;
+import com.seibel.distanthorizons.core.network.event.internal.ProtocolErrorInternalEvent;
+import com.seibel.distanthorizons.core.network.messages.MessageRegistry;
+import com.seibel.distanthorizons.core.network.messages.AbstractNetworkMessage;
+import com.seibel.distanthorizons.core.network.messages.base.CloseReasonMessage;
+import com.seibel.distanthorizons.core.wrapperInterfaces.misc.IPluginPacketSender;
+import com.seibel.distanthorizons.core.wrapperInterfaces.misc.IServerPlayerWrapper;
 import net.distant_horizons.coreapi.ModInfo;
 import io.netty.buffer.ByteBufUtil;
 import net.minecraft.network.FriendlyByteBuf;

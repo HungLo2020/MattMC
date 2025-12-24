@@ -1,6 +1,6 @@
 package net.irisshaders.iris.mixin.sky;
 
-import net.iris.mixin.LevelRendererAccessor;
+import net.irisshaders.iris.mixin.LevelRendererAccessor;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.DimensionSpecialEffects;
 import net.minecraft.world.level.material.FogType;

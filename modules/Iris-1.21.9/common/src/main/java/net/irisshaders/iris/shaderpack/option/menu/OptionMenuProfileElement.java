@@ -1,10 +1,10 @@
 package net.irisshaders.iris.shaderpack.option.menu;
 
-import net.iris.Iris;
-import net.iris.shaderpack.option.OptionSet;
-import net.iris.shaderpack.option.ProfileSet;
-import net.iris.shaderpack.option.values.MutableOptionValues;
-import net.iris.shaderpack.option.values.OptionValues;
+import net.irisshaders.iris.Iris;
+import net.irisshaders.iris.shaderpack.option.OptionSet;
+import net.irisshaders.iris.shaderpack.option.ProfileSet;
+import net.irisshaders.iris.shaderpack.option.values.MutableOptionValues;
+import net.irisshaders.iris.shaderpack.option.values.OptionValues;
 
 public class OptionMenuProfileElement extends OptionMenuElement {
 	public final ProfileSet profiles;

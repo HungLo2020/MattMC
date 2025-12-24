@@ -24,10 +24,10 @@ import io.github.douira.glsl_transformer.parser.ParseShape;
 import io.github.douira.glsl_transformer.util.Type;
 import it.unimi.dsi.fastutil.objects.Object2IntArrayMap;
 import it.unimi.dsi.fastutil.objects.Object2IntMap;
-import net.iris.Iris;
-import net.iris.gl.shader.ShaderType;
-import net.iris.pipeline.transform.PatchShaderType;
-import net.iris.pipeline.transform.parameter.Parameters;
+import net.irisshaders.iris.Iris;
+import net.sodium.client.gl.shader.ShaderType;
+import net.irisshaders.iris.pipeline.transform.PatchShaderType;
+import net.irisshaders.iris.pipeline.transform.parameter.Parameters;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 

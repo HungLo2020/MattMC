@@ -1,12 +1,12 @@
 package net.caffeinemc.mods.sodium.client.render.chunk.data;
 
-import net.sodium.client.gl.arena.GlBufferArena;
-import net.sodium.client.gl.arena.GlBufferSegment;
-import net.sodium.client.gl.arena.PendingUpload;
-import net.sodium.client.gl.device.CommandList;
-import net.sodium.client.model.quad.properties.ModelQuadFacing;
-import net.sodium.client.render.chunk.SharedQuadIndexBuffer;
-import net.sodium.client.render.chunk.region.RenderRegion;
+import net.caffeinemc.mods.sodium.client.gl.arena.GlBufferArena;
+import net.caffeinemc.mods.sodium.client.gl.arena.GlBufferSegment;
+import net.caffeinemc.mods.sodium.client.gl.arena.PendingUpload;
+import net.caffeinemc.mods.sodium.client.gl.device.CommandList;
+import net.caffeinemc.mods.sodium.client.model.quad.properties.ModelQuadFacing;
+import net.caffeinemc.mods.sodium.client.render.chunk.SharedQuadIndexBuffer;
+import net.caffeinemc.mods.sodium.client.render.chunk.region.RenderRegion;
 import net.sodium.client.util.UInt32;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;

@@ -1,6 +1,6 @@
 package net.irisshaders.iris.pbr.format;
 
-import net.iris.Iris;
+import net.irisshaders.iris.Iris;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.packs.resources.Resource;
 import net.minecraft.server.packs.resources.ResourceManager;

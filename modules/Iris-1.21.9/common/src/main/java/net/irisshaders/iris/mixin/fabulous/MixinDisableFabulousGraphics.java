@@ -1,6 +1,6 @@
 package net.irisshaders.iris.mixin.fabulous;
 
-import net.iris.Iris;
+import net.irisshaders.iris.Iris;
 import net.minecraft.client.GraphicsStatus;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.Options;

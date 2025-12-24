@@ -19,7 +19,7 @@
 
 package com.seibel.distanthorizons.core.render.glObject.vertexAttribute;
 
-import net.distant_horizons.coreapi.util.MathUtil;
+import net.sodium.api.util.MathUtil;
 import org.lwjgl.opengl.GL32;
 
 public final class VertexPointer
