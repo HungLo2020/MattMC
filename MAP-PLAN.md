@@ -10,7 +10,7 @@ This document outlines the architectural design and feature set for implementing
 - Mouse wheel zoom with maximum detail at 1 pixel per block
 - Waypoint creation with teleportation support via dedicated menu
 - Multi-dimension support (Overworld, Nether, End)
-- Persistent storage across game sessions
+- Persistent storage across game sessions (save-specific for single player, server-specific for multiplayer)
 - No minimap or cave layer complexity
 
 **Key Architectural Decision:**
@@ -143,23 +143,52 @@ Note: This system does NOT use:
 
 ### Directory Structure
 
+**Single Player (Save-Specific):**
 ```
 <minecraft_root>/
-  └── mattmc_map/               # Completely separate from vanilla saves
-      ├── <world_name>/
-      │   ├── overworld/
-      │   │   ├── tiles/
-      │   │   │   ├── zoom_0/  # 1:1 pixel per block (highest detail)
-      │   │   │   ├── zoom_1/  # 1:2 pixel per block
-      │   │   │   ├── zoom_2/  # 1:4 pixel per block
-      │   │   │   └── zoom_n/  # Progressive zoom-out levels
-      │   │   └── explored.dat
-      │   ├── the_nether/
-      │   ├── the_end/
-      │   ├── waypoints.json
-      │   └── config.json
-      └── global_config.json
+  └── mattmc_map/
+      └── saves/
+          └── <world_name>/           # Save-specific directory
+              ├── overworld/
+              │   ├── tiles/
+              │   │   ├── zoom_0/     # 1:1 pixel per block (highest detail)
+              │   │   ├── zoom_1/     # 1:2 pixel per block
+              │   │   ├── zoom_2/     # 1:4 pixel per block
+              │   │   └── zoom_n/     # Progressive zoom-out levels
+              │   └── explored.dat
+              ├── the_nether/
+              ├── the_end/
+              ├── waypoints.json
+              └── config.json
 ```
+
+**Multiplayer/Dedicated Server (Server-Specific):**
+```
+<minecraft_root>/
+  └── mattmc_map/
+      └── servers/
+          └── <server_address>/       # Server-specific directory (not world-specific)
+              ├── overworld/
+              │   ├── tiles/
+              │   │   ├── zoom_0/
+              │   │   ├── zoom_1/
+              │   │   └── zoom_n/
+              │   └── explored.dat
+              ├── the_nether/
+              ├── the_end/
+              ├── waypoints.json
+              └── config.json
+```
+
+**Server Address Format:**
+- IP-based: `192.168.1.100_25565` (IP_PORT)
+- Domain-based: `play.example.com_25565`
+- Localhost: `localhost_25565`
+
+**Directory Selection Logic:**
+- Single player: Use `saves/<world_name>/`
+- Multiplayer: Use `servers/<server_address>/`
+- This ensures each server maintains its own separate map data
 
 ---
 
@@ -217,18 +246,8 @@ Note: This system does NOT use:
 - Customization options:
   - Name (text input)
   - Color (color picker with presets)
-  - Icon (selection from icon set)
   - Dimension (auto-detected, read-only)
   - Coordinates (auto-filled from click location)
-
-**Waypoint Icons:**
-- Home (house icon)
-- Death (skull)
-- Portal (purple swirl)
-- Cave (pickaxe)
-- Village (bell)
-- Custom (star, default)
-- Additional themed icons
 
 **Waypoint Actions:**
 - **Teleport:** Instant teleportation to waypoint
@@ -241,7 +260,8 @@ Note: This system does NOT use:
 - **Navigate:** Show path/direction to waypoint
 
 **Waypoint Display:**
-- Icons rendered on map at waypoint locations
+- Waypoint icon with user-selected color displayed on map
+- Single default icon design (not configurable by user)
 - Name labels (toggle-able)
 - Distance indicator when hovering
 - Visual effects (glow, pulse) for selected waypoint
@@ -278,6 +298,19 @@ Note: This system does NOT use:
 - Background scanning of loaded chunks
 - Manual refresh option
 - Auto-update while map is open
+
+### 6. Save/Server Management
+
+**Single Player:**
+- Maps stored per world save
+- Each world has its own independent map data
+- Waypoints unique to each world
+
+**Multiplayer/Servers:**
+- Maps stored per server address (not per world)
+- Server-specific map persists across reconnections
+- Waypoints shared across all worlds on same server
+- Separate map data for each server you connect to
 
 ---
 
@@ -386,14 +419,13 @@ Note: This system does NOT use:
 - Dimension (world key)
 - Position (x, y, z coordinates)
 - Color (RGB integer)
-- Icon (enum/string identifier)
 - Creation timestamp
 - Enabled flag
 
 **Operations:**
 - Create waypoint
 - Read waypoint (by ID, by name, by dimension)
-- Update waypoint (rename, recolor, change icon)
+- Update waypoint (rename, recolor)
 - Delete waypoint
 - List waypoints (filtered, sorted)
 - Teleport to waypoint
@@ -413,7 +445,7 @@ Note: This system does NOT use:
 2. Determine required tiles (tile coordinates)
 3. Load tiles from cache (or queue generation)
 4. Render tiles to screen (OpenGL texture quads)
-5. Render waypoint icons and labels
+5. Render waypoint markers and labels
 6. Render player marker
 7. Render UI elements (controls, info)
 
@@ -444,6 +476,21 @@ Note: This system does NOT use:
 - Zoom (change zoom level, adjust center)
 - Center on position (player, waypoint)
 - Fit bounds (show specific area)
+
+### Component 8: Save/Server Directory Manager
+
+**Purpose:** Determine correct storage directory based on connection type
+
+**Responsibilities:**
+- Detect if player is in single player or multiplayer
+- Generate appropriate directory path
+- Handle server address formatting
+- Create directories as needed
+
+**Directory Logic:**
+- Single player: Use world save name
+- Multiplayer: Use server IP:port or domain:port
+- Sanitize addresses (replace invalid filesystem characters)
 
 ---
 
@@ -491,12 +538,12 @@ Note: This system does NOT use:
 ├──────────────────────────────────────────────────────────────┤
 │                                                               │
 │  Overworld (3)                                                │
-│    🏠 Home Base          X: 100, Y: 64, Z: 200     [Teleport]│
-│    ⚔️  Mine Entrance     X: -50, Y: 12, Z: 300     [Teleport]│
-│    🏰 Castle             X: 500, Y: 80, Z: -100    [Teleport]│
+│    ● Home Base          X: 100, Y: 64, Z: 200     [Teleport] │
+│    ● Mine Entrance      X: -50, Y: 12, Z: 300     [Teleport] │
+│    ● Castle             X: 500, Y: 80, Z: -100    [Teleport] │
 │                                                               │
 │  The Nether (1)                                               │
-│    🌀 Nether Hub         X: 12, Y: 64, Z: 25       [Teleport]│
+│    ● Nether Hub         X: 12, Y: 64, Z: 25       [Teleport] │
 │                                                               │
 │  The End (0)                                                  │
 │    (No waypoints)                                             │
@@ -510,9 +557,11 @@ Note: This system does NOT use:
 - Search bar (filter by name)
 - Create button (opens creation dialog)
 - Grouped by dimension (collapsible sections)
-- Each waypoint row shows: icon, name, coordinates, teleport button
+- Each waypoint row shows: waypoint icon (colored), name, coordinates, teleport button
 - Selection highlights row
 - Edit/Delete buttons for selected waypoint
+
+**Note:** Waypoints use a single default icon design, colored by user choice (not configurable icons)
 
 ### Create/Edit Waypoint Dialog
 
@@ -522,9 +571,9 @@ Note: This system does NOT use:
 ├─────────────────────────────────────────┤
 │  Name: [_________________________]       │
 │                                          │
-│  Icon: 🏠 🏰 ⚔️ 🎁 🌀 💀 ⛏️ 🔔 ⭐       │
-│                                          │
 │  Color: [●●●●●●●●●●●●] Custom: [    ]  │
+│         Red Orange Yellow Green          │
+│         Blue Purple Pink White           │
 │                                          │
 │  Location:                               │
 │    Dimension: Overworld                  │
@@ -536,9 +585,10 @@ Note: This system does NOT use:
 
 **Fields:**
 - Name (text input, required)
-- Icon (selectable grid of icons)
 - Color (preset palette + custom color picker)
 - Location (auto-filled, can be edited)
+
+**Note:** Uses single default icon design - only color is customizable
 
 ### Settings Panel
 
@@ -584,10 +634,11 @@ Note: This system does NOT use:
 - Coordinates: Monospace for alignment
 - Headers: Bold variant
 
-**Icons:**
-- Waypoint icons: 16×16 pixel art style
-- UI icons: Matching Minecraft GUI style
-- Player marker: Distinctive, always visible
+**Waypoint Markers:**
+- Single default icon design (e.g., pin/marker shape)
+- Size: 12-16 pixels
+- Colors: User-selectable from palette
+- Icon design not configurable (always same shape, just different colors)
 
 ---
 
@@ -597,13 +648,15 @@ Note: This system does NOT use:
 
 **Tile Files:**
 - Format: PNG (compressed)
-- Location: `mattmc_map/<world>/<dimension>/tiles/zoom_<level>/<region>/tile_<x>_<z>.png`
+- Location (Single Player): `mattmc_map/saves/<world_name>/<dimension>/tiles/zoom_<level>/<region>/tile_<x>_<z>.png`
+- Location (Multiplayer): `mattmc_map/servers/<server_address>/<dimension>/tiles/zoom_<level>/<region>/tile_<x>_<z>.png`
 - Naming: Tile coordinates in file name
 - Organization: Grouped by region (32×32 tiles per region directory)
 
 **Waypoint File:**
 - Format: JSON
-- Location: `mattmc_map/<world>/waypoints.json`
+- Location (Single Player): `mattmc_map/saves/<world_name>/waypoints.json`
+- Location (Multiplayer): `mattmc_map/servers/<server_address>/waypoints.json`
 - Structure:
   ```json
   {
@@ -615,7 +668,6 @@ Note: This system does NOT use:
         "dimension": "minecraft:overworld",
         "x": 123, "y": 64, "z": 456,
         "color": 16711680,
-        "icon": "HOME",
         "created": 1234567890000,
         "enabled": true
       }
@@ -625,12 +677,13 @@ Note: This system does NOT use:
 
 **Explored Chunks:**
 - Format: Custom binary format (compact)
-- Location: `mattmc_map/<world>/<dimension>/explored.dat`
+- Location (Single Player): `mattmc_map/saves/<world_name>/<dimension>/explored.dat`
+- Location (Multiplayer): `mattmc_map/servers/<server_address>/<dimension>/explored.dat`
 - Content: Bitset of explored chunk coordinates
 
 **Configuration:**
 - Format: JSON
-- Location: `mattmc_map/<world>/config.json` (per-world) and `mattmc_map/global_config.json` (global)
+- Location: Per-world/server config and global config
 - Settings: Zoom ranges, display options, performance tuning
 
 ### Save/Load Strategy
@@ -650,6 +703,18 @@ Note: This system does NOT use:
 - Corrupted files: Fallback to empty/default state
 - Missing files: Create new with defaults
 - Version mismatch: Attempt migration or reset
+
+### Directory Management
+
+**Single Player Detection:**
+- Check if connected to integrated server
+- Use world save name for directory
+
+**Multiplayer Detection:**
+- Check if connected to dedicated server
+- Extract server address (IP:port or domain:port)
+- Sanitize address for filesystem compatibility
+- Create server-specific directory
 
 ---
 
@@ -681,7 +746,7 @@ Note: This system does NOT use:
 ### Optimization Strategies
 
 **Rendering Optimizations:**
-- Texture atlas for UI elements and waypoint icons
+- Texture atlas for UI elements
 - Batch rendering (minimize draw calls)
 - Viewport culling (don't render offscreen content)
 - LOD system (lower detail for distant areas)
@@ -711,12 +776,13 @@ Note: This system does NOT use:
 - Block color mapper (complete block palette)
 - Chunk data extraction and storage
 - Explored chunk tracking
-- File system structure setup
+- File system structure setup (with save/server detection)
 
 **Validation:**
 - Chunks scanned without blocking game
 - Colors accurate for all block types
 - Explored chunks persist across sessions
+- Correct directory used for single player vs multiplayer
 
 ### Phase 2: Tile System (Weeks 3-4)
 
@@ -758,17 +824,17 @@ Note: This system does NOT use:
 **Focus:** Waypoint creation and management
 
 **Deliverables:**
-- Waypoint data model
+- Waypoint data model (color selection only)
 - Waypoint manager (CRUD operations)
 - Waypoints menu UI
 - Waypoint creation/edit dialog
-- Waypoint rendering on map
+- Waypoint rendering on map (single icon design, user-colored)
 - JSON persistence
 
 **Validation:**
 - Create waypoints via menu
 - Edit and delete waypoints
-- Waypoints render on map
+- Waypoints render on map with default icon in chosen color
 - Waypoints persist across sessions
 - Search and filter work
 
@@ -853,9 +919,11 @@ Note: This system does NOT use:
 
 **Hook:** World load and unload events
 
-**Purpose:** Load/save map data
+**Purpose:** Load/save map data, determine directory
 
 **Actions on Load:**
+- Detect single player vs multiplayer
+- Determine appropriate directory path
 - Load waypoints from JSON
 - Load explored chunks metadata
 - Load configuration
@@ -894,7 +962,9 @@ This map system is designed as a completely **standalone, independent system** t
    - Essential features only (no minimap, no cave layers)
    - Mouse wheel zoom with 1 pixel per block maximum detail
    - Dedicated waypoints menu for creation and teleportation
+   - Single default waypoint icon design (color customizable, shape not)
    - Multi-dimension support with coordinate conversion
+   - Save-specific maps for single player, server-specific for multiplayer
 
 3. **Performance-Oriented:**
    - Async processing to avoid blocking game
@@ -907,16 +977,28 @@ This map system is designed as a completely **standalone, independent system** t
    - Clear UI with dedicated waypoints menu
    - Smooth zoom and pan
    - Integrated with vanilla key bindings
+   - Single default waypoint icon (visible, color customizable)
+
+### Storage Strategy
+
+**Single Player:**
+- Maps saved per world in `mattmc_map/saves/<world_name>/`
+- Each world has independent map data
+
+**Multiplayer:**
+- Maps saved per server in `mattmc_map/servers/<server_address>/`
+- Server maps persist across reconnections
+- Not world-specific - all worlds on same server share map data
 
 ### Timeline
 
 **Total Duration:** 10 weeks
 
 **Major Milestones:**
-- Week 2: Core data collection working
+- Week 2: Core data collection working with save/server detection
 - Week 4: Tiles generating at all zoom levels
 - Week 6: Map GUI functional with zoom
-- Week 8: Waypoint system complete
+- Week 8: Waypoint system complete (default icon, color customizable)
 - Week 9: Teleportation working
 - Week 10: Polish and release
 
@@ -926,15 +1008,17 @@ This map system is designed as a completely **standalone, independent system** t
 - Smooth 60 FPS rendering during pan/zoom
 - Maximum zoom shows 1 pixel per block detail
 - Waypoints menu allows easy creation and teleportation
+- Waypoints display with default icon in user-selected color
 - Multi-dimension support with proper coordinate conversion
 - Data persists correctly across sessions
+- Correct directory used for single player vs multiplayer
 - Memory usage stays under budget
 
 This architecture provides a solid foundation for a high-performance, user-friendly map system that rivals external mods while benefiting from direct source code integration.
 
 ---
 
-*Document Version: 3.0*  
+*Document Version: 4.1*  
 *Updated: December 2024*  
 *For: MattMC (Minecraft 1.21.10)*  
-*Focus: Architecture & Design (Code implementation to follow)*
+*Focus: Architecture & Design (Single default icon, Save/Server-specific storage)*
