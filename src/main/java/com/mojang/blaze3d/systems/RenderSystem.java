@@ -26,6 +26,8 @@ import net.minecraft.api.Environment;
 import net.minecraft.Util;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.DynamicUniforms;
+import net.minecraft.hooks.HookRegistry;
+import net.minecraft.hooks.RenderHooks;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.ArrayListDeque;
 import net.minecraft.util.Mth;
@@ -140,7 +142,19 @@ public class RenderSystem {
 	}
 
 	public static void flipFrame(Window window, @Nullable TracyFrameCapture tracyFrameCapture) {
-		pollEvents();
+		// HOOK: Check if mods want to skip the first pollEvents call
+		boolean skipFirstPoll = false;
+		for (RenderHooks hook : HookRegistry.getRenderHooks()) {
+			if (hook.shouldSkipFirstPollEvents()) {
+				skipFirstPoll = true;
+				break;
+			}
+		}
+		
+		if (!skipFirstPoll) {
+			pollEvents();
+		}
+		
 		Tesselator.getInstance().clear();
 		GLFW.glfwSwapBuffers(window.handle());
 		if (tracyFrameCapture != null) {

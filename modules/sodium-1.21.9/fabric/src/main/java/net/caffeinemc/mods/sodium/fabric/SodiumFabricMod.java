@@ -26,7 +26,8 @@ public class SodiumFabricMod implements ClientModInitializer {
 
         Renderer.register(SodiumRenderer.INSTANCE);
 
-        // Register hook implementation (replaces mixin-based approach)
+        // Register hook implementations (replaces mixin-based approach)
         HookRegistry.registerGameHook(new SodiumGameHook());
+        HookRegistry.registerRenderHook(new SodiumRenderHook());
     }
 }
