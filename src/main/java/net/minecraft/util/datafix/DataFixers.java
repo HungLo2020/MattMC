@@ -373,6 +373,7 @@ import net.minecraft.util.datafix.schemas.V4531;
 import net.minecraft.util.datafix.schemas.V4532;
 import net.minecraft.util.datafix.schemas.V4533;
 import net.minecraft.util.datafix.schemas.V4543;
+import net.minecraft.util.datafix.schemas.V4549;
 import net.minecraft.util.datafix.schemas.V501;
 import net.minecraft.util.datafix.schemas.V700;
 import net.minecraft.util.datafix.schemas.V701;
@@ -1526,6 +1527,9 @@ public class DataFixers {
 		Schema schema278 = dataFixerBuilder.addSchema(4548, SAME_NAMESPACED);
 		dataFixerBuilder.addFixer(new WorldSpawnDataFix(schema278));
 		dataFixerBuilder.addFixer(new PlayerRespawnDataFix(schema278));
+		Schema schema279 = dataFixerBuilder.addSchema(4549, SAME_NAMESPACED);
+		dataFixerBuilder.addFixer(BlockRenameFix.create(schema279, "Rename quantize:tuff_bricks to minecraft:tuff_bricks", createRenamer("quantize:tuff_bricks", "minecraft:tuff_bricks")));
+		dataFixerBuilder.addFixer(ItemRenameFix.create(schema279, "Rename quantize:tuff_bricks to minecraft:tuff_bricks", createRenamer("quantize:tuff_bricks", "minecraft:tuff_bricks")));
 	}
 
 	private static UnaryOperator<String> createRenamerNoNamespace(Map<String, String> map) {
