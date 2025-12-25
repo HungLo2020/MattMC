@@ -186,7 +186,13 @@ public class TreeFeatures {
 	}
 
 	private static TreeConfiguration.TreeConfigurationBuilder createSuperBirch() {
-		return createStraightBlobTree(Blocks.BIRCH_LOG, Blocks.BIRCH_LEAVES, 5, 2, 6, 2).ignoreVines();
+		return new TreeConfiguration.TreeConfigurationBuilder(
+			BlockStateProvider.simple(Blocks.BIRCH_LOG),
+			new OffshootTrunkPlacer(5, 2, 6),
+			BlockStateProvider.simple(Blocks.BIRCH_LEAVES),
+			new BlobFoliagePlacer(ConstantInt.of(2), ConstantInt.of(0), 3),
+			new TwoLayersFeatureSize(1, 0, 1)
+		).ignoreVines();
 	}
 
 	private static TreeConfiguration.TreeConfigurationBuilder createJungleTree() {
