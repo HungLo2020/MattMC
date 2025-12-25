@@ -2,7 +2,6 @@ package net.caffeinemc.mods.sodium.fabric;
 
 import net.caffeinemc.mods.sodium.client.util.color.FastCubicSampler;
 import net.minecraft.client.multiplayer.ClientLevel;
-import net.minecraft.core.QuartPos;
 import net.minecraft.hooks.SkyColorHooks;
 import net.minecraft.util.CubicSampler;
 import net.minecraft.world.level.Level;
@@ -18,16 +17,13 @@ public class SodiumSkyColorHook implements SkyColorHooks {
     @Override
     public Vec3 sampleSkyColor(Level level, Vec3 pos, CubicSampler.Vec3Fetcher rgbFetcher) {
         // Use Sodium's optimized fast cubic sampler for sky color sampling
-        // FastCubicSampler works with block coordinates, so we need to convert to quart coordinates
-        // when fetching biomes
+        // The position (pos) is already in quart coordinates (scaled by 0.25 in getSkyColor)
+        // FastCubicSampler will floor the position and add offsets, maintaining quart coordinates
+        // So the ColorFetcher receives quart coordinates, matching what getNoiseBiomeAtQuart expects
         if (level instanceof ClientLevel clientLevel) {
             return FastCubicSampler.sampleColor(
                 pos,
-                (x, y, z) -> clientLevel.getBiomeManager().getNoiseBiomeAtQuart(
-                    QuartPos.fromBlock(x),
-                    QuartPos.fromBlock(y),
-                    QuartPos.fromBlock(z)
-                ).value().getSkyColor(),
+                (x, y, z) -> clientLevel.getBiomeManager().getNoiseBiomeAtQuart(x, y, z).value().getSkyColor(),
                 Function.identity()
             );
         }
