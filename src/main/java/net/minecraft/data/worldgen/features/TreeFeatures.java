@@ -64,6 +64,7 @@ import net.minecraft.world.level.levelgen.feature.trunkplacers.FancyTrunkPlacer;
 import net.minecraft.world.level.levelgen.feature.trunkplacers.ForkingTrunkPlacer;
 import net.minecraft.world.level.levelgen.feature.trunkplacers.GiantTrunkPlacer;
 import net.minecraft.world.level.levelgen.feature.trunkplacers.MegaJungleTrunkPlacer;
+import net.minecraft.world.level.levelgen.feature.trunkplacers.OffshootTrunkPlacer;
 import net.minecraft.world.level.levelgen.feature.trunkplacers.StraightTrunkPlacer;
 import net.minecraft.world.level.levelgen.feature.trunkplacers.UpwardsBranchingTrunkPlacer;
 
@@ -175,7 +176,13 @@ public class TreeFeatures {
 	}
 
 	private static TreeConfiguration.TreeConfigurationBuilder createBirch() {
-		return createStraightBlobTree(Blocks.BIRCH_LOG, Blocks.BIRCH_LEAVES, 5, 2, 0, 2).ignoreVines();
+		return new TreeConfiguration.TreeConfigurationBuilder(
+			BlockStateProvider.simple(Blocks.BIRCH_LOG),
+			new OffshootTrunkPlacer(5, 2, 0),
+			BlockStateProvider.simple(Blocks.BIRCH_LEAVES),
+			new BlobFoliagePlacer(ConstantInt.of(2), ConstantInt.of(0), 3),
+			new TwoLayersFeatureSize(1, 0, 1)
+		).ignoreVines();
 	}
 
 	private static TreeConfiguration.TreeConfigurationBuilder createSuperBirch() {
