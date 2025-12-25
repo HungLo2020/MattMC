@@ -20,6 +20,7 @@ public class HookRegistry {
     private static final List<FogRenderHooks> fogRenderHooks = new ArrayList<>();
     private static final List<EntityRenderHooks> entityRenderHooks = new ArrayList<>();
     private static final List<SkyColorHooks> skyColorHooks = new ArrayList<>();
+    private static final List<RenderBuffersHooks> renderBuffersHooks = new ArrayList<>();
 
     /**
      * Register a GameHooks implementation.
@@ -274,6 +275,27 @@ public class HookRegistry {
     }
 
     /**
+     * Register a RenderBuffersHooks implementation.
+     * Should be called during mod initialization.
+     *
+     * @param hook The hook implementation to register
+     */
+    public static void registerRenderBuffersHook(RenderBuffersHooks hook) {
+        if (hook != null) {
+            renderBuffersHooks.add(hook);
+        }
+    }
+
+    /**
+     * Get all registered RenderBuffersHooks implementations.
+     *
+     * @return List of registered RenderBuffersHooks
+     */
+    public static List<RenderBuffersHooks> getRenderBuffersHooks() {
+        return new ArrayList<>(renderBuffersHooks);
+    }
+
+    /**
      * Clear all registered hooks. Useful for testing.
      */
     public static void clearAll() {
@@ -289,5 +311,6 @@ public class HookRegistry {
         fogRenderHooks.clear();
         entityRenderHooks.clear();
         skyColorHooks.clear();
+        renderBuffersHooks.clear();
     }
 }
