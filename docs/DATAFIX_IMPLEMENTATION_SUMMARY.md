@@ -1,10 +1,31 @@
 # DataFix Implementation Summary
 
 ## Problem Statement
-You wanted to add a new datafix using Minecraft's DataFixerUpper to remap `quantize:tuff_bricks` to `minecraft:tuff_bricks` when updating an old save file.
+You wanted to add a new datafix using Minecraft's DataFixerUpper to remap quantize tuff blocks to their minecraft equivalents when updating an old save file.
+
+The following blocks needed to be remapped:
+- `quantize:tuff_bricks` → `minecraft:tuff_bricks`
+- `quantize:chiseled_tuff_bricks` → `minecraft:chiseled_tuff_bricks`
+- `quantize:chiseled_tuff` → `minecraft:chiseled_tuff`
+- `quantize:polished_tuff` → `minecraft:polished_tuff`
+- `quantize:polished_tuff_slab` → `minecraft:polished_tuff_slab`
+- `quantize:polished_tuff_stairs` → `minecraft:polished_tuff_stairs`
+- `quantize:tuff_brick_slab` → `minecraft:tuff_brick_slab`
+- `quantize:tuff_brick_stairs` → `minecraft:tuff_brick_stairs`
+
+**Critical requirement:** Block properties (facing direction, rotation, waterlogged state, etc.) must be preserved during conversion.
 
 ## Solution Overview
-I've successfully implemented a DataFixerUpper fix that will automatically convert all instances of `quantize:tuff_bricks` blocks and items to `minecraft:tuff_bricks` when loading older worlds.
+I've successfully implemented a DataFixerUpper fix that will automatically convert all instances of quantize tuff blocks and items to their minecraft equivalents when loading older worlds.
+
+### Block Properties Preservation
+The `BlockRenameFix` class automatically preserves all block properties during the rename operation. This means:
+- Stairs facing directions are preserved
+- Slab positions (top/bottom) are preserved
+- Waterlogged states are preserved
+- Any other block properties are preserved
+
+The fix only changes the block's namespace and name - all properties remain intact!
 
 ## What Was Changed
 
@@ -32,8 +53,42 @@ Added the following code at the end of the `addFixers` method:
 
 ```java
 Schema schema279 = dataFixerBuilder.addSchema(4549, SAME_NAMESPACED);
-dataFixerBuilder.addFixer(BlockRenameFix.create(schema279, "Rename quantize:tuff_bricks to minecraft:tuff_bricks", createRenamer("quantize:tuff_bricks", "minecraft:tuff_bricks")));
-dataFixerBuilder.addFixer(ItemRenameFix.create(schema279, "Rename quantize:tuff_bricks to minecraft:tuff_bricks", createRenamer("quantize:tuff_bricks", "minecraft:tuff_bricks")));
+dataFixerBuilder.addFixer(
+    BlockRenameFix.create(
+        schema279,
+        "Rename quantize tuff blocks to minecraft",
+        createRenamer(
+            ImmutableMap.<String, String>builder()
+                .put("quantize:tuff_bricks", "minecraft:tuff_bricks")
+                .put("quantize:chiseled_tuff_bricks", "minecraft:chiseled_tuff_bricks")
+                .put("quantize:chiseled_tuff", "minecraft:chiseled_tuff")
+                .put("quantize:polished_tuff", "minecraft:polished_tuff")
+                .put("quantize:polished_tuff_slab", "minecraft:polished_tuff_slab")
+                .put("quantize:polished_tuff_stairs", "minecraft:polished_tuff_stairs")
+                .put("quantize:tuff_brick_slab", "minecraft:tuff_brick_slab")
+                .put("quantize:tuff_brick_stairs", "minecraft:tuff_brick_stairs")
+                .build()
+        )
+    )
+);
+dataFixerBuilder.addFixer(
+    ItemRenameFix.create(
+        schema279,
+        "Rename quantize tuff items to minecraft",
+        createRenamer(
+            ImmutableMap.<String, String>builder()
+                .put("quantize:tuff_bricks", "minecraft:tuff_bricks")
+                .put("quantize:chiseled_tuff_bricks", "minecraft:chiseled_tuff_bricks")
+                .put("quantize:chiseled_tuff", "minecraft:chiseled_tuff")
+                .put("quantize:polished_tuff", "minecraft:polished_tuff")
+                .put("quantize:polished_tuff_slab", "minecraft:polished_tuff_slab")
+                .put("quantize:polished_tuff_stairs", "minecraft:polished_tuff_stairs")
+                .put("quantize:tuff_brick_slab", "minecraft:tuff_brick_slab")
+                .put("quantize:tuff_brick_stairs", "minecraft:tuff_brick_stairs")
+                .build()
+        )
+    )
+);
 ```
 
 ### 3. Documentation: `DATAFIX_TUFF_BRICKS.md`
@@ -66,18 +121,30 @@ Comprehensive documentation explaining how the datafix works, how to test it, an
 **Before (in old save):**
 ```json
 {
-  "Name": "quantize:tuff_bricks",
-  "Properties": {}
+  "Name": "quantize:polished_tuff_stairs",
+  "Properties": {
+    "facing": "north",
+    "half": "top",
+    "shape": "straight",
+    "waterlogged": "false"
+  }
 }
 ```
 
 **After (automatically fixed):**
 ```json
 {
-  "Name": "minecraft:tuff_bricks",
-  "Properties": {}
+  "Name": "minecraft:polished_tuff_stairs",
+  "Properties": {
+    "facing": "north",
+    "half": "top",
+    "shape": "straight",
+    "waterlogged": "false"
+  }
 }
 ```
+
+Notice how all properties (facing, half, shape, waterlogged) are preserved!
 
 ## Testing the Implementation
 
@@ -89,12 +156,19 @@ BUILD SUCCESSFUL in 1m 11s
 
 ### How to Test Functionality
 
-1. **Create a test world** with `quantize:tuff_bricks` blocks (if you have access to the quantize mod)
-2. **Load the world** in MattMC
-3. **Verify** that:
-   - Blocks in the world are now `minecraft:tuff_bricks`
-   - Items in inventories/chests are now `minecraft:tuff_bricks`
-   - Breaking blocks drops `minecraft:tuff_bricks`
+1. **Create a test world** with quantize tuff blocks (if you have access to the quantize mod)
+2. **Place various blocks** with different orientations:
+   - Stairs facing different directions
+   - Slabs in top and bottom positions
+   - Waterlogged variants
+3. **Load the world** in MattMC
+4. **Verify** that:
+   - All blocks are now `minecraft:` variants
+   - Stairs still face the correct directions
+   - Slabs are still in the correct positions
+   - Waterlogged states are preserved
+   - Items in inventories/chests are converted
+   - Breaking blocks drops the correct `minecraft:` variants
 
 ### Using NBT Tools
 You can also verify using NBT editors:
