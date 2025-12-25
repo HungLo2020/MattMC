@@ -11,9 +11,7 @@
   },
   "client": [
     "core.GlCommandEncoderAccessor",
-    "core.MinecraftMixin",
     "core.WindowMixin",
-    "core.gui.LevelLoadTrackerMixin",
     "core.model.colors.BlockColorsMixin",
     "core.model.TextureAtlasSpriteMixin",
     "core.render.BlockEntityTypeMixin",
@@ -29,7 +27,6 @@
     "core.render.texture.TextureAtlasAccessor",
     "core.render.world.ChunkSectionsToRenderMixin",
     "core.render.world.EntityRendererAccessor",
-    "core.render.world.FogRendererMixin",
     "core.render.world.GameRendererMixin",
     "core.render.world.RenderBuffersMixin",
     "core.render.world.LevelRendererMixin",
@@ -40,17 +37,9 @@
     "core.world.map.ClientChunkCacheMixin",
     "core.world.map.ClientPacketListenerMixin",
     "core.world.map.ClientLevelMixin",
-    "features.gui.hooks.console.GameRendererMixin",
-    "features.gui.hooks.debug.DebugEntryMemoryMixin",
-    "features.gui.hooks.settings.OptionsScreenMixin",
-    "features.options.overlays.GuiMixin",
-    "features.options.render_layers.LeavesBlockMixin",
-    "features.options.render_layers.ItemBlockRenderTypesMixin",
-    "features.options.weather.LevelRendererMixin",
     "features.render.entity.CubeMixin",
     "features.render.entity.ModelPartMixin",
     "features.render.entity.cull.EntityRendererMixin",
-    "features.render.entity.shadows.ShadowFeatureRendererMixin",
     "features.gui.hooks.debug.DebugScreenEntriesAccessor",
     "features.render.frapi.BakedModelMixin",
     "features.render.frapi.BlockModelPartMixin",
@@ -101,7 +90,6 @@
     "features.textures.scan.SpriteContentsMixin",
     "features.textures.scan.TextureAtlasSpriteMixin",
     "workarounds.context_creation.WindowMixin",
-    "workarounds.context_creation.RenderSystemMixin",
-    "workarounds.event_loop.RenderSystemMixin"
+    "workarounds.context_creation.RenderSystemMixin"
   ]
 }

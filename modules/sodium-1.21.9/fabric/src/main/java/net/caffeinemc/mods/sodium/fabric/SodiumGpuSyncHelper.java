@@ -1,42 +1,28 @@
-package net.caffeinemc.mods.sodium.mixin.core;
+package net.caffeinemc.mods.sodium.fabric;
 
 import it.unimi.dsi.fastutil.longs.LongArrayFIFOQueue;
 import net.caffeinemc.mods.sodium.client.SodiumClientMod;
-import net.caffeinemc.mods.sodium.client.checks.ResourcePackScanner;
-import net.minecraft.client.Minecraft;
-import net.minecraft.server.packs.resources.ReloadableResourceManager;
 import net.minecraft.util.profiling.Profiler;
 import net.minecraft.util.profiling.ProfilerFiller;
 import org.lwjgl.opengl.GL32C;
-import org.spongepowered.asm.mixin.Final;
-import org.spongepowered.asm.mixin.Mixin;
-import org.spongepowered.asm.mixin.Shadow;
-import org.spongepowered.asm.mixin.Unique;
-import org.spongepowered.asm.mixin.injection.At;
-import org.spongepowered.asm.mixin.injection.Inject;
-import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
-import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
-import java.util.concurrent.CompletableFuture;
 
-@Mixin(Minecraft.class)
-public class MinecraftMixin {
-    @Shadow
-    @Final
-    private ReloadableResourceManager resourceManager;
-    @Unique
-    private final LongArrayFIFOQueue fences = new LongArrayFIFOQueue();
+/**
+ * Helper class to manage GPU synchronization fences for Sodium.
+ * Replaces the fence queue that was in MinecraftMixin.
+ */
+public class SodiumGpuSyncHelper {
+    private static final LongArrayFIFOQueue fences = new LongArrayFIFOQueue();
 
     /**
-     * We run this at the beginning of the frame (except for the first frame) to give the previous frame plenty of time
-     * to render on the GPU. This allows us to stall on ClientWaitSync for less time.
+     * Called at the beginning of each frame to wait for the GPU to catch up.
+     * This allows us to stall on ClientWaitSync for less time.
      */
-    @Inject(method = "runTick", at = @At("HEAD"))
-    private void preRender(boolean tick, CallbackInfo ci) {
+    public static void beforeFrameTick() {
         ProfilerFiller profiler = Profiler.get();
         profiler.push("wait_for_gpu");
 
-        while (this.fences.size() > SodiumClientMod.options().advanced.cpuRenderAheadLimit) {
-            var fence = this.fences.dequeueLong();
+        while (fences.size() > SodiumClientMod.options().advanced.cpuRenderAheadLimit) {
+            long fence = fences.dequeueLong();
             // We do a ClientWaitSync here instead of a WaitSync to not allow the CPU to get too far ahead of the GPU.
             // This is also needed to make sure that our persistently-mapped staging buffers function correctly, rather
             // than being overwritten by data meant for future frames before the current one has finished rendering on
@@ -61,23 +47,16 @@ public class MinecraftMixin {
         profiler.pop();
     }
 
-    @Inject(method = "runTick", at = @At("RETURN"))
-    private void postRender(boolean tick, CallbackInfo ci) {
-        var fence = GL32C.glFenceSync(GL32C.GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
+    /**
+     * Called at the end of each frame to create a new fence for GPU synchronization.
+     */
+    public static void afterFrameTick() {
+        long fence = GL32C.glFenceSync(GL32C.GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
 
         if (fence == 0) {
             throw new RuntimeException("Failed to create fence object");
         }
 
-        this.fences.enqueue(fence);
+        fences.enqueue(fence);
     }
-
-    /**
-     * Check for problematic core shader resource packs after every resource reload.
-     */
-    @Inject(method = "reloadResourcePacks()Ljava/util/concurrent/CompletableFuture;", at = @At("TAIL"))
-    private void postResourceReload(CallbackInfoReturnable<CompletableFuture<Void>> cir) {
-        ResourcePackScanner.checkIfCoreShaderLoaded(this.resourceManager);
-    }
-
 }

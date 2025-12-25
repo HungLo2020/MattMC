@@ -13,5 +13,31 @@ public interface GameHooks {
      *
      * @param minecraft The Minecraft instance
      */
-    void onGameInitialized(Minecraft minecraft);
+    default void onGameInitialized(Minecraft minecraft) {}
+
+    /**
+     * Called at the start of each tick/frame, before any rendering or game logic.
+     * Replaces @Inject(method = "runTick", at = @At("HEAD"))
+     *
+     * @param minecraft The Minecraft instance
+     * @param tick Whether this is a game tick (true) or just a render frame (false)
+     */
+    default void beforeRunTick(Minecraft minecraft, boolean tick) {}
+
+    /**
+     * Called at the end of each tick/frame, after all rendering and game logic.
+     * Replaces @Inject(method = "runTick", at = @At("RETURN"))
+     *
+     * @param minecraft The Minecraft instance
+     * @param tick Whether this was a game tick (true) or just a render frame (false)
+     */
+    default void afterRunTick(Minecraft minecraft, boolean tick) {}
+
+    /**
+     * Called after resource packs are reloaded.
+     * Replaces @Inject(method = "reloadResourcePacks()...", at = @At("TAIL"))
+     *
+     * @param minecraft The Minecraft instance
+     */
+    default void afterResourceReload(Minecraft minecraft) {}
 }
