@@ -26,4 +26,12 @@ public interface FogRenderHooks {
     default void onFogParametersCalculated(Camera camera, int fogMode, boolean bl, 
                                           DeltaTracker deltaTracker, float partialTicks, 
                                           ClientLevel level, FogData fogData, Vector4f fogColor) {}
+    
+    /**
+     * Allows mods to provide fog parameters for shader rendering (for Iris compatibility).
+     * Returns fog parameters object (typically FogParameters from Sodium).
+     */
+    default Object getFogParameters() {
+        return null;
+    }
 }

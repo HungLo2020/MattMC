@@ -188,7 +188,7 @@ public abstract class LevelRendererMixin implements LevelRendererExtension {
 
         try {
             // Use the hook-based fog parameter storage instead of mixin cast
-            this.renderer.setupTerrain(camera, viewport, net.caffeinemc.mods.sodium.fabric.SodiumFogRenderHook.getFogParameters(), spectator, updateChunksImmediately, matrices);
+            this.renderer.setupTerrain(camera, viewport, net.caffeinemc.mods.sodium.fabric.SodiumFogRenderHook.getFogParametersStatic(), spectator, updateChunksImmediately, matrices);
         } finally {
             RenderDevice.exitManagedCode();
         }

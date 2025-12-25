@@ -27,11 +27,16 @@ public class SodiumFogRenderHook implements FogRenderHooks {
         );
     }
     
+    @Override
+    public Object getFogParameters() {
+        return cachedParameters;
+    }
+    
     /**
      * Get the cached fog parameters.
      * @return The most recently calculated fog parameters
      */
-    public static FogParameters getFogParameters() {
+    public static FogParameters getFogParametersStatic() {
         return cachedParameters;
     }
 }
