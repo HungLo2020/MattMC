@@ -256,6 +256,8 @@ import net.minecraft.network.syncher.SynchedEntityData.DataValue;
 import net.minecraft.resources.RegistryOps;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.hooks.HookRegistry;
+import net.minecraft.hooks.ClientPacketListenerHooks;
 import net.minecraft.server.level.ClientInformation;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundEvents;
@@ -894,6 +896,11 @@ public class ClientPacketListener extends ClientCommonPacketListenerImpl impleme
 		this.level.getChunkSource().drop(clientboundForgetLevelChunkPacket.pos());
 		this.debugSubscriber.dropChunk(clientboundForgetLevelChunkPacket.pos());
 		this.queueLightRemoval(clientboundForgetLevelChunkPacket);
+		
+		// Call hooks after handling chunk unload
+		for (ClientPacketListenerHooks hook : HookRegistry.getClientPacketListenerHooks()) {
+			hook.onChunkUnload(this.level, clientboundForgetLevelChunkPacket);
+		}
 	}
 
 	private void queueLightRemoval(ClientboundForgetLevelChunkPacket clientboundForgetLevelChunkPacket) {
@@ -2400,6 +2407,11 @@ public class ClientPacketListener extends ClientCommonPacketListenerImpl impleme
 		Iterator<byte[]> iterator2 = clientboundLightUpdatePacketData.getBlockUpdates().iterator();
 		this.readSectionList(i, j, levelLightEngine, LightLayer.BLOCK, bitSet3, bitSet4, iterator2, bl);
 		levelLightEngine.setLightEnabled(new ChunkPos(i, j), true);
+		
+		// Call hooks after applying light data
+		for (ClientPacketListenerHooks hook : HookRegistry.getClientPacketListenerHooks()) {
+			hook.onLightDataApplied(this.level, i, j, clientboundLightUpdatePacketData, bl);
+		}
 	}
 
 	public void handleMerchantOffers(ClientboundMerchantOffersPacket clientboundMerchantOffersPacket) {
