@@ -18,6 +18,8 @@ import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.client.renderer.texture.TextureManager;
 import net.minecraft.client.resources.metadata.gui.GuiMetadataSection;
 import net.minecraft.data.AtlasIds;
+import net.minecraft.hooks.AtlasManagerHooks;
+import net.minecraft.hooks.HookRegistry;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.packs.metadata.MetadataSectionType;
 import net.minecraft.server.packs.resources.PreparableReloadListener;
@@ -88,17 +90,25 @@ public class AtlasManager implements PreparableReloadListener, MaterialSet, Auto
 	@Override
 	public TextureAtlasSprite get(Material material) {
 		TextureAtlasSprite textureAtlasSprite = (TextureAtlasSprite)this.materialLookup.get(material);
+		TextureAtlasSprite result;
 		if (textureAtlasSprite != null) {
-			return textureAtlasSprite;
+			result = textureAtlasSprite;
 		} else {
 			ResourceLocation resourceLocation = material.atlasLocation();
 			AtlasManager.AtlasEntry atlasEntry = (AtlasManager.AtlasEntry)this.atlasByTexture.get(resourceLocation);
 			if (atlasEntry == null) {
 				throw new IllegalArgumentException("Invalid atlas texture id: " + resourceLocation);
 			} else {
-				return atlasEntry.atlas().missingSprite();
+				result = atlasEntry.atlas().missingSprite();
 			}
 		}
+		
+		// Call hooks after sprite is retrieved
+		for (AtlasManagerHooks hook : HookRegistry.getAtlasManagerHooks()) {
+			hook.onSpriteRetrieved(material, result);
+		}
+		
+		return result;
 	}
 
 	public void prepareSharedState(SharedState sharedState) {

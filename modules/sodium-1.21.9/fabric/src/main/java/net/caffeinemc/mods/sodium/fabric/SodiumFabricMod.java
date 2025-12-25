@@ -42,5 +42,7 @@ public class SodiumFabricMod implements ClientModInitializer {
         HookRegistry.registerRenderBuffersHook(new SodiumRenderBuffersHook());
         HookRegistry.registerTextureAtlasSpriteHook(new SodiumTextureAtlasSpriteHook());
         HookRegistry.registerFogColorHook(new SodiumFogColorHook());
+        HookRegistry.registerAtlasManagerHook(new SodiumAtlasManagerHook());
+        HookRegistry.registerTextureAtlasHook(new SodiumTextureAtlasHook());
     }
 }

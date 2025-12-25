@@ -23,6 +23,8 @@ public class HookRegistry {
     private static final List<RenderBuffersHooks> renderBuffersHooks = new ArrayList<>();
     private static final List<TextureAtlasSpriteHooks> textureAtlasSpriteHooks = new ArrayList<>();
     private static final List<FogColorHooks> fogColorHooks = new ArrayList<>();
+    private static final List<AtlasManagerHooks> atlasManagerHooks = new ArrayList<>();
+    private static final List<TextureAtlasHooks> textureAtlasHooks = new ArrayList<>();
 
     /**
      * Register a GameHooks implementation.
@@ -340,6 +342,48 @@ public class HookRegistry {
     }
 
     /**
+     * Register an AtlasManagerHooks implementation.
+     * Should be called during mod initialization.
+     *
+     * @param hook The hook implementation to register
+     */
+    public static void registerAtlasManagerHook(AtlasManagerHooks hook) {
+        if (hook != null) {
+            atlasManagerHooks.add(hook);
+        }
+    }
+
+    /**
+     * Get all registered AtlasManagerHooks implementations.
+     *
+     * @return List of registered AtlasManagerHooks
+     */
+    public static List<AtlasManagerHooks> getAtlasManagerHooks() {
+        return new ArrayList<>(atlasManagerHooks);
+    }
+
+    /**
+     * Register a TextureAtlasHooks implementation.
+     * Should be called during mod initialization.
+     *
+     * @param hook The hook implementation to register
+     */
+    public static void registerTextureAtlasHook(TextureAtlasHooks hook) {
+        if (hook != null) {
+            textureAtlasHooks.add(hook);
+        }
+    }
+
+    /**
+     * Get all registered TextureAtlasHooks implementations.
+     *
+     * @return List of registered TextureAtlasHooks
+     */
+    public static List<TextureAtlasHooks> getTextureAtlasHooks() {
+        return new ArrayList<>(textureAtlasHooks);
+    }
+
+    /**
      * Clear all registered hooks. Useful for testing.
      */
     public static void clearAll() {
@@ -358,5 +402,7 @@ public class HookRegistry {
         renderBuffersHooks.clear();
         textureAtlasSpriteHooks.clear();
         fogColorHooks.clear();
+        atlasManagerHooks.clear();
+        textureAtlasHooks.clear();
     }
 }
