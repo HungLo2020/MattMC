@@ -76,6 +76,18 @@ public abstract class LeavesBlock extends Block implements SimpleWaterloggedBloc
 	}
 
 	@Override
+	protected boolean skipRendering(BlockState state, BlockState stateFrom, Direction direction) {
+		// Call hooks to allow mods to customize skip rendering behavior
+		for (net.minecraft.hooks.BlockRenderHooks hook : net.minecraft.hooks.HookRegistry.getBlockRenderHooks()) {
+			Boolean override = hook.shouldSkipRendering(state, stateFrom, direction, super.skipRendering(state, stateFrom, direction));
+			if (override != null) {
+				return override;
+			}
+		}
+		return super.skipRendering(state, stateFrom, direction);
+	}
+
+	@Override
 	protected BlockState updateShape(
 		BlockState blockState,
 		LevelReader levelReader,

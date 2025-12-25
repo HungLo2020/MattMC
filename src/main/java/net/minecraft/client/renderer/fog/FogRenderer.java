@@ -179,6 +179,11 @@ public class FogRenderer implements AutoCloseable {
 		fogData.renderDistanceStart = h - j;
 		fogData.renderDistanceEnd = h;
 
+		// Call hooks to allow mods to intercept fog parameters
+		for (net.minecraft.hooks.FogRenderHooks hook : net.minecraft.hooks.HookRegistry.getFogRenderHooks()) {
+			hook.onFogParametersCalculated(camera, i, bl, deltaTracker, f, clientLevel, fogData, vector4f);
+		}
+
 		try (GpuBuffer.MappedView mappedView = RenderSystem.getDevice().createCommandEncoder().mapBuffer(this.regularBuffer.currentBuffer(), false, true)) {
 			this.updateBuffer(
 				mappedView.data(),
