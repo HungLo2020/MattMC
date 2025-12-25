@@ -25,6 +25,7 @@
     "core.render.texture.TextureAtlasAccessor",
     "core.render.world.ChunkSectionsToRenderMixin",
     "core.render.world.EntityRendererAccessor",
+    "core.render.world.GameRendererMixin",
     "core.render.world.LevelRendererMixin",
     "core.world.biome.ClientLevelMixin",
     "core.world.chunk.ZeroBitStorageMixin",

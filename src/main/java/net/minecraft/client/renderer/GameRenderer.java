@@ -100,7 +100,7 @@ import org.joml.Vector4f;
 import org.slf4j.Logger;
 
 @Environment(EnvType.CLIENT)
-public class GameRenderer implements Projector, AutoCloseable, net.minecraft.hooks.FogStorage {
+public class GameRenderer implements Projector, AutoCloseable {
 	private static final ResourceLocation BLUR_POST_CHAIN_ID = ResourceLocation.withDefaultNamespace("blur");
 	public static final int MAX_BLUR_RADIUS = 10;
 	private static final Logger LOGGER = LogUtils.getLogger();
@@ -957,18 +957,5 @@ public class GameRenderer implements Projector, AutoCloseable, net.minecraft.hoo
 
 	public synchronized PanoramaRenderer getPanorama() {
 		return this.panorama;
-	}
-
-	// FogStorage interface implementation for Iris shader compatibility
-	@Override
-	public Object sodium$getFogParameters() {
-		// Delegate to hook-based fog parameter storage
-		for (net.minecraft.hooks.FogRenderHooks hook : net.minecraft.hooks.HookRegistry.getFogRenderHooks()) {
-			Object params = hook.getFogParameters();
-			if (params != null) {
-				return params;
-			}
-		}
-		return null;
 	}
 }
