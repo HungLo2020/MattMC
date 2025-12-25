@@ -134,7 +134,7 @@ public class GameRules {
 		"disableRaids", GameRules.Category.MOBS, GameRules.BooleanValue.create(false)
 	);
 	public static final GameRules.Key<GameRules.BooleanValue> RULE_DOINSOMNIA = register(
-		"doInsomnia", GameRules.Category.SPAWNING, GameRules.BooleanValue.create(true)
+		"doInsomnia", GameRules.Category.SPAWNING, GameRules.BooleanValue.create(false)
 	);
 	public static final GameRules.Key<GameRules.BooleanValue> RULE_DO_IMMEDIATE_RESPAWN = register(
 		"doImmediateRespawn", GameRules.Category.PLAYER, GameRules.BooleanValue.create(false, (minecraftServer, booleanValue) -> {
