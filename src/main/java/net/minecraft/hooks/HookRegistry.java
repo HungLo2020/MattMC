@@ -21,6 +21,8 @@ public class HookRegistry {
     private static final List<EntityRenderHooks> entityRenderHooks = new ArrayList<>();
     private static final List<SkyColorHooks> skyColorHooks = new ArrayList<>();
     private static final List<RenderBuffersHooks> renderBuffersHooks = new ArrayList<>();
+    private static final List<TextureAtlasSpriteHooks> textureAtlasSpriteHooks = new ArrayList<>();
+    private static final List<FogColorHooks> fogColorHooks = new ArrayList<>();
 
     /**
      * Register a GameHooks implementation.
@@ -296,6 +298,48 @@ public class HookRegistry {
     }
 
     /**
+     * Register a TextureAtlasSpriteHooks implementation.
+     * Should be called during mod initialization.
+     *
+     * @param hook The hook implementation to register
+     */
+    public static void registerTextureAtlasSpriteHook(TextureAtlasSpriteHooks hook) {
+        if (hook != null) {
+            textureAtlasSpriteHooks.add(hook);
+        }
+    }
+
+    /**
+     * Get all registered TextureAtlasSpriteHooks implementations.
+     *
+     * @return List of registered TextureAtlasSpriteHooks
+     */
+    public static List<TextureAtlasSpriteHooks> getTextureAtlasSpriteHooks() {
+        return new ArrayList<>(textureAtlasSpriteHooks);
+    }
+
+    /**
+     * Register a FogColorHooks implementation.
+     * Should be called during mod initialization.
+     *
+     * @param hook The hook implementation to register
+     */
+    public static void registerFogColorHook(FogColorHooks hook) {
+        if (hook != null) {
+            fogColorHooks.add(hook);
+        }
+    }
+
+    /**
+     * Get all registered FogColorHooks implementations.
+     *
+     * @return List of registered FogColorHooks
+     */
+    public static List<FogColorHooks> getFogColorHooks() {
+        return new ArrayList<>(fogColorHooks);
+    }
+
+    /**
      * Clear all registered hooks. Useful for testing.
      */
     public static void clearAll() {
@@ -312,5 +356,7 @@ public class HookRegistry {
         entityRenderHooks.clear();
         skyColorHooks.clear();
         renderBuffersHooks.clear();
+        textureAtlasSpriteHooks.clear();
+        fogColorHooks.clear();
     }
 }

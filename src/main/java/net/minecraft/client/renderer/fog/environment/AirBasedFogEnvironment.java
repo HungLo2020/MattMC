@@ -4,6 +4,8 @@ import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.client.Camera;
 import net.minecraft.client.multiplayer.ClientLevel;
+import net.minecraft.hooks.FogColorHooks;
+import net.minecraft.hooks.HookRegistry;
 import net.minecraft.util.ARGB;
 import net.minecraft.util.CubicSampler;
 import net.minecraft.util.Mth;
@@ -19,10 +21,24 @@ public abstract class AirBasedFogEnvironment extends FogEnvironment {
 		float g = Mth.clamp(Mth.cos(clientLevel.getTimeOfDay(f) * (float) (Math.PI * 2)) * 2.0F + 0.5F, 0.0F, 1.0F);
 		BiomeManager biomeManager = clientLevel.getBiomeManager();
 		Vec3 vec3 = camera.getPosition().subtract(2.0, 2.0, 2.0).scale(0.25);
+		
+		// Allow hooks to provide custom fog color sampling
+		CubicSampler.Vec3Fetcher rgbFetcher = (ix, jx, kx) -> Vec3.fromRGB24(((Biome)biomeManager.getNoiseBiomeAtQuart(ix, jx, kx).value()).getFogColor());
+		Vec3 sampledColor = null;
+		for (FogColorHooks hook : HookRegistry.getFogColorHooks()) {
+			sampledColor = hook.sampleFogColor(biomeManager, vec3, rgbFetcher);
+			if (sampledColor != null) {
+				break;
+			}
+		}
+		
+		// Fall back to default implementation if no hook provided a result
+		if (sampledColor == null) {
+			sampledColor = CubicSampler.gaussianSampleVec3(vec3, rgbFetcher);
+		}
+		
 		Vec3 vec32 = clientLevel.effects()
-			.getBrightnessDependentFogColor(
-				CubicSampler.gaussianSampleVec3(vec3, (ix, jx, kx) -> Vec3.fromRGB24(((Biome)biomeManager.getNoiseBiomeAtQuart(ix, jx, kx).value()).getFogColor())), g
-			);
+			.getBrightnessDependentFogColor(sampledColor, g);
 		float h = (float)vec32.x();
 		float j = (float)vec32.y();
 		float k = (float)vec32.z();
