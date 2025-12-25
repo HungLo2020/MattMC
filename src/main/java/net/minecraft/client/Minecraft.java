@@ -1771,8 +1771,10 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 
 		if (this.level != null) {
 			if (!this.pause) {
-				profilerFiller.popPush("gameRenderer");
-				this.gameRenderer.tick();
+				if (this.player != null) {
+					profilerFiller.popPush("gameRenderer");
+					this.gameRenderer.tick();
+				}
 				profilerFiller.popPush("entities");
 				this.level.tickEntities();
 				profilerFiller.popPush("blockEntities");
