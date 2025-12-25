@@ -14,6 +14,11 @@ public class HookRegistry {
     private static final List<GuiRenderHooks> guiRenderHooks = new ArrayList<>();
     private static final List<DebugScreenHooks> debugScreenHooks = new ArrayList<>();
     private static final List<ScreenFactoryHooks> screenFactoryHooks = new ArrayList<>();
+    private static final List<BlockRenderHooks> blockRenderHooks = new ArrayList<>();
+    private static final List<RenderTypeHooks> renderTypeHooks = new ArrayList<>();
+    private static final List<PlayerPositionHooks> playerPositionHooks = new ArrayList<>();
+    private static final List<FogRenderHooks> fogRenderHooks = new ArrayList<>();
+    private static final List<EntityRenderHooks> entityRenderHooks = new ArrayList<>();
 
     /**
      * Register a GameHooks implementation.
@@ -142,6 +147,111 @@ public class HookRegistry {
     }
 
     /**
+     * Register a BlockRenderHooks implementation.
+     * Should be called during mod initialization.
+     *
+     * @param hook The hook implementation to register
+     */
+    public static void registerBlockRenderHook(BlockRenderHooks hook) {
+        if (hook != null) {
+            blockRenderHooks.add(hook);
+        }
+    }
+
+    /**
+     * Get all registered BlockRenderHooks implementations.
+     *
+     * @return List of registered BlockRenderHooks
+     */
+    public static List<BlockRenderHooks> getBlockRenderHooks() {
+        return new ArrayList<>(blockRenderHooks);
+    }
+
+    /**
+     * Register a RenderTypeHooks implementation.
+     * Should be called during mod initialization.
+     *
+     * @param hook The hook implementation to register
+     */
+    public static void registerRenderTypeHook(RenderTypeHooks hook) {
+        if (hook != null) {
+            renderTypeHooks.add(hook);
+        }
+    }
+
+    /**
+     * Get all registered RenderTypeHooks implementations.
+     *
+     * @return List of registered RenderTypeHooks
+     */
+    public static List<RenderTypeHooks> getRenderTypeHooks() {
+        return new ArrayList<>(renderTypeHooks);
+    }
+
+    /**
+     * Register a PlayerPositionHooks implementation.
+     * Should be called during mod initialization.
+     *
+     * @param hook The hook implementation to register
+     */
+    public static void registerPlayerPositionHook(PlayerPositionHooks hook) {
+        if (hook != null) {
+            playerPositionHooks.add(hook);
+        }
+    }
+
+    /**
+     * Get all registered PlayerPositionHooks implementations.
+     *
+     * @return List of registered PlayerPositionHooks
+     */
+    public static List<PlayerPositionHooks> getPlayerPositionHooks() {
+        return new ArrayList<>(playerPositionHooks);
+    }
+
+    /**
+     * Register a FogRenderHooks implementation.
+     * Should be called during mod initialization.
+     *
+     * @param hook The hook implementation to register
+     */
+    public static void registerFogRenderHook(FogRenderHooks hook) {
+        if (hook != null) {
+            fogRenderHooks.add(hook);
+        }
+    }
+
+    /**
+     * Get all registered FogRenderHooks implementations.
+     *
+     * @return List of registered FogRenderHooks
+     */
+    public static List<FogRenderHooks> getFogRenderHooks() {
+        return new ArrayList<>(fogRenderHooks);
+    }
+
+    /**
+     * Register an EntityRenderHooks implementation.
+     * Should be called during mod initialization.
+     *
+     * @param hook The hook implementation to register
+     */
+    public static void registerEntityRenderHook(EntityRenderHooks hook) {
+        if (hook != null) {
+            entityRenderHooks.add(hook);
+        }
+    }
+
+    /**
+     * Get all registered EntityRenderHooks implementations.
+     *
+     * @return List of registered EntityRenderHooks
+     */
+    public static List<EntityRenderHooks> getEntityRenderHooks() {
+        return new ArrayList<>(entityRenderHooks);
+    }
+
+    /**
      * Clear all registered hooks. Useful for testing.
      */
     public static void clearAll() {
@@ -151,5 +261,10 @@ public class HookRegistry {
         guiRenderHooks.clear();
         debugScreenHooks.clear();
         screenFactoryHooks.clear();
+        blockRenderHooks.clear();
+        renderTypeHooks.clear();
+        playerPositionHooks.clear();
+        fogRenderHooks.clear();
+        entityRenderHooks.clear();
     }
 }
