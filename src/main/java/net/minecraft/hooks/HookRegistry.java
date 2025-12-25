@@ -19,6 +19,12 @@ public class HookRegistry {
     private static final List<PlayerPositionHooks> playerPositionHooks = new ArrayList<>();
     private static final List<FogRenderHooks> fogRenderHooks = new ArrayList<>();
     private static final List<EntityRenderHooks> entityRenderHooks = new ArrayList<>();
+    private static final List<SkyColorHooks> skyColorHooks = new ArrayList<>();
+    private static final List<RenderBuffersHooks> renderBuffersHooks = new ArrayList<>();
+    private static final List<TextureAtlasSpriteHooks> textureAtlasSpriteHooks = new ArrayList<>();
+    private static final List<FogColorHooks> fogColorHooks = new ArrayList<>();
+    private static final List<AtlasManagerHooks> atlasManagerHooks = new ArrayList<>();
+    private static final List<TextureAtlasHooks> textureAtlasHooks = new ArrayList<>();
 
     /**
      * Register a GameHooks implementation.
@@ -252,6 +258,132 @@ public class HookRegistry {
     }
 
     /**
+     * Register a SkyColorHooks implementation.
+     * Should be called during mod initialization.
+     *
+     * @param hook The hook implementation to register
+     */
+    public static void registerSkyColorHook(SkyColorHooks hook) {
+        if (hook != null) {
+            skyColorHooks.add(hook);
+        }
+    }
+
+    /**
+     * Get all registered SkyColorHooks implementations.
+     *
+     * @return List of registered SkyColorHooks
+     */
+    public static List<SkyColorHooks> getSkyColorHooks() {
+        return new ArrayList<>(skyColorHooks);
+    }
+
+    /**
+     * Register a RenderBuffersHooks implementation.
+     * Should be called during mod initialization.
+     *
+     * @param hook The hook implementation to register
+     */
+    public static void registerRenderBuffersHook(RenderBuffersHooks hook) {
+        if (hook != null) {
+            renderBuffersHooks.add(hook);
+        }
+    }
+
+    /**
+     * Get all registered RenderBuffersHooks implementations.
+     *
+     * @return List of registered RenderBuffersHooks
+     */
+    public static List<RenderBuffersHooks> getRenderBuffersHooks() {
+        return new ArrayList<>(renderBuffersHooks);
+    }
+
+    /**
+     * Register a TextureAtlasSpriteHooks implementation.
+     * Should be called during mod initialization.
+     *
+     * @param hook The hook implementation to register
+     */
+    public static void registerTextureAtlasSpriteHook(TextureAtlasSpriteHooks hook) {
+        if (hook != null) {
+            textureAtlasSpriteHooks.add(hook);
+        }
+    }
+
+    /**
+     * Get all registered TextureAtlasSpriteHooks implementations.
+     *
+     * @return List of registered TextureAtlasSpriteHooks
+     */
+    public static List<TextureAtlasSpriteHooks> getTextureAtlasSpriteHooks() {
+        return new ArrayList<>(textureAtlasSpriteHooks);
+    }
+
+    /**
+     * Register a FogColorHooks implementation.
+     * Should be called during mod initialization.
+     *
+     * @param hook The hook implementation to register
+     */
+    public static void registerFogColorHook(FogColorHooks hook) {
+        if (hook != null) {
+            fogColorHooks.add(hook);
+        }
+    }
+
+    /**
+     * Get all registered FogColorHooks implementations.
+     *
+     * @return List of registered FogColorHooks
+     */
+    public static List<FogColorHooks> getFogColorHooks() {
+        return new ArrayList<>(fogColorHooks);
+    }
+
+    /**
+     * Register an AtlasManagerHooks implementation.
+     * Should be called during mod initialization.
+     *
+     * @param hook The hook implementation to register
+     */
+    public static void registerAtlasManagerHook(AtlasManagerHooks hook) {
+        if (hook != null) {
+            atlasManagerHooks.add(hook);
+        }
+    }
+
+    /**
+     * Get all registered AtlasManagerHooks implementations.
+     *
+     * @return List of registered AtlasManagerHooks
+     */
+    public static List<AtlasManagerHooks> getAtlasManagerHooks() {
+        return new ArrayList<>(atlasManagerHooks);
+    }
+
+    /**
+     * Register a TextureAtlasHooks implementation.
+     * Should be called during mod initialization.
+     *
+     * @param hook The hook implementation to register
+     */
+    public static void registerTextureAtlasHook(TextureAtlasHooks hook) {
+        if (hook != null) {
+            textureAtlasHooks.add(hook);
+        }
+    }
+
+    /**
+     * Get all registered TextureAtlasHooks implementations.
+     *
+     * @return List of registered TextureAtlasHooks
+     */
+    public static List<TextureAtlasHooks> getTextureAtlasHooks() {
+        return new ArrayList<>(textureAtlasHooks);
+    }
+
+    /**
      * Clear all registered hooks. Useful for testing.
      */
     public static void clearAll() {
@@ -266,5 +398,11 @@ public class HookRegistry {
         playerPositionHooks.clear();
         fogRenderHooks.clear();
         entityRenderHooks.clear();
+        skyColorHooks.clear();
+        renderBuffersHooks.clear();
+        textureAtlasSpriteHooks.clear();
+        fogColorHooks.clear();
+        atlasManagerHooks.clear();
+        textureAtlasHooks.clear();
     }
 }

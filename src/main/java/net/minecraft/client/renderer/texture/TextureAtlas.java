@@ -19,6 +19,8 @@ import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.CrashReport;
 import net.minecraft.CrashReportCategory;
+import net.minecraft.hooks.HookRegistry;
+import net.minecraft.hooks.TextureAtlasHooks;
 import net.minecraft.ReportedException;
 import net.minecraft.SharedConstants;
 import net.minecraft.resources.ResourceLocation;
@@ -171,6 +173,11 @@ public class TextureAtlas extends AbstractTexture implements Dumpable, Tickable 
 		if (textureAtlasSprite == null) {
 			throw new IllegalStateException("Tried to lookup sprite, but atlas is not initialized");
 		} else {
+			// Call hooks after sprite is retrieved
+			for (TextureAtlasHooks hook : HookRegistry.getTextureAtlasHooks()) {
+				hook.onSpriteRetrieved(resourceLocation, textureAtlasSprite);
+			}
+			
 			return textureAtlasSprite;
 		}
 	}

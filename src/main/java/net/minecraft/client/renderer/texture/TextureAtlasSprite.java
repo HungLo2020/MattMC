@@ -5,6 +5,8 @@ import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.client.renderer.SpriteCoordinateExpander;
+import net.minecraft.hooks.HookRegistry;
+import net.minecraft.hooks.TextureAtlasSpriteHooks;
 import net.minecraft.resources.ResourceLocation;
 import org.jetbrains.annotations.Nullable;
 
@@ -113,7 +115,17 @@ public class TextureAtlasSprite {
 	}
 
 	public float uvShrinkRatio() {
-		return 4.0F / this.atlasSize();
+		float defaultRatio = 4.0F / this.atlasSize();
+		
+		// Allow hooks to override UV shrink ratio
+		for (TextureAtlasSpriteHooks hook : HookRegistry.getTextureAtlasSpriteHooks()) {
+			Float customRatio = hook.overrideUvShrinkRatio(this, defaultRatio);
+			if (customRatio != null) {
+				return customRatio;
+			}
+		}
+		
+		return defaultRatio;
 	}
 
 	public VertexConsumer wrap(VertexConsumer vertexConsumer) {

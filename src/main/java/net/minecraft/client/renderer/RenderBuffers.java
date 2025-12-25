@@ -8,6 +8,8 @@ import net.minecraft.api.Environment;
 import net.minecraft.Util;
 import net.minecraft.client.renderer.chunk.ChunkSectionLayer;
 import net.minecraft.client.resources.model.ModelBakery;
+import net.minecraft.hooks.HookRegistry;
+import net.minecraft.hooks.RenderBuffersHooks;
 
 @Environment(EnvType.CLIENT)
 public class RenderBuffers {
@@ -18,7 +20,17 @@ public class RenderBuffers {
 	private final OutlineBufferSource outlineBufferSource;
 
 	public RenderBuffers(int i) {
-		this.sectionBufferPool = SectionBufferBuilderPool.allocate(i);
+		// Allow hooks to provide custom section buffer pool
+		SectionBufferBuilderPool customPool = null;
+		for (RenderBuffersHooks hook : HookRegistry.getRenderBuffersHooks()) {
+			customPool = hook.provideSectionBufferPool(i);
+			if (customPool != null) {
+				break;
+			}
+		}
+		
+		// Fall back to default implementation if no hook provided a result
+		this.sectionBufferPool = (customPool != null) ? customPool : SectionBufferBuilderPool.allocate(i);
 		SequencedMap<RenderType, ByteBufferBuilder> sequencedMap = (SequencedMap<RenderType, ByteBufferBuilder>)Util.make(
 			new Object2ObjectLinkedOpenHashMap(), object2ObjectLinkedOpenHashMap -> {
 				object2ObjectLinkedOpenHashMap.put(Sheets.solidBlockSheet(), this.fixedBufferPack.buffer(ChunkSectionLayer.SOLID));
