@@ -43,19 +43,21 @@ public class OffshootTrunkPlacer extends TrunkPlacer {
 			this.placeLog(levelSimulatedReader, biConsumer, randomSource, blockPos.above(j), treeConfiguration);
 		}
 
-		// Add 1-2 random horizontal offshoots
-		int offshootCount = 1 + randomSource.nextInt(2); // 1 or 2 offshoots
-		
-		for (int k = 0; k < offshootCount; k++) {
-			// Random height for the offshoot (can be at any height except the top)
-			int offshootHeight = randomSource.nextInt(Math.max(1, i - 1));
+		// Add 1-2 random horizontal offshoots (only for trees with height >= 3)
+		if (i >= 3) {
+			int offshootCount = 1 + randomSource.nextInt(2); // 1 or 2 offshoots
 			
-			// Random cardinal direction
-			Direction direction = Direction.Plane.HORIZONTAL.getRandomDirection(randomSource);
-			
-			// Place a single horizontal offshoot block
-			BlockPos offshootPos = blockPos.above(offshootHeight).relative(direction);
-			this.placeLog(levelSimulatedReader, biConsumer, randomSource, offshootPos, treeConfiguration);
+			for (int k = 0; k < offshootCount; k++) {
+				// Random height for the offshoot (can be at any height except the top and bottom)
+				int offshootHeight = 1 + randomSource.nextInt(i - 1);
+				
+				// Random cardinal direction
+				Direction direction = Direction.Plane.HORIZONTAL.getRandomDirection(randomSource);
+				
+				// Place a single horizontal offshoot block
+				BlockPos offshootPos = blockPos.above(offshootHeight).relative(direction);
+				this.placeLog(levelSimulatedReader, biConsumer, randomSource, offshootPos, treeConfiguration);
+			}
 		}
 
 		// Return only the main trunk top for foliage placement (no foliage on offshoots)
