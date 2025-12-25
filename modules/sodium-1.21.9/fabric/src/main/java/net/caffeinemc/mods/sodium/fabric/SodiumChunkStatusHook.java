@@ -3,6 +3,7 @@ package net.caffeinemc.mods.sodium.fabric;
 import net.caffeinemc.mods.sodium.client.render.chunk.map.ChunkStatus;
 import net.caffeinemc.mods.sodium.client.render.chunk.map.ChunkTrackerHolder;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.hooks.ChunkStatusHooks;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.chunk.LevelChunk;
@@ -15,7 +16,7 @@ public class SodiumChunkStatusHook implements ChunkStatusHooks {
     @Override
     public void onChunkUnload(LevelChunk chunk) {
         var pos = chunk.getPos();
-        ChunkTrackerHolder.get(chunk.getLevel())
+        ChunkTrackerHolder.get((ClientLevel) chunk.getLevel())
                 .onChunkStatusRemoved(pos.x, pos.z, ChunkStatus.FLAG_ALL);
     }
 
