@@ -164,6 +164,11 @@ public class RenderSystem {
 		dynamicUniforms.reset();
 		Minecraft.getInstance().levelRenderer.endFrame();
 		pollEvents();
+		
+		// Call render context hooks before swap buffers complete
+		for (net.minecraft.hooks.RenderContextHooks hook : net.minecraft.hooks.HookRegistry.getRenderContextHooks()) {
+			hook.beforeSwapBuffers(window);
+		}
 	}
 
 	public static void limitDisplayFPS(int i) {
@@ -233,6 +238,11 @@ public class RenderSystem {
 		DEVICE = new GlDevice(l, i, bl, biFunction, bl2);
 		apiDescription = getDevice().getImplementationInformation();
 		dynamicUniforms = new DynamicUniforms();
+		
+		// Call render context hooks after renderer initialized
+		for (net.minecraft.hooks.RenderContextHooks hook : net.minecraft.hooks.HookRegistry.getRenderContextHooks()) {
+			hook.onRendererInitialized(l);
+		}
 	}
 
 	public static void setErrorCallback(GLFWErrorCallbackI gLFWErrorCallbackI) {

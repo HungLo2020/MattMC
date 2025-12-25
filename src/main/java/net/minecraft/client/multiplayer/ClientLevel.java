@@ -394,6 +394,11 @@ public class ClientLevel extends Level implements CacheSlot.Cleaner<ClientLevel>
 	}
 
 	public void unload(LevelChunk levelChunk) {
+		// Call chunk status hooks
+		for (net.minecraft.hooks.ChunkStatusHooks hook : net.minecraft.hooks.HookRegistry.getChunkStatusHooks()) {
+			hook.onChunkUnload(levelChunk);
+		}
+		
 		levelChunk.clearAllBlockEntities();
 		this.chunkSource.getLightEngine().setLightEnabled(levelChunk.getPos(), false);
 		this.entityStorage.stopTicking(levelChunk.getPos());

@@ -64,6 +64,11 @@ public class ClientChunkCache extends ChunkSource {
 			LevelChunk levelChunk = this.storage.getChunk(i);
 			if (isValidChunk(levelChunk, chunkPos.x, chunkPos.z)) {
 				this.storage.drop(i, levelChunk);
+				
+				// Call chunk status hooks after chunk block data dropped
+				for (net.minecraft.hooks.ChunkStatusHooks hook : net.minecraft.hooks.HookRegistry.getChunkStatusHooks()) {
+					hook.onChunkBlockDataDropped(chunkPos);
+				}
 			}
 		}
 	}
@@ -117,6 +122,12 @@ public class ClientChunkCache extends ChunkSource {
 			}
 
 			this.level.onChunkLoaded(chunkPos);
+			
+			// Call chunk status hooks after chunk block data loaded
+			for (net.minecraft.hooks.ChunkStatusHooks hook : net.minecraft.hooks.HookRegistry.getChunkStatusHooks()) {
+				hook.onChunkBlockDataLoaded(i, j);
+			}
+			
 			return levelChunk;
 		}
 	}

@@ -894,6 +894,11 @@ public class ClientPacketListener extends ClientCommonPacketListenerImpl impleme
 		this.level.getChunkSource().drop(clientboundForgetLevelChunkPacket.pos());
 		this.debugSubscriber.dropChunk(clientboundForgetLevelChunkPacket.pos());
 		this.queueLightRemoval(clientboundForgetLevelChunkPacket);
+		
+		// Call chunk status hooks after chunk unload packet
+		for (net.minecraft.hooks.ChunkStatusHooks hook : net.minecraft.hooks.HookRegistry.getChunkStatusHooks()) {
+			hook.onChunkUnloadPacket(clientboundForgetLevelChunkPacket.pos().x, clientboundForgetLevelChunkPacket.pos().z);
+		}
 	}
 
 	private void queueLightRemoval(ClientboundForgetLevelChunkPacket clientboundForgetLevelChunkPacket) {
@@ -2400,6 +2405,11 @@ public class ClientPacketListener extends ClientCommonPacketListenerImpl impleme
 		Iterator<byte[]> iterator2 = clientboundLightUpdatePacketData.getBlockUpdates().iterator();
 		this.readSectionList(i, j, levelLightEngine, LightLayer.BLOCK, bitSet3, bitSet4, iterator2, bl);
 		levelLightEngine.setLightEnabled(new ChunkPos(i, j), true);
+		
+		// Call chunk status hooks after light data received
+		for (net.minecraft.hooks.ChunkStatusHooks hook : net.minecraft.hooks.HookRegistry.getChunkStatusHooks()) {
+			hook.onLightDataReceived(i, j);
+		}
 	}
 
 	public void handleMerchantOffers(ClientboundMerchantOffersPacket clientboundMerchantOffersPacket) {
