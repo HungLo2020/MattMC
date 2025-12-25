@@ -10,6 +10,8 @@ import java.util.function.Supplier;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.ChatFormatting;
+import net.minecraft.hooks.GraphicsConfigHooks;
+import net.minecraft.hooks.HookRegistry;
 import net.minecraft.Optionull;
 import net.minecraft.Util;
 import net.minecraft.client.AttackIndicatorStatus;
@@ -262,7 +264,18 @@ public class Gui {
 	}
 
 	private void renderCameraOverlays(GuiGraphics guiGraphics, DeltaTracker deltaTracker) {
-		if (Minecraft.useFancyGraphics()) {
+		boolean useFancy = Minecraft.useFancyGraphics();
+		
+		// HOOK: Allow mods to override vignette enable setting
+		for (GraphicsConfigHooks hook : HookRegistry.getGraphicsConfigHooks()) {
+			Boolean override = hook.shouldEnableVignette(useFancy);
+			if (override != null) {
+				useFancy = override;
+				break;
+			}
+		}
+		
+		if (useFancy) {
 			this.renderVignette(guiGraphics, this.minecraft.getCameraEntity());
 		}
 

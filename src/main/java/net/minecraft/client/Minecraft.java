@@ -10,6 +10,8 @@ import net.minecraft.client.auth.UserApiService.UserFlag;
 import net.minecraft.client.auth.UserApiService.UserProperties;
 import net.minecraft.client.auth.ProfileResult.ProfileActionType;
 import net.minecraft.client.auth.ProfileResult;
+import net.minecraft.hooks.GameHooks;
+import net.minecraft.hooks.HookRegistry;
 
 import com.mojang.blaze3d.TracyFrameCapture;
 import com.mojang.blaze3d.pipeline.MainTarget;
@@ -723,6 +725,11 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 			runnable = () -> this.setScreen(screen);
 		}
 
+		// HOOK: Call registered game initialization hooks
+		for (GameHooks hook : HookRegistry.getGameHooks()) {
+			hook.onGameInitialized(this);
+		}
+
 		return runnable;
 	}
 
@@ -1014,6 +1021,11 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 							this.downloadedPackSource.onReloadSuccess();
 							completableFuture.complete(null);
 							this.onResourceLoadFinished(gameLoadCookie);
+							
+							// HOOK: Call registered hooks after resource reload
+							for (GameHooks hook : HookRegistry.getGameHooks()) {
+								hook.afterResourceReload(this);
+							}
 						}),
 						!bl
 					)
@@ -1206,6 +1218,11 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 	}
 
 	private void runTick(boolean bl) {
+		// HOOK: Call registered hooks at beginning of tick
+		for (GameHooks hook : HookRegistry.getGameHooks()) {
+			hook.beforeRunTick(this, bl);
+		}
+
 		this.window.setErrorSection("Pre render");
 		if (this.window.shouldClose()) {
 			this.stop();
@@ -1321,6 +1338,11 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 		}
 
 		profilerFiller.pop();
+
+		// HOOK: Call registered hooks at end of tick
+		for (GameHooks hook : HookRegistry.getGameHooks()) {
+			hook.afterRunTick(this, bl);
+		}
 	}
 
 	private ProfilerFiller constructProfiler(boolean bl, @Nullable SingleTickProfiler singleTickProfiler) {

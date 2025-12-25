@@ -68,7 +68,18 @@ public class OptionsScreen extends Screen {
 		GridLayout.RowHelper rowHelper = gridLayout.createRowHelper(2);
 		rowHelper.addChild(this.openScreenButton(SKIN_CUSTOMIZATION, () -> new SkinCustomizationScreen(this, this.options)));
 		rowHelper.addChild(this.openScreenButton(SOUNDS, () -> new SoundOptionsScreen(this, this.options)));
-		rowHelper.addChild(this.openScreenButton(VIDEO, () -> new VideoSettingsScreen(this, this.minecraft, this.options)));
+		
+		// Allow mods to override the video settings screen factory
+		java.util.function.Supplier<Screen> videoSettingsFactory = () -> new VideoSettingsScreen(this, this.minecraft, this.options);
+		for (net.minecraft.hooks.ScreenFactoryHooks hook : net.minecraft.hooks.HookRegistry.getScreenFactoryHooks()) {
+			java.util.function.Supplier<Screen> override = hook.getVideoSettingsScreenFactory(videoSettingsFactory, this);
+			if (override != null) {
+				videoSettingsFactory = override;
+				break;
+			}
+		}
+		rowHelper.addChild(this.openScreenButton(VIDEO, videoSettingsFactory));
+		
 		rowHelper.addChild(this.openScreenButton(CONTROLS, () -> new ControlsScreen(this, this.options)));
 		rowHelper.addChild(this.openScreenButton(CHAT, () -> new ChatOptionsScreen(this, this.options)));
 		rowHelper.addChild(

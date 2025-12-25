@@ -689,6 +689,12 @@ public class GameRenderer implements Projector, AutoCloseable {
 
 			this.minecraft.gui.renderDeferredSubtitles();
 			profilerFiller.popPush("guiRendering");
+			
+			// Call GUI render hooks to allow mods to render custom overlays
+			for (net.minecraft.hooks.GuiRenderHooks hook : net.minecraft.hooks.HookRegistry.getGuiRenderHooks()) {
+				hook.onBeforeGuiRender(this.minecraft, this.guiRenderState, this.renderBuffers, deltaTracker, bl);
+			}
+			
 			this.guiRenderer.render(this.fogRenderer.getBuffer(FogRenderer.FogMode.NONE));
 			this.guiRenderer.incrementFrameNumber();
 			profilerFiller.pop();

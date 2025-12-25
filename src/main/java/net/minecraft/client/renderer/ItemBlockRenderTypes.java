@@ -365,7 +365,16 @@ public class ItemBlockRenderTypes {
 	public static ChunkSectionLayer getChunkRenderType(BlockState blockState) {
 		Block block = blockState.getBlock();
 		if (block instanceof LeavesBlock) {
-			return renderCutout ? ChunkSectionLayer.CUTOUT_MIPPED : ChunkSectionLayer.SOLID;
+			boolean cutout = renderCutout;
+			// Call hooks to allow mods to override cutout rendering
+			for (net.minecraft.hooks.RenderTypeHooks hook : net.minecraft.hooks.HookRegistry.getRenderTypeHooks()) {
+				Boolean override = hook.shouldUseCutoutRendering(renderCutout);
+				if (override != null) {
+					cutout = override;
+					break;
+				}
+			}
+			return cutout ? ChunkSectionLayer.CUTOUT_MIPPED : ChunkSectionLayer.SOLID;
 		} else {
 			ChunkSectionLayer chunkSectionLayer = (ChunkSectionLayer)TYPE_BY_BLOCK.get(block);
 			return chunkSectionLayer != null ? chunkSectionLayer : ChunkSectionLayer.SOLID;
@@ -375,7 +384,16 @@ public class ItemBlockRenderTypes {
 	public static RenderType getMovingBlockRenderType(BlockState blockState) {
 		Block block = blockState.getBlock();
 		if (block instanceof LeavesBlock) {
-			return renderCutout ? RenderType.cutoutMipped() : RenderType.solid();
+			boolean cutout = renderCutout;
+			// Call hooks to allow mods to override cutout rendering
+			for (net.minecraft.hooks.RenderTypeHooks hook : net.minecraft.hooks.HookRegistry.getRenderTypeHooks()) {
+				Boolean override = hook.shouldUseCutoutRendering(renderCutout);
+				if (override != null) {
+					cutout = override;
+					break;
+				}
+			}
+			return cutout ? RenderType.cutoutMipped() : RenderType.solid();
 		} else {
 			ChunkSectionLayer chunkSectionLayer = (ChunkSectionLayer)TYPE_BY_BLOCK.get(block);
 			if (chunkSectionLayer != null) {
@@ -413,5 +431,9 @@ public class ItemBlockRenderTypes {
 
 	public static void setFancy(boolean bl) {
 		renderCutout = bl;
+		// Call hooks to notify mods of fancy graphics mode change
+		for (net.minecraft.hooks.RenderTypeHooks hook : net.minecraft.hooks.HookRegistry.getRenderTypeHooks()) {
+			hook.onSetFancyGraphics(bl);
+		}
 	}
 }

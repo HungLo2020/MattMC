@@ -7,6 +7,7 @@ import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.renderer.v1.Renderer;
 import net.fabricmc.loader.api.FabricLoader;
 import net.fabricmc.loader.api.ModContainer;
+import net.minecraft.hooks.HookRegistry;
 import java.util.function.Consumer;
 
 public class SodiumFabricMod implements ClientModInitializer {
@@ -24,5 +25,18 @@ public class SodiumFabricMod implements ClientModInitializer {
                 .forEach(api -> api.accept(FlawlessFrames.getProvider()));
 
         Renderer.register(SodiumRenderer.INSTANCE);
+
+        // Register hook implementations (replaces mixin-based approach)
+        HookRegistry.registerGameHook(new SodiumGameHook());
+        HookRegistry.registerRenderHook(new SodiumRenderHook());
+        HookRegistry.registerGraphicsConfigHook(new SodiumGraphicsConfigHook());
+        HookRegistry.registerGuiRenderHook(new SodiumGuiRenderHook());
+        HookRegistry.registerDebugScreenHook(new SodiumDebugScreenHook());
+        HookRegistry.registerScreenFactoryHook(new SodiumScreenFactoryHook());
+        HookRegistry.registerBlockRenderHook(new SodiumBlockRenderHook());
+        HookRegistry.registerRenderTypeHook(new SodiumRenderTypeHook());
+        HookRegistry.registerPlayerPositionHook(new SodiumPlayerPositionHook());
+        HookRegistry.registerFogRenderHook(new SodiumFogRenderHook());
+        HookRegistry.registerEntityRenderHook(new SodiumEntityRenderHook());
     }
 }

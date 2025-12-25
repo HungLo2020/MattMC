@@ -131,6 +131,14 @@ public class LevelLoadTracker implements LevelLoadListener {
 				return true;
 			} else {
 				BlockPos blockPos = this.player.blockPosition();
+				// Call hooks to allow mods to override player position for chunk loading
+				for (net.minecraft.hooks.PlayerPositionHooks hook : net.minecraft.hooks.HookRegistry.getPlayerPositionHooks()) {
+					BlockPos override = hook.getPlayerBlockPositionForChunkLoading(this.player, blockPos);
+					if (override != null) {
+						blockPos = override;
+						break;
+					}
+				}
 				return !this.level.isOutsideBuildHeight(blockPos.getY()) && !this.player.isSpectator() && this.player.isAlive()
 					? this.levelRenderer.isSectionCompiled(blockPos)
 					: true;
