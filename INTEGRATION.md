@@ -174,7 +174,7 @@ After thoroughly analyzing all mixin configuration files across the entire codeb
 
 ### Implementation Progress
 
-- ✅ **Completed**: 12 mixins converted to hooks (4.2% of 284 total)
+- ✅ **Completed**: 17 mixins converted to hooks (6.0% of 284 total)
   1. Sodium `MinecraftMixin.postInit()` → GameHooks.onGameInitialized()
   2. Sodium `MinecraftMixin.preRender()` → GameHooks.beforeRunTick()
   3. Sodium `MinecraftMixin.postRender()` → GameHooks.afterRunTick()
@@ -183,21 +183,36 @@ After thoroughly analyzing all mixin configuration files across the entire codeb
   6. Sodium `RenderSystemMixin` (event loop) → RenderHooks.shouldSkipFirstPollEvents()
   7. Sodium `GuiMixin` (vignette) → GraphicsConfigHooks.shouldEnableVignette()
   8-9. Sodium `WeatherLevelRendererMixin` (2 methods) → GraphicsConfigHooks.getWeatherQuality()
-  10. Sodium `GameRendererMixin` (console overlay) → GuiRenderHooks.onBeforeGuiRender()
-  11. Sodium `DebugEntryMemoryMixin` (off-heap memory) → DebugScreenHooks.onDebugMemoryDisplay()
-  12. Sodium `OptionsScreenMixin` (video settings) → ScreenFactoryHooks.getVideoSettingsScreenFactory()
-- ⏳ **Remaining**: 272 mixins to convert to hooks (85 Sodium + 168 Iris + 19 DH)
+  10. Sodium `GameRendererMixin` (console overlay) → GuiRenderHooks.onGuiRender()
+  11. Sodium `DebugEntryMemoryMixin` (off-heap memory) → DebugScreenHooks.addDebugInfo()
+  12. Sodium `OptionsScreenMixin` (video settings) → ScreenFactoryHooks.overrideScreenFactory()
+  13. Sodium `LeavesBlockMixin` → BlockRenderHooks.shouldSkipRendering()
+  14-15. Sodium `ItemBlockRenderTypesMixin` (2 methods) → RenderTypeHooks.shouldUseCutoutRendering() + onSetFancyGraphics()
+  16. Sodium `LevelLoadTrackerMixin` → PlayerPositionHooks.getPlayerBlockPositionForChunkLoading()
+  17. Sodium `FogRendererMixin` → FogRenderHooks.onFogParametersCalculated()
+  18. Sodium `ShadowFeatureRendererMixin` → EntityRenderHooks.onRenderEntityShadows()
+- ⏳ **Remaining**: 267 mixins to convert to hooks (80 Sodium + 168 Iris + 19 DH)
 
 **Recent Sessions**:
 - Session 1: MinecraftMixin (4 methods, GPU sync + resource reload) - 5 mixins
 - Session 2: RenderSystemMixin (event loop workaround) - 1 mixin
 - Session 3: GuiMixin + WeatherLevelRendererMixin (graphics config overrides) - 3 mixins
 - Session 4: GameRendererMixin, DebugEntryMemoryMixin, OptionsScreenMixin (complex patterns) - 3 mixins
+- Session 5: LeavesBlockMixin, ItemBlockRenderTypesMixin, LevelLoadTrackerMixin, FogRendererMixin, ShadowFeatureRendererMixin - 5 mixins
 - Build verified successful after each session
 
 **Hook Infrastructure Created**:
 - GameHooks (4 methods) - Game lifecycle events
 - RenderHooks (1 method) - Rendering system lifecycle
+- GraphicsConfigHooks (4 methods) - Graphics quality configuration
+- GuiRenderHooks (1 method) - GUI rendering with full context
+- DebugScreenHooks (1 method) - F3 debug screen custom information
+- ScreenFactoryHooks (1 method) - Screen creation/replacement
+- BlockRenderHooks (1 method) - Block rendering customization
+- RenderTypeHooks (2 methods) - Render type overrides
+- PlayerPositionHooks (1 method) - Player position calculations
+- FogRenderHooks (1 method) - Fog parameter interception
+- EntityRenderHooks (1 method) - Entity shadow rendering optimization
 - GraphicsConfigHooks (4 methods) - Graphics quality overrides
 - GuiRenderHooks (1 method) - GUI rendering extensions (NEW)
 - DebugScreenHooks (1 method) - F3 debug screen custom info (NEW)
