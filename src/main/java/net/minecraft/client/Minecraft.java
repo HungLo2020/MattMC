@@ -1720,7 +1720,7 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 		this.gameRenderer.pick(1.0F);
 		this.tutorial.onLookAt(this.level, this.hitResult);
 		profilerFiller.push("gameMode");
-		if (!this.pause && this.level != null) {
+		if (!this.pause && this.level != null && this.player != null) {
 			this.gameMode.tick();
 		}
 
