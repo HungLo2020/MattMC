@@ -11,6 +11,9 @@ public class HookRegistry {
     private static final List<GameHooks> gameHooks = new ArrayList<>();
     private static final List<RenderHooks> renderHooks = new ArrayList<>();
     private static final List<GraphicsConfigHooks> graphicsConfigHooks = new ArrayList<>();
+    private static final List<GuiRenderHooks> guiRenderHooks = new ArrayList<>();
+    private static final List<DebugScreenHooks> debugScreenHooks = new ArrayList<>();
+    private static final List<ScreenFactoryHooks> screenFactoryHooks = new ArrayList<>();
 
     /**
      * Register a GameHooks implementation.
@@ -76,11 +79,77 @@ public class HookRegistry {
     }
 
     /**
+     * Register a GuiRenderHooks implementation.
+     * Should be called during mod initialization.
+     *
+     * @param hook The hook implementation to register
+     */
+    public static void registerGuiRenderHook(GuiRenderHooks hook) {
+        if (hook != null) {
+            guiRenderHooks.add(hook);
+        }
+    }
+
+    /**
+     * Get all registered GuiRenderHooks implementations.
+     *
+     * @return List of registered GuiRenderHooks
+     */
+    public static List<GuiRenderHooks> getGuiRenderHooks() {
+        return new ArrayList<>(guiRenderHooks);
+    }
+
+    /**
+     * Register a DebugScreenHooks implementation.
+     * Should be called during mod initialization.
+     *
+     * @param hook The hook implementation to register
+     */
+    public static void registerDebugScreenHook(DebugScreenHooks hook) {
+        if (hook != null) {
+            debugScreenHooks.add(hook);
+        }
+    }
+
+    /**
+     * Get all registered DebugScreenHooks implementations.
+     *
+     * @return List of registered DebugScreenHooks
+     */
+    public static List<DebugScreenHooks> getDebugScreenHooks() {
+        return new ArrayList<>(debugScreenHooks);
+    }
+
+    /**
+     * Register a ScreenFactoryHooks implementation.
+     * Should be called during mod initialization.
+     *
+     * @param hook The hook implementation to register
+     */
+    public static void registerScreenFactoryHook(ScreenFactoryHooks hook) {
+        if (hook != null) {
+            screenFactoryHooks.add(hook);
+        }
+    }
+
+    /**
+     * Get all registered ScreenFactoryHooks implementations.
+     *
+     * @return List of registered ScreenFactoryHooks
+     */
+    public static List<ScreenFactoryHooks> getScreenFactoryHooks() {
+        return new ArrayList<>(screenFactoryHooks);
+    }
+
+    /**
      * Clear all registered hooks. Useful for testing.
      */
     public static void clearAll() {
         gameHooks.clear();
         renderHooks.clear();
         graphicsConfigHooks.clear();
+        guiRenderHooks.clear();
+        debugScreenHooks.clear();
+        screenFactoryHooks.clear();
     }
 }

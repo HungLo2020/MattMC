@@ -31,6 +31,11 @@ public class DebugEntryMemory implements DebugScreenEntry {
 				String.format(Locale.ROOT, "Allocated: %2d%% %03dMB", m * 100L / l, bytesToMegabytes(m))
 			)
 		);
+		
+		// Call debug screen hooks to allow mods to add custom debug information
+		for (net.minecraft.hooks.DebugScreenHooks hook : net.minecraft.hooks.HookRegistry.getDebugScreenHooks()) {
+			hook.onDebugMemoryDisplay(debugScreenDisplayer, level, levelChunk, levelChunk2);
+		}
 	}
 
 	private static long bytesToMegabytes(long l) {
