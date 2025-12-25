@@ -6,6 +6,7 @@ import net.minecraft.client.renderer.*;
 import net.minecraft.client.renderer.entity.state.EntityRenderState;
 import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.hooks.EntityRenderHooks;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.phys.AABB;
 import net.sodium.api.math.MatrixHelper;
 import net.sodium.api.util.ColorABGR;
@@ -22,7 +23,7 @@ import org.lwjgl.system.MemoryStack;
 public class SodiumEntityRenderHook implements EntityRenderHooks {
     private static final int DEFAULT_NORMAL = NormI8.pack(0.0f, 1.0f, 0.0f);
     private static final int SHADOW_COLOR = ColorABGR.pack(1.0f, 1.0f, 1.0f);
-    private static final RenderType SHADOW_RENDER_TYPE = RenderType.entityShadow(RenderType.SHADOW_LOCATION);
+    private static final RenderType SHADOW_RENDER_TYPE = RenderType.entityShadow(ResourceLocation.withDefaultNamespace("textures/misc/shadow.png"));
     
     @Override
     public boolean onRenderEntityShadows(SubmitNodeCollection submitNodeCollection,
