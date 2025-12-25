@@ -37,6 +37,8 @@ import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.phys.shapes.VoxelShape;
+import net.minecraft.hooks.EntityRendererHooks;
+import net.minecraft.hooks.HookRegistry;
 import org.jetbrains.annotations.Nullable;
 
 @Environment(EnvType.CLIENT)
@@ -76,6 +78,14 @@ public abstract class EntityRenderer<T extends Entity, S extends EntityRenderSta
 			AABB aABB = this.getBoundingBoxForCulling(entity).inflate(0.5);
 			if (aABB.hasNaN() || aABB.getSize() == 0.0) {
 				aABB = new AABB(entity.getX() - 2.0, entity.getY() - 2.0, entity.getZ() - 2.0, entity.getX() + 2.0, entity.getY() + 2.0, entity.getZ() + 2.0);
+			}
+
+			// Allow hooks to add custom visibility checks before frustum check
+			for (EntityRendererHooks hook : HookRegistry.getEntityRendererHooks()) {
+				Boolean customCheck = hook.onEntityFrustumCheck(this, entity, frustum, aABB);
+				if (customCheck != null && !customCheck) {
+					return false; // Hook forces hidden
+				}
 			}
 
 			if (frustum.isVisible(aABB)) {

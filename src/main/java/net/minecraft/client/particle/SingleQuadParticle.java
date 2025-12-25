@@ -13,6 +13,8 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.ARGB;
 import net.minecraft.util.Mth;
 import net.minecraft.world.phys.Vec3;
+import net.minecraft.hooks.HookRegistry;
+import net.minecraft.hooks.ParticleRenderHooks;
 import org.joml.Quaternionf;
 
 @Environment(EnvType.CLIENT)
@@ -61,6 +63,11 @@ public abstract class SingleQuadParticle extends Particle {
 	}
 
 	protected void extractRotatedQuad(QuadParticleRenderState quadParticleRenderState, Quaternionf quaternionf, float f, float g, float h, float i) {
+		// Call hooks before extracting quad
+		for (ParticleRenderHooks hook : HookRegistry.getParticleRenderHooks()) {
+			hook.onParticleQuadExtract(this, this.sprite, quadParticleRenderState, quaternionf);
+		}
+		
 		quadParticleRenderState.add(
 			this.getLayer(),
 			f,
@@ -103,6 +110,11 @@ public abstract class SingleQuadParticle extends Particle {
 
 	protected void setSprite(TextureAtlasSprite textureAtlasSprite) {
 		this.sprite = textureAtlasSprite;
+		
+		// Call hooks after setting sprite
+		for (ParticleRenderHooks hook : HookRegistry.getParticleRenderHooks()) {
+			hook.onParticleSpriteSet(this, textureAtlasSprite);
+		}
 	}
 
 	protected float getU0() {

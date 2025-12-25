@@ -26,6 +26,8 @@ import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.BlockAndTintGetter;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.hooks.HookRegistry;
+import net.minecraft.hooks.ModelBlockRendererHooks;
 
 @Environment(EnvType.CLIENT)
 public class ModelBlockRenderer {
@@ -194,6 +196,11 @@ public class ModelBlockRenderer {
 		ModelBlockRenderer.CommonRenderStorage commonRenderStorage,
 		int i
 	) {
+		// Call hooks before rendering quad
+		for (ModelBlockRendererHooks hook : HookRegistry.getModelBlockRendererHooks()) {
+			hook.onPutQuadData(blockAndTintGetter, blockState, blockPos, vertexConsumer, pose, bakedQuad, i);
+		}
+		
 		int j = bakedQuad.tintIndex();
 		float f;
 		float g;

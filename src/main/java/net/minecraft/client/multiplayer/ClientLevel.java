@@ -90,6 +90,8 @@ import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LevelHeightAccessor;
 import net.minecraft.world.level.Level.ExplosionInteraction;
+import net.minecraft.hooks.HookRegistry;
+import net.minecraft.hooks.SkyColorHooks;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.biome.Biomes;
 import net.minecraft.world.level.block.Block;
@@ -772,9 +774,21 @@ public class ClientLevel extends Level implements CacheSlot.Cleaner<ClientLevel>
 	public int getSkyColor(Vec3 vec3, float f) {
 		float g = this.getTimeOfDay(f);
 		Vec3 vec32 = vec3.subtract(2.0, 2.0, 2.0).scale(0.25);
-		Vec3 vec33 = CubicSampler.gaussianSampleVec3(
-			vec32, (ix, jx, kx) -> Vec3.fromRGB24(((Biome)this.getBiomeManager().getNoiseBiomeAtQuart(ix, jx, kx).value()).getSkyColor())
-		);
+		
+		// Allow hooks to provide custom sky color sampling
+		CubicSampler.Vec3Fetcher rgbFetcher = (ix, jx, kx) -> Vec3.fromRGB24(((Biome)this.getBiomeManager().getNoiseBiomeAtQuart(ix, jx, kx).value()).getSkyColor());
+		Vec3 vec33 = null;
+		for (SkyColorHooks hook : HookRegistry.getSkyColorHooks()) {
+			vec33 = hook.sampleSkyColor(this, vec32, rgbFetcher);
+			if (vec33 != null) {
+				break;
+			}
+		}
+		
+		// Fall back to default implementation if no hook provided a result
+		if (vec33 == null) {
+			vec33 = CubicSampler.gaussianSampleVec3(vec32, rgbFetcher);
+		}
 		float h = Mth.cos(g * (float) (Math.PI * 2)) * 2.0F + 0.5F;
 		h = Mth.clamp(h, 0.0F, 1.0F);
 		vec33 = vec33.scale(h);
