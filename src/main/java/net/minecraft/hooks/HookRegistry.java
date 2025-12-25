@@ -28,6 +28,8 @@ public class HookRegistry {
     private static final List<GuiGraphicsHooks> guiGraphicsHooks = new ArrayList<>();
     private static final List<EntityRendererHooks> entityRendererHooks = new ArrayList<>();
     private static final List<ModelBlockRendererHooks> modelBlockRendererHooks = new ArrayList<>();
+    private static final List<ParticleRenderHooks> particleRenderHooks = new ArrayList<>();
+    private static final List<ClientPacketListenerHooks> clientPacketListenerHooks = new ArrayList<>();
 
     /**
      * Register a GameHooks implementation.
@@ -450,6 +452,48 @@ public class HookRegistry {
     }
 
     /**
+     * Register a ParticleRenderHooks implementation.
+     * Should be called during mod initialization.
+     *
+     * @param hook The hook implementation to register
+     */
+    public static void registerParticleRenderHook(ParticleRenderHooks hook) {
+        if (hook != null) {
+            particleRenderHooks.add(hook);
+        }
+    }
+
+    /**
+     * Get all registered ParticleRenderHooks implementations.
+     *
+     * @return List of registered ParticleRenderHooks
+     */
+    public static List<ParticleRenderHooks> getParticleRenderHooks() {
+        return new ArrayList<>(particleRenderHooks);
+    }
+
+    /**
+     * Register a ClientPacketListenerHooks implementation.
+     * Should be called during mod initialization.
+     *
+     * @param hook The hook implementation to register
+     */
+    public static void registerClientPacketListenerHook(ClientPacketListenerHooks hook) {
+        if (hook != null) {
+            clientPacketListenerHooks.add(hook);
+        }
+    }
+
+    /**
+     * Get all registered ClientPacketListenerHooks implementations.
+     *
+     * @return List of registered ClientPacketListenerHooks
+     */
+    public static List<ClientPacketListenerHooks> getClientPacketListenerHooks() {
+        return new ArrayList<>(clientPacketListenerHooks);
+    }
+
+    /**
      * Clear all registered hooks. Useful for testing.
      */
     public static void clearAll() {
@@ -473,5 +517,7 @@ public class HookRegistry {
         guiGraphicsHooks.clear();
         entityRendererHooks.clear();
         modelBlockRendererHooks.clear();
+        particleRenderHooks.clear();
+        clientPacketListenerHooks.clear();
     }
 }
