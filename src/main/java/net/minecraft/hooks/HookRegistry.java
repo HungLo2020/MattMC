@@ -26,6 +26,8 @@ public class HookRegistry {
     private static final List<AtlasManagerHooks> atlasManagerHooks = new ArrayList<>();
     private static final List<TextureAtlasHooks> textureAtlasHooks = new ArrayList<>();
     private static final List<GuiGraphicsHooks> guiGraphicsHooks = new ArrayList<>();
+    private static final List<EntityRendererHooks> entityRendererHooks = new ArrayList<>();
+    private static final List<ModelBlockRendererHooks> modelBlockRendererHooks = new ArrayList<>();
 
     /**
      * Register a GameHooks implementation.
@@ -406,6 +408,48 @@ public class HookRegistry {
     }
 
     /**
+     * Register an EntityRendererHooks implementation.
+     * Should be called during mod initialization.
+     *
+     * @param hook The hook implementation to register
+     */
+    public static void registerEntityRendererHook(EntityRendererHooks hook) {
+        if (hook != null) {
+            entityRendererHooks.add(hook);
+        }
+    }
+
+    /**
+     * Get all registered EntityRendererHooks implementations.
+     *
+     * @return List of registered EntityRendererHooks
+     */
+    public static List<EntityRendererHooks> getEntityRendererHooks() {
+        return new ArrayList<>(entityRendererHooks);
+    }
+
+    /**
+     * Register a ModelBlockRendererHooks implementation.
+     * Should be called during mod initialization.
+     *
+     * @param hook The hook implementation to register
+     */
+    public static void registerModelBlockRendererHook(ModelBlockRendererHooks hook) {
+        if (hook != null) {
+            modelBlockRendererHooks.add(hook);
+        }
+    }
+
+    /**
+     * Get all registered ModelBlockRendererHooks implementations.
+     *
+     * @return List of registered ModelBlockRendererHooks
+     */
+    public static List<ModelBlockRendererHooks> getModelBlockRendererHooks() {
+        return new ArrayList<>(modelBlockRendererHooks);
+    }
+
+    /**
      * Clear all registered hooks. Useful for testing.
      */
     public static void clearAll() {
@@ -427,5 +471,7 @@ public class HookRegistry {
         atlasManagerHooks.clear();
         textureAtlasHooks.clear();
         guiGraphicsHooks.clear();
+        entityRendererHooks.clear();
+        modelBlockRendererHooks.clear();
     }
 }

@@ -105,6 +105,11 @@ public class TextureAtlas extends AbstractTexture implements Dumpable, Tickable 
 				}
 			}
 		}
+		
+		// Call hooks after atlas upload
+		for (TextureAtlasHooks hook : HookRegistry.getTextureAtlasHooks()) {
+			hook.onAtlasUpload(this, this.location, preparations);
+		}
 	}
 
 	@Override
