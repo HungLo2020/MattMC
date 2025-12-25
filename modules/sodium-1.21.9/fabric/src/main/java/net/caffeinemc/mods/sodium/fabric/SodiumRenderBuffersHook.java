@@ -12,6 +12,7 @@ public class SodiumRenderBuffersHook implements RenderBuffersHooks {
     @Override
     public SectionBufferBuilderPool provideSectionBufferPool(int size) {
         // Return Sodium's optimized non-storing builder pool
+        // Note: size parameter is ignored as NonStoringBuilderPool doesn't allocate buffers upfront
         return new NonStoringBuilderPool();
     }
 }
