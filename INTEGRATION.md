@@ -174,19 +174,19 @@ After thoroughly analyzing all mixin configuration files across the entire codeb
 
 ### Implementation Progress
 
-- ✅ **Completed**: 5 mixins converted to hooks
-  1. Sodium `MinecraftMixin.postInit()` → GameHooks.onGameInitialized() 
+- ✅ **Completed**: 6 mixins converted to hooks  
+  1. Sodium `MinecraftMixin.postInit()` → GameHooks.onGameInitialized()
   2. Sodium `MinecraftMixin.preRender()` → GameHooks.beforeRunTick()
   3. Sodium `MinecraftMixin.postRender()` → GameHooks.afterRunTick()
   4. Sodium `MinecraftMixin.postResourceReload()` → GameHooks.afterResourceReload()
   5. All MinecraftMixin functionality fully replaced, file deleted
-- ⏳ **Remaining**: 279 mixins to convert to hooks (92 Sodium + 168 Iris + 19 DH)
+  6. Sodium `RenderSystemMixin` (event loop) → RenderHooks.shouldSkipFirstPollEvents()
+- ⏳ **Remaining**: 278 mixins to convert to hooks (91 Sodium + 168 Iris + 19 DH)
 
-**Recent Session**: Converted all 4 methods from Sodium's MinecraftMixin:
-- Created SodiumGpuSyncHelper to manage GPU fence queue
-- Expanded GameHooks interface with 3 new methods
-- Modified Minecraft.runTick() and reloadResourcePacks() with hook calls
-- Build verified successful
+**Recent Sessions**:
+- Session 1: Converted MinecraftMixin (4 methods, GPU sync + resource reload)
+- Session 2: Converted RenderSystemMixin (event loop workaround)
+- Build verified successful after each conversion
 
 ### Estimated Effort
 
