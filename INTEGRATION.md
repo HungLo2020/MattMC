@@ -117,3 +117,74 @@ A working proof of concept has been implemented for Sodium's resource pack check
 - Minecraft integration: Added hook call in `Minecraft.buildInitialScreens()`
 - Sodium implementation: `SodiumGameHook` implements the interface
 - Original mixin removed from `MinecraftMixin.java`
+
+## Mixin Inventory - Total Count
+
+After thoroughly analyzing all mixin configuration files across the entire codebase, here is the complete breakdown of mixins that need to be replaced:
+
+### Sodium: 97 mixins
+- `sodium-common.mixins.json`: 93 mixins (core rendering, chunk optimizations, entity rendering, texture system, features, workarounds)
+- `sodium-fabric.mixins.json`: 4 mixins (fabric-specific integrations)
+
+### Iris: 168 mixins
+- `mixins.iris.json`: 123 mixins (shader pipeline, rendering, entity rendering, sky, texture handling, state tracking)
+- `mixins.iris.fabric.json`: 3 mixins (fabric-specific integrations)
+- `mixins.iris.compat.sodium.json`: 19 mixins (Sodium compatibility layer)
+- `mixins.iris.vertexformat.json`: 8 mixins (vertex format modifications)
+- `mixins.iris.fantastic.json`: 7 mixins (particle and feature renderer modifications)
+- `mixins.iris.compat.dh.json`: 4 mixins (Distant Horizons compatibility)
+- `mixins.iris.fixes.maxfpscrash.json`: 1 mixin (max FPS crash fix)
+- `mixins.iris.devenvironment.json`: 2 mixins (development environment)
+- `mixins.iris.integrationtest.json`: 1 mixin (integration testing)
+- `mixins.iris.bettermipmaps.json`: 0 mixins (empty/disabled)
+
+### Distant Horizons: 19 mixins
+- `DistantHorizons.fabric.mixins.json`: 19 mixins
+  - Server mixins (9): Chunk generation, chunk map, entity tracking, player management, threading, lifecycle
+  - Client mixins (10): Level rendering, fog, debug overlay, lighting, chunk sections, texture utilities
+
+### **TOTAL: 284 mixins across all mods**
+
+### Breakdown by Category
+
+**Rendering & Graphics**: ~180 mixins
+- Core rendering pipeline modifications
+- Shader integration and management
+- Entity and particle rendering
+- Texture handling and animations
+- Vertex format customizations
+- Sky, clouds, weather rendering
+
+**World & Chunk Management**: ~50 mixins
+- Chunk loading and rendering
+- LOD (Level of Detail) system
+- World generation hooks
+- Chunk section management
+
+**Game Lifecycle & Integration**: ~30 mixins
+- Initialization hooks
+- Resource loading and management
+- Configuration screens
+- Debug overlays
+
+**Compatibility & Fixes**: ~24 mixins
+- Mod-to-mod compatibility (Sodium ↔ Iris, Iris ↔ DH)
+- Bug fixes and workarounds
+- Platform-specific adjustments
+
+### Implementation Progress
+
+- ✅ **Completed**: 1 mixin (Sodium's `MinecraftMixin.postInit()` - game initialization hook)
+- ⏳ **Remaining**: 283 mixins to convert to hooks
+
+### Estimated Effort
+
+Converting all 284 mixins to hooks is a substantial undertaking. Based on the proof of concept:
+
+- **Simple injections** (~40% of mixins): 1-2 hours each → ~110 mixins × 1.5 hours = 165 hours
+- **Moderate complexity** (~40% of mixins): 3-5 hours each → ~110 mixins × 4 hours = 440 hours  
+- **Complex transformations** (~20% of mixins): 6-12 hours each → ~60 mixins × 9 hours = 540 hours
+
+**Total estimated effort**: 1,145 hours or approximately **29 weeks** of full-time work
+
+This can be parallelized or done incrementally, with mods remaining functional throughout the conversion process as long as unconverted mixins continue to use the current mixin system.
