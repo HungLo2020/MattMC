@@ -19,6 +19,9 @@ public class HookRegistry {
     private static final List<PlayerPositionHooks> playerPositionHooks = new ArrayList<>();
     private static final List<FogRenderHooks> fogRenderHooks = new ArrayList<>();
     private static final List<EntityRenderHooks> entityRenderHooks = new ArrayList<>();
+    private static final List<ChunkStatusHooks> chunkStatusHooks = new ArrayList<>();
+    private static final List<WindowCreationHooks> windowCreationHooks = new ArrayList<>();
+    private static final List<RenderContextHooks> renderContextHooks = new ArrayList<>();
 
     /**
      * Register a GameHooks implementation.
@@ -252,6 +255,69 @@ public class HookRegistry {
     }
 
     /**
+     * Register a ChunkStatusHooks implementation.
+     * Should be called during mod initialization.
+     *
+     * @param hook The hook implementation to register
+     */
+    public static void registerChunkStatusHook(ChunkStatusHooks hook) {
+        if (hook != null) {
+            chunkStatusHooks.add(hook);
+        }
+    }
+
+    /**
+     * Get all registered ChunkStatusHooks implementations.
+     *
+     * @return List of registered ChunkStatusHooks
+     */
+    public static List<ChunkStatusHooks> getChunkStatusHooks() {
+        return new ArrayList<>(chunkStatusHooks);
+    }
+
+    /**
+     * Register a WindowCreationHooks implementation.
+     * Should be called during mod initialization.
+     *
+     * @param hook The hook implementation to register
+     */
+    public static void registerWindowCreationHook(WindowCreationHooks hook) {
+        if (hook != null) {
+            windowCreationHooks.add(hook);
+        }
+    }
+
+    /**
+     * Get all registered WindowCreationHooks implementations.
+     *
+     * @return List of registered WindowCreationHooks
+     */
+    public static List<WindowCreationHooks> getWindowCreationHooks() {
+        return new ArrayList<>(windowCreationHooks);
+    }
+
+    /**
+     * Register a RenderContextHooks implementation.
+     * Should be called during mod initialization.
+     *
+     * @param hook The hook implementation to register
+     */
+    public static void registerRenderContextHook(RenderContextHooks hook) {
+        if (hook != null) {
+            renderContextHooks.add(hook);
+        }
+    }
+
+    /**
+     * Get all registered RenderContextHooks implementations.
+     *
+     * @return List of registered RenderContextHooks
+     */
+    public static List<RenderContextHooks> getRenderContextHooks() {
+        return new ArrayList<>(renderContextHooks);
+    }
+
+    /**
      * Clear all registered hooks. Useful for testing.
      */
     public static void clearAll() {
@@ -266,5 +332,8 @@ public class HookRegistry {
         playerPositionHooks.clear();
         fogRenderHooks.clear();
         entityRenderHooks.clear();
+        chunkStatusHooks.clear();
+        windowCreationHooks.clear();
+        renderContextHooks.clear();
     }
 }
