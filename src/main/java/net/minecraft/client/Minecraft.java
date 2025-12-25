@@ -1021,6 +1021,11 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 							this.downloadedPackSource.onReloadSuccess();
 							completableFuture.complete(null);
 							this.onResourceLoadFinished(gameLoadCookie);
+							
+							// HOOK: Call registered hooks after resource reload
+							for (GameHooks hook : HookRegistry.getGameHooks()) {
+								hook.afterResourceReload(this);
+							}
 						}),
 						!bl
 					)
@@ -1213,6 +1218,11 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 	}
 
 	private void runTick(boolean bl) {
+		// HOOK: Call registered hooks at beginning of tick
+		for (GameHooks hook : HookRegistry.getGameHooks()) {
+			hook.beforeRunTick(this, bl);
+		}
+
 		this.window.setErrorSection("Pre render");
 		if (this.window.shouldClose()) {
 			this.stop();
@@ -1328,6 +1338,11 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 		}
 
 		profilerFiller.pop();
+
+		// HOOK: Call registered hooks at end of tick
+		for (GameHooks hook : HookRegistry.getGameHooks()) {
+			hook.afterRunTick(this, bl);
+		}
 	}
 
 	private ProfilerFiller constructProfiler(boolean bl, @Nullable SingleTickProfiler singleTickProfiler) {
