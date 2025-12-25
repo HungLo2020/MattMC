@@ -10,6 +10,7 @@ import java.util.List;
 public class HookRegistry {
     private static final List<GameHooks> gameHooks = new ArrayList<>();
     private static final List<RenderHooks> renderHooks = new ArrayList<>();
+    private static final List<GraphicsConfigHooks> graphicsConfigHooks = new ArrayList<>();
 
     /**
      * Register a GameHooks implementation.
@@ -54,10 +55,32 @@ public class HookRegistry {
     }
 
     /**
+     * Register a GraphicsConfigHooks implementation.
+     * Should be called during mod initialization.
+     *
+     * @param hook The hook implementation to register
+     */
+    public static void registerGraphicsConfigHook(GraphicsConfigHooks hook) {
+        if (hook != null) {
+            graphicsConfigHooks.add(hook);
+        }
+    }
+
+    /**
+     * Get all registered GraphicsConfigHooks implementations.
+     *
+     * @return List of registered GraphicsConfigHooks
+     */
+    public static List<GraphicsConfigHooks> getGraphicsConfigHooks() {
+        return new ArrayList<>(graphicsConfigHooks);
+    }
+
+    /**
      * Clear all registered hooks. Useful for testing.
      */
     public static void clearAll() {
         gameHooks.clear();
         renderHooks.clear();
+        graphicsConfigHooks.clear();
     }
 }

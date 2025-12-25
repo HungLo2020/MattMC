@@ -14,6 +14,8 @@ import net.minecraft.core.BlockPos.MutableBlockPos;
 import net.minecraft.core.Direction.Axis;
 import net.minecraft.core.particles.ParticleOptions;
 import net.minecraft.core.particles.ParticleTypes;
+import net.minecraft.hooks.GraphicsConfigHooks;
+import net.minecraft.hooks.HookRegistry;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ParticleStatus;
 import net.minecraft.sounds.SoundEvents;
@@ -60,7 +62,18 @@ public class WeatherEffectRenderer {
 	public void extractRenderState(Level level, int i, float f, Vec3 vec3, WeatherRenderState weatherRenderState) {
 		weatherRenderState.intensity = level.getRainLevel(f);
 		if (!(weatherRenderState.intensity <= 0.0F)) {
-			weatherRenderState.radius = Minecraft.useFancyGraphics() ? 10 : 5;
+			boolean useFancy = Minecraft.useFancyGraphics();
+			
+			// HOOK: Allow mods to override weather quality
+			for (GraphicsConfigHooks hook : HookRegistry.getGraphicsConfigHooks()) {
+				Boolean override = hook.getWeatherQuality(useFancy, Minecraft.getInstance().options.graphicsMode().get());
+				if (override != null) {
+					useFancy = override;
+					break;
+				}
+			}
+			
+			weatherRenderState.radius = useFancy ? 10 : 5;
 			int j = Mth.floor(vec3.x);
 			int k = Mth.floor(vec3.y);
 			int l = Mth.floor(vec3.z);
@@ -153,7 +166,18 @@ public class WeatherEffectRenderer {
 	}
 
 	public void tickRainParticles(ClientLevel clientLevel, Camera camera, int i, ParticleStatus particleStatus) {
-		float f = clientLevel.getRainLevel(1.0F) / (Minecraft.useFancyGraphics() ? 1.0F : 2.0F);
+		boolean useFancy = Minecraft.useFancyGraphics();
+		
+		// HOOK: Allow mods to override weather quality
+		for (GraphicsConfigHooks hook : HookRegistry.getGraphicsConfigHooks()) {
+			Boolean override = hook.getWeatherQuality(useFancy, Minecraft.getInstance().options.graphicsMode().get());
+			if (override != null) {
+				useFancy = override;
+				break;
+			}
+		}
+		
+		float f = clientLevel.getRainLevel(1.0F) / (useFancy ? 1.0F : 2.0F);
 		if (!(f <= 0.0F)) {
 			RandomSource randomSource = RandomSource.create(i * 312987231L);
 			BlockPos blockPos = BlockPos.containing(camera.getPosition());
