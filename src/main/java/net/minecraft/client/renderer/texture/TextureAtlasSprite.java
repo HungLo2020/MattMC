@@ -129,6 +129,11 @@ public class TextureAtlasSprite {
 	}
 
 	public VertexConsumer wrap(VertexConsumer vertexConsumer) {
+		// Call hooks when sprite wraps a vertex consumer
+		for (TextureAtlasSpriteHooks hook : HookRegistry.getTextureAtlasSpriteHooks()) {
+			hook.onSpriteWrap(this, vertexConsumer);
+		}
+		
 		return new SpriteCoordinateExpander(vertexConsumer, this);
 	}
 

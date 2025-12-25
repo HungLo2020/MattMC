@@ -57,6 +57,8 @@ import net.minecraft.client.resources.model.Material;
 import net.minecraft.client.resources.model.MaterialSet;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.data.AtlasIds;
+import net.minecraft.hooks.GuiGraphicsHooks;
+import net.minecraft.hooks.HookRegistry;
 import net.minecraft.locale.Language;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.FormattedText;
@@ -334,10 +336,22 @@ public class GuiGraphics {
 	}
 
 	public void blitSprite(RenderPipeline renderPipeline, TextureAtlasSprite textureAtlasSprite, int i, int j, int k, int l) {
+		// Call hooks before blitting sprite
+		for (GuiGraphicsHooks hook : HookRegistry.getGuiGraphicsHooks()) {
+			hook.onSpriteBlitSimple(renderPipeline, textureAtlasSprite, i, j, k, l, -1);
+		}
+		
 		this.blitSprite(renderPipeline, textureAtlasSprite, i, j, k, l, -1);
 	}
 
 	public void blitSprite(RenderPipeline renderPipeline, TextureAtlasSprite textureAtlasSprite, int i, int j, int k, int l, int m) {
+		// Call hooks before blitting sprite (avoid double-call from the overload above)
+		if (m != -1) {
+			for (GuiGraphicsHooks hook : HookRegistry.getGuiGraphicsHooks()) {
+				hook.onSpriteBlitSimple(renderPipeline, textureAtlasSprite, i, j, k, l, m);
+			}
+		}
+		
 		if (k != 0 && l != 0) {
 			this.innerBlit(
 				renderPipeline,
@@ -356,6 +370,11 @@ public class GuiGraphics {
 	}
 
 	private void blitSprite(RenderPipeline renderPipeline, TextureAtlasSprite textureAtlasSprite, int i, int j, int k, int l, int m, int n, int o, int p, int q) {
+		// Call hooks before blitting sprite with UV coordinates
+		for (GuiGraphicsHooks hook : HookRegistry.getGuiGraphicsHooks()) {
+			hook.onSpriteBlitUV(renderPipeline, textureAtlasSprite, i, j, k, l, m, n, o, p, q);
+		}
+		
 		if (o != 0 && p != 0) {
 			this.innerBlit(
 				renderPipeline,

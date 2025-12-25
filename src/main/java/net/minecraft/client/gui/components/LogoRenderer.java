@@ -10,6 +10,7 @@ import net.minecraft.util.RandomSource;
 
 @Environment(EnvType.CLIENT)
 public class LogoRenderer {
+	public static final ResourceLocation MATTMC_LOGO = ResourceLocation.withDefaultNamespace("textures/gui/title/mattmc.png");
 	public static final ResourceLocation MINECRAFT_LOGO = ResourceLocation.withDefaultNamespace("textures/gui/title/minecraft.png");
 	public static final ResourceLocation EASTER_EGG_LOGO = ResourceLocation.withDefaultNamespace("textures/gui/title/minceraft.png");
 	public static final ResourceLocation MINECRAFT_EDITION = ResourceLocation.withDefaultNamespace("textures/gui/title/edition.png");
@@ -23,7 +24,16 @@ public class LogoRenderer {
 	private static final int EDITION_TEXTURE_HEIGHT = 16;
 	public static final int DEFAULT_HEIGHT_OFFSET = 30;
 	private static final int EDITION_LOGO_OVERLAP = 7;
-	private final boolean showEasterEgg = RandomSource.create().nextFloat() < 1.0E-4;
+
+	// Use a single RNG for consistent choices per instance
+	private static final RandomSource RNG = RandomSource.create();
+
+	// Original easter egg trigger chance
+	private final boolean showEasterEgg = RNG.nextFloat() < 1.0E-4;
+
+	// If the easter egg triggers, choose which vanilla logo to show (minecraft or minceraft)
+	private final ResourceLocation easterEggLogoChoice = RNG.nextBoolean() ? MINECRAFT_LOGO : EASTER_EGG_LOGO;
+
 	private final boolean keepLogoThroughFade;
 
 	public LogoRenderer(boolean bl) {
@@ -38,7 +48,12 @@ public class LogoRenderer {
 		int k = i / 2 - 128;
 		float g = this.keepLogoThroughFade ? 1.0F : f;
 		int l = ARGB.white(g);
-		guiGraphics.blit(RenderPipelines.GUI_TEXTURED, this.showEasterEgg ? EASTER_EGG_LOGO : MINECRAFT_LOGO, k, j, 0.0F, 0.0F, 256, 44, 256, 64, l);
+
+		// Normally show MattMC logo; if easter egg triggers show one of the vanilla logos randomly.
+		ResourceLocation logo = this.showEasterEgg ? this.easterEggLogoChoice : MATTMC_LOGO;
+
+		guiGraphics.blit(RenderPipelines.GUI_TEXTURED, logo, k, j, 0.0F, 0.0F, 256, 44, 256, 64, l);
+
 		int m = i / 2 - 64;
 		int n = j + 44 - 7;
 		guiGraphics.blit(RenderPipelines.GUI_TEXTURED, MINECRAFT_EDITION, m, n, 0.0F, 0.0F, 128, 14, 128, 16, l);
