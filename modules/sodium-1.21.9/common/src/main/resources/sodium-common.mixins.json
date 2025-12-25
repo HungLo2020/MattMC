@@ -65,7 +65,6 @@
     "features.render.model.item.ItemRendererMixin",
     "features.render.particle.QuadParticleRenderStateMixin",
     "features.render.world.sky.FogRendererMixin",
-    "features.render.world.sky.ClientLevelMixin",
     "features.render.world.sky.LevelRendererMixin",
     "features.render.world.clouds.CloudRendererMixin",
     "features.textures.NativeImageAccessor",

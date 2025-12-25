@@ -38,5 +38,6 @@ public class SodiumFabricMod implements ClientModInitializer {
         HookRegistry.registerPlayerPositionHook(new SodiumPlayerPositionHook());
         HookRegistry.registerFogRenderHook(new SodiumFogRenderHook());
         HookRegistry.registerEntityRenderHook(new SodiumEntityRenderHook());
+        HookRegistry.registerSkyColorHook(new SodiumSkyColorHook());
     }
 }
