@@ -174,19 +174,22 @@ After thoroughly analyzing all mixin configuration files across the entire codeb
 
 ### Implementation Progress
 
-- ✅ **Completed**: 6 mixins converted to hooks  
+- ✅ **Completed**: 9 mixins converted to hooks
   1. Sodium `MinecraftMixin.postInit()` → GameHooks.onGameInitialized()
   2. Sodium `MinecraftMixin.preRender()` → GameHooks.beforeRunTick()
   3. Sodium `MinecraftMixin.postRender()` → GameHooks.afterRunTick()
   4. Sodium `MinecraftMixin.postResourceReload()` → GameHooks.afterResourceReload()
   5. All MinecraftMixin functionality fully replaced, file deleted
   6. Sodium `RenderSystemMixin` (event loop) → RenderHooks.shouldSkipFirstPollEvents()
-- ⏳ **Remaining**: 278 mixins to convert to hooks (91 Sodium + 168 Iris + 19 DH)
+  7. Sodium `GuiMixin` (vignette) → GraphicsConfigHooks.shouldEnableVignette()
+  8-9. Sodium `WeatherLevelRendererMixin` (2 methods) → GraphicsConfigHooks.getWeatherQuality()
+- ⏳ **Remaining**: 275 mixins to convert to hooks (88 Sodium + 168 Iris + 19 DH)
 
 **Recent Sessions**:
-- Session 1: Converted MinecraftMixin (4 methods, GPU sync + resource reload)
-- Session 2: Converted RenderSystemMixin (event loop workaround)
-- Build verified successful after each conversion
+- Session 1: MinecraftMixin (4 methods, GPU sync + resource reload)
+- Session 2: RenderSystemMixin (event loop workaround)
+- Session 3: GuiMixin + WeatherLevelRendererMixin (graphics config overrides)
+- Build verified successful after each session
 
 ### Estimated Effort
 
