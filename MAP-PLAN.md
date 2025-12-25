@@ -2,12 +2,13 @@
 
 ## Executive Summary
 
-This document outlines a comprehensive plan for implementing a standalone, integrated world map system into MattMC (Minecraft 1.21.10). Similar to how JourneyMap and Xaero's World Map operate as independent systems, this implementation will be a self-contained map mod built directly into the base game source code, without relying on vanilla map or waypoint systems.
+This document outlines the architectural design and feature set for implementing a standalone world map system into MattMC (Minecraft 1.21.10). Similar to how JourneyMap and Xaero's World Map operate as independent systems, this implementation will be a self-contained map mod built directly into the base game source code, without relying on vanilla map or waypoint systems.
 
 **Core Features:**
 - Full-screen world map accessible via M key
 - Progressive map exploration (reveals as player explores)
-- Waypoint creation with teleportation support
+- Mouse wheel zoom with maximum detail at 1 pixel per block
+- Waypoint creation with teleportation support via dedicated menu
 - Multi-dimension support (Overworld, Nether, End)
 - Persistent storage across game sessions
 - No minimap or cave layer complexity
@@ -20,146 +21,114 @@ This system will be **completely independent** from vanilla Minecraft's map item
 ## Table of Contents
 
 1. [Research Summary](#research-summary)
-2. [Architecture Overview](#architecture-overview)
-3. [Component Design](#component-design)
-4. [Implementation Phases](#implementation-phases)
-5. [Technical Specifications](#technical-specifications)
-6. [Performance Considerations](#performance-considerations)
-7. [Integration Points](#integration-points)
-8. [Data Persistence](#data-persistence)
-9. [User Interface Design](#user-interface-design)
-10. [Testing Strategy](#testing-strategy)
-11. [Future Extensibility](#future-extensibility)
+2. [Core Architecture](#core-architecture)
+3. [Feature Specifications](#feature-specifications)
+4. [System Components](#system-components)
+5. [User Interface Design](#user-interface-design)
+6. [Data Persistence](#data-persistence)
+7. [Performance Requirements](#performance-requirements)
+8. [Implementation Phases](#implementation-phases)
+9. [Integration Points](#integration-points)
 
 ---
 
 ## Research Summary
 
-### JourneyMap Architecture
+### JourneyMap Zoom System
 
-JourneyMap operates as a completely independent mapping system:
+**Zoom Implementation:**
+- Mouse wheel controls zoom in/out
+- Discrete zoom levels with smooth transitions
+- Center-on-mouse zoom behavior (point under cursor stays fixed)
+- Zoom range typically from 1 pixel = multiple blocks to 1 pixel = 1 block
+- Configuration for custom zoom steps and ranges
 
-**Data Collection:**
-- Custom chunk scanner that directly accesses world data
-- Independent from vanilla map rendering
-- Hooks into client tick events to track player movement
-- Asynchronously scans chunks in background threads
-- Extracts block data, biome info, and height information directly from chunk sections
+**Detail Levels:**
+- Maximum zoom: 1 pixel per block (highest detail)
+- Minimum zoom: Up to hundreds of blocks per pixel (overview)
+- Dynamic tile rendering adjusts to zoom level
+- Smooth interpolation between zoom levels
 
-**Rendering Pipeline:**
-- Custom tile renderer using OpenGL/LWJGL directly
-- Generates 512×512 pixel map tiles from chunk data
-- Applies custom color mapping for blocks (not using vanilla MapColor)
-- Height-based shading algorithm (brighter for higher elevations)
-- Biome-aware grass and water coloring
+### Xaero's World Map Zoom System
 
-**Storage System:**
-- Tiles stored as PNG files: `.minecraft/journeymap/data/mp/<world>/DIM<id>/<region>/`
-- Separate directory structure per dimension
-- Metadata files track explored regions
-- Completely independent from vanilla saved game data
-
-**Waypoint System:**
-- Custom waypoint data structure (independent from vanilla)
-- Stored in JSON files: `.minecraft/journeymap/data/sp/<world>/waypoints/`
-- Dimension-aware waypoint management
-- Teleportation via custom command system
-
-### Xaero's World Map Architecture
-
-Xaero's operates similarly as a standalone system:
+**Zoom Characteristics:**
+- Google Maps-like zooming experience
+- Mouse wheel for continuous zoom control
+- Maximum detail: Pixel-perfect block representation
+- Massive zoom-out: Can display up to ~760,000 blocks with extensions
+- Standard display: ~30,000 blocks wide at full zoom-out
 
 **Rendering Approach:**
-- Direct access to chunk data via client world
-- Custom color palette for all Minecraft blocks
-- Real-time tile generation as chunks load
-- Tile cache in memory (LRU eviction)
-- On-disk tile storage in `.minecraft/XaeroWorldMap/`
+- Dynamic scaling based on zoom level
+- Tile-based rendering with multiple resolution levels
+- Resource-intensive at extreme zoom-out levels
+- Configurable zoom range in settings
 
-**Map Display:**
-- Custom GUI screen (not extending vanilla screens)
-- Direct OpenGL rendering for smooth panning/zooming
-- Texture atlas for efficient tile rendering
-- No dependency on vanilla rendering systems
+### Key Takeaways for MattMC
 
-**Waypoint Architecture:**
-- Independent waypoint data model
-- Stored separately from vanilla game data
-- Custom serialization format
-- Synchronized between minimap and world map
+**Zoom System Design:**
+1. Mouse wheel as primary zoom control
+2. Maximum detail level: 1 pixel = 1 block (highest zoom)
+3. Smooth zoom transitions with center-on-mouse behavior
+4. Configurable zoom range
+5. Dynamic tile rendering based on zoom level
 
-### Key Takeaways for MattMC Implementation
-
-Both successful map mods share these architectural patterns:
-
-1. **Independent Data Collection:**
-   - Direct chunk data access (not through vanilla map systems)
-   - Custom chunk scanners running asynchronously
-   - Block and biome data extraction
-
-2. **Standalone Rendering:**
-   - Custom tile generation algorithms
-   - Independent color mapping systems
-   - Direct OpenGL/texture manipulation
-
-3. **Separate Storage:**
-   - Own directory structure outside vanilla saves
-   - Custom file formats (PNG tiles + metadata)
-   - Independent persistence layer
-
-4. **Self-Contained Waypoints:**
-   - Custom waypoint data structures
-   - Separate from any vanilla systems
-   - Own serialization and storage
-
-This MattMC implementation will follow these same patterns, creating a completely independent map system that happens to be integrated into the source code for better performance and access.
+**Architecture Patterns:**
+1. Independent chunk scanning system
+2. Multi-resolution tile generation
+3. Asynchronous background processing
+4. Separate storage from vanilla game data
+5. Custom rendering pipeline
 
 ---
 
-## Architecture Overview
+## Core Architecture
 
-### High-Level Design
+### System Overview
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │              MattMC Standalone Map System                    │
 ├─────────────────────────────────────────────────────────────┤
 │                                                              │
-│  ┌───────────────┐      ┌──────────────┐                    │
-│  │  Map Key      │─────>│  Map GUI     │                    │
-│  │  Handler      │      │  Screen      │                    │
-│  │  (M Key)      │      │              │                    │
-│  └───────────────┘      └──────┬───────┘                    │
-│                                 │                            │
-│                                 v                            │
+│  Input Layer                                                 │
 │  ┌─────────────────────────────────────────────┐            │
-│  │         Map Tile Renderer                   │            │
-│  │  - Custom OpenGL tile rendering             │            │
-│  │  - Pan/Zoom viewport management             │            │
-│  │  - Texture atlas for tile batching          │            │
-│  └──────────────┬──────────────────────────────┘            │
-│                 │                                            │
-│                 v                                            │
-│  ┌─────────────────────────────────────────────┐            │
-│  │         World Data Collector                │            │
-│  │  - Asynchronous chunk scanner               │            │
-│  │  - Direct block data extraction             │            │
-│  │  - Biome and height information             │            │
-│  └──────────────┬──────────────────────────────┘            │
-│                 │                                            │
-│                 v                                            │
-│  ┌─────────────────────────────────────────────┐            │
-│  │         Tile Cache & Storage                │            │
-│  │  - In-memory LRU cache                      │            │
-│  │  - PNG file persistence                     │            │
-│  │  - Region-based organization                │            │
+│  │ - M Key (registered with vanilla keys)      │            │
+│  │ - Mouse Wheel (zoom control)                │            │
+│  │ - Mouse Drag (pan control)                  │            │
+│  │ - Mouse Click (waypoint interaction)        │            │
 │  └─────────────────────────────────────────────┘            │
-│                                                              │
+│                         ↓                                    │
+│  GUI Layer                                                   │
 │  ┌─────────────────────────────────────────────┐            │
-│  │         Waypoint System (Independent)       │            │
-│  │  - Custom waypoint data model               │            │
-│  │  - JSON persistence                         │            │
-│  │  - Teleport command integration             │            │
+│  │ - World Map Screen (full-screen)            │            │
+│  │ - Waypoints Menu (create/manage/teleport)   │            │
+│  │ - Dimension Selector                        │            │
+│  │ - Zoom Controls & Display                   │            │
+│  └─────────────────────────────────────────────┘            │
+│                         ↓                                    │
+│  Rendering Layer                                             │
+│  ┌─────────────────────────────────────────────┐            │
+│  │ - Tile Renderer (OpenGL/LWJGL)              │            │
+│  │ - Waypoint Overlay Renderer                 │            │
+│  │ - Player Position Marker                    │            │
+│  │ - Viewport Management                       │            │
+│  └─────────────────────────────────────────────┘            │
+│                         ↓                                    │
+│  Data Layer                                                  │
+│  ┌─────────────────────────────────────────────┐            │
+│  │ - World Chunk Scanner (async)               │            │
+│  │ - Tile Generator (multi-resolution)         │            │
+│  │ - Tile Cache (LRU, in-memory)               │            │
+│  │ - Waypoint Manager                          │            │
+│  └─────────────────────────────────────────────┘            │
+│                         ↓                                    │
+│  Storage Layer                                               │
+│  ┌─────────────────────────────────────────────┐            │
+│  │ - PNG Tile Files                            │            │
+│  │ - Waypoint JSON                             │            │
+│  │ - Explored Chunks Metadata                  │            │
+│  │ - Configuration Files                       │            │
 │  └─────────────────────────────────────────────┘            │
 │                                                              │
 └─────────────────────────────────────────────────────────────┘
@@ -172,26 +141,6 @@ Note: This system does NOT use:
   ❌ vanilla waypoint data structures
 ```
 
-### Data Flow
-
-1. **Chunk Exploration:**
-   ```
-   Chunk Load Event → Background Scanner → Extract Block Data →
-   Custom Color Mapping → Generate Tile Image → Cache & Save
-   ```
-
-2. **Map Viewing:**
-   ```
-   M Key → Open Custom Map Screen → Load Tiles from Cache/Disk →
-   Render with OpenGL → Display Waypoints → Handle Input
-   ```
-
-3. **Waypoint Management:**
-   ```
-   User Input → Create Waypoint Object → Store in JSON →
-   Render on Map → Enable Teleportation
-   ```
-
 ### Directory Structure
 
 ```
@@ -199,1037 +148,793 @@ Note: This system does NOT use:
   └── mattmc_map/               # Completely separate from vanilla saves
       ├── <world_name>/
       │   ├── overworld/
-      │   │   ├── regions/
-      │   │   │   ├── r.0.0/
-      │   │   │   │   ├── tile_0_0.png
-      │   │   │   │   ├── tile_0_1.png
-      │   │   │   │   └── ...
-      │   │   │   └── r.0.1/
-      │   │   └── explored.dat      # Explored chunk tracking
+      │   │   ├── tiles/
+      │   │   │   ├── zoom_0/  # 1:1 pixel per block (highest detail)
+      │   │   │   ├── zoom_1/  # 1:2 pixel per block
+      │   │   │   ├── zoom_2/  # 1:4 pixel per block
+      │   │   │   └── zoom_n/  # Progressive zoom-out levels
+      │   │   └── explored.dat
       │   ├── the_nether/
       │   ├── the_end/
-      │   └── waypoints.json        # Custom waypoint storage
-      └── config.json               # Map system configuration
+      │   ├── waypoints.json
+      │   └── config.json
+      └── global_config.json
 ```
 
 ---
 
-## Component Design
+## Feature Specifications
 
-### 1. World Data Collector
+### 1. Map Display
 
-**Package:** `net.minecraft.client.mattmc.map.collector`
+**Core Functionality:**
+- Full-screen map interface (replaces entire game view)
+- Real-time rendering of explored terrain
+- Smooth panning with mouse drag
+- Player position indicator (always visible)
+- Dimension indicator (shows current dimension)
+- Coordinate display (updates on mouse hover)
 
-**Class:** `WorldChunkScanner`
+**Visual Elements:**
+- Block-accurate terrain coloring
+- Biome-aware grass and water colors
+- Height-based shading (brighter = higher, darker = lower)
+- Structure highlighting (optional)
+- Grid overlay (optional, shows chunk boundaries)
 
-**Purpose:** Asynchronously scan loaded chunks and extract renderable data
+### 2. Zoom System
 
-```java
-public class WorldChunkScanner {
-    private final ExecutorService scannerThread;
-    private final ClientLevel world;
-    private final Set<ChunkPos> scannedChunks;
-    
-    /**
-     * Scan a chunk and extract all renderable data
-     * Runs in background thread to avoid blocking client
-     */
-    public CompletableFuture<ChunkMapData> scanChunk(ChunkPos pos) {
-        return CompletableFuture.supplyAsync(() -> {
-            LevelChunk chunk = world.getChunk(pos.x, pos.z);
-            return extractChunkData(chunk);
-        }, scannerThread);
-    }
-    
-    /**
-     * Extract block colors, heights, and biome data from chunk
-     * Does NOT use vanilla MapColor - custom color mapping
-     */
-    private ChunkMapData extractChunkData(LevelChunk chunk) {
-        ChunkMapData data = new ChunkMapData(chunk.getPos());
-        
-        // Scan from top to bottom to find surface blocks
-        for (int x = 0; x < 16; x++) {
-            for (int z = 0; z < 16; z++) {
-                BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
-                
-                // Find highest non-air block
-                for (int y = world.getMaxBuildHeight() - 1; y >= world.getMinBuildHeight(); y--) {
-                    pos.set(chunk.getPos().getMinBlockX() + x, y, chunk.getPos().getMinBlockZ() + z);
-                    BlockState state = chunk.getBlockState(pos);
-                    
-                    if (!state.isAir()) {
-                        // Custom color extraction (independent from vanilla)
-                        int color = BlockColorMapper.getBlockColor(state, chunk.getBiome(pos));
-                        int height = y;
-                        
-                        data.setPixel(x, z, color, height);
-                        break;
-                    }
-                }
-            }
-        }
-        
-        return data;
-    }
-    
-    /**
-     * Register chunk load listener
-     */
-    public void onChunkLoad(ChunkEvent.Load event) {
-        if (event.getLevel().isClientSide()) {
-            ChunkPos pos = event.getChunk().getPos();
-            if (!scannedChunks.contains(pos)) {
-                scanChunk(pos).thenAccept(data -> {
-                    TileGenerator.markTileDirty(pos);
-                    scannedChunks.add(pos);
-                });
-            }
-        }
-    }
-}
+**Zoom Levels:**
+- **Maximum Zoom (Zoom 0):** 1 pixel = 1 block (highest detail)
+- **Progressive Zoom Out:** Each level reduces detail (1:2, 1:4, 1:8, 1:16, etc.)
+- **Minimum Zoom:** Configurable, default ~1:64 (large area overview)
+
+**Zoom Controls:**
+- **Mouse Wheel:** Primary zoom control
+  - Scroll up: Zoom in (increase detail)
+  - Scroll down: Zoom out (decrease detail)
+- **Keyboard:** Secondary zoom control (+ and - keys)
+- **UI Buttons:** Zoom in/out buttons with current zoom level display
+
+**Zoom Behavior:**
+- Center-on-mouse: Point under cursor remains stationary during zoom
+- Smooth transitions between zoom levels
+- Configurable zoom speed (sensitivity)
+- Zoom limits to prevent over-zoom or excessive zoom-out
+
+### 3. Waypoint System
+
+**Waypoint Menu:**
+- Dedicated "Waypoints" button in map interface
+- Opens full waypoint management screen
+- List view of all waypoints (grouped by dimension)
+- Search/filter functionality
+- Sort options (name, distance, dimension, creation date)
+
+**Waypoint Creation:**
+- Click "Create Waypoint" in waypoints menu
+- Or right-click on map to create at location
+- Customization options:
+  - Name (text input)
+  - Color (color picker with presets)
+  - Icon (selection from icon set)
+  - Dimension (auto-detected, read-only)
+  - Coordinates (auto-filled from click location)
+
+**Waypoint Icons:**
+- Home (house icon)
+- Death (skull)
+- Portal (purple swirl)
+- Cave (pickaxe)
+- Village (bell)
+- Custom (star, default)
+- Additional themed icons
+
+**Waypoint Actions:**
+- **Teleport:** Instant teleportation to waypoint
+  - Requires creative mode or teleport permission
+  - Handles cross-dimension teleport automatically
+  - Confirmation dialog for long-distance teleports
+- **Edit:** Modify waypoint properties
+- **Delete:** Remove waypoint (with confirmation)
+- **Share:** Copy coordinates to chat/clipboard
+- **Navigate:** Show path/direction to waypoint
+
+**Waypoint Display:**
+- Icons rendered on map at waypoint locations
+- Name labels (toggle-able)
+- Distance indicator when hovering
+- Visual effects (glow, pulse) for selected waypoint
+- Dim/hide disabled waypoints
+
+### 4. Dimension Support
+
+**Dimension Switching:**
+- Dropdown menu in map header
+- Keyboard shortcuts (Tab to cycle)
+- Quick-switch to player's current dimension
+- Remembers last viewed position per dimension
+
+**Coordinate Conversion:**
+- Automatic Nether ↔ Overworld conversion (1:8 ratio)
+- Visual indicator when viewing different dimension
+- "Show Equivalent Position" feature (overlay other dimension coordinates)
+
+**Dimension-Specific Features:**
+- Separate explored area per dimension
+- Independent waypoint lists
+- Dimension-appropriate coloring (Nether = red tint, End = purple tint)
+
+### 5. Exploration Tracking
+
+**Progressive Revelation:**
+- Map initially blank/unexplored
+- Reveals as player enters chunks
+- Explored areas persist across sessions
+- Visual distinction between explored and unexplored
+
+**Update Mechanisms:**
+- Real-time update as chunks load
+- Background scanning of loaded chunks
+- Manual refresh option
+- Auto-update while map is open
+
+---
+
+## System Components
+
+### Component 1: World Chunk Scanner
+
+**Purpose:** Asynchronously scan loaded chunks and extract map data
+
+**Responsibilities:**
+- Monitor chunk load events
+- Extract block surface data (top-most solid block)
+- Gather biome information
+- Calculate height values for shading
+- Mark chunks as explored
+- Queue tile regeneration
+
+**Processing Flow:**
+1. Chunk loads in game world
+2. Scanner detects load event
+3. Scan scheduled in background thread
+4. Block data extracted (top-down scan)
+5. Color and height information stored
+6. Affected tiles marked dirty
+7. Tile regeneration queued
+
+**Performance Characteristics:**
+- Non-blocking (runs in separate thread)
+- Configurable scan priority
+- Batch processing for multiple chunks
+- Throttling to prevent CPU overload
+
+### Component 2: Block Color Mapper
+
+**Purpose:** Independent color mapping system for all Minecraft blocks
+
+**Responsibilities:**
+- Maintain color database for all blocks
+- Handle biome-specific colors (grass, leaves, water)
+- Apply height-based shading
+- Support resource pack color extraction
+
+**Color Categories:**
+- Stone variants (granite, andesite, diorite, deepslate)
+- Wood types (oak, spruce, birch, jungle, etc.)
+- Terrain (dirt, sand, gravel, clay)
+- Foliage (grass, leaves - biome-aware)
+- Water (biome-aware, depth-aware)
+- Special blocks (ores, structures)
+
+**Biome Coloring:**
+- Grass: Temperature and humidity-based interpolation
+- Leaves: Biome foliage color
+- Water: Biome water color
+- Other biome-specific blocks
+
+### Component 3: Tile Generator
+
+**Purpose:** Generate multi-resolution PNG tiles from chunk data
+
+**Tile Specifications:**
+- Base tile size: 512×512 pixels
+- Multiple zoom levels (0 to n)
+- Zoom 0: 512×512 blocks (1 pixel = 1 block)
+- Zoom 1: 1024×1024 blocks (1 pixel = 2 blocks)
+- Zoom n: Progressive scaling
+
+**Generation Process:**
+1. Receive tile request (dimension, coordinates, zoom level)
+2. Load chunk data for tile coverage area
+3. Apply color mapping to blocks
+4. Apply height-based shading
+5. Generate PNG image
+6. Cache in memory
+7. Save to disk (async)
+
+**Optimization:**
+- Generate only requested zoom levels
+- Lazy generation (on-demand)
+- Incremental updates (only changed areas)
+- Multi-threaded generation
+
+### Component 4: Tile Cache
+
+**Purpose:** In-memory LRU cache for fast tile access
+
+**Characteristics:**
+- Size: Configurable, default 256 tiles (~512MB at 512×512 px)
+- Eviction: Least Recently Used (LRU)
+- Write-back: Save dirty tiles before eviction
+- Preload: Load tiles around viewport
+
+**Cache Strategies:**
+- Viewport-based priority (visible tiles stay in cache)
+- Adjacent tile preloading (smooth panning)
+- Zoom-level awareness (cache relevant zoom level)
+- Dimension isolation (clear cache on dimension switch)
+
+### Component 5: Waypoint Manager
+
+**Purpose:** Manage user-created waypoints
+
+**Data Model:**
+- UUID (unique identifier)
+- Name (user-defined string)
+- Dimension (world key)
+- Position (x, y, z coordinates)
+- Color (RGB integer)
+- Icon (enum/string identifier)
+- Creation timestamp
+- Enabled flag
+
+**Operations:**
+- Create waypoint
+- Read waypoint (by ID, by name, by dimension)
+- Update waypoint (rename, recolor, change icon)
+- Delete waypoint
+- List waypoints (filtered, sorted)
+- Teleport to waypoint
+
+**Persistence:**
+- JSON file format
+- Save on modification
+- Load on world load
+- Backup/restore functionality
+
+### Component 6: Map Renderer
+
+**Purpose:** Render map tiles and overlays to screen
+
+**Rendering Pipeline:**
+1. Calculate visible viewport (based on center position and zoom)
+2. Determine required tiles (tile coordinates)
+3. Load tiles from cache (or queue generation)
+4. Render tiles to screen (OpenGL texture quads)
+5. Render waypoint icons and labels
+6. Render player marker
+7. Render UI elements (controls, info)
+
+**Rendering Optimizations:**
+- Batch tile rendering (single draw call)
+- Texture atlas for UI elements
+- Frustum culling (skip offscreen tiles)
+- LOD (level of detail) based on zoom
+
+### Component 7: Viewport Manager
+
+**Purpose:** Manage map viewport (position, zoom, transform)
+
+**State:**
+- Center position (world X, Z coordinates)
+- Zoom level (0 to max)
+- Screen dimensions
+- Current dimension
+
+**Coordinate Transformations:**
+- World to screen (blocks → pixels)
+- Screen to world (pixels → blocks)
+- Tile to world (tile coordinates → block coordinates)
+- World to tile (block coordinates → tile coordinates)
+
+**Viewport Operations:**
+- Pan (translate center position)
+- Zoom (change zoom level, adjust center)
+- Center on position (player, waypoint)
+- Fit bounds (show specific area)
+
+---
+
+## User Interface Design
+
+### Main Map Screen Layout
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│  [X] World Map          Overworld ▼    Waypoints  Settings   │ Header (40px)
+├──────────────────────────────────────────────────────────────┤
+│                                                               │
+│                                                               │
+│                    MAP VIEWPORT                               │
+│                                                               │
+│               [Rendered tiles, waypoints,                     │ Main Area
+│                player position]                               │
+│                                                               │
+│                                                               │
+│                                                               │
+├──────────────────────────────────────────────────────────────┤
+│ Zoom: [-] 100% (1:1) [+]  │  X: 1234, Z: 5678  │  [Center]  │ Footer (35px)
+└──────────────────────────────────────────────────────────────┘
 ```
 
-**Class:** `ChunkMapData`
+**Header Elements:**
+- Close button (X) - top left
+- Title "World Map" - left
+- Dimension selector dropdown - center
+- "Waypoints" button - right of center
+- "Settings" button - top right
 
-```java
-public class ChunkMapData {
-    private final ChunkPos position;
-    private final int[][] colors;      // 16x16 pixel colors
-    private final int[][] heights;     // 16x16 heights for shading
-    
-    public ChunkMapData(ChunkPos pos) {
-        this.position = pos;
-        this.colors = new int[16][16];
-        this.heights = new int[16][16];
-    }
-    
-    public void setPixel(int x, int z, int color, int height) {
-        colors[x][z] = color;
-        heights[x][z] = height;
-    }
-    
-    public int getColor(int x, int z) {
-        return colors[x][z];
-    }
-    
-    public int getHeight(int x, int z) {
-        return heights[x][z];
-    }
-}
+**Footer Elements:**
+- Zoom controls (- button, level display, + button) - left
+- Coordinate display (updates on hover) - center
+- "Center on Player" button - right
+
+### Waypoints Menu
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│  Waypoints                                        [X] Close   │
+├──────────────────────────────────────────────────────────────┤
+│  [Search...]                    [+ Create Waypoint]           │
+├──────────────────────────────────────────────────────────────┤
+│                                                               │
+│  Overworld (3)                                                │
+│    🏠 Home Base          X: 100, Y: 64, Z: 200     [Teleport]│
+│    ⚔️  Mine Entrance     X: -50, Y: 12, Z: 300     [Teleport]│
+│    🏰 Castle             X: 500, Y: 80, Z: -100    [Teleport]│
+│                                                               │
+│  The Nether (1)                                               │
+│    🌀 Nether Hub         X: 12, Y: 64, Z: 25       [Teleport]│
+│                                                               │
+│  The End (0)                                                  │
+│    (No waypoints)                                             │
+│                                                               │
+├──────────────────────────────────────────────────────────────┤
+│  Selected: Home Base                [Edit]  [Delete]          │
+└──────────────────────────────────────────────────────────────┘
 ```
 
-### 2. Custom Block Color Mapper
+**Features:**
+- Search bar (filter by name)
+- Create button (opens creation dialog)
+- Grouped by dimension (collapsible sections)
+- Each waypoint row shows: icon, name, coordinates, teleport button
+- Selection highlights row
+- Edit/Delete buttons for selected waypoint
 
-**Package:** `net.minecraft.client.mattmc.map.color`
+### Create/Edit Waypoint Dialog
 
-**Class:** `BlockColorMapper`
-
-**Purpose:** Independent color mapping system (does NOT use vanilla MapColor)
-
-```java
-public class BlockColorMapper {
-    private static final Map<Block, Integer> BLOCK_COLORS = new HashMap<>();
-    private static final Map<Block, BiFunction<BlockState, Holder<Biome>, Integer>> BIOME_COLORS = new HashMap<>();
-    
-    static {
-        // Initialize custom color mappings for all blocks
-        initializeBlockColors();
-        initializeBiomeColors();
-    }
-    
-    /**
-     * Get color for a block, with biome awareness
-     */
-    public static int getBlockColor(BlockState state, Holder<Biome> biome) {
-        Block block = state.getBlock();
-        
-        // Check biome-sensitive blocks first (grass, leaves, water)
-        if (BIOME_COLORS.containsKey(block)) {
-            return BIOME_COLORS.get(block).apply(state, biome);
-        }
-        
-        // Standard block color
-        return BLOCK_COLORS.getOrDefault(block, 0x808080); // Gray default
-    }
-    
-    private static void initializeBlockColors() {
-        // Stone variants
-        BLOCK_COLORS.put(Blocks.STONE, 0x7F7F7F);
-        BLOCK_COLORS.put(Blocks.DEEPSLATE, 0x4A4A4A);
-        BLOCK_COLORS.put(Blocks.GRANITE, 0x926B5B);
-        
-        // Wood variants
-        BLOCK_COLORS.put(Blocks.OAK_LOG, 0x6B5434);
-        BLOCK_COLORS.put(Blocks.SPRUCE_LOG, 0x3D2712);
-        BLOCK_COLORS.put(Blocks.BIRCH_LOG, 0xD7CB8D);
-        
-        // Terrain
-        BLOCK_COLORS.put(Blocks.DIRT, 0x8B6340);
-        BLOCK_COLORS.put(Blocks.SAND, 0xDDD799);
-        BLOCK_COLORS.put(Blocks.GRAVEL, 0x7F7B7B);
-        BLOCK_COLORS.put(Blocks.SNOW, 0xFFFEFE);
-        BLOCK_COLORS.put(Blocks.ICE, 0x9DDBFF);
-        
-        // ... (continue for all blocks)
-    }
-    
-    private static void initializeBiomeColors() {
-        // Grass color varies by biome
-        BIOME_COLORS.put(Blocks.GRASS_BLOCK, (state, biome) -> {
-            return getBiomeGrassColor(biome);
-        });
-        
-        // Leaves color varies by biome
-        BIOME_COLORS.put(Blocks.OAK_LEAVES, (state, biome) -> {
-            return getBiomeFoliageColor(biome);
-        });
-        
-        // Water color varies by biome
-        BIOME_COLORS.put(Blocks.WATER, (state, biome) -> {
-            return getBiomeWaterColor(biome);
-        });
-    }
-    
-    private static int getBiomeGrassColor(Holder<Biome> biome) {
-        // Custom biome grass coloring logic
-        // Similar to vanilla but independent implementation
-        int temperature = (int)(biome.value().getBaseTemperature() * 100);
-        int humidity = (int)(biome.value().climateSettings.downfall() * 100);
-        return interpolateGrassColor(temperature, humidity);
-    }
-}
+```
+┌─────────────────────────────────────────┐
+│  Create Waypoint              [X] Close  │
+├─────────────────────────────────────────┤
+│  Name: [_________________________]       │
+│                                          │
+│  Icon: 🏠 🏰 ⚔️ 🎁 🌀 💀 ⛏️ 🔔 ⭐       │
+│                                          │
+│  Color: [●●●●●●●●●●●●] Custom: [    ]  │
+│                                          │
+│  Location:                               │
+│    Dimension: Overworld                  │
+│    X: 123   Y: 64   Z: 456               │
+│                                          │
+│              [Cancel]  [Create]          │
+└─────────────────────────────────────────┘
 ```
 
-### 3. Tile Generator and Cache
+**Fields:**
+- Name (text input, required)
+- Icon (selectable grid of icons)
+- Color (preset palette + custom color picker)
+- Location (auto-filled, can be edited)
 
-**Package:** `net.minecraft.client.mattmc.map.tile`
+### Settings Panel
 
-**Class:** `MapTileGenerator`
-
-**Purpose:** Generate PNG tiles from chunk data
-
-```java
-public class MapTileGenerator {
-    private static final int TILE_SIZE = 512;  // 512x512 pixels
-    private static final int CHUNKS_PER_TILE = 32;  // 32x32 chunks
-    
-    /**
-     * Generate a tile from chunk data
-     * One tile covers 32x32 chunks = 512x512 blocks = 512x512 pixels at 1:1 scale
-     */
-    public static MapTile generateTile(ResourceKey<Level> dimension, int tileX, int tileZ, 
-                                       Map<ChunkPos, ChunkMapData> chunkData) {
-        BufferedImage image = new BufferedImage(TILE_SIZE, TILE_SIZE, BufferedImage.TYPE_INT_RGB);
-        
-        int baseChunkX = tileX * CHUNKS_PER_TILE;
-        int baseChunkZ = tileZ * CHUNKS_PER_TILE;
-        
-        for (int cx = 0; cx < CHUNKS_PER_TILE; cx++) {
-            for (int cz = 0; cz < CHUNKS_PER_TILE; cz++) {
-                ChunkPos chunkPos = new ChunkPos(baseChunkX + cx, baseChunkZ + cz);
-                ChunkMapData data = chunkData.get(chunkPos);
-                
-                if (data != null) {
-                    renderChunkToTile(image, cx, cz, data);
-                }
-            }
-        }
-        
-        return new MapTile(dimension, tileX, tileZ, image);
-    }
-    
-    /**
-     * Render a single chunk (16x16 blocks) onto the tile
-     */
-    private static void renderChunkToTile(BufferedImage tile, int chunkX, int chunkZ, 
-                                          ChunkMapData data) {
-        int pixelBaseX = chunkX * 16;
-        int pixelBaseZ = chunkZ * 16;
-        
-        for (int x = 0; x < 16; x++) {
-            for (int z = 0; z < 16; z++) {
-                int color = data.getColor(x, z);
-                int height = data.getHeight(x, z);
-                
-                // Apply height-based shading
-                color = applyHeightShading(color, height, getNeighborHeights(data, x, z));
-                
-                tile.setRGB(pixelBaseX + x, pixelBaseZ + z, color);
-            }
-        }
-    }
-    
-    /**
-     * Apply height-based shading (brighter for higher, darker for lower)
-     */
-    private static int applyHeightShading(int baseColor, int height, int[] neighborHeights) {
-        // Calculate average height difference with neighbors
-        int avgNeighborHeight = 0;
-        for (int h : neighborHeights) avgNeighborHeight += h;
-        avgNeighborHeight /= neighborHeights.length;
-        
-        int heightDiff = height - avgNeighborHeight;
-        
-        // Shade factor: +/- 20% based on height difference
-        double shadeFactor = 1.0 + (heightDiff / 8.0) * 0.2;
-        shadeFactor = Math.max(0.7, Math.min(1.3, shadeFactor));
-        
-        int r = (int)(((baseColor >> 16) & 0xFF) * shadeFactor);
-        int g = (int)(((baseColor >> 8) & 0xFF) * shadeFactor);
-        int b = (int)((baseColor & 0xFF) * shadeFactor);
-        
-        r = Math.max(0, Math.min(255, r));
-        g = Math.max(0, Math.min(255, g));
-        b = Math.max(0, Math.min(255, b));
-        
-        return (r << 16) | (g << 8) | b;
-    }
-}
+```
+┌─────────────────────────────────────────┐
+│  Map Settings                 [X] Close  │
+├─────────────────────────────────────────┤
+│  Display                                 │
+│    [ ] Show chunk grid                   │
+│    [✓] Show waypoint labels              │
+│    [✓] Show player marker                │
+│    [ ] Show coordinates                  │
+│                                          │
+│  Zoom                                    │
+│    Min Zoom: [1:64 ▼]                    │
+│    Max Zoom: [1:1  ▼]                    │
+│    Zoom Speed: [Normal ▼]                │
+│                                          │
+│  Performance                             │
+│    Tile Cache: [256 tiles ▼]             │
+│    [ ] High quality rendering            │
+│                                          │
+│              [Reset]  [Apply]            │
+└─────────────────────────────────────────┘
 ```
 
-**Class:** `MapTile`
+**Settings Categories:**
+- Display options (toggles for various visual elements)
+- Zoom configuration (range and speed)
+- Performance tuning (cache size, quality)
 
-```java
-public class MapTile {
-    private final ResourceKey<Level> dimension;
-    private final int tileX, tileZ;
-    private final BufferedImage image;
-    private final long timestamp;
-    private boolean dirty;
-    
-    public MapTile(ResourceKey<Level> dimension, int tileX, int tileZ, BufferedImage image) {
-        this.dimension = dimension;
-        this.tileX = tileX;
-        this.tileZ = tileZ;
-        this.image = image;
-        this.timestamp = System.currentTimeMillis();
-        this.dirty = true;
-    }
-    
-    /**
-     * Save tile to disk as PNG
-     */
-    public void saveToDisk(Path mapDirectory) {
-        try {
-            Path regionDir = getTileRegionPath(mapDirectory);
-            Files.createDirectories(regionDir);
-            
-            Path tileFile = regionDir.resolve(String.format("tile_%d_%d.png", tileX, tileZ));
-            ImageIO.write(image, "PNG", tileFile.toFile());
-            
-            dirty = false;
-        } catch (IOException e) {
-            // Log error
-        }
-    }
-    
-    /**
-     * Load tile from disk
-     */
-    public static MapTile loadFromDisk(ResourceKey<Level> dimension, int tileX, int tileZ, 
-                                       Path mapDirectory) {
-        try {
-            Path regionDir = getTileRegionPath(mapDirectory, dimension, tileX, tileZ);
-            Path tileFile = regionDir.resolve(String.format("tile_%d_%d.png", tileX, tileZ));
-            
-            if (Files.exists(tileFile)) {
-                BufferedImage image = ImageIO.read(tileFile.toFile());
-                MapTile tile = new MapTile(dimension, tileX, tileZ, image);
-                tile.dirty = false;
-                return tile;
-            }
-        } catch (IOException e) {
-            // Log error
-        }
-        return null;
-    }
-    
-    private Path getTileRegionPath(Path mapDirectory) {
-        int regionX = Math.floorDiv(tileX, 32);
-        int regionZ = Math.floorDiv(tileZ, 32);
-        return getTileRegionPath(mapDirectory, dimension, regionX, regionZ);
-    }
-    
-    private static Path getTileRegionPath(Path mapDirectory, ResourceKey<Level> dimension, 
-                                          int regionX, int regionZ) {
-        String dimName = dimension.location().getPath().replace(":", "_");
-        return mapDirectory.resolve(dimName)
-                          .resolve("regions")
-                          .resolve(String.format("r.%d.%d", regionX, regionZ));
-    }
-}
-```
+### Visual Design Guidelines
 
-**Class:** `TileCache`
+**Color Scheme:**
+- Background: Semi-transparent dark overlay (#000000CC)
+- UI panels: Dark gray (#2B2B2B)
+- Text: White (#FFFFFF) and light gray (#CCCCCC)
+- Accents: Minecraft green (#55FF55)
+- Buttons: Minecraft button style (matching vanilla)
 
-```java
-public class TileCache {
-    private final int maxSize;
-    private final LinkedHashMap<TileKey, MapTile> cache;
-    
-    public TileCache(int maxSize) {
-        this.maxSize = maxSize;
-        this.cache = new LinkedHashMap<>(maxSize, 0.75f, true) {
-            @Override
-            protected boolean removeEldestEntry(Map.Entry<TileKey, MapTile> eldest) {
-                if (size() > maxSize) {
-                    // Save to disk before evicting
-                    if (eldest.getValue().isDirty()) {
-                        eldest.getValue().saveToDisk(getMapDirectory());
-                    }
-                    return true;
-                }
-                return false;
-            }
-        };
-    }
-    
-    public MapTile getTile(ResourceKey<Level> dimension, int tileX, int tileZ) {
-        TileKey key = new TileKey(dimension, tileX, tileZ);
-        return cache.get(key);
-    }
-    
-    public void putTile(MapTile tile) {
-        TileKey key = new TileKey(tile.getDimension(), tile.getTileX(), tile.getTileZ());
-        cache.put(key, tile);
-    }
-}
-```
+**Typography:**
+- UI text: Minecraft font
+- Coordinates: Monospace for alignment
+- Headers: Bold variant
 
-### 4. Custom Map GUI Screen
+**Icons:**
+- Waypoint icons: 16×16 pixel art style
+- UI icons: Matching Minecraft GUI style
+- Player marker: Distinctive, always visible
 
-**Package:** `net.minecraft.client.mattmc.map.gui`
+---
 
-**Class:** `WorldMapScreen`
+## Data Persistence
 
-**Purpose:** Full-screen map interface with custom rendering
+### File Formats
 
-```java
-public class WorldMapScreen extends Screen {
-    private final MapTileRenderer tileRenderer;
-    private final WaypointRenderer waypointRenderer;
-    private final MapDataManager dataManager;
-    
-    // Viewport state
-    private double centerWorldX, centerWorldZ;
-    private double zoomLevel = 1.0;  // 0.5, 1.0, 2.0, 4.0
-    private ResourceKey<Level> currentDimension;
-    
-    // UI state
-    private boolean dragging = false;
-    private double dragStartX, dragStartZ;
-    
-    public WorldMapScreen() {
-        super(Component.literal("World Map"));
-        this.tileRenderer = new MapTileRenderer();
-        this.waypointRenderer = new WaypointRenderer();
-        this.dataManager = MapDataManager.getInstance();
-        
-        // Initialize to player's current position and dimension
-        Player player = Minecraft.getInstance().player;
-        if (player != null) {
-            this.centerWorldX = player.getX();
-            this.centerWorldZ = player.getZ();
-            this.currentDimension = player.level().dimension();
-        }
-    }
-    
-    @Override
-    public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        // Render dark background
-        graphics.fill(0, 0, this.width, this.height, 0xE0000000);
-        
-        // Calculate visible area
-        MapViewport viewport = calculateViewport();
-        
-        // Render map tiles
-        tileRenderer.render(graphics, viewport, currentDimension, dataManager.getTileCache());
-        
-        // Render waypoints
-        waypointRenderer.render(graphics, viewport, dataManager.getWaypoints(currentDimension));
-        
-        // Render player position
-        renderPlayerMarker(graphics, viewport);
-        
-        // Render UI elements
-        renderHeader(graphics);
-        renderFooter(graphics, mouseX, mouseY);
-        
-        super.render(graphics, mouseX, mouseY, partialTick);
-    }
-    
-    private MapViewport calculateViewport() {
-        return new MapViewport(
-            centerWorldX, centerWorldZ,
-            width, height - 70,  // Account for header/footer
-            zoomLevel
-        );
-    }
-    
-    @Override
-    public boolean mouseDragged(double mouseX, double mouseY, int button, 
-                                double dragX, double dragY) {
-        if (button == 0) {  // Left click
-            // Pan the map
-            double worldDragX = dragX / zoomLevel;
-            double worldDragZ = dragY / zoomLevel;
-            
-            centerWorldX -= worldDragX;
-            centerWorldZ -= worldDragZ;
-            
-            return true;
-        }
-        return super.mouseDragged(mouseX, mouseY, button, dragX, dragY);
-    }
-    
-    @Override
-    public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
-        // Zoom in/out
-        if (scrollY > 0) {
-            zoomLevel = Math.min(4.0, zoomLevel * 1.2);
-        } else {
-            zoomLevel = Math.max(0.5, zoomLevel / 1.2);
-        }
-        return true;
-    }
-    
-    @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        if (button == 1) {  // Right click
-            // Check if clicked on waypoint
-            MapViewport viewport = calculateViewport();
-            BlockPos worldPos = viewport.screenToWorld((int)mouseX, (int)mouseY);
-            
-            Waypoint waypoint = waypointRenderer.getWaypointAtPosition(worldPos, 10);
-            if (waypoint != null) {
-                openWaypointMenu(waypoint);
-                return true;
-            }
-        } else if (button == 0) {  // Left click
-            // Create new waypoint
-            MapViewport viewport = calculateViewport();
-            BlockPos worldPos = viewport.screenToWorld((int)mouseX, (int)mouseY);
-            openCreateWaypointDialog(worldPos);
-            return true;
-        }
-        return super.mouseClicked(mouseX, mouseY, button);
-    }
-    
-    private void renderHeader(GuiGraphics graphics) {
-        // Title
-        graphics.drawString(font, "World Map", 10, 10, 0xFFFFFF);
-        
-        // Dimension selector
-        // ... render dimension dropdown ...
-        
-        // Close button
-        // ... render X button ...
-    }
-    
-    private void renderFooter(GuiGraphics graphics, int mouseX, int mouseY) {
-        int footerY = height - 30;
-        
-        // Zoom controls
-        // ... render zoom buttons ...
-        
-        // Coordinates
-        MapViewport viewport = calculateViewport();
-        BlockPos hoverPos = viewport.screenToWorld(mouseX, mouseY);
-        String coords = String.format("X: %d, Z: %d", hoverPos.getX(), hoverPos.getZ());
-        graphics.drawString(font, coords, width / 2 - 50, footerY, 0xFFFFFF);
-    }
-}
-```
+**Tile Files:**
+- Format: PNG (compressed)
+- Location: `mattmc_map/<world>/<dimension>/tiles/zoom_<level>/<region>/tile_<x>_<z>.png`
+- Naming: Tile coordinates in file name
+- Organization: Grouped by region (32×32 tiles per region directory)
 
-### 5. Independent Waypoint System
+**Waypoint File:**
+- Format: JSON
+- Location: `mattmc_map/<world>/waypoints.json`
+- Structure:
+  ```json
+  {
+    "version": 1,
+    "waypoints": [
+      {
+        "id": "uuid-string",
+        "name": "Home Base",
+        "dimension": "minecraft:overworld",
+        "x": 123, "y": 64, "z": 456,
+        "color": 16711680,
+        "icon": "HOME",
+        "created": 1234567890000,
+        "enabled": true
+      }
+    ]
+  }
+  ```
 
-**Package:** `net.minecraft.client.mattmc.map.waypoint`
+**Explored Chunks:**
+- Format: Custom binary format (compact)
+- Location: `mattmc_map/<world>/<dimension>/explored.dat`
+- Content: Bitset of explored chunk coordinates
 
-**Class:** `MapWaypoint`
+**Configuration:**
+- Format: JSON
+- Location: `mattmc_map/<world>/config.json` (per-world) and `mattmc_map/global_config.json` (global)
+- Settings: Zoom ranges, display options, performance tuning
 
-**Purpose:** Custom waypoint data structure (independent from vanilla)
+### Save/Load Strategy
 
-```java
-public class MapWaypoint {
-    private final UUID id;
-    private String name;
-    private final ResourceKey<Level> dimension;
-    private final BlockPos position;
-    private int color;  // RGB color
-    private WaypointIcon icon;
-    private final long createdTime;
-    private boolean enabled;
-    
-    public MapWaypoint(String name, ResourceKey<Level> dimension, BlockPos position, 
-                       int color, WaypointIcon icon) {
-        this.id = UUID.randomUUID();
-        this.name = name;
-        this.dimension = dimension;
-        this.position = position.immutable();
-        this.color = color;
-        this.icon = icon;
-        this.createdTime = System.currentTimeMillis();
-        this.enabled = true;
-    }
-    
-    // Getters and setters
-    
-    /**
-     * Serialize to JSON (not NBT)
-     */
-    public JsonObject toJson() {
-        JsonObject json = new JsonObject();
-        json.addProperty("id", id.toString());
-        json.addProperty("name", name);
-        json.addProperty("dimension", dimension.location().toString());
-        json.addProperty("x", position.getX());
-        json.addProperty("y", position.getY());
-        json.addProperty("z", position.getZ());
-        json.addProperty("color", color);
-        json.addProperty("icon", icon.name());
-        json.addProperty("created", createdTime);
-        json.addProperty("enabled", enabled);
-        return json;
-    }
-    
-    /**
-     * Deserialize from JSON
-     */
-    public static MapWaypoint fromJson(JsonObject json) {
-        UUID id = UUID.fromString(json.get("id").getAsString());
-        String name = json.get("name").getAsString();
-        ResourceKey<Level> dimension = ResourceKey.create(
-            Registries.DIMENSION,
-            ResourceLocation.parse(json.get("dimension").getAsString())
-        );
-        BlockPos position = new BlockPos(
-            json.get("x").getAsInt(),
-            json.get("y").getAsInt(),
-            json.get("z").getAsInt()
-        );
-        int color = json.get("color").getAsInt();
-        WaypointIcon icon = WaypointIcon.valueOf(json.get("icon").getAsString());
-        
-        MapWaypoint waypoint = new MapWaypoint(name, dimension, position, color, icon);
-        waypoint.id = id;
-        waypoint.createdTime = json.get("created").getAsLong();
-        waypoint.enabled = json.get("enabled").getAsBoolean();
-        
-        return waypoint;
-    }
-}
+**When to Save:**
+- Tile generation: Save immediately after generation
+- Waypoint changes: Save on create/edit/delete
+- Explored chunks: Periodic save (every 60 seconds) + on world save
+- Configuration: Save on settings change
 
-public enum WaypointIcon {
-    HOME,      // House icon
-    DEATH,     // Skull
-    PORTAL,    // Purple swirl
-    CAVE,      // Pickaxe
-    VILLAGE,   // Bell
-    CUSTOM     // Star (default)
-}
-```
+**When to Load:**
+- World load: Load waypoints and explored chunks
+- Map open: Load configuration
+- Tile display: Load tiles on-demand (lazy loading)
 
-**Class:** `WaypointManager`
+**Error Handling:**
+- Corrupted files: Fallback to empty/default state
+- Missing files: Create new with defaults
+- Version mismatch: Attempt migration or reset
 
-```java
-public class WaypointManager {
-    private final Map<ResourceKey<Level>, List<MapWaypoint>> waypointsByDimension;
-    private final Path waypointsFile;
-    
-    public WaypointManager(Path mapDirectory) {
-        this.waypointsByDimension = new HashMap<>();
-        this.waypointsFile = mapDirectory.resolve("waypoints.json");
-        load();
-    }
-    
-    public void addWaypoint(MapWaypoint waypoint) {
-        waypointsByDimension
-            .computeIfAbsent(waypoint.getDimension(), k -> new ArrayList<>())
-            .add(waypoint);
-        save();
-    }
-    
-    public void removeWaypoint(UUID id) {
-        for (List<MapWaypoint> waypoints : waypointsByDimension.values()) {
-            waypoints.removeIf(w -> w.getId().equals(id));
-        }
-        save();
-    }
-    
-    public List<MapWaypoint> getWaypoints(ResourceKey<Level> dimension) {
-        return waypointsByDimension.getOrDefault(dimension, Collections.emptyList());
-    }
-    
-    public void teleportToWaypoint(MapWaypoint waypoint) {
-        Player player = Minecraft.getInstance().player;
-        if (player == null) return;
-        
-        // Build teleport command
-        String command = String.format(
-            "/execute in %s run tp @s %d %d %d",
-            waypoint.getDimension().location(),
-            waypoint.getPosition().getX(),
-            waypoint.getPosition().getY(),
-            waypoint.getPosition().getZ()
-        );
-        
-        // Execute command
-        player.connection.sendCommand(command.substring(1));  // Remove leading /
-    }
-    
-    /**
-     * Save waypoints to JSON file
-     */
-    private void save() {
-        try {
-            JsonObject root = new JsonObject();
-            JsonArray waypointsArray = new JsonArray();
-            
-            for (List<MapWaypoint> waypoints : waypointsByDimension.values()) {
-                for (MapWaypoint waypoint : waypoints) {
-                    waypointsArray.add(waypoint.toJson());
-                }
-            }
-            
-            root.addProperty("version", 1);
-            root.add("waypoints", waypointsArray);
-            
-            Files.writeString(waypointsFile, new GsonBuilder().setPrettyPrinting().create().toJson(root));
-        } catch (IOException e) {
-            // Log error
-        }
-    }
-    
-    /**
-     * Load waypoints from JSON file
-     */
-    private void load() {
-        if (!Files.exists(waypointsFile)) return;
-        
-        try {
-            String json = Files.readString(waypointsFile);
-            JsonObject root = JsonParser.parseString(json).getAsJsonObject();
-            JsonArray waypointsArray = root.getAsJsonArray("waypoints");
-            
-            waypointsByDimension.clear();
-            
-            for (JsonElement element : waypointsArray) {
-                MapWaypoint waypoint = MapWaypoint.fromJson(element.getAsJsonObject());
-                waypointsByDimension
-                    .computeIfAbsent(waypoint.getDimension(), k -> new ArrayList<>())
-                    .add(waypoint);
-            }
-        } catch (IOException e) {
-            // Log error
-        }
-    }
-}
-```
+---
+
+## Performance Requirements
+
+### Target Metrics
+
+**Rendering:**
+- 60 FPS minimum while map is open
+- < 100ms time to open map screen
+- < 16ms per frame rendering time
+- Smooth pan and zoom (no stuttering)
+
+**Tile Generation:**
+- < 500ms to generate single tile (zoom 0)
+- < 2 seconds for full viewport (typical 3×3 tiles)
+- Background generation doesn't impact game FPS
+
+**Memory:**
+- < 200MB total map system overhead
+- Tile cache: Configurable, default 256 tiles (~512MB)
+- Waypoint data: < 1MB (thousands of waypoints)
+
+**Storage:**
+- < 10MB per 1000 explored chunks (tiles + metadata)
+- PNG compression for efficient disk usage
+- Incremental saves (only changed data)
+
+### Optimization Strategies
+
+**Rendering Optimizations:**
+- Texture atlas for UI elements and waypoint icons
+- Batch rendering (minimize draw calls)
+- Viewport culling (don't render offscreen content)
+- LOD system (lower detail for distant areas)
+
+**Generation Optimizations:**
+- Multi-threaded tile generation
+- Incremental updates (only regenerate changed areas)
+- Lazy generation (generate only when needed)
+- Caching intermediate results
+
+**Memory Optimizations:**
+- LRU cache with aggressive eviction
+- Lazy loading (load tiles on-demand)
+- Unload tiles outside viewport margin
+- Compress data in memory where possible
 
 ---
 
 ## Implementation Phases
 
-### Phase 1: Core Chunk Scanner (Week 1-2)
+### Phase 1: Core Infrastructure (Weeks 1-2)
 
-**Goals:**
-- Implement independent chunk data collector
-- Create custom block color mapping system
-- Set up background scanning threads
+**Focus:** Foundation and data collection
 
 **Deliverables:**
-- `WorldChunkScanner` with async scanning
-- `BlockColorMapper` with full block palette
-- `ChunkMapData` structure
-- Chunk load event hooks
+- World chunk scanner (async background processing)
+- Block color mapper (complete block palette)
+- Chunk data extraction and storage
+- Explored chunk tracking
+- File system structure setup
 
-**Tests:**
-- Verify chunks are scanned on load
-- Verify color mapping matches expected values
-- Verify background thread doesn't block client
+**Validation:**
+- Chunks scanned without blocking game
+- Colors accurate for all block types
+- Explored chunks persist across sessions
 
-### Phase 2: Tile Generation & Storage (Week 3-4)
+### Phase 2: Tile System (Weeks 3-4)
 
-**Goals:**
-- Implement tile generator from chunk data
-- Create PNG persistence system
-- Build in-memory tile cache
+**Focus:** Multi-resolution tile generation and caching
 
 **Deliverables:**
-- `MapTileGenerator` with height shading
-- `MapTile` with PNG save/load
-- `TileCache` with LRU eviction
-- Directory structure creation
+- Tile generator for multiple zoom levels
+- PNG encoding/decoding
+- Tile cache with LRU eviction
+- Directory organization for tiles
+- Height-based shading algorithm
 
-**Tests:**
-- Generate tiles from test chunks
-- Verify PNG files are created
-- Verify cache eviction works
-- Benchmark tile generation speed
+**Validation:**
+- Tiles generate at all zoom levels
+- 1:1 pixel-per-block at zoom 0
+- Cache eviction works correctly
+- Tiles save/load from disk
 
-### Phase 3: Map GUI & Rendering (Week 5-6)
+### Phase 3: Map GUI (Weeks 5-6)
 
-**Goals:**
-- Create custom map screen
-- Implement viewport system
-- Add pan and zoom
+**Focus:** User interface and rendering
 
 **Deliverables:**
-- `WorldMapScreen` with custom rendering
-- `MapViewport` coordinate transformation
-- `MapTileRenderer` for OpenGL rendering
-- M key binding
+- World map screen (full-screen interface)
+- Viewport management (pan, zoom)
+- Tile rendering (OpenGL)
+- Mouse controls (drag, wheel, click)
+- Coordinate display and UI elements
 
-**Tests:**
-- Open map with M key
-- Pan around smoothly
-- Zoom in/out
-- Verify rendering performance (60 FPS)
+**Validation:**
+- Map opens with M key
+- Smooth panning with mouse drag
+- Mouse wheel zoom works correctly
+- Center-on-mouse zoom behavior
+- 60 FPS rendering achieved
 
-### Phase 4: Waypoint System (Week 7-8)
+### Phase 4: Waypoint System (Weeks 7-8)
 
-**Goals:**
-- Implement independent waypoint data
-- Create waypoint UI
-- Add persistence
-
-**Deliverables:**
-- `MapWaypoint` class
-- `WaypointManager` with JSON storage
-- `WaypointRenderer` for map display
-- Waypoint creation dialog
-
-**Tests:**
-- Create waypoints
-- Save and reload
-- Render on map
-- Edit/delete waypoints
-
-### Phase 5: Teleportation & Commands (Week 9)
-
-**Goals:**
-- Add teleport functionality
-- Implement waypoint commands
-- Handle dimension switching
+**Focus:** Waypoint creation and management
 
 **Deliverables:**
-- Teleport integration
-- `/mapwaypoint` command
-- Cross-dimension teleport
-- Permission checks
+- Waypoint data model
+- Waypoint manager (CRUD operations)
+- Waypoints menu UI
+- Waypoint creation/edit dialog
+- Waypoint rendering on map
+- JSON persistence
 
-**Tests:**
+**Validation:**
+- Create waypoints via menu
+- Edit and delete waypoints
+- Waypoints render on map
+- Waypoints persist across sessions
+- Search and filter work
+
+### Phase 5: Teleportation (Week 9)
+
+**Focus:** Waypoint teleportation functionality
+
+**Deliverables:**
+- Teleport command integration
+- Cross-dimension teleport handling
+- Permission system integration
+- Teleport confirmation dialogs
+- Coordinate conversion (Nether/Overworld)
+
+**Validation:**
 - Teleport within dimension
-- Teleport across dimensions
-- Test Nether coordinate conversion
+- Cross-dimension teleport
+- Nether coordinates convert correctly (1:8)
+- Permission checks work
 
-### Phase 6: Polish & Optimization (Week 10)
+### Phase 6: Polish & Configuration (Week 10)
 
-**Goals:**
-- Optimize performance
-- Add UI polish
+**Focus:** Settings, optimization, and final polish
+
+**Deliverables:**
+- Settings menu
+- Configuration persistence
+- Performance optimizations
+- Visual polish and animations
+- Help/tutorial screen
 - Documentation
 
-**Deliverables:**
-- Performance optimizations
-- Help screen
-- Configuration options
-- User guide
-
----
-
-## Technical Specifications
-
-### File Structure
-
-```
-<minecraft_root>/mattmc_map/
-  └── <world_name>/
-      ├── overworld/
-      │   ├── regions/
-      │   │   └── r.<rx>.<rz>/
-      │   │       └── tile_<x>_<z>.png
-      │   └── explored.dat
-      ├── the_nether/
-      ├── the_end/
-      ├── waypoints.json
-      └── config.json
-```
-
-### Tile Specifications
-
-- **Size:** 512×512 pixels
-- **Coverage:** 32×32 chunks = 512×512 blocks
-- **Format:** PNG (compressed)
-- **Scale:** 1 pixel = 1 block at 100% zoom
-
-### Waypoint JSON Format
-
-```json
-{
-  "version": 1,
-  "waypoints": [
-    {
-      "id": "uuid-string",
-      "name": "Home Base",
-      "dimension": "minecraft:overworld",
-      "x": 123,
-      "y": 64,
-      "z": 456,
-      "color": 16711680,
-      "icon": "HOME",
-      "created": 1234567890000,
-      "enabled": true
-    }
-  ]
-}
-```
-
-### Coordinate Conversion
-
-```java
-// Nether to Overworld (multiply by 8)
-public static BlockPos netherToOverworld(BlockPos nether) {
-    return new BlockPos(nether.getX() * 8, nether.getY(), nether.getZ() * 8);
-}
-
-// Overworld to Nether (divide by 8)
-public static BlockPos overworldToNether(BlockPos overworld) {
-    return new BlockPos(overworld.getX() / 8, overworld.getY(), overworld.getZ() / 8);
-}
-
-// End uses 1:1 mapping with Overworld
-```
-
----
-
-## Performance Considerations
-
-### Target Metrics
-
-- **60 FPS** map rendering
-- **< 100ms** map screen open time
-- **< 50ms** pan/zoom response
-- **< 2 seconds** tile generation per 32×32 chunk area
-- **< 200MB** memory footprint
-
-### Optimization Strategies
-
-1. **Async Chunk Scanning:**
-   - Dedicated thread pool for chunk scanning
-   - Queue-based processing
-   - Non-blocking client thread
-
-2. **Tile Cache:**
-   - LRU cache (256 tiles = ~512MB)
-   - Aggressive eviction
-   - Lazy loading
-
-3. **Rendering:**
-   - Texture atlas for tiles
-   - Batch OpenGL calls
-   - Viewport culling
-
-4. **Storage:**
-   - PNG compression
-   - Region-based organization
-   - Incremental saves
+**Validation:**
+- Settings save and load
+- Performance targets met
+- UI is polished and consistent
+- No major bugs
 
 ---
 
 ## Integration Points
 
-### 1. Chunk Load Events
+### 1. Key Registration
 
-**Hook:** Forge/Fabric chunk load event
+**Location:** Register with vanilla key bindings system
 
-```java
-@SubscribeEvent
-public void onChunkLoad(ChunkEvent.Load event) {
-    if (event.getLevel().isClientSide()) {
-        WorldChunkScanner.getInstance().onChunkLoad(event);
-    }
-}
-```
+**Implementation Approach:**
+- Register M key in the same place vanilla keys are registered
+- Use Minecraft's `KeyMapping` system
+- Category: Custom "MattMC Map" category or "Gameplay" category
+- Binding: Default to M, user-configurable
 
-### 2. Key Binding
+**Registration Point:**
+- Client initialization phase
+- Alongside vanilla key bindings (movement, inventory, etc.)
+- Before main menu displays
 
-**Registration:**
+### 2. Chunk Load Events
 
-```java
-public static final KeyMapping OPEN_MAP = new KeyMapping(
-    "key.mattmc.openmap",
-    GLFW.GLFW_KEY_M,
-    "key.categories.mattmc"
-);
-```
+**Hook:** Client-side chunk load events
 
-**Handler:**
+**Purpose:** Trigger chunk scanning when chunks load
 
-```java
-@SubscribeEvent
-public void onKeyInput(InputEvent.Key event) {
-    if (OPEN_MAP.consumeClick()) {
-        Minecraft.getInstance().setScreen(new WorldMapScreen());
-    }
-}
-```
+**Integration:**
+- Subscribe to chunk load events (Forge/Fabric event bus)
+- Filter for client-side only
+- Trigger async scan in background
 
 ### 3. Client Tick
 
-**Purpose:** Update active scans, cache management
+**Hook:** Client tick event
 
-```java
-@SubscribeEvent
-public void onClientTick(TickEvent.ClientTickEvent event) {
-    if (event.phase == TickEvent.Phase.END) {
-        MapDataManager.getInstance().tick();
-    }
-}
-```
+**Purpose:** Update systems, process queues
+
+**Tasks:**
+- Process tile generation queue
+- Update tile cache
+- Handle async operation completion
+- Update UI animations
+
+### 4. World Load/Unload
+
+**Hook:** World load and unload events
+
+**Purpose:** Load/save map data
+
+**Actions on Load:**
+- Load waypoints from JSON
+- Load explored chunks metadata
+- Load configuration
+- Initialize map systems
+
+**Actions on Unload:**
+- Save modified tiles
+- Save waypoints
+- Save explored chunks
+- Save configuration
+- Clean up resources
+
+### 5. Render Pipeline
+
+**Integration:** Custom screen rendering
+
+**Approach:**
+- Map screen extends vanilla `Screen` class
+- Custom rendering using `GuiGraphics` and OpenGL
+- Integrates with vanilla GUI rendering system
 
 ---
 
 ## Conclusion
 
-This implementation plan describes a **completely independent map system** that operates similarly to JourneyMap and Xaero's World Map, but integrated directly into MattMC's source code.
+This map system is designed as a completely **standalone, independent system** that operates similarly to JourneyMap and Xaero's World Map, but with the advantage of being integrated directly into MattMC's source code.
 
-**Key Architectural Decisions:**
+### Key Design Principles
 
-1. **No Vanilla Dependencies:**
-   - Does NOT use vanilla MapRenderer
-   - Does NOT use vanilla MapColor
-   - Does NOT use vanilla waypoint systems
+1. **Independence from Vanilla:**
+   - No dependencies on vanilla map or waypoint systems
    - Custom chunk scanning and data extraction
+   - Independent color mapping and rendering
 
-2. **Standalone Components:**
-   - Custom block color mapping
-   - Independent tile generation
-   - Separate file storage
-   - Own waypoint data model
+2. **Feature-Focused:**
+   - Essential features only (no minimap, no cave layers)
+   - Mouse wheel zoom with 1 pixel per block maximum detail
+   - Dedicated waypoints menu for creation and teleportation
+   - Multi-dimension support with coordinate conversion
 
-3. **Similar to Map Mods:**
-   - Async chunk scanning
-   - PNG tile storage
-   - LRU caching
-   - Custom rendering pipeline
+3. **Performance-Oriented:**
+   - Async processing to avoid blocking game
+   - Efficient tile caching and rendering
+   - Configurable performance tuning
+   - Target: 60 FPS with < 200MB overhead
 
-**Advantages:**
+4. **User-Friendly:**
+   - Intuitive controls (M key, mouse wheel, drag)
+   - Clear UI with dedicated waypoints menu
+   - Smooth zoom and pan
+   - Integrated with vanilla key bindings
 
-- Complete control over all systems
-- Optimized for MattMC's needs
-- No vanilla limitations
-- Better performance through source integration
-- Focused feature set
+### Timeline
 
-**Timeline:** 10 weeks for full implementation
+**Total Duration:** 10 weeks
 
-This system will operate as a true "map mod" built into the game, independent of all vanilla mapping and waypoint systems.
+**Major Milestones:**
+- Week 2: Core data collection working
+- Week 4: Tiles generating at all zoom levels
+- Week 6: Map GUI functional with zoom
+- Week 8: Waypoint system complete
+- Week 9: Teleportation working
+- Week 10: Polish and release
+
+### Success Criteria
+
+- Map opens instantly with M key
+- Smooth 60 FPS rendering during pan/zoom
+- Maximum zoom shows 1 pixel per block detail
+- Waypoints menu allows easy creation and teleportation
+- Multi-dimension support with proper coordinate conversion
+- Data persists correctly across sessions
+- Memory usage stays under budget
+
+This architecture provides a solid foundation for a high-performance, user-friendly map system that rivals external mods while benefiting from direct source code integration.
 
 ---
 
-*Document Version: 2.0*  
+*Document Version: 3.0*  
 *Updated: December 2024*  
 *For: MattMC (Minecraft 1.21.10)*  
-*Architecture: Independent Map System (No Vanilla Dependencies)*
+*Focus: Architecture & Design (Code implementation to follow)*
