@@ -3,7 +3,7 @@ package net.caffeinemc.mods.sodium.client.model.color;
 import it.unimi.dsi.fastutil.objects.Reference2ReferenceMap;
 import it.unimi.dsi.fastutil.objects.Reference2ReferenceOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ReferenceSet;
-import net.caffeinemc.mods.sodium.client.model.color.interop.BlockColorsExtension;
+import net.caffeinemc.mods.sodium.client.hooks.SodiumBlockColorHook;
 import net.caffeinemc.mods.sodium.client.services.FluidRendererFactory;
 import net.minecraft.client.color.block.BlockColors;
 import net.minecraft.world.level.block.Block;
@@ -22,13 +22,14 @@ public class ColorProviderRegistry {
     private final ReferenceSet<Block> overridenBlocks;
 
     public ColorProviderRegistry(BlockColors blockColors) {
-        var providers = BlockColorsExtension.getProviders(blockColors);
+        var hook = SodiumBlockColorHook.getInstance();
+        var providers = hook.getProviders();
 
         for (var entry : providers.reference2ReferenceEntrySet()) {
             this.blocks.put(entry.getKey(), DefaultColorProviders.adapt(entry.getValue()));
         }
 
-        this.overridenBlocks = BlockColorsExtension.getOverridenVanillaBlocks(blockColors);
+        this.overridenBlocks = hook.getOverridenVanillaBlocks();
 
         this.installOverrides();
     }

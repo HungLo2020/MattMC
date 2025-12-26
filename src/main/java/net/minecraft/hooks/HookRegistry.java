@@ -30,6 +30,7 @@ public class HookRegistry {
     private static final List<ModelBlockRendererHooks> modelBlockRendererHooks = new ArrayList<>();
     private static final List<ParticleRenderHooks> particleRenderHooks = new ArrayList<>();
     private static final List<ClientPacketListenerHooks> clientPacketListenerHooks = new ArrayList<>();
+    private static final List<BlockColorHooks> blockColorHooks = new ArrayList<>();
 
     /**
      * Register a GameHooks implementation.
@@ -494,6 +495,27 @@ public class HookRegistry {
     }
 
     /**
+     * Register a BlockColorHooks implementation.
+     * Should be called during mod initialization.
+     *
+     * @param hook The hook implementation to register
+     */
+    public static void registerBlockColorHook(BlockColorHooks hook) {
+        if (hook != null) {
+            blockColorHooks.add(hook);
+        }
+    }
+
+    /**
+     * Get all registered BlockColorHooks implementations.
+     *
+     * @return List of registered BlockColorHooks
+     */
+    public static List<BlockColorHooks> getBlockColorHooks() {
+        return new ArrayList<>(blockColorHooks);
+    }
+
+    /**
      * Clear all registered hooks. Useful for testing.
      */
     public static void clearAll() {
@@ -519,5 +541,6 @@ public class HookRegistry {
         modelBlockRendererHooks.clear();
         particleRenderHooks.clear();
         clientPacketListenerHooks.clear();
+        blockColorHooks.clear();
     }
 }

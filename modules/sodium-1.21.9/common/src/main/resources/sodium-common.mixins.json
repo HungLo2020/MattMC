@@ -12,7 +12,6 @@
   "client": [
     "core.GlCommandEncoderAccessor",
     "core.WindowMixin",
-    "core.model.colors.BlockColorsMixin",
     "core.render.BlockEntityTypeMixin",
     "core.render.VertexFormatMixin",
     "core.render.frustum.FrustumMixin",
