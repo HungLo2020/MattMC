@@ -19,8 +19,10 @@ import net.minecraft.world.entity.EntitySpawnReason;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.InsideBlockEffectApplier;
 import net.minecraft.world.entity.Relative;
+import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.GameRules;
 import net.minecraft.world.level.Level;
@@ -109,6 +111,19 @@ public class NetherPortalBlock extends Block implements Portal {
 	protected void entityInside(
 		BlockState blockState, Level level, BlockPos blockPos, Entity entity, InsideBlockEffectApplier insideBlockEffectApplier, boolean bl
 	) {
+		// Check if the entity is an ItemEntity containing a pitcher pod
+		if (entity instanceof ItemEntity itemEntity) {
+			ItemStack stack = itemEntity.getItem();
+			if (stack.is(Items.PITCHER_POD)) {
+				// Mark this entity to go to Primordial Caves
+				entity.getPersistentData().putBoolean("PrimordialCavesPortal", true);
+				if (entity.canUsePortal(false)) {
+					entity.setAsInsidePortal(this, blockPos);
+				}
+				return;
+			}
+		}
+		
 		if (entity.canUsePortal(false)) {
 			entity.setAsInsidePortal(this, blockPos);
 		}
@@ -128,7 +143,21 @@ public class NetherPortalBlock extends Block implements Portal {
 	@Nullable
 	@Override
 	public TeleportTransition getPortalDestination(ServerLevel serverLevel, Entity entity, BlockPos blockPos) {
-		ResourceKey<Level> resourceKey = serverLevel.dimension() == Level.NETHER ? Level.OVERWORLD : Level.NETHER;
+		// Check if this entity should go to Primordial Caves (pitcher pod was thrown)
+		boolean toPrimordialCaves = entity.getPersistentData().getBoolean("PrimordialCavesPortal");
+		
+		ResourceKey<Level> resourceKey;
+		if (toPrimordialCaves) {
+			// Pitcher pod goes to Primordial Caves from Overworld or Nether
+			resourceKey = Level.PRIMORDIAL_CAVES;
+		} else if (serverLevel.dimension() == Level.PRIMORDIAL_CAVES) {
+			// From Primordial Caves, go back to Overworld
+			resourceKey = Level.OVERWORLD;
+		} else {
+			// Normal portal logic: Nether <-> Overworld
+			resourceKey = serverLevel.dimension() == Level.NETHER ? Level.OVERWORLD : Level.NETHER;
+		}
+		
 		ServerLevel serverLevel2 = serverLevel.getServer().getLevel(resourceKey);
 		if (serverLevel2 == null) {
 			return null;
