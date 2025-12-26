@@ -31,6 +31,8 @@ public class HookRegistry {
     private static final List<ParticleRenderHooks> particleRenderHooks = new ArrayList<>();
     private static final List<ClientPacketListenerHooks> clientPacketListenerHooks = new ArrayList<>();
     private static final List<BlockColorHooks> blockColorHooks = new ArrayList<>();
+    private static final List<ClientLevelHooks> clientLevelHooks = new ArrayList<>();
+    private static final List<VertexFormatHooks> vertexFormatHooks = new ArrayList<>();
 
     /**
      * Register a GameHooks implementation.
@@ -516,6 +518,48 @@ public class HookRegistry {
     }
 
     /**
+     * Register a ClientLevelHooks implementation.
+     * Should be called during mod initialization.
+     *
+     * @param hook The hook implementation to register
+     */
+    public static void registerClientLevelHook(ClientLevelHooks hook) {
+        if (hook != null) {
+            clientLevelHooks.add(hook);
+        }
+    }
+
+    /**
+     * Get all registered ClientLevelHooks implementations.
+     *
+     * @return List of registered ClientLevelHooks
+     */
+    public static List<ClientLevelHooks> getClientLevelHooks() {
+        return new ArrayList<>(clientLevelHooks);
+    }
+
+    /**
+     * Register a VertexFormatHooks implementation.
+     * Should be called during mod initialization.
+     *
+     * @param hook The hook implementation to register
+     */
+    public static void registerVertexFormatHook(VertexFormatHooks hook) {
+        if (hook != null) {
+            vertexFormatHooks.add(hook);
+        }
+    }
+
+    /**
+     * Get all registered VertexFormatHooks implementations.
+     *
+     * @return List of registered VertexFormatHooks
+     */
+    public static List<VertexFormatHooks> getVertexFormatHooks() {
+        return new ArrayList<>(vertexFormatHooks);
+    }
+
+    /**
      * Clear all registered hooks. Useful for testing.
      */
     public static void clearAll() {
@@ -542,5 +586,7 @@ public class HookRegistry {
         particleRenderHooks.clear();
         clientPacketListenerHooks.clear();
         blockColorHooks.clear();
+        clientLevelHooks.clear();
+        vertexFormatHooks.clear();
     }
 }
