@@ -90,6 +90,7 @@ public abstract class Level implements LevelAccessor, AutoCloseable {
 	public static final ResourceKey<Level> OVERWORLD = ResourceKey.create(Registries.DIMENSION, ResourceLocation.withDefaultNamespace("overworld"));
 	public static final ResourceKey<Level> NETHER = ResourceKey.create(Registries.DIMENSION, ResourceLocation.withDefaultNamespace("the_nether"));
 	public static final ResourceKey<Level> END = ResourceKey.create(Registries.DIMENSION, ResourceLocation.withDefaultNamespace("the_end"));
+	public static final ResourceKey<Level> PRIMORDIAL_CAVES = ResourceKey.create(Registries.DIMENSION, ResourceLocation.withDefaultNamespace("primordial_caves"));
 	public static final int MAX_LEVEL_SIZE = 30000000;
 	public static final int LONG_PARTICLE_CLIP_RANGE = 512;
 	public static final int SHORT_PARTICLE_CLIP_RANGE = 32;

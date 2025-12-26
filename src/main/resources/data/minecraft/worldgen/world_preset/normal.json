@@ -31,6 +31,17 @@
         },
         "settings": "minecraft:nether"
       }
+    },
+    "minecraft:primordial_caves": {
+      "type": "minecraft:primordial_caves",
+      "generator": {
+        "type": "minecraft:noise",
+        "biome_source": {
+          "type": "minecraft:multi_noise",
+          "preset": "minecraft:primordial_caves"
+        },
+        "settings": "minecraft:primordial_caves"
+      }
     }
   }
 }

@@ -2008,6 +2008,17 @@ public class Blocks {
 			.lightLevel(blockStatex -> 11)
 			.pushReaction(PushReaction.BLOCK)
 	);
+	public static final Block PRIMORDIAL_CAVES_PORTAL = register(
+		"primordial_caves_portal",
+		PrimordialCavesPortalBlock::new,
+		BlockBehaviour.Properties.of()
+			.noCollision()
+			.randomTicks()
+			.strength(-1.0F)
+			.sound(SoundType.GLASS)
+			.lightLevel(blockStatex -> 11)
+			.pushReaction(PushReaction.BLOCK)
+	);
 	public static final Block CARVED_PUMPKIN = register(
 		"carved_pumpkin",
 		CarvedPumpkinBlock::new,
