@@ -78,8 +78,21 @@ public class MultiNoiseBiomeSourceParameterList {
 				}
 			}
 		);
+		public static final MultiNoiseBiomeSourceParameterList.Preset PRIMORDIAL_CAVES = new MultiNoiseBiomeSourceParameterList.Preset(
+			ResourceLocation.withDefaultNamespace("primordial_caves"),
+			new MultiNoiseBiomeSourceParameterList.Preset.SourceProvider() {
+				@Override
+				public <T> Climate.ParameterList<T> apply(Function<ResourceKey<Biome>, T> function) {
+					return new Climate.ParameterList<>(
+						List.of(
+							Pair.of(Climate.parameters(0.0F, 0.0F, 0.0F, 0.0F, 0.0F, 0.0F, 0.0F), function.apply(Biomes.PRIMORDIAL_PLAINS))
+						)
+					);
+				}
+			}
+		);
 		static final Map<ResourceLocation, MultiNoiseBiomeSourceParameterList.Preset> BY_NAME = (Map<ResourceLocation, MultiNoiseBiomeSourceParameterList.Preset>)Stream.of(
-				NETHER, OVERWORLD
+				NETHER, OVERWORLD, PRIMORDIAL_CAVES
 			)
 			.collect(Collectors.toMap(MultiNoiseBiomeSourceParameterList.Preset::id, preset -> preset));
 		public static final Codec<MultiNoiseBiomeSourceParameterList.Preset> CODEC = ResourceLocation.CODEC

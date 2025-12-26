@@ -9,6 +9,7 @@ public class BuiltinDimensionTypes {
 	public static final ResourceKey<DimensionType> NETHER = register("the_nether");
 	public static final ResourceKey<DimensionType> END = register("the_end");
 	public static final ResourceKey<DimensionType> OVERWORLD_CAVES = register("overworld_caves");
+	public static final ResourceKey<DimensionType> PRIMORDIAL_CAVES = register("primordial_caves");
 	public static final ResourceLocation OVERWORLD_EFFECTS = ResourceLocation.withDefaultNamespace("overworld");
 	public static final ResourceLocation NETHER_EFFECTS = ResourceLocation.withDefaultNamespace("the_nether");
 	public static final ResourceLocation END_EFFECTS = ResourceLocation.withDefaultNamespace("the_end");
