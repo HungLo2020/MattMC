@@ -1135,17 +1135,20 @@ tasks.register('copyJdkToRun') {
             return
         }
         
-        // Delete existing JDK directory to avoid permission issues with existing files
-        if (destJdkDir.exists()) {
-            delete destJdkDir
-        }
+        // On Windows, file locking can prevent deletion. Use sync instead of delete+copy
+        // sync will overwrite existing files without needing to delete the directory first
+        println "📂 Syncing JDK to run directory..."
         
-        println "📂 Copying JDK to run directory..."
-        copy {
+        // Ensure parent directory exists
+        destJdkDir.parentFile.mkdirs()
+        
+        // Use sync to copy files, which handles overwrites gracefully
+        sync {
             from srcJdkDir
             into destJdkDir
         }
-        println "✅ JDK copied to ${destJdkDir}"
+        
+        println "✅ JDK synced to ${destJdkDir}"
     }
 }
 
