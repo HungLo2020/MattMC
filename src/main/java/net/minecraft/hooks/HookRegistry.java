@@ -30,6 +30,12 @@ public class HookRegistry {
     private static final List<ModelBlockRendererHooks> modelBlockRendererHooks = new ArrayList<>();
     private static final List<ParticleRenderHooks> particleRenderHooks = new ArrayList<>();
     private static final List<ClientPacketListenerHooks> clientPacketListenerHooks = new ArrayList<>();
+    private static final List<BlockColorHooks> blockColorHooks = new ArrayList<>();
+    private static final List<ClientLevelHooks> clientLevelHooks = new ArrayList<>();
+    private static final List<VertexFormatHooks> vertexFormatHooks = new ArrayList<>();
+    private static final List<BlockEntityTypeHooks> blockEntityTypeHooks = new ArrayList<>();
+    private static final List<SpriteContentsHooks> spriteContentsHooks = new ArrayList<>();
+    private static final List<WindowHooks> windowHooks = new ArrayList<>();
 
     /**
      * Register a GameHooks implementation.
@@ -494,6 +500,131 @@ public class HookRegistry {
     }
 
     /**
+     * Register a BlockColorHooks implementation.
+     * Should be called during mod initialization.
+     *
+     * @param hook The hook implementation to register
+     */
+    public static void registerBlockColorHook(BlockColorHooks hook) {
+        if (hook != null) {
+            blockColorHooks.add(hook);
+        }
+    }
+
+    /**
+     * Get all registered BlockColorHooks implementations.
+     *
+     * @return List of registered BlockColorHooks
+     */
+    public static List<BlockColorHooks> getBlockColorHooks() {
+        return new ArrayList<>(blockColorHooks);
+    }
+
+    /**
+     * Register a ClientLevelHooks implementation.
+     * Should be called during mod initialization.
+     *
+     * @param hook The hook implementation to register
+     */
+    public static void registerClientLevelHook(ClientLevelHooks hook) {
+        if (hook != null) {
+            clientLevelHooks.add(hook);
+        }
+    }
+
+    /**
+     * Get all registered ClientLevelHooks implementations.
+     *
+     * @return List of registered ClientLevelHooks
+     */
+    public static List<ClientLevelHooks> getClientLevelHooks() {
+        return new ArrayList<>(clientLevelHooks);
+    }
+
+    /**
+     * Register a VertexFormatHooks implementation.
+     * Should be called during mod initialization.
+     *
+     * @param hook The hook implementation to register
+     */
+    public static void registerVertexFormatHook(VertexFormatHooks hook) {
+        if (hook != null) {
+            vertexFormatHooks.add(hook);
+        }
+    }
+
+    /**
+     * Get all registered VertexFormatHooks implementations.
+     *
+     * @return List of registered VertexFormatHooks
+     */
+    public static List<VertexFormatHooks> getVertexFormatHooks() {
+        return new ArrayList<>(vertexFormatHooks);
+    }
+
+    /**
+     * Register a BlockEntityTypeHooks implementation.
+     * Should be called during mod initialization.
+     *
+     * @param hook The hook implementation to register
+     */
+    public static void registerBlockEntityTypeHook(BlockEntityTypeHooks hook) {
+        if (hook != null) {
+            blockEntityTypeHooks.add(hook);
+        }
+    }
+
+    /**
+     * Get all registered BlockEntityTypeHooks implementations.
+     *
+     * @return List of registered BlockEntityTypeHooks
+     */
+    public static List<BlockEntityTypeHooks> getBlockEntityTypeHooks() {
+        return new ArrayList<>(blockEntityTypeHooks);
+    }
+
+    /**
+     * Register a SpriteContentsHooks implementation.
+     * Should be called during mod initialization.
+     *
+     * @param hook The hook implementation to register
+     */
+    public static void registerSpriteContentsHook(SpriteContentsHooks hook) {
+        if (hook != null) {
+            spriteContentsHooks.add(hook);
+        }
+    }
+
+    /**
+     * Get all registered SpriteContentsHooks implementations.
+     *
+     * @return List of registered SpriteContentsHooks
+     */
+    public static List<SpriteContentsHooks> getSpriteContentsHooks() {
+        return new ArrayList<>(spriteContentsHooks);
+    }
+
+    /**
+     * Register a WindowHooks implementation.
+     *
+     * @param hook The hook implementation to register
+     */
+    public static void registerWindowHook(WindowHooks hook) {
+        if (hook != null) {
+            windowHooks.add(hook);
+        }
+    }
+
+    /**
+     * Get all registered WindowHooks implementations.
+     *
+     * @return List of registered WindowHooks
+     */
+    public static List<WindowHooks> getWindowHooks() {
+        return new ArrayList<>(windowHooks);
+    }
+
+    /**
      * Clear all registered hooks. Useful for testing.
      */
     public static void clearAll() {
@@ -519,5 +650,11 @@ public class HookRegistry {
         modelBlockRendererHooks.clear();
         particleRenderHooks.clear();
         clientPacketListenerHooks.clear();
+        blockColorHooks.clear();
+        clientLevelHooks.clear();
+        vertexFormatHooks.clear();
+        blockEntityTypeHooks.clear();
+        spriteContentsHooks.clear();
+        windowHooks.clear();
     }
 }

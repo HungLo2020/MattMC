@@ -93,6 +93,12 @@ public final class Window implements AutoCloseable {
 		GLFW.glfwWindowHint(139267, 3);
 		GLFW.glfwWindowHint(139272, 204801);
 		GLFW.glfwWindowHint(139270, 1);
+		
+		// Call registered hooks for window hint configuration
+		for (net.minecraft.hooks.WindowHooks hook : net.minecraft.hooks.HookRegistry.getWindowHooks()) {
+			hook.onBeforeWindowCreate();
+		}
+		
 		this.handle = GLFW.glfwCreateWindow(this.width, this.height, string2, this.fullscreen && monitor != null ? monitor.getMonitor() : 0L, 0L);
 		if (monitor != null) {
 			VideoMode videoMode = monitor.getPreferredVidMode(this.fullscreen ? this.preferredFullscreenVideoMode : Optional.empty());

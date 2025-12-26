@@ -255,6 +255,11 @@ public class ClientLevel extends Level implements CacheSlot.Cleaner<ClientLevel>
 		this.serverSimulationDistance = j;
 		this.updateSkyBrightness();
 		this.prepareWeather();
+		
+		// Call registered hooks for client level initialization
+		for (net.minecraft.hooks.ClientLevelHooks hook : net.minecraft.hooks.HookRegistry.getClientLevelHooks()) {
+			hook.onClientLevelInit(this, l);
+		}
 	}
 
 	public void queueLightUpdate(Runnable runnable) {
@@ -396,6 +401,11 @@ public class ClientLevel extends Level implements CacheSlot.Cleaner<ClientLevel>
 	}
 
 	public void unload(LevelChunk levelChunk) {
+		// Call registered hooks for chunk unload
+		for (net.minecraft.hooks.ClientLevelHooks hook : net.minecraft.hooks.HookRegistry.getClientLevelHooks()) {
+			hook.onChunkUnload(this, levelChunk.getPos().x, levelChunk.getPos().z);
+		}
+		
 		levelChunk.clearAllBlockEntities();
 		this.chunkSource.getLightEngine().setLightEnabled(levelChunk.getPos(), false);
 		this.entityStorage.stopTicking(levelChunk.getPos());
