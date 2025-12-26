@@ -174,7 +174,7 @@ After thoroughly analyzing all mixin configuration files across the entire codeb
 
 ### Implementation Progress
 
-- ✅ **Completed**: 21 mixins converted to hooks (7.4% of 284 total)
+- ✅ **Completed**: 24 mixins converted to hooks (8.5% of 284 total)
   1. Sodium `MinecraftMixin.postInit()` → GameHooks.onGameInitialized()
   2. Sodium `MinecraftMixin.preRender()` → GameHooks.beforeRunTick()
   3. Sodium `MinecraftMixin.postRender()` → GameHooks.afterRunTick()
@@ -195,7 +195,10 @@ After thoroughly analyzing all mixin configuration files across the entire codeb
   20. Sodium `ClientLevelMixin` (biome) → ClientLevelHooks.onClientLevelInit()
   21. Sodium `ClientLevelMixin` (map) → ClientLevelHooks.onChunkUnload()
   22. Sodium `VertexFormatMixin` → VertexFormatHooks.onVertexFormatInit()
-- ⏳ **Remaining**: 263 mixins to convert to hooks (76 Sodium + 168 Iris + 19 DH)
+  23. Sodium `ClientChunkCacheMixin` → ClientLevelHooks.onChunkLoaded() + onChunkDropped()
+  24. Sodium `BlockEntityTypeMixin` → BlockEntityTypeHooks.onBlockEntityTypeInit()
+  25. Sodium `SpriteContentsMixin` → SpriteContentsHooks.onSpriteContentsInit()
+- ⏳ **Remaining**: 260 mixins to convert to hooks (73 Sodium + 168 Iris + 19 DH)
 
 **Recent Sessions**:
 - Session 1: MinecraftMixin (4 methods, GPU sync + resource reload) - 5 mixins
@@ -205,6 +208,7 @@ After thoroughly analyzing all mixin configuration files across the entire codeb
 - Session 5: LeavesBlockMixin, ItemBlockRenderTypesMixin, LevelLoadTrackerMixin, FogRendererMixin, ShadowFeatureRendererMixin - 5 mixins
 - Session 6: BlockColorsMixin - 1 mixin
 - Session 7: ClientLevelMixin (2 files), VertexFormatMixin - 3 mixins
+- Session 8: ClientChunkCacheMixin, BlockEntityTypeMixin, SpriteContentsMixin - 3 mixins
 - Build verified successful after each session
 
 **Hook Infrastructure Created**:
@@ -220,8 +224,10 @@ After thoroughly analyzing all mixin configuration files across the entire codeb
 - FogRenderHooks (1 method) - Fog parameter interception
 - EntityRenderHooks (1 method) - Entity shadow rendering optimization
 - BlockColorHooks (1 method) - Block color provider tracking
-- ClientLevelHooks (2 methods) - Client level initialization and chunk lifecycle
+- ClientLevelHooks (4 methods) - Client level initialization and chunk lifecycle
 - VertexFormatHooks (1 method) - Vertex format initialization
+- BlockEntityTypeHooks (1 method) - Block entity type initialization
+- SpriteContentsHooks (1 method) - Sprite contents initialization
 
 ### Estimated Effort
 
