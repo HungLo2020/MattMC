@@ -117,6 +117,12 @@ public class ClientChunkCache extends ChunkSource {
 			}
 
 			this.level.onChunkLoaded(chunkPos);
+			
+			// Call registered hooks for chunk loaded
+			for (net.minecraft.hooks.ClientLevelHooks hook : net.minecraft.hooks.HookRegistry.getClientLevelHooks()) {
+				hook.onChunkLoaded(this.level, i, j);
+			}
+			
 			return levelChunk;
 		}
 	}
@@ -216,6 +222,11 @@ public class ClientChunkCache extends ChunkSource {
 			}
 
 			ClientChunkCache.this.level.unload(levelChunk);
+			
+			// Call registered hooks for chunk drop
+			for (net.minecraft.hooks.ClientLevelHooks hook : net.minecraft.hooks.HookRegistry.getClientLevelHooks()) {
+				hook.onChunkDropped(ClientChunkCache.this.level, levelChunk.getPos().x, levelChunk.getPos().z);
+			}
 		}
 
 		public void onSectionEmptinessChanged(int i, int j, int k, boolean bl) {

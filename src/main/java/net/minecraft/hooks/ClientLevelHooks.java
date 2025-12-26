@@ -25,4 +25,24 @@ public interface ClientLevelHooks {
      */
     default void onChunkUnload(ClientLevel level, int chunkX, int chunkZ) {
     }
+    
+    /**
+     * Called after a chunk is loaded into the client chunk cache.
+     * 
+     * @param level The client level
+     * @param chunkX The chunk X coordinate
+     * @param chunkZ The chunk Z coordinate
+     */
+    default void onChunkLoaded(ClientLevel level, int chunkX, int chunkZ) {
+    }
+    
+    /**
+     * Called after a chunk is dropped from the client chunk cache.
+     * 
+     * @param level The client level
+     * @param chunkX The chunk X coordinate
+     * @param chunkZ The chunk Z coordinate
+     */
+    default void onChunkDropped(ClientLevel level, int chunkX, int chunkZ) {
+    }
 }

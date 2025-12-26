@@ -33,6 +33,8 @@ public class HookRegistry {
     private static final List<BlockColorHooks> blockColorHooks = new ArrayList<>();
     private static final List<ClientLevelHooks> clientLevelHooks = new ArrayList<>();
     private static final List<VertexFormatHooks> vertexFormatHooks = new ArrayList<>();
+    private static final List<BlockEntityTypeHooks> blockEntityTypeHooks = new ArrayList<>();
+    private static final List<SpriteContentsHooks> spriteContentsHooks = new ArrayList<>();
 
     /**
      * Register a GameHooks implementation.
@@ -560,6 +562,48 @@ public class HookRegistry {
     }
 
     /**
+     * Register a BlockEntityTypeHooks implementation.
+     * Should be called during mod initialization.
+     *
+     * @param hook The hook implementation to register
+     */
+    public static void registerBlockEntityTypeHook(BlockEntityTypeHooks hook) {
+        if (hook != null) {
+            blockEntityTypeHooks.add(hook);
+        }
+    }
+
+    /**
+     * Get all registered BlockEntityTypeHooks implementations.
+     *
+     * @return List of registered BlockEntityTypeHooks
+     */
+    public static List<BlockEntityTypeHooks> getBlockEntityTypeHooks() {
+        return new ArrayList<>(blockEntityTypeHooks);
+    }
+
+    /**
+     * Register a SpriteContentsHooks implementation.
+     * Should be called during mod initialization.
+     *
+     * @param hook The hook implementation to register
+     */
+    public static void registerSpriteContentsHook(SpriteContentsHooks hook) {
+        if (hook != null) {
+            spriteContentsHooks.add(hook);
+        }
+    }
+
+    /**
+     * Get all registered SpriteContentsHooks implementations.
+     *
+     * @return List of registered SpriteContentsHooks
+     */
+    public static List<SpriteContentsHooks> getSpriteContentsHooks() {
+        return new ArrayList<>(spriteContentsHooks);
+    }
+
+    /**
      * Clear all registered hooks. Useful for testing.
      */
     public static void clearAll() {
@@ -588,5 +632,7 @@ public class HookRegistry {
         blockColorHooks.clear();
         clientLevelHooks.clear();
         vertexFormatHooks.clear();
+        blockEntityTypeHooks.clear();
+        spriteContentsHooks.clear();
     }
 }

@@ -41,6 +41,22 @@ public class SodiumClientLevelHook implements ClientLevelHooks {
         }
     }
 
+    @Override
+    public void onChunkLoaded(ClientLevel level, int chunkX, int chunkZ) {
+        ChunkTracker tracker = this.chunkTrackers.get(level);
+        if (tracker != null) {
+            tracker.onChunkStatusAdded(chunkX, chunkZ, ChunkStatus.FLAG_HAS_BLOCK_DATA);
+        }
+    }
+
+    @Override
+    public void onChunkDropped(ClientLevel level, int chunkX, int chunkZ) {
+        ChunkTracker tracker = this.chunkTrackers.get(level);
+        if (tracker != null) {
+            tracker.onChunkStatusRemoved(chunkX, chunkZ, ChunkStatus.FLAG_HAS_BLOCK_DATA);
+        }
+    }
+
     /**
      * Get the biome zoom seed for a level.
      * Used by BiomeSeedProvider interface.

@@ -1,5 +1,6 @@
 package net.caffeinemc.mods.sodium.client.render.chunk;
 
+import net.caffeinemc.mods.sodium.client.hooks.SodiumBlockEntityTypeHook;
 import net.sodium.api.blockentity.BlockEntityRenderPredicate;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.BlockGetter;
@@ -15,7 +16,7 @@ public interface ExtendedBlockEntityType<T extends BlockEntity> {
     boolean sodium$removeRenderPredicate(BlockEntityRenderPredicate<T> shouldAddRenderer);
 
     static <T extends BlockEntity> boolean shouldRender(BlockEntityType<? extends T> type, BlockGetter blockGetter, BlockPos blockPos, T entity) {
-       BlockEntityRenderPredicate<T>[] predicates = ((ExtendedBlockEntityType<T>) type).sodium$getRenderPredicates();
+       BlockEntityRenderPredicate<T>[] predicates = SodiumBlockEntityTypeHook.getRenderPredicates((BlockEntityType<T>) type);
 
         for (int i = 0; i < predicates.length; i++) {
             if (!predicates[i].shouldRender(blockGetter, blockPos, entity)) {
@@ -27,10 +28,10 @@ public interface ExtendedBlockEntityType<T extends BlockEntity> {
     }
 
     static <T extends BlockEntity> void addRenderPredicate(BlockEntityType<T> type, BlockEntityRenderPredicate<T> predicate) {
-        ((ExtendedBlockEntityType<T>) type).sodium$addRenderPredicate(predicate);
+        SodiumBlockEntityTypeHook.addRenderPredicate(type, predicate);
     }
 
     static <T extends BlockEntity> boolean removeRenderPredicate(BlockEntityType<T> type, BlockEntityRenderPredicate<T> predicate) {
-        return ((ExtendedBlockEntityType<T>) type).sodium$removeRenderPredicate(predicate);
+        return SodiumBlockEntityTypeHook.removeRenderPredicate(type, predicate);
     }
 }

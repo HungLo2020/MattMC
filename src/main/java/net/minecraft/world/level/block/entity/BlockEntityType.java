@@ -290,6 +290,11 @@ public class BlockEntityType<T extends BlockEntity> {
 	private BlockEntityType(BlockEntityType.BlockEntitySupplier<? extends T> blockEntitySupplier, Set<Block> set) {
 		this.factory = blockEntitySupplier;
 		this.validBlocks = set;
+		
+		// Call registered hooks for block entity type initialization
+		for (net.minecraft.hooks.BlockEntityTypeHooks hook : net.minecraft.hooks.HookRegistry.getBlockEntityTypeHooks()) {
+			hook.onBlockEntityTypeInit(this);
+		}
 	}
 
 	public T create(BlockPos blockPos, BlockState blockState) {
