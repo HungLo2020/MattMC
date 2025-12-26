@@ -111,19 +111,6 @@ public class NetherPortalBlock extends Block implements Portal {
 	protected void entityInside(
 		BlockState blockState, Level level, BlockPos blockPos, Entity entity, InsideBlockEffectApplier insideBlockEffectApplier, boolean bl
 	) {
-		// Check if the entity is an ItemEntity containing a pitcher pod
-		if (entity instanceof ItemEntity itemEntity) {
-			ItemStack stack = itemEntity.getItem();
-			if (stack.is(Items.PITCHER_POD)) {
-				// Mark this entity to go to Primordial Caves
-				entity.getPersistentData().putBoolean("PrimordialCavesPortal", true);
-				if (entity.canUsePortal(false)) {
-					entity.setAsInsidePortal(this, blockPos);
-				}
-				return;
-			}
-		}
-		
 		if (entity.canUsePortal(false)) {
 			entity.setAsInsidePortal(this, blockPos);
 		}
@@ -143,8 +130,14 @@ public class NetherPortalBlock extends Block implements Portal {
 	@Nullable
 	@Override
 	public TeleportTransition getPortalDestination(ServerLevel serverLevel, Entity entity, BlockPos blockPos) {
-		// Check if this entity should go to Primordial Caves (pitcher pod was thrown)
-		boolean toPrimordialCaves = entity.getPersistentData().getBoolean("PrimordialCavesPortal");
+		// Check if this entity is a pitcher pod (ItemEntity containing pitcher pod)
+		boolean toPrimordialCaves = false;
+		if (entity instanceof ItemEntity itemEntity) {
+			ItemStack stack = itemEntity.getItem();
+			if (stack.is(Items.PITCHER_POD)) {
+				toPrimordialCaves = true;
+			}
+		}
 		
 		ResourceKey<Level> resourceKey;
 		if (toPrimordialCaves) {
