@@ -1,16 +1,6 @@
 #ifndef INCLUDE_LIGHT_AND_AMBIENT_COLORS
     #define INCLUDE_LIGHT_AND_AMBIENT_COLORS
 
-    // Primordial Caves detection constants
-    const vec3 PRIMORDIAL_CAVES_FOG_COLOR = vec3(0.7529, 0.8471, 1.0); // RGB: 192, 216, 255
-    const float FOG_COLOR_TOLERANCE = 0.01;
-    const vec3 PRIMORDIAL_CAVES_AMBIENT_BASE = vec3(0.7, 0.65, 0.6);
-    const float PRIMORDIAL_CAVES_AMBIENT_MULT = 4.0;
-    const float PRIMORDIAL_CAVES_BRIGHTNESS_MULT = 1.5;
-
-    // Detect Primordial Caves by unique fog color
-    bool isPrimordialCaves = distance(fogColor, PRIMORDIAL_CAVES_FOG_COLOR) < FOG_COLOR_TOLERANCE;
-
     #if defined OVERWORLD
         #ifndef COMPOSITE
             vec3 noonClearLightColor = vec3(0.7, 0.55, 0.4) * 1.9; //ground and cloud color
@@ -83,11 +73,5 @@
         vec3 lightColor    = endLightColor * (0.35 - endLightBalancer);
         vec3 ambientColor  = endLightColor * (0.2 + endLightBalancer);
     #endif
-
-    // Override lighting for Primordial Caves dimension (detected by unique fog color)
-    if (isPrimordialCaves) {
-        lightColor   = vec3(0.0);
-        ambientColor = PRIMORDIAL_CAVES_AMBIENT_BASE * (PRIMORDIAL_CAVES_AMBIENT_MULT + PRIMORDIAL_CAVES_BRIGHTNESS_MULT * vsBrightness);
-    }
 
 #endif //INCLUDE_LIGHT_AND_AMBIENT_COLORS
