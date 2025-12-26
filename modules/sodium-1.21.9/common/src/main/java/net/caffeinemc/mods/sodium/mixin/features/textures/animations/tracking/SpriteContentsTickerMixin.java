@@ -37,11 +37,9 @@ public class SpriteContentsTickerMixin {
 
     @Inject(method = "tickAndUpload", at = @At("HEAD"), cancellable = true)
     private void preTick(CallbackInfo ci) {
-        SpriteContentsExtension parent = (SpriteContentsExtension) this.parent;
-
         boolean onDemand = SodiumClientMod.options().performance.animateOnlyVisibleTextures;
 
-        if (onDemand && !parent.sodium$isActive()) {
+        if (onDemand && !SpriteContentsExtension.isActive(this.parent)) {
             this.subFrame++;
             List<SpriteContents.FrameInfo> frames = ((AnimatedTextureAccessor)this.animationInfo).getFrames();
             if (this.subFrame >= ((SpriteContentsFrameInfoAccessor) (Object) frames.get(this.frame)).getTime()) {
@@ -54,7 +52,6 @@ public class SpriteContentsTickerMixin {
 
     @Inject(method = "tickAndUpload", at = @At("TAIL"))
     private void postTick(CallbackInfo ci) {
-        SpriteContentsExtension parent = (SpriteContentsExtension) this.parent;
-        parent.sodium$setActive(false);
+        SpriteContentsExtension.setActive(this.parent, false);
     }
 }

@@ -43,6 +43,11 @@ public class VertexFormat {
 			int k = vertexFormatElement != null ? list.indexOf(vertexFormatElement) : -1;
 			this.offsetsByElement[j] = k != -1 ? intList.getInt(k) : -1;
 		}
+		
+		// Call registered hooks for vertex format initialization
+		for (net.minecraft.hooks.VertexFormatHooks hook : net.minecraft.hooks.HookRegistry.getVertexFormatHooks()) {
+			hook.onVertexFormatInit(this);
+		}
 	}
 
 	public static VertexFormat.Builder builder() {

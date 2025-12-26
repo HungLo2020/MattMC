@@ -32,6 +32,8 @@ public class BlockColors {
 	public static final int LILY_PAD_DEFAULT = -9321636;
 	private final IdMapper<BlockColor> blockColors = new IdMapper(32);
 	private final Map<Block, Set<Property<?>>> coloringStates = Maps.<Block, Set<Property<?>>>newHashMap();
+	private final Map<Block, BlockColor> registeredProviders = Maps.<Block, BlockColor>newHashMap();
+
 
 	public static BlockColors createDefault() {
 		BlockColors blockColors = new BlockColors();
@@ -126,6 +128,14 @@ public class BlockColors {
 	public void register(BlockColor blockColor, Block... blocks) {
 		for (Block block : blocks) {
 			this.blockColors.addMapping(blockColor, BuiltInRegistries.BLOCK.getId(block));
+			
+			// Track registrations and notify hooks
+			boolean isReplacement = this.registeredProviders.containsKey(block);
+			this.registeredProviders.put(block, blockColor);
+			
+			for (net.minecraft.hooks.BlockColorHooks hook : net.minecraft.hooks.HookRegistry.getBlockColorHooks()) {
+				hook.onBlockColorRegistered(blockColor, block, isReplacement);
+			}
 		}
 	}
 

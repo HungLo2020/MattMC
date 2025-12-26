@@ -134,6 +134,6 @@ public class VertexSerializerRegistryImpl implements VertexSerializerRegistry {
     }
 
     private static int getGlobalId(VertexFormat format) {
-        return ((VertexFormatExtensions) format).sodium$getGlobalId();
+        return VertexFormatExtensions.getGlobalId(format);
     }
 }
