@@ -8,13 +8,12 @@ import java.util.WeakHashMap;
 
 /**
  * Sodium's implementation of SpriteContentsHooks.
- * Tracks sprite animation state for optimization purposes.
+ * Tracks sprite active state for optimization purposes.
  */
 public class SodiumSpriteContentsHook implements SpriteContentsHooks {
     private static final SodiumSpriteContentsHook INSTANCE = new SodiumSpriteContentsHook();
     
-    // Use WeakHashMap to avoid memory leaks
-    private final Map<SpriteContents, Boolean> hasAnimation = new WeakHashMap<>();
+    // Use WeakHashMap to avoid memory leaks - only tracks active state
     private final Map<SpriteContents, Boolean> isActive = new WeakHashMap<>();
 
     private SodiumSpriteContentsHook() {
@@ -24,19 +23,13 @@ public class SodiumSpriteContentsHook implements SpriteContentsHooks {
         return INSTANCE;
     }
 
-    @Override
-    public void onSpriteContentsInit(SpriteContents spriteContents, boolean hasAnimation) {
-        this.hasAnimation.put(spriteContents, hasAnimation);
-        this.isActive.put(spriteContents, false); // Start inactive
-    }
-
     /**
      * Check if sprite contents has animation.
      * Used by SpriteContentsExtension interface.
      */
     public static boolean hasAnimation(SpriteContents spriteContents) {
-        Boolean result = INSTANCE.hasAnimation.get(spriteContents);
-        return result != null && result;
+        // Directly check if the sprite has an animated texture (public field)
+        return spriteContents.animatedTexture != null;
     }
 
     /**

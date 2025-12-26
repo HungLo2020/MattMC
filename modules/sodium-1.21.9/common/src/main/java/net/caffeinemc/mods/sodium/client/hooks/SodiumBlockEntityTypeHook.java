@@ -27,12 +27,6 @@ public class SodiumBlockEntityTypeHook implements BlockEntityTypeHooks {
         return INSTANCE;
     }
 
-    @Override
-    public void onBlockEntityTypeInit(BlockEntityType<?> blockEntityType) {
-        // Initialize with empty predicates array
-        renderPredicates.put(blockEntityType, new BlockEntityRenderPredicate[0]);
-    }
-
     /**
      * Get render predicates for a block entity type.
      * Used by ExtendedBlockEntityType interface.
