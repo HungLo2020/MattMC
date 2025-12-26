@@ -16,6 +16,7 @@ public class TrunkPlacerType<P extends TrunkPlacer> {
 		"upwards_branching_trunk_placer", UpwardsBranchingTrunkPlacer.CODEC
 	);
 	public static final TrunkPlacerType<CherryTrunkPlacer> CHERRY_TRUNK_PLACER = register("cherry_trunk_placer", CherryTrunkPlacer.CODEC);
+	public static final TrunkPlacerType<OffshootTrunkPlacer> OFFSHOOT_TRUNK_PLACER = register("offshoot_trunk_placer", OffshootTrunkPlacer.CODEC);
 	private final MapCodec<P> codec;
 
 	private static <P extends TrunkPlacer> TrunkPlacerType<P> register(String string, MapCodec<P> mapCodec) {
