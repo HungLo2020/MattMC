@@ -12,17 +12,14 @@ import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
+import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityDimensions;
-import net.minecraft.world.entity.EntitySpawnReason;
-import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.InsideBlockEffectApplier;
 import net.minecraft.world.entity.Relative;
-import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.Items;
 import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.GameRules;
 import net.minecraft.world.level.Level;
@@ -44,18 +41,18 @@ import net.minecraft.world.phys.shapes.VoxelShape;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 
-public class NetherPortalBlock extends Block implements Portal {
+public class PrimordialCavesPortalBlock extends Block implements Portal {
 	private static final Logger LOGGER = LogUtils.getLogger();
-	public static final MapCodec<NetherPortalBlock> CODEC = simpleCodec(NetherPortalBlock::new);
+	public static final MapCodec<PrimordialCavesPortalBlock> CODEC = simpleCodec(PrimordialCavesPortalBlock::new);
 	public static final EnumProperty<Direction.Axis> AXIS = BlockStateProperties.HORIZONTAL_AXIS;
 	private static final Map<Direction.Axis, VoxelShape> SHAPES = Shapes.rotateHorizontalAxis(Block.column(4.0, 16.0, 0.0, 16.0));
 
 	@Override
-	public MapCodec<NetherPortalBlock> codec() {
+	public MapCodec<PrimordialCavesPortalBlock> codec() {
 		return CODEC;
 	}
 
-	public NetherPortalBlock(BlockBehaviour.Properties properties) {
+	public PrimordialCavesPortalBlock(BlockBehaviour.Properties properties) {
 		super(properties);
 		this.registerDefaultState(this.stateDefinition.any().setValue(AXIS, Direction.Axis.X));
 	}
@@ -63,29 +60,6 @@ public class NetherPortalBlock extends Block implements Portal {
 	@Override
 	protected VoxelShape getShape(BlockState blockState, BlockGetter blockGetter, BlockPos blockPos, CollisionContext collisionContext) {
 		return (VoxelShape)SHAPES.get(blockState.getValue(AXIS));
-	}
-
-	@Override
-	protected void randomTick(BlockState blockState, ServerLevel serverLevel, BlockPos blockPos, RandomSource randomSource) {
-		if (serverLevel.dimensionType().natural()
-			&& serverLevel.isSpawningMonsters()
-			&& randomSource.nextInt(2000) < serverLevel.getDifficulty().getId()
-			&& serverLevel.anyPlayerCloseEnoughForSpawning(blockPos)) {
-			while (serverLevel.getBlockState(blockPos).is(this)) {
-				blockPos = blockPos.below();
-			}
-
-			if (serverLevel.getBlockState(blockPos).isValidSpawn(serverLevel, blockPos, EntityType.ZOMBIFIED_PIGLIN)) {
-				Entity entity = EntityType.ZOMBIFIED_PIGLIN.spawn(serverLevel, blockPos.above(), EntitySpawnReason.STRUCTURE);
-				if (entity != null) {
-					entity.setPortalCooldown();
-					Entity entity2 = entity.getVehicle();
-					if (entity2 != null) {
-						entity2.setPortalCooldown();
-					}
-				}
-			}
-		}
 	}
 
 	@Override
@@ -111,57 +85,9 @@ public class NetherPortalBlock extends Block implements Portal {
 	protected void entityInside(
 		BlockState blockState, Level level, BlockPos blockPos, Entity entity, InsideBlockEffectApplier insideBlockEffectApplier, boolean bl
 	) {
-		// Check if a pitcher pod is thrown into the portal - convert to Primordial Caves portal
-		if (entity instanceof ItemEntity itemEntity && level instanceof ServerLevel serverLevel) {
-			ItemStack stack = itemEntity.getItem();
-			if (stack.is(Items.PITCHER_POD)) {
-				// Convert this portal to a Primordial Caves portal
-				convertToPrimordialCavesPortal(serverLevel, blockPos, blockState);
-				// Remove the pitcher pod
-				itemEntity.discard();
-				// Play sound effect
-				level.playSound(null, blockPos, SoundEvents.PORTAL_TRIGGER, SoundSource.BLOCKS, 1.0F, 1.0F);
-				return;
-			}
-		}
-		
 		if (entity.canUsePortal(false)) {
 			entity.setAsInsidePortal(this, blockPos);
 		}
-	}
-	
-	private void convertToPrimordialCavesPortal(ServerLevel level, BlockPos blockPos, BlockState blockState) {
-		// Get the axis of the portal
-		Direction.Axis axis = blockState.getValue(AXIS);
-		
-		// Find all connected portal blocks
-		BlockUtil.FoundRectangle portalShape = BlockUtil.getLargestRectangleAround(
-			blockPos,
-			axis,
-			21,
-			Direction.Axis.Y,
-			21,
-			pos -> level.getBlockState(pos).is(this)
-		);
-		
-		// Calculate the axis directions for the rectangle
-		Direction.Axis secondaryAxis = axis == Direction.Axis.X ? Direction.Axis.Z : Direction.Axis.X;
-		Direction primaryDir = Direction.get(Direction.AxisDirection.POSITIVE, axis);
-		Direction secondaryDir = Direction.get(Direction.AxisDirection.POSITIVE, secondaryAxis);
-		Direction verticalDir = Direction.UP;
-		
-		// Calculate max corner from minCorner and sizes
-		BlockPos maxCorner = portalShape.minCorner
-			.relative(primaryDir, portalShape.axis1Size - 1)
-			.relative(verticalDir, portalShape.axis2Size - 1);
-		
-		// Convert all portal blocks to Primordial Caves portal blocks
-		BlockPos.betweenClosed(portalShape.minCorner, maxCorner).forEach(pos -> {
-			BlockState state = level.getBlockState(pos);
-			if (state.is(this)) {
-				level.setBlock(pos, Blocks.PRIMORDIAL_CAVES_PORTAL.defaultBlockState().setValue(PrimordialCavesPortalBlock.AXIS, axis), 3);
-			}
-		});
 	}
 
 	@Override
@@ -178,7 +104,8 @@ public class NetherPortalBlock extends Block implements Portal {
 	@Nullable
 	@Override
 	public TeleportTransition getPortalDestination(ServerLevel serverLevel, Entity entity, BlockPos blockPos) {
-		ResourceKey<Level> resourceKey = serverLevel.dimension() == Level.NETHER ? Level.OVERWORLD : Level.NETHER;
+		// Primordial Caves portal always goes to Primordial Caves or back to Overworld
+		ResourceKey<Level> resourceKey = serverLevel.dimension() == Level.PRIMORDIAL_CAVES ? Level.OVERWORLD : Level.PRIMORDIAL_CAVES;
 		ServerLevel serverLevel2 = serverLevel.getServer().getLevel(resourceKey);
 		if (serverLevel2 == null) {
 			return null;
@@ -261,28 +188,21 @@ public class NetherPortalBlock extends Block implements Portal {
 		double d = foundRectangle.axis1Size;
 		double e = foundRectangle.axis2Size;
 		EntityDimensions entityDimensions = entity.getDimensions(entity.getPose());
-		int i = axis == axis2 ? 0 : 90;
-		double f = entityDimensions.width() / 2.0 + (d - entityDimensions.width()) * vec3.x();
-		double g = (e - entityDimensions.height()) * vec3.y();
-		double h = 0.5 + vec3.z();
-		boolean bl = axis2 == Direction.Axis.X;
-		Vec3 vec32 = new Vec3(blockPos.getX() + (bl ? f : h), blockPos.getY() + g, blockPos.getZ() + (bl ? h : f));
+		int i = axis == Direction.Axis.X ? Mth.floor(d - (double)entityDimensions.width()) / 2 : Mth.floor(d - (double)entityDimensions.width() / 2.0) / 2;
+		int j = Mth.floor(e - (double)entityDimensions.height()) / 2;
+		BlockPos blockPos2 = blockPos.relative(Direction.get(Direction.AxisDirection.POSITIVE, axis2), i);
+		BlockPos blockPos3 = blockPos2.relative(Direction.UP, j);
+		Vec3 vec32 = new Vec3((double)blockPos3.getX() + vec3.x, (double)blockPos3.getY() + vec3.y, (double)blockPos3.getZ() + vec3.z);
 		Vec3 vec33 = PortalShape.findCollisionFreePosition(vec32, serverLevel, entity, entityDimensions);
-		return new TeleportTransition(serverLevel, vec33, Vec3.ZERO, i, 0.0F, Relative.union(Relative.DELTA, Relative.ROTATION), postTeleportTransition);
+		return new TeleportTransition(serverLevel, vec33, Vec3.ZERO, 0.0F, 0.0F, Relative.union(Relative.DELTA, Relative.ROTATION), postTeleportTransition);
 	}
 
-	@Override
-	public Portal.Transition getLocalTransition() {
-		return Portal.Transition.CONFUSION;
-	}
-
-	@Override
 	public void animateTick(BlockState blockState, Level level, BlockPos blockPos, RandomSource randomSource) {
 		if (randomSource.nextInt(100) == 0) {
 			level.playLocalSound(
-				blockPos.getX() + 0.5,
-				blockPos.getY() + 0.5,
-				blockPos.getZ() + 0.5,
+				(double)blockPos.getX() + 0.5,
+				(double)blockPos.getY() + 0.5,
+				(double)blockPos.getZ() + 0.5,
 				SoundEvents.PORTAL_AMBIENT,
 				SoundSource.BLOCKS,
 				0.5F,
@@ -291,47 +211,30 @@ public class NetherPortalBlock extends Block implements Portal {
 			);
 		}
 
+		// Different particle color for Primordial Caves portal - green/earthy tone
 		for (int i = 0; i < 4; i++) {
-			double d = blockPos.getX() + randomSource.nextDouble();
-			double e = blockPos.getY() + randomSource.nextDouble();
-			double f = blockPos.getZ() + randomSource.nextDouble();
-			double g = (randomSource.nextFloat() - 0.5) * 0.5;
-			double h = (randomSource.nextFloat() - 0.5) * 0.5;
-			double j = (randomSource.nextFloat() - 0.5) * 0.5;
+			double d = (double)blockPos.getX() + randomSource.nextDouble();
+			double e = (double)blockPos.getY() + randomSource.nextDouble();
+			double f = (double)blockPos.getZ() + randomSource.nextDouble();
+			double g = ((double)randomSource.nextFloat() - 0.5) * 0.5;
+			double h = ((double)randomSource.nextFloat() - 0.5) * 0.5;
+			double j = ((double)randomSource.nextFloat() - 0.5) * 0.5;
 			int k = randomSource.nextInt(2) * 2 - 1;
 			if (!level.getBlockState(blockPos.west()).is(this) && !level.getBlockState(blockPos.east()).is(this)) {
-				d = blockPos.getX() + 0.5 + 0.25 * k;
-				g = randomSource.nextFloat() * 2.0F * k;
+				d = (double)blockPos.getX() + 0.5 + 0.25 * (double)k;
+				g = randomSource.nextFloat() * 2.0F * (float)k;
 			} else {
-				f = blockPos.getZ() + 0.5 + 0.25 * k;
-				j = randomSource.nextFloat() * 2.0F * k;
+				f = (double)blockPos.getZ() + 0.5 + 0.25 * (double)k;
+				j = randomSource.nextFloat() * 2.0F * (float)k;
 			}
 
+			// Use a different particle type or color for visual distinction
 			level.addParticle(ParticleTypes.PORTAL, d, e, f, g, h, j);
 		}
 	}
 
-	@Override
-	protected ItemStack getCloneItemStack(LevelReader levelReader, BlockPos blockPos, BlockState blockState, boolean bl) {
+	public ItemStack getCloneItemStack(LevelReader levelReader, BlockPos blockPos, BlockState blockState) {
 		return ItemStack.EMPTY;
-	}
-
-	@Override
-	protected BlockState rotate(BlockState blockState, Rotation rotation) {
-		switch (rotation) {
-			case COUNTERCLOCKWISE_90:
-			case CLOCKWISE_90:
-				switch ((Direction.Axis)blockState.getValue(AXIS)) {
-					case X:
-						return blockState.setValue(AXIS, Direction.Axis.Z);
-					case Z:
-						return blockState.setValue(AXIS, Direction.Axis.X);
-					default:
-						return blockState;
-				}
-			default:
-				return blockState;
-		}
 	}
 
 	@Override
