@@ -174,7 +174,7 @@ After thoroughly analyzing all mixin configuration files across the entire codeb
 
 ### Implementation Progress
 
-- ✅ **Completed**: 17 mixins converted to hooks (6.0% of 284 total)
+- ✅ **Completed**: 21 mixins converted to hooks (7.4% of 284 total)
   1. Sodium `MinecraftMixin.postInit()` → GameHooks.onGameInitialized()
   2. Sodium `MinecraftMixin.preRender()` → GameHooks.beforeRunTick()
   3. Sodium `MinecraftMixin.postRender()` → GameHooks.afterRunTick()
@@ -191,7 +191,11 @@ After thoroughly analyzing all mixin configuration files across the entire codeb
   16. Sodium `LevelLoadTrackerMixin` → PlayerPositionHooks.getPlayerBlockPositionForChunkLoading()
   17. Sodium `FogRendererMixin` → FogRenderHooks.onFogParametersCalculated()
   18. Sodium `ShadowFeatureRendererMixin` → EntityRenderHooks.onRenderEntityShadows()
-- ⏳ **Remaining**: 267 mixins to convert to hooks (80 Sodium + 168 Iris + 19 DH)
+  19. Sodium `BlockColorsMixin` → BlockColorHooks.onBlockColorRegistered()
+  20. Sodium `ClientLevelMixin` (biome) → ClientLevelHooks.onClientLevelInit()
+  21. Sodium `ClientLevelMixin` (map) → ClientLevelHooks.onChunkUnload()
+  22. Sodium `VertexFormatMixin` → VertexFormatHooks.onVertexFormatInit()
+- ⏳ **Remaining**: 263 mixins to convert to hooks (76 Sodium + 168 Iris + 19 DH)
 
 **Recent Sessions**:
 - Session 1: MinecraftMixin (4 methods, GPU sync + resource reload) - 5 mixins
@@ -199,6 +203,8 @@ After thoroughly analyzing all mixin configuration files across the entire codeb
 - Session 3: GuiMixin + WeatherLevelRendererMixin (graphics config overrides) - 3 mixins
 - Session 4: GameRendererMixin, DebugEntryMemoryMixin, OptionsScreenMixin (complex patterns) - 3 mixins
 - Session 5: LeavesBlockMixin, ItemBlockRenderTypesMixin, LevelLoadTrackerMixin, FogRendererMixin, ShadowFeatureRendererMixin - 5 mixins
+- Session 6: BlockColorsMixin - 1 mixin
+- Session 7: ClientLevelMixin (2 files), VertexFormatMixin - 3 mixins
 - Build verified successful after each session
 
 **Hook Infrastructure Created**:
@@ -213,10 +219,9 @@ After thoroughly analyzing all mixin configuration files across the entire codeb
 - PlayerPositionHooks (1 method) - Player position calculations
 - FogRenderHooks (1 method) - Fog parameter interception
 - EntityRenderHooks (1 method) - Entity shadow rendering optimization
-- GraphicsConfigHooks (4 methods) - Graphics quality overrides
-- GuiRenderHooks (1 method) - GUI rendering extensions (NEW)
-- DebugScreenHooks (1 method) - F3 debug screen custom info (NEW)
-- ScreenFactoryHooks (1 method) - Screen creation/replacement (NEW)
+- BlockColorHooks (1 method) - Block color provider tracking
+- ClientLevelHooks (2 methods) - Client level initialization and chunk lifecycle
+- VertexFormatHooks (1 method) - Vertex format initialization
 
 ### Estimated Effort
 
