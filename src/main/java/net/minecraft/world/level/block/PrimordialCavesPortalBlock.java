@@ -385,6 +385,42 @@ public class PrimordialCavesPortalBlock extends Block implements Portal {
 		}
 	}
 
+	@Override
+	public BlockState playerWillDestroy(Level level, BlockPos blockPos, BlockState blockState, Player player) {
+		// When a player breaks one portal block, break all connected portal blocks
+		if (!level.isClientSide() && !player.isCreative()) {
+			// Find and break all connected portal blocks
+			breakConnectedPortalBlocks(level, blockPos);
+		}
+		return super.playerWillDestroy(level, blockPos, blockState, player);
+	}
+	
+	private void breakConnectedPortalBlocks(Level level, BlockPos startPos) {
+		// Use BFS to find all connected portal blocks
+		java.util.Set<BlockPos> visited = new java.util.HashSet<>();
+		java.util.Queue<BlockPos> queue = new java.util.LinkedList<>();
+		queue.add(startPos);
+		visited.add(startPos);
+		
+		while (!queue.isEmpty()) {
+			BlockPos currentPos = queue.poll();
+			
+			// Check all 6 directions for connected portal blocks
+			for (Direction direction : Direction.values()) {
+				BlockPos neighborPos = currentPos.relative(direction);
+				if (!visited.contains(neighborPos)) {
+					visited.add(neighborPos);
+					BlockState neighborState = level.getBlockState(neighborPos);
+					if (neighborState.is(this)) {
+						queue.add(neighborPos);
+						// Break this portal block (without dropping items since we already handle that)
+						level.destroyBlock(neighborPos, false);
+					}
+				}
+			}
+		}
+	}
+
 	public ItemStack getCloneItemStack(LevelReader levelReader, BlockPos blockPos, BlockState blockState) {
 		return ItemStack.EMPTY;
 	}
