@@ -23,7 +23,7 @@
         #else
             vec3 nightClearLightColor = vec3(0.07, 0.12, 0.27); //light shaft color
         #endif
-        vec3 nightClearAmbientColor   = vec3(0.09, 0.12, 0.17) * (1.55 + vsBrightness * 0.77);
+        vec3 nightClearAmbientColor   = vec3(0.09, 0.12, 0.17) * (5.0 + vsBrightness * 2.0);
 
         #ifdef SPECIAL_BIOME_WEATHER
             vec3 drlcSnowM = inSnowy * vec3(-0.06, 0.0, 0.04);
