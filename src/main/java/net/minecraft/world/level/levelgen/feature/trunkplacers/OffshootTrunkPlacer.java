@@ -47,10 +47,10 @@ public class OffshootTrunkPlacer extends TrunkPlacer {
 		// Add 1-2 random horizontal offshoots (only for trees with height >= 5)
 		// Offshoots should be below the foliage (top - 4 blocks)
 		if (i >= 5) {
-			int offshootCount = 1 + randomSource.nextInt(2); // 1 or 2 offshoots
+			int offshootCount = randomSource.nextInt(2); // 1 or 2 offshoots
 			
 			// Calculate safe height range: top minus 4 blocks to avoid foliage
-			int maxOffshootHeight = i - 4;
+			int maxOffshootHeight = i - 3;
 			
 			for (int k = 0; k < offshootCount; k++) {
 				// Random height for the offshoot (between 1 and top - 4)
