@@ -40,7 +40,7 @@ public record WorldDimensions(Map<ResourceKey<LevelStem>, LevelStem> dimensions)
 			)
 			.apply(instance, instance.stable(WorldDimensions::new))
 	);
-	private static final Set<ResourceKey<LevelStem>> BUILTIN_ORDER = ImmutableSet.of(LevelStem.OVERWORLD, LevelStem.NETHER, LevelStem.END);
+	private static final Set<ResourceKey<LevelStem>> BUILTIN_ORDER = ImmutableSet.of(LevelStem.OVERWORLD, LevelStem.NETHER, LevelStem.END, LevelStem.PRIMORDIAL_CAVES);
 	private static final int VANILLA_DIMENSION_COUNT = BUILTIN_ORDER.size();
 
 	public WorldDimensions(Map<ResourceKey<LevelStem>, LevelStem> dimensions) {

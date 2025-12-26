@@ -80,10 +80,27 @@ public class PrimordialCavesPortalBlock extends Block implements Portal {
 		Direction.Axis axis = direction.getAxis();
 		Direction.Axis axis2 = blockState.getValue(AXIS);
 		boolean bl = axis2 != axis && axis.isHorizontal();
-		// Use the same logic as NetherPortalBlock - check if portal shape is still complete
-		return !bl && !blockState2.is(this) && !PortalShape.findAnyShape(levelReader, blockPos, axis2).isComplete()
-			? Blocks.AIR.defaultBlockState()
-			: super.updateShape(blockState, levelReader, scheduledTickAccess, blockPos, direction, blockPos2, blockState2, randomSource);
+		
+		// Check if the portal is still valid by verifying obsidian frame support
+		// We can't use PortalShape.findAnyShape() because it only works with nether portals
+		// Instead, check if there's obsidian or other portal blocks nearby to support this block
+		if (!bl && !blockState2.is(this) && !blockState2.is(Blocks.OBSIDIAN)) {
+			// Check if there's at least one adjacent portal block or obsidian for support
+			boolean hasSupport = false;
+			for (Direction dir : Direction.values()) {
+				BlockPos neighborPos = blockPos.relative(dir);
+				BlockState neighborState = levelReader.getBlockState(neighborPos);
+				if (neighborState.is(this) || neighborState.is(Blocks.OBSIDIAN)) {
+					hasSupport = true;
+					break;
+				}
+			}
+			if (!hasSupport) {
+				return Blocks.AIR.defaultBlockState();
+			}
+		}
+		
+		return super.updateShape(blockState, levelReader, scheduledTickAccess, blockPos, direction, blockPos2, blockState2, randomSource);
 	}
 
 	@Override
