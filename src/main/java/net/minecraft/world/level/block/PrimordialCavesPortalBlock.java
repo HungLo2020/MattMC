@@ -80,26 +80,10 @@ public class PrimordialCavesPortalBlock extends Block implements Portal {
 		Direction.Axis axis = direction.getAxis();
 		Direction.Axis axis2 = blockState.getValue(AXIS);
 		boolean bl = axis2 != axis && axis.isHorizontal();
-		
-		// Check if the portal frame is still valid (obsidian frame)
-		// We use a simplified check - just verify adjacent blocks
-		if (!bl && !blockState2.is(this) && !blockState2.is(Blocks.OBSIDIAN)) {
-			// Check if we're surrounded by other portal blocks or obsidian
-			boolean hasSupport = false;
-			for (Direction dir : Direction.values()) {
-				BlockPos neighborPos = blockPos.relative(dir);
-				BlockState neighborState = levelReader.getBlockState(neighborPos);
-				if (neighborState.is(this) || neighborState.is(Blocks.OBSIDIAN)) {
-					hasSupport = true;
-					break;
-				}
-			}
-			if (!hasSupport) {
-				return Blocks.AIR.defaultBlockState();
-			}
-		}
-		
-		return super.updateShape(blockState, levelReader, scheduledTickAccess, blockPos, direction, blockPos2, blockState2, randomSource);
+		// Use the same logic as NetherPortalBlock - check if portal shape is still complete
+		return !bl && !blockState2.is(this) && !PortalShape.findAnyShape(levelReader, blockPos, axis2).isComplete()
+			? Blocks.AIR.defaultBlockState()
+			: super.updateShape(blockState, levelReader, scheduledTickAccess, blockPos, direction, blockPos2, blockState2, randomSource);
 	}
 
 	@Override
@@ -382,42 +366,6 @@ public class PrimordialCavesPortalBlock extends Block implements Portal {
 
 			// Use a different particle type or color for visual distinction
 			level.addParticle(ParticleTypes.PORTAL, d, e, f, g, h, j);
-		}
-	}
-
-	@Override
-	public BlockState playerWillDestroy(Level level, BlockPos blockPos, BlockState blockState, Player player) {
-		// When a player breaks one portal block, break all connected portal blocks
-		if (!level.isClientSide() && !player.isCreative()) {
-			// Find and break all connected portal blocks
-			breakConnectedPortalBlocks(level, blockPos);
-		}
-		return super.playerWillDestroy(level, blockPos, blockState, player);
-	}
-	
-	private void breakConnectedPortalBlocks(Level level, BlockPos startPos) {
-		// Use BFS to find all connected portal blocks
-		java.util.Set<BlockPos> visited = new java.util.HashSet<>();
-		java.util.Queue<BlockPos> queue = new java.util.LinkedList<>();
-		queue.add(startPos);
-		visited.add(startPos);
-		
-		while (!queue.isEmpty()) {
-			BlockPos currentPos = queue.poll();
-			
-			// Check all 6 directions for connected portal blocks
-			for (Direction direction : Direction.values()) {
-				BlockPos neighborPos = currentPos.relative(direction);
-				if (!visited.contains(neighborPos)) {
-					visited.add(neighborPos);
-					BlockState neighborState = level.getBlockState(neighborPos);
-					if (neighborState.is(this)) {
-						queue.add(neighborPos);
-						// Break this portal block (without dropping items since we already handle that)
-						level.destroyBlock(neighborPos, false);
-					}
-				}
-			}
 		}
 	}
 

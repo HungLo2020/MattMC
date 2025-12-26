@@ -555,7 +555,7 @@ public abstract class MinecraftServer extends ReentrantBlockableEventLoop<TickTa
 			writableRegistry.register(
 				LevelStem.PRIMORDIAL_CAVES,
 				primordialCavesLevelStem,
-				new RegistrationInfo(Optional.empty(), Lifecycle.experimental())
+				new RegistrationInfo(Optional.empty(), Lifecycle.stable())
 			);
 			
 			// Freeze and return the new registry
