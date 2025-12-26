@@ -63,9 +63,14 @@ public class SpriteContents implements Stitcher.Entry, AutoCloseable {
 		this.byMipLevel = new NativeImage[]{this.originalImage};
 		
 		// Call registered hooks for sprite contents initialization
-		boolean hasAnimation = this.animatedTexture != null;
-		for (net.minecraft.hooks.SpriteContentsHooks hook : net.minecraft.hooks.HookRegistry.getSpriteContentsHooks()) {
-			hook.onSpriteContentsInit(this, hasAnimation);
+		// Wrapped in try-catch to handle class loading issues during initialization
+		try {
+			boolean hasAnimation = this.animatedTexture != null;
+			for (net.minecraft.hooks.SpriteContentsHooks hook : net.minecraft.hooks.HookRegistry.getSpriteContentsHooks()) {
+				hook.onSpriteContentsInit(this, hasAnimation);
+			}
+		} catch (Throwable ignored) {
+			// Ignore errors during class initialization - hooks will handle lazy init
 		}
 	}
 

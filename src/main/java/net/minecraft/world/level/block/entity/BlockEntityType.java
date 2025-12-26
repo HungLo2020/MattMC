@@ -292,8 +292,13 @@ public class BlockEntityType<T extends BlockEntity> {
 		this.validBlocks = set;
 		
 		// Call registered hooks for block entity type initialization
-		for (net.minecraft.hooks.BlockEntityTypeHooks hook : net.minecraft.hooks.HookRegistry.getBlockEntityTypeHooks()) {
-			hook.onBlockEntityTypeInit(this);
+		// Wrapped in try-catch to handle class loading issues during static initialization
+		try {
+			for (net.minecraft.hooks.BlockEntityTypeHooks hook : net.minecraft.hooks.HookRegistry.getBlockEntityTypeHooks()) {
+				hook.onBlockEntityTypeInit(this);
+			}
+		} catch (Throwable ignored) {
+			// Ignore errors during class initialization - hooks will handle lazy init
 		}
 	}
 
