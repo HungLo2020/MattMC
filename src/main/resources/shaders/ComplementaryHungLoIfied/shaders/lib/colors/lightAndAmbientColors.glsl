@@ -1,6 +1,9 @@
 #ifndef INCLUDE_LIGHT_AND_AMBIENT_COLORS
     #define INCLUDE_LIGHT_AND_AMBIENT_COLORS
 
+    // Detect Primordial Caves by unique fog color (RGB: 192, 216, 255)
+    bool isPrimordialCaves = distance(fogColor, vec3(0.7529, 0.8471, 1.0)) < 0.01;
+
     #if defined OVERWORLD
         #ifndef COMPOSITE
             vec3 noonClearLightColor = vec3(0.7, 0.55, 0.4) * 1.9; //ground and cloud color
@@ -65,21 +68,19 @@
         vec3 lightColor   = mix(clearLightColor, rainLightColor, rainFactor);
         vec3 ambientColor = mix(clearAmbientColor, rainAmbientColor, rainFactor);
     #elif defined NETHER
-        // Check if this is Primordial Caves (fixed at midnight, worldTime = 18000)
-        #if worldTime == 18000
-            // Primordial Caves: bright cave lighting separate from nether
-            vec3 lightColor   = vec3(0.0);
-            vec3 ambientColor = vec3(0.7, 0.65, 0.6) * (4.0 + 1.5 * vsBrightness);
-        #else
-            // Actual Nether dimension
-            vec3 lightColor   = vec3(0.0);
-            vec3 ambientColor = (netherColor + 0.5 * lavaLightColor) * (0.9 + 0.45 * vsBrightness);
-        #endif
+        vec3 lightColor   = vec3(0.0);
+        vec3 ambientColor = (netherColor + 0.5 * lavaLightColor) * (0.9 + 0.45 * vsBrightness);
     #elif defined END
         vec3 endLightColor = vec3(0.68, 0.51, 1.07);
         float endLightBalancer = 0.2 * vsBrightness;
         vec3 lightColor    = endLightColor * (0.35 - endLightBalancer);
         vec3 ambientColor  = endLightColor * (0.2 + endLightBalancer);
     #endif
+
+    // Override lighting for Primordial Caves dimension (detected by unique fog color)
+    if (isPrimordialCaves) {
+        lightColor   = vec3(0.0);
+        ambientColor = vec3(0.7, 0.65, 0.6) * (4.0 + 1.5 * vsBrightness);
+    }
 
 #endif //INCLUDE_LIGHT_AND_AMBIENT_COLORS
