@@ -134,34 +134,42 @@ public class NetherPortalBlock extends Block implements Portal {
 		// Get the axis of the portal
 		Direction.Axis axis = blockState.getValue(AXIS);
 		
-		// Find all connected portal blocks
-		BlockUtil.FoundRectangle portalShape = BlockUtil.getLargestRectangleAround(
-			blockPos,
-			axis,
-			21,
-			Direction.Axis.Y,
-			21,
-			pos -> level.getBlockState(pos).is(this)
-		);
+		// Use PortalShape to find the complete portal structure
+		PortalShape portalShape = PortalShape.findAnyShape(level, blockPos, axis);
 		
-		// Calculate the axis directions for the rectangle
-		Direction.Axis secondaryAxis = axis == Direction.Axis.X ? Direction.Axis.Z : Direction.Axis.X;
-		Direction primaryDir = Direction.get(Direction.AxisDirection.POSITIVE, axis);
-		Direction secondaryDir = Direction.get(Direction.AxisDirection.POSITIVE, secondaryAxis);
-		Direction verticalDir = Direction.UP;
+		if (!portalShape.isComplete()) {
+			return; // Don't convert incomplete portals
+		}
 		
-		// Calculate max corner from minCorner and sizes
-		BlockPos maxCorner = portalShape.minCorner
-			.relative(primaryDir, portalShape.axis1Size - 1)
-			.relative(verticalDir, portalShape.axis2Size - 1);
+		// Collect all connected portal blocks by searching in a 21x21 area (max portal size)
+		java.util.List<BlockPos> portalBlocks = new java.util.ArrayList<>();
+		java.util.Set<BlockPos> visited = new java.util.HashSet<>();
+		java.util.Queue<BlockPos> queue = new java.util.LinkedList<>();
+		queue.add(blockPos);
+		visited.add(blockPos);
 		
-		// Convert all portal blocks to Primordial Caves portal blocks
-		BlockPos.betweenClosed(portalShape.minCorner, maxCorner).forEach(pos -> {
-			BlockState state = level.getBlockState(pos);
-			if (state.is(this)) {
-				level.setBlock(pos, Blocks.PRIMORDIAL_CAVES_PORTAL.defaultBlockState().setValue(PrimordialCavesPortalBlock.AXIS, axis), 3);
+		// BFS to find all connected portal blocks
+		while (!queue.isEmpty()) {
+			BlockPos current = queue.poll();
+			if (level.getBlockState(current).is(this)) {
+				portalBlocks.add(current);
+				
+				// Check all 4 adjacent positions (same axis plane and vertical)
+				for (Direction dir : Direction.values()) {
+					BlockPos neighbor = current.relative(dir);
+					if (!visited.contains(neighbor) && neighbor.distManhattan(blockPos) <= 42) {
+						visited.add(neighbor);
+						queue.add(neighbor);
+					}
+				}
 			}
-		});
+		}
+		
+		// Convert all portal blocks at once with flag 2 (no block updates to neighbors)
+		// This prevents the portal from breaking during conversion
+		for (BlockPos pos : portalBlocks) {
+			level.setBlock(pos, Blocks.PRIMORDIAL_CAVES_PORTAL.defaultBlockState().setValue(PrimordialCavesPortalBlock.AXIS, axis), 2);
+		}
 	}
 
 	@Override
