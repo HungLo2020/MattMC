@@ -18,6 +18,9 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityDimensions;
 import net.minecraft.world.entity.InsideBlockEffectApplier;
 import net.minecraft.world.entity.Relative;
+import net.minecraft.world.entity.ai.village.poi.PoiManager;
+import net.minecraft.world.entity.ai.village.poi.PoiRecord;
+import net.minecraft.world.entity.ai.village.poi.PoiTypes;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.BlockGetter;
@@ -32,6 +35,7 @@ import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.block.state.properties.EnumProperty;
 import net.minecraft.world.level.border.WorldBorder;
 import net.minecraft.world.level.dimension.DimensionType;
+import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.portal.PortalShape;
 import net.minecraft.world.level.portal.TeleportTransition;
 import net.minecraft.world.phys.Vec3;
@@ -127,17 +131,17 @@ public class PrimordialCavesPortalBlock extends Block implements Portal {
 		if (serverLevel2 == null) {
 			return null;
 		} else {
-			boolean bl = serverLevel2.dimension() == Level.NETHER;
 			WorldBorder worldBorder = serverLevel2.getWorldBorder();
 			double d = DimensionType.getTeleportationScale(serverLevel.dimensionType(), serverLevel2.dimensionType());
 			BlockPos blockPos2 = worldBorder.clampToBounds(entity.getX() * d, entity.getY(), entity.getZ() * d);
-			return this.getExitPortal(serverLevel2, entity, blockPos, blockPos2, bl, worldBorder);
+			return this.getExitPortal(serverLevel2, entity, blockPos, blockPos2, worldBorder);
 		}
 	}
 
 	@Nullable
-	private TeleportTransition getExitPortal(ServerLevel serverLevel, Entity entity, BlockPos blockPos, BlockPos blockPos2, boolean bl, WorldBorder worldBorder) {
-		Optional<BlockPos> optional = serverLevel.getPortalForcer().findClosestPortalPosition(blockPos2, bl, worldBorder);
+	private TeleportTransition getExitPortal(ServerLevel serverLevel, Entity entity, BlockPos blockPos, BlockPos blockPos2, WorldBorder worldBorder) {
+		// Look for existing primordial caves portal
+		Optional<BlockPos> optional = this.findPrimordialCavesPortal(serverLevel, blockPos2, worldBorder);
 		BlockUtil.FoundRectangle foundRectangle;
 		TeleportTransition.PostTeleportTransition postTeleportTransition;
 		if (optional.isPresent()) {
@@ -149,12 +153,13 @@ public class PrimordialCavesPortalBlock extends Block implements Portal {
 				21,
 				Direction.Axis.Y,
 				21,
-				blockPosx -> serverLevel.getBlockState(blockPosx) == blockState
+				blockPosx -> serverLevel.getBlockState(blockPosx).is(this)
 			);
 			postTeleportTransition = TeleportTransition.PLAY_PORTAL_SOUND.then(entityx -> entityx.placePortalTicket(blockPos3));
 		} else {
+			// Create new portal at destination
 			Direction.Axis axis = (Direction.Axis)entity.level().getBlockState(blockPos).getOptionalValue(AXIS).orElse(Direction.Axis.X);
-			Optional<BlockUtil.FoundRectangle> optional2 = serverLevel.getPortalForcer().createPortal(blockPos2, axis);
+			Optional<BlockUtil.FoundRectangle> optional2 = this.createPrimordialCavesPortal(serverLevel, blockPos2, axis);
 			if (optional2.isEmpty()) {
 				LOGGER.error("Unable to create a portal, likely target out of worldborder");
 				return null;
@@ -165,6 +170,135 @@ public class PrimordialCavesPortalBlock extends Block implements Portal {
 		}
 
 		return getDimensionTransitionFromExit(entity, blockPos, foundRectangle, serverLevel, postTeleportTransition);
+	}
+	
+	private Optional<BlockPos> findPrimordialCavesPortal(ServerLevel serverLevel, BlockPos blockPos, WorldBorder worldBorder) {
+		// Search for existing primordial caves portal POI
+		PoiManager poiManager = serverLevel.getPoiManager();
+		int searchRadius = 128; // Same as overworld portal search radius
+		poiManager.ensureLoadedAndValid(serverLevel, blockPos, searchRadius);
+		return poiManager.getInSquare(holder -> holder.is(PoiTypes.PRIMORDIAL_CAVES_PORTAL), blockPos, searchRadius, PoiManager.Occupancy.ANY)
+			.map(PoiRecord::getPos)
+			.filter(worldBorder::isWithinBounds)
+			.filter(blockPosx -> serverLevel.getBlockState(blockPosx).hasProperty(BlockStateProperties.HORIZONTAL_AXIS))
+			.min(java.util.Comparator.comparingDouble((BlockPos bp2) -> bp2.distSqr(blockPos)).thenComparingInt(bp2 -> bp2.getY()));
+	}
+	
+	private Optional<BlockUtil.FoundRectangle> createPrimordialCavesPortal(ServerLevel serverLevel, BlockPos blockPos, Direction.Axis axis) {
+		// Use the standard portal creation logic but with our portal block
+		Direction direction = Direction.get(Direction.AxisDirection.POSITIVE, axis);
+		double d = -1.0;
+		BlockPos blockPos2 = null;
+		double e = -1.0;
+		BlockPos blockPos3 = null;
+		WorldBorder worldBorder = serverLevel.getWorldBorder();
+		int i = Math.min(serverLevel.getMaxY(), serverLevel.getMinY() + serverLevel.getLogicalHeight() - 1);
+		BlockPos.MutableBlockPos mutableBlockPos = blockPos.mutable();
+
+		for (BlockPos.MutableBlockPos mutableBlockPos2 : BlockPos.spiralAround(blockPos, 16, Direction.EAST, Direction.SOUTH)) {
+			int k = Math.min(i, serverLevel.getHeight(Heightmap.Types.MOTION_BLOCKING, mutableBlockPos2.getX(), mutableBlockPos2.getZ()));
+			if (worldBorder.isWithinBounds(mutableBlockPos2) && worldBorder.isWithinBounds(mutableBlockPos2.move(direction, 1))) {
+				mutableBlockPos2.move(direction.getOpposite(), 1);
+
+				for (int l = k; l >= serverLevel.getMinY(); l--) {
+					mutableBlockPos2.setY(l);
+					if (this.canPortalReplaceBlock(mutableBlockPos2, serverLevel)) {
+						int m = l;
+
+						while (l > serverLevel.getMinY() && this.canPortalReplaceBlock(mutableBlockPos2.move(Direction.DOWN), serverLevel)) {
+							l--;
+						}
+
+						if (l + 4 <= i) {
+							int n = m - l;
+							if (n <= 0 || n >= 3) {
+								mutableBlockPos2.setY(l);
+								if (this.canCreatePortalAt(serverLevel, mutableBlockPos2, mutableBlockPos, direction, n)) {
+									double f = blockPos.distSqr(mutableBlockPos2);
+									if (this.canCreatePortalAt(serverLevel, mutableBlockPos2, mutableBlockPos, direction, n)
+										&& (d == -1.0 || d > f)) {
+										d = f;
+										blockPos2 = mutableBlockPos2.immutable();
+									}
+
+									if (d == -1.0 && (e == -1.0 || e > f)) {
+										e = f;
+										blockPos3 = mutableBlockPos2.immutable();
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+
+		if (d == -1.0 && e != -1.0) {
+			blockPos2 = blockPos3;
+			d = e;
+		}
+
+		if (d == -1.0) {
+			blockPos2 = (new BlockPos(blockPos.getX(), Mth.clamp(blockPos.getY(), 70, serverLevel.getMaxY() - 10), blockPos.getZ())).immutable();
+			Direction direction2 = direction.getClockWise();
+			if (!worldBorder.isWithinBounds(blockPos2)) {
+				return Optional.empty();
+			}
+
+			for (int o = -1; o < 2; o++) {
+				for (int p = 0; p < 2; p++) {
+					for (int q = -1; q < 3; q++) {
+						BlockState blockState = q < 0 ? Blocks.OBSIDIAN.defaultBlockState() : Blocks.AIR.defaultBlockState();
+						mutableBlockPos.setWithOffset(blockPos2, p * direction.getStepX() + o * direction2.getStepX(), q, p * direction.getStepZ() + o * direction2.getStepZ());
+						serverLevel.setBlockAndUpdate(mutableBlockPos, blockState);
+					}
+				}
+			}
+		}
+
+		for (int o = -1; o < 3; o++) {
+			for (int p = -1; p < 4; p++) {
+				if (o == -1 || o == 2 || p == -1 || p == 3) {
+					mutableBlockPos.setWithOffset(blockPos2, o * direction.getStepX(), p, o * direction.getStepZ());
+					serverLevel.setBlock(mutableBlockPos, Blocks.OBSIDIAN.defaultBlockState(), 3);
+				}
+			}
+		}
+
+		BlockState blockState = this.defaultBlockState().setValue(AXIS, axis);
+
+		for (int o = 0; o < 2; o++) {
+			for (int p = 0; p < 3; p++) {
+				mutableBlockPos.setWithOffset(blockPos2, o * direction.getStepX(), p, o * direction.getStepZ());
+				serverLevel.setBlock(mutableBlockPos, blockState, 18);
+			}
+		}
+
+		return Optional.of(new BlockUtil.FoundRectangle(blockPos2.immutable(), 2, 3));
+	}
+	
+	private boolean canPortalReplaceBlock(BlockPos blockPos, ServerLevel serverLevel) {
+		BlockState blockState = serverLevel.getBlockState(blockPos);
+		return blockState.canBeReplaced() || blockState.is(Blocks.AIR) || blockState.is(Blocks.WATER) || blockState.is(Blocks.LAVA);
+	}
+	
+	private boolean canCreatePortalAt(ServerLevel serverLevel, BlockPos blockPos, BlockPos.MutableBlockPos mutableBlockPos, Direction direction, int i) {
+		Direction direction2 = direction.getClockWise();
+
+		for (int j = -1; j < 3; j++) {
+			for (int k = -1; k < 4; k++) {
+				mutableBlockPos.setWithOffset(blockPos, j * direction.getStepX() + i * direction2.getStepX(), k, j * direction.getStepZ() + i * direction2.getStepZ());
+				if (k < 0 && !serverLevel.getBlockState(mutableBlockPos).isSolid()) {
+					return false;
+				}
+
+				if (k >= 0 && !this.canPortalReplaceBlock(mutableBlockPos, serverLevel)) {
+					return false;
+				}
+			}
+		}
+
+		return true;
 	}
 
 	private static TeleportTransition getDimensionTransitionFromExit(

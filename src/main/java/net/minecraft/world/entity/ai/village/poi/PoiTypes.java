@@ -38,6 +38,7 @@ public class PoiTypes {
 	public static final ResourceKey<PoiType> BEEHIVE = createKey("beehive");
 	public static final ResourceKey<PoiType> BEE_NEST = createKey("bee_nest");
 	public static final ResourceKey<PoiType> NETHER_PORTAL = createKey("nether_portal");
+	public static final ResourceKey<PoiType> PRIMORDIAL_CAVES_PORTAL = createKey("primordial_caves_portal");
 	public static final ResourceKey<PoiType> LODESTONE = createKey("lodestone");
 	public static final ResourceKey<PoiType> LIGHTNING_ROD = createKey("lightning_rod");
 	public static final ResourceKey<PoiType> TEST_INSTANCE = createKey("test_instance");
@@ -135,6 +136,7 @@ public class PoiTypes {
 		register(registry, BEEHIVE, getBlockStates(Blocks.BEEHIVE), 0, 1);
 		register(registry, BEE_NEST, getBlockStates(Blocks.BEE_NEST), 0, 1);
 		register(registry, NETHER_PORTAL, getBlockStates(Blocks.NETHER_PORTAL), 0, 1);
+		register(registry, PRIMORDIAL_CAVES_PORTAL, getBlockStates(Blocks.PRIMORDIAL_CAVES_PORTAL), 0, 1);
 		register(registry, LODESTONE, getBlockStates(Blocks.LODESTONE), 0, 1);
 		register(registry, TEST_INSTANCE, getBlockStates(Blocks.TEST_INSTANCE_BLOCK), 0, 1);
 		return register(registry, LIGHTNING_ROD, LIGHTNING_RODS, 0, 1);
