@@ -111,7 +111,7 @@ public class DimensionTypes {
 				256,
 				128,
 				BlockTags.INFINIBURN_OVERWORLD,
-				BuiltinDimensionTypes.NETHER_EFFECTS,
+				BuiltinDimensionTypes.OVERWORLD_EFFECTS,
 				0.1F,
 				Optional.empty(),
 				new DimensionType.MonsterSettings(false, true, UniformInt.of(0, 7), 0)
