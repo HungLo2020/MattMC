@@ -174,7 +174,7 @@ After thoroughly analyzing all mixin configuration files across the entire codeb
 
 ### Implementation Progress
 
-- ✅ **Completed**: 24 mixins converted to hooks (8.5% of 284 total)
+- ✅ **Completed**: 27 mixins converted to hooks (9.5% of 284 total)
   1. Sodium `MinecraftMixin.postInit()` → GameHooks.onGameInitialized()
   2. Sodium `MinecraftMixin.preRender()` → GameHooks.beforeRunTick()
   3. Sodium `MinecraftMixin.postRender()` → GameHooks.afterRunTick()
@@ -198,7 +198,10 @@ After thoroughly analyzing all mixin configuration files across the entire codeb
   23. Sodium `ClientChunkCacheMixin` → ClientLevelHooks.onChunkLoaded() + onChunkDropped()
   24. Sodium `BlockEntityTypeMixin` → BlockEntityTypeHooks.onBlockEntityTypeInit()
   25. Sodium `SpriteContentsMixin` → SpriteContentsHooks.onSpriteContentsInit()
-- ⏳ **Remaining**: 260 mixins to convert to hooks (73 Sodium + 168 Iris + 19 DH)
+  26. Sodium `FrustumMixin` → ViewportProvider (hook-based)
+  27. Sodium `GameRendererMixin` (fog storage) → FogStorage (hook-based)
+  28. Sodium `WindowMixin` → NativeWindowHandle + window hints (hook-based)
+- ⏳ **Remaining**: 257 mixins to convert to hooks (70 Sodium + 168 Iris + 19 DH)
 
 **Recent Sessions**:
 - Session 1: MinecraftMixin (4 methods, GPU sync + resource reload) - 5 mixins
@@ -209,6 +212,7 @@ After thoroughly analyzing all mixin configuration files across the entire codeb
 - Session 6: BlockColorsMixin - 1 mixin
 - Session 7: ClientLevelMixin (2 files), VertexFormatMixin - 3 mixins
 - Session 8: ClientChunkCacheMixin, BlockEntityTypeMixin, SpriteContentsMixin - 3 mixins
+- Session 9: FrustumMixin, GameRendererMixin (fog), WindowMixin - 3 mixins
 - Build verified successful after each session
 
 **Hook Infrastructure Created**:

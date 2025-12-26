@@ -11,8 +11,6 @@
   },
   "client": [
     "core.GlCommandEncoderAccessor",
-    "core.WindowMixin",
-    "core.render.frustum.FrustumMixin",
     "core.render.immediate.consumer.BufferBuilderMixin",
     "core.render.immediate.consumer.EntityOutlineGeneratorMixin",
     "core.render.immediate.consumer.SheetedDecalTextureGeneratorMixin",
@@ -22,7 +20,6 @@
     "core.render.texture.TextureAtlasAccessor",
     "core.render.world.ChunkSectionsToRenderMixin",
     "core.render.world.EntityRendererAccessor",
-    "core.render.world.GameRendererMixin",
     "core.render.world.LevelRendererMixin",
     "core.world.chunk.ZeroBitStorageMixin",
     "core.world.chunk.SimpleBitStorageMixin",

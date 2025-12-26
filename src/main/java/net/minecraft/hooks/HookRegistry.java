@@ -35,6 +35,7 @@ public class HookRegistry {
     private static final List<VertexFormatHooks> vertexFormatHooks = new ArrayList<>();
     private static final List<BlockEntityTypeHooks> blockEntityTypeHooks = new ArrayList<>();
     private static final List<SpriteContentsHooks> spriteContentsHooks = new ArrayList<>();
+    private static final List<WindowHooks> windowHooks = new ArrayList<>();
 
     /**
      * Register a GameHooks implementation.
@@ -604,6 +605,26 @@ public class HookRegistry {
     }
 
     /**
+     * Register a WindowHooks implementation.
+     *
+     * @param hook The hook implementation to register
+     */
+    public static void registerWindowHook(WindowHooks hook) {
+        if (hook != null) {
+            windowHooks.add(hook);
+        }
+    }
+
+    /**
+     * Get all registered WindowHooks implementations.
+     *
+     * @return List of registered WindowHooks
+     */
+    public static List<WindowHooks> getWindowHooks() {
+        return new ArrayList<>(windowHooks);
+    }
+
+    /**
      * Clear all registered hooks. Useful for testing.
      */
     public static void clearAll() {
@@ -634,5 +655,6 @@ public class HookRegistry {
         vertexFormatHooks.clear();
         blockEntityTypeHooks.clear();
         spriteContentsHooks.clear();
+        windowHooks.clear();
     }
 }
