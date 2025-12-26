@@ -2,28 +2,32 @@
 
 This project uses Temurin OpenJDK 21 bundled with the application to ensure consistent Java runtime across all environments.
 
-## Automatic Download (Linux)
+## Automatic Download (Windows/Linux/macOS)
 
-On Linux systems, the JDK is automatically downloaded when needed:
+The JDK is automatically downloaded when needed on all major platforms:
 
+### Windows
+```cmd
+gradlew downloadJdk
+gradlew copyJdkToRun
+```
+
+### Linux/macOS
 ```bash
-# Download JDK to libraries/jdk-21
 ./gradlew downloadJdk
-
-# Copy JDK to run directory
 ./gradlew copyJdkToRun
 ```
 
 The JDK is automatically downloaded and copied when you run:
-- `./gradlew runClient`
+- `./gradlew runClient` (or `gradlew runClient` on Windows)
 - `./gradlew runServer`
 - `./gradlew runServerGui`
 - `./gradlew clientDist`
 - `./gradlew clientDistZip`
 
-## Manual Download (Windows/macOS/Linux)
+## Manual Download (Alternative Method)
 
-If automatic download doesn't work or you're on Windows/macOS, download manually:
+If automatic download doesn't work, download manually:
 
 1. Go to: https://adoptium.net/temurin/releases/
 2. Select:
@@ -56,10 +60,12 @@ MattMC/
 ├── libraries/
 │   ├── jdk-21/              # Bundled JDK (not committed to git)
 │   │   ├── bin/
-│   │   │   └── java         # Java executable
+│   │   │   ├── java         # Java executable (Linux/macOS)
+│   │   │   └── java.exe     # Java executable (Windows)
 │   │   ├── lib/
 │   │   └── ...
-│   └── download-jdk.sh      # Automatic download script (Linux)
+│   ├── download-jdk.sh      # Automatic download script (Linux/macOS)
+│   └── download-jdk.ps1     # Automatic download script (Windows)
 └── run/
     └── jdk-21/              # JDK copied here at runtime (not committed to git)
         ├── bin/
