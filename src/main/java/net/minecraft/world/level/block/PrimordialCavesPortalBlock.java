@@ -129,6 +129,7 @@ public class PrimordialCavesPortalBlock extends Block implements Portal {
 		ResourceKey<Level> resourceKey = serverLevel.dimension() == Level.PRIMORDIAL_CAVES ? Level.OVERWORLD : Level.PRIMORDIAL_CAVES;
 		ServerLevel serverLevel2 = serverLevel.getServer().getLevel(resourceKey);
 		if (serverLevel2 == null) {
+			LOGGER.error("Failed to get dimension {} for portal teleportation. Dimension may not be loaded.", resourceKey.location());
 			return null;
 		} else {
 			WorldBorder worldBorder = serverLevel2.getWorldBorder();
