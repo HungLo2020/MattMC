@@ -74,6 +74,7 @@
         vec3 ambientColor  = endLightColor * (0.2 + endLightBalancer);
     #else
         // Primordial Caves and other custom dimensions - use bright cave lighting
+        // Direct light disabled (no sun/moon) but high ambient light for cave visibility
         vec3 lightColor   = vec3(0.0);
         vec3 ambientColor = vec3(0.6, 0.55, 0.5) * (1.8 + 0.8 * vsBrightness);
     #endif
