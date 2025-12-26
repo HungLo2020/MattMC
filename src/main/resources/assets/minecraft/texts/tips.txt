@@ -1,3 +1,4 @@
 Creepers are afraid of cats!
 Its easiest to find diamonds at Y-level -58
 Use torches to light up dark areas and prevent mob spawning!
+Try throwing a pitcher pod in a Nether portal
