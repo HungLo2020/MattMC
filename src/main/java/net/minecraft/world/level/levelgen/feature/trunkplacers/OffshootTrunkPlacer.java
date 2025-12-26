@@ -44,17 +44,17 @@ public class OffshootTrunkPlacer extends TrunkPlacer {
 			this.placeLog(levelSimulatedReader, biConsumer, randomSource, blockPos.above(j), treeConfiguration);
 		}
 
-		// Add 1-2 random horizontal offshoots (only for trees with height >= 5)
-		// Offshoots should be below the foliage (top - 4 blocks)
+		// Add 0-1 random horizontal offshoots (only for trees with height >= 5)
+		// Offshoots should be below the foliage (top - 3 blocks) and at least 2 blocks above ground
 		if (i >= 5) {
-			int offshootCount = randomSource.nextInt(2); // 1 or 2 offshoots
+			int offshootCount = randomSource.nextInt(2); // 0 or 1 offshoots
 			
-			// Calculate safe height range: top minus 4 blocks to avoid foliage
+			// Calculate safe height range: top minus 3 blocks to avoid foliage
 			int maxOffshootHeight = i - 3;
 			
 			for (int k = 0; k < offshootCount; k++) {
-				// Random height for the offshoot (between 1 and top - 4)
-				int offshootHeight = 1 + randomSource.nextInt(Math.max(1, maxOffshootHeight - 1));
+				// Random height for the offshoot (between 2 and top - 3)
+				int offshootHeight = 2 + randomSource.nextInt(Math.max(1, maxOffshootHeight - 2));
 				
 				// Random cardinal direction
 				Direction direction = Direction.Plane.HORIZONTAL.getRandomDirection(randomSource);
