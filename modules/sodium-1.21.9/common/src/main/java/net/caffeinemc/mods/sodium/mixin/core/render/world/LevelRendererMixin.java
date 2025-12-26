@@ -170,7 +170,7 @@ public abstract class LevelRendererMixin implements LevelRendererExtension {
      */
     @Overwrite
     private void cullTerrain(Camera camera, Frustum frustum, boolean spectator) {
-        var viewport = ViewportProvider.createViewport(frustum);
+        var viewport = ((ViewportProvider) frustum).sodium$createViewport();
         var updateChunksImmediately = FlawlessFrames.isActive();
 
         int sectionX = SectionPos.posToSectionCoord(camera.getPosition().x());
