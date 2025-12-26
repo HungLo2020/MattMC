@@ -34,6 +34,7 @@ public class LevelLoadingScreen extends Screen {
 	private float smoothedProgress;
 	private long lastNarration = -1L;
 	private LevelLoadingScreen.Reason reason;
+	private String currentTip;
 	@Nullable
 	private TextureAtlasSprite cachedNetherPortalSprite;
 	private static final Object2IntMap<ChunkStatus> COLORS = (Object2IntMap<ChunkStatus>)Util.make(new Object2IntOpenHashMap(), object2IntOpenHashMap -> {
@@ -56,6 +57,7 @@ public class LevelLoadingScreen extends Screen {
 		super(Component.empty());
 		this.loadTracker = levelLoadTracker;
 		this.reason = reason;
+		this.currentTip = Minecraft.getInstance().getTipsManager().getRandomTip();
 	}
 
 	public void update(LevelLoadTracker levelLoadTracker, LevelLoadingScreen.Reason reason) {
@@ -115,6 +117,11 @@ public class LevelLoadingScreen extends Screen {
 		guiGraphics.drawCenteredString(this.font, DOWNLOADING_TERRAIN_TEXT, k, o, -1);
 		if (this.loadTracker.hasProgress()) {
 			this.drawProgressBar(guiGraphics, k - 100, o + 9 + 3, 200, 2, this.smoothedProgress);
+		}
+
+		// Display tip in bottom left corner
+		if (this.currentTip != null) {
+			guiGraphics.drawString(this.font, this.currentTip, 5, this.height - 15, -1);
 		}
 	}
 
