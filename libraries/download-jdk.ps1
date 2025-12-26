@@ -39,24 +39,15 @@ Write-Host "📥 Downloading Temurin OpenJDK 21 for $Platform..." -ForegroundCol
 Write-Host "   URL: $JdkUrl"
 
 # Create temporary directory
-$TempDir = Join-Path $env:TEMP "jdk-download-$(Get-Random)"
+$TempDir = Join-Path $env:TEMP "jdk-download-$([System.Guid]::NewGuid())"
 New-Item -ItemType Directory -Path $TempDir -Force | Out-Null
 
 try {
     $ArchivePath = Join-Path $TempDir $JdkArchive
     
-    # Download JDK using .NET WebClient for better progress reporting
+    # Download JDK using Invoke-WebRequest for better PowerShell compatibility
     Write-Host "⏬ Downloading..." -ForegroundColor Yellow
-    $webClient = New-Object System.Net.WebClient
-    
-    # Add progress handler
-    $webClient.DownloadProgressChanged += {
-        param($sender, $e)
-        Write-Progress -Activity "Downloading JDK" -Status "$($e.ProgressPercentage)% Complete" -PercentComplete $e.ProgressPercentage
-    }
-    
-    $webClient.DownloadFileTaskAsync($JdkUrl, $ArchivePath).GetAwaiter().GetResult()
-    Write-Progress -Activity "Downloading JDK" -Completed
+    Invoke-WebRequest -Uri $JdkUrl -OutFile $ArchivePath -UseBasicParsing
     
     Write-Host "📦 Extracting JDK..." -ForegroundColor Yellow
     

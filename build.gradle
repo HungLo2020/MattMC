@@ -1081,7 +1081,7 @@ tasks.register('downloadJdk', Exec) {
     
     // Use platform-specific download script
     if (isWindows) {
-        commandLine 'powershell', '-ExecutionPolicy', 'Bypass', '-File', 'libraries/download-jdk.ps1'
+        commandLine 'powershell', '-ExecutionPolicy', 'RemoteSigned', '-File', 'libraries/download-jdk.ps1'
     } else if (isLinux) {
         commandLine 'bash', 'libraries/download-jdk.sh'
     } else if (isMac) {
