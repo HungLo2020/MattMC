@@ -27,7 +27,7 @@ public class TipsManager extends SimplePreparableReloadListener<List<String>> {
 
 	protected List<String> prepare(ResourceManager resourceManager, ProfilerFiller profilerFiller) {
 		try {
-			BufferedReader bufferedReader = Minecraft.getInstance().getResourceManager().openAsReader(TIPS_LOCATION);
+			BufferedReader bufferedReader = resourceManager.openAsReader(TIPS_LOCATION);
 
 			List var4;
 			try {
