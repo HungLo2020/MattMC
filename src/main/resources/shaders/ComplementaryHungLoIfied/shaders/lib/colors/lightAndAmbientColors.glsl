@@ -23,7 +23,7 @@
         #else
             vec3 nightClearLightColor = vec3(0.07, 0.12, 0.27); //light shaft color
         #endif
-        vec3 nightClearAmbientColor   = vec3(0.09, 0.12, 0.17) * (5.0 + vsBrightness * 2.0);
+        vec3 nightClearAmbientColor   = vec3(0.09, 0.12, 0.17) * (1.55 + vsBrightness * 0.77);
 
         #ifdef SPECIAL_BIOME_WEATHER
             vec3 drlcSnowM = inSnowy * vec3(-0.06, 0.0, 0.04);
@@ -65,8 +65,16 @@
         vec3 lightColor   = mix(clearLightColor, rainLightColor, rainFactor);
         vec3 ambientColor = mix(clearAmbientColor, rainAmbientColor, rainFactor);
     #elif defined NETHER
-        vec3 lightColor   = vec3(0.0);
-        vec3 ambientColor = (netherColor + 0.5 * lavaLightColor) * (0.9 + 0.45 * vsBrightness);
+        // Check if this is Primordial Caves (fixed at midnight, worldTime = 18000)
+        #if worldTime == 18000
+            // Primordial Caves: bright cave lighting separate from nether
+            vec3 lightColor   = vec3(0.0);
+            vec3 ambientColor = vec3(0.7, 0.65, 0.6) * (4.0 + 1.5 * vsBrightness);
+        #else
+            // Actual Nether dimension
+            vec3 lightColor   = vec3(0.0);
+            vec3 ambientColor = (netherColor + 0.5 * lavaLightColor) * (0.9 + 0.45 * vsBrightness);
+        #endif
     #elif defined END
         vec3 endLightColor = vec3(0.68, 0.51, 1.07);
         float endLightBalancer = 0.2 * vsBrightness;
