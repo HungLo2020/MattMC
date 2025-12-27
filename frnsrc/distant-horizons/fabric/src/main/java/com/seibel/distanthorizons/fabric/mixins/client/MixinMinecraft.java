@@ -40,6 +40,9 @@ public abstract class MixinMinecraft
 	@Shadow
 	public abstract boolean isLocalServer();
 	
+	@Unique
+	private ClientLevel lastLevel;
+	
 	/** 
 	 * Can be enabled for testing the auto updater UI. <br/>
 	 * will always show the auto updater if set to true. 
@@ -155,8 +158,21 @@ public abstract class MixinMinecraft
 	}
 	#endif
 	
-	// updateLevelInEngines @Inject has been replaced with hook-based system
-	// See DhMinecraftLevelHook
+	@Inject(at = @At("HEAD"), method = "updateLevelInEngines")
+	public void updateLevelInEngines(ClientLevel level, CallbackInfo ci)
+	{
+		if (this.lastLevel != null && level != this.lastLevel)
+		{
+			ClientApi.INSTANCE.clientLevelUnloadEvent(ClientLevelWrapper.getWrapper(this.lastLevel));
+		}
+		
+		if (level != null)
+		{
+			ClientApi.INSTANCE.clientLevelLoadEvent(ClientLevelWrapper.getWrapper(level, true));
+		}
+		
+		this.lastLevel = level;
+	}
 	
 	@Inject(at = @At("HEAD"), method = "close()V")
 	public void close(CallbackInfo ci) { SelfUpdater.onClose(); }

@@ -103,6 +103,18 @@ public class FabricClientProxy implements AbstractModInitializer.IEventProxy
 		
 		
 		
+		//===============//
+		// register hooks //
+		//===============//
+		
+		LOGGER.info("Registering Distant Horizons hooks");
+		
+		net.minecraft.hooks.HookRegistry.registerLightTextureHook(new com.seibel.distanthorizons.fabric.hooks.DhLightTextureHook());
+		net.minecraft.hooks.HookRegistry.registerMinecraftLevelHook(new com.seibel.distanthorizons.fabric.hooks.DhMinecraftLevelHook());
+		net.minecraft.hooks.HookRegistry.registerChunkRenderLayerHook(new com.seibel.distanthorizons.fabric.hooks.DhChunkRenderLayerHook());
+		
+		
+		
 		//==============//
 		// chunk events //
 		//==============//
