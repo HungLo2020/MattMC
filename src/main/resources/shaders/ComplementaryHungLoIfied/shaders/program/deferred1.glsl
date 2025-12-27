@@ -436,7 +436,7 @@ void main() {
             #endif
         #endif
         #ifdef PRIMORDIAL_CAVES
-            color.rgb = netherColor * (1.0 - maxBlindnessDarkness);
+            color.rgb = primordialCavesColor * (1.0 - maxBlindnessDarkness);
 
             #ifdef ATM_COLOR_MULTS
                 color.rgb *= atmColorMult;

@@ -51,7 +51,9 @@
             #elif defined NETHER
                 vec3 fogColorM = netherColor;
             #elif defined PRIMORDIAL_CAVES
-                vec3 fogColorM = netherColor;
+                //vec3 fogColorM = netherColor;
+                //vec3 fogColorM = vec3(0.05, 0.1, 0.05);
+                vec3 fogColorM = primordialCavesColor;
             #else
                 vec3 fogColorM = endSkyColor;
             #endif
