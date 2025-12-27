@@ -10,98 +10,191 @@
     }
   },
   "disable_mob_generation": false,
-  "legacy_random_source": true,
+  "legacy_random_source": false,
   "noise": {
-    "height": 128,
-    "min_y": 0,
+    "height": 384,
+    "min_y": -64,
     "size_horizontal": 1,
     "size_vertical": 2
   },
   "noise_router": {
-    "barrier": 0.0,
-    "continents": 0.0,
-    "depth": 0.0,
-    "erosion": 0.0,
-    "final_density": {
-      "type": "minecraft:squeeze",
-      "argument": {
-        "type": "minecraft:mul",
-        "argument1": 0.64,
-        "argument2": {
-          "type": "minecraft:interpolated",
-          "argument": {
-            "type": "minecraft:blend_density",
-            "argument": {
-              "type": "minecraft:add",
-              "argument1": 2.5,
-              "argument2": {
-                "type": "minecraft:mul",
-                "argument1": {
-                  "type": "minecraft:y_clamped_gradient",
-                  "from_value": 0.0,
-                  "from_y": -8,
-                  "to_value": 1.0,
-                  "to_y": 24
-                },
-                "argument2": {
-                  "type": "minecraft:add",
-                  "argument1": -2.5,
-                  "argument2": {
-                    "type": "minecraft:add",
-                    "argument1": 0.9375,
-                    "argument2": {
-                      "type": "minecraft:mul",
-                      "argument1": {
-                        "type": "minecraft:y_clamped_gradient",
-                        "from_value": 1.0,
-                        "from_y": 104,
-                        "to_value": 0.0,
-                        "to_y": 128
-                      },
-                      "argument2": {
-                        "type": "minecraft:add",
-                        "argument1": -0.9375,
-                        "argument2": "minecraft:nether/base_3d_noise"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
+    "barrier": -1,
+    "continents": "minecraft:primordial_continents",
+    "depth": "minecraft:primordial_depth",
+    "erosion": "minecraft:primordial_erosion",
+    "final_density": "minecraft:primordial_final_density",
+    "fluid_level_floodedness": -1,
+    "fluid_level_spread": -1,
+    "preliminary_surface_level": {
+      "type": "minecraft:y_clamped_gradient",
+      "from_y": -64,
+      "to_y": -9,
+      "from_value": 1,
+      "to_value": 0
     },
-    "fluid_level_floodedness": 0.0,
-    "fluid_level_spread": 0.0,
-    "lava": 0.0,
-    "preliminary_surface_level": 0.0,
-    "ridges": 0.0,
+    "lava": -0.3,
+    "ridges": "minecraft:overworld/ridges",
     "temperature": {
       "type": "minecraft:shifted_noise",
       "noise": "minecraft:temperature",
       "shift_x": "minecraft:shift_x",
-      "shift_y": 0.0,
+      "shift_y": 0,
       "shift_z": "minecraft:shift_z",
       "xz_scale": 0.25,
-      "y_scale": 0.0
+      "y_scale": 0
     },
     "vegetation": {
       "type": "minecraft:shifted_noise",
       "noise": "minecraft:vegetation",
       "shift_x": "minecraft:shift_x",
-      "shift_y": 0.0,
+      "shift_y": 0,
       "shift_z": "minecraft:shift_z",
       "xz_scale": 0.25,
-      "y_scale": 0.0
+      "y_scale": 0
     },
-    "vein_gap": 0.0,
-    "vein_ridged": 0.0,
-    "vein_toggle": 0.0
+    "vein_gap": 0,
+    "vein_ridged": 0,
+    "vein_toggle": 0
   },
   "ore_veins_enabled": false,
-  "sea_level": 32,
-  "spawn_target": [],
+  "sea_level": -6,
+  "spawn_target": [
+    {
+      "weirdness": [
+        -1,
+        1
+      ],
+      "continentalness": [
+        -1.2,
+        -0.455
+      ],
+      "erosion": [
+        -1,
+        1
+      ],
+      "temperature": [
+        -0.15,
+        1
+      ],
+      "humidity": [
+        -1,
+        1
+      ],
+      "depth": [
+        0,
+        0.2
+      ],
+      "offset": 0
+    },
+    {
+      "weirdness": [
+        -1,
+        1
+      ],
+      "continentalness": [
+        -0.455,
+        -0.19
+      ],
+      "erosion": [
+        -1,
+        1
+      ],
+      "temperature": [
+        -0.15,
+        1
+      ],
+      "humidity": [
+        -1,
+        1
+      ],
+      "depth": [
+        0,
+        0
+      ],
+      "offset": 0
+    },
+    {
+      "weirdness": [
+        -1,
+        1
+      ],
+      "continentalness": [
+        -0.19,
+        0.03
+      ],
+      "erosion": [
+        -1,
+        1
+      ],
+      "temperature": [
+        0.55,
+        1
+      ],
+      "humidity": [
+        -1,
+        1
+      ],
+      "depth": [
+        0,
+        0.2
+      ],
+      "offset": 0
+    },
+    {
+      "weirdness": [
+        -1,
+        0.4
+      ],
+      "continentalness": [
+        -0.455,
+        -0.19
+      ],
+      "erosion": [
+        -1,
+        1
+      ],
+      "temperature": [
+        -0.15,
+        1
+      ],
+      "humidity": [
+        -1,
+        1
+      ],
+      "depth": [
+        0,
+        0.2
+      ],
+      "offset": 0
+    },
+    {
+      "weirdness": [
+        0.4,
+        1
+      ],
+      "continentalness": [
+        -0.455,
+        0.03
+      ],
+      "erosion": [
+        -1,
+        1
+      ],
+      "temperature": [
+        0.55,
+        1
+      ],
+      "humidity": [
+        -1,
+        1
+      ],
+      "depth": [
+        0,
+        0.2
+      ],
+      "offset": 0
+    }
+  ],
   "surface_rule": {
     "type": "minecraft:sequence",
     "sequence": [
