@@ -13,6 +13,7 @@ public class BuiltinDimensionTypes {
 	public static final ResourceLocation OVERWORLD_EFFECTS = ResourceLocation.withDefaultNamespace("overworld");
 	public static final ResourceLocation NETHER_EFFECTS = ResourceLocation.withDefaultNamespace("the_nether");
 	public static final ResourceLocation END_EFFECTS = ResourceLocation.withDefaultNamespace("the_end");
+	public static final ResourceLocation PRIMORDIAL_CAVES_EFFECTS = ResourceLocation.withDefaultNamespace("primordial_caves");
 
 	private static ResourceKey<DimensionType> register(String string) {
 		return ResourceKey.create(Registries.DIMENSION_TYPE, ResourceLocation.withDefaultNamespace(string));
