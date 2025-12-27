@@ -492,7 +492,7 @@ void DoLighting(inout vec4 color, inout vec3 shadowMult, vec3 playerPos, vec3 vi
             float absNdotE = abs(NdotE);
             float absNdotE2 = pow2(absNdotE);
 
-            #if !defined NETHER
+            #if !defined NETHER && !defined PRIMORDIAL_CAVES
                 float NdotUM = 0.75 + NdotU * 0.25;
             #else
                 float NdotUM = 0.75 + abs(NdotU + 0.5) * 0.16666;
@@ -504,6 +504,9 @@ void DoLighting(inout vec4 color, inout vec3 shadowMult, vec3 playerPos, vec3 vi
             #ifdef OVERWORLD
                 lightColorM *= 1.0 + absNdotE2 * 0.75;
             #elif defined NETHER
+                directionShade *= directionShade;
+                ambientColorM += lavaLightColor * pow2(absNdotN * 0.5 + max0(-NdotU)) * (0.7 + 0.35 * vsBrightness);
+            #elif defined PRIMORDIAL_CAVES
                 directionShade *= directionShade;
                 ambientColorM += lavaLightColor * pow2(absNdotN * 0.5 + max0(-NdotU)) * (0.7 + 0.35 * vsBrightness);
             #endif
@@ -566,6 +569,11 @@ void DoLighting(inout vec4 color, inout vec3 shadowMult, vec3 playerPos, vec3 vi
                         1.0 + dotSceneLighting * 0.02 + NdotUmax0 * (0.15 + 0.25 * pow2(noonFactor * pow2(lightmapY2)))
                     );
                 #elif defined NETHER
+                    vanillaAO = pow(
+                        pow1_5(vanillaAO),
+                        1.0 + NdotUmax0 * 0.5
+                    );
+                #elif defined PRIMORDIAL_CAVES
                     vanillaAO = pow(
                         pow1_5(vanillaAO),
                         1.0 + NdotUmax0 * 0.5
