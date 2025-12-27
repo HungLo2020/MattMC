@@ -10,6 +10,8 @@
         #include "/lib/atmospherics/sky.glsl"
     #elif defined NETHER
         #include "/lib/colors/skyColors.glsl"
+    #elif defined PRIMORDIAL_CAVES
+        #include "/lib/colors/skyColors.glsl"
     #endif
 
     void DoBorderFog(inout vec3 color, inout float skyFade, float lPos, float VdotU, float VdotS, float dither) {
@@ -22,6 +24,11 @@
             fog = 1.0 - exp(-3.0 * fog);
         #endif
         #ifdef NETHER
+            float farM = min(renderDistance, NETHER_VIEW_LIMIT); // consistency9023HFUE85JG
+            float fog = lPos / farM;
+            fog = fog * 0.3 + 0.7 * pow(fog, 256.0 / max(farM, 256.0));
+        #endif
+        #ifdef PRIMORDIAL_CAVES
             float farM = min(renderDistance, NETHER_VIEW_LIMIT); // consistency9023HFUE85JG
             float fog = lPos / farM;
             fog = fog * 0.3 + 0.7 * pow(fog, 256.0 / max(farM, 256.0));
@@ -43,6 +50,10 @@
                 vec3 fogColorM = GetSky(VdotU, VdotS, dither, true, false);
             #elif defined NETHER
                 vec3 fogColorM = netherColor;
+            #elif defined PRIMORDIAL_CAVES
+                //vec3 fogColorM = netherColor;
+                //vec3 fogColorM = vec3(0.05, 0.1, 0.05);
+                vec3 fogColorM = primordialCavesColor;
             #else
                 vec3 fogColorM = endSkyColor;
             #endif

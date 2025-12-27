@@ -714,6 +714,8 @@
     #endif
     vec3 lavaLightColor = vec3(0.15, 0.06, 0.01);
 
+    vec3 primordialCavesColor = vec3(0.16, 0.22, 0.14);
+
     const vec3 endSkyColor = vec3(0.095, 0.07, 0.15) * 1.5;
 
     #if WEATHER_TEX_OPACITY == 100
