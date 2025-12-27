@@ -435,6 +435,13 @@ void main() {
                 color.rgb *= atmColorMult;
             #endif
         #endif
+        #ifdef PRIMORDIAL_CAVES
+            color.rgb = netherColor * (1.0 - maxBlindnessDarkness);
+
+            #ifdef ATM_COLOR_MULTS
+                color.rgb *= atmColorMult;
+            #endif
+        #endif
         #ifdef END
             color.rgb = endSkyColor;
             color.rgb += GetEnderStars(viewPos.xyz, VdotU);
