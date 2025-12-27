@@ -4,6 +4,8 @@
 
 Minecraft's **Data Generation** system allows you to programmatically generate JSON data files (recipes, loot tables, tags, etc.) from Java code instead of manually writing JSON files. This ensures consistency, reduces errors, and makes it easier to maintain large amounts of game data.
 
+> **Quick Start**: If you're new to datagen, start with our [Quick Start Example](examples/DATAGEN-QUICKSTART.md) which walks you through creating your first block loot table step-by-step.
+
 ## What is Datagen?
 
 Datagen is a Java-based code generation system that:
