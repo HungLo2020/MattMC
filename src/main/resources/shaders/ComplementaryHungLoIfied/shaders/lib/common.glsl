@@ -523,7 +523,8 @@
     #ifdef NETHER
         #undef ATMOSPHERIC_FOG
         #undef NO_WAVING_INDOORS
-    #else
+    #endif
+    #if !defined NETHER && !defined PRIMORDIAL_CAVES
         #undef NETHER_STORM
     #endif
     #ifdef END
