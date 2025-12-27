@@ -72,10 +72,10 @@
         float endLightBalancer = 0.2 * vsBrightness;
         vec3 lightColor    = endLightColor * (0.35 - endLightBalancer);
         vec3 ambientColor  = endLightColor * (0.2 + endLightBalancer);
-    #else
+    /**#else
         // Custom dimensions (including Primordial Caves world-2)
         vec3 lightColor   = vec3(0.0);
-        vec3 ambientColor = vec3(0.7, 0.65, 0.6) * (4.0 + 1.5 * vsBrightness);
+        vec3 ambientColor = vec3(0.7, 0.65, 0.6) * (4.0 + 1.5 * vsBrightness);*/
     #endif
 
 #endif //INCLUDE_LIGHT_AND_AMBIENT_COLORS
