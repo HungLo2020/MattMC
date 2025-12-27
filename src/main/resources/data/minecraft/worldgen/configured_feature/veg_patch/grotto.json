@@ -16,7 +16,7 @@
       "min_inclusive": 2,
       "max_inclusive": 4
     },
-    "replaceable": "#dwho:replaceable/mud",
+    "replaceable": "#minecraft:replaceable/mud",
     "ground_state": {
       "type": "minecraft:weighted_state_provider",
       "entries": [

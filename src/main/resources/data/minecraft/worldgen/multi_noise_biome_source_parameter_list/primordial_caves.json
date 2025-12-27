@@ -1,5 +1,6 @@
 {
-  "biomes": [
+  "preset": "minecraft:primordial_caves"
+}
     {
       "parameters": {
         "weirdness": [

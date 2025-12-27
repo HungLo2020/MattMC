@@ -37,8 +37,8 @@
           "Name": "minecraft:water"
         }
       ],
-      "cannot_replace": "#dwho:cannot_replace/ocean",
-      "invalid_blocks": "#dwho:invalid/ocean"
+      "cannot_replace": "#minecraft:cannot_replace/ocean",
+      "invalid_blocks": "#minecraft:invalid/ocean"
     },
     "layers": {
       "filling": 1.5,

@@ -16,7 +16,7 @@
       "min_inclusive": 3,
       "max_inclusive": 5
     },
-    "replaceable": "#dwho:replaceable/tuff",
+    "replaceable": "#minecraft:replaceable/tuff",
     "ground_state": {
       "type": "minecraft:weighted_state_provider",
       "entries": [

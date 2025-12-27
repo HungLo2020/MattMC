@@ -10,6 +10,6 @@
     "rock_count": 4,
     "hole_count": 1,
     "requires_block_below": false,
-    "valid_blocks": "#dwho:surface"
+    "valid_blocks": "#minecraft:surface"
   }
 }

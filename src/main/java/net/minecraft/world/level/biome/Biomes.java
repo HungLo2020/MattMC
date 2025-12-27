@@ -70,7 +70,23 @@ public abstract class Biomes {
 	public static final ResourceKey<Biome> END_MIDLANDS = register("end_midlands");
 	public static final ResourceKey<Biome> SMALL_END_ISLANDS = register("small_end_islands");
 	public static final ResourceKey<Biome> END_BARRENS = register("end_barrens");
-	public static final ResourceKey<Biome> PRIMORDIAL_PLAINS = register("primordial_plains");
+	// Primordial Caves Biomes (from Dwarfhollow)
+	public static final ResourceKey<Biome> ANCIENT_CAVES = register("ancient_caves");
+	public static final ResourceKey<Biome> BAMBOO_SWAMP = register("bamboo_swamp");
+	public static final ResourceKey<Biome> BLACK_SEA = register("black_sea");
+	public static final ResourceKey<Biome> BRONZE_SANCTUARY = register("bronze_sanctuary");
+	public static final ResourceKey<Biome> CRYSTAL_CAVES = register("crystal_caves");
+	public static final ResourceKey<Biome> DRY_MIDLANDS = register("dry_midlands");
+	public static final ResourceKey<Biome> FLORAL_GROVE = register("floral_grove");
+	public static final ResourceKey<Biome> FROZEN_CAVES = register("frozen_caves");
+	public static final ResourceKey<Biome> GRIMSTONE_GROTTO = register("grimstone_grotto");
+	public static final ResourceKey<Biome> HONEYCOMB_CAVES = register("honeycomb_caves");
+	public static final ResourceKey<Biome> ICE_FLOES = register("ice_floes");
+	public static final ResourceKey<Biome> MUSHROOM_CAVES = register("mushroom_caves");
+	public static final ResourceKey<Biome> ORICHALC_HIGHLANDS = register("orichalc_highlands");
+	public static final ResourceKey<Biome> POWDERED_WASTES = register("powdered_wastes");
+	public static final ResourceKey<Biome> SHADOW_WOODS = register("shadow_woods");
+	public static final ResourceKey<Biome> THE_BRAMBLE = register("the_bramble");
 
 	private static ResourceKey<Biome> register(String string) {
 		return ResourceKey.create(Registries.BIOME, ResourceLocation.withDefaultNamespace(string));

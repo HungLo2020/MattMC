@@ -65,8 +65,8 @@
         "max_root_width": 4,
         "max_root_length": 12,
         "random_skew_chance": 0.65,
-        "can_grow_through": "#dwho:surface",
-        "muddy_roots_in": "#dwho:surface",
+        "can_grow_through": "#minecraft:surface",
+        "muddy_roots_in": "#minecraft:surface",
         "muddy_roots_provider": {
           "type": "minecraft:simple_state_provider",
           "state": {

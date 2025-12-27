@@ -48,8 +48,8 @@
           "Name": "minecraft:air"
         }
       ],
-      "cannot_replace": "#dwho:cannot_replace/amethyst_geode",
-      "invalid_blocks": "#dwho:invalid/amethyst_geode"
+      "cannot_replace": "#minecraft:cannot_replace/amethyst_geode",
+      "invalid_blocks": "#minecraft:invalid/amethyst_geode"
     },
     "layers": {
       "filling": 1.0,

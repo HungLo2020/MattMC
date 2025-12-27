@@ -16,7 +16,7 @@
       "min_inclusive": 2,
       "max_inclusive": 4
     },
-    "replaceable": "#dwho:replaceable/snow",
+    "replaceable": "#minecraft:replaceable/snow",
     "ground_state": {
       "type": "minecraft:weighted_state_provider",
       "entries": [

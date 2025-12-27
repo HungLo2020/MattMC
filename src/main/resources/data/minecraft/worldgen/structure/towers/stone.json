@@ -1,6 +1,6 @@
 {
   "type": "minecraft:jigsaw",
-  "biomes": "#dwho:has_structure/towers",
+  "biomes": "#minecraft:has_structure/towers",
   "step": "underground_structures",
   "terrain_adaptation": "beard_thin",
   "spawn_overrides": {

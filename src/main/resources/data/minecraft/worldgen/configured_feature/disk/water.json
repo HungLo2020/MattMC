@@ -15,7 +15,7 @@
             "predicates": [
               {
                 "type": "minecraft:matching_blocks",
-                "blocks": "#dwho:surface"
+                "blocks": "#minecraft:surface"
               },
               {
                 "type": "minecraft:matching_blocks",
@@ -97,7 +97,7 @@
     "half_height": 0,
     "target": {
       "type": "minecraft:matching_blocks",
-      "blocks": "#dwho:surface"
+      "blocks": "#minecraft:surface"
     }
   }
 }
