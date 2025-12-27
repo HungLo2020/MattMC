@@ -19,6 +19,7 @@
     "client.MixinLevelRenderer",
     "client.MixinChunkSectionsToRender",
     "client.MixinLightTexture",
+    "client.LightTextureAccessor",
     "client.MixinMinecraft",
     "client.MixinOptionsScreen",
     "client.MixinTextureUtil"
