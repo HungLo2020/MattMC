@@ -23,22 +23,37 @@
     "depth": 0.0,
     "erosion": 0.0,
     "final_density": {
-      "type": "minecraft:add",
+      "type": "minecraft:min",
       "argument1": {
-        "type": "minecraft:mul",
-        "argument1": 0.9,
-        "argument2": {
-          "type": "minecraft:y_clamped_gradient",
-          "from_value": -1.0,
-          "from_y": 0,
-          "to_value": 1.0,
-          "to_y": 128
-        }
+        "type": "minecraft:add",
+        "argument1": {
+          "type": "minecraft:mul",
+          "argument1": 0.75,
+          "argument2": {
+            "type": "minecraft:y_clamped_gradient",
+            "from_value": -1.0,
+            "from_y": 0,
+            "to_value": 1.0,
+            "to_y": 128
+          }
+        },
+        "argument2": "minecraft:primordial_caves/base_3d_noise"
       },
       "argument2": {
-        "type": "minecraft:mul",
-        "argument1": 1.2,
-        "argument2": "minecraft:primordial_caves/base_3d_noise"
+        "type": "minecraft:max",
+        "argument1": {
+          "type": "minecraft:min",
+          "argument1": "minecraft:primordial_caves/cheese",
+          "argument2": {
+            "type": "minecraft:range_choice",
+            "input": "minecraft:primordial_caves/pillars",
+            "max_exclusive": 0.04,
+            "min_inclusive": -1000000.0,
+            "when_in_range": -1000000.0,
+            "when_out_of_range": "minecraft:primordial_caves/pillars"
+          }
+        },
+        "argument2": "minecraft:primordial_caves/noodle"
       }
     },
     "fluid_level_floodedness": 0.0,
