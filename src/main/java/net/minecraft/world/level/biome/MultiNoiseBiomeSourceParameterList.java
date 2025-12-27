@@ -85,7 +85,7 @@ public class MultiNoiseBiomeSourceParameterList {
 				public <T> Climate.ParameterList<T> apply(Function<ResourceKey<Biome>, T> function) {
 					return new Climate.ParameterList<>(
 						List.of(
-							Pair.of(Climate.parameters(0.0F, 0.0F, 0.0F, 0.0F, 0.0F, 0.0F, 0.0F), function.apply(Biomes.PRIMORDIAL_PLAINS))
+							Pair.of(Climate.parameters(0.0F, 0.0F, 0.0F, 0.0F, 0.0F, 0.0F, 0.0F), function.apply(Biomes.BRONZE_SANCTUARY))
 						)
 					);
 				}
