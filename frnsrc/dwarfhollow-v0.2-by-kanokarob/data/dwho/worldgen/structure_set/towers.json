@@ -1,0 +1,14 @@
+{
+  "placement": {
+    "type": "minecraft:random_spread",
+    "separation": 16,
+    "spacing": 24,
+    "salt": 956719
+  },
+  "structures": [
+    {
+      "structure": "dwho:towers/stone",
+      "weight": 1
+    }
+  ]
+}

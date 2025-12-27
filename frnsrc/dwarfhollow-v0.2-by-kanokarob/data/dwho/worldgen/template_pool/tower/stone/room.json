@@ -1,0 +1,77 @@
+{
+  "fallback": "dwho:tower/stone/fallback",
+  "elements": [
+    {
+      "weight": 5,
+      "element": {
+        "element_type": "minecraft:single_pool_element",
+        "location": "dwho:towers/stone/room_empty",
+        "processors": "dwho:tower_stone",
+        "projection": "rigid"
+      }
+    },
+    {
+      "weight": 3,
+      "element": {
+        "element_type": "minecraft:single_pool_element",
+        "location": "dwho:towers/stone/room_checkpoint",
+        "processors": "dwho:tower_stone",
+        "projection": "rigid"
+      }
+    },
+    {
+      "weight": 4,
+      "element": {
+        "element_type": "minecraft:single_pool_element",
+        "location": "dwho:towers/stone/room_battle",
+        "processors": "dwho:tower_stone",
+        "projection": "rigid"
+      }
+    },
+    {
+      "weight": 4,
+      "element": {
+        "element_type": "minecraft:single_pool_element",
+        "location": "dwho:towers/stone/room_fountain",
+        "processors": "dwho:tower_stone",
+        "projection": "rigid"
+      }
+    },
+    {
+      "weight": 4,
+      "element": {
+        "element_type": "minecraft:single_pool_element",
+        "location": "dwho:towers/stone/tower_empty",
+        "processors": "dwho:tower_stone",
+        "projection": "rigid"
+      }
+    },
+    {
+      "weight": 3,
+      "element": {
+        "element_type": "minecraft:single_pool_element",
+        "location": "dwho:towers/stone/tower_treasure",
+        "processors": "dwho:tower_stone",
+        "projection": "rigid"
+      }
+    },
+    {
+      "weight": 4,
+      "element": {
+        "element_type": "minecraft:single_pool_element",
+        "location": "dwho:towers/stone/tower_battle",
+        "processors": "dwho:tower_stone",
+        "projection": "rigid"
+      }
+    },
+    {
+      "weight": 1,
+      "element": {
+        "element_type": "minecraft:single_pool_element",
+        "location": "dwho:towers/stone/roof",
+        "processors": "dwho:tower_stone",
+        "projection": "rigid"
+      }
+    }
+  ]
+}

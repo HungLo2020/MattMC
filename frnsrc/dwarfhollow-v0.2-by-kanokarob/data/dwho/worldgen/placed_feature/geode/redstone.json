@@ -1,0 +1,27 @@
+{
+  "feature": "dwho:geode/redstone",
+  "placement": [
+    {
+      "type": "minecraft:rarity_filter",
+      "chance": 17
+    },
+    {
+      "type": "minecraft:height_range",
+      "height": {
+        "type": "minecraft:biased_to_bottom",
+        "min_inclusive": {
+          "above_bottom": 16
+        },
+        "max_inclusive": {
+          "absolute": 120
+        }
+      }
+    },
+    {
+      "type": "minecraft:in_square"
+    },
+    {
+      "type": "minecraft:biome"
+    }
+  ]
+}

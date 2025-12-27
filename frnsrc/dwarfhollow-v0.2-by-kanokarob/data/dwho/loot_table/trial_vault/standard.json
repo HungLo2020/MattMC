@@ -1,0 +1,34 @@
+{
+  "pools": [
+    {
+      "rolls": 1,
+      "entries": [
+        {
+          "type": "minecraft:item",
+          "name": "minecraft:vault",
+          "functions": [
+            {
+              "function": "minecraft:set_components",
+              "components": {
+                "minecraft:block_entity_data": {
+                  "id": "minecraft:vault",
+                  "config": {
+                    "loot_table": "dwho:chests/vault/standard",
+                    "key_item": {
+                      "id": "minecraft:trial_key"
+                    },
+                    "override_loot_table_to_display": "dwho:chests/spawner/standard"
+                  }
+                },
+                "minecraft:block_state": {
+                  "ominous": "false"
+                },
+                "minecraft:item_name": "{\"text\":\"Trial Vault\"}"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

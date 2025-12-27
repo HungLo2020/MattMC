@@ -1,0 +1,28 @@
+{
+  "pools": [
+    {
+      "rolls": 1,
+      "entries": [
+        {
+          "type": "minecraft:item",
+          "name": "minecraft:trial_spawner",
+          "functions": [
+            {
+              "function": "minecraft:set_components",
+              "components": {
+                "minecraft:item_name": {"text":"Stray Trial Spawner","color":"aqua"},
+                "minecraft:block_entity_data": {
+                  "id": "minecraft:trial_spawner",
+                  "required_player_range": 8,
+                  "target_cooldown_length": 216000,
+                  "normal_config": "dwho:stray",
+                  "ominous_config": "dwho:stray_ominous"
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

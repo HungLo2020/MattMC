@@ -1,0 +1,34 @@
+{
+  "pools": [
+    {
+      "rolls": 1,
+      "entries": [
+        {
+          "type": "minecraft:item",
+          "name": "minecraft:vault",
+          "functions": [
+            {
+              "function": "minecraft:set_components",
+              "components": {
+                "minecraft:block_entity_data": {
+                  "id": "minecraft:vault",
+                  "config": {
+                    "loot_table": "dwho:chests/vault/ominous",
+                    "key_item": {
+                      "id": "minecraft:ominous_trial_key"
+                    },
+                    "override_loot_table_to_display": "dwho:chests/vault/ominous"
+                  }
+                },
+                "minecraft:block_state": {
+                  "ominous": "true"
+                },
+                "minecraft:item_name": "{\"text\":\"Ominous Trial Vault\",\"color\":\"aqua\"}"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

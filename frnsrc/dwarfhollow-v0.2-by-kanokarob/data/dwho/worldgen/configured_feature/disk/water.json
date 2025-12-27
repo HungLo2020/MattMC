@@ -1,0 +1,103 @@
+{
+  "type": "minecraft:disk",
+  "config": {
+    "state_provider": {
+      "fallback": {
+        "type": "minecraft:simple_state_provider",
+        "state": {
+          "Name": "minecraft:dirt"
+        }
+      },
+      "rules": [
+        {
+          "if_true": {
+            "type": "minecraft:all_of",
+            "predicates": [
+              {
+                "type": "minecraft:matching_blocks",
+                "blocks": "#dwho:surface"
+              },
+              {
+                "type": "minecraft:matching_blocks",
+                "blocks": "#minecraft:air",
+                "offset": [
+                  0,
+                  1,
+                  0
+                ]
+              },
+              {
+                "type": "minecraft:not",
+                "predicate": {
+                  "type": "minecraft:all_of",
+                  "predicates": [
+                    {
+                      "type": "minecraft:matching_blocks",
+                      "blocks": "#minecraft:air",
+                      "offset": [1,0,0]
+                    },
+                    {
+                      "type": "minecraft:matching_blocks",
+                      "blocks": "#minecraft:air",
+                      "offset": [-1,0,0]
+                    },
+                    {
+                      "type": "minecraft:matching_blocks",
+                      "blocks": "#minecraft:air",
+                      "offset": [0,0,1]
+                    },
+                    {
+                      "type": "minecraft:matching_blocks",
+                      "blocks": "#minecraft:air",
+                      "offset": [0,0,-1]
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          "then": {
+            "type": "minecraft:simple_state_provider",
+            "state": {
+              "Name": "minecraft:water"
+            }
+          }
+        },
+        {
+          "if_true": {
+            "type": "minecraft:matching_fluids",
+            "fluids": "#minecraft:water"
+          },
+          "then": {
+            "type": "minecraft:simple_state_provider",
+            "state": {
+              "Name": "minecraft:water"
+            }
+          }
+        },
+        {
+          "if_true": {
+            "type": "minecraft:matching_blocks",
+            "blocks": "#minecraft:air"
+          },
+          "then": {
+            "type": "minecraft:simple_state_provider",
+            "state": {
+              "Name": "minecraft:dirt"
+            }
+          }
+        }
+      ]
+    },
+    "radius": {
+      "type": "minecraft:biased_to_bottom",
+      "min_inclusive": 2,
+      "max_inclusive": 4
+    },
+    "half_height": 0,
+    "target": {
+      "type": "minecraft:matching_blocks",
+      "blocks": "#dwho:surface"
+    }
+  }
+}

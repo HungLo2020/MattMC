@@ -1,0 +1,13 @@
+{
+  "fallback": "dwho:village/dry/supports/chain",
+  "elements": [
+    {
+      "weight": 1,
+      "element": {
+        "element_type": "minecraft:feature_pool_element",
+        "feature": "dwho:block_column/support_chain_oak",
+        "projection": "rigid"
+      }
+    }
+  ]
+}

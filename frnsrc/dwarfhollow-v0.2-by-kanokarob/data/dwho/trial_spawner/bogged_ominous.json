@@ -1,0 +1,26 @@
+{
+  "total_mobs": 3,
+  "simultaneous_mobs": 2,
+  "total_mobs_added_per_player": 1,
+  "simultaneous_mobs_added_per_player": 0.75,
+  "spawn_potentials": [
+    {
+      "weight": 1,
+      "data": {
+        "entity": {
+          "id": "minecraft:bogged"
+        },
+        "equipment": {
+          "loot_table": "dwho:equipment/ominous_bogged",
+          "slot_drop_chances": 0.0
+        }
+      }
+    }
+  ],
+  "loot_tables_to_eject": [
+    {
+      "weight": 1,
+      "data": "dwho:chests/spawner/ominous"
+    }
+  ]
+}

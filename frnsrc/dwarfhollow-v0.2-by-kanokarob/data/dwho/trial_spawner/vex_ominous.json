@@ -1,0 +1,26 @@
+{
+  "total_mobs": 5,
+  "simultaneous_mobs": 3,
+  "total_mobs_added_per_player": 1.5,
+  "simultaneous_mobs_added_per_player": 1,
+  "spawn_potentials": [
+    {
+      "weight": 1,
+      "data": {
+        "entity": {
+          "id": "minecraft:vex"
+        },
+        "equipment": {
+          "loot_table": "dwho:equipment/ominous_vex",
+          "slot_drop_chances": 0.0
+        }
+      }
+    }
+  ],
+  "loot_tables_to_eject": [
+    {
+      "weight": 1,
+      "data": "dwho:chests/spawner/ominous"
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "values": [
+    "#minecraft:air",
+    "#dwho:ores",
+    "#dwho:base_stone_dwarfhollow",
+    "minecraft:light",
+    "minecraft:water",
+    "minecraft:bedrock",
+    "minecraft:cactus",
+    "minecraft:cactus_flower",
+    "minecraft:short_dry_grass",
+    "minecraft:tall_dry_grass",
+    "minecraft:dripstone_block",
+    "minecraft:pointed_dripstone",
+    "minecraft:red_sand",
+    "minecraft:red_sandstone",
+    "minecraft:granite",
+    "minecraft:red_sandstone_wall",
+    "minecraft:cut_red_sandstone",
+    "minecraft:polished_granite"
+  ]
+}

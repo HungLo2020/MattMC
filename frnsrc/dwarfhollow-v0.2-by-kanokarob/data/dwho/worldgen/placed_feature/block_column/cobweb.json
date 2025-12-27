@@ -1,0 +1,30 @@
+{
+  "feature": "dwho:block_column/cobweb",
+  "placement": [
+    {
+      "type": "minecraft:count_on_every_layer",
+      "count": 9
+    },
+    {
+      "type": "minecraft:rarity_filter",
+      "chance": 4
+    },
+    {
+      "type": "minecraft:environment_scan",
+      "direction_of_search": "up",
+      "max_steps": 16,
+      "target_condition": {
+        "type": "minecraft:matching_block_tag",
+        "tag": "dwho:surface",
+        "offset": [0,1,0]
+      },
+      "allowed_search_condition": {
+        "type": "minecraft:matching_block_tag",
+        "tag": "minecraft:air"
+      }
+    },
+    {
+      "type": "minecraft:biome"
+    }
+  ]
+}
