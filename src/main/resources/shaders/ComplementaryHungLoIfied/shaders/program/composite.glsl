@@ -151,7 +151,7 @@ void main() {
         volumetricEffect = GetVolumetricLight(color, vlFactorM, translucentMult, lViewPos, lViewPos1, nViewPos, VdotL, VdotU, texCoord, z0, z1, dither);
     #endif
 
-    #ifdef NETHER_STORM
+    #if defined NETHER_STORM && (defined NETHER || defined PRIMORDIAL_CAVES)
         volumetricEffect = GetNetherStorm(color, translucentMult, nPlayerPos, playerPos, lViewPos, lViewPos1, dither);
     #endif
 
@@ -162,7 +162,7 @@ void main() {
         volumetricEffect.rgb *= moonPhaseInfluence;
     #endif
 
-    #ifdef NETHER_STORM
+    #if defined NETHER_STORM && (defined NETHER || defined PRIMORDIAL_CAVES)
         color = mix(color, volumetricEffect.rgb, volumetricEffect.a);
     #endif
 
