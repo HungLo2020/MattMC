@@ -531,7 +531,7 @@
         #undef ATMOSPHERIC_FOG
         #undef NO_WAVING_INDOORS
     #endif
-    #if !defined NETHER && !defined PRIMORDIAL_CAVES
+    #ifndef NETHER
         #undef NETHER_STORM
     #endif
     #ifndef PRIMORDIAL_CAVES
