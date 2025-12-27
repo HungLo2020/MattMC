@@ -23,6 +23,7 @@ import com.electronwill.nightconfig.core.Config;
 import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
 import com.seibel.distanthorizons.core.logging.DhLogger;
 
+import java.net.URL;
 import java.util.*;
 
 /**
@@ -45,7 +46,7 @@ public static List<String> releaseID = new ArrayList<>();
 public static List<String> mcVersions = new ArrayList<>();
 public static Map<String, String> releaseNames = new HashMap<>();
 public static Map<String, List<String>> mcVerToReleaseID = new HashMap<>();
-public static Map<String, String> downloadUrl = new HashMap<>();
+public static Map<String, URL> downloadUrl = new HashMap<>();
 public static Map<String, String> changeLogs = new HashMap<>();
 
 
@@ -54,6 +55,11 @@ public static boolean init()
 LOGGER.info("Modrinth integration disabled - no network calls will be made");
 initted = false;
 return false;
+}
+
+public static String getLatestIDForVersion(String mcVersion)
+{
+return "";
 }
 
 public static String getLatestNameForVersion(String mcVersion)
@@ -66,8 +72,8 @@ public static String getLatestShaForVersion(String mcVersion)
 return "";
 }
 
-public static String getLatestDownloadForVersion(String mcVersion)
+public static URL getLatestDownloadForVersion(String mcVersion)
 {
-return "";
+return null;
 }
 }

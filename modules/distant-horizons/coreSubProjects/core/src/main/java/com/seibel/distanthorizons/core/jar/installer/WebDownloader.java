@@ -73,4 +73,10 @@ public static String calculateChecksum(File file) throws Exception
 {
 throw new Exception("Checksum calculation disabled");
 }
+
+public static String formatMarkdownToHtml(String markdown, int maxWidth)
+{
+LOGGER.warn("Markdown formatting disabled - returning empty string");
+return "";
+}
 }
