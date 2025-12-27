@@ -12,8 +12,8 @@
   "disable_mob_generation": false,
   "legacy_random_source": false,
   "noise": {
-    "height": 256,
-    "min_y": 0,
+    "height": 384,
+    "min_y": -64,
     "size_horizontal": 1,
     "size_vertical": 2
   },
@@ -27,8 +27,8 @@
     "fluid_level_spread": -1,
     "preliminary_surface_level": {
       "type": "minecraft:y_clamped_gradient",
-      "from_y": 0,
-      "to_y": 7,
+      "from_y": -64,
+      "to_y": -9,
       "from_value": 1,
       "to_value": 0
     },
@@ -57,8 +57,144 @@
     "vein_toggle": 0
   },
   "ore_veins_enabled": false,
-  "sea_level": 26,
-  "spawn_target": [],
+  "sea_level": -6,
+  "spawn_target": [
+    {
+      "weirdness": [
+        -1,
+        1
+      ],
+      "continentalness": [
+        -1.2,
+        -0.455
+      ],
+      "erosion": [
+        -1,
+        1
+      ],
+      "temperature": [
+        -0.15,
+        1
+      ],
+      "humidity": [
+        -1,
+        1
+      ],
+      "depth": [
+        0,
+        0.2
+      ],
+      "offset": 0
+    },
+    {
+      "weirdness": [
+        -1,
+        1
+      ],
+      "continentalness": [
+        -0.455,
+        -0.19
+      ],
+      "erosion": [
+        -1,
+        1
+      ],
+      "temperature": [
+        -0.15,
+        1
+      ],
+      "humidity": [
+        -1,
+        1
+      ],
+      "depth": [
+        0,
+        0
+      ],
+      "offset": 0
+    },
+    {
+      "weirdness": [
+        -1,
+        1
+      ],
+      "continentalness": [
+        -0.19,
+        0.03
+      ],
+      "erosion": [
+        -1,
+        1
+      ],
+      "temperature": [
+        0.55,
+        1
+      ],
+      "humidity": [
+        -1,
+        1
+      ],
+      "depth": [
+        0,
+        0.2
+      ],
+      "offset": 0
+    },
+    {
+      "weirdness": [
+        -1,
+        0.4
+      ],
+      "continentalness": [
+        -0.455,
+        -0.19
+      ],
+      "erosion": [
+        -1,
+        1
+      ],
+      "temperature": [
+        -0.15,
+        1
+      ],
+      "humidity": [
+        -1,
+        1
+      ],
+      "depth": [
+        0,
+        0.2
+      ],
+      "offset": 0
+    },
+    {
+      "weirdness": [
+        0.4,
+        1
+      ],
+      "continentalness": [
+        -0.455,
+        0.03
+      ],
+      "erosion": [
+        -1,
+        1
+      ],
+      "temperature": [
+        0.55,
+        1
+      ],
+      "humidity": [
+        -1,
+        1
+      ],
+      "depth": [
+        0,
+        0.2
+      ],
+      "offset": 0
+    }
+  ],
   "surface_rule": {
     "type": "minecraft:sequence",
     "sequence": [
