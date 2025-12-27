@@ -137,6 +137,12 @@ MattMC/
 ├── gradlew / gradlew.bat # Gradle wrapper scripts
 ├── gradle/               # Gradle wrapper files
 ├── libraries/            # Bundled JDK and launch scripts
+├── docs/                 # Developer documentation
+│   ├── DATAGEN-GUIDE.md          # Data generation system guide
+│   ├── DATA-SYSTEM.md            # Data pack and JSON format reference
+│   ├── COMMAND-SYSTEM.md         # Command system documentation
+│   ├── WORLD-GENERATION-SYSTEM.md # World generation guide
+│   └── ...                        # Additional system documentation
 ├── src/                  # Source code (standard Maven/Gradle structure)
 │   └── main/
 │       ├── java/         # All Java source files
@@ -150,6 +156,11 @@ MattMC/
 │       │       │   ├── server/    # Server-specific code
 │       │       │   │   ├── Main.java       # Server entry point
 │       │       │   │   └── dedicated/      # Dedicated server implementation
+│       │       │   ├── data/      # Data generation system
+│       │       │   │   ├── Main.java       # Datagen entry point
+│       │       │   │   ├── loot/           # Loot table generators
+│       │       │   │   ├── recipes/        # Recipe generators
+│       │       │   │   └── tags/           # Tag generators
 │       │       │   ├── world/     # World generation, entities, blocks
 │       │       │   ├── network/   # Networking and protocol implementation
 │       │       │   ├── commands/  # Command system
@@ -158,6 +169,7 @@ MattMC/
 │       │       ├── iris/          # Iris API
 │       │       └── sodium/        # Sodium API
 │       └── resources/    # Resource files
+│           ├── data/              # Data packs (recipes, loot tables, etc.)
 │           └── version.json       # Version information
 └── run/                  # Runtime directory (created on first run)
     ├── jdk-21/           # Bundled JDK (optional)
@@ -200,18 +212,42 @@ The `gradle.properties` file configures Gradle for optimal build speeds:
 The entire Minecraft codebase is available in the `src/main/java/` directory using standard Maven/Gradle structure:
 - `src/main/java/net/minecraft/` - Main Minecraft source code
 - `src/main/java/com/mojang/` - Mojang libraries (blaze3d, math, logging)
+- `src/main/java/net/minecraft/data/` - Data generation system
 
 You can:
 
 1. **Modify Game Mechanics**: Edit entity behavior, world generation, etc.
 2. **Add Features**: Implement new blocks, items, or game modes
-3. **Optimize Performance**: Profile and improve hot paths
-4. **Debug Issues**: Full source access for troubleshooting
+3. **Generate Data Files**: Use the datagen system to create JSON files programmatically
+4. **Optimize Performance**: Profile and improve hot paths
+5. **Debug Issues**: Full source access for troubleshooting
 
 After making changes, rebuild with:
 ```bash
 ./gradlew build
 ```
+
+### Data Generation
+
+MattMC includes Minecraft's powerful **data generation system** (datagen) that allows you to programmatically generate JSON data files from Java code.
+
+**Benefits:**
+- Write type-safe Java code instead of error-prone JSON
+- Validate data at build time
+- Ensure consistency across related data
+- Reduce boilerplate with helper methods
+
+**Quick Example - Generating a Loot Table:**
+```java
+// Add to a custom BlockLootSubProvider
+this.dropSelf(Blocks.STONE);  // Block drops itself
+this.add(Blocks.DIAMOND_ORE,  // Ore with fortune bonus
+    block -> createOreDrop(block, Items.DIAMOND));
+```
+
+**Learn More:**
+- See [docs/DATAGEN-GUIDE.md](docs/DATAGEN-GUIDE.md) for comprehensive datagen documentation
+- Learn about the generated JSON formats in [docs/DATA-SYSTEM.md](docs/DATA-SYSTEM.md)
 
 ### IDE Setup
 
