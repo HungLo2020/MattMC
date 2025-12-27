@@ -26,7 +26,7 @@
       "type": "minecraft:squeeze",
       "argument": {
         "type": "minecraft:mul",
-        "argument1": 0.64,
+        "argument1": 0.4,
         "argument2": {
           "type": "minecraft:interpolated",
           "argument": {
@@ -61,7 +61,7 @@
                       "argument2": {
                         "type": "minecraft:add",
                         "argument1": -0.9375,
-                        "argument2": "minecraft:nether/base_3d_noise"
+                        "argument2": "minecraft:primordial_caves/base_3d_noise"
                       }
                     }
                   }
