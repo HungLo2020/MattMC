@@ -174,7 +174,29 @@ public class LightTexture implements AutoCloseable {
 	}
 
 	public static float getBrightness(DimensionType dimensionType, int i) {
-		return getBrightness(dimensionType.ambientLight(), i);
+		float brightness = getBrightness(dimensionType.ambientLight(), i);
+		
+		// Apply brightness floor for Primordial Caves dimension
+		// This ensures the dimension is always well-lit, working with both vanilla and shaders
+		if (isPrimordialCaves(dimensionType)) {
+			// Apply a brightness multiplier and floor to ensure visibility
+			float brightnessMultiplier = 2.5F;
+			float brightnessFloor = 0.6F;
+			brightness = Math.max(brightnessFloor, brightness * brightnessMultiplier);
+			brightness = Math.min(1.0F, brightness); // Clamp to max brightness
+		}
+		
+		return brightness;
+	}
+	
+	private static boolean isPrimordialCaves(DimensionType dimensionType) {
+		// Check if this is the Primordial Caves dimension
+		// We can identify it by checking if it's registered with the Primordial Caves key
+		// For now, we'll use a simple heuristic: dimensions with has_skylight=true, fixed_time=6000, and ambient_light=0.1
+		return dimensionType.hasSkyLight() 
+			&& dimensionType.fixedTime().isPresent() 
+			&& dimensionType.fixedTime().getAsLong() == 6000L
+			&& Math.abs(dimensionType.ambientLight() - 0.1F) < 0.01F;
 	}
 
 	public static float getBrightness(float f, int i) {

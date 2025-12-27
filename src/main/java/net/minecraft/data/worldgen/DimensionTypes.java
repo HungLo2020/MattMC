@@ -99,8 +99,8 @@ public class DimensionTypes {
 		bootstrapContext.register(
 			BuiltinDimensionTypes.PRIMORDIAL_CAVES,
 			new DimensionType(
-				OptionalLong.of(18000L),
-				false,
+				OptionalLong.of(6000L),
+				true,
 				true,
 				false,
 				true,
@@ -112,7 +112,7 @@ public class DimensionTypes {
 				128,
 				BlockTags.INFINIBURN_OVERWORLD,
 				BuiltinDimensionTypes.OVERWORLD_EFFECTS,
-				1.0F,
+				0.1F,
 				Optional.empty(),
 				new DimensionType.MonsterSettings(false, true, UniformInt.of(0, 7), 0)
 			)
