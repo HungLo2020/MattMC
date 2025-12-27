@@ -1,0 +1,49 @@
+{
+  "type": "minecraft:simple_block",
+  "config": {
+    "to_place": {
+      "type": "minecraft:weighted_state_provider",
+      "entries": [
+        {
+          "weight": 20,
+          "data": {
+            "Name": "minecraft:moss_carpet"
+          }
+        },
+        {
+          "weight": 8,
+          "data": {
+            "Name": "minecraft:big_dripleaf"
+          }
+        },
+        {
+          "weight": 6,
+          "data": {
+            "Name": "minecraft:sugar_cane",
+            "Properties": {
+              "age": "0"
+            }
+          }
+        },
+        {
+          "weight": 12,
+          "data": {
+            "Name": "minecraft:small_dripleaf"
+          }
+        },
+        {
+          "weight": 3,
+          "data": {
+            "Name": "minecraft:red_mushroom"
+          }
+        },
+        {
+          "weight": 2,
+          "data": {
+            "Name": "minecraft:brown_mushroom"
+          }
+        }
+      ]
+    }
+  }
+}

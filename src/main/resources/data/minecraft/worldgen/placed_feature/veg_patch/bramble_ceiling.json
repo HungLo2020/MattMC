@@ -1,0 +1,35 @@
+{
+  "feature": "minecraft:veg_patch/bramble_ceiling",
+  "placement": [
+    {
+      "type": "minecraft:count_on_every_layer",
+      "count": 12
+    },
+    {
+      "type": "minecraft:biome"
+    },
+    {
+      "type": "minecraft:environment_scan",
+      "direction_of_search": "up",
+      "max_steps": 32,
+      "target_condition": {
+        "type": "minecraft:solid"
+      },
+      "allowed_search_condition": {
+        "type": "minecraft:matching_blocks",
+        "blocks": [
+          "minecraft:air",
+          "minecraft:water",
+          "minecraft:pale_oak_wood",
+          "minecraft:pale_moss_carpet",
+          "minecraft:open_eyeblossom",
+          "minecraft:closed_eyeblossom",
+          "minecraft:tall_grass",
+          "minecraft:short_grass",
+          "minecraft:orange_tulip",
+          "minecraft:torchflower"
+        ]
+      }
+    }
+  ]
+}

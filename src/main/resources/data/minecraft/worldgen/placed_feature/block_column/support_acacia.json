@@ -1,0 +1,9 @@
+{
+  "feature": "minecraft:block_column/support_acacia",
+  "placement": [
+    {
+      "type": "minecraft:count",
+      "count": 20
+    }
+  ]
+}

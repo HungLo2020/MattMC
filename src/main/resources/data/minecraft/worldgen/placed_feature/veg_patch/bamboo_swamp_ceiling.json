@@ -1,0 +1,31 @@
+{
+  "feature": "minecraft:veg_patch/bamboo_swamp_ceiling",
+  "placement": [
+    {
+      "type": "minecraft:count_on_every_layer",
+      "count": 12
+    },
+    {
+      "type": "minecraft:biome"
+    },
+    {
+      "type": "minecraft:environment_scan",
+      "direction_of_search": "up",
+      "max_steps": 32,
+      "target_condition": {
+        "type": "minecraft:solid"
+      },
+      "allowed_search_condition": {
+        "type": "minecraft:matching_blocks",
+        "blocks": [
+          "minecraft:air",
+          "minecraft:water",
+          "minecraft:bamboo",
+          "minecraft:bamboo_sapling",
+          "minecraft:tall_grass",
+          "minecraft:jungle_leaves"
+        ]
+      }
+    }
+  ]
+}

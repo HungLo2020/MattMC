@@ -1,0 +1,16 @@
+{
+  "feature": "minecraft:veg_patch/sugarcane",
+  "placement": [
+    {
+      "type": "minecraft:count_on_every_layer",
+      "count": 1
+    },
+    {
+      "type": "minecraft:rarity_filter",
+      "chance": 15
+    },
+    {
+      "type": "minecraft:biome"
+    }
+  ]
+}

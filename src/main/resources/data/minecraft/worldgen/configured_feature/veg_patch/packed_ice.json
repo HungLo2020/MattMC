@@ -1,0 +1,27 @@
+{
+  "type": "minecraft:vegetation_patch",
+  "config": {
+    "surface": "ceiling",
+    "depth": 1,
+    "vertical_range": 7,
+    "extra_bottom_block_chance": 0.0,
+    "extra_edge_column_chance": 0.0,
+    "vegetation_chance": 0.825,
+    "xz_radius": {
+      "type": "minecraft:uniform",
+      "min_inclusive": 3,
+      "max_inclusive": 5
+    },
+    "replaceable": "#dwho:replaceable/ice",
+    "ground_state": {
+      "type": "minecraft:simple_state_provider",
+      "state": {
+        "Name": "minecraft:packed_ice"
+      }
+    },
+    "vegetation_feature": {
+      "feature": "minecraft:vegetation/packed_ice",
+      "placement": []
+    }
+  }
+}

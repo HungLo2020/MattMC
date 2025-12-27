@@ -1,0 +1,13 @@
+{
+  "fallback": "minecraft:village/dry/supports/red_sandstone_wall",
+  "elements": [
+    {
+      "weight": 1,
+      "element": {
+        "element_type": "minecraft:feature_pool_element",
+        "feature": "minecraft:block_column/support_red_sandstone_wall",
+        "projection": "rigid"
+      }
+    }
+  ]
+}

@@ -1,0 +1,77 @@
+{
+  "fallback": "minecraft:tower/stone/fallback",
+  "elements": [
+    {
+      "weight": 5,
+      "element": {
+        "element_type": "minecraft:single_pool_element",
+        "location": "minecraft:towers/stone/room_empty",
+        "processors": "minecraft:tower_stone",
+        "projection": "rigid"
+      }
+    },
+    {
+      "weight": 3,
+      "element": {
+        "element_type": "minecraft:single_pool_element",
+        "location": "minecraft:towers/stone/room_checkpoint",
+        "processors": "minecraft:tower_stone",
+        "projection": "rigid"
+      }
+    },
+    {
+      "weight": 4,
+      "element": {
+        "element_type": "minecraft:single_pool_element",
+        "location": "minecraft:towers/stone/room_battle",
+        "processors": "minecraft:tower_stone",
+        "projection": "rigid"
+      }
+    },
+    {
+      "weight": 4,
+      "element": {
+        "element_type": "minecraft:single_pool_element",
+        "location": "minecraft:towers/stone/room_fountain",
+        "processors": "minecraft:tower_stone",
+        "projection": "rigid"
+      }
+    },
+    {
+      "weight": 4,
+      "element": {
+        "element_type": "minecraft:single_pool_element",
+        "location": "minecraft:towers/stone/tower_empty",
+        "processors": "minecraft:tower_stone",
+        "projection": "rigid"
+      }
+    },
+    {
+      "weight": 3,
+      "element": {
+        "element_type": "minecraft:single_pool_element",
+        "location": "minecraft:towers/stone/tower_treasure",
+        "processors": "minecraft:tower_stone",
+        "projection": "rigid"
+      }
+    },
+    {
+      "weight": 4,
+      "element": {
+        "element_type": "minecraft:single_pool_element",
+        "location": "minecraft:towers/stone/tower_battle",
+        "processors": "minecraft:tower_stone",
+        "projection": "rigid"
+      }
+    },
+    {
+      "weight": 1,
+      "element": {
+        "element_type": "minecraft:single_pool_element",
+        "location": "minecraft:towers/stone/roof",
+        "processors": "minecraft:tower_stone",
+        "projection": "rigid"
+      }
+    }
+  ]
+}

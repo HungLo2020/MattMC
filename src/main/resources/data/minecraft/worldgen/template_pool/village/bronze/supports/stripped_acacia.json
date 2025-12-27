@@ -1,0 +1,13 @@
+{
+  "fallback": "minecraft:village/bronze/supports/stripped_acacia",
+  "elements": [
+    {
+      "weight": 1,
+      "element": {
+        "element_type": "minecraft:feature_pool_element",
+        "feature": "minecraft:block_column/support_stripped_acacia",
+        "projection": "rigid"
+      }
+    }
+  ]
+}

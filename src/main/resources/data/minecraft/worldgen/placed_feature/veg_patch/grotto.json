@@ -1,0 +1,16 @@
+{
+  "feature": "minecraft:veg_patch/grotto",
+  "placement": [
+    {
+      "type": "minecraft:count_on_every_layer",
+      "count": 7
+    },
+    {
+      "type": "minecraft:rarity_filter",
+      "chance": 3
+    },
+    {
+      "type": "minecraft:biome"
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "fallback": "minecraft:tower/stone/fallback",
+  "elements": [
+    {
+      "weight": 1,
+      "element": {
+        "element_type": "minecraft:single_pool_element",
+        "location": "minecraft:towers/stone/roof",
+        "processors": "minecraft:tower_stone",
+        "projection": "rigid"
+      }
+    }
+  ]
+}

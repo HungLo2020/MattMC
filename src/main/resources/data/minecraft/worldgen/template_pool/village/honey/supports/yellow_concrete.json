@@ -1,0 +1,13 @@
+{
+  "fallback": "minecraft:village/honey/supports/yellow_concrete",
+  "elements": [
+    {
+      "weight": 1,
+      "element": {
+        "element_type": "minecraft:feature_pool_element",
+        "feature": "minecraft:block_column/support_yellow_concrete",
+        "projection": "rigid"
+      }
+    }
+  ]
+}

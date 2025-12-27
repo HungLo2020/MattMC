@@ -1,0 +1,16 @@
+{
+  "feature": "minecraft:patch/dead_bush",
+  "placement": [
+    {
+      "type": "minecraft:count_on_every_layer",
+      "count": 3
+    },
+    {
+      "type": "minecraft:rarity_filter",
+      "chance": 7
+    },
+    {
+      "type": "minecraft:biome"
+    }
+  ]
+}

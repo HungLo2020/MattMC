@@ -1,0 +1,14 @@
+{
+  "fallback": "minecraft:empty",
+  "elements": [
+    {
+      "weight": 1,
+      "element": {
+        "element_type": "minecraft:single_pool_element",
+        "location": "minecraft:towers/stone/lobby",
+        "processors": "minecraft:tower_stone",
+        "projection": "rigid"
+      }
+    }
+  ]
+}

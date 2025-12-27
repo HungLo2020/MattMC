@@ -1,0 +1,9 @@
+{
+  "feature": "minecraft:block_column/support_cut_red_sandstone",
+  "placement": [
+    {
+      "type": "minecraft:count",
+      "count": 20
+    }
+  ]
+}
