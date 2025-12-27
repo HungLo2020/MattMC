@@ -20,21 +20,16 @@
 package com.seibel.distanthorizons.core.jar.installer;
 
 import com.electronwill.nightconfig.core.Config;
-import com.electronwill.nightconfig.json.JsonFormat;
 import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
 import com.seibel.distanthorizons.core.logging.DhLogger;
 
-import javax.net.ssl.HttpsURLConnection;
 import java.io.*;
 import java.net.URL;
-import java.net.URLConnection;
-import java.security.DigestInputStream;
-import java.security.MessageDigest;
 import java.util.ArrayList;
 
 /**
- * Does something similar to wget/curl. <br>
- * It allows you to download a file from a link, and other useful web utils
+ * Web download functionality has been disabled.
+ * This class is kept as a stub to maintain compatibility.
  *
  * @author coolGi
  */
@@ -45,59 +40,35 @@ public class WebDownloader
 	
 	public static boolean netIsAvailable()
 	{
-		try
-		{
-			final URL url = new URL("https://example.com"); // example.com will always be online as long as a DNS server exists, so attempt to ping it to check for internet connectivity
-			final URLConnection conn = url.openConnection();
-			conn.connect();
-			conn.getInputStream().close();
-			return false;
-		}
-		catch (Exception e)
-		{
-			return true;
-		}
+		LOGGER.info("Network connectivity check disabled");
+		return false;
 	}
 	
 	public static void downloadAsFile(URL url, File file) throws Exception
 	{
-//        URL url = new URL(urlS);
-		
-		HttpsURLConnection connection = (HttpsURLConnection) url
-				.openConnection();
-		long filesize = connection.getContentLengthLong();
-		if (filesize == -1)
-		{
-			throw new Exception("Content length must not be -1 (unknown)!");
-		}
-		long totalDataRead = 0;
-		try (java.io.BufferedInputStream in = new java.io.BufferedInputStream(
-				connection.getInputStream()))
-		{
-			java.io.FileOutputStream fos = new java.io.FileOutputStream(file);
-			try (java.io.BufferedOutputStream bout = new BufferedOutputStream(
-					fos, 1024))
-			{
-				byte[] data = new byte[1024];
-				int i, percent = -1;
-				while ((i = in.read(data, 0, 1024)) >= 0)
-				{
-					totalDataRead = totalDataRead + i;
-					bout.write(data, 0, i);
-					
-					// TODO: Link this to an atomic integer rather than printing it to log
-                    int newPercent = (int) ((totalDataRead * 100) / filesize);
-					if (percent != newPercent)
-					{
-						percent = newPercent;
-						LOGGER.info(percent +"% downloaded");
-					}
-				}
-			}
-		}
+		throw new Exception("Web download functionality has been disabled");
 	}
 	
 	public static String downloadAsString(URL url) throws Exception
+	{
+		throw new Exception("Web download functionality has been disabled");
+	}
+	
+	public static Config parseWebJson(String url) throws Exception
+	{
+		throw new Exception("Web download functionality has been disabled");
+	}
+	
+	public static ArrayList<Config> parseWebJsonList(String url) throws Exception
+	{
+		throw new Exception("Web download functionality has been disabled");
+	}
+	
+	public static String calculateChecksum(File file) throws Exception
+	{
+		throw new Exception("Checksum calculation disabled");
+	}
+}
 	{
 		StringBuilder stringBuilder = new StringBuilder();
 //        URL url = new URL(urlS);

@@ -22,13 +22,12 @@ package com.seibel.distanthorizons.core.jar.installer;
 import com.electronwill.nightconfig.core.Config;
 import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
 import com.seibel.distanthorizons.core.logging.DhLogger;
-import org.jetbrains.annotations.Nullable;
 
-import java.net.URL;
 import java.util.*;
 
 /**
- * Gets info for nightly builds
+ * GitLab integration has been disabled.
+ * This class is kept as a stub to maintain compatibility.
  *
  * @author coolGi
  */
@@ -39,17 +38,9 @@ public class GitlabGetter
 	/** DH's instance of the Gitlab getter */
 	public static GitlabGetter INSTANCE = new GitlabGetter();
 	
-	public static final String GitlabApi = "https://gitlab.com/api/v4/projects/";
-	/** Gitlab project ID (can by gotten by typing `document.getElementById('project_id').value` on your main project's console) */
 	public final String projectID;
-	/** Combines the {@link GitlabGetter#GitlabApi} and {@link GitlabGetter#projectID} into one var (Followed by a "/" at the end) */
 	public final String GitProjID;
 	public ArrayList<Config> projectPipelines = new ArrayList<>();
-	
-	/** Commit sha; Commit info */
-	private static final Map<String, Config> commitInfo = new HashMap<>();
-	/** Pipeline ID; Pipeline info */
-	private static final Map<Number, ArrayList<Config>> pipelineInfo = new HashMap<>();
 	
 	/** Uses our projectID to init this */
 	public GitlabGetter()
@@ -60,24 +51,25 @@ public class GitlabGetter
 	public GitlabGetter(String projectID)
 	{
 		this.projectID = projectID;
-		this.GitProjID = GitlabApi + projectID + "/";
-		
-		try
-		{
-			this.projectPipelines = WebDownloader.parseWebJsonList(this.GitProjID + "pipelines");
-		}
-		catch (Exception e) { LOGGER.error("Unable to get project pipelines, error: ["+e.getMessage()+"].", e); }
+		this.GitProjID = "";
+		LOGGER.info("GitLab integration disabled - no network calls will be made");
 	}
 	
 	public Config getCommitInfo(String commit)
 	{
-		if (!commitInfo.containsKey(commit))
-		{
-			try
-			{
-				commitInfo.put(commit, WebDownloader.parseWebJson(this.GitProjID + "repository/commits/" + commit));
-			}
-			catch (Exception e)
+		return null;
+	}
+	
+	public Config getPipelineInfo(Number pipeline)
+	{
+		return null;
+	}
+	
+	public Map<String, String> getDownloads(Number pipeline)
+	{
+		return new HashMap<>();
+	}
+}
 			{
 				LOGGER.error("Unable to get commit info for project ["+this.GitProjID+"], commit: ["+commit+"], error: ["+e.getMessage()+"].", e);
 				// Return empty

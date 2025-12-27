@@ -1,57 +1,13 @@
-/*
- *    This file is part of the Distant Horizons mod
- *    licensed under the GNU LGPL v3 License.
- *
- *    Copyright (C) 2020 James Seibel
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the GNU Lesser General Public License as published by
- *    the Free Software Foundation, version 3.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    GNU Lesser General Public License for more details.
- *
- *    You should have received a copy of the GNU Lesser General Public License
- *    along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
-
 package com.seibel.distanthorizons.core.jar.updater;
 
-import com.seibel.distanthorizons.api.enums.config.EDhApiUpdateBranch;
-import com.seibel.distanthorizons.core.config.Config;
-import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
-import com.seibel.distanthorizons.core.jar.JarUtils;
-import com.seibel.distanthorizons.core.jar.ModJarInfo;
-import com.seibel.distanthorizons.core.jar.installer.GitlabGetter;
-import com.seibel.distanthorizons.core.jar.installer.ModrinthGetter;
-import com.seibel.distanthorizons.core.jar.installer.WebDownloader;
-import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
-import com.seibel.distanthorizons.core.logging.f3.F3Screen;
-import com.seibel.distanthorizons.core.util.NativeDialogUtil;
-import com.seibel.distanthorizons.core.wrapperInterfaces.IVersionConstants;
-import com.seibel.distanthorizons.coreapi.ModInfo;
-import com.seibel.distanthorizons.coreapi.util.StringUtil;
-import com.seibel.distanthorizons.coreapi.util.jar.DeleteOnUnlock;
 import com.seibel.distanthorizons.core.logging.DhLogger;
+import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
 
-import javax.swing.*;
-import java.awt.*;
-import java.io.*;
-import java.net.URLEncoder;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.security.MessageDigest;
-import java.text.NumberFormat;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.zip.CRC32;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipFile;
+import java.io.File;
 
 /**
- * Used to update the mod automatically
+ * Self-updater functionality has been disabled.
+ * This class is kept as a stub to maintain compatibility.
  *
  * @author coolGi
  */
@@ -62,42 +18,39 @@ public class SelfUpdater
 	/** As we cannot delete(or replace) the jar while the mod is running, we just have this to delete it once the game closes */
 	public static boolean deleteOldJarOnJvmShutdown = false;
 	
-	private static String currentJarSha = "";
-	private static String mcVersion = SingletonInjector.INSTANCE.get(IVersionConstants.class).getMinecraftVersion();
-	
 	public static File newFileLocation;
 	
 	
 	/**
 	 * Should be called on the game starting.
-	 * (After the config has been initialised)
+	 * Auto-update functionality disabled - always returns false.
 	 *
-	 * @return Whether it should open the update ui
+	 * @return Whether it should open the update ui (always false)
 	 */
 	public static boolean onStart()
 	{
-		LOGGER.info("Checking for Distant Horizons update");
-		
-		try
-		{
-			currentJarSha = JarUtils.getFileChecksum(MessageDigest.getInstance("SHA"), JarUtils.jarFile);
-		}
-		catch (Exception e)
-		{
-			LOGGER.error("Unable to get existing jar checksum, error: ["+e.getMessage()+"].", e);
-			return false;
-		}
-		
-		boolean returnValue = false;
-		try
-		{
-			EDhApiUpdateBranch updateBranch = EDhApiUpdateBranch.convertAutoToStableOrNightly(Config.Client.Advanced.AutoUpdater.updateBranch.get());
-			returnValue = (updateBranch == EDhApiUpdateBranch.STABLE) ? onStableStart() : onNightlyStart();
-		}
-		catch (Exception e) // Shouldn't be needed, but just in case
-		{
-			LOGGER.warn("Unexpected updater startup error: ["+e.getMessage()+"].", e);
-		}
+		LOGGER.info("Auto-updater has been disabled - no update checks will be performed");
+		return false;
+	}
+	
+	/**
+	 * Called on game close.
+	 * Auto-update functionality disabled - no-op.
+	 */
+	public static void onClose()
+	{
+		// Auto-update disabled - nothing to do
+	}
+	
+	/**
+	 * Update the mod.
+	 * Auto-update functionality disabled - no-op.
+	 */
+	public static void updateMod()
+	{
+		LOGGER.warn("Auto-updater has been disabled - cannot update mod");
+	}
+}
 		return returnValue;
 	}
 	private static boolean onStableStart()
