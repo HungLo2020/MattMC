@@ -27,6 +27,9 @@ Thumbs.db
 # JDK (too large to commit)
 libraries/jdk-21/
 
+# Data generation output
+generated/
+
 # Test outputs and reports
 build/test-results/
 build/reports/tests/

@@ -1166,6 +1166,139 @@ tasks.register('acceptEula') {
 runServer.dependsOn acceptEula
 runServerGui.dependsOn acceptEula
 
+// ============================================================================
+// DATA GENERATION TASKS
+// ============================================================================
+// Run Minecraft's built-in data generation to create JSON resources
+// (recipes, loot tables, tags, advancements, models, etc.)
+// ============================================================================
+
+// Task to run server-side data generation
+tasks.register('runDatagen', JavaExec) {
+    group = 'minecraft'
+    description = 'Generates server-side data (recipes, loot tables, tags, advancements, etc.)'
+    
+    dependsOn 'classes', 'copyJdkToRun'
+    
+    // Explicitly declare dependency on the classes output to ensure proper task ordering
+    inputs.files(sourceSets.main.output.classesDirs)
+    
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'net.minecraft.data.Main'
+    
+    workingDir = file('.')
+    
+    // JVM arguments optimized for data generation
+    jvmArgs = [
+        '-Xmx4G',
+        '-Xms2G',
+        '-XX:+UseG1GC'
+    ]
+    
+    // Arguments for data generation
+    // --output: where to write generated files
+    // --server: generate server-side data (recipes, loot, tags, advancements)
+    // --reports: generate data reports (useful for debugging)
+    // --all: generate everything
+    args = [
+        '--output', file('generated').absolutePath,
+        '--server',
+        '--reports',
+        '--all'
+    ]
+    
+    doFirst {
+        verifyMainClassExists('net/minecraft/data/Main.class', 'Data generation main class')
+        file('generated').mkdirs()
+        println "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        println "Starting server-side data generation..."
+        println "Output directory: ${file('generated').absolutePath}"
+        println "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    }
+    
+    doLast {
+        println "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        println "✅ Server-side data generation complete!"
+        println "Generated files are in: ${file('generated').absolutePath}"
+        println "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    }
+    
+    // Configure to use bundled JDK
+    configureBundledJdk(it)
+}
+
+// Task to run client-side data generation
+tasks.register('runDatagenClient', JavaExec) {
+    group = 'minecraft'
+    description = 'Generates client-side data (models, atlases, etc.)'
+    
+    dependsOn 'classes', 'copyJdkToRun'
+    
+    // Explicitly declare dependency on the classes output to ensure proper task ordering
+    inputs.files(sourceSets.main.output.classesDirs)
+    
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'net.minecraft.client.data.Main'
+    
+    workingDir = file('.')
+    
+    // JVM arguments optimized for data generation
+    jvmArgs = [
+        '-Xmx4G',
+        '-Xms2G',
+        '-XX:+UseG1GC'
+    ]
+    
+    // Arguments for data generation
+    // --output: where to write generated files
+    // --client: generate client-side data (models, atlases)
+    // --all: generate everything
+    args = [
+        '--output', file('generated').absolutePath,
+        '--client',
+        '--all'
+    ]
+    
+    doFirst {
+        verifyMainClassExists('net/minecraft/client/data/Main.class', 'Client data generation main class')
+        file('generated').mkdirs()
+        println "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        println "Starting client-side data generation..."
+        println "Output directory: ${file('generated').absolutePath}"
+        println "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    }
+    
+    doLast {
+        println "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        println "✅ Client-side data generation complete!"
+        println "Generated files are in: ${file('generated').absolutePath}"
+        println "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    }
+    
+    // Configure to use bundled JDK
+    configureBundledJdk(it)
+}
+
+// Task to run both server and client data generation
+tasks.register('runDatagenAll') {
+    group = 'minecraft'
+    description = 'Generates all data (server + client)'
+    
+    dependsOn 'runDatagen', 'runDatagenClient'
+    
+    doLast {
+        println ""
+        println "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        println "✅ All data generation complete!"
+        println "   - Server data: recipes, loot tables, tags, advancements"
+        println "   - Client data: models, atlases"
+        println "   - Reports: data validation and debugging info"
+        println ""
+        println "Output directory: ${file('generated').absolutePath}"
+        println "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    }
+}
+
 // Build task configuration
 tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
