@@ -168,6 +168,12 @@ public class LightTexture implements AutoCloseable {
 				}
 
 				this.ubo.rotate();
+				
+				// Call registered light texture hooks
+				for (net.minecraft.hooks.LightTextureHooks hook : net.minecraft.hooks.HookRegistry.getLightTextureHooks()) {
+					hook.onLightTextureUpdated(this, f);
+				}
+				
 				profilerFiller.pop();
 			}
 		}

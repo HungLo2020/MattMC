@@ -2181,6 +2181,11 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 	}
 
 	private void updateLevelInEngines(@Nullable ClientLevel clientLevel) {
+		// Call registered level hooks before updating engines
+		for (net.minecraft.hooks.MinecraftLevelHooks hook : net.minecraft.hooks.HookRegistry.getMinecraftLevelHooks()) {
+			hook.onLevelUpdateInEngines(clientLevel);
+		}
+		
 		this.soundManager.stop();
 		this.setCameraEntity(null);
 		this.pendingConnection = null;

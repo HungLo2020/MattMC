@@ -36,6 +36,9 @@ public class HookRegistry {
     private static final List<BlockEntityTypeHooks> blockEntityTypeHooks = new ArrayList<>();
     private static final List<SpriteContentsHooks> spriteContentsHooks = new ArrayList<>();
     private static final List<WindowHooks> windowHooks = new ArrayList<>();
+    private static final List<LightTextureHooks> lightTextureHooks = new ArrayList<>();
+    private static final List<MinecraftLevelHooks> minecraftLevelHooks = new ArrayList<>();
+    private static final List<ChunkRenderLayerHooks> chunkRenderLayerHooks = new ArrayList<>();
 
     /**
      * Register a GameHooks implementation.
@@ -625,6 +628,69 @@ public class HookRegistry {
     }
 
     /**
+     * Register a LightTextureHooks implementation.
+     * Should be called during mod initialization.
+     *
+     * @param hook The hook implementation to register
+     */
+    public static void registerLightTextureHook(LightTextureHooks hook) {
+        if (hook != null) {
+            lightTextureHooks.add(hook);
+        }
+    }
+
+    /**
+     * Get all registered LightTextureHooks implementations.
+     *
+     * @return List of registered LightTextureHooks
+     */
+    public static List<LightTextureHooks> getLightTextureHooks() {
+        return new ArrayList<>(lightTextureHooks);
+    }
+
+    /**
+     * Register a MinecraftLevelHooks implementation.
+     * Should be called during mod initialization.
+     *
+     * @param hook The hook implementation to register
+     */
+    public static void registerMinecraftLevelHook(MinecraftLevelHooks hook) {
+        if (hook != null) {
+            minecraftLevelHooks.add(hook);
+        }
+    }
+
+    /**
+     * Get all registered MinecraftLevelHooks implementations.
+     *
+     * @return List of registered MinecraftLevelHooks
+     */
+    public static List<MinecraftLevelHooks> getMinecraftLevelHooks() {
+        return new ArrayList<>(minecraftLevelHooks);
+    }
+
+    /**
+     * Register a ChunkRenderLayerHooks implementation.
+     * Should be called during mod initialization.
+     *
+     * @param hook The hook implementation to register
+     */
+    public static void registerChunkRenderLayerHook(ChunkRenderLayerHooks hook) {
+        if (hook != null) {
+            chunkRenderLayerHooks.add(hook);
+        }
+    }
+
+    /**
+     * Get all registered ChunkRenderLayerHooks implementations.
+     *
+     * @return List of registered ChunkRenderLayerHooks
+     */
+    public static List<ChunkRenderLayerHooks> getChunkRenderLayerHooks() {
+        return new ArrayList<>(chunkRenderLayerHooks);
+    }
+
+    /**
      * Clear all registered hooks. Useful for testing.
      */
     public static void clearAll() {
@@ -656,5 +722,8 @@ public class HookRegistry {
         blockEntityTypeHooks.clear();
         spriteContentsHooks.clear();
         windowHooks.clear();
+        lightTextureHooks.clear();
+        minecraftLevelHooks.clear();
+        chunkRenderLayerHooks.clear();
     }
 }
