@@ -33,85 +33,41 @@ import java.util.*;
  */
 public class ModrinthGetter
 {
-	private static final DhLogger LOGGER = new DhLoggerBuilder().build();
-	
-	public static final String projectID = "distanthorizons";
-	/** Functions should only be accessed once this is true */
-	public static boolean initted = false;
-	public static ArrayList<Config> projectRelease = new ArrayList<>();
-	public static Map<String, Config> idToJson = new HashMap<>();
-	
-	public static List<String> releaseID = new ArrayList<>();
-	public static List<String> mcVersions = new ArrayList<>();
-	public static Map<String, String> releaseNames = new HashMap<>();
-	public static Map<String, List<String>> mcVerToReleaseID = new HashMap<>();
-	public static Map<String, String> downloadUrl = new HashMap<>();
-	public static Map<String, String> changeLogs = new HashMap<>();
-	
-	
-	public static boolean init()
-	{
-		LOGGER.info("Modrinth integration disabled - no network calls will be made");
-		initted = false;
-		return false;
-	}
-	
-	public static String getLatestNameForVersion(String mcVersion)
-	{
-		return "";
-	}
-	
-	public static String getLatestShaForVersion(String mcVersion)
-	{
-		return "";
-	}
-	
-	public static String getLatestDownloadForVersion(String mcVersion)
-	{
-		return "";
-	}
+private static final DhLogger LOGGER = new DhLoggerBuilder().build();
+
+public static final String projectID = "distanthorizons";
+/** Functions should only be accessed once this is true */
+public static boolean initted = false;
+public static ArrayList<Config> projectRelease = new ArrayList<>();
+public static Map<String, Config> idToJson = new HashMap<>();
+
+public static List<String> releaseID = new ArrayList<>();
+public static List<String> mcVersions = new ArrayList<>();
+public static Map<String, String> releaseNames = new HashMap<>();
+public static Map<String, List<String>> mcVerToReleaseID = new HashMap<>();
+public static Map<String, String> downloadUrl = new HashMap<>();
+public static Map<String, String> changeLogs = new HashMap<>();
+
+
+public static boolean init()
+{
+LOGGER.info("Modrinth integration disabled - no network calls will be made");
+initted = false;
+return false;
 }
-				}
-			}
-			// Sort them to look better
-			Collections.sort(mcVersions);
-			Collections.reverse(mcVersions);
-			
-			initted = true;
-			return true;
-		}
-		catch (Exception e)
-		{
-			LOGGER.error("Unable to set up Modrinth access, error: ["+e.getMessage()+"]", e);
-			return false;
-		}
-	}
-	
-	public static String getLatestIDForVersion(String mcVer)
-	{
-		try
-		{
-			return mcVerToReleaseID.get(mcVer).get(0);
-		}
-		catch (Exception e)
-		{
-			return null;
-		}
-	}
-	public static String getLatestNameForVersion(String mcVer)
-	{
-		return releaseNames.get(mcVerToReleaseID.get(mcVer).get(0));
-	}
-	public static URL getLatestDownloadForVersion(String mcVer)
-	{
-		return downloadUrl.get(mcVerToReleaseID.get(mcVer).get(0));
-	}
-	public static String getLatestShaForVersion(String mcVer)
-	{
-		return (((ArrayList<Config>) idToJson.get(
-				mcVerToReleaseID.get(mcVer).get(0)
-		).get("files")).get(0).get("hashes.sha1")
-				.toString());
-	}
-	
+
+public static String getLatestNameForVersion(String mcVersion)
+{
+return "";
+}
+
+public static String getLatestShaForVersion(String mcVersion)
+{
+return "";
+}
+
+public static String getLatestDownloadForVersion(String mcVersion)
+{
+return "";
+}
 }

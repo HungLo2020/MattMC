@@ -35,110 +35,42 @@ import java.util.ArrayList;
  */
 public class WebDownloader
 {
-	private static final DhLogger LOGGER = new DhLoggerBuilder().build();
-	
-	
-	public static boolean netIsAvailable()
-	{
-		LOGGER.info("Network connectivity check disabled");
-		return false;
-	}
-	
-	public static void downloadAsFile(URL url, File file) throws Exception
-	{
-		throw new Exception("Web download functionality has been disabled");
-	}
-	
-	public static String downloadAsString(URL url) throws Exception
-	{
-		throw new Exception("Web download functionality has been disabled");
-	}
-	
-	public static Config parseWebJson(String url) throws Exception
-	{
-		throw new Exception("Web download functionality has been disabled");
-	}
-	
-	public static ArrayList<Config> parseWebJsonList(String url) throws Exception
-	{
-		throw new Exception("Web download functionality has been disabled");
-	}
-	
-	public static String calculateChecksum(File file) throws Exception
-	{
-		throw new Exception("Checksum calculation disabled");
-	}
+private static final DhLogger LOGGER = new DhLoggerBuilder().build();
+
+
+public static boolean netIsAvailable()
+{
+LOGGER.info("Network connectivity check disabled");
+return false;
 }
-	{
-		StringBuilder stringBuilder = new StringBuilder();
-//        URL url = new URL(urlS);
-		
-		URLConnection urlConnection = url.openConnection();
-		urlConnection.setConnectTimeout(1000);
-		urlConnection.setReadTimeout(1000);
-		BufferedReader bReader = new BufferedReader(new InputStreamReader(urlConnection.getInputStream()));
-		
-		String line;
-		while ((line = bReader.readLine()) != null)
-		{
-			stringBuilder.append(line);
-		}
-		
-		return (stringBuilder.toString());
-	}
-	
-	public static String formatMarkdownToHtml(String md, int width)
-	{
-		String str = String.format("<html><div style=\"width:%dpx;\">%s</div></html>", width, md);
-		return new MarkdownFormatter.HTMLFormat().convertTo(str);
-	}
-	
-	
-	
-	public static Config parseWebJson(String url) throws Exception
-	{
-		return parseWebJson(new URL(url));
-	}
-	public static Config parseWebJson(URL url) throws Exception
-	{
-		return JsonFormat.minimalInstance().createParser().parse(WebDownloader.downloadAsString(url));
-	}
-	
-	public static ArrayList<Config> parseWebJsonList(String url) throws Exception
-	{
-		return parseWebJsonList(new URL(url));
-	}
-	public static ArrayList<Config> parseWebJsonList(URL url) throws Exception
-	{
-		// Is there a better way of doing this?
-		return JsonFormat.minimalInstance().createParser().parse("{\"E\":" + WebDownloader.downloadAsString(url) + "}").get("E");
-	}
-	
-	
-	
-	// Taken from https://mkyong.com/java/how-to-generate-a-file-checksum-value-in-java/ but added some comments
-	/**
-	 * @param filepath Path to the file
-	 * @param md The checksum. Can be gotten by "MessageDigest.getInstance("SHA-256")" and can replace string with something like SHA, MD2, MD5, SHA-256, SHA-384...
-	 * @return Returns the checksum using the previous md
-	 */
-	private static String checksum(String filepath, MessageDigest md) throws IOException
-	{
-		// file hashing with DigestInputStream
-		try (DigestInputStream dis = new DigestInputStream(new FileInputStream(filepath), md))
-		{
-			while (dis.read() != -1) ; //empty loop to clear the data
-			md = dis.getMessageDigest();
-		}
-		
-		// bytes to hex
-		StringBuilder result = new StringBuilder();
-		for (byte b : md.digest())
-		{
-			result.append(String.format("%02x", b));
-		}
-		return result.toString();
-		
-	}
-	
+
+public static void downloadAsFile(URL url, File file) throws Exception
+{
+throw new Exception("Web download functionality has been disabled");
+}
+
+public static String downloadAsFile(String url, File file) throws Exception
+{
+throw new Exception("Web download functionality has been disabled");
+}
+
+public static String downloadAsString(URL url) throws Exception
+{
+throw new Exception("Web download functionality has been disabled");
+}
+
+public static Config parseWebJson(String url) throws Exception
+{
+throw new Exception("Web download functionality has been disabled");
+}
+
+public static ArrayList<Config> parseWebJsonList(String url) throws Exception
+{
+throw new Exception("Web download functionality has been disabled");
+}
+
+public static String calculateChecksum(File file) throws Exception
+{
+throw new Exception("Checksum calculation disabled");
+}
 }

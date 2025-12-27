@@ -23,6 +23,7 @@ import com.electronwill.nightconfig.core.Config;
 import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
 import com.seibel.distanthorizons.core.logging.DhLogger;
 
+import java.net.URL;
 import java.util.*;
 
 /**
@@ -33,127 +34,45 @@ import java.util.*;
  */
 public class GitlabGetter
 {
-	private static final DhLogger LOGGER = new DhLoggerBuilder().build();
-	
-	/** DH's instance of the Gitlab getter */
-	public static GitlabGetter INSTANCE = new GitlabGetter();
-	
-	public final String projectID;
-	public final String GitProjID;
-	public ArrayList<Config> projectPipelines = new ArrayList<>();
-	
-	/** Uses our projectID to init this */
-	public GitlabGetter()
-	{
-		this("18204078");
-	}
-	
-	public GitlabGetter(String projectID)
-	{
-		this.projectID = projectID;
-		this.GitProjID = "";
-		LOGGER.info("GitLab integration disabled - no network calls will be made");
-	}
-	
-	public Config getCommitInfo(String commit)
-	{
-		return null;
-	}
-	
-	public Config getPipelineInfo(Number pipeline)
-	{
-		return null;
-	}
-	
-	public Map<String, String> getDownloads(Number pipeline)
-	{
-		return new HashMap<>();
-	}
+private static final DhLogger LOGGER = new DhLoggerBuilder().build();
+
+/** DH's instance of the Gitlab getter */
+public static GitlabGetter INSTANCE = new GitlabGetter();
+
+public final String projectID;
+public final String GitProjID;
+public ArrayList<Config> projectPipelines = new ArrayList<>();
+
+/** Uses our projectID to init this */
+public GitlabGetter()
+{
+this("18204078");
 }
-			{
-				LOGGER.error("Unable to get commit info for project ["+this.GitProjID+"], commit: ["+commit+"], error: ["+e.getMessage()+"].", e);
-				// Return empty
-				return Config.inMemory();
-			}
-		}
-		
-		return commitInfo.get(commit);
-	}
-	
-	public ArrayList<Config> getPipelineInfo(Number pipeline)
-	{
-		if (!pipelineInfo.containsKey(pipeline))
-		{
-			try
-			{
-				pipelineInfo.put(pipeline, WebDownloader.parseWebJsonList(this.GitProjID + "pipelines/" + pipeline + "/jobs"));
-			}
-			catch (Exception e)
-			{
-				LOGGER.error("Unable to get ["+pipeline+"]'s pipeline info, error: ["+e.getMessage()+"].", e);
-				
-				// Return empty
-				return new ArrayList<>();
-			}
-		}
-		
-		return pipelineInfo.get(pipeline);
-	}
-	
-	/**
-	 * Gets all the Minecraft download links to a pipeline ID
-	 * 
-	 * @param pipelineID Uses {@link Number} instead of a specific value due to the possibility of receiving Integer or Long
-	 * @return Minecraft version; Download URL
-	 */
-	public Map<String, URL> getDownloads(Number pipelineID)
-	{
-		Map<String, URL> downloads = new HashMap<>();
-		ArrayList<Config> currentPipelineInfo = this.getPipelineInfo(pipelineID);
-		
-		try
-		{
-			for (Config cfg : currentPipelineInfo)
-			{
-				if (!cfg.get("stage").equals("build"))
-				{
-					continue;
-				}
-				downloads.put(
-						((String) cfg.get("name")).split("\\[|\\]")[1], // Regex to extract the Minecraft version from the text
-						new URL(this.GitProjID + "jobs/" + cfg.get("id") + "/artifacts")
-				);
-			}
-		}
-		catch (Exception e) { LOGGER.error("Unable to get downloads for pipeline ["+pipelineID+"], error: ["+e.getMessage()+"].", e); }
-		
-		return downloads;
-	}
-	
-	// Just a small test for this (Should output the nightly for each version that it supports)
-	public static void main(String[] args) {
-		GitlabGetter gitlabGetter = new GitlabGetter();
-		
-		System.out.println(gitlabGetter.getDownloads(gitlabGetter.projectPipelines.get(0).get("id")));
-	}
-	
-	
-	
-	/** 
-	 * A simple url getter for the latest jar of a version
-	 * @apiNote Not dependent on the instance of this object, will just download the one for the base mod
-	 */
-	@Nullable
-	public static URL getLatestForVersion(String mcVer)
-	{
-		try
-		{
-			return new URL("https://gitlab.com/distant-horizons-team/distant-horizons/-/jobs/artifacts/main/download?job=build:%20%5B" + mcVer + "%5D");
-		}
-		catch (Exception e)
-		{
-			LOGGER.error("Unable to get latest URL for MC version ["+mcVer+"], error: ["+e.getMessage()+"].", e);
-			return null;
-		} // This should always be safe (unless you stuff up **badly** somewhere)
-	}
+
+public GitlabGetter(String projectID)
+{
+this.projectID = projectID;
+this.GitProjID = "";
+LOGGER.info("GitLab integration disabled - no network calls will be made");
+}
+
+public Config getCommitInfo(String commit)
+{
+return null;
+}
+
+public Config getPipelineInfo(Number pipeline)
+{
+return null;
+}
+
+public Map<String, URL> getDownloads(Number pipeline)
+{
+return new HashMap<>();
+}
+
+public static URL getLatestForVersion(String mcVersion)
+{
+return null;
+}
 }
