@@ -1,8 +1,8 @@
 {
   "values": [
     "#minecraft:air",
-    "#dwho:ores",
-    "#dwho:base_stone_dwarfhollow",
+    "#minecraft:ores",
+    "#minecraft:base_stone_primordial",
     "minecraft:light",
     "minecraft:water",
     "minecraft:bedrock",
