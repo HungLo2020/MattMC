@@ -17,7 +17,7 @@ import net.minecraft.util.ExtraCodecs;
 import net.minecraft.util.StringRepresentable;
 
 public interface ClickEvent {
-	Codec<ClickEvent> CODEC = ClickEvent.Action.CODEC.dispatch("action", ClickEvent::action, action -> action.codec);
+	Codec<ClickEvent> CODEC = ClickEvent.Action.UNSAFE_CODEC.dispatch("action", ClickEvent::action, action -> action.codec);
 
 	ClickEvent.Action action();
 
