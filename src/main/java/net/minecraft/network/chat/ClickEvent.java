@@ -22,14 +22,14 @@ public interface ClickEvent {
 	ClickEvent.Action action();
 
 	public static enum Action implements StringRepresentable {
-		OPEN_URL("open_url", true, ClickEvent.OpenUrl.CODEC),
-		OPEN_FILE("open_file", false, ClickEvent.OpenFile.CODEC),
-		RUN_COMMAND("run_command", true, ClickEvent.RunCommand.CODEC),
-		SUGGEST_COMMAND("suggest_command", true, ClickEvent.SuggestCommand.CODEC),
-		SHOW_DIALOG("show_dialog", true, ClickEvent.ShowDialog.CODEC),
-		CHANGE_PAGE("change_page", true, ClickEvent.ChangePage.CODEC),
-		COPY_TO_CLIPBOARD("copy_to_clipboard", true, ClickEvent.CopyToClipboard.CODEC),
-		CUSTOM("custom", true, ClickEvent.Custom.CODEC);
+		OPEN_URL("open_url", true, ClickEvent.OpenUrl.CODEC), // Allow from server: players can click URLs
+		OPEN_FILE("open_file", false, ClickEvent.OpenFile.CODEC), // Disallow from server: security risk
+		RUN_COMMAND("run_command", true, ClickEvent.RunCommand.CODEC), // Allow from server: needed for command results
+		SUGGEST_COMMAND("suggest_command", true, ClickEvent.SuggestCommand.CODEC), // MUST BE TRUE: needed for /locate and other clickable coordinates
+		SHOW_DIALOG("show_dialog", true, ClickEvent.ShowDialog.CODEC), // Allow from server: needed for dialogs
+		CHANGE_PAGE("change_page", true, ClickEvent.ChangePage.CODEC), // Allow from server: needed for books
+		COPY_TO_CLIPBOARD("copy_to_clipboard", true, ClickEvent.CopyToClipboard.CODEC), // Allow from server: convenient for users
+		CUSTOM("custom", true, ClickEvent.Custom.CODEC); // Allow from server: extensibility
 
 		public static final Codec<ClickEvent.Action> UNSAFE_CODEC = StringRepresentable.fromEnum(ClickEvent.Action::values);
 		public static final Codec<ClickEvent.Action> CODEC = UNSAFE_CODEC.validate(ClickEvent.Action::filterForSerialization);
@@ -56,6 +56,12 @@ public interface ClickEvent {
 			return this.codec;
 		}
 
+		/**
+		 * Filters click event actions during serialization/deserialization.
+		 * Returns an error if the action is not allowed from server (allowFromServer=false).
+		 * This prevents potentially dangerous actions (like OPEN_FILE) from being sent by servers.
+		 * For /locate and similar commands to work, SUGGEST_COMMAND must have allowFromServer=true.
+		 */
 		public static DataResult<ClickEvent.Action> filterForSerialization(ClickEvent.Action action) {
 			return !action.isAllowedFromServer() ? DataResult.error(() -> "Click event type not allowed: " + action) : DataResult.success(action, Lifecycle.stable());
 		}
