@@ -1,7 +1,7 @@
 # Fix for /locate Command Clickable Coordinates
 
 ## Problem
-The `/locate` command in MattMC was showing coordinates as plain text instead of green, clickable text that suggests a `/tp` command when clicked.
+The `/locate` command was showing coordinates as plain text instead of green, clickable text that suggests a `/tp` command when clicked.
 
 ## Root Cause
 The `ClickEvent.Action.SUGGEST_COMMAND` enum value has an `allowFromServer` flag that controls whether click events of this type can be sent from the server to the client. When this flag is `false`, the codec filters out these click events during serialization/deserialization, causing them to be stripped from the component before being displayed.
@@ -11,9 +11,9 @@ The `allowFromServer` flag for `SUGGEST_COMMAND` is now confirmed to be `true` (
 
 ### Key Code Locations
 
-1. **ClickEvent.java line 28**: `SUGGEST_COMMAND("suggest_command", true, ...)` - The second parameter MUST be `true`
-2. **ClickEvent.java line 66**: The filter logic that checks this flag
-3. **LocateCommand.java line 174-179**: Where the clickable component is created
+1. **ClickEvent.java**: `SUGGEST_COMMAND("suggest_command", true, ...)` - The second parameter MUST be `true`
+2. **ClickEvent.java**: The `filterForSerialization` method that validates this flag
+3. **LocateCommand.java**: The `showLocateResult` method where the clickable component is created
 
 ## Testing
 

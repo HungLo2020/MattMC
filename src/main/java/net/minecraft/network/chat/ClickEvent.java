@@ -25,7 +25,7 @@ public interface ClickEvent {
 		OPEN_URL("open_url", true, ClickEvent.OpenUrl.CODEC), // Allow from server: players can click URLs
 		OPEN_FILE("open_file", false, ClickEvent.OpenFile.CODEC), // Disallow from server: security risk
 		RUN_COMMAND("run_command", true, ClickEvent.RunCommand.CODEC), // Allow from server: needed for command results
-		SUGGEST_COMMAND("suggest_command", true, ClickEvent.SuggestCommand.CODEC), // MUST BE TRUE: needed for /locate and other clickable coordinates
+		SUGGEST_COMMAND("suggest_command", true, ClickEvent.SuggestCommand.CODEC), // MUST BE TRUE: allows servers to send clickable coordinates (e.g., /locate command)
 		SHOW_DIALOG("show_dialog", true, ClickEvent.ShowDialog.CODEC), // Allow from server: needed for dialogs
 		CHANGE_PAGE("change_page", true, ClickEvent.ChangePage.CODEC), // Allow from server: needed for books
 		COPY_TO_CLIPBOARD("copy_to_clipboard", true, ClickEvent.CopyToClipboard.CODEC), // Allow from server: convenient for users
