@@ -20,7 +20,8 @@ public class ComponentRenderUtils {
 	private static final FormattedCharSequence INDENT = FormattedCharSequence.codepoint(32, Style.EMPTY);
 
 	private static String stripColor(String string) {
-		return Minecraft.getInstance().options.chatColors().get() ? string : ChatFormatting.stripFormatting(string);
+		// Always preserve formatting to maintain styled text (clickable coordinates, etc.)
+		return string;
 	}
 
 	public static List<FormattedCharSequence> wrapComponents(FormattedText formattedText, int i, Font font) {
