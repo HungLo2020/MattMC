@@ -125,8 +125,6 @@ public class SharedConstants {
 	public static final boolean DEBUG_WORLD_RECREATE = debugFlag("WORLD_RECREATE");
 	public static final boolean DEBUG_SHOW_SERVER_DEBUG_VALUES = debugFlag("SHOW_SERVER_DEBUG_VALUES");
 	public static final boolean DEBUG_FEATURE_COUNT = debugFlag("FEATURE_COUNT");
-	public static final boolean DEBUG_FORCE_TELEMETRY = debugFlag("FORCE_TELEMETRY");
-	public static final boolean DEBUG_DONT_SEND_TELEMETRY_TO_BACKEND = debugFlag("DONT_SEND_TELEMETRY_TO_BACKEND");
 	public static final long MAXIMUM_TICK_TIME_NANOS = Duration.ofMillis(300L).toNanos();
 	public static final float MAXIMUM_BLOCK_EXPLOSION_RESISTANCE = 3600000.0F;
 	public static final boolean USE_WORKFLOWS_HOOKS = false;

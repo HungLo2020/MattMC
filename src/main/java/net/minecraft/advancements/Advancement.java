@@ -31,7 +31,6 @@ public record Advancement(
 	AdvancementRewards rewards,
 	Map<String, Criterion<?>> criteria,
 	AdvancementRequirements requirements,
-	boolean sendsTelemetryEvent,
 	Optional<Component> name
 ) {
 	private static final Codec<Map<String, Criterion<?>>> CRITERIA_CODEC = Codec.unboundedMap(Codec.STRING, Criterion.CODEC)
@@ -42,12 +41,11 @@ public record Advancement(
 					DisplayInfo.CODEC.optionalFieldOf("display").forGetter(Advancement::display),
 					AdvancementRewards.CODEC.optionalFieldOf("rewards", AdvancementRewards.EMPTY).forGetter(Advancement::rewards),
 					CRITERIA_CODEC.fieldOf("criteria").forGetter(Advancement::criteria),
-					AdvancementRequirements.CODEC.optionalFieldOf("requirements").forGetter(advancement -> Optional.of(advancement.requirements())),
-					Codec.BOOL.optionalFieldOf("sends_telemetry_event", false).forGetter(Advancement::sendsTelemetryEvent)
+					AdvancementRequirements.CODEC.optionalFieldOf("requirements").forGetter(advancement -> Optional.of(advancement.requirements()))
 				)
-				.apply(instance, (optional, optional2, advancementRewards, map, optional3, boolean_) -> {
+				.apply(instance, (optional, optional2, advancementRewards, map, optional3) -> {
 					AdvancementRequirements advancementRequirements = (AdvancementRequirements)optional3.orElseGet(() -> AdvancementRequirements.allOf(map.keySet()));
-					return new Advancement(optional, optional2, advancementRewards, map, advancementRequirements, boolean_);
+					return new Advancement(optional, optional2, advancementRewards, map, advancementRequirements);
 				})
 		)
 		.validate(Advancement::validate);
@@ -58,10 +56,9 @@ public record Advancement(
 		Optional<DisplayInfo> optional2,
 		AdvancementRewards advancementRewards,
 		Map<String, Criterion<?>> map,
-		AdvancementRequirements advancementRequirements,
-		boolean bl
+		AdvancementRequirements advancementRequirements
 	) {
-		this(optional, optional2, advancementRewards, Map.copyOf(map), advancementRequirements, bl, optional2.map(Advancement::decorateName));
+		this(optional, optional2, advancementRewards, Map.copyOf(map), advancementRequirements, optional2.map(Advancement::decorateName));
 	}
 
 	private static DataResult<Advancement> validate(Advancement advancement) {
@@ -84,7 +81,6 @@ public record Advancement(
 		registryFriendlyByteBuf.writeOptional(this.parent, FriendlyByteBuf::writeResourceLocation);
 		DisplayInfo.STREAM_CODEC.apply(ByteBufCodecs::optional).encode(registryFriendlyByteBuf, this.display);
 		this.requirements.write(registryFriendlyByteBuf);
-		registryFriendlyByteBuf.writeBoolean(this.sendsTelemetryEvent);
 	}
 
 	private static Advancement read(RegistryFriendlyByteBuf registryFriendlyByteBuf) {
@@ -93,8 +89,7 @@ public record Advancement(
 			(Optional<DisplayInfo>)DisplayInfo.STREAM_CODEC.apply(ByteBufCodecs::optional).decode(registryFriendlyByteBuf),
 			AdvancementRewards.EMPTY,
 			Map.of(),
-			new AdvancementRequirements(registryFriendlyByteBuf),
-			registryFriendlyByteBuf.readBoolean()
+			new AdvancementRequirements(registryFriendlyByteBuf)
 		);
 	}
 
@@ -116,10 +111,9 @@ public record Advancement(
 		private final ImmutableMap.Builder<String, Criterion<?>> criteria = ImmutableMap.builder();
 		private Optional<AdvancementRequirements> requirements = Optional.empty();
 		private AdvancementRequirements.Strategy requirementsStrategy = AdvancementRequirements.Strategy.AND;
-		private boolean sendsTelemetryEvent;
 
 		public static Advancement.Builder advancement() {
-			return new Advancement.Builder().sendsTelemetryEvent();
+			return new Advancement.Builder();
 		}
 
 		public static Advancement.Builder recipeAdvancement() {
@@ -209,16 +203,11 @@ public record Advancement(
 			return this;
 		}
 
-		public Advancement.Builder sendsTelemetryEvent() {
-			this.sendsTelemetryEvent = true;
-			return this;
-		}
-
 		public AdvancementHolder build(ResourceLocation resourceLocation) {
 			Map<String, Criterion<?>> map = this.criteria.buildOrThrow();
 			AdvancementRequirements advancementRequirements = (AdvancementRequirements)this.requirements.orElseGet(() -> this.requirementsStrategy.create(map.keySet()));
 			return new AdvancementHolder(
-				resourceLocation, new Advancement(this.parent, this.display, this.rewards, map, advancementRequirements, this.sendsTelemetryEvent)
+				resourceLocation, new Advancement(this.parent, this.display, this.rewards, map, advancementRequirements)
 			);
 		}
 
