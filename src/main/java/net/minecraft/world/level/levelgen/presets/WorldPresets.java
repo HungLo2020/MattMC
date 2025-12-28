@@ -193,7 +193,7 @@ public class WorldPresets {
 					// Entry 40 - PRIMORDIAL_OCEAN
 					Pair.of(Climate.parameters(Climate.Parameter.span(-0.15F, 1.0F), Climate.Parameter.span(-1.0F, 1.0F), Climate.Parameter.span(-0.19F, 1.0F), Climate.Parameter.span(-1.0F, 1.0F), Climate.Parameter.span(0.85F, 1.0F), Climate.Parameter.span(0.4F, 1.0F), 0.0F), biomes.getOrThrow(Biomes.PRIMORDIAL_OCEAN)),
 					// Entry 41 - PRIMORDIAL_OCEAN
-					Pair.of(Climate.parameters(Climate.Parameter.span(-0.15F, 1.0F), Climate.Parameter.span(-1.0F, 1.0F), Climate.Parameter.span(-0.19F, 1.0F), Climate.Parameter.span(-1.0F, 1.0F), Climate.Parameter.span(1.0F, 1.0F), Climate.Parameter.span(-1.0F, 1.0F), 0.0F), biomes.getOrThrow(Biomes.PRIMORDIAL_OCEAN))
+					Pair.of(Climate.parameters(Climate.Parameter.span(-0.15F, 1F), Climate.Parameter.span(-1F, 1F), Climate.Parameter.span(-0.19F, 1F), Climate.Parameter.span(-1F, 1F), Climate.Parameter.span(1F, 1F), Climate.Parameter.span(0.4F, 1F), 0F), biomes.getOrThrow(Biomes.PRIMORDIAL_OCEAN))
 				)
 			);
 		}
