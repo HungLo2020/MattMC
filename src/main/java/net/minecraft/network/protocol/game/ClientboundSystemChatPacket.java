@@ -10,7 +10,7 @@ import net.minecraft.network.protocol.PacketType;
 
 public record ClientboundSystemChatPacket(Component content, boolean overlay) implements Packet<ClientGamePacketListener> {
 	public static final StreamCodec<RegistryFriendlyByteBuf, ClientboundSystemChatPacket> STREAM_CODEC = StreamCodec.composite(
-		ComponentSerialization.TRUSTED_STREAM_CODEC,
+		ComponentSerialization.TRUSTED_STREAM_CODEC, // Use TRUSTED codec to preserve click events and styles
 		ClientboundSystemChatPacket::content,
 		ByteBufCodecs.BOOL,
 		ClientboundSystemChatPacket::overlay,
