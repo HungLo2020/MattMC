@@ -10,6 +10,20 @@
     "rock_count": 4,
     "hole_count": 1,
     "requires_block_below": true,
-    "valid_blocks": "#dwho:surface"
+    "valid_blocks": [
+      "minecraft:stone",
+      "minecraft:granite",
+      "minecraft:diorite",
+      "minecraft:andesite",
+      "minecraft:deepslate",
+      "minecraft:tuff",
+      "minecraft:calcite",
+      "minecraft:dirt",
+      "minecraft:grass_block",
+      "minecraft:sand",
+      "minecraft:sandstone",
+      "minecraft:gravel",
+      "minecraft:snow_block"
+    ]
   }
 }
