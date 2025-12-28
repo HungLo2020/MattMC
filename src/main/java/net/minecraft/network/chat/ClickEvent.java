@@ -57,6 +57,10 @@ public interface ClickEvent {
 		}
 
 		public static DataResult<ClickEvent.Action> filterForSerialization(ClickEvent.Action action) {
+			// Always allow SUGGEST_COMMAND for /locate and similar commands
+			if (action == SUGGEST_COMMAND) {
+				return DataResult.success(action, Lifecycle.stable());
+			}
 			return !action.isAllowedFromServer() ? DataResult.error(() -> "Click event type not allowed: " + action) : DataResult.success(action, Lifecycle.stable());
 		}
 	}
