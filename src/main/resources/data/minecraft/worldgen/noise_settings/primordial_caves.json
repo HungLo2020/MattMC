@@ -558,9 +558,21 @@
               }
             },
             {
-              "type": "minecraft:block",
-              "result_state": {
-                "Name": "minecraft:dirt"
+              "type": "minecraft:condition",
+              "if_true": {
+                "type": "minecraft:not",
+                "invert": {
+                  "type": "minecraft:biome",
+                  "biome_is": [
+                    "minecraft:primordial_ocean"
+                  ]
+                }
+              },
+              "then_run": {
+                "type": "minecraft:block",
+                "result_state": {
+                  "Name": "minecraft:dirt"
+                }
               }
             }
           ]
