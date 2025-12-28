@@ -38,7 +38,7 @@
         }
       },
       "cannot_replace": "#minecraft:features_cannot_replace",
-      "invalid_blocks": "#dwho:invalid/ore_geodes"
+      "invalid_blocks": "#minecraft:invalid/ore_geodes"
     },
     "crack": {
       "base_crack_size": 2,
