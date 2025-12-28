@@ -1,0 +1,16 @@
+{
+    "values": [
+        "minecraft:stone",
+        "minecraft:deepslate",
+        "minecraft:amethyst_block",
+        "minecraft:calcite",
+        "minecraft:packed_ice",
+        "minecraft:sandstone",
+        "minecraft:tuff",
+        "minecraft:packed_ice",
+        "minecraft:blue_ice",
+        "minecraft:obsidian",
+        "minecraft:prismarine",
+        "#minecraft:terracotta"
+    ]
+}

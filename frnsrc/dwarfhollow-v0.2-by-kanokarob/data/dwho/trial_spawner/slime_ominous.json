@@ -1,0 +1,29 @@
+{
+  "total_mobs": 4,
+  "simultaneous_mobs": 2,
+  "total_mobs_added_per_player": 1.5,
+  "simultaneous_mobs_added_per_player": 1.34,
+  "spawn_potentials": [
+    {
+      "weight": 1,
+      "data": {
+        "entity": {
+          "id": "minecraft:slime",
+          "Size": 2,
+          "attributes": [
+            {
+              "id": "minecraft:scale",
+              "base": 0.8
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "loot_tables_to_eject": [
+    {
+      "weight": 1,
+      "data": "dwho:chests/spawner/ominous"
+    }
+  ]
+}

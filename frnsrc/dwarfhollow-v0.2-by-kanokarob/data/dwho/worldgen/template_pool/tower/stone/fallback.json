@@ -1,0 +1,14 @@
+{
+  "fallback": "dwho:tower/stone/fallback",
+  "elements": [
+    {
+      "weight": 1,
+      "element": {
+        "element_type": "minecraft:single_pool_element",
+        "location": "dwho:towers/stone/roof",
+        "processors": "dwho:tower_stone",
+        "projection": "rigid"
+      }
+    }
+  ]
+}

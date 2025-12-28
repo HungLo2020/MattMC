@@ -53,12 +53,8 @@ public class ShaderPackSelectionList extends IrisObjectSelectionList<ShaderPackS
 
 		this.screen = screen;
 		this.topButtonRow = new TopButtonRowEntry(this, Iris.getIrisConfig().areShadersEnabled());
-		this.downloadButton = new PinnedEntry(Component.literal("Download Shaders"), () -> this.minecraft.setScreen(new ConfirmLinkScreen(bl -> {
-			if (bl) {
-				Util.getPlatform().openUri("https://modrinth.com/shaders");
-			}
-			this.minecraft.setScreen(this.screen);
-		}, "https://modrinth.com/shaders", true)), this);
+		// Download button removed - no external shader pack downloads
+		this.downloadButton = null;
 		try {
 			watcher1 = FileSystems.getDefault().newWatchService();
 			key1 = Iris.getShaderpacksDirectory().register(watcher1,
@@ -188,9 +184,10 @@ public class ShaderPackSelectionList extends IrisObjectSelectionList<ShaderPackS
 
 		this.addEntry(topButtonRow);
 
-		if (names.isEmpty()) {
-			this.addEntry(downloadButton);
-		}
+		// Download button removed - no external shader pack downloads
+		// if (names.isEmpty()) {
+		// 	this.addEntry(downloadButton);
+		// }
 
 		// Only allow the enable/disable shaders button if the user has
 		// added a shader pack. Otherwise, the button will be disabled.

@@ -174,7 +174,7 @@ After thoroughly analyzing all mixin configuration files across the entire codeb
 
 ### Implementation Progress
 
-- ✅ **Completed**: 24 mixins converted to hooks (8.5% of 284 total)
+- ✅ **Completed**: 26 mixins converted to hooks (9.2% of 284 total)
   1. Sodium `MinecraftMixin.postInit()` → GameHooks.onGameInitialized()
   2. Sodium `MinecraftMixin.preRender()` → GameHooks.beforeRunTick()
   3. Sodium `MinecraftMixin.postRender()` → GameHooks.afterRunTick()
@@ -198,7 +198,11 @@ After thoroughly analyzing all mixin configuration files across the entire codeb
   23. Sodium `ClientChunkCacheMixin` → ClientLevelHooks.onChunkLoaded() + onChunkDropped()
   24. Sodium `BlockEntityTypeMixin` → BlockEntityTypeHooks.onBlockEntityTypeInit()
   25. Sodium `SpriteContentsMixin` → SpriteContentsHooks.onSpriteContentsInit()
-- ⏳ **Remaining**: 260 mixins to convert to hooks (73 Sodium + 168 Iris + 19 DH)
+  26. Sodium `WindowMixin` → NativeWindowHandle + window hints (hook-based)
+- ⏳ **Remaining**: 259 mixins to convert to hooks (72 Sodium + 168 Iris + 19 DH)
+- ⚠️ **Cannot Convert** (Iris compatibility):
+  - `core.render.world.GameRendererMixin` (FogStorage) - Iris casts GameRenderer to FogStorage
+  - `core.render.frustum.FrustumMixin` (ViewportProvider) - Iris shadow frustums extend Frustum and implement ViewportProvider
 
 **Recent Sessions**:
 - Session 1: MinecraftMixin (4 methods, GPU sync + resource reload) - 5 mixins
@@ -209,6 +213,7 @@ After thoroughly analyzing all mixin configuration files across the entire codeb
 - Session 6: BlockColorsMixin - 1 mixin
 - Session 7: ClientLevelMixin (2 files), VertexFormatMixin - 3 mixins
 - Session 8: ClientChunkCacheMixin, BlockEntityTypeMixin, SpriteContentsMixin - 3 mixins
+- Session 9: WindowMixin - 1 mixin (FrustumMixin and GameRendererMixin reverted for Iris compatibility)
 - Build verified successful after each session
 
 **Hook Infrastructure Created**:

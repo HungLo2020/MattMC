@@ -11,6 +11,7 @@ import com.mojang.datafixers.DataFixer;
 import com.mojang.jtracy.DiscontinuousFrame;
 import com.mojang.jtracy.TracyClient;
 import com.mojang.logging.LogUtils;
+import com.mojang.serialization.Lifecycle;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectArraySet;
 import java.awt.image.BufferedImage;
@@ -64,10 +65,15 @@ import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.GlobalPos;
+import net.minecraft.core.Holder;
 import net.minecraft.core.HolderGetter;
+import net.minecraft.core.HolderLookup;
 import net.minecraft.core.LayeredRegistryAccess;
+import net.minecraft.core.MappedRegistry;
 import net.minecraft.core.Registry;
 import net.minecraft.core.RegistryAccess;
+import net.minecraft.core.RegistrationInfo;
+import net.minecraft.core.WritableRegistry;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.data.worldgen.features.MiscOverworldFeatures;
 import net.minecraft.gametest.framework.GameTestTicker;
@@ -154,14 +160,21 @@ import net.minecraft.world.level.LevelSettings;
 import net.minecraft.world.level.TicketStorage;
 import net.minecraft.world.level.WorldDataConfiguration;
 import net.minecraft.world.level.biome.BiomeManager;
+import net.minecraft.world.level.biome.MultiNoiseBiomeSource;
+import net.minecraft.world.level.biome.MultiNoiseBiomeSourceParameterLists;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.FuelValues;
 import net.minecraft.world.level.border.WorldBorder;
+import net.minecraft.world.level.chunk.ChunkGenerator;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
 import net.minecraft.world.level.chunk.storage.ChunkIOErrorReporter;
 import net.minecraft.world.level.chunk.storage.RegionStorageInfo;
+import net.minecraft.world.level.dimension.BuiltinDimensionTypes;
+import net.minecraft.world.level.dimension.DimensionType;
 import net.minecraft.world.level.dimension.LevelStem;
 import net.minecraft.world.level.levelgen.Heightmap;
+import net.minecraft.world.level.levelgen.NoiseBasedChunkGenerator;
+import net.minecraft.world.level.levelgen.NoiseGeneratorSettings;
 import net.minecraft.world.level.levelgen.PatrolSpawner;
 import net.minecraft.world.level.levelgen.PhantomSpawner;
 import net.minecraft.world.level.levelgen.WorldOptions;
@@ -401,6 +414,10 @@ public abstract class MinecraftServer extends ReentrantBlockableEventLoop<TickTa
 		ServerLevelData serverLevelData = this.worldData.overworldData();
 		boolean bl = this.worldData.isDebugWorld();
 		Registry<LevelStem> registry = this.registries.compositeAccess().lookupOrThrow(Registries.LEVEL_STEM);
+		
+		// Inject Primordial Caves dimension for existing worlds
+		registry = ensurePrimordialCavesDimension(registry);
+		
 		WorldOptions worldOptions = this.worldData.worldGenOptions();
 		long l = worldOptions.seed();
 		long m = BiomeManager.obfuscateSeed(l);
@@ -486,6 +503,66 @@ public abstract class MinecraftServer extends ReentrantBlockableEventLoop<TickTa
 
 		if (bl2) {
 			serverLevelData.setLegacyWorldBorderSettings(Optional.empty());
+		}
+	}
+
+	/**
+	 * Ensures the Primordial Caves dimension is available in the registry.
+	 * This allows the dimension to work in existing worlds that were created before the dimension was added.
+	 */
+	private Registry<LevelStem> ensurePrimordialCavesDimension(Registry<LevelStem> registry) {
+		// Check if the Primordial Caves dimension already exists
+		if (registry.containsKey(LevelStem.PRIMORDIAL_CAVES)) {
+			return registry; // Already exists, no modification needed
+		}
+		
+		LOGGER.info("Injecting Primordial Caves dimension into existing world");
+		
+		try {
+			// Get required lookups
+			HolderLookup.Provider provider = this.registries.compositeAccess();
+			HolderLookup<DimensionType> dimensionTypes = provider.lookupOrThrow(Registries.DIMENSION_TYPE);
+			HolderLookup<net.minecraft.world.level.biome.Biome> biomes = provider.lookupOrThrow(Registries.BIOME);
+			HolderLookup<net.minecraft.world.level.levelgen.structure.StructureSet> structureSets = provider.lookupOrThrow(Registries.STRUCTURE_SET);
+			HolderLookup<net.minecraft.world.level.levelgen.NoiseGeneratorSettings> noiseSettings = provider.lookupOrThrow(Registries.NOISE_SETTINGS);
+			HolderLookup<net.minecraft.world.level.biome.MultiNoiseBiomeSourceParameterList> multiNoise = provider.lookupOrThrow(Registries.MULTI_NOISE_BIOME_SOURCE_PARAMETER_LIST);
+			
+			// Get the dimension type
+			Holder<DimensionType> dimensionTypeHolder = dimensionTypes.getOrThrow(net.minecraft.world.level.dimension.BuiltinDimensionTypes.PRIMORDIAL_CAVES);
+			
+			// Create biome source
+			Holder<net.minecraft.world.level.biome.MultiNoiseBiomeSourceParameterList> multiNoiseHolder = multiNoise.getOrThrow(net.minecraft.world.level.biome.MultiNoiseBiomeSourceParameterLists.PRIMORDIAL_CAVES);
+			net.minecraft.world.level.biome.MultiNoiseBiomeSource biomeSource = net.minecraft.world.level.biome.MultiNoiseBiomeSource.createFromPreset(multiNoiseHolder);
+			
+			// Get noise settings
+			Holder<net.minecraft.world.level.levelgen.NoiseGeneratorSettings> noiseSettingsHolder = noiseSettings.getOrThrow(net.minecraft.world.level.levelgen.NoiseGeneratorSettings.PRIMORDIAL_CAVES);
+			
+			// Create chunk generator
+			net.minecraft.world.level.chunk.ChunkGenerator chunkGenerator = new net.minecraft.world.level.levelgen.NoiseBasedChunkGenerator(biomeSource, noiseSettingsHolder);
+			
+			// Create the LevelStem
+			LevelStem primordialCavesLevelStem = new LevelStem(dimensionTypeHolder, chunkGenerator);
+			
+			// Create a new writable registry with all existing dimensions plus ours
+			WritableRegistry<LevelStem> writableRegistry = new MappedRegistry<>(Registries.LEVEL_STEM, registry.registryLifecycle());
+			
+			// Copy all existing dimensions
+			registry.listElements().forEach(reference -> {
+				writableRegistry.register(reference.key(), reference.value(), registry.registrationInfo(reference.key()).orElse(new RegistrationInfo(Optional.empty(), Lifecycle.stable())));
+			});
+			
+			// Add Primordial Caves dimension
+			writableRegistry.register(
+				LevelStem.PRIMORDIAL_CAVES,
+				primordialCavesLevelStem,
+				new RegistrationInfo(Optional.empty(), Lifecycle.stable())
+			);
+			
+			// Freeze and return the new registry
+			return writableRegistry.freeze();
+		} catch (Exception e) {
+			LOGGER.error("Failed to inject Primordial Caves dimension: {}", e.getMessage(), e);
+			return registry; // Return original registry if injection fails
 		}
 	}
 

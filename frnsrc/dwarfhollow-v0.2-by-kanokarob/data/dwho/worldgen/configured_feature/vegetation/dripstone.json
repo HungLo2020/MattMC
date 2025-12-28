@@ -1,0 +1,18 @@
+{
+  "type": "minecraft:random_selector",
+  "config": {
+    "default": {
+      "feature": "dwho:rock_dripstone",
+      "placement": []
+    },
+    "features": [
+      {
+        "chance": 0.15,
+        "feature": {
+          "feature": "dwho:pointed_dripstone",
+          "placement": []
+        }
+      }
+    ]
+  }
+}

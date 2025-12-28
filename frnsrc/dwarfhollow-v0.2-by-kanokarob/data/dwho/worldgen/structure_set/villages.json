@@ -1,0 +1,22 @@
+{
+  "placement": {
+    "type": "minecraft:random_spread",
+    "salt": 10387312,
+    "separation": 8,
+    "spacing": 21
+  },
+  "structures": [
+    {
+      "structure": "dwho:village_bronze",
+      "weight": 1
+    },
+    {
+      "structure": "dwho:village_honey",
+      "weight": 1
+    },
+    {
+      "structure": "dwho:village_dry",
+      "weight": 1
+    }
+  ]
+}

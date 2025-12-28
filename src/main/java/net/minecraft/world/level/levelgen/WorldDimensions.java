@@ -40,7 +40,7 @@ public record WorldDimensions(Map<ResourceKey<LevelStem>, LevelStem> dimensions)
 			)
 			.apply(instance, instance.stable(WorldDimensions::new))
 	);
-	private static final Set<ResourceKey<LevelStem>> BUILTIN_ORDER = ImmutableSet.of(LevelStem.OVERWORLD, LevelStem.NETHER, LevelStem.END);
+	private static final Set<ResourceKey<LevelStem>> BUILTIN_ORDER = ImmutableSet.of(LevelStem.OVERWORLD, LevelStem.NETHER, LevelStem.END, LevelStem.PRIMORDIAL_CAVES);
 	private static final int VANILLA_DIMENSION_COUNT = BUILTIN_ORDER.size();
 
 	public WorldDimensions(Map<ResourceKey<LevelStem>, LevelStem> dimensions) {
@@ -124,8 +124,12 @@ public record WorldDimensions(Map<ResourceKey<LevelStem>, LevelStem> dimensions)
 			return isStableOverworld(levelStem);
 		} else if (resourceKey == LevelStem.NETHER) {
 			return isStableNether(levelStem);
+		} else if (resourceKey == LevelStem.END) {
+			return isStableEnd(levelStem);
+		} else if (resourceKey == LevelStem.PRIMORDIAL_CAVES) {
+			return isStablePrimordialCaves(levelStem);
 		} else {
-			return resourceKey == LevelStem.END ? isStableEnd(levelStem) : false;
+			return false;
 		}
 	}
 
@@ -154,6 +158,14 @@ public record WorldDimensions(Map<ResourceKey<LevelStem>, LevelStem> dimensions)
 			&& noiseBasedChunkGenerator.getBiomeSource() instanceof TheEndBiomeSource;
 	}
 
+	private static boolean isStablePrimordialCaves(LevelStem levelStem) {
+		return levelStem.type().is(BuiltinDimensionTypes.PRIMORDIAL_CAVES)
+			&& levelStem.generator() instanceof NoiseBasedChunkGenerator noiseBasedChunkGenerator
+			&& noiseBasedChunkGenerator.stable(NoiseGeneratorSettings.PRIMORDIAL_CAVES)
+			&& noiseBasedChunkGenerator.getBiomeSource() instanceof MultiNoiseBiomeSource multiNoiseBiomeSource
+			&& multiNoiseBiomeSource.stable(MultiNoiseBiomeSourceParameterLists.PRIMORDIAL_CAVES);
+	}
+
 	public WorldDimensions.Complete bake(Registry<LevelStem> registry) {
 		Stream<ResourceKey<LevelStem>> stream = Stream.concat(registry.registryKeySet().stream(), this.dimensions.keySet().stream()).distinct();
 
@@ -171,7 +183,17 @@ public record WorldDimensions(Map<ResourceKey<LevelStem>, LevelStem> dimensions)
 					.or(() -> Optional.ofNullable((LevelStem)this.dimensions.get(resourceKey)))
 					.ifPresent(levelStem -> list.add(new Entry(resourceKey, levelStem)))
 			);
-		Lifecycle lifecycle = list.size() == VANILLA_DIMENSION_COUNT ? Lifecycle.stable() : Lifecycle.experimental();
+		// Check if dimensions are stable: either vanilla 3 (Overworld, Nether, End) or all 4 builtins including Primordial Caves
+		boolean hasVanillaThree = list.size() == 3 && 
+			list.stream().anyMatch(e -> e.key == LevelStem.OVERWORLD) &&
+			list.stream().anyMatch(e -> e.key == LevelStem.NETHER) &&
+			list.stream().anyMatch(e -> e.key == LevelStem.END);
+		boolean hasAllBuiltins = list.size() == VANILLA_DIMENSION_COUNT &&
+			list.stream().anyMatch(e -> e.key == LevelStem.OVERWORLD) &&
+			list.stream().anyMatch(e -> e.key == LevelStem.NETHER) &&
+			list.stream().anyMatch(e -> e.key == LevelStem.END) &&
+			list.stream().anyMatch(e -> e.key == LevelStem.PRIMORDIAL_CAVES);
+		Lifecycle lifecycle = (hasVanillaThree || hasAllBuiltins) ? Lifecycle.stable() : Lifecycle.experimental();
 		WritableRegistry<LevelStem> writableRegistry = new MappedRegistry<>(Registries.LEVEL_STEM, lifecycle);
 		list.forEach(arg -> writableRegistry.register(arg.key, arg.value, arg.registrationInfo()));
 		Registry<LevelStem> registry2 = writableRegistry.freeze();

@@ -1,0 +1,27 @@
+{
+  "type": "minecraft:vegetation_patch",
+  "config": {
+    "surface": "ceiling",
+    "depth": 1,
+    "vertical_range": 7,
+    "extra_bottom_block_chance": 0.825,
+    "extra_edge_column_chance": 0.375,
+    "vegetation_chance": 0.04,
+    "xz_radius": {
+      "type": "minecraft:uniform",
+      "min_inclusive": 3,
+      "max_inclusive": 5
+    },
+    "replaceable": "#dwho:replaceable/bramble",
+    "ground_state": {
+      "type": "minecraft:simple_state_provider",
+      "state": {
+        "Name": "minecraft:pale_moss_block"
+      }
+    },
+    "vegetation_feature": {
+      "feature": "dwho:vegetation/bramble_ceiling",
+      "placement": []
+    }
+  }
+}

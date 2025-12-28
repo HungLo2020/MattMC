@@ -11,7 +11,6 @@
   },
   "client": [
     "core.GlCommandEncoderAccessor",
-    "core.WindowMixin",
     "core.render.frustum.FrustumMixin",
     "core.render.immediate.consumer.BufferBuilderMixin",
     "core.render.immediate.consumer.EntityOutlineGeneratorMixin",

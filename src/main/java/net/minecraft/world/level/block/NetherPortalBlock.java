@@ -19,8 +19,10 @@ import net.minecraft.world.entity.EntitySpawnReason;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.InsideBlockEffectApplier;
 import net.minecraft.world.entity.Relative;
+import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.GameRules;
 import net.minecraft.world.level.Level;
@@ -109,8 +111,64 @@ public class NetherPortalBlock extends Block implements Portal {
 	protected void entityInside(
 		BlockState blockState, Level level, BlockPos blockPos, Entity entity, InsideBlockEffectApplier insideBlockEffectApplier, boolean bl
 	) {
+		// Check if a pitcher pod is thrown into the portal - convert to Primordial Caves portal
+		if (entity instanceof ItemEntity itemEntity && level instanceof ServerLevel serverLevel) {
+			ItemStack stack = itemEntity.getItem();
+			if (stack.is(Items.PITCHER_POD)) {
+				// Convert this portal to a Primordial Caves portal
+				convertToPrimordialCavesPortal(serverLevel, blockPos, blockState);
+				// Remove the pitcher pod
+				itemEntity.discard();
+				// Play sound effect
+				level.playSound(null, blockPos, SoundEvents.PORTAL_TRIGGER, SoundSource.BLOCKS, 1.0F, 1.0F);
+				return;
+			}
+		}
+		
 		if (entity.canUsePortal(false)) {
 			entity.setAsInsidePortal(this, blockPos);
+		}
+	}
+	
+	private void convertToPrimordialCavesPortal(ServerLevel level, BlockPos blockPos, BlockState blockState) {
+		// Get the axis of the portal
+		Direction.Axis axis = blockState.getValue(AXIS);
+		
+		// Use PortalShape to find the complete portal structure
+		PortalShape portalShape = PortalShape.findAnyShape(level, blockPos, axis);
+		
+		if (!portalShape.isComplete()) {
+			return; // Don't convert incomplete portals
+		}
+		
+		// Collect all connected portal blocks by searching in a 21x21 area (max portal size)
+		java.util.List<BlockPos> portalBlocks = new java.util.ArrayList<>();
+		java.util.Set<BlockPos> visited = new java.util.HashSet<>();
+		java.util.Queue<BlockPos> queue = new java.util.LinkedList<>();
+		queue.add(blockPos);
+		visited.add(blockPos);
+		
+		// BFS to find all connected portal blocks
+		while (!queue.isEmpty()) {
+			BlockPos current = queue.poll();
+			if (level.getBlockState(current).is(this)) {
+				portalBlocks.add(current);
+				
+				// Check all 4 adjacent positions (same axis plane and vertical)
+				for (Direction dir : Direction.values()) {
+					BlockPos neighbor = current.relative(dir);
+					if (!visited.contains(neighbor) && neighbor.distManhattan(blockPos) <= 42) {
+						visited.add(neighbor);
+						queue.add(neighbor);
+					}
+				}
+			}
+		}
+		
+		// Convert all portal blocks at once with flag 2 (no block updates to neighbors)
+		// This prevents the portal from breaking during conversion
+		for (BlockPos pos : portalBlocks) {
+			level.setBlock(pos, Blocks.PRIMORDIAL_CAVES_PORTAL.defaultBlockState().setValue(PrimordialCavesPortalBlock.AXIS, axis), 2);
 		}
 	}
 

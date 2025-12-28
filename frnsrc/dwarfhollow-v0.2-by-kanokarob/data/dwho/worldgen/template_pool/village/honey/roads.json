@@ -1,0 +1,59 @@
+{
+  "fallback": "minecraft:empty",
+  "elements": [
+    {
+      "weight": 16,
+      "element": {
+        "element_type": "minecraft:single_pool_element",
+        "location": "dwho:village/honey/roads/straight",
+        "processors": "dwho:roads_honey",
+        "projection": "rigid"
+      }
+    },
+    {
+      "weight": 4,
+      "element": {
+        "element_type": "minecraft:single_pool_element",
+        "location": "dwho:village/honey/roads/corner_left",
+        "processors": "dwho:roads_honey",
+        "projection": "rigid"
+      }
+    },
+    {
+      "weight": 4,
+      "element": {
+        "element_type": "minecraft:single_pool_element",
+        "location": "dwho:village/honey/roads/corner_right",
+        "processors": "dwho:roads_honey",
+        "projection": "rigid"
+      }
+    },
+    {
+      "weight": 8,
+      "element": {
+        "element_type": "minecraft:single_pool_element",
+        "location": "dwho:village/honey/roads/intersection",
+        "processors": "dwho:roads_honey",
+        "projection": "rigid"
+      }
+    },
+    {
+      "weight": 6,
+      "element": {
+        "element_type": "minecraft:single_pool_element",
+        "location": "dwho:village/honey/roads/ramp_up",
+        "processors": "dwho:roads_honey",
+        "projection": "rigid"
+      }
+    },
+    {
+      "weight": 6,
+      "element": {
+        "element_type": "minecraft:single_pool_element",
+        "location": "dwho:village/honey/roads/ramp_down",
+        "processors": "dwho:roads_honey",
+        "projection": "rigid"
+      }
+    }
+  ]
+}

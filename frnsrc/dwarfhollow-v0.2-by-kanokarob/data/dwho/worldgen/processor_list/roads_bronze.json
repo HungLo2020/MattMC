@@ -1,0 +1,35 @@
+{
+  "processors": [
+    {
+      "processor_type": "minecraft:rule",
+      "rules": [
+        {
+          "location_predicate": {
+            "predicate_type": "minecraft:tag_match",
+            "tag": "minecraft:air"
+          },
+          "input_predicate": {
+            "predicate_type": "minecraft:block_match",
+            "block": "minecraft:dirt_path"
+          },
+          "output_state": {
+            "Name": "minecraft:acacia_planks"
+          }
+        },
+        {
+          "location_predicate": {
+            "predicate_type": "minecraft:always_true"
+          },
+          "input_predicate": {
+            "predicate_type": "minecraft:random_block_match",
+            "block": "minecraft:dirt_path",
+            "probability": 0.27777
+          },
+          "output_state": {
+            "Name": "minecraft:grass_block"
+          }
+        }
+      ]
+    }
+  ]
+}

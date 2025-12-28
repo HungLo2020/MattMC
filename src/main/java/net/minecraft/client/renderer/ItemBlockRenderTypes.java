@@ -318,6 +318,7 @@ public class ItemBlockRenderTypes {
 		ChunkSectionLayer chunkSectionLayer4 = ChunkSectionLayer.TRANSLUCENT;
 		hashMap.put(Blocks.ICE, chunkSectionLayer4);
 		hashMap.put(Blocks.NETHER_PORTAL, chunkSectionLayer4);
+		hashMap.put(Blocks.PRIMORDIAL_CAVES_PORTAL, chunkSectionLayer4);
 		hashMap.put(Blocks.WHITE_STAINED_GLASS, chunkSectionLayer4);
 		hashMap.put(Blocks.ORANGE_STAINED_GLASS, chunkSectionLayer4);
 		hashMap.put(Blocks.MAGENTA_STAINED_GLASS, chunkSectionLayer4);

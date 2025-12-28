@@ -150,6 +150,7 @@ import net.minecraft.client.resources.GrassColorReloadListener;
 import net.minecraft.client.resources.MapTextureManager;
 import net.minecraft.client.resources.SkinManager;
 import net.minecraft.client.resources.SplashManager;
+import net.minecraft.client.resources.TipsManager;
 import net.minecraft.client.resources.WaypointStyleManager;
 import net.minecraft.client.resources.language.I18n;
 import net.minecraft.client.resources.language.LanguageManager;
@@ -317,6 +318,7 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 	private final MusicManager musicManager;
 	private final FontManager fontManager;
 	private final SplashManager splashManager;
+	private final TipsManager tipsManager;
 	private final GpuWarnlistManager gpuWarnlistManager;
 	private final PeriodicNotificationManager regionalCompliancies = new PeriodicNotificationManager(REGIONAL_COMPLIANCIES, Minecraft::countryEqualsISO3);
 	private final UserApiService userApiService;
@@ -510,6 +512,8 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 		this.resourceManager.registerReloadListener(this.soundManager);
 		this.splashManager = new SplashManager(this.user);
 		this.resourceManager.registerReloadListener(this.splashManager);
+		this.tipsManager = new TipsManager();
+		this.resourceManager.registerReloadListener(this.tipsManager);
 		this.atlasManager = new AtlasManager(this.textureManager, this.options.mipmapLevels().get());
 		this.resourceManager.registerReloadListener(this.atlasManager);
 		ProfileResolver profileResolver = new LocalPlayerResolver(this, this.services.profileResolver());
@@ -2177,6 +2181,11 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 	}
 
 	private void updateLevelInEngines(@Nullable ClientLevel clientLevel) {
+		// Call registered level hooks before updating engines
+		for (net.minecraft.hooks.MinecraftLevelHooks hook : net.minecraft.hooks.HookRegistry.getMinecraftLevelHooks()) {
+			hook.onLevelUpdateInEngines(clientLevel);
+		}
+		
 		this.soundManager.stop();
 		this.setCameraEntity(null);
 		this.pendingConnection = null;
@@ -2673,6 +2682,10 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 
 	public SplashManager getSplashManager() {
 		return this.splashManager;
+	}
+
+	public TipsManager getTipsManager() {
+		return this.tipsManager;
 	}
 
 	@Nullable

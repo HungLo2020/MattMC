@@ -6,6 +6,7 @@ import net.caffeinemc.mods.sodium.client.hooks.SodiumBlockEntityTypeHook;
 import net.caffeinemc.mods.sodium.client.hooks.SodiumClientLevelHook;
 import net.caffeinemc.mods.sodium.client.hooks.SodiumSpriteContentsHook;
 import net.caffeinemc.mods.sodium.client.hooks.SodiumVertexFormatHook;
+import net.caffeinemc.mods.sodium.client.hooks.SodiumWindowHook;
 import net.caffeinemc.mods.sodium.client.render.frapi.SodiumRenderer;
 import net.caffeinemc.mods.sodium.client.util.FlawlessFrames;
 import net.fabricmc.api.ClientModInitializer;
@@ -59,5 +60,6 @@ public class SodiumFabricMod implements ClientModInitializer {
         HookRegistry.registerVertexFormatHook(SodiumVertexFormatHook.getInstance());
         HookRegistry.registerBlockEntityTypeHook(SodiumBlockEntityTypeHook.getInstance());
         HookRegistry.registerSpriteContentsHook(SodiumSpriteContentsHook.getInstance());
+        HookRegistry.registerWindowHook(SodiumWindowHook.getInstance());
     }
 }

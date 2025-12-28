@@ -34,6 +34,14 @@ float GetBloomFog(float lViewPos) {
         bloomFog *= float(isEyeInWater == 0);
 
         float bloomFogMult = netherBloomAdd;
+    #elif defined PRIMORDIAL_CAVES
+        float farM = min(renderDistance, NETHER_VIEW_LIMIT); // consistency9023HFUE85JG
+        float bloomFog = lViewPos / clamp(farM, 96.0, 256.0);
+        bloomFog *= bloomFog * bloomFog;
+        bloomFog = 1.0 - exp(-8.0 * bloomFog);
+        bloomFog *= float(isEyeInWater == 0);
+
+        float bloomFogMult = netherBloomAdd;
     #endif
 
     bloomFogMult *= BLOOM_STRENGTH * 8.33333;

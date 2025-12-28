@@ -1,0 +1,33 @@
+{
+  "total_mobs": 3,
+  "simultaneous_mobs": 2,
+  "total_mobs_added_per_player": 1,
+  "simultaneous_mobs_added_per_player": 0.75,
+  "spawn_potentials": [
+    {
+      "weight": 1,
+      "data": {
+        "entity": {
+          "id": "minecraft:cave_spider",
+          "attributes": [
+            {
+              "id": "minecraft:scale",
+              "base": 1.15
+            }
+          ],
+          "Passengers": [
+            {
+              "id": "minecraft:skeleton"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "loot_tables_to_eject": [
+    {
+      "weight": 1,
+      "data": "dwho:chests/spawner/ominous"
+    }
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "feature": "dwho:block_column/support_chain_red_sandstone",
+  "placement": [
+    {
+      "type": "minecraft:block_predicate_filter",
+      "predicate": {
+        "type": "minecraft:matching_blocks",
+        "blocks": "minecraft:oak_planks",
+        "offset": [0,-1,0]
+      }
+    },
+    {
+      "type": "minecraft:count",
+      "count": 20
+    }
+  ]
+}

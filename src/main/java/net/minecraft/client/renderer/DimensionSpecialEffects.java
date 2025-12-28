@@ -21,6 +21,7 @@ public abstract class DimensionSpecialEffects {
 			object2ObjectArrayMap.put(BuiltinDimensionTypes.OVERWORLD_EFFECTS, overworldEffects);
 			object2ObjectArrayMap.put(BuiltinDimensionTypes.NETHER_EFFECTS, new DimensionSpecialEffects.NetherEffects());
 			object2ObjectArrayMap.put(BuiltinDimensionTypes.END_EFFECTS, new DimensionSpecialEffects.EndEffects());
+			object2ObjectArrayMap.put(BuiltinDimensionTypes.PRIMORDIAL_CAVES_EFFECTS, new DimensionSpecialEffects.PrimordialCavesEffects());
 		}
 	);
 	private final DimensionSpecialEffects.SkyType skyType;
@@ -81,6 +82,23 @@ public abstract class DimensionSpecialEffects {
 	@Environment(EnvType.CLIENT)
 	public static class NetherEffects extends DimensionSpecialEffects {
 		public NetherEffects() {
+			super(DimensionSpecialEffects.SkyType.NONE, true, false);
+		}
+
+		@Override
+		public Vec3 getBrightnessDependentFogColor(Vec3 vec3, float f) {
+			return vec3;
+		}
+
+		@Override
+		public boolean isFoggyAt(int i, int j) {
+			return true;
+		}
+	}
+
+	@Environment(EnvType.CLIENT)
+	public static class PrimordialCavesEffects extends DimensionSpecialEffects {
+		public PrimordialCavesEffects() {
 			super(DimensionSpecialEffects.SkyType.NONE, true, false);
 		}
 

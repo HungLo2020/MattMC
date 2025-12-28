@@ -1,0 +1,62 @@
+{
+  "type": "minecraft:add",
+  "argument1": {
+    "type": "minecraft:add",
+    "argument1": {
+      "type": "minecraft:mul",
+      "argument1": {
+        "type": "minecraft:add",
+        "argument1": {
+          "type": "minecraft:mul",
+          "argument1": {
+            "type": "minecraft:noise",
+            "noise": "dwho:erosion",
+            "xz_scale": 6.25,
+            "y_scale": 36
+          },
+          "argument2": "dwho:erosion"
+        },
+        "argument2": -0.00625
+      },
+      "argument2": "dwho:continents"
+    },
+    "argument2": 0.0235
+  },
+  "argument2": {
+    "type": "minecraft:add",
+    "argument1": {
+      "type": "minecraft:range_choice",
+      "input": "dwho:continents",
+      "min_inclusive": -1,
+      "max_exclusive": 0.1,
+      "when_in_range": {
+        "type": "minecraft:mul",
+        "argument1": -0.0625,
+        "argument2": {
+          "type": "minecraft:abs",
+          "argument": {
+            "type": "minecraft:noise",
+            "noise": "dwho:rocks",
+            "xz_scale": 1,
+            "y_scale": 3
+          }
+        }
+      },
+      "when_out_of_range": -0.00685
+    },
+    "argument2": {
+      "type": "minecraft:mul",
+      "argument1": {
+        "type": "minecraft:add",
+        "argument1": "dwho:ridges",
+        "argument2": {
+          "type": "minecraft:noise",
+          "noise": "dwho:ridge",
+          "xz_scale": 2,
+          "y_scale": 12
+        }
+      },
+      "argument2": 0.0625
+    }
+  }
+}

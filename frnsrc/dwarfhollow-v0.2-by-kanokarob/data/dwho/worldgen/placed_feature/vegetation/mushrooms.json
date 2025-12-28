@@ -1,0 +1,50 @@
+{
+  "feature": {
+    "config": {
+      "features": [
+        {
+          "chance": 0.065,
+          "feature": {
+            "feature": "dwho:tree/red_mushroom_bulb",
+            "placement": []
+          }
+        }
+      ],
+      "default": {
+        "feature": "dwho:tree/brown_mushroom_roots",
+        "placement": []
+      }
+    },
+    "type": "minecraft:random_selector"
+  },
+  "placement": [
+    {
+      "type": "minecraft:count_on_every_layer",
+      "count": 25
+    },
+    {
+      "type": "minecraft:block_predicate_filter",
+      "predicate": {
+        "type": "minecraft:all_of",
+        "predicates": [
+          {
+            "type": "minecraft:matching_blocks",
+            "blocks": "minecraft:air"
+          },
+          {
+            "type": "minecraft:matching_block_tag",
+            "offset": [
+              0,
+              -1,
+              0
+            ],
+            "tag": "dwho:surface"
+          }
+        ]
+      }
+    },
+    {
+      "type": "minecraft:biome"
+    }
+  ]
+}
