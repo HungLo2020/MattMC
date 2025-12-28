@@ -1142,7 +1142,7 @@
             ],
             "offset": 0
           },
-          "biome": "minecraft:primordial_plains"
+          "biome": "minecraft:primordial_ocean"
         },
         {
           "parameters": {
@@ -1202,7 +1202,7 @@
             ],
             "offset": 0
           },
-          "biome": "minecraft:primordial_plains"
+          "biome": "minecraft:primordial_ocean"
         },
         {
           "parameters": {
