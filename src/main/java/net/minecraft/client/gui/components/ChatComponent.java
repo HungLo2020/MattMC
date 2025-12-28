@@ -119,7 +119,8 @@ public class ChatComponent {
 				});
 				int s = this.forEachLine(l, i, bl, p, (jx, kx, lx, line, mx, gx) -> {
 					int nx = lx + r;
-					guiGraphics.drawString(this.minecraft.font, line.content(), jx, nx, ARGB.color(gx * g, -1));
+					// Use full opacity to preserve styled text colors (e.g., green clickable coordinates)
+					guiGraphics.drawString(this.minecraft.font, line.content(), jx, nx, ARGB.color(g, -1));
 				});
 				long t = this.minecraft.getChatListener().queueSize();
 				if (t > 0L) {
