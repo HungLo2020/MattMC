@@ -83,7 +83,8 @@ public record NoiseGeneratorSettings(
 		bootstrapContext.register(END, end(bootstrapContext));
 		bootstrapContext.register(CAVES, caves(bootstrapContext));
 		bootstrapContext.register(FLOATING_ISLANDS, floatingIslands(bootstrapContext));
-		bootstrapContext.register(PRIMORDIAL_CAVES, primordialCaves(bootstrapContext));
+		// PRIMORDIAL_CAVES is loaded from JSON file: src/main/resources/data/minecraft/worldgen/noise_settings/primordial_caves.json
+		// bootstrapContext.register(PRIMORDIAL_CAVES, primordialCaves(bootstrapContext));
 	}
 
 	private static NoiseGeneratorSettings end(BootstrapContext<?> bootstrapContext) {

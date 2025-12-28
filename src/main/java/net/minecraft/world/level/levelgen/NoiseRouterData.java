@@ -428,12 +428,12 @@ public class NoiseRouterData {
 	}
 
 	protected static NoiseRouter primordialCaves(HolderGetter<DensityFunction> holderGetter, HolderGetter<NormalNoise.NoiseParameters> holderGetter2) {
-		// Reference the DWHO density functions defined in JSON
+		// Reference the DWHO density functions defined in JSON (matching noise_settings/primordial_caves.json exactly)
 		ResourceKey<DensityFunction> continents = ResourceKey.create(Registries.DENSITY_FUNCTION, ResourceLocation.withDefaultNamespace("dwho_continents"));
 		ResourceKey<DensityFunction> erosion = ResourceKey.create(Registries.DENSITY_FUNCTION, ResourceLocation.withDefaultNamespace("dwho_erosion"));
 		ResourceKey<DensityFunction> depth = ResourceKey.create(Registries.DENSITY_FUNCTION, ResourceLocation.withDefaultNamespace("dwho_depth"));
 		ResourceKey<DensityFunction> finalDensity = ResourceKey.create(Registries.DENSITY_FUNCTION, ResourceLocation.withDefaultNamespace("dwho_final_density"));
-		ResourceKey<DensityFunction> ridges = ResourceKey.create(Registries.DENSITY_FUNCTION, ResourceLocation.withDefaultNamespace("dwho_ridges"));
+		ResourceKey<DensityFunction> ridges = ResourceKey.create(Registries.DENSITY_FUNCTION, ResourceLocation.fromNamespaceAndPath("minecraft", "overworld/ridges"));
 		
 		DensityFunction densityFunction2 = getFunction(holderGetter, SHIFT_X);
 		DensityFunction densityFunction3 = getFunction(holderGetter, SHIFT_Z);
