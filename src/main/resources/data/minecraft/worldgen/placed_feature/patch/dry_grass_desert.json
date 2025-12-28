@@ -6,9 +6,6 @@
       "count": 3
     },
     {
-      "type": "minecraft:in_square"
-    },
-    {
       "type": "minecraft:noise_threshold_count",
       "above_noise": 10,
       "below_noise": 5,
@@ -17,6 +14,9 @@
     {
       "type": "minecraft:rarity_filter",
       "chance": 3
+    },
+    {
+      "type": "minecraft:biome"
     }
   ]
 }

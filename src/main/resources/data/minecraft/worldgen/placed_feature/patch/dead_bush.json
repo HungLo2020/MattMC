@@ -6,11 +6,11 @@
       "count": 3
     },
     {
-      "type": "minecraft:in_square"
-    },
-    {
       "type": "minecraft:rarity_filter",
       "chance": 7
+    },
+    {
+      "type": "minecraft:biome"
     }
   ]
 }
