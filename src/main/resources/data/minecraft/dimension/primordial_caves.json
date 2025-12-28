@@ -3,7 +3,6 @@
   "generator": {
     "type": "minecraft:noise",
     "biome_source": {
-      "type": "minecraft:multi_noise",
       "biomes": [
         {
           "parameters": {
@@ -41,7 +40,8 @@
           },
           "biome": "minecraft:primordial_plains"
         }
-      ]
+      ],
+      "type": "minecraft:multi_noise"
     },
     "settings": "minecraft:primordial_caves"
   }
