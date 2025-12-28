@@ -8,6 +8,7 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.levelgen.Noises;
 import net.minecraft.world.level.levelgen.SurfaceRules;
 import net.minecraft.world.level.levelgen.VerticalAnchor;
+import net.minecraft.world.level.levelgen.placement.CaveSurface;
 
 public class SurfaceRuleData {
 	private static final SurfaceRules.RuleSource AIR = makeStateRule(Blocks.AIR);
@@ -368,62 +369,106 @@ public class SurfaceRuleData {
 	}
 
 	public static SurfaceRules.RuleSource primordialCaves() {
-		SurfaceRules.RuleSource grassBlock = GRASS_BLOCK;
-		SurfaceRules.RuleSource dirt = DIRT;
-		SurfaceRules.RuleSource basaltBlock = makeStateRule(Blocks.BASALT);
+		// Exact conversion of the primordial_caves.json surface_rule to Java
+		SurfaceRules.RuleSource bedrock = BEDROCK;
+		SurfaceRules.RuleSource grassBlock = makeStateRule(Blocks.GRASS_BLOCK);
+		SurfaceRules.RuleSource basalt = makeStateRule(Blocks.BASALT);
 		SurfaceRules.RuleSource obsidian = makeStateRule(Blocks.OBSIDIAN);
 		SurfaceRules.RuleSource sand = SAND;
 		SurfaceRules.RuleSource sandstone = SANDSTONE;
+		SurfaceRules.RuleSource dirt = DIRT;
 		SurfaceRules.RuleSource deepslate = makeStateRule(Blocks.DEEPSLATE);
 		SurfaceRules.RuleSource stone = STONE;
 		
-		// Bedrock layers
 		SurfaceRules.ConditionSource bedrockFloor = SurfaceRules.verticalGradient("minecraft:bedrock_floor", VerticalAnchor.aboveBottom(0), VerticalAnchor.aboveBottom(5));
 		SurfaceRules.ConditionSource bedrockRoof = SurfaceRules.not(SurfaceRules.verticalGradient("minecraft:bedrock_roof", VerticalAnchor.belowTop(5), VerticalAnchor.belowTop(0)));
+		SurfaceRules.ConditionSource deepslateLayer = SurfaceRules.verticalGradient("minecraft:deepslate", VerticalAnchor.absolute(120), VerticalAnchor.absolute(128));
 		
-		// Surface rules based on biome and water level
-		SurfaceRules.ConditionSource isWaterSurface = SurfaceRules.waterBlockCheck(-1, 0);
+		SurfaceRules.ConditionSource waterCheck = SurfaceRules.waterBlockCheck(-1, 0);
 		SurfaceRules.ConditionSource isPrimordialPlains = SurfaceRules.isBiome(Biomes.PRIMORDIAL_PLAINS);
 		SurfaceRules.ConditionSource isDryMidlands = SurfaceRules.isBiome(Biomes.DRY_MIDLANDS);
 		SurfaceRules.ConditionSource isPrimordialOcean = SurfaceRules.isBiome(Biomes.PRIMORDIAL_OCEAN);
-		SurfaceRules.ConditionSource isFloor = SurfaceRules.stoneDepthCheck(0, false, 0, VerticalAnchor.absolute(0), SurfaceRules.VerticalSurfaceType.FLOOR);
-		SurfaceRules.ConditionSource isCeiling = SurfaceRules.stoneDepthCheck(0, false, 0, VerticalAnchor.absolute(0), SurfaceRules.VerticalSurfaceType.CEILING);
 		
-		// Deepslate layer
-		SurfaceRules.ConditionSource deepslateLayer = SurfaceRules.verticalGradient("minecraft:deepslate", VerticalAnchor.absolute(120), VerticalAnchor.absolute(128));
+		// stone_depth conditions with exact parameters from JSON
+		SurfaceRules.ConditionSource stoneDepth0_0_floor = SurfaceRules.stoneDepthCheck(0, false, 0, CaveSurface.FLOOR);
+		SurfaceRules.ConditionSource stoneDepth0_3_floor = SurfaceRules.stoneDepthCheck(0, false, 3, CaveSurface.FLOOR);
+		SurfaceRules.ConditionSource stoneDepth0_3_floor_addSurface = SurfaceRules.stoneDepthCheck(0, true, 3, CaveSurface.FLOOR);
+		SurfaceRules.ConditionSource stoneDepth0_5_floor_addSurface = SurfaceRules.stoneDepthCheck(0, true, 5, CaveSurface.FLOOR);
+		SurfaceRules.ConditionSource stoneDepth0_3_ceiling = SurfaceRules.stoneDepthCheck(0, false, 3, CaveSurface.CEILING);
 		
 		return SurfaceRules.sequence(
-			// Bedrock
-			SurfaceRules.ifTrue(bedrockFloor, BEDROCK),
-			SurfaceRules.ifTrue(bedrockRoof, BEDROCK),
-			// Floor surfaces
-			SurfaceRules.ifTrue(
-				isFloor,
-				SurfaceRules.sequence(
-					SurfaceRules.ifTrue(
-						isWaterSurface,
-						SurfaceRules.sequence(
-							SurfaceRules.ifTrue(isPrimordialPlains, grassBlock),
-							SurfaceRules.ifTrue(isPrimordialOcean, basaltBlock)
+			// Bedrock floor
+			SurfaceRules.ifTrue(bedrockFloor, bedrock),
+			// Bedrock roof
+			SurfaceRules.ifTrue(bedrockRoof, bedrock),
+			// Main surface sequence
+			SurfaceRules.sequence(
+				// Floor surface layer 1: stone_depth 0, secondary_depth_range 0
+				SurfaceRules.ifTrue(
+					stoneDepth0_0_floor,
+					SurfaceRules.sequence(
+						SurfaceRules.ifTrue(
+							waterCheck,
+							SurfaceRules.sequence(
+								SurfaceRules.ifTrue(isPrimordialPlains, grassBlock),
+								SurfaceRules.ifTrue(isPrimordialOcean, basalt)
+							)
 						)
-					),
-					// Sub-surface
-					SurfaceRules.ifTrue(isPrimordialOcean, obsidian),
-					SurfaceRules.ifTrue(isDryMidlands, sand),
-					SurfaceRules.ifTrue(isPrimordialPlains, dirt)
+					)
+				),
+				// Floor surface layer 2: stone_depth 0, secondary_depth_range 3
+				SurfaceRules.ifTrue(
+					stoneDepth0_3_floor,
+					SurfaceRules.sequence(
+						SurfaceRules.ifTrue(
+							waterCheck,
+							SurfaceRules.sequence(
+								SurfaceRules.ifTrue(isDryMidlands, sand)
+							)
+						),
+						SurfaceRules.ifTrue(isPrimordialOcean, obsidian)
+					)
+				),
+				// Floor surface layer 3: stone_depth 0, add_surface_depth true, secondary_depth_range 3
+				SurfaceRules.ifTrue(
+					stoneDepth0_3_floor_addSurface,
+					SurfaceRules.sequence(
+						SurfaceRules.ifTrue(
+							waterCheck,
+							SurfaceRules.sequence(
+								SurfaceRules.ifTrue(isPrimordialPlains, dirt)
+							)
+						),
+						SurfaceRules.ifTrue(isDryMidlands, sand),
+						SurfaceRules.ifTrue(isPrimordialPlains, grassBlock)
+					)
+				),
+				// Floor surface layer 4: stone_depth 0, add_surface_depth true, secondary_depth_range 5
+				SurfaceRules.ifTrue(
+					stoneDepth0_5_floor_addSurface,
+					SurfaceRules.sequence(
+						SurfaceRules.ifTrue(
+							waterCheck,
+							SurfaceRules.sequence(
+								SurfaceRules.ifTrue(isDryMidlands, sandstone)
+							)
+						)
+					)
 				)
 			),
-			// Ceiling surfaces
-			SurfaceRules.ifTrue(
-				isCeiling,
-				SurfaceRules.sequence(
-					SurfaceRules.ifTrue(isDryMidlands, sandstone),
-					SurfaceRules.ifTrue(isPrimordialOcean, obsidian)
+			// Ceiling surface layer
+			SurfaceRules.sequence(
+				SurfaceRules.ifTrue(
+					stoneDepth0_3_ceiling,
+					SurfaceRules.sequence(
+						SurfaceRules.ifTrue(isDryMidlands, sandstone),
+						SurfaceRules.ifTrue(isPrimordialOcean, obsidian)
+					)
 				)
 			),
 			// Deepslate layer
 			SurfaceRules.ifTrue(deepslateLayer, deepslate),
-			// Default
+			// Default stone
 			stone
 		);
 	}
