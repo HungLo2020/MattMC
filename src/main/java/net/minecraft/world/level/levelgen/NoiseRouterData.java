@@ -433,6 +433,7 @@ public class NoiseRouterData {
 		ResourceKey<DensityFunction> erosion = ResourceKey.create(Registries.DENSITY_FUNCTION, ResourceLocation.withDefaultNamespace("dwho_erosion"));
 		ResourceKey<DensityFunction> depth = ResourceKey.create(Registries.DENSITY_FUNCTION, ResourceLocation.withDefaultNamespace("dwho_depth"));
 		ResourceKey<DensityFunction> finalDensity = ResourceKey.create(Registries.DENSITY_FUNCTION, ResourceLocation.withDefaultNamespace("dwho_final_density"));
+		ResourceKey<DensityFunction> ridges = ResourceKey.create(Registries.DENSITY_FUNCTION, ResourceLocation.withDefaultNamespace("dwho_ridges"));
 		
 		DensityFunction densityFunction2 = getFunction(holderGetter, SHIFT_X);
 		DensityFunction densityFunction3 = getFunction(holderGetter, SHIFT_Z);
@@ -441,21 +442,21 @@ public class NoiseRouterData {
 		DensityFunction densityFunction6 = postProcess(getFunction(holderGetter, finalDensity));
 		
 		return new NoiseRouter(
-			DensityFunctions.zero(),
-			DensityFunctions.zero(),
-			getFunction(holderGetter, continents),
-			getFunction(holderGetter, erosion),
-			densityFunction4,
-			densityFunction5,
-			DensityFunctions.zero(),
-			DensityFunctions.zero(),
-			DensityFunctions.zero(),
-			getFunction(holderGetter, depth),
-			DensityFunctions.constant(-0.3),
-			densityFunction6,
-			DensityFunctions.zero(),
-			DensityFunctions.zero(),
-			DensityFunctions.zero()
+			DensityFunctions.zero(), // barrierNoise
+			DensityFunctions.zero(), // fluidLevelFloodednessNoise
+			DensityFunctions.zero(), // fluidLevelSpreadNoise
+			DensityFunctions.zero(), // lavaNoise
+			densityFunction4, // temperature
+			densityFunction5, // vegetation
+			getFunction(holderGetter, continents), // continents
+			getFunction(holderGetter, erosion), // erosion
+			getFunction(holderGetter, depth), // depth
+			getFunction(holderGetter, ridges), // ridges
+			DensityFunctions.constant(-0.3), // preliminarySurfaceLevel
+			densityFunction6, // finalDensity
+			DensityFunctions.zero(), // veinToggle
+			DensityFunctions.zero(), // veinRidged
+			DensityFunctions.zero() // veinGap
 		);
 	}
 
