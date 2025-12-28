@@ -71,6 +71,8 @@ public abstract class Biomes {
 	public static final ResourceKey<Biome> SMALL_END_ISLANDS = register("small_end_islands");
 	public static final ResourceKey<Biome> END_BARRENS = register("end_barrens");
 	public static final ResourceKey<Biome> PRIMORDIAL_PLAINS = register("primordial_plains");
+	public static final ResourceKey<Biome> DRY_MIDLANDS = register("dry_midlands");
+	public static final ResourceKey<Biome> PRIMORDIAL_OCEAN = register("primordial_ocean");
 
 	private static ResourceKey<Biome> register(String string) {
 		return ResourceKey.create(Registries.BIOME, ResourceLocation.withDefaultNamespace(string));

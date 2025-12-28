@@ -83,6 +83,7 @@ public record NoiseGeneratorSettings(
 		bootstrapContext.register(END, end(bootstrapContext));
 		bootstrapContext.register(CAVES, caves(bootstrapContext));
 		bootstrapContext.register(FLOATING_ISLANDS, floatingIslands(bootstrapContext));
+		bootstrapContext.register(PRIMORDIAL_CAVES, primordialCaves(bootstrapContext));
 	}
 
 	private static NoiseGeneratorSettings end(BootstrapContext<?> bootstrapContext) {
@@ -162,6 +163,72 @@ public record NoiseGeneratorSettings(
 			false,
 			false,
 			true
+		);
+	}
+
+	private static NoiseGeneratorSettings primordialCaves(BootstrapContext<?> bootstrapContext) {
+		return new NoiseGeneratorSettings(
+			NoiseSettings.PRIMORDIAL_CAVES_NOISE_SETTINGS,
+			Blocks.STONE.defaultBlockState(),
+			Blocks.WATER.defaultBlockState(),
+			NoiseRouterData.primordialCaves(bootstrapContext.lookup(Registries.DENSITY_FUNCTION), bootstrapContext.lookup(Registries.NOISE)),
+			SurfaceRuleData.primordialCaves(),
+			primordialCavesSpawnTarget(),
+			-6,
+			false,
+			false,
+			false,
+			false
+		);
+	}
+
+	private static List<Climate.ParameterPoint> primordialCavesSpawnTarget() {
+		return List.of(
+			new Climate.ParameterPoint(
+				Climate.Parameter.span(-0.15F, 1.0F),
+				Climate.Parameter.span(-1.0F, 1.0F),
+				Climate.Parameter.span(-1.2F, -0.455F),
+				Climate.Parameter.span(-1.0F, 1.0F),
+				Climate.Parameter.span(0.0F, 0.2F),
+				Climate.Parameter.span(-1.0F, 1.0F),
+				0L
+			),
+			new Climate.ParameterPoint(
+				Climate.Parameter.span(-0.15F, 1.0F),
+				Climate.Parameter.span(-1.0F, 1.0F),
+				Climate.Parameter.span(-0.455F, -0.19F),
+				Climate.Parameter.span(-1.0F, 1.0F),
+				Climate.Parameter.span(0.0F, 0.0F),
+				Climate.Parameter.span(-1.0F, 1.0F),
+				0L
+			),
+			new Climate.ParameterPoint(
+				Climate.Parameter.span(0.55F, 1.0F),
+				Climate.Parameter.span(-1.0F, 1.0F),
+				Climate.Parameter.span(-0.19F, 0.03F),
+				Climate.Parameter.span(-1.0F, 1.0F),
+				Climate.Parameter.span(0.0F, 0.2F),
+				Climate.Parameter.span(-1.0F, 1.0F),
+				0L
+			),
+			new Climate.ParameterPoint(
+				Climate.Parameter.span(-0.15F, 1.0F),
+				Climate.Parameter.span(-1.0F, 1.0F),
+				Climate.Parameter.span(-0.455F, -0.19F),
+				Climate.Parameter.span(-1.0F, 1.0F),
+				Climate.Parameter.span(0.0F, 0.2F),
+				Climate.Parameter.span(-1.0F, 0.4F),
+				0L
+			),
+			new Climate.ParameterPoint(
+				Climate.Parameter.span(0.55F, 1.0F),
+				Climate.Parameter.span(-1.0F, 1.0F),
+				Climate.Parameter.span(-0.455F, 0.03F),
+				Climate.Parameter.span(-1.0F, 1.0F),
+				Climate.Parameter.span(0.0F, 0.2F),
+				Climate.Parameter.span(0.4F, 1.0F),
+				0L
+			)
 		);
 	}
 

@@ -427,6 +427,38 @@ public class NoiseRouterData {
 		return noNewCaves(holderGetter, holderGetter2, slideEndLike(getFunction(holderGetter, BASE_3D_NOISE_END), 0, 256));
 	}
 
+	protected static NoiseRouter primordialCaves(HolderGetter<DensityFunction> holderGetter, HolderGetter<NormalNoise.NoiseParameters> holderGetter2) {
+		// Reference the DWHO density functions defined in JSON
+		ResourceKey<DensityFunction> continents = ResourceKey.create(Registries.DENSITY_FUNCTION, ResourceLocation.withDefaultNamespace("dwho_continents"));
+		ResourceKey<DensityFunction> erosion = ResourceKey.create(Registries.DENSITY_FUNCTION, ResourceLocation.withDefaultNamespace("dwho_erosion"));
+		ResourceKey<DensityFunction> depth = ResourceKey.create(Registries.DENSITY_FUNCTION, ResourceLocation.withDefaultNamespace("dwho_depth"));
+		ResourceKey<DensityFunction> finalDensity = ResourceKey.create(Registries.DENSITY_FUNCTION, ResourceLocation.withDefaultNamespace("dwho_final_density"));
+		
+		DensityFunction densityFunction2 = getFunction(holderGetter, SHIFT_X);
+		DensityFunction densityFunction3 = getFunction(holderGetter, SHIFT_Z);
+		DensityFunction densityFunction4 = DensityFunctions.shiftedNoise2d(densityFunction2, densityFunction3, 0.25, holderGetter2.getOrThrow(Noises.TEMPERATURE));
+		DensityFunction densityFunction5 = DensityFunctions.shiftedNoise2d(densityFunction2, densityFunction3, 0.25, holderGetter2.getOrThrow(Noises.VEGETATION));
+		DensityFunction densityFunction6 = postProcess(getFunction(holderGetter, finalDensity));
+		
+		return new NoiseRouter(
+			DensityFunctions.zero(),
+			DensityFunctions.zero(),
+			getFunction(holderGetter, continents),
+			getFunction(holderGetter, erosion),
+			densityFunction4,
+			densityFunction5,
+			DensityFunctions.zero(),
+			DensityFunctions.zero(),
+			DensityFunctions.zero(),
+			getFunction(holderGetter, depth),
+			DensityFunctions.constant(-0.3),
+			densityFunction6,
+			DensityFunctions.zero(),
+			DensityFunctions.zero(),
+			DensityFunctions.zero()
+		);
+	}
+
 	private static DensityFunction slideEnd(DensityFunction densityFunction) {
 		return slideEndLike(densityFunction, 0, 128);
 	}
