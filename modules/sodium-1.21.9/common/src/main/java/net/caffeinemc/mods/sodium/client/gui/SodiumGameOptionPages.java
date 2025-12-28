@@ -21,6 +21,7 @@ import net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.QuadSp
 import net.minecraft.client.*;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ParticleStatus;
+import net.minecraft.client.PanoramaTheme;
 import org.lwjgl.opengl.GL;
 import org.lwjgl.opengl.GLCapabilities;
 
@@ -60,6 +61,20 @@ public class SodiumGameOptionPages {
                         .setTooltip(Component.translatable("sodium.options.brightness.tooltip"))
                         .setControl(opt -> new SliderControl(opt, 0, 100, 1, ControlValueFormatter.brightness()))
                         .setBinding((opts, value) -> opts.gamma().set(value * 0.01D), (opts) -> (int) (opts.gamma().get() / 0.01D))
+                        .build())
+                .add(OptionImpl.createBuilder(PanoramaTheme.class, vanillaOpts)
+                        .setName(Component.translatable("options.panoramaTheme"))
+                        .setTooltip(Component.translatable("sodium.options.panorama_theme.tooltip"))
+                        .setControl(option -> new CyclingControl<>(option, PanoramaTheme.class, new Component[] {
+                                Component.translatable("options.panoramaTheme.aquatic"),
+                                Component.translatable("options.panoramaTheme.caves"),
+                                Component.translatable("options.panoramaTheme.copperAge"),
+                                Component.translatable("options.panoramaTheme.nether"),
+                                Component.translatable("options.panoramaTheme.release"),
+                                Component.translatable("options.panoramaTheme.springToLife"),
+                                Component.translatable("options.panoramaTheme.trickyTrials")
+                        }))
+                        .setBinding((opts, value) -> opts.panoramaTheme().set(value), opts -> opts.panoramaTheme().get())
                         .build())
                 .build());
 
