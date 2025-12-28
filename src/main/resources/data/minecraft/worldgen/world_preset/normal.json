@@ -38,7 +38,44 @@
         "type": "minecraft:noise",
         "biome_source": {
           "type": "minecraft:multi_noise",
-          "preset": "minecraft:primordial_caves"
+          "biomes": [
+            {
+              "parameters": {
+                "weirdness": [-1, 1],
+                "continentalness": [-1.2, -0.19],
+                "erosion": [-1, 1],
+                "temperature": [0.2, 1],
+                "humidity": [-1, 1],
+                "depth": [0.2, 0.9],
+                "offset": 0
+              },
+              "biome": "minecraft:dry_midlands"
+            },
+            {
+              "parameters": {
+                "weirdness": [-1, 1],
+                "continentalness": [-1.2, 1],
+                "erosion": [-1, 1],
+                "temperature": [-1, 0.2],
+                "humidity": [-1, 1],
+                "depth": [0, 1],
+                "offset": 0
+              },
+              "biome": "minecraft:primordial_plains"
+            },
+            {
+              "parameters": {
+                "weirdness": [-1, 1],
+                "continentalness": [-0.19, 1],
+                "erosion": [-1, 1],
+                "temperature": [0.2, 1],
+                "humidity": [-1, 1],
+                "depth": [0, 0.2],
+                "offset": 0
+              },
+              "biome": "minecraft:primordial_plains"
+            }
+          ]
         },
         "settings": "minecraft:primordial_caves"
       }
