@@ -80,7 +80,8 @@
     [
       "minecraft:patch/bubble_coral",
       "minecraft:patch/seagrass",
-      "minecraft:block_column/basalt"
+      "minecraft:block_column/basalt",
+      "minecraft:patch/sea_pickle_primordial"
     ],
     []
   ],
