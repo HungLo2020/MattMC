@@ -1,9 +1,9 @@
 {
-  "feature": "minecraft:sea_pickle",
+  "feature": "minecraft:patch/sea_pickle_primordial",
   "placement": [
     {
       "type": "minecraft:count_on_every_layer",
-      "count": 8
+      "count": 16
     },
     {
       "type": "minecraft:height_range",
@@ -20,8 +20,26 @@
     {
       "type": "minecraft:block_predicate_filter",
       "predicate": {
-        "type": "minecraft:matching_blocks",
-        "blocks": "minecraft:water"
+        "type": "minecraft:all_of",
+        "predicates": [
+          {
+            "type": "minecraft:matching_blocks",
+            "blocks": "minecraft:water",
+            "offset": [0, 0, 0]
+          },
+          {
+            "type": "minecraft:matching_blocks",
+            "blocks": [
+              "minecraft:basalt",
+              "minecraft:obsidian",
+              "minecraft:gravel",
+              "minecraft:stone",
+              "minecraft:deepslate",
+              "minecraft:prismarine"
+            ],
+            "offset": [0, -1, 0]
+          }
+        ]
       }
     },
     {
