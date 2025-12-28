@@ -1,0 +1,14 @@
+{
+  "values": [
+    "#minecraft:surface/amethyst",
+    "#minecraft:surface/desert",
+    "#minecraft:surface/grassy",
+    "#minecraft:surface/honey",
+    "#minecraft:surface/snowy",
+    "#minecraft:surface/swampy",
+    "#minecraft:surface/bramble",
+    "#minecraft:surface/ice",
+    "#minecraft:surface/mushroom",
+    "#minecraft:surface/terracotta"
+  ]
+}
