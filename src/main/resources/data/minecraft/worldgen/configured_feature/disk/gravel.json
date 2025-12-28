@@ -1,0 +1,61 @@
+{
+  "type": "minecraft:disk",
+  "config": {
+    "state_provider": {
+      "fallback": {
+        "type": "minecraft:simple_state_provider",
+        "state": {
+          "Name": "minecraft:gravel"
+        }
+      },
+      "rules": [
+        {
+          "if_true": {
+            "type": "minecraft:all_of",
+            "predicates": [
+              {
+                "type": "minecraft:matching_blocks",
+                "blocks": [
+                  "minecraft:basalt",
+                  "minecraft:deepslate"
+                ]
+              },
+              {
+                "type": "minecraft:matching_blocks",
+                "blocks": [
+                  "minecraft:water",
+                  "minecraft:air",
+                  "minecraft:cave_air"
+                ],
+                "offset": [
+                  0,
+                  1,
+                  0
+                ]
+              }
+            ]
+          },
+          "then": {
+            "type": "minecraft:simple_state_provider",
+            "state": {
+              "Name": "minecraft:gravel"
+            }
+          }
+        }
+      ]
+    },
+    "radius": {
+      "type": "minecraft:uniform",
+      "min_inclusive": 2,
+      "max_inclusive": 4
+    },
+    "half_height": 1,
+    "target": {
+      "type": "minecraft:matching_blocks",
+      "blocks": [
+        "minecraft:basalt",
+        "minecraft:deepslate"
+      ]
+    }
+  }
+}
