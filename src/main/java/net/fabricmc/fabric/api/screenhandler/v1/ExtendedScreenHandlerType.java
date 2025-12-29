@@ -19,12 +19,11 @@ package net.fabricmc.fabric.api.screenhandler.v1;
 import java.util.Objects;
 
 import net.minecraft.world.entity.player.Inventory;
-import net.minecraft.network.RegistryByteBuf;
-import net.minecraft.network.codec.PacketCodec;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.world.flag.FeatureFlags;
-import net.minecraft.world.inventory.MenuProvider;
+import net.minecraft.world.inventory.MenuType;
 import net.minecraft.world.inventory.AbstractContainerMenu;
-import net.minecraft.world.inventory.ScreenHandlerType;
 
 /**
  * A {@link ScreenHandlerType} for an extended screen handler that
@@ -72,17 +71,17 @@ import net.minecraft.world.inventory.ScreenHandlerType;
  * @param <T> the type of screen handler created by this type
  * @param <D> the type of the data
  */
-public class ExtendedScreenHandlerType<T extends AbstractContainerMenu, D> extends ScreenHandlerType<T> {
+public class ExtendedScreenHandlerType<T extends AbstractContainerMenu, D> extends MenuType<T> {
 	private final ExtendedFactory<T, D> factory;
-	private final PacketCodec<? super RegistryByteBuf, D> packetCodec;
+	private final StreamCodec<? super RegistryFriendlyByteBuf, D> packetCodec;
 
 	/**
 	 * Constructs an extended screen handler type.
 	 *
 	 * @param factory the screen handler factory used for {@link #create(int, Inventory, Object)}
 	 */
-	public ExtendedScreenHandlerType(ExtendedFactory<T, D> factory, PacketCodec<? super RegistryByteBuf, D> packetCodec) {
-		super(null, FeatureFlags.VANILLA_FEATURES);
+	public ExtendedScreenHandlerType(ExtendedFactory<T, D> factory, StreamCodec<? super RegistryFriendlyByteBuf, D> packetCodec) {
+		super(null, FeatureFlags.VANILLA_SET);
 		this.factory = Objects.requireNonNull(factory, "screen handler factory cannot be null");
 		this.packetCodec = Objects.requireNonNull(packetCodec, "packet codec cannot be null");
 	}
@@ -112,7 +111,7 @@ public class ExtendedScreenHandlerType<T extends AbstractContainerMenu, D> exten
 	/**
 	 * @return the packet codec for serializing the data of this screen handler
 	 */
-	public PacketCodec<? super RegistryByteBuf, D> getPacketCodec() {
+	public StreamCodec<? super RegistryFriendlyByteBuf, D> getPacketCodec() {
 		return packetCodec;
 	}
 

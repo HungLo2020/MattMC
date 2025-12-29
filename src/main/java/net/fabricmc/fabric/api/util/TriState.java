@@ -24,12 +24,12 @@ import java.util.function.Supplier;
 import com.mojang.serialization.Codec;
 import org.jetbrains.annotations.Nullable;
 
-import net.minecraft.util.StringIdentifiable;
+import net.minecraft.util.StringRepresentable;
 
 /**
  * Represents a boolean value which can be true, false or refer to a default value.
  */
-public enum TriState implements StringIdentifiable {
+public enum TriState implements StringRepresentable {
 	/**
 	 * Represents the boolean value of {@code false}.
 	 */
@@ -165,7 +165,7 @@ public enum TriState implements StringIdentifiable {
 	 * @return lowercase name of the value.
 	 */
 	@Override
-	public String asString() {
+	public String getSerializedName() {
 		return this.name;
 	}
 

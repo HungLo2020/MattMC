@@ -16,8 +16,8 @@
 
 package net.fabricmc.fabric.api.screenhandler.v1;
 
-import net.minecraft.world.inventory.MenuProvider;
-import net.minecraft.server.network.ServerPlayer;
+import net.minecraft.world.MenuProvider;
+import net.minecraft.server.level.ServerPlayer;
 
 /**
  * An extension of {@code MenuProvider} that can write additional data to a screen opening packet.
