@@ -11,7 +11,7 @@
 ---------------------------------------------------------------------*/
 
 //User Settings//
-    #define SHADER_STYLE 1 //[1 4]
+    #define SHADER_STYLE 4 //[1 4]
 
     #define RP_MODE 1 //[1 0 3 2]
 
@@ -27,7 +27,7 @@
     #define BLOCK_REFLECT_QUALITY 3 //[0 1 2 3]
     #define ANISOTROPIC_FILTER 0 //[0 4 8 16]
 
-    #define COLORED_LIGHTING 0 //[128 192 256 384 512 768 1024]
+    #define COLORED_LIGHTING 256 //[128 192 256 384 512 768 1024]
     #if defined IRIS_FEATURE_CUSTOM_IMAGES && SHADOW_QUALITY > -1 && !defined MC_OS_MAC
         #define COLORED_LIGHTING_INTERNAL COLORED_LIGHTING
         #if COLORED_LIGHTING_INTERNAL > 0
