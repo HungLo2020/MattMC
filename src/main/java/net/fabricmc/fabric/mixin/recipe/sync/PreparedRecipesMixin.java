@@ -33,7 +33,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import net.minecraft.world.item.crafting.PreparedRecipes;
-import net.minecraft.world.item.crafting.RecipeEntry;
+import net.minecraft.world.item.crafting.RecipeHolder;
 import net.minecraft.world.item.crafting.RecipeSerializer;
 
 import net.fabricmc.fabric.impl.recipe.sync.RecipeSyncImpl;
@@ -42,12 +42,12 @@ import net.fabricmc.fabric.impl.recipe.sync.SyncedSerializerAwarePreparedRecipe;
 @Mixin(PreparedRecipes.class)
 public class PreparedRecipesMixin implements SyncedSerializerAwarePreparedRecipe {
 	@Unique
-	private Map<RecipeSerializer<?>, List<RecipeEntry<?>>> bySyncedSerializer;
+	private Map<RecipeSerializer<?>, List<RecipeHolder<?>>> bySyncedSerializer;
 
 	@Inject(method = "of", at = @At("HEAD"))
-	private static void provideSerializerMap(Iterable<RecipeEntry<?>> recipes, CallbackInfoReturnable<PreparedRecipes> cir,
-											@Share("bySerializer") LocalRef<IdentityHashMap<RecipeSerializer<?>, List<RecipeEntry<?>>>> bySerializer) {
-		var map = new IdentityHashMap<RecipeSerializer<?>, List<RecipeEntry<?>>>();
+	private static void provideSerializerMap(Iterable<RecipeHolder<?>> recipes, CallbackInfoReturnable<PreparedRecipes> cir,
+											@Share("bySerializer") LocalRef<IdentityHashMap<RecipeSerializer<?>, List<RecipeHolder<?>>>> bySerializer) {
+		var map = new IdentityHashMap<RecipeSerializer<?>, List<RecipeHolder<?>>>();
 
 		for (RecipeSerializer<?> serializer : RecipeSyncImpl.getSyncedSerializers()) {
 			map.put(serializer, new ArrayList<>());
@@ -57,9 +57,9 @@ public class PreparedRecipesMixin implements SyncedSerializerAwarePreparedRecipe
 	}
 
 	@Inject(method = "of", at = @At(value = "INVOKE", target = "Lcom/google/common/collect/ImmutableMap$Builder;put(Ljava/lang/Object;Ljava/lang/Object;)Lcom/google/common/collect/ImmutableMap$Builder;"))
-	private static void fillSerializerMap(Iterable<RecipeEntry<?>> recipes, CallbackInfoReturnable<PreparedRecipes> cir, @Local RecipeEntry<?> entry,
-										@Share("bySerializer") LocalRef<IdentityHashMap<RecipeSerializer<?>, List<RecipeEntry<?>>>> bySerializer) {
-		List<RecipeEntry<?>> list = bySerializer.get().get(entry.value().getSerializer());
+	private static void fillSerializerMap(Iterable<RecipeHolder<?>> recipes, CallbackInfoReturnable<PreparedRecipes> cir, @Local RecipeHolder<?> entry,
+										@Share("bySerializer") LocalRef<IdentityHashMap<RecipeSerializer<?>, List<RecipeHolder<?>>>> bySerializer) {
+		List<RecipeHolder<?>> list = bySerializer.get().get(entry.value().getSerializer());
 
 		if (list != null) {
 			list.add(entry);
@@ -68,13 +68,13 @@ public class PreparedRecipesMixin implements SyncedSerializerAwarePreparedRecipe
 
 	@ModifyReturnValue(method = "of", at = @At("RETURN"))
 	private static PreparedRecipes attachSerializerMap(PreparedRecipes original,
-													@Share("bySerializer") LocalRef<IdentityHashMap<RecipeSerializer<?>, List<RecipeEntry<?>>>> bySerializer) {
+													@Share("bySerializer") LocalRef<IdentityHashMap<RecipeSerializer<?>, List<RecipeHolder<?>>>> bySerializer) {
 		((PreparedRecipesMixin) (Object) original).bySyncedSerializer = bySerializer.get();
 		return original;
 	}
 
 	@Override
-	public @Nullable List<RecipeEntry<?>> fabric_getRecipesBySyncedSerializer(RecipeSerializer<?> serializer) {
+	public @Nullable List<RecipeHolder<?>> fabric_getRecipesBySyncedSerializer(RecipeSerializer<?> serializer) {
 		//noinspection unchecked
 		return this.bySyncedSerializer.get(serializer);
 	}

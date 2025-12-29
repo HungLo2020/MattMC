@@ -36,7 +36,7 @@ import net.minecraft.network.chat.MutableText;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.Formatting;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.util.thread.ThreadExecutor;
+import net.minecraft.util.thread.BlockableEventLoop;
 
 import net.fabricmc.fabric.api.event.registry.RegistryAttribute;
 import net.fabricmc.fabric.impl.registry.sync.RegistrySyncManager;
@@ -50,7 +50,7 @@ public final class ClientRegistrySyncHandler {
 	private ClientRegistrySyncHandler() {
 	}
 
-	public static <T extends RegistryPacketHandler.RegistrySyncPayload> CompletableFuture<Boolean> receivePacket(ThreadExecutor<?> executor, RegistryPacketHandler<T> handler, T payload, boolean accept) {
+	public static <T extends RegistryPacketHandler.RegistrySyncPayload> CompletableFuture<Boolean> receivePacket(BlockableEventLoop<?> executor, RegistryPacketHandler<T> handler, T payload, boolean accept) {
 		handler.receivePayload(payload);
 
 		if (!handler.isPacketFinished()) {

@@ -18,11 +18,11 @@ package net.fabricmc.fabric.api.client.itemgroup.v1;
 
 import java.util.List;
 
-import net.minecraft.client.gui.screens.inventory.CreativeInventoryScreen;
+import net.minecraft.client.gui.screens.inventory.CreativeModeInventoryScreen;
 import net.minecraft.world.item.CreativeModeTab;
 
 /**
- * Fabric provided extensions to {@link CreativeInventoryScreen}.
+ * Fabric provided extensions to {@link CreativeModeInventoryScreen}.
  * This interface is automatically implemented on all creative inventory screens via Mixin and interface injection.
  */
 public interface FabricCreativeInventoryScreen {

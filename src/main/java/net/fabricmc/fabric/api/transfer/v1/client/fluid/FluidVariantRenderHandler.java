@@ -20,7 +20,7 @@ import java.util.List;
 
 import org.jetbrains.annotations.Nullable;
 
-import net.minecraft.client.texture.TextureAtlasSprite;
+import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.world.item.tooltip.TooltipType;
 import net.minecraft.network.chat.Component;
 import net.minecraft.core.BlockPos;

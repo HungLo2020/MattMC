@@ -20,7 +20,7 @@ import java.util.Collection;
 import java.util.stream.Stream;
 
 import net.minecraft.world.item.crafting.Recipe;
-import net.minecraft.world.item.crafting.RecipeEntry;
+import net.minecraft.world.item.crafting.RecipeHolder;
 import net.minecraft.world.item.crafting.RecipeType;
 import net.minecraft.world.item.crafting.ServerRecipeManager;
 import net.minecraft.world.item.crafting.input.RecipeInput;
@@ -38,14 +38,14 @@ public interface FabricServerRecipeManager extends FabricRecipeManager {
 	 *
 	 * @return the stream of matching recipes
 	 */
-	default <I extends RecipeInput, T extends Recipe<I>> Stream<RecipeEntry<T>> getAllMatches(RecipeType<T> type, I input, Level world) {
+	default <I extends RecipeInput, T extends Recipe<I>> Stream<RecipeHolder<T>> getAllMatches(RecipeType<T> type, I input, Level world) {
 		throw new AssertionError("Implemented in Mixin");
 	}
 
 	/**
 	 * @return the collection of recipe entries of given type
 	 */
-	default <I extends RecipeInput, T extends Recipe<I>> Collection<RecipeEntry<T>> getAllOfType(RecipeType<T> type) {
+	default <I extends RecipeInput, T extends Recipe<I>> Collection<RecipeHolder<T>> getAllOfType(RecipeType<T> type) {
 		throw new AssertionError("Implemented in Mixin");
 	}
 }

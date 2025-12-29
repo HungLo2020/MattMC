@@ -25,7 +25,7 @@ import net.minecraft.network.codec.PacketCodecs;
 import net.minecraft.network.handler.PacketDecoderException;
 import net.minecraft.network.protocol.CustomPacketPayload;
 import net.minecraft.world.item.crafting.Recipe;
-import net.minecraft.world.item.crafting.RecipeEntry;
+import net.minecraft.world.item.crafting.RecipeHolder;
 import net.minecraft.world.item.crafting.RecipeSerializer;
 import net.minecraft.core.Registries;
 import net.minecraft.resources.ResourceKey;
@@ -45,7 +45,7 @@ public record RecipeSyncPayloadS2C(List<Entry> entries) implements CustomPacketP
 		return ID;
 	}
 
-	public record Entry(RecipeSerializer<?> serializer, List<RecipeEntry<?>> recipes) {
+	public record Entry(RecipeSerializer<?> serializer, List<RecipeHolder<?>> recipes) {
 		public static final PacketCodec<RegistryByteBuf, Entry> CODEC = PacketCodec.of(
 				Entry::write,
 				Entry::read
@@ -60,13 +60,13 @@ public record RecipeSyncPayloadS2C(List<Entry> entries) implements CustomPacketP
 			}
 
 			int count = buf.readVarInt();
-			var list = new ArrayList<RecipeEntry<?>>();
+			var list = new ArrayList<RecipeHolder<?>>();
 
 			for (int i = 0; i < count; i++) {
 				ResourceKey<Recipe<?>> id = buf.readRegistryKey(Registries.RECIPE);
 				//noinspection deprecation
 				Recipe<?> recipe = recipeSerializer.packetCodec().decode(buf);
-				list.add(new RecipeEntry<>(id, recipe));
+				list.add(new RecipeHolder<>(id, recipe));
 			}
 
 			return new Entry(recipeSerializer, list);
@@ -80,7 +80,7 @@ public record RecipeSyncPayloadS2C(List<Entry> entries) implements CustomPacketP
 			//noinspection unchecked,deprecation
 			PacketCodec<RegistryByteBuf, Recipe<?>> serializer = ((PacketCodec<RegistryByteBuf, Recipe<?>>) this.serializer.packetCodec());
 
-			for (RecipeEntry<?> recipe : this.recipes) {
+			for (RecipeHolder<?> recipe : this.recipes) {
 				buf.writeRegistryKey(recipe.id());
 				serializer.encode(buf, recipe.value());
 			}

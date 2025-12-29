@@ -23,7 +23,7 @@ import java.util.Set;
 
 import it.unimi.dsi.fastutil.objects.ReferenceOpenHashSet;
 
-import net.minecraft.world.item.crafting.RecipeEntry;
+import net.minecraft.world.item.crafting.RecipeHolder;
 import net.minecraft.world.item.crafting.RecipeSerializer;
 import net.minecraft.core.Registries;
 import net.minecraft.server.level.ServerPlayer;
@@ -79,7 +79,7 @@ public class RecipeSyncImpl implements ModInitializer {
 		var list = new ArrayList<RecipeSyncPayloadS2C.Entry>();
 
 		for (RecipeSerializer<?> serializer : serializers) {
-			List<RecipeEntry<?>> recipes = accessor.fabric_getRecipesBySyncedSerializer(serializer);
+			List<RecipeHolder<?>> recipes = accessor.fabric_getRecipesBySyncedSerializer(serializer);
 
 			if (recipes != null && !recipes.isEmpty()) {
 				list.add(new RecipeSyncPayloadS2C.Entry(serializer, recipes));

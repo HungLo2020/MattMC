@@ -20,8 +20,8 @@ import java.util.List;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.particle.ParticleSpriteManager;
-import net.minecraft.client.texture.TextureAtlasSprite;
-import net.minecraft.client.texture.TextureAtlas;
+import net.minecraft.client.renderer.texture.TextureAtlasSprite;
+import net.minecraft.client.renderer.texture.TextureAtlas;
 import net.minecraft.util.Atlases;
 import net.minecraft.core.random.Random;
 

@@ -20,10 +20,10 @@ import java.util.List;
 
 import org.jetbrains.annotations.Nullable;
 
-import net.minecraft.world.item.crafting.RecipeEntry;
+import net.minecraft.world.item.crafting.RecipeHolder;
 import net.minecraft.world.item.crafting.RecipeSerializer;
 
 public interface SyncedSerializerAwarePreparedRecipe {
 	@Nullable
-	List<RecipeEntry<?>> fabric_getRecipesBySyncedSerializer(RecipeSerializer<?> serializer);
+	List<RecipeHolder<?>> fabric_getRecipesBySyncedSerializer(RecipeSerializer<?> serializer);
 }

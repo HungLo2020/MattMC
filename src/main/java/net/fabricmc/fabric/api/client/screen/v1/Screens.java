@@ -22,7 +22,7 @@ import java.util.Objects;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.font.Font;
 import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.client.gui.components.ClickableWidget;
+import net.minecraft.client.gui.components.AbstractWidget;
 
 import net.fabricmc.fabric.impl.client.screen.ScreenExtensions;
 import net.fabricmc.fabric.mixin.screen.ScreenAccessor;
@@ -40,7 +40,7 @@ public final class Screens {
 	 *
 	 * @return a list of all of a screen's buttons
 	 */
-	public static List<ClickableWidget> getButtons(Screen screen) {
+	public static List<AbstractWidget> getButtons(Screen screen) {
 		Objects.requireNonNull(screen, "Screen cannot be null");
 
 		return ScreenExtensions.getExtensions(screen).fabric_getButtons();

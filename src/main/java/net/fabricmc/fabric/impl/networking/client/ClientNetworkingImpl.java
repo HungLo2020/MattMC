@@ -23,7 +23,7 @@ import org.jetbrains.annotations.Nullable;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.multiplayer.ConnectScreen;
 import net.minecraft.client.multiplayer.ClientConfigurationPacketListenerImpl;
-import net.minecraft.client.multiplayer.ClientLoginPacketListenerImpl;
+import net.minecraft.client.multiplayer.ClientHandshakePacketListenerImpl;
 import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.network.Connection;
 import net.minecraft.network.NetworkPhase;
@@ -65,7 +65,7 @@ public final class ClientNetworkingImpl {
 		return (ClientConfigurationNetworkAddon) ((NetworkHandlerExtensions) handler).getAddon();
 	}
 
-	public static ClientLoginNetworkAddon getAddon(ClientLoginPacketListenerImpl handler) {
+	public static ClientLoginNetworkAddon getAddon(ClientHandshakePacketListenerImpl handler) {
 		return (ClientLoginNetworkAddon) ((NetworkHandlerExtensions) handler).getAddon();
 	}
 

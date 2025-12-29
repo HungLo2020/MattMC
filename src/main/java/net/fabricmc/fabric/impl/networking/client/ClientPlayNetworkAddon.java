@@ -24,7 +24,7 @@ import org.slf4j.Logger;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientPacketListener;
-import net.minecraft.client.multiplayer.LocalPlayer;
+import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.network.NetworkPhase;
 import net.minecraft.network.protocol.CustomPacketPayload;
 import net.minecraft.network.protocol.Packet;

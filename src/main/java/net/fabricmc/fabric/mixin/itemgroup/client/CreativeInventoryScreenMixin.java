@@ -30,8 +30,8 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.screens.inventory.CreativeInventoryScreen;
-import net.minecraft.client.gui.screens.inventory.CreativeInventoryScreen.CreativeScreenHandler;
+import net.minecraft.client.gui.screens.inventory.CreativeModeInventoryScreen;
+import net.minecraft.client.gui.screens.inventory.CreativeModeInventoryScreen.CreativeScreenHandler;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.client.input.KeyInput;
 import net.minecraft.world.entity.player.Inventory;
@@ -43,7 +43,7 @@ import net.fabricmc.fabric.api.client.itemgroup.v1.FabricCreativeInventoryScreen
 import net.fabricmc.fabric.impl.client.itemgroup.FabricCreativeGuiComponents;
 import net.fabricmc.fabric.impl.itemgroup.FabricItemGroupImpl;
 
-@Mixin(CreativeInventoryScreen.class)
+@Mixin(CreativeModeInventoryScreen.class)
 public abstract class CreativeInventoryScreenMixin extends AbstractContainerScreen<CreativeScreenHandler> implements FabricCreativeInventoryScreen {
 	public CreativeInventoryScreenMixin(CreativeScreenHandler screenHandler, Inventory playerInventory, Component text) {
 		super(screenHandler, playerInventory, text);
@@ -77,7 +77,7 @@ public abstract class CreativeInventoryScreenMixin extends AbstractContainerScre
 		int xpos = x + 171;
 		int ypos = y + 4;
 
-		CreativeInventoryScreen self = (CreativeInventoryScreen) (Object) this;
+		CreativeModeInventoryScreen self = (CreativeModeInventoryScreen) (Object) this;
 		addDrawableChild(new FabricCreativeGuiComponents.ItemGroupButtonWidget(xpos + 10, ypos, FabricCreativeGuiComponents.Type.NEXT, self));
 		addDrawableChild(new FabricCreativeGuiComponents.ItemGroupButtonWidget(xpos, ypos, FabricCreativeGuiComponents.Type.PREVIOUS, self));
 	}

@@ -26,7 +26,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientConfigurationPacketListenerImpl;
 import net.minecraft.network.protocol.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.util.thread.ThreadExecutor;
+import net.minecraft.util.thread.BlockableEventLoop;
 
 import net.fabricmc.fabric.api.networking.v1.PacketSender;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
@@ -257,7 +257,7 @@ public final class ClientConfigurationNetworking {
 		 * Handles the incoming packet.
 		 *
 		 * <p>Unlike {@link ClientPlayNetworking.PlayPayloadHandler} this method is executed on {@linkplain io.netty.channel.EventLoop netty's event loops}.
-		 * Modification to the game should be {@linkplain ThreadExecutor#submit(Runnable) scheduled}.
+		 * Modification to the game should be {@linkplain BlockableEventLoop#submit(Runnable) scheduled}.
 		 *
 		 * <p>An example usage of this:
 		 * <pre>{@code

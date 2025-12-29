@@ -148,7 +148,7 @@ public final class ServerLoginNetworking {
 		 * Handles an incoming query response from a client.
 		 *
 		 * <p>This method is executed on {@linkplain io.netty.channel.EventLoop netty's event loops}.
-		 * Modification to the game should be {@linkplain net.minecraft.util.thread.ThreadExecutor#submit(Runnable) scheduled} using the provided Minecraft client instance.
+		 * Modification to the game should be {@linkplain net.minecraft.util.thread.BlockableEventLoop#submit(Runnable) scheduled} using the provided Minecraft client instance.
 		 *
 		 * <p><b>Whether the client understood the query should be checked before reading from the payload of the packet.</b>
 		 * @param server the server
@@ -199,7 +199,7 @@ public final class ServerLoginNetworking {
 		 * 	}));
 		 * });
 		 * }</pre>
-		 * Usually it is enough to pass the return value for {@link net.minecraft.util.thread.ThreadExecutor#submit(Runnable)} for {@code future}.</p>
+		 * Usually it is enough to pass the return value for {@link net.minecraft.util.thread.BlockableEventLoop#submit(Runnable)} for {@code future}.</p>
 		 *
 		 * @param future the future that must be done before the player can log in
 		 */

@@ -48,7 +48,7 @@ public interface FabricItem {
 	 * This function is called on the client side when the components or count of the stack has changed, but not the item,
 	 * and returning false cancels this animation.
 	 *
-	 * @param player   the current player; this may be safely cast to {@link net.minecraft.client.multiplayer.LocalPlayer} in client-only code
+	 * @param player   the current player; this may be safely cast to {@link net.minecraft.client.player.LocalPlayer} in client-only code
 	 * @param hand     the hand; this function applies both to the main hand and the off hand
 	 * @param oldStack the previous stack, of this item
 	 * @param newStack the new stack, also of this item

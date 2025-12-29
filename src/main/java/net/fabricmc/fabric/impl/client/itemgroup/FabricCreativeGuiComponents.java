@@ -24,7 +24,7 @@ import java.util.stream.Collectors;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gl.RenderPipelines;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.screens.inventory.CreativeInventoryScreen;
+import net.minecraft.client.gui.screens.inventory.CreativeModeInventoryScreen;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.item.ItemGroups;
@@ -46,10 +46,10 @@ public class FabricCreativeGuiComponents {
 	}
 
 	public static class ItemGroupButtonWidget extends Button {
-		final CreativeInventoryScreen screen;
+		final CreativeModeInventoryScreen screen;
 		final Type type;
 
-		public ItemGroupButtonWidget(int x, int y, Type type, CreativeInventoryScreen screen) {
+		public ItemGroupButtonWidget(int x, int y, Type type, CreativeModeInventoryScreen screen) {
 			super(x, y, 10, 12, type.text, (bw) -> type.clickConsumer.accept(screen), Button.DEFAULT_NARRATION_SUPPLIER);
 			this.type = type;
 			this.screen = screen;
@@ -75,14 +75,14 @@ public class FabricCreativeGuiComponents {
 	}
 
 	public enum Type {
-		NEXT(Component.literal(">"), CreativeInventoryScreen::switchToNextPage, screen -> screen.getCurrentPage() + 1 < screen.getPageCount()),
-		PREVIOUS(Component.literal("<"), CreativeInventoryScreen::switchToPreviousPage, screen -> screen.getCurrentPage() != 0);
+		NEXT(Component.literal(">"), CreativeModeInventoryScreen::switchToNextPage, screen -> screen.getCurrentPage() + 1 < screen.getPageCount()),
+		PREVIOUS(Component.literal("<"), CreativeModeInventoryScreen::switchToPreviousPage, screen -> screen.getCurrentPage() != 0);
 
 		final Component text;
-		final Consumer<CreativeInventoryScreen> clickConsumer;
-		final Predicate<CreativeInventoryScreen> isEnabled;
+		final Consumer<CreativeModeInventoryScreen> clickConsumer;
+		final Predicate<CreativeModeInventoryScreen> isEnabled;
 
-		Type(Component text, Consumer<CreativeInventoryScreen> clickConsumer, Predicate<CreativeInventoryScreen> isEnabled) {
+		Type(Component text, Consumer<CreativeModeInventoryScreen> clickConsumer, Predicate<CreativeModeInventoryScreen> isEnabled) {
 			this.text = text;
 			this.clickConsumer = clickConsumer;
 			this.isEnabled = isEnabled;

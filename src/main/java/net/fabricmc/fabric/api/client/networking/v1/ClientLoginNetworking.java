@@ -24,7 +24,7 @@ import io.netty.channel.ChannelFutureListener;
 import org.jetbrains.annotations.Nullable;
 
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.multiplayer.ClientLoginPacketListenerImpl;
+import net.minecraft.client.multiplayer.ClientHandshakePacketListenerImpl;
 import net.minecraft.network.Connection;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.PacketListener;
@@ -102,8 +102,8 @@ public final class ClientLoginNetworking {
 		if (connection != null) {
 			final PacketListener packetListener = connection.getPacketListener();
 
-			if (packetListener instanceof ClientLoginPacketListenerImpl) {
-				return ClientNetworkingImpl.getAddon(((ClientLoginPacketListenerImpl) packetListener)).registerChannel(channelName, queryHandler);
+			if (packetListener instanceof ClientHandshakePacketListenerImpl) {
+				return ClientNetworkingImpl.getAddon(((ClientHandshakePacketListenerImpl) packetListener)).registerChannel(channelName, queryHandler);
 			}
 		}
 
@@ -126,8 +126,8 @@ public final class ClientLoginNetworking {
 		if (connection != null) {
 			final PacketListener packetListener = connection.getPacketListener();
 
-			if (packetListener instanceof ClientLoginPacketListenerImpl) {
-				return ClientNetworkingImpl.getAddon(((ClientLoginPacketListenerImpl) packetListener)).unregisterChannel(channelName);
+			if (packetListener instanceof ClientHandshakePacketListenerImpl) {
+				return ClientNetworkingImpl.getAddon(((ClientHandshakePacketListenerImpl) packetListener)).unregisterChannel(channelName);
 			}
 		}
 
@@ -143,7 +143,7 @@ public final class ClientLoginNetworking {
 		 * Handles an incoming query request from a server.
 		 *
 		 * <p>This method is executed on {@linkplain io.netty.channel.EventLoop netty's event loops}.
-		 * Modification to the game should be {@linkplain net.minecraft.util.thread.ThreadExecutor#submit(Runnable) scheduled} using the provided Minecraft client instance.
+		 * Modification to the game should be {@linkplain net.minecraft.util.thread.BlockableEventLoop#submit(Runnable) scheduled} using the provided Minecraft client instance.
 		 *
 		 * <p>The return value of this method is a completable future that may be used to delay the login process to the server until a task {@link CompletableFuture#isDone() is done}.
 		 * The future should complete in reasonably time to prevent disconnection by the server.
@@ -156,6 +156,6 @@ public final class ClientLoginNetworking {
 		 * @return a completable future which contains the payload to respond to the server with.
 		 * If the future contains {@code null}, then the server will be notified that the client did not understand the query.
 		 */
-		CompletableFuture<@Nullable FriendlyByteBuf> receive(Minecraft client, ClientLoginPacketListenerImpl handler, FriendlyByteBuf buf, Consumer<ChannelFutureListener> callbacksConsumer);
+		CompletableFuture<@Nullable FriendlyByteBuf> receive(Minecraft client, ClientHandshakePacketListenerImpl handler, FriendlyByteBuf buf, Consumer<ChannelFutureListener> callbacksConsumer);
 	}
 }
