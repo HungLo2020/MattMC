@@ -43,7 +43,7 @@ public class HappyGhastRenderer extends AgeableMobRenderer<HappyGhast, HappyGhas
 		return new HappyGhastRenderState();
 	}
 
-	protected AABB getBoundingBoxForCulling(HappyGhast happyGhast) {
+	public AABB getBoundingBoxForCulling(HappyGhast happyGhast) {
 		AABB aABB = super.getBoundingBoxForCulling(happyGhast);
 		float f = happyGhast.getBbHeight();
 		return aABB.setMinY(aABB.minY - f / 2.0F);

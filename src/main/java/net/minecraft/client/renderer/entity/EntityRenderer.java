@@ -104,7 +104,7 @@ public abstract class EntityRenderer<T extends Entity, S extends EntityRenderSta
 		}
 	}
 
-	protected AABB getBoundingBoxForCulling(T entity) {
+	public AABB getBoundingBoxForCulling(T entity) { // Made public for Sodium entity culling integration
 		return entity.getBoundingBox();
 	}
 

@@ -13,7 +13,7 @@ import org.lwjgl.system.MemoryUtil;
 public class MeshData implements AutoCloseable {
 	private final ByteBufferBuilder.Result vertexBuffer;
 	@Nullable
-	private ByteBufferBuilder.Result indexBuffer;
+	public ByteBufferBuilder.Result indexBuffer; // Made public for Sodium vertex sorting integration
 	private final MeshData.DrawState drawState;
 
 	public MeshData(ByteBufferBuilder.Result result, MeshData.DrawState drawState) {

@@ -77,9 +77,9 @@ public class MixinLevelRenderer {
 			return;
 		} else {
 			this.particlesRenderState.submit(submitNodeStorage, this.levelRenderState.cameraRenderState);
-			((PhasedParticleEngine) ((FeatureRenderDispatcherAccessor) this.featureRenderDispatcher).getParticleFeatureRenderer()).setParticleRenderingPhase(settings == ParticleRenderingSettings.BEFORE ? ParticleRenderingPhase.EVERYTHING : ParticleRenderingPhase.OPAQUE);
+			((PhasedParticleEngine) this.featureRenderDispatcher.particleFeatureRenderer).setParticleRenderingPhase(settings == ParticleRenderingSettings.BEFORE ? ParticleRenderingPhase.EVERYTHING : ParticleRenderingPhase.OPAQUE);
 			original.call(instance);
-			((PhasedParticleEngine) ((FeatureRenderDispatcherAccessor) this.featureRenderDispatcher).getParticleFeatureRenderer()).setParticleRenderingPhase(ParticleRenderingPhase.EVERYTHING);
+			((PhasedParticleEngine) this.featureRenderDispatcher.particleFeatureRenderer).setParticleRenderingPhase(ParticleRenderingPhase.EVERYTHING);
 
 			if (settings == ParticleRenderingSettings.BEFORE) {
 				particlesRenderState.reset();
@@ -114,8 +114,8 @@ public class MixinLevelRenderer {
 	private void iris$renderTranslucentParticles(FeatureRenderDispatcher instance, Operation<Void> original) {
 		ParticleRenderingSettings settings = getRenderingSettings();
 
-		((PhasedParticleEngine) ((FeatureRenderDispatcherAccessor) this.featureRenderDispatcher).getParticleFeatureRenderer()).setParticleRenderingPhase(settings == ParticleRenderingSettings.AFTER ? ParticleRenderingPhase.EVERYTHING : ParticleRenderingPhase.TRANSLUCENT);
+		((PhasedParticleEngine) this.featureRenderDispatcher.particleFeatureRenderer).setParticleRenderingPhase(settings == ParticleRenderingSettings.AFTER ? ParticleRenderingPhase.EVERYTHING : ParticleRenderingPhase.TRANSLUCENT);
 		original.call(instance);
-		((PhasedParticleEngine) ((FeatureRenderDispatcherAccessor) this.featureRenderDispatcher).getParticleFeatureRenderer()).setParticleRenderingPhase(ParticleRenderingPhase.EVERYTHING);
+		((PhasedParticleEngine) this.featureRenderDispatcher.particleFeatureRenderer).setParticleRenderingPhase(ParticleRenderingPhase.EVERYTHING);
 	}
 }
