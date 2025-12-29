@@ -6,18 +6,21 @@
 
 ### Mixin Conversion Status
 
-**Total Mixins:** 235 → **221 remaining** (14 removed)  
-**Conversion Progress:** 6.0% complete
+**Total Mixins:** 235 → **218 remaining** (17 removed)  
+**Conversion Progress:** 7.2% complete
 
-#### Removed Mixins (14):
+#### Removed Mixins (17):
 1-9. Previous mixins...
 10. ✅ `net.caffeinemc.mods.sodium.mixin.features.render.immediate.buffer_builder.sorting.MeshDataAccessor` - Made `MeshData.indexBuffer` field public
 11. ✅ `net.irisshaders.iris.mixin.fantastic.FeatureRenderDispatcherAccessor` - Made `FeatureRenderDispatcher.particleFeatureRenderer` field public
 12. ✅ `net.caffeinemc.mods.sodium.mixin.core.render.world.EntityRendererAccessor` - Made `EntityRenderer.getBoundingBoxForCulling()` method public
 13. ✅ `net.irisshaders.iris.mixin.GameRendererAccessor` - Made `GameRenderer` fields/methods public (panoramicMode, resourcePool, bobHurt, bobView, shouldRenderBlockOutline)
 14. ✅ `net.caffeinemc.mods.sodium.mixin.core.GlCommandEncoderAccessor` - Made `GlCommandEncoder` field/method public (lastProgram, applyPipelineState)
+15. ✅ `net.irisshaders.iris.mixin.rendertype.RenderTypeAccessor` - `RenderType.sortOnUpload()` method already public
+16. ✅ `net.irisshaders.iris.mixin.rendertype.RenderStateShardAccessor` - Unused mixin (no references in codebase)
+17. ✅ `net.irisshaders.iris.compat.sodium.mixin.BlockRendererAccessor` - Made `BlockRenderer.buffers` field public
 
-#### Modified Files (40):
+#### Modified Files (43):
 1-19. Previous files...
 20. `com.mojang.blaze3d.vertex.MeshData` - Made `indexBuffer` field public
 21. `net.minecraft.client.renderer.feature.FeatureRenderDispatcher` - Made `particleFeatureRenderer` field public
@@ -31,6 +34,8 @@
 34. `net.irisshaders.iris.pathways.HandRenderer` - Direct method calls and field access
 35. `net.irisshaders.iris.uniforms.IrisExclusiveUniforms` - Direct method call
 36. `net.caffeinemc.mods.sodium.client.render.chunk.ShaderChunkRenderer` - Direct method call and field access
+37. `net.irisshaders.iris.layer.OuterWrappedRenderType` ⭐ - Direct method call to sortOnUpload()
+38. `net.caffeinemc.mods.sodium.client.render.chunk.compile.pipeline.BlockRenderer` ⭐ - Made `buffers` field public
 
 ---
 
@@ -77,10 +82,10 @@ Hooks are already being called from Minecraft core code:
 
 ## Current Mixin Statistics
 
-### Total Mixin Count: 221 Files (14 removed)
+### Total Mixin Count: 218 Files (17 removed)
 
 **Breakdown by Type:**
-- **@Accessor mixins**: 45 remaining (59 originally, 14 removed)
+- **@Accessor mixins**: 42 remaining (59 originally, 17 removed)
 - **@Invoker mixins**: 0 remaining (1 originally, 1 removed - all converted!)
 - **@Inject annotations**: 254 (multiple per file)
 - **@Redirect annotations**: 46
@@ -89,14 +94,14 @@ Hooks are already being called from Minecraft core code:
 
 **Distribution by Mod:**
 - **Sodium**: ~45 mixins (rendering optimizations, 5 removed)
-- **Iris**: ~141 mixins (shader system integration, 8 removed)
+- **Iris**: ~138 mixins (shader system integration, 11 removed)
 - **Distant Horizons**: ~23 mixins (LOD rendering, 1 removed)
 - **Fabric API**: ~12 mixins (compatibility layer)
 
 ### Mixin Complexity Analysis
 
 **Simple (Easy to Convert):**
-- 45 @Accessor mixins remaining - Just need to change visibility modifiers
+- 42 @Accessor mixins remaining - Just need to change visibility modifiers (29% complete!)
 - 0 @Invoker mixins - ALL CONVERTED! ✅
 - ~100 simple @Inject mixins - Direct HEAD/RETURN injections
 

@@ -44,7 +44,7 @@ public class BlockRenderer extends AbstractBlockRenderContext {
     private final int[] vertexColors = new int[4];
     private final ChunkVertexEncoder.Vertex[] vertices = ChunkVertexEncoder.Vertex.uninitializedQuad();
 
-    private ChunkBuildBuffers buffers;
+    public ChunkBuildBuffers buffers; // Made public for Iris Sodium integration (though currently unused)
 
     private final Vector3f posOffset = new Vector3f();
     private final BlockPos.MutableBlockPos scratchPos = new BlockPos.MutableBlockPos();

@@ -4,7 +4,6 @@ import com.mojang.blaze3d.pipeline.RenderPipeline;
 import com.mojang.blaze3d.pipeline.RenderTarget;
 import com.mojang.blaze3d.vertex.MeshData;
 import com.mojang.blaze3d.vertex.VertexFormat;
-import net.irisshaders.iris.mixin.rendertype.RenderTypeAccessor;
 import net.minecraft.client.renderer.RenderStateShard;
 import net.minecraft.client.renderer.RenderType;
 import org.jetbrains.annotations.Nullable;
@@ -18,7 +17,7 @@ public class OuterWrappedRenderType extends RenderType {
 
 	public OuterWrappedRenderType(String name, RenderType wrapped, RenderStateShard extra) {
 		super(name, wrapped.bufferSize(),
-			wrapped.affectsCrumbling(), shouldSortOnUpload(wrapped), wrapped::setupRenderState, wrapped::clearRenderState);
+			wrapped.affectsCrumbling(), wrapped.sortOnUpload(), wrapped::setupRenderState, wrapped::clearRenderState); // Direct method call - sortOnUpload() is public
 
 		this.extra = extra;
 		this.wrapped = wrapped;
@@ -34,10 +33,6 @@ public class OuterWrappedRenderType extends RenderType {
 
 	private RenderType unwrap() {
 		return wrapped;
-	}
-
-	private static boolean shouldSortOnUpload(RenderType type) {
-		return ((RenderTypeAccessor) type).shouldSortOnUpload();
 	}
 
 	@Override
