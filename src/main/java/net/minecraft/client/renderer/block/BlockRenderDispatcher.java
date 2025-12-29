@@ -32,7 +32,7 @@ public class BlockRenderDispatcher implements ResourceManagerReloadListener {
 	private final BlockModelShaper blockModelShaper;
 	private final MaterialSet materials;
 	private final ModelBlockRenderer modelRenderer;
-	private final Supplier<SpecialBlockModelRenderer> specialBlockModelRenderer;
+	public final Supplier<SpecialBlockModelRenderer> specialBlockModelRenderer;
 	private final LiquidBlockRenderer liquidBlockRenderer;
 	private final RandomSource singleThreadRandom = RandomSource.create();
 	private final List<BlockModelPart> singleThreadPartList = new ArrayList();

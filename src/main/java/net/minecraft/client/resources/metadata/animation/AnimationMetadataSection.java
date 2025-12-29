@@ -10,9 +10,47 @@ import net.minecraft.server.packs.metadata.MetadataSectionType;
 import net.minecraft.util.ExtraCodecs;
 
 @Environment(EnvType.CLIENT)
-public record AnimationMetadataSection(
-	Optional<List<AnimationFrame>> frames, Optional<Integer> frameWidth, Optional<Integer> frameHeight, int defaultFrameTime, boolean interpolatedFrames
-) {
+public class AnimationMetadataSection {
+	private Optional<List<AnimationFrame>> frames;
+	public Optional<Integer> frameWidth;
+	public Optional<Integer> frameHeight;
+	private int defaultFrameTime;
+	private boolean interpolatedFrames;
+
+	public AnimationMetadataSection(
+		Optional<List<AnimationFrame>> frames,
+		Optional<Integer> frameWidth,
+		Optional<Integer> frameHeight,
+		int defaultFrameTime,
+		boolean interpolatedFrames
+	) {
+		this.frames = frames;
+		this.frameWidth = frameWidth;
+		this.frameHeight = frameHeight;
+		this.defaultFrameTime = defaultFrameTime;
+		this.interpolatedFrames = interpolatedFrames;
+	}
+
+	public Optional<List<AnimationFrame>> frames() {
+		return this.frames;
+	}
+
+	public Optional<Integer> frameWidth() {
+		return this.frameWidth;
+	}
+
+	public Optional<Integer> frameHeight() {
+		return this.frameHeight;
+	}
+
+	public int defaultFrameTime() {
+		return this.defaultFrameTime;
+	}
+
+	public boolean interpolatedFrames() {
+		return this.interpolatedFrames;
+	}
+
 	public static final Codec<AnimationMetadataSection> CODEC = RecordCodecBuilder.create(
 		instance -> instance.group(
 				AnimationFrame.CODEC.listOf().optionalFieldOf("frames").forGetter(AnimationMetadataSection::frames),

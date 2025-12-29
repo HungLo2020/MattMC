@@ -12,7 +12,6 @@ import net.caffeinemc.mods.sodium.client.gl.shader.uniform.GlUniformMatrix4f;
 import net.caffeinemc.mods.sodium.client.render.chunk.terrain.TerrainRenderPass;
 import net.caffeinemc.mods.sodium.client.render.chunk.vertex.format.impl.CompactChunkVertex;
 import net.caffeinemc.mods.sodium.client.util.FogParameters;
-import net.caffeinemc.mods.sodium.mixin.core.render.texture.TextureAtlasAccessor;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.texture.TextureAtlas;
 import org.joml.Matrix4fc;
@@ -53,7 +52,7 @@ public class DefaultShaderInterface implements ChunkShaderInterface {
         this.bindTexture(ChunkShaderTextureSlot.BLOCK, pass.getAtlas());
         this.bindTexture(ChunkShaderTextureSlot.LIGHT, Minecraft.getInstance().gameRenderer.lightTexture().getTextureView());
 
-        var textureAtlas = (TextureAtlasAccessor) Minecraft.getInstance()
+        var textureAtlas = (TextureAtlas) Minecraft.getInstance()
                 .getTextureManager()
                 .getTexture(TextureAtlas.LOCATION_BLOCKS);
 
@@ -64,8 +63,8 @@ public class DefaultShaderInterface implements ChunkShaderInterface {
         double subTexelOffset = 1.0f / CompactChunkVertex.TEXTURE_MAX_VALUE;
 
         this.uniformTexCoordShrink.set(
-                (float) (subTexelOffset - (((1.0D / textureAtlas.getWidth()) / subTexelPrecision))),
-                (float) (subTexelOffset - (((1.0D / textureAtlas.getHeight()) / subTexelPrecision)))
+                (float) (subTexelOffset - (((1.0D / textureAtlas.width) / subTexelPrecision))),
+                (float) (subTexelOffset - (((1.0D / textureAtlas.height) / subTexelPrecision)))
         );
 
         this.fogShader.setup(parameters);

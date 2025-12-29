@@ -6,10 +6,10 @@
 
 ### Mixin Conversion Status
 
-**Total Mixins:** 235 → **215 remaining** (20 removed)  
-**Conversion Progress:** 8.5% complete
+**Total Mixins:** 235 → **212 remaining** (23 removed)  
+**Conversion Progress:** 9.8% complete
 
-#### Removed Mixins (20):
+#### Removed Mixins (23):
 1-9. Previous mixins...
 10. ✅ `net.caffeinemc.mods.sodium.mixin.features.render.immediate.buffer_builder.sorting.MeshDataAccessor` - Made `MeshData.indexBuffer` field public
 11. ✅ `net.irisshaders.iris.mixin.fantastic.FeatureRenderDispatcherAccessor` - Made `FeatureRenderDispatcher.particleFeatureRenderer` field public
@@ -22,8 +22,11 @@
 18. ✅ `net.irisshaders.iris.mixin.LevelRendererAccessor` - Made `LevelRenderer` fields/methods public (entityRenderDispatcher, renderBuffers, level, destructionProgress, cullTerrain, extractVisibleBlockEntities, doesMobEffectBlockSky)
 19. ✅ `net.caffeinemc.mods.sodium.mixin.features.render.frapi.ModelBlockRendererAccessor` - Made `ModelBlockRenderer.blockColors` field public
 20. ✅ `net.caffeinemc.mods.sodium.mixin.features.render.frapi.ItemRendererAccessor` - Made `ItemRenderer.getSpecialFoilBuffer()` method public
+21. ✅ `net.caffeinemc.mods.sodium.mixin.core.render.texture.TextureAtlasAccessor` - Made `TextureAtlas.width` and `height` fields public
+22. ✅ `net.caffeinemc.mods.sodium.mixin.features.render.frapi.BlockRenderDispatcherAccessor` - Made `BlockRenderDispatcher.specialBlockModelRenderer` field public
+23. ✅ `net.irisshaders.iris.mixin.texture.AnimationMetadataSectionAccessor` - Converted record to mutable class with public `frameWidth` and `frameHeight` fields
 
-#### Modified Files (60+ total):
+#### Modified Files (65+ total):
 1-19. Previous files...
 20. `com.mojang.blaze3d.vertex.MeshData` - Made `indexBuffer` field public
 21. `net.minecraft.client.renderer.feature.FeatureRenderDispatcher` - Made `particleFeatureRenderer` field public
@@ -46,6 +49,12 @@
 51-54. Iris mixin files (4 files) - Direct method calls and field access
 55. `net.caffeinemc.mods.sodium.client.render.frapi.SodiumRenderer` - Direct field access
 56. `net.caffeinemc.mods.sodium.client.render.frapi.render.ItemRenderContext` - Direct method call
+57. `net.minecraft.client.renderer.texture.TextureAtlas` ⭐ - Made `width` and `height` fields public for texture coordinate calculations
+58. `net.caffeinemc.mods.sodium.client.render.chunk.shader.DefaultShaderInterface` - Direct field access to texture dimensions
+59. `net.minecraft.client.renderer.block.BlockRenderDispatcher` ⭐ - Made `specialBlockModelRenderer` field public for FRAPI
+60. `net.caffeinemc.mods.sodium.client.render.frapi.SodiumRenderer` - Direct field access to special renderer
+61. `net.minecraft.client.resources.metadata.animation.AnimationMetadataSection` ⭐⭐ - Converted from record to mutable class with public frameWidth/frameHeight fields
+62. `net.irisshaders.iris.pbr.loader.AtlasPBRLoader` - Direct field access to animation metadata
 
 ---
 
@@ -92,10 +101,10 @@ Hooks are already being called from Minecraft core code:
 
 ## Current Mixin Statistics
 
-### Total Mixin Count: 215 Files (20 removed)
+### Total Mixin Count: 212 Files (23 removed)
 
 **Breakdown by Type:**
-- **@Accessor mixins**: 39 remaining (59 originally, 20 removed)
+- **@Accessor mixins**: 36 remaining (59 originally, 23 removed)
 - **@Invoker mixins**: 0 remaining (1 originally, 1 removed - all converted!)
 - **@Inject annotations**: 254 (multiple per file)
 - **@Redirect annotations**: 46
@@ -103,15 +112,15 @@ Hooks are already being called from Minecraft core code:
 - **@ModifyArg/@ModifyVariable**: 15
 
 **Distribution by Mod:**
-- **Sodium**: ~43 mixins (rendering optimizations, 7 removed)
-- **Iris**: ~137 mixins (shader system integration, 12 removed)
+- **Sodium**: ~41 mixins (rendering optimizations, 9 removed)
+- **Iris**: ~136 mixins (shader system integration, 13 removed)
 - **Distant Horizons**: ~23 mixins (LOD rendering, 1 removed)
 - **Fabric API**: ~12 mixins (compatibility layer)
 
 ### Mixin Complexity Analysis
 
 **Simple (Easy to Convert):**
-- 39 @Accessor mixins remaining - Just need to change visibility modifiers (34% complete!)
+- 36 @Accessor mixins remaining - Just need to change visibility modifiers (39% complete!)
 - 0 @Invoker mixins - ALL CONVERTED! ✅
 - ~100 simple @Inject mixins - Direct HEAD/RETURN injections
 

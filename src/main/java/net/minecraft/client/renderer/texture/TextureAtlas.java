@@ -41,8 +41,8 @@ public class TextureAtlas extends AbstractTexture implements Dumpable, Tickable 
 	private TextureAtlasSprite missingSprite;
 	private final ResourceLocation location;
 	private final int maxSupportedTextureSize;
-	private int width;
-	private int height;
+	public int width;
+	public int height;
 	private int mipLevel;
 
 	public TextureAtlas(ResourceLocation resourceLocation) {

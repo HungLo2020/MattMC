@@ -2,7 +2,6 @@ package net.irisshaders.iris.pbr.loader;
 
 import com.mojang.blaze3d.platform.NativeImage;
 import net.irisshaders.iris.Iris;
-import net.irisshaders.iris.mixin.texture.AnimationMetadataSectionAccessor;
 import net.irisshaders.iris.mixin.texture.TextureAtlasAccessor;
 import net.irisshaders.iris.pbr.format.TextureFormat;
 import net.irisshaders.iris.pbr.format.TextureFormatLoader;
@@ -142,14 +141,13 @@ public class AtlasPBRLoader implements PBRTextureLoader<TextureAtlas> {
 				frameHeight = targetFrameHeight;
 
 				if (metadataSection != null) {
-					AnimationMetadataSectionAccessor animationAccessor = (AnimationMetadataSectionAccessor) (Object) metadataSection;
-					int internalFrameWidth = animationAccessor.getFrameWidth().orElse(-1);
-					int internalFrameHeight = animationAccessor.getFrameHeight().orElse(-1);
+					int internalFrameWidth = metadataSection.frameWidth().orElse(-1);
+					int internalFrameHeight = metadataSection.frameHeight().orElse(-1);
 					if (internalFrameWidth != -1) {
-						animationAccessor.setFrameWidth(Optional.of(frameWidth));
+						metadataSection.frameWidth = Optional.of(frameWidth);
 					}
 					if (internalFrameHeight != -1) {
-						animationAccessor.setFrameHeight(Optional.of(frameHeight));
+						metadataSection.frameHeight = Optional.of(frameHeight);
 					}
 				}
 			} catch (Exception e) {
