@@ -114,7 +114,6 @@
     "texture.MixinResourceLocation",
     "texture.MixinSpriteContents",
     "texture.MixinTextureManager",
-    "texture.ReloadableTextureAccessor",
     "texture.SpriteContentsAccessor",
     "texture.SpriteContentsAnimatedTextureAccessor",
     "texture.SpriteContentsFrameInfoAccessor",

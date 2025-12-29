@@ -1,6 +1,5 @@
 package net.irisshaders.iris.pbr.loader;
 
-import net.irisshaders.iris.mixin.texture.ReloadableTextureAccessor;
 import net.irisshaders.iris.pbr.texture.PBRType;
 import net.irisshaders.iris.vertices.ImmediateState;
 import net.minecraft.client.renderer.texture.AbstractTexture;
@@ -17,7 +16,7 @@ import java.io.IOException;
 public class SimplePBRLoader implements PBRTextureLoader<SimpleTexture> {
 	@Override
 	public void load(SimpleTexture texture, ResourceManager resourceManager, PBRTextureConsumer pbrTextureConsumer) {
-		ResourceLocation location = ((ReloadableTextureAccessor) texture).getLocation();
+		ResourceLocation location = texture.resourceId(); // Direct method call - resourceId() is public
 
 		AbstractTexture normalTexture = createPBRTexture(location, resourceManager, PBRType.NORMAL);
 		AbstractTexture specularTexture = createPBRTexture(location, resourceManager, PBRType.SPECULAR);

@@ -6,10 +6,10 @@
 
 ### Mixin Conversion Status
 
-**Total Mixins:** 235 → **227 remaining** (8 removed)  
-**Conversion Progress:** 3.4% complete
+**Total Mixins:** 235 → **226 remaining** (9 removed)  
+**Conversion Progress:** 3.8% complete
 
-#### Removed Mixins (8):
+#### Removed Mixins (9):
 1. ✅ `net.irisshaders.iris.mixin.DimensionTypeAccessor` - Record fields are public by default
 2. ✅ `net.irisshaders.iris.mixin.LightTextureAccessor` - Changed `LightTexture.texture` field visibility to public
 3. ✅ `com.seibel.distanthorizons.fabric.mixins.client.LightTextureAccessor` - Same as above
@@ -17,9 +17,10 @@
 5. ✅ `net.irisshaders.iris.mixin.EndFlashAccess` - Added public setter methods to `EndFlashState`
 6. ✅ `net.irisshaders.iris.mixin.GlStateManagerAccessor` - Made static fields `BLEND`, `DEPTH`, `COLOR_MASK`, `TEXTURES`, `activeTexture` public
 7. ✅ `net.caffeinemc.mods.sodium.mixin.features.textures.NativeImageAccessor` - `NativeImage.pixels` field already public
-8. ✅ `net.caffeinemc.mods.sodium.mixin.features.gui.hooks.debug.DebugScreenEntriesAccessor` - Made `DebugScreenEntries.ENTRIES_BY_LOCATION` public
+8. ✅ `net.caffeinemc.mods/sodium.mixin.features.gui.hooks.debug.DebugScreenEntriesAccessor` - Made `DebugScreenEntries.ENTRIES_BY_LOCATION` public
+9. ✅ `net.irisshaders.iris.mixin.texture.ReloadableTextureAccessor` - `ReloadableTexture.resourceId()` method already public
 
-#### Modified Files (24):
+#### Modified Files (25):
 1. `net.minecraft.client.renderer.LightTexture` - Made `texture` field public
 2. `net.irisshaders.iris.pipeline.CustomTextureManager` - Updated to use direct field access (2x)
 3. `com.seibel.distanthorizons.fabric.hooks.DhLightTextureHook` - Updated to use direct field access
@@ -38,6 +39,7 @@
 16. `net.caffeinemc.mods.sodium.client.util.NativeImageHelper` - Direct field access for `pixels`
 17. `net.minecraft.client.gui.components.debug.DebugScreenEntries` - Made static field public
 18. `net.caffeinemc.mods.sodium.client.SodiumClientMod` - Direct static field access
+19. `net.irisshaders.iris.pbr.loader.SimplePBRLoader` - Use public `resourceId()` method
 
 ---
 
@@ -84,10 +86,10 @@ Hooks are already being called from Minecraft core code:
 
 ## Current Mixin Statistics
 
-### Total Mixin Count: 227 Files (8 removed)
+### Total Mixin Count: 226 Files (9 removed)
 
 **Breakdown by Type:**
-- **@Accessor mixins**: 51 remaining (59 originally, 8 removed)
+- **@Accessor mixins**: 50 remaining (59 originally, 9 removed)
 - **@Invoker mixins**: 1 (<1% of total)
 - **@Inject annotations**: 254 (multiple per file)
 - **@Redirect annotations**: 46
@@ -96,14 +98,14 @@ Hooks are already being called from Minecraft core code:
 
 **Distribution by Mod:**
 - **Sodium**: ~48 mixins (rendering optimizations, 2 removed)
-- **Iris**: ~144 mixins (shader system integration, 5 removed)
+- **Iris**: ~143 mixins (shader system integration, 6 removed)
 - **Distant Horizons**: ~23 mixins (LOD rendering, 1 removed)
 - **Fabric API**: ~12 mixins (compatibility layer)
 
 ### Mixin Complexity Analysis
 
 **Simple (Easy to Convert):**
-- 51 @Accessor mixins remaining - Just need to change visibility modifiers
+- 50 @Accessor mixins remaining - Just need to change visibility modifiers
 - 1 @Invoker mixin - Make method public/protected
 - ~100 simple @Inject mixins - Direct HEAD/RETURN injections
 
