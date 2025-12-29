@@ -25,8 +25,8 @@ import org.jetbrains.annotations.UnmodifiableView;
 
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.Container;
-import net.minecraft.world.entity.player.WorldlyContainer;
-import net.minecraft.world.entity.player.SimpleContainer;
+import net.minecraft.world.WorldlyContainer;
+import net.minecraft.world.SimpleContainer;
 import net.minecraft.core.Direction;
 
 import net.fabricmc.fabric.api.transfer.v1.storage.SlottedStorage;
