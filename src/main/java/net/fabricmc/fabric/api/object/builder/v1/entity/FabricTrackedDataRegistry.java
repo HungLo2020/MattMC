@@ -18,8 +18,8 @@ package net.fabricmc.fabric.api.object.builder.v1.entity;
 
 import org.jetbrains.annotations.Nullable;
 
-import net.minecraft.world.entity.data.EntityDataSerializer;
-import net.minecraft.world.entity.data.EntityDataSerializers;
+import net.minecraft.network.syncher.EntityDataSerializer;
+import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.resources.ResourceLocation;
 
 import net.fabricmc.fabric.impl.object.builder.FabricTrackedDataRegistryImpl;

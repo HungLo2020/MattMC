@@ -22,7 +22,7 @@ import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import net.minecraft.component.ComponentType;
+import net.minecraft.core.component.DataComponentType;
 import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.packs.Resource;
@@ -52,7 +52,7 @@ public class EnchantmentUtil {
 				.forEach(component -> {
 					if (component.value() instanceof List<?> valueList) {
 						// component type cast is checked by the value
-						accessor.invokeGetEffectsList((ComponentType<List<Object>>) component.type())
+						accessor.invokeGetEffectsList((DataComponentType<List<Object>>) component.type())
 								.addAll(valueList);
 					}
 				});

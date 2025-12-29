@@ -24,7 +24,7 @@ import net.minecraft.world.level.block.entity.BrewingStandBlockEntity;
 import net.minecraft.world.level.block.entity.ChestBlockEntity;
 import net.minecraft.world.level.block.entity.ShulkerBoxBlockEntity;
 import net.minecraft.world.level.block.enums.ChestType;
-import net.minecraft.component.ComponentType;
+import net.minecraft.core.component.DataComponentType;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.core.BlockPos;
@@ -159,7 +159,7 @@ class InventorySlotWrapper extends SingleStackStorage {
 			// Components have changed, we need to copy the stack.
 			if (!Objects.equals(original.getComponentChanges(), currentStack.getComponentChanges())) {
 				// Remove all the existing components and copy the new ones on top.
-				for (ComponentType<?> type : original.getComponents().getTypes()) {
+				for (DataComponentType<?> type : original.getComponents().getTypes()) {
 					original.set(type, null);
 				}
 

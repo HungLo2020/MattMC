@@ -28,7 +28,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.entity.ai.village.MerchantOffer;
-import net.minecraft.world.entity.ai.village.MerchantOffers;
+import net.minecraft.world.item.trading.MerchantOffers;
 import net.minecraft.world.entity.ai.village.TradedItem;
 import net.minecraft.world.entity.ai.village.VillagerType;
 

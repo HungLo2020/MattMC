@@ -29,7 +29,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import net.minecraft.core.component.DataComponentPatch;
-import net.minecraft.component.ComponentType;
+import net.minecraft.core.component.DataComponentType;
 
 import net.fabricmc.fabric.api.transfer.v1.storage.SlottedStorage;
 import net.fabricmc.fabric.api.transfer.v1.storage.Storage;
@@ -124,9 +124,9 @@ public class TransferApiImpl {
 
 	@SuppressWarnings("unchecked")
 	private static void writeChangesTo(DataComponentPatch changes, DataComponentPatch.Builder builder) {
-		for (Map.Entry<ComponentType<?>, Optional<?>> entry : changes.entrySet()) {
+		for (Map.Entry<DataComponentType<?>, Optional<?>> entry : changes.entrySet()) {
 			if (entry.getValue().isPresent()) {
-				builder.add((ComponentType<Object>) entry.getKey(), entry.getValue().get());
+				builder.add((DataComponentType<Object>) entry.getKey(), entry.getValue().get());
 			} else {
 				builder.remove(entry.getKey());
 			}
