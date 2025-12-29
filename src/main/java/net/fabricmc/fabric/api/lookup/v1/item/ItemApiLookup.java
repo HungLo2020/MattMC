@@ -20,7 +20,7 @@ import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.Nullable;
 
 import net.minecraft.world.item.Item;
-import net.minecraft.world.item.ItemLike;
+import net.minecraft.world.level.ItemLike;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.resources.ResourceLocation;
 

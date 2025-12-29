@@ -22,7 +22,7 @@ import java.util.List;
 import net.minecraft.client.gui.Drawable;
 import net.minecraft.client.gui.Element;
 import net.minecraft.client.gui.Selectable;
-import net.minecraft.client.gui.widget.ClickableWidget;
+import net.minecraft.client.gui.components.ClickableWidget;
 
 // TODO: When events for listening to addition of child elements are added, fire events from this list.
 public final class ButtonList extends AbstractList<ClickableWidget> {

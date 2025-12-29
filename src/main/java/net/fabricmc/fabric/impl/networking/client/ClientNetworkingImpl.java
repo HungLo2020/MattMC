@@ -28,7 +28,7 @@ import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.network.Connection;
 import net.minecraft.network.NetworkPhase;
 import net.minecraft.network.NetworkSide;
-import net.minecraft.network.listener.ServerCommonPacketListener;
+import net.minecraft.network.ServerCommonPacketListener;
 import net.minecraft.network.protocol.CustomPacketPayload;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.c2s.common.CustomPayloadC2SPacket;

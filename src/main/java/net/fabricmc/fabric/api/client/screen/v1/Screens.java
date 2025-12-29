@@ -22,7 +22,7 @@ import java.util.Objects;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.font.Font;
 import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.client.gui.widget.ClickableWidget;
+import net.minecraft.client.gui.components.ClickableWidget;
 
 import net.fabricmc.fabric.impl.client.screen.ScreenExtensions;
 import net.fabricmc.fabric.mixin.screen.ScreenAccessor;

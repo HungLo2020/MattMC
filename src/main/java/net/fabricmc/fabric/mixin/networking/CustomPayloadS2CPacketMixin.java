@@ -55,7 +55,7 @@ public class CustomPayloadS2CPacketMixin implements SplittablePacket, GenericPay
 					ordinal = 0
 			)
 	)
-	private static PacketCodec<RegistryByteBuf, CustomPacketPayload> wrapPlayCodec(CustomPacketPayload.CodecFactory<RegistryByteBuf> unknownCodecFactory, List<CustomPacketPayload.Type<RegistryByteBuf, ?>> types, Operation<PacketCodec<RegistryByteBuf, CustomPacketPayload>> original) {
+	private static PacketCodec<RegistryByteBuf, CustomPacketPayload> wrapPlayCodec(CustomPacketPayload.CodecFactory<RegistryByteBuf> unknownCodecFactory, List<ResourceLocation<RegistryByteBuf, ?>> types, Operation<PacketCodec<RegistryByteBuf, CustomPacketPayload>> original) {
 		PacketCodec<RegistryByteBuf, CustomPacketPayload> codec = original.call(unknownCodecFactory, types);
 		FabricCustomPayloadPacketCodec<RegistryByteBuf> fabricCodec = (FabricCustomPayloadPacketCodec<RegistryByteBuf>) codec;
 		fabricCodec.fabric_setPacketCodecProvider((packetByteBuf, identifier) -> PayloadTypeRegistryImpl.PLAY_S2C.get(identifier));
@@ -70,7 +70,7 @@ public class CustomPayloadS2CPacketMixin implements SplittablePacket, GenericPay
 					ordinal = 1
 			)
 	)
-	private static PacketCodec<FriendlyByteBuf, CustomPacketPayload> wrapConfigCodec(CustomPacketPayload.CodecFactory<FriendlyByteBuf> unknownCodecFactory, List<CustomPacketPayload.Type<FriendlyByteBuf, ?>> types, Operation<PacketCodec<FriendlyByteBuf, CustomPacketPayload>> original) {
+	private static PacketCodec<FriendlyByteBuf, CustomPacketPayload> wrapConfigCodec(CustomPacketPayload.CodecFactory<FriendlyByteBuf> unknownCodecFactory, List<ResourceLocation<FriendlyByteBuf, ?>> types, Operation<PacketCodec<FriendlyByteBuf, CustomPacketPayload>> original) {
 		PacketCodec<FriendlyByteBuf, CustomPacketPayload> codec = original.call(unknownCodecFactory, types);
 		FabricCustomPayloadPacketCodec<FriendlyByteBuf> fabricCodec = (FabricCustomPayloadPacketCodec<FriendlyByteBuf>) codec;
 		fabricCodec.fabric_setPacketCodecProvider((packetByteBuf, identifier) -> PayloadTypeRegistryImpl.CONFIGURATION_S2C.get(identifier));

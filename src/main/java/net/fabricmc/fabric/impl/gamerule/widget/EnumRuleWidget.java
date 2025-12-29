@@ -22,7 +22,7 @@ import java.util.Locale;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.world.EditGameRulesScreen;
-import net.minecraft.client.gui.widget.Button;
+import net.minecraft.client.gui.components.Button;
 import net.minecraft.network.chat.OrderedText;
 import net.minecraft.network.chat.Component;
 

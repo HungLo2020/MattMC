@@ -19,7 +19,7 @@ package net.fabricmc.fabric.impl.client.screen;
 import java.util.List;
 
 import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.client.gui.widget.ClickableWidget;
+import net.minecraft.client.gui.components.ClickableWidget;
 
 import net.fabricmc.fabric.api.client.screen.v1.ScreenEvents;
 import net.fabricmc.fabric.api.client.screen.v1.ScreenKeyboardEvents;

@@ -22,7 +22,7 @@ import java.util.Set;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.Nullable;
 
-import net.minecraft.network.listener.ClientCommonPacketListener;
+import net.minecraft.network.ClientCommonPacketListener;
 import net.minecraft.network.protocol.CustomPacketPayload;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.server.MinecraftServer;
@@ -51,7 +51,7 @@ import net.fabricmc.fabric.impl.networking.server.ServerNetworkingImpl;
  *
  * <ul>
  *     <li>A class implementing {@link CustomPacketPayload} that is "sent" over the network</li>
- *     <li>{@link CustomPacketPayload.Type} instance, which represents the packet's type (and its codec)</li>
+ *     <li>{@link ResourceLocation} instance, which represents the packet's type (and its codec)</li>
  *     <li>{@link PlayPayloadHandler}, which handles the packet (usually implemented as a functional interface)</li>
  * </ul>
  *

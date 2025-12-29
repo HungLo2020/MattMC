@@ -20,7 +20,7 @@ import java.util.Objects;
 
 import net.minecraft.network.NetworkPhase;
 import net.minecraft.network.NetworkSide;
-import net.minecraft.network.listener.ClientCommonPacketListener;
+import net.minecraft.network.ClientCommonPacketListener;
 import net.minecraft.network.protocol.CustomPacketPayload;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.s2c.common.CustomPayloadS2CPacket;

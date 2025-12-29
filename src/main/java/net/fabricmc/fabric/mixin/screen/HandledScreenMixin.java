@@ -23,7 +23,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import net.minecraft.client.gui.ClickType;
 import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.client.gui.screens.ingame.AbstractContainerScreen;
+import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.network.chat.Component;
 
 @Mixin(AbstractContainerScreen.class)

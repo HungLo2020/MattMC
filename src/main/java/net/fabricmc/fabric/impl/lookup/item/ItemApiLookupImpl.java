@@ -25,7 +25,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import net.minecraft.world.item.Item;
-import net.minecraft.world.item.ItemLike;
+import net.minecraft.world.level.ItemLike;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.core.Registries;
 import net.minecraft.resources.ResourceLocation;

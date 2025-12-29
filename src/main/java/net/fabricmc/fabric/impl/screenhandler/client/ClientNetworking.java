@@ -21,8 +21,8 @@ import org.slf4j.LoggerFactory;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.client.gui.screens.ingame.HandledScreens;
-import net.minecraft.client.gui.screens.ingame.ScreenHandlerProvider;
+import net.minecraft.client.gui.screens.inventory.HandledScreens;
+import net.minecraft.client.gui.screens.inventory.ScreenHandlerProvider;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.core.Registries;
 import net.minecraft.world.inventory.ScreenHandlerType;

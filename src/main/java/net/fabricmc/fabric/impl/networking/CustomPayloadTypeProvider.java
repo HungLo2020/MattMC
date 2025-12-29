@@ -21,5 +21,5 @@ import net.minecraft.network.protocol.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
 
 public interface CustomPayloadTypeProvider<B extends FriendlyByteBuf> {
-	CustomPacketPayload.Type<B, ? extends CustomPacketPayload> get(B packetByteBuf, ResourceLocation identifier);
+	ResourceLocation<B, ? extends CustomPacketPayload> get(B packetByteBuf, ResourceLocation identifier);
 }

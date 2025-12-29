@@ -38,7 +38,7 @@ import net.minecraft.network.NetworkSide;
 import net.minecraft.network.handler.DecoderHandler;
 import net.minecraft.network.handler.EncoderHandler;
 import net.minecraft.network.handler.NetworkStateTransitions;
-import net.minecraft.network.listener.PacketListener;
+import net.minecraft.network.PacketListener;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.state.NetworkState;
 import net.minecraft.resources.ResourceLocation;

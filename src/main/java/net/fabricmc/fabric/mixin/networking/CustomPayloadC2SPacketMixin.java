@@ -54,13 +54,13 @@ public class CustomPayloadC2SPacketMixin implements SplittablePacket, GenericPay
 					target = "Lnet/minecraft/network/packet/CustomPacketPayload;createCodec(Lnet/minecraft/network/packet/CustomPacketPayload$CodecFactory;Ljava/util/List;)Lnet/minecraft/network/codec/PacketCodec;"
 			)
 	)
-	private static PacketCodec<FriendlyByteBuf, CustomPacketPayload> wrapCodec(CustomPacketPayload.CodecFactory<FriendlyByteBuf> unknownCodecFactory, List<CustomPacketPayload.Type<FriendlyByteBuf, ?>> types, Operation<PacketCodec<FriendlyByteBuf, CustomPacketPayload>> original) {
+	private static PacketCodec<FriendlyByteBuf, CustomPacketPayload> wrapCodec(CustomPacketPayload.CodecFactory<FriendlyByteBuf> unknownCodecFactory, List<ResourceLocation<FriendlyByteBuf, ?>> types, Operation<PacketCodec<FriendlyByteBuf, CustomPacketPayload>> original) {
 		PacketCodec<FriendlyByteBuf, CustomPacketPayload> codec = original.call(unknownCodecFactory, types);
 		FabricCustomPayloadPacketCodec<FriendlyByteBuf> fabricCodec = (FabricCustomPayloadPacketCodec<FriendlyByteBuf>) codec;
 		fabricCodec.fabric_setPacketCodecProvider((packetByteBuf, identifier) -> {
 			// CustomPayloadC2SPacket does not have a separate codec for play/configuration. We know if the packetByteBuf is a FriendlyByteBuf we are in the play phase.
 			if (packetByteBuf instanceof RegistryByteBuf) {
-				return (CustomPacketPayload.Type<FriendlyByteBuf, ? extends CustomPacketPayload>) (Object) PayloadTypeRegistryImpl.PLAY_C2S.get(identifier);
+				return (ResourceLocation<FriendlyByteBuf, ? extends CustomPacketPayload>) (Object) PayloadTypeRegistryImpl.PLAY_C2S.get(identifier);
 			}
 
 			return PayloadTypeRegistryImpl.CONFIGURATION_C2S.get(identifier);

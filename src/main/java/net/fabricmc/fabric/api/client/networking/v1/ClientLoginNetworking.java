@@ -27,7 +27,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLoginPacketListenerImpl;
 import net.minecraft.network.Connection;
 import net.minecraft.network.FriendlyByteBuf;
-import net.minecraft.network.listener.PacketListener;
+import net.minecraft.network.PacketListener;
 import net.minecraft.resources.ResourceLocation;
 
 import net.fabricmc.fabric.api.networking.v1.ServerLoginNetworking;

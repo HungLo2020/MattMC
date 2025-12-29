@@ -30,9 +30,9 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.screens.ingame.CreativeInventoryScreen;
-import net.minecraft.client.gui.screens.ingame.CreativeInventoryScreen.CreativeScreenHandler;
-import net.minecraft.client.gui.screens.ingame.AbstractContainerScreen;
+import net.minecraft.client.gui.screens.inventory.CreativeInventoryScreen;
+import net.minecraft.client.gui.screens.inventory.CreativeInventoryScreen.CreativeScreenHandler;
+import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.client.input.KeyInput;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.item.CreativeModeTab;

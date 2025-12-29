@@ -51,7 +51,7 @@ public abstract class CustomPayloadPacketCodecMixin<B extends FriendlyByteBuf> i
 	}, at = @At(value = "INVOKE", target = "Lnet/minecraft/network/packet/CustomPacketPayload$1;getCodec(Lnet/minecraft/util/ResourceLocation;)Lnet/minecraft/network/codec/PacketCodec;"))
 	private PacketCodec<B, ? extends CustomPacketPayload> wrapGetCodec(@Coerce PacketCodec<B, CustomPacketPayload> instance, ResourceLocation identifier, Operation<PacketCodec<B, CustomPacketPayload>> original, B packetByteBuf) {
 		if (customPayloadTypeProvider != null) {
-			CustomPacketPayload.Type<B, ? extends CustomPacketPayload> payloadType = customPayloadTypeProvider.get(packetByteBuf, identifier);
+			ResourceLocation<B, ? extends CustomPacketPayload> payloadType = customPayloadTypeProvider.get(packetByteBuf, identifier);
 
 			if (payloadType != null) {
 				return payloadType.codec();
