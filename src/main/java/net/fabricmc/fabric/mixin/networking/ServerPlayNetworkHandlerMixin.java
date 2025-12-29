@@ -32,7 +32,7 @@ import net.minecraft.network.state.NetworkState;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.network.ConnectedClientData;
 import net.minecraft.server.network.ServerCommonNetworkHandler;
-import net.minecraft.server.network.ServerConfigurationNetworkHandler;
+import net.minecraft.server.network.ServerConfigurationPacketListenerImpl;
 import net.minecraft.server.network.ServerGamePacketListenerImpl;
 
 import net.fabricmc.fabric.impl.networking.NetworkHandlerExtensions;
@@ -76,7 +76,7 @@ abstract class ServerPlayNetworkHandlerMixin extends ServerCommonNetworkHandler 
 	private <T extends PacketListener> void onAcknowledgeReconfiguration(Connection instance, NetworkState<T> state, T packetListener, Operation<Void> original) {
 		original.call(instance, state, packetListener);
 
-		ServerConfigurationNetworkHandler networkHandler = (ServerConfigurationNetworkHandler) packetListener;
+		ServerConfigurationPacketListenerImpl networkHandler = (ServerConfigurationPacketListenerImpl) packetListener;
 		ServerNetworkingImpl.getAddon(networkHandler).setReconfiguring();
 
 		if (addon.requestedReconfigure()) {

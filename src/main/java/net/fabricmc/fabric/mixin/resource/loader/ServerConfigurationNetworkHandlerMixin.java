@@ -27,11 +27,11 @@ import net.minecraft.core.VersionedIdentifier;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.network.ConnectedClientData;
 import net.minecraft.server.network.ServerCommonNetworkHandler;
-import net.minecraft.server.network.ServerConfigurationNetworkHandler;
+import net.minecraft.server.network.ServerConfigurationPacketListenerImpl;
 
 import net.fabricmc.fabric.impl.resource.loader.FabricOriginalKnownPacksGetter;
 
-@Mixin(ServerConfigurationNetworkHandler.class)
+@Mixin(ServerConfigurationPacketListenerImpl.class)
 public abstract class ServerConfigurationNetworkHandlerMixin extends ServerCommonNetworkHandler {
 	public ServerConfigurationNetworkHandlerMixin(MinecraftServer server, Connection connection, ConnectedClientData clientData) {
 		super(server, connection, clientData);

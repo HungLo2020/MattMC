@@ -24,7 +24,7 @@ import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import net.minecraft.world.entity.data.TrackedDataHandler;
+import net.minecraft.world.entity.data.EntityDataSerializer;
 import net.minecraft.core.Registry;
 import net.minecraft.core.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
@@ -39,12 +39,12 @@ public final class FabricTrackedDataRegistryImpl {
 	private static final Logger LOGGER = LoggerFactory.getLogger(FabricTrackedDataRegistryImpl.class);
 
 	private static final ResourceLocation HANDLER_REGISTRY_ID = ResourceLocation.of("fabric-object-builder-api-v1", "tracked_data_handler");
-	private static final ResourceKey<Registry<TrackedDataHandler<?>>> HANDLER_REGISTRY_KEY = ResourceKey.ofRegistry(HANDLER_REGISTRY_ID);
+	private static final ResourceKey<Registry<EntityDataSerializer<?>>> HANDLER_REGISTRY_KEY = ResourceKey.ofRegistry(HANDLER_REGISTRY_ID);
 
-	private static final List<TrackedDataHandler<?>> VANILLA_HANDLERS = new ArrayList<>();
+	private static final List<EntityDataSerializer<?>> VANILLA_HANDLERS = new ArrayList<>();
 	@Nullable
-	private static Registry<TrackedDataHandler<?>> handlerRegistry = null;
-	private static final List<TrackedDataHandler<?>> EXTERNAL_MODDED_HANDLERS = new ArrayList<>();
+	private static Registry<EntityDataSerializer<?>> handlerRegistry = null;
+	private static final List<EntityDataSerializer<?>> EXTERNAL_MODDED_HANDLERS = new ArrayList<>();
 
 	private FabricTrackedDataRegistryImpl() {
 	}
@@ -58,9 +58,9 @@ public final class FabricTrackedDataRegistryImpl {
 			throw new IllegalStateException("Already stored vanilla handlers!");
 		}
 
-		Int2ObjectBiMap<TrackedDataHandler<?>> dataHandlers = TrackedDataHandlerRegistryAccessor.fabric_getDataHandlers();
+		Int2ObjectBiMap<EntityDataSerializer<?>> dataHandlers = TrackedDataHandlerRegistryAccessor.fabric_getDataHandlers();
 
-		for (TrackedDataHandler<?> handler : dataHandlers) {
+		for (EntityDataSerializer<?> handler : dataHandlers) {
 			VANILLA_HANDLERS.add(handler);
 		}
 
@@ -68,9 +68,9 @@ public final class FabricTrackedDataRegistryImpl {
 	}
 
 	private static void storeExternalHandlers() {
-		Int2ObjectBiMap<TrackedDataHandler<?>> dataHandlers = TrackedDataHandlerRegistryAccessor.fabric_getDataHandlers();
+		Int2ObjectBiMap<EntityDataSerializer<?>> dataHandlers = TrackedDataHandlerRegistryAccessor.fabric_getDataHandlers();
 
-		for (TrackedDataHandler<?> handler : dataHandlers) {
+		for (EntityDataSerializer<?> handler : dataHandlers) {
 			if (VANILLA_HANDLERS.contains(handler)) continue;
 			if (handlerRegistry != null && handlerRegistry.getId(handler) != null) continue;
 			if (EXTERNAL_MODDED_HANDLERS.contains(handler)) continue;
@@ -81,7 +81,7 @@ public final class FabricTrackedDataRegistryImpl {
 	}
 
 	/**
-	 * Reorders handlers in {@code TrackedDataHandlerRegistry#DATA_HANDLERS} to have a consistent order between client and server.
+	 * Reorders handlers in {@code EntityDataSerializers#DATA_HANDLERS} to have a consistent order between client and server.
 	 *
 	 * <p>The order used is as follows:
 	 *
@@ -92,38 +92,38 @@ public final class FabricTrackedDataRegistryImpl {
 	 * </ul>
 	*/
 	private static void reorderHandlers() {
-		Int2ObjectBiMap<TrackedDataHandler<?>> dataHandlers = TrackedDataHandlerRegistryAccessor.fabric_getDataHandlers();
+		Int2ObjectBiMap<EntityDataSerializer<?>> dataHandlers = TrackedDataHandlerRegistryAccessor.fabric_getDataHandlers();
 		LOGGER.debug("Reordering tracked data handlers containing {} entries", dataHandlers.size());
 
 		// Reset the map so that handlers can be added back in a new order
 		dataHandlers.clear();
 
 		// Add handlers back to map
-		for (TrackedDataHandler<?> handler : VANILLA_HANDLERS) {
+		for (EntityDataSerializer<?> handler : VANILLA_HANDLERS) {
 			dataHandlers.add(handler);
 		}
 
 		if (handlerRegistry != null) {
-			for (TrackedDataHandler<?> handler : handlerRegistry) {
+			for (EntityDataSerializer<?> handler : handlerRegistry) {
 				dataHandlers.add(handler);
 			}
 		}
 
-		for (TrackedDataHandler<?> handler : EXTERNAL_MODDED_HANDLERS) {
+		for (EntityDataSerializer<?> handler : EXTERNAL_MODDED_HANDLERS) {
 			dataHandlers.add(handler);
 		}
 
 		LOGGER.debug("Finished reordering tracked data handlers containing {} entries", dataHandlers.size());
 	}
 
-	public static void register(ResourceLocation id, TrackedDataHandler<?> handler) {
+	public static void register(ResourceLocation id, EntityDataSerializer<?> handler) {
 		Objects.requireNonNull(id, "Tracked data handler ID cannot be null!");
 		Objects.requireNonNull(handler, "Tracked data handler cannot be null!");
 
 		storeExternalHandlers();
 
 		if (VANILLA_HANDLERS.contains(handler) || EXTERNAL_MODDED_HANDLERS.contains(handler)) {
-			throw new IllegalArgumentException("Cannot register tracked data handler previously added via TrackedDataHandlerRegistry.register");
+			throw new IllegalArgumentException("Cannot register tracked data handler previously added via EntityDataSerializers.register");
 		}
 
 		if (handlerRegistry == null) {
@@ -143,7 +143,7 @@ public final class FabricTrackedDataRegistryImpl {
 	}
 
 	@Nullable
-	public static TrackedDataHandler<?> get(ResourceLocation id) {
+	public static EntityDataSerializer<?> get(ResourceLocation id) {
 		Objects.requireNonNull(id, "Tracked data handler ID cannot be null!");
 
 		if (handlerRegistry == null) {
@@ -154,7 +154,7 @@ public final class FabricTrackedDataRegistryImpl {
 	}
 
 	@Nullable
-	public static ResourceLocation getId(TrackedDataHandler<?> handler) {
+	public static ResourceLocation getId(EntityDataSerializer<?> handler) {
 		Objects.requireNonNull(handler, "Tracked data handler cannot be null!");
 
 		if (handlerRegistry == null) {

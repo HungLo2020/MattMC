@@ -21,13 +21,13 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-import net.minecraft.client.multiplayer.ClientConfigurationNetworkHandler;
+import net.minecraft.client.multiplayer.ClientConfigurationPacketListenerImpl;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.server.packs.ResourceFactory;
 
 import net.fabricmc.fabric.api.event.lifecycle.v1.CommonLifecycleEvents;
 
-@Mixin(ClientConfigurationNetworkHandler.class)
+@Mixin(ClientConfigurationPacketListenerImpl.class)
 public class ClientConfigurationNetworkHandlerMixin {
 	@Inject(method = "method_57043", at = @At(value = "RETURN"))
 	private void invokeTagsLoaded(ResourceFactory factory, CallbackInfoReturnable<RegistryAccess.Immutable> cir) {

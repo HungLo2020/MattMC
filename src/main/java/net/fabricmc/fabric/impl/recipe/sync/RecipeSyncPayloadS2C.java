@@ -29,7 +29,7 @@ import net.minecraft.world.item.crafting.RecipeEntry;
 import net.minecraft.world.item.crafting.RecipeSerializer;
 import net.minecraft.core.Registries;
 import net.minecraft.core.ResourceKey;
-import net.minecraft.core.RegistryKeys;
+import net.minecraft.core.Registries;
 import net.minecraft.resources.ResourceLocation;
 
 /**
@@ -63,7 +63,7 @@ public record RecipeSyncPayloadS2C(List<Entry> entries) implements CustomPacketP
 			var list = new ArrayList<RecipeEntry<?>>();
 
 			for (int i = 0; i < count; i++) {
-				ResourceKey<Recipe<?>> id = buf.readRegistryKey(RegistryKeys.RECIPE);
+				ResourceKey<Recipe<?>> id = buf.readRegistryKey(Registries.RECIPE);
 				//noinspection deprecation
 				Recipe<?> recipe = recipeSerializer.packetCodec().decode(buf);
 				list.add(new RecipeEntry<>(id, recipe));

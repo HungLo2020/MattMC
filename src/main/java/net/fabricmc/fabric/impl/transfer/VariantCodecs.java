@@ -27,7 +27,7 @@ import net.minecraft.network.RegistryByteBuf;
 import net.minecraft.network.codec.PacketCodec;
 import net.minecraft.network.codec.PacketCodecs;
 import net.minecraft.core.Registries;
-import net.minecraft.core.RegistryKeys;
+import net.minecraft.core.Registries;
 
 import net.fabricmc.fabric.api.transfer.v1.fluid.FluidVariant;
 import net.fabricmc.fabric.api.transfer.v1.item.ItemVariant;
@@ -43,7 +43,7 @@ public class VariantCodecs {
 	);
 	public static final Codec<ItemVariant> ITEM_CODEC = UNVALIDATED_ITEM_CODEC.validate(VariantCodecs::validateComponents);
 	public static final PacketCodec<RegistryByteBuf, ItemVariant> ITEM_PACKET_CODEC = PacketCodec.tuple(
-			PacketCodecs.registryEntry(RegistryKeys.ITEM), ItemVariant::getRegistryEntry,
+			PacketCodecs.registryEntry(Registries.ITEM), ItemVariant::getRegistryEntry,
 			ComponentChanges.PACKET_CODEC, ItemVariant::getComponents,
 			ItemVariantImpl::of
 	);
@@ -54,7 +54,7 @@ public class VariantCodecs {
 		).apply(instance, FluidVariantImpl::of)
 	);
 	public static final PacketCodec<RegistryByteBuf, FluidVariant> FLUID_PACKET_CODEC = PacketCodec.tuple(
-			PacketCodecs.registryEntry(RegistryKeys.FLUID), FluidVariant::getRegistryEntry,
+			PacketCodecs.registryEntry(Registries.FLUID), FluidVariant::getRegistryEntry,
 			ComponentChanges.PACKET_CODEC, FluidVariant::getComponents,
 			FluidVariantImpl::of
 	);

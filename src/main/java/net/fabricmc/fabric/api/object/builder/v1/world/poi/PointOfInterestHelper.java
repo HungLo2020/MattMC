@@ -24,7 +24,7 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.BlockState;
 import net.minecraft.core.Registries;
 import net.minecraft.core.ResourceKey;
-import net.minecraft.core.RegistryKeys;
+import net.minecraft.core.Registries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.poi.PoiRecord;
 import net.minecraft.world.poi.PoiType;
@@ -77,6 +77,6 @@ public final class PointOfInterestHelper {
 	// INTERNAL METHODS
 
 	private static PoiType register(ResourceLocation id, int ticketCount, int searchDistance, Set<BlockState> states) {
-		return PointOfInterestTypes.register(Registries.POINT_OF_INTEREST_TYPE, ResourceKey.of(RegistryKeys.POINT_OF_INTEREST_TYPE, id), states, ticketCount, searchDistance);
+		return PointOfInterestTypes.register(Registries.POINT_OF_INTEREST_TYPE, ResourceKey.of(Registries.POINT_OF_INTEREST_TYPE, id), states, ticketCount, searchDistance);
 	}
 }

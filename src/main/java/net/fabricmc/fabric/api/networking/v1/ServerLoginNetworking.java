@@ -25,7 +25,7 @@ import org.jetbrains.annotations.Nullable;
 
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.network.ServerLoginNetworkHandler;
+import net.minecraft.server.network.ServerLoginPacketListenerImpl;
 import net.minecraft.resources.ResourceLocation;
 
 import net.fabricmc.fabric.impl.networking.server.ServerNetworkingImpl;
@@ -51,7 +51,7 @@ public final class ServerLoginNetworking {
 	 * @param channelHandler the handler
 	 * @return false if a handler is already registered to the channel
 	 * @see ServerLoginNetworking#unregisterGlobalReceiver(ResourceLocation)
-	 * @see ServerLoginNetworking#registerReceiver(ServerLoginNetworkHandler, ResourceLocation, LoginQueryResponseHandler)
+	 * @see ServerLoginNetworking#registerReceiver(ServerLoginPacketListenerImpl, ResourceLocation, LoginQueryResponseHandler)
 	 */
 	public static boolean registerGlobalReceiver(ResourceLocation channelName, LoginQueryResponseHandler channelHandler) {
 		return ServerNetworkingImpl.LOGIN.registerGlobalReceiver(channelName, channelHandler);
@@ -66,7 +66,7 @@ public final class ServerLoginNetworking {
 	 * @param channelName the id of the channel
 	 * @return the previous handler, or {@code null} if no handler was bound to the channel
 	 * @see ServerLoginNetworking#registerGlobalReceiver(ResourceLocation, LoginQueryResponseHandler)
-	 * @see ServerLoginNetworking#unregisterReceiver(ServerLoginNetworkHandler, ResourceLocation)
+	 * @see ServerLoginNetworking#unregisterReceiver(ServerLoginPacketListenerImpl, ResourceLocation)
 	 */
 	@Nullable
 	public static ServerLoginNetworking.LoginQueryResponseHandler unregisterGlobalReceiver(ResourceLocation channelName) {
@@ -87,14 +87,14 @@ public final class ServerLoginNetworking {
 	 * Registers a handler to a query response channel.
 	 *
 	 * <p>If a handler is already registered to the {@code channelName}, this method will return {@code false}, and no change will be made.
-	 * Use {@link #unregisterReceiver(ServerLoginNetworkHandler, ResourceLocation)} to unregister the existing handler.
+	 * Use {@link #unregisterReceiver(ServerLoginPacketListenerImpl, ResourceLocation)} to unregister the existing handler.
 	 *
 	 * @param networkHandler the handler
 	 * @param channelName the id of the channel
 	 * @param responseHandler the handler
 	 * @return false if a handler is already registered to the channel name
 	 */
-	public static boolean registerReceiver(ServerLoginNetworkHandler networkHandler, ResourceLocation channelName, LoginQueryResponseHandler responseHandler) {
+	public static boolean registerReceiver(ServerLoginPacketListenerImpl networkHandler, ResourceLocation channelName, LoginQueryResponseHandler responseHandler) {
 		Objects.requireNonNull(networkHandler, "Network handler cannot be null");
 
 		return ServerNetworkingImpl.getAddon(networkHandler).registerChannel(channelName, responseHandler);
@@ -109,7 +109,7 @@ public final class ServerLoginNetworking {
 	 * @return the previous handler, or {@code null} if no handler was bound to the channel name
 	 */
 	@Nullable
-	public static ServerLoginNetworking.LoginQueryResponseHandler unregisterReceiver(ServerLoginNetworkHandler networkHandler, ResourceLocation channelName) {
+	public static ServerLoginNetworking.LoginQueryResponseHandler unregisterReceiver(ServerLoginPacketListenerImpl networkHandler, ResourceLocation channelName) {
 		Objects.requireNonNull(networkHandler, "Network handler cannot be null");
 
 		return ServerNetworkingImpl.getAddon(networkHandler).unregisterChannel(channelName);
@@ -122,7 +122,7 @@ public final class ServerLoginNetworking {
 	 *
 	 * @param handler the server login network handler
 	 */
-	public static MinecraftServer getServer(ServerLoginNetworkHandler handler) {
+	public static MinecraftServer getServer(ServerLoginPacketListenerImpl handler) {
 		Objects.requireNonNull(handler, "Network handler cannot be null");
 
 		return ((ServerLoginNetworkHandlerAccessor) handler).getServer();
@@ -134,7 +134,7 @@ public final class ServerLoginNetworking {
 	 * @param handler the network handler, representing the connection to the client
 	 * @return the packet sender
 	 */
-	public static LoginPacketSender getSender(ServerLoginNetworkHandler handler) {
+	public static LoginPacketSender getSender(ServerLoginPacketListenerImpl handler) {
 		Objects.requireNonNull(handler, "Network handler cannot be null");
 		return ServerNetworkingImpl.getAddon(handler);
 	}
@@ -158,7 +158,7 @@ public final class ServerLoginNetworking {
 		 * @param synchronizer the synchronizer which may be used to delay log-in till a {@link Future} is completed.
 		 * @param responseSender the packet sender
 		 */
-		void receive(MinecraftServer server, ServerLoginNetworkHandler handler, boolean understood, FriendlyByteBuf buf, LoginSynchronizer synchronizer, PacketSender responseSender);
+		void receive(MinecraftServer server, ServerLoginPacketListenerImpl handler, boolean understood, FriendlyByteBuf buf, LoginSynchronizer synchronizer, PacketSender responseSender);
 	}
 
 	/**

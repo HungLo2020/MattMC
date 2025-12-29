@@ -17,7 +17,7 @@
 package net.fabricmc.fabric.api.client.networking.v1;
 
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.multiplayer.ClientConfigurationNetworkHandler;
+import net.minecraft.client.multiplayer.ClientConfigurationPacketListenerImpl;
 import net.minecraft.network.protocol.CustomPacketPayload;
 
 import net.fabricmc.fabric.api.event.Event;
@@ -78,22 +78,22 @@ public final class ClientConfigurationConnectionEvents {
 
 	@FunctionalInterface
 	public interface Init {
-		void onConfigurationInit(ClientConfigurationNetworkHandler handler, Minecraft client);
+		void onConfigurationInit(ClientConfigurationPacketListenerImpl handler, Minecraft client);
 	}
 
 	@FunctionalInterface
 	public interface Start {
-		void onConfigurationStart(ClientConfigurationNetworkHandler handler, Minecraft client);
+		void onConfigurationStart(ClientConfigurationPacketListenerImpl handler, Minecraft client);
 	}
 
 	@FunctionalInterface
 	public interface Complete {
-		void onConfigurationComplete(ClientConfigurationNetworkHandler handler, Minecraft client);
+		void onConfigurationComplete(ClientConfigurationPacketListenerImpl handler, Minecraft client);
 	}
 
 	@FunctionalInterface
 	public interface Disconnect {
-		void onConfigurationDisconnect(ClientConfigurationNetworkHandler handler, Minecraft client);
+		void onConfigurationDisconnect(ClientConfigurationPacketListenerImpl handler, Minecraft client);
 	}
 
 	// Deprecated:
@@ -114,6 +114,6 @@ public final class ClientConfigurationConnectionEvents {
 	@Deprecated
 	@FunctionalInterface
 	public interface Ready {
-		void onConfigurationReady(ClientConfigurationNetworkHandler handler, Minecraft client);
+		void onConfigurationReady(ClientConfigurationPacketListenerImpl handler, Minecraft client);
 	}
 }

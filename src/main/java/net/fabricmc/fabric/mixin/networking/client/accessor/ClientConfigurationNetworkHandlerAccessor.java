@@ -20,9 +20,9 @@ import com.mojang.authlib.GameProfile;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.gen.Accessor;
 
-import net.minecraft.client.multiplayer.ClientConfigurationNetworkHandler;
+import net.minecraft.client.multiplayer.ClientConfigurationPacketListenerImpl;
 
-@Mixin(ClientConfigurationNetworkHandler.class)
+@Mixin(ClientConfigurationPacketListenerImpl.class)
 public interface ClientConfigurationNetworkHandlerAccessor {
 	@Accessor
 	GameProfile getProfile();

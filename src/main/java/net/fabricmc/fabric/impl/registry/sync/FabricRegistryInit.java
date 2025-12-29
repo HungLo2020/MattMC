@@ -140,11 +140,11 @@ public class FabricRegistryInit implements ModInitializer {
 		RegistryAttributeHolder.get(Registries.STAT_TYPE)
 				.addAttribute(RegistryAttribute.SYNCED);
 
-		// Synced by rawID in TrackedDataHandlerRegistry.VILLAGER_DATA
+		// Synced by rawID in EntityDataSerializers.VILLAGER_DATA
 		RegistryAttributeHolder.get(Registries.VILLAGER_TYPE)
 				.addAttribute(RegistryAttribute.SYNCED);
 
-		// Synced by rawID in TrackedDataHandlerRegistry.VILLAGER_DATA
+		// Synced by rawID in EntityDataSerializers.VILLAGER_DATA
 		RegistryAttributeHolder.get(Registries.VILLAGER_PROFESSION)
 				.addAttribute(RegistryAttribute.SYNCED);
 

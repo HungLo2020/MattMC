@@ -23,12 +23,12 @@ import org.spongepowered.asm.mixin.injection.At;
 
 import net.minecraft.core.Registry;
 import net.minecraft.core.ResourceKey;
-import net.minecraft.core.RegistryKeys;
+import net.minecraft.core.Registries;
 import net.minecraft.resources.ResourceLocation;
 
 // Vanilla doesn't mark namespaces in the directories of tags and dynamic registry elements at all,
 // so we prepend the directories with the namespace if it's a modded registry id.
-@Mixin(RegistryKeys.class)
+@Mixin(Registries.class)
 public class RegistryKeysMixin {
 	@ModifyReturnValue(method = "getPath", at = @At("RETURN"))
 	private static String prependDirectoryWithNamespace(String original, @Local(argsOnly = true) ResourceKey<? extends Registry<?>> registryRef) {

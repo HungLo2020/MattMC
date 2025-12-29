@@ -23,7 +23,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-import net.minecraft.client.multiplayer.ClientConfigurationNetworkHandler;
+import net.minecraft.client.multiplayer.ClientConfigurationPacketListenerImpl;
 import net.minecraft.network.protocol.s2c.config.SelectKnownPacksS2CPacket;
 import net.minecraft.world.item.crafting.RecipeSerializer;
 import net.minecraft.core.Registries;
@@ -33,7 +33,7 @@ import net.fabricmc.fabric.api.client.networking.v1.ClientConfigurationNetworkin
 import net.fabricmc.fabric.impl.recipe.sync.RecipeSyncImpl;
 import net.fabricmc.fabric.impl.recipe.sync.SupportedRecipeSerializersPayloadC2S;
 
-@Mixin(ClientConfigurationNetworkHandler.class)
+@Mixin(ClientConfigurationPacketListenerImpl.class)
 public class ClientConfigurationNetworkHandlerMixin {
 	@Inject(method = "onSelectKnownPacks", at = @At("TAIL"))
 	private void sendSupportedRecipeSerializers(SelectKnownPacksS2CPacket packet, CallbackInfo ci) {

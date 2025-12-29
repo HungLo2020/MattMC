@@ -22,8 +22,8 @@ import org.jetbrains.annotations.Nullable;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.multiplayer.ConnectScreen;
-import net.minecraft.client.multiplayer.ClientConfigurationNetworkHandler;
-import net.minecraft.client.multiplayer.ClientLoginNetworkHandler;
+import net.minecraft.client.multiplayer.ClientConfigurationPacketListenerImpl;
+import net.minecraft.client.multiplayer.ClientLoginPacketListenerImpl;
 import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.network.Connection;
 import net.minecraft.network.NetworkPhase;
@@ -61,11 +61,11 @@ public final class ClientNetworkingImpl {
 		return (ClientPlayNetworkAddon) ((NetworkHandlerExtensions) handler).getAddon();
 	}
 
-	public static ClientConfigurationNetworkAddon getAddon(ClientConfigurationNetworkHandler handler) {
+	public static ClientConfigurationNetworkAddon getAddon(ClientConfigurationPacketListenerImpl handler) {
 		return (ClientConfigurationNetworkAddon) ((NetworkHandlerExtensions) handler).getAddon();
 	}
 
-	public static ClientLoginNetworkAddon getAddon(ClientLoginNetworkHandler handler) {
+	public static ClientLoginNetworkAddon getAddon(ClientLoginPacketListenerImpl handler) {
 		return (ClientLoginNetworkAddon) ((NetworkHandlerExtensions) handler).getAddon();
 	}
 

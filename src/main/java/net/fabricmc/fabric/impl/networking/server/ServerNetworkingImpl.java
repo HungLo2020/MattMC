@@ -24,8 +24,8 @@ import net.minecraft.network.listener.ClientCommonPacketListener;
 import net.minecraft.network.protocol.CustomPacketPayload;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.s2c.common.CustomPayloadS2CPacket;
-import net.minecraft.server.network.ServerConfigurationNetworkHandler;
-import net.minecraft.server.network.ServerLoginNetworkHandler;
+import net.minecraft.server.network.ServerConfigurationPacketListenerImpl;
+import net.minecraft.server.network.ServerLoginPacketListenerImpl;
 import net.minecraft.server.network.ServerGamePacketListenerImpl;
 
 import net.fabricmc.fabric.api.networking.v1.ServerConfigurationNetworking;
@@ -44,11 +44,11 @@ public final class ServerNetworkingImpl {
 		return (ServerPlayNetworkAddon) ((NetworkHandlerExtensions) handler).getAddon();
 	}
 
-	public static ServerLoginNetworkAddon getAddon(ServerLoginNetworkHandler handler) {
+	public static ServerLoginNetworkAddon getAddon(ServerLoginPacketListenerImpl handler) {
 		return (ServerLoginNetworkAddon) ((NetworkHandlerExtensions) handler).getAddon();
 	}
 
-	public static ServerConfigurationNetworkAddon getAddon(ServerConfigurationNetworkHandler handler) {
+	public static ServerConfigurationNetworkAddon getAddon(ServerConfigurationPacketListenerImpl handler) {
 		return (ServerConfigurationNetworkAddon) ((NetworkHandlerExtensions) handler).getAddon();
 	}
 

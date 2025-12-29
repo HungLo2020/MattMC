@@ -41,7 +41,7 @@ import net.minecraft.core.Registry;
 import net.minecraft.world.inventory.ScreenTexts;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.PlayerConfigEntry;
-import net.minecraft.server.network.ServerConfigurationNetworkHandler;
+import net.minecraft.server.network.ServerConfigurationPacketListenerImpl;
 import net.minecraft.server.network.ServerPlayerConfigurationTask;
 import net.minecraft.network.chat.MutableText;
 import net.minecraft.network.chat.Component;
@@ -67,7 +67,7 @@ public final class RegistrySyncManager {
 
 	private RegistrySyncManager() { }
 
-	public static void configureClient(ServerConfigurationNetworkHandler handler, MinecraftServer server) {
+	public static void configureClient(ServerConfigurationPacketListenerImpl handler, MinecraftServer server) {
 		if (!DEBUG && server.isHost(new PlayerConfigEntry(handler.getDebugProfile()))) {
 			// Dont send in singleplayer
 			return;
@@ -137,7 +137,7 @@ public final class RegistrySyncManager {
 	}
 
 	public record SyncConfigurationTask(
-			ServerConfigurationNetworkHandler handler,
+			ServerConfigurationPacketListenerImpl handler,
 			Map<ResourceLocation, Object2IntMap<ResourceLocation>> map
 	) implements ServerPlayerConfigurationTask {
 		public static final Key KEY = new Key("fabric:registry/sync");

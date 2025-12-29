@@ -24,7 +24,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientCommonNetworkHandler;
-import net.minecraft.client.multiplayer.ClientConfigurationNetworkHandler;
+import net.minecraft.client.multiplayer.ClientConfigurationPacketListenerImpl;
 import net.minecraft.client.multiplayer.ClientConnectionState;
 import net.minecraft.network.Connection;
 import net.minecraft.network.protocol.s2c.config.ReadyS2CPacket;
@@ -34,7 +34,7 @@ import net.fabricmc.fabric.impl.networking.client.ClientConfigurationNetworkAddo
 import net.fabricmc.fabric.impl.networking.client.ClientNetworkingImpl;
 
 // We want to apply a bit earlier than other mods which may not use us in order to prevent refCount issues
-@Mixin(value = ClientConfigurationNetworkHandler.class, priority = 999)
+@Mixin(value = ClientConfigurationPacketListenerImpl.class, priority = 999)
 public abstract class ClientConfigurationNetworkHandlerMixin extends ClientCommonNetworkHandler implements NetworkHandlerExtensions {
 	@Unique
 	private ClientConfigurationNetworkAddon addon;
@@ -45,7 +45,7 @@ public abstract class ClientConfigurationNetworkHandlerMixin extends ClientCommo
 
 	@Inject(method = "<init>", at = @At("RETURN"))
 	private void initAddon(CallbackInfo ci) {
-		this.addon = new ClientConfigurationNetworkAddon((ClientConfigurationNetworkHandler) (Object) this, this.client);
+		this.addon = new ClientConfigurationNetworkAddon((ClientConfigurationPacketListenerImpl) (Object) this, this.client);
 		// A bit of a hack but it allows the field above to be set in case someone registers handlers during INIT event which refers to said field
 		ClientNetworkingImpl.setClientConfigurationAddon(this.addon);
 		this.addon.lateInit();

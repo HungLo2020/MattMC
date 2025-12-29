@@ -38,7 +38,7 @@ import net.minecraft.core.RegistryAccess;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.network.ConnectedClientData;
 import net.minecraft.server.network.ServerCommonNetworkHandler;
-import net.minecraft.server.network.ServerConfigurationNetworkHandler;
+import net.minecraft.server.network.ServerConfigurationPacketListenerImpl;
 import net.minecraft.server.network.ServerPlayerConfigurationTask;
 
 import net.fabricmc.fabric.api.networking.v1.FabricServerConfigurationNetworkHandler;
@@ -47,7 +47,7 @@ import net.fabricmc.fabric.impl.networking.NetworkHandlerExtensions;
 import net.fabricmc.fabric.impl.networking.server.ServerConfigurationNetworkAddon;
 
 // We want to apply a bit earlier than other mods which may not use us in order to prevent refCount issues
-@Mixin(value = ServerConfigurationNetworkHandler.class, priority = 900)
+@Mixin(value = ServerConfigurationPacketListenerImpl.class, priority = 900)
 public abstract class ServerConfigurationNetworkHandlerMixin extends ServerCommonNetworkHandler implements NetworkHandlerExtensions, FabricServerConfigurationNetworkHandler {
 	@Shadow
 	@Nullable
@@ -81,7 +81,7 @@ public abstract class ServerConfigurationNetworkHandlerMixin extends ServerCommo
 
 	@Inject(method = "<init>", at = @At("RETURN"))
 	private void initAddon(CallbackInfo ci) {
-		this.addon = new ServerConfigurationNetworkAddon((ServerConfigurationNetworkHandler) (Object) this, this.server);
+		this.addon = new ServerConfigurationNetworkAddon((ServerConfigurationPacketListenerImpl) (Object) this, this.server);
 		// A bit of a hack but it allows the field above to be set in case someone registers handlers during INIT event which refers to said field
 		this.addon.lateInit();
 	}

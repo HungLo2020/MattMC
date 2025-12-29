@@ -40,7 +40,7 @@ import net.minecraft.core.CombinedDynamicRegistries;
 import net.minecraft.core.WritableRegistry;
 import net.minecraft.core.Registry;
 import net.minecraft.core.ResourceKey;
-import net.minecraft.core.RegistryKeys;
+import net.minecraft.core.Registries;
 import net.minecraft.core.RegistryOps;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.ReloadableRegistries;
@@ -89,7 +89,7 @@ abstract class ReloadableRegistriesMixin {
 	private static <T> T modifyLootTable(T value, ResourceLocation id, RegistryOps<JsonElement> ops) {
 		if (!(value instanceof LootTable table)) return value;
 
-		ResourceKey<LootTable> key = ResourceKey.of(RegistryKeys.LOOT_TABLE, id);
+		ResourceKey<LootTable> key = ResourceKey.of(Registries.LOOT_TABLE, id);
 		// Populated above.
 		HolderLookup.WrapperLookup registries = WRAPPERS.get(ops);
 		// Populated inside JsonDataLoaderMixin

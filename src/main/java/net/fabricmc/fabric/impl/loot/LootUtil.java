@@ -21,7 +21,7 @@ import java.util.Map;
 import java.util.function.Function;
 
 import net.minecraft.world.level.storage.loot.LootTable;
-import net.minecraft.core.RegistryKeys;
+import net.minecraft.core.Registries;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.Holder;
 import net.minecraft.server.packs.Resource;
@@ -61,7 +61,7 @@ public final class LootUtil {
 				.createRegistryLookup();
 
 		HolderLookup<LootTable> lootTableRegistryWrapper = wrapperLookup
-				.getOptional(RegistryKeys.LOOT_TABLE)
+				.getOptional(Registries.LOOT_TABLE)
 				.orElseThrow(() -> new IllegalStateException("Failed to fetch LootTable wrapper from WrapperLookup"));
 
 		return lootTableRegistryWrapper

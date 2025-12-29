@@ -40,7 +40,7 @@ public final class FabricItemGroup {
 	 * <p>Example:
 	 *
 	 * <pre>{@code
-	 * private static final ResourceKey<ItemGroup> ITEM_GROUP = ResourceKey.of(RegistryKeys.ITEM_GROUP, ResourceLocation.of(MOD_ID, "test_group"));
+	 * private static final ResourceKey<ItemGroup> ITEM_GROUP = ResourceKey.of(Registries.ITEM_GROUP, ResourceLocation.of(MOD_ID, "test_group"));
 	 *
 	 * @Override
 	 * public void onInitialize() {

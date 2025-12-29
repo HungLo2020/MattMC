@@ -16,19 +16,19 @@
 
 package net.fabricmc.fabric.api.networking.v1;
 
-import net.minecraft.server.network.ServerConfigurationNetworkHandler;
+import net.minecraft.server.network.ServerConfigurationPacketListenerImpl;
 import net.minecraft.server.network.ServerPlayerConfigurationTask;
 import net.minecraft.resources.ResourceLocation;
 
 /**
- * Fabric-provided extensions for {@link ServerConfigurationNetworkHandler}.
+ * Fabric-provided extensions for {@link ServerConfigurationPacketListenerImpl}.
  * This interface is automatically implemented via Mixin and interface injection.
  */
 public interface FabricServerConfigurationNetworkHandler {
 	/**
 	 * Enqueues a {@link ServerPlayerConfigurationTask} task to be processed.
 	 *
-	 * <p>Before adding a task use {@link ServerConfigurationNetworking#canSend(ServerConfigurationNetworkHandler, ResourceLocation)}
+	 * <p>Before adding a task use {@link ServerConfigurationNetworking#canSend(ServerConfigurationPacketListenerImpl, ResourceLocation)}
 	 * to ensure that the client can process this task.
 	 *
 	 * <p>Once the client has handled the task a packet should be sent to the server.

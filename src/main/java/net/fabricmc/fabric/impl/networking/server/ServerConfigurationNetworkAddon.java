@@ -29,7 +29,7 @@ import net.minecraft.network.protocol.CustomPacketPayload;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.s2c.common.CommonPingS2CPacket;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.network.ServerConfigurationNetworkHandler;
+import net.minecraft.server.network.ServerConfigurationPacketListenerImpl;
 import net.minecraft.resources.ResourceLocation;
 
 import net.fabricmc.fabric.api.networking.v1.PacketSender;
@@ -43,7 +43,7 @@ import net.fabricmc.fabric.impl.networking.RegistrationPayload;
 import net.fabricmc.fabric.mixin.networking.accessor.ServerCommonNetworkHandlerAccessor;
 
 public final class ServerConfigurationNetworkAddon extends AbstractChanneledNetworkAddon<ServerConfigurationNetworking.ConfigurationPacketHandler<?>> {
-	private final ServerConfigurationNetworkHandler handler;
+	private final ServerConfigurationPacketListenerImpl handler;
 	private final MinecraftServer server;
 	private final ServerConfigurationNetworking.Context context;
 	private RegisterState registerState = RegisterState.NOT_SENT;
@@ -51,7 +51,7 @@ public final class ServerConfigurationNetworkAddon extends AbstractChanneledNetw
 	private String clientBrand = null;
 	private boolean isReconfiguring = false;
 
-	public ServerConfigurationNetworkAddon(ServerConfigurationNetworkHandler handler, MinecraftServer server) {
+	public ServerConfigurationNetworkAddon(ServerConfigurationPacketListenerImpl handler, MinecraftServer server) {
 		super(ServerNetworkingImpl.CONFIGURATION, ((ServerCommonNetworkHandlerAccessor) handler).getConnection(), "ServerConfigurationNetworkAddon for " + handler.getDebugProfile().name());
 		this.handler = handler;
 		this.server = server;
@@ -217,7 +217,7 @@ public final class ServerConfigurationNetworkAddon extends AbstractChanneledNetw
 		return (ChannelInfoHolder) ((ServerCommonNetworkHandlerAccessor) handler).getConnection();
 	}
 
-	private record ContextImpl(MinecraftServer server, ServerConfigurationNetworkHandler networkHandler, PacketSender responseSender) implements ServerConfigurationNetworking.Context {
+	private record ContextImpl(MinecraftServer server, ServerConfigurationPacketListenerImpl networkHandler, PacketSender responseSender) implements ServerConfigurationNetworking.Context {
 		private ContextImpl {
 			Objects.requireNonNull(server, "server");
 			Objects.requireNonNull(networkHandler, "networkHandler");

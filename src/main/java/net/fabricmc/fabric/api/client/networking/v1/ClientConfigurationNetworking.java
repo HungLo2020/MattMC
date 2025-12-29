@@ -23,7 +23,7 @@ import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.Nullable;
 
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.multiplayer.ClientConfigurationNetworkHandler;
+import net.minecraft.client.multiplayer.ClientConfigurationPacketListenerImpl;
 import net.minecraft.network.protocol.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.thread.ThreadExecutor;
@@ -282,9 +282,9 @@ public final class ClientConfigurationNetworking {
 		Minecraft client();
 
 		/**
-		 * @return The ClientConfigurationNetworkHandler instance
+		 * @return The ClientConfigurationPacketListenerImpl instance
 		 */
-		ClientConfigurationNetworkHandler networkHandler();
+		ClientConfigurationPacketListenerImpl networkHandler();
 
 		/**
 		 * @return The packet sender

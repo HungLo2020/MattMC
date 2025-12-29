@@ -25,7 +25,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.multiplayer.ClientLoginNetworkHandler;
+import net.minecraft.client.multiplayer.ClientLoginPacketListenerImpl;
 import net.minecraft.network.Connection;
 import net.minecraft.network.protocol.s2c.login.LoginQueryRequestS2CPacket;
 
@@ -33,7 +33,7 @@ import net.fabricmc.fabric.impl.networking.NetworkHandlerExtensions;
 import net.fabricmc.fabric.impl.networking.client.ClientLoginNetworkAddon;
 import net.fabricmc.fabric.impl.networking.payload.PacketByteBufLoginQueryRequestPayload;
 
-@Mixin(ClientLoginNetworkHandler.class)
+@Mixin(ClientLoginPacketListenerImpl.class)
 abstract class ClientLoginNetworkHandlerMixin implements NetworkHandlerExtensions {
 	@Shadow
 	@Final
@@ -48,7 +48,7 @@ abstract class ClientLoginNetworkHandlerMixin implements NetworkHandlerExtension
 
 	@Inject(method = "<init>", at = @At("RETURN"))
 	private void initAddon(CallbackInfo ci) {
-		this.addon = new ClientLoginNetworkAddon((ClientLoginNetworkHandler) (Object) this, this.client);
+		this.addon = new ClientLoginNetworkAddon((ClientLoginPacketListenerImpl) (Object) this, this.client);
 		// A bit of a hack but it allows the field above to be set in case someone registers handlers during INIT event which refers to said field
 		this.addon.lateInit();
 	}

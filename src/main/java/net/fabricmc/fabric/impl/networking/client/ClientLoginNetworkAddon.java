@@ -24,7 +24,7 @@ import io.netty.channel.ChannelFutureListener;
 import org.jetbrains.annotations.Nullable;
 
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.multiplayer.ClientLoginNetworkHandler;
+import net.minecraft.client.multiplayer.ClientLoginPacketListenerImpl;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.protocol.c2s.login.LoginQueryResponseC2SPacket;
 import net.minecraft.network.protocol.s2c.login.LoginQueryRequestS2CPacket;
@@ -39,11 +39,11 @@ import net.fabricmc.fabric.impl.networking.payload.PacketByteBufLoginQueryRespon
 import net.fabricmc.fabric.mixin.networking.client.accessor.ClientLoginNetworkHandlerAccessor;
 
 public final class ClientLoginNetworkAddon extends AbstractNetworkAddon<ClientLoginNetworking.LoginQueryRequestHandler> {
-	private final ClientLoginNetworkHandler handler;
+	private final ClientLoginPacketListenerImpl handler;
 	private final Minecraft client;
 	private boolean firstResponse = true;
 
-	public ClientLoginNetworkAddon(ClientLoginNetworkHandler handler, Minecraft client) {
+	public ClientLoginNetworkAddon(ClientLoginPacketListenerImpl handler, Minecraft client) {
 		super(ClientNetworkingImpl.LOGIN, "ClientLoginNetworkAddon for Client");
 		this.handler = handler;
 		this.client = client;

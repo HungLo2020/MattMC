@@ -29,14 +29,14 @@ import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.c2s.login.LoginQueryResponseC2SPacket;
 import net.minecraft.network.protocol.s2c.login.LoginQueryRequestS2CPacket;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.network.ServerLoginNetworkHandler;
+import net.minecraft.server.network.ServerLoginPacketListenerImpl;
 
 import net.fabricmc.fabric.impl.networking.NetworkHandlerExtensions;
 import net.fabricmc.fabric.impl.networking.PacketCallbackListener;
 import net.fabricmc.fabric.impl.networking.payload.PacketByteBufLoginQueryResponse;
 import net.fabricmc.fabric.impl.networking.server.ServerLoginNetworkAddon;
 
-@Mixin(ServerLoginNetworkHandler.class)
+@Mixin(ServerLoginPacketListenerImpl.class)
 abstract class ServerLoginNetworkHandlerMixin implements NetworkHandlerExtensions, PacketCallbackListener {
 	@Shadow
 	protected abstract void tickVerify(GameProfile profile);
@@ -46,13 +46,13 @@ abstract class ServerLoginNetworkHandlerMixin implements NetworkHandlerExtension
 
 	@Inject(method = "<init>", at = @At("RETURN"))
 	private void initAddon(CallbackInfo ci) {
-		this.addon = new ServerLoginNetworkAddon((ServerLoginNetworkHandler) (Object) this);
+		this.addon = new ServerLoginNetworkAddon((ServerLoginPacketListenerImpl) (Object) this);
 		// A bit of a hack but it allows the field above to be set in case someone registers handlers during INIT event which refers to said field
 		this.addon.lateInit();
 	}
 
-	@Redirect(method = "tick", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/network/ServerLoginNetworkHandler;tickVerify(Lcom/mojang/authlib/GameProfile;)V"))
-	private void handlePlayerJoin(ServerLoginNetworkHandler instance, GameProfile profile) {
+	@Redirect(method = "tick", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/network/ServerLoginPacketListenerImpl;tickVerify(Lcom/mojang/authlib/GameProfile;)V"))
+	private void handlePlayerJoin(ServerLoginPacketListenerImpl instance, GameProfile profile) {
 		// Do not accept the player, thereby moving into play stage until all login futures being waited on are completed
 		if (this.addon.queryTick()) {
 			this.tickVerify(profile);

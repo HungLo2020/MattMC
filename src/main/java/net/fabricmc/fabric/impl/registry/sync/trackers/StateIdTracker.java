@@ -28,7 +28,7 @@ import org.slf4j.LoggerFactory;
 
 import net.minecraft.core.Registry;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.util.IdList;
+import net.minecraft.util.IdMap;
 
 import net.fabricmc.fabric.api.event.registry.RegistryEntryAddedCallback;
 import net.fabricmc.fabric.api.event.registry.RegistryIdRemapCallback;
@@ -39,11 +39,11 @@ public final class StateIdTracker<T, S> implements RegistryIdRemapCallback<T>, R
 	private static final Set<ResourceLocation> TRACKED = new HashSet<>();
 
 	private final Registry<T> registry;
-	private final IdList<S> stateList;
+	private final IdMap<S> stateList;
 	private final Function<T, Collection<S>> stateGetter;
 	private int currentHighestId = 0;
 
-	public static <T, S> void register(Registry<T> registry, IdList<S> stateList, Function<T, Collection<S>> stateGetter) {
+	public static <T, S> void register(Registry<T> registry, IdMap<S> stateList, Function<T, Collection<S>> stateGetter) {
 		if (!TRACKED.add(registry.getKey().getValue())) {
 			throw new IllegalStateException("Trying to register a tracker for registry " + registry.getKey().getValue() + " more than once!");
 		}
@@ -53,7 +53,7 @@ public final class StateIdTracker<T, S> implements RegistryIdRemapCallback<T>, R
 		RegistryIdRemapCallback.event(registry).register(tracker);
 	}
 
-	private StateIdTracker(Registry<T> registry, IdList<S> stateList, Function<T, Collection<S>> stateGetter) {
+	private StateIdTracker(Registry<T> registry, IdMap<S> stateList, Function<T, Collection<S>> stateGetter) {
 		this.registry = registry;
 		this.stateList = stateList;
 		this.stateGetter = stateGetter;

@@ -19,14 +19,14 @@ package net.fabricmc.fabric.mixin.object.builder;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.gen.Accessor;
 
-import net.minecraft.world.entity.data.TrackedDataHandler;
-import net.minecraft.world.entity.data.TrackedDataHandlerRegistry;
+import net.minecraft.world.entity.data.EntityDataSerializer;
+import net.minecraft.world.entity.data.EntityDataSerializers;
 import net.minecraft.util.Int2ObjectBiMap;
 
-@Mixin(TrackedDataHandlerRegistry.class)
+@Mixin(EntityDataSerializers.class)
 public interface TrackedDataHandlerRegistryAccessor {
 	@Accessor("DATA_HANDLERS")
-	static Int2ObjectBiMap<TrackedDataHandler<?>> fabric_getDataHandlers() {
+	static Int2ObjectBiMap<EntityDataSerializer<?>> fabric_getDataHandlers() {
 		throw new AssertionError("Untransformed @Accessor");
 	}
 }

@@ -21,23 +21,23 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-import net.minecraft.world.entity.data.TrackedDataHandler;
-import net.minecraft.world.entity.data.TrackedDataHandlerRegistry;
+import net.minecraft.world.entity.data.EntityDataSerializer;
+import net.minecraft.world.entity.data.EntityDataSerializers;
 
 import net.fabricmc.fabric.impl.object.builder.FabricTrackedDataRegistryImpl;
 import net.fabricmc.loader.api.FabricLoader;
 
-@Mixin(TrackedDataHandlerRegistry.class)
+@Mixin(EntityDataSerializers.class)
 abstract class TrackedDataHandlerRegistryMixin {
 	@Inject(method = "<clinit>", at = @At("TAIL"))
 	private static void storeVanillaHandlers(CallbackInfo ci) {
 		FabricTrackedDataRegistryImpl.storeVanillaHandlers();
 	}
 
-	@Inject(method = "register(Lnet/minecraft/entity/data/TrackedDataHandler;)V", at = @At("HEAD"))
-	private static void onHeadRegister(TrackedDataHandler<?> handler, CallbackInfo ci) {
+	@Inject(method = "register(Lnet/minecraft/entity/data/EntityDataSerializer;)V", at = @At("HEAD"))
+	private static void onHeadRegister(EntityDataSerializer<?> handler, CallbackInfo ci) {
 		if (FabricTrackedDataRegistryImpl.hasStoredVanillaHandlers() && FabricLoader.getInstance().isDevelopmentEnvironment()) {
-			throw new IllegalStateException("Tried to register tracked data handler " + handler + " using TrackedDataHandlerRegistry.register. This is not allowed as it can lead to desynchronization issues; use FabricTrackedDataRegistry.register instead.");
+			throw new IllegalStateException("Tried to register tracked data handler " + handler + " using EntityDataSerializers.register. This is not allowed as it can lead to desynchronization issues; use FabricTrackedDataRegistry.register instead.");
 		}
 	}
 }

@@ -38,7 +38,7 @@ import net.minecraft.network.protocol.c2s.login.LoginQueryResponseC2SPacket;
 import net.minecraft.network.protocol.s2c.login.LoginCompressionS2CPacket;
 import net.minecraft.network.protocol.s2c.login.LoginQueryRequestS2CPacket;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.network.ServerLoginNetworkHandler;
+import net.minecraft.server.network.ServerLoginPacketListenerImpl;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 
@@ -53,14 +53,14 @@ import net.fabricmc.fabric.mixin.networking.accessor.ServerLoginNetworkHandlerAc
 
 public final class ServerLoginNetworkAddon extends AbstractNetworkAddon<ServerLoginNetworking.LoginQueryResponseHandler> implements LoginPacketSender {
 	private final Connection connection;
-	private final ServerLoginNetworkHandler handler;
+	private final ServerLoginPacketListenerImpl handler;
 	private final MinecraftServer server;
 	private final QueryIdFactory queryIdFactory;
 	private final Collection<Future<?>> waits = new ConcurrentLinkedQueue<>();
 	private final Map<Integer, ResourceLocation> channels = new ConcurrentHashMap<>();
 	private boolean firstQueryTick = true;
 
-	public ServerLoginNetworkAddon(ServerLoginNetworkHandler handler) {
+	public ServerLoginNetworkAddon(ServerLoginPacketListenerImpl handler) {
 		super(ServerNetworkingImpl.LOGIN, "ServerLoginNetworkAddon for " + handler.getConnectionInfo());
 		this.connection = ((ServerLoginNetworkHandlerAccessor) handler).getConnection();
 		this.handler = handler;
