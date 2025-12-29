@@ -30,7 +30,7 @@ import org.spongepowered.asm.mixin.injection.Coerce;
 import net.minecraft.client.multiplayer.ClientRegistries;
 import net.minecraft.core.Registry;
 import net.minecraft.resources.ResourceKey;
-import net.minecraft.core.RegistryDataLoader;
+import net.minecraft.resources.RegistryDataLoader;
 import net.minecraft.core.SerializableRegistries;
 import net.minecraft.server.packs.ResourceFactory;
 

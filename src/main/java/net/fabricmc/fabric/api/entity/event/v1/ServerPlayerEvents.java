@@ -17,7 +17,7 @@
 package net.fabricmc.fabric.api.entity.event.v1;
 
 import net.minecraft.world.entity.damage.DamageSource;
-import net.minecraft.server.network.ServerPlayer;
+import net.minecraft.server.level.ServerPlayer;
 
 import net.fabricmc.fabric.api.event.Event;
 import net.fabricmc.fabric.api.event.EventFactory;

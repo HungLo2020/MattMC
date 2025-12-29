@@ -30,7 +30,7 @@ import net.minecraft.network.protocol.CustomPacketPayload;
 import net.minecraft.core.Registries;
 import net.minecraft.core.Registry;
 import net.minecraft.world.inventory.AbstractContainerMenu;
-import net.minecraft.server.network.ServerPlayer;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.TextCodecs;
 import net.minecraft.resources.ResourceLocation;

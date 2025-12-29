@@ -33,7 +33,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.Registry;
 import net.minecraft.resources.ResourceKey;
-import net.minecraft.core.RegistryDataLoader;
+import net.minecraft.resources.RegistryDataLoader;
 import net.minecraft.core.HolderLookup;
 
 import net.fabricmc.fabric.api.event.registry.DynamicRegistrySetupCallback;

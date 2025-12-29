@@ -26,7 +26,7 @@ import net.minecraft.core.Registry;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.core.DefaultedMappedRegistry;
 import net.minecraft.core.MappedRegistry;
-import net.minecraft.core.HolderInfo;
+import net.minecraft.core.Holder;
 import net.minecraft.resources.ResourceLocation;
 
 import net.fabricmc.fabric.mixin.registry.sync.RegistriesAccessor;

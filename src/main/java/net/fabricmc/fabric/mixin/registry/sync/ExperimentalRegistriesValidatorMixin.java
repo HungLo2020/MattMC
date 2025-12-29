@@ -23,7 +23,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Redirect;
 
 import net.minecraft.core.ExperimentalRegistriesValidator;
-import net.minecraft.core.RegistryDataLoader;
+import net.minecraft.resources.RegistryDataLoader;
 
 import net.fabricmc.fabric.api.event.registry.DynamicRegistries;
 
