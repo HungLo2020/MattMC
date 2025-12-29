@@ -28,7 +28,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.network.RegistryByteBuf;
 import net.minecraft.network.codec.PacketCodec;
 import net.minecraft.world.item.crafting.Ingredient;
-import net.minecraft.core.RegistryEntry;
+import net.minecraft.core.Holder;
 import net.minecraft.resources.ResourceLocation;
 
 import net.fabricmc.fabric.api.recipe.v1.ingredient.CustomIngredient;
@@ -51,8 +51,8 @@ public class DifferenceIngredient implements CustomIngredient {
 	}
 
 	@Override
-	public Stream<RegistryEntry<Item>> getMatchingItems() {
-		final List<RegistryEntry<Item>> subtractedMatchingItems = subtracted.getMatchingItems().toList();
+	public Stream<Holder<Item>> getMatchingItems() {
+		final List<Holder<Item>> subtractedMatchingItems = subtracted.getMatchingItems().toList();
 		return base.getMatchingItems()
 				.filter(registryEntry -> !subtractedMatchingItems.contains(registryEntry));
 	}

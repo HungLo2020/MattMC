@@ -16,10 +16,10 @@
 
 package net.fabricmc.fabric.mixin.event.lifecycle;
 
-import static net.minecraft.server.level.ChunkLevelType.BLOCK_TICKING;
-import static net.minecraft.server.level.ChunkLevelType.ENTITY_TICKING;
-import static net.minecraft.server.level.ChunkLevelType.FULL;
-import static net.minecraft.server.level.ChunkLevelType.INACCESSIBLE;
+import static net.minecraft.server.level.FullChunkStatus.BLOCK_TICKING;
+import static net.minecraft.server.level.FullChunkStatus.ENTITY_TICKING;
+import static net.minecraft.server.level.FullChunkStatus.FULL;
+import static net.minecraft.server.level.FullChunkStatus.INACCESSIBLE;
 
 import java.util.concurrent.Executor;
 
@@ -32,7 +32,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import net.minecraft.server.level.ChunkHolder;
-import net.minecraft.server.level.ChunkLevelType;
+import net.minecraft.server.level.FullChunkStatus;
 import net.minecraft.server.level.ChunkLevels;
 import net.minecraft.server.level.ServerChunkLoadingManager;
 import net.minecraft.server.level.ServerLevel;
@@ -55,10 +55,10 @@ public abstract class ChunkHolderMixin extends AbstractChunkHolder implements Ch
 	private int lastTickLevel;
 
 	@Unique
-	private static final ChunkLevelType[] fabric_CHUNK_LEVEL_TYPES = ChunkLevelType.values(); // values() clones the internal array each call, so cache the return
+	private static final FullChunkStatus[] fabric_CHUNK_LEVEL_TYPES = FullChunkStatus.values(); // values() clones the internal array each call, so cache the return
 
 	@Unique
-	private ChunkLevelType fabric_currentEventLevelType = INACCESSIBLE;
+	private FullChunkStatus fabric_currentEventLevelType = INACCESSIBLE;
 
 	private ChunkHolderMixin(ChunkPos pos) {
 		super(pos);
@@ -101,13 +101,13 @@ public abstract class ChunkHolderMixin extends AbstractChunkHolder implements Ch
 	 * Really means increase level (chunk load type demotion). Fire right before onChunkStatusChange() is called.
 	 */
 	@Inject(method = "decreaseLevel", at = @At("HEAD"))
-	private void decreaseLevel(ServerChunkLoadingManager chunkLoadingManager, ChunkLevelType target, CallbackInfo ci) {
-		ChunkLevelType previous = ChunkLevels.getType(this.lastTickLevel);
+	private void decreaseLevel(ServerChunkLoadingManager chunkLoadingManager, FullChunkStatus target, CallbackInfo ci) {
+		FullChunkStatus previous = ChunkLevels.getType(this.lastTickLevel);
 		ServerLevel serverWorld = (ServerLevel) world;
 
 		for (int i = previous.ordinal(); i > target.ordinal(); i--) {
-			ChunkLevelType oldLevelType = fabric_CHUNK_LEVEL_TYPES[i];
-			ChunkLevelType newLevelType = fabric_CHUNK_LEVEL_TYPES[i-1];
+			FullChunkStatus oldLevelType = fabric_CHUNK_LEVEL_TYPES[i];
+			FullChunkStatus newLevelType = fabric_CHUNK_LEVEL_TYPES[i-1];
 			if (this.fabric_currentEventLevelType.isAfter(oldLevelType)) { // if a promotion event got cancelled or never finished, then do _not_ fire an equivalent demotion event
 				ServerChunkEvents.CHUNK_LEVEL_TYPE_CHANGE.invoker().onChunkLevelTypeChange(serverWorld, (LevelChunk) this.getUncheckedOrNull(ChunkStatus.FULL), oldLevelType, newLevelType);
 				this.fabric_currentEventLevelType = newLevelType;
@@ -116,12 +116,12 @@ public abstract class ChunkHolderMixin extends AbstractChunkHolder implements Ch
 	}
 
 	@Override
-	public void fabric_setCurrentEventLevelType(ChunkLevelType levelType) {
+	public void fabric_setCurrentEventLevelType(FullChunkStatus levelType) {
 		this.fabric_currentEventLevelType = levelType;
 	}
 
 	@Override
-	public ChunkLevelType fabric_getCurrentEventLevelType() {
+	public FullChunkStatus fabric_getCurrentEventLevelType() {
 		return this.fabric_currentEventLevelType;
 	}
 }

@@ -28,7 +28,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.network.RegistryByteBuf;
 import net.minecraft.network.codec.PacketCodec;
-import net.minecraft.core.RegistryEntry;
+import net.minecraft.core.Holder;
 
 import net.fabricmc.fabric.api.transfer.v1.storage.TransferVariant;
 import net.fabricmc.fabric.impl.transfer.VariantCodecs;
@@ -86,7 +86,7 @@ public interface ItemVariant extends TransferVariant<Item> {
 		return getObject();
 	}
 
-	default RegistryEntry<Item> getRegistryEntry() {
+	default Holder<Item> getRegistryEntry() {
 		return getItem().getRegistryEntry();
 	}
 

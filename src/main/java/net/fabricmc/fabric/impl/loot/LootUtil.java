@@ -22,8 +22,8 @@ import java.util.function.Function;
 
 import net.minecraft.world.level.storage.loot.LootTable;
 import net.minecraft.core.RegistryKeys;
-import net.minecraft.core.RegistryWrapper;
-import net.minecraft.core.RegistryEntry;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.core.Holder;
 import net.minecraft.server.packs.Resource;
 import net.minecraft.server.packs.ResourcePackSource;
 import net.minecraft.server.level.ServerLevel;
@@ -54,13 +54,13 @@ public final class LootUtil {
 		return LootTableSource.DATA_PACK;
 	}
 
-	public static RegistryEntry<LootTable> getEntryOrDirect(ServerLevel world, LootTable table) {
-		RegistryWrapper.WrapperLookup wrapperLookup = world
+	public static Holder<LootTable> getEntryOrDirect(ServerLevel world, LootTable table) {
+		HolderLookup.WrapperLookup wrapperLookup = world
 				.getServer()
 				.getReloadableRegistries()
 				.createRegistryLookup();
 
-		RegistryWrapper<LootTable> lootTableRegistryWrapper = wrapperLookup
+		HolderLookup<LootTable> lootTableRegistryWrapper = wrapperLookup
 				.getOptional(RegistryKeys.LOOT_TABLE)
 				.orElseThrow(() -> new IllegalStateException("Failed to fetch LootTable wrapper from WrapperLookup"));
 
@@ -68,7 +68,7 @@ public final class LootUtil {
 				.streamEntries()
 				.filter(it -> it.value().equals(table))
 				.findFirst()
-				.map(Function.<RegistryEntry<LootTable>>identity())
-				.orElseGet(() -> RegistryEntry.of(table));
+				.map(Function.<Holder<LootTable>>identity())
+				.orElseGet(() -> Holder.of(table));
 	}
 }

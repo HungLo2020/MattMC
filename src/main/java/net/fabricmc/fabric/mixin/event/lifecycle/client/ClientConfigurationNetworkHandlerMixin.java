@@ -22,7 +22,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import net.minecraft.client.multiplayer.ClientConfigurationNetworkHandler;
-import net.minecraft.core.DynamicRegistryManager;
+import net.minecraft.core.RegistryAccess;
 import net.minecraft.server.packs.ResourceFactory;
 
 import net.fabricmc.fabric.api.event.lifecycle.v1.CommonLifecycleEvents;
@@ -30,7 +30,7 @@ import net.fabricmc.fabric.api.event.lifecycle.v1.CommonLifecycleEvents;
 @Mixin(ClientConfigurationNetworkHandler.class)
 public class ClientConfigurationNetworkHandlerMixin {
 	@Inject(method = "method_57043", at = @At(value = "RETURN"))
-	private void invokeTagsLoaded(ResourceFactory factory, CallbackInfoReturnable<DynamicRegistryManager.Immutable> cir) {
+	private void invokeTagsLoaded(ResourceFactory factory, CallbackInfoReturnable<RegistryAccess.Immutable> cir) {
 		CommonLifecycleEvents.TAGS_LOADED.invoker().onTagsLoaded(cir.getReturnValue(), true);
 	}
 }

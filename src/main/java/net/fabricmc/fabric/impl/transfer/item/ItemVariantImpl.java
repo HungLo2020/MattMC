@@ -25,7 +25,7 @@ import net.minecraft.component.ComponentMap;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
-import net.minecraft.core.RegistryEntry;
+import net.minecraft.core.Holder;
 
 import net.fabricmc.fabric.api.transfer.v1.item.ItemVariant;
 import net.fabricmc.fabric.impl.transfer.TransferApiImpl;
@@ -43,7 +43,7 @@ public class ItemVariantImpl implements ItemVariant {
 		}
 	}
 
-	public static ItemVariant of(RegistryEntry<Item> item, ComponentChanges components) {
+	public static ItemVariant of(Holder<Item> item, ComponentChanges components) {
 		return of(item.value(), components);
 	}
 

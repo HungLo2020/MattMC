@@ -19,7 +19,7 @@ package net.fabricmc.fabric.api.event.registry;
 import java.util.function.Consumer;
 
 import net.minecraft.core.Registry;
-import net.minecraft.core.RegistryEntry;
+import net.minecraft.core.Holder;
 import net.minecraft.resources.ResourceLocation;
 
 import net.fabricmc.fabric.api.event.Event;
@@ -57,9 +57,9 @@ public interface RegistryEntryAddedCallback<T> {
 	 * <p>Note: The callback is recursive and will be invoked for anything registered within the callback itself.
 	 *
 	 * @param registry the registry to listen to
-	 * @param consumer the callback that accepts a {@link RegistryEntry.Reference}
+	 * @param consumer the callback that accepts a {@link Holder.Reference}
 	 */
-	static <T> void allEntries(Registry<T> registry, Consumer<RegistryEntry.Reference<T>> consumer) {
+	static <T> void allEntries(Registry<T> registry, Consumer<Holder.Reference<T>> consumer) {
 		event(registry).register((rawId, id, object) -> consumer.accept(registry.getEntry(id).orElseThrow()));
 		// Call the consumer for all existing entries, after registering the callback.
 		// This way if the callback registers a new entry, it will also be called for that entry.

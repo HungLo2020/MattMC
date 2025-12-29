@@ -28,7 +28,7 @@ import java.util.concurrent.Executor;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
-import net.minecraft.core.RegistryWrapper;
+import net.minecraft.core.HolderLookup;
 import net.minecraft.server.packs.OverlayResourcePack;
 import net.minecraft.server.packs.Pack;
 import net.minecraft.server.packs.ResourcePackInfo;
@@ -162,11 +162,11 @@ public class ResourceManagerHelperImpl implements ResourceManagerHelper {
 	}
 
 	@Override
-	public void registerReloadListener(ResourceLocation identifier, Function<RegistryWrapper.WrapperLookup, IdentifiableResourceReloadListener> listenerFactory) {
+	public void registerReloadListener(ResourceLocation identifier, Function<HolderLookup.WrapperLookup, IdentifiableResourceReloadListener> listenerFactory) {
 		this.resourceLoader.registerReloader(identifier, new ResourceReloader() {
 			@Override
 			public CompletableFuture<Void> reload(Store store, Executor prepareExecutor, Synchronizer reloadSynchronizer, Executor applyExecutor) {
-				RegistryWrapper.WrapperLookup registries = store.getOrThrow(ResourceLoader.RELOADER_REGISTRY_LOOKUP_KEY);
+				HolderLookup.WrapperLookup registries = store.getOrThrow(ResourceLoader.RELOADER_REGISTRY_LOOKUP_KEY);
 				ResourceReloader resourceReloader = listenerFactory.apply(registries);
 
 				return resourceReloader.reload(store, prepareExecutor, reloadSynchronizer, applyExecutor);

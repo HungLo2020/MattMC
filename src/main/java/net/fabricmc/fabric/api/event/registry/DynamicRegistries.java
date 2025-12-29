@@ -23,7 +23,7 @@ import org.jetbrains.annotations.Unmodifiable;
 
 import net.minecraft.core.Registry;
 import net.minecraft.core.ResourceKey;
-import net.minecraft.core.RegistryLoader;
+import net.minecraft.core.RegistryDataLoader;
 
 import net.fabricmc.fabric.impl.registry.sync.DynamicRegistriesImpl;
 
@@ -85,7 +85,7 @@ public final class DynamicRegistries {
 	 *
 	 * @return an unmodifiable list of all dynamic registries
 	 */
-	public static @Unmodifiable List<RegistryLoader.Entry<?>> getDynamicRegistries() {
+	public static @Unmodifiable List<RegistryDataLoader.Entry<?>> getDynamicRegistries() {
 		return DynamicRegistriesImpl.getDynamicRegistries();
 	}
 

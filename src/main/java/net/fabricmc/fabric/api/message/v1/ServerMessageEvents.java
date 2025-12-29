@@ -16,8 +16,8 @@
 
 package net.fabricmc.fabric.api.message.v1;
 
-import net.minecraft.network.message.MessageType;
-import net.minecraft.network.message.SignedMessage;
+import net.minecraft.network.message.ChatType;
+import net.minecraft.network.message.PlayerChatMessage;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.server.network.ServerPlayer;
@@ -147,10 +147,10 @@ public final class ServerMessageEvents {
 		 *
 		 * @param message the broadcast message with message decorators applied; use {@code message.getContent()} to get the text
 		 * @param sender  the player that sent the message
-		 * @param params the {@link MessageType.Parameters}
+		 * @param params the {@link ChatType.Parameters}
 		 * @return {@code true} if the message should be broadcast, otherwise {@code false}
 		 */
-		boolean allowChatMessage(SignedMessage message, ServerPlayer sender, MessageType.Parameters params);
+		boolean allowChatMessage(PlayerChatMessage message, ServerPlayer sender, ChatType.Parameters params);
 	}
 
 	@FunctionalInterface
@@ -183,10 +183,10 @@ public final class ServerMessageEvents {
 		 *
 		 * @param message the broadcast message with message decorators applied if applicable; use {@code message.getContent()} to get the text
 		 * @param source  the command source that sent the message
-		 * @param params the {@link MessageType.Parameters}
+		 * @param params the {@link ChatType.Parameters}
 		 * @return {@code true} if the message should be broadcast, otherwise {@code false}
 		 */
-		boolean allowCommandMessage(SignedMessage message, CommandSourceStack source, MessageType.Parameters params);
+		boolean allowCommandMessage(PlayerChatMessage message, CommandSourceStack source, ChatType.Parameters params);
 	}
 
 	@FunctionalInterface
@@ -202,9 +202,9 @@ public final class ServerMessageEvents {
 		 *
 		 * @param message the broadcast message with message decorators applied; use {@code message.getContent()} to get the text
 		 * @param sender  the player that sent the message
-		 * @param params the {@link MessageType.Parameters}
+		 * @param params the {@link ChatType.Parameters}
 		 */
-		void onChatMessage(SignedMessage message, ServerPlayer sender, MessageType.Parameters params);
+		void onChatMessage(PlayerChatMessage message, ServerPlayer sender, ChatType.Parameters params);
 	}
 
 	@FunctionalInterface
@@ -234,8 +234,8 @@ public final class ServerMessageEvents {
 		 *
 		 * @param message the broadcast message with message decorators applied if applicable; use {@code message.getContent()} to get the text
 		 * @param source  the command source that sent the message
-		 * @param params the {@link MessageType.Parameters}
+		 * @param params the {@link ChatType.Parameters}
 		 */
-		void onCommandMessage(SignedMessage message, CommandSourceStack source, MessageType.Parameters params);
+		void onCommandMessage(PlayerChatMessage message, CommandSourceStack source, ChatType.Parameters params);
 	}
 }

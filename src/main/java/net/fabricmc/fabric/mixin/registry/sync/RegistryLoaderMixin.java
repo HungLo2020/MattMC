@@ -30,16 +30,16 @@ import org.spongepowered.asm.mixin.injection.Coerce;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-import net.minecraft.core.DynamicRegistryManager;
+import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.Registry;
 import net.minecraft.core.ResourceKey;
-import net.minecraft.core.RegistryLoader;
-import net.minecraft.core.RegistryWrapper;
+import net.minecraft.core.RegistryDataLoader;
+import net.minecraft.core.HolderLookup;
 
 import net.fabricmc.fabric.api.event.registry.DynamicRegistrySetupCallback;
 import net.fabricmc.fabric.impl.registry.sync.DynamicRegistryViewImpl;
 
-@Mixin(RegistryLoader.class)
+@Mixin(RegistryDataLoader.class)
 public class RegistryLoaderMixin {
 	@Unique
 	private static final ThreadLocal<Boolean> IS_SERVER = ThreadLocal.withInitial(() -> false);
@@ -48,8 +48,8 @@ public class RegistryLoaderMixin {
 	 * Sets IS_SERVER flag. Note that this must be reset after call, as the render thread
 	 * invokes this method as well.
 	 */
-	@WrapOperation(method = "loadFromResource(Lnet/minecraft/resource/ResourceManager;Ljava/util/List;Ljava/util/List;)Lnet/minecraft/registry/DynamicRegistryManager$Immutable;", at = @At(value = "INVOKE", target = "Lnet/minecraft/registry/RegistryLoader;load(Lnet/minecraft/registry/RegistryLoader$RegistryLoadable;Ljava/util/List;Ljava/util/List;)Lnet/minecraft/registry/DynamicRegistryManager$Immutable;"))
-	private static DynamicRegistryManager.Immutable wrapIsServerCall(@Coerce Object registryLoadable, List<RegistryWrapper.Impl<?>> baseRegistries, List<RegistryLoader.Entry<?>> entries, Operation<DynamicRegistryManager.Immutable> original) {
+	@WrapOperation(method = "loadFromResource(Lnet/minecraft/resource/ResourceManager;Ljava/util/List;Ljava/util/List;)Lnet/minecraft/registry/RegistryAccess$Immutable;", at = @At(value = "INVOKE", target = "Lnet/minecraft/registry/RegistryDataLoader;load(Lnet/minecraft/registry/RegistryDataLoader$RegistryLoadable;Ljava/util/List;Ljava/util/List;)Lnet/minecraft/registry/RegistryAccess$Immutable;"))
+	private static RegistryAccess.Immutable wrapIsServerCall(@Coerce Object registryLoadable, List<HolderLookup.Impl<?>> baseRegistries, List<RegistryDataLoader.Entry<?>> entries, Operation<RegistryAccess.Immutable> original) {
 		try {
 			IS_SERVER.set(true);
 			return original.call(registryLoadable, baseRegistries, entries);
@@ -59,19 +59,19 @@ public class RegistryLoaderMixin {
 	}
 
 	@Inject(
-			method = "load(Lnet/minecraft/registry/RegistryLoader$RegistryLoadable;Ljava/util/List;Ljava/util/List;)Lnet/minecraft/registry/DynamicRegistryManager$Immutable;",
+			method = "load(Lnet/minecraft/registry/RegistryDataLoader$RegistryLoadable;Ljava/util/List;Ljava/util/List;)Lnet/minecraft/registry/RegistryAccess$Immutable;",
 			at = @At(
 					value = "INVOKE",
 					target = "Ljava/util/List;forEach(Ljava/util/function/Consumer;)V",
 					ordinal = 0
 			)
 	)
-	private static void beforeLoad(@Coerce Object registryLoadable, List<RegistryWrapper.Impl<?>> baseRegistries, List<RegistryLoader.Entry<?>> entries, CallbackInfoReturnable<DynamicRegistryManager.Immutable> cir, @Local(ordinal = 2) List<RegistryLoader.Loader<?>> registriesList) {
+	private static void beforeLoad(@Coerce Object registryLoadable, List<HolderLookup.Impl<?>> baseRegistries, List<RegistryDataLoader.Entry<?>> entries, CallbackInfoReturnable<RegistryAccess.Immutable> cir, @Local(ordinal = 2) List<RegistryDataLoader.Loader<?>> registriesList) {
 		if (!IS_SERVER.get()) return;
 
 		Map<ResourceKey<? extends Registry<?>>, Registry<?>> registries = new IdentityHashMap<>(registriesList.size());
 
-		for (RegistryLoader.Loader<?> entry : registriesList) {
+		for (RegistryDataLoader.Loader<?> entry : registriesList) {
 			registries.put(entry.registry().getKey(), entry.registry());
 		}
 

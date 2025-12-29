@@ -23,7 +23,7 @@ import org.spongepowered.asm.mixin.injection.Redirect;
 import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.core.RegistryEntry;
+import net.minecraft.core.Holder;
 
 import net.fabricmc.fabric.api.item.v1.EnchantingContext;
 
@@ -33,7 +33,7 @@ abstract class EnchantmentHelperMixin {
 			method = "method_60143",
 			at = @At(value = "INVOKE", target = "Lnet/minecraft/enchantment/Enchantment;isPrimaryItem(Lnet/minecraft/item/ItemStack;)Z")
 	)
-	private static boolean useCustomEnchantingChecks(Enchantment instance, ItemStack stack, ItemStack itemStack, boolean bl, RegistryEntry<Enchantment> registryEntry) {
+	private static boolean useCustomEnchantingChecks(Enchantment instance, ItemStack stack, ItemStack itemStack, boolean bl, Holder<Enchantment> registryEntry) {
 		return stack.canBeEnchantedWith(registryEntry, EnchantingContext.PRIMARY);
 	}
 }

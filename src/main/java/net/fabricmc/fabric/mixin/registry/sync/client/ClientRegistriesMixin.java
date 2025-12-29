@@ -30,7 +30,7 @@ import org.spongepowered.asm.mixin.injection.Coerce;
 import net.minecraft.client.multiplayer.ClientRegistries;
 import net.minecraft.core.Registry;
 import net.minecraft.core.ResourceKey;
-import net.minecraft.core.RegistryLoader;
+import net.minecraft.core.RegistryDataLoader;
 import net.minecraft.core.SerializableRegistries;
 import net.minecraft.server.packs.ResourceFactory;
 
@@ -41,11 +41,11 @@ public class ClientRegistriesMixin {
 	/**
 	 * Keep the pre-24w04a behavior of removing empty registries, even if the client knows that registry.
 	 */
-	@WrapOperation(method = "createRegistryManager", at = @At(value = "FIELD", target = "Lnet/minecraft/registry/RegistryLoader;SYNCED_REGISTRIES:Ljava/util/List;", opcode = Opcodes.GETSTATIC))
-	private List<RegistryLoader.Entry<?>> skipEmptyRegistries(Operation<List<RegistryLoader.Entry<?>>> operation, ResourceFactory resourceFactory, @Coerce ClientRegistriesDynamicRegistriesAccessor storage, boolean bl) {
+	@WrapOperation(method = "createRegistryManager", at = @At(value = "FIELD", target = "Lnet/minecraft/registry/RegistryDataLoader;SYNCED_REGISTRIES:Ljava/util/List;", opcode = Opcodes.GETSTATIC))
+	private List<RegistryDataLoader.Entry<?>> skipEmptyRegistries(Operation<List<RegistryDataLoader.Entry<?>>> operation, ResourceFactory resourceFactory, @Coerce ClientRegistriesDynamicRegistriesAccessor storage, boolean bl) {
 		Map<ResourceKey<? extends Registry<?>>, List<SerializableRegistries.SerializedRegistryEntry>> dynamicRegistries = storage.getDynamicRegistries();
 
-		List<RegistryLoader.Entry<?>> result = new ArrayList<>(operation.call());
+		List<RegistryDataLoader.Entry<?>> result = new ArrayList<>(operation.call());
 		result.removeIf(entry -> DynamicRegistriesImpl.SKIP_EMPTY_SYNC_REGISTRIES.contains(entry.key()) && !dynamicRegistries.containsKey(entry.key()));
 		return result;
 	}

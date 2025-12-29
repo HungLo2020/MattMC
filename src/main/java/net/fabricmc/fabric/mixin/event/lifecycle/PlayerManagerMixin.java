@@ -22,13 +22,13 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import net.minecraft.network.Connection;
-import net.minecraft.server.PlayerManager;
+import net.minecraft.server.PlayerList;
 import net.minecraft.server.network.ConnectedClientData;
 import net.minecraft.server.network.ServerPlayer;
 
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 
-@Mixin(PlayerManager.class)
+@Mixin(PlayerList.class)
 public class PlayerManagerMixin {
 	@Inject(
 			method = "onPlayerConnect",
@@ -43,7 +43,7 @@ public class PlayerManagerMixin {
 			at = @At(value = "INVOKE", target = "Lnet/minecraft/network/packet/s2c/common/SynchronizeTagsS2CPacket;<init>(Ljava/util/Map;)V")
 	)
 	private void hookOnDataPacksReloaded(CallbackInfo ci) {
-		for (ServerPlayer player : ((PlayerManager) (Object) this).getPlayerList()) {
+		for (ServerPlayer player : ((PlayerList) (Object) this).getPlayerList()) {
 			ServerLifecycleEvents.SYNC_DATA_PACK_CONTENTS.invoker().onSyncDataPackContents(player, false);
 		}
 	}

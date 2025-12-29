@@ -32,7 +32,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.world.item.crafting.display.SlotDisplay;
-import net.minecraft.core.RegistryEntry;
+import net.minecraft.core.Holder;
 import net.minecraft.core.RegistryEntryList;
 import net.minecraft.resources.ResourceLocation;
 
@@ -76,7 +76,7 @@ public class CustomIngredientImpl extends Ingredient {
 
 	private final CustomIngredient customIngredient;
 	@Nullable
-	private List<RegistryEntry<Item>> customMatchingItems;
+	private List<Holder<Item>> customMatchingItems;
 
 	public CustomIngredientImpl(CustomIngredient customIngredient) {
 		// We must pass a registry entry list that contains something that isn't air. It doesn't actually get used.
@@ -85,7 +85,7 @@ public class CustomIngredientImpl extends Ingredient {
 		this.customIngredient = customIngredient;
 	}
 
-	public List<RegistryEntry<Item>> getCustomMatchingItems() {
+	public List<Holder<Item>> getCustomMatchingItems() {
 		if (customMatchingItems == null) {
 			customMatchingItems = customIngredient.getMatchingItems().toList();
 		}
@@ -104,7 +104,7 @@ public class CustomIngredientImpl extends Ingredient {
 	}
 
 	@Override
-	public Stream<RegistryEntry<Item>> getMatchingItems() {
+	public Stream<Holder<Item>> getMatchingItems() {
 		return getCustomMatchingItems().stream();
 	}
 
@@ -119,7 +119,7 @@ public class CustomIngredientImpl extends Ingredient {
 	}
 
 	@Override
-	public boolean acceptsItem(RegistryEntry<Item> registryEntry) {
+	public boolean acceptsItem(Holder<Item> registryEntry) {
 		return getCustomMatchingItems().contains(registryEntry);
 	}
 

@@ -19,7 +19,7 @@ package net.fabricmc.fabric.api.item.v1;
 import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.core.ResourceKey;
-import net.minecraft.core.RegistryEntry;
+import net.minecraft.core.Holder;
 
 import net.fabricmc.fabric.api.event.Event;
 import net.fabricmc.fabric.api.event.EventFactory;
@@ -40,15 +40,15 @@ public final class EnchantmentEvents {
 	 *
 	 * <p>To modify the behavior of your own modded <em>enchantments</em>, specify a custom tag for {@link Enchantment.Definition#supportedItems()} instead.
 	 * To modify the behavior of your own modded <em>items</em>, add to the applicable tags instead, when that suffices.
-	 * Note that this event triggers <em>before</em> {@link FabricItem#canBeEnchantedWith(ItemStack, RegistryEntry, EnchantingContext)},
+	 * Note that this event triggers <em>before</em> {@link FabricItem#canBeEnchantedWith(ItemStack, Holder, EnchantingContext)},
 	 * and that method will only be called if no listeners override it.</p>
 	 *
 	 * <p>Note that allowing an enchantment using this event does not guarantee the item will receive that enchantment,
 	 * only that it isn't forbidden from doing so.</p>
 	 *
-	 * @see AllowEnchanting#allowEnchanting(RegistryEntry, ItemStack, EnchantingContext)
+	 * @see AllowEnchanting#allowEnchanting(Holder, ItemStack, EnchantingContext)
 	 * @see Enchantment#isAcceptableItem(ItemStack)
-	 * @see FabricItem#canBeEnchantedWith(ItemStack, RegistryEntry, EnchantingContext)
+	 * @see FabricItem#canBeEnchantedWith(ItemStack, Holder, EnchantingContext)
 	 */
 	public static final Event<AllowEnchanting> ALLOW_ENCHANTING = EventFactory.createArrayBacked(
 			AllowEnchanting.class,
@@ -99,7 +99,7 @@ public final class EnchantmentEvents {
 		 * @see EnchantingContext
 		 */
 		TriState allowEnchanting(
-				RegistryEntry<Enchantment> enchantment,
+				Holder<Enchantment> enchantment,
 				ItemStack target,
 				EnchantingContext enchantingContext
 		);

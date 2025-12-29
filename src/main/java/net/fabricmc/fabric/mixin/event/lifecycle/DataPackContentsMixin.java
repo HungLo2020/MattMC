@@ -25,8 +25,8 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import net.minecraft.core.CombinedDynamicRegistries;
-import net.minecraft.core.DynamicRegistryManager;
-import net.minecraft.core.RegistryWrapper;
+import net.minecraft.core.RegistryAccess;
+import net.minecraft.core.HolderLookup;
 import net.minecraft.core.ServerDynamicRegistryType;
 import net.minecraft.world.flag.FeatureFlagSet;
 import net.minecraft.server.ServerResources;
@@ -37,10 +37,10 @@ import net.fabricmc.fabric.api.event.lifecycle.v1.CommonLifecycleEvents;
 @Mixin(ServerResources.class)
 public class DataPackContentsMixin {
 	@Unique
-	private DynamicRegistryManager dynamicRegistryManager;
+	private RegistryAccess dynamicRegistryManager;
 
 	@Inject(method = "<init>", at = @At("TAIL"))
-	private void init(CombinedDynamicRegistries<ServerDynamicRegistryType> combinedDynamicRegistries, RegistryWrapper.WrapperLookup wrapperLookup, FeatureFlagSet featureSet, CommandManager.RegistrationEnvironment registrationEnvironment, List list, int i, CallbackInfo ci) {
+	private void init(CombinedDynamicRegistries<ServerDynamicRegistryType> combinedDynamicRegistries, HolderLookup.WrapperLookup wrapperLookup, FeatureFlagSet featureSet, CommandManager.RegistrationEnvironment registrationEnvironment, List list, int i, CallbackInfo ci) {
 		dynamicRegistryManager = combinedDynamicRegistries.getCombinedRegistryManager();
 	}
 

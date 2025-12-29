@@ -20,7 +20,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Stream;
 
-import net.minecraft.core.DynamicRegistryManager;
+import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.Registry;
 import net.minecraft.core.ResourceKey;
 
@@ -35,8 +35,8 @@ public final class DynamicRegistryViewImpl implements DynamicRegistryView {
 	}
 
 	@Override
-	public DynamicRegistryManager asDynamicRegistryManager() {
-		return new DynamicRegistryManager.Immutable() {
+	public RegistryAccess asDynamicRegistryManager() {
+		return new RegistryAccess.Immutable() {
 			@SuppressWarnings("unchecked")
 			public <T> Optional<Registry<T>> getOptional(ResourceKey<? extends Registry<? extends T>> key) {
 				return Optional.ofNullable((Registry<T>) DynamicRegistryViewImpl.this.registries.get(key));

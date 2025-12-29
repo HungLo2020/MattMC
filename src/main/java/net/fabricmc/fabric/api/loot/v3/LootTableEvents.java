@@ -25,8 +25,8 @@ import net.minecraft.world.level.storage.loot.LootTable;
 import net.minecraft.world.level.storage.loot.context.LootContext;
 import net.minecraft.core.Registry;
 import net.minecraft.core.ResourceKey;
-import net.minecraft.core.RegistryWrapper;
-import net.minecraft.core.RegistryEntry;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.core.Holder;
 import net.minecraft.server.packs.ResourceManager;
 
 import net.fabricmc.fabric.api.event.Event;
@@ -124,7 +124,7 @@ public final class LootTableEvents {
 		 * @return the new loot table, or null if it wasn't replaced
 		 */
 		@Nullable
-		LootTable replaceLootTable(ResourceKey<LootTable> key, LootTable original, LootTableSource source, RegistryWrapper.WrapperLookup registries);
+		LootTable replaceLootTable(ResourceKey<LootTable> key, LootTable original, LootTableSource source, HolderLookup.WrapperLookup registries);
 	}
 
 	@FunctionalInterface
@@ -137,7 +137,7 @@ public final class LootTableEvents {
 		 * @param source          the source of the loot table
 		 * @param registries      the registry wrapper lookup
 		 */
-		void modifyLootTable(ResourceKey<LootTable> key, LootTable.Builder tableBuilder, LootTableSource source, RegistryWrapper.WrapperLookup registries);
+		void modifyLootTable(ResourceKey<LootTable> key, LootTable.Builder tableBuilder, LootTableSource source, HolderLookup.WrapperLookup registries);
 	}
 
 	@FunctionalInterface
@@ -155,10 +155,10 @@ public final class LootTableEvents {
 	public interface ModifyDrops {
 		/**
 		 * Called after a loot table is finished generating drops to modify drops.
-		 * @param entry the loot table's registry entry. This will be a {@link RegistryEntry.Reference} if the lootTable is registered, or a {@link RegistryEntry.Direct} if the table is inline
+		 * @param entry the loot table's registry entry. This will be a {@link Holder.Reference} if the lootTable is registered, or a {@link Holder.Direct} if the table is inline
 		 * @param context the loot context for the current drops
 		 * @param drops the list of drops from the loot table to modify
 		 */
-		void modifyLootTableDrops(RegistryEntry<LootTable> entry, LootContext context, List<ItemStack> drops);
+		void modifyLootTableDrops(Holder<LootTable> entry, LootContext context, List<ItemStack> drops);
 	}
 }

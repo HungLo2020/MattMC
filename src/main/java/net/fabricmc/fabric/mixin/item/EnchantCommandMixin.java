@@ -25,7 +25,7 @@ import org.spongepowered.asm.mixin.injection.Redirect;
 import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.core.RegistryEntry;
+import net.minecraft.core.Holder;
 import net.minecraft.commands.EnchantCommand;
 import net.minecraft.commands.CommandSourceStack;
 
@@ -37,7 +37,7 @@ abstract class EnchantCommandMixin {
 			method = "execute",
 			at = @At(value = "INVOKE", target = "Lnet/minecraft/enchantment/Enchantment;isAcceptableItem(Lnet/minecraft/item/ItemStack;)Z")
 	)
-	private static boolean callAllowEnchantingEvent(Enchantment instance, ItemStack stack, CommandSourceStack source, Collection<? extends Entity> targets, RegistryEntry<Enchantment> enchantment) {
+	private static boolean callAllowEnchantingEvent(Enchantment instance, ItemStack stack, CommandSourceStack source, Collection<? extends Entity> targets, Holder<Enchantment> enchantment) {
 		return stack.canBeEnchantedWith(enchantment, EnchantingContext.ACCEPTABLE);
 	}
 }

@@ -24,7 +24,7 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.world.item.crafting.display.SlotDisplay;
-import net.minecraft.core.RegistryEntry;
+import net.minecraft.core.Holder;
 
 import net.fabricmc.fabric.impl.recipe.ingredient.CustomIngredientImpl;
 
@@ -75,7 +75,7 @@ public interface CustomIngredient {
 	 *
 	 * <p>Note: no caching needs to be done by the implementation, this is already handled by the ingredient itself.
 	 */
-	Stream<RegistryEntry<Item>> getMatchingItems();
+	Stream<Holder<Item>> getMatchingItems();
 
 	/**
 	 * Returns whether this ingredient always requires {@linkplain #test direct stack testing}.

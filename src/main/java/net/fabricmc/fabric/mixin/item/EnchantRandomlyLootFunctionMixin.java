@@ -23,7 +23,7 @@ import org.spongepowered.asm.mixin.injection.Redirect;
 import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.storage.loot.function.EnchantRandomlyLootFunction;
-import net.minecraft.core.RegistryEntry;
+import net.minecraft.core.Holder;
 
 import net.fabricmc.fabric.api.item.v1.EnchantingContext;
 
@@ -33,7 +33,7 @@ abstract class EnchantRandomlyLootFunctionMixin {
 			method = "method_60291",
 			at = @At(value = "INVOKE", target = "Lnet/minecraft/enchantment/Enchantment;isAcceptableItem(Lnet/minecraft/item/ItemStack;)Z")
 	)
-	private static boolean callAllowEnchantingEvent(Enchantment enchantment, ItemStack stack, boolean bl, ItemStack itemStack, RegistryEntry<Enchantment> registryEntry) {
+	private static boolean callAllowEnchantingEvent(Enchantment enchantment, ItemStack stack, boolean bl, ItemStack itemStack, Holder<Enchantment> registryEntry) {
 		return stack.canBeEnchantedWith(registryEntry, EnchantingContext.ACCEPTABLE);
 	}
 }

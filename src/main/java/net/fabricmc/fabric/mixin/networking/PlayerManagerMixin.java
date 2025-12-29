@@ -22,13 +22,13 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import net.minecraft.network.Connection;
-import net.minecraft.server.PlayerManager;
+import net.minecraft.server.PlayerList;
 import net.minecraft.server.network.ConnectedClientData;
 import net.minecraft.server.network.ServerPlayer;
 
 import net.fabricmc.fabric.impl.networking.server.ServerNetworkingImpl;
 
-@Mixin(PlayerManager.class)
+@Mixin(PlayerList.class)
 abstract class PlayerManagerMixin {
 	@Inject(method = "onPlayerConnect", at = @At(value = "INVOKE", target = "Lnet/minecraft/network/packet/s2c/play/PlayerAbilitiesS2CPacket;<init>(Lnet/minecraft/entity/player/PlayerAbilities;)V"))
 	private void handlePlayerConnection(Connection connection, ServerPlayer player, ConnectedClientData arg, CallbackInfo ci) {

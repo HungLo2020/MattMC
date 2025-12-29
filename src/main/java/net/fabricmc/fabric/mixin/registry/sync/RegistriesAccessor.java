@@ -19,13 +19,13 @@ package net.fabricmc.fabric.mixin.registry.sync;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.gen.Accessor;
 
-import net.minecraft.core.MutableRegistry;
+import net.minecraft.core.WritableRegistry;
 import net.minecraft.core.Registries;
 
 @Mixin(Registries.class)
 public interface RegistriesAccessor<T> {
 	@Accessor()
-	static MutableRegistry<MutableRegistry<?>> getROOT() {
+	static WritableRegistry<WritableRegistry<?>> getROOT() {
 		throw new UnsupportedOperationException();
 	}
 }

@@ -25,24 +25,24 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-import net.minecraft.network.message.MessageType;
-import net.minecraft.network.message.SignedMessage;
+import net.minecraft.network.message.ChatType;
+import net.minecraft.network.message.PlayerChatMessage;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.PlayerManager;
+import net.minecraft.server.PlayerList;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.server.network.ServerPlayer;
 import net.minecraft.network.chat.Component;
 
 import net.fabricmc.fabric.api.message.v1.ServerMessageEvents;
 
-@Mixin(PlayerManager.class)
+@Mixin(PlayerList.class)
 public abstract class PlayerManagerMixin {
 	@Shadow
 	@Final
 	private MinecraftServer server;
 
-	@Inject(method = "broadcast(Lnet/minecraft/network/message/SignedMessage;Lnet/minecraft/server/network/ServerPlayer;Lnet/minecraft/network/message/MessageType$Parameters;)V", at = @At("HEAD"), cancellable = true)
-	private void onSendChatMessage(SignedMessage message, ServerPlayer sender, MessageType.Parameters params, CallbackInfo ci) {
+	@Inject(method = "broadcast(Lnet/minecraft/network/message/PlayerChatMessage;Lnet/minecraft/server/network/ServerPlayer;Lnet/minecraft/network/message/ChatType$Parameters;)V", at = @At("HEAD"), cancellable = true)
+	private void onSendChatMessage(PlayerChatMessage message, ServerPlayer sender, ChatType.Parameters params, CallbackInfo ci) {
 		if (!ServerMessageEvents.ALLOW_CHAT_MESSAGE.invoker().allowChatMessage(message, sender, params)) {
 			ci.cancel();
 			return;
@@ -61,8 +61,8 @@ public abstract class PlayerManagerMixin {
 		ServerMessageEvents.GAME_MESSAGE.invoker().onGameMessage(this.server, message, overlay);
 	}
 
-	@Inject(method = "broadcast(Lnet/minecraft/network/message/SignedMessage;Lnet/minecraft/server/command/CommandSourceStack;Lnet/minecraft/network/message/MessageType$Parameters;)V", at = @At("HEAD"), cancellable = true)
-	private void onSendCommandMessage(SignedMessage message, CommandSourceStack source, MessageType.Parameters params, CallbackInfo ci) {
+	@Inject(method = "broadcast(Lnet/minecraft/network/message/PlayerChatMessage;Lnet/minecraft/server/command/CommandSourceStack;Lnet/minecraft/network/message/ChatType$Parameters;)V", at = @At("HEAD"), cancellable = true)
+	private void onSendCommandMessage(PlayerChatMessage message, CommandSourceStack source, ChatType.Parameters params, CallbackInfo ci) {
 		if (!ServerMessageEvents.ALLOW_COMMAND_MESSAGE.invoker().allowCommandMessage(message, source, params)) {
 			ci.cancel();
 			return;

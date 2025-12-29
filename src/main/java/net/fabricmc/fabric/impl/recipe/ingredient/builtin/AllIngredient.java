@@ -25,7 +25,7 @@ import com.mojang.serialization.MapCodec;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.Ingredient;
-import net.minecraft.core.RegistryEntry;
+import net.minecraft.core.Holder;
 import net.minecraft.resources.ResourceLocation;
 
 import net.fabricmc.fabric.api.recipe.v1.ingredient.CustomIngredientSerializer;
@@ -55,9 +55,9 @@ public class AllIngredient extends CombinedIngredient {
 	}
 
 	@Override
-	public Stream<RegistryEntry<Item>> getMatchingItems() {
+	public Stream<Holder<Item>> getMatchingItems() {
 		// There's always at least one sub ingredient, so accessing ingredients[0] is safe.
-		List<RegistryEntry<Item>> previewStacks = new ArrayList<>(ingredients.getFirst().getMatchingItems().toList());
+		List<Holder<Item>> previewStacks = new ArrayList<>(ingredients.getFirst().getMatchingItems().toList());
 
 		for (int i = 1; i < ingredients.size(); ++i) {
 			Ingredient ing = ingredients.get(i);

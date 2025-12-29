@@ -24,7 +24,7 @@ import it.unimi.dsi.fastutil.objects.Object2ObjectMap;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import org.slf4j.Logger;
 
-import net.minecraft.server.level.ChunkLevelType;
+import net.minecraft.server.level.FullChunkStatus;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.core.ChunkPos;
 
@@ -35,7 +35,7 @@ import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 
 public final class ServerChunkLifecycleTests implements ModInitializer {
 	private static final Logger LOGGER = LogUtils.getLogger();
-	private record ChunkLevelTypeEvent(ChunkLevelType oldLevelType, ChunkLevelType newLevelType) { }
+	private record ChunkLevelTypeEvent(FullChunkStatus oldLevelType, FullChunkStatus newLevelType) { }
 
 	@Override
 	public void onInitialize() {
@@ -71,7 +71,7 @@ public final class ServerChunkLifecycleTests implements ModInitializer {
 	 * Moving into another chunk should trigger some logs.
 	 */
 	private static void setupChunkLevelTypeChangeTest() {
-		final Object2ObjectMap<ResourceLocation, Object2IntMap<ChunkLevelType>> worldsChunkLevelEvents = new Object2ObjectOpenHashMap<>();
+		final Object2ObjectMap<ResourceLocation, Object2IntMap<FullChunkStatus>> worldsChunkLevelEvents = new Object2ObjectOpenHashMap<>();
 		final Object2ObjectMap<ResourceLocation, Long2ObjectOpenHashMap<ChunkLevelTypeEvent>> worldsChunkLevelTypeTracker = new Object2ObjectOpenHashMap<>();
 
 		ServerChunkEvents.CHUNK_LEVEL_TYPE_CHANGE.register((world, worldChunk, oldLevelType, newLevelType) -> {
@@ -92,7 +92,7 @@ public final class ServerChunkLifecycleTests implements ModInitializer {
 				throw new AssertionError("CHUNK_LEVEL_TYPE_CHANGE for " + worldKey + " " + chunkPos + " NOT SEQUENTIAL: " + oldLevelType + "->" + newLevelType);
 			}
 
-			ChunkLevelTypeEvent prevEvent = worldsChunkLevelTypeTracker.computeIfAbsent(worldKey, obj -> new Long2ObjectOpenHashMap<>()).computeIfAbsent(chunkPos.toLong(), l -> new ChunkLevelTypeEvent(ChunkLevelType.INACCESSIBLE, ChunkLevelType.INACCESSIBLE));
+			ChunkLevelTypeEvent prevEvent = worldsChunkLevelTypeTracker.computeIfAbsent(worldKey, obj -> new Long2ObjectOpenHashMap<>()).computeIfAbsent(chunkPos.toLong(), l -> new ChunkLevelTypeEvent(FullChunkStatus.INACCESSIBLE, FullChunkStatus.INACCESSIBLE));
 
 			if (prevEvent.newLevelType() != oldLevelType) { // check if newLevelType from the previous event == oldLevelType for this current event. Catches any out-of-sync firing issues.
 				throw new AssertionError("CHUNK_LEVEL_TYPE_CHANGE for " + worldKey + " " + chunkPos + " PREVIOUS_EVENT: " + prevEvent.oldLevelType() + "->" + prevEvent.newLevelType() + " / CURRENT_EVENT: " + oldLevelType + "->" + newLevelType);
@@ -104,11 +104,11 @@ public final class ServerChunkLifecycleTests implements ModInitializer {
 
 		ServerTickEvents.END_WORLD_TICK.register(world -> {
 			if (world.getTime() % 20 == 0) { // limit to 1 per second
-				Object2IntMap<ChunkLevelType> levelTypes = worldsChunkLevelEvents.get(world.getRegistryKey().getValue());
+				Object2IntMap<FullChunkStatus> levelTypes = worldsChunkLevelEvents.get(world.getRegistryKey().getValue());
 
 				if (levelTypes != null && !levelTypes.isEmpty()) {
 					StringBuilder sb = new StringBuilder(world.getRegistryKey().getValue() + " ");
-					// Logs the number of level type changes for each ChunkLevelType, only logs the newLevelType
+					// Logs the number of level type changes for each FullChunkStatus, only logs the newLevelType
 					levelTypes.forEach((newLevelType, numOfEvents) -> sb.append(newLevelType).append(": ").append(numOfEvents).append(", "));
 					LOGGER.info(sb.toString());
 					levelTypes.clear();
@@ -118,12 +118,12 @@ public final class ServerChunkLifecycleTests implements ModInitializer {
 
 		ServerLifecycleEvents.SERVER_STOPPED.register(server -> {
 			worldsChunkLevelTypeTracker.forEach((id, chunks) -> {
-				final Object2IntMap<ChunkLevelType> totals = new Object2IntOpenHashMap<>();
+				final Object2IntMap<FullChunkStatus> totals = new Object2IntOpenHashMap<>();
 				chunks.forEach((chunkPos, chunkLevelTypeEvent) -> {
 					totals.mergeInt(chunkLevelTypeEvent.newLevelType(), 1, Integer::sum);
 				});
 
-				if (totals.containsKey(ChunkLevelType.FULL) || totals.containsKey(ChunkLevelType.BLOCK_TICKING) || totals.containsKey(ChunkLevelType.ENTITY_TICKING)) {
+				if (totals.containsKey(FullChunkStatus.FULL) || totals.containsKey(FullChunkStatus.BLOCK_TICKING) || totals.containsKey(FullChunkStatus.ENTITY_TICKING)) {
 					StringBuilder sb = new StringBuilder("CHUNK_LEVEL_TYPE_CHANGE expected all chunks to be INACCESSIBLE for " + id + ", instead got ");
 					totals.forEach((chunkLevelType, finalTotal) -> {
 						sb.append(chunkLevelType).append(": ").append(finalTotal);

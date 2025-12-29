@@ -24,7 +24,7 @@ import com.mojang.serialization.MapCodec;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.Ingredient;
-import net.minecraft.core.RegistryEntry;
+import net.minecraft.core.Holder;
 import net.minecraft.resources.ResourceLocation;
 
 import net.fabricmc.fabric.api.recipe.v1.ingredient.CustomIngredientSerializer;
@@ -54,7 +54,7 @@ public class AnyIngredient extends CombinedIngredient {
 	}
 
 	@Override
-	public Stream<RegistryEntry<Item>> getMatchingItems() {
+	public Stream<Holder<Item>> getMatchingItems() {
 		return ingredients.stream()
 				.flatMap(Ingredient::getMatchingItems);
 	}

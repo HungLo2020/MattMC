@@ -20,7 +20,7 @@ import java.util.function.Function;
 
 import org.jetbrains.annotations.ApiStatus;
 
-import net.minecraft.core.RegistryWrapper;
+import net.minecraft.core.HolderLookup;
 import net.minecraft.server.packs.ResourceManager;
 import net.minecraft.server.packs.ResourceReloader;
 import net.minecraft.server.packs.ResourceType;
@@ -66,7 +66,7 @@ public interface ResourceManagerHelper {
 	 * or {@link net.fabricmc.fabric.api.resource.v1.DataResourceLoader#registerReloader(ResourceLocation, Function)} instead.
 	 */
 	@Deprecated
-	void registerReloadListener(ResourceLocation identifier, Function<RegistryWrapper.WrapperLookup, IdentifiableResourceReloadListener> listenerFactory);
+	void registerReloadListener(ResourceLocation identifier, Function<HolderLookup.WrapperLookup, IdentifiableResourceReloadListener> listenerFactory);
 
 	/**
 	 * Get the ResourceManagerHelper instance for a given resource type.

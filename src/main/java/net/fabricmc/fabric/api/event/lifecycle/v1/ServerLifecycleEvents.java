@@ -16,9 +16,9 @@
 
 package net.fabricmc.fabric.api.event.lifecycle.v1;
 
-import net.minecraft.server.packs.LifecycledResourceManager;
+import net.minecraft.server.packs.ReloadableResourceManager;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.PlayerManager;
+import net.minecraft.server.PlayerList;
 import net.minecraft.server.network.ServerPlayer;
 
 import net.fabricmc.fabric.api.event.Event;
@@ -31,7 +31,7 @@ public final class ServerLifecycleEvents {
 	/**
 	 * Called when a Minecraft server is starting.
 	 *
-	 * <p>This occurs before the {@link PlayerManager player manager} and any worlds are loaded.
+	 * <p>This occurs before the {@link PlayerList player manager} and any worlds are loaded.
 	 */
 	public static final Event<ServerStarting> SERVER_STARTING = EventFactory.createArrayBacked(ServerStarting.class, callbacks -> server -> {
 		for (ServerStarting callback : callbacks) {
@@ -162,7 +162,7 @@ public final class ServerLifecycleEvents {
 
 	@FunctionalInterface
 	public interface StartDataPackReload {
-		void startDataPackReload(MinecraftServer server, LifecycledResourceManager resourceManager);
+		void startDataPackReload(MinecraftServer server, ReloadableResourceManager resourceManager);
 	}
 
 	@FunctionalInterface
@@ -176,7 +176,7 @@ public final class ServerLifecycleEvents {
 		 * @param resourceManager the resource manager
 		 * @param success if the reload was successful
 		 */
-		void endDataPackReload(MinecraftServer server, LifecycledResourceManager resourceManager, boolean success);
+		void endDataPackReload(MinecraftServer server, ReloadableResourceManager resourceManager, boolean success);
 	}
 
 	@FunctionalInterface

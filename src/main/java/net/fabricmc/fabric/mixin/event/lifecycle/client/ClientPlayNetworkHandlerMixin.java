@@ -30,7 +30,7 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.network.protocol.s2c.common.SynchronizeTagsS2CPacket;
 import net.minecraft.network.protocol.s2c.play.GameJoinS2CPacket;
 import net.minecraft.network.protocol.s2c.play.PlayerRespawnS2CPacket;
-import net.minecraft.core.DynamicRegistryManager;
+import net.minecraft.core.RegistryAccess;
 import net.minecraft.world.level.chunk.LevelChunk;
 
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientBlockEntityEvents;
@@ -45,7 +45,7 @@ abstract class ClientPlayNetworkHandlerMixin {
 
 	@Shadow
 	@Final
-	private DynamicRegistryManager.Immutable combinedDynamicRegistries;
+	private RegistryAccess.Immutable combinedDynamicRegistries;
 
 	@Inject(method = "onPlayerRespawn", at = @At(value = "NEW", target = "net/minecraft/client/world/ClientLevel"))
 	private void onPlayerRespawn(PlayerRespawnS2CPacket packet, CallbackInfo ci) {
@@ -102,7 +102,7 @@ abstract class ClientPlayNetworkHandlerMixin {
 		}
 	}
 
-	@Inject(method = "onSynchronizeTags", at = @At(value = "INVOKE", target = "Lnet/minecraft/item/FuelRegistry;createDefault(Lnet/minecraft/registry/RegistryWrapper$WrapperLookup;Lnet/minecraft/resource/featuretoggle/FeatureFlagSet;)Lnet/minecraft/item/FuelRegistry;"))
+	@Inject(method = "onSynchronizeTags", at = @At(value = "INVOKE", target = "Lnet/minecraft/item/FuelRegistry;createDefault(Lnet/minecraft/registry/HolderLookup$WrapperLookup;Lnet/minecraft/resource/featuretoggle/FeatureFlagSet;)Lnet/minecraft/item/FuelRegistry;"))
 	private void invokeTagsLoaded(SynchronizeTagsS2CPacket packet, CallbackInfo ci) {
 		CommonLifecycleEvents.TAGS_LOADED.invoker().onTagsLoaded(combinedDynamicRegistries, true);
 	}

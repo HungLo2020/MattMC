@@ -22,7 +22,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-import net.minecraft.server.level.ChunkLevelType;
+import net.minecraft.server.level.FullChunkStatus;
 import net.minecraft.world.level.chunk.AbstractChunkHolder;
 import net.minecraft.world.level.chunk.Chunk;
 import net.minecraft.world.level.chunk.ChunkGenerating;
@@ -36,7 +36,7 @@ import net.fabricmc.fabric.impl.event.lifecycle.ChunkLevelTypeEventTracker;
 @Mixin(ChunkGenerating.class)
 abstract class ChunkGeneratingMixin {
 	@Unique
-	private static final ChunkLevelType[] fabric_CHUNK_LEVEL_TYPES = ChunkLevelType.values(); // values() clones the internal array each call, so cache the return
+	private static final FullChunkStatus[] fabric_CHUNK_LEVEL_TYPES = FullChunkStatus.values(); // values() clones the internal array each call, so cache the return
 
 	@Inject(method = "method_60553", at = @At("TAIL"))
 	private static void onChunkLoad(Chunk chunk, ChunkGenerationContext chunkGenerationContext, AbstractChunkHolder chunkHolder, CallbackInfoReturnable<Chunk> callbackInfoReturnable) {
@@ -53,8 +53,8 @@ abstract class ChunkGeneratingMixin {
 		ChunkLevelTypeEventTracker levelTypeTracker = (ChunkLevelTypeEventTracker) chunkHolder;
 
 		for (int i = levelTypeTracker.fabric_getCurrentEventLevelType().ordinal(); i < chunkHolder.getLevelType().ordinal(); i++) {
-			ChunkLevelType oldLevelType = fabric_CHUNK_LEVEL_TYPES[i];
-			ChunkLevelType newLevelType = fabric_CHUNK_LEVEL_TYPES[i+1];
+			FullChunkStatus oldLevelType = fabric_CHUNK_LEVEL_TYPES[i];
+			FullChunkStatus newLevelType = fabric_CHUNK_LEVEL_TYPES[i+1];
 			ServerChunkEvents.CHUNK_LEVEL_TYPE_CHANGE.invoker().onChunkLevelTypeChange(chunkGenerationContext.world(), worldChunk, oldLevelType, newLevelType);
 			levelTypeTracker.fabric_setCurrentEventLevelType(newLevelType);
 		}

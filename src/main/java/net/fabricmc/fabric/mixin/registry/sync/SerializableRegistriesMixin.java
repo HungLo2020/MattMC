@@ -27,9 +27,9 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-import net.minecraft.core.DynamicRegistryManager;
+import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.Registry;
-import net.minecraft.core.RegistryLoader;
+import net.minecraft.core.RegistryDataLoader;
 import net.minecraft.core.SerializableRegistries;
 
 import net.fabricmc.fabric.impl.registry.sync.DynamicRegistriesImpl;
@@ -42,7 +42,7 @@ abstract class SerializableRegistriesMixin {
 	 */
 	@Dynamic("method_45961: Stream.filter in stream")
 	@Inject(method = "method_56601", at = @At("HEAD"), cancellable = true)
-	private static void filterNonSyncedEntries(DynamicRegistryManager.Entry<?> entry, CallbackInfoReturnable<Boolean> cir) {
+	private static void filterNonSyncedEntries(RegistryAccess.Entry<?> entry, CallbackInfoReturnable<Boolean> cir) {
 		boolean canSkip = DynamicRegistriesImpl.SKIP_EMPTY_SYNC_REGISTRIES.contains(entry.key());
 
 		if (canSkip && entry.value().size() == 0) {
@@ -55,7 +55,7 @@ abstract class SerializableRegistriesMixin {
 	 */
 	@Dynamic("method_56597: Optional.ifPresent in serialize")
 	@Inject(method = "method_56596", at = @At("HEAD"), cancellable = true)
-	private static void filterNonSyncedEntriesAgain(Set set, RegistryLoader.Entry entry, DynamicOps dynamicOps, BiConsumer biConsumer, Registry registry, CallbackInfo ci) {
+	private static void filterNonSyncedEntriesAgain(Set set, RegistryDataLoader.Entry entry, DynamicOps dynamicOps, BiConsumer biConsumer, Registry registry, CallbackInfo ci) {
 		boolean canSkip = DynamicRegistriesImpl.SKIP_EMPTY_SYNC_REGISTRIES.contains(registry.getKey());
 
 		if (canSkip && registry.size() == 0) {

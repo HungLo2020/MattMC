@@ -27,19 +27,19 @@ import org.jetbrains.annotations.Unmodifiable;
 
 import net.minecraft.core.Registry;
 import net.minecraft.core.ResourceKey;
-import net.minecraft.core.RegistryLoader;
+import net.minecraft.core.RegistryDataLoader;
 import net.minecraft.core.SerializableRegistries;
 
 import net.fabricmc.fabric.api.event.registry.DynamicRegistries;
 
 public final class DynamicRegistriesImpl {
-	private static final List<RegistryLoader.Entry<?>> DYNAMIC_REGISTRIES = new ArrayList<>(RegistryLoader.DYNAMIC_REGISTRIES);
+	private static final List<RegistryDataLoader.Entry<?>> DYNAMIC_REGISTRIES = new ArrayList<>(RegistryDataLoader.DYNAMIC_REGISTRIES);
 	public static final Set<ResourceKey<?>> FABRIC_DYNAMIC_REGISTRY_KEYS = new HashSet<>();
 	public static final Set<ResourceKey<? extends Registry<?>>> DYNAMIC_REGISTRY_KEYS = new HashSet<>();
 	public static final Set<ResourceKey<? extends Registry<?>>> SKIP_EMPTY_SYNC_REGISTRIES = new HashSet<>();
 
 	static {
-		for (RegistryLoader.Entry<?> vanillaEntry : RegistryLoader.DYNAMIC_REGISTRIES) {
+		for (RegistryDataLoader.Entry<?> vanillaEntry : RegistryDataLoader.DYNAMIC_REGISTRIES) {
 			DYNAMIC_REGISTRY_KEYS.add(vanillaEntry.key());
 		}
 	}
@@ -47,11 +47,11 @@ public final class DynamicRegistriesImpl {
 	private DynamicRegistriesImpl() {
 	}
 
-	public static @Unmodifiable List<RegistryLoader.Entry<?>> getDynamicRegistries() {
+	public static @Unmodifiable List<RegistryDataLoader.Entry<?>> getDynamicRegistries() {
 		return List.copyOf(DYNAMIC_REGISTRIES);
 	}
 
-	public static <T> RegistryLoader.Entry<T> register(ResourceKey<? extends Registry<T>> key, Codec<T> serverCodec) {
+	public static <T> RegistryDataLoader.Entry<T> register(ResourceKey<? extends Registry<T>> key, Codec<T> serverCodec) {
 		Objects.requireNonNull(key, "Registry key cannot be null");
 		Objects.requireNonNull(serverCodec, "Server codec cannot be null");
 
@@ -59,7 +59,7 @@ public final class DynamicRegistriesImpl {
 			throw new IllegalArgumentException("Dynamic registry " + key + " has already been registered!");
 		}
 
-		var entry = new RegistryLoader.Entry<>(key, serverCodec, false);
+		var entry = new RegistryDataLoader.Entry<>(key, serverCodec, false);
 		DYNAMIC_REGISTRIES.add(entry);
 		FABRIC_DYNAMIC_REGISTRY_KEYS.add(key);
 		return entry;
@@ -70,11 +70,11 @@ public final class DynamicRegistriesImpl {
 		Objects.requireNonNull(clientCodec, "Client codec cannot be null");
 		Objects.requireNonNull(options, "Options cannot be null");
 
-		if (!(RegistryLoader.SYNCED_REGISTRIES instanceof ArrayList<RegistryLoader.Entry<?>>)) {
-			RegistryLoader.SYNCED_REGISTRIES = new ArrayList<>(RegistryLoader.SYNCED_REGISTRIES);
+		if (!(RegistryDataLoader.SYNCED_REGISTRIES instanceof ArrayList<RegistryDataLoader.Entry<?>>)) {
+			RegistryDataLoader.SYNCED_REGISTRIES = new ArrayList<>(RegistryDataLoader.SYNCED_REGISTRIES);
 		}
 
-		RegistryLoader.SYNCED_REGISTRIES.add(new RegistryLoader.Entry<>(key, clientCodec, false));
+		RegistryDataLoader.SYNCED_REGISTRIES.add(new RegistryDataLoader.Entry<>(key, clientCodec, false));
 
 		if (!(SerializableRegistries.SYNCED_REGISTRIES instanceof HashSet<ResourceKey<? extends Registry<?>>>)) {
 			SerializableRegistries.SYNCED_REGISTRIES = new HashSet<>(SerializableRegistries.SYNCED_REGISTRIES);

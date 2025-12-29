@@ -25,7 +25,7 @@ import org.spongepowered.asm.mixin.injection.Redirect;
 import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.core.RegistryEntry;
+import net.minecraft.core.Holder;
 import net.minecraft.world.inventory.AnvilScreenHandler;
 import net.minecraft.world.inventory.ForgingScreenHandler;
 import net.minecraft.world.inventory.ContainerLevelAccess;
@@ -47,7 +47,7 @@ abstract class AnvilScreenHandlerMixin extends ForgingScreenHandler {
 					target = "Lnet/minecraft/enchantment/Enchantment;isAcceptableItem(Lnet/minecraft/item/ItemStack;)Z"
 			)
 	)
-	private boolean callAllowEnchantingEvent(Enchantment instance, ItemStack stack, @Local RegistryEntry<Enchantment> registryEntry) {
+	private boolean callAllowEnchantingEvent(Enchantment instance, ItemStack stack, @Local Holder<Enchantment> registryEntry) {
 		return stack.canBeEnchantedWith(registryEntry, EnchantingContext.ACCEPTABLE);
 	}
 }

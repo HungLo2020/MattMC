@@ -26,38 +26,38 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 
 import net.minecraft.world.item.enchantment.Enchantment;
-import net.minecraft.core.MutableRegistry;
+import net.minecraft.core.WritableRegistry;
 import net.minecraft.core.ResourceKey;
-import net.minecraft.core.RegistryLoader;
+import net.minecraft.core.RegistryDataLoader;
 import net.minecraft.core.RegistryOps;
-import net.minecraft.core.RegistryEntry;
-import net.minecraft.core.RegistryEntryInfo;
+import net.minecraft.core.Holder;
+import net.minecraft.core.HolderInfo;
 import net.minecraft.server.packs.Resource;
 
 import net.fabricmc.fabric.impl.item.EnchantmentUtil;
 
-@Mixin(RegistryLoader.class)
+@Mixin(RegistryDataLoader.class)
 abstract class RegistryLoaderMixin {
 	@WrapOperation(
 			method = "parseAndAdd",
 			at = @At(
 					value = "INVOKE",
-					target = "Lnet/minecraft/registry/MutableRegistry;add(Lnet/minecraft/registry/ResourceKey;Ljava/lang/Object;Lnet/minecraft/registry/entry/RegistryEntryInfo;)Lnet/minecraft/registry/entry/RegistryEntry$Reference;"
+					target = "Lnet/minecraft/registry/WritableRegistry;add(Lnet/minecraft/registry/ResourceKey;Ljava/lang/Object;Lnet/minecraft/registry/entry/HolderInfo;)Lnet/minecraft/registry/entry/Holder$Reference;"
 			)
 	)
 	@SuppressWarnings("unchecked")
-	private static <T> RegistryEntry.Reference<T> enchantmentKey(
-			MutableRegistry<T> instance,
+	private static <T> Holder.Reference<T> enchantmentKey(
+			WritableRegistry<T> instance,
 			ResourceKey<T> objectKey,
 			Object object,
-			RegistryEntryInfo registryEntryInfo,
-			Operation<RegistryEntry.Reference<T>> original,
-			MutableRegistry<T> registry,
+			HolderInfo registryEntryInfo,
+			Operation<Holder.Reference<T>> original,
+			WritableRegistry<T> registry,
 			Decoder<T> decoder,
 			RegistryOps<JsonElement> ops,
 			ResourceKey<T> registryKey,
 			Resource resource,
-			RegistryEntryInfo entryInfo
+			HolderInfo entryInfo
 	) {
 		if (object instanceof Enchantment enchantment) {
 			Enchantment modified = EnchantmentUtil.modify((ResourceKey<Enchantment>) objectKey, enchantment, EnchantmentUtil.determineSource(resource));
@@ -66,7 +66,7 @@ abstract class RegistryLoaderMixin {
 				object = modified;
 
 				// Clear the knownPackInfo to force the server to sync the data pack to the client
-				registryEntryInfo = new RegistryEntryInfo(Optional.empty(), registryEntryInfo.lifecycle());
+				registryEntryInfo = new HolderInfo(Optional.empty(), registryEntryInfo.lifecycle());
 			}
 		}
 

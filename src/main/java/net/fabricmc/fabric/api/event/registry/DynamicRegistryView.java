@@ -21,7 +21,7 @@ import java.util.stream.Stream;
 
 import org.jetbrains.annotations.ApiStatus;
 
-import net.minecraft.core.DynamicRegistryManager;
+import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.Registry;
 import net.minecraft.core.ResourceKey;
 
@@ -37,9 +37,9 @@ import net.minecraft.core.ResourceKey;
 @ApiStatus.NonExtendable
 public interface DynamicRegistryView {
 	/**
-	 * @return an {@link DynamicRegistryManager} instance representing the registry view
+	 * @return an {@link RegistryAccess} instance representing the registry view
 	 */
-	DynamicRegistryManager asDynamicRegistryManager();
+	RegistryAccess asDynamicRegistryManager();
 
 	/**
 	 * @return the stream of registries that are currently being loaded

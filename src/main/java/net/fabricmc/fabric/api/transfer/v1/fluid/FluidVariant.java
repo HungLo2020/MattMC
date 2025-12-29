@@ -24,7 +24,7 @@ import net.minecraft.world.level.material.Fluid;
 import net.minecraft.world.level.material.Fluids;
 import net.minecraft.network.RegistryByteBuf;
 import net.minecraft.network.codec.PacketCodec;
-import net.minecraft.core.RegistryEntry;
+import net.minecraft.core.Holder;
 
 import net.fabricmc.fabric.api.transfer.v1.storage.TransferVariant;
 import net.fabricmc.fabric.impl.transfer.VariantCodecs;
@@ -81,7 +81,7 @@ public interface FluidVariant extends TransferVariant<Fluid> {
 		return getObject();
 	}
 
-	default RegistryEntry<Fluid> getRegistryEntry() {
+	default Holder<Fluid> getRegistryEntry() {
 		return getFluid().getRegistryEntry();
 	}
 

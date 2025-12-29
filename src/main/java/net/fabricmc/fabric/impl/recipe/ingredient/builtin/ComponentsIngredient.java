@@ -33,7 +33,7 @@ import net.minecraft.network.RegistryByteBuf;
 import net.minecraft.network.codec.PacketCodec;
 import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.world.item.crafting.display.SlotDisplay;
-import net.minecraft.core.RegistryEntry;
+import net.minecraft.core.Holder;
 import net.minecraft.resources.ResourceLocation;
 
 import net.fabricmc.fabric.api.recipe.v1.ingredient.CustomIngredient;
@@ -84,7 +84,7 @@ public class ComponentsIngredient implements CustomIngredient {
 	}
 
 	@Override
-	public Stream<RegistryEntry<Item>> getMatchingItems() {
+	public Stream<Holder<Item>> getMatchingItems() {
 		return base.getMatchingItems();
 	}
 
@@ -95,7 +95,7 @@ public class ComponentsIngredient implements CustomIngredient {
 		);
 	}
 
-	private SlotDisplay createEntryDisplay(RegistryEntry<Item> entry) {
+	private SlotDisplay createEntryDisplay(Holder<Item> entry) {
 		ItemStack stack = entry.value().getDefaultStack();
 		stack.applyChanges(components);
 		return new SlotDisplay.StackSlotDisplay(stack);

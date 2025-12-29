@@ -28,7 +28,7 @@ import net.minecraft.world.item.Items;
 import net.minecraft.world.item.PotionItem;
 import net.minecraft.world.item.TippedArrowItem;
 import net.minecraft.world.item.alchemy.Potion;
-import net.minecraft.core.RegistryEntry;
+import net.minecraft.core.Holder;
 import net.minecraft.util.Hand;
 import net.minecraft.resources.ResourceLocation;
 
@@ -120,7 +120,7 @@ public interface FabricItem {
 	 * @param context the context in which the enchantment is being checked
 	 * @return whether the enchantment is allowed to apply to the stack
 	 */
-	default boolean canBeEnchantedWith(ItemStack stack, RegistryEntry<Enchantment> enchantment, EnchantingContext context) {
+	default boolean canBeEnchantedWith(ItemStack stack, Holder<Enchantment> enchantment, EnchantingContext context) {
 		return context == EnchantingContext.PRIMARY
 				? enchantment.value().isPrimaryItem(stack)
 				: enchantment.value().isAcceptableItem(stack);
@@ -146,13 +146,13 @@ public interface FabricItem {
 	 * @return the namespace of the mod that created the item
 	 */
 	default String getCreatorNamespace(ItemStack stack) {
-		RegistryEntry<?> entry = stack.getRegistryEntry();
+		Holder<?> entry = stack.getRegistryEntry();
 
 		if ((this instanceof PotionItem || this instanceof TippedArrowItem) && stack.contains(DataComponents.POTION_CONTENTS)) {
-			Optional<RegistryEntry<Potion>> potion = stack.get(DataComponents.POTION_CONTENTS).potion();
+			Optional<Holder<Potion>> potion = stack.get(DataComponents.POTION_CONTENTS).potion();
 			if (potion.isPresent()) entry = potion.get();
 		} else if (stack.isOf(Items.ENCHANTED_BOOK) && stack.contains(DataComponents.STORED_ENCHANTMENTS)) {
-			Set<RegistryEntry<Enchantment>> enchantments = stack.get(DataComponents.STORED_ENCHANTMENTS).getEnchantments();
+			Set<Holder<Enchantment>> enchantments = stack.get(DataComponents.STORED_ENCHANTMENTS).getEnchantments();
 			if (enchantments.size() == 1) entry = enchantments.iterator().next();
 		}
 

@@ -49,12 +49,12 @@ import org.spongepowered.asm.mixin.injection.ModifyVariable;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-import net.minecraft.core.MutableRegistry;
+import net.minecraft.core.WritableRegistry;
 import net.minecraft.core.Registry;
 import net.minecraft.core.ResourceKey;
-import net.minecraft.core.SimpleRegistry;
-import net.minecraft.core.RegistryEntry;
-import net.minecraft.core.RegistryEntryInfo;
+import net.minecraft.core.MappedRegistry;
+import net.minecraft.core.Holder;
+import net.minecraft.core.HolderInfo;
 import net.minecraft.resources.ResourceLocation;
 
 import net.fabricmc.fabric.api.event.Event;
@@ -70,8 +70,8 @@ import net.fabricmc.fabric.impl.registry.sync.RemapException;
 import net.fabricmc.fabric.impl.registry.sync.RemapStateImpl;
 import net.fabricmc.fabric.impl.registry.sync.RemappableRegistry;
 
-@Mixin(SimpleRegistry.class)
-public abstract class SimpleRegistryMixin<T> implements MutableRegistry<T>, RemappableRegistry, ListenableRegistry<T>, FabricRegistry {
+@Mixin(MappedRegistry.class)
+public abstract class SimpleRegistryMixin<T> implements WritableRegistry<T>, RemappableRegistry, ListenableRegistry<T>, FabricRegistry {
 	// Namespaces used by the vanilla game. "brigadier" is used by command argument type registry.
 	// While Realms use "realms" namespace, it is irrelevant for Registry Sync.
 	@Unique
@@ -79,16 +79,16 @@ public abstract class SimpleRegistryMixin<T> implements MutableRegistry<T>, Rema
 
 	@Shadow
 	@Final
-	private ObjectList<RegistryEntry.Reference<T>> rawIdToEntry;
+	private ObjectList<Holder.Reference<T>> rawIdToEntry;
 	@Shadow
 	@Final
 	private Reference2IntMap<T> entryToRawId;
 	@Shadow
 	@Final
-	private Map<ResourceLocation, RegistryEntry.Reference<T>> idToEntry;
+	private Map<ResourceLocation, Holder.Reference<T>> idToEntry;
 	@Shadow
 	@Final
-	private Map<ResourceKey<T>, RegistryEntry.Reference<T>> keyToEntry;
+	private Map<ResourceKey<T>, Holder.Reference<T>> keyToEntry;
 
 	@Shadow
 	public abstract Optional<ResourceKey<T>> getKey(T entry);
@@ -111,7 +111,7 @@ public abstract class SimpleRegistryMixin<T> implements MutableRegistry<T>, Rema
 	@Unique
 	private Object2IntMap<ResourceLocation> fabric_prevIndexedEntries;
 	@Unique
-	private BiMap<ResourceLocation, RegistryEntry.Reference<T>> fabric_prevEntries;
+	private BiMap<ResourceLocation, Holder.Reference<T>> fabric_prevEntries;
 	@Unique
 	// invariant: the sets of keys and values are disjoint (every alias points to a 'deepest' non-alias ID)
 	private Map<ResourceLocation, ResourceLocation> aliases = new HashMap<>();
@@ -183,7 +183,7 @@ public abstract class SimpleRegistryMixin<T> implements MutableRegistry<T>, Rema
 	}
 
 	@Inject(method = "add", at = @At("RETURN"))
-	private void set(ResourceKey<T> key, T entry, RegistryEntryInfo arg, CallbackInfoReturnable<RegistryEntry.Reference<T>> info) {
+	private void set(ResourceKey<T> key, T entry, HolderInfo arg, CallbackInfoReturnable<Holder.Reference<T>> info) {
 		// We need to restore the 1.19 behavior of binding the value to references immediately.
 		// Unfrozen registries cannot be interacted with otherwise, because the references would throw when
 		// trying to access their values.
@@ -302,7 +302,7 @@ public abstract class SimpleRegistryMixin<T> implements MutableRegistry<T>, Rema
 		Int2IntMap idMap = new Int2IntOpenHashMap();
 
 		for (int i = 0; i < rawIdToEntry.size(); i++) {
-			RegistryEntry.Reference<T> reference = rawIdToEntry.get(i);
+			Holder.Reference<T> reference = rawIdToEntry.get(i);
 
 			// Unused id, can happen if there are holes in the registry.
 			if (reference == null) {
@@ -326,7 +326,7 @@ public abstract class SimpleRegistryMixin<T> implements MutableRegistry<T>, Rema
 
 		for (ResourceLocation identifier : orderedRemoteEntries) {
 			int id = remoteIndexedEntries.getInt(identifier);
-			RegistryEntry.Reference<T> object = idToEntry.get(identifier);
+			Holder.Reference<T> object = idToEntry.get(identifier);
 
 			// Warn if an object is missing from the local registry.
 			// This should only happen in AUTHORITATIVE mode, and as such we
@@ -376,7 +376,7 @@ public abstract class SimpleRegistryMixin<T> implements MutableRegistry<T>, Rema
 
 			idToEntry.putAll(fabric_prevEntries);
 
-			for (Map.Entry<ResourceLocation, RegistryEntry.Reference<T>> entry : fabric_prevEntries.entrySet()) {
+			for (Map.Entry<ResourceLocation, Holder.Reference<T>> entry : fabric_prevEntries.entrySet()) {
 				ResourceKey<T> entryKey = ResourceKey.of(getKey(), entry.getKey());
 				keyToEntry.put(entryKey, entry.getValue());
 			}

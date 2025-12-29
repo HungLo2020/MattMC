@@ -45,7 +45,7 @@ import net.minecraft.world.item.ItemGroup;
 import net.minecraft.world.item.ItemGroups;
 import net.minecraft.core.Registries;
 import net.minecraft.core.ResourceKey;
-import net.minecraft.core.RegistryEntry;
+import net.minecraft.core.Holder;
 import net.minecraft.resources.ResourceLocation;
 
 import net.fabricmc.fabric.impl.itemgroup.FabricItemGroupImpl;
@@ -70,7 +70,7 @@ public class ItemGroupsMixin {
 
 		int count = 0;
 
-		Comparator<RegistryEntry.Reference<ItemGroup>> entryComparator = (e1, e2) -> {
+		Comparator<Holder.Reference<ItemGroup>> entryComparator = (e1, e2) -> {
 			// Non-displayable groups should come last for proper pagination
 			int displayCompare = Boolean.compare(e1.value().shouldDisplay(), e2.value().shouldDisplay());
 
@@ -81,11 +81,11 @@ public class ItemGroupsMixin {
 				return compareNamespaceFirst(e1.registryKey().getValue(), e2.registryKey().getValue());
 			}
 		};
-		final List<RegistryEntry.Reference<ItemGroup>> sortedItemGroups = Registries.ITEM_GROUP.streamEntries()
+		final List<Holder.Reference<ItemGroup>> sortedItemGroups = Registries.ITEM_GROUP.streamEntries()
 				.sorted(entryComparator)
 				.toList();
 
-		for (RegistryEntry.Reference<ItemGroup> reference : sortedItemGroups) {
+		for (Holder.Reference<ItemGroup> reference : sortedItemGroups) {
 			final ItemGroup itemGroup = reference.value();
 			final FabricItemGroupImpl fabricItemGroup = (FabricItemGroupImpl) itemGroup;
 
