@@ -294,6 +294,20 @@ final class KnotClassDelegate<T extends ClassLoader & KnotClassDelegate.ClassLoa
 			return null;
 		}
 
+		// MATTMC MODIFICATION: In single-JAR mode where Fabric Loader and game are in the same JAR,
+		// we must prevent core Fabric Loader classes from being loaded by the target (Knot) class loader.
+		// They should only be loaded by the parent (system) class loader to maintain isolation.
+		// However, game-specific classes (like Log4jLogHandler) need to be in the target CL.
+		if (name.startsWith("net.fabricmc.loader.") && !allowFromParent) {
+			// Don't block game-specific classes or classes explicitly requested for target CL
+			if (!name.startsWith("net.fabricmc.loader.impl.game.minecraft.")) {
+				return null; // Force delegation to parent class loader
+			}
+		}
+		if (name.startsWith("net.fabricmc.api.") && !allowFromParent) {
+			return null; // Force delegation to parent class loader
+		}
+
 		if (!allowedPrefixes.isEmpty() && !DISABLE_ISOLATION) { // check prefix restrictions (allows exposing libraries partially during startup)
 			String fileName = LoaderUtil.getClassFileName(name);
 			URL url = classLoader.getResource(fileName);
