@@ -19,7 +19,7 @@ package net.fabricmc.fabric.api.message.v1;
 import net.minecraft.network.message.MessageType;
 import net.minecraft.network.message.SignedMessage;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.commands.ServerCommandSource;
+import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.server.network.ServerPlayer;
 import net.minecraft.network.chat.Component;
 
@@ -186,7 +186,7 @@ public final class ServerMessageEvents {
 		 * @param params the {@link MessageType.Parameters}
 		 * @return {@code true} if the message should be broadcast, otherwise {@code false}
 		 */
-		boolean allowCommandMessage(SignedMessage message, ServerCommandSource source, MessageType.Parameters params);
+		boolean allowCommandMessage(SignedMessage message, CommandSourceStack source, MessageType.Parameters params);
 	}
 
 	@FunctionalInterface
@@ -236,6 +236,6 @@ public final class ServerMessageEvents {
 		 * @param source  the command source that sent the message
 		 * @param params the {@link MessageType.Parameters}
 		 */
-		void onCommandMessage(SignedMessage message, ServerCommandSource source, MessageType.Parameters params);
+		void onCommandMessage(SignedMessage message, CommandSourceStack source, MessageType.Parameters params);
 	}
 }

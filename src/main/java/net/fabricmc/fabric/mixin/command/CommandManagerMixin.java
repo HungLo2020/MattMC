@@ -26,7 +26,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import net.minecraft.commands.CommandRegistryAccess;
 import net.minecraft.commands.CommandManager;
-import net.minecraft.commands.ServerCommandSource;
+import net.minecraft.commands.CommandSourceStack;
 
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 
@@ -34,7 +34,7 @@ import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 public abstract class CommandManagerMixin {
 	@Shadow
 	@Final
-	private CommandDispatcher<ServerCommandSource> dispatcher;
+	private CommandDispatcher<CommandSourceStack> dispatcher;
 
 	/**
 	 * Wait an inject in a constructor?

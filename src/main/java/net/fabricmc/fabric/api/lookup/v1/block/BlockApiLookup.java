@@ -67,10 +67,10 @@ import net.fabricmc.fabric.impl.lookup.block.BlockApiLookupImpl;
  *
  * <pre>{@code
  * // If the block entity directly implements the interface, registerSelf can be used.
- * public class ContainerBlockEntity implements FluidContainer {
+ * public class BaseContainerBlockEntity implements FluidContainer {
  *     // ...
  * }
- * BlockEntityType<ContainerBlockEntity> CONTAINER_BLOCK_ENTITY_TYPE;
+ * BlockEntityType<BaseContainerBlockEntity> CONTAINER_BLOCK_ENTITY_TYPE;
  * MyApi.FLUID_CONTAINER.registerSelf(CONTAINER_BLOCK_ENTITY_TYPE);
  *
  * // For more complicated block entity logic, registerForBlockEntities can be used.

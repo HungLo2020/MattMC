@@ -24,7 +24,7 @@ import org.jetbrains.annotations.ApiStatus;
 
 import net.minecraft.core.ResourceKey;
 import net.minecraft.server.packss.ResourceLocation;
-import net.minecraft.village.TradeOffers;
+import net.minecraft.village.MerchantOffers;
 import net.minecraft.village.VillagerProfession;
 
 import net.fabricmc.fabric.impl.object.builder.TradeOfferInternals;
@@ -50,7 +50,7 @@ public final class TradeOfferHelper {
 	 * @param level the profession level the villager must be to offer the trades
 	 * @param factories a consumer to provide the factories
 	 */
-	public static void registerVillagerOffers(ResourceKey<VillagerProfession> profession, int level, Consumer<List<TradeOffers.Factory>> factories) {
+	public static void registerVillagerOffers(ResourceKey<VillagerProfession> profession, int level, Consumer<List<MerchantOffers.Factory>> factories) {
 		TradeOfferInternals.registerVillagerOffers(profession, level, (trades, rebalanced) -> factories.accept(trades));
 	}
 
@@ -93,7 +93,7 @@ public final class TradeOfferHelper {
 
 	@FunctionalInterface
 	public interface VillagerOffersAdder {
-		void onRegister(List<TradeOffers.Factory> factories, boolean rebalanced);
+		void onRegister(List<MerchantOffers.Factory> factories, boolean rebalanced);
 	}
 
 	/**
@@ -135,7 +135,7 @@ public final class TradeOfferHelper {
 		 * @return this builder, for chaining
 		 * @throws IllegalArgumentException if {@code count} is not positive or if {@code factories} is empty
 		 */
-		WanderingTraderOffersBuilder pool(ResourceLocation id, int count, TradeOffers.Factory... factories);
+		WanderingTraderOffersBuilder pool(ResourceLocation id, int count, MerchantOffers.Factory... factories);
 
 		/**
 		 * Adds a new pool to the offer list. Exactly {@code count} offers are picked from
@@ -146,8 +146,8 @@ public final class TradeOfferHelper {
 		 * @return this builder, for chaining
 		 * @throws IllegalArgumentException if {@code count} is not positive or if {@code factories} is empty
 		 */
-		default WanderingTraderOffersBuilder pool(ResourceLocation id, int count, Collection<? extends TradeOffers.Factory> factories) {
-			return pool(id, count, factories.toArray(TradeOffers.Factory[]::new));
+		default WanderingTraderOffersBuilder pool(ResourceLocation id, int count, Collection<? extends MerchantOffers.Factory> factories) {
+			return pool(id, count, factories.toArray(MerchantOffers.Factory[]::new));
 		}
 
 		/**
@@ -158,7 +158,7 @@ public final class TradeOfferHelper {
 		 * @return this builder, for chaining
 		 * @throws IllegalArgumentException if {@code factories} is empty
 		 */
-		default WanderingTraderOffersBuilder addAll(ResourceLocation id, Collection<? extends TradeOffers.Factory> factories) {
+		default WanderingTraderOffersBuilder addAll(ResourceLocation id, Collection<? extends MerchantOffers.Factory> factories) {
 			return pool(id, factories.size(), factories);
 		}
 
@@ -170,7 +170,7 @@ public final class TradeOfferHelper {
 		 * @return this builder, for chaining
 		 * @throws IllegalArgumentException if {@code factories} is empty
 		 */
-		default WanderingTraderOffersBuilder addAll(ResourceLocation id, TradeOffers.Factory... factories) {
+		default WanderingTraderOffersBuilder addAll(ResourceLocation id, MerchantOffers.Factory... factories) {
 			return pool(id, factories.length, factories);
 		}
 
@@ -183,7 +183,7 @@ public final class TradeOfferHelper {
 		 * @return this builder, for chaining
 		 * @throws IndexOutOfBoundsException if {@code pool} is out of bounds
 		 */
-		WanderingTraderOffersBuilder addOffersToPool(ResourceLocation pool, TradeOffers.Factory... factories);
+		WanderingTraderOffersBuilder addOffersToPool(ResourceLocation pool, MerchantOffers.Factory... factories);
 
 		/**
 		 * Adds trade offers to an existing pool identified by an ID.
@@ -194,8 +194,8 @@ public final class TradeOfferHelper {
 		 * @return this builder, for chaining
 		 * @throws IndexOutOfBoundsException if {@code pool} is out of bounds
 		 */
-		default WanderingTraderOffersBuilder addOffersToPool(ResourceLocation pool, Collection<TradeOffers.Factory> factories) {
-			return addOffersToPool(pool, factories.toArray(TradeOffers.Factory[]::new));
+		default WanderingTraderOffersBuilder addOffersToPool(ResourceLocation pool, Collection<MerchantOffers.Factory> factories) {
+			return addOffersToPool(pool, factories.toArray(MerchantOffers.Factory[]::new));
 		}
 	}
 }

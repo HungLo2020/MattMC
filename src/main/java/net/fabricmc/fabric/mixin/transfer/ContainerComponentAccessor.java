@@ -21,7 +21,7 @@ import org.spongepowered.asm.mixin.gen.Accessor;
 
 import net.minecraft.component.type.ContainerComponent;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.util.collection.DefaultedList;
+import net.minecraft.util.DefaultedList;
 
 @Mixin(ContainerComponent.class)
 public interface ContainerComponentAccessor {

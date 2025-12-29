@@ -29,7 +29,7 @@ import net.minecraft.network.message.MessageType;
 import net.minecraft.network.message.SignedMessage;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.PlayerManager;
-import net.minecraft.commands.ServerCommandSource;
+import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.server.network.ServerPlayer;
 import net.minecraft.network.chat.Component;
 
@@ -61,8 +61,8 @@ public abstract class PlayerManagerMixin {
 		ServerMessageEvents.GAME_MESSAGE.invoker().onGameMessage(this.server, message, overlay);
 	}
 
-	@Inject(method = "broadcast(Lnet/minecraft/network/message/SignedMessage;Lnet/minecraft/server/command/ServerCommandSource;Lnet/minecraft/network/message/MessageType$Parameters;)V", at = @At("HEAD"), cancellable = true)
-	private void onSendCommandMessage(SignedMessage message, ServerCommandSource source, MessageType.Parameters params, CallbackInfo ci) {
+	@Inject(method = "broadcast(Lnet/minecraft/network/message/SignedMessage;Lnet/minecraft/server/command/CommandSourceStack;Lnet/minecraft/network/message/MessageType$Parameters;)V", at = @At("HEAD"), cancellable = true)
+	private void onSendCommandMessage(SignedMessage message, CommandSourceStack source, MessageType.Parameters params, CallbackInfo ci) {
 		if (!ServerMessageEvents.ALLOW_COMMAND_MESSAGE.invoker().allowCommandMessage(message, source, params)) {
 			ci.cancel();
 			return;

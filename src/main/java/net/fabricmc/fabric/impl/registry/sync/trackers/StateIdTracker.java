@@ -28,7 +28,7 @@ import org.slf4j.LoggerFactory;
 
 import net.minecraft.core.Registry;
 import net.minecraft.server.packss.ResourceLocation;
-import net.minecraft.util.collection.IdList;
+import net.minecraft.util.IdList;
 
 import net.fabricmc.fabric.api.event.registry.RegistryEntryAddedCallback;
 import net.fabricmc.fabric.api.event.registry.RegistryIdRemapCallback;

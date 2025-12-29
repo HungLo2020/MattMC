@@ -27,7 +27,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import net.minecraft.world.level.block.entity.BrewingStandBlockEntity;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.util.collection.DefaultedList;
+import net.minecraft.util.DefaultedList;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.Level;
 

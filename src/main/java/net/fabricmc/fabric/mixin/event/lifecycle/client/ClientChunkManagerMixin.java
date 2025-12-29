@@ -45,12 +45,12 @@ public abstract class ClientChunkManagerMixin {
 	ClientLevel world;
 
 	@Inject(method = "loadChunkFromPacket", at = @At("TAIL"))
-	private void onChunkLoad(int x, int z, FriendlyByteBuf packetByteBuf, Map<Heightmap.Type, long[]> highmap, Consumer<ChunkData.BlockEntityVisitor> consumer, CallbackInfoReturnable<LevelChunk> info) {
+	private void onChunkLoad(int x, int z, FriendlyByteBuf packetByteBuf, Map<Heightmap.Types, long[]> highmap, Consumer<ChunkData.BlockEntityVisitor> consumer, CallbackInfoReturnable<LevelChunk> info) {
 		ClientChunkEvents.CHUNK_LOAD.invoker().onChunkLoad(this.world, info.getReturnValue());
 	}
 
 	@Inject(method = "loadChunkFromPacket", at = @At(value = "NEW", target = "net/minecraft/world/chunk/LevelChunk", shift = At.Shift.BEFORE))
-	private void onChunkUnload(int x, int z, FriendlyByteBuf buf, Map<Heightmap.Type, long[]> highmap, Consumer<ChunkData.BlockEntityVisitor> consumer, CallbackInfoReturnable<LevelChunk> info, @Local LevelChunk worldChunk) {
+	private void onChunkUnload(int x, int z, FriendlyByteBuf buf, Map<Heightmap.Types, long[]> highmap, Consumer<ChunkData.BlockEntityVisitor> consumer, CallbackInfoReturnable<LevelChunk> info, @Local LevelChunk worldChunk) {
 		if (worldChunk != null) {
 			ClientChunkEvents.CHUNK_UNLOAD.invoker().onChunkUnload(this.world, worldChunk);
 		}

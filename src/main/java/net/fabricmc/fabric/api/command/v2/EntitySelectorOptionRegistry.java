@@ -19,7 +19,7 @@ package net.fabricmc.fabric.api.command.v2;
 import java.util.function.Predicate;
 
 import net.minecraft.commands.EntitySelectorOptions;
-import net.minecraft.commands.EntitySelectorReader;
+import net.minecraft.commands.EntitySelectorParser;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.packss.ResourceLocation;
 
@@ -63,7 +63,7 @@ public final class EntitySelectorOptionRegistry {
 	 * @param handler the handler for the entity option that reads and sets the predicate
 	 * @param canUse the predicate that checks whether the option is syntactically valid
 	 */
-	public static void register(ResourceLocation id, Component description, EntitySelectorOptions.SelectorHandler handler, Predicate<EntitySelectorReader> canUse) {
+	public static void register(ResourceLocation id, Component description, EntitySelectorOptions.SelectorHandler handler, Predicate<EntitySelectorParser> canUse) {
 		EntitySelectorOptionsAccessor.callPutOption(id.toUnderscoreSeparatedString(), handler, canUse, description);
 	}
 

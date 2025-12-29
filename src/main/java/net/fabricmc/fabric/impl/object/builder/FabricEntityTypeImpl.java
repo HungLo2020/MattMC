@@ -24,9 +24,9 @@ import org.jetbrains.annotations.Nullable;
 
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.entity.SpawnGroup;
+import net.minecraft.world.entity.MobCategory;
 import net.minecraft.world.entity.SpawnLocation;
-import net.minecraft.world.entity.SpawnRestriction;
+import net.minecraft.world.entity.SpawnPlacements;
 import net.minecraft.world.entity.attribute.DefaultAttributeContainer;
 import net.minecraft.world.entity.mob.Mob;
 import net.minecraft.world.Heightmap;
@@ -44,7 +44,7 @@ public interface FabricEntityTypeImpl {
 
 		void fabric_setMobEntityBuilder(Mob<? extends Mob> mobBuilder);
 
-		static <T extends LivingEntity> EntityType.Builder<T> createLiving(EntityType.EntityFactory<T> factory, SpawnGroup spawnGroup, UnaryOperator<FabricEntityType.Builder.Living<T>> livingBuilder) {
+		static <T extends LivingEntity> EntityType.Builder<T> createLiving(EntityType.EntityFactory<T> factory, MobCategory spawnGroup, UnaryOperator<FabricEntityType.Builder.Living<T>> livingBuilder) {
 			EntityType.Builder<T> builder = EntityType.Builder.create(factory, spawnGroup);
 			Living<T> builderImpl = new Living<>();
 			livingBuilder.apply(builderImpl);
@@ -52,7 +52,7 @@ public interface FabricEntityTypeImpl {
 			return builder;
 		}
 
-		static <T extends Mob> EntityType.Builder<T> createMob(EntityType.EntityFactory<T> factory, SpawnGroup spawnGroup, UnaryOperator<FabricEntityType.Builder.Mob<T>> mobBuilder) {
+		static <T extends Mob> EntityType.Builder<T> createMob(EntityType.EntityFactory<T> factory, MobCategory spawnGroup, UnaryOperator<FabricEntityType.Builder.Mob<T>> mobBuilder) {
 			EntityType.Builder<T> builder = EntityType.Builder.create(factory, spawnGroup);
 			Mob<T> builderImpl = new Mob<>();
 			mobBuilder.apply(builderImpl);
@@ -80,11 +80,11 @@ public interface FabricEntityTypeImpl {
 
 		final class Mob<T extends Mob> extends Living<T> implements FabricEntityType.Builder.Mob<T> {
 			private SpawnLocation restrictionLocation;
-			private Heightmap.Type restrictionHeightmap;
-			private SpawnRestriction.SpawnPredicate<T> spawnPredicate;
+			private Heightmap.Types restrictionHeightmap;
+			private SpawnPlacements.SpawnPredicate<T> spawnPredicate;
 
 			@Override
-			public FabricEntityType.Builder.Mob<T> spawnRestriction(SpawnLocation location, Heightmap.Type heightmap, SpawnRestriction.SpawnPredicate<T> spawnPredicate) {
+			public FabricEntityType.Builder.Mob<T> spawnRestriction(SpawnLocation location, Heightmap.Types heightmap, SpawnPlacements.SpawnPredicate<T> spawnPredicate) {
 				this.restrictionLocation = Objects.requireNonNull(location, "Location cannot be null.");
 				this.restrictionHeightmap = Objects.requireNonNull(heightmap, "Heightmap type cannot be null.");
 				this.spawnPredicate = Objects.requireNonNull(spawnPredicate, "Spawn predicate cannot be null.");
@@ -101,7 +101,7 @@ public interface FabricEntityTypeImpl {
 				super.onBuild(type);
 
 				if (this.spawnPredicate != null) {
-					SpawnRestriction.register(type, this.restrictionLocation, this.restrictionHeightmap, this.spawnPredicate);
+					SpawnPlacements.register(type, this.restrictionLocation, this.restrictionHeightmap, this.spawnPredicate);
 				}
 			}
 		}

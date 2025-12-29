@@ -22,12 +22,12 @@ import java.util.Set;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 
-import net.minecraft.commands.EntitySelectorReader;
+import net.minecraft.commands.EntitySelectorParser;
 import net.minecraft.server.packss.ResourceLocation;
 
 import net.fabricmc.fabric.api.command.v2.FabricEntitySelectorReader;
 
-@Mixin(EntitySelectorReader.class)
+@Mixin(EntitySelectorParser.class)
 public class EntitySelectorReaderMixin implements FabricEntitySelectorReader {
 	@Unique
 	private final Set<ResourceLocation> flags = new HashSet<>();

@@ -28,7 +28,7 @@ import net.minecraft.world.entity.data.TrackedDataHandler;
 import net.minecraft.core.Registry;
 import net.minecraft.core.ResourceKey;
 import net.minecraft.server.packss.ResourceLocation;
-import net.minecraft.util.collection.Int2ObjectBiMap;
+import net.minecraft.util.Int2ObjectBiMap;
 
 import net.fabricmc.fabric.api.event.registry.FabricRegistryBuilder;
 import net.fabricmc.fabric.api.event.registry.RegistryAttribute;

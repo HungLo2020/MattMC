@@ -29,7 +29,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.commands.ServerCommandSource;
+import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.world.GameRules;
 
 import net.fabricmc.fabric.api.gamerule.v1.GameRuleRegistry;
@@ -65,7 +65,7 @@ public final class EnumRule<E extends Enum<E>> extends GameRules.Rule<EnumRule<E
 	}
 
 	@Override
-	protected void setFromArgument(CommandContext<ServerCommandSource> context, String name) {
+	protected void setFromArgument(CommandContext<CommandSourceStack> context, String name) {
 		// Do nothing. We use a different system for application with literals
 	}
 

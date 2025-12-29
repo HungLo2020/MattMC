@@ -20,7 +20,7 @@ import com.mojang.brigadier.CommandDispatcher;
 
 import net.minecraft.commands.CommandRegistryAccess;
 import net.minecraft.commands.CommandManager;
-import net.minecraft.commands.ServerCommandSource;
+import net.minecraft.commands.CommandSourceStack;
 
 import net.fabricmc.fabric.api.event.Event;
 import net.fabricmc.fabric.api.event.EventFactory;
@@ -51,5 +51,5 @@ public interface CommandRegistrationCallback {
 	 * @param registryAccess object exposing access to the game's registries
 	 * @param environment environment the registrations should be done for, used for commands that are dedicated or integrated server only
 	 */
-	void register(CommandDispatcher<ServerCommandSource> dispatcher, CommandRegistryAccess registryAccess, CommandManager.RegistrationEnvironment environment);
+	void register(CommandDispatcher<CommandSourceStack> dispatcher, CommandRegistryAccess registryAccess, CommandManager.RegistrationEnvironment environment);
 }

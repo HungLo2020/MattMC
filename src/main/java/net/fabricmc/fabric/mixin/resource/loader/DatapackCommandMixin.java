@@ -36,7 +36,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import net.minecraft.server.packs.PackRepository;
 import net.minecraft.server.packs.ResourcePackProfile;
 import net.minecraft.commands.DatapackCommand;
-import net.minecraft.commands.ServerCommandSource;
+import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.network.chat.Component;
 
 import net.fabricmc.fabric.impl.resource.loader.FabricResourcePackProfile;
@@ -62,7 +62,7 @@ public class DatapackCommandMixin {
 	}
 
 	@Inject(method = "getPackContainer", at = @At(value = "INVOKE", target = "Ljava/util/Collection;contains(Ljava/lang/Object;)Z", shift = At.Shift.BEFORE))
-	private static void errorOnInternalPack(CommandContext<ServerCommandSource> context, String name, boolean enable, CallbackInfoReturnable<ResourcePackProfile> cir, @Local ResourcePackProfile profile) throws CommandSyntaxException {
+	private static void errorOnInternalPack(CommandContext<CommandSourceStack> context, String name, boolean enable, CallbackInfoReturnable<ResourcePackProfile> cir, @Local ResourcePackProfile profile) throws CommandSyntaxException {
 		if (((FabricResourcePackProfile) profile).fabric_isHidden()) throw INTERNAL_PACK_EXCEPTION.create(profile.getId());
 	}
 }

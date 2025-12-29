@@ -29,7 +29,7 @@ import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.entity.LockableContainerBlockEntity;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.util.collection.DefaultedList;
+import net.minecraft.util.DefaultedList;
 import net.minecraft.core.BlockPos;
 
 import net.fabricmc.fabric.impl.transfer.item.SpecialLogicInventory;

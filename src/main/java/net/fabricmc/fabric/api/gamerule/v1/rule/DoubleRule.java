@@ -22,7 +22,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.commands.ServerCommandSource;
+import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.world.GameRules;
 
 import net.fabricmc.fabric.api.gamerule.v1.GameRuleRegistry;
@@ -58,7 +58,7 @@ public final class DoubleRule extends GameRules.Rule<DoubleRule> implements Vali
 	}
 
 	@Override
-	protected void setFromArgument(CommandContext<ServerCommandSource> context, String name) {
+	protected void setFromArgument(CommandContext<CommandSourceStack> context, String name) {
 		this.value = context.getArgument(name, Double.class);
 	}
 

@@ -27,7 +27,7 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.core.entry.RegistryEntry;
 import net.minecraft.commands.EnchantCommand;
-import net.minecraft.commands.ServerCommandSource;
+import net.minecraft.commands.CommandSourceStack;
 
 import net.fabricmc.fabric.api.item.v1.EnchantingContext;
 
@@ -37,7 +37,7 @@ abstract class EnchantCommandMixin {
 			method = "execute",
 			at = @At(value = "INVOKE", target = "Lnet/minecraft/enchantment/Enchantment;isAcceptableItem(Lnet/minecraft/item/ItemStack;)Z")
 	)
-	private static boolean callAllowEnchantingEvent(Enchantment instance, ItemStack stack, ServerCommandSource source, Collection<? extends Entity> targets, RegistryEntry<Enchantment> enchantment) {
+	private static boolean callAllowEnchantingEvent(Enchantment instance, ItemStack stack, CommandSourceStack source, Collection<? extends Entity> targets, RegistryEntry<Enchantment> enchantment) {
 		return stack.canBeEnchantedWith(enchantment, EnchantingContext.ACCEPTABLE);
 	}
 }

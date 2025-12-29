@@ -22,9 +22,9 @@ import java.util.function.UnaryOperator;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.entity.SpawnGroup;
+import net.minecraft.world.entity.MobCategory;
 import net.minecraft.world.entity.SpawnLocation;
-import net.minecraft.world.entity.SpawnRestriction;
+import net.minecraft.world.entity.SpawnPlacements;
 import net.minecraft.world.entity.attribute.DefaultAttributeContainer;
 import net.minecraft.world.entity.mob.Mob;
 import net.minecraft.world.Heightmap;
@@ -64,14 +64,14 @@ public interface FabricEntityType {
 		/**
 		 * Creates an entity type builder for a living entity.
 		 *
-		 * <p>This entity's spawn group will automatically be set to {@link SpawnGroup#MISC}.
+		 * <p>This entity's spawn group will automatically be set to {@link MobCategory#MISC}.
 		 *
 		 * @param <T> the type of entity
 		 * @param livingBuilder a function to configure living entity specific properties
 		 *
 		 * @return a new living entity type builder
 		 */
-		static <T extends LivingEntity> EntityType.Builder<T> createLiving(EntityType.EntityFactory<T> factory, SpawnGroup spawnGroup, UnaryOperator<Living<T>> livingBuilder) {
+		static <T extends LivingEntity> EntityType.Builder<T> createLiving(EntityType.EntityFactory<T> factory, MobCategory spawnGroup, UnaryOperator<Living<T>> livingBuilder) {
 			return FabricEntityTypeImpl.Builder.createLiving(factory, spawnGroup, livingBuilder);
 		}
 
@@ -83,12 +83,12 @@ public interface FabricEntityType {
 		 *
 		 * @return a new mob entity type builder
 		 */
-		static <T extends Mob> EntityType.Builder<T> createMob(EntityType.EntityFactory<T> factory, SpawnGroup spawnGroup, UnaryOperator<Mob<T>> mobBuilder) {
+		static <T extends Mob> EntityType.Builder<T> createMob(EntityType.EntityFactory<T> factory, MobCategory spawnGroup, UnaryOperator<Mob<T>> mobBuilder) {
 			return FabricEntityTypeImpl.Builder.createMob(factory, spawnGroup, mobBuilder);
 		}
 
 		/**
-		 * A builder for additional properties of a living entity, use via {@link #createLiving(EntityType.EntityFactory, SpawnGroup, UnaryOperator)}.
+		 * A builder for additional properties of a living entity, use via {@link #createLiving(EntityType.EntityFactory, MobCategory, UnaryOperator)}.
 		 * @param <T> the type of living entity
 		 */
 		interface Living<T extends LivingEntity> {
@@ -102,7 +102,7 @@ public interface FabricEntityType {
 		}
 
 		/**
-		 * A builder for additional properties of a mob entity, use via {@link #createMob(EntityType.EntityFactory, SpawnGroup, UnaryOperator)}.
+		 * A builder for additional properties of a mob entity, use via {@link #createMob(EntityType.EntityFactory, MobCategory, UnaryOperator)}.
 		 * @param <T> the type of mob entity
 		 */
 		interface Mob<T extends Mob> extends Living<T> {
@@ -113,7 +113,7 @@ public interface FabricEntityType {
 			 *
 			 * @return this builder for chaining.
 			 */
-			Mob<T> spawnRestriction(SpawnLocation location, Heightmap.Type heightmap, SpawnRestriction.SpawnPredicate<T> spawnPredicate);
+			Mob<T> spawnRestriction(SpawnLocation location, Heightmap.Types heightmap, SpawnPlacements.SpawnPredicate<T> spawnPredicate);
 
 			/**
 			 * Sets the default attributes for a type of mob entity.

@@ -27,12 +27,12 @@ import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import net.minecraft.core.ResourceKey;
-import net.minecraft.village.TradeOffer;
-import net.minecraft.village.TradeOffers;
+import net.minecraft.village.MerchantOffer;
+import net.minecraft.village.MerchantOffers;
 import net.minecraft.village.TradedItem;
 import net.minecraft.village.VillagerType;
 
-@Mixin(TradeOffers.TypeAwareBuyForOneEmeraldFactory.class)
+@Mixin(MerchantOffers.TypeAwareBuyForOneEmeraldFactory.class)
 public abstract class TradeOffersTypeAwareBuyForOneEmeraldFactoryMixin {
 	/**
 	 * Vanilla will check the "VillagerType -> Item" map in the stream and throw an exception for villager types not specified in the map.
@@ -53,7 +53,7 @@ public abstract class TradeOffersTypeAwareBuyForOneEmeraldFactoryMixin {
 			method = "create",
 			at = @At(value = "INVOKE", target = "Ljava/util/Map;get(Ljava/lang/Object;)Ljava/lang/Object;")
 	)
-	private Object failOnNullItem(Object item, @Cancellable CallbackInfoReturnable<TradeOffer> cir) {
+	private Object failOnNullItem(Object item, @Cancellable CallbackInfoReturnable<MerchantOffer> cir) {
 		if (item == null) {
 			cir.setReturnValue(null);
 		}

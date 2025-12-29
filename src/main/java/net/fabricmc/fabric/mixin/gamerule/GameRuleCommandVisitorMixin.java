@@ -24,7 +24,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-import net.minecraft.commands.ServerCommandSource;
+import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.world.GameRules;
 
 import net.fabricmc.fabric.impl.gamerule.EnumRuleCommand;
@@ -34,7 +34,7 @@ import net.fabricmc.fabric.impl.gamerule.EnumRuleType;
 public abstract class GameRuleCommandVisitorMixin {
 	@Final
 	@Shadow
-	LiteralArgumentBuilder<ServerCommandSource> field_19419;
+	LiteralArgumentBuilder<CommandSourceStack> field_19419;
 
 	@Inject(at = @At("HEAD"), method = "visit(Lnet/minecraft/world/GameRules$Key;Lnet/minecraft/world/GameRules$Type;)V", cancellable = true)
 	private <T extends GameRules.Rule<T>> void onRegisterCommand(GameRules.Key<T> key, GameRules.Type<T> type, CallbackInfo ci) {

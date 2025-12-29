@@ -27,7 +27,7 @@ import com.mojang.brigadier.tree.LiteralCommandNode;
 
 import net.minecraft.world.flag.FeatureFlagSet;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.commands.ServerCommandSource;
+import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.world.GameRules;
 
 import net.fabricmc.fabric.api.gamerule.v1.rule.EnumRule;
@@ -40,8 +40,8 @@ public final class EnumRuleType<E extends Enum<E>> extends GameRules.Type<EnumRu
 		this.supportedValues = supportedValues;
 	}
 
-	public void register(LiteralArgumentBuilder<ServerCommandSource> literalArgumentBuilder, GameRules.Key<EnumRule<E>> key) {
-		LiteralCommandNode<ServerCommandSource> ruleNode = literal(key.getName()).build();
+	public void register(LiteralArgumentBuilder<CommandSourceStack> literalArgumentBuilder, GameRules.Key<EnumRule<E>> key) {
+		LiteralCommandNode<CommandSourceStack> ruleNode = literal(key.getName()).build();
 
 		for (E supportedValue : this.supportedValues) {
 			ruleNode.addChild(literal(supportedValue.toString()).executes(context -> EnumRuleCommand.executeAndSetEnum(context, supportedValue, key)).build());
@@ -52,7 +52,7 @@ public final class EnumRuleType<E extends Enum<E>> extends GameRules.Type<EnumRu
 
 	@Override
 	@Deprecated
-	public RequiredArgumentBuilder<ServerCommandSource, ?> argument(String name) {
+	public RequiredArgumentBuilder<CommandSourceStack, ?> argument(String name) {
 		return super.argument(name);
 	}
 }

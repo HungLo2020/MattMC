@@ -28,7 +28,7 @@ import net.minecraft.SharedConstants;
 import net.minecraft.commands.CommandRegistryAccess;
 import net.minecraft.commands.CommandManager;
 import net.minecraft.commands.DebugConfigCommand;
-import net.minecraft.commands.ServerCommandSource;
+import net.minecraft.commands.CommandSourceStack;
 
 import net.fabricmc.loader.api.FabricLoader;
 
@@ -36,7 +36,7 @@ import net.fabricmc.loader.api.FabricLoader;
 public class CommandManagerMixin {
 	@Shadow
 	@Final
-	private CommandDispatcher<ServerCommandSource> dispatcher;
+	private CommandDispatcher<CommandSourceStack> dispatcher;
 
 	@Inject(method = "<init>", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/dedicated/command/BanIpCommand;register(Lcom/mojang/brigadier/CommandDispatcher;)V"))
 	private void init(CommandManager.RegistrationEnvironment environment, CommandRegistryAccess commandRegistryAccess, CallbackInfo ci) {

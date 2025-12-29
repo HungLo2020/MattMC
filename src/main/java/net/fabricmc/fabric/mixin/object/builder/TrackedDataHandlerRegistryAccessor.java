@@ -21,7 +21,7 @@ import org.spongepowered.asm.mixin.gen.Accessor;
 
 import net.minecraft.world.entity.data.TrackedDataHandler;
 import net.minecraft.world.entity.data.TrackedDataHandlerRegistry;
-import net.minecraft.util.collection.Int2ObjectBiMap;
+import net.minecraft.util.Int2ObjectBiMap;
 
 @Mixin(TrackedDataHandlerRegistry.class)
 public interface TrackedDataHandlerRegistryAccessor {
