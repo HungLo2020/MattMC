@@ -162,8 +162,7 @@ public record WorldDimensions(Map<ResourceKey<LevelStem>, LevelStem> dimensions)
 		return levelStem.type().is(BuiltinDimensionTypes.PRIMORDIAL_CAVES)
 			&& levelStem.generator() instanceof NoiseBasedChunkGenerator noiseBasedChunkGenerator
 			&& noiseBasedChunkGenerator.stable(NoiseGeneratorSettings.PRIMORDIAL_CAVES)
-			&& noiseBasedChunkGenerator.getBiomeSource() instanceof MultiNoiseBiomeSource multiNoiseBiomeSource
-			&& multiNoiseBiomeSource.stable(MultiNoiseBiomeSourceParameterLists.PRIMORDIAL_CAVES);
+			&& noiseBasedChunkGenerator.getBiomeSource() instanceof MultiNoiseBiomeSource;
 	}
 
 	public WorldDimensions.Complete bake(Registry<LevelStem> registry) {
