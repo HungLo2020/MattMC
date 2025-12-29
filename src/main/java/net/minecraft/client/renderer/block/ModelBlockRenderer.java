@@ -32,7 +32,7 @@ import net.minecraft.hooks.ModelBlockRendererHooks;
 @Environment(EnvType.CLIENT)
 public class ModelBlockRenderer {
 	private static final Direction[] DIRECTIONS = Direction.values();
-	private final BlockColors blockColors;
+	public final BlockColors blockColors; // Made public for Sodium FRAPI integration
 	private static final int CACHE_SIZE = 100;
 	static final ThreadLocal<ModelBlockRenderer.Cache> CACHE = ThreadLocal.withInitial(ModelBlockRenderer.Cache::new);
 

@@ -25,7 +25,7 @@ import net.caffeinemc.mods.sodium.client.render.frapi.helper.ColorHelper;
 import net.caffeinemc.mods.sodium.client.render.frapi.mesh.EncodingFormat;
 import net.caffeinemc.mods.sodium.client.render.frapi.mesh.MutableQuadViewImpl;
 import net.caffeinemc.mods.sodium.client.render.texture.SpriteFinderCache;
-import net.caffeinemc.mods.sodium.mixin.features.render.frapi.ItemRendererAccessor;
+
 import net.fabricmc.fabric.api.renderer.v1.mesh.MeshView;
 import net.fabricmc.fabric.api.renderer.v1.mesh.QuadEmitter;
 import net.fabricmc.fabric.api.renderer.v1.render.RenderLayerHelper;
@@ -246,7 +246,7 @@ public class ItemRenderContext extends AbstractRenderContext {
                 }
             }
 
-            return ItemRendererAccessor.sodium$getSpecialFoilBuffer(bufferSource, type, specialGlintEntry);
+            return ItemRenderer.getSpecialFoilBuffer(bufferSource, type, specialGlintEntry);
         }
 
         return ItemRenderer.getFoilBuffer(bufferSource, type, true, glint != ItemStackRenderState.FoilType.NONE);

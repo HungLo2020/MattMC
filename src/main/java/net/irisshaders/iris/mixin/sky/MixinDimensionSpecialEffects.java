@@ -1,6 +1,5 @@
 package net.irisshaders.iris.mixin.sky;
 
-import net.irisshaders.iris.mixin.LevelRendererAccessor;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.DimensionSpecialEffects;
 import net.minecraft.world.level.material.FogType;
@@ -20,7 +19,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 public class MixinDimensionSpecialEffects {
 	@Inject(method = "getSunriseOrSunsetColor", at = @At("HEAD"), cancellable = true)
 	private void iris$getSunriseColor(float f, CallbackInfoReturnable<Integer> cir) {
-		boolean blockSky = ((LevelRendererAccessor) Minecraft.getInstance().levelRenderer).invokeDoesMobEffectBlockSky(Minecraft.getInstance().gameRenderer.getMainCamera());
+		boolean blockSky = Minecraft.getInstance().levelRenderer.doesMobEffectBlockSky(Minecraft.getInstance().gameRenderer.getMainCamera());
 
 		if (blockSky) {
 			cir.setReturnValue(0);

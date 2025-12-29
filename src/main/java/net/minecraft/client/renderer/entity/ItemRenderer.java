@@ -55,7 +55,7 @@ public class ItemRenderer {
 		renderQuadList(poseStack, vertexConsumer, list, is, i, j);
 	}
 
-	private static VertexConsumer getSpecialFoilBuffer(MultiBufferSource multiBufferSource, RenderType renderType, PoseStack.Pose pose) {
+	public static VertexConsumer getSpecialFoilBuffer(MultiBufferSource multiBufferSource, RenderType renderType, PoseStack.Pose pose) { // Made public for Sodium FRAPI integration
 		return VertexMultiConsumer.create(
 			new SheetedDecalTextureGenerator(
 				multiBufferSource.getBuffer(useTransparentGlint(renderType) ? RenderType.glintTranslucent() : RenderType.glint()), pose, 0.0078125F

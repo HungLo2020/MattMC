@@ -13,7 +13,6 @@ import net.irisshaders.iris.compat.dh.DHCompat;
 import net.irisshaders.iris.gl.GLDebug;
 import net.irisshaders.iris.gl.IrisRenderSystem;
 import net.irisshaders.iris.gui.option.IrisVideoSettings;
-import net.irisshaders.iris.mixin.LevelRendererAccessor;
 import net.irisshaders.iris.pipeline.IrisRenderingPipeline;
 import net.irisshaders.iris.pipeline.WorldRenderingPhase;
 import net.irisshaders.iris.shaderpack.programs.ProgramSource;
@@ -376,7 +375,7 @@ public class ShadowRenderer {
 		GlStateManager._viewport(0, 0, resolution, resolution);
 	}
 
-	public void renderShadows(LevelRendererAccessor levelRenderer, Camera playerCamera, CameraRenderState renderState) {
+	public void renderShadows(LevelRenderer levelRenderer, Camera playerCamera, CameraRenderState renderState) {
 		if (IrisVideoSettings.getOverriddenShadowDistance(IrisVideoSettings.shadowDistance) == 0) {
 			return;
 		}
@@ -404,8 +403,8 @@ public class ShadowRenderer {
 		visibleBlockEntities = new ArrayList<>();
 
 		// NB: We store the previous player buffers in order to be able to allow mods rendering entities in the shadow pass (Flywheel) to use the shadow buffers instead.
-		RenderBuffers playerBuffers = levelRenderer.getRenderBuffers();
-		levelRenderer.setRenderBuffers(buffers);
+		RenderBuffers playerBuffers = levelRenderer.renderBuffers; // Direct field access - renderBuffers is now public
+		levelRenderer.renderBuffers = buffers; // Direct field assignment
 
 		visibleBlockEntities = new ArrayList<>();
 		setupShadowViewport();
@@ -473,7 +472,7 @@ public class ShadowRenderer {
 		((LevelRenderer) levelRenderer).needsUpdate();
 
 		// Execute the vanilla terrain setup / culling routines using our shadow frustum.
-		levelRenderer.invokeCullTerrain(playerCamera, terrainFrustumHolder.getFrustum(),  false);
+		levelRenderer.cullTerrain(playerCamera, terrainFrustumHolder.getFrustum(),  false);
 
 		// Don't forget to increment the frame counter! This variable is arbitrary and only used in terrain setup,
 		// and if it's not incremented, the vanilla culling code will get confused and think that it's already seen
@@ -549,7 +548,7 @@ public class ShadowRenderer {
 		// rendering.
 
 		MultiBufferSource.BufferSource bufferSource = buffers.bufferSource();
-		EntityRenderDispatcher dispatcher = levelRenderer.getEntityRenderDispatcher();
+		EntityRenderDispatcher dispatcher = levelRenderer.entityRenderDispatcher;
 		RenderSystem.getModelViewStack().identity();
 
 		renderedShadowEntities = renderEntities(levelRenderer, dispatcher, bufferSource, modelView, tickDelta, entityShadowFrustum, cameraX, cameraY, cameraZ);
@@ -611,7 +610,7 @@ public class ShadowRenderer {
 		compositeRenderer.renderAll();
 		GLDebug.popGroup();
 
-		levelRenderer.setRenderBuffers(playerBuffers);
+		levelRenderer.renderBuffers = playerBuffers; // Direct field assignment
 
 		visibleBlockEntities = null;
 		ACTIVE = false;
@@ -622,7 +621,7 @@ public class ShadowRenderer {
 		profiler.popPush("updatechunks");
 	}
 
-	private int renderBlockEntities(LevelRendererAccessor levelRenderer, PoseStack modelView, SubmitNodeStorage submitNodeStorage, LevelRenderState levelRenderState, Camera camera) {
+	private int renderBlockEntities(LevelRenderer levelRenderer, PoseStack modelView, SubmitNodeStorage submitNodeStorage, LevelRenderState levelRenderState, Camera camera) {
 		Vec3 vec3 = camera.getPosition();
 		PoseStack poseStack = modelView;
 		double d = vec3.x();
@@ -643,8 +642,8 @@ public class ShadowRenderer {
 		return i;
 	}
 
-	private void extractVisibleBlockEntities(LevelRendererAccessor accessor, MultiBufferSource.BufferSource bufferSource, PoseStack modelView, float tickDelta, Camera camera, LevelRenderState levelRenderState, boolean lightsOnly) {
-		accessor.invokeExtractBlockEntities(camera, tickDelta, levelRenderState);
+	private void extractVisibleBlockEntities(LevelRenderer accessor, MultiBufferSource.BufferSource bufferSource, PoseStack modelView, float tickDelta, Camera camera, LevelRenderState levelRenderState, boolean lightsOnly) {
+		accessor.extractVisibleBlockEntities(camera, tickDelta, levelRenderState); // Direct method call - method is now public
 
 		if (lightsOnly) {
 			Iterator<BlockEntityRenderState> state = levelRenderState.blockEntityRenderStates.iterator();
@@ -656,7 +655,7 @@ public class ShadowRenderer {
 		}
 	}
 
-	private int renderEntities(LevelRendererAccessor levelRenderer, EntityRenderDispatcher dispatcher, MultiBufferSource.BufferSource bufferSource, PoseStack modelView, float tickDelta, Frustum frustum, double cameraX, double cameraY, double cameraZ) {
+	private int renderEntities(LevelRenderer levelRenderer, EntityRenderDispatcher dispatcher, MultiBufferSource.BufferSource bufferSource, PoseStack modelView, float tickDelta, Frustum frustum, double cameraX, double cameraY, double cameraZ) {
 		Profiler.get().push("cull");
 
 		for (EntityRenderState entityRenderState : levelRenderState.entityRenderStates) {
@@ -694,7 +693,7 @@ public class ShadowRenderer {
 		}
 
 	}
-	private int renderPlayerEntity(LevelRendererAccessor levelRenderer, EntityRenderDispatcher dispatcher, MultiBufferSource.BufferSource bufferSource, PoseStack modelView, float tickDelta, Frustum frustum, double cameraX, double cameraY, double cameraZ) {
+	private int renderPlayerEntity(LevelRenderer levelRenderer, EntityRenderDispatcher dispatcher, MultiBufferSource.BufferSource bufferSource, PoseStack modelView, float tickDelta, Frustum frustum, double cameraX, double cameraY, double cameraZ) {
 		Profiler.get().push("cull");
 
 		Entity player = Minecraft.getInstance().player;
@@ -732,7 +731,7 @@ public class ShadowRenderer {
 		return shadowEntities;
 	}
 
-	private void copyPreTranslucentDepth(LevelRendererAccessor levelRenderer) {
+	private void copyPreTranslucentDepth(LevelRenderer levelRenderer) {
 		Profiler.get().popPush("translucent depth copy");
 
 		targets.copyPreTranslucentDepth();

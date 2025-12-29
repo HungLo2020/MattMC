@@ -117,9 +117,9 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 	public static final int NEARBY_SECTION_DISTANCE_IN_BLOCKS = 32;
 	private static final int MINIMUM_TRANSPARENT_SORT_COUNT = 15;
 	private final Minecraft minecraft;
-	private final EntityRenderDispatcher entityRenderDispatcher;
+	public final EntityRenderDispatcher entityRenderDispatcher; // Made public for Iris shadow rendering
 	private final BlockEntityRenderDispatcher blockEntityRenderDispatcher;
-	private RenderBuffers renderBuffers; // Non-final to allow Iris shadow rendering to swap buffers
+	public RenderBuffers renderBuffers; // Made public for Iris shadow rendering (already non-final)
 	private final SkyRenderer skyRenderer = new SkyRenderer();
 	private final CloudRenderer cloudRenderer = new CloudRenderer();
 	private final WorldBorderRenderer worldBorderRenderer = new WorldBorderRenderer();
@@ -128,7 +128,7 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 	public final DebugRenderer debugRenderer = new DebugRenderer();
 	public final GameTestBlockHighlightRenderer gameTestBlockHighlightRenderer = new GameTestBlockHighlightRenderer();
 	@Nullable
-	public ClientLevel level;
+	public ClientLevel level; // Already public
 	private final SectionOcclusionGraph sectionOcclusionGraph = new SectionOcclusionGraph();
 	private final ObjectArrayList<SectionRenderDispatcher.RenderSection> visibleSections = new ObjectArrayList<>(10000);
 	private final ObjectArrayList<SectionRenderDispatcher.RenderSection> nearbyVisibleSections = new ObjectArrayList<>(50);
@@ -136,7 +136,7 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 	private ViewArea viewArea;
 	private int ticks;
 	private final Int2ObjectMap<BlockDestructionProgress> destroyingBlocks = new Int2ObjectOpenHashMap<>();
-	private final Long2ObjectMap<SortedSet<BlockDestructionProgress>> destructionProgress = new Long2ObjectOpenHashMap<>();
+	public final Long2ObjectMap<SortedSet<BlockDestructionProgress>> destructionProgress = new Long2ObjectOpenHashMap<>(); // Made public for Iris shadow rendering
 	@Nullable
 	private RenderTarget entityOutlineTarget;
 	private final LevelTargetBundle targets = new LevelTargetBundle();
@@ -341,7 +341,7 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 			: "E: " + this.levelRenderState.entityRenderStates.size() + "/" + this.level.getEntityCount() + ", SD: " + this.level.getServerSimulationDistance();
 	}
 
-	private void cullTerrain(Camera camera, Frustum frustum, boolean bl) {
+	public void cullTerrain(Camera camera, Frustum frustum, boolean bl) { // Made public for Iris shadow rendering
 		Vec3 vec3 = camera.getPosition();
 		if (this.minecraft.options.getEffectiveRenderDistance() != this.lastViewDistance) {
 			this.allChanged();
@@ -804,7 +804,7 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 		}
 	}
 
-	private void extractVisibleBlockEntities(Camera camera, float f, LevelRenderState levelRenderState) {
+	public void extractVisibleBlockEntities(Camera camera, float f, LevelRenderState levelRenderState) { // Made public for Iris shadow rendering
 		Vec3 vec3 = camera.getPosition();
 		double d = vec3.x();
 		double e = vec3.y();
@@ -1134,7 +1134,7 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 		}
 	}
 
-	private boolean doesMobEffectBlockSky(Camera camera) {
+	public boolean doesMobEffectBlockSky(Camera camera) { // Made public for Iris sky rendering
 		return !(camera.getEntity() instanceof LivingEntity livingEntity)
 			? false
 			: livingEntity.hasEffect(MobEffects.BLINDNESS) || livingEntity.hasEffect(MobEffects.DARKNESS);
