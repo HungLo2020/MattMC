@@ -28,7 +28,7 @@ import net.minecraft.network.Connection;
 import net.minecraft.network.OffThreadException;
 import net.minecraft.network.PacketListener;
 import net.minecraft.network.protocol.common.ServerboundCustomPayloadPacket;
-import net.minecraft.network.state.NetworkState;
+import net.minecraft.network.ConnectionProtocol;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.network.ConnectedClientData;
 import net.minecraft.server.network.ServerCommonNetworkHandler;
@@ -73,7 +73,7 @@ abstract class ServerPlayNetworkHandlerMixin extends ServerCommonNetworkHandler 
 	}
 
 	@WrapOperation(method = "onAcknowledgeReconfiguration", at = @At(value = "INVOKE", target = "Lnet/minecraft/network/Connection;transitionInbound(Lnet/minecraft/network/state/NetworkState;Lnet/minecraft/network/listener/PacketListener;)V"))
-	private <T extends PacketListener> void onAcknowledgeReconfiguration(Connection instance, NetworkState<T> state, T packetListener, Operation<Void> original) {
+	private <T extends PacketListener> void onAcknowledgeReconfiguration(Connection instance, ConnectionProtocol<T> state, T packetListener, Operation<Void> original) {
 		original.call(instance, state, packetListener);
 
 		ServerConfigurationPacketListenerImpl networkHandler = (ServerConfigurationPacketListenerImpl) packetListener;

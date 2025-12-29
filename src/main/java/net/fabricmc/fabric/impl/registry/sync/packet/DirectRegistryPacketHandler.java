@@ -284,7 +284,7 @@ public class DirectRegistryPacketHandler extends RegistryPacketHandler<DirectReg
 	}
 
 	public record Payload(byte[] data) implements RegistrySyncPayload {
-		public static CustomPacketPayload.Type<Payload> ID = new Id<>(ResourceLocation.fromNamespaceAndPath("fabric", "registry/sync/direct"));
+		public static CustomPacketPayload.Type<Payload> ID = new Type<>(ResourceLocation.fromNamespaceAndPath("fabric", "registry/sync/direct"));
 		public static StreamCodec<FriendlyByteBuf, Payload> CODEC = CustomPacketPayload.codecOf(Payload::write, Payload::new);
 
 		Payload(FriendlyByteBuf buf) {

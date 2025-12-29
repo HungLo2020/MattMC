@@ -25,7 +25,7 @@ import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
 
 public record CommonRegisterPayload(int version, String phase, Set<ResourceLocation> channels) implements CustomPacketPayload {
-	public static final CustomPacketPayload.Type<CommonRegisterPayload> ID = new Id<>(ResourceLocation.of("c:register"));
+	public static final CustomPacketPayload.Type<CommonRegisterPayload> ID = new Type<>(ResourceLocation.of("c:register"));
 	public static final StreamCodec<FriendlyByteBuf, CommonRegisterPayload> CODEC = CustomPacketPayload.codecOf(CommonRegisterPayload::write, CommonRegisterPayload::new);
 
 	public static final String PLAY_PHASE = "play";
@@ -46,7 +46,7 @@ public record CommonRegisterPayload(int version, String phase, Set<ResourceLocat
 	}
 
 	@Override
-	public Id<CommonRegisterPayload> getId() {
+	public Type<CommonRegisterPayload> getId() {
 		return ID;
 	}
 }

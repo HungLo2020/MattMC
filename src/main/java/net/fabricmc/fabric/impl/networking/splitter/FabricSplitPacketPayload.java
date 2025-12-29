@@ -23,7 +23,7 @@ import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
 
 public record FabricSplitPacketPayload(ByteBuf byteBuf) implements CustomPacketPayload {
-	public static final Id<FabricSplitPacketPayload> ID = new Id<>(ResourceLocation.fromNamespaceAndPath("fabric", "split"));
+	public static final Type<FabricSplitPacketPayload> ID = new Type<>(ResourceLocation.fromNamespaceAndPath("fabric", "split"));
 	public static final StreamCodec<ByteBuf, FabricSplitPacketPayload> CODEC = StreamCodec.ofStatic(FabricSplitPacketPayload::write, FabricSplitPacketPayload::read);
 
 	private static FabricSplitPacketPayload read(ByteBuf buf) {

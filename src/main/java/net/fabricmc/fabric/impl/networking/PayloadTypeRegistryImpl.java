@@ -26,40 +26,40 @@ import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import org.jetbrains.annotations.Nullable;
 
 import net.minecraft.network.ConnectionProtocol;
-import net.minecraft.network.NetworkSide;
+import net.minecraft.network.protocol.PacketFlow;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.encoding.VarInts;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.network.state.NetworkState;
+import net.minecraft.network.ConnectionProtocol;
 import net.minecraft.resources.ResourceLocation;
 
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.fabricmc.fabric.impl.networking.splitter.FabricPacketSplitter;
 
 public class PayloadTypeRegistryImpl<B extends FriendlyByteBuf> implements PayloadTypeRegistry<B> {
-	public static final PayloadTypeRegistryImpl<FriendlyByteBuf> CONFIGURATION_C2S = new PayloadTypeRegistryImpl<>(ConnectionProtocol.CONFIGURATION, NetworkSide.SERVERBOUND);
-	public static final PayloadTypeRegistryImpl<FriendlyByteBuf> CONFIGURATION_S2C = new PayloadTypeRegistryImpl<>(ConnectionProtocol.CONFIGURATION, NetworkSide.CLIENTBOUND);
-	public static final PayloadTypeRegistryImpl<RegistryFriendlyByteBuf> PLAY_C2S = new PayloadTypeRegistryImpl<>(ConnectionProtocol.PLAY, NetworkSide.SERVERBOUND);
-	public static final PayloadTypeRegistryImpl<RegistryFriendlyByteBuf> PLAY_S2C = new PayloadTypeRegistryImpl<>(ConnectionProtocol.PLAY, NetworkSide.CLIENTBOUND);
+	public static final PayloadTypeRegistryImpl<FriendlyByteBuf> CONFIGURATION_C2S = new PayloadTypeRegistryImpl<>(ConnectionProtocol.CONFIGURATION, PacketFlow.SERVERBOUND);
+	public static final PayloadTypeRegistryImpl<FriendlyByteBuf> CONFIGURATION_S2C = new PayloadTypeRegistryImpl<>(ConnectionProtocol.CONFIGURATION, PacketFlow.CLIENTBOUND);
+	public static final PayloadTypeRegistryImpl<RegistryFriendlyByteBuf> PLAY_C2S = new PayloadTypeRegistryImpl<>(ConnectionProtocol.PLAY, PacketFlow.SERVERBOUND);
+	public static final PayloadTypeRegistryImpl<RegistryFriendlyByteBuf> PLAY_S2C = new PayloadTypeRegistryImpl<>(ConnectionProtocol.PLAY, PacketFlow.CLIENTBOUND);
 	private final Map<ResourceLocation, CustomPacketPayload.TypeAndCodec<B, ? extends CustomPacketPayload>> packetTypes = new HashMap<>();
 	private final Object2IntMap<ResourceLocation> maxPacketSize = new Object2IntOpenHashMap<>();
 	private final ConnectionProtocol state;
-	private final NetworkSide side;
+	private final PacketFlow side;
 	private final int minimalSplittableSize;
 
-	private PayloadTypeRegistryImpl(ConnectionProtocol state, NetworkSide side) {
+	private PayloadTypeRegistryImpl(ConnectionProtocol state, PacketFlow side) {
 		this.state = state;
 		this.side = side;
-		this.minimalSplittableSize = side == NetworkSide.CLIENTBOUND ? FabricPacketSplitter.SAFE_S2C_SPLIT_SIZE : FabricPacketSplitter.SAFE_C2S_SPLIT_SIZE;
+		this.minimalSplittableSize = side == PacketFlow.CLIENTBOUND ? FabricPacketSplitter.SAFE_S2C_SPLIT_SIZE : FabricPacketSplitter.SAFE_C2S_SPLIT_SIZE;
 	}
 
 	@Nullable
-	public static PayloadTypeRegistryImpl<?> get(NetworkState<?> state) {
+	public static PayloadTypeRegistryImpl<?> get(ConnectionProtocol<?> state) {
 		return switch (state.id()) {
-		case CONFIGURATION -> state.side() == NetworkSide.CLIENTBOUND ? CONFIGURATION_S2C : CONFIGURATION_C2S;
-		case PLAY -> state.side() == NetworkSide.CLIENTBOUND ? PLAY_S2C : PLAY_C2S;
+		case CONFIGURATION -> state.side() == PacketFlow.CLIENTBOUND ? CONFIGURATION_S2C : CONFIGURATION_C2S;
+		case PLAY -> state.side() == PacketFlow.CLIENTBOUND ? PLAY_S2C : PLAY_C2S;
 		default -> null;
 		};
 	}
@@ -122,7 +122,7 @@ public class PayloadTypeRegistryImpl<B extends FriendlyByteBuf> implements Paylo
 		return state;
 	}
 
-	public NetworkSide getSide() {
+	public PacketFlow getSide() {
 		return side;
 	}
 }

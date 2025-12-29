@@ -34,13 +34,13 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import net.minecraft.network.Connection;
 import net.minecraft.network.ConnectionProtocol;
-import net.minecraft.network.NetworkSide;
+import net.minecraft.network.protocol.PacketFlow;
 import net.minecraft.network.handler.DecoderHandler;
 import net.minecraft.network.handler.EncoderHandler;
 import net.minecraft.network.handler.NetworkStateTransitions;
 import net.minecraft.network.PacketListener;
 import net.minecraft.network.protocol.Packet;
-import net.minecraft.network.state.NetworkState;
+import net.minecraft.network.ConnectionProtocol;
 import net.minecraft.resources.ResourceLocation;
 
 import net.fabricmc.fabric.impl.networking.ChannelInfoHolder;
@@ -60,7 +60,7 @@ abstract class ClientConnectionMixin implements ChannelInfoHolder {
 	private Map<ConnectionProtocol, Collection<ResourceLocation>> playChannels;
 
 	@Inject(method = "<init>", at = @At("RETURN"))
-	private void initAddedFields(NetworkSide side, CallbackInfo ci) {
+	private void initAddedFields(PacketFlow side, CallbackInfo ci) {
 		this.playChannels = new ConcurrentHashMap<>();
 	}
 
@@ -72,7 +72,7 @@ abstract class ClientConnectionMixin implements ChannelInfoHolder {
 	}
 
 	@Inject(method = "setPacketListener", at = @At("HEAD"))
-	private void unwatchAddon(NetworkState<?> state, PacketListener listener, CallbackInfo ci) {
+	private void unwatchAddon(ConnectionProtocol<?> state, PacketListener listener, CallbackInfo ci) {
 		if (this.packetListener instanceof NetworkHandlerExtensions oldListener) {
 			oldListener.getAddon().endSession();
 		}
@@ -93,7 +93,7 @@ abstract class ClientConnectionMixin implements ChannelInfoHolder {
 	}
 
 	@ModifyArg(method = "transitionInbound", at = @At(value = "INVOKE", target = "Lio/netty/channel/Channel;writeAndFlush(Ljava/lang/Object;)Lio/netty/channel/ChannelFuture;"))
-	private Object injectFabricPacketSlitterHandlerInbound(Object transitioner, @Local(argsOnly = true) NetworkState<?> state) {
+	private Object injectFabricPacketSlitterHandlerInbound(Object transitioner, @Local(argsOnly = true) ConnectionProtocol<?> state) {
 		PayloadTypeRegistryImpl<?> payloadTypeRegistry = PayloadTypeRegistryImpl.get(state);
 
 		if (payloadTypeRegistry == null) {
@@ -107,7 +107,7 @@ abstract class ClientConnectionMixin implements ChannelInfoHolder {
 	}
 
 	@ModifyArg(method = "transitionOutbound", at = @At(value = "INVOKE", target = "Lio/netty/channel/Channel;writeAndFlush(Ljava/lang/Object;)Lio/netty/channel/ChannelFuture;"))
-	private Object injectFabricPacketSlitterHandlerOutbound(Object transitioner, @Local(argsOnly = true) NetworkState<?> state) {
+	private Object injectFabricPacketSlitterHandlerOutbound(Object transitioner, @Local(argsOnly = true) ConnectionProtocol<?> state) {
 		PayloadTypeRegistryImpl<?> payloadTypeRegistry = PayloadTypeRegistryImpl.get(state);
 
 		if (payloadTypeRegistry == null) {

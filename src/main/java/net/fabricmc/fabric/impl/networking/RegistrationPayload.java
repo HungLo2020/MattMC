@@ -29,13 +29,13 @@ import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.InvalidIdentifierException;
 
-public record RegistrationPayload(Id<RegistrationPayload> id, List<ResourceLocation> channels) implements CustomPacketPayload {
+public record RegistrationPayload(Type<RegistrationPayload> id, List<ResourceLocation> channels) implements CustomPacketPayload {
 	public static final CustomPacketPayload.Type<RegistrationPayload> REGISTER = new CustomPacketPayload.Type<>(NetworkingImpl.REGISTER_CHANNEL);
 	public static final CustomPacketPayload.Type<RegistrationPayload> UNREGISTER = new CustomPacketPayload.Type<>(NetworkingImpl.UNREGISTER_CHANNEL);
 	public static final StreamCodec<FriendlyByteBuf, RegistrationPayload> REGISTER_CODEC = codec(REGISTER);
 	public static final StreamCodec<FriendlyByteBuf, RegistrationPayload> UNREGISTER_CODEC = codec(UNREGISTER);
 
-	private RegistrationPayload(Id<RegistrationPayload> id, FriendlyByteBuf buf) {
+	private RegistrationPayload(Type<RegistrationPayload> id, FriendlyByteBuf buf) {
 		this(id, read(buf));
 	}
 
@@ -88,7 +88,7 @@ public record RegistrationPayload(Id<RegistrationPayload> id, List<ResourceLocat
 		return id;
 	}
 
-	private static StreamCodec<FriendlyByteBuf, RegistrationPayload> codec(Id<RegistrationPayload> id) {
+	private static StreamCodec<FriendlyByteBuf, RegistrationPayload> codec(Type<RegistrationPayload> id) {
 		return CustomPacketPayload.codecOf(RegistrationPayload::write, buf -> new RegistrationPayload(id, buf));
 	}
 }

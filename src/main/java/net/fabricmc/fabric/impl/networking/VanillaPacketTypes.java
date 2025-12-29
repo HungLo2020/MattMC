@@ -20,10 +20,10 @@ import java.util.ArrayList;
 
 import org.jetbrains.annotations.Nullable;
 
-import net.minecraft.network.NetworkSide;
+import net.minecraft.network.protocol.PacketFlow;
 import net.minecraft.network.protocol.PacketType;
 import net.minecraft.network.state.ConfigurationStates;
-import net.minecraft.network.state.NetworkState;
+import net.minecraft.network.ConnectionProtocol;
 import net.minecraft.network.state.PlayStateFactories;
 
 public record VanillaPacketTypes(PacketType<?>[] ids) {
@@ -37,7 +37,7 @@ public record VanillaPacketTypes(PacketType<?>[] ids) {
 		return id > 0 && id < this.ids.length ? this.ids[id] : null;
 	}
 
-	private static VanillaPacketTypes of(NetworkState.Factory factory) {
+	private static VanillaPacketTypes of(ConnectionProtocol.Factory factory) {
 		var list = new ArrayList<PacketType<?>>();
 
 		// See NetworkStateBuilder#createState for reference.
@@ -46,10 +46,10 @@ public record VanillaPacketTypes(PacketType<?>[] ids) {
 		return new VanillaPacketTypes(list.toArray(PacketType[]::new));
 	}
 
-	public static VanillaPacketTypes get(NetworkState<?> state) {
+	public static VanillaPacketTypes get(ConnectionProtocol<?> state) {
 		return switch (state.id()) {
-		case CONFIGURATION -> state.side() == NetworkSide.CLIENTBOUND ? CONFIGURATION_S2C : CONFIGURATION_C2S;
-		case PLAY -> state.side() == NetworkSide.CLIENTBOUND ? PLAY_S2C : PLAY_C2S;
+		case CONFIGURATION -> state.side() == PacketFlow.CLIENTBOUND ? CONFIGURATION_S2C : CONFIGURATION_C2S;
+		case PLAY -> state.side() == PacketFlow.CLIENTBOUND ? PLAY_S2C : PLAY_C2S;
 		default -> throw new IllegalArgumentException("Not implemented for " + state.id() + "!");
 		};
 	}

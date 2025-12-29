@@ -18,7 +18,7 @@ package net.fabricmc.fabric.impl.networking.splitter;
 
 import io.netty.buffer.ByteBuf;
 
-import net.minecraft.network.NetworkSide;
+import net.minecraft.network.protocol.PacketFlow;
 import net.minecraft.network.handler.EncoderHandler;
 import net.minecraft.network.PacketListener;
 import net.minecraft.network.protocol.Packet;
@@ -32,7 +32,7 @@ import net.fabricmc.fabric.impl.networking.NetworkingImpl;
  * Allows to avoid requiring to serialize the packet twice.
  */
 public record PassthroughPacket(ByteBuf buf) implements Packet<PacketListener> {
-	private static final PacketType<? extends Packet<PacketListener>> FAKE_TYPE = new PacketType<>(NetworkSide.SERVERBOUND, ResourceLocation.fromNamespaceAndPath(NetworkingImpl.MOD_ID, "passthrough"));
+	private static final PacketType<? extends Packet<PacketListener>> FAKE_TYPE = new PacketType<>(PacketFlow.SERVERBOUND, ResourceLocation.fromNamespaceAndPath(NetworkingImpl.MOD_ID, "passthrough"));
 
 	@Override
 	public PacketType<? extends Packet<PacketListener>> getPacketType() {

@@ -30,14 +30,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import net.minecraft.network.ConnectionProtocol;
-import net.minecraft.network.NetworkSide;
+import net.minecraft.network.protocol.PacketFlow;
 import net.minecraft.resources.ResourceLocation;
 
 public final class GlobalReceiverRegistry<H> {
 	public static final int DEFAULT_CHANNEL_NAME_MAX_LENGTH = 128;
 	private static final Logger LOGGER = LoggerFactory.getLogger(GlobalReceiverRegistry.class);
 
-	private final NetworkSide side;
+	private final PacketFlow side;
 	private final ConnectionProtocol phase;
 	@Nullable
 	private final PayloadTypeRegistryImpl<?> payloadTypeRegistry;
@@ -46,7 +46,7 @@ public final class GlobalReceiverRegistry<H> {
 	private final Map<ResourceLocation, H> handlers = new HashMap<>();
 	private final Set<AbstractNetworkAddon<H>> trackedAddons = new HashSet<>();
 
-	public GlobalReceiverRegistry(NetworkSide side, ConnectionProtocol phase, @Nullable PayloadTypeRegistryImpl<?> payloadTypeRegistry) {
+	public GlobalReceiverRegistry(PacketFlow side, ConnectionProtocol phase, @Nullable PayloadTypeRegistryImpl<?> payloadTypeRegistry) {
 		this.side = side;
 		this.phase = phase;
 		this.payloadTypeRegistry = payloadTypeRegistry;
