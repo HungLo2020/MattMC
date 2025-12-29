@@ -25,7 +25,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import net.minecraft.world.entity.EntityType;
-import net.minecraft.world.entity.vehicle.AbstractMinecartEntity;
+import net.minecraft.world.entity.vehicle.AbstractMinecart;
 import net.minecraft.core.registries.Registries;
 
 /**
@@ -46,8 +46,8 @@ public final class MinecartComparatorLogicRegistry {
 	 */
 	@Nullable
 	@SuppressWarnings("unchecked")
-	public static MinecartComparatorLogic<AbstractMinecartEntity> getCustomComparatorLogic(EntityType<?> type) {
-		return (MinecartComparatorLogic<AbstractMinecartEntity>) LOGICS.get(type);
+	public static MinecartComparatorLogic<AbstractMinecart> getCustomComparatorLogic(EntityType<?> type) {
+		return (MinecartComparatorLogic<AbstractMinecart>) LOGICS.get(type);
 	}
 
 	/**
@@ -59,7 +59,7 @@ public final class MinecartComparatorLogicRegistry {
 	 * @param type  the minecart entity type
 	 * @param logic the logic to register
 	 */
-	public static <T extends AbstractMinecartEntity> void register(EntityType<T> type, MinecartComparatorLogic<? super T> logic) {
+	public static <T extends AbstractMinecart> void register(EntityType<T> type, MinecartComparatorLogic<? super T> logic) {
 		Objects.requireNonNull(type, "Entity type cannot be null");
 		Objects.requireNonNull(logic, "Logic cannot be null");
 

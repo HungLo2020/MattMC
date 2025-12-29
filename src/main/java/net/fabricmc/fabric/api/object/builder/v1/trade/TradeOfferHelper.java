@@ -24,8 +24,8 @@ import org.jetbrains.annotations.ApiStatus;
 
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.village.MerchantOffers;
-import net.minecraft.village.VillagerProfession;
+import net.minecraft.world.entity.ai.village.MerchantOffers;
+import net.minecraft.world.entity.npc.VillagerProfession;
 
 import net.fabricmc.fabric.impl.object.builder.TradeOfferInternals;
 

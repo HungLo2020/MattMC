@@ -29,13 +29,13 @@ import net.minecraft.world.entity.EntityDimensions;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.MobCategory;
-import net.minecraft.world.entity.SpawnLocation;
+import net.minecraft.world.entity.SpawnPlacementType;
 import net.minecraft.world.entity.SpawnPlacements;
-import net.minecraft.world.entity.attribute.DefaultAttributeContainer;
-import net.minecraft.world.entity.mob.Mob;
+import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
+import net.minecraft.world.entity.Mob;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.flag.FeatureFlag;
-import net.minecraft.world.Heightmap;
+import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.Level;
 
 /**
@@ -353,7 +353,7 @@ public class FabricEntityTypeBuilder<T extends Entity> {
 	@Deprecated
 	public static class Living<T extends LivingEntity> extends FabricEntityTypeBuilder<T> {
 		@Nullable
-		private Supplier<DefaultAttributeContainer.Builder> defaultAttributeBuilder;
+		private Supplier<AttributeSupplier.Builder> defaultAttributeBuilder;
 
 		protected Living(MobCategory spawnGroup, EntityType.EntityFactory<T> function) {
 			super(spawnGroup, function);
@@ -469,7 +469,7 @@ public class FabricEntityTypeBuilder<T extends Entity> {
 		 * @deprecated use {@link FabricEntityType.Builder.Living#defaultAttributes(Supplier)}
 		 */
 		@Deprecated
-		public FabricEntityTypeBuilder.Living<T> defaultAttributes(Supplier<DefaultAttributeContainer.Builder> defaultAttributeBuilder) {
+		public FabricEntityTypeBuilder.Living<T> defaultAttributes(Supplier<AttributeSupplier.Builder> defaultAttributeBuilder) {
 			Objects.requireNonNull(defaultAttributeBuilder, "Cannot set null attribute builder");
 			this.defaultAttributeBuilder = defaultAttributeBuilder;
 			return this;
@@ -495,7 +495,7 @@ public class FabricEntityTypeBuilder<T extends Entity> {
 	 */
 	@Deprecated
 	public static class Mob<T extends Mob> extends FabricEntityTypeBuilder.Living<T> {
-		private SpawnLocation spawnLocation;
+		private SpawnPlacementType spawnLocation;
 		private Heightmap.Types restrictionHeightmap;
 		private SpawnPlacements.SpawnPredicate<T> spawnPredicate;
 
@@ -596,7 +596,7 @@ public class FabricEntityTypeBuilder<T extends Entity> {
 		}
 
 		@Override
-		public FabricEntityTypeBuilder.Mob<T> defaultAttributes(Supplier<DefaultAttributeContainer.Builder> defaultAttributeBuilder) {
+		public FabricEntityTypeBuilder.Mob<T> defaultAttributes(Supplier<AttributeSupplier.Builder> defaultAttributeBuilder) {
 			super.defaultAttributes(defaultAttributeBuilder);
 			return this;
 		}
@@ -607,10 +607,10 @@ public class FabricEntityTypeBuilder<T extends Entity> {
 		 * <p>This is used by mobs to determine whether Minecraft should spawn an entity within a certain context.
 		 *
 		 * @return this builder for chaining.
-		 * @deprecated use {@link FabricEntityType.Builder.Mob#spawnRestriction(SpawnLocation, Heightmap.Types, SpawnPlacements.SpawnPredicate)}
+		 * @deprecated use {@link FabricEntityType.Builder.Mob#spawnRestriction(SpawnPlacementType, Heightmap.Types, SpawnPlacements.SpawnPredicate)}
 		 */
 		@Deprecated
-		public FabricEntityTypeBuilder.Mob<T> spawnRestriction(SpawnLocation spawnLocation, Heightmap.Types heightmap, SpawnPlacements.SpawnPredicate<T> spawnPredicate) {
+		public FabricEntityTypeBuilder.Mob<T> spawnRestriction(SpawnPlacementType spawnLocation, Heightmap.Types heightmap, SpawnPlacements.SpawnPredicate<T> spawnPredicate) {
 			this.spawnLocation = Objects.requireNonNull(spawnLocation, "Spawn location cannot be null.");
 			this.restrictionHeightmap = Objects.requireNonNull(heightmap, "Heightmap type cannot be null.");
 			this.spawnPredicate = Objects.requireNonNull(spawnPredicate, "Spawn predicate cannot be null.");

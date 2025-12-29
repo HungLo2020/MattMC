@@ -27,10 +27,10 @@ import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import net.minecraft.resources.ResourceKey;
-import net.minecraft.village.MerchantOffer;
-import net.minecraft.village.MerchantOffers;
-import net.minecraft.village.TradedItem;
-import net.minecraft.village.VillagerType;
+import net.minecraft.world.entity.ai.village.MerchantOffer;
+import net.minecraft.world.entity.ai.village.MerchantOffers;
+import net.minecraft.world.entity.ai.village.TradedItem;
+import net.minecraft.world.entity.ai.village.VillagerType;
 
 @Mixin(MerchantOffers.TypeAwareBuyForOneEmeraldFactory.class)
 public abstract class TradeOffersTypeAwareBuyForOneEmeraldFactoryMixin {
