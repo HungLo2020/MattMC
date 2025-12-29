@@ -26,7 +26,7 @@ import net.minecraft.world.inventory.MenuType;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 
 /**
- * A {@link ScreenHandlerType} for an extended screen handler that
+ * A {@link MenuType} for an extended screen handler that
  * synchronizes additional data to the client when it is opened.
  *
  * <p>Extended screen handlers can be opened using
@@ -47,11 +47,11 @@ import net.minecraft.world.inventory.AbstractContainerMenu;
  * }
  *
  * // Creating and registering the type
- * public static final ExtendedScreenHandlerType<OvenScreenHandler> OVEN =
- * 	new ExtendedScreenHandlerType((syncId, inventory, data) -> ..., OvenData.PACKET_CODEC);
+ * public static final ExtendedMenuType<OvenScreenHandler> OVEN =
+ * 	new ExtendedMenuType((syncId, inventory, data) -> ..., OvenData.PACKET_CODEC);
  * Registry.register(Registry.SCREEN_HANDLER, ResourceLocation.of(...), OVEN);
  *
- * // Note: remember to also register the screen using vanilla's HandledScreens!
+ * // Note: remember to also register the screen using vanilla's MenuScreens!
  *
  * // Screen handler class
  * public class OvenScreenHandler extends AbstractContainerMenu {
@@ -71,7 +71,7 @@ import net.minecraft.world.inventory.AbstractContainerMenu;
  * @param <T> the type of screen handler created by this type
  * @param <D> the type of the data
  */
-public class ExtendedScreenHandlerType<T extends AbstractContainerMenu, D> extends MenuType<T> {
+public class ExtendedMenuType<T extends AbstractContainerMenu, D> extends MenuType<T> {
 	private final ExtendedFactory<T, D> factory;
 	private final StreamCodec<? super RegistryFriendlyByteBuf, D> packetCodec;
 
@@ -80,7 +80,7 @@ public class ExtendedScreenHandlerType<T extends AbstractContainerMenu, D> exten
 	 *
 	 * @param factory the screen handler factory used for {@link #create(int, Inventory, Object)}
 	 */
-	public ExtendedScreenHandlerType(ExtendedFactory<T, D> factory, StreamCodec<? super RegistryFriendlyByteBuf, D> packetCodec) {
+	public ExtendedMenuType(ExtendedFactory<T, D> factory, StreamCodec<? super RegistryFriendlyByteBuf, D> packetCodec) {
 		super(null, FeatureFlags.VANILLA_SET);
 		this.factory = Objects.requireNonNull(factory, "screen handler factory cannot be null");
 		this.packetCodec = Objects.requireNonNull(packetCodec, "packet codec cannot be null");
@@ -93,7 +93,7 @@ public class ExtendedScreenHandlerType<T extends AbstractContainerMenu, D> exten
 	@Deprecated
 	@Override
 	public final T create(int syncId, Inventory inventory) {
-		throw new UnsupportedOperationException("Use ExtendedScreenHandlerType.create(int, Inventory, FriendlyByteBuf)!");
+		throw new UnsupportedOperationException("Use ExtendedMenuType.create(int, Inventory, FriendlyByteBuf)!");
 	}
 
 	/**

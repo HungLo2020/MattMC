@@ -32,7 +32,7 @@ import net.minecraft.core.Registry;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.TextCodecs;
+import net.minecraft.network.chat.ComponentSerialization;
 import net.minecraft.resources.ResourceLocation;
 
 import net.fabricmc.api.ModInitializer;
@@ -40,7 +40,7 @@ import net.fabricmc.fabric.api.event.registry.RegistryEntryAddedCallback;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.fabricmc.fabric.api.screenhandler.v1.ExtendedScreenHandlerFactory;
-import net.fabricmc.fabric.api.screenhandler.v1.ExtendedScreenHandlerType;
+import net.fabricmc.fabric.api.screenhandler.v1.ExtendedMenuType;
 
 public final class Networking implements ModInitializer {
 	private static final Logger LOGGER = LoggerFactory.getLogger("fabric-screen-handler-api-v1/server");
@@ -85,7 +85,7 @@ public final class Networking implements ModInitializer {
 		PayloadTypeRegistry.playS2C().register(OpenScreenPayload.ID, OpenScreenPayload.CODEC);
 
 		forEachEntry(Registries.SCREEN_HANDLER, (type, id) -> {
-			if (type instanceof ExtendedScreenHandlerType<?, ?> extended) {
+			if (type instanceof ExtendedMenuType<?, ?> extended) {
 				CODEC_BY_ID.put(id, extended.getPacketCodec());
 			}
 		});
@@ -111,13 +111,13 @@ public final class Networking implements ModInitializer {
 			ResourceLocation id = buf.readIdentifier();
 			StreamCodec<RegistryFriendlyByteBuf, D> codec = (StreamCodec<RegistryFriendlyByteBuf, D>) CODEC_BY_ID.get(id);
 
-			return new OpenScreenPayload<>(id, buf.readByte(), TextCodecs.REGISTRY_PACKET_CODEC.decode(buf), codec, codec == null ? null : codec.decode(buf));
+			return new OpenScreenPayload<>(id, buf.readByte(), ComponentSerialization.REGISTRY_PACKET_CODEC.decode(buf), codec, codec == null ? null : codec.decode(buf));
 		}
 
 		private void write(RegistryFriendlyByteBuf buf) {
 			buf.writeIdentifier(this.identifier);
 			buf.writeByte(this.syncId);
-			TextCodecs.REGISTRY_PACKET_CODEC.encode(buf, this.title);
+			ComponentSerialization.REGISTRY_PACKET_CODEC.encode(buf, this.title);
 			this.innerCodec.encode(buf, this.data);
 		}
 

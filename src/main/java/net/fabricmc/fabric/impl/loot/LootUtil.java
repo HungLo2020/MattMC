@@ -24,7 +24,7 @@ import net.minecraft.world.level.storage.loot.LootTable;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.Holder;
-import net.minecraft.server.packs.Resource;
+import net.minecraft.server.packs.resources.Resource;
 import net.minecraft.server.packs.repository.PackSource;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.resources.ResourceLocation;

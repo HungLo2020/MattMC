@@ -28,7 +28,7 @@ import org.jetbrains.annotations.Unmodifiable;
 import net.minecraft.core.Registry;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.RegistryDataLoader;
-import net.minecraft.core.SerializableRegistries;
+import net.minecraft.core.RegistrySynchronization;
 
 import net.fabricmc.fabric.api.event.registry.DynamicRegistries;
 
@@ -76,11 +76,11 @@ public final class DynamicRegistriesImpl {
 
 		RegistryDataLoader.SYNCED_REGISTRIES.add(new RegistryDataLoader.RegistryData<>(key, clientCodec, false));
 
-		if (!(SerializableRegistries.SYNCED_REGISTRIES instanceof HashSet<ResourceKey<? extends Registry<?>>>)) {
-			SerializableRegistries.SYNCED_REGISTRIES = new HashSet<>(SerializableRegistries.SYNCED_REGISTRIES);
+		if (!(RegistrySynchronization.SYNCED_REGISTRIES instanceof HashSet<ResourceKey<? extends Registry<?>>>)) {
+			RegistrySynchronization.SYNCED_REGISTRIES = new HashSet<>(RegistrySynchronization.SYNCED_REGISTRIES);
 		}
 
-		SerializableRegistries.SYNCED_REGISTRIES.add(key);
+		RegistrySynchronization.SYNCED_REGISTRIES.add(key);
 
 		for (DynamicRegistries.SyncOption option : options) {
 			if (option == DynamicRegistries.SyncOption.SKIP_WHEN_EMPTY) {

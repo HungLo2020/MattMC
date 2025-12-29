@@ -44,7 +44,7 @@ import net.minecraft.world.InteractionResult;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.world.phys.Vec3;
-import net.minecraft.world.BlockView;
+import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.CollisionView;
 import net.minecraft.world.level.Level;
 
@@ -117,8 +117,8 @@ abstract class LivingEntityMixin {
 		}
 	}
 
-	@WrapOperation(method = "getSleepingDirection", at = @At(value = "INVOKE", target = "Lnet/minecraft/block/BedBlock;getDirection(Lnet/minecraft/world/BlockView;Lnet/minecraft/util/math/BlockPos;)Lnet/minecraft/util/math/Direction;"))
-	private Direction onGetSleepingDirection(BlockView world, BlockPos sleepingPos, Operation<Direction> operation) {
+	@WrapOperation(method = "getSleepingDirection", at = @At(value = "INVOKE", target = "Lnet/minecraft/block/BedBlock;getDirection(Lnet/minecraft/world/BlockGetter;Lnet/minecraft/util/math/BlockPos;)Lnet/minecraft/util/math/Direction;"))
+	private Direction onGetSleepingDirection(BlockGetter world, BlockPos sleepingPos, Operation<Direction> operation) {
 		final Direction sleepingDirection = operation.call(world, sleepingPos);
 		return EntitySleepEvents.MODIFY_SLEEPING_DIRECTION.invoker().modifySleepDirection((LivingEntity) (Object) this, sleepingPos, sleepingDirection);
 	}

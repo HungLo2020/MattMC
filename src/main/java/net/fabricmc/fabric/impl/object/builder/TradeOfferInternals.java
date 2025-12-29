@@ -32,7 +32,7 @@ import org.apache.commons.lang3.tuple.Tuple;
 
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.util.Util;
+import net.minecraft.Util;
 import net.minecraft.world.item.trading.MerchantOffers;
 import net.minecraft.world.entity.npc.VillagerProfession;
 

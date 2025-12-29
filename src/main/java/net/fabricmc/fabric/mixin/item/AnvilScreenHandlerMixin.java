@@ -29,14 +29,14 @@ import net.minecraft.core.Holder;
 import net.minecraft.world.inventory.AnvilScreenHandler;
 import net.minecraft.world.inventory.ForgingScreenHandler;
 import net.minecraft.world.inventory.ContainerLevelAccess;
-import net.minecraft.world.inventory.ScreenHandlerType;
+import net.minecraft.world.inventory.MenuType;
 import net.minecraft.world.inventory.slot.ForgingSlotsManager;
 
 import net.fabricmc.fabric.api.item.v1.EnchantingContext;
 
 @Mixin(AnvilScreenHandler.class)
 abstract class AnvilScreenHandlerMixin extends ForgingScreenHandler {
-	AnvilScreenHandlerMixin(@Nullable ScreenHandlerType<?> type, int syncId, Inventory playerInventory, ContainerLevelAccess context, ForgingSlotsManager forgingSlotsManager) {
+	AnvilScreenHandlerMixin(@Nullable MenuType<?> type, int syncId, Inventory playerInventory, ContainerLevelAccess context, ForgingSlotsManager forgingSlotsManager) {
 		super(type, syncId, playerInventory, context, forgingSlotsManager);
 	}
 

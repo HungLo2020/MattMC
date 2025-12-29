@@ -21,9 +21,9 @@ import net.minecraft.server.level.ServerPlayer;
 
 /**
  * An extension of {@code MenuProvider} that can write additional data to a screen opening packet.
- * This is used for {@linkplain ExtendedScreenHandlerType extended screen handlers}.
+ * This is used for {@linkplain ExtendedMenuType extended screen handlers}.
  *
- * @see ExtendedScreenHandlerType usage examples
+ * @see ExtendedMenuType usage examples
  */
 public interface ExtendedScreenHandlerFactory<D> extends MenuProvider {
 	/**

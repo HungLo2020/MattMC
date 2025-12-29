@@ -29,7 +29,7 @@ import net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents;
 
 @Mixin(Mob.class)
 public class MobEntityMixin {
-	@ModifyArg(method = "convertTo(Lnet/minecraft/entity/EntityType;Lnet/minecraft/entity/conversion/ConversionParams;Lnet/minecraft/entity/SpawnReason;Lnet/minecraft/entity/conversion/ConversionParams$Finalizer;)Lnet/minecraft/entity/mob/Mob;", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/world/ServerLevel;spawnEntity(Lnet/minecraft/entity/Entity;)Z"))
+	@ModifyArg(method = "convertTo(Lnet/minecraft/entity/EntityType;Lnet/minecraft/entity/conversion/ConversionParams;Lnet/minecraft/entity/MobSpawnType;Lnet/minecraft/entity/conversion/ConversionParams$Finalizer;)Lnet/minecraft/entity/mob/Mob;", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/world/ServerLevel;spawnEntity(Lnet/minecraft/entity/Entity;)Z"))
 	private Entity afterEntityConverted(Entity converted, @Local(argsOnly = true) ConversionParams conversionContext) {
 		ServerLivingEntityEvents.MOB_CONVERSION.invoker().onConversion((Mob) (Object) this, (Mob) converted, conversionContext);
 		return converted;

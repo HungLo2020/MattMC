@@ -36,7 +36,7 @@ import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.fabricmc.fabric.api.networking.v1.ServerConfigurationNetworking;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.fabricmc.fabric.mixin.recipe.sync.ServerCommonNetworkHandlerAccessor;
-import net.fabricmc.fabric.mixin.recipe.sync.ServerRecipeManagerAccessor;
+import net.fabricmc.fabric.mixin.recipe.sync.RecipeManagerAccessor;
 
 public class RecipeSyncImpl implements ModInitializer {
 	// Recipe packet might contain a lot of data depending on mods, so it's best to increase it's max size to 64 MB.
@@ -74,7 +74,7 @@ public class RecipeSyncImpl implements ModInitializer {
 
 		Set<RecipeSerializer<?>> serializers = ((SyncedSerializerAwareClientConnection) ((ServerCommonNetworkHandlerAccessor) player.networkHandler).getConnection()).fabric_getSyncedRecipeSerializers();
 
-		SyncedSerializerAwarePreparedRecipe accessor = (SyncedSerializerAwarePreparedRecipe) ((ServerRecipeManagerAccessor) player.getEntityWorld().getRecipeManager()).getPreparedRecipes();
+		SyncedSerializerAwarePreparedRecipe accessor = (SyncedSerializerAwarePreparedRecipe) ((RecipeManagerAccessor) player.getEntityWorld().getRecipeManager()).getPreparedRecipes();
 
 		var list = new ArrayList<RecipeSyncPayloadS2C.Entry>();
 

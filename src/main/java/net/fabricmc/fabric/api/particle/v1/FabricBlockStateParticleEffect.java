@@ -22,7 +22,7 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.core.particles.BlockParticleOption;
 import net.minecraft.core.particles.ParticleType;
 import net.minecraft.core.BlockPos;
-import net.minecraft.world.BlockView;
+import net.minecraft.world.level.BlockGetter;
 
 import net.fabricmc.fabric.impl.particle.BlockStateParticleEffectFactoryImpl;
 
@@ -33,7 +33,7 @@ public interface FabricBlockStateParticleEffect {
 	/**
 	 * Alternative for {@link BlockParticleOption#BlockParticleOption(ParticleType, BlockState)} that also
 	 * accepts a {@link BlockPos}. This method should be used instead of the vanilla constructor when the block state
-	 * is retrieved using a block pos, most commonly through {@link BlockView#getBlockState(BlockPos)}. This ensures
+	 * is retrieved using a block pos, most commonly through {@link BlockGetter#getBlockState(BlockPos)}. This ensures
 	 * that any particles created from this effect use an accurate pos for any client-side logic.
 	 *
 	 * <p>If an instance with a non-null block pos needs to be synced to the client, the block pos will only be synced

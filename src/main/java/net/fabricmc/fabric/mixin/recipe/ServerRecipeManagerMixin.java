@@ -30,18 +30,18 @@ import net.minecraft.world.item.crafting.PreparedRecipes;
 import net.minecraft.world.item.crafting.Recipe;
 import net.minecraft.world.item.crafting.RecipeHolder;
 import net.minecraft.world.item.crafting.RecipeType;
-import net.minecraft.world.item.crafting.ServerRecipeManager;
+import net.minecraft.world.item.crafting.RecipeManager;
 import net.minecraft.world.item.crafting.RecipeInput;
 import net.minecraft.server.packs.resources.ResourceManager;
 import net.minecraft.util.profiler.Profiler;
 import net.minecraft.world.level.Level;
 
-import net.fabricmc.fabric.api.recipe.v1.FabricServerRecipeManager;
+import net.fabricmc.fabric.api.recipe.v1.FabricRecipeManager;
 import net.fabricmc.fabric.api.recipe.v1.sync.SynchronizedRecipes;
 import net.fabricmc.fabric.impl.recipe.sync.SynchronizedRecipesImpl;
 
-@Mixin(ServerRecipeManager.class)
-public abstract class ServerRecipeManagerMixin implements FabricServerRecipeManager {
+@Mixin(RecipeManager.class)
+public abstract class RecipeManagerMixin implements FabricRecipeManager {
 	@Shadow
 	private PreparedRecipes preparedRecipes;
 	@Unique

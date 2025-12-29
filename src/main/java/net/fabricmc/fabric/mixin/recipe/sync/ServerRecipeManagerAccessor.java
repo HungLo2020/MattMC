@@ -20,10 +20,10 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.gen.Accessor;
 
 import net.minecraft.world.item.crafting.PreparedRecipes;
-import net.minecraft.world.item.crafting.ServerRecipeManager;
+import net.minecraft.world.item.crafting.RecipeManager;
 
-@Mixin(ServerRecipeManager.class)
-public interface ServerRecipeManagerAccessor {
+@Mixin(RecipeManager.class)
+public interface RecipeManagerAccessor {
 	@Accessor
 	PreparedRecipes getPreparedRecipes();
 }

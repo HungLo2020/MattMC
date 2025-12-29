@@ -22,7 +22,7 @@ import java.util.Set;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.Nullable;
 
-import net.minecraft.network.ClientCommonPacketListener;
+import net.minecraft.network.protocol.game.ClientGamePacketListener;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.server.MinecraftServer;
@@ -249,7 +249,7 @@ public final class ServerPlayNetworking {
 	 * @param packet the packet
 	 * @return a new packet
 	 */
-	public static <T extends CustomPacketPayload> Packet<ClientCommonPacketListener> createS2CPacket(T packet) {
+	public static <T extends CustomPacketPayload> Packet<ClientGamePacketListener> createS2CPacket(T packet) {
 		return ServerNetworkingImpl.createS2CPacket(packet);
 	}
 

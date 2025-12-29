@@ -32,7 +32,7 @@ import net.minecraft.resources.RegistryDataLoader;
 import net.minecraft.core.RegistryOps;
 import net.minecraft.core.Holder;
 import net.minecraft.core.Holder;
-import net.minecraft.server.packs.Resource;
+import net.minecraft.server.packs.resources.Resource;
 
 import net.fabricmc.fabric.impl.item.EnchantmentUtil;
 

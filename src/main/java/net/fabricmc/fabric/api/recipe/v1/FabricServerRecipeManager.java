@@ -22,14 +22,14 @@ import java.util.stream.Stream;
 import net.minecraft.world.item.crafting.Recipe;
 import net.minecraft.world.item.crafting.RecipeHolder;
 import net.minecraft.world.item.crafting.RecipeType;
-import net.minecraft.world.item.crafting.ServerRecipeManager;
+import net.minecraft.world.item.crafting.RecipeManager;
 import net.minecraft.world.item.crafting.RecipeInput;
 import net.minecraft.world.level.Level;
 
 /**
- * General-purpose Fabric-provided extensions for {@link ServerRecipeManager} class.
+ * General-purpose Fabric-provided extensions for {@link RecipeManager} class.
  */
-public interface FabricServerRecipeManager extends FabricRecipeManager {
+public interface FabricRecipeManager extends FabricRecipeManager {
 	/**
 	 * Creates a stream of all recipe entries of the given {@code type} that match the
 	 * given {@code input} and {@code world}.

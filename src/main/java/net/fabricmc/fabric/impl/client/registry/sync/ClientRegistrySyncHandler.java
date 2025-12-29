@@ -31,7 +31,7 @@ import org.slf4j.LoggerFactory;
 
 import net.minecraft.core.registries.Registries;
 import net.minecraft.core.Registry;
-import net.minecraft.world.inventory.CommonComponents;
+import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.network.chat.Component;
 import net.minecraft.ChatFormatting;

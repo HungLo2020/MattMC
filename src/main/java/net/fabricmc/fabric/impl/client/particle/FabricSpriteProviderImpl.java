@@ -22,7 +22,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.particle.ParticleEngine;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.client.renderer.texture.TextureAtlas;
-import net.minecraft.util.Atlases;
+import net.minecraft.client.renderer.Sheets;
 import net.minecraft.util.RandomSource;
 
 import net.fabricmc.fabric.api.client.particle.v1.FabricSpriteProvider;
@@ -30,7 +30,7 @@ import net.fabricmc.fabric.api.client.particle.v1.FabricSpriteProvider;
 public record FabricSpriteProviderImpl(ParticleResources.MutableSpriteSet delegate) implements FabricSpriteProvider {
 	@Override
 	public TextureAtlas getAtlas() {
-		return Minecraft.getInstance().getAtlasManager().getAtlasTexture(Atlases.PARTICLES);
+		return Minecraft.getInstance().getAtlasManager().getAtlasTexture(Sheets.PARTICLES);
 	}
 
 	@Override

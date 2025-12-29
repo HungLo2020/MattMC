@@ -31,7 +31,7 @@ import net.minecraft.client.multiplayer.ClientRegistries;
 import net.minecraft.core.Registry;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.RegistryDataLoader;
-import net.minecraft.core.SerializableRegistries;
+import net.minecraft.core.RegistrySynchronization;
 import net.minecraft.server.packs.ResourceFactory;
 
 import net.fabricmc.fabric.impl.registry.sync.DynamicRegistriesImpl;
@@ -43,7 +43,7 @@ public class ClientRegistriesMixin {
 	 */
 	@WrapOperation(method = "createRegistryManager", at = @At(value = "FIELD", target = "Lnet/minecraft/registry/RegistryDataLoader;SYNCED_REGISTRIES:Ljava/util/List;", opcode = Opcodes.GETSTATIC))
 	private List<RegistryDataLoader.RegistryData<?>> skipEmptyRegistries(Operation<List<RegistryDataLoader.RegistryData<?>>> operation, ResourceFactory resourceFactory, @Coerce ClientRegistriesDynamicRegistriesAccessor storage, boolean bl) {
-		Map<ResourceKey<? extends Registry<?>>, List<SerializableRegistries.SerializedRegistryEntry>> dynamicRegistries = storage.getDynamicRegistries();
+		Map<ResourceKey<? extends Registry<?>>, List<RegistrySynchronization.SerializedRegistryEntry>> dynamicRegistries = storage.getDynamicRegistries();
 
 		List<RegistryDataLoader.RegistryData<?>> result = new ArrayList<>(operation.call());
 		result.removeIf(entry -> DynamicRegistriesImpl.SKIP_EMPTY_SYNC_REGISTRIES.contains(entry.key()) && !dynamicRegistries.containsKey(entry.key()));

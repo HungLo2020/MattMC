@@ -34,7 +34,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import net.minecraft.server.level.ChunkHolder;
 import net.minecraft.server.level.FullChunkStatus;
 import net.minecraft.server.level.ChunkLevels;
-import net.minecraft.server.level.ServerChunkLoadingManager;
+import net.minecraft.server.level.ChunkMap;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.HeightLimitView;
@@ -68,7 +68,7 @@ public abstract class ChunkHolderMixin extends AbstractChunkHolder implements Ch
 	 * Handles INACCESSIBLE -> FULL for chunks that are immediately loaded and available. {@link ChunkGeneratingMixin} handles the rest.
 	 */
 	@Inject(method = "updateFutures", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/world/ChunkHolder;combineSavingFuture(Ljava/util/concurrent/CompletableFuture;)V", shift = At.Shift.AFTER, ordinal = 0))
-	private void updateFutures$inaccessibleToFull(ServerChunkLoadingManager chunkLoadingManager, Executor executor, CallbackInfo ci) {
+	private void updateFutures$inaccessibleToFull(ChunkMap chunkLoadingManager, Executor executor, CallbackInfo ci) {
 		if (this.getUncheckedOrNull(ChunkStatus.FULL) instanceof LevelChunk && this.fabric_currentEventLevelType == INACCESSIBLE) { // prevent duplicate events with ChunkGeneratingMixin
 			ServerChunkEvents.CHUNK_LEVEL_TYPE_CHANGE.invoker().onChunkLevelTypeChange((ServerLevel) world, (LevelChunk) this.getUncheckedOrNull(ChunkStatus.FULL), INACCESSIBLE, FULL);
 			this.fabric_currentEventLevelType = FULL;
@@ -79,7 +79,7 @@ public abstract class ChunkHolderMixin extends AbstractChunkHolder implements Ch
 	 * Handles FULL -> BLOCK_TICKING.
 	 */
 	@Inject(method = "updateFutures", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/world/ChunkHolder;combineSavingFuture(Ljava/util/concurrent/CompletableFuture;)V", shift = At.Shift.AFTER, ordinal = 1))
-	private void updateFutures$fullToBlockTicking(ServerChunkLoadingManager chunkLoadingManager, Executor executor, CallbackInfo ci) {
+	private void updateFutures$fullToBlockTicking(ChunkMap chunkLoadingManager, Executor executor, CallbackInfo ci) {
 		if (fabric_currentEventLevelType == FULL) { // if INACCESSIBLE->FULL did not fire immediately, then ChunkGeneratingMixin will handle this later.
 			ServerChunkEvents.CHUNK_LEVEL_TYPE_CHANGE.invoker().onChunkLevelTypeChange((ServerLevel) world, (LevelChunk) this.getUncheckedOrNull(ChunkStatus.FULL), FULL, BLOCK_TICKING);
 			this.fabric_currentEventLevelType = BLOCK_TICKING;
@@ -90,7 +90,7 @@ public abstract class ChunkHolderMixin extends AbstractChunkHolder implements Ch
 	 * Handles BLOCK_TICKING -> ENTITY_TICKING.
 	 */
 	@Inject(method = "updateFutures", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/world/ChunkHolder;combineSavingFuture(Ljava/util/concurrent/CompletableFuture;)V", shift = At.Shift.AFTER, ordinal = 2))
-	private void updateFutures$blockTickingToEntityTicking(ServerChunkLoadingManager chunkLoadingManager, Executor executor, CallbackInfo ci) {
+	private void updateFutures$blockTickingToEntityTicking(ChunkMap chunkLoadingManager, Executor executor, CallbackInfo ci) {
 		if (fabric_currentEventLevelType == BLOCK_TICKING) { // if INACCESSIBLE->FULL->BLOCK_TICKING did not fire immediately, then ChunkGeneratingMixin will handle this later.
 			ServerChunkEvents.CHUNK_LEVEL_TYPE_CHANGE.invoker().onChunkLevelTypeChange((ServerLevel) world, (LevelChunk) this.getUncheckedOrNull(ChunkStatus.FULL), BLOCK_TICKING, ENTITY_TICKING);
 			this.fabric_currentEventLevelType = ENTITY_TICKING;
@@ -101,7 +101,7 @@ public abstract class ChunkHolderMixin extends AbstractChunkHolder implements Ch
 	 * Really means increase level (chunk load type demotion). Fire right before onChunkStatusChange() is called.
 	 */
 	@Inject(method = "decreaseLevel", at = @At("HEAD"))
-	private void decreaseLevel(ServerChunkLoadingManager chunkLoadingManager, FullChunkStatus target, CallbackInfo ci) {
+	private void decreaseLevel(ChunkMap chunkLoadingManager, FullChunkStatus target, CallbackInfo ci) {
 		FullChunkStatus previous = ChunkLevels.getType(this.lastTickLevel);
 		ServerLevel serverWorld = (ServerLevel) world;
 

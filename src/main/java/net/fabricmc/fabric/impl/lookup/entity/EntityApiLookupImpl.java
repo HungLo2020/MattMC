@@ -31,7 +31,7 @@ import org.slf4j.LoggerFactory;
 
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
-import net.minecraft.world.entity.SpawnReason;
+import net.minecraft.world.entity.MobSpawnType;
 import net.minecraft.world.entity.EntityPredicates;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.server.MinecraftServer;
@@ -71,7 +71,7 @@ public class EntityApiLookupImpl<A, C> implements EntityApiLookup<A, C> {
 			synchronized (REGISTERED_SELVES) {
 				REGISTERED_SELVES.forEach((apiClass, entityTypes) -> {
 					for (EntityType<?> entityType : entityTypes) {
-						Entity entity = entityType.create(server.getOverworld(), SpawnReason.LOAD);
+						Entity entity = entityType.create(server.getOverworld(), MobSpawnType.LOAD);
 
 						if (entity == null) {
 							String errorMessage = String.format(

@@ -27,7 +27,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.world.item.ItemGroups;
+import net.minecraft.world.item.CreativeModeTabs;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.core.Registry;
 import net.minecraft.resources.ResourceLocation;
@@ -58,7 +58,7 @@ public class MinecraftClientMixin {
 		LOGGER.debug("Freezing registries");
 		Registries.bootstrap();
 		BlockInitTracker.postFreeze();
-		ItemGroups.collect();
+		CreativeModeTabs.collect();
 	}
 
 	@Unique

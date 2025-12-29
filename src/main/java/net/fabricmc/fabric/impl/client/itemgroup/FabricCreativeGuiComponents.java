@@ -27,7 +27,7 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.inventory.CreativeModeInventoryScreen;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.world.item.CreativeModeTab;
-import net.minecraft.world.item.ItemGroups;
+import net.minecraft.world.item.CreativeModeTabs;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
@@ -37,12 +37,12 @@ import net.fabricmc.fabric.impl.itemgroup.FabricItemGroupImpl;
 public class FabricCreativeGuiComponents {
 	private static final ResourceLocation BUTTON_TEX = ResourceLocation.of("fabric", "textures/gui/creative_buttons.png");
 	private static final double TABS_PER_PAGE = FabricItemGroupImpl.TABS_PER_PAGE;
-	public static final Set<CreativeModeTab> COMMON_GROUPS = Set.of(ItemGroups.SEARCH, ItemGroups.INVENTORY, ItemGroups.HOTBAR, ItemGroups.OPERATOR).stream()
+	public static final Set<CreativeModeTab> COMMON_GROUPS = Set.of(CreativeModeTabs.SEARCH, CreativeModeTabs.INVENTORY, CreativeModeTabs.HOTBAR, CreativeModeTabs.OPERATOR).stream()
 			.map(Registries.ITEM_GROUP::getValueOrThrow)
 			.collect(Collectors.toSet());
 
 	public static int getPageCount() {
-		return (int) Math.ceil((ItemGroups.getGroupsToDisplay().size() - COMMON_GROUPS.stream().filter(CreativeModeTab::shouldDisplay).count()) / TABS_PER_PAGE);
+		return (int) Math.ceil((CreativeModeTabs.getGroupsToDisplay().size() - COMMON_GROUPS.stream().filter(CreativeModeTab::shouldDisplay).count()) / TABS_PER_PAGE);
 	}
 
 	public static class ItemGroupButtonWidget extends Button {

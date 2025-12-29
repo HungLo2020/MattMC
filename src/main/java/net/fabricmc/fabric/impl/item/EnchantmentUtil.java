@@ -25,7 +25,7 @@ import org.slf4j.LoggerFactory;
 import net.minecraft.core.component.DataComponentType;
 import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraft.resources.ResourceKey;
-import net.minecraft.server.packs.Resource;
+import net.minecraft.server.packs.resources.Resource;
 import net.minecraft.server.packs.repository.PackSource;
 
 import net.fabricmc.fabric.api.item.v1.EnchantmentEvents;

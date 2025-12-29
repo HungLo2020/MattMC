@@ -25,7 +25,7 @@ import net.fabricmc.fabric.api.event.EventFactory;
 import net.fabricmc.fabric.impl.itemgroup.ItemGroupEventsImpl;
 
 /**
- * Holds events related to {@link ItemGroups}.
+ * Holds events related to {@link CreativeModeTabs}.
  */
 public final class ItemGroupEvents {
 	private ItemGroupEvents() {

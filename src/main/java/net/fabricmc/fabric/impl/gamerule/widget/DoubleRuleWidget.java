@@ -22,7 +22,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.world.EditGameRulesScreen;
 import net.minecraft.client.gui.components.EditBox;
-import net.minecraft.world.inventory.CommonComponents;
+import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.OrderedText;
 import net.minecraft.network.chat.Component;
 

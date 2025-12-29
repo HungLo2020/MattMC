@@ -33,7 +33,7 @@ public final class BlockSetTypeBuilder {
 	private boolean openableByHand = true;
 	private boolean openableByWindCharge = true;
 	private boolean buttonActivatedByArrows = true;
-	private BlockSetType.ActivationRule pressurePlateActivationRule = BlockSetType.ActivationRule.EVERYTHING;
+	private BlockSetType.PressurePlateSensitivity pressurePlateActivationRule = BlockSetType.PressurePlateSensitivity.EVERYTHING;
 	private SoundType soundGroup = SoundType.WOOD;
 	private SoundEvent doorCloseSound = SoundEvents.BLOCK_WOODEN_DOOR_CLOSE;
 	private SoundEvent doorOpenSound = SoundEvents.BLOCK_WOODEN_DOOR_OPEN;
@@ -81,13 +81,13 @@ public final class BlockSetTypeBuilder {
 	}
 
 	/**
-	 * Sets this block set type's pressure plate {@link BlockSetType.ActivationRule}.
+	 * Sets this block set type's pressure plate {@link BlockSetType.PressurePlateSensitivity}.
 	 *
-	 * <p>Defaults to {@link BlockSetType.ActivationRule#EVERYTHING}.
+	 * <p>Defaults to {@link BlockSetType.PressurePlateSensitivity#EVERYTHING}.
 	 *
 	 * @return this builder for chaining
 	 */
-	public BlockSetTypeBuilder pressurePlateActivationRule(BlockSetType.ActivationRule activationRule) {
+	public BlockSetTypeBuilder pressurePlateActivationRule(BlockSetType.PressurePlateSensitivity activationRule) {
 		this.pressurePlateActivationRule = activationRule;
 		return this;
 	}
