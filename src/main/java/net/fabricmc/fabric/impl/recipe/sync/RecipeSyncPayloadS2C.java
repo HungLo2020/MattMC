@@ -19,24 +19,24 @@ package net.fabricmc.fabric.impl.recipe.sync;
 import java.util.ArrayList;
 import java.util.List;
 
-import net.minecraft.network.RegistryByteBuf;
-import net.minecraft.network.codec.PacketCodec;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.codec.PacketCodecs;
 import net.minecraft.network.handler.PacketDecoderException;
-import net.minecraft.network.protocol.CustomPacketPayload;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.world.item.crafting.Recipe;
-import net.minecraft.world.item.crafting.RecipeEntry;
+import net.minecraft.world.item.crafting.RecipeHolder;
 import net.minecraft.world.item.crafting.RecipeSerializer;
-import net.minecraft.core.Registries;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
-import net.minecraft.core.Registries;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceLocation;
 
 /**
  * Main packet used to send recipes to the client.
  */
 public record RecipeSyncPayloadS2C(List<Entry> entries) implements CustomPacketPayload {
-	public static final PacketCodec<RegistryByteBuf, RecipeSyncPayloadS2C> CODEC = Entry.CODEC.collect(PacketCodecs.toList()).xmap(RecipeSyncPayloadS2C::new, RecipeSyncPayloadS2C::entries);
+	public static final StreamCodec<RegistryFriendlyByteBuf, RecipeSyncPayloadS2C> CODEC = Entry.CODEC.collect(PacketCodecs.toList()).xmap(RecipeSyncPayloadS2C::new, RecipeSyncPayloadS2C::entries);
 
 	public static final Id<RecipeSyncPayloadS2C> ID = new Id<>(ResourceLocation.of("fabric", "recipe_sync"));
 
@@ -45,13 +45,13 @@ public record RecipeSyncPayloadS2C(List<Entry> entries) implements CustomPacketP
 		return ID;
 	}
 
-	public record Entry(RecipeSerializer<?> serializer, List<RecipeEntry<?>> recipes) {
-		public static final PacketCodec<RegistryByteBuf, Entry> CODEC = PacketCodec.of(
+	public record Entry(RecipeSerializer<?> serializer, List<RecipeHolder<?>> recipes) {
+		public static final StreamCodec<RegistryFriendlyByteBuf, Entry> CODEC = StreamCodec.of(
 				Entry::write,
 				Entry::read
 		);
 
-		private static Entry read(RegistryByteBuf buf) {
+		private static Entry read(RegistryFriendlyByteBuf buf) {
 			ResourceLocation recipeSerializerId = buf.readIdentifier();
 			RecipeSerializer<?> recipeSerializer = Registries.RECIPE_SERIALIZER.get(recipeSerializerId);
 
@@ -60,27 +60,27 @@ public record RecipeSyncPayloadS2C(List<Entry> entries) implements CustomPacketP
 			}
 
 			int count = buf.readVarInt();
-			var list = new ArrayList<RecipeEntry<?>>();
+			var list = new ArrayList<RecipeHolder<?>>();
 
 			for (int i = 0; i < count; i++) {
 				ResourceKey<Recipe<?>> id = buf.readRegistryKey(Registries.RECIPE);
 				//noinspection deprecation
 				Recipe<?> recipe = recipeSerializer.packetCodec().decode(buf);
-				list.add(new RecipeEntry<>(id, recipe));
+				list.add(new RecipeHolder<>(id, recipe));
 			}
 
 			return new Entry(recipeSerializer, list);
 		}
 
-		private void write(RegistryByteBuf buf) {
+		private void write(RegistryFriendlyByteBuf buf) {
 			buf.writeIdentifier(Registries.RECIPE_SERIALIZER.getId(this.serializer));
 
 			buf.writeVarInt(this.recipes.size());
 
 			//noinspection unchecked,deprecation
-			PacketCodec<RegistryByteBuf, Recipe<?>> serializer = ((PacketCodec<RegistryByteBuf, Recipe<?>>) this.serializer.packetCodec());
+			StreamCodec<RegistryFriendlyByteBuf, Recipe<?>> serializer = ((StreamCodec<RegistryFriendlyByteBuf, Recipe<?>>) this.serializer.packetCodec());
 
-			for (RecipeEntry<?> recipe : this.recipes) {
+			for (RecipeHolder<?> recipe : this.recipes) {
 				buf.writeRegistryKey(recipe.id());
 				serializer.encode(buf, recipe.value());
 			}

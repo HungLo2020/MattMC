@@ -33,8 +33,8 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-import net.minecraft.server.packs.PackRepository;
-import net.minecraft.server.packs.ResourcePackProfile;
+import net.minecraft.server.packs.repository.PackRepository;
+import net.minecraft.server.packs.repository.Pack;
 import net.minecraft.commands.DatapackCommand;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.network.chat.Component;
@@ -53,16 +53,16 @@ public class DatapackCommandMixin {
 
 	@Redirect(method = "method_13136", at = @At(value = "INVOKE", target = "Lnet/minecraft/resource/PackRepository;getEnabledIds()Ljava/util/Collection;"))
 	private static Collection<String> filterEnabledPackSuggestions(PackRepository dataPackManager) {
-		return dataPackManager.getEnabledProfiles().stream().filter(profile -> !((FabricResourcePackProfile) profile).fabric_isHidden()).map(ResourcePackProfile::getId).toList();
+		return dataPackManager.getEnabledProfiles().stream().filter(profile -> !((FabricResourcePackProfile) profile).fabric_isHidden()).map(Pack::getId).toList();
 	}
 
 	@WrapOperation(method = "method_13120", at = @At(value = "INVOKE", target = "Ljava/util/stream/Stream;filter(Ljava/util/function/Predicate;)Ljava/util/stream/Stream;", ordinal = 0))
-	private static Stream<ResourcePackProfile> filterDisabledPackSuggestions(Stream<ResourcePackProfile> instance, Predicate<? super ResourcePackProfile> predicate, Operation<Stream<ResourcePackProfile>> original) {
+	private static Stream<Pack> filterDisabledPackSuggestions(Stream<Pack> instance, Predicate<? super Pack> predicate, Operation<Stream<Pack>> original) {
 		return original.call(instance, predicate).filter(profile -> !((FabricResourcePackProfile) profile).fabric_isHidden());
 	}
 
 	@Inject(method = "getPackContainer", at = @At(value = "INVOKE", target = "Ljava/util/Collection;contains(Ljava/lang/Object;)Z", shift = At.Shift.BEFORE))
-	private static void errorOnInternalPack(CommandContext<CommandSourceStack> context, String name, boolean enable, CallbackInfoReturnable<ResourcePackProfile> cir, @Local ResourcePackProfile profile) throws CommandSyntaxException {
+	private static void errorOnInternalPack(CommandContext<CommandSourceStack> context, String name, boolean enable, CallbackInfoReturnable<Pack> cir, @Local Pack profile) throws CommandSyntaxException {
 		if (((FabricResourcePackProfile) profile).fabric_isHidden()) throw INTERNAL_PACK_EXCEPTION.create(profile.getId());
 	}
 }

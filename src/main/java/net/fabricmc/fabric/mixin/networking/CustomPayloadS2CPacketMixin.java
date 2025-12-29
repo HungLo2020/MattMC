@@ -28,10 +28,10 @@ import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 
 import net.minecraft.network.FriendlyByteBuf;
-import net.minecraft.network.RegistryByteBuf;
-import net.minecraft.network.codec.PacketCodec;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.handler.EncoderHandler;
-import net.minecraft.network.protocol.CustomPacketPayload;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.s2c.common.CustomPayloadS2CPacket;
 
@@ -51,13 +51,13 @@ public class CustomPayloadS2CPacketMixin implements SplittablePacket, GenericPay
 			method = "<clinit>",
 			at = @At(
 					value = "INVOKE",
-					target = "Lnet/minecraft/network/packet/CustomPacketPayload;createCodec(Lnet/minecraft/network/packet/CustomPacketPayload$CodecFactory;Ljava/util/List;)Lnet/minecraft/network/codec/PacketCodec;",
+					target = "Lnet/minecraft/network/packet/CustomPacketPayload;createCodec(Lnet/minecraft/network/packet/CustomPacketPayload$CodecFactory;Ljava/util/List;)Lnet/minecraft/network/codec/StreamCodec;",
 					ordinal = 0
 			)
 	)
-	private static PacketCodec<RegistryByteBuf, CustomPacketPayload> wrapPlayCodec(CustomPacketPayload.CodecFactory<RegistryByteBuf> unknownCodecFactory, List<ResourceLocation<RegistryByteBuf, ?>> types, Operation<PacketCodec<RegistryByteBuf, CustomPacketPayload>> original) {
-		PacketCodec<RegistryByteBuf, CustomPacketPayload> codec = original.call(unknownCodecFactory, types);
-		FabricCustomPayloadPacketCodec<RegistryByteBuf> fabricCodec = (FabricCustomPayloadPacketCodec<RegistryByteBuf>) codec;
+	private static StreamCodec<RegistryFriendlyByteBuf, CustomPacketPayload> wrapPlayCodec(CustomPacketPayload.CodecFactory<RegistryFriendlyByteBuf> unknownCodecFactory, List<CustomPacketPayload.TypeAndCodec<RegistryFriendlyByteBuf, ?>> types, Operation<StreamCodec<RegistryFriendlyByteBuf, CustomPacketPayload>> original) {
+		StreamCodec<RegistryFriendlyByteBuf, CustomPacketPayload> codec = original.call(unknownCodecFactory, types);
+		FabricCustomPayloadPacketCodec<RegistryFriendlyByteBuf> fabricCodec = (FabricCustomPayloadPacketCodec<RegistryFriendlyByteBuf>) codec;
 		fabricCodec.fabric_setPacketCodecProvider((packetByteBuf, identifier) -> PayloadTypeRegistryImpl.PLAY_S2C.get(identifier));
 		return codec;
 	}
@@ -66,12 +66,12 @@ public class CustomPayloadS2CPacketMixin implements SplittablePacket, GenericPay
 			method = "<clinit>",
 			at = @At(
 					value = "INVOKE",
-					target = "Lnet/minecraft/network/packet/CustomPacketPayload;createCodec(Lnet/minecraft/network/packet/CustomPacketPayload$CodecFactory;Ljava/util/List;)Lnet/minecraft/network/codec/PacketCodec;",
+					target = "Lnet/minecraft/network/packet/CustomPacketPayload;createCodec(Lnet/minecraft/network/packet/CustomPacketPayload$CodecFactory;Ljava/util/List;)Lnet/minecraft/network/codec/StreamCodec;",
 					ordinal = 1
 			)
 	)
-	private static PacketCodec<FriendlyByteBuf, CustomPacketPayload> wrapConfigCodec(CustomPacketPayload.CodecFactory<FriendlyByteBuf> unknownCodecFactory, List<ResourceLocation<FriendlyByteBuf, ?>> types, Operation<PacketCodec<FriendlyByteBuf, CustomPacketPayload>> original) {
-		PacketCodec<FriendlyByteBuf, CustomPacketPayload> codec = original.call(unknownCodecFactory, types);
+	private static StreamCodec<FriendlyByteBuf, CustomPacketPayload> wrapConfigCodec(CustomPacketPayload.CodecFactory<FriendlyByteBuf> unknownCodecFactory, List<CustomPacketPayload.TypeAndCodec<FriendlyByteBuf, ?>> types, Operation<StreamCodec<FriendlyByteBuf, CustomPacketPayload>> original) {
+		StreamCodec<FriendlyByteBuf, CustomPacketPayload> codec = original.call(unknownCodecFactory, types);
 		FabricCustomPayloadPacketCodec<FriendlyByteBuf> fabricCodec = (FabricCustomPayloadPacketCodec<FriendlyByteBuf>) codec;
 		fabricCodec.fabric_setPacketCodecProvider((packetByteBuf, identifier) -> PayloadTypeRegistryImpl.CONFIGURATION_S2C.get(identifier));
 		return codec;

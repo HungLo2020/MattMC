@@ -18,14 +18,14 @@ package net.fabricmc.fabric.api.client.particle.v1;
 
 import java.util.List;
 
-import net.minecraft.client.particle.ParticleFactory;
-import net.minecraft.client.particle.SpriteProvider;
-import net.minecraft.client.texture.TextureAtlasSprite;
-import net.minecraft.client.texture.TextureAtlas;
+import net.minecraft.client.particle.ParticleProvider;
+import net.minecraft.client.particle.SpriteSet;
+import net.minecraft.client.renderer.texture.TextureAtlasSprite;
+import net.minecraft.client.renderer.texture.TextureAtlas;
 import net.minecraft.core.particles.ParticleType;
 
 /**
- * FabricSpriteProvider. It does the same thing as vanilla's SpriteProvider,
+ * FabricSpriteProvider. It does the same thing as vanilla's SpriteSet,
  * but in a way that's accessible to mods, and that exposes the atlas as well.
  *
  * <p>Custom sprites registered using ParticleFactoryRegistry have the options
@@ -33,10 +33,10 @@ import net.minecraft.core.particles.ParticleType;
  * interface containing the sprites set loaded for their particle from the
  * active resource packs.
  *
- * @see ParticleFactoryRegistry#register(ParticleType, ParticleFactory)
+ * @see ParticleFactoryRegistry#register(ParticleType, ParticleProvider)
  * @see ParticleFactoryRegistry.PendingParticleFactory
  */
-public interface FabricSpriteProvider extends SpriteProvider {
+public interface FabricSpriteProvider extends SpriteSet {
 	/**
 	 * Returns the entire particles texture atlas.
 	 */

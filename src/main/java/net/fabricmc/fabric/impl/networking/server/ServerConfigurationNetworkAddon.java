@@ -23,9 +23,9 @@ import java.util.Objects;
 import io.netty.channel.ChannelFutureListener;
 import org.jetbrains.annotations.Nullable;
 
-import net.minecraft.network.NetworkPhase;
+import net.minecraft.network.ConnectionProtocol;
 import net.minecraft.network.protocol.BrandCustomPayload;
-import net.minecraft.network.protocol.CustomPacketPayload;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.s2c.common.CommonPingS2CPacket;
 import net.minecraft.server.MinecraftServer;
@@ -58,7 +58,7 @@ public final class ServerConfigurationNetworkAddon extends AbstractChanneledNetw
 		this.context = new ContextImpl(server, handler, this);
 
 		// Must register pending channels via lateinit
-		this.registerPendingChannels((ChannelInfoHolder) this.connection, NetworkPhase.CONFIGURATION);
+		this.registerPendingChannels((ChannelInfoHolder) this.connection, ConnectionProtocol.CONFIGURATION);
 	}
 
 	@Override

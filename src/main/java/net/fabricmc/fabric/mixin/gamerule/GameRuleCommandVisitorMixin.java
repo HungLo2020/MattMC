@@ -25,7 +25,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import net.minecraft.commands.CommandSourceStack;
-import net.minecraft.world.GameRules;
+import net.minecraft.world.level.GameRules;
 
 import net.fabricmc.fabric.impl.gamerule.EnumRuleCommand;
 import net.fabricmc.fabric.impl.gamerule.EnumRuleType;
@@ -37,7 +37,7 @@ public abstract class GameRuleCommandVisitorMixin {
 	LiteralArgumentBuilder<CommandSourceStack> field_19419;
 
 	@Inject(at = @At("HEAD"), method = "visit(Lnet/minecraft/world/GameRules$Key;Lnet/minecraft/world/GameRules$Type;)V", cancellable = true)
-	private <T extends GameRules.Rule<T>> void onRegisterCommand(GameRules.Key<T> key, GameRules.Type<T> type, CallbackInfo ci) {
+	private <T extends GameRules.Value<T>> void onRegisterCommand(GameRules.Key<T> key, GameRules.Type<T> type, CallbackInfo ci) {
 		// Check if our type is a EnumRuleType
 		if (type instanceof EnumRuleType) {
 			//noinspection rawtypes,unchecked

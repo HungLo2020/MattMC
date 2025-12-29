@@ -25,7 +25,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.util.ActionResult;
+import net.minecraft.world.InteractionResult;
 import net.minecraft.util.Unit;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.Level;
@@ -35,8 +35,8 @@ import net.fabricmc.fabric.api.entity.event.v1.EntitySleepEvents;
 @Mixin(Player.class)
 abstract class PlayerEntityMixin {
 	@Inject(method = "trySleep", at = @At("HEAD"), cancellable = true)
-	private void onTrySleep(BlockPos pos, CallbackInfoReturnable<Either<Player.SleepFailureReason, Unit>> info) {
-		Player.SleepFailureReason failureReason = EntitySleepEvents.ALLOW_SLEEPING.invoker().allowSleep((Player) (Object) this, pos);
+	private void onTrySleep(BlockPos pos, CallbackInfoReturnable<Either<Player.BedSleepingProblem, Unit>> info) {
+		Player.BedSleepingProblem failureReason = EntitySleepEvents.ALLOW_SLEEPING.invoker().allowSleep((Player) (Object) this, pos);
 
 		if (failureReason != null) {
 			info.setReturnValue(Either.left(failureReason));
@@ -49,9 +49,9 @@ abstract class PlayerEntityMixin {
 
 		if (((LivingEntity) (Object) this).getSleepingPosition().isPresent()) {
 			BlockPos pos = ((LivingEntity) (Object) this).getSleepingPosition().get();
-			ActionResult result = EntitySleepEvents.ALLOW_SLEEP_TIME.invoker().allowSleepTime((Player) (Object) this, pos, !day);
+			InteractionResult result = EntitySleepEvents.ALLOW_SLEEP_TIME.invoker().allowSleepTime((Player) (Object) this, pos, !day);
 
-			if (result != ActionResult.PASS) {
+			if (result != InteractionResult.PASS) {
 				return !result.isAccepted(); // true from the event = night-like conditions, so we have to invert
 			}
 		}

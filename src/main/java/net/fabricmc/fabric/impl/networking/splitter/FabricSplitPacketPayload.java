@@ -18,13 +18,13 @@ package net.fabricmc.fabric.impl.networking.splitter;
 
 import io.netty.buffer.ByteBuf;
 
-import net.minecraft.network.codec.PacketCodec;
-import net.minecraft.network.protocol.CustomPacketPayload;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
 
 public record FabricSplitPacketPayload(ByteBuf byteBuf) implements CustomPacketPayload {
 	public static final Id<FabricSplitPacketPayload> ID = new Id<>(ResourceLocation.of("fabric", "split"));
-	public static final PacketCodec<ByteBuf, FabricSplitPacketPayload> CODEC = PacketCodec.ofStatic(FabricSplitPacketPayload::write, FabricSplitPacketPayload::read);
+	public static final StreamCodec<ByteBuf, FabricSplitPacketPayload> CODEC = StreamCodec.ofStatic(FabricSplitPacketPayload::write, FabricSplitPacketPayload::read);
 
 	private static FabricSplitPacketPayload read(ByteBuf buf) {
 		return new FabricSplitPacketPayload(buf.readBytes(buf.readableBytes()));

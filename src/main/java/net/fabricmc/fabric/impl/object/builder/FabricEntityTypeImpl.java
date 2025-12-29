@@ -25,11 +25,11 @@ import org.jetbrains.annotations.Nullable;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.MobCategory;
-import net.minecraft.world.entity.SpawnLocation;
+import net.minecraft.world.entity.SpawnPlacementType;
 import net.minecraft.world.entity.SpawnPlacements;
-import net.minecraft.world.entity.attribute.DefaultAttributeContainer;
-import net.minecraft.world.entity.mob.Mob;
-import net.minecraft.world.Heightmap;
+import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
+import net.minecraft.world.entity.Mob;
+import net.minecraft.world.level.levelgen.Heightmap;
 
 import net.fabricmc.fabric.api.object.builder.v1.entity.FabricDefaultAttributeRegistry;
 import net.fabricmc.fabric.api.object.builder.v1.entity.FabricEntityType;
@@ -62,10 +62,10 @@ public interface FabricEntityTypeImpl {
 
 		sealed class Living<T extends LivingEntity> implements FabricEntityType.Builder.Living<T> permits Mob {
 			@Nullable
-			private Supplier<DefaultAttributeContainer.Builder> defaultAttributeBuilder;
+			private Supplier<AttributeSupplier.Builder> defaultAttributeBuilder;
 
 			@Override
-			public FabricEntityType.Builder.Living<T> defaultAttributes(Supplier<DefaultAttributeContainer.Builder> defaultAttributeBuilder) {
+			public FabricEntityType.Builder.Living<T> defaultAttributes(Supplier<AttributeSupplier.Builder> defaultAttributeBuilder) {
 				Objects.requireNonNull(defaultAttributeBuilder, "Cannot set null attribute builder");
 				this.defaultAttributeBuilder = defaultAttributeBuilder;
 				return this;
@@ -79,12 +79,12 @@ public interface FabricEntityTypeImpl {
 		}
 
 		final class Mob<T extends Mob> extends Living<T> implements FabricEntityType.Builder.Mob<T> {
-			private SpawnLocation restrictionLocation;
+			private SpawnPlacementType restrictionLocation;
 			private Heightmap.Types restrictionHeightmap;
 			private SpawnPlacements.SpawnPredicate<T> spawnPredicate;
 
 			@Override
-			public FabricEntityType.Builder.Mob<T> spawnRestriction(SpawnLocation location, Heightmap.Types heightmap, SpawnPlacements.SpawnPredicate<T> spawnPredicate) {
+			public FabricEntityType.Builder.Mob<T> spawnRestriction(SpawnPlacementType location, Heightmap.Types heightmap, SpawnPlacements.SpawnPredicate<T> spawnPredicate) {
 				this.restrictionLocation = Objects.requireNonNull(location, "Location cannot be null.");
 				this.restrictionHeightmap = Objects.requireNonNull(heightmap, "Heightmap type cannot be null.");
 				this.spawnPredicate = Objects.requireNonNull(spawnPredicate, "Spawn predicate cannot be null.");
@@ -92,7 +92,7 @@ public interface FabricEntityTypeImpl {
 			}
 
 			@Override
-			public FabricEntityType.Builder.Mob<T> defaultAttributes(Supplier<DefaultAttributeContainer.Builder> defaultAttributeBuilder) {
+			public FabricEntityType.Builder.Mob<T> defaultAttributes(Supplier<AttributeSupplier.Builder> defaultAttributeBuilder) {
 				super.defaultAttributes(defaultAttributeBuilder);
 				return this;
 			}

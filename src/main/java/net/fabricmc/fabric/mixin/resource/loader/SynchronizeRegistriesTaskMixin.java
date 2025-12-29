@@ -33,7 +33,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.s2c.config.SelectKnownPacksS2CPacket;
-import net.minecraft.core.VersionedIdentifier;
+import net.minecraft.server.packs.repository.KnownPack;
 import net.minecraft.server.network.SynchronizeRegistriesTask;
 
 import net.fabricmc.fabric.impl.resource.loader.ModResourcePackCreator;
@@ -44,13 +44,13 @@ public abstract class SynchronizeRegistriesTaskMixin {
 	private static final Logger LOGGER = LoggerFactory.getLogger("SynchronizeRegistriesTaskMixin");
 	@Shadow
 	@Final
-	private List<VersionedIdentifier> knownPacks;
+	private List<KnownPack> knownPacks;
 
 	@Shadow
-	protected abstract void syncRegistryAndTags(Consumer<Packet<?>> sender, Set<VersionedIdentifier> commonKnownPacks);
+	protected abstract void syncRegistryAndTags(Consumer<Packet<?>> sender, Set<KnownPack> commonKnownPacks);
 
 	@Inject(method = "onSelectKnownPacks", at = @At("HEAD"), cancellable = true)
-	public void onSelectKnownPacks(List<VersionedIdentifier> clientKnownPacks, Consumer<Packet<?>> sender, CallbackInfo ci) {
+	public void onSelectKnownPacks(List<KnownPack> clientKnownPacks, Consumer<Packet<?>> sender, CallbackInfo ci) {
 		if (new HashSet<>(this.knownPacks).containsAll(clientKnownPacks)) {
 			this.syncRegistryAndTags(sender, Set.copyOf(clientKnownPacks));
 			ci.cancel();
@@ -58,7 +58,7 @@ public abstract class SynchronizeRegistriesTaskMixin {
 	}
 
 	@Inject(method = "syncRegistryAndTags", at = @At("HEAD"))
-	public void syncRegistryAndTags(Consumer<Packet<?>> sender, Set<VersionedIdentifier> commonKnownPacks, CallbackInfo ci) {
+	public void syncRegistryAndTags(Consumer<Packet<?>> sender, Set<KnownPack> commonKnownPacks, CallbackInfo ci) {
 		LOGGER.debug("Synchronizing registries with common known packs: {}", commonKnownPacks);
 	}
 

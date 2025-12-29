@@ -27,15 +27,15 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import net.minecraft.server.level.ChunkHolder;
-import net.minecraft.server.level.ServerChunkLoadingManager;
+import net.minecraft.server.level.ChunkMap;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.chunk.Chunk;
 import net.minecraft.world.level.chunk.LevelChunk;
 
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerChunkEvents;
 
-@Mixin(ServerChunkLoadingManager.class)
-public abstract class ServerChunkLoadingManagerMixin {
+@Mixin(ChunkMap.class)
+public abstract class ChunkMapMixin {
 	@Shadow
 	@Final
 	ServerLevel world;
@@ -44,7 +44,7 @@ public abstract class ServerChunkLoadingManagerMixin {
 	 * Injection is inside of tryUnloadChunk.
 	 * We inject just after "setLoadedToWorld" is made false, since here the LevelChunk is guaranteed to be unloaded.
 	 */
-	@Inject(method = "method_60440", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/world/ServerChunkLoadingManager;save(Lnet/minecraft/world/chunk/Chunk;)Z"))
+	@Inject(method = "method_60440", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/world/ChunkMap;save(Lnet/minecraft/world/chunk/Chunk;)Z"))
 	private void onChunkUnload(ChunkHolder chunkHolder, CompletableFuture<?> completableFuture, long l, CallbackInfo ci, @Local Chunk chunk) {
 		if (chunk instanceof LevelChunk worldChunk) {
 			ServerChunkEvents.CHUNK_UNLOAD.invoker().onChunkUnload(this.world, worldChunk);

@@ -24,9 +24,9 @@ import org.jetbrains.annotations.UnmodifiableView;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.ItemUsage;
+import net.minecraft.world.item.ItemUtils;
 import net.minecraft.world.inventory.AbstractContainerMenu;
-import net.minecraft.util.Hand;
+import net.minecraft.world.InteractionHand;
 
 import net.fabricmc.fabric.api.lookup.v1.item.ItemApiLookup;
 import net.fabricmc.fabric.api.transfer.v1.item.ItemVariant;
@@ -90,9 +90,9 @@ public interface ContainerItemContext {
 	 *
 	 * <p>In creative mode, {@link #forCreativeInteraction} is used with the hand stack.
 	 * Otherwise, {@link #ofPlayerHand} is used.
-	 * This matches the behavior of {@link ItemUsage#exchangeStack}.
+	 * This matches the behavior of {@link ItemUtils#exchangeStack}.
 	 */
-	static ContainerItemContext forPlayerInteraction(Player player, Hand hand) {
+	static ContainerItemContext forPlayerInteraction(Player player, InteractionHand hand) {
 		if (player.isInCreativeMode()) {
 			return forCreativeInteraction(player, player.getStackInHand(hand));
 		} else {
@@ -105,7 +105,7 @@ public interface ContainerItemContext {
 	 *
 	 * <p>The stack will never be modified, and any updated stack will only be added to the player's inventory
 	 * if the player's inventory doesn't already contain it.
-	 * This matches the creative behavior of {@link ItemUsage#exchangeStack}.
+	 * This matches the creative behavior of {@link ItemUtils#exchangeStack}.
 	 */
 	static ContainerItemContext forCreativeInteraction(Player player, ItemStack interactingStack) {
 		return new CreativeInteractionContainerItemContext(ItemVariant.of(interactingStack), interactingStack.getCount(), player);
@@ -114,7 +114,7 @@ public interface ContainerItemContext {
 	/**
 	 * Return a context for the passed player's hand.
 	 */
-	static ContainerItemContext ofPlayerHand(Player player, Hand hand) {
+	static ContainerItemContext ofPlayerHand(Player player, InteractionHand hand) {
 		return new PlayerContainerItemContext(player, hand);
 	}
 

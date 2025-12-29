@@ -20,13 +20,13 @@ import java.util.HashSet;
 import java.util.Set;
 
 import net.minecraft.network.FriendlyByteBuf;
-import net.minecraft.network.codec.PacketCodec;
-import net.minecraft.network.protocol.CustomPacketPayload;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
 
 public record CommonRegisterPayload(int version, String phase, Set<ResourceLocation> channels) implements CustomPacketPayload {
-	public static final CustomPacketPayload.Id<CommonRegisterPayload> ID = new Id<>(ResourceLocation.of("c:register"));
-	public static final PacketCodec<FriendlyByteBuf, CommonRegisterPayload> CODEC = CustomPacketPayload.codecOf(CommonRegisterPayload::write, CommonRegisterPayload::new);
+	public static final CustomPacketPayload.Type<CommonRegisterPayload> ID = new Id<>(ResourceLocation.of("c:register"));
+	public static final StreamCodec<FriendlyByteBuf, CommonRegisterPayload> CODEC = CustomPacketPayload.codecOf(CommonRegisterPayload::write, CommonRegisterPayload::new);
 
 	public static final String PLAY_PHASE = "play";
 	public static final String CONFIGURATION_PHASE = "configuration";

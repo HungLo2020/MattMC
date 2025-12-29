@@ -21,9 +21,9 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 
 import net.minecraft.world.entity.EntityType;
-import net.minecraft.world.entity.mob.BreezeEntity;
-import net.minecraft.world.entity.mob.Monster;
-import net.minecraft.core.particles.BlockStateParticleEffect;
+import net.minecraft.world.entity.BreezeEntity;
+import net.minecraft.world.entity.Monster;
+import net.minecraft.core.particles.BlockParticleOption;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.Level;
 
@@ -35,8 +35,8 @@ abstract class BreezeEntityMixin extends Monster {
 		super(entityType, world);
 	}
 
-	@ModifyExpressionValue(method = { "addLongJumpingParticles", "addBlockParticles" }, at = @At(value = "NEW", target = "(Lnet/minecraft/particle/ParticleType;Lnet/minecraft/block/BlockState;)Lnet/minecraft/particle/BlockStateParticleEffect;"))
-	private BlockStateParticleEffect modifyBlockStateParticleEffect(BlockStateParticleEffect original) {
+	@ModifyExpressionValue(method = { "addLongJumpingParticles", "addBlockParticles" }, at = @At(value = "NEW", target = "(Lnet/minecraft/particle/ParticleType;Lnet/minecraft/block/BlockState;)Lnet/minecraft/particle/BlockParticleOption;"))
+	private BlockParticleOption modifyBlockStateParticleEffect(BlockParticleOption original) {
 		BlockPos blockPos = !getBlockStateAtPos().isAir() ? getBlockPos() : getSteppingPos();
 		((BlockStateParticleEffectExtension) original).fabric_setBlockPos(blockPos);
 		return original;

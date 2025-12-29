@@ -23,9 +23,9 @@ import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.Nullable;
 
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.multiplayer.LocalPlayer;
-import net.minecraft.network.ServerCommonPacketListener;
-import net.minecraft.network.protocol.CustomPacketPayload;
+import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.network.protocol.common.ServerCommonPacketListener;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.resources.ResourceLocation;
 
@@ -66,9 +66,9 @@ public final class ClientPlayNetworking {
 	 * @return false if a handler is already registered to the channel
 	 * @throws IllegalArgumentException if the codec for {@code type} has not been {@linkplain PayloadTypeRegistry#playS2C() registered} yet
 	 * @see ClientPlayNetworking#unregisterGlobalReceiver(ResourceLocation)
-	 * @see ClientPlayNetworking#registerReceiver(CustomPacketPayload.Id, PlayPayloadHandler)
+	 * @see ClientPlayNetworking#registerReceiver(CustomPacketPayload.Type, PlayPayloadHandler)
 	 */
-	public static <T extends CustomPacketPayload> boolean registerGlobalReceiver(CustomPacketPayload.Id<T> type, PlayPayloadHandler<T> handler) {
+	public static <T extends CustomPacketPayload> boolean registerGlobalReceiver(CustomPacketPayload.Type<T> type, PlayPayloadHandler<T> handler) {
 		return ClientNetworkingImpl.PLAY.registerGlobalReceiver(type.id(), handler);
 	}
 
@@ -80,8 +80,8 @@ public final class ClientPlayNetworking {
 	 *
 	 * @param id the payload id
 	 * @return the previous handler, or {@code null} if no handler was bound to the channel,
-	 * or it was not registered using {@link #registerGlobalReceiver(CustomPacketPayload.Id, PlayPayloadHandler)}
-	 * @see ClientPlayNetworking#registerGlobalReceiver(CustomPacketPayload.Id, PlayPayloadHandler)
+	 * or it was not registered using {@link #registerGlobalReceiver(CustomPacketPayload.Type, PlayPayloadHandler)}
+	 * @see ClientPlayNetworking#registerGlobalReceiver(CustomPacketPayload.Type, PlayPayloadHandler)
 	 * @see ClientPlayNetworking#unregisterReceiver(ResourceLocation)
 	 */
 	@Nullable
@@ -115,7 +115,7 @@ public final class ClientPlayNetworking {
 	 * @throws IllegalStateException if the client is not connected to a server
 	 * @see ClientPlayConnectionEvents#INIT
 	 */
-	public static <T extends CustomPacketPayload> boolean registerReceiver(CustomPacketPayload.Id<T> type, PlayPayloadHandler<T> handler) {
+	public static <T extends CustomPacketPayload> boolean registerReceiver(CustomPacketPayload.Type<T> type, PlayPayloadHandler<T> handler) {
 		final ClientPlayNetworkAddon addon = ClientNetworkingImpl.getClientPlayAddon();
 
 		if (addon != null) {
@@ -132,7 +132,7 @@ public final class ClientPlayNetworking {
 	 *
 	 * @param id the payload id
 	 * @return the previous handler, or {@code null} if no handler was bound to the channel,
-	 * or it was not registered using {@link #registerReceiver(CustomPacketPayload.Id, PlayPayloadHandler)}
+	 * or it was not registered using {@link #registerReceiver(CustomPacketPayload.Type, PlayPayloadHandler)}
 	 * @throws IllegalStateException if the client is not connected to a server
 	 */
 	@Nullable
@@ -201,7 +201,7 @@ public final class ClientPlayNetworking {
 	 * @param type the payload type
 	 * @return {@code true} if the connected server has declared the ability to receive a payload on the specified channel
 	 */
-	public static boolean canSend(CustomPacketPayload.Id<?> type) {
+	public static boolean canSend(CustomPacketPayload.Type<?> type) {
 		return canSend(type.id());
 	}
 

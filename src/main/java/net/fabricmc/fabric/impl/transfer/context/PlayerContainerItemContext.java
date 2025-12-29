@@ -19,7 +19,7 @@ package net.fabricmc.fabric.impl.transfer.context;
 import java.util.List;
 
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.util.Hand;
+import net.minecraft.world.InteractionHand;
 
 import net.fabricmc.fabric.api.transfer.v1.context.ContainerItemContext;
 import net.fabricmc.fabric.api.transfer.v1.item.ItemVariant;
@@ -31,7 +31,7 @@ public class PlayerContainerItemContext implements ContainerItemContext {
 	private final PlayerInventoryStorage playerWrapper;
 	private final SingleSlotStorage<ItemVariant> slot;
 
-	public PlayerContainerItemContext(Player player, Hand hand) {
+	public PlayerContainerItemContext(Player player, InteractionHand hand) {
 		this.playerWrapper = PlayerInventoryStorage.of(player);
 		this.slot = playerWrapper.getHandSlot(hand);
 	}

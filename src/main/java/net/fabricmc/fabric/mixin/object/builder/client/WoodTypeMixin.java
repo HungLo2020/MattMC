@@ -21,7 +21,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-import net.minecraft.world.level.block.WoodType;
+import net.minecraft.world.level.block.state.properties.WoodType;
 import net.minecraft.client.renderer.TexturedRenderLayers;
 import net.minecraft.resources.ResourceLocation;
 

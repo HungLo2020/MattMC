@@ -21,14 +21,14 @@ import java.util.Optional;
 import org.jetbrains.annotations.Nullable;
 
 import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.material.FlowableFluid;
+import net.minecraft.world.level.material.FlowingFluid;
 import net.minecraft.world.level.material.Fluid;
 import net.minecraft.world.level.material.Fluids;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.network.chat.Style;
 import net.minecraft.network.chat.Component;
-import net.minecraft.util.Formatting;
+import net.minecraft.ChatFormatting;
 import net.minecraft.world.level.Level;
 
 import net.fabricmc.fabric.api.lookup.v1.custom.ApiProviderMap;
@@ -135,7 +135,7 @@ public final class FluidVariantAttributes {
 	 * Return a positive integer, representing the viscosity of this fluid variant.
 	 * Fluids with lower viscosity generally flow faster than fluids with higher viscosity.
 	 *
-	 * <p>More precisely, viscosity should be {@value FluidConstants#VISCOSITY_RATIO} * {@link FlowableFluid#getMaxFlowDistance} for flowable fluids.
+	 * <p>More precisely, viscosity should be {@value FluidConstants#VISCOSITY_RATIO} * {@link FlowingFluid#getMaxFlowDistance} for flowable fluids.
 	 * The reference values are {@value FluidConstants#WATER_VISCOSITY} for water,
 	 * {@value FluidConstants#LAVA_VISCOSITY_NETHER} for lava in ultrawarm dimensions (such as the nether),
 	 * and {@value FluidConstants#LAVA_VISCOSITY} for lava in other dimensions.
@@ -166,7 +166,7 @@ public final class FluidVariantAttributes {
 			@Override
 			public Component getName(FluidVariant fluidVariant) {
 				if (coloredVanillaFluidNames) {
-					return Blocks.WATER.getName().setStyle(Style.EMPTY.withColor(Formatting.BLUE));
+					return Blocks.WATER.getName().setStyle(Style.EMPTY.withColor(ChatFormatting.BLUE));
 				} else {
 					return FluidVariantAttributeHandler.super.getName(fluidVariant);
 				}
@@ -181,7 +181,7 @@ public final class FluidVariantAttributes {
 			@Override
 			public Component getName(FluidVariant fluidVariant) {
 				if (coloredVanillaFluidNames) {
-					return Blocks.LAVA.getName().setStyle(Style.EMPTY.withColor(Formatting.RED));
+					return Blocks.LAVA.getName().setStyle(Style.EMPTY.withColor(ChatFormatting.RED));
 				} else {
 					return FluidVariantAttributeHandler.super.getName(fluidVariant);
 				}

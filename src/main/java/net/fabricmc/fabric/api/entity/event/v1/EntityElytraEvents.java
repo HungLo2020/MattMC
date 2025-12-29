@@ -16,7 +16,7 @@
 
 package net.fabricmc.fabric.api.entity.event.v1;
 
-import net.minecraft.component.DataComponents;
+import net.minecraft.core.component.DataComponents;
 import net.minecraft.world.entity.LivingEntity;
 
 import net.fabricmc.fabric.api.event.Event;

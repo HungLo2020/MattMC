@@ -18,7 +18,9 @@ package net.fabricmc.fabric.api.client.message.v1;
 
 import java.time.Instant;
 
-import com.mojang.authlib.GameProfile;
+// GameProfile is not available in com.mojang.authlib in this context
+// Using net.minecraft types instead
+import net.minecraft.world.entity.player.Player;
 import org.jetbrains.annotations.Nullable;
 
 import net.minecraft.client.gui.components.ChatComponent;
@@ -65,7 +67,7 @@ public final class ClientReceiveMessageEvents {
 	 *
 	 * <p>Overlay is whether the message will be displayed in the action bar.
 	 * To toggle overlay, return false and call
-	 * {@link net.minecraft.client.multiplayer.LocalPlayer#sendMessage(Component, boolean) LocalPlayer.sendMessage(message, overlay)}.
+	 * {@link net.minecraft.client.player.LocalPlayer#sendMessage(Component, boolean) LocalPlayer.sendMessage(message, overlay)}.
 	 */
 	public static final Event<AllowGame> ALLOW_GAME = EventFactory.createArrayBacked(AllowGame.class, listeners -> (message, overlay) -> {
 		boolean allow = true;
@@ -160,7 +162,7 @@ public final class ClientReceiveMessageEvents {
 		 * @param receptionTimestamp the timestamp when the message was received
 		 * @return {@code true} if the message should be displayed, otherwise {@code false}
 		 */
-		boolean allowReceiveChatMessage(Component message, @Nullable PlayerChatMessage signedMessage, @Nullable GameProfile sender, ChatType.Bound params, Instant receptionTimestamp);
+		boolean allowReceiveChatMessage(Component message, @Nullable PlayerChatMessage signedMessage, @Nullable Player sender, ChatType.Bound params, Instant receptionTimestamp);
 	}
 
 	@FunctionalInterface
@@ -173,7 +175,7 @@ public final class ClientReceiveMessageEvents {
 		 *
 		 * <p>Overlay is whether the message will be displayed in the action bar.
 		 * To toggle overlay, return false and call
-		 * {@link net.minecraft.client.multiplayer.LocalPlayer#sendMessage(Component, boolean) LocalPlayer.sendMessage(message, overlay)}.
+		 * {@link net.minecraft.client.player.LocalPlayer#sendMessage(Component, boolean) LocalPlayer.sendMessage(message, overlay)}.
 		 *
 		 * @param message the message received from the server
 		 * @param overlay whether the message will be displayed in the action bar
@@ -213,7 +215,7 @@ public final class ClientReceiveMessageEvents {
 		 * @param params             the parameters of the message
 		 * @param receptionTimestamp the timestamp when the message was received
 		 */
-		void onReceiveChatMessage(Component message, @Nullable PlayerChatMessage signedMessage, @Nullable GameProfile sender, ChatType.Bound params, Instant receptionTimestamp);
+		void onReceiveChatMessage(Component message, @Nullable PlayerChatMessage signedMessage, @Nullable Player sender, ChatType.Bound params, Instant receptionTimestamp);
 	}
 
 	@FunctionalInterface
@@ -243,7 +245,7 @@ public final class ClientReceiveMessageEvents {
 		 * @param params             the parameters of the message
 		 * @param receptionTimestamp the timestamp when the message was received
 		 */
-		void onReceiveChatMessageCanceled(Component message, @Nullable PlayerChatMessage signedMessage, @Nullable GameProfile sender, ChatType.Bound params, Instant receptionTimestamp);
+		void onReceiveChatMessageCanceled(Component message, @Nullable PlayerChatMessage signedMessage, @Nullable Player sender, ChatType.Bound params, Instant receptionTimestamp);
 	}
 
 	@FunctionalInterface

@@ -29,14 +29,14 @@ import org.jetbrains.annotations.VisibleForTesting;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import net.minecraft.core.Registries;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.core.Registry;
-import net.minecraft.world.inventory.ScreenTexts;
-import net.minecraft.network.chat.MutableText;
+import net.minecraft.network.chat.CommonComponents;
+import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.network.chat.Component;
-import net.minecraft.util.Formatting;
+import net.minecraft.ChatFormatting;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.util.thread.ThreadExecutor;
+import net.minecraft.util.thread.BlockableEventLoop;
 
 import net.fabricmc.fabric.api.event.registry.RegistryAttribute;
 import net.fabricmc.fabric.impl.registry.sync.RegistrySyncManager;
@@ -50,7 +50,7 @@ public final class ClientRegistrySyncHandler {
 	private ClientRegistrySyncHandler() {
 	}
 
-	public static <T extends RegistryPacketHandler.RegistrySyncPayload> CompletableFuture<Boolean> receivePacket(ThreadExecutor<?> executor, RegistryPacketHandler<T> handler, T payload, boolean accept) {
+	public static <T extends RegistryPacketHandler.RegistrySyncPayload> CompletableFuture<Boolean> receivePacket(BlockableEventLoop<?> executor, RegistryPacketHandler<T> handler, T payload, boolean accept) {
 		handler.receivePayload(payload);
 
 		if (!handler.isPacketFinished()) {
@@ -170,7 +170,7 @@ public final class ClientRegistrySyncHandler {
 	}
 
 	private static Component missingRegistriesError(List<ResourceLocation> missingRegistries) {
-		MutableText text = Component.empty();
+		MutableComponent text = Component.empty();
 
 		final int count = missingRegistries.size();
 
@@ -180,14 +180,14 @@ public final class ClientRegistrySyncHandler {
 			text = text.append(Component.translatable("fabric-registry-sync-v0.unknown-registry.title.plural", count));
 		}
 
-		text = text.append(Component.translatable("fabric-registry-sync-v0.unknown-registry.subtitle.1").formatted(Formatting.GREEN));
+		text = text.append(Component.translatable("fabric-registry-sync-v0.unknown-registry.subtitle.1").formatted(ChatFormatting.GREEN));
 		text = text.append(Component.translatable("fabric-registry-sync-v0.unknown-registry.subtitle.2"));
 
 		final int toDisplay = 4;
 
 		for (int i = 0; i < Math.min(missingRegistries.size(), toDisplay); i++) {
-			text = text.append(Component.literal(missingRegistries.get(i).toString()).formatted(Formatting.YELLOW));
-			text = text.append(ScreenTexts.LINE_BREAK);
+			text = text.append(Component.literal(missingRegistries.get(i).toString()).formatted(ChatFormatting.YELLOW));
+			text = text.append(CommonComponents.LINE_BREAK);
 		}
 
 		if (missingRegistries.size() > toDisplay) {
@@ -198,7 +198,7 @@ public final class ClientRegistrySyncHandler {
 	}
 
 	private static Component missingEntriesError(Map<ResourceLocation, List<ResourceLocation>> missingEntries) {
-		MutableText text = Component.empty();
+		MutableComponent text = Component.empty();
 
 		final int count = missingEntries.values().stream().mapToInt(List::size).sum();
 
@@ -208,7 +208,7 @@ public final class ClientRegistrySyncHandler {
 			text = text.append(Component.translatable("fabric-registry-sync-v0.unknown-remote.title.plural", count));
 		}
 
-		text = text.append(Component.translatable("fabric-registry-sync-v0.unknown-remote.subtitle.1").formatted(Formatting.GREEN));
+		text = text.append(Component.translatable("fabric-registry-sync-v0.unknown-remote.subtitle.1").formatted(ChatFormatting.GREEN));
 		text = text.append(Component.translatable("fabric-registry-sync-v0.unknown-remote.subtitle.2"));
 
 		final int toDisplay = 4;
@@ -221,8 +221,8 @@ public final class ClientRegistrySyncHandler {
 				.toList();
 
 		for (int i = 0; i < Math.min(namespaces.size(), toDisplay); i++) {
-			text = text.append(Component.literal(namespaces.get(i)).formatted(Formatting.YELLOW));
-			text = text.append(ScreenTexts.LINE_BREAK);
+			text = text.append(Component.literal(namespaces.get(i)).formatted(ChatFormatting.YELLOW));
+			text = text.append(CommonComponents.LINE_BREAK);
 		}
 
 		if (namespaces.size() > toDisplay) {

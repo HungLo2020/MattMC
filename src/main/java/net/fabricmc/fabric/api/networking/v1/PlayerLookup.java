@@ -24,19 +24,19 @@ import java.util.stream.Collectors;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.network.PlayerAssociatedNetworkHandler;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.server.level.ServerChunkLoadingManager;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.level.ChunkMap;
 import net.minecraft.server.level.ServerChunkCache;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.ChunkPos;
-import net.minecraft.core.Vec3;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.phys.Vec3;
 import net.minecraft.core.Vec3i;
 import net.minecraft.world.level.chunk.ChunkSource;
 
 import net.fabricmc.fabric.mixin.networking.accessor.EntityTrackerAccessor;
-import net.fabricmc.fabric.mixin.networking.accessor.ServerChunkLoadingManagerAccessor;
+import net.fabricmc.fabric.mixin.networking.accessor.ChunkMapAccessor;
 
 /**
  * Helper methods to lookup players in a server.
@@ -112,8 +112,8 @@ public final class PlayerLookup {
 		ChunkSource manager = entity.getEntityWorld().getChunkManager();
 
 		if (manager instanceof ServerChunkCache) {
-			ServerChunkLoadingManager chunkLoadingManager = ((ServerChunkCache) manager).chunkLoadingManager;
-			EntityTrackerAccessor tracker = ((ServerChunkLoadingManagerAccessor) chunkLoadingManager).getEntityTrackers().get(entity.getId());
+			ChunkMap chunkLoadingManager = ((ServerChunkCache) manager).chunkLoadingManager;
+			EntityTrackerAccessor tracker = ((ChunkMapAccessor) chunkLoadingManager).getEntityTrackers().get(entity.getId());
 
 			// return an immutable collection to guard against accidental removals.
 			if (tracker != null) {

@@ -23,13 +23,13 @@ import org.jetbrains.annotations.Nullable;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.multiplayer.ConnectScreen;
 import net.minecraft.client.multiplayer.ClientConfigurationPacketListenerImpl;
-import net.minecraft.client.multiplayer.ClientLoginPacketListenerImpl;
+import net.minecraft.client.multiplayer.ClientHandshakePacketListenerImpl;
 import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.network.Connection;
-import net.minecraft.network.NetworkPhase;
+import net.minecraft.network.ConnectionProtocol;
 import net.minecraft.network.NetworkSide;
 import net.minecraft.network.ServerCommonPacketListener;
-import net.minecraft.network.protocol.CustomPacketPayload;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.c2s.common.CustomPayloadC2SPacket;
 
@@ -50,9 +50,9 @@ import net.fabricmc.fabric.mixin.networking.client.accessor.ConnectScreenAccesso
 import net.fabricmc.fabric.mixin.networking.client.accessor.MinecraftClientAccessor;
 
 public final class ClientNetworkingImpl {
-	public static final GlobalReceiverRegistry<ClientLoginNetworking.LoginQueryRequestHandler> LOGIN = new GlobalReceiverRegistry<>(NetworkSide.CLIENTBOUND, NetworkPhase.LOGIN, null);
-	public static final GlobalReceiverRegistry<ClientConfigurationNetworking.ConfigurationPayloadHandler<?>> CONFIGURATION = new GlobalReceiverRegistry<>(NetworkSide.CLIENTBOUND, NetworkPhase.CONFIGURATION, PayloadTypeRegistryImpl.CONFIGURATION_S2C);
-	public static final GlobalReceiverRegistry<ClientPlayNetworking.PlayPayloadHandler<?>> PLAY = new GlobalReceiverRegistry<>(NetworkSide.CLIENTBOUND, NetworkPhase.PLAY, PayloadTypeRegistryImpl.PLAY_S2C);
+	public static final GlobalReceiverRegistry<ClientLoginNetworking.LoginQueryRequestHandler> LOGIN = new GlobalReceiverRegistry<>(NetworkSide.CLIENTBOUND, ConnectionProtocol.LOGIN, null);
+	public static final GlobalReceiverRegistry<ClientConfigurationNetworking.ConfigurationPayloadHandler<?>> CONFIGURATION = new GlobalReceiverRegistry<>(NetworkSide.CLIENTBOUND, ConnectionProtocol.CONFIGURATION, PayloadTypeRegistryImpl.CONFIGURATION_S2C);
+	public static final GlobalReceiverRegistry<ClientPlayNetworking.PlayPayloadHandler<?>> PLAY = new GlobalReceiverRegistry<>(NetworkSide.CLIENTBOUND, ConnectionProtocol.PLAY, PayloadTypeRegistryImpl.PLAY_S2C);
 
 	private static ClientPlayNetworkAddon currentPlayAddon;
 	private static ClientConfigurationNetworkAddon currentConfigurationAddon;
@@ -65,7 +65,7 @@ public final class ClientNetworkingImpl {
 		return (ClientConfigurationNetworkAddon) ((NetworkHandlerExtensions) handler).getAddon();
 	}
 
-	public static ClientLoginNetworkAddon getAddon(ClientLoginPacketListenerImpl handler) {
+	public static ClientLoginNetworkAddon getAddon(ClientHandshakePacketListenerImpl handler) {
 		return (ClientLoginNetworkAddon) ((NetworkHandlerExtensions) handler).getAddon();
 	}
 
@@ -158,7 +158,7 @@ public final class ClientNetworkingImpl {
 					throw new IllegalStateException("Negotiated common packet version: %d but received packet with version: %d".formatted(addon.getNegotiatedVersion(), payload.version()));
 				}
 
-				addon.getChannelInfoHolder().fabric_getPendingChannelsNames(NetworkPhase.PLAY).addAll(payload.channels());
+				addon.getChannelInfoHolder().fabric_getPendingChannelsNames(ConnectionProtocol.PLAY).addAll(payload.channels());
 				NetworkingImpl.LOGGER.debug("Received accepted channels from the server");
 				context.responseSender().sendPacket(new CommonRegisterPayload(addon.getNegotiatedVersion(), CommonRegisterPayload.PLAY_PHASE, ClientPlayNetworking.getGlobalReceivers()));
 			} else {

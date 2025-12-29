@@ -23,11 +23,11 @@ import org.slf4j.LoggerFactory;
 
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.commands.CommandSourceStack;
-import net.minecraft.world.GameRules;
+import net.minecraft.world.level.GameRules;
 
 import net.fabricmc.fabric.api.gamerule.v1.GameRuleRegistry;
 
-public final class DoubleRule extends GameRules.Rule<DoubleRule> implements ValidateableRule {
+public final class DoubleRule extends GameRules.Value<DoubleRule> implements ValidateableRule {
 	private static final Logger LOGGER = LoggerFactory.getLogger(GameRuleRegistry.class);
 
 	private final double minimumValue;

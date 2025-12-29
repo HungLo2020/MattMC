@@ -24,37 +24,37 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.Consumer;
 
-import net.minecraft.component.ComponentType;
-import net.minecraft.component.type.TooltipDisplayComponent;
+import net.minecraft.core.component.DataComponentType;
+import net.minecraft.core.component.TooltipDisplayComponent;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.tooltip.TooltipAppender;
-import net.minecraft.world.item.tooltip.TooltipType;
+import net.minecraft.world.inventory.tooltip.TooltipComponent;
+import net.minecraft.world.item.TooltipFlag;
 import net.minecraft.network.chat.Component;
 
 public final class ComponentTooltipAppenderRegistryImpl {
-	private static final List<ComponentType<? extends TooltipAppender>> first = new ArrayList<>();
-	private static final List<ComponentType<? extends TooltipAppender>> last = new ArrayList<>();
-	private static final Map<ComponentType<?>, List<ComponentType<? extends TooltipAppender>>> before = new IdentityHashMap<>();
-	private static final Map<ComponentType<?>, List<ComponentType<? extends TooltipAppender>>> after = new IdentityHashMap<>();
+	private static final List<DataComponentType<? extends TooltipComponent>> first = new ArrayList<>();
+	private static final List<DataComponentType<? extends TooltipComponent>> last = new ArrayList<>();
+	private static final Map<DataComponentType<?>, List<DataComponentType<? extends TooltipComponent>>> before = new IdentityHashMap<>();
+	private static final Map<DataComponentType<?>, List<DataComponentType<? extends TooltipComponent>>> after = new IdentityHashMap<>();
 	private static boolean hasModdedEntries = false;
 
-	public static void addFirst(ComponentType<? extends TooltipAppender> componentType) {
+	public static void addFirst(DataComponentType<? extends TooltipComponent> componentType) {
 		first.add(componentType);
 		onModified();
 	}
 
-	public static void addLast(ComponentType<? extends TooltipAppender> componentType) {
+	public static void addLast(DataComponentType<? extends TooltipComponent> componentType) {
 		last.add(componentType);
 		onModified();
 	}
 
-	public static void addBefore(ComponentType<?> anchor, ComponentType<? extends TooltipAppender> componentType) {
+	public static void addBefore(DataComponentType<?> anchor, DataComponentType<? extends TooltipComponent> componentType) {
 		before.computeIfAbsent(anchor, k -> new ArrayList<>()).add(componentType);
 		onModified();
 	}
 
-	public static void addAfter(ComponentType<?> anchor, ComponentType<? extends TooltipAppender> componentType) {
+	public static void addAfter(DataComponentType<?> anchor, DataComponentType<? extends TooltipComponent> componentType) {
 		after.computeIfAbsent(anchor, k -> new ArrayList<>()).add(componentType);
 		onModified();
 	}
@@ -73,11 +73,11 @@ public final class ComponentTooltipAppenderRegistryImpl {
 			Item.TooltipContext context,
 			TooltipDisplayComponent displayComponent,
 			Consumer<Component> textConsumer,
-			TooltipType type
+			TooltipFlag type
 	) {
-		Set<ComponentType<?>> cycleDetector = new HashSet<>();
+		Set<DataComponentType<?>> cycleDetector = new HashSet<>();
 
-		for (ComponentType<? extends TooltipAppender> componentType : first) {
+		for (DataComponentType<? extends TooltipComponent> componentType : first) {
 			appendCustomComponentTooltip(stack, componentType, context, displayComponent, textConsumer, type, cycleDetector);
 		}
 	}
@@ -87,28 +87,28 @@ public final class ComponentTooltipAppenderRegistryImpl {
 			Item.TooltipContext context,
 			TooltipDisplayComponent displayComponent,
 			Consumer<Component> textConsumer,
-			TooltipType type
+			TooltipFlag type
 	) {
-		Set<ComponentType<?>> cycleDetector = new HashSet<>();
+		Set<DataComponentType<?>> cycleDetector = new HashSet<>();
 
-		for (ComponentType<? extends TooltipAppender> componentType : last) {
+		for (DataComponentType<? extends TooltipComponent> componentType : last) {
 			appendCustomComponentTooltip(stack, componentType, context, displayComponent, textConsumer, type, cycleDetector);
 		}
 	}
 
 	public static void onBefore(
 			ItemStack stack,
-			ComponentType<?> componentType,
+			DataComponentType<?> componentType,
 			Item.TooltipContext context,
 			TooltipDisplayComponent displayComponent,
 			Consumer<Component> textConsumer,
-			TooltipType type,
-			Set<ComponentType<?>> cycleDetector
+			TooltipFlag type,
+			Set<DataComponentType<?>> cycleDetector
 	) {
-		List<ComponentType<? extends TooltipAppender>> befores = before.get(componentType);
+		List<DataComponentType<? extends TooltipComponent>> befores = before.get(componentType);
 
 		if (befores != null) {
-			for (ComponentType<? extends TooltipAppender> beforeComponentType : befores) {
+			for (DataComponentType<? extends TooltipComponent> beforeComponentType : befores) {
 				appendCustomComponentTooltip(stack, beforeComponentType, context, displayComponent, textConsumer, type, cycleDetector);
 			}
 		}
@@ -116,17 +116,17 @@ public final class ComponentTooltipAppenderRegistryImpl {
 
 	public static void onAfter(
 			ItemStack stack,
-			ComponentType<?> componentType,
+			DataComponentType<?> componentType,
 			Item.TooltipContext context,
 			TooltipDisplayComponent displayComponent,
 			Consumer<Component> textConsumer,
-			TooltipType type,
-			Set<ComponentType<?>> cycleDetector
+			TooltipFlag type,
+			Set<DataComponentType<?>> cycleDetector
 	) {
-		List<ComponentType<? extends TooltipAppender>> afters = after.get(componentType);
+		List<DataComponentType<? extends TooltipComponent>> afters = after.get(componentType);
 
 		if (afters != null) {
-			for (ComponentType<? extends TooltipAppender> afterComponentType : afters) {
+			for (DataComponentType<? extends TooltipComponent> afterComponentType : afters) {
 				appendCustomComponentTooltip(stack, afterComponentType, context, displayComponent, textConsumer, type, cycleDetector);
 			}
 		}
@@ -134,12 +134,12 @@ public final class ComponentTooltipAppenderRegistryImpl {
 
 	private static void appendCustomComponentTooltip(
 			ItemStack stack,
-			ComponentType<? extends TooltipAppender> componentType,
+			DataComponentType<? extends TooltipComponent> componentType,
 			Item.TooltipContext context,
 			TooltipDisplayComponent displayComponent,
 			Consumer<Component> textConsumer,
-			TooltipType type,
-			Set<ComponentType<?>> cycleDetector
+			TooltipFlag type,
+			Set<DataComponentType<?>> cycleDetector
 	) {
 		if (!cycleDetector.add(componentType)) {
 			return;

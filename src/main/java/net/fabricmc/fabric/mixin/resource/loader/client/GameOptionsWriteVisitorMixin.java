@@ -26,8 +26,8 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.ModifyArg;
 
 import net.minecraft.client.Minecraft;
-import net.minecraft.server.packs.PackRepository;
-import net.minecraft.server.packs.ResourcePackProfile;
+import net.minecraft.server.packs.repository.PackRepository;
+import net.minecraft.server.packs.repository.Pack;
 
 import net.fabricmc.fabric.impl.resource.loader.FabricResourcePackProfile;
 
@@ -42,7 +42,7 @@ public class GameOptionsWriteVisitorMixin {
 		PackRepository manager = Minecraft.getInstance().getResourcePackManager();
 
 		for (String pack : packs) {
-			ResourcePackProfile profile = manager.getProfile(pack);
+			Pack profile = manager.getProfile(pack);
 
 			// Nonexistent pack profiles should be handled in the same way as vanilla
 			if (profile == null || !((FabricResourcePackProfile) profile).fabric_isHidden()) copy.add(pack);

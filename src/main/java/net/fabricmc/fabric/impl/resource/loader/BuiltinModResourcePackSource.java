@@ -16,11 +16,11 @@
 
 package net.fabricmc.fabric.impl.resource.loader;
 
-import net.minecraft.server.packs.ResourcePackSource;
+import net.minecraft.server.packs.repository.PackSource;
 import net.minecraft.network.chat.Component;
-import net.minecraft.util.Formatting;
+import net.minecraft.ChatFormatting;
 
-public record BuiltinModResourcePackSource(String modId) implements ResourcePackSource {
+public record BuiltinModResourcePackSource(String modId) implements PackSource {
 	@Override
 	public boolean canBeEnabledLater() {
 		return true;
@@ -28,6 +28,6 @@ public record BuiltinModResourcePackSource(String modId) implements ResourcePack
 
 	@Override
 	public Component decorate(Component packName) {
-		return Component.translatable("pack.nameAndSource", packName, Component.translatable("pack.source.builtinMod", modId)).formatted(Formatting.GRAY);
+		return Component.translatable("pack.nameAndSource", packName, Component.translatable("pack.source.builtinMod", modId)).formatted(ChatFormatting.GRAY);
 	}
 }

@@ -25,9 +25,9 @@ import net.minecraft.world.item.Items;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundEvents;
-import net.minecraft.util.Hand;
-import net.minecraft.util.crash.CrashException;
-import net.minecraft.util.crash.CrashReport;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.ReportedException;
+import net.minecraft.CrashReport;
 
 import net.fabricmc.fabric.api.transfer.v1.context.ContainerItemContext;
 import net.fabricmc.fabric.api.transfer.v1.storage.Storage;
@@ -55,7 +55,7 @@ public final class FluidStorageUtil {
 	 * @param hand The hand that the player used.
 	 * @return True if some fluid was moved.
 	 */
-	public static boolean interactWithFluidStorage(Storage<FluidVariant> storage, Player player, Hand hand) {
+	public static boolean interactWithFluidStorage(Storage<FluidVariant> storage, Player player, InteractionHand hand) {
 		// Check if hand is a fluid container.
 		Storage<FluidVariant> handStorage = ContainerItemContext.forPlayerInteraction(player, hand).find(FluidStorage.ITEM);
 		if (handStorage == null) return false;
@@ -69,10 +69,10 @@ public final class FluidStorageUtil {
 			CrashReport report = CrashReport.create(e, "Interacting with fluid storage");
 			report.addElement("Interaction details")
 					.add("Player", () -> DebugMessages.forPlayer(player))
-					.add("Hand", hand)
-					.add("Hand item", handItem::toString)
+					.add("InteractionHand", hand)
+					.add("InteractionHand item", handItem::toString)
 					.add("Fluid storage", () -> Objects.toString(storage, null));
-			throw new CrashException(report);
+			throw new ReportedException(report);
 		}
 	}
 

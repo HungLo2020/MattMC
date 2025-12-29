@@ -26,7 +26,7 @@ import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import org.jetbrains.annotations.Nullable;
 
 import net.minecraft.network.FriendlyByteBuf;
-import net.minecraft.network.protocol.CustomPacketPayload;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
 
 import net.fabricmc.fabric.api.event.registry.RegistryAttribute;
@@ -37,7 +37,7 @@ public abstract class RegistryPacketHandler<T extends RegistryPacketHandler.Regi
 	private int rawBufSize = 0;
 	private int deflatedBufSize = 0;
 
-	public abstract CustomPacketPayload.Id<T> getPacketId();
+	public abstract CustomPacketPayload.Type<T> getPacketId();
 
 	public abstract void sendPacket(Consumer<T> sender, Map<ResourceLocation, Object2IntMap<ResourceLocation>> registryMap);
 

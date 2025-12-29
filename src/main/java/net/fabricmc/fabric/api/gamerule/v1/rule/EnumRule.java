@@ -30,11 +30,11 @@ import org.slf4j.LoggerFactory;
 
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.commands.CommandSourceStack;
-import net.minecraft.world.GameRules;
+import net.minecraft.world.level.GameRules;
 
 import net.fabricmc.fabric.api.gamerule.v1.GameRuleRegistry;
 
-public final class EnumRule<E extends Enum<E>> extends GameRules.Rule<EnumRule<E>> {
+public final class EnumRule<E extends Enum<E>> extends GameRules.Value<EnumRule<E>> {
 	private static final Logger LOGGER = LoggerFactory.getLogger(GameRuleRegistry.class);
 
 	private final Class<E> classType;

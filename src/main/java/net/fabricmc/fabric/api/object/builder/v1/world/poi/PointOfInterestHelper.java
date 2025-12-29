@@ -22,13 +22,13 @@ import com.google.common.collect.ImmutableSet;
 
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.core.Registries;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
-import net.minecraft.core.Registries;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.world.poi.PoiRecord;
-import net.minecraft.world.poi.PoiType;
-import net.minecraft.world.poi.PointOfInterestTypes;
+import net.minecraft.world.entity.ai.village.poi.PoiRecord;
+import net.minecraft.world.entity.ai.village.poi.PoiType;
+import net.minecraft.world.entity.ai.village.poi.PoiTypes;
 
 /**
  * This class provides utilities to create a {@link PoiType}.
@@ -77,6 +77,6 @@ public final class PointOfInterestHelper {
 	// INTERNAL METHODS
 
 	private static PoiType register(ResourceLocation id, int ticketCount, int searchDistance, Set<BlockState> states) {
-		return PointOfInterestTypes.register(Registries.POINT_OF_INTEREST_TYPE, ResourceKey.of(Registries.POINT_OF_INTEREST_TYPE, id), states, ticketCount, searchDistance);
+		return PoiTypes.register(Registries.POINT_OF_INTEREST_TYPE, ResourceKey.of(Registries.POINT_OF_INTEREST_TYPE, id), states, ticketCount, searchDistance);
 	}
 }

@@ -20,7 +20,7 @@ import org.jetbrains.annotations.Nullable;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 
-import net.minecraft.world.GameRules;
+import net.minecraft.world.level.GameRules;
 
 import net.fabricmc.fabric.api.gamerule.v1.CustomGameRuleCategory;
 import net.fabricmc.fabric.impl.gamerule.RuleKeyExtensions;

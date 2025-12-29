@@ -36,16 +36,16 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import net.minecraft.network.protocol.Packet;
-import net.minecraft.core.Registries;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.core.Registry;
-import net.minecraft.world.inventory.ScreenTexts;
+import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.PlayerConfigEntry;
+import net.minecraft.server.players.UserWhiteListEntry;
 import net.minecraft.server.network.ServerConfigurationPacketListenerImpl;
-import net.minecraft.server.network.ServerPlayerConfigurationTask;
-import net.minecraft.network.chat.MutableText;
+import net.minecraft.server.network.ConfigurationTask;
+import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.network.chat.Component;
-import net.minecraft.util.Formatting;
+import net.minecraft.ChatFormatting;
 import net.minecraft.resources.ResourceLocation;
 
 import net.fabricmc.fabric.api.event.registry.RegistryAttribute;
@@ -112,20 +112,20 @@ public final class RegistrySyncManager {
 				.sorted()
 				.toList();
 
-		MutableText text = Component.literal("The following registry entry namespaces may be related:\n\n");
+		MutableComponent text = Component.literal("The following registry entry namespaces may be related:\n\n");
 
 		for (int i = 0; i < Math.min(namespaces.size(), toDisplay); i++) {
-			text = text.append(Component.literal(namespaces.get(i)).formatted(Formatting.YELLOW));
-			text = text.append(ScreenTexts.LINE_BREAK);
+			text = text.append(Component.literal(namespaces.get(i)).formatted(ChatFormatting.YELLOW));
+			text = text.append(CommonComponents.LINE_BREAK);
 		}
 
 		if (namespaces.size() > toDisplay) {
 			text = text.append(Component.literal("And %d more...".formatted(namespaces.size() - toDisplay)));
 		}
 
-		return Component.literal("This server requires ").append(Component.literal(brandText).formatted(Formatting.GREEN)).append(" installed on your client!")
-				.append(ScreenTexts.LINE_BREAK).append(text)
-				.append(ScreenTexts.LINE_BREAK).append(ScreenTexts.LINE_BREAK).append(Component.literal("Contact the server's administrator for more information!").formatted(Formatting.GOLD));
+		return Component.literal("This server requires ").append(Component.literal(brandText).formatted(ChatFormatting.GREEN)).append(" installed on your client!")
+				.append(CommonComponents.LINE_BREAK).append(text)
+				.append(CommonComponents.LINE_BREAK).append(CommonComponents.LINE_BREAK).append(Component.literal("Contact the server's administrator for more information!").formatted(ChatFormatting.GOLD));
 	}
 
 	private static boolean areAllRegistriesOptional(Map<ResourceLocation, Object2IntMap<ResourceLocation>> map) {
@@ -139,8 +139,8 @@ public final class RegistrySyncManager {
 	public record SyncConfigurationTask(
 			ServerConfigurationPacketListenerImpl handler,
 			Map<ResourceLocation, Object2IntMap<ResourceLocation>> map
-	) implements ServerPlayerConfigurationTask {
-		public static final Key KEY = new Key("fabric:registry/sync");
+	) implements ConfigurationTask {
+		public static final ConfigurationTask.Type KEY = new ConfigurationTask.Type("fabric:registry/sync");
 
 		@Override
 		public void sendPacket(Consumer<Packet<?>> sender) {
@@ -148,7 +148,7 @@ public final class RegistrySyncManager {
 		}
 
 		@Override
-		public Key getKey() {
+		public ConfigurationTask.Type getKey() {
 			return KEY;
 		}
 	}

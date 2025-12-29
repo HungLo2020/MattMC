@@ -29,7 +29,7 @@ import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import net.minecraft.network.NetworkPhase;
+import net.minecraft.network.ConnectionProtocol;
 import net.minecraft.network.NetworkSide;
 import net.minecraft.resources.ResourceLocation;
 
@@ -38,7 +38,7 @@ public final class GlobalReceiverRegistry<H> {
 	private static final Logger LOGGER = LoggerFactory.getLogger(GlobalReceiverRegistry.class);
 
 	private final NetworkSide side;
-	private final NetworkPhase phase;
+	private final ConnectionProtocol phase;
 	@Nullable
 	private final PayloadTypeRegistryImpl<?> payloadTypeRegistry;
 
@@ -46,7 +46,7 @@ public final class GlobalReceiverRegistry<H> {
 	private final Map<ResourceLocation, H> handlers = new HashMap<>();
 	private final Set<AbstractNetworkAddon<H>> trackedAddons = new HashSet<>();
 
-	public GlobalReceiverRegistry(NetworkSide side, NetworkPhase phase, @Nullable PayloadTypeRegistryImpl<?> payloadTypeRegistry) {
+	public GlobalReceiverRegistry(NetworkSide side, ConnectionProtocol phase, @Nullable PayloadTypeRegistryImpl<?> payloadTypeRegistry) {
 		this.side = side;
 		this.phase = phase;
 		this.payloadTypeRegistry = payloadTypeRegistry;
@@ -228,7 +228,7 @@ public final class GlobalReceiverRegistry<H> {
 		}
 	}
 
-	public NetworkPhase getPhase() {
+	public ConnectionProtocol getPhase() {
 		return phase;
 	}
 }

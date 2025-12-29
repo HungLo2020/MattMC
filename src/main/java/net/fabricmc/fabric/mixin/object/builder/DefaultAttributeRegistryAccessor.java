@@ -23,13 +23,13 @@ import org.spongepowered.asm.mixin.gen.Accessor;
 
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.entity.attribute.DefaultAttributeContainer;
-import net.minecraft.world.entity.attribute.DefaultAttributeRegistry;
+import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
+import net.minecraft.world.entity.ai.attributes.DefaultAttributeRegistry;
 
 @Mixin(DefaultAttributeRegistry.class)
 public interface DefaultAttributeRegistryAccessor {
 	@Accessor("DEFAULT_ATTRIBUTE_REGISTRY")
-	static Map<EntityType<? extends LivingEntity>, DefaultAttributeContainer> getRegistry() {
+	static Map<EntityType<? extends LivingEntity>, AttributeSupplier> getRegistry() {
 		throw new AssertionError("mixin dummy");
 	}
 }

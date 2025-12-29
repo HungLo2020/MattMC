@@ -21,7 +21,7 @@ import java.util.List;
 import java.util.Objects;
 
 import net.minecraft.world.entity.player.Inventory;
-import net.minecraft.util.Hand;
+import net.minecraft.world.InteractionHand;
 
 import net.fabricmc.fabric.api.transfer.v1.item.ItemVariant;
 import net.fabricmc.fabric.api.transfer.v1.item.PlayerInventoryStorage;
@@ -55,7 +55,7 @@ class PlayerInventoryStorageImpl extends InventoryStorageImpl implements PlayerI
 		List<SingleSlotStorage<ItemVariant>> mainSlots = getSlots().subList(0, Inventory.MAIN_SIZE);
 
 		// Stack into the main stack first and the offhand stack second.
-		for (Hand hand : Hand.values()) {
+		for (InteractionHand hand : InteractionHand.values()) {
 			SingleSlotStorage<ItemVariant> handSlot = getHandSlot(hand);
 
 			if (handSlot.getResource().equals(resource)) {
@@ -83,14 +83,14 @@ class PlayerInventoryStorageImpl extends InventoryStorageImpl implements PlayerI
 	}
 
 	@Override
-	public SingleSlotStorage<ItemVariant> getHandSlot(Hand hand) {
-		if (Objects.requireNonNull(hand) == Hand.MAIN_HAND) {
+	public SingleSlotStorage<ItemVariant> getHandSlot(InteractionHand hand) {
+		if (Objects.requireNonNull(hand) == InteractionHand.MAIN_HAND) {
 			if (Inventory.isValidHotbarIndex(playerInventory.getSelectedSlot())) {
 				return getSlot(playerInventory.getSelectedSlot());
 			} else {
 				throw new RuntimeException("Unexpected player selected slot: " + playerInventory.getSelectedSlot());
 			}
-		} else if (hand == Hand.OFF_HAND) {
+		} else if (hand == InteractionHand.OFF_HAND) {
 			return getSlot(Inventory.OFF_HAND_SLOT);
 		} else {
 			throw new UnsupportedOperationException("Unknown hand: " + hand);

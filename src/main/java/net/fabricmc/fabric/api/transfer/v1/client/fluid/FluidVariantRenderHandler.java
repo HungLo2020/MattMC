@@ -20,11 +20,11 @@ import java.util.List;
 
 import org.jetbrains.annotations.Nullable;
 
-import net.minecraft.client.texture.TextureAtlasSprite;
-import net.minecraft.world.item.tooltip.TooltipType;
+import net.minecraft.client.renderer.texture.TextureAtlasSprite;
+import net.minecraft.world.item.TooltipFlag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.core.BlockPos;
-import net.minecraft.world.BlockAndTintGetter;
+import net.minecraft.world.level.BlockAndTintGetter;
 
 import net.fabricmc.fabric.api.client.render.fluid.v1.FluidRenderHandler;
 import net.fabricmc.fabric.api.client.render.fluid.v1.FluidRenderHandlerRegistry;
@@ -41,7 +41,7 @@ public interface FluidVariantRenderHandler {
 	 * <p>The name of the fluid, and its identifier if the tooltip context is advanced, should not be appended.
 	 * They are already added by {@link FluidVariantRendering#getTooltip}.
 	 */
-	default void appendTooltip(FluidVariant fluidVariant, List<Component> tooltip, TooltipType tooltipType) {
+	default void appendTooltip(FluidVariant fluidVariant, List<Component> tooltip, TooltipFlag tooltipType) {
 	}
 
 	/**

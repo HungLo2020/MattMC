@@ -21,9 +21,9 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 
 import net.minecraft.world.entity.EntityType;
-import net.minecraft.world.entity.mob.Monster;
-import net.minecraft.world.entity.mob.WardenEntity;
-import net.minecraft.core.particles.BlockStateParticleEffect;
+import net.minecraft.world.entity.Monster;
+import net.minecraft.world.entity.WardenEntity;
+import net.minecraft.core.particles.BlockParticleOption;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.event.Vibrations;
 
@@ -35,8 +35,8 @@ abstract class WardenEntityMixin extends Monster implements Vibrations {
 		super(entityType, world);
 	}
 
-	@ModifyExpressionValue(method = "addDigParticles", at = @At(value = "NEW", target = "(Lnet/minecraft/particle/ParticleType;Lnet/minecraft/block/BlockState;)Lnet/minecraft/particle/BlockStateParticleEffect;"))
-	private BlockStateParticleEffect modifyBlockStateParticleEffect(BlockStateParticleEffect original) {
+	@ModifyExpressionValue(method = "addDigParticles", at = @At(value = "NEW", target = "(Lnet/minecraft/particle/ParticleType;Lnet/minecraft/block/BlockState;)Lnet/minecraft/particle/BlockParticleOption;"))
+	private BlockParticleOption modifyBlockStateParticleEffect(BlockParticleOption original) {
 		((BlockStateParticleEffectExtension) original).fabric_setBlockPos(getSteppingPos());
 		return original;
 	}

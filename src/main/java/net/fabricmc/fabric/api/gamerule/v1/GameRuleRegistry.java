@@ -16,7 +16,7 @@
 
 package net.fabricmc.fabric.api.gamerule.v1;
 
-import net.minecraft.world.GameRules;
+import net.minecraft.world.level.GameRules;
 
 import net.fabricmc.fabric.impl.gamerule.RuleKeyExtensions;
 import net.fabricmc.fabric.mixin.gamerule.GameRulesAccessor;
@@ -44,7 +44,7 @@ public final class GameRuleRegistry {
 	 * @return a rule key which can be used to query the value of the rule
 	 * @throws IllegalStateException if a rule of the same name already exists
 	 */
-	public static <T extends GameRules.Rule<T>> GameRules.Key<T> register(String name, GameRules.Category category, GameRules.Type<T> type) {
+	public static <T extends GameRules.Value<T>> GameRules.Key<T> register(String name, GameRules.Category category, GameRules.Type<T> type) {
 		return GameRulesAccessor.callRegister(name, category, type);
 	}
 
@@ -58,7 +58,7 @@ public final class GameRuleRegistry {
 	 * @return a rule key which can be used to query the value of the rule
 	 * @throws IllegalStateException if a rule of the same name already exists
 	 */
-	public static <T extends GameRules.Rule<T>> GameRules.Key<T> register(String name, CustomGameRuleCategory category, GameRules.Type<T> type) {
+	public static <T extends GameRules.Value<T>> GameRules.Key<T> register(String name, CustomGameRuleCategory category, GameRules.Type<T> type) {
 		final GameRules.Key<T> key = GameRulesAccessor.callRegister(name, GameRules.Category.MISC, type);
 		((RuleKeyExtensions) (Object) key).fabric_setCustomCategory(category);
 		return key;

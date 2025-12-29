@@ -29,15 +29,15 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.entity.attribute.DefaultAttributeContainer;
-import net.minecraft.world.entity.attribute.DefaultAttributeRegistry;
+import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
+import net.minecraft.world.entity.ai.attributes.DefaultAttributeRegistry;
 
 @Mixin(DefaultAttributeRegistry.class)
 public abstract class DefaultAttributeRegistryMixin {
 	@Shadow
 	@Final
 	@Mutable
-	private static Map<EntityType<? extends LivingEntity>, DefaultAttributeContainer> DEFAULT_ATTRIBUTE_REGISTRY;
+	private static Map<EntityType<? extends LivingEntity>, AttributeSupplier> DEFAULT_ATTRIBUTE_REGISTRY;
 
 	@Inject(method = "<clinit>*", at = @At("TAIL"))
 	private static void injectAttributes(CallbackInfo ci) {

@@ -35,7 +35,7 @@ public class EncoderHandlerMixin {
 	@Inject(
 			at = @At(
 					value = "INVOKE",
-					target = "Lnet/minecraft/network/codec/PacketCodec;encode(Ljava/lang/Object;Ljava/lang/Object;)V"
+					target = "Lnet/minecraft/network/codec/StreamCodec;encode(Ljava/lang/Object;Ljava/lang/Object;)V"
 			),
 			method = "encode(Lio/netty/channel/ChannelHandlerContext;Lnet/minecraft/network/packet/Packet;Lio/netty/buffer/ByteBuf;)V"
 	)
@@ -52,7 +52,7 @@ public class EncoderHandlerMixin {
 					// Normal target after writing
 					@At(
 							value = "INVOKE",
-							target = "Lnet/minecraft/network/codec/PacketCodec;encode(Ljava/lang/Object;Ljava/lang/Object;)V",
+							target = "Lnet/minecraft/network/codec/StreamCodec;encode(Ljava/lang/Object;Ljava/lang/Object;)V",
 							shift = At.Shift.AFTER,
 							by = 1
 					),

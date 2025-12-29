@@ -23,11 +23,11 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.MobCategory;
-import net.minecraft.world.entity.SpawnLocation;
+import net.minecraft.world.entity.SpawnPlacementType;
 import net.minecraft.world.entity.SpawnPlacements;
-import net.minecraft.world.entity.attribute.DefaultAttributeContainer;
-import net.minecraft.world.entity.mob.Mob;
-import net.minecraft.world.Heightmap;
+import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
+import net.minecraft.world.entity.Mob;
+import net.minecraft.world.level.levelgen.Heightmap;
 
 import net.fabricmc.fabric.impl.object.builder.FabricEntityTypeImpl;
 
@@ -98,7 +98,7 @@ public interface FabricEntityType {
 			 * @param defaultAttributeBuilder a function to generate the default attribute builder from the entity type
 			 * @return this builder for chaining
 			 */
-			Living<T> defaultAttributes(Supplier<DefaultAttributeContainer.Builder> defaultAttributeBuilder);
+			Living<T> defaultAttributes(Supplier<AttributeSupplier.Builder> defaultAttributeBuilder);
 		}
 
 		/**
@@ -113,7 +113,7 @@ public interface FabricEntityType {
 			 *
 			 * @return this builder for chaining.
 			 */
-			Mob<T> spawnRestriction(SpawnLocation location, Heightmap.Types heightmap, SpawnPlacements.SpawnPredicate<T> spawnPredicate);
+			Mob<T> spawnRestriction(SpawnPlacementType location, Heightmap.Types heightmap, SpawnPlacements.SpawnPredicate<T> spawnPredicate);
 
 			/**
 			 * Sets the default attributes for a type of mob entity.
@@ -122,7 +122,7 @@ public interface FabricEntityType {
 			 * @return this builder for chaining
 			 */
 			@Override
-			Mob<T> defaultAttributes(Supplier<DefaultAttributeContainer.Builder> defaultAttributeBuilder);
+			Mob<T> defaultAttributes(Supplier<AttributeSupplier.Builder> defaultAttributeBuilder);
 		}
 	}
 }

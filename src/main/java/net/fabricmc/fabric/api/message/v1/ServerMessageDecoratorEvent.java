@@ -41,7 +41,7 @@ import net.fabricmc.fabric.api.event.EventFactory;
  *
  * <pre>{@code
  * ServerMessageDecoratorEvent.EVENT.register(ServerMessageDecoratorEvent.CONTENT_PHASE, (sender, message) -> {
- *     // Add smiley face. Has to copy() to get a MutableText with siblings and styles.
+ *     // Add smiley face. Has to copy() to get a MutableComponent with siblings and styles.
  *     return message.copy().append(" :)");
  * });
  * }</pre>

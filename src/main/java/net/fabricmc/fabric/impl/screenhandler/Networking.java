@@ -24,15 +24,15 @@ import java.util.function.BiConsumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import net.minecraft.network.RegistryByteBuf;
-import net.minecraft.network.codec.PacketCodec;
-import net.minecraft.network.protocol.CustomPacketPayload;
-import net.minecraft.core.Registries;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.core.Registry;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.TextCodecs;
+import net.minecraft.network.chat.ComponentSerialization;
 import net.minecraft.resources.ResourceLocation;
 
 import net.fabricmc.api.ModInitializer;
@@ -40,7 +40,7 @@ import net.fabricmc.fabric.api.event.registry.RegistryEntryAddedCallback;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.fabricmc.fabric.api.screenhandler.v1.ExtendedScreenHandlerFactory;
-import net.fabricmc.fabric.api.screenhandler.v1.ExtendedScreenHandlerType;
+import net.fabricmc.fabric.api.screenhandler.v1.ExtendedMenuType;
 
 public final class Networking implements ModInitializer {
 	private static final Logger LOGGER = LoggerFactory.getLogger("fabric-screen-handler-api-v1/server");
@@ -51,7 +51,7 @@ public final class Networking implements ModInitializer {
 	// title: text
 	// customData: buf
 	public static final ResourceLocation OPEN_ID = ResourceLocation.of("fabric-screen-handler-api-v1", "open_screen");
-	public static final Map<ResourceLocation, PacketCodec<? super RegistryByteBuf, ?>> CODEC_BY_ID = new HashMap<>();
+	public static final Map<ResourceLocation, StreamCodec<? super RegistryFriendlyByteBuf, ?>> CODEC_BY_ID = new HashMap<>();
 
 	/**
 	 * Opens an extended screen handler by sending a custom packet to the client.
@@ -74,7 +74,7 @@ public final class Networking implements ModInitializer {
 			return;
 		}
 
-		PacketCodec<RegistryByteBuf, D> codec = (PacketCodec<RegistryByteBuf, D>) Objects.requireNonNull(CODEC_BY_ID.get(typeId), () -> "Codec for " + typeId + " is not registered!");
+		StreamCodec<RegistryFriendlyByteBuf, D> codec = (StreamCodec<RegistryFriendlyByteBuf, D>) Objects.requireNonNull(CODEC_BY_ID.get(typeId), () -> "Codec for " + typeId + " is not registered!");
 		D data = factory.getScreenOpeningData(player);
 
 		ServerPlayNetworking.send(player, new OpenScreenPayload<>(typeId, syncId, factory.getDisplayName(), codec, data));
@@ -85,7 +85,7 @@ public final class Networking implements ModInitializer {
 		PayloadTypeRegistry.playS2C().register(OpenScreenPayload.ID, OpenScreenPayload.CODEC);
 
 		forEachEntry(Registries.SCREEN_HANDLER, (type, id) -> {
-			if (type instanceof ExtendedScreenHandlerType<?, ?> extended) {
+			if (type instanceof ExtendedMenuType<?, ?> extended) {
 				CODEC_BY_ID.put(id, extended.getPacketCodec());
 			}
 		});
@@ -102,27 +102,27 @@ public final class Networking implements ModInitializer {
 		});
 	}
 
-	public record OpenScreenPayload<D>(ResourceLocation identifier, int syncId, Component title, PacketCodec<RegistryByteBuf, D> innerCodec, D data) implements CustomPacketPayload {
-		public static final PacketCodec<RegistryByteBuf, OpenScreenPayload<?>> CODEC = CustomPacketPayload.codecOf(OpenScreenPayload::write, OpenScreenPayload::fromBuf);
-		public static final CustomPacketPayload.Id<OpenScreenPayload<?>> ID = new Id<>(OPEN_ID);
+	public record OpenScreenPayload<D>(ResourceLocation identifier, int syncId, Component title, StreamCodec<RegistryFriendlyByteBuf, D> innerCodec, D data) implements CustomPacketPayload {
+		public static final StreamCodec<RegistryFriendlyByteBuf, OpenScreenPayload<?>> CODEC = CustomPacketPayload.codecOf(OpenScreenPayload::write, OpenScreenPayload::fromBuf);
+		public static final CustomPacketPayload.Type<OpenScreenPayload<?>> ID = new Id<>(OPEN_ID);
 
 		@SuppressWarnings("unchecked")
-		private static <D> OpenScreenPayload<D> fromBuf(RegistryByteBuf buf) {
+		private static <D> OpenScreenPayload<D> fromBuf(RegistryFriendlyByteBuf buf) {
 			ResourceLocation id = buf.readIdentifier();
-			PacketCodec<RegistryByteBuf, D> codec = (PacketCodec<RegistryByteBuf, D>) CODEC_BY_ID.get(id);
+			StreamCodec<RegistryFriendlyByteBuf, D> codec = (StreamCodec<RegistryFriendlyByteBuf, D>) CODEC_BY_ID.get(id);
 
-			return new OpenScreenPayload<>(id, buf.readByte(), TextCodecs.REGISTRY_PACKET_CODEC.decode(buf), codec, codec == null ? null : codec.decode(buf));
+			return new OpenScreenPayload<>(id, buf.readByte(), ComponentSerialization.REGISTRY_PACKET_CODEC.decode(buf), codec, codec == null ? null : codec.decode(buf));
 		}
 
-		private void write(RegistryByteBuf buf) {
+		private void write(RegistryFriendlyByteBuf buf) {
 			buf.writeIdentifier(this.identifier);
 			buf.writeByte(this.syncId);
-			TextCodecs.REGISTRY_PACKET_CODEC.encode(buf, this.title);
+			ComponentSerialization.REGISTRY_PACKET_CODEC.encode(buf, this.title);
 			this.innerCodec.encode(buf, this.data);
 		}
 
 		@Override
-		public Id<? extends CustomPacketPayload> getId() {
+		public CustomPacketPayload.Type<? extends CustomPacketPayload> getId() {
 			return ID;
 		}
 	}

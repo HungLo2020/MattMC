@@ -18,8 +18,8 @@ package net.fabricmc.fabric.api.command.v2;
 
 import java.util.function.Predicate;
 
-import net.minecraft.commands.EntitySelectorOptions;
-import net.minecraft.commands.EntitySelectorParser;
+import net.minecraft.commands.arguments.selector.options.EntitySelectorOptions;
+import net.minecraft.commands.arguments.selector.EntitySelectorParser;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 
@@ -63,7 +63,7 @@ public final class EntitySelectorOptionRegistry {
 	 * @param handler the handler for the entity option that reads and sets the predicate
 	 * @param canUse the predicate that checks whether the option is syntactically valid
 	 */
-	public static void register(ResourceLocation id, Component description, EntitySelectorOptions.SelectorHandler handler, Predicate<EntitySelectorParser> canUse) {
+	public static void register(ResourceLocation id, Component description, EntitySelectorOptions.Modifier handler, Predicate<EntitySelectorParser> canUse) {
 		EntitySelectorOptionsAccessor.callPutOption(id.toUnderscoreSeparatedString(), handler, canUse, description);
 	}
 
@@ -75,7 +75,7 @@ public final class EntitySelectorOptionRegistry {
 	 * @param description the description of the option
 	 * @param handler the handler for the entity option that reads and sets the predicate
 	 */
-	public static void registerNonRepeatable(ResourceLocation id, Component description, EntitySelectorOptions.SelectorHandler handler) {
+	public static void registerNonRepeatable(ResourceLocation id, Component description, EntitySelectorOptions.Modifier handler) {
 		register(id, description, (reader) -> {
 			handler.handle(reader);
 			reader.setCustomFlag(id, true);

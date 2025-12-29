@@ -33,13 +33,13 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import net.minecraft.network.Connection;
-import net.minecraft.network.RegistryByteBuf;
+import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.network.ConnectedClientData;
 import net.minecraft.server.network.ServerCommonNetworkHandler;
 import net.minecraft.server.network.ServerConfigurationPacketListenerImpl;
-import net.minecraft.server.network.ServerPlayerConfigurationTask;
+import net.minecraft.server.network.ConfigurationTask;
 
 import net.fabricmc.fabric.api.networking.v1.FabricServerConfigurationNetworkHandler;
 import net.fabricmc.fabric.impl.networking.FabricRegistryByteBuf;
@@ -51,14 +51,14 @@ import net.fabricmc.fabric.impl.networking.server.ServerConfigurationNetworkAddo
 public abstract class ServerConfigurationNetworkHandlerMixin extends ServerCommonNetworkHandler implements NetworkHandlerExtensions, FabricServerConfigurationNetworkHandler {
 	@Shadow
 	@Nullable
-	private ServerPlayerConfigurationTask currentTask;
+	private ConfigurationTask currentTask;
 
 	@Shadow
-	protected abstract void onTaskFinished(ServerPlayerConfigurationTask.Key key);
+	protected abstract void onTaskFinished(ConfigurationTask.Type key);
 
 	@Shadow
 	@Final
-	private Queue<ServerPlayerConfigurationTask> tasks;
+	private Queue<ConfigurationTask> tasks;
 
 	@Shadow
 	public abstract boolean isConnectionOpen();
@@ -138,7 +138,7 @@ public abstract class ServerConfigurationNetworkHandlerMixin extends ServerCommo
 			return false;
 		}
 
-		final ServerPlayerConfigurationTask task = this.tasks.poll();
+		final ConfigurationTask task = this.tasks.poll();
 
 		if (task != null) {
 			this.currentTask = task;
@@ -155,18 +155,18 @@ public abstract class ServerConfigurationNetworkHandlerMixin extends ServerCommo
 	}
 
 	@Override
-	public void addTask(ServerPlayerConfigurationTask task) {
+	public void addTask(ConfigurationTask task) {
 		tasks.add(task);
 	}
 
 	@Override
-	public void completeTask(ServerPlayerConfigurationTask.Key key) {
+	public void completeTask(ConfigurationTask.Type key) {
 		if (!earlyTaskExecution) {
 			onTaskFinished(key);
 			return;
 		}
 
-		final ServerPlayerConfigurationTask.Key currentKey = this.currentTask != null ? this.currentTask.getKey() : null;
+		final ConfigurationTask.Type currentKey = this.currentTask != null ? this.currentTask.getKey() : null;
 
 		if (!key.equals(currentKey)) {
 			throw new IllegalStateException("Unexpected request for task finish, current task: " + currentKey + ", requested: " + key);
@@ -176,8 +176,8 @@ public abstract class ServerConfigurationNetworkHandlerMixin extends ServerCommo
 		sendConfigurations();
 	}
 
-	@WrapOperation(method = "onReady", at = @At(value = "INVOKE", target = "Lnet/minecraft/network/RegistryByteBuf;makeFactory(Lnet/minecraft/registry/RegistryAccess;)Ljava/util/function/Function;"))
-	private Function<ByteBuf, RegistryByteBuf> bindChannelInfo(RegistryAccess registryManager, Operation<Function<ByteBuf, RegistryByteBuf>> original) {
+	@WrapOperation(method = "onReady", at = @At(value = "INVOKE", target = "Lnet/minecraft/network/RegistryFriendlyByteBuf;makeFactory(Lnet/minecraft/registry/RegistryAccess;)Ljava/util/function/Function;"))
+	private Function<ByteBuf, RegistryFriendlyByteBuf> bindChannelInfo(RegistryAccess registryManager, Operation<Function<ByteBuf, RegistryFriendlyByteBuf>> original) {
 		return original.call(registryManager).andThen(registryByteBuf -> {
 			FabricRegistryByteBuf fabricRegistryByteBuf = (FabricRegistryByteBuf) registryByteBuf;
 			fabricRegistryByteBuf.fabric_setSendableConfigurationChannels(Set.copyOf(addon.getSendableChannels()));

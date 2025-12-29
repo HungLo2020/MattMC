@@ -22,11 +22,11 @@ import org.jetbrains.annotations.Nullable;
 
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.ChestBlock;
-import net.minecraft.world.level.block.InventoryProvider;
+import net.minecraft.world.level.block.entity.WorldlyContainerHolder;
 import net.minecraft.world.level.block.entity.ChestBlockEntity;
-import net.minecraft.world.item.inventory.Container;
-import net.minecraft.world.item.inventory.SidedInventory;
-import net.minecraft.world.item.inventory.SimpleInventory;
+import net.minecraft.world.Container;
+import net.minecraft.world.WorldlyContainer;
+import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.item.Items;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.core.Direction;
@@ -58,9 +58,9 @@ public final class ItemStorage {
 	 * that is if the return value of {@link Storage#supportsInsertion} or {@link Storage#supportsExtraction} changes,
 	 * the storage should notify its neighbors with a block update so that they can refresh their connections if necessary.
 	 *
-	 * <p>Block entities directly implementing {@link Container} or {@link SidedInventory} are automatically handled by a fallback provider,
+	 * <p>Block entities directly implementing {@link Container} or {@link WorldlyContainer} are automatically handled by a fallback provider,
 	 * and don't need to do anything.
-	 * Blocks that implement {@link InventoryProvider} and whose returned inventory is constant (it's the same for two subsequent calls)
+	 * Blocks that implement {@link WorldlyContainerHolder} and whose returned inventory is constant (it's the same for two subsequent calls)
 	 * are also handled automatically and don't need to do anything.
 	 * The fallback provider assumes that the {@link Container} "owns" its contents. If that's not the case,
 	 * for example because it redirects all function calls to another inventory, then implementing {@link Container} should be avoided.
@@ -69,9 +69,9 @@ public final class ItemStorage {
 	 *
 	 * <p>Depending on the use case, the following strategies can be used to offer a {@code Storage<ItemVariant>} implementation:
 	 * <ul>
-	 *     <li>Directly implementing {@code Container} or {@code SidedInventory} on a block entity - it will be wrapped automatically.</li>
+	 *     <li>Directly implementing {@code Container} or {@code WorldlyContainer} on a block entity - it will be wrapped automatically.</li>
 	 *     <li>Storing an inventory inside a block entity field, and converting it manually with {@link InventoryStorage#of}.
-	 *     {@link SimpleInventory} can be used for easy implementation.</li>
+	 *     {@link SimpleContainer} can be used for easy implementation.</li>
 	 *     <li>{@link SingleStackStorage} can also be used for more flexibility. Multiple of them can be combined with {@link CombinedStorage}.</li>
 	 *     <li>Directly providing a custom implementation of {@code Storage<ItemVariant>} is also possible.</li>
 	 * </ul>
@@ -115,9 +115,9 @@ public final class ItemStorage {
 		ItemStorage.SIDED.registerFallback((world, pos, state, blockEntity, direction) -> {
 			Container inventoryToWrap = null;
 
-			if (state.getBlock() instanceof InventoryProvider provider) {
-				SidedInventory first = provider.getInventory(state, world, pos);
-				SidedInventory second = provider.getInventory(state, world, pos);
+			if (state.getBlock() instanceof WorldlyContainerHolder provider) {
+				WorldlyContainer first = provider.getInventory(state, world, pos);
+				WorldlyContainer second = provider.getInventory(state, world, pos);
 
 				// Hopefully we can trust the sided inventory not to change.
 				if (first == second && first != null) {

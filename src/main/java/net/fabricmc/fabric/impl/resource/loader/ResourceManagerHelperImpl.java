@@ -29,16 +29,16 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 
 import net.minecraft.core.HolderLookup;
-import net.minecraft.server.packs.OverlayResourcePack;
-import net.minecraft.server.packs.Pack;
-import net.minecraft.server.packs.ResourcePackInfo;
-import net.minecraft.server.packs.ResourcePackPosition;
-import net.minecraft.server.packs.ResourcePackProfile;
-import net.minecraft.server.packs.ResourceReloader;
-import net.minecraft.server.packs.ResourceType;
+import net.minecraft.server.packs.CompositePackResources;
+import net.minecraft.server.packs.repository.Pack;
+import net.minecraft.server.packs.PackLocationInfo;
+import net.minecraft.server.packs.Pack.Position;
+import net.minecraft.server.packs.repository.Pack;
+import net.minecraft.server.packs.resources.PreparableReloadListener;
+import net.minecraft.server.packs.PackType;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.util.Pair;
+import com.mojang.datafixers.util.Pair;
 
 import net.fabricmc.fabric.api.resource.IdentifiableResourceReloadListener;
 import net.fabricmc.fabric.api.resource.ResourceManagerHelper;
@@ -47,16 +47,16 @@ import net.fabricmc.fabric.api.resource.v1.ResourceLoader;
 import net.fabricmc.loader.api.ModContainer;
 
 public class ResourceManagerHelperImpl implements ResourceManagerHelper {
-	private static final Map<ResourceType, ResourceManagerHelperImpl> registryMap = new HashMap<>();
-	private static final Set<Pair<Component, ModNioResourcePack>> builtinResourcePacks = new HashSet<>();
+	private static final Map<PackType, ResourceManagerHelperImpl> registryMap = new HashMap<>();
+	private static final Set<Tuple<Component, ModNioResourcePack>> builtinResourcePacks = new HashSet<>();
 
 	private final ResourceLoader resourceLoader;
 
-	private ResourceManagerHelperImpl(ResourceType type) {
+	private ResourceManagerHelperImpl(PackType type) {
 		this.resourceLoader = ResourceLoader.get(type);
 	}
 
-	public static ResourceManagerHelperImpl get(ResourceType type) {
+	public static ResourceManagerHelperImpl get(PackType type) {
 		return registryMap.computeIfAbsent(type, ResourceManagerHelperImpl::new);
 	}
 
@@ -77,16 +77,16 @@ public class ResourceManagerHelperImpl implements ResourceManagerHelper {
 		List<Path> paths = container.getRootPaths();
 		String separator = paths.getFirst().getFileSystem().getSeparator();
 		subPath = subPath.replace("/", separator);
-		ModNioResourcePack resourcePack = ModNioResourcePack.create(id.toString(), container, subPath, ResourceType.CLIENT_RESOURCES, activationType, false);
-		ModNioResourcePack dataPack = ModNioResourcePack.create(id.toString(), container, subPath, ResourceType.SERVER_DATA, activationType, false);
+		ModNioResourcePack resourcePack = ModNioResourcePack.create(id.toString(), container, subPath, PackType.CLIENT_RESOURCES, activationType, false);
+		ModNioResourcePack dataPack = ModNioResourcePack.create(id.toString(), container, subPath, PackType.SERVER_DATA, activationType, false);
 		if (resourcePack == null && dataPack == null) return false;
 
 		if (resourcePack != null) {
-			builtinResourcePacks.add(new Pair<>(displayName, resourcePack));
+			builtinResourcePacks.add(new Tuple<>(displayName, resourcePack));
 		}
 
 		if (dataPack != null) {
-			builtinResourcePacks.add(new Pair<>(displayName, dataPack));
+			builtinResourcePacks.add(new Tuple<>(displayName, dataPack));
 		}
 
 		return true;
@@ -107,34 +107,34 @@ public class ResourceManagerHelperImpl implements ResourceManagerHelper {
 		return registerBuiltinResourcePack(id, subPath, container, Component.literal(id.getNamespace() + "/" + id.getPath()), activationType);
 	}
 
-	public static void registerBuiltinResourcePacks(ResourceType resourceType, Consumer<ResourcePackProfile> consumer) {
+	public static void registerBuiltinResourcePacks(PackType resourceType, Consumer<Pack> consumer) {
 		// Loop through each registered built-in resource packs and add them if valid.
-		for (Pair<Component, ModNioResourcePack> entry : builtinResourcePacks) {
+		for (Tuple<Component, ModNioResourcePack> entry : builtinResourcePacks) {
 			ModNioResourcePack pack = entry.getRight();
 
 			// Add the built-in pack only if namespaces for the specified resource type are present.
 			if (!pack.getNamespaces(resourceType).isEmpty()) {
 				// Make the resource pack profile for built-in pack, should never be always enabled.
-				ResourcePackInfo info = new ResourcePackInfo(
+				PackLocationInfo info = new PackLocationInfo(
 						entry.getRight().getId(),
 						entry.getLeft(),
 						new BuiltinModResourcePackSource(pack.getFabricModMetadata().getName()),
 						entry.getRight().getKnownPackInfo()
 				);
-				ResourcePackPosition info2 = new ResourcePackPosition(
+				Pack.Position info2 = new Pack.Position(
 						pack.getActivationType() == ResourcePackActivationType.ALWAYS_ENABLED,
-						ResourcePackProfile.InsertionPosition.TOP,
+						Pack.InsertionPosition.TOP,
 						false
 				);
 
-				ResourcePackProfile profile = ResourcePackProfile.create(info, new ResourcePackProfile.PackFactory() {
+				Pack profile = Pack.create(info, new Pack.ResourcesSupplier() {
 					@Override
-					public Pack open(ResourcePackInfo var1) {
+					public Pack open(PackLocationInfo var1) {
 						return entry.getRight();
 					}
 
 					@Override
-					public Pack openWithOverlays(ResourcePackInfo var1, ResourcePackProfile.Metadata metadata) {
+					public Pack openWithOverlays(PackLocationInfo var1, Pack.Metadata metadata) {
 						ModNioResourcePack pack = entry.getRight();
 
 						if (metadata.overlays().isEmpty()) {
@@ -147,7 +147,7 @@ public class ResourceManagerHelperImpl implements ResourceManagerHelper {
 							overlays.add(pack.createOverlay(overlay));
 						}
 
-						return new OverlayResourcePack(pack, overlays);
+						return new CompositePackResources(pack, overlays);
 					}
 				}, resourceType, info2);
 				consumer.accept(profile);
@@ -163,11 +163,11 @@ public class ResourceManagerHelperImpl implements ResourceManagerHelper {
 
 	@Override
 	public void registerReloadListener(ResourceLocation identifier, Function<HolderLookup.Provider, IdentifiableResourceReloadListener> listenerFactory) {
-		this.resourceLoader.registerReloader(identifier, new ResourceReloader() {
+		this.resourceLoader.registerReloader(identifier, new PreparableReloadListener() {
 			@Override
 			public CompletableFuture<Void> reload(Store store, Executor prepareExecutor, Synchronizer reloadSynchronizer, Executor applyExecutor) {
 				HolderLookup.Provider registries = store.getOrThrow(ResourceLoader.RELOADER_REGISTRY_LOOKUP_KEY);
-				ResourceReloader resourceReloader = listenerFactory.apply(registries);
+				PreparableReloadListener resourceReloader = listenerFactory.apply(registries);
 
 				return resourceReloader.reload(store, prepareExecutor, reloadSynchronizer, applyExecutor);
 			}

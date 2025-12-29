@@ -19,7 +19,7 @@ package net.fabricmc.fabric.impl.recipe.sync.client;
 import java.util.ArrayList;
 import java.util.Comparator;
 
-import net.minecraft.world.item.crafting.RecipeEntry;
+import net.minecraft.world.item.crafting.RecipeHolder;
 
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
@@ -38,7 +38,7 @@ public class RecipeSyncImplClient implements ClientModInitializer {
 		SynchronizedRecipes recipes;
 
 		if (!payload.entries().isEmpty()) {
-			var collectedRecipes = new ArrayList<RecipeEntry<?>>();
+			var collectedRecipes = new ArrayList<RecipeHolder<?>>();
 
 			for (RecipeSyncPayloadS2C.Entry entry : payload.entries()) {
 				collectedRecipes.addAll(entry.recipes());

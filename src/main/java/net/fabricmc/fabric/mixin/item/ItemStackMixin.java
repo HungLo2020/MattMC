@@ -36,15 +36,15 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.ModifyArg;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-import net.minecraft.component.ComponentType;
-import net.minecraft.component.DataComponents;
-import net.minecraft.component.type.TooltipDisplayComponent;
+import net.minecraft.core.component.DataComponentType;
+import net.minecraft.core.component.DataComponents;
+import net.minecraft.core.component.TooltipDisplayComponent;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.tooltip.TooltipType;
+import net.minecraft.world.item.TooltipFlag;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.network.chat.Component;
@@ -91,12 +91,12 @@ public abstract class ItemStackMixin implements FabricItemStack {
 		original.call(instance, amount, serverWorld, serverPlayerEntity, consumer);
 	}
 
-	@ModifyArg(method = "appendTooltip", at = @At(value = "INVOKE", target = "Lnet/minecraft/item/ItemStack;appendComponentTooltip(Lnet/minecraft/component/ComponentType;Lnet/minecraft/item/Item$TooltipContext;Lnet/minecraft/component/type/TooltipDisplayComponent;Ljava/util/function/Consumer;Lnet/minecraft/item/tooltip/TooltipType;)V"))
-	private ComponentType<?> preAppendComponentTooltip(
-			ComponentType<?> componentType,
+	@ModifyArg(method = "appendTooltip", at = @At(value = "INVOKE", target = "Lnet/minecraft/item/ItemStack;appendComponentTooltip(Lnet/minecraft/component/DataComponentType;Lnet/minecraft/item/Item$TooltipContext;Lnet/minecraft/component/type/TooltipDisplayComponent;Ljava/util/function/Consumer;Lnet/minecraft/item/tooltip/TooltipFlag;)V"))
+	private DataComponentType<?> preAppendComponentTooltip(
+			DataComponentType<?> componentType,
 			@Local(argsOnly = true) Item.TooltipContext context,
 			@Local(argsOnly = true) TooltipDisplayComponent displayComponent,
-			@Local(argsOnly = true) TooltipType type,
+			@Local(argsOnly = true) TooltipFlag type,
 			@Local(argsOnly = true) Consumer<Component> textConsumer,
 			@Share("index") LocalIntRef index
 	) {
@@ -104,12 +104,12 @@ public abstract class ItemStackMixin implements FabricItemStack {
 		return componentType;
 	}
 
-	@ModifyArg(method = "appendTooltip", at = @At(value = "INVOKE", target = "Lnet/minecraft/component/type/TooltipDisplayComponent;shouldDisplay(Lnet/minecraft/component/ComponentType;)Z"))
-	private ComponentType<?> preShouldDisplay(
-			ComponentType<?> componentType,
+	@ModifyArg(method = "appendTooltip", at = @At(value = "INVOKE", target = "Lnet/minecraft/component/type/TooltipDisplayComponent;shouldDisplay(Lnet/minecraft/component/DataComponentType;)Z"))
+	private DataComponentType<?> preShouldDisplay(
+			DataComponentType<?> componentType,
 			@Local(argsOnly = true) Item.TooltipContext context,
 			@Local(argsOnly = true) TooltipDisplayComponent displayComponent,
-			@Local(argsOnly = true) TooltipType type,
+			@Local(argsOnly = true) TooltipFlag type,
 			@Local(argsOnly = true) Consumer<Component> textConsumer,
 			@Share("index") LocalIntRef index
 	) {
@@ -122,7 +122,7 @@ public abstract class ItemStackMixin implements FabricItemStack {
 			Item.TooltipContext context,
 			TooltipDisplayComponent displayComponent,
 			@Nullable Player player,
-			TooltipType type,
+			TooltipFlag type,
 			Consumer<Component> textConsumer,
 			CallbackInfo ci,
 			@Share("index") LocalIntRef index
@@ -136,7 +136,7 @@ public abstract class ItemStackMixin implements FabricItemStack {
 			Item.TooltipContext context,
 			TooltipDisplayComponent displayComponent,
 			@Nullable Player player,
-			TooltipType type,
+			TooltipFlag type,
 			Consumer<Component> textConsumer,
 			CallbackInfo ci,
 			@Share("index") LocalIntRef index
@@ -144,13 +144,13 @@ public abstract class ItemStackMixin implements FabricItemStack {
 		preAppendTooltip(null, context, displayComponent, textConsumer, type, index);
 	}
 
-	@ModifyExpressionValue(method = "appendTooltip", at = @At(value = "INVOKE", target = "Lnet/minecraft/item/tooltip/TooltipType;isAdvanced()Z"))
+	@ModifyExpressionValue(method = "appendTooltip", at = @At(value = "INVOKE", target = "Lnet/minecraft/item/tooltip/TooltipFlag;isAdvanced()Z"))
 	private boolean postTooltipsNonAdvanced(
 			boolean isAdvanced,
 			Item.TooltipContext context,
 			TooltipDisplayComponent displayComponent,
 			@Nullable Player player,
-			TooltipType type,
+			TooltipFlag type,
 			Consumer<Component> textConsumer,
 			@Share("index") LocalIntRef index
 	) {
@@ -163,11 +163,11 @@ public abstract class ItemStackMixin implements FabricItemStack {
 
 	@Unique
 	private void preAppendTooltip(
-			@Nullable ComponentType<?> componentType,
+			@Nullable DataComponentType<?> componentType,
 			Item.TooltipContext context,
 			TooltipDisplayComponent displayComponent,
 			Consumer<Component> textConsumer,
-			TooltipType tooltipType,
+			TooltipFlag tooltipType,
 			LocalIntRef index
 	) {
 		if (!ComponentTooltipAppenderRegistryImpl.hasModdedEntries()) {
@@ -178,7 +178,7 @@ public abstract class ItemStackMixin implements FabricItemStack {
 			ComponentTooltipAppenderRegistryImpl.onFirst((ItemStack) (Object) this, context, displayComponent, textConsumer, tooltipType);
 		}
 
-		List<ComponentType<?>> vanillaOrder = VanillaTooltipAppenderOrder.getVanillaOrder();
+		List<DataComponentType<?>> vanillaOrder = VanillaTooltipAppenderOrder.getVanillaOrder();
 
 		if (index.get() > vanillaOrder.size()) {
 			return;
@@ -188,8 +188,8 @@ public abstract class ItemStackMixin implements FabricItemStack {
 
 		while (true) {
 			if (index.get() > 0) {
-				ComponentType<?> prevComponentInOrder = vanillaOrder.get(index.get() - 1);
-				HashSet<ComponentType<?>> cycleDetector = new HashSet<>();
+				DataComponentType<?> prevComponentInOrder = vanillaOrder.get(index.get() - 1);
+				HashSet<DataComponentType<?>> cycleDetector = new HashSet<>();
 				cycleDetector.add(prevComponentInOrder);
 				ComponentTooltipAppenderRegistryImpl.onAfter((ItemStack) (Object) this, prevComponentInOrder, context, displayComponent, textConsumer, tooltipType, cycleDetector);
 			}
@@ -199,8 +199,8 @@ public abstract class ItemStackMixin implements FabricItemStack {
 				break;
 			}
 
-			ComponentType<?> componentInOrder = vanillaOrder.get(index.get());
-			HashSet<ComponentType<?>> cycleDetector = new HashSet<>();
+			DataComponentType<?> componentInOrder = vanillaOrder.get(index.get());
+			HashSet<DataComponentType<?>> cycleDetector = new HashSet<>();
 			cycleDetector.add(componentInOrder);
 			ComponentTooltipAppenderRegistryImpl.onBefore((ItemStack) (Object) this, componentInOrder, context, displayComponent, textConsumer, tooltipType, cycleDetector);
 			index.set(index.get() + 1);

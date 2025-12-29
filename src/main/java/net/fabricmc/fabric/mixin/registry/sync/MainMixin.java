@@ -24,8 +24,8 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-import net.minecraft.world.item.ItemGroups;
-import net.minecraft.core.Registries;
+import net.minecraft.world.item.CreativeModeTabs;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.server.Main;
 
 import net.fabricmc.api.EnvType;
@@ -46,7 +46,7 @@ public class MainMixin {
 
 			Registries.bootstrap();
 			BlockInitTracker.postFreeze();
-			ItemGroups.collect();
+			CreativeModeTabs.collect();
 		}
 	}
 }

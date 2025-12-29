@@ -22,7 +22,7 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Redirect;
 
-import net.minecraft.server.packs.DataPackSettings;
+import net.minecraft.server.packs.repository.PackSelectionConfig;
 import net.minecraft.test.TestServer;
 
 import net.fabricmc.fabric.impl.resource.loader.ModResourcePackUtil;
@@ -32,8 +32,8 @@ import net.fabricmc.fabric.impl.resource.loader.ModResourcePackUtil;
  */
 @Mixin(TestServer.class)
 public class TestServerMixin {
-	@Redirect(method = "create", at = @At(value = "NEW", target = "(Ljava/util/List;Ljava/util/List;)Lnet/minecraft/resource/DataPackSettings;"))
-	private static DataPackSettings replaceDefaultDataPackSettings(List<String> enabled, List<String> disabled) {
+	@Redirect(method = "create", at = @At(value = "NEW", target = "(Ljava/util/List;Ljava/util/List;)Lnet/minecraft/resource/PackSelectionConfig;"))
+	private static PackSelectionConfig replaceDefaultDataPackSettings(List<String> enabled, List<String> disabled) {
 		return ModResourcePackUtil.createTestServerSettings(enabled, disabled);
 	}
 }

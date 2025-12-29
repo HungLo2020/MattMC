@@ -45,7 +45,7 @@ public class TaggedChoiceMixin implements TaggedChoiceExtension {
 	@Inject(
 			method = "lambda$apply$0", at = @At("RETURN")
 	)
-	private void onApply(Pair key, CallbackInfoReturnable<Type> cir) {
+	private void onApply(Tuple key, CallbackInfoReturnable<Type> cir) {
 		if (failSoft) {
 			Type returnValue = cir.getReturnValue();
 

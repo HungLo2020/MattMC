@@ -26,7 +26,7 @@ import org.jetbrains.annotations.Nullable;
 
 import net.minecraft.world.flag.FeatureFlagSet;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.world.GameRules;
+import net.minecraft.world.level.GameRules;
 
 import net.fabricmc.fabric.api.gamerule.v1.rule.DoubleRule;
 import net.fabricmc.fabric.api.gamerule.v1.rule.EnumRule;
@@ -44,7 +44,7 @@ import net.fabricmc.fabric.mixin.gamerule.GameRulesBooleanRuleAccessor;
  * <p>To register a game rule, you can use {@link GameRuleRegistry#register(String, GameRules.Category, GameRules.Type)}.
  * For example, to register a game rule that is an integer where the acceptable values are between 0 and 10, one would use the following:
  * <blockquote><pre>
- * public static final GameRules.Key&lt;GameRules.IntRule&gt; EXAMPLE_INT_RULE = GameRuleRegistry.register("exampleIntRule", GameRules.Category.UPDATES, GameRuleFactory.createIntRule(1, 10));
+ * public static final GameRules.Key&lt;GameRules.IntegerValue&gt; EXAMPLE_INT_RULE = GameRuleRegistry.register("exampleIntRule", GameRules.Category.UPDATES, GameRuleFactory.createIntRule(1, 10));
  * </pre></blockquote>
  *
  * <p>To register a game rule in a custom category, {@link GameRuleRegistry#register(String, CustomGameRuleCategory, GameRules.Type)} should be used.
@@ -58,7 +58,7 @@ public final class GameRuleFactory {
 	 * @param defaultValue the default value of the game rule
 	 * @return a boolean rule type
 	 */
-	public static GameRules.Type<GameRules.BooleanRule> createBooleanRule(boolean defaultValue) {
+	public static GameRules.Type<GameRules.BooleanValue> createBooleanRule(boolean defaultValue) {
 		return createBooleanRule(defaultValue, (server, rule) -> {
 		});
 	}
@@ -70,7 +70,7 @@ public final class GameRuleFactory {
 	 * @param changedCallback a callback that is invoked when the value of a game rule has changed
 	 * @return a boolean rule type
 	 */
-	public static GameRules.Type<GameRules.BooleanRule> createBooleanRule(boolean defaultValue, BiConsumer<MinecraftServer, GameRules.BooleanRule> changedCallback) {
+	public static GameRules.Type<GameRules.BooleanValue> createBooleanRule(boolean defaultValue, BiConsumer<MinecraftServer, GameRules.BooleanValue> changedCallback) {
 		return GameRulesBooleanRuleAccessor.invokeCreate(defaultValue, changedCallback);
 	}
 
@@ -80,7 +80,7 @@ public final class GameRuleFactory {
 	 * @param defaultValue the default value of the game rule
 	 * @return an integer rule type
 	 */
-	public static GameRules.Type<GameRules.IntRule> createIntRule(int defaultValue) {
+	public static GameRules.Type<GameRules.IntegerValue> createIntRule(int defaultValue) {
 		return createIntRule(defaultValue, (server, rule) -> {
 		});
 	}
@@ -92,7 +92,7 @@ public final class GameRuleFactory {
 	 * @param minimumValue the minimum value the game rule may accept
 	 * @return an integer rule type
 	 */
-	public static GameRules.Type<GameRules.IntRule> createIntRule(int defaultValue, int minimumValue) {
+	public static GameRules.Type<GameRules.IntegerValue> createIntRule(int defaultValue, int minimumValue) {
 		return createIntRule(defaultValue, minimumValue, Integer.MAX_VALUE, (server, rule) -> {
 		});
 	}
@@ -105,7 +105,7 @@ public final class GameRuleFactory {
 	 * @param changedCallback a callback that is invoked when the value of a game rule has changed
 	 * @return an integer rule type
 	 */
-	public static GameRules.Type<GameRules.IntRule> createIntRule(int defaultValue, int minimumValue, BiConsumer<MinecraftServer, GameRules.IntRule> changedCallback) {
+	public static GameRules.Type<GameRules.IntegerValue> createIntRule(int defaultValue, int minimumValue, BiConsumer<MinecraftServer, GameRules.IntegerValue> changedCallback) {
 		return createIntRule(defaultValue, minimumValue, Integer.MAX_VALUE, changedCallback);
 	}
 
@@ -117,7 +117,7 @@ public final class GameRuleFactory {
 	 * @param maximumValue the maximum value the game rule may accept
 	 * @return an integer rule type
 	 */
-	public static GameRules.Type<GameRules.IntRule> createIntRule(int defaultValue, int minimumValue, int maximumValue) {
+	public static GameRules.Type<GameRules.IntegerValue> createIntRule(int defaultValue, int minimumValue, int maximumValue) {
 		return createIntRule(defaultValue, minimumValue, maximumValue, (server, rule) -> {
 		});
 	}
@@ -129,7 +129,7 @@ public final class GameRuleFactory {
 	 * @param changedCallback a callback that is invoked when the value of a game rule has changed
 	 * @return an integer rule type
 	 */
-	public static GameRules.Type<GameRules.IntRule> createIntRule(int defaultValue, BiConsumer<MinecraftServer, GameRules.IntRule> changedCallback) {
+	public static GameRules.Type<GameRules.IntegerValue> createIntRule(int defaultValue, BiConsumer<MinecraftServer, GameRules.IntegerValue> changedCallback) {
 		return createIntRule(defaultValue, Integer.MIN_VALUE, Integer.MAX_VALUE, changedCallback);
 	}
 
@@ -142,13 +142,13 @@ public final class GameRuleFactory {
 	 * @param changedCallback a callback that is invoked when the value of a game rule has changed
 	 * @return an integer rule type
 	 */
-	public static GameRules.Type<GameRules.IntRule> createIntRule(int defaultValue, int minimumValue, int maximumValue, @Nullable BiConsumer<MinecraftServer, GameRules.IntRule> changedCallback) {
+	public static GameRules.Type<GameRules.IntegerValue> createIntRule(int defaultValue, int minimumValue, int maximumValue, @Nullable BiConsumer<MinecraftServer, GameRules.IntegerValue> changedCallback) {
 		return new GameRules.Type<>(
 				() -> IntegerArgumentType.integer(minimumValue, maximumValue),
 				type -> new BoundedIntRule(type, defaultValue, minimumValue, maximumValue), // Internally use a bounded int rule
 				changedCallback,
-				GameRules.Visitor::visitInt,
-				GameRules.IntRule.class,
+				GameRules.GameRuleTypeVisitor::visitInt,
+				GameRules.IntegerValue.class,
 				FeatureFlagSet.empty()
 		);
 	}
@@ -301,13 +301,13 @@ public final class GameRuleFactory {
 
 	// RULE VISITORS - INTERNAL
 
-	private static void visitDouble(GameRules.Visitor visitor, GameRules.Key<DoubleRule> key, GameRules.Type<DoubleRule> type) {
+	private static void visitDouble(GameRules.GameRuleTypeVisitor visitor, GameRules.Key<DoubleRule> key, GameRules.Type<DoubleRule> type) {
 		if (visitor instanceof FabricGameRuleVisitor) {
 			((FabricGameRuleVisitor) visitor).visitDouble(key, type);
 		}
 	}
 
-	private static <E extends Enum<E>> void visitEnum(GameRules.Visitor visitor, GameRules.Key<EnumRule<E>> key, GameRules.Type<EnumRule<E>> type) {
+	private static <E extends Enum<E>> void visitEnum(GameRules.GameRuleTypeVisitor visitor, GameRules.Key<EnumRule<E>> key, GameRules.Type<EnumRule<E>> type) {
 		if (visitor instanceof FabricGameRuleVisitor) {
 			((FabricGameRuleVisitor) visitor).visitEnum(key, type);
 		}

@@ -25,13 +25,13 @@ import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import org.jetbrains.annotations.Nullable;
 
-import net.minecraft.network.NetworkPhase;
+import net.minecraft.network.ConnectionProtocol;
 import net.minecraft.network.NetworkSide;
 import net.minecraft.network.FriendlyByteBuf;
-import net.minecraft.network.RegistryByteBuf;
-import net.minecraft.network.codec.PacketCodec;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.encoding.VarInts;
-import net.minecraft.network.protocol.CustomPacketPayload;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.network.state.NetworkState;
 import net.minecraft.resources.ResourceLocation;
 
@@ -39,17 +39,17 @@ import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.fabricmc.fabric.impl.networking.splitter.FabricPacketSplitter;
 
 public class PayloadTypeRegistryImpl<B extends FriendlyByteBuf> implements PayloadTypeRegistry<B> {
-	public static final PayloadTypeRegistryImpl<FriendlyByteBuf> CONFIGURATION_C2S = new PayloadTypeRegistryImpl<>(NetworkPhase.CONFIGURATION, NetworkSide.SERVERBOUND);
-	public static final PayloadTypeRegistryImpl<FriendlyByteBuf> CONFIGURATION_S2C = new PayloadTypeRegistryImpl<>(NetworkPhase.CONFIGURATION, NetworkSide.CLIENTBOUND);
-	public static final PayloadTypeRegistryImpl<RegistryByteBuf> PLAY_C2S = new PayloadTypeRegistryImpl<>(NetworkPhase.PLAY, NetworkSide.SERVERBOUND);
-	public static final PayloadTypeRegistryImpl<RegistryByteBuf> PLAY_S2C = new PayloadTypeRegistryImpl<>(NetworkPhase.PLAY, NetworkSide.CLIENTBOUND);
-	private final Map<ResourceLocation, ResourceLocation<B, ? extends CustomPacketPayload>> packetTypes = new HashMap<>();
+	public static final PayloadTypeRegistryImpl<FriendlyByteBuf> CONFIGURATION_C2S = new PayloadTypeRegistryImpl<>(ConnectionProtocol.CONFIGURATION, NetworkSide.SERVERBOUND);
+	public static final PayloadTypeRegistryImpl<FriendlyByteBuf> CONFIGURATION_S2C = new PayloadTypeRegistryImpl<>(ConnectionProtocol.CONFIGURATION, NetworkSide.CLIENTBOUND);
+	public static final PayloadTypeRegistryImpl<RegistryFriendlyByteBuf> PLAY_C2S = new PayloadTypeRegistryImpl<>(ConnectionProtocol.PLAY, NetworkSide.SERVERBOUND);
+	public static final PayloadTypeRegistryImpl<RegistryFriendlyByteBuf> PLAY_S2C = new PayloadTypeRegistryImpl<>(ConnectionProtocol.PLAY, NetworkSide.CLIENTBOUND);
+	private final Map<ResourceLocation, CustomPacketPayload.TypeAndCodec<B, ? extends CustomPacketPayload>> packetTypes = new HashMap<>();
 	private final Object2IntMap<ResourceLocation> maxPacketSize = new Object2IntOpenHashMap<>();
-	private final NetworkPhase state;
+	private final ConnectionProtocol state;
 	private final NetworkSide side;
 	private final int minimalSplittableSize;
 
-	private PayloadTypeRegistryImpl(NetworkPhase state, NetworkSide side) {
+	private PayloadTypeRegistryImpl(ConnectionProtocol state, NetworkSide side) {
 		this.state = state;
 		this.side = side;
 		this.minimalSplittableSize = side == NetworkSide.CLIENTBOUND ? FabricPacketSplitter.SAFE_S2C_SPLIT_SIZE : FabricPacketSplitter.SAFE_C2S_SPLIT_SIZE;
@@ -65,11 +65,11 @@ public class PayloadTypeRegistryImpl<B extends FriendlyByteBuf> implements Paylo
 	}
 
 	@Override
-	public <T extends CustomPacketPayload> ResourceLocation<? super B, T> register(CustomPacketPayload.Id<T> id, PacketCodec<? super B, T> codec) {
+	public <T extends CustomPacketPayload> CustomPacketPayload.TypeAndCodec<? super B, T> register(CustomPacketPayload.Type<T> id, StreamCodec<? super B, T> codec) {
 		Objects.requireNonNull(id, "id");
 		Objects.requireNonNull(codec, "codec");
 
-		final ResourceLocation<B, T> payloadType = new ResourceLocation<>(id, codec.cast());
+		final CustomPacketPayload.TypeAndCodec<B, T> payloadType = new ResourceLocation<>(id, codec.cast());
 
 		if (packetTypes.containsKey(id.id())) {
 			throw new IllegalArgumentException("Packet type " + id + " is already registered!");
@@ -80,12 +80,12 @@ public class PayloadTypeRegistryImpl<B extends FriendlyByteBuf> implements Paylo
 	}
 
 	@Override
-	public <T extends CustomPacketPayload> ResourceLocation<? super B, T> registerLarge(CustomPacketPayload.Id<T> id, PacketCodec<? super B, T> codec, int maxPayloadSize) {
+	public <T extends CustomPacketPayload> CustomPacketPayload.TypeAndCodec<? super B, T> registerLarge(CustomPacketPayload.Type<T> id, StreamCodec<? super B, T> codec, int maxPayloadSize) {
 		if (maxPayloadSize < 0) {
 			throw new IllegalArgumentException("Provided maxPayloadSize needs to be positive!");
 		}
 
-		ResourceLocation<? super B, T> type = register(id, codec);
+		CustomPacketPayload.TypeAndCodec<? super B, T> type = register(id, codec);
 		// Defines max packet size, increased by length of packet's ResourceLocation to cover full size of CustomPayloadX2YPackets.
 		int identifierSize = ByteBufUtil.utf8MaxBytes(id.id().toString());
 		int maxPacketSize = maxPayloadSize + VarInts.getSizeInBytes(identifierSize) + identifierSize + 5 * 2;
@@ -104,21 +104,21 @@ public class PayloadTypeRegistryImpl<B extends FriendlyByteBuf> implements Paylo
 	}
 
 	@Nullable
-	public ResourceLocation<B, ? extends CustomPacketPayload> get(ResourceLocation id) {
+	public CustomPacketPayload.TypeAndCodec<B, ? extends CustomPacketPayload> get(ResourceLocation id) {
 		return packetTypes.get(id);
 	}
 
 	@Nullable
-	public <T extends CustomPacketPayload> ResourceLocation<B, T> get(CustomPacketPayload.Id<T> id) {
+	public <T extends CustomPacketPayload> CustomPacketPayload.TypeAndCodec<B, T> get(CustomPacketPayload.Type<T> id) {
 		//noinspection unchecked
-		return (ResourceLocation<B, T>) packetTypes.get(id.id());
+		return (CustomPacketPayload.TypeAndCodec<B, T>) packetTypes.get(id.id());
 	}
 
 	public int getMaxPacketSize(ResourceLocation id) {
 		return this.maxPacketSize.getOrDefault(id, -1);
 	}
 
-	public NetworkPhase getPhase() {
+	public ConnectionProtocol getPhase() {
 		return state;
 	}
 

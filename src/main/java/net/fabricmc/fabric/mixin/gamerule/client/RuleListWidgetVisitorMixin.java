@@ -26,7 +26,7 @@ import org.spongepowered.asm.mixin.injection.Redirect;
 
 import net.minecraft.client.gui.screens.world.EditGameRulesScreen;
 import net.minecraft.client.resource.language.I18n;
-import net.minecraft.world.GameRules;
+import net.minecraft.world.level.GameRules;
 
 import net.fabricmc.fabric.api.gamerule.v1.FabricGameRuleVisitor;
 import net.fabricmc.fabric.api.gamerule.v1.rule.DoubleRule;
@@ -35,12 +35,12 @@ import net.fabricmc.fabric.impl.gamerule.widget.DoubleRuleWidget;
 import net.fabricmc.fabric.impl.gamerule.widget.EnumRuleWidget;
 
 @Mixin(targets = "net/minecraft/client/gui/screen/world/EditGameRulesScreen$RuleListWidget$1")
-public abstract class RuleListWidgetVisitorMixin implements GameRules.Visitor, FabricGameRuleVisitor {
+public abstract class RuleListWidgetVisitorMixin implements GameRules.GameRuleTypeVisitor, FabricGameRuleVisitor {
 	@Final
 	@Shadow
 	private EditGameRulesScreen field_24314;
 	@Shadow
-	protected abstract <T extends GameRules.Rule<T>> void createRuleWidget(GameRules.Key<T> key, EditGameRulesScreen.RuleWidgetFactory<T> ruleWidgetFactory);
+	protected abstract <T extends GameRules.Value<T>> void createRuleWidget(GameRules.Key<T> key, EditGameRulesScreen.RuleWidgetFactory<T> ruleWidgetFactory);
 
 	@Override
 	public void visitDouble(GameRules.Key<DoubleRule> key, GameRules.Type<DoubleRule> type) {
@@ -60,7 +60,7 @@ public abstract class RuleListWidgetVisitorMixin implements GameRules.Visitor, F
 	 * @reason We need to display an enum rule's default value as translated.
 	 */
 	@Redirect(at = @At(value = "INVOKE", target = "Lnet/minecraft/world/GameRules$Rule;serialize()Ljava/lang/String;"), method = "net/minecraft/client/gui/screen/world/EditGameRulesScreen$RuleListWidget$1.createRuleWidget(Lnet/minecraft/world/GameRules$Key;Lnet/minecraft/client/gui/screen/world/EditGameRulesScreen$RuleWidgetFactory;)V")
-	private <T extends GameRules.Rule<T>> String displayProperEnumName(GameRules.Rule<T> rule, GameRules.Key<T> key, EditGameRulesScreen.RuleWidgetFactory<T> widgetFactory) {
+	private <T extends GameRules.Value<T>> String displayProperEnumName(GameRules.Value<T> rule, GameRules.Key<T> key, EditGameRulesScreen.RuleWidgetFactory<T> widgetFactory) {
 		if (rule instanceof EnumRule) {
 			String translationKey = key.getTranslationKey() + "." + ((EnumRule<?>) rule).get().name().toLowerCase(Locale.ROOT);
 

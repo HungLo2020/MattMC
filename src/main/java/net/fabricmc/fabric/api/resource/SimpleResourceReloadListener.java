@@ -20,7 +20,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 
 import net.minecraft.server.packs.resources.ResourceManager;
-import net.minecraft.server.packs.SynchronousResourceReloader;
+import net.minecraft.server.packs.resources.ResourceManagerReloadListener;
 
 /**
  * A simplified version of the "resource reload listener" interface, hiding the
@@ -36,7 +36,7 @@ import net.minecraft.server.packs.SynchronousResourceReloader;
  * the apply stage is guaranteed to run on the game thread.
  *
  * <p>For a fully synchronous alternative, consider using
- * {@link SynchronousResourceReloader} in conjunction with
+ * {@link ResourceManagerReloadListener} in conjunction with
  * {@link IdentifiableResourceReloadListener}.
  *
  * @param <T> The data object.
@@ -45,9 +45,9 @@ import net.minecraft.server.packs.SynchronousResourceReloader;
 @Deprecated
 public interface SimpleResourceReloadListener<T> extends IdentifiableResourceReloadListener {
 	@Override
-	default CompletableFuture<Void> reload(Store store, Executor loadExecutor, Synchronizer helper, Executor applyExecutor) {
-		return load(store.getResourceManager(), loadExecutor).thenCompose(helper::whenPrepared).thenCompose(
-				(o) -> apply(o, store.getResourceManager(), applyExecutor)
+	default CompletableFuture<Void> reload(PreparationBarrier store, ResourceManager manager, Executor loadExecutor, Executor applyExecutor) {
+		return load(manager, loadExecutor).thenCompose(store::wait).thenCompose(
+				(o) -> apply(o, manager, applyExecutor)
 		);
 	}
 

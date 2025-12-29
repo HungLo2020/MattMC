@@ -23,7 +23,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.ModifyArg;
 
 import net.minecraft.network.Connection;
-import net.minecraft.core.VersionedIdentifier;
+import net.minecraft.server.packs.repository.KnownPack;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.network.ConnectedClientData;
 import net.minecraft.server.network.ServerCommonNetworkHandler;
@@ -43,7 +43,7 @@ public abstract class ServerConfigurationNetworkHandlerMixin extends ServerCommo
 	 * the client to use the new data pack data.
 	 */
 	@ModifyArg(method = "sendConfigurations", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/network/SynchronizeRegistriesTask;<init>(Ljava/util/List;Lnet/minecraft/registry/CombinedDynamicRegistries;)V", ordinal = 0))
-	public List<VersionedIdentifier> filterKnownPacks(List<VersionedIdentifier> currentKnownPacks) {
+	public List<KnownPack> filterKnownPacks(List<KnownPack> currentKnownPacks) {
 		return ((FabricOriginalKnownPacksGetter) this.server).fabric_getOriginalKnownPacks().stream().filter(currentKnownPacks::contains).toList();
 	}
 }

@@ -20,15 +20,15 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Redirect;
 
-import net.minecraft.server.packs.DataConfiguration;
+import net.minecraft.server.WorldDataConfiguration;
 import net.minecraft.server.dedicated.ServerPropertiesHandler;
 
 import net.fabricmc.fabric.impl.resource.loader.ModResourcePackUtil;
 
 @Mixin(ServerPropertiesHandler.class)
 public class ServerPropertiesHandlerMixin {
-	@Redirect(method = "<init>", at = @At(value = "FIELD", target = "Lnet/minecraft/resource/DataConfiguration;SAFE_MODE:Lnet/minecraft/resource/DataConfiguration;"))
-	private DataConfiguration replaceDefaultDataConfiguration() {
+	@Redirect(method = "<init>", at = @At(value = "FIELD", target = "Lnet/minecraft/resource/WorldDataConfiguration;SAFE_MODE:Lnet/minecraft/resource/WorldDataConfiguration;"))
+	private WorldDataConfiguration replaceDefaultDataConfiguration() {
 		return ModResourcePackUtil.createDefaultDataConfiguration();
 	}
 }

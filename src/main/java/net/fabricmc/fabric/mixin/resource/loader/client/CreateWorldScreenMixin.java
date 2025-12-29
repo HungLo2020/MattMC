@@ -29,9 +29,9 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.world.CreateWorldScreen;
-import net.minecraft.server.packs.DataConfiguration;
-import net.minecraft.server.packs.PackRepository;
-import net.minecraft.server.packs.ResourceType;
+import net.minecraft.server.WorldDataConfiguration;
+import net.minecraft.server.packs.repository.PackRepository;
+import net.minecraft.server.packs.PackType;
 
 import net.fabricmc.fabric.impl.resource.loader.ModResourcePackCreator;
 import net.fabricmc.fabric.impl.resource.loader.ModResourcePackUtil;
@@ -46,23 +46,23 @@ public abstract class CreateWorldScreenMixin extends Screen {
 	}
 
 	@ModifyVariable(method = "show(Lnet/minecraft/client/Minecraft;Ljava/lang/Runnable;Ljava/util/function/Function;Lnet/minecraft/client/world/GeneratorOptionsFactory;Lnet/minecraft/registry/ResourceKey;Lnet/minecraft/client/gui/screen/world/CreateWorldCallback;)V",
-			at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/screen/world/CreateWorldScreen;createServerConfig(Lnet/minecraft/resource/PackRepository;Lnet/minecraft/resource/DataConfiguration;)Lnet/minecraft/server/SaveLoading$ServerConfig;"))
+			at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/screen/world/CreateWorldScreen;createServerConfig(Lnet/minecraft/resource/PackRepository;Lnet/minecraft/resource/WorldDataConfiguration;)Lnet/minecraft/server/SaveLoading$ServerConfig;"))
 	private static PackRepository onCreateResManagerInit(PackRepository manager) {
 		// Add mod data packs to the initial res pack manager so they are active even if the user doesn't use custom data packs
-		manager.providers.add(new ModResourcePackCreator(ResourceType.SERVER_DATA));
+		manager.providers.add(new ModResourcePackCreator(PackType.SERVER_DATA));
 		return manager;
 	}
 
 	@Redirect(method = "show(Lnet/minecraft/client/Minecraft;Ljava/lang/Runnable;Ljava/util/function/Function;Lnet/minecraft/client/world/GeneratorOptionsFactory;Lnet/minecraft/registry/ResourceKey;Lnet/minecraft/client/gui/screen/world/CreateWorldCallback;)V",
-			at = @At(value = "FIELD", target = "Lnet/minecraft/resource/DataConfiguration;SAFE_MODE:Lnet/minecraft/resource/DataConfiguration;", ordinal = 0))
-	private static DataConfiguration replaceDefaultSettings() {
+			at = @At(value = "FIELD", target = "Lnet/minecraft/resource/WorldDataConfiguration;SAFE_MODE:Lnet/minecraft/resource/WorldDataConfiguration;", ordinal = 0))
+	private static WorldDataConfiguration replaceDefaultSettings() {
 		return ModResourcePackUtil.createDefaultDataConfiguration();
 	}
 
 	@Inject(method = "getScannedPack",
 			at = @At(value = "INVOKE", target = "Lnet/minecraft/resource/PackRepository;scanPacks()V", shift = At.Shift.BEFORE))
-	private void onScanPacks(CallbackInfoReturnable<Pair<File, PackRepository>> cir) {
+	private void onScanPacks(CallbackInfoReturnable<Tuple<File, PackRepository>> cir) {
 		// Allow to display built-in data packs in the data pack selection screen at world creation.
-		this.packManager.providers.add(new ModResourcePackCreator(ResourceType.SERVER_DATA));
+		this.packManager.providers.add(new ModResourcePackCreator(PackType.SERVER_DATA));
 	}
 }

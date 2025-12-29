@@ -28,9 +28,9 @@ import io.netty.channel.ChannelFutureListener;
 import org.jetbrains.annotations.Nullable;
 
 import net.minecraft.network.Connection;
-import net.minecraft.network.NetworkPhase;
+import net.minecraft.network.ConnectionProtocol;
 import net.minecraft.network.OffThreadException;
-import net.minecraft.network.protocol.CustomPacketPayload;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
@@ -61,7 +61,7 @@ public abstract class AbstractChanneledNetworkAddon<H> extends AbstractNetworkAd
 		this.sendableChannels = Collections.synchronizedSet(new HashSet<>());
 	}
 
-	protected void registerPendingChannels(ChannelInfoHolder holder, NetworkPhase state) {
+	protected void registerPendingChannels(ChannelInfoHolder holder, ConnectionProtocol state) {
 		final Collection<ResourceLocation> pending = holder.fabric_getPendingChannelsNames(state);
 
 		if (!pending.isEmpty()) {
@@ -121,7 +121,7 @@ public abstract class AbstractChanneledNetworkAddon<H> extends AbstractNetworkAd
 	}
 
 	@Nullable
-	protected RegistrationPayload createRegistrationPayload(CustomPacketPayload.Id<RegistrationPayload> id, Collection<ResourceLocation> channels) {
+	protected RegistrationPayload createRegistrationPayload(CustomPacketPayload.Type<RegistrationPayload> id, Collection<ResourceLocation> channels) {
 		if (channels.isEmpty()) {
 			return null;
 		}

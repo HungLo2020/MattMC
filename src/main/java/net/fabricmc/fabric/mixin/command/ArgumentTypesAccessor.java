@@ -22,12 +22,12 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.gen.Accessor;
 
 import net.minecraft.commands.argument.ArgumentTypes;
-import net.minecraft.commands.argument.serialize.ArgumentSerializer;
+import net.minecraft.commands.synchronization.ArgumentTypeInfo;
 
 @Mixin(ArgumentTypes.class)
 public interface ArgumentTypesAccessor {
 	@Accessor("CLASS_MAP")
-	static Map<Class<?>, ArgumentSerializer<?, ?>> fabric_getClassMap() {
+	static Map<Class<?>, ArgumentTypeInfo<?, ?>> fabric_getClassMap() {
 		throw new AssertionError("");
 	}
 }

@@ -21,9 +21,9 @@ import java.util.Objects;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientConfigurationPacketListenerImpl;
-import net.minecraft.network.NetworkPhase;
+import net.minecraft.network.ConnectionProtocol;
 import net.minecraft.network.protocol.BrandCustomPayload;
-import net.minecraft.network.protocol.CustomPacketPayload;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.resources.ResourceLocation;
 
@@ -47,7 +47,7 @@ public final class ClientConfigurationNetworkAddon extends ClientCommonNetworkAd
 		this.context = new ContextImpl(client, handler, this);
 
 		// Must register pending channels via lateinit
-		this.registerPendingChannels((ChannelInfoHolder) this.connection, NetworkPhase.CONFIGURATION);
+		this.registerPendingChannels((ChannelInfoHolder) this.connection, ConnectionProtocol.CONFIGURATION);
 	}
 
 	@Override

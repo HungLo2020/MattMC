@@ -21,17 +21,17 @@ import org.slf4j.LoggerFactory;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.client.gui.screens.inventory.HandledScreens;
-import net.minecraft.client.gui.screens.inventory.ScreenHandlerProvider;
+import net.minecraft.client.gui.screens.MenuScreens;
+import net.minecraft.world.MenuProvider;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.core.Registries;
-import net.minecraft.world.inventory.ScreenHandlerType;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.world.inventory.MenuType;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
-import net.fabricmc.fabric.api.screenhandler.v1.ExtendedScreenHandlerType;
+import net.fabricmc.fabric.api.screenhandler.v1.ExtendedMenuType;
 import net.fabricmc.fabric.impl.screenhandler.Networking;
 
 public final class ClientNetworking implements ClientModInitializer {
@@ -50,31 +50,31 @@ public final class ClientNetworking implements ClientModInitializer {
 		int syncId = payload.syncId();
 		Component title = payload.title();
 
-		ScreenHandlerType<?> type = Registries.SCREEN_HANDLER.get(typeId);
+		MenuType<?> type = Registries.SCREEN_HANDLER.get(typeId);
 
 		if (type == null || payload.data() == null) {
 			LOGGER.warn("Unknown screen handler ID: {}", typeId);
 			return;
 		}
 
-		if (!(type instanceof ExtendedScreenHandlerType)) {
+		if (!(type instanceof ExtendedMenuType)) {
 			LOGGER.warn("Received extended opening packet for non-extended screen handler {}", typeId);
 			return;
 		}
 
-		HandledScreens.Provider screenFactory = HandledScreens.getProvider(type);
+		MenuScreens.Provider screenFactory = MenuScreens.getProvider(type);
 
 		if (screenFactory != null) {
 			Minecraft client = Minecraft.getInstance();
 			Player player = client.player;
 
 			Screen screen = screenFactory.create(
-					((ExtendedScreenHandlerType<?, D>) type).create(syncId, player.getInventory(), payload.data()),
+					((ExtendedMenuType<?, D>) type).create(syncId, player.getInventory(), payload.data()),
 					player.getInventory(),
 					title
 			);
 
-			player.currentScreenHandler = ((ScreenHandlerProvider<?>) screen).getScreenHandler();
+			player.currentScreenHandler = ((MenuProvider<?>) screen).getScreenHandler();
 			client.setScreen(screen);
 		} else {
 			LOGGER.warn("Screen not registered for screen handler {}!", typeId);

@@ -33,9 +33,9 @@ import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import org.jetbrains.annotations.Nullable;
 
 import net.minecraft.network.FriendlyByteBuf;
-import net.minecraft.network.codec.PacketCodec;
-import net.minecraft.network.protocol.CustomPacketPayload;
-import net.minecraft.core.Registries;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.core.Registry;
 import net.minecraft.resources.ResourceLocation;
 
@@ -78,7 +78,7 @@ public class DirectRegistryPacketHandler extends RegistryPacketHandler<DirectReg
 	private int totalPacketReceived = 0;
 
 	@Override
-	public CustomPacketPayload.Id<DirectRegistryPacketHandler.Payload> getPacketId() {
+	public CustomPacketPayload.Type<DirectRegistryPacketHandler.Payload> getPacketId() {
 		return Payload.ID;
 	}
 
@@ -284,8 +284,8 @@ public class DirectRegistryPacketHandler extends RegistryPacketHandler<DirectReg
 	}
 
 	public record Payload(byte[] data) implements RegistrySyncPayload {
-		public static CustomPacketPayload.Id<Payload> ID = new Id<>(ResourceLocation.of("fabric", "registry/sync/direct"));
-		public static PacketCodec<FriendlyByteBuf, Payload> CODEC = CustomPacketPayload.codecOf(Payload::write, Payload::new);
+		public static CustomPacketPayload.Type<Payload> ID = new Id<>(ResourceLocation.of("fabric", "registry/sync/direct"));
+		public static StreamCodec<FriendlyByteBuf, Payload> CODEC = CustomPacketPayload.codecOf(Payload::write, Payload::new);
 
 		Payload(FriendlyByteBuf buf) {
 			this(readAllBytes(buf));
@@ -302,7 +302,7 @@ public class DirectRegistryPacketHandler extends RegistryPacketHandler<DirectReg
 		}
 
 		@Override
-		public Id<? extends CustomPacketPayload> getId() {
+		public CustomPacketPayload.Type<? extends CustomPacketPayload> getId() {
 			return ID;
 		}
 	}

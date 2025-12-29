@@ -19,7 +19,7 @@ package net.fabricmc.fabric.api.resource;
 import java.util.Collection;
 import java.util.Collections;
 
-import net.minecraft.server.packs.ResourceReloader;
+import net.minecraft.server.packs.resources.PreparableReloadListener;
 import net.minecraft.resources.ResourceLocation;
 
 /**
@@ -30,11 +30,11 @@ import net.minecraft.resources.ResourceLocation;
  * themselves.
  *
  * @see net.fabricmc.fabric.api.resource.v1.reloader.ResourceReloaderKeys
- * @deprecated Use {@link net.fabricmc.fabric.api.resource.v1.ResourceLoader#registerReloader(ResourceLocation, ResourceReloader)}
+ * @deprecated Use {@link net.fabricmc.fabric.api.resource.v1.ResourceLoader#registerReloader(ResourceLocation, PreparableReloadListener)}
  * and {@link net.fabricmc.fabric.api.resource.v1.ResourceLoader#addReloaderOrdering(ResourceLocation, ResourceLocation)} instead.
  */
 @Deprecated
-public interface IdentifiableResourceReloadListener extends ResourceReloader {
+public interface IdentifiableResourceReloadListener extends PreparableReloadListener {
 	/**
 	 * @return The unique identifier of this listener.
 	 */

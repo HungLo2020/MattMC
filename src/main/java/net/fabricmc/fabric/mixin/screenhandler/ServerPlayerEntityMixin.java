@@ -30,7 +30,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.network.protocol.Packet;
-import net.minecraft.core.Registries;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.world.inventory.MenuProvider;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.SimpleNamedScreenHandlerFactory;
@@ -40,7 +40,7 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.Level;
 
 import net.fabricmc.fabric.api.screenhandler.v1.ExtendedScreenHandlerFactory;
-import net.fabricmc.fabric.api.screenhandler.v1.ExtendedScreenHandlerType;
+import net.fabricmc.fabric.api.screenhandler.v1.ExtendedMenuType;
 import net.fabricmc.fabric.impl.screenhandler.Networking;
 
 @Mixin(ServerPlayer.class)
@@ -70,7 +70,7 @@ public abstract class ServerPlayerEntityMixin extends Player {
 		if (factory instanceof ExtendedScreenHandlerFactory || (factory instanceof SimpleNamedScreenHandlerFactory simpleFactory && simpleFactory.baseFactory instanceof ExtendedScreenHandlerFactory)) {
 			// Set the screen handler, so the factory method can access it through the player.
 			currentScreenHandler = handler;
-		} else if (handler.getType() instanceof ExtendedScreenHandlerType<?, ?>) {
+		} else if (handler.getType() instanceof ExtendedMenuType<?, ?>) {
 			ResourceLocation id = Registries.SCREEN_HANDLER.getId(handler.getType());
 			throw new IllegalArgumentException("[Fabric] Extended screen handler " + id + " must be opened with an ExtendedScreenHandlerFactory!");
 		}
@@ -85,7 +85,7 @@ public abstract class ServerPlayerEntityMixin extends Player {
 		if (factory instanceof ExtendedScreenHandlerFactory<?> extendedFactory) {
 			AbstractContainerMenu handler = Objects.requireNonNull(currentScreenHandler);
 
-			if (handler.getType() instanceof ExtendedScreenHandlerType<?, ?>) {
+			if (handler.getType() instanceof ExtendedMenuType<?, ?>) {
 				Networking.sendOpenPacket((ServerPlayer) (Object) this, extendedFactory, handler, screenHandlerSyncId);
 			} else {
 				ResourceLocation id = Registries.SCREEN_HANDLER.getId(handler.getType());

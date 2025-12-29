@@ -24,14 +24,14 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-import net.minecraft.network.codec.PacketCodec;
+import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.handler.PacketCodecDispatcher;
-import net.minecraft.network.protocol.CustomPacketPayload;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.network.protocol.c2s.common.CustomPayloadC2SPacket;
 import net.minecraft.network.protocol.s2c.common.CustomPayloadS2CPacket;
 
 @Mixin(PacketCodecDispatcher.class)
-public abstract class PacketCodecDispatcherMixin<B extends ByteBuf, V, T> implements PacketCodec<B, V> {
+public abstract class PacketCodecDispatcherMixin<B extends ByteBuf, V, T> implements StreamCodec<B, V> {
 	// Add the custom payload id to the error message
 	@Inject(method = "encode(Lio/netty/buffer/ByteBuf;Ljava/lang/Object;)V", at = @At(value = "NEW", target = "(Ljava/lang/String;Ljava/lang/Throwable;)Lio/netty/handler/codec/EncoderException;"))
 	public void encode(B byteBuf, V packet, CallbackInfo ci, @Local(ordinal = 1) T packetId, @Local Exception e) {

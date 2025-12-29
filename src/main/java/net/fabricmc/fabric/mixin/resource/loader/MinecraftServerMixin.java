@@ -27,10 +27,10 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-import net.minecraft.core.VersionedIdentifier;
-import net.minecraft.server.packs.Pack;
-import net.minecraft.server.packs.PackRepository;
-import net.minecraft.server.packs.ResourcePackProfile;
+import net.minecraft.server.packs.repository.KnownPack;
+import net.minecraft.server.packs.repository.Pack;
+import net.minecraft.server.packs.repository.PackRepository;
+import net.minecraft.server.packs.repository.Pack;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.SaveLoader;
 import net.minecraft.util.ApiServices;
@@ -44,14 +44,14 @@ import net.fabricmc.fabric.impl.resource.loader.ModNioResourcePack;
 @Mixin(MinecraftServer.class)
 public class MinecraftServerMixin implements FabricOriginalKnownPacksGetter {
 	@Unique
-	private List<VersionedIdentifier> fabric_originalKnownPacks;
+	private List<KnownPack> fabric_originalKnownPacks;
 
 	@Inject(method = "<init>", at = @At("TAIL"))
 	private void init(Thread serverThread, LevelStorage.Session session, PackRepository dataPackManager, SaveLoader saveLoader, Proxy proxy, DataFixer dataFixer, ApiServices apiServices, ChunkLoadProgress chunkLoadProgress, CallbackInfo ci) {
 		this.fabric_originalKnownPacks = saveLoader.resourceManager().streamResourcePacks().flatMap(pack -> pack.getInfo().knownPackInfo().stream()).toList();
 	}
 
-	@Redirect(method = "loadDataPacks(Lnet/minecraft/resource/PackRepository;Lnet/minecraft/resource/DataConfiguration;ZZ)Lnet/minecraft/resource/DataConfiguration;", at = @At(value = "INVOKE", target = "Ljava/util/List;contains(Ljava/lang/Object;)Z"))
+	@Redirect(method = "loadDataPacks(Lnet/minecraft/resource/PackRepository;Lnet/minecraft/resource/WorldDataConfiguration;ZZ)Lnet/minecraft/resource/WorldDataConfiguration;", at = @At(value = "INVOKE", target = "Ljava/util/List;contains(Ljava/lang/Object;)Z"))
 	private static boolean onCheckDisabled(List<String> list, Object o, PackRepository resourcePackManager) {
 		String profileId = (String) o;
 		boolean contains = list.contains(profileId);
@@ -60,7 +60,7 @@ public class MinecraftServerMixin implements FabricOriginalKnownPacksGetter {
 			return true;
 		}
 
-		ResourcePackProfile profile = resourcePackManager.getProfile(profileId);
+		Pack profile = resourcePackManager.getProfile(profileId);
 
 		if (profile.getSource() instanceof BuiltinModResourcePackSource) {
 			try (Pack pack = profile.createResourcePack()) {
@@ -73,7 +73,7 @@ public class MinecraftServerMixin implements FabricOriginalKnownPacksGetter {
 	}
 
 	@Override
-	public List<VersionedIdentifier> fabric_getOriginalKnownPacks() {
+	public List<KnownPack> fabric_getOriginalKnownPacks() {
 		return this.fabric_originalKnownPacks;
 	}
 }

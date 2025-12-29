@@ -16,20 +16,20 @@
 
 package net.fabricmc.fabric.mixin.itemgroup;
 
-import static net.minecraft.world.item.ItemGroups.BUILDING_BLOCKS;
-import static net.minecraft.world.item.ItemGroups.COLORED_BLOCKS;
-import static net.minecraft.world.item.ItemGroups.COMBAT;
-import static net.minecraft.world.item.ItemGroups.FOOD_AND_DRINK;
-import static net.minecraft.world.item.ItemGroups.FUNCTIONAL;
-import static net.minecraft.world.item.ItemGroups.HOTBAR;
-import static net.minecraft.world.item.ItemGroups.INGREDIENTS;
-import static net.minecraft.world.item.ItemGroups.INVENTORY;
-import static net.minecraft.world.item.ItemGroups.NATURAL;
-import static net.minecraft.world.item.ItemGroups.OPERATOR;
-import static net.minecraft.world.item.ItemGroups.REDSTONE;
-import static net.minecraft.world.item.ItemGroups.SEARCH;
-import static net.minecraft.world.item.ItemGroups.SPAWN_EGGS;
-import static net.minecraft.world.item.ItemGroups.TOOLS;
+import static net.minecraft.world.item.CreativeModeTabs.BUILDING_BLOCKS;
+import static net.minecraft.world.item.CreativeModeTabs.COLORED_BLOCKS;
+import static net.minecraft.world.item.CreativeModeTabs.COMBAT;
+import static net.minecraft.world.item.CreativeModeTabs.FOOD_AND_DRINK;
+import static net.minecraft.world.item.CreativeModeTabs.FUNCTIONAL;
+import static net.minecraft.world.item.CreativeModeTabs.HOTBAR;
+import static net.minecraft.world.item.CreativeModeTabs.INGREDIENTS;
+import static net.minecraft.world.item.CreativeModeTabs.INVENTORY;
+import static net.minecraft.world.item.CreativeModeTabs.NATURAL;
+import static net.minecraft.world.item.CreativeModeTabs.OPERATOR;
+import static net.minecraft.world.item.CreativeModeTabs.REDSTONE;
+import static net.minecraft.world.item.CreativeModeTabs.SEARCH;
+import static net.minecraft.world.item.CreativeModeTabs.SPAWN_EGGS;
+import static net.minecraft.world.item.CreativeModeTabs.TOOLS;
 
 import java.util.Comparator;
 import java.util.HashMap;
@@ -42,15 +42,15 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import net.minecraft.world.item.CreativeModeTab;
-import net.minecraft.world.item.ItemGroups;
-import net.minecraft.core.Registries;
+import net.minecraft.world.item.CreativeModeTabs;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.core.Holder;
 import net.minecraft.resources.ResourceLocation;
 
 import net.fabricmc.fabric.impl.itemgroup.FabricItemGroupImpl;
 
-@Mixin(ItemGroups.class)
+@Mixin(CreativeModeTabs.class)
 public class ItemGroupsMixin {
 	@Unique
 	private static final int TABS_PER_PAGE = FabricItemGroupImpl.TABS_PER_PAGE;

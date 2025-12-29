@@ -25,21 +25,21 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import net.minecraft.SharedConstants;
-import net.minecraft.commands.CommandRegistryAccess;
-import net.minecraft.commands.CommandManager;
+import net.minecraft.commands.CommandBuildContext;
+import net.minecraft.commands.Commands;
 import net.minecraft.commands.DebugConfigCommand;
 import net.minecraft.commands.CommandSourceStack;
 
 import net.fabricmc.loader.api.FabricLoader;
 
-@Mixin(CommandManager.class)
+@Mixin(Commands.class)
 public class CommandManagerMixin {
 	@Shadow
 	@Final
 	private CommandDispatcher<CommandSourceStack> dispatcher;
 
 	@Inject(method = "<init>", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/dedicated/command/BanIpCommand;register(Lcom/mojang/brigadier/CommandDispatcher;)V"))
-	private void init(CommandManager.RegistrationEnvironment environment, CommandRegistryAccess commandRegistryAccess, CallbackInfo ci) {
+	private void init(Commands.CommandSelection environment, CommandBuildContext commandRegistryAccess, CallbackInfo ci) {
 		if (SharedConstants.isDevelopment) {
 			// Command is registered when isDevelopment is set.
 			return;

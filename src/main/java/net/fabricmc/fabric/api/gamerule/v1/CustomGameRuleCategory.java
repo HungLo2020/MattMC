@@ -20,7 +20,7 @@ import java.util.Optional;
 
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.world.GameRules;
+import net.minecraft.world.level.GameRules;
 
 import net.fabricmc.fabric.impl.gamerule.RuleKeyExtensions;
 
@@ -72,7 +72,7 @@ public final class CustomGameRuleCategory {
 	 * @param <T> the type of value the rule holds
 	 * @return the custom category this rule belongs to. Otherwise {@link Optional#empty() empty}
 	 */
-	public static <T extends GameRules.Rule<T>> Optional<CustomGameRuleCategory> getCategory(GameRules.Key<T> key) {
+	public static <T extends GameRules.Value<T>> Optional<CustomGameRuleCategory> getCategory(GameRules.Key<T> key) {
 		return Optional.ofNullable(((RuleKeyExtensions) (Object) key).fabric_getCustomCategory());
 	}
 }

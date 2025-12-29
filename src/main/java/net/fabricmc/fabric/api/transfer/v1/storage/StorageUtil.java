@@ -22,11 +22,11 @@ import java.util.function.Predicate;
 
 import org.jetbrains.annotations.Nullable;
 
-import net.minecraft.world.item.inventory.Container;
+import net.minecraft.world.Container;
 import net.minecraft.world.inventory.AbstractContainerMenu;
-import net.minecraft.util.crash.CrashException;
-import net.minecraft.util.crash.CrashReport;
-import net.minecraft.core.MathHelper;
+import net.minecraft.ReportedException;
+import net.minecraft.CrashReport;
+import net.minecraft.util.Mth;
 
 import net.fabricmc.fabric.api.transfer.v1.storage.base.ResourceAmount;
 import net.fabricmc.fabric.api.transfer.v1.storage.base.SingleSlotStorage;
@@ -119,7 +119,7 @@ public final class StorageUtil {
 					.add("Filter", filter::toString)
 					.add("Max amount", maxAmount)
 					.add("Transaction", transaction);
-			throw new CrashException(report);
+			throw new ReportedException(report);
 		}
 
 		return totalMoved;
@@ -200,7 +200,7 @@ public final class StorageUtil {
 					.add("Storage", storage::toString)
 					.add("Max amount", maxAmount)
 					.add("Transaction", transaction);
-			throw new CrashException(report);
+			throw new ReportedException(report);
 		}
 
 		return null;
@@ -236,7 +236,7 @@ public final class StorageUtil {
 					.add("Resource", () -> Objects.toString(resource, null))
 					.add("Max amount", maxAmount)
 					.add("Transaction", transaction);
-			throw new CrashException(report);
+			throw new ReportedException(report);
 		}
 
 		return amount;
@@ -269,7 +269,7 @@ public final class StorageUtil {
 					.add("Resource", () -> Objects.toString(resource, null))
 					.add("Max amount", maxAmount)
 					.add("Transaction", transaction);
-			throw new CrashException(report);
+			throw new ReportedException(report);
 		}
 	}
 
@@ -406,6 +406,6 @@ public final class StorageUtil {
 			}
 		}
 
-		return MathHelper.floor(fillPercentage / viewCount * 14) + (hasNonEmptyView ? 1 : 0);
+		return Mth.floor(fillPercentage / viewCount * 14) + (hasNonEmptyView ? 1 : 0);
 	}
 }

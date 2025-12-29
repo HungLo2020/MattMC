@@ -19,21 +19,21 @@ package net.fabricmc.fabric.impl.resource.loader;
 import java.util.ArrayList;
 import java.util.List;
 
-import net.minecraft.server.packs.OverlayResourcePack;
-import net.minecraft.server.packs.Pack;
-import net.minecraft.server.packs.ResourcePackInfo;
-import net.minecraft.server.packs.ResourcePackProfile;
+import net.minecraft.server.packs.CompositePackResources;
+import net.minecraft.server.packs.repository.Pack;
+import net.minecraft.server.packs.PackLocationInfo;
+import net.minecraft.server.packs.repository.Pack;
 
 import net.fabricmc.fabric.api.resource.ModResourcePack;
 
-public record ModResourcePackFactory(ModResourcePack pack) implements ResourcePackProfile.PackFactory {
+public record ModResourcePackFactory(ModResourcePack pack) implements Pack.ResourcesSupplier {
 	@Override
-	public Pack open(ResourcePackInfo var1) {
+	public Pack open(PackLocationInfo var1) {
 		return pack;
 	}
 
 	@Override
-	public Pack openWithOverlays(ResourcePackInfo var1, ResourcePackProfile.Metadata metadata) {
+	public Pack openWithOverlays(PackLocationInfo var1, Pack.Metadata metadata) {
 		if (metadata.overlays().isEmpty()) {
 			return pack;
 		} else {
@@ -43,7 +43,7 @@ public record ModResourcePackFactory(ModResourcePack pack) implements ResourcePa
 				overlays.add(pack.createOverlay(overlay));
 			}
 
-			return new OverlayResourcePack(pack, overlays);
+			return new CompositePackResources(pack, overlays);
 		}
 	}
 }

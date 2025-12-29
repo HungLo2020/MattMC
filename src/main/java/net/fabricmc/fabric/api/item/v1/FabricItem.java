@@ -19,7 +19,7 @@ package net.fabricmc.fabric.api.item.v1;
 import java.util.Optional;
 import java.util.Set;
 
-import net.minecraft.component.DataComponents;
+import net.minecraft.core.component.DataComponents;
 import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
@@ -29,7 +29,7 @@ import net.minecraft.world.item.PotionItem;
 import net.minecraft.world.item.TippedArrowItem;
 import net.minecraft.world.item.alchemy.Potion;
 import net.minecraft.core.Holder;
-import net.minecraft.util.Hand;
+import net.minecraft.world.InteractionHand;
 import net.minecraft.resources.ResourceLocation;
 
 import net.fabricmc.fabric.impl.item.FabricItemInternals;
@@ -48,13 +48,13 @@ public interface FabricItem {
 	 * This function is called on the client side when the components or count of the stack has changed, but not the item,
 	 * and returning false cancels this animation.
 	 *
-	 * @param player   the current player; this may be safely cast to {@link net.minecraft.client.multiplayer.LocalPlayer} in client-only code
+	 * @param player   the current player; this may be safely cast to {@link net.minecraft.client.player.LocalPlayer} in client-only code
 	 * @param hand     the hand; this function applies both to the main hand and the off hand
 	 * @param oldStack the previous stack, of this item
 	 * @param newStack the new stack, also of this item
 	 * @return true to run the vanilla animation, false to cancel it.
 	 */
-	default boolean allowComponentsUpdateAnimation(Player player, Hand hand, ItemStack oldStack, ItemStack newStack) {
+	default boolean allowComponentsUpdateAnimation(Player player, InteractionHand hand, ItemStack oldStack, ItemStack newStack) {
 		return true;
 	}
 

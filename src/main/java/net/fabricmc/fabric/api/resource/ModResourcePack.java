@@ -16,14 +16,14 @@
 
 package net.fabricmc.fabric.api.resource;
 
-import net.minecraft.server.packs.Pack;
+import net.minecraft.server.packs.PackResources;
 
 import net.fabricmc.loader.api.metadata.ModMetadata;
 
 /**
  * Interface implemented by mod-provided resource packs.
  */
-public interface ModResourcePack extends Pack {
+public interface ModResourcePack extends PackResources {
 	/**
 	 * @return The ModMetadata object associated with the mod providing this
 	 * resource pack.

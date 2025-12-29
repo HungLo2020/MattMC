@@ -18,10 +18,10 @@ package net.fabricmc.fabric.impl.networking.server;
 
 import java.util.Objects;
 
-import net.minecraft.network.NetworkPhase;
+import net.minecraft.network.ConnectionProtocol;
 import net.minecraft.network.NetworkSide;
-import net.minecraft.network.ClientCommonPacketListener;
-import net.minecraft.network.protocol.CustomPacketPayload;
+import net.minecraft.network.protocol.game.ClientGamePacketListener;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.s2c.common.CustomPayloadS2CPacket;
 import net.minecraft.server.network.ServerConfigurationPacketListenerImpl;
@@ -36,9 +36,9 @@ import net.fabricmc.fabric.impl.networking.NetworkHandlerExtensions;
 import net.fabricmc.fabric.impl.networking.PayloadTypeRegistryImpl;
 
 public final class ServerNetworkingImpl {
-	public static final GlobalReceiverRegistry<ServerLoginNetworking.LoginQueryResponseHandler> LOGIN = new GlobalReceiverRegistry<>(NetworkSide.SERVERBOUND, NetworkPhase.LOGIN, null);
-	public static final GlobalReceiverRegistry<ServerConfigurationNetworking.ConfigurationPacketHandler<?>> CONFIGURATION = new GlobalReceiverRegistry<>(NetworkSide.SERVERBOUND, NetworkPhase.CONFIGURATION, PayloadTypeRegistryImpl.CONFIGURATION_C2S);
-	public static final GlobalReceiverRegistry<ServerPlayNetworking.PlayPayloadHandler<?>> PLAY = new GlobalReceiverRegistry<>(NetworkSide.SERVERBOUND, NetworkPhase.PLAY, PayloadTypeRegistryImpl.PLAY_C2S);
+	public static final GlobalReceiverRegistry<ServerLoginNetworking.LoginQueryResponseHandler> LOGIN = new GlobalReceiverRegistry<>(NetworkSide.SERVERBOUND, ConnectionProtocol.LOGIN, null);
+	public static final GlobalReceiverRegistry<ServerConfigurationNetworking.ConfigurationPacketHandler<?>> CONFIGURATION = new GlobalReceiverRegistry<>(NetworkSide.SERVERBOUND, ConnectionProtocol.CONFIGURATION, PayloadTypeRegistryImpl.CONFIGURATION_C2S);
+	public static final GlobalReceiverRegistry<ServerPlayNetworking.PlayPayloadHandler<?>> PLAY = new GlobalReceiverRegistry<>(NetworkSide.SERVERBOUND, ConnectionProtocol.PLAY, PayloadTypeRegistryImpl.PLAY_C2S);
 
 	public static ServerPlayNetworkAddon getAddon(ServerGamePacketListenerImpl handler) {
 		return (ServerPlayNetworkAddon) ((NetworkHandlerExtensions) handler).getAddon();
@@ -52,7 +52,7 @@ public final class ServerNetworkingImpl {
 		return (ServerConfigurationNetworkAddon) ((NetworkHandlerExtensions) handler).getAddon();
 	}
 
-	public static Packet<ClientCommonPacketListener> createS2CPacket(CustomPacketPayload payload) {
+	public static Packet<ClientGamePacketListener> createS2CPacket(CustomPacketPayload payload) {
 		Objects.requireNonNull(payload, "Payload cannot be null");
 		Objects.requireNonNull(payload.getId(), "CustomPacketPayload#getId() cannot return null for payload class: " + payload.getClass());
 

@@ -17,7 +17,7 @@
 package net.fabricmc.fabric.api.itemgroup.v1;
 
 import net.minecraft.world.item.CreativeModeTab;
-import net.minecraft.core.Registries;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
 
 import net.fabricmc.fabric.impl.itemgroup.FabricItemGroupBuilderImpl;

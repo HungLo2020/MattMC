@@ -30,20 +30,20 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.screens.inventory.CreativeInventoryScreen;
-import net.minecraft.client.gui.screens.inventory.CreativeInventoryScreen.CreativeScreenHandler;
+import net.minecraft.client.gui.screens.inventory.CreativeModeInventoryScreen;
+import net.minecraft.client.gui.screens.inventory.CreativeModeInventoryScreen.CreativeScreenHandler;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.client.input.KeyInput;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.item.CreativeModeTab;
-import net.minecraft.world.item.ItemGroups;
+import net.minecraft.world.item.CreativeModeTabs;
 import net.minecraft.network.chat.Component;
 
 import net.fabricmc.fabric.api.client.itemgroup.v1.FabricCreativeInventoryScreen;
 import net.fabricmc.fabric.impl.client.itemgroup.FabricCreativeGuiComponents;
 import net.fabricmc.fabric.impl.itemgroup.FabricItemGroupImpl;
 
-@Mixin(CreativeInventoryScreen.class)
+@Mixin(CreativeModeInventoryScreen.class)
 public abstract class CreativeInventoryScreenMixin extends AbstractContainerScreen<CreativeScreenHandler> implements FabricCreativeInventoryScreen {
 	public CreativeInventoryScreenMixin(CreativeScreenHandler screenHandler, Inventory playerInventory, Component text) {
 		super(screenHandler, playerInventory, text);
@@ -62,7 +62,7 @@ public abstract class CreativeInventoryScreenMixin extends AbstractContainerScre
 	@Unique
 	private void updateSelection() {
 		if (!isGroupVisible(selectedTab)) {
-			ItemGroups.getGroups()
+			CreativeModeTabs.getGroups()
 					.stream()
 					.filter(this::isGroupVisible)
 					.min((a, b) -> Boolean.compare(a.isSpecial(), b.isSpecial()))
@@ -77,7 +77,7 @@ public abstract class CreativeInventoryScreenMixin extends AbstractContainerScre
 		int xpos = x + 171;
 		int ypos = y + 4;
 
-		CreativeInventoryScreen self = (CreativeInventoryScreen) (Object) this;
+		CreativeModeInventoryScreen self = (CreativeModeInventoryScreen) (Object) this;
 		addDrawableChild(new FabricCreativeGuiComponents.ItemGroupButtonWidget(xpos + 10, ypos, FabricCreativeGuiComponents.Type.NEXT, self));
 		addDrawableChild(new FabricCreativeGuiComponents.ItemGroupButtonWidget(xpos, ypos, FabricCreativeGuiComponents.Type.PREVIOUS, self));
 	}
@@ -140,7 +140,7 @@ public abstract class CreativeInventoryScreenMixin extends AbstractContainerScre
 
 	@Unique
 	private boolean hasGroupForPage(int page) {
-		return ItemGroups.getGroupsToDisplay()
+		return CreativeModeTabs.getGroupsToDisplay()
 				.stream()
 				.anyMatch(itemGroup -> getPage(itemGroup) == page);
 	}
@@ -172,7 +172,7 @@ public abstract class CreativeInventoryScreenMixin extends AbstractContainerScre
 
 	@Override
 	public List<CreativeModeTab> getItemGroupsOnPage(int page) {
-		return ItemGroups.getGroupsToDisplay()
+		return CreativeModeTabs.getGroupsToDisplay()
 				.stream()
 				.filter(itemGroup -> getPage(itemGroup) == page)
 				// Thanks to isXander for the sorting
@@ -183,7 +183,7 @@ public abstract class CreativeInventoryScreenMixin extends AbstractContainerScre
 
 	@Override
 	public boolean hasAdditionalPages() {
-		return ItemGroups.getGroupsToDisplay().size() > (Objects.requireNonNull(ItemGroups.displayContext).hasPermissions() ? 14 : 13);
+		return CreativeModeTabs.getGroupsToDisplay().size() > (Objects.requireNonNull(CreativeModeTabs.displayContext).hasPermissions() ? 14 : 13);
 	}
 
 	@Override

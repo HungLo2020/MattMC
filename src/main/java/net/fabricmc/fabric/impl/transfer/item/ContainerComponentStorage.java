@@ -21,9 +21,9 @@ import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
-import net.minecraft.component.ComponentChanges;
-import net.minecraft.component.DataComponents;
-import net.minecraft.component.type.ContainerComponent;
+import net.minecraft.core.component.DataComponentPatch;
+import net.minecraft.core.component.DataComponents;
+import net.minecraft.world.item.component.ItemContainerContents;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 
@@ -53,8 +53,8 @@ public class ContainerComponentStorage extends CombinedSlottedStorage<ItemVarian
 		parts = Collections.unmodifiableList(backingList);
 	}
 
-	ContainerComponent container() {
-		return ctx.getItemVariant().getComponentMap().getOrDefault(DataComponents.CONTAINER, ContainerComponent.DEFAULT);
+	ItemContainerContents container() {
+		return ctx.getItemVariant().getComponentMap().getOrDefault(DataComponents.CONTAINER, ItemContainerContents.DEFAULT);
 	}
 
 	ContainerComponentAccessor containerAccessor() {
@@ -89,8 +89,8 @@ public class ContainerComponentStorage extends CombinedSlottedStorage<ItemVarian
 
 			ContainerItemContext ctx = ContainerComponentStorage.this.ctx;
 
-			ItemVariant newVariant = ctx.getItemVariant().withComponentChanges(ComponentChanges.builder()
-							.add(DataComponents.CONTAINER, ContainerComponent.fromStacks(stacks))
+			ItemVariant newVariant = ctx.getItemVariant().withComponentChanges(DataComponentPatch.builder()
+							.add(DataComponents.CONTAINER, ItemContainerContents.fromStacks(stacks))
 							.build());
 
 			return ctx.exchange(newVariant, 1, transaction) == 1;

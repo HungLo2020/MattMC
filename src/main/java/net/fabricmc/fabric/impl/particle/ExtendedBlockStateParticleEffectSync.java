@@ -19,9 +19,9 @@ package net.fabricmc.fabric.impl.particle;
 import java.util.Set;
 
 import net.minecraft.network.FriendlyByteBuf;
-import net.minecraft.network.RegistryByteBuf;
-import net.minecraft.network.codec.PacketCodec;
-import net.minecraft.network.protocol.CustomPacketPayload;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
 
 import net.fabricmc.api.ModInitializer;
@@ -36,7 +36,7 @@ public class ExtendedBlockStateParticleEffectSync implements ModInitializer {
 		PayloadTypeRegistry.configurationS2C().register(DummyPayload.ID, DummyPayload.CODEC);
 	}
 
-	public static boolean shouldEncodeFallback(RegistryByteBuf buf) {
+	public static boolean shouldEncodeFallback(RegistryFriendlyByteBuf buf) {
 		Set<ResourceLocation> channels = ((FabricRegistryByteBuf) buf).fabric_getSendableConfigurationChannels();
 
 		if (channels == null) {
@@ -48,8 +48,8 @@ public class ExtendedBlockStateParticleEffectSync implements ModInitializer {
 
 	public record DummyPayload() implements CustomPacketPayload {
 		public static final DummyPayload INSTANCE = new DummyPayload();
-		public static final PacketCodec<FriendlyByteBuf, DummyPayload> CODEC = PacketCodec.unit(INSTANCE);
-		public static final CustomPacketPayload.Id<DummyPayload> ID = new Id<>(PACKET_ID);
+		public static final StreamCodec<FriendlyByteBuf, DummyPayload> CODEC = StreamCodec.unit(INSTANCE);
+		public static final CustomPacketPayload.Type<DummyPayload> ID = new Id<>(PACKET_ID);
 
 		@Override
 		public Id<? extends CustomPacketPayload> getId() {

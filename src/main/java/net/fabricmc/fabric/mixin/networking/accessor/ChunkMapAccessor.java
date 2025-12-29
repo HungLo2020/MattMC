@@ -14,16 +14,16 @@
  * limitations under the License.
  */
 
-package net.fabricmc.fabric.mixin.recipe.sync;
+package net.fabricmc.fabric.mixin.networking.accessor;
 
+import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.gen.Accessor;
 
-import net.minecraft.world.item.crafting.PreparedRecipes;
-import net.minecraft.world.item.crafting.ServerRecipeManager;
+import net.minecraft.server.level.ChunkMap;
 
-@Mixin(ServerRecipeManager.class)
-public interface ServerRecipeManagerAccessor {
+@Mixin(ChunkMap.class)
+public interface ChunkMapAccessor {
 	@Accessor
-	PreparedRecipes getPreparedRecipes();
+	Int2ObjectMap<EntityTrackerAccessor> getEntityTrackers();
 }

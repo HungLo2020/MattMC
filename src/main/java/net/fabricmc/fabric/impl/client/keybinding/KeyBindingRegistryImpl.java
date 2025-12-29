@@ -22,7 +22,7 @@ import com.google.common.collect.Lists;
 import it.unimi.dsi.fastutil.objects.ReferenceArrayList;
 
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.Options.KeyMapping;
+import net.minecraft.client.KeyMapping;
 
 public final class KeyBindingRegistryImpl {
 	private static final List<KeyMapping> MODDED_KEY_BINDINGS = new ReferenceArrayList<>(); // ArrayList with identity based comparisons for contains/remove/indexOf etc., required for correctly handling duplicate keybinds

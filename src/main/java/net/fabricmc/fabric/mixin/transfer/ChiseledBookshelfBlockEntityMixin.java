@@ -24,9 +24,9 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import net.minecraft.world.level.block.entity.ChiseledBookshelfBlockEntity;
-import net.minecraft.world.item.inventory.Container;
+import net.minecraft.world.Container;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.util.DefaultedList;
+import net.minecraft.core.NonNullList;
 
 import net.fabricmc.fabric.api.transfer.v1.transaction.TransactionContext;
 import net.fabricmc.fabric.api.transfer.v1.transaction.base.SnapshotParticipant;
@@ -39,7 +39,7 @@ import net.fabricmc.fabric.impl.transfer.item.SpecialLogicInventory;
 @Mixin(ChiseledBookshelfBlockEntity.class)
 public class ChiseledBookshelfBlockEntityMixin implements SpecialLogicInventory {
 	@Shadow
-	private DefaultedList<ItemStack> heldStacks;
+	private NonNullList<ItemStack> heldStacks;
 	@Shadow
 	private int lastInteractedSlot; // last interacted slot
 	@Unique

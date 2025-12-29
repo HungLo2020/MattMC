@@ -25,7 +25,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import net.minecraft.client.Options.Options;
-import net.minecraft.client.Options.KeyMapping;
+import net.minecraft.client.KeyMapping;
 
 import net.fabricmc.fabric.impl.client.keybinding.KeyBindingRegistryImpl;
 

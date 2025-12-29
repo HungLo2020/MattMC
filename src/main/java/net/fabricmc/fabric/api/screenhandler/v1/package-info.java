@@ -26,13 +26,13 @@
  * "Simple" screen handlers are the type of screen handlers used in vanilla.
  * They can automatically synchronize items and integer properties between the server and the client,
  * but they don't support having custom data sent in the opening packet.
- * You can create simple screen handlers using vanilla's {@link net.minecraft.world.inventory.ScreenHandlerType}.
+ * You can create simple screen handlers using vanilla's {@link net.minecraft.world.inventory.MenuType}.
  *
  * <p>This module adds <i>extended screen handlers</i> that can synchronize their own custom data
  * when they are opened, which can be useful for defining additional properties of a screen on the server.
  * For example, a mod can synchronize text that will show up as a label.
  * You can create extended screen handlers using
- * {@link net.fabricmc.fabric.api.screenhandler.v1.ExtendedScreenHandlerType}.
+ * {@link net.fabricmc.fabric.api.screenhandler.v1.ExtendedMenuType}.
  *
  * <h2>Opening screen handlers</h2>
  * Screen handlers can be opened using

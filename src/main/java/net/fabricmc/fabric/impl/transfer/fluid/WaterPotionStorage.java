@@ -18,8 +18,8 @@ package net.fabricmc.fabric.impl.transfer.fluid;
 
 import org.jetbrains.annotations.Nullable;
 
-import net.minecraft.component.DataComponents;
-import net.minecraft.component.type.PotionContentsComponent;
+import net.minecraft.core.component.DataComponents;
+import net.minecraft.world.item.alchemy.PotionContents;
 import net.minecraft.world.level.material.Fluids;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
@@ -48,8 +48,8 @@ public class WaterPotionStorage implements ExtractionOnlyStorage<FluidVariant>, 
 
 	private static boolean isWaterPotion(ContainerItemContext context) {
 		ItemVariant variant = context.getItemVariant();
-		PotionContentsComponent potionContents = variant.getComponentMap()
-				.getOrDefault(DataComponents.POTION_CONTENTS, PotionContentsComponent.DEFAULT);
+		PotionContents potionContents = variant.getComponentMap()
+				.getOrDefault(DataComponents.POTION_CONTENTS, PotionContents.DEFAULT);
 		return variant.isOf(Items.POTION) && potionContents.potion().orElse(null) == Potions.WATER;
 	}
 
@@ -65,7 +65,7 @@ public class WaterPotionStorage implements ExtractionOnlyStorage<FluidVariant>, 
 
 	private ItemVariant mapToGlassBottle() {
 		ItemStack newStack = context.getItemVariant().toStack();
-		newStack.set(DataComponents.POTION_CONTENTS, PotionContentsComponent.DEFAULT);
+		newStack.set(DataComponents.POTION_CONTENTS, PotionContents.DEFAULT);
 		return ItemVariant.of(Items.GLASS_BOTTLE, newStack.getComponentChanges());
 	}
 

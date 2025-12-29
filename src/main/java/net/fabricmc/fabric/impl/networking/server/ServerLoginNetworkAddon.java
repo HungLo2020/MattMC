@@ -32,7 +32,7 @@ import org.jetbrains.annotations.Nullable;
 import net.minecraft.network.Connection;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.PacketCallbacks;
-import net.minecraft.network.protocol.CustomPacketPayload;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.c2s.login.LoginQueryResponseC2SPacket;
 import net.minecraft.network.protocol.s2c.login.LoginCompressionS2CPacket;

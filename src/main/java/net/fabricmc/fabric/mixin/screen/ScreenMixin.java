@@ -28,11 +28,11 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.Drawable;
-import net.minecraft.client.gui.Element;
-import net.minecraft.client.gui.Selectable;
+import net.minecraft.client.gui.components.Renderable;
+import net.minecraft.client.gui.components.events.GuiEventListener;
+import net.minecraft.client.gui.components.TabOrderedElement;
 import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.client.gui.components.ClickableWidget;
+import net.minecraft.client.gui.components.AbstractWidget;
 
 import net.fabricmc.fabric.api.client.screen.v1.ScreenEvents;
 import net.fabricmc.fabric.api.client.screen.v1.ScreenKeyboardEvents;
@@ -46,13 +46,13 @@ import net.fabricmc.fabric.impl.client.screen.ScreenExtensions;
 abstract class ScreenMixin implements ScreenExtensions {
 	@Shadow
 	@Final
-	protected List<Selectable> selectables;
+	protected List<TabOrderedElement> selectables;
 	@Shadow
 	@Final
-	protected List<Element> children;
+	protected List<GuiEventListener> children;
 	@Shadow
 	@Final
-	protected List<Drawable> drawables;
+	protected List<Renderable> drawables;
 
 	@Unique
 	private ButtonList fabricButtons;
@@ -176,7 +176,7 @@ abstract class ScreenMixin implements ScreenExtensions {
 	}
 
 	@Override
-	public List<ClickableWidget> fabric_getButtons() {
+	public List<AbstractWidget> fabric_getButtons() {
 		// Lazy init to make the list access safe after Screen#init
 		if (this.fabricButtons == null) {
 			this.fabricButtons = new ButtonList(this.drawables, this.selectables, this.children);

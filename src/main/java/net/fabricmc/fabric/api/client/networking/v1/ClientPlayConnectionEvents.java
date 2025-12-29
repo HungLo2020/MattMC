@@ -18,7 +18,7 @@ package net.fabricmc.fabric.api.client.networking.v1;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientPacketListener;
-import net.minecraft.network.protocol.CustomPacketPayload;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 
 import net.fabricmc.fabric.api.event.Event;
 import net.fabricmc.fabric.api.event.EventFactory;
@@ -31,7 +31,7 @@ public final class ClientPlayConnectionEvents {
 	/**
 	 * Event indicating a connection entered the PLAY state, ready for registering channel handlers.
 	 *
-	 * @see ClientPlayNetworking#registerReceiver(CustomPacketPayload.Id, ClientPlayNetworking.PlayPayloadHandler)
+	 * @see ClientPlayNetworking#registerReceiver(CustomPacketPayload.Type, ClientPlayNetworking.PlayPayloadHandler)
 	 */
 	public static final Event<Init> INIT = EventFactory.createArrayBacked(Init.class, callbacks -> (handler, client) -> {
 		for (Init callback : callbacks) {

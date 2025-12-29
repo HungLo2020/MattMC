@@ -29,9 +29,9 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import net.minecraft.world.item.CreativeModeTab;
-import net.minecraft.world.item.ItemGroups;
+import net.minecraft.world.item.CreativeModeTabs;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.core.Registries;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
 
 import net.fabricmc.fabric.api.event.Event;
@@ -53,14 +53,14 @@ abstract class ItemGroupMixin implements FabricItemGroupImpl {
 
 	@SuppressWarnings("ConstantConditions")
 	@Inject(method = "updateEntries", at = @At("TAIL"))
-	public void getStacks(CreativeModeTab.DisplayContext context, CallbackInfo ci) {
+	public void getStacks(CreativeModeTab.ItemDisplayParameters context, CallbackInfo ci) {
 		final CreativeModeTab self = (CreativeModeTab) (Object) this;
 		final ResourceKey<CreativeModeTab> registryKey = Registries.ITEM_GROUP.getKey(self).orElseThrow(() -> new IllegalStateException("Unregistered item group : " + self));
 
 		// Do not modify special item groups (except Operator Blocks) at all.
 		// Special item groups include Saved Hotbars, Search, and Survival Container.
 		// Note, search gets modified as part of the parent item group.
-		if (self.isSpecial() && registryKey != ItemGroups.OPERATOR) return;
+		if (self.isSpecial() && registryKey != CreativeModeTabs.OPERATOR) return;
 
 		// Sanity check for the injection point. It should be after these fields are set.
 		Objects.requireNonNull(displayStacks, "displayStacks");
@@ -72,7 +72,7 @@ abstract class ItemGroupMixin implements FabricItemGroupImpl {
 		var entries = new FabricItemGroupEntries(context, mutableDisplayStacks, mutableSearchTabStacks);
 
 		// Now trigger the events
-		if (registryKey != ItemGroups.OPERATOR || context.hasPermissions()) {
+		if (registryKey != CreativeModeTabs.OPERATOR || context.hasPermissions()) {
 			final Event<ItemGroupEvents.ModifyEntries> modifyEntriesEvent = ItemGroupEventsImpl.getModifyEntriesEvent(registryKey);
 
 			if (modifyEntriesEvent != null) {

@@ -26,7 +26,7 @@ import org.slf4j.Logger;
 
 import net.minecraft.server.level.FullChunkStatus;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.core.ChunkPos;
+import net.minecraft.world.level.ChunkPos;
 
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerChunkEvents;

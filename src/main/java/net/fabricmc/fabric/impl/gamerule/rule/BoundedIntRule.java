@@ -19,17 +19,17 @@ package net.fabricmc.fabric.impl.gamerule.rule;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import net.minecraft.world.GameRules;
+import net.minecraft.world.level.GameRules;
 
 import net.fabricmc.fabric.api.gamerule.v1.GameRuleRegistry;
 
-public final class BoundedIntRule extends GameRules.IntRule {
+public final class BoundedIntRule extends GameRules.IntegerValue {
 	private static final Logger LOGGER = LoggerFactory.getLogger(GameRuleRegistry.class);
 
 	private final int minimumValue;
 	private final int maximumValue;
 
-	public BoundedIntRule(GameRules.Type<GameRules.IntRule> type, int initialValue, int minimumValue, int maximumValue) {
+	public BoundedIntRule(GameRules.Type<GameRules.IntegerValue> type, int initialValue, int minimumValue, int maximumValue) {
 		super(type, initialValue);
 		this.minimumValue = minimumValue;
 		this.maximumValue = maximumValue;
@@ -64,7 +64,7 @@ public final class BoundedIntRule extends GameRules.IntRule {
 	}
 
 	@Override
-	protected GameRules.IntRule copy() {
+	protected GameRules.IntegerValue copy() {
 		return new BoundedIntRule(this.type, this.get(), this.minimumValue, this.maximumValue);
 	}
 

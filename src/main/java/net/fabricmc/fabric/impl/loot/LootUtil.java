@@ -21,11 +21,11 @@ import java.util.Map;
 import java.util.function.Function;
 
 import net.minecraft.world.level.storage.loot.LootTable;
-import net.minecraft.core.Registries;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.Holder;
-import net.minecraft.server.packs.Resource;
-import net.minecraft.server.packs.ResourcePackSource;
+import net.minecraft.server.packs.resources.Resource;
+import net.minecraft.server.packs.repository.PackSource;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.resources.ResourceLocation;
 
@@ -39,9 +39,9 @@ public final class LootUtil {
 
 	public static LootTableSource determineSource(Resource resource) {
 		if (resource != null) {
-			ResourcePackSource packSource = ((FabricResource) resource).getFabricPackSource();
+			PackSource packSource = ((FabricResource) resource).getFabricPackSource();
 
-			if (packSource == ResourcePackSource.BUILTIN) {
+			if (packSource == PackSource.BUILTIN) {
 				return LootTableSource.VANILLA;
 			} else if (packSource == ModResourcePackCreator.RESOURCE_PACK_SOURCE || packSource instanceof BuiltinModResourcePackSource) {
 				return LootTableSource.MOD;

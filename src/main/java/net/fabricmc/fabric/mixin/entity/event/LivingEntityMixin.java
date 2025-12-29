@@ -38,13 +38,13 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.entity.damage.DamageSource;
+import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.util.ActionResult;
+import net.minecraft.world.InteractionResult;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
-import net.minecraft.core.Vec3;
-import net.minecraft.world.BlockView;
+import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.CollisionView;
 import net.minecraft.world.level.Level;
 
@@ -110,15 +110,15 @@ abstract class LivingEntityMixin {
 	@Inject(method = "method_18405", at = @At("RETURN"), cancellable = true)
 	private void onIsSleepingInBed(BlockPos sleepingPos, CallbackInfoReturnable<Boolean> info) {
 		BlockState bedState = ((LivingEntity) (Object) this).getEntityWorld().getBlockState(sleepingPos);
-		ActionResult result = EntitySleepEvents.ALLOW_BED.invoker().allowBed((LivingEntity) (Object) this, sleepingPos, bedState, info.getReturnValueZ());
+		InteractionResult result = EntitySleepEvents.ALLOW_BED.invoker().allowBed((LivingEntity) (Object) this, sleepingPos, bedState, info.getReturnValueZ());
 
-		if (result != ActionResult.PASS) {
+		if (result != InteractionResult.PASS) {
 			info.setReturnValue(result.isAccepted());
 		}
 	}
 
-	@WrapOperation(method = "getSleepingDirection", at = @At(value = "INVOKE", target = "Lnet/minecraft/block/BedBlock;getDirection(Lnet/minecraft/world/BlockView;Lnet/minecraft/util/math/BlockPos;)Lnet/minecraft/util/math/Direction;"))
-	private Direction onGetSleepingDirection(BlockView world, BlockPos sleepingPos, Operation<Direction> operation) {
+	@WrapOperation(method = "getSleepingDirection", at = @At(value = "INVOKE", target = "Lnet/minecraft/block/BedBlock;getDirection(Lnet/minecraft/world/BlockGetter;Lnet/minecraft/util/math/BlockPos;)Lnet/minecraft/util/math/Direction;"))
+	private Direction onGetSleepingDirection(BlockGetter world, BlockPos sleepingPos, Operation<Direction> operation) {
 		final Direction sleepingDirection = operation.call(world, sleepingPos);
 		return EntitySleepEvents.MODIFY_SLEEPING_DIRECTION.invoker().modifySleepDirection((LivingEntity) (Object) this, sleepingPos, sleepingDirection);
 	}
@@ -128,7 +128,7 @@ abstract class LivingEntityMixin {
 	@Dynamic("method_18404: Synthetic lambda body for Optional.ifPresent in wakeUp")
 	@ModifyVariable(method = {"method_18404", "sleep"}, at = @At(value = "INVOKE_ASSIGN", target = "Lnet/minecraft/world/Level;getBlockState(Lnet/minecraft/util/math/BlockPos;)Lnet/minecraft/block/BlockState;"))
 	private BlockState modifyBedForOccupiedState(BlockState state, BlockPos sleepingPos) {
-		ActionResult result = EntitySleepEvents.ALLOW_BED.invoker().allowBed((LivingEntity) (Object) this, sleepingPos, state, state.getBlock() instanceof BedBlock);
+		InteractionResult result = EntitySleepEvents.ALLOW_BED.invoker().allowBed((LivingEntity) (Object) this, sleepingPos, state, state.getBlock() instanceof BedBlock);
 
 		// If a valid bed, replace with vanilla red bed so that the vanilla instanceof check succeeds.
 		return result.isAccepted() ? Blocks.RED_BED.getDefaultState() : state;

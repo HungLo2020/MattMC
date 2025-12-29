@@ -24,9 +24,9 @@ import org.jetbrains.annotations.Nullable;
 
 import net.minecraft.world.item.crafting.PreparedRecipes;
 import net.minecraft.world.item.crafting.Recipe;
-import net.minecraft.world.item.crafting.RecipeEntry;
+import net.minecraft.world.item.crafting.RecipeHolder;
 import net.minecraft.world.item.crafting.RecipeType;
-import net.minecraft.world.item.crafting.input.RecipeInput;
+import net.minecraft.world.item.crafting.RecipeInput;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.level.Level;
 
@@ -35,32 +35,32 @@ import net.fabricmc.fabric.api.recipe.v1.sync.SynchronizedRecipes;
 public record SynchronizedRecipesImpl(PreparedRecipes preparedRecipes) implements SynchronizedRecipes {
 	public static final SynchronizedRecipesImpl EMPTY = new SynchronizedRecipesImpl(PreparedRecipes.EMPTY);
 
-	public static SynchronizedRecipesImpl of(Iterable<RecipeEntry<?>> recipes) {
+	public static SynchronizedRecipesImpl of(Iterable<RecipeHolder<?>> recipes) {
 		return new SynchronizedRecipesImpl(PreparedRecipes.of(recipes));
 	}
 
 	@Override
-	public <I extends RecipeInput, T extends Recipe<I>> Stream<RecipeEntry<T>> getAllMatches(RecipeType<T> type, I input, Level world) {
+	public <I extends RecipeInput, T extends Recipe<I>> Stream<RecipeHolder<T>> getAllMatches(RecipeType<T> type, I input, Level world) {
 		return this.preparedRecipes.find(type, input, world);
 	}
 
 	@Override
-	public <I extends RecipeInput, T extends Recipe<I>> Collection<RecipeEntry<T>> getAllOfType(RecipeType<T> type) {
+	public <I extends RecipeInput, T extends Recipe<I>> Collection<RecipeHolder<T>> getAllOfType(RecipeType<T> type) {
 		return this.preparedRecipes.getAll(type);
 	}
 
 	@Override
-	public <I extends RecipeInput, T extends Recipe<I>> Optional<RecipeEntry<T>> getFirstMatch(RecipeType<T> type, I input, Level world) {
+	public <I extends RecipeInput, T extends Recipe<I>> Optional<RecipeHolder<T>> getFirstMatch(RecipeType<T> type, I input, Level world) {
 		return this.preparedRecipes.find(type, input, world).findFirst();
 	}
 
 	@Override
-	public @Nullable RecipeEntry<?> get(ResourceKey<Recipe<?>> key) {
+	public @Nullable RecipeHolder<?> get(ResourceKey<Recipe<?>> key) {
 		return this.preparedRecipes.get(key);
 	}
 
 	@Override
-	public Collection<RecipeEntry<?>> recipes() {
+	public Collection<RecipeHolder<?>> recipes() {
 		return this.preparedRecipes.recipes();
 	}
 }

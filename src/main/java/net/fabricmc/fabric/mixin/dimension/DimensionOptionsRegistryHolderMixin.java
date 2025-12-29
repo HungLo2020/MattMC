@@ -24,7 +24,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Redirect;
 
 import net.minecraft.resources.ResourceKey;
-import net.minecraft.core.Registries;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.world.level.dimension.DimensionOptions;
 import net.minecraft.world.level.dimension.DimensionOptionsRegistryHolder;
 

@@ -21,8 +21,8 @@ import java.util.List;
 import java.util.Objects;
 
 import net.minecraft.network.Connection;
-import net.minecraft.network.NetworkPhase;
-import net.minecraft.network.protocol.CustomPacketPayload;
+import net.minecraft.network.ConnectionProtocol;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.network.ServerGamePacketListenerImpl;
@@ -53,7 +53,7 @@ public final class ServerPlayNetworkAddon extends AbstractChanneledNetworkAddon<
 		this.context = new ContextImpl(server, handler, this);
 
 		// Must register pending channels via lateinit
-		this.registerPendingChannels((ChannelInfoHolder) this.connection, NetworkPhase.PLAY);
+		this.registerPendingChannels((ChannelInfoHolder) this.connection, ConnectionProtocol.PLAY);
 	}
 
 	@Override

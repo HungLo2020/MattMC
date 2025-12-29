@@ -29,7 +29,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.DetectorRailBlock;
 import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.vehicle.AbstractMinecartEntity;
+import net.minecraft.world.entity.vehicle.AbstractMinecart;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.world.level.Level;
@@ -38,14 +38,14 @@ import net.fabricmc.fabric.api.object.builder.v1.entity.MinecartComparatorLogicR
 
 @Mixin(DetectorRailBlock.class)
 public abstract class DetectorRailBlockMixin {
-	@Shadow protected abstract <T extends AbstractMinecartEntity> List<T> getCarts(Level world, BlockPos pos, Class<T> entityClass, @Nullable Predicate<Entity> entityPredicate);
+	@Shadow protected abstract <T extends AbstractMinecart> List<T> getCarts(Level world, BlockPos pos, Class<T> entityClass, @Nullable Predicate<Entity> entityPredicate);
 
 	@Inject(at = @At("HEAD"), method = "getComparatorOutput", cancellable = true)
 	private void getCustomComparatorOutput(BlockState state, Level world, BlockPos pos, Direction direction, CallbackInfoReturnable<Integer> cir) {
 		if (state.get(DetectorRailBlock.POWERED)) {
-			List<AbstractMinecartEntity> carts = getCarts(world, pos, AbstractMinecartEntity.class,
+			List<AbstractMinecart> carts = getCarts(world, pos, AbstractMinecart.class,
 					cart -> MinecartComparatorLogicRegistry.getCustomComparatorLogic(cart.getType()) != null);
-			for (AbstractMinecartEntity cart : carts) {
+			for (AbstractMinecart cart : carts) {
 				int comparatorValue = MinecartComparatorLogicRegistry.getCustomComparatorLogic(cart.getType())
 						.getComparatorValue(cart, state, pos);
 				if (comparatorValue >= 0) {

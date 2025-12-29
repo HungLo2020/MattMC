@@ -16,7 +16,7 @@
 
 package net.fabricmc.fabric.impl.gamerule;
 
-import static net.minecraft.commands.CommandManager.literal;
+import static net.minecraft.commands.Commands.literal;
 
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
@@ -25,7 +25,7 @@ import com.mojang.brigadier.exceptions.SimpleCommandExceptionType;
 
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.network.chat.Component;
-import net.minecraft.world.GameRules;
+import net.minecraft.world.level.GameRules;
 
 import net.fabricmc.fabric.api.gamerule.v1.rule.EnumRule;
 import net.fabricmc.fabric.mixin.gamerule.GameRuleCommandAccessor;
