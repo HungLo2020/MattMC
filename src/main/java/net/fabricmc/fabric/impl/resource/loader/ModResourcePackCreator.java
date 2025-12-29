@@ -30,7 +30,7 @@ import net.minecraft.server.packs.ResourcePackPosition;
 import net.minecraft.server.packs.ResourcePackProfile;
 import net.minecraft.server.packs.ResourcePackProvider;
 import net.minecraft.server.packs.ResourcePackSource;
-import net.minecraft.server.packs.ResourceType;
+import net.minecraft.server.packs.PackType;
 import net.minecraft.network.chat.Component;
 
 import net.fabricmc.fabric.api.resource.ModResourcePack;
@@ -67,21 +67,21 @@ public class ModResourcePackCreator implements ResourcePackProvider {
 			return true;
 		}
 	};
-	public static final ModResourcePackCreator CLIENT_RESOURCE_PACK_PROVIDER = new ModResourcePackCreator(ResourceType.CLIENT_RESOURCES);
+	public static final ModResourcePackCreator CLIENT_RESOURCE_PACK_PROVIDER = new ModResourcePackCreator(PackType.CLIENT_RESOURCES);
 	/**
 	 * The maximum number of known data packs requested from the client, including vanilla data packs.
 	 */
 	public static final int MAX_KNOWN_PACKS = Integer.getInteger("fabric-resource-loader-v0:maxKnownPacks", 1024);
 
-	private final ResourceType type;
+	private final PackType type;
 	private final ResourcePackPosition activationInfo;
 	private final boolean forClientDataPackManager;
 
-	public ModResourcePackCreator(ResourceType type) {
+	public ModResourcePackCreator(PackType type) {
 		this(type, false);
 	}
 
-	protected ModResourcePackCreator(ResourceType type, boolean forClientDataPackManager) {
+	protected ModResourcePackCreator(PackType type, boolean forClientDataPackManager) {
 		this.type = type;
 		this.activationInfo = new ResourcePackPosition(!forClientDataPackManager, ResourcePackProfile.InsertionPosition.TOP, false);
 		this.forClientDataPackManager = forClientDataPackManager;
@@ -123,7 +123,7 @@ public class ModResourcePackCreator implements ResourcePackProvider {
 		// Build a list of mod resource packs.
 		registerModPack(consumer, null, BASE_PARENT);
 
-		if (this.type == ResourceType.CLIENT_RESOURCES) {
+		if (this.type == PackType.CLIENT_RESOURCES) {
 			// Programmer Art/High Contrast data packs can never be enabled.
 			registerModPack(consumer, PROGRAMMER_ART, PROGRAMMER_ART_PARENT);
 			registerModPack(consumer, HIGH_CONTRAST, HIGH_CONTRAST_PARENT);

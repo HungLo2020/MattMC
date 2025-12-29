@@ -35,7 +35,7 @@ import net.minecraft.server.packs.ResourcePackInfo;
 import net.minecraft.server.packs.ResourcePackPosition;
 import net.minecraft.server.packs.ResourcePackProfile;
 import net.minecraft.server.packs.resources.PreparableReloadListener;
-import net.minecraft.server.packs.ResourceType;
+import net.minecraft.server.packs.PackType;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Pair;
@@ -47,16 +47,16 @@ import net.fabricmc.fabric.api.resource.v1.ResourceLoader;
 import net.fabricmc.loader.api.ModContainer;
 
 public class ResourceManagerHelperImpl implements ResourceManagerHelper {
-	private static final Map<ResourceType, ResourceManagerHelperImpl> registryMap = new HashMap<>();
+	private static final Map<PackType, ResourceManagerHelperImpl> registryMap = new HashMap<>();
 	private static final Set<Pair<Component, ModNioResourcePack>> builtinResourcePacks = new HashSet<>();
 
 	private final ResourceLoader resourceLoader;
 
-	private ResourceManagerHelperImpl(ResourceType type) {
+	private ResourceManagerHelperImpl(PackType type) {
 		this.resourceLoader = ResourceLoader.get(type);
 	}
 
-	public static ResourceManagerHelperImpl get(ResourceType type) {
+	public static ResourceManagerHelperImpl get(PackType type) {
 		return registryMap.computeIfAbsent(type, ResourceManagerHelperImpl::new);
 	}
 
@@ -77,8 +77,8 @@ public class ResourceManagerHelperImpl implements ResourceManagerHelper {
 		List<Path> paths = container.getRootPaths();
 		String separator = paths.getFirst().getFileSystem().getSeparator();
 		subPath = subPath.replace("/", separator);
-		ModNioResourcePack resourcePack = ModNioResourcePack.create(id.toString(), container, subPath, ResourceType.CLIENT_RESOURCES, activationType, false);
-		ModNioResourcePack dataPack = ModNioResourcePack.create(id.toString(), container, subPath, ResourceType.SERVER_DATA, activationType, false);
+		ModNioResourcePack resourcePack = ModNioResourcePack.create(id.toString(), container, subPath, PackType.CLIENT_RESOURCES, activationType, false);
+		ModNioResourcePack dataPack = ModNioResourcePack.create(id.toString(), container, subPath, PackType.SERVER_DATA, activationType, false);
 		if (resourcePack == null && dataPack == null) return false;
 
 		if (resourcePack != null) {
@@ -107,7 +107,7 @@ public class ResourceManagerHelperImpl implements ResourceManagerHelper {
 		return registerBuiltinResourcePack(id, subPath, container, Component.literal(id.getNamespace() + "/" + id.getPath()), activationType);
 	}
 
-	public static void registerBuiltinResourcePacks(ResourceType resourceType, Consumer<ResourcePackProfile> consumer) {
+	public static void registerBuiltinResourcePacks(PackType resourceType, Consumer<ResourcePackProfile> consumer) {
 		// Loop through each registered built-in resource packs and add them if valid.
 		for (Pair<Component, ModNioResourcePack> entry : builtinResourcePacks) {
 			ModNioResourcePack pack = entry.getRight();

@@ -31,7 +31,7 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.world.CreateWorldScreen;
 import net.minecraft.server.packs.DataConfiguration;
 import net.minecraft.server.packs.PackRepository;
-import net.minecraft.server.packs.ResourceType;
+import net.minecraft.server.packs.PackType;
 
 import net.fabricmc.fabric.impl.resource.loader.ModResourcePackCreator;
 import net.fabricmc.fabric.impl.resource.loader.ModResourcePackUtil;
@@ -49,7 +49,7 @@ public abstract class CreateWorldScreenMixin extends Screen {
 			at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/screen/world/CreateWorldScreen;createServerConfig(Lnet/minecraft/resource/PackRepository;Lnet/minecraft/resource/DataConfiguration;)Lnet/minecraft/server/SaveLoading$ServerConfig;"))
 	private static PackRepository onCreateResManagerInit(PackRepository manager) {
 		// Add mod data packs to the initial res pack manager so they are active even if the user doesn't use custom data packs
-		manager.providers.add(new ModResourcePackCreator(ResourceType.SERVER_DATA));
+		manager.providers.add(new ModResourcePackCreator(PackType.SERVER_DATA));
 		return manager;
 	}
 
@@ -63,6 +63,6 @@ public abstract class CreateWorldScreenMixin extends Screen {
 			at = @At(value = "INVOKE", target = "Lnet/minecraft/resource/PackRepository;scanPacks()V", shift = At.Shift.BEFORE))
 	private void onScanPacks(CallbackInfoReturnable<Pair<File, PackRepository>> cir) {
 		// Allow to display built-in data packs in the data pack selection screen at world creation.
-		this.packManager.providers.add(new ModResourcePackCreator(ResourceType.SERVER_DATA));
+		this.packManager.providers.add(new ModResourcePackCreator(PackType.SERVER_DATA));
 	}
 }

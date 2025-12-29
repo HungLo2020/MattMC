@@ -55,7 +55,7 @@ public final class FluidStorageUtil {
 	 * @param hand The hand that the player used.
 	 * @return True if some fluid was moved.
 	 */
-	public static boolean interactWithFluidStorage(Storage<FluidVariant> storage, Player player, Hand hand) {
+	public static boolean interactWithFluidStorage(Storage<FluidVariant> storage, Player player, InteractionHand hand) {
 		// Check if hand is a fluid container.
 		Storage<FluidVariant> handStorage = ContainerItemContext.forPlayerInteraction(player, hand).find(FluidStorage.ITEM);
 		if (handStorage == null) return false;
@@ -69,8 +69,8 @@ public final class FluidStorageUtil {
 			CrashReport report = CrashReport.create(e, "Interacting with fluid storage");
 			report.addElement("Interaction details")
 					.add("Player", () -> DebugMessages.forPlayer(player))
-					.add("Hand", hand)
-					.add("Hand item", handItem::toString)
+					.add("InteractionHand", hand)
+					.add("InteractionHand item", handItem::toString)
 					.add("Fluid storage", () -> Objects.toString(storage, null));
 			throw new CrashException(report);
 		}

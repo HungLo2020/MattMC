@@ -23,7 +23,7 @@ import org.jetbrains.annotations.ApiStatus;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.server.packs.resources.ResourceManager;
 import net.minecraft.server.packs.resources.PreparableReloadListener;
-import net.minecraft.server.packs.ResourceType;
+import net.minecraft.server.packs.PackType;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 
@@ -74,7 +74,7 @@ public interface ResourceManagerHelper {
 	 * @param type The given resource type.
 	 * @return The ResourceManagerHelper instance.
 	 */
-	static ResourceManagerHelper get(ResourceType type) {
+	static ResourceManagerHelper get(PackType type) {
 		return ResourceManagerHelperImpl.get(type);
 	}
 

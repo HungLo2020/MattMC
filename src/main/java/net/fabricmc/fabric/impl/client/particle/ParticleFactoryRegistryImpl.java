@@ -68,7 +68,7 @@ public final class ParticleFactoryRegistryImpl implements ParticleFactoryRegistr
 
 		@Override
 		public <T extends ParticleOptions> void register(ParticleType<T> type, PendingParticleFactory<T> constructor) {
-			var delegate = new ParticleEngine.SimpleSpriteProvider();
+			var delegate = new ParticleResources.MutableSpriteSet();
 			var fabricSpriteProvider = new FabricSpriteProviderImpl(delegate);
 			particleSpriteManager.spriteAwareParticleFactories.put(Registries.PARTICLE_TYPE.getId(type), delegate);
 			register(type, constructor.create(fabricSpriteProvider));

@@ -54,7 +54,7 @@ public abstract class ServerConfigurationNetworkHandlerMixin extends ServerCommo
 	private ConfigurationTask currentTask;
 
 	@Shadow
-	protected abstract void onTaskFinished(ConfigurationTask.Key key);
+	protected abstract void onTaskFinished(ConfigurationTask.Type key);
 
 	@Shadow
 	@Final
@@ -160,13 +160,13 @@ public abstract class ServerConfigurationNetworkHandlerMixin extends ServerCommo
 	}
 
 	@Override
-	public void completeTask(ConfigurationTask.Key key) {
+	public void completeTask(ConfigurationTask.Type key) {
 		if (!earlyTaskExecution) {
 			onTaskFinished(key);
 			return;
 		}
 
-		final ConfigurationTask.Key currentKey = this.currentTask != null ? this.currentTask.getKey() : null;
+		final ConfigurationTask.Type currentKey = this.currentTask != null ? this.currentTask.getKey() : null;
 
 		if (!key.equals(currentKey)) {
 			throw new IllegalStateException("Unexpected request for task finish, current task: " + currentKey + ", requested: " + key);

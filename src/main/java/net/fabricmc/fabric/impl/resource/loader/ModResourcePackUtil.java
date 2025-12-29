@@ -48,7 +48,7 @@ import net.minecraft.server.packs.PackVersion;
 import net.minecraft.server.packs.Pack;
 import net.minecraft.server.packs.PackRepository;
 import net.minecraft.server.packs.ResourcePackProfile;
-import net.minecraft.server.packs.ResourceType;
+import net.minecraft.server.packs.PackType;
 import net.minecraft.server.packs.VanillaDataPackProvider;
 import net.minecraft.world.flag.FeatureFlags;
 import net.minecraft.server.packs.metadata.PackResourceMetadata;
@@ -80,7 +80,7 @@ public final class ModResourcePackUtil {
 	 * @param type    the type of resource
 	 * @param subPath the resource pack sub path directory in mods, may be {@code null}
 	 */
-	public static List<ModResourcePack> getModResourcePacks(FabricLoader fabricLoader, ResourceType type, @Nullable String subPath) {
+	public static List<ModResourcePack> getModResourcePacks(FabricLoader fabricLoader, PackType type, @Nullable String subPath) {
 		ModResourcePackSorter sorter = new ModResourcePackSorter();
 
 		Collection<ModContainer> containers = fabricLoader.getAllMods();
@@ -182,7 +182,7 @@ public final class ModResourcePackUtil {
 		return null;
 	}
 
-	public static InputStream openDefault(ModContainer container, ResourceType type, String filename) throws IOException {
+	public static InputStream openDefault(ModContainer container, PackType type, String filename) throws IOException {
 		switch (filename) {
 		case "pack.mcmeta":
 			String description = Objects.requireNonNullElse(container.getMetadata().getId(), "");
@@ -205,14 +205,14 @@ public final class ModResourcePackUtil {
 		return new PackResourceMetadata(description, new Range<>(packVersion));
 	}
 
-	public static JsonObject getMetadataPackJson(PackVersion packVersion, Component description, ResourceType resourceType) {
+	public static JsonObject getMetadataPackJson(PackVersion packVersion, Component description, PackType resourceType) {
 		return PackResourceMetadata.createCodec(resourceType)
 				.encodeStart(JsonOps.INSTANCE, getMetadataPack(packVersion, description))
 				.getOrThrow()
 				.getAsJsonObject();
 	}
 
-	public static String serializeMetadata(PackVersion packVersion, String description, ResourceType resourceType) {
+	public static String serializeMetadata(PackVersion packVersion, String description, PackType resourceType) {
 		// This seems to be still manually deserialized
 		JsonObject pack = getMetadataPackJson(packVersion, Component.literal(description), resourceType);
 		JsonObject metadata = new JsonObject();
@@ -234,7 +234,7 @@ public final class ModResourcePackUtil {
 	 * @return the default data pack settings
 	 */
 	public static DataConfiguration createDefaultDataConfiguration() {
-		ModResourcePackCreator modResourcePackCreator = new ModResourcePackCreator(ResourceType.SERVER_DATA);
+		ModResourcePackCreator modResourcePackCreator = new ModResourcePackCreator(PackType.SERVER_DATA);
 		List<ResourcePackProfile> moddedResourcePacks = new ArrayList<>();
 		modResourcePackCreator.register(moddedResourcePacks::add);
 
@@ -272,7 +272,7 @@ public final class ModResourcePackUtil {
 	public static DataPackSettings createTestServerSettings(List<String> enabled, List<String> disabled) {
 		// Collect modded profiles
 		Set<String> moddedProfiles = new HashSet<>();
-		ModResourcePackCreator modResourcePackCreator = new ModResourcePackCreator(ResourceType.SERVER_DATA);
+		ModResourcePackCreator modResourcePackCreator = new ModResourcePackCreator(PackType.SERVER_DATA);
 		modResourcePackCreator.register(profile -> moddedProfiles.add(profile.getId()));
 
 		// Remove them from the enabled list
@@ -298,7 +298,7 @@ public final class ModResourcePackUtil {
 	 * {@code VanillaDataPackProvider.createClientManager} used by vanilla.
 	 */
 	public static PackRepository createClientManager() {
-		return new PackRepository(new VanillaDataPackProvider(new SymlinkFinder((path) -> true)), new ModResourcePackCreator(ResourceType.SERVER_DATA, true));
+		return new PackRepository(new VanillaDataPackProvider(new SymlinkFinder((path) -> true)), new ModResourcePackCreator(PackType.SERVER_DATA, true));
 	}
 
 	public enum Order {

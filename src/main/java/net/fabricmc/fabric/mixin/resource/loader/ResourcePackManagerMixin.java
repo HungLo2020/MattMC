@@ -41,7 +41,7 @@ import net.minecraft.server.packs.PackRepository;
 import net.minecraft.server.packs.ResourcePackProfile;
 import net.minecraft.server.packs.ResourcePackProvider;
 import net.minecraft.server.packs.ResourcePackSource;
-import net.minecraft.server.packs.ResourceType;
+import net.minecraft.server.packs.PackType;
 
 import net.fabricmc.fabric.impl.resource.loader.FabricResourcePackProfile;
 import net.fabricmc.fabric.impl.resource.loader.ModResourcePackCreator;
@@ -79,7 +79,7 @@ public abstract class ResourcePackManagerMixin {
 
 		// On server, add the mod resource pack provider.
 		if (shouldAddServerProvider) {
-			providers.add(new ModResourcePackCreator(ResourceType.SERVER_DATA));
+			providers.add(new ModResourcePackCreator(PackType.SERVER_DATA));
 		}
 	}
 

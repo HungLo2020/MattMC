@@ -92,7 +92,7 @@ public interface ContainerItemContext {
 	 * Otherwise, {@link #ofPlayerHand} is used.
 	 * This matches the behavior of {@link ItemUsage#exchangeStack}.
 	 */
-	static ContainerItemContext forPlayerInteraction(Player player, Hand hand) {
+	static ContainerItemContext forPlayerInteraction(Player player, InteractionHand hand) {
 		if (player.isInCreativeMode()) {
 			return forCreativeInteraction(player, player.getStackInHand(hand));
 		} else {
@@ -114,7 +114,7 @@ public interface ContainerItemContext {
 	/**
 	 * Return a context for the passed player's hand.
 	 */
-	static ContainerItemContext ofPlayerHand(Player player, Hand hand) {
+	static ContainerItemContext ofPlayerHand(Player player, InteractionHand hand) {
 		return new PlayerContainerItemContext(player, hand);
 	}
 

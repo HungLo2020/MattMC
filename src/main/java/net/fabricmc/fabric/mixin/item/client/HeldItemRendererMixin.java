@@ -51,7 +51,7 @@ public class HeldItemRendererMixin {
 		ItemStack newMainStack = client.player.getMainHandStack();
 
 		if (mainHand.getItem() == newMainStack.getItem()) {
-			if (!mainHand.getItem().allowComponentsUpdateAnimation(client.player, Hand.MAIN_HAND, mainHand, newMainStack)) {
+			if (!mainHand.getItem().allowComponentsUpdateAnimation(client.player, InteractionHand.MAIN_HAND, mainHand, newMainStack)) {
 				mainHand = newMainStack;
 			}
 		}
@@ -60,7 +60,7 @@ public class HeldItemRendererMixin {
 		ItemStack newOffStack = client.player.getOffHandStack();
 
 		if (offHand.getItem() == newOffStack.getItem()) {
-			if (!offHand.getItem().allowComponentsUpdateAnimation(client.player, Hand.OFF_HAND, offHand, newOffStack)) {
+			if (!offHand.getItem().allowComponentsUpdateAnimation(client.player, InteractionHand.OFF_HAND, offHand, newOffStack)) {
 				offHand = newOffStack;
 			}
 		}

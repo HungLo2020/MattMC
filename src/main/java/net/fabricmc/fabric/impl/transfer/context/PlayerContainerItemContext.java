@@ -31,7 +31,7 @@ public class PlayerContainerItemContext implements ContainerItemContext {
 	private final PlayerInventoryStorage playerWrapper;
 	private final SingleSlotStorage<ItemVariant> slot;
 
-	public PlayerContainerItemContext(Player player, Hand hand) {
+	public PlayerContainerItemContext(Player player, InteractionHand hand) {
 		this.playerWrapper = PlayerInventoryStorage.of(player);
 		this.slot = playerWrapper.getHandSlot(hand);
 	}

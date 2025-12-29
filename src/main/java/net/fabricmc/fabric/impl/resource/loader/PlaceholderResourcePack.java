@@ -32,14 +32,14 @@ import net.minecraft.server.packs.InputSupplier;
 import net.minecraft.server.packs.Pack;
 import net.minecraft.server.packs.ResourcePackInfo;
 import net.minecraft.server.packs.ResourcePackProfile;
-import net.minecraft.server.packs.ResourceType;
+import net.minecraft.server.packs.PackType;
 import net.minecraft.server.packs.metadata.PackResourceMetadata;
 import net.minecraft.server.packs.metadata.ResourceMetadataMap;
 import net.minecraft.server.packs.metadata.ResourceMetadataSerializer;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 
-public record PlaceholderResourcePack(ResourceType type, ResourcePackInfo metadata) implements Pack {
+public record PlaceholderResourcePack(PackType type, ResourcePackInfo metadata) implements Pack {
 	private static final Component DESCRIPTION_TEXT = Component.translatable("pack.description.modResources");
 
 	public PackResourceMetadata getMetadata() {
@@ -74,16 +74,16 @@ public record PlaceholderResourcePack(ResourceType type, ResourcePackInfo metada
 	 */
 	@Nullable
 	@Override
-	public InputSupplier<InputStream> open(ResourceType type, ResourceLocation id) {
+	public InputSupplier<InputStream> open(PackType type, ResourceLocation id) {
 		return null;
 	}
 
 	@Override
-	public void findResources(ResourceType type, String namespace, String prefix, ResultConsumer consumer) {
+	public void findResources(PackType type, String namespace, String prefix, ResultConsumer consumer) {
 	}
 
 	@Override
-	public Set<String> getNamespaces(ResourceType type) {
+	public Set<String> getNamespaces(PackType type) {
 		return Collections.emptySet();
 	}
 
@@ -107,7 +107,7 @@ public record PlaceholderResourcePack(ResourceType type, ResourcePackInfo metada
 	public void close() {
 	}
 
-	public record Factory(ResourceType type, ResourcePackInfo metadata) implements ResourcePackProfile.PackFactory {
+	public record Factory(PackType type, ResourcePackInfo metadata) implements ResourcePackProfile.PackFactory {
 		@Override
 		public Pack open(ResourcePackInfo var1) {
 			return new PlaceholderResourcePack(this.type, metadata);

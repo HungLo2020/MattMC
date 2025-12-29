@@ -152,5 +152,5 @@ public interface PlayerInventoryStorage extends InventoryStorage {
 	/**
 	 * Return a wrapper around the current slot of the passed hand.
 	 */
-	SingleSlotStorage<ItemVariant> getHandSlot(Hand hand);
+	SingleSlotStorage<ItemVariant> getHandSlot(InteractionHand hand);
 }

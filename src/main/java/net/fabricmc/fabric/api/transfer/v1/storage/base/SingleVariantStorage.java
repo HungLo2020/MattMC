@@ -20,8 +20,8 @@ import java.util.function.Supplier;
 
 import com.mojang.serialization.Codec;
 
-import net.minecraft.storage.ReadView;
-import net.minecraft.storage.WriteView;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.CompoundTag;
 
 import net.fabricmc.fabric.api.transfer.v1.storage.StoragePreconditions;
 import net.fabricmc.fabric.api.transfer.v1.storage.TransferVariant;
@@ -155,28 +155,28 @@ public abstract class SingleVariantStorage<T extends TransferVariant<?>> extends
 	}
 
 	/**
-	 * Read a {@link SingleVariantStorage} from a {@link ReadView}.
+	 * Read a {@link SingleVariantStorage} from a {@link CompoundTag}.
 	 *
 	 * @param storage the {@link SingleVariantStorage} to read into
 	 * @param codec the item variant codec
 	 * @param fallback the fallback item variant, used when the data is invalid
-	 * @param data the @{@link ReadView} instance to read from
+	 * @param data the @{@link CompoundTag} instance to read from
 	 * @param <T> the type of the item variant
 	 */
-	public static <T extends TransferVariant<?>> void readData(SingleVariantStorage<T> storage, Codec<T> codec, Supplier<T> fallback, ReadView data) {
+	public static <T extends TransferVariant<?>> void readData(SingleVariantStorage<T> storage, Codec<T> codec, Supplier<T> fallback, CompoundTag data) {
 		storage.variant = data.read("variant", codec).orElseGet(fallback);
 		storage.amount = data.getLong("amount", 0L);
 	}
 
 	/**
-	 * Write a {@link SingleVariantStorage} to {@link WriteView}.
+	 * Write a {@link SingleVariantStorage} to {@link CompoundTag}.
 	 *
 	 * @param storage the {@link SingleVariantStorage} to write from
 	 * @param codec the item variant codec
-	 * @param data the @{@link WriteView} instance to write from
+	 * @param data the @{@link CompoundTag} instance to write from
 	 * @param <T> the type of the item variant
 	 */
-	public static <T extends TransferVariant<?>> void writeData(SingleVariantStorage<T> storage, Codec<T> codec, WriteView data) {
+	public static <T extends TransferVariant<?>> void writeData(SingleVariantStorage<T> storage, Codec<T> codec, CompoundTag data) {
 		data.put("variant", codec, storage.variant);
 		data.putLong("amount", storage.amount);
 	}

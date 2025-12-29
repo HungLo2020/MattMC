@@ -54,7 +54,7 @@ public interface FabricItem {
 	 * @param newStack the new stack, also of this item
 	 * @return true to run the vanilla animation, false to cancel it.
 	 */
-	default boolean allowComponentsUpdateAnimation(Player player, Hand hand, ItemStack oldStack, ItemStack newStack) {
+	default boolean allowComponentsUpdateAnimation(Player player, InteractionHand hand, ItemStack oldStack, ItemStack newStack) {
 		return true;
 	}
 
