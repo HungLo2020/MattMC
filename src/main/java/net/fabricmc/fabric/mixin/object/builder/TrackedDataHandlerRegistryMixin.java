@@ -21,8 +21,8 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-import net.minecraft.entity.data.TrackedDataHandler;
-import net.minecraft.entity.data.TrackedDataHandlerRegistry;
+import net.minecraft.world.entity.data.TrackedDataHandler;
+import net.minecraft.world.entity.data.TrackedDataHandlerRegistry;
 
 import net.fabricmc.fabric.impl.object.builder.FabricTrackedDataRegistryImpl;
 import net.fabricmc.loader.api.FabricLoader;

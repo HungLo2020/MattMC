@@ -21,8 +21,8 @@ import org.jetbrains.annotations.Nullable;
 import net.minecraft.component.DataComponentTypes;
 import net.minecraft.component.type.PotionContentsComponent;
 import net.minecraft.fluid.Fluids;
-import net.minecraft.item.ItemStack;
-import net.minecraft.item.Items;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import net.minecraft.potion.Potions;
 
 import net.fabricmc.fabric.api.transfer.v1.context.ContainerItemContext;

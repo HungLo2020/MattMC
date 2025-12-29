@@ -41,8 +41,8 @@ import net.minecraft.nbt.NbtIo;
 import net.minecraft.nbt.NbtList;
 import net.minecraft.nbt.NbtSizeTracker;
 import net.minecraft.nbt.NbtString;
-import net.minecraft.resource.ResourcePack;
-import net.minecraft.resource.ResourcePackProfile;
+import net.minecraft.server.packs.ResourcePack;
+import net.minecraft.server.packs.ResourcePackProfile;
 
 import net.fabricmc.fabric.impl.resource.loader.FabricResourcePackProfile;
 import net.fabricmc.fabric.impl.resource.loader.ModNioResourcePack;

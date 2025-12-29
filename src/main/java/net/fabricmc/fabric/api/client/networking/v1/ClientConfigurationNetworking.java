@@ -22,10 +22,10 @@ import java.util.Set;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.Nullable;
 
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.network.ClientConfigurationNetworkHandler;
-import net.minecraft.network.packet.CustomPayload;
-import net.minecraft.util.Identifier;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.multiplayer.ClientConfigurationNetworkHandler;
+import net.minecraft.network.protocol.CustomPayload;
+import net.minecraft.server.packss.ResourceLocation;
 import net.minecraft.util.thread.ThreadExecutor;
 
 import net.fabricmc.fabric.api.networking.v1.PacketSender;
@@ -82,7 +82,7 @@ public final class ClientConfigurationNetworking {
 	 * @return the previous handler, or {@code null} if no handler was bound to the channel,
 	 * or it was not registered using {@link #registerGlobalReceiver(CustomPayload.Id, ConfigurationPayloadHandler)}
 	 * @see ClientConfigurationNetworking#registerGlobalReceiver(CustomPayload.Id, ConfigurationPayloadHandler)
-	 * @see ClientConfigurationNetworking#unregisterReceiver(Identifier)
+	 * @see ClientConfigurationNetworking#unregisterReceiver(ResourceLocation)
 	 */
 	@Nullable
 	public static ClientConfigurationNetworking.ConfigurationPayloadHandler<?> unregisterGlobalReceiver(CustomPayload.Id<?> id) {
@@ -95,7 +95,7 @@ public final class ClientConfigurationNetworking {
 	 *
 	 * @return all channel names which global receivers are registered for.
 	 */
-	public static Set<Identifier> getGlobalReceivers() {
+	public static Set<ResourceLocation> getGlobalReceivers() {
 		return ClientNetworkingImpl.CONFIGURATION.getChannels();
 	}
 
@@ -103,9 +103,9 @@ public final class ClientConfigurationNetworking {
 	 * Registers a handler for a packet type.
 	 *
 	 * <p>If a handler is already registered for the {@code type}, this method will return {@code false}, and no change will be made.
-	 * Use {@link #unregisterReceiver(Identifier)} to unregister the existing handler.
+	 * Use {@link #unregisterReceiver(ResourceLocation)} to unregister the existing handler.
 	 *
-	 * <p>For example, if you only register a receiver using this method when a {@linkplain ClientLoginNetworking#registerGlobalReceiver(Identifier, ClientLoginNetworking.LoginQueryRequestHandler)}
+	 * <p>For example, if you only register a receiver using this method when a {@linkplain ClientLoginNetworking#registerGlobalReceiver(ResourceLocation, ClientLoginNetworking.LoginQueryRequestHandler)}
 	 * login query has been received, you should use {@link ClientPlayConnectionEvents#INIT} to register the channel handler.
 	 *
 	 * @param id the payload id
@@ -136,7 +136,7 @@ public final class ClientConfigurationNetworking {
 	 * @throws IllegalStateException if the client is not connected to a server
 	 */
 	@Nullable
-	public static ClientConfigurationNetworking.ConfigurationPayloadHandler<?> unregisterReceiver(Identifier id) {
+	public static ClientConfigurationNetworking.ConfigurationPayloadHandler<?> unregisterReceiver(ResourceLocation id) {
 		final ClientConfigurationNetworkAddon addon = ClientNetworkingImpl.getClientConfigurationAddon();
 
 		if (addon != null) {
@@ -152,7 +152,7 @@ public final class ClientConfigurationNetworking {
 	 * @return All the channel names that the client can receive packets on
 	 * @throws IllegalStateException if the client is not connected to a server
 	 */
-	public static Set<Identifier> getReceived() throws IllegalStateException {
+	public static Set<ResourceLocation> getReceived() throws IllegalStateException {
 		final ClientConfigurationNetworkAddon addon = ClientNetworkingImpl.getClientConfigurationAddon();
 
 		if (addon != null) {
@@ -168,7 +168,7 @@ public final class ClientConfigurationNetworking {
 	 * @return All the channel names the connected server declared the ability to receive a packets on
 	 * @throws IllegalStateException if the client is not connected to a server
 	 */
-	public static Set<Identifier> getSendable() throws IllegalStateException {
+	public static Set<ResourceLocation> getSendable() throws IllegalStateException {
 		final ClientConfigurationNetworkAddon addon = ClientNetworkingImpl.getClientConfigurationAddon();
 
 		if (addon != null) {
@@ -185,7 +185,7 @@ public final class ClientConfigurationNetworking {
 	 * @return {@code true} if the connected server has declared the ability to receive a packet on the specified channel.
 	 * False if the client is not in game.
 	 */
-	public static boolean canSend(Identifier channelName) throws IllegalArgumentException {
+	public static boolean canSend(ResourceLocation channelName) throws IllegalArgumentException {
 		final ClientConfigurationNetworkAddon addon = ClientNetworkingImpl.getClientConfigurationAddon();
 
 		if (addon != null) {
@@ -277,9 +277,9 @@ public final class ClientConfigurationNetworking {
 	@ApiStatus.NonExtendable
 	public interface Context {
 		/**
-		 * @return The MinecraftClient instance
+		 * @return The Minecraft instance
 		 */
-		MinecraftClient client();
+		Minecraft client();
 
 		/**
 		 * @return The ClientConfigurationNetworkHandler instance

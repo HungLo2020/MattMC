@@ -25,11 +25,11 @@ import io.netty.util.AsciiString;
 
 import net.minecraft.network.PacketByteBuf;
 import net.minecraft.network.codec.PacketCodec;
-import net.minecraft.network.packet.CustomPayload;
-import net.minecraft.util.Identifier;
+import net.minecraft.network.protocol.CustomPayload;
+import net.minecraft.server.packss.ResourceLocation;
 import net.minecraft.util.InvalidIdentifierException;
 
-public record RegistrationPayload(Id<RegistrationPayload> id, List<Identifier> channels) implements CustomPayload {
+public record RegistrationPayload(Id<RegistrationPayload> id, List<ResourceLocation> channels) implements CustomPayload {
 	public static final CustomPayload.Id<RegistrationPayload> REGISTER = new CustomPayload.Id<>(NetworkingImpl.REGISTER_CHANNEL);
 	public static final CustomPayload.Id<RegistrationPayload> UNREGISTER = new CustomPayload.Id<>(NetworkingImpl.UNREGISTER_CHANNEL);
 	public static final PacketCodec<PacketByteBuf, RegistrationPayload> REGISTER_CODEC = codec(REGISTER);
@@ -42,7 +42,7 @@ public record RegistrationPayload(Id<RegistrationPayload> id, List<Identifier> c
 	private void write(PacketByteBuf buf) {
 		boolean first = true;
 
-		for (Identifier channel : channels) {
+		for (ResourceLocation channel : channels) {
 			if (first) {
 				first = false;
 			} else {
@@ -53,8 +53,8 @@ public record RegistrationPayload(Id<RegistrationPayload> id, List<Identifier> c
 		}
 	}
 
-	private static List<Identifier> read(PacketByteBuf buf) {
-		List<Identifier> ids = new ArrayList<>();
+	private static List<ResourceLocation> read(PacketByteBuf buf) {
+		List<ResourceLocation> ids = new ArrayList<>();
 		StringBuilder active = new StringBuilder();
 
 		while (buf.isReadable()) {
@@ -73,11 +73,11 @@ public record RegistrationPayload(Id<RegistrationPayload> id, List<Identifier> c
 		return Collections.unmodifiableList(ids);
 	}
 
-	private static void addId(List<Identifier> ids, StringBuilder sb) {
+	private static void addId(List<ResourceLocation> ids, StringBuilder sb) {
 		String literal = sb.toString();
 
 		try {
-			ids.add(Identifier.of(literal));
+			ids.add(ResourceLocation.of(literal));
 		} catch (InvalidIdentifierException ex) {
 			NetworkingImpl.LOGGER.warn("Received invalid channel identifier \"{}\"", literal);
 		}

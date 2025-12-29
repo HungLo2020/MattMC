@@ -16,7 +16,7 @@
 
 package net.fabricmc.fabric.api.recipe.v1;
 
-import net.minecraft.recipe.RecipeManager;
+import net.minecraft.world.item.crafting.RecipeManager;
 
 import net.fabricmc.fabric.api.recipe.v1.sync.SynchronizedRecipes;
 import net.fabricmc.fabric.impl.recipe.sync.SynchronizedRecipesImpl;

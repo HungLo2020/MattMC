@@ -23,14 +23,14 @@ import net.minecraft.network.RegistryByteBuf;
 import net.minecraft.network.codec.PacketCodec;
 import net.minecraft.network.codec.PacketCodecs;
 import net.minecraft.network.handler.PacketDecoderException;
-import net.minecraft.network.packet.CustomPayload;
-import net.minecraft.recipe.Recipe;
-import net.minecraft.recipe.RecipeEntry;
-import net.minecraft.recipe.RecipeSerializer;
-import net.minecraft.registry.Registries;
-import net.minecraft.registry.RegistryKey;
-import net.minecraft.registry.RegistryKeys;
-import net.minecraft.util.Identifier;
+import net.minecraft.network.protocol.CustomPayload;
+import net.minecraft.world.item.crafting.Recipe;
+import net.minecraft.world.item.crafting.RecipeEntry;
+import net.minecraft.world.item.crafting.RecipeSerializer;
+import net.minecraft.core.Registries;
+import net.minecraft.core.ResourceKey;
+import net.minecraft.core.RegistryKeys;
+import net.minecraft.server.packss.ResourceLocation;
 
 /**
  * Main packet used to send recipes to the client.
@@ -38,7 +38,7 @@ import net.minecraft.util.Identifier;
 public record RecipeSyncPayloadS2C(List<Entry> entries) implements CustomPayload {
 	public static final PacketCodec<RegistryByteBuf, RecipeSyncPayloadS2C> CODEC = Entry.CODEC.collect(PacketCodecs.toList()).xmap(RecipeSyncPayloadS2C::new, RecipeSyncPayloadS2C::entries);
 
-	public static final Id<RecipeSyncPayloadS2C> ID = new Id<>(Identifier.of("fabric", "recipe_sync"));
+	public static final Id<RecipeSyncPayloadS2C> ID = new Id<>(ResourceLocation.of("fabric", "recipe_sync"));
 
 	@Override
 	public Id<? extends CustomPayload> getId() {
@@ -52,7 +52,7 @@ public record RecipeSyncPayloadS2C(List<Entry> entries) implements CustomPayload
 		);
 
 		private static Entry read(RegistryByteBuf buf) {
-			Identifier recipeSerializerId = buf.readIdentifier();
+			ResourceLocation recipeSerializerId = buf.readIdentifier();
 			RecipeSerializer<?> recipeSerializer = Registries.RECIPE_SERIALIZER.get(recipeSerializerId);
 
 			if (recipeSerializer == null || !RecipeSyncImpl.isSynced(recipeSerializer)) {
@@ -63,7 +63,7 @@ public record RecipeSyncPayloadS2C(List<Entry> entries) implements CustomPayload
 			var list = new ArrayList<RecipeEntry<?>>();
 
 			for (int i = 0; i < count; i++) {
-				RegistryKey<Recipe<?>> id = buf.readRegistryKey(RegistryKeys.RECIPE);
+				ResourceKey<Recipe<?>> id = buf.readRegistryKey(RegistryKeys.RECIPE);
 				//noinspection deprecation
 				Recipe<?> recipe = recipeSerializer.packetCodec().decode(buf);
 				list.add(new RecipeEntry<>(id, recipe));

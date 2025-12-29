@@ -18,10 +18,10 @@ package net.fabricmc.fabric.impl.lookup.block;
 
 import org.jetbrains.annotations.Nullable;
 
-import net.minecraft.block.BlockState;
-import net.minecraft.block.entity.BlockEntity;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.util.math.BlockPos;
+import net.minecraft.world.level.block.BlockState;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.core.BlockPos;
 
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerBlockEntityEvents;
 import net.fabricmc.fabric.api.lookup.v1.block.BlockApiCache;
@@ -29,7 +29,7 @@ import net.fabricmc.fabric.api.lookup.v1.block.BlockApiLookup;
 
 public final class BlockApiCacheImpl<A, C> implements BlockApiCache<A, C> {
 	private final BlockApiLookupImpl<A, C> lookup;
-	private final ServerWorld world;
+	private final ServerLevel world;
 	private final BlockPos pos;
 	/**
 	 * We always cache the block entity, even if it's null. We rely on BE load and unload events to invalidate the cache when necessary.
@@ -44,7 +44,7 @@ public final class BlockApiCacheImpl<A, C> implements BlockApiCache<A, C> {
 	private BlockState lastState = null;
 	private BlockApiLookup.BlockApiProvider<A, C> cachedProvider = null;
 
-	public BlockApiCacheImpl(BlockApiLookupImpl<A, C> lookup, ServerWorld world, BlockPos pos) {
+	public BlockApiCacheImpl(BlockApiLookupImpl<A, C> lookup, ServerLevel world, BlockPos pos) {
 		((ServerWorldCache) world).fabric_registerCache(pos, this);
 		this.lookup = lookup;
 		this.world = world;
@@ -119,7 +119,7 @@ public final class BlockApiCacheImpl<A, C> implements BlockApiCache<A, C> {
 	}
 
 	@Override
-	public ServerWorld getWorld() {
+	public ServerLevel getWorld() {
 		return world;
 	}
 

@@ -26,7 +26,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.Drawable;
 import net.minecraft.client.gui.Element;
@@ -114,28 +114,28 @@ abstract class ScreenMixin implements ScreenExtensions {
 		ScreenEvents.afterBackground(((Screen) (Object) this)).invoker().afterBackground((Screen) (Object) this, context, mouseX, mouseY, deltaTicks);
 	}
 
-	@Inject(method = "init(Lnet/minecraft/client/MinecraftClient;II)V", at = @At("HEAD"))
-	private void beforeInitScreen(MinecraftClient client, int width, int height, CallbackInfo ci) {
+	@Inject(method = "init(Lnet/minecraft/client/Minecraft;II)V", at = @At("HEAD"))
+	private void beforeInitScreen(Minecraft client, int width, int height, CallbackInfo ci) {
 		beforeInit(client, width, height);
 	}
 
-	@Inject(method = "init(Lnet/minecraft/client/MinecraftClient;II)V", at = @At("TAIL"))
-	private void afterInitScreen(MinecraftClient client, int width, int height, CallbackInfo ci) {
+	@Inject(method = "init(Lnet/minecraft/client/Minecraft;II)V", at = @At("TAIL"))
+	private void afterInitScreen(Minecraft client, int width, int height, CallbackInfo ci) {
 		afterInit(client, width, height);
 	}
 
 	@Inject(method = "resize", at = @At("HEAD"))
-	private void beforeResizeScreen(MinecraftClient client, int width, int height, CallbackInfo ci) {
+	private void beforeResizeScreen(Minecraft client, int width, int height, CallbackInfo ci) {
 		beforeInit(client, width, height);
 	}
 
 	@Inject(method = "resize", at = @At("TAIL"))
-	private void afterResizeScreen(MinecraftClient client, int width, int height, CallbackInfo ci) {
+	private void afterResizeScreen(Minecraft client, int width, int height, CallbackInfo ci) {
 		afterInit(client, width, height);
 	}
 
 	@Unique
-	private void beforeInit(MinecraftClient client, int width, int height) {
+	private void beforeInit(Minecraft client, int width, int height) {
 		// All elements are repopulated on the screen, so we need to reinitialize all events
 		this.fabricButtons = null;
 		this.removeEvent = ScreenEventFactory.createRemoveEvent();
@@ -171,7 +171,7 @@ abstract class ScreenMixin implements ScreenExtensions {
 	}
 
 	@Unique
-	private void afterInit(MinecraftClient client, int width, int height) {
+	private void afterInit(Minecraft client, int width, int height) {
 		ScreenEvents.AFTER_INIT.invoker().afterInit(client, (Screen) (Object) this, width, height);
 	}
 

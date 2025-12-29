@@ -24,7 +24,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import net.minecraft.network.handler.EncoderHandler;
-import net.minecraft.network.packet.Packet;
+import net.minecraft.network.protocol.Packet;
 
 import net.fabricmc.fabric.impl.networking.splitter.PassthroughPacket;
 

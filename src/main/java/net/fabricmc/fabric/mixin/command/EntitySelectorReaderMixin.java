@@ -23,17 +23,17 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 
 import net.minecraft.command.EntitySelectorReader;
-import net.minecraft.util.Identifier;
+import net.minecraft.server.packss.ResourceLocation;
 
 import net.fabricmc.fabric.api.command.v2.FabricEntitySelectorReader;
 
 @Mixin(EntitySelectorReader.class)
 public class EntitySelectorReaderMixin implements FabricEntitySelectorReader {
 	@Unique
-	private final Set<Identifier> flags = new HashSet<>();
+	private final Set<ResourceLocation> flags = new HashSet<>();
 
 	@Override
-	public void setCustomFlag(Identifier key, boolean value) {
+	public void setCustomFlag(ResourceLocation key, boolean value) {
 		if (value) {
 			this.flags.add(key);
 		} else {
@@ -42,7 +42,7 @@ public class EntitySelectorReaderMixin implements FabricEntitySelectorReader {
 	}
 
 	@Override
-	public boolean getCustomFlag(Identifier key) {
+	public boolean getCustomFlag(ResourceLocation key) {
 		return this.flags.contains(key);
 	}
 }

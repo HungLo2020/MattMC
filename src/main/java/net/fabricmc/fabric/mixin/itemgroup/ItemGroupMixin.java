@@ -28,11 +28,11 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-import net.minecraft.item.ItemGroup;
-import net.minecraft.item.ItemGroups;
-import net.minecraft.item.ItemStack;
-import net.minecraft.registry.Registries;
-import net.minecraft.registry.RegistryKey;
+import net.minecraft.world.item.ItemGroup;
+import net.minecraft.world.item.ItemGroups;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.core.Registries;
+import net.minecraft.core.ResourceKey;
 
 import net.fabricmc.fabric.api.event.Event;
 import net.fabricmc.fabric.api.itemgroup.v1.FabricItemGroupEntries;
@@ -55,7 +55,7 @@ abstract class ItemGroupMixin implements FabricItemGroupImpl {
 	@Inject(method = "updateEntries", at = @At("TAIL"))
 	public void getStacks(ItemGroup.DisplayContext context, CallbackInfo ci) {
 		final ItemGroup self = (ItemGroup) (Object) this;
-		final RegistryKey<ItemGroup> registryKey = Registries.ITEM_GROUP.getKey(self).orElseThrow(() -> new IllegalStateException("Unregistered item group : " + self));
+		final ResourceKey<ItemGroup> registryKey = Registries.ITEM_GROUP.getKey(self).orElseThrow(() -> new IllegalStateException("Unregistered item group : " + self));
 
 		// Do not modify special item groups (except Operator Blocks) at all.
 		// Special item groups include Saved Hotbars, Search, and Survival Inventory.

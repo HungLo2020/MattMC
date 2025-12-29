@@ -23,11 +23,11 @@ import java.util.function.Predicate;
 
 import org.jetbrains.annotations.ApiStatus;
 
-import net.minecraft.item.Item;
-import net.minecraft.item.ItemConvertible;
-import net.minecraft.item.ItemGroup;
-import net.minecraft.item.ItemStack;
-import net.minecraft.resource.featuretoggle.FeatureSet;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemConvertible;
+import net.minecraft.world.item.ItemGroup;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.flag.FeatureFlagSet;
 
 /**
  * This class allows the entries of {@linkplain ItemGroup item groups} to be modified by the events in {@link ItemGroupEvents}.
@@ -51,7 +51,7 @@ public class FabricItemGroupEntries implements ItemGroup.Entries {
 	/**
 	 * @return the currently enabled feature set
 	 */
-	public FeatureSet getEnabledFeatures() {
+	public FeatureFlagSet getEnabledFeatures() {
 		return context.enabledFeatures();
 	}
 
@@ -137,7 +137,7 @@ public class FabricItemGroupEntries implements ItemGroup.Entries {
 	}
 
 	/**
-	 * See {@link #prepend(ItemStack, net.minecraft.item.ItemGroup.StackVisibility)}.
+	 * See {@link #prepend(ItemStack, net.minecraft.world.item.ItemGroup.StackVisibility)}.
 	 * Automatically creates an {@link ItemStack} from the given item.
 	 */
 	public void prepend(ItemConvertible item, ItemGroup.StackVisibility visibility) {
@@ -173,14 +173,14 @@ public class FabricItemGroupEntries implements ItemGroup.Entries {
 	}
 
 	/**
-	 * See {@link #addAfter(ItemConvertible, Collection, net.minecraft.item.ItemGroup.StackVisibility)}.
+	 * See {@link #addAfter(ItemConvertible, Collection, net.minecraft.world.item.ItemGroup.StackVisibility)}.
 	 */
 	public void addAfter(ItemConvertible afterLast, Collection<ItemStack> newStacks) {
 		addAfter(afterLast, newStacks, ItemGroup.StackVisibility.PARENT_AND_SEARCH_TABS);
 	}
 
 	/**
-	 * See {@link #addAfter(ItemStack, Collection, net.minecraft.item.ItemGroup.StackVisibility)}.
+	 * See {@link #addAfter(ItemStack, Collection, net.minecraft.world.item.ItemGroup.StackVisibility)}.
 	 */
 	public void addAfter(ItemStack afterLast, Collection<ItemStack> newStacks) {
 		addAfter(afterLast, newStacks, ItemGroup.StackVisibility.PARENT_AND_SEARCH_TABS);
@@ -290,14 +290,14 @@ public class FabricItemGroupEntries implements ItemGroup.Entries {
 	}
 
 	/**
-	 * See {@link #addBefore(ItemConvertible, Collection, net.minecraft.item.ItemGroup.StackVisibility)}.
+	 * See {@link #addBefore(ItemConvertible, Collection, net.minecraft.world.item.ItemGroup.StackVisibility)}.
 	 */
 	public void addBefore(ItemConvertible beforeFirst, Collection<ItemStack> newStacks) {
 		addBefore(beforeFirst, newStacks, ItemGroup.StackVisibility.PARENT_AND_SEARCH_TABS);
 	}
 
 	/**
-	 * See {@link #addBefore(ItemStack, Collection, net.minecraft.item.ItemGroup.StackVisibility)}.
+	 * See {@link #addBefore(ItemStack, Collection, net.minecraft.world.item.ItemGroup.StackVisibility)}.
 	 */
 	public void addBefore(ItemStack beforeFirst, Collection<ItemStack> newStacks) {
 		addBefore(beforeFirst, newStacks, ItemGroup.StackVisibility.PARENT_AND_SEARCH_TABS);
@@ -379,7 +379,7 @@ public class FabricItemGroupEntries implements ItemGroup.Entries {
 	}
 
 	/**
-	 * @return True if the item of a given stack is enabled in the current {@link FeatureSet}.
+	 * @return True if the item of a given stack is enabled in the current {@link FeatureFlagSet}.
 	 * @see Item#isEnabled
 	 */
 	private boolean isEnabled(ItemStack stack) {

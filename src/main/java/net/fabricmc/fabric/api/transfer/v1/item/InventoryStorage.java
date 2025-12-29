@@ -23,11 +23,11 @@ import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.UnmodifiableView;
 
-import net.minecraft.entity.player.PlayerInventory;
-import net.minecraft.inventory.Inventory;
-import net.minecraft.inventory.SidedInventory;
-import net.minecraft.inventory.SimpleInventory;
-import net.minecraft.util.math.Direction;
+import net.minecraft.world.entity.player.PlayerInventory;
+import net.minecraft.world.item.inventory.Inventory;
+import net.minecraft.world.item.inventory.SidedInventory;
+import net.minecraft.world.item.inventory.SimpleInventory;
+import net.minecraft.core.Direction;
 
 import net.fabricmc.fabric.api.transfer.v1.storage.SlottedStorage;
 import net.fabricmc.fabric.api.transfer.v1.storage.base.CombinedStorage;

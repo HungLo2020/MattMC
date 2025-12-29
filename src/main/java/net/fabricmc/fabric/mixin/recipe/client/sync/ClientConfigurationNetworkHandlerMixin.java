@@ -23,11 +23,11 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-import net.minecraft.client.network.ClientConfigurationNetworkHandler;
-import net.minecraft.network.packet.s2c.config.SelectKnownPacksS2CPacket;
-import net.minecraft.recipe.RecipeSerializer;
-import net.minecraft.registry.Registries;
-import net.minecraft.util.Identifier;
+import net.minecraft.client.multiplayer.ClientConfigurationNetworkHandler;
+import net.minecraft.network.protocol.s2c.config.SelectKnownPacksS2CPacket;
+import net.minecraft.world.item.crafting.RecipeSerializer;
+import net.minecraft.core.Registries;
+import net.minecraft.server.packss.ResourceLocation;
 
 import net.fabricmc.fabric.api.client.networking.v1.ClientConfigurationNetworking;
 import net.fabricmc.fabric.impl.recipe.sync.RecipeSyncImpl;
@@ -41,7 +41,7 @@ public class ClientConfigurationNetworkHandlerMixin {
 			return;
 		}
 
-		var ids = new HashSet<Identifier>();
+		var ids = new HashSet<ResourceLocation>();
 
 		for (RecipeSerializer<?> serializer : RecipeSyncImpl.getSyncedSerializers()) {
 			ids.add(Registries.RECIPE_SERIALIZER.getId(serializer));

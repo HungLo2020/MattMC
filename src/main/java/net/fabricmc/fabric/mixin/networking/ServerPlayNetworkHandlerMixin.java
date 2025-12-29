@@ -27,7 +27,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import net.minecraft.network.ClientConnection;
 import net.minecraft.network.OffThreadException;
 import net.minecraft.network.listener.PacketListener;
-import net.minecraft.network.packet.c2s.common.CustomPayloadC2SPacket;
+import net.minecraft.network.protocol.c2s.common.CustomPayloadC2SPacket;
 import net.minecraft.network.state.NetworkState;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.network.ConnectedClientData;

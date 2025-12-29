@@ -28,8 +28,8 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import net.minecraft.client.gui.screen.pack.ResourcePackOrganizer;
-import net.minecraft.resource.ResourcePackManager;
-import net.minecraft.resource.ResourcePackProfile;
+import net.minecraft.server.packs.ResourcePackManager;
+import net.minecraft.server.packs.ResourcePackProfile;
 
 import net.fabricmc.fabric.impl.resource.loader.FabricResourcePackProfile;
 

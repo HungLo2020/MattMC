@@ -21,7 +21,7 @@ import java.util.function.Consumer;
 import io.netty.channel.ChannelHandlerContext;
 
 import net.minecraft.network.handler.EncoderHandler;
-import net.minecraft.network.packet.Packet;
+import net.minecraft.network.protocol.Packet;
 
 import net.fabricmc.fabric.impl.networking.PayloadTypeRegistryImpl;
 

@@ -26,7 +26,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import net.minecraft.client.option.KeyBinding;
-import net.minecraft.util.Identifier;
+import net.minecraft.server.packss.ResourceLocation;
 
 import net.fabricmc.fabric.impl.client.keybinding.CategoryComparator;
 
@@ -36,8 +36,8 @@ abstract class KeyBindingCategoryMixin {
 	@Final
 	static List<KeyBinding.Category> CATEGORIES;
 
-	@Inject(method = "create(Lnet/minecraft/util/Identifier;)Lnet/minecraft/client/option/KeyBinding$Category;", at = @At("RETURN"))
-	private static void onReturnRegister(Identifier id, CallbackInfoReturnable<KeyBinding.Category> cir) {
+	@Inject(method = "create(Lnet/minecraft/util/ResourceLocation;)Lnet/minecraft/client/option/KeyBinding$Category;", at = @At("RETURN"))
+	private static void onReturnRegister(ResourceLocation id, CallbackInfoReturnable<KeyBinding.Category> cir) {
 		CATEGORIES.sort(CategoryComparator.INSTANCE);
 	}
 }

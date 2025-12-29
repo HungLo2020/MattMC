@@ -16,9 +16,9 @@
 
 package net.fabricmc.fabric.api.renderer.v1.render;
 
-import net.minecraft.client.renderer.MultiBufferSource;
-import net.minecraft.client.renderer.RenderType;
-import net.minecraft.client.renderer.chunk.ChunkSectionLayer;
+import net.minecraft.client.rendererer.MultiBufferSource;
+import net.minecraft.client.rendererer.RenderType;
+import net.minecraft.client.rendererer.chunk.ChunkSectionLayer;
 import org.jetbrains.annotations.Nullable;
 
 /**

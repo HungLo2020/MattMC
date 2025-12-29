@@ -22,7 +22,7 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 
 import net.minecraft.network.ClientConnection;
-import net.minecraft.recipe.RecipeSerializer;
+import net.minecraft.world.item.crafting.RecipeSerializer;
 
 import net.fabricmc.fabric.impl.recipe.sync.SyncedSerializerAwareClientConnection;
 

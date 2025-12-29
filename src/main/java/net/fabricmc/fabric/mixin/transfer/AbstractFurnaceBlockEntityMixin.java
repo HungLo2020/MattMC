@@ -23,14 +23,14 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-import net.minecraft.block.BlockState;
-import net.minecraft.block.entity.AbstractFurnaceBlockEntity;
-import net.minecraft.block.entity.BlockEntityType;
-import net.minecraft.block.entity.LockableContainerBlockEntity;
-import net.minecraft.item.ItemStack;
-import net.minecraft.server.world.ServerWorld;
+import net.minecraft.world.level.block.BlockState;
+import net.minecraft.world.level.block.entity.AbstractFurnaceBlockEntity;
+import net.minecraft.world.level.block.entity.BlockEntityType;
+import net.minecraft.world.level.block.entity.LockableContainerBlockEntity;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.collection.DefaultedList;
-import net.minecraft.util.math.BlockPos;
+import net.minecraft.core.BlockPos;
 
 import net.fabricmc.fabric.impl.transfer.item.SpecialLogicInventory;
 
@@ -75,7 +75,7 @@ public abstract class AbstractFurnaceBlockEntityMixin extends LockableContainerB
 			// Update cook time if needed. Code taken from AbstractFurnaceBlockEntity#setStack.
 			boolean bl = !stack.isEmpty() && ItemStack.areItemsAndComponentsEqual(stack, itemStack);
 
-			if (!bl && this.world instanceof ServerWorld world) {
+			if (!bl && this.world instanceof ServerLevel world) {
 				this.cookingTotalTime = getCookTime(world, (AbstractFurnaceBlockEntity) (Object) this);
 				this.cookingTimeSpent = 0;
 			}
@@ -83,7 +83,7 @@ public abstract class AbstractFurnaceBlockEntityMixin extends LockableContainerB
 	}
 
 	@Shadow
-	private static int getCookTime(ServerWorld world, AbstractFurnaceBlockEntity abstractFurnaceBlockEntity) {
+	private static int getCookTime(ServerLevel world, AbstractFurnaceBlockEntity abstractFurnaceBlockEntity) {
 		throw new AssertionError();
 	}
 }

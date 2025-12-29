@@ -18,8 +18,8 @@ package net.fabricmc.fabric.impl.particle;
 
 import net.minecraft.network.RegistryByteBuf;
 import net.minecraft.network.codec.PacketCodec;
-import net.minecraft.particle.BlockStateParticleEffect;
-import net.minecraft.util.math.BlockPos;
+import net.minecraft.core.particles.BlockStateParticleEffect;
+import net.minecraft.core.BlockPos;
 
 public class ExtendedBlockStateParticleEffectPacketCodec implements PacketCodec<RegistryByteBuf, BlockStateParticleEffect> {
 	private static final int PACKET_MARKER = -1;

@@ -23,11 +23,11 @@ import java.util.Set;
 
 import it.unimi.dsi.fastutil.objects.ReferenceOpenHashSet;
 
-import net.minecraft.recipe.RecipeEntry;
-import net.minecraft.recipe.RecipeSerializer;
-import net.minecraft.registry.Registries;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.util.Identifier;
+import net.minecraft.world.item.crafting.RecipeEntry;
+import net.minecraft.world.item.crafting.RecipeSerializer;
+import net.minecraft.core.Registries;
+import net.minecraft.server.network.ServerPlayer;
+import net.minecraft.server.packss.ResourceLocation;
 
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.event.Event;
@@ -43,7 +43,7 @@ public class RecipeSyncImpl implements ModInitializer {
 	private static final int RECIPE_PAYLOAD_MAX_SIZE = 64 * 1024 * 1024;
 	private static final Set<RecipeSerializer<?>> SYNCED_SERIALIZERS = new ReferenceOpenHashSet<>();
 
-	public static final Identifier RECIPE_SYNC_EVENT_PHASE = Identifier.of("fabric", "recipe_sync");
+	public static final ResourceLocation RECIPE_SYNC_EVENT_PHASE = ResourceLocation.of("fabric", "recipe_sync");
 
 	@Override
 	public void onInitialize() {
@@ -59,7 +59,7 @@ public class RecipeSyncImpl implements ModInitializer {
 	private static void onRecipeSyncRequest(SupportedRecipeSerializersPayloadC2S payload, ServerConfigurationNetworking.Context context) {
 		var set = new ReferenceOpenHashSet<RecipeSerializer<?>>();
 
-		for (Identifier identifier : payload.synchronizedSerializers()) {
+		for (ResourceLocation identifier : payload.synchronizedSerializers()) {
 			Registries.RECIPE_SERIALIZER.getOptionalValue(identifier).ifPresent(set::add);
 		}
 
@@ -67,7 +67,7 @@ public class RecipeSyncImpl implements ModInitializer {
 				.fabric_setSyncedRecipeSerializers(set);
 	}
 
-	private static void sendRecipes(ServerPlayerEntity player, boolean exist) {
+	private static void sendRecipes(ServerPlayer player, boolean exist) {
 		if (!ServerPlayNetworking.canSend(player, RecipeSyncPayloadS2C.ID)) {
 			return;
 		}

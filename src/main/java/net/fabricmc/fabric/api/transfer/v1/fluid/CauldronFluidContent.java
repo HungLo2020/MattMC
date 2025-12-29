@@ -20,13 +20,13 @@ import java.util.Collection;
 
 import org.jetbrains.annotations.Nullable;
 
-import net.minecraft.block.Block;
-import net.minecraft.block.BlockState;
-import net.minecraft.block.Blocks;
-import net.minecraft.block.LeveledCauldronBlock;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.BlockState;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.LeveledCauldronBlock;
 import net.minecraft.fluid.Fluid;
 import net.minecraft.fluid.Fluids;
-import net.minecraft.state.property.IntProperty;
+import net.minecraft.statse.property.IntProperty;
 
 import net.fabricmc.fabric.api.lookup.v1.custom.ApiProviderMap;
 import net.fabricmc.fabric.impl.transfer.fluid.CauldronStorage;

@@ -22,10 +22,10 @@ import java.util.Optional;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.gen.Accessor;
 
-import net.minecraft.loot.LootPool;
-import net.minecraft.loot.LootTable;
-import net.minecraft.loot.function.LootFunction;
-import net.minecraft.util.Identifier;
+import net.minecraft.world.level.storage.loot.LootPool;
+import net.minecraft.world.level.storage.loot.LootTable;
+import net.minecraft.world.level.storage.loot.function.LootFunction;
+import net.minecraft.server.packss.ResourceLocation;
 
 import net.fabricmc.fabric.api.loot.v3.FabricLootTableBuilder;
 
@@ -42,5 +42,5 @@ public interface LootTableAccessor {
 	List<LootFunction> fabric_getFunctions();
 
 	@Accessor("randomSequenceId")
-	Optional<Identifier> fabric_getRandomSequenceId();
+	Optional<ResourceLocation> fabric_getRandomSequenceId();
 }

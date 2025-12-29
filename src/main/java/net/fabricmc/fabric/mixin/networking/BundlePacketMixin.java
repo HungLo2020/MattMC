@@ -24,8 +24,8 @@ import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.ModifyVariable;
 
-import net.minecraft.network.packet.BundlePacket;
-import net.minecraft.network.packet.Packet;
+import net.minecraft.network.protocol.BundlePacket;
+import net.minecraft.network.protocol.Packet;
 
 @Mixin(BundlePacket.class)
 public class BundlePacketMixin {

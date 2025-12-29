@@ -24,8 +24,8 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-import net.minecraft.item.ItemGroups;
-import net.minecraft.registry.Registries;
+import net.minecraft.world.item.ItemGroups;
+import net.minecraft.core.Registries;
 import net.minecraft.server.Main;
 
 import net.fabricmc.api.EnvType;

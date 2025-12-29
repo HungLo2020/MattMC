@@ -18,7 +18,7 @@ package net.fabricmc.fabric.impl.event.lifecycle;
 
 import java.util.Set;
 
-import net.minecraft.world.chunk.WorldChunk;
+import net.minecraft.world.level.chunk.WorldChunk;
 
 /**
  * A simple marker interface which holds references to chunks which block entities may be loaded or unloaded from.

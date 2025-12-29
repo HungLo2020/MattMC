@@ -25,18 +25,18 @@ import java.util.Set;
 import com.mojang.serialization.Codec;
 import org.jetbrains.annotations.Unmodifiable;
 
-import net.minecraft.registry.Registry;
-import net.minecraft.registry.RegistryKey;
-import net.minecraft.registry.RegistryLoader;
-import net.minecraft.registry.SerializableRegistries;
+import net.minecraft.core.Registry;
+import net.minecraft.core.ResourceKey;
+import net.minecraft.core.RegistryLoader;
+import net.minecraft.core.SerializableRegistries;
 
 import net.fabricmc.fabric.api.event.registry.DynamicRegistries;
 
 public final class DynamicRegistriesImpl {
 	private static final List<RegistryLoader.Entry<?>> DYNAMIC_REGISTRIES = new ArrayList<>(RegistryLoader.DYNAMIC_REGISTRIES);
-	public static final Set<RegistryKey<?>> FABRIC_DYNAMIC_REGISTRY_KEYS = new HashSet<>();
-	public static final Set<RegistryKey<? extends Registry<?>>> DYNAMIC_REGISTRY_KEYS = new HashSet<>();
-	public static final Set<RegistryKey<? extends Registry<?>>> SKIP_EMPTY_SYNC_REGISTRIES = new HashSet<>();
+	public static final Set<ResourceKey<?>> FABRIC_DYNAMIC_REGISTRY_KEYS = new HashSet<>();
+	public static final Set<ResourceKey<? extends Registry<?>>> DYNAMIC_REGISTRY_KEYS = new HashSet<>();
+	public static final Set<ResourceKey<? extends Registry<?>>> SKIP_EMPTY_SYNC_REGISTRIES = new HashSet<>();
 
 	static {
 		for (RegistryLoader.Entry<?> vanillaEntry : RegistryLoader.DYNAMIC_REGISTRIES) {
@@ -51,7 +51,7 @@ public final class DynamicRegistriesImpl {
 		return List.copyOf(DYNAMIC_REGISTRIES);
 	}
 
-	public static <T> RegistryLoader.Entry<T> register(RegistryKey<? extends Registry<T>> key, Codec<T> serverCodec) {
+	public static <T> RegistryLoader.Entry<T> register(ResourceKey<? extends Registry<T>> key, Codec<T> serverCodec) {
 		Objects.requireNonNull(key, "Registry key cannot be null");
 		Objects.requireNonNull(serverCodec, "Server codec cannot be null");
 
@@ -65,7 +65,7 @@ public final class DynamicRegistriesImpl {
 		return entry;
 	}
 
-	public static <T> void addSyncedRegistry(RegistryKey<? extends Registry<T>> key, Codec<T> clientCodec, DynamicRegistries.SyncOption... options) {
+	public static <T> void addSyncedRegistry(ResourceKey<? extends Registry<T>> key, Codec<T> clientCodec, DynamicRegistries.SyncOption... options) {
 		Objects.requireNonNull(key, "Registry key cannot be null");
 		Objects.requireNonNull(clientCodec, "Client codec cannot be null");
 		Objects.requireNonNull(options, "Options cannot be null");
@@ -76,7 +76,7 @@ public final class DynamicRegistriesImpl {
 
 		RegistryLoader.SYNCED_REGISTRIES.add(new RegistryLoader.Entry<>(key, clientCodec, false));
 
-		if (!(SerializableRegistries.SYNCED_REGISTRIES instanceof HashSet<RegistryKey<? extends Registry<?>>>)) {
+		if (!(SerializableRegistries.SYNCED_REGISTRIES instanceof HashSet<ResourceKey<? extends Registry<?>>>)) {
 			SerializableRegistries.SYNCED_REGISTRIES = new HashSet<>(SerializableRegistries.SYNCED_REGISTRIES);
 		}
 

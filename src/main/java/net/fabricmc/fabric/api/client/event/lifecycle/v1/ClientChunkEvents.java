@@ -16,8 +16,8 @@
 
 package net.fabricmc.fabric.api.client.event.lifecycle.v1;
 
-import net.minecraft.client.world.ClientWorld;
-import net.minecraft.world.chunk.WorldChunk;
+import net.minecraft.client.multiplayer.ClientLevel;
+import net.minecraft.world.level.chunk.WorldChunk;
 
 import net.fabricmc.fabric.api.event.Event;
 import net.fabricmc.fabric.api.event.EventFactory;
@@ -27,7 +27,7 @@ public final class ClientChunkEvents {
 	}
 
 	/**
-	 * Called when a chunk is loaded into a ClientWorld.
+	 * Called when a chunk is loaded into a ClientLevel.
 	 *
 	 * <p>When this event is called, the chunk is already in the world.
 	 */
@@ -38,7 +38,7 @@ public final class ClientChunkEvents {
 	});
 
 	/**
-	 * Called when a chunk is about to be unloaded from a ClientWorld.
+	 * Called when a chunk is about to be unloaded from a ClientLevel.
 	 *
 	 * <p>When this event is called, the chunk is still present in the world.
 	 */
@@ -50,11 +50,11 @@ public final class ClientChunkEvents {
 
 	@FunctionalInterface
 	public interface Load {
-		void onChunkLoad(ClientWorld world, WorldChunk chunk);
+		void onChunkLoad(ClientLevel world, WorldChunk chunk);
 	}
 
 	@FunctionalInterface
 	public interface Unload {
-		void onChunkUnload(ClientWorld world, WorldChunk chunk);
+		void onChunkUnload(ClientLevel world, WorldChunk chunk);
 	}
 }

@@ -20,9 +20,9 @@ import io.netty.channel.ChannelFutureListener;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.Nullable;
 
-import net.minecraft.network.packet.CustomPayload;
-import net.minecraft.network.packet.Packet;
-import net.minecraft.text.Text;
+import net.minecraft.network.protocol.CustomPayload;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.chat.Component;
 
 /**
  * Represents something that supports sending packets to channels.
@@ -76,5 +76,5 @@ public interface PacketSender {
 	 * Disconnects the player.
 	 * @param disconnectReason the reason for disconnection
 	 */
-	void disconnect(Text disconnectReason);
+	void disconnect(Component disconnectReason);
 }

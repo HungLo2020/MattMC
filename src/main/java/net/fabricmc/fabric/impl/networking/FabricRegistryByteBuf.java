@@ -20,11 +20,11 @@ import java.util.Set;
 
 import org.jetbrains.annotations.Nullable;
 
-import net.minecraft.util.Identifier;
+import net.minecraft.server.packss.ResourceLocation;
 
 public interface FabricRegistryByteBuf {
-	void fabric_setSendableConfigurationChannels(Set<Identifier> globalChannels);
+	void fabric_setSendableConfigurationChannels(Set<ResourceLocation> globalChannels);
 
 	@Nullable
-	Set<Identifier> fabric_getSendableConfigurationChannels();
+	Set<ResourceLocation> fabric_getSendableConfigurationChannels();
 }

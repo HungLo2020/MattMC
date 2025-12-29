@@ -24,7 +24,7 @@ import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.brigadier.exceptions.SimpleCommandExceptionType;
 
 import net.minecraft.server.command.ServerCommandSource;
-import net.minecraft.text.Text;
+import net.minecraft.network.chat.Component;
 import net.minecraft.world.GameRules;
 
 import net.fabricmc.fabric.api.gamerule.v1.rule.EnumRule;
@@ -49,10 +49,10 @@ public final class EnumRuleCommand {
 		try {
 			rule.set(value, serverCommandSource.getServer());
 		} catch (IllegalArgumentException e) {
-			throw new SimpleCommandExceptionType(Text.literal(e.getMessage())).create();
+			throw new SimpleCommandExceptionType(Component.literal(e.getMessage())).create();
 		}
 
-		serverCommandSource.sendFeedback(() -> Text.translatable("commands.gamerule.set", key.getName(), rule.toString()), true);
+		serverCommandSource.sendFeedback(() -> Component.translatable("commands.gamerule.set", key.getName(), rule.toString()), true);
 		return rule.getCommandResult();
 	}
 }

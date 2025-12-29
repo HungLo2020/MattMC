@@ -19,8 +19,8 @@ package net.fabricmc.fabric.api.message.v1;
 import java.util.Objects;
 
 import net.minecraft.network.message.MessageDecorator;
-import net.minecraft.text.Text;
-import net.minecraft.util.Identifier;
+import net.minecraft.network.chat.Component;
+import net.minecraft.server.packss.ResourceLocation;
 
 import net.fabricmc.fabric.api.event.Event;
 import net.fabricmc.fabric.api.event.EventFactory;
@@ -33,7 +33,7 @@ import net.fabricmc.fabric.api.event.EventFactory;
  * <p>This event uses phases to provide better mod compatibilities between mods that add custom
  * content and styling. Message decorators with the styling phase will always apply after the ones
  * with the content phase. When registering the message decorator, it is recommended to choose one
- * of the phases from this interface and pass that to the {@link Event#register(Identifier, Object)}
+ * of the phases from this interface and pass that to the {@link Event#register(ResourceLocation, Object)}
  * function. If not given, the message decorator will run in the default phase, which is between
  * the content phase and the styling phase.
  *
@@ -66,15 +66,15 @@ public final class ServerMessageDecoratorEvent {
 	 * The content phase of the event, passed when registering a message decorator. Use this when
 	 * the decorator modifies the text content of the message.
 	 */
-	public static final Identifier CONTENT_PHASE = Identifier.of("fabric", "content");
+	public static final ResourceLocation CONTENT_PHASE = ResourceLocation.of("fabric", "content");
 	/**
 	 * The styling phase of the event, passed when registering a message decorator. Use this when
 	 * the decorator only modifies the styling of the message with the text intact.
 	 */
-	public static final Identifier STYLING_PHASE = Identifier.of("fabric", "styling");
+	public static final ResourceLocation STYLING_PHASE = ResourceLocation.of("fabric", "styling");
 
 	public static final Event<MessageDecorator> EVENT = EventFactory.createWithPhases(MessageDecorator.class, decorators -> (sender, message) -> {
-		Text decorated = message;
+		Component decorated = message;
 
 		for (MessageDecorator decorator : decorators) {
 			decorated = handle(decorator.decorate(sender, decorated), decorator);
@@ -83,7 +83,7 @@ public final class ServerMessageDecoratorEvent {
 		return decorated;
 	}, CONTENT_PHASE, Event.DEFAULT_PHASE, STYLING_PHASE);
 
-	private static <T extends Text> T handle(T decorated, MessageDecorator decorator) {
+	private static <T extends Component> T handle(T decorated, MessageDecorator decorator) {
 		String decoratorName = decorator.getClass().getName();
 		return Objects.requireNonNull(decorated, "message decorator %s returned null".formatted(decoratorName));
 	}

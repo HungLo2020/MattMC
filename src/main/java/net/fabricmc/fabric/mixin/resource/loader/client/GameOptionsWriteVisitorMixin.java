@@ -25,9 +25,9 @@ import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.ModifyArg;
 
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.resource.ResourcePackManager;
-import net.minecraft.resource.ResourcePackProfile;
+import net.minecraft.client.Minecraft;
+import net.minecraft.server.packs.ResourcePackManager;
+import net.minecraft.server.packs.ResourcePackProfile;
 
 import net.fabricmc.fabric.impl.resource.loader.FabricResourcePackProfile;
 
@@ -39,7 +39,7 @@ public class GameOptionsWriteVisitorMixin {
 	@Unique
 	private static List<String> toPackListString(List<String> packs) {
 		List<String> copy = new ArrayList<>(packs.size());
-		ResourcePackManager manager = MinecraftClient.getInstance().getResourcePackManager();
+		ResourcePackManager manager = Minecraft.getInstance().getResourcePackManager();
 
 		for (String pack : packs) {
 			ResourcePackProfile profile = manager.getProfile(pack);

@@ -19,8 +19,8 @@ package net.fabricmc.fabric.impl.transfer.fluid;
 import java.util.Iterator;
 import java.util.List;
 
-import net.minecraft.item.Item;
-import net.minecraft.item.Items;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.Items;
 
 import net.fabricmc.fabric.api.transfer.v1.context.ContainerItemContext;
 import net.fabricmc.fabric.api.transfer.v1.fluid.FluidConstants;

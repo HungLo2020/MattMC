@@ -23,12 +23,12 @@ import java.util.concurrent.CompletableFuture;
 import io.netty.channel.ChannelFutureListener;
 import org.jetbrains.annotations.Nullable;
 
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.network.ClientLoginNetworkHandler;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.multiplayer.ClientLoginNetworkHandler;
 import net.minecraft.network.PacketByteBuf;
-import net.minecraft.network.packet.c2s.login.LoginQueryResponseC2SPacket;
-import net.minecraft.network.packet.s2c.login.LoginQueryRequestS2CPacket;
-import net.minecraft.util.Identifier;
+import net.minecraft.network.protocol.c2s.login.LoginQueryResponseC2SPacket;
+import net.minecraft.network.protocol.s2c.login.LoginQueryRequestS2CPacket;
+import net.minecraft.server.packss.ResourceLocation;
 
 import net.fabricmc.fabric.api.client.networking.v1.ClientLoginConnectionEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientLoginNetworking;
@@ -40,10 +40,10 @@ import net.fabricmc.fabric.mixin.networking.client.accessor.ClientLoginNetworkHa
 
 public final class ClientLoginNetworkAddon extends AbstractNetworkAddon<ClientLoginNetworking.LoginQueryRequestHandler> {
 	private final ClientLoginNetworkHandler handler;
-	private final MinecraftClient client;
+	private final Minecraft client;
 	private boolean firstResponse = true;
 
-	public ClientLoginNetworkAddon(ClientLoginNetworkHandler handler, MinecraftClient client) {
+	public ClientLoginNetworkAddon(ClientLoginNetworkHandler handler, Minecraft client) {
 		super(ClientNetworkingImpl.LOGIN, "ClientLoginNetworkAddon for Client");
 		this.handler = handler;
 		this.client = client;
@@ -59,7 +59,7 @@ public final class ClientLoginNetworkAddon extends AbstractNetworkAddon<ClientLo
 		return handlePacket(packet.queryId(), packet.payload().id(), payload.data());
 	}
 
-	private boolean handlePacket(int queryId, Identifier channelName, PacketByteBuf originalBuf) {
+	private boolean handlePacket(int queryId, ResourceLocation channelName, PacketByteBuf originalBuf) {
 		this.logger.debug("Handling inbound login response with id {} and channel with name {}", queryId, channelName);
 
 		if (this.firstResponse) {
@@ -95,11 +95,11 @@ public final class ClientLoginNetworkAddon extends AbstractNetworkAddon<ClientLo
 	}
 
 	@Override
-	protected void handleRegistration(Identifier channelName) {
+	protected void handleRegistration(ResourceLocation channelName) {
 	}
 
 	@Override
-	protected void handleUnregistration(Identifier channelName) {
+	protected void handleUnregistration(ResourceLocation channelName) {
 	}
 
 	@Override
@@ -108,7 +108,7 @@ public final class ClientLoginNetworkAddon extends AbstractNetworkAddon<ClientLo
 	}
 
 	@Override
-	protected boolean isReservedChannel(Identifier channelName) {
+	protected boolean isReservedChannel(ResourceLocation channelName) {
 		return false;
 	}
 }

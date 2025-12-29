@@ -21,10 +21,10 @@ import java.util.Objects;
 import java.util.function.UnaryOperator;
 
 import net.minecraft.component.ComponentChanges;
-import net.minecraft.item.ItemStack;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.nbt.NbtHelper;
-import net.minecraft.recipe.Ingredient;
+import net.minecraft.world.item.crafting.Ingredient;
 
 import net.fabricmc.fabric.impl.recipe.ingredient.builtin.AllIngredient;
 import net.fabricmc.fabric.impl.recipe.ingredient.builtin.AnyIngredient;

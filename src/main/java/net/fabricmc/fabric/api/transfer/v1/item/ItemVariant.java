@@ -22,13 +22,13 @@ import com.mojang.serialization.Codec;
 import org.jetbrains.annotations.ApiStatus;
 
 import net.minecraft.component.ComponentChanges;
-import net.minecraft.item.Item;
-import net.minecraft.item.ItemConvertible;
-import net.minecraft.item.ItemStack;
-import net.minecraft.item.Items;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemConvertible;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import net.minecraft.network.RegistryByteBuf;
 import net.minecraft.network.codec.PacketCodec;
-import net.minecraft.registry.entry.RegistryEntry;
+import net.minecraft.core.entry.RegistryEntry;
 
 import net.fabricmc.fabric.api.transfer.v1.storage.TransferVariant;
 import net.fabricmc.fabric.impl.transfer.VariantCodecs;

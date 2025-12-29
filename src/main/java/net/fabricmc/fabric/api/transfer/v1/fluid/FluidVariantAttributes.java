@@ -20,16 +20,16 @@ import java.util.Optional;
 
 import org.jetbrains.annotations.Nullable;
 
-import net.minecraft.block.Blocks;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.fluid.FlowableFluid;
 import net.minecraft.fluid.Fluid;
 import net.minecraft.fluid.Fluids;
-import net.minecraft.sound.SoundEvent;
-import net.minecraft.sound.SoundEvents;
-import net.minecraft.text.Style;
-import net.minecraft.text.Text;
+import net.minecraft.sounds.SoundEvent;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.network.chat.Style;
+import net.minecraft.network.chat.Component;
 import net.minecraft.util.Formatting;
-import net.minecraft.world.World;
+import net.minecraft.world.Level;
 
 import net.fabricmc.fabric.api.lookup.v1.custom.ApiProviderMap;
 import net.fabricmc.fabric.impl.transfer.TransferApiImpl;
@@ -80,7 +80,7 @@ public final class FluidVariantAttributes {
 	/**
 	 * Return the name that should be used for the passed fluid variant.
 	 */
-	public static Text getName(FluidVariant variant) {
+	public static Component getName(FluidVariant variant) {
 		return getHandlerOrDefault(variant.getFluid()).getName(variant);
 	}
 
@@ -140,9 +140,9 @@ public final class FluidVariantAttributes {
 	 * {@value FluidConstants#LAVA_VISCOSITY_NETHER} for lava in ultrawarm dimensions (such as the nether),
 	 * and {@value FluidConstants#LAVA_VISCOSITY} for lava in other dimensions.
 	 *
-	 * @param world World if available, otherwise null.
+	 * @param world Level if available, otherwise null.
 	 */
-	public static int getViscosity(FluidVariant variant, @Nullable World world) {
+	public static int getViscosity(FluidVariant variant, @Nullable Level world) {
 		int viscosity = getHandlerOrDefault(variant.getFluid()).getViscosity(variant, world);
 
 		if (viscosity <= 0) {
@@ -164,7 +164,7 @@ public final class FluidVariantAttributes {
 	static {
 		register(Fluids.WATER, new FluidVariantAttributeHandler() {
 			@Override
-			public Text getName(FluidVariant fluidVariant) {
+			public Component getName(FluidVariant fluidVariant) {
 				if (coloredVanillaFluidNames) {
 					return Blocks.WATER.getName().setStyle(Style.EMPTY.withColor(Formatting.BLUE));
 				} else {
@@ -179,7 +179,7 @@ public final class FluidVariantAttributes {
 		});
 		register(Fluids.LAVA, new FluidVariantAttributeHandler() {
 			@Override
-			public Text getName(FluidVariant fluidVariant) {
+			public Component getName(FluidVariant fluidVariant) {
 				if (coloredVanillaFluidNames) {
 					return Blocks.LAVA.getName().setStyle(Style.EMPTY.withColor(Formatting.RED));
 				} else {
@@ -203,7 +203,7 @@ public final class FluidVariantAttributes {
 			}
 
 			@Override
-			public int getViscosity(FluidVariant variant, @Nullable World world) {
+			public int getViscosity(FluidVariant variant, @Nullable Level world) {
 				if (world != null && world.getDimension().ultrawarm()) {
 					return FluidConstants.LAVA_VISCOSITY_NETHER;
 				} else {

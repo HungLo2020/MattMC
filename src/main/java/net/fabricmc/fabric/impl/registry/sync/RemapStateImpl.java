@@ -20,23 +20,23 @@ import it.unimi.dsi.fastutil.ints.Int2IntMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 
-import net.minecraft.registry.Registry;
-import net.minecraft.util.Identifier;
+import net.minecraft.core.Registry;
+import net.minecraft.server.packss.ResourceLocation;
 
 import net.fabricmc.fabric.api.event.registry.RegistryIdRemapCallback;
 
 public class RemapStateImpl<T> implements RegistryIdRemapCallback.RemapState<T> {
 	private final Int2IntMap rawIdChangeMap;
-	private final Int2ObjectMap<Identifier> oldIdMap;
-	private final Int2ObjectMap<Identifier> newIdMap;
+	private final Int2ObjectMap<ResourceLocation> oldIdMap;
+	private final Int2ObjectMap<ResourceLocation> newIdMap;
 
-	public RemapStateImpl(Registry<T> registry, Int2ObjectMap<Identifier> oldIdMap, Int2IntMap rawIdChangeMap) {
+	public RemapStateImpl(Registry<T> registry, Int2ObjectMap<ResourceLocation> oldIdMap, Int2IntMap rawIdChangeMap) {
 		this.rawIdChangeMap = rawIdChangeMap;
 		this.oldIdMap = oldIdMap;
 		this.newIdMap = new Int2ObjectOpenHashMap<>();
 
 		for (Int2IntMap.Entry entry : rawIdChangeMap.int2IntEntrySet()) {
-			Identifier id = registry.getId(registry.get(entry.getIntValue()));
+			ResourceLocation id = registry.getId(registry.get(entry.getIntValue()));
 			newIdMap.put(entry.getIntValue(), id);
 		}
 	}
@@ -47,12 +47,12 @@ public class RemapStateImpl<T> implements RegistryIdRemapCallback.RemapState<T> 
 	}
 
 	@Override
-	public Identifier getIdFromOld(int oldRawId) {
+	public ResourceLocation getIdFromOld(int oldRawId) {
 		return oldIdMap.get(oldRawId);
 	}
 
 	@Override
-	public Identifier getIdFromNew(int newRawId) {
+	public ResourceLocation getIdFromNew(int newRawId) {
 		return newIdMap.get(newRawId);
 	}
 }

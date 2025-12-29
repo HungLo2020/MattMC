@@ -22,8 +22,8 @@ import org.spongepowered.asm.mixin.injection.Redirect;
 
 import net.minecraft.enchantment.Enchantment;
 import net.minecraft.enchantment.EnchantmentHelper;
-import net.minecraft.item.ItemStack;
-import net.minecraft.registry.entry.RegistryEntry;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.core.entry.RegistryEntry;
 
 import net.fabricmc.fabric.api.item.v1.EnchantingContext;
 

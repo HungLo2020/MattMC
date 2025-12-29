@@ -26,8 +26,8 @@ import it.unimi.dsi.fastutil.ints.Int2ObjectRBTreeMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import net.minecraft.registry.Registry;
-import net.minecraft.util.Identifier;
+import net.minecraft.core.Registry;
+import net.minecraft.server.packss.ResourceLocation;
 import net.minecraft.util.collection.IdList;
 
 import net.fabricmc.fabric.api.event.registry.RegistryEntryAddedCallback;
@@ -36,7 +36,7 @@ import net.fabricmc.fabric.impl.registry.sync.RemovableIdList;
 
 public final class StateIdTracker<T, S> implements RegistryIdRemapCallback<T>, RegistryEntryAddedCallback<T> {
 	private static final Logger LOGGER = LoggerFactory.getLogger(StateIdTracker.class);
-	private static final Set<Identifier> TRACKED = new HashSet<>();
+	private static final Set<ResourceLocation> TRACKED = new HashSet<>();
 
 	private final Registry<T> registry;
 	private final IdList<S> stateList;
@@ -62,7 +62,7 @@ public final class StateIdTracker<T, S> implements RegistryIdRemapCallback<T>, R
 	}
 
 	@Override
-	public void onEntryAdded(int rawId, Identifier id, T object) {
+	public void onEntryAdded(int rawId, ResourceLocation id, T object) {
 		if (rawId == currentHighestId + 1) {
 			stateGetter.apply(object).forEach(stateList::add);
 			currentHighestId = rawId;

@@ -26,7 +26,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-import net.minecraft.registry.RegistryKey;
+import net.minecraft.core.ResourceKey;
 import net.minecraft.village.TradeOffer;
 import net.minecraft.village.TradeOffers;
 import net.minecraft.village.TradedItem;
@@ -41,7 +41,7 @@ public abstract class TradeOffersTypeAwareBuyForOneEmeraldFactoryMixin {
 	 * So we return an empty stream so an exception is never thrown.
 	 */
 	@Redirect(method = "<init>", at = @At(value = "INVOKE", target = "Ljava/util/Set;stream()Ljava/util/stream/Stream;"))
-	private <T> Stream<T> disableVanillaCheck(Set<RegistryKey<VillagerType>> instance) {
+	private <T> Stream<T> disableVanillaCheck(Set<ResourceKey<VillagerType>> instance) {
 		return Stream.empty();
 	}
 

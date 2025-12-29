@@ -16,12 +16,12 @@
 
 package net.fabricmc.fabric.api.event.lifecycle.v1;
 
-import net.minecraft.server.world.ChunkHolder;
-import net.minecraft.server.world.ChunkLevelType;
-import net.minecraft.server.world.ServerChunkManager;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.world.chunk.ChunkStatus;
-import net.minecraft.world.chunk.WorldChunk;
+import net.minecraft.server.level.ChunkHolder;
+import net.minecraft.server.level.ChunkLevelType;
+import net.minecraft.server.level.ServerChunkManager;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.chunk.ChunkStatus;
+import net.minecraft.world.level.chunk.WorldChunk;
 
 import net.fabricmc.fabric.api.event.Event;
 import net.fabricmc.fabric.api.event.EventFactory;
@@ -31,7 +31,7 @@ public final class ServerChunkEvents {
 	}
 
 	/**
-	 * Called when a chunk is loaded into a ServerWorld.
+	 * Called when a chunk is loaded into a ServerLevel.
 	 *
 	 * <p>When this event is called, the chunk is already in the world.
 	 *
@@ -46,7 +46,7 @@ public final class ServerChunkEvents {
 	});
 
 	/**
-	 * Called when a newly generated chunk is loaded into a ServerWorld.
+	 * Called when a newly generated chunk is loaded into a ServerLevel.
 	 *
 	 * <p>When this event is called, the chunk is already in the world.
 	 */
@@ -57,7 +57,7 @@ public final class ServerChunkEvents {
 	});
 
 	/**
-	 * Called when a chunk is unloaded from a ServerWorld.
+	 * Called when a chunk is unloaded from a ServerLevel.
 	 *
 	 * <p>When this event is called, the chunk is still present in the world.
 	 *
@@ -89,21 +89,21 @@ public final class ServerChunkEvents {
 
 	@FunctionalInterface
 	public interface Load {
-		void onChunkLoad(ServerWorld world, WorldChunk chunk);
+		void onChunkLoad(ServerLevel world, WorldChunk chunk);
 	}
 
 	@FunctionalInterface
 	public interface Generate {
-		void onChunkGenerate(ServerWorld world, WorldChunk chunk);
+		void onChunkGenerate(ServerLevel world, WorldChunk chunk);
 	}
 
 	@FunctionalInterface
 	public interface Unload {
-		void onChunkUnload(ServerWorld world, WorldChunk chunk);
+		void onChunkUnload(ServerLevel world, WorldChunk chunk);
 	}
 
 	@FunctionalInterface
 	public interface LevelTypeChange {
-		void onChunkLevelTypeChange(ServerWorld world, WorldChunk chunk, ChunkLevelType oldLevelType, ChunkLevelType newLevelType);
+		void onChunkLevelTypeChange(ServerLevel world, WorldChunk chunk, ChunkLevelType oldLevelType, ChunkLevelType newLevelType);
 	}
 }

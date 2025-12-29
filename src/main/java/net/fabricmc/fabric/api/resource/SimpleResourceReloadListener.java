@@ -19,8 +19,8 @@ package net.fabricmc.fabric.api.resource;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 
-import net.minecraft.resource.ResourceManager;
-import net.minecraft.resource.SynchronousResourceReloader;
+import net.minecraft.server.packs.ResourceManager;
+import net.minecraft.server.packs.SynchronousResourceReloader;
 
 /**
  * A simplified version of the "resource reload listener" interface, hiding the

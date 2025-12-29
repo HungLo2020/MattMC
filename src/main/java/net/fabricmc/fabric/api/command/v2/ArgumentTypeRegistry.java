@@ -19,9 +19,9 @@ package net.fabricmc.fabric.api.command.v2;
 import com.mojang.brigadier.arguments.ArgumentType;
 
 import net.minecraft.command.argument.serialize.ArgumentSerializer;
-import net.minecraft.registry.Registries;
-import net.minecraft.registry.Registry;
-import net.minecraft.util.Identifier;
+import net.minecraft.core.Registries;
+import net.minecraft.core.Registry;
+import net.minecraft.server.packss.ResourceLocation;
 
 import net.fabricmc.fabric.mixin.command.ArgumentTypesAccessor;
 
@@ -36,7 +36,7 @@ public final class ArgumentTypeRegistry {
 	 * @param <T> the argument type properties
 	 */
 	public static <A extends ArgumentType<?>, T extends ArgumentSerializer.ArgumentTypeProperties<A>> void registerArgumentType(
-			Identifier id, Class<? extends A> clazz, ArgumentSerializer<A, T> serializer) {
+			ResourceLocation id, Class<? extends A> clazz, ArgumentSerializer<A, T> serializer) {
 		ArgumentTypesAccessor.fabric_getClassMap().put(clazz, serializer);
 		Registry.register(Registries.COMMAND_ARGUMENT_TYPE, id, serializer);
 	}

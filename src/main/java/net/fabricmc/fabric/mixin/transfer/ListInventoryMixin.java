@@ -21,7 +21,7 @@ import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 
-import net.minecraft.inventory.ListInventory;
+import net.minecraft.world.item.inventory.ListInventory;
 
 import net.fabricmc.fabric.impl.transfer.item.SpecialLogicAccess;
 

@@ -23,12 +23,12 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 
-import net.minecraft.world.World;
-import net.minecraft.world.chunk.WorldChunk;
+import net.minecraft.world.Level;
+import net.minecraft.world.level.chunk.WorldChunk;
 
 import net.fabricmc.fabric.impl.event.lifecycle.LoadedChunksCache;
 
-@Mixin(World.class)
+@Mixin(Level.class)
 public abstract class WorldMixin implements LoadedChunksCache {
 	@Shadow
 	public abstract boolean isClient();

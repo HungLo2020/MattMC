@@ -18,21 +18,21 @@ package net.fabricmc.fabric.api.screenhandler.v1;
 
 import java.util.Objects;
 
-import net.minecraft.entity.player.PlayerInventory;
+import net.minecraft.world.entity.player.PlayerInventory;
 import net.minecraft.network.RegistryByteBuf;
 import net.minecraft.network.codec.PacketCodec;
-import net.minecraft.resource.featuretoggle.FeatureFlags;
-import net.minecraft.screen.NamedScreenHandlerFactory;
-import net.minecraft.screen.ScreenHandler;
-import net.minecraft.screen.ScreenHandlerType;
+import net.minecraft.world.flag.FeatureFlags;
+import net.minecraft.world.inventory.NamedScreenHandlerFactory;
+import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.world.inventory.ScreenHandlerType;
 
 /**
  * A {@link ScreenHandlerType} for an extended screen handler that
  * synchronizes additional data to the client when it is opened.
  *
  * <p>Extended screen handlers can be opened using
- * {@link net.minecraft.entity.player.PlayerEntity#openHandledScreen(NamedScreenHandlerFactory)
- * PlayerEntity.openHandledScreen} with an
+ * {@link net.minecraft.world.entity.player.Player#openHandledScreen(NamedScreenHandlerFactory)
+ * Player.openHandledScreen} with an
  * {@link ExtendedScreenHandlerFactory}.
  *
  * <h2>Example</h2>
@@ -50,12 +50,12 @@ import net.minecraft.screen.ScreenHandlerType;
  * // Creating and registering the type
  * public static final ExtendedScreenHandlerType<OvenScreenHandler> OVEN =
  * 	new ExtendedScreenHandlerType((syncId, inventory, data) -> ..., OvenData.PACKET_CODEC);
- * Registry.register(Registry.SCREEN_HANDLER, Identifier.of(...), OVEN);
+ * Registry.register(Registry.SCREEN_HANDLER, ResourceLocation.of(...), OVEN);
  *
  * // Note: remember to also register the screen using vanilla's HandledScreens!
  *
  * // Screen handler class
- * public class OvenScreenHandler extends ScreenHandler {
+ * public class OvenScreenHandler extends AbstractContainerMenu {
  * 	public OvenScreenHandler(int syncId) {
  * 		super(MyScreenHandlers.OVEN, syncId);
  * 	}
@@ -65,14 +65,14 @@ import net.minecraft.screen.ScreenHandlerType;
  * var factory = new ExtendedScreenHandlerFactory() {
  * 	...
  * };
- * player.openHandlerScreen(factory); // only works on ServerPlayerEntity instances
+ * player.openHandlerScreen(factory); // only works on ServerPlayer instances
  * }
  * </pre>
  *
  * @param <T> the type of screen handler created by this type
  * @param <D> the type of the data
  */
-public class ExtendedScreenHandlerType<T extends ScreenHandler, D> extends ScreenHandlerType<T> {
+public class ExtendedScreenHandlerType<T extends AbstractContainerMenu, D> extends ScreenHandlerType<T> {
 	private final ExtendedFactory<T, D> factory;
 	private final PacketCodec<? super RegistryByteBuf, D> packetCodec;
 
@@ -127,7 +127,7 @@ public class ExtendedScreenHandlerType<T extends ScreenHandler, D> extends Scree
 	 * @see #create(int, PlayerInventory, Object)
 	 */
 	@FunctionalInterface
-	public interface ExtendedFactory<T extends ScreenHandler, D> {
+	public interface ExtendedFactory<T extends AbstractContainerMenu, D> {
 		/**
 		 * Creates a new screen handler with additional screen opening data.
 		 *

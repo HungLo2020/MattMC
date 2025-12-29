@@ -16,10 +16,10 @@
 
 package net.fabricmc.fabric.mixin.event.lifecycle;
 
-import static net.minecraft.server.world.ChunkLevelType.BLOCK_TICKING;
-import static net.minecraft.server.world.ChunkLevelType.ENTITY_TICKING;
-import static net.minecraft.server.world.ChunkLevelType.FULL;
-import static net.minecraft.server.world.ChunkLevelType.INACCESSIBLE;
+import static net.minecraft.server.level.ChunkLevelType.BLOCK_TICKING;
+import static net.minecraft.server.level.ChunkLevelType.ENTITY_TICKING;
+import static net.minecraft.server.level.ChunkLevelType.FULL;
+import static net.minecraft.server.level.ChunkLevelType.INACCESSIBLE;
 
 import java.util.concurrent.Executor;
 
@@ -31,16 +31,16 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-import net.minecraft.server.world.ChunkHolder;
-import net.minecraft.server.world.ChunkLevelType;
-import net.minecraft.server.world.ChunkLevels;
-import net.minecraft.server.world.ServerChunkLoadingManager;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.util.math.ChunkPos;
+import net.minecraft.server.level.ChunkHolder;
+import net.minecraft.server.level.ChunkLevelType;
+import net.minecraft.server.level.ChunkLevels;
+import net.minecraft.server.level.ServerChunkLoadingManager;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.core.ChunkPos;
 import net.minecraft.world.HeightLimitView;
-import net.minecraft.world.chunk.AbstractChunkHolder;
-import net.minecraft.world.chunk.ChunkStatus;
-import net.minecraft.world.chunk.WorldChunk;
+import net.minecraft.world.level.chunk.AbstractChunkHolder;
+import net.minecraft.world.level.chunk.ChunkStatus;
+import net.minecraft.world.level.chunk.WorldChunk;
 
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerChunkEvents;
 import net.fabricmc.fabric.impl.event.lifecycle.ChunkLevelTypeEventTracker;
@@ -70,7 +70,7 @@ public abstract class ChunkHolderMixin extends AbstractChunkHolder implements Ch
 	@Inject(method = "updateFutures", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/world/ChunkHolder;combineSavingFuture(Ljava/util/concurrent/CompletableFuture;)V", shift = At.Shift.AFTER, ordinal = 0))
 	private void updateFutures$inaccessibleToFull(ServerChunkLoadingManager chunkLoadingManager, Executor executor, CallbackInfo ci) {
 		if (this.getUncheckedOrNull(ChunkStatus.FULL) instanceof WorldChunk && this.fabric_currentEventLevelType == INACCESSIBLE) { // prevent duplicate events with ChunkGeneratingMixin
-			ServerChunkEvents.CHUNK_LEVEL_TYPE_CHANGE.invoker().onChunkLevelTypeChange((ServerWorld) world, (WorldChunk) this.getUncheckedOrNull(ChunkStatus.FULL), INACCESSIBLE, FULL);
+			ServerChunkEvents.CHUNK_LEVEL_TYPE_CHANGE.invoker().onChunkLevelTypeChange((ServerLevel) world, (WorldChunk) this.getUncheckedOrNull(ChunkStatus.FULL), INACCESSIBLE, FULL);
 			this.fabric_currentEventLevelType = FULL;
 		}
 	}
@@ -81,7 +81,7 @@ public abstract class ChunkHolderMixin extends AbstractChunkHolder implements Ch
 	@Inject(method = "updateFutures", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/world/ChunkHolder;combineSavingFuture(Ljava/util/concurrent/CompletableFuture;)V", shift = At.Shift.AFTER, ordinal = 1))
 	private void updateFutures$fullToBlockTicking(ServerChunkLoadingManager chunkLoadingManager, Executor executor, CallbackInfo ci) {
 		if (fabric_currentEventLevelType == FULL) { // if INACCESSIBLE->FULL did not fire immediately, then ChunkGeneratingMixin will handle this later.
-			ServerChunkEvents.CHUNK_LEVEL_TYPE_CHANGE.invoker().onChunkLevelTypeChange((ServerWorld) world, (WorldChunk) this.getUncheckedOrNull(ChunkStatus.FULL), FULL, BLOCK_TICKING);
+			ServerChunkEvents.CHUNK_LEVEL_TYPE_CHANGE.invoker().onChunkLevelTypeChange((ServerLevel) world, (WorldChunk) this.getUncheckedOrNull(ChunkStatus.FULL), FULL, BLOCK_TICKING);
 			this.fabric_currentEventLevelType = BLOCK_TICKING;
 		}
 	}
@@ -92,7 +92,7 @@ public abstract class ChunkHolderMixin extends AbstractChunkHolder implements Ch
 	@Inject(method = "updateFutures", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/world/ChunkHolder;combineSavingFuture(Ljava/util/concurrent/CompletableFuture;)V", shift = At.Shift.AFTER, ordinal = 2))
 	private void updateFutures$blockTickingToEntityTicking(ServerChunkLoadingManager chunkLoadingManager, Executor executor, CallbackInfo ci) {
 		if (fabric_currentEventLevelType == BLOCK_TICKING) { // if INACCESSIBLE->FULL->BLOCK_TICKING did not fire immediately, then ChunkGeneratingMixin will handle this later.
-			ServerChunkEvents.CHUNK_LEVEL_TYPE_CHANGE.invoker().onChunkLevelTypeChange((ServerWorld) world, (WorldChunk) this.getUncheckedOrNull(ChunkStatus.FULL), BLOCK_TICKING, ENTITY_TICKING);
+			ServerChunkEvents.CHUNK_LEVEL_TYPE_CHANGE.invoker().onChunkLevelTypeChange((ServerLevel) world, (WorldChunk) this.getUncheckedOrNull(ChunkStatus.FULL), BLOCK_TICKING, ENTITY_TICKING);
 			this.fabric_currentEventLevelType = ENTITY_TICKING;
 		}
 	}
@@ -103,7 +103,7 @@ public abstract class ChunkHolderMixin extends AbstractChunkHolder implements Ch
 	@Inject(method = "decreaseLevel", at = @At("HEAD"))
 	private void decreaseLevel(ServerChunkLoadingManager chunkLoadingManager, ChunkLevelType target, CallbackInfo ci) {
 		ChunkLevelType previous = ChunkLevels.getType(this.lastTickLevel);
-		ServerWorld serverWorld = (ServerWorld) world;
+		ServerLevel serverWorld = (ServerLevel) world;
 
 		for (int i = previous.ordinal(); i > target.ordinal(); i--) {
 			ChunkLevelType oldLevelType = fabric_CHUNK_LEVEL_TYPES[i];

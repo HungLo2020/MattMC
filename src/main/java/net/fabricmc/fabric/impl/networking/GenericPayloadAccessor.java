@@ -16,7 +16,7 @@
 
 package net.fabricmc.fabric.impl.networking;
 
-import net.minecraft.network.packet.CustomPayload;
+import net.minecraft.network.protocol.CustomPayload;
 
 public interface GenericPayloadAccessor {
 	CustomPayload fabric_payload();

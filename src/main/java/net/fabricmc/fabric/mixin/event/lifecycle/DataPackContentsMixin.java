@@ -24,11 +24,11 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-import net.minecraft.registry.CombinedDynamicRegistries;
-import net.minecraft.registry.DynamicRegistryManager;
-import net.minecraft.registry.RegistryWrapper;
-import net.minecraft.registry.ServerDynamicRegistryType;
-import net.minecraft.resource.featuretoggle.FeatureSet;
+import net.minecraft.core.CombinedDynamicRegistries;
+import net.minecraft.core.DynamicRegistryManager;
+import net.minecraft.core.RegistryWrapper;
+import net.minecraft.core.ServerDynamicRegistryType;
+import net.minecraft.world.flag.FeatureFlagSet;
 import net.minecraft.server.DataPackContents;
 import net.minecraft.server.command.CommandManager;
 
@@ -40,7 +40,7 @@ public class DataPackContentsMixin {
 	private DynamicRegistryManager dynamicRegistryManager;
 
 	@Inject(method = "<init>", at = @At("TAIL"))
-	private void init(CombinedDynamicRegistries<ServerDynamicRegistryType> combinedDynamicRegistries, RegistryWrapper.WrapperLookup wrapperLookup, FeatureSet featureSet, CommandManager.RegistrationEnvironment registrationEnvironment, List list, int i, CallbackInfo ci) {
+	private void init(CombinedDynamicRegistries<ServerDynamicRegistryType> combinedDynamicRegistries, RegistryWrapper.WrapperLookup wrapperLookup, FeatureFlagSet featureSet, CommandManager.RegistrationEnvironment registrationEnvironment, List list, int i, CallbackInfo ci) {
 		dynamicRegistryManager = combinedDynamicRegistries.getCombinedRegistryManager();
 	}
 

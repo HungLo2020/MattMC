@@ -22,7 +22,7 @@ import com.mojang.datafixers.DataFixer;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 
-import net.minecraft.datafixer.DataFixTypes;
+import net.minecraft.util.datafix.DataFixTypes;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.world.PersistentStateManager;
 

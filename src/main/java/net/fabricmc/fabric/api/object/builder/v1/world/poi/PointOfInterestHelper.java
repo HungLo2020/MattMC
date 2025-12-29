@@ -20,12 +20,12 @@ import java.util.Set;
 
 import com.google.common.collect.ImmutableSet;
 
-import net.minecraft.block.Block;
-import net.minecraft.block.BlockState;
-import net.minecraft.registry.Registries;
-import net.minecraft.registry.RegistryKey;
-import net.minecraft.registry.RegistryKeys;
-import net.minecraft.util.Identifier;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.BlockState;
+import net.minecraft.core.Registries;
+import net.minecraft.core.ResourceKey;
+import net.minecraft.core.RegistryKeys;
+import net.minecraft.server.packss.ResourceLocation;
 import net.minecraft.world.poi.PointOfInterest;
 import net.minecraft.world.poi.PointOfInterestType;
 import net.minecraft.world.poi.PointOfInterestTypes;
@@ -49,7 +49,7 @@ public final class PointOfInterestHelper {
 	 * @param blocks all the blocks where a {@link PointOfInterest} of this type will be present.
 	 * @return a new {@link PointOfInterestType}.
 	 */
-	public static PointOfInterestType register(Identifier id, int ticketCount, int searchDistance, Block... blocks) {
+	public static PointOfInterestType register(ResourceLocation id, int ticketCount, int searchDistance, Block... blocks) {
 		final ImmutableSet.Builder<BlockState> builder = ImmutableSet.builder();
 
 		for (Block block : blocks) {
@@ -68,7 +68,7 @@ public final class PointOfInterestHelper {
 	 * @param blocks all {@link BlockState block states} where a {@link PointOfInterest} of this type will be present
 	 * @return a new {@link PointOfInterestType}.
 	 */
-	public static PointOfInterestType register(Identifier id, int ticketCount, int searchDistance, Iterable<BlockState> blocks) {
+	public static PointOfInterestType register(ResourceLocation id, int ticketCount, int searchDistance, Iterable<BlockState> blocks) {
 		final ImmutableSet.Builder<BlockState> builder = ImmutableSet.builder();
 
 		return register(id, ticketCount, searchDistance, builder.addAll(blocks).build());
@@ -76,7 +76,7 @@ public final class PointOfInterestHelper {
 
 	// INTERNAL METHODS
 
-	private static PointOfInterestType register(Identifier id, int ticketCount, int searchDistance, Set<BlockState> states) {
-		return PointOfInterestTypes.register(Registries.POINT_OF_INTEREST_TYPE, RegistryKey.of(RegistryKeys.POINT_OF_INTEREST_TYPE, id), states, ticketCount, searchDistance);
+	private static PointOfInterestType register(ResourceLocation id, int ticketCount, int searchDistance, Set<BlockState> states) {
+		return PointOfInterestTypes.register(Registries.POINT_OF_INTEREST_TYPE, ResourceKey.of(RegistryKeys.POINT_OF_INTEREST_TYPE, id), states, ticketCount, searchDistance);
 	}
 }

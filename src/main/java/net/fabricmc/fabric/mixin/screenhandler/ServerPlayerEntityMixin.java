@@ -28,35 +28,35 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.network.packet.Packet;
-import net.minecraft.registry.Registries;
-import net.minecraft.screen.NamedScreenHandlerFactory;
-import net.minecraft.screen.ScreenHandler;
-import net.minecraft.screen.SimpleNamedScreenHandlerFactory;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.core.Registries;
+import net.minecraft.world.inventory.NamedScreenHandlerFactory;
+import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.world.inventory.SimpleNamedScreenHandlerFactory;
 import net.minecraft.server.network.ServerPlayNetworkHandler;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.util.Identifier;
-import net.minecraft.world.World;
+import net.minecraft.server.network.ServerPlayer;
+import net.minecraft.server.packss.ResourceLocation;
+import net.minecraft.world.Level;
 
 import net.fabricmc.fabric.api.screenhandler.v1.ExtendedScreenHandlerFactory;
 import net.fabricmc.fabric.api.screenhandler.v1.ExtendedScreenHandlerType;
 import net.fabricmc.fabric.impl.screenhandler.Networking;
 
-@Mixin(ServerPlayerEntity.class)
-public abstract class ServerPlayerEntityMixin extends PlayerEntity {
+@Mixin(ServerPlayer.class)
+public abstract class ServerPlayerEntityMixin extends Player {
 	@Shadow
 	private int screenHandlerSyncId;
 
-	private ServerPlayerEntityMixin(World world, GameProfile gameProfile) {
+	private ServerPlayerEntityMixin(Level world, GameProfile gameProfile) {
 		super(world, gameProfile);
 	}
 
 	@Shadow
 	public abstract void closeHandledScreen();
 
-	@Redirect(method = "openHandledScreen(Lnet/minecraft/screen/NamedScreenHandlerFactory;)Ljava/util/OptionalInt;", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/network/ServerPlayerEntity;closeHandledScreen()V"))
-	private void fabric_closeHandledScreenIfAllowed(ServerPlayerEntity player, NamedScreenHandlerFactory factory) {
+	@Redirect(method = "openHandledScreen(Lnet/minecraft/screen/NamedScreenHandlerFactory;)Ljava/util/OptionalInt;", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/network/ServerPlayer;closeHandledScreen()V"))
+	private void fabric_closeHandledScreenIfAllowed(ServerPlayer player, NamedScreenHandlerFactory factory) {
 		if (factory.shouldCloseCurrentScreen()) {
 			this.closeHandledScreen();
 		} else {
@@ -66,12 +66,12 @@ public abstract class ServerPlayerEntityMixin extends PlayerEntity {
 	}
 
 	@Inject(method = "openHandledScreen(Lnet/minecraft/screen/NamedScreenHandlerFactory;)Ljava/util/OptionalInt;", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/network/ServerPlayNetworkHandler;sendPacket(Lnet/minecraft/network/packet/Packet;)V"))
-	private void fabric_storeOpenedScreenHandler(NamedScreenHandlerFactory factory, CallbackInfoReturnable<OptionalInt> info, @Local ScreenHandler handler) {
+	private void fabric_storeOpenedScreenHandler(NamedScreenHandlerFactory factory, CallbackInfoReturnable<OptionalInt> info, @Local AbstractContainerMenu handler) {
 		if (factory instanceof ExtendedScreenHandlerFactory || (factory instanceof SimpleNamedScreenHandlerFactory simpleFactory && simpleFactory.baseFactory instanceof ExtendedScreenHandlerFactory)) {
 			// Set the screen handler, so the factory method can access it through the player.
 			currentScreenHandler = handler;
 		} else if (handler.getType() instanceof ExtendedScreenHandlerType<?, ?>) {
-			Identifier id = Registries.SCREEN_HANDLER.getId(handler.getType());
+			ResourceLocation id = Registries.SCREEN_HANDLER.getId(handler.getType());
 			throw new IllegalArgumentException("[Fabric] Extended screen handler " + id + " must be opened with an ExtendedScreenHandlerFactory!");
 		}
 	}
@@ -83,12 +83,12 @@ public abstract class ServerPlayerEntityMixin extends PlayerEntity {
 		}
 
 		if (factory instanceof ExtendedScreenHandlerFactory<?> extendedFactory) {
-			ScreenHandler handler = Objects.requireNonNull(currentScreenHandler);
+			AbstractContainerMenu handler = Objects.requireNonNull(currentScreenHandler);
 
 			if (handler.getType() instanceof ExtendedScreenHandlerType<?, ?>) {
-				Networking.sendOpenPacket((ServerPlayerEntity) (Object) this, extendedFactory, handler, screenHandlerSyncId);
+				Networking.sendOpenPacket((ServerPlayer) (Object) this, extendedFactory, handler, screenHandlerSyncId);
 			} else {
-				Identifier id = Registries.SCREEN_HANDLER.getId(handler.getType());
+				ResourceLocation id = Registries.SCREEN_HANDLER.getId(handler.getType());
 				throw new IllegalArgumentException("[Fabric] Non-extended screen handler " + id + " must not be opened with an ExtendedScreenHandlerFactory!");
 			}
 		} else {

@@ -16,7 +16,7 @@
 
 package net.fabricmc.fabric.api.resource;
 
-import net.minecraft.resource.SynchronousResourceReloader;
+import net.minecraft.server.packs.SynchronousResourceReloader;
 
 /**
  * A simplified version of the "resource reload listener" interface, hiding the

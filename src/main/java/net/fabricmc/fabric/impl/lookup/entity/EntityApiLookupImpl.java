@@ -29,13 +29,13 @@ import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.EntityType;
-import net.minecraft.entity.SpawnReason;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.SpawnReason;
 import net.minecraft.predicate.entity.EntityPredicates;
-import net.minecraft.registry.Registries;
+import net.minecraft.core.Registries;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.util.Identifier;
+import net.minecraft.server.packss.ResourceLocation;
 
 import net.fabricmc.fabric.api.lookup.v1.custom.ApiLookupMap;
 import net.fabricmc.fabric.api.lookup.v1.custom.ApiProviderMap;
@@ -47,20 +47,20 @@ public class EntityApiLookupImpl<A, C> implements EntityApiLookup<A, C> {
 	private static final Map<Class<?>, Set<EntityType<?>>> REGISTERED_SELVES = new HashMap<>();
 	private static boolean checkEntityLookup = true;
 
-	private final Identifier identifier;
+	private final ResourceLocation identifier;
 	private final Class<A> apiClass;
 	private final Class<C> contextClass;
 	private final ApiProviderMap<EntityType<?>, EntityApiProvider<A, C>> providerMap = ApiProviderMap.create();
 	private final List<EntityApiProvider<A, C>> fallbackProviders = new CopyOnWriteArrayList<>();
 
-	private EntityApiLookupImpl(Identifier identifier, Class<A> apiClass, Class<C> contextClass) {
+	private EntityApiLookupImpl(ResourceLocation identifier, Class<A> apiClass, Class<C> contextClass) {
 		this.identifier = identifier;
 		this.apiClass = apiClass;
 		this.contextClass = contextClass;
 	}
 
 	@SuppressWarnings("unchecked")
-	public static <A, C> EntityApiLookup<A, C> get(Identifier lookupId, Class<A> apiClass, Class<C> contextClass) {
+	public static <A, C> EntityApiLookup<A, C> get(ResourceLocation lookupId, Class<A> apiClass, Class<C> contextClass) {
 		return (EntityApiLookup<A, C>) LOOKUPS.getLookup(lookupId, apiClass, contextClass);
 	}
 
@@ -157,7 +157,7 @@ public class EntityApiLookupImpl<A, C> implements EntityApiLookup<A, C> {
 	}
 
 	@Override
-	public Identifier getId() {
+	public ResourceLocation getId() {
 		return identifier;
 	}
 

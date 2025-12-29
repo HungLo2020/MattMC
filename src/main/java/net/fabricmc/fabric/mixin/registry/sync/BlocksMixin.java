@@ -21,9 +21,9 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-import net.minecraft.block.BlockState;
-import net.minecraft.block.Blocks;
-import net.minecraft.registry.Registries;
+import net.minecraft.world.level.block.BlockState;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.core.Registries;
 
 import net.fabricmc.fabric.api.event.registry.RegistryEntryAddedCallback;
 

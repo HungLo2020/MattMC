@@ -22,12 +22,12 @@ import com.mojang.serialization.codecs.RecordCodecBuilder;
 
 import net.minecraft.component.ComponentChanges;
 import net.minecraft.component.MergedComponentMap;
-import net.minecraft.item.ItemStack;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.network.RegistryByteBuf;
 import net.minecraft.network.codec.PacketCodec;
 import net.minecraft.network.codec.PacketCodecs;
-import net.minecraft.registry.Registries;
-import net.minecraft.registry.RegistryKeys;
+import net.minecraft.core.Registries;
+import net.minecraft.core.RegistryKeys;
 
 import net.fabricmc.fabric.api.transfer.v1.fluid.FluidVariant;
 import net.fabricmc.fabric.api.transfer.v1.item.ItemVariant;

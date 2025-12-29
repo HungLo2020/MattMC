@@ -36,10 +36,10 @@ import org.spongepowered.asm.service.MixinService;
 import net.minecraft.component.ComponentType;
 import net.minecraft.component.DataComponentTypes;
 import net.minecraft.component.type.TooltipDisplayComponent;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.item.Item;
-import net.minecraft.item.ItemStack;
-import net.minecraft.item.tooltip.TooltipType;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.tooltip.TooltipType;
 
 import net.fabricmc.loader.api.FabricLoader;
 
@@ -66,7 +66,7 @@ public final class VanillaTooltipAppenderOrder {
 							Type.VOID_TYPE,
 							Type.getObjectType("net/minecraft/class_1792$class_9635"), // Item.TooltipContext
 							Type.getObjectType("net/minecraft/class_10712"), // TooltipDisplayComponent
-							Type.getObjectType("net/minecraft/class_1657"), // PlayerEntity
+							Type.getObjectType("net/minecraft/class_1657"), // Player
 							Type.getObjectType("net/minecraft/class_1836"), // TooltipType
 							Type.getType(Consumer.class)
 					)
@@ -75,7 +75,7 @@ public final class VanillaTooltipAppenderOrder {
 					Type.VOID_TYPE,
 					Type.getType(Item.TooltipContext.class),
 					Type.getType(TooltipDisplayComponent.class),
-					Type.getType(PlayerEntity.class),
+					Type.getType(Player.class),
 					Type.getType(TooltipType.class),
 					Type.getType(Consumer.class)
 			);
@@ -88,14 +88,14 @@ public final class VanillaTooltipAppenderOrder {
 							Type.VOID_TYPE,
 							Type.getType(Consumer.class),
 							Type.getObjectType("net/minecraft/class_10712"), // TooltipDisplayComponent
-							Type.getObjectType("net/minecraft/class_1657") // PlayerEntity
+							Type.getObjectType("net/minecraft/class_1657") // Player
 					)
 			);
 			String appendAttributeModifiersTooltipDesc = Type.getMethodDescriptor(
 					Type.VOID_TYPE,
 					Type.getType(Consumer.class),
 					Type.getType(TooltipDisplayComponent.class),
-					Type.getType(PlayerEntity.class)
+					Type.getType(Player.class)
 			);
 
 			MethodNode appendTooltipMethod = itemStackNode.methods.stream()

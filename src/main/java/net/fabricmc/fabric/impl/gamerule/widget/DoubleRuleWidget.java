@@ -18,13 +18,13 @@ package net.fabricmc.fabric.impl.gamerule.widget;
 
 import java.util.List;
 
-import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.world.EditGameRulesScreen;
 import net.minecraft.client.gui.widget.TextFieldWidget;
-import net.minecraft.screen.ScreenTexts;
-import net.minecraft.text.OrderedText;
-import net.minecraft.text.Text;
+import net.minecraft.world.inventory.ScreenTexts;
+import net.minecraft.network.chat.OrderedText;
+import net.minecraft.network.chat.Component;
 
 import net.fabricmc.fabric.api.gamerule.v1.rule.DoubleRule;
 import net.fabricmc.fabric.mixin.gamerule.client.EditGameRulesScreenAccessor;
@@ -32,11 +32,11 @@ import net.fabricmc.fabric.mixin.gamerule.client.EditGameRulesScreenAccessor;
 public final class DoubleRuleWidget extends EditGameRulesScreen.NamedRuleWidget {
 	private final TextFieldWidget textFieldWidget;
 
-	public DoubleRuleWidget(EditGameRulesScreen gameRuleScreen, Text name, List<OrderedText> description, final String ruleName, DoubleRule rule) {
+	public DoubleRuleWidget(EditGameRulesScreen gameRuleScreen, Component name, List<OrderedText> description, final String ruleName, DoubleRule rule) {
 		gameRuleScreen.super(description, name);
 		EditGameRulesScreenAccessor accessor = (EditGameRulesScreenAccessor) gameRuleScreen;
 
-		this.textFieldWidget = new TextFieldWidget(MinecraftClient.getInstance().textRenderer, 10, 5, 42, 20,
+		this.textFieldWidget = new TextFieldWidget(Minecraft.getInstance().textRenderer, 10, 5, 42, 20,
 				name.copy()
 				.append(ScreenTexts.LINE_BREAK)
 				.append(ruleName)

@@ -25,13 +25,13 @@ import it.unimi.dsi.fastutil.objects.Object2ReferenceOpenHashMap;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.util.math.BlockPos;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.core.BlockPos;
 
 import net.fabricmc.fabric.impl.lookup.block.BlockApiCacheImpl;
 import net.fabricmc.fabric.impl.lookup.block.ServerWorldCache;
 
-@Mixin(ServerWorld.class)
+@Mixin(ServerLevel.class)
 abstract class ServerWorldMixin implements ServerWorldCache {
 	@Unique
 	private final Map<BlockPos, List<WeakReference<BlockApiCacheImpl<?, ?>>>> apiLookupCaches = new Object2ReferenceOpenHashMap<>();

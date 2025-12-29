@@ -16,11 +16,11 @@
 
 package net.fabricmc.fabric.api.event.lifecycle.v1;
 
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.EquipmentSlot;
-import net.minecraft.entity.LivingEntity;
-import net.minecraft.item.ItemStack;
-import net.minecraft.server.world.ServerWorld;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.server.level.ServerLevel;
 
 import net.fabricmc.fabric.api.event.Event;
 import net.fabricmc.fabric.api.event.EventFactory;
@@ -30,7 +30,7 @@ public final class ServerEntityEvents {
 	}
 
 	/**
-	 * Called when an Entity is loaded into a ServerWorld.
+	 * Called when an Entity is loaded into a ServerLevel.
 	 *
 	 * <p>When this event is called, the entity is already in the world.
 	 */
@@ -41,7 +41,7 @@ public final class ServerEntityEvents {
 	});
 
 	/**
-	 * Called when an Entity is unloaded from a ServerWorld.
+	 * Called when an Entity is unloaded from a ServerLevel.
 	 *
 	 * <p>This event is called before the entity is removed from the world.
 	 */
@@ -65,12 +65,12 @@ public final class ServerEntityEvents {
 
 	@FunctionalInterface
 	public interface Load {
-		void onLoad(Entity entity, ServerWorld world);
+		void onLoad(Entity entity, ServerLevel world);
 	}
 
 	@FunctionalInterface
 	public interface Unload {
-		void onUnload(Entity entity, ServerWorld world);
+		void onUnload(Entity entity, ServerLevel world);
 	}
 
 	@FunctionalInterface

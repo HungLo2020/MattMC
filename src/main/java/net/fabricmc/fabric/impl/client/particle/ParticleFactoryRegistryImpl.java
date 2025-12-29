@@ -21,9 +21,9 @@ import java.util.Map;
 
 import net.minecraft.client.particle.ParticleFactory;
 import net.minecraft.client.particle.ParticleSpriteManager;
-import net.minecraft.particle.ParticleEffect;
-import net.minecraft.particle.ParticleType;
-import net.minecraft.registry.Registries;
+import net.minecraft.core.particles.ParticleEffect;
+import net.minecraft.core.particles.ParticleType;
+import net.minecraft.core.Registries;
 
 import net.fabricmc.fabric.api.client.particle.v1.ParticleFactoryRegistry;
 

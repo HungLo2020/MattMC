@@ -21,10 +21,10 @@ import java.util.List;
 
 import org.slf4j.Logger;
 
-import net.minecraft.block.entity.BlockEntity;
-import net.minecraft.registry.Registries;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.world.chunk.WorldChunk;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.core.Registries;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.chunk.WorldChunk;
 
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerBlockEntityEvents;
@@ -64,7 +64,7 @@ public final class ServerBlockEntityLifecycleTests implements ModInitializer {
 					logger.info("[SERVER] Tracked BlockEntities:" + this.serverBlockEntities.size() + " Ticked at: " + minecraftServer.getTicks() + "ticks");
 				}
 
-				for (ServerWorld world : minecraftServer.getWorlds()) {
+				for (ServerLevel world : minecraftServer.getWorlds()) {
 					int worldEntities = 0;
 
 					for (WorldChunk chunk : ((LoadedChunksCache) world).fabric_getLoadedChunks()) {

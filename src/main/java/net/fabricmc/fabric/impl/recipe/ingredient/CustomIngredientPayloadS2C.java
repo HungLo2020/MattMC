@@ -19,7 +19,7 @@ package net.fabricmc.fabric.impl.recipe.ingredient;
 import net.minecraft.network.PacketByteBuf;
 import net.minecraft.network.codec.PacketCodec;
 import net.minecraft.network.codec.PacketCodecs;
-import net.minecraft.network.packet.CustomPayload;
+import net.minecraft.network.protocol.CustomPayload;
 
 public record CustomIngredientPayloadS2C(int protocolVersion) implements CustomPayload {
 	public static final PacketCodec<PacketByteBuf, CustomIngredientPayloadS2C> CODEC = PacketCodec.tuple(

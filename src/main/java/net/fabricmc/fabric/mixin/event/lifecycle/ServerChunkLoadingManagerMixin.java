@@ -26,11 +26,11 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-import net.minecraft.server.world.ChunkHolder;
-import net.minecraft.server.world.ServerChunkLoadingManager;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.world.chunk.Chunk;
-import net.minecraft.world.chunk.WorldChunk;
+import net.minecraft.server.level.ChunkHolder;
+import net.minecraft.server.level.ServerChunkLoadingManager;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.chunk.Chunk;
+import net.minecraft.world.level.chunk.WorldChunk;
 
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerChunkEvents;
 
@@ -38,7 +38,7 @@ import net.fabricmc.fabric.api.event.lifecycle.v1.ServerChunkEvents;
 public abstract class ServerChunkLoadingManagerMixin {
 	@Shadow
 	@Final
-	ServerWorld world;
+	ServerLevel world;
 
 	/**
 	 * Injection is inside of tryUnloadChunk.

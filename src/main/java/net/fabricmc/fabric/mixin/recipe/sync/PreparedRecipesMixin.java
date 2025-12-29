@@ -32,9 +32,9 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-import net.minecraft.recipe.PreparedRecipes;
-import net.minecraft.recipe.RecipeEntry;
-import net.minecraft.recipe.RecipeSerializer;
+import net.minecraft.world.item.crafting.PreparedRecipes;
+import net.minecraft.world.item.crafting.RecipeEntry;
+import net.minecraft.world.item.crafting.RecipeSerializer;
 
 import net.fabricmc.fabric.impl.recipe.sync.RecipeSyncImpl;
 import net.fabricmc.fabric.impl.recipe.sync.SyncedSerializerAwarePreparedRecipe;

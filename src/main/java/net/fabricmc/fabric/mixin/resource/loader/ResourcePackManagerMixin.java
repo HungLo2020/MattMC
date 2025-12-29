@@ -36,12 +36,12 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-import net.minecraft.resource.FileResourcePackProvider;
-import net.minecraft.resource.ResourcePackManager;
-import net.minecraft.resource.ResourcePackProfile;
-import net.minecraft.resource.ResourcePackProvider;
-import net.minecraft.resource.ResourcePackSource;
-import net.minecraft.resource.ResourceType;
+import net.minecraft.server.packs.FileResourcePackProvider;
+import net.minecraft.server.packs.ResourcePackManager;
+import net.minecraft.server.packs.ResourcePackProfile;
+import net.minecraft.server.packs.ResourcePackProvider;
+import net.minecraft.server.packs.ResourcePackSource;
+import net.minecraft.server.packs.ResourceType;
 
 import net.fabricmc.fabric.impl.resource.loader.FabricResourcePackProfile;
 import net.fabricmc.fabric.impl.resource.loader.ModResourcePackCreator;

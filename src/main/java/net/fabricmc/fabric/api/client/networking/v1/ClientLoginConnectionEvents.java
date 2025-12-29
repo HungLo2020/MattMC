@@ -16,9 +16,9 @@
 
 package net.fabricmc.fabric.api.client.networking.v1;
 
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.network.ClientLoginNetworkHandler;
-import net.minecraft.util.Identifier;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.multiplayer.ClientLoginNetworkHandler;
+import net.minecraft.server.packss.ResourceLocation;
 
 import net.fabricmc.fabric.api.event.Event;
 import net.fabricmc.fabric.api.event.EventFactory;
@@ -32,7 +32,7 @@ public final class ClientLoginConnectionEvents {
 	 * This event may be used by mods to prepare their client side state.
 	 * This event does not guarantee that a login attempt will be successful.
 	 *
-	 * @see ClientLoginNetworking#registerReceiver(Identifier, ClientLoginNetworking.LoginQueryRequestHandler)
+	 * @see ClientLoginNetworking#registerReceiver(ResourceLocation, ClientLoginNetworking.LoginQueryRequestHandler)
 	 */
 	public static final Event<Init> INIT = EventFactory.createArrayBacked(Init.class, callbacks -> (handler, client) -> {
 		for (Init callback : callbacks) {
@@ -79,7 +79,7 @@ public final class ClientLoginConnectionEvents {
 	 */
 	@FunctionalInterface
 	public interface Init {
-		void onLoginStart(ClientLoginNetworkHandler handler, MinecraftClient client);
+		void onLoginStart(ClientLoginNetworkHandler handler, Minecraft client);
 	}
 
 	/**
@@ -87,7 +87,7 @@ public final class ClientLoginConnectionEvents {
 	 */
 	@FunctionalInterface
 	public interface QueryStart {
-		void onLoginQueryStart(ClientLoginNetworkHandler handler, MinecraftClient client);
+		void onLoginQueryStart(ClientLoginNetworkHandler handler, Minecraft client);
 	}
 
 	/**
@@ -95,6 +95,6 @@ public final class ClientLoginConnectionEvents {
 	 */
 	@FunctionalInterface
 	public interface Disconnect {
-		void onLoginDisconnect(ClientLoginNetworkHandler handler, MinecraftClient client);
+		void onLoginDisconnect(ClientLoginNetworkHandler handler, Minecraft client);
 	}
 }

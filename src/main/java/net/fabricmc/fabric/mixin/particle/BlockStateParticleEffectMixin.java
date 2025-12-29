@@ -24,8 +24,8 @@ import org.spongepowered.asm.mixin.injection.At;
 
 import net.minecraft.network.RegistryByteBuf;
 import net.minecraft.network.codec.PacketCodec;
-import net.minecraft.particle.BlockStateParticleEffect;
-import net.minecraft.util.math.BlockPos;
+import net.minecraft.core.particles.BlockStateParticleEffect;
+import net.minecraft.core.BlockPos;
 
 import net.fabricmc.fabric.api.particle.v1.FabricBlockStateParticleEffect;
 import net.fabricmc.fabric.impl.particle.BlockStateParticleEffectExtension;

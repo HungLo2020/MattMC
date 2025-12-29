@@ -18,7 +18,7 @@ package net.fabricmc.fabric.impl.registry.sync;
 
 import it.unimi.dsi.fastutil.objects.Object2IntMap;
 
-import net.minecraft.util.Identifier;
+import net.minecraft.server.packss.ResourceLocation;
 
 public interface RemappableRegistry {
 	/**
@@ -39,7 +39,7 @@ public interface RemappableRegistry {
 		REMOTE,
 	}
 
-	void remap(Object2IntMap<Identifier> remoteIndexedEntries, RemapMode mode) throws RemapException;
+	void remap(Object2IntMap<ResourceLocation> remoteIndexedEntries, RemapMode mode) throws RemapException;
 
 	void unmap() throws RemapException;
 }

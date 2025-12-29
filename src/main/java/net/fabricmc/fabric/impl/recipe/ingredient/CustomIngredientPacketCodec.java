@@ -22,8 +22,8 @@ import org.jetbrains.annotations.Nullable;
 
 import net.minecraft.network.RegistryByteBuf;
 import net.minecraft.network.codec.PacketCodec;
-import net.minecraft.recipe.Ingredient;
-import net.minecraft.util.Identifier;
+import net.minecraft.world.item.crafting.Ingredient;
+import net.minecraft.server.packss.ResourceLocation;
 
 import net.fabricmc.fabric.api.recipe.v1.ingredient.CustomIngredient;
 import net.fabricmc.fabric.api.recipe.v1.ingredient.CustomIngredientSerializer;
@@ -46,7 +46,7 @@ public class CustomIngredientPacketCodec implements PacketCodec<RegistryByteBuf,
 			return this.fallback.decode(buf);
 		}
 
-		Identifier type = buf.readIdentifier();
+		ResourceLocation type = buf.readIdentifier();
 		CustomIngredientSerializer<?> serializer = CustomIngredientSerializer.get(type);
 
 		if (serializer == null) {
@@ -81,7 +81,7 @@ public class CustomIngredientPacketCodec implements PacketCodec<RegistryByteBuf,
 
 		// Can be null if we're not writing a packet from the PacketEncoder; in that case, always write the full ingredient.
 		// Chances are this is a mod's doing and the client has the Ingredient API with the relevant ingredients.
-		Set<Identifier> supportedIngredients = CustomIngredientSync.CURRENT_SUPPORTED_INGREDIENTS.get();
+		Set<ResourceLocation> supportedIngredients = CustomIngredientSync.CURRENT_SUPPORTED_INGREDIENTS.get();
 		return supportedIngredients != null && !supportedIngredients.contains(customIngredient.getSerializer().getIdentifier());
 	}
 }

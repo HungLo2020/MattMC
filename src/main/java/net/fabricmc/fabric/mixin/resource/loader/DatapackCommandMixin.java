@@ -33,11 +33,11 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-import net.minecraft.resource.ResourcePackManager;
-import net.minecraft.resource.ResourcePackProfile;
+import net.minecraft.server.packs.ResourcePackManager;
+import net.minecraft.server.packs.ResourcePackProfile;
 import net.minecraft.server.command.DatapackCommand;
 import net.minecraft.server.command.ServerCommandSource;
-import net.minecraft.text.Text;
+import net.minecraft.network.chat.Component;
 
 import net.fabricmc.fabric.impl.resource.loader.FabricResourcePackProfile;
 
@@ -49,7 +49,7 @@ import net.fabricmc.fabric.impl.resource.loader.FabricResourcePackProfile;
 public class DatapackCommandMixin {
 	@Unique
 	private static final DynamicCommandExceptionType INTERNAL_PACK_EXCEPTION = new DynamicCommandExceptionType(
-			packName -> Text.stringifiedTranslatable("commands.datapack.fabric.internal", packName));
+			packName -> Component.stringifiedTranslatable("commands.datapack.fabric.internal", packName));
 
 	@Redirect(method = "method_13136", at = @At(value = "INVOKE", target = "Lnet/minecraft/resource/ResourcePackManager;getEnabledIds()Ljava/util/Collection;"))
 	private static Collection<String> filterEnabledPackSuggestions(ResourcePackManager dataPackManager) {

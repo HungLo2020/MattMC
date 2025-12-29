@@ -16,9 +16,9 @@
 
 package net.fabricmc.fabric.api.client.particle.v1;
 
-import net.minecraft.block.BlockState;
-import net.minecraft.client.world.ClientWorld;
-import net.minecraft.util.math.BlockPos;
+import net.minecraft.world.level.block.BlockState;
+import net.minecraft.client.multiplayer.ClientLevel;
+import net.minecraft.core.BlockPos;
 
 import net.fabricmc.fabric.api.event.Event;
 import net.fabricmc.fabric.api.event.EventFactory;
@@ -58,6 +58,6 @@ public final class ParticleRenderEvents {
 		 * @param pos   the position of the particle
 		 * @return {@code true} if color provider tinting should be allowed, {@code false} otherwise
 		 */
-		boolean allowBlockDustTint(BlockState state, ClientWorld world, BlockPos pos);
+		boolean allowBlockDustTint(BlockState state, ClientLevel world, BlockPos pos);
 	}
 }

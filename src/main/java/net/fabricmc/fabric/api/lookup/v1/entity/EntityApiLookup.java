@@ -21,9 +21,9 @@ import java.util.function.BiFunction;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.Nullable;
 
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.EntityType;
-import net.minecraft.util.Identifier;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.server.packss.ResourceLocation;
 
 import net.fabricmc.fabric.impl.lookup.entity.EntityApiLookupImpl;
 
@@ -45,7 +45,7 @@ import net.fabricmc.fabric.impl.lookup.entity.EntityApiLookupImpl;
  * <p>We need to create the EntityApiLookup. We don't need any context so we use {@link Void}.
  * <pre>{@code
  * public class MyApi {
- *     public static final EntityApiLookup<Leveled, Void> LEVELED_ENTITY = EntityApiLookup.get(Identifier.of("mymod", "leveled_entity"), Leveled.class, Void.class);
+ *     public static final EntityApiLookup<Leveled, Void> LEVELED_ENTITY = EntityApiLookup.get(ResourceLocation.of("mymod", "leveled_entity"), Leveled.class, Void.class);
  * }
  * }</pre>
  *
@@ -93,7 +93,7 @@ public interface EntityApiLookup<A, C> {
 	 * @return the unique lookup with the passed lookupId.
 	 * @throws IllegalArgumentException If another {@code apiClass} or another {@code contextClass} was already registered with the same identifier.
 	 */
-	static <A, C> EntityApiLookup<A, C> get(Identifier lookupId, Class<A> apiClass, Class<C> contextClass) {
+	static <A, C> EntityApiLookup<A, C> get(ResourceLocation lookupId, Class<A> apiClass, Class<C> contextClass) {
 		return EntityApiLookupImpl.get(lookupId, apiClass, contextClass);
 	}
 
@@ -149,7 +149,7 @@ public interface EntityApiLookup<A, C> {
 	/**
 	 * Return the identifier of this lookup.
 	 */
-	Identifier getId();
+	ResourceLocation getId();
 
 	/**
 	 * Returns the API class of this lookup.

@@ -22,7 +22,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-import net.minecraft.registry.Registries;
+import net.minecraft.core.Registries;
 
 @Mixin(Registries.class)
 public class RegistriesMixin {

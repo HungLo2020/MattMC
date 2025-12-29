@@ -22,12 +22,12 @@ import java.util.Objects;
 
 import net.minecraft.network.ClientConnection;
 import net.minecraft.network.NetworkPhase;
-import net.minecraft.network.packet.CustomPayload;
-import net.minecraft.network.packet.Packet;
+import net.minecraft.network.protocol.CustomPayload;
+import net.minecraft.network.protocol.Packet;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.network.ServerPlayNetworkHandler;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.util.Identifier;
+import net.minecraft.server.network.ServerPlayer;
+import net.minecraft.server.packss.ResourceLocation;
 
 import net.fabricmc.fabric.api.networking.v1.PacketSender;
 import net.fabricmc.fabric.api.networking.v1.S2CPlayChannelEvents;
@@ -91,17 +91,17 @@ public final class ServerPlayNetworkAddon extends AbstractChanneledNetworkAddon<
 	}
 
 	@Override
-	protected void invokeRegisterEvent(List<Identifier> ids) {
+	protected void invokeRegisterEvent(List<ResourceLocation> ids) {
 		S2CPlayChannelEvents.REGISTER.invoker().onChannelRegister(this.handler, this, this.server, ids);
 	}
 
 	@Override
-	protected void invokeUnregisterEvent(List<Identifier> ids) {
+	protected void invokeUnregisterEvent(List<ResourceLocation> ids) {
 		S2CPlayChannelEvents.UNREGISTER.invoker().onChannelUnregister(this.handler, this, this.server, ids);
 	}
 
 	@Override
-	protected void handleRegistration(Identifier channelName) {
+	protected void handleRegistration(ResourceLocation channelName) {
 		// If we can already send packets, immediately send the register packet for this channel
 		if (this.sentInitialRegisterPacket) {
 			RegistrationPayload registrationPayload = this.createRegistrationPayload(RegistrationPayload.REGISTER, Collections.singleton(channelName));
@@ -113,7 +113,7 @@ public final class ServerPlayNetworkAddon extends AbstractChanneledNetworkAddon<
 	}
 
 	@Override
-	protected void handleUnregistration(Identifier channelName) {
+	protected void handleUnregistration(ResourceLocation channelName) {
 		// If we can already send packets, immediately send the unregister packet for this channel
 		if (this.sentInitialRegisterPacket) {
 			RegistrationPayload registrationPayload = this.createRegistrationPayload(RegistrationPayload.UNREGISTER, Collections.singleton(channelName));
@@ -130,7 +130,7 @@ public final class ServerPlayNetworkAddon extends AbstractChanneledNetworkAddon<
 	}
 
 	@Override
-	protected boolean isReservedChannel(Identifier channelName) {
+	protected boolean isReservedChannel(ResourceLocation channelName) {
 		return NetworkingImpl.isReservedCommonChannel(channelName);
 	}
 
@@ -155,7 +155,7 @@ public final class ServerPlayNetworkAddon extends AbstractChanneledNetworkAddon<
 		}
 
 		@Override
-		public ServerPlayerEntity player() {
+		public ServerPlayer player() {
 			return handler.getPlayer();
 		}
 	}

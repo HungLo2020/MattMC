@@ -27,7 +27,7 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Redirect;
 
-import net.minecraft.datafixer.schema.Schema2832;
+import net.minecraft.util.datafix.schema.Schema2832;
 
 import net.fabricmc.fabric.impl.dimension.TaggedChoiceExtension;
 

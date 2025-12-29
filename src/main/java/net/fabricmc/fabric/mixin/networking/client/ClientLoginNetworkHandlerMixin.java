@@ -24,10 +24,10 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.network.ClientLoginNetworkHandler;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.multiplayer.ClientLoginNetworkHandler;
 import net.minecraft.network.ClientConnection;
-import net.minecraft.network.packet.s2c.login.LoginQueryRequestS2CPacket;
+import net.minecraft.network.protocol.s2c.login.LoginQueryRequestS2CPacket;
 
 import net.fabricmc.fabric.impl.networking.NetworkHandlerExtensions;
 import net.fabricmc.fabric.impl.networking.client.ClientLoginNetworkAddon;
@@ -37,7 +37,7 @@ import net.fabricmc.fabric.impl.networking.payload.PacketByteBufLoginQueryReques
 abstract class ClientLoginNetworkHandlerMixin implements NetworkHandlerExtensions {
 	@Shadow
 	@Final
-	private MinecraftClient client;
+	private Minecraft client;
 
 	@Shadow
 	@Final

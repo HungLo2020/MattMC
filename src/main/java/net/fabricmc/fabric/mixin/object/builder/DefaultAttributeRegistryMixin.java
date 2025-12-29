@@ -27,10 +27,10 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-import net.minecraft.entity.EntityType;
-import net.minecraft.entity.LivingEntity;
-import net.minecraft.entity.attribute.DefaultAttributeContainer;
-import net.minecraft.entity.attribute.DefaultAttributeRegistry;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.attribute.DefaultAttributeContainer;
+import net.minecraft.world.entity.attribute.DefaultAttributeRegistry;
 
 @Mixin(DefaultAttributeRegistry.class)
 public abstract class DefaultAttributeRegistryMixin {

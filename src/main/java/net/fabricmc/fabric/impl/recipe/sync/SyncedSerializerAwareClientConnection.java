@@ -19,7 +19,7 @@ package net.fabricmc.fabric.impl.recipe.sync;
 import java.util.Set;
 
 import net.minecraft.network.ClientConnection;
-import net.minecraft.recipe.RecipeSerializer;
+import net.minecraft.world.item.crafting.RecipeSerializer;
 
 /**
  * Implemented on {@link ClientConnection} to store which recipe serializers should be synced to client.

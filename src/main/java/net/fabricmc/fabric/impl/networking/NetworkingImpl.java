@@ -21,8 +21,8 @@ import org.slf4j.LoggerFactory;
 
 import net.minecraft.network.PacketByteBuf;
 import net.minecraft.network.codec.PacketCodec;
-import net.minecraft.network.packet.CustomPayload;
-import net.minecraft.util.Identifier;
+import net.minecraft.network.protocol.CustomPayload;
+import net.minecraft.server.packss.ResourceLocation;
 
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.fabricmc.fabric.impl.networking.splitter.FabricSplitPacketPayload;
@@ -34,14 +34,14 @@ public final class NetworkingImpl {
 	/**
 	 * Id of packet used to register supported channels.
 	 */
-	public static final Identifier REGISTER_CHANNEL = Identifier.ofVanilla("register");
+	public static final ResourceLocation REGISTER_CHANNEL = ResourceLocation.ofVanilla("register");
 
 	/**
 	 * Id of packet used to unregister supported channels.
 	 */
-	public static final Identifier UNREGISTER_CHANNEL = Identifier.ofVanilla("unregister");
+	public static final ResourceLocation UNREGISTER_CHANNEL = ResourceLocation.ofVanilla("unregister");
 
-	public static boolean isReservedCommonChannel(Identifier channelName) {
+	public static boolean isReservedCommonChannel(ResourceLocation channelName) {
 		return channelName.equals(REGISTER_CHANNEL) || channelName.equals(UNREGISTER_CHANNEL);
 	}
 

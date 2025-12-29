@@ -21,13 +21,13 @@ import java.util.function.BiFunction;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.Nullable;
 
-import net.minecraft.block.Block;
-import net.minecraft.block.BlockState;
-import net.minecraft.block.entity.BlockEntity;
-import net.minecraft.block.entity.BlockEntityType;
-import net.minecraft.util.Identifier;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.world.World;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.BlockState;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.entity.BlockEntityType;
+import net.minecraft.server.packss.ResourceLocation;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.Level;
 
 import net.fabricmc.fabric.impl.lookup.block.BlockApiLookupImpl;
 
@@ -51,7 +51,7 @@ import net.fabricmc.fabric.impl.lookup.block.BlockApiLookupImpl;
  *
  * <pre>{@code
  * public final class MyApi {
- *     public static final BlockApiLookup<FluidContainer, Direction> FLUID_CONTAINER = BlockApiLookup.get(Identifier.of("mymod", "fluid_container"), FluidContainer.class, Direction.class);
+ *     public static final BlockApiLookup<FluidContainer, Direction> FLUID_CONTAINER = BlockApiLookup.get(ResourceLocation.of("mymod", "fluid_container"), FluidContainer.class, Direction.class);
  * }}</pre>
  * Using that, we can query instances of {@code FluidContainer}:
  *
@@ -149,7 +149,7 @@ public interface BlockApiLookup<A, C> {
 	 * @return The unique lookup with the passed lookupId.
 	 * @throws IllegalArgumentException If another {@code apiClass} or another {@code contextClass} was already registered with the same identifier.
 	 */
-	static <A, C> BlockApiLookup<A, C> get(Identifier lookupId, Class<A> apiClass, Class<C> contextClass) {
+	static <A, C> BlockApiLookup<A, C> get(ResourceLocation lookupId, Class<A> apiClass, Class<C> contextClass) {
 		return BlockApiLookupImpl.get(lookupId, apiClass, contextClass);
 	}
 
@@ -157,7 +157,7 @@ public interface BlockApiLookup<A, C> {
 	 * Attempt to retrieve an API from a block in the world.
 	 * Consider using {@link BlockApiCache} if you are doing frequent queries at the same position.
 	 *
-	 * <p>Note: If the block state or the block entity is known, it is more efficient to use {@link BlockApiLookup#find(World, BlockPos, BlockState, BlockEntity, Object)}.
+	 * <p>Note: If the block state or the block entity is known, it is more efficient to use {@link BlockApiLookup#find(Level, BlockPos, BlockState, BlockEntity, Object)}.
 	 *
 	 * @param world The world.
 	 * @param pos The position of the block.
@@ -165,7 +165,7 @@ public interface BlockApiLookup<A, C> {
 	 * @return The retrieved API, or {@code null} if no API was found.
 	 */
 	@Nullable
-	default A find(World world, BlockPos pos, C context) {
+	default A find(Level world, BlockPos pos, C context) {
 		return find(world, pos, null, null, context);
 	}
 
@@ -181,7 +181,7 @@ public interface BlockApiLookup<A, C> {
 	 * @return The retrieved API, or {@code null} if no API was found.
 	 */
 	@Nullable
-	A find(World world, BlockPos pos, @Nullable BlockState state, @Nullable BlockEntity blockEntity, C context);
+	A find(Level world, BlockPos pos, @Nullable BlockState state, @Nullable BlockEntity blockEntity, C context);
 
 	/**
 	 * Expose the API for the passed block entities directly implementing it.
@@ -247,7 +247,7 @@ public interface BlockApiLookup<A, C> {
 	/**
 	 * Return the identifier of this lookup.
 	 */
-	Identifier getId();
+	ResourceLocation getId();
 
 	/**
 	 * Return the API class of this lookup.
@@ -279,7 +279,7 @@ public interface BlockApiLookup<A, C> {
 		 * @return An API of type {@code A}, or {@code null} if no API is available.
 		 */
 		@Nullable
-		A find(World world, BlockPos pos, BlockState state, @Nullable BlockEntity blockEntity, C context);
+		A find(Level world, BlockPos pos, BlockState state, @Nullable BlockEntity blockEntity, C context);
 	}
 
 	@FunctionalInterface

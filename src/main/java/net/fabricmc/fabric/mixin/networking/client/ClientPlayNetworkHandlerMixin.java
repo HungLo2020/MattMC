@@ -22,12 +22,12 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.network.ClientCommonNetworkHandler;
-import net.minecraft.client.network.ClientConnectionState;
-import net.minecraft.client.network.ClientPlayNetworkHandler;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.multiplayer.ClientCommonNetworkHandler;
+import net.minecraft.client.multiplayer.ClientConnectionState;
+import net.minecraft.client.multiplayer.ClientPlayNetworkHandler;
 import net.minecraft.network.ClientConnection;
-import net.minecraft.network.packet.s2c.play.GameJoinS2CPacket;
+import net.minecraft.network.protocol.s2c.play.GameJoinS2CPacket;
 
 import net.fabricmc.fabric.impl.networking.NetworkHandlerExtensions;
 import net.fabricmc.fabric.impl.networking.client.ClientNetworkingImpl;
@@ -39,7 +39,7 @@ abstract class ClientPlayNetworkHandlerMixin extends ClientCommonNetworkHandler 
 	@Unique
 	private ClientPlayNetworkAddon addon;
 
-	protected ClientPlayNetworkHandlerMixin(MinecraftClient client, ClientConnection connection, ClientConnectionState connectionState) {
+	protected ClientPlayNetworkHandlerMixin(Minecraft client, ClientConnection connection, ClientConnectionState connectionState) {
 		super(client, connection, connectionState);
 	}
 

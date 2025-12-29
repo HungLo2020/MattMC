@@ -23,9 +23,9 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-import net.minecraft.block.entity.ChiseledBookshelfBlockEntity;
-import net.minecraft.inventory.Inventory;
-import net.minecraft.item.ItemStack;
+import net.minecraft.world.level.block.entity.ChiseledBookshelfBlockEntity;
+import net.minecraft.world.item.inventory.Inventory;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.util.collection.DefaultedList;
 
 import net.fabricmc.fabric.api.transfer.v1.transaction.TransactionContext;

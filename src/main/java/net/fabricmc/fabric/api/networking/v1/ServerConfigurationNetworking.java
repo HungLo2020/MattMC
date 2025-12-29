@@ -23,11 +23,11 @@ import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.Nullable;
 
 import net.minecraft.network.listener.ClientCommonPacketListener;
-import net.minecraft.network.packet.CustomPayload;
-import net.minecraft.network.packet.Packet;
+import net.minecraft.network.protocol.CustomPayload;
+import net.minecraft.network.protocol.Packet;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.network.ServerConfigurationNetworkHandler;
-import net.minecraft.util.Identifier;
+import net.minecraft.server.packss.ResourceLocation;
 import net.minecraft.util.thread.ThreadExecutor;
 
 import net.fabricmc.fabric.impl.networking.server.ServerNetworkingImpl;
@@ -56,13 +56,13 @@ public final class ServerConfigurationNetworking {
 	 * A global receiver is registered to all connections, in the present and future.
 	 *
 	 * <p>If a handler is already registered for the {@code type}, this method will return {@code false}, and no change will be made.
-	 * Use {@link #unregisterReceiver(ServerConfigurationNetworkHandler, Identifier)} to unregister the existing handler.
+	 * Use {@link #unregisterReceiver(ServerConfigurationNetworkHandler, ResourceLocation)} to unregister the existing handler.
 	 *
 	 * @param type the packet type
 	 * @param handler the handler
 	 * @return {@code false} if a handler is already registered to the channel
 	 * @throws IllegalArgumentException if the codec for {@code type} has not been {@linkplain PayloadTypeRegistry#configurationC2S() registered} yet
-	 * @see ServerConfigurationNetworking#unregisterGlobalReceiver(Identifier)
+	 * @see ServerConfigurationNetworking#unregisterGlobalReceiver(ResourceLocation)
 	 * @see ServerConfigurationNetworking#registerReceiver(ServerConfigurationNetworkHandler, CustomPayload.Id, ConfigurationPacketHandler)
 	 */
 	public static <T extends CustomPayload> boolean registerGlobalReceiver(CustomPayload.Id<T> type, ConfigurationPacketHandler<T> handler) {
@@ -79,10 +79,10 @@ public final class ServerConfigurationNetworking {
 	 * @return the previous handler, or {@code null} if no handler was bound to the channel,
 	 * or it was not registered using {@link #registerGlobalReceiver(CustomPayload.Id, ConfigurationPacketHandler)}
 	 * @see ServerConfigurationNetworking#registerGlobalReceiver(CustomPayload.Id, ConfigurationPacketHandler)
-	 * @see ServerConfigurationNetworking#unregisterReceiver(ServerConfigurationNetworkHandler, Identifier)
+	 * @see ServerConfigurationNetworking#unregisterReceiver(ServerConfigurationNetworkHandler, ResourceLocation)
 	 */
 	@Nullable
-	public static ServerConfigurationNetworking.ConfigurationPacketHandler<?> unregisterGlobalReceiver(Identifier id) {
+	public static ServerConfigurationNetworking.ConfigurationPacketHandler<?> unregisterGlobalReceiver(ResourceLocation id) {
 		return ServerNetworkingImpl.CONFIGURATION.unregisterGlobalReceiver(id);
 	}
 
@@ -92,7 +92,7 @@ public final class ServerConfigurationNetworking {
 	 *
 	 * @return all channel names which global receivers are registered for.
 	 */
-	public static Set<Identifier> getGlobalReceivers() {
+	public static Set<ResourceLocation> getGlobalReceivers() {
 		return ServerNetworkingImpl.CONFIGURATION.getChannels();
 	}
 
@@ -102,7 +102,7 @@ public final class ServerConfigurationNetworking {
 	 * the channel handler will only be applied to the client represented by the {@link ServerConfigurationNetworkHandler}.
 	 *
 	 * <p>If a handler is already registered for the {@code type}, this method will return {@code false}, and no change will be made.
-	 * Use {@link #unregisterReceiver(ServerConfigurationNetworkHandler, Identifier)} to unregister the existing handler.
+	 * Use {@link #unregisterReceiver(ServerConfigurationNetworkHandler, ResourceLocation)} to unregister the existing handler.
 	 *
 	 * @param networkHandler the network handler
 	 * @param type the packet type
@@ -125,7 +125,7 @@ public final class ServerConfigurationNetworking {
 	 * or it was not registered using {@link #registerReceiver(ServerConfigurationNetworkHandler, CustomPayload.Id, ConfigurationPacketHandler)}
 	 */
 	@Nullable
-	public static ServerConfigurationNetworking.ConfigurationPacketHandler<?> unregisterReceiver(ServerConfigurationNetworkHandler networkHandler, Identifier id) {
+	public static ServerConfigurationNetworking.ConfigurationPacketHandler<?> unregisterReceiver(ServerConfigurationNetworkHandler networkHandler, ResourceLocation id) {
 		return ServerNetworkingImpl.getAddon(networkHandler).unregisterChannel(id);
 	}
 
@@ -135,7 +135,7 @@ public final class ServerConfigurationNetworking {
 	 * @param handler the network handler
 	 * @return All the channel names that the server can receive packets on
 	 */
-	public static Set<Identifier> getReceived(ServerConfigurationNetworkHandler handler) {
+	public static Set<ResourceLocation> getReceived(ServerConfigurationNetworkHandler handler) {
 		Objects.requireNonNull(handler, "Server configuration network handler cannot be null");
 
 		return ServerNetworkingImpl.getAddon(handler).getReceivableChannels();
@@ -147,7 +147,7 @@ public final class ServerConfigurationNetworking {
 	 * @param handler the network handler
 	 * @return {@code true} if the connected client has declared the ability to receive a packet on the specified channel
 	 */
-	public static Set<Identifier> getSendable(ServerConfigurationNetworkHandler handler) {
+	public static Set<ResourceLocation> getSendable(ServerConfigurationNetworkHandler handler) {
 		Objects.requireNonNull(handler, "Server configuration network handler cannot be null");
 
 		return ServerNetworkingImpl.getAddon(handler).getSendableChannels();
@@ -160,7 +160,7 @@ public final class ServerConfigurationNetworking {
 	 * @param channelName the channel name
 	 * @return {@code true} if the connected client has declared the ability to receive a packet on the specified channel
 	 */
-	public static boolean canSend(ServerConfigurationNetworkHandler handler, Identifier channelName) {
+	public static boolean canSend(ServerConfigurationNetworkHandler handler, ResourceLocation channelName) {
 		Objects.requireNonNull(handler, "Server configuration network handler cannot be null");
 		Objects.requireNonNull(channelName, "Channel name cannot be null");
 

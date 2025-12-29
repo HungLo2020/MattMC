@@ -21,15 +21,15 @@ import java.util.Set;
 import net.minecraft.network.PacketByteBuf;
 import net.minecraft.network.RegistryByteBuf;
 import net.minecraft.network.codec.PacketCodec;
-import net.minecraft.network.packet.CustomPayload;
-import net.minecraft.util.Identifier;
+import net.minecraft.network.protocol.CustomPayload;
+import net.minecraft.server.packss.ResourceLocation;
 
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.fabricmc.fabric.impl.networking.FabricRegistryByteBuf;
 
 public class ExtendedBlockStateParticleEffectSync implements ModInitializer {
-	private static final Identifier PACKET_ID = Identifier.of("fabric", "extended_block_state_particle_effect_sync");
+	private static final ResourceLocation PACKET_ID = ResourceLocation.of("fabric", "extended_block_state_particle_effect_sync");
 
 	@Override
 	public void onInitialize() {
@@ -37,7 +37,7 @@ public class ExtendedBlockStateParticleEffectSync implements ModInitializer {
 	}
 
 	public static boolean shouldEncodeFallback(RegistryByteBuf buf) {
-		Set<Identifier> channels = ((FabricRegistryByteBuf) buf).fabric_getSendableConfigurationChannels();
+		Set<ResourceLocation> channels = ((FabricRegistryByteBuf) buf).fabric_getSendableConfigurationChannels();
 
 		if (channels == null) {
 			return true;

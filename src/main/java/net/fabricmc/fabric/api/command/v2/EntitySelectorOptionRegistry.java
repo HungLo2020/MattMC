@@ -20,8 +20,8 @@ import java.util.function.Predicate;
 
 import net.minecraft.command.EntitySelectorOptions;
 import net.minecraft.command.EntitySelectorReader;
-import net.minecraft.text.Text;
-import net.minecraft.util.Identifier;
+import net.minecraft.network.chat.Component;
+import net.minecraft.server.packss.ResourceLocation;
 
 import net.fabricmc.fabric.mixin.command.EntitySelectorOptionsAccessor;
 
@@ -40,8 +40,8 @@ public final class EntitySelectorOptionRegistry {
 	 * {@code example_min_health} and can be used like {@code @e[example_min_health=5]}.
 	 * <pre>{@code
 	 * EntitySelectorOptionRegistry.register(
-	 * 	Identifier.of("example", "min_health"),
-	 * 	Text.literal("Minimum entity health"),
+	 * 	ResourceLocation.of("example", "min_health"),
+	 * 	Component.literal("Minimum entity health"),
 	 * 	(reader) -> {
 	 * 	    final float minHealth = reader.getReader().readFloat();
 	 *
@@ -63,7 +63,7 @@ public final class EntitySelectorOptionRegistry {
 	 * @param handler the handler for the entity option that reads and sets the predicate
 	 * @param canUse the predicate that checks whether the option is syntactically valid
 	 */
-	public static void register(Identifier id, Text description, EntitySelectorOptions.SelectorHandler handler, Predicate<EntitySelectorReader> canUse) {
+	public static void register(ResourceLocation id, Component description, EntitySelectorOptions.SelectorHandler handler, Predicate<EntitySelectorReader> canUse) {
 		EntitySelectorOptionsAccessor.callPutOption(id.toUnderscoreSeparatedString(), handler, canUse, description);
 	}
 
@@ -75,7 +75,7 @@ public final class EntitySelectorOptionRegistry {
 	 * @param description the description of the option
 	 * @param handler the handler for the entity option that reads and sets the predicate
 	 */
-	public static void registerNonRepeatable(Identifier id, Text description, EntitySelectorOptions.SelectorHandler handler) {
+	public static void registerNonRepeatable(ResourceLocation id, Component description, EntitySelectorOptions.SelectorHandler handler) {
 		register(id, description, (reader) -> {
 			handler.handle(reader);
 			reader.setCustomFlag(id, true);

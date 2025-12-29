@@ -21,13 +21,13 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-import net.minecraft.block.BlockState;
-import net.minecraft.block.DispenserBlock;
-import net.minecraft.block.DropperBlock;
-import net.minecraft.block.entity.DispenserBlockEntity;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Direction;
+import net.minecraft.world.level.block.BlockState;
+import net.minecraft.world.level.block.DispenserBlock;
+import net.minecraft.world.level.block.DropperBlock;
+import net.minecraft.world.level.block.entity.DispenserBlockEntity;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 
 import net.fabricmc.fabric.api.transfer.v1.item.InventoryStorage;
 import net.fabricmc.fabric.api.transfer.v1.item.ItemStorage;
@@ -50,7 +50,7 @@ public class DropperBlockMixin {
 			cancellable = true,
 			allow = 1
 	)
-	public void hookDispense(ServerWorld world, BlockState blockState, BlockPos pos, CallbackInfo ci) {
+	public void hookDispense(ServerLevel world, BlockState blockState, BlockPos pos, CallbackInfo ci) {
 		DispenserBlockEntity dispenser = (DispenserBlockEntity) world.getBlockEntity(pos);
 		Direction direction = dispenser.getCachedState().get(DispenserBlock.FACING);
 

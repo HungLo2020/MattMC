@@ -21,7 +21,7 @@ import java.util.List;
 import com.google.common.collect.Lists;
 import it.unimi.dsi.fastutil.objects.ReferenceArrayList;
 
-import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.option.KeyBinding;
 
 public final class KeyBindingRegistryImpl {
@@ -31,7 +31,7 @@ public final class KeyBindingRegistryImpl {
 	}
 
 	public static KeyBinding registerKeyBinding(KeyBinding binding) {
-		if (MinecraftClient.getInstance().options != null) {
+		if (Minecraft.getInstance().options != null) {
 			throw new IllegalStateException("GameOptions has already been initialised");
 		}
 

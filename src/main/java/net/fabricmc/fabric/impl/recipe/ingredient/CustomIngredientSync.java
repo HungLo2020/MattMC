@@ -20,9 +20,9 @@ import java.util.Set;
 import java.util.function.Consumer;
 
 import net.minecraft.network.handler.EncoderHandler;
-import net.minecraft.network.packet.Packet;
+import net.minecraft.network.protocol.Packet;
 import net.minecraft.server.network.ServerPlayerConfigurationTask;
-import net.minecraft.util.Identifier;
+import net.minecraft.server.packss.ResourceLocation;
 
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
@@ -44,9 +44,9 @@ import net.fabricmc.fabric.mixin.recipe.ingredient.EncoderHandlerMixin;
  * </ul>
  */
 public class CustomIngredientSync implements ModInitializer {
-	public static final Identifier PACKET_ID = Identifier.of("fabric", "custom_ingredient_sync");
+	public static final ResourceLocation PACKET_ID = ResourceLocation.of("fabric", "custom_ingredient_sync");
 	public static final int PROTOCOL_VERSION_1 = 1;
-	public static final ThreadLocal<Set<Identifier>> CURRENT_SUPPORTED_INGREDIENTS = new ThreadLocal<>();
+	public static final ThreadLocal<Set<ResourceLocation>> CURRENT_SUPPORTED_INGREDIENTS = new ThreadLocal<>();
 
 	public static CustomIngredientPayloadC2S createResponsePayload(int serverProtocolVersion) {
 		if (serverProtocolVersion < PROTOCOL_VERSION_1) {
@@ -58,11 +58,11 @@ public class CustomIngredientSync implements ModInitializer {
 		return new CustomIngredientPayloadC2S(PROTOCOL_VERSION_1, CustomIngredientImpl.REGISTERED_SERIALIZERS.keySet());
 	}
 
-	public static Set<Identifier> decodeResponsePayload(CustomIngredientPayloadC2S payload) {
+	public static Set<ResourceLocation> decodeResponsePayload(CustomIngredientPayloadC2S payload) {
 		int protocolVersion = payload.protocolVersion();
 		switch (protocolVersion) {
 		case PROTOCOL_VERSION_1 -> {
-			Set<Identifier> serializers = payload.registeredSerializers();
+			Set<ResourceLocation> serializers = payload.registeredSerializers();
 			// Remove unknown keys to save memory
 			serializers.removeIf(id -> !CustomIngredientImpl.REGISTERED_SERIALIZERS.containsKey(id));
 			return serializers;
@@ -87,7 +87,7 @@ public class CustomIngredientSync implements ModInitializer {
 		});
 
 		ServerConfigurationNetworking.registerGlobalReceiver(CustomIngredientPayloadC2S.ID, (payload, context) -> {
-			Set<Identifier> supportedCustomIngredients = decodeResponsePayload(payload);
+			Set<ResourceLocation> supportedCustomIngredients = decodeResponsePayload(payload);
 			((SupportedIngredientsClientConnection) ((ServerCommonNetworkHandlerAccessor) context.networkHandler()).getConnection()).fabric_setSupportedCustomIngredients(supportedCustomIngredients);
 			context.networkHandler().completeTask(IngredientSyncTask.KEY);
 		});

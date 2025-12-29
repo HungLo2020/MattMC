@@ -18,9 +18,9 @@ package net.fabricmc.fabric.api.event.registry;
 
 import java.util.function.Consumer;
 
-import net.minecraft.registry.Registry;
-import net.minecraft.registry.entry.RegistryEntry;
-import net.minecraft.util.Identifier;
+import net.minecraft.core.Registry;
+import net.minecraft.core.entry.RegistryEntry;
+import net.minecraft.server.packss.ResourceLocation;
 
 import net.fabricmc.fabric.api.event.Event;
 import net.fabricmc.fabric.impl.registry.sync.ListenableRegistry;
@@ -39,7 +39,7 @@ public interface RegistryEntryAddedCallback<T> {
 	 * @param id the identifier of the entry
 	 * @param object the object that was added
 	 */
-	void onEntryAdded(int rawId, Identifier id, T object);
+	void onEntryAdded(int rawId, ResourceLocation id, T object);
 
 	/**
 	 * Get the {@link Event} for the {@link RegistryEntryAddedCallback} for the given registry.

@@ -25,13 +25,13 @@ import java.util.function.Predicate;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.VisibleForTesting;
 
-import net.minecraft.resource.ResourcePackInfo;
-import net.minecraft.resource.ResourcePackPosition;
-import net.minecraft.resource.ResourcePackProfile;
-import net.minecraft.resource.ResourcePackProvider;
-import net.minecraft.resource.ResourcePackSource;
-import net.minecraft.resource.ResourceType;
-import net.minecraft.text.Text;
+import net.minecraft.server.packs.ResourcePackInfo;
+import net.minecraft.server.packs.ResourcePackPosition;
+import net.minecraft.server.packs.ResourcePackProfile;
+import net.minecraft.server.packs.ResourcePackProvider;
+import net.minecraft.server.packs.ResourcePackSource;
+import net.minecraft.server.packs.ResourceType;
+import net.minecraft.network.chat.Component;
 
 import net.fabricmc.fabric.api.resource.ModResourcePack;
 import net.fabricmc.loader.api.FabricLoader;
@@ -58,8 +58,8 @@ public class ModResourcePackCreator implements ResourcePackProvider {
 	 */
 	public static final ResourcePackSource RESOURCE_PACK_SOURCE = new ResourcePackSource() {
 		@Override
-		public Text decorate(Text packName) {
-			return Text.translatable("pack.nameAndSource", packName, Text.translatable("pack.source.fabricmod"));
+		public Component decorate(Component packName) {
+			return Component.translatable("pack.nameAndSource", packName, Component.translatable("pack.source.fabricmod"));
 		}
 
 		@Override
@@ -108,7 +108,7 @@ public class ModResourcePackCreator implements ResourcePackProvider {
 
 		ResourcePackInfo metadata = new ResourcePackInfo(
 				FABRIC,
-				Text.translatable("pack.name.fabricMods"),
+				Component.translatable("pack.name.fabricMods"),
 				RESOURCE_PACK_SOURCE,
 				Optional.empty()
 		);

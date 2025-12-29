@@ -20,7 +20,7 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.ModifyArg;
 
-import net.minecraft.network.packet.c2s.config.SelectKnownPacksC2SPacket;
+import net.minecraft.network.protocol.c2s.config.SelectKnownPacksC2SPacket;
 
 import net.fabricmc.fabric.impl.resource.loader.ModResourcePackCreator;
 

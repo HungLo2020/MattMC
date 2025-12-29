@@ -25,7 +25,7 @@ import org.spongepowered.asm.mixin.gen.Invoker;
 import net.minecraft.component.ComponentMap;
 import net.minecraft.component.ComponentType;
 import net.minecraft.enchantment.Enchantment;
-import net.minecraft.registry.entry.RegistryEntryList;
+import net.minecraft.core.entry.RegistryEntryList;
 
 @Mixin(Enchantment.Builder.class)
 public interface EnchantmentBuilderAccessor {

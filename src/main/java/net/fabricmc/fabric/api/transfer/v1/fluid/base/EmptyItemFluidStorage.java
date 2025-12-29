@@ -21,7 +21,7 @@ import java.util.List;
 import java.util.function.Function;
 
 import net.minecraft.fluid.Fluid;
-import net.minecraft.item.Item;
+import net.minecraft.world.item.Item;
 
 import net.fabricmc.fabric.api.transfer.v1.context.ContainerItemContext;
 import net.fabricmc.fabric.api.transfer.v1.fluid.FluidVariant;

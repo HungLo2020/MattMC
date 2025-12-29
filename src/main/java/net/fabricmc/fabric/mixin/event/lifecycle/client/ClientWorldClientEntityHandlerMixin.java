@@ -23,18 +23,18 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-import net.minecraft.client.world.ClientWorld;
-import net.minecraft.entity.Entity;
+import net.minecraft.client.multiplayer.ClientLevel;
+import net.minecraft.world.entity.Entity;
 
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientEntityEvents;
 
-@Mixin(targets = "net/minecraft/client/world/ClientWorld$ClientEntityHandler")
+@Mixin(targets = "net/minecraft/client/world/ClientLevel$ClientEntityHandler")
 abstract class ClientWorldClientEntityHandlerMixin {
-	// final synthetic Lnet/minecraft/client/world/ClientWorld; field_27735
+	// final synthetic Lnet/minecraft/client/world/ClientLevel; field_27735
 	@SuppressWarnings("ShadowTarget")
 	@Shadow
 	@Final
-	private ClientWorld field_27735;
+	private ClientLevel field_27735;
 
 	// Call our load event after vanilla has loaded the entity
 	@Inject(method = "startTracking(Lnet/minecraft/entity/Entity;)V", at = @At("TAIL"))

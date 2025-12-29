@@ -21,10 +21,10 @@ import java.util.function.Supplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import net.minecraft.entity.EntityType;
-import net.minecraft.entity.LivingEntity;
-import net.minecraft.entity.attribute.DefaultAttributeContainer;
-import net.minecraft.registry.Registries;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.attribute.DefaultAttributeContainer;
+import net.minecraft.core.Registries;
 
 import net.fabricmc.fabric.mixin.object.builder.DefaultAttributeRegistryAccessor;
 
@@ -35,9 +35,9 @@ import net.fabricmc.fabric.mixin.object.builder.DefaultAttributeRegistryAccessor
  * FabricEntityTypeBuilder} for utility on entity type registration in general.</p>
  *
  * <p>A registered default attribute for an entity type can be retrieved through
- * {@link net.minecraft.entity.attribute.DefaultAttributeRegistry#get(EntityType)}.</p>
+ * {@link net.minecraft.world.entity.attribute.DefaultAttributeRegistry#get(EntityType)}.</p>
  *
- * @see net.minecraft.entity.attribute.DefaultAttributeRegistry
+ * @see net.minecraft.world.entity.attribute.DefaultAttributeRegistry
  */
 public final class FabricDefaultAttributeRegistry {
 	/**
@@ -69,7 +69,7 @@ public final class FabricDefaultAttributeRegistry {
 	 * </p>
 	 *
 	 * <p>If a registration overrides another, a debug log message will be emitted. Existing registrations
-	 * can be checked at {@link net.minecraft.entity.attribute.DefaultAttributeRegistry#hasDefinitionFor(EntityType)}.</p>
+	 * can be checked at {@link net.minecraft.world.entity.attribute.DefaultAttributeRegistry#hasDefinitionFor(EntityType)}.</p>
 	 *
 	 * <p>For convenience, this can also be done on the {@link FabricEntityType.Builder} to simplify the building process.
 	 *

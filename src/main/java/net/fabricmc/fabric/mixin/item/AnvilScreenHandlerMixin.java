@@ -23,14 +23,14 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Redirect;
 
 import net.minecraft.enchantment.Enchantment;
-import net.minecraft.entity.player.PlayerInventory;
-import net.minecraft.item.ItemStack;
-import net.minecraft.registry.entry.RegistryEntry;
-import net.minecraft.screen.AnvilScreenHandler;
-import net.minecraft.screen.ForgingScreenHandler;
-import net.minecraft.screen.ScreenHandlerContext;
-import net.minecraft.screen.ScreenHandlerType;
-import net.minecraft.screen.slot.ForgingSlotsManager;
+import net.minecraft.world.entity.player.PlayerInventory;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.core.entry.RegistryEntry;
+import net.minecraft.world.inventory.AnvilScreenHandler;
+import net.minecraft.world.inventory.ForgingScreenHandler;
+import net.minecraft.world.inventory.ScreenHandlerContext;
+import net.minecraft.world.inventory.ScreenHandlerType;
+import net.minecraft.world.inventory.slot.ForgingSlotsManager;
 
 import net.fabricmc.fabric.api.item.v1.EnchantingContext;
 

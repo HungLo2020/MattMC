@@ -22,13 +22,13 @@ import java.util.Objects;
 import com.mojang.logging.LogUtils;
 import org.slf4j.Logger;
 
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.network.ClientPlayNetworkHandler;
-import net.minecraft.client.network.ClientPlayerEntity;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.multiplayer.ClientPlayNetworkHandler;
+import net.minecraft.client.multiplayer.LocalPlayer;
 import net.minecraft.network.NetworkPhase;
-import net.minecraft.network.packet.CustomPayload;
-import net.minecraft.network.packet.Packet;
-import net.minecraft.util.Identifier;
+import net.minecraft.network.protocol.CustomPayload;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.server.packss.ResourceLocation;
 
 import net.fabricmc.fabric.api.client.networking.v1.C2SPlayChannelEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
@@ -41,7 +41,7 @@ public final class ClientPlayNetworkAddon extends ClientCommonNetworkAddon<Clien
 
 	private static final Logger LOGGER = LogUtils.getLogger();
 
-	public ClientPlayNetworkAddon(ClientPlayNetworkHandler handler, MinecraftClient client) {
+	public ClientPlayNetworkAddon(ClientPlayNetworkHandler handler, Minecraft client) {
 		super(ClientNetworkingImpl.PLAY, handler.getConnection(), "ClientPlayNetworkAddon for " + handler.getProfile().name(), handler, client);
 		this.context = new ContextImpl(client, this);
 
@@ -84,12 +84,12 @@ public final class ClientPlayNetworkAddon extends ClientCommonNetworkAddon<Clien
 	}
 
 	@Override
-	protected void invokeRegisterEvent(List<Identifier> ids) {
+	protected void invokeRegisterEvent(List<ResourceLocation> ids) {
 		C2SPlayChannelEvents.REGISTER.invoker().onChannelRegister(this.handler, this, this.client, ids);
 	}
 
 	@Override
-	protected void invokeUnregisterEvent(List<Identifier> ids) {
+	protected void invokeUnregisterEvent(List<ResourceLocation> ids) {
 		C2SPlayChannelEvents.UNREGISTER.invoker().onChannelUnregister(this.handler, this, this.client, ids);
 	}
 
@@ -98,14 +98,14 @@ public final class ClientPlayNetworkAddon extends ClientCommonNetworkAddon<Clien
 		ClientPlayConnectionEvents.DISCONNECT.invoker().onPlayDisconnect(this.handler, this.client);
 	}
 
-	private record ContextImpl(MinecraftClient client, PacketSender responseSender) implements ClientPlayNetworking.Context {
+	private record ContextImpl(Minecraft client, PacketSender responseSender) implements ClientPlayNetworking.Context {
 		private ContextImpl {
 			Objects.requireNonNull(client, "client");
 			Objects.requireNonNull(responseSender, "responseSender");
 		}
 
 		@Override
-		public ClientPlayerEntity player() {
+		public LocalPlayer player() {
 			return Objects.requireNonNull(client.player, "player");
 		}
 	}

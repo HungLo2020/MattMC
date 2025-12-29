@@ -24,10 +24,10 @@ import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import net.minecraft.entity.data.TrackedDataHandler;
-import net.minecraft.registry.Registry;
-import net.minecraft.registry.RegistryKey;
-import net.minecraft.util.Identifier;
+import net.minecraft.world.entity.data.TrackedDataHandler;
+import net.minecraft.core.Registry;
+import net.minecraft.core.ResourceKey;
+import net.minecraft.server.packss.ResourceLocation;
 import net.minecraft.util.collection.Int2ObjectBiMap;
 
 import net.fabricmc.fabric.api.event.registry.FabricRegistryBuilder;
@@ -38,8 +38,8 @@ import net.fabricmc.fabric.mixin.object.builder.TrackedDataHandlerRegistryAccess
 public final class FabricTrackedDataRegistryImpl {
 	private static final Logger LOGGER = LoggerFactory.getLogger(FabricTrackedDataRegistryImpl.class);
 
-	private static final Identifier HANDLER_REGISTRY_ID = Identifier.of("fabric-object-builder-api-v1", "tracked_data_handler");
-	private static final RegistryKey<Registry<TrackedDataHandler<?>>> HANDLER_REGISTRY_KEY = RegistryKey.ofRegistry(HANDLER_REGISTRY_ID);
+	private static final ResourceLocation HANDLER_REGISTRY_ID = ResourceLocation.of("fabric-object-builder-api-v1", "tracked_data_handler");
+	private static final ResourceKey<Registry<TrackedDataHandler<?>>> HANDLER_REGISTRY_KEY = ResourceKey.ofRegistry(HANDLER_REGISTRY_ID);
 
 	private static final List<TrackedDataHandler<?>> VANILLA_HANDLERS = new ArrayList<>();
 	@Nullable
@@ -116,7 +116,7 @@ public final class FabricTrackedDataRegistryImpl {
 		LOGGER.debug("Finished reordering tracked data handlers containing {} entries", dataHandlers.size());
 	}
 
-	public static void register(Identifier id, TrackedDataHandler<?> handler) {
+	public static void register(ResourceLocation id, TrackedDataHandler<?> handler) {
 		Objects.requireNonNull(id, "Tracked data handler ID cannot be null!");
 		Objects.requireNonNull(handler, "Tracked data handler cannot be null!");
 
@@ -143,7 +143,7 @@ public final class FabricTrackedDataRegistryImpl {
 	}
 
 	@Nullable
-	public static TrackedDataHandler<?> get(Identifier id) {
+	public static TrackedDataHandler<?> get(ResourceLocation id) {
 		Objects.requireNonNull(id, "Tracked data handler ID cannot be null!");
 
 		if (handlerRegistry == null) {
@@ -154,7 +154,7 @@ public final class FabricTrackedDataRegistryImpl {
 	}
 
 	@Nullable
-	public static Identifier getId(TrackedDataHandler<?> handler) {
+	public static ResourceLocation getId(TrackedDataHandler<?> handler) {
 		Objects.requireNonNull(handler, "Tracked data handler cannot be null!");
 
 		if (handlerRegistry == null) {

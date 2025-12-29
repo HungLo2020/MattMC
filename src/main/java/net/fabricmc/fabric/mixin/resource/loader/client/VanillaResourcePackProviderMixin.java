@@ -24,8 +24,8 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import net.minecraft.client.resource.DefaultClientResourcePackProvider;
-import net.minecraft.resource.ResourcePackProfile;
-import net.minecraft.resource.VanillaResourcePackProvider;
+import net.minecraft.server.packs.ResourcePackProfile;
+import net.minecraft.server.packs.VanillaResourcePackProvider;
 
 import net.fabricmc.fabric.impl.resource.loader.ModResourcePackCreator;
 

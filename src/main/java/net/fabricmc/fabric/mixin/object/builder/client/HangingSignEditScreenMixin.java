@@ -21,10 +21,10 @@ import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 
-import net.minecraft.block.entity.SignBlockEntity;
+import net.minecraft.world.level.block.entity.SignBlockEntity;
 import net.minecraft.client.gui.screen.ingame.AbstractSignEditScreen;
 import net.minecraft.client.gui.screen.ingame.HangingSignEditScreen;
-import net.minecraft.util.Identifier;
+import net.minecraft.server.packss.ResourceLocation;
 
 @Mixin(HangingSignEditScreen.class)
 public abstract class HangingSignEditScreenMixin extends AbstractSignEditScreen {
@@ -32,10 +32,10 @@ public abstract class HangingSignEditScreenMixin extends AbstractSignEditScreen 
 		super(blockEntity, filtered, bl);
 	}
 
-	@WrapOperation(method = "<init>", at = @At(value = "INVOKE", target = "Lnet/minecraft/util/Identifier;ofVanilla(Ljava/lang/String;)Lnet/minecraft/util/Identifier;"))
-	private Identifier init(String id, Operation<Identifier> original) {
-		if (signType.name().indexOf(Identifier.NAMESPACE_SEPARATOR) != -1) {
-			Identifier identifier = Identifier.of(signType.name());
+	@WrapOperation(method = "<init>", at = @At(value = "INVOKE", target = "Lnet/minecraft/util/ResourceLocation;ofVanilla(Ljava/lang/String;)Lnet/minecraft/util/ResourceLocation;"))
+	private ResourceLocation init(String id, Operation<ResourceLocation> original) {
+		if (signType.name().indexOf(ResourceLocation.NAMESPACE_SEPARATOR) != -1) {
+			ResourceLocation identifier = ResourceLocation.of(signType.name());
 			return identifier.withPath(path -> "textures/gui/hanging_signs/" + path + ".png");
 		}
 

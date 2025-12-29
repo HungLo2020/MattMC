@@ -18,7 +18,7 @@ package net.fabricmc.fabric.impl.resource.loader;
 
 import java.util.List;
 
-import net.minecraft.registry.VersionedIdentifier;
+import net.minecraft.core.VersionedIdentifier;
 
 public interface FabricOriginalKnownPacksGetter {
 	/**

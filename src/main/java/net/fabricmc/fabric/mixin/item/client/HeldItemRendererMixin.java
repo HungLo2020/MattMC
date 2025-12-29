@@ -23,9 +23,9 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.render.item.HeldItemRenderer;
-import net.minecraft.item.ItemStack;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.renderer.item.HeldItemRenderer;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.util.Hand;
 
 import net.fabricmc.fabric.api.item.v1.FabricItem;
@@ -43,7 +43,7 @@ public class HeldItemRendererMixin {
 
 	@Shadow
 	@Final
-	private MinecraftClient client;
+	private Minecraft client;
 
 	@Inject(method = "updateHeldItems", at = @At("HEAD"))
 	private void modifyProgressAnimation(CallbackInfo ci) {

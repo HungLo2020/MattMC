@@ -30,8 +30,8 @@ import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.tuple.Pair;
 
-import net.minecraft.registry.RegistryKey;
-import net.minecraft.util.Identifier;
+import net.minecraft.core.ResourceKey;
+import net.minecraft.server.packss.ResourceLocation;
 import net.minecraft.util.Util;
 import net.minecraft.village.TradeOffers;
 import net.minecraft.village.VillagerProfession;
@@ -48,9 +48,9 @@ public final class TradeOfferInternals {
 	 */
 	private static void initVillagerTrades() {
 		if (!(TradeOffers.REBALANCED_PROFESSION_TO_LEVELED_TRADE instanceof HashMap)) {
-			Map<RegistryKey<VillagerProfession>, Int2ObjectMap<TradeOffers.Factory[]>> map = new HashMap<>(TradeOffers.REBALANCED_PROFESSION_TO_LEVELED_TRADE);
+			Map<ResourceKey<VillagerProfession>, Int2ObjectMap<TradeOffers.Factory[]>> map = new HashMap<>(TradeOffers.REBALANCED_PROFESSION_TO_LEVELED_TRADE);
 
-			for (Map.Entry<RegistryKey<VillagerProfession>, Int2ObjectMap<TradeOffers.Factory[]>> trade : TradeOffers.PROFESSION_TO_LEVELED_TRADE.entrySet()) {
+			for (Map.Entry<ResourceKey<VillagerProfession>, Int2ObjectMap<TradeOffers.Factory[]>> trade : TradeOffers.PROFESSION_TO_LEVELED_TRADE.entrySet()) {
 				if (!map.containsKey(trade.getKey())) map.put(trade.getKey(), trade.getValue());
 			}
 
@@ -60,7 +60,7 @@ public final class TradeOfferInternals {
 
 	// synchronized guards against concurrent modifications - Vanilla does not mutate the underlying arrays (as of 1.16),
 	// so reads will be fine without locking.
-	public static synchronized void registerVillagerOffers(RegistryKey<VillagerProfession> profession, int level, TradeOfferHelper.VillagerOffersAdder factory) {
+	public static synchronized void registerVillagerOffers(ResourceKey<VillagerProfession> profession, int level, TradeOfferHelper.VillagerOffersAdder factory) {
 		Objects.requireNonNull(profession, "VillagerProfession may not be null.");
 		initVillagerTrades();
 		registerOffers(TradeOffers.PROFESSION_TO_LEVELED_TRADE.computeIfAbsent(profession, key -> new Int2ObjectOpenHashMap<>()), level, trades -> factory.onRegister(trades, false));
@@ -79,13 +79,13 @@ public final class TradeOfferInternals {
 	}
 
 	public static class WanderingTraderOffersBuilderImpl implements TradeOfferHelper.WanderingTraderOffersBuilder {
-		private static final Object2IntMap<Identifier> ID_TO_INDEX = Util.make(new Object2IntOpenHashMap<>(), idToIndex -> {
+		private static final Object2IntMap<ResourceLocation> ID_TO_INDEX = Util.make(new Object2IntOpenHashMap<>(), idToIndex -> {
 			idToIndex.put(BUY_ITEMS_POOL, 0);
 			idToIndex.put(SELL_SPECIAL_ITEMS_POOL, 1);
 			idToIndex.put(SELL_COMMON_ITEMS_POOL, 2);
 		});
 
-		private static final Map<Identifier, TradeOffers.Factory[]> DELAYED_MODIFICATIONS = new HashMap<>();
+		private static final Map<ResourceLocation, TradeOffers.Factory[]> DELAYED_MODIFICATIONS = new HashMap<>();
 
 		/**
 		 * Make the trade list modifiable.
@@ -97,7 +97,7 @@ public final class TradeOfferInternals {
 		}
 
 		@Override
-		public TradeOfferHelper.WanderingTraderOffersBuilder pool(Identifier id, int count, TradeOffers.Factory... factories) {
+		public TradeOfferHelper.WanderingTraderOffersBuilder pool(ResourceLocation id, int count, TradeOffers.Factory... factories) {
 			if (factories.length == 0) throw new IllegalArgumentException("cannot add empty pool");
 			if (count <= 0) throw new IllegalArgumentException("count must be positive");
 
@@ -117,7 +117,7 @@ public final class TradeOfferInternals {
 		}
 
 		@Override
-		public TradeOfferHelper.WanderingTraderOffersBuilder addOffersToPool(Identifier pool, TradeOffers.Factory... factories) {
+		public TradeOfferHelper.WanderingTraderOffersBuilder addOffersToPool(ResourceLocation pool, TradeOffers.Factory... factories) {
 			if (!ID_TO_INDEX.containsKey(pool)) {
 				DELAYED_MODIFICATIONS.compute(pool, (id, current) -> {
 					if (current == null) return factories;

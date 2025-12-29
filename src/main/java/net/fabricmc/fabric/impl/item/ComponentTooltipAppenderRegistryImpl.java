@@ -26,11 +26,11 @@ import java.util.function.Consumer;
 
 import net.minecraft.component.ComponentType;
 import net.minecraft.component.type.TooltipDisplayComponent;
-import net.minecraft.item.Item;
-import net.minecraft.item.ItemStack;
-import net.minecraft.item.tooltip.TooltipAppender;
-import net.minecraft.item.tooltip.TooltipType;
-import net.minecraft.text.Text;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.tooltip.TooltipAppender;
+import net.minecraft.world.item.tooltip.TooltipType;
+import net.minecraft.network.chat.Component;
 
 public final class ComponentTooltipAppenderRegistryImpl {
 	private static final List<ComponentType<? extends TooltipAppender>> first = new ArrayList<>();
@@ -72,7 +72,7 @@ public final class ComponentTooltipAppenderRegistryImpl {
 			ItemStack stack,
 			Item.TooltipContext context,
 			TooltipDisplayComponent displayComponent,
-			Consumer<Text> textConsumer,
+			Consumer<Component> textConsumer,
 			TooltipType type
 	) {
 		Set<ComponentType<?>> cycleDetector = new HashSet<>();
@@ -86,7 +86,7 @@ public final class ComponentTooltipAppenderRegistryImpl {
 			ItemStack stack,
 			Item.TooltipContext context,
 			TooltipDisplayComponent displayComponent,
-			Consumer<Text> textConsumer,
+			Consumer<Component> textConsumer,
 			TooltipType type
 	) {
 		Set<ComponentType<?>> cycleDetector = new HashSet<>();
@@ -101,7 +101,7 @@ public final class ComponentTooltipAppenderRegistryImpl {
 			ComponentType<?> componentType,
 			Item.TooltipContext context,
 			TooltipDisplayComponent displayComponent,
-			Consumer<Text> textConsumer,
+			Consumer<Component> textConsumer,
 			TooltipType type,
 			Set<ComponentType<?>> cycleDetector
 	) {
@@ -119,7 +119,7 @@ public final class ComponentTooltipAppenderRegistryImpl {
 			ComponentType<?> componentType,
 			Item.TooltipContext context,
 			TooltipDisplayComponent displayComponent,
-			Consumer<Text> textConsumer,
+			Consumer<Component> textConsumer,
 			TooltipType type,
 			Set<ComponentType<?>> cycleDetector
 	) {
@@ -137,7 +137,7 @@ public final class ComponentTooltipAppenderRegistryImpl {
 			ComponentType<? extends TooltipAppender> componentType,
 			Item.TooltipContext context,
 			TooltipDisplayComponent displayComponent,
-			Consumer<Text> textConsumer,
+			Consumer<Component> textConsumer,
 			TooltipType type,
 			Set<ComponentType<?>> cycleDetector
 	) {

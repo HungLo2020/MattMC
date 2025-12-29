@@ -22,13 +22,13 @@ import java.util.function.UnaryOperator;
 
 import org.jetbrains.annotations.Nullable;
 
-import net.minecraft.entity.EntityType;
-import net.minecraft.entity.LivingEntity;
-import net.minecraft.entity.SpawnGroup;
-import net.minecraft.entity.SpawnLocation;
-import net.minecraft.entity.SpawnRestriction;
-import net.minecraft.entity.attribute.DefaultAttributeContainer;
-import net.minecraft.entity.mob.MobEntity;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.SpawnGroup;
+import net.minecraft.world.entity.SpawnLocation;
+import net.minecraft.world.entity.SpawnRestriction;
+import net.minecraft.world.entity.attribute.DefaultAttributeContainer;
+import net.minecraft.world.entity.mob.MobEntity;
 import net.minecraft.world.Heightmap;
 
 import net.fabricmc.fabric.api.object.builder.v1.entity.FabricDefaultAttributeRegistry;

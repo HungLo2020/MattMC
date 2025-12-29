@@ -24,9 +24,9 @@ import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import net.minecraft.entity.EntityType;
-import net.minecraft.entity.vehicle.AbstractMinecartEntity;
-import net.minecraft.registry.Registries;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.vehicle.AbstractMinecartEntity;
+import net.minecraft.core.Registries;
 
 /**
  * A registry for {@linkplain MinecartComparatorLogic custom minecart comparator logic}.

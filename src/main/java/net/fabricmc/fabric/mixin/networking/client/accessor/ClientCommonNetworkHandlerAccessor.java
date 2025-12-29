@@ -19,7 +19,7 @@ package net.fabricmc.fabric.mixin.networking.client.accessor;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.gen.Accessor;
 
-import net.minecraft.client.network.ClientCommonNetworkHandler;
+import net.minecraft.client.multiplayer.ClientCommonNetworkHandler;
 import net.minecraft.network.ClientConnection;
 
 @Mixin(ClientCommonNetworkHandler.class)

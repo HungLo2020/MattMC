@@ -26,13 +26,13 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screen.Screen;
 
 import net.fabricmc.fabric.api.client.screen.v1.ScreenEvents;
 import net.fabricmc.loader.api.FabricLoader;
 
-@Mixin(MinecraftClient.class)
+@Mixin(Minecraft.class)
 abstract class MinecraftClientMixin {
 	@Unique
 	private static final Logger LOGGER = LoggerFactory.getLogger("fabric-screen-api-v1");
@@ -92,7 +92,7 @@ abstract class MinecraftClientMixin {
 		ScreenEvents.beforeTick(this.tickingScreen).invoker().beforeTick(this.tickingScreen);
 	}
 
-	@Inject(method = "startIntegratedServer", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/MinecraftClient;render(Z)V"))
+	@Inject(method = "startIntegratedServer", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/Minecraft;render(Z)V"))
 	private void afterLoadingScreenTick(CallbackInfo ci) {
 		ScreenEvents.afterTick(this.tickingScreen).invoker().afterTick(this.tickingScreen);
 		// Finally set the currently ticking screen to null

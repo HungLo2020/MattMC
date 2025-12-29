@@ -21,7 +21,7 @@ import java.util.ArrayList;
 import org.jetbrains.annotations.Nullable;
 
 import net.minecraft.network.NetworkSide;
-import net.minecraft.network.packet.PacketType;
+import net.minecraft.network.protocol.PacketType;
 import net.minecraft.network.state.ConfigurationStates;
 import net.minecraft.network.state.NetworkState;
 import net.minecraft.network.state.PlayStateFactories;

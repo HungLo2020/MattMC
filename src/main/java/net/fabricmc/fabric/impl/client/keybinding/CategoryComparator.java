@@ -19,15 +19,15 @@ package net.fabricmc.fabric.impl.client.keybinding;
 import java.util.Comparator;
 
 import net.minecraft.client.option.KeyBinding;
-import net.minecraft.util.Identifier;
+import net.minecraft.server.packss.ResourceLocation;
 
 public class CategoryComparator implements Comparator<KeyBinding.Category> {
 	public static final CategoryComparator INSTANCE = new CategoryComparator();
 
 	@Override
 	public int compare(KeyBinding.Category o1, KeyBinding.Category o2) {
-		boolean o1Vanilla = o1.id().getNamespace().equals(Identifier.DEFAULT_NAMESPACE);
-		boolean o2Vanilla = o2.id().getNamespace().equals(Identifier.DEFAULT_NAMESPACE);
+		boolean o1Vanilla = o1.id().getNamespace().equals(ResourceLocation.DEFAULT_NAMESPACE);
+		boolean o2Vanilla = o2.id().getNamespace().equals(ResourceLocation.DEFAULT_NAMESPACE);
 
 		// If both are from vanilla, don't reorder them. Assumes sort is stable.
 		if (o1Vanilla && o2Vanilla) {

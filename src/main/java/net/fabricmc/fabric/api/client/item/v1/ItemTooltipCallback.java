@@ -18,10 +18,10 @@ package net.fabricmc.fabric.api.client.item.v1;
 
 import java.util.List;
 
-import net.minecraft.item.Item;
-import net.minecraft.item.ItemStack;
-import net.minecraft.item.tooltip.TooltipType;
-import net.minecraft.text.Text;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.tooltip.TooltipType;
+import net.minecraft.network.chat.Component;
 
 import net.fabricmc.fabric.api.event.Event;
 import net.fabricmc.fabric.api.event.EventFactory;
@@ -37,10 +37,10 @@ public interface ItemTooltipCallback {
 	});
 
 	/**
-	 * Called when an item stack's tooltip is rendered. Text added to {@code lines} will be
+	 * Called when an item stack's tooltip is rendered. Component added to {@code lines} will be
 	 * rendered with the tooltip.
 	 *
 	 * @param lines the list containing the lines of text displayed on the stack's tooltip
 	 */
-	void getTooltip(ItemStack stack, Item.TooltipContext tooltipContext, TooltipType tooltipType, List<Text> lines);
+	void getTooltip(ItemStack stack, Item.TooltipContext tooltipContext, TooltipType tooltipType, List<Component> lines);
 }

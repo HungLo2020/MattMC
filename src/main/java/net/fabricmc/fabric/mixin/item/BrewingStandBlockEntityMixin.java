@@ -24,12 +24,12 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-import net.minecraft.block.entity.BrewingStandBlockEntity;
-import net.minecraft.item.Item;
-import net.minecraft.item.ItemStack;
+import net.minecraft.world.level.block.entity.BrewingStandBlockEntity;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.util.collection.DefaultedList;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.world.World;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.Level;
 
 @Mixin(BrewingStandBlockEntity.class)
 public class BrewingStandBlockEntityMixin {
@@ -37,7 +37,7 @@ public class BrewingStandBlockEntityMixin {
 	private static final ThreadLocal<ItemStack> REMAINDER_STACK = new ThreadLocal<>();
 
 	@Inject(method = "craft", at = @At(value = "INVOKE", target = "Lnet/minecraft/item/ItemStack;decrement(I)V", shift = At.Shift.AFTER))
-	private static void captureItemStack(World world, BlockPos pos, DefaultedList<ItemStack> slots, CallbackInfo ci, @Local ItemStack itemStack) {
+	private static void captureItemStack(Level world, BlockPos pos, DefaultedList<ItemStack> slots, CallbackInfo ci, @Local ItemStack itemStack) {
 		REMAINDER_STACK.set(itemStack.getRecipeRemainder());
 	}
 

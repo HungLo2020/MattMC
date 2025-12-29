@@ -39,9 +39,9 @@ import net.minecraft.network.handler.DecoderHandler;
 import net.minecraft.network.handler.EncoderHandler;
 import net.minecraft.network.handler.NetworkStateTransitions;
 import net.minecraft.network.listener.PacketListener;
-import net.minecraft.network.packet.Packet;
+import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.state.NetworkState;
-import net.minecraft.util.Identifier;
+import net.minecraft.server.packss.ResourceLocation;
 
 import net.fabricmc.fabric.impl.networking.ChannelInfoHolder;
 import net.fabricmc.fabric.impl.networking.NetworkHandlerExtensions;
@@ -57,7 +57,7 @@ abstract class ClientConnectionMixin implements ChannelInfoHolder {
 	private PacketListener packetListener;
 
 	@Unique
-	private Map<NetworkPhase, Collection<Identifier>> playChannels;
+	private Map<NetworkPhase, Collection<ResourceLocation>> playChannels;
 
 	@Inject(method = "<init>", at = @At("RETURN"))
 	private void initAddedFields(NetworkSide side, CallbackInfo ci) {
@@ -121,7 +121,7 @@ abstract class ClientConnectionMixin implements ChannelInfoHolder {
 	}
 
 	@Override
-	public Collection<Identifier> fabric_getPendingChannelsNames(NetworkPhase state) {
+	public Collection<ResourceLocation> fabric_getPendingChannelsNames(NetworkPhase state) {
 		return this.playChannels.computeIfAbsent(state, (key) -> Collections.newSetFromMap(new ConcurrentHashMap<>()));
 	}
 }

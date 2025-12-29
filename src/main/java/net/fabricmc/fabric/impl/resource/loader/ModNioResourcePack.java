@@ -42,15 +42,15 @@ import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import net.minecraft.registry.VersionedIdentifier;
-import net.minecraft.resource.AbstractFileResourcePack;
-import net.minecraft.resource.InputSupplier;
-import net.minecraft.resource.ResourcePack;
-import net.minecraft.resource.ResourcePackInfo;
-import net.minecraft.resource.ResourceType;
-import net.minecraft.resource.metadata.ResourceMetadataSerializer;
-import net.minecraft.text.Text;
-import net.minecraft.util.Identifier;
+import net.minecraft.core.VersionedIdentifier;
+import net.minecraft.server.packs.AbstractFileResourcePack;
+import net.minecraft.server.packs.InputSupplier;
+import net.minecraft.server.packs.ResourcePack;
+import net.minecraft.server.packs.ResourcePackInfo;
+import net.minecraft.server.packs.ResourceType;
+import net.minecraft.server.packs.metadata.ResourceMetadataSerializer;
+import net.minecraft.network.chat.Component;
+import net.minecraft.server.packss.ResourceLocation;
 import net.minecraft.util.path.PathUtil;
 
 import net.fabricmc.fabric.api.resource.ModResourcePack;
@@ -101,9 +101,9 @@ public class ModNioResourcePack implements ResourcePack, ModResourcePack {
 		if (paths.isEmpty()) return null;
 
 		String packId = subPath != null && modBundled ? id + "_" + subPath : id;
-		Text displayName = subPath == null
-				? Text.translatable("pack.name.fabricMod", mod.getMetadata().getName())
-				: Text.translatable("pack.name.fabricMod.subPack", mod.getMetadata().getName(), Text.translatable("resourcePack." + subPath + ".name"));
+		Component displayName = subPath == null
+				? Component.translatable("pack.name.fabricMod", mod.getMetadata().getName())
+				: Component.translatable("pack.name.fabricMod.subPack", mod.getMetadata().getName(), Component.translatable("resourcePack." + subPath + ".name"));
 		ResourcePackInfo metadata = new ResourcePackInfo(
 				packId,
 				displayName,
@@ -235,7 +235,7 @@ public class ModNioResourcePack implements ResourcePack, ModResourcePack {
 
 	@Override
 	@Nullable
-	public InputSupplier<InputStream> open(ResourceType type, Identifier id) {
+	public InputSupplier<InputStream> open(ResourceType type, ResourceLocation id) {
 		final Path path = getPath(getFilename(type, id));
 		return path == null ? null : InputSupplier.create(path);
 	}
@@ -257,7 +257,7 @@ public class ModNioResourcePack implements ResourcePack, ModResourcePack {
 					@Override
 					public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
 						String filename = nsPath.relativize(file).toString().replace(separator, "/");
-						Identifier identifier = Identifier.tryParse(namespace, filename);
+						ResourceLocation identifier = ResourceLocation.tryParse(namespace, filename);
 
 						if (identifier == null) {
 							LOGGER.error("Invalid path in mod resource-pack {}: {}:{}, ignoring", id, namespace, filename);
@@ -314,7 +314,7 @@ public class ModNioResourcePack implements ResourcePack, ModResourcePack {
 		return path.getFileSystem() == DEFAULT_FS ? path.toFile().exists() : Files.exists(path);
 	}
 
-	private static String getFilename(ResourceType type, Identifier id) {
+	private static String getFilename(ResourceType type, ResourceLocation id) {
 		return String.format(Locale.ROOT, "%s/%s/%s", type.getDirectory(), id.getNamespace(), id.getPath());
 	}
 }

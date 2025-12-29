@@ -28,16 +28,16 @@ import java.util.concurrent.Executor;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
-import net.minecraft.registry.RegistryWrapper;
-import net.minecraft.resource.OverlayResourcePack;
-import net.minecraft.resource.ResourcePack;
-import net.minecraft.resource.ResourcePackInfo;
-import net.minecraft.resource.ResourcePackPosition;
-import net.minecraft.resource.ResourcePackProfile;
-import net.minecraft.resource.ResourceReloader;
-import net.minecraft.resource.ResourceType;
-import net.minecraft.text.Text;
-import net.minecraft.util.Identifier;
+import net.minecraft.core.RegistryWrapper;
+import net.minecraft.server.packs.OverlayResourcePack;
+import net.minecraft.server.packs.ResourcePack;
+import net.minecraft.server.packs.ResourcePackInfo;
+import net.minecraft.server.packs.ResourcePackPosition;
+import net.minecraft.server.packs.ResourcePackProfile;
+import net.minecraft.server.packs.ResourceReloader;
+import net.minecraft.server.packs.ResourceType;
+import net.minecraft.network.chat.Component;
+import net.minecraft.server.packss.ResourceLocation;
 import net.minecraft.util.Pair;
 
 import net.fabricmc.fabric.api.resource.IdentifiableResourceReloadListener;
@@ -48,7 +48,7 @@ import net.fabricmc.loader.api.ModContainer;
 
 public class ResourceManagerHelperImpl implements ResourceManagerHelper {
 	private static final Map<ResourceType, ResourceManagerHelperImpl> registryMap = new HashMap<>();
-	private static final Set<Pair<Text, ModNioResourcePack>> builtinResourcePacks = new HashSet<>();
+	private static final Set<Pair<Component, ModNioResourcePack>> builtinResourcePacks = new HashSet<>();
 
 	private final ResourceLoader resourceLoader;
 
@@ -69,10 +69,10 @@ public class ResourceManagerHelperImpl implements ResourceManagerHelper {
 	 * @param displayName    the display name of the resource pack
 	 * @param activationType the activation type of the resource pack
 	 * @return {@code true} if successfully registered the resource pack, else {@code false}
-	 * @see ResourceManagerHelper#registerBuiltinResourcePack(Identifier, ModContainer, Text, ResourcePackActivationType)
-	 * @see ResourceManagerHelper#registerBuiltinResourcePack(Identifier, ModContainer, ResourcePackActivationType)
+	 * @see ResourceManagerHelper#registerBuiltinResourcePack(ResourceLocation, ModContainer, Component, ResourcePackActivationType)
+	 * @see ResourceManagerHelper#registerBuiltinResourcePack(ResourceLocation, ModContainer, ResourcePackActivationType)
 	 */
-	public static boolean registerBuiltinResourcePack(Identifier id, String subPath, ModContainer container, Text displayName, ResourcePackActivationType activationType) {
+	public static boolean registerBuiltinResourcePack(ResourceLocation id, String subPath, ModContainer container, Component displayName, ResourcePackActivationType activationType) {
 		// Assuming the mod has multiple paths, we simply "hope" that the  file separator is *not* different across them
 		List<Path> paths = container.getRootPaths();
 		String separator = paths.getFirst().getFileSystem().getSeparator();
@@ -100,16 +100,16 @@ public class ResourceManagerHelperImpl implements ResourceManagerHelper {
 	 * @param container      the mod container
 	 * @param activationType the activation type of the resource pack
 	 * @return {@code true} if successfully registered the resource pack, else {@code false}
-	 * @see ResourceManagerHelper#registerBuiltinResourcePack(Identifier, ModContainer, ResourcePackActivationType)
-	 * @see ResourceManagerHelper#registerBuiltinResourcePack(Identifier, ModContainer, Text, ResourcePackActivationType)
+	 * @see ResourceManagerHelper#registerBuiltinResourcePack(ResourceLocation, ModContainer, ResourcePackActivationType)
+	 * @see ResourceManagerHelper#registerBuiltinResourcePack(ResourceLocation, ModContainer, Component, ResourcePackActivationType)
 	 */
-	public static boolean registerBuiltinResourcePack(Identifier id, String subPath, ModContainer container, ResourcePackActivationType activationType) {
-		return registerBuiltinResourcePack(id, subPath, container, Text.literal(id.getNamespace() + "/" + id.getPath()), activationType);
+	public static boolean registerBuiltinResourcePack(ResourceLocation id, String subPath, ModContainer container, ResourcePackActivationType activationType) {
+		return registerBuiltinResourcePack(id, subPath, container, Component.literal(id.getNamespace() + "/" + id.getPath()), activationType);
 	}
 
 	public static void registerBuiltinResourcePacks(ResourceType resourceType, Consumer<ResourcePackProfile> consumer) {
 		// Loop through each registered built-in resource packs and add them if valid.
-		for (Pair<Text, ModNioResourcePack> entry : builtinResourcePacks) {
+		for (Pair<Component, ModNioResourcePack> entry : builtinResourcePacks) {
 			ModNioResourcePack pack = entry.getRight();
 
 			// Add the built-in pack only if namespaces for the specified resource type are present.
@@ -162,7 +162,7 @@ public class ResourceManagerHelperImpl implements ResourceManagerHelper {
 	}
 
 	@Override
-	public void registerReloadListener(Identifier identifier, Function<RegistryWrapper.WrapperLookup, IdentifiableResourceReloadListener> listenerFactory) {
+	public void registerReloadListener(ResourceLocation identifier, Function<RegistryWrapper.WrapperLookup, IdentifiableResourceReloadListener> listenerFactory) {
 		this.resourceLoader.registerReloader(identifier, new ResourceReloader() {
 			@Override
 			public CompletableFuture<Void> reload(Store store, Executor prepareExecutor, Synchronizer reloadSynchronizer, Executor applyExecutor) {

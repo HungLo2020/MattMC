@@ -20,8 +20,8 @@ import java.util.Optional;
 
 import net.minecraft.network.RegistryByteBuf;
 import net.minecraft.network.codec.PacketCodec;
-import net.minecraft.recipe.Ingredient;
-import net.minecraft.util.Identifier;
+import net.minecraft.world.item.crafting.Ingredient;
+import net.minecraft.server.packss.ResourceLocation;
 
 import net.fabricmc.fabric.api.recipe.v1.ingredient.CustomIngredient;
 import net.fabricmc.fabric.api.recipe.v1.ingredient.CustomIngredientSerializer;
@@ -43,7 +43,7 @@ public class OptionalCustomIngredientPacketCodec implements PacketCodec<Registry
 			return this.fallback.decode(buf);
 		}
 
-		Identifier type = buf.readIdentifier();
+		ResourceLocation type = buf.readIdentifier();
 		CustomIngredientSerializer<?> serializer = CustomIngredientSerializer.get(type);
 
 		if (serializer == null) {

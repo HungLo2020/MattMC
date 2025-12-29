@@ -20,14 +20,14 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Function;
 
-import net.minecraft.loot.LootTable;
-import net.minecraft.registry.RegistryKeys;
-import net.minecraft.registry.RegistryWrapper;
-import net.minecraft.registry.entry.RegistryEntry;
-import net.minecraft.resource.Resource;
-import net.minecraft.resource.ResourcePackSource;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.util.Identifier;
+import net.minecraft.world.level.storage.loot.LootTable;
+import net.minecraft.core.RegistryKeys;
+import net.minecraft.core.RegistryWrapper;
+import net.minecraft.core.entry.RegistryEntry;
+import net.minecraft.server.packs.Resource;
+import net.minecraft.server.packs.ResourcePackSource;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.packss.ResourceLocation;
 
 import net.fabricmc.fabric.api.loot.v3.LootTableSource;
 import net.fabricmc.fabric.impl.resource.loader.BuiltinModResourcePackSource;
@@ -35,7 +35,7 @@ import net.fabricmc.fabric.impl.resource.loader.FabricResource;
 import net.fabricmc.fabric.impl.resource.loader.ModResourcePackCreator;
 
 public final class LootUtil {
-	public static final ThreadLocal<Map<Identifier, LootTableSource>> SOURCES = ThreadLocal.withInitial(HashMap::new);
+	public static final ThreadLocal<Map<ResourceLocation, LootTableSource>> SOURCES = ThreadLocal.withInitial(HashMap::new);
 
 	public static LootTableSource determineSource(Resource resource) {
 		if (resource != null) {
@@ -54,7 +54,7 @@ public final class LootUtil {
 		return LootTableSource.DATA_PACK;
 	}
 
-	public static RegistryEntry<LootTable> getEntryOrDirect(ServerWorld world, LootTable table) {
+	public static RegistryEntry<LootTable> getEntryOrDirect(ServerLevel world, LootTable table) {
 		RegistryWrapper.WrapperLookup wrapperLookup = world
 				.getServer()
 				.getReloadableRegistries()

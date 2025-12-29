@@ -16,9 +16,9 @@
 
 package net.fabricmc.fabric.api.object.builder.v1.entity;
 
-import net.minecraft.block.BlockState;
-import net.minecraft.entity.vehicle.AbstractMinecartEntity;
-import net.minecraft.util.math.BlockPos;
+import net.minecraft.world.level.block.BlockState;
+import net.minecraft.world.entity.vehicle.AbstractMinecartEntity;
+import net.minecraft.core.BlockPos;
 
 /**
  * Provides custom comparator output for minecarts resting on detector rails.
@@ -28,7 +28,7 @@ import net.minecraft.util.math.BlockPos;
 public interface MinecartComparatorLogic<T extends AbstractMinecartEntity> {
 	/**
 	 * Compute the comparator output of a detector rail when a minecart is resting
-	 * on top of it. Called from {@link net.minecraft.block.DetectorRailBlock#getComparatorOutput}.
+	 * on top of it. Called from {@link net.minecraft.world.level.block.DetectorRailBlock#getComparatorOutput}.
 	 * @param minecart The minecart on the rail
 	 * @param state Block state of the rail
 	 * @param pos Position of the rail

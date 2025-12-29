@@ -22,7 +22,7 @@ import net.minecraft.client.particle.ParticleFactory;
 import net.minecraft.client.particle.SpriteProvider;
 import net.minecraft.client.texture.Sprite;
 import net.minecraft.client.texture.SpriteAtlasTexture;
-import net.minecraft.particle.ParticleType;
+import net.minecraft.core.particles.ParticleType;
 
 /**
  * FabricSpriteProvider. It does the same thing as vanilla's SpriteProvider,

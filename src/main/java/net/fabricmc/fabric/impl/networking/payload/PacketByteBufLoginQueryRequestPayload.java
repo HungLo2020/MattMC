@@ -17,10 +17,10 @@
 package net.fabricmc.fabric.impl.networking.payload;
 
 import net.minecraft.network.PacketByteBuf;
-import net.minecraft.network.packet.s2c.login.LoginQueryRequestPayload;
-import net.minecraft.util.Identifier;
+import net.minecraft.network.protocol.s2c.login.LoginQueryRequestPayload;
+import net.minecraft.server.packss.ResourceLocation;
 
-public record PacketByteBufLoginQueryRequestPayload(Identifier id, PacketByteBuf data) implements LoginQueryRequestPayload {
+public record PacketByteBufLoginQueryRequestPayload(ResourceLocation id, PacketByteBuf data) implements LoginQueryRequestPayload {
 	@Override
 	public void write(PacketByteBuf buf) {
 		PayloadHelper.write(buf, data());

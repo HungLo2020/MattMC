@@ -19,10 +19,10 @@ package net.fabricmc.fabric.api.lookup.v1.item;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.Nullable;
 
-import net.minecraft.item.Item;
-import net.minecraft.item.ItemConvertible;
-import net.minecraft.item.ItemStack;
-import net.minecraft.util.Identifier;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemConvertible;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.server.packss.ResourceLocation;
 
 import net.fabricmc.fabric.api.lookup.v1.block.BlockApiLookup;
 import net.fabricmc.fabric.impl.lookup.item.ItemApiLookupImpl;
@@ -47,7 +47,7 @@ import net.fabricmc.fabric.impl.lookup.item.ItemApiLookupImpl;
  *
  * <pre>{@code
  * public final class MyApi {
- *     public static final ItemApiLookup<FluidContainer, Void> FLUID_CONTAINER_ITEM = ItemApiLookup.get(Identifier.of("mymod", "fluid_container"), FluidContainer.class, Void.class);
+ *     public static final ItemApiLookup<FluidContainer, Void> FLUID_CONTAINER_ITEM = ItemApiLookup.get(ResourceLocation.of("mymod", "fluid_container"), FluidContainer.class, Void.class);
  * }}</pre>
  * API instances are easy to access:
  *
@@ -102,7 +102,7 @@ public interface ItemApiLookup<A, C> {
 	 * @return The unique lookup with the passed lookupId.
 	 * @throws IllegalArgumentException If another {@code apiClass} or another {@code contextClass} was already registered with the same identifier.
 	 */
-	static <A, C> ItemApiLookup<A, C> get(Identifier lookupId, Class<A> apiClass, Class<C> contextClass) {
+	static <A, C> ItemApiLookup<A, C> get(ResourceLocation lookupId, Class<A> apiClass, Class<C> contextClass) {
 		return ItemApiLookupImpl.get(lookupId, apiClass, contextClass);
 	}
 
@@ -148,7 +148,7 @@ public interface ItemApiLookup<A, C> {
 	/**
 	 * Return the identifier of this lookup.
 	 */
-	Identifier getId();
+	ResourceLocation getId();
 
 	/**
 	 * Return the API class of this lookup.

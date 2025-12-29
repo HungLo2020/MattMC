@@ -18,20 +18,20 @@ package net.fabricmc.fabric.impl.transfer;
 
 import org.jetbrains.annotations.Nullable;
 
-import net.minecraft.block.entity.BlockEntity;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.entity.player.PlayerInventory;
-import net.minecraft.inventory.Inventory;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.world.World;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.entity.player.PlayerInventory;
+import net.minecraft.world.item.inventory.Inventory;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.Level;
 
 public final class DebugMessages {
-	public static String forGlobalPos(@Nullable World world, BlockPos pos) {
+	public static String forGlobalPos(@Nullable Level world, BlockPos pos) {
 		String dimension = world != null ? world.getDimensionEntry().getIdAsString() : "<no dimension>";
 		return dimension + "@" + pos.toShortString();
 	}
 
-	public static String forPlayer(PlayerEntity player) {
+	public static String forPlayer(Player player) {
 		return player.getDisplayName() + "/" + player.getUuidAsString();
 	}
 

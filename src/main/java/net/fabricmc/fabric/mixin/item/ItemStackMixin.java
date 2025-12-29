@@ -39,15 +39,15 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import net.minecraft.component.ComponentType;
 import net.minecraft.component.DataComponentTypes;
 import net.minecraft.component.type.TooltipDisplayComponent;
-import net.minecraft.entity.EquipmentSlot;
-import net.minecraft.entity.LivingEntity;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.item.Item;
-import net.minecraft.item.ItemStack;
-import net.minecraft.item.tooltip.TooltipType;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.text.Text;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.tooltip.TooltipType;
+import net.minecraft.server.network.ServerPlayer;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.network.chat.Component;
 
 import net.fabricmc.fabric.api.item.v1.CustomDamageHandler;
 import net.fabricmc.fabric.api.item.v1.FabricItemStack;
@@ -63,8 +63,8 @@ public abstract class ItemStackMixin implements FabricItemStack {
 	@Shadow
 	public abstract void decrement(int amount);
 
-	@WrapOperation(method = "damage(ILnet/minecraft/entity/LivingEntity;Lnet/minecraft/entity/EquipmentSlot;)V", at = @At(value = "INVOKE", target = "Lnet/minecraft/item/ItemStack;damage(ILnet/minecraft/server/world/ServerWorld;Lnet/minecraft/server/network/ServerPlayerEntity;Ljava/util/function/Consumer;)V"))
-	private void hookDamage(ItemStack instance, int amount, ServerWorld serverWorld, ServerPlayerEntity serverPlayerEntity, Consumer<Item> consumer, Operation<Void> original, @Local(argsOnly = true) LivingEntity entity, @Local(argsOnly = true) EquipmentSlot slot) {
+	@WrapOperation(method = "damage(ILnet/minecraft/entity/LivingEntity;Lnet/minecraft/entity/EquipmentSlot;)V", at = @At(value = "INVOKE", target = "Lnet/minecraft/item/ItemStack;damage(ILnet/minecraft/server/world/ServerLevel;Lnet/minecraft/server/network/ServerPlayer;Ljava/util/function/Consumer;)V"))
+	private void hookDamage(ItemStack instance, int amount, ServerLevel serverWorld, ServerPlayer serverPlayerEntity, Consumer<Item> consumer, Operation<Void> original, @Local(argsOnly = true) LivingEntity entity, @Local(argsOnly = true) EquipmentSlot slot) {
 		CustomDamageHandler handler = ((ItemExtensions) getItem()).fabric_getCustomDamageHandler();
 
 		/*
@@ -97,7 +97,7 @@ public abstract class ItemStackMixin implements FabricItemStack {
 			@Local(argsOnly = true) Item.TooltipContext context,
 			@Local(argsOnly = true) TooltipDisplayComponent displayComponent,
 			@Local(argsOnly = true) TooltipType type,
-			@Local(argsOnly = true) Consumer<Text> textConsumer,
+			@Local(argsOnly = true) Consumer<Component> textConsumer,
 			@Share("index") LocalIntRef index
 	) {
 		preAppendTooltip(componentType, context, displayComponent, textConsumer, type, index);
@@ -110,20 +110,20 @@ public abstract class ItemStackMixin implements FabricItemStack {
 			@Local(argsOnly = true) Item.TooltipContext context,
 			@Local(argsOnly = true) TooltipDisplayComponent displayComponent,
 			@Local(argsOnly = true) TooltipType type,
-			@Local(argsOnly = true) Consumer<Text> textConsumer,
+			@Local(argsOnly = true) Consumer<Component> textConsumer,
 			@Share("index") LocalIntRef index
 	) {
 		preAppendTooltip(componentType, context, displayComponent, textConsumer, type, index);
 		return componentType;
 	}
 
-	@Inject(method = "appendTooltip", at = @At(value = "INVOKE", target = "Lnet/minecraft/item/ItemStack;appendAttributeModifiersTooltip(Ljava/util/function/Consumer;Lnet/minecraft/component/type/TooltipDisplayComponent;Lnet/minecraft/entity/player/PlayerEntity;)V"))
+	@Inject(method = "appendTooltip", at = @At(value = "INVOKE", target = "Lnet/minecraft/item/ItemStack;appendAttributeModifiersTooltip(Ljava/util/function/Consumer;Lnet/minecraft/component/type/TooltipDisplayComponent;Lnet/minecraft/entity/player/Player;)V"))
 	private void preAttributeModifiers(
 			Item.TooltipContext context,
 			TooltipDisplayComponent displayComponent,
-			@Nullable PlayerEntity player,
+			@Nullable Player player,
 			TooltipType type,
-			Consumer<Text> textConsumer,
+			Consumer<Component> textConsumer,
 			CallbackInfo ci,
 			@Share("index") LocalIntRef index
 	) {
@@ -131,13 +131,13 @@ public abstract class ItemStackMixin implements FabricItemStack {
 		preAppendTooltip(DataComponentTypes.ATTRIBUTE_MODIFIERS, context, displayComponent, textConsumer, type, index);
 	}
 
-	@Inject(method = "appendTooltip", at = @At(value = "INVOKE", target = "Lnet/minecraft/registry/DefaultedRegistry;getId(Ljava/lang/Object;)Lnet/minecraft/util/Identifier;"))
+	@Inject(method = "appendTooltip", at = @At(value = "INVOKE", target = "Lnet/minecraft/registry/DefaultedRegistry;getId(Ljava/lang/Object;)Lnet/minecraft/util/ResourceLocation;"))
 	private void postTooltipsAdvanced(
 			Item.TooltipContext context,
 			TooltipDisplayComponent displayComponent,
-			@Nullable PlayerEntity player,
+			@Nullable Player player,
 			TooltipType type,
-			Consumer<Text> textConsumer,
+			Consumer<Component> textConsumer,
 			CallbackInfo ci,
 			@Share("index") LocalIntRef index
 	) {
@@ -149,9 +149,9 @@ public abstract class ItemStackMixin implements FabricItemStack {
 			boolean isAdvanced,
 			Item.TooltipContext context,
 			TooltipDisplayComponent displayComponent,
-			@Nullable PlayerEntity player,
+			@Nullable Player player,
 			TooltipType type,
-			Consumer<Text> textConsumer,
+			Consumer<Component> textConsumer,
 			@Share("index") LocalIntRef index
 	) {
 		if (!isAdvanced) {
@@ -166,7 +166,7 @@ public abstract class ItemStackMixin implements FabricItemStack {
 			@Nullable ComponentType<?> componentType,
 			Item.TooltipContext context,
 			TooltipDisplayComponent displayComponent,
-			Consumer<Text> textConsumer,
+			Consumer<Component> textConsumer,
 			TooltipType tooltipType,
 			LocalIntRef index
 	) {

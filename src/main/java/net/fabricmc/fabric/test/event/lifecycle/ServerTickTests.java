@@ -19,8 +19,8 @@ package net.fabricmc.fabric.test.event.lifecycle;
 import java.util.HashMap;
 import java.util.Map;
 
-import net.minecraft.registry.RegistryKey;
-import net.minecraft.world.World;
+import net.minecraft.core.ResourceKey;
+import net.minecraft.world.Level;
 
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
@@ -29,7 +29,7 @@ import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
  * Test related to ticking events on the server.
  */
 public final class ServerTickTests implements ModInitializer {
-	private final Map<RegistryKey<World>, Integer> tickTracker = new HashMap<>();
+	private final Map<ResourceKey<Level>, Integer> tickTracker = new HashMap<>();
 
 	@Override
 	public void onInitialize() {
@@ -42,7 +42,7 @@ public final class ServerTickTests implements ModInitializer {
 		ServerTickEvents.START_WORLD_TICK.register(world -> {
 			// Verify we are inside the tick
 			if (!world.isInBlockTick()) {
-				throw new AssertionError("Start tick event should be fired while ServerWorld is inside of block tick");
+				throw new AssertionError("Start tick event should be fired while ServerLevel is inside of block tick");
 			}
 		});
 
@@ -50,7 +50,7 @@ public final class ServerTickTests implements ModInitializer {
 			final int worldTicks = tickTracker.computeIfAbsent(world.getRegistryKey(), k -> 0);
 
 			if (worldTicks % 200 == 0) { // Log every 200 ticks to verify the tick callback works on the server world
-				ServerLifecycleTests.LOGGER.info("Ticked Server World - " + worldTicks + " ticks:" + world.getRegistryKey().getValue());
+				ServerLifecycleTests.LOGGER.info("Ticked Server Level - " + worldTicks + " ticks:" + world.getRegistryKey().getValue());
 			}
 
 			this.tickTracker.put(world.getRegistryKey(), worldTicks + 1);

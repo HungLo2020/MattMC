@@ -35,7 +35,7 @@ import org.jetbrains.annotations.VisibleForTesting;
 import net.minecraft.client.particle.ParticleManager;
 import net.minecraft.client.particle.ParticleRenderer;
 import net.minecraft.client.particle.ParticleTextureSheet;
-import net.minecraft.util.Identifier;
+import net.minecraft.server.packss.ResourceLocation;
 
 import net.fabricmc.fabric.impl.base.toposort.NodeSorting;
 import net.fabricmc.fabric.impl.base.toposort.SortableNode;
@@ -45,7 +45,7 @@ public final class ParticleRendererRegistryImpl {
 	public static final ParticleRendererRegistryImpl INSTANCE = new ParticleRendererRegistryImpl(ParticleManagerAccessor.getParticleTextureSheets());
 
 	private final List<ParticleTextureSheet> textureSheets;
-	private final Map<Identifier, ParticleTextureNode> nodes = new HashMap<>();
+	private final Map<ResourceLocation, ParticleTextureNode> nodes = new HashMap<>();
 	private final IdentityHashMap<ParticleTextureSheet, Function<ParticleManager, ParticleRenderer<?>>> factories = new IdentityHashMap<>();
 
 	@VisibleForTesting
@@ -53,11 +53,11 @@ public final class ParticleRendererRegistryImpl {
 		var copyOfTextureSheets = new ArrayList<>(textureSheets);
 		this.textureSheets = textureSheets;
 
-		Identifier last = null;
+		ResourceLocation last = null;
 
 		// Populate the nodes with vanilla texture sheets, to allow sorting with custom sheets later.
 		for (ParticleTextureSheet sheet : this.textureSheets) {
-			Identifier id = getId(sheet);
+			ResourceLocation id = getId(sheet);
 
 			nodes.put(id, new ParticleTextureNode(sheet));
 
@@ -75,7 +75,7 @@ public final class ParticleRendererRegistryImpl {
 	}
 
 	public void register(ParticleTextureSheet textureSheet, Function<ParticleManager, ParticleRenderer<?>> function) {
-		final Identifier id = getId(textureSheet);
+		final ResourceLocation id = getId(textureSheet);
 
 		if (nodes.containsKey(id)) {
 			throw new IllegalArgumentException("A ParticleTextureSheet with the id " + id + " has already been registered.");
@@ -93,7 +93,7 @@ public final class ParticleRendererRegistryImpl {
 		sort();
 	}
 
-	public void registerOrdering(Identifier first, Identifier second) {
+	public void registerOrdering(ResourceLocation first, ResourceLocation second) {
 		Objects.requireNonNull(first);
 		Objects.requireNonNull(second);
 
@@ -112,7 +112,7 @@ public final class ParticleRendererRegistryImpl {
 		sort();
 	}
 
-	public @Nullable ParticleTextureSheet getParticleTextureSheet(Identifier id) {
+	public @Nullable ParticleTextureSheet getParticleTextureSheet(ResourceLocation id) {
 		Objects.requireNonNull(id);
 		ParticleTextureNode entry = nodes.get(id);
 		return entry != null ? entry.textureSheet : null;
@@ -149,10 +149,10 @@ public final class ParticleRendererRegistryImpl {
 	}
 
 	private static class ParticleTextureNode extends SortableNode<ParticleTextureNode> {
-		final Identifier id;
+		final ResourceLocation id;
 		final ParticleTextureSheet textureSheet;
 
-		private ParticleTextureNode(Identifier id, ParticleTextureSheet textureSheet) {
+		private ParticleTextureNode(ResourceLocation id, ParticleTextureSheet textureSheet) {
 			this.id = id;
 			this.textureSheet = textureSheet;
 		}

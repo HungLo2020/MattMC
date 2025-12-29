@@ -21,16 +21,16 @@ import java.util.Set;
 
 import net.minecraft.component.DataComponentTypes;
 import net.minecraft.enchantment.Enchantment;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.item.Item;
-import net.minecraft.item.ItemStack;
-import net.minecraft.item.Items;
-import net.minecraft.item.PotionItem;
-import net.minecraft.item.TippedArrowItem;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.item.PotionItem;
+import net.minecraft.world.item.TippedArrowItem;
 import net.minecraft.potion.Potion;
-import net.minecraft.registry.entry.RegistryEntry;
+import net.minecraft.core.entry.RegistryEntry;
 import net.minecraft.util.Hand;
-import net.minecraft.util.Identifier;
+import net.minecraft.server.packss.ResourceLocation;
 
 import net.fabricmc.fabric.impl.item.FabricItemInternals;
 
@@ -48,13 +48,13 @@ public interface FabricItem {
 	 * This function is called on the client side when the components or count of the stack has changed, but not the item,
 	 * and returning false cancels this animation.
 	 *
-	 * @param player   the current player; this may be safely cast to {@link net.minecraft.client.network.ClientPlayerEntity} in client-only code
+	 * @param player   the current player; this may be safely cast to {@link net.minecraft.client.multiplayer.LocalPlayer} in client-only code
 	 * @param hand     the hand; this function applies both to the main hand and the off hand
 	 * @param oldStack the previous stack, of this item
 	 * @param newStack the new stack, also of this item
 	 * @return true to run the vanilla animation, false to cancel it.
 	 */
-	default boolean allowComponentsUpdateAnimation(PlayerEntity player, Hand hand, ItemStack oldStack, ItemStack newStack) {
+	default boolean allowComponentsUpdateAnimation(Player player, Hand hand, ItemStack oldStack, ItemStack newStack) {
 		return true;
 	}
 
@@ -68,7 +68,7 @@ public interface FabricItem {
 	 * @param newStack the new stack, also of this item
 	 * @return true to allow continuing block breaking, false to reset the progress.
 	 */
-	default boolean allowContinuingBlockBreaking(PlayerEntity player, ItemStack oldStack, ItemStack newStack) {
+	default boolean allowContinuingBlockBreaking(Player player, ItemStack oldStack, ItemStack newStack) {
 		return false;
 	}
 
@@ -187,12 +187,12 @@ public interface FabricItem {
 		}
 
 		/**
-		 * Sets the model of the item to static Identifier.
+		 * Sets the model of the item to static ResourceLocation.
 		 *
 		 * @param modelId the model id item should use
 		 * @return this builder
 		 */
-		default Item.Settings modelId(Identifier modelId) {
+		default Item.Settings modelId(ResourceLocation modelId) {
 			return (Item.Settings) this;
 		}
 	}

@@ -31,9 +31,9 @@ import net.minecraft.network.PacketByteBuf;
 import net.minecraft.network.RegistryByteBuf;
 import net.minecraft.network.codec.PacketCodec;
 import net.minecraft.network.handler.EncoderHandler;
-import net.minecraft.network.packet.CustomPayload;
-import net.minecraft.network.packet.Packet;
-import net.minecraft.network.packet.s2c.common.CustomPayloadS2CPacket;
+import net.minecraft.network.protocol.CustomPayload;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.s2c.common.CustomPayloadS2CPacket;
 
 import net.fabricmc.fabric.impl.networking.FabricCustomPayloadPacketCodec;
 import net.fabricmc.fabric.impl.networking.GenericPayloadAccessor;

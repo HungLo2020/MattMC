@@ -26,15 +26,15 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-import net.minecraft.recipe.PreparedRecipes;
-import net.minecraft.recipe.Recipe;
-import net.minecraft.recipe.RecipeEntry;
-import net.minecraft.recipe.RecipeType;
-import net.minecraft.recipe.ServerRecipeManager;
-import net.minecraft.recipe.input.RecipeInput;
-import net.minecraft.resource.ResourceManager;
+import net.minecraft.world.item.crafting.PreparedRecipes;
+import net.minecraft.world.item.crafting.Recipe;
+import net.minecraft.world.item.crafting.RecipeEntry;
+import net.minecraft.world.item.crafting.RecipeType;
+import net.minecraft.world.item.crafting.ServerRecipeManager;
+import net.minecraft.world.item.crafting.input.RecipeInput;
+import net.minecraft.server.packs.ResourceManager;
 import net.minecraft.util.profiler.Profiler;
-import net.minecraft.world.World;
+import net.minecraft.world.Level;
 
 import net.fabricmc.fabric.api.recipe.v1.FabricServerRecipeManager;
 import net.fabricmc.fabric.api.recipe.v1.sync.SynchronizedRecipes;
@@ -58,7 +58,7 @@ public abstract class ServerRecipeManagerMixin implements FabricServerRecipeMana
 	}
 
 	@Override
-	public <I extends RecipeInput, T extends Recipe<I>> Stream<RecipeEntry<T>> getAllMatches(RecipeType<T> type, I input, World world) {
+	public <I extends RecipeInput, T extends Recipe<I>> Stream<RecipeEntry<T>> getAllMatches(RecipeType<T> type, I input, Level world) {
 		return this.preparedRecipes.find(type, input, world);
 	}
 

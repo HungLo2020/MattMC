@@ -20,7 +20,7 @@ import java.util.Arrays;
 import java.util.function.Consumer;
 
 import net.minecraft.network.NetworkPhase;
-import net.minecraft.network.packet.Packet;
+import net.minecraft.network.protocol.Packet;
 import net.minecraft.server.network.ServerPlayerConfigurationTask;
 
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;

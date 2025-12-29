@@ -22,9 +22,9 @@ import com.mojang.serialization.MapCodec;
 
 import net.minecraft.network.RegistryByteBuf;
 import net.minecraft.network.codec.PacketCodec;
-import net.minecraft.particle.ParticleEffect;
-import net.minecraft.particle.ParticleType;
-import net.minecraft.particle.SimpleParticleType;
+import net.minecraft.core.particles.ParticleEffect;
+import net.minecraft.core.particles.ParticleType;
+import net.minecraft.core.particles.SimpleParticleType;
 
 /**
  * Methods for creating particle types, both simple and using an existing attribute factory.
@@ -37,8 +37,8 @@ import net.minecraft.particle.SimpleParticleType;
  *
  * {@literal @}Override
  * public void onInitialize() {
- *     Registry.register(Registries.PARTICLE_TYPE, Identifier.of("testmod", "simple"), SIMPLE_TEST_PARTICLE);
- *     Registry.register(Registries.PARTICLE_TYPE, Identifier.of("testmod", "custom"), CUSTOM_TEST_PARTICLE);
+ *     Registry.register(Registries.PARTICLE_TYPE, ResourceLocation.of("testmod", "simple"), SIMPLE_TEST_PARTICLE);
+ *     Registry.register(Registries.PARTICLE_TYPE, ResourceLocation.of("testmod", "custom"), CUSTOM_TEST_PARTICLE);
  * }}
  * </pre>
  * </blockquote>

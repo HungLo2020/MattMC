@@ -18,9 +18,9 @@ package net.fabricmc.fabric.api.object.builder.v1.entity;
 
 import org.jetbrains.annotations.Nullable;
 
-import net.minecraft.entity.data.TrackedDataHandler;
-import net.minecraft.entity.data.TrackedDataHandlerRegistry;
-import net.minecraft.util.Identifier;
+import net.minecraft.world.entity.data.TrackedDataHandler;
+import net.minecraft.world.entity.data.TrackedDataHandlerRegistry;
+import net.minecraft.server.packss.ResourceLocation;
 
 import net.fabricmc.fabric.impl.object.builder.FabricTrackedDataRegistryImpl;
 
@@ -41,7 +41,7 @@ public final class FabricTrackedDataRegistry {
 	 * However, the integer ID of a given custom handler registered through this method may change on registry sync.
 	 * The integer IDs of vanilla handlers are guaranteed to remain constant.
 	 */
-	public static void register(Identifier id, TrackedDataHandler<?> handler) {
+	public static void register(ResourceLocation id, TrackedDataHandler<?> handler) {
 		FabricTrackedDataRegistryImpl.register(id, handler);
 	}
 
@@ -49,16 +49,16 @@ public final class FabricTrackedDataRegistry {
 	 * Retrieves the handler for the given ID, or {@code null} if it does not exist.
 	 */
 	@Nullable
-	public static TrackedDataHandler<?> get(Identifier id) {
+	public static TrackedDataHandler<?> get(ResourceLocation id) {
 		return FabricTrackedDataRegistryImpl.get(id);
 	}
 
 	/**
 	 * Retrieves the ID for the given handler, or {@code null} if the handler was not registered with
-	 * {@link #register(Identifier, TrackedDataHandler)}.
+	 * {@link #register(ResourceLocation, TrackedDataHandler)}.
 	 */
 	@Nullable
-	public static Identifier getId(TrackedDataHandler<?> handler) {
+	public static ResourceLocation getId(TrackedDataHandler<?> handler) {
 		return FabricTrackedDataRegistryImpl.getId(handler);
 	}
 }

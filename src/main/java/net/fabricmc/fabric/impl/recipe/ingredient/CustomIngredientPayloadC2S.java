@@ -22,13 +22,13 @@ import java.util.Set;
 import net.minecraft.network.PacketByteBuf;
 import net.minecraft.network.codec.PacketCodec;
 import net.minecraft.network.codec.PacketCodecs;
-import net.minecraft.network.packet.CustomPayload;
-import net.minecraft.util.Identifier;
+import net.minecraft.network.protocol.CustomPayload;
+import net.minecraft.server.packss.ResourceLocation;
 
-public record CustomIngredientPayloadC2S(int protocolVersion, Set<Identifier> registeredSerializers) implements CustomPayload {
+public record CustomIngredientPayloadC2S(int protocolVersion, Set<ResourceLocation> registeredSerializers) implements CustomPayload {
 	public static final PacketCodec<PacketByteBuf, CustomIngredientPayloadC2S> CODEC = PacketCodec.tuple(
 			PacketCodecs.VAR_INT, CustomIngredientPayloadC2S::protocolVersion,
-			PacketCodecs.collection(HashSet::new, Identifier.PACKET_CODEC), CustomIngredientPayloadC2S::registeredSerializers,
+			PacketCodecs.collection(HashSet::new, ResourceLocation.PACKET_CODEC), CustomIngredientPayloadC2S::registeredSerializers,
 			CustomIngredientPayloadC2S::new
 	);
 	public static final CustomPayload.Id<CustomIngredientPayloadC2S> ID = new Id<>(CustomIngredientSync.PACKET_ID);

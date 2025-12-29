@@ -21,7 +21,7 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Redirect;
 
-import net.minecraft.world.chunk.SerializedChunk;
+import net.minecraft.world.level.chunk.SerializedChunk;
 
 @Mixin(SerializedChunk.class)
 public class SerializedChunkMixin {

@@ -17,7 +17,7 @@
 package net.fabricmc.fabric.api.event.lifecycle.v1;
 
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.world.ServerWorld;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.PersistentState;
 
 import net.fabricmc.fabric.api.event.Event;
@@ -49,12 +49,12 @@ public final class ServerWorldEvents {
 
 	@FunctionalInterface
 	public interface Load {
-		void onWorldLoad(MinecraftServer server, ServerWorld world);
+		void onWorldLoad(MinecraftServer server, ServerLevel world);
 	}
 
 	@FunctionalInterface
 	public interface Unload {
-		void onWorldUnload(MinecraftServer server, ServerWorld world);
+		void onWorldUnload(MinecraftServer server, ServerLevel world);
 	}
 
 	private ServerWorldEvents() {

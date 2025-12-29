@@ -17,9 +17,9 @@
 package net.fabricmc.fabric.api.renderer.v1.mesh;
 
 import net.fabricmc.fabric.api.util.TriState;
-import net.minecraft.client.renderer.chunk.ChunkSectionLayer;
-import net.minecraft.client.renderer.item.ItemStackRenderState;
-import net.minecraft.client.renderer.texture.TextureAtlasSprite;
+import net.minecraft.client.rendererer.chunk.ChunkSectionLayer;
+import net.minecraft.client.rendererer.item.ItemStackRenderState;
+import net.minecraft.client.rendererer.texture.TextureAtlasSprite;
 import net.minecraft.core.Direction;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Vector2f;

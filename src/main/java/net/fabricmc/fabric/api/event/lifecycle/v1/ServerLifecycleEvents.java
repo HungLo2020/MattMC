@@ -16,10 +16,10 @@
 
 package net.fabricmc.fabric.api.event.lifecycle.v1;
 
-import net.minecraft.resource.LifecycledResourceManager;
+import net.minecraft.server.packs.LifecycledResourceManager;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.PlayerManager;
-import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.server.network.ServerPlayer;
 
 import net.fabricmc.fabric.api.event.Event;
 import net.fabricmc.fabric.api.event.EventFactory;
@@ -157,7 +157,7 @@ public final class ServerLifecycleEvents {
 		 * @param player Player to which the data is being sent.
 		 * @param joined True if the player is joining the server, false if the server finished a successful resource reload.
 		 */
-		void onSyncDataPackContents(ServerPlayerEntity player, boolean joined);
+		void onSyncDataPackContents(ServerPlayer player, boolean joined);
 	}
 
 	@FunctionalInterface

@@ -30,11 +30,11 @@ import org.spongepowered.asm.mixin.injection.Coerce;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-import net.minecraft.registry.DynamicRegistryManager;
-import net.minecraft.registry.Registry;
-import net.minecraft.registry.RegistryKey;
-import net.minecraft.registry.RegistryLoader;
-import net.minecraft.registry.RegistryWrapper;
+import net.minecraft.core.DynamicRegistryManager;
+import net.minecraft.core.Registry;
+import net.minecraft.core.ResourceKey;
+import net.minecraft.core.RegistryLoader;
+import net.minecraft.core.RegistryWrapper;
 
 import net.fabricmc.fabric.api.event.registry.DynamicRegistrySetupCallback;
 import net.fabricmc.fabric.impl.registry.sync.DynamicRegistryViewImpl;
@@ -69,7 +69,7 @@ public class RegistryLoaderMixin {
 	private static void beforeLoad(@Coerce Object registryLoadable, List<RegistryWrapper.Impl<?>> baseRegistries, List<RegistryLoader.Entry<?>> entries, CallbackInfoReturnable<DynamicRegistryManager.Immutable> cir, @Local(ordinal = 2) List<RegistryLoader.Loader<?>> registriesList) {
 		if (!IS_SERVER.get()) return;
 
-		Map<RegistryKey<? extends Registry<?>>, Registry<?>> registries = new IdentityHashMap<>(registriesList.size());
+		Map<ResourceKey<? extends Registry<?>>, Registry<?>> registries = new IdentityHashMap<>(registriesList.size());
 
 		for (RegistryLoader.Loader<?> entry : registriesList) {
 			registries.put(entry.registry().getKey(), entry.registry());

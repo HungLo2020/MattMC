@@ -21,9 +21,9 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-import net.minecraft.client.network.ClientConfigurationNetworkHandler;
-import net.minecraft.registry.DynamicRegistryManager;
-import net.minecraft.resource.ResourceFactory;
+import net.minecraft.client.multiplayer.ClientConfigurationNetworkHandler;
+import net.minecraft.core.DynamicRegistryManager;
+import net.minecraft.server.packs.ResourceFactory;
 
 import net.fabricmc.fabric.api.event.lifecycle.v1.CommonLifecycleEvents;
 

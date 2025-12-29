@@ -22,22 +22,22 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 
 import net.minecraft.network.ClientConnection;
-import net.minecraft.util.Identifier;
+import net.minecraft.server.packss.ResourceLocation;
 
 import net.fabricmc.fabric.impl.recipe.ingredient.SupportedIngredientsClientConnection;
 
 @Mixin(ClientConnection.class)
 public abstract class ClientConnectionMixin implements SupportedIngredientsClientConnection {
 	@Unique
-	private Set<Identifier> fabric_supportedCustomIngredients = Set.of();
+	private Set<ResourceLocation> fabric_supportedCustomIngredients = Set.of();
 
 	@Override
-	public void fabric_setSupportedCustomIngredients(Set<Identifier> supportedCustomIngredients) {
+	public void fabric_setSupportedCustomIngredients(Set<ResourceLocation> supportedCustomIngredients) {
 		fabric_supportedCustomIngredients = supportedCustomIngredients;
 	}
 
 	@Override
-	public Set<Identifier> fabric_getSupportedCustomIngredients() {
+	public Set<ResourceLocation> fabric_getSupportedCustomIngredients() {
 		return fabric_supportedCustomIngredients;
 	}
 }

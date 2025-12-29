@@ -27,10 +27,10 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-import net.minecraft.registry.DynamicRegistryManager;
-import net.minecraft.registry.Registry;
-import net.minecraft.registry.RegistryLoader;
-import net.minecraft.registry.SerializableRegistries;
+import net.minecraft.core.DynamicRegistryManager;
+import net.minecraft.core.Registry;
+import net.minecraft.core.RegistryLoader;
+import net.minecraft.core.SerializableRegistries;
 
 import net.fabricmc.fabric.impl.registry.sync.DynamicRegistriesImpl;
 

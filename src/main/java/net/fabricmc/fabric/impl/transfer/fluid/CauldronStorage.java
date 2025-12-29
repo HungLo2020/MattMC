@@ -21,10 +21,10 @@ import java.util.Map;
 import com.google.common.collect.MapMaker;
 import com.google.common.primitives.Ints;
 
-import net.minecraft.block.BlockState;
-import net.minecraft.block.Blocks;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.world.World;
+import net.minecraft.world.level.block.BlockState;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.Level;
 
 import net.fabricmc.fabric.api.transfer.v1.fluid.CauldronFluidContent;
 import net.fabricmc.fabric.api.transfer.v1.fluid.FluidVariant;
@@ -39,7 +39,7 @@ import net.fabricmc.fabric.impl.transfer.DebugMessages;
  *
  * <p>Implementation notes:
  * <ul>
- *     <li>To make sure multiple access to the same cauldron return the same wrapper, we maintain a {@code (World, BlockPos) -> Wrapper} cache.</li>
+ *     <li>To make sure multiple access to the same cauldron return the same wrapper, we maintain a {@code (Level, BlockPos) -> Wrapper} cache.</li>
  *     <li>The wrapper mutates the world directly with setBlockState, but updates are suppressed.
  *     On final commit, a block update is sent by reverting to {@linkplain #lastReleasedSnapshot the initial block state} with updates suppressed,
  *     then setting the final block state again, without suppressing updates.</li>
@@ -47,7 +47,7 @@ import net.fabricmc.fabric.impl.transfer.DebugMessages;
  */
 public class CauldronStorage extends SnapshotParticipant<BlockState> implements SingleSlotStorage<FluidVariant> {
 	// Record is used for convenient constructor, hashcode and equals implementations.
-	private record WorldLocation(World world, BlockPos pos) {
+	private record WorldLocation(Level world, BlockPos pos) {
 		@Override
 		public String toString() {
 			return DebugMessages.forGlobalPos(world, pos);
@@ -57,7 +57,7 @@ public class CauldronStorage extends SnapshotParticipant<BlockState> implements 
 	// Weak values to make sure wrappers are cleaned up after use, thread-safe.
 	private static final Map<WorldLocation, CauldronStorage> CAULDRONS = new MapMaker().concurrencyLevel(1).weakValues().makeMap();
 
-	public static CauldronStorage get(World world, BlockPos pos) {
+	public static CauldronStorage get(Level world, BlockPos pos) {
 		WorldLocation location = new WorldLocation(world, pos.toImmutable());
 		return CAULDRONS.computeIfAbsent(location, CauldronStorage::new);
 	}

@@ -16,8 +16,8 @@
 
 package net.fabricmc.fabric.api.screenhandler.v1;
 
-import net.minecraft.screen.NamedScreenHandlerFactory;
-import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.world.inventory.NamedScreenHandlerFactory;
+import net.minecraft.server.network.ServerPlayer;
 
 /**
  * An extension of {@code NamedScreenHandlerFactory} that can write additional data to a screen opening packet.
@@ -32,5 +32,5 @@ public interface ExtendedScreenHandlerFactory<D> extends NamedScreenHandlerFacto
 	 * @param player the player that is opening the screen
 	 * @return the screen opening data
 	 */
-	D getScreenOpeningData(ServerPlayerEntity player);
+	D getScreenOpeningData(ServerPlayer player);
 }

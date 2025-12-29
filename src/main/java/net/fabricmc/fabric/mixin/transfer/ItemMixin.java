@@ -20,7 +20,7 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 
 import net.minecraft.component.ComponentChanges;
-import net.minecraft.item.Item;
+import net.minecraft.world.item.Item;
 
 import net.fabricmc.fabric.api.transfer.v1.item.ItemVariant;
 import net.fabricmc.fabric.impl.transfer.item.ItemVariantCache;

@@ -21,7 +21,7 @@ import org.spongepowered.asm.mixin.Mutable;
 import org.spongepowered.asm.mixin.gen.Accessor;
 
 import net.minecraft.component.ComponentMap;
-import net.minecraft.item.Item;
+import net.minecraft.world.item.Item;
 
 @Mixin(Item.class)
 public interface ItemAccessor {

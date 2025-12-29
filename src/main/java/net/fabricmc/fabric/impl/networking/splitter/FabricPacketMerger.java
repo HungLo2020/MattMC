@@ -27,10 +27,10 @@ import org.jetbrains.annotations.Nullable;
 
 import net.minecraft.network.encoding.VarInts;
 import net.minecraft.network.handler.DecoderHandler;
-import net.minecraft.network.packet.CustomPayload;
-import net.minecraft.network.packet.Packet;
-import net.minecraft.network.packet.PacketType;
-import net.minecraft.util.Identifier;
+import net.minecraft.network.protocol.CustomPayload;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.PacketType;
+import net.minecraft.server.packss.ResourceLocation;
 
 import net.fabricmc.fabric.impl.networking.GenericPayloadAccessor;
 import net.fabricmc.fabric.impl.networking.PayloadTypeRegistryImpl;
@@ -79,7 +79,7 @@ public class FabricPacketMerger extends MessageToMessageDecoder<Packet<?>> {
 				throw new DecoderException("Received unsupported split packet type! Expected '" + packet.getPacketType().id() + " got '" + (packetType != null ? packetType.id() : "<NULL>") + "'!");
 			}
 
-			Identifier payloadId = Identifier.PACKET_CODEC.decode(payload.byteBuf());
+			ResourceLocation payloadId = ResourceLocation.PACKET_CODEC.decode(payload.byteBuf());
 
 			buf.readerIndex(readerIndex);
 			int maxSize = payloadTypeRegistry.getMaxPacketSize(payloadId);
@@ -112,12 +112,12 @@ public class FabricPacketMerger extends MessageToMessageDecoder<Packet<?>> {
 
 	private static class Merger {
 		private final DecoderHandlerAccessor decoderHandler;
-		private final Identifier packetId;
+		private final ResourceLocation packetId;
 		private final int finalSize;
 
 		private final ByteBuf byteBuf;
 
-		Merger(DecoderHandler<?> decoderHandler, Identifier identifier, int finalSize) {
+		Merger(DecoderHandler<?> decoderHandler, ResourceLocation identifier, int finalSize) {
 			this.decoderHandler = (DecoderHandlerAccessor) decoderHandler;
 			this.packetId = identifier;
 			this.byteBuf = Unpooled.buffer(finalSize);

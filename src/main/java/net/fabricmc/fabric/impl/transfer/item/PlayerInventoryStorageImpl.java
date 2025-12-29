@@ -20,7 +20,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
-import net.minecraft.entity.player.PlayerInventory;
+import net.minecraft.world.entity.player.PlayerInventory;
 import net.minecraft.util.Hand;
 
 import net.fabricmc.fabric.api.transfer.v1.item.ItemVariant;

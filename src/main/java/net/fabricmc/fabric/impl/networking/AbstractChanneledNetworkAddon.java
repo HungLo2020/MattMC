@@ -30,10 +30,10 @@ import org.jetbrains.annotations.Nullable;
 import net.minecraft.network.ClientConnection;
 import net.minecraft.network.NetworkPhase;
 import net.minecraft.network.OffThreadException;
-import net.minecraft.network.packet.CustomPayload;
-import net.minecraft.network.packet.Packet;
-import net.minecraft.text.Text;
-import net.minecraft.util.Identifier;
+import net.minecraft.network.protocol.CustomPayload;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.chat.Component;
+import net.minecraft.server.packss.ResourceLocation;
 
 import net.fabricmc.fabric.api.networking.v1.PacketSender;
 
@@ -50,7 +50,7 @@ public abstract class AbstractChanneledNetworkAddon<H> extends AbstractNetworkAd
 
 	protected final ClientConnection connection;
 	protected final GlobalReceiverRegistry<H> receiver;
-	protected final Set<Identifier> sendableChannels;
+	protected final Set<ResourceLocation> sendableChannels;
 
 	protected int commonVersion = -1;
 
@@ -62,7 +62,7 @@ public abstract class AbstractChanneledNetworkAddon<H> extends AbstractNetworkAd
 	}
 
 	protected void registerPendingChannels(ChannelInfoHolder holder, NetworkPhase state) {
-		final Collection<Identifier> pending = holder.fabric_getPendingChannelsNames(state);
+		final Collection<ResourceLocation> pending = holder.fabric_getPendingChannelsNames(state);
 
 		if (!pending.isEmpty()) {
 			register(new ArrayList<>(pending));
@@ -72,7 +72,7 @@ public abstract class AbstractChanneledNetworkAddon<H> extends AbstractNetworkAd
 
 	// always supposed to handle async!
 	public boolean handle(CustomPayload payload) {
-		final Identifier channelName = payload.getId().id();
+		final ResourceLocation channelName = payload.getId().id();
 		this.logger.debug("Handling inbound packet from channel with name \"{}\"", channelName);
 
 		// Handle reserved packets
@@ -121,7 +121,7 @@ public abstract class AbstractChanneledNetworkAddon<H> extends AbstractNetworkAd
 	}
 
 	@Nullable
-	protected RegistrationPayload createRegistrationPayload(CustomPayload.Id<RegistrationPayload> id, Collection<Identifier> channels) {
+	protected RegistrationPayload createRegistrationPayload(CustomPayload.Id<RegistrationPayload> id, Collection<ResourceLocation> channels) {
 		if (channels.isEmpty()) {
 			return null;
 		}
@@ -138,12 +138,12 @@ public abstract class AbstractChanneledNetworkAddon<H> extends AbstractNetworkAd
 		}
 	}
 
-	void register(List<Identifier> ids) {
+	void register(List<ResourceLocation> ids) {
 		ids.forEach(this::registerChannel);
 		schedule(() -> this.invokeRegisterEvent(ids));
 	}
 
-	private void registerChannel(Identifier id) {
+	private void registerChannel(ResourceLocation id) {
 		if (this.sendableChannels.size() >= MAX_CHANNELS) {
 			throw new IllegalArgumentException("Cannot register more than " + MAX_CHANNELS + " channels");
 		}
@@ -155,7 +155,7 @@ public abstract class AbstractChanneledNetworkAddon<H> extends AbstractNetworkAd
 		this.sendableChannels.add(id);
 	}
 
-	void unregister(List<Identifier> ids) {
+	void unregister(List<ResourceLocation> ids) {
 		this.sendableChannels.removeAll(ids);
 		schedule(() -> this.invokeUnregisterEvent(ids));
 	}
@@ -168,7 +168,7 @@ public abstract class AbstractChanneledNetworkAddon<H> extends AbstractNetworkAd
 	}
 
 	@Override
-	public void disconnect(Text disconnectReason) {
+	public void disconnect(Component disconnectReason) {
 		Objects.requireNonNull(disconnectReason, "Disconnect reason cannot be null");
 
 		this.connection.disconnect(disconnectReason);
@@ -179,11 +179,11 @@ public abstract class AbstractChanneledNetworkAddon<H> extends AbstractNetworkAd
 	 */
 	protected abstract void schedule(Runnable task);
 
-	protected abstract void invokeRegisterEvent(List<Identifier> ids);
+	protected abstract void invokeRegisterEvent(List<ResourceLocation> ids);
 
-	protected abstract void invokeUnregisterEvent(List<Identifier> ids);
+	protected abstract void invokeUnregisterEvent(List<ResourceLocation> ids);
 
-	public Set<Identifier> getSendableChannels() {
+	public Set<ResourceLocation> getSendableChannels() {
 		return Collections.unmodifiableSet(this.sendableChannels);
 	}
 

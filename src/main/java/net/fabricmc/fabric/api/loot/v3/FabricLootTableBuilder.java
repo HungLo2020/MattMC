@@ -21,9 +21,9 @@ import java.util.function.Consumer;
 
 import org.jetbrains.annotations.ApiStatus;
 
-import net.minecraft.loot.LootPool;
-import net.minecraft.loot.LootTable;
-import net.minecraft.loot.function.LootFunction;
+import net.minecraft.world.level.storage.loot.LootPool;
+import net.minecraft.world.level.storage.loot.LootTable;
+import net.minecraft.world.level.storage.loot.function.LootFunction;
 
 import net.fabricmc.fabric.mixin.loot.LootTableAccessor;
 

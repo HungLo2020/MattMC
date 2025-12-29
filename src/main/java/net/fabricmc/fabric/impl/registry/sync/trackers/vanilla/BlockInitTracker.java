@@ -18,9 +18,9 @@ package net.fabricmc.fabric.impl.registry.sync.trackers.vanilla;
 
 import java.util.List;
 
-import net.minecraft.block.BlockState;
-import net.minecraft.registry.Registries;
-import net.minecraft.util.math.MathHelper;
+import net.minecraft.world.level.block.BlockState;
+import net.minecraft.core.Registries;
+import net.minecraft.core.MathHelper;
 
 import net.fabricmc.fabric.mixin.registry.sync.DebugChunkGeneratorAccessor;
 

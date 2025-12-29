@@ -16,12 +16,12 @@
 
 package net.fabricmc.fabric.api.object.builder.v1.block.type;
 
-import net.minecraft.block.BlockSetType;
-import net.minecraft.block.WoodType;
-import net.minecraft.sound.BlockSoundGroup;
-import net.minecraft.sound.SoundEvent;
-import net.minecraft.sound.SoundEvents;
-import net.minecraft.util.Identifier;
+import net.minecraft.world.level.block.BlockSetType;
+import net.minecraft.world.level.block.WoodType;
+import net.minecraft.sounds.BlockSoundGroup;
+import net.minecraft.sounds.SoundEvent;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.server.packss.ResourceLocation;
 
 /**
  * This class allows easy creation of {@link WoodType}s.
@@ -122,7 +122,7 @@ public final class WoodTypeBuilder {
 	/**
 	 * Builds and registers a {@link WoodType} from this builder's values.
 	 *
-	 * <p>Alternatively, you can use {@link #build(Identifier, BlockSetType)} to build without registering.
+	 * <p>Alternatively, you can use {@link #build(ResourceLocation, BlockSetType)} to build without registering.
 	 * <br>Then {@link WoodType#register(WoodType)} can be used to register it later.
 	 *
 	 * @param id the id for the built {@link WoodType}
@@ -130,7 +130,7 @@ public final class WoodTypeBuilder {
 	 *
 	 * @return the built and registered {@link WoodType}
 	 */
-	public WoodType register(Identifier id, BlockSetType setType) {
+	public WoodType register(ResourceLocation id, BlockSetType setType) {
 		return WoodType.register(this.build(id, setType));
 	}
 
@@ -138,14 +138,14 @@ public final class WoodTypeBuilder {
 	 * Builds a {@link WoodType} from this builder's values without registering it.
 	 *
 	 * <p>Use {@link WoodType#register(WoodType)} to register it later.
-	 * <br>Alternatively, you can use {@link #register(Identifier, BlockSetType)} to build and register it now.
+	 * <br>Alternatively, you can use {@link #register(ResourceLocation, BlockSetType)} to build and register it now.
 	 *
 	 * @param id the id for the built {@link WoodType}
 	 * @param setType the {@link BlockSetType} for the built {@link WoodType}
 	 *
 	 * @return the built {@link WoodType}
 	 */
-	public WoodType build(Identifier id, BlockSetType setType) {
+	public WoodType build(ResourceLocation id, BlockSetType setType) {
 		return new WoodType(id.toString(), setType, soundGroup, hangingSignSoundGroup, fenceGateCloseSound, fenceGateOpenSound);
 	}
 }

@@ -23,13 +23,13 @@ import java.util.stream.Stream;
 import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 
-import net.minecraft.item.Item;
-import net.minecraft.item.ItemStack;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.network.RegistryByteBuf;
 import net.minecraft.network.codec.PacketCodec;
-import net.minecraft.recipe.Ingredient;
-import net.minecraft.registry.entry.RegistryEntry;
-import net.minecraft.util.Identifier;
+import net.minecraft.world.item.crafting.Ingredient;
+import net.minecraft.core.entry.RegistryEntry;
+import net.minecraft.server.packss.ResourceLocation;
 
 import net.fabricmc.fabric.api.recipe.v1.ingredient.CustomIngredient;
 import net.fabricmc.fabric.api.recipe.v1.ingredient.CustomIngredientSerializer;
@@ -89,7 +89,7 @@ public class DifferenceIngredient implements CustomIngredient {
 	}
 
 	private static class Serializer implements CustomIngredientSerializer<DifferenceIngredient> {
-		private static final Identifier ID = Identifier.of("fabric", "difference");
+		private static final ResourceLocation ID = ResourceLocation.of("fabric", "difference");
 		private static final MapCodec<DifferenceIngredient> CODEC = RecordCodecBuilder.mapCodec(instance ->
 				instance.group(
 						Ingredient.CODEC.fieldOf("base").forGetter(DifferenceIngredient::getBase),
@@ -103,7 +103,7 @@ public class DifferenceIngredient implements CustomIngredient {
 		);
 
 		@Override
-		public Identifier getIdentifier() {
+		public ResourceLocation getIdentifier() {
 			return ID;
 		}
 

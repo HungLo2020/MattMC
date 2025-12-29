@@ -34,19 +34,19 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-import net.minecraft.loot.LootDataType;
-import net.minecraft.loot.LootTable;
-import net.minecraft.registry.CombinedDynamicRegistries;
-import net.minecraft.registry.MutableRegistry;
-import net.minecraft.registry.Registry;
-import net.minecraft.registry.RegistryKey;
-import net.minecraft.registry.RegistryKeys;
-import net.minecraft.registry.RegistryOps;
-import net.minecraft.registry.RegistryWrapper;
-import net.minecraft.registry.ReloadableRegistries;
-import net.minecraft.registry.ServerDynamicRegistryType;
-import net.minecraft.resource.ResourceManager;
-import net.minecraft.util.Identifier;
+import net.minecraft.world.level.storage.loot.LootDataType;
+import net.minecraft.world.level.storage.loot.LootTable;
+import net.minecraft.core.CombinedDynamicRegistries;
+import net.minecraft.core.MutableRegistry;
+import net.minecraft.core.Registry;
+import net.minecraft.core.ResourceKey;
+import net.minecraft.core.RegistryKeys;
+import net.minecraft.core.RegistryOps;
+import net.minecraft.core.RegistryWrapper;
+import net.minecraft.core.ReloadableRegistries;
+import net.minecraft.core.ServerDynamicRegistryType;
+import net.minecraft.server.packs.ResourceManager;
+import net.minecraft.server.packss.ResourceLocation;
 
 import net.fabricmc.fabric.api.loot.v3.FabricLootTableBuilder;
 import net.fabricmc.fabric.api.loot.v3.LootTableEvents;
@@ -81,15 +81,15 @@ abstract class ReloadableRegistriesMixin {
 	}
 
 	@Inject(method = "method_61240", at = @At(value = "INVOKE", target = "Ljava/util/Map;forEach(Ljava/util/function/BiConsumer;)V"))
-	private static <T> void modifyLootTable(LootDataType<T> lootDataType, ResourceManager resourceManager, RegistryOps<JsonElement> registryOps, CallbackInfoReturnable<MutableRegistry<?>> cir, @Local Map<Identifier, T> map) {
+	private static <T> void modifyLootTable(LootDataType<T> lootDataType, ResourceManager resourceManager, RegistryOps<JsonElement> registryOps, CallbackInfoReturnable<MutableRegistry<?>> cir, @Local Map<ResourceLocation, T> map) {
 		map.replaceAll((identifier, t) -> modifyLootTable(t, identifier, registryOps));
 	}
 
 	@Unique
-	private static <T> T modifyLootTable(T value, Identifier id, RegistryOps<JsonElement> ops) {
+	private static <T> T modifyLootTable(T value, ResourceLocation id, RegistryOps<JsonElement> ops) {
 		if (!(value instanceof LootTable table)) return value;
 
-		RegistryKey<LootTable> key = RegistryKey.of(RegistryKeys.LOOT_TABLE, id);
+		ResourceKey<LootTable> key = ResourceKey.of(RegistryKeys.LOOT_TABLE, id);
 		// Populated above.
 		RegistryWrapper.WrapperLookup registries = WRAPPERS.get(ops);
 		// Populated inside JsonDataLoaderMixin

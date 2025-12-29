@@ -16,20 +16,20 @@
 
 package net.fabricmc.fabric.mixin.itemgroup;
 
-import static net.minecraft.item.ItemGroups.BUILDING_BLOCKS;
-import static net.minecraft.item.ItemGroups.COLORED_BLOCKS;
-import static net.minecraft.item.ItemGroups.COMBAT;
-import static net.minecraft.item.ItemGroups.FOOD_AND_DRINK;
-import static net.minecraft.item.ItemGroups.FUNCTIONAL;
-import static net.minecraft.item.ItemGroups.HOTBAR;
-import static net.minecraft.item.ItemGroups.INGREDIENTS;
-import static net.minecraft.item.ItemGroups.INVENTORY;
-import static net.minecraft.item.ItemGroups.NATURAL;
-import static net.minecraft.item.ItemGroups.OPERATOR;
-import static net.minecraft.item.ItemGroups.REDSTONE;
-import static net.minecraft.item.ItemGroups.SEARCH;
-import static net.minecraft.item.ItemGroups.SPAWN_EGGS;
-import static net.minecraft.item.ItemGroups.TOOLS;
+import static net.minecraft.world.item.ItemGroups.BUILDING_BLOCKS;
+import static net.minecraft.world.item.ItemGroups.COLORED_BLOCKS;
+import static net.minecraft.world.item.ItemGroups.COMBAT;
+import static net.minecraft.world.item.ItemGroups.FOOD_AND_DRINK;
+import static net.minecraft.world.item.ItemGroups.FUNCTIONAL;
+import static net.minecraft.world.item.ItemGroups.HOTBAR;
+import static net.minecraft.world.item.ItemGroups.INGREDIENTS;
+import static net.minecraft.world.item.ItemGroups.INVENTORY;
+import static net.minecraft.world.item.ItemGroups.NATURAL;
+import static net.minecraft.world.item.ItemGroups.OPERATOR;
+import static net.minecraft.world.item.ItemGroups.REDSTONE;
+import static net.minecraft.world.item.ItemGroups.SEARCH;
+import static net.minecraft.world.item.ItemGroups.SPAWN_EGGS;
+import static net.minecraft.world.item.ItemGroups.TOOLS;
 
 import java.util.Comparator;
 import java.util.HashMap;
@@ -41,12 +41,12 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-import net.minecraft.item.ItemGroup;
-import net.minecraft.item.ItemGroups;
-import net.minecraft.registry.Registries;
-import net.minecraft.registry.RegistryKey;
-import net.minecraft.registry.entry.RegistryEntry;
-import net.minecraft.util.Identifier;
+import net.minecraft.world.item.ItemGroup;
+import net.minecraft.world.item.ItemGroups;
+import net.minecraft.core.Registries;
+import net.minecraft.core.ResourceKey;
+import net.minecraft.core.entry.RegistryEntry;
+import net.minecraft.server.packss.ResourceLocation;
 
 import net.fabricmc.fabric.impl.itemgroup.FabricItemGroupImpl;
 
@@ -66,7 +66,7 @@ public class ItemGroupsMixin {
 
 	@Inject(method = "updateEntries", at = @At("TAIL"))
 	private static void paginateGroups(CallbackInfo ci) {
-		final List<RegistryKey<ItemGroup>> vanillaGroups = List.of(BUILDING_BLOCKS, COLORED_BLOCKS, NATURAL, FUNCTIONAL, REDSTONE, HOTBAR, SEARCH, TOOLS, COMBAT, FOOD_AND_DRINK, INGREDIENTS, SPAWN_EGGS, OPERATOR, INVENTORY);
+		final List<ResourceKey<ItemGroup>> vanillaGroups = List.of(BUILDING_BLOCKS, COLORED_BLOCKS, NATURAL, FUNCTIONAL, REDSTONE, HOTBAR, SEARCH, TOOLS, COMBAT, FOOD_AND_DRINK, INGREDIENTS, SPAWN_EGGS, OPERATOR, INVENTORY);
 
 		int count = 0;
 
@@ -109,7 +109,7 @@ public class ItemGroupsMixin {
 		record ItemGroupPosition(ItemGroup.Row row, int column, int page) { }
 		var map = new HashMap<ItemGroupPosition, String>();
 
-		for (RegistryKey<ItemGroup> registryKey : Registries.ITEM_GROUP.getKeys()) {
+		for (ResourceKey<ItemGroup> registryKey : Registries.ITEM_GROUP.getKeys()) {
 			final ItemGroup itemGroup = Registries.ITEM_GROUP.getValueOrThrow(registryKey);
 			final FabricItemGroupImpl fabricItemGroup = (FabricItemGroupImpl) itemGroup;
 			final String displayName = itemGroup.getDisplayName().getString();
@@ -122,10 +122,10 @@ public class ItemGroupsMixin {
 		}
 	}
 
-	// Identifier#compareTo checks the path first, but we want to check the namespace first so that groups added by the
+	// ResourceLocation#compareTo checks the path first, but we want to check the namespace first so that groups added by the
 	// same mod appear next to each other.
 	@Unique
-	private static int compareNamespaceFirst(Identifier a, Identifier b) {
+	private static int compareNamespaceFirst(ResourceLocation a, ResourceLocation b) {
 		int c = a.getNamespace().compareTo(b.getNamespace());
 
 		if (c != 0) {

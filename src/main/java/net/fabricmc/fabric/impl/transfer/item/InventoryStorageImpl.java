@@ -24,10 +24,10 @@ import java.util.Map;
 import com.google.common.collect.MapMaker;
 import org.jetbrains.annotations.Nullable;
 
-import net.minecraft.entity.player.PlayerInventory;
-import net.minecraft.inventory.Inventory;
-import net.minecraft.inventory.SidedInventory;
-import net.minecraft.util.math.Direction;
+import net.minecraft.world.entity.player.PlayerInventory;
+import net.minecraft.world.item.inventory.Inventory;
+import net.minecraft.world.item.inventory.SidedInventory;
+import net.minecraft.core.Direction;
 
 import net.fabricmc.fabric.api.transfer.v1.item.InventoryStorage;
 import net.fabricmc.fabric.api.transfer.v1.item.ItemVariant;

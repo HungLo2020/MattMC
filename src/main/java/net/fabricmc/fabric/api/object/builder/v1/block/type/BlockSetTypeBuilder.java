@@ -16,11 +16,11 @@
 
 package net.fabricmc.fabric.api.object.builder.v1.block.type;
 
-import net.minecraft.block.BlockSetType;
-import net.minecraft.sound.BlockSoundGroup;
-import net.minecraft.sound.SoundEvent;
-import net.minecraft.sound.SoundEvents;
-import net.minecraft.util.Identifier;
+import net.minecraft.world.level.block.BlockSetType;
+import net.minecraft.sounds.BlockSoundGroup;
+import net.minecraft.sounds.SoundEvent;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.server.packss.ResourceLocation;
 
 /**
  * This class allows easy creation of {@link BlockSetType}s.
@@ -253,14 +253,14 @@ public final class BlockSetTypeBuilder {
 	/**
 	 * Builds and registers a {@link BlockSetType} from this builder's values.
 	 *
-	 * <p>Alternatively, you can use {@link #build(Identifier)} to build without registering.
+	 * <p>Alternatively, you can use {@link #build(ResourceLocation)} to build without registering.
 	 * <br>Then {@link BlockSetType#register(BlockSetType)} can be used to register it later.
 	 *
 	 * @param id the id for the built {@link BlockSetType}
 	 *
 	 * @return the built and registered {@link BlockSetType}
 	 */
-	public BlockSetType register(Identifier id) {
+	public BlockSetType register(ResourceLocation id) {
 		return BlockSetType.register(this.build(id));
 	}
 
@@ -268,13 +268,13 @@ public final class BlockSetTypeBuilder {
 	 * Builds a {@link BlockSetType} from this builder's values without registering it.
 	 *
 	 * <p>Use {@link BlockSetType#register(BlockSetType)} to register it later.
-	 * <br>Alternatively, you can use {@link #register(Identifier)} to build and register it now.
+	 * <br>Alternatively, you can use {@link #register(ResourceLocation)} to build and register it now.
 	 *
 	 * @param id the id for the built {@link BlockSetType}
 	 *
 	 * @return the built {@link BlockSetType}
 	 */
-	public BlockSetType build(Identifier id) {
+	public BlockSetType build(ResourceLocation id) {
 		return new BlockSetType(id.toString(), openableByHand, openableByWindCharge, buttonActivatedByArrows, pressurePlateActivationRule, soundGroup, doorCloseSound, doorOpenSound, trapdoorCloseSound, trapdoorOpenSound, pressurePlateClickOffSound, pressurePlateClickOnSound, buttonClickOffSound, buttonClickOnSound);
 	}
 }

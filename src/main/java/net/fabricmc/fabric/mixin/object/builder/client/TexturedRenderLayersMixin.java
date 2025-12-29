@@ -22,10 +22,10 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-import net.minecraft.client.render.TexturedRenderLayers;
+import net.minecraft.client.renderer.TexturedRenderLayers;
 import net.minecraft.client.util.SpriteIdentifier;
 import net.minecraft.client.util.SpriteMapper;
-import net.minecraft.util.Identifier;
+import net.minecraft.server.packss.ResourceLocation;
 
 import net.fabricmc.fabric.impl.object.builder.client.SignTypeTextureHelper;
 
@@ -38,11 +38,11 @@ abstract class TexturedRenderLayersMixin {
 
 	@Redirect(method = "createSignTextureId", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/util/SpriteMapper;mapVanilla(Ljava/lang/String;)Lnet/minecraft/client/util/SpriteIdentifier;"))
 	private static SpriteIdentifier redirectSignVanillaId(SpriteMapper instance, String name) {
-		return instance.map(Identifier.of(name));
+		return instance.map(ResourceLocation.of(name));
 	}
 
 	@Redirect(method = "createHangingSignTextureId", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/util/SpriteMapper;mapVanilla(Ljava/lang/String;)Lnet/minecraft/client/util/SpriteIdentifier;"))
 	private static SpriteIdentifier redirectHangingVanillaId(SpriteMapper instance, String name) {
-		return instance.map(Identifier.of(name));
+		return instance.map(ResourceLocation.of(name));
 	}
 }

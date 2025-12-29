@@ -26,7 +26,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import net.minecraft.client.particle.ParticleFactory;
 import net.minecraft.client.particle.ParticleSpriteManager;
-import net.minecraft.registry.Registries;
+import net.minecraft.core.Registries;
 
 import net.fabricmc.fabric.impl.registry.sync.trackers.Int2ObjectMapTracker;
 

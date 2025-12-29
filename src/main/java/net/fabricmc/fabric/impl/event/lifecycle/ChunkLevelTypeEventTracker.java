@@ -16,7 +16,7 @@
 
 package net.fabricmc.fabric.impl.event.lifecycle;
 
-import net.minecraft.server.world.ChunkLevelType;
+import net.minecraft.server.level.ChunkLevelType;
 
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerChunkEvents;
 

@@ -16,21 +16,21 @@
 
 package net.fabricmc.fabric.impl.transfer.item;
 
-import static net.minecraft.util.math.Direction.UP;
+import static net.minecraft.core.Direction.UP;
 
 import java.util.Map;
 
 import com.google.common.collect.MapMaker;
 import org.jetbrains.annotations.Nullable;
 
-import net.minecraft.block.BlockState;
-import net.minecraft.block.ComposterBlock;
-import net.minecraft.item.Items;
-import net.minecraft.sound.SoundCategory;
-import net.minecraft.sound.SoundEvents;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Direction;
-import net.minecraft.world.World;
+import net.minecraft.world.level.block.BlockState;
+import net.minecraft.world.level.block.ComposterBlock;
+import net.minecraft.world.item.Items;
+import net.minecraft.sounds.SoundCategory;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.world.Level;
 import net.minecraft.world.WorldEvents;
 
 import net.fabricmc.fabric.api.transfer.v1.item.ItemVariant;
@@ -48,7 +48,7 @@ import net.fabricmc.fabric.impl.transfer.DebugMessages;
  */
 public class ComposterWrapper extends SnapshotParticipant<Float> {
 	// Record is used for convenient constructor, hashcode and equals implementations.
-	private record WorldLocation(World world, BlockPos pos) {
+	private record WorldLocation(Level world, BlockPos pos) {
 		private BlockState getBlockState() {
 			return world.getBlockState(pos);
 		}
@@ -68,7 +68,7 @@ public class ComposterWrapper extends SnapshotParticipant<Float> {
 	private static final Map<WorldLocation, ComposterWrapper> COMPOSTERS = new MapMaker().concurrencyLevel(1).weakValues().makeMap();
 
 	@Nullable
-	public static Storage<ItemVariant> get(World world, BlockPos pos, @Nullable Direction direction) {
+	public static Storage<ItemVariant> get(Level world, BlockPos pos, @Nullable Direction direction) {
 		if (direction != null && direction.getAxis().isVertical()) {
 			WorldLocation location = new WorldLocation(world, pos.toImmutable());
 			ComposterWrapper composterWrapper = COMPOSTERS.computeIfAbsent(location, ComposterWrapper::new);

@@ -16,9 +16,9 @@
 
 package net.fabricmc.fabric.api.itemgroup.v1;
 
-import net.minecraft.item.ItemGroup;
-import net.minecraft.item.ItemGroups;
-import net.minecraft.registry.RegistryKey;
+import net.minecraft.world.item.ItemGroup;
+import net.minecraft.world.item.ItemGroups;
+import net.minecraft.core.ResourceKey;
 
 import net.fabricmc.fabric.api.event.Event;
 import net.fabricmc.fabric.api.event.EventFactory;
@@ -34,7 +34,7 @@ public final class ItemGroupEvents {
 	/**
 	 * This event allows the entries of any item group to be modified.
 	 * <p/>
-	 * Use {@link #modifyEntriesEvent(RegistryKey)} to get the event for a specific item group.
+	 * Use {@link #modifyEntriesEvent(ResourceKey)} to get the event for a specific item group.
 	 * <p/>
 	 * This event is invoked after those two more specific events.
 	 */
@@ -47,10 +47,10 @@ public final class ItemGroupEvents {
 	/**
 	 * Returns the modify entries event for a specific item group. This uses the group ID and
 	 * is suitable for modifying a modded item group that might not exist.
-	 * @param registryKey the {@link RegistryKey} of the item group to modify
+	 * @param registryKey the {@link ResourceKey} of the item group to modify
 	 * @return the event
 	 */
-	public static Event<ModifyEntries> modifyEntriesEvent(RegistryKey<ItemGroup> registryKey) {
+	public static Event<ModifyEntries> modifyEntriesEvent(ResourceKey<ItemGroup> registryKey) {
 		return ItemGroupEventsImpl.getOrCreateModifyEntriesEvent(registryKey);
 	}
 

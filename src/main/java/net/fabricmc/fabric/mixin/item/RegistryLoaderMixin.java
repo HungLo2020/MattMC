@@ -26,13 +26,13 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 
 import net.minecraft.enchantment.Enchantment;
-import net.minecraft.registry.MutableRegistry;
-import net.minecraft.registry.RegistryKey;
-import net.minecraft.registry.RegistryLoader;
-import net.minecraft.registry.RegistryOps;
-import net.minecraft.registry.entry.RegistryEntry;
-import net.minecraft.registry.entry.RegistryEntryInfo;
-import net.minecraft.resource.Resource;
+import net.minecraft.core.MutableRegistry;
+import net.minecraft.core.ResourceKey;
+import net.minecraft.core.RegistryLoader;
+import net.minecraft.core.RegistryOps;
+import net.minecraft.core.entry.RegistryEntry;
+import net.minecraft.core.entry.RegistryEntryInfo;
+import net.minecraft.server.packs.Resource;
 
 import net.fabricmc.fabric.impl.item.EnchantmentUtil;
 
@@ -42,25 +42,25 @@ abstract class RegistryLoaderMixin {
 			method = "parseAndAdd",
 			at = @At(
 					value = "INVOKE",
-					target = "Lnet/minecraft/registry/MutableRegistry;add(Lnet/minecraft/registry/RegistryKey;Ljava/lang/Object;Lnet/minecraft/registry/entry/RegistryEntryInfo;)Lnet/minecraft/registry/entry/RegistryEntry$Reference;"
+					target = "Lnet/minecraft/registry/MutableRegistry;add(Lnet/minecraft/registry/ResourceKey;Ljava/lang/Object;Lnet/minecraft/registry/entry/RegistryEntryInfo;)Lnet/minecraft/registry/entry/RegistryEntry$Reference;"
 			)
 	)
 	@SuppressWarnings("unchecked")
 	private static <T> RegistryEntry.Reference<T> enchantmentKey(
 			MutableRegistry<T> instance,
-			RegistryKey<T> objectKey,
+			ResourceKey<T> objectKey,
 			Object object,
 			RegistryEntryInfo registryEntryInfo,
 			Operation<RegistryEntry.Reference<T>> original,
 			MutableRegistry<T> registry,
 			Decoder<T> decoder,
 			RegistryOps<JsonElement> ops,
-			RegistryKey<T> registryKey,
+			ResourceKey<T> registryKey,
 			Resource resource,
 			RegistryEntryInfo entryInfo
 	) {
 		if (object instanceof Enchantment enchantment) {
-			Enchantment modified = EnchantmentUtil.modify((RegistryKey<Enchantment>) objectKey, enchantment, EnchantmentUtil.determineSource(resource));
+			Enchantment modified = EnchantmentUtil.modify((ResourceKey<Enchantment>) objectKey, enchantment, EnchantmentUtil.determineSource(resource));
 
 			if (modified != null) {
 				object = modified;

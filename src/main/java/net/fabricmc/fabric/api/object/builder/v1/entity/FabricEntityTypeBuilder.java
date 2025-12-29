@@ -23,20 +23,20 @@ import java.util.function.UnaryOperator;
 import com.google.common.collect.ImmutableSet;
 import org.jetbrains.annotations.Nullable;
 
-import net.minecraft.block.Block;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.EntityDimensions;
-import net.minecraft.entity.EntityType;
-import net.minecraft.entity.LivingEntity;
-import net.minecraft.entity.SpawnGroup;
-import net.minecraft.entity.SpawnLocation;
-import net.minecraft.entity.SpawnRestriction;
-import net.minecraft.entity.attribute.DefaultAttributeContainer;
-import net.minecraft.entity.mob.MobEntity;
-import net.minecraft.registry.RegistryKey;
-import net.minecraft.resource.featuretoggle.FeatureFlag;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityDimensions;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.SpawnGroup;
+import net.minecraft.world.entity.SpawnLocation;
+import net.minecraft.world.entity.SpawnRestriction;
+import net.minecraft.world.entity.attribute.DefaultAttributeContainer;
+import net.minecraft.world.entity.mob.MobEntity;
+import net.minecraft.core.ResourceKey;
+import net.minecraft.world.flag.FeatureFlag;
 import net.minecraft.world.Heightmap;
-import net.minecraft.world.World;
+import net.minecraft.world.Level;
 
 /**
  * @deprecated replace with {@link EntityType.Builder}
@@ -135,7 +135,7 @@ public class FabricEntityTypeBuilder<T extends Entity> {
 		return new FabricEntityTypeBuilder.Mob<>(SpawnGroup.MISC, FabricEntityTypeBuilder::emptyFactory);
 	}
 
-	private static <T extends Entity> T emptyFactory(EntityType<T> type, World world) {
+	private static <T extends Entity> T emptyFactory(EntityType<T> type, Level world) {
 		return null;
 	}
 
@@ -307,10 +307,10 @@ public class FabricEntityTypeBuilder<T extends Entity> {
 	 * Creates the entity type.
 	 *
 	 * @return a new {@link EntityType}
-	 * @deprecated use {@link EntityType.Builder#build(net.minecraft.registry.RegistryKey)}
+	 * @deprecated use {@link EntityType.Builder#build(net.minecraft.core.ResourceKey)}
 	 */
 	@Deprecated
-	public EntityType<T> build(RegistryKey<EntityType<?>> key) {
+	public EntityType<T> build(ResourceKey<EntityType<?>> key) {
 		EntityType.Builder<T> builder = EntityType.Builder.create(this.factory, this.spawnGroup)
 				.allowSpawningInside(specificSpawnBlocks.toArray(Block[]::new))
 				.maxTrackingRange(this.trackRange)
@@ -477,7 +477,7 @@ public class FabricEntityTypeBuilder<T extends Entity> {
 
 		@Deprecated
 		@Override
-		public EntityType<T> build(RegistryKey<EntityType<?>> key) {
+		public EntityType<T> build(ResourceKey<EntityType<?>> key) {
 			final EntityType<T> type = super.build(key);
 
 			if (this.defaultAttributeBuilder != null) {
@@ -618,7 +618,7 @@ public class FabricEntityTypeBuilder<T extends Entity> {
 		}
 
 		@Override
-		public EntityType<T> build(RegistryKey<EntityType<?>> key) {
+		public EntityType<T> build(ResourceKey<EntityType<?>> key) {
 			EntityType<T> type = super.build(key);
 
 			if (this.spawnPredicate != null) {

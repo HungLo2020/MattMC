@@ -24,13 +24,13 @@ import io.netty.channel.ChannelFutureListener;
 import org.jetbrains.annotations.Nullable;
 
 import net.minecraft.network.NetworkPhase;
-import net.minecraft.network.packet.BrandCustomPayload;
-import net.minecraft.network.packet.CustomPayload;
-import net.minecraft.network.packet.Packet;
-import net.minecraft.network.packet.s2c.common.CommonPingS2CPacket;
+import net.minecraft.network.protocol.BrandCustomPayload;
+import net.minecraft.network.protocol.CustomPayload;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.s2c.common.CommonPingS2CPacket;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.network.ServerConfigurationNetworkHandler;
-import net.minecraft.util.Identifier;
+import net.minecraft.server.packss.ResourceLocation;
 
 import net.fabricmc.fabric.api.networking.v1.PacketSender;
 import net.fabricmc.fabric.api.networking.v1.S2CConfigurationChannelEvents;
@@ -146,17 +146,17 @@ public final class ServerConfigurationNetworkAddon extends AbstractChanneledNetw
 	}
 
 	@Override
-	protected void invokeRegisterEvent(List<Identifier> ids) {
+	protected void invokeRegisterEvent(List<ResourceLocation> ids) {
 		S2CConfigurationChannelEvents.REGISTER.invoker().onChannelRegister(this.handler, this, this.server, ids);
 	}
 
 	@Override
-	protected void invokeUnregisterEvent(List<Identifier> ids) {
+	protected void invokeUnregisterEvent(List<ResourceLocation> ids) {
 		S2CConfigurationChannelEvents.UNREGISTER.invoker().onChannelUnregister(this.handler, this, this.server, ids);
 	}
 
 	@Override
-	protected void handleRegistration(Identifier channelName) {
+	protected void handleRegistration(ResourceLocation channelName) {
 		// If we can already send packets, immediately send the register packet for this channel
 		if (this.registerState != RegisterState.NOT_SENT) {
 			RegistrationPayload registrationPayload = this.createRegistrationPayload(RegistrationPayload.REGISTER, Collections.singleton(channelName));
@@ -168,7 +168,7 @@ public final class ServerConfigurationNetworkAddon extends AbstractChanneledNetw
 	}
 
 	@Override
-	protected void handleUnregistration(Identifier channelName) {
+	protected void handleUnregistration(ResourceLocation channelName) {
 		// If we can already send packets, immediately send the unregister packet for this channel
 		if (this.registerState != RegisterState.NOT_SENT) {
 			RegistrationPayload registrationPayload = this.createRegistrationPayload(RegistrationPayload.UNREGISTER, Collections.singleton(channelName));
@@ -185,7 +185,7 @@ public final class ServerConfigurationNetworkAddon extends AbstractChanneledNetw
 	}
 
 	@Override
-	protected boolean isReservedChannel(Identifier channelName) {
+	protected boolean isReservedChannel(ResourceLocation channelName) {
 		return NetworkingImpl.isReservedCommonChannel(channelName);
 	}
 

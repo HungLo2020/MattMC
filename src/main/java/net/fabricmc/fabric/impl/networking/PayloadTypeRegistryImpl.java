@@ -31,9 +31,9 @@ import net.minecraft.network.PacketByteBuf;
 import net.minecraft.network.RegistryByteBuf;
 import net.minecraft.network.codec.PacketCodec;
 import net.minecraft.network.encoding.VarInts;
-import net.minecraft.network.packet.CustomPayload;
+import net.minecraft.network.protocol.CustomPayload;
 import net.minecraft.network.state.NetworkState;
-import net.minecraft.util.Identifier;
+import net.minecraft.server.packss.ResourceLocation;
 
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.fabricmc.fabric.impl.networking.splitter.FabricPacketSplitter;
@@ -43,8 +43,8 @@ public class PayloadTypeRegistryImpl<B extends PacketByteBuf> implements Payload
 	public static final PayloadTypeRegistryImpl<PacketByteBuf> CONFIGURATION_S2C = new PayloadTypeRegistryImpl<>(NetworkPhase.CONFIGURATION, NetworkSide.CLIENTBOUND);
 	public static final PayloadTypeRegistryImpl<RegistryByteBuf> PLAY_C2S = new PayloadTypeRegistryImpl<>(NetworkPhase.PLAY, NetworkSide.SERVERBOUND);
 	public static final PayloadTypeRegistryImpl<RegistryByteBuf> PLAY_S2C = new PayloadTypeRegistryImpl<>(NetworkPhase.PLAY, NetworkSide.CLIENTBOUND);
-	private final Map<Identifier, CustomPayload.Type<B, ? extends CustomPayload>> packetTypes = new HashMap<>();
-	private final Object2IntMap<Identifier> maxPacketSize = new Object2IntOpenHashMap<>();
+	private final Map<ResourceLocation, CustomPayload.Type<B, ? extends CustomPayload>> packetTypes = new HashMap<>();
+	private final Object2IntMap<ResourceLocation> maxPacketSize = new Object2IntOpenHashMap<>();
 	private final NetworkPhase state;
 	private final NetworkSide side;
 	private final int minimalSplittableSize;
@@ -86,7 +86,7 @@ public class PayloadTypeRegistryImpl<B extends PacketByteBuf> implements Payload
 		}
 
 		CustomPayload.Type<? super B, T> type = register(id, codec);
-		// Defines max packet size, increased by length of packet's Identifier to cover full size of CustomPayloadX2YPackets.
+		// Defines max packet size, increased by length of packet's ResourceLocation to cover full size of CustomPayloadX2YPackets.
 		int identifierSize = ByteBufUtil.utf8MaxBytes(id.id().toString());
 		int maxPacketSize = maxPayloadSize + VarInts.getSizeInBytes(identifierSize) + identifierSize + 5 * 2;
 
@@ -104,7 +104,7 @@ public class PayloadTypeRegistryImpl<B extends PacketByteBuf> implements Payload
 	}
 
 	@Nullable
-	public CustomPayload.Type<B, ? extends CustomPayload> get(Identifier id) {
+	public CustomPayload.Type<B, ? extends CustomPayload> get(ResourceLocation id) {
 		return packetTypes.get(id);
 	}
 
@@ -114,7 +114,7 @@ public class PayloadTypeRegistryImpl<B extends PacketByteBuf> implements Payload
 		return (CustomPayload.Type<B, T>) packetTypes.get(id.id());
 	}
 
-	public int getMaxPacketSize(Identifier id) {
+	public int getMaxPacketSize(ResourceLocation id) {
 		return this.maxPacketSize.getOrDefault(id, -1);
 	}
 

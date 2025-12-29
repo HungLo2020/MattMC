@@ -26,9 +26,9 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import net.minecraft.network.codec.PacketCodec;
 import net.minecraft.network.handler.PacketCodecDispatcher;
-import net.minecraft.network.packet.CustomPayload;
-import net.minecraft.network.packet.c2s.common.CustomPayloadC2SPacket;
-import net.minecraft.network.packet.s2c.common.CustomPayloadS2CPacket;
+import net.minecraft.network.protocol.CustomPayload;
+import net.minecraft.network.protocol.c2s.common.CustomPayloadC2SPacket;
+import net.minecraft.network.protocol.s2c.common.CustomPayloadS2CPacket;
 
 @Mixin(PacketCodecDispatcher.class)
 public abstract class PacketCodecDispatcherMixin<B extends ByteBuf, V, T> implements PacketCodec<B, V> {

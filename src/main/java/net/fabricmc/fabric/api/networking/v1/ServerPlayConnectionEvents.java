@@ -16,7 +16,7 @@
 
 package net.fabricmc.fabric.api.networking.v1;
 
-import net.minecraft.network.packet.CustomPayload;
+import net.minecraft.network.protocol.CustomPayload;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.network.ServerPlayNetworkHandler;
 

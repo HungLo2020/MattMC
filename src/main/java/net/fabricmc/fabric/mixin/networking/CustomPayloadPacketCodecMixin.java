@@ -25,8 +25,8 @@ import org.spongepowered.asm.mixin.injection.Coerce;
 
 import net.minecraft.network.PacketByteBuf;
 import net.minecraft.network.codec.PacketCodec;
-import net.minecraft.network.packet.CustomPayload;
-import net.minecraft.util.Identifier;
+import net.minecraft.network.protocol.CustomPayload;
+import net.minecraft.server.packss.ResourceLocation;
 
 import net.fabricmc.fabric.impl.networking.CustomPayloadTypeProvider;
 import net.fabricmc.fabric.impl.networking.FabricCustomPayloadPacketCodec;
@@ -48,8 +48,8 @@ public abstract class CustomPayloadPacketCodecMixin<B extends PacketByteBuf> imp
 	@WrapOperation(method = {
 			"encode(Lnet/minecraft/network/PacketByteBuf;Lnet/minecraft/network/packet/CustomPayload$Id;Lnet/minecraft/network/packet/CustomPayload;)V",
 			"decode(Lnet/minecraft/network/PacketByteBuf;)Lnet/minecraft/network/packet/CustomPayload;"
-	}, at = @At(value = "INVOKE", target = "Lnet/minecraft/network/packet/CustomPayload$1;getCodec(Lnet/minecraft/util/Identifier;)Lnet/minecraft/network/codec/PacketCodec;"))
-	private PacketCodec<B, ? extends CustomPayload> wrapGetCodec(@Coerce PacketCodec<B, CustomPayload> instance, Identifier identifier, Operation<PacketCodec<B, CustomPayload>> original, B packetByteBuf) {
+	}, at = @At(value = "INVOKE", target = "Lnet/minecraft/network/packet/CustomPayload$1;getCodec(Lnet/minecraft/util/ResourceLocation;)Lnet/minecraft/network/codec/PacketCodec;"))
+	private PacketCodec<B, ? extends CustomPayload> wrapGetCodec(@Coerce PacketCodec<B, CustomPayload> instance, ResourceLocation identifier, Operation<PacketCodec<B, CustomPayload>> original, B packetByteBuf) {
 		if (customPayloadTypeProvider != null) {
 			CustomPayload.Type<B, ? extends CustomPayload> payloadType = customPayloadTypeProvider.get(packetByteBuf, identifier);
 

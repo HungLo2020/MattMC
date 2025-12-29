@@ -20,12 +20,12 @@ import java.util.function.Function;
 
 import org.jetbrains.annotations.ApiStatus;
 
-import net.minecraft.registry.RegistryWrapper;
-import net.minecraft.resource.ResourceManager;
-import net.minecraft.resource.ResourceReloader;
-import net.minecraft.resource.ResourceType;
-import net.minecraft.text.Text;
-import net.minecraft.util.Identifier;
+import net.minecraft.core.RegistryWrapper;
+import net.minecraft.server.packs.ResourceManager;
+import net.minecraft.server.packs.ResourceReloader;
+import net.minecraft.server.packs.ResourceType;
+import net.minecraft.network.chat.Component;
+import net.minecraft.server.packss.ResourceLocation;
 
 import net.fabricmc.fabric.impl.resource.loader.ResourceManagerHelperImpl;
 import net.fabricmc.loader.api.ModContainer;
@@ -39,7 +39,7 @@ public interface ResourceManagerHelper {
 	 * Add a resource reload listener for a given registry.
 	 *
 	 * @param listener The resource reload listener.
-	 * @deprecated Use {@link net.fabricmc.fabric.api.resource.v1.ResourceLoader#registerReloader(Identifier, ResourceReloader)} instead.
+	 * @deprecated Use {@link net.fabricmc.fabric.api.resource.v1.ResourceLoader#registerReloader(ResourceLocation, ResourceReloader)} instead.
 	 */
 	@Deprecated
 	default void addReloadListener(IdentifiableResourceReloadListener listener) {
@@ -50,7 +50,7 @@ public interface ResourceManagerHelper {
 	 * Register a resource reload listener for a given resource manager type.
 	 *
 	 * @param listener The resource reload listener.
-	 * @deprecated Use {@link net.fabricmc.fabric.api.resource.v1.ResourceLoader#registerReloader(Identifier, ResourceReloader)} instead.
+	 * @deprecated Use {@link net.fabricmc.fabric.api.resource.v1.ResourceLoader#registerReloader(ResourceLocation, ResourceReloader)} instead.
 	 */
 	@Deprecated
 	void registerReloadListener(IdentifiableResourceReloadListener listener);
@@ -62,11 +62,11 @@ public interface ResourceManagerHelper {
 	 *
 	 * @param identifier The identifier of the listener.
 	 * @param listenerFactory   A function that creates a new instance of the listener with a given registry lookup.
-	 * @deprecated Use {@link net.fabricmc.fabric.api.resource.v1.ResourceLoader#RELOADER_REGISTRY_LOOKUP_KEY} with {@link net.minecraft.resource.ResourceReloader.Store},
-	 * or {@link net.fabricmc.fabric.api.resource.v1.DataResourceLoader#registerReloader(Identifier, Function)} instead.
+	 * @deprecated Use {@link net.fabricmc.fabric.api.resource.v1.ResourceLoader#RELOADER_REGISTRY_LOOKUP_KEY} with {@link net.minecraft.server.packs.ResourceReloader.Store},
+	 * or {@link net.fabricmc.fabric.api.resource.v1.DataResourceLoader#registerReloader(ResourceLocation, Function)} instead.
 	 */
 	@Deprecated
-	void registerReloadListener(Identifier identifier, Function<RegistryWrapper.WrapperLookup, IdentifiableResourceReloadListener> listenerFactory);
+	void registerReloadListener(ResourceLocation identifier, Function<RegistryWrapper.WrapperLookup, IdentifiableResourceReloadListener> listenerFactory);
 
 	/**
 	 * Get the ResourceManagerHelper instance for a given resource type.
@@ -94,7 +94,7 @@ public interface ResourceManagerHelper {
 	 * @param activationType the activation type of the resource pack
 	 * @return {@code true} if successfully registered the resource pack, else {@code false}
 	 */
-	static boolean registerBuiltinResourcePack(Identifier id, ModContainer container, ResourcePackActivationType activationType) {
+	static boolean registerBuiltinResourcePack(ResourceLocation id, ModContainer container, ResourcePackActivationType activationType) {
 		return ResourceManagerHelperImpl.registerBuiltinResourcePack(id, "resourcepacks/" + id.getPath(), container, activationType);
 	}
 
@@ -115,7 +115,7 @@ public interface ResourceManagerHelper {
 	 * @param activationType the activation type of the resource pack
 	 * @return {@code true} if successfully registered the resource pack, else {@code false}
 	 */
-	static boolean registerBuiltinResourcePack(Identifier id, ModContainer container, Text displayName, ResourcePackActivationType activationType) {
+	static boolean registerBuiltinResourcePack(ResourceLocation id, ModContainer container, Component displayName, ResourcePackActivationType activationType) {
 		return ResourceManagerHelperImpl.registerBuiltinResourcePack(id, "resourcepacks/" + id.getPath(), container, displayName, activationType);
 	}
 
@@ -135,11 +135,11 @@ public interface ResourceManagerHelper {
 	 * @param displayName    the display name of the resource pack, should include mod name for clarity
 	 * @param activationType the activation type of the resource pack
 	 * @return {@code true} if successfully registered the resource pack, else {@code false}
-	 * @deprecated Use {@link #registerBuiltinResourcePack(Identifier, ModContainer, Text, ResourcePackActivationType)} instead.
+	 * @deprecated Use {@link #registerBuiltinResourcePack(ResourceLocation, ModContainer, Component, ResourcePackActivationType)} instead.
 	 */
 	@Deprecated
-	static boolean registerBuiltinResourcePack(Identifier id, ModContainer container, String displayName, ResourcePackActivationType activationType) {
-		return ResourceManagerHelperImpl.registerBuiltinResourcePack(id, "resourcepacks/" + id.getPath(), container, Text.literal(displayName), activationType);
+	static boolean registerBuiltinResourcePack(ResourceLocation id, ModContainer container, String displayName, ResourcePackActivationType activationType) {
+		return ResourceManagerHelperImpl.registerBuiltinResourcePack(id, "resourcepacks/" + id.getPath(), container, Component.literal(displayName), activationType);
 	}
 
 	/**
@@ -160,11 +160,11 @@ public interface ResourceManagerHelper {
 	 * @param container        the mod container
 	 * @param enabledByDefault {@code true} if enabled by default, else {@code false}
 	 * @return {@code true} if successfully registered the resource pack, else {@code false}
-	 * @deprecated Please use {@link #registerBuiltinResourcePack(Identifier, ModContainer, ResourcePackActivationType)} instead, the {@code sub path} should be removed in a future
+	 * @deprecated Please use {@link #registerBuiltinResourcePack(ResourceLocation, ModContainer, ResourcePackActivationType)} instead, the {@code sub path} should be removed in a future
 	 * release in favor of the identifier path.
 	 */
 	@Deprecated
-	static boolean registerBuiltinResourcePack(Identifier id, String subPath, ModContainer container, boolean enabledByDefault) {
+	static boolean registerBuiltinResourcePack(ResourceLocation id, String subPath, ModContainer container, boolean enabledByDefault) {
 		return ResourceManagerHelperImpl.registerBuiltinResourcePack(id, subPath, container,
 				enabledByDefault ? ResourcePackActivationType.DEFAULT_ENABLED : ResourcePackActivationType.NORMAL);
 	}

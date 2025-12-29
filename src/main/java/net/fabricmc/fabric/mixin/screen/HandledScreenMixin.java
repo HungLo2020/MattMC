@@ -23,12 +23,12 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import net.minecraft.client.gui.Click;
 import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.gui.screen.ingame.HandledScreen;
-import net.minecraft.text.Text;
+import net.minecraft.client.gui.screen.ingame.AbstractContainerScreen;
+import net.minecraft.network.chat.Component;
 
-@Mixin(HandledScreen.class)
+@Mixin(AbstractContainerScreen.class)
 public abstract class HandledScreenMixin extends Screen {
-	private HandledScreenMixin(Text title) {
+	private HandledScreenMixin(Component title) {
 		super(title);
 	}
 

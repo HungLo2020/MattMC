@@ -18,8 +18,8 @@ package net.fabricmc.fabric.api.recipe.v1.sync;
 
 import java.util.Objects;
 
-import net.minecraft.recipe.RecipeSerializer;
-import net.minecraft.util.Identifier;
+import net.minecraft.world.item.crafting.RecipeSerializer;
+import net.minecraft.server.packss.ResourceLocation;
 
 import net.fabricmc.fabric.api.event.Event;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
@@ -38,7 +38,7 @@ public final class RecipeSynchronization {
 	 * Event phase used for sending recipes to the client. It runs after the default event phase {@link Event#DEFAULT_PHASE}.
 	 * It's defined for {@link ServerLifecycleEvents#SYNC_DATA_PACK_CONTENTS} event.
 	 */
-	public static final Identifier RECIPE_SYNC_EVENT_PHASE = RecipeSyncImpl.RECIPE_SYNC_EVENT_PHASE;
+	public static final ResourceLocation RECIPE_SYNC_EVENT_PHASE = RecipeSyncImpl.RECIPE_SYNC_EVENT_PHASE;
 
 	private RecipeSynchronization() {
 	}

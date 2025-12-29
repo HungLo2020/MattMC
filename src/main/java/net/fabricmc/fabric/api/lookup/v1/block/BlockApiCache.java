@@ -21,16 +21,16 @@ import java.util.Objects;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.Nullable;
 
-import net.minecraft.block.BlockState;
-import net.minecraft.block.entity.BlockEntity;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.util.math.BlockPos;
+import net.minecraft.world.level.block.BlockState;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.core.BlockPos;
 
 import net.fabricmc.fabric.impl.lookup.block.BlockApiCacheImpl;
 import net.fabricmc.fabric.impl.lookup.block.BlockApiLookupImpl;
 
 /**
- * A {@link BlockApiLookup} bound to a {@link ServerWorld} and a position, providing much faster API access.
+ * A {@link BlockApiLookup} bound to a {@link ServerLevel} and a position, providing much faster API access.
  * Refer to {@link BlockApiLookup} for example code.
  *
  * <p>This object caches the block entity at the target position, and the last used API provider, removing those queries.
@@ -82,7 +82,7 @@ public interface BlockApiCache<A, C> {
 	/**
 	 * Return the world this cache is bound to.
 	 */
-	ServerWorld getWorld();
+	ServerLevel getWorld();
 
 	/**
 	 * Return the position this cache is bound to.
@@ -90,14 +90,14 @@ public interface BlockApiCache<A, C> {
 	BlockPos getPos();
 
 	/**
-	 * Create a new instance bound to the passed {@link ServerWorld} and position, and querying the same API as the passed lookup.
+	 * Create a new instance bound to the passed {@link ServerLevel} and position, and querying the same API as the passed lookup.
 	 */
-	static <A, C> BlockApiCache<A, C> create(BlockApiLookup<A, C> lookup, ServerWorld world, BlockPos pos) {
+	static <A, C> BlockApiCache<A, C> create(BlockApiLookup<A, C> lookup, ServerLevel world, BlockPos pos) {
 		Objects.requireNonNull(pos, "BlockPos may not be null.");
-		Objects.requireNonNull(world, "ServerWorld may not be null.");
+		Objects.requireNonNull(world, "ServerLevel may not be null.");
 
 		if (!(lookup instanceof BlockApiLookupImpl)) {
-			throw new IllegalArgumentException("Cannot cache foreign implementation of BlockApiLookup. Use `BlockApiLookup#get(Identifier, Class<A>, Class<C>);` to get instances.");
+			throw new IllegalArgumentException("Cannot cache foreign implementation of BlockApiLookup. Use `BlockApiLookup#get(ResourceLocation, Class<A>, Class<C>);` to get instances.");
 		}
 
 		return new BlockApiCacheImpl<>((BlockApiLookupImpl<A, C>) lookup, world, pos);

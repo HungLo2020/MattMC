@@ -22,16 +22,16 @@ import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Redirect;
 
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.network.ClientPlayerInteractionManager;
-import net.minecraft.item.ItemStack;
-import net.minecraft.util.math.BlockPos;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.multiplayer.ClientPlayerInteractionManager;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.core.BlockPos;
 
 @Mixin(ClientPlayerInteractionManager.class)
 public class ClientPlayerInteractionManagerMixin {
 	@Shadow
 	@Final
-	private MinecraftClient client;
+	private Minecraft client;
 	@Shadow
 	private BlockPos currentBreakingPos;
 	@Shadow

@@ -24,7 +24,7 @@ import org.jetbrains.annotations.Nullable;
 import net.minecraft.client.particle.ParticleManager;
 import net.minecraft.client.particle.ParticleRenderer;
 import net.minecraft.client.particle.ParticleTextureSheet;
-import net.minecraft.util.Identifier;
+import net.minecraft.server.packss.ResourceLocation;
 
 import net.fabricmc.fabric.impl.client.particle.ParticleRendererRegistryImpl;
 
@@ -53,7 +53,7 @@ public final class ParticleRendererRegistry {
 	 * @param first  the texture sheet to render first
 	 * @param second the texture sheet to render second
 	 */
-	public static void registerOrdering(ParticleTextureSheet first, Identifier second) {
+	public static void registerOrdering(ParticleTextureSheet first, ResourceLocation second) {
 		registerOrdering(getId(first), second);
 	}
 
@@ -83,7 +83,7 @@ public final class ParticleRendererRegistry {
 	 * @param first  the texture sheet to render first
 	 * @param second the texture sheet to render second
 	 */
-	public static void registerOrdering(Identifier first, ParticleTextureSheet second) {
+	public static void registerOrdering(ResourceLocation first, ParticleTextureSheet second) {
 		registerOrdering(first, getId(second));
 	}
 
@@ -98,7 +98,7 @@ public final class ParticleRendererRegistry {
 	 * @param first  the texture sheet to render first
 	 * @param second the texture sheet to render second
 	 */
-	public static void registerOrdering(Identifier first, Identifier second) {
+	public static void registerOrdering(ResourceLocation first, ResourceLocation second) {
 		ParticleRendererRegistryImpl.INSTANCE.registerOrdering(first, second);
 	}
 
@@ -108,7 +108,7 @@ public final class ParticleRendererRegistry {
 	 * @param id the identifier of the texture sheet
 	 * @return the texture sheet, or null if none is registered with the given identifier
 	 */
-	public static @Nullable ParticleTextureSheet getParticleTextureSheet(Identifier id) {
+	public static @Nullable ParticleTextureSheet getParticleTextureSheet(ResourceLocation id) {
 		return ParticleRendererRegistryImpl.INSTANCE.getParticleTextureSheet(id);
 	}
 
@@ -118,15 +118,15 @@ public final class ParticleRendererRegistry {
 	 * @param textureSheet the texture sheet
 	 * @return the identifier
 	 */
-	public static Identifier getId(ParticleTextureSheet textureSheet) {
+	public static ResourceLocation getId(ParticleTextureSheet textureSheet) {
 		if (textureSheet == ParticleTextureSheet.SINGLE_QUADS
 				|| textureSheet == ParticleTextureSheet.NO_RENDER
 				|| textureSheet == ParticleTextureSheet.ELDER_GUARDIANS
 				|| textureSheet == ParticleTextureSheet.ITEM_PICKUP) {
-			return Identifier.ofVanilla(textureSheet.name().toLowerCase(Locale.ROOT));
+			return ResourceLocation.ofVanilla(textureSheet.name().toLowerCase(Locale.ROOT));
 		}
 
-		return Identifier.of(textureSheet.name());
+		return ResourceLocation.of(textureSheet.name());
 	}
 
 	private ParticleRendererRegistry() {

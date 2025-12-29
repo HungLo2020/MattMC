@@ -19,13 +19,13 @@ package net.fabricmc.fabric.impl.networking.client;
 import java.util.List;
 import java.util.Objects;
 
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.network.ClientConfigurationNetworkHandler;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.multiplayer.ClientConfigurationNetworkHandler;
 import net.minecraft.network.NetworkPhase;
-import net.minecraft.network.packet.BrandCustomPayload;
-import net.minecraft.network.packet.CustomPayload;
-import net.minecraft.network.packet.Packet;
-import net.minecraft.util.Identifier;
+import net.minecraft.network.protocol.BrandCustomPayload;
+import net.minecraft.network.protocol.CustomPayload;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.server.packss.ResourceLocation;
 
 import net.fabricmc.fabric.api.client.networking.v1.C2SConfigurationChannelEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientConfigurationConnectionEvents;
@@ -42,7 +42,7 @@ public final class ClientConfigurationNetworkAddon extends ClientCommonNetworkAd
 	private boolean sentInitialRegisterPacket;
 	private boolean hasStarted;
 
-	public ClientConfigurationNetworkAddon(ClientConfigurationNetworkHandler handler, MinecraftClient client) {
+	public ClientConfigurationNetworkAddon(ClientConfigurationNetworkHandler handler, Minecraft client) {
 		super(ClientNetworkingImpl.CONFIGURATION, ((ClientCommonNetworkHandlerAccessor) handler).getConnection(), "ClientPlayNetworkAddon for " + ((ClientConfigurationNetworkHandlerAccessor) handler).getProfile().name(), handler, client);
 		this.context = new ContextImpl(client, handler, this);
 
@@ -110,12 +110,12 @@ public final class ClientConfigurationNetworkAddon extends ClientCommonNetworkAd
 	}
 
 	@Override
-	protected void invokeRegisterEvent(List<Identifier> ids) {
+	protected void invokeRegisterEvent(List<ResourceLocation> ids) {
 		C2SConfigurationChannelEvents.REGISTER.invoker().onChannelRegister(this.handler, this, this.client, ids);
 	}
 
 	@Override
-	protected void invokeUnregisterEvent(List<Identifier> ids) {
+	protected void invokeUnregisterEvent(List<ResourceLocation> ids) {
 		C2SConfigurationChannelEvents.UNREGISTER.invoker().onChannelUnregister(this.handler, this, this.client, ids);
 	}
 
@@ -134,7 +134,7 @@ public final class ClientConfigurationNetworkAddon extends ClientCommonNetworkAd
 		return (ChannelInfoHolder) ((ClientCommonNetworkHandlerAccessor) handler).getConnection();
 	}
 
-	private record ContextImpl(MinecraftClient client, ClientConfigurationNetworkHandler networkHandler, PacketSender responseSender) implements ClientConfigurationNetworking.Context {
+	private record ContextImpl(Minecraft client, ClientConfigurationNetworkHandler networkHandler, PacketSender responseSender) implements ClientConfigurationNetworking.Context {
 		private ContextImpl {
 			Objects.requireNonNull(client, "client");
 			Objects.requireNonNull(networkHandler, "networkHandler");

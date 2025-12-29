@@ -20,7 +20,7 @@ import java.util.Objects;
 
 import org.jetbrains.annotations.ApiStatus;
 
-import net.minecraft.util.Identifier;
+import net.minecraft.server.packss.ResourceLocation;
 
 import net.fabricmc.fabric.impl.lookup.custom.ApiLookupMapImpl;
 
@@ -34,7 +34,7 @@ import net.fabricmc.fabric.impl.lookup.custom.ApiLookupMapImpl;
  * to illustrate how to use {@link ApiLookupMap} and {@link ApiProviderMap}.
  * <pre>{@code
  * public interface ItemStackApiLookup<A, C> {
- *     static <A, C> ItemStackApiLookup<A, C> get(Identifier lookupId, Class<A> apiClass, Class<C> contextClass) {
+ *     static <A, C> ItemStackApiLookup<A, C> get(ResourceLocation lookupId, Class<A> apiClass, Class<C> contextClass) {
  *         return ItemStackApiLookupImpl.get(lookupId, apiClass, contextClass);
  *     }
  *     // Find an API instance.
@@ -57,12 +57,12 @@ import net.fabricmc.fabric.impl.lookup.custom.ApiLookupMapImpl;
  *     private static final ApiLookupMap<ItemStackApiLookup<?, ?>> LOOKUPS = ApiLookupMap.create(ItemStackApiLookupImpl::new);
  *     // We have to perform an unchecked cast to convert <?, ?> back to <A, C>.
  *     ＠SuppressWarnings("unchecked")
- *     public static <A, C> ItemStackApiLookup<A, C> get(Identifier lookupId, Class<A> apiClass, Class<C> contextClass) {
+ *     public static <A, C> ItemStackApiLookup<A, C> get(ResourceLocation lookupId, Class<A> apiClass, Class<C> contextClass) {
  *         // Null checks are already handled by ApiLookupMap#get.
  *         return (ItemStackApiLookup<A, C>) LOOKUPS.getLookup(lookupId, apiClass, contextClass);
  *     }
  *
- *     private ItemStackApiLookupImpl(Identifier id, Class<?> apiClass, Class<?> contextClass) {
+ *     private ItemStackApiLookupImpl(ResourceLocation id, Class<?> apiClass, Class<?> contextClass) {
  *         // We don't use these parameters, so nothing to do here.
  *         // In practice, these parameters should be stored and exposed with identifier(), apiClass() and contextClass() getter functions.
  *     }
@@ -116,7 +116,7 @@ public interface ApiLookupMap<L> extends Iterable<L> {
 	 * @throws IllegalArgumentException If another {@code apiClass} or another {@code contextClass} was already registered with the same identifier.
 	 * @throws NullPointerException If one of the arguments is null.
 	 */
-	L getLookup(Identifier lookupId, Class<?> apiClass, Class<?> contextClass);
+	L getLookup(ResourceLocation lookupId, Class<?> apiClass, Class<?> contextClass);
 
 	@FunctionalInterface
 	interface LookupConstructor<L> {
@@ -127,7 +127,7 @@ public interface ApiLookupMap<L> extends Iterable<L> {
 		 * @param apiClass The API class passed to {@link #getLookup}.
 		 * @param contextClass The context class passed to {@link #getLookup}.
 		 */
-		L get(Identifier identifier, Class<?> apiClass, Class<?> contextClass);
+		L get(ResourceLocation identifier, Class<?> apiClass, Class<?> contextClass);
 	}
 
 	/**

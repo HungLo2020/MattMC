@@ -34,10 +34,10 @@ import org.jetbrains.annotations.Nullable;
 
 import net.minecraft.network.PacketByteBuf;
 import net.minecraft.network.codec.PacketCodec;
-import net.minecraft.network.packet.CustomPayload;
-import net.minecraft.registry.Registries;
-import net.minecraft.registry.Registry;
-import net.minecraft.util.Identifier;
+import net.minecraft.network.protocol.CustomPayload;
+import net.minecraft.core.Registries;
+import net.minecraft.core.Registry;
+import net.minecraft.server.packss.ResourceLocation;
 
 import net.fabricmc.fabric.api.event.registry.RegistryAttribute;
 import net.fabricmc.fabric.api.event.registry.RegistryAttributeHolder;
@@ -50,7 +50,7 @@ import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
  * <p>This method optimize the packet in multiple way:
  * <ul>
  *     <li>Directly write into the buffer instead of using an nbt;</li>
- *     <li>Group all {@link Identifier} with same namespace together and only send those unique namespaces once for each group;</li>
+ *     <li>Group all {@link ResourceLocation} with same namespace together and only send those unique namespaces once for each group;</li>
  *     <li>Group consecutive rawIds together and only send the difference of the first rawId and the last rawId of the bulk before.
  *     This is based on the assumption that mods generally register all of their object at once,
  *     therefore making the rawIds somewhat densely packed.</li>
@@ -60,7 +60,7 @@ import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
  */
 public class DirectRegistryPacketHandler extends RegistryPacketHandler<DirectRegistryPacketHandler.Payload> {
 	/**
-	 * @see net.minecraft.network.packet.s2c.play.CustomPayloadS2CPacket#MAX_PAYLOAD_SIZE
+	 * @see net.minecraft.network.protocol.s2c.play.CustomPayloadS2CPacket#MAX_PAYLOAD_SIZE
 	 */
 	@SuppressWarnings("JavadocReference")
 	private static final int MAX_PAYLOAD_SIZE = Integer.getInteger("fabric.registry.direct.maxPayloadSize", 0x100000);
@@ -69,10 +69,10 @@ public class DirectRegistryPacketHandler extends RegistryPacketHandler<DirectReg
 	private PacketByteBuf combinedBuf;
 
 	@Nullable
-	private Map<Identifier, Object2IntMap<Identifier>> syncedRegistryMap;
+	private Map<ResourceLocation, Object2IntMap<ResourceLocation>> syncedRegistryMap;
 
 	@Nullable
-	private Map<Identifier, EnumSet<RegistryAttribute>> syncedRegistryAttributes;
+	private Map<ResourceLocation, EnumSet<RegistryAttribute>> syncedRegistryAttributes;
 
 	private boolean isPacketFinished = false;
 	private int totalPacketReceived = 0;
@@ -83,12 +83,12 @@ public class DirectRegistryPacketHandler extends RegistryPacketHandler<DirectReg
 	}
 
 	@Override
-	public void sendPacket(Consumer<DirectRegistryPacketHandler.Payload> sender, Map<Identifier, Object2IntMap<Identifier>> registryMap) {
+	public void sendPacket(Consumer<DirectRegistryPacketHandler.Payload> sender, Map<ResourceLocation, Object2IntMap<ResourceLocation>> registryMap) {
 		PacketByteBuf buf = PacketByteBufs.create();
 
 		// Group registry ids with same namespace.
-		Map<String, List<Identifier>> regNamespaceGroups = registryMap.keySet().stream()
-				.collect(Collectors.groupingBy(Identifier::getNamespace));
+		Map<String, List<ResourceLocation>> regNamespaceGroups = registryMap.keySet().stream()
+				.collect(Collectors.groupingBy(ResourceLocation::getNamespace));
 
 		buf.writeVarInt(regNamespaceGroups.size());
 
@@ -96,31 +96,31 @@ public class DirectRegistryPacketHandler extends RegistryPacketHandler<DirectReg
 			buf.writeString(optimizeNamespace(regNamespace));
 			buf.writeVarInt(regIds.size());
 
-			for (Identifier regId : regIds) {
+			for (ResourceLocation regId : regIds) {
 				buf.writeString(regId.getPath());
 				buf.writeByte(encodeRegistryAttributes(regId));
 
-				Object2IntMap<Identifier> idMap = registryMap.get(regId);
+				Object2IntMap<ResourceLocation> idMap = registryMap.get(regId);
 
 				// Sort object ids by its namespace. We use linked map here to keep the original namespace ordering.
-				Map<String, List<Object2IntMap.Entry<Identifier>>> idNamespaceGroups = idMap.object2IntEntrySet().stream()
+				Map<String, List<Object2IntMap.Entry<ResourceLocation>>> idNamespaceGroups = idMap.object2IntEntrySet().stream()
 						.collect(Collectors.groupingBy(e -> e.getKey().getNamespace(), LinkedHashMap::new, Collectors.toCollection(ArrayList::new)));
 
 				buf.writeVarInt(idNamespaceGroups.size());
 
 				int lastBulkLastRawId = 0;
 
-				for (Map.Entry<String, List<Object2IntMap.Entry<Identifier>>> idNamespaceEntry : idNamespaceGroups.entrySet()) {
+				for (Map.Entry<String, List<Object2IntMap.Entry<ResourceLocation>>> idNamespaceEntry : idNamespaceGroups.entrySet()) {
 					// Make sure the ids are sorted by its raw id.
-					List<Object2IntMap.Entry<Identifier>> idPairs = idNamespaceEntry.getValue();
+					List<Object2IntMap.Entry<ResourceLocation>> idPairs = idNamespaceEntry.getValue();
 					idPairs.sort(Comparator.comparingInt(Object2IntMap.Entry::getIntValue));
 
 					// Group consecutive raw ids together.
-					List<List<Object2IntMap.Entry<Identifier>>> bulks = new ArrayList<>();
+					List<List<Object2IntMap.Entry<ResourceLocation>>> bulks = new ArrayList<>();
 
-					Iterator<Object2IntMap.Entry<Identifier>> idPairIter = idPairs.iterator();
-					List<Object2IntMap.Entry<Identifier>> currentBulk = new ArrayList<>();
-					Object2IntMap.Entry<Identifier> currentPair = idPairIter.next();
+					Iterator<Object2IntMap.Entry<ResourceLocation>> idPairIter = idPairs.iterator();
+					List<Object2IntMap.Entry<ResourceLocation>> currentBulk = new ArrayList<>();
+					Object2IntMap.Entry<ResourceLocation> currentPair = idPairIter.next();
 					currentBulk.add(currentPair);
 
 					while (idPairIter.hasNext()) {
@@ -139,14 +139,14 @@ public class DirectRegistryPacketHandler extends RegistryPacketHandler<DirectReg
 					buf.writeString(optimizeNamespace(idNamespaceEntry.getKey()));
 					buf.writeVarInt(bulks.size());
 
-					for (List<Object2IntMap.Entry<Identifier>> bulk : bulks) {
+					for (List<Object2IntMap.Entry<ResourceLocation>> bulk : bulks) {
 						int firstRawId = bulk.get(0).getIntValue();
 						int bulkRawIdStartDiff = firstRawId - lastBulkLastRawId;
 
 						buf.writeVarInt(bulkRawIdStartDiff);
 						buf.writeVarInt(bulk.size());
 
-						for (Object2IntMap.Entry<Identifier> idPair : bulk) {
+						for (Object2IntMap.Entry<ResourceLocation> idPair : bulk) {
 							buf.writeString(idPair.getKey().getPath());
 
 							lastBulkLastRawId = idPair.getIntValue();
@@ -201,7 +201,7 @@ public class DirectRegistryPacketHandler extends RegistryPacketHandler<DirectReg
 			for (int j = 0; j < regNamespaceGroupLength; j++) {
 				String regPath = combinedBuf.readString();
 				EnumSet<RegistryAttribute> attributes = decodeRegistryAttributes(combinedBuf.readByte());
-				Object2IntMap<Identifier> idMap = new Object2IntLinkedOpenHashMap<>();
+				Object2IntMap<ResourceLocation> idMap = new Object2IntLinkedOpenHashMap<>();
 				int idNamespaceGroupAmount = combinedBuf.readVarInt();
 
 				int lastBulkLastRawId = 0;
@@ -219,14 +219,14 @@ public class DirectRegistryPacketHandler extends RegistryPacketHandler<DirectReg
 						for (int m = 0; m < bulkSize; m++) {
 							currentRawId++;
 							String idPath = combinedBuf.readString();
-							idMap.put(Identifier.of(idNamespace, idPath), currentRawId);
+							idMap.put(ResourceLocation.of(idNamespace, idPath), currentRawId);
 						}
 
 						lastBulkLastRawId = currentRawId;
 					}
 				}
 
-				Identifier registryId = Identifier.of(regNamespace, regPath);
+				ResourceLocation registryId = ResourceLocation.of(regNamespace, regPath);
 				syncedRegistryMap.put(registryId, idMap);
 				syncedRegistryAttributes.put(registryId, attributes);
 			}
@@ -256,8 +256,8 @@ public class DirectRegistryPacketHandler extends RegistryPacketHandler<DirectReg
 			return null;
 		}
 
-		Map<Identifier, Object2IntMap<Identifier>> map = Collections.unmodifiableMap(syncedRegistryMap);
-		Map<Identifier, EnumSet<RegistryAttribute>> attributes = Collections.unmodifiableMap(syncedRegistryAttributes);
+		Map<ResourceLocation, Object2IntMap<ResourceLocation>> map = Collections.unmodifiableMap(syncedRegistryMap);
+		Map<ResourceLocation, EnumSet<RegistryAttribute>> attributes = Collections.unmodifiableMap(syncedRegistryAttributes);
 
 		isPacketFinished = false;
 		totalPacketReceived = 0;
@@ -276,15 +276,15 @@ public class DirectRegistryPacketHandler extends RegistryPacketHandler<DirectReg
 	}
 
 	private static String optimizeNamespace(String namespace) {
-		return namespace.equals(Identifier.DEFAULT_NAMESPACE) ? "" : namespace;
+		return namespace.equals(ResourceLocation.DEFAULT_NAMESPACE) ? "" : namespace;
 	}
 
 	private static String unoptimizeNamespace(String namespace) {
-		return namespace.isEmpty() ? Identifier.DEFAULT_NAMESPACE : namespace;
+		return namespace.isEmpty() ? ResourceLocation.DEFAULT_NAMESPACE : namespace;
 	}
 
 	public record Payload(byte[] data) implements RegistrySyncPayload {
-		public static CustomPayload.Id<Payload> ID = new Id<>(Identifier.of("fabric", "registry/sync/direct"));
+		public static CustomPayload.Id<Payload> ID = new Id<>(ResourceLocation.of("fabric", "registry/sync/direct"));
 		public static PacketCodec<PacketByteBuf, Payload> CODEC = CustomPayload.codecOf(Payload::write, Payload::new);
 
 		Payload(PacketByteBuf buf) {
@@ -307,7 +307,7 @@ public class DirectRegistryPacketHandler extends RegistryPacketHandler<DirectReg
 		}
 	}
 
-	private static byte encodeRegistryAttributes(Identifier identifier) {
+	private static byte encodeRegistryAttributes(ResourceLocation identifier) {
 		Registry<?> registry = Registries.REGISTRIES.get(identifier);
 
 		if (registry == null) {

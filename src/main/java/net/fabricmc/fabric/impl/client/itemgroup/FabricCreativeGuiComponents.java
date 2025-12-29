@@ -21,21 +21,21 @@ import java.util.function.Consumer;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
-import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gl.RenderPipelines;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.ingame.CreativeInventoryScreen;
 import net.minecraft.client.gui.widget.ButtonWidget;
-import net.minecraft.item.ItemGroup;
-import net.minecraft.item.ItemGroups;
-import net.minecraft.registry.Registries;
-import net.minecraft.text.Text;
-import net.minecraft.util.Identifier;
+import net.minecraft.world.item.ItemGroup;
+import net.minecraft.world.item.ItemGroups;
+import net.minecraft.core.Registries;
+import net.minecraft.network.chat.Component;
+import net.minecraft.server.packss.ResourceLocation;
 
 import net.fabricmc.fabric.impl.itemgroup.FabricItemGroupImpl;
 
 public class FabricCreativeGuiComponents {
-	private static final Identifier BUTTON_TEX = Identifier.of("fabric", "textures/gui/creative_buttons.png");
+	private static final ResourceLocation BUTTON_TEX = ResourceLocation.of("fabric", "textures/gui/creative_buttons.png");
 	private static final double TABS_PER_PAGE = FabricItemGroupImpl.TABS_PER_PAGE;
 	public static final Set<ItemGroup> COMMON_GROUPS = Set.of(ItemGroups.SEARCH, ItemGroups.INVENTORY, ItemGroups.HOTBAR, ItemGroups.OPERATOR).stream()
 			.map(Registries.ITEM_GROUP::getValueOrThrow)
@@ -69,20 +69,20 @@ public class FabricCreativeGuiComponents {
 			drawContext.drawTexture(RenderPipelines.GUI_TEXTURED, BUTTON_TEX, this.getX(), this.getY(), u + (type == Type.NEXT ? 10 : 0), v, 10, 12, 256, 256);
 
 			if (this.isHovered()) {
-				drawContext.drawTooltip(MinecraftClient.getInstance().textRenderer, Text.translatable("fabric.gui.creativeTabPage", screen.getCurrentPage() + 1, getPageCount()), mouseX, mouseY);
+				drawContext.drawTooltip(Minecraft.getInstance().textRenderer, Component.translatable("fabric.gui.creativeTabPage", screen.getCurrentPage() + 1, getPageCount()), mouseX, mouseY);
 			}
 		}
 	}
 
 	public enum Type {
-		NEXT(Text.literal(">"), CreativeInventoryScreen::switchToNextPage, screen -> screen.getCurrentPage() + 1 < screen.getPageCount()),
-		PREVIOUS(Text.literal("<"), CreativeInventoryScreen::switchToPreviousPage, screen -> screen.getCurrentPage() != 0);
+		NEXT(Component.literal(">"), CreativeInventoryScreen::switchToNextPage, screen -> screen.getCurrentPage() + 1 < screen.getPageCount()),
+		PREVIOUS(Component.literal("<"), CreativeInventoryScreen::switchToPreviousPage, screen -> screen.getCurrentPage() != 0);
 
-		final Text text;
+		final Component text;
 		final Consumer<CreativeInventoryScreen> clickConsumer;
 		final Predicate<CreativeInventoryScreen> isEnabled;
 
-		Type(Text text, Consumer<CreativeInventoryScreen> clickConsumer, Predicate<CreativeInventoryScreen> isEnabled) {
+		Type(Component text, Consumer<CreativeInventoryScreen> clickConsumer, Predicate<CreativeInventoryScreen> isEnabled) {
 			this.text = text;
 			this.clickConsumer = clickConsumer;
 			this.isEnabled = isEnabled;

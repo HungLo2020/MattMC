@@ -17,9 +17,9 @@
 package net.fabricmc.fabric.api.item.v1;
 
 import net.minecraft.enchantment.Enchantment;
-import net.minecraft.item.Item;
-import net.minecraft.item.ItemStack;
-import net.minecraft.registry.entry.RegistryEntry;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.core.entry.RegistryEntry;
 
 import net.fabricmc.fabric.api.util.TriState;
 

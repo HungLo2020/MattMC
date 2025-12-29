@@ -22,7 +22,7 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Redirect;
 
-import net.minecraft.resource.DataPackSettings;
+import net.minecraft.server.packs.DataPackSettings;
 import net.minecraft.test.TestServer;
 
 import net.fabricmc.fabric.impl.resource.loader.ModResourcePackUtil;

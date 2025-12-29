@@ -16,7 +16,7 @@
 
 package net.fabricmc.fabric.api.renderer.v1.mesh;
 
-import net.minecraft.client.renderer.block.model.BakedQuad;
+import net.minecraft.client.rendererer.block.model.BakedQuad;
 
 /**
  * Interface for building quads and emitting them to a mesh.

@@ -24,17 +24,17 @@ import com.mojang.serialization.codecs.RecordCodecBuilder;
 
 import net.minecraft.component.DataComponentTypes;
 import net.minecraft.component.type.NbtComponent;
-import net.minecraft.item.Item;
-import net.minecraft.item.ItemStack;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.nbt.StringNbtReader;
 import net.minecraft.network.RegistryByteBuf;
 import net.minecraft.network.codec.PacketCodec;
 import net.minecraft.network.codec.PacketCodecs;
-import net.minecraft.recipe.Ingredient;
-import net.minecraft.recipe.display.SlotDisplay;
-import net.minecraft.registry.entry.RegistryEntry;
-import net.minecraft.util.Identifier;
+import net.minecraft.world.item.crafting.Ingredient;
+import net.minecraft.world.item.crafting.display.SlotDisplay;
+import net.minecraft.core.entry.RegistryEntry;
+import net.minecraft.server.packss.ResourceLocation;
 
 import net.fabricmc.fabric.api.recipe.v1.ingredient.CustomIngredient;
 import net.fabricmc.fabric.api.recipe.v1.ingredient.CustomIngredientSerializer;
@@ -111,7 +111,7 @@ public class CustomDataIngredient implements CustomIngredient {
 	}
 
 	private static class Serializer implements CustomIngredientSerializer<CustomDataIngredient> {
-		private static final Identifier ID = Identifier.of("fabric", "custom_data");
+		private static final ResourceLocation ID = ResourceLocation.of("fabric", "custom_data");
 
 		private static final MapCodec<CustomDataIngredient> CODEC = RecordCodecBuilder.mapCodec(instance ->
 				instance.group(
@@ -127,7 +127,7 @@ public class CustomDataIngredient implements CustomIngredient {
 		);
 
 		@Override
-		public Identifier getIdentifier() {
+		public ResourceLocation getIdentifier() {
 			return ID;
 		}
 

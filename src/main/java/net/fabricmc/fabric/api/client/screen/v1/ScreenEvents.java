@@ -18,7 +18,7 @@ package net.fabricmc.fabric.api.client.screen.v1;
 
 import java.util.Objects;
 
-import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 
@@ -44,7 +44,7 @@ import net.fabricmc.fabric.impl.client.screen.ScreenExtensions;
 
 public final class ScreenEvents {
 	/**
-	 * An event that is called before {@link Screen#init(MinecraftClient, int, int) a screen is initialized} to its default state.
+	 * An event that is called before {@link Screen#init(Minecraft, int, int) a screen is initialized} to its default state.
 	 * It should be noted some methods in {@link Screens} such as a screen's {@link Screen#getTextRenderer text renderer} may not be initialized yet, and as such their use is discouraged.
 	 *
 	 * <!--<p>Typically this event is used to register screen events such as listening to when child elements are added to the screen. ------ Uncomment when child add/remove event is added for elements-->
@@ -76,7 +76,7 @@ public final class ScreenEvents {
 	});
 
 	/**
-	 * An event that is called after {@link Screen#init(MinecraftClient, int, int) a screen is initialized} to its default state.
+	 * An event that is called after {@link Screen#init(Minecraft, int, int) a screen is initialized} to its default state.
 	 *
 	 * <p>Typically this event is used to modify a screen after the screen has been initialized.
 	 * Modifications such as changing sizes of buttons, removing buttons and adding/removing child elements to the screen can be done safely using this event.
@@ -172,12 +172,12 @@ public final class ScreenEvents {
 
 	@FunctionalInterface
 	public interface BeforeInit {
-		void beforeInit(MinecraftClient client, Screen screen, int scaledWidth, int scaledHeight);
+		void beforeInit(Minecraft client, Screen screen, int scaledWidth, int scaledHeight);
 	}
 
 	@FunctionalInterface
 	public interface AfterInit {
-		void afterInit(MinecraftClient client, Screen screen, int scaledWidth, int scaledHeight);
+		void afterInit(Minecraft client, Screen screen, int scaledWidth, int scaledHeight);
 	}
 
 	@FunctionalInterface

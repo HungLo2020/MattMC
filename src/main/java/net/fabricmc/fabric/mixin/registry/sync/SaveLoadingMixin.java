@@ -22,7 +22,7 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.ModifyArg;
 
-import net.minecraft.registry.RegistryLoader;
+import net.minecraft.core.RegistryLoader;
 import net.minecraft.server.SaveLoading;
 
 import net.fabricmc.fabric.api.event.registry.DynamicRegistries;

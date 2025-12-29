@@ -16,9 +16,9 @@
 
 package net.fabricmc.fabric.api.itemgroup.v1;
 
-import net.minecraft.item.ItemGroup;
-import net.minecraft.registry.Registries;
-import net.minecraft.text.Text;
+import net.minecraft.world.item.ItemGroup;
+import net.minecraft.core.Registries;
+import net.minecraft.network.chat.Component;
 
 import net.fabricmc.fabric.impl.itemgroup.FabricItemGroupBuilderImpl;
 
@@ -35,17 +35,17 @@ public final class FabricItemGroup {
 	 *
 	 * <p>You must register the newly created {@link ItemGroup} to the {@link Registries#ITEM_GROUP} registry.
 	 *
-	 * <p>You must also set a display name by calling {@link ItemGroup.Builder#displayName(Text)}
+	 * <p>You must also set a display name by calling {@link ItemGroup.Builder#displayName(Component)}
 	 *
 	 * <p>Example:
 	 *
 	 * <pre>{@code
-	 * private static final RegistryKey<ItemGroup> ITEM_GROUP = RegistryKey.of(RegistryKeys.ITEM_GROUP, Identifier.of(MOD_ID, "test_group"));
+	 * private static final ResourceKey<ItemGroup> ITEM_GROUP = ResourceKey.of(RegistryKeys.ITEM_GROUP, ResourceLocation.of(MOD_ID, "test_group"));
 	 *
 	 * @Override
 	 * public void onInitialize() {
 	 *    Registry.register(Registries.ITEM_GROUP, ITEM_GROUP, FabricItemGroup.builder()
-	 *       .displayName(Text.translatable("modid.test_group"))
+	 *       .displayName(Component.translatable("modid.test_group"))
 	 *       .icon(() -> new ItemStack(Items.DIAMOND))
 	 *       .entries((context, entries) -> {
 	 *          entries.add(TEST_ITEM);

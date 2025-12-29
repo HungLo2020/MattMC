@@ -16,8 +16,8 @@
 
 package net.fabricmc.fabric.api.client.event.lifecycle.v1;
 
-import net.minecraft.block.entity.BlockEntity;
-import net.minecraft.client.world.ClientWorld;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.client.multiplayer.ClientLevel;
 
 import net.fabricmc.fabric.api.event.Event;
 import net.fabricmc.fabric.api.event.EventFactory;
@@ -27,7 +27,7 @@ public final class ClientBlockEntityEvents {
 	}
 
 	/**
-	 * Called when a BlockEntity is loaded into a ClientWorld.
+	 * Called when a BlockEntity is loaded into a ClientLevel.
 	 *
 	 * <p>When this event is called, the block entity is already in the world.
 	 * However, its data might not be loaded yet, so don't rely on it.
@@ -39,7 +39,7 @@ public final class ClientBlockEntityEvents {
 	});
 
 	/**
-	 * Called when a BlockEntity is about to be unloaded from a ClientWorld.
+	 * Called when a BlockEntity is about to be unloaded from a ClientLevel.
 	 *
 	 * <p>When this event is called, the block entity is still present on the world.
 	 */
@@ -51,11 +51,11 @@ public final class ClientBlockEntityEvents {
 
 	@FunctionalInterface
 	public interface Load {
-		void onLoad(BlockEntity blockEntity, ClientWorld world);
+		void onLoad(BlockEntity blockEntity, ClientLevel world);
 	}
 
 	@FunctionalInterface
 	public interface Unload {
-		void onUnload(BlockEntity blockEntity, ClientWorld world);
+		void onUnload(BlockEntity blockEntity, ClientLevel world);
 	}
 }

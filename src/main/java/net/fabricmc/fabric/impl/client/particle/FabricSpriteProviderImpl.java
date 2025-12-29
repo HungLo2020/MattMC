@@ -18,19 +18,19 @@ package net.fabricmc.fabric.impl.client.particle;
 
 import java.util.List;
 
-import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.particle.ParticleSpriteManager;
 import net.minecraft.client.texture.Sprite;
 import net.minecraft.client.texture.SpriteAtlasTexture;
 import net.minecraft.util.Atlases;
-import net.minecraft.util.math.random.Random;
+import net.minecraft.core.random.Random;
 
 import net.fabricmc.fabric.api.client.particle.v1.FabricSpriteProvider;
 
 public record FabricSpriteProviderImpl(ParticleSpriteManager.SimpleSpriteProvider delegate) implements FabricSpriteProvider {
 	@Override
 	public SpriteAtlasTexture getAtlas() {
-		return MinecraftClient.getInstance().getAtlasManager().getAtlasTexture(Atlases.PARTICLES);
+		return Minecraft.getInstance().getAtlasManager().getAtlasTexture(Atlases.PARTICLES);
 	}
 
 	@Override

@@ -19,12 +19,12 @@ package net.fabricmc.fabric.api.recipe.v1;
 import java.util.Collection;
 import java.util.stream.Stream;
 
-import net.minecraft.recipe.Recipe;
-import net.minecraft.recipe.RecipeEntry;
-import net.minecraft.recipe.RecipeType;
-import net.minecraft.recipe.ServerRecipeManager;
-import net.minecraft.recipe.input.RecipeInput;
-import net.minecraft.world.World;
+import net.minecraft.world.item.crafting.Recipe;
+import net.minecraft.world.item.crafting.RecipeEntry;
+import net.minecraft.world.item.crafting.RecipeType;
+import net.minecraft.world.item.crafting.ServerRecipeManager;
+import net.minecraft.world.item.crafting.input.RecipeInput;
+import net.minecraft.world.Level;
 
 /**
  * General-purpose Fabric-provided extensions for {@link ServerRecipeManager} class.
@@ -38,7 +38,7 @@ public interface FabricServerRecipeManager extends FabricRecipeManager {
 	 *
 	 * @return the stream of matching recipes
 	 */
-	default <I extends RecipeInput, T extends Recipe<I>> Stream<RecipeEntry<T>> getAllMatches(RecipeType<T> type, I input, World world) {
+	default <I extends RecipeInput, T extends Recipe<I>> Stream<RecipeEntry<T>> getAllMatches(RecipeType<T> type, I input, Level world) {
 		throw new AssertionError("Implemented in Mixin");
 	}
 

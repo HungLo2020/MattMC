@@ -42,17 +42,17 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import net.minecraft.SharedConstants;
-import net.minecraft.resource.DataConfiguration;
-import net.minecraft.resource.DataPackSettings;
-import net.minecraft.resource.PackVersion;
-import net.minecraft.resource.ResourcePack;
-import net.minecraft.resource.ResourcePackManager;
-import net.minecraft.resource.ResourcePackProfile;
-import net.minecraft.resource.ResourceType;
-import net.minecraft.resource.VanillaDataPackProvider;
-import net.minecraft.resource.featuretoggle.FeatureFlags;
-import net.minecraft.resource.metadata.PackResourceMetadata;
-import net.minecraft.text.Text;
+import net.minecraft.server.packs.DataConfiguration;
+import net.minecraft.server.packs.DataPackSettings;
+import net.minecraft.server.packs.PackVersion;
+import net.minecraft.server.packs.ResourcePack;
+import net.minecraft.server.packs.ResourcePackManager;
+import net.minecraft.server.packs.ResourcePackProfile;
+import net.minecraft.server.packs.ResourceType;
+import net.minecraft.server.packs.VanillaDataPackProvider;
+import net.minecraft.world.flag.FeatureFlags;
+import net.minecraft.server.packs.metadata.PackResourceMetadata;
+import net.minecraft.network.chat.Component;
 import net.minecraft.util.dynamic.Range;
 import net.minecraft.util.path.SymlinkFinder;
 
@@ -201,11 +201,11 @@ public final class ModResourcePackUtil {
 		}
 	}
 
-	public static PackResourceMetadata getMetadataPack(PackVersion packVersion, Text description) {
+	public static PackResourceMetadata getMetadataPack(PackVersion packVersion, Component description) {
 		return new PackResourceMetadata(description, new Range<>(packVersion));
 	}
 
-	public static JsonObject getMetadataPackJson(PackVersion packVersion, Text description, ResourceType resourceType) {
+	public static JsonObject getMetadataPackJson(PackVersion packVersion, Component description, ResourceType resourceType) {
 		return PackResourceMetadata.createCodec(resourceType)
 				.encodeStart(JsonOps.INSTANCE, getMetadataPack(packVersion, description))
 				.getOrThrow()
@@ -214,17 +214,17 @@ public final class ModResourcePackUtil {
 
 	public static String serializeMetadata(PackVersion packVersion, String description, ResourceType resourceType) {
 		// This seems to be still manually deserialized
-		JsonObject pack = getMetadataPackJson(packVersion, Text.literal(description), resourceType);
+		JsonObject pack = getMetadataPackJson(packVersion, Component.literal(description), resourceType);
 		JsonObject metadata = new JsonObject();
 		metadata.add("pack", pack);
 		return GSON.toJson(metadata);
 	}
 
-	public static Text getName(ModMetadata info) {
+	public static Component getName(ModMetadata info) {
 		if (info.getId() != null) {
-			return Text.literal(info.getId());
+			return Component.literal(info.getId());
 		} else {
-			return Text.translatable("pack.name.fabricMod", info.getId());
+			return Component.translatable("pack.name.fabricMod", info.getId());
 		}
 	}
 

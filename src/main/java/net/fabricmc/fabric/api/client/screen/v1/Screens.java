@@ -19,7 +19,7 @@ package net.fabricmc.fabric.api.client.screen.v1;
 import java.util.List;
 import java.util.Objects;
 
-import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.font.TextRenderer;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.ClickableWidget;
@@ -59,7 +59,7 @@ public final class Screens {
 		return screen.getTextRenderer();
 	}
 
-	public static MinecraftClient getClient(Screen screen) {
+	public static Minecraft getClient(Screen screen) {
 		Objects.requireNonNull(screen, "Screen cannot be null");
 
 		return ((ScreenAccessor) screen).getClient();

@@ -21,9 +21,9 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Redirect;
 
 import net.minecraft.enchantment.Enchantment;
-import net.minecraft.item.ItemStack;
-import net.minecraft.loot.function.EnchantRandomlyLootFunction;
-import net.minecraft.registry.entry.RegistryEntry;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.storage.loot.function.EnchantRandomlyLootFunction;
+import net.minecraft.core.entry.RegistryEntry;
 
 import net.fabricmc.fabric.api.item.v1.EnchantingContext;
 

@@ -26,9 +26,9 @@ import net.minecraft.component.MergedComponentMap;
 import net.minecraft.fluid.FlowableFluid;
 import net.minecraft.fluid.Fluid;
 import net.minecraft.fluid.Fluids;
-import net.minecraft.registry.Registries;
-import net.minecraft.registry.entry.RegistryEntry;
-import net.minecraft.util.Identifier;
+import net.minecraft.core.Registries;
+import net.minecraft.core.entry.RegistryEntry;
+import net.minecraft.server.packss.ResourceLocation;
 
 import net.fabricmc.fabric.api.transfer.v1.fluid.FluidVariant;
 import net.fabricmc.fabric.impl.transfer.TransferApiImpl;
@@ -46,7 +46,7 @@ public class FluidVariantImpl implements FluidVariant {
 				fluid = flowable.getStill();
 			} else {
 				// If not a FlowableFluid, we don't know how to convert -> crash.
-				Identifier id = Registries.FLUID.getId(fluid);
+				ResourceLocation id = Registries.FLUID.getId(fluid);
 				throw new IllegalArgumentException("Cannot convert flowing fluid %s (%s) into a still fluid.".formatted(id, fluid));
 			}
 		}

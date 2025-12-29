@@ -24,14 +24,14 @@ import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import net.minecraft.block.Block;
-import net.minecraft.block.BlockState;
-import net.minecraft.block.entity.BlockEntity;
-import net.minecraft.block.entity.BlockEntityType;
-import net.minecraft.registry.Registries;
-import net.minecraft.util.Identifier;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.world.World;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.BlockState;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.entity.BlockEntityType;
+import net.minecraft.core.Registries;
+import net.minecraft.server.packss.ResourceLocation;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.Level;
 
 import net.fabricmc.fabric.api.lookup.v1.block.BlockApiLookup;
 import net.fabricmc.fabric.api.lookup.v1.custom.ApiLookupMap;
@@ -43,18 +43,18 @@ public final class BlockApiLookupImpl<A, C> implements BlockApiLookup<A, C> {
 	private static final ApiLookupMap<BlockApiLookup<?, ?>> LOOKUPS = ApiLookupMap.create(BlockApiLookupImpl::new);
 
 	@SuppressWarnings("unchecked")
-	public static <A, C> BlockApiLookup<A, C> get(Identifier lookupId, Class<A> apiClass, Class<C> contextClass) {
+	public static <A, C> BlockApiLookup<A, C> get(ResourceLocation lookupId, Class<A> apiClass, Class<C> contextClass) {
 		return (BlockApiLookup<A, C>) LOOKUPS.getLookup(lookupId, apiClass, contextClass);
 	}
 
-	private final Identifier identifier;
+	private final ResourceLocation identifier;
 	private final Class<A> apiClass;
 	private final Class<C> contextClass;
 	private final ApiProviderMap<Block, BlockApiProvider<A, C>> providerMap = ApiProviderMap.create();
 	private final List<BlockApiProvider<A, C>> fallbackProviders = new CopyOnWriteArrayList<>();
 
 	@SuppressWarnings("unchecked")
-	private BlockApiLookupImpl(Identifier identifier, Class<?> apiClass, Class<?> contextClass) {
+	private BlockApiLookupImpl(ResourceLocation identifier, Class<?> apiClass, Class<?> contextClass) {
 		this.identifier = identifier;
 		this.apiClass = (Class<A>) apiClass;
 		this.contextClass = (Class<C>) contextClass;
@@ -62,8 +62,8 @@ public final class BlockApiLookupImpl<A, C> implements BlockApiLookup<A, C> {
 
 	@Nullable
 	@Override
-	public A find(World world, BlockPos pos, @Nullable BlockState state, @Nullable BlockEntity blockEntity, C context) {
-		Objects.requireNonNull(world, "World may not be null.");
+	public A find(Level world, BlockPos pos, @Nullable BlockState state, @Nullable BlockEntity blockEntity, C context) {
+		Objects.requireNonNull(world, "Level may not be null.");
 		Objects.requireNonNull(pos, "BlockPos may not be null.");
 		// Providers have the final say whether a null context is allowed.
 
@@ -177,7 +177,7 @@ public final class BlockApiLookupImpl<A, C> implements BlockApiLookup<A, C> {
 	}
 
 	@Override
-	public Identifier getId() {
+	public ResourceLocation getId() {
 		return identifier;
 	}
 

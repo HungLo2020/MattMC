@@ -24,9 +24,9 @@ import it.unimi.dsi.fastutil.objects.Object2ObjectMap;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import org.slf4j.Logger;
 
-import net.minecraft.server.world.ChunkLevelType;
-import net.minecraft.util.Identifier;
-import net.minecraft.util.math.ChunkPos;
+import net.minecraft.server.level.ChunkLevelType;
+import net.minecraft.server.packss.ResourceLocation;
+import net.minecraft.core.ChunkPos;
 
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerChunkEvents;
@@ -49,7 +49,7 @@ public final class ServerChunkLifecycleTests implements ModInitializer {
 	 * Moving to an unexplored area will start logging again.
 	 */
 	private static void setupChunkGenerateTest() {
-		final Object2IntMap<Identifier> generated = new Object2IntOpenHashMap<>();
+		final Object2IntMap<ResourceLocation> generated = new Object2IntOpenHashMap<>();
 
 		ServerTickEvents.END_WORLD_TICK.register(world -> {
 			final int count = generated.removeInt(world.getRegistryKey().getValue());
@@ -71,11 +71,11 @@ public final class ServerChunkLifecycleTests implements ModInitializer {
 	 * Moving into another chunk should trigger some logs.
 	 */
 	private static void setupChunkLevelTypeChangeTest() {
-		final Object2ObjectMap<Identifier, Object2IntMap<ChunkLevelType>> worldsChunkLevelEvents = new Object2ObjectOpenHashMap<>();
-		final Object2ObjectMap<Identifier, Long2ObjectOpenHashMap<ChunkLevelTypeEvent>> worldsChunkLevelTypeTracker = new Object2ObjectOpenHashMap<>();
+		final Object2ObjectMap<ResourceLocation, Object2IntMap<ChunkLevelType>> worldsChunkLevelEvents = new Object2ObjectOpenHashMap<>();
+		final Object2ObjectMap<ResourceLocation, Long2ObjectOpenHashMap<ChunkLevelTypeEvent>> worldsChunkLevelTypeTracker = new Object2ObjectOpenHashMap<>();
 
 		ServerChunkEvents.CHUNK_LEVEL_TYPE_CHANGE.register((world, worldChunk, oldLevelType, newLevelType) -> {
-			final Identifier worldKey = world.getRegistryKey().getValue();
+			final ResourceLocation worldKey = world.getRegistryKey().getValue();
 
 			if (!world.getServer().isOnThread()) {
 				world.getServer().stop(false); // make sure the server actually "crashes", the throw below will just log the error.

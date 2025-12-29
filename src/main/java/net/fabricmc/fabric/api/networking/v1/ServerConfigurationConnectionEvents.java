@@ -51,7 +51,7 @@ public final class ServerConfigurationConnectionEvents {
 	 *  handler.addTask(new TestConfigurationTask("Example data"));
 	 * 	} else {
 	 * 	  // You can opt to disconnect the client if it cannot handle the configuration task
-	 * 	  handler.disconnect(Text.literal("Network test configuration not supported by client"));
+	 * 	  handler.disconnect(Component.literal("Network test configuration not supported by client"));
 	 * 	  }
 	 * });
 	 * }</pre>

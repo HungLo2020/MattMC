@@ -19,8 +19,8 @@ package net.fabricmc.fabric.api.client.particle.v1;
 import org.jetbrains.annotations.ApiStatus;
 
 import net.minecraft.client.particle.ParticleFactory;
-import net.minecraft.particle.ParticleEffect;
-import net.minecraft.particle.ParticleType;
+import net.minecraft.core.particles.ParticleEffect;
+import net.minecraft.core.particles.ParticleType;
 
 import net.fabricmc.fabric.api.particle.v1.FabricParticleTypes;
 import net.fabricmc.fabric.impl.client.particle.ParticleFactoryRegistryImpl;

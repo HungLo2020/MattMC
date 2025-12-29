@@ -17,9 +17,9 @@
 package net.fabricmc.fabric.api.item.v1;
 
 import net.minecraft.enchantment.Enchantment;
-import net.minecraft.item.ItemStack;
-import net.minecraft.registry.RegistryKey;
-import net.minecraft.registry.entry.RegistryEntry;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.core.ResourceKey;
+import net.minecraft.core.entry.RegistryEntry;
 
 import net.fabricmc.fabric.api.event.Event;
 import net.fabricmc.fabric.api.event.EventFactory;
@@ -75,7 +75,7 @@ public final class EnchantmentEvents {
 	 * for more information.
 	 *
 	 * <p>Note: If you wish to modify the exclusive set of the enchantment, consider extending the
-	 * {@linkplain net.minecraft.registry.tag.EnchantmentTags relevant tag} through your mod's data pack instead.
+	 * {@linkplain net.minecraft.core.tag.EnchantmentTags relevant tag} through your mod's data pack instead.
 	 */
 	public static final Event<Modify> MODIFY = EventFactory.createArrayBacked(
 			Modify.class,
@@ -115,7 +115,7 @@ public final class EnchantmentEvents {
 		 * @param source The source of the enchantment
 		 */
 		void modify(
-				RegistryKey<Enchantment> key,
+				ResourceKey<Enchantment> key,
 				Enchantment.Builder builder,
 				EnchantmentSource source
 		);

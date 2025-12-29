@@ -24,9 +24,9 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import net.minecraft.network.OffThreadException;
-import net.minecraft.network.packet.CustomPayload;
-import net.minecraft.network.packet.c2s.common.CommonPongC2SPacket;
-import net.minecraft.network.packet.c2s.common.CustomPayloadC2SPacket;
+import net.minecraft.network.protocol.CustomPayload;
+import net.minecraft.network.protocol.c2s.common.CommonPongC2SPacket;
+import net.minecraft.network.protocol.c2s.common.CustomPayloadC2SPacket;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.network.ServerCommonNetworkHandler;
 

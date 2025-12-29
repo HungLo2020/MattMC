@@ -35,18 +35,18 @@ import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import net.minecraft.network.packet.Packet;
-import net.minecraft.registry.Registries;
-import net.minecraft.registry.Registry;
-import net.minecraft.screen.ScreenTexts;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.core.Registries;
+import net.minecraft.core.Registry;
+import net.minecraft.world.inventory.ScreenTexts;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.PlayerConfigEntry;
 import net.minecraft.server.network.ServerConfigurationNetworkHandler;
 import net.minecraft.server.network.ServerPlayerConfigurationTask;
-import net.minecraft.text.MutableText;
-import net.minecraft.text.Text;
+import net.minecraft.network.chat.MutableText;
+import net.minecraft.network.chat.Component;
 import net.minecraft.util.Formatting;
-import net.minecraft.util.Identifier;
+import net.minecraft.server.packss.ResourceLocation;
 
 import net.fabricmc.fabric.api.event.registry.RegistryAttribute;
 import net.fabricmc.fabric.api.event.registry.RegistryAttributeHolder;
@@ -73,7 +73,7 @@ public final class RegistrySyncManager {
 			return;
 		}
 
-		final Map<Identifier, Object2IntMap<Identifier>> map = RegistrySyncManager.createAndPopulateRegistryMap();
+		final Map<ResourceLocation, Object2IntMap<ResourceLocation>> map = RegistrySyncManager.createAndPopulateRegistryMap();
 
 		if (map == null) {
 			// Don't send when there is nothing to map
@@ -87,7 +87,7 @@ public final class RegistrySyncManager {
 			}
 
 			// Disconnect incompatible clients
-			Text message = getIncompatibleClientText(ServerNetworkingImpl.getAddon(handler).getClientBrand(), map);
+			Component message = getIncompatibleClientText(ServerNetworkingImpl.getAddon(handler).getClientBrand(), map);
 			handler.disconnect(message);
 			return;
 		}
@@ -95,7 +95,7 @@ public final class RegistrySyncManager {
 		handler.addTask(new SyncConfigurationTask(handler, map));
 	}
 
-	private static Text getIncompatibleClientText(@Nullable String brand, Map<Identifier, Object2IntMap<Identifier>> map) {
+	private static Component getIncompatibleClientText(@Nullable String brand, Map<ResourceLocation, Object2IntMap<ResourceLocation>> map) {
 		String brandText = switch (brand) {
 		case "fabric" -> "Fabric API";
 		case null, default -> "Fabric Loader and Fabric API";
@@ -106,29 +106,29 @@ public final class RegistrySyncManager {
 		List<String> namespaces = map.values().stream()
 				.map(Object2IntMap::keySet)
 				.flatMap(Set::stream)
-				.map(Identifier::getNamespace)
-				.filter(s -> !s.equals(Identifier.DEFAULT_NAMESPACE))
+				.map(ResourceLocation::getNamespace)
+				.filter(s -> !s.equals(ResourceLocation.DEFAULT_NAMESPACE))
 				.distinct()
 				.sorted()
 				.toList();
 
-		MutableText text = Text.literal("The following registry entry namespaces may be related:\n\n");
+		MutableText text = Component.literal("The following registry entry namespaces may be related:\n\n");
 
 		for (int i = 0; i < Math.min(namespaces.size(), toDisplay); i++) {
-			text = text.append(Text.literal(namespaces.get(i)).formatted(Formatting.YELLOW));
+			text = text.append(Component.literal(namespaces.get(i)).formatted(Formatting.YELLOW));
 			text = text.append(ScreenTexts.LINE_BREAK);
 		}
 
 		if (namespaces.size() > toDisplay) {
-			text = text.append(Text.literal("And %d more...".formatted(namespaces.size() - toDisplay)));
+			text = text.append(Component.literal("And %d more...".formatted(namespaces.size() - toDisplay)));
 		}
 
-		return Text.literal("This server requires ").append(Text.literal(brandText).formatted(Formatting.GREEN)).append(" installed on your client!")
+		return Component.literal("This server requires ").append(Component.literal(brandText).formatted(Formatting.GREEN)).append(" installed on your client!")
 				.append(ScreenTexts.LINE_BREAK).append(text)
-				.append(ScreenTexts.LINE_BREAK).append(ScreenTexts.LINE_BREAK).append(Text.literal("Contact the server's administrator for more information!").formatted(Formatting.GOLD));
+				.append(ScreenTexts.LINE_BREAK).append(ScreenTexts.LINE_BREAK).append(Component.literal("Contact the server's administrator for more information!").formatted(Formatting.GOLD));
 	}
 
-	private static boolean areAllRegistriesOptional(Map<Identifier, Object2IntMap<Identifier>> map) {
+	private static boolean areAllRegistriesOptional(Map<ResourceLocation, Object2IntMap<ResourceLocation>> map) {
 		return map.keySet().stream()
 				.map(Registries.REGISTRIES::get)
 				.filter(Objects::nonNull)
@@ -138,7 +138,7 @@ public final class RegistrySyncManager {
 
 	public record SyncConfigurationTask(
 			ServerConfigurationNetworkHandler handler,
-			Map<Identifier, Object2IntMap<Identifier>> map
+			Map<ResourceLocation, Object2IntMap<ResourceLocation>> map
 	) implements ServerPlayerConfigurationTask {
 		public static final Key KEY = new Key("fabric:registry/sync");
 
@@ -159,10 +159,10 @@ public final class RegistrySyncManager {
 	 * @return a {@link Map} to sync, null when empty
 	 */
 	@Nullable
-	public static Map<Identifier, Object2IntMap<Identifier>> createAndPopulateRegistryMap() {
-		Map<Identifier, Object2IntMap<Identifier>> map = new LinkedHashMap<>();
+	public static Map<ResourceLocation, Object2IntMap<ResourceLocation>> createAndPopulateRegistryMap() {
+		Map<ResourceLocation, Object2IntMap<ResourceLocation>> map = new LinkedHashMap<>();
 
-		for (Identifier registryId : Registries.REGISTRIES.getIds()) {
+		for (ResourceLocation registryId : Registries.REGISTRIES.getIds()) {
 			Registry registry = Registries.REGISTRIES.get(registryId);
 
 			if (DEBUG_WRITE_REGISTRY_DATA) {
@@ -185,7 +185,7 @@ public final class RegistrySyncManager {
 						for (Object o : registry) {
 							String classType = (o == null) ? "null" : o.getClass().getName();
 							//noinspection unchecked
-							Identifier id = registry.getId(o);
+							ResourceLocation id = registry.getId(o);
 							if (id == null) continue;
 
 							//noinspection unchecked
@@ -222,12 +222,12 @@ public final class RegistrySyncManager {
 			LOGGER.debug("Syncing registry: " + registryId);
 
 			if (registry instanceof RemappableRegistry) {
-				Object2IntMap<Identifier> idMap = new Object2IntLinkedOpenHashMap<>();
+				Object2IntMap<ResourceLocation> idMap = new Object2IntLinkedOpenHashMap<>();
 				IntSet rawIdsFound = DEBUG ? new IntOpenHashSet() : null;
 
 				for (Object o : registry) {
 					//noinspection unchecked
-					Identifier id = registry.getId(o);
+					ResourceLocation id = registry.getId(o);
 					if (id == null) continue;
 
 					//noinspection unchecked

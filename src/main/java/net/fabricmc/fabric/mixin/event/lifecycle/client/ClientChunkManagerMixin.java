@@ -28,13 +28,13 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-import net.minecraft.client.world.ClientChunkManager;
-import net.minecraft.client.world.ClientWorld;
+import net.minecraft.client.multiplayer.ClientChunkManager;
+import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.network.PacketByteBuf;
-import net.minecraft.network.packet.s2c.play.ChunkData;
-import net.minecraft.util.math.ChunkPos;
+import net.minecraft.network.protocol.s2c.play.ChunkData;
+import net.minecraft.core.ChunkPos;
 import net.minecraft.world.Heightmap;
-import net.minecraft.world.chunk.WorldChunk;
+import net.minecraft.world.level.chunk.WorldChunk;
 
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientChunkEvents;
 
@@ -42,7 +42,7 @@ import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientChunkEvents;
 public abstract class ClientChunkManagerMixin {
 	@Final
 	@Shadow
-	ClientWorld world;
+	ClientLevel world;
 
 	@Inject(method = "loadChunkFromPacket", at = @At("TAIL"))
 	private void onChunkLoad(int x, int z, PacketByteBuf packetByteBuf, Map<Heightmap.Type, long[]> highmap, Consumer<ChunkData.BlockEntityVisitor> consumer, CallbackInfoReturnable<WorldChunk> info) {

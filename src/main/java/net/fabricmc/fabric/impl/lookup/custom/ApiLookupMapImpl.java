@@ -22,12 +22,12 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
-import net.minecraft.util.Identifier;
+import net.minecraft.server.packss.ResourceLocation;
 
 import net.fabricmc.fabric.api.lookup.v1.custom.ApiLookupMap;
 
 public final class ApiLookupMapImpl<L> implements ApiLookupMap<L> {
-	private final Map<Identifier, StoredLookup<L>> lookups = new HashMap<>();
+	private final Map<ResourceLocation, StoredLookup<L>> lookups = new HashMap<>();
 	private final LookupConstructor<L> lookupConstructor;
 
 	public ApiLookupMapImpl(LookupConstructor<L> lookupConstructor) {
@@ -35,8 +35,8 @@ public final class ApiLookupMapImpl<L> implements ApiLookupMap<L> {
 	}
 
 	@Override
-	public synchronized L getLookup(Identifier lookupId, Class<?> apiClass, Class<?> contextClass) {
-		Objects.requireNonNull(lookupId, "Lookup Identifier may not be null.");
+	public synchronized L getLookup(ResourceLocation lookupId, Class<?> apiClass, Class<?> contextClass) {
+		Objects.requireNonNull(lookupId, "Lookup ResourceLocation may not be null.");
 		Objects.requireNonNull(apiClass, "API class may not be null.");
 		Objects.requireNonNull(contextClass, "Context class may not be null.");
 

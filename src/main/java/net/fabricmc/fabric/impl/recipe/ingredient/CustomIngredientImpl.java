@@ -27,14 +27,14 @@ import com.mojang.serialization.Codec;
 import com.mojang.serialization.DataResult;
 import org.jetbrains.annotations.Nullable;
 
-import net.minecraft.item.Item;
-import net.minecraft.item.ItemStack;
-import net.minecraft.item.Items;
-import net.minecraft.recipe.Ingredient;
-import net.minecraft.recipe.display.SlotDisplay;
-import net.minecraft.registry.entry.RegistryEntry;
-import net.minecraft.registry.entry.RegistryEntryList;
-import net.minecraft.util.Identifier;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.item.crafting.Ingredient;
+import net.minecraft.world.item.crafting.display.SlotDisplay;
+import net.minecraft.core.entry.RegistryEntry;
+import net.minecraft.core.entry.RegistryEntryList;
+import net.minecraft.server.packss.ResourceLocation;
 
 import net.fabricmc.fabric.api.recipe.v1.ingredient.CustomIngredient;
 import net.fabricmc.fabric.api.recipe.v1.ingredient.CustomIngredientSerializer;
@@ -48,9 +48,9 @@ public class CustomIngredientImpl extends Ingredient {
 
 	public static final String TYPE_KEY = "fabric:type";
 
-	static final Map<Identifier, CustomIngredientSerializer<?>> REGISTERED_SERIALIZERS = new ConcurrentHashMap<>();
+	static final Map<ResourceLocation, CustomIngredientSerializer<?>> REGISTERED_SERIALIZERS = new ConcurrentHashMap<>();
 
-	public static final Codec<CustomIngredientSerializer<?>> CODEC = Identifier.CODEC.flatXmap(identifier ->
+	public static final Codec<CustomIngredientSerializer<?>> CODEC = ResourceLocation.CODEC.flatXmap(identifier ->
 					Optional.ofNullable(REGISTERED_SERIALIZERS.get(identifier))
 							.map(DataResult::success)
 							.orElseGet(() -> DataResult.error(() -> "Unknown custom ingredient serializer: " + identifier)),
@@ -66,8 +66,8 @@ public class CustomIngredientImpl extends Ingredient {
 	}
 
 	@Nullable
-	public static CustomIngredientSerializer<?> getSerializer(Identifier identifier) {
-		Objects.requireNonNull(identifier, "Identifier may not be null.");
+	public static CustomIngredientSerializer<?> getSerializer(ResourceLocation identifier) {
+		Objects.requireNonNull(identifier, "ResourceLocation may not be null.");
 
 		return REGISTERED_SERIALIZERS.get(identifier);
 	}

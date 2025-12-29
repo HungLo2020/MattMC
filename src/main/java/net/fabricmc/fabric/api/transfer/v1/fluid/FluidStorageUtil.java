@@ -18,13 +18,13 @@ package net.fabricmc.fabric.api.transfer.v1.fluid;
 
 import java.util.Objects;
 
-import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.fluid.Fluids;
-import net.minecraft.item.Item;
-import net.minecraft.item.Items;
-import net.minecraft.sound.SoundCategory;
-import net.minecraft.sound.SoundEvent;
-import net.minecraft.sound.SoundEvents;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.Items;
+import net.minecraft.sounds.SoundCategory;
+import net.minecraft.sounds.SoundEvent;
+import net.minecraft.sounds.SoundEvents;
 import net.minecraft.util.Hand;
 import net.minecraft.util.crash.CrashException;
 import net.minecraft.util.crash.CrashReport;
@@ -55,7 +55,7 @@ public final class FluidStorageUtil {
 	 * @param hand The hand that the player used.
 	 * @return True if some fluid was moved.
 	 */
-	public static boolean interactWithFluidStorage(Storage<FluidVariant> storage, PlayerEntity player, Hand hand) {
+	public static boolean interactWithFluidStorage(Storage<FluidVariant> storage, Player player, Hand hand) {
 		// Check if hand is a fluid container.
 		Storage<FluidVariant> handStorage = ContainerItemContext.forPlayerInteraction(player, hand).find(FluidStorage.ITEM);
 		if (handStorage == null) return false;
@@ -76,7 +76,7 @@ public final class FluidStorageUtil {
 		}
 	}
 
-	private static boolean moveWithSound(Storage<FluidVariant> from, Storage<FluidVariant> to, PlayerEntity player, boolean fill, Item handItem) {
+	private static boolean moveWithSound(Storage<FluidVariant> from, Storage<FluidVariant> to, Player player, boolean fill, Item handItem) {
 		for (StorageView<FluidVariant> view : from) {
 			if (view.isResourceBlank()) continue;
 			FluidVariant resource = view.getResource();

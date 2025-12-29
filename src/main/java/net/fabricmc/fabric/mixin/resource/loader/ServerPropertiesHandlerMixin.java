@@ -20,7 +20,7 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Redirect;
 
-import net.minecraft.resource.DataConfiguration;
+import net.minecraft.server.packs.DataConfiguration;
 import net.minecraft.server.dedicated.ServerPropertiesHandler;
 
 import net.fabricmc.fabric.impl.resource.loader.ModResourcePackUtil;

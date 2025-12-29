@@ -23,12 +23,12 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-import net.minecraft.block.entity.Hopper;
-import net.minecraft.block.entity.HopperBlockEntity;
-import net.minecraft.inventory.Inventory;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Direction;
-import net.minecraft.world.World;
+import net.minecraft.world.level.block.entity.Hopper;
+import net.minecraft.world.level.block.entity.HopperBlockEntity;
+import net.minecraft.world.item.inventory.Inventory;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.world.Level;
 
 import net.fabricmc.fabric.api.transfer.v1.item.InventoryStorage;
 import net.fabricmc.fabric.api.transfer.v1.item.ItemStorage;
@@ -47,12 +47,12 @@ public class HopperBlockEntityMixin {
 	@Inject(
 			at = @At(
 					value = "INVOKE_ASSIGN",
-					target = "Lnet/minecraft/block/entity/HopperBlockEntity;getOutputInventory(Lnet/minecraft/world/World;Lnet/minecraft/util/math/BlockPos;Lnet/minecraft/block/entity/HopperBlockEntity;)Lnet/minecraft/inventory/Inventory;"
+					target = "Lnet/minecraft/block/entity/HopperBlockEntity;getOutputInventory(Lnet/minecraft/world/Level;Lnet/minecraft/util/math/BlockPos;Lnet/minecraft/block/entity/HopperBlockEntity;)Lnet/minecraft/inventory/Inventory;"
 			),
 			method = "insert",
 			cancellable = true
 	)
-	private static void hookInsert(World world, BlockPos pos, HopperBlockEntity blockEntity, CallbackInfoReturnable<Boolean> cir, @Local Inventory targetInventory) {
+	private static void hookInsert(Level world, BlockPos pos, HopperBlockEntity blockEntity, CallbackInfoReturnable<Boolean> cir, @Local Inventory targetInventory) {
 		// Let vanilla handle the transfer if it found an inventory.
 		if (targetInventory != null) return;
 
@@ -76,12 +76,12 @@ public class HopperBlockEntityMixin {
 	@Inject(
 			at = @At(
 					value = "INVOKE_ASSIGN",
-					target = "Lnet/minecraft/block/entity/HopperBlockEntity;getInputInventory(Lnet/minecraft/world/World;Lnet/minecraft/block/entity/Hopper;Lnet/minecraft/util/math/BlockPos;Lnet/minecraft/block/BlockState;)Lnet/minecraft/inventory/Inventory;"
+					target = "Lnet/minecraft/block/entity/HopperBlockEntity;getInputInventory(Lnet/minecraft/world/Level;Lnet/minecraft/block/entity/Hopper;Lnet/minecraft/util/math/BlockPos;Lnet/minecraft/block/BlockState;)Lnet/minecraft/inventory/Inventory;"
 			),
-			method = "extract(Lnet/minecraft/world/World;Lnet/minecraft/block/entity/Hopper;)Z",
+			method = "extract(Lnet/minecraft/world/Level;Lnet/minecraft/block/entity/Hopper;)Z",
 			cancellable = true
 	)
-	private static void hookExtract(World world, Hopper hopper, CallbackInfoReturnable<Boolean> cir, @Local Inventory inputInventory) {
+	private static void hookExtract(Level world, Hopper hopper, CallbackInfoReturnable<Boolean> cir, @Local Inventory inputInventory) {
 		// Let vanilla handle the transfer if it found an inventory.
 		if (inputInventory != null) return;
 

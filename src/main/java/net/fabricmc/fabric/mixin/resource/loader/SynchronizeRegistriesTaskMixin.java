@@ -31,9 +31,9 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-import net.minecraft.network.packet.Packet;
-import net.minecraft.network.packet.s2c.config.SelectKnownPacksS2CPacket;
-import net.minecraft.registry.VersionedIdentifier;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.s2c.config.SelectKnownPacksS2CPacket;
+import net.minecraft.core.VersionedIdentifier;
 import net.minecraft.server.network.SynchronizeRegistriesTask;
 
 import net.fabricmc.fabric.impl.resource.loader.ModResourcePackCreator;

@@ -31,7 +31,7 @@ import org.slf4j.LoggerFactory;
 
 import net.minecraft.network.NetworkPhase;
 import net.minecraft.network.NetworkSide;
-import net.minecraft.util.Identifier;
+import net.minecraft.server.packss.ResourceLocation;
 
 public final class GlobalReceiverRegistry<H> {
 	public static final int DEFAULT_CHANNEL_NAME_MAX_LENGTH = 128;
@@ -43,7 +43,7 @@ public final class GlobalReceiverRegistry<H> {
 	private final PayloadTypeRegistryImpl<?> payloadTypeRegistry;
 
 	private final ReadWriteLock lock = new ReentrantReadWriteLock();
-	private final Map<Identifier, H> handlers = new HashMap<>();
+	private final Map<ResourceLocation, H> handlers = new HashMap<>();
 	private final Set<AbstractNetworkAddon<H>> trackedAddons = new HashSet<>();
 
 	public GlobalReceiverRegistry(NetworkSide side, NetworkPhase phase, @Nullable PayloadTypeRegistryImpl<?> payloadTypeRegistry) {
@@ -63,7 +63,7 @@ public final class GlobalReceiverRegistry<H> {
 	}
 
 	@Nullable
-	public H getHandler(Identifier channelName) {
+	public H getHandler(ResourceLocation channelName) {
 		Lock lock = this.lock.readLock();
 		lock.lock();
 
@@ -74,7 +74,7 @@ public final class GlobalReceiverRegistry<H> {
 		}
 	}
 
-	public boolean registerGlobalReceiver(Identifier channelName, H handler) {
+	public boolean registerGlobalReceiver(ResourceLocation channelName, H handler) {
 		Objects.requireNonNull(channelName, "Channel name cannot be null");
 		Objects.requireNonNull(handler, "Channel handler cannot be null");
 
@@ -101,7 +101,7 @@ public final class GlobalReceiverRegistry<H> {
 	}
 
 	@Nullable
-	public H unregisterGlobalReceiver(Identifier channelName) {
+	public H unregisterGlobalReceiver(ResourceLocation channelName) {
 		Objects.requireNonNull(channelName, "Channel name cannot be null");
 
 		if (NetworkingImpl.isReservedCommonChannel(channelName)) {
@@ -124,7 +124,7 @@ public final class GlobalReceiverRegistry<H> {
 		}
 	}
 
-	public Map<Identifier, H> getHandlers() {
+	public Map<ResourceLocation, H> getHandlers() {
 		Lock lock = this.lock.writeLock();
 		lock.lock();
 
@@ -135,7 +135,7 @@ public final class GlobalReceiverRegistry<H> {
 		}
 	}
 
-	public Set<Identifier> getChannels() {
+	public Set<ResourceLocation> getChannels() {
 		Lock lock = this.lock.readLock();
 		lock.lock();
 
@@ -184,7 +184,7 @@ public final class GlobalReceiverRegistry<H> {
 		}
 	}
 
-	private void handleRegistration(Identifier channelName, H handler) {
+	private void handleRegistration(ResourceLocation channelName, H handler) {
 		Lock lock = this.lock.writeLock();
 		lock.lock();
 
@@ -199,7 +199,7 @@ public final class GlobalReceiverRegistry<H> {
 		}
 	}
 
-	private void handleUnregistration(Identifier channelName) {
+	private void handleUnregistration(ResourceLocation channelName) {
 		Lock lock = this.lock.writeLock();
 		lock.lock();
 
@@ -214,7 +214,7 @@ public final class GlobalReceiverRegistry<H> {
 		}
 	}
 
-	public void assertPayloadType(Identifier channelName) {
+	public void assertPayloadType(ResourceLocation channelName) {
 		if (payloadTypeRegistry == null) {
 			return;
 		}

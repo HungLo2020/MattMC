@@ -21,11 +21,11 @@ import java.util.List;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.UnmodifiableView;
 
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.entity.player.PlayerInventory;
-import net.minecraft.item.ItemStack;
-import net.minecraft.item.ItemUsage;
-import net.minecraft.screen.ScreenHandler;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.entity.player.PlayerInventory;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.ItemUsage;
+import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.util.Hand;
 
 import net.fabricmc.fabric.api.lookup.v1.item.ItemApiLookup;
@@ -92,7 +92,7 @@ public interface ContainerItemContext {
 	 * Otherwise, {@link #ofPlayerHand} is used.
 	 * This matches the behavior of {@link ItemUsage#exchangeStack}.
 	 */
-	static ContainerItemContext forPlayerInteraction(PlayerEntity player, Hand hand) {
+	static ContainerItemContext forPlayerInteraction(Player player, Hand hand) {
 		if (player.isInCreativeMode()) {
 			return forCreativeInteraction(player, player.getStackInHand(hand));
 		} else {
@@ -107,28 +107,28 @@ public interface ContainerItemContext {
 	 * if the player's inventory doesn't already contain it.
 	 * This matches the creative behavior of {@link ItemUsage#exchangeStack}.
 	 */
-	static ContainerItemContext forCreativeInteraction(PlayerEntity player, ItemStack interactingStack) {
+	static ContainerItemContext forCreativeInteraction(Player player, ItemStack interactingStack) {
 		return new CreativeInteractionContainerItemContext(ItemVariant.of(interactingStack), interactingStack.getCount(), player);
 	}
 
 	/**
 	 * Return a context for the passed player's hand.
 	 */
-	static ContainerItemContext ofPlayerHand(PlayerEntity player, Hand hand) {
+	static ContainerItemContext ofPlayerHand(Player player, Hand hand) {
 		return new PlayerContainerItemContext(player, hand);
 	}
 
 	/**
 	 * Return a context for the passed player's cursor slot. This is recommended for screen handler click interactions.
 	 */
-	static ContainerItemContext ofPlayerCursor(PlayerEntity player, ScreenHandler screenHandler) {
+	static ContainerItemContext ofPlayerCursor(Player player, AbstractContainerMenu screenHandler) {
 		return ofPlayerSlot(player, PlayerInventoryStorage.getCursorStorage(screenHandler));
 	}
 
 	/**
 	 * Return a context for a slot, with the passed player as fallback.
 	 */
-	static ContainerItemContext ofPlayerSlot(PlayerEntity player, SingleSlotStorage<ItemVariant> slot) {
+	static ContainerItemContext ofPlayerSlot(Player player, SingleSlotStorage<ItemVariant> slot) {
 		return new PlayerContainerItemContext(player, slot);
 	}
 

@@ -20,9 +20,9 @@ import java.util.Set;
 
 import org.jetbrains.annotations.Nullable;
 
-import net.minecraft.block.Block;
-import net.minecraft.block.entity.BlockEntity;
-import net.minecraft.block.entity.BlockEntityType;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.entity.BlockEntityType;
 
 public class ExtendedBlockEntityType<T extends BlockEntity> extends BlockEntityType<T> {
 	@Nullable

@@ -19,10 +19,10 @@ package net.fabricmc.fabric.impl.resource.loader;
 import java.util.ArrayList;
 import java.util.List;
 
-import net.minecraft.resource.OverlayResourcePack;
-import net.minecraft.resource.ResourcePack;
-import net.minecraft.resource.ResourcePackInfo;
-import net.minecraft.resource.ResourcePackProfile;
+import net.minecraft.server.packs.OverlayResourcePack;
+import net.minecraft.server.packs.ResourcePack;
+import net.minecraft.server.packs.ResourcePackInfo;
+import net.minecraft.server.packs.ResourcePackProfile;
 
 import net.fabricmc.fabric.api.resource.ModResourcePack;
 

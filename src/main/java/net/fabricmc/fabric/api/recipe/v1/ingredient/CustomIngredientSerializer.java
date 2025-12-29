@@ -21,8 +21,8 @@ import org.jetbrains.annotations.Nullable;
 
 import net.minecraft.network.RegistryByteBuf;
 import net.minecraft.network.codec.PacketCodec;
-import net.minecraft.recipe.Ingredient;
-import net.minecraft.util.Identifier;
+import net.minecraft.world.item.crafting.Ingredient;
+import net.minecraft.server.packss.ResourceLocation;
 
 import net.fabricmc.fabric.impl.recipe.ingredient.CustomIngredientImpl;
 
@@ -47,14 +47,14 @@ public interface CustomIngredientSerializer<T extends CustomIngredient> {
 	 * {@return the custom ingredient serializer registered with the given identifier, or {@code null} if there is no such serializer}.
 	 */
 	@Nullable
-	static CustomIngredientSerializer<?> get(Identifier identifier) {
+	static CustomIngredientSerializer<?> get(ResourceLocation identifier) {
 		return CustomIngredientImpl.getSerializer(identifier);
 	}
 
 	/**
 	 * {@return the identifier of this serializer}.
 	 */
-	Identifier getIdentifier();
+	ResourceLocation getIdentifier();
 
 	/**
 	 * {@return the codec}.

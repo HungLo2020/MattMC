@@ -32,20 +32,20 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.ingame.CreativeInventoryScreen;
 import net.minecraft.client.gui.screen.ingame.CreativeInventoryScreen.CreativeScreenHandler;
-import net.minecraft.client.gui.screen.ingame.HandledScreen;
+import net.minecraft.client.gui.screen.ingame.AbstractContainerScreen;
 import net.minecraft.client.input.KeyInput;
-import net.minecraft.entity.player.PlayerInventory;
-import net.minecraft.item.ItemGroup;
-import net.minecraft.item.ItemGroups;
-import net.minecraft.text.Text;
+import net.minecraft.world.entity.player.PlayerInventory;
+import net.minecraft.world.item.ItemGroup;
+import net.minecraft.world.item.ItemGroups;
+import net.minecraft.network.chat.Component;
 
 import net.fabricmc.fabric.api.client.itemgroup.v1.FabricCreativeInventoryScreen;
 import net.fabricmc.fabric.impl.client.itemgroup.FabricCreativeGuiComponents;
 import net.fabricmc.fabric.impl.itemgroup.FabricItemGroupImpl;
 
 @Mixin(CreativeInventoryScreen.class)
-public abstract class CreativeInventoryScreenMixin extends HandledScreen<CreativeScreenHandler> implements FabricCreativeInventoryScreen {
-	public CreativeInventoryScreenMixin(CreativeScreenHandler screenHandler, PlayerInventory playerInventory, Text text) {
+public abstract class CreativeInventoryScreenMixin extends AbstractContainerScreen<CreativeScreenHandler> implements FabricCreativeInventoryScreen {
+	public CreativeInventoryScreenMixin(CreativeScreenHandler screenHandler, PlayerInventory playerInventory, Component text) {
 		super(screenHandler, playerInventory, text);
 	}
 

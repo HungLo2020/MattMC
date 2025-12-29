@@ -30,8 +30,8 @@ import net.minecraft.network.message.SignedMessage;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.PlayerManager;
 import net.minecraft.server.command.ServerCommandSource;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.text.Text;
+import net.minecraft.server.network.ServerPlayer;
+import net.minecraft.network.chat.Component;
 
 import net.fabricmc.fabric.api.message.v1.ServerMessageEvents;
 
@@ -41,8 +41,8 @@ public abstract class PlayerManagerMixin {
 	@Final
 	private MinecraftServer server;
 
-	@Inject(method = "broadcast(Lnet/minecraft/network/message/SignedMessage;Lnet/minecraft/server/network/ServerPlayerEntity;Lnet/minecraft/network/message/MessageType$Parameters;)V", at = @At("HEAD"), cancellable = true)
-	private void onSendChatMessage(SignedMessage message, ServerPlayerEntity sender, MessageType.Parameters params, CallbackInfo ci) {
+	@Inject(method = "broadcast(Lnet/minecraft/network/message/SignedMessage;Lnet/minecraft/server/network/ServerPlayer;Lnet/minecraft/network/message/MessageType$Parameters;)V", at = @At("HEAD"), cancellable = true)
+	private void onSendChatMessage(SignedMessage message, ServerPlayer sender, MessageType.Parameters params, CallbackInfo ci) {
 		if (!ServerMessageEvents.ALLOW_CHAT_MESSAGE.invoker().allowChatMessage(message, sender, params)) {
 			ci.cancel();
 			return;
@@ -51,8 +51,8 @@ public abstract class PlayerManagerMixin {
 		ServerMessageEvents.CHAT_MESSAGE.invoker().onChatMessage(message, sender, params);
 	}
 
-	@Inject(method = "broadcast(Lnet/minecraft/text/Text;Ljava/util/function/Function;Z)V", at = @At("HEAD"), cancellable = true)
-	private void onSendGameMessage(Text message, Function<ServerPlayerEntity, Text> playerMessageFactory, boolean overlay, CallbackInfo ci) {
+	@Inject(method = "broadcast(Lnet/minecraft/text/Component;Ljava/util/function/Function;Z)V", at = @At("HEAD"), cancellable = true)
+	private void onSendGameMessage(Component message, Function<ServerPlayer, Component> playerMessageFactory, boolean overlay, CallbackInfo ci) {
 		if (!ServerMessageEvents.ALLOW_GAME_MESSAGE.invoker().allowGameMessage(this.server, message, overlay)) {
 			ci.cancel();
 			return;

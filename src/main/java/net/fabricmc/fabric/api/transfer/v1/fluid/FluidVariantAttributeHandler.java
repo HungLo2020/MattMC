@@ -20,16 +20,16 @@ import java.util.Optional;
 
 import org.jetbrains.annotations.Nullable;
 
-import net.minecraft.block.Block;
-import net.minecraft.block.Blocks;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.fluid.FlowableFluid;
 import net.minecraft.fluid.Fluid;
-import net.minecraft.item.BucketItem;
-import net.minecraft.registry.Registries;
-import net.minecraft.sound.SoundEvent;
-import net.minecraft.text.Text;
+import net.minecraft.world.item.BucketItem;
+import net.minecraft.core.Registries;
+import net.minecraft.sounds.SoundEvent;
+import net.minecraft.network.chat.Component;
 import net.minecraft.util.Util;
-import net.minecraft.world.World;
+import net.minecraft.world.Level;
 
 /**
  * Defines the common attributes of {@linkplain FluidVariant fluid variants} of a given Fluid.
@@ -39,12 +39,12 @@ public interface FluidVariantAttributeHandler {
 	/**
 	 * Return the name that should be used for the passed fluid variant.
 	 */
-	default Text getName(FluidVariant fluidVariant) {
+	default Component getName(FluidVariant fluidVariant) {
 		Block fluidBlock = fluidVariant.getFluid().getDefaultState().getBlockState().getBlock();
 
 		if (!fluidVariant.isBlank() && fluidBlock == Blocks.AIR) {
 			// Some non-placeable fluids use air as their fluid block, in that case infer translation key from the fluid id.
-			return Text.translatable(Util.createTranslationKey("block", Registries.FLUID.getId(fluidVariant.getFluid())));
+			return Component.translatable(Util.createTranslationKey("block", Registries.FLUID.getId(fluidVariant.getFluid())));
 		} else {
 			return fluidBlock.getName();
 		}
@@ -92,9 +92,9 @@ public interface FluidVariantAttributeHandler {
 	 * {@value FluidConstants#LAVA_VISCOSITY_NETHER} for lava in ultrawarm dimensions (such as the nether),
 	 * and {@value FluidConstants#LAVA_VISCOSITY} for lava in other dimensions.
 	 *
-	 * @param world World if available, otherwise null.
+	 * @param world Level if available, otherwise null.
 	 */
-	default int getViscosity(FluidVariant variant, @Nullable World world) {
+	default int getViscosity(FluidVariant variant, @Nullable Level world) {
 		return FluidConstants.WATER_VISCOSITY;
 	}
 

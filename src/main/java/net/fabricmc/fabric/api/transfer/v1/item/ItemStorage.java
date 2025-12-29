@@ -20,16 +20,16 @@ import java.util.List;
 
 import org.jetbrains.annotations.Nullable;
 
-import net.minecraft.block.Blocks;
-import net.minecraft.block.ChestBlock;
-import net.minecraft.block.InventoryProvider;
-import net.minecraft.block.entity.ChestBlockEntity;
-import net.minecraft.inventory.Inventory;
-import net.minecraft.inventory.SidedInventory;
-import net.minecraft.inventory.SimpleInventory;
-import net.minecraft.item.Items;
-import net.minecraft.util.Identifier;
-import net.minecraft.util.math.Direction;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.ChestBlock;
+import net.minecraft.world.level.block.InventoryProvider;
+import net.minecraft.world.level.block.entity.ChestBlockEntity;
+import net.minecraft.world.item.inventory.Inventory;
+import net.minecraft.world.item.inventory.SidedInventory;
+import net.minecraft.world.item.inventory.SimpleInventory;
+import net.minecraft.world.item.Items;
+import net.minecraft.server.packss.ResourceLocation;
+import net.minecraft.core.Direction;
 
 import net.fabricmc.fabric.api.lookup.v1.block.BlockApiLookup;
 import net.fabricmc.fabric.api.lookup.v1.item.ItemApiLookup;
@@ -83,7 +83,7 @@ public final class ItemStorage {
 	 * On the client thread (i.e. with a client world), contents of queried Storages are unreliable and should not be modified.
 	 */
 	public static final BlockApiLookup<Storage<ItemVariant>, @Nullable Direction> SIDED =
-			BlockApiLookup.get(Identifier.of("fabric", "sided_item_storage"), Storage.asClass(), Direction.class);
+			BlockApiLookup.get(ResourceLocation.of("fabric", "sided_item_storage"), Storage.asClass(), Direction.class);
 
 	/**
 	 * Item access to item variant storages.
@@ -93,7 +93,7 @@ public final class ItemStorage {
 	 * Returned APIs should behave the same regardless of the logical side.
 	 */
 	public static final ItemApiLookup<Storage<ItemVariant>, ContainerItemContext> ITEM =
-			ItemApiLookup.get(Identifier.of("fabric", "item_storage"), Storage.asClass(), ContainerItemContext.class);
+			ItemApiLookup.get(ResourceLocation.of("fabric", "item_storage"), Storage.asClass(), ContainerItemContext.class);
 
 	private ItemStorage() {
 	}

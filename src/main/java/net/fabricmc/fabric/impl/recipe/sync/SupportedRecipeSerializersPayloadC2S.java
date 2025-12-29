@@ -22,18 +22,18 @@ import java.util.Set;
 import net.minecraft.network.PacketByteBuf;
 import net.minecraft.network.codec.PacketCodec;
 import net.minecraft.network.codec.PacketCodecs;
-import net.minecraft.network.packet.CustomPayload;
-import net.minecraft.util.Identifier;
+import net.minecraft.network.protocol.CustomPayload;
+import net.minecraft.server.packss.ResourceLocation;
 
 /**
  * Used to notify server which recipes can be synced to the client.
  */
-public record SupportedRecipeSerializersPayloadC2S(Set<Identifier> synchronizedSerializers) implements CustomPayload {
+public record SupportedRecipeSerializersPayloadC2S(Set<ResourceLocation> synchronizedSerializers) implements CustomPayload {
 	public static final PacketCodec<PacketByteBuf, SupportedRecipeSerializersPayloadC2S> CODEC = PacketCodec.tuple(
-			PacketCodecs.collection(HashSet::new, Identifier.PACKET_CODEC), SupportedRecipeSerializersPayloadC2S::synchronizedSerializers,
+			PacketCodecs.collection(HashSet::new, ResourceLocation.PACKET_CODEC), SupportedRecipeSerializersPayloadC2S::synchronizedSerializers,
 			SupportedRecipeSerializersPayloadC2S::new
 	);
-	public static final Id<SupportedRecipeSerializersPayloadC2S> ID = new Id<>(Identifier.of("fabric", "recipe_sync/supported_serializers"));
+	public static final Id<SupportedRecipeSerializersPayloadC2S> ID = new Id<>(ResourceLocation.of("fabric", "recipe_sync/supported_serializers"));
 
 	@Override
 	public Id<? extends CustomPayload> getId() {

@@ -26,8 +26,8 @@ import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import org.jetbrains.annotations.Nullable;
 
 import net.minecraft.network.PacketByteBuf;
-import net.minecraft.network.packet.CustomPayload;
-import net.minecraft.util.Identifier;
+import net.minecraft.network.protocol.CustomPayload;
+import net.minecraft.server.packss.ResourceLocation;
 
 import net.fabricmc.fabric.api.event.registry.RegistryAttribute;
 import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
@@ -39,7 +39,7 @@ public abstract class RegistryPacketHandler<T extends RegistryPacketHandler.Regi
 
 	public abstract CustomPayload.Id<T> getPacketId();
 
-	public abstract void sendPacket(Consumer<T> sender, Map<Identifier, Object2IntMap<Identifier>> registryMap);
+	public abstract void sendPacket(Consumer<T> sender, Map<ResourceLocation, Object2IntMap<ResourceLocation>> registryMap);
 
 	public abstract void receivePayload(T payload);
 
@@ -96,7 +96,7 @@ public abstract class RegistryPacketHandler<T extends RegistryPacketHandler.Regi
 	}
 
 	public record SyncedPacketData(
-			Map<Identifier, Object2IntMap<Identifier>> idMap,
-			Map<Identifier, EnumSet<RegistryAttribute>> attributes
+			Map<ResourceLocation, Object2IntMap<ResourceLocation>> idMap,
+			Map<ResourceLocation, EnumSet<RegistryAttribute>> attributes
 	) { }
 }

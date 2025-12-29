@@ -16,9 +16,9 @@
 
 package net.fabricmc.fabric.api.client.networking.v1;
 
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.network.ClientPlayNetworkHandler;
-import net.minecraft.network.packet.CustomPayload;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.multiplayer.ClientPlayNetworkHandler;
+import net.minecraft.network.protocol.CustomPayload;
 
 import net.fabricmc.fabric.api.event.Event;
 import net.fabricmc.fabric.api.event.EventFactory;
@@ -67,16 +67,16 @@ public final class ClientPlayConnectionEvents {
 
 	@FunctionalInterface
 	public interface Init {
-		void onPlayInit(ClientPlayNetworkHandler handler, MinecraftClient client);
+		void onPlayInit(ClientPlayNetworkHandler handler, Minecraft client);
 	}
 
 	@FunctionalInterface
 	public interface Join {
-		void onPlayReady(ClientPlayNetworkHandler handler, PacketSender sender, MinecraftClient client);
+		void onPlayReady(ClientPlayNetworkHandler handler, PacketSender sender, Minecraft client);
 	}
 
 	@FunctionalInterface
 	public interface Disconnect {
-		void onPlayDisconnect(ClientPlayNetworkHandler handler, MinecraftClient client);
+		void onPlayDisconnect(ClientPlayNetworkHandler handler, Minecraft client);
 	}
 }

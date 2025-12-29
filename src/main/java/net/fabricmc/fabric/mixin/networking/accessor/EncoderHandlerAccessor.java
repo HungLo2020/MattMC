@@ -22,7 +22,7 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.gen.Invoker;
 
 import net.minecraft.network.handler.EncoderHandler;
-import net.minecraft.network.packet.Packet;
+import net.minecraft.network.protocol.Packet;
 
 @Mixin(EncoderHandler.class)
 public interface EncoderHandlerAccessor {

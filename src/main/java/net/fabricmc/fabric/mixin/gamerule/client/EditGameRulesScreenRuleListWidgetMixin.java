@@ -27,7 +27,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screen.world.EditGameRulesScreen;
 import net.minecraft.world.GameRules;
 
@@ -39,7 +39,7 @@ public abstract class EditGameRulesScreenRuleListWidgetMixin extends net.minecra
 	@Unique
 	private final Map<CustomGameRuleCategory, List<EditGameRulesScreen.AbstractRuleWidget>> fabricCategories = new HashMap<>();
 
-	public EditGameRulesScreenRuleListWidgetMixin(MinecraftClient client, int width, int height, int top, int itemHeight) {
+	public EditGameRulesScreenRuleListWidgetMixin(Minecraft client, int width, int height, int top, int itemHeight) {
 		super(client, width, height, top, itemHeight);
 	}
 

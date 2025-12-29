@@ -19,12 +19,12 @@ package net.fabricmc.fabric.impl.gamerule.widget;
 import java.util.List;
 import java.util.Locale;
 
-import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.world.EditGameRulesScreen;
 import net.minecraft.client.gui.widget.ButtonWidget;
-import net.minecraft.text.OrderedText;
-import net.minecraft.text.Text;
+import net.minecraft.network.chat.OrderedText;
+import net.minecraft.network.chat.Component;
 
 import net.fabricmc.fabric.api.gamerule.v1.rule.EnumRule;
 
@@ -32,11 +32,11 @@ public final class EnumRuleWidget<E extends Enum<E>> extends EditGameRulesScreen
 	private final ButtonWidget buttonWidget;
 	private final String rootTranslationKey;
 
-	public EnumRuleWidget(EditGameRulesScreen gameRuleScreen, Text name, List<OrderedText> description, final String ruleName, EnumRule<E> rule, String translationKey) {
+	public EnumRuleWidget(EditGameRulesScreen gameRuleScreen, Component name, List<OrderedText> description, final String ruleName, EnumRule<E> rule, String translationKey) {
 		gameRuleScreen.super(description, name);
 
 		// Overwrite line wrapping to account for button larger than vanilla's by 44 pixels.
-		this.name = MinecraftClient.getInstance().textRenderer.wrapLines(name, 175 - 44);
+		this.name = Minecraft.getInstance().textRenderer.wrapLines(name, 175 - 44);
 
 		// Base translation key needs to be set before the button widget is created.
 		this.rootTranslationKey = translationKey;
@@ -48,9 +48,9 @@ public final class EnumRuleWidget<E extends Enum<E>> extends EditGameRulesScreen
 		this.children.add(this.buttonWidget);
 	}
 
-	public Text getValueText(E value) {
+	public Component getValueText(E value) {
 		final String key = this.rootTranslationKey + "." + value.name().toLowerCase(Locale.ROOT);
-		return Text.translatableWithFallback(key, value.toString());
+		return Component.translatableWithFallback(key, value.toString());
 	}
 
 	@Override

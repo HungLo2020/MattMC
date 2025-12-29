@@ -23,8 +23,8 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-import net.minecraft.block.entity.JukeboxBlockEntity;
-import net.minecraft.item.ItemStack;
+import net.minecraft.world.level.block.entity.JukeboxBlockEntity;
+import net.minecraft.world.item.ItemStack;
 
 import net.fabricmc.fabric.impl.transfer.item.SpecialLogicInventory;
 

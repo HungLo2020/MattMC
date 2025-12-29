@@ -23,18 +23,18 @@ import java.util.stream.Stream;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.Nullable;
 
-import net.minecraft.recipe.Recipe;
-import net.minecraft.recipe.RecipeEntry;
-import net.minecraft.recipe.RecipeType;
-import net.minecraft.recipe.input.RecipeInput;
-import net.minecraft.registry.RegistryKey;
-import net.minecraft.world.World;
+import net.minecraft.world.item.crafting.Recipe;
+import net.minecraft.world.item.crafting.RecipeEntry;
+import net.minecraft.world.item.crafting.RecipeType;
+import net.minecraft.world.item.crafting.input.RecipeInput;
+import net.minecraft.core.ResourceKey;
+import net.minecraft.world.Level;
 
 /**
  * This class provides access to synchronized recipes on the client.
  *
  * <p>You can access SynchronizedClientRecipes by calling getSynchronizedRecipes
- * method on {@link net.minecraft.recipe.RecipeManager}
+ * method on {@link net.minecraft.world.item.crafting.RecipeManager}
  *
  * <p>See {@link RecipeSynchronization}.
  */
@@ -48,7 +48,7 @@ public interface SynchronizedRecipes {
 	 *
 	 * @return the stream of matching recipes
 	 */
-	<I extends RecipeInput, T extends Recipe<I>> Stream<RecipeEntry<T>> getAllMatches(RecipeType<T> type, I input, World world);
+	<I extends RecipeInput, T extends Recipe<I>> Stream<RecipeEntry<T>> getAllMatches(RecipeType<T> type, I input, Level world);
 
 	/**
 	 * @return the collection of recipe entries of given type
@@ -61,7 +61,7 @@ public interface SynchronizedRecipes {
 	 *
 	 * @return the optional containing matching recipe entry or empty
 	 */
-	default <I extends RecipeInput, T extends Recipe<I>> Optional<RecipeEntry<T>> getFirstMatch(RecipeType<T> type, I input, World world, @Nullable RegistryKey<Recipe<?>> recipe) {
+	default <I extends RecipeInput, T extends Recipe<I>> Optional<RecipeEntry<T>> getFirstMatch(RecipeType<T> type, I input, Level world, @Nullable ResourceKey<Recipe<?>> recipe) {
 		RecipeEntry<T> recipeEntry = recipe != null ? this.get(type, recipe) : null;
 		return this.getFirstMatch(type, input, world, recipeEntry);
 	}
@@ -72,7 +72,7 @@ public interface SynchronizedRecipes {
 	 *
 	 * @return the optional containing matching recipe entry or empty
 	 */
-	default <I extends RecipeInput, T extends Recipe<I>> Optional<RecipeEntry<T>> getFirstMatch(RecipeType<T> type, I input, World world, @Nullable RecipeEntry<T> recipe) {
+	default <I extends RecipeInput, T extends Recipe<I>> Optional<RecipeEntry<T>> getFirstMatch(RecipeType<T> type, I input, Level world, @Nullable RecipeEntry<T> recipe) {
 		return recipe != null && recipe.value().matches(input, world) ? Optional.of(recipe) : this.getFirstMatch(type, input, world);
 	}
 
@@ -82,19 +82,19 @@ public interface SynchronizedRecipes {
 	 *
 	 * @return the optional containing matching recipe entry or empty
 	 */
-	<I extends RecipeInput, T extends Recipe<I>> Optional<RecipeEntry<T>> getFirstMatch(RecipeType<T> type, I input, World world);
+	<I extends RecipeInput, T extends Recipe<I>> Optional<RecipeEntry<T>> getFirstMatch(RecipeType<T> type, I input, Level world);
 
 	/**
 	 * @return recipe with matching {@code key} or null if not present
 	 */
 	@Nullable
-	RecipeEntry<?> get(RegistryKey<Recipe<?>> key);
+	RecipeEntry<?> get(ResourceKey<Recipe<?>> key);
 
 	/**
 	 * @return recipe with matching {@code key} of type {@code type} or null if not present
 	 */
 	@Nullable
-	default <T extends Recipe<?>> RecipeEntry<T> get(RecipeType<T> type, RegistryKey<Recipe<?>> key) {
+	default <T extends Recipe<?>> RecipeEntry<T> get(RecipeType<T> type, ResourceKey<Recipe<?>> key) {
 		RecipeEntry<?> recipeEntry = this.get(key);
 		//noinspection unchecked
 		return recipeEntry != null && recipeEntry.value().getType().equals(type) ? (RecipeEntry<T>) recipeEntry : null;

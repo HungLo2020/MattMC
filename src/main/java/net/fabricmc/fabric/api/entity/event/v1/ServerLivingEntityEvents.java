@@ -16,10 +16,10 @@
 
 package net.fabricmc.fabric.api.entity.event.v1;
 
-import net.minecraft.entity.LivingEntity;
-import net.minecraft.entity.conversion.EntityConversionContext;
-import net.minecraft.entity.damage.DamageSource;
-import net.minecraft.entity.mob.MobEntity;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.conversion.EntityConversionContext;
+import net.minecraft.world.entity.damage.DamageSource;
+import net.minecraft.world.entity.mob.MobEntity;
 
 import net.fabricmc.fabric.api.event.Event;
 import net.fabricmc.fabric.api.event.EventFactory;

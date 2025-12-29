@@ -24,7 +24,7 @@ import com.mojang.brigadier.arguments.DoubleArgumentType;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import org.jetbrains.annotations.Nullable;
 
-import net.minecraft.resource.featuretoggle.FeatureSet;
+import net.minecraft.world.flag.FeatureFlagSet;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.world.GameRules;
 
@@ -149,7 +149,7 @@ public final class GameRuleFactory {
 				changedCallback,
 				GameRules.Visitor::visitInt,
 				GameRules.IntRule.class,
-				FeatureSet.empty()
+				FeatureFlagSet.empty()
 		);
 	}
 
@@ -228,7 +228,7 @@ public final class GameRuleFactory {
 				changedCallback,
 				GameRuleFactory::visitDouble,
 				DoubleRule.class,
-				FeatureSet.empty()
+				FeatureFlagSet.empty()
 		);
 	}
 

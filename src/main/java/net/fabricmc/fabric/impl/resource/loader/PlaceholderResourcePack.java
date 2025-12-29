@@ -28,19 +28,19 @@ import org.apache.commons.io.IOUtils;
 import org.jetbrains.annotations.Nullable;
 
 import net.minecraft.SharedConstants;
-import net.minecraft.resource.InputSupplier;
-import net.minecraft.resource.ResourcePack;
-import net.minecraft.resource.ResourcePackInfo;
-import net.minecraft.resource.ResourcePackProfile;
-import net.minecraft.resource.ResourceType;
-import net.minecraft.resource.metadata.PackResourceMetadata;
-import net.minecraft.resource.metadata.ResourceMetadataMap;
-import net.minecraft.resource.metadata.ResourceMetadataSerializer;
-import net.minecraft.text.Text;
-import net.minecraft.util.Identifier;
+import net.minecraft.server.packs.InputSupplier;
+import net.minecraft.server.packs.ResourcePack;
+import net.minecraft.server.packs.ResourcePackInfo;
+import net.minecraft.server.packs.ResourcePackProfile;
+import net.minecraft.server.packs.ResourceType;
+import net.minecraft.server.packs.metadata.PackResourceMetadata;
+import net.minecraft.server.packs.metadata.ResourceMetadataMap;
+import net.minecraft.server.packs.metadata.ResourceMetadataSerializer;
+import net.minecraft.network.chat.Component;
+import net.minecraft.server.packss.ResourceLocation;
 
 public record PlaceholderResourcePack(ResourceType type, ResourcePackInfo metadata) implements ResourcePack {
-	private static final Text DESCRIPTION_TEXT = Text.translatable("pack.description.modResources");
+	private static final Component DESCRIPTION_TEXT = Component.translatable("pack.description.modResources");
 
 	public PackResourceMetadata getMetadata() {
 		return ModResourcePackUtil.getMetadataPack(
@@ -74,7 +74,7 @@ public record PlaceholderResourcePack(ResourceType type, ResourcePackInfo metada
 	 */
 	@Nullable
 	@Override
-	public InputSupplier<InputStream> open(ResourceType type, Identifier id) {
+	public InputSupplier<InputStream> open(ResourceType type, ResourceLocation id) {
 		return null;
 	}
 

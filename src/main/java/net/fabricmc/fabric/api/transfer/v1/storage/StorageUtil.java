@@ -22,11 +22,11 @@ import java.util.function.Predicate;
 
 import org.jetbrains.annotations.Nullable;
 
-import net.minecraft.inventory.Inventory;
-import net.minecraft.screen.ScreenHandler;
+import net.minecraft.world.item.inventory.Inventory;
+import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.util.crash.CrashException;
 import net.minecraft.util.crash.CrashReport;
-import net.minecraft.util.math.MathHelper;
+import net.minecraft.core.MathHelper;
 
 import net.fabricmc.fabric.api.transfer.v1.storage.base.ResourceAmount;
 import net.fabricmc.fabric.api.transfer.v1.storage.base.SingleSlotStorage;
@@ -384,7 +384,7 @@ public final class StorageUtil {
 	}
 
 	/**
-	 * Compute the comparator output for a storage, similar to {@link ScreenHandler#calculateComparatorOutput(Inventory)}.
+	 * Compute the comparator output for a storage, similar to {@link AbstractContainerMenu#calculateComparatorOutput(Inventory)}.
 	 *
 	 * @param storage The storage for which the comparator level should be computed.
 	 * @param <T> The type of the stored resources.

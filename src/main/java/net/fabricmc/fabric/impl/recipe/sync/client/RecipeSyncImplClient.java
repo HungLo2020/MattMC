@@ -19,7 +19,7 @@ package net.fabricmc.fabric.impl.recipe.sync.client;
 import java.util.ArrayList;
 import java.util.Comparator;
 
-import net.minecraft.recipe.RecipeEntry;
+import net.minecraft.world.item.crafting.RecipeEntry;
 
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;

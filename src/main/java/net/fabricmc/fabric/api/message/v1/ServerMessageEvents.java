@@ -20,8 +20,8 @@ import net.minecraft.network.message.MessageType;
 import net.minecraft.network.message.SignedMessage;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.command.ServerCommandSource;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.text.Text;
+import net.minecraft.server.network.ServerPlayer;
+import net.minecraft.network.chat.Component;
 
 import net.fabricmc.fabric.api.event.Event;
 import net.fabricmc.fabric.api.event.EventFactory;
@@ -150,7 +150,7 @@ public final class ServerMessageEvents {
 		 * @param params the {@link MessageType.Parameters}
 		 * @return {@code true} if the message should be broadcast, otherwise {@code false}
 		 */
-		boolean allowChatMessage(SignedMessage message, ServerPlayerEntity sender, MessageType.Parameters params);
+		boolean allowChatMessage(SignedMessage message, ServerPlayer sender, MessageType.Parameters params);
 	}
 
 	@FunctionalInterface
@@ -166,7 +166,7 @@ public final class ServerMessageEvents {
 		 * @param overlay {@code true} when the message is an overlay
 		 * @return {@code true} if the message should be broadcast, otherwise {@code false}
 		 */
-		boolean allowGameMessage(MinecraftServer server, Text message, boolean overlay);
+		boolean allowGameMessage(MinecraftServer server, Component message, boolean overlay);
 	}
 
 	@FunctionalInterface
@@ -204,7 +204,7 @@ public final class ServerMessageEvents {
 		 * @param sender  the player that sent the message
 		 * @param params the {@link MessageType.Parameters}
 		 */
-		void onChatMessage(SignedMessage message, ServerPlayerEntity sender, MessageType.Parameters params);
+		void onChatMessage(SignedMessage message, ServerPlayer sender, MessageType.Parameters params);
 	}
 
 	@FunctionalInterface
@@ -218,7 +218,7 @@ public final class ServerMessageEvents {
 		 * @param message the broadcast message
 		 * @param overlay {@code true} when the message is an overlay
 		 */
-		void onGameMessage(MinecraftServer server, Text message, boolean overlay);
+		void onGameMessage(MinecraftServer server, Component message, boolean overlay);
 	}
 
 	@FunctionalInterface

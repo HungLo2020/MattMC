@@ -20,7 +20,7 @@ import java.util.WeakHashMap;
 
 import org.jetbrains.annotations.Nullable;
 
-import net.minecraft.item.Item;
+import net.minecraft.world.item.Item;
 
 import net.fabricmc.fabric.api.item.v1.CustomDamageHandler;
 import net.fabricmc.fabric.api.item.v1.EquipmentSlotProvider;

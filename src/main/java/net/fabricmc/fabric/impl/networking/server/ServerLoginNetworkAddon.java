@@ -32,15 +32,15 @@ import org.jetbrains.annotations.Nullable;
 import net.minecraft.network.ClientConnection;
 import net.minecraft.network.PacketByteBuf;
 import net.minecraft.network.PacketCallbacks;
-import net.minecraft.network.packet.CustomPayload;
-import net.minecraft.network.packet.Packet;
-import net.minecraft.network.packet.c2s.login.LoginQueryResponseC2SPacket;
-import net.minecraft.network.packet.s2c.login.LoginCompressionS2CPacket;
-import net.minecraft.network.packet.s2c.login.LoginQueryRequestS2CPacket;
+import net.minecraft.network.protocol.CustomPayload;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.c2s.login.LoginQueryResponseC2SPacket;
+import net.minecraft.network.protocol.s2c.login.LoginCompressionS2CPacket;
+import net.minecraft.network.protocol.s2c.login.LoginQueryRequestS2CPacket;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.network.ServerLoginNetworkHandler;
-import net.minecraft.text.Text;
-import net.minecraft.util.Identifier;
+import net.minecraft.network.chat.Component;
+import net.minecraft.server.packss.ResourceLocation;
 
 import net.fabricmc.fabric.api.networking.v1.LoginPacketSender;
 import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
@@ -57,7 +57,7 @@ public final class ServerLoginNetworkAddon extends AbstractNetworkAddon<ServerLo
 	private final MinecraftServer server;
 	private final QueryIdFactory queryIdFactory;
 	private final Collection<Future<?>> waits = new ConcurrentLinkedQueue<>();
-	private final Map<Integer, Identifier> channels = new ConcurrentHashMap<>();
+	private final Map<Integer, ResourceLocation> channels = new ConcurrentHashMap<>();
 	private boolean firstQueryTick = true;
 
 	public ServerLoginNetworkAddon(ServerLoginNetworkHandler handler) {
@@ -133,7 +133,7 @@ public final class ServerLoginNetworkAddon extends AbstractNetworkAddon<ServerLo
 
 	private boolean handle(int queryId, @Nullable PacketByteBuf originalBuf) {
 		this.logger.debug("Handling inbound login query with id {}", queryId);
-		Identifier channel = this.channels.remove(queryId);
+		ResourceLocation channel = this.channels.remove(queryId);
 
 		if (channel == null) {
 			this.logger.warn("Query ID {} was received but no query has been associated in {}!", queryId, this.connection);
@@ -165,7 +165,7 @@ public final class ServerLoginNetworkAddon extends AbstractNetworkAddon<ServerLo
 	}
 
 	@Override
-	public Packet<?> createPacket(Identifier channelName, PacketByteBuf buf) {
+	public Packet<?> createPacket(ResourceLocation channelName, PacketByteBuf buf) {
 		int queryId = this.queryIdFactory.nextId();
 		return new LoginQueryRequestS2CPacket(queryId, new PacketByteBufLoginQueryRequestPayload(channelName, buf));
 	}
@@ -178,7 +178,7 @@ public final class ServerLoginNetworkAddon extends AbstractNetworkAddon<ServerLo
 	}
 
 	@Override
-	public void disconnect(Text disconnectReason) {
+	public void disconnect(Component disconnectReason) {
 		Objects.requireNonNull(disconnectReason, "Disconnect reason cannot be null");
 
 		this.connection.disconnect(disconnectReason);
@@ -189,11 +189,11 @@ public final class ServerLoginNetworkAddon extends AbstractNetworkAddon<ServerLo
 	}
 
 	@Override
-	protected void handleRegistration(Identifier channelName) {
+	protected void handleRegistration(ResourceLocation channelName) {
 	}
 
 	@Override
-	protected void handleUnregistration(Identifier channelName) {
+	protected void handleUnregistration(ResourceLocation channelName) {
 	}
 
 	@Override
@@ -202,7 +202,7 @@ public final class ServerLoginNetworkAddon extends AbstractNetworkAddon<ServerLo
 	}
 
 	@Override
-	protected boolean isReservedChannel(Identifier channelName) {
+	protected boolean isReservedChannel(ResourceLocation channelName) {
 		return false;
 	}
 }

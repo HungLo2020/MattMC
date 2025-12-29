@@ -19,8 +19,8 @@ package net.fabricmc.fabric.mixin.object.builder;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.gen.Accessor;
 
-import net.minecraft.entity.data.TrackedDataHandler;
-import net.minecraft.entity.data.TrackedDataHandlerRegistry;
+import net.minecraft.world.entity.data.TrackedDataHandler;
+import net.minecraft.world.entity.data.TrackedDataHandlerRegistry;
 import net.minecraft.util.collection.Int2ObjectBiMap;
 
 @Mixin(TrackedDataHandlerRegistry.class)

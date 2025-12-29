@@ -22,13 +22,13 @@ import java.util.stream.Stream;
 
 import org.jetbrains.annotations.Nullable;
 
-import net.minecraft.recipe.PreparedRecipes;
-import net.minecraft.recipe.Recipe;
-import net.minecraft.recipe.RecipeEntry;
-import net.minecraft.recipe.RecipeType;
-import net.minecraft.recipe.input.RecipeInput;
-import net.minecraft.registry.RegistryKey;
-import net.minecraft.world.World;
+import net.minecraft.world.item.crafting.PreparedRecipes;
+import net.minecraft.world.item.crafting.Recipe;
+import net.minecraft.world.item.crafting.RecipeEntry;
+import net.minecraft.world.item.crafting.RecipeType;
+import net.minecraft.world.item.crafting.input.RecipeInput;
+import net.minecraft.core.ResourceKey;
+import net.minecraft.world.Level;
 
 import net.fabricmc.fabric.api.recipe.v1.sync.SynchronizedRecipes;
 
@@ -40,7 +40,7 @@ public record SynchronizedRecipesImpl(PreparedRecipes preparedRecipes) implement
 	}
 
 	@Override
-	public <I extends RecipeInput, T extends Recipe<I>> Stream<RecipeEntry<T>> getAllMatches(RecipeType<T> type, I input, World world) {
+	public <I extends RecipeInput, T extends Recipe<I>> Stream<RecipeEntry<T>> getAllMatches(RecipeType<T> type, I input, Level world) {
 		return this.preparedRecipes.find(type, input, world);
 	}
 
@@ -50,12 +50,12 @@ public record SynchronizedRecipesImpl(PreparedRecipes preparedRecipes) implement
 	}
 
 	@Override
-	public <I extends RecipeInput, T extends Recipe<I>> Optional<RecipeEntry<T>> getFirstMatch(RecipeType<T> type, I input, World world) {
+	public <I extends RecipeInput, T extends Recipe<I>> Optional<RecipeEntry<T>> getFirstMatch(RecipeType<T> type, I input, Level world) {
 		return this.preparedRecipes.find(type, input, world).findFirst();
 	}
 
 	@Override
-	public @Nullable RecipeEntry<?> get(RegistryKey<Recipe<?>> key) {
+	public @Nullable RecipeEntry<?> get(ResourceKey<Recipe<?>> key) {
 		return this.preparedRecipes.get(key);
 	}
 

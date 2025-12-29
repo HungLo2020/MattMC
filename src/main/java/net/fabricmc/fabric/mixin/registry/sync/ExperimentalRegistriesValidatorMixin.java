@@ -22,8 +22,8 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Redirect;
 
-import net.minecraft.registry.ExperimentalRegistriesValidator;
-import net.minecraft.registry.RegistryLoader;
+import net.minecraft.core.ExperimentalRegistriesValidator;
+import net.minecraft.core.RegistryLoader;
 
 import net.fabricmc.fabric.api.event.registry.DynamicRegistries;
 

@@ -16,8 +16,8 @@
 
 package net.fabricmc.fabric.impl.itemgroup;
 
-import net.minecraft.item.ItemGroup;
-import net.minecraft.text.Text;
+import net.minecraft.world.item.ItemGroup;
+import net.minecraft.network.chat.Component;
 
 public final class FabricItemGroupBuilderImpl extends ItemGroup.Builder {
 	private boolean hasDisplayName = false;
@@ -28,7 +28,7 @@ public final class FabricItemGroupBuilderImpl extends ItemGroup.Builder {
 	}
 
 	@Override
-	public ItemGroup.Builder displayName(Text displayName) {
+	public ItemGroup.Builder displayName(Component displayName) {
 		hasDisplayName = true;
 		return super.displayName(displayName);
 	}

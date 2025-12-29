@@ -24,9 +24,9 @@ import org.slf4j.LoggerFactory;
 
 import net.minecraft.component.ComponentType;
 import net.minecraft.enchantment.Enchantment;
-import net.minecraft.registry.RegistryKey;
-import net.minecraft.resource.Resource;
-import net.minecraft.resource.ResourcePackSource;
+import net.minecraft.core.ResourceKey;
+import net.minecraft.server.packs.Resource;
+import net.minecraft.server.packs.ResourcePackSource;
 
 import net.fabricmc.fabric.api.item.v1.EnchantmentEvents;
 import net.fabricmc.fabric.api.item.v1.EnchantmentSource;
@@ -40,7 +40,7 @@ public class EnchantmentUtil {
 
 	@SuppressWarnings("unchecked")
 	@Nullable
-	public static Enchantment modify(RegistryKey<Enchantment> key, Enchantment originalEnchantment, EnchantmentSource source) {
+	public static Enchantment modify(ResourceKey<Enchantment> key, Enchantment originalEnchantment, EnchantmentSource source) {
 		Enchantment.Builder builder = Enchantment.builder(originalEnchantment.definition());
 		EnchantmentBuilderAccessor accessor = (EnchantmentBuilderAccessor) builder;
 		BuilderExtensions builderExtensions = (BuilderExtensions) builder;
