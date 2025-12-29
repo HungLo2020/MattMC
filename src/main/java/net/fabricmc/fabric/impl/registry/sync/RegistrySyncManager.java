@@ -45,7 +45,7 @@ import net.minecraft.server.network.ServerConfigurationPacketListenerImpl;
 import net.minecraft.server.network.ServerPlayerConfigurationTask;
 import net.minecraft.network.chat.MutableText;
 import net.minecraft.network.chat.Component;
-import net.minecraft.util.Formatting;
+import net.minecraft.ChatFormatting;
 import net.minecraft.resources.ResourceLocation;
 
 import net.fabricmc.fabric.api.event.registry.RegistryAttribute;
@@ -115,7 +115,7 @@ public final class RegistrySyncManager {
 		MutableText text = Component.literal("The following registry entry namespaces may be related:\n\n");
 
 		for (int i = 0; i < Math.min(namespaces.size(), toDisplay); i++) {
-			text = text.append(Component.literal(namespaces.get(i)).formatted(Formatting.YELLOW));
+			text = text.append(Component.literal(namespaces.get(i)).formatted(ChatFormatting.YELLOW));
 			text = text.append(ScreenTexts.LINE_BREAK);
 		}
 
@@ -123,9 +123,9 @@ public final class RegistrySyncManager {
 			text = text.append(Component.literal("And %d more...".formatted(namespaces.size() - toDisplay)));
 		}
 
-		return Component.literal("This server requires ").append(Component.literal(brandText).formatted(Formatting.GREEN)).append(" installed on your client!")
+		return Component.literal("This server requires ").append(Component.literal(brandText).formatted(ChatFormatting.GREEN)).append(" installed on your client!")
 				.append(ScreenTexts.LINE_BREAK).append(text)
-				.append(ScreenTexts.LINE_BREAK).append(ScreenTexts.LINE_BREAK).append(Component.literal("Contact the server's administrator for more information!").formatted(Formatting.GOLD));
+				.append(ScreenTexts.LINE_BREAK).append(ScreenTexts.LINE_BREAK).append(Component.literal("Contact the server's administrator for more information!").formatted(ChatFormatting.GOLD));
 	}
 
 	private static boolean areAllRegistriesOptional(Map<ResourceLocation, Object2IntMap<ResourceLocation>> map) {

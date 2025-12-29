@@ -26,7 +26,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.entity.HeldItemRenderer;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.util.Hand;
+import net.minecraft.world.InteractionHand;
 
 import net.fabricmc.fabric.api.item.v1.FabricItem;
 

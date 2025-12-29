@@ -39,7 +39,7 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.statse.property.Property;
-import net.minecraft.util.ActionResult;
+import net.minecraft.world.InteractionResult;
 import net.minecraft.util.Unit;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -111,16 +111,16 @@ abstract class ServerPlayerEntityMixin extends LivingEntityMixin {
 	@Redirect(method = "trySleep", at = @At(value = "INVOKE", target = "Ljava/util/List;isEmpty()Z"))
 	private boolean hasNoMonstersNearby(List<Monster> monsters, BlockPos pos) {
 		boolean vanillaResult = monsters.isEmpty();
-		ActionResult result = EntitySleepEvents.ALLOW_NEARBY_MONSTERS.invoker().allowNearbyMonsters((Player) (Object) this, pos, vanillaResult);
-		return result != ActionResult.PASS ? result.isAccepted() : vanillaResult;
+		InteractionResult result = EntitySleepEvents.ALLOW_NEARBY_MONSTERS.invoker().allowNearbyMonsters((Player) (Object) this, pos, vanillaResult);
+		return result != InteractionResult.PASS ? result.isAccepted() : vanillaResult;
 	}
 
 	@Redirect(method = "trySleep", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/world/ServerLevel;isDay()Z"))
 	private boolean redirectDaySleepCheck(ServerLevel world, BlockPos pos) {
 		boolean day = world.isDay();
-		ActionResult result = EntitySleepEvents.ALLOW_SLEEP_TIME.invoker().allowSleepTime((Player) (Object) this, pos, !day);
+		InteractionResult result = EntitySleepEvents.ALLOW_SLEEP_TIME.invoker().allowSleepTime((Player) (Object) this, pos, !day);
 
-		if (result != ActionResult.PASS) {
+		if (result != InteractionResult.PASS) {
 			return !result.isAccepted(); // true from the event = night-like conditions, so we have to invert
 		}
 

@@ -19,7 +19,7 @@ package net.fabricmc.fabric.mixin.transfer;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 
-import net.minecraft.component.DataComponentPatch;
+import net.minecraft.core.component.DataComponentPatch;
 import net.minecraft.world.item.Item;
 
 import net.fabricmc.fabric.api.transfer.v1.item.ItemVariant;

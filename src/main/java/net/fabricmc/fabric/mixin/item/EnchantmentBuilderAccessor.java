@@ -22,7 +22,7 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.gen.Accessor;
 import org.spongepowered.asm.mixin.gen.Invoker;
 
-import net.minecraft.component.DataComponentMap;
+import net.minecraft.core.component.DataComponentMap;
 import net.minecraft.component.ComponentType;
 import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraft.core.RegistryEntryList;

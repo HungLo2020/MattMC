@@ -49,7 +49,7 @@ public class ExtendedBlockStateParticleEffectSync implements ModInitializer {
 	public record DummyPayload() implements CustomPacketPayload {
 		public static final DummyPayload INSTANCE = new DummyPayload();
 		public static final StreamCodec<FriendlyByteBuf, DummyPayload> CODEC = StreamCodec.unit(INSTANCE);
-		public static final CustomPacketPayload.Id<DummyPayload> ID = new Id<>(PACKET_ID);
+		public static final CustomPacketPayload.Type<DummyPayload> ID = new Id<>(PACKET_ID);
 
 		@Override
 		public Id<? extends CustomPacketPayload> getId() {

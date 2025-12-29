@@ -37,7 +37,7 @@ public abstract class RegistryPacketHandler<T extends RegistryPacketHandler.Regi
 	private int rawBufSize = 0;
 	private int deflatedBufSize = 0;
 
-	public abstract CustomPacketPayload.Id<T> getPacketId();
+	public abstract CustomPacketPayload.Type<T> getPacketId();
 
 	public abstract void sendPacket(Consumer<T> sender, Map<ResourceLocation, Object2IntMap<ResourceLocation>> registryMap);
 

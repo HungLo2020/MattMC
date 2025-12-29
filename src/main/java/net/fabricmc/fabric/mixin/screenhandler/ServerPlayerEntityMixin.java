@@ -20,7 +20,7 @@ import java.util.Objects;
 import java.util.OptionalInt;
 
 import com.llamalad7.mixinextras.sugar.Local;
-import com.mojang.authlib.GameProfile;
+import com.mojang.authlib.PlayerProfile;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
@@ -48,7 +48,7 @@ public abstract class ServerPlayerEntityMixin extends Player {
 	@Shadow
 	private int screenHandlerSyncId;
 
-	private ServerPlayerEntityMixin(Level world, GameProfile gameProfile) {
+	private ServerPlayerEntityMixin(Level world, PlayerProfile gameProfile) {
 		super(world, gameProfile);
 	}
 

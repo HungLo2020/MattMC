@@ -20,7 +20,7 @@ import java.time.Instant;
 
 import com.llamalad7.mixinextras.sugar.Local;
 import com.llamalad7.mixinextras.sugar.ref.LocalRef;
-import com.mojang.authlib.GameProfile;
+import com.mojang.authlib.PlayerProfile;
 import org.jetbrains.annotations.Nullable;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
@@ -39,12 +39,12 @@ import net.fabricmc.fabric.api.client.message.v1.ClientReceiveMessageEvents;
 @Mixin(MessageHandler.class)
 public abstract class MessageHandlerMixin {
 	@Inject(method = "processChatMessageInternal", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/hud/InGameHud;getChatHud()Lnet/minecraft/client/gui/hud/ChatComponent;", ordinal = 0), cancellable = true)
-	private void fabric_onSignedChatMessage(ChatType.Bound params, PlayerChatMessage message, Component decorated, GameProfile sender, boolean onlyShowSecureChat, Instant receptionTimestamp, CallbackInfoReturnable<Boolean> cir) {
+	private void fabric_onSignedChatMessage(ChatType.Bound params, PlayerChatMessage message, Component decorated, PlayerProfile sender, boolean onlyShowSecureChat, Instant receptionTimestamp, CallbackInfoReturnable<Boolean> cir) {
 		fabric_onChatMessage(decorated, message, sender, params, receptionTimestamp, cir);
 	}
 
 	@Inject(method = "processChatMessageInternal", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/hud/InGameHud;getChatHud()Lnet/minecraft/client/gui/hud/ChatComponent;", ordinal = 1), cancellable = true)
-	private void fabric_onFilteredSignedChatMessage(ChatType.Bound params, PlayerChatMessage message, Component decorated, GameProfile sender, boolean onlyShowSecureChat, Instant receptionTimestamp, CallbackInfoReturnable<Boolean> cir) {
+	private void fabric_onFilteredSignedChatMessage(ChatType.Bound params, PlayerChatMessage message, Component decorated, PlayerProfile sender, boolean onlyShowSecureChat, Instant receptionTimestamp, CallbackInfoReturnable<Boolean> cir) {
 		Component filtered = message.filterMask().getFilteredText(message.getSignedContent());
 
 		if (filtered != null) {
@@ -58,7 +58,7 @@ public abstract class MessageHandlerMixin {
 	}
 
 	@Unique
-	private void fabric_onChatMessage(Component message, @Nullable PlayerChatMessage signedMessage, @Nullable GameProfile sender, ChatType.Bound params, Instant receptionTimestamp, CallbackInfoReturnable<Boolean> cir) {
+	private void fabric_onChatMessage(Component message, @Nullable PlayerChatMessage signedMessage, @Nullable PlayerProfile sender, ChatType.Bound params, Instant receptionTimestamp, CallbackInfoReturnable<Boolean> cir) {
 		if (ClientReceiveMessageEvents.ALLOW_CHAT.invoker().allowReceiveChatMessage(message, signedMessage, sender, params, receptionTimestamp)) {
 			ClientReceiveMessageEvents.CHAT.invoker().onReceiveChatMessage(message, signedMessage, sender, params, receptionTimestamp);
 		} else {

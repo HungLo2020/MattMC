@@ -18,8 +18,8 @@ package net.fabricmc.fabric.api.transfer.v1.storage;
 
 import java.util.Objects;
 
-import net.minecraft.component.DataComponentPatch;
-import net.minecraft.component.DataComponentMap;
+import net.minecraft.core.component.DataComponentPatch;
+import net.minecraft.core.component.DataComponentMap;
 
 /**
  * An immutable association of an immutable object instance (for example {@code Item} or {@code Fluid}) and data components.

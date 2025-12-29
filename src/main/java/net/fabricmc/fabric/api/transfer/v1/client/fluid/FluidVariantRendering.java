@@ -28,9 +28,9 @@ import net.minecraft.world.level.material.Fluid;
 import net.minecraft.world.item.tooltip.TooltipType;
 import net.minecraft.core.Registries;
 import net.minecraft.network.chat.Component;
-import net.minecraft.util.Formatting;
+import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
-import net.minecraft.world.BlockAndTintGetter;
+import net.minecraft.world.level.BlockAndTintGetter;
 
 import net.fabricmc.fabric.api.lookup.v1.custom.ApiProviderMap;
 import net.fabricmc.fabric.api.transfer.v1.fluid.FluidVariant;
@@ -96,7 +96,7 @@ public final class FluidVariantRendering {
 
 		// If advanced tooltips are enabled, render the fluid id
 		if (type.isAdvanced()) {
-			tooltip.add(Component.literal(Registries.FLUID.getId(fluidVariant.getFluid()).toString()).formatted(Formatting.DARK_GRAY));
+			tooltip.add(Component.literal(Registries.FLUID.getId(fluidVariant.getFluid()).toString()).formatted(ChatFormatting.DARK_GRAY));
 		}
 
 		// TODO: consider adding an event to append to tooltips?

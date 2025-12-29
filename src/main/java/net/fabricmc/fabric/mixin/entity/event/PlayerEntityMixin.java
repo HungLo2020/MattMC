@@ -25,7 +25,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.util.ActionResult;
+import net.minecraft.world.InteractionResult;
 import net.minecraft.util.Unit;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.Level;
@@ -49,9 +49,9 @@ abstract class PlayerEntityMixin {
 
 		if (((LivingEntity) (Object) this).getSleepingPosition().isPresent()) {
 			BlockPos pos = ((LivingEntity) (Object) this).getSleepingPosition().get();
-			ActionResult result = EntitySleepEvents.ALLOW_SLEEP_TIME.invoker().allowSleepTime((Player) (Object) this, pos, !day);
+			InteractionResult result = EntitySleepEvents.ALLOW_SLEEP_TIME.invoker().allowSleepTime((Player) (Object) this, pos, !day);
 
-			if (result != ActionResult.PASS) {
+			if (result != InteractionResult.PASS) {
 				return !result.isAccepted(); // true from the event = night-like conditions, so we have to invert
 			}
 		}

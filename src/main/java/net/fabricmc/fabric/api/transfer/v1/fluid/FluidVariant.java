@@ -19,7 +19,7 @@ package net.fabricmc.fabric.api.transfer.v1.fluid;
 import com.mojang.serialization.Codec;
 import org.jetbrains.annotations.ApiStatus;
 
-import net.minecraft.component.DataComponentPatch;
+import net.minecraft.core.component.DataComponentPatch;
 import net.minecraft.world.level.material.Fluid;
 import net.minecraft.world.level.material.Fluids;
 import net.minecraft.network.RegistryFriendlyByteBuf;

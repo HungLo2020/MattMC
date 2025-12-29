@@ -28,7 +28,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import net.minecraft.component.DataComponentPatch;
+import net.minecraft.core.component.DataComponentPatch;
 import net.minecraft.component.ComponentType;
 
 import net.fabricmc.fabric.api.transfer.v1.storage.SlottedStorage;

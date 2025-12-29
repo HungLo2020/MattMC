@@ -30,8 +30,8 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.InvalidIdentifierException;
 
 public record RegistrationPayload(Id<RegistrationPayload> id, List<ResourceLocation> channels) implements CustomPacketPayload {
-	public static final CustomPacketPayload.Id<RegistrationPayload> REGISTER = new CustomPacketPayload.Id<>(NetworkingImpl.REGISTER_CHANNEL);
-	public static final CustomPacketPayload.Id<RegistrationPayload> UNREGISTER = new CustomPacketPayload.Id<>(NetworkingImpl.UNREGISTER_CHANNEL);
+	public static final CustomPacketPayload.Type<RegistrationPayload> REGISTER = new CustomPacketPayload.Type<>(NetworkingImpl.REGISTER_CHANNEL);
+	public static final CustomPacketPayload.Type<RegistrationPayload> UNREGISTER = new CustomPacketPayload.Type<>(NetworkingImpl.UNREGISTER_CHANNEL);
 	public static final StreamCodec<FriendlyByteBuf, RegistrationPayload> REGISTER_CODEC = codec(REGISTER);
 	public static final StreamCodec<FriendlyByteBuf, RegistrationPayload> UNREGISTER_CODEC = codec(UNREGISTER);
 

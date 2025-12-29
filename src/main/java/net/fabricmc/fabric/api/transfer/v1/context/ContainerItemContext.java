@@ -26,7 +26,7 @@ import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.ItemUsage;
 import net.minecraft.world.inventory.AbstractContainerMenu;
-import net.minecraft.util.Hand;
+import net.minecraft.world.InteractionHand;
 
 import net.fabricmc.fabric.api.lookup.v1.item.ItemApiLookup;
 import net.fabricmc.fabric.api.transfer.v1.item.ItemVariant;

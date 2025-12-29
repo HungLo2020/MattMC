@@ -25,7 +25,7 @@ import net.minecraft.world.item.Items;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundEvents;
-import net.minecraft.util.Hand;
+import net.minecraft.world.InteractionHand;
 import net.minecraft.util.crash.CrashException;
 import net.minecraft.util.crash.CrashReport;
 

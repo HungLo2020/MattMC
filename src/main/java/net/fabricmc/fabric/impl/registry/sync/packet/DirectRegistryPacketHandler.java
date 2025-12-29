@@ -78,7 +78,7 @@ public class DirectRegistryPacketHandler extends RegistryPacketHandler<DirectReg
 	private int totalPacketReceived = 0;
 
 	@Override
-	public CustomPacketPayload.Id<DirectRegistryPacketHandler.Payload> getPacketId() {
+	public CustomPacketPayload.Type<DirectRegistryPacketHandler.Payload> getPacketId() {
 		return Payload.ID;
 	}
 
@@ -284,7 +284,7 @@ public class DirectRegistryPacketHandler extends RegistryPacketHandler<DirectReg
 	}
 
 	public record Payload(byte[] data) implements RegistrySyncPayload {
-		public static CustomPacketPayload.Id<Payload> ID = new Id<>(ResourceLocation.of("fabric", "registry/sync/direct"));
+		public static CustomPacketPayload.Type<Payload> ID = new Id<>(ResourceLocation.of("fabric", "registry/sync/direct"));
 		public static StreamCodec<FriendlyByteBuf, Payload> CODEC = CustomPacketPayload.codecOf(Payload::write, Payload::new);
 
 		Payload(FriendlyByteBuf buf) {

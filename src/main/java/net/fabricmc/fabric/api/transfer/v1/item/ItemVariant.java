@@ -21,7 +21,7 @@ import java.util.Objects;
 import com.mojang.serialization.Codec;
 import org.jetbrains.annotations.ApiStatus;
 
-import net.minecraft.component.DataComponentPatch;
+import net.minecraft.core.component.DataComponentPatch;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.level.ItemLike;
 import net.minecraft.world.item.ItemStack;

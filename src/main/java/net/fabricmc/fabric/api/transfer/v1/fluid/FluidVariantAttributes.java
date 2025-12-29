@@ -28,7 +28,7 @@ import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.network.chat.Style;
 import net.minecraft.network.chat.Component;
-import net.minecraft.util.Formatting;
+import net.minecraft.ChatFormatting;
 import net.minecraft.world.level.Level;
 
 import net.fabricmc.fabric.api.lookup.v1.custom.ApiProviderMap;
@@ -166,7 +166,7 @@ public final class FluidVariantAttributes {
 			@Override
 			public Component getName(FluidVariant fluidVariant) {
 				if (coloredVanillaFluidNames) {
-					return Blocks.WATER.getName().setStyle(Style.EMPTY.withColor(Formatting.BLUE));
+					return Blocks.WATER.getName().setStyle(Style.EMPTY.withColor(ChatFormatting.BLUE));
 				} else {
 					return FluidVariantAttributeHandler.super.getName(fluidVariant);
 				}
@@ -181,7 +181,7 @@ public final class FluidVariantAttributes {
 			@Override
 			public Component getName(FluidVariant fluidVariant) {
 				if (coloredVanillaFluidNames) {
-					return Blocks.LAVA.getName().setStyle(Style.EMPTY.withColor(Formatting.RED));
+					return Blocks.LAVA.getName().setStyle(Style.EMPTY.withColor(ChatFormatting.RED));
 				} else {
 					return FluidVariantAttributeHandler.super.getName(fluidVariant);
 				}

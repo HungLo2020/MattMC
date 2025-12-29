@@ -19,7 +19,7 @@ package net.fabricmc.fabric.impl.transfer.context;
 import java.util.List;
 
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.util.Hand;
+import net.minecraft.world.InteractionHand;
 
 import net.fabricmc.fabric.api.transfer.v1.context.ContainerItemContext;
 import net.fabricmc.fabric.api.transfer.v1.item.ItemVariant;

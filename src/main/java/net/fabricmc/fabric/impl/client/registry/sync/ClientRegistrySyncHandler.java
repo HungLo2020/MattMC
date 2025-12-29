@@ -34,7 +34,7 @@ import net.minecraft.core.Registry;
 import net.minecraft.world.inventory.ScreenTexts;
 import net.minecraft.network.chat.MutableText;
 import net.minecraft.network.chat.Component;
-import net.minecraft.util.Formatting;
+import net.minecraft.ChatFormatting;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.thread.BlockableEventLoop;
 
@@ -180,13 +180,13 @@ public final class ClientRegistrySyncHandler {
 			text = text.append(Component.translatable("fabric-registry-sync-v0.unknown-registry.title.plural", count));
 		}
 
-		text = text.append(Component.translatable("fabric-registry-sync-v0.unknown-registry.subtitle.1").formatted(Formatting.GREEN));
+		text = text.append(Component.translatable("fabric-registry-sync-v0.unknown-registry.subtitle.1").formatted(ChatFormatting.GREEN));
 		text = text.append(Component.translatable("fabric-registry-sync-v0.unknown-registry.subtitle.2"));
 
 		final int toDisplay = 4;
 
 		for (int i = 0; i < Math.min(missingRegistries.size(), toDisplay); i++) {
-			text = text.append(Component.literal(missingRegistries.get(i).toString()).formatted(Formatting.YELLOW));
+			text = text.append(Component.literal(missingRegistries.get(i).toString()).formatted(ChatFormatting.YELLOW));
 			text = text.append(ScreenTexts.LINE_BREAK);
 		}
 
@@ -208,7 +208,7 @@ public final class ClientRegistrySyncHandler {
 			text = text.append(Component.translatable("fabric-registry-sync-v0.unknown-remote.title.plural", count));
 		}
 
-		text = text.append(Component.translatable("fabric-registry-sync-v0.unknown-remote.subtitle.1").formatted(Formatting.GREEN));
+		text = text.append(Component.translatable("fabric-registry-sync-v0.unknown-remote.subtitle.1").formatted(ChatFormatting.GREEN));
 		text = text.append(Component.translatable("fabric-registry-sync-v0.unknown-remote.subtitle.2"));
 
 		final int toDisplay = 4;
@@ -221,7 +221,7 @@ public final class ClientRegistrySyncHandler {
 				.toList();
 
 		for (int i = 0; i < Math.min(namespaces.size(), toDisplay); i++) {
-			text = text.append(Component.literal(namespaces.get(i)).formatted(Formatting.YELLOW));
+			text = text.append(Component.literal(namespaces.get(i)).formatted(ChatFormatting.YELLOW));
 			text = text.append(ScreenTexts.LINE_BREAK);
 		}
 

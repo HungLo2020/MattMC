@@ -20,7 +20,7 @@ import java.util.List;
 
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.core.Registries;
-import net.minecraft.core.MathHelper;
+import net.minecraft.util.Mth;
 
 import net.fabricmc.fabric.mixin.registry.sync.DebugChunkGeneratorAccessor;
 
@@ -30,8 +30,8 @@ public final class BlockInitTracker {
 				.flatMap((block) -> block.getStateManager().getStates().stream())
 				.toList();
 
-		final int xLength = MathHelper.ceil(MathHelper.sqrt(blockStateList.size()));
-		final int zLength = MathHelper.ceil(blockStateList.size() / (float) xLength);
+		final int xLength = Mth.ceil(Mth.sqrt(blockStateList.size()));
+		final int zLength = Mth.ceil(blockStateList.size() / (float) xLength);
 
 		DebugChunkGeneratorAccessor.setBLOCK_STATES(blockStateList);
 		DebugChunkGeneratorAccessor.setX_SIDE_LENGTH(xLength);

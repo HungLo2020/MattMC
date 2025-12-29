@@ -29,7 +29,7 @@ import net.minecraft.world.item.PotionItem;
 import net.minecraft.world.item.TippedArrowItem;
 import net.minecraft.world.item.alchemy.Potion;
 import net.minecraft.core.Holder;
-import net.minecraft.util.Hand;
+import net.minecraft.world.InteractionHand;
 import net.minecraft.resources.ResourceLocation;
 
 import net.fabricmc.fabric.impl.item.FabricItemInternals;

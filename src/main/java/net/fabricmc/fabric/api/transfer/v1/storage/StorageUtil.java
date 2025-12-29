@@ -26,7 +26,7 @@ import net.minecraft.world.item.inventory.Container;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.util.crash.CrashException;
 import net.minecraft.util.crash.CrashReport;
-import net.minecraft.core.MathHelper;
+import net.minecraft.util.Mth;
 
 import net.fabricmc.fabric.api.transfer.v1.storage.base.ResourceAmount;
 import net.fabricmc.fabric.api.transfer.v1.storage.base.SingleSlotStorage;
@@ -406,6 +406,6 @@ public final class StorageUtil {
 			}
 		}
 
-		return MathHelper.floor(fillPercentage / viewCount * 14) + (hasNonEmptyView ? 1 : 0);
+		return Mth.floor(fillPercentage / viewCount * 14) + (hasNonEmptyView ? 1 : 0);
 	}
 }
