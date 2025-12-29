@@ -26,7 +26,7 @@ import net.minecraft.sounds.SoundSource;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.world.InteractionHand;
-import net.minecraft.CrashException;
+import net.minecraft.ReportedException;
 import net.minecraft.CrashReport;
 
 import net.fabricmc.fabric.api.transfer.v1.context.ContainerItemContext;
@@ -72,7 +72,7 @@ public final class FluidStorageUtil {
 					.add("InteractionHand", hand)
 					.add("InteractionHand item", handItem::toString)
 					.add("Fluid storage", () -> Objects.toString(storage, null));
-			throw new CrashException(report);
+			throw new ReportedException(report);
 		}
 	}
 

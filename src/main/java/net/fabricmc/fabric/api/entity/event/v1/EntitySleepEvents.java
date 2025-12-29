@@ -55,7 +55,7 @@ public final class EntitySleepEvents {
 	 * <p><b>Note:</b> Please use the more detailed events {@link #ALLOW_SLEEP_TIME} and {@link #ALLOW_NEARBY_MONSTERS}
 	 * if they match your use case! This helps with mod compatibility.
 	 *
-	 * <p>If this event returns a {@link net.minecraft.world.entity.player.Player.SleepFailureReason}, it is used
+	 * <p>If this event returns a {@link net.minecraft.world.entity.player.Player.BedSleepingProblem}, it is used
 	 * as the return value of {@link Player#trySleep(BlockPos)} and sleeping fails. A {@code null} return value
 	 * means that the player will start sleeping.
 	 *
@@ -65,7 +65,7 @@ public final class EntitySleepEvents {
 	 */
 	public static final Event<AllowSleeping> ALLOW_SLEEPING = EventFactory.createArrayBacked(AllowSleeping.class, callbacks -> (player, sleepingPos) -> {
 		for (AllowSleeping callback : callbacks) {
-			Player.SleepFailureReason reason = callback.allowSleep(player, sleepingPos);
+			Player.BedSleepingProblem reason = callback.allowSleep(player, sleepingPos);
 
 			if (reason != null) {
 				return reason;
@@ -240,7 +240,7 @@ public final class EntitySleepEvents {
 		 * @see Player#trySleep(BlockPos)
 		 */
 		@Nullable
-		Player.SleepFailureReason allowSleep(Player player, BlockPos sleepingPos);
+		Player.BedSleepingProblem allowSleep(Player player, BlockPos sleepingPos);
 	}
 
 	@FunctionalInterface

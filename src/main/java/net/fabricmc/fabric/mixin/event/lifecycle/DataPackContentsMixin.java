@@ -40,7 +40,7 @@ public class DataPackContentsMixin {
 	private RegistryAccess dynamicRegistryManager;
 
 	@Inject(method = "<init>", at = @At("TAIL"))
-	private void init(CombinedDynamicRegistries<ServerDynamicRegistryType> combinedDynamicRegistries, HolderLookup.Provider wrapperLookup, FeatureFlagSet featureSet, Commands.RegistrationEnvironment registrationEnvironment, List list, int i, CallbackInfo ci) {
+	private void init(CombinedDynamicRegistries<ServerDynamicRegistryType> combinedDynamicRegistries, HolderLookup.Provider wrapperLookup, FeatureFlagSet featureSet, Commands.CommandSelection registrationEnvironment, List list, int i, CallbackInfo ci) {
 		dynamicRegistryManager = combinedDynamicRegistries.getCombinedRegistryManager();
 	}
 

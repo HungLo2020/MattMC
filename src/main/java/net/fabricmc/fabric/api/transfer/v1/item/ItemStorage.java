@@ -22,7 +22,7 @@ import org.jetbrains.annotations.Nullable;
 
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.ChestBlock;
-import net.minecraft.world.level.block.InventoryProvider;
+import net.minecraft.world.level.block.entity.WorldlyContainerHolder;
 import net.minecraft.world.level.block.entity.ChestBlockEntity;
 import net.minecraft.world.Container;
 import net.minecraft.world.WorldlyContainer;
@@ -60,7 +60,7 @@ public final class ItemStorage {
 	 *
 	 * <p>Block entities directly implementing {@link Container} or {@link WorldlyContainer} are automatically handled by a fallback provider,
 	 * and don't need to do anything.
-	 * Blocks that implement {@link InventoryProvider} and whose returned inventory is constant (it's the same for two subsequent calls)
+	 * Blocks that implement {@link WorldlyContainerHolder} and whose returned inventory is constant (it's the same for two subsequent calls)
 	 * are also handled automatically and don't need to do anything.
 	 * The fallback provider assumes that the {@link Container} "owns" its contents. If that's not the case,
 	 * for example because it redirects all function calls to another inventory, then implementing {@link Container} should be avoided.
@@ -115,7 +115,7 @@ public final class ItemStorage {
 		ItemStorage.SIDED.registerFallback((world, pos, state, blockEntity, direction) -> {
 			Container inventoryToWrap = null;
 
-			if (state.getBlock() instanceof InventoryProvider provider) {
+			if (state.getBlock() instanceof WorldlyContainerHolder provider) {
 				WorldlyContainer first = provider.getInventory(state, world, pos);
 				WorldlyContainer second = provider.getInventory(state, world, pos);
 

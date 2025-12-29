@@ -24,7 +24,7 @@ import org.jetbrains.annotations.Nullable;
 
 import net.minecraft.world.Container;
 import net.minecraft.world.inventory.AbstractContainerMenu;
-import net.minecraft.CrashException;
+import net.minecraft.ReportedException;
 import net.minecraft.CrashReport;
 import net.minecraft.util.Mth;
 
@@ -119,7 +119,7 @@ public final class StorageUtil {
 					.add("Filter", filter::toString)
 					.add("Max amount", maxAmount)
 					.add("Transaction", transaction);
-			throw new CrashException(report);
+			throw new ReportedException(report);
 		}
 
 		return totalMoved;
@@ -200,7 +200,7 @@ public final class StorageUtil {
 					.add("Storage", storage::toString)
 					.add("Max amount", maxAmount)
 					.add("Transaction", transaction);
-			throw new CrashException(report);
+			throw new ReportedException(report);
 		}
 
 		return null;
@@ -236,7 +236,7 @@ public final class StorageUtil {
 					.add("Resource", () -> Objects.toString(resource, null))
 					.add("Max amount", maxAmount)
 					.add("Transaction", transaction);
-			throw new CrashException(report);
+			throw new ReportedException(report);
 		}
 
 		return amount;
@@ -269,7 +269,7 @@ public final class StorageUtil {
 					.add("Resource", () -> Objects.toString(resource, null))
 					.add("Max amount", maxAmount)
 					.add("Transaction", transaction);
-			throw new CrashException(report);
+			throw new ReportedException(report);
 		}
 	}
 

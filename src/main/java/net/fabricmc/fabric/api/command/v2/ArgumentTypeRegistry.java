@@ -35,7 +35,7 @@ public final class ArgumentTypeRegistry {
 	 * @param <A> the argument type
 	 * @param <T> the argument type properties
 	 */
-	public static <A extends ArgumentType<?>, T extends ArgumentTypeInfo.ArgumentTypeProperties<A>> void registerArgumentType(
+	public static <A extends ArgumentType<?>, T extends ArgumentTypeInfo.Template<A>> void registerArgumentType(
 			ResourceLocation id, Class<? extends A> clazz, ArgumentTypeInfo<A, T> serializer) {
 		ArgumentTypesAccessor.fabric_getClassMap().put(clazz, serializer);
 		Registry.register(Registries.COMMAND_ARGUMENT_TYPE, id, serializer);
