@@ -18,7 +18,7 @@ package net.fabricmc.fabric.impl.client.keybinding;
 
 import java.util.Comparator;
 
-import net.minecraft.client.option.KeyBinding;
+import net.minecraft.client.Options.KeyBinding;
 import net.minecraft.server.packss.ResourceLocation;
 
 public class CategoryComparator implements Comparator<KeyBinding.Category> {

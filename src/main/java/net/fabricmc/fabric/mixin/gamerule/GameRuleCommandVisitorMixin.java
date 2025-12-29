@@ -24,7 +24,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-import net.minecraft.server.command.ServerCommandSource;
+import net.minecraft.commands.ServerCommandSource;
 import net.minecraft.world.GameRules;
 
 import net.fabricmc.fabric.impl.gamerule.EnumRuleCommand;

@@ -27,7 +27,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-import net.minecraft.client.gui.screen.pack.ResourcePackOrganizer;
+import net.minecraft.client.gui.screens.pack.ResourcePackOrganizer;
 import net.minecraft.server.packs.ResourcePackManager;
 import net.minecraft.server.packs.ResourcePackProfile;
 

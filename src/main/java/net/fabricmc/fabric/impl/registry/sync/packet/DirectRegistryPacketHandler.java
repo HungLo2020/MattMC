@@ -32,7 +32,7 @@ import it.unimi.dsi.fastutil.objects.Object2IntLinkedOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import org.jetbrains.annotations.Nullable;
 
-import net.minecraft.network.PacketByteBuf;
+import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.PacketCodec;
 import net.minecraft.network.protocol.CustomPayload;
 import net.minecraft.core.Registries;
@@ -66,7 +66,7 @@ public class DirectRegistryPacketHandler extends RegistryPacketHandler<DirectReg
 	private static final int MAX_PAYLOAD_SIZE = Integer.getInteger("fabric.registry.direct.maxPayloadSize", 0x100000);
 
 	@Nullable
-	private PacketByteBuf combinedBuf;
+	private FriendlyByteBuf combinedBuf;
 
 	@Nullable
 	private Map<ResourceLocation, Object2IntMap<ResourceLocation>> syncedRegistryMap;
@@ -84,7 +84,7 @@ public class DirectRegistryPacketHandler extends RegistryPacketHandler<DirectReg
 
 	@Override
 	public void sendPacket(Consumer<DirectRegistryPacketHandler.Payload> sender, Map<ResourceLocation, Object2IntMap<ResourceLocation>> registryMap) {
-		PacketByteBuf buf = PacketByteBufs.create();
+		FriendlyByteBuf buf = PacketByteBufs.create();
 
 		// Group registry ids with same namespace.
 		Map<String, List<ResourceLocation>> regNamespaceGroups = registryMap.keySet().stream()
@@ -162,7 +162,7 @@ public class DirectRegistryPacketHandler extends RegistryPacketHandler<DirectReg
 
 		while (sliceIndex < readableBytes) {
 			int sliceSize = Math.min(readableBytes - sliceIndex, MAX_PAYLOAD_SIZE);
-			PacketByteBuf slicedBuf = PacketByteBufs.slice(buf, sliceIndex, sliceSize);
+			FriendlyByteBuf slicedBuf = PacketByteBufs.slice(buf, sliceIndex, sliceSize);
 			sender.accept(createPayload(slicedBuf));
 			sliceIndex += sliceSize;
 		}
@@ -267,7 +267,7 @@ public class DirectRegistryPacketHandler extends RegistryPacketHandler<DirectReg
 		return new SyncedPacketData(map, attributes);
 	}
 
-	private DirectRegistryPacketHandler.Payload createPayload(PacketByteBuf buf) {
+	private DirectRegistryPacketHandler.Payload createPayload(FriendlyByteBuf buf) {
 		if (buf.readableBytes() == 0) {
 			return new Payload(new byte[0]);
 		}
@@ -285,17 +285,17 @@ public class DirectRegistryPacketHandler extends RegistryPacketHandler<DirectReg
 
 	public record Payload(byte[] data) implements RegistrySyncPayload {
 		public static CustomPayload.Id<Payload> ID = new Id<>(ResourceLocation.of("fabric", "registry/sync/direct"));
-		public static PacketCodec<PacketByteBuf, Payload> CODEC = CustomPayload.codecOf(Payload::write, Payload::new);
+		public static PacketCodec<FriendlyByteBuf, Payload> CODEC = CustomPayload.codecOf(Payload::write, Payload::new);
 
-		Payload(PacketByteBuf buf) {
+		Payload(FriendlyByteBuf buf) {
 			this(readAllBytes(buf));
 		}
 
-		private void write(PacketByteBuf buf) {
+		private void write(FriendlyByteBuf buf) {
 			buf.writeBytes(data);
 		}
 
-		private static byte[] readAllBytes(PacketByteBuf buf) {
+		private static byte[] readAllBytes(FriendlyByteBuf buf) {
 			byte[] bytes = new byte[buf.readableBytes()];
 			buf.readBytes(bytes);
 			return bytes;

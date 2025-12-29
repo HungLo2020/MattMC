@@ -29,7 +29,7 @@ import net.minecraft.network.message.MessageType;
 import net.minecraft.network.message.SignedMessage;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.PlayerManager;
-import net.minecraft.server.command.ServerCommandSource;
+import net.minecraft.commands.ServerCommandSource;
 import net.minecraft.server.network.ServerPlayer;
 import net.minecraft.network.chat.Component;
 

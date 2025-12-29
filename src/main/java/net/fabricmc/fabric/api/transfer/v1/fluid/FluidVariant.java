@@ -20,8 +20,8 @@ import com.mojang.serialization.Codec;
 import org.jetbrains.annotations.ApiStatus;
 
 import net.minecraft.component.ComponentChanges;
-import net.minecraft.fluid.Fluid;
-import net.minecraft.fluid.Fluids;
+import net.minecraft.world.level.material.Fluid;
+import net.minecraft.world.level.material.Fluids;
 import net.minecraft.network.RegistryByteBuf;
 import net.minecraft.network.codec.PacketCodec;
 import net.minecraft.core.entry.RegistryEntry;
@@ -55,7 +55,7 @@ public interface FluidVariant extends TransferVariant<Fluid> {
 	/**
 	 * Retrieve a FluidVariant with a fluid, and a {@code null} tag.
 	 *
-	 * <p>The flowing and still variations of {@linkplain net.minecraft.fluid.FlowableFluid flowable fluids}
+	 * <p>The flowing and still variations of {@linkplain net.minecraft.world.level.material.FlowableFluid flowable fluids}
 	 * are normalized to always refer to the still variant. For example,
 	 * {@code FluidVariant.of(Fluids.FLOWING_WATER).getFluid() == Fluids.WATER}.
 	 */
@@ -66,7 +66,7 @@ public interface FluidVariant extends TransferVariant<Fluid> {
 	/**
 	 * Retrieve a FluidVariant with a fluid, and an optional tag.
 	 *
-	 * <p>The flowing and still variations of {@linkplain net.minecraft.fluid.FlowableFluid flowable fluids}
+	 * <p>The flowing and still variations of {@linkplain net.minecraft.world.level.material.FlowableFluid flowable fluids}
 	 * are normalized to always refer to the still fluid. For example,
 	 * {@code FluidVariant.of(Fluids.FLOWING_WATER, ComponentChanges.EMPTY).getFluid() == Fluids.WATER}.
 	 */

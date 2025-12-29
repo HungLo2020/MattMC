@@ -25,7 +25,7 @@ import io.netty.buffer.ByteBuf;
 import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import org.jetbrains.annotations.Nullable;
 
-import net.minecraft.network.PacketByteBuf;
+import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.protocol.CustomPayload;
 import net.minecraft.server.packss.ResourceLocation;
 
@@ -50,7 +50,7 @@ public abstract class RegistryPacketHandler<T extends RegistryPacketHandler.Regi
 	@Nullable
 	public abstract SyncedPacketData getSyncedPacketData();
 
-	protected final void computeBufSize(PacketByteBuf buf) {
+	protected final void computeBufSize(FriendlyByteBuf buf) {
 		if (!RegistrySyncManager.DEBUG) {
 			return;
 		}
@@ -60,7 +60,7 @@ public abstract class RegistryPacketHandler<T extends RegistryPacketHandler.Regi
 		Deflater deflater = new Deflater();
 
 		int i = byteBuf.readableBytes();
-		PacketByteBuf deflatedBuf = PacketByteBufs.create();
+		FriendlyByteBuf deflatedBuf = PacketByteBufs.create();
 
 		if (i < 256) {
 			deflatedBuf.writeVarInt(0);

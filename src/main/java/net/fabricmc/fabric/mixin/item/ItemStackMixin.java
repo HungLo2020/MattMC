@@ -37,7 +37,7 @@ import org.spongepowered.asm.mixin.injection.ModifyArg;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import net.minecraft.component.ComponentType;
-import net.minecraft.component.DataComponentTypes;
+import net.minecraft.component.DataComponents;
 import net.minecraft.component.type.TooltipDisplayComponent;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
@@ -128,7 +128,7 @@ public abstract class ItemStackMixin implements FabricItemStack {
 			@Share("index") LocalIntRef index
 	) {
 		// Special case: attribute modifiers are extracted into a separate method
-		preAppendTooltip(DataComponentTypes.ATTRIBUTE_MODIFIERS, context, displayComponent, textConsumer, type, index);
+		preAppendTooltip(DataComponents.ATTRIBUTE_MODIFIERS, context, displayComponent, textConsumer, type, index);
 	}
 
 	@Inject(method = "appendTooltip", at = @At(value = "INVOKE", target = "Lnet/minecraft/registry/DefaultedRegistry;getId(Ljava/lang/Object;)Lnet/minecraft/util/ResourceLocation;"))

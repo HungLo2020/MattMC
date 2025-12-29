@@ -16,20 +16,20 @@
 
 package net.fabricmc.fabric.impl.networking;
 
-import net.minecraft.network.PacketByteBuf;
+import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.PacketCodec;
 import net.minecraft.network.protocol.CustomPayload;
 import net.minecraft.server.packss.ResourceLocation;
 
 public record CommonVersionPayload(int[] versions) implements CustomPayload {
-	public static final PacketCodec<PacketByteBuf, CommonVersionPayload> CODEC = CustomPayload.codecOf(CommonVersionPayload::write, CommonVersionPayload::new);
+	public static final PacketCodec<FriendlyByteBuf, CommonVersionPayload> CODEC = CustomPayload.codecOf(CommonVersionPayload::write, CommonVersionPayload::new);
 	public static final CustomPayload.Id<CommonVersionPayload> ID = new Id<>(ResourceLocation.of("c:version"));
 
-	private CommonVersionPayload(PacketByteBuf buf) {
+	private CommonVersionPayload(FriendlyByteBuf buf) {
 		this(buf.readIntArray());
 	}
 
-	public void write(PacketByteBuf buf) {
+	public void write(FriendlyByteBuf buf) {
 		buf.writeIntArray(versions);
 	}
 

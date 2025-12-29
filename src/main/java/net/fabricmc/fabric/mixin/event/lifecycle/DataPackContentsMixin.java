@@ -30,7 +30,7 @@ import net.minecraft.core.RegistryWrapper;
 import net.minecraft.core.ServerDynamicRegistryType;
 import net.minecraft.world.flag.FeatureFlagSet;
 import net.minecraft.server.DataPackContents;
-import net.minecraft.server.command.CommandManager;
+import net.minecraft.commands.CommandManager;
 
 import net.fabricmc.fabric.api.event.lifecycle.v1.CommonLifecycleEvents;
 

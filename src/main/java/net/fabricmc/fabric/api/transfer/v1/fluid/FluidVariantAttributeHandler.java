@@ -22,8 +22,8 @@ import org.jetbrains.annotations.Nullable;
 
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
-import net.minecraft.fluid.FlowableFluid;
-import net.minecraft.fluid.Fluid;
+import net.minecraft.world.level.material.FlowableFluid;
+import net.minecraft.world.level.material.Fluid;
 import net.minecraft.world.item.BucketItem;
 import net.minecraft.core.Registries;
 import net.minecraft.sounds.SoundEvent;

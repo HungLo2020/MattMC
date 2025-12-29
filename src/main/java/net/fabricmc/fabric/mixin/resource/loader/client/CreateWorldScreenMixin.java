@@ -27,8 +27,8 @@ import org.spongepowered.asm.mixin.injection.ModifyVariable;
 import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.gui.screen.world.CreateWorldScreen;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.screens.world.CreateWorldScreen;
 import net.minecraft.server.packs.DataConfiguration;
 import net.minecraft.server.packs.ResourcePackManager;
 import net.minecraft.server.packs.ResourceType;

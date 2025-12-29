@@ -25,8 +25,8 @@ import org.spongepowered.asm.mixin.injection.Redirect;
 
 import net.minecraft.core.ResourceKey;
 import net.minecraft.core.RegistryKeys;
-import net.minecraft.world.dimension.DimensionOptions;
-import net.minecraft.world.dimension.DimensionOptionsRegistryHolder;
+import net.minecraft.world.level.dimension.DimensionOptions;
+import net.minecraft.world.level.dimension.DimensionOptionsRegistryHolder;
 
 import net.fabricmc.fabric.impl.dimension.FailSoftMapCodec;
 

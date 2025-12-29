@@ -24,7 +24,7 @@ import org.spongepowered.asm.mixin.gen.Invoker;
 
 import net.minecraft.component.ComponentMap;
 import net.minecraft.component.ComponentType;
-import net.minecraft.enchantment.Enchantment;
+import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraft.core.entry.RegistryEntryList;
 
 @Mixin(Enchantment.Builder.class)

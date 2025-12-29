@@ -18,8 +18,8 @@ package net.fabricmc.fabric.api.command.v2;
 
 import java.util.function.Predicate;
 
-import net.minecraft.command.EntitySelectorOptions;
-import net.minecraft.command.EntitySelectorReader;
+import net.minecraft.commands.EntitySelectorOptions;
+import net.minecraft.commands.EntitySelectorReader;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.packss.ResourceLocation;
 

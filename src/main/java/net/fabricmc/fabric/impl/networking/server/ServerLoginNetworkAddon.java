@@ -30,7 +30,7 @@ import io.netty.channel.ChannelFutureListener;
 import org.jetbrains.annotations.Nullable;
 
 import net.minecraft.network.ClientConnection;
-import net.minecraft.network.PacketByteBuf;
+import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.PacketCallbacks;
 import net.minecraft.network.protocol.CustomPayload;
 import net.minecraft.network.protocol.Packet;
@@ -131,7 +131,7 @@ public final class ServerLoginNetworkAddon extends AbstractNetworkAddon<ServerLo
 		return handle(packet.queryId(), response == null ? null : response.data());
 	}
 
-	private boolean handle(int queryId, @Nullable PacketByteBuf originalBuf) {
+	private boolean handle(int queryId, @Nullable FriendlyByteBuf originalBuf) {
 		this.logger.debug("Handling inbound login query with id {}", queryId);
 		ResourceLocation channel = this.channels.remove(queryId);
 
@@ -147,7 +147,7 @@ public final class ServerLoginNetworkAddon extends AbstractNetworkAddon<ServerLo
 			return false;
 		}
 
-		PacketByteBuf buf = understood ? PacketByteBufs.slice(originalBuf) : PacketByteBufs.empty();
+		FriendlyByteBuf buf = understood ? PacketByteBufs.slice(originalBuf) : PacketByteBufs.empty();
 
 		try {
 			handler.receive(this.server, this.handler, understood, buf, this.waits::add, this);
@@ -165,7 +165,7 @@ public final class ServerLoginNetworkAddon extends AbstractNetworkAddon<ServerLo
 	}
 
 	@Override
-	public Packet<?> createPacket(ResourceLocation channelName, PacketByteBuf buf) {
+	public Packet<?> createPacket(ResourceLocation channelName, FriendlyByteBuf buf) {
 		int queryId = this.queryIdFactory.nextId();
 		return new LoginQueryRequestS2CPacket(queryId, new PacketByteBufLoginQueryRequestPayload(channelName, buf));
 	}

@@ -20,9 +20,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.gui.screen.ingame.HandledScreens;
-import net.minecraft.client.gui.screen.ingame.ScreenHandlerProvider;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.screens.ingame.HandledScreens;
+import net.minecraft.client.gui.screens.ingame.ScreenHandlerProvider;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.core.Registries;
 import net.minecraft.world.inventory.ScreenHandlerType;

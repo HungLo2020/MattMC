@@ -22,11 +22,11 @@ import java.util.stream.Stream;
 import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 
-import net.minecraft.component.DataComponentTypes;
+import net.minecraft.component.DataComponents;
 import net.minecraft.component.type.NbtComponent;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.nbt.NbtCompound;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.StringNbtReader;
 import net.minecraft.network.RegistryByteBuf;
 import net.minecraft.network.codec.PacketCodec;
@@ -43,9 +43,9 @@ public class CustomDataIngredient implements CustomIngredient {
 	public static final CustomIngredientSerializer<CustomDataIngredient> SERIALIZER = new Serializer();
 
 	private final Ingredient base;
-	private final NbtCompound nbt;
+	private final CompoundTag nbt;
 
-	public CustomDataIngredient(Ingredient base, NbtCompound nbt) {
+	public CustomDataIngredient(Ingredient base, CompoundTag nbt) {
 		if (nbt == null || nbt.isEmpty()) throw new IllegalArgumentException("NBT cannot be null; use components ingredient for strict matching");
 
 		this.base = base;
@@ -56,7 +56,7 @@ public class CustomDataIngredient implements CustomIngredient {
 	public boolean test(ItemStack stack) {
 		if (!base.test(stack)) return false;
 
-		NbtComponent nbt = stack.get(DataComponentTypes.CUSTOM_DATA);
+		NbtComponent nbt = stack.get(DataComponents.CUSTOM_DATA);
 
 		return nbt != null && nbt.matches(this.nbt);
 	}
@@ -75,7 +75,7 @@ public class CustomDataIngredient implements CustomIngredient {
 
 	private SlotDisplay createEntryDisplay(RegistryEntry<Item> entry) {
 		ItemStack stack = entry.value().getDefaultStack();
-		stack.apply(DataComponentTypes.CUSTOM_DATA, NbtComponent.DEFAULT, existingNbt -> NbtComponent.of(existingNbt.copyNbt().copyFrom(nbt)));
+		stack.apply(DataComponents.CUSTOM_DATA, NbtComponent.DEFAULT, existingNbt -> NbtComponent.of(existingNbt.copyNbt().copyFrom(nbt)));
 		return new SlotDisplay.StackSlotDisplay(stack);
 	}
 
@@ -93,7 +93,7 @@ public class CustomDataIngredient implements CustomIngredient {
 		return base;
 	}
 
-	private NbtCompound getNbt() {
+	private CompoundTag getNbt() {
 		return nbt;
 	}
 

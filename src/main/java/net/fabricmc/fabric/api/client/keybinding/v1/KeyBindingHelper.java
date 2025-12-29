@@ -18,7 +18,7 @@ package net.fabricmc.fabric.api.client.keybinding.v1;
 
 import java.util.Objects;
 
-import net.minecraft.client.option.KeyBinding;
+import net.minecraft.client.Options.KeyBinding;
 import net.minecraft.client.util.InputUtil;
 
 import net.fabricmc.fabric.impl.client.keybinding.KeyBindingRegistryImpl;
@@ -33,7 +33,7 @@ import net.fabricmc.fabric.mixin.client.keybinding.KeyBindingAccessor;
  * }</pre>
  *
  * @see KeyBinding
- * @see net.minecraft.client.option.StickyKeyBinding
+ * @see net.minecraft.client.Options.StickyKeyBinding
  */
 public final class KeyBindingHelper {
 	private KeyBindingHelper() {

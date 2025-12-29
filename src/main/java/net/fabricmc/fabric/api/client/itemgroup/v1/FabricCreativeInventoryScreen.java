@@ -18,7 +18,7 @@ package net.fabricmc.fabric.api.client.itemgroup.v1;
 
 import java.util.List;
 
-import net.minecraft.client.gui.screen.ingame.CreativeInventoryScreen;
+import net.minecraft.client.gui.screens.ingame.CreativeInventoryScreen;
 import net.minecraft.world.item.ItemGroup;
 
 /**

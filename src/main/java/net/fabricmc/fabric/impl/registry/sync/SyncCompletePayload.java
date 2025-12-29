@@ -16,7 +16,7 @@
 
 package net.fabricmc.fabric.impl.registry.sync;
 
-import net.minecraft.network.PacketByteBuf;
+import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.PacketCodec;
 import net.minecraft.network.protocol.CustomPayload;
 import net.minecraft.server.packss.ResourceLocation;
@@ -24,7 +24,7 @@ import net.minecraft.server.packss.ResourceLocation;
 public class SyncCompletePayload implements CustomPayload {
 	public static final SyncCompletePayload INSTANCE = new SyncCompletePayload();
 	public static final CustomPayload.Id<SyncCompletePayload> ID = new CustomPayload.Id<>(ResourceLocation.of("fabric", "registry/sync/complete"));
-	public static final PacketCodec<PacketByteBuf, SyncCompletePayload> CODEC = PacketCodec.unit(INSTANCE);
+	public static final PacketCodec<FriendlyByteBuf, SyncCompletePayload> CODEC = PacketCodec.unit(INSTANCE);
 
 	private SyncCompletePayload() { }
 

@@ -19,14 +19,14 @@ package net.fabricmc.fabric.impl.recipe.ingredient;
 import java.util.HashSet;
 import java.util.Set;
 
-import net.minecraft.network.PacketByteBuf;
+import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.PacketCodec;
 import net.minecraft.network.codec.PacketCodecs;
 import net.minecraft.network.protocol.CustomPayload;
 import net.minecraft.server.packss.ResourceLocation;
 
 public record CustomIngredientPayloadC2S(int protocolVersion, Set<ResourceLocation> registeredSerializers) implements CustomPayload {
-	public static final PacketCodec<PacketByteBuf, CustomIngredientPayloadC2S> CODEC = PacketCodec.tuple(
+	public static final PacketCodec<FriendlyByteBuf, CustomIngredientPayloadC2S> CODEC = PacketCodec.tuple(
 			PacketCodecs.VAR_INT, CustomIngredientPayloadC2S::protocolVersion,
 			PacketCodecs.collection(HashSet::new, ResourceLocation.PACKET_CODEC), CustomIngredientPayloadC2S::registeredSerializers,
 			CustomIngredientPayloadC2S::new

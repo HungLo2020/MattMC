@@ -22,7 +22,7 @@ import java.util.Set;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 
-import net.minecraft.command.EntitySelectorReader;
+import net.minecraft.commands.EntitySelectorReader;
 import net.minecraft.server.packss.ResourceLocation;
 
 import net.fabricmc.fabric.api.command.v2.FabricEntitySelectorReader;

@@ -25,7 +25,7 @@ import java.util.List;
 import org.apache.commons.lang3.math.Fraction;
 
 import net.minecraft.component.ComponentChanges;
-import net.minecraft.component.DataComponentTypes;
+import net.minecraft.component.DataComponents;
 import net.minecraft.component.type.BundleContentsComponent;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
@@ -73,7 +73,7 @@ public class BundleContentsStorage implements Storage<ItemVariant> {
 		if (inserted == 0) return 0;
 
 		ComponentChanges changes = ComponentChanges.builder()
-				.add(DataComponentTypes.BUNDLE_CONTENTS, builder.build())
+				.add(DataComponents.BUNDLE_CONTENTS, builder.build())
 				.build();
 
 		if (!updateStack(changes, transaction)) return 0;
@@ -123,7 +123,7 @@ public class BundleContentsStorage implements Storage<ItemVariant> {
 	}
 
 	BundleContentsComponent bundleContents() {
-		return ctx.getItemVariant().getComponentMap().getOrDefault(DataComponentTypes.BUNDLE_CONTENTS, BundleContentsComponent.DEFAULT);
+		return ctx.getItemVariant().getComponentMap().getOrDefault(DataComponents.BUNDLE_CONTENTS, BundleContentsComponent.DEFAULT);
 	}
 
 	private class BundleSlotWrapper implements StorageView<ItemVariant> {
@@ -155,7 +155,7 @@ public class BundleContentsStorage implements Storage<ItemVariant> {
 			if (stacksCopy.get(index).isEmpty()) stacksCopy.remove(index);
 
 			ComponentChanges changes = ComponentChanges.builder()
-					.add(DataComponentTypes.BUNDLE_CONTENTS, new BundleContentsComponent(stacksCopy))
+					.add(DataComponents.BUNDLE_CONTENTS, new BundleContentsComponent(stacksCopy))
 					.build();
 
 			if (!updateStack(changes, transaction)) return 0;

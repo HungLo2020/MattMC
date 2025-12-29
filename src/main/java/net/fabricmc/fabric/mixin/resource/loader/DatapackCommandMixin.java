@@ -35,8 +35,8 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import net.minecraft.server.packs.ResourcePackManager;
 import net.minecraft.server.packs.ResourcePackProfile;
-import net.minecraft.server.command.DatapackCommand;
-import net.minecraft.server.command.ServerCommandSource;
+import net.minecraft.commands.DatapackCommand;
+import net.minecraft.commands.ServerCommandSource;
 import net.minecraft.network.chat.Component;
 
 import net.fabricmc.fabric.impl.resource.loader.FabricResourcePackProfile;

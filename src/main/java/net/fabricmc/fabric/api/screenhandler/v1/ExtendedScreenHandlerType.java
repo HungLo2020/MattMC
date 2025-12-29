@@ -94,7 +94,7 @@ public class ExtendedScreenHandlerType<T extends AbstractContainerMenu, D> exten
 	@Deprecated
 	@Override
 	public final T create(int syncId, PlayerInventory inventory) {
-		throw new UnsupportedOperationException("Use ExtendedScreenHandlerType.create(int, PlayerInventory, PacketByteBuf)!");
+		throw new UnsupportedOperationException("Use ExtendedScreenHandlerType.create(int, PlayerInventory, FriendlyByteBuf)!");
 	}
 
 	/**

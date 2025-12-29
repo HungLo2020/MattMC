@@ -25,7 +25,7 @@ import com.mojang.serialization.Decoder;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 
-import net.minecraft.enchantment.Enchantment;
+import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraft.core.MutableRegistry;
 import net.minecraft.core.ResourceKey;
 import net.minecraft.core.RegistryLoader;

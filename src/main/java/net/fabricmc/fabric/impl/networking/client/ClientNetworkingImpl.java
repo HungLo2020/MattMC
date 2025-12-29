@@ -21,7 +21,7 @@ import java.util.Objects;
 import org.jetbrains.annotations.Nullable;
 
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.screen.multiplayer.ConnectScreen;
+import net.minecraft.client.gui.screens.multiplayer.ConnectScreen;
 import net.minecraft.client.multiplayer.ClientConfigurationNetworkHandler;
 import net.minecraft.client.multiplayer.ClientLoginNetworkHandler;
 import net.minecraft.client.multiplayer.ClientPlayNetworkHandler;

@@ -18,7 +18,7 @@ package net.fabricmc.fabric.api.networking.v1;
 
 import org.jetbrains.annotations.ApiStatus;
 
-import net.minecraft.network.PacketByteBuf;
+import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.RegistryByteBuf;
 import net.minecraft.network.codec.PacketCodec;
 import net.minecraft.network.protocol.CustomPayload;
@@ -29,7 +29,7 @@ import net.fabricmc.fabric.impl.networking.PayloadTypeRegistryImpl;
  * A registry for payload types.
  */
 @ApiStatus.NonExtendable
-public interface PayloadTypeRegistry<B extends PacketByteBuf> {
+public interface PayloadTypeRegistry<B extends FriendlyByteBuf> {
 	/**
 	 * Registers a custom payload type.
 	 *
@@ -63,14 +63,14 @@ public interface PayloadTypeRegistry<B extends PacketByteBuf> {
 	/**
 	 * @return the {@link PayloadTypeRegistry} instance for the client to server configuration channel.
 	 */
-	static PayloadTypeRegistry<PacketByteBuf> configurationC2S() {
+	static PayloadTypeRegistry<FriendlyByteBuf> configurationC2S() {
 		return PayloadTypeRegistryImpl.CONFIGURATION_C2S;
 	}
 
 	/**
 	 * @return the {@link PayloadTypeRegistry} instance for the server to client configuration channel.
 	 */
-	static PayloadTypeRegistry<PacketByteBuf> configurationS2C() {
+	static PayloadTypeRegistry<FriendlyByteBuf> configurationS2C() {
 		return PayloadTypeRegistryImpl.CONFIGURATION_S2C;
 	}
 

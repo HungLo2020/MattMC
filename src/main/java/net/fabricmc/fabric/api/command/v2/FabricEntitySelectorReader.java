@@ -19,7 +19,7 @@ package net.fabricmc.fabric.api.command.v2;
 import net.minecraft.server.packss.ResourceLocation;
 
 /**
- * Fabric extension to {@link net.minecraft.command.EntitySelectorReader}, implemented
+ * Fabric extension to {@link net.minecraft.commands.EntitySelectorReader}, implemented
  * using interface injection. This allows custom entity selectors to
  * set a custom flag to a reader. This can be used to implement mutually-exclusive
  * or non-repeatable entity selector option.

@@ -16,7 +16,7 @@
 
 package net.fabricmc.fabric.api.transfer.v1.fluid;
 
-import net.minecraft.fluid.FlowableFluid;
+import net.minecraft.world.level.material.FlowableFluid;
 
 /**
  * Constants for fluid transfer. In general, 1 bucket = 81000 droplets = 1 block.

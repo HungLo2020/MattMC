@@ -18,15 +18,15 @@ package net.fabricmc.fabric.api.transfer.v1.fluid;
 
 import org.jetbrains.annotations.Nullable;
 
-import net.minecraft.component.DataComponentTypes;
+import net.minecraft.component.DataComponents;
 import net.minecraft.component.type.PotionContentsComponent;
-import net.minecraft.fluid.Fluid;
-import net.minecraft.fluid.Fluids;
+import net.minecraft.world.level.material.Fluid;
+import net.minecraft.world.level.material.Fluids;
 import net.minecraft.world.item.BucketItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
-import net.minecraft.potion.Potions;
+import net.minecraft.world.item.alchemy.Potions;
 import net.minecraft.server.packss.ResourceLocation;
 import net.minecraft.core.Direction;
 
@@ -162,7 +162,7 @@ public final class FluidStorage {
 		combinedItemApiProvider(Items.GLASS_BOTTLE).register(context -> {
 			return new EmptyItemFluidStorage(context, emptyBottle -> {
 				ItemStack newStack = emptyBottle.toStack();
-				newStack.set(DataComponentTypes.POTION_CONTENTS, new PotionContentsComponent(Potions.WATER));
+				newStack.set(DataComponents.POTION_CONTENTS, new PotionContentsComponent(Potions.WATER));
 				return ItemVariant.of(Items.POTION, newStack.getComponentChanges());
 			}, Fluids.WATER, FluidConstants.BOTTLE);
 		});

@@ -16,14 +16,14 @@
 
 package net.fabricmc.fabric.impl.gamerule;
 
-import static net.minecraft.server.command.CommandManager.literal;
+import static net.minecraft.commands.CommandManager.literal;
 
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.brigadier.exceptions.SimpleCommandExceptionType;
 
-import net.minecraft.server.command.ServerCommandSource;
+import net.minecraft.commands.ServerCommandSource;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.GameRules;
 

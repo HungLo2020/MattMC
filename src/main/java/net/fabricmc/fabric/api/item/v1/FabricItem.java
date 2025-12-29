@@ -19,15 +19,15 @@ package net.fabricmc.fabric.api.item.v1;
 import java.util.Optional;
 import java.util.Set;
 
-import net.minecraft.component.DataComponentTypes;
-import net.minecraft.enchantment.Enchantment;
+import net.minecraft.component.DataComponents;
+import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.PotionItem;
 import net.minecraft.world.item.TippedArrowItem;
-import net.minecraft.potion.Potion;
+import net.minecraft.world.item.alchemy.Potion;
 import net.minecraft.core.entry.RegistryEntry;
 import net.minecraft.util.Hand;
 import net.minecraft.server.packss.ResourceLocation;
@@ -148,11 +148,11 @@ public interface FabricItem {
 	default String getCreatorNamespace(ItemStack stack) {
 		RegistryEntry<?> entry = stack.getRegistryEntry();
 
-		if ((this instanceof PotionItem || this instanceof TippedArrowItem) && stack.contains(DataComponentTypes.POTION_CONTENTS)) {
-			Optional<RegistryEntry<Potion>> potion = stack.get(DataComponentTypes.POTION_CONTENTS).potion();
+		if ((this instanceof PotionItem || this instanceof TippedArrowItem) && stack.contains(DataComponents.POTION_CONTENTS)) {
+			Optional<RegistryEntry<Potion>> potion = stack.get(DataComponents.POTION_CONTENTS).potion();
 			if (potion.isPresent()) entry = potion.get();
-		} else if (stack.isOf(Items.ENCHANTED_BOOK) && stack.contains(DataComponentTypes.STORED_ENCHANTMENTS)) {
-			Set<RegistryEntry<Enchantment>> enchantments = stack.get(DataComponentTypes.STORED_ENCHANTMENTS).getEnchantments();
+		} else if (stack.isOf(Items.ENCHANTED_BOOK) && stack.contains(DataComponents.STORED_ENCHANTMENTS)) {
+			Set<RegistryEntry<Enchantment>> enchantments = stack.get(DataComponents.STORED_ENCHANTMENTS).getEnchantments();
 			if (enchantments.size() == 1) entry = enchantments.iterator().next();
 		}
 

@@ -25,7 +25,7 @@ import org.jetbrains.annotations.Nullable;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLoginNetworkHandler;
-import net.minecraft.network.PacketByteBuf;
+import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.protocol.c2s.login.LoginQueryResponseC2SPacket;
 import net.minecraft.network.protocol.s2c.login.LoginQueryRequestS2CPacket;
 import net.minecraft.server.packss.ResourceLocation;
@@ -59,7 +59,7 @@ public final class ClientLoginNetworkAddon extends AbstractNetworkAddon<ClientLo
 		return handlePacket(packet.queryId(), packet.payload().id(), payload.data());
 	}
 
-	private boolean handlePacket(int queryId, ResourceLocation channelName, PacketByteBuf originalBuf) {
+	private boolean handlePacket(int queryId, ResourceLocation channelName, FriendlyByteBuf originalBuf) {
 		this.logger.debug("Handling inbound login response with id {} and channel with name {}", queryId, channelName);
 
 		if (this.firstResponse) {
@@ -73,11 +73,11 @@ public final class ClientLoginNetworkAddon extends AbstractNetworkAddon<ClientLo
 			return false;
 		}
 
-		PacketByteBuf buf = PacketByteBufs.slice(originalBuf);
+		FriendlyByteBuf buf = PacketByteBufs.slice(originalBuf);
 		List<ChannelFutureListener> callbacks = new ArrayList<>();
 
 		try {
-			CompletableFuture<@Nullable PacketByteBuf> future = handler.receive(this.client, this.handler, buf, callbacks::add);
+			CompletableFuture<@Nullable FriendlyByteBuf> future = handler.receive(this.client, this.handler, buf, callbacks::add);
 			future.thenAccept(result -> {
 				LoginQueryResponseC2SPacket packet = new LoginQueryResponseC2SPacket(queryId, result == null ? null : new PacketByteBufLoginQueryResponse(result));
 				((ClientLoginNetworkHandlerAccessor) this.handler).getConnection().send(packet, operation -> {

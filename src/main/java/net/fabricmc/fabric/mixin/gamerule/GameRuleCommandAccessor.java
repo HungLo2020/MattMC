@@ -20,8 +20,8 @@ import com.mojang.brigadier.context.CommandContext;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.gen.Invoker;
 
-import net.minecraft.server.command.GameRuleCommand;
-import net.minecraft.server.command.ServerCommandSource;
+import net.minecraft.commands.GameRuleCommand;
+import net.minecraft.commands.ServerCommandSource;
 import net.minecraft.world.GameRules;
 
 @Mixin(GameRuleCommand.class)

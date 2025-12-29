@@ -23,7 +23,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-import net.minecraft.network.PacketByteBuf;
+import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.protocol.s2c.login.LoginQueryRequestPayload;
 import net.minecraft.network.protocol.s2c.login.LoginQueryRequestS2CPacket;
 import net.minecraft.server.packss.ResourceLocation;
@@ -38,7 +38,7 @@ public class LoginQueryRequestS2CPacketMixin {
 	private static int MAX_PAYLOAD_SIZE;
 
 	@Inject(method = "readPayload", at = @At("HEAD"), cancellable = true)
-	private static void readPayload(ResourceLocation id, PacketByteBuf buf, CallbackInfoReturnable<LoginQueryRequestPayload> cir) {
+	private static void readPayload(ResourceLocation id, FriendlyByteBuf buf, CallbackInfoReturnable<LoginQueryRequestPayload> cir) {
 		cir.setReturnValue(new PacketByteBufLoginQueryRequestPayload(id, PayloadHelper.read(buf, MAX_PAYLOAD_SIZE)));
 	}
 }

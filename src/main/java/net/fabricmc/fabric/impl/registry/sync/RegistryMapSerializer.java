@@ -22,19 +22,19 @@ import java.util.Map;
 import it.unimi.dsi.fastutil.objects.Object2IntLinkedOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2IntMap;
 
-import net.minecraft.nbt.NbtCompound;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.packss.ResourceLocation;
 
 public class RegistryMapSerializer {
 	public static final int VERSION = 1;
 
-	public static Map<ResourceLocation, Object2IntMap<ResourceLocation>> fromNbt(NbtCompound nbt) {
-		NbtCompound mainNbt = nbt.getCompound("registries").orElseThrow();
+	public static Map<ResourceLocation, Object2IntMap<ResourceLocation>> fromNbt(CompoundTag nbt) {
+		CompoundTag mainNbt = nbt.getCompound("registries").orElseThrow();
 		Map<ResourceLocation, Object2IntMap<ResourceLocation>> map = new LinkedHashMap<>();
 
 		for (String registryId : mainNbt.getKeys()) {
 			Object2IntMap<ResourceLocation> idMap = new Object2IntLinkedOpenHashMap<>();
-			NbtCompound idNbt = mainNbt.getCompound(registryId).orElseThrow();
+			CompoundTag idNbt = mainNbt.getCompound(registryId).orElseThrow();
 
 			for (String id : idNbt.getKeys()) {
 				idMap.put(ResourceLocation.of(id), idNbt.getInt(id, 0));
@@ -46,11 +46,11 @@ public class RegistryMapSerializer {
 		return map;
 	}
 
-	public static NbtCompound toNbt(Map<ResourceLocation, Object2IntMap<ResourceLocation>> map) {
-		NbtCompound mainNbt = new NbtCompound();
+	public static CompoundTag toNbt(Map<ResourceLocation, Object2IntMap<ResourceLocation>> map) {
+		CompoundTag mainNbt = new CompoundTag();
 
 		map.forEach((registryId, idMap) -> {
-			NbtCompound registryNbt = new NbtCompound();
+			CompoundTag registryNbt = new CompoundTag();
 
 			for (Object2IntMap.Entry<ResourceLocation> idPair : idMap.object2IntEntrySet()) {
 				registryNbt.putInt(idPair.getKey().toString(), idPair.getIntValue());
@@ -59,7 +59,7 @@ public class RegistryMapSerializer {
 			mainNbt.put(registryId.toString(), registryNbt);
 		});
 
-		NbtCompound nbt = new NbtCompound();
+		CompoundTag nbt = new CompoundTag();
 		nbt.putInt("version", VERSION);
 		nbt.put("registries", mainNbt);
 		return nbt;

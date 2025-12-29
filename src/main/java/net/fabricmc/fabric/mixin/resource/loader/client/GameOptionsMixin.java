@@ -35,12 +35,12 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-import net.minecraft.client.option.GameOptions;
-import net.minecraft.nbt.NbtCompound;
+import net.minecraft.client.Options.GameOptions;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtIo;
-import net.minecraft.nbt.NbtList;
+import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.NbtSizeTracker;
-import net.minecraft.nbt.NbtString;
+import net.minecraft.nbt.StringTag;
 import net.minecraft.server.packs.ResourcePack;
 import net.minecraft.server.packs.ResourcePackProfile;
 
@@ -82,8 +82,8 @@ public class GameOptionsMixin {
 
 		if (Files.exists(trackerFile)) {
 			try {
-				NbtCompound data = NbtIo.readCompressed(trackerFile, NbtSizeTracker.ofUnlimitedBytes());
-				NbtList values = data.getList("values").orElseThrow();
+				CompoundTag data = NbtIo.readCompressed(trackerFile, NbtSizeTracker.ofUnlimitedBytes());
+				ListTag values = data.getList("values").orElseThrow();
 
 				for (int i = 0; i < values.size(); i++) {
 					trackedPacks.add(values.getString(i).orElseThrow());
@@ -118,15 +118,15 @@ public class GameOptionsMixin {
 		}
 
 		try {
-			NbtList values = new NbtList();
+			ListTag values = new ListTag();
 
 			for (String id : trackedPacks) {
 				if (!removedPacks.contains(id)) {
-					values.add(NbtString.of(id));
+					values.add(StringTag.of(id));
 				}
 			}
 
-			NbtCompound nbt = new NbtCompound();
+			CompoundTag nbt = new CompoundTag();
 			nbt.put("values", values);
 			NbtIo.writeCompressed(nbt, trackerFile);
 		} catch (IOException e) {

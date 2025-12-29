@@ -20,9 +20,9 @@ import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 
-import net.minecraft.command.CommandSource;
+import net.minecraft.commands.CommandSourceStack;
 
-@Mixin(CommandSource.class)
+@Mixin(CommandSourceStack.class)
 public interface CommandSourceMixin {
 	// Minecraft is hardcoded to only autofill identifiers with the "minecraft" namespace.
 	// This allows non-vanilla identifiers to be autofilled

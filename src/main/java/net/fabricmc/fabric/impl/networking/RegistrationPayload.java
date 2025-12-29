@@ -23,7 +23,7 @@ import java.util.List;
 
 import io.netty.util.AsciiString;
 
-import net.minecraft.network.PacketByteBuf;
+import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.PacketCodec;
 import net.minecraft.network.protocol.CustomPayload;
 import net.minecraft.server.packss.ResourceLocation;
@@ -32,14 +32,14 @@ import net.minecraft.util.InvalidIdentifierException;
 public record RegistrationPayload(Id<RegistrationPayload> id, List<ResourceLocation> channels) implements CustomPayload {
 	public static final CustomPayload.Id<RegistrationPayload> REGISTER = new CustomPayload.Id<>(NetworkingImpl.REGISTER_CHANNEL);
 	public static final CustomPayload.Id<RegistrationPayload> UNREGISTER = new CustomPayload.Id<>(NetworkingImpl.UNREGISTER_CHANNEL);
-	public static final PacketCodec<PacketByteBuf, RegistrationPayload> REGISTER_CODEC = codec(REGISTER);
-	public static final PacketCodec<PacketByteBuf, RegistrationPayload> UNREGISTER_CODEC = codec(UNREGISTER);
+	public static final PacketCodec<FriendlyByteBuf, RegistrationPayload> REGISTER_CODEC = codec(REGISTER);
+	public static final PacketCodec<FriendlyByteBuf, RegistrationPayload> UNREGISTER_CODEC = codec(UNREGISTER);
 
-	private RegistrationPayload(Id<RegistrationPayload> id, PacketByteBuf buf) {
+	private RegistrationPayload(Id<RegistrationPayload> id, FriendlyByteBuf buf) {
 		this(id, read(buf));
 	}
 
-	private void write(PacketByteBuf buf) {
+	private void write(FriendlyByteBuf buf) {
 		boolean first = true;
 
 		for (ResourceLocation channel : channels) {
@@ -53,7 +53,7 @@ public record RegistrationPayload(Id<RegistrationPayload> id, List<ResourceLocat
 		}
 	}
 
-	private static List<ResourceLocation> read(PacketByteBuf buf) {
+	private static List<ResourceLocation> read(FriendlyByteBuf buf) {
 		List<ResourceLocation> ids = new ArrayList<>();
 		StringBuilder active = new StringBuilder();
 
@@ -88,7 +88,7 @@ public record RegistrationPayload(Id<RegistrationPayload> id, List<ResourceLocat
 		return id;
 	}
 
-	private static PacketCodec<PacketByteBuf, RegistrationPayload> codec(Id<RegistrationPayload> id) {
+	private static PacketCodec<FriendlyByteBuf, RegistrationPayload> codec(Id<RegistrationPayload> id) {
 		return CustomPayload.codecOf(RegistrationPayload::write, buf -> new RegistrationPayload(id, buf));
 	}
 }

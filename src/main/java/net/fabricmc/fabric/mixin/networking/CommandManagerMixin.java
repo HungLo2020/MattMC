@@ -25,10 +25,10 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import net.minecraft.SharedConstants;
-import net.minecraft.command.CommandRegistryAccess;
-import net.minecraft.server.command.CommandManager;
-import net.minecraft.server.command.DebugConfigCommand;
-import net.minecraft.server.command.ServerCommandSource;
+import net.minecraft.commands.CommandRegistryAccess;
+import net.minecraft.commands.CommandManager;
+import net.minecraft.commands.DebugConfigCommand;
+import net.minecraft.commands.ServerCommandSource;
 
 import net.fabricmc.loader.api.FabricLoader;
 

@@ -24,7 +24,7 @@ import org.jetbrains.annotations.Nullable;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.texture.Sprite;
-import net.minecraft.fluid.Fluid;
+import net.minecraft.world.level.material.Fluid;
 import net.minecraft.world.item.tooltip.TooltipType;
 import net.minecraft.core.Registries;
 import net.minecraft.network.chat.Component;

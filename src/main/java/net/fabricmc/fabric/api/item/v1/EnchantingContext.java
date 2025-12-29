@@ -16,7 +16,7 @@
 
 package net.fabricmc.fabric.api.item.v1;
 
-import net.minecraft.enchantment.Enchantment;
+import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraft.world.item.ItemStack;
 
 /**

@@ -25,7 +25,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-import net.minecraft.client.option.KeyBinding;
+import net.minecraft.client.Options.KeyBinding;
 import net.minecraft.server.packss.ResourceLocation;
 
 import net.fabricmc.fabric.impl.client.keybinding.CategoryComparator;

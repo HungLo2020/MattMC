@@ -19,30 +19,30 @@ package net.fabricmc.fabric.impl.networking;
 import java.util.HashSet;
 import java.util.Set;
 
-import net.minecraft.network.PacketByteBuf;
+import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.PacketCodec;
 import net.minecraft.network.protocol.CustomPayload;
 import net.minecraft.server.packss.ResourceLocation;
 
 public record CommonRegisterPayload(int version, String phase, Set<ResourceLocation> channels) implements CustomPayload {
 	public static final CustomPayload.Id<CommonRegisterPayload> ID = new Id<>(ResourceLocation.of("c:register"));
-	public static final PacketCodec<PacketByteBuf, CommonRegisterPayload> CODEC = CustomPayload.codecOf(CommonRegisterPayload::write, CommonRegisterPayload::new);
+	public static final PacketCodec<FriendlyByteBuf, CommonRegisterPayload> CODEC = CustomPayload.codecOf(CommonRegisterPayload::write, CommonRegisterPayload::new);
 
 	public static final String PLAY_PHASE = "play";
 	public static final String CONFIGURATION_PHASE = "configuration";
 
-	private CommonRegisterPayload(PacketByteBuf buf) {
+	private CommonRegisterPayload(FriendlyByteBuf buf) {
 		this(
 				buf.readVarInt(),
 				buf.readString(),
-				buf.readCollection(HashSet::new, PacketByteBuf::readIdentifier)
+				buf.readCollection(HashSet::new, FriendlyByteBuf::readIdentifier)
 		);
 	}
 
-	public void write(PacketByteBuf buf) {
+	public void write(FriendlyByteBuf buf) {
 		buf.writeVarInt(version);
 		buf.writeString(phase);
-		buf.writeCollection(channels, PacketByteBuf::writeIdentifier);
+		buf.writeCollection(channels, FriendlyByteBuf::writeIdentifier);
 	}
 
 	@Override

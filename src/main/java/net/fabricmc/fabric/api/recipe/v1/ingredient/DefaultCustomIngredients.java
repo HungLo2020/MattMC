@@ -22,7 +22,7 @@ import java.util.function.UnaryOperator;
 
 import net.minecraft.component.ComponentChanges;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.nbt.NbtCompound;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtHelper;
 import net.minecraft.world.item.crafting.Ingredient;
 
@@ -156,7 +156,7 @@ public final class DefaultCustomIngredients {
 
 	/**
 	 * Creates an ingredient that wraps another ingredient to also check for stack's {@linkplain
-	 * net.minecraft.component.DataComponentTypes#CUSTOM_DATA custom data}.
+	 * net.minecraft.component.DataComponents#CUSTOM_DATA custom data}.
 	 * This check is non-strict; the ingredient custom data must be a subset of the stack custom data.
 	 * This is useful for mods that still rely on NBT-based custom data instead of custom components,
 	 * such as those requiring vanilla compatibility or interacting with another data packs.
@@ -165,9 +165,9 @@ public final class DefaultCustomIngredients {
 	 * For strict matching, use {@link #components(Ingredient, UnaryOperator)} like this instead:
 	 *
 	 * <pre>{@code
-	 * components(base, builder -> builder.add(DataComponentTypes.CUSTOM_DATA, NbtComponent.of(nbt)));
+	 * components(base, builder -> builder.add(DataComponents.CUSTOM_DATA, NbtComponent.of(nbt)));
 	 * // or, to check for absence of custom data:
-	 * components(base, builder -> builder.remove(DataComponentTypes.CUSTOM_DATA));
+	 * components(base, builder -> builder.remove(DataComponents.CUSTOM_DATA));
 	 * }</pre>
 	 *
 	 * <p>See {@link NbtHelper#matches} for how matching works.
@@ -183,7 +183,7 @@ public final class DefaultCustomIngredients {
 	 *
 	 * @throws IllegalArgumentException if {@code nbt} is {@code null} or empty
 	 */
-	public static Ingredient customData(Ingredient base, NbtCompound nbt) {
+	public static Ingredient customData(Ingredient base, CompoundTag nbt) {
 		return new CustomDataIngredient(base, nbt).toVanilla();
 	}
 

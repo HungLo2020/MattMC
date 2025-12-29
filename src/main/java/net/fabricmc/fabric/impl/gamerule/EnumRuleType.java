@@ -16,7 +16,7 @@
 
 package net.fabricmc.fabric.impl.gamerule;
 
-import static net.minecraft.server.command.CommandManager.literal;
+import static net.minecraft.commands.CommandManager.literal;
 
 import java.util.function.BiConsumer;
 import java.util.function.Function;
@@ -27,7 +27,7 @@ import com.mojang.brigadier.tree.LiteralCommandNode;
 
 import net.minecraft.world.flag.FeatureFlagSet;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.command.ServerCommandSource;
+import net.minecraft.commands.ServerCommandSource;
 import net.minecraft.world.GameRules;
 
 import net.fabricmc.fabric.api.gamerule.v1.rule.EnumRule;

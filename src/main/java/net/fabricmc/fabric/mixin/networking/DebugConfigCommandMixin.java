@@ -20,7 +20,7 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Redirect;
 
-import net.minecraft.server.command.DebugConfigCommand;
+import net.minecraft.commands.DebugConfigCommand;
 import net.minecraft.server.network.ServerConfigurationNetworkHandler;
 
 @Mixin(DebugConfigCommand.class)

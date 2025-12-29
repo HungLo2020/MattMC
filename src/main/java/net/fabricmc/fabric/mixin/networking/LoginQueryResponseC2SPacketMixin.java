@@ -23,7 +23,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-import net.minecraft.network.PacketByteBuf;
+import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.protocol.c2s.login.LoginQueryResponseC2SPacket;
 import net.minecraft.network.protocol.c2s.login.LoginQueryResponsePayload;
 
@@ -37,7 +37,7 @@ public class LoginQueryResponseC2SPacketMixin {
 	private static int MAX_PAYLOAD_SIZE;
 
 	@Inject(method = "readPayload", at = @At("HEAD"), cancellable = true)
-	private static void readResponse(int queryId, PacketByteBuf buf, CallbackInfoReturnable<LoginQueryResponsePayload> cir) {
+	private static void readResponse(int queryId, FriendlyByteBuf buf, CallbackInfoReturnable<LoginQueryResponsePayload> cir) {
 		boolean hasPayload = buf.readBoolean();
 
 		if (!hasPayload) {

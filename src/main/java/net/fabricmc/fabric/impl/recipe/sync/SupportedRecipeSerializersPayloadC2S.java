@@ -19,7 +19,7 @@ package net.fabricmc.fabric.impl.recipe.sync;
 import java.util.HashSet;
 import java.util.Set;
 
-import net.minecraft.network.PacketByteBuf;
+import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.PacketCodec;
 import net.minecraft.network.codec.PacketCodecs;
 import net.minecraft.network.protocol.CustomPayload;
@@ -29,7 +29,7 @@ import net.minecraft.server.packss.ResourceLocation;
  * Used to notify server which recipes can be synced to the client.
  */
 public record SupportedRecipeSerializersPayloadC2S(Set<ResourceLocation> synchronizedSerializers) implements CustomPayload {
-	public static final PacketCodec<PacketByteBuf, SupportedRecipeSerializersPayloadC2S> CODEC = PacketCodec.tuple(
+	public static final PacketCodec<FriendlyByteBuf, SupportedRecipeSerializersPayloadC2S> CODEC = PacketCodec.tuple(
 			PacketCodecs.collection(HashSet::new, ResourceLocation.PACKET_CODEC), SupportedRecipeSerializersPayloadC2S::synchronizedSerializers,
 			SupportedRecipeSerializersPayloadC2S::new
 	);

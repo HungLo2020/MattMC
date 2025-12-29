@@ -19,7 +19,7 @@ package net.fabricmc.fabric.api.transfer.v1.fluid;
 import java.util.Objects;
 
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.fluid.Fluids;
+import net.minecraft.world.level.material.Fluids;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.Items;
 import net.minecraft.sounds.SoundCategory;

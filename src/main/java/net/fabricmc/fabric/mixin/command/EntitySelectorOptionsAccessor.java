@@ -21,8 +21,8 @@ import java.util.function.Predicate;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.gen.Invoker;
 
-import net.minecraft.command.EntitySelectorOptions;
-import net.minecraft.command.EntitySelectorReader;
+import net.minecraft.commands.EntitySelectorOptions;
+import net.minecraft.commands.EntitySelectorReader;
 import net.minecraft.network.chat.Component;
 
 @Mixin(EntitySelectorOptions.class)

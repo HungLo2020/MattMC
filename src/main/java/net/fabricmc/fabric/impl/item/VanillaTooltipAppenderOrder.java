@@ -34,7 +34,7 @@ import org.objectweb.asm.tree.MethodNode;
 import org.spongepowered.asm.service.MixinService;
 
 import net.minecraft.component.ComponentType;
-import net.minecraft.component.DataComponentTypes;
+import net.minecraft.component.DataComponents;
 import net.minecraft.component.type.TooltipDisplayComponent;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
@@ -106,7 +106,7 @@ public final class VanillaTooltipAppenderOrder {
 			// Search for data component accesses within this method
 			List<ComponentType<?>> componentTypes = new ArrayList<>();
 			Set<String> alreadyAddedComponents = new HashSet<>();
-			String owner = Type.getInternalName(DataComponentTypes.class);
+			String owner = Type.getInternalName(DataComponents.class);
 			String desc = Type.getDescriptor(ComponentType.class);
 
 			for (AbstractInsnNode insn : appendTooltipMethod.instructions) {
@@ -118,7 +118,7 @@ public final class VanillaTooltipAppenderOrder {
 					String fieldName = fieldInsn.name;
 
 					if (alreadyAddedComponents.add(fieldName)) {
-						componentTypes.add((ComponentType<?>) DataComponentTypes.class.getField(fieldName).get(null));
+						componentTypes.add((ComponentType<?>) DataComponents.class.getField(fieldName).get(null));
 					}
 				} else if (insn instanceof MethodInsnNode methodInsn
 						&& methodInsn.name.equals(appendAttributeModifiersTooltipName)
@@ -126,7 +126,7 @@ public final class VanillaTooltipAppenderOrder {
 						&& methodInsn.owner.equals(Type.getInternalName(ItemStack.class))
 				) {
 					// Special case: attribute modifiers are extracted into a separate method
-					componentTypes.add(DataComponentTypes.ATTRIBUTE_MODIFIERS);
+					componentTypes.add(DataComponents.ATTRIBUTE_MODIFIERS);
 				}
 			}
 

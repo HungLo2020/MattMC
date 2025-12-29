@@ -18,7 +18,7 @@ package net.fabricmc.fabric.impl.particle;
 
 import java.util.Set;
 
-import net.minecraft.network.PacketByteBuf;
+import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.RegistryByteBuf;
 import net.minecraft.network.codec.PacketCodec;
 import net.minecraft.network.protocol.CustomPayload;
@@ -48,7 +48,7 @@ public class ExtendedBlockStateParticleEffectSync implements ModInitializer {
 
 	public record DummyPayload() implements CustomPayload {
 		public static final DummyPayload INSTANCE = new DummyPayload();
-		public static final PacketCodec<PacketByteBuf, DummyPayload> CODEC = PacketCodec.unit(INSTANCE);
+		public static final PacketCodec<FriendlyByteBuf, DummyPayload> CODEC = PacketCodec.unit(INSTANCE);
 		public static final CustomPayload.Id<DummyPayload> ID = new Id<>(PACKET_ID);
 
 		@Override
