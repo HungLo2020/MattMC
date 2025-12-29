@@ -31,9 +31,9 @@ import net.minecraft.SharedConstants;
 import net.minecraft.server.packs.InputSupplier;
 import net.minecraft.server.packs.Pack;
 import net.minecraft.server.packs.ResourcePackInfo;
-import net.minecraft.server.packs.ResourcePackProfile;
+import net.minecraft.server.packs.Pack;
 import net.minecraft.server.packs.PackType;
-import net.minecraft.server.packs.metadata.PackResourceMetadata;
+import net.minecraft.server.packs.metadata.PackMetadataSection;
 import net.minecraft.server.packs.metadata.ResourceMetadataMap;
 import net.minecraft.server.packs.metadata.ResourceMetadataSerializer;
 import net.minecraft.network.chat.Component;
@@ -42,7 +42,7 @@ import net.minecraft.resources.ResourceLocation;
 public record PlaceholderResourcePack(PackType type, ResourcePackInfo metadata) implements Pack {
 	private static final Component DESCRIPTION_TEXT = Component.translatable("pack.description.modResources");
 
-	public PackResourceMetadata getMetadata() {
+	public PackMetadataSection getMetadata() {
 		return ModResourcePackUtil.getMetadataPack(
 				SharedConstants.getGameVersion().packVersion(type),
 				DESCRIPTION_TEXT
@@ -56,7 +56,7 @@ public record PlaceholderResourcePack(PackType type, ResourcePackInfo metadata) 
 			switch (segments[0]) {
 			case "pack.mcmeta":
 				return () -> {
-					DataResult<JsonElement> result = PackResourceMetadata.createCodec(type)
+					DataResult<JsonElement> result = PackMetadataSection.createCodec(type)
 							.encodeStart(JsonOps.INSTANCE, getMetadata());
 					String metadata = result.getOrThrow().toString();
 					return IOUtils.toInputStream(metadata, StandardCharsets.UTF_8);
@@ -90,7 +90,7 @@ public record PlaceholderResourcePack(PackType type, ResourcePackInfo metadata) 
 	@Nullable
 	@Override
 	public <T> T parseMetadata(ResourceMetadataSerializer<T> metaReader) {
-		return ResourceMetadataMap.of(PackResourceMetadata.getSerializerFor(type), getMetadata()).get(metaReader);
+		return ResourceMetadataMap.of(PackMetadataSection.getSerializerFor(type), getMetadata()).get(metaReader);
 	}
 
 	@Override
@@ -107,14 +107,14 @@ public record PlaceholderResourcePack(PackType type, ResourcePackInfo metadata) 
 	public void close() {
 	}
 
-	public record Factory(PackType type, ResourcePackInfo metadata) implements ResourcePackProfile.PackFactory {
+	public record Factory(PackType type, ResourcePackInfo metadata) implements Pack.PackFactory {
 		@Override
 		public Pack open(ResourcePackInfo var1) {
 			return new PlaceholderResourcePack(this.type, metadata);
 		}
 
 		@Override
-		public Pack openWithOverlays(ResourcePackInfo var1, ResourcePackProfile.Metadata metadata) {
+		public Pack openWithOverlays(ResourcePackInfo var1, Pack.Metadata metadata) {
 			return open(var1);
 		}
 	}

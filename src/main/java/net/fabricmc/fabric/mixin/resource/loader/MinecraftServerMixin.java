@@ -30,7 +30,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import net.minecraft.core.VersionedIdentifier;
 import net.minecraft.server.packs.Pack;
 import net.minecraft.server.packs.PackRepository;
-import net.minecraft.server.packs.ResourcePackProfile;
+import net.minecraft.server.packs.Pack;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.SaveLoader;
 import net.minecraft.util.ApiServices;
@@ -51,7 +51,7 @@ public class MinecraftServerMixin implements FabricOriginalKnownPacksGetter {
 		this.fabric_originalKnownPacks = saveLoader.resourceManager().streamResourcePacks().flatMap(pack -> pack.getInfo().knownPackInfo().stream()).toList();
 	}
 
-	@Redirect(method = "loadDataPacks(Lnet/minecraft/resource/PackRepository;Lnet/minecraft/resource/DataConfiguration;ZZ)Lnet/minecraft/resource/DataConfiguration;", at = @At(value = "INVOKE", target = "Ljava/util/List;contains(Ljava/lang/Object;)Z"))
+	@Redirect(method = "loadDataPacks(Lnet/minecraft/resource/PackRepository;Lnet/minecraft/resource/WorldDataConfiguration;ZZ)Lnet/minecraft/resource/WorldDataConfiguration;", at = @At(value = "INVOKE", target = "Ljava/util/List;contains(Ljava/lang/Object;)Z"))
 	private static boolean onCheckDisabled(List<String> list, Object o, PackRepository resourcePackManager) {
 		String profileId = (String) o;
 		boolean contains = list.contains(profileId);
@@ -60,7 +60,7 @@ public class MinecraftServerMixin implements FabricOriginalKnownPacksGetter {
 			return true;
 		}
 
-		ResourcePackProfile profile = resourcePackManager.getProfile(profileId);
+		Pack profile = resourcePackManager.getProfile(profileId);
 
 		if (profile.getSource() instanceof BuiltinModResourcePackSource) {
 			try (Pack pack = profile.createResourcePack()) {

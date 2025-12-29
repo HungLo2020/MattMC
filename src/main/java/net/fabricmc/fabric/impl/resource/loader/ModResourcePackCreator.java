@@ -27,9 +27,9 @@ import org.jetbrains.annotations.VisibleForTesting;
 
 import net.minecraft.server.packs.ResourcePackInfo;
 import net.minecraft.server.packs.ResourcePackPosition;
-import net.minecraft.server.packs.ResourcePackProfile;
+import net.minecraft.server.packs.Pack;
 import net.minecraft.server.packs.ResourcePackProvider;
-import net.minecraft.server.packs.ResourcePackSource;
+import net.minecraft.server.packs.PackSource;
 import net.minecraft.server.packs.PackType;
 import net.minecraft.network.chat.Component;
 
@@ -56,7 +56,7 @@ public class ModResourcePackCreator implements ResourcePackProvider {
 	/**
 	 * This can be used to check if a pack profile is for mod-provided packs.
 	 */
-	public static final ResourcePackSource RESOURCE_PACK_SOURCE = new ResourcePackSource() {
+	public static final PackSource RESOURCE_PACK_SOURCE = new PackSource() {
 		@Override
 		public Component decorate(Component packName) {
 			return Component.translatable("pack.nameAndSource", packName, Component.translatable("pack.source.fabricmod"));
@@ -83,7 +83,7 @@ public class ModResourcePackCreator implements ResourcePackProvider {
 
 	protected ModResourcePackCreator(PackType type, boolean forClientDataPackManager) {
 		this.type = type;
-		this.activationInfo = new ResourcePackPosition(!forClientDataPackManager, ResourcePackProfile.InsertionPosition.TOP, false);
+		this.activationInfo = new ResourcePackPosition(!forClientDataPackManager, Pack.InsertionPosition.TOP, false);
 		this.forClientDataPackManager = forClientDataPackManager;
 	}
 
@@ -93,7 +93,7 @@ public class ModResourcePackCreator implements ResourcePackProvider {
 	 * @param consumer The resource pack profile consumer.
 	 */
 	@Override
-	public void register(Consumer<ResourcePackProfile> consumer) {
+	public void register(Consumer<Pack> consumer) {
 		/*
 			Register order rule in this provider:
 			1. Mod resource packs
@@ -113,7 +113,7 @@ public class ModResourcePackCreator implements ResourcePackProvider {
 				Optional.empty()
 		);
 
-		consumer.accept(ResourcePackProfile.create(
+		consumer.accept(Pack.create(
 				metadata,
 				new PlaceholderResourcePack.Factory(this.type, metadata),
 				this.type,
@@ -133,11 +133,11 @@ public class ModResourcePackCreator implements ResourcePackProvider {
 		ResourceManagerHelperImpl.registerBuiltinResourcePacks(this.type, consumer);
 	}
 
-	private void registerModPack(Consumer<ResourcePackProfile> consumer, @Nullable String subPath, Predicate<Set<String>> parents) {
+	private void registerModPack(Consumer<Pack> consumer, @Nullable String subPath, Predicate<Set<String>> parents) {
 		List<ModResourcePack> packs = ModResourcePackUtil.getModResourcePacks(FabricLoader.getInstance(), this.type, subPath);
 
 		for (ModResourcePack pack : packs) {
-			ResourcePackProfile profile = ResourcePackProfile.create(
+			Pack profile = Pack.create(
 					pack.getInfo(),
 					new ModResourcePackFactory(pack),
 					this.type,

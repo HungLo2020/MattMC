@@ -42,7 +42,7 @@ import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.NbtSizeTracker;
 import net.minecraft.nbt.StringTag;
 import net.minecraft.server.packs.Pack;
-import net.minecraft.server.packs.ResourcePackProfile;
+import net.minecraft.server.packs.Pack;
 
 import net.fabricmc.fabric.impl.resource.loader.FabricResourcePackProfile;
 import net.fabricmc.fabric.impl.resource.loader.ModNioResourcePack;
@@ -96,10 +96,10 @@ public class GameOptionsMixin {
 		Set<String> removedPacks = new HashSet<>(trackedPacks);
 		Set<String> resourcePacks = new LinkedHashSet<>(this.resourcePacks);
 
-		List<ResourcePackProfile> profiles = new ArrayList<>();
+		List<Pack> profiles = new ArrayList<>();
 		ModResourcePackCreator.CLIENT_RESOURCE_PACK_PROVIDER.register(profiles::add);
 
-		for (ResourcePackProfile profile : profiles) {
+		for (Pack profile : profiles) {
 			// Always add "Fabric Mods" pack to enabled resource packs.
 			if (profile.getId().equals(ModResourcePackCreator.FABRIC)) {
 				resourcePacks.add(profile.getId());
@@ -136,8 +136,8 @@ public class GameOptionsMixin {
 		this.resourcePacks = new ArrayList<>(resourcePacks);
 	}
 
-	@WrapOperation(method = "refreshResourcePacks", at = @At(value = "INVOKE", target = "Lnet/minecraft/resource/ResourcePackProfile;isPinned()Z"))
-	private boolean excludeInternalResourcePacksFromRefreshCheck(ResourcePackProfile instance, Operation<Boolean> original) {
+	@WrapOperation(method = "refreshResourcePacks", at = @At(value = "INVOKE", target = "Lnet/minecraft/resource/Pack;isPinned()Z"))
+	private boolean excludeInternalResourcePacksFromRefreshCheck(Pack instance, Operation<Boolean> original) {
 		// Treat Fabric hidden resource packs as pinned during the check for changed resource packs so that they won't count as changed when refreshing resource packs
 		return original.call(instance) || ((FabricResourcePackProfile) instance).fabric_isHidden();
 	}

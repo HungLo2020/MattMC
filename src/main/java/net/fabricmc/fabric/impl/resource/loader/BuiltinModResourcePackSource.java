@@ -16,11 +16,11 @@
 
 package net.fabricmc.fabric.impl.resource.loader;
 
-import net.minecraft.server.packs.ResourcePackSource;
+import net.minecraft.server.packs.PackSource;
 import net.minecraft.network.chat.Component;
 import net.minecraft.ChatFormatting;
 
-public record BuiltinModResourcePackSource(String modId) implements ResourcePackSource {
+public record BuiltinModResourcePackSource(String modId) implements PackSource {
 	@Override
 	public boolean canBeEnabledLater() {
 		return true;

@@ -29,7 +29,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import net.minecraft.client.gui.screens.pack.ResourcePackOrganizer;
 import net.minecraft.server.packs.PackRepository;
-import net.minecraft.server.packs.ResourcePackProfile;
+import net.minecraft.server.packs.Pack;
 
 import net.fabricmc.fabric.impl.resource.loader.FabricResourcePackProfile;
 
@@ -37,11 +37,11 @@ import net.fabricmc.fabric.impl.resource.loader.FabricResourcePackProfile;
 public class ResourcePackOrganizerMixin {
 	@Shadow
 	@Final
-	List<ResourcePackProfile> enabledPacks;
+	List<Pack> enabledPacks;
 
 	@Shadow
 	@Final
-	List<ResourcePackProfile> disabledPacks;
+	List<Pack> disabledPacks;
 
 	/**
 	 * Do not list hidden packs in either enabledPacks or disabledPacks.

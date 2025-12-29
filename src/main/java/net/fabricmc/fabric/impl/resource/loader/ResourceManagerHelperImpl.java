@@ -33,7 +33,7 @@ import net.minecraft.server.packs.OverlayResourcePack;
 import net.minecraft.server.packs.Pack;
 import net.minecraft.server.packs.ResourcePackInfo;
 import net.minecraft.server.packs.ResourcePackPosition;
-import net.minecraft.server.packs.ResourcePackProfile;
+import net.minecraft.server.packs.Pack;
 import net.minecraft.server.packs.resources.PreparableReloadListener;
 import net.minecraft.server.packs.PackType;
 import net.minecraft.network.chat.Component;
@@ -107,7 +107,7 @@ public class ResourceManagerHelperImpl implements ResourceManagerHelper {
 		return registerBuiltinResourcePack(id, subPath, container, Component.literal(id.getNamespace() + "/" + id.getPath()), activationType);
 	}
 
-	public static void registerBuiltinResourcePacks(PackType resourceType, Consumer<ResourcePackProfile> consumer) {
+	public static void registerBuiltinResourcePacks(PackType resourceType, Consumer<Pack> consumer) {
 		// Loop through each registered built-in resource packs and add them if valid.
 		for (Pair<Component, ModNioResourcePack> entry : builtinResourcePacks) {
 			ModNioResourcePack pack = entry.getRight();
@@ -123,18 +123,18 @@ public class ResourceManagerHelperImpl implements ResourceManagerHelper {
 				);
 				ResourcePackPosition info2 = new ResourcePackPosition(
 						pack.getActivationType() == ResourcePackActivationType.ALWAYS_ENABLED,
-						ResourcePackProfile.InsertionPosition.TOP,
+						Pack.InsertionPosition.TOP,
 						false
 				);
 
-				ResourcePackProfile profile = ResourcePackProfile.create(info, new ResourcePackProfile.PackFactory() {
+				Pack profile = Pack.create(info, new Pack.PackFactory() {
 					@Override
 					public Pack open(ResourcePackInfo var1) {
 						return entry.getRight();
 					}
 
 					@Override
-					public Pack openWithOverlays(ResourcePackInfo var1, ResourcePackProfile.Metadata metadata) {
+					public Pack openWithOverlays(ResourcePackInfo var1, Pack.Metadata metadata) {
 						ModNioResourcePack pack = entry.getRight();
 
 						if (metadata.overlays().isEmpty()) {

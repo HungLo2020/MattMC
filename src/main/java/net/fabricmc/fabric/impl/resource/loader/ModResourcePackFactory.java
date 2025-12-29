@@ -22,18 +22,18 @@ import java.util.List;
 import net.minecraft.server.packs.OverlayResourcePack;
 import net.minecraft.server.packs.Pack;
 import net.minecraft.server.packs.ResourcePackInfo;
-import net.minecraft.server.packs.ResourcePackProfile;
+import net.minecraft.server.packs.Pack;
 
 import net.fabricmc.fabric.api.resource.ModResourcePack;
 
-public record ModResourcePackFactory(ModResourcePack pack) implements ResourcePackProfile.PackFactory {
+public record ModResourcePackFactory(ModResourcePack pack) implements Pack.PackFactory {
 	@Override
 	public Pack open(ResourcePackInfo var1) {
 		return pack;
 	}
 
 	@Override
-	public Pack openWithOverlays(ResourcePackInfo var1, ResourcePackProfile.Metadata metadata) {
+	public Pack openWithOverlays(ResourcePackInfo var1, Pack.Metadata metadata) {
 		if (metadata.overlays().isEmpty()) {
 			return pack;
 		} else {

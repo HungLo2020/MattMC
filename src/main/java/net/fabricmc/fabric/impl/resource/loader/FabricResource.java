@@ -18,7 +18,7 @@ package net.fabricmc.fabric.impl.resource.loader;
 
 import org.slf4j.LoggerFactory;
 
-import net.minecraft.server.packs.ResourcePackSource;
+import net.minecraft.server.packs.PackSource;
 
 /**
  * Extensions to {@link net.minecraft.server.packs.Resource}.
@@ -34,8 +34,8 @@ public interface FabricResource {
 	 *
 	 * @return the resource pack source
 	 */
-	default ResourcePackSource getFabricPackSource() {
+	default PackSource getFabricPackSource() {
 		LoggerFactory.getLogger(FabricResource.class).error("Unknown Resource implementation {}, returning PACK_SOURCE_NONE as the source", getClass().getName());
-		return ResourcePackSource.NONE;
+		return PackSource.NONE;
 	}
 }

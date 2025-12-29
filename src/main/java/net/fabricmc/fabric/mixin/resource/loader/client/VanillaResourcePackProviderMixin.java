@@ -24,7 +24,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import net.minecraft.client.resource.DefaultClientResourcePackProvider;
-import net.minecraft.server.packs.ResourcePackProfile;
+import net.minecraft.server.packs.Pack;
 import net.minecraft.server.packs.VanillaResourcePackProvider;
 
 import net.fabricmc.fabric.impl.resource.loader.ModResourcePackCreator;
@@ -32,7 +32,7 @@ import net.fabricmc.fabric.impl.resource.loader.ModResourcePackCreator;
 @Mixin(VanillaResourcePackProvider.class)
 public class VanillaResourcePackProviderMixin {
 	@Inject(method = "register", at = @At("RETURN"))
-	private void addBuiltinResourcePacks(Consumer<ResourcePackProfile> consumer, CallbackInfo ci) {
+	private void addBuiltinResourcePacks(Consumer<Pack> consumer, CallbackInfo ci) {
 		// Register mod and built-in resource packs after the vanilla built-in resource packs are registered.
 		// noinspection ConstantConditions
 		if ((Object) this instanceof DefaultClientResourcePackProvider) {
