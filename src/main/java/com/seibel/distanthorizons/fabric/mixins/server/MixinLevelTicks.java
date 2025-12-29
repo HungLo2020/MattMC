@@ -1,0 +1,28 @@
+package com.seibel.distanthorizons.fabric.mixins.server;
+
+
+import com.seibel.distanthorizons.common.wrappers.worldGeneration.BatchGenerationEnvironment;
+import net.minecraft.world.ticks.LevelTicks;
+import net.minecraft.world.ticks.ScheduledTick;
+
+import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+
+@Mixin(LevelTicks.class) // available in 1.18.2+, but only needed in 1.21.4+
+public class MixinLevelTicks<T>
+{
+	@Inject(method = "schedule", at = @At(value = "HEAD"), cancellable = true)
+	private void onChunkSave(ScheduledTick<T> tick, CallbackInfo ci)
+	{
+		// In MC 1.21.4 an error check was added to log attempting to schedule ticks for unloaded chunks
+		// this caused a lot of unnecessary errors when generating sand (FallingBlock.class).
+		if (BatchGenerationEnvironment.isThisDhWorldGenThread())
+		{
+			ci.cancel();
+		}
+	}
+	
+}
+
