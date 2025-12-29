@@ -115,7 +115,7 @@ public final class RegistrySyncManager {
 		MutableComponent text = Component.literal("The following registry entry namespaces may be related:\n\n");
 
 		for (int i = 0; i < Math.min(namespaces.size(), toDisplay); i++) {
-			text = text.append(Component.literal(namespaces.get(i)).formatted(ChatFormatting.YELLOW));
+			text = text.append(Component.literal(namespaces.get(i)).withStyle(ChatFormatting.YELLOW));
 			text = text.append(CommonComponents.LINE_BREAK);
 		}
 
@@ -123,9 +123,9 @@ public final class RegistrySyncManager {
 			text = text.append(Component.literal("And %d more...".formatted(namespaces.size() - toDisplay)));
 		}
 
-		return Component.literal("This server requires ").append(Component.literal(brandText).formatted(ChatFormatting.GREEN)).append(" installed on your client!")
+		return Component.literal("This server requires ").append(Component.literal(brandText).withStyle(ChatFormatting.GREEN)).append(" installed on your client!")
 				.append(CommonComponents.LINE_BREAK).append(text)
-				.append(CommonComponents.LINE_BREAK).append(CommonComponents.LINE_BREAK).append(Component.literal("Contact the server's administrator for more information!").formatted(ChatFormatting.GOLD));
+				.append(CommonComponents.LINE_BREAK).append(CommonComponents.LINE_BREAK).append(Component.literal("Contact the server's administrator for more information!").withStyle(ChatFormatting.GOLD));
 	}
 
 	private static boolean areAllRegistriesOptional(Map<ResourceLocation, Object2IntMap<ResourceLocation>> map) {

@@ -180,13 +180,13 @@ public final class ClientRegistrySyncHandler {
 			text = text.append(Component.translatable("fabric-registry-sync-v0.unknown-registry.title.plural", count));
 		}
 
-		text = text.append(Component.translatable("fabric-registry-sync-v0.unknown-registry.subtitle.1").formatted(ChatFormatting.GREEN));
+		text = text.append(Component.translatable("fabric-registry-sync-v0.unknown-registry.subtitle.1").withStyle(ChatFormatting.GREEN));
 		text = text.append(Component.translatable("fabric-registry-sync-v0.unknown-registry.subtitle.2"));
 
 		final int toDisplay = 4;
 
 		for (int i = 0; i < Math.min(missingRegistries.size(), toDisplay); i++) {
-			text = text.append(Component.literal(missingRegistries.get(i).toString()).formatted(ChatFormatting.YELLOW));
+			text = text.append(Component.literal(missingRegistries.get(i).toString()).withStyle(ChatFormatting.YELLOW));
 			text = text.append(CommonComponents.LINE_BREAK);
 		}
 
@@ -208,7 +208,7 @@ public final class ClientRegistrySyncHandler {
 			text = text.append(Component.translatable("fabric-registry-sync-v0.unknown-remote.title.plural", count));
 		}
 
-		text = text.append(Component.translatable("fabric-registry-sync-v0.unknown-remote.subtitle.1").formatted(ChatFormatting.GREEN));
+		text = text.append(Component.translatable("fabric-registry-sync-v0.unknown-remote.subtitle.1").withStyle(ChatFormatting.GREEN));
 		text = text.append(Component.translatable("fabric-registry-sync-v0.unknown-remote.subtitle.2"));
 
 		final int toDisplay = 4;
@@ -221,7 +221,7 @@ public final class ClientRegistrySyncHandler {
 				.toList();
 
 		for (int i = 0; i < Math.min(namespaces.size(), toDisplay); i++) {
-			text = text.append(Component.literal(namespaces.get(i)).formatted(ChatFormatting.YELLOW));
+			text = text.append(Component.literal(namespaces.get(i)).withStyle(ChatFormatting.YELLOW));
 			text = text.append(CommonComponents.LINE_BREAK);
 		}
 
