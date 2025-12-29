@@ -107,9 +107,9 @@ public final class ClientNetworkingImpl {
 	public static ClientPlayNetworkAddon getClientPlayAddon() {
 		// Since Minecraft can be a bit weird, we need to check for the play addon in a few ways:
 		// If the client's player is set this will work
-		if (Minecraft.getInstance().getNetworkHandler() != null) {
+		if (Minecraft.getInstance().getConnection() != null) {
 			currentPlayAddon = null; // Shouldn't need this anymore
-			return getAddon(Minecraft.getInstance().getNetworkHandler());
+			return getAddon(Minecraft.getInstance().getConnection());
 		}
 
 		// We haven't hit the end of onGameJoin yet, use our backing field here to access the network handler
@@ -160,10 +160,10 @@ public final class ClientNetworkingImpl {
 
 				addon.getChannelInfoHolder().fabric_getPendingChannelsNames(ConnectionProtocol.PLAY).addAll(payload.channels());
 				NetworkingImpl.LOGGER.debug("Received accepted channels from the server");
-				context.responseSender().sendPacket(new CommonRegisterPayload(addon.getNegotiatedVersion(), CommonRegisterPayload.PLAY_PHASE, ClientPlayNetworking.getGlobalReceivers()));
+				context.responseSender().send(new CommonRegisterPayload(addon.getNegotiatedVersion(), CommonRegisterPayload.PLAY_PHASE, ClientPlayNetworking.getGlobalReceivers()));
 			} else {
 				addon.onCommonRegisterPacket(payload);
-				context.responseSender().sendPacket(addon.createRegisterPayload());
+				context.responseSender().send(addon.createRegisterPayload());
 			}
 		});
 	}
@@ -178,7 +178,7 @@ public final class ClientNetworkingImpl {
 			throw new UnsupportedOperationException("Client does not support any requested versions from server");
 		}
 
-		packetSender.sendPacket(new CommonVersionPayload(new int[]{ version }));
+		packetSender.send(new CommonVersionPayload(new int[]{ version }));
 		return version;
 	}
 }

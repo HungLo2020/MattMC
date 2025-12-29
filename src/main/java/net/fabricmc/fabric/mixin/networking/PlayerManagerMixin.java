@@ -32,6 +32,6 @@ import net.fabricmc.fabric.impl.networking.server.ServerNetworkingImpl;
 abstract class PlayerManagerMixin {
 	@Inject(method = "onPlayerConnect", at = @At(value = "INVOKE", target = "Lnet/minecraft/network/packet/s2c/play/PlayerAbilitiesS2CPacket;<init>(Lnet/minecraft/entity/player/PlayerAbilities;)V"))
 	private void handlePlayerConnection(Connection connection, ServerPlayer player, ConnectedClientData arg, CallbackInfo ci) {
-		ServerNetworkingImpl.getAddon(player.networkHandler).onClientReady();
+		ServerNetworkingImpl.getAddon(player.connection).onClientReady();
 	}
 }

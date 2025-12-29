@@ -107,7 +107,7 @@ public final class ServerPlayNetworkAddon extends AbstractChanneledNetworkAddon<
 			RegistrationPayload registrationPayload = this.createRegistrationPayload(RegistrationPayload.REGISTER, Collections.singleton(channelName));
 
 			if (registrationPayload != null) {
-				this.sendPacket(registrationPayload);
+				this.send(registrationPayload);
 			}
 		}
 	}
@@ -119,7 +119,7 @@ public final class ServerPlayNetworkAddon extends AbstractChanneledNetworkAddon<
 			RegistrationPayload registrationPayload = this.createRegistrationPayload(RegistrationPayload.UNREGISTER, Collections.singleton(channelName));
 
 			if (registrationPayload != null) {
-				this.sendPacket(registrationPayload);
+				this.send(registrationPayload);
 			}
 		}
 	}

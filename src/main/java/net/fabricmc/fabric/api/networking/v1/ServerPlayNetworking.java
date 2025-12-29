@@ -150,7 +150,7 @@ public final class ServerPlayNetworking {
 	public static Set<ResourceLocation> getReceived(ServerPlayer player) {
 		Objects.requireNonNull(player, "Server player entity cannot be null");
 
-		return getReceived(player.networkHandler);
+		return getReceived(player.connection);
 	}
 
 	/**
@@ -174,7 +174,7 @@ public final class ServerPlayNetworking {
 	public static Set<ResourceLocation> getSendable(ServerPlayer player) {
 		Objects.requireNonNull(player, "Server player entity cannot be null");
 
-		return getSendable(player.networkHandler);
+		return getSendable(player.connection);
 	}
 
 	/**
@@ -199,7 +199,7 @@ public final class ServerPlayNetworking {
 	public static boolean canSend(ServerPlayer player, ResourceLocation channelName) {
 		Objects.requireNonNull(player, "Server player entity cannot be null");
 
-		return canSend(player.networkHandler, channelName);
+		return canSend(player.connection, channelName);
 	}
 
 	/**
@@ -212,7 +212,7 @@ public final class ServerPlayNetworking {
 	public static boolean canSend(ServerPlayer player, CustomPacketPayload.Type<?> type) {
 		Objects.requireNonNull(player, "Server player entity cannot be null");
 
-		return canSend(player.networkHandler, type.id());
+		return canSend(player.connection, type.id());
 	}
 
 	/**
@@ -262,7 +262,7 @@ public final class ServerPlayNetworking {
 	public static PacketSender getSender(ServerPlayer player) {
 		Objects.requireNonNull(player, "Server player entity cannot be null");
 
-		return getSender(player.networkHandler);
+		return getSender(player.connection);
 	}
 
 	/**
@@ -290,7 +290,7 @@ public final class ServerPlayNetworking {
 		Objects.requireNonNull(payload, "Payload cannot be null");
 		Objects.requireNonNull(payload.type(), "CustomPacketPayload#getId() cannot return null for payload class: " + payload.getClass());
 
-		player.networkHandler.sendPacket(createS2CPacket(payload));
+		player.connection.send(createS2CPacket(payload));
 	}
 
 	/**
@@ -301,7 +301,7 @@ public final class ServerPlayNetworking {
 	public static void reconfigure(ServerPlayer player) {
 		Objects.requireNonNull(player, "Server player entity cannot be null");
 
-		reconfigure(player.networkHandler);
+		reconfigure(player.connection);
 	}
 
 	/**

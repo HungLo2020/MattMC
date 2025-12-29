@@ -23,7 +23,7 @@ import net.minecraft.resources.ResourceLocation;
 
 public class SyncCompletePayload implements CustomPacketPayload {
 	public static final SyncCompletePayload INSTANCE = new SyncCompletePayload();
-	public static final CustomPacketPayload.Type<SyncCompletePayload> ID = new CustomPacketPayload.Type<>(ResourceLocation.of("fabric", "registry/sync/complete"));
+	public static final CustomPacketPayload.Type<SyncCompletePayload> ID = new CustomPacketPayload.Type<>(ResourceLocation.fromNamespaceAndPath("fabric", "registry/sync/complete"));
 	public static final StreamCodec<FriendlyByteBuf, SyncCompletePayload> CODEC = StreamCodec.unit(INSTANCE);
 
 	private SyncCompletePayload() { }

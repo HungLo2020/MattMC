@@ -378,7 +378,7 @@ public abstract class SimpleRegistryMixin<T> implements WritableRegistry<T>, Rem
 
 			for (Map.Entry<ResourceLocation, Holder.Reference<T>> entry : fabric_prevEntries.entrySet()) {
 				ResourceKey<T> entryKey = ResourceKey.of(getKey(), entry.getKey());
-				keyToEntry.put(entryKey, entry.value());
+				keyToEntry.put(entryKey, entry.getValue());
 			}
 
 			remap(fabric_prevIndexedEntries, RemapMode.AUTHORITATIVE);
@@ -444,7 +444,7 @@ public abstract class SimpleRegistryMixin<T> implements WritableRegistry<T>, Rem
 		ResourceLocation deepest = aliases.getOrDefault(newId, newId);
 
 		for (Map.Entry<ResourceLocation, ResourceLocation> entry : aliases.entrySet()) {
-			if (old.equals(entry.value())) {
+			if (old.equals(entry.getValue())) {
 				entry.setValue(deepest);
 			}
 		}

@@ -48,13 +48,13 @@ public final class ParticleFactoryRegistryImpl implements ParticleFactoryRegistr
 		void applyTo(ParticleFactoryRegistry registry) {
 			for (Map.Entry<ParticleType<?>, ParticleProvider<?>> entry : factories.entrySet()) {
 				ParticleType type = entry.getKey();
-				ParticleProvider factory = entry.value();
+				ParticleProvider factory = entry.getValue();
 				registry.register(type, factory);
 			}
 
 			for (Map.Entry<ParticleType<?>, PendingParticleFactory<?>> entry : constructors.entrySet()) {
 				ParticleType type = entry.getKey();
-				PendingParticleFactory constructor = entry.value();
+				PendingParticleFactory constructor = entry.getValue();
 				registry.register(type, constructor);
 			}
 		}

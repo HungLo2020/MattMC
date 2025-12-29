@@ -142,7 +142,7 @@ public abstract class ServerConfigurationNetworkHandlerMixin extends ServerCommo
 
 		if (task != null) {
 			this.currentTask = task;
-			task.sendPacket(this::sendPacket);
+			task.send(this::sendPacket);
 			return true;
 		}
 

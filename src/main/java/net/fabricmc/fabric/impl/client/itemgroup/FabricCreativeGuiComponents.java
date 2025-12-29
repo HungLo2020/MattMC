@@ -35,7 +35,7 @@ import net.minecraft.resources.ResourceLocation;
 import net.fabricmc.fabric.impl.itemgroup.FabricItemGroupImpl;
 
 public class FabricCreativeGuiComponents {
-	private static final ResourceLocation BUTTON_TEX = ResourceLocation.of("fabric", "textures/gui/creative_buttons.png");
+	private static final ResourceLocation BUTTON_TEX = ResourceLocation.fromNamespaceAndPath("fabric", "textures/gui/creative_buttons.png");
 	private static final double TABS_PER_PAGE = FabricItemGroupImpl.TABS_PER_PAGE;
 	public static final Set<CreativeModeTab> COMMON_GROUPS = Set.of(CreativeModeTabs.SEARCH, CreativeModeTabs.INVENTORY, CreativeModeTabs.HOTBAR, CreativeModeTabs.OPERATOR).stream()
 			.map(Registries.ITEM_GROUP::getValueOrThrow)

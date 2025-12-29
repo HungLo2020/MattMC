@@ -51,7 +51,7 @@ abstract class ClientCommonNetworkAddon<H, T extends ClientCommonNetworkHandler>
 			final RegistrationPayload payload = this.createRegistrationPayload(RegistrationPayload.REGISTER, Collections.singleton(channelName));
 
 			if (payload != null) {
-				this.sendPacket(payload);
+				this.send(payload);
 			}
 		}
 	}
@@ -63,7 +63,7 @@ abstract class ClientCommonNetworkAddon<H, T extends ClientCommonNetworkHandler>
 			final RegistrationPayload payload = this.createRegistrationPayload(RegistrationPayload.UNREGISTER, Collections.singleton(channelName));
 
 			if (payload != null) {
-				this.sendPacket(payload);
+				this.send(payload);
 			}
 		}
 	}

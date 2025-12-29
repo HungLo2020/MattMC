@@ -38,7 +38,7 @@ import net.fabricmc.fabric.mixin.registry.sync.RegistriesAccessor;
  *
  * <pre>
  * {@code
- *  ResourceKey<Registry<String>> registryKey = ResourceKey.ofRegistry(ResourceLocation.of("modid", "registry_name"));
+ *  ResourceKey<Registry<String>> registryKey = ResourceKey.createRegistryKey(ResourceLocation.fromNamespaceAndPath("modid", "registry_name"));
  *  Registry<String> registry = FabricRegistryBuilder.createSimple(registryKey)
  * 													.attribute(RegistryAttribute.SYNCED)
  * 													.buildAndRegister();
@@ -98,7 +98,7 @@ public final class FabricRegistryBuilder<T, R extends WritableRegistry<T>> {
 	 */
 	@Deprecated
 	public static <T> FabricRegistryBuilder<T, MappedRegistry<T>> createSimple(Class<T> type, ResourceLocation registryId) {
-		return createSimple(ResourceKey.ofRegistry(registryId));
+		return createSimple(ResourceKey.createRegistryKey(registryId));
 	}
 
 	/**
@@ -112,7 +112,7 @@ public final class FabricRegistryBuilder<T, R extends WritableRegistry<T>> {
 	 */
 	@Deprecated
 	public static <T> FabricRegistryBuilder<T, DefaultedMappedRegistry<T>> createDefaulted(Class<T> type, ResourceLocation registryId, ResourceLocation defaultId) {
-		return createDefaulted(ResourceKey.ofRegistry(registryId), defaultId);
+		return createDefaulted(ResourceKey.createRegistryKey(registryId), defaultId);
 	}
 
 	private final R registry;

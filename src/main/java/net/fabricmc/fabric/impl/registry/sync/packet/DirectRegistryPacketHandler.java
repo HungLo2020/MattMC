@@ -219,14 +219,14 @@ public class DirectRegistryPacketHandler extends RegistryPacketHandler<DirectReg
 						for (int m = 0; m < bulkSize; m++) {
 							currentRawId++;
 							String idPath = combinedBuf.readUtf();
-							idMap.put(ResourceLocation.of(idNamespace, idPath), currentRawId);
+							idMap.put(ResourceLocation.fromNamespaceAndPath(idNamespace, idPath), currentRawId);
 						}
 
 						lastBulkLastRawId = currentRawId;
 					}
 				}
 
-				ResourceLocation registryId = ResourceLocation.of(regNamespace, regPath);
+				ResourceLocation registryId = ResourceLocation.fromNamespaceAndPath(regNamespace, regPath);
 				syncedRegistryMap.put(registryId, idMap);
 				syncedRegistryAttributes.put(registryId, attributes);
 			}
@@ -284,7 +284,7 @@ public class DirectRegistryPacketHandler extends RegistryPacketHandler<DirectReg
 	}
 
 	public record Payload(byte[] data) implements RegistrySyncPayload {
-		public static CustomPacketPayload.Type<Payload> ID = new Id<>(ResourceLocation.of("fabric", "registry/sync/direct"));
+		public static CustomPacketPayload.Type<Payload> ID = new Id<>(ResourceLocation.fromNamespaceAndPath("fabric", "registry/sync/direct"));
 		public static StreamCodec<FriendlyByteBuf, Payload> CODEC = CustomPacketPayload.codecOf(Payload::write, Payload::new);
 
 		Payload(FriendlyByteBuf buf) {

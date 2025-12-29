@@ -45,13 +45,13 @@ public class CommonPacketsImpl {
 		PayloadTypeRegistry.playS2C().register(CommonRegisterPayload.ID, CommonRegisterPayload.CODEC);
 
 		ServerConfigurationNetworking.registerGlobalReceiver(CommonVersionPayload.ID, (payload, context) -> {
-			ServerConfigurationNetworkAddon addon = ServerNetworkingImpl.getAddon(context.networkHandler());
+			ServerConfigurationNetworkAddon addon = ServerNetworkingImpl.getAddon(context.connection());
 			addon.onCommonVersionPacket(getNegotiatedVersion(payload));
-			context.networkHandler().completeTask(CommonVersionConfigurationTask.KEY);
+			context.connection().completeTask(CommonVersionConfigurationTask.KEY);
 		});
 
 		ServerConfigurationNetworking.registerGlobalReceiver(CommonRegisterPayload.ID, (payload, context) -> {
-			ServerConfigurationNetworkAddon addon = ServerNetworkingImpl.getAddon(context.networkHandler());
+			ServerConfigurationNetworkAddon addon = ServerNetworkingImpl.getAddon(context.connection());
 
 			if (CommonRegisterPayload.PLAY_PHASE.equals(payload.phase())) {
 				if (payload.version() != addon.getNegotiatedVersion()) {
@@ -65,7 +65,7 @@ public class CommonPacketsImpl {
 				addon.onCommonRegisterPacket(payload);
 			}
 
-			context.networkHandler().completeTask(CommonRegisterConfigurationTask.KEY);
+			context.connection().completeTask(CommonRegisterConfigurationTask.KEY);
 		});
 
 		// Create a configuration task to send and receive the common packets
@@ -89,7 +89,7 @@ public class CommonPacketsImpl {
 
 		@Override
 		public void sendPacket(Consumer<Packet<?>> sender) {
-			addon.sendPacket(new CommonVersionPayload(SUPPORTED_COMMON_PACKET_VERSIONS));
+			addon.send(new CommonVersionPayload(SUPPORTED_COMMON_PACKET_VERSIONS));
 		}
 
 		@Override
@@ -104,7 +104,7 @@ public class CommonPacketsImpl {
 
 		@Override
 		public void sendPacket(Consumer<Packet<?>> sender) {
-			addon.sendPacket(new CommonRegisterPayload(addon.getNegotiatedVersion(), CommonRegisterPayload.PLAY_PHASE, ServerPlayNetworking.getGlobalReceivers()));
+			addon.send(new CommonRegisterPayload(addon.getNegotiatedVersion(), CommonRegisterPayload.PLAY_PHASE, ServerPlayNetworking.getGlobalReceivers()));
 		}
 
 		@Override

@@ -237,7 +237,7 @@ public final class ClientConfigurationNetworking {
 		final ClientConfigurationNetworkAddon addon = ClientNetworkingImpl.getClientConfigurationAddon();
 
 		if (addon != null) {
-			addon.sendPacket(payload);
+			addon.send(payload);
 			return;
 		}
 

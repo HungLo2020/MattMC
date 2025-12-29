@@ -45,7 +45,7 @@ abstract class RegistrySynchronizationMixin {
 	private static void filterNonSyncedEntries(RegistryAccess.Entry<?> entry, CallbackInfoReturnable<Boolean> cir) {
 		boolean canSkip = DynamicRegistriesImpl.SKIP_EMPTY_SYNC_REGISTRIES.contains(entry.key());
 
-		if (canSkip && entry.value().size() == 0) {
+		if (canSkip && entry.getValue().size() == 0) {
 			cir.setReturnValue(false);
 		}
 	}

@@ -40,7 +40,7 @@ public final class EntitySelectorOptionRegistry {
 	 * {@code example_min_health} and can be used like {@code @e[example_min_health=5]}.
 	 * <pre>{@code
 	 * EntitySelectorOptionRegistry.register(
-	 * 	ResourceLocation.of("example", "min_health"),
+	 * 	ResourceLocation.fromNamespaceAndPath("example", "min_health"),
 	 * 	Component.literal("Minimum entity health"),
 	 * 	(reader) -> {
 	 * 	    final float minHealth = reader.getReader().readFloat();

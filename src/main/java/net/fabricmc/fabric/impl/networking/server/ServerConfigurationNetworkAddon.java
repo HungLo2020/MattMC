@@ -93,7 +93,7 @@ public final class ServerConfigurationNetworkAddon extends AbstractChanneledNetw
 		if (this.registerState == RegisterState.NOT_SENT) {
 			// Send the registration packet, followed by a ping
 			this.sendInitialChannelRegistrationPacket();
-			this.sendPacket(new ClientboundPingPacket(0xFAB71C));
+			this.send(new ClientboundPingPacket(0xFAB71C));
 
 			this.registerState = RegisterState.SENT;
 
@@ -162,7 +162,7 @@ public final class ServerConfigurationNetworkAddon extends AbstractChanneledNetw
 			RegistrationPayload registrationPayload = this.createRegistrationPayload(RegistrationPayload.REGISTER, Collections.singleton(channelName));
 
 			if (registrationPayload != null) {
-				this.sendPacket(registrationPayload);
+				this.send(registrationPayload);
 			}
 		}
 	}
@@ -174,7 +174,7 @@ public final class ServerConfigurationNetworkAddon extends AbstractChanneledNetw
 			RegistrationPayload registrationPayload = this.createRegistrationPayload(RegistrationPayload.UNREGISTER, Collections.singleton(channelName));
 
 			if (registrationPayload != null) {
-				this.sendPacket(registrationPayload);
+				this.send(registrationPayload);
 			}
 		}
 	}

@@ -187,8 +187,8 @@ public final class ClientPlayNetworking {
 	 */
 	public static boolean canSend(ResourceLocation channelName) throws IllegalArgumentException {
 		// You cant send without a client player, so this is fine
-		if (Minecraft.getInstance().getNetworkHandler() != null) {
-			return ClientNetworkingImpl.getAddon(Minecraft.getInstance().getNetworkHandler()).getSendableChannels().contains(channelName);
+		if (Minecraft.getInstance().getConnection() != null) {
+			return ClientNetworkingImpl.getAddon(Minecraft.getInstance().getConnection()).getSendableChannels().contains(channelName);
 		}
 
 		return false;
@@ -223,8 +223,8 @@ public final class ClientPlayNetworking {
 	 */
 	public static PacketSender getSender() throws IllegalStateException {
 		// You cant send without a client player, so this is fine
-		if (Minecraft.getInstance().getNetworkHandler() != null) {
-			return ClientNetworkingImpl.getAddon(Minecraft.getInstance().getNetworkHandler());
+		if (Minecraft.getInstance().getConnection() != null) {
+			return ClientNetworkingImpl.getAddon(Minecraft.getInstance().getConnection());
 		}
 
 		throw new IllegalStateException("Cannot get payload sender when not in game!");
@@ -243,8 +243,8 @@ public final class ClientPlayNetworking {
 		Objects.requireNonNull(payload.type(), "CustomPacketPayload#getId() cannot return null for payload class: " + payload.getClass());
 
 		// You cant send without a client player, so this is fine
-		if (Minecraft.getInstance().getNetworkHandler() != null) {
-			Minecraft.getInstance().getNetworkHandler().sendPacket(createC2SPacket(payload));
+		if (Minecraft.getInstance().getConnection() != null) {
+			Minecraft.getInstance().getConnection().send(createC2SPacket(payload));
 			return;
 		}
 

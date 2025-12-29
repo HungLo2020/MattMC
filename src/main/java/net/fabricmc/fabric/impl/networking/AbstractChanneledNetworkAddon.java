@@ -116,7 +116,7 @@ public abstract class AbstractChanneledNetworkAddon<H> extends AbstractNetworkAd
 		final RegistrationPayload payload = createRegistrationPayload(RegistrationPayload.REGISTER, this.getReceivableChannels());
 
 		if (payload != null) {
-			this.sendPacket(payload);
+			this.send(payload);
 		}
 	}
 

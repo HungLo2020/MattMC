@@ -51,7 +51,7 @@ public interface LoginPacketSender extends PacketSender {
 		Objects.requireNonNull(channel, "Channel cannot be null");
 		Objects.requireNonNull(buf, "Payload cannot be null");
 
-		this.sendPacket(this.createPacket(channel, buf));
+		this.send(this.createPacket(channel, buf));
 	}
 
 	/**
@@ -65,6 +65,6 @@ public interface LoginPacketSender extends PacketSender {
 		Objects.requireNonNull(channel, "Channel cannot be null");
 		Objects.requireNonNull(buf, "Payload cannot be null");
 
-		this.sendPacket(this.createPacket(channel, buf), callback);
+		this.send(this.createPacket(channel, buf), callback);
 	}
 }

@@ -123,7 +123,7 @@ public final class ParticleRendererRegistry {
 				|| textureSheet == ParticleRenderType.NO_RENDER
 				|| textureSheet == ParticleRenderType.ELDER_GUARDIANS
 				|| textureSheet == ParticleRenderType.ITEM_PICKUP) {
-			return ResourceLocation.ofVanilla(textureSheet.name().toLowerCase(Locale.ROOT));
+			return ResourceLocation.withDefaultNamespace(textureSheet.name().toLowerCase(Locale.ROOT));
 		}
 
 		return ResourceLocation.of(textureSheet.name());

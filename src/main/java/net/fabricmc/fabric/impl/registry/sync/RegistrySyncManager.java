@@ -144,7 +144,7 @@ public final class RegistrySyncManager {
 
 		@Override
 		public void sendPacket(Consumer<Packet<?>> sender) {
-			DIRECT_PACKET_HANDLER.sendPacket(payload -> handler.sendPacket(ServerConfigurationNetworking.createS2CPacket(payload)), map);
+			DIRECT_PACKET_HANDLER.send(payload -> handler.send(ServerConfigurationNetworking.createS2CPacket(payload)), map);
 		}
 
 		@Override
