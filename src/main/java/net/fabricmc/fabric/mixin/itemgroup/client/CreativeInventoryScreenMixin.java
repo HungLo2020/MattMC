@@ -29,7 +29,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-import net.minecraft.client.gui.DrawContext;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.ingame.CreativeInventoryScreen;
 import net.minecraft.client.gui.screens.ingame.CreativeInventoryScreen.CreativeScreenHandler;
 import net.minecraft.client.gui.screens.ingame.AbstractContainerScreen;
@@ -90,7 +90,7 @@ public abstract class CreativeInventoryScreenMixin extends AbstractContainerScre
 	}
 
 	@Inject(method = "renderTabTooltipIfHovered", at = @At("HEAD"), cancellable = true)
-	private void renderTabTooltipIfHovered(DrawContext drawContext, ItemGroup itemGroup, int mx, int my, CallbackInfoReturnable<Boolean> info) {
+	private void renderTabTooltipIfHovered(GuiGraphics drawContext, ItemGroup itemGroup, int mx, int my, CallbackInfoReturnable<Boolean> info) {
 		if (!isGroupVisible(itemGroup)) {
 			info.setReturnValue(false);
 		}
@@ -104,7 +104,7 @@ public abstract class CreativeInventoryScreenMixin extends AbstractContainerScre
 	}
 
 	@Inject(method = "renderTabIcon", at = @At("HEAD"), cancellable = true)
-	private void renderTabIcon(DrawContext drawContext, ItemGroup itemGroup, CallbackInfo info) {
+	private void renderTabIcon(GuiGraphics drawContext, ItemGroup itemGroup, CallbackInfo info) {
 		if (!isGroupVisible(itemGroup)) {
 			info.cancel();
 		}

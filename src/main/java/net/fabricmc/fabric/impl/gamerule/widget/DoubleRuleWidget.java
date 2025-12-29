@@ -19,7 +19,7 @@ package net.fabricmc.fabric.impl.gamerule.widget;
 import java.util.List;
 
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.DrawContext;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.world.EditGameRulesScreen;
 import net.minecraft.client.gui.widget.EditBox;
 import net.minecraft.world.inventory.ScreenTexts;
@@ -58,7 +58,7 @@ public final class DoubleRuleWidget extends EditGameRulesScreen.NamedRuleWidget 
 	}
 
 	@Override
-	public void render(DrawContext drawContext, int mouseX, int mouseY, boolean hovered, float tickDelta) {
+	public void render(GuiGraphics drawContext, int mouseX, int mouseY, boolean hovered, float tickDelta) {
 		this.drawName(drawContext, this.getContentY(), this.getContentX());
 
 		this.textFieldWidget.setX(this.getContentRightEnd() - 44);

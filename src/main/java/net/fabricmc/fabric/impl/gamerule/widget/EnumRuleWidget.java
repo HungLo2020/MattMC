@@ -20,7 +20,7 @@ import java.util.List;
 import java.util.Locale;
 
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.DrawContext;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.world.EditGameRulesScreen;
 import net.minecraft.client.gui.widget.Button;
 import net.minecraft.network.chat.OrderedText;
@@ -54,7 +54,7 @@ public final class EnumRuleWidget<E extends Enum<E>> extends EditGameRulesScreen
 	}
 
 	@Override
-	public void render(DrawContext drawContext, int mouseX, int mouseY, boolean hovered, float tickDelta) {
+	public void render(GuiGraphics drawContext, int mouseX, int mouseY, boolean hovered, float tickDelta) {
 		this.drawName(drawContext, this.getContentY(), this.getContentX());
 
 		this.buttonWidget.setX(this.getContentRightEnd() - 89);

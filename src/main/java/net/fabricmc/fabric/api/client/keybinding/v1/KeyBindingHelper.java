@@ -18,8 +18,8 @@ package net.fabricmc.fabric.api.client.keybinding.v1;
 
 import java.util.Objects;
 
-import net.minecraft.client.Options.KeyMapping;
-import net.minecraft.client.util.InputUtil;
+import net.minecraft.client.KeyMapping;
+import com.mojang.blaze3d.platform.InputConstants;
 
 import net.fabricmc.fabric.impl.client.keybinding.KeyBindingRegistryImpl;
 import net.fabricmc.fabric.mixin.client.keybinding.KeyBindingAccessor;
@@ -28,8 +28,8 @@ import net.fabricmc.fabric.mixin.client.keybinding.KeyBindingAccessor;
  * Helper for registering {@link KeyMapping}s.
  *
  * <pre>{@code
- * KeyMapping left = KeyBindingHelper.registerKeyBinding(new KeyMapping("key.example.left", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_P, KeyMapping.Category.MISC));
- * KeyMapping right = KeyBindingHelper.registerKeyBinding(new KeyMapping("key.example.right", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_U, KeyMapping.Category.MISC));
+ * KeyMapping left = KeyBindingHelper.registerKeyBinding(new KeyMapping("key.example.left", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_P, KeyMapping.Category.MISC));
+ * KeyMapping right = KeyBindingHelper.registerKeyBinding(new KeyMapping("key.example.right", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_U, KeyMapping.Category.MISC));
  * }</pre>
  *
  * @see KeyMapping
@@ -57,7 +57,7 @@ public final class KeyBindingHelper {
 	 * @param keyBinding the keybinding
 	 * @return configured KeyCode
 	 */
-	public static InputUtil.Key getBoundKeyOf(KeyMapping keyBinding) {
+	public static InputConstants.Key getBoundKeyOf(KeyMapping keyBinding) {
 		return ((KeyBindingAccessor) keyBinding).fabric_getBoundKey();
 	}
 }

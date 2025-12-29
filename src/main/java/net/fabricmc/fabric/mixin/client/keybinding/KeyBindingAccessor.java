@@ -20,10 +20,10 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.gen.Accessor;
 
 import net.minecraft.client.Options.KeyMapping;
-import net.minecraft.client.util.InputUtil;
+import net.minecraft.client.util.InputConstants;
 
 @Mixin(KeyMapping.class)
 public interface KeyBindingAccessor {
 	@Accessor("boundKey")
-	InputUtil.Key fabric_getBoundKey();
+	InputConstants.Key fabric_getBoundKey();
 }

@@ -23,7 +23,7 @@ import java.util.stream.Collectors;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gl.RenderPipelines;
-import net.minecraft.client.gui.DrawContext;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.ingame.CreativeInventoryScreen;
 import net.minecraft.client.gui.widget.Button;
 import net.minecraft.world.item.ItemGroup;
@@ -56,7 +56,7 @@ public class FabricCreativeGuiComponents {
 		}
 
 		@Override
-		protected void renderWidget(DrawContext drawContext, int mouseX, int mouseY, float delta) {
+		protected void renderWidget(GuiGraphics drawContext, int mouseX, int mouseY, float delta) {
 			this.active = type.isEnabled.test(screen);
 			this.visible = screen.hasAdditionalPages();
 
