@@ -20,11 +20,11 @@ import java.util.List;
 
 import org.jetbrains.annotations.Nullable;
 
-import net.minecraft.client.texture.Sprite;
+import net.minecraft.client.texture.TextureAtlasSprite;
 import net.minecraft.world.item.tooltip.TooltipType;
 import net.minecraft.network.chat.Component;
 import net.minecraft.core.BlockPos;
-import net.minecraft.world.BlockRenderView;
+import net.minecraft.world.BlockAndTintGetter;
 
 import net.fabricmc.fabric.api.client.render.fluid.v1.FluidRenderHandler;
 import net.fabricmc.fabric.api.client.render.fluid.v1.FluidRenderHandlerRegistry;
@@ -53,7 +53,7 @@ public interface FluidVariantRenderHandler {
 	 * they may not be null.
 	 */
 	@Nullable
-	default Sprite[] getSprites(FluidVariant fluidVariant) {
+	default TextureAtlasSprite[] getSprites(FluidVariant fluidVariant) {
 		// Use the fluid render handler by default.
 		FluidRenderHandler fluidRenderHandler = FluidRenderHandlerRegistry.INSTANCE.get(fluidVariant.getFluid());
 
@@ -73,7 +73,7 @@ public interface FluidVariantRenderHandler {
 	 * If they are provided, this method may return a color that depends on the location.
 	 * For example, water returns the biome-dependent color if the context parameters are specified, or its default color if one of them is null.
 	 */
-	default int getColor(FluidVariant fluidVariant, @Nullable BlockRenderView view, @Nullable BlockPos pos) {
+	default int getColor(FluidVariant fluidVariant, @Nullable BlockAndTintGetter view, @Nullable BlockPos pos) {
 		// Use the fluid render handler by default.
 		FluidRenderHandler fluidRenderHandler = FluidRenderHandlerRegistry.INSTANCE.get(fluidVariant.getFluid());
 

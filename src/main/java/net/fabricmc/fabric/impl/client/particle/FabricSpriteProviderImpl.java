@@ -20,7 +20,7 @@ import java.util.List;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.particle.ParticleSpriteManager;
-import net.minecraft.client.texture.Sprite;
+import net.minecraft.client.texture.TextureAtlasSprite;
 import net.minecraft.client.texture.TextureAtlas;
 import net.minecraft.util.Atlases;
 import net.minecraft.core.random.Random;
@@ -34,22 +34,22 @@ public record FabricSpriteProviderImpl(ParticleSpriteManager.SimpleSpriteProvide
 	}
 
 	@Override
-	public List<Sprite> getSprites() {
+	public List<TextureAtlasSprite> getSprites() {
 		return delegate.sprites;
 	}
 
 	@Override
-	public Sprite getSprite(int i, int j) {
+	public TextureAtlasSprite getSprite(int i, int j) {
 		return delegate.getSprite(i, j);
 	}
 
 	@Override
-	public Sprite getSprite(Random random) {
+	public TextureAtlasSprite getSprite(Random random) {
 		return delegate.getSprite(random);
 	}
 
 	@Override
-	public Sprite getFirst() {
+	public TextureAtlasSprite getFirst() {
 		return delegate.getFirst();
 	}
 }

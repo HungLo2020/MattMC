@@ -17,8 +17,8 @@
 package net.fabricmc.fabric.api.renderer.v1.model;
 
 import net.fabricmc.fabric.api.renderer.v1.mesh.QuadView;
-import net.minecraft.client.rendererer.texture.TextureAtlas;
-import net.minecraft.client.rendererer.texture.TextureAtlasSprite;
+import net.minecraft.client.renderer.texture.TextureAtlas;
+import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import org.jetbrains.annotations.Nullable;
 
 /**

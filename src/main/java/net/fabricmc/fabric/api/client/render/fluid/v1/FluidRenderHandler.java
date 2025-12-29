@@ -16,8 +16,8 @@
 
 package net.fabricmc.fabric.api.client.render.fluid.v1;
 
-import net.minecraft.client.rendererer.texture.TextureAtlas;
-import net.minecraft.client.rendererer.texture.TextureAtlasSprite;
+import net.minecraft.client.renderer.texture.TextureAtlas;
+import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.BlockAndTintGetter;
 import net.minecraft.world.level.material.FluidState;
