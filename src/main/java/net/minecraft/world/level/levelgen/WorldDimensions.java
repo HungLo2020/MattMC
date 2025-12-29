@@ -162,8 +162,7 @@ public record WorldDimensions(Map<ResourceKey<LevelStem>, LevelStem> dimensions)
 		return levelStem.type().is(BuiltinDimensionTypes.PRIMORDIAL_CAVES)
 			&& levelStem.generator() instanceof NoiseBasedChunkGenerator noiseBasedChunkGenerator
 			&& noiseBasedChunkGenerator.stable(NoiseGeneratorSettings.PRIMORDIAL_CAVES)
-			&& noiseBasedChunkGenerator.getBiomeSource() instanceof MultiNoiseBiomeSource multiNoiseBiomeSource
-			&& multiNoiseBiomeSource.stable(MultiNoiseBiomeSourceParameterLists.PRIMORDIAL_CAVES);
+			&& noiseBasedChunkGenerator.getBiomeSource() instanceof MultiNoiseBiomeSource;
 	}
 
 	public WorldDimensions.Complete bake(Registry<LevelStem> registry) {
@@ -183,17 +182,10 @@ public record WorldDimensions(Map<ResourceKey<LevelStem>, LevelStem> dimensions)
 					.or(() -> Optional.ofNullable((LevelStem)this.dimensions.get(resourceKey)))
 					.ifPresent(levelStem -> list.add(new Entry(resourceKey, levelStem)))
 			);
-		// Check if dimensions are stable: either vanilla 3 (Overworld, Nether, End) or all 4 builtins including Primordial Caves
-		boolean hasVanillaThree = list.size() == 3 && 
-			list.stream().anyMatch(e -> e.key == LevelStem.OVERWORLD) &&
-			list.stream().anyMatch(e -> e.key == LevelStem.NETHER) &&
-			list.stream().anyMatch(e -> e.key == LevelStem.END);
-		boolean hasAllBuiltins = list.size() == VANILLA_DIMENSION_COUNT &&
-			list.stream().anyMatch(e -> e.key == LevelStem.OVERWORLD) &&
-			list.stream().anyMatch(e -> e.key == LevelStem.NETHER) &&
-			list.stream().anyMatch(e -> e.key == LevelStem.END) &&
-			list.stream().anyMatch(e -> e.key == LevelStem.PRIMORDIAL_CAVES);
-		Lifecycle lifecycle = (hasVanillaThree || hasAllBuiltins) ? Lifecycle.stable() : Lifecycle.experimental();
+		// Check if dimensions are stable: any combination of builtin dimensions (Overworld, Nether, End, Primordial Caves) is considered stable
+		// Only non-builtin custom dimensions trigger experimental mode
+		boolean allBuiltins = list.stream().allMatch(e -> BUILTIN_ORDER.contains(e.key));
+		Lifecycle lifecycle = allBuiltins ? Lifecycle.stable() : Lifecycle.experimental();
 		WritableRegistry<LevelStem> writableRegistry = new MappedRegistry<>(Registries.LEVEL_STEM, lifecycle);
 		list.forEach(arg -> writableRegistry.register(arg.key, arg.value, arg.registrationInfo()));
 		Registry<LevelStem> registry2 = writableRegistry.freeze();
