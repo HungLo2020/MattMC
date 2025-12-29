@@ -22,14 +22,14 @@ import java.util.Locale;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screens.world.EditGameRulesScreen;
-import net.minecraft.client.gui.widget.ButtonWidget;
+import net.minecraft.client.gui.widget.Button;
 import net.minecraft.network.chat.OrderedText;
 import net.minecraft.network.chat.Component;
 
 import net.fabricmc.fabric.api.gamerule.v1.rule.EnumRule;
 
 public final class EnumRuleWidget<E extends Enum<E>> extends EditGameRulesScreen.NamedRuleWidget {
-	private final ButtonWidget buttonWidget;
+	private final Button buttonWidget;
 	private final String rootTranslationKey;
 
 	public EnumRuleWidget(EditGameRulesScreen gameRuleScreen, Component name, List<OrderedText> description, final String ruleName, EnumRule<E> rule, String translationKey) {
@@ -40,7 +40,7 @@ public final class EnumRuleWidget<E extends Enum<E>> extends EditGameRulesScreen
 
 		// Base translation key needs to be set before the button widget is created.
 		this.rootTranslationKey = translationKey;
-		this.buttonWidget = ButtonWidget.builder(this.getValueText(rule.get()), (buttonWidget) -> {
+		this.buttonWidget = Button.builder(this.getValueText(rule.get()), (buttonWidget) -> {
 			rule.cycle();
 			buttonWidget.setMessage(this.getValueText(rule.get()));
 		}).position(10, 5).size(88, 20).build();

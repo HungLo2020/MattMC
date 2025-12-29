@@ -45,7 +45,7 @@ import org.slf4j.LoggerFactory;
 import net.minecraft.core.VersionedIdentifier;
 import net.minecraft.server.packs.AbstractFileResourcePack;
 import net.minecraft.server.packs.InputSupplier;
-import net.minecraft.server.packs.ResourcePack;
+import net.minecraft.server.packs.Pack;
 import net.minecraft.server.packs.ResourcePackInfo;
 import net.minecraft.server.packs.ResourceType;
 import net.minecraft.server.packs.metadata.ResourceMetadataSerializer;
@@ -58,7 +58,7 @@ import net.fabricmc.fabric.api.resource.ResourcePackActivationType;
 import net.fabricmc.loader.api.ModContainer;
 import net.fabricmc.loader.api.metadata.ModMetadata;
 
-public class ModNioResourcePack implements ResourcePack, ModResourcePack {
+public class ModNioResourcePack implements Pack, ModResourcePack {
 	private static final Logger LOGGER = LoggerFactory.getLogger(ModNioResourcePack.class);
 	private static final Pattern RESOURCE_PACK_PATH = Pattern.compile("[a-z0-9-_.]+");
 	private static final FileSystem DEFAULT_FS = FileSystems.getDefault();

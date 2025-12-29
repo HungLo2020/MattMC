@@ -20,10 +20,10 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.gen.Accessor;
 
 import net.minecraft.client.multiplayer.ClientCommonNetworkHandler;
-import net.minecraft.network.ClientConnection;
+import net.minecraft.network.Connection;
 
 @Mixin(ClientCommonNetworkHandler.class)
 public interface ClientCommonNetworkHandlerAccessor {
 	@Accessor
-	ClientConnection getConnection();
+	Connection getConnection();
 }

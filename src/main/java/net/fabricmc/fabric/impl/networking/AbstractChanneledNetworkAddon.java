@@ -27,7 +27,7 @@ import java.util.Set;
 import io.netty.channel.ChannelFutureListener;
 import org.jetbrains.annotations.Nullable;
 
-import net.minecraft.network.ClientConnection;
+import net.minecraft.network.Connection;
 import net.minecraft.network.NetworkPhase;
 import net.minecraft.network.OffThreadException;
 import net.minecraft.network.protocol.CustomPacketPayload;
@@ -48,13 +48,13 @@ public abstract class AbstractChanneledNetworkAddon<H> extends AbstractNetworkAd
 	// The maximum length of a channel name a connecting client can use, 128 is the default and minimum value.
 	private static final int MAX_CHANNEL_NAME_LENGTH = Math.max(Integer.getInteger("fabric.networking.maxChannelNameLength", GlobalReceiverRegistry.DEFAULT_CHANNEL_NAME_MAX_LENGTH), GlobalReceiverRegistry.DEFAULT_CHANNEL_NAME_MAX_LENGTH);
 
-	protected final ClientConnection connection;
+	protected final Connection connection;
 	protected final GlobalReceiverRegistry<H> receiver;
 	protected final Set<ResourceLocation> sendableChannels;
 
 	protected int commonVersion = -1;
 
-	protected AbstractChanneledNetworkAddon(GlobalReceiverRegistry<H> receiver, ClientConnection connection, String description) {
+	protected AbstractChanneledNetworkAddon(GlobalReceiverRegistry<H> receiver, Connection connection, String description) {
 		super(receiver, description);
 		this.connection = connection;
 		this.receiver = receiver;

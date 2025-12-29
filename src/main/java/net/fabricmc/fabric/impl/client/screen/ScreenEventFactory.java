@@ -74,7 +74,7 @@ public final class ScreenEventFactory {
 		});
 	}
 
-	// Keyboard events
+	// KeyboardHandler events
 
 	public static Event<ScreenKeyboardEvents.AllowKeyPress> createAllowKeyPressEvent() {
 		return EventFactory.createArrayBacked(ScreenKeyboardEvents.AllowKeyPress.class, callbacks -> (screen, context) -> {
@@ -132,7 +132,7 @@ public final class ScreenEventFactory {
 		});
 	}
 
-	// Mouse Events
+	// MouseHandler Events
 
 	public static Event<ScreenMouseEvents.AllowMouseClick> createAllowMouseClickEvent() {
 		return EventFactory.createArrayBacked(ScreenMouseEvents.AllowMouseClick.class, callbacks -> (screen, context) -> {

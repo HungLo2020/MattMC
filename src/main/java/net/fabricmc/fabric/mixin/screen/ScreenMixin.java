@@ -69,7 +69,7 @@ abstract class ScreenMixin implements ScreenExtensions {
 	@Unique
 	private Event<ScreenEvents.AfterRender> afterRenderEvent;
 
-	// Keyboard
+	// KeyboardHandler
 	@Unique
 	private Event<ScreenKeyboardEvents.AllowKeyPress> allowKeyPressEvent;
 	@Unique
@@ -83,7 +83,7 @@ abstract class ScreenMixin implements ScreenExtensions {
 	@Unique
 	private Event<ScreenKeyboardEvents.AfterKeyRelease> afterKeyReleaseEvent;
 
-	// Mouse
+	// MouseHandler
 	@Unique
 	private Event<ScreenMouseEvents.AllowMouseClick> allowMouseClickEvent;
 	@Unique
@@ -145,7 +145,7 @@ abstract class ScreenMixin implements ScreenExtensions {
 		this.beforeTickEvent = ScreenEventFactory.createBeforeTickEvent();
 		this.afterTickEvent = ScreenEventFactory.createAfterTickEvent();
 
-		// Keyboard
+		// KeyboardHandler
 		this.allowKeyPressEvent = ScreenEventFactory.createAllowKeyPressEvent();
 		this.beforeKeyPressEvent = ScreenEventFactory.createBeforeKeyPressEvent();
 		this.afterKeyPressEvent = ScreenEventFactory.createAfterKeyPressEvent();
@@ -153,7 +153,7 @@ abstract class ScreenMixin implements ScreenExtensions {
 		this.beforeKeyReleaseEvent = ScreenEventFactory.createBeforeKeyReleaseEvent();
 		this.afterKeyReleaseEvent = ScreenEventFactory.createAfterKeyReleaseEvent();
 
-		// Mouse
+		// MouseHandler
 		this.allowMouseClickEvent = ScreenEventFactory.createAllowMouseClickEvent();
 		this.beforeMouseClickEvent = ScreenEventFactory.createBeforeMouseClickEvent();
 		this.afterMouseClickEvent = ScreenEventFactory.createAfterMouseClickEvent();
@@ -224,7 +224,7 @@ abstract class ScreenMixin implements ScreenExtensions {
 		return ensureEventsAreInitialized(this.afterRenderEvent);
 	}
 
-	// Keyboard
+	// KeyboardHandler
 
 	@Override
 	public Event<ScreenKeyboardEvents.AllowKeyPress> fabric_getAllowKeyPressEvent() {
@@ -256,7 +256,7 @@ abstract class ScreenMixin implements ScreenExtensions {
 		return ensureEventsAreInitialized(this.afterKeyReleaseEvent);
 	}
 
-	// Mouse
+	// MouseHandler
 
 	@Override
 	public Event<ScreenMouseEvents.AllowMouseClick> fabric_getAllowMouseClickEvent() {

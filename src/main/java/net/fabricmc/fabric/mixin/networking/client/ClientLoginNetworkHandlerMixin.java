@@ -26,7 +26,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLoginNetworkHandler;
-import net.minecraft.network.ClientConnection;
+import net.minecraft.network.Connection;
 import net.minecraft.network.protocol.s2c.login.LoginQueryRequestS2CPacket;
 
 import net.fabricmc.fabric.impl.networking.NetworkHandlerExtensions;
@@ -41,7 +41,7 @@ abstract class ClientLoginNetworkHandlerMixin implements NetworkHandlerExtension
 
 	@Shadow
 	@Final
-	private ClientConnection connection;
+	private Connection connection;
 
 	@Unique
 	private ClientLoginNetworkAddon addon;

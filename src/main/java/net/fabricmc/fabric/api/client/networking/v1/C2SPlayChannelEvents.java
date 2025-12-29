@@ -19,7 +19,7 @@ package net.fabricmc.fabric.api.client.networking.v1;
 import java.util.List;
 
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.multiplayer.ClientPlayNetworkHandler;
+import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.server.packss.ResourceLocation;
 
 import net.fabricmc.fabric.api.event.Event;
@@ -58,7 +58,7 @@ public final class C2SPlayChannelEvents {
 	 */
 	@FunctionalInterface
 	public interface Register {
-		void onChannelRegister(ClientPlayNetworkHandler handler, PacketSender sender, Minecraft client, List<ResourceLocation> channels);
+		void onChannelRegister(ClientPacketListener handler, PacketSender sender, Minecraft client, List<ResourceLocation> channels);
 	}
 
 	/**
@@ -66,6 +66,6 @@ public final class C2SPlayChannelEvents {
 	 */
 	@FunctionalInterface
 	public interface Unregister {
-		void onChannelUnregister(ClientPlayNetworkHandler handler, PacketSender sender, Minecraft client, List<ResourceLocation> channels);
+		void onChannelUnregister(ClientPacketListener handler, PacketSender sender, Minecraft client, List<ResourceLocation> channels);
 	}
 }

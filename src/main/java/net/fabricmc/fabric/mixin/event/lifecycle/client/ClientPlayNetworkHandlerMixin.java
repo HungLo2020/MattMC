@@ -24,21 +24,21 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import net.minecraft.world.level.block.entity.BlockEntity;
-import net.minecraft.client.multiplayer.ClientPlayNetworkHandler;
+import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.network.protocol.s2c.common.SynchronizeTagsS2CPacket;
 import net.minecraft.network.protocol.s2c.play.GameJoinS2CPacket;
 import net.minecraft.network.protocol.s2c.play.PlayerRespawnS2CPacket;
 import net.minecraft.core.DynamicRegistryManager;
-import net.minecraft.world.level.chunk.WorldChunk;
+import net.minecraft.world.level.chunk.LevelChunk;
 
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientBlockEntityEvents;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientEntityEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.CommonLifecycleEvents;
 import net.fabricmc.fabric.impl.event.lifecycle.LoadedChunksCache;
 
-@Mixin(ClientPlayNetworkHandler.class)
+@Mixin(ClientPacketListener.class)
 abstract class ClientPlayNetworkHandlerMixin {
 	@Shadow
 	private ClientLevel world;
@@ -55,7 +55,7 @@ abstract class ClientPlayNetworkHandlerMixin {
 				ClientEntityEvents.ENTITY_UNLOAD.invoker().onUnload(entity, this.world);
 			}
 
-			for (WorldChunk chunk : ((LoadedChunksCache) this.world).fabric_getLoadedChunks()) {
+			for (LevelChunk chunk : ((LoadedChunksCache) this.world).fabric_getLoadedChunks()) {
 				for (BlockEntity blockEntity : chunk.getBlockEntities().values()) {
 					ClientBlockEntityEvents.BLOCK_ENTITY_UNLOAD.invoker().onUnload(blockEntity, this.world);
 				}
@@ -77,7 +77,7 @@ abstract class ClientPlayNetworkHandlerMixin {
 				ClientEntityEvents.ENTITY_UNLOAD.invoker().onUnload(entity, this.world);
 			}
 
-			for (WorldChunk chunk : ((LoadedChunksCache) this.world).fabric_getLoadedChunks()) {
+			for (LevelChunk chunk : ((LoadedChunksCache) this.world).fabric_getLoadedChunks()) {
 				for (BlockEntity blockEntity : chunk.getBlockEntities().values()) {
 					ClientBlockEntityEvents.BLOCK_ENTITY_UNLOAD.invoker().onUnload(blockEntity, this.world);
 				}
@@ -94,7 +94,7 @@ abstract class ClientPlayNetworkHandlerMixin {
 				ClientEntityEvents.ENTITY_UNLOAD.invoker().onUnload(entity, this.world);
 			}
 
-			for (WorldChunk chunk : ((LoadedChunksCache) this.world).fabric_getLoadedChunks()) {
+			for (LevelChunk chunk : ((LoadedChunksCache) this.world).fabric_getLoadedChunks()) {
 				for (BlockEntity blockEntity : chunk.getBlockEntities().values()) {
 					ClientBlockEntityEvents.BLOCK_ENTITY_UNLOAD.invoker().onUnload(blockEntity, this.world);
 				}

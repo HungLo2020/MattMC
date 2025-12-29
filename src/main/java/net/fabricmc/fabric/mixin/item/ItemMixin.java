@@ -42,7 +42,7 @@ abstract class ItemMixin implements ItemExtensions, FabricItem {
 	private CustomDamageHandler customDamageHandler;
 
 	@Inject(method = "<init>", at = @At("RETURN"))
-	private void onConstruct(Item.Settings settings, CallbackInfo info) {
+	private void onConstruct(Item.Properties settings, CallbackInfo info) {
 		FabricItemInternals.onBuild(settings, (Item) (Object) this);
 	}
 

@@ -30,7 +30,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.world.CreateWorldScreen;
 import net.minecraft.server.packs.DataConfiguration;
-import net.minecraft.server.packs.ResourcePackManager;
+import net.minecraft.server.packs.PackRepository;
 import net.minecraft.server.packs.ResourceType;
 
 import net.fabricmc.fabric.impl.resource.loader.ModResourcePackCreator;
@@ -39,15 +39,15 @@ import net.fabricmc.fabric.impl.resource.loader.ModResourcePackUtil;
 @Mixin(CreateWorldScreen.class)
 public abstract class CreateWorldScreenMixin extends Screen {
 	@Shadow
-	private ResourcePackManager packManager;
+	private PackRepository packManager;
 
 	private CreateWorldScreenMixin() {
 		super(null);
 	}
 
 	@ModifyVariable(method = "show(Lnet/minecraft/client/Minecraft;Ljava/lang/Runnable;Ljava/util/function/Function;Lnet/minecraft/client/world/GeneratorOptionsFactory;Lnet/minecraft/registry/ResourceKey;Lnet/minecraft/client/gui/screen/world/CreateWorldCallback;)V",
-			at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/screen/world/CreateWorldScreen;createServerConfig(Lnet/minecraft/resource/ResourcePackManager;Lnet/minecraft/resource/DataConfiguration;)Lnet/minecraft/server/SaveLoading$ServerConfig;"))
-	private static ResourcePackManager onCreateResManagerInit(ResourcePackManager manager) {
+			at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/screen/world/CreateWorldScreen;createServerConfig(Lnet/minecraft/resource/PackRepository;Lnet/minecraft/resource/DataConfiguration;)Lnet/minecraft/server/SaveLoading$ServerConfig;"))
+	private static PackRepository onCreateResManagerInit(PackRepository manager) {
 		// Add mod data packs to the initial res pack manager so they are active even if the user doesn't use custom data packs
 		manager.providers.add(new ModResourcePackCreator(ResourceType.SERVER_DATA));
 		return manager;
@@ -60,8 +60,8 @@ public abstract class CreateWorldScreenMixin extends Screen {
 	}
 
 	@Inject(method = "getScannedPack",
-			at = @At(value = "INVOKE", target = "Lnet/minecraft/resource/ResourcePackManager;scanPacks()V", shift = At.Shift.BEFORE))
-	private void onScanPacks(CallbackInfoReturnable<Pair<File, ResourcePackManager>> cir) {
+			at = @At(value = "INVOKE", target = "Lnet/minecraft/resource/PackRepository;scanPacks()V", shift = At.Shift.BEFORE))
+	private void onScanPacks(CallbackInfoReturnable<Pair<File, PackRepository>> cir) {
 		// Allow to display built-in data packs in the data pack selection screen at world creation.
 		this.packManager.providers.add(new ModResourcePackCreator(ResourceType.SERVER_DATA));
 	}

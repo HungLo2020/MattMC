@@ -32,7 +32,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.ModifyArg;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-import net.minecraft.network.ClientConnection;
+import net.minecraft.network.Connection;
 import net.minecraft.network.NetworkPhase;
 import net.minecraft.network.NetworkSide;
 import net.minecraft.network.handler.DecoderHandler;
@@ -51,7 +51,7 @@ import net.fabricmc.fabric.impl.networking.VanillaPacketTypes;
 import net.fabricmc.fabric.impl.networking.splitter.FabricPacketMerger;
 import net.fabricmc.fabric.impl.networking.splitter.FabricPacketSplitter;
 
-@Mixin(ClientConnection.class)
+@Mixin(Connection.class)
 abstract class ClientConnectionMixin implements ChannelInfoHolder {
 	@Shadow
 	private PacketListener packetListener;
@@ -64,7 +64,7 @@ abstract class ClientConnectionMixin implements ChannelInfoHolder {
 		this.playChannels = new ConcurrentHashMap<>();
 	}
 
-	@Inject(method = "sendImmediately", at = @At(value = "FIELD", target = "Lnet/minecraft/network/ClientConnection;packetsSentCounter:I"))
+	@Inject(method = "sendImmediately", at = @At(value = "FIELD", target = "Lnet/minecraft/network/Connection;packetsSentCounter:I"))
 	private void checkPacket(Packet<?> packet, ChannelFutureListener callback, boolean flush, CallbackInfo ci) {
 		if (this.packetListener instanceof PacketCallbackListener) {
 			((PacketCallbackListener) this.packetListener).sent(packet);

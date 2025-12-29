@@ -21,7 +21,7 @@ import java.util.List;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screens.world.EditGameRulesScreen;
-import net.minecraft.client.gui.widget.TextFieldWidget;
+import net.minecraft.client.gui.widget.EditBox;
 import net.minecraft.world.inventory.ScreenTexts;
 import net.minecraft.network.chat.OrderedText;
 import net.minecraft.network.chat.Component;
@@ -30,13 +30,13 @@ import net.fabricmc.fabric.api.gamerule.v1.rule.DoubleRule;
 import net.fabricmc.fabric.mixin.gamerule.client.EditGameRulesScreenAccessor;
 
 public final class DoubleRuleWidget extends EditGameRulesScreen.NamedRuleWidget {
-	private final TextFieldWidget textFieldWidget;
+	private final EditBox textFieldWidget;
 
 	public DoubleRuleWidget(EditGameRulesScreen gameRuleScreen, Component name, List<OrderedText> description, final String ruleName, DoubleRule rule) {
 		gameRuleScreen.super(description, name);
 		EditGameRulesScreenAccessor accessor = (EditGameRulesScreenAccessor) gameRuleScreen;
 
-		this.textFieldWidget = new TextFieldWidget(Minecraft.getInstance().textRenderer, 10, 5, 42, 20,
+		this.textFieldWidget = new EditBox(Minecraft.getInstance().textRenderer, 10, 5, 42, 20,
 				name.copy()
 				.append(ScreenTexts.LINE_BREAK)
 				.append(ruleName)

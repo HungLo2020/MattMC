@@ -26,7 +26,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientCommonNetworkHandler;
 import net.minecraft.client.multiplayer.ClientConfigurationNetworkHandler;
 import net.minecraft.client.multiplayer.ClientConnectionState;
-import net.minecraft.network.ClientConnection;
+import net.minecraft.network.Connection;
 import net.minecraft.network.protocol.s2c.config.ReadyS2CPacket;
 
 import net.fabricmc.fabric.impl.networking.NetworkHandlerExtensions;
@@ -39,7 +39,7 @@ public abstract class ClientConfigurationNetworkHandlerMixin extends ClientCommo
 	@Unique
 	private ClientConfigurationNetworkAddon addon;
 
-	protected ClientConfigurationNetworkHandlerMixin(Minecraft client, ClientConnection connection, ClientConnectionState connectionState) {
+	protected ClientConfigurationNetworkHandlerMixin(Minecraft client, Connection connection, ClientConnectionState connectionState) {
 		super(client, connection, connectionState);
 	}
 
@@ -51,7 +51,7 @@ public abstract class ClientConfigurationNetworkHandlerMixin extends ClientCommo
 		this.addon.lateInit();
 	}
 
-	@Inject(method = "onReady", at = @At(value = "NEW", target = "(Lnet/minecraft/client/Minecraft;Lnet/minecraft/network/ClientConnection;Lnet/minecraft/client/network/ClientConnectionState;)Lnet/minecraft/client/network/ClientPlayNetworkHandler;"))
+	@Inject(method = "onReady", at = @At(value = "NEW", target = "(Lnet/minecraft/client/Minecraft;Lnet/minecraft/network/Connection;Lnet/minecraft/client/network/ClientConnectionState;)Lnet/minecraft/client/network/ClientPacketListener;"))
 	public void handleComplete(ReadyS2CPacket packet, CallbackInfo ci) {
 		this.addon.handleComplete();
 	}

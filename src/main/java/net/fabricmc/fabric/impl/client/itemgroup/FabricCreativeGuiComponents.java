@@ -25,7 +25,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gl.RenderPipelines;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screens.ingame.CreativeInventoryScreen;
-import net.minecraft.client.gui.widget.ButtonWidget;
+import net.minecraft.client.gui.widget.Button;
 import net.minecraft.world.item.ItemGroup;
 import net.minecraft.world.item.ItemGroups;
 import net.minecraft.core.Registries;
@@ -45,12 +45,12 @@ public class FabricCreativeGuiComponents {
 		return (int) Math.ceil((ItemGroups.getGroupsToDisplay().size() - COMMON_GROUPS.stream().filter(ItemGroup::shouldDisplay).count()) / TABS_PER_PAGE);
 	}
 
-	public static class ItemGroupButtonWidget extends ButtonWidget {
+	public static class ItemGroupButtonWidget extends Button {
 		final CreativeInventoryScreen screen;
 		final Type type;
 
 		public ItemGroupButtonWidget(int x, int y, Type type, CreativeInventoryScreen screen) {
-			super(x, y, 10, 12, type.text, (bw) -> type.clickConsumer.accept(screen), ButtonWidget.DEFAULT_NARRATION_SUPPLIER);
+			super(x, y, 10, 12, type.text, (bw) -> type.clickConsumer.accept(screen), Button.DEFAULT_NARRATION_SUPPLIER);
 			this.type = type;
 			this.screen = screen;
 		}

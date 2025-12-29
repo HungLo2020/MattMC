@@ -21,7 +21,7 @@ import java.util.List;
 import net.minecraft.client.particle.ParticleFactory;
 import net.minecraft.client.particle.SpriteProvider;
 import net.minecraft.client.texture.Sprite;
-import net.minecraft.client.texture.SpriteAtlasTexture;
+import net.minecraft.client.texture.TextureAtlas;
 import net.minecraft.core.particles.ParticleType;
 
 /**
@@ -40,7 +40,7 @@ public interface FabricSpriteProvider extends SpriteProvider {
 	/**
 	 * Returns the entire particles texture atlas.
 	 */
-	SpriteAtlasTexture getAtlas();
+	TextureAtlas getAtlas();
 
 	/**
 	 * Gets the list of all sprites available for this particle to use.

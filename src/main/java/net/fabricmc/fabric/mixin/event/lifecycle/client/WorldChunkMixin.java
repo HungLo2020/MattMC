@@ -34,12 +34,12 @@ import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.Level;
-import net.minecraft.world.level.chunk.WorldChunk;
+import net.minecraft.world.level.chunk.LevelChunk;
 
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientBlockEntityEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerBlockEntityEvents;
 
-@Mixin(WorldChunk.class)
+@Mixin(LevelChunk.class)
 abstract class WorldChunkMixin {
 	@Shadow
 	public abstract Level getWorld();
@@ -73,8 +73,8 @@ abstract class WorldChunkMixin {
 	}
 
 	// Use the slice to not redirect codepath where block entity is loaded
-	@Redirect(method = "getBlockEntity(Lnet/minecraft/util/math/BlockPos;Lnet/minecraft/world/chunk/WorldChunk$CreationType;)Lnet/minecraft/block/entity/BlockEntity;", at = @At(value = "INVOKE", target = "Ljava/util/Map;remove(Ljava/lang/Object;)Ljava/lang/Object;"),
-			slice = @Slice(from = @At(value = "INVOKE", target = "Lnet/minecraft/world/chunk/WorldChunk;createBlockEntity(Lnet/minecraft/util/math/BlockPos;)Lnet/minecraft/block/entity/BlockEntity;")))
+	@Redirect(method = "getBlockEntity(Lnet/minecraft/util/math/BlockPos;Lnet/minecraft/world/chunk/LevelChunk$CreationType;)Lnet/minecraft/block/entity/BlockEntity;", at = @At(value = "INVOKE", target = "Ljava/util/Map;remove(Ljava/lang/Object;)Ljava/lang/Object;"),
+			slice = @Slice(from = @At(value = "INVOKE", target = "Lnet/minecraft/world/chunk/LevelChunk;createBlockEntity(Lnet/minecraft/util/math/BlockPos;)Lnet/minecraft/block/entity/BlockEntity;")))
 	private <K, V> Object onRemoveBlockEntity(Map<K, V> map, K key) {
 		@Nullable final V removed = map.remove(key);
 

@@ -26,7 +26,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-import net.minecraft.server.packs.ResourcePack;
+import net.minecraft.server.packs.Pack;
 import net.minecraft.server.packs.ResourcePackInfo;
 import net.minecraft.server.packs.ResourcePackProfile;
 import net.minecraft.server.packs.ResourcePackSource;
@@ -36,7 +36,7 @@ import net.fabricmc.fabric.impl.resource.loader.ResourcePackSourceTracker;
 
 /**
  * Implements resource pack source tracking (for {@link net.fabricmc.fabric.impl.resource.loader.FabricResource}).
- * {@link ResourcePack} doesn't hold a reference to its {@link ResourcePackSource}
+ * {@link Pack} doesn't hold a reference to its {@link ResourcePackSource}
  * so we store the source in a global tracker when the resource packs are created.
  *
  * @see ResourcePackSourceTracker
@@ -52,7 +52,7 @@ abstract class ResourcePackProfileMixin implements FabricResourcePackProfile {
 	public abstract ResourcePackInfo getInfo();
 
 	@Inject(method = "createResourcePack", at = @At("RETURN"))
-	private void onCreateResourcePack(CallbackInfoReturnable<ResourcePack> info) {
+	private void onCreateResourcePack(CallbackInfoReturnable<Pack> info) {
 		ResourcePackSourceTracker.setSource(info.getReturnValue(), getInfo().source());
 	}
 

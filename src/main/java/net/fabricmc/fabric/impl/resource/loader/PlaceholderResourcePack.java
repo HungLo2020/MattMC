@@ -29,7 +29,7 @@ import org.jetbrains.annotations.Nullable;
 
 import net.minecraft.SharedConstants;
 import net.minecraft.server.packs.InputSupplier;
-import net.minecraft.server.packs.ResourcePack;
+import net.minecraft.server.packs.Pack;
 import net.minecraft.server.packs.ResourcePackInfo;
 import net.minecraft.server.packs.ResourcePackProfile;
 import net.minecraft.server.packs.ResourceType;
@@ -39,7 +39,7 @@ import net.minecraft.server.packs.metadata.ResourceMetadataSerializer;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.packss.ResourceLocation;
 
-public record PlaceholderResourcePack(ResourceType type, ResourcePackInfo metadata) implements ResourcePack {
+public record PlaceholderResourcePack(ResourceType type, ResourcePackInfo metadata) implements Pack {
 	private static final Component DESCRIPTION_TEXT = Component.translatable("pack.description.modResources");
 
 	public PackResourceMetadata getMetadata() {
@@ -109,12 +109,12 @@ public record PlaceholderResourcePack(ResourceType type, ResourcePackInfo metada
 
 	public record Factory(ResourceType type, ResourcePackInfo metadata) implements ResourcePackProfile.PackFactory {
 		@Override
-		public ResourcePack open(ResourcePackInfo var1) {
+		public Pack open(ResourcePackInfo var1) {
 			return new PlaceholderResourcePack(this.type, metadata);
 		}
 
 		@Override
-		public ResourcePack openWithOverlays(ResourcePackInfo var1, ResourcePackProfile.Metadata metadata) {
+		public Pack openWithOverlays(ResourcePackInfo var1, ResourcePackProfile.Metadata metadata) {
 			return open(var1);
 		}
 	}

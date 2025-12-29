@@ -20,7 +20,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import net.minecraft.server.packs.OverlayResourcePack;
-import net.minecraft.server.packs.ResourcePack;
+import net.minecraft.server.packs.Pack;
 import net.minecraft.server.packs.ResourcePackInfo;
 import net.minecraft.server.packs.ResourcePackProfile;
 
@@ -28,16 +28,16 @@ import net.fabricmc.fabric.api.resource.ModResourcePack;
 
 public record ModResourcePackFactory(ModResourcePack pack) implements ResourcePackProfile.PackFactory {
 	@Override
-	public ResourcePack open(ResourcePackInfo var1) {
+	public Pack open(ResourcePackInfo var1) {
 		return pack;
 	}
 
 	@Override
-	public ResourcePack openWithOverlays(ResourcePackInfo var1, ResourcePackProfile.Metadata metadata) {
+	public Pack openWithOverlays(ResourcePackInfo var1, ResourcePackProfile.Metadata metadata) {
 		if (metadata.overlays().isEmpty()) {
 			return pack;
 		} else {
-			List<ResourcePack> overlays = new ArrayList<>(metadata.overlays().size());
+			List<Pack> overlays = new ArrayList<>(metadata.overlays().size());
 
 			for (String overlay : metadata.overlays()) {
 				overlays.add(pack.createOverlay(overlay));

@@ -21,13 +21,13 @@ import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 
-import net.minecraft.client.Mouse;
+import net.minecraft.client.MouseHandler;
 import net.minecraft.client.gui.Click;
 import net.minecraft.client.gui.screens.Screen;
 
 import net.fabricmc.fabric.api.client.screen.v1.ScreenMouseEvents;
 
-@Mixin(Mouse.class)
+@Mixin(MouseHandler.class)
 abstract class MouseMixin {
 	@WrapOperation(method = "onMouseButton", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/screen/Screen;mouseClicked(Lnet/minecraft/client/gui/Click;Z)Z"))
 	private boolean invokeMouseClickedEvents(Screen screen, Click ctx, boolean doubleClick, Operation<Boolean> operation) {

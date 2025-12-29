@@ -25,8 +25,8 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientCommonNetworkHandler;
 import net.minecraft.client.multiplayer.ClientConnectionState;
-import net.minecraft.client.multiplayer.ClientPlayNetworkHandler;
-import net.minecraft.network.ClientConnection;
+import net.minecraft.client.multiplayer.ClientPacketListener;
+import net.minecraft.network.Connection;
 import net.minecraft.network.protocol.s2c.play.GameJoinS2CPacket;
 
 import net.fabricmc.fabric.impl.networking.NetworkHandlerExtensions;
@@ -34,18 +34,18 @@ import net.fabricmc.fabric.impl.networking.client.ClientNetworkingImpl;
 import net.fabricmc.fabric.impl.networking.client.ClientPlayNetworkAddon;
 
 // We want to apply a bit earlier than other mods which may not use us in order to prevent refCount issues
-@Mixin(value = ClientPlayNetworkHandler.class, priority = 999)
+@Mixin(value = ClientPacketListener.class, priority = 999)
 abstract class ClientPlayNetworkHandlerMixin extends ClientCommonNetworkHandler implements NetworkHandlerExtensions {
 	@Unique
 	private ClientPlayNetworkAddon addon;
 
-	protected ClientPlayNetworkHandlerMixin(Minecraft client, ClientConnection connection, ClientConnectionState connectionState) {
+	protected ClientPlayNetworkHandlerMixin(Minecraft client, Connection connection, ClientConnectionState connectionState) {
 		super(client, connection, connectionState);
 	}
 
 	@Inject(method = "<init>", at = @At("RETURN"))
 	private void initAddon(CallbackInfo ci) {
-		this.addon = new ClientPlayNetworkAddon((ClientPlayNetworkHandler) (Object) this, this.client);
+		this.addon = new ClientPlayNetworkAddon((ClientPacketListener) (Object) this, this.client);
 		// A bit of a hack but it allows the field above to be set in case someone registers handlers during INIT event which refers to said field
 		ClientNetworkingImpl.setClientPlayAddon(this.addon);
 		this.addon.lateInit();

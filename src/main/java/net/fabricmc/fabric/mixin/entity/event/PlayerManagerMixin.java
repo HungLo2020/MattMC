@@ -23,7 +23,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import net.minecraft.world.entity.Entity;
-import net.minecraft.network.ClientConnection;
+import net.minecraft.network.Connection;
 import net.minecraft.server.PlayerManager;
 import net.minecraft.server.network.ConnectedClientData;
 import net.minecraft.server.network.ServerPlayer;
@@ -44,7 +44,7 @@ abstract class PlayerManagerMixin {
 	}
 
 	@Inject(method = "onPlayerConnect", at = @At("RETURN"))
-	private void firePlayerJoinEvent(ClientConnection connection, ServerPlayer player, ConnectedClientData clientData, CallbackInfo ci) {
+	private void firePlayerJoinEvent(Connection connection, ServerPlayer player, ConnectedClientData clientData, CallbackInfo ci) {
 		ServerPlayerEvents.JOIN.invoker().onJoin(player);
 	}
 

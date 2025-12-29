@@ -45,8 +45,8 @@ import net.minecraft.SharedConstants;
 import net.minecraft.server.packs.DataConfiguration;
 import net.minecraft.server.packs.DataPackSettings;
 import net.minecraft.server.packs.PackVersion;
-import net.minecraft.server.packs.ResourcePack;
-import net.minecraft.server.packs.ResourcePackManager;
+import net.minecraft.server.packs.Pack;
+import net.minecraft.server.packs.PackRepository;
 import net.minecraft.server.packs.ResourcePackProfile;
 import net.minecraft.server.packs.ResourceType;
 import net.minecraft.server.packs.VanillaDataPackProvider;
@@ -249,7 +249,7 @@ public final class ModResourcePackUtil {
 				continue;
 			}
 
-			try (ResourcePack pack = profile.createResourcePack()) {
+			try (Pack pack = profile.createResourcePack()) {
 				if (pack instanceof ModNioResourcePack && ((ModNioResourcePack) pack).getActivationType().isEnabledByDefault()) {
 					enabled.add(profile.getId());
 				} else {
@@ -294,11 +294,11 @@ public final class ModResourcePackUtil {
 	}
 
 	/**
-	 * Creates the ResourcePackManager used by the ClientDataPackManager and replaces
+	 * Creates the PackRepository used by the ClientDataPackManager and replaces
 	 * {@code VanillaDataPackProvider.createClientManager} used by vanilla.
 	 */
-	public static ResourcePackManager createClientManager() {
-		return new ResourcePackManager(new VanillaDataPackProvider(new SymlinkFinder((path) -> true)), new ModResourcePackCreator(ResourceType.SERVER_DATA, true));
+	public static PackRepository createClientManager() {
+		return new PackRepository(new VanillaDataPackProvider(new SymlinkFinder((path) -> true)), new ModResourcePackCreator(ResourceType.SERVER_DATA, true));
 	}
 
 	public enum Order {

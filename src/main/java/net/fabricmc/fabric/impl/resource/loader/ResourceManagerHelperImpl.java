@@ -30,7 +30,7 @@ import java.util.function.Function;
 
 import net.minecraft.core.RegistryWrapper;
 import net.minecraft.server.packs.OverlayResourcePack;
-import net.minecraft.server.packs.ResourcePack;
+import net.minecraft.server.packs.Pack;
 import net.minecraft.server.packs.ResourcePackInfo;
 import net.minecraft.server.packs.ResourcePackPosition;
 import net.minecraft.server.packs.ResourcePackProfile;
@@ -129,19 +129,19 @@ public class ResourceManagerHelperImpl implements ResourceManagerHelper {
 
 				ResourcePackProfile profile = ResourcePackProfile.create(info, new ResourcePackProfile.PackFactory() {
 					@Override
-					public ResourcePack open(ResourcePackInfo var1) {
+					public Pack open(ResourcePackInfo var1) {
 						return entry.getRight();
 					}
 
 					@Override
-					public ResourcePack openWithOverlays(ResourcePackInfo var1, ResourcePackProfile.Metadata metadata) {
+					public Pack openWithOverlays(ResourcePackInfo var1, ResourcePackProfile.Metadata metadata) {
 						ModNioResourcePack pack = entry.getRight();
 
 						if (metadata.overlays().isEmpty()) {
 							return pack;
 						}
 
-						List<ResourcePack> overlays = new ArrayList<>(metadata.overlays().size());
+						List<Pack> overlays = new ArrayList<>(metadata.overlays().size());
 
 						for (String overlay : metadata.overlays()) {
 							overlays.add(pack.createOverlay(overlay));

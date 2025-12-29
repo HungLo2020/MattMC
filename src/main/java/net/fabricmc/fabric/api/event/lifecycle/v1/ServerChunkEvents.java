@@ -18,10 +18,10 @@ package net.fabricmc.fabric.api.event.lifecycle.v1;
 
 import net.minecraft.server.level.ChunkHolder;
 import net.minecraft.server.level.ChunkLevelType;
-import net.minecraft.server.level.ServerChunkManager;
+import net.minecraft.server.level.ServerChunkCache;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.chunk.ChunkStatus;
-import net.minecraft.world.level.chunk.WorldChunk;
+import net.minecraft.world.level.chunk.LevelChunk;
 
 import net.fabricmc.fabric.api.event.Event;
 import net.fabricmc.fabric.api.event.EventFactory;
@@ -75,10 +75,10 @@ public final class ServerChunkEvents {
 	 *
 	 * <p>When this event is being called:
 	 * <ul>
-	 * <li>The chunk's {@link WorldChunk#getLevelType()} has already changed.</li>
+	 * <li>The chunk's {@link LevelChunk#getLevelType()} has already changed.</li>
 	 * <li>Entities within the chunk are not guaranteed to be accessible.</li>
 	 * <li>The chunk's corresponding level type future in {@link ChunkHolder} is not guaranteed to be done.</li>
-	 * <li>When transitioning from {@link ChunkLevelType#INACCESSIBLE} to {@link ChunkLevelType#FULL}, calling {@link ServerChunkManager#getChunkFutureSyncOnMainThread(int, int, ChunkStatus, boolean)} to fetch the current chunk at {@link ChunkStatus#FULL} status results in undefined behavior.</li>
+	 * <li>When transitioning from {@link ChunkLevelType#INACCESSIBLE} to {@link ChunkLevelType#FULL}, calling {@link ServerChunkCache#getChunkFutureSyncOnMainThread(int, int, ChunkStatus, boolean)} to fetch the current chunk at {@link ChunkStatus#FULL} status results in undefined behavior.</li>
 	 * </ul>
 	 */
 	public static final Event<LevelTypeChange> CHUNK_LEVEL_TYPE_CHANGE = EventFactory.createArrayBacked(LevelTypeChange.class, (world, chunk, oldLevelType, newLevelType) -> { }, callbacks -> (serverWorld, chunk, oldLevelType, newLevelType) -> {
@@ -89,21 +89,21 @@ public final class ServerChunkEvents {
 
 	@FunctionalInterface
 	public interface Load {
-		void onChunkLoad(ServerLevel world, WorldChunk chunk);
+		void onChunkLoad(ServerLevel world, LevelChunk chunk);
 	}
 
 	@FunctionalInterface
 	public interface Generate {
-		void onChunkGenerate(ServerLevel world, WorldChunk chunk);
+		void onChunkGenerate(ServerLevel world, LevelChunk chunk);
 	}
 
 	@FunctionalInterface
 	public interface Unload {
-		void onChunkUnload(ServerLevel world, WorldChunk chunk);
+		void onChunkUnload(ServerLevel world, LevelChunk chunk);
 	}
 
 	@FunctionalInterface
 	public interface LevelTypeChange {
-		void onChunkLevelTypeChange(ServerLevel world, WorldChunk chunk, ChunkLevelType oldLevelType, ChunkLevelType newLevelType);
+		void onChunkLevelTypeChange(ServerLevel world, LevelChunk chunk, ChunkLevelType oldLevelType, ChunkLevelType newLevelType);
 	}
 }

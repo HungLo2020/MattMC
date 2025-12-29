@@ -33,7 +33,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-import net.minecraft.server.packs.ResourcePackManager;
+import net.minecraft.server.packs.PackRepository;
 import net.minecraft.server.packs.ResourcePackProfile;
 import net.minecraft.commands.DatapackCommand;
 import net.minecraft.commands.ServerCommandSource;
@@ -51,8 +51,8 @@ public class DatapackCommandMixin {
 	private static final DynamicCommandExceptionType INTERNAL_PACK_EXCEPTION = new DynamicCommandExceptionType(
 			packName -> Component.stringifiedTranslatable("commands.datapack.fabric.internal", packName));
 
-	@Redirect(method = "method_13136", at = @At(value = "INVOKE", target = "Lnet/minecraft/resource/ResourcePackManager;getEnabledIds()Ljava/util/Collection;"))
-	private static Collection<String> filterEnabledPackSuggestions(ResourcePackManager dataPackManager) {
+	@Redirect(method = "method_13136", at = @At(value = "INVOKE", target = "Lnet/minecraft/resource/PackRepository;getEnabledIds()Ljava/util/Collection;"))
+	private static Collection<String> filterEnabledPackSuggestions(PackRepository dataPackManager) {
 		return dataPackManager.getEnabledProfiles().stream().filter(profile -> !((FabricResourcePackProfile) profile).fabric_isHidden()).map(ResourcePackProfile::getId).toList();
 	}
 

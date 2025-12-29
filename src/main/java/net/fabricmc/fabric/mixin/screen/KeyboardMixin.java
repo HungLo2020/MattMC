@@ -21,13 +21,13 @@ import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 
-import net.minecraft.client.Keyboard;
+import net.minecraft.client.KeyboardHandler;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.KeyInput;
 
 import net.fabricmc.fabric.api.client.screen.v1.ScreenKeyboardEvents;
 
-@Mixin(Keyboard.class)
+@Mixin(KeyboardHandler.class)
 abstract class KeyboardMixin {
 	@WrapOperation(method = "onKey", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/screen/Screen;keyPressed(Lnet/minecraft/client/input/KeyInput;)Z"))
 	private boolean invokeKeyPressedEvents(Screen screen, KeyInput ctx, Operation<Boolean> operation) {

@@ -29,7 +29,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import io.netty.channel.ChannelFutureListener;
 import org.jetbrains.annotations.Nullable;
 
-import net.minecraft.network.ClientConnection;
+import net.minecraft.network.Connection;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.PacketCallbacks;
 import net.minecraft.network.protocol.CustomPacketPayload;
@@ -52,7 +52,7 @@ import net.fabricmc.fabric.impl.networking.payload.PacketByteBufLoginQueryRespon
 import net.fabricmc.fabric.mixin.networking.accessor.ServerLoginNetworkHandlerAccessor;
 
 public final class ServerLoginNetworkAddon extends AbstractNetworkAddon<ServerLoginNetworking.LoginQueryResponseHandler> implements LoginPacketSender {
-	private final ClientConnection connection;
+	private final Connection connection;
 	private final ServerLoginNetworkHandler handler;
 	private final MinecraftServer server;
 	private final QueryIdFactory queryIdFactory;

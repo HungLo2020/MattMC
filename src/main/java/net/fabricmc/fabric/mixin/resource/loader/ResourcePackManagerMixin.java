@@ -37,7 +37,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import net.minecraft.server.packs.FileResourcePackProvider;
-import net.minecraft.server.packs.ResourcePackManager;
+import net.minecraft.server.packs.PackRepository;
 import net.minecraft.server.packs.ResourcePackProfile;
 import net.minecraft.server.packs.ResourcePackProvider;
 import net.minecraft.server.packs.ResourcePackSource;
@@ -47,7 +47,7 @@ import net.fabricmc.fabric.impl.resource.loader.FabricResourcePackProfile;
 import net.fabricmc.fabric.impl.resource.loader.ModResourcePackCreator;
 import net.fabricmc.fabric.impl.resource.loader.ModResourcePackUtil;
 
-@Mixin(ResourcePackManager.class)
+@Mixin(PackRepository.class)
 public abstract class ResourcePackManagerMixin {
 	@Unique
 	private static final Logger LOGGER = LoggerFactory.getLogger("ResourcePackManagerMixin");

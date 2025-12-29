@@ -35,13 +35,13 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-import net.minecraft.client.Options.GameOptions;
+import net.minecraft.client.Options.Options;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtIo;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.NbtSizeTracker;
 import net.minecraft.nbt.StringTag;
-import net.minecraft.server.packs.ResourcePack;
+import net.minecraft.server.packs.Pack;
 import net.minecraft.server.packs.ResourcePackProfile;
 
 import net.fabricmc.fabric.impl.resource.loader.FabricResourcePackProfile;
@@ -49,7 +49,7 @@ import net.fabricmc.fabric.impl.resource.loader.ModNioResourcePack;
 import net.fabricmc.fabric.impl.resource.loader.ModResourcePackCreator;
 import net.fabricmc.loader.api.FabricLoader;
 
-@Mixin(GameOptions.class)
+@Mixin(Options.class)
 public class GameOptionsMixin {
 	@Shadow
 	public List<String> resourcePacks;
@@ -106,7 +106,7 @@ public class GameOptionsMixin {
 				continue;
 			}
 
-			try (ResourcePack pack = profile.createResourcePack()) {
+			try (Pack pack = profile.createResourcePack()) {
 				if (pack instanceof ModNioResourcePack builtinPack && builtinPack.getActivationType().isEnabledByDefault()) {
 					if (trackedPacks.add(builtinPack.getId())) {
 						resourcePacks.add(profile.getId());

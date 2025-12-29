@@ -22,7 +22,7 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.ModifyArg;
 
-import net.minecraft.network.ClientConnection;
+import net.minecraft.network.Connection;
 import net.minecraft.core.VersionedIdentifier;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.network.ConnectedClientData;
@@ -33,7 +33,7 @@ import net.fabricmc.fabric.impl.resource.loader.FabricOriginalKnownPacksGetter;
 
 @Mixin(ServerConfigurationNetworkHandler.class)
 public abstract class ServerConfigurationNetworkHandlerMixin extends ServerCommonNetworkHandler {
-	public ServerConfigurationNetworkHandlerMixin(MinecraftServer server, ClientConnection connection, ConnectedClientData clientData) {
+	public ServerConfigurationNetworkHandlerMixin(MinecraftServer server, Connection connection, ConnectedClientData clientData) {
 		super(server, connection, clientData);
 	}
 

@@ -21,11 +21,11 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.gen.Accessor;
 
 import net.minecraft.client.Minecraft;
-import net.minecraft.network.ClientConnection;
+import net.minecraft.network.Connection;
 
 @Mixin(Minecraft.class)
 public interface MinecraftClientAccessor {
 	@Nullable
 	@Accessor("integratedServerConnection")
-	ClientConnection getConnection();
+	Connection getConnection();
 }

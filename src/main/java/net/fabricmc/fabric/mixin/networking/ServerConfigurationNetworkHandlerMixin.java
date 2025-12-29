@@ -32,7 +32,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-import net.minecraft.network.ClientConnection;
+import net.minecraft.network.Connection;
 import net.minecraft.network.RegistryByteBuf;
 import net.minecraft.core.DynamicRegistryManager;
 import net.minecraft.server.MinecraftServer;
@@ -75,7 +75,7 @@ public abstract class ServerConfigurationNetworkHandlerMixin extends ServerCommo
 	@Unique
 	private boolean earlyTaskExecution;
 
-	public ServerConfigurationNetworkHandlerMixin(MinecraftServer server, ClientConnection connection, ConnectedClientData arg) {
+	public ServerConfigurationNetworkHandlerMixin(MinecraftServer server, Connection connection, ConnectedClientData arg) {
 		super(server, connection, arg);
 	}
 

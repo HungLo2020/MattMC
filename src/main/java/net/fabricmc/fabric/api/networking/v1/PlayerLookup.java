@@ -27,13 +27,13 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.network.PlayerAssociatedNetworkHandler;
 import net.minecraft.server.network.ServerPlayer;
 import net.minecraft.server.level.ServerChunkLoadingManager;
-import net.minecraft.server.level.ServerChunkManager;
+import net.minecraft.server.level.ServerChunkCache;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.ChunkPos;
 import net.minecraft.core.Vec3;
 import net.minecraft.core.Vec3i;
-import net.minecraft.world.level.chunk.ChunkManager;
+import net.minecraft.world.level.chunk.ChunkSource;
 
 import net.fabricmc.fabric.mixin.networking.accessor.EntityTrackerAccessor;
 import net.fabricmc.fabric.mixin.networking.accessor.ServerChunkLoadingManagerAccessor;
@@ -109,10 +109,10 @@ public final class PlayerLookup {
 	 */
 	public static Collection<ServerPlayer> tracking(Entity entity) {
 		Objects.requireNonNull(entity, "Entity cannot be null");
-		ChunkManager manager = entity.getEntityWorld().getChunkManager();
+		ChunkSource manager = entity.getEntityWorld().getChunkManager();
 
-		if (manager instanceof ServerChunkManager) {
-			ServerChunkLoadingManager chunkLoadingManager = ((ServerChunkManager) manager).chunkLoadingManager;
+		if (manager instanceof ServerChunkCache) {
+			ServerChunkLoadingManager chunkLoadingManager = ((ServerChunkCache) manager).chunkLoadingManager;
 			EntityTrackerAccessor tracker = ((ServerChunkLoadingManagerAccessor) chunkLoadingManager).getEntityTrackers().get(entity.getId());
 
 			// return an immutable collection to guard against accidental removals.

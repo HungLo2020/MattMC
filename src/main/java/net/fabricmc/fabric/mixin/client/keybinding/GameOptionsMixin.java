@@ -24,17 +24,17 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-import net.minecraft.client.Options.GameOptions;
-import net.minecraft.client.Options.KeyBinding;
+import net.minecraft.client.Options.Options;
+import net.minecraft.client.Options.KeyMapping;
 
 import net.fabricmc.fabric.impl.client.keybinding.KeyBindingRegistryImpl;
 
-@Mixin(GameOptions.class)
+@Mixin(Options.class)
 public class GameOptionsMixin {
 	@Mutable
 	@Final
 	@Shadow
-	public KeyBinding[] allKeys;
+	public KeyMapping[] allKeys;
 
 	@Inject(at = @At("HEAD"), method = "load()V")
 	public void loadHook(CallbackInfo info) {

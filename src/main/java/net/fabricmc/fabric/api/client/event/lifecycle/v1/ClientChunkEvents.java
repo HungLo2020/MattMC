@@ -17,7 +17,7 @@
 package net.fabricmc.fabric.api.client.event.lifecycle.v1;
 
 import net.minecraft.client.multiplayer.ClientLevel;
-import net.minecraft.world.level.chunk.WorldChunk;
+import net.minecraft.world.level.chunk.LevelChunk;
 
 import net.fabricmc.fabric.api.event.Event;
 import net.fabricmc.fabric.api.event.EventFactory;
@@ -50,11 +50,11 @@ public final class ClientChunkEvents {
 
 	@FunctionalInterface
 	public interface Load {
-		void onChunkLoad(ClientLevel world, WorldChunk chunk);
+		void onChunkLoad(ClientLevel world, LevelChunk chunk);
 	}
 
 	@FunctionalInterface
 	public interface Unload {
-		void onChunkUnload(ClientLevel world, WorldChunk chunk);
+		void onChunkUnload(ClientLevel world, LevelChunk chunk);
 	}
 }

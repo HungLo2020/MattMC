@@ -26,7 +26,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.ModifyArg;
 
 import net.minecraft.client.Minecraft;
-import net.minecraft.server.packs.ResourcePackManager;
+import net.minecraft.server.packs.PackRepository;
 import net.minecraft.server.packs.ResourcePackProfile;
 
 import net.fabricmc.fabric.impl.resource.loader.FabricResourcePackProfile;
@@ -34,12 +34,12 @@ import net.fabricmc.fabric.impl.resource.loader.FabricResourcePackProfile;
 /**
  * Mixins to the anonymous class in #write method.
  */
-@Mixin(targets = "net/minecraft/client/option/GameOptions$3")
+@Mixin(targets = "net/minecraft/client/option/Options$3")
 public class GameOptionsWriteVisitorMixin {
 	@Unique
 	private static List<String> toPackListString(List<String> packs) {
 		List<String> copy = new ArrayList<>(packs.size());
-		ResourcePackManager manager = Minecraft.getInstance().getResourcePackManager();
+		PackRepository manager = Minecraft.getInstance().getResourcePackManager();
 
 		for (String pack : packs) {
 			ResourcePackProfile profile = manager.getProfile(pack);

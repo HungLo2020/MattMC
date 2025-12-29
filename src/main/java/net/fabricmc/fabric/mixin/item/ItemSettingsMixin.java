@@ -25,13 +25,13 @@ import net.minecraft.server.packss.ResourceLocation;
 
 import net.fabricmc.fabric.api.item.v1.FabricItem;
 
-@Mixin(Item.Settings.class)
+@Mixin(Item.Properties.class)
 public class ItemSettingsMixin implements FabricItem.Settings {
 	@Shadow
 	private RegistryKeyedValue<Item, ResourceLocation> modelId;
 
 	@Override
-	public Item.Settings modelId(ResourceLocation modelId) {
+	public Item.Properties modelId(ResourceLocation modelId) {
 		this.modelId = RegistryKeyedValue.fixed(modelId);
 		return FabricItem.Settings.super.modelId(modelId);
 	}

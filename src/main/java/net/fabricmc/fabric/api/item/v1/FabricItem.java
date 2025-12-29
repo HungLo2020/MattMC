@@ -92,7 +92,7 @@ public interface FabricItem {
 	 *
 	 * <p>This is a stack-aware version of {@link Item#getRecipeRemainder()}.
 	 *
-	 * <p>Note that simple item remainders can also be set via {@link Item.Settings#recipeRemainder(Item)}.
+	 * <p>Note that simple item remainders can also be set via {@link Item.Properties#recipeRemainder(Item)}.
 	 *
 	 * <p>If you want to get a remainder for a stack,
 	 * is recommended to use the stack version of this method: {@link FabricItemStack#getRecipeRemainder()}.
@@ -160,7 +160,7 @@ public interface FabricItem {
 	}
 
 	/**
-	 * Fabric-provided extensions for {@link Item.Settings}.
+	 * Fabric-provided extensions for {@link Item.Properties}.
 	 * This interface is automatically implemented on all item settings via Mixin and interface injection.
 	 */
 	interface Settings {
@@ -170,9 +170,9 @@ public interface FabricItem {
 		 * @param equipmentSlotProvider the equipment slot provider
 		 * @return this builder
 		 */
-		default Item.Settings equipmentSlot(EquipmentSlotProvider equipmentSlotProvider) {
-			FabricItemInternals.computeExtraData((Item.Settings) this).equipmentSlot(equipmentSlotProvider);
-			return (Item.Settings) this;
+		default Item.Properties equipmentSlot(EquipmentSlotProvider equipmentSlotProvider) {
+			FabricItemInternals.computeExtraData((Item.Properties) this).equipmentSlot(equipmentSlotProvider);
+			return (Item.Properties) this;
 		}
 
 		/**
@@ -181,9 +181,9 @@ public interface FabricItem {
 		 *
 		 * @see CustomDamageHandler
 		 */
-		default Item.Settings customDamage(CustomDamageHandler handler) {
-			FabricItemInternals.computeExtraData((Item.Settings) this).customDamage(handler);
-			return (Item.Settings) this;
+		default Item.Properties customDamage(CustomDamageHandler handler) {
+			FabricItemInternals.computeExtraData((Item.Properties) this).customDamage(handler);
+			return (Item.Properties) this;
 		}
 
 		/**
@@ -192,8 +192,8 @@ public interface FabricItem {
 		 * @param modelId the model id item should use
 		 * @return this builder
 		 */
-		default Item.Settings modelId(ResourceLocation modelId) {
-			return (Item.Settings) this;
+		default Item.Properties modelId(ResourceLocation modelId) {
+			return (Item.Properties) this;
 		}
 	}
 }

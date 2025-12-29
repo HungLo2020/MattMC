@@ -20,10 +20,10 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.gen.Accessor;
 
 import net.minecraft.client.gui.screens.multiplayer.ConnectScreen;
-import net.minecraft.network.ClientConnection;
+import net.minecraft.network.Connection;
 
 @Mixin(ConnectScreen.class)
 public interface ConnectScreenAccessor {
 	@Accessor
-	ClientConnection getConnection();
+	Connection getConnection();
 }

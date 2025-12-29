@@ -21,7 +21,7 @@ import java.util.List;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.particle.ParticleSpriteManager;
 import net.minecraft.client.texture.Sprite;
-import net.minecraft.client.texture.SpriteAtlasTexture;
+import net.minecraft.client.texture.TextureAtlas;
 import net.minecraft.util.Atlases;
 import net.minecraft.core.random.Random;
 
@@ -29,7 +29,7 @@ import net.fabricmc.fabric.api.client.particle.v1.FabricSpriteProvider;
 
 public record FabricSpriteProviderImpl(ParticleSpriteManager.SimpleSpriteProvider delegate) implements FabricSpriteProvider {
 	@Override
-	public SpriteAtlasTexture getAtlas() {
+	public TextureAtlas getAtlas() {
 		return Minecraft.getInstance().getAtlasManager().getAtlasTexture(Atlases.PARTICLES);
 	}
 

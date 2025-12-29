@@ -28,7 +28,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import net.minecraft.client.gui.screens.pack.ResourcePackOrganizer;
-import net.minecraft.server.packs.ResourcePackManager;
+import net.minecraft.server.packs.PackRepository;
 import net.minecraft.server.packs.ResourcePackProfile;
 
 import net.fabricmc.fabric.impl.resource.loader.FabricResourcePackProfile;
@@ -45,10 +45,10 @@ public class ResourcePackOrganizerMixin {
 
 	/**
 	 * Do not list hidden packs in either enabledPacks or disabledPacks.
-	 * They are managed entirely by ResourcePackManager on save, and are invisible to client.
+	 * They are managed entirely by PackRepository on save, and are invisible to client.
 	 */
 	@Inject(method = "<init>", at = @At("TAIL"))
-	private void removeHiddenPacksInit(Consumer<ResourcePackOrganizer.AbstractPack> updateCallback, Function iconIdSupplier, ResourcePackManager resourcePackManager, Consumer applier, CallbackInfo ci) {
+	private void removeHiddenPacksInit(Consumer<ResourcePackOrganizer.AbstractPack> updateCallback, Function iconIdSupplier, PackRepository resourcePackManager, Consumer applier, CallbackInfo ci) {
 		this.enabledPacks.removeIf(profile -> ((FabricResourcePackProfile) profile).fabric_isHidden());
 		this.disabledPacks.removeIf(profile -> ((FabricResourcePackProfile) profile).fabric_isHidden());
 	}

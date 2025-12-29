@@ -85,7 +85,7 @@ public final class ScreenEvents {
 	 * <pre>{@code
 	 * ScreenEvents.AFTER_INIT.register((client, screen, scaledWidth, scaledHeight) -> {
 	 * 	if (screen instanceof TitleScreen) {
-	 * 		Screens.getButtons(screen).add(new ButtonWidget(...));
+	 * 		Screens.getButtons(screen).add(new Button(...));
 	 * 	}
 	 * });
 	 * }</pre>

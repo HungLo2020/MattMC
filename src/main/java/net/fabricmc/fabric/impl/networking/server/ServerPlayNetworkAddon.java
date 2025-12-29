@@ -20,12 +20,12 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 
-import net.minecraft.network.ClientConnection;
+import net.minecraft.network.Connection;
 import net.minecraft.network.NetworkPhase;
 import net.minecraft.network.protocol.CustomPacketPayload;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.network.ServerPlayNetworkHandler;
+import net.minecraft.server.network.ServerGamePacketListenerImpl;
 import net.minecraft.server.network.ServerPlayer;
 import net.minecraft.server.packss.ResourceLocation;
 
@@ -39,14 +39,14 @@ import net.fabricmc.fabric.impl.networking.NetworkingImpl;
 import net.fabricmc.fabric.impl.networking.RegistrationPayload;
 
 public final class ServerPlayNetworkAddon extends AbstractChanneledNetworkAddon<ServerPlayNetworking.PlayPayloadHandler<?>> {
-	private final ServerPlayNetworkHandler handler;
+	private final ServerGamePacketListenerImpl handler;
 	private final MinecraftServer server;
 	private final ServerPlayNetworking.Context context;
 
 	private boolean sentInitialRegisterPacket;
 	private boolean requestedReconfigure = false;
 
-	public ServerPlayNetworkAddon(ServerPlayNetworkHandler handler, ClientConnection connection, MinecraftServer server) {
+	public ServerPlayNetworkAddon(ServerGamePacketListenerImpl handler, Connection connection, MinecraftServer server) {
 		super(ServerNetworkingImpl.PLAY, connection, "ServerPlayNetworkAddon for " + handler.player.getDisplayName());
 		this.handler = handler;
 		this.server = server;
@@ -147,7 +147,7 @@ public final class ServerPlayNetworkAddon extends AbstractChanneledNetworkAddon<
 		return requestedReconfigure;
 	}
 
-	private record ContextImpl(MinecraftServer server, ServerPlayNetworkHandler handler, PacketSender responseSender) implements ServerPlayNetworking.Context {
+	private record ContextImpl(MinecraftServer server, ServerGamePacketListenerImpl handler, PacketSender responseSender) implements ServerPlayNetworking.Context {
 		private ContextImpl {
 			Objects.requireNonNull(server, "server");
 			Objects.requireNonNull(handler, "handler");

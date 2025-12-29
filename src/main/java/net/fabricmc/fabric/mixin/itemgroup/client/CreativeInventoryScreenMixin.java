@@ -70,7 +70,7 @@ public abstract class CreativeInventoryScreenMixin extends AbstractContainerScre
 		}
 	}
 
-	@Inject(method = "init", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/widget/TextFieldWidget;setEditableColor(I)V", shift = At.Shift.AFTER))
+	@Inject(method = "init", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/widget/EditBox;setEditableColor(I)V", shift = At.Shift.AFTER))
 	private void init(CallbackInfo info) {
 		currentPage = getPage(selectedTab);
 

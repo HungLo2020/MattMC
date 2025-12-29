@@ -24,8 +24,8 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.multiplayer.ConnectScreen;
 import net.minecraft.client.multiplayer.ClientConfigurationNetworkHandler;
 import net.minecraft.client.multiplayer.ClientLoginNetworkHandler;
-import net.minecraft.client.multiplayer.ClientPlayNetworkHandler;
-import net.minecraft.network.ClientConnection;
+import net.minecraft.client.multiplayer.ClientPacketListener;
+import net.minecraft.network.Connection;
 import net.minecraft.network.NetworkPhase;
 import net.minecraft.network.NetworkSide;
 import net.minecraft.network.listener.ServerCommonPacketListener;
@@ -57,7 +57,7 @@ public final class ClientNetworkingImpl {
 	private static ClientPlayNetworkAddon currentPlayAddon;
 	private static ClientConfigurationNetworkAddon currentConfigurationAddon;
 
-	public static ClientPlayNetworkAddon getAddon(ClientPlayNetworkHandler handler) {
+	public static ClientPlayNetworkAddon getAddon(ClientPacketListener handler) {
 		return (ClientPlayNetworkAddon) ((NetworkHandlerExtensions) handler).getAddon();
 	}
 
@@ -80,8 +80,8 @@ public final class ClientNetworkingImpl {
 	 * Due to the way logging into an integrated or remote dedicated server will differ, we need to obtain the login client connection differently.
 	 */
 	@Nullable
-	public static ClientConnection getLoginConnection() {
-		final ClientConnection connection = ((MinecraftClientAccessor) Minecraft.getInstance()).getConnection();
+	public static Connection getLoginConnection() {
+		final Connection connection = ((MinecraftClientAccessor) Minecraft.getInstance()).getConnection();
 
 		// Check if we are connecting to an integrated server. This will set the field on Minecraft
 		if (connection != null) {

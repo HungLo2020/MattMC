@@ -34,7 +34,7 @@ import net.minecraft.core.Registries;
 import net.minecraft.world.inventory.MenuProvider;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.SimpleNamedScreenHandlerFactory;
-import net.minecraft.server.network.ServerPlayNetworkHandler;
+import net.minecraft.server.network.ServerGamePacketListenerImpl;
 import net.minecraft.server.network.ServerPlayer;
 import net.minecraft.server.packss.ResourceLocation;
 import net.minecraft.world.Level;
@@ -65,7 +65,7 @@ public abstract class ServerPlayerEntityMixin extends Player {
 		}
 	}
 
-	@Inject(method = "openHandledScreen(Lnet/minecraft/screen/MenuProvider;)Ljava/util/OptionalInt;", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/network/ServerPlayNetworkHandler;sendPacket(Lnet/minecraft/network/packet/Packet;)V"))
+	@Inject(method = "openHandledScreen(Lnet/minecraft/screen/MenuProvider;)Ljava/util/OptionalInt;", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/network/ServerGamePacketListenerImpl;sendPacket(Lnet/minecraft/network/packet/Packet;)V"))
 	private void fabric_storeOpenedScreenHandler(MenuProvider factory, CallbackInfoReturnable<OptionalInt> info, @Local AbstractContainerMenu handler) {
 		if (factory instanceof ExtendedScreenHandlerFactory || (factory instanceof SimpleNamedScreenHandlerFactory simpleFactory && simpleFactory.baseFactory instanceof ExtendedScreenHandlerFactory)) {
 			// Set the screen handler, so the factory method can access it through the player.
@@ -76,8 +76,8 @@ public abstract class ServerPlayerEntityMixin extends Player {
 		}
 	}
 
-	@Redirect(method = "openHandledScreen(Lnet/minecraft/screen/MenuProvider;)Ljava/util/OptionalInt;", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/network/ServerPlayNetworkHandler;sendPacket(Lnet/minecraft/network/packet/Packet;)V"))
-	private void fabric_replaceVanillaScreenPacket(ServerPlayNetworkHandler networkHandler, Packet<?> packet, MenuProvider factory) {
+	@Redirect(method = "openHandledScreen(Lnet/minecraft/screen/MenuProvider;)Ljava/util/OptionalInt;", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/network/ServerGamePacketListenerImpl;sendPacket(Lnet/minecraft/network/packet/Packet;)V"))
+	private void fabric_replaceVanillaScreenPacket(ServerGamePacketListenerImpl networkHandler, Packet<?> packet, MenuProvider factory) {
 		if (factory instanceof SimpleNamedScreenHandlerFactory simpleFactory && simpleFactory.baseFactory instanceof ExtendedScreenHandlerFactory<?> extendedFactory) {
 			factory = extendedFactory;
 		}

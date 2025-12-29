@@ -29,12 +29,12 @@ import net.minecraft.core.DynamicRegistryManager;
 import net.minecraft.core.RegistryWrapper;
 import net.minecraft.core.ServerDynamicRegistryType;
 import net.minecraft.world.flag.FeatureFlagSet;
-import net.minecraft.server.DataPackContents;
+import net.minecraft.server.ServerResources;
 import net.minecraft.commands.CommandManager;
 
 import net.fabricmc.fabric.api.event.lifecycle.v1.CommonLifecycleEvents;
 
-@Mixin(DataPackContents.class)
+@Mixin(ServerResources.class)
 public class DataPackContentsMixin {
 	@Unique
 	private DynamicRegistryManager dynamicRegistryManager;

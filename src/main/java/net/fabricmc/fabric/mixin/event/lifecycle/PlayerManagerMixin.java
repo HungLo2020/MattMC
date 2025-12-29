@@ -21,7 +21,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-import net.minecraft.network.ClientConnection;
+import net.minecraft.network.Connection;
 import net.minecraft.server.PlayerManager;
 import net.minecraft.server.network.ConnectedClientData;
 import net.minecraft.server.network.ServerPlayer;
@@ -34,7 +34,7 @@ public class PlayerManagerMixin {
 			method = "onPlayerConnect",
 			at = @At(value = "NEW", target = "net/minecraft/network/packet/s2c/play/SynchronizeRecipesS2CPacket")
 	)
-	private void hookOnPlayerConnect(ClientConnection connection, ServerPlayer player, ConnectedClientData arg, CallbackInfo ci) {
+	private void hookOnPlayerConnect(Connection connection, ServerPlayer player, ConnectedClientData arg, CallbackInfo ci) {
 		ServerLifecycleEvents.SYNC_DATA_PACK_CONTENTS.invoker().onSyncDataPackContents(player, true);
 	}
 

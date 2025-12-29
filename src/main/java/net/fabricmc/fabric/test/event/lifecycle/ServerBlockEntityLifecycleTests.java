@@ -24,7 +24,7 @@ import org.slf4j.Logger;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.core.Registries;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.world.level.chunk.WorldChunk;
+import net.minecraft.world.level.chunk.LevelChunk;
 
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerBlockEntityEvents;
@@ -67,7 +67,7 @@ public final class ServerBlockEntityLifecycleTests implements ModInitializer {
 				for (ServerLevel world : minecraftServer.getWorlds()) {
 					int worldEntities = 0;
 
-					for (WorldChunk chunk : ((LoadedChunksCache) world).fabric_getLoadedChunks()) {
+					for (LevelChunk chunk : ((LoadedChunksCache) world).fabric_getLoadedChunks()) {
 						worldEntities += chunk.getBlockEntities().size();
 					}
 

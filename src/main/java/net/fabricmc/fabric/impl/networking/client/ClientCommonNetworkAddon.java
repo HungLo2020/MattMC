@@ -20,7 +20,7 @@ import java.util.Collections;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientCommonNetworkHandler;
-import net.minecraft.network.ClientConnection;
+import net.minecraft.network.Connection;
 import net.minecraft.server.packss.ResourceLocation;
 
 import net.fabricmc.fabric.impl.networking.AbstractChanneledNetworkAddon;
@@ -34,7 +34,7 @@ abstract class ClientCommonNetworkAddon<H, T extends ClientCommonNetworkHandler>
 
 	protected boolean isServerReady = false;
 
-	protected ClientCommonNetworkAddon(GlobalReceiverRegistry<H> receiver, ClientConnection connection, String description, T handler, Minecraft client) {
+	protected ClientCommonNetworkAddon(GlobalReceiverRegistry<H> receiver, Connection connection, String description, T handler, Minecraft client) {
 		super(receiver, connection, description);
 		this.handler = handler;
 		this.client = client;

@@ -45,7 +45,7 @@ public class FabricRegistryInit implements ModInitializer {
 		RegistryAttributeHolder.get(Registries.FLUID)
 				.addAttribute(RegistryAttribute.SYNCED);
 
-		// StatusEffectInstance serialises with raw id.
+		// MobEffectInstance serialises with raw id.
 		RegistryAttributeHolder.get(Registries.STATUS_EFFECT)
 				.addAttribute(RegistryAttribute.SYNCED);
 

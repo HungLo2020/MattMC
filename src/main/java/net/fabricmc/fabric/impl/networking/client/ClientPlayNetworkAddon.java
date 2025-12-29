@@ -23,7 +23,7 @@ import com.mojang.logging.LogUtils;
 import org.slf4j.Logger;
 
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.multiplayer.ClientPlayNetworkHandler;
+import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.client.multiplayer.LocalPlayer;
 import net.minecraft.network.NetworkPhase;
 import net.minecraft.network.protocol.CustomPacketPayload;
@@ -36,12 +36,12 @@ import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.fabricmc.fabric.api.networking.v1.PacketSender;
 import net.fabricmc.fabric.impl.networking.ChannelInfoHolder;
 
-public final class ClientPlayNetworkAddon extends ClientCommonNetworkAddon<ClientPlayNetworking.PlayPayloadHandler<?>, ClientPlayNetworkHandler> {
+public final class ClientPlayNetworkAddon extends ClientCommonNetworkAddon<ClientPlayNetworking.PlayPayloadHandler<?>, ClientPacketListener> {
 	private final ContextImpl context;
 
 	private static final Logger LOGGER = LogUtils.getLogger();
 
-	public ClientPlayNetworkAddon(ClientPlayNetworkHandler handler, Minecraft client) {
+	public ClientPlayNetworkAddon(ClientPacketListener handler, Minecraft client) {
 		super(ClientNetworkingImpl.PLAY, handler.getConnection(), "ClientPlayNetworkAddon for " + handler.getProfile().name(), handler, client);
 		this.context = new ContextImpl(client, this);
 

@@ -18,21 +18,21 @@ package net.fabricmc.fabric.api.client.keybinding.v1;
 
 import java.util.Objects;
 
-import net.minecraft.client.Options.KeyBinding;
+import net.minecraft.client.Options.KeyMapping;
 import net.minecraft.client.util.InputUtil;
 
 import net.fabricmc.fabric.impl.client.keybinding.KeyBindingRegistryImpl;
 import net.fabricmc.fabric.mixin.client.keybinding.KeyBindingAccessor;
 
 /**
- * Helper for registering {@link KeyBinding}s.
+ * Helper for registering {@link KeyMapping}s.
  *
  * <pre>{@code
- * KeyBinding left = KeyBindingHelper.registerKeyBinding(new KeyBinding("key.example.left", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_P, KeyBinding.Category.MISC));
- * KeyBinding right = KeyBindingHelper.registerKeyBinding(new KeyBinding("key.example.right", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_U, KeyBinding.Category.MISC));
+ * KeyMapping left = KeyBindingHelper.registerKeyBinding(new KeyMapping("key.example.left", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_P, KeyMapping.Category.MISC));
+ * KeyMapping right = KeyBindingHelper.registerKeyBinding(new KeyMapping("key.example.right", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_U, KeyMapping.Category.MISC));
  * }</pre>
  *
- * @see KeyBinding
+ * @see KeyMapping
  * @see net.minecraft.client.Options.StickyKeyBinding
  */
 public final class KeyBindingHelper {
@@ -46,18 +46,18 @@ public final class KeyBindingHelper {
 	 * @return the keybinding itself
 	 * @throws IllegalArgumentException when a key binding with the same ID is already registered
 	 */
-	public static KeyBinding registerKeyBinding(KeyBinding keyBinding) {
+	public static KeyMapping registerKeyBinding(KeyMapping keyBinding) {
 		Objects.requireNonNull(keyBinding, "key binding cannot be null");
 		return KeyBindingRegistryImpl.registerKeyBinding(keyBinding);
 	}
 
 	/**
-	 * Returns the configured KeyCode bound to the KeyBinding from the player's settings.
+	 * Returns the configured KeyCode bound to the KeyMapping from the player's settings.
 	 *
 	 * @param keyBinding the keybinding
 	 * @return configured KeyCode
 	 */
-	public static InputUtil.Key getBoundKeyOf(KeyBinding keyBinding) {
+	public static InputUtil.Key getBoundKeyOf(KeyMapping keyBinding) {
 		return ((KeyBindingAccessor) keyBinding).fabric_getBoundKey();
 	}
 }

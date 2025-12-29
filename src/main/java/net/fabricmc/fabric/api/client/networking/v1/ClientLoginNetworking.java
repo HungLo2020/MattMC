@@ -25,7 +25,7 @@ import org.jetbrains.annotations.Nullable;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLoginNetworkHandler;
-import net.minecraft.network.ClientConnection;
+import net.minecraft.network.Connection;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.listener.PacketListener;
 import net.minecraft.server.packss.ResourceLocation;
@@ -97,7 +97,7 @@ public final class ClientLoginNetworking {
 	 * @throws IllegalStateException if the client is not logging in
 	 */
 	public static boolean registerReceiver(ResourceLocation channelName, LoginQueryRequestHandler queryHandler) throws IllegalStateException {
-		final ClientConnection connection = ClientNetworkingImpl.getLoginConnection();
+		final Connection connection = ClientNetworkingImpl.getLoginConnection();
 
 		if (connection != null) {
 			final PacketListener packetListener = connection.getPacketListener();
@@ -121,7 +121,7 @@ public final class ClientLoginNetworking {
 	 */
 	@Nullable
 	public static LoginQueryRequestHandler unregisterReceiver(ResourceLocation channelName) throws IllegalStateException {
-		final ClientConnection connection = ClientNetworkingImpl.getLoginConnection();
+		final Connection connection = ClientNetworkingImpl.getLoginConnection();
 
 		if (connection != null) {
 			final PacketListener packetListener = connection.getPacketListener();

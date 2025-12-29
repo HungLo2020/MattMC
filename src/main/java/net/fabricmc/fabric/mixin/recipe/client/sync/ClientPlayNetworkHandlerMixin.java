@@ -23,12 +23,12 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 
-import net.minecraft.client.multiplayer.ClientPlayNetworkHandler;
+import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.client.recipebook.ClientRecipeManager;
 
 import net.fabricmc.fabric.impl.recipe.sync.client.SynchronizedClientRecipesSetter;
 
-@Mixin(ClientPlayNetworkHandler.class)
+@Mixin(ClientPacketListener.class)
 public class ClientPlayNetworkHandlerMixin {
 	@Shadow
 	private ClientRecipeManager recipeManager;
@@ -37,8 +37,8 @@ public class ClientPlayNetworkHandlerMixin {
 	 * Copies previously synchronized client recipes, as server mods might send the SynchronizeRecipesS2CPacket for custom
 	 * vanilla compatible functionality, without actually wanting to (re)synchronize recipes.
 	 */
-	@WrapOperation(method = "onSynchronizeRecipes", at = @At(value = "FIELD", target = "Lnet/minecraft/client/network/ClientPlayNetworkHandler;recipeManager:Lnet/minecraft/client/recipebook/ClientRecipeManager;", opcode = Opcodes.PUTFIELD))
-	private void copyPreviousRecipes(ClientPlayNetworkHandler instance, ClientRecipeManager value, Operation<Void> original) {
+	@WrapOperation(method = "onSynchronizeRecipes", at = @At(value = "FIELD", target = "Lnet/minecraft/client/network/ClientPacketListener;recipeManager:Lnet/minecraft/client/recipebook/ClientRecipeManager;", opcode = Opcodes.PUTFIELD))
+	private void copyPreviousRecipes(ClientPacketListener instance, ClientRecipeManager value, Operation<Void> original) {
 		((SynchronizedClientRecipesSetter) value).fabric_setSynchronizedClientRecipes(this.recipeManager.getSynchronizedRecipes());
 		original.call(instance, value);
 	}

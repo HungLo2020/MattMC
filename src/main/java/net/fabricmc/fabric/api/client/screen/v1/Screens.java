@@ -20,7 +20,7 @@ import java.util.List;
 import java.util.Objects;
 
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.font.TextRenderer;
+import net.minecraft.client.font.Font;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.widget.ClickableWidget;
 
@@ -53,7 +53,7 @@ public final class Screens {
 	 * @deprecated Use {@link Screen#getTextRenderer()} directly
 	 */
 	@Deprecated
-	public static TextRenderer getTextRenderer(Screen screen) {
+	public static Font getTextRenderer(Screen screen) {
 		Objects.requireNonNull(screen, "Screen cannot be null");
 
 		return screen.getTextRenderer();
