@@ -39,7 +39,6 @@ import net.irisshaders.iris.gui.option.IrisVideoSettings;
 import net.irisshaders.iris.helpers.FakeChainedJsonException;
 import net.irisshaders.iris.helpers.OptionalBoolean;
 import net.irisshaders.iris.helpers.Tri;
-import net.irisshaders.iris.mixin.GlStateManagerAccessor;
 import net.irisshaders.iris.mixin.LevelRendererAccessor;
 import net.irisshaders.iris.pathways.CenterDepthSampler;
 import net.irisshaders.iris.pathways.FullScreenQuadRenderer;
@@ -840,7 +839,7 @@ public class IrisRenderingPipeline implements WorldRenderingPipeline, ShaderRend
 
 			TextureFormat textureFormat = TextureFormatLoader.getFormat();
 			if (textureFormat != null) {
-				int previousBinding = GlStateManagerAccessor.getTEXTURES()[GlStateManagerAccessor.getActiveTexture()].binding;
+				int previousBinding = GlStateManager.TEXTURES[GlStateManager.activeTexture].binding;
 				textureFormat.setupTextureParameters(PBRType.NORMAL, pbrHolder.normalTexture());
 				textureFormat.setupTextureParameters(PBRType.SPECULAR, pbrHolder.specularTexture());
 				GlStateManager._bindTexture(previousBinding);

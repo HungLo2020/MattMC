@@ -1,7 +1,6 @@
 package net.irisshaders.iris.gl.blending;
 
 import com.mojang.blaze3d.opengl.GlStateManager;
-import net.irisshaders.iris.mixin.GlStateManagerAccessor;
 
 public class DepthColorStorage {
 	private static boolean originalDepthEnable;
@@ -15,8 +14,8 @@ public class DepthColorStorage {
 	public static void disableDepthColor() {
 		if (!depthColorLocked) {
 			// Only save the previous state if the depth and color mask wasn't already locked
-			GlStateManager.ColorMask colorMask = GlStateManagerAccessor.getCOLOR_MASK();
-			GlStateManager.DepthState depthState = GlStateManagerAccessor.getDEPTH();
+			GlStateManager.ColorMask colorMask = GlStateManager.COLOR_MASK;
+			GlStateManager.DepthState depthState = GlStateManager.DEPTH;
 
 			originalDepthEnable = depthState.mask;
 			originalColor = new ColorMask(colorMask.red, colorMask.green, colorMask.blue, colorMask.alpha);

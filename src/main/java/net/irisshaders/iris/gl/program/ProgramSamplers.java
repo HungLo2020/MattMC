@@ -13,7 +13,6 @@ import net.irisshaders.iris.gl.sampler.SamplerLimits;
 import net.irisshaders.iris.gl.state.ValueUpdateNotifier;
 import net.irisshaders.iris.gl.texture.TextureAccess;
 import net.irisshaders.iris.gl.texture.TextureType;
-import net.irisshaders.iris.mixin.GlStateManagerAccessor;
 import net.irisshaders.iris.shaderpack.properties.PackRenderTargetDirectives;
 import org.lwjgl.opengl.GL20C;
 
@@ -71,7 +70,7 @@ public class ProgramSamplers {
 
 		// We need to keep the active texture intact, since if we mess it up
 		// in the middle of RenderType setup, bad things will happen.
-		int activeTexture = GlStateManagerAccessor.getActiveTexture();
+		int activeTexture = GlStateManager.activeTexture;
 
 		for (SamplerBinding samplerBinding : samplerBindings) {
 			samplerBinding.update();

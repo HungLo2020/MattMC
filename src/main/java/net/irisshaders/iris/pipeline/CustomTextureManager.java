@@ -9,7 +9,6 @@ import net.irisshaders.iris.gl.texture.GlTexture;
 import net.irisshaders.iris.gl.texture.TextureAccess;
 import net.irisshaders.iris.gl.texture.TextureType;
 import net.irisshaders.iris.gl.texture.TextureWrapper;
-import net.irisshaders.iris.mixin.GlStateManagerAccessor;
 import net.irisshaders.iris.pbr.format.TextureFormat;
 import net.irisshaders.iris.pbr.format.TextureFormatLoader;
 import net.irisshaders.iris.pbr.texture.PBRAtlasTexture;
@@ -148,8 +147,8 @@ public class CustomTextureManager {
 				return new TextureWrapper(() -> {
 					AbstractTexture texture = textureManager.getTexture(textureLocation);
 					if (texture instanceof TextureAtlas || texture instanceof PBRAtlasTexture) {
-						int tex = GlStateManagerAccessor.getActiveTexture();
-						int binding = GlStateManagerAccessor.getTEXTURES()[tex].binding;
+						int tex = GlStateManager.activeTexture;
+						int binding = GlStateManager.TEXTURES[tex].binding;
 						texture.setFilter(false, Minecraft.getInstance().options.mipmapLevels().get() > 0);
 						GlStateManager._activeTexture(GL46C.GL_TEXTURE0 + tex);
 						GlStateManager._bindTexture(binding);
@@ -165,8 +164,8 @@ public class CustomTextureManager {
 
 					if (texture != null) {
 						if (texture instanceof TextureAtlas || texture instanceof PBRAtlasTexture) {
-							int tex = GlStateManagerAccessor.getActiveTexture();
-							int binding = GlStateManagerAccessor.getTEXTURES()[tex].binding;
+							int tex = GlStateManager.activeTexture;
+							int binding = GlStateManager.TEXTURES[tex].binding;
 							texture.setFilter(false, Minecraft.getInstance().options.mipmapLevels().get() > 0);
 							GlStateManager._activeTexture(GL46C.GL_TEXTURE0 + tex);
 							GlStateManager._bindTexture(binding);
@@ -180,7 +179,7 @@ public class CustomTextureManager {
 
 						TextureFormat textureFormat = TextureFormatLoader.getFormat();
 						if (textureFormat != null) {
-							int previousBinding = GlStateManagerAccessor.getTEXTURES()[GlStateManagerAccessor.getActiveTexture()].binding;
+							int previousBinding = GlStateManager.TEXTURES[GlStateManager.activeTexture].binding;
 							GlStateManager._bindTexture(pbrTexture.getTexture().iris$getGlId());
 							textureFormat.setupTextureParameters(pbrType, pbrTexture);
 							GlStateManager._bindTexture(previousBinding);

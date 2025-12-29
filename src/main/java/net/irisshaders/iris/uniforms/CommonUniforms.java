@@ -8,7 +8,6 @@ import net.irisshaders.iris.gl.state.StateUpdateNotifiers;
 import net.irisshaders.iris.gl.uniform.DynamicUniformHolder;
 import net.irisshaders.iris.gl.uniform.UniformHolder;
 import net.irisshaders.iris.layer.GbufferPrograms;
-import net.irisshaders.iris.mixin.GlStateManagerAccessor;
 import net.irisshaders.iris.mixin.texture.TextureAtlasAccessor;
 import net.irisshaders.iris.mixinterface.LocalPlayerInterface;
 import net.irisshaders.iris.pbr.TextureInfoCache;
@@ -88,7 +87,7 @@ public final class CommonUniforms {
 		});
 
 		uniforms.uniform2i("gtextureSize", () -> {
-			int glId = GlStateManagerAccessor.getTEXTURES()[0].binding;
+			int glId = GlStateManager.TEXTURES[0].binding;
 
 			TextureInfo info = TextureInfoCache.INSTANCE.getInfo(glId);
 			return new Vector2i(info.getWidth(), info.getHeight());
@@ -96,7 +95,7 @@ public final class CommonUniforms {
 		}, StateUpdateNotifiers.bindTextureNotifier);
 
 		uniforms.uniform4i("blendFunc", () -> {
-			GlStateManager.BlendState blend = GlStateManagerAccessor.getBLEND();
+			GlStateManager.BlendState blend = GlStateManager.BLEND; // Direct static field access
 
 			if (blend.mode.enabled) { // Direct field access - enabled is public
 				return new Vector4i(blend.srcRgb, blend.dstRgb, blend.srcAlpha, blend.dstAlpha);

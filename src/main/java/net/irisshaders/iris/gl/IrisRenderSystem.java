@@ -10,7 +10,6 @@ import it.unimi.dsi.fastutil.ints.IntList;
 import net.irisshaders.iris.Iris;
 import net.irisshaders.iris.gl.sampler.SamplerLimits;
 import net.irisshaders.iris.gl.texture.TextureType;
-import net.irisshaders.iris.mixin.GlStateManagerAccessor;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.renderer.PerspectiveProjectionMatrixBuffer;
@@ -336,13 +335,13 @@ public class IrisRenderSystem {
 	public static void disableBufferBlend(int buffer) {
 		RenderSystem.assertOnRenderThread();
 		GL32C.glDisablei(GL32C.GL_BLEND, buffer);
-		((BooleanStateExtended) GlStateManagerAccessor.getBLEND().mode).setUnknownState();
+		((BooleanStateExtended) GlStateManager.BLEND.mode).setUnknownState();
 	}
 
 	public static void enableBufferBlend(int buffer) {
 		RenderSystem.assertOnRenderThread();
 		GL32C.glEnablei(GL32C.GL_BLEND, buffer);
-		((BooleanStateExtended) GlStateManagerAccessor.getBLEND().mode).setUnknownState();
+		((BooleanStateExtended) GlStateManager.BLEND.mode).setUnknownState();
 	}
 
 	public static void blendFuncSeparatei(int buffer, int srcRGB, int dstRGB, int srcAlpha, int dstAlpha) {
@@ -394,7 +393,7 @@ public class IrisRenderSystem {
 
 	public static void bindTextureForSetup(int glType, int glId) {
 		if (glType == GL46C.GL_TEXTURE_2D) {
-			lastTex = GlStateManagerAccessor.getTEXTURES()[GlStateManagerAccessor.getActiveTexture()].binding;
+			lastTex = GlStateManager.TEXTURES[GlStateManager.activeTexture].binding;
 		}
 		GL30C.glBindTexture(glType, glId);
 	}
@@ -660,14 +659,14 @@ public class IrisRenderSystem {
 		@Override
 		public void bindTextureToUnit(int target, int unit, int texture) {
 			if (target == GL46C.GL_TEXTURE_2D) {
-				if (GlStateManagerAccessor.getTEXTURES()[unit].binding == texture) {
+				if (GlStateManager.TEXTURES[unit].binding == texture) {
 					return;
 				}
 
 				ARBDirectStateAccess.glBindTextureUnit(unit, texture);
 
 				// Manually fix GLStateManager bindings...
-				GlStateManagerAccessor.getTEXTURES()[unit].binding = texture;
+				GlStateManager.TEXTURES[unit].binding = texture;
 			} else {
 				ARBDirectStateAccess.glBindTextureUnit(unit, texture);
 			}
@@ -709,7 +708,7 @@ public class IrisRenderSystem {
 	public static class DSAUnsupported implements DSAAccess {
 		@Override
 		public void generateMipmaps(int texture, int target) {
-			int previous = GlStateManagerAccessor.getTEXTURES()[GlStateManagerAccessor.getActiveTexture()].binding;
+			int previous = GlStateManager.TEXTURES[GlStateManager.activeTexture].binding;
 			GlStateManager._bindTexture(texture);
 			GL32C.glGenerateMipmap(target);
 			GlStateManager._bindTexture(previous);
@@ -774,7 +773,7 @@ public class IrisRenderSystem {
 
 		@Override
 		public void copyTexSubImage2D(int destTexture, int target, int i, int i1, int i2, int i3, int i4, int width, int height) {
-			int previous = GlStateManagerAccessor.getTEXTURES()[GlStateManagerAccessor.getActiveTexture()].binding;
+			int previous = GlStateManager.TEXTURES[GlStateManager.activeTexture].binding;
 			GlStateManager._bindTexture(destTexture);
 			GL32C.glCopyTexSubImage2D(target, i, i1, i2, i3, i4, width, height);
 			GlStateManager._bindTexture(previous);
@@ -782,11 +781,11 @@ public class IrisRenderSystem {
 
 		@Override
 		public void bindTextureToUnit(int target, int unit, int texture) {
-			int activeTexture = GlStateManagerAccessor.getActiveTexture();
+			int activeTexture = GlStateManager.activeTexture;
 			GlStateManager._activeTexture(GL30C.GL_TEXTURE0 + unit);
 			GL46C.glBindTexture(target, texture);
 			if (target == GL46C.GL_TEXTURE_2D) {
-				GlStateManagerAccessor.getTEXTURES()[unit].binding = texture;
+				GlStateManager.TEXTURES[unit].binding = texture;
 			}
 			GlStateManager._activeTexture(GL30C.GL_TEXTURE0 + activeTexture);
 		}

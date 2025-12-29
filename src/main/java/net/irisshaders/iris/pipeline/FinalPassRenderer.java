@@ -25,7 +25,6 @@ import net.irisshaders.iris.gl.sampler.SamplerLimits;
 import net.irisshaders.iris.gl.shader.ShaderCompileException;
 import net.irisshaders.iris.gl.state.FogMode;
 import net.irisshaders.iris.gl.texture.TextureAccess;
-import net.irisshaders.iris.mixin.GlStateManagerAccessor;
 import net.irisshaders.iris.mixinterface.CustomPass;
 import net.irisshaders.iris.pathways.CenterDepthSampler;
 import net.irisshaders.iris.pathways.FullScreenQuadRenderer;
@@ -319,7 +318,7 @@ public class FinalPassRenderer {
 		for (int i = 0; i < SamplerLimits.get().getMaxTextureUnits(); i++) {
 			// Unbind all textures that we may have used.
 			// NB: This is necessary for shader pack reloading to work properly
-			if (GlStateManagerAccessor.getTEXTURES()[i].binding != 0) {
+			if (GlStateManager.TEXTURES[i].binding != 0) {
 				GlStateManager._activeTexture(GL15C.GL_TEXTURE0 + i);
 				GlStateManager._bindTexture(0);
 			}

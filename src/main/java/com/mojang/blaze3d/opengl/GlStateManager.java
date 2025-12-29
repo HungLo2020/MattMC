@@ -30,17 +30,17 @@ public class GlStateManager {
 	private static int numTextures = 0;
 	private static final Plot PLOT_BUFFERS = TracyClient.createPlot("GPU Buffers");
 	private static int numBuffers = 0;
-	private static final GlStateManager.BlendState BLEND = new GlStateManager.BlendState();
-	private static final GlStateManager.DepthState DEPTH = new GlStateManager.DepthState();
+	public static final GlStateManager.BlendState BLEND = new GlStateManager.BlendState(); // Made public for Iris shader mod integration
+	public static final GlStateManager.DepthState DEPTH = new GlStateManager.DepthState(); // Made public for Iris shader mod integration
 	private static final GlStateManager.CullState CULL = new GlStateManager.CullState();
 	private static final GlStateManager.PolygonOffsetState POLY_OFFSET = new GlStateManager.PolygonOffsetState();
 	private static final GlStateManager.ColorLogicState COLOR_LOGIC = new GlStateManager.ColorLogicState();
 	private static final GlStateManager.ScissorState SCISSOR = new GlStateManager.ScissorState();
-	private static int activeTexture;
-	private static final GlStateManager.TextureState[] TEXTURES = (GlStateManager.TextureState[])IntStream.range(0, 12)
+	public static int activeTexture; // Made public for Iris shader mod integration
+	public static final GlStateManager.TextureState[] TEXTURES = (GlStateManager.TextureState[])IntStream.range(0, 12)
 		.mapToObj(i -> new GlStateManager.TextureState())
-		.toArray(GlStateManager.TextureState[]::new);
-	private static final GlStateManager.ColorMask COLOR_MASK = new GlStateManager.ColorMask();
+		.toArray(GlStateManager.TextureState[]::new); // Made public for Iris shader mod integration
+	public static final GlStateManager.ColorMask COLOR_MASK = new GlStateManager.ColorMask(); // Made public for Iris shader mod integration
 	private static int readFbo;
 	private static int writeFbo;
 

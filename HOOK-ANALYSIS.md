@@ -6,24 +6,33 @@
 
 ### Mixin Conversion Status
 
-**Total Mixins:** 235 → **230 remaining** (5 removed)  
-**Conversion Progress:** 2.1% complete
+**Total Mixins:** 235 → **229 remaining** (6 removed)  
+**Conversion Progress:** 2.6% complete
 
-#### Removed Mixins (5):
+#### Removed Mixins (6):
 1. ✅ `net.irisshaders.iris.mixin.DimensionTypeAccessor` - Record fields are public by default
 2. ✅ `net.irisshaders.iris.mixin.LightTextureAccessor` - Changed `LightTexture.texture` field visibility to public
 3. ✅ `com.seibel.distanthorizons.fabric.mixins.client.LightTextureAccessor` - Same as above
 4. ✅ `net.irisshaders.iris.mixin.statelisteners.BooleanStateAccessor` - `GlStateManager.BooleanState.enabled` field already public
 5. ✅ `net.irisshaders.iris.mixin.EndFlashAccess` - Added public setter methods to `EndFlashState`
+6. ✅ `net.irisshaders.iris.mixin.GlStateManagerAccessor` - Made static fields `BLEND`, `DEPTH`, `COLOR_MASK`, `TEXTURES`, `activeTexture` public
 
-#### Modified Files (7):
+#### Modified Files (19):
 1. `net.minecraft.client.renderer.LightTexture` - Made `texture` field public
-2. `net.irisshaders.iris.pipeline.CustomTextureManager` - Updated to use direct field access
+2. `net.irisshaders.iris.pipeline.CustomTextureManager` - Updated to use direct field access (2x)
 3. `com.seibel.distanthorizons.fabric.hooks.DhLightTextureHook` - Updated to use direct field access
-4. `net.irisshaders.iris.gl.blending.BlendModeStorage` - Updated to use direct field access for `enabled`
-5. `net.irisshaders.iris.uniforms.CommonUniforms` - Updated to use direct field access for `enabled`
+4. `net.irisshaders.iris.gl.blending.BlendModeStorage` - Updated to use direct field access (2x)
+5. `net.irisshaders.iris.uniforms.CommonUniforms` - Updated to use direct field access
 6. `net.minecraft.client.renderer.EndFlashState` - Added public setter methods
 7. `net.irisshaders.iris.shadows.ShadowMatrices` - Removed unused import
+8. `com.mojang.blaze3d.opengl.GlStateManager` - Made 5 static fields public
+9. `net.irisshaders.iris.gl.program.ProgramSamplers` - Direct field access
+10. `net.irisshaders.iris.gl.blending.DepthColorStorage` - Direct field access (2x)
+11. `net.irisshaders.iris.gl.IrisRenderSystem` - Direct field access (8x)
+12. `net.irisshaders.iris.gl.texture.DepthCopyStrategy` - Direct field access
+13. `net.irisshaders.iris.pbr.TextureInfoCache` - Direct field access
+14. `net.irisshaders.iris.pbr.texture.PBRTextureManager` - Direct field access
+15. `net.irisshaders.iris.pipeline.CompositeRenderer` - Direct field access
 
 ---
 
@@ -70,10 +79,10 @@ Hooks are already being called from Minecraft core code:
 
 ## Current Mixin Statistics
 
-### Total Mixin Count: 230 Files (5 removed)
+### Total Mixin Count: 229 Files (6 removed)
 
 **Breakdown by Type:**
-- **@Accessor mixins**: 54 remaining (59 originally, 5 removed)
+- **@Accessor mixins**: 53 remaining (59 originally, 6 removed)
 - **@Invoker mixins**: 1 (<1% of total)
 - **@Inject annotations**: 254 (multiple per file)
 - **@Redirect annotations**: 46
@@ -82,14 +91,14 @@ Hooks are already being called from Minecraft core code:
 
 **Distribution by Mod:**
 - **Sodium**: ~50 mixins (rendering optimizations)
-- **Iris**: ~145 mixins (shader system integration, 4 removed)
+- **Iris**: ~144 mixins (shader system integration, 5 removed)
 - **Distant Horizons**: ~23 mixins (LOD rendering, 1 removed)
 - **Fabric API**: ~12 mixins (compatibility layer)
 
 ### Mixin Complexity Analysis
 
 **Simple (Easy to Convert):**
-- 54 @Accessor mixins remaining - Just need to change visibility modifiers
+- 53 @Accessor mixins remaining - Just need to change visibility modifiers
 - 1 @Invoker mixin - Make method public/protected
 - ~100 simple @Inject mixins - Direct HEAD/RETURN injections
 

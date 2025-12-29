@@ -3,7 +3,6 @@ package net.irisshaders.iris.pbr;
 import com.mojang.blaze3d.opengl.GlStateManager;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
-import net.irisshaders.iris.mixin.GlStateManagerAccessor;
 import org.jetbrains.annotations.Nullable;
 import org.lwjgl.opengl.GL20C;
 
@@ -30,7 +29,7 @@ public class TextureInfoCache {
 	public void onTexImage2D(int target, int level, int internalformat, int width, int height, int border,
 							 int format, int type, @Nullable ByteBuffer pixels) {
 		if (level == 0) {
-			int id = GlStateManagerAccessor.getTEXTURES()[GlStateManagerAccessor.getActiveTexture()].binding;
+			int id = GlStateManager.TEXTURES[GlStateManager.activeTexture].binding;
 			TextureInfo info = getInfo(id);
 			info.internalFormat = internalformat;
 			info.width = width;
