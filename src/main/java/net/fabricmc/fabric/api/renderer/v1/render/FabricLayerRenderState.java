@@ -18,7 +18,7 @@ package net.fabricmc.fabric.api.renderer.v1.render;
 
 import net.fabricmc.fabric.api.renderer.v1.mesh.MutableMesh;
 import net.fabricmc.fabric.api.renderer.v1.mesh.QuadEmitter;
-import net.minecraft.client.renderer.entity.ItemStackRenderState;
+import net.minecraft.client.resources.model.ItemStackRenderState;
 
 /**
  * Fabric extension interface for LayerRenderState.

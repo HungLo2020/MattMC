@@ -27,7 +27,7 @@ import net.minecraft.world.item.crafting.Recipe;
 import net.minecraft.world.item.crafting.RecipeEntry;
 import net.minecraft.world.item.crafting.RecipeType;
 import net.minecraft.world.item.crafting.input.RecipeInput;
-import net.minecraft.core.ResourceKey;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.Level;
 
 /**

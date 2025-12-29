@@ -22,7 +22,7 @@ import java.util.Map;
 import org.jetbrains.annotations.Nullable;
 
 import net.minecraft.world.item.ItemGroup;
-import net.minecraft.core.ResourceKey;
+import net.minecraft.resources.ResourceKey;
 
 import net.fabricmc.fabric.api.event.Event;
 import net.fabricmc.fabric.api.event.EventFactory;

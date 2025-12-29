@@ -26,7 +26,7 @@ import com.mojang.serialization.Codec;
 import org.jetbrains.annotations.Unmodifiable;
 
 import net.minecraft.core.Registry;
-import net.minecraft.core.ResourceKey;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.core.RegistryDataLoader;
 import net.minecraft.core.SerializableRegistries;
 

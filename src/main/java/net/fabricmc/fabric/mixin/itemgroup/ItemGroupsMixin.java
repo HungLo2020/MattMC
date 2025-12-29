@@ -44,7 +44,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import net.minecraft.world.item.ItemGroup;
 import net.minecraft.world.item.ItemGroups;
 import net.minecraft.core.Registries;
-import net.minecraft.core.ResourceKey;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.core.Holder;
 import net.minecraft.resources.ResourceLocation;
 

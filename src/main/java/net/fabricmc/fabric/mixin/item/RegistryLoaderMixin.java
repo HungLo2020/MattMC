@@ -27,7 +27,7 @@ import org.spongepowered.asm.mixin.injection.At;
 
 import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraft.core.WritableRegistry;
-import net.minecraft.core.ResourceKey;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.core.RegistryDataLoader;
 import net.minecraft.core.RegistryOps;
 import net.minecraft.core.Holder;

@@ -16,7 +16,7 @@
 
 package net.fabricmc.fabric.api.event.lifecycle.v1;
 
-import net.minecraft.server.packs.ReloadableResourceManager;
+import net.minecraft.server.packs.resources.ReloadableResourceManager;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.PlayerList;
 import net.minecraft.server.network.ServerPlayer;

@@ -51,7 +51,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import net.minecraft.core.WritableRegistry;
 import net.minecraft.core.Registry;
-import net.minecraft.core.ResourceKey;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.core.MappedRegistry;
 import net.minecraft.core.Holder;
 import net.minecraft.core.HolderInfo;

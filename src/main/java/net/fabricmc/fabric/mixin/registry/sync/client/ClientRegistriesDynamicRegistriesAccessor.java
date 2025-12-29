@@ -23,7 +23,7 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.gen.Accessor;
 
 import net.minecraft.core.Registry;
-import net.minecraft.core.ResourceKey;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.core.SerializableRegistries;
 
 @Mixin(targets = "net/minecraft/client/network/ClientRegistries$DynamicRegistries")

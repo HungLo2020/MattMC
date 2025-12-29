@@ -26,7 +26,7 @@ import org.slf4j.LoggerFactory;
 
 import net.minecraft.world.entity.data.EntityDataSerializer;
 import net.minecraft.core.Registry;
-import net.minecraft.core.ResourceKey;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Int2ObjectBiMap;
 

@@ -39,7 +39,7 @@ import net.minecraft.world.level.storage.loot.LootTable;
 import net.minecraft.core.CombinedDynamicRegistries;
 import net.minecraft.core.WritableRegistry;
 import net.minecraft.core.Registry;
-import net.minecraft.core.ResourceKey;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.core.Registries;
 import net.minecraft.core.RegistryOps;
 import net.minecraft.core.HolderLookup;

@@ -28,7 +28,7 @@ import net.minecraft.world.item.crafting.Recipe;
 import net.minecraft.world.item.crafting.RecipeEntry;
 import net.minecraft.world.item.crafting.RecipeSerializer;
 import net.minecraft.core.Registries;
-import net.minecraft.core.ResourceKey;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.core.Registries;
 import net.minecraft.resources.ResourceLocation;
 

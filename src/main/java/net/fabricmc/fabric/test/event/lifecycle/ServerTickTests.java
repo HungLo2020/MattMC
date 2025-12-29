@@ -19,7 +19,7 @@ package net.fabricmc.fabric.test.event.lifecycle;
 import java.util.HashMap;
 import java.util.Map;
 
-import net.minecraft.core.ResourceKey;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.Level;
 
 import net.fabricmc.api.ModInitializer;

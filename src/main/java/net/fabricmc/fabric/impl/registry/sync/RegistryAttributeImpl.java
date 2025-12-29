@@ -22,7 +22,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import org.jetbrains.annotations.VisibleForTesting;
 
-import net.minecraft.core.ResourceKey;
+import net.minecraft.resources.ResourceKey;
 
 import net.fabricmc.fabric.api.event.registry.RegistryAttribute;
 import net.fabricmc.fabric.api.event.registry.RegistryAttributeHolder;

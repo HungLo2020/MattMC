@@ -23,7 +23,7 @@ import org.jetbrains.annotations.ApiStatus;
 
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.Registry;
-import net.minecraft.core.ResourceKey;
+import net.minecraft.resources.ResourceKey;
 
 /**
  * A view providing access to the registries that are currently being loaded. This is passed to

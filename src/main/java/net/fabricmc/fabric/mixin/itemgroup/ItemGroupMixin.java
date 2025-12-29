@@ -32,7 +32,7 @@ import net.minecraft.world.item.ItemGroup;
 import net.minecraft.world.item.ItemGroups;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.core.Registries;
-import net.minecraft.core.ResourceKey;
+import net.minecraft.resources.ResourceKey;
 
 import net.fabricmc.fabric.api.event.Event;
 import net.fabricmc.fabric.api.itemgroup.v1.FabricItemGroupEntries;

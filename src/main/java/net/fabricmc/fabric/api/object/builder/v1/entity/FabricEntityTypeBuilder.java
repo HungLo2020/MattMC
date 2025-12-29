@@ -33,7 +33,7 @@ import net.minecraft.world.entity.SpawnLocation;
 import net.minecraft.world.entity.SpawnPlacements;
 import net.minecraft.world.entity.attribute.DefaultAttributeContainer;
 import net.minecraft.world.entity.mob.Mob;
-import net.minecraft.core.ResourceKey;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.flag.FeatureFlag;
 import net.minecraft.world.Heightmap;
 import net.minecraft.world.Level;

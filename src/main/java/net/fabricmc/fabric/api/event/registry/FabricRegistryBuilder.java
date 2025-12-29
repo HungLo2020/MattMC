@@ -23,7 +23,7 @@ import com.mojang.serialization.Lifecycle;
 import net.minecraft.core.DefaultedRegistry;
 import net.minecraft.core.WritableRegistry;
 import net.minecraft.core.Registry;
-import net.minecraft.core.ResourceKey;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.core.DefaultedMappedRegistry;
 import net.minecraft.core.MappedRegistry;
 import net.minecraft.core.HolderInfo;

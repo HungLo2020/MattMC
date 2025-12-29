@@ -22,7 +22,7 @@ import java.util.stream.Stream;
 
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.Registry;
-import net.minecraft.core.ResourceKey;
+import net.minecraft.resources.ResourceKey;
 
 import net.fabricmc.fabric.api.event.registry.DynamicRegistryView;
 import net.fabricmc.fabric.api.event.registry.RegistryEntryAddedCallback;
