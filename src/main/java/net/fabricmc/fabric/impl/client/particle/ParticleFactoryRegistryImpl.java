@@ -20,7 +20,7 @@ import java.util.IdentityHashMap;
 import java.util.Map;
 
 import net.minecraft.client.particle.ParticleProvider;
-import net.minecraft.client.particle.ParticleSpriteManager;
+import net.minecraft.client.particle.ParticleEngine;
 import net.minecraft.core.particles.ParticleOptions;
 import net.minecraft.core.particles.ParticleType;
 import net.minecraft.core.registries.Registries;
@@ -60,7 +60,7 @@ public final class ParticleFactoryRegistryImpl implements ParticleFactoryRegistr
 		}
 	}
 
-	record DirectParticleFactoryRegistry(ParticleSpriteManager particleSpriteManager) implements ParticleFactoryRegistry {
+	record DirectParticleFactoryRegistry(ParticleEngine particleSpriteManager) implements ParticleFactoryRegistry {
 		@Override
 		public <T extends ParticleOptions> void register(ParticleType<T> type, ParticleProvider<T> factory) {
 			particleSpriteManager.particleFactories.put(Registries.PARTICLE_TYPE.getRawId(type), factory);
@@ -68,7 +68,7 @@ public final class ParticleFactoryRegistryImpl implements ParticleFactoryRegistr
 
 		@Override
 		public <T extends ParticleOptions> void register(ParticleType<T> type, PendingParticleFactory<T> constructor) {
-			var delegate = new ParticleSpriteManager.SimpleSpriteProvider();
+			var delegate = new ParticleEngine.SimpleSpriteProvider();
 			var fabricSpriteProvider = new FabricSpriteProviderImpl(delegate);
 			particleSpriteManager.spriteAwareParticleFactories.put(Registries.PARTICLE_TYPE.getId(type), delegate);
 			register(type, constructor.create(fabricSpriteProvider));
@@ -89,7 +89,7 @@ public final class ParticleFactoryRegistryImpl implements ParticleFactoryRegistr
 		internalRegistry.register(type, constructor);
 	}
 
-	public void initialize(ParticleSpriteManager particleSpriteManager) {
+	public void initialize(ParticleEngine particleSpriteManager) {
 		ParticleFactoryRegistry newRegistry = new DirectParticleFactoryRegistry(particleSpriteManager);
 		DeferredParticleFactoryRegistry oldRegistry = (DeferredParticleFactoryRegistry) internalRegistry;
 		oldRegistry.applyTo(newRegistry);

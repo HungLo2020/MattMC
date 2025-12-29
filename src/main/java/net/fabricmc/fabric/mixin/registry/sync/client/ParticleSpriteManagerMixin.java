@@ -25,12 +25,12 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import net.minecraft.client.particle.ParticleProvider;
-import net.minecraft.client.particle.ParticleSpriteManager;
+import net.minecraft.client.particle.ParticleEngine;
 import net.minecraft.core.registries.Registries;
 
 import net.fabricmc.fabric.impl.registry.sync.trackers.Int2ObjectMapTracker;
 
-@Mixin(ParticleSpriteManager.class)
+@Mixin(ParticleEngine.class)
 public class ParticleSpriteManagerMixin {
 	@Final
 	@Shadow

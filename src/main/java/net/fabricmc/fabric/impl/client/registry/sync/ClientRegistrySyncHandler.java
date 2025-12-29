@@ -31,8 +31,8 @@ import org.slf4j.LoggerFactory;
 
 import net.minecraft.core.registries.Registries;
 import net.minecraft.core.Registry;
-import net.minecraft.world.inventory.ScreenTexts;
-import net.minecraft.network.chat.MutableText;
+import net.minecraft.world.inventory.CommonComponents;
+import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.network.chat.Component;
 import net.minecraft.ChatFormatting;
 import net.minecraft.resources.ResourceLocation;
@@ -170,7 +170,7 @@ public final class ClientRegistrySyncHandler {
 	}
 
 	private static Component missingRegistriesError(List<ResourceLocation> missingRegistries) {
-		MutableText text = Component.empty();
+		MutableComponent text = Component.empty();
 
 		final int count = missingRegistries.size();
 
@@ -187,7 +187,7 @@ public final class ClientRegistrySyncHandler {
 
 		for (int i = 0; i < Math.min(missingRegistries.size(), toDisplay); i++) {
 			text = text.append(Component.literal(missingRegistries.get(i).toString()).formatted(ChatFormatting.YELLOW));
-			text = text.append(ScreenTexts.LINE_BREAK);
+			text = text.append(CommonComponents.LINE_BREAK);
 		}
 
 		if (missingRegistries.size() > toDisplay) {
@@ -198,7 +198,7 @@ public final class ClientRegistrySyncHandler {
 	}
 
 	private static Component missingEntriesError(Map<ResourceLocation, List<ResourceLocation>> missingEntries) {
-		MutableText text = Component.empty();
+		MutableComponent text = Component.empty();
 
 		final int count = missingEntries.values().stream().mapToInt(List::size).sum();
 
@@ -222,7 +222,7 @@ public final class ClientRegistrySyncHandler {
 
 		for (int i = 0; i < Math.min(namespaces.size(), toDisplay); i++) {
 			text = text.append(Component.literal(namespaces.get(i)).formatted(ChatFormatting.YELLOW));
-			text = text.append(ScreenTexts.LINE_BREAK);
+			text = text.append(CommonComponents.LINE_BREAK);
 		}
 
 		if (namespaces.size() > toDisplay) {
