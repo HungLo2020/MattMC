@@ -39,3 +39,4 @@ jmh-result.txt
 # Test coverage
 .jacoco/
 /Task
+*.inline_backup
