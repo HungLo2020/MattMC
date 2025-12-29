@@ -16,7 +16,7 @@
 
 package net.fabricmc.fabric.impl.object.builder.client;
 
-import net.minecraft.world.level.block.WoodType;
+import net.minecraft.world.level.block.state.properties.WoodType;
 import net.minecraft.client.renderer.TexturedRenderLayers;
 
 public final class SignTypeTextureHelper {

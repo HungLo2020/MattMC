@@ -16,9 +16,9 @@
 
 package net.fabricmc.fabric.api.object.builder.v1.block.type;
 
-import net.minecraft.world.level.block.BlockSetType;
-import net.minecraft.world.level.block.WoodType;
-import net.minecraft.sounds.BlockSoundGroup;
+import net.minecraft.world.level.block.state.properties.BlockSetType;
+import net.minecraft.world.level.block.state.properties.WoodType;
+import net.minecraft.world.level.block.SoundType;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.resources.ResourceLocation;
@@ -34,19 +34,19 @@ import net.minecraft.resources.ResourceLocation;
  * @see BlockSetTypeBuilder
  */
 public final class WoodTypeBuilder {
-	private BlockSoundGroup soundGroup = BlockSoundGroup.WOOD;
-	private BlockSoundGroup hangingSignSoundGroup = BlockSoundGroup.HANGING_SIGN;
+	private SoundType soundGroup = SoundType.WOOD;
+	private SoundType hangingSignSoundGroup = SoundType.HANGING_SIGN;
 	private SoundEvent fenceGateCloseSound = SoundEvents.BLOCK_FENCE_GATE_CLOSE;
 	private SoundEvent fenceGateOpenSound = SoundEvents.BLOCK_FENCE_GATE_OPEN;
 
 	/**
 	 * Sets this wood type's sound group.
 	 *
-	 * <p>Defaults to {@link BlockSoundGroup#WOOD}.
+	 * <p>Defaults to {@link SoundType#WOOD}.
 	 *
 	 * @return this builder for chaining
 	 */
-	public WoodTypeBuilder soundGroup(BlockSoundGroup soundGroup) {
+	public WoodTypeBuilder soundGroup(SoundType soundGroup) {
 		this.soundGroup = soundGroup;
 		return this;
 	}
@@ -54,11 +54,11 @@ public final class WoodTypeBuilder {
 	/**
 	 * Sets this wood type's hanging sign sound group.
 	 *
-	 * <p>Defaults to {@link BlockSoundGroup#HANGING_SIGN}.
+	 * <p>Defaults to {@link SoundType#HANGING_SIGN}.
 	 *
 	 * @return this builder for chaining
 	 */
-	public WoodTypeBuilder hangingSignSoundGroup(BlockSoundGroup hangingSignSoundGroup) {
+	public WoodTypeBuilder hangingSignSoundGroup(SoundType hangingSignSoundGroup) {
 		this.hangingSignSoundGroup = hangingSignSoundGroup;
 		return this;
 	}

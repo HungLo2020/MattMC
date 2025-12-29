@@ -16,7 +16,7 @@
 
 package net.fabricmc.fabric.impl.transfer.item;
 
-import net.minecraft.world.entity.player.SidedInventory;
+import net.minecraft.world.entity.player.WorldlyContainer;
 import net.minecraft.core.Direction;
 
 import net.fabricmc.fabric.api.transfer.v1.item.ItemVariant;
@@ -30,10 +30,10 @@ import net.fabricmc.fabric.impl.transfer.DebugMessages;
  */
 class SidedInventorySlotWrapper implements SingleSlotStorage<ItemVariant> {
 	private final InventorySlotWrapper slotWrapper;
-	private final SidedInventory sidedInventory;
+	private final WorldlyContainer sidedInventory;
 	private final Direction direction;
 
-	SidedInventorySlotWrapper(InventorySlotWrapper slotWrapper, SidedInventory sidedInventory, Direction direction) {
+	SidedInventorySlotWrapper(InventorySlotWrapper slotWrapper, WorldlyContainer sidedInventory, Direction direction) {
 		this.slotWrapper = slotWrapper;
 		this.sidedInventory = sidedInventory;
 		this.direction = direction;

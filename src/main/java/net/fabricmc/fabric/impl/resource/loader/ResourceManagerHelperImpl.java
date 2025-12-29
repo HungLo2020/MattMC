@@ -34,7 +34,7 @@ import net.minecraft.server.packs.Pack;
 import net.minecraft.server.packs.ResourcePackInfo;
 import net.minecraft.server.packs.ResourcePackPosition;
 import net.minecraft.server.packs.ResourcePackProfile;
-import net.minecraft.server.packs.ResourceReloader;
+import net.minecraft.server.packs.resources.PreparableReloadListener;
 import net.minecraft.server.packs.ResourceType;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
@@ -163,11 +163,11 @@ public class ResourceManagerHelperImpl implements ResourceManagerHelper {
 
 	@Override
 	public void registerReloadListener(ResourceLocation identifier, Function<HolderLookup.Provider, IdentifiableResourceReloadListener> listenerFactory) {
-		this.resourceLoader.registerReloader(identifier, new ResourceReloader() {
+		this.resourceLoader.registerReloader(identifier, new PreparableReloadListener() {
 			@Override
 			public CompletableFuture<Void> reload(Store store, Executor prepareExecutor, Synchronizer reloadSynchronizer, Executor applyExecutor) {
 				HolderLookup.Provider registries = store.getOrThrow(ResourceLoader.RELOADER_REGISTRY_LOOKUP_KEY);
-				ResourceReloader resourceReloader = listenerFactory.apply(registries);
+				PreparableReloadListener resourceReloader = listenerFactory.apply(registries);
 
 				return resourceReloader.reload(store, prepareExecutor, reloadSynchronizer, applyExecutor);
 			}

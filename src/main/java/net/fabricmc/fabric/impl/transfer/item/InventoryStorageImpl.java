@@ -26,7 +26,7 @@ import org.jetbrains.annotations.Nullable;
 
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.Container;
-import net.minecraft.world.entity.player.SidedInventory;
+import net.minecraft.world.entity.player.WorldlyContainer;
 import net.minecraft.core.Direction;
 
 import net.fabricmc.fabric.api.transfer.v1.item.InventoryStorage;
@@ -106,7 +106,7 @@ public class InventoryStorageImpl extends CombinedStorage<ItemVariant, SingleSlo
 	}
 
 	private InventoryStorage getSidedWrapper(@Nullable Direction direction) {
-		if (inventory instanceof SidedInventory && direction != null) {
+		if (inventory instanceof WorldlyContainer && direction != null) {
 			return new SidedInventoryStorageImpl(this, direction);
 		} else {
 			return this;

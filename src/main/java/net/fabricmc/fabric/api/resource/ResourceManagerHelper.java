@@ -22,7 +22,7 @@ import org.jetbrains.annotations.ApiStatus;
 
 import net.minecraft.core.HolderLookup;
 import net.minecraft.server.packs.resources.ResourceManager;
-import net.minecraft.server.packs.ResourceReloader;
+import net.minecraft.server.packs.resources.PreparableReloadListener;
 import net.minecraft.server.packs.ResourceType;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
@@ -39,7 +39,7 @@ public interface ResourceManagerHelper {
 	 * Add a resource reload listener for a given registry.
 	 *
 	 * @param listener The resource reload listener.
-	 * @deprecated Use {@link net.fabricmc.fabric.api.resource.v1.ResourceLoader#registerReloader(ResourceLocation, ResourceReloader)} instead.
+	 * @deprecated Use {@link net.fabricmc.fabric.api.resource.v1.ResourceLoader#registerReloader(ResourceLocation, PreparableReloadListener)} instead.
 	 */
 	@Deprecated
 	default void addReloadListener(IdentifiableResourceReloadListener listener) {
@@ -50,7 +50,7 @@ public interface ResourceManagerHelper {
 	 * Register a resource reload listener for a given resource manager type.
 	 *
 	 * @param listener The resource reload listener.
-	 * @deprecated Use {@link net.fabricmc.fabric.api.resource.v1.ResourceLoader#registerReloader(ResourceLocation, ResourceReloader)} instead.
+	 * @deprecated Use {@link net.fabricmc.fabric.api.resource.v1.ResourceLoader#registerReloader(ResourceLocation, PreparableReloadListener)} instead.
 	 */
 	@Deprecated
 	void registerReloadListener(IdentifiableResourceReloadListener listener);
@@ -62,7 +62,7 @@ public interface ResourceManagerHelper {
 	 *
 	 * @param identifier The identifier of the listener.
 	 * @param listenerFactory   A function that creates a new instance of the listener with a given registry lookup.
-	 * @deprecated Use {@link net.fabricmc.fabric.api.resource.v1.ResourceLoader#RELOADER_REGISTRY_LOOKUP_KEY} with {@link net.minecraft.server.packs.ResourceReloader.Store},
+	 * @deprecated Use {@link net.fabricmc.fabric.api.resource.v1.ResourceLoader#RELOADER_REGISTRY_LOOKUP_KEY} with {@link net.minecraft.server.packs.resources.PreparableReloadListener.Store},
 	 * or {@link net.fabricmc.fabric.api.resource.v1.DataResourceLoader#registerReloader(ResourceLocation, Function)} instead.
 	 */
 	@Deprecated

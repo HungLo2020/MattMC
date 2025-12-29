@@ -20,7 +20,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 
 import net.minecraft.server.packs.resources.ResourceManager;
-import net.minecraft.server.packs.SynchronousResourceReloader;
+import net.minecraft.server.packs.resources.ResourceManagerReloadListener;
 
 /**
  * A simplified version of the "resource reload listener" interface, hiding the
@@ -36,7 +36,7 @@ import net.minecraft.server.packs.SynchronousResourceReloader;
  * the apply stage is guaranteed to run on the game thread.
  *
  * <p>For a fully synchronous alternative, consider using
- * {@link SynchronousResourceReloader} in conjunction with
+ * {@link ResourceManagerReloadListener} in conjunction with
  * {@link IdentifiableResourceReloadListener}.
  *
  * @param <T> The data object.
