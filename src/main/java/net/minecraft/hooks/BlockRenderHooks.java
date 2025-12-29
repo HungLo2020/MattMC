@@ -2,6 +2,7 @@ package net.minecraft.hooks;
 
 import net.minecraft.core.Direction;
 import net.minecraft.world.level.block.state.BlockState;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Hook interface for block rendering customizations.
@@ -17,6 +18,7 @@ public interface BlockRenderHooks {
      * @param defaultResult The vanilla skip rendering result
      * @return Boolean override (null to use vanilla behavior, true/false to override)
      */
+    @Nullable
     default Boolean shouldSkipRendering(BlockState state, BlockState stateFrom, Direction direction, boolean defaultResult) {
         return null;
     }

@@ -2,6 +2,7 @@ package net.minecraft.hooks;
 
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Hook interface for customizing TextureAtlasSprite behavior.
@@ -16,6 +17,7 @@ public interface TextureAtlasSpriteHooks {
      * @param defaultRatio The default UV shrink ratio that would be calculated
      * @return Custom UV shrink ratio, or null to use default behavior
      */
+    @Nullable
     default Float overrideUvShrinkRatio(TextureAtlasSprite sprite, float defaultRatio) {
         return null;
     }

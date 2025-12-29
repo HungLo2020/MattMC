@@ -1,6 +1,7 @@
 package net.minecraft.hooks;
 
 import net.minecraft.client.GraphicsStatus;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Hook interface for graphics and rendering quality configuration.
@@ -14,6 +15,7 @@ public interface GraphicsConfigHooks {
      * @param vanillaFancy The vanilla fancy graphics setting
      * @return null for vanilla behavior, true/false to override
      */
+    @Nullable
     default Boolean shouldUseFancyGraphics(boolean vanillaFancy) {
         return null;
     }
@@ -26,6 +28,7 @@ public interface GraphicsConfigHooks {
      * @param graphicsMode The current graphics mode
      * @return null for vanilla behavior, true/false to override
      */
+    @Nullable
     default Boolean getWeatherQuality(boolean vanillaFancy, GraphicsStatus graphicsMode) {
         return null;
     }
@@ -38,6 +41,7 @@ public interface GraphicsConfigHooks {
      * @param graphicsMode The current graphics mode
      * @return null for vanilla behavior, true/false to override
      */
+    @Nullable
     default Boolean getLeavesQuality(boolean vanillaFancy, GraphicsStatus graphicsMode) {
         return null;
     }
@@ -49,6 +53,7 @@ public interface GraphicsConfigHooks {
      * @param vanillaFancy The vanilla fancy graphics setting
      * @return null for vanilla behavior, true/false to override
      */
+    @Nullable
     default Boolean shouldEnableVignette(boolean vanillaFancy) {
         return null;
     }

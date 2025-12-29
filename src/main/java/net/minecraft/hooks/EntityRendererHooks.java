@@ -5,6 +5,7 @@ import net.minecraft.client.renderer.entity.EntityRenderer;
 import net.minecraft.client.renderer.entity.state.EntityRenderState;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.phys.AABB;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Hook interface for EntityRenderer visibility checks.
@@ -21,6 +22,7 @@ public interface EntityRendererHooks {
      * @param aabb The entity's AABB
      * @return null to use default behavior, true to force visible, false to force hidden
      */
+    @Nullable
     default <T extends Entity, S extends EntityRenderState> Boolean onEntityFrustumCheck(EntityRenderer<T, S> renderer, T entity, Frustum frustum, AABB aabb) {
         return null;
     }

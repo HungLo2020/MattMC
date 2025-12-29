@@ -1,6 +1,7 @@
 package net.minecraft.hooks;
 
 import net.minecraft.client.renderer.SectionBufferBuilderPool;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Hook interface for customizing RenderBuffers initialization.
@@ -14,6 +15,7 @@ public interface RenderBuffersHooks {
      * @param size The requested pool size
      * @return Custom section buffer pool, or null to use default behavior
      */
+    @Nullable
     default SectionBufferBuilderPool provideSectionBufferPool(int size) {
         return null;
     }

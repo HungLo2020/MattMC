@@ -1,5 +1,7 @@
 package net.minecraft.hooks;
 
+import org.jetbrains.annotations.Nullable;
+
 /**
  * Hook interface for render type customizations.
  * Allows mods to override render type behavior (e.g., leaves cutout rendering).
@@ -19,6 +21,7 @@ public interface RenderTypeHooks {
      * @param vanillaCutout The vanilla cutout state
      * @return Boolean override (null to use vanilla behavior, true/false to override)
      */
+    @Nullable
     default Boolean shouldUseCutoutRendering(boolean vanillaCutout) {
         return null;
     }

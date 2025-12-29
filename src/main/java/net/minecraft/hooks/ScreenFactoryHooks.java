@@ -1,6 +1,7 @@
 package net.minecraft.hooks;
 
 import net.minecraft.client.gui.screens.Screen;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.function.Supplier;
 
@@ -17,6 +18,7 @@ public interface ScreenFactoryHooks {
      * @param parent The parent screen
      * @return A replacement screen factory, or null to use the original
      */
+    @Nullable
     default Supplier<Screen> getVideoSettingsScreenFactory(Supplier<Screen> original, Screen parent) {
         return null;
     }

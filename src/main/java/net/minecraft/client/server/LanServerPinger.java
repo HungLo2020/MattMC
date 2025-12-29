@@ -10,6 +10,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.DefaultUncaughtExceptionHandler;
+import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 
 @Environment(EnvType.CLIENT)
@@ -73,6 +74,7 @@ public class LanServerPinger extends Thread {
 		}
 	}
 
+	@Nullable
 	public static String parseAddress(String string) {
 		int i = string.indexOf("[/MOTD]");
 		if (i < 0) {

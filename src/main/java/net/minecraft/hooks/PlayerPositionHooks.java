@@ -2,6 +2,7 @@ package net.minecraft.hooks;
 
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.core.BlockPos;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Hook interface for player position customizations.
@@ -15,6 +16,7 @@ public interface PlayerPositionHooks {
      * @param defaultPosition The vanilla block position (feet position)
      * @return BlockPos override (null to use vanilla behavior, non-null to override)
      */
+    @Nullable
     default BlockPos getPlayerBlockPositionForChunkLoading(LocalPlayer player, BlockPos defaultPosition) {
         return null;
     }
