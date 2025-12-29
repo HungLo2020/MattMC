@@ -28,11 +28,11 @@ import org.apache.commons.io.IOUtils;
 import org.jetbrains.annotations.Nullable;
 
 import net.minecraft.SharedConstants;
-import net.minecraft.server.packs.IoSupplier;
+import net.minecraft.server.packs.resources.IoSupplier;
 import net.minecraft.server.packs.repository.Pack;
 import net.minecraft.server.packs.PackLocationInfo;
 import net.minecraft.server.packs.repository.Pack;
-import net.minecraft.server.packs.repository.PackType;
+import net.minecraft.server.packs.PackType;
 import net.minecraft.server.packs.metadata.PackMetadataSection;
 import net.minecraft.server.packs.metadata.ResourceMetadataMap;
 import net.minecraft.server.packs.metadata.ResourceMetadataSerializer;

@@ -35,7 +35,7 @@ import net.minecraft.server.packs.PackLocationInfo;
 import net.minecraft.server.packs.ResourcePackPosition;
 import net.minecraft.server.packs.repository.Pack;
 import net.minecraft.server.packs.resources.PreparableReloadListener;
-import net.minecraft.server.packs.repository.PackType;
+import net.minecraft.server.packs.PackType;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Pair;

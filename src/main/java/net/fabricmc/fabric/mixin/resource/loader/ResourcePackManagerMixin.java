@@ -41,7 +41,7 @@ import net.minecraft.server.packs.repository.PackRepository;
 import net.minecraft.server.packs.repository.Pack;
 import net.minecraft.server.packs.ResourcePackProvider;
 import net.minecraft.server.packs.repository.PackSource;
-import net.minecraft.server.packs.repository.PackType;
+import net.minecraft.server.packs.PackType;
 
 import net.fabricmc.fabric.impl.resource.loader.FabricResourcePackProfile;
 import net.fabricmc.fabric.impl.resource.loader.ModResourcePackCreator;

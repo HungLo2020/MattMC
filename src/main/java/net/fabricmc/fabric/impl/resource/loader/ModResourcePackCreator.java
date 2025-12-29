@@ -30,7 +30,7 @@ import net.minecraft.server.packs.ResourcePackPosition;
 import net.minecraft.server.packs.repository.Pack;
 import net.minecraft.server.packs.ResourcePackProvider;
 import net.minecraft.server.packs.repository.PackSource;
-import net.minecraft.server.packs.repository.PackType;
+import net.minecraft.server.packs.PackType;
 import net.minecraft.network.chat.Component;
 
 import net.fabricmc.fabric.api.resource.ModResourcePack;

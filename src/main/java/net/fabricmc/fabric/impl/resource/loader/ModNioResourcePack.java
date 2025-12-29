@@ -44,10 +44,10 @@ import org.slf4j.LoggerFactory;
 
 import net.minecraft.core.VersionedIdentifier;
 import net.minecraft.server.packs.AbstractFileResourcePack;
-import net.minecraft.server.packs.IoSupplier;
+import net.minecraft.server.packs.resources.IoSupplier;
 import net.minecraft.server.packs.repository.Pack;
 import net.minecraft.server.packs.PackLocationInfo;
-import net.minecraft.server.packs.repository.PackType;
+import net.minecraft.server.packs.PackType;
 import net.minecraft.server.packs.metadata.ResourceMetadataSerializer;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;

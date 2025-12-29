@@ -31,7 +31,7 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.world.CreateWorldScreen;
 import net.minecraft.server.WorldDataConfiguration;
 import net.minecraft.server.packs.repository.PackRepository;
-import net.minecraft.server.packs.repository.PackType;
+import net.minecraft.server.packs.PackType;
 
 import net.fabricmc.fabric.impl.resource.loader.ModResourcePackCreator;
 import net.fabricmc.fabric.impl.resource.loader.ModResourcePackUtil;

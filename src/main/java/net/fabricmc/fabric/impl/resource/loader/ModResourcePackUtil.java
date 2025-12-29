@@ -48,7 +48,7 @@ import net.minecraft.server.packs.repository.PackFormat;
 import net.minecraft.server.packs.repository.Pack;
 import net.minecraft.server.packs.repository.PackRepository;
 import net.minecraft.server.packs.repository.Pack;
-import net.minecraft.server.packs.repository.PackType;
+import net.minecraft.server.packs.PackType;
 import net.minecraft.server.packs.VanillaDataPackProvider;
 import net.minecraft.world.flag.FeatureFlags;
 import net.minecraft.server.packs.metadata.PackMetadataSection;
