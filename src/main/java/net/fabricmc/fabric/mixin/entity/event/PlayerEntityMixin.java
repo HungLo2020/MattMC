@@ -47,8 +47,8 @@ abstract class PlayerEntityMixin {
 	private boolean redirectDaySleepCheck(Level world) {
 		boolean day = world.dimensionType().hasFixedTime() ? false : (world.dayTime() % 24000L < 13000L);
 
-		if (((LivingEntity) (Object) this).getSleepingPosition().isPresent()) {
-			BlockPos pos = ((LivingEntity) (Object) this).getSleepingPosition().get();
+		if (((LivingEntity) (Object) this).getSleepingPos().isPresent()) {
+			BlockPos pos = ((LivingEntity) (Object) this).getSleepingPos().get();
 			InteractionResult result = EntitySleepEvents.ALLOW_SLEEP_TIME.invoker().allowSleepTime((Player) (Object) this, pos, !day);
 
 			if (result != InteractionResult.PASS) {

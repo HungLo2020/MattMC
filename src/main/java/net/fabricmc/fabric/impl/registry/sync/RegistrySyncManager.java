@@ -68,7 +68,7 @@ public final class RegistrySyncManager {
 	private RegistrySyncManager() { }
 
 	public static void configureClient(ServerConfigurationPacketListenerImpl handler, MinecraftServer server) {
-		if (!DEBUG && server.isHost(new PlayerConfigEntry(handler.getDebugProfile()))) {
+		if (!DEBUG && server.isHost(new PlayerConfigEntry(handler.getOwner()))) {
 			// Dont send in singleplayer
 			return;
 		}
