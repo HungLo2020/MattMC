@@ -22,7 +22,7 @@ import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gl.RenderPipelines;
+import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.inventory.CreativeModeInventoryScreen;
 import net.minecraft.client.gui.components.Button;

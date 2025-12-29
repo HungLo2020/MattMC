@@ -32,7 +32,7 @@ import net.minecraft.client.multiplayer.ClientChunkCache;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.protocol.s2c.play.ChunkData;
-import net.minecraft.core.ChunkPos;
+import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.chunk.LevelChunk;
 

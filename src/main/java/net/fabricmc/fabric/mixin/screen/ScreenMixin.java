@@ -28,7 +28,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.Drawable;
+import net.minecraft.client.gui.Renderable;
 import net.minecraft.client.gui.Element;
 import net.minecraft.client.gui.Selectable;
 import net.minecraft.client.gui.screens.Screen;
@@ -52,7 +52,7 @@ abstract class ScreenMixin implements ScreenExtensions {
 	protected List<Element> children;
 	@Shadow
 	@Final
-	protected List<Drawable> drawables;
+	protected List<Renderable> drawables;
 
 	@Unique
 	private ButtonList fabricButtons;

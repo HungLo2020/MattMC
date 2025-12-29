@@ -32,7 +32,7 @@ import org.slf4j.LoggerFactory;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.SpawnReason;
-import net.minecraft.predicate.entity.EntityPredicates;
+import net.minecraft.world.entity.EntityPredicates;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.resources.ResourceLocation;

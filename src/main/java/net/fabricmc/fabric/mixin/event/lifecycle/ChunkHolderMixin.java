@@ -36,7 +36,7 @@ import net.minecraft.server.level.FullChunkStatus;
 import net.minecraft.server.level.ChunkLevels;
 import net.minecraft.server.level.ServerChunkLoadingManager;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.core.ChunkPos;
+import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.HeightLimitView;
 import net.minecraft.world.level.chunk.AbstractChunkHolder;
 import net.minecraft.world.level.chunk.status.ChunkStatus;

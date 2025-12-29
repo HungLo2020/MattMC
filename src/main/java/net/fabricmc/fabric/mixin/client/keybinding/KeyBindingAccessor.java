@@ -19,7 +19,7 @@ package net.fabricmc.fabric.mixin.client.keybinding;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.gen.Accessor;
 
-import net.minecraft.client.Options.KeyMapping;
+import net.minecraft.client.KeyMapping;
 import net.minecraft.client.util.InputConstants;
 
 @Mixin(KeyMapping.class)
