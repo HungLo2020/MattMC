@@ -4,7 +4,6 @@ import com.mojang.blaze3d.platform.InputConstants;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.math.Axis;
 import net.irisshaders.iris.Iris;
-import net.irisshaders.iris.mixin.EndFlashAccess;
 import net.irisshaders.iris.pipeline.WorldRenderingPipeline;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.Screen;

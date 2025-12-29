@@ -3,7 +3,6 @@ package net.irisshaders.iris.gl.blending;
 import com.mojang.blaze3d.opengl.GlStateManager;
 import net.irisshaders.iris.gl.IrisRenderSystem;
 import net.irisshaders.iris.mixin.GlStateManagerAccessor;
-import net.irisshaders.iris.mixin.statelisteners.BooleanStateAccessor;
 
 public class BlendModeStorage {
 	private static boolean originalBlendEnable;
@@ -19,7 +18,7 @@ public class BlendModeStorage {
 			// Only save the previous state if the blend mode wasn't already locked
 			GlStateManager.BlendState blendState = GlStateManagerAccessor.getBLEND();
 
-			originalBlendEnable = ((BooleanStateAccessor) blendState.mode).isEnabled();
+			originalBlendEnable = blendState.mode.enabled; // Direct field access - enabled is public
 			originalBlend = new BlendMode(blendState.srcRgb, blendState.dstRgb, blendState.srcAlpha, blendState.dstAlpha);
 		}
 
@@ -40,7 +39,7 @@ public class BlendModeStorage {
 			// Only save the previous state if the blend mode wasn't already locked
 			GlStateManager.BlendState blendState = GlStateManagerAccessor.getBLEND();
 
-			originalBlendEnable = ((BooleanStateAccessor) blendState.mode).isEnabled();
+			originalBlendEnable = blendState.mode.enabled; // Direct field access - enabled is public
 			originalBlend = new BlendMode(blendState.srcRgb, blendState.dstRgb, blendState.srcAlpha, blendState.dstAlpha);
 		}
 
