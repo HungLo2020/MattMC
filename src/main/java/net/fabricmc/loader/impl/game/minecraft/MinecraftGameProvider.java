@@ -216,19 +216,37 @@ public class MinecraftGameProvider implements GameProvider {
 			envGameJar = classifier.getOrigin(envGameLib);
 			
 			// MATTMC MODIFICATION: Handle integrated source mode where Fabric Loader and Minecraft
-			// are compiled to the same output directory. In this case, the classifier won't find
-			// Minecraft because the build output is marked as a system library (Fabric Loader).
+			// are compiled to the same output (either directory or JAR). In this case, the classifier
+			// won't find Minecraft because the build output is marked as a system library (Fabric Loader).
 			// We check if Minecraft classes exist in the Fabric Loader's code source.
 			if (envGameJar == null) {
 				Path loaderCodeSource = net.fabricmc.loader.impl.util.UrlUtil.LOADER_CODE_SOURCE;
-				if (loaderCodeSource != null && Files.isDirectory(loaderCodeSource)) {
-					// Check if Minecraft client/server main class exists in the loader's directory
+				if (loaderCodeSource != null) {
+					// Check if Minecraft client/server main class exists
 					String mainClassPath = envType == EnvType.CLIENT 
 						? "net/minecraft/client/main/Main.class"
 						: "net/minecraft/server/Main.class";
-					Path mainClass = loaderCodeSource.resolve(mainClassPath);
-					if (Files.exists(mainClass)) {
-						Log.info(LogCategory.GAME_PROVIDER, "Detected integrated source mode - using Fabric Loader code source as game jar");
+					
+					boolean hasMinecraft = false;
+					
+					// Check if it's a directory (development mode)
+					if (Files.isDirectory(loaderCodeSource)) {
+						Path mainClass = loaderCodeSource.resolve(mainClassPath);
+						hasMinecraft = Files.exists(mainClass);
+					} 
+					// Check if it's a JAR file (single-JAR mode)
+					else if (Files.isRegularFile(loaderCodeSource) && loaderCodeSource.toString().endsWith(".jar")) {
+						try {
+							java.util.jar.JarFile jarFile = new java.util.jar.JarFile(loaderCodeSource.toFile());
+							hasMinecraft = jarFile.getEntry(mainClassPath) != null;
+							jarFile.close();
+						} catch (IOException e) {
+							Log.warn(LogCategory.GAME_PROVIDER, "Failed to check JAR for Minecraft classes", e);
+						}
+					}
+					
+					if (hasMinecraft) {
+						Log.info(LogCategory.GAME_PROVIDER, "Detected integrated source mode - using Fabric Loader code source as game jar: " + loaderCodeSource);
 						envGameJar = loaderCodeSource;
 						entrypoint = mainClassPath.substring(0, mainClassPath.length() - 6).replace('/', '.');
 					}
@@ -255,7 +273,13 @@ public class MinecraftGameProvider implements GameProvider {
 				gameJars.add(assetsJar);
 			}
 
-			entrypoint = classifier.getClassName(envGameLib);
+			// MATTMC MODIFICATION: Only use classifier entrypoint if we haven't set it in integrated mode
+			String classifierEntrypoint = classifier.getClassName(envGameLib);
+			if (classifierEntrypoint != null) {
+				entrypoint = classifierEntrypoint;
+			} else if (entrypoint == null) {
+				Log.warn(LogCategory.GAME_PROVIDER, "Entrypoint not found by classifier and not set by integrated source mode detection");
+			}
 			realmsJar = classifier.getOrigin(McLibrary.REALMS);
 			hasModLoader = classifier.has(McLibrary.MODLOADER);
 			log4jAvailable = classifier.has(McLibrary.LOG4J_API) && classifier.has(McLibrary.LOG4J_CORE);
