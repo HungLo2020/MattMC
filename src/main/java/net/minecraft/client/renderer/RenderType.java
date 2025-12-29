@@ -22,6 +22,7 @@ import net.minecraft.Util;
 import net.minecraft.client.renderer.blockentity.AbstractEndPortalRenderer;
 import net.minecraft.client.renderer.entity.ItemRenderer;
 import net.minecraft.resources.ResourceLocation;
+import org.jetbrains.annotations.Nullable;
 import org.joml.Vector3f;
 import org.joml.Vector4f;
 
@@ -1124,10 +1125,12 @@ public abstract class RenderType extends RenderStateShard {
 	}
 	
 	// Iris compatibility methods
+	@Nullable
 	public RenderPipeline iris$getPipeline() {
 		return null;
 	}
 	
+	@Nullable
 	public RenderTarget iris$getRenderTarget() {
 		return null;
 	}
