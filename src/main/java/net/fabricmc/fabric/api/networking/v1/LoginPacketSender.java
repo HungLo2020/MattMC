@@ -24,7 +24,7 @@ import org.jetbrains.annotations.Nullable;
 
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.protocol.Packet;
-import net.minecraft.server.packss.ResourceLocation;
+import net.minecraft.resources.ResourceLocation;
 
 /**
  * Represents something that supports sending packets to login channels.

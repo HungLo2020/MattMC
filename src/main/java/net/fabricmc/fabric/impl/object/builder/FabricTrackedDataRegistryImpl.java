@@ -27,7 +27,7 @@ import org.slf4j.LoggerFactory;
 import net.minecraft.world.entity.data.TrackedDataHandler;
 import net.minecraft.core.Registry;
 import net.minecraft.core.ResourceKey;
-import net.minecraft.server.packss.ResourceLocation;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Int2ObjectBiMap;
 
 import net.fabricmc.fabric.api.event.registry.FabricRegistryBuilder;

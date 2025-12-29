@@ -35,7 +35,7 @@ import net.minecraft.world.entity.SpawnReason;
 import net.minecraft.predicate.entity.EntityPredicates;
 import net.minecraft.core.Registries;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.packss.ResourceLocation;
+import net.minecraft.resources.ResourceLocation;
 
 import net.fabricmc.fabric.api.lookup.v1.custom.ApiLookupMap;
 import net.fabricmc.fabric.api.lookup.v1.custom.ApiProviderMap;

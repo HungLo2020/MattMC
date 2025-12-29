@@ -37,7 +37,7 @@ import net.minecraft.server.packs.ResourcePackProfile;
 import net.minecraft.server.packs.ResourceReloader;
 import net.minecraft.server.packs.ResourceType;
 import net.minecraft.network.chat.Component;
-import net.minecraft.server.packss.ResourceLocation;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Pair;
 
 import net.fabricmc.fabric.api.resource.IdentifiableResourceReloadListener;

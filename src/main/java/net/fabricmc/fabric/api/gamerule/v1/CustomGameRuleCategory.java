@@ -19,7 +19,7 @@ package net.fabricmc.fabric.api.gamerule.v1;
 import java.util.Optional;
 
 import net.minecraft.network.chat.Component;
-import net.minecraft.server.packss.ResourceLocation;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.GameRules;
 
 import net.fabricmc.fabric.impl.gamerule.RuleKeyExtensions;

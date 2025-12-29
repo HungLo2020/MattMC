@@ -20,7 +20,7 @@ import org.jetbrains.annotations.Nullable;
 
 import net.minecraft.world.entity.data.TrackedDataHandler;
 import net.minecraft.world.entity.data.TrackedDataHandlerRegistry;
-import net.minecraft.server.packss.ResourceLocation;
+import net.minecraft.resources.ResourceLocation;
 
 import net.fabricmc.fabric.impl.object.builder.FabricTrackedDataRegistryImpl;
 

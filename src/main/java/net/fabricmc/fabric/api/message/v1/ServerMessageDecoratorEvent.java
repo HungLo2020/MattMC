@@ -20,7 +20,7 @@ import java.util.Objects;
 
 import net.minecraft.network.message.MessageDecorator;
 import net.minecraft.network.chat.Component;
-import net.minecraft.server.packss.ResourceLocation;
+import net.minecraft.resources.ResourceLocation;
 
 import net.fabricmc.fabric.api.event.Event;
 import net.fabricmc.fabric.api.event.EventFactory;

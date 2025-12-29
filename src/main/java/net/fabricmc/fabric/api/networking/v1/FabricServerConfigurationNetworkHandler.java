@@ -18,7 +18,7 @@ package net.fabricmc.fabric.api.networking.v1;
 
 import net.minecraft.server.network.ServerConfigurationNetworkHandler;
 import net.minecraft.server.network.ServerPlayerConfigurationTask;
-import net.minecraft.server.packss.ResourceLocation;
+import net.minecraft.resources.ResourceLocation;
 
 /**
  * Fabric-provided extensions for {@link ServerConfigurationNetworkHandler}.

@@ -32,9 +32,9 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.world.item.crafting.display.SlotDisplay;
-import net.minecraft.core.entry.RegistryEntry;
-import net.minecraft.core.entry.RegistryEntryList;
-import net.minecraft.server.packss.ResourceLocation;
+import net.minecraft.core.RegistryEntry;
+import net.minecraft.core.RegistryEntryList;
+import net.minecraft.resources.ResourceLocation;
 
 import net.fabricmc.fabric.api.recipe.v1.ingredient.CustomIngredient;
 import net.fabricmc.fabric.api.recipe.v1.ingredient.CustomIngredientSerializer;

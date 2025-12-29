@@ -20,7 +20,7 @@ import java.util.Collection;
 import java.util.Collections;
 
 import net.minecraft.server.packs.ResourceReloader;
-import net.minecraft.server.packss.ResourceLocation;
+import net.minecraft.resources.ResourceLocation;
 
 /**
  * Interface for "identifiable" resource reload listeners.

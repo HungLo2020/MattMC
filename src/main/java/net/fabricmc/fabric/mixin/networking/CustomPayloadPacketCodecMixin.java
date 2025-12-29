@@ -26,7 +26,7 @@ import org.spongepowered.asm.mixin.injection.Coerce;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.PacketCodec;
 import net.minecraft.network.protocol.CustomPacketPayload;
-import net.minecraft.server.packss.ResourceLocation;
+import net.minecraft.resources.ResourceLocation;
 
 import net.fabricmc.fabric.impl.networking.CustomPayloadTypeProvider;
 import net.fabricmc.fabric.impl.networking.FabricCustomPayloadPacketCodec;

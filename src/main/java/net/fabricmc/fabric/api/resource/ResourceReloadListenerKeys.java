@@ -16,7 +16,7 @@
 
 package net.fabricmc.fabric.api.resource;
 
-import net.minecraft.server.packss.ResourceLocation;
+import net.minecraft.resources.ResourceLocation;
 
 import net.fabricmc.fabric.api.resource.v1.reloader.ResourceReloaderKeys;
 

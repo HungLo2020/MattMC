@@ -26,7 +26,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.protocol.s2c.login.LoginQueryRequestPayload;
 import net.minecraft.network.protocol.s2c.login.LoginQueryRequestS2CPacket;
-import net.minecraft.server.packss.ResourceLocation;
+import net.minecraft.resources.ResourceLocation;
 
 import net.fabricmc.fabric.impl.networking.payload.PacketByteBufLoginQueryRequestPayload;
 import net.fabricmc.fabric.impl.networking.payload.PayloadHelper;

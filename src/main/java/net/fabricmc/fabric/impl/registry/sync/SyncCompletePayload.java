@@ -19,7 +19,7 @@ package net.fabricmc.fabric.impl.registry.sync;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.PacketCodec;
 import net.minecraft.network.protocol.CustomPacketPayload;
-import net.minecraft.server.packss.ResourceLocation;
+import net.minecraft.resources.ResourceLocation;
 
 public class SyncCompletePayload implements CustomPacketPayload {
 	public static final SyncCompletePayload INSTANCE = new SyncCompletePayload();

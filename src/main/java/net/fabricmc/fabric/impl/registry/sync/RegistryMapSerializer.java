@@ -23,7 +23,7 @@ import it.unimi.dsi.fastutil.objects.Object2IntLinkedOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2IntMap;
 
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.server.packss.ResourceLocation;
+import net.minecraft.resources.ResourceLocation;
 
 public class RegistryMapSerializer {
 	public static final int VERSION = 1;

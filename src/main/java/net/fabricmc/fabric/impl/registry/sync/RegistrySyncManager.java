@@ -46,7 +46,7 @@ import net.minecraft.server.network.ServerPlayerConfigurationTask;
 import net.minecraft.network.chat.MutableText;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.Formatting;
-import net.minecraft.server.packss.ResourceLocation;
+import net.minecraft.resources.ResourceLocation;
 
 import net.fabricmc.fabric.api.event.registry.RegistryAttribute;
 import net.fabricmc.fabric.api.event.registry.RegistryAttributeHolder;

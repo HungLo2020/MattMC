@@ -29,7 +29,7 @@ import java.util.function.Function;
 
 import com.google.common.collect.MapMaker;
 
-import net.minecraft.server.packss.ResourceLocation;
+import net.minecraft.resources.ResourceLocation;
 
 import net.fabricmc.fabric.api.event.Event;
 

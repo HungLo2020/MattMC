@@ -23,11 +23,11 @@ import java.util.function.Function;
 import net.minecraft.world.level.storage.loot.LootTable;
 import net.minecraft.core.RegistryKeys;
 import net.minecraft.core.RegistryWrapper;
-import net.minecraft.core.entry.RegistryEntry;
+import net.minecraft.core.RegistryEntry;
 import net.minecraft.server.packs.Resource;
 import net.minecraft.server.packs.ResourcePackSource;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.server.packss.ResourceLocation;
+import net.minecraft.resources.ResourceLocation;
 
 import net.fabricmc.fabric.api.loot.v3.LootTableSource;
 import net.fabricmc.fabric.impl.resource.loader.BuiltinModResourcePackSource;

@@ -27,7 +27,7 @@ import net.minecraft.client.multiplayer.ClientConfigurationNetworkHandler;
 import net.minecraft.network.protocol.s2c.config.SelectKnownPacksS2CPacket;
 import net.minecraft.world.item.crafting.RecipeSerializer;
 import net.minecraft.core.Registries;
-import net.minecraft.server.packss.ResourceLocation;
+import net.minecraft.resources.ResourceLocation;
 
 import net.fabricmc.fabric.api.client.networking.v1.ClientConfigurationNetworking;
 import net.fabricmc.fabric.impl.recipe.sync.RecipeSyncImpl;

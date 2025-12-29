@@ -25,7 +25,7 @@ import net.minecraft.component.ComponentMap;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
-import net.minecraft.core.entry.RegistryEntry;
+import net.minecraft.core.RegistryEntry;
 
 import net.fabricmc.fabric.api.transfer.v1.item.ItemVariant;
 import net.fabricmc.fabric.impl.transfer.TransferApiImpl;

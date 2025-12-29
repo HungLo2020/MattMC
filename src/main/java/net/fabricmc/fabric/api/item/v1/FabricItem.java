@@ -28,9 +28,9 @@ import net.minecraft.world.item.Items;
 import net.minecraft.world.item.PotionItem;
 import net.minecraft.world.item.TippedArrowItem;
 import net.minecraft.world.item.alchemy.Potion;
-import net.minecraft.core.entry.RegistryEntry;
+import net.minecraft.core.RegistryEntry;
 import net.minecraft.util.Hand;
-import net.minecraft.server.packss.ResourceLocation;
+import net.minecraft.resources.ResourceLocation;
 
 import net.fabricmc.fabric.impl.item.FabricItemInternals;
 

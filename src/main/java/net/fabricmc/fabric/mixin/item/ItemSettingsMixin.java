@@ -21,7 +21,7 @@ import org.spongepowered.asm.mixin.Shadow;
 
 import net.minecraft.world.item.Item;
 import net.minecraft.core.RegistryKeyedValue;
-import net.minecraft.server.packss.ResourceLocation;
+import net.minecraft.resources.ResourceLocation;
 
 import net.fabricmc.fabric.api.item.v1.FabricItem;
 

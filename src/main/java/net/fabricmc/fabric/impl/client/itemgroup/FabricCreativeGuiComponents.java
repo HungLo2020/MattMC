@@ -30,7 +30,7 @@ import net.minecraft.world.item.ItemGroup;
 import net.minecraft.world.item.ItemGroups;
 import net.minecraft.core.Registries;
 import net.minecraft.network.chat.Component;
-import net.minecraft.server.packss.ResourceLocation;
+import net.minecraft.resources.ResourceLocation;
 
 import net.fabricmc.fabric.impl.itemgroup.FabricItemGroupImpl;
 

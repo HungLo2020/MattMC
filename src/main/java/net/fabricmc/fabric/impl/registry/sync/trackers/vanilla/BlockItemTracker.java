@@ -19,7 +19,7 @@ package net.fabricmc.fabric.impl.registry.sync.trackers.vanilla;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.core.Registry;
-import net.minecraft.server.packss.ResourceLocation;
+import net.minecraft.resources.ResourceLocation;
 
 import net.fabricmc.fabric.api.event.registry.RegistryEntryAddedCallback;
 

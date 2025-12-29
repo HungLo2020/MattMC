@@ -18,7 +18,7 @@ package net.fabricmc.fabric.api.event;
 
 import java.util.function.Function;
 
-import net.minecraft.server.packss.ResourceLocation;
+import net.minecraft.resources.ResourceLocation;
 
 import net.fabricmc.fabric.impl.base.event.EventFactoryImpl;
 

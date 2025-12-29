@@ -37,7 +37,7 @@ import net.minecraft.server.packs.metadata.PackResourceMetadata;
 import net.minecraft.server.packs.metadata.ResourceMetadataMap;
 import net.minecraft.server.packs.metadata.ResourceMetadataSerializer;
 import net.minecraft.network.chat.Component;
-import net.minecraft.server.packss.ResourceLocation;
+import net.minecraft.resources.ResourceLocation;
 
 public record PlaceholderResourcePack(ResourceType type, ResourcePackInfo metadata) implements Pack {
 	private static final Component DESCRIPTION_TEXT = Component.translatable("pack.description.modResources");

@@ -26,7 +26,7 @@ import net.minecraft.world.level.storage.loot.context.LootContext;
 import net.minecraft.core.Registry;
 import net.minecraft.core.ResourceKey;
 import net.minecraft.core.RegistryWrapper;
-import net.minecraft.core.entry.RegistryEntry;
+import net.minecraft.core.RegistryEntry;
 import net.minecraft.server.packs.ResourceManager;
 
 import net.fabricmc.fabric.api.event.Event;

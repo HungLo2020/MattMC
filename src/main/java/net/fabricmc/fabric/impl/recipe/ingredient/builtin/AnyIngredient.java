@@ -24,8 +24,8 @@ import com.mojang.serialization.MapCodec;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.Ingredient;
-import net.minecraft.core.entry.RegistryEntry;
-import net.minecraft.server.packss.ResourceLocation;
+import net.minecraft.core.RegistryEntry;
+import net.minecraft.resources.ResourceLocation;
 
 import net.fabricmc.fabric.api.recipe.v1.ingredient.CustomIngredientSerializer;
 

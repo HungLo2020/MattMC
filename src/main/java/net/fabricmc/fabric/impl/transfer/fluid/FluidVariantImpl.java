@@ -27,8 +27,8 @@ import net.minecraft.world.level.material.FlowableFluid;
 import net.minecraft.world.level.material.Fluid;
 import net.minecraft.world.level.material.Fluids;
 import net.minecraft.core.Registries;
-import net.minecraft.core.entry.RegistryEntry;
-import net.minecraft.server.packss.ResourceLocation;
+import net.minecraft.core.RegistryEntry;
+import net.minecraft.resources.ResourceLocation;
 
 import net.fabricmc.fabric.api.transfer.v1.fluid.FluidVariant;
 import net.fabricmc.fabric.impl.transfer.TransferApiImpl;

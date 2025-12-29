@@ -25,7 +25,7 @@ import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import org.slf4j.Logger;
 
 import net.minecraft.server.level.ChunkLevelType;
-import net.minecraft.server.packss.ResourceLocation;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.core.ChunkPos;
 
 import net.fabricmc.api.ModInitializer;

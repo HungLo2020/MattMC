@@ -21,7 +21,7 @@ import net.minecraft.world.level.block.WoodType;
 import net.minecraft.sounds.BlockSoundGroup;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundEvents;
-import net.minecraft.server.packss.ResourceLocation;
+import net.minecraft.resources.ResourceLocation;
 
 /**
  * This class allows easy creation of {@link WoodType}s.

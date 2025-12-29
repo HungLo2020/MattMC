@@ -20,7 +20,7 @@ import java.util.Objects;
 
 import org.jetbrains.annotations.ApiStatus;
 
-import net.minecraft.server.packss.ResourceLocation;
+import net.minecraft.resources.ResourceLocation;
 
 import net.fabricmc.fabric.impl.lookup.custom.ApiLookupMapImpl;
 

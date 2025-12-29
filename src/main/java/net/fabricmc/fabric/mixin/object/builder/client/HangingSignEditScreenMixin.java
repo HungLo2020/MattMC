@@ -24,7 +24,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import net.minecraft.world.level.block.entity.SignBlockEntity;
 import net.minecraft.client.gui.screens.ingame.AbstractSignEditScreen;
 import net.minecraft.client.gui.screens.ingame.HangingSignEditScreen;
-import net.minecraft.server.packss.ResourceLocation;
+import net.minecraft.resources.ResourceLocation;
 
 @Mixin(HangingSignEditScreen.class)
 public abstract class HangingSignEditScreenMixin extends AbstractSignEditScreen {

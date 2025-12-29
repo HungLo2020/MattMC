@@ -23,7 +23,7 @@ import java.util.function.Consumer;
 import org.jetbrains.annotations.ApiStatus;
 
 import net.minecraft.core.ResourceKey;
-import net.minecraft.server.packss.ResourceLocation;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.village.MerchantOffers;
 import net.minecraft.village.VillagerProfession;
 

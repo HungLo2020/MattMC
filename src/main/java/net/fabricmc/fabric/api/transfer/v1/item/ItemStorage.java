@@ -28,7 +28,7 @@ import net.minecraft.world.item.inventory.Container;
 import net.minecraft.world.item.inventory.SidedInventory;
 import net.minecraft.world.item.inventory.SimpleInventory;
 import net.minecraft.world.item.Items;
-import net.minecraft.server.packss.ResourceLocation;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.core.Direction;
 
 import net.fabricmc.fabric.api.lookup.v1.block.BlockApiLookup;

@@ -26,7 +26,7 @@ import io.netty.util.AsciiString;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.PacketCodec;
 import net.minecraft.network.protocol.CustomPacketPayload;
-import net.minecraft.server.packss.ResourceLocation;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.InvalidIdentifierException;
 
 public record RegistrationPayload(Id<RegistrationPayload> id, List<ResourceLocation> channels) implements CustomPacketPayload {

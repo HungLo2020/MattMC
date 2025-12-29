@@ -19,7 +19,7 @@ package net.fabricmc.fabric.api.event.registry;
 import it.unimi.dsi.fastutil.ints.Int2IntMap;
 
 import net.minecraft.core.Registry;
-import net.minecraft.server.packss.ResourceLocation;
+import net.minecraft.resources.ResourceLocation;
 
 import net.fabricmc.fabric.api.event.Event;
 import net.fabricmc.fabric.impl.registry.sync.ListenableRegistry;

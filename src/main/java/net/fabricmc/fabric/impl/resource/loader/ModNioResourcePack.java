@@ -50,7 +50,7 @@ import net.minecraft.server.packs.ResourcePackInfo;
 import net.minecraft.server.packs.ResourceType;
 import net.minecraft.server.packs.metadata.ResourceMetadataSerializer;
 import net.minecraft.network.chat.Component;
-import net.minecraft.server.packss.ResourceLocation;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.path.PathUtil;
 
 import net.fabricmc.fabric.api.resource.ModResourcePack;

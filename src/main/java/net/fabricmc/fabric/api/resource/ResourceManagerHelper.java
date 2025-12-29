@@ -25,7 +25,7 @@ import net.minecraft.server.packs.ResourceManager;
 import net.minecraft.server.packs.ResourceReloader;
 import net.minecraft.server.packs.ResourceType;
 import net.minecraft.network.chat.Component;
-import net.minecraft.server.packss.ResourceLocation;
+import net.minecraft.resources.ResourceLocation;
 
 import net.fabricmc.fabric.impl.resource.loader.ResourceManagerHelperImpl;
 import net.fabricmc.loader.api.ModContainer;

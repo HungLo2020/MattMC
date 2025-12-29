@@ -25,7 +25,7 @@ import org.spongepowered.asm.mixin.injection.Redirect;
 import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.core.entry.RegistryEntry;
+import net.minecraft.core.RegistryEntry;
 import net.minecraft.world.inventory.AnvilScreenHandler;
 import net.minecraft.world.inventory.ForgingScreenHandler;
 import net.minecraft.world.inventory.ContainerLevelAccess;

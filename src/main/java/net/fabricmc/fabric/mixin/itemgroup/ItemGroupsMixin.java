@@ -45,8 +45,8 @@ import net.minecraft.world.item.ItemGroup;
 import net.minecraft.world.item.ItemGroups;
 import net.minecraft.core.Registries;
 import net.minecraft.core.ResourceKey;
-import net.minecraft.core.entry.RegistryEntry;
-import net.minecraft.server.packss.ResourceLocation;
+import net.minecraft.core.RegistryEntry;
+import net.minecraft.resources.ResourceLocation;
 
 import net.fabricmc.fabric.impl.itemgroup.FabricItemGroupImpl;
 

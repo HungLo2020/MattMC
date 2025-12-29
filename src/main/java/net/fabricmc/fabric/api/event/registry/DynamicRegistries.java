@@ -57,7 +57,7 @@ import net.fabricmc.fabric.impl.registry.sync.DynamicRegistriesImpl;
  * {@snippet :
  * // @link region substring=ResourceKey target=ResourceKey
  * // @link region substring=ofRegistry target="ResourceKey#ofRegistry"
- * // @link region substring=ResourceLocation target="net.minecraft.server.packss.ResourceLocation#ResourceLocation(String, String)"
+ * // @link region substring=ResourceLocation target="net.minecraft.resources.ResourceLocation#ResourceLocation(String, String)"
  * public static final ResourceKey<Registry<MyData>> MY_DATA_KEY = ResourceKey.ofRegistry(ResourceLocation.of("my_mod", "my_data"));
  * // @end @end @end
  *

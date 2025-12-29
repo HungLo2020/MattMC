@@ -23,7 +23,7 @@ import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.PacketCodec;
 import net.minecraft.network.codec.PacketCodecs;
 import net.minecraft.network.protocol.CustomPacketPayload;
-import net.minecraft.server.packss.ResourceLocation;
+import net.minecraft.resources.ResourceLocation;
 
 public record CustomIngredientPayloadC2S(int protocolVersion, Set<ResourceLocation> registeredSerializers) implements CustomPacketPayload {
 	public static final PacketCodec<FriendlyByteBuf, CustomIngredientPayloadC2S> CODEC = PacketCodec.tuple(

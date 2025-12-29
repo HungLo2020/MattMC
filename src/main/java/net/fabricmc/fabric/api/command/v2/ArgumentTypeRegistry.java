@@ -21,7 +21,7 @@ import com.mojang.brigadier.arguments.ArgumentType;
 import net.minecraft.commands.argument.serialize.ArgumentSerializer;
 import net.minecraft.core.Registries;
 import net.minecraft.core.Registry;
-import net.minecraft.server.packss.ResourceLocation;
+import net.minecraft.resources.ResourceLocation;
 
 import net.fabricmc.fabric.mixin.command.ArgumentTypesAccessor;
 

@@ -35,7 +35,7 @@ import net.minecraft.world.inventory.ScreenTexts;
 import net.minecraft.network.chat.MutableText;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.Formatting;
-import net.minecraft.server.packss.ResourceLocation;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.thread.ThreadExecutor;
 
 import net.fabricmc.fabric.api.event.registry.RegistryAttribute;

@@ -23,7 +23,7 @@ import net.minecraft.network.handler.EncoderHandler;
 import net.minecraft.network.listener.PacketListener;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.PacketType;
-import net.minecraft.server.packss.ResourceLocation;
+import net.minecraft.resources.ResourceLocation;
 
 import net.fabricmc.fabric.impl.networking.NetworkingImpl;
 

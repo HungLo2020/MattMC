@@ -30,7 +30,7 @@ import net.minecraft.world.item.crafting.RecipeSerializer;
 import net.minecraft.core.Registries;
 import net.minecraft.core.ResourceKey;
 import net.minecraft.core.RegistryKeys;
-import net.minecraft.server.packss.ResourceLocation;
+import net.minecraft.resources.ResourceLocation;
 
 /**
  * Main packet used to send recipes to the client.

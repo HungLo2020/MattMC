@@ -28,7 +28,7 @@ import net.minecraft.client.multiplayer.ClientLoginNetworkHandler;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.protocol.c2s.login.LoginQueryResponseC2SPacket;
 import net.minecraft.network.protocol.s2c.login.LoginQueryRequestS2CPacket;
-import net.minecraft.server.packss.ResourceLocation;
+import net.minecraft.resources.ResourceLocation;
 
 import net.fabricmc.fabric.api.client.networking.v1.ClientLoginConnectionEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientLoginNetworking;

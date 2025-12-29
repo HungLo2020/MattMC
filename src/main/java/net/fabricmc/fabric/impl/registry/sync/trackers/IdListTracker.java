@@ -20,7 +20,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import net.minecraft.core.Registry;
-import net.minecraft.server.packss.ResourceLocation;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.IdList;
 
 import net.fabricmc.fabric.api.event.registry.RegistryEntryAddedCallback;

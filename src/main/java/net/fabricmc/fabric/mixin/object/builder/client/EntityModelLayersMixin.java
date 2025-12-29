@@ -25,7 +25,7 @@ import net.minecraft.world.level.block.WoodType;
 import net.minecraft.client.renderer.block.entity.HangingSignBlockEntityRenderer;
 import net.minecraft.client.renderer.entity.model.EntityModelLayer;
 import net.minecraft.client.renderer.entity.model.EntityModelLayers;
-import net.minecraft.server.packss.ResourceLocation;
+import net.minecraft.resources.ResourceLocation;
 
 @Mixin(EntityModelLayers.class)
 public class EntityModelLayersMixin {

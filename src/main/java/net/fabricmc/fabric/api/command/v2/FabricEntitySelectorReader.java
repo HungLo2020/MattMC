@@ -16,7 +16,7 @@
 
 package net.fabricmc.fabric.api.command.v2;
 
-import net.minecraft.server.packss.ResourceLocation;
+import net.minecraft.resources.ResourceLocation;
 
 /**
  * Fabric extension to {@link net.minecraft.commands.EntitySelectorParser}, implemented

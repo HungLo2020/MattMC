@@ -27,7 +27,7 @@ import net.minecraft.network.protocol.CustomPacketPayload;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.network.ServerConfigurationNetworkHandler;
-import net.minecraft.server.packss.ResourceLocation;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.thread.ThreadExecutor;
 
 import net.fabricmc.fabric.impl.networking.server.ServerNetworkingImpl;

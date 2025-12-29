@@ -25,7 +25,7 @@ import net.minecraft.world.level.block.BlockState;
 import net.minecraft.core.Registries;
 import net.minecraft.core.ResourceKey;
 import net.minecraft.core.RegistryKeys;
-import net.minecraft.server.packss.ResourceLocation;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.poi.PoiRecord;
 import net.minecraft.world.poi.PoiType;
 import net.minecraft.world.poi.PointOfInterestTypes;

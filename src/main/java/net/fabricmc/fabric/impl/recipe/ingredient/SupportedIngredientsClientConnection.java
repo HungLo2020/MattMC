@@ -19,7 +19,7 @@ package net.fabricmc.fabric.impl.recipe.ingredient;
 import java.util.Set;
 
 import net.minecraft.network.Connection;
-import net.minecraft.server.packss.ResourceLocation;
+import net.minecraft.resources.ResourceLocation;
 
 /**
  * Implemented on {@link Connection} to store which custom ingredients the client supports.

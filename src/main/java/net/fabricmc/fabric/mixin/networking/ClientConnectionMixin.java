@@ -41,7 +41,7 @@ import net.minecraft.network.handler.NetworkStateTransitions;
 import net.minecraft.network.listener.PacketListener;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.state.NetworkState;
-import net.minecraft.server.packss.ResourceLocation;
+import net.minecraft.resources.ResourceLocation;
 
 import net.fabricmc.fabric.impl.networking.ChannelInfoHolder;
 import net.fabricmc.fabric.impl.networking.NetworkHandlerExtensions;

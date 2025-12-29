@@ -33,7 +33,7 @@ import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.server.network.ServerPlayer;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.TextCodecs;
-import net.minecraft.server.packss.ResourceLocation;
+import net.minecraft.resources.ResourceLocation;
 
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.event.registry.RegistryEntryAddedCallback;

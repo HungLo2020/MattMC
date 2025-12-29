@@ -19,7 +19,7 @@ package net.fabricmc.fabric.impl.client.keybinding;
 import java.util.Comparator;
 
 import net.minecraft.client.Options.KeyMapping;
-import net.minecraft.server.packss.ResourceLocation;
+import net.minecraft.resources.ResourceLocation;
 
 public class CategoryComparator implements Comparator<KeyMapping.Category> {
 	public static final CategoryComparator INSTANCE = new CategoryComparator();

@@ -53,9 +53,9 @@ import net.minecraft.core.MutableRegistry;
 import net.minecraft.core.Registry;
 import net.minecraft.core.ResourceKey;
 import net.minecraft.core.SimpleRegistry;
-import net.minecraft.core.entry.RegistryEntry;
-import net.minecraft.core.entry.RegistryEntryInfo;
-import net.minecraft.server.packss.ResourceLocation;
+import net.minecraft.core.RegistryEntry;
+import net.minecraft.core.RegistryEntryInfo;
+import net.minecraft.resources.ResourceLocation;
 
 import net.fabricmc.fabric.api.event.Event;
 import net.fabricmc.fabric.api.event.EventFactory;

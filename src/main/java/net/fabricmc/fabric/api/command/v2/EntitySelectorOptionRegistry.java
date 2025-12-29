@@ -21,7 +21,7 @@ import java.util.function.Predicate;
 import net.minecraft.commands.EntitySelectorOptions;
 import net.minecraft.commands.EntitySelectorParser;
 import net.minecraft.network.chat.Component;
-import net.minecraft.server.packss.ResourceLocation;
+import net.minecraft.resources.ResourceLocation;
 
 import net.fabricmc.fabric.mixin.command.EntitySelectorOptionsAccessor;
 

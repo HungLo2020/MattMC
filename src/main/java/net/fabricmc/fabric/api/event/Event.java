@@ -18,7 +18,7 @@ package net.fabricmc.fabric.api.event;
 
 import org.jetbrains.annotations.ApiStatus;
 
-import net.minecraft.server.packss.ResourceLocation;
+import net.minecraft.resources.ResourceLocation;
 
 /**
  * Base class for Fabric's event implementations.

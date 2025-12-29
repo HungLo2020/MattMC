@@ -19,7 +19,7 @@ package net.fabricmc.fabric.impl.networking;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.PacketCodec;
 import net.minecraft.network.protocol.CustomPacketPayload;
-import net.minecraft.server.packss.ResourceLocation;
+import net.minecraft.resources.ResourceLocation;
 
 public record CommonVersionPayload(int[] versions) implements CustomPacketPayload {
 	public static final PacketCodec<FriendlyByteBuf, CommonVersionPayload> CODEC = CustomPacketPayload.codecOf(CommonVersionPayload::write, CommonVersionPayload::new);

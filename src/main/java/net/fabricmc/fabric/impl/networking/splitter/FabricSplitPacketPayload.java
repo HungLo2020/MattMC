@@ -20,7 +20,7 @@ import io.netty.buffer.ByteBuf;
 
 import net.minecraft.network.codec.PacketCodec;
 import net.minecraft.network.protocol.CustomPacketPayload;
-import net.minecraft.server.packss.ResourceLocation;
+import net.minecraft.resources.ResourceLocation;
 
 public record FabricSplitPacketPayload(ByteBuf byteBuf) implements CustomPacketPayload {
 	public static final Id<FabricSplitPacketPayload> ID = new Id<>(ResourceLocation.of("fabric", "split"));

@@ -19,7 +19,7 @@ package net.fabricmc.fabric.impl.networking;
 import java.util.Collection;
 
 import net.minecraft.network.NetworkPhase;
-import net.minecraft.server.packss.ResourceLocation;
+import net.minecraft.resources.ResourceLocation;
 
 public interface ChannelInfoHolder {
 	/**

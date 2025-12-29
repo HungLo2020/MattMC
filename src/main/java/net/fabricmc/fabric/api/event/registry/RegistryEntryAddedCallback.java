@@ -19,8 +19,8 @@ package net.fabricmc.fabric.api.event.registry;
 import java.util.function.Consumer;
 
 import net.minecraft.core.Registry;
-import net.minecraft.core.entry.RegistryEntry;
-import net.minecraft.server.packss.ResourceLocation;
+import net.minecraft.core.RegistryEntry;
+import net.minecraft.resources.ResourceLocation;
 
 import net.fabricmc.fabric.api.event.Event;
 import net.fabricmc.fabric.impl.registry.sync.ListenableRegistry;

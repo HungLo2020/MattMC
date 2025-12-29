@@ -22,7 +22,7 @@ import java.util.function.Consumer;
 import net.minecraft.network.handler.EncoderHandler;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.server.network.ServerPlayerConfigurationTask;
-import net.minecraft.server.packss.ResourceLocation;
+import net.minecraft.resources.ResourceLocation;
 
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;

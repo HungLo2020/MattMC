@@ -30,8 +30,8 @@ import net.minecraft.core.MutableRegistry;
 import net.minecraft.core.ResourceKey;
 import net.minecraft.core.RegistryLoader;
 import net.minecraft.core.RegistryOps;
-import net.minecraft.core.entry.RegistryEntry;
-import net.minecraft.core.entry.RegistryEntryInfo;
+import net.minecraft.core.RegistryEntry;
+import net.minecraft.core.RegistryEntryInfo;
 import net.minecraft.server.packs.Resource;
 
 import net.fabricmc.fabric.impl.item.EnchantmentUtil;

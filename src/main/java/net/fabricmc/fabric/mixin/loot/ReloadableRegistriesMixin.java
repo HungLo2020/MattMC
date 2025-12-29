@@ -46,7 +46,7 @@ import net.minecraft.core.RegistryWrapper;
 import net.minecraft.core.ReloadableRegistries;
 import net.minecraft.core.ServerDynamicRegistryType;
 import net.minecraft.server.packs.ResourceManager;
-import net.minecraft.server.packss.ResourceLocation;
+import net.minecraft.resources.ResourceLocation;
 
 import net.fabricmc.fabric.api.loot.v3.FabricLootTableBuilder;
 import net.fabricmc.fabric.api.loot.v3.LootTableEvents;
