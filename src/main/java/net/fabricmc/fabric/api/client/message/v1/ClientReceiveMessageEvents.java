@@ -18,7 +18,7 @@ package net.fabricmc.fabric.api.client.message.v1;
 
 import java.time.Instant;
 
-import com.mojang.authlib.PlayerProfile;
+import com.mojang.authlib.GameProfile;
 import org.jetbrains.annotations.Nullable;
 
 import net.minecraft.client.gui.components.ChatComponent;
@@ -160,7 +160,7 @@ public final class ClientReceiveMessageEvents {
 		 * @param receptionTimestamp the timestamp when the message was received
 		 * @return {@code true} if the message should be displayed, otherwise {@code false}
 		 */
-		boolean allowReceiveChatMessage(Component message, @Nullable PlayerChatMessage signedMessage, @Nullable PlayerProfile sender, ChatType.Bound params, Instant receptionTimestamp);
+		boolean allowReceiveChatMessage(Component message, @Nullable PlayerChatMessage signedMessage, @Nullable GameProfile sender, ChatType.Bound params, Instant receptionTimestamp);
 	}
 
 	@FunctionalInterface
@@ -213,7 +213,7 @@ public final class ClientReceiveMessageEvents {
 		 * @param params             the parameters of the message
 		 * @param receptionTimestamp the timestamp when the message was received
 		 */
-		void onReceiveChatMessage(Component message, @Nullable PlayerChatMessage signedMessage, @Nullable PlayerProfile sender, ChatType.Bound params, Instant receptionTimestamp);
+		void onReceiveChatMessage(Component message, @Nullable PlayerChatMessage signedMessage, @Nullable GameProfile sender, ChatType.Bound params, Instant receptionTimestamp);
 	}
 
 	@FunctionalInterface
@@ -243,7 +243,7 @@ public final class ClientReceiveMessageEvents {
 		 * @param params             the parameters of the message
 		 * @param receptionTimestamp the timestamp when the message was received
 		 */
-		void onReceiveChatMessageCanceled(Component message, @Nullable PlayerChatMessage signedMessage, @Nullable PlayerProfile sender, ChatType.Bound params, Instant receptionTimestamp);
+		void onReceiveChatMessageCanceled(Component message, @Nullable PlayerChatMessage signedMessage, @Nullable GameProfile sender, ChatType.Bound params, Instant receptionTimestamp);
 	}
 
 	@FunctionalInterface

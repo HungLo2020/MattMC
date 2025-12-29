@@ -17,7 +17,7 @@
 package net.fabricmc.fabric.api.itemgroup.v1;
 
 import net.minecraft.world.item.CreativeModeTab;
-import net.minecraft.world.item.ItemGroups;
+import net.minecraft.world.item.CreativeModeTabs;
 import net.minecraft.resources.ResourceKey;
 
 import net.fabricmc.fabric.api.event.Event;

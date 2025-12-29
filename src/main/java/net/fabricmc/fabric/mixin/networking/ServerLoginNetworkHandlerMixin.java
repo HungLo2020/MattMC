@@ -16,7 +16,7 @@
 
 package net.fabricmc.fabric.mixin.networking;
 
-import com.mojang.authlib.PlayerProfile;
+import com.mojang.authlib.GameProfile;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
@@ -39,7 +39,7 @@ import net.fabricmc.fabric.impl.networking.server.ServerLoginNetworkAddon;
 @Mixin(ServerLoginPacketListenerImpl.class)
 abstract class ServerLoginNetworkHandlerMixin implements NetworkHandlerExtensions, PacketCallbackListener {
 	@Shadow
-	protected abstract void tickVerify(PlayerProfile profile);
+	protected abstract void tickVerify(GameProfile profile);
 
 	@Unique
 	private ServerLoginNetworkAddon addon;
@@ -51,8 +51,8 @@ abstract class ServerLoginNetworkHandlerMixin implements NetworkHandlerExtension
 		this.addon.lateInit();
 	}
 
-	@Redirect(method = "tick", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/network/ServerLoginPacketListenerImpl;tickVerify(Lcom/mojang/authlib/PlayerProfile;)V"))
-	private void handlePlayerJoin(ServerLoginPacketListenerImpl instance, PlayerProfile profile) {
+	@Redirect(method = "tick", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/network/ServerLoginPacketListenerImpl;tickVerify(Lcom/mojang/authlib/GameProfile;)V"))
+	private void handlePlayerJoin(ServerLoginPacketListenerImpl instance, GameProfile profile) {
 		// Do not accept the player, thereby moving into play stage until all login futures being waited on are completed
 		if (this.addon.queryTick()) {
 			this.tickVerify(profile);

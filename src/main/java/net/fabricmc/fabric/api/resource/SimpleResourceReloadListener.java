@@ -45,9 +45,9 @@ import net.minecraft.server.packs.resources.ResourceManagerReloadListener;
 @Deprecated
 public interface SimpleResourceReloadListener<T> extends IdentifiableResourceReloadListener {
 	@Override
-	default CompletableFuture<Void> reload(Store store, Executor loadExecutor, Synchronizer helper, Executor applyExecutor) {
-		return load(store.getResourceManager(), loadExecutor).thenCompose(helper::whenPrepared).thenCompose(
-				(o) -> apply(o, store.getResourceManager(), applyExecutor)
+	default CompletableFuture<Void> reload(PreparationBarrier store, ResourceManager manager, Executor loadExecutor, Executor applyExecutor) {
+		return load(manager, loadExecutor).thenCompose(store::wait).thenCompose(
+				(o) -> apply(o, manager, applyExecutor)
 		);
 	}
 
