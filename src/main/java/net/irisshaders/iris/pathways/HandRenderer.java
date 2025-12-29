@@ -6,7 +6,6 @@ import com.mojang.blaze3d.vertex.ByteBufferBuilder;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexSorting;
 import net.irisshaders.iris.Iris;
-import net.irisshaders.iris.mixin.GameRendererAccessor;
 import net.irisshaders.iris.pipeline.WorldRenderingPhase;
 import net.irisshaders.iris.pipeline.WorldRenderingPipeline;
 import net.irisshaders.iris.uniforms.CapturedRenderingState;
@@ -54,15 +53,15 @@ public class HandRenderer {
 
 		// We need to scale the matrix by 0.125 so the hand doesn't clip through blocks.
 		Matrix4f scaleMatrix = new Matrix4f().scale(1F, 1F, DEPTH);
-		scaleMatrix.mul(gameRenderer.getProjectionMatrix(((GameRendererAccessor) gameRenderer).invokeGetFov(camera, tickDelta, false)));
+		scaleMatrix.mul(gameRenderer.getProjectionMatrix(gameRenderer.getFov(camera, tickDelta, false))); // Direct method call - getFov is now public
 		RenderSystem.setProjectionMatrix(cachedProjectionMatrixBuffer.getBuffer(scaleMatrix), ProjectionType.PERSPECTIVE);
 
 		poseStack.setIdentity();
 
-		((GameRendererAccessor) gameRenderer).invokeBobHurt(poseStack, tickDelta);
+		gameRenderer.bobHurt(poseStack, tickDelta);
 
 		if (Minecraft.getInstance().options.bobView().get()) {
-			((GameRendererAccessor) gameRenderer).invokeBobView(poseStack, tickDelta);
+			gameRenderer.bobView(poseStack, tickDelta);
 		}
 
 		return poseStack;
@@ -71,7 +70,7 @@ public class HandRenderer {
 	private boolean canRender(Camera camera, GameRenderer gameRenderer) {
 		return !(camera.isDetached()
 			|| !(camera.getEntity() instanceof Player)
-			|| ((GameRendererAccessor) gameRenderer).getPanoramicMode()
+			|| gameRenderer.panoramicMode
 			|| Minecraft.getInstance().options.hideGui
 			|| (camera.getEntity() instanceof LivingEntity && ((LivingEntity) camera.getEntity()).isSleeping())
 			|| Minecraft.getInstance().gameMode.getPlayerMode() == GameType.SPECTATOR);

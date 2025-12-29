@@ -44,7 +44,7 @@ public class GlCommandEncoder implements CommandEncoder {
 	private RenderPipeline lastPipeline;
 	private boolean inRenderPass;
 	@Nullable
-	private GlProgram lastProgram;
+	public GlProgram lastProgram; // Made public for Sodium shader rendering integration
 
 	protected GlCommandEncoder(GlDevice glDevice) {
 		this.device = glDevice;
@@ -900,7 +900,7 @@ public class GlCommandEncoder implements CommandEncoder {
 		return true;
 	}
 
-	private void applyPipelineState(RenderPipeline renderPipeline) {
+	public void applyPipelineState(RenderPipeline renderPipeline) { // Made public for Sodium shader rendering integration
 		if (this.lastPipeline != renderPipeline) {
 			this.lastPipeline = renderPipeline;
 			if (renderPipeline.getDepthTestFunction() != DepthTestFunction.NO_DEPTH_TEST) {

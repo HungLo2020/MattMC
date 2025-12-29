@@ -126,10 +126,10 @@ public class GameRenderer implements Projector, AutoCloseable {
 	private long lastActiveTime = Util.getMillis();
 	private final LightTexture lightTexture;
 	private final OverlayTexture overlayTexture = new OverlayTexture();
-	private boolean panoramicMode;
+	public boolean panoramicMode; // Made public for Iris shader integration
 	protected CubeMap cubeMap;
 	protected PanoramaRenderer panorama;
-	private final CrossFrameResourcePool resourcePool = new CrossFrameResourcePool(3);
+	public final CrossFrameResourcePool resourcePool = new CrossFrameResourcePool(3); // Made public for Iris shader integration
 	private final FogRenderer fogRenderer = new FogRenderer();
 	private final GuiRenderer guiRenderer;
 	private final GuiRenderState guiRenderState;
@@ -485,7 +485,7 @@ public class GameRenderer implements Projector, AutoCloseable {
 		}
 	}
 
-	private void bobHurt(PoseStack poseStack, float f) {
+	public void bobHurt(PoseStack poseStack, float f) { // Made public for Iris hand rendering
 		if (this.minecraft.getCameraEntity() instanceof LivingEntity livingEntity) {
 			float g = livingEntity.hurtTime - f;
 			if (livingEntity.isDeadOrDying()) {
@@ -507,7 +507,7 @@ public class GameRenderer implements Projector, AutoCloseable {
 		}
 	}
 
-	private void bobView(PoseStack poseStack, float f) {
+	public void bobView(PoseStack poseStack, float f) { // Made public for Iris hand rendering
 		if (this.minecraft.getCameraEntity() instanceof AbstractClientPlayer abstractClientPlayer) {
 			ClientAvatarState clientAvatarState = abstractClientPlayer.avatarState();
 			float g = clientAvatarState.getBackwardsInterpolatedWalkDistance(f);
@@ -763,7 +763,7 @@ public class GameRenderer implements Projector, AutoCloseable {
 		}
 	}
 
-	private boolean shouldRenderBlockOutline() {
+	public boolean shouldRenderBlockOutline() { // Made public for Iris shader integration
 		if (!this.renderBlockOutline) {
 			return false;
 		} else {
