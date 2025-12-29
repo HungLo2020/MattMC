@@ -1,19 +1,69 @@
 {
   "schemaVersion": 1,
-  "id": "fabricloader",
-  "name": "Fabric Loader",
-  "version": "${version}",
+  "id": "mattmc",
+  "name": "MattMC",
+  "version": "1.21.10",
+  "description": "Minecraft 1.21.10 with integrated Fabric Loader, Sodium, Iris, and Distant Horizons",
   "environment": "*",
-  "description": "The base mod loader.",
   "contact": {
-    "homepage": "https://fabricmc.net",
-    "irc": "ircs://irc.esper.net:6697/fabric",
-    "issues": "https://github.com/FabricMC/fabric-loader/issues",
-    "sources": "https://github.com/FabricMC/fabric-loader"
+    "homepage": "https://github.com/HungLo2020/MattMC",
+    "sources": "https://github.com/HungLo2020/MattMC"
   },
-  "license": "Apache-2.0",
-  "icon": "assets/fabricloader/icon.png",
+  "license": "Mixed (Apache-2.0, LGPL-3.0, Polyform-Shield-1.0.0)",
+  "icon": "iris-logo.png",
   "authors": [
-    "FabricMC"
-  ]
+    "HungLo2020",
+    "FabricMC",
+    "CaffeineMC",
+    "IrisShaders",
+    "James Seibel"
+  ],
+  "entrypoints": {
+    "client": [
+      "net.caffeinemc.mods.sodium.fabric.SodiumFabricMod",
+      "com.seibel.distanthorizons.fabric.FabricMain"
+    ],
+    "server": [
+      "com.seibel.distanthorizons.fabric.FabricMain"
+    ],
+    "preLaunch": [
+      "net.caffeinemc.mods.sodium.fabric.SodiumPreLaunch"
+    ]
+  },
+  "provides": [
+    "fabricloader",
+    "sodium",
+    "iris",
+    "distanthorizons",
+    "lod"
+  ],
+  "mixins": [
+    "sodium-common.mixins.json",
+    "sodium-fabric.mixins.json",
+    "mixins.iris.json",
+    "mixins.iris.fabric.json",
+    "mixins.iris.fantastic.json",
+    "mixins.iris.vertexformat.json",
+    "mixins.iris.bettermipmaps.json",
+    "mixins.iris.compat.sodium.json",
+    "mixins.iris.compat.dh.json",
+    "mixins.iris.fixes.maxfpscrash.json",
+    "DistantHorizons.fabric.mixins.json"
+  ],
+  "depends": {
+    "minecraft": "1.21.10",
+    "java": ">=21"
+  },
+  "custom": {
+    "fabric-renderer-api-v1:contains_renderer": true,
+    "sodium:options": {
+      "mixin.features.render.world.sky": false
+    },
+    "loom:injected_interfaces": {
+      "net/minecraft/class_276": ["net/irisshaders/iris/mixinterface/RenderTargetInterface"],
+      "com/mojang/blaze3d/textures/GpuTexture": ["net/irisshaders/iris/mixinterface/GpuTextureInterface"],
+      "com/mojang/blaze3d/systems/RenderPass": ["net/irisshaders/iris/mixinterface/RenderPassInterface"],
+      "net/minecraft/class_1921": ["net/irisshaders/iris/mixinterface/RenderTypeInterface"]
+    }
+  }
 }

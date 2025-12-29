@@ -396,6 +396,16 @@ sourceSets {
 }
 
 // ============================================================================
+// RESOURCE PROCESSING
+// ============================================================================
+// Handle duplicate resources from consolidated mods
+// ============================================================================
+
+tasks.named('processResources') {
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
+
+// ============================================================================
 // DEPENDENCIES ARE NOW SIMPLE
 // ============================================================================
 // No separate configurations needed - everything uses main implementation
