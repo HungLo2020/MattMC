@@ -108,14 +108,14 @@ public final class Networking implements ModInitializer {
 
 		@SuppressWarnings("unchecked")
 		private static <D> OpenScreenPayload<D> fromBuf(RegistryFriendlyByteBuf buf) {
-			ResourceLocation id = buf.readIdentifier();
+			ResourceLocation id = buf.readResourceLocation();
 			StreamCodec<RegistryFriendlyByteBuf, D> codec = (StreamCodec<RegistryFriendlyByteBuf, D>) CODEC_BY_ID.get(id);
 
 			return new OpenScreenPayload<>(id, buf.readByte(), ComponentSerialization.REGISTRY_PACKET_CODEC.decode(buf), codec, codec == null ? null : codec.decode(buf));
 		}
 
 		private void write(RegistryFriendlyByteBuf buf) {
-			buf.writeIdentifier(this.identifier);
+			buf.writeResourceLocation(this.identifier);
 			buf.writeByte(this.syncId);
 			ComponentSerialization.REGISTRY_PACKET_CODEC.encode(buf, this.title);
 			this.innerCodec.encode(buf, this.data);

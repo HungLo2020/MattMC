@@ -52,7 +52,7 @@ public record RecipeSyncPayloadS2C(List<Entry> entries) implements CustomPacketP
 		);
 
 		private static Entry read(RegistryFriendlyByteBuf buf) {
-			ResourceLocation recipeSerializerId = buf.readIdentifier();
+			ResourceLocation recipeSerializerId = buf.readResourceLocation();
 			RecipeSerializer<?> recipeSerializer = Registries.RECIPE_SERIALIZER.get(recipeSerializerId);
 
 			if (recipeSerializer == null || !RecipeSyncImpl.isSynced(recipeSerializer)) {
@@ -73,7 +73,7 @@ public record RecipeSyncPayloadS2C(List<Entry> entries) implements CustomPacketP
 		}
 
 		private void write(RegistryFriendlyByteBuf buf) {
-			buf.writeIdentifier(Registries.RECIPE_SERIALIZER.getId(this.serializer));
+			buf.writeResourceLocation(Registries.RECIPE_SERIALIZER.getId(this.serializer));
 
 			buf.writeVarInt(this.recipes.size());
 

@@ -93,11 +93,11 @@ public class DirectRegistryPacketHandler extends RegistryPacketHandler<DirectReg
 		buf.writeVarInt(regNamespaceGroups.size());
 
 		regNamespaceGroups.forEach((regNamespace, regIds) -> {
-			buf.writeString(optimizeNamespace(regNamespace));
+			buf.writeUtf(optimizeNamespace(regNamespace));
 			buf.writeVarInt(regIds.size());
 
 			for (ResourceLocation regId : regIds) {
-				buf.writeString(regId.getPath());
+				buf.writeUtf(regId.getPath());
 				buf.writeByte(encodeRegistryAttributes(regId));
 
 				Object2IntMap<ResourceLocation> idMap = registryMap.get(regId);
@@ -136,7 +136,7 @@ public class DirectRegistryPacketHandler extends RegistryPacketHandler<DirectReg
 
 					bulks.add(currentBulk);
 
-					buf.writeString(optimizeNamespace(idNamespaceEntry.getKey()));
+					buf.writeUtf(optimizeNamespace(idNamespaceEntry.getKey()));
 					buf.writeVarInt(bulks.size());
 
 					for (List<Object2IntMap.Entry<ResourceLocation>> bulk : bulks) {
@@ -147,7 +147,7 @@ public class DirectRegistryPacketHandler extends RegistryPacketHandler<DirectReg
 						buf.writeVarInt(bulk.size());
 
 						for (Object2IntMap.Entry<ResourceLocation> idPair : bulk) {
-							buf.writeString(idPair.getKey().getPath());
+							buf.writeUtf(idPair.getKey().getPath());
 
 							lastBulkLastRawId = idPair.getIntValue();
 						}
@@ -195,11 +195,11 @@ public class DirectRegistryPacketHandler extends RegistryPacketHandler<DirectReg
 		int regNamespaceGroupAmount = combinedBuf.readVarInt();
 
 		for (int i = 0; i < regNamespaceGroupAmount; i++) {
-			String regNamespace = unoptimizeNamespace(combinedBuf.readString());
+			String regNamespace = unoptimizeNamespace(combinedBuf.readUtf());
 			int regNamespaceGroupLength = combinedBuf.readVarInt();
 
 			for (int j = 0; j < regNamespaceGroupLength; j++) {
-				String regPath = combinedBuf.readString();
+				String regPath = combinedBuf.readUtf();
 				EnumSet<RegistryAttribute> attributes = decodeRegistryAttributes(combinedBuf.readByte());
 				Object2IntMap<ResourceLocation> idMap = new Object2IntLinkedOpenHashMap<>();
 				int idNamespaceGroupAmount = combinedBuf.readVarInt();
@@ -207,7 +207,7 @@ public class DirectRegistryPacketHandler extends RegistryPacketHandler<DirectReg
 				int lastBulkLastRawId = 0;
 
 				for (int k = 0; k < idNamespaceGroupAmount; k++) {
-					String idNamespace = unoptimizeNamespace(combinedBuf.readString());
+					String idNamespace = unoptimizeNamespace(combinedBuf.readUtf());
 					int rawIdBulkAmount = combinedBuf.readVarInt();
 
 					for (int l = 0; l < rawIdBulkAmount; l++) {
@@ -218,7 +218,7 @@ public class DirectRegistryPacketHandler extends RegistryPacketHandler<DirectReg
 
 						for (int m = 0; m < bulkSize; m++) {
 							currentRawId++;
-							String idPath = combinedBuf.readString();
+							String idPath = combinedBuf.readUtf();
 							idMap.put(ResourceLocation.of(idNamespace, idPath), currentRawId);
 						}
 

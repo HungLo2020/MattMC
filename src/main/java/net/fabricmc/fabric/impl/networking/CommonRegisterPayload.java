@@ -34,14 +34,14 @@ public record CommonRegisterPayload(int version, String phase, Set<ResourceLocat
 	private CommonRegisterPayload(FriendlyByteBuf buf) {
 		this(
 				buf.readVarInt(),
-				buf.readString(),
+				buf.readUtf(),
 				buf.readCollection(HashSet::new, FriendlyByteBuf::readIdentifier)
 		);
 	}
 
 	public void write(FriendlyByteBuf buf) {
 		buf.writeVarInt(version);
-		buf.writeString(phase);
+		buf.writeUtf(phase);
 		buf.writeCollection(channels, FriendlyByteBuf::writeIdentifier);
 	}
 

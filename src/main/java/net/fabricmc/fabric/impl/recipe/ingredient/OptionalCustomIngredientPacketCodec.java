@@ -43,7 +43,7 @@ public class OptionalCustomIngredientPacketCodec implements StreamCodec<Registry
 			return this.fallback.decode(buf);
 		}
 
-		ResourceLocation type = buf.readIdentifier();
+		ResourceLocation type = buf.readResourceLocation();
 		CustomIngredientSerializer<?> serializer = CustomIngredientSerializer.get(type);
 
 		if (serializer == null) {
@@ -71,7 +71,7 @@ public class OptionalCustomIngredientPacketCodec implements StreamCodec<Registry
 
 		// The client supports this custom ingredient, so we send it as a custom ingredient.
 		buf.writeVarInt(CustomIngredientPacketCodec.PACKET_MARKER);
-		buf.writeIdentifier(customIngredient.getSerializer().getIdentifier());
+		buf.writeResourceLocation(customIngredient.getSerializer().getIdentifier());
 		StreamCodec<RegistryFriendlyByteBuf, CustomIngredient> packetCodec = (StreamCodec<RegistryFriendlyByteBuf, CustomIngredient>) customIngredient.getSerializer().getPacketCodec();
 		packetCodec.encode(buf, customIngredient);
 	}
