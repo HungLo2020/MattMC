@@ -28,7 +28,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-import net.minecraft.world.item.ItemGroup;
+import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.item.ItemGroups;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.core.Registries;
@@ -40,7 +40,7 @@ import net.fabricmc.fabric.api.itemgroup.v1.ItemGroupEvents;
 import net.fabricmc.fabric.impl.itemgroup.FabricItemGroupImpl;
 import net.fabricmc.fabric.impl.itemgroup.ItemGroupEventsImpl;
 
-@Mixin(ItemGroup.class)
+@Mixin(CreativeModeTab.class)
 abstract class ItemGroupMixin implements FabricItemGroupImpl {
 	@Shadow
 	private Collection<ItemStack> displayStacks;
@@ -53,9 +53,9 @@ abstract class ItemGroupMixin implements FabricItemGroupImpl {
 
 	@SuppressWarnings("ConstantConditions")
 	@Inject(method = "updateEntries", at = @At("TAIL"))
-	public void getStacks(ItemGroup.DisplayContext context, CallbackInfo ci) {
-		final ItemGroup self = (ItemGroup) (Object) this;
-		final ResourceKey<ItemGroup> registryKey = Registries.ITEM_GROUP.getKey(self).orElseThrow(() -> new IllegalStateException("Unregistered item group : " + self));
+	public void getStacks(CreativeModeTab.DisplayContext context, CallbackInfo ci) {
+		final CreativeModeTab self = (CreativeModeTab) (Object) this;
+		final ResourceKey<CreativeModeTab> registryKey = Registries.ITEM_GROUP.getKey(self).orElseThrow(() -> new IllegalStateException("Unregistered item group : " + self));
 
 		// Do not modify special item groups (except Operator Blocks) at all.
 		// Special item groups include Saved Hotbars, Search, and Survival Container.

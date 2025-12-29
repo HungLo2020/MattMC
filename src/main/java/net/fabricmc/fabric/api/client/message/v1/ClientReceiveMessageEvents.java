@@ -160,7 +160,7 @@ public final class ClientReceiveMessageEvents {
 		 * @param receptionTimestamp the timestamp when the message was received
 		 * @return {@code true} if the message should be displayed, otherwise {@code false}
 		 */
-		boolean allowReceiveChatMessage(Component message, @Nullable PlayerChatMessage signedMessage, @Nullable GameProfile sender, ChatType.Parameters params, Instant receptionTimestamp);
+		boolean allowReceiveChatMessage(Component message, @Nullable PlayerChatMessage signedMessage, @Nullable GameProfile sender, ChatType.LootContextParams params, Instant receptionTimestamp);
 	}
 
 	@FunctionalInterface
@@ -213,7 +213,7 @@ public final class ClientReceiveMessageEvents {
 		 * @param params             the parameters of the message
 		 * @param receptionTimestamp the timestamp when the message was received
 		 */
-		void onReceiveChatMessage(Component message, @Nullable PlayerChatMessage signedMessage, @Nullable GameProfile sender, ChatType.Parameters params, Instant receptionTimestamp);
+		void onReceiveChatMessage(Component message, @Nullable PlayerChatMessage signedMessage, @Nullable GameProfile sender, ChatType.LootContextParams params, Instant receptionTimestamp);
 	}
 
 	@FunctionalInterface
@@ -243,7 +243,7 @@ public final class ClientReceiveMessageEvents {
 		 * @param params             the parameters of the message
 		 * @param receptionTimestamp the timestamp when the message was received
 		 */
-		void onReceiveChatMessageCanceled(Component message, @Nullable PlayerChatMessage signedMessage, @Nullable GameProfile sender, ChatType.Parameters params, Instant receptionTimestamp);
+		void onReceiveChatMessageCanceled(Component message, @Nullable PlayerChatMessage signedMessage, @Nullable GameProfile sender, ChatType.LootContextParams params, Instant receptionTimestamp);
 	}
 
 	@FunctionalInterface

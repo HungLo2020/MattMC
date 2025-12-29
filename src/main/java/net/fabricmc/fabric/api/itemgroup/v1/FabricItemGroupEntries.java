@@ -25,26 +25,26 @@ import org.jetbrains.annotations.ApiStatus;
 
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemLike;
-import net.minecraft.world.item.ItemGroup;
+import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.flag.FeatureFlagSet;
 
 /**
- * This class allows the entries of {@linkplain ItemGroup item groups} to be modified by the events in {@link ItemGroupEvents}.
+ * This class allows the entries of {@linkplain CreativeModeTab item groups} to be modified by the events in {@link ItemGroupEvents}.
  */
-public class FabricItemGroupEntries implements ItemGroup.Entries {
-	private final ItemGroup.DisplayContext context;
+public class FabricItemGroupEntries implements CreativeModeTab.Entries {
+	private final CreativeModeTab.DisplayContext context;
 	private final List<ItemStack> displayStacks;
 	private final List<ItemStack> searchTabStacks;
 
 	@ApiStatus.Internal
-	public FabricItemGroupEntries(ItemGroup.DisplayContext context, List<ItemStack> displayStacks, List<ItemStack> searchTabStacks) {
+	public FabricItemGroupEntries(CreativeModeTab.DisplayContext context, List<ItemStack> displayStacks, List<ItemStack> searchTabStacks) {
 		this.context = context;
 		this.displayStacks = displayStacks;
 		this.searchTabStacks = searchTabStacks;
 	}
 
-	public ItemGroup.DisplayContext getContext() {
+	public CreativeModeTab.DisplayContext getContext() {
 		return context;
 	}
 
@@ -85,7 +85,7 @@ public class FabricItemGroupEntries implements ItemGroup.Entries {
 	 *                   for searches, or both.
 	 */
 	@Override
-	public void add(ItemStack stack, ItemGroup.StackVisibility visibility) {
+	public void add(ItemStack stack, CreativeModeTab.StackVisibility visibility) {
 		if (isEnabled(stack)) {
 			checkStack(stack);
 
@@ -101,11 +101,11 @@ public class FabricItemGroupEntries implements ItemGroup.Entries {
 	}
 
 	/**
-	 * See {@link #prepend(ItemStack, ItemGroup.StackVisibility)}. Will use {@link ItemGroup.StackVisibility#PARENT_AND_SEARCH_TABS}
+	 * See {@link #prepend(ItemStack, CreativeModeTab.StackVisibility)}. Will use {@link CreativeModeTab.StackVisibility#PARENT_AND_SEARCH_TABS}
 	 * for visibility.
 	 */
 	public void prepend(ItemStack stack) {
-		prepend(stack, ItemGroup.StackVisibility.PARENT_AND_SEARCH_TABS);
+		prepend(stack, CreativeModeTab.StackVisibility.PARENT_AND_SEARCH_TABS);
 	}
 
 	/**
@@ -114,7 +114,7 @@ public class FabricItemGroupEntries implements ItemGroup.Entries {
 	 * @param visibility Determines whether the stack will be shown in the tab itself, returned
 	 *                   for searches, or both.
 	 */
-	public void prepend(ItemStack stack, ItemGroup.StackVisibility visibility) {
+	public void prepend(ItemStack stack, CreativeModeTab.StackVisibility visibility) {
 		if (isEnabled(stack)) {
 			checkStack(stack);
 
@@ -133,14 +133,14 @@ public class FabricItemGroupEntries implements ItemGroup.Entries {
 	 * See {@link #prepend(ItemStack)}. Automatically creates an {@link ItemStack} from the given item.
 	 */
 	public void prepend(ItemLike item) {
-		prepend(item, ItemGroup.StackVisibility.PARENT_AND_SEARCH_TABS);
+		prepend(item, CreativeModeTab.StackVisibility.PARENT_AND_SEARCH_TABS);
 	}
 
 	/**
-	 * See {@link #prepend(ItemStack, net.minecraft.world.item.ItemGroup.StackVisibility)}.
+	 * See {@link #prepend(ItemStack, net.minecraft.world.item.CreativeModeTab.StackVisibility)}.
 	 * Automatically creates an {@link ItemStack} from the given item.
 	 */
-	public void prepend(ItemLike item, ItemGroup.StackVisibility visibility) {
+	public void prepend(ItemLike item, CreativeModeTab.StackVisibility visibility) {
 		prepend(new ItemStack(item), visibility);
 	}
 
@@ -173,17 +173,17 @@ public class FabricItemGroupEntries implements ItemGroup.Entries {
 	}
 
 	/**
-	 * See {@link #addAfter(ItemLike, Collection, net.minecraft.world.item.ItemGroup.StackVisibility)}.
+	 * See {@link #addAfter(ItemLike, Collection, net.minecraft.world.item.CreativeModeTab.StackVisibility)}.
 	 */
 	public void addAfter(ItemLike afterLast, Collection<ItemStack> newStacks) {
-		addAfter(afterLast, newStacks, ItemGroup.StackVisibility.PARENT_AND_SEARCH_TABS);
+		addAfter(afterLast, newStacks, CreativeModeTab.StackVisibility.PARENT_AND_SEARCH_TABS);
 	}
 
 	/**
-	 * See {@link #addAfter(ItemStack, Collection, net.minecraft.world.item.ItemGroup.StackVisibility)}.
+	 * See {@link #addAfter(ItemStack, Collection, net.minecraft.world.item.CreativeModeTab.StackVisibility)}.
 	 */
 	public void addAfter(ItemStack afterLast, Collection<ItemStack> newStacks) {
-		addAfter(afterLast, newStacks, ItemGroup.StackVisibility.PARENT_AND_SEARCH_TABS);
+		addAfter(afterLast, newStacks, CreativeModeTab.StackVisibility.PARENT_AND_SEARCH_TABS);
 	}
 
 	/**
@@ -194,7 +194,7 @@ public class FabricItemGroupEntries implements ItemGroup.Entries {
 	 * @param visibility Determines whether the stack will be shown in the tab itself, returned
 	 *                   for searches, or both.
 	 */
-	public void addAfter(ItemLike afterLast, Collection<ItemStack> newStacks, ItemGroup.StackVisibility visibility) {
+	public void addAfter(ItemLike afterLast, Collection<ItemStack> newStacks, CreativeModeTab.StackVisibility visibility) {
 		newStacks = getEnabledStacks(newStacks);
 
 		if (newStacks.isEmpty()) {
@@ -219,7 +219,7 @@ public class FabricItemGroupEntries implements ItemGroup.Entries {
 	 * @param visibility Determines whether the stack will be shown in the tab itself, returned
 	 *                   for searches, or both.
 	 */
-	public void addAfter(ItemStack afterLast, Collection<ItemStack> newStacks, ItemGroup.StackVisibility visibility) {
+	public void addAfter(ItemStack afterLast, Collection<ItemStack> newStacks, CreativeModeTab.StackVisibility visibility) {
 		newStacks = getEnabledStacks(newStacks);
 
 		if (newStacks.isEmpty()) {
@@ -244,7 +244,7 @@ public class FabricItemGroupEntries implements ItemGroup.Entries {
 	 * @param visibility Determines whether the stack will be shown in the tab itself, returned
 	 *                   for searches, or both.
 	 */
-	public void addAfter(Predicate<ItemStack> afterLast, Collection<ItemStack> newStacks, ItemGroup.StackVisibility visibility) {
+	public void addAfter(Predicate<ItemStack> afterLast, Collection<ItemStack> newStacks, CreativeModeTab.StackVisibility visibility) {
 		newStacks = getEnabledStacks(newStacks);
 
 		if (newStacks.isEmpty()) {
@@ -290,17 +290,17 @@ public class FabricItemGroupEntries implements ItemGroup.Entries {
 	}
 
 	/**
-	 * See {@link #addBefore(ItemLike, Collection, net.minecraft.world.item.ItemGroup.StackVisibility)}.
+	 * See {@link #addBefore(ItemLike, Collection, net.minecraft.world.item.CreativeModeTab.StackVisibility)}.
 	 */
 	public void addBefore(ItemLike beforeFirst, Collection<ItemStack> newStacks) {
-		addBefore(beforeFirst, newStacks, ItemGroup.StackVisibility.PARENT_AND_SEARCH_TABS);
+		addBefore(beforeFirst, newStacks, CreativeModeTab.StackVisibility.PARENT_AND_SEARCH_TABS);
 	}
 
 	/**
-	 * See {@link #addBefore(ItemStack, Collection, net.minecraft.world.item.ItemGroup.StackVisibility)}.
+	 * See {@link #addBefore(ItemStack, Collection, net.minecraft.world.item.CreativeModeTab.StackVisibility)}.
 	 */
 	public void addBefore(ItemStack beforeFirst, Collection<ItemStack> newStacks) {
-		addBefore(beforeFirst, newStacks, ItemGroup.StackVisibility.PARENT_AND_SEARCH_TABS);
+		addBefore(beforeFirst, newStacks, CreativeModeTab.StackVisibility.PARENT_AND_SEARCH_TABS);
 	}
 
 	/**
@@ -311,7 +311,7 @@ public class FabricItemGroupEntries implements ItemGroup.Entries {
 	 * @param visibility  Determines whether the stack will be shown in the tab itself, returned
 	 *                    for searches, or both.
 	 */
-	public void addBefore(ItemLike beforeFirst, Collection<ItemStack> newStacks, ItemGroup.StackVisibility visibility) {
+	public void addBefore(ItemLike beforeFirst, Collection<ItemStack> newStacks, CreativeModeTab.StackVisibility visibility) {
 		newStacks = getEnabledStacks(newStacks);
 
 		if (newStacks.isEmpty()) {
@@ -336,7 +336,7 @@ public class FabricItemGroupEntries implements ItemGroup.Entries {
 	 * @param visibility  Determines whether the stack will be shown in the tab itself, returned
 	 *                    for searches, or both.
 	 */
-	public void addBefore(ItemStack beforeFirst, Collection<ItemStack> newStacks, ItemGroup.StackVisibility visibility) {
+	public void addBefore(ItemStack beforeFirst, Collection<ItemStack> newStacks, CreativeModeTab.StackVisibility visibility) {
 		newStacks = getEnabledStacks(newStacks);
 
 		if (newStacks.isEmpty()) {
@@ -361,7 +361,7 @@ public class FabricItemGroupEntries implements ItemGroup.Entries {
 	 * @param visibility  Determines whether the stack will be shown in the tab itself, returned
 	 *                    for searches, or both.
 	 */
-	public void addBefore(Predicate<ItemStack> beforeFirst, Collection<ItemStack> newStacks, ItemGroup.StackVisibility visibility) {
+	public void addBefore(Predicate<ItemStack> beforeFirst, Collection<ItemStack> newStacks, CreativeModeTab.StackVisibility visibility) {
 		newStacks = getEnabledStacks(newStacks);
 
 		if (newStacks.isEmpty()) {
@@ -396,7 +396,7 @@ public class FabricItemGroupEntries implements ItemGroup.Entries {
 	}
 
 	/**
-	 * Adds the {@link ItemStack} before the first match, if no matches the {@link ItemStack} is appended to the end of the {@link ItemGroup}.
+	 * Adds the {@link ItemStack} before the first match, if no matches the {@link ItemStack} is appended to the end of the {@link CreativeModeTab}.
 	 */
 	private static void addBefore(Predicate<ItemStack> predicate, Collection<ItemStack> newStacks, List<ItemStack> addTo) {
 		checkStacks(newStacks);

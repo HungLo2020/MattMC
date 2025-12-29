@@ -16,7 +16,7 @@
 
 package net.fabricmc.fabric.api.itemgroup.v1;
 
-import net.minecraft.world.item.ItemGroup;
+import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.core.Registries;
 import net.minecraft.network.chat.Component;
 
@@ -30,17 +30,17 @@ public final class FabricItemGroup {
 	}
 
 	/**
-	 * Creates a new builder for {@link ItemGroup}. Item groups are used to group items in the creative
+	 * Creates a new builder for {@link CreativeModeTab}. Item groups are used to group items in the creative
 	 * inventory.
 	 *
-	 * <p>You must register the newly created {@link ItemGroup} to the {@link Registries#ITEM_GROUP} registry.
+	 * <p>You must register the newly created {@link CreativeModeTab} to the {@link Registries#ITEM_GROUP} registry.
 	 *
-	 * <p>You must also set a display name by calling {@link ItemGroup.Builder#displayName(Component)}
+	 * <p>You must also set a display name by calling {@link CreativeModeTab.Builder#displayName(Component)}
 	 *
 	 * <p>Example:
 	 *
 	 * <pre>{@code
-	 * private static final ResourceKey<ItemGroup> ITEM_GROUP = ResourceKey.of(Registries.ITEM_GROUP, ResourceLocation.of(MOD_ID, "test_group"));
+	 * private static final ResourceKey<CreativeModeTab> ITEM_GROUP = ResourceKey.of(Registries.ITEM_GROUP, ResourceLocation.of(MOD_ID, "test_group"));
 	 *
 	 * @Override
 	 * public void onInitialize() {
@@ -55,9 +55,9 @@ public final class FabricItemGroup {
 	 * }
 	 * }</pre>
 	 *
-	 * @return a new {@link ItemGroup.Builder} instance
+	 * @return a new {@link CreativeModeTab.Builder} instance
 	 */
-	public static ItemGroup.Builder builder() {
+	public static CreativeModeTab.Builder builder() {
 		return new FabricItemGroupBuilderImpl();
 	}
 }

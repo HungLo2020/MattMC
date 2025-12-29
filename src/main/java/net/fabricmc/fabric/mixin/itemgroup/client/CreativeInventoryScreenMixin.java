@@ -35,7 +35,7 @@ import net.minecraft.client.gui.screens.ingame.CreativeInventoryScreen.CreativeS
 import net.minecraft.client.gui.screens.ingame.AbstractContainerScreen;
 import net.minecraft.client.input.KeyInput;
 import net.minecraft.world.entity.player.Inventory;
-import net.minecraft.world.item.ItemGroup;
+import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.item.ItemGroups;
 import net.minecraft.network.chat.Component;
 
@@ -50,10 +50,10 @@ public abstract class CreativeInventoryScreenMixin extends AbstractContainerScre
 	}
 
 	@Shadow
-	protected abstract void setSelectedTab(ItemGroup itemGroup_1);
+	protected abstract void setSelectedTab(CreativeModeTab itemGroup_1);
 
 	@Shadow
-	private static ItemGroup selectedTab;
+	private static CreativeModeTab selectedTab;
 
 	// "static" matches selectedTab
 	@Unique
@@ -83,28 +83,28 @@ public abstract class CreativeInventoryScreenMixin extends AbstractContainerScre
 	}
 
 	@Inject(method = "setSelectedTab", at = @At("HEAD"), cancellable = true)
-	private void setSelectedTab(ItemGroup itemGroup, CallbackInfo info) {
+	private void setSelectedTab(CreativeModeTab itemGroup, CallbackInfo info) {
 		if (!isGroupVisible(itemGroup)) {
 			info.cancel();
 		}
 	}
 
 	@Inject(method = "renderTabTooltipIfHovered", at = @At("HEAD"), cancellable = true)
-	private void renderTabTooltipIfHovered(GuiGraphics drawContext, ItemGroup itemGroup, int mx, int my, CallbackInfoReturnable<Boolean> info) {
+	private void renderTabTooltipIfHovered(GuiGraphics drawContext, CreativeModeTab itemGroup, int mx, int my, CallbackInfoReturnable<Boolean> info) {
 		if (!isGroupVisible(itemGroup)) {
 			info.setReturnValue(false);
 		}
 	}
 
 	@Inject(method = "isClickInTab", at = @At("HEAD"), cancellable = true)
-	private void isClickInTab(ItemGroup itemGroup, double mx, double my, CallbackInfoReturnable<Boolean> info) {
+	private void isClickInTab(CreativeModeTab itemGroup, double mx, double my, CallbackInfoReturnable<Boolean> info) {
 		if (!isGroupVisible(itemGroup)) {
 			info.setReturnValue(false);
 		}
 	}
 
 	@Inject(method = "renderTabIcon", at = @At("HEAD"), cancellable = true)
-	private void renderTabIcon(GuiGraphics drawContext, ItemGroup itemGroup, CallbackInfo info) {
+	private void renderTabIcon(GuiGraphics drawContext, CreativeModeTab itemGroup, CallbackInfo info) {
 		if (!isGroupVisible(itemGroup)) {
 			info.cancel();
 		}
@@ -124,12 +124,12 @@ public abstract class CreativeInventoryScreenMixin extends AbstractContainerScre
 	}
 
 	@Unique
-	private boolean isGroupVisible(ItemGroup itemGroup) {
+	private boolean isGroupVisible(CreativeModeTab itemGroup) {
 		return itemGroup.shouldDisplay() && currentPage == getPage(itemGroup);
 	}
 
 	@Override
-	public int getPage(ItemGroup itemGroup) {
+	public int getPage(CreativeModeTab itemGroup) {
 		if (FabricCreativeGuiComponents.COMMON_GROUPS.contains(itemGroup)) {
 			return currentPage;
 		}
@@ -171,12 +171,12 @@ public abstract class CreativeInventoryScreenMixin extends AbstractContainerScre
 	}
 
 	@Override
-	public List<ItemGroup> getItemGroupsOnPage(int page) {
+	public List<CreativeModeTab> getItemGroupsOnPage(int page) {
 		return ItemGroups.getGroupsToDisplay()
 				.stream()
 				.filter(itemGroup -> getPage(itemGroup) == page)
 				// Thanks to isXander for the sorting
-				.sorted(Comparator.comparing(ItemGroup::getRow).thenComparingInt(ItemGroup::getColumn))
+				.sorted(Comparator.comparing(CreativeModeTab::getRow).thenComparingInt(CreativeModeTab::getColumn))
 				.sorted((a, b) -> Boolean.compare(a.isSpecial(), b.isSpecial()))
 				.toList();
 	}
@@ -187,12 +187,12 @@ public abstract class CreativeInventoryScreenMixin extends AbstractContainerScre
 	}
 
 	@Override
-	public ItemGroup getSelectedItemGroup() {
+	public CreativeModeTab getSelectedItemGroup() {
 		return selectedTab;
 	}
 
 	@Override
-	public boolean setSelectedItemGroup(ItemGroup itemGroup) {
+	public boolean setSelectedItemGroup(CreativeModeTab itemGroup) {
 		Objects.requireNonNull(itemGroup, "itemGroup");
 
 		if (selectedTab == itemGroup) {

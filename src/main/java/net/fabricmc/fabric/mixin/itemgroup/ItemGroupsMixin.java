@@ -41,7 +41,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-import net.minecraft.world.item.ItemGroup;
+import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.item.ItemGroups;
 import net.minecraft.core.Registries;
 import net.minecraft.resources.ResourceKey;
@@ -66,11 +66,11 @@ public class ItemGroupsMixin {
 
 	@Inject(method = "updateEntries", at = @At("TAIL"))
 	private static void paginateGroups(CallbackInfo ci) {
-		final List<ResourceKey<ItemGroup>> vanillaGroups = List.of(BUILDING_BLOCKS, COLORED_BLOCKS, NATURAL, FUNCTIONAL, REDSTONE, HOTBAR, SEARCH, TOOLS, COMBAT, FOOD_AND_DRINK, INGREDIENTS, SPAWN_EGGS, OPERATOR, INVENTORY);
+		final List<ResourceKey<CreativeModeTab>> vanillaGroups = List.of(BUILDING_BLOCKS, COLORED_BLOCKS, NATURAL, FUNCTIONAL, REDSTONE, HOTBAR, SEARCH, TOOLS, COMBAT, FOOD_AND_DRINK, INGREDIENTS, SPAWN_EGGS, OPERATOR, INVENTORY);
 
 		int count = 0;
 
-		Comparator<Holder.Reference<ItemGroup>> entryComparator = (e1, e2) -> {
+		Comparator<Holder.Reference<CreativeModeTab>> entryComparator = (e1, e2) -> {
 			// Non-displayable groups should come last for proper pagination
 			int displayCompare = Boolean.compare(e1.value().shouldDisplay(), e2.value().shouldDisplay());
 
@@ -81,12 +81,12 @@ public class ItemGroupsMixin {
 				return compareNamespaceFirst(e1.registryKey().getValue(), e2.registryKey().getValue());
 			}
 		};
-		final List<Holder.Reference<ItemGroup>> sortedItemGroups = Registries.ITEM_GROUP.streamEntries()
+		final List<Holder.Reference<CreativeModeTab>> sortedItemGroups = Registries.ITEM_GROUP.streamEntries()
 				.sorted(entryComparator)
 				.toList();
 
-		for (Holder.Reference<ItemGroup> reference : sortedItemGroups) {
-			final ItemGroup itemGroup = reference.value();
+		for (Holder.Reference<CreativeModeTab> reference : sortedItemGroups) {
+			final CreativeModeTab itemGroup = reference.value();
 			final FabricItemGroupImpl fabricItemGroup = (FabricItemGroupImpl) itemGroup;
 
 			if (vanillaGroups.contains(reference.registryKey())) {
@@ -98,19 +98,19 @@ public class ItemGroupsMixin {
 			final ItemGroupAccessor itemGroupAccessor = (ItemGroupAccessor) itemGroup;
 			fabricItemGroup.fabric_setPage((count / TABS_PER_PAGE) + 1);
 			int pageIndex = count % TABS_PER_PAGE;
-			ItemGroup.Row row = pageIndex < (TABS_PER_PAGE / 2) ? ItemGroup.Row.TOP : ItemGroup.Row.BOTTOM;
+			CreativeModeTab.Row row = pageIndex < (TABS_PER_PAGE / 2) ? CreativeModeTab.Row.TOP : CreativeModeTab.Row.BOTTOM;
 			itemGroupAccessor.setRow(row);
-			itemGroupAccessor.setColumn(row == ItemGroup.Row.TOP ? pageIndex % TABS_PER_PAGE : (pageIndex - TABS_PER_PAGE / 2) % (TABS_PER_PAGE));
+			itemGroupAccessor.setColumn(row == CreativeModeTab.Row.TOP ? pageIndex % TABS_PER_PAGE : (pageIndex - TABS_PER_PAGE / 2) % (TABS_PER_PAGE));
 
 			count++;
 		}
 
 		// Overlapping group detection logic, with support for pages.
-		record ItemGroupPosition(ItemGroup.Row row, int column, int page) { }
+		record ItemGroupPosition(CreativeModeTab.Row row, int column, int page) { }
 		var map = new HashMap<ItemGroupPosition, String>();
 
-		for (ResourceKey<ItemGroup> registryKey : Registries.ITEM_GROUP.getKeys()) {
-			final ItemGroup itemGroup = Registries.ITEM_GROUP.getValueOrThrow(registryKey);
+		for (ResourceKey<CreativeModeTab> registryKey : Registries.ITEM_GROUP.getKeys()) {
+			final CreativeModeTab itemGroup = Registries.ITEM_GROUP.getValueOrThrow(registryKey);
 			final FabricItemGroupImpl fabricItemGroup = (FabricItemGroupImpl) itemGroup;
 			final String displayName = itemGroup.getDisplayName().getString();
 			final var position = new ItemGroupPosition(itemGroup.getRow(), itemGroup.getColumn(), fabricItemGroup.fabric_getPage());

@@ -18,7 +18,7 @@ package net.fabricmc.fabric.api.message.v1;
 
 import java.util.Objects;
 
-import net.minecraft.network.chat.MessageDecorator;
+import net.minecraft.network.chat.ChatDecorator;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 
@@ -26,7 +26,7 @@ import net.fabricmc.fabric.api.event.Event;
 import net.fabricmc.fabric.api.event.EventFactory;
 
 /**
- * A class for registering a {@link MessageDecorator}. Check the message decorator documentation
+ * A class for registering a {@link ChatDecorator}. Check the message decorator documentation
  * for how message decorators work. Unlike other events, this uses a functional interface that is
  * provided by the vanilla game.
  *
@@ -73,17 +73,17 @@ public final class ServerMessageDecoratorEvent {
 	 */
 	public static final ResourceLocation STYLING_PHASE = ResourceLocation.of("fabric", "styling");
 
-	public static final Event<MessageDecorator> EVENT = EventFactory.createWithPhases(MessageDecorator.class, decorators -> (sender, message) -> {
+	public static final Event<ChatDecorator> EVENT = EventFactory.createWithPhases(ChatDecorator.class, decorators -> (sender, message) -> {
 		Component decorated = message;
 
-		for (MessageDecorator decorator : decorators) {
+		for (ChatDecorator decorator : decorators) {
 			decorated = handle(decorator.decorate(sender, decorated), decorator);
 		}
 
 		return decorated;
 	}, CONTENT_PHASE, Event.DEFAULT_PHASE, STYLING_PHASE);
 
-	private static <T extends Component> T handle(T decorated, MessageDecorator decorator) {
+	private static <T extends Component> T handle(T decorated, ChatDecorator decorator) {
 		String decoratorName = decorator.getClass().getName();
 		return Objects.requireNonNull(decorated, "message decorator %s returned null".formatted(decoratorName));
 	}

@@ -16,7 +16,7 @@
 
 package net.fabricmc.fabric.api.itemgroup.v1;
 
-import net.minecraft.world.item.ItemGroup;
+import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.item.ItemGroups;
 import net.minecraft.resources.ResourceKey;
 
@@ -50,7 +50,7 @@ public final class ItemGroupEvents {
 	 * @param registryKey the {@link ResourceKey} of the item group to modify
 	 * @return the event
 	 */
-	public static Event<ModifyEntries> modifyEntriesEvent(ResourceKey<ItemGroup> registryKey) {
+	public static Event<ModifyEntries> modifyEntriesEvent(ResourceKey<CreativeModeTab> registryKey) {
 		return ItemGroupEventsImpl.getOrCreateModifyEntriesEvent(registryKey);
 	}
 
@@ -72,6 +72,6 @@ public final class ItemGroupEvents {
 		 * @param entries the entries
 		 * @see FabricItemGroupEntries
 		 */
-		void modifyEntries(ItemGroup group, FabricItemGroupEntries entries);
+		void modifyEntries(CreativeModeTab group, FabricItemGroupEntries entries);
 	}
 }

@@ -21,7 +21,7 @@ import java.util.Map;
 
 import org.jetbrains.annotations.Nullable;
 
-import net.minecraft.world.item.ItemGroup;
+import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.resources.ResourceKey;
 
 import net.fabricmc.fabric.api.event.Event;
@@ -29,14 +29,14 @@ import net.fabricmc.fabric.api.event.EventFactory;
 import net.fabricmc.fabric.api.itemgroup.v1.ItemGroupEvents;
 
 public class ItemGroupEventsImpl {
-	private static final Map<ResourceKey<ItemGroup>, Event<ItemGroupEvents.ModifyEntries>> ITEM_GROUP_EVENT_MAP = new HashMap<>();
+	private static final Map<ResourceKey<CreativeModeTab>, Event<ItemGroupEvents.ModifyEntries>> ITEM_GROUP_EVENT_MAP = new HashMap<>();
 
-	public static Event<ItemGroupEvents.ModifyEntries> getOrCreateModifyEntriesEvent(ResourceKey<ItemGroup> registryKey) {
+	public static Event<ItemGroupEvents.ModifyEntries> getOrCreateModifyEntriesEvent(ResourceKey<CreativeModeTab> registryKey) {
 		return ITEM_GROUP_EVENT_MAP.computeIfAbsent(registryKey, (g -> createModifyEvent()));
 	}
 
 	@Nullable
-	public static Event<ItemGroupEvents.ModifyEntries> getModifyEntriesEvent(ResourceKey<ItemGroup> registryKey) {
+	public static Event<ItemGroupEvents.ModifyEntries> getModifyEntriesEvent(ResourceKey<CreativeModeTab> registryKey) {
 		return ITEM_GROUP_EVENT_MAP.get(registryKey);
 	}
 
