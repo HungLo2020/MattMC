@@ -16,8 +16,8 @@
 
 package net.fabricmc.fabric.api.message.v1;
 
-import net.minecraft.network.message.ChatType;
-import net.minecraft.network.message.PlayerChatMessage;
+import net.minecraft.network.chat.ChatType;
+import net.minecraft.network.chat.PlayerChatMessage;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.server.network.ServerPlayer;

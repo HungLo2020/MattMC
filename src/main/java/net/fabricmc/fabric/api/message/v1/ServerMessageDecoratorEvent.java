@@ -18,7 +18,7 @@ package net.fabricmc.fabric.api.message.v1;
 
 import java.util.Objects;
 
-import net.minecraft.network.message.MessageDecorator;
+import net.minecraft.network.chat.MessageDecorator;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 

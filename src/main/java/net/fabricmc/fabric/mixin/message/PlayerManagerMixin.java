@@ -25,8 +25,8 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-import net.minecraft.network.message.ChatType;
-import net.minecraft.network.message.PlayerChatMessage;
+import net.minecraft.network.chat.ChatType;
+import net.minecraft.network.chat.PlayerChatMessage;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.PlayerList;
 import net.minecraft.commands.CommandSourceStack;

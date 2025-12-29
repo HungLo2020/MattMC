@@ -22,7 +22,7 @@ import org.jetbrains.annotations.Nullable;
 
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.storage.loot.LootTable;
-import net.minecraft.world.level.storage.loot.context.LootContext;
+import net.minecraft.world.level.storage.loot.parameters.LootContext;
 import net.minecraft.core.Registry;
 import net.minecraft.core.ResourceKey;
 import net.minecraft.core.HolderLookup;

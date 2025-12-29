@@ -22,9 +22,9 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.gen.Accessor;
 
 import net.minecraft.world.level.storage.loot.LootPool;
-import net.minecraft.world.level.storage.loot.condition.LootCondition;
-import net.minecraft.world.level.storage.loot.entry.LootPoolEntry;
-import net.minecraft.world.level.storage.loot.function.LootFunction;
+import net.minecraft.world.level.storage.loot.predicates.LootCondition;
+import net.minecraft.world.level.storage.loot.entries.LootPoolEntry;
+import net.minecraft.world.level.storage.loot.functions.LootFunction;
 import net.minecraft.world.level.storage.loot.provider.number.LootNumberProvider;
 
 import net.fabricmc.fabric.api.loot.v3.FabricLootPoolBuilder;

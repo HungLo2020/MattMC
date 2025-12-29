@@ -21,9 +21,9 @@ import java.time.Instant;
 import com.mojang.authlib.GameProfile;
 import org.jetbrains.annotations.Nullable;
 
-import net.minecraft.client.gui.hud.ChatHud;
-import net.minecraft.network.message.ChatType;
-import net.minecraft.network.message.PlayerChatMessage;
+import net.minecraft.client.gui.components.ChatHud;
+import net.minecraft.network.chat.ChatType;
+import net.minecraft.network.chat.PlayerChatMessage;
 import net.minecraft.network.chat.Component;
 
 import net.fabricmc.fabric.api.event.Event;

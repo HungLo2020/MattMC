@@ -24,7 +24,7 @@ import org.spongepowered.asm.mixin.gen.Accessor;
 
 import net.minecraft.world.level.storage.loot.LootPool;
 import net.minecraft.world.level.storage.loot.LootTable;
-import net.minecraft.world.level.storage.loot.function.LootFunction;
+import net.minecraft.world.level.storage.loot.functions.LootFunction;
 import net.minecraft.resources.ResourceLocation;
 
 import net.fabricmc.fabric.api.loot.v3.FabricLootTableBuilder;

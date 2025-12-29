@@ -23,7 +23,7 @@ import org.jetbrains.annotations.ApiStatus;
 
 import net.minecraft.world.level.storage.loot.LootPool;
 import net.minecraft.world.level.storage.loot.LootTable;
-import net.minecraft.world.level.storage.loot.function.LootFunction;
+import net.minecraft.world.level.storage.loot.functions.LootFunction;
 
 import net.fabricmc.fabric.mixin.loot.LootTableAccessor;
 

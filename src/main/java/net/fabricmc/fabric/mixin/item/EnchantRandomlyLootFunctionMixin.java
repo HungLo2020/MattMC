@@ -22,7 +22,7 @@ import org.spongepowered.asm.mixin.injection.Redirect;
 
 import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.storage.loot.function.EnchantRandomlyLootFunction;
+import net.minecraft.world.level.storage.loot.functions.EnchantRandomlyLootFunction;
 import net.minecraft.core.Holder;
 
 import net.fabricmc.fabric.api.item.v1.EnchantingContext;
