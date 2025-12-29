@@ -6,18 +6,20 @@
 
 ### Mixin Conversion Status
 
-**Total Mixins:** 235 → **229 remaining** (6 removed)  
-**Conversion Progress:** 2.6% complete
+**Total Mixins:** 235 → **227 remaining** (8 removed)  
+**Conversion Progress:** 3.4% complete
 
-#### Removed Mixins (6):
+#### Removed Mixins (8):
 1. ✅ `net.irisshaders.iris.mixin.DimensionTypeAccessor` - Record fields are public by default
 2. ✅ `net.irisshaders.iris.mixin.LightTextureAccessor` - Changed `LightTexture.texture` field visibility to public
 3. ✅ `com.seibel.distanthorizons.fabric.mixins.client.LightTextureAccessor` - Same as above
 4. ✅ `net.irisshaders.iris.mixin.statelisteners.BooleanStateAccessor` - `GlStateManager.BooleanState.enabled` field already public
 5. ✅ `net.irisshaders.iris.mixin.EndFlashAccess` - Added public setter methods to `EndFlashState`
 6. ✅ `net.irisshaders.iris.mixin.GlStateManagerAccessor` - Made static fields `BLEND`, `DEPTH`, `COLOR_MASK`, `TEXTURES`, `activeTexture` public
+7. ✅ `net.caffeinemc.mods.sodium.mixin.features.textures.NativeImageAccessor` - `NativeImage.pixels` field already public
+8. ✅ `net.caffeinemc.mods.sodium.mixin.features.gui.hooks.debug.DebugScreenEntriesAccessor` - Made `DebugScreenEntries.ENTRIES_BY_LOCATION` public
 
-#### Modified Files (19):
+#### Modified Files (24):
 1. `net.minecraft.client.renderer.LightTexture` - Made `texture` field public
 2. `net.irisshaders.iris.pipeline.CustomTextureManager` - Updated to use direct field access (2x)
 3. `com.seibel.distanthorizons.fabric.hooks.DhLightTextureHook` - Updated to use direct field access
@@ -33,6 +35,9 @@
 13. `net.irisshaders.iris.pbr.TextureInfoCache` - Direct field access
 14. `net.irisshaders.iris.pbr.texture.PBRTextureManager` - Direct field access
 15. `net.irisshaders.iris.pipeline.CompositeRenderer` - Direct field access
+16. `net.caffeinemc.mods.sodium.client.util.NativeImageHelper` - Direct field access for `pixels`
+17. `net.minecraft.client.gui.components.debug.DebugScreenEntries` - Made static field public
+18. `net.caffeinemc.mods.sodium.client.SodiumClientMod` - Direct static field access
 
 ---
 
@@ -79,10 +84,10 @@ Hooks are already being called from Minecraft core code:
 
 ## Current Mixin Statistics
 
-### Total Mixin Count: 229 Files (6 removed)
+### Total Mixin Count: 227 Files (8 removed)
 
 **Breakdown by Type:**
-- **@Accessor mixins**: 53 remaining (59 originally, 6 removed)
+- **@Accessor mixins**: 51 remaining (59 originally, 8 removed)
 - **@Invoker mixins**: 1 (<1% of total)
 - **@Inject annotations**: 254 (multiple per file)
 - **@Redirect annotations**: 46
@@ -90,7 +95,7 @@ Hooks are already being called from Minecraft core code:
 - **@ModifyArg/@ModifyVariable**: 15
 
 **Distribution by Mod:**
-- **Sodium**: ~50 mixins (rendering optimizations)
+- **Sodium**: ~48 mixins (rendering optimizations, 2 removed)
 - **Iris**: ~144 mixins (shader system integration, 5 removed)
 - **Distant Horizons**: ~23 mixins (LOD rendering, 1 removed)
 - **Fabric API**: ~12 mixins (compatibility layer)
@@ -98,7 +103,7 @@ Hooks are already being called from Minecraft core code:
 ### Mixin Complexity Analysis
 
 **Simple (Easy to Convert):**
-- 53 @Accessor mixins remaining - Just need to change visibility modifiers
+- 51 @Accessor mixins remaining - Just need to change visibility modifiers
 - 1 @Invoker mixin - Make method public/protected
 - ~100 simple @Inject mixins - Direct HEAD/RETURN injections
 

@@ -9,7 +9,7 @@ import org.jetbrains.annotations.Nullable;
 
 @Environment(EnvType.CLIENT)
 public class DebugScreenEntries {
-	private static final Map<ResourceLocation, DebugScreenEntry> ENTRIES_BY_LOCATION = new HashMap();
+	public static final Map<ResourceLocation, DebugScreenEntry> ENTRIES_BY_LOCATION = new HashMap(); // Made public for Sodium debug screen integration
 	public static final ResourceLocation GAME_VERSION = register("game_version", new DebugEntryVersion());
 	public static final ResourceLocation FPS = register("fps", new DebugEntryFps());
 	public static final ResourceLocation TPS = register("tps", new DebugEntryTps());

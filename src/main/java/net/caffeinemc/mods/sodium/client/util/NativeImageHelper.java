@@ -1,6 +1,5 @@
 package net.caffeinemc.mods.sodium.client.util;
 
-import net.caffeinemc.mods.sodium.mixin.features.textures.NativeImageAccessor;
 import com.mojang.blaze3d.platform.NativeImage;
 
 import java.util.Locale;
@@ -12,7 +11,6 @@ public class NativeImageHelper {
                     "Tried to get pointer to RGBA pixel data on NativeImage of wrong format; have %s", nativeImage.format()));
         }
 
-        return ((NativeImageAccessor) (Object) nativeImage) // duck type since NativeImage is final
-                .getPixels();
+        return nativeImage.pixels; // Direct field access - pixels is public
     }
 }
