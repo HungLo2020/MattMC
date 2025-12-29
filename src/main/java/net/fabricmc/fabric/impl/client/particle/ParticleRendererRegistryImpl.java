@@ -33,7 +33,7 @@ import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.VisibleForTesting;
 
 import net.minecraft.client.particle.ParticleEngine;
-import net.minecraft.client.particle.ParticleRenderer;
+import net.minecraft.client.particle.ParticleProvider;
 import net.minecraft.client.particle.ParticleRenderType;
 import net.minecraft.resources.ResourceLocation;
 
@@ -46,7 +46,7 @@ public final class ParticleRendererRegistryImpl {
 
 	private final List<ParticleRenderType> textureSheets;
 	private final Map<ResourceLocation, ParticleTextureNode> nodes = new HashMap<>();
-	private final IdentityHashMap<ParticleRenderType, Function<ParticleEngine, ParticleRenderer<?>>> factories = new IdentityHashMap<>();
+	private final IdentityHashMap<ParticleRenderType, Function<ParticleEngine, ParticleProvider<?>>> factories = new IdentityHashMap<>();
 
 	@VisibleForTesting
 	public ParticleRendererRegistryImpl(List<ParticleRenderType> textureSheets) {
@@ -74,7 +74,7 @@ public final class ParticleRendererRegistryImpl {
 		assertIdentical(textureSheets, copyOfTextureSheets);
 	}
 
-	public void register(ParticleRenderType textureSheet, Function<ParticleEngine, ParticleRenderer<?>> function) {
+	public void register(ParticleRenderType textureSheet, Function<ParticleEngine, ParticleProvider<?>> function) {
 		final ResourceLocation id = getId(textureSheet);
 
 		if (nodes.containsKey(id)) {
@@ -119,7 +119,7 @@ public final class ParticleRendererRegistryImpl {
 	}
 
 	@Nullable
-	public Function<ParticleEngine, ParticleRenderer<?>> getFactory(ParticleRenderType textureSheet) {
+	public Function<ParticleEngine, ParticleProvider<?>> getFactory(ParticleRenderType textureSheet) {
 		return factories.get(textureSheet);
 	}
 

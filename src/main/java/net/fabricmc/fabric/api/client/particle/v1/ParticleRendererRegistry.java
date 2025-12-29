@@ -22,23 +22,23 @@ import java.util.function.Function;
 import org.jetbrains.annotations.Nullable;
 
 import net.minecraft.client.particle.ParticleEngine;
-import net.minecraft.client.particle.ParticleRenderer;
+import net.minecraft.client.particle.ParticleProvider;
 import net.minecraft.client.particle.ParticleRenderType;
 import net.minecraft.resources.ResourceLocation;
 
 import net.fabricmc.fabric.impl.client.particle.ParticleRendererRegistryImpl;
 
 /**
- * A registry for custom {@link ParticleRenderer}s.
+ * A registry for custom {@link ParticleProvider}s.
  */
 public final class ParticleRendererRegistry {
 	/**
-	 * Registers a {@link ParticleRenderer} factory for the given {@link ParticleRenderType}.
+	 * Registers a {@link ParticleProvider} factory for the given {@link ParticleRenderType}.
 	 *
 	 * @param textureSheet the texture sheet
 	 * @param function the factory function
 	 */
-	public static void register(ParticleRenderType textureSheet, Function<ParticleEngine, ParticleRenderer<?>> function) {
+	public static void register(ParticleRenderType textureSheet, Function<ParticleEngine, ParticleProvider<?>> function) {
 		ParticleRendererRegistryImpl.INSTANCE.register(textureSheet, function);
 	}
 

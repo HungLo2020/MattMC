@@ -28,9 +28,9 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.Renderable;
-import net.minecraft.client.gui.Element;
-import net.minecraft.client.gui.Selectable;
+import net.minecraft.client.gui.components.Renderable;
+import net.minecraft.client.gui.components.events.GuiEventListener;
+import net.minecraft.client.gui.components.TabOrderedElement;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.components.AbstractWidget;
 
@@ -46,10 +46,10 @@ import net.fabricmc.fabric.impl.client.screen.ScreenExtensions;
 abstract class ScreenMixin implements ScreenExtensions {
 	@Shadow
 	@Final
-	protected List<Selectable> selectables;
+	protected List<TabOrderedElement> selectables;
 	@Shadow
 	@Final
-	protected List<Element> children;
+	protected List<GuiEventListener> children;
 	@Shadow
 	@Final
 	protected List<Renderable> drawables;

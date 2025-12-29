@@ -48,9 +48,9 @@ public final class TradeOfferInternals {
 	 */
 	private static void initVillagerTrades() {
 		if (!(MerchantOffers.REBALANCED_PROFESSION_TO_LEVELED_TRADE instanceof HashMap)) {
-			Map<ResourceKey<VillagerProfession>, Int2ObjectMap<MerchantOffers.Factory[]>> map = new HashMap<>(MerchantOffers.REBALANCED_PROFESSION_TO_LEVELED_TRADE);
+			Map<ResourceKey<VillagerProfession>, Int2ObjectMap<VillagerTrades.ItemListing[]>> map = new HashMap<>(MerchantOffers.REBALANCED_PROFESSION_TO_LEVELED_TRADE);
 
-			for (Map.Entry<ResourceKey<VillagerProfession>, Int2ObjectMap<MerchantOffers.Factory[]>> trade : MerchantOffers.PROFESSION_TO_LEVELED_TRADE.entrySet()) {
+			for (Map.Entry<ResourceKey<VillagerProfession>, Int2ObjectMap<VillagerTrades.ItemListing[]>> trade : MerchantOffers.PROFESSION_TO_LEVELED_TRADE.entrySet()) {
 				if (!map.containsKey(trade.getKey())) map.put(trade.getKey(), trade.getValue());
 			}
 
@@ -67,14 +67,14 @@ public final class TradeOfferInternals {
 		registerOffers(MerchantOffers.REBALANCED_PROFESSION_TO_LEVELED_TRADE.computeIfAbsent(profession, key -> new Int2ObjectOpenHashMap<>()), level, trades -> factory.onRegister(trades, true));
 	}
 
-	private static void registerOffers(Int2ObjectMap<MerchantOffers.Factory[]> leveledTradeMap, int level, Consumer<List<MerchantOffers.Factory>> factory) {
-		final List<MerchantOffers.Factory> list = new ArrayList<>();
+	private static void registerOffers(Int2ObjectMap<VillagerTrades.ItemListing[]> leveledTradeMap, int level, Consumer<List<VillagerTrades.ItemListing>> factory) {
+		final List<VillagerTrades.ItemListing> list = new ArrayList<>();
 		factory.accept(list);
 
-		final MerchantOffers.Factory[] originalEntries = leveledTradeMap.computeIfAbsent(level, key -> new MerchantOffers.Factory[0]);
-		final MerchantOffers.Factory[] addedEntries = list.toArray(new MerchantOffers.Factory[0]);
+		final VillagerTrades.ItemListing[] originalEntries = leveledTradeMap.computeIfAbsent(level, key -> new VillagerTrades.ItemListing[0]);
+		final VillagerTrades.ItemListing[] addedEntries = list.toArray(new VillagerTrades.ItemListing[0]);
 
-		final MerchantOffers.Factory[] allEntries = ArrayUtils.addAll(originalEntries, addedEntries);
+		final VillagerTrades.ItemListing[] allEntries = ArrayUtils.addAll(originalEntries, addedEntries);
 		leveledTradeMap.put(level, allEntries);
 	}
 
@@ -85,7 +85,7 @@ public final class TradeOfferInternals {
 			idToIndex.put(SELL_COMMON_ITEMS_POOL, 2);
 		});
 
-		private static final Map<ResourceLocation, MerchantOffers.Factory[]> DELAYED_MODIFICATIONS = new HashMap<>();
+		private static final Map<ResourceLocation, VillagerTrades.ItemListing[]> DELAYED_MODIFICATIONS = new HashMap<>();
 
 		/**
 		 * Make the trade list modifiable.
@@ -97,7 +97,7 @@ public final class TradeOfferInternals {
 		}
 
 		@Override
-		public TradeOfferHelper.WanderingTraderOffersBuilder pool(ResourceLocation id, int count, MerchantOffers.Factory... factories) {
+		public TradeOfferHelper.WanderingTraderOffersBuilder pool(ResourceLocation id, int count, VillagerTrades.ItemListing... factories) {
 			if (factories.length == 0) throw new IllegalArgumentException("cannot add empty pool");
 			if (count <= 0) throw new IllegalArgumentException("count must be positive");
 
@@ -105,11 +105,11 @@ public final class TradeOfferInternals {
 
 			if (ID_TO_INDEX.containsKey(id)) throw new IllegalArgumentException("pool id %s is already registered".formatted(id));
 
-			Pair<MerchantOffers.Factory[], Integer> pool = Pair.of(factories, count);
+			Pair<VillagerTrades.ItemListing[], Integer> pool = Pair.of(factories, count);
 			initWanderingTraderTrades();
 			ID_TO_INDEX.put(id, MerchantOffers.WANDERING_TRADER_TRADES.size());
 			MerchantOffers.WANDERING_TRADER_TRADES.add(pool);
-			MerchantOffers.Factory[] delayedModifications = DELAYED_MODIFICATIONS.remove(id);
+			VillagerTrades.ItemListing[] delayedModifications = DELAYED_MODIFICATIONS.remove(id);
 
 			if (delayedModifications != null) addOffersToPool(id, delayedModifications);
 
@@ -117,7 +117,7 @@ public final class TradeOfferInternals {
 		}
 
 		@Override
-		public TradeOfferHelper.WanderingTraderOffersBuilder addOffersToPool(ResourceLocation pool, MerchantOffers.Factory... factories) {
+		public TradeOfferHelper.WanderingTraderOffersBuilder addOffersToPool(ResourceLocation pool, VillagerTrades.ItemListing... factories) {
 			if (!ID_TO_INDEX.containsKey(pool)) {
 				DELAYED_MODIFICATIONS.compute(pool, (id, current) -> {
 					if (current == null) return factories;
@@ -129,8 +129,8 @@ public final class TradeOfferInternals {
 
 			int poolIndex = ID_TO_INDEX.getInt(pool);
 			initWanderingTraderTrades();
-			Pair<MerchantOffers.Factory[], Integer> poolPair = MerchantOffers.WANDERING_TRADER_TRADES.get(poolIndex);
-			MerchantOffers.Factory[] modified = ArrayUtils.addAll(poolPair.getLeft(), factories);
+			Pair<VillagerTrades.ItemListing[], Integer> poolPair = MerchantOffers.WANDERING_TRADER_TRADES.get(poolIndex);
+			VillagerTrades.ItemListing[] modified = ArrayUtils.addAll(poolPair.getLeft(), factories);
 			MerchantOffers.WANDERING_TRADER_TRADES.set(poolIndex, Pair.of(modified, poolPair.getRight()));
 			return this;
 		}

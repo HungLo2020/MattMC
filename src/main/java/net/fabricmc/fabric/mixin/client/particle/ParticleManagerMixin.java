@@ -30,7 +30,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import net.minecraft.client.particle.ParticleEngine;
-import net.minecraft.client.particle.ParticleRenderer;
+import net.minecraft.client.particle.ParticleProvider;
 import net.minecraft.client.particle.ParticleRenderType;
 
 import net.fabricmc.fabric.impl.client.particle.ParticleRendererRegistryImpl;
@@ -48,8 +48,8 @@ public abstract class ParticleManagerMixin {
 	}
 
 	@Inject(method = "createParticleRenderer", at = @At(value = "NEW", target = "(Lnet/minecraft/client/particle/ParticleEngine;Lnet/minecraft/client/particle/ParticleRenderType;)Lnet/minecraft/client/particle/BillboardParticleRenderer;"), cancellable = true)
-	private void createParticleRenderer(ParticleRenderType textureSheet, CallbackInfoReturnable<ParticleRenderer<?>> cir) {
-		Function<ParticleEngine, ParticleRenderer<?>> factory = ParticleRendererRegistryImpl.INSTANCE.getFactory(textureSheet);
+	private void createParticleRenderer(ParticleRenderType textureSheet, CallbackInfoReturnable<ParticleProvider<?>> cir) {
+		Function<ParticleEngine, ParticleProvider<?>> factory = ParticleRendererRegistryImpl.INSTANCE.getFactory(textureSheet);
 
 		if (factory != null) {
 			cir.setReturnValue(factory.apply((ParticleEngine) (Object) this));
