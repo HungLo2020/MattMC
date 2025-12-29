@@ -1,0 +1,13 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "net.iris.iris.mixin.bettermipmaps",
+  "refmap": "iris.refmap.json",
+  "plugin": "net.iris.iris.mixin.IrisMixinPlugin",
+  "compatibilityLevel": "JAVA_8",
+  "client": [
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

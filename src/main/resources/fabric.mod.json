@@ -1,0 +1,63 @@
+{
+    "schemaVersion": 1,
+    "id": "mattmc-integrated",
+    "version": "1.21.10",
+
+    "provides": [ "sodium", "iris", "distanthorizons", "lod" ],
+    
+    "name": "MattMC Integrated Mods",
+    "description": "MattMC with integrated Sodium, Iris, and Distant Horizons",
+    "authors": ["HungLo2020", "CaffeineMC", "IrisShaders", "James Seibel"],
+    
+    "license": "Mixed",
+    "icon": "sodium-icon.png",
+    
+    "environment": "*",
+    "entrypoints": {
+        "client": [
+            "net.sodium.fabric.SodiumFabricMod",
+            "net.distant_horizons.fabric.FabricMain"
+        ],
+        "preLaunch": [
+            "net.sodium.fabric.SodiumPreLaunch"
+        ],
+        "server": [
+            "net.distant_horizons.fabric.FabricMain"
+        ]
+    },
+    
+    "mixins": [
+        "sodium-common.mixins.json",
+        "sodium-fabric.mixins.json",
+        "mixins.iris.json",
+        "mixins.iris.fabric.json",
+        "mixins.iris.compat.sodium.json",
+        "mixins.iris.compat.dh.json",
+        "mixins.iris.vertexformat.json",
+        "mixins.iris.fantastic.json",
+        "mixins.iris.fixes.maxfpscrash.json",
+        "mixins.iris.devenvironment.json",
+        "mixins.iris.bettermipmaps.json",
+        "mixins.iris.integrationtest.json",
+        "DistantHorizons.fabric.mixins.json"
+    ],
+    
+    "depends": {
+        "fabricloader": "*",
+        "minecraft": ">=1.21.10",
+        "java": ">=21"
+    },
+    
+    "custom": {
+        "fabric-renderer-api-v1:contains_renderer": true,
+        "sodium:options": {
+            "mixin.features.render.world.sky": false
+        },
+        "loom:injected_interfaces": {
+            "net/minecraft/class_276": ["net/iris/iris/mixinterface/RenderTargetInterface"],
+            "com/mojang/blaze3d/textures/GpuTexture": ["net/iris/iris/mixinterface/GpuTextureInterface"],
+            "com/mojang/blaze3d/systems/RenderPass": ["net/iris/iris/mixinterface/RenderPassInterface"],
+            "net/minecraft/class_1921": ["net/iris/iris/mixinterface/RenderTypeInterface"]
+        }
+    }
+}
