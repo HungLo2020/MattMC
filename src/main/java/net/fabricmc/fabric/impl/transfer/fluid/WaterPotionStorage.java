@@ -18,8 +18,8 @@ package net.fabricmc.fabric.impl.transfer.fluid;
 
 import org.jetbrains.annotations.Nullable;
 
-import net.minecraft.component.DataComponents;
-import net.minecraft.component.type.PotionContentsComponent;
+import net.minecraft.core.component.DataComponents;
+import net.minecraft.core.component.type.PotionContentsComponent;
 import net.minecraft.world.level.material.Fluids;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;

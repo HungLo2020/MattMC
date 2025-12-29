@@ -23,7 +23,7 @@ import java.util.function.Supplier;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 
-import net.minecraft.component.ComponentType;
+import net.minecraft.core.component.ComponentType;
 
 /**
  * Fabric-provided extensions for {@link net.minecraft.component.ComponentMap.Builder}.

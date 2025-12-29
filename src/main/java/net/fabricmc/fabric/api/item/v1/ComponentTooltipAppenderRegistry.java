@@ -19,7 +19,7 @@ package net.fabricmc.fabric.api.item.v1;
 import com.google.common.base.Preconditions;
 import org.jetbrains.annotations.ApiStatus;
 
-import net.minecraft.component.ComponentType;
+import net.minecraft.core.component.ComponentType;
 import net.minecraft.world.item.tooltip.TooltipAppender;
 
 import net.fabricmc.fabric.impl.item.ComponentTooltipAppenderRegistryImpl;

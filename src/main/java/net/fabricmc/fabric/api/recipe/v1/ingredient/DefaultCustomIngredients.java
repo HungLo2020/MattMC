@@ -20,7 +20,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.function.UnaryOperator;
 
-import net.minecraft.component.ComponentChanges;
+import net.minecraft.core.component.ComponentChanges;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtHelper;

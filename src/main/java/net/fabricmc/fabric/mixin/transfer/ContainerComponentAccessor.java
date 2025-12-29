@@ -19,7 +19,7 @@ package net.fabricmc.fabric.mixin.transfer;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.gen.Accessor;
 
-import net.minecraft.component.type.ContainerComponent;
+import net.minecraft.core.component.type.ContainerComponent;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.util.DefaultedList;
 

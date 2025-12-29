@@ -36,9 +36,9 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.ModifyArg;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-import net.minecraft.component.ComponentType;
-import net.minecraft.component.DataComponents;
-import net.minecraft.component.type.TooltipDisplayComponent;
+import net.minecraft.core.component.ComponentType;
+import net.minecraft.core.component.DataComponents;
+import net.minecraft.core.component.type.TooltipDisplayComponent;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;

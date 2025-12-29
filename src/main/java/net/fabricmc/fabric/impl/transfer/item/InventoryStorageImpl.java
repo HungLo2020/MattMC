@@ -25,7 +25,7 @@ import com.google.common.collect.MapMaker;
 import org.jetbrains.annotations.Nullable;
 
 import net.minecraft.world.entity.player.Inventory;
-import net.minecraft.world.item.inventory.Container;
+import net.minecraft.world.Container;
 import net.minecraft.world.item.inventory.SidedInventory;
 import net.minecraft.core.Direction;
 

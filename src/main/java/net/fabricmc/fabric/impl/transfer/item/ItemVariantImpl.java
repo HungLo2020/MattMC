@@ -20,8 +20,8 @@ import java.util.Objects;
 
 import org.jetbrains.annotations.Nullable;
 
-import net.minecraft.component.ComponentChanges;
-import net.minecraft.component.ComponentMap;
+import net.minecraft.core.component.ComponentChanges;
+import net.minecraft.core.component.ComponentMap;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;

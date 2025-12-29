@@ -24,9 +24,9 @@ import java.util.List;
 
 import org.apache.commons.lang3.math.Fraction;
 
-import net.minecraft.component.ComponentChanges;
-import net.minecraft.component.DataComponents;
-import net.minecraft.component.type.BundleContentsComponent;
+import net.minecraft.core.component.ComponentChanges;
+import net.minecraft.core.component.DataComponents;
+import net.minecraft.core.component.type.BundleContentsComponent;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 

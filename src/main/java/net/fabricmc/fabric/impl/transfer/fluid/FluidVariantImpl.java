@@ -20,9 +20,9 @@ import java.util.Objects;
 
 import org.jetbrains.annotations.Nullable;
 
-import net.minecraft.component.ComponentChanges;
-import net.minecraft.component.ComponentMap;
-import net.minecraft.component.MergedComponentMap;
+import net.minecraft.core.component.ComponentChanges;
+import net.minecraft.core.component.ComponentMap;
+import net.minecraft.core.component.MergedComponentMap;
 import net.minecraft.world.level.material.FlowableFluid;
 import net.minecraft.world.level.material.Fluid;
 import net.minecraft.world.level.material.Fluids;

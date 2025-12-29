@@ -33,9 +33,9 @@ import org.objectweb.asm.tree.MethodInsnNode;
 import org.objectweb.asm.tree.MethodNode;
 import org.spongepowered.asm.service.MixinService;
 
-import net.minecraft.component.ComponentType;
-import net.minecraft.component.DataComponents;
-import net.minecraft.component.type.TooltipDisplayComponent;
+import net.minecraft.core.component.ComponentType;
+import net.minecraft.core.component.DataComponents;
+import net.minecraft.core.component.type.TooltipDisplayComponent;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;

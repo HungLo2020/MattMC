@@ -25,8 +25,8 @@ import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import org.jetbrains.annotations.Nullable;
 
-import net.minecraft.component.ComponentChanges;
-import net.minecraft.component.ComponentType;
+import net.minecraft.core.component.ComponentChanges;
+import net.minecraft.core.component.ComponentType;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.network.RegistryByteBuf;

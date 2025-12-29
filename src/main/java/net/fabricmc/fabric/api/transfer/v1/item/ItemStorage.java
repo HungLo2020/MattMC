@@ -24,7 +24,7 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.ChestBlock;
 import net.minecraft.world.level.block.InventoryProvider;
 import net.minecraft.world.level.block.entity.ChestBlockEntity;
-import net.minecraft.world.item.inventory.Container;
+import net.minecraft.world.Container;
 import net.minecraft.world.item.inventory.SidedInventory;
 import net.minecraft.world.item.inventory.SimpleInventory;
 import net.minecraft.world.item.Items;

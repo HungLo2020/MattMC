@@ -24,7 +24,7 @@ import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.UnmodifiableView;
 
 import net.minecraft.world.entity.player.Inventory;
-import net.minecraft.world.item.inventory.Container;
+import net.minecraft.world.Container;
 import net.minecraft.world.item.inventory.SidedInventory;
 import net.minecraft.world.item.inventory.SimpleInventory;
 import net.minecraft.core.Direction;

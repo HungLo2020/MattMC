@@ -29,8 +29,8 @@ import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 
-import net.minecraft.component.ComponentMap;
-import net.minecraft.component.ComponentType;
+import net.minecraft.core.component.ComponentMap;
+import net.minecraft.core.component.ComponentType;
 
 import net.fabricmc.fabric.api.item.v1.FabricComponentMapBuilder;
 

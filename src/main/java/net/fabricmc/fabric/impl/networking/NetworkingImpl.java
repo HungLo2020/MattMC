@@ -21,7 +21,7 @@ import org.slf4j.LoggerFactory;
 
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.PacketCodec;
-import net.minecraft.network.protocol.CustomPacketPayload;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
 
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;

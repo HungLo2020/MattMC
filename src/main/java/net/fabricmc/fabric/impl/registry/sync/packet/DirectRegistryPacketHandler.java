@@ -34,7 +34,7 @@ import org.jetbrains.annotations.Nullable;
 
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.PacketCodec;
-import net.minecraft.network.protocol.CustomPacketPayload;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.core.Registries;
 import net.minecraft.core.Registry;
 import net.minecraft.resources.ResourceLocation;

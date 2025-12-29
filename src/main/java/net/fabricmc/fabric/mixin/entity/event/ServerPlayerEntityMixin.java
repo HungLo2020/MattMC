@@ -38,7 +38,7 @@ import net.minecraft.world.entity.mob.Monster;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.statse.property.Property;
+import net.minecraft.world.level.block.state.properties.Property;
 import net.minecraft.util.ActionResult;
 import net.minecraft.util.Unit;
 import net.minecraft.core.BlockPos;

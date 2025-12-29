@@ -20,8 +20,8 @@ import com.mojang.serialization.Codec;
 import com.mojang.serialization.DataResult;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 
-import net.minecraft.component.ComponentChanges;
-import net.minecraft.component.MergedComponentMap;
+import net.minecraft.core.component.ComponentChanges;
+import net.minecraft.core.component.MergedComponentMap;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.network.RegistryByteBuf;
 import net.minecraft.network.codec.PacketCodec;

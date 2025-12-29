@@ -20,7 +20,7 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.gen.Accessor;
 
 import net.minecraft.world.item.inventory.DoubleInventory;
-import net.minecraft.world.item.inventory.Container;
+import net.minecraft.world.Container;
 
 @Mixin(DoubleInventory.class)
 public interface DoubleInventoryAccessor {

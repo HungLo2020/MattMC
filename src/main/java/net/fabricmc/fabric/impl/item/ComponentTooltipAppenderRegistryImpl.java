@@ -24,8 +24,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.Consumer;
 
-import net.minecraft.component.ComponentType;
-import net.minecraft.component.type.TooltipDisplayComponent;
+import net.minecraft.core.component.ComponentType;
+import net.minecraft.core.component.type.TooltipDisplayComponent;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.tooltip.TooltipAppender;

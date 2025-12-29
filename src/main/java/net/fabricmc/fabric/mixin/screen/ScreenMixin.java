@@ -32,7 +32,7 @@ import net.minecraft.client.gui.Drawable;
 import net.minecraft.client.gui.Element;
 import net.minecraft.client.gui.Selectable;
 import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.client.gui.components.ClickableWidget;
+import net.minecraft.client.gui.components.AbstractWidget;
 
 import net.fabricmc.fabric.api.client.screen.v1.ScreenEvents;
 import net.fabricmc.fabric.api.client.screen.v1.ScreenKeyboardEvents;
@@ -176,7 +176,7 @@ abstract class ScreenMixin implements ScreenExtensions {
 	}
 
 	@Override
-	public List<ClickableWidget> fabric_getButtons() {
+	public List<AbstractWidget> fabric_getButtons() {
 		// Lazy init to make the list access safe after Screen#init
 		if (this.fabricButtons == null) {
 			this.fabricButtons = new ButtonList(this.drawables, this.selectables, this.children);

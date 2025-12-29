@@ -21,7 +21,7 @@ import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 
-import net.minecraft.component.ComponentMap;
+import net.minecraft.core.component.ComponentMap;
 import net.minecraft.world.item.Item;
 
 import net.fabricmc.fabric.api.event.Event;

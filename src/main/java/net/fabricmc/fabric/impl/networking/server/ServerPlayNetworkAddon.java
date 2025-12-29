@@ -22,7 +22,7 @@ import java.util.Objects;
 
 import net.minecraft.network.Connection;
 import net.minecraft.network.NetworkPhase;
-import net.minecraft.network.protocol.CustomPacketPayload;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.network.ServerGamePacketListenerImpl;

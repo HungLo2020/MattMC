@@ -19,7 +19,7 @@ package net.fabricmc.fabric.api.item.v1;
 import java.util.Optional;
 import java.util.Set;
 
-import net.minecraft.component.DataComponents;
+import net.minecraft.core.component.DataComponents;
 import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;

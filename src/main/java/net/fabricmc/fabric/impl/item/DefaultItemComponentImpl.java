@@ -19,7 +19,7 @@ package net.fabricmc.fabric.impl.item;
 import java.util.function.BiConsumer;
 import java.util.function.Predicate;
 
-import net.minecraft.component.ComponentMap;
+import net.minecraft.core.component.ComponentMap;
 import net.minecraft.world.item.Item;
 import net.minecraft.core.Registries;
 
