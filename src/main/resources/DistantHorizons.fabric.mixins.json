@@ -19,7 +19,6 @@
     "client.MixinDebugScreenOverlay",
     "client.MixinFogRenderer",
     "client.MixinLevelRenderer",
-    "client.LightTextureAccessor",
     "client.MixinMinecraft",
     "client.MixinOptionsScreen",
     "client.MixinTextureUtil"
