@@ -122,7 +122,7 @@ public final class Networking implements ModInitializer {
 		}
 
 		@Override
-		public Id<? extends CustomPacketPayload> getId() {
+		public CustomPacketPayload.Type<? extends CustomPacketPayload> getId() {
 			return ID;
 		}
 	}

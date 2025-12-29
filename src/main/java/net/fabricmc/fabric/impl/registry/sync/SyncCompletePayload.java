@@ -29,7 +29,7 @@ public class SyncCompletePayload implements CustomPacketPayload {
 	private SyncCompletePayload() { }
 
 	@Override
-	public Id<? extends CustomPacketPayload> getId() {
+	public CustomPacketPayload.Type<? extends CustomPacketPayload> getId() {
 		return ID;
 	}
 }

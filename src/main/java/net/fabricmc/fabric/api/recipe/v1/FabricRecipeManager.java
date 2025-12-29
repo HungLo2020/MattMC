@@ -29,7 +29,7 @@ import net.minecraft.world.level.Level;
 /**
  * General-purpose Fabric-provided extensions for {@link RecipeManager} class.
  */
-public interface FabricRecipeManager extends FabricRecipeManager {
+public interface FabricRecipeManager {
 	/**
 	 * Creates a stream of all recipe entries of the given {@code type} that match the
 	 * given {@code input} and {@code world}.

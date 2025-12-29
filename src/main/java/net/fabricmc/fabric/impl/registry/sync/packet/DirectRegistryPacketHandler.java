@@ -302,7 +302,7 @@ public class DirectRegistryPacketHandler extends RegistryPacketHandler<DirectReg
 		}
 
 		@Override
-		public Id<? extends CustomPacketPayload> getId() {
+		public CustomPacketPayload.Type<? extends CustomPacketPayload> getId() {
 			return ID;
 		}
 	}

@@ -140,7 +140,7 @@ public final class RegistrySyncManager {
 			ServerConfigurationPacketListenerImpl handler,
 			Map<ResourceLocation, Object2IntMap<ResourceLocation>> map
 	) implements ConfigurationTask {
-		public static final Key KEY = new Key("fabric:registry/sync");
+		public static final ConfigurationTask.Type KEY = new ConfigurationTask.Type("fabric:registry/sync");
 
 		@Override
 		public void sendPacket(Consumer<Packet<?>> sender) {
@@ -148,7 +148,7 @@ public final class RegistrySyncManager {
 		}
 
 		@Override
-		public Key getKey() {
+		public ConfigurationTask.Type getKey() {
 			return KEY;
 		}
 	}
