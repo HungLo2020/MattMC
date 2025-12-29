@@ -23,7 +23,7 @@ import org.jetbrains.annotations.ApiStatus;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.server.packs.resources.ResourceManager;
 import net.minecraft.server.packs.resources.PreparableReloadListener;
-import net.minecraft.server.packs.PackType;
+import net.minecraft.server.packs.repository.PackType;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 

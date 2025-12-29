@@ -20,20 +20,20 @@ import java.util.ArrayList;
 import java.util.List;
 
 import net.minecraft.server.packs.OverlayResourcePack;
-import net.minecraft.server.packs.Pack;
-import net.minecraft.server.packs.ResourcePackInfo;
-import net.minecraft.server.packs.Pack;
+import net.minecraft.server.packs.repository.Pack;
+import net.minecraft.server.packs.PackLocationInfo;
+import net.minecraft.server.packs.repository.Pack;
 
 import net.fabricmc.fabric.api.resource.ModResourcePack;
 
 public record ModResourcePackFactory(ModResourcePack pack) implements Pack.PackFactory {
 	@Override
-	public Pack open(ResourcePackInfo var1) {
+	public Pack open(PackLocationInfo var1) {
 		return pack;
 	}
 
 	@Override
-	public Pack openWithOverlays(ResourcePackInfo var1, Pack.Metadata metadata) {
+	public Pack openWithOverlays(PackLocationInfo var1, Pack.Metadata metadata) {
 		if (metadata.overlays().isEmpty()) {
 			return pack;
 		} else {

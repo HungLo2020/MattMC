@@ -33,8 +33,8 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-import net.minecraft.server.packs.PackRepository;
-import net.minecraft.server.packs.Pack;
+import net.minecraft.server.packs.repository.PackRepository;
+import net.minecraft.server.packs.repository.Pack;
 import net.minecraft.commands.DatapackCommand;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.network.chat.Component;

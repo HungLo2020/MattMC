@@ -16,7 +16,7 @@
 
 package net.fabricmc.fabric.impl.resource.loader;
 
-import net.minecraft.server.packs.PackSource;
+import net.minecraft.server.packs.repository.PackSource;
 import net.minecraft.network.chat.Component;
 import net.minecraft.ChatFormatting;
 

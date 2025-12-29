@@ -44,10 +44,10 @@ import org.slf4j.LoggerFactory;
 
 import net.minecraft.core.VersionedIdentifier;
 import net.minecraft.server.packs.AbstractFileResourcePack;
-import net.minecraft.server.packs.InputSupplier;
-import net.minecraft.server.packs.Pack;
-import net.minecraft.server.packs.ResourcePackInfo;
-import net.minecraft.server.packs.PackType;
+import net.minecraft.server.packs.IoSupplier;
+import net.minecraft.server.packs.repository.Pack;
+import net.minecraft.server.packs.PackLocationInfo;
+import net.minecraft.server.packs.repository.PackType;
 import net.minecraft.server.packs.metadata.ResourceMetadataSerializer;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
@@ -69,7 +69,7 @@ public class ModNioResourcePack implements Pack, ModResourcePack {
 	private final PackType type;
 	private final ResourcePackActivationType activationType;
 	private final Map<PackType, Set<String>> namespaces;
-	private final ResourcePackInfo metadata;
+	private final PackLocationInfo metadata;
 	/**
 	 * Whether the pack is bundled and loaded by default, as opposed to registered built-in packs.
 	 * @see ModResourcePackUtil#appendModResourcePacks(List, PackType, String)
@@ -104,7 +104,7 @@ public class ModNioResourcePack implements Pack, ModResourcePack {
 		Component displayName = subPath == null
 				? Component.translatable("pack.name.fabricMod", mod.getMetadata().getName())
 				: Component.translatable("pack.name.fabricMod.subPack", mod.getMetadata().getName(), Component.translatable("resourcePack." + subPath + ".name"));
-		ResourcePackInfo metadata = new ResourcePackInfo(
+		PackLocationInfo metadata = new PackLocationInfo(
 				packId,
 				displayName,
 				ModResourcePackCreator.RESOURCE_PACK_SOURCE,
@@ -115,7 +115,7 @@ public class ModNioResourcePack implements Pack, ModResourcePack {
 		return ret.getNamespaces(type).isEmpty() ? null : ret;
 	}
 
-	private ModNioResourcePack(String id, ModContainer mod, List<Path> paths, PackType type, ResourcePackActivationType activationType, boolean modBundled, ResourcePackInfo metadata) {
+	private ModNioResourcePack(String id, ModContainer mod, List<Path> paths, PackType type, ResourcePackActivationType activationType, boolean modBundled, PackLocationInfo metadata) {
 		this.id = id;
 		this.mod = mod;
 		this.basePaths = paths;
@@ -211,7 +211,7 @@ public class ModNioResourcePack implements Pack, ModResourcePack {
 		return !namespaces.get(type).contains(filename.substring(prefixLen, nsEnd));
 	}
 
-	private InputSupplier<InputStream> openFile(String filename) {
+	private IoSupplier<InputStream> openFile(String filename) {
 		Path path = getPath(filename);
 
 		if (path != null && Files.isRegularFile(path)) {
@@ -227,7 +227,7 @@ public class ModNioResourcePack implements Pack, ModResourcePack {
 
 	@Nullable
 	@Override
-	public InputSupplier<InputStream> openRoot(String... pathSegments) {
+	public IoSupplier<InputStream> openRoot(String... pathSegments) {
 		PathUtil.validatePath(pathSegments);
 
 		return this.openFile(String.join("/", pathSegments));
@@ -235,9 +235,9 @@ public class ModNioResourcePack implements Pack, ModResourcePack {
 
 	@Override
 	@Nullable
-	public InputSupplier<InputStream> open(PackType type, ResourceLocation id) {
+	public IoSupplier<InputStream> open(PackType type, ResourceLocation id) {
 		final Path path = getPath(getFilename(type, id));
-		return path == null ? null : InputSupplier.create(path);
+		return path == null ? null : IoSupplier.create(path);
 	}
 
 	@Override
@@ -262,7 +262,7 @@ public class ModNioResourcePack implements Pack, ModResourcePack {
 						if (identifier == null) {
 							LOGGER.error("Invalid path in mod resource-pack {}: {}:{}, ignoring", id, namespace, filename);
 						} else {
-							visitor.accept(identifier, InputSupplier.create(file));
+							visitor.accept(identifier, IoSupplier.create(file));
 						}
 
 						return FileVisitResult.CONTINUE;
@@ -287,7 +287,7 @@ public class ModNioResourcePack implements Pack, ModResourcePack {
 	}
 
 	@Override
-	public ResourcePackInfo getInfo() {
+	public PackLocationInfo getInfo() {
 		return metadata;
 	}
 

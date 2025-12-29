@@ -26,8 +26,8 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.ModifyArg;
 
 import net.minecraft.client.Minecraft;
-import net.minecraft.server.packs.PackRepository;
-import net.minecraft.server.packs.Pack;
+import net.minecraft.server.packs.repository.PackRepository;
+import net.minecraft.server.packs.repository.Pack;
 
 import net.fabricmc.fabric.impl.resource.loader.FabricResourcePackProfile;
 

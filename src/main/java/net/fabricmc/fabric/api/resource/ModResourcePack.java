@@ -16,7 +16,7 @@
 
 package net.fabricmc.fabric.api.resource;
 
-import net.minecraft.server.packs.Pack;
+import net.minecraft.server.packs.repository.Pack;
 
 import net.fabricmc.loader.api.metadata.ModMetadata;
 

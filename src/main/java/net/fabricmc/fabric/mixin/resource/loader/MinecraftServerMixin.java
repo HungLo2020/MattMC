@@ -28,9 +28,9 @@ import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import net.minecraft.core.VersionedIdentifier;
-import net.minecraft.server.packs.Pack;
-import net.minecraft.server.packs.PackRepository;
-import net.minecraft.server.packs.Pack;
+import net.minecraft.server.packs.repository.Pack;
+import net.minecraft.server.packs.repository.PackRepository;
+import net.minecraft.server.packs.repository.Pack;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.SaveLoader;
 import net.minecraft.util.ApiServices;

@@ -28,7 +28,7 @@ import org.spongepowered.asm.mixin.injection.Redirect;
 
 import net.minecraft.client.resource.ClientDataPackManager;
 import net.minecraft.core.VersionedIdentifier;
-import net.minecraft.server.packs.PackRepository;
+import net.minecraft.server.packs.repository.PackRepository;
 
 import net.fabricmc.fabric.impl.resource.loader.ModResourcePackCreator;
 import net.fabricmc.fabric.impl.resource.loader.ModResourcePackUtil;

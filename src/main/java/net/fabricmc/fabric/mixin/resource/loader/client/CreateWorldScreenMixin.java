@@ -29,9 +29,9 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.world.CreateWorldScreen;
-import net.minecraft.server.packs.WorldDataConfiguration;
-import net.minecraft.server.packs.PackRepository;
-import net.minecraft.server.packs.PackType;
+import net.minecraft.server.WorldDataConfiguration;
+import net.minecraft.server.packs.repository.PackRepository;
+import net.minecraft.server.packs.repository.PackType;
 
 import net.fabricmc.fabric.impl.resource.loader.ModResourcePackCreator;
 import net.fabricmc.fabric.impl.resource.loader.ModResourcePackUtil;

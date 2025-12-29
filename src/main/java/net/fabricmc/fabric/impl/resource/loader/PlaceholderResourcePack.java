@@ -28,18 +28,18 @@ import org.apache.commons.io.IOUtils;
 import org.jetbrains.annotations.Nullable;
 
 import net.minecraft.SharedConstants;
-import net.minecraft.server.packs.InputSupplier;
-import net.minecraft.server.packs.Pack;
-import net.minecraft.server.packs.ResourcePackInfo;
-import net.minecraft.server.packs.Pack;
-import net.minecraft.server.packs.PackType;
+import net.minecraft.server.packs.IoSupplier;
+import net.minecraft.server.packs.repository.Pack;
+import net.minecraft.server.packs.PackLocationInfo;
+import net.minecraft.server.packs.repository.Pack;
+import net.minecraft.server.packs.repository.PackType;
 import net.minecraft.server.packs.metadata.PackMetadataSection;
 import net.minecraft.server.packs.metadata.ResourceMetadataMap;
 import net.minecraft.server.packs.metadata.ResourceMetadataSerializer;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 
-public record PlaceholderResourcePack(PackType type, ResourcePackInfo metadata) implements Pack {
+public record PlaceholderResourcePack(PackType type, PackLocationInfo metadata) implements Pack {
 	private static final Component DESCRIPTION_TEXT = Component.translatable("pack.description.modResources");
 
 	public PackMetadataSection getMetadata() {
@@ -51,7 +51,7 @@ public record PlaceholderResourcePack(PackType type, ResourcePackInfo metadata) 
 
 	@Nullable
 	@Override
-	public InputSupplier<InputStream> openRoot(String... segments) {
+	public IoSupplier<InputStream> openRoot(String... segments) {
 		if (segments.length > 0) {
 			switch (segments[0]) {
 			case "pack.mcmeta":
@@ -74,7 +74,7 @@ public record PlaceholderResourcePack(PackType type, ResourcePackInfo metadata) 
 	 */
 	@Nullable
 	@Override
-	public InputSupplier<InputStream> open(PackType type, ResourceLocation id) {
+	public IoSupplier<InputStream> open(PackType type, ResourceLocation id) {
 		return null;
 	}
 
@@ -94,7 +94,7 @@ public record PlaceholderResourcePack(PackType type, ResourcePackInfo metadata) 
 	}
 
 	@Override
-	public ResourcePackInfo getInfo() {
+	public PackLocationInfo getInfo() {
 		return metadata;
 	}
 
@@ -107,14 +107,14 @@ public record PlaceholderResourcePack(PackType type, ResourcePackInfo metadata) 
 	public void close() {
 	}
 
-	public record Factory(PackType type, ResourcePackInfo metadata) implements Pack.PackFactory {
+	public record Factory(PackType type, PackLocationInfo metadata) implements Pack.PackFactory {
 		@Override
-		public Pack open(ResourcePackInfo var1) {
+		public Pack open(PackLocationInfo var1) {
 			return new PlaceholderResourcePack(this.type, metadata);
 		}
 
 		@Override
-		public Pack openWithOverlays(ResourcePackInfo var1, Pack.Metadata metadata) {
+		public Pack openWithOverlays(PackLocationInfo var1, Pack.Metadata metadata) {
 			return open(var1);
 		}
 	}

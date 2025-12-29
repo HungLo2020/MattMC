@@ -25,12 +25,12 @@ import java.util.function.Predicate;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.VisibleForTesting;
 
-import net.minecraft.server.packs.ResourcePackInfo;
+import net.minecraft.server.packs.PackLocationInfo;
 import net.minecraft.server.packs.ResourcePackPosition;
-import net.minecraft.server.packs.Pack;
+import net.minecraft.server.packs.repository.Pack;
 import net.minecraft.server.packs.ResourcePackProvider;
-import net.minecraft.server.packs.PackSource;
-import net.minecraft.server.packs.PackType;
+import net.minecraft.server.packs.repository.PackSource;
+import net.minecraft.server.packs.repository.PackType;
 import net.minecraft.network.chat.Component;
 
 import net.fabricmc.fabric.api.resource.ModResourcePack;
@@ -106,7 +106,7 @@ public class ModResourcePackCreator implements ResourcePackProvider {
 			4. User resource packs
 		 */
 
-		ResourcePackInfo metadata = new ResourcePackInfo(
+		PackLocationInfo metadata = new PackLocationInfo(
 				FABRIC,
 				Component.translatable("pack.name.fabricMods"),
 				RESOURCE_PACK_SOURCE,

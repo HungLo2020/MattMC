@@ -18,8 +18,8 @@ package net.fabricmc.fabric.impl.resource.loader;
 
 import java.util.WeakHashMap;
 
-import net.minecraft.server.packs.Pack;
-import net.minecraft.server.packs.PackSource;
+import net.minecraft.server.packs.repository.Pack;
+import net.minecraft.server.packs.repository.PackSource;
 
 /**
  * Tracks the sources of resource packs in a global weak hash map.

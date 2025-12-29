@@ -30,12 +30,12 @@ import java.util.function.Function;
 
 import net.minecraft.core.HolderLookup;
 import net.minecraft.server.packs.OverlayResourcePack;
-import net.minecraft.server.packs.Pack;
-import net.minecraft.server.packs.ResourcePackInfo;
+import net.minecraft.server.packs.repository.Pack;
+import net.minecraft.server.packs.PackLocationInfo;
 import net.minecraft.server.packs.ResourcePackPosition;
-import net.minecraft.server.packs.Pack;
+import net.minecraft.server.packs.repository.Pack;
 import net.minecraft.server.packs.resources.PreparableReloadListener;
-import net.minecraft.server.packs.PackType;
+import net.minecraft.server.packs.repository.PackType;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Pair;
@@ -115,7 +115,7 @@ public class ResourceManagerHelperImpl implements ResourceManagerHelper {
 			// Add the built-in pack only if namespaces for the specified resource type are present.
 			if (!pack.getNamespaces(resourceType).isEmpty()) {
 				// Make the resource pack profile for built-in pack, should never be always enabled.
-				ResourcePackInfo info = new ResourcePackInfo(
+				PackLocationInfo info = new PackLocationInfo(
 						entry.getRight().getId(),
 						entry.getLeft(),
 						new BuiltinModResourcePackSource(pack.getFabricModMetadata().getName()),
@@ -129,12 +129,12 @@ public class ResourceManagerHelperImpl implements ResourceManagerHelper {
 
 				Pack profile = Pack.create(info, new Pack.PackFactory() {
 					@Override
-					public Pack open(ResourcePackInfo var1) {
+					public Pack open(PackLocationInfo var1) {
 						return entry.getRight();
 					}
 
 					@Override
-					public Pack openWithOverlays(ResourcePackInfo var1, Pack.Metadata metadata) {
+					public Pack openWithOverlays(PackLocationInfo var1, Pack.Metadata metadata) {
 						ModNioResourcePack pack = entry.getRight();
 
 						if (metadata.overlays().isEmpty()) {
