@@ -33,7 +33,7 @@ import org.spongepowered.asm.mixin.injection.ModifyArg;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import net.minecraft.network.Connection;
-import net.minecraft.network.NetworkPhase;
+import net.minecraft.network.ConnectionProtocol;
 import net.minecraft.network.NetworkSide;
 import net.minecraft.network.handler.DecoderHandler;
 import net.minecraft.network.handler.EncoderHandler;
@@ -57,7 +57,7 @@ abstract class ClientConnectionMixin implements ChannelInfoHolder {
 	private PacketListener packetListener;
 
 	@Unique
-	private Map<NetworkPhase, Collection<ResourceLocation>> playChannels;
+	private Map<ConnectionProtocol, Collection<ResourceLocation>> playChannels;
 
 	@Inject(method = "<init>", at = @At("RETURN"))
 	private void initAddedFields(NetworkSide side, CallbackInfo ci) {
@@ -121,7 +121,7 @@ abstract class ClientConnectionMixin implements ChannelInfoHolder {
 	}
 
 	@Override
-	public Collection<ResourceLocation> fabric_getPendingChannelsNames(NetworkPhase state) {
+	public Collection<ResourceLocation> fabric_getPendingChannelsNames(ConnectionProtocol state) {
 		return this.playChannels.computeIfAbsent(state, (key) -> Collections.newSetFromMap(new ConcurrentHashMap<>()));
 	}
 }

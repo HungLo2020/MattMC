@@ -22,7 +22,7 @@ import org.jetbrains.annotations.Nullable;
 
 import net.minecraft.core.component.DataComponentPatch;
 import net.minecraft.core.component.DataComponentMap;
-import net.minecraft.core.component.MergedComponentMap;
+import net.minecraft.core.component.PatchedDataComponentMap;
 import net.minecraft.world.level.material.FlowingFluid;
 import net.minecraft.world.level.material.Fluid;
 import net.minecraft.world.level.material.Fluids;
@@ -72,7 +72,7 @@ public class FluidVariantImpl implements FluidVariant {
 	public FluidVariantImpl(Fluid fluid, DataComponentPatch components) {
 		this.fluid = fluid;
 		this.components = components;
-		this.componentMap = components == DataComponentPatch.EMPTY ? DataComponentMap.EMPTY : MergedComponentMap.create(DataComponentMap.EMPTY, components);
+		this.componentMap = components == DataComponentPatch.EMPTY ? DataComponentMap.EMPTY : PatchedDataComponentMap.create(DataComponentMap.EMPTY, components);
 		this.hashCode = Objects.hash(fluid, components);
 	}
 

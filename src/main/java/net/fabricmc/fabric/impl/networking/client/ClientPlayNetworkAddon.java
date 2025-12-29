@@ -25,7 +25,7 @@ import org.slf4j.Logger;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.client.player.LocalPlayer;
-import net.minecraft.network.NetworkPhase;
+import net.minecraft.network.ConnectionProtocol;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.resources.ResourceLocation;
@@ -46,7 +46,7 @@ public final class ClientPlayNetworkAddon extends ClientCommonNetworkAddon<Clien
 		this.context = new ContextImpl(client, this);
 
 		// Must register pending channels via lateinit
-		this.registerPendingChannels((ChannelInfoHolder) this.connection, NetworkPhase.PLAY);
+		this.registerPendingChannels((ChannelInfoHolder) this.connection, ConnectionProtocol.PLAY);
 	}
 
 	@Override

@@ -29,7 +29,7 @@ import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.entity.LockableContainerBlockEntity;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.util.DefaultedList;
+import net.minecraft.core.NonNullList;
 import net.minecraft.core.BlockPos;
 
 import net.fabricmc.fabric.impl.transfer.item.SpecialLogicInventory;
@@ -40,7 +40,7 @@ import net.fabricmc.fabric.impl.transfer.item.SpecialLogicInventory;
 @Mixin(AbstractFurnaceBlockEntity.class)
 public abstract class AbstractFurnaceBlockEntityMixin extends LockableContainerBlockEntity implements SpecialLogicInventory {
 	@Shadow
-	protected DefaultedList<ItemStack> inventory;
+	protected NonNullList<ItemStack> inventory;
 	@Shadow
 	int cookingTimeSpent;
 	@Shadow
