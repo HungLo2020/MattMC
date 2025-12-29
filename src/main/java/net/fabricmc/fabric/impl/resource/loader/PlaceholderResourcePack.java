@@ -33,7 +33,7 @@ import net.minecraft.server.packs.repository.Pack;
 import net.minecraft.server.packs.PackLocationInfo;
 import net.minecraft.server.packs.repository.Pack;
 import net.minecraft.server.packs.PackType;
-import net.minecraft.server.packs.metadata.PackMetadataSection;
+import net.minecraft.server.packs.metadata.pack.PackMetadataSection;
 import net.minecraft.server.packs.metadata.ResourceMetadataMap;
 import net.minecraft.server.packs.metadata.ResourceMetadataSerializer;
 import net.minecraft.network.chat.Component;
@@ -107,7 +107,7 @@ public record PlaceholderResourcePack(PackType type, PackLocationInfo metadata) 
 	public void close() {
 	}
 
-	public record Factory(PackType type, PackLocationInfo metadata) implements Pack.PackFactory {
+	public record Factory(PackType type, PackLocationInfo metadata) implements Pack.ResourcesSupplier {
 		@Override
 		public Pack open(PackLocationInfo var1) {
 			return new PlaceholderResourcePack(this.type, metadata);

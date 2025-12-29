@@ -26,7 +26,7 @@ import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.VisibleForTesting;
 
 import net.minecraft.server.packs.PackLocationInfo;
-import net.minecraft.server.packs.ResourcePackPosition;
+import net.minecraft.server.packs.Pack.Position;
 import net.minecraft.server.packs.repository.Pack;
 import net.minecraft.server.packs.ResourcePackProvider;
 import net.minecraft.server.packs.repository.PackSource;
@@ -74,7 +74,7 @@ public class ModResourcePackCreator implements ResourcePackProvider {
 	public static final int MAX_KNOWN_PACKS = Integer.getInteger("fabric-resource-loader-v0:maxKnownPacks", 1024);
 
 	private final PackType type;
-	private final ResourcePackPosition activationInfo;
+	private final Pack.Position activationInfo;
 	private final boolean forClientDataPackManager;
 
 	public ModResourcePackCreator(PackType type) {
@@ -83,7 +83,7 @@ public class ModResourcePackCreator implements ResourcePackProvider {
 
 	protected ModResourcePackCreator(PackType type, boolean forClientDataPackManager) {
 		this.type = type;
-		this.activationInfo = new ResourcePackPosition(!forClientDataPackManager, Pack.InsertionPosition.TOP, false);
+		this.activationInfo = new Pack.Position(!forClientDataPackManager, Pack.InsertionPosition.TOP, false);
 		this.forClientDataPackManager = forClientDataPackManager;
 	}
 

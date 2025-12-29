@@ -29,10 +29,10 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 
 import net.minecraft.core.HolderLookup;
-import net.minecraft.server.packs.OverlayResourcePack;
+import net.minecraft.server.packs.CompositePackResources;
 import net.minecraft.server.packs.repository.Pack;
 import net.minecraft.server.packs.PackLocationInfo;
-import net.minecraft.server.packs.ResourcePackPosition;
+import net.minecraft.server.packs.Pack.Position;
 import net.minecraft.server.packs.repository.Pack;
 import net.minecraft.server.packs.resources.PreparableReloadListener;
 import net.minecraft.server.packs.PackType;
@@ -121,13 +121,13 @@ public class ResourceManagerHelperImpl implements ResourceManagerHelper {
 						new BuiltinModResourcePackSource(pack.getFabricModMetadata().getName()),
 						entry.getRight().getKnownPackInfo()
 				);
-				ResourcePackPosition info2 = new ResourcePackPosition(
+				Pack.Position info2 = new Pack.Position(
 						pack.getActivationType() == ResourcePackActivationType.ALWAYS_ENABLED,
 						Pack.InsertionPosition.TOP,
 						false
 				);
 
-				Pack profile = Pack.create(info, new Pack.PackFactory() {
+				Pack profile = Pack.create(info, new Pack.ResourcesSupplier() {
 					@Override
 					public Pack open(PackLocationInfo var1) {
 						return entry.getRight();
@@ -147,7 +147,7 @@ public class ResourceManagerHelperImpl implements ResourceManagerHelper {
 							overlays.add(pack.createOverlay(overlay));
 						}
 
-						return new OverlayResourcePack(pack, overlays);
+						return new CompositePackResources(pack, overlays);
 					}
 				}, resourceType, info2);
 				consumer.accept(profile);
