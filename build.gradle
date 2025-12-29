@@ -56,6 +56,14 @@ repositories {
     // Always include Maven Central (for most dependencies)
     mavenCentral()
     
+    // JitPack repository (needed for some open-source dependencies - always enabled)
+    maven { 
+        url = 'https://jitpack.io'
+        content {
+            includeGroup 'com.github.Mojang'
+        }
+    }
+    
     // Only add remote repositories if bundled dependencies are NOT available
     if (!useBundledDeps) {
         println "⚠ Bundled dependencies not found. Using remote repositories."
@@ -73,13 +81,6 @@ repositories {
             content {
                 includeGroup 'com.mojang'
                 includeGroup 'net.minecraft'
-            }
-        }
-        // JitPack for open-source Mojang libraries
-        maven { 
-            url = 'https://jitpack.io'
-            content {
-                includeGroup 'com.github.Mojang'
             }
         }
         // Forge mirrors for Mojang libraries
@@ -310,6 +311,7 @@ dependencies {
     implementation 'org.antlr:antlr4-runtime:4.13.1'
     // GLSL Transformer - GLSL shader transformation library
     implementation 'io.github.douira:glsl-transformer:3.0.0-pre3'
+    // Note: StarEval (kroppeb.stareval) is bundled in src/main/java/kroppeb/
     
     // ===== DISTANT HORIZONS DEPENDENCIES =====
     // Additional dependencies required for Distant Horizons core

@@ -16,32 +16,48 @@
 
 package net.fabricmc.fabric.api.client.keybinding.v1;
 
-import net.minecraft.client.KeyMapping;
+import java.util.Objects;
 
-import java.util.ArrayList;
-import java.util.List;
+import net.minecraft.client.KeyMapping;
+import com.mojang.blaze3d.platform.InputConstants;
+
+import net.fabricmc.fabric.impl.client.keybinding.KeyBindingRegistryImpl;
+import net.fabricmc.fabric.mixin.client.keybinding.KeyBindingAccessor;
 
 /**
- * Helper for registering key bindings.
+ * Helper for registering {@link KeyMapping}s.
+ *
+ * <pre>{@code
+ * KeyMapping left = KeyBindingHelper.registerKeyBinding(new KeyMapping("key.example.left", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_P, KeyMapping.Category.MISC));
+ * KeyMapping right = KeyBindingHelper.registerKeyBinding(new KeyMapping("key.example.right", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_U, KeyMapping.Category.MISC));
+ * }</pre>
+ *
+ * @see KeyMapping
+ * @see net.minecraft.client.Options.StickyKeyBinding
  */
 public final class KeyBindingHelper {
-    private static final List<KeyMapping> REGISTERED_BINDINGS = new ArrayList<>();
-    
-    private KeyBindingHelper() { }
-    
-    /**
-     * Registers a key binding and returns it.
-     * The binding will be added to Minecraft's key mapping list on game initialization.
-     */
-    public static KeyMapping registerKeyBinding(KeyMapping keyMapping) {
-        REGISTERED_BINDINGS.add(keyMapping);
-        return keyMapping;
-    }
-    
-    /**
-     * Gets all registered key bindings.
-     */
-    public static List<KeyMapping> getRegisteredBindings() {
-        return REGISTERED_BINDINGS;
-    }
+	private KeyBindingHelper() {
+	}
+
+	/**
+	 * Registers the keybinding and add the keybinding category if required.
+	 *
+	 * @param keyBinding the keybinding
+	 * @return the keybinding itself
+	 * @throws IllegalArgumentException when a key binding with the same ID is already registered
+	 */
+	public static KeyMapping registerKeyBinding(KeyMapping keyBinding) {
+		Objects.requireNonNull(keyBinding, "key binding cannot be null");
+		return KeyBindingRegistryImpl.registerKeyBinding(keyBinding);
+	}
+
+	/**
+	 * Returns the configured KeyCode bound to the KeyMapping from the player's settings.
+	 *
+	 * @param keyBinding the keybinding
+	 * @return configured KeyCode
+	 */
+	public static InputConstants.Key getBoundKeyOf(KeyMapping keyBinding) {
+		return ((KeyBindingAccessor) keyBinding).fabric_getBoundKey();
+	}
 }
