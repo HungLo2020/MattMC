@@ -39,7 +39,7 @@ import net.minecraft.world.inventory.AbstractContainerMenu;
  * {@code
  * // Data class
  * public record OvenData(String label) {
- *     public static final PacketCodec<RegistryByteBuf, OvenData> PACKET_CODEC = PacketCodec.tuple(
+ *     public static final StreamCodec<RegistryFriendlyByteBuf, OvenData> PACKET_CODEC = StreamCodec.tuple(
  *     	PacketCodecs.STRING,
  *     	OvenData::label,
  *     	OvenData::new

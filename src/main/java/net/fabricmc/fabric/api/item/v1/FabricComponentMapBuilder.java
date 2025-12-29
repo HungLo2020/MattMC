@@ -26,7 +26,7 @@ import org.jetbrains.annotations.NotNull;
 import net.minecraft.component.ComponentType;
 
 /**
- * Fabric-provided extensions for {@link net.minecraft.component.ComponentMap.Builder}.
+ * Fabric-provided extensions for {@link net.minecraft.component.DataComponentMap.Builder}.
  *
  * <p>Note: This interface is automatically implemented on all component map builders via Mixin and interface injection.
  */

@@ -28,7 +28,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import net.minecraft.component.ComponentChanges;
+import net.minecraft.component.DataComponentPatch;
 import net.minecraft.component.ComponentType;
 
 import net.fabricmc.fabric.api.transfer.v1.storage.SlottedStorage;
@@ -113,8 +113,8 @@ public class TransferApiImpl {
 		};
 	}
 
-	public static ComponentChanges mergeChanges(ComponentChanges base, ComponentChanges applied) {
-		ComponentChanges.Builder builder = ComponentChanges.builder();
+	public static DataComponentPatch mergeChanges(DataComponentPatch base, DataComponentPatch applied) {
+		DataComponentPatch.Builder builder = DataComponentPatch.builder();
 
 		writeChangesTo(base, builder);
 		writeChangesTo(applied, builder);
@@ -123,7 +123,7 @@ public class TransferApiImpl {
 	}
 
 	@SuppressWarnings("unchecked")
-	private static void writeChangesTo(ComponentChanges changes, ComponentChanges.Builder builder) {
+	private static void writeChangesTo(DataComponentPatch changes, DataComponentPatch.Builder builder) {
 		for (Map.Entry<ComponentType<?>, Optional<?>> entry : changes.entrySet()) {
 			if (entry.getValue().isPresent()) {
 				builder.add((ComponentType<Object>) entry.getKey(), entry.getValue().get());

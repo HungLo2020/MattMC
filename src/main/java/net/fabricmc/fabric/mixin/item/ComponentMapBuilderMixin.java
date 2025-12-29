@@ -29,19 +29,19 @@ import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 
-import net.minecraft.component.ComponentMap;
+import net.minecraft.component.DataComponentMap;
 import net.minecraft.component.ComponentType;
 
 import net.fabricmc.fabric.api.item.v1.FabricComponentMapBuilder;
 
-@Mixin(ComponentMap.Builder.class)
+@Mixin(DataComponentMap.Builder.class)
 abstract class ComponentMapBuilderMixin implements FabricComponentMapBuilder {
 	@Shadow
 	@Final
 	private Reference2ObjectMap<ComponentType<?>, Object> components;
 
 	@Shadow
-	public abstract <T> ComponentMap.Builder add(ComponentType<T> type, @Nullable T value);
+	public abstract <T> DataComponentMap.Builder add(ComponentType<T> type, @Nullable T value);
 
 	@Override
 	@SuppressWarnings("unchecked")

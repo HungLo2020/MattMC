@@ -21,8 +21,8 @@ import java.util.function.Function;
 
 import com.mojang.serialization.MapCodec;
 
-import net.minecraft.network.RegistryByteBuf;
-import net.minecraft.network.codec.PacketCodec;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.codec.PacketCodecs;
 import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.world.item.crafting.display.SlotDisplay;
@@ -82,7 +82,7 @@ abstract class CombinedIngredient implements CustomIngredient {
 	static class Serializer<I extends CombinedIngredient> implements CustomIngredientSerializer<I> {
 		private final ResourceLocation identifier;
 		private final MapCodec<I> codec;
-		private final PacketCodec<RegistryByteBuf, I> packetCodec;
+		private final StreamCodec<RegistryFriendlyByteBuf, I> packetCodec;
 
 		Serializer(ResourceLocation identifier, Function<List<Ingredient>, I> factory, MapCodec<I> codec) {
 			this.identifier = identifier;
@@ -102,7 +102,7 @@ abstract class CombinedIngredient implements CustomIngredient {
 		}
 
 		@Override
-		public PacketCodec<RegistryByteBuf, I> getPacketCodec() {
+		public StreamCodec<RegistryFriendlyByteBuf, I> getPacketCodec() {
 			return this.packetCodec;
 		}
 	}

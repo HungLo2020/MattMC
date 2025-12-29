@@ -22,7 +22,7 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.gen.Accessor;
 import org.spongepowered.asm.mixin.gen.Invoker;
 
-import net.minecraft.component.ComponentMap;
+import net.minecraft.component.DataComponentMap;
 import net.minecraft.component.ComponentType;
 import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraft.core.RegistryEntryList;
@@ -36,7 +36,7 @@ public interface EnchantmentBuilderAccessor {
 	RegistryEntryList<Enchantment> getExclusiveSet();
 
 	@Accessor("effectMap")
-	ComponentMap.Builder getEffectMap();
+	DataComponentMap.Builder getEffectMap();
 
 	@Invoker("getEffectsList")
 	<E> List<E> invokeGetEffectsList(ComponentType<List<E>> type);

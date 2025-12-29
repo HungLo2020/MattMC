@@ -20,11 +20,11 @@ import com.mojang.serialization.Codec;
 import com.mojang.serialization.DataResult;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 
-import net.minecraft.component.ComponentChanges;
+import net.minecraft.component.DataComponentPatch;
 import net.minecraft.component.MergedComponentMap;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.network.RegistryByteBuf;
-import net.minecraft.network.codec.PacketCodec;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.codec.PacketCodecs;
 import net.minecraft.core.Registries;
 import net.minecraft.core.Registries;
@@ -38,24 +38,24 @@ public class VariantCodecs {
 	// AIR is valid (for some reason), don't use ItemStack#ITEM_CODEC
 	private static final Codec<ItemVariant> UNVALIDATED_ITEM_CODEC = RecordCodecBuilder.create(instance -> instance.group(
 			Registries.ITEM.getEntryCodec().fieldOf("item").forGetter(ItemVariant::getRegistryEntry),
-			ComponentChanges.CODEC.optionalFieldOf("components", ComponentChanges.EMPTY).forGetter(ItemVariant::getComponents)
+			DataComponentPatch.CODEC.optionalFieldOf("components", DataComponentPatch.EMPTY).forGetter(ItemVariant::getComponents)
 		).apply(instance, ItemVariantImpl::of)
 	);
 	public static final Codec<ItemVariant> ITEM_CODEC = UNVALIDATED_ITEM_CODEC.validate(VariantCodecs::validateComponents);
-	public static final PacketCodec<RegistryByteBuf, ItemVariant> ITEM_PACKET_CODEC = PacketCodec.tuple(
+	public static final StreamCodec<RegistryFriendlyByteBuf, ItemVariant> ITEM_PACKET_CODEC = StreamCodec.tuple(
 			PacketCodecs.registryEntry(Registries.ITEM), ItemVariant::getRegistryEntry,
-			ComponentChanges.PACKET_CODEC, ItemVariant::getComponents,
+			DataComponentPatch.PACKET_CODEC, ItemVariant::getComponents,
 			ItemVariantImpl::of
 	);
 
 	public static final Codec<FluidVariant> FLUID_CODEC = RecordCodecBuilder.create(instance -> instance.group(
 			Registries.FLUID.getEntryCodec().fieldOf("fluid").forGetter(FluidVariant::getRegistryEntry),
-			ComponentChanges.CODEC.optionalFieldOf("components", ComponentChanges.EMPTY).forGetter(FluidVariant::getComponents)
+			DataComponentPatch.CODEC.optionalFieldOf("components", DataComponentPatch.EMPTY).forGetter(FluidVariant::getComponents)
 		).apply(instance, FluidVariantImpl::of)
 	);
-	public static final PacketCodec<RegistryByteBuf, FluidVariant> FLUID_PACKET_CODEC = PacketCodec.tuple(
+	public static final StreamCodec<RegistryFriendlyByteBuf, FluidVariant> FLUID_PACKET_CODEC = StreamCodec.tuple(
 			PacketCodecs.registryEntry(Registries.FLUID), FluidVariant::getRegistryEntry,
-			ComponentChanges.PACKET_CODEC, FluidVariant::getComponents,
+			DataComponentPatch.PACKET_CODEC, FluidVariant::getComponents,
 			FluidVariantImpl::of
 	);
 

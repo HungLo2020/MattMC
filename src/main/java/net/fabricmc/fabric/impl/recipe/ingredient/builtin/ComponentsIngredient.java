@@ -25,12 +25,12 @@ import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import org.jetbrains.annotations.Nullable;
 
-import net.minecraft.component.ComponentChanges;
+import net.minecraft.component.DataComponentPatch;
 import net.minecraft.component.ComponentType;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.network.RegistryByteBuf;
-import net.minecraft.network.codec.PacketCodec;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.world.item.crafting.display.SlotDisplay;
 import net.minecraft.core.Holder;
@@ -43,9 +43,9 @@ public class ComponentsIngredient implements CustomIngredient {
 	public static final CustomIngredientSerializer<ComponentsIngredient> SERIALIZER = new Serializer();
 
 	private final Ingredient base;
-	private final ComponentChanges components;
+	private final DataComponentPatch components;
 
-	public ComponentsIngredient(Ingredient base, ComponentChanges components) {
+	public ComponentsIngredient(Ingredient base, DataComponentPatch components) {
 		if (components.isEmpty()) {
 			throw new IllegalArgumentException("ComponentIngredient must have at least one defined component");
 		}
@@ -116,7 +116,7 @@ public class ComponentsIngredient implements CustomIngredient {
 	}
 
 	@Nullable
-	private ComponentChanges getComponents() {
+	private DataComponentPatch getComponents() {
 		return components;
 	}
 
@@ -138,12 +138,12 @@ public class ComponentsIngredient implements CustomIngredient {
 		private static final MapCodec<ComponentsIngredient> CODEC = RecordCodecBuilder.mapCodec(instance ->
 				instance.group(
 						Ingredient.CODEC.fieldOf("base").forGetter(ComponentsIngredient::getBase),
-						ComponentChanges.CODEC.fieldOf("components").forGetter(ComponentsIngredient::getComponents)
+						DataComponentPatch.CODEC.fieldOf("components").forGetter(ComponentsIngredient::getComponents)
 				).apply(instance, ComponentsIngredient::new)
 		);
-		private static final PacketCodec<RegistryByteBuf, ComponentsIngredient> PACKET_CODEC = PacketCodec.tuple(
+		private static final StreamCodec<RegistryFriendlyByteBuf, ComponentsIngredient> PACKET_CODEC = StreamCodec.tuple(
 				Ingredient.PACKET_CODEC, ComponentsIngredient::getBase,
-				ComponentChanges.PACKET_CODEC, ComponentsIngredient::getComponents,
+				DataComponentPatch.PACKET_CODEC, ComponentsIngredient::getComponents,
 				ComponentsIngredient::new
 		);
 
@@ -158,7 +158,7 @@ public class ComponentsIngredient implements CustomIngredient {
 		}
 
 		@Override
-		public PacketCodec<RegistryByteBuf, ComponentsIngredient> getPacketCodec() {
+		public StreamCodec<RegistryFriendlyByteBuf, ComponentsIngredient> getPacketCodec() {
 			return PACKET_CODEC;
 		}
 	}

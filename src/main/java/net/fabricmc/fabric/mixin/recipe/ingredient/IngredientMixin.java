@@ -31,8 +31,8 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import net.minecraft.world.item.Item;
-import net.minecraft.network.RegistryByteBuf;
-import net.minecraft.network.codec.PacketCodec;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.core.RegistryEntryList;
 
@@ -58,11 +58,11 @@ public class IngredientMixin implements FabricIngredient {
 			method = "<clinit>",
 			at = @At(
 					value = "INVOKE",
-					target = "Lnet/minecraft/network/codec/PacketCodec;xmap(Ljava/util/function/Function;Ljava/util/function/Function;)Lnet/minecraft/network/codec/PacketCodec;",
+					target = "Lnet/minecraft/network/codec/StreamCodec;xmap(Ljava/util/function/Function;Ljava/util/function/Function;)Lnet/minecraft/network/codec/StreamCodec;",
 					ordinal = 0
 			)
 	)
-	private static PacketCodec<RegistryByteBuf, Ingredient> useCustomIngredientPacketCodec(PacketCodec<RegistryByteBuf, Ingredient> original) {
+	private static StreamCodec<RegistryFriendlyByteBuf, Ingredient> useCustomIngredientPacketCodec(StreamCodec<RegistryFriendlyByteBuf, Ingredient> original) {
 		return new CustomIngredientPacketCodec(original);
 	}
 
@@ -70,11 +70,11 @@ public class IngredientMixin implements FabricIngredient {
 			method = "<clinit>",
 			at = @At(
 					value = "INVOKE",
-					target = "Lnet/minecraft/network/codec/PacketCodec;xmap(Ljava/util/function/Function;Ljava/util/function/Function;)Lnet/minecraft/network/codec/PacketCodec;",
+					target = "Lnet/minecraft/network/codec/StreamCodec;xmap(Ljava/util/function/Function;Ljava/util/function/Function;)Lnet/minecraft/network/codec/StreamCodec;",
 					ordinal = 1
 			)
 	)
-	private static PacketCodec<RegistryByteBuf, Optional<Ingredient>> useOptionalCustomIngredientPacketCodec(PacketCodec<RegistryByteBuf, Optional<Ingredient>> original) {
+	private static StreamCodec<RegistryFriendlyByteBuf, Optional<Ingredient>> useOptionalCustomIngredientPacketCodec(StreamCodec<RegistryFriendlyByteBuf, Optional<Ingredient>> original) {
 		return new OptionalCustomIngredientPacketCodec(original);
 	}
 

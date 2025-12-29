@@ -21,13 +21,13 @@ import java.util.Objects;
 import com.mojang.serialization.Codec;
 import org.jetbrains.annotations.ApiStatus;
 
-import net.minecraft.component.ComponentChanges;
+import net.minecraft.component.DataComponentPatch;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.level.ItemLike;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
-import net.minecraft.network.RegistryByteBuf;
-import net.minecraft.network.codec.PacketCodec;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.core.Holder;
 
 import net.fabricmc.fabric.api.transfer.v1.storage.TransferVariant;
@@ -42,7 +42,7 @@ import net.fabricmc.fabric.impl.transfer.item.ItemVariantImpl;
 @ApiStatus.NonExtendable
 public interface ItemVariant extends TransferVariant<Item> {
 	Codec<ItemVariant> CODEC = VariantCodecs.ITEM_CODEC;
-	PacketCodec<RegistryByteBuf, ItemVariant> PACKET_CODEC = VariantCodecs.ITEM_PACKET_CODEC;
+	StreamCodec<RegistryFriendlyByteBuf, ItemVariant> PACKET_CODEC = VariantCodecs.ITEM_PACKET_CODEC;
 
 	/**
 	 * Retrieve a blank ItemVariant.
@@ -62,13 +62,13 @@ public interface ItemVariant extends TransferVariant<Item> {
 	 * Retrieve an ItemVariant with an item and without a tag.
 	 */
 	static ItemVariant of(ItemLike item) {
-		return of(item, ComponentChanges.EMPTY);
+		return of(item, DataComponentPatch.EMPTY);
 	}
 
 	/**
 	 * Retrieve an ItemVariant with an item and an optional tag.
 	 */
-	static ItemVariant of(ItemLike item, ComponentChanges components) {
+	static ItemVariant of(ItemLike item, DataComponentPatch components) {
 		return ItemVariantImpl.of(item.asItem(), components);
 	}
 
@@ -112,8 +112,8 @@ public interface ItemVariant extends TransferVariant<Item> {
 	 * @param changes the changes to apply
 	 * @return the new variant with the changes applied
 	 *
-	 * @see ItemStack#applyUnvalidatedChanges(ComponentChanges)
+	 * @see ItemStack#applyUnvalidatedChanges(DataComponentPatch)
 	 */
 	@Override
-	ItemVariant withComponentChanges(ComponentChanges changes);
+	ItemVariant withComponentChanges(DataComponentPatch changes);
 }

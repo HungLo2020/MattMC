@@ -19,9 +19,9 @@ package net.fabricmc.fabric.api.networking.v1;
 import org.jetbrains.annotations.ApiStatus;
 
 import net.minecraft.network.FriendlyByteBuf;
-import net.minecraft.network.RegistryByteBuf;
-import net.minecraft.network.codec.PacketCodec;
-import net.minecraft.network.protocol.CustomPacketPayload;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 
 import net.fabricmc.fabric.impl.networking.PayloadTypeRegistryImpl;
 
@@ -41,7 +41,7 @@ public interface PayloadTypeRegistry<B extends FriendlyByteBuf> {
 	 * @param <T>   the payload type
 	 * @return the registered payload type
 	 */
-	<T extends CustomPacketPayload> ResourceLocation<? super B, T> register(CustomPacketPayload.Id<T> id, PacketCodec<? super B, T> codec);
+	<T extends CustomPacketPayload> ResourceLocation<? super B, T> register(CustomPacketPayload.Id<T> id, StreamCodec<? super B, T> codec);
 
 	/**
 	 * Registers a large custom payload type.
@@ -58,7 +58,7 @@ public interface PayloadTypeRegistry<B extends FriendlyByteBuf> {
 	 * @param maxPacketSize the maximum size of payload packet
 	 * @return the registered payload type
 	 */
-	<T extends CustomPacketPayload> ResourceLocation<? super B, T> registerLarge(CustomPacketPayload.Id<T> id, PacketCodec<? super B, T> codec, int maxPacketSize);
+	<T extends CustomPacketPayload> ResourceLocation<? super B, T> registerLarge(CustomPacketPayload.Id<T> id, StreamCodec<? super B, T> codec, int maxPacketSize);
 
 	/**
 	 * @return the {@link PayloadTypeRegistry} instance for the client to server configuration channel.
@@ -77,14 +77,14 @@ public interface PayloadTypeRegistry<B extends FriendlyByteBuf> {
 	/**
 	 * @return the {@link PayloadTypeRegistry} instance for the client to server play channel.
 	 */
-	static PayloadTypeRegistry<RegistryByteBuf> playC2S() {
+	static PayloadTypeRegistry<RegistryFriendlyByteBuf> playC2S() {
 		return PayloadTypeRegistryImpl.PLAY_C2S;
 	}
 
 	/**
 	 * @return the {@link PayloadTypeRegistry} instance for the server to client play channel.
 	 */
-	static PayloadTypeRegistry<RegistryByteBuf> playS2C() {
+	static PayloadTypeRegistry<RegistryFriendlyByteBuf> playS2C() {
 		return PayloadTypeRegistryImpl.PLAY_S2C;
 	}
 }

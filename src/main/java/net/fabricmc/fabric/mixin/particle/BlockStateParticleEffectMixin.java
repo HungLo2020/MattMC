@@ -22,8 +22,8 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 
-import net.minecraft.network.RegistryByteBuf;
-import net.minecraft.network.codec.PacketCodec;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.core.particles.BlockStateParticleEffect;
 import net.minecraft.core.BlockPos;
 
@@ -49,7 +49,7 @@ abstract class BlockStateParticleEffectMixin implements FabricBlockStateParticle
 	}
 
 	@ModifyReturnValue(method = "createPacketCodec", at = @At("RETURN"))
-	private static PacketCodec<? super RegistryByteBuf, BlockStateParticleEffect> modifyPacketCodec(PacketCodec<? super RegistryByteBuf, BlockStateParticleEffect> codec) {
+	private static StreamCodec<? super RegistryFriendlyByteBuf, BlockStateParticleEffect> modifyPacketCodec(StreamCodec<? super RegistryFriendlyByteBuf, BlockStateParticleEffect> codec) {
 		return new ExtendedBlockStateParticleEffectPacketCodec(codec);
 	}
 }

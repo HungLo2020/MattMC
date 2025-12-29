@@ -19,7 +19,7 @@ package net.fabricmc.fabric.impl.item;
 import java.util.function.BiConsumer;
 import java.util.function.Predicate;
 
-import net.minecraft.component.ComponentMap;
+import net.minecraft.component.DataComponentMap;
 import net.minecraft.world.item.Item;
 import net.minecraft.core.Registries;
 
@@ -38,10 +38,10 @@ public class DefaultItemComponentImpl {
 		}
 
 		@Override
-		public void modify(Predicate<Item> itemPredicate, BiConsumer<ComponentMap.Builder, Item> builderConsumer) {
+		public void modify(Predicate<Item> itemPredicate, BiConsumer<DataComponentMap.Builder, Item> builderConsumer) {
 			for (Item item : Registries.ITEM) {
 				if (itemPredicate.test(item)) {
-					ComponentMap.Builder builder = ComponentMap.builder().addAll(item.getComponents());
+					DataComponentMap.Builder builder = DataComponentMap.builder().addAll(item.getComponents());
 					builderConsumer.accept(builder, item);
 					((ItemAccessor) item).setComponents(builder.build());
 				}

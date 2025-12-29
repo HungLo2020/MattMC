@@ -33,7 +33,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import net.minecraft.network.Connection;
-import net.minecraft.network.RegistryByteBuf;
+import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.network.ConnectedClientData;
@@ -176,8 +176,8 @@ public abstract class ServerConfigurationNetworkHandlerMixin extends ServerCommo
 		sendConfigurations();
 	}
 
-	@WrapOperation(method = "onReady", at = @At(value = "INVOKE", target = "Lnet/minecraft/network/RegistryByteBuf;makeFactory(Lnet/minecraft/registry/RegistryAccess;)Ljava/util/function/Function;"))
-	private Function<ByteBuf, RegistryByteBuf> bindChannelInfo(RegistryAccess registryManager, Operation<Function<ByteBuf, RegistryByteBuf>> original) {
+	@WrapOperation(method = "onReady", at = @At(value = "INVOKE", target = "Lnet/minecraft/network/RegistryFriendlyByteBuf;makeFactory(Lnet/minecraft/registry/RegistryAccess;)Ljava/util/function/Function;"))
+	private Function<ByteBuf, RegistryFriendlyByteBuf> bindChannelInfo(RegistryAccess registryManager, Operation<Function<ByteBuf, RegistryFriendlyByteBuf>> original) {
 		return original.call(registryManager).andThen(registryByteBuf -> {
 			FabricRegistryByteBuf fabricRegistryByteBuf = (FabricRegistryByteBuf) registryByteBuf;
 			fabricRegistryByteBuf.fabric_setSendableConfigurationChannels(Set.copyOf(addon.getSendableChannels()));

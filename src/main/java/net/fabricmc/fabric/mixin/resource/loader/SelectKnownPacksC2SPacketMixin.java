@@ -26,7 +26,7 @@ import net.fabricmc.fabric.impl.resource.loader.ModResourcePackCreator;
 
 @Mixin(SelectKnownPacksC2SPacket.class)
 public class SelectKnownPacksC2SPacketMixin {
-	@ModifyArg(method = "<clinit>", at = @At(value = "INVOKE", target = "Lnet/minecraft/network/codec/PacketCodecs;toList(I)Lnet/minecraft/network/codec/PacketCodec$ResultFunction;"))
+	@ModifyArg(method = "<clinit>", at = @At(value = "INVOKE", target = "Lnet/minecraft/network/codec/PacketCodecs;toList(I)Lnet/minecraft/network/codec/StreamCodec$ResultFunction;"))
 	private static int setMaxKnownPacks(int constant) {
 		return ModResourcePackCreator.MAX_KNOWN_PACKS;
 	}

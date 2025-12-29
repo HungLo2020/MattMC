@@ -20,8 +20,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import net.minecraft.network.FriendlyByteBuf;
-import net.minecraft.network.codec.PacketCodec;
-import net.minecraft.network.protocol.CustomPacketPayload;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
 
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
@@ -60,7 +60,7 @@ public final class NetworkingImpl {
 		registerGeneric(FabricSplitPacketPayload.ID, FabricSplitPacketPayload.CODEC);
 	}
 
-	private static <T extends CustomPacketPayload> void registerGeneric(CustomPacketPayload.Id<T> id, PacketCodec<? super FriendlyByteBuf, T> codec) {
+	private static <T extends CustomPacketPayload> void registerGeneric(CustomPacketPayload.Id<T> id, StreamCodec<? super FriendlyByteBuf, T> codec) {
 		PayloadTypeRegistry.configurationS2C().register(id, codec);
 		PayloadTypeRegistry.configurationC2S().register(id, codec);
 		PayloadTypeRegistry.playS2C().register(id, codec);

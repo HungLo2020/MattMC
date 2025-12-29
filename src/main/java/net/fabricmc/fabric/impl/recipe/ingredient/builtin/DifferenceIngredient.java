@@ -25,8 +25,8 @@ import com.mojang.serialization.codecs.RecordCodecBuilder;
 
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.network.RegistryByteBuf;
-import net.minecraft.network.codec.PacketCodec;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.core.Holder;
 import net.minecraft.resources.ResourceLocation;
@@ -96,7 +96,7 @@ public class DifferenceIngredient implements CustomIngredient {
 						Ingredient.CODEC.fieldOf("subtracted").forGetter(DifferenceIngredient::getSubtracted)
 				).apply(instance, DifferenceIngredient::new)
 		);
-		private static final PacketCodec<RegistryByteBuf, DifferenceIngredient> PACKET_CODEC = PacketCodec.tuple(
+		private static final StreamCodec<RegistryFriendlyByteBuf, DifferenceIngredient> PACKET_CODEC = StreamCodec.tuple(
 				Ingredient.PACKET_CODEC, DifferenceIngredient::getBase,
 				Ingredient.PACKET_CODEC, DifferenceIngredient::getSubtracted,
 				DifferenceIngredient::new
@@ -113,7 +113,7 @@ public class DifferenceIngredient implements CustomIngredient {
 		}
 
 		@Override
-		public PacketCodec<RegistryByteBuf, DifferenceIngredient> getPacketCodec() {
+		public StreamCodec<RegistryFriendlyByteBuf, DifferenceIngredient> getPacketCodec() {
 			return PACKET_CODEC;
 		}
 	}

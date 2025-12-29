@@ -28,8 +28,8 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.StringNbtReader;
-import net.minecraft.network.RegistryByteBuf;
-import net.minecraft.network.codec.PacketCodec;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.codec.PacketCodecs;
 import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.world.item.crafting.display.SlotDisplay;
@@ -120,7 +120,7 @@ public class CustomDataIngredient implements CustomIngredient {
 				).apply(instance, CustomDataIngredient::new)
 		);
 
-		private static final PacketCodec<RegistryByteBuf, CustomDataIngredient> PACKET_CODEC = PacketCodec.tuple(
+		private static final StreamCodec<RegistryFriendlyByteBuf, CustomDataIngredient> PACKET_CODEC = StreamCodec.tuple(
 				Ingredient.PACKET_CODEC, CustomDataIngredient::getBase,
 				PacketCodecs.NBT_COMPOUND, CustomDataIngredient::getNbt,
 				CustomDataIngredient::new
@@ -137,7 +137,7 @@ public class CustomDataIngredient implements CustomIngredient {
 		}
 
 		@Override
-		public PacketCodec<RegistryByteBuf, CustomDataIngredient> getPacketCodec() {
+		public StreamCodec<RegistryFriendlyByteBuf, CustomDataIngredient> getPacketCodec() {
 			return PACKET_CODEC;
 		}
 	}

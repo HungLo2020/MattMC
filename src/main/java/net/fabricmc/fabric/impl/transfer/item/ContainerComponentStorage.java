@@ -21,7 +21,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
-import net.minecraft.component.ComponentChanges;
+import net.minecraft.component.DataComponentPatch;
 import net.minecraft.component.DataComponents;
 import net.minecraft.component.type.ContainerComponent;
 import net.minecraft.world.item.Item;
@@ -89,7 +89,7 @@ public class ContainerComponentStorage extends CombinedSlottedStorage<ItemVarian
 
 			ContainerItemContext ctx = ContainerComponentStorage.this.ctx;
 
-			ItemVariant newVariant = ctx.getItemVariant().withComponentChanges(ComponentChanges.builder()
+			ItemVariant newVariant = ctx.getItemVariant().withComponentChanges(DataComponentPatch.builder()
 							.add(DataComponents.CONTAINER, ContainerComponent.fromStacks(stacks))
 							.build());
 

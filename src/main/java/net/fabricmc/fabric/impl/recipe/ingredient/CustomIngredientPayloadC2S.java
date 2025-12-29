@@ -20,13 +20,13 @@ import java.util.HashSet;
 import java.util.Set;
 
 import net.minecraft.network.FriendlyByteBuf;
-import net.minecraft.network.codec.PacketCodec;
+import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.codec.PacketCodecs;
-import net.minecraft.network.protocol.CustomPacketPayload;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
 
 public record CustomIngredientPayloadC2S(int protocolVersion, Set<ResourceLocation> registeredSerializers) implements CustomPacketPayload {
-	public static final PacketCodec<FriendlyByteBuf, CustomIngredientPayloadC2S> CODEC = PacketCodec.tuple(
+	public static final StreamCodec<FriendlyByteBuf, CustomIngredientPayloadC2S> CODEC = StreamCodec.tuple(
 			PacketCodecs.VAR_INT, CustomIngredientPayloadC2S::protocolVersion,
 			PacketCodecs.collection(HashSet::new, ResourceLocation.PACKET_CODEC), CustomIngredientPayloadC2S::registeredSerializers,
 			CustomIngredientPayloadC2S::new

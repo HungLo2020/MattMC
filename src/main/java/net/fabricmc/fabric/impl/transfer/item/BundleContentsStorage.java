@@ -24,7 +24,7 @@ import java.util.List;
 
 import org.apache.commons.lang3.math.Fraction;
 
-import net.minecraft.component.ComponentChanges;
+import net.minecraft.component.DataComponentPatch;
 import net.minecraft.component.DataComponents;
 import net.minecraft.component.type.BundleContentsComponent;
 import net.minecraft.world.item.Item;
@@ -49,7 +49,7 @@ public class BundleContentsStorage implements Storage<ItemVariant> {
 		this.originalItem = ctx.getItemVariant().getItem();
 	}
 
-	private boolean updateStack(ComponentChanges changes, TransactionContext transaction) {
+	private boolean updateStack(DataComponentPatch changes, TransactionContext transaction) {
 		ItemVariant newVariant = ctx.getItemVariant().withComponentChanges(changes);
 		return ctx.exchange(newVariant, 1, transaction) > 0;
 	}
@@ -72,7 +72,7 @@ public class BundleContentsStorage implements Storage<ItemVariant> {
 
 		if (inserted == 0) return 0;
 
-		ComponentChanges changes = ComponentChanges.builder()
+		DataComponentPatch changes = DataComponentPatch.builder()
 				.add(DataComponents.BUNDLE_CONTENTS, builder.build())
 				.build();
 
@@ -154,7 +154,7 @@ public class BundleContentsStorage implements Storage<ItemVariant> {
 			stacksCopy.get(index).decrement(extracted);
 			if (stacksCopy.get(index).isEmpty()) stacksCopy.remove(index);
 
-			ComponentChanges changes = ComponentChanges.builder()
+			DataComponentPatch changes = DataComponentPatch.builder()
 					.add(DataComponents.BUNDLE_CONTENTS, new BundleContentsComponent(stacksCopy))
 					.build();
 

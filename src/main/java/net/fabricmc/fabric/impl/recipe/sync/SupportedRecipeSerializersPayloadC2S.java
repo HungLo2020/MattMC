@@ -20,16 +20,16 @@ import java.util.HashSet;
 import java.util.Set;
 
 import net.minecraft.network.FriendlyByteBuf;
-import net.minecraft.network.codec.PacketCodec;
+import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.codec.PacketCodecs;
-import net.minecraft.network.protocol.CustomPacketPayload;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
 
 /**
  * Used to notify server which recipes can be synced to the client.
  */
 public record SupportedRecipeSerializersPayloadC2S(Set<ResourceLocation> synchronizedSerializers) implements CustomPacketPayload {
-	public static final PacketCodec<FriendlyByteBuf, SupportedRecipeSerializersPayloadC2S> CODEC = PacketCodec.tuple(
+	public static final StreamCodec<FriendlyByteBuf, SupportedRecipeSerializersPayloadC2S> CODEC = StreamCodec.tuple(
 			PacketCodecs.collection(HashSet::new, ResourceLocation.PACKET_CODEC), SupportedRecipeSerializersPayloadC2S::synchronizedSerializers,
 			SupportedRecipeSerializersPayloadC2S::new
 	);

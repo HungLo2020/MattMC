@@ -22,7 +22,7 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 
 import net.minecraft.client.MouseHandler;
-import net.minecraft.client.gui.ClickType;
+import net.minecraft.world.inventory.ClickType;
 import net.minecraft.client.gui.screens.Screen;
 
 import net.fabricmc.fabric.api.client.screen.v1.ScreenMouseEvents;

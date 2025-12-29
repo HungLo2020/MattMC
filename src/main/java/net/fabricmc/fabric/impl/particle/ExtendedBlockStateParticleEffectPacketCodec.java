@@ -16,21 +16,21 @@
 
 package net.fabricmc.fabric.impl.particle;
 
-import net.minecraft.network.RegistryByteBuf;
-import net.minecraft.network.codec.PacketCodec;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.core.particles.BlockStateParticleEffect;
 import net.minecraft.core.BlockPos;
 
-public class ExtendedBlockStateParticleEffectPacketCodec implements PacketCodec<RegistryByteBuf, BlockStateParticleEffect> {
+public class ExtendedBlockStateParticleEffectPacketCodec implements StreamCodec<RegistryFriendlyByteBuf, BlockStateParticleEffect> {
 	private static final int PACKET_MARKER = -1;
-	private final PacketCodec<? super RegistryByteBuf, BlockStateParticleEffect> fallback;
+	private final StreamCodec<? super RegistryFriendlyByteBuf, BlockStateParticleEffect> fallback;
 
-	public ExtendedBlockStateParticleEffectPacketCodec(PacketCodec<? super RegistryByteBuf, BlockStateParticleEffect> fallback) {
+	public ExtendedBlockStateParticleEffectPacketCodec(StreamCodec<? super RegistryFriendlyByteBuf, BlockStateParticleEffect> fallback) {
 		this.fallback = fallback;
 	}
 
 	@Override
-	public BlockStateParticleEffect decode(RegistryByteBuf buf) {
+	public BlockStateParticleEffect decode(RegistryFriendlyByteBuf buf) {
 		int index = buf.readerIndex();
 
 		if (buf.readVarInt() != PACKET_MARKER) {
@@ -46,7 +46,7 @@ public class ExtendedBlockStateParticleEffectPacketCodec implements PacketCodec<
 	}
 
 	@Override
-	public void encode(RegistryByteBuf buf, BlockStateParticleEffect value) {
+	public void encode(RegistryFriendlyByteBuf buf, BlockStateParticleEffect value) {
 		BlockPos pos = value.getBlockPos();
 
 		if (pos == null || ExtendedBlockStateParticleEffectSync.shouldEncodeFallback(buf)) {
