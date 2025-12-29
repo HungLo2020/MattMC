@@ -30,7 +30,7 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.client.particle.BillboardParticle;
 import net.minecraft.client.particle.BlockDustParticle;
 import net.minecraft.client.multiplayer.ClientLevel;
-import net.minecraft.core.particles.BlockStateParticleEffect;
+import net.minecraft.core.particles.BlockParticleOption;
 import net.minecraft.core.BlockPos;
 
 import net.fabricmc.fabric.api.client.particle.v1.ParticleRenderEvents;
@@ -66,7 +66,7 @@ abstract class BlockDustParticleMixin extends BillboardParticle {
 	}
 
 	@Redirect(method = "create", at = @At(value = "NEW", target = "(Lnet/minecraft/client/world/ClientLevel;DDDDDDLnet/minecraft/block/BlockState;)Lnet/minecraft/client/particle/BlockDustParticle;"))
-	private static BlockDustParticle constructBlockDustParticle(ClientLevel world, double x, double y, double z, double velocityX, double velocityY, double velocityZ, BlockState state, BlockStateParticleEffect parameters, ClientLevel world1, double x1, double y1, double z1, double velocityX1, double velocityY1, double velocityZ1) {
+	private static BlockDustParticle constructBlockDustParticle(ClientLevel world, double x, double y, double z, double velocityX, double velocityY, double velocityZ, BlockState state, BlockParticleOption parameters, ClientLevel world1, double x1, double y1, double z1, double velocityX1, double velocityY1, double velocityZ1) {
 		BlockPos blockPos = parameters.getBlockPos();
 
 		if (blockPos != null) {

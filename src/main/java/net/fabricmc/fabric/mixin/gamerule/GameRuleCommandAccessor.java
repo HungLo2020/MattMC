@@ -22,17 +22,17 @@ import org.spongepowered.asm.mixin.gen.Invoker;
 
 import net.minecraft.commands.GameRuleCommand;
 import net.minecraft.commands.CommandSourceStack;
-import net.minecraft.world.GameRules;
+import net.minecraft.world.level.GameRules;
 
 @Mixin(GameRuleCommand.class)
 public interface GameRuleCommandAccessor {
 	@Invoker
-	static <T extends GameRules.Rule<T>> int invokeExecuteSet(CommandContext<CommandSourceStack> commandContext, GameRules.Key<T> ruleKey) {
+	static <T extends GameRules.Value<T>> int invokeExecuteSet(CommandContext<CommandSourceStack> commandContext, GameRules.Key<T> ruleKey) {
 		throw new AssertionError("This shouldn't happen!");
 	}
 
 	@Invoker
-	static <T extends GameRules.Rule<T>> int invokeExecuteQuery(CommandSourceStack serverCommandSource, GameRules.Key<T> ruleKey) {
+	static <T extends GameRules.Value<T>> int invokeExecuteQuery(CommandSourceStack serverCommandSource, GameRules.Key<T> ruleKey) {
 		throw new AssertionError("This shouldn't happen!");
 	}
 }

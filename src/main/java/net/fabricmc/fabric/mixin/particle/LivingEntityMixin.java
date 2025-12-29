@@ -22,15 +22,15 @@ import org.spongepowered.asm.mixin.injection.At;
 
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.core.particles.BlockStateParticleEffect;
+import net.minecraft.core.particles.BlockParticleOption;
 import net.minecraft.core.BlockPos;
 
 import net.fabricmc.fabric.impl.particle.BlockStateParticleEffectExtension;
 
 @Mixin(LivingEntity.class)
 abstract class LivingEntityMixin {
-	@ModifyExpressionValue(method = "fall", at = @At(value = "NEW", target = "(Lnet/minecraft/particle/ParticleType;Lnet/minecraft/block/BlockState;)Lnet/minecraft/particle/BlockStateParticleEffect;"))
-	private BlockStateParticleEffect modifyBlockStateParticleEffect(BlockStateParticleEffect original, double heightDifference, boolean onGround, BlockState state, BlockPos landedPosition) {
+	@ModifyExpressionValue(method = "fall", at = @At(value = "NEW", target = "(Lnet/minecraft/particle/ParticleType;Lnet/minecraft/block/BlockState;)Lnet/minecraft/particle/BlockParticleOption;"))
+	private BlockParticleOption modifyBlockStateParticleEffect(BlockParticleOption original, double heightDifference, boolean onGround, BlockState state, BlockPos landedPosition) {
 		((BlockStateParticleEffectExtension) original).fabric_setBlockPos(landedPosition);
 		return original;
 	}

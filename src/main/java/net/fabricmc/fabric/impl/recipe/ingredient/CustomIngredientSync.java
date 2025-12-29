@@ -21,7 +21,7 @@ import java.util.function.Consumer;
 
 import net.minecraft.network.handler.EncoderHandler;
 import net.minecraft.network.protocol.Packet;
-import net.minecraft.server.network.ServerPlayerConfigurationTask;
+import net.minecraft.server.network.ConfigurationTask;
 import net.minecraft.resources.ResourceLocation;
 
 import net.fabricmc.api.ModInitializer;
@@ -93,7 +93,7 @@ public class CustomIngredientSync implements ModInitializer {
 		});
 	}
 
-	private record IngredientSyncTask() implements ServerPlayerConfigurationTask {
+	private record IngredientSyncTask() implements ConfigurationTask {
 		public static final Key KEY = new Key(PACKET_ID.toString());
 
 		@Override

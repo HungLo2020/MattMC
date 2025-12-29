@@ -21,7 +21,7 @@ import java.util.function.Consumer;
 
 import net.minecraft.network.NetworkPhase;
 import net.minecraft.network.protocol.Packet;
-import net.minecraft.server.network.ServerPlayerConfigurationTask;
+import net.minecraft.server.network.ConfigurationTask;
 
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.fabricmc.fabric.api.networking.v1.ServerConfigurationConnectionEvents;
@@ -84,7 +84,7 @@ public class CommonPacketsImpl {
 	}
 
 	// A configuration phase task to send and receive the version packets.
-	private record CommonVersionConfigurationTask(ServerConfigurationNetworkAddon addon) implements ServerPlayerConfigurationTask {
+	private record CommonVersionConfigurationTask(ServerConfigurationNetworkAddon addon) implements ConfigurationTask {
 		public static final Key KEY = new Key(CommonVersionPayload.ID.id().toString());
 
 		@Override
@@ -99,7 +99,7 @@ public class CommonPacketsImpl {
 	}
 
 	// A configuration phase task to send and receive the registration packets.
-	private record CommonRegisterConfigurationTask(ServerConfigurationNetworkAddon addon) implements ServerPlayerConfigurationTask {
+	private record CommonRegisterConfigurationTask(ServerConfigurationNetworkAddon addon) implements ConfigurationTask {
 		public static final Key KEY = new Key(CommonRegisterPayload.ID.id().toString());
 
 		@Override

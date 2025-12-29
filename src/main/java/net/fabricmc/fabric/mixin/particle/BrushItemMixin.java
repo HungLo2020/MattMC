@@ -22,7 +22,7 @@ import org.spongepowered.asm.mixin.injection.At;
 
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.item.BrushItem;
-import net.minecraft.core.particles.BlockStateParticleEffect;
+import net.minecraft.core.particles.BlockParticleOption;
 import net.minecraft.util.Arm;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.Vec3;
@@ -32,8 +32,8 @@ import net.fabricmc.fabric.impl.particle.BlockStateParticleEffectExtension;
 
 @Mixin(BrushItem.class)
 abstract class BrushItemMixin {
-	@ModifyExpressionValue(method = "addDustParticles", at = @At(value = "NEW", target = "(Lnet/minecraft/particle/ParticleType;Lnet/minecraft/block/BlockState;)Lnet/minecraft/particle/BlockStateParticleEffect;"))
-	private BlockStateParticleEffect modifyBlockStateParticleEffect(BlockStateParticleEffect original, Level world, BlockHitResult hitResult, BlockState state, Vec3 userRotation, Arm arm) {
+	@ModifyExpressionValue(method = "addDustParticles", at = @At(value = "NEW", target = "(Lnet/minecraft/particle/ParticleType;Lnet/minecraft/block/BlockState;)Lnet/minecraft/particle/BlockParticleOption;"))
+	private BlockParticleOption modifyBlockStateParticleEffect(BlockParticleOption original, Level world, BlockHitResult hitResult, BlockState state, Vec3 userRotation, Arm arm) {
 		((BlockStateParticleEffectExtension) original).fabric_setBlockPos(hitResult.getBlockPos());
 		return original;
 	}

@@ -25,12 +25,12 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import net.minecraft.commands.CommandRegistryAccess;
-import net.minecraft.commands.CommandManager;
+import net.minecraft.commands.Commands;
 import net.minecraft.commands.CommandSourceStack;
 
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 
-@Mixin(CommandManager.class)
+@Mixin(Commands.class)
 public abstract class CommandManagerMixin {
 	@Shadow
 	@Final
@@ -44,7 +44,7 @@ public abstract class CommandManagerMixin {
 	 * @reason Add commands before ambiguities are calculated.
 	 */
 	@Inject(at = @At(value = "INVOKE", target = "Lcom/mojang/brigadier/CommandDispatcher;setConsumer(Lcom/mojang/brigadier/ResultConsumer;)V"), method = "<init>")
-	private void fabric_addCommands(CommandManager.RegistrationEnvironment environment, CommandRegistryAccess registryAccess, CallbackInfo ci) {
+	private void fabric_addCommands(Commands.RegistrationEnvironment environment, CommandRegistryAccess registryAccess, CallbackInfo ci) {
 		CommandRegistrationCallback.EVENT.invoker().register(this.dispatcher, registryAccess, environment);
 	}
 }

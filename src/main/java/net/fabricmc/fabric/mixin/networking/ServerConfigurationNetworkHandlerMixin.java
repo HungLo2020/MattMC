@@ -39,7 +39,7 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.network.ConnectedClientData;
 import net.minecraft.server.network.ServerCommonNetworkHandler;
 import net.minecraft.server.network.ServerConfigurationPacketListenerImpl;
-import net.minecraft.server.network.ServerPlayerConfigurationTask;
+import net.minecraft.server.network.ConfigurationTask;
 
 import net.fabricmc.fabric.api.networking.v1.FabricServerConfigurationNetworkHandler;
 import net.fabricmc.fabric.impl.networking.FabricRegistryByteBuf;
@@ -51,14 +51,14 @@ import net.fabricmc.fabric.impl.networking.server.ServerConfigurationNetworkAddo
 public abstract class ServerConfigurationNetworkHandlerMixin extends ServerCommonNetworkHandler implements NetworkHandlerExtensions, FabricServerConfigurationNetworkHandler {
 	@Shadow
 	@Nullable
-	private ServerPlayerConfigurationTask currentTask;
+	private ConfigurationTask currentTask;
 
 	@Shadow
-	protected abstract void onTaskFinished(ServerPlayerConfigurationTask.Key key);
+	protected abstract void onTaskFinished(ConfigurationTask.Key key);
 
 	@Shadow
 	@Final
-	private Queue<ServerPlayerConfigurationTask> tasks;
+	private Queue<ConfigurationTask> tasks;
 
 	@Shadow
 	public abstract boolean isConnectionOpen();
@@ -138,7 +138,7 @@ public abstract class ServerConfigurationNetworkHandlerMixin extends ServerCommo
 			return false;
 		}
 
-		final ServerPlayerConfigurationTask task = this.tasks.poll();
+		final ConfigurationTask task = this.tasks.poll();
 
 		if (task != null) {
 			this.currentTask = task;
@@ -155,18 +155,18 @@ public abstract class ServerConfigurationNetworkHandlerMixin extends ServerCommo
 	}
 
 	@Override
-	public void addTask(ServerPlayerConfigurationTask task) {
+	public void addTask(ConfigurationTask task) {
 		tasks.add(task);
 	}
 
 	@Override
-	public void completeTask(ServerPlayerConfigurationTask.Key key) {
+	public void completeTask(ConfigurationTask.Key key) {
 		if (!earlyTaskExecution) {
 			onTaskFinished(key);
 			return;
 		}
 
-		final ServerPlayerConfigurationTask.Key currentKey = this.currentTask != null ? this.currentTask.getKey() : null;
+		final ConfigurationTask.Key currentKey = this.currentTask != null ? this.currentTask.getKey() : null;
 
 		if (!key.equals(currentKey)) {
 			throw new IllegalStateException("Unexpected request for task finish, current task: " + currentKey + ", requested: " + key);

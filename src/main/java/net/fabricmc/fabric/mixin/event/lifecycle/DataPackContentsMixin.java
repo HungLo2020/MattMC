@@ -30,7 +30,7 @@ import net.minecraft.core.HolderLookup;
 import net.minecraft.core.ServerDynamicRegistryType;
 import net.minecraft.world.flag.FeatureFlagSet;
 import net.minecraft.server.ServerResources;
-import net.minecraft.commands.CommandManager;
+import net.minecraft.commands.Commands;
 
 import net.fabricmc.fabric.api.event.lifecycle.v1.CommonLifecycleEvents;
 
@@ -40,7 +40,7 @@ public class DataPackContentsMixin {
 	private RegistryAccess dynamicRegistryManager;
 
 	@Inject(method = "<init>", at = @At("TAIL"))
-	private void init(CombinedDynamicRegistries<ServerDynamicRegistryType> combinedDynamicRegistries, HolderLookup.Provider wrapperLookup, FeatureFlagSet featureSet, CommandManager.RegistrationEnvironment registrationEnvironment, List list, int i, CallbackInfo ci) {
+	private void init(CombinedDynamicRegistries<ServerDynamicRegistryType> combinedDynamicRegistries, HolderLookup.Provider wrapperLookup, FeatureFlagSet featureSet, Commands.RegistrationEnvironment registrationEnvironment, List list, int i, CallbackInfo ci) {
 		dynamicRegistryManager = combinedDynamicRegistries.getCombinedRegistryManager();
 	}
 

@@ -17,7 +17,7 @@
 package net.fabricmc.fabric.api.networking.v1;
 
 import net.minecraft.server.network.ServerConfigurationPacketListenerImpl;
-import net.minecraft.server.network.ServerPlayerConfigurationTask;
+import net.minecraft.server.network.ConfigurationTask;
 import net.minecraft.resources.ResourceLocation;
 
 /**
@@ -26,18 +26,18 @@ import net.minecraft.resources.ResourceLocation;
  */
 public interface FabricServerConfigurationNetworkHandler {
 	/**
-	 * Enqueues a {@link ServerPlayerConfigurationTask} task to be processed.
+	 * Enqueues a {@link ConfigurationTask} task to be processed.
 	 *
 	 * <p>Before adding a task use {@link ServerConfigurationNetworking#canSend(ServerConfigurationPacketListenerImpl, ResourceLocation)}
 	 * to ensure that the client can process this task.
 	 *
 	 * <p>Once the client has handled the task a packet should be sent to the server.
-	 * Upon receiving this packet the server should call {@link FabricServerConfigurationNetworkHandler#completeTask(ServerPlayerConfigurationTask.Key)},
+	 * Upon receiving this packet the server should call {@link FabricServerConfigurationNetworkHandler#completeTask(ConfigurationTask.Key)},
 	 * otherwise the client cannot join the world.
 	 *
 	 * @param task the task
 	 */
-	default void addTask(ServerPlayerConfigurationTask task) {
+	default void addTask(ConfigurationTask task) {
 		throw new UnsupportedOperationException("Implemented via mixin");
 	}
 
@@ -47,7 +47,7 @@ public interface FabricServerConfigurationNetworkHandler {
 	 * @param key the task key
 	 * @throws IllegalStateException if the current task is not {@code key}
 	 */
-	default void completeTask(ServerPlayerConfigurationTask.Key key) {
+	default void completeTask(ConfigurationTask.Key key) {
 		throw new UnsupportedOperationException("Implemented via mixin");
 	}
 }

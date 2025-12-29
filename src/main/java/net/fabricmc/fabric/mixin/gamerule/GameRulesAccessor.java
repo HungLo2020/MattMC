@@ -22,12 +22,12 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.gen.Accessor;
 import org.spongepowered.asm.mixin.gen.Invoker;
 
-import net.minecraft.world.GameRules;
+import net.minecraft.world.level.GameRules;
 
 @Mixin(GameRules.class)
 public interface GameRulesAccessor {
 	@Invoker("register")
-	static <T extends GameRules.Rule<T>> GameRules.Key<T> callRegister(String name, GameRules.Category category, GameRules.Type<T> type) {
+	static <T extends GameRules.Value<T>> GameRules.Key<T> callRegister(String name, GameRules.Category category, GameRules.Type<T> type) {
 		throw new AssertionError("This shouldn't happen!");
 	}
 

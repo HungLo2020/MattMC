@@ -16,7 +16,7 @@
 
 package net.fabricmc.fabric.api.gamerule.v1;
 
-import net.minecraft.world.GameRules;
+import net.minecraft.world.level.GameRules;
 
 import net.fabricmc.fabric.api.gamerule.v1.rule.DoubleRule;
 import net.fabricmc.fabric.api.gamerule.v1.rule.EnumRule;
@@ -30,7 +30,7 @@ import net.fabricmc.fabric.api.gamerule.v1.rule.EnumRule;
  * <p>Rule types specified by this interface are not exhaustive.
  * New entries may be added in the future.
  */
-public interface FabricGameRuleVisitor extends GameRules.Visitor {
+public interface FabricGameRuleVisitor extends GameRules.GameRuleTypeVisitor {
 	/**
 	 * Visit a double rule.
 	 *

@@ -42,7 +42,7 @@ import net.minecraft.world.inventory.ScreenTexts;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.PlayerConfigEntry;
 import net.minecraft.server.network.ServerConfigurationPacketListenerImpl;
-import net.minecraft.server.network.ServerPlayerConfigurationTask;
+import net.minecraft.server.network.ConfigurationTask;
 import net.minecraft.network.chat.MutableText;
 import net.minecraft.network.chat.Component;
 import net.minecraft.ChatFormatting;
@@ -139,7 +139,7 @@ public final class RegistrySyncManager {
 	public record SyncConfigurationTask(
 			ServerConfigurationPacketListenerImpl handler,
 			Map<ResourceLocation, Object2IntMap<ResourceLocation>> map
-	) implements ServerPlayerConfigurationTask {
+	) implements ConfigurationTask {
 		public static final Key KEY = new Key("fabric:registry/sync");
 
 		@Override
