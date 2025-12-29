@@ -34,7 +34,7 @@ public record CommonVersionPayload(int[] versions) implements CustomPacketPayloa
 	}
 
 	@Override
-	public Id<? extends CustomPacketPayload> getId() {
+	public Type<? extends CustomPacketPayload> getId() {
 		return ID;
 	}
 }

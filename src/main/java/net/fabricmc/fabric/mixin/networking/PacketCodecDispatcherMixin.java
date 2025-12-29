@@ -43,8 +43,8 @@ public abstract class PacketCodecDispatcherMixin<B extends ByteBuf, V, T> implem
 			payload = customPayloadS2CPacket.payload();
 		}
 
-		if (payload != null && payload.getId() != null) {
-			throw new EncoderException("Failed to encode packet '%s' (%s)".formatted(packetId, payload.getId().id().toString()), e);
+		if (payload != null && payload.type() != null) {
+			throw new EncoderException("Failed to encode packet '%s' (%s)".formatted(packetId, payload.type().id().toString()), e);
 		}
 	}
 }

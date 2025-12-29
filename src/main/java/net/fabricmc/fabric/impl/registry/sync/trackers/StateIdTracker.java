@@ -44,8 +44,8 @@ public final class StateIdTracker<T, S> implements RegistryIdRemapCallback<T>, R
 	private int currentHighestId = 0;
 
 	public static <T, S> void register(Registry<T> registry, IdMap<S> stateList, Function<T, Collection<S>> stateGetter) {
-		if (!TRACKED.add(registry.getKey().getValue())) {
-			throw new IllegalStateException("Trying to register a tracker for registry " + registry.getKey().getValue() + " more than once!");
+		if (!TRACKED.add(registry.getKey().value())) {
+			throw new IllegalStateException("Trying to register a tracker for registry " + registry.getKey().value() + " more than once!");
 		}
 
 		StateIdTracker<T, S> tracker = new StateIdTracker<>(registry, stateList, stateGetter);

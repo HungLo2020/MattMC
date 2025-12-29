@@ -74,8 +74,8 @@ abstract class ServerWorldMixin implements ServerWorldCache {
 		// Try to invalidate GC'd lookups from the cache after 2 * the number of cached lookups
 		if (apiLookupAccessesWithoutCleanup > 2 * apiLookupCaches.size()) {
 			apiLookupCaches.entrySet().removeIf(entry -> {
-				entry.getValue().removeIf(weakReference -> weakReference.get() == null);
-				return entry.getValue().isEmpty();
+				entry.value().removeIf(weakReference -> weakReference.get() == null);
+				return entry.value().isEmpty();
 			});
 
 			apiLookupAccessesWithoutCleanup = 0;

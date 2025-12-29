@@ -232,7 +232,7 @@ public final class ClientConfigurationNetworking {
 	 */
 	public static void send(CustomPacketPayload payload) {
 		Objects.requireNonNull(payload, "Payload cannot be null");
-		Objects.requireNonNull(payload.getId(), "CustomPacketPayload#getId() cannot return null for payload class: " + payload.getClass());
+		Objects.requireNonNull(payload.type(), "CustomPacketPayload#getId() cannot return null for payload class: " + payload.getClass());
 
 		final ClientConfigurationNetworkAddon addon = ClientNetworkingImpl.getClientConfigurationAddon();
 

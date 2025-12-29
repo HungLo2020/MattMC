@@ -109,7 +109,7 @@ abstract class LivingEntityMixin {
 	@Dynamic("method_18405: Synthetic lambda body for Optional.map in isSleepingInBed")
 	@Inject(method = "method_18405", at = @At("RETURN"), cancellable = true)
 	private void onIsSleepingInBed(BlockPos sleepingPos, CallbackInfoReturnable<Boolean> info) {
-		BlockState bedState = ((LivingEntity) (Object) this).getEntityWorld().getBlockState(sleepingPos);
+		BlockState bedState = ((LivingEntity) (Object) this).level().getBlockState(sleepingPos);
 		InteractionResult result = EntitySleepEvents.ALLOW_BED.invoker().allowBed((LivingEntity) (Object) this, sleepingPos, bedState, info.getReturnValueZ());
 
 		if (result != InteractionResult.PASS) {
@@ -131,7 +131,7 @@ abstract class LivingEntityMixin {
 		InteractionResult result = EntitySleepEvents.ALLOW_BED.invoker().allowBed((LivingEntity) (Object) this, sleepingPos, state, state.getBlock() instanceof BedBlock);
 
 		// If a valid bed, replace with vanilla red bed so that the vanilla instanceof check succeeds.
-		return result.isAccepted() ? Blocks.RED_BED.getDefaultState() : state;
+		return result.isAccepted() ? Blocks.RED_BED.defaultBlockState() : state;
 	}
 
 	// The injector is shared because method_18404 and sleep share much of the structure here.

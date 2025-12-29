@@ -109,11 +109,11 @@ public final class PlayerLookup {
 	 */
 	public static Collection<ServerPlayer> tracking(Entity entity) {
 		Objects.requireNonNull(entity, "Entity cannot be null");
-		ChunkSource manager = entity.getEntityWorld().getChunkManager();
+		ChunkSource manager = entity.level().getChunkManager();
 
 		if (manager instanceof ServerChunkCache) {
 			ChunkMap chunkLoadingManager = ((ServerChunkCache) manager).chunkLoadingManager;
-			EntityTrackerAccessor tracker = ((ChunkMapAccessor) chunkLoadingManager).getEntityTrackers().get(entity.getId());
+			EntityTrackerAccessor tracker = ((ChunkMapAccessor) chunkLoadingManager).getEntityTrackers().get(entity.type());
 
 			// return an immutable collection to guard against accidental removals.
 			if (tracker != null) {
@@ -138,11 +138,11 @@ public final class PlayerLookup {
 		Objects.requireNonNull(blockEntity, "BlockEntity cannot be null");
 
 		//noinspection ConstantConditions - IJ intrinsics don't know hasWorld == true will result in no null
-		if (!blockEntity.hasWorld() || blockEntity.getWorld().isClient()) {
+		if (!blockEntity.hasLevel() || blockEntity.getLevel().isClient()) {
 			throw new IllegalArgumentException("Only supported on server worlds!");
 		}
 
-		return tracking((ServerLevel) blockEntity.getWorld(), blockEntity.getPos());
+		return tracking((ServerLevel) blockEntity.getLevel(), blockEntity.getBlockPos());
 	}
 
 	/**

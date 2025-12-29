@@ -180,7 +180,7 @@ public final class GlobalReceiverRegistry<H> {
 	 */
 	private void logTrackedAddonSize() {
 		if (LOGGER.isTraceEnabled() && this.trackedAddons.size() > 1) {
-			LOGGER.trace("{} receiver registry tracks {} addon instances", phase.getId(), trackedAddons.size());
+			LOGGER.trace("{} receiver registry tracks {} addon instances", phase.type(), trackedAddons.size());
 		}
 	}
 

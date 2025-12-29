@@ -189,7 +189,7 @@ public final class ServerConfigurationNetworking {
 	 */
 	public static Packet<ClientGamePacketListener> createS2CPacket(CustomPacketPayload payload) {
 		Objects.requireNonNull(payload, "Payload cannot be null");
-		Objects.requireNonNull(payload.getId(), "CustomPacketPayload#getId() cannot return null for payload class: " + payload.getClass());
+		Objects.requireNonNull(payload.type(), "CustomPacketPayload#getId() cannot return null for payload class: " + payload.getClass());
 
 		return ServerNetworkingImpl.createS2CPacket(payload);
 	}
@@ -217,7 +217,7 @@ public final class ServerConfigurationNetworking {
 	public static void send(ServerConfigurationPacketListenerImpl handler, CustomPacketPayload payload) {
 		Objects.requireNonNull(handler, "Server configuration handler cannot be null");
 		Objects.requireNonNull(payload, "Payload cannot be null");
-		Objects.requireNonNull(payload.getId(), "CustomPacketPayload#getId() cannot return null for payload class: " + payload.getClass());
+		Objects.requireNonNull(payload.type(), "CustomPacketPayload#getId() cannot return null for payload class: " + payload.getClass());
 
 		handler.sendPacket(createS2CPacket(payload));
 	}

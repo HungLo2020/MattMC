@@ -54,7 +54,7 @@ public final class ServerNetworkingImpl {
 
 	public static Packet<ClientGamePacketListener> createS2CPacket(CustomPacketPayload payload) {
 		Objects.requireNonNull(payload, "Payload cannot be null");
-		Objects.requireNonNull(payload.getId(), "CustomPacketPayload#getId() cannot return null for payload class: " + payload.getClass());
+		Objects.requireNonNull(payload.type(), "CustomPacketPayload#getId() cannot return null for payload class: " + payload.getClass());
 
 		return new ClientboundCustomPayloadPacket(payload);
 	}

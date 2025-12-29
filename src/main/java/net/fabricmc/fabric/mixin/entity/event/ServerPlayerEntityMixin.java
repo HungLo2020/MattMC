@@ -66,8 +66,8 @@ abstract class ServerPlayerEntityMixin extends LivingEntityMixin {
 
 		// If the damage source that killed the player was an entity, then fire the event.
 		if (attacker != null) {
-			attacker.onKilledOther(this.getEntityWorld(), (ServerPlayer) (Object) this, source);
-			ServerEntityCombatEvents.AFTER_KILLED_OTHER_ENTITY.invoker().afterKilledOtherEntity(this.getEntityWorld(), attacker, (ServerPlayer) (Object) this, source);
+			attacker.onKilledOther(this.level(), (ServerPlayer) (Object) this, source);
+			ServerEntityCombatEvents.AFTER_KILLED_OTHER_ENTITY.invoker().afterKilledOtherEntity(this.level(), attacker, (ServerPlayer) (Object) this, source);
 		}
 	}
 
@@ -81,7 +81,7 @@ abstract class ServerPlayerEntityMixin extends LivingEntityMixin {
 	 */
 	@Inject(method = "worldChanged(Lnet/minecraft/server/world/ServerLevel;)V", at = @At("TAIL"))
 	private void afterWorldChanged(ServerLevel origin, CallbackInfo ci) {
-		ServerEntityWorldChangeEvents.AFTER_PLAYER_CHANGE_WORLD.invoker().afterChangeWorld((ServerPlayer) (Object) this, origin, this.getEntityWorld());
+		ServerEntityWorldChangeEvents.AFTER_PLAYER_CHANGE_WORLD.invoker().afterChangeWorld((ServerPlayer) (Object) this, origin, this.level());
 	}
 
 	@Inject(method = "copyFrom", at = @At("TAIL"))

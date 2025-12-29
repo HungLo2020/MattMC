@@ -89,7 +89,7 @@ public abstract class AbstractNetworkAddon<H> {
 			for (Map.Entry<ResourceLocation, H> entry : map.entrySet()) {
 				assertNotReserved(entry.getKey());
 
-				boolean unique = this.handlers.putIfAbsent(entry.getKey(), entry.getValue()) == null;
+				boolean unique = this.handlers.putIfAbsent(entry.getKey(), entry.value()) == null;
 				if (unique) handleRegistration(entry.getKey());
 			}
 		} finally {

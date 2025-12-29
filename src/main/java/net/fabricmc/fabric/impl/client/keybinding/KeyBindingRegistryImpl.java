@@ -37,9 +37,9 @@ public final class KeyBindingRegistryImpl {
 
 		for (KeyMapping existingKeyBindings : MODDED_KEY_BINDINGS) {
 			if (existingKeyBindings == binding) {
-				throw new IllegalArgumentException("Attempted to register a key binding twice: " + binding.getId());
-			} else if (existingKeyBindings.getId().equals(binding.getId())) {
-				throw new IllegalArgumentException("Attempted to register two key bindings with equal ID: " + binding.getId() + "!");
+				throw new IllegalArgumentException("Attempted to register a key binding twice: " + binding.type());
+			} else if (existingKeyBindings.type().equals(binding.type())) {
+				throw new IllegalArgumentException("Attempted to register two key bindings with equal ID: " + binding.type() + "!");
 			}
 		}
 

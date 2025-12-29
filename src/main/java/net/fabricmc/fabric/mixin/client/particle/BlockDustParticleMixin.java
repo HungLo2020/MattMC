@@ -59,7 +59,7 @@ abstract class BlockDustParticleMixin extends BillboardParticle {
 	private static BlockState removeUntintableParticles(BlockState state, @Local(argsOnly = true) ClientLevel world, @Local(argsOnly = true) BlockPos blockPos) {
 		if (!ParticleRenderEvents.ALLOW_BLOCK_DUST_TINT.invoker().allowBlockDustTint(state, world, blockPos)) {
 			// As of 1.20.1, vanilla hardcodes grass block particles to not get tinted.
-			return Blocks.GRASS_BLOCK.getDefaultState();
+			return Blocks.GRASS_BLOCK.defaultBlockState();
 		}
 
 		return state;

@@ -71,7 +71,7 @@ public final class ClientNetworkingImpl {
 
 	public static Packet<ServerCommonPacketListener> createC2SPacket(CustomPacketPayload payload) {
 		Objects.requireNonNull(payload, "Payload cannot be null");
-		Objects.requireNonNull(payload.getId(), "CustomPacketPayload#getId() cannot return null for payload class: " + payload.getClass());
+		Objects.requireNonNull(payload.type(), "CustomPacketPayload#getId() cannot return null for payload class: " + payload.getClass());
 
 		return new ServerboundCustomPayloadPacket(payload);
 	}

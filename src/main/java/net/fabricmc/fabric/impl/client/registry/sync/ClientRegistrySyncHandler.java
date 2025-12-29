@@ -107,7 +107,7 @@ public final class ClientRegistrySyncHandler {
 				throw new RemapException("Registry " + registryId + " is not remappable");
 			}
 
-			remappableRegistry.remap(entry.getValue(), RemappableRegistry.RemapMode.REMOTE);
+			remappableRegistry.remap(entry.value(), RemappableRegistry.RemapMode.REMOTE);
 		}
 	}
 
@@ -156,7 +156,7 @@ public final class ClientRegistrySyncHandler {
 			LOGGER.error("Received unknown remote registry entries from server");
 
 			for (Map.Entry<ResourceLocation, List<ResourceLocation>> entry : missingEntries.entrySet()) {
-				for (ResourceLocation identifier : entry.getValue()) {
+				for (ResourceLocation identifier : entry.value()) {
 					LOGGER.error("Registry entry ({}) is missing from local registry ({})", identifier, entry.getKey());
 				}
 			}

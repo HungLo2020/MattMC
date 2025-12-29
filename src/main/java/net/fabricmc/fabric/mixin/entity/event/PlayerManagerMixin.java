@@ -38,8 +38,8 @@ abstract class PlayerManagerMixin {
 		ServerPlayer newPlayer = cir.getReturnValue();
 		ServerPlayerEvents.AFTER_RESPAWN.invoker().afterRespawn(oldPlayer, newPlayer, alive);
 
-		if (oldPlayer.getEntityWorld() != newPlayer.getEntityWorld()) {
-			ServerEntityWorldChangeEvents.AFTER_PLAYER_CHANGE_WORLD.invoker().afterChangeWorld(newPlayer, oldPlayer.getEntityWorld(), newPlayer.getEntityWorld());
+		if (oldPlayer.level() != newPlayer.level()) {
+			ServerEntityWorldChangeEvents.AFTER_PLAYER_CHANGE_WORLD.invoker().afterChangeWorld(newPlayer, oldPlayer.level(), newPlayer.level());
 		}
 	}
 

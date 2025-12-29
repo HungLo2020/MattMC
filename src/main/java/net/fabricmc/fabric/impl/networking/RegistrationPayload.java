@@ -84,7 +84,7 @@ public record RegistrationPayload(Id<RegistrationPayload> id, List<ResourceLocat
 	}
 
 	@Override
-	public Id<? extends CustomPacketPayload> getId() {
+	public Type<? extends CustomPacketPayload> getId() {
 		return id;
 	}
 

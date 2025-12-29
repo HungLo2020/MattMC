@@ -35,7 +35,7 @@ public record FabricSplitPacketPayload(ByteBuf byteBuf) implements CustomPacketP
 	}
 
 	@Override
-	public Id<? extends CustomPacketPayload> getId() {
+	public Type<? extends CustomPacketPayload> getId() {
 		return ID;
 	}
 }

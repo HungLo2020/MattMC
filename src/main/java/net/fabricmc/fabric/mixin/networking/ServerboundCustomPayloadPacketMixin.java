@@ -70,14 +70,14 @@ public class ServerboundCustomPayloadPacketMixin implements SplittablePacket, Ge
 
 	@Override
 	public void fabric_split(PayloadTypeRegistryImpl<?> payloadTypeRegistry, ChannelHandlerContext channelHandlerContext, EncoderHandler<?> encoder, Packet<?> packet, Consumer<Packet<?>> consumer) throws Exception {
-		int size = payloadTypeRegistry.getMaxPacketSize(this.payload.getId().id());
+		int size = payloadTypeRegistry.getMaxPacketSize(this.payload.type().id());
 
 		if (size == -1) {
 			consumer.accept((Packet<?>) this);
 			return;
 		}
 
-		FabricPacketSplitter.genericPacketSplitter(this.payload.getId().id(), channelHandlerContext, encoder, packet, ServerboundCustomPayloadPacket::new, consumer, FabricPacketSplitter.SAFE_C2S_SPLIT_SIZE, size);
+		FabricPacketSplitter.genericPacketSplitter(this.payload.type().id(), channelHandlerContext, encoder, packet, ServerboundCustomPayloadPacket::new, consumer, FabricPacketSplitter.SAFE_C2S_SPLIT_SIZE, size);
 	}
 
 	@Override

@@ -40,7 +40,7 @@ abstract class EntityMixin {
 		Entity ret = original.call(instance, sourceWorld, targetWorld, teleportTarget);
 
 		if (ret != null) {
-			ServerEntityWorldChangeEvents.AFTER_ENTITY_CHANGE_WORLD.invoker().afterChangeWorld((Entity) (Object) this, ret, (ServerLevel) this.world, (ServerLevel) ret.getEntityWorld());
+			ServerEntityWorldChangeEvents.AFTER_ENTITY_CHANGE_WORLD.invoker().afterChangeWorld((Entity) (Object) this, ret, (ServerLevel) this.world, (ServerLevel) ret.level());
 		}
 
 		return ret;

@@ -288,7 +288,7 @@ public final class ServerPlayNetworking {
 	public static void send(ServerPlayer player, CustomPacketPayload payload) {
 		Objects.requireNonNull(player, "Server player entity cannot be null");
 		Objects.requireNonNull(payload, "Payload cannot be null");
-		Objects.requireNonNull(payload.getId(), "CustomPacketPayload#getId() cannot return null for payload class: " + payload.getClass());
+		Objects.requireNonNull(payload.type(), "CustomPacketPayload#getId() cannot return null for payload class: " + payload.getClass());
 
 		player.networkHandler.sendPacket(createS2CPacket(payload));
 	}
