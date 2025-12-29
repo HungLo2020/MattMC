@@ -1,5 +1,26 @@
 # Hook-Based System Analysis for MattMC Single-JAR Architecture
 
+## Migration Progress Tracker
+
+**Last Updated:** December 29, 2024
+
+### Mixin Conversion Status
+
+**Total Mixins:** 235 → **232 remaining** (3 removed)  
+**Conversion Progress:** 1.3% complete
+
+#### Removed Mixins (3):
+1. ✅ `net.irisshaders.iris.mixin.DimensionTypeAccessor` - Record fields are public by default
+2. ✅ `net.irisshaders.iris.mixin.LightTextureAccessor` - Changed `LightTexture.texture` field visibility to public
+3. ✅ `com.seibel.distanthorizons.fabric.mixins.client.LightTextureAccessor` - Same as above
+
+#### Modified Files (3):
+1. `net.minecraft.client.renderer.LightTexture` - Made `texture` field public
+2. `net.irisshaders.iris.pipeline.CustomTextureManager` - Updated to use direct field access
+3. `com.seibel.distanthorizons.fabric.hooks.DhLightTextureHook` - Updated to use direct field access
+
+---
+
 ## Executive Summary
 
 After thorough analysis of the NEXT-STEPS.md document and the current state of the MattMC project, **I strongly recommend transitioning from mixins to a hook-based system** for integrating mods with Minecraft core. The single source set architecture creates a unique opportunity to eliminate the complexity and overhead of runtime bytecode manipulation.
@@ -43,10 +64,10 @@ Hooks are already being called from Minecraft core code:
 
 ## Current Mixin Statistics
 
-### Total Mixin Count: 235 Files
+### Total Mixin Count: 232 Files (3 removed)
 
 **Breakdown by Type:**
-- **@Accessor mixins**: 59 (25% of total)
+- **@Accessor mixins**: 56 remaining (59 originally, 3 removed)
 - **@Invoker mixins**: 1 (<1% of total)
 - **@Inject annotations**: 254 (multiple per file)
 - **@Redirect annotations**: 46
@@ -55,14 +76,14 @@ Hooks are already being called from Minecraft core code:
 
 **Distribution by Mod:**
 - **Sodium**: ~50 mixins (rendering optimizations)
-- **Iris**: ~149 mixins (shader system integration)
-- **Distant Horizons**: ~24 mixins (LOD rendering)
+- **Iris**: ~147 mixins (shader system integration, 2 removed)
+- **Distant Horizons**: ~23 mixins (LOD rendering, 1 removed)
 - **Fabric API**: ~12 mixins (compatibility layer)
 
 ### Mixin Complexity Analysis
 
 **Simple (Easy to Convert):**
-- 59 @Accessor mixins - Just need to change visibility modifiers
+- 56 @Accessor mixins remaining - Just need to change visibility modifiers
 - 1 @Invoker mixin - Make method public/protected
 - ~100 simple @Inject mixins - Direct HEAD/RETURN injections
 

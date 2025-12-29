@@ -10,7 +10,6 @@ import net.irisshaders.iris.gl.texture.TextureAccess;
 import net.irisshaders.iris.gl.texture.TextureType;
 import net.irisshaders.iris.gl.texture.TextureWrapper;
 import net.irisshaders.iris.mixin.GlStateManagerAccessor;
-import net.irisshaders.iris.mixin.LightTextureAccessor;
 import net.irisshaders.iris.pbr.format.TextureFormat;
 import net.irisshaders.iris.pbr.format.TextureFormatLoader;
 import net.irisshaders.iris.pbr.texture.PBRAtlasTexture;
@@ -101,8 +100,8 @@ public class CustomTextureManager {
 		} else if (textureData instanceof CustomTextureData.LightmapMarker) {
 			// Special code path for the light texture. While shader packs hardcode the primary light texture, it's
 			// possible that a mod will create a different light texture, so this code path is robust to that.
-			return new TextureWrapper(() -> ((LightTextureAccessor) Minecraft.getInstance().gameRenderer.lightTexture())
-				.getLightTexture().iris$getGlId(), TextureType.TEXTURE_2D);
+			return new TextureWrapper(() -> Minecraft.getInstance().gameRenderer.lightTexture().texture
+				.iris$getGlId(), TextureType.TEXTURE_2D);
 		} else if (textureData instanceof CustomTextureData.RawData1D rawData1D) {
 			GlTexture texture = new GlTexture(TextureType.TEXTURE_1D, rawData1D.getSizeX(), 0, 0, rawData1D.getInternalFormat().getGlFormat(), rawData1D.getPixelFormat().getGlFormat(), rawData1D.getPixelType().getGlFormat(), rawData1D.getContent(), rawData1D.getFilteringData());
 			ownedRawTextures.add(texture);

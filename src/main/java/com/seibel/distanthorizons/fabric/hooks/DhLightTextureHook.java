@@ -1,22 +1,3 @@
-/*
- *    This file is part of the Distant Horizons mod
- *    licensed under the GNU LGPL v3 License.
- *
- *    Copyright (C) 2020 James Seibel
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the GNU Lesser General Public License as published by
- *    the Free Software Foundation, version 3.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    GNU Lesser General Public License for more details.
- *
- *    You should have received a copy of the GNU Lesser General Public License
- *    along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
-
 package com.seibel.distanthorizons.fabric.hooks;
 
 import com.mojang.blaze3d.opengl.GlTexture;
@@ -26,7 +7,6 @@ import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftClientWrapper;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftRenderWrapper;
 import com.seibel.distanthorizons.core.wrapperInterfaces.world.IClientLevelWrapper;
-import com.seibel.distanthorizons.fabric.mixins.client.LightTextureAccessor;
 import net.minecraft.client.renderer.LightTexture;
 import net.minecraft.hooks.LightTextureHooks;
 
@@ -54,8 +34,7 @@ public class DhLightTextureHook implements LightTextureHooks {
             this.renderWrapper = (MinecraftRenderWrapper)SingletonInjector.INSTANCE.get(IMinecraftRenderWrapper.class);
         }
 
-        LightTextureAccessor accessor = (LightTextureAccessor) lightTexture;
-        GlTexture glTexture = (GlTexture) accessor.getTexture();
+        GlTexture glTexture = (GlTexture) lightTexture.texture; // Direct field access - texture is now public
         this.renderWrapper.setLightmapId(glTexture.glId(), clientLevel);
     }
 }

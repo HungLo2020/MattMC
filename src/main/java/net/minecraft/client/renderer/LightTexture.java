@@ -42,7 +42,7 @@ public class LightTexture implements AutoCloseable {
 		.putVec3()
 		.get();
 	private static final Vector3f END_FLASH_SKY_LIGHT_COLOR = new Vector3f(0.9F, 0.5F, 1.0F);
-	private final GpuTexture texture;
+	public final GpuTexture texture; // Made public for mod integration (was accessed via mixin)
 	private final GpuTextureView textureView;
 	private boolean updateLightTexture;
 	private float blockLightRedFlicker;
