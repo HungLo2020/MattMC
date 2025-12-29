@@ -17,9 +17,9 @@
 package net.fabricmc.fabric.impl.networking;
 
 import net.minecraft.network.FriendlyByteBuf;
-import net.minecraft.network.protocol.CustomPayload;
+import net.minecraft.network.protocol.CustomPacketPayload;
 import net.minecraft.server.packss.ResourceLocation;
 
 public interface CustomPayloadTypeProvider<B extends FriendlyByteBuf> {
-	CustomPayload.Type<B, ? extends CustomPayload> get(B packetByteBuf, ResourceLocation identifier);
+	CustomPacketPayload.Type<B, ? extends CustomPacketPayload> get(B packetByteBuf, ResourceLocation identifier);
 }

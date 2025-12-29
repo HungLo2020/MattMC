@@ -18,12 +18,12 @@ package net.fabricmc.fabric.impl.networking;
 
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.PacketCodec;
-import net.minecraft.network.protocol.CustomPayload;
+import net.minecraft.network.protocol.CustomPacketPayload;
 import net.minecraft.server.packss.ResourceLocation;
 
-public record CommonVersionPayload(int[] versions) implements CustomPayload {
-	public static final PacketCodec<FriendlyByteBuf, CommonVersionPayload> CODEC = CustomPayload.codecOf(CommonVersionPayload::write, CommonVersionPayload::new);
-	public static final CustomPayload.Id<CommonVersionPayload> ID = new Id<>(ResourceLocation.of("c:version"));
+public record CommonVersionPayload(int[] versions) implements CustomPacketPayload {
+	public static final PacketCodec<FriendlyByteBuf, CommonVersionPayload> CODEC = CustomPacketPayload.codecOf(CommonVersionPayload::write, CommonVersionPayload::new);
+	public static final CustomPacketPayload.Id<CommonVersionPayload> ID = new Id<>(ResourceLocation.of("c:version"));
 
 	private CommonVersionPayload(FriendlyByteBuf buf) {
 		this(buf.readIntArray());
@@ -34,7 +34,7 @@ public record CommonVersionPayload(int[] versions) implements CustomPayload {
 	}
 
 	@Override
-	public Id<? extends CustomPayload> getId() {
+	public Id<? extends CustomPacketPayload> getId() {
 		return ID;
 	}
 }

@@ -32,7 +32,7 @@ import net.minecraft.world.entity.SpawnGroup;
 import net.minecraft.world.entity.SpawnLocation;
 import net.minecraft.world.entity.SpawnRestriction;
 import net.minecraft.world.entity.attribute.DefaultAttributeContainer;
-import net.minecraft.world.entity.mob.MobEntity;
+import net.minecraft.world.entity.mob.Mob;
 import net.minecraft.core.ResourceKey;
 import net.minecraft.world.flag.FeatureFlag;
 import net.minecraft.world.Heightmap;
@@ -131,7 +131,7 @@ public class FabricEntityTypeBuilder<T extends Entity> {
 	 * @return a new mob entity type builder
 	 * @deprecated use {@link FabricEntityType.Builder#createMob(EntityType.EntityFactory, SpawnGroup, UnaryOperator)}
 	 */
-	public static <T extends MobEntity> FabricEntityTypeBuilder.Mob<T> createMob() {
+	public static <T extends Mob> FabricEntityTypeBuilder.Mob<T> createMob() {
 		return new FabricEntityTypeBuilder.Mob<>(SpawnGroup.MISC, FabricEntityTypeBuilder::emptyFactory);
 	}
 
@@ -489,12 +489,12 @@ public class FabricEntityTypeBuilder<T extends Entity> {
 	}
 
 	/**
-	 * An extended version of {@link FabricEntityTypeBuilder} with support for features on present on {@link MobEntity mob entities}, such as spawn restrictions.
+	 * An extended version of {@link FabricEntityTypeBuilder} with support for features on present on {@link Mob mob entities}, such as spawn restrictions.
 	 *
 	 * @param <T> Entity class.
 	 */
 	@Deprecated
-	public static class Mob<T extends MobEntity> extends FabricEntityTypeBuilder.Living<T> {
+	public static class Mob<T extends Mob> extends FabricEntityTypeBuilder.Living<T> {
 		private SpawnLocation spawnLocation;
 		private Heightmap.Type restrictionHeightmap;
 		private SpawnRestriction.SpawnPredicate<T> spawnPredicate;

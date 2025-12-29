@@ -25,7 +25,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import net.minecraft.world.level.block.BlockState;
 import net.minecraft.world.level.block.CrafterBlock;
 import net.minecraft.world.level.block.entity.CrafterBlockEntity;
-import net.minecraft.world.item.inventory.Inventory;
+import net.minecraft.world.item.inventory.Container;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.CraftingRecipe;
 import net.minecraft.world.item.crafting.RecipeEntry;
@@ -42,7 +42,7 @@ import net.fabricmc.fabric.api.transfer.v1.transaction.Transaction;
 public class CrafterBlockMixin {
 	// Inject after vanilla's attempts to insert the stack into an inventory.
 	@Inject(method = "transferOrSpawnStack", at = @At(value = "INVOKE", target = "Lnet/minecraft/item/ItemStack;isEmpty()Z", shift = At.Shift.BEFORE))
-	private void transferOrSpawnStack(ServerLevel world, BlockPos pos, CrafterBlockEntity blockEntity, ItemStack inputStack, BlockState state, RecipeEntry<CraftingRecipe> recipe, CallbackInfo ci, @Local Direction direction, @Local Inventory inventory, @Local(ordinal = 1) ItemStack itemStack) {
+	private void transferOrSpawnStack(ServerLevel world, BlockPos pos, CrafterBlockEntity blockEntity, ItemStack inputStack, BlockState state, RecipeEntry<CraftingRecipe> recipe, CallbackInfo ci, @Local Direction direction, @Local Container inventory, @Local(ordinal = 1) ItemStack itemStack) {
 		if (inventory != null) {
 			// Vanilla already found and tested an inventory, nothing else to do even if it failed to insert.
 			return;

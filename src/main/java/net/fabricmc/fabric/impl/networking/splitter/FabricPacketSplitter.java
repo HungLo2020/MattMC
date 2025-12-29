@@ -28,7 +28,7 @@ import io.netty.handler.codec.MessageToMessageEncoder;
 
 import net.minecraft.network.encoding.VarInts;
 import net.minecraft.network.handler.EncoderHandler;
-import net.minecraft.network.protocol.CustomPayload;
+import net.minecraft.network.protocol.CustomPacketPayload;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.c2s.common.CustomPayloadC2SPacket;
 import net.minecraft.network.protocol.s2c.common.CustomPayloadS2CPacket;
@@ -61,7 +61,7 @@ public class FabricPacketSplitter extends MessageToMessageEncoder<Packet<?>> {
 	}
 
 	public static void genericPacketSplitter(ResourceLocation packetId, ChannelHandlerContext channelHandlerContext, EncoderHandler<?> encoder, Packet<?> packet,
-											Function<CustomPayload, Packet<?>> packetConstructor, Consumer<Packet<?>> consumer, int maxChunkSize, int maxPacketSize) throws Exception {
+											Function<CustomPacketPayload, Packet<?>> packetConstructor, Consumer<Packet<?>> consumer, int maxChunkSize, int maxPacketSize) throws Exception {
 		ByteBuf buf = Unpooled.buffer();
 		((EncoderHandlerAccessor) encoder).fabric_encode(channelHandlerContext, packet, buf);
 

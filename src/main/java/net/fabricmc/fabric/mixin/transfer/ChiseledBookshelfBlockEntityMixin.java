@@ -24,7 +24,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import net.minecraft.world.level.block.entity.ChiseledBookshelfBlockEntity;
-import net.minecraft.world.item.inventory.Inventory;
+import net.minecraft.world.item.inventory.Container;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.util.collection.DefaultedList;
 
@@ -34,7 +34,7 @@ import net.fabricmc.fabric.impl.transfer.item.SpecialLogicInventory;
 
 /**
  * This mixin tracks the last interacted slot for transaction support, defers block state updates,
- * and allows setting empty stacks via {@link Inventory#setStack} in a transfer API context (needed for extractions).
+ * and allows setting empty stacks via {@link Container#setStack} in a transfer API context (needed for extractions).
  */
 @Mixin(ChiseledBookshelfBlockEntity.class)
 public class ChiseledBookshelfBlockEntityMixin implements SpecialLogicInventory {

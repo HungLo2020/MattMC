@@ -26,7 +26,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientPlayNetworkHandler;
 import net.minecraft.client.multiplayer.LocalPlayer;
 import net.minecraft.network.NetworkPhase;
-import net.minecraft.network.protocol.CustomPayload;
+import net.minecraft.network.protocol.CustomPacketPayload;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.server.packss.ResourceLocation;
 
@@ -73,13 +73,13 @@ public final class ClientPlayNetworkAddon extends ClientCommonNetworkAddon<Clien
 	}
 
 	@Override
-	protected void receive(ClientPlayNetworking.PlayPayloadHandler<?> handler, CustomPayload payload) {
+	protected void receive(ClientPlayNetworking.PlayPayloadHandler<?> handler, CustomPacketPayload payload) {
 		((ClientPlayNetworking.PlayPayloadHandler) handler).receive(payload, context);
 	}
 
 	// impl details
 	@Override
-	public Packet<?> createPacket(CustomPayload packet) {
+	public Packet<?> createPacket(CustomPacketPayload packet) {
 		return ClientPlayNetworking.createC2SPacket(packet);
 	}
 

@@ -22,7 +22,7 @@ import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.UnmodifiableView;
 
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.entity.player.PlayerInventory;
+import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.ItemUsage;
 import net.minecraft.world.inventory.AbstractContainerMenu;
@@ -247,7 +247,7 @@ public interface ContainerItemContext {
 	SingleSlotStorage<ItemVariant> getMainSlot();
 
 	/**
-	 * Try to insert items into this context, without prioritizing a specific slot, similar to {@link PlayerInventory#offerOrDrop}.
+	 * Try to insert items into this context, without prioritizing a specific slot, similar to {@link Inventory#offerOrDrop}.
 	 * This should be used for insertion after insertion into the main slot failed.
 	 * {@link #insert} can be used to insert into the main slot first, then send any overflow through this function.
 	 *

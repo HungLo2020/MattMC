@@ -19,17 +19,17 @@ package net.fabricmc.fabric.impl.recipe.ingredient;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.PacketCodec;
 import net.minecraft.network.codec.PacketCodecs;
-import net.minecraft.network.protocol.CustomPayload;
+import net.minecraft.network.protocol.CustomPacketPayload;
 
-public record CustomIngredientPayloadS2C(int protocolVersion) implements CustomPayload {
+public record CustomIngredientPayloadS2C(int protocolVersion) implements CustomPacketPayload {
 	public static final PacketCodec<FriendlyByteBuf, CustomIngredientPayloadS2C> CODEC = PacketCodec.tuple(
 			PacketCodecs.VAR_INT, CustomIngredientPayloadS2C::protocolVersion,
 			CustomIngredientPayloadS2C::new
 	);
-	public static final CustomPayload.Id<CustomIngredientPayloadS2C> ID = new Id<>(CustomIngredientSync.PACKET_ID);
+	public static final CustomPacketPayload.Id<CustomIngredientPayloadS2C> ID = new Id<>(CustomIngredientSync.PACKET_ID);
 
 	@Override
-	public Id<? extends CustomPayload> getId() {
+	public Id<? extends CustomPacketPayload> getId() {
 		return ID;
 	}
 }

@@ -36,13 +36,13 @@
  *
  * <h2>Opening screen handlers</h2>
  * Screen handlers can be opened using
- * {@link net.minecraft.world.entity.player.Player#openHandledScreen(net.minecraft.world.inventory.NamedScreenHandlerFactory)}.
+ * {@link net.minecraft.world.entity.player.Player#openHandledScreen(net.minecraft.world.inventory.MenuProvider)}.
  * Note that calling it on the logical client does nothing. To open an extended screen handler, the factory passed in
  * should be an {@link net.fabricmc.fabric.api.screenhandler.v1.ExtendedScreenHandlerFactory}, or a
  * {@link net.minecraft.world.inventory.SimpleNamedScreenHandlerFactory} that wraps such factory.
  *
  * <h2>Overwriting screen handlers</h2>
- * You might have noticed that calling {@link net.minecraft.world.entity.player.Player#openHandledScreen(net.minecraft.world.inventory.NamedScreenHandlerFactory) openHandledScreen} while on another screen will move
+ * You might have noticed that calling {@link net.minecraft.world.entity.player.Player#openHandledScreen(net.minecraft.world.inventory.MenuProvider) openHandledScreen} while on another screen will move
  * the cursor to the center of the screen. This is because the current screen gets closed before
  * opening the screen, resetting the cursor position. Since this behavior can be problematic,
  * this API provides a way to disable this. By overriding {@link

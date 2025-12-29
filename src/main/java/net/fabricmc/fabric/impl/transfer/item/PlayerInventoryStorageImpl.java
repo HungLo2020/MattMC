@@ -20,7 +20,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
-import net.minecraft.world.entity.player.PlayerInventory;
+import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.util.Hand;
 
 import net.fabricmc.fabric.api.transfer.v1.item.ItemVariant;
@@ -34,9 +34,9 @@ import net.fabricmc.fabric.impl.transfer.DebugMessages;
 
 class PlayerInventoryStorageImpl extends InventoryStorageImpl implements PlayerInventoryStorage {
 	private final DroppedStacks droppedStacks;
-	private final PlayerInventory playerInventory;
+	private final Inventory playerInventory;
 
-	PlayerInventoryStorageImpl(PlayerInventory playerInventory) {
+	PlayerInventoryStorageImpl(Inventory playerInventory) {
 		super(playerInventory);
 		this.droppedStacks = new DroppedStacks();
 		this.playerInventory = playerInventory;
@@ -52,7 +52,7 @@ class PlayerInventoryStorageImpl extends InventoryStorageImpl implements PlayerI
 		StoragePreconditions.notBlankNotNegative(resource, amount);
 		long initialAmount = amount;
 
-		List<SingleSlotStorage<ItemVariant>> mainSlots = getSlots().subList(0, PlayerInventory.MAIN_SIZE);
+		List<SingleSlotStorage<ItemVariant>> mainSlots = getSlots().subList(0, Inventory.MAIN_SIZE);
 
 		// Stack into the main stack first and the offhand stack second.
 		for (Hand hand : Hand.values()) {
@@ -85,13 +85,13 @@ class PlayerInventoryStorageImpl extends InventoryStorageImpl implements PlayerI
 	@Override
 	public SingleSlotStorage<ItemVariant> getHandSlot(Hand hand) {
 		if (Objects.requireNonNull(hand) == Hand.MAIN_HAND) {
-			if (PlayerInventory.isValidHotbarIndex(playerInventory.getSelectedSlot())) {
+			if (Inventory.isValidHotbarIndex(playerInventory.getSelectedSlot())) {
 				return getSlot(playerInventory.getSelectedSlot());
 			} else {
 				throw new RuntimeException("Unexpected player selected slot: " + playerInventory.getSelectedSlot());
 			}
 		} else if (hand == Hand.OFF_HAND) {
-			return getSlot(PlayerInventory.OFF_HAND_SLOT);
+			return getSlot(Inventory.OFF_HAND_SLOT);
 		} else {
 			throw new UnsupportedOperationException("Unknown hand: " + hand);
 		}

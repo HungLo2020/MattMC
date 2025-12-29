@@ -23,7 +23,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientConfigurationNetworkHandler;
 import net.minecraft.network.NetworkPhase;
 import net.minecraft.network.protocol.BrandCustomPayload;
-import net.minecraft.network.protocol.CustomPayload;
+import net.minecraft.network.protocol.CustomPacketPayload;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.server.packss.ResourceLocation;
 
@@ -74,7 +74,7 @@ public final class ClientConfigurationNetworkAddon extends ClientCommonNetworkAd
 	}
 
 	@Override
-	public boolean handle(CustomPayload payload) {
+	public boolean handle(CustomPacketPayload payload) {
 		boolean result = super.handle(payload);
 
 		if (payload instanceof BrandCustomPayload) {
@@ -99,13 +99,13 @@ public final class ClientConfigurationNetworkAddon extends ClientCommonNetworkAd
 	}
 
 	@Override
-	protected void receive(ClientConfigurationNetworking.ConfigurationPayloadHandler<?> handler, CustomPayload payload) {
+	protected void receive(ClientConfigurationNetworking.ConfigurationPayloadHandler<?> handler, CustomPacketPayload payload) {
 		((ClientConfigurationNetworking.ConfigurationPayloadHandler) handler).receive(payload, this.context);
 	}
 
 	// impl details
 	@Override
-	public Packet<?> createPacket(CustomPayload packet) {
+	public Packet<?> createPacket(CustomPacketPayload packet) {
 		return ClientPlayNetworking.createC2SPacket(packet);
 	}
 

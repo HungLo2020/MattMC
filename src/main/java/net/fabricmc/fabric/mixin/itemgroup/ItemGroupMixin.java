@@ -58,7 +58,7 @@ abstract class ItemGroupMixin implements FabricItemGroupImpl {
 		final ResourceKey<ItemGroup> registryKey = Registries.ITEM_GROUP.getKey(self).orElseThrow(() -> new IllegalStateException("Unregistered item group : " + self));
 
 		// Do not modify special item groups (except Operator Blocks) at all.
-		// Special item groups include Saved Hotbars, Search, and Survival Inventory.
+		// Special item groups include Saved Hotbars, Search, and Survival Container.
 		// Note, search gets modified as part of the parent item group.
 		if (self.isSpecial() && registryKey != ItemGroups.OPERATOR) return;
 

@@ -22,7 +22,7 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.material.Fluids;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.Items;
-import net.minecraft.sounds.SoundCategory;
+import net.minecraft.sounds.SoundSource;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.util.Hand;
@@ -105,7 +105,7 @@ public final class FluidStorageUtil {
 						if (!fill && handItem == Items.POTION) sound = SoundEvents.ITEM_BOTTLE_EMPTY;
 					}
 
-					player.getEntityWorld().playSound(player, player.getX(), player.getEyeY(), player.getZ(), sound, SoundCategory.PLAYERS, 1, 1);
+					player.getEntityWorld().playSound(player, player.getX(), player.getEyeY(), player.getZ(), sound, SoundSource.PLAYERS, 1, 1);
 
 					return true;
 				}

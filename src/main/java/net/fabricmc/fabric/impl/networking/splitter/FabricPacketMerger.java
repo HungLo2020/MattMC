@@ -27,7 +27,7 @@ import org.jetbrains.annotations.Nullable;
 
 import net.minecraft.network.encoding.VarInts;
 import net.minecraft.network.handler.DecoderHandler;
-import net.minecraft.network.protocol.CustomPayload;
+import net.minecraft.network.protocol.CustomPacketPayload;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.PacketType;
 import net.minecraft.server.packss.ResourceLocation;
@@ -54,7 +54,7 @@ public class FabricPacketMerger extends MessageToMessageDecoder<Packet<?>> {
 		if (this.packetMerger != null) {
 			ensureNotTransitioning(packet);
 
-			CustomPayload payload = packet instanceof GenericPayloadAccessor accessor ? accessor.fabric_payload() : null;
+			CustomPacketPayload payload = packet instanceof GenericPayloadAccessor accessor ? accessor.fabric_payload() : null;
 
 			if (payload == null) {
 				throw new DecoderException("Received '" + packet.getPacketType().id() + "' packet, while expecting 'minecraft:custom_payload'!");

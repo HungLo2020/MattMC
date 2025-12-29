@@ -19,7 +19,7 @@ package net.fabricmc.fabric.api.client.particle.v1;
 import org.jetbrains.annotations.ApiStatus;
 
 import net.minecraft.client.particle.ParticleFactory;
-import net.minecraft.core.particles.ParticleEffect;
+import net.minecraft.core.particles.ParticleOptions;
 import net.minecraft.core.particles.ParticleType;
 
 import net.fabricmc.fabric.api.particle.v1.FabricParticleTypes;
@@ -40,7 +40,7 @@ public interface ParticleFactoryRegistry {
 	/**
 	 * Registers a factory for constructing particles of the given type.
 	 */
-	<T extends ParticleEffect> void register(ParticleType<T> type, ParticleFactory<T> factory);
+	<T extends ParticleOptions> void register(ParticleType<T> type, ParticleFactory<T> factory);
 
 	/**
 	 * Registers a delayed factory for constructing particles of the given type.
@@ -49,7 +49,7 @@ public interface ParticleFactoryRegistry {
 	 *
 	 * <p>Particle sprites will be loaded from domain:/particles/particle_name.json as per vanilla minecraft behavior.
 	 */
-	<T extends ParticleEffect> void register(ParticleType<T> type, PendingParticleFactory<T> constructor);
+	<T extends ParticleOptions> void register(ParticleType<T> type, PendingParticleFactory<T> constructor);
 
 	/**
 	 * A pending particle factory.
@@ -57,7 +57,7 @@ public interface ParticleFactoryRegistry {
 	 * @param <T> The type of particle effects this factory deals with.
 	 */
 	@FunctionalInterface
-	interface PendingParticleFactory<T extends ParticleEffect> {
+	interface PendingParticleFactory<T extends ParticleOptions> {
 		/**
 		 * Called to create a new particle factory.
 		 *

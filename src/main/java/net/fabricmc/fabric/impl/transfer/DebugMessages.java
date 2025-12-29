@@ -20,8 +20,8 @@ import org.jetbrains.annotations.Nullable;
 
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.entity.player.PlayerInventory;
-import net.minecraft.world.item.inventory.Inventory;
+import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.world.item.inventory.Container;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.Level;
 
@@ -35,10 +35,10 @@ public final class DebugMessages {
 		return player.getDisplayName() + "/" + player.getUuidAsString();
 	}
 
-	public static String forInventory(@Nullable Inventory inventory) {
+	public static String forInventory(@Nullable Container inventory) {
 		if (inventory == null) {
 			return "~~NULL~~"; // like in crash reports
-		} else if (inventory instanceof PlayerInventory playerInventory) {
+		} else if (inventory instanceof Inventory playerInventory) {
 			return forPlayer(playerInventory.player);
 		} else {
 			String result = inventory.toString();

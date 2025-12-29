@@ -30,7 +30,7 @@ import org.jetbrains.annotations.Nullable;
 import net.minecraft.network.ClientConnection;
 import net.minecraft.network.NetworkPhase;
 import net.minecraft.network.OffThreadException;
-import net.minecraft.network.protocol.CustomPayload;
+import net.minecraft.network.protocol.CustomPacketPayload;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.packss.ResourceLocation;
@@ -71,7 +71,7 @@ public abstract class AbstractChanneledNetworkAddon<H> extends AbstractNetworkAd
 	}
 
 	// always supposed to handle async!
-	public boolean handle(CustomPayload payload) {
+	public boolean handle(CustomPacketPayload payload) {
 		final ResourceLocation channelName = payload.getId().id();
 		this.logger.debug("Handling inbound packet from channel with name \"{}\"", channelName);
 
@@ -110,7 +110,7 @@ public abstract class AbstractChanneledNetworkAddon<H> extends AbstractNetworkAd
 
 	protected abstract boolean isOnReceiveThread();
 
-	protected abstract void receive(H handler, CustomPayload payload);
+	protected abstract void receive(H handler, CustomPacketPayload payload);
 
 	protected void sendInitialChannelRegistrationPacket() {
 		final RegistrationPayload payload = createRegistrationPayload(RegistrationPayload.REGISTER, this.getReceivableChannels());
@@ -121,7 +121,7 @@ public abstract class AbstractChanneledNetworkAddon<H> extends AbstractNetworkAd
 	}
 
 	@Nullable
-	protected RegistrationPayload createRegistrationPayload(CustomPayload.Id<RegistrationPayload> id, Collection<ResourceLocation> channels) {
+	protected RegistrationPayload createRegistrationPayload(CustomPacketPayload.Id<RegistrationPayload> id, Collection<ResourceLocation> channels) {
 		if (channels.isEmpty()) {
 			return null;
 		}

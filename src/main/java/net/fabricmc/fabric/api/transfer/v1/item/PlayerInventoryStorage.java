@@ -19,7 +19,7 @@ package net.fabricmc.fabric.api.transfer.v1.item;
 import org.jetbrains.annotations.ApiStatus;
 
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.entity.player.PlayerInventory;
+import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.util.Hand;
@@ -30,9 +30,9 @@ import net.fabricmc.fabric.api.transfer.v1.transaction.TransactionContext;
 import net.fabricmc.fabric.impl.transfer.item.CursorSlotWrapper;
 
 /**
- * A {@code Storage<ItemVariant>} implementation for a {@link PlayerInventory}.
+ * A {@code Storage<ItemVariant>} implementation for a {@link Inventory}.
  * This is a specialized version of {@link InventoryStorage},
- * with an additional transactional wrapper for {@link PlayerInventory#offerOrDrop}.
+ * with an additional transactional wrapper for {@link Inventory#offerOrDrop}.
  *
  * <p>Note that this is a wrapper around all the slots of the player inventory.
  * However, {@link #insert} is overridden to behave like {@link #offer}.
@@ -53,7 +53,7 @@ public interface PlayerInventoryStorage extends InventoryStorage {
 	/**
 	 * Return an instance for the passed player inventory.
 	 */
-	static PlayerInventoryStorage of(PlayerInventory playerInventory) {
+	static PlayerInventoryStorage of(Inventory playerInventory) {
 		return (PlayerInventoryStorage) InventoryStorage.of(playerInventory, null);
 	}
 
@@ -75,7 +75,7 @@ public interface PlayerInventoryStorage extends InventoryStorage {
 	long insert(ItemVariant resource, long maxAmount, TransactionContext transaction);
 
 	/**
-	 * Add items to the inventory if possible, and drop any leftover items in the world, similar to {@link PlayerInventory#offerOrDrop}.
+	 * Add items to the inventory if possible, and drop any leftover items in the world, similar to {@link Inventory#offerOrDrop}.
 	 *
 	 * <p>Note: This function has full transaction support, and will not actually drop the items until the outermost transaction is committed.
 	 *
@@ -89,7 +89,7 @@ public interface PlayerInventoryStorage extends InventoryStorage {
 	}
 
 	/**
-	 * Try to add items to the inventory if possible, stacking like {@link PlayerInventory#offer}.
+	 * Try to add items to the inventory if possible, stacking like {@link Inventory#offer}.
 	 * Unlike {@link #offerOrDrop}, this function will not drop excess items.
 	 *
 	 * <p>The exact behavior is:

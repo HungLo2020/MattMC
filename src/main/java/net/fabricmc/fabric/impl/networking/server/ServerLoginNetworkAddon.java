@@ -32,7 +32,7 @@ import org.jetbrains.annotations.Nullable;
 import net.minecraft.network.ClientConnection;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.PacketCallbacks;
-import net.minecraft.network.protocol.CustomPayload;
+import net.minecraft.network.protocol.CustomPacketPayload;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.c2s.login.LoginQueryResponseC2SPacket;
 import net.minecraft.network.protocol.s2c.login.LoginCompressionS2CPacket;
@@ -160,8 +160,8 @@ public final class ServerLoginNetworkAddon extends AbstractNetworkAddon<ServerLo
 	}
 
 	@Override
-	public Packet<?> createPacket(CustomPayload packet) {
-		throw new UnsupportedOperationException("Cannot send CustomPayload during login");
+	public Packet<?> createPacket(CustomPacketPayload packet) {
+		throw new UnsupportedOperationException("Cannot send CustomPacketPayload during login");
 	}
 
 	@Override

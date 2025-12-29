@@ -25,13 +25,13 @@ import io.netty.util.AsciiString;
 
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.PacketCodec;
-import net.minecraft.network.protocol.CustomPayload;
+import net.minecraft.network.protocol.CustomPacketPayload;
 import net.minecraft.server.packss.ResourceLocation;
 import net.minecraft.util.InvalidIdentifierException;
 
-public record RegistrationPayload(Id<RegistrationPayload> id, List<ResourceLocation> channels) implements CustomPayload {
-	public static final CustomPayload.Id<RegistrationPayload> REGISTER = new CustomPayload.Id<>(NetworkingImpl.REGISTER_CHANNEL);
-	public static final CustomPayload.Id<RegistrationPayload> UNREGISTER = new CustomPayload.Id<>(NetworkingImpl.UNREGISTER_CHANNEL);
+public record RegistrationPayload(Id<RegistrationPayload> id, List<ResourceLocation> channels) implements CustomPacketPayload {
+	public static final CustomPacketPayload.Id<RegistrationPayload> REGISTER = new CustomPacketPayload.Id<>(NetworkingImpl.REGISTER_CHANNEL);
+	public static final CustomPacketPayload.Id<RegistrationPayload> UNREGISTER = new CustomPacketPayload.Id<>(NetworkingImpl.UNREGISTER_CHANNEL);
 	public static final PacketCodec<FriendlyByteBuf, RegistrationPayload> REGISTER_CODEC = codec(REGISTER);
 	public static final PacketCodec<FriendlyByteBuf, RegistrationPayload> UNREGISTER_CODEC = codec(UNREGISTER);
 
@@ -84,11 +84,11 @@ public record RegistrationPayload(Id<RegistrationPayload> id, List<ResourceLocat
 	}
 
 	@Override
-	public Id<? extends CustomPayload> getId() {
+	public Id<? extends CustomPacketPayload> getId() {
 		return id;
 	}
 
 	private static PacketCodec<FriendlyByteBuf, RegistrationPayload> codec(Id<RegistrationPayload> id) {
-		return CustomPayload.codecOf(RegistrationPayload::write, buf -> new RegistrationPayload(id, buf));
+		return CustomPacketPayload.codecOf(RegistrationPayload::write, buf -> new RegistrationPayload(id, buf));
 	}
 }

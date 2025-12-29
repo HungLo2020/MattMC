@@ -17,7 +17,7 @@
 package net.fabricmc.fabric.api.screenhandler.v1;
 
 /**
- * An extension to {@link net.minecraft.world.inventory.NamedScreenHandlerFactory}.
+ * An extension to {@link net.minecraft.world.inventory.MenuProvider}.
  * Unlike {@link ExtendedScreenHandlerFactory}, this can be used by any screen
  * handlers, and is implemented via interface injection.
  */

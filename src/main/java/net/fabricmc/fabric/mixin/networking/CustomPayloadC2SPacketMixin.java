@@ -31,7 +31,7 @@ import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.RegistryByteBuf;
 import net.minecraft.network.codec.PacketCodec;
 import net.minecraft.network.handler.EncoderHandler;
-import net.minecraft.network.protocol.CustomPayload;
+import net.minecraft.network.protocol.CustomPacketPayload;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.c2s.common.CustomPayloadC2SPacket;
 
@@ -45,22 +45,22 @@ import net.fabricmc.fabric.impl.networking.splitter.SplittablePacket;
 public class CustomPayloadC2SPacketMixin implements SplittablePacket, GenericPayloadAccessor {
 	@Shadow
 	@Final
-	private CustomPayload payload;
+	private CustomPacketPayload payload;
 
 	@WrapOperation(
 			method = "<clinit>",
 			at = @At(
 					value = "INVOKE",
-					target = "Lnet/minecraft/network/packet/CustomPayload;createCodec(Lnet/minecraft/network/packet/CustomPayload$CodecFactory;Ljava/util/List;)Lnet/minecraft/network/codec/PacketCodec;"
+					target = "Lnet/minecraft/network/packet/CustomPacketPayload;createCodec(Lnet/minecraft/network/packet/CustomPacketPayload$CodecFactory;Ljava/util/List;)Lnet/minecraft/network/codec/PacketCodec;"
 			)
 	)
-	private static PacketCodec<FriendlyByteBuf, CustomPayload> wrapCodec(CustomPayload.CodecFactory<FriendlyByteBuf> unknownCodecFactory, List<CustomPayload.Type<FriendlyByteBuf, ?>> types, Operation<PacketCodec<FriendlyByteBuf, CustomPayload>> original) {
-		PacketCodec<FriendlyByteBuf, CustomPayload> codec = original.call(unknownCodecFactory, types);
+	private static PacketCodec<FriendlyByteBuf, CustomPacketPayload> wrapCodec(CustomPacketPayload.CodecFactory<FriendlyByteBuf> unknownCodecFactory, List<CustomPacketPayload.Type<FriendlyByteBuf, ?>> types, Operation<PacketCodec<FriendlyByteBuf, CustomPacketPayload>> original) {
+		PacketCodec<FriendlyByteBuf, CustomPacketPayload> codec = original.call(unknownCodecFactory, types);
 		FabricCustomPayloadPacketCodec<FriendlyByteBuf> fabricCodec = (FabricCustomPayloadPacketCodec<FriendlyByteBuf>) codec;
 		fabricCodec.fabric_setPacketCodecProvider((packetByteBuf, identifier) -> {
 			// CustomPayloadC2SPacket does not have a separate codec for play/configuration. We know if the packetByteBuf is a FriendlyByteBuf we are in the play phase.
 			if (packetByteBuf instanceof RegistryByteBuf) {
-				return (CustomPayload.Type<FriendlyByteBuf, ? extends CustomPayload>) (Object) PayloadTypeRegistryImpl.PLAY_C2S.get(identifier);
+				return (CustomPacketPayload.Type<FriendlyByteBuf, ? extends CustomPacketPayload>) (Object) PayloadTypeRegistryImpl.PLAY_C2S.get(identifier);
 			}
 
 			return PayloadTypeRegistryImpl.CONFIGURATION_C2S.get(identifier);
@@ -81,7 +81,7 @@ public class CustomPayloadC2SPacketMixin implements SplittablePacket, GenericPay
 	}
 
 	@Override
-	public CustomPayload fabric_payload() {
+	public CustomPacketPayload fabric_payload() {
 		return this.payload;
 	}
 }

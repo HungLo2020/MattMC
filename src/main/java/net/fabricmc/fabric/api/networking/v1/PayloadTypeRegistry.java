@@ -21,7 +21,7 @@ import org.jetbrains.annotations.ApiStatus;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.RegistryByteBuf;
 import net.minecraft.network.codec.PacketCodec;
-import net.minecraft.network.protocol.CustomPayload;
+import net.minecraft.network.protocol.CustomPacketPayload;
 
 import net.fabricmc.fabric.impl.networking.PayloadTypeRegistryImpl;
 
@@ -41,7 +41,7 @@ public interface PayloadTypeRegistry<B extends FriendlyByteBuf> {
 	 * @param <T>   the payload type
 	 * @return the registered payload type
 	 */
-	<T extends CustomPayload> CustomPayload.Type<? super B, T> register(CustomPayload.Id<T> id, PacketCodec<? super B, T> codec);
+	<T extends CustomPacketPayload> CustomPacketPayload.Type<? super B, T> register(CustomPacketPayload.Id<T> id, PacketCodec<? super B, T> codec);
 
 	/**
 	 * Registers a large custom payload type.
@@ -58,7 +58,7 @@ public interface PayloadTypeRegistry<B extends FriendlyByteBuf> {
 	 * @param maxPacketSize the maximum size of payload packet
 	 * @return the registered payload type
 	 */
-	<T extends CustomPayload> CustomPayload.Type<? super B, T> registerLarge(CustomPayload.Id<T> id, PacketCodec<? super B, T> codec, int maxPacketSize);
+	<T extends CustomPacketPayload> CustomPacketPayload.Type<? super B, T> registerLarge(CustomPacketPayload.Id<T> id, PacketCodec<? super B, T> codec, int maxPacketSize);
 
 	/**
 	 * @return the {@link PayloadTypeRegistry} instance for the client to server configuration channel.

@@ -26,7 +26,7 @@ import net.minecraft.world.entity.SpawnGroup;
 import net.minecraft.world.entity.SpawnLocation;
 import net.minecraft.world.entity.SpawnRestriction;
 import net.minecraft.world.entity.attribute.DefaultAttributeContainer;
-import net.minecraft.world.entity.mob.MobEntity;
+import net.minecraft.world.entity.mob.Mob;
 import net.minecraft.world.Heightmap;
 
 import net.fabricmc.fabric.impl.object.builder.FabricEntityTypeImpl;
@@ -83,7 +83,7 @@ public interface FabricEntityType {
 		 *
 		 * @return a new mob entity type builder
 		 */
-		static <T extends MobEntity> EntityType.Builder<T> createMob(EntityType.EntityFactory<T> factory, SpawnGroup spawnGroup, UnaryOperator<Mob<T>> mobBuilder) {
+		static <T extends Mob> EntityType.Builder<T> createMob(EntityType.EntityFactory<T> factory, SpawnGroup spawnGroup, UnaryOperator<Mob<T>> mobBuilder) {
 			return FabricEntityTypeImpl.Builder.createMob(factory, spawnGroup, mobBuilder);
 		}
 
@@ -105,7 +105,7 @@ public interface FabricEntityType {
 		 * A builder for additional properties of a mob entity, use via {@link #createMob(EntityType.EntityFactory, SpawnGroup, UnaryOperator)}.
 		 * @param <T> the type of mob entity
 		 */
-		interface Mob<T extends MobEntity> extends Living<T> {
+		interface Mob<T extends Mob> extends Living<T> {
 			/**
 			 * Registers a spawn restriction for this entity.
 			 *

@@ -34,7 +34,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.entity.mob.MobEntity;
+import net.minecraft.world.entity.mob.Mob;
 import net.minecraft.core.ResourceKey;
 import net.minecraft.server.packss.ResourceLocation;
 
@@ -56,7 +56,7 @@ public abstract class EntityTypeBuilderMixin<T extends Entity> implements Fabric
 	@Unique
 	private FabricEntityTypeImpl.Builder.Living<? extends LivingEntity> livingBuilder = null;
 	@Unique
-	private FabricEntityTypeImpl.Builder.Mob<? extends MobEntity> mobBuilder = null;
+	private FabricEntityTypeImpl.Builder.Mob<? extends Mob> mobBuilder = null;
 
 	@Override
 	public EntityType.Builder<T> alwaysUpdateVelocity(boolean alwaysUpdateVelocity) {
@@ -96,7 +96,7 @@ public abstract class EntityTypeBuilderMixin<T extends Entity> implements Fabric
 
 	@SuppressWarnings("unchecked")
 	@Unique
-	private static <T extends MobEntity> EntityType<T> castMob(EntityType<?> type) {
+	private static <T extends Mob> EntityType<T> castMob(EntityType<?> type) {
 		return (EntityType<T>) type;
 	}
 
@@ -117,7 +117,7 @@ public abstract class EntityTypeBuilderMixin<T extends Entity> implements Fabric
 	}
 
 	@Override
-	public void fabric_setMobEntityBuilder(FabricEntityTypeImpl.Builder.Mob<? extends MobEntity> mobBuilder) {
+	public void fabric_setMobEntityBuilder(FabricEntityTypeImpl.Builder.Mob<? extends Mob> mobBuilder) {
 		Objects.requireNonNull(mobBuilder, "Cannot set null mob entity builder");
 		this.mobBuilder = mobBuilder;
 	}

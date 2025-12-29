@@ -18,18 +18,18 @@ package net.fabricmc.fabric.impl.registry.sync;
 
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.PacketCodec;
-import net.minecraft.network.protocol.CustomPayload;
+import net.minecraft.network.protocol.CustomPacketPayload;
 import net.minecraft.server.packss.ResourceLocation;
 
-public class SyncCompletePayload implements CustomPayload {
+public class SyncCompletePayload implements CustomPacketPayload {
 	public static final SyncCompletePayload INSTANCE = new SyncCompletePayload();
-	public static final CustomPayload.Id<SyncCompletePayload> ID = new CustomPayload.Id<>(ResourceLocation.of("fabric", "registry/sync/complete"));
+	public static final CustomPacketPayload.Id<SyncCompletePayload> ID = new CustomPacketPayload.Id<>(ResourceLocation.of("fabric", "registry/sync/complete"));
 	public static final PacketCodec<FriendlyByteBuf, SyncCompletePayload> CODEC = PacketCodec.unit(INSTANCE);
 
 	private SyncCompletePayload() { }
 
 	@Override
-	public Id<? extends CustomPayload> getId() {
+	public Id<? extends CustomPacketPayload> getId() {
 		return ID;
 	}
 }

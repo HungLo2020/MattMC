@@ -28,7 +28,7 @@ import net.minecraft.world.entity.SpawnGroup;
 import net.minecraft.world.entity.SpawnLocation;
 import net.minecraft.world.entity.SpawnRestriction;
 import net.minecraft.world.entity.attribute.DefaultAttributeContainer;
-import net.minecraft.world.entity.mob.MobEntity;
+import net.minecraft.world.entity.mob.Mob;
 import net.minecraft.world.Heightmap;
 
 import net.fabricmc.fabric.api.object.builder.v1.entity.FabricDefaultAttributeRegistry;
@@ -42,7 +42,7 @@ public interface FabricEntityTypeImpl {
 	interface Builder {
 		void fabric_setLivingEntityBuilder(Living<? extends LivingEntity> livingBuilder);
 
-		void fabric_setMobEntityBuilder(Mob<? extends MobEntity> mobBuilder);
+		void fabric_setMobEntityBuilder(Mob<? extends Mob> mobBuilder);
 
 		static <T extends LivingEntity> EntityType.Builder<T> createLiving(EntityType.EntityFactory<T> factory, SpawnGroup spawnGroup, UnaryOperator<FabricEntityType.Builder.Living<T>> livingBuilder) {
 			EntityType.Builder<T> builder = EntityType.Builder.create(factory, spawnGroup);
@@ -52,7 +52,7 @@ public interface FabricEntityTypeImpl {
 			return builder;
 		}
 
-		static <T extends MobEntity> EntityType.Builder<T> createMob(EntityType.EntityFactory<T> factory, SpawnGroup spawnGroup, UnaryOperator<FabricEntityType.Builder.Mob<T>> mobBuilder) {
+		static <T extends Mob> EntityType.Builder<T> createMob(EntityType.EntityFactory<T> factory, SpawnGroup spawnGroup, UnaryOperator<FabricEntityType.Builder.Mob<T>> mobBuilder) {
 			EntityType.Builder<T> builder = EntityType.Builder.create(factory, spawnGroup);
 			Mob<T> builderImpl = new Mob<>();
 			mobBuilder.apply(builderImpl);
@@ -78,7 +78,7 @@ public interface FabricEntityTypeImpl {
 			}
 		}
 
-		final class Mob<T extends MobEntity> extends Living<T> implements FabricEntityType.Builder.Mob<T> {
+		final class Mob<T extends Mob> extends Living<T> implements FabricEntityType.Builder.Mob<T> {
 			private SpawnLocation restrictionLocation;
 			private Heightmap.Type restrictionHeightmap;
 			private SpawnRestriction.SpawnPredicate<T> spawnPredicate;

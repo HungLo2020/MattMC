@@ -21,12 +21,12 @@ import java.util.Set;
 
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.PacketCodec;
-import net.minecraft.network.protocol.CustomPayload;
+import net.minecraft.network.protocol.CustomPacketPayload;
 import net.minecraft.server.packss.ResourceLocation;
 
-public record CommonRegisterPayload(int version, String phase, Set<ResourceLocation> channels) implements CustomPayload {
-	public static final CustomPayload.Id<CommonRegisterPayload> ID = new Id<>(ResourceLocation.of("c:register"));
-	public static final PacketCodec<FriendlyByteBuf, CommonRegisterPayload> CODEC = CustomPayload.codecOf(CommonRegisterPayload::write, CommonRegisterPayload::new);
+public record CommonRegisterPayload(int version, String phase, Set<ResourceLocation> channels) implements CustomPacketPayload {
+	public static final CustomPacketPayload.Id<CommonRegisterPayload> ID = new Id<>(ResourceLocation.of("c:register"));
+	public static final PacketCodec<FriendlyByteBuf, CommonRegisterPayload> CODEC = CustomPacketPayload.codecOf(CommonRegisterPayload::write, CommonRegisterPayload::new);
 
 	public static final String PLAY_PHASE = "play";
 	public static final String CONFIGURATION_PHASE = "configuration";

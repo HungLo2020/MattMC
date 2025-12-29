@@ -34,7 +34,7 @@ import net.minecraft.client.gui.screens.ingame.CreativeInventoryScreen;
 import net.minecraft.client.gui.screens.ingame.CreativeInventoryScreen.CreativeScreenHandler;
 import net.minecraft.client.gui.screens.ingame.AbstractContainerScreen;
 import net.minecraft.client.input.KeyInput;
-import net.minecraft.world.entity.player.PlayerInventory;
+import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.item.ItemGroup;
 import net.minecraft.world.item.ItemGroups;
 import net.minecraft.network.chat.Component;
@@ -45,7 +45,7 @@ import net.fabricmc.fabric.impl.itemgroup.FabricItemGroupImpl;
 
 @Mixin(CreativeInventoryScreen.class)
 public abstract class CreativeInventoryScreenMixin extends AbstractContainerScreen<CreativeScreenHandler> implements FabricCreativeInventoryScreen {
-	public CreativeInventoryScreenMixin(CreativeScreenHandler screenHandler, PlayerInventory playerInventory, Component text) {
+	public CreativeInventoryScreenMixin(CreativeScreenHandler screenHandler, Inventory playerInventory, Component text) {
 		super(screenHandler, playerInventory, text);
 	}
 

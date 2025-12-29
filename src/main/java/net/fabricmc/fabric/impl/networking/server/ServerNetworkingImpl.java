@@ -21,7 +21,7 @@ import java.util.Objects;
 import net.minecraft.network.NetworkPhase;
 import net.minecraft.network.NetworkSide;
 import net.minecraft.network.listener.ClientCommonPacketListener;
-import net.minecraft.network.protocol.CustomPayload;
+import net.minecraft.network.protocol.CustomPacketPayload;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.s2c.common.CustomPayloadS2CPacket;
 import net.minecraft.server.network.ServerConfigurationNetworkHandler;
@@ -52,9 +52,9 @@ public final class ServerNetworkingImpl {
 		return (ServerConfigurationNetworkAddon) ((NetworkHandlerExtensions) handler).getAddon();
 	}
 
-	public static Packet<ClientCommonPacketListener> createS2CPacket(CustomPayload payload) {
+	public static Packet<ClientCommonPacketListener> createS2CPacket(CustomPacketPayload payload) {
 		Objects.requireNonNull(payload, "Payload cannot be null");
-		Objects.requireNonNull(payload.getId(), "CustomPayload#getId() cannot return null for payload class: " + payload.getClass());
+		Objects.requireNonNull(payload.getId(), "CustomPacketPayload#getId() cannot return null for payload class: " + payload.getClass());
 
 		return new CustomPayloadS2CPacket(payload);
 	}

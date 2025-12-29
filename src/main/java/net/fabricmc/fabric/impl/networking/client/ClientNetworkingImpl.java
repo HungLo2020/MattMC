@@ -29,7 +29,7 @@ import net.minecraft.network.ClientConnection;
 import net.minecraft.network.NetworkPhase;
 import net.minecraft.network.NetworkSide;
 import net.minecraft.network.listener.ServerCommonPacketListener;
-import net.minecraft.network.protocol.CustomPayload;
+import net.minecraft.network.protocol.CustomPacketPayload;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.c2s.common.CustomPayloadC2SPacket;
 
@@ -69,9 +69,9 @@ public final class ClientNetworkingImpl {
 		return (ClientLoginNetworkAddon) ((NetworkHandlerExtensions) handler).getAddon();
 	}
 
-	public static Packet<ServerCommonPacketListener> createC2SPacket(CustomPayload payload) {
+	public static Packet<ServerCommonPacketListener> createC2SPacket(CustomPacketPayload payload) {
 		Objects.requireNonNull(payload, "Payload cannot be null");
-		Objects.requireNonNull(payload.getId(), "CustomPayload#getId() cannot return null for payload class: " + payload.getClass());
+		Objects.requireNonNull(payload.getId(), "CustomPacketPayload#getId() cannot return null for payload class: " + payload.getClass());
 
 		return new CustomPayloadC2SPacket(payload);
 	}

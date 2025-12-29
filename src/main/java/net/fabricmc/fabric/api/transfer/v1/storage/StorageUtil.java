@@ -22,7 +22,7 @@ import java.util.function.Predicate;
 
 import org.jetbrains.annotations.Nullable;
 
-import net.minecraft.world.item.inventory.Inventory;
+import net.minecraft.world.item.inventory.Container;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.util.crash.CrashException;
 import net.minecraft.util.crash.CrashReport;
@@ -384,7 +384,7 @@ public final class StorageUtil {
 	}
 
 	/**
-	 * Compute the comparator output for a storage, similar to {@link AbstractContainerMenu#calculateComparatorOutput(Inventory)}.
+	 * Compute the comparator output for a storage, similar to {@link AbstractContainerMenu#calculateComparatorOutput(Container)}.
 	 *
 	 * @param storage The storage for which the comparator level should be computed.
 	 * @param <T> The type of the stored resources.

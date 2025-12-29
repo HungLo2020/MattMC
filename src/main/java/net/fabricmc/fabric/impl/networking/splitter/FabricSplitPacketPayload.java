@@ -19,10 +19,10 @@ package net.fabricmc.fabric.impl.networking.splitter;
 import io.netty.buffer.ByteBuf;
 
 import net.minecraft.network.codec.PacketCodec;
-import net.minecraft.network.protocol.CustomPayload;
+import net.minecraft.network.protocol.CustomPacketPayload;
 import net.minecraft.server.packss.ResourceLocation;
 
-public record FabricSplitPacketPayload(ByteBuf byteBuf) implements CustomPayload {
+public record FabricSplitPacketPayload(ByteBuf byteBuf) implements CustomPacketPayload {
 	public static final Id<FabricSplitPacketPayload> ID = new Id<>(ResourceLocation.of("fabric", "split"));
 	public static final PacketCodec<ByteBuf, FabricSplitPacketPayload> CODEC = PacketCodec.ofStatic(FabricSplitPacketPayload::write, FabricSplitPacketPayload::read);
 
@@ -35,7 +35,7 @@ public record FabricSplitPacketPayload(ByteBuf byteBuf) implements CustomPayload
 	}
 
 	@Override
-	public Id<? extends CustomPayload> getId() {
+	public Id<? extends CustomPacketPayload> getId() {
 		return ID;
 	}
 }

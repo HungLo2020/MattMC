@@ -18,11 +18,11 @@ package net.fabricmc.fabric.api.screenhandler.v1;
 
 import java.util.Objects;
 
-import net.minecraft.world.entity.player.PlayerInventory;
+import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.network.RegistryByteBuf;
 import net.minecraft.network.codec.PacketCodec;
 import net.minecraft.world.flag.FeatureFlags;
-import net.minecraft.world.inventory.NamedScreenHandlerFactory;
+import net.minecraft.world.inventory.MenuProvider;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.ScreenHandlerType;
 
@@ -31,7 +31,7 @@ import net.minecraft.world.inventory.ScreenHandlerType;
  * synchronizes additional data to the client when it is opened.
  *
  * <p>Extended screen handlers can be opened using
- * {@link net.minecraft.world.entity.player.Player#openHandledScreen(NamedScreenHandlerFactory)
+ * {@link net.minecraft.world.entity.player.Player#openHandledScreen(MenuProvider)
  * Player.openHandledScreen} with an
  * {@link ExtendedScreenHandlerFactory}.
  *
@@ -79,7 +79,7 @@ public class ExtendedScreenHandlerType<T extends AbstractContainerMenu, D> exten
 	/**
 	 * Constructs an extended screen handler type.
 	 *
-	 * @param factory the screen handler factory used for {@link #create(int, PlayerInventory, Object)}
+	 * @param factory the screen handler factory used for {@link #create(int, Inventory, Object)}
 	 */
 	public ExtendedScreenHandlerType(ExtendedFactory<T, D> factory, PacketCodec<? super RegistryByteBuf, D> packetCodec) {
 		super(null, FeatureFlags.VANILLA_FEATURES);
@@ -88,13 +88,13 @@ public class ExtendedScreenHandlerType<T extends AbstractContainerMenu, D> exten
 	}
 
 	/**
-	 * @throws UnsupportedOperationException always; use {@link #create(int, PlayerInventory, Object)}
-	 * @deprecated Use {@link #create(int, PlayerInventory, Object)} instead.
+	 * @throws UnsupportedOperationException always; use {@link #create(int, Inventory, Object)}
+	 * @deprecated Use {@link #create(int, Inventory, Object)} instead.
 	 */
 	@Deprecated
 	@Override
-	public final T create(int syncId, PlayerInventory inventory) {
-		throw new UnsupportedOperationException("Use ExtendedScreenHandlerType.create(int, PlayerInventory, FriendlyByteBuf)!");
+	public final T create(int syncId, Inventory inventory) {
+		throw new UnsupportedOperationException("Use ExtendedScreenHandlerType.create(int, Inventory, FriendlyByteBuf)!");
 	}
 
 	/**
@@ -105,7 +105,7 @@ public class ExtendedScreenHandlerType<T extends AbstractContainerMenu, D> exten
 	 * @param data      the synced opening data
 	 * @return the created screen handler
 	 */
-	public T create(int syncId, PlayerInventory inventory, D data) {
+	public T create(int syncId, Inventory inventory, D data) {
 		return factory.create(syncId, inventory, data);
 	}
 
@@ -124,7 +124,7 @@ public class ExtendedScreenHandlerType<T extends AbstractContainerMenu, D> exten
 	 *
 	 * @param <T> the type of screen handlers created
 	 * @param <D> the type of the data
-	 * @see #create(int, PlayerInventory, Object)
+	 * @see #create(int, Inventory, Object)
 	 */
 	@FunctionalInterface
 	public interface ExtendedFactory<T extends AbstractContainerMenu, D> {
@@ -136,6 +136,6 @@ public class ExtendedScreenHandlerType<T extends AbstractContainerMenu, D> exten
 		 * @param data      the synced data
 		 * @return the created screen handler
 		 */
-		T create(int syncId, PlayerInventory inventory, D data);
+		T create(int syncId, Inventory inventory, D data);
 	}
 }

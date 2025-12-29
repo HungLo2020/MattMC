@@ -21,7 +21,7 @@ import java.util.Map;
 
 import net.minecraft.client.particle.ParticleFactory;
 import net.minecraft.client.particle.ParticleSpriteManager;
-import net.minecraft.core.particles.ParticleEffect;
+import net.minecraft.core.particles.ParticleOptions;
 import net.minecraft.core.particles.ParticleType;
 import net.minecraft.core.Registries;
 
@@ -35,12 +35,12 @@ public final class ParticleFactoryRegistryImpl implements ParticleFactoryRegistr
 		private final Map<ParticleType<?>, PendingParticleFactory<?>> constructors = new IdentityHashMap<>();
 
 		@Override
-		public <T extends ParticleEffect> void register(ParticleType<T> type, ParticleFactory<T> factory) {
+		public <T extends ParticleOptions> void register(ParticleType<T> type, ParticleFactory<T> factory) {
 			factories.put(type, factory);
 		}
 
 		@Override
-		public <T extends ParticleEffect> void register(ParticleType<T> type, PendingParticleFactory<T> factory) {
+		public <T extends ParticleOptions> void register(ParticleType<T> type, PendingParticleFactory<T> factory) {
 			constructors.put(type, factory);
 		}
 
@@ -62,12 +62,12 @@ public final class ParticleFactoryRegistryImpl implements ParticleFactoryRegistr
 
 	record DirectParticleFactoryRegistry(ParticleSpriteManager particleSpriteManager) implements ParticleFactoryRegistry {
 		@Override
-		public <T extends ParticleEffect> void register(ParticleType<T> type, ParticleFactory<T> factory) {
+		public <T extends ParticleOptions> void register(ParticleType<T> type, ParticleFactory<T> factory) {
 			particleSpriteManager.particleFactories.put(Registries.PARTICLE_TYPE.getRawId(type), factory);
 		}
 
 		@Override
-		public <T extends ParticleEffect> void register(ParticleType<T> type, PendingParticleFactory<T> constructor) {
+		public <T extends ParticleOptions> void register(ParticleType<T> type, PendingParticleFactory<T> constructor) {
 			var delegate = new ParticleSpriteManager.SimpleSpriteProvider();
 			var fabricSpriteProvider = new FabricSpriteProviderImpl(delegate);
 			particleSpriteManager.spriteAwareParticleFactories.put(Registries.PARTICLE_TYPE.getId(type), delegate);
@@ -80,12 +80,12 @@ public final class ParticleFactoryRegistryImpl implements ParticleFactoryRegistr
 	private ParticleFactoryRegistryImpl() { }
 
 	@Override
-	public <T extends ParticleEffect> void register(ParticleType<T> type, ParticleFactory<T> factory) {
+	public <T extends ParticleOptions> void register(ParticleType<T> type, ParticleFactory<T> factory) {
 		internalRegistry.register(type, factory);
 	}
 
 	@Override
-	public <T extends ParticleEffect> void register(ParticleType<T> type, PendingParticleFactory<T> constructor) {
+	public <T extends ParticleOptions> void register(ParticleType<T> type, PendingParticleFactory<T> constructor) {
 		internalRegistry.register(type, constructor);
 	}
 

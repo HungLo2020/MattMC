@@ -22,7 +22,7 @@ import org.spongepowered.asm.mixin.injection.At;
 
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.mob.BreezeEntity;
-import net.minecraft.world.entity.mob.HostileEntity;
+import net.minecraft.world.entity.mob.Monster;
 import net.minecraft.core.particles.BlockStateParticleEffect;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.Level;
@@ -30,8 +30,8 @@ import net.minecraft.world.Level;
 import net.fabricmc.fabric.impl.particle.BlockStateParticleEffectExtension;
 
 @Mixin(BreezeEntity.class)
-abstract class BreezeEntityMixin extends HostileEntity {
-	private BreezeEntityMixin(EntityType<? extends HostileEntity> entityType, Level world) {
+abstract class BreezeEntityMixin extends Monster {
+	private BreezeEntityMixin(EntityType<? extends Monster> entityType, Level world) {
 		super(entityType, world);
 	}
 

@@ -23,12 +23,12 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Redirect;
 
 import net.minecraft.world.item.enchantment.Enchantment;
-import net.minecraft.world.entity.player.PlayerInventory;
+import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.core.entry.RegistryEntry;
 import net.minecraft.world.inventory.AnvilScreenHandler;
 import net.minecraft.world.inventory.ForgingScreenHandler;
-import net.minecraft.world.inventory.ScreenHandlerContext;
+import net.minecraft.world.inventory.ContainerLevelAccess;
 import net.minecraft.world.inventory.ScreenHandlerType;
 import net.minecraft.world.inventory.slot.ForgingSlotsManager;
 
@@ -36,7 +36,7 @@ import net.fabricmc.fabric.api.item.v1.EnchantingContext;
 
 @Mixin(AnvilScreenHandler.class)
 abstract class AnvilScreenHandlerMixin extends ForgingScreenHandler {
-	AnvilScreenHandlerMixin(@Nullable ScreenHandlerType<?> type, int syncId, PlayerInventory playerInventory, ScreenHandlerContext context, ForgingSlotsManager forgingSlotsManager) {
+	AnvilScreenHandlerMixin(@Nullable ScreenHandlerType<?> type, int syncId, Inventory playerInventory, ContainerLevelAccess context, ForgingSlotsManager forgingSlotsManager) {
 		super(type, syncId, playerInventory, context, forgingSlotsManager);
 	}
 

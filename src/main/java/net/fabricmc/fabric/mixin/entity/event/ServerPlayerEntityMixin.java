@@ -34,7 +34,7 @@ import net.minecraft.world.level.block.BlockState;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.damage.DamageSource;
-import net.minecraft.world.entity.mob.HostileEntity;
+import net.minecraft.world.entity.mob.Monster;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.server.network.ServerPlayer;
 import net.minecraft.server.level.ServerLevel;
@@ -109,7 +109,7 @@ abstract class ServerPlayerEntityMixin extends LivingEntityMixin {
 	}
 
 	@Redirect(method = "trySleep", at = @At(value = "INVOKE", target = "Ljava/util/List;isEmpty()Z"))
-	private boolean hasNoMonstersNearby(List<HostileEntity> monsters, BlockPos pos) {
+	private boolean hasNoMonstersNearby(List<Monster> monsters, BlockPos pos) {
 		boolean vanillaResult = monsters.isEmpty();
 		ActionResult result = EntitySleepEvents.ALLOW_NEARBY_MONSTERS.invoker().allowNearbyMonsters((Player) (Object) this, pos, vanillaResult);
 		return result != ActionResult.PASS ? result.isAccepted() : vanillaResult;

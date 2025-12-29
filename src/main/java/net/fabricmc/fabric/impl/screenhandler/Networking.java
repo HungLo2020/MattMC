@@ -26,7 +26,7 @@ import org.slf4j.LoggerFactory;
 
 import net.minecraft.network.RegistryByteBuf;
 import net.minecraft.network.codec.PacketCodec;
-import net.minecraft.network.protocol.CustomPayload;
+import net.minecraft.network.protocol.CustomPacketPayload;
 import net.minecraft.core.Registries;
 import net.minecraft.core.Registry;
 import net.minecraft.world.inventory.AbstractContainerMenu;
@@ -102,9 +102,9 @@ public final class Networking implements ModInitializer {
 		});
 	}
 
-	public record OpenScreenPayload<D>(ResourceLocation identifier, int syncId, Component title, PacketCodec<RegistryByteBuf, D> innerCodec, D data) implements CustomPayload {
-		public static final PacketCodec<RegistryByteBuf, OpenScreenPayload<?>> CODEC = CustomPayload.codecOf(OpenScreenPayload::write, OpenScreenPayload::fromBuf);
-		public static final CustomPayload.Id<OpenScreenPayload<?>> ID = new Id<>(OPEN_ID);
+	public record OpenScreenPayload<D>(ResourceLocation identifier, int syncId, Component title, PacketCodec<RegistryByteBuf, D> innerCodec, D data) implements CustomPacketPayload {
+		public static final PacketCodec<RegistryByteBuf, OpenScreenPayload<?>> CODEC = CustomPacketPayload.codecOf(OpenScreenPayload::write, OpenScreenPayload::fromBuf);
+		public static final CustomPacketPayload.Id<OpenScreenPayload<?>> ID = new Id<>(OPEN_ID);
 
 		@SuppressWarnings("unchecked")
 		private static <D> OpenScreenPayload<D> fromBuf(RegistryByteBuf buf) {
@@ -122,7 +122,7 @@ public final class Networking implements ModInitializer {
 		}
 
 		@Override
-		public Id<? extends CustomPayload> getId() {
+		public Id<? extends CustomPacketPayload> getId() {
 			return ID;
 		}
 	}

@@ -26,7 +26,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientCommonNetworkHandler;
 import net.minecraft.network.OffThreadException;
-import net.minecraft.network.protocol.CustomPayload;
+import net.minecraft.network.protocol.CustomPacketPayload;
 import net.minecraft.network.protocol.s2c.common.CustomPayloadS2CPacket;
 
 import net.fabricmc.fabric.impl.networking.NetworkHandlerExtensions;
@@ -41,7 +41,7 @@ public abstract class ClientCommonNetworkHandlerMixin implements NetworkHandlerE
 
 	@Inject(method = "onCustomPayload(Lnet/minecraft/network/packet/s2c/common/CustomPayloadS2CPacket;)V", at = @At("HEAD"), cancellable = true)
 	public void onCustomPayload(CustomPayloadS2CPacket packet, CallbackInfo ci) {
-		final CustomPayload payload = packet.payload();
+		final CustomPacketPayload payload = packet.payload();
 
 		try {
 			boolean handled;

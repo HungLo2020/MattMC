@@ -25,7 +25,7 @@ import org.jetbrains.annotations.Nullable;
 
 import net.minecraft.network.NetworkPhase;
 import net.minecraft.network.protocol.BrandCustomPayload;
-import net.minecraft.network.protocol.CustomPayload;
+import net.minecraft.network.protocol.CustomPacketPayload;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.s2c.common.CommonPingS2CPacket;
 import net.minecraft.server.MinecraftServer;
@@ -62,7 +62,7 @@ public final class ServerConfigurationNetworkAddon extends AbstractChanneledNetw
 	}
 
 	@Override
-	public boolean handle(CustomPayload payload) {
+	public boolean handle(CustomPacketPayload payload) {
 		if (payload instanceof BrandCustomPayload brandCustomPayload) {
 			clientBrand = brandCustomPayload.brand();
 			return false;
@@ -129,7 +129,7 @@ public final class ServerConfigurationNetworkAddon extends AbstractChanneledNetw
 	}
 
 	@Override
-	protected void receive(ServerConfigurationNetworking.ConfigurationPacketHandler<?> handler, CustomPayload payload) {
+	protected void receive(ServerConfigurationNetworking.ConfigurationPacketHandler<?> handler, CustomPacketPayload payload) {
 		((ServerConfigurationNetworking.ConfigurationPacketHandler) handler).receive(payload, this.context);
 	}
 
@@ -141,7 +141,7 @@ public final class ServerConfigurationNetworkAddon extends AbstractChanneledNetw
 	}
 
 	@Override
-	public Packet<?> createPacket(CustomPayload packet) {
+	public Packet<?> createPacket(CustomPacketPayload packet) {
 		return ServerConfigurationNetworking.createS2CPacket(packet);
 	}
 

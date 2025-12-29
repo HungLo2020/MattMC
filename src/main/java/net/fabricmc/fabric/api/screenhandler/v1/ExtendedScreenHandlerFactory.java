@@ -16,16 +16,16 @@
 
 package net.fabricmc.fabric.api.screenhandler.v1;
 
-import net.minecraft.world.inventory.NamedScreenHandlerFactory;
+import net.minecraft.world.inventory.MenuProvider;
 import net.minecraft.server.network.ServerPlayer;
 
 /**
- * An extension of {@code NamedScreenHandlerFactory} that can write additional data to a screen opening packet.
+ * An extension of {@code MenuProvider} that can write additional data to a screen opening packet.
  * This is used for {@linkplain ExtendedScreenHandlerType extended screen handlers}.
  *
  * @see ExtendedScreenHandlerType usage examples
  */
-public interface ExtendedScreenHandlerFactory<D> extends NamedScreenHandlerFactory {
+public interface ExtendedScreenHandlerFactory<D> extends MenuProvider {
 	/**
 	 * Writes additional server -&gt; client screen opening data to the buffer.
 	 *

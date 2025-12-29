@@ -22,7 +22,7 @@ import java.util.Objects;
 
 import net.minecraft.network.ClientConnection;
 import net.minecraft.network.NetworkPhase;
-import net.minecraft.network.protocol.CustomPayload;
+import net.minecraft.network.protocol.CustomPacketPayload;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.network.ServerPlayNetworkHandler;
@@ -74,7 +74,7 @@ public final class ServerPlayNetworkAddon extends AbstractChanneledNetworkAddon<
 	}
 
 	@Override
-	protected void receive(ServerPlayNetworking.PlayPayloadHandler<?> payloadHandler, CustomPayload payload) {
+	protected void receive(ServerPlayNetworking.PlayPayloadHandler<?> payloadHandler, CustomPacketPayload payload) {
 		((ServerPlayNetworking.PlayPayloadHandler) payloadHandler).receive(payload, ServerPlayNetworkAddon.this.context);
 	}
 
@@ -86,7 +86,7 @@ public final class ServerPlayNetworkAddon extends AbstractChanneledNetworkAddon<
 	}
 
 	@Override
-	public Packet<?> createPacket(CustomPayload packet) {
+	public Packet<?> createPacket(CustomPacketPayload packet) {
 		return ServerPlayNetworking.createS2CPacket(packet);
 	}
 

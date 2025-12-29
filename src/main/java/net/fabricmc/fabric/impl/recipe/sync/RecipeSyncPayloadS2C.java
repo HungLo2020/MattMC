@@ -23,7 +23,7 @@ import net.minecraft.network.RegistryByteBuf;
 import net.minecraft.network.codec.PacketCodec;
 import net.minecraft.network.codec.PacketCodecs;
 import net.minecraft.network.handler.PacketDecoderException;
-import net.minecraft.network.protocol.CustomPayload;
+import net.minecraft.network.protocol.CustomPacketPayload;
 import net.minecraft.world.item.crafting.Recipe;
 import net.minecraft.world.item.crafting.RecipeEntry;
 import net.minecraft.world.item.crafting.RecipeSerializer;
@@ -35,13 +35,13 @@ import net.minecraft.server.packss.ResourceLocation;
 /**
  * Main packet used to send recipes to the client.
  */
-public record RecipeSyncPayloadS2C(List<Entry> entries) implements CustomPayload {
+public record RecipeSyncPayloadS2C(List<Entry> entries) implements CustomPacketPayload {
 	public static final PacketCodec<RegistryByteBuf, RecipeSyncPayloadS2C> CODEC = Entry.CODEC.collect(PacketCodecs.toList()).xmap(RecipeSyncPayloadS2C::new, RecipeSyncPayloadS2C::entries);
 
 	public static final Id<RecipeSyncPayloadS2C> ID = new Id<>(ResourceLocation.of("fabric", "recipe_sync"));
 
 	@Override
-	public Id<? extends CustomPayload> getId() {
+	public Id<? extends CustomPacketPayload> getId() {
 		return ID;
 	}
 

@@ -31,7 +31,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.core.Registries;
-import net.minecraft.world.inventory.NamedScreenHandlerFactory;
+import net.minecraft.world.inventory.MenuProvider;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.SimpleNamedScreenHandlerFactory;
 import net.minecraft.server.network.ServerPlayNetworkHandler;
@@ -55,8 +55,8 @@ public abstract class ServerPlayerEntityMixin extends Player {
 	@Shadow
 	public abstract void closeHandledScreen();
 
-	@Redirect(method = "openHandledScreen(Lnet/minecraft/screen/NamedScreenHandlerFactory;)Ljava/util/OptionalInt;", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/network/ServerPlayer;closeHandledScreen()V"))
-	private void fabric_closeHandledScreenIfAllowed(ServerPlayer player, NamedScreenHandlerFactory factory) {
+	@Redirect(method = "openHandledScreen(Lnet/minecraft/screen/MenuProvider;)Ljava/util/OptionalInt;", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/network/ServerPlayer;closeHandledScreen()V"))
+	private void fabric_closeHandledScreenIfAllowed(ServerPlayer player, MenuProvider factory) {
 		if (factory.shouldCloseCurrentScreen()) {
 			this.closeHandledScreen();
 		} else {
@@ -65,8 +65,8 @@ public abstract class ServerPlayerEntityMixin extends Player {
 		}
 	}
 
-	@Inject(method = "openHandledScreen(Lnet/minecraft/screen/NamedScreenHandlerFactory;)Ljava/util/OptionalInt;", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/network/ServerPlayNetworkHandler;sendPacket(Lnet/minecraft/network/packet/Packet;)V"))
-	private void fabric_storeOpenedScreenHandler(NamedScreenHandlerFactory factory, CallbackInfoReturnable<OptionalInt> info, @Local AbstractContainerMenu handler) {
+	@Inject(method = "openHandledScreen(Lnet/minecraft/screen/MenuProvider;)Ljava/util/OptionalInt;", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/network/ServerPlayNetworkHandler;sendPacket(Lnet/minecraft/network/packet/Packet;)V"))
+	private void fabric_storeOpenedScreenHandler(MenuProvider factory, CallbackInfoReturnable<OptionalInt> info, @Local AbstractContainerMenu handler) {
 		if (factory instanceof ExtendedScreenHandlerFactory || (factory instanceof SimpleNamedScreenHandlerFactory simpleFactory && simpleFactory.baseFactory instanceof ExtendedScreenHandlerFactory)) {
 			// Set the screen handler, so the factory method can access it through the player.
 			currentScreenHandler = handler;
@@ -76,8 +76,8 @@ public abstract class ServerPlayerEntityMixin extends Player {
 		}
 	}
 
-	@Redirect(method = "openHandledScreen(Lnet/minecraft/screen/NamedScreenHandlerFactory;)Ljava/util/OptionalInt;", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/network/ServerPlayNetworkHandler;sendPacket(Lnet/minecraft/network/packet/Packet;)V"))
-	private void fabric_replaceVanillaScreenPacket(ServerPlayNetworkHandler networkHandler, Packet<?> packet, NamedScreenHandlerFactory factory) {
+	@Redirect(method = "openHandledScreen(Lnet/minecraft/screen/MenuProvider;)Ljava/util/OptionalInt;", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/network/ServerPlayNetworkHandler;sendPacket(Lnet/minecraft/network/packet/Packet;)V"))
+	private void fabric_replaceVanillaScreenPacket(ServerPlayNetworkHandler networkHandler, Packet<?> packet, MenuProvider factory) {
 		if (factory instanceof SimpleNamedScreenHandlerFactory simpleFactory && simpleFactory.baseFactory instanceof ExtendedScreenHandlerFactory<?> extendedFactory) {
 			factory = extendedFactory;
 		}

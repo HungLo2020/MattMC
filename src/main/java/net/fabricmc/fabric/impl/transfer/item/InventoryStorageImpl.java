@@ -24,8 +24,8 @@ import java.util.Map;
 import com.google.common.collect.MapMaker;
 import org.jetbrains.annotations.Nullable;
 
-import net.minecraft.world.entity.player.PlayerInventory;
-import net.minecraft.world.item.inventory.Inventory;
+import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.world.item.inventory.Container;
 import net.minecraft.world.item.inventory.SidedInventory;
 import net.minecraft.core.Direction;
 
@@ -38,24 +38,24 @@ import net.fabricmc.fabric.impl.transfer.DebugMessages;
 
 /**
  * Implementation of {@link InventoryStorage}.
- * Note on thread-safety: we assume that Inventory's are inherently single-threaded, and no attempt is made at synchronization.
+ * Note on thread-safety: we assume that Container's are inherently single-threaded, and no attempt is made at synchronization.
  * However, the access to implementations can happen on multiple threads concurrently, which is why we use a thread-safe wrapper map.
  */
 public class InventoryStorageImpl extends CombinedStorage<ItemVariant, SingleSlotStorage<ItemVariant>> implements InventoryStorage {
 	/**
 	 * Global wrapper concurrent map.
 	 *
-	 * <p>A note on GC: weak keys alone are not suitable as the InventoryStorage slots strongly reference the Inventory keys.
+	 * <p>A note on GC: weak keys alone are not suitable as the InventoryStorage slots strongly reference the Container keys.
 	 * Weak values are suitable, but we have to ensure that the InventoryStorageImpl remains strongly reachable as long as
 	 * one of the slot wrappers refers to it, hence the {@code strongRef} field in {@link InventorySlotWrapper}.
 	 */
 	// TODO: look into promoting the weak reference to a soft reference if building the wrappers becomes a performance bottleneck.
 	// TODO: should have identity semantics?
-	private static final Map<Inventory, InventoryStorageImpl> WRAPPERS = new MapMaker().weakValues().makeMap();
+	private static final Map<Container, InventoryStorageImpl> WRAPPERS = new MapMaker().weakValues().makeMap();
 
-	public static InventoryStorage of(Inventory inventory, @Nullable Direction direction) {
+	public static InventoryStorage of(Container inventory, @Nullable Direction direction) {
 		InventoryStorageImpl storage = WRAPPERS.computeIfAbsent(inventory, inv -> {
-			if (inv instanceof PlayerInventory playerInventory) {
+			if (inv instanceof Inventory playerInventory) {
 				return new PlayerInventoryStorageImpl(playerInventory);
 			} else {
 				return new InventoryStorageImpl(inv);
@@ -65,7 +65,7 @@ public class InventoryStorageImpl extends CombinedStorage<ItemVariant, SingleSlo
 		return storage.getSidedWrapper(direction);
 	}
 
-	final Inventory inventory;
+	final Container inventory;
 	/**
 	 * This {@code backingList} is the real list of wrappers.
 	 * The {@code parts} in the superclass is the public-facing unmodifiable sublist with exactly the right amount of slots.
@@ -76,7 +76,7 @@ public class InventoryStorageImpl extends CombinedStorage<ItemVariant, SingleSlo
 	 */
 	final MarkDirtyParticipant markDirtyParticipant = new MarkDirtyParticipant();
 
-	InventoryStorageImpl(Inventory inventory) {
+	InventoryStorageImpl(Container inventory) {
 		super(Collections.emptyList());
 		this.inventory = inventory;
 		this.backingList = new ArrayList<>();

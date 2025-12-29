@@ -31,7 +31,7 @@ import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.RegistryByteBuf;
 import net.minecraft.network.codec.PacketCodec;
 import net.minecraft.network.handler.EncoderHandler;
-import net.minecraft.network.protocol.CustomPayload;
+import net.minecraft.network.protocol.CustomPacketPayload;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.s2c.common.CustomPayloadS2CPacket;
 
@@ -45,18 +45,18 @@ import net.fabricmc.fabric.impl.networking.splitter.SplittablePacket;
 public class CustomPayloadS2CPacketMixin implements SplittablePacket, GenericPayloadAccessor {
 	@Shadow
 	@Final
-	private CustomPayload payload;
+	private CustomPacketPayload payload;
 
 	@WrapOperation(
 			method = "<clinit>",
 			at = @At(
 					value = "INVOKE",
-					target = "Lnet/minecraft/network/packet/CustomPayload;createCodec(Lnet/minecraft/network/packet/CustomPayload$CodecFactory;Ljava/util/List;)Lnet/minecraft/network/codec/PacketCodec;",
+					target = "Lnet/minecraft/network/packet/CustomPacketPayload;createCodec(Lnet/minecraft/network/packet/CustomPacketPayload$CodecFactory;Ljava/util/List;)Lnet/minecraft/network/codec/PacketCodec;",
 					ordinal = 0
 			)
 	)
-	private static PacketCodec<RegistryByteBuf, CustomPayload> wrapPlayCodec(CustomPayload.CodecFactory<RegistryByteBuf> unknownCodecFactory, List<CustomPayload.Type<RegistryByteBuf, ?>> types, Operation<PacketCodec<RegistryByteBuf, CustomPayload>> original) {
-		PacketCodec<RegistryByteBuf, CustomPayload> codec = original.call(unknownCodecFactory, types);
+	private static PacketCodec<RegistryByteBuf, CustomPacketPayload> wrapPlayCodec(CustomPacketPayload.CodecFactory<RegistryByteBuf> unknownCodecFactory, List<CustomPacketPayload.Type<RegistryByteBuf, ?>> types, Operation<PacketCodec<RegistryByteBuf, CustomPacketPayload>> original) {
+		PacketCodec<RegistryByteBuf, CustomPacketPayload> codec = original.call(unknownCodecFactory, types);
 		FabricCustomPayloadPacketCodec<RegistryByteBuf> fabricCodec = (FabricCustomPayloadPacketCodec<RegistryByteBuf>) codec;
 		fabricCodec.fabric_setPacketCodecProvider((packetByteBuf, identifier) -> PayloadTypeRegistryImpl.PLAY_S2C.get(identifier));
 		return codec;
@@ -66,12 +66,12 @@ public class CustomPayloadS2CPacketMixin implements SplittablePacket, GenericPay
 			method = "<clinit>",
 			at = @At(
 					value = "INVOKE",
-					target = "Lnet/minecraft/network/packet/CustomPayload;createCodec(Lnet/minecraft/network/packet/CustomPayload$CodecFactory;Ljava/util/List;)Lnet/minecraft/network/codec/PacketCodec;",
+					target = "Lnet/minecraft/network/packet/CustomPacketPayload;createCodec(Lnet/minecraft/network/packet/CustomPacketPayload$CodecFactory;Ljava/util/List;)Lnet/minecraft/network/codec/PacketCodec;",
 					ordinal = 1
 			)
 	)
-	private static PacketCodec<FriendlyByteBuf, CustomPayload> wrapConfigCodec(CustomPayload.CodecFactory<FriendlyByteBuf> unknownCodecFactory, List<CustomPayload.Type<FriendlyByteBuf, ?>> types, Operation<PacketCodec<FriendlyByteBuf, CustomPayload>> original) {
-		PacketCodec<FriendlyByteBuf, CustomPayload> codec = original.call(unknownCodecFactory, types);
+	private static PacketCodec<FriendlyByteBuf, CustomPacketPayload> wrapConfigCodec(CustomPacketPayload.CodecFactory<FriendlyByteBuf> unknownCodecFactory, List<CustomPacketPayload.Type<FriendlyByteBuf, ?>> types, Operation<PacketCodec<FriendlyByteBuf, CustomPacketPayload>> original) {
+		PacketCodec<FriendlyByteBuf, CustomPacketPayload> codec = original.call(unknownCodecFactory, types);
 		FabricCustomPayloadPacketCodec<FriendlyByteBuf> fabricCodec = (FabricCustomPayloadPacketCodec<FriendlyByteBuf>) codec;
 		fabricCodec.fabric_setPacketCodecProvider((packetByteBuf, identifier) -> PayloadTypeRegistryImpl.CONFIGURATION_S2C.get(identifier));
 		return codec;
@@ -90,7 +90,7 @@ public class CustomPayloadS2CPacketMixin implements SplittablePacket, GenericPay
 	}
 
 	@Override
-	public CustomPayload fabric_payload() {
+	public CustomPacketPayload fabric_payload() {
 		return this.payload;
 	}
 }

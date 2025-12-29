@@ -61,7 +61,7 @@
  * <p>The lookup already provides compatibility with vanilla inventories, however it may sometimes be interesting to use
  * {@link net.fabricmc.fabric.api.transfer.v1.item.InventoryStorage InventoryStorage} or
  * {@link net.fabricmc.fabric.api.transfer.v1.item.PlayerInventoryStorage PlayerInventoryStorage} when interaction with
- * {@code Inventory}-based APIs is required.
+ * {@code Container}-based APIs is required.
  *
  * <h2>{@code ContainerItemContext}</h2>
  * {@link net.fabricmc.fabric.api.transfer.v1.context.ContainerItemContext ContainerItemContext} is a context designed for {@code ItemApiLookup} queries

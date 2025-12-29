@@ -22,19 +22,19 @@ import java.util.Set;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.PacketCodec;
 import net.minecraft.network.codec.PacketCodecs;
-import net.minecraft.network.protocol.CustomPayload;
+import net.minecraft.network.protocol.CustomPacketPayload;
 import net.minecraft.server.packss.ResourceLocation;
 
-public record CustomIngredientPayloadC2S(int protocolVersion, Set<ResourceLocation> registeredSerializers) implements CustomPayload {
+public record CustomIngredientPayloadC2S(int protocolVersion, Set<ResourceLocation> registeredSerializers) implements CustomPacketPayload {
 	public static final PacketCodec<FriendlyByteBuf, CustomIngredientPayloadC2S> CODEC = PacketCodec.tuple(
 			PacketCodecs.VAR_INT, CustomIngredientPayloadC2S::protocolVersion,
 			PacketCodecs.collection(HashSet::new, ResourceLocation.PACKET_CODEC), CustomIngredientPayloadC2S::registeredSerializers,
 			CustomIngredientPayloadC2S::new
 	);
-	public static final CustomPayload.Id<CustomIngredientPayloadC2S> ID = new Id<>(CustomIngredientSync.PACKET_ID);
+	public static final CustomPacketPayload.Id<CustomIngredientPayloadC2S> ID = new Id<>(CustomIngredientSync.PACKET_ID);
 
 	@Override
-	public Id<? extends CustomPayload> getId() {
+	public Id<? extends CustomPacketPayload> getId() {
 		return ID;
 	}
 }
