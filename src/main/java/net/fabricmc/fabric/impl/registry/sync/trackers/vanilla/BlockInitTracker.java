@@ -18,7 +18,7 @@ package net.fabricmc.fabric.impl.registry.sync.trackers.vanilla;
 
 import java.util.List;
 
-import net.minecraft.world.level.block.BlockState;
+import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.core.Registries;
 import net.minecraft.core.MathHelper;
 

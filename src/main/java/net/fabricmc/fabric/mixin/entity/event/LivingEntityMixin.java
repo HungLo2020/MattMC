@@ -33,7 +33,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import net.minecraft.world.level.block.BedBlock;
-import net.minecraft.world.level.block.BlockState;
+import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
@@ -46,7 +46,7 @@ import net.minecraft.core.Direction;
 import net.minecraft.core.Vec3;
 import net.minecraft.world.BlockView;
 import net.minecraft.world.CollisionView;
-import net.minecraft.world.Level;
+import net.minecraft.world.level.Level;
 
 import net.fabricmc.fabric.api.entity.event.v1.EntitySleepEvents;
 import net.fabricmc.fabric.api.entity.event.v1.ServerEntityCombatEvents;

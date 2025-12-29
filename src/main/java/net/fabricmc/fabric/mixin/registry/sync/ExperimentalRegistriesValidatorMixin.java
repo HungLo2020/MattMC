@@ -30,7 +30,7 @@ import net.fabricmc.fabric.api.event.registry.DynamicRegistries;
 @Mixin(ExperimentalRegistriesValidator.class)
 class ExperimentalRegistriesValidatorMixin {
 	@Redirect(at = @At(value = "FIELD", target = "Lnet/minecraft/registry/RegistryDataLoader;DYNAMIC_REGISTRIES:Ljava/util/List;"), method = "method_54839")
-	private static List<RegistryDataLoader.Entry<?>> getDynamicRegistries() {
+	private static List<RegistryDataLoader.RegistryData<?>> getDynamicRegistries() {
 		// Register cloners for all dynamic registries.
 		return DynamicRegistries.getDynamicRegistries();
 	}

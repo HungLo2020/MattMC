@@ -23,7 +23,7 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.item.inventory.Container;
 import net.minecraft.core.BlockPos;
-import net.minecraft.world.Level;
+import net.minecraft.world.level.Level;
 
 public final class DebugMessages {
 	public static String forGlobalPos(@Nullable Level world, BlockPos pos) {

@@ -29,7 +29,7 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.util.DefaultedList;
 import net.minecraft.core.BlockPos;
-import net.minecraft.world.Level;
+import net.minecraft.world.level.Level;
 
 @Mixin(BrewingStandBlockEntity.class)
 public class BrewingStandBlockEntityMixin {

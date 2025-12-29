@@ -42,7 +42,7 @@ public abstract class PlayerManagerMixin {
 	private MinecraftServer server;
 
 	@Inject(method = "broadcast(Lnet/minecraft/network/message/PlayerChatMessage;Lnet/minecraft/server/network/ServerPlayer;Lnet/minecraft/network/message/ChatType$LootContextParams;)V", at = @At("HEAD"), cancellable = true)
-	private void onSendChatMessage(PlayerChatMessage message, ServerPlayer sender, ChatType.LootContextParams params, CallbackInfo ci) {
+	private void onSendChatMessage(PlayerChatMessage message, ServerPlayer sender, ChatType.Bound params, CallbackInfo ci) {
 		if (!ServerMessageEvents.ALLOW_CHAT_MESSAGE.invoker().allowChatMessage(message, sender, params)) {
 			ci.cancel();
 			return;
@@ -62,7 +62,7 @@ public abstract class PlayerManagerMixin {
 	}
 
 	@Inject(method = "broadcast(Lnet/minecraft/network/message/PlayerChatMessage;Lnet/minecraft/server/command/CommandSourceStack;Lnet/minecraft/network/message/ChatType$LootContextParams;)V", at = @At("HEAD"), cancellable = true)
-	private void onSendCommandMessage(PlayerChatMessage message, CommandSourceStack source, ChatType.LootContextParams params, CallbackInfo ci) {
+	private void onSendCommandMessage(PlayerChatMessage message, CommandSourceStack source, ChatType.Bound params, CallbackInfo ci) {
 		if (!ServerMessageEvents.ALLOW_COMMAND_MESSAGE.invoker().allowCommandMessage(message, source, params)) {
 			ci.cancel();
 			return;

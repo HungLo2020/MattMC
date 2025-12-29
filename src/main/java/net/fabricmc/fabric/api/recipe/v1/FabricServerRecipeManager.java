@@ -24,7 +24,7 @@ import net.minecraft.world.item.crafting.RecipeEntry;
 import net.minecraft.world.item.crafting.RecipeType;
 import net.minecraft.world.item.crafting.ServerRecipeManager;
 import net.minecraft.world.item.crafting.input.RecipeInput;
-import net.minecraft.world.Level;
+import net.minecraft.world.level.Level;
 
 /**
  * General-purpose Fabric-provided extensions for {@link ServerRecipeManager} class.

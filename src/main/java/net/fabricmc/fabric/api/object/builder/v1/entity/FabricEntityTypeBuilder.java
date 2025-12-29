@@ -36,7 +36,7 @@ import net.minecraft.world.entity.mob.Mob;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.flag.FeatureFlag;
 import net.minecraft.world.Heightmap;
-import net.minecraft.world.Level;
+import net.minecraft.world.level.Level;
 
 /**
  * @deprecated replace with {@link EntityType.Builder}

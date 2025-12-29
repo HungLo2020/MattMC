@@ -162,11 +162,11 @@ public class ResourceManagerHelperImpl implements ResourceManagerHelper {
 	}
 
 	@Override
-	public void registerReloadListener(ResourceLocation identifier, Function<HolderLookup.WrapperLookup, IdentifiableResourceReloadListener> listenerFactory) {
+	public void registerReloadListener(ResourceLocation identifier, Function<HolderLookup.Provider, IdentifiableResourceReloadListener> listenerFactory) {
 		this.resourceLoader.registerReloader(identifier, new ResourceReloader() {
 			@Override
 			public CompletableFuture<Void> reload(Store store, Executor prepareExecutor, Synchronizer reloadSynchronizer, Executor applyExecutor) {
-				HolderLookup.WrapperLookup registries = store.getOrThrow(ResourceLoader.RELOADER_REGISTRY_LOOKUP_KEY);
+				HolderLookup.Provider registries = store.getOrThrow(ResourceLoader.RELOADER_REGISTRY_LOOKUP_KEY);
 				ResourceReloader resourceReloader = listenerFactory.apply(registries);
 
 				return resourceReloader.reload(store, prepareExecutor, reloadSynchronizer, applyExecutor);

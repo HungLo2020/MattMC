@@ -22,12 +22,12 @@ import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.Nullable;
 
 import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.BlockState;
+import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.core.BlockPos;
-import net.minecraft.world.Level;
+import net.minecraft.world.level.Level;
 
 import net.fabricmc.fabric.impl.lookup.block.BlockApiLookupImpl;
 

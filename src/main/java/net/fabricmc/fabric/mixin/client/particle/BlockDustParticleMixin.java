@@ -25,7 +25,7 @@ import org.spongepowered.asm.mixin.injection.ModifyVariable;
 import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.Slice;
 
-import net.minecraft.world.level.block.BlockState;
+import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.client.particle.BillboardParticle;
 import net.minecraft.client.particle.BlockDustParticle;

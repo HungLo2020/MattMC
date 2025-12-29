@@ -31,7 +31,7 @@ import net.fabricmc.fabric.api.event.registry.DynamicRegistries;
 @Mixin(SaveLoading.class)
 abstract class SaveLoadingMixin {
 	@ModifyArg(method = "load", at = @At(value = "INVOKE", target = "Lnet/minecraft/registry/RegistryDataLoader;loadFromResource(Lnet/minecraft/resource/ResourceManager;Ljava/util/List;Ljava/util/List;)Lnet/minecraft/registry/RegistryAccess$Immutable;", ordinal = 0), index = 2, allow = 1)
-	private static List<RegistryDataLoader.Entry<?>> modifyLoadedEntries(List<RegistryDataLoader.Entry<?>> entries) {
+	private static List<RegistryDataLoader.RegistryData<?>> modifyLoadedEntries(List<RegistryDataLoader.RegistryData<?>> entries) {
 		return DynamicRegistries.getDynamicRegistries();
 	}
 }

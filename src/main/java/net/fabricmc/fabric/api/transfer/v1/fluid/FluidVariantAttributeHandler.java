@@ -29,7 +29,7 @@ import net.minecraft.core.Registries;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.Util;
-import net.minecraft.world.Level;
+import net.minecraft.world.level.Level;
 
 /**
  * Defines the common attributes of {@linkplain FluidVariant fluid variants} of a given Fluid.

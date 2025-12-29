@@ -55,7 +55,7 @@ public final class LootUtil {
 	}
 
 	public static Holder<LootTable> getEntryOrDirect(ServerLevel world, LootTable table) {
-		HolderLookup.WrapperLookup wrapperLookup = world
+		HolderLookup.Provider wrapperLookup = world
 				.getServer()
 				.getReloadableRegistries()
 				.createRegistryLookup();

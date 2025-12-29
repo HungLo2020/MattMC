@@ -147,10 +147,10 @@ public final class ServerMessageEvents {
 		 *
 		 * @param message the broadcast message with message decorators applied; use {@code message.getContent()} to get the text
 		 * @param sender  the player that sent the message
-		 * @param params the {@link ChatType.LootContextParams}
+		 * @param params the {@link ChatType.Bound}
 		 * @return {@code true} if the message should be broadcast, otherwise {@code false}
 		 */
-		boolean allowChatMessage(PlayerChatMessage message, ServerPlayer sender, ChatType.LootContextParams params);
+		boolean allowChatMessage(PlayerChatMessage message, ServerPlayer sender, ChatType.Bound params);
 	}
 
 	@FunctionalInterface
@@ -183,10 +183,10 @@ public final class ServerMessageEvents {
 		 *
 		 * @param message the broadcast message with message decorators applied if applicable; use {@code message.getContent()} to get the text
 		 * @param source  the command source that sent the message
-		 * @param params the {@link ChatType.LootContextParams}
+		 * @param params the {@link ChatType.Bound}
 		 * @return {@code true} if the message should be broadcast, otherwise {@code false}
 		 */
-		boolean allowCommandMessage(PlayerChatMessage message, CommandSourceStack source, ChatType.LootContextParams params);
+		boolean allowCommandMessage(PlayerChatMessage message, CommandSourceStack source, ChatType.Bound params);
 	}
 
 	@FunctionalInterface
@@ -202,9 +202,9 @@ public final class ServerMessageEvents {
 		 *
 		 * @param message the broadcast message with message decorators applied; use {@code message.getContent()} to get the text
 		 * @param sender  the player that sent the message
-		 * @param params the {@link ChatType.LootContextParams}
+		 * @param params the {@link ChatType.Bound}
 		 */
-		void onChatMessage(PlayerChatMessage message, ServerPlayer sender, ChatType.LootContextParams params);
+		void onChatMessage(PlayerChatMessage message, ServerPlayer sender, ChatType.Bound params);
 	}
 
 	@FunctionalInterface
@@ -234,8 +234,8 @@ public final class ServerMessageEvents {
 		 *
 		 * @param message the broadcast message with message decorators applied if applicable; use {@code message.getContent()} to get the text
 		 * @param source  the command source that sent the message
-		 * @param params the {@link ChatType.LootContextParams}
+		 * @param params the {@link ChatType.Bound}
 		 */
-		void onCommandMessage(PlayerChatMessage message, CommandSourceStack source, ChatType.LootContextParams params);
+		void onCommandMessage(PlayerChatMessage message, CommandSourceStack source, ChatType.Bound params);
 	}
 }

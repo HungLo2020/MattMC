@@ -19,7 +19,7 @@ package net.fabricmc.fabric.api.resource;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 
-import net.minecraft.server.packs.ResourceManager;
+import net.minecraft.server.packs.resources.ResourceManager;
 import net.minecraft.server.packs.SynchronousResourceReloader;
 
 /**

@@ -20,7 +20,7 @@ import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 
-import net.minecraft.world.level.block.BlockState;
+import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.core.particles.BlockStateParticleEffect;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.core.BlockPos;

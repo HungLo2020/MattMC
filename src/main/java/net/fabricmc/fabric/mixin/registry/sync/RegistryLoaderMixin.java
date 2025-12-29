@@ -49,7 +49,7 @@ public class RegistryLoaderMixin {
 	 * invokes this method as well.
 	 */
 	@WrapOperation(method = "loadFromResource(Lnet/minecraft/resource/ResourceManager;Ljava/util/List;Ljava/util/List;)Lnet/minecraft/registry/RegistryAccess$Immutable;", at = @At(value = "INVOKE", target = "Lnet/minecraft/registry/RegistryDataLoader;load(Lnet/minecraft/registry/RegistryDataLoader$RegistryLoadable;Ljava/util/List;Ljava/util/List;)Lnet/minecraft/registry/RegistryAccess$Immutable;"))
-	private static RegistryAccess.Immutable wrapIsServerCall(@Coerce Object registryLoadable, List<HolderLookup.Impl<?>> baseRegistries, List<RegistryDataLoader.Entry<?>> entries, Operation<RegistryAccess.Immutable> original) {
+	private static RegistryAccess.Immutable wrapIsServerCall(@Coerce Object registryLoadable, List<HolderLookup.Impl<?>> baseRegistries, List<RegistryDataLoader.RegistryData<?>> entries, Operation<RegistryAccess.Immutable> original) {
 		try {
 			IS_SERVER.set(true);
 			return original.call(registryLoadable, baseRegistries, entries);
@@ -66,7 +66,7 @@ public class RegistryLoaderMixin {
 					ordinal = 0
 			)
 	)
-	private static void beforeLoad(@Coerce Object registryLoadable, List<HolderLookup.Impl<?>> baseRegistries, List<RegistryDataLoader.Entry<?>> entries, CallbackInfoReturnable<RegistryAccess.Immutable> cir, @Local(ordinal = 2) List<RegistryDataLoader.Loader<?>> registriesList) {
+	private static void beforeLoad(@Coerce Object registryLoadable, List<HolderLookup.Impl<?>> baseRegistries, List<RegistryDataLoader.RegistryData<?>> entries, CallbackInfoReturnable<RegistryAccess.Immutable> cir, @Local(ordinal = 2) List<RegistryDataLoader.Loader<?>> registriesList) {
 		if (!IS_SERVER.get()) return;
 
 		Map<ResourceKey<? extends Registry<?>>, Registry<?>> registries = new IdentityHashMap<>(registriesList.size());

@@ -16,7 +16,7 @@
 
 package net.fabricmc.fabric.api.client.particle.v1;
 
-import net.minecraft.world.level.block.BlockState;
+import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.core.BlockPos;
 

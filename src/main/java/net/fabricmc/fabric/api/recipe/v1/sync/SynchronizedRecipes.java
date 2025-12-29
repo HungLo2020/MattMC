@@ -28,7 +28,7 @@ import net.minecraft.world.item.crafting.RecipeEntry;
 import net.minecraft.world.item.crafting.RecipeType;
 import net.minecraft.world.item.crafting.input.RecipeInput;
 import net.minecraft.resources.ResourceKey;
-import net.minecraft.world.Level;
+import net.minecraft.world.level.Level;
 
 /**
  * This class provides access to synchronized recipes on the client.

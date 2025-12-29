@@ -29,7 +29,7 @@ import net.minecraft.sounds.SoundEvents;
 import net.minecraft.network.chat.Style;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.Formatting;
-import net.minecraft.world.Level;
+import net.minecraft.world.level.Level;
 
 import net.fabricmc.fabric.api.lookup.v1.custom.ApiProviderMap;
 import net.fabricmc.fabric.impl.transfer.TransferApiImpl;

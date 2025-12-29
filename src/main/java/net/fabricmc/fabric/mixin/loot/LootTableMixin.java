@@ -28,7 +28,7 @@ import org.spongepowered.asm.mixin.Unique;
 
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.storage.loot.LootTable;
-import net.minecraft.world.level.storage.loot.parameters.LootContext;
+import net.minecraft.world.level.storage.loot.LootContext;
 import net.minecraft.core.Holder;
 
 import net.fabricmc.fabric.api.loot.v3.LootTableEvents;

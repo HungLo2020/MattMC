@@ -32,9 +32,9 @@ import net.minecraft.world.item.crafting.RecipeEntry;
 import net.minecraft.world.item.crafting.RecipeType;
 import net.minecraft.world.item.crafting.ServerRecipeManager;
 import net.minecraft.world.item.crafting.input.RecipeInput;
-import net.minecraft.server.packs.ResourceManager;
+import net.minecraft.server.packs.resources.ResourceManager;
 import net.minecraft.util.profiler.Profiler;
-import net.minecraft.world.Level;
+import net.minecraft.world.level.Level;
 
 import net.fabricmc.fabric.api.recipe.v1.FabricServerRecipeManager;
 import net.fabricmc.fabric.api.recipe.v1.sync.SynchronizedRecipes;

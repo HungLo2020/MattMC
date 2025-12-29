@@ -45,7 +45,7 @@ import net.minecraft.core.RegistryOps;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.ReloadableRegistries;
 import net.minecraft.core.ServerDynamicRegistryType;
-import net.minecraft.server.packs.ResourceManager;
+import net.minecraft.server.packs.resources.ResourceManager;
 import net.minecraft.resources.ResourceLocation;
 
 import net.fabricmc.fabric.api.loot.v3.FabricLootTableBuilder;
@@ -63,10 +63,10 @@ abstract class ReloadableRegistriesMixin {
 	 * Due to possible cross-thread handling, this uses WeakHashMap instead of ThreadLocal.
 	 */
 	@Unique
-	private static final WeakHashMap<RegistryOps<JsonElement>, HolderLookup.WrapperLookup> WRAPPERS = new WeakHashMap<>();
+	private static final WeakHashMap<RegistryOps<JsonElement>, HolderLookup.Provider> WRAPPERS = new WeakHashMap<>();
 
 	@WrapOperation(method = "reload", at = @At(value = "INVOKE", target = "Lnet/minecraft/registry/HolderLookup$WrapperLookup;getOps(Lcom/mojang/serialization/DynamicOps;)Lnet/minecraft/registry/RegistryOps;"))
-	private static RegistryOps<JsonElement> storeOps(HolderLookup.WrapperLookup registries, DynamicOps<JsonElement> ops, Operation<RegistryOps<JsonElement>> original) {
+	private static RegistryOps<JsonElement> storeOps(HolderLookup.Provider registries, DynamicOps<JsonElement> ops, Operation<RegistryOps<JsonElement>> original) {
 		RegistryOps<JsonElement> created = original.call(registries, ops);
 		WRAPPERS.put(created, registries);
 		return created;
@@ -91,7 +91,7 @@ abstract class ReloadableRegistriesMixin {
 
 		ResourceKey<LootTable> key = ResourceKey.of(Registries.LOOT_TABLE, id);
 		// Populated above.
-		HolderLookup.WrapperLookup registries = WRAPPERS.get(ops);
+		HolderLookup.Provider registries = WRAPPERS.get(ops);
 		// Populated inside JsonDataLoaderMixin
 		LootTableSource source = LootUtil.SOURCES.get().getOrDefault(id, LootTableSource.DATA_PACK);
 		// Invoke the REPLACE event for the current loot table.

@@ -31,7 +31,7 @@ import net.minecraft.world.level.storage.loot.LootDataType;
 import net.minecraft.server.packs.JsonDataLoader;
 import net.minecraft.server.packs.Resource;
 import net.minecraft.server.packs.ResourceFinder;
-import net.minecraft.server.packs.ResourceManager;
+import net.minecraft.server.packs.resources.ResourceManager;
 import net.minecraft.resources.ResourceLocation;
 
 import net.fabricmc.fabric.impl.loot.LootUtil;

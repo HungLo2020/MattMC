@@ -24,7 +24,7 @@ import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.mob.Monster;
 import net.minecraft.world.entity.mob.WardenEntity;
 import net.minecraft.core.particles.BlockStateParticleEffect;
-import net.minecraft.world.Level;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.event.Vibrations;
 
 import net.fabricmc.fabric.impl.particle.BlockStateParticleEffectExtension;

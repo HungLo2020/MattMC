@@ -20,7 +20,7 @@ import net.minecraft.server.level.ChunkHolder;
 import net.minecraft.server.level.FullChunkStatus;
 import net.minecraft.server.level.ServerChunkCache;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.world.level.chunk.ChunkStatus;
+import net.minecraft.world.level.chunk.status.ChunkStatus;
 import net.minecraft.world.level.chunk.LevelChunk;
 
 import net.fabricmc.fabric.api.event.Event;

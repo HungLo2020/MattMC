@@ -39,7 +39,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.core.ChunkPos;
 import net.minecraft.world.HeightLimitView;
 import net.minecraft.world.level.chunk.AbstractChunkHolder;
-import net.minecraft.world.level.chunk.ChunkStatus;
+import net.minecraft.world.level.chunk.status.ChunkStatus;
 import net.minecraft.world.level.chunk.LevelChunk;
 
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerChunkEvents;

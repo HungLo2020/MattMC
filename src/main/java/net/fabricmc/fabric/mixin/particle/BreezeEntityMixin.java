@@ -25,7 +25,7 @@ import net.minecraft.world.entity.mob.BreezeEntity;
 import net.minecraft.world.entity.mob.Monster;
 import net.minecraft.core.particles.BlockStateParticleEffect;
 import net.minecraft.core.BlockPos;
-import net.minecraft.world.Level;
+import net.minecraft.world.level.Level;
 
 import net.fabricmc.fabric.impl.particle.BlockStateParticleEffectExtension;
 

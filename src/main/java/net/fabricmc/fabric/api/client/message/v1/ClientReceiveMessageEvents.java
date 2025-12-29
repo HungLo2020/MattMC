@@ -21,7 +21,7 @@ import java.time.Instant;
 import com.mojang.authlib.GameProfile;
 import org.jetbrains.annotations.Nullable;
 
-import net.minecraft.client.gui.components.ChatHud;
+import net.minecraft.client.gui.components.ChatComponent;
 import net.minecraft.network.chat.ChatType;
 import net.minecraft.network.chat.PlayerChatMessage;
 import net.minecraft.network.chat.Component;
@@ -102,7 +102,7 @@ public final class ClientReceiveMessageEvents {
 	 * Mods can use this to listen to the message.
 	 *
 	 * <p>If mods want to modify the message, they should use {@link #ALLOW_CHAT}
-	 * and manually add the new message to the chat hud using {@link ChatHud#addMessage(Component)}
+	 * and manually add the new message to the chat hud using {@link ChatComponent#addMessage(Component)}
 	 */
 	public static final Event<Chat> CHAT = EventFactory.createArrayBacked(Chat.class, listeners -> (message, signedMessage, sender, params, receptionTimestamp) -> {
 		for (Chat listener : listeners) {
@@ -160,7 +160,7 @@ public final class ClientReceiveMessageEvents {
 		 * @param receptionTimestamp the timestamp when the message was received
 		 * @return {@code true} if the message should be displayed, otherwise {@code false}
 		 */
-		boolean allowReceiveChatMessage(Component message, @Nullable PlayerChatMessage signedMessage, @Nullable GameProfile sender, ChatType.LootContextParams params, Instant receptionTimestamp);
+		boolean allowReceiveChatMessage(Component message, @Nullable PlayerChatMessage signedMessage, @Nullable GameProfile sender, ChatType.Bound params, Instant receptionTimestamp);
 	}
 
 	@FunctionalInterface
@@ -213,7 +213,7 @@ public final class ClientReceiveMessageEvents {
 		 * @param params             the parameters of the message
 		 * @param receptionTimestamp the timestamp when the message was received
 		 */
-		void onReceiveChatMessage(Component message, @Nullable PlayerChatMessage signedMessage, @Nullable GameProfile sender, ChatType.LootContextParams params, Instant receptionTimestamp);
+		void onReceiveChatMessage(Component message, @Nullable PlayerChatMessage signedMessage, @Nullable GameProfile sender, ChatType.Bound params, Instant receptionTimestamp);
 	}
 
 	@FunctionalInterface
@@ -243,7 +243,7 @@ public final class ClientReceiveMessageEvents {
 		 * @param params             the parameters of the message
 		 * @param receptionTimestamp the timestamp when the message was received
 		 */
-		void onReceiveChatMessageCanceled(Component message, @Nullable PlayerChatMessage signedMessage, @Nullable GameProfile sender, ChatType.LootContextParams params, Instant receptionTimestamp);
+		void onReceiveChatMessageCanceled(Component message, @Nullable PlayerChatMessage signedMessage, @Nullable GameProfile sender, ChatType.Bound params, Instant receptionTimestamp);
 	}
 
 	@FunctionalInterface

@@ -28,7 +28,7 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.util.ActionResult;
 import net.minecraft.util.Unit;
 import net.minecraft.core.BlockPos;
-import net.minecraft.world.Level;
+import net.minecraft.world.level.Level;
 
 import net.fabricmc.fabric.api.entity.event.v1.EntitySleepEvents;
 

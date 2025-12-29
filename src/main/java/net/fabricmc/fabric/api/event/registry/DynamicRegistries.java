@@ -85,7 +85,7 @@ public final class DynamicRegistries {
 	 *
 	 * @return an unmodifiable list of all dynamic registries
 	 */
-	public static @Unmodifiable List<RegistryDataLoader.Entry<?>> getDynamicRegistries() {
+	public static @Unmodifiable List<RegistryDataLoader.RegistryData<?>> getDynamicRegistries() {
 		return DynamicRegistriesImpl.getDynamicRegistries();
 	}
 

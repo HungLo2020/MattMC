@@ -18,7 +18,7 @@ package net.fabricmc.fabric.api.entity.event.v1;
 
 import org.jetbrains.annotations.Nullable;
 
-import net.minecraft.world.level.block.BlockState;
+import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.util.ActionResult;

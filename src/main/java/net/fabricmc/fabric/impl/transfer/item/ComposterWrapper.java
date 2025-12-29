@@ -23,14 +23,14 @@ import java.util.Map;
 import com.google.common.collect.MapMaker;
 import org.jetbrains.annotations.Nullable;
 
-import net.minecraft.world.level.block.BlockState;
+import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.ComposterBlock;
 import net.minecraft.world.item.Items;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
-import net.minecraft.world.Level;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.WorldEvents;
 
 import net.fabricmc.fabric.api.transfer.v1.item.ItemVariant;
