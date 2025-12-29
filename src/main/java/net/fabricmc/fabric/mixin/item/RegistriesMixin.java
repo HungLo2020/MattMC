@@ -21,7 +21,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-import net.minecraft.core.Registries;
+import net.minecraft.core.registries.Registries;
 
 import net.fabricmc.fabric.impl.item.DefaultItemComponentImpl;
 

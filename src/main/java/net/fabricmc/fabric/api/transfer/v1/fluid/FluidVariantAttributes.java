@@ -21,7 +21,7 @@ import java.util.Optional;
 import org.jetbrains.annotations.Nullable;
 
 import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.material.FlowableFluid;
+import net.minecraft.world.level.material.FlowingFluid;
 import net.minecraft.world.level.material.Fluid;
 import net.minecraft.world.level.material.Fluids;
 import net.minecraft.sounds.SoundEvent;
@@ -135,7 +135,7 @@ public final class FluidVariantAttributes {
 	 * Return a positive integer, representing the viscosity of this fluid variant.
 	 * Fluids with lower viscosity generally flow faster than fluids with higher viscosity.
 	 *
-	 * <p>More precisely, viscosity should be {@value FluidConstants#VISCOSITY_RATIO} * {@link FlowableFluid#getMaxFlowDistance} for flowable fluids.
+	 * <p>More precisely, viscosity should be {@value FluidConstants#VISCOSITY_RATIO} * {@link FlowingFluid#getMaxFlowDistance} for flowable fluids.
 	 * The reference values are {@value FluidConstants#WATER_VISCOSITY} for water,
 	 * {@value FluidConstants#LAVA_VISCOSITY_NETHER} for lava in ultrawarm dimensions (such as the nether),
 	 * and {@value FluidConstants#LAVA_VISCOSITY} for lava in other dimensions.

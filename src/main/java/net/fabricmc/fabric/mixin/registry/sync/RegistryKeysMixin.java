@@ -23,7 +23,7 @@ import org.spongepowered.asm.mixin.injection.At;
 
 import net.minecraft.core.Registry;
 import net.minecraft.resources.ResourceKey;
-import net.minecraft.core.Registries;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceLocation;
 
 // Vanilla doesn't mark namespaces in the directories of tags and dynamic registry elements at all,

@@ -16,7 +16,7 @@
 
 package net.fabricmc.fabric.impl.transfer.item;
 
-import net.minecraft.world.item.inventory.SidedInventory;
+import net.minecraft.world.entity.player.SidedInventory;
 import net.minecraft.core.Direction;
 
 import net.fabricmc.fabric.api.transfer.v1.item.ItemVariant;

@@ -37,14 +37,14 @@ import org.spongepowered.asm.mixin.injection.ModifyArg;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import net.minecraft.component.ComponentType;
-import net.minecraft.component.DataComponents;
-import net.minecraft.component.type.TooltipDisplayComponent;
+import net.minecraft.core.component.DataComponents;
+import net.minecraft.core.component.TooltipDisplayComponent;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.tooltip.TooltipType;
+import net.minecraft.world.item.TooltipFlag;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.network.chat.Component;
@@ -91,12 +91,12 @@ public abstract class ItemStackMixin implements FabricItemStack {
 		original.call(instance, amount, serverWorld, serverPlayerEntity, consumer);
 	}
 
-	@ModifyArg(method = "appendTooltip", at = @At(value = "INVOKE", target = "Lnet/minecraft/item/ItemStack;appendComponentTooltip(Lnet/minecraft/component/ComponentType;Lnet/minecraft/item/Item$TooltipContext;Lnet/minecraft/component/type/TooltipDisplayComponent;Ljava/util/function/Consumer;Lnet/minecraft/item/tooltip/TooltipType;)V"))
+	@ModifyArg(method = "appendTooltip", at = @At(value = "INVOKE", target = "Lnet/minecraft/item/ItemStack;appendComponentTooltip(Lnet/minecraft/component/ComponentType;Lnet/minecraft/item/Item$TooltipContext;Lnet/minecraft/component/type/TooltipDisplayComponent;Ljava/util/function/Consumer;Lnet/minecraft/item/tooltip/TooltipFlag;)V"))
 	private ComponentType<?> preAppendComponentTooltip(
 			ComponentType<?> componentType,
 			@Local(argsOnly = true) Item.TooltipContext context,
 			@Local(argsOnly = true) TooltipDisplayComponent displayComponent,
-			@Local(argsOnly = true) TooltipType type,
+			@Local(argsOnly = true) TooltipFlag type,
 			@Local(argsOnly = true) Consumer<Component> textConsumer,
 			@Share("index") LocalIntRef index
 	) {
@@ -109,7 +109,7 @@ public abstract class ItemStackMixin implements FabricItemStack {
 			ComponentType<?> componentType,
 			@Local(argsOnly = true) Item.TooltipContext context,
 			@Local(argsOnly = true) TooltipDisplayComponent displayComponent,
-			@Local(argsOnly = true) TooltipType type,
+			@Local(argsOnly = true) TooltipFlag type,
 			@Local(argsOnly = true) Consumer<Component> textConsumer,
 			@Share("index") LocalIntRef index
 	) {
@@ -122,7 +122,7 @@ public abstract class ItemStackMixin implements FabricItemStack {
 			Item.TooltipContext context,
 			TooltipDisplayComponent displayComponent,
 			@Nullable Player player,
-			TooltipType type,
+			TooltipFlag type,
 			Consumer<Component> textConsumer,
 			CallbackInfo ci,
 			@Share("index") LocalIntRef index
@@ -136,7 +136,7 @@ public abstract class ItemStackMixin implements FabricItemStack {
 			Item.TooltipContext context,
 			TooltipDisplayComponent displayComponent,
 			@Nullable Player player,
-			TooltipType type,
+			TooltipFlag type,
 			Consumer<Component> textConsumer,
 			CallbackInfo ci,
 			@Share("index") LocalIntRef index
@@ -144,13 +144,13 @@ public abstract class ItemStackMixin implements FabricItemStack {
 		preAppendTooltip(null, context, displayComponent, textConsumer, type, index);
 	}
 
-	@ModifyExpressionValue(method = "appendTooltip", at = @At(value = "INVOKE", target = "Lnet/minecraft/item/tooltip/TooltipType;isAdvanced()Z"))
+	@ModifyExpressionValue(method = "appendTooltip", at = @At(value = "INVOKE", target = "Lnet/minecraft/item/tooltip/TooltipFlag;isAdvanced()Z"))
 	private boolean postTooltipsNonAdvanced(
 			boolean isAdvanced,
 			Item.TooltipContext context,
 			TooltipDisplayComponent displayComponent,
 			@Nullable Player player,
-			TooltipType type,
+			TooltipFlag type,
 			Consumer<Component> textConsumer,
 			@Share("index") LocalIntRef index
 	) {
@@ -167,7 +167,7 @@ public abstract class ItemStackMixin implements FabricItemStack {
 			Item.TooltipContext context,
 			TooltipDisplayComponent displayComponent,
 			Consumer<Component> textConsumer,
-			TooltipType tooltipType,
+			TooltipFlag tooltipType,
 			LocalIntRef index
 	) {
 		if (!ComponentTooltipAppenderRegistryImpl.hasModdedEntries()) {

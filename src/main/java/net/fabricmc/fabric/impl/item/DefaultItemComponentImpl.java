@@ -21,7 +21,7 @@ import java.util.function.Predicate;
 
 import net.minecraft.core.component.DataComponentMap;
 import net.minecraft.world.item.Item;
-import net.minecraft.core.Registries;
+import net.minecraft.core.registries.Registries;
 
 import net.fabricmc.fabric.api.item.v1.DefaultItemComponentEvents;
 import net.fabricmc.fabric.mixin.item.ItemAccessor;

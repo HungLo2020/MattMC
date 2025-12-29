@@ -25,7 +25,7 @@ import net.minecraft.world.item.BrushItem;
 import net.minecraft.core.particles.BlockStateParticleEffect;
 import net.minecraft.util.Arm;
 import net.minecraft.world.phys.BlockHitResult;
-import net.minecraft.core.Vec3;
+import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.level.Level;
 
 import net.fabricmc.fabric.impl.particle.BlockStateParticleEffectExtension;

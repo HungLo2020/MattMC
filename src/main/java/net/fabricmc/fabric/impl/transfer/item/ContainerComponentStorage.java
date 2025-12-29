@@ -22,8 +22,8 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 import net.minecraft.core.component.DataComponentPatch;
-import net.minecraft.component.DataComponents;
-import net.minecraft.component.type.ContainerComponent;
+import net.minecraft.core.component.DataComponents;
+import net.minecraft.core.component.ContainerComponent;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 

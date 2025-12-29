@@ -26,8 +26,8 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.codec.PacketCodecs;
-import net.minecraft.core.Registries;
-import net.minecraft.core.Registries;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.core.registries.Registries;
 
 import net.fabricmc.fabric.api.transfer.v1.fluid.FluidVariant;
 import net.fabricmc.fabric.api.transfer.v1.item.ItemVariant;

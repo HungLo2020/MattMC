@@ -55,7 +55,7 @@ public interface FluidVariant extends TransferVariant<Fluid> {
 	/**
 	 * Retrieve a FluidVariant with a fluid, and a {@code null} tag.
 	 *
-	 * <p>The flowing and still variations of {@linkplain net.minecraft.world.level.material.FlowableFluid flowable fluids}
+	 * <p>The flowing and still variations of {@linkplain net.minecraft.world.level.material.FlowingFluid flowable fluids}
 	 * are normalized to always refer to the still variant. For example,
 	 * {@code FluidVariant.of(Fluids.FLOWING_WATER).getFluid() == Fluids.WATER}.
 	 */
@@ -66,7 +66,7 @@ public interface FluidVariant extends TransferVariant<Fluid> {
 	/**
 	 * Retrieve a FluidVariant with a fluid, and an optional tag.
 	 *
-	 * <p>The flowing and still variations of {@linkplain net.minecraft.world.level.material.FlowableFluid flowable fluids}
+	 * <p>The flowing and still variations of {@linkplain net.minecraft.world.level.material.FlowingFluid flowable fluids}
 	 * are normalized to always refer to the still fluid. For example,
 	 * {@code FluidVariant.of(Fluids.FLOWING_WATER, DataComponentPatch.EMPTY).getFluid() == Fluids.WATER}.
 	 */

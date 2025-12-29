@@ -22,10 +22,10 @@ import java.util.function.Predicate;
 
 import org.jetbrains.annotations.Nullable;
 
-import net.minecraft.world.item.inventory.Container;
+import net.minecraft.world.Container;
 import net.minecraft.world.inventory.AbstractContainerMenu;
-import net.minecraft.util.crash.CrashException;
-import net.minecraft.util.crash.CrashReport;
+import net.minecraft.CrashException;
+import net.minecraft.CrashReport;
 import net.minecraft.util.Mth;
 
 import net.fabricmc.fabric.api.transfer.v1.storage.base.ResourceAmount;

@@ -26,7 +26,7 @@ import org.jetbrains.annotations.Nullable;
 import net.minecraft.world.item.crafting.Recipe;
 import net.minecraft.world.item.crafting.RecipeHolder;
 import net.minecraft.world.item.crafting.RecipeType;
-import net.minecraft.world.item.crafting.input.RecipeInput;
+import net.minecraft.world.item.crafting.RecipeInput;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.level.Level;
 

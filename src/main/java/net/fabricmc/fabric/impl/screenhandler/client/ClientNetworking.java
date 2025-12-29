@@ -24,7 +24,7 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.inventory.HandledScreens;
 import net.minecraft.client.gui.screens.inventory.ScreenHandlerProvider;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.core.Registries;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.world.inventory.ScreenHandlerType;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;

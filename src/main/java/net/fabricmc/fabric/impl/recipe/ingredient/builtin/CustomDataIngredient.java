@@ -22,8 +22,8 @@ import java.util.stream.Stream;
 import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 
-import net.minecraft.component.DataComponents;
-import net.minecraft.component.type.NbtComponent;
+import net.minecraft.core.component.DataComponents;
+import net.minecraft.core.component.NbtComponent;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.nbt.CompoundTag;

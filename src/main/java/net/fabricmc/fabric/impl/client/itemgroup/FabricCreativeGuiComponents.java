@@ -28,7 +28,7 @@ import net.minecraft.client.gui.screens.inventory.CreativeModeInventoryScreen;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.item.ItemGroups;
-import net.minecraft.core.Registries;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 

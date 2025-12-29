@@ -19,7 +19,7 @@ package net.fabricmc.fabric.api.command.v2;
 import com.mojang.brigadier.arguments.ArgumentType;
 
 import net.minecraft.commands.argument.serialize.ArgumentSerializer;
-import net.minecraft.core.Registries;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.core.Registry;
 import net.minecraft.resources.ResourceLocation;
 

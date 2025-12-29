@@ -24,7 +24,7 @@ import org.slf4j.LoggerFactory;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.attribute.DefaultAttributeContainer;
-import net.minecraft.core.Registries;
+import net.minecraft.core.registries.Registries;
 
 import net.fabricmc.fabric.mixin.object.builder.DefaultAttributeRegistryAccessor;
 

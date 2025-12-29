@@ -20,7 +20,7 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.gen.Accessor;
 
 import net.minecraft.core.WritableRegistry;
-import net.minecraft.core.Registries;
+import net.minecraft.core.registries.Registries;
 
 @Mixin(Registries.class)
 public interface RegistriesAccessor<T> {

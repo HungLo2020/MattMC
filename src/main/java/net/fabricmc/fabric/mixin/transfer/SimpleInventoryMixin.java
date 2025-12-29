@@ -21,7 +21,7 @@ import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Redirect;
 
-import net.minecraft.world.item.inventory.SimpleInventory;
+import net.minecraft.world.entity.player.SimpleInventory;
 import net.minecraft.world.item.ItemStack;
 
 import net.fabricmc.fabric.impl.transfer.item.SpecialLogicInventory;

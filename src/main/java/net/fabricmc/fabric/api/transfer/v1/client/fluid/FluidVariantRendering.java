@@ -25,8 +25,8 @@ import org.jetbrains.annotations.Nullable;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.world.level.material.Fluid;
-import net.minecraft.world.item.tooltip.TooltipType;
-import net.minecraft.core.Registries;
+import net.minecraft.world.item.TooltipFlag;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
@@ -75,17 +75,17 @@ public final class FluidVariantRendering {
 	 * Return a mutable list: the tooltip for the passed fluid variant, including the name and additional lines if available
 	 * and the id of the fluid if advanced tooltips are enabled.
 	 *
-	 * <p>Compared to {@linkplain #getTooltip(FluidVariant, TooltipType) the other overload}, the current tooltip context is automatically used.
+	 * <p>Compared to {@linkplain #getTooltip(FluidVariant, TooltipFlag) the other overload}, the current tooltip context is automatically used.
 	 */
 	public static List<Component> getTooltip(FluidVariant fluidVariant) {
-		return getTooltip(fluidVariant, Minecraft.getInstance().options.advancedItemTooltips ? TooltipType.Default.ADVANCED : TooltipType.Default.BASIC);
+		return getTooltip(fluidVariant, Minecraft.getInstance().options.advancedItemTooltips ? TooltipFlag.Default.ADVANCED : TooltipFlag.Default.BASIC);
 	}
 
 	/**
 	 * Return a mutable list: the tooltip for the passed fluid variant, including the name and additional lines if available
 	 * and the id of the fluid if advanced tooltips are enabled.
 	 */
-	public static List<Component> getTooltip(FluidVariant fluidVariant, TooltipType type) {
+	public static List<Component> getTooltip(FluidVariant fluidVariant, TooltipFlag type) {
 		List<Component> tooltip = new ArrayList<>();
 
 		// Name first

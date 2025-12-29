@@ -20,7 +20,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
-import net.minecraft.world.item.inventory.SidedInventory;
+import net.minecraft.world.entity.player.SidedInventory;
 import net.minecraft.core.Direction;
 
 import net.fabricmc.fabric.api.transfer.v1.item.InventoryStorage;

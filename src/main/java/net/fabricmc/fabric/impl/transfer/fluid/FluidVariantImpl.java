@@ -23,10 +23,10 @@ import org.jetbrains.annotations.Nullable;
 import net.minecraft.core.component.DataComponentPatch;
 import net.minecraft.core.component.DataComponentMap;
 import net.minecraft.component.MergedComponentMap;
-import net.minecraft.world.level.material.FlowableFluid;
+import net.minecraft.world.level.material.FlowingFluid;
 import net.minecraft.world.level.material.Fluid;
 import net.minecraft.world.level.material.Fluids;
-import net.minecraft.core.Registries;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.core.Holder;
 import net.minecraft.resources.ResourceLocation;
 
@@ -41,11 +41,11 @@ public class FluidVariantImpl implements FluidVariant {
 		if (!fluid.isStill(fluid.getDefaultState()) && fluid != Fluids.EMPTY) {
 			// Note: the empty fluid is not still, that's why we check for it specifically.
 
-			if (fluid instanceof FlowableFluid flowable) {
+			if (fluid instanceof FlowingFluid flowable) {
 				// Normalize FlowableFluids to their still variants.
 				fluid = flowable.getStill();
 			} else {
-				// If not a FlowableFluid, we don't know how to convert -> crash.
+				// If not a FlowingFluid, we don't know how to convert -> crash.
 				ResourceLocation id = Registries.FLUID.getId(fluid);
 				throw new IllegalArgumentException("Cannot convert flowing fluid %s (%s) into a still fluid.".formatted(id, fluid));
 			}
