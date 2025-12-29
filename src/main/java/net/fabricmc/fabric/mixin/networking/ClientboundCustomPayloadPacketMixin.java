@@ -33,7 +33,7 @@ import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.handler.EncoderHandler;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.network.protocol.Packet;
-import net.minecraft.network.protocol.s2c.common.CustomPayloadS2CPacket;
+import net.minecraft.network.protocol.common.ClientboundCustomPayloadPacket;
 
 import net.fabricmc.fabric.impl.networking.FabricCustomPayloadPacketCodec;
 import net.fabricmc.fabric.impl.networking.GenericPayloadAccessor;
@@ -41,8 +41,8 @@ import net.fabricmc.fabric.impl.networking.PayloadTypeRegistryImpl;
 import net.fabricmc.fabric.impl.networking.splitter.FabricPacketSplitter;
 import net.fabricmc.fabric.impl.networking.splitter.SplittablePacket;
 
-@Mixin(CustomPayloadS2CPacket.class)
-public class CustomPayloadS2CPacketMixin implements SplittablePacket, GenericPayloadAccessor {
+@Mixin(ClientboundCustomPayloadPacket.class)
+public class ClientboundCustomPayloadPacketMixin implements SplittablePacket, GenericPayloadAccessor {
 	@Shadow
 	@Final
 	private CustomPacketPayload payload;
@@ -86,7 +86,7 @@ public class CustomPayloadS2CPacketMixin implements SplittablePacket, GenericPay
 			return;
 		}
 
-		FabricPacketSplitter.genericPacketSplitter(this.payload.getId().id(), channelHandlerContext, encoder, packet, CustomPayloadS2CPacket::new, consumer, FabricPacketSplitter.SAFE_S2C_SPLIT_SIZE, size);
+		FabricPacketSplitter.genericPacketSplitter(this.payload.getId().id(), channelHandlerContext, encoder, packet, ClientboundCustomPayloadPacket::new, consumer, FabricPacketSplitter.SAFE_S2C_SPLIT_SIZE, size);
 	}
 
 	@Override

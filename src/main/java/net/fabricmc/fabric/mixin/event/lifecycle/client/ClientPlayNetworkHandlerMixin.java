@@ -27,7 +27,7 @@ import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.world.entity.Entity;
-import net.minecraft.network.protocol.s2c.common.SynchronizeTagsS2CPacket;
+import net.minecraft.network.protocol.common.SynchronizeTagsS2CPacket;
 import net.minecraft.network.protocol.s2c.play.GameJoinS2CPacket;
 import net.minecraft.network.protocol.s2c.play.PlayerRespawnS2CPacket;
 import net.minecraft.core.RegistryAccess;

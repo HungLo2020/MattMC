@@ -26,8 +26,8 @@ import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import net.minecraft.network.protocol.Packet;
-import net.minecraft.network.protocol.c2s.login.LoginQueryResponseC2SPacket;
-import net.minecraft.network.protocol.s2c.login.LoginQueryRequestS2CPacket;
+import net.minecraft.network.protocol.login.ServerboundCustomQueryAnswerPacket;
+import net.minecraft.network.protocol.login.ClientboundCustomQueryPacket;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.network.ServerLoginPacketListenerImpl;
 
@@ -60,7 +60,7 @@ abstract class ServerLoginNetworkHandlerMixin implements NetworkHandlerExtension
 	}
 
 	@Inject(method = "onQueryResponse", at = @At("HEAD"), cancellable = true)
-	private void handleCustomPayloadReceivedAsync(LoginQueryResponseC2SPacket packet, CallbackInfo ci) {
+	private void handleCustomPayloadReceivedAsync(ServerboundCustomQueryAnswerPacket packet, CallbackInfo ci) {
 		// Handle queries
 		if (this.addon.handle(packet)) {
 			ci.cancel();
@@ -78,8 +78,8 @@ abstract class ServerLoginNetworkHandlerMixin implements NetworkHandlerExtension
 
 	@Override
 	public void sent(Packet<?> packet) {
-		if (packet instanceof LoginQueryRequestS2CPacket) {
-			this.addon.registerOutgoingPacket((LoginQueryRequestS2CPacket) packet);
+		if (packet instanceof ClientboundCustomQueryPacket) {
+			this.addon.registerOutgoingPacket((ClientboundCustomQueryPacket) packet);
 		}
 	}
 

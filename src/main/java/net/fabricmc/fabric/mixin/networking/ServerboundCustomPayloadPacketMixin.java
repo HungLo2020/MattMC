@@ -33,7 +33,7 @@ import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.handler.EncoderHandler;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.network.protocol.Packet;
-import net.minecraft.network.protocol.c2s.common.CustomPayloadC2SPacket;
+import net.minecraft.network.protocol.common.ServerboundCustomPayloadPacket;
 
 import net.fabricmc.fabric.impl.networking.FabricCustomPayloadPacketCodec;
 import net.fabricmc.fabric.impl.networking.GenericPayloadAccessor;
@@ -41,8 +41,8 @@ import net.fabricmc.fabric.impl.networking.PayloadTypeRegistryImpl;
 import net.fabricmc.fabric.impl.networking.splitter.FabricPacketSplitter;
 import net.fabricmc.fabric.impl.networking.splitter.SplittablePacket;
 
-@Mixin(CustomPayloadC2SPacket.class)
-public class CustomPayloadC2SPacketMixin implements SplittablePacket, GenericPayloadAccessor {
+@Mixin(ServerboundCustomPayloadPacket.class)
+public class ServerboundCustomPayloadPacketMixin implements SplittablePacket, GenericPayloadAccessor {
 	@Shadow
 	@Final
 	private CustomPacketPayload payload;
@@ -58,7 +58,7 @@ public class CustomPayloadC2SPacketMixin implements SplittablePacket, GenericPay
 		StreamCodec<FriendlyByteBuf, CustomPacketPayload> codec = original.call(unknownCodecFactory, types);
 		FabricCustomPayloadPacketCodec<FriendlyByteBuf> fabricCodec = (FabricCustomPayloadPacketCodec<FriendlyByteBuf>) codec;
 		fabricCodec.fabric_setPacketCodecProvider((packetByteBuf, identifier) -> {
-			// CustomPayloadC2SPacket does not have a separate codec for play/configuration. We know if the packetByteBuf is a FriendlyByteBuf we are in the play phase.
+			// ServerboundCustomPayloadPacket does not have a separate codec for play/configuration. We know if the packetByteBuf is a FriendlyByteBuf we are in the play phase.
 			if (packetByteBuf instanceof RegistryFriendlyByteBuf) {
 				return (CustomPacketPayload.TypeAndCodec<FriendlyByteBuf, ? extends CustomPacketPayload>) (Object) PayloadTypeRegistryImpl.PLAY_C2S.get(identifier);
 			}
@@ -77,7 +77,7 @@ public class CustomPayloadC2SPacketMixin implements SplittablePacket, GenericPay
 			return;
 		}
 
-		FabricPacketSplitter.genericPacketSplitter(this.payload.getId().id(), channelHandlerContext, encoder, packet, CustomPayloadC2SPacket::new, consumer, FabricPacketSplitter.SAFE_C2S_SPLIT_SIZE, size);
+		FabricPacketSplitter.genericPacketSplitter(this.payload.getId().id(), channelHandlerContext, encoder, packet, ServerboundCustomPayloadPacket::new, consumer, FabricPacketSplitter.SAFE_C2S_SPLIT_SIZE, size);
 	}
 
 	@Override

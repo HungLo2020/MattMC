@@ -23,7 +23,7 @@ import net.minecraft.network.NetworkSide;
 import net.minecraft.network.protocol.game.ClientGamePacketListener;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.network.protocol.Packet;
-import net.minecraft.network.protocol.s2c.common.CustomPayloadS2CPacket;
+import net.minecraft.network.protocol.common.ClientboundCustomPayloadPacket;
 import net.minecraft.server.network.ServerConfigurationPacketListenerImpl;
 import net.minecraft.server.network.ServerLoginPacketListenerImpl;
 import net.minecraft.server.network.ServerGamePacketListenerImpl;
@@ -56,6 +56,6 @@ public final class ServerNetworkingImpl {
 		Objects.requireNonNull(payload, "Payload cannot be null");
 		Objects.requireNonNull(payload.getId(), "CustomPacketPayload#getId() cannot return null for payload class: " + payload.getClass());
 
-		return new CustomPayloadS2CPacket(payload);
+		return new ClientboundCustomPayloadPacket(payload);
 	}
 }

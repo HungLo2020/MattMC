@@ -27,7 +27,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientCommonNetworkHandler;
 import net.minecraft.network.OffThreadException;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.network.protocol.s2c.common.CustomPayloadS2CPacket;
+import net.minecraft.network.protocol.common.ClientboundCustomPayloadPacket;
 
 import net.fabricmc.fabric.impl.networking.NetworkHandlerExtensions;
 import net.fabricmc.fabric.impl.networking.client.ClientConfigurationNetworkAddon;
@@ -39,8 +39,8 @@ public abstract class ClientCommonNetworkHandlerMixin implements NetworkHandlerE
 	@Final
 	protected Minecraft client;
 
-	@Inject(method = "onCustomPayload(Lnet/minecraft/network/packet/s2c/common/CustomPayloadS2CPacket;)V", at = @At("HEAD"), cancellable = true)
-	public void onCustomPayload(CustomPayloadS2CPacket packet, CallbackInfo ci) {
+	@Inject(method = "onCustomPayload(Lnet/minecraft/network/packet/s2c/common/ClientboundCustomPayloadPacket;)V", at = @At("HEAD"), cancellable = true)
+	public void onCustomPayload(ClientboundCustomPayloadPacket packet, CallbackInfo ci) {
 		final CustomPacketPayload payload = packet.payload();
 
 		try {

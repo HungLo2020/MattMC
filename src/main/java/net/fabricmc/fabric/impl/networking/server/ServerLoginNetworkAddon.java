@@ -34,9 +34,9 @@ import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.PacketCallbacks;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.network.protocol.Packet;
-import net.minecraft.network.protocol.c2s.login.LoginQueryResponseC2SPacket;
-import net.minecraft.network.protocol.s2c.login.LoginCompressionS2CPacket;
-import net.minecraft.network.protocol.s2c.login.LoginQueryRequestS2CPacket;
+import net.minecraft.network.protocol.login.ServerboundCustomQueryAnswerPacket;
+import net.minecraft.network.protocol.login.ClientboundLoginCompressionPacket;
+import net.minecraft.network.protocol.login.ClientboundCustomQueryPacket;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.network.ServerLoginPacketListenerImpl;
 import net.minecraft.network.chat.Component;
@@ -47,7 +47,7 @@ import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
 import net.fabricmc.fabric.api.networking.v1.ServerLoginConnectionEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerLoginNetworking;
 import net.fabricmc.fabric.impl.networking.AbstractNetworkAddon;
-import net.fabricmc.fabric.impl.networking.payload.PacketByteBufLoginQueryRequestPayload;
+import net.fabricmc.fabric.impl.networking.payload.PacketByteBufCustomQueryPayload;
 import net.fabricmc.fabric.impl.networking.payload.PacketByteBufLoginQueryResponse;
 import net.fabricmc.fabric.mixin.networking.accessor.ServerLoginNetworkHandlerAccessor;
 
@@ -114,7 +114,7 @@ public final class ServerLoginNetworkAddon extends AbstractNetworkAddon<ServerLo
 	private void sendCompressionPacket() {
 		// Compression is not needed for local transport
 		if (this.server.getNetworkCompressionThreshold() >= 0 && !this.connection.isLocal()) {
-			this.connection.send(new LoginCompressionS2CPacket(this.server.getNetworkCompressionThreshold()),
+			this.connection.send(new ClientboundLoginCompressionPacket(this.server.getNetworkCompressionThreshold()),
 					PacketCallbacks.always(() -> connection.setCompressionThreshold(server.getNetworkCompressionThreshold(), true))
 			);
 		}
@@ -126,17 +126,17 @@ public final class ServerLoginNetworkAddon extends AbstractNetworkAddon<ServerLo
 	 * @param packet the packet to handle
 	 * @return true if the packet was handled
 	 */
-	public boolean handle(LoginQueryResponseC2SPacket packet) {
+	public boolean handle(ServerboundCustomQueryAnswerPacket packet) {
 		PacketByteBufLoginQueryResponse response = (PacketByteBufLoginQueryResponse) packet.response();
-		return handle(packet.queryId(), response == null ? null : response.data());
+		return handle(packet.transactionId(), response == null ? null : response.data());
 	}
 
-	private boolean handle(int queryId, @Nullable FriendlyByteBuf originalBuf) {
+	private boolean handle(int transactionId, @Nullable FriendlyByteBuf originalBuf) {
 		this.logger.debug("Handling inbound login query with id {}", queryId);
-		ResourceLocation channel = this.channels.remove(queryId);
+		ResourceLocation channel = this.channels.remove(transactionId);
 
 		if (channel == null) {
-			this.logger.warn("Query ID {} was received but no query has been associated in {}!", queryId, this.connection);
+			this.logger.warn("Query ID {} was received but no query has been associated in {}!", transactionId, this.connection);
 			return false;
 		}
 
@@ -166,8 +166,8 @@ public final class ServerLoginNetworkAddon extends AbstractNetworkAddon<ServerLo
 
 	@Override
 	public Packet<?> createPacket(ResourceLocation channelName, FriendlyByteBuf buf) {
-		int queryId = this.queryIdFactory.nextId();
-		return new LoginQueryRequestS2CPacket(queryId, new PacketByteBufLoginQueryRequestPayload(channelName, buf));
+		int transactionId = this.queryIdFactory.nextId();
+		return new ClientboundCustomQueryPacket(transactionId, new PacketByteBufCustomQueryPayload(channelName, buf));
 	}
 
 	@Override
@@ -184,8 +184,8 @@ public final class ServerLoginNetworkAddon extends AbstractNetworkAddon<ServerLo
 		this.connection.disconnect(disconnectReason);
 	}
 
-	public void registerOutgoingPacket(LoginQueryRequestS2CPacket packet) {
-		this.channels.put(packet.queryId(), packet.payload().id());
+	public void registerOutgoingPacket(ClientboundCustomQueryPacket packet) {
+		this.channels.put(packet.transactionId(), packet.payload().id());
 	}
 
 	@Override

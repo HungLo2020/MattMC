@@ -27,11 +27,11 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientHandshakePacketListenerImpl;
 import net.minecraft.network.Connection;
-import net.minecraft.network.protocol.s2c.login.LoginQueryRequestS2CPacket;
+import net.minecraft.network.protocol.login.ClientboundCustomQueryPacket;
 
 import net.fabricmc.fabric.impl.networking.NetworkHandlerExtensions;
 import net.fabricmc.fabric.impl.networking.client.ClientLoginNetworkAddon;
-import net.fabricmc.fabric.impl.networking.payload.PacketByteBufLoginQueryRequestPayload;
+import net.fabricmc.fabric.impl.networking.payload.PacketByteBufCustomQueryPayload;
 
 @Mixin(ClientHandshakePacketListenerImpl.class)
 abstract class ClientLoginNetworkHandlerMixin implements NetworkHandlerExtensions {
@@ -54,8 +54,8 @@ abstract class ClientLoginNetworkHandlerMixin implements NetworkHandlerExtension
 	}
 
 	@Inject(method = "onQueryRequest", at = @At(value = "INVOKE", target = "Ljava/util/function/Consumer;accept(Ljava/lang/Object;)V", shift = At.Shift.AFTER), cancellable = true)
-	private void handleQueryRequest(LoginQueryRequestS2CPacket packet, CallbackInfo ci) {
-		if (packet.payload() instanceof PacketByteBufLoginQueryRequestPayload payload) {
+	private void handleQueryRequest(ClientboundCustomQueryPacket packet, CallbackInfo ci) {
+		if (packet.payload() instanceof PacketByteBufCustomQueryPayload payload) {
 			if (this.addon.handlePacket(packet)) {
 				ci.cancel();
 			} else {

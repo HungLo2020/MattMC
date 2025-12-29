@@ -27,8 +27,8 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.handler.PacketCodecDispatcher;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.network.protocol.c2s.common.CustomPayloadC2SPacket;
-import net.minecraft.network.protocol.s2c.common.CustomPayloadS2CPacket;
+import net.minecraft.network.protocol.common.ServerboundCustomPayloadPacket;
+import net.minecraft.network.protocol.common.ClientboundCustomPayloadPacket;
 
 @Mixin(PacketCodecDispatcher.class)
 public abstract class PacketCodecDispatcherMixin<B extends ByteBuf, V, T> implements StreamCodec<B, V> {
@@ -37,9 +37,9 @@ public abstract class PacketCodecDispatcherMixin<B extends ByteBuf, V, T> implem
 	public void encode(B byteBuf, V packet, CallbackInfo ci, @Local(ordinal = 1) T packetId, @Local Exception e) {
 		CustomPacketPayload payload = null;
 
-		if (packet instanceof CustomPayloadC2SPacket customPayloadC2SPacket) {
+		if (packet instanceof ServerboundCustomPayloadPacket customPayloadC2SPacket) {
 			payload = customPayloadC2SPacket.payload();
-		} else if (packet instanceof CustomPayloadS2CPacket customPayloadS2CPacket) {
+		} else if (packet instanceof ClientboundCustomPayloadPacket customPayloadS2CPacket) {
 			payload = customPayloadS2CPacket.payload();
 		}
 

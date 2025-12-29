@@ -25,8 +25,8 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import net.minecraft.network.OffThreadException;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.network.protocol.c2s.common.CommonPongC2SPacket;
-import net.minecraft.network.protocol.c2s.common.CustomPayloadC2SPacket;
+import net.minecraft.network.protocol.common.CommonPongC2SPacket;
+import net.minecraft.network.protocol.common.ServerboundCustomPayloadPacket;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.network.ServerCommonNetworkHandler;
 
@@ -40,7 +40,7 @@ public abstract class ServerCommonNetworkHandlerMixin implements NetworkHandlerE
 	protected MinecraftServer server;
 
 	@Inject(method = "onCustomPayload", at = @At("HEAD"), cancellable = true)
-	private void handleCustomPayloadReceivedAsync(CustomPayloadC2SPacket packet, CallbackInfo ci) {
+	private void handleCustomPayloadReceivedAsync(ServerboundCustomPayloadPacket packet, CallbackInfo ci) {
 		final CustomPacketPayload payload = packet.payload();
 
 		try {

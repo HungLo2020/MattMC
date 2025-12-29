@@ -60,7 +60,7 @@ import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
  */
 public class DirectRegistryPacketHandler extends RegistryPacketHandler<DirectRegistryPacketHandler.Payload> {
 	/**
-	 * @see net.minecraft.network.protocol.s2c.play.CustomPayloadS2CPacket#MAX_PAYLOAD_SIZE
+	 * @see net.minecraft.network.protocol.s2c.play.ClientboundCustomPayloadPacket#MAX_PAYLOAD_SIZE
 	 */
 	@SuppressWarnings("JavadocReference")
 	private static final int MAX_PAYLOAD_SIZE = Integer.getInteger("fabric.registry.direct.maxPayloadSize", 0x100000);

@@ -24,27 +24,21 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import net.minecraft.network.FriendlyByteBuf;
-import net.minecraft.network.protocol.c2s.login.LoginQueryResponseC2SPacket;
-import net.minecraft.network.protocol.c2s.login.LoginQueryResponsePayload;
+import net.minecraft.network.protocol.login.CustomQueryPayload;
+import net.minecraft.network.protocol.login.ClientboundCustomQueryPacket;
+import net.minecraft.resources.ResourceLocation;
 
-import net.fabricmc.fabric.impl.networking.payload.PacketByteBufLoginQueryResponse;
+import net.fabricmc.fabric.impl.networking.payload.PacketByteBufCustomQueryPayload;
 import net.fabricmc.fabric.impl.networking.payload.PayloadHelper;
 
-@Mixin(LoginQueryResponseC2SPacket.class)
-public class LoginQueryResponseC2SPacketMixin {
+@Mixin(ClientboundCustomQueryPacket.class)
+public class ClientboundCustomQueryPacketMixin {
 	@Shadow
 	@Final
 	private static int MAX_PAYLOAD_SIZE;
 
 	@Inject(method = "readPayload", at = @At("HEAD"), cancellable = true)
-	private static void readResponse(int queryId, FriendlyByteBuf buf, CallbackInfoReturnable<LoginQueryResponsePayload> cir) {
-		boolean hasPayload = buf.readBoolean();
-
-		if (!hasPayload) {
-			cir.setReturnValue(null);
-			return;
-		}
-
-		cir.setReturnValue(new PacketByteBufLoginQueryResponse(PayloadHelper.read(buf, MAX_PAYLOAD_SIZE)));
+	private static void readPayload(ResourceLocation id, FriendlyByteBuf buf, CallbackInfoReturnable<CustomQueryPayload> cir) {
+		cir.setReturnValue(new PacketByteBufCustomQueryPayload(id, PayloadHelper.read(buf, MAX_PAYLOAD_SIZE)));
 	}
 }
