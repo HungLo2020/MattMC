@@ -32,7 +32,7 @@ import net.minecraft.resources.ResourceLocation;
 public class RegistryKeysMixin {
 	@ModifyReturnValue(method = "getPath", at = @At("RETURN"))
 	private static String prependDirectoryWithNamespace(String original, @Local(argsOnly = true) ResourceKey<? extends Registry<?>> registryRef) {
-		ResourceLocation id = registryRef.value();
+		ResourceLocation id = registryRef.location();
 
 		if (!id.getNamespace().equals(ResourceLocation.DEFAULT_NAMESPACE)) {
 			return id.getNamespace() + "/" + id.getPath();
@@ -43,7 +43,7 @@ public class RegistryKeysMixin {
 
 	@ModifyReturnValue(method = "getTagPath", at = @At("RETURN"))
 	private static String prependTagDirectoryWithNamespace(String original, @Local(argsOnly = true) ResourceKey<? extends Registry<?>> registryRef) {
-		ResourceLocation id = registryRef.value();
+		ResourceLocation id = registryRef.location();
 
 		if (!id.getNamespace().equals(ResourceLocation.DEFAULT_NAMESPACE)) {
 			return "tags/" + id.getNamespace() + "/" + id.getPath();

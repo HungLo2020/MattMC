@@ -112,7 +112,7 @@ public class DirectRegistryPacketHandler extends RegistryPacketHandler<DirectReg
 
 				for (Map.Entry<String, List<Object2IntMap.Entry<ResourceLocation>>> idNamespaceEntry : idNamespaceGroups.entrySet()) {
 					// Make sure the ids are sorted by its raw id.
-					List<Object2IntMap.Entry<ResourceLocation>> idPairs = idNamespaceEntry.value();
+					List<Object2IntMap.Entry<ResourceLocation>> idPairs = idNamespaceEntry.getValue();
 					idPairs.sort(Comparator.comparingInt(Object2IntMap.Entry::getIntValue));
 
 					// Group consecutive raw ids together.

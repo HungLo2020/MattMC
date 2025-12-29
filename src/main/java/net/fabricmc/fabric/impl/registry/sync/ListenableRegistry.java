@@ -28,7 +28,7 @@ public interface ListenableRegistry<T> {
 	@SuppressWarnings("unchecked")
 	static <T> ListenableRegistry<T> get(Registry<T> registry) {
 		if (!(registry instanceof ListenableRegistry)) {
-			throw new IllegalArgumentException("Unsupported registry: " + registry.getKey().value());
+			throw new IllegalArgumentException("Unsupported registry: " + registry.getKey().location());
 		}
 
 		// Safe cast: this is implemented via Mixin and T will always match the T in Registry<T>

@@ -171,12 +171,12 @@ public abstract class SimpleRegistryMixin<T> implements WritableRegistry<T>, Rem
 
 	@Unique
 	private void onChange(ResourceKey<T> registryKey) {
-		if (RegistrySyncManager.postBootstrap || !VANILLA_NAMESPACES.contains(registryKey.value().getNamespace())) {
+		if (RegistrySyncManager.postBootstrap || !VANILLA_NAMESPACES.contains(registryKey.location().getNamespace())) {
 			RegistryAttributeHolder holder = RegistryAttributeHolder.get(getKey());
 
 			if (!holder.hasAttribute(RegistryAttribute.MODDED)) {
-				ResourceLocation id = getKey().value();
-				FABRIC_LOGGER.debug("Registry {} has been marked as modded, registry entry {} was changed", id, registryKey.value());
+				ResourceLocation id = getKey().location();
+				FABRIC_LOGGER.debug("Registry {} has been marked as modded, registry entry {} was changed", id, registryKey.location());
 				RegistryAttributeHolder.get(getKey()).addAttribute(RegistryAttribute.MODDED);
 			}
 		}
@@ -290,7 +290,7 @@ public abstract class SimpleRegistryMixin<T> implements WritableRegistry<T>, Rem
 
 					maxId++;
 
-					FABRIC_LOGGER.debug("An ID for {} was not sent by the server, assuming client only registry entry and assigning a new id ({}) in {}", id.toString(), maxId, getKey().value().toString());
+					FABRIC_LOGGER.debug("An ID for {} was not sent by the server, assuming client only registry entry and assigning a new id ({}) in {}", id.toString(), maxId, getKey().location().toString());
 					remoteIndexedEntries.put(id, maxId);
 				}
 			}
@@ -306,7 +306,7 @@ public abstract class SimpleRegistryMixin<T> implements WritableRegistry<T>, Rem
 
 			// Unused id, can happen if there are holes in the registry.
 			if (reference == null) {
-				throw new RemapException("Unused id " + i + " in registry " + getKey().value());
+				throw new RemapException("Unused id " + i + " in registry " + getKey().location());
 			}
 
 			ResourceLocation id = reference.registryKey().value();
