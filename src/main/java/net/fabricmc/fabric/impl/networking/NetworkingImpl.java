@@ -60,7 +60,7 @@ public final class NetworkingImpl {
 		registerGeneric(FabricSplitPacketPayload.ID, FabricSplitPacketPayload.CODEC);
 	}
 
-	private static <T extends CustomPacketPayload> void registerGeneric(CustomPacketPayload.Id<T> id, PacketCodec<? super FriendlyByteBuf, T> codec) {
+	private static <T extends CustomPacketPayload> void registerGeneric(CustomPacketPayload.Type<T> id, PacketCodec<? super FriendlyByteBuf, T> codec) {
 		PayloadTypeRegistry.configurationS2C().register(id, codec);
 		PayloadTypeRegistry.configurationC2S().register(id, codec);
 		PayloadTypeRegistry.playS2C().register(id, codec);

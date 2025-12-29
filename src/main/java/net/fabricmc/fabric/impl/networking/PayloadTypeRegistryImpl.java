@@ -65,7 +65,7 @@ public class PayloadTypeRegistryImpl<B extends FriendlyByteBuf> implements Paylo
 	}
 
 	@Override
-	public <T extends CustomPacketPayload> ResourceLocation<? super B, T> register(CustomPacketPayload.Id<T> id, PacketCodec<? super B, T> codec) {
+	public <T extends CustomPacketPayload> ResourceLocation<? super B, T> register(CustomPacketPayload.Type<T> id, PacketCodec<? super B, T> codec) {
 		Objects.requireNonNull(id, "id");
 		Objects.requireNonNull(codec, "codec");
 
@@ -80,7 +80,7 @@ public class PayloadTypeRegistryImpl<B extends FriendlyByteBuf> implements Paylo
 	}
 
 	@Override
-	public <T extends CustomPacketPayload> ResourceLocation<? super B, T> registerLarge(CustomPacketPayload.Id<T> id, PacketCodec<? super B, T> codec, int maxPayloadSize) {
+	public <T extends CustomPacketPayload> ResourceLocation<? super B, T> registerLarge(CustomPacketPayload.Type<T> id, PacketCodec<? super B, T> codec, int maxPayloadSize) {
 		if (maxPayloadSize < 0) {
 			throw new IllegalArgumentException("Provided maxPayloadSize needs to be positive!");
 		}
@@ -109,7 +109,7 @@ public class PayloadTypeRegistryImpl<B extends FriendlyByteBuf> implements Paylo
 	}
 
 	@Nullable
-	public <T extends CustomPacketPayload> ResourceLocation<B, T> get(CustomPacketPayload.Id<T> id) {
+	public <T extends CustomPacketPayload> ResourceLocation<B, T> get(CustomPacketPayload.Type<T> id) {
 		//noinspection unchecked
 		return (ResourceLocation<B, T>) packetTypes.get(id.id());
 	}

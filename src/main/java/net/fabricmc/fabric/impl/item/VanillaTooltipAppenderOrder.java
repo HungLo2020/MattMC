@@ -39,7 +39,7 @@ import net.minecraft.component.type.TooltipDisplayComponent;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.tooltip.TooltipType;
+import net.minecraft.world.item.TooltipFlag;
 
 import net.fabricmc.loader.api.FabricLoader;
 
@@ -67,7 +67,7 @@ public final class VanillaTooltipAppenderOrder {
 							Type.getObjectType("net/minecraft/class_1792$class_9635"), // Item.TooltipContext
 							Type.getObjectType("net/minecraft/class_10712"), // TooltipDisplayComponent
 							Type.getObjectType("net/minecraft/class_1657"), // Player
-							Type.getObjectType("net/minecraft/class_1836"), // TooltipType
+							Type.getObjectType("net/minecraft/class_1836"), // TooltipFlag
 							Type.getType(Consumer.class)
 					)
 			);
@@ -76,7 +76,7 @@ public final class VanillaTooltipAppenderOrder {
 					Type.getType(Item.TooltipContext.class),
 					Type.getType(TooltipDisplayComponent.class),
 					Type.getType(Player.class),
-					Type.getType(TooltipType.class),
+					Type.getType(TooltipFlag.class),
 					Type.getType(Consumer.class)
 			);
 

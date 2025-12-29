@@ -32,7 +32,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.world.item.crafting.ShapelessRecipe;
 import net.minecraft.world.item.crafting.book.CraftingRecipeCategory;
-import net.minecraft.world.item.crafting.input.CraftingRecipeInput;
+import net.minecraft.world.item.crafting.CraftingRecipeInput;
 import net.minecraft.world.level.Level;
 
 import net.fabricmc.fabric.impl.recipe.ingredient.ShapelessMatch;

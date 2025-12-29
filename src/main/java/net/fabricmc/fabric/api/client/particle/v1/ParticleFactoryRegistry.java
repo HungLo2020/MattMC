@@ -18,7 +18,7 @@ package net.fabricmc.fabric.api.client.particle.v1;
 
 import org.jetbrains.annotations.ApiStatus;
 
-import net.minecraft.client.particle.ParticleFactory;
+import net.minecraft.client.particle.ParticleProvider;
 import net.minecraft.core.particles.ParticleOptions;
 import net.minecraft.core.particles.ParticleType;
 
@@ -40,7 +40,7 @@ public interface ParticleFactoryRegistry {
 	/**
 	 * Registers a factory for constructing particles of the given type.
 	 */
-	<T extends ParticleOptions> void register(ParticleType<T> type, ParticleFactory<T> factory);
+	<T extends ParticleOptions> void register(ParticleType<T> type, ParticleProvider<T> factory);
 
 	/**
 	 * Registers a delayed factory for constructing particles of the given type.
@@ -67,6 +67,6 @@ public interface ParticleFactoryRegistry {
 		 *
 		 * @return A new particle factory.
 		 */
-		ParticleFactory<T> create(FabricSpriteProvider provider);
+		ParticleProvider<T> create(FabricSpriteProvider provider);
 	}
 }

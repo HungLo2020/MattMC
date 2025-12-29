@@ -23,7 +23,7 @@ import net.minecraft.resources.ResourceLocation;
 
 public record CommonVersionPayload(int[] versions) implements CustomPacketPayload {
 	public static final PacketCodec<FriendlyByteBuf, CommonVersionPayload> CODEC = CustomPacketPayload.codecOf(CommonVersionPayload::write, CommonVersionPayload::new);
-	public static final CustomPacketPayload.Id<CommonVersionPayload> ID = new Id<>(ResourceLocation.of("c:version"));
+	public static final CustomPacketPayload.Type<CommonVersionPayload> ID = new Id<>(ResourceLocation.of("c:version"));
 
 	private CommonVersionPayload(FriendlyByteBuf buf) {
 		this(buf.readIntArray());

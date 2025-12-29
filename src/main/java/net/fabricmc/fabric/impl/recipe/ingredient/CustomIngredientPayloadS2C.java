@@ -26,7 +26,7 @@ public record CustomIngredientPayloadS2C(int protocolVersion) implements CustomP
 			PacketCodecs.VAR_INT, CustomIngredientPayloadS2C::protocolVersion,
 			CustomIngredientPayloadS2C::new
 	);
-	public static final CustomPacketPayload.Id<CustomIngredientPayloadS2C> ID = new Id<>(CustomIngredientSync.PACKET_ID);
+	public static final CustomPacketPayload.Type<CustomIngredientPayloadS2C> ID = new Id<>(CustomIngredientSync.PACKET_ID);
 
 	@Override
 	public Id<? extends CustomPacketPayload> getId() {

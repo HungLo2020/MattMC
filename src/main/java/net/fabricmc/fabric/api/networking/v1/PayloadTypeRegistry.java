@@ -41,7 +41,7 @@ public interface PayloadTypeRegistry<B extends FriendlyByteBuf> {
 	 * @param <T>   the payload type
 	 * @return the registered payload type
 	 */
-	<T extends CustomPacketPayload> ResourceLocation<? super B, T> register(CustomPacketPayload.Id<T> id, PacketCodec<? super B, T> codec);
+	<T extends CustomPacketPayload> ResourceLocation<? super B, T> register(CustomPacketPayload.Type<T> id, PacketCodec<? super B, T> codec);
 
 	/**
 	 * Registers a large custom payload type.
@@ -58,7 +58,7 @@ public interface PayloadTypeRegistry<B extends FriendlyByteBuf> {
 	 * @param maxPacketSize the maximum size of payload packet
 	 * @return the registered payload type
 	 */
-	<T extends CustomPacketPayload> ResourceLocation<? super B, T> registerLarge(CustomPacketPayload.Id<T> id, PacketCodec<? super B, T> codec, int maxPacketSize);
+	<T extends CustomPacketPayload> ResourceLocation<? super B, T> registerLarge(CustomPacketPayload.Type<T> id, PacketCodec<? super B, T> codec, int maxPacketSize);
 
 	/**
 	 * @return the {@link PayloadTypeRegistry} instance for the client to server configuration channel.

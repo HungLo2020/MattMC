@@ -121,7 +121,7 @@ public abstract class AbstractChanneledNetworkAddon<H> extends AbstractNetworkAd
 	}
 
 	@Nullable
-	protected RegistrationPayload createRegistrationPayload(CustomPacketPayload.Id<RegistrationPayload> id, Collection<ResourceLocation> channels) {
+	protected RegistrationPayload createRegistrationPayload(CustomPacketPayload.Type<RegistrationPayload> id, Collection<ResourceLocation> channels) {
 		if (channels.isEmpty()) {
 			return null;
 		}

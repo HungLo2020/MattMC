@@ -20,7 +20,7 @@ import java.util.List;
 
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.tooltip.TooltipType;
+import net.minecraft.world.item.TooltipFlag;
 import net.minecraft.network.chat.Component;
 
 import net.fabricmc.fabric.api.event.Event;
@@ -42,5 +42,5 @@ public interface ItemTooltipCallback {
 	 *
 	 * @param lines the list containing the lines of text displayed on the stack's tooltip
 	 */
-	void getTooltip(ItemStack stack, Item.TooltipContext tooltipContext, TooltipType tooltipType, List<Component> lines);
+	void getTooltip(ItemStack stack, Item.TooltipContext tooltipContext, TooltipFlag tooltipType, List<Component> lines);
 }

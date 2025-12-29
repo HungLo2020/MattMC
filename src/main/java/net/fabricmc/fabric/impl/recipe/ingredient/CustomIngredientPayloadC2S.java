@@ -31,7 +31,7 @@ public record CustomIngredientPayloadC2S(int protocolVersion, Set<ResourceLocati
 			PacketCodecs.collection(HashSet::new, ResourceLocation.PACKET_CODEC), CustomIngredientPayloadC2S::registeredSerializers,
 			CustomIngredientPayloadC2S::new
 	);
-	public static final CustomPacketPayload.Id<CustomIngredientPayloadC2S> ID = new Id<>(CustomIngredientSync.PACKET_ID);
+	public static final CustomPacketPayload.Type<CustomIngredientPayloadC2S> ID = new Id<>(CustomIngredientSync.PACKET_ID);
 
 	@Override
 	public Id<? extends CustomPacketPayload> getId() {

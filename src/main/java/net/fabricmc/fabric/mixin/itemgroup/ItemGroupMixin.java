@@ -53,7 +53,7 @@ abstract class ItemGroupMixin implements FabricItemGroupImpl {
 
 	@SuppressWarnings("ConstantConditions")
 	@Inject(method = "updateEntries", at = @At("TAIL"))
-	public void getStacks(CreativeModeTab.DisplayContext context, CallbackInfo ci) {
+	public void getStacks(CreativeModeTab.ItemDisplayParameters context, CallbackInfo ci) {
 		final CreativeModeTab self = (CreativeModeTab) (Object) this;
 		final ResourceKey<CreativeModeTab> registryKey = Registries.ITEM_GROUP.getKey(self).orElseThrow(() -> new IllegalStateException("Unregistered item group : " + self));
 

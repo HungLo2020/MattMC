@@ -24,7 +24,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-import net.minecraft.client.particle.ParticleFactory;
+import net.minecraft.client.particle.ParticleProvider;
 import net.minecraft.client.particle.ParticleSpriteManager;
 import net.minecraft.core.Registries;
 
@@ -34,10 +34,10 @@ import net.fabricmc.fabric.impl.registry.sync.trackers.Int2ObjectMapTracker;
 public class ParticleSpriteManagerMixin {
 	@Final
 	@Shadow
-	private Int2ObjectMap<ParticleFactory<?>> particleFactories;
+	private Int2ObjectMap<ParticleProvider<?>> particleFactories;
 
 	@Inject(method = "<init>", at = @At("RETURN"))
 	public void onInit(CallbackInfo info) {
-		Int2ObjectMapTracker.register(Registries.PARTICLE_TYPE, "ParticleManager.factories", particleFactories);
+		Int2ObjectMapTracker.register(Registries.PARTICLE_TYPE, "ParticleEngine.factories", particleFactories);
 	}
 }

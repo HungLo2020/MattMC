@@ -104,7 +104,7 @@ public final class Networking implements ModInitializer {
 
 	public record OpenScreenPayload<D>(ResourceLocation identifier, int syncId, Component title, PacketCodec<RegistryByteBuf, D> innerCodec, D data) implements CustomPacketPayload {
 		public static final PacketCodec<RegistryByteBuf, OpenScreenPayload<?>> CODEC = CustomPacketPayload.codecOf(OpenScreenPayload::write, OpenScreenPayload::fromBuf);
-		public static final CustomPacketPayload.Id<OpenScreenPayload<?>> ID = new Id<>(OPEN_ID);
+		public static final CustomPacketPayload.Type<OpenScreenPayload<?>> ID = new Id<>(OPEN_ID);
 
 		@SuppressWarnings("unchecked")
 		private static <D> OpenScreenPayload<D> fromBuf(RegistryByteBuf buf) {

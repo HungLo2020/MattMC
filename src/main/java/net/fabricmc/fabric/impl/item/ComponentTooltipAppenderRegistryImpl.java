@@ -29,7 +29,7 @@ import net.minecraft.component.type.TooltipDisplayComponent;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.tooltip.TooltipAppender;
-import net.minecraft.world.item.tooltip.TooltipType;
+import net.minecraft.world.item.TooltipFlag;
 import net.minecraft.network.chat.Component;
 
 public final class ComponentTooltipAppenderRegistryImpl {
@@ -73,7 +73,7 @@ public final class ComponentTooltipAppenderRegistryImpl {
 			Item.TooltipContext context,
 			TooltipDisplayComponent displayComponent,
 			Consumer<Component> textConsumer,
-			TooltipType type
+			TooltipFlag type
 	) {
 		Set<ComponentType<?>> cycleDetector = new HashSet<>();
 
@@ -87,7 +87,7 @@ public final class ComponentTooltipAppenderRegistryImpl {
 			Item.TooltipContext context,
 			TooltipDisplayComponent displayComponent,
 			Consumer<Component> textConsumer,
-			TooltipType type
+			TooltipFlag type
 	) {
 		Set<ComponentType<?>> cycleDetector = new HashSet<>();
 
@@ -102,7 +102,7 @@ public final class ComponentTooltipAppenderRegistryImpl {
 			Item.TooltipContext context,
 			TooltipDisplayComponent displayComponent,
 			Consumer<Component> textConsumer,
-			TooltipType type,
+			TooltipFlag type,
 			Set<ComponentType<?>> cycleDetector
 	) {
 		List<ComponentType<? extends TooltipAppender>> befores = before.get(componentType);
@@ -120,7 +120,7 @@ public final class ComponentTooltipAppenderRegistryImpl {
 			Item.TooltipContext context,
 			TooltipDisplayComponent displayComponent,
 			Consumer<Component> textConsumer,
-			TooltipType type,
+			TooltipFlag type,
 			Set<ComponentType<?>> cycleDetector
 	) {
 		List<ComponentType<? extends TooltipAppender>> afters = after.get(componentType);
@@ -138,7 +138,7 @@ public final class ComponentTooltipAppenderRegistryImpl {
 			Item.TooltipContext context,
 			TooltipDisplayComponent displayComponent,
 			Consumer<Component> textConsumer,
-			TooltipType type,
+			TooltipFlag type,
 			Set<ComponentType<?>> cycleDetector
 	) {
 		if (!cycleDetector.add(componentType)) {
