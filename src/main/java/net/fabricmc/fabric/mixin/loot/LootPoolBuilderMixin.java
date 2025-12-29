@@ -25,9 +25,9 @@ import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 
 import net.minecraft.world.level.storage.loot.LootPool;
-import net.minecraft.world.level.storage.loot.predicates.LootCondition;
+import net.minecraft.world.level.storage.loot.predicates.LootItemCondition;
 import net.minecraft.world.level.storage.loot.entries.LootPoolEntry;
-import net.minecraft.world.level.storage.loot.functions.LootFunction;
+import net.minecraft.world.level.storage.loot.functions.LootItemFunction;
 
 import net.fabricmc.fabric.api.loot.v3.FabricLootPoolBuilder;
 
@@ -43,11 +43,11 @@ abstract class LootPoolBuilderMixin implements FabricLootPoolBuilder {
 
 	@Shadow
 	@Final
-	private ImmutableList.Builder<LootCondition> conditions;
+	private ImmutableList.Builder<LootItemCondition> conditions;
 
 	@Shadow
 	@Final
-	private ImmutableList.Builder<LootFunction> functions;
+	private ImmutableList.Builder<LootItemFunction> functions;
 
 	@Unique
 	private LootPool.Builder self() {
@@ -68,25 +68,25 @@ abstract class LootPoolBuilderMixin implements FabricLootPoolBuilder {
 	}
 
 	@Override
-	public LootPool.Builder conditionally(LootCondition condition) {
+	public LootPool.Builder conditionally(LootItemCondition condition) {
 		this.conditions.add(condition);
 		return self();
 	}
 
 	@Override
-	public LootPool.Builder conditionally(Collection<? extends LootCondition> conditions) {
+	public LootPool.Builder conditionally(Collection<? extends LootItemCondition> conditions) {
 		this.conditions.addAll(conditions);
 		return self();
 	}
 
 	@Override
-	public LootPool.Builder apply(LootFunction function) {
+	public LootPool.Builder apply(LootItemFunction function) {
 		this.functions.add(function);
 		return self();
 	}
 
 	@Override
-	public LootPool.Builder apply(Collection<? extends LootFunction> functions) {
+	public LootPool.Builder apply(Collection<? extends LootItemFunction> functions) {
 		this.functions.addAll(functions);
 		return self();
 	}

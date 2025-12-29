@@ -25,7 +25,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import net.minecraft.world.item.Item;
-import net.minecraft.world.item.ItemConvertible;
+import net.minecraft.world.item.ItemLike;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.core.Registries;
 import net.minecraft.resources.ResourceLocation;
@@ -84,8 +84,8 @@ public class ItemApiLookupImpl<A, C> implements ItemApiLookup<A, C> {
 
 	@SuppressWarnings("unchecked")
 	@Override
-	public void registerSelf(ItemConvertible... items) {
-		for (ItemConvertible itemConvertible : items) {
+	public void registerSelf(ItemLike... items) {
+		for (ItemLike itemConvertible : items) {
 			Item item = itemConvertible.asItem();
 
 			if (!apiClass.isAssignableFrom(item.getClass())) {
@@ -102,14 +102,14 @@ public class ItemApiLookupImpl<A, C> implements ItemApiLookup<A, C> {
 	}
 
 	@Override
-	public void registerForItems(ItemApiProvider<A, C> provider, ItemConvertible... items) {
+	public void registerForItems(ItemApiProvider<A, C> provider, ItemLike... items) {
 		Objects.requireNonNull(provider, "ItemApiProvider may not be null.");
 
 		if (items.length == 0) {
-			throw new IllegalArgumentException("Must register at least one ItemConvertible instance with an ItemApiProvider.");
+			throw new IllegalArgumentException("Must register at least one ItemLike instance with an ItemApiProvider.");
 		}
 
-		for (ItemConvertible itemConvertible : items) {
+		for (ItemLike itemConvertible : items) {
 			Item item = itemConvertible.asItem();
 			Objects.requireNonNull(item, "Item convertible in item form may not be null.");
 

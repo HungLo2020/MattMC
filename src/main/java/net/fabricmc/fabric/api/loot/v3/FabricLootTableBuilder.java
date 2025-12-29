@@ -23,7 +23,7 @@ import org.jetbrains.annotations.ApiStatus;
 
 import net.minecraft.world.level.storage.loot.LootPool;
 import net.minecraft.world.level.storage.loot.LootTable;
-import net.minecraft.world.level.storage.loot.functions.LootFunction;
+import net.minecraft.world.level.storage.loot.functions.LootItemFunction;
 
 import net.fabricmc.fabric.mixin.loot.LootTableAccessor;
 
@@ -51,7 +51,7 @@ public interface FabricLootTableBuilder {
 	 * @param function the applied function
 	 * @return this builder
 	 */
-	default LootTable.Builder apply(LootFunction function) {
+	default LootTable.Builder apply(LootItemFunction function) {
 		throw new UnsupportedOperationException("Implemented via mixin");
 	}
 
@@ -71,7 +71,7 @@ public interface FabricLootTableBuilder {
 	 * @param functions the applied functions
 	 * @return this builder
 	 */
-	default LootTable.Builder apply(Collection<? extends LootFunction> functions) {
+	default LootTable.Builder apply(Collection<? extends LootItemFunction> functions) {
 		throw new UnsupportedOperationException("Implemented via mixin");
 	}
 

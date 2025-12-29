@@ -23,7 +23,7 @@ import org.jetbrains.annotations.ApiStatus;
 
 import net.minecraft.component.ComponentChanges;
 import net.minecraft.world.item.Item;
-import net.minecraft.world.item.ItemConvertible;
+import net.minecraft.world.item.ItemLike;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.network.RegistryByteBuf;
@@ -61,14 +61,14 @@ public interface ItemVariant extends TransferVariant<Item> {
 	/**
 	 * Retrieve an ItemVariant with an item and without a tag.
 	 */
-	static ItemVariant of(ItemConvertible item) {
+	static ItemVariant of(ItemLike item) {
 		return of(item, ComponentChanges.EMPTY);
 	}
 
 	/**
 	 * Retrieve an ItemVariant with an item and an optional tag.
 	 */
-	static ItemVariant of(ItemConvertible item, ComponentChanges components) {
+	static ItemVariant of(ItemLike item, ComponentChanges components) {
 		return ItemVariantImpl.of(item.asItem(), components);
 	}
 

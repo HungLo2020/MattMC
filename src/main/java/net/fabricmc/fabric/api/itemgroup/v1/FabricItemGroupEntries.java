@@ -24,7 +24,7 @@ import java.util.function.Predicate;
 import org.jetbrains.annotations.ApiStatus;
 
 import net.minecraft.world.item.Item;
-import net.minecraft.world.item.ItemConvertible;
+import net.minecraft.world.item.ItemLike;
 import net.minecraft.world.item.ItemGroup;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.flag.FeatureFlagSet;
@@ -132,7 +132,7 @@ public class FabricItemGroupEntries implements ItemGroup.Entries {
 	/**
 	 * See {@link #prepend(ItemStack)}. Automatically creates an {@link ItemStack} from the given item.
 	 */
-	public void prepend(ItemConvertible item) {
+	public void prepend(ItemLike item) {
 		prepend(item, ItemGroup.StackVisibility.PARENT_AND_SEARCH_TABS);
 	}
 
@@ -140,14 +140,14 @@ public class FabricItemGroupEntries implements ItemGroup.Entries {
 	 * See {@link #prepend(ItemStack, net.minecraft.world.item.ItemGroup.StackVisibility)}.
 	 * Automatically creates an {@link ItemStack} from the given item.
 	 */
-	public void prepend(ItemConvertible item, ItemGroup.StackVisibility visibility) {
+	public void prepend(ItemLike item, ItemGroup.StackVisibility visibility) {
 		prepend(new ItemStack(item), visibility);
 	}
 
 	/**
-	 * See {@link #addAfter(ItemConvertible, Collection)}.
+	 * See {@link #addAfter(ItemLike, Collection)}.
 	 */
-	public void addAfter(ItemConvertible afterLast, ItemStack... newStack) {
+	public void addAfter(ItemLike afterLast, ItemStack... newStack) {
 		addAfter(afterLast, Arrays.asList(newStack));
 	}
 
@@ -159,23 +159,23 @@ public class FabricItemGroupEntries implements ItemGroup.Entries {
 	}
 
 	/**
-	 * See {@link #addAfter(ItemConvertible, Collection)}.
+	 * See {@link #addAfter(ItemLike, Collection)}.
 	 */
-	public void addAfter(ItemConvertible afterLast, ItemConvertible... newItem) {
+	public void addAfter(ItemLike afterLast, ItemLike... newItem) {
 		addAfter(afterLast, Arrays.stream(newItem).map(ItemStack::new).toList());
 	}
 
 	/**
 	 * See {@link #addAfter(ItemStack, Collection)}.
 	 */
-	public void addAfter(ItemStack afterLast, ItemConvertible... newItem) {
+	public void addAfter(ItemStack afterLast, ItemLike... newItem) {
 		addAfter(afterLast, Arrays.stream(newItem).map(ItemStack::new).toList());
 	}
 
 	/**
-	 * See {@link #addAfter(ItemConvertible, Collection, net.minecraft.world.item.ItemGroup.StackVisibility)}.
+	 * See {@link #addAfter(ItemLike, Collection, net.minecraft.world.item.ItemGroup.StackVisibility)}.
 	 */
-	public void addAfter(ItemConvertible afterLast, Collection<ItemStack> newStacks) {
+	public void addAfter(ItemLike afterLast, Collection<ItemStack> newStacks) {
 		addAfter(afterLast, newStacks, ItemGroup.StackVisibility.PARENT_AND_SEARCH_TABS);
 	}
 
@@ -194,7 +194,7 @@ public class FabricItemGroupEntries implements ItemGroup.Entries {
 	 * @param visibility Determines whether the stack will be shown in the tab itself, returned
 	 *                   for searches, or both.
 	 */
-	public void addAfter(ItemConvertible afterLast, Collection<ItemStack> newStacks, ItemGroup.StackVisibility visibility) {
+	public void addAfter(ItemLike afterLast, Collection<ItemStack> newStacks, ItemGroup.StackVisibility visibility) {
 		newStacks = getEnabledStacks(newStacks);
 
 		if (newStacks.isEmpty()) {
@@ -262,9 +262,9 @@ public class FabricItemGroupEntries implements ItemGroup.Entries {
 	}
 
 	/**
-	 * See {@link #addBefore(ItemConvertible, Collection)}.
+	 * See {@link #addBefore(ItemLike, Collection)}.
 	 */
-	public void addBefore(ItemConvertible beforeFirst, ItemStack... newStack) {
+	public void addBefore(ItemLike beforeFirst, ItemStack... newStack) {
 		addBefore(beforeFirst, Arrays.asList(newStack));
 	}
 
@@ -276,23 +276,23 @@ public class FabricItemGroupEntries implements ItemGroup.Entries {
 	}
 
 	/**
-	 * See {@link #addBefore(ItemConvertible, Collection)}.
+	 * See {@link #addBefore(ItemLike, Collection)}.
 	 */
-	public void addBefore(ItemConvertible beforeFirst, ItemConvertible... newItem) {
+	public void addBefore(ItemLike beforeFirst, ItemLike... newItem) {
 		addBefore(beforeFirst, Arrays.stream(newItem).map(ItemStack::new).toList());
 	}
 
 	/**
 	 * See {@link #addBefore(ItemStack, Collection)}.
 	 */
-	public void addBefore(ItemStack beforeFirst, ItemConvertible... newItem) {
+	public void addBefore(ItemStack beforeFirst, ItemLike... newItem) {
 		addBefore(beforeFirst, Arrays.stream(newItem).map(ItemStack::new).toList());
 	}
 
 	/**
-	 * See {@link #addBefore(ItemConvertible, Collection, net.minecraft.world.item.ItemGroup.StackVisibility)}.
+	 * See {@link #addBefore(ItemLike, Collection, net.minecraft.world.item.ItemGroup.StackVisibility)}.
 	 */
-	public void addBefore(ItemConvertible beforeFirst, Collection<ItemStack> newStacks) {
+	public void addBefore(ItemLike beforeFirst, Collection<ItemStack> newStacks) {
 		addBefore(beforeFirst, newStacks, ItemGroup.StackVisibility.PARENT_AND_SEARCH_TABS);
 	}
 
@@ -311,7 +311,7 @@ public class FabricItemGroupEntries implements ItemGroup.Entries {
 	 * @param visibility  Determines whether the stack will be shown in the tab itself, returned
 	 *                    for searches, or both.
 	 */
-	public void addBefore(ItemConvertible beforeFirst, Collection<ItemStack> newStacks, ItemGroup.StackVisibility visibility) {
+	public void addBefore(ItemLike beforeFirst, Collection<ItemStack> newStacks, ItemGroup.StackVisibility visibility) {
 		newStacks = getEnabledStacks(newStacks);
 
 		if (newStacks.isEmpty()) {
@@ -456,7 +456,7 @@ public class FabricItemGroupEntries implements ItemGroup.Entries {
 		addTo.addAll(newStacks);
 	}
 
-	private static void addBefore(ItemConvertible anchor, Collection<ItemStack> newStacks, List<ItemStack> addTo) {
+	private static void addBefore(ItemLike anchor, Collection<ItemStack> newStacks, List<ItemStack> addTo) {
 		checkStacks(newStacks);
 
 		Item anchorItem = anchor.asItem();
@@ -472,7 +472,7 @@ public class FabricItemGroupEntries implements ItemGroup.Entries {
 		addTo.addAll(newStacks);
 	}
 
-	private static void addAfter(ItemConvertible anchor, Collection<ItemStack> newStacks, List<ItemStack> addTo) {
+	private static void addAfter(ItemLike anchor, Collection<ItemStack> newStacks, List<ItemStack> addTo) {
 		checkStacks(newStacks);
 
 		Item anchorItem = anchor.asItem();

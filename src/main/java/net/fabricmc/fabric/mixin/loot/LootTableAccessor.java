@@ -24,7 +24,7 @@ import org.spongepowered.asm.mixin.gen.Accessor;
 
 import net.minecraft.world.level.storage.loot.LootPool;
 import net.minecraft.world.level.storage.loot.LootTable;
-import net.minecraft.world.level.storage.loot.functions.LootFunction;
+import net.minecraft.world.level.storage.loot.functions.LootItemFunction;
 import net.minecraft.resources.ResourceLocation;
 
 import net.fabricmc.fabric.api.loot.v3.FabricLootTableBuilder;
@@ -39,7 +39,7 @@ public interface LootTableAccessor {
 	List<LootPool> fabric_getPools();
 
 	@Accessor("functions")
-	List<LootFunction> fabric_getFunctions();
+	List<LootItemFunction> fabric_getFunctions();
 
 	@Accessor("randomSequenceId")
 	Optional<ResourceLocation> fabric_getRandomSequenceId();

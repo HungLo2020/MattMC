@@ -29,7 +29,7 @@ import net.minecraft.world.PersistentStateManager;
 @Mixin(PersistentStateManager.class)
 class PersistentStateManagerMixin {
 	/**
-	 * Handle mods passing a null DataFixTypes to a PersistentState.Type.
+	 * Handle mods passing a null DataFixTypes to a SavedData.Type.
 	 */
 	@WrapOperation(method = "readNbt", at = @At(value = "INVOKE", target = "Lnet/minecraft/datafixer/DataFixTypes;update(Lcom/mojang/datafixers/DataFixer;Lnet/minecraft/nbt/CompoundTag;II)Lnet/minecraft/nbt/CompoundTag;"))
 	private CompoundTag handleNullDataFixType(DataFixTypes dataFixTypes, DataFixer dataFixer, CompoundTag nbt, int oldVersion, int newVersion, Operation<CompoundTag> original) {
