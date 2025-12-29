@@ -45,7 +45,7 @@ abstract class PlayerEntityMixin {
 
 	@Redirect(method = "tick", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/Level;isDay()Z"))
 	private boolean redirectDaySleepCheck(Level world) {
-		boolean day = world.isDay();
+		boolean day = world.dimensionType().hasFixedTime() ? false : (world.dayTime() % 24000L < 13000L);
 
 		if (((LivingEntity) (Object) this).getSleepingPosition().isPresent()) {
 			BlockPos pos = ((LivingEntity) (Object) this).getSleepingPosition().get();

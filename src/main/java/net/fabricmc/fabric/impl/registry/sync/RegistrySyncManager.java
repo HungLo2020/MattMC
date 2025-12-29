@@ -189,7 +189,7 @@ public final class RegistrySyncManager {
 							if (id == null) continue;
 
 							//noinspection unchecked
-							int rawId = registry.getRawId(o);
+							int rawId = registry.getId(o);
 							String stringId = id.toString();
 							builder.append("\"").append(rawId).append("\",\"").append(stringId).append("\",\"").append(classType).append("\"\n");
 						}
@@ -231,7 +231,7 @@ public final class RegistrySyncManager {
 					if (id == null) continue;
 
 					//noinspection unchecked
-					int rawId = registry.getRawId(o);
+					int rawId = registry.getId(o);
 
 					if (DEBUG) {
 						if (registry.get(id) != o) {

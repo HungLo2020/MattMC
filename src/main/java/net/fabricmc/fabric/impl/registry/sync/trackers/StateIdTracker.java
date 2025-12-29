@@ -84,7 +84,7 @@ public final class StateIdTracker<T, S> implements RegistryIdRemapCallback<T>, R
 
 		currentHighestId = 0;
 		registry.forEach((t) -> {
-			int rawId = registry.getRawId(t);
+			int rawId = registry.getId(t);
 			currentHighestId = Math.max(currentHighestId, rawId);
 			sortedBlocks.put(rawId, t);
 		});
@@ -98,7 +98,7 @@ public final class StateIdTracker<T, S> implements RegistryIdRemapCallback<T>, R
 		currentHighestId = 0;
 
 		for (T object : registry) {
-			currentHighestId = Math.max(currentHighestId, registry.getRawId(object));
+			currentHighestId = Math.max(currentHighestId, registry.getId(object));
 		}
 	}
 }

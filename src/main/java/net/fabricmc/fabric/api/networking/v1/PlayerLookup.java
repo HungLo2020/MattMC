@@ -58,8 +58,8 @@ public final class PlayerLookup {
 		Objects.requireNonNull(server, "The server cannot be null");
 
 		// return an immutable collection to guard against accidental removals.
-		if (server.getPlayerManager() != null) {
-			return Collections.unmodifiableCollection(server.getPlayerManager().getPlayerList());
+		if (server.getPlayerList() != null) {
+			return Collections.unmodifiableCollection(server.getPlayerList().getPlayerList());
 		}
 
 		return Collections.emptyList();
@@ -91,7 +91,7 @@ public final class PlayerLookup {
 		Objects.requireNonNull(world, "The world cannot be null");
 		Objects.requireNonNull(pos, "The chunk pos cannot be null");
 
-		return world.getChunkManager().chunkLoadingManager.getPlayersWatchingChunk(pos, false);
+		return world.getChunkSource().chunkLoadingManager.getPlayersWatchingChunk(pos, false);
 	}
 
 	/**
@@ -109,7 +109,7 @@ public final class PlayerLookup {
 	 */
 	public static Collection<ServerPlayer> tracking(Entity entity) {
 		Objects.requireNonNull(entity, "Entity cannot be null");
-		ChunkSource manager = entity.level().getChunkManager();
+		ChunkSource manager = entity.level().getChunkSource();
 
 		if (manager instanceof ServerChunkCache) {
 			ChunkMap chunkLoadingManager = ((ServerChunkCache) manager).chunkLoadingManager;
@@ -173,7 +173,7 @@ public final class PlayerLookup {
 
 		return world(world)
 				.stream()
-				.filter((p) -> p.squaredDistanceTo(pos) <= radiusSq)
+				.filter((p) -> p.distanceToSqr(pos) <= radiusSq)
 				.collect(Collectors.toList());
 	}
 
@@ -192,7 +192,7 @@ public final class PlayerLookup {
 
 		return world(world)
 				.stream()
-				.filter((p) -> p.squaredDistanceTo(pos.getX(), pos.getY(), pos.getZ()) <= radiusSq)
+				.filter((p) -> p.distanceToSqr(pos.getX(), pos.getY(), pos.getZ()) <= radiusSq)
 				.collect(Collectors.toList());
 	}
 

@@ -117,7 +117,7 @@ abstract class ServerPlayerEntityMixin extends LivingEntityMixin {
 
 	@Redirect(method = "trySleep", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/world/ServerLevel;isDay()Z"))
 	private boolean redirectDaySleepCheck(ServerLevel world, BlockPos pos) {
-		boolean day = world.isDay();
+		boolean day = world.dimensionType().hasFixedTime() ? false : (world.dayTime() % 24000L < 13000L);
 		InteractionResult result = EntitySleepEvents.ALLOW_SLEEP_TIME.invoker().allowSleepTime((Player) (Object) this, pos, !day);
 
 		if (result != InteractionResult.PASS) {
