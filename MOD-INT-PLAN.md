@@ -2,13 +2,13 @@
 
 ## Executive Summary
 
-This document outlines a comprehensive, robust plan to integrate Sodium, Iris, and Distant Horizons mods directly into the main Minecraft JAR, eliminating the need for separate mod JARs while maintaining the current hook-based architecture that's already partially implemented.
+This document outlines a comprehensive, robust plan to integrate Sodium, Iris, Distant Horizons mods, AND Fabric Loader directly into a single unified JAR, eliminating all separate mod JARs and drastically simplifying the build system.
 
-**Goal**: Combine Minecraft + Fabric Loader + all mods into a single JAR with drastically simplified build system for easier iteration, testing, and maintenance.
+**Goal**: Combine Minecraft + Fabric Loader + all mods into **ONE SINGLE JAR** for easier iteration, testing, and maintenance.
 
-**Key Challenge**: Minecraft cannot depend on mods at compile time (would create circular dependencies), but mods depend on Minecraft.
+**Key Insight**: Once all code is moved to the same source set (`src/main/java`), there are NO circular dependencies - Minecraft can reference mod classes freely, and mods can reference Minecraft classes. Everything compiles together in a single pass.
 
-**Solution Approach**: Multi-phase build with source set reorganization, mixin configuration consolidation, and unified Fabric Loader integration.
+**Solution Approach**: Two-phase build with complete source consolidation, mixin configuration updates, and internal Fabric Loader mod discovery.
 
 ---
 
@@ -42,11 +42,19 @@ MattMC/
 5. **distantHorizons** source set → `distanthorizons-2.4.4-b-dev-mc1.21.10.jar` (depends on fabricLoader + main)
 6. Runtime: Fabric Loader discovers mod JARs in `run/mods/` directory
 
-**Dependencies**:
+**Current Dependencies** (separate compilation):
 - Minecraft → Fabric Loader (compile-time)
 - Sodium → Fabric Loader + Minecraft (compile-time)
 - Iris → Fabric Loader + Minecraft + Sodium (compile-time)
 - Distant Horizons → Fabric Loader + Minecraft (compile-time)
+
+**Target Process**:
+1. **Single source set** → `MattMC-1.21.10.jar` (ONE JAR with everything)
+
+**Target Dependencies** (unified compilation):
+- Everything compiles together in a single pass
+- No inter-module dependencies - all code is in one source set
+- Minecraft can reference mod classes directly (no circular dependency!)
 
 ### Mixin System
 
@@ -75,58 +83,77 @@ MattMC/
 
 ## The Challenge
 
-**Why can't we just move mod source into `src/main/java`?**
+**What needs to be solved to move everything into one JAR?**
 
-1. **Circular Dependency Problem**:
-   - Mods depend on Minecraft classes (e.g., `net.minecraft.client.Minecraft`)
-   - If Minecraft source references mod classes directly → circular dependency
-   - Java compiler cannot resolve circular dependencies at compile time
+1. **Mixin Targeting Issue**:
+   - Mixins currently target classes in separate JARs
+   - If everything is in one JAR, mixin configs need to be consolidated
+   - Mixin refmap (mapping) generation may need adjustments
+   - Solution: Consolidate all mixin configs into the main JAR's resources
 
-2. **Mixin Targeting Issue**:
-   - Mixins use bytecode manipulation to modify classes
-   - Currently target classes in separate JARs
-   - If everything is in one JAR, mixin system needs reconfiguration
-   - Mixin refmap (mapping) generation breaks with single JAR
+2. **Fabric Loader Discovery**:
+   - Fabric Loader currently scans `run/mods/` directory for mod JARs
+   - Each mod has its own `fabric.mod.json` in separate JARs
+   - With everything in one JAR, need to tell Fabric Loader about embedded mods
+   - Solution: Either use a single mod ID with all entrypoints, OR teach Fabric Loader to discover embedded mod metadata
 
-3. **Fabric Loader Discovery**:
-   - Fabric Loader scans classpath for `fabric.mod.json` files
-   - Currently expects mod JARs in `run/mods/` directory
-   - Must adapt to discover mods from same JAR as Minecraft
+3. **Source Organization**:
+   - Need to move all source code from `modules/` to `src/main/java/`
+   - Need to consolidate all resources from `modules/*/resources/` to `src/main/resources/`
+   - Need to update build.gradle to compile everything together
+   - Solution: Direct source migration with proper package structure
+
+**Important**: There is NO circular dependency problem once everything is in the same source set. The Java compiler can handle all cross-references because it sees all classes at once.
 
 ---
 
-## Proposed Solution: Three-Phase Integration
+## Proposed Solution: Two-Phase Integration
 
-### Phase 1: Source Reorganization (No Circular Dependencies)
+### Phase 1: Complete Source Consolidation
 
-**Objective**: Move all mod source code into main source tree while maintaining compilation order.
+**Objective**: Move ALL source code (Fabric Loader + Minecraft + all mods) into a single unified source tree.
 
-#### Step 1.1: Create Mod Package Structure
+#### Step 1.1: Create Complete Package Structure
 
 ```
 src/main/java/
-├── net/minecraft/                   # Minecraft (compiles first)
-├── net/fabricmc/                    # Fabric API stubs (compiles first)
-├── net/caffeinemc/mods/sodium/     # Sodium mod (compiles after Minecraft)
-├── net/irisshaders/iris/           # Iris mod (compiles after Sodium)
-└── com/seibel/distanthorizons/     # DH mod (compiles after Minecraft)
+├── net/minecraft/                   # Minecraft core
+├── net/fabricmc/                    # Fabric Loader + Fabric API
+│   ├── loader/                      # Fabric Loader classes (from modules/fabric-loader-0.18.2)
+│   ├── api/                         # Fabric API stubs
+│   └── ...
+├── net/caffeinemc/mods/sodium/     # Sodium mod
+├── net/irisshaders/iris/           # Iris mod
+└── com/seibel/distanthorizons/     # Distant Horizons mod
 ```
+
+**Key Insight**: Everything compiles together in ONE pass - no compilation order needed!
 
 **Implementation**:
 ```bash
+# Copy Fabric Loader source
+cp -r modules/fabric-loader-0.18.2/src/main/java/* src/main/java/
+cp -r modules/fabric-loader-0.18.2/src/main/legacyJava/* src/main/java/
+cp -r modules/fabric-loader-0.18.2/src/java17/java/* src/main/java/
+cp -r modules/fabric-loader-0.18.2/minecraft/src/main/java/* src/main/java/
+cp -r modules/fabric-loader-0.18.2/minecraft/src/main/legacyJava/* src/main/java/
+
 # Copy Sodium source
-cp -r modules/sodium-1.21.9/common/src/main/java/net/caffeinemc src/main/java/net/
-cp -r modules/sodium-1.21.9/fabric/src/main/java/net/caffeinemc src/main/java/net/
+cp -r modules/sodium-1.21.9/common/src/main/java/* src/main/java/
+cp -r modules/sodium-1.21.9/common/src/api/java/* src/main/java/
+cp -r modules/sodium-1.21.9/common/src/boot/java/* src/main/java/
+cp -r modules/sodium-1.21.9/fabric/src/main/java/* src/main/java/
 
 # Copy Iris source  
-cp -r modules/Iris-1.21.9/common/src/main/java/net/irisshaders src/main/java/net/
-cp -r modules/Iris-1.21.9/fabric/src/main/java/net/irisshaders src/main/java/net/
+cp -r modules/Iris-1.21.9/common/src/main/java/* src/main/java/
+cp -r modules/Iris-1.21.9/common/src/api/java/* src/main/java/
+cp -r modules/Iris-1.21.9/fabric/src/main/java/* src/main/java/
 
 # Copy Distant Horizons source
-cp -r modules/distant-horizons/coreSubProjects/core/src/main/java/com/seibel src/main/java/com/
-cp -r modules/distant-horizons/coreSubProjects/api/src/main/java/com/seibel src/main/java/com/
-cp -r modules/distant-horizons/common/src/main/java/com/seibel src/main/java/com/
-cp -r modules/distant-horizons/fabric/src/main/java/com/seibel src/main/java/com/
+cp -r modules/distant-horizons/coreSubProjects/core/src/main/java/* src/main/java/
+cp -r modules/distant-horizons/coreSubProjects/api/src/main/java/* src/main/java/
+cp -r modules/distant-horizons/common/src/main/java/* src/main/java/
+cp -r modules/distant-horizons/fabric/src/main/java/* src/main/java/
 ```
 
 #### Step 1.2: Consolidate Resources
@@ -156,6 +183,10 @@ src/main/resources/
 
 **Copy Resources**:
 ```bash
+# Copy Fabric Loader resources
+cp -r modules/fabric-loader-0.18.2/src/main/resources/* src/main/resources/
+cp -r modules/fabric-loader-0.18.2/minecraft/src/main/resources/* src/main/resources/
+
 # Copy Sodium resources
 cp -r modules/sodium-1.21.9/common/src/main/resources/* src/main/resources/
 cp -r modules/sodium-1.21.9/fabric/src/main/resources/* src/main/resources/
@@ -170,50 +201,60 @@ cp -r modules/distant-horizons/fabric/src/main/resources/* src/main/resources/
 
 #### Step 1.3: Update Gradle Build Configuration
 
-**Remove Separate Source Sets**:
+**Remove ALL Separate Source Sets**:
 ```gradle
-// DELETE these source sets:
+// DELETE all these source sets:
+// - sourceSets.fabricLoader
 // - sourceSets.sodium
 // - sourceSets.iris  
 // - sourceSets.distantHorizons
 
 // KEEP only:
 sourceSets {
-    fabricLoader { /* ... */ }
-    main { /* ... */ }  // Now includes all mod source
+    main {
+        java {
+            srcDir 'src/main/java'  // ALL source code together
+        }
+        resources {
+            srcDir 'src/main/resources'  // ALL resources together
+        }
+    }
     test { /* ... */ }
 }
 ```
 
-**Update Compilation Order** (prevent circular deps):
+**Compilation**: Simple single-pass compilation - no special configuration needed!
 ```gradle
+// Everything compiles together automatically
+// No circular dependencies because everything is in one source set
 tasks.named('compileJava') {
-    // Configure multi-pass compilation or use incremental compilation
-    options.compilerArgs += [
-        // First compile Minecraft and Fabric stubs
-        '-sourcepath', 'src/main/java/net/minecraft:src/main/java/net/fabricmc',
-        // Then compile mods
-        '-processorpath', configurations.annotationProcessor.asPath
-    ]
+    // Standard compilation - nothing special needed
+    options.encoding = 'UTF-8'
+    options.release = 21
 }
 ```
 
-**Alternative**: Use `--patch-module` for module system:
-```gradle
-tasks.named('compileJava') {
-    options.compilerArgs += [
-        '--patch-module', 'minecraft=src/main/java'
-    ]
-}
-```
-
-#### Step 1.4: Remove Mod JAR Tasks
+#### Step 1.4: Remove ALL Separate JAR Tasks
 
 ```gradle
-// DELETE these tasks:
+// DELETE all these tasks:
+// - tasks.register('fabricLoaderJar', Jar)
+// - tasks.register('gameJar', Jar)
 // - tasks.register('sodiumJar', Jar)
 // - tasks.register('irisJar', Jar)
 // - tasks.register('distantHorizonsJar', Jar)
+
+// KEEP only the main jar task:
+jar {
+    // Single JAR with EVERYTHING
+    from sourceSets.main.output
+    
+    manifest {
+        attributes(
+            'Main-Class': 'net.fabricmc.loader.impl.launch.knot.KnotClient'
+        )
+    }
+}
 ```
 
 ---
@@ -369,11 +410,11 @@ public class SodiumMixinPlugin implements IMixinConfigPlugin {
 
 ---
 
-### Phase 3: Fabric Loader Integration
+### Phase 2: Fabric Loader Internal Mod Discovery
 
-**Objective**: Make Fabric Loader discover and load mods from the same JAR as Minecraft.
+**Objective**: Make Fabric Loader discover and load mods that are embedded in the same JAR (no external mod directory).
 
-#### Step 3.1: Understand Fabric Loader Mod Discovery
+#### Step 2.1: Understand Fabric Loader Mod Discovery
 
 **Current Discovery Process**:
 1. `DirectoryModCandidateFinder` - Scans `run/mods/` directory
@@ -385,7 +426,7 @@ public class SodiumMixinPlugin implements IMixinConfigPlugin {
 - `net.fabricmc.loader.impl.discovery.ModCandidateImpl`
 - `net.fabricmc.loader.impl.discovery.ClasspathModCandidateFinder`
 
-#### Step 3.2: Modify Fabric Loader for Same-JAR Mods
+#### Step 2.2: Modify Fabric Loader for Internal Mods
 
 **Option A: Enhanced Classpath Scanner**
 
@@ -423,7 +464,7 @@ public class ClasspathModCandidateFinder implements ModCandidateFinder {
 
 No Fabric Loader changes needed - just use single `fabric.mod.json` with multiple entrypoints (see Phase 2.3 Option A).
 
-#### Step 3.3: Update Mod Loading
+#### Step 2.3: Update Mod Loading
 
 **Ensure Mixin Configs Load**:
 
@@ -447,7 +488,7 @@ public class Knot {
 }
 ```
 
-#### Step 3.4: Handle Mod Dependencies
+#### Step 2.4: Handle Mod Dependencies
 
 **Problem**: Iris depends on Sodium, but both are in same JAR.
 
@@ -576,7 +617,7 @@ public class ModResolver {
     # Fix any compilation errors (missing imports, package conflicts)
     ```
 
-#### Week 5-6: Mixin System Reconfiguration (Phase 2)
+#### Week 5-6: Mixin System Reconfiguration (part of Phase 1)
 
 12. **Create Unified Mixin Configuration**
     - Option 1: Create `mattmc-all.mixins.json` combining all
@@ -598,7 +639,7 @@ public class ModResolver {
     # -Dmixin.debug.verbose=true -Dmixin.debug.export=true
     ```
 
-#### Week 7-8: Fabric Loader Modification (Phase 3)
+#### Week 7-8: Fabric Loader Modification (Phase 2)
 
 16. **Modify Fabric Loader Mod Discovery**
     - Update `ClasspathModCandidateFinder` to scan `META-INF/mods/` or `fabric-mods/`
@@ -694,28 +735,23 @@ tasks.register('runClient', JavaExec) {
 }
 ```
 
-**After** (Simplified):
+**After** (Simplified to ONE JAR):
 ```gradle
-// 2 source sets (fabricLoader + main with all mod code)
+// SINGLE source set with EVERYTHING
 sourceSets {
-    fabricLoader { /* ... */ }
     main {
         java {
-            srcDir 'src/main/java'  // Includes all mod source
+            srcDir 'src/main/java'  // Fabric Loader + Minecraft + ALL mods
         }
         resources {
-            srcDir 'src/main/resources'  // Includes all mod resources
+            srcDir 'src/main/resources'  // All resources
         }
-        compileClasspath += sourceSets.fabricLoader.output
     }
 }
 
-// 2 JAR tasks
-tasks.register('fabricLoaderJar', Jar) { /* ... */ }
-
+// SINGLE JAR task
 jar {
-    // Single JAR with everything
-    from sourceSets.fabricLoader.output
+    // One JAR with EVERYTHING - Fabric Loader + Minecraft + all mods
     from sourceSets.main.output
     
     manifest {
@@ -725,28 +761,30 @@ jar {
     }
 }
 
-// Simplified runClient task (no mod copying needed)
+// Simplified runClient task - ONE JAR!
 tasks.register('runClient', JavaExec) {
-    dependsOn 'fabricLoaderJar', 'jar'
+    dependsOn 'jar'
     
     classpath = files(
-        file("${buildDir}/libs/fabric-loader-${fabricLoaderVersion}.jar"),
         file("${buildDir}/libs/MattMC-${version}.jar")
     ) + configurations.runtimeClasspath
     
-    // No mod copying - everything is in main JAR!
+    mainClass = 'net.fabricmc.loader.impl.launch.knot.KnotClient'
+    
+    // No mod copying - everything is already in the ONE JAR!
 }
 ```
 
 ### Dependency Changes
 
-**Remove**:
+**Remove ALL separate source set configurations**:
+- fabricLoader configurations (`fabricLoaderImplementation`, etc.)
 - Sodium configurations (`sodiumImplementation`, `sodiumCompileOnly`, etc.)
 - Iris configurations (`irisImplementation`, `irisCompileOnly`, etc.)
 - DH configurations (`distantHorizonsImplementation`, etc.)
 
 **Keep**:
-- All mod dependencies now in main `implementation` (Sodium, Iris, DH deps)
+- Single `implementation` block with ALL dependencies (Fabric, Minecraft, Sodium, Iris, DH)
 
 ---
 
@@ -762,13 +800,13 @@ tasks.register('runClient', JavaExec) {
 - Consider disabling refmap if dev environment only
 - Gradual migration: keep old JARs working while testing
 
-#### Risk: Circular Dependency at Compile Time
-**Impact**: Compilation fails entirely
+#### Risk: Compilation Issues
+**Impact**: Compilation fails due to missing dependencies or package conflicts
 **Mitigation**:
-- Use multi-pass compilation
-- Leverage `--patch-module` flag
-- Careful package organization (Minecraft first, then mods)
-- Incremental approach: migrate one mod at a time
+- Ensure all dependencies are in the main configuration
+- Check for package name conflicts between mods
+- Test compilation early and often
+- Note: NO circular dependency risk - everything compiles in one pass!
 
 #### Risk: Fabric Loader Doesn't Discover Same-JAR Mods
 **Impact**: Mods don't initialize, features missing
@@ -875,10 +913,11 @@ If integration fails catastrophically:
 ## Success Criteria
 
 ### Build System
-- ✅ Single `./gradlew build` command produces working JAR
+- ✅ Single `./gradlew build` command produces ONE working JAR
 - ✅ No separate mod JAR copying needed
+- ✅ No separate Fabric Loader JAR needed
 - ✅ Build time ≤ 120% of current time
-- ✅ Build configuration < 1000 lines (vs. current 1500+)
+- ✅ Build configuration < 500 lines (vs. current 1500+) - massive simplification!
 
 ### Runtime
 - ✅ All mods initialize successfully
@@ -949,27 +988,26 @@ After successful integration:
 
 ## Conclusion
 
-**Is this plan feasible?** YES.
+**Is this plan feasible?** YES, absolutely!
 
 **Key Success Factors**:
-1. Incremental approach - migrate one mod at a time
-2. Extensive testing at each phase
-3. Rollback plan if issues arise
-4. Leverage existing hook system (9% already done)
+1. No circular dependency issues - everything compiles together in one pass
+2. Simpler than originally thought - just consolidate sources and update Fabric Loader discovery
+3. Extensive testing at each phase
+4. Rollback plan if issues arise
 
 **Estimated Timeline**:
-- **Phase 1 (Source Reorganization)**: 2-4 weeks
-- **Phase 2 (Mixin Reconfiguration)**: 2-3 weeks
-- **Phase 3 (Fabric Loader Changes)**: 2-3 weeks
+- **Phase 1 (Complete Source Consolidation + Mixin Updates)**: 3-5 weeks
+- **Phase 2 (Fabric Loader Internal Discovery)**: 2-3 weeks
 - **Testing & Refinement**: 2-3 weeks
-- **Total**: 8-13 weeks (2-3 months)
+- **Total**: 7-11 weeks (2-3 months)
 
 **Compared to Hook Conversion**:
 - Hook conversion: ~29 weeks
-- This plan: ~10 weeks average
-- **2.9x faster** to achieve single JAR goal
+- This plan: ~9 weeks average
+- **3.2x faster** to achieve ONE JAR goal
 
-**Recommendation**: Proceed with this plan, starting with Sodium as proof-of-concept, then Iris, then Distant Horizons.
+**Recommendation**: Proceed with complete migration - move ALL sources (including Fabric Loader) to src/main/java in one step. This is simpler than incremental migration because there are no circular dependencies to worry about.
 
 ---
 
@@ -1025,15 +1063,18 @@ After successful integration:
 
 ```
 MattMC/
-├── build.gradle                     # SIMPLIFIED (2 source sets, 2 JARs)
+├── build.gradle                     # MASSIVELY SIMPLIFIED (1 source set, 1 JAR)
 ├── modules/                         # CAN BE DELETED (or kept as reference)
-│   ├── fabric-loader-0.18.2/       # Still built separately
+│   ├── fabric-loader-0.18.2/       # SOURCE MOVED to src/main/java
 │   ├── sodium-1.21.9/              # SOURCE MOVED to src/main/java
 │   ├── Iris-1.21.9/                # SOURCE MOVED to src/main/java
 │   └── distant-horizons/           # SOURCE MOVED to src/main/java
 ├── src/main/java/
-│   ├── net/minecraft/              # Minecraft source (unchanged)
-│   ├── net/fabricmc/               # Fabric API stubs (unchanged)
+│   ├── net/minecraft/              # Minecraft source
+│   ├── net/fabricmc/               # Fabric Loader + Fabric API (MOVED FROM modules/fabric-loader-0.18.2)
+│   │   ├── loader/                 # Fabric Loader classes
+│   │   ├── api/                    # Fabric API
+│   │   └── ...
 │   ├── net/caffeinemc/mods/sodium/ # MOVED FROM modules/sodium-1.21.9
 │   ├── net/irisshaders/iris/       # MOVED FROM modules/Iris-1.21.9
 │   └── com/seibel/distanthorizons/ # MOVED FROM modules/distant-horizons
@@ -1056,11 +1097,12 @@ MattMC/
 │       ├── iris/
 │       └── distanthorizons/
 └── build/libs/
-    ├── fabric-loader-0.18.2.jar    # Fabric Loader (separate as before)
-    └── MattMC-1.21.10.jar          # SINGLE JAR: Minecraft + all mods!
+    └── MattMC-1.21.10.jar          # ONE SINGLE JAR: Fabric Loader + Minecraft + all mods!
 ```
 
-**Key Change**: `run/mods/` directory **NO LONGER NEEDED** - everything is in the main JAR!
+**Key Changes**: 
+- `run/mods/` directory **NO LONGER NEEDED** - everything is in ONE JAR!
+- **NO separate Fabric Loader JAR** - it's included in the main JAR!
 
 ---
 
