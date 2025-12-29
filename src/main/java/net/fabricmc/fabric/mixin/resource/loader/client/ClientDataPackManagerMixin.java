@@ -27,7 +27,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Redirect;
 
 import net.minecraft.client.resource.ClientDataPackManager;
-import net.minecraft.core.VersionedIdentifier;
+import net.minecraft.server.packs.repository.KnownPack;
 import net.minecraft.server.packs.repository.PackRepository;
 
 import net.fabricmc.fabric.impl.resource.loader.ModResourcePackCreator;
@@ -44,7 +44,7 @@ public class ClientDataPackManagerMixin {
 	}
 
 	@ModifyReturnValue(method = "getCommonKnownPacks", at = @At("RETURN"))
-	List<VersionedIdentifier> getCommonKnownPacksReturn(List<VersionedIdentifier> original) {
+	List<KnownPack> getCommonKnownPacksReturn(List<KnownPack> original) {
 		if (original.size() > ModResourcePackCreator.MAX_KNOWN_PACKS) {
 			LOGGER.warn("Too many knownPacks: Found {}; max {}", original.size(), ModResourcePackCreator.MAX_KNOWN_PACKS);
 			return original.subList(0, ModResourcePackCreator.MAX_KNOWN_PACKS);

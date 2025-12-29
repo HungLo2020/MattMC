@@ -27,7 +27,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-import net.minecraft.core.VersionedIdentifier;
+import net.minecraft.server.packs.repository.KnownPack;
 import net.minecraft.server.packs.repository.Pack;
 import net.minecraft.server.packs.repository.PackRepository;
 import net.minecraft.server.packs.repository.Pack;
@@ -44,7 +44,7 @@ import net.fabricmc.fabric.impl.resource.loader.ModNioResourcePack;
 @Mixin(MinecraftServer.class)
 public class MinecraftServerMixin implements FabricOriginalKnownPacksGetter {
 	@Unique
-	private List<VersionedIdentifier> fabric_originalKnownPacks;
+	private List<KnownPack> fabric_originalKnownPacks;
 
 	@Inject(method = "<init>", at = @At("TAIL"))
 	private void init(Thread serverThread, LevelStorage.Session session, PackRepository dataPackManager, SaveLoader saveLoader, Proxy proxy, DataFixer dataFixer, ApiServices apiServices, ChunkLoadProgress chunkLoadProgress, CallbackInfo ci) {
@@ -73,7 +73,7 @@ public class MinecraftServerMixin implements FabricOriginalKnownPacksGetter {
 	}
 
 	@Override
-	public List<VersionedIdentifier> fabric_getOriginalKnownPacks() {
+	public List<KnownPack> fabric_getOriginalKnownPacks() {
 		return this.fabric_originalKnownPacks;
 	}
 }

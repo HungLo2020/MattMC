@@ -38,7 +38,7 @@ import net.minecraft.server.packs.resources.PreparableReloadListener;
 import net.minecraft.server.packs.PackType;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.util.Pair;
+import com.mojang.datafixers.util.Pair;
 
 import net.fabricmc.fabric.api.resource.IdentifiableResourceReloadListener;
 import net.fabricmc.fabric.api.resource.ResourceManagerHelper;
@@ -48,7 +48,7 @@ import net.fabricmc.loader.api.ModContainer;
 
 public class ResourceManagerHelperImpl implements ResourceManagerHelper {
 	private static final Map<PackType, ResourceManagerHelperImpl> registryMap = new HashMap<>();
-	private static final Set<Pair<Component, ModNioResourcePack>> builtinResourcePacks = new HashSet<>();
+	private static final Set<Tuple<Component, ModNioResourcePack>> builtinResourcePacks = new HashSet<>();
 
 	private final ResourceLoader resourceLoader;
 
@@ -82,11 +82,11 @@ public class ResourceManagerHelperImpl implements ResourceManagerHelper {
 		if (resourcePack == null && dataPack == null) return false;
 
 		if (resourcePack != null) {
-			builtinResourcePacks.add(new Pair<>(displayName, resourcePack));
+			builtinResourcePacks.add(new Tuple<>(displayName, resourcePack));
 		}
 
 		if (dataPack != null) {
-			builtinResourcePacks.add(new Pair<>(displayName, dataPack));
+			builtinResourcePacks.add(new Tuple<>(displayName, dataPack));
 		}
 
 		return true;
@@ -109,7 +109,7 @@ public class ResourceManagerHelperImpl implements ResourceManagerHelper {
 
 	public static void registerBuiltinResourcePacks(PackType resourceType, Consumer<Pack> consumer) {
 		// Loop through each registered built-in resource packs and add them if valid.
-		for (Pair<Component, ModNioResourcePack> entry : builtinResourcePacks) {
+		for (Tuple<Component, ModNioResourcePack> entry : builtinResourcePacks) {
 			ModNioResourcePack pack = entry.getRight();
 
 			// Add the built-in pack only if namespaces for the specified resource type are present.

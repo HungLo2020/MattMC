@@ -42,13 +42,13 @@ import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import net.minecraft.core.VersionedIdentifier;
+import net.minecraft.server.packs.repository.KnownPack;
 import net.minecraft.server.packs.AbstractFileResourcePack;
 import net.minecraft.server.packs.resources.IoSupplier;
 import net.minecraft.server.packs.repository.Pack;
 import net.minecraft.server.packs.PackLocationInfo;
 import net.minecraft.server.packs.PackType;
-import net.minecraft.server.packs.metadata.ResourceMetadataSerializer;
+import net.minecraft.server.packs.metadata.MetadataSectionType;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.path.PathUtil;
@@ -108,7 +108,7 @@ public class ModNioResourcePack implements Pack, ModResourcePack {
 				packId,
 				displayName,
 				ModResourcePackCreator.RESOURCE_PACK_SOURCE,
-				Optional.of(new VersionedIdentifier(ModResourcePackCreator.FABRIC, packId, mod.getMetadata().getVersion().getFriendlyString()))
+				Optional.of(new KnownPack(ModResourcePackCreator.FABRIC, packId, mod.getMetadata().getVersion().getFriendlyString()))
 		);
 		ModNioResourcePack ret = new ModNioResourcePack(packId, mod, paths, type, activationType, modBundled, metadata);
 
@@ -280,7 +280,7 @@ public class ModNioResourcePack implements Pack, ModResourcePack {
 	}
 
 	@Override
-	public <T> T parseMetadata(ResourceMetadataSerializer<T> metaReader) throws IOException {
+	public <T> T parseMetadata(MetadataSectionType<T> metaReader) throws IOException {
 		try (InputStream is = Objects.requireNonNull(openFile("pack.mcmeta")).get()) {
 			return AbstractFileResourcePack.parseMetadata(metaReader, is, this.metadata);
 		}

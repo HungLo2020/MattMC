@@ -20,7 +20,7 @@ import java.util.Map;
 import java.util.Optional;
 
 import com.google.common.collect.ImmutableMap;
-import com.mojang.datafixers.util.Pair;
+import com.mojang.datafixers.util.Tuple;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.DataResult;
 import com.mojang.serialization.DynamicOps;
@@ -39,8 +39,8 @@ public record FailSoftMapCodec<K, V>(Codec<K> keyCodec, Codec<V> elementCodec) i
 	private static final Logger LOGGER = LoggerFactory.getLogger("FailSoftMapCodec");
 
 	@Override
-	public <T> DataResult<Pair<Map<K, V>, T>> decode(final DynamicOps<T> ops, final T input) {
-		return ops.getMap(input).setLifecycle(Lifecycle.stable()).flatMap(map -> decode(ops, map)).map(r -> Pair.of(r, input));
+	public <T> DataResult<Tuple<Map<K, V>, T>> decode(final DynamicOps<T> ops, final T input) {
+		return ops.getMap(input).setLifecycle(Lifecycle.stable()).flatMap(map -> decode(ops, map)).map(r -> Tuple.of(r, input));
 	}
 
 	@Override

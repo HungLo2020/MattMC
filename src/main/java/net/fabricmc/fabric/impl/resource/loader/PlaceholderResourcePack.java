@@ -35,7 +35,7 @@ import net.minecraft.server.packs.repository.Pack;
 import net.minecraft.server.packs.PackType;
 import net.minecraft.server.packs.metadata.pack.PackMetadataSection;
 import net.minecraft.server.packs.metadata.ResourceMetadataMap;
-import net.minecraft.server.packs.metadata.ResourceMetadataSerializer;
+import net.minecraft.server.packs.metadata.MetadataSectionType;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 
@@ -89,7 +89,7 @@ public record PlaceholderResourcePack(PackType type, PackLocationInfo metadata) 
 
 	@Nullable
 	@Override
-	public <T> T parseMetadata(ResourceMetadataSerializer<T> metaReader) {
+	public <T> T parseMetadata(MetadataSectionType<T> metaReader) {
 		return ResourceMetadataMap.of(PackMetadataSection.getSerializerFor(type), getMetadata()).get(metaReader);
 	}
 

@@ -28,7 +28,7 @@ import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import org.apache.commons.lang3.ArrayUtils;
-import org.apache.commons.lang3.tuple.Pair;
+import org.apache.commons.lang3.tuple.Tuple;
 
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
@@ -105,7 +105,7 @@ public final class TradeOfferInternals {
 
 			if (ID_TO_INDEX.containsKey(id)) throw new IllegalArgumentException("pool id %s is already registered".formatted(id));
 
-			Pair<VillagerTrades.ItemListing[], Integer> pool = Pair.of(factories, count);
+			Tuple<VillagerTrades.ItemListing[], Integer> pool = Tuple.of(factories, count);
 			initWanderingTraderTrades();
 			ID_TO_INDEX.put(id, MerchantOffers.WANDERING_TRADER_TRADES.size());
 			MerchantOffers.WANDERING_TRADER_TRADES.add(pool);
@@ -129,9 +129,9 @@ public final class TradeOfferInternals {
 
 			int poolIndex = ID_TO_INDEX.getInt(pool);
 			initWanderingTraderTrades();
-			Pair<VillagerTrades.ItemListing[], Integer> poolPair = MerchantOffers.WANDERING_TRADER_TRADES.get(poolIndex);
+			Tuple<VillagerTrades.ItemListing[], Integer> poolPair = MerchantOffers.WANDERING_TRADER_TRADES.get(poolIndex);
 			VillagerTrades.ItemListing[] modified = ArrayUtils.addAll(poolPair.getLeft(), factories);
-			MerchantOffers.WANDERING_TRADER_TRADES.set(poolIndex, Pair.of(modified, poolPair.getRight()));
+			MerchantOffers.WANDERING_TRADER_TRADES.set(poolIndex, Tuple.of(modified, poolPair.getRight()));
 			return this;
 		}
 	}

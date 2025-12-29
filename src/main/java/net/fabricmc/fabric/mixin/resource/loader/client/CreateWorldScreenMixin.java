@@ -18,7 +18,7 @@ package net.fabricmc.fabric.mixin.resource.loader.client;
 
 import java.io.File;
 
-import com.mojang.datafixers.util.Pair;
+import com.mojang.datafixers.util.Tuple;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
@@ -61,7 +61,7 @@ public abstract class CreateWorldScreenMixin extends Screen {
 
 	@Inject(method = "getScannedPack",
 			at = @At(value = "INVOKE", target = "Lnet/minecraft/resource/PackRepository;scanPacks()V", shift = At.Shift.BEFORE))
-	private void onScanPacks(CallbackInfoReturnable<Pair<File, PackRepository>> cir) {
+	private void onScanPacks(CallbackInfoReturnable<Tuple<File, PackRepository>> cir) {
 		// Allow to display built-in data packs in the data pack selection screen at world creation.
 		this.packManager.providers.add(new ModResourcePackCreator(PackType.SERVER_DATA));
 	}
