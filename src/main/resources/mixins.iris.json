@@ -38,7 +38,6 @@
     "MixinParticleEngine",
     "MixinShaderManager_Overrides",
     "MixinQuickPlayDev",
-    "MixinRenderPass",
     "MixinRenderPipeline",
     "MixinRenderSection",
     "MixinRenderSystem",

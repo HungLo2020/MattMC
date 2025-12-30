@@ -26,7 +26,7 @@ import net.minecraft.world.level.material.Fluid;
 import net.minecraft.world.level.material.FluidState;
 import net.minecraft.world.level.material.Fluids;
 
-public class FluidRendererImpl extends FluidRenderer {
+public class FluidRendererImpl extends FluidRenderer implements net.irisshaders.iris.vertices.sodium.terrain.VertexEncoderInterface {
     private final ColorProviderRegistry colorProviderRegistry;
     private final DefaultFluidRenderer defaultRenderer;
     private final DefaultRenderContext defaultContext;
@@ -165,5 +165,11 @@ public class FluidRendererImpl extends FluidRenderer {
                 }
             };
         }
+    }
+    
+    // Iris: Delegate to default renderer for vertex encoding
+    @Override
+    public void beginBlock(int blockId, byte isFluid, byte lightEmission, int x, int y, int z) {
+        ((net.irisshaders.iris.vertices.sodium.terrain.VertexEncoderInterface) this.defaultRenderer).beginBlock(blockId, isFluid, lightEmission, x, y, z);
     }
 }
