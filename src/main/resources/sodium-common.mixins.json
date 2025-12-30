@@ -17,8 +17,6 @@
     "core.render.immediate.consumer.VertexMultiConsumerMixin$MultipleMixin",
     "core.render.world.ChunkSectionsToRenderMixin",
     "core.render.world.LevelRendererMixin",
-    "core.world.chunk.ZeroBitStorageMixin",
-    "core.world.chunk.SimpleBitStorageMixin",
     "core.world.chunk.PalettedContainerMixin",
     "features.render.entity.CubeMixin",
     "features.render.entity.ModelPartMixin",

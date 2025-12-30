@@ -6,8 +6,12 @@
 
 ### Mixin Conversion Status
 
-**Total Mixins:** 218 → **154 remaining** (64 removed)  
-**Conversion Progress:** 29.4% complete
+**Total Mixins:** 218 → **152 remaining** (66 removed)  
+**Conversion Progress:** 30.3% complete
+
+#### Removed Mixins (Session 12 - 2 mixins):
+92. ✅ `SimpleBitStorageMixin` - Interface implementation → SimpleBitStorage implements BitStorageExtension
+93. ✅ `ZeroBitStorageMixin` - Interface implementation → ZeroBitStorage implements BitStorageExtension
 
 #### Removed Mixins (Session 11 - Cleanup):
 - Removed debug logging from DH hooks after successful fixes
