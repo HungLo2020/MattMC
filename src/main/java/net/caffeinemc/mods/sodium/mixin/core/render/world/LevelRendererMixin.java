@@ -154,6 +154,11 @@ public abstract class LevelRendererMixin implements LevelRendererExtension {
      */
     @Overwrite
     private ChunkSectionsToRender prepareChunkRenders(Matrix4fc matrix4fc, double x, double y, double z) {
+        // Call Distant Horizons hooks before Sodium's terrain preparation
+        for (net.minecraft.hooks.LevelRendererHooks hook : net.minecraft.hooks.HookRegistry.getLevelRendererHooks()) {
+            hook.onBeforePrepareChunkRenders(matrix4fc, x, y, z);
+        }
+        
         ChunkSectionsToRender chunkSectionsToRender = new ChunkSectionsToRender(STATIC_MAP, -1, new GpuBufferSlice[0]);
         ((SodiumChunkSection) (Object) chunkSectionsToRender).sodium$setRendering(renderer, matrices, x, y, z);
         return chunkSectionsToRender;

@@ -1019,15 +1019,8 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 	}
 
 	private ChunkSectionsToRender prepareChunkRenders(Matrix4fc matrix4fc, double d, double e, double f) {
-		// Call registered hooks before preparing chunk renders
-		var hooks = net.minecraft.hooks.HookRegistry.getLevelRendererHooks();
-		if (!hooks.isEmpty()) {
-			System.out.println("[MATTMC-DEBUG] LevelRenderer.prepareChunkRenders: Calling " + hooks.size() + " level renderer hooks");
-		}
-		for (net.minecraft.hooks.LevelRendererHooks hook : hooks) {
-			hook.onBeforePrepareChunkRenders(matrix4fc, d, e, f);
-		}
-		
+		// NOTE: This method is overwritten by Sodium's LevelRendererMixin
+		// The hook call is made in Sodium's version instead
 		ObjectListIterator<SectionRenderDispatcher.RenderSection> objectListIterator = this.visibleSections.listIterator(0);
 		EnumMap<ChunkSectionLayer, List<RenderPass.Draw<GpuBufferSlice[]>>> enumMap = new EnumMap(ChunkSectionLayer.class);
 		int i = 0;
