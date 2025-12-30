@@ -58,6 +58,13 @@ public class ItemModelResolver {
 		@Nullable ItemOwner itemOwner,
 		int i
 	) {
+		// Iris: Set display item context
+		if (itemStack != null) {
+			((net.irisshaders.iris.mixinterface.ItemContextState) itemStackRenderState).setDisplayItem(itemStack.getItem(), itemStack.get(DataComponents.ITEM_MODEL));
+		} else {
+			((net.irisshaders.iris.mixinterface.ItemContextState) itemStackRenderState).setDisplayItem(null, null);
+		}
+		
 		ResourceLocation resourceLocation = (ResourceLocation)itemStack.get(DataComponents.ITEM_MODEL);
 		if (resourceLocation != null) {
 			itemStackRenderState.setOversizedInGui(((ClientItem.Properties)this.clientProperties.apply(resourceLocation)).oversizedInGui());

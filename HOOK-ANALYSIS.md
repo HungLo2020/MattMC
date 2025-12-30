@@ -6,8 +6,12 @@
 
 ### Mixin Conversion Status
 
-**Total Mixins:** 218 → **113 remaining** (105 removed)  
-**Conversion Progress:** 48.2% complete
+**Total Mixins:** 218 → **111 remaining** (107 removed)  
+**Conversion Progress:** 49.1% complete
+
+#### Removed Mixins (Session 22 - 2 mixins):
+132. ✅ `MixinItemRenderer` - HEAD inject → Inlined display item context setting into ItemModelResolver.appendItemLayers()
+133. ✅ `MixinFogRenderer` - HEAD + RETURN injects → Inlined fog density and color capture into FogRenderer.setupFog()
 
 #### Removed Mixins (Session 21 - 4 mixins):
 128. ✅ `ItemStackStateMixin` - Interface implementation + inject → ItemStackRenderState implements ItemContextState

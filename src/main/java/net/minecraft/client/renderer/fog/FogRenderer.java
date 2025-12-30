@@ -161,6 +161,26 @@ public class FogRenderer implements AutoCloseable {
 	}
 
 	public Vector4f setupFog(Camera camera, int i, boolean bl, DeltaTracker deltaTracker, float f, ClientLevel clientLevel) {
+		// Iris: Setup legacy water fog density
+		if (camera.getFluidInCamera() == net.minecraft.world.level.material.FogType.WATER) {
+			net.minecraft.world.entity.Entity entity2 = camera.getEntity();
+			
+			float density = 0.05F;
+			
+			if (entity2 instanceof net.minecraft.client.player.LocalPlayer localPlayer) {
+				density -= localPlayer.getWaterVision() * localPlayer.getWaterVision() * 0.03F;
+				net.minecraft.core.Holder<net.minecraft.world.level.biome.Biome> biome = localPlayer.level().getBiome(localPlayer.blockPosition());
+				
+				if (biome.is(net.minecraft.tags.BiomeTags.HAS_CLOSER_WATER_FOG)) {
+					density += 0.005F;
+				}
+			}
+			
+			net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setFogDensity(density);
+		} else {
+			net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setFogDensity(-1.0F);
+		}
+		
 		float g = deltaTracker.getGameTimeDeltaPartialTick(false);
 		Vector4f vector4f = this.computeFogColor(camera, g, clientLevel, i, f, bl);
 		float h = i * 16;
@@ -208,6 +228,9 @@ public class FogRenderer implements AutoCloseable {
 				fogData.cloudEnd
 			);
 		}
+		
+		// Iris: Capture fog color
+		net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setFogColor(vector4f.x, vector4f.y, vector4f.z);
 
 		return vector4f;
 	}
