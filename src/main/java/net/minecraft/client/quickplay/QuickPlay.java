@@ -80,6 +80,24 @@ public class QuickPlay {
 	}
 
 	private static void joinSingleplayerWorld(Minecraft minecraft, @Nullable String string) {
+		// Iris integration: Auto-create world in development environment
+		if (net.irisshaders.iris.platform.IrisPlatformHelpers.getInstance().isDevelopmentEnvironment()) {
+			if (!minecraft.getLevelSource().levelExists(string)) {
+				minecraft.createWorldOpenFlows().createFreshLevel(string, 
+					new net.minecraft.world.level.LevelSettings(string, net.minecraft.world.level.GameType.CREATIVE, false, 
+						net.minecraft.world.Difficulty.HARD, true, new net.minecraft.world.level.GameRules(
+							net.minecraft.world.flag.FeatureFlagSet.of(net.minecraft.world.flag.FeatureFlags.MINECART_IMPROVEMENTS, 
+								net.minecraft.world.flag.FeatureFlags.REDSTONE_EXPERIMENTS)), 
+						net.minecraft.world.level.WorldDataConfiguration.DEFAULT),
+					net.minecraft.world.level.levelgen.WorldOptions.defaultWithRandomSeed(), 
+					net.minecraft.world.level.levelgen.presets.WorldPresets::createNormalWorldDimensions, 
+					minecraft.screen);
+			} else {
+				minecraft.createWorldOpenFlows().openWorld(string, () -> minecraft.setScreen(new TitleScreen()));
+			}
+			return;
+		}
+		
 		if (!StringUtil.isBlank(string) && minecraft.getLevelSource().levelExists(string)) {
 			minecraft.createWorldOpenFlows().openWorld(string, () -> minecraft.setScreen(new TitleScreen()));
 		} else {

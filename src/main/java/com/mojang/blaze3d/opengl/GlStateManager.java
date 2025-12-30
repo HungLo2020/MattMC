@@ -528,7 +528,7 @@ public class GlStateManager {
 	}
 
 	@Environment(EnvType.CLIENT)
-	public static class BooleanState {
+	public static class BooleanState implements net.irisshaders.iris.gl.BooleanStateExtended {
 		private final int state;
 		/**
 		 * The enabled state.
@@ -537,6 +537,8 @@ public class GlStateManager {
 		 * Originally widened by: iris.accesswidener
 		 */
 		public boolean enabled;
+		// Iris integration: track unknown state
+		private boolean stateUnknown;
 
 		public BooleanState(int i) {
 			this.state = i;
@@ -552,6 +554,17 @@ public class GlStateManager {
 
 		public void setEnabled(boolean bl) {
 			RenderSystem.assertOnRenderThread();
+			// Iris: Handle unknown state
+			if (stateUnknown) {
+				this.enabled = bl;
+				stateUnknown = false;
+				if (bl) {
+					GL11.glEnable(this.state);
+				} else {
+					GL11.glDisable(this.state);
+				}
+				return;
+			}
 			if (bl != this.enabled) {
 				this.enabled = bl;
 				if (bl) {
@@ -560,6 +573,11 @@ public class GlStateManager {
 					GL11.glDisable(this.state);
 				}
 			}
+		}
+
+		@Override
+		public void setUnknownState() {
+			stateUnknown = true;
 		}
 	}
 

@@ -8,9 +8,12 @@ import net.minecraft.world.phys.AABB;
 import org.joml.Matrix4f;
 import org.joml.Vector3d;
 
-public class BoxCullingFrustum extends Frustum implements net.caffeinemc.mods.sodium.client.render.viewport.frustum.Frustum, ViewportProvider {
+public class BoxCullingFrustum extends Frustum implements net.caffeinemc.mods.sodium.client.render.viewport.frustum.Frustum, ViewportProvider, com.seibel.distanthorizons.api.interfaces.override.rendering.IDhApiShadowCullingFrustum {
 	private final BoxCuller boxCuller;
 	private final Vector3d position = new Vector3d();
+	// DH integration fields
+	private int worldMinYDH;
+	private int worldMaxYDH;
 
 	public BoxCullingFrustum(BoxCuller boxCuller) {
 		super(new Matrix4f(), new Matrix4f());
@@ -48,5 +51,17 @@ public class BoxCullingFrustum extends Frustum implements net.caffeinemc.mods.so
 	@Override
 	public int intersectAab(float v, float v1, float v2, float v3, float v4, float v5) {
 		return this.boxCuller.intersectAab(v, v1, v2, v3, v4, v5);
+	}
+
+	// DH API implementation
+	@Override
+	public void update(int worldMinBlockY, int worldMaxBlockY, com.seibel.distanthorizons.api.objects.math.DhApiMat4f worldViewProjection) {
+		this.worldMinYDH = worldMinBlockY;
+		this.worldMaxYDH = worldMaxBlockY;
+	}
+
+	@Override
+	public boolean intersects(int lodBlockPosMinX, int lodBlockPosMinZ, int lodBlockWidth, int lodDetailLevel) {
+		return !boxCuller.isCulled(lodBlockPosMinX, this.worldMinYDH, lodBlockPosMinZ, lodBlockPosMinX + lodBlockWidth, this.worldMaxYDH, lodBlockPosMinZ + lodBlockWidth);
 	}
 }

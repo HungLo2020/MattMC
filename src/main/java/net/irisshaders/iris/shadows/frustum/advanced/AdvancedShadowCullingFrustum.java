@@ -35,9 +35,12 @@ import java.lang.management.ManagementFactory;
  * are not sensitive to the specific internal ordering of planes and corners, in order to avoid potential bugs at the
  * cost of slightly more computations.</p>
  */
-public class AdvancedShadowCullingFrustum extends Frustum implements net.caffeinemc.mods.sodium.client.render.viewport.frustum.Frustum, ViewportProvider {
+public class AdvancedShadowCullingFrustum extends Frustum implements net.caffeinemc.mods.sodium.client.render.viewport.frustum.Frustum, ViewportProvider, com.seibel.distanthorizons.api.interfaces.override.rendering.IDhApiShadowCullingFrustum {
 	private static final int MAX_CLIPPING_PLANES = 13;
 	protected final BoxCuller boxCuller;
+	// DH integration fields
+	private int worldMinYDH;
+	private int worldMaxYDH;
 	/**
 	 * We store each plane equation as a Vector4f.
 	 *
@@ -448,5 +451,17 @@ public class AdvancedShadowCullingFrustum extends Frustum implements net.caffein
 	@Override
 	public Viewport sodium$createViewport() {
 		return new Viewport(this, position.set(x, y, z));
+	}
+
+	// DH API implementation
+	@Override
+	public void update(int worldMinBlockY, int worldMaxBlockY, com.seibel.distanthorizons.api.objects.math.DhApiMat4f worldViewProjection) {
+		this.worldMinYDH = worldMinBlockY;
+		this.worldMaxYDH = worldMaxBlockY;
+	}
+
+	@Override
+	public boolean intersects(int lodBlockPosMinX, int lodBlockPosMinZ, int lodBlockWidth, int lodDetailLevel) {
+		return this.isVisible(lodBlockPosMinX, this.worldMinYDH, lodBlockPosMinZ, lodBlockPosMinX + lodBlockWidth, this.worldMaxYDH, lodBlockPosMinZ + lodBlockWidth) != org.joml.FrustumIntersection.OUTSIDE;
 	}
 }

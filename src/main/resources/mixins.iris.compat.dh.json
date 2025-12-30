@@ -5,8 +5,6 @@
   "package": "net.irisshaders.iris.compat.dh.mixin",
   "compatibilityLevel": "JAVA_8",
   "client": [
-    "MixinAdvancedShadowCullingFrustum",
-    "MixinBoxCullingFrustum"
   ],
   "injectors": {
     "defaultRequire": 1
