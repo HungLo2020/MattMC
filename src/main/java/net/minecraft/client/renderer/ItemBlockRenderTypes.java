@@ -18,6 +18,18 @@ import net.minecraft.world.level.material.Fluids;
 
 @Environment(EnvType.CLIENT)
 public class ItemBlockRenderTypes {
+	// Iris: Material mapping support
+	private static final ChunkSectionLayer[] LAYER_SET_VANILLA;
+	
+	static {
+		LAYER_SET_VANILLA = new ChunkSectionLayer[net.irisshaders.iris.shaderpack.materialmap.BlockRenderType.values().length];
+		for (int i = 0; i < net.irisshaders.iris.shaderpack.materialmap.BlockRenderType.values().length; i++) {
+			LAYER_SET_VANILLA[i] = net.irisshaders.iris.shaderpack.materialmap.BlockMaterialMapping.convertBlockToRenderType(
+				net.irisshaders.iris.shaderpack.materialmap.BlockRenderType.values()[i]
+			);
+		}
+	}
+	
 	private static final Map<Block, ChunkSectionLayer> TYPE_BY_BLOCK = Util.make(Maps.<Block, ChunkSectionLayer>newHashMap(), hashMap -> {
 		ChunkSectionLayer chunkSectionLayer = ChunkSectionLayer.TRIPWIRE;
 		hashMap.put(Blocks.TRIPWIRE, chunkSectionLayer);
@@ -364,6 +376,13 @@ public class ItemBlockRenderTypes {
 	private static boolean renderCutout;
 
 	public static ChunkSectionLayer getChunkRenderType(BlockState blockState) {
+		// Iris: Custom material mapping
+		net.irisshaders.iris.shaderpack.materialmap.BlockRenderType type = 
+			net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings.INSTANCE.getBlockTypeIds().get(blockState.getBlock());
+		if (type != null) {
+			return LAYER_SET_VANILLA[type.ordinal()];
+		}
+		
 		Block block = blockState.getBlock();
 		if (block instanceof LeavesBlock) {
 			boolean cutout = renderCutout;

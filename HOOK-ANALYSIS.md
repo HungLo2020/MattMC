@@ -6,8 +6,13 @@
 
 ### Mixin Conversion Status
 
-**Total Mixins:** 218 → **152 remaining** (66 removed)  
-**Conversion Progress:** 30.3% complete
+**Total Mixins:** 218 → **149 remaining** (69 removed)  
+**Conversion Progress:** 31.7% complete
+
+#### Removed Mixins (Session 13 - 3 mixins):
+94. ✅ `MixinClientLevelData_DisableVoidPlane` - Inlined into ClientLevel.ClientLevelData.getHorizonHeight()
+95. ✅ `MixinItemBlockRenderTypes` - Inlined material mapping into ItemBlockRenderTypes.getChunkRenderType()
+96. ✅ `MixinItemInHandRenderer` - Inlined translucent hand check into ItemInHandRenderer.renderArmWithItem()
 
 #### Removed Mixins (Session 12 - 2 mixins):
 92. ✅ `SimpleBitStorageMixin` - Interface implementation → SimpleBitStorage implements BitStorageExtension
