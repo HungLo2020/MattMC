@@ -7,6 +7,7 @@ import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftClientWrapper;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftRenderWrapper;
 import com.seibel.distanthorizons.core.wrapperInterfaces.world.IClientLevelWrapper;
+import com.seibel.distanthorizons.fabric.mixins.client.LightTextureAccessor;
 import net.minecraft.client.renderer.LightTexture;
 import net.minecraft.hooks.LightTextureHooks;
 
@@ -34,7 +35,8 @@ public class DhLightTextureHook implements LightTextureHooks {
             this.renderWrapper = (MinecraftRenderWrapper)SingletonInjector.INSTANCE.get(IMinecraftRenderWrapper.class);
         }
 
-        GlTexture glTexture = (GlTexture) lightTexture.texture; // Direct field access - texture is now public
+        LightTextureAccessor accessor = (LightTextureAccessor) lightTexture;
+        GlTexture glTexture = (GlTexture) accessor.getTexture();
         this.renderWrapper.setLightmapId(glTexture.glId(), clientLevel);
     }
 }
