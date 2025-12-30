@@ -6,13 +6,17 @@
 
 ### Mixin Conversion Status
 
-**Total Mixins:** 218 → **121 remaining** (97 removed)  
-**Conversion Progress:** 44.5% complete
+**Total Mixins:** 218 → **117 remaining** (101 removed)  
+**Conversion Progress:** 46.3% complete
 
-#### Removed Mixins (Session 20 - 3 mixins):
+#### Removed Mixins (Session 20 - 7 mixins):
 121. ✅ `MixinParticlesRenderState` - Interface implementation → ParticlesRenderState implements ParticleRenderStateExtension
 122. ✅ `MixinVertexFormat` - Interface implementation → VertexFormat implements VertexFormatExtension
 123. ✅ `PalettedContainerMixin` - Interface implementation → PalettedContainer implements PalettedContainerROExtension
+124. ✅ `MixinItemSubmit` - Interface implementation → SubmitNodeStorage.ItemSubmit implements ModelStorage
+125. ✅ `MixinModelSubmit` - Interface implementation → SubmitNodeStorage.ModelSubmit implements ModelStorage
+126. ✅ `MixinTextSubmit` - Interface implementation → SubmitNodeStorage.TextSubmit implements ModelStorage
+127. ✅ `MixinModelPartSubmit` - Interface implementation → SubmitNodeStorage.ModelPartSubmit implements ModelStorage
 
 #### Removed Mixins (Session 19 - 9 mixins):
 112. ✅ `MixinBiomeAmbientSoundsHandler` - Interface implementation → BiomeAmbientSoundsHandler implements BiomeAmbienceInterface
