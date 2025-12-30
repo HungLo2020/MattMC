@@ -1,221 +1,52 @@
-[08:33:43] [Render thread/ERROR]: Failed to handle packet ClientboundLoginPacket[playerId=54, hardcore=false, levels=[ResourceKey[minecraft:dimension / minecraft:the_nether], ResourceKey[minecraft:dimension / minecraft:the_end], ResourceKey[minecraft:dimension / minecraft:overworld], ResourceKey[minecraft:dimension / minecraft:primordial_caves]], maxPlayers=8, chunkRadius=10, simulationDistance=0, reducedDebugInfo=false, showDeathScreen=true, doLimitedCrafting=false, commonPlayerSpawnInfo=CommonPlayerSpawnInfo[dimensionType=Reference{ResourceKey[minecraft:dimension_type / minecraft:overworld]=DimensionType[fixedTime=OptionalLong.empty, hasSkyLight=true, hasCeiling=false, ultraWarm=false, natural=true, coordinateScale=1.0, bedWorks=true, respawnAnchorWorks=false, minY=-64, height=384, logicalHeight=384, infiniburn=TagKey[minecraft:block / minecraft:infiniburn_overworld], effectsLocation=minecraft:overworld, ambientLight=0.0, cloudHeight=Optional[192], monsterSettings=MonsterSettings[piglinSafe=false, hasRaids=true, monsterSpawnLightTest=[0-7], monsterSpawnBlockLightLimit=0]]}, dimension=ResourceKey[minecraft:dimension / minecraft:overworld], seed=-1641543005846384936, gameType=SPECTATOR, previousGameType=CREATIVE, isDebug=false, isFlat=false, lastDeathLocation=Optional.empty, portalCooldown=0, seaLevel=63], enforcesSecureChat=false], disconnecting
-java.lang.ArrayIndexOutOfBoundsException: Index 12 out of bounds for length 12
-        at knot/com.mojang.blaze3d.opengl.GlStateManager._bindTexture(GlStateManager.java:404) ~[MattMC-1.21.10.jar:?]
-        at knot/net.irisshaders.iris.pipeline.PipelineManager.resetTextureState(PipelineManager.java:105) ~[MattMC-1.21.10.jar:?]
-        at knot/net.irisshaders.iris.pipeline.PipelineManager.lambda$destroyPipeline$0(PipelineManager.java:86) ~[MattMC-1.21.10.jar:?]
-        at java.base/java.util.HashMap.forEach(HashMap.java:1429) ~[?:?]
-        at knot/net.irisshaders.iris.pipeline.PipelineManager.destroyPipeline(PipelineManager.java:84) ~[MattMC-1.21.10.jar:?]
-        at knot/net.minecraft.client.Minecraft.handler$zdg000$mattmc$iris$resetPipeline(Minecraft.java:4435) ~[MattMC-1.21.10.jar:?]
-        at knot/net.minecraft.client.Minecraft.updateLevelInEngines(Minecraft.java) ~[MattMC-1.21.10.jar:?]
-        at knot/net.minecraft.client.Minecraft.setLevel(Minecraft.java:2098) ~[MattMC-1.21.10.jar:?]
-        at knot/net.minecraft.client.multiplayer.ClientPacketListener.handleLogin(ClientPacketListener.java:514) ~[MattMC-1.21.10.jar:?]
-        at knot/net.minecraft.network.protocol.game.ClientboundLoginPacket.handle(ClientboundLoginPacket.java:67) ~[MattMC-1.21.10.jar:?]
-        at knot/net.minecraft.network.protocol.game.ClientboundLoginPacket.handle(ClientboundLoginPacket.java:14) ~[MattMC-1.21.10.jar:?]
-        at knot/net.minecraft.network.PacketProcessor$ListenerAndPacket.handle(PacketProcessor.java:50) [MattMC-1.21.10.jar:?]
-        at knot/net.minecraft.network.PacketProcessor.processQueuedPackets(PacketProcessor.java:37) [MattMC-1.21.10.jar:?]
-        at knot/net.minecraft.client.Minecraft.runTick(Minecraft.java:1293) [MattMC-1.21.10.jar:?]
-        at knot/net.minecraft.client.Minecraft.run(Minecraft.java:925) [MattMC-1.21.10.jar:?]
-        at knot/net.minecraft.client.main.Main.main(Main.java:258) [MattMC-1.21.10.jar:?]
-        at net.fabricmc.loader.impl.game.minecraft.MinecraftGameProvider.launch(MinecraftGameProvider.java:560) [MattMC-1.21.10.jar:1.21.10]
-        at net.fabricmc.loader.impl.launch.knot.Knot.launch(Knot.java:72) [MattMC-1.21.10.jar:1.21.10]
-        at net.fabricmc.loader.impl.launch.knot.KnotClient.main(KnotClient.java:23) [MattMC-1.21.10.jar:1.21.10]
-[08:33:43] [DH-Request Module Ticker [minecraft:overworld] Thread[0]/INFO]: Batch Chunk Generator initialized
-[08:33:43] [DH-Request Module Ticker [minecraft:overworld] Thread[0]/INFO]: Set world gen queue for level [minecraft:overworld].
-[08:33:43] [Server thread/INFO]: Changing simulation distance to 12, from 0
-[08:33:43] [Render thread/ERROR]: Unreported exception thrown!
-java.lang.NullPointerException: Cannot invoke "net.minecraft.world.entity.Entity.isPassenger()" because "entity" is null
-        at knot/net.minecraft.client.Camera.setup(Camera.java:58) ~[MattMC-1.21.10.jar:?]
-        at knot/net.minecraft.client.renderer.GameRenderer.renderLevel(GameRenderer.java:808) ~[MattMC-1.21.10.jar:?]
-        at knot/net.minecraft.client.renderer.GameRenderer.render(GameRenderer.java:599) ~[MattMC-1.21.10.jar:?]
-        at knot/net.minecraft.client.Minecraft.runTick(Minecraft.java:1332) ~[MattMC-1.21.10.jar:?]
-        at knot/net.minecraft.client.Minecraft.run(Minecraft.java:925) [MattMC-1.21.10.jar:?]
-        at knot/net.minecraft.client.main.Main.main(Main.java:258) [MattMC-1.21.10.jar:?]
-        at net.fabricmc.loader.impl.game.minecraft.MinecraftGameProvider.launch(MinecraftGameProvider.java:560) [MattMC-1.21.10.jar:1.21.10]
-        at net.fabricmc.loader.impl.launch.knot.Knot.launch(Knot.java:72) [MattMC-1.21.10.jar:1.21.10]
-        at net.fabricmc.loader.impl.launch.knot.KnotClient.main(KnotClient.java:23) [MattMC-1.21.10.jar:1.21.10]
-[08:33:44] [Server thread/INFO]: Player840 lost connection: Disconnected
-[08:33:44] [Server thread/INFO]: Player840 left the game
-[08:33:44] [Server thread/INFO]: Stopping singleplayer server as player logged out
-[08:33:44] [Server thread/INFO]: Stopping server
-[08:33:44] [Server thread/INFO]: Saving players
-[08:33:44] [Server thread/INFO]: Saving worlds
-[08:33:44] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:overworld
-[08:33:44] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:the_nether
-[08:33:44] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:the_end
-[08:33:44] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:primordial_caves
-[08:33:44] [Server thread/INFO]: ThreadedAnvilChunkStorage (New World (4)): All chunks are saved
-[08:33:44] [Server thread/INFO]: ThreadedAnvilChunkStorage (DIM-1): All chunks are saved
-[08:33:44] [Server thread/INFO]: ThreadedAnvilChunkStorage (DIM1): All chunks are saved
-[08:33:44] [Server thread/INFO]: ThreadedAnvilChunkStorage (primordial_caves): All chunks are saved
-[08:33:44] [Server thread/INFO]: ThreadedAnvilChunkStorage: All dimensions are saved
-[08:33:44] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[New World]@minecraft:primordial_caves}].
-[08:33:44] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[New World]@minecraft:the_end}].
-[08:33:44] [level shutdown/INFO]: Closing world gen queue
-[08:33:44] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[New World]@minecraft:the_nether}].
-[08:33:44] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[New World]@minecraft:the_end}
-[08:33:44] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[New World]@minecraft:primordial_caves}
-[08:33:44] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[New World]@minecraft:the_nether}
-[08:33:44] [level shutdown/INFO]: Closing WorldGenerationQueue...
-[08:33:44] [level shutdown/INFO]: Shutting down world generator thread pool...
-[08:33:44] [level shutdown/INFO]: World generator thread pool shutdown with [0] incomplete tasks.
-[08:33:44] [level shutdown/INFO]: [BatchGenerator] shutting down...
-[08:33:44] [level shutdown/INFO]: Closing [BatchGenerationEnvironment]
-[08:33:44] [level shutdown/INFO]: Finished closing WorldGenerationQueue
-[08:33:44] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[New World]@minecraft:overworld}].
-[08:33:44] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[New World]@minecraft:overworld}
-[08:33:44] [Server thread/INFO]: Closed DhWorld of type [CLIENT_SERVER].
-[08:33:44] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[New World]@minecraft:the_end}].
-[08:33:44] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[New World]@minecraft:the_nether}].
-[08:33:44] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[New World]@minecraft:the_end}
-[08:33:44] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[New World]@minecraft:overworld}].
-[08:33:44] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[New World]@minecraft:the_nether}
-[08:33:44] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[New World]@minecraft:primordial_caves}].
-[08:33:44] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[New World]@minecraft:overworld}
-[08:33:44] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[New World]@minecraft:primordial_caves}
-[08:33:44] [Server thread/INFO]: Closed DhWorld of type [CLIENT_SERVER].
-[08:33:44] [Server thread/INFO]: Shutting down PriorityTaskPicker thread pool...
-[08:33:44] [Server thread/INFO]: Closing all [4] database connections...
-[08:33:44] [Server thread/INFO]: Closing database connection: [jdbc:sqlite:/home/matt/Documents/Repos/MattMC/run/saves/New World (4)/dimensions/minecraft/primordial_caves/data/DistantHorizons.sqlite]
-[08:33:44] [Server thread/INFO]: Closing database connection: [jdbc:sqlite:/home/matt/Documents/Repos/MattMC/run/saves/New World (4)/data/DistantHorizons.sqlite]
-[08:33:44] [Server thread/INFO]: Closing database connection: [jdbc:sqlite:/home/matt/Documents/Repos/MattMC/run/saves/New World (4)/DIM-1/data/DistantHorizons.sqlite]
-[08:33:44] [Server thread/INFO]: Closing database connection: [jdbc:sqlite:/home/matt/Documents/Repos/MattMC/run/saves/New World (4)/DIM1/data/DistantHorizons.sqlite]
----- Minecraft Crash Report ----
-// But it works on my machine.
-
-Time: 2025-12-30 08:33:44
-Description: Unexpected error
-
-java.lang.NullPointerException: Cannot invoke "net.minecraft.world.entity.Entity.isPassenger()" because "entity" is null
-        at knot//net.minecraft.client.Camera.setup(Camera.java:58)
-        at knot//net.minecraft.client.renderer.GameRenderer.renderLevel(GameRenderer.java:808)
-        at knot//net.minecraft.client.renderer.GameRenderer.render(GameRenderer.java:599)
-        at knot//net.minecraft.client.Minecraft.runTick(Minecraft.java:1332)
-        at knot//net.minecraft.client.Minecraft.run(Minecraft.java:925)
-        at knot//net.minecraft.client.main.Main.main(Main.java:258)
-        at net.fabricmc.loader.impl.game.minecraft.MinecraftGameProvider.launch(MinecraftGameProvider.java:560)
-        at net.fabricmc.loader.impl.launch.knot.Knot.launch(Knot.java:72)
-        at net.fabricmc.loader.impl.launch.knot.KnotClient.main(KnotClient.java:23)
-
-
-A detailed walkthrough of the error, its code path and all known details is as follows:
----------------------------------------------------------------------------------------
-
--- Head --
-Thread: Render thread
-Stacktrace:
-        at knot//net.minecraft.client.Camera.setup(Camera.java:58)
-        at knot//net.minecraft.client.renderer.GameRenderer.renderLevel(GameRenderer.java:808)
-
--- Uptime --
-Details:
-        JVM uptime: 18.055s
-        Wall uptime: 14.321s
-        High-res time: 13.978s
-        Client ticks: 204 ticks / 10.200s
-Stacktrace:
-        at knot//net.minecraft.client.Minecraft.fillReport(Minecraft.java:2329)
-        at knot//net.minecraft.client.Minecraft.emergencySaveAndCrash(Minecraft.java:1003)
-        at knot//net.minecraft.client.Minecraft.run(Minecraft.java:962)
-        at knot//net.minecraft.client.main.Main.main(Main.java:258)
-        at net.fabricmc.loader.impl.game.minecraft.MinecraftGameProvider.launch(MinecraftGameProvider.java:560)
-        at net.fabricmc.loader.impl.launch.knot.Knot.launch(Knot.java:72)
-        at net.fabricmc.loader.impl.launch.knot.KnotClient.main(KnotClient.java:23)
-
--- Affected level --
-Details:
-        All players: 0 total;
-        Chunk stats: 729, 0
-        Level dimension: minecraft:overworld
-        Level spawn location: World: (8,64,8), Section: (at 8,0,8 in 0,4,0; chunk contains blocks 0,-64,0 to 15,319,15), Region: (0,0; contains chunks 0,0 to 31,31, blocks 0,-64,0 to 511,319,511)
-        Level time: 0 game time, 0 day time
-        Server brand: ~~ERROR~~ NullPointerException: Cannot read field "connection" because "this.minecraft.player" is null
-        Server type: Integrated singleplayer server
-        Tracked entity count: 0
-
--- Last reload --
-Details:
-        Reload number: 1
-        Reload reason: initial
-        Finished: Yes
-        Packs: vanilla
-
--- System Details --
-Details:
-        Minecraft Version: 1.21.10
-        Minecraft Version ID: 1.21.10
-        Operating System: Linux (amd64) version 6.14.0-37-generic
-        Java Version: 21.0.5, Eclipse Adoptium
-        Java VM Version: OpenJDK 64-Bit Server VM (mixed mode, sharing), Eclipse Adoptium
-        Memory: 1730150400 bytes (1650 MiB) / 4294967296 bytes (4096 MiB) up to 8589934592 bytes (8192 MiB)
-        CPUs: 20
-        Processor Vendor: GenuineIntel
-        Processor Name: 12th Gen Intel(R) Core(TM) i7-12700K
-        Identifier: Intel64 Family 6 Model 151 Stepping 2
-        Microarchitecture: Alder Lake
-        Frequency (GHz): 4.90
-        Number of physical packages: 1
-        Number of physical CPUs: 12
-        Number of logical CPUs: 20
-        Graphics card #0 name: GA102 [GeForce RTX 3080 Ti]
-        Graphics card #0 vendor: NVIDIA Corporation (0x10de)
-        Graphics card #0 VRAM (MiB): 16416.00
-        Graphics card #0 deviceId: 0x2208
-        Graphics card #0 versionInfo: unknown
-        Virtual memory max (MiB): 32300.84
-        Virtual memory used (MiB): 23595.61
-        Swap memory total (MiB): 16384.00
-        Swap memory used (MiB): 4599.23
-        Space in storage for jna.tmpdir (MiB): <path not set>
-        Space in storage for org.lwjgl.system.SharedLibraryExtractPath (MiB): <path not set>
-        Space in storage for io.netty.native.workdir (MiB): <path not set>
-        Space in storage for java.io.tmpdir (MiB): available: 15859.21, total: 15916.84
-        Space in storage for workdir (MiB): available: 281852.78, total: 937500.69
-        JVM Flags: 4 total; -XX:+UseZGC -XX:+ZGenerational -Xms4G -Xmx8G
-        Debug Flags: 0 total;
-        Loaded Shaderpack: ComplementaryHungLoIfied.zip
-                Profile: MATTMC (+0 options changed by user)
-        Launched Version: 1.21.10
-        Backend library: LWJGL version 3.3.3-snapshot
-        Backend API: NVIDIA GeForce RTX 3080 Ti/PCIe/SSE2 GL version 3.3.0 NVIDIA 580.95.05, NVIDIA Corporation
-        Window size: 1920x1080
-        GFLW Platform: x11
-        Render Extensions: GL_ARB_buffer_storage, GL_KHR_debug, GL_ARB_vertex_attrib_binding, GL_ARB_direct_state_access
-        GL debug messages:
-        Is Modded: Definitely; Client brand changed to 'fabric'; Server brand changed to 'fabric'
-        Universe: 400921fb54442d18
-        Type: Integrated Server (map_client.txt)
-        Graphics mode: fancy
-        Render Distance: 10/10 chunks
-        Resource Packs: vanilla
-        Current Language: en_us
-        Locale: en_US
-        System encoding: UTF-8
-        File encoding: UTF-8
-        CPU: 20x 12th Gen Intel(R) Core(TM) i7-12700K
-        Server Running: false
-        Player Count: 0 / 8; []
-        Active Data Packs: vanilla
-        Available Data Packs: minecart_improvements, redstone_experiments, trade_rebalance, vanilla
-        Enabled Feature Flags: minecraft:vanilla
-        World Generation: Stable
-        World Seed: -4287532483329339035
-        Suppressed Exceptions: ~~NONE~~
-#@!@# Game crashed! Crash report saved to: #@!@# /home/matt/Documents/Repos/MattMC/run/crash-reports/crash-2025-12-30_08.33.44-client.txt
-
-> Task :runClient FAILED
-
-FAILURE: Build failed with an exception.
-
-* What went wrong:
-Execution failed for task ':runClient'.
-> Process 'command '/home/matt/Documents/Repos/MattMC/run/jdk-21/bin/java'' finished with non-zero exit value 255
-
-* Try:
-> Run with --stacktrace option to get the stack trace.
-> Run with --info or --debug option to get more log output.
-> Run with --scan to get full insights.
-> Get more help at https://help.gradle.org.
-
-BUILD FAILED in 48s
-7 actionable tasks: 7 executed
-matt@HungLoDE:~/Documents/Repos/MattMC$ w
+A mod crashed on startup!
+net.fabricmc.loader.impl.FormattedException: java.lang.RuntimeException: Could not execute entrypoint stage 'preLaunch' due to errors, provided by 'mattmc' at 'net.caffeinemc.mods.sodium.fabric.SodiumPreLaunch'!
+	at net.fabricmc.loader.impl.FormattedException.ofLocalized(FormattedException.java:63)
+	at net.fabricmc.loader.impl.launch.knot.Knot.init(Knot.java:158)
+	at net.fabricmc.loader.impl.launch.knot.Knot.launch(Knot.java:66)
+	at net.fabricmc.loader.impl.launch.knot.KnotClient.main(KnotClient.java:23)
+Caused by: java.lang.RuntimeException: Could not execute entrypoint stage 'preLaunch' due to errors, provided by 'mattmc' at 'net.caffeinemc.mods.sodium.fabric.SodiumPreLaunch'!
+	at net.fabricmc.loader.impl.FabricLoaderImpl.lambda$invokeEntrypoints$2(FabricLoaderImpl.java:409)
+	at net.fabricmc.loader.impl.util.ExceptionUtil.gatherExceptions(ExceptionUtil.java:33)
+	at net.fabricmc.loader.impl.FabricLoaderImpl.invokeEntrypoints(FabricLoaderImpl.java:407)
+	at net.fabricmc.loader.impl.launch.knot.Knot.init(Knot.java:156)
+	... 2 more
+Caused by: net.fabricmc.loader.api.EntrypointException: Exception while loading entries for entrypoint 'preLaunch' provided by 'mattmc'
+	at net.fabricmc.loader.impl.entrypoint.EntrypointContainerImpl.getEntrypoint(EntrypointContainerImpl.java:56)
+	at net.fabricmc.loader.impl.FabricLoaderImpl.invokeEntrypoints(FabricLoaderImpl.java:405)
+	... 3 more
+Caused by: java.lang.RuntimeException: Mixin transformation of net.caffeinemc.mods.sodium.fabric.SodiumPreLaunch failed
+	at net.fabricmc.loader.impl.launch.knot.KnotClassDelegate.getPostMixinClassByteArray(KnotClassDelegate.java:454)
+	at net.fabricmc.loader.impl.launch.knot.KnotClassDelegate.tryLoadClass(KnotClassDelegate.java:350)
+	at net.fabricmc.loader.impl.launch.knot.KnotClassDelegate.loadClass(KnotClassDelegate.java:231)
+	at net.fabricmc.loader.impl.launch.knot.KnotClassLoader.loadClass(KnotClassLoader.java:119)
+	at java.base/java.lang.ClassLoader.loadClass(ClassLoader.java:526)
+	at java.base/java.lang.Class.forName0(Native Method)
+	at java.base/java.lang.Class.forName(Class.java:534)
+	at java.base/java.lang.Class.forName(Class.java:513)
+	at net.fabricmc.loader.impl.util.DefaultLanguageAdapter.create(DefaultLanguageAdapter.java:50)
+	at net.fabricmc.loader.impl.entrypoint.EntrypointStorage$NewEntry.getOrCreate(EntrypointStorage.java:124)
+	at net.fabricmc.loader.impl.entrypoint.EntrypointContainerImpl.getEntrypoint(EntrypointContainerImpl.java:53)
+	... 4 more
+Caused by: org.spongepowered.asm.mixin.throwables.MixinApplyError: Mixin [mixins.iris.fixes.maxfpscrash.json:MixinMaxFpsCrashFix from mod mattmc] from phase [DEFAULT] in config [mixins.iris.fixes.maxfpscrash.json] FAILED during PREPARE
+	at org.spongepowered.asm.mixin.transformer.MixinProcessor.handleMixinError(MixinProcessor.java:686)
+	at org.spongepowered.asm.mixin.transformer.MixinProcessor.handleMixinPrepareError(MixinProcessor.java:633)
+	at org.spongepowered.asm.mixin.transformer.MixinProcessor.prepareConfigs(MixinProcessor.java:591)
+	at org.spongepowered.asm.mixin.transformer.MixinProcessor.select(MixinProcessor.java:510)
+	at org.spongepowered.asm.mixin.transformer.MixinProcessor.checkSelect(MixinProcessor.java:486)
+	at org.spongepowered.asm.mixin.transformer.MixinProcessor.lockAndSelect(MixinProcessor.java:438)
+	at org.spongepowered.asm.mixin.transformer.MixinProcessor.couldTransformClass(MixinProcessor.java:398)
+	at org.spongepowered.asm.mixin.transformer.MixinTransformer.couldTransformClass(MixinTransformer.java:265)
+	at org.spongepowered.asm.mixin.transformer.MixinTransformer.transformClass(MixinTransformer.java:233)
+	at org.spongepowered.asm.mixin.transformer.MixinTransformer.transformClassBytes(MixinTransformer.java:202)
+	at net.fabricmc.loader.impl.launch.knot.KnotClassDelegate.getPostMixinClassByteArray(KnotClassDelegate.java:449)
+	... 14 more
+Caused by: org.spongepowered.asm.mixin.transformer.throwables.InvalidMixinException: The specified mixin 'net.irisshaders.iris.mixin.MixinMaxFpsCrashFix' was not found
+	at org.spongepowered.asm.mixin.transformer.MixinInfo.<init>(MixinInfo.java:864)
+	at org.spongepowered.asm.mixin.transformer.MixinConfig.prepareMixins(MixinConfig.java:933)
+	at org.spongepowered.asm.mixin.transformer.MixinConfig.prepare(MixinConfig.java:862)
+	at org.spongepowered.asm.mixin.transformer.MixinProcessor.prepareConfigs(MixinProcessor.java:588)
+	... 22 more
+Caused by: java.lang.ClassNotFoundException: The specified mixin 'net.irisshaders.iris.mixin.MixinMaxFpsCrashFix' was not found
+	at org.spongepowered.asm.mixin.transformer.MixinInfo.loadMixinClass(MixinInfo.java:1318)
+	at org.spongepowered.asm.mixin.transformer.MixinInfo.<init>(MixinInfo.java:857)
+	... 25 more
