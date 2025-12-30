@@ -165,6 +165,15 @@ public class SodiumGameOptions {
         }
 
         FileUtil.writeTextRobustly(GSON.toJson(config), path);
+        
+        // Iris: Save Iris config when Sodium options change (for Max Shadow Distance setting)
+        try {
+            if (net.irisshaders.iris.Iris.getIrisConfig() != null) {
+                net.irisshaders.iris.Iris.getIrisConfig().save();
+            }
+        } catch (IOException e) {
+            net.irisshaders.iris.Iris.logger.error("Failed to save Iris config file", e);
+        }
     }
 
     public boolean isReadOnly() {

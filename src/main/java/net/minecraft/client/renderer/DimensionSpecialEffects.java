@@ -43,6 +43,22 @@ public abstract class DimensionSpecialEffects {
 	}
 
 	public int getSunriseOrSunsetColor(float f) {
+		// Iris: Disable sunrise/sunset effect when blindness is active or submerged in fluid
+		boolean blockSky = net.minecraft.client.Minecraft.getInstance().levelRenderer.doesMobEffectBlockSky(
+			net.minecraft.client.Minecraft.getInstance().gameRenderer.getMainCamera()
+		);
+		
+		if (blockSky) {
+			return 0;
+		}
+		
+		net.minecraft.world.level.material.FogType fogType = 
+			net.minecraft.client.Minecraft.getInstance().gameRenderer.getMainCamera().getFluidInCamera();
+		
+		if (fogType != net.minecraft.world.level.material.FogType.NONE) {
+			return 0;
+		}
+		
 		return 0;
 	}
 

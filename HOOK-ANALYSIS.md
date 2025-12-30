@@ -6,8 +6,13 @@
 
 ### Mixin Conversion Status
 
-**Total Mixins:** 218 → **149 remaining** (69 removed)  
-**Conversion Progress:** 31.7% complete
+**Total Mixins:** 218 → **146 remaining** (72 removed)  
+**Conversion Progress:** 33.0% complete
+
+#### Removed Mixins (Session 14 - 3 mixins):
+97. ✅ `statelisteners.MixinGlStateManager` - Inlined blend function listener into GlStateManager._blendFuncSeparate()
+98. ✅ `MixinSodiumGameOptions` - Inlined Iris config save into SodiumGameOptions.writeToDisk()
+99. ✅ `sky.MixinDimensionSpecialEffects` - Inlined sunrise/sunset disable logic into DimensionSpecialEffects.getSunriseOrSunsetColor()
 
 #### Removed Mixins (Session 13 - 3 mixins):
 94. ✅ `MixinClientLevelData_DisableVoidPlane` - Inlined into ClientLevel.ClientLevelData.getHorizonHeight()

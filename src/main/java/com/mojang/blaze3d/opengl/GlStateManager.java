@@ -28,6 +28,13 @@ import org.lwjgl.system.MemoryUtil;
 public class GlStateManager {
 	private static final Plot PLOT_TEXTURES = TracyClient.createPlot("GPU Textures");
 	private static int numTextures = 0;
+	
+	// Iris: State update notification support
+	private static Runnable blendFuncListener;
+	
+	static {
+		net.irisshaders.iris.gl.state.StateUpdateNotifiers.blendFuncNotifier = listener -> blendFuncListener = listener;
+	}
 	private static final Plot PLOT_BUFFERS = TracyClient.createPlot("GPU Buffers");
 	private static int numBuffers = 0;
 	public static final GlStateManager.BlendState BLEND = new GlStateManager.BlendState(); // Made public for Iris shader mod integration
@@ -104,6 +111,11 @@ public class GlStateManager {
 			BLEND.srcAlpha = k;
 			BLEND.dstAlpha = l;
 			glBlendFuncSeparate(i, j, k, l);
+		}
+		
+		// Iris: Notify listener of blend function changes
+		if (blendFuncListener != null) {
+			blendFuncListener.run();
 		}
 	}
 
