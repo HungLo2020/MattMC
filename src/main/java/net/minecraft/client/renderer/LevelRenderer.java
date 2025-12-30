@@ -1456,10 +1456,26 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 	// These are called from the lambda bodies to provide stable mixin targets
 	
 	public void iris$renderSkyPassBody() {
-		// Sodium: Prevents the sky layer from rendering when the fog distance is reduced
+		// Sodium + Iris: Prevents the sky layer from rendering when the fog distance is reduced
 		// Fixes MC-152504 by canceling sky rendering when camera is submersed
-		if (Minecraft.getInstance().gameRenderer.getMainCamera().getFluidInCamera() != net.minecraft.world.level.material.FogType.NONE || this.doesMobEffectBlockSky(Minecraft.getInstance().gameRenderer.getMainCamera())) {
-			return; // Early exit cancels sky rendering
+		Camera camera = Minecraft.getInstance().gameRenderer.getMainCamera();
+		
+		// When Iris pack is NOT active, use the advanced fog checks
+		if (net.irisshaders.iris.Iris.getCurrentPack().isEmpty()) {
+			net.minecraft.world.phys.Vec3 cameraPosition = camera.getPosition();
+			boolean isSubmersed = camera.getFluidInCamera() != net.minecraft.world.level.material.FogType.NONE;
+			boolean blockSky = this.doesMobEffectBlockSky(camera);
+			boolean useThickFog = this.minecraft.level.effects().isFoggyAt(net.minecraft.util.Mth.floor(cameraPosition.x()),
+				net.minecraft.util.Mth.floor(cameraPosition.y())) || this.minecraft.gui.getBossOverlay().shouldCreateWorldFog();
+			
+			if (isSubmersed || blockSky || useThickFog) {
+				return; // Early exit cancels sky rendering
+			}
+		} else {
+			// When Iris pack is active, use simple submersion check
+			if (camera.getFluidInCamera() != net.minecraft.world.level.material.FogType.NONE || this.doesMobEffectBlockSky(camera)) {
+				return; // Early exit cancels sky rendering
+			}
 		}
 		
 		// This method is injected into by Iris mixins for sky rendering phase changes

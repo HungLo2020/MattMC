@@ -15,7 +15,7 @@ import net.minecraft.client.renderer.RenderPipelines;
 import org.jetbrains.annotations.Nullable;
 
 @Environment(EnvType.CLIENT)
-public abstract class RenderTarget {
+public abstract class RenderTarget implements net.irisshaders.iris.targets.Blaze3dRenderTargetExt, net.irisshaders.iris.mixinterface.RenderTargetInterface {
 	private static int UNNAMED_RENDER_TARGETS = 0;
 	public int width;
 	public int height;
@@ -30,6 +30,9 @@ public abstract class RenderTarget {
 	@Nullable
 	protected GpuTextureView depthTextureView;
 	public FilterMode filterMode;
+	// Iris: Buffer version tracking for detecting texture recreation
+	private int iris$depthBufferVersion;
+	private int iris$colorBufferVersion;
 
 	public RenderTarget(@Nullable String string, boolean bl) {
 		this.label = string == null ? "FBO " + UNNAMED_RENDER_TARGETS++ : string;
@@ -44,6 +47,10 @@ public abstract class RenderTarget {
 
 	public void destroyBuffers() {
 		RenderSystem.assertOnRenderThread();
+		// Iris: Track buffer recreation
+		iris$depthBufferVersion++;
+		iris$colorBufferVersion++;
+		
 		if (this.depthTexture != null) {
 			this.depthTexture.close();
 			this.depthTexture = null;
@@ -155,8 +162,23 @@ public abstract class RenderTarget {
 		return this.depthTextureView;
 	}
 	
-	// Iris compatibility method
+	// Iris: Blaze3dRenderTargetExt implementation
+	@Override
+	public int iris$getDepthBufferVersion() {
+		return iris$depthBufferVersion;
+	}
+
+	@Override
+	public int iris$getColorBufferVersion() {
+		return iris$colorBufferVersion;
+	}
+	
+	// Iris: RenderTargetInterface implementation
+	@Override
 	public void iris$bindFramebuffer() {
-		// Stub for Iris compatibility - actual binding handled by Iris mixin
+		com.mojang.blaze3d.opengl.GlStateManager._glBindFramebuffer(com.mojang.blaze3d.opengl.GlConst.GL_FRAMEBUFFER, 
+			((com.mojang.blaze3d.opengl.GlTexture) this.colorTexture).getFbo(
+				((com.mojang.blaze3d.opengl.GlDevice) RenderSystem.getDevice()).directStateAccess(), 
+				this.depthTexture));
 	}
 }
