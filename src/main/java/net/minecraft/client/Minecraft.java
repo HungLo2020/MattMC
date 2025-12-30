@@ -269,6 +269,10 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 	private static final Component SOCIAL_INTERACTIONS_NOT_AVAILABLE = Component.translatable("multiplayer.socialInteractions.not_available");
 	private static final Component SAVING_LEVEL = Component.translatable("menu.savingLevel");
 	public static final String UPDATE_DRIVERS_ADVICE = "Please make sure you have up-to-date drivers (see aka.ms/mcdriver for instructions).";
+	
+	// Iris: Early initialization flag
+	private static boolean iris$initialized;
+	
 	private final long canary = Double.doubleToLongBits(Math.PI);
 	private final Path resourcePackDirectory;
 	private final CompletableFuture<ProfileResult> profileFuture;
@@ -434,6 +438,13 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 		KeybindResolver.setKeyResolver(KeyMapping::createNameSupplier);
 		this.fixerUpper = DataFixers.getDataFixer();
 		this.gameThread = Thread.currentThread();
+		
+		// Iris: Early initialization before Options creation
+		if (!iris$initialized) {
+			iris$initialized = true;
+			new net.irisshaders.iris.Iris().onEarlyInitialize();
+		}
+		
 		this.options = new Options(this, this.gameDirectory);
 		this.debugEntries = new DebugScreenEntryList(this.gameDirectory);
 		this.toastManager = new ToastManager(this, this.options);
@@ -1886,6 +1897,11 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 
 		profilerFiller.popPush("keyboard");
 		this.keyboardHandler.tick();
+		profilerFiller.pop();
+		
+		// Iris: Check for keybinds at end of tick
+		profilerFiller.push("iris_keybinds");
+		net.irisshaders.iris.Iris.handleKeybinds(this);
 		profilerFiller.pop();
 	}
 

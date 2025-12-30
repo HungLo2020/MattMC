@@ -6,8 +6,13 @@
 
 ### Mixin Conversion Status
 
-**Total Mixins:** 218 → **146 remaining** (72 removed)  
-**Conversion Progress:** 33.0% complete
+**Total Mixins:** 218 → **143 remaining** (75 removed)  
+**Conversion Progress:** 34.4% complete
+
+#### Removed Mixins (Session 15 - 3 mixins):
+100. ✅ `shadows.MixinBeaconRenderer` - Inlined shadow pass check into BeaconRenderer.submitBeaconBeam()
+101. ✅ `MixinMinecraft_Keybinds` - Inlined Iris keybind handling into Minecraft.tick()
+102. ✅ `MixinOptions_Entrypoint` - Inlined Iris early initialization into Minecraft constructor
 
 #### Removed Mixins (Session 14 - 3 mixins):
 97. ✅ `statelisteners.MixinGlStateManager` - Inlined blend function listener into GlStateManager._blendFuncSeparate()

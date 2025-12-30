@@ -76,6 +76,13 @@ public class BeaconRenderer<T extends BlockEntity & BeaconBeamOwner> implements 
 	public static void submitBeaconBeam(
 		PoseStack poseStack, SubmitNodeCollector submitNodeCollector, ResourceLocation resourceLocation, float f, float g, int i, int j, int k, float h, float l
 	) {
+		// Iris: Don't render beacon beam in shadow pass
+		if (net.irisshaders.iris.shadows.ShadowRenderingState.areShadowsCurrentlyBeingRendered()) {
+			// TODO: Don't do this if we're doing the "Unified Entity Rendering" optimization
+			// TODO: This isn't necessary on most shaderpacks if we support blockEntityId
+			return;
+		}
+		
 		final int iFinal = i;
 		final int jFinal = j;
 		final int kFinal = k;
