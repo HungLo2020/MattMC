@@ -9,7 +9,7 @@ import org.joml.FrustumIntersection;
 import org.joml.Matrix4f;
 import org.joml.Vector3d;
 
-public class NonCullingFrustum extends Frustum implements ViewportProvider, net.caffeinemc.mods.sodium.client.render.viewport.frustum.Frustum {
+public class NonCullingFrustum extends Frustum implements ViewportProvider, net.caffeinemc.mods.sodium.client.render.viewport.frustum.Frustum, com.seibel.distanthorizons.api.interfaces.override.rendering.IDhApiShadowCullingFrustum {
 	private final Vector3d position = new Vector3d();
 
 	public NonCullingFrustum() {
@@ -66,5 +66,16 @@ public class NonCullingFrustum extends Frustum implements ViewportProvider, net.
 	@Override
 	public int intersectAab(float v, float v1, float v2, float v3, float v4, float v5) {
 		return FrustumIntersection.INSIDE;
+	}
+	
+	// DH API integration: Shadow culling frustum - never cull
+	@Override
+	public void update(int worldMinBlockY, int worldMaxBlockY, com.seibel.distanthorizons.api.objects.math.DhApiMat4f worldViewProjection) {
+		// Empty implementation - no update needed for non-culling frustum
+	}
+	
+	@Override
+	public boolean intersects(int lodBlockPosMinX, int lodBlockPosMinZ, int lodBlockWidth, int lodDetailLevel) {
+		return true; // Never cull
 	}
 }

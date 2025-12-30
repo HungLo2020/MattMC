@@ -285,8 +285,13 @@ public class GLRenderDevice implements RenderDevice {
         @Override
         public void multiDrawElementsBaseVertex(MultiDrawBatch batch, GlIndexType indexType) {
             GlPrimitiveType primitiveType = GLRenderDevice.this.activeTessellation.getPrimitiveType();
+            
+            // Iris: Use GL_PATCHES when tessellation is active
+            int primitiveId = net.irisshaders.iris.vertices.ImmediateState.usingTessellation 
+                ? org.lwjgl.opengl.GL43C.GL_PATCHES 
+                : primitiveType.getId();
 
-            GL32C.nglMultiDrawElementsBaseVertex(primitiveType.getId(),
+            GL32C.nglMultiDrawElementsBaseVertex(primitiveId,
                     batch.pElementCount,
                     indexType.getFormatId(),
                     batch.pElementPointer,

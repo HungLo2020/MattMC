@@ -6,9 +6,7 @@
   "compatibilityLevel": "JAVA_8",
   "client": [
     "MixinAdvancedShadowCullingFrustum",
-    "MixinBoxCullingFrustum",
-    "MixinCullEverythingFrustum",
-    "MixinNonCullingFrustum"
+    "MixinBoxCullingFrustum"
   ],
   "injectors": {
     "defaultRequire": 1
