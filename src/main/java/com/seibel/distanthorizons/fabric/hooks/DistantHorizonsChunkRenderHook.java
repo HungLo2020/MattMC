@@ -36,6 +36,8 @@ public class DistantHorizonsChunkRenderHook implements ChunkRenderLayerHooks {
 
     @Override
     public void onBeforeRenderLayer(ChunkSectionLayerGroup layerGroup) {
+        LOGGER.info("[DH-RENDER-LAYER] onBeforeRenderLayer called with layerGroup: " + layerGroup);
+        
         ClientApi.RENDER_STATE.clientLevelWrapper = ClientLevelWrapper.getWrapperIfDifferent(
             ClientApi.RENDER_STATE.clientLevelWrapper,
             Minecraft.getInstance().levelRenderer.level
@@ -43,6 +45,7 @@ public class DistantHorizonsChunkRenderHook implements ChunkRenderLayerHooks {
 
         if (layerGroup == ChunkSectionLayerGroup.TRANSLUCENT) {
             try {
+                LOGGER.info("[DH-RENDER-LAYER] Rendering TRANSLUCENT layer");
                 ClientApi.INSTANCE.renderFadeTransparent();
                 ClientApi.INSTANCE.renderDeferredLodsForShaders();
             } catch (Exception e) {
@@ -50,6 +53,7 @@ public class DistantHorizonsChunkRenderHook implements ChunkRenderLayerHooks {
             }
         } else if (layerGroup == ChunkSectionLayerGroup.TRIPWIRE) {
             try {
+                LOGGER.info("[DH-RENDER-LAYER] Rendering TRIPWIRE layer");
                 ClientApi.INSTANCE.renderFadeOpaque();
             } catch (Exception e) {
                 LOGGER.error("[DH-RENDER-LAYER] Error rendering tripwire: " + e.getMessage(), e);
