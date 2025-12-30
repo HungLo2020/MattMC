@@ -6,8 +6,19 @@
 
 ### Mixin Conversion Status
 
-**Total Mixins:** 218 → **134 remaining** (84 removed)  
-**Conversion Progress:** 38.5% complete
+**Total Mixins:** 218 → **124 remaining** (94 removed)  
+**Conversion Progress:** 43.1% complete
+
+#### Removed Mixins (Session 19 - 9 mixins):
+112. ✅ `MixinBiomeAmbientSoundsHandler` - Interface implementation → BiomeAmbientSoundsHandler implements BiomeAmbienceInterface
+113. ✅ `MixinDebugEntries` - Inlined into DebugScreenEntries static initializer
+114. ✅ `MixinClientPacketListener` - Inlined into ClientPacketListener.handleLogin()
+115. ✅ `MixinMinecraft_Images` - Inlined into Minecraft constructor
+116. ✅ `LevelRendererMixin` (Sodium sky) - Inlined into LevelRenderer.iris$renderSkyPassBody()
+117. ✅ `MixinBlockStateBehavior` - Inlined AO level adjustment into BlockBehaviour.BlockStateBase.getShadeBrightness()
+118. ✅ `MixinGameRenderer_NightVisionCompat` - Added null check in GameRenderer.getNightVisionScale()
+119. ✅ `MixinLevelRenderer_Sky` (Iris) - Combined sky fog checks into LevelRenderer.iris$renderSkyPassBody()
+120. ✅ `MixinRenderTarget` - Interface implementations → RenderTarget implements Blaze3dRenderTargetExt and RenderTargetInterface
 
 #### Removed Mixins (Session 18 - 3 mixins):
 109. ✅ `VertexMultiConsumerMixin` (Double and Multiple) - Interface implementation → VertexMultiConsumer.Double and Multiple implement VertexBufferWriter

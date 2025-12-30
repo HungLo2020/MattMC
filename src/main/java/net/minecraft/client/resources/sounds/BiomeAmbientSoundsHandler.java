@@ -73,12 +73,12 @@ public class BiomeAmbientSoundsHandler implements AmbientSoundHandler, net.iriss
 		});
 		
 		// Iris: Calculate constant moodiness for shader uniforms
-		BlockPos blockPos = this.player.blockPosition();
-		int j = this.player.level().getBrightness(LightLayer.SKY, blockPos);
-		if (j > 0) {
-			this.constantMoodiness -= (float) j / (float) 15 * 0.001F;
+		BlockPos constantMoodPos = this.player.blockPosition();
+		int skyBrightness = this.player.level().getBrightness(LightLayer.SKY, constantMoodPos);
+		if (skyBrightness > 0) {
+			this.constantMoodiness -= (float) skyBrightness / (float) 15 * 0.001F;
 		} else {
-			this.constantMoodiness -= (float) (this.player.level().getBrightness(LightLayer.BLOCK, blockPos) - 1) / 6000.0F;
+			this.constantMoodiness -= (float) (this.player.level().getBrightness(LightLayer.BLOCK, constantMoodPos) - 1) / 6000.0F;
 		}
 		this.constantMoodiness = Mth.clamp(constantMoodiness, 0.0f, 1.0f);
 		
