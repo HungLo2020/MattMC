@@ -746,12 +746,10 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 						versionId
 					));
 				} else {
-					com.seibel.distanthorizons.core.logging.DhLoggerBuilder.getLogger().info(
-						"Unable to find new DH update for the [" + updateBranch + "] branch. Assuming DH is up to date...");
+					LOGGER.info("Unable to find new DH update for the [" + updateBranch + "] branch. Assuming DH is up to date...");
 				}
 			} catch (Exception e) {
-				com.seibel.distanthorizons.core.logging.DhLoggerBuilder.getLogger().info(
-					"Unable to show DH update screen, reason: [" + e.getMessage() + "].");
+				LOGGER.info("Unable to show DH update screen, reason: [" + e.getMessage() + "].");
 			}
 		};
 	}
