@@ -190,14 +190,12 @@ public class FabricMain extends AbstractModInitializer implements ClientModIniti
 		super.onInitializeClient();
 		
 		// Register Distant Horizons rendering hooks to replace mixin-based injection
-		LOGGER.info("[DH-HOOK-INIT] Registering Distant Horizons rendering hooks...");
 		net.minecraft.hooks.HookRegistry.registerChunkRenderLayerHook(
 			new com.seibel.distanthorizons.fabric.hooks.DistantHorizonsChunkRenderHook()
 		);
 		net.minecraft.hooks.HookRegistry.registerLevelRendererHook(
 			new com.seibel.distanthorizons.fabric.hooks.DistantHorizonsLevelRenderHook()
 		);
-		LOGGER.info("[DH-HOOK-INIT] Distant Horizons rendering hooks registered successfully.");
 	}
 	
 }

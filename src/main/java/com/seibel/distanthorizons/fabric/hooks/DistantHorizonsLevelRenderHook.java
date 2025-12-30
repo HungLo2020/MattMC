@@ -41,8 +41,6 @@ public class DistantHorizonsLevelRenderHook implements LevelRendererHooks {
 
     @Override
     public void onBeforeRenderLevel(Camera camera, Matrix4f positionMatrix, Matrix4f projectionMatrix) {
-        LOGGER.info("[DH-RENDER-HOOK] onBeforeRenderLevel called");
-        
         ClientApi.RENDER_STATE.mcModelViewMatrix = McObjectConverter.Convert(positionMatrix);
         ClientApi.RENDER_STATE.mcProjectionMatrix = McObjectConverter.Convert(projectionMatrix);
         
@@ -60,9 +58,6 @@ public class DistantHorizonsLevelRenderHook implements LevelRendererHooks {
 
     @Override
     public void onBeforePrepareChunkRenders(Matrix4fc modelViewMatrix, double camX, double camY, double camZ) {
-        LOGGER.info("[DH-RENDER-HOOK] ========== prepareChunkRenders() CALLED ==========");
-        LOGGER.info("[DH-RENDER-HOOK] Thread: " + Thread.currentThread().getName() + " (ID: " + Thread.currentThread().getId() + ")");
-        
         ClientApi.RENDER_STATE.mcModelViewMatrix = McObjectConverter.Convert(modelViewMatrix);
         
         LevelRenderer levelRenderer = Minecraft.getInstance().levelRenderer;
@@ -71,28 +66,20 @@ public class DistantHorizonsLevelRenderHook implements LevelRendererHooks {
             levelRenderer.level
         );
         
-        LOGGER.info("[DH-RENDER-HOOK] clientLevelWrapper: " + ClientApi.RENDER_STATE.clientLevelWrapper);
-        LOGGER.info("[DH-RENDER-HOOK] ClientApi.INSTANCE: " + ClientApi.INSTANCE);
-        
         // only crash during development
         if (ModInfo.IS_DEV_BUILD) {
-            LOGGER.info("[DH-RENDER-HOOK] Development build - checking canRenderOrThrow()");
             try {
                 ClientApi.RENDER_STATE.canRenderOrThrow();
-                LOGGER.info("[DH-RENDER-HOOK] canRenderOrThrow() passed");
             } catch (Exception ex) {
                 LOGGER.error("[DH-RENDER-HOOK] canRenderOrThrow() failed: " + ex.getMessage(), ex);
                 throw ex;
             }
         }
         
-        LOGGER.info("[DH-RENDER-HOOK] Calling ClientApi.INSTANCE.renderLods()");
         try {
             ClientApi.INSTANCE.renderLods();
-            LOGGER.info("[DH-RENDER-HOOK] ClientApi.INSTANCE.renderLods() completed successfully");
         } catch (Exception ex) {
             LOGGER.error("[DH-RENDER-HOOK] renderLods() failed: " + ex.getMessage(), ex);
         }
-        LOGGER.info("[DH-RENDER-HOOK] ========== prepareChunkRenders() COMPLETE ==========");
     }
 }
