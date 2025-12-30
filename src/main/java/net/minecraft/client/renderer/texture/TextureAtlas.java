@@ -36,14 +36,14 @@ public class TextureAtlas extends AbstractTexture implements Dumpable, Tickable 
 	public static final ResourceLocation LOCATION_PARTICLES = ResourceLocation.withDefaultNamespace("textures/atlas/particles.png");
 	private List<SpriteContents> sprites = List.of();
 	private List<TextureAtlasSprite.Ticker> animatedTextures = List.of();
-	private Map<ResourceLocation, TextureAtlasSprite> texturesByName = Map.of();
+	public Map<ResourceLocation, TextureAtlasSprite> texturesByName = Map.of();
 	@Nullable
 	private TextureAtlasSprite missingSprite;
 	private final ResourceLocation location;
 	private final int maxSupportedTextureSize;
 	public int width;
 	public int height;
-	private int mipLevel;
+	public int mipLevel;
 
 	public TextureAtlas(ResourceLocation resourceLocation) {
 		this.location = resourceLocation;
@@ -208,11 +208,11 @@ public class TextureAtlas extends AbstractTexture implements Dumpable, Tickable 
 		return this.maxSupportedTextureSize;
 	}
 
-	int getWidth() {
+	public int getWidth() {
 		return this.width;
 	}
 
-	int getHeight() {
+	public int getHeight() {
 		return this.height;
 	}
 }

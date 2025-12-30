@@ -22,7 +22,6 @@ import net.irisshaders.iris.gl.program.ProgramImages;
 import net.irisshaders.iris.gl.program.ProgramSamplers;
 import net.irisshaders.iris.gl.program.ProgramUniforms;
 import net.irisshaders.iris.gl.state.FogMode;
-import net.irisshaders.iris.mixin.texture.TextureAtlasAccessor;
 import net.irisshaders.iris.pipeline.IrisRenderingPipeline;
 import net.irisshaders.iris.samplers.IrisSamplers;
 import net.irisshaders.iris.uniforms.CapturedRenderingState;
@@ -178,10 +177,10 @@ public class SodiumShader implements ChunkShaderInterface {
 		double subTexelPrecision = (1 << GLRenderDevice.INSTANCE.getSubTexelPrecisionBits());
 		double subTexelOffset = 1.0f / CompactChunkVertex.TEXTURE_MAX_VALUE;
 
-		if (this.uniformTexCoordShrink != null) {
+	if (this.uniformTexCoordShrink != null) {
 			this.uniformTexCoordShrink.set(
-				(float) (subTexelOffset - (((1.0D / ((TextureAtlasAccessor) textureAtlas).callGetWidth()) / subTexelPrecision))),
-				(float) (subTexelOffset - (((1.0D / ((TextureAtlasAccessor) textureAtlas).callGetHeight()) / subTexelPrecision)))
+				(float) (subTexelOffset - (((1.0D / ((TextureAtlas) textureAtlas).getWidth()) / subTexelPrecision))),
+				(float) (subTexelOffset - (((1.0D / ((TextureAtlas) textureAtlas).getHeight()) / subTexelPrecision)))
 			);
 		}
 		bindTextures(pass.getAtlas());

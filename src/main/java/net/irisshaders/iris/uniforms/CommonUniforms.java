@@ -8,7 +8,6 @@ import net.irisshaders.iris.gl.state.StateUpdateNotifiers;
 import net.irisshaders.iris.gl.uniform.DynamicUniformHolder;
 import net.irisshaders.iris.gl.uniform.UniformHolder;
 import net.irisshaders.iris.layer.GbufferPrograms;
-import net.irisshaders.iris.mixin.texture.TextureAtlasAccessor;
 import net.irisshaders.iris.mixinterface.LocalPlayerInterface;
 import net.irisshaders.iris.pbr.TextureInfoCache;
 import net.irisshaders.iris.pbr.TextureInfoCache.TextureInfo;
@@ -78,8 +77,7 @@ public final class CommonUniforms {
 
 			AbstractTexture texture = TextureTracker.INSTANCE.getTexture(glId);
 			if (texture instanceof TextureAtlas atlas) {
-				TextureAtlasAccessor atlasAccessor = (TextureAtlasAccessor) atlas;
-				return new Vector2i(atlasAccessor.callGetWidth(), atlasAccessor.callGetHeight());
+				return new Vector2i(atlas.getWidth(), atlas.getHeight());
 			}
 
 			return ZERO_VECTOR_2i;

@@ -2,7 +2,6 @@ package net.irisshaders.iris.pbr.loader;
 
 import com.mojang.blaze3d.platform.NativeImage;
 import net.irisshaders.iris.Iris;
-import net.irisshaders.iris.mixin.texture.TextureAtlasAccessor;
 import net.irisshaders.iris.pbr.format.TextureFormat;
 import net.irisshaders.iris.pbr.format.TextureFormatLoader;
 import net.irisshaders.iris.pbr.mipmap.ChannelMipmapGenerator;
@@ -40,14 +39,13 @@ public class AtlasPBRLoader implements PBRTextureLoader<TextureAtlas> {
 
 	@Override
 	public void load(TextureAtlas atlas, ResourceManager resourceManager, PBRTextureConsumer pbrTextureConsumer) {
-		TextureAtlasAccessor atlasAccessor = (TextureAtlasAccessor) atlas;
-		int atlasWidth = atlasAccessor.callGetWidth();
-		int atlasHeight = atlasAccessor.callGetHeight();
-		int mipLevel = atlasAccessor.getMipLevel();
+		int atlasWidth = atlas.getWidth();
+		int atlasHeight = atlas.getHeight();
+		int mipLevel = atlas.mipLevel;
 
 		PBRAtlasTexture normalAtlas = null;
 		PBRAtlasTexture specularAtlas = null;
-		for (TextureAtlasSprite sprite : ((TextureAtlasAccessor) atlas).getTexturesByName().values()) {
+		for (TextureAtlasSprite sprite : atlas.texturesByName.values()) {
 			PBRTextureAtlasSprite normalSprite = createPBRSprite(sprite, resourceManager, atlas, atlasWidth, atlasHeight, mipLevel, PBRType.NORMAL);
 			PBRTextureAtlasSprite specularSprite = createPBRSprite(sprite, resourceManager, atlas, atlasWidth, atlasHeight, mipLevel, PBRType.SPECULAR);
 			if (normalSprite != null) {
