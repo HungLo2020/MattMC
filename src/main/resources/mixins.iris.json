@@ -93,7 +93,6 @@
     "texture.MixinSpriteContents",
     "texture.MixinTextureManager",
     "texture.pbr.MixinDirectoryLister",
-    "texture.pbr.MixinReloadableTexture",
     "texture.pbr.MixinSpriteContents",
     "texture.pbr.MixinTextureAtlas"
   ],

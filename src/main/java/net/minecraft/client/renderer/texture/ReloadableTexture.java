@@ -39,6 +39,9 @@ public abstract class ReloadableTexture extends AbstractTexture {
 		this.setFilter(bl, false);
 		this.setClamp(bl2);
 		gpuDevice.createCommandEncoder().writeToTexture(this.texture, nativeImage);
+		
+		// Iris: Track texture for PBR system
+		net.irisshaders.iris.pbr.TextureTracker.INSTANCE.trackTexture(this.texture.iris$getGlId(), this);
 	}
 
 	public abstract TextureContents loadContents(ResourceManager resourceManager) throws IOException;

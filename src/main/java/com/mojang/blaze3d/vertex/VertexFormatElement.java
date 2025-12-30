@@ -48,6 +48,10 @@ public record VertexFormatElement(int id, int index, VertexFormatElement.Type ty
 	}
 
 	private boolean supportsUsage(int i, VertexFormatElement.Usage usage) {
+		// Iris: Fix generic vertex attributes - allow all indices for GENERIC usage
+		if (usage == VertexFormatElement.Usage.GENERIC) {
+			return true;
+		}
 		return i == 0 || usage == VertexFormatElement.Usage.UV;
 	}
 
