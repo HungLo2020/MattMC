@@ -88,9 +88,13 @@ public class LodRendererEvents {
 			// canceling it will prevent DH from rendering for that frame
 			@Override
 			public void beforeRender(DhApiCancelableEventParam<DhApiRenderParam> event) {
-
-				DhApi.Delayed.renderProxy.setDeferTransparentRendering(Iris.isPackInUseQuick() && getInstance().shouldOverride);
-				DhApi.Delayed.configs.graphics().fog().drawMode().setValue(getInstance().shouldOverride ? EDhApiFogDrawMode.FOG_DISABLED : EDhApiFogDrawMode.FOG_ENABLED);
+				// When any Iris shader pack is loaded, always use separate opaque/transparent passes
+				// This is required for proper texture binding and water rendering with shaders
+				boolean irisShaderActive = Iris.isPackInUseQuick();
+				DHCompatInternal instance = getInstance();
+				
+				DhApi.Delayed.renderProxy.setDeferTransparentRendering(irisShaderActive);
+				DhApi.Delayed.configs.graphics().fog().drawMode().setValue(instance.shouldOverride ? EDhApiFogDrawMode.FOG_DISABLED : EDhApiFogDrawMode.FOG_ENABLED);
 			}
 		};
 
