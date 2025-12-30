@@ -10,9 +10,6 @@
     "conformVisibility": true
   },
   "client": [
-    "core.render.immediate.consumer.EntityOutlineGeneratorMixin",
-    "core.render.immediate.consumer.SheetedDecalTextureGeneratorMixin",
-    "core.render.immediate.consumer.SpriteCoordinateExpanderMixin",
     "core.render.immediate.consumer.VertexMultiConsumerMixin$DoubleMixin",
     "core.render.immediate.consumer.VertexMultiConsumerMixin$MultipleMixin",
     "core.render.world.ChunkSectionsToRenderMixin",

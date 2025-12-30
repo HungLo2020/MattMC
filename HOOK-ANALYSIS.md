@@ -6,8 +6,13 @@
 
 ### Mixin Conversion Status
 
-**Total Mixins:** 218 → **140 remaining** (78 removed)  
-**Conversion Progress:** 35.8% complete
+**Total Mixins:** 218 → **137 remaining** (81 removed)  
+**Conversion Progress:** 37.2% complete
+
+#### Removed Mixins (Session 17 - 3 mixins):
+106. ✅ `SheetedDecalTextureGeneratorMixin` - Interface implementation → SheetedDecalTextureGenerator implements VertexBufferWriter
+107. ✅ `SpriteCoordinateExpanderMixin` - Interface implementation → SpriteCoordinateExpander implements VertexBufferWriter
+108. ✅ `EntityOutlineGeneratorMixin` - Interface implementation → OutlineBufferSource.EntityOutlineGenerator implements VertexBufferWriter
 
 #### Removed Mixins (Session 16 - 3 mixins):
 103. ✅ `BlockModelPartMixin` - Interface implementation → BlockModelPart implements FabricBlockModelPart
