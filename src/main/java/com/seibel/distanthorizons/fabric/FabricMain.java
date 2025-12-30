@@ -185,4 +185,17 @@ public class FabricMain extends AbstractModInitializer implements ClientModIniti
 		}
 	}
 	
+	@Override
+	public void onInitializeClient() {
+		super.onInitializeClient();
+		
+		// Register Distant Horizons rendering hooks to replace mixin-based injection
+		net.minecraft.hooks.HookRegistry.registerChunkRenderLayerHook(
+			new com.seibel.distanthorizons.fabric.hooks.DistantHorizonsChunkRenderHook()
+		);
+		net.minecraft.hooks.HookRegistry.registerLevelRendererHook(
+			new com.seibel.distanthorizons.fabric.hooks.DistantHorizonsLevelRenderHook()
+		);
+	}
+	
 }

@@ -6,8 +6,12 @@
 
 ### Mixin Conversion Status
 
-**Total Mixins:** 218 → **156 remaining** (62 removed)  
-**Conversion Progress:** 28.4% complete
+**Total Mixins:** 218 → **154 remaining** (64 removed)  
+**Conversion Progress:** 29.4% complete
+
+#### Removed Mixins (Session 10 - 2 mixins):
+90. ✅ `MixinChunkSectionsToRender` (Distant Horizons) - Converted to ChunkRenderLayerHooks
+91. ✅ `MixinLevelRenderer` (Distant Horizons) - Converted to LevelRendererHooks
 
 #### Removed Mixins (Session 9 - 6 mixins):
 84. ✅ `FrustumMixin` - Interface implementation → Frustum implements ViewportProvider

@@ -460,6 +460,11 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 		Vector4f vector4f,
 		boolean bl2
 	) {
+		// Call registered hooks before rendering level
+		for (net.minecraft.hooks.LevelRendererHooks hook : net.minecraft.hooks.HookRegistry.getLevelRendererHooks()) {
+			hook.onBeforeRenderLevel(camera, matrix4f, matrix4f2);
+		}
+		
 		float f = deltaTracker.getGameTimeDeltaPartialTick(false);
 		this.levelRenderState.reset();
 		this.blockEntityRenderDispatcher.prepare(camera);
@@ -1010,6 +1015,11 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 	}
 
 	private ChunkSectionsToRender prepareChunkRenders(Matrix4fc matrix4fc, double d, double e, double f) {
+		// Call registered hooks before preparing chunk renders
+		for (net.minecraft.hooks.LevelRendererHooks hook : net.minecraft.hooks.HookRegistry.getLevelRendererHooks()) {
+			hook.onBeforePrepareChunkRenders(matrix4fc, d, e, f);
+		}
+		
 		ObjectListIterator<SectionRenderDispatcher.RenderSection> objectListIterator = this.visibleSections.listIterator(0);
 		EnumMap<ChunkSectionLayer, List<RenderPass.Draw<GpuBufferSlice[]>>> enumMap = new EnumMap(ChunkSectionLayer.class);
 		int i = 0;

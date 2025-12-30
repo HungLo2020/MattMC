@@ -15,12 +15,19 @@ import net.minecraft.api.Environment;
 import net.minecraft.SharedConstants;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.RenderPipelines;
+import net.minecraft.hooks.ChunkRenderLayerHooks;
+import net.minecraft.hooks.HookRegistry;
 
 @Environment(EnvType.CLIENT)
 public record ChunkSectionsToRender(
 	EnumMap<ChunkSectionLayer, List<RenderPass.Draw<GpuBufferSlice[]>>> drawsPerLayer, int maxIndicesRequired, GpuBufferSlice[] dynamicTransforms
 ) {
 	public void renderGroup(ChunkSectionLayerGroup chunkSectionLayerGroup) {
+		// Call registered hooks before rendering the layer group
+		for (ChunkRenderLayerHooks hook : HookRegistry.getChunkRenderLayerHooks()) {
+			hook.onBeforeRenderLayer(chunkSectionLayerGroup);
+		}
+		
 		RenderSystem.AutoStorageIndexBuffer autoStorageIndexBuffer = RenderSystem.getSequentialBuffer(VertexFormat.Mode.QUADS);
 		GpuBuffer gpuBuffer = this.maxIndicesRequired == 0 ? null : autoStorageIndexBuffer.getBuffer(this.maxIndicesRequired);
 		VertexFormat.IndexType indexType = this.maxIndicesRequired == 0 ? null : autoStorageIndexBuffer.type();
