@@ -1,28 +1,29 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-BASE="origin/master"
-TARGET="origin/develop"
+COMMIT="11839ba9b32ead477b2ae053214037cfa29cecce"
 OUT="OUTPUT.txt"
 
-git fetch origin --prune
+# Fresh output file
+: > "$OUT"
 
 {
-	echo "=== Change summary: $BASE -> $TARGET (excluding frnsrc/ and *.json) ==="
+	echo "=== Full diff for commit $COMMIT (vs parent) ==="
 	echo "Generated: $(date -Is)"
 	echo
-	echo "Code  Meaning"
-	echo "A     Added (new file)"
-	echo "M     Modified"
-	echo "D     Deleted"
-	echo "R###  Renamed (score shown)"
-	echo "C###  Copied (score shown)"
-	echo "T     Type changed (e.g., file -> symlink)"
-	echo "U     Unmerged / conflict"
+
+	# Metadata + file summary
+	echo "=== Commit info ==="
+	git show --no-patch --pretty=fuller "$COMMIT"
 	echo
-	echo "=== Changes ==="
-	# Exclude everything under frnsrc/ and all .json files anywhere.
-	git -c diff.renameLimit=10000 diff --name-status -M -C "$BASE...$TARGET" -- . ':(exclude)frnsrc/**' ':(exclude)**/*.json'
-} > "$OUT"
+
+	echo "=== Files changed (stat) ==="
+	git show --stat --oneline "$COMMIT"
+	echo
+
+	echo "=== Full patch (all changes) ==="
+	git show --patch "$COMMIT"
+
+} >> "$OUT"
 
 echo "Wrote $OUT"
