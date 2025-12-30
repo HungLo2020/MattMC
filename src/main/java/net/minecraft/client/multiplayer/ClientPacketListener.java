@@ -455,6 +455,9 @@ public class ClientPacketListener extends ClientCommonPacketListenerImpl impleme
 	}
 
 	public void close() {
+		// DH: Fire client disconnected event
+		com.seibel.distanthorizons.core.api.internal.ClientApi.INSTANCE.onClientOnlyDisconnected();
+		
 		this.closed = true;
 		this.clearLevel();
 	}
@@ -554,6 +557,11 @@ public class ClientPacketListener extends ClientCommonPacketListenerImpl impleme
 			this.minecraft.getToastManager().addToast(systemToast);
 			this.seenInsecureChatWarning = true;
 		}
+		
+		// DH: Fire client connected and level load events
+		com.seibel.distanthorizons.core.api.internal.ClientApi.INSTANCE.onClientOnlyConnected();
+		com.seibel.distanthorizons.core.api.internal.ClientApi.INSTANCE.clientLevelLoadEvent(
+			com.seibel.distanthorizons.common.wrappers.world.ClientLevelWrapper.getWrapper(this.level, true));
 	}
 
 	public void handleAddEntity(ClientboundAddEntityPacket clientboundAddEntityPacket) {
@@ -889,6 +897,19 @@ public class ClientPacketListener extends ClientCommonPacketListenerImpl impleme
 		}
 
 		this.level.setSectionRangeDirty(i - 1, this.level.getMinSectionY(), j - 1, i + 1, this.level.getMaxSectionY(), j + 1);
+		
+		// DH: Fire chunk load event on background thread
+		if (levelChunk != null) {
+			java.util.concurrent.AbstractExecutorService executor = com.seibel.distanthorizons.core.util.threading.ThreadPoolUtil.getFileHandlerExecutor();
+			if (executor != null) {
+				executor.execute(() -> {
+					com.seibel.distanthorizons.core.wrapperInterfaces.world.IClientLevelWrapper clientLevel = 
+						com.seibel.distanthorizons.common.wrappers.world.ClientLevelWrapper.getWrapper((net.minecraft.client.multiplayer.ClientLevel) this.level);
+					com.seibel.distanthorizons.core.api.internal.SharedApi.INSTANCE.chunkLoadEvent(
+						new com.seibel.distanthorizons.common.wrappers.chunk.ChunkWrapper(levelChunk, clientLevel), clientLevel);
+				});
+			}
+		}
 	}
 
 	public void handleForgetLevelChunk(ClientboundForgetLevelChunkPacket clientboundForgetLevelChunkPacket) {

@@ -3,18 +3,13 @@
   "minVersion": "0.8",
   "package": "com.seibel.distanthorizons.fabric.mixins",
   "mixins": [
-    "server.MixinChunkMap",
-    "server.MixinTracingExecutor"
+    "server.MixinChunkMap"
   ],
   "client": [
-    "client.MixinClientLevel",
-    "client.MixinClientPacketListener",
     "client.MixinChunkSectionsToRender",
-    "client.MixinDebugScreenOverlay",
     "client.MixinFogRenderer",
     "client.MixinLevelRenderer",
-    "client.MixinOptionsScreen",
-    "client.MixinTextureUtil"
+    "client.MixinOptionsScreen"
   ],
   "server": [],
   "injectors": {
