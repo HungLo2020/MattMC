@@ -20,7 +20,7 @@ import net.minecraft.world.level.biome.BiomeManager;
 import org.jetbrains.annotations.Nullable;
 
 @Environment(EnvType.CLIENT)
-public class BiomeAmbientSoundsHandler implements AmbientSoundHandler {
+public class BiomeAmbientSoundsHandler implements AmbientSoundHandler, net.irisshaders.iris.mixinterface.BiomeAmbienceInterface {
 	private static final int LOOP_SOUND_CROSS_FADE_TIME = 40;
 	private static final float SKY_MOOD_RECOVERY_RATE = 0.001F;
 	private final LocalPlayer player;
@@ -31,6 +31,7 @@ public class BiomeAmbientSoundsHandler implements AmbientSoundHandler {
 	private Optional<AmbientMoodSettings> moodSettings = Optional.empty();
 	private Optional<AmbientAdditionsSettings> additionsSettings = Optional.empty();
 	private float moodiness;
+	private float constantMoodiness; // Iris: for BiomeAmbienceInterface
 	@Nullable
 	private Biome previousBiome;
 
@@ -70,6 +71,17 @@ public class BiomeAmbientSoundsHandler implements AmbientSoundHandler {
 				this.soundManager.play(SimpleSoundInstance.forAmbientAddition((SoundEvent)ambientAdditionsSettings.getSoundEvent().value()));
 			}
 		});
+		
+		// Iris: Calculate constant moodiness for shader uniforms
+		BlockPos blockPos = this.player.blockPosition();
+		int j = this.player.level().getBrightness(LightLayer.SKY, blockPos);
+		if (j > 0) {
+			this.constantMoodiness -= (float) j / (float) 15 * 0.001F;
+		} else {
+			this.constantMoodiness -= (float) (this.player.level().getBrightness(LightLayer.BLOCK, blockPos) - 1) / 6000.0F;
+		}
+		this.constantMoodiness = Mth.clamp(constantMoodiness, 0.0f, 1.0f);
+		
 		this.moodSettings
 			.ifPresent(
 				ambientMoodSettings -> {
@@ -110,6 +122,12 @@ public class BiomeAmbientSoundsHandler implements AmbientSoundHandler {
 					}
 				}
 			);
+	}
+
+	// Iris: BiomeAmbienceInterface implementation
+	@Override
+	public float getConstantMood() {
+		return constantMoodiness;
 	}
 
 	@Environment(EnvType.CLIENT)

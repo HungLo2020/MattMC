@@ -689,6 +689,15 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 		}
 
 		this.packetProcessor = new PacketProcessor(this.gameThread);
+		
+		// Iris: Setup GUI texture images
+		if (!net.irisshaders.iris.platform.IrisPlatformHelpers.getInstance().isModLoaded("fabric-resource-loader-v0")) {
+			try {
+				this.textureManager.register(net.minecraft.resources.ResourceLocation.fromNamespaceAndPath("iris", "textures/gui/widgets.png"), new net.irisshaders.iris.targets.backed.NativeImageBackedCustomTexture(new net.irisshaders.iris.shaderpack.texture.CustomTextureData.PngData(new net.irisshaders.iris.shaderpack.texture.TextureFilteringData(false, false), org.apache.commons.io.IOUtils.toByteArray(net.irisshaders.iris.Iris.class.getResourceAsStream("/assets/iris/textures/gui/widgets.png")))));
+			} catch (java.io.IOException e) {
+				throw new RuntimeException(e);
+			}
+		}
 	}
 
 	public boolean hasShiftDown() {

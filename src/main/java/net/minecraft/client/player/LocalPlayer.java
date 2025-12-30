@@ -1127,8 +1127,8 @@ public class LocalPlayer extends AbstractClientPlayer implements net.irisshaders
 	@Override
 	public float getCurrentConstantMood() {
 		for (AmbientSoundHandler ambientSoundHandler : this.ambientSoundHandlers) {
-			if (ambientSoundHandler instanceof net.minecraft.client.resources.sounds.BiomeAmbientSoundsHandler) {
-				return ((net.irisshaders.iris.mixinterface.BiomeAmbienceInterface) ambientSoundHandler).getConstantMood();
+			if (ambientSoundHandler instanceof net.minecraft.client.resources.sounds.BiomeAmbientSoundsHandler handler) {
+				return handler.getConstantMood();
 			}
 		}
 
