@@ -33,7 +33,7 @@ import net.minecraft.world.level.material.FluidState;
 import net.minecraft.world.level.material.Fluids;
 import org.jetbrains.annotations.Nullable;
 
-public final class Biome {
+public final class Biome implements net.irisshaders.iris.mixinterface.ExtendedBiome {
 	public static final Codec<Biome> DIRECT_CODEC = RecordCodecBuilder.create(
 		instance -> instance.group(
 				Biome.ClimateSettings.CODEC.forGetter(biome -> biome.climateSettings),
@@ -67,6 +67,8 @@ public final class Biome {
 	private final BiomeGenerationSettings generationSettings;
 	private final MobSpawnSettings mobSettings;
 	private final BiomeSpecialEffects specialEffects;
+	// Iris: Track biome category
+	private int biomeCategory = -1;
 	private final ThreadLocal<Long2FloatLinkedOpenHashMap> temperatureCache = ThreadLocal.withInitial(() -> Util.make(() -> {
 		Long2FloatLinkedOpenHashMap long2FloatLinkedOpenHashMap = new Long2FloatLinkedOpenHashMap(1024, 0.25F) {
 			@Override
@@ -433,5 +435,21 @@ public final class Biome {
 		public String getSerializedName() {
 			return this.name;
 		}
+	}
+	
+	// Iris: Implementation of ExtendedBiome interface
+	@Override
+	public int getBiomeCategory() {
+		return this.biomeCategory;
+	}
+	
+	@Override
+	public void setBiomeCategory(int biomeCategory) {
+		this.biomeCategory = biomeCategory;
+	}
+	
+	@Override
+	public float getDownfall() {
+		return this.climateSettings.downfall();
 	}
 }
