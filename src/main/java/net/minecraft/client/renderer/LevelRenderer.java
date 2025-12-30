@@ -186,8 +186,26 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 		this.skyRenderer.close();
 		this.cloudRenderer.close();
 	}
+	
+	// Iris: Helper method to disable fabulous graphics when shaders are enabled
+	private void disableFabulousGraphicsIfNeeded() {
+		net.minecraft.client.Options options = this.minecraft.options;
+		
+		if (!net.irisshaders.iris.Iris.getIrisConfig().areShadersEnabled()) {
+			// Nothing to do here, shaders are disabled.
+			return;
+		}
+		
+		if (options.graphicsMode().get() == GraphicsStatus.FABULOUS) {
+			// Disable fabulous graphics when shaders are enabled.
+			options.graphicsMode().set(GraphicsStatus.FANCY);
+		}
+	}
 
 	public void onResourceManagerReload(ResourceManager resourceManager) {
+		// Iris: Disable fabulous graphics when shaders are enabled
+		disableFabulousGraphicsIfNeeded();
+		
 		this.initOutline();
 		this.skyRenderer.initTextures();
 	}
@@ -257,6 +275,9 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 	}
 
 	public void allChanged() {
+		// Iris: Disable fabulous graphics when shaders are enabled
+		disableFabulousGraphicsIfNeeded();
+		
 		if (this.level != null) {
 			this.level.clearTintCaches();
 			if (this.sectionRenderDispatcher == null) {

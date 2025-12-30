@@ -6,15 +6,30 @@
 
 ### Mixin Conversion Status
 
-**Total Mixins:** 218 → **172 remaining** (46 removed)  
-**Conversion Progress:** 21.1% complete
+**Total Mixins:** 218 → **161 remaining** (57 removed)  
+**Conversion Progress:** 26.1% complete
+
+#### Removed Mixins (Session 8 - 4 mixins):
+80. ✅ `MixinTweakFarPlane` - Dead code (disabled mixin with all @Redirect commented out)
+81. ✅ `MixinSystemReport` - RETURN injection → SystemReport constructor adds shaderpack info
+82. ✅ `MixinTitleScreen` - RETURN injection → TitleScreen.init() calls Iris.onLoadingComplete()
+83. ✅ `fabulous.MixinDisableFabulousGraphics` - 2 HEAD injections → LevelRenderer disables fabulous graphics
+
+#### Removed Mixins (Session 7 - 7 mixins):
+73. ✅ `MixinAdvancedShadowCullingFrustum` - Interface implementation → IDhApiShadowCullingFrustum
+74. ✅ `MixinBoxCullingFrustum` - Interface implementation → IDhApiShadowCullingFrustum
+75. ✅ `MixinBooleanState` - Interface implementation → GlStateManager.BooleanState implements BooleanStateExtended
+76. ✅ `MixinQuickPlayDev` - HEAD injection → QuickPlay.joinSingleplayerWorld() dev world creation
+77. ✅ `MixinMaxFpsCrashFix` - Dead code (unused method, no injections)
+78. ✅ `MixinEndFlash` - Dead code (commented @Inject)
+79. ✅ `MixinChunkBorderRenderer` - Dead code (unused field, no injections)
 
 #### Removed Mixins (Session 6 - 5 mixins):
-75. ✅ `MixinCullEverythingFrustum` - Interface implementation → CullEverythingFrustum implements IDhApiShadowCullingFrustum
-76. ✅ `MixinNonCullingFrustum` - Interface implementation → NonCullingFrustum implements IDhApiShadowCullingFrustum
-77. ✅ `MixinGlRenderDevice` - @Redirect → GLRenderDevice.multiDrawElementsBaseVertex() tessellation check
-78. ✅ `MixinScreenEffectRenderer` - HEAD injection → ScreenEffectRenderer.renderWater() early return
-79. ✅ `MixinResourceLocation` - 2 HEAD injections → isValidPath() and validPathChar() inline checks
+68. ✅ `MixinCullEverythingFrustum` - Interface implementation → CullEverythingFrustum implements IDhApiShadowCullingFrustum
+69. ✅ `MixinNonCullingFrustum` - Interface implementation → NonCullingFrustum implements IDhApiShadowCullingFrustum
+70. ✅ `MixinGlRenderDevice` - @Redirect → GLRenderDevice.multiDrawElementsBaseVertex() tessellation check
+71. ✅ `MixinScreenEffectRenderer` - HEAD injection → ScreenEffectRenderer.renderWater() early return
+72. ✅ `MixinResourceLocation` - 2 HEAD injections → isValidPath() and validPathChar() inline checks
 
 #### Removed Mixins (Session 5 - 5 mixins):
 70-74. (See previous documentation)
@@ -106,25 +121,28 @@ Hooks are already being called from Minecraft core code:
 
 ## Current Mixin Statistics
 
-### Total Mixin Count: 172 Files (46 removed)
+### Total Mixin Count: 161 Files (57 removed)
 
 **Breakdown by Type:**
 - **@Accessor mixins**: 0 remaining (ALL REMOVED! ✅)
 - **@Invoker mixins**: 0 remaining (ALL REMOVED! ✅)
-- **@Inject annotations**: ~200 (reduced from ~255)
-- **@Redirect annotations**: ~41 (reduced from ~46, 2 removed)
+- **@Inject annotations**: ~190 (reduced from ~255)
+- **@Redirect annotations**: ~40 (reduced from ~46)
 - **@ModifyConstant annotations**: ~14 (reduced from ~15, 1 removed)
 - **@Overwrite annotations**: ~23
 - **@ModifyArg/@ModifyVariable**: ~15
 
 **Distribution by Mod:**
 - **Sodium**: ~37 mixins (rendering optimizations, 2 removed)
-- **Iris**: ~102 mixins (shader system integration, 22 removed)
-- **Distant Horizons**: **0 server mixins** (10 removed), 2 client mixins (8 client removed)
+- **Iris**: ~95 mixins (shader system integration, 29 removed)
+- **Distant Horizons**: **0 server mixins** (10 removed - 100% complete!), 2 client mixins (8 client removed), **0 compat mixins** (4 removed - 100% complete!)
 - **Fabric API**: ~12 mixins (compatibility layer)
 - **Common**: ~21 mixins
 
-**DH Mixin Removal:** All 10 DH server mixins removed! ✅
+**Major Milestones:**
+- ✅ All DH server mixins removed (10/10)!
+- ✅ All DH compat mixins removed (4/4)!
+- ✅ All @Accessor and @Invoker mixins removed!
 
 ### Mixin Complexity Analysis
 

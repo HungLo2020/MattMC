@@ -60,6 +60,18 @@ public class SystemReport {
 		this.ignoreErrors("hardware", () -> this.putHardware(new SystemInfo()));
 		this.setDetail("JVM Flags", (Supplier<String>)(() -> printJvmFlags(string -> string.startsWith("-X"))));
 		this.setDetail("Debug Flags", (Supplier<String>)(() -> printJvmFlags(string -> string.startsWith("-DMC_DEBUG_"))));
+		
+		// Iris: Add shaderpack info to crash reports
+		if (net.irisshaders.iris.Iris.getCurrentPackName() != null) {
+			this.setDetail("Loaded Shaderpack", () -> {
+				StringBuilder sb = new StringBuilder(net.irisshaders.iris.Iris.getCurrentPackName() + (net.irisshaders.iris.Iris.isFallback() ? " (fallback)" : ""));
+				net.irisshaders.iris.Iris.getCurrentPack().ifPresent(pack -> {
+					sb.append("\n\t\t");
+					sb.append(pack.getProfileInfo());
+				});
+				return sb.toString();
+			});
+		}
 	}
 
 	private static String printJvmFlags(Predicate<String> predicate) {
