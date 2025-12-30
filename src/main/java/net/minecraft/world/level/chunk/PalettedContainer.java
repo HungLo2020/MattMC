@@ -22,7 +22,7 @@ import net.minecraft.util.ThreadingDetector;
 import net.minecraft.util.ZeroBitStorage;
 import org.jetbrains.annotations.Nullable;
 
-public class PalettedContainer<T> implements PaletteResize<T>, PalettedContainerRO<T> {
+public class PalettedContainer<T> implements PaletteResize<T>, PalettedContainerRO<T>, net.caffeinemc.mods.sodium.client.world.PalettedContainerROExtension<T> {
 	private static final int MIN_PALETTE_BITS = 0;
 	private volatile PalettedContainer.Data<T> data;
 	private final Strategy<T> strategy;
@@ -336,5 +336,52 @@ public class PalettedContainer<T> implements PaletteResize<T>, PalettedContainer
 		public PalettedContainer.Data<T> copy() {
 			return new PalettedContainer.Data<>(this.configuration, this.storage.copy(), this.palette.copy());
 		}
+	}
+	
+	// Sodium: PalettedContainerROExtension implementation
+	@Override
+	public void sodium$unpack(T[] values) {
+		java.util.Objects.requireNonNull(this.strategy);
+
+		if (values.length != this.strategy.entryCount()) {
+			throw new IllegalArgumentException("Array is wrong size");
+		}
+
+		PalettedContainer.Data<T> data = java.util.Objects.requireNonNull(this.data, "PalettedContainer must have data");
+
+		net.caffeinemc.mods.sodium.client.world.BitStorageExtension storage = (net.caffeinemc.mods.sodium.client.world.BitStorageExtension) data.storage();
+		storage.sodium$unpack(values, data.palette());
+	}
+
+	@Override
+	public void sodium$unpack(T[] values, int minX, int minY, int minZ, int maxX, int maxY, int maxZ) {
+		java.util.Objects.requireNonNull(this.strategy);
+
+		if (values.length != this.strategy.entryCount()) {
+			throw new IllegalArgumentException("Array is wrong size");
+		}
+
+		PalettedContainer.Data<T> data = java.util.Objects.requireNonNull(this.data, "PalettedContainer must have data");
+
+		BitStorage storage = data.storage();
+		Palette<T> palette = data.palette();
+
+		for (int y = minY; y <= maxY; y++) {
+			for (int z = minZ; z <= maxZ; z++) {
+				for (int x = minX; x <= maxX; x++) {
+					int localBlockIndex = this.strategy.getIndex(x, y, z);
+
+					int paletteIndex = storage.get(localBlockIndex);
+					T paletteValue = palette.valueFor(paletteIndex);
+
+					values[localBlockIndex] = paletteValue;
+				}
+			}
+		}
+	}
+
+	@Override
+	public PalettedContainerRO<T> sodium$copy() {
+		return this.copy();
 	}
 }

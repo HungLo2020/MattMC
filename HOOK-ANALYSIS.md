@@ -6,8 +6,13 @@
 
 ### Mixin Conversion Status
 
-**Total Mixins:** 218 → **124 remaining** (94 removed)  
-**Conversion Progress:** 43.1% complete
+**Total Mixins:** 218 → **121 remaining** (97 removed)  
+**Conversion Progress:** 44.5% complete
+
+#### Removed Mixins (Session 20 - 3 mixins):
+121. ✅ `MixinParticlesRenderState` - Interface implementation → ParticlesRenderState implements ParticleRenderStateExtension
+122. ✅ `MixinVertexFormat` - Interface implementation → VertexFormat implements VertexFormatExtension
+123. ✅ `PalettedContainerMixin` - Interface implementation → PalettedContainer implements PalettedContainerROExtension
 
 #### Removed Mixins (Session 19 - 9 mixins):
 112. ✅ `MixinBiomeAmbientSoundsHandler` - Interface implementation → BiomeAmbientSoundsHandler implements BiomeAmbienceInterface

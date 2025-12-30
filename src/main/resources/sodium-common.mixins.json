@@ -12,7 +12,6 @@
   "client": [
     "core.render.world.ChunkSectionsToRenderMixin",
     "core.render.world.LevelRendererMixin",
-    "core.world.chunk.PalettedContainerMixin",
     "features.render.entity.CubeMixin",
     "features.render.entity.ModelPartMixin",
     "features.render.frapi.BlockRenderDispatcherMixin",

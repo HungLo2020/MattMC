@@ -9,7 +9,6 @@
     "MixinStationaryItemParticle",
     "MixinTerrainParticle",
     "MixinParticleFeatureRenderer",
-    "MixinParticlesRenderState",
     "MixinLevelRenderer"
   ],
   "injectors": {
