@@ -88,9 +88,15 @@ public class LodRendererEvents {
 			// canceling it will prevent DH from rendering for that frame
 			@Override
 			public void beforeRender(DhApiCancelableEventParam<DhApiRenderParam> event) {
+				boolean packInUse = Iris.isPackInUseQuick();
+				boolean shouldOverride = getInstance().shouldOverride;
+				boolean deferTransparent = packInUse && shouldOverride;
+				
+				Iris.logger.info("[DH-WATER-DEBUG] beforeRender: packInUse={}, shouldOverride={}, setDeferTransparentRendering={}", 
+					packInUse, shouldOverride, deferTransparent);
 
-				DhApi.Delayed.renderProxy.setDeferTransparentRendering(Iris.isPackInUseQuick() && getInstance().shouldOverride);
-				DhApi.Delayed.configs.graphics().fog().drawMode().setValue(getInstance().shouldOverride ? EDhApiFogDrawMode.FOG_DISABLED : EDhApiFogDrawMode.FOG_ENABLED);
+				DhApi.Delayed.renderProxy.setDeferTransparentRendering(deferTransparent);
+				DhApi.Delayed.configs.graphics().fog().drawMode().setValue(shouldOverride ? EDhApiFogDrawMode.FOG_DISABLED : EDhApiFogDrawMode.FOG_ENABLED);
 			}
 		};
 
