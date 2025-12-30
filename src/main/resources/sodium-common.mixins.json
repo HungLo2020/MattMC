@@ -29,7 +29,6 @@
     "features.render.immediate.matrix_stack.VertexConsumerMixin",
     "features.render.model.item.ItemRendererMixin",
     "features.render.particle.QuadParticleRenderStateMixin",
-    "features.render.world.sky.LevelRendererMixin",
     "features.render.world.clouds.CloudRendererMixin",
     "features.textures.animations.tracking.SpriteContentsTickerMixin",
     "features.textures.animations.upload.SpriteContentsInterpolationMixin",
