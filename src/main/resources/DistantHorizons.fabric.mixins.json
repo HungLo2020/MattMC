@@ -16,6 +16,7 @@
   "client": [
     "client.MixinClientLevel",
     "client.MixinClientPacketListener",
+    "client.MixinChunkSectionsToRender",
     "client.MixinDebugScreenOverlay",
     "client.MixinFogRenderer",
     "client.MixinLevelRenderer",
