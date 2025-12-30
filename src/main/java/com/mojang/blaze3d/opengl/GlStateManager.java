@@ -37,7 +37,8 @@ public class GlStateManager {
 	private static final GlStateManager.ColorLogicState COLOR_LOGIC = new GlStateManager.ColorLogicState();
 	private static final GlStateManager.ScissorState SCISSOR = new GlStateManager.ScissorState();
 	public static int activeTexture; // Made public for Iris shader mod integration
-	public static final GlStateManager.TextureState[] TEXTURES = (GlStateManager.TextureState[])IntStream.range(0, 12)
+	// Iris: Increased from 12 to 128 to support more texture units for shaders
+	public static final GlStateManager.TextureState[] TEXTURES = (GlStateManager.TextureState[])IntStream.range(0, 128)
 		.mapToObj(i -> new GlStateManager.TextureState())
 		.toArray(GlStateManager.TextureState[]::new); // Made public for Iris shader mod integration
 	public static final GlStateManager.ColorMask COLOR_MASK = new GlStateManager.ColorMask(); // Made public for Iris shader mod integration

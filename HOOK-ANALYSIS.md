@@ -6,19 +6,16 @@
 
 ### Mixin Conversion Status
 
-**Total Mixins:** 218 → **190 remaining** (28 removed)  
-**Conversion Progress:** 12.8% complete
+**Total Mixins:** 218 → **189 remaining** (29 removed)  
+**Conversion Progress:** 13.3% complete
+
+#### Removed Mixins (Session 3 - Bugfix):
+62. ✅ `MixinGlStateManager` (root) - @ModifyConstant to change TEXTURES array size from 12 to 128
+   - Fixed ArrayIndexOutOfBoundsException in PipelineManager.resetTextureState()
+   - Changed constant directly in GlStateManager.java: `IntStream.range(0, 128)`
 
 #### Removed Mixins (Session 3 - 6 mixins):
-56. ✅ `MixinGlStateManager` (texunits) - Completely empty file, deleted
-57. ✅ `MixinBlockState` - Empty with commented code, deleted
-58. ✅ `MixinByteBufferBuilder` → ByteBufferBuilder implements MojangBufferAccessor
-59. ✅ `MixinBiome` → Biome implements ExtendedBiome (biomeCategory field + 3 methods)
-60. ✅ `MixinRenderType` → RenderType implements RenderTypeInterface (base class)
-61. ✅ `MixinRenderType2` → RenderType.CompositeRenderType overrides (actual implementation)
-
-#### Removed Mixins (Session 2 - 10 mixins):
-46-55. (See previous documentation)
+56-61. (See previous documentation)
 25. ✅ `net.irisshaders.iris.mixin.texture.TextureAtlasAccessor` - Made `TextureAtlas.texturesByName`, `mipLevel` fields and `getWidth()`, `getHeight()` methods public
 26. ✅ `net.caffeinemc.mods.sodium.mixin.features.textures.animations.upload.SpriteContentsAccessor` - Made `SpriteContents.byMipLevel` field public
 27. ✅ `net.irisshaders.iris.mixin.texture.SpriteContentsAccessor` - `SpriteContents.animatedTexture` field already public
@@ -107,19 +104,20 @@ Hooks are already being called from Minecraft core code:
 
 ## Current Mixin Statistics
 
-### Total Mixin Count: 190 Files (28 removed)
+### Total Mixin Count: 189 Files (29 removed)
 
 **Breakdown by Type:**
 - **@Accessor mixins**: 0 remaining (ALL REMOVED! ✅)
 - **@Invoker mixins**: 0 remaining (ALL REMOVED! ✅)
 - **@Inject annotations**: ~220 (reduced from ~255)
 - **@Redirect annotations**: ~43 (reduced from ~46)
+- **@ModifyConstant annotations**: ~14 (reduced from ~15, 1 removed)
 - **@Overwrite annotations**: ~23
 - **@ModifyArg/@ModifyVariable**: ~15
 
 **Distribution by Mod:**
 - **Sodium**: ~39 mixins (rendering optimizations)
-- **Iris**: ~118 mixins (shader system integration, 6 removed)
+- **Iris**: ~117 mixins (shader system integration, 7 removed)
 - **Distant Horizons**: **0 server mixins** (10 removed), 2 client mixins (8 client removed)
 - **Fabric API**: ~12 mixins (compatibility layer)
 - **Common**: ~21 mixins
