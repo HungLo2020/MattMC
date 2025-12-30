@@ -566,6 +566,10 @@ public class GameRenderer implements Projector, AutoCloseable, net.caffeinemc.mo
 
 	public static float getNightVisionScale(LivingEntity livingEntity, float f) {
 		MobEffectInstance mobEffectInstance = livingEntity.getEffect(MobEffects.NIGHT_VISION);
+		// Iris: Origins compatibility - allow getNightVisionScale even if entity doesn't have night vision
+		if (mobEffectInstance == null) {
+			return 0.0F;
+		}
 		return !mobEffectInstance.endsWithin(200) ? 1.0F : 0.7F + Mth.sin((mobEffectInstance.getDuration() - f) * (float) Math.PI * 0.2F) * 0.3F;
 	}
 

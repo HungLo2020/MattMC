@@ -1456,6 +1456,12 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 	// These are called from the lambda bodies to provide stable mixin targets
 	
 	public void iris$renderSkyPassBody() {
+		// Sodium: Prevents the sky layer from rendering when the fog distance is reduced
+		// Fixes MC-152504 by canceling sky rendering when camera is submersed
+		if (Minecraft.getInstance().gameRenderer.getMainCamera().getFluidInCamera() != net.minecraft.world.level.material.FogType.NONE || this.doesMobEffectBlockSky(Minecraft.getInstance().gameRenderer.getMainCamera())) {
+			return; // Early exit cancels sky rendering
+		}
+		
 		// This method is injected into by Iris mixins for sky rendering phase changes
 		// The actual sky rendering happens in addSkyPass lambda
 	}

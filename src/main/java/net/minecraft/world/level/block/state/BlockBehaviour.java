@@ -606,7 +606,10 @@ public abstract class BlockBehaviour implements FeatureElement {
 		}
 
 		public float getShadeBrightness(BlockGetter blockGetter, BlockPos blockPos) {
-			return this.getBlock().getShadeBrightness(this.asState(), blockGetter, blockPos);
+			float originalValue = this.getBlock().getShadeBrightness(this.asState(), blockGetter, blockPos);
+			// Iris: Apply ambientOcclusionLevel support
+			float aoLightValue = net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings.INSTANCE.getAmbientOcclusionLevel();
+			return 1.0F - aoLightValue * (1.0F - originalValue);
 		}
 
 		public boolean isRedstoneConductor(BlockGetter blockGetter, BlockPos blockPos) {
