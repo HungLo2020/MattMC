@@ -46,8 +46,6 @@
     "features.render.particle.QuadParticleRenderStateMixin",
     "features.render.world.sky.LevelRendererMixin",
     "features.render.world.clouds.CloudRendererMixin",
-    "features.textures.SpriteContentsInvoker",
-    "features.textures.animations.tracking.AnimatedTextureAccessor",
     "features.textures.animations.tracking.SpriteContentsTickerMixin",
     "features.textures.animations.upload.SpriteContentsInterpolationMixin",
     "features.textures.mipmaps.MipmapGeneratorMixin",

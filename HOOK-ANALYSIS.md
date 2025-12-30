@@ -6,10 +6,10 @@
 
 ### Mixin Conversion Status
 
-**Total Mixins:** 235 → **204 remaining** (31 removed)  
-**Conversion Progress:** 13.2% complete
+**Total Mixins:** 235 → **202 remaining** (33 removed)  
+**Conversion Progress:** 14.0% complete
 
-#### Removed Mixins (31):
+#### Removed Mixins (33):
 1-24. Previous mixins (see commit history)...
 25. ✅ `net.irisshaders.iris.mixin.texture.TextureAtlasAccessor` - Made `TextureAtlas.texturesByName`, `mipLevel` fields and `getWidth()`, `getHeight()` methods public
 26. ✅ `net.caffeinemc.mods.sodium.mixin.features.textures.animations.upload.SpriteContentsAccessor` - Made `SpriteContents.byMipLevel` field public
@@ -21,6 +21,8 @@
 32. ✅ `net.caffeinemc.mods.sodium.mixin.features.textures.animations.upload.SpriteContentsTickerAccessor` - `SpriteContents.Ticker` fields already public
 33. ✅ `net.irisshaders.iris.mixin.texture.SpriteContentsTickerAccessor` - Same as #32
 34. ✅ `net.caffeinemc.mods.sodium.mixin.features.textures.animations.tracking.SpriteContentsFrameInfoAccessor` - Same as #30
+35. ✅ `net.caffeinemc.mods.sodium.mixin.features.textures.SpriteContentsInvoker` (@Invoker) - Made `SpriteContents.upload()` method public for Sodium animation interpolation
+36. ✅ `net.caffeinemc.mods.sodium.mixin.features.textures.animations.tracking.AnimatedTextureAccessor` - `SpriteContents.AnimatedTexture.frames` field already public
 
 #### Modified Files (65+ total):
 1-19. Previous files...
@@ -97,26 +99,26 @@ Hooks are already being called from Minecraft core code:
 
 ## Current Mixin Statistics
 
-### Total Mixin Count: 212 Files (23 removed)
+### Total Mixin Count: 202 Files (33 removed)
 
 **Breakdown by Type:**
-- **@Accessor mixins**: 36 remaining (59 originally, 23 removed)
-- **@Invoker mixins**: 0 remaining (1 originally, 1 removed - all converted!)
+- **@Accessor mixins**: 26 remaining (59 originally, 33 removed - 56% complete!)
+- **@Invoker mixins**: 0 remaining (1 originally, 1 removed - 100% complete! ✅)
 - **@Inject annotations**: 254 (multiple per file)
 - **@Redirect annotations**: 46
 - **@Overwrite annotations**: 23
 - **@ModifyArg/@ModifyVariable**: 15
 
 **Distribution by Mod:**
-- **Sodium**: ~41 mixins (rendering optimizations, 9 removed)
-- **Iris**: ~136 mixins (shader system integration, 13 removed)
+- **Sodium**: ~39 mixins (rendering optimizations, 11 removed)
+- **Iris**: ~128 mixins (shader system integration, 21 removed)
 - **Distant Horizons**: ~23 mixins (LOD rendering, 1 removed)
 - **Fabric API**: ~12 mixins (compatibility layer)
 
 ### Mixin Complexity Analysis
 
 **Simple (Easy to Convert):**
-- 36 @Accessor mixins remaining - Just need to change visibility modifiers (39% complete!)
+- 26 @Accessor mixins remaining - Just need to change visibility modifiers (56% complete!)
 - 0 @Invoker mixins - ALL CONVERTED! ✅
 - ~100 simple @Inject mixins - Direct HEAD/RETURN injections
 

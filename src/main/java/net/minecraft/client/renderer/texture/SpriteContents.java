@@ -139,7 +139,7 @@ public class SpriteContents implements Stitcher.Entry, AutoCloseable {
 		return list.size() <= 1 ? null : new SpriteContents.AnimatedTexture(List.copyOf(list), k, animationMetadataSection.interpolatedFrames());
 	}
 
-	void upload(int i, int j, int k, int l, NativeImage[] nativeImages, GpuTexture gpuTexture) {
+	public void upload(int i, int j, int k, int l, NativeImage[] nativeImages, GpuTexture gpuTexture) {
 		for (int m = 0; m < this.byMipLevel.length; m++) {
 			RenderSystem.getDevice()
 				.createCommandEncoder()
