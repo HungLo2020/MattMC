@@ -6,8 +6,13 @@
 
 ### Mixin Conversion Status
 
-**Total Mixins:** 218 → **143 remaining** (75 removed)  
-**Conversion Progress:** 34.4% complete
+**Total Mixins:** 218 → **140 remaining** (78 removed)  
+**Conversion Progress:** 35.8% complete
+
+#### Removed Mixins (Session 16 - 3 mixins):
+103. ✅ `BlockModelPartMixin` - Interface implementation → BlockModelPart implements FabricBlockModelPart
+104. ✅ `ItemBlockRenderTypesMixin` - Inlined fast HashMap wrapper into ItemBlockRenderTypes static initializer
+105. ✅ `SubmitNodeStorageMixin` - Interface implementation → SubmitNodeStorage implements OrderedSubmitNodeCollectorExtension
 
 #### Removed Mixins (Session 15 - 3 mixins):
 100. ✅ `shadows.MixinBeaconRenderer` - Inlined shadow pass check into BeaconRenderer.submitBeaconBeam()

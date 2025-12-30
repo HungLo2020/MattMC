@@ -10,12 +10,22 @@ import net.minecraft.core.Direction;
 import org.jetbrains.annotations.Nullable;
 
 @Environment(EnvType.CLIENT)
-public interface BlockModelPart extends net.irisshaders.iris.compat.general.IrisModelPart {
+public interface BlockModelPart extends net.irisshaders.iris.compat.general.IrisModelPart, net.fabricmc.fabric.api.renderer.v1.model.FabricBlockModelPart {
 	List<BakedQuad> getQuads(@Nullable Direction direction);
 
 	boolean useAmbientOcclusion();
 
 	TextureAtlasSprite particleIcon();
+	
+	// Sodium FRAPI: Implementation of FabricBlockModelPart
+	@Override
+	default void emitQuads(net.fabricmc.fabric.api.renderer.v1.mesh.QuadEmitter emitter, java.util.function.Predicate<@Nullable Direction> cullTest) {
+		if (emitter instanceof net.caffeinemc.mods.sodium.client.render.frapi.render.AbstractBlockRenderContext.BlockEmitter be) {
+			be.emitPart(this, cullTest);
+		}
+		// If not a BlockEmitter, do nothing - no super call needed since interface
+		// provides default implementation
+	}
 
 	@Environment(EnvType.CLIENT)
 	public interface Unbaked extends ResolvableModel {
