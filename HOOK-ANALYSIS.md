@@ -6,8 +6,16 @@
 
 ### Mixin Conversion Status
 
-**Total Mixins:** 218 → **161 remaining** (57 removed)  
-**Conversion Progress:** 26.1% complete
+**Total Mixins:** 218 → **156 remaining** (62 removed)  
+**Conversion Progress:** 28.4% complete
+
+#### Removed Mixins (Session 9 - 6 mixins):
+84. ✅ `FrustumMixin` - Interface implementation → Frustum implements ViewportProvider
+85. ✅ `BufferBuilderMixin` (consumer) - Interface implementation → BufferBuilder implements BufferBuilderExtension  
+86. ✅ `LevelSliceMixin` - Interface implementation → LevelSlice implements FabricBlockView
+87. ✅ `GameRendererMixin` - Interface implementation → GameRenderer implements FogStorage
+88. ✅ `MixinLocalPlayer` - Interface implementation → LocalPlayer implements LocalPlayerInterface
+89. ✅ `MixinRenderTarget` (state_tracking) - Dead code (commented @Inject)
 
 #### Removed Mixins (Session 8 - 4 mixins):
 80. ✅ `MixinTweakFarPlane` - Dead code (disabled mixin with all @Redirect commented out)
