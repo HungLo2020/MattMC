@@ -23,14 +23,8 @@ public record ChunkSectionsToRender(
 	EnumMap<ChunkSectionLayer, List<RenderPass.Draw<GpuBufferSlice[]>>> drawsPerLayer, int maxIndicesRequired, GpuBufferSlice[] dynamicTransforms
 ) {
 	public void renderGroup(ChunkSectionLayerGroup chunkSectionLayerGroup) {
-		// Call registered hooks before rendering the layer group
-		var hooks = HookRegistry.getChunkRenderLayerHooks();
-		if (!hooks.isEmpty()) {
-			System.out.println("[MATTMC-DEBUG] ChunkSectionsToRender: Calling " + hooks.size() + " chunk render layer hooks");
-		}
-		for (ChunkRenderLayerHooks hook : hooks) {
-			hook.onBeforeRenderLayer(chunkSectionLayerGroup);
-		}
+		// NOTE: Hook calls are in Sodium's ChunkSectionsToRenderMixin
+		// Sodium cancels this method when active, so hooks must run before cancellation
 		
 		RenderSystem.AutoStorageIndexBuffer autoStorageIndexBuffer = RenderSystem.getSequentialBuffer(VertexFormat.Mode.QUADS);
 		GpuBuffer gpuBuffer = this.maxIndicesRequired == 0 ? null : autoStorageIndexBuffer.getBuffer(this.maxIndicesRequired);

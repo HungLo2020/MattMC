@@ -31,6 +31,12 @@ public class ChunkSectionsToRenderMixin implements SodiumChunkSection {
 
     @Inject(method = "renderGroup", at = @At("HEAD"), cancellable = true)
     private void sodium$renderGroup(ChunkSectionLayerGroup chunkSectionLayerGroup, CallbackInfo ci) {
+        // Call DH hooks before Sodium rendering (must run before cancellation)
+        // This maintains compatibility with order = 800 from the original DH mixin
+        for (net.minecraft.hooks.ChunkRenderLayerHooks hook : net.minecraft.hooks.HookRegistry.getChunkRenderLayerHooks()) {
+            hook.onBeforeRenderLayer(chunkSectionLayerGroup);
+        }
+        
         if (renderer != null) {
             ci.cancel();
 
