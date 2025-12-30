@@ -7,9 +7,7 @@
   ],
   "client": [
     "client.MixinChunkSectionsToRender",
-    "client.MixinFogRenderer",
-    "client.MixinLevelRenderer",
-    "client.MixinOptionsScreen"
+    "client.MixinLevelRenderer"
   ],
   "server": [],
   "injectors": {

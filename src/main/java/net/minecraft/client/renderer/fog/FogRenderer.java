@@ -178,6 +178,17 @@ public class FogRenderer implements AutoCloseable {
 		float j = Mth.clamp(h / 10.0F, 4.0F, 64.0F);
 		fogData.renderDistanceStart = h - j;
 		fogData.renderDistanceEnd = h;
+		
+		// DH: Cancel fog if configured
+		if (shouldCancelDhFog(camera, entity)) {
+			final float A_REALLY_REALLY_BIG_VALUE = 420694206942069.F;
+			final float A_EVEN_LARGER_VALUE = 42069420694206942069.F;
+			
+			fogData.environmentalStart = A_REALLY_REALLY_BIG_VALUE;
+			fogData.environmentalEnd = A_EVEN_LARGER_VALUE;
+			fogData.renderDistanceStart = A_REALLY_REALLY_BIG_VALUE;
+			fogData.renderDistanceEnd = A_EVEN_LARGER_VALUE;
+		}
 
 		// Call hooks to allow mods to intercept fog parameters
 		for (net.minecraft.hooks.FogRenderHooks hook : net.minecraft.hooks.HookRegistry.getFogRenderHooks()) {
@@ -213,6 +224,23 @@ public class FogRenderer implements AutoCloseable {
 	private void updateBuffer(ByteBuffer byteBuffer, int i, Vector4f vector4f, float f, float g, float h, float j, float k, float l) {
 		byteBuffer.position(i);
 		Std140Builder.intoBuffer(byteBuffer).putVec4(vector4f).putFloat(f).putFloat(g).putFloat(h).putFloat(j).putFloat(k).putFloat(l);
+	}
+	
+	// DH: Helper method to determine if vanilla fog should be cancelled
+	private static boolean shouldCancelDhFog(Camera camera, Entity entity) {
+		FogType fogType = camera.getFluidInCamera();
+		boolean cameraNotInFluid = fogType == FogType.NONE;
+		
+		boolean isSpecialFog = (entity instanceof net.minecraft.world.entity.LivingEntity) 
+			&& ((net.minecraft.world.entity.LivingEntity) entity).hasEffect(net.minecraft.world.effect.MobEffects.BLINDNESS);
+		
+		boolean cancelFog = !isSpecialFog;
+		cancelFog = cancelFog && cameraNotInFluid;
+		cancelFog = cancelFog && !com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector.INSTANCE.get(
+			com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftRenderWrapper.class).isFogStateSpecial();
+		cancelFog = cancelFog && !com.seibel.distanthorizons.core.config.Config.Client.Advanced.Graphics.Fog.enableVanillaFog.get();
+		
+		return cancelFog;
 	}
 
 	@Environment(EnvType.CLIENT)
