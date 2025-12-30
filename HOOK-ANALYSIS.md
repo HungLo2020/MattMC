@@ -6,11 +6,23 @@
 
 ### Mixin Conversion Status
 
-**Total Mixins:** 235 → **202 remaining** (33 removed)  
-**Conversion Progress:** 14.0% complete
+**Total Mixins:** 218 → **206 remaining** (12 removed)  
+**Conversion Progress:** 5.5% complete
 
-#### Removed Mixins (33):
-1-24. Previous mixins (see commit history)...
+#### Removed Mixins (45 total, 12 in this session):
+1-33. Previous mixins (see commit history)...
+34. ✅ `MixinItem` - Item now directly implements IrisItemLightProvider
+35. ✅ `MixinBlockModelPart` - BlockModelPart now directly extends IrisModelPart
+36. ✅ `MixinEntity` - Empty mixin, removed
+37. ✅ `MixinChunkGenerator` - Empty mixin, removed
+38. ✅ `MixinUtilBackgroundThread` - Empty mixin (comments only), removed
+39. ✅ `MixinPostChain` - Empty mixin, removed
+40. ✅ `MixinTextureUtil` - Empty mixin, removed
+41. ✅ `MixinLevelTicks` - Inlined into LevelTicks.schedule()
+42. ✅ `MixinMinecraft` - DH auto updater logic inlined into Minecraft class
+43. ✅ `MixinServerPlayer` - ServerPlayer now directly implements IMixinServerPlayer with field/methods
+44. ✅ `MixinPlayerManager` - Fabric event firing inlined into PlayerList.placeNewPlayer()
+45. ✅ `MixinMinecraftServerLifecycle` - All Fabric lifecycle events inlined into MinecraftServer
 25. ✅ `net.irisshaders.iris.mixin.texture.TextureAtlasAccessor` - Made `TextureAtlas.texturesByName`, `mipLevel` fields and `getWidth()`, `getHeight()` methods public
 26. ✅ `net.caffeinemc.mods.sodium.mixin.features.textures.animations.upload.SpriteContentsAccessor` - Made `SpriteContents.byMipLevel` field public
 27. ✅ `net.irisshaders.iris.mixin.texture.SpriteContentsAccessor` - `SpriteContents.animatedTexture` field already public
@@ -99,18 +111,22 @@ Hooks are already being called from Minecraft core code:
 
 ## Current Mixin Statistics
 
-### Total Mixin Count: 202 Files (33 removed)
+### Total Mixin Count: 206 Files (12 removed)
 
 **Breakdown by Type:**
-- **@Accessor mixins**: 26 remaining (59 originally, 33 removed - 56% complete!)
-- **@Invoker mixins**: 0 remaining (1 originally, 1 removed - 100% complete! ✅)
-- **@Inject annotations**: 254 (multiple per file)
-- **@Redirect annotations**: 46
-- **@Overwrite annotations**: 23
-- **@ModifyArg/@ModifyVariable**: 15
+- **@Accessor mixins**: 0 remaining (ALL REMOVED! ✅)
+- **@Invoker mixins**: 0 remaining (ALL REMOVED! ✅)
+- **@Inject annotations**: ~245 (multiple per file, some removed)
+- **@Redirect annotations**: ~45
+- **@Overwrite annotations**: ~23
+- **@ModifyArg/@ModifyVariable**: ~15
 
 **Distribution by Mod:**
-- **Sodium**: ~39 mixins (rendering optimizations, 11 removed)
+- **Sodium**: ~39 mixins (rendering optimizations)
+- **Iris**: ~124 mixins (shader system integration)
+- **Distant Horizons**: ~10 mixins (LOD rendering, 12 removed from original 22)
+- **Fabric API**: ~12 mixins (compatibility layer)
+- **Common**: ~21 mixins
 - **Iris**: ~128 mixins (shader system integration, 21 removed)
 - **Distant Horizons**: ~23 mixins (LOD rendering, 1 removed)
 - **Fabric API**: ~12 mixins (compatibility layer)
