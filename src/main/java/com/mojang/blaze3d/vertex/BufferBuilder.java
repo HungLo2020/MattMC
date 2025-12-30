@@ -2,15 +2,19 @@ package com.mojang.blaze3d.vertex;
 
 import java.nio.ByteOrder;
 import java.util.stream.Collectors;
+import net.caffeinemc.mods.sodium.client.render.vertex.buffer.BufferBuilderExtension;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.util.ARGB;
 import net.minecraft.util.Mth;
+import net.sodium.api.memory.MemoryIntrinsics;
+import net.sodium.api.vertex.serializer.VertexSerializerRegistry;
 import org.jetbrains.annotations.Nullable;
+import org.lwjgl.system.MemoryStack;
 import org.lwjgl.system.MemoryUtil;
 
 @Environment(EnvType.CLIENT)
-public class BufferBuilder implements VertexConsumer {
+public class BufferBuilder implements VertexConsumer, BufferBuilderExtension {
 	private static final int MAX_VERTEX_COUNT = 16777215;
 	private static final long NOT_BUILDING = -1L;
 	private static final long UNKNOWN_ELEMENT = -1L;
@@ -269,5 +273,45 @@ public class BufferBuilder implements VertexConsumer {
 		} else {
 			VertexConsumer.super.addVertex(f, g, h, i, j, k, l, m, n, o, p);
 		}
+	}
+
+	@Override
+	public void sodium$duplicateVertex() {
+		if (this.vertices == 0) {
+			return;
+		}
+
+		long head = this.buffer.reserve(this.vertexSize);
+		MemoryIntrinsics.copyMemory(head - this.vertexSize, head, this.vertexSize);
+
+		this.vertices++;
+	}
+
+	@Override
+	public void push(MemoryStack stack, long src, int count, VertexFormat format) {
+		var length = count * this.vertexSize;
+
+		// The buffer may change in the even, so we need to make sure that the
+		// pointer is retrieved *after* the resize
+		var dst = this.buffer.reserve(length);
+
+		if (format == this.format) {
+			// The layout is the same, so we can just perform a memory copy
+			// The stride of a vertex format is always 4 bytes, so this aligned copy is always safe
+			MemoryIntrinsics.copyMemory(src, dst, length);
+		} else {
+			// The layout differs, so we need to perform a conversion on the vertex data
+			this.copySlow(src, dst, count, format);
+		}
+
+		this.vertices += count;
+		this.vertexPointer = (dst + length) - vertexSize;
+		this.elementsToFill = 0;
+	}
+
+	private void copySlow(long src, long dst, int count, VertexFormat format) {
+		VertexSerializerRegistry.instance()
+				.get(format, this.format)
+				.serialize(src, dst, count);
 	}
 }

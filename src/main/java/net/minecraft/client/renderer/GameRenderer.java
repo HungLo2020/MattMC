@@ -100,7 +100,7 @@ import org.joml.Vector4f;
 import org.slf4j.Logger;
 
 @Environment(EnvType.CLIENT)
-public class GameRenderer implements Projector, AutoCloseable {
+public class GameRenderer implements Projector, AutoCloseable, net.caffeinemc.mods.sodium.client.util.FogStorage {
 	private static final ResourceLocation BLUR_POST_CHAIN_ID = ResourceLocation.withDefaultNamespace("blur");
 	public static final int MAX_BLUR_RADIUS = 10;
 	private static final Logger LOGGER = LogUtils.getLogger();
@@ -957,5 +957,11 @@ public class GameRenderer implements Projector, AutoCloseable {
 
 	public synchronized PanoramaRenderer getPanorama() {
 		return this.panorama;
+	}
+
+	@Override
+	public net.caffeinemc.mods.sodium.client.util.FogParameters sodium$getFogParameters() {
+		// Use the hook-based fog parameter storage instead of mixin
+		return net.caffeinemc.mods.sodium.fabric.SodiumFogRenderHook.getFogParameters();
 	}
 }
