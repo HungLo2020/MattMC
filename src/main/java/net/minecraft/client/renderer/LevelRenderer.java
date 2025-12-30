@@ -461,7 +461,11 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 		boolean bl2
 	) {
 		// Call registered hooks before rendering level
-		for (net.minecraft.hooks.LevelRendererHooks hook : net.minecraft.hooks.HookRegistry.getLevelRendererHooks()) {
+		var hooks = net.minecraft.hooks.HookRegistry.getLevelRendererHooks();
+		if (!hooks.isEmpty()) {
+			System.out.println("[MATTMC-DEBUG] LevelRenderer.renderLevel: Calling " + hooks.size() + " level renderer hooks");
+		}
+		for (net.minecraft.hooks.LevelRendererHooks hook : hooks) {
 			hook.onBeforeRenderLevel(camera, matrix4f, matrix4f2);
 		}
 		
@@ -1016,7 +1020,11 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 
 	private ChunkSectionsToRender prepareChunkRenders(Matrix4fc matrix4fc, double d, double e, double f) {
 		// Call registered hooks before preparing chunk renders
-		for (net.minecraft.hooks.LevelRendererHooks hook : net.minecraft.hooks.HookRegistry.getLevelRendererHooks()) {
+		var hooks = net.minecraft.hooks.HookRegistry.getLevelRendererHooks();
+		if (!hooks.isEmpty()) {
+			System.out.println("[MATTMC-DEBUG] LevelRenderer.prepareChunkRenders: Calling " + hooks.size() + " level renderer hooks");
+		}
+		for (net.minecraft.hooks.LevelRendererHooks hook : hooks) {
 			hook.onBeforePrepareChunkRenders(matrix4fc, d, e, f);
 		}
 		

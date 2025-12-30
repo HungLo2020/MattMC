@@ -24,7 +24,11 @@ public record ChunkSectionsToRender(
 ) {
 	public void renderGroup(ChunkSectionLayerGroup chunkSectionLayerGroup) {
 		// Call registered hooks before rendering the layer group
-		for (ChunkRenderLayerHooks hook : HookRegistry.getChunkRenderLayerHooks()) {
+		var hooks = HookRegistry.getChunkRenderLayerHooks();
+		if (!hooks.isEmpty()) {
+			System.out.println("[MATTMC-DEBUG] ChunkSectionsToRender: Calling " + hooks.size() + " chunk render layer hooks");
+		}
+		for (ChunkRenderLayerHooks hook : hooks) {
 			hook.onBeforeRenderLayer(chunkSectionLayerGroup);
 		}
 		
