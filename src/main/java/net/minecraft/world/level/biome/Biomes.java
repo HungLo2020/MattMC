@@ -5,6 +5,9 @@ import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 
 public abstract class Biomes {
+	// Iris: Track biome IDs for shader uniforms
+	private static int currentId = 0;
+	
 	public static final ResourceKey<Biome> THE_VOID = register("the_void");
 	public static final ResourceKey<Biome> PLAINS = register("plains");
 	public static final ResourceKey<Biome> SUNFLOWER_PLAINS = register("sunflower_plains");
@@ -74,6 +77,9 @@ public abstract class Biomes {
 	public static final ResourceKey<Biome> PRIMORDIAL_OCEAN = register("primordial_ocean");
 
 	private static ResourceKey<Biome> register(String string) {
-		return ResourceKey.create(Registries.BIOME, ResourceLocation.withDefaultNamespace(string));
+		ResourceKey<Biome> key = ResourceKey.create(Registries.BIOME, ResourceLocation.withDefaultNamespace(string));
+		// Iris: Register biome ID for shader uniforms
+		net.irisshaders.iris.uniforms.BiomeUniforms.getBiomeMap().put(key, currentId++);
+		return key;
 	}
 }

@@ -6,16 +6,20 @@
 
 ### Mixin Conversion Status
 
-**Total Mixins:** 218 → **189 remaining** (29 removed)  
-**Conversion Progress:** 13.3% complete
+**Total Mixins:** 218 → **182 remaining** (36 removed)  
+**Conversion Progress:** 16.5% complete
+
+#### Removed Mixins (Session 4 - 7 mixins):
+63. ✅ `MixinLightningBoltRenderer` - Commented @Redirect code, method returns null (empty)
+64. ✅ `MixinChainedJsonException` - HEAD injection → ChainedJsonException.forException()
+65. ✅ `MixinTheEndGatewayRenderer` - HEAD injection → TheEndGatewayRenderer.renderType()
+66. ✅ `MixinGpuTexture2` - Interface with AssertionError, base class already has methods
+67. ✅ `MixinWindow` - INVOKE injection → Window constructor after glfwDefaultWindowHints()
+68. ✅ `MixinBiomes` - TAIL injection → Biomes.register() for biome ID tracking
+69. ✅ `MixinRenderPass_Stub` - Interface with UnsupportedOperationException, fixed type signatures
 
 #### Removed Mixins (Session 3 - Bugfix):
-62. ✅ `MixinGlStateManager` (root) - @ModifyConstant to change TEXTURES array size from 12 to 128
-   - Fixed ArrayIndexOutOfBoundsException in PipelineManager.resetTextureState()
-   - Changed constant directly in GlStateManager.java: `IntStream.range(0, 128)`
-
-#### Removed Mixins (Session 3 - 6 mixins):
-56-61. (See previous documentation)
+62. (See previous documentation)
 25. ✅ `net.irisshaders.iris.mixin.texture.TextureAtlasAccessor` - Made `TextureAtlas.texturesByName`, `mipLevel` fields and `getWidth()`, `getHeight()` methods public
 26. ✅ `net.caffeinemc.mods.sodium.mixin.features.textures.animations.upload.SpriteContentsAccessor` - Made `SpriteContents.byMipLevel` field public
 27. ✅ `net.irisshaders.iris.mixin.texture.SpriteContentsAccessor` - `SpriteContents.animatedTexture` field already public
@@ -104,20 +108,20 @@ Hooks are already being called from Minecraft core code:
 
 ## Current Mixin Statistics
 
-### Total Mixin Count: 189 Files (29 removed)
+### Total Mixin Count: 182 Files (36 removed)
 
 **Breakdown by Type:**
 - **@Accessor mixins**: 0 remaining (ALL REMOVED! ✅)
 - **@Invoker mixins**: 0 remaining (ALL REMOVED! ✅)
-- **@Inject annotations**: ~220 (reduced from ~255)
-- **@Redirect annotations**: ~43 (reduced from ~46)
+- **@Inject annotations**: ~210 (reduced from ~255)
+- **@Redirect annotations**: ~42 (reduced from ~46)
 - **@ModifyConstant annotations**: ~14 (reduced from ~15, 1 removed)
 - **@Overwrite annotations**: ~23
 - **@ModifyArg/@ModifyVariable**: ~15
 
 **Distribution by Mod:**
 - **Sodium**: ~39 mixins (rendering optimizations)
-- **Iris**: ~117 mixins (shader system integration, 7 removed)
+- **Iris**: ~110 mixins (shader system integration, 14 removed)
 - **Distant Horizons**: **0 server mixins** (10 removed), 2 client mixins (8 client removed)
 - **Fabric API**: ~12 mixins (compatibility layer)
 - **Common**: ~21 mixins

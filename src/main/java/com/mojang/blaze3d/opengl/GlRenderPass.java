@@ -196,13 +196,13 @@ public class GlRenderPass implements RenderPass {
 	}
 	
 	// Iris compatibility
-	private Object irisCustomPass;
+	private net.irisshaders.iris.mixinterface.CustomPass irisCustomPass;
 	
-	public void iris$setCustomPass(Object pass) {
+	public void iris$setCustomPass(net.irisshaders.iris.mixinterface.CustomPass pass) {
 		this.irisCustomPass = pass;
 	}
 	
-	public Object iris$getCustomPass() {
+	public net.irisshaders.iris.mixinterface.CustomPass iris$getCustomPass() {
 		return this.irisCustomPass;
 	}
 }

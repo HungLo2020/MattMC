@@ -8,7 +8,6 @@
   "client": [
     "MixinGpuTexture",
     "MixinBiomeAmbientSoundsHandler",
-    "MixinBiomes",
     "MixinBlockStateBehavior",
     "MixinBooleanState",
     "MixinChunkBorderRenderer",
@@ -40,7 +39,6 @@
     "MixinShaderManager_Overrides",
     "MixinQuickPlayDev",
     "MixinRenderPass",
-    "MixinRenderPass_Stub",
     "MixinRenderPipeline",
     "MixinRenderSection",
     "MixinRenderSystem",
