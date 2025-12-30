@@ -161,6 +161,12 @@ public class ScreenEffectRenderer {
 	}
 
 	private static void renderWater(Minecraft minecraft, PoseStack poseStack, MultiBufferSource multiBufferSource) {
+		// Iris: Disable underwater overlay rendering when shader pack requests it
+		net.irisshaders.iris.pipeline.WorldRenderingPipeline pipeline = net.irisshaders.iris.Iris.getPipelineManager().getPipelineNullable();
+		if (pipeline != null && !pipeline.shouldRenderUnderwaterOverlay()) {
+			return;
+		}
+		
 		BlockPos blockPos = BlockPos.containing(minecraft.player.getX(), minecraft.player.getEyeY(), minecraft.player.getZ());
 		float f = LightTexture.getBrightness(minecraft.player.level().dimensionType(), minecraft.player.level().getMaxLocalRawBrightness(blockPos));
 		int i = ARGB.colorFromFloat(0.1F, f, f, f);

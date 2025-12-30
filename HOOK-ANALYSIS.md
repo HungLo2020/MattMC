@@ -6,18 +6,18 @@
 
 ### Mixin Conversion Status
 
-**Total Mixins:** 218 → **177 remaining** (41 removed)  
-**Conversion Progress:** 18.8% complete
+**Total Mixins:** 218 → **172 remaining** (46 removed)  
+**Conversion Progress:** 21.1% complete
+
+#### Removed Mixins (Session 6 - 5 mixins):
+75. ✅ `MixinCullEverythingFrustum` - Interface implementation → CullEverythingFrustum implements IDhApiShadowCullingFrustum
+76. ✅ `MixinNonCullingFrustum` - Interface implementation → NonCullingFrustum implements IDhApiShadowCullingFrustum
+77. ✅ `MixinGlRenderDevice` - @Redirect → GLRenderDevice.multiDrawElementsBaseVertex() tessellation check
+78. ✅ `MixinScreenEffectRenderer` - HEAD injection → ScreenEffectRenderer.renderWater() early return
+79. ✅ `MixinResourceLocation` - 2 HEAD injections → isValidPath() and validPathChar() inline checks
 
 #### Removed Mixins (Session 5 - 5 mixins):
-70. ✅ `MixinVertexFormatElement` - HEAD injection → VertexFormatElement.supportsUsage() for GENERIC fix
-71. ✅ `MixinReloadableTexture` - RETURN injection → ReloadableTexture.doLoad() texture tracking
-72. ✅ `MixinFireworkSparkParticle` - @Override getLayer() → FireworkParticles.SparkParticle
-73. ✅ `MixinFluidRendererImpl` - Interface implementation → FluidRendererImpl delegates to defaultRenderer
-74. ✅ `MixinRenderPass` - Interface implementation, field already in GlRenderPass
-
-#### Removed Mixins (Session 4 - 7 mixins):
-63-69. (See previous documentation)
+70-74. (See previous documentation)
 25. ✅ `net.irisshaders.iris.mixin.texture.TextureAtlasAccessor` - Made `TextureAtlas.texturesByName`, `mipLevel` fields and `getWidth()`, `getHeight()` methods public
 26. ✅ `net.caffeinemc.mods.sodium.mixin.features.textures.animations.upload.SpriteContentsAccessor` - Made `SpriteContents.byMipLevel` field public
 27. ✅ `net.irisshaders.iris.mixin.texture.SpriteContentsAccessor` - `SpriteContents.animatedTexture` field already public
@@ -106,20 +106,20 @@ Hooks are already being called from Minecraft core code:
 
 ## Current Mixin Statistics
 
-### Total Mixin Count: 177 Files (41 removed)
+### Total Mixin Count: 172 Files (46 removed)
 
 **Breakdown by Type:**
 - **@Accessor mixins**: 0 remaining (ALL REMOVED! ✅)
 - **@Invoker mixins**: 0 remaining (ALL REMOVED! ✅)
-- **@Inject annotations**: ~205 (reduced from ~255)
-- **@Redirect annotations**: ~42 (reduced from ~46)
+- **@Inject annotations**: ~200 (reduced from ~255)
+- **@Redirect annotations**: ~41 (reduced from ~46, 2 removed)
 - **@ModifyConstant annotations**: ~14 (reduced from ~15, 1 removed)
 - **@Overwrite annotations**: ~23
 - **@ModifyArg/@ModifyVariable**: ~15
 
 **Distribution by Mod:**
-- **Sodium**: ~38 mixins (rendering optimizations, 1 removed)
-- **Iris**: ~106 mixins (shader system integration, 18 removed)
+- **Sodium**: ~37 mixins (rendering optimizations, 2 removed)
+- **Iris**: ~102 mixins (shader system integration, 22 removed)
 - **Distant Horizons**: **0 server mixins** (10 removed), 2 client mixins (8 client removed)
 - **Fabric API**: ~12 mixins (compatibility layer)
 - **Common**: ~21 mixins
