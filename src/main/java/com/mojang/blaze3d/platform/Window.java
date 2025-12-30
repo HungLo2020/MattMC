@@ -87,6 +87,14 @@ public final class Window implements AutoCloseable {
 		this.windowedWidth = this.width = Math.max(displayData.width(), 1);
 		this.windowedHeight = this.height = Math.max(displayData.height(), 1);
 		GLFW.glfwDefaultWindowHints();
+		
+		// Iris: Enable OpenGL debug context if debug options are enabled
+		if (net.irisshaders.iris.Iris.getIrisConfig().areDebugOptionsEnabled()) {
+			GLFW.glfwWindowHint(GLFW.GLFW_OPENGL_DEBUG_CONTEXT, GLFW.GLFW_TRUE);
+			GLFW.glfwWindowHint(GLFW.GLFW_CONTEXT_NO_ERROR, GLFW.GLFW_FALSE);
+			net.irisshaders.iris.Iris.logger.info("OpenGL debug context activated.");
+		}
+		
 		GLFW.glfwWindowHint(139265, 196609);
 		GLFW.glfwWindowHint(139275, 221185);
 		GLFW.glfwWindowHint(139266, 3);

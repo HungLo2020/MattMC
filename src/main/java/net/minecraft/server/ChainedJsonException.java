@@ -36,6 +36,11 @@ public class ChainedJsonException extends IOException {
 	}
 
 	public static ChainedJsonException forException(Exception exception) {
+		// Iris: Handle shader compile exceptions specially
+		if (exception instanceof net.irisshaders.iris.gl.shader.ShaderCompileException e) {
+			return new net.irisshaders.iris.helpers.FakeChainedJsonException(e);
+		}
+		
 		if (exception instanceof ChainedJsonException) {
 			return (ChainedJsonException)exception;
 		} else {
