@@ -6,12 +6,14 @@
 
 ### Mixin Conversion Status
 
-**Total Mixins:** 218 → **115 remaining** (103 removed)  
-**Conversion Progress:** 47.2% complete
+**Total Mixins:** 218 → **113 remaining** (105 removed)  
+**Conversion Progress:** 48.2% complete
 
-#### Removed Mixins (Session 21 - 2 mixins):
+#### Removed Mixins (Session 21 - 4 mixins):
 128. ✅ `ItemStackStateMixin` - Interface implementation + inject → ItemStackRenderState implements ItemContextState
 129. ✅ `MixinRenderSystem` (statelisteners) - Static fields + inject → Inlined fog listeners into RenderSystem.setShaderFog()
+130. ✅ `MixinUniform` - RETURN inject → Inlined sampler name fallbacks into GlStateManager._glGetUniformLocation()
+131. ✅ `MixinRenderPipeline` - RETURN inject → Inlined extended vertex format logic into RenderPipeline.getVertexFormat()
 
 #### Removed Mixins (Session 20 - 7 mixins):
 121. ✅ `MixinParticlesRenderState` - Interface implementation → ParticlesRenderState implements ParticleRenderStateExtension

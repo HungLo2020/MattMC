@@ -186,9 +186,32 @@ public class GlStateManager {
 		GL20.glLinkProgram(i);
 	}
 
-	public static int _glGetUniformLocation(int i, CharSequence charSequence) {
+	public static int _glGetUniformLocation(int programId, CharSequence name) {
 		RenderSystem.assertOnRenderThread();
-		return GL20.glGetUniformLocation(i, charSequence);
+		int location = GL20.glGetUniformLocation(programId, name);
+		
+		// Iris: Handle sampler name fallbacks for extended shaders
+		if (location == -1 && name.equals("Sampler0")) {
+			location = GL20.glGetUniformLocation(programId, "tex");
+			
+			if (location == -1) {
+				location = GL20.glGetUniformLocation(programId, "gtexture");
+				
+				if (location == -1) {
+					location = GL20.glGetUniformLocation(programId, "texture");
+				}
+			}
+		}
+		
+		if (location == -1 && name.equals("Sampler1")) {
+			location = GL20.glGetUniformLocation(programId, "iris_overlay");
+		}
+		
+		if (location == -1 && name.equals("Sampler2")) {
+			location = GL20.glGetUniformLocation(programId, "lightmap");
+		}
+		
+		return location;
 	}
 
 	public static void _glUniform1i(int i, int j) {
