@@ -29,9 +29,14 @@ import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix4f;
 import org.joml.Quaternionf;
+// Sodium FRAPI imports
+import net.caffeinemc.mods.sodium.client.render.frapi.render.MeshItemCommand;
+import net.caffeinemc.mods.sodium.client.render.frapi.render.OrderedSubmitNodeCollectorExtension;
+import net.caffeinemc.mods.sodium.client.render.frapi.render.SubmitNodeCollectionExtension;
+import net.fabricmc.fabric.api.renderer.v1.mesh.MeshView;
 
 @Environment(EnvType.CLIENT)
-public class SubmitNodeCollection implements OrderedSubmitNodeCollector {
+public class SubmitNodeCollection implements OrderedSubmitNodeCollector, OrderedSubmitNodeCollectorExtension, SubmitNodeCollectionExtension {
 	private final List<SubmitNodeStorage.ShadowSubmit> shadowSubmits = new ArrayList();
 	private final List<SubmitNodeStorage.FlameSubmit> flameSubmits = new ArrayList();
 	private final NameTagFeatureRenderer.Storage nameTagSubmits = new NameTagFeatureRenderer.Storage();
@@ -48,6 +53,8 @@ public class SubmitNodeCollection implements OrderedSubmitNodeCollector {
 	private final CustomFeatureRenderer.Storage customGeometrySubmits = new CustomFeatureRenderer.Storage();
 	private final SubmitNodeStorage submitNodeStorage;
 	private boolean wasUsed = false;
+	// Sodium FRAPI: Mesh item commands for fabric rendering API
+	private final List<MeshItemCommand> meshItemCommands = new ArrayList<>();
 
 	public SubmitNodeCollection(SubmitNodeStorage submitNodeStorage) {
 		this.submitNodeStorage = submitNodeStorage;
@@ -256,6 +263,24 @@ public class SubmitNodeCollection implements OrderedSubmitNodeCollector {
 		this.modelSubmits.clear();
 		this.customGeometrySubmits.clear();
 		this.modelPartSubmits.clear();
+		// Sodium FRAPI: Clear mesh item commands
+		this.meshItemCommands.clear();
+	}
+	
+	// Sodium FRAPI: OrderedSubmitNodeCollectorExtension implementation
+	@Override
+	public void fabric_submitItem(PoseStack matrices, ItemDisplayContext displayContext, int light, int overlay, 
+			int outlineColors, int[] tintLayers, List<BakedQuad> quads, RenderType renderLayer, 
+			ItemStackRenderState.FoilType foilType, MeshView mesh) {
+		this.wasUsed = true;
+		this.meshItemCommands.add(new MeshItemCommand(matrices.last().copy(), displayContext, light, overlay, 
+			outlineColors, tintLayers, quads, renderLayer, foilType, mesh));
+	}
+	
+	// Sodium FRAPI: SubmitNodeCollectionExtension implementation
+	@Override
+	public List<MeshItemCommand> sodium_getMeshItemCommands() {
+		return this.meshItemCommands;
 	}
 
 	public void endFrame() {

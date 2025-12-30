@@ -6,8 +6,13 @@
 
 ### Mixin Conversion Status
 
-**Total Mixins:** 218 → **137 remaining** (81 removed)  
-**Conversion Progress:** 37.2% complete
+**Total Mixins:** 218 → **134 remaining** (84 removed)  
+**Conversion Progress:** 38.5% complete
+
+#### Removed Mixins (Session 18 - 3 mixins):
+109. ✅ `VertexMultiConsumerMixin` (Double and Multiple) - Interface implementation → VertexMultiConsumer.Double and Multiple implement VertexBufferWriter
+110. ✅ `SubmitNodeCollectionMixin` - Interface implementation → SubmitNodeCollection implements OrderedSubmitNodeCollectorExtension and SubmitNodeCollectionExtension
+111. ✅ `BakedModelMixin` - Interface implementation → BlockStateModel implements FabricBlockStateModel
 
 #### Removed Mixins (Session 17 - 3 mixins):
 106. ✅ `SheetedDecalTextureGeneratorMixin` - Interface implementation → SheetedDecalTextureGenerator implements VertexBufferWriter

@@ -23,9 +23,10 @@ public class VertexMultiConsumer {
 	}
 
 	@Environment(EnvType.CLIENT)
-	static class Double implements VertexConsumer {
+	static class Double implements VertexConsumer, net.sodium.api.vertex.buffer.VertexBufferWriter {
 		private final VertexConsumer first;
 		private final VertexConsumer second;
+		private boolean canUseIntrinsics; // Sodium: VertexBufferWriter optimization
 
 		public Double(VertexConsumer vertexConsumer, VertexConsumer vertexConsumer2) {
 			if (vertexConsumer == vertexConsumer2) {
@@ -33,7 +34,22 @@ public class VertexMultiConsumer {
 			} else {
 				this.first = vertexConsumer;
 				this.second = vertexConsumer2;
+				// Sodium: Check if both delegates support fast vertex processing
+				this.canUseIntrinsics = net.sodium.api.vertex.buffer.VertexBufferWriter.tryOf(this.first) != null 
+					&& net.sodium.api.vertex.buffer.VertexBufferWriter.tryOf(this.second) != null;
 			}
+		}
+		
+		// Sodium: VertexBufferWriter implementation for fast vertex processing
+		@Override
+		public boolean canUseIntrinsics() {
+			return this.canUseIntrinsics;
+		}
+		
+		@Override
+		public void push(org.lwjgl.system.MemoryStack stack, long ptr, int count, com.mojang.blaze3d.vertex.VertexFormat format) {
+			net.sodium.api.vertex.buffer.VertexBufferWriter.copyInto(net.sodium.api.vertex.buffer.VertexBufferWriter.of(this.first), stack, ptr, count, format);
+			net.sodium.api.vertex.buffer.VertexBufferWriter.copyInto(net.sodium.api.vertex.buffer.VertexBufferWriter.of(this.second), stack, ptr, count, format);
 		}
 
 		@Override
@@ -86,7 +102,10 @@ public class VertexMultiConsumer {
 	}
 
 	@Environment(EnvType.CLIENT)
-	record Multiple(VertexConsumer[] delegates) implements VertexConsumer {
+	static class Multiple implements VertexConsumer, net.sodium.api.vertex.buffer.VertexBufferWriter {
+		private final VertexConsumer[] delegates;
+		private boolean canUseIntrinsics; // Sodium: VertexBufferWriter optimization
+
 		Multiple(VertexConsumer[] delegates) {
 			for (int i = 0; i < delegates.length; i++) {
 				for (int j = i + 1; j < delegates.length; j++) {
@@ -97,6 +116,35 @@ public class VertexMultiConsumer {
 			}
 
 			this.delegates = delegates;
+			// Sodium: Check if all delegates support fast vertex processing
+			this.canUseIntrinsics = allDelegatesSupportIntrinsics();
+		}
+		
+		// Sodium: Check if all delegates support intrinsics
+		private boolean allDelegatesSupportIntrinsics() {
+			for (var delegate : this.delegates) {
+				if (net.sodium.api.vertex.buffer.VertexBufferWriter.tryOf(delegate) == null) {
+					return false;
+				}
+			}
+			return true;
+		}
+		
+		// Sodium: VertexBufferWriter implementation for fast vertex processing
+		@Override
+		public boolean canUseIntrinsics() {
+			return this.canUseIntrinsics;
+		}
+		
+		@Override
+		public void push(org.lwjgl.system.MemoryStack stack, long ptr, int count, com.mojang.blaze3d.vertex.VertexFormat format) {
+			for (var delegate : this.delegates) {
+				net.sodium.api.vertex.buffer.VertexBufferWriter.copyInto(net.sodium.api.vertex.buffer.VertexBufferWriter.of(delegate), stack, ptr, count, format);
+			}
+		}
+		
+		public VertexConsumer[] delegates() {
+			return this.delegates;
 		}
 
 		private void forEach(Consumer<VertexConsumer> consumer) {
