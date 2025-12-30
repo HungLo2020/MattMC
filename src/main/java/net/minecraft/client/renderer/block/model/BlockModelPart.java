@@ -10,7 +10,7 @@ import net.minecraft.core.Direction;
 import org.jetbrains.annotations.Nullable;
 
 @Environment(EnvType.CLIENT)
-public interface BlockModelPart {
+public interface BlockModelPart extends net.irisshaders.iris.compat.general.IrisModelPart {
 	List<BakedQuad> getQuads(@Nullable Direction direction);
 
 	boolean useAmbientOcclusion();
