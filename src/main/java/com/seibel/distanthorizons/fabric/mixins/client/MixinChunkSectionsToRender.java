@@ -42,8 +42,8 @@ public class MixinChunkSectionsToRender {
 	@Unique
 	private static final DhLogger LOGGER = new DhLoggerBuilder().build();
 
-	// needs to fire at HEAD with a lower than normal order (less than 1000)
-	// otherwise it will be canceled by Sodium
+	// needs to fire at HEAD with order = 800 (higher priority than default 1000)
+	// so it runs before Sodium's mixin which would otherwise cancel the method
 	@Inject(at = @At("HEAD"), method = "renderGroup", order = 800)
 	private void renderDeferredLayer(ChunkSectionLayerGroup chunkSectionLayerGroup, CallbackInfo ci) {
 		ClientApi.RENDER_STATE.clientLevelWrapper = ClientLevelWrapper.getWrapperIfDifferent(
