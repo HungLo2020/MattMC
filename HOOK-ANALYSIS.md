@@ -6,23 +6,23 @@
 
 ### Mixin Conversion Status
 
-**Total Mixins:** 218 → **206 remaining** (12 removed)  
-**Conversion Progress:** 5.5% complete
+**Total Mixins:** 218 → **196 remaining** (22 removed)  
+**Conversion Progress:** 10.1% complete
 
-#### Removed Mixins (45 total, 12 in this session):
-1-33. Previous mixins (see commit history)...
-34. ✅ `MixinItem` - Item now directly implements IrisItemLightProvider
-35. ✅ `MixinBlockModelPart` - BlockModelPart now directly extends IrisModelPart
-36. ✅ `MixinEntity` - Empty mixin, removed
-37. ✅ `MixinChunkGenerator` - Empty mixin, removed
-38. ✅ `MixinUtilBackgroundThread` - Empty mixin (comments only), removed
-39. ✅ `MixinPostChain` - Empty mixin, removed
-40. ✅ `MixinTextureUtil` - Empty mixin, removed
-41. ✅ `MixinLevelTicks` - Inlined into LevelTicks.schedule()
-42. ✅ `MixinMinecraft` - DH auto updater logic inlined into Minecraft class
-43. ✅ `MixinServerPlayer` - ServerPlayer now directly implements IMixinServerPlayer with field/methods
-44. ✅ `MixinPlayerManager` - Fabric event firing inlined into PlayerList.placeNewPlayer()
-45. ✅ `MixinMinecraftServerLifecycle` - All Fabric lifecycle events inlined into MinecraftServer
+#### Removed Mixins (Session 2 - 10 mixins):
+46. ✅ `MixinDebugScreenOverlay` - Empty mixin (F3 debug handled by DhDebugScreenEntry)
+47. ✅ `MixinTextureUtil` (client) - Empty mixin (TODO comment only)
+48. ✅ `MixinClientLevel` - Empty mixin (functionality moved to ClientPacketListener)
+49. ✅ `MixinTracingExecutor` - Inlined HEAD injection into TracingExecutor.forName()
+50. ✅ `MixinClientPacketListener` - 3 injections inlined (handleLogin RETURN, close HEAD, enableChunkLight TAIL)
+51. ✅ `MixinOptionsScreen` - RETURN injection inlined into OptionsScreen.init()
+52. ✅ `MixinFogRenderer` - WrapOperation inlined into FogRenderer.setupFog()
+53. ✅ `MixinBlockUpdate` - Deprecated empty mixin with commented code
+54. ✅ `MixinServerLevel` - Deprecated empty mixin with commented code
+55. ✅ `MixinChunkMap` - RETURN injection inlined into ChunkMap.save()
+
+#### Removed Mixins (Session 1 - 12 mixins):
+34-45. (See previous documentation)
 25. ✅ `net.irisshaders.iris.mixin.texture.TextureAtlasAccessor` - Made `TextureAtlas.texturesByName`, `mipLevel` fields and `getWidth()`, `getHeight()` methods public
 26. ✅ `net.caffeinemc.mods.sodium.mixin.features.textures.animations.upload.SpriteContentsAccessor` - Made `SpriteContents.byMipLevel` field public
 27. ✅ `net.irisshaders.iris.mixin.texture.SpriteContentsAccessor` - `SpriteContents.animatedTexture` field already public
@@ -111,25 +111,24 @@ Hooks are already being called from Minecraft core code:
 
 ## Current Mixin Statistics
 
-### Total Mixin Count: 206 Files (12 removed)
+### Total Mixin Count: 196 Files (22 removed)
 
 **Breakdown by Type:**
 - **@Accessor mixins**: 0 remaining (ALL REMOVED! ✅)
 - **@Invoker mixins**: 0 remaining (ALL REMOVED! ✅)
-- **@Inject annotations**: ~245 (multiple per file, some removed)
-- **@Redirect annotations**: ~45
+- **@Inject annotations**: ~230 (reduced from ~255)
+- **@Redirect annotations**: ~44 (reduced from ~46)
 - **@Overwrite annotations**: ~23
 - **@ModifyArg/@ModifyVariable**: ~15
 
 **Distribution by Mod:**
 - **Sodium**: ~39 mixins (rendering optimizations)
 - **Iris**: ~124 mixins (shader system integration)
-- **Distant Horizons**: ~10 mixins (LOD rendering, 12 removed from original 22)
+- **Distant Horizons**: **0 server mixins** (10 removed), 2 client mixins (8 client removed)
 - **Fabric API**: ~12 mixins (compatibility layer)
 - **Common**: ~21 mixins
-- **Iris**: ~128 mixins (shader system integration, 21 removed)
-- **Distant Horizons**: ~23 mixins (LOD rendering, 1 removed)
-- **Fabric API**: ~12 mixins (compatibility layer)
+
+**DH Mixin Removal:** All 10 DH server mixins removed! ✅
 
 ### Mixin Complexity Analysis
 
