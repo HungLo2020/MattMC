@@ -14,6 +14,7 @@
     "server.MixinMinecraftServerLifecycle"
   ],
   "client": [
+    "client.LightTextureAccessor",
     "client.MixinClientLevel",
     "client.MixinClientPacketListener",
     "client.MixinDebugScreenOverlay",
