@@ -24,7 +24,7 @@ import org.joml.Vector3f;
 import org.joml.Vector3fc;
 
 @Environment(EnvType.CLIENT)
-public class ItemStackRenderState {
+public class ItemStackRenderState implements net.irisshaders.iris.mixinterface.ItemContextState {
 	ItemDisplayContext displayContext = ItemDisplayContext.NONE;
 	private int activeLayerCount;
 	private boolean animated;
@@ -32,6 +32,9 @@ public class ItemStackRenderState {
 	@Nullable
 	private AABB cachedModelBoundingBox;
 	private ItemStackRenderState.LayerRenderState[] layers = new ItemStackRenderState.LayerRenderState[]{new ItemStackRenderState.LayerRenderState()};
+	// Iris: ItemContextState fields
+	private net.minecraft.world.item.Item iris_displayStack;
+	private net.minecraft.resources.ResourceLocation iris_displayModelId;
 
 	public void ensureCapacity(int i) {
 		int j = this.layers.length;
@@ -61,6 +64,9 @@ public class ItemStackRenderState {
 		this.animated = false;
 		this.oversizedInGui = false;
 		this.cachedModelBoundingBox = null;
+		// Iris: Clear display stack
+		this.iris_displayStack = null;
+		this.iris_displayModelId = null;
 	}
 
 	public void setAnimated() {
@@ -241,5 +247,21 @@ public class ItemStackRenderState {
 
 			poseStack.popPose();
 		}
+	}
+	
+	// Iris: ItemContextState implementation
+	@Override
+	public void setDisplayItem(net.minecraft.world.item.Item itemStack, net.minecraft.resources.ResourceLocation modelId) {
+		this.iris_displayStack = itemStack;
+		this.iris_displayModelId = modelId;
+	}
+
+	@Override
+	public net.minecraft.world.item.Item getDisplayItem() {
+		return iris_displayStack;
+	}
+	
+	public net.minecraft.resources.ResourceLocation getDisplayItemModel() {
+		return iris_displayModelId;
 	}
 }

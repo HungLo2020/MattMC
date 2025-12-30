@@ -6,8 +6,12 @@
 
 ### Mixin Conversion Status
 
-**Total Mixins:** 218 → **117 remaining** (101 removed)  
-**Conversion Progress:** 46.3% complete
+**Total Mixins:** 218 → **115 remaining** (103 removed)  
+**Conversion Progress:** 47.2% complete
+
+#### Removed Mixins (Session 21 - 2 mixins):
+128. ✅ `ItemStackStateMixin` - Interface implementation + inject → ItemStackRenderState implements ItemContextState
+129. ✅ `MixinRenderSystem` (statelisteners) - Static fields + inject → Inlined fog listeners into RenderSystem.setShaderFog()
 
 #### Removed Mixins (Session 20 - 7 mixins):
 121. ✅ `MixinParticlesRenderState` - Interface implementation → ParticlesRenderState implements ParticleRenderStateExtension

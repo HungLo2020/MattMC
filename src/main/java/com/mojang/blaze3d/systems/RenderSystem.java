@@ -96,6 +96,14 @@ public class RenderSystem {
 	@Nullable
 	private static DynamicUniforms dynamicUniforms;
 	private static ScissorState scissorStateForRenderTypeDraws = new ScissorState();
+	// Iris: Fog state listeners
+	private static Runnable fogStartListener;
+	private static Runnable fogEndListener;
+	
+	static {
+		net.irisshaders.iris.gl.state.StateUpdateNotifiers.fogStartNotifier = listener -> fogStartListener = listener;
+		net.irisshaders.iris.gl.state.StateUpdateNotifiers.fogEndNotifier = listener -> fogEndListener = listener;
+	}
 
 	public static void initRenderThread() {
 		if (renderThread != null) {
@@ -178,6 +186,13 @@ public class RenderSystem {
 	}
 
 	public static void setShaderFog(GpuBufferSlice gpuBufferSlice) {
+		// Iris: Notify fog listeners
+		if (fogStartListener != null) {
+			fogStartListener.run();
+		}
+		if (fogEndListener != null) {
+			fogEndListener.run();
+		}
 		shaderFog = gpuBufferSlice;
 	}
 
