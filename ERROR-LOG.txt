@@ -1,52 +1,129 @@
-A mod crashed on startup!
-net.fabricmc.loader.impl.FormattedException: java.lang.RuntimeException: Could not execute entrypoint stage 'preLaunch' due to errors, provided by 'mattmc' at 'net.caffeinemc.mods.sodium.fabric.SodiumPreLaunch'!
-	at net.fabricmc.loader.impl.FormattedException.ofLocalized(FormattedException.java:63)
-	at net.fabricmc.loader.impl.launch.knot.Knot.init(Knot.java:158)
-	at net.fabricmc.loader.impl.launch.knot.Knot.launch(Knot.java:66)
-	at net.fabricmc.loader.impl.launch.knot.KnotClient.main(KnotClient.java:23)
-Caused by: java.lang.RuntimeException: Could not execute entrypoint stage 'preLaunch' due to errors, provided by 'mattmc' at 'net.caffeinemc.mods.sodium.fabric.SodiumPreLaunch'!
-	at net.fabricmc.loader.impl.FabricLoaderImpl.lambda$invokeEntrypoints$2(FabricLoaderImpl.java:409)
-	at net.fabricmc.loader.impl.util.ExceptionUtil.gatherExceptions(ExceptionUtil.java:33)
-	at net.fabricmc.loader.impl.FabricLoaderImpl.invokeEntrypoints(FabricLoaderImpl.java:407)
-	at net.fabricmc.loader.impl.launch.knot.Knot.init(Knot.java:156)
-	... 2 more
-Caused by: net.fabricmc.loader.api.EntrypointException: Exception while loading entries for entrypoint 'preLaunch' provided by 'mattmc'
-	at net.fabricmc.loader.impl.entrypoint.EntrypointContainerImpl.getEntrypoint(EntrypointContainerImpl.java:56)
-	at net.fabricmc.loader.impl.FabricLoaderImpl.invokeEntrypoints(FabricLoaderImpl.java:405)
-	... 3 more
-Caused by: java.lang.RuntimeException: Mixin transformation of net.caffeinemc.mods.sodium.fabric.SodiumPreLaunch failed
-	at net.fabricmc.loader.impl.launch.knot.KnotClassDelegate.getPostMixinClassByteArray(KnotClassDelegate.java:454)
-	at net.fabricmc.loader.impl.launch.knot.KnotClassDelegate.tryLoadClass(KnotClassDelegate.java:350)
-	at net.fabricmc.loader.impl.launch.knot.KnotClassDelegate.loadClass(KnotClassDelegate.java:231)
-	at net.fabricmc.loader.impl.launch.knot.KnotClassLoader.loadClass(KnotClassLoader.java:119)
-	at java.base/java.lang.ClassLoader.loadClass(ClassLoader.java:526)
-	at java.base/java.lang.Class.forName0(Native Method)
-	at java.base/java.lang.Class.forName(Class.java:534)
-	at java.base/java.lang.Class.forName(Class.java:513)
-	at net.fabricmc.loader.impl.util.DefaultLanguageAdapter.create(DefaultLanguageAdapter.java:50)
-	at net.fabricmc.loader.impl.entrypoint.EntrypointStorage$NewEntry.getOrCreate(EntrypointStorage.java:124)
-	at net.fabricmc.loader.impl.entrypoint.EntrypointContainerImpl.getEntrypoint(EntrypointContainerImpl.java:53)
-	... 4 more
-Caused by: org.spongepowered.asm.mixin.throwables.MixinApplyError: Mixin [sodium-common.mixins.json:features.render.world.sky.LevelRendererMixin from mod mattmc] from phase [DEFAULT] in config [sodium-common.mixins.json] FAILED during PREPARE
-	at org.spongepowered.asm.mixin.transformer.MixinProcessor.handleMixinError(MixinProcessor.java:686)
-	at org.spongepowered.asm.mixin.transformer.MixinProcessor.handleMixinPrepareError(MixinProcessor.java:633)
-	at org.spongepowered.asm.mixin.transformer.MixinProcessor.prepareConfigs(MixinProcessor.java:591)
-	at org.spongepowered.asm.mixin.transformer.MixinProcessor.select(MixinProcessor.java:510)
-	at org.spongepowered.asm.mixin.transformer.MixinProcessor.checkSelect(MixinProcessor.java:486)
-	at org.spongepowered.asm.mixin.transformer.MixinProcessor.lockAndSelect(MixinProcessor.java:438)
-	at org.spongepowered.asm.mixin.transformer.MixinProcessor.couldTransformClass(MixinProcessor.java:398)
-	at org.spongepowered.asm.mixin.transformer.MixinTransformer.couldTransformClass(MixinTransformer.java:265)
-	at org.spongepowered.asm.mixin.transformer.MixinTransformer.transformClass(MixinTransformer.java:233)
-	at org.spongepowered.asm.mixin.transformer.MixinTransformer.transformClassBytes(MixinTransformer.java:202)
-	at net.fabricmc.loader.impl.launch.knot.KnotClassDelegate.getPostMixinClassByteArray(KnotClassDelegate.java:449)
-	... 14 more
-Caused by: org.spongepowered.asm.mixin.transformer.throwables.InvalidMixinException: The specified mixin 'net.caffeinemc.mods.sodium.mixin.features.render.world.sky.LevelRendererMixin' was not found
-	at org.spongepowered.asm.mixin.transformer.MixinInfo.<init>(MixinInfo.java:864)
-	at org.spongepowered.asm.mixin.transformer.MixinConfig.prepareMixins(MixinConfig.java:933)
-	at org.spongepowered.asm.mixin.transformer.MixinConfig.prepare(MixinConfig.java:862)
-	at org.spongepowered.asm.mixin.transformer.MixinProcessor.prepareConfigs(MixinProcessor.java:588)
-	... 22 more
-Caused by: java.lang.ClassNotFoundException: The specified mixin 'net.caffeinemc.mods.sodium.mixin.features.render.world.sky.LevelRendererMixin' was not found
-	at org.spongepowered.asm.mixin.transformer.MixinInfo.loadMixinClass(MixinInfo.java:1318)
-	at org.spongepowered.asm.mixin.transformer.MixinInfo.<init>(MixinInfo.java:857)
-	... 25 more
+[LWJGL] Loading library: openal
+        Module: org.lwjgl.openal
+        Loaded from org.lwjgl.librarypath: /tmp/lwjgl_matt/3.3.3-snapshot/x64/libopenal.so
+[LWJGL] [ALC] ALC_SOFT_reopen_device was reported as available but an entry point is missing.
+---- Minecraft Crash Report ----
+// Who set us up the TNT?
+
+Time: 2025-12-30 15:24:19
+Description: Initializing game
+
+java.lang.NullPointerException: Cannot invoke "net.irisshaders.iris.gl.IrisRenderSystem$DSAAccess.texParameteri(int, int, int, int)" because "net.irisshaders.iris.gl.IrisRenderSystem.dsaState" is null
+        at knot//net.irisshaders.iris.gl.IrisRenderSystem.texParameteri(IrisRenderSystem.java:183)
+        at knot//com.mojang.blaze3d.opengl.GlTexture.redirect$zbh000$mattmc$useDSA(GlTexture.java:564)
+        at knot//com.mojang.blaze3d.opengl.GlTexture.flushModeChanges(GlTexture.java:64)
+        at knot//com.mojang.blaze3d.opengl.GlTexture.iris$getGlId(GlTexture.java:540)
+        at knot//net.minecraft.client.renderer.texture.AbstractTexture.handler$zea000$mattmc$iris$afterGenerateId(AbstractTexture.java:532)
+        at knot//net.minecraft.client.renderer.texture.AbstractTexture.getTexture(AbstractTexture.java:58)
+        at knot//net.minecraft.client.gui.font.FontTexture.add(FontTexture.java:44)
+        at knot//net.minecraft.client.gui.font.GlyphStitcher.stitch(GlyphStitcher.java:56)
+        at knot//net.minecraft.client.gui.font.glyphs.SpecialGlyphs.bake(SpecialGlyphs.java:52)
+        at knot//net.minecraft.client.gui.font.FontSet.resetTextures(FontSet.java:91)
+        at knot//net.minecraft.client.gui.font.FontSet.reload(FontSet.java:83)
+        at knot//net.minecraft.client.gui.font.FontSet.reload(FontSet.java:78)
+        at knot//net.minecraft.client.gui.font.FontManager.createFontSet(FontManager.java:88)
+        at knot//net.minecraft.client.gui.font.FontManager.<init>(FontManager.java:81)
+        at knot//net.minecraft.client.Minecraft.<init>(Minecraft.java:533)
+        at knot//net.minecraft.client.main.Main.main(Main.java:243)
+        at net.fabricmc.loader.impl.game.minecraft.MinecraftGameProvider.launch(MinecraftGameProvider.java:560)
+        at net.fabricmc.loader.impl.launch.knot.Knot.launch(Knot.java:72)
+        at net.fabricmc.loader.impl.launch.knot.KnotClient.main(KnotClient.java:23)
+
+
+A detailed walkthrough of the error, its code path and all known details is as follows:
+---------------------------------------------------------------------------------------
+
+-- Head --
+Thread: Render thread
+Stacktrace:
+        at knot//net.irisshaders.iris.gl.IrisRenderSystem.texParameteri(IrisRenderSystem.java:183)
+        at knot//com.mojang.blaze3d.opengl.GlTexture.redirect$zbh000$mattmc$useDSA(GlTexture.java:564)
+        at knot//com.mojang.blaze3d.opengl.GlTexture.flushModeChanges(GlTexture.java:64)
+        at knot//com.mojang.blaze3d.opengl.GlTexture.iris$getGlId(GlTexture.java:540)
+        at knot//net.minecraft.client.renderer.texture.AbstractTexture.handler$zea000$mattmc$iris$afterGenerateId(AbstractTexture.java:532)
+        at knot//net.minecraft.client.renderer.texture.AbstractTexture.getTexture(AbstractTexture.java:58)
+        at knot//net.minecraft.client.gui.font.FontTexture.add(FontTexture.java:44)
+        at knot//net.minecraft.client.gui.font.GlyphStitcher.stitch(GlyphStitcher.java:56)
+        at knot//net.minecraft.client.gui.font.glyphs.SpecialGlyphs.bake(SpecialGlyphs.java:52)
+        at knot//net.minecraft.client.gui.font.FontSet.resetTextures(FontSet.java:91)
+        at knot//net.minecraft.client.gui.font.FontSet.reload(FontSet.java:83)
+        at knot//net.minecraft.client.gui.font.FontSet.reload(FontSet.java:78)
+        at knot//net.minecraft.client.gui.font.FontManager.createFontSet(FontManager.java:88)
+        at knot//net.minecraft.client.gui.font.FontManager.<init>(FontManager.java:81)
+        at knot//net.minecraft.client.Minecraft.<init>(Minecraft.java:533)
+
+-- Initialization --
+Details:
+        Modules:
+Stacktrace:
+        at knot//net.minecraft.client.main.Main.main(Main.java:243)
+        at net.fabricmc.loader.impl.game.minecraft.MinecraftGameProvider.launch(MinecraftGameProvider.java:560)
+        at net.fabricmc.loader.impl.launch.knot.Knot.launch(Knot.java:72)
+        at net.fabricmc.loader.impl.launch.knot.KnotClient.main(KnotClient.java:23)
+
+-- System Details --
+Details:
+        Minecraft Version: 1.21.10
+        Minecraft Version ID: 1.21.10
+        Operating System: Linux (amd64) version 6.14.0-37-generic
+        Java Version: 21.0.5, Eclipse Adoptium
+        Java VM Version: OpenJDK 64-Bit Server VM (mixed mode, sharing), Eclipse Adoptium
+        Memory: 3357540352 bytes (3202 MiB) / 4294967296 bytes (4096 MiB) up to 8589934592 bytes (8192 MiB)
+        CPUs: 20
+        Processor Vendor: GenuineIntel
+        Processor Name: 12th Gen Intel(R) Core(TM) i7-12700K
+        Identifier: Intel64 Family 6 Model 151 Stepping 2
+        Microarchitecture: Alder Lake
+        Frequency (GHz): 4.90
+        Number of physical packages: 1
+        Number of physical CPUs: 12
+        Number of logical CPUs: 20
+        Graphics card #0 name: GA102 [GeForce RTX 3080 Ti]
+        Graphics card #0 vendor: NVIDIA Corporation (0x10de)
+        Graphics card #0 VRAM (MiB): 16416.00
+        Graphics card #0 deviceId: 0x2208
+        Graphics card #0 versionInfo: unknown
+        Virtual memory max (MiB): 32300.84
+        Virtual memory used (MiB): 24554.52
+        Swap memory total (MiB): 16384.00
+        Swap memory used (MiB): 4508.04
+        Space in storage for jna.tmpdir (MiB): <path not set>
+        Space in storage for org.lwjgl.system.SharedLibraryExtractPath (MiB): <path not set>
+        Space in storage for io.netty.native.workdir (MiB): <path not set>
+        Space in storage for java.io.tmpdir (MiB): available: 15859.19, total: 15916.84
+        Space in storage for workdir (MiB): available: 281459.69, total: 937500.69
+        JVM Flags: 4 total; -XX:+UseZGC -XX:+ZGenerational -Xms4G -Xmx8G
+        Debug Flags: 0 total;
+        Launched Version: 1.21.10
+        Backend library: LWJGL version 3.3.3-snapshot
+        Backend API: NVIDIA GeForce RTX 3080 Ti/PCIe/SSE2 GL version 3.3.0 NVIDIA 580.95.05, NVIDIA Corporation
+        Window size: <not initialized>
+        GFLW Platform: x11
+        Render Extensions: GL_ARB_buffer_storage, GL_KHR_debug, GL_ARB_vertex_attrib_binding, GL_ARB_direct_state_access
+        GL debug messages:
+        Is Modded: Definitely; Client brand changed to 'fabric'
+        Universe: 404
+        Type: Client (map_client.txt)
+        Locale: en_US
+        System encoding: UTF-8
+        File encoding: UTF-8
+        CPU: 20x 12th Gen Intel(R) Core(TM) i7-12700K
+#@!@# Game crashed! Crash report saved to: #@!@# /home/matt/Documents/Repos/MattMC/run/crash-reports/crash-2025-12-30_15.24.19-client.txt
+
+> Task :runClient FAILED
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':runClient'.
+> Process 'command '/home/matt/Documents/Repos/MattMC/run/jdk-21/bin/java'' finished with non-zero exit value 255
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights.
+> Get more help at https://help.gradle.org.
+
+BUILD FAILED in 35s
+7 actionable tasks: 7 executed
+matt@HungLoDE:~/Documents/Repos/MattMC$
