@@ -40,33 +40,32 @@ public class SpriteContentsInterpolationMixin {
      */
     @Overwrite
     void uploadInterpolatedFrame(int x, int y, SpriteContents.Ticker arg, GpuTexture gpuTexture) {
-        SpriteContents.AnimatedTexture animation = ((SpriteContentsTickerAccessor) arg).getAnimationInfo();
-        SpriteContentsAnimatedTextureAccessor animation2 = (SpriteContentsAnimatedTextureAccessor) ((SpriteContentsTickerAccessor) arg).getAnimationInfo();
-        List<SpriteContents.FrameInfo> frames = ((SpriteContentsAnimatedTextureAccessor) animation).getFrames();
-        SpriteContentsTickerAccessor accessor = (SpriteContentsTickerAccessor) arg;
-        SpriteContentsFrameInfoAccessor animationFrame = (SpriteContentsFrameInfoAccessor) (Object) frames.get(accessor.getFrameIndex());
+        SpriteContents.AnimatedTexture animation = arg.animationInfo;
+        SpriteContents.AnimatedTexture animation2 = arg.animationInfo;
+        List<SpriteContents.FrameInfo> frames = animation.frames;
+        SpriteContents.FrameInfo animationFrame = (SpriteContents.FrameInfo) (Object) frames.get(arg.frame);
 
-        int curIndex = animationFrame.getIndex();
-        int nextIndex = ((SpriteContentsFrameInfoAccessor) (Object) animation2.getFrames().get((accessor.getFrameIndex() + 1) % frames.size())).getIndex();
+        int curIndex = animationFrame.index();
+        int nextIndex = ((SpriteContents.FrameInfo) (Object) animation2.frames.get((arg.frame + 1) % frames.size())).index();
 
         if (curIndex == nextIndex) {
             return;
         }
 
         // The mix factor between the current and next frame
-        float mix = 1.0F - (float) accessor.getFrameTicks() / (float) animationFrame.getTime();
+        float mix = 1.0F - (float) arg.subFrame / (float) animationFrame.time();
 
         for (int layer = 0; layer < this.activeFrame.length; layer++) {
             int width = this.parent.width() >> layer;
             int height = this.parent.height() >> layer;
 
-            int curX = ((curIndex % animation2.getFrameRowSize()) * width);
-            int curY = ((curIndex / animation2.getFrameRowSize()) * height);
+            int curX = ((curIndex % animation2.frameRowSize) * width);
+            int curY = ((curIndex / animation2.frameRowSize) * height);
 
-            int nextX = ((nextIndex % animation2.getFrameRowSize()) * width);
-            int nextY = ((nextIndex / animation2.getFrameRowSize()) * height);
+            int nextX = ((nextIndex % animation2.frameRowSize) * width);
+            int nextY = ((nextIndex / animation2.frameRowSize) * height);
 
-            NativeImage src = ((SpriteContentsAccessor) this.parent).getImages()[layer];
+            NativeImage src = this.parent.byMipLevel[layer];
             NativeImage dst = this.activeFrame[layer];
 
             long ppSrcPixel = NativeImageHelper.getPointerRGBA(src);

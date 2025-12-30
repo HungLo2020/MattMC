@@ -6,9 +6,6 @@ import com.mojang.blaze3d.textures.FilterMode;
 import com.mojang.blaze3d.textures.GpuTexture;
 import com.mojang.blaze3d.textures.TextureFormat;
 import net.irisshaders.iris.Iris;
-import net.irisshaders.iris.mixin.texture.SpriteContentsAnimatedTextureAccessor;
-import net.irisshaders.iris.mixin.texture.SpriteContentsFrameInfoAccessor;
-import net.irisshaders.iris.mixin.texture.SpriteContentsTickerAccessor;
 import net.irisshaders.iris.pbr.TextureTracker;
 import net.irisshaders.iris.pbr.format.TextureFormatLoader;
 import net.irisshaders.iris.pbr.loader.AtlasPBRLoader.PBRTextureAtlasSprite;
@@ -52,27 +49,25 @@ public class PBRAtlasTexture extends AbstractTexture implements PBRDumpable {
 	}
 
 	public static void syncAnimation(SpriteContents.Ticker source, SpriteContents.Ticker target) {
-		SpriteContentsTickerAccessor sourceAccessor = (SpriteContentsTickerAccessor) source;
-		List<FrameInfo> sourceFrames = ((SpriteContentsAnimatedTextureAccessor) sourceAccessor.getAnimationInfo()).getFrames();
+		List<FrameInfo> sourceFrames = source.animationInfo.frames;
 
 		int ticks = 0;
-		for (int f = 0; f < sourceAccessor.getFrame(); f++) {
-			ticks += ((SpriteContentsFrameInfoAccessor) (Object) sourceFrames.get(f)).getTime();
+		for (int f = 0; f < source.frame; f++) {
+			ticks += ((SpriteContents.FrameInfo) (Object) sourceFrames.get(f)).time();
 		}
 
-		SpriteContentsTickerAccessor targetAccessor = (SpriteContentsTickerAccessor) target;
-		List<FrameInfo> targetFrames = ((SpriteContentsAnimatedTextureAccessor) targetAccessor.getAnimationInfo()).getFrames();
+		List<FrameInfo> targetFrames = target.animationInfo.frames;
 
 		int cycleTime = 0;
 		int frameCount = targetFrames.size();
 		for (FrameInfo frame : targetFrames) {
-			cycleTime += ((SpriteContentsFrameInfoAccessor) (Object) frame).getTime();
+			cycleTime += ((SpriteContents.FrameInfo) (Object) frame).time();
 		}
 		ticks %= cycleTime;
 
 		int targetFrame = 0;
 		while (true) {
-			int time = ((SpriteContentsFrameInfoAccessor) (Object) targetFrames.get(targetFrame)).getTime();
+			int time = ((SpriteContents.FrameInfo) (Object) targetFrames.get(targetFrame)).time();
 			if (ticks >= time) {
 				targetFrame++;
 				ticks -= time;
@@ -81,8 +76,8 @@ public class PBRAtlasTexture extends AbstractTexture implements PBRDumpable {
 			}
 		}
 
-		targetAccessor.setFrame(targetFrame);
-		targetAccessor.setSubFrame(ticks + sourceAccessor.getSubFrame());
+		target.frame = targetFrame;
+		target.subFrame = ticks + source.subFrame;
 	}
 
 	protected static void dumpSpriteNames(Path dir, String fileName, Map<ResourceLocation, PBRTextureAtlasSprite> sprites) {
@@ -183,10 +178,7 @@ public class PBRAtlasTexture extends AbstractTexture implements PBRDumpable {
 			if (sourceTicker != null && targetTicker != null) {
 				syncAnimation(sourceTicker, targetTicker);
 
-				SpriteContentsTickerAccessor tickerAccessor = (SpriteContentsTickerAccessor) targetTicker;
-				SpriteContentsAnimatedTextureAccessor infoAccessor = (SpriteContentsAnimatedTextureAccessor) tickerAccessor.getAnimationInfo();
-
-				infoAccessor.invokeUploadFrame(sprite.getX(), sprite.getY(), ((SpriteContentsFrameInfoAccessor) (Object) infoAccessor.getFrames().get(tickerAccessor.getFrame())).getIndex(), texture);
+				targetTicker.animationInfo.uploadFrame(sprite.getX(), sprite.getY(), ((SpriteContents.FrameInfo) (Object) targetTicker.animationInfo.frames.get(targetTicker.frame)).index(), texture);
 				return;
 			}
 		}

@@ -2,29 +2,25 @@
 
 ## Migration Progress Tracker
 
-**Last Updated:** December 29, 2024
+**Last Updated:** December 30, 2024
 
 ### Mixin Conversion Status
 
-**Total Mixins:** 235 → **212 remaining** (23 removed)  
-**Conversion Progress:** 9.8% complete
+**Total Mixins:** 235 → **204 remaining** (31 removed)  
+**Conversion Progress:** 13.2% complete
 
-#### Removed Mixins (23):
-1-9. Previous mixins...
-10. ✅ `net.caffeinemc.mods.sodium.mixin.features.render.immediate.buffer_builder.sorting.MeshDataAccessor` - Made `MeshData.indexBuffer` field public
-11. ✅ `net.irisshaders.iris.mixin.fantastic.FeatureRenderDispatcherAccessor` - Made `FeatureRenderDispatcher.particleFeatureRenderer` field public
-12. ✅ `net.caffeinemc.mods.sodium.mixin.core.render.world.EntityRendererAccessor` - Made `EntityRenderer.getBoundingBoxForCulling()` method public
-13. ✅ `net.irisshaders.iris.mixin.GameRendererAccessor` - Made `GameRenderer` fields/methods public (panoramicMode, resourcePool, bobHurt, bobView, shouldRenderBlockOutline)
-14. ✅ `net.caffeinemc.mods.sodium.mixin.core.GlCommandEncoderAccessor` - Made `GlCommandEncoder` field/method public (lastProgram, applyPipelineState)
-15. ✅ `net.irisshaders.iris.mixin.rendertype.RenderTypeAccessor` - `RenderType.sortOnUpload()` method already public
-16. ✅ `net.irisshaders.iris.mixin.rendertype.RenderStateShardAccessor` - Unused mixin (no references in codebase)
-17. ✅ `net.irisshaders.iris.compat.sodium.mixin.BlockRendererAccessor` - Made `BlockRenderer.buffers` field public
-18. ✅ `net.irisshaders.iris.mixin.LevelRendererAccessor` - Made `LevelRenderer` fields/methods public (entityRenderDispatcher, renderBuffers, level, destructionProgress, cullTerrain, extractVisibleBlockEntities, doesMobEffectBlockSky)
-19. ✅ `net.caffeinemc.mods.sodium.mixin.features.render.frapi.ModelBlockRendererAccessor` - Made `ModelBlockRenderer.blockColors` field public
-20. ✅ `net.caffeinemc.mods.sodium.mixin.features.render.frapi.ItemRendererAccessor` - Made `ItemRenderer.getSpecialFoilBuffer()` method public
-21. ✅ `net.caffeinemc.mods.sodium.mixin.core.render.texture.TextureAtlasAccessor` - Made `TextureAtlas.width` and `height` fields public
-22. ✅ `net.caffeinemc.mods.sodium.mixin.features.render.frapi.BlockRenderDispatcherAccessor` - Made `BlockRenderDispatcher.specialBlockModelRenderer` field public
-23. ✅ `net.irisshaders.iris.mixin.texture.AnimationMetadataSectionAccessor` - Converted record to mutable class with public `frameWidth` and `frameHeight` fields
+#### Removed Mixins (31):
+1-24. Previous mixins (see commit history)...
+25. ✅ `net.irisshaders.iris.mixin.texture.TextureAtlasAccessor` - Made `TextureAtlas.texturesByName`, `mipLevel` fields and `getWidth()`, `getHeight()` methods public
+26. ✅ `net.caffeinemc.mods.sodium.mixin.features.textures.animations.upload.SpriteContentsAccessor` - Made `SpriteContents.byMipLevel` field public
+27. ✅ `net.irisshaders.iris.mixin.texture.SpriteContentsAccessor` - `SpriteContents.animatedTexture` field already public
+28. ✅ `net.caffeinemc.mods.sodium.mixin.features.textures.animations.upload.SpriteContentsAnimatedTextureAccessor` - Made `SpriteContents.AnimatedTexture.frames`, `frameRowSize` fields and `uploadFrame()` method public
+29. ✅ `net.irisshaders.iris.mixin.texture.SpriteContentsAnimatedTextureAccessor` - Same as #28
+30. ✅ `net.caffeinemc.mods.sodium.mixin.features.textures.animations.upload.SpriteContentsFrameInfoAccessor` - `SpriteContents.FrameInfo` is a public record (fields already public)
+31. ✅ `net.irisshaders.iris.mixin.texture.SpriteContentsFrameInfoAccessor` - Same as #30
+32. ✅ `net.caffeinemc.mods.sodium.mixin.features.textures.animations.upload.SpriteContentsTickerAccessor` - `SpriteContents.Ticker` fields already public
+33. ✅ `net.irisshaders.iris.mixin.texture.SpriteContentsTickerAccessor` - Same as #32
+34. ✅ `net.caffeinemc.mods.sodium.mixin.features.textures.animations.tracking.SpriteContentsFrameInfoAccessor` - Same as #30
 
 #### Modified Files (65+ total):
 1-19. Previous files...

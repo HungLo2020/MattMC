@@ -41,8 +41,8 @@ public class SpriteContentsTickerMixin {
 
         if (onDemand && !SpriteContentsExtension.isActive(this.parent)) {
             this.subFrame++;
-            List<SpriteContents.FrameInfo> frames = ((AnimatedTextureAccessor)this.animationInfo).getFrames();
-            if (this.subFrame >= ((SpriteContentsFrameInfoAccessor) (Object) frames.get(this.frame)).getTime()) {
+            List<SpriteContents.FrameInfo> frames = this.animationInfo.frames;
+            if (this.subFrame >= ((SpriteContents.FrameInfo) (Object) frames.get(this.frame)).time()) {
                 this.frame = (this.frame + 1) % frames.size();
                 this.subFrame = 0;
             }

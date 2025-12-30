@@ -39,7 +39,7 @@ public class SpriteContents implements Stitcher.Entry, AutoCloseable {
 	final int width;
 	final int height;
 	public final NativeImage originalImage;
-	NativeImage[] byMipLevel;
+	public NativeImage[] byMipLevel;
 	@Nullable
 	public final SpriteContents.AnimatedTexture animatedTexture;
 	private final List<WithValue<?>> additionalMetadata;
@@ -214,7 +214,7 @@ public class SpriteContents implements Stitcher.Entry, AutoCloseable {
 	@Environment(EnvType.CLIENT)
 	public class AnimatedTexture {
 		public final List<SpriteContents.FrameInfo> frames;
-		private final int frameRowSize;
+		public final int frameRowSize;
 		private final boolean interpolateFrames;
 
 		AnimatedTexture(final List<SpriteContents.FrameInfo> list, final int i, final boolean bl) {
@@ -231,7 +231,7 @@ public class SpriteContents implements Stitcher.Entry, AutoCloseable {
 			return i / this.frameRowSize;
 		}
 
-		void uploadFrame(int i, int j, int k, GpuTexture gpuTexture) {
+		public void uploadFrame(int i, int j, int k, GpuTexture gpuTexture) {
 			int l = this.getFrameX(k) * SpriteContents.this.width;
 			int m = this.getFrameY(k) * SpriteContents.this.height;
 			SpriteContents.this.upload(i, j, l, m, SpriteContents.this.byMipLevel, gpuTexture);
