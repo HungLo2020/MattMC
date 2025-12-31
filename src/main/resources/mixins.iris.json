@@ -9,7 +9,6 @@
     "MixinGlCommandEncoder",
     "MixinLevelRenderer",
     "MixinModelViewBobbing",
-    "MixinShaderManager_Overrides",
     "MixinCompiledShaderProgram",
     "entity_render_context.MixinModelStorageTrigger"
   ],
