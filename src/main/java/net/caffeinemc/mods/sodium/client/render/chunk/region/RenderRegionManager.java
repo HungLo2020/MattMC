@@ -148,7 +148,8 @@ public class RenderRegionManager {
             // Once invalidated the tessellation will be re-created on the next attempted use
             if (bufferChanged) {
                 region.refreshTesselation(commandList);
-                region.clearAllCachedBatches();
+                // Iris: From MixinRenderRegionManager - use forceClear instead of regular clear
+                ((net.irisshaders.iris.mixinterface.ShadowRenderRegion) region).iris$forceClearAllBatches();
             }
 
             // Collect the upload results

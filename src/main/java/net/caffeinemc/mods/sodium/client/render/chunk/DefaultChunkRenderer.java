@@ -51,7 +51,10 @@ public class DefaultChunkRenderer extends ShaderChunkRenderer {
                        boolean indexedRenderingEnabled) {
         super.begin(renderPass, parameters);
 
-        final boolean useBlockFaceCulling = SodiumClientMod.options().performance.useBlockFaceCulling;
+        // Iris: From MixinDefaultChunkRenderer - disable block face culling in shadow pass
+        final boolean useBlockFaceCulling = net.irisshaders.iris.shadows.ShadowRenderingState.areShadowsCurrentlyBeingRendered() 
+            ? false 
+            : SodiumClientMod.options().performance.useBlockFaceCulling;
         final boolean useIndexedTessellation = renderPass.isTranslucent() && indexedRenderingEnabled;
 
         ChunkShaderInterface shader = this.activeProgram.getInterface();
@@ -333,7 +336,11 @@ public class DefaultChunkRenderer extends ShaderChunkRenderer {
 
         GlTessellation tessellation = resources.getIndexedTessellation();
         if (tessellation == null) {
-            tessellation = this.createRegionTessellation(commandList, resources, false);
+            // Iris: From MixinDefaultChunkRenderer - don't use shared index buffer in shadow pass
+            boolean useSharedIndexBuffer = net.irisshaders.iris.shadows.ShadowRenderingState.areShadowsCurrentlyBeingRendered() 
+                ? false 
+                : false;
+            tessellation = this.createRegionTessellation(commandList, resources, useSharedIndexBuffer);
             resources.updateIndexedTessellation(commandList, tessellation);
         }
 
