@@ -314,4 +314,19 @@ public class BufferBuilder implements VertexConsumer, BufferBuilderExtension {
 				.get(format, this.format)
 				.serialize(src, dst, count);
 	}
+	
+	// Iris: Override putBulkData to support separate AO
+	@Override
+	public void putBulkData(PoseStack.Pose matrixEntry, net.minecraft.client.renderer.block.model.BakedQuad quad, float[] brightnesses, float red, float green,
+							float blue, float alpha, int[] lights, int overlay, boolean useQuadColorData) {
+		if (net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings.INSTANCE.shouldUseSeparateAo()) {
+			float[] brightnesses1 = brightnesses;
+			int brightnessIndex = 0;
+
+			brightnesses = new float[brightnesses.length];
+			java.util.Arrays.fill(brightnesses, 1.0f);
+		}
+
+		VertexConsumer.super.putBulkData(matrixEntry, quad, brightnesses, red, green, blue, alpha, lights, overlay, useQuadColorData);
+	}
 }

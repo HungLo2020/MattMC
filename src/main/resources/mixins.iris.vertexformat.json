@@ -7,7 +7,6 @@
   "refmap": "iris.refmap.json",
   "client": [
     "MixinBufferBuilder",
-    "block_rendering.MixinBufferBuilder_SeparateAo",
     "block_rendering.MixinChunkRebuildTask",
     "block_rendering.MixinClientLevel",
     "immediate.MixinBufferSource",

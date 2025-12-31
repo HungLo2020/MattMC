@@ -12,7 +12,7 @@ import net.caffeinemc.mods.sodium.client.render.texture.SpriteFinderCache;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import org.jetbrains.annotations.NotNull;
 
-public class ChunkVertexConsumer implements VertexConsumer {
+public class ChunkVertexConsumer implements VertexConsumer, net.irisshaders.iris.vertices.BlockSensitiveBufferBuilder {
     private static final int ATTRIBUTE_POSITION_BIT = 1 << 0;
     private static final int ATTRIBUTE_COLOR_BIT = 1 << 1;
     private static final int ATTRIBUTE_TEXTURE_BIT = 1 << 2;
@@ -193,5 +193,31 @@ public class ChunkVertexConsumer implements VertexConsumer {
         }
 
         return NormI8.pack(normX, normY, normZ);
+    }
+    
+    // Iris: BlockSensitiveBufferBuilder interface implementation
+    @Override
+    public void beginBlock(int block, byte renderType, byte blockEmission, int localPosX, int localPosY, int localPosZ) {
+        ((net.irisshaders.iris.vertices.BlockSensitiveBufferBuilder) modelBuilder).beginBlock(block, renderType, blockEmission, localPosX, localPosY, localPosZ);
+    }
+
+    @Override
+    public void overrideBlock(int block) {
+        ((net.irisshaders.iris.vertices.BlockSensitiveBufferBuilder) modelBuilder).overrideBlock(block);
+    }
+
+    @Override
+    public void restoreBlock() {
+        ((net.irisshaders.iris.vertices.BlockSensitiveBufferBuilder) modelBuilder).restoreBlock();
+    }
+
+    @Override
+    public void endBlock() {
+        ((net.irisshaders.iris.vertices.BlockSensitiveBufferBuilder) modelBuilder).endBlock();
+    }
+
+    @Override
+    public void ignoreMidBlock(boolean b) {
+        ((net.irisshaders.iris.vertices.BlockSensitiveBufferBuilder) modelBuilder).ignoreMidBlock(b);
     }
 }
