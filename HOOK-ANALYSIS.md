@@ -6,8 +6,13 @@
 
 ### Mixin Conversion Status
 
-**Total Mixins:** 218 → **83 remaining** (135 removed)  
-**Conversion Progress:** 62.0% complete - **MILESTONE: 62% REACHED!** 🎉🎉
+**Total Mixins:** 218 → **80 remaining** (138 removed)  
+**Conversion Progress:** 63.3% complete - **MILESTONE: 63% REACHED!** 🎉🎉🎉
+
+#### Removed Mixins (Session 30 - 3 mixins):
+164. ✅ `DirectionMixin` - @Overwrite of getApproximateNearest() → Inlined optimized direction calculation into Direction class (10.4% → 1.5% performance improvement)
+165. ✅ `VertexSortingMixin` - @Overwrites of byDistance() methods + @ModifyExpressionValue for ORTHOGRAPHIC_Z → Inlined Sodium optimized vertex sorting into VertexSorting
+166. ✅ `MipmapGeneratorMixin` - @Overwrite of alphaBlend() → Inlined enhanced mipmap downsampling with alpha-weighted blending into MipmapGenerator
 
 #### Removed Mixins (Session 29 - 4 mixins):
 160. ✅ `MixinWeatherRenderer` - @Redirect + @WrapMethod injects → Inlined weather rendering conditions into WeatherEffectRenderer.render() and tickRainParticles()
