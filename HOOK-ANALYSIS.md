@@ -9,6 +9,54 @@
 **Total Mixins:** 218 → **6 remaining** (212 removed)  
 **Conversion Progress:** 97.2% complete - **MILESTONE: 97% REACHED!** 🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉
 
+#### Remaining Mixins (Final 6 - Highly Complex Core Shader Pipeline Integration):
+
+**Status: ANALYZED - Awaiting Conversion (Session 51+)**
+
+These remaining 6 mixins represent the most complex and deeply integrated parts of the Iris shader pipeline and Sodium rendering system. Each requires extensive testing with shaders active to ensure 100% identical behavior.
+
+1. **MixinGlCommandEncoder** (Iris) - 191 lines, 3 @Inject + 5 @Redirect (8 hooks total)
+   - Shadow rendering viewport/framebuffer management
+   - Temporary FBO storage for shader passes
+   - Render pass state bypass for custom Iris passes
+   - Complexity: HIGH - Core GL command encoder modifications for shader pipeline
+
+2. **MixinLevelRenderer** (Iris/fantastic) - 121 lines, 1 @Inject + 1 @Redirect + 2 @WrapOperation (5 hooks total)
+   - Particle rendering phase separation (BEFORE/AFTER/MIXED modes)
+   - Opaque vs translucent particle splitting
+   - Particle pass cancellation logic
+   - Complexity: MODERATE - Particle rendering phase management
+
+3. **MixinBufferBuilder** (Iris/vertices) - 264 lines, 1 @ModifyVariable + 1 @Redirect + 3 @Inject (5 hooks total)
+   - Extended vertex format injection (TERRAIN, ENTITY, GLYPH formats)
+   - MID_BLOCK, ENTITY_ELEMENT, ENTITY_ID_ELEMENT injection
+   - Tangent and mid-texture calculation
+   - Normal recalculation for smooth shading
+   - Implements BlockSensitiveBufferBuilder interface
+   - Complexity: VERY HIGH - Core vertex data extension system for shaders
+
+4. **MixinLevelRenderer** (Iris/main) - 264 lines, 15 @Inject + 1 @WrapOperation + 1 @ModifyArg + 1 @ModifyVariable (18 hooks total)
+   - Main Iris rendering pipeline integration
+   - Shadow pass setup and management
+   - Terrain rendering hooks
+   - Sky/weather rendering modifications
+   - Hand rendering separation
+   - Complexity: VERY HIGH - Primary Iris integration point
+
+5. **LevelRendererMixin** (Sodium/core) - 292 lines, 10 @Overwrite + 7 @Inject + 1 @Redirect (17+ hooks total)
+   - Core Sodium LevelRenderer complete rewrite
+   - Chunk rendering system override
+   - Terrain batching and sorting
+   - Translucent rendering modifications
+   - Complexity: EXTREMELY HIGH - Core Sodium rendering system
+
+6. **MixinRenderSectionManagerShadow** (Iris/Sodium) - 170 lines, 6 @Inject + 6 @Redirect (12 hooks total)
+   - Shadow pass chunk rendering
+   - Render list swapping for shadow passes
+   - Task queue management for shadows
+   - Section visibility in shadow pass
+   - Complexity: VERY HIGH - Sodium + Iris shadow integration
+
 #### Removed Mixins (Session 50 - 3 mixins):
 237. ✅ `MixinCompiledShaderProgram` (Iris) - Interface + 2 @Inject + 2 @Redirect → GlProgram implements ShaderInstanceInterface with shader skip logic and uniform block handling
 238. ✅ `MixinChunkMeshBuildTask` (Iris/Sodium) - 4 @Inject → Inlined Iris block data capture and light block voxelization into ChunkBuilderMeshingTask.execute()
