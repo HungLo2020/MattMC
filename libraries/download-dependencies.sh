@@ -95,7 +95,7 @@ MOJANG_BASE="https://libraries.minecraft.net"
 
 download_jar "${MOJANG_BASE}/com/mojang/brigadier/1.3.10/brigadier-1.3.10.jar" "brigadier-1.3.10.jar"
 download_jar "${MOJANG_BASE}/com/mojang/datafixerupper/8.0.16/datafixerupper-8.0.16.jar" "datafixerupper-8.0.16.jar"
-# NOTE: authlib removed - replaced with custom PlayerProfile system
+# NOTE: authlib removed - replaced with custom PlayerProfile system (net.minecraft.server.profile.PlayerProfile, ProfileProperty, ProfilePropertyMap)
 download_jar "${MOJANG_BASE}/com/mojang/logging/1.2.7/logging-1.2.7.jar" "logging-1.2.7.jar"
 download_jar "${MOJANG_BASE}/com/mojang/jtracy/1.0.29/jtracy-1.0.29.jar" "jtracy-1.0.29.jar"
 download_jar "${MOJANG_BASE}/com/mojang/blocklist/1.0.10/blocklist-1.0.10.jar" "blocklist-1.0.10.jar"
