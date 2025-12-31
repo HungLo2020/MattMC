@@ -622,6 +622,16 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 		if (levelRenderState.haveGlowingEntities && this.targets.entityOutline != null) {
 			this.targets.entityOutline = framePass.readsAndWrites(this.targets.entityOutline);
 		}
+		
+		// Iris: From MixinLevelRenderer (fantastic) - Add particle target for BEFORE rendering
+		net.irisshaders.iris.shaderpack.properties.ParticleRenderingSettings settings = net.irisshaders.iris.Iris.getPipelineManager().getPipeline()
+			.map(net.irisshaders.iris.pipeline.WorldRenderingPipeline::getParticleRenderingSettings)
+			.orElse(net.irisshaders.iris.shaderpack.properties.ParticleRenderingSettings.MIXED);
+		if (settings == net.irisshaders.iris.shaderpack.properties.ParticleRenderingSettings.BEFORE) {
+			if (this.targets.particles != null) {
+				this.targets.particles = framePass.readsAndWrites(this.targets.particles);
+			}
+		}
 
 		ResourceHandle<RenderTarget> resourceHandle = this.targets.main;
 		ResourceHandle<RenderTarget> resourceHandle2 = this.targets.translucent;
@@ -715,6 +725,14 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 	}
 
 	private void addParticlesPass(FrameGraphBuilder frameGraphBuilder, GpuBufferSlice gpuBufferSlice) {
+		// Iris: From MixinLevelRenderer (fantastic) - Disable particles pass if rendering BEFORE
+		net.irisshaders.iris.shaderpack.properties.ParticleRenderingSettings settings = net.irisshaders.iris.Iris.getPipelineManager().getPipeline()
+			.map(net.irisshaders.iris.pipeline.WorldRenderingPipeline::getParticleRenderingSettings)
+			.orElse(net.irisshaders.iris.shaderpack.properties.ParticleRenderingSettings.MIXED);
+		if (settings == net.irisshaders.iris.shaderpack.properties.ParticleRenderingSettings.BEFORE) {
+			return; // Cancel this pass - particles already rendered in main pass
+		}
+		
 		FramePass framePass = frameGraphBuilder.addPass("particles");
 		if (this.targets.particles != null) {
 			this.targets.particles = framePass.readsAndWrites(this.targets.particles);
@@ -1566,17 +1584,61 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 	
 	// Wrapper method for feature rendering in main pass - allows Iris mixins to intercept
 	public void iris$renderAllFeaturesMain() {
-		this.featureRenderDispatcher.renderAllFeatures();
+		// Iris: From MixinLevelRenderer (fantastic) - Handle particle rendering phases
+		net.irisshaders.iris.shaderpack.properties.ParticleRenderingSettings settings = net.irisshaders.iris.Iris.getPipelineManager().getPipeline()
+			.map(net.irisshaders.iris.pipeline.WorldRenderingPipeline::getParticleRenderingSettings)
+			.orElse(net.irisshaders.iris.shaderpack.properties.ParticleRenderingSettings.MIXED);
+		
+		if (settings == net.irisshaders.iris.shaderpack.properties.ParticleRenderingSettings.AFTER) {
+			// After mode: just render features normally
+			this.featureRenderDispatcher.renderAllFeatures();
+			return;
+		} else {
+			// Before or Mixed mode: submit particles first, then render with phase control
+			this.particlesRenderState.submit(this.submitNodeStorage, this.levelRenderState.cameraRenderState);
+			((net.irisshaders.iris.fantastic.PhasedParticleEngine) this.featureRenderDispatcher.particleFeatureRenderer)
+				.setParticleRenderingPhase(settings == net.irisshaders.iris.shaderpack.properties.ParticleRenderingSettings.BEFORE 
+					? net.irisshaders.iris.fantastic.ParticleRenderingPhase.EVERYTHING 
+					: net.irisshaders.iris.fantastic.ParticleRenderingPhase.OPAQUE);
+			this.featureRenderDispatcher.renderAllFeatures();
+			((net.irisshaders.iris.fantastic.PhasedParticleEngine) this.featureRenderDispatcher.particleFeatureRenderer)
+				.setParticleRenderingPhase(net.irisshaders.iris.fantastic.ParticleRenderingPhase.EVERYTHING);
+			
+			if (settings == net.irisshaders.iris.shaderpack.properties.ParticleRenderingSettings.BEFORE) {
+				this.particlesRenderState.reset();
+			}
+		}
 	}
 	
 	// Wrapper method for particle submission - allows Iris mixins to intercept
 	public void iris$submitParticles() {
-		this.particlesRenderState.submit(this.submitNodeStorage, this.levelRenderState.cameraRenderState);
+		// Iris: From MixinLevelRenderer (fantastic) - Redirect to avoid item pickup particles in Mixed mode
+		net.irisshaders.iris.shaderpack.properties.ParticleRenderingSettings settings = net.irisshaders.iris.Iris.getPipelineManager().getPipeline()
+			.map(net.irisshaders.iris.pipeline.WorldRenderingPipeline::getParticleRenderingSettings)
+			.orElse(net.irisshaders.iris.shaderpack.properties.ParticleRenderingSettings.MIXED);
+		
+		if (settings == net.irisshaders.iris.shaderpack.properties.ParticleRenderingSettings.MIXED) {
+			((net.irisshaders.iris.mixinterface.ParticleRenderStateExtension) this.particlesRenderState)
+				.submitWithoutItems(this.submitNodeStorage, this.levelRenderState.cameraRenderState);
+		} else {
+			this.particlesRenderState.submit(this.submitNodeStorage, this.levelRenderState.cameraRenderState);
+		}
 	}
 	
 	// Wrapper method for feature rendering in particles pass - allows Iris mixins to intercept
 	public void iris$renderAllFeaturesParticles() {
+		// Iris: From MixinLevelRenderer (fantastic) - Render translucent particles with phase control
+		net.irisshaders.iris.shaderpack.properties.ParticleRenderingSettings settings = net.irisshaders.iris.Iris.getPipelineManager().getPipeline()
+			.map(net.irisshaders.iris.pipeline.WorldRenderingPipeline::getParticleRenderingSettings)
+			.orElse(net.irisshaders.iris.shaderpack.properties.ParticleRenderingSettings.MIXED);
+		
+		((net.irisshaders.iris.fantastic.PhasedParticleEngine) this.featureRenderDispatcher.particleFeatureRenderer)
+			.setParticleRenderingPhase(settings == net.irisshaders.iris.shaderpack.properties.ParticleRenderingSettings.AFTER 
+				? net.irisshaders.iris.fantastic.ParticleRenderingPhase.EVERYTHING 
+				: net.irisshaders.iris.fantastic.ParticleRenderingPhase.TRANSLUCENT);
 		this.featureRenderDispatcher.renderAllFeatures();
+		((net.irisshaders.iris.fantastic.PhasedParticleEngine) this.featureRenderDispatcher.particleFeatureRenderer)
+			.setParticleRenderingPhase(net.irisshaders.iris.fantastic.ParticleRenderingPhase.EVERYTHING);
 	}
 	
 	// Iris: From shadows.MixinLevelRenderer - implement CullingDataCache interface
