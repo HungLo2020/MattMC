@@ -178,7 +178,47 @@ public class SubmitNodeStorage implements SubmitNodeCollector, net.caffeinemc.mo
 	}
 
 	@Environment(EnvType.CLIENT)
-	public record CustomGeometrySubmit(PoseStack.Pose pose, SubmitNodeCollector.CustomGeometryRenderer customGeometryRenderer) {
+	public record CustomGeometrySubmit(PoseStack.Pose pose, SubmitNodeCollector.CustomGeometryRenderer customGeometryRenderer) implements net.irisshaders.iris.mixinterface.ModelStorage {
+		private static final java.util.WeakHashMap<CustomGeometrySubmit, ModelStorageData> STORAGE = new java.util.WeakHashMap<>();
+		
+		public CustomGeometrySubmit {
+			// Iris: Capture state on construction
+			ModelStorageData data = STORAGE.computeIfAbsent(this, k -> new ModelStorageData());
+			data.entityId = net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.getCurrentRenderedEntity();
+			data.beId = net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.getCurrentRenderedBlockEntity();
+			data.itemId = net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.getCurrentRenderedItem();
+			data.isRenderingBEs = net.irisshaders.iris.vertices.ImmediateState.isRenderingBEs;
+		}
+		
+		@Override
+		public void iris$capture() {
+			ModelStorageData data = STORAGE.computeIfAbsent(this, k -> new ModelStorageData());
+			data.entityId = net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.getCurrentRenderedEntity();
+			data.beId = net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.getCurrentRenderedBlockEntity();
+			data.itemId = net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.getCurrentRenderedItem();
+			data.isRenderingBEs = net.irisshaders.iris.vertices.ImmediateState.isRenderingBEs;
+		}
+		
+		@Override
+		public void iris$set() {
+			ModelStorageData data = STORAGE.get(this);
+			if (data != null) {
+				net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setCurrentEntity(data.entityId);
+				net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setCurrentBlockEntity(data.beId);
+				net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setCurrentRenderedItem(data.itemId);
+			}
+		}
+		
+		@Override
+		public boolean iris$wasBE() {
+			ModelStorageData data = STORAGE.get(this);
+			return data != null && data.isRenderingBEs;
+		}
+		
+		private static class ModelStorageData {
+			int entityId, beId, itemId;
+			boolean isRenderingBEs;
+		}
 	}
 
 	@Environment(EnvType.CLIENT)

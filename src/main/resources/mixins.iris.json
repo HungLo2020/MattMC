@@ -38,7 +38,6 @@
     "entity_render_context.MixinFlameFeatureRenderer",
     "entity_render_context.MixinGlyphRenderType",
     "entity_render_context.MixinTextFeatureRenderer",
-    "entity_render_context.MixinCustomGeometrySubmit",
     "entity_render_context.MixinCustomFeatureRenderer",
     "entity_render_context.MixinModelPartFeatureRenderer",
     "entity_render_context.MixinItemFeatureRenderer",
