@@ -357,14 +357,31 @@ public class SpriteContents implements Stitcher.Entry, AutoCloseable, net.caffei
 		public final SpriteContents.AnimatedTexture animationInfo;
 		@Nullable
 		public final SpriteContents.InterpolationData interpolationData;
+		
+		// Sodium: From SpriteContentsTickerMixin - parent tracking for on-demand animation
+		private SpriteContents parent;
 
 		Ticker(final SpriteContents.AnimatedTexture animatedTexture, @Nullable final SpriteContents.InterpolationData interpolationData) {
 			this.animationInfo = animatedTexture;
 			this.interpolationData = interpolationData;
+			// Sodium: From SpriteContentsTickerMixin - assign parent
+			this.parent = SpriteContents.this;
 		}
 
 		@Override
 		public void tickAndUpload(int i, int j, GpuTexture gpuTexture) {
+			// Sodium: From SpriteContentsTickerMixin - on-demand animation check
+			boolean onDemand = net.caffeinemc.mods.sodium.client.SodiumClientMod.options().performance.animateOnlyVisibleTextures;
+			
+			if (onDemand && !net.caffeinemc.mods.sodium.client.render.texture.SpriteContentsExtension.isActive(this.parent)) {
+				this.subFrame++;
+				if (this.subFrame >= ((SpriteContents.FrameInfo)this.animationInfo.frames.get(this.frame)).time()) {
+					this.frame = (this.frame + 1) % this.animationInfo.frames.size();
+					this.subFrame = 0;
+				}
+				return; // Skip the upload
+			}
+			
 			this.subFrame++;
 			SpriteContents.FrameInfo frameInfo = (SpriteContents.FrameInfo)this.animationInfo.frames.get(this.frame);
 			if (this.subFrame >= frameInfo.time) {
@@ -378,6 +395,9 @@ public class SpriteContents implements Stitcher.Entry, AutoCloseable, net.caffei
 			} else if (this.interpolationData != null) {
 				this.interpolationData.uploadInterpolatedFrame(i, j, this, gpuTexture);
 			}
+			
+			// Sodium: From SpriteContentsTickerMixin - reset active flag after upload
+			net.caffeinemc.mods.sodium.client.render.texture.SpriteContentsExtension.setActive(this.parent, false);
 		}
 
 		@Override
