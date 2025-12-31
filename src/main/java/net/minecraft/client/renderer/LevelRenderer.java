@@ -495,6 +495,9 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 		Vec3 vec3 = camera.getPosition();
 		Frustum frustum = this.prepareCullFrustum(matrix4f, matrix4f3, vec3);
 		
+		// Sodium: Store matrices for setupTerrain (from LevelRendererMixin @Inject at="INVOKE cullTerrain")
+		this.matrices = new net.caffeinemc.mods.sodium.client.render.chunk.ChunkRenderMatrices(matrix4f2, matrix4f);
+		
 		// Iris: From MixinLevelRenderer - Render shadow terrain after frustum preparation
 		this.pipeline.renderShadows(this, camera, this.levelRenderState.cameraRenderState);
 		
