@@ -23,6 +23,9 @@ public class ClientLanguage extends Language {
 	private static final Logger LOGGER = LogUtils.getLogger();
 	private final Map<String, String> storage;
 	private final boolean defaultRightToLeft;
+	
+	// Iris: From MixinClientLanguage - track language codes for shaderpack translations
+	private static final List<String> iris$languageCodes = new java.util.ArrayList<>();
 
 	private ClientLanguage(Map<String, String> map, boolean bl) {
 		this.storage = map;
@@ -30,6 +33,10 @@ public class ClientLanguage extends Language {
 	}
 
 	public static ClientLanguage loadFrom(ResourceManager resourceManager, List<String> list, boolean bl) {
+		// Iris: From MixinClientLanguage - clear language codes at start
+		iris$languageCodes.clear();
+		new java.util.LinkedList<>(list).descendingIterator().forEachRemaining(iris$languageCodes::add);
+		
 		Map<String, String> map = new HashMap();
 
 		for (String string : list) {
@@ -50,6 +57,12 @@ public class ClientLanguage extends Language {
 	}
 
 	private static void appendFrom(String string, List<Resource> list, Map<String, String> map) {
+		// Iris: From MixinClientLanguage - load Iris built-in language files
+		String json = String.format(Locale.ROOT, "lang/%s.json", string);
+		if (net.irisshaders.iris.Iris.class.getResource("/assets/iris/" + json) != null) {
+			Language.loadFromJson(net.irisshaders.iris.Iris.class.getResourceAsStream("/assets/iris/" + json), map::put);
+		}
+		
 		for (Resource resource : list) {
 			try {
 				InputStream inputStream = resource.open();
@@ -78,11 +91,53 @@ public class ClientLanguage extends Language {
 	}
 
 	public String getOrDefault(String string, String string2) {
+		// Iris: From MixinClientLanguage - check shaderpack language overrides first
+		String override = iris$lookupOverriddenEntry(string);
+		if (override != null) {
+			return override;
+		}
+		
 		return (String)this.storage.getOrDefault(string, string2);
 	}
 
 	public boolean has(String string) {
+		// Iris: From MixinClientLanguage - check shaderpack language overrides
+		String override = iris$lookupOverriddenEntry(string);
+		if (override != null) {
+			return true;
+		}
+		
 		return this.storage.containsKey(string);
+	}
+	
+	// Iris: From MixinClientLanguage - lookup shaderpack language entries
+	private String iris$lookupOverriddenEntry(String key) {
+		net.irisshaders.iris.shaderpack.ShaderPack pack = net.irisshaders.iris.Iris.getCurrentPack().orElse(null);
+		
+		if (pack == null) {
+			return null;
+		}
+		
+		net.irisshaders.iris.shaderpack.LanguageMap languageMap = pack.getLanguageMap();
+		
+		if (storage.containsKey(key)) {
+			// Don't allow shader packs to override existing MC translations
+			return null;
+		}
+		
+		for (String code : iris$languageCodes) {
+			Map<String, String> translations = languageMap.getTranslations(code);
+			
+			if (translations != null) {
+				String translation = translations.get(key);
+				
+				if (translation != null) {
+					return translation;
+				}
+			}
+		}
+		
+		return null;
 	}
 
 	public boolean isDefaultRightToLeft() {
