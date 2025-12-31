@@ -51,6 +51,13 @@ public class GlStateManager {
 	public static final GlStateManager.ColorMask COLOR_MASK = new GlStateManager.ColorMask(); // Made public for Iris shader mod integration
 	private static int readFbo;
 	private static int writeFbo;
+	
+	// Iris: From MixinGlStateManager_FramebufferBinding - program and viewport state tracking
+	private static int iris$program;
+	private static int iris$viewportX;
+	private static int iris$viewportY;
+	private static int iris$viewportWidth;
+	private static int iris$viewportHeight;
 
 	public static void _disableScissorTest() {
 		RenderSystem.assertOnRenderThread();
@@ -87,6 +94,12 @@ public class GlStateManager {
 
 	public static void _depthMask(boolean bl) {
 		RenderSystem.assertOnRenderThread();
+		// Iris: From MixinGlStateManager_DepthColorOverride - depth mask lock support
+		if (net.irisshaders.iris.gl.blending.DepthColorStorage.isDepthColorLocked()) {
+			net.irisshaders.iris.gl.blending.DepthColorStorage.deferDepthEnable(bl);
+			return;
+		}
+		
 		if (bl != DEPTH.mask) {
 			DEPTH.mask = bl;
 			GL11.glDepthMask(bl);
@@ -183,7 +196,18 @@ public class GlStateManager {
 
 	public static void _glUseProgram(int i) {
 		RenderSystem.assertOnRenderThread();
+		// Iris: From MixinGlStateManager_FramebufferBinding - avoid redundant program switches
+		if (iris$program == 0 && i == 0) {
+			return;
+		}
+		
+		net.irisshaders.iris.gl.IrisRenderSystem.onProgramUse();
+		
+		iris$program = i;
 		GL20.glUseProgram(i);
+		
+		// Iris: From MixinGlStateManager_DepthColorOverride - reset tessellation flag
+		net.irisshaders.iris.vertices.ImmediateState.usingTessellation = false;
 	}
 
 	public static int glCreateProgram() {
@@ -414,6 +438,12 @@ public class GlStateManager {
 
 	public static void _activeTexture(int i) {
 		RenderSystem.assertOnRenderThread();
+		// Iris: From MixinGlStateManager_FramebufferBinding - validate texture unit range
+		int tex = i - org.lwjgl.opengl.GL46C.GL_TEXTURE0;
+		if (tex < 0 || tex > 128) {
+			throw new IllegalArgumentException("Texture " + tex + " out of range");
+		}
+		
 		if (activeTexture != i - 33984) {
 			activeTexture = i - 33984;
 			GL13.glActiveTexture(i);
@@ -482,11 +512,27 @@ public class GlStateManager {
 	}
 
 	public static void _viewport(int i, int j, int k, int l) {
+		// Iris: From MixinGlStateManager_FramebufferBinding - avoid redundant viewport changes
+		if (iris$viewportX == i && iris$viewportY == j && iris$viewportWidth == k && iris$viewportHeight == l) {
+			return;
+		}
+		
+		iris$viewportX = i;
+		iris$viewportY = j;
+		iris$viewportWidth = k;
+		iris$viewportHeight = l;
+		
 		GL11.glViewport(i, j, k, l);
 	}
 
 	public static void _colorMask(boolean bl, boolean bl2, boolean bl3, boolean bl4) {
 		RenderSystem.assertOnRenderThread();
+		// Iris: From MixinGlStateManager_DepthColorOverride - color mask lock support
+		if (net.irisshaders.iris.gl.blending.DepthColorStorage.isDepthColorLocked()) {
+			net.irisshaders.iris.gl.blending.DepthColorStorage.deferColorMask(bl, bl2, bl3, bl4);
+			return;
+		}
+		
 		if (bl != COLOR_MASK.red || bl2 != COLOR_MASK.green || bl3 != COLOR_MASK.blue || bl4 != COLOR_MASK.alpha) {
 			COLOR_MASK.red = bl;
 			COLOR_MASK.green = bl2;
@@ -521,7 +567,13 @@ public class GlStateManager {
 
 	public static void _drawElements(int i, int j, int k, long l) {
 		RenderSystem.assertOnRenderThread();
-		GL11.glDrawElements(i, j, k, l);
+		// Iris: From MixinGlStateManager_DepthColorOverride - tessellation support
+		int mode = i;
+		if (mode == org.lwjgl.opengl.GL43C.GL_TRIANGLES && net.irisshaders.iris.vertices.ImmediateState.usingTessellation) {
+			mode = org.lwjgl.opengl.GL43C.GL_PATCHES;
+		}
+		
+		org.lwjgl.opengl.GL43C.glDrawElements(mode, j, k, l);
 	}
 
 	public static void _drawArrays(int i, int j, int k) {

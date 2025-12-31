@@ -481,7 +481,14 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 		Vec3 vec3 = camera.getPosition();
 		Frustum frustum = this.prepareCullFrustum(matrix4f, matrix4f3, vec3);
 		profilerFiller.popPush("cullTerrain");
-		this.cullTerrain(camera, frustum, this.minecraft.player.isSpectator());
+		// Iris: From MixinLevelRenderer_SkipRendering - skip terrain culling if pipeline requests
+		if (net.irisshaders.iris.Iris.getPipelineManager().getPipelineNullable() instanceof net.irisshaders.iris.pipeline.IrisRenderingPipeline pipeline) {
+			if (!pipeline.skipAllRendering()) {
+				this.cullTerrain(camera, frustum, this.minecraft.player.isSpectator());
+			}
+		} else {
+			this.cullTerrain(camera, frustum, this.minecraft.player.isSpectator());
+		}
 		profilerFiller.popPush("compileSections");
 		this.compileSections(camera);
 		profilerFiller.popPush("extract");
@@ -789,7 +796,15 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 		boolean bl = this.shouldShowEntityOutlines();
 		Entity.setViewScale(Mth.clamp(this.minecraft.options.getEffectiveRenderDistance() / 8.0, 1.0, 2.5) * this.minecraft.options.entityDistanceScaling().get());
 
-		for (Entity entity : this.level.entitiesForRendering()) {
+		// Iris: From MixinLevelRenderer_SkipRendering - skip entity extraction if pipeline requests
+		Iterable<Entity> entities;
+		if (net.irisshaders.iris.Iris.getPipelineManager().getPipelineNullable() instanceof net.irisshaders.iris.pipeline.IrisRenderingPipeline pipeline && pipeline.skipAllRendering()) {
+			entities = java.util.Collections.emptyList();
+		} else {
+			entities = this.level.entitiesForRendering();
+		}
+
+		for (Entity entity : entities) {
 			if (this.entityRenderDispatcher.shouldRender(entity, frustum, d, e, f) || entity.hasIndirectPassenger(this.minecraft.player)) {
 				BlockPos blockPos = entity.blockPosition();
 				if ((this.level.isOutsideBuildHeight(blockPos.getY()) || this.isSectionCompiled(blockPos))
@@ -1534,7 +1549,14 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 	
 	// Wrapper method for terrain chunk rendering - allows Iris mixins to intercept
 	public void iris$renderTerrainGroup(ChunkSectionsToRender chunkSectionsToRender, ChunkSectionLayerGroup group) {
-		chunkSectionsToRender.renderGroup(group);
+		// Iris: From MixinLevelRenderer_SkipRendering - skip chunk rendering if pipeline requests
+		if (net.irisshaders.iris.Iris.getPipelineManager().getPipelineNullable() instanceof net.irisshaders.iris.pipeline.IrisRenderingPipeline pipeline) {
+			if (!pipeline.skipAllRendering()) {
+				chunkSectionsToRender.renderGroup(group);
+			}
+		} else {
+			chunkSectionsToRender.renderGroup(group);
+		}
 	}
 	
 	// Wrapper method for feature rendering in main pass - allows Iris mixins to intercept
