@@ -6,8 +6,14 @@
 
 ### Mixin Conversion Status
 
-**Total Mixins:** 218 → **87 remaining** (131 removed)  
-**Conversion Progress:** 60.1% complete - **MILESTONE: 60% REACHED!** 🎉🎉
+**Total Mixins:** 218 → **83 remaining** (135 removed)  
+**Conversion Progress:** 62.0% complete - **MILESTONE: 62% REACHED!** 🎉🎉
+
+#### Removed Mixins (Session 29 - 4 mixins):
+160. ✅ `MixinWeatherRenderer` - @Redirect + @WrapMethod injects → Inlined weather rendering conditions into WeatherEffectRenderer.render() and tickRainParticles()
+161. ✅ `MixinSkyRenderer` - Multiple HEAD injects + helper methods → Inlined sky rendering phase tracking into SkyRenderer (renderSkyDisc, renderSun, renderMoon, renderStars, etc.)
+162. ✅ `MixinPreventRebuildNearInShadowPass` - Empty mixin (no actual logic, just injection point) → Deleted file
+163. ✅ `MixinEnderDragonRenderer` - HEAD + RETURN injects → Inlined entity ID tracking for crystal beams into EnderDragonRenderer.submitCrystalBeams()
 
 #### Removed Mixins (Session 28 - 6 mixins):
 154. ✅ `MixinSodiumRenderer` (DH) - Dead code (completely commented out, not registered in config) → Deleted file
