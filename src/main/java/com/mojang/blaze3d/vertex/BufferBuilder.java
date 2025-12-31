@@ -1,8 +1,19 @@
 package com.mojang.blaze3d.vertex;
 
 import java.nio.ByteOrder;
+import java.util.Arrays;
 import java.util.stream.Collectors;
 import net.caffeinemc.mods.sodium.client.render.vertex.buffer.BufferBuilderExtension;
+import net.irisshaders.iris.Iris;
+import net.irisshaders.iris.uniforms.CapturedRenderingState;
+import net.irisshaders.iris.vertices.BlockSensitiveBufferBuilder;
+import net.irisshaders.iris.vertices.BufferBuilderPolygonView;
+import net.irisshaders.iris.vertices.ExtendedDataHelper;
+import net.irisshaders.iris.vertices.ImmediateState;
+import net.irisshaders.iris.vertices.IrisVertexFormats;
+import net.irisshaders.iris.vertices.MojangBufferAccessor;
+import net.irisshaders.iris.vertices.NormI8;
+import net.irisshaders.iris.vertices.NormalHelper;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.util.ARGB;
@@ -10,11 +21,12 @@ import net.minecraft.util.Mth;
 import net.sodium.api.memory.MemoryIntrinsics;
 import net.sodium.api.vertex.serializer.VertexSerializerRegistry;
 import org.jetbrains.annotations.Nullable;
+import org.joml.Vector3f;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.system.MemoryUtil;
 
 @Environment(EnvType.CLIENT)
-public class BufferBuilder implements VertexConsumer, BufferBuilderExtension {
+public class BufferBuilder implements VertexConsumer, BufferBuilderExtension, BlockSensitiveBufferBuilder {
 	private static final int MAX_VERTEX_COUNT = 16777215;
 	private static final long NOT_BUILDING = -1L;
 	private static final long UNKNOWN_ELEMENT = -1L;
@@ -32,21 +44,64 @@ public class BufferBuilder implements VertexConsumer, BufferBuilderExtension {
 	private int elementsToFill;
 	private boolean building = true;
 
+	// Iris extended vertex format support
+	private final BufferBuilderPolygonView polygon = new BufferBuilderPolygonView();
+	private final Vector3f normal = new Vector3f();
+	private final long[] vertexOffsets = new long[4];
+	private boolean skipEndVertexOnce;
+	private boolean extending;
+	private boolean injectNormalAndUV1;
+	private int iris$vertexCount;
+	private int currentBlock = -1;
+	private byte currentRenderType = -1;
+	private int currentLocalPosX;
+	private int currentLocalPosY;
+	private int currentLocalPosZ;
+
 	public BufferBuilder(ByteBufferBuilder byteBufferBuilder, VertexFormat.Mode mode, VertexFormat vertexFormat) {
 		if (!vertexFormat.contains(VertexFormatElement.POSITION)) {
 			throw new IllegalArgumentException("Cannot build mesh with no position element");
 		} else {
 			this.buffer = byteBufferBuilder;
 			this.mode = mode;
+			
+			// Iris: Dynamically extend vertex formats for shader support
+			vertexFormat = iris$extendFormat(vertexFormat);
+			
 			this.format = vertexFormat;
 			this.vertexSize = vertexFormat.getVertexSize();
 			this.initialElementsToFill = vertexFormat.getElementsMask() & ~VertexFormatElement.POSITION.mask();
 			this.offsetsByElement = vertexFormat.getOffsetsByElement();
 			boolean bl = vertexFormat == DefaultVertexFormat.NEW_ENTITY;
 			boolean bl2 = vertexFormat == DefaultVertexFormat.BLOCK;
-			this.fastFormat = bl || bl2;
+			this.fastFormat = (bl || bl2) && !extending; // Iris: disable fastFormat when extending
 			this.fullFormat = bl;
 		}
+	}
+	
+	// Iris: Extend vertex format for terrain, entity, and glyph rendering
+	private VertexFormat iris$extendFormat(VertexFormat format) {
+		injectNormalAndUV1 = false;
+
+		if (ImmediateState.skipExtension.get() || !ImmediateState.isRenderingLevel || !Iris.isPackInUseQuick()) {
+			return format;
+		}
+
+		if (format == DefaultVertexFormat.BLOCK || format == IrisVertexFormats.TERRAIN) {
+			extending = true;
+			injectNormalAndUV1 = false;
+			return IrisVertexFormats.TERRAIN;
+		} else if (format == DefaultVertexFormat.NEW_ENTITY || format == IrisVertexFormats.ENTITY) {
+			extending = true;
+			injectNormalAndUV1 = false;
+			return IrisVertexFormats.ENTITY;
+		} else if (format == DefaultVertexFormat.POSITION_COLOR_TEX_LIGHTMAP || format == IrisVertexFormats.GLYPH) {
+			extending = true;
+			injectNormalAndUV1 = true;
+			return IrisVertexFormats.GLYPH;
+		}
+
+		return format;
 	}
 
 	@Nullable
@@ -121,6 +176,11 @@ public class BufferBuilder implements VertexConsumer, BufferBuilderExtension {
 
 	private void endLastVertex() {
 		if (this.vertices != 0) {
+			// Iris: Extended vertex format handling
+			if (this.vertices > 0 && extending) {
+				iris$beforeNext();
+			}
+			
 			if (this.elementsToFill != 0) {
 				String string = (String)VertexFormatElement.elementsFromMask(this.elementsToFill).map(this.format::getElementName).collect(Collectors.joining(", "));
 				throw new IllegalStateException("Missing elements in vertex: " + string);
@@ -132,6 +192,94 @@ public class BufferBuilder implements VertexConsumer, BufferBuilderExtension {
 				}
 			}
 		}
+	}
+	
+	// Iris: Process vertex before completion
+	private void iris$beforeNext() {
+		// We can't fill these yet
+		this.elementsToFill = this.elementsToFill & ~IrisVertexFormats.MID_TEXTURE_ELEMENT.mask();
+		this.elementsToFill = this.elementsToFill & ~IrisVertexFormats.TANGENT_ELEMENT.mask();
+
+		if (injectNormalAndUV1 && this.elementsToFill != (this.elementsToFill & ~VertexFormatElement.NORMAL.mask())) {
+			this.setNormal(0, 1, 0);
+		}
+
+		if (skipEndVertexOnce) {
+			skipEndVertexOnce = false;
+			return;
+		}
+
+		if (mode != VertexFormat.Mode.QUADS && mode != VertexFormat.Mode.TRIANGLES) {
+			return;
+		}
+
+		vertexOffsets[iris$vertexCount] = vertexPointer - ((MojangBufferAccessor) buffer).getPointer();
+
+		iris$vertexCount++;
+
+		if (mode == VertexFormat.Mode.QUADS && iris$vertexCount == 4 || mode == VertexFormat.Mode.TRIANGLES && iris$vertexCount == 3) {
+			fillExtendedData(iris$vertexCount);
+		}
+	}
+	
+	// Iris: Fill extended vertex data (tangents, mid-texture coordinates)
+	private void fillExtendedData(int vertexAmount) {
+		iris$vertexCount = 0;
+
+		int stride = format.getVertexSize();
+
+		polygon.setup(((MojangBufferAccessor) buffer).getPointer(), vertexOffsets, stride, vertexAmount);
+
+		float midU = 0;
+		float midV = 0;
+
+		for (int vertex = 0; vertex < vertexAmount; vertex++) {
+			midU += polygon.u(vertex);
+			midV += polygon.v(vertex);
+		}
+
+		midU /= vertexAmount;
+		midV /= vertexAmount;
+
+		int midTexOffset = this.offsetsByElement[IrisVertexFormats.MID_TEXTURE_ELEMENT.id()];
+		int normalOffset = this.offsetsByElement[VertexFormatElement.NORMAL.id()];
+		int tangentOffset = this.offsetsByElement[IrisVertexFormats.TANGENT_ELEMENT.id()];
+		
+		if (vertexAmount == 3) {
+			// Smooth shaded triangles - use per-vertex normals
+			for (int vertex = 0; vertex < vertexAmount; vertex++) {
+				long newPointer = ((MojangBufferAccessor) buffer).getPointer() + vertexOffsets[vertex];
+				int vertexNormal = MemoryUtil.memGetInt(newPointer + normalOffset);
+
+				int tangent = NormalHelper.computeTangentSmooth(NormI8.unpackX(vertexNormal), NormI8.unpackY(vertexNormal), NormI8.unpackZ(vertexNormal), polygon);
+
+				MemoryUtil.memPutFloat(newPointer + midTexOffset, midU);
+				MemoryUtil.memPutFloat(newPointer + midTexOffset + 4, midV);
+				MemoryUtil.memPutInt(newPointer + tangentOffset, tangent);
+			}
+		} else {
+			// Quads - compute face normal
+			boolean recalculateNormal = ImmediateState.isRenderingLevel;
+			NormalHelper.computeFaceNormal(normal, polygon);
+			int packedNormal = 0;
+			if (recalculateNormal) {
+				packedNormal = NormI8.pack(normal.x, normal.y, normal.z, 0.0f);
+			}
+			int tangent = NormalHelper.computeTangent(normal.x, normal.y, normal.z, polygon);
+
+			for (int vertex = 0; vertex < vertexAmount; vertex++) {
+				long newPointer = ((MojangBufferAccessor) buffer).getPointer() + vertexOffsets[vertex];
+
+				MemoryUtil.memPutFloat(newPointer + midTexOffset, midU);
+				MemoryUtil.memPutFloat(newPointer + midTexOffset + 4, midV);
+				if (recalculateNormal) {
+					MemoryUtil.memPutInt(newPointer + normalOffset, packedNormal);
+				}
+				MemoryUtil.memPutInt(newPointer + tangentOffset, tangent);
+			}
+		}
+
+		Arrays.fill(vertexOffsets, 0);
 	}
 
 	private static void putRgba(long l, int i) {
@@ -155,7 +303,34 @@ public class BufferBuilder implements VertexConsumer, BufferBuilderExtension {
 		MemoryUtil.memPutFloat(l, f);
 		MemoryUtil.memPutFloat(l + 4L, g);
 		MemoryUtil.memPutFloat(l + 8L, h);
+		
+		// Iris: Inject extended vertex data (MID_BLOCK, ENTITY_ELEMENT, ENTITY_ID_ELEMENT)
+		iris$injectMidBlock(f, g, h);
+		
 		return this;
+	}
+	
+	// Iris: Inject mid-block and entity ID data after vertex position
+	private void iris$injectMidBlock(float x, float y, float z) {
+		if ((this.elementsToFill & IrisVertexFormats.MID_BLOCK_ELEMENT.mask()) != 0) {
+			long midBlockOffset = this.beginElement(IrisVertexFormats.MID_BLOCK_ELEMENT);
+			MemoryUtil.memPutInt(midBlockOffset, ExtendedDataHelper.computeMidBlock(x, y, z, currentLocalPosX, currentLocalPosY, currentLocalPosZ));
+			byte currentBlockEmission = -1;
+			MemoryUtil.memPutByte(midBlockOffset + 3, currentBlockEmission);
+		}
+
+		if ((this.elementsToFill & IrisVertexFormats.ENTITY_ELEMENT.mask()) != 0) {
+			long offset = this.beginElement(IrisVertexFormats.ENTITY_ELEMENT);
+			// ENTITY_ELEMENT
+			MemoryUtil.memPutShort(offset, (short) currentBlock);
+			MemoryUtil.memPutShort(offset + 2, currentRenderType);
+		} else if ((this.elementsToFill & IrisVertexFormats.ENTITY_ID_ELEMENT.mask()) != 0) {
+			long offset = this.beginElement(IrisVertexFormats.ENTITY_ID_ELEMENT);
+			// ENTITY_ID_ELEMENT
+			MemoryUtil.memPutShort(offset, (short) CapturedRenderingState.INSTANCE.getCurrentRenderedEntity());
+			MemoryUtil.memPutShort(offset + 2, (short) CapturedRenderingState.INSTANCE.getCurrentRenderedBlockEntity());
+			MemoryUtil.memPutShort(offset + 4, (short) CapturedRenderingState.INSTANCE.getCurrentRenderedItem());
+		}
 	}
 
 	@Override
@@ -377,5 +552,30 @@ public class BufferBuilder implements VertexConsumer, BufferBuilderExtension {
 		if (bakedQuad.sprite() != null) {
 			net.sodium.api.texture.SpriteUtil.INSTANCE.markSpriteActive(bakedQuad.sprite());
 		}
+	}
+	
+	// Iris: BlockSensitiveBufferBuilder interface implementation
+	@Override
+	public void beginBlock(int block, byte renderType, byte blockEmission, int localPosX, int localPosY, int localPosZ) {
+		this.currentBlock = block;
+		this.currentRenderType = renderType;
+		this.currentLocalPosX = localPosX;
+		this.currentLocalPosY = localPosY;
+		this.currentLocalPosZ = localPosZ;
+	}
+
+	@Override
+	public void endBlock() {
+		this.currentBlock = -1;
+		this.currentRenderType = -1;
+		this.currentLocalPosX = 0;
+		this.currentLocalPosY = 0;
+		this.currentLocalPosZ = 0;
+	}
+	
+	// Sodium: Skip endLastVertex when Sodium calls push() - used by dynamic remap
+	public void push() {
+		// This method is called by Sodium via mixin - skip the next endLastVertex call
+		skipEndVertexOnce = true;
 	}
 }

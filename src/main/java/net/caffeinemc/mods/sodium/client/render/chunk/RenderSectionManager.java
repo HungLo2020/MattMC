@@ -99,11 +99,22 @@ public class RenderSectionManager {
 
     @NotNull
     private SortedRenderLists renderLists;
+    
+    // Iris: Shadow rendering support - separate render lists for shadow pass
+    @NotNull
+    private SortedRenderLists shadowRenderLists = SortedRenderLists.empty();
+    private boolean shadowNeedsRenderListUpdate = true;
+    private boolean renderListStateIsShadow = false;
+    
     private SectionCollector sectionCollector;
     private SectionCollector lastSectionCollector;
 
     @NotNull
     private Map<TaskQueueType, ArrayDeque<RenderSection>> taskLists;
+    
+    // Iris: Shadow rendering support - separate task lists for shadow pass
+    @NotNull
+    private Map<TaskQueueType, ArrayDeque<RenderSection>> shadowTaskLists = new java.util.EnumMap<>(TaskQueueType.class);
 
     private int frame;
     private long lastFrameDuration = -1;
@@ -150,6 +161,11 @@ public class RenderSectionManager {
         for (var type : TaskQueueType.values()) {
             this.taskLists.put(type, new ArrayDeque<>());
         }
+        
+        // Iris: Initialize shadow task lists
+        for (var type : TaskQueueType.values()) {
+            this.shadowTaskLists.put(type, new ArrayDeque<>());
+        }
     }
 
     public void prepareFrame(Vector3dc cameraPosition) {
@@ -175,6 +191,27 @@ public class RenderSectionManager {
     }
 
     private boolean createTerrainRenderList(Camera camera, Viewport viewport, FogParameters fogParameters, int frame, boolean spectator) {
+        // Iris: Handle shadow rendering state transitions
+        if (!net.irisshaders.iris.shadows.ShadowRenderingState.areShadowsCurrentlyBeingRendered()) {
+            if (this.renderListStateIsShadow) {
+                // Swap back to regular render lists
+                for (var region : this.regions.getLoadedRegions()) {
+                    ((net.irisshaders.iris.mixinterface.ShadowRenderRegion) region).swapToRegularRenderList();
+                }
+                this.renderListStateIsShadow = false;
+            }
+        } else {
+            if (this.shadowNeedsRenderListUpdate) {
+                if (!this.renderListStateIsShadow) {
+                    // Swap to shadow render lists
+                    for (var region : this.regions.getLoadedRegions()) {
+                        ((net.irisshaders.iris.mixinterface.ShadowRenderRegion) region).swapToShadowRenderList();
+                    }
+                    this.renderListStateIsShadow = true;
+                }
+            }
+        }
+        
         this.resetRenderLists();
 
         final var searchDistance = this.getSearchDistance(fogParameters);
@@ -182,7 +219,11 @@ public class RenderSectionManager {
 
         var importantRebuildQueueType = SodiumClientMod.options().performance.chunkBuildDeferMode.getImportantRebuildQueueType();
         var importantSortQueueType = this.sortBehavior.getDeferMode().getImportantRebuildQueueType();
-        if (this.isOutOfGraph(viewport.getChunkCoord())) {
+        
+        // Iris: Disable occlusion culling for shadows
+        boolean iris$disableOcclusion = net.irisshaders.iris.shadows.ShadowRenderingState.areShadowsCurrentlyBeingRendered();
+        
+        if (iris$disableOcclusion || this.isOutOfGraph(viewport.getChunkCoord())) {
             var visitor = new TreeSectionCollector(frame, importantRebuildQueueType, importantSortQueueType, this.sectionByPosition);
             this.renderableSectionTree.prepareForTraversal();
             this.renderableSectionTree.traverse(visitor, viewport, searchDistance);
@@ -196,7 +237,12 @@ public class RenderSectionManager {
         }
         this.lastSectionCollector = null;
 
-        this.taskLists = this.sectionCollector.getTaskLists();
+        // Iris: Use shadow or regular task lists based on current state
+        if (net.irisshaders.iris.shadows.ShadowRenderingState.areShadowsCurrentlyBeingRendered()) {
+            this.shadowTaskLists = this.sectionCollector.getTaskLists();
+        } else {
+            this.taskLists = this.sectionCollector.getTaskLists();
+        }
 
         // when there were sections with pending updates that were skipped because they already had a task running,
         // it needs to revisit them to schedule the remaining pending updates.
@@ -207,7 +253,12 @@ public class RenderSectionManager {
 
     public void finalizeRenderLists(Viewport viewport) {
         if (this.sectionCollector != null) {
-            this.renderLists = this.sectionCollector.createRenderLists(viewport);
+            // Iris: Use shadow render lists when rendering shadows
+            if (net.irisshaders.iris.shadows.ShadowRenderingState.areShadowsCurrentlyBeingRendered()) {
+                this.shadowRenderLists = this.sectionCollector.createRenderLists(viewport);
+            } else {
+                this.renderLists = this.sectionCollector.createRenderLists(viewport);
+            }
             this.lastSectionCollector = this.sectionCollector;
             this.sectionCollector = null;
         }
@@ -253,9 +304,16 @@ public class RenderSectionManager {
     }
 
     private void resetRenderLists() {
-        this.renderLists = SortedRenderLists.empty();
+        // Iris: Reset shadow or regular render lists based on current state
+        if (net.irisshaders.iris.shadows.ShadowRenderingState.areShadowsCurrentlyBeingRendered()) {
+            this.shadowRenderLists = SortedRenderLists.empty();
+        } else {
+            this.renderLists = SortedRenderLists.empty();
+        }
 
-        for (var list : this.taskLists.values()) {
+        // Iris: Use shadow or regular task lists based on current state
+        var lists = net.irisshaders.iris.shadows.ShadowRenderingState.areShadowsCurrentlyBeingRendered() ? this.shadowTaskLists : this.taskLists;
+        for (var list : lists.values()) {
             list.clear();
         }
     }
@@ -291,6 +349,9 @@ public class RenderSectionManager {
     }
 
     public void onSectionRemoved(int x, int y, int z) {
+        // Iris: Notify shadow render list needs update
+        this.shadowNeedsRenderListUpdate = true;
+        
         long sectionPos = SectionPos.asLong(x, y, z);
         RenderSection section = this.sectionByPosition.remove(sectionPos);
 
@@ -323,7 +384,11 @@ public class RenderSectionManager {
         RenderDevice device = RenderDevice.INSTANCE;
         CommandList commandList = device.createCommandList();
 
-        this.chunkRenderer.render(matrices, commandList, this.renderLists, pass, new CameraTransform(x, y, z), fogParameters, this.sortBehavior != SortBehavior.OFF);
+        // Iris: Use shadow or regular render lists based on current state
+        var lists = net.irisshaders.iris.shadows.ShadowRenderingState.areShadowsCurrentlyBeingRendered() 
+            ? this.shadowRenderLists 
+            : this.renderLists;
+        this.chunkRenderer.render(matrices, commandList, lists, pass, new CameraTransform(x, y, z), fogParameters, this.sortBehavior != SortBehavior.OFF);
 
         commandList.flush();
     }
@@ -372,6 +437,11 @@ public class RenderSectionManager {
     }
 
     public void uploadChunks() {
+        // Iris: Do not upload chunks during shadow pass
+        if (net.irisshaders.iris.shadows.ShadowRenderingState.areShadowsCurrentlyBeingRendered()) {
+            return;
+        }
+        
         var results = this.collectChunkBuildResults();
 
         if (results.isEmpty()) {
@@ -490,6 +560,9 @@ public class RenderSectionManager {
     }
 
     private boolean updateSectionInfo(RenderSection render, BuiltSectionInfo info) {
+        // Iris: Notify shadow render list needs update
+        this.shadowNeedsRenderListUpdate = true;
+        
         if (info == null || !RenderSectionFlags.needsRender(info.flags)) {
             this.renderableSectionTree.remove(render);
         } else {
@@ -549,6 +622,11 @@ public class RenderSectionManager {
     }
 
     public void updateChunks(boolean updateImmediately) {
+        // Iris: Do not update chunks during shadow pass
+        if (net.irisshaders.iris.shadows.ShadowRenderingState.areShadowsCurrentlyBeingRendered()) {
+            return;
+        }
+        
         this.thisFrameBlockingTasks = 0;
         this.nextFrameBlockingTasks = 0;
         this.deferredTasks = 0;
@@ -602,7 +680,11 @@ public class RenderSectionManager {
     }
 
     private void submitSectionTasks(ChunkJobCollector collector, UploadResourceBudget uploadBudget, TaskQueueType queueType) {
-        var taskList = this.taskLists.get(queueType);
+        // Iris: Use shadow or regular task lists based on current state
+        var lists = net.irisshaders.iris.shadows.ShadowRenderingState.areShadowsCurrentlyBeingRendered() 
+            ? this.shadowTaskLists 
+            : this.taskLists;
+        var taskList = lists.get(queueType);
 
         // submit tasks as long as there's tasks available, the collector has worker thread budget, and there's enough upload budget left 
         while (!taskList.isEmpty() && collector.hasBudgetRemaining() && (uploadBudget.isAvailable() || queueType.allowsUnlimitedUploadDuration())) {
@@ -708,6 +790,8 @@ public class RenderSectionManager {
     }
 
     public boolean needsUpdate() {
+        // Iris: Notify that shadow render list needs update when camera changes
+        this.shadowNeedsRenderListUpdate = true;
         return this.needsGraphUpdate;
     }
 
@@ -741,7 +825,11 @@ public class RenderSectionManager {
 
     public int getVisibleChunkCount() {
         var sections = 0;
-        var iterator = this.renderLists.iterator();
+        // Iris: Use shadow or regular render lists based on current state
+        var lists = net.irisshaders.iris.shadows.ShadowRenderingState.areShadowsCurrentlyBeingRendered() 
+            ? this.shadowRenderLists 
+            : this.renderLists;
+        var iterator = lists.iterator();
 
         while (iterator.hasNext()) {
             var renderList = iterator.next();
@@ -925,7 +1013,10 @@ public class RenderSectionManager {
     }
 
     public @NotNull SortedRenderLists getRenderLists() {
-        return this.renderLists;
+        // Iris: Return shadow or regular render lists based on current state
+        return net.irisshaders.iris.shadows.ShadowRenderingState.areShadowsCurrentlyBeingRendered() 
+            ? this.shadowRenderLists 
+            : this.renderLists;
     }
 
     public boolean isSectionBuilt(int x, int y, int z) {
