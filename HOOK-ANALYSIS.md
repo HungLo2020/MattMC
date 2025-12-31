@@ -6,8 +6,13 @@
 
 ### Mixin Conversion Status
 
-**Total Mixins:** 218 → **12 remaining** (206 removed)  
-**Conversion Progress:** 94.5% complete - **MILESTONE: 94% REACHED!** 🎉🎉🎉🎉🎉🎉🎉🎉🎉
+**Total Mixins:** 218 → **9 remaining** (209 removed)  
+**Conversion Progress:** 95.9% complete - **MILESTONE: 95% REACHED!** 🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉
+
+#### Removed Mixins (Session 49 - 3 mixins):
+234. ✅ `BlockRenderDispatcherMixin` (Sodium/FRAPI) - 1 @Inject + 1 @Redirect → Inlined Sodium FRAPI rendering into BlockRenderDispatcher.renderBreakingTexture() and renderSingleBlock()
+235. ✅ `MixinSodiumGameOptionPages` (Iris/Sodium) - 2 @Redirect + 1 @ModifyArg → Inlined Iris shadow distance, color space, and limited graphics options into SodiumGameOptionPages
+236. ✅ `MixinModelStorageTrigger` (Iris) - 4 @WrapOperation + 2 @WrapMethod → Inlined Iris model storage capture and render type wrapping into SubmitNodeCollection
 
 #### Removed Mixins (Session 48 - 3 mixins):
 231. ✅ `ModelBlockRendererMixin` (Sodium/FRAPI) - 1 @Overwrite → Inlined Sodium FRAPI rendering with SimpleBlockRenderContext into ModelBlockRenderer.renderModel()
@@ -18,12 +23,6 @@
 228. ✅ `VertexConsumerMixin` (Sodium) - 2 @Overwrite → Inlined Sodium MatrixHelper transforms into VertexConsumer.addVertex() and setNormal() to avoid Vector3f allocations
 229. ✅ `CloudRendererMixin` (Sodium) - 1 @Overwrite → Inlined Sodium optimized cloud meshing with direct memory access into CloudRenderer.buildMesh()
 230. ✅ `SpriteContentsInterpolationMixin` (Sodium) - 1 @Inject + 1 @Overwrite → Inlined Sodium optimized sprite interpolation with ColorMixer into SpriteContents.InterpolationData
-
-#### Removed Mixins (Session 46 - 4 mixins):
-224. ✅ `ModelPartMixin` (Sodium) - 1 @Overwrite → Inlined Sodium optimized transform with MatrixHelper.rotateZYX into ModelPart.translateAndRotate()
-225. ✅ `CubeMixin` (Sodium) - 1 @Redirect + 1 @Inject → Added ModelCuboid field and fast EntityRenderer.renderCuboid() in ModelPart.Cube.compile()
-226. ✅ `ItemRendererMixin` (Sodium) - 1 @WrapOperation → Inlined Sodium fast item quad rendering into ItemRenderer.renderQuadList()
-227. ✅ `BiomeMixin` (Sodium) - 1 @Inject + 2 @Overwrite → Inlined biome color caching with BiomeColorMaps into Biome.getGrassColor() and getFoliageColor()
 
 #### Removed Mixins (Session 45 - 5 mixins):
 219. ✅ `SpriteContentsMixin` (Sodium/mipmaps) - 1 @WrapOperation → Inlined transparent pixel color filling into SpriteContents constructor to fix black bleeding in mipmaps
