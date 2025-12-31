@@ -303,8 +303,13 @@ public class SpriteContents implements Stitcher.Entry, AutoCloseable, net.caffei
 	@Environment(EnvType.CLIENT)
 	public final class InterpolationData implements AutoCloseable {
 		private final NativeImage[] activeFrame = new NativeImage[SpriteContents.this.byMipLevel.length];
+		// Sodium: Parent reference for optimized interpolation (merged from SpriteContentsInterpolationMixin)
+		private SpriteContents parent;
+		private static final int STRIDE = 4;
 
 		InterpolationData() {
+			// Sodium: Assign parent (merged from SpriteContentsInterpolationMixin)
+			this.parent = SpriteContents.this;
 			for (int i = 0; i < this.activeFrame.length; i++) {
 				int j = SpriteContents.this.width >> i;
 				int k = SpriteContents.this.height >> i;
@@ -313,40 +318,65 @@ public class SpriteContents implements Stitcher.Entry, AutoCloseable, net.caffei
 		}
 
 		void uploadInterpolatedFrame(int i, int j, SpriteContents.Ticker ticker, GpuTexture gpuTexture) {
-			SpriteContents.AnimatedTexture animatedTexture = ticker.animationInfo;
-			List<SpriteContents.FrameInfo> list = animatedTexture.frames;
-			SpriteContents.FrameInfo frameInfo = (SpriteContents.FrameInfo)list.get(ticker.frame);
-			float f = (float)ticker.subFrame / frameInfo.time;
-			int k = frameInfo.index;
-			int l = ((SpriteContents.FrameInfo)list.get((ticker.frame + 1) % list.size())).index;
-			if (k != l) {
-				for (int m = 0; m < this.activeFrame.length; m++) {
-					int n = SpriteContents.this.width >> m;
-					int o = SpriteContents.this.height >> m;
+			// Sodium: Optimized interpolated frame upload (merged from SpriteContentsInterpolationMixin)
+			SpriteContents.AnimatedTexture animation = ticker.animationInfo;
+			SpriteContents.AnimatedTexture animation2 = ticker.animationInfo;
+			List<SpriteContents.FrameInfo> frames = animation.frames;
+			SpriteContents.FrameInfo animationFrame = (SpriteContents.FrameInfo) (Object) frames.get(ticker.frame);
 
-					for (int p = 0; p < o; p++) {
-						for (int q = 0; q < n; q++) {
-							int r = this.getPixel(animatedTexture, k, m, q, p);
-							int s = this.getPixel(animatedTexture, l, m, q, p);
-							this.activeFrame[m].setPixel(q, p, ARGB.lerp(f, r, s));
-						}
-					}
-				}
+			int curIndex = animationFrame.index();
+			int nextIndex = ((SpriteContents.FrameInfo) (Object) animation2.frames.get((ticker.frame + 1) % frames.size())).index();
 
-				SpriteContents.this.upload(i, j, 0, 0, this.activeFrame, gpuTexture);
-				if (SharedConstants.DEBUG_DUMP_INTERPOLATED_TEXTURE_FRAMES) {
-					try {
-						Path path = TextureUtil.getDebugTexturePath();
-						Path path2 = path.resolve(SpriteContents.this.name.toDebugFileName());
-						Files.createDirectories(path2);
+			if (curIndex == nextIndex) {
+				return;
+			}
 
-						for (int o = 0; o < this.activeFrame.length; o++) {
-							this.activeFrame[o].writeToFile(path2.resolve(SpriteContents.this.name.toDebugFileName() + "_" + o + "_" + k + "_" + l + ".png"));
-						}
-					} catch (IOException var18) {
+			// The mix factor between the current and next frame
+			float mix = 1.0F - (float) ticker.subFrame / (float) animationFrame.time();
+
+			for (int layer = 0; layer < this.activeFrame.length; layer++) {
+				int width = this.parent.width() >> layer;
+				int height = this.parent.height() >> layer;
+
+				int curX = ((curIndex % animation2.frameRowSize) * width);
+				int curY = ((curIndex / animation2.frameRowSize) * height);
+
+				int nextX = ((nextIndex % animation2.frameRowSize) * width);
+				int nextY = ((nextIndex / animation2.frameRowSize) * height);
+
+				NativeImage src = this.parent.byMipLevel[layer];
+				NativeImage dst = this.activeFrame[layer];
+
+				long ppSrcPixel = net.caffeinemc.mods.sodium.client.util.NativeImageHelper.getPointerRGBA(src);
+				long ppDstPixel = net.caffeinemc.mods.sodium.client.util.NativeImageHelper.getPointerRGBA(dst);
+
+				for (int layerY = 0; layerY < height; layerY++) {
+					// Pointers to the pixel array for the current and next frame
+					long pRgba1 = ppSrcPixel + (curX + (long) (curY + layerY) * src.getWidth()) * STRIDE;
+					long pRgba2 = ppSrcPixel + (nextX + (long) (nextY + layerY) * src.getWidth()) * STRIDE;
+
+					for (int layerX = 0; layerX < width; layerX++) {
+						int rgba1 = org.lwjgl.system.MemoryUtil.memGetInt(pRgba1);
+						int rgba2 = org.lwjgl.system.MemoryUtil.memGetInt(pRgba2);
+
+						// Mix the RGB components and truncate the A component
+						int mixedRgb = net.sodium.api.util.ColorMixer.mix(rgba1, rgba2, mix) & 0x00FFFFFF;
+
+						// Take the A component from the source pixel
+						int alpha = rgba1 & 0xFF000000;
+
+						// Update the pixel within the interpolated frame using the combined RGB and A components
+						org.lwjgl.system.MemoryUtil.memPutInt(ppDstPixel, mixedRgb | alpha);
+
+						pRgba1 += STRIDE;
+						pRgba2 += STRIDE;
+
+						ppDstPixel += STRIDE;
 					}
 				}
 			}
+
+			this.parent.upload(i, j, 0, 0, this.activeFrame, gpuTexture);
 		}
 
 		private int getPixel(SpriteContents.AnimatedTexture animatedTexture, int i, int j, int k, int l) {

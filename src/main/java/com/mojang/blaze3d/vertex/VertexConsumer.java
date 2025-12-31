@@ -7,6 +7,7 @@ import net.minecraft.api.Environment;
 import net.minecraft.client.renderer.LightTexture;
 import net.minecraft.client.renderer.block.model.BakedQuad;
 import net.minecraft.util.ARGB;
+import org.joml.Matrix3f;
 import org.joml.Matrix3x2f;
 import org.joml.Matrix4f;
 import org.joml.Vector2f;
@@ -116,8 +117,12 @@ public interface VertexConsumer {
 	}
 
 	default VertexConsumer addVertex(Matrix4f matrix4f, float f, float g, float h) {
-		Vector3f vector3f = matrix4f.transformPosition(f, g, h, new Vector3f());
-		return this.addVertex(vector3f.x(), vector3f.y(), vector3f.z());
+		// Sodium: Optimized to avoid Vector3f allocation (merged from VertexConsumerMixin)
+		float xt = net.sodium.api.math.MatrixHelper.transformPositionX(matrix4f, f, g, h);
+		float yt = net.sodium.api.math.MatrixHelper.transformPositionY(matrix4f, f, g, h);
+		float zt = net.sodium.api.math.MatrixHelper.transformPositionZ(matrix4f, f, g, h);
+
+		return this.addVertex(xt, yt, zt);
 	}
 
 	default VertexConsumer addVertexWith2DPose(Matrix3x2f matrix3x2f, float f, float g) {
@@ -126,8 +131,22 @@ public interface VertexConsumer {
 	}
 
 	default VertexConsumer setNormal(PoseStack.Pose pose, float f, float g, float h) {
-		Vector3f vector3f = pose.transformNormal(f, g, h, new Vector3f());
-		return this.setNormal(vector3f.x(), vector3f.y(), vector3f.z());
+		// Sodium: Optimized to avoid Vector3f allocation (merged from VertexConsumerMixin)
+		Matrix3f matrix = pose.normal();
+
+		float xt = net.sodium.api.math.MatrixHelper.transformNormalX(matrix, f, g, h);
+		float yt = net.sodium.api.math.MatrixHelper.transformNormalY(matrix, f, g, h);
+		float zt = net.sodium.api.math.MatrixHelper.transformNormalZ(matrix, f, g, h);
+
+		if (!pose.trustedNormals) {
+			float scalar = org.joml.Math.invsqrt(org.joml.Math.fma(xt, xt, org.joml.Math.fma(yt, yt, zt * zt)));
+
+			xt *= scalar;
+			yt *= scalar;
+			zt *= scalar;
+		}
+
+		return this.setNormal(xt, yt, zt);
 	}
 
 	default VertexConsumer setNormal(PoseStack.Pose pose, Vector3f vector3f) {
