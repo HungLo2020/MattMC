@@ -38,6 +38,11 @@ public class ModelFeatureRenderer {
 		this.renderBatch(bufferSource, outlineBufferSource, storage.opaqueModelSubmits, bufferSource2);
 		storage.translucentModelSubmits.sort(Comparator.comparingDouble(translucentModelSubmit -> -translucentModelSubmit.position().lengthSquared()));
 		this.renderTranslucents(bufferSource, outlineBufferSource, storage.translucentModelSubmits, bufferSource2);
+		
+		// Iris: Clear rendering state (from MixinModelFeatureRenderer)
+		net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setCurrentRenderedItem(0);
+		net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setCurrentEntity(0);
+		net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setCurrentBlockEntity(0);
 	}
 
 	private void renderTranslucents(
@@ -47,6 +52,9 @@ public class ModelFeatureRenderer {
 		MultiBufferSource.BufferSource bufferSource2
 	) {
 		for (SubmitNodeStorage.TranslucentModelSubmit<?> translucentModelSubmit : list) {
+			// Iris: Set model storage state (from MixinModelFeatureRenderer)
+			((net.irisshaders.iris.mixinterface.ModelStorage) (Object) translucentModelSubmit.modelSubmit()).iris$set();
+			
 			this.renderModel(
 				translucentModelSubmit.modelSubmit(),
 				translucentModelSubmit.renderType(),
@@ -76,6 +84,9 @@ public class ModelFeatureRenderer {
 			VertexConsumer vertexConsumer = bufferSource.getBuffer((RenderType)entry.getKey());
 
 			for (SubmitNodeStorage.ModelSubmit<?> modelSubmit : (List<SubmitNodeStorage.ModelSubmit<?>>)entry.getValue()) {
+				// Iris: Set model storage state (from MixinModelFeatureRenderer)
+				((net.irisshaders.iris.mixinterface.ModelStorage) (Object) modelSubmit).iris$set();
+				
 				this.renderModel(modelSubmit, (RenderType)entry.getKey(), vertexConsumer, outlineBufferSource, bufferSource2);
 			}
 		}

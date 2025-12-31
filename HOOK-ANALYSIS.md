@@ -6,8 +6,14 @@
 
 ### Mixin Conversion Status
 
-**Total Mixins:** 218 → **97 remaining** (121 removed)  
-**Conversion Progress:** 55.5% complete - **SURPASSED 55%!** 🎉
+**Total Mixins:** 218 → **93 remaining** (125 removed)  
+**Conversion Progress:** 57.3% complete - **APPROACHING 60%!** 🎉
+
+#### Removed Mixins (Session 27 - 4 mixins):
+150. ✅ `ItemStackStateLayerMixin` - INJECT (HEAD + TAIL) + @Unique fields → Inlined item context setup/clear into ItemStackRenderState.LayerRenderState.submit() with helper method
+151. ✅ `MixinTextFeatureRenderer` - Multiple INJECT → Inlined model storage set/clear and BE tracking into TextFeatureRenderer.render()
+152. ✅ `MixinModelFeatureRenderer` - Multiple INJECT → Inlined model storage set calls into ModelFeatureRenderer.renderBatch() and renderTranslucents(), clear in render()
+153. ✅ `MixinGlyphRenderType` - @WrapMethod → Inlined block entity render type wrapping into GlyphRenderTypes.select()
 
 #### Removed Mixins (Session 26 - 5 mixins):
 145. ✅ `MixinCapeLayer` - HEAD + RETURN injects → Inlined cape item context set/clear into CapeLayer.submit()
