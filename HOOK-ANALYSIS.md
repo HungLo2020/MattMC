@@ -6,8 +6,15 @@
 
 ### Mixin Conversion Status
 
-**Total Mixins:** 218 → **55 remaining** (163 removed)  
-**Conversion Progress:** 74.8% complete - **MILESTONE: 74% REACHED!** 🎉🎉🎉🎉🎉
+**Total Mixins:** 218 → **50 remaining** (168 removed)  
+**Conversion Progress:** 77.1% complete - **MILESTONE: 77% REACHED!** 🎉🎉🎉🎉🎉
+
+#### Removed Mixins (Session 37 - 5 mixins):
+192. ✅ `MixinRenderRegionArenas` (Iris) - @Redirect → Inlined extended vertex format into RenderRegion.DeviceResources constructor
+193. ✅ `MixinRenderRegionManager` (Iris) - @Redirect → Inlined forceClearAllBatches into RenderRegionManager.uploadResults
+194. ✅ `MixinDefaultChunkRenderer` (Iris) - @Redirect + @ModifyArg → Inlined shadow pass optimizations (disable face culling, no shared index buffer)
+195. ✅ `MixinChunkVertex` (Iris) - Interface implementation + @Inject → ChunkVertexEncoder.Vertex implements ChunkVertexExtension with all extension fields/methods
+196. ✅ `MixinRenderSectionManager` (Iris) - 2 @ModifyArg + @Redirect → Inlined extended vertex format and fog occlusion disable into RenderSectionManager
 
 #### Removed Mixins (Session 36 - 5 mixins):
 187. ✅ `SpriteContentsTickerMixin` (Sodium) - 3 @Inject (init/HEAD/TAIL) → Inlined on-demand texture animation into SpriteContents.Ticker constructor and tickAndUpload()

@@ -121,10 +121,12 @@ public class RenderSectionManager {
     public RenderSectionManager(ClientLevel level, int renderDistance, SortBehavior sortBehavior, CommandList commandList) {
         this.meshTaskSizeEstimator = new MeshTaskSizeEstimator(level);
 
-        this.chunkRenderer = new DefaultChunkRenderer(RenderDevice.INSTANCE, ChunkMeshFormats.COMPACT);
+        // Iris: From MixinRenderSectionManager - use extended vertex format
+        this.chunkRenderer = new DefaultChunkRenderer(RenderDevice.INSTANCE, net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings.INSTANCE.getVertexFormat());
 
         this.level = level;
-        this.builder = new ChunkBuilder(level, ChunkMeshFormats.COMPACT);
+        // Iris: From MixinRenderSectionManager - use extended vertex format for builder
+        this.builder = new ChunkBuilder(level, net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings.INSTANCE.getVertexFormat());
 
         this.renderDistance = renderDistance;
         this.sortBehavior = sortBehavior;
@@ -219,7 +221,12 @@ public class RenderSectionManager {
     private float getSearchDistance(FogParameters fogParameters) {
         float distance;
 
-        if (SodiumClientMod.options().performance.useFogOcclusion) {
+        // Iris: From MixinRenderSectionManager - disable fog occlusion when shader pack is loaded
+        boolean useFogOcclusion = net.irisshaders.iris.Iris.getCurrentPack().isPresent() 
+            ? false 
+            : SodiumClientMod.options().performance.useFogOcclusion;
+
+        if (useFogOcclusion) {
             distance = this.getEffectiveRenderDistance(fogParameters);
         } else {
             distance = this.getRenderDistance();
