@@ -87,7 +87,12 @@ public class LightTexture implements AutoCloseable {
 
 	private float calculateDarknessScale(LivingEntity livingEntity, float f, float g) {
 		float h = 0.45F * f;
-		return Math.max(0.0F, Mth.cos((livingEntity.tickCount - g) * (float) Math.PI * 0.025F) * h);
+		float result = Math.max(0.0F, Mth.cos((livingEntity.tickCount - g) * (float) Math.PI * 0.025F) * h);
+		
+		// Iris: Store darkness value after calculation
+		net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setDarknessLightFactor((float) (result * this.minecraft.options.darknessEffectScale().get()));
+		
+		return result;
 	}
 
 	public void updateLightTexture(float f) {
@@ -97,6 +102,9 @@ public class LightTexture implements AutoCloseable {
 			profilerFiller.push("lightTex");
 			ClientLevel clientLevel = this.minecraft.level;
 			if (clientLevel != null) {
+				// Iris: Reset darkness value before calculating
+				net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setDarknessLightFactor(0.0F);
+				
 				float g = clientLevel.getSkyDarken(1.0F);
 				float i;
 				Vector3f vector3f;

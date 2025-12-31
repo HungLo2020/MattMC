@@ -32,6 +32,8 @@ public class RenderSection {
 
     private int incomingDirections;
     private int lastVisibleFrame = -1;
+    // Iris: Shadow rendering tracking
+    private int lastVisibleFrameShadow;
 
     private int adjacentMask;
     public RenderSection
@@ -294,10 +296,19 @@ public class RenderSection {
     }
 
     public void setLastVisibleFrame(int frame) {
-        this.lastVisibleFrame = frame;
+        // Iris: Track shadow frames separately
+        if (net.irisshaders.iris.shadows.ShadowRenderingState.areShadowsCurrentlyBeingRendered()) {
+            this.lastVisibleFrameShadow = frame;
+        } else {
+            this.lastVisibleFrame = frame;
+        }
     }
 
     public int getLastVisibleFrame() {
+        // Iris: Return shadow frame when rendering shadows
+        if (net.irisshaders.iris.shadows.ShadowRenderingState.areShadowsCurrentlyBeingRendered()) {
+            return this.lastVisibleFrameShadow;
+        }
         return this.lastVisibleFrame;
     }
 

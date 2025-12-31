@@ -6,8 +6,13 @@
 
 ### Mixin Conversion Status
 
-**Total Mixins:** 218 → **105 remaining** (113 removed)  
-**Conversion Progress:** 51.8% complete - **OVER HALFWAY!** 🎉
+**Total Mixins:** 218 → **102 remaining** (116 removed)  
+**Conversion Progress:** 53.2% complete - **OVER HALFWAY!** 🎉
+
+#### Removed Mixins (Session 25 - 3 mixins):
+142. ✅ `MixinEntityRenderer` - Empty mixin (unused fields only) → Deleted entirely
+143. ✅ `MixinLightTexture` - Two INVOKE + RETURN injects → Inlined darkness reset/store into LightTexture methods
+144. ✅ `MixinRenderSection` - Two HEAD cancellable injects → Added shadow frame tracking to RenderSection.setLastVisibleFrame() and getLastVisibleFrame()
 
 #### Removed Mixins (Session 24 - 7 conversions, 5 files):
 135. ✅ `MixinOptions_CloudsOverride` - HEAD inject → Inlined cloud status override into Options.getCloudsType()
