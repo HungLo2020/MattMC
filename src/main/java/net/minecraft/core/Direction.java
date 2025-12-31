@@ -309,19 +309,50 @@ public enum Direction implements StringRepresentable {
 		return getApproximateNearest((float)d, (float)e, (float)f);
 	}
 
-	public static Direction getApproximateNearest(float f, float g, float h) {
-		Direction direction = NORTH;
-		float i = Float.MIN_VALUE;
+	public static Direction getApproximateNearest(float x, float y, float z) {
+		// Sodium: Optimized implementation to avoid looping over all directions
+		// Performance improvement: 10.4% → 1.5% in SheetedDecalTextureGenerator
+		// (from DirectionMixin)
+		
+		// Vanilla quirk: return NORTH if all coordinates are zero
+		if (x == 0 && y == 0 && z == 0)
+			return Direction.NORTH;
 
-		for (Direction direction2 : VALUES) {
-			float j = f * direction2.normal.getX() + g * direction2.normal.getY() + h * direction2.normal.getZ();
-			if (j > i) {
-				i = j;
-				direction = direction2;
+		// First choice in ties: negative, positive; Y, Z, X
+		var yM = Math.abs(y);
+		var zM = Math.abs(z);
+		var xM = Math.abs(x);
+
+		if (yM >= zM) {
+			if (yM >= xM) {
+				// Y biggest
+				if (y <= 0) {
+					return Direction.DOWN;
+				} else /* y > 0 */ {
+					return Direction.UP;
+				}
+			} else /* zM <= yM < xM */ {
+				// X biggest, fall through
+			}
+		} else /* yM < zM */ {
+			if (zM >= xM) {
+				// Z biggest
+				if (z <= 0) {
+					return Direction.NORTH;
+				} else /* z > 0 */ {
+					return Direction.SOUTH;
+				}
+			} else /* yM < zM < xM */ {
+				// X biggest, fall through
 			}
 		}
 
-		return direction;
+		// X biggest
+		if (x <= 0) {
+			return Direction.WEST;
+		} else /* x > 0 */ {
+			return Direction.EAST;
+		}
 	}
 
 	public static Direction getApproximateNearest(Vec3 vec3) {
