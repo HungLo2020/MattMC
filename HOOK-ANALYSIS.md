@@ -6,8 +6,19 @@
 
 ### Mixin Conversion Status
 
-**Total Mixins:** 218 → **69 remaining** (149 removed)  
-**Conversion Progress:** 68.3% complete - **MILESTONE: 68% REACHED!** 🎉🎉🎉🎉🎉
+**Total Mixins:** 218 → **60 remaining** (158 removed)  
+**Conversion Progress:** 72.5% complete - **MILESTONE: 72% REACHED!** 🎉🎉🎉🎉🎉
+
+#### Removed Mixins (Session 35 - 9 mixins):
+178. ✅ `MixinGlStateManager_FramebufferBinding` (Iris) - 3 @Inject (HEAD cancellable) → Inlined program/viewport state tracking and texture validation into GlStateManager
+179. ✅ `MixinGlStateManager_DepthColorOverride` (Iris) - 2 @Inject + 1 @Redirect → Inlined depth/color mask locking and tessellation support into GlStateManager
+180. ✅ `MixinLevelRenderer_SkipRendering` (Iris) - 3 @WrapWithCondition + @WrapOperation → Inlined skip rendering checks into LevelRenderer.renderLevel() and iris$renderTerrainGroup()
+181. ✅ `MixinAbstractTexture` (Iris) - Interface implementation + @Inject → AbstractTexture implements AbstractTextureExtended with texture tracking in getTexture()
+182. ✅ `MixinSpriteContents` (Iris) - Interface implementation + @Redirect + @Inject → SpriteContents implements SpriteContentsExtension with custom mipmap generation and ticker tracking
+183. ✅ `MixinBlockEntityRenderDispatcher` (Iris) - 2 @Inject (AFTER/RETURN) → Inlined block entity render tracking into BlockEntityRenderDispatcher.submit()
+184. ✅ `MixinEntityRenderDispatcher` (Iris) - 2 @Inject (AFTER/INVOKE) → Inlined entity render tracking with entity ID mapping into EntityRenderDispatcher.submit()
+185. ✅ `MixinChunkMapCommon` (DH) - Deleted (not a real mixin, just helper class without @Mixin annotation)
+186. ✅ `ExampleMixin` (DH) - Deleted (example template file, not a real mixin)
 
 #### Removed Mixins (Session 34 - 3 mixins):
 175. ✅ `MixinStationaryItemParticle` (Iris) - 2 @Inject (RETURN/HEAD) → Inlined particle opacity tracking into BlockMarker constructor and getLayer()
