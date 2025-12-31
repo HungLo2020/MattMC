@@ -6,8 +6,16 @@
 
 ### Mixin Conversion Status
 
-**Total Mixins:** 218 → **93 remaining** (125 removed)  
-**Conversion Progress:** 57.3% complete - **APPROACHING 60%!** 🎉
+**Total Mixins:** 218 → **87 remaining** (131 removed)  
+**Conversion Progress:** 60.1% complete - **MILESTONE: 60% REACHED!** 🎉🎉
+
+#### Removed Mixins (Session 28 - 6 mixins):
+154. ✅ `MixinSodiumRenderer` (DH) - Dead code (completely commented out, not registered in config) → Deleted file
+155. ✅ `ItemLayerRenderStateMixin` - Interface implementation (FabricLayerRenderState, AccessLayerRenderState) → Inlined into ItemStackRenderState.LayerRenderState with mutableMesh field
+156. ✅ `MixinVideoSettingsScreen` - @ModifyArg → Inlined shader pack button addition into VideoSettingsScreen.options() method
+157. ✅ `MixinTheEndPortalRenderer` - Two HEAD injects → Inlined render type override and submit cancellation into AbstractEndPortalRenderer
+158. ✅ `TextureAtlasSpriteMixin` - Interface implementation (TextureAtlasSpriteExtension) + @WrapOperation → Inlined into TextureAtlasSprite with hasUnknownImageContents tracking
+159. ✅ `SpriteContentsMixin` (scan) - Interface implementation (SpriteContentsExtension) + @WrapOperation → Inlined transparency scanning into SpriteContents constructor
 
 #### Removed Mixins (Session 27 - 4 mixins):
 150. ✅ `ItemStackStateLayerMixin` - INJECT (HEAD + TAIL) + @Unique fields → Inlined item context setup/clear into ItemStackRenderState.LayerRenderState.submit() with helper method
