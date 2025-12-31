@@ -2,6 +2,9 @@ package net.minecraft.client.renderer.entity.layers;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import java.util.function.Function;
+import net.irisshaders.iris.shaderpack.materialmap.NamespacedId;
+import net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings;
+import net.irisshaders.iris.uniforms.CapturedRenderingState;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.client.model.EntityModel;
@@ -10,7 +13,9 @@ import net.minecraft.client.renderer.entity.RenderLayerParent;
 import net.minecraft.client.renderer.entity.state.LivingEntityRenderState;
 import net.minecraft.client.resources.model.EquipmentClientInfo;
 import net.minecraft.core.component.DataComponents;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceKey;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.equipment.EquipmentAsset;
 import net.minecraft.world.item.equipment.Equippable;
@@ -59,6 +64,13 @@ public class SimpleEquipmentLayer<S extends LivingEntityRenderState, RM extends 
 		Equippable equippable = (Equippable)itemStack.get(DataComponents.EQUIPPABLE);
 		if (equippable != null && !equippable.assetId().isEmpty()) {
 			EM entityModel = livingEntityRenderState.isBaby ? this.babyModel : this.adultModel;
+			
+			// Iris: Set item context
+			if (WorldRenderingSettings.INSTANCE.getItemIds() != null) {
+				ResourceLocation location = BuiltInRegistries.ITEM.getKey(itemStack.getItem());
+				CapturedRenderingState.INSTANCE.setCurrentRenderedItem(WorldRenderingSettings.INSTANCE.getItemIds().applyAsInt(new NamespacedId(location.getNamespace(), location.getPath())));
+			}
+			
 			this.equipmentRenderer
 				.renderLayers(
 					this.layer,
@@ -73,6 +85,9 @@ public class SimpleEquipmentLayer<S extends LivingEntityRenderState, RM extends 
 					livingEntityRenderState.outlineColor,
 					this.order
 				);
+			
+			// Iris: Clear item context
+			CapturedRenderingState.INSTANCE.setCurrentRenderedItem(0);
 		}
 	}
 }

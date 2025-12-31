@@ -35,7 +35,7 @@ import org.joml.Vector4f;
 import org.lwjgl.system.MemoryStack;
 
 @Environment(EnvType.CLIENT)
-public class FogRenderer implements AutoCloseable {
+public class FogRenderer implements AutoCloseable, net.caffeinemc.mods.sodium.client.util.FogStorage {
 	public static final int FOG_UBO_SIZE = new Std140SizeCalculator().putVec4().putFloat().putFloat().putFloat().putFloat().putFloat().putFloat().get();
 	private static final List<FogEnvironment> FOG_ENVIRONMENTS = Lists.<FogEnvironment>newArrayList(
 		new LavaFogEnvironment(),
@@ -49,6 +49,8 @@ public class FogRenderer implements AutoCloseable {
 	private static boolean fogEnabled = true;
 	private final GpuBuffer emptyBuffer;
 	private final MappableRingBuffer regularBuffer;
+	// Sodium: FogStorage interface implementation (from FogRendererMixin)
+	private net.caffeinemc.mods.sodium.client.util.FogParameters parameters = net.caffeinemc.mods.sodium.client.util.FogParameters.NONE;
 
 	public FogRenderer() {
 		GpuDevice gpuDevice = RenderSystem.getDevice();
@@ -161,6 +163,26 @@ public class FogRenderer implements AutoCloseable {
 	}
 
 	public Vector4f setupFog(Camera camera, int i, boolean bl, DeltaTracker deltaTracker, float f, ClientLevel clientLevel) {
+		// Iris: Setup legacy water fog density
+		if (camera.getFluidInCamera() == net.minecraft.world.level.material.FogType.WATER) {
+			net.minecraft.world.entity.Entity entity2 = camera.getEntity();
+			
+			float density = 0.05F;
+			
+			if (entity2 instanceof net.minecraft.client.player.LocalPlayer localPlayer) {
+				density -= localPlayer.getWaterVision() * localPlayer.getWaterVision() * 0.03F;
+				net.minecraft.core.Holder<net.minecraft.world.level.biome.Biome> biome = localPlayer.level().getBiome(localPlayer.blockPosition());
+				
+				if (biome.is(net.minecraft.tags.BiomeTags.HAS_CLOSER_WATER_FOG)) {
+					density += 0.005F;
+				}
+			}
+			
+			net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setFogDensity(density);
+		} else {
+			net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setFogDensity(-1.0F);
+		}
+		
 		float g = deltaTracker.getGameTimeDeltaPartialTick(false);
 		Vector4f vector4f = this.computeFogColor(camera, g, clientLevel, i, f, bl);
 		float h = i * 16;
@@ -178,6 +200,17 @@ public class FogRenderer implements AutoCloseable {
 		float j = Mth.clamp(h / 10.0F, 4.0F, 64.0F);
 		fogData.renderDistanceStart = h - j;
 		fogData.renderDistanceEnd = h;
+		
+		// DH: Cancel fog if configured
+		if (shouldCancelDhFog(camera, entity)) {
+			final float A_REALLY_REALLY_BIG_VALUE = 420694206942069.F;
+			final float A_EVEN_LARGER_VALUE = 42069420694206942069.F;
+			
+			fogData.environmentalStart = A_REALLY_REALLY_BIG_VALUE;
+			fogData.environmentalEnd = A_EVEN_LARGER_VALUE;
+			fogData.renderDistanceStart = A_REALLY_REALLY_BIG_VALUE;
+			fogData.renderDistanceEnd = A_EVEN_LARGER_VALUE;
+		}
 
 		// Call hooks to allow mods to intercept fog parameters
 		for (net.minecraft.hooks.FogRenderHooks hook : net.minecraft.hooks.HookRegistry.getFogRenderHooks()) {
@@ -196,7 +229,12 @@ public class FogRenderer implements AutoCloseable {
 				fogData.skyEnd,
 				fogData.cloudEnd
 			);
+			// Sodium: Store fog parameters (from FogRendererMixin)
+			parameters = new net.caffeinemc.mods.sodium.client.util.FogParameters(vector4f.x, vector4f.y, vector4f.z, vector4f.w, fogData.environmentalStart, fogData.environmentalEnd, fogData.renderDistanceStart, fogData.renderDistanceEnd);
 		}
+		
+		// Iris: Capture fog color
+		net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setFogColor(vector4f.x, vector4f.y, vector4f.z);
 
 		return vector4f;
 	}
@@ -213,6 +251,29 @@ public class FogRenderer implements AutoCloseable {
 	private void updateBuffer(ByteBuffer byteBuffer, int i, Vector4f vector4f, float f, float g, float h, float j, float k, float l) {
 		byteBuffer.position(i);
 		Std140Builder.intoBuffer(byteBuffer).putVec4(vector4f).putFloat(f).putFloat(g).putFloat(h).putFloat(j).putFloat(k).putFloat(l);
+	}
+	
+	// DH: Helper method to determine if vanilla fog should be cancelled
+	private static boolean shouldCancelDhFog(Camera camera, Entity entity) {
+		FogType fogType = camera.getFluidInCamera();
+		boolean cameraNotInFluid = fogType == FogType.NONE;
+		
+		boolean isSpecialFog = (entity instanceof net.minecraft.world.entity.LivingEntity) 
+			&& ((net.minecraft.world.entity.LivingEntity) entity).hasEffect(net.minecraft.world.effect.MobEffects.BLINDNESS);
+		
+		boolean cancelFog = !isSpecialFog;
+		cancelFog = cancelFog && cameraNotInFluid;
+		cancelFog = cancelFog && !com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector.INSTANCE.get(
+			com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftRenderWrapper.class).isFogStateSpecial();
+		cancelFog = cancelFog && !com.seibel.distanthorizons.core.config.Config.Client.Advanced.Graphics.Fog.enableVanillaFog.get();
+		
+		return cancelFog;
+	}
+	
+	// Sodium: FogStorage interface method (from FogRendererMixin)
+	@Override
+	public net.caffeinemc.mods.sodium.client.util.FogParameters sodium$getFogParameters() {
+		return parameters;
 	}
 
 	@Environment(EnvType.CLIENT)

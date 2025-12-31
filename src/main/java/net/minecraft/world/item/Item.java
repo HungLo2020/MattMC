@@ -86,7 +86,7 @@ import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 
-public class Item implements FeatureElement, ItemLike {
+public class Item implements FeatureElement, ItemLike, net.iris.api.v0.item.IrisItemLightProvider {
 	public static final Codec<Holder<Item>> CODEC = BuiltInRegistries.ITEM
 		.holderByNameCodec()
 		.validate(holder -> holder.is(Items.AIR.builtInRegistryHolder()) ? DataResult.error(() -> "Item must not be minecraft:air") : DataResult.success(holder));

@@ -33,8 +33,9 @@ public class VideoSettingsScreen extends OptionsSubScreen {
 	private final GpuWarnlistManager gpuWarnlistManager;
 	private final int oldMipmaps;
 
-	private static OptionInstance<?>[] options(Options options) {
-		return new OptionInstance[]{
+	private OptionInstance<?>[] options(Options options) {
+		// Iris: Add shader pack selection button (from MixinVideoSettingsScreen)
+		OptionInstance<?>[] baseOptions = new OptionInstance[]{
 			options.graphicsMode(),
 			options.renderDistance(),
 			options.prioritizeChunkUpdates(),
@@ -62,6 +63,13 @@ public class VideoSettingsScreen extends OptionsSubScreen {
 			options.bobView(),
 			options.cloudRange()
 		};
+		
+		// Add Iris shader pack button and render distance option
+		OptionInstance<?>[] extendedOptions = new OptionInstance[baseOptions.length + 2];
+		System.arraycopy(baseOptions, 0, extendedOptions, 0, baseOptions.length);
+		extendedOptions[extendedOptions.length - 2] = new OptionInstance<>("options.iris.shaderPackSelection", OptionInstance.cachedConstantTooltip(net.minecraft.network.chat.Component.empty()), (arg, object) -> net.minecraft.network.chat.Component.empty(), OptionInstance.BOOLEAN_VALUES, true, (parent) -> this.minecraft.setScreen(new net.irisshaders.iris.gui.screen.ShaderPackScreen(this)));
+		extendedOptions[extendedOptions.length - 1] = net.irisshaders.iris.gui.option.IrisVideoSettings.RENDER_DISTANCE;
+		return extendedOptions;
 	}
 
 	public VideoSettingsScreen(Screen screen, Minecraft minecraft, Options options) {
@@ -119,7 +127,7 @@ public class VideoSettingsScreen extends OptionsSubScreen {
 		);
 		this.list.addBig(optionInstance);
 		this.list.addBig(this.options.biomeBlendRadius());
-		this.list.addSmall(options(this.options));
+		this.list.addSmall(this.options(this.options));
 	}
 
 	@Override

@@ -44,7 +44,12 @@ public class GlCommandEncoder implements CommandEncoder {
 	private RenderPipeline lastPipeline;
 	private boolean inRenderPass;
 	@Nullable
-	private GlProgram lastProgram;
+	public GlProgram lastProgram; // Made public for Sodium shader rendering integration
+	
+	// Iris: From MixinGlCommandEncoder - Shadow rendering state and program tracking
+	private int iris$tempFBO;
+	private java.util.List<net.irisshaders.iris.pipeline.programs.IrisProgram> iris$programsToClear = new java.util.ArrayList<>();
+	private static GlRenderPass iris$lastPass;
 
 	protected GlCommandEncoder(GlDevice glDevice) {
 		this.device = glDevice;
@@ -92,7 +97,14 @@ public class GlCommandEncoder implements CommandEncoder {
 				this.inRenderPass = true;
 				this.device.debugLabels().pushDebugGroup(supplier);
 				int i = ((GlTexture)gpuTextureView.texture()).getFbo(this.device.directStateAccess(), gpuTextureView2 == null ? null : gpuTextureView2.texture());
-				GlStateManager._glBindFramebuffer(36160, i);
+				
+				// Iris: From MixinGlCommandEncoder - Do not change framebuffer in shadow pass or safe multiply state
+				if (net.irisshaders.iris.shadows.ShadowRenderingState.areShadowsCurrentlyBeingRendered() || net.irisshaders.iris.vertices.ImmediateState.safeToMultiply) {
+					this.iris$tempFBO = i;
+				} else {
+					GlStateManager._glBindFramebuffer(36160, i);
+				}
+				
 				int j = 0;
 				if (optionalInt.isPresent()) {
 					int k = optionalInt.getAsInt();
@@ -112,7 +124,11 @@ public class GlCommandEncoder implements CommandEncoder {
 					GlStateManager._clear(j);
 				}
 
-				GlStateManager._viewport(0, 0, gpuTextureView.getWidth(0), gpuTextureView.getHeight(0));
+				// Iris: From MixinGlCommandEncoder - Do not change viewport in shadow pass
+				if (!net.irisshaders.iris.shadows.ShadowRenderingState.areShadowsCurrentlyBeingRendered()) {
+					GlStateManager._viewport(0, 0, gpuTextureView.getWidth(0), gpuTextureView.getHeight(0));
+				}
+				
 				this.lastPipeline = null;
 				return new GlRenderPass(this, gpuTextureView2 != null);
 			}
@@ -235,7 +251,8 @@ public class GlCommandEncoder implements CommandEncoder {
 
 	@Override
 	public void writeToBuffer(GpuBufferSlice gpuBufferSlice, ByteBuffer byteBuffer) {
-		if (this.inRenderPass) {
+		// Iris: From MixinGlCommandEncoder - Ignore render pass check if temporarilyIgnorePass is true
+		if (!net.irisshaders.iris.vertices.ImmediateState.temporarilyIgnorePass && this.inRenderPass) {
 			throw new IllegalStateException("Close the existing render pass before performing additional commands");
 		} else {
 			GlBuffer glBuffer = (GlBuffer)gpuBufferSlice.buffer();
@@ -378,7 +395,8 @@ public class GlCommandEncoder implements CommandEncoder {
 
 	@Override
 	public void writeToTexture(GpuTexture gpuTexture, NativeImage nativeImage, int i, int j, int k, int l, int m, int n, int o, int p) {
-		if (this.inRenderPass) {
+		// Iris: From MixinGlCommandEncoder - Ignore render pass check if temporarilyIgnorePass is true
+		if (!net.irisshaders.iris.vertices.ImmediateState.temporarilyIgnorePass && this.inRenderPass) {
 			throw new IllegalStateException("Close the existing render pass before performing additional commands");
 		} else if (i >= 0 && i < gpuTexture.getMipLevels()) {
 			if (o + m > nativeImage.getWidth() || p + n > nativeImage.getHeight()) {
@@ -429,7 +447,8 @@ public class GlCommandEncoder implements CommandEncoder {
 
 	@Override
 	public void writeToTexture(GpuTexture gpuTexture, ByteBuffer byteBuffer, NativeImage.Format format, int i, int j, int k, int l, int m, int n) {
-		if (this.inRenderPass) {
+		// Iris: From MixinGlCommandEncoder - Ignore render pass check if temporarilyIgnorePass is true
+		if (!net.irisshaders.iris.vertices.ImmediateState.temporarilyIgnorePass && this.inRenderPass) {
 			throw new IllegalStateException("Close the existing render pass before performing additional commands");
 		} else if (i >= 0 && i < gpuTexture.getMipLevels()) {
 			if (m * n * format.components() > byteBuffer.remaining()) {
@@ -762,6 +781,70 @@ public class GlCommandEncoder implements CommandEncoder {
 	}
 
 	private boolean trySetup(GlRenderPass glRenderPass, Collection<String> collection) {
+		// Iris: From MixinGlCommandEncoder - Unlock depth color and handle custom passes
+		net.irisshaders.iris.gl.blending.DepthColorStorage.unlockDepthColor();
+		
+		if (net.irisshaders.iris.vertices.ImmediateState.safeToMultiply && !(glRenderPass.pipeline.program() instanceof net.irisshaders.iris.pipeline.programs.ExtendedShader)) {
+			GlStateManager._glBindFramebuffer(org.lwjgl.opengl.GL46C.GL_FRAMEBUFFER, iris$tempFBO);
+		}
+		
+		iris$lastPass = glRenderPass;
+		
+		// Handle Iris custom pass
+		if (glRenderPass.iris$getCustomPass() != null) {
+			this.lastProgram = null;
+			
+			((net.irisshaders.iris.mixinterface.CustomPass)glRenderPass.iris$getCustomPass()).setupState();
+			
+			RenderPipeline renderPipeline = glRenderPass.pipeline.info();
+			
+			if (glRenderPass.isScissorEnabled()) {
+				GlStateManager._enableScissorTest();
+				GlStateManager._scissorBox(glRenderPass.getScissorX(), glRenderPass.getScissorY(), glRenderPass.getScissorWidth(), glRenderPass.getScissorHeight());
+			} else {
+				GlStateManager._disableScissorTest();
+			}
+			
+			if (this.lastPipeline != renderPipeline) {
+				this.lastPipeline = renderPipeline;
+				
+				if (renderPipeline.getDepthTestFunction() != DepthTestFunction.NO_DEPTH_TEST) {
+					GlStateManager._enableDepthTest();
+					GlStateManager._depthFunc(GlConst.toGl(renderPipeline.getDepthTestFunction()));
+				} else {
+					GlStateManager._disableDepthTest();
+				}
+				
+				if (renderPipeline.isCull()) {
+					GlStateManager._enableCull();
+				} else {
+					GlStateManager._disableCull();
+				}
+				
+				GlStateManager._polygonMode(1032, GlConst.toGl(renderPipeline.getPolygonMode()));
+				GlStateManager._depthMask(renderPipeline.isWriteDepth());
+				GlStateManager._colorMask(renderPipeline.isWriteColor(), renderPipeline.isWriteColor(), renderPipeline.isWriteColor(), renderPipeline.isWriteAlpha());
+				
+				if (renderPipeline.getDepthBiasConstant() == 0.0F && renderPipeline.getDepthBiasScaleFactor() == 0.0F) {
+					GlStateManager._disablePolygonOffset();
+				} else {
+					GlStateManager._polygonOffset(renderPipeline.getDepthBiasScaleFactor(), renderPipeline.getDepthBiasConstant());
+					GlStateManager._enablePolygonOffset();
+				}
+				
+				switch (renderPipeline.getColorLogic()) {
+					case NONE:
+						GlStateManager._disableColorLogicOp();
+						break;
+					case OR_REVERSE:
+						GlStateManager._enableColorLogicOp();
+						GlStateManager._logicOp(5387);
+				}
+			}
+			
+			return true;
+		}
+		
 		if (GlRenderPass.VALIDATION) {
 			if (glRenderPass.pipeline == null) {
 				throw new IllegalStateException("Can't draw without a render pipeline");
@@ -897,10 +980,20 @@ public class GlCommandEncoder implements CommandEncoder {
 			GlStateManager._disableScissorTest();
 		}
 
+		// Iris: From MixinGlCommandEncoder - Setup IrisProgram state if needed
+		if (glRenderPass.pipeline.program() instanceof net.irisshaders.iris.pipeline.programs.IrisProgram is && !is.iris$isSetUp()) {
+			GpuTextureView sam = glRenderPass.samplers.get("Sampler0");
+			if (sam != null) {
+				RenderSystem.setShaderTexture(0, sam);
+			}
+			is.iris$setupState();
+			iris$programsToClear.add(is);
+		}
+
 		return true;
 	}
 
-	private void applyPipelineState(RenderPipeline renderPipeline) {
+	public void applyPipelineState(RenderPipeline renderPipeline) { // Made public for Sodium shader rendering integration
 		if (this.lastPipeline != renderPipeline) {
 			this.lastPipeline = renderPipeline;
 			if (renderPipeline.getDepthTestFunction() != DepthTestFunction.NO_DEPTH_TEST) {
@@ -951,8 +1044,17 @@ public class GlCommandEncoder implements CommandEncoder {
 	}
 
 	public void finishRenderPass() {
+		// Iris: From MixinGlCommandEncoder - Clear IrisProgram state and unbind framebuffer conditionally
+		iris$programsToClear.forEach(net.irisshaders.iris.pipeline.programs.IrisProgram::iris$clearState);
+		iris$programsToClear.clear();
+		
 		this.inRenderPass = false;
-		GlStateManager._glBindFramebuffer(36160, 0);
+		
+		// Don't unbind framebuffer if in safe multiply state
+		if (!net.irisshaders.iris.vertices.ImmediateState.safeToMultiply) {
+			GlStateManager._glBindFramebuffer(36160, 0);
+		}
+		
 		this.device.debugLabels().popDebugGroup();
 	}
 

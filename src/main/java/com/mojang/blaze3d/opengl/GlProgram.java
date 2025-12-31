@@ -20,7 +20,7 @@ import org.lwjgl.opengl.GL31;
 import org.slf4j.Logger;
 
 @Environment(EnvType.CLIENT)
-public class GlProgram implements AutoCloseable {
+public class GlProgram implements AutoCloseable, net.irisshaders.iris.mixinterface.ShaderInstanceInterface {
 	private static final Logger LOGGER = LogUtils.getLogger();
 	public static Set<String> BUILT_IN_UNIFORMS = Sets.<String>newHashSet("Projection", "Lighting", "Fog", "Globals");
 	public static GlProgram INVALID_PROGRAM = new GlProgram(-1, "invalid");
@@ -33,6 +33,16 @@ public class GlProgram implements AutoCloseable {
 	public final Map<String, Uniform> uniformsByName = new HashMap();
 	private final int programId;
 	private final String debugLabel;
+	
+	// Iris: Merged from MixinCompiledShaderProgram
+	private static final com.google.common.collect.ImmutableSet<String> ATTRIBUTE_LIST = com.google.common.collect.ImmutableSet.of("Position", "Color", "Normal", "UV0", "UV1", "UV2");
+	private static GlProgram lastAppliedShader;
+	private java.lang.invoke.MethodHandle shouldSkip;
+	
+	static {
+		net.irisshaders.iris.compat.SkipList.shouldSkipList.put(net.irisshaders.iris.pipeline.programs.ExtendedShader.class, net.irisshaders.iris.compat.SkipList.NONE);
+		net.irisshaders.iris.compat.SkipList.shouldSkipList.put(net.irisshaders.iris.pipeline.programs.FallbackShader.class, net.irisshaders.iris.compat.SkipList.NONE);
+	}
 
 	public GlProgram(int i, String string) {
 		this.programId = i;
@@ -79,7 +89,13 @@ public class GlProgram implements AutoCloseable {
 
 			Uniform uniform = switch (uniformDescription.type()) {
 				case UNIFORM_BUFFER -> {
-					int k = GL31.glGetUniformBlockIndex(this.programId, string);
+					// Iris: Change uniform block index for IrisProgram (merged from MixinCompiledShaderProgram)
+					int k;
+					if (this instanceof net.irisshaders.iris.pipeline.programs.IrisProgram is) {
+						k = is.iris$getBlockIndex(this.programId, string);
+					} else {
+						k = GL31.glGetUniformBlockIndex(this.programId, string);
+					}
 					if (k == -1) {
 						yield null;
 					} else {
@@ -91,7 +107,10 @@ public class GlProgram implements AutoCloseable {
 				case TEXEL_BUFFER -> {
 					int k = GlStateManager._glGetUniformLocation(this.programId, string);
 					if (k == -1) {
-						LOGGER.warn("{} shader program does not use utb {} defined in the pipeline. This might be a bug.", this.debugLabel, string);
+						// Iris: Silence warnings for known shaders (merged from MixinCompiledShaderProgram)
+						if (!isKnownShader()) {
+							LOGGER.warn("{} shader program does not use utb {} defined in the pipeline. This might be a bug.", this.debugLabel, string);
+						}
 						yield null;
 					} else {
 						int l = j++;
@@ -108,7 +127,10 @@ public class GlProgram implements AutoCloseable {
 		for (String string2 : list2) {
 			int m = GlStateManager._glGetUniformLocation(this.programId, string2);
 			if (m == -1) {
-				LOGGER.warn("{} shader program does not use sampler {} defined in the pipeline. This might be a bug.", this.debugLabel, string2);
+				// Iris: Silence warnings for known shaders (merged from MixinCompiledShaderProgram)
+				if (!isKnownShader()) {
+					LOGGER.warn("{} shader program does not use sampler {} defined in the pipeline. This might be a bug.", this.debugLabel, string2);
+				}
 			} else {
 				int n = j++;
 				this.uniformsByName.put(string2, new Uniform.Sampler(m, n));
@@ -157,5 +179,44 @@ public class GlProgram implements AutoCloseable {
 
 	public Map<String, Uniform> getUniforms() {
 		return this.uniformsByName;
+	}
+	
+	// Iris: Merged from MixinCompiledShaderProgram
+	@Override
+	public void setShouldSkip(java.lang.invoke.MethodHandle s) {
+		shouldSkip = s;
+	}
+	
+	public boolean iris$shouldSkipThis() {
+		if (net.irisshaders.iris.Iris.getIrisConfig().shouldAllowUnknownShaders()) {
+			if (net.irisshaders.iris.shadows.ShadowRenderer.ACTIVE) return true;
+
+			if (!shouldOverrideShaders()) return false;
+
+			if (shouldSkip == net.irisshaders.iris.compat.SkipList.NONE) return false;
+			if (shouldSkip == net.irisshaders.iris.compat.SkipList.ALWAYS) return true;
+
+			try {
+				return (boolean) shouldSkip.invoke(this);
+			} catch (Throwable e) {
+				throw new RuntimeException(e);
+			}
+		} else {
+			return !(this instanceof net.irisshaders.iris.pipeline.programs.ExtendedShader || this instanceof net.irisshaders.iris.pipeline.programs.FallbackShader || !shouldOverrideShaders());
+		}
+	}
+	
+	private static boolean shouldOverrideShaders() {
+		net.irisshaders.iris.pipeline.WorldRenderingPipeline pipeline = net.irisshaders.iris.Iris.getPipelineManager().getPipelineNullable();
+
+		if (pipeline instanceof net.irisshaders.iris.pipeline.ShaderRenderingPipeline) {
+			return ((net.irisshaders.iris.pipeline.ShaderRenderingPipeline) pipeline).shouldOverrideShaders();
+		} else {
+			return false;
+		}
+	}
+	
+	private boolean isKnownShader() {
+		return this instanceof net.irisshaders.iris.pipeline.programs.ExtendedShader || this instanceof net.irisshaders.iris.pipeline.programs.FallbackShader;
 	}
 }

@@ -170,6 +170,18 @@ public class EnderDragonRenderer extends EntityRenderer<EnderDragon, EnderDragon
 	public static void submitCrystalBeams(float f, float g, float h, float i, PoseStack poseStack, SubmitNodeCollector submitNodeCollector, int j) {
 		float k = Mth.sqrt(f * f + h * h);
 		float l = Mth.sqrt(f * f + g * g + h * h);
+		
+		// Iris: Set entity ID for crystal beam rendering (from MixinEnderDragonRenderer)
+		int iris$previousEntity = 0;
+		if (net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings.INSTANCE.getEntityIds() != null) {
+			iris$previousEntity = net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.getCurrentRenderedEntity();
+			net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setCurrentEntity(
+				net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings.INSTANCE.getEntityIds().applyAsInt(
+					new net.irisshaders.iris.shaderpack.materialmap.NamespacedId("minecraft", "end_crystal_beam")
+				)
+			);
+		}
+		
 		poseStack.pushPose();
 		poseStack.translate(0.0F, 2.0F, 0.0F);
 		poseStack.mulPose(Axis.YP.rotation((float)(-Math.atan2(h, f)) - (float) (Math.PI / 2)));
@@ -210,6 +222,11 @@ public class EnderDragonRenderer extends EntityRenderer<EnderDragon, EnderDragon
 			}
 		);
 		poseStack.popPose();
+		
+		// Iris: Restore previous entity ID (from MixinEnderDragonRenderer)
+		if (iris$previousEntity != 0) {
+			net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setCurrentEntity(iris$previousEntity);
+		}
 	}
 
 	public EnderDragonRenderState createRenderState() {

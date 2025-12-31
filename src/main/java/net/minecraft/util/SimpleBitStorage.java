@@ -1,10 +1,14 @@
 package net.minecraft.util;
 
 import java.util.function.IntConsumer;
+import net.caffeinemc.mods.sodium.client.world.BitStorageExtension;
+import net.minecraft.world.level.chunk.Palette;
 import org.apache.commons.lang3.Validate;
 import org.jetbrains.annotations.Nullable;
 
-public class SimpleBitStorage implements BitStorage {
+import java.util.Objects;
+
+public class SimpleBitStorage implements BitStorage, BitStorageExtension {
 	private static final int[] MAGIC = new int[]{
 		-1,
 		-1,
@@ -360,6 +364,26 @@ public class SimpleBitStorage implements BitStorage {
 	@Override
 	public BitStorage copy() {
 		return new SimpleBitStorage(this.bits, this.size, (long[])this.data.clone());
+	}
+
+	// Sodium BitStorageExtension implementation
+	@Override
+	public <T> void sodium$unpack(T[] out, Palette<T> palette) {
+		int idx = 0;
+
+		for (long word : this.data) {
+			long l = word;
+
+			for (int j = 0; j < this.valuesPerLong; ++j) {
+				out[idx] = Objects.requireNonNull(palette.valueFor((int) (l & this.mask)),
+						"Palette does not contain entry for value in storage");
+				l >>= this.bits;
+
+				if (++idx >= this.size) {
+					return;
+				}
+			}
+		}
 	}
 
 	public static class InitializationException extends RuntimeException {

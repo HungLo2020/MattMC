@@ -4,6 +4,10 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Function;
+import net.irisshaders.iris.helpers.EntityState;
+import net.irisshaders.iris.shaderpack.materialmap.NamespacedId;
+import net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings;
+import net.irisshaders.iris.uniforms.CapturedRenderingState;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.Util;
@@ -17,6 +21,7 @@ import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.client.resources.model.EquipmentAssetManager;
 import net.minecraft.client.resources.model.EquipmentClientInfo;
 import net.minecraft.core.component.DataComponents;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.ARGB;
@@ -76,6 +81,15 @@ public class EquipmentLayerRenderer {
 			for (EquipmentClientInfo.Layer layer : list) {
 				int n = getColorForLayer(layer, l);
 				if (n != 0) {
+					// Iris: Set item context before rendering
+					if (layer.usePlayerTexture() && WorldRenderingSettings.INSTANCE.getItemIds() != null) {
+						ResourceLocation location = itemStack.get(DataComponents.ITEM_MODEL);
+						if (location == null) {
+							location = BuiltInRegistries.ITEM.getKey(itemStack.getItem());
+						}
+						CapturedRenderingState.INSTANCE.setCurrentRenderedItem(WorldRenderingSettings.INSTANCE.getItemIds().applyAsInt(new NamespacedId(location.getNamespace(), location.getPath())));
+					}
+					
 					ResourceLocation resourceLocation2 = layer.usePlayerTexture() && resourceLocation != null
 						? resourceLocation
 						: (ResourceLocation)this.layerTextureLookup.apply(new EquipmentLayerRenderer.LayerTextureKey(layerType, layer));
@@ -91,11 +105,22 @@ public class EquipmentLayerRenderer {
 
 			ArmorTrim armorTrim = (ArmorTrim)itemStack.get(DataComponents.TRIM);
 			if (armorTrim != null) {
+				// Iris: Set trim item context
+				if (WorldRenderingSettings.INSTANCE.getItemIds() != null) {
+					EntityState.interposeItemId(WorldRenderingSettings.INSTANCE.getItemIds().applyAsInt(new NamespacedId("minecraft", "trim_" + armorTrim.material().value().assets().base().suffix())));
+				}
+				
 				TextureAtlasSprite textureAtlasSprite = (TextureAtlasSprite)this.trimSpriteLookup
 					.apply(new EquipmentLayerRenderer.TrimSpriteKey(armorTrim, layerType, resourceKey));
 				RenderType renderType = Sheets.armorTrimsSheet(((TrimPattern)armorTrim.pattern().value()).decal());
 				submitNodeCollector.order(m++).submitModel(model, object, poseStack, renderType, i, OverlayTexture.NO_OVERLAY, -1, textureAtlasSprite, j, null);
+				
+				// Iris: Restore item context after trim
+				EntityState.restoreItemId();
 			}
+			
+			// Iris: Clear item context at end
+			CapturedRenderingState.INSTANCE.setCurrentRenderedItem(0);
 		}
 	}
 

@@ -87,6 +87,14 @@ public final class Window implements AutoCloseable {
 		this.windowedWidth = this.width = Math.max(displayData.width(), 1);
 		this.windowedHeight = this.height = Math.max(displayData.height(), 1);
 		GLFW.glfwDefaultWindowHints();
+		
+		// Iris: Enable OpenGL debug context if debug options are enabled
+		if (net.irisshaders.iris.Iris.getIrisConfig().areDebugOptionsEnabled()) {
+			GLFW.glfwWindowHint(GLFW.GLFW_OPENGL_DEBUG_CONTEXT, GLFW.GLFW_TRUE);
+			GLFW.glfwWindowHint(GLFW.GLFW_CONTEXT_NO_ERROR, GLFW.GLFW_FALSE);
+			net.irisshaders.iris.Iris.logger.info("OpenGL debug context activated.");
+		}
+		
 		GLFW.glfwWindowHint(139265, 196609);
 		GLFW.glfwWindowHint(139275, 221185);
 		GLFW.glfwWindowHint(139266, 3);
@@ -99,7 +107,14 @@ public final class Window implements AutoCloseable {
 			hook.onBeforeWindowCreate();
 		}
 		
-		this.handle = GLFW.glfwCreateWindow(this.width, this.height, string2, this.fullscreen && monitor != null ? monitor.getMonitor() : 0L, 0L);
+		// Sodium: Apply NVIDIA workarounds (from WindowMixin)
+		net.sodium.client.compatibility.workarounds.nvidia.NvidiaWorkarounds.applyEnvironmentChanges();
+		try {
+			this.handle = GLFW.glfwCreateWindow(this.width, this.height, string2, this.fullscreen && monitor != null ? monitor.getMonitor() : 0L, 0L);
+		} finally {
+			net.sodium.client.compatibility.workarounds.nvidia.NvidiaWorkarounds.undoEnvironmentChanges();
+		}
+		
 		if (monitor != null) {
 			VideoMode videoMode = monitor.getPreferredVidMode(this.fullscreen ? this.preferredFullscreenVideoMode : Optional.empty());
 			this.windowedX = this.x = monitor.getX() + videoMode.getWidth() / 2 - this.width / 2;

@@ -29,9 +29,14 @@ import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix4f;
 import org.joml.Quaternionf;
+// Sodium FRAPI imports
+import net.caffeinemc.mods.sodium.client.render.frapi.render.MeshItemCommand;
+import net.caffeinemc.mods.sodium.client.render.frapi.render.OrderedSubmitNodeCollectorExtension;
+import net.caffeinemc.mods.sodium.client.render.frapi.render.SubmitNodeCollectionExtension;
+import net.fabricmc.fabric.api.renderer.v1.mesh.MeshView;
 
 @Environment(EnvType.CLIENT)
-public class SubmitNodeCollection implements OrderedSubmitNodeCollector {
+public class SubmitNodeCollection implements OrderedSubmitNodeCollector, OrderedSubmitNodeCollectorExtension, SubmitNodeCollectionExtension {
 	private final List<SubmitNodeStorage.ShadowSubmit> shadowSubmits = new ArrayList();
 	private final List<SubmitNodeStorage.FlameSubmit> flameSubmits = new ArrayList();
 	private final NameTagFeatureRenderer.Storage nameTagSubmits = new NameTagFeatureRenderer.Storage();
@@ -48,6 +53,8 @@ public class SubmitNodeCollection implements OrderedSubmitNodeCollector {
 	private final CustomFeatureRenderer.Storage customGeometrySubmits = new CustomFeatureRenderer.Storage();
 	private final SubmitNodeStorage submitNodeStorage;
 	private boolean wasUsed = false;
+	// Sodium FRAPI: Mesh item commands for fabric rendering API
+	private final List<MeshItemCommand> meshItemCommands = new ArrayList<>();
 
 	public SubmitNodeCollection(SubmitNodeStorage submitNodeStorage) {
 		this.submitNodeStorage = submitNodeStorage;
@@ -79,7 +86,10 @@ public class SubmitNodeCollection implements OrderedSubmitNodeCollector {
 		PoseStack poseStack, float f, float g, FormattedCharSequence formattedCharSequence, boolean bl, Font.DisplayMode displayMode, int i, int j, int k, int l
 	) {
 		this.wasUsed = true;
-		this.textSubmits.add(new SubmitNodeStorage.TextSubmit(new Matrix4f(poseStack.last().pose()), f, g, formattedCharSequence, bl, displayMode, i, j, k, l));
+		SubmitNodeStorage.TextSubmit textSubmit = new SubmitNodeStorage.TextSubmit(new Matrix4f(poseStack.last().pose()), f, g, formattedCharSequence, bl, displayMode, i, j, k, l);
+		// Iris: Capture model storage (merged from MixinModelStorageTrigger)
+		((net.irisshaders.iris.mixinterface.ModelStorage) textSubmit).iris$capture();
+		this.textSubmits.add(textSubmit);
 	}
 
 	@Override
@@ -107,10 +117,17 @@ public class SubmitNodeCollection implements OrderedSubmitNodeCollector {
 		int l,
 		@Nullable ModelFeatureRenderer.CrumblingOverlay crumblingOverlay
 	) {
+		// Iris: Change render type if rendering block entities (merged from MixinModelStorageTrigger)
+		if (net.irisshaders.iris.vertices.ImmediateState.isRenderingBEs) {
+			renderType = net.irisshaders.iris.layer.OuterWrappedRenderType.wrapExactlyOnce("iris:block_entity", renderType, net.irisshaders.iris.layer.BlockEntityRenderStateShard.INSTANCE);
+		}
+		
 		this.wasUsed = true;
 		SubmitNodeStorage.ModelSubmit<S> modelSubmit = new SubmitNodeStorage.ModelSubmit<>(
 			poseStack.last().copy(), model, object, i, j, k, textureAtlasSprite, l, crumblingOverlay
 		);
+		// Iris: Capture model storage (merged from MixinModelStorageTrigger)
+		((net.irisshaders.iris.mixinterface.ModelStorage) (Object) modelSubmit).iris$capture();
 		this.modelSubmits.add(renderType, modelSubmit);
 	}
 
@@ -129,8 +146,10 @@ public class SubmitNodeCollection implements OrderedSubmitNodeCollector {
 		int l
 	) {
 		this.wasUsed = true;
-		this.modelPartSubmits
-			.add(renderType, new SubmitNodeStorage.ModelPartSubmit(poseStack.last().copy(), modelPart, i, j, textureAtlasSprite, bl, bl2, k, crumblingOverlay, l));
+		SubmitNodeStorage.ModelPartSubmit modelPartSubmit = new SubmitNodeStorage.ModelPartSubmit(poseStack.last().copy(), modelPart, i, j, textureAtlasSprite, bl, bl2, k, crumblingOverlay, l);
+		// Iris: Capture model storage (merged from MixinModelStorageTrigger)
+		((net.irisshaders.iris.mixinterface.ModelStorage) (Object) modelPartSubmit).iris$capture();
+		this.modelPartSubmits.add(renderType, modelPartSubmit);
 	}
 
 	@Override
@@ -166,11 +185,19 @@ public class SubmitNodeCollection implements OrderedSubmitNodeCollector {
 		ItemStackRenderState.FoilType foilType
 	) {
 		this.wasUsed = true;
-		this.itemSubmits.add(new SubmitNodeStorage.ItemSubmit(poseStack.last().copy(), itemDisplayContext, i, j, k, is, list, renderType, foilType));
+		SubmitNodeStorage.ItemSubmit itemSubmit = new SubmitNodeStorage.ItemSubmit(poseStack.last().copy(), itemDisplayContext, i, j, k, is, list, renderType, foilType);
+		// Iris: Capture model storage (merged from MixinModelStorageTrigger)
+		((net.irisshaders.iris.mixinterface.ModelStorage) itemSubmit).iris$capture();
+		this.itemSubmits.add(itemSubmit);
 	}
 
 	@Override
 	public void submitCustomGeometry(PoseStack poseStack, RenderType renderType, SubmitNodeCollector.CustomGeometryRenderer customGeometryRenderer) {
+		// Iris: Change render type if rendering block entities (merged from MixinModelStorageTrigger)
+		if (net.irisshaders.iris.vertices.ImmediateState.isRenderingBEs) {
+			renderType = net.irisshaders.iris.layer.OuterWrappedRenderType.wrapExactlyOnce("iris:block_entity", renderType, net.irisshaders.iris.layer.BlockEntityRenderStateShard.INSTANCE);
+		}
+		
 		this.wasUsed = true;
 		this.customGeometrySubmits.add(poseStack, renderType, customGeometryRenderer);
 	}
@@ -256,6 +283,24 @@ public class SubmitNodeCollection implements OrderedSubmitNodeCollector {
 		this.modelSubmits.clear();
 		this.customGeometrySubmits.clear();
 		this.modelPartSubmits.clear();
+		// Sodium FRAPI: Clear mesh item commands
+		this.meshItemCommands.clear();
+	}
+	
+	// Sodium FRAPI: OrderedSubmitNodeCollectorExtension implementation
+	@Override
+	public void fabric_submitItem(PoseStack matrices, ItemDisplayContext displayContext, int light, int overlay, 
+			int outlineColors, int[] tintLayers, List<BakedQuad> quads, RenderType renderLayer, 
+			ItemStackRenderState.FoilType foilType, MeshView mesh) {
+		this.wasUsed = true;
+		this.meshItemCommands.add(new MeshItemCommand(matrices.last().copy(), displayContext, light, overlay, 
+			outlineColors, tintLayers, quads, renderLayer, foilType, mesh));
+	}
+	
+	// Sodium FRAPI: SubmitNodeCollectionExtension implementation
+	@Override
+	public List<MeshItemCommand> sodium_getMeshItemCommands() {
+		return this.meshItemCommands;
 	}
 
 	public void endFrame() {

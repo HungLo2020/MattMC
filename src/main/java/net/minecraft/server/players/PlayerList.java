@@ -189,6 +189,25 @@ public abstract class PlayerList {
 			new ClientboundUpdateRecipesPacket(recipeManager.getSynchronizedItemProperties(), recipeManager.getSynchronizedStonecutterRecipes())
 		);
 		this.sendPlayerPermissionLevel(serverPlayer);
+		
+		// DH/Fabric: Fire ServerPlayConnectionEvents.JOIN event
+		try {
+			net.fabricmc.fabric.api.networking.v1.PacketSender sender = new net.fabricmc.fabric.api.networking.v1.PacketSender() {
+				@Override
+				public void sendPacket(net.minecraft.network.protocol.common.custom.CustomPacketPayload payload) {
+					// Minimal implementation - DH doesn't use packet sending in event handlers
+				}
+				
+				@Override
+				public void sendPacket(net.minecraft.resources.ResourceLocation channel, net.minecraft.network.FriendlyByteBuf buf) {
+					// Minimal implementation - DH doesn't use packet sending in event handlers
+				}
+			};
+			net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents.JOIN.invoker().onPlayReady(serverPlayer, sender, this.server);
+		} catch (Exception e) {
+			// Ignore - event handlers should not break player join
+		}
+		
 		serverPlayer.getStats().markAllDirty();
 		serverPlayer.getRecipeBook().sendInitialRecipeBook(serverPlayer);
 		this.updateEntireScoreboard(serverLevel.getScoreboard(), serverPlayer);

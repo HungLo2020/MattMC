@@ -100,7 +100,7 @@ import org.joml.Vector4f;
 import org.slf4j.Logger;
 
 @Environment(EnvType.CLIENT)
-public class GameRenderer implements Projector, AutoCloseable {
+public class GameRenderer implements Projector, AutoCloseable, net.caffeinemc.mods.sodium.client.util.FogStorage {
 	private static final ResourceLocation BLUR_POST_CHAIN_ID = ResourceLocation.withDefaultNamespace("blur");
 	public static final int MAX_BLUR_RADIUS = 10;
 	private static final Logger LOGGER = LogUtils.getLogger();
@@ -116,6 +116,8 @@ public class GameRenderer implements Projector, AutoCloseable {
 	private final RenderBuffers renderBuffers;
 	private float spinningEffectTime;
 	private float spinningEffectSpeed;
+	// Iris: Merged from MixinModelViewBobbing
+	private boolean areShadersOn;
 	private float fovModifier;
 	private float oldFovModifier;
 	private float darkenWorldAmount;
@@ -126,10 +128,10 @@ public class GameRenderer implements Projector, AutoCloseable {
 	private long lastActiveTime = Util.getMillis();
 	private final LightTexture lightTexture;
 	private final OverlayTexture overlayTexture = new OverlayTexture();
-	private boolean panoramicMode;
+	public boolean panoramicMode; // Made public for Iris shader integration
 	protected CubeMap cubeMap;
 	protected PanoramaRenderer panorama;
-	private final CrossFrameResourcePool resourcePool = new CrossFrameResourcePool(3);
+	public final CrossFrameResourcePool resourcePool = new CrossFrameResourcePool(3); // Made public for Iris shader integration
 	private final FogRenderer fogRenderer = new FogRenderer();
 	private final GuiRenderer guiRenderer;
 	private final GuiRenderState guiRenderState;
@@ -180,6 +182,12 @@ public class GameRenderer implements Projector, AutoCloseable {
 				new GuiProfilerChartRenderer(bufferSource)
 			)
 		);
+		
+		// Iris: From MixinGameRenderer - log hardware information
+		net.irisshaders.iris.Iris.logger.info("Hardware information:");
+		net.irisshaders.iris.Iris.logger.info("CPU: " + com.mojang.blaze3d.platform.GLX._getCpuInfo());
+		net.irisshaders.iris.Iris.logger.info("GPU: " + com.mojang.blaze3d.systems.RenderSystem.getDevice().getRenderer() + " (Supports OpenGL " + com.mojang.blaze3d.systems.RenderSystem.getDevice().getVersion() + ")");
+		net.irisshaders.iris.Iris.logger.info("OS: " + System.getProperty("os.name") + " (" + System.getProperty("os.version") + ")");
 		this.screenEffectRenderer = new ScreenEffectRenderer(minecraft, atlasManager, bufferSource);
 		this.cubeMap = this.createCubeMap(minecraft.options.panoramaTheme().get());
 		this.panorama = new PanoramaRenderer(this.cubeMap);
@@ -485,7 +493,7 @@ public class GameRenderer implements Projector, AutoCloseable {
 		}
 	}
 
-	private void bobHurt(PoseStack poseStack, float f) {
+	public void bobHurt(PoseStack poseStack, float f) { // Made public for Iris hand rendering
 		if (this.minecraft.getCameraEntity() instanceof LivingEntity livingEntity) {
 			float g = livingEntity.hurtTime - f;
 			if (livingEntity.isDeadOrDying()) {
@@ -507,7 +515,7 @@ public class GameRenderer implements Projector, AutoCloseable {
 		}
 	}
 
-	private void bobView(PoseStack poseStack, float f) {
+	public void bobView(PoseStack poseStack, float f) { // Made public for Iris hand rendering
 		if (this.minecraft.getCameraEntity() instanceof AbstractClientPlayer abstractClientPlayer) {
 			ClientAvatarState clientAvatarState = abstractClientPlayer.avatarState();
 			float g = clientAvatarState.getBackwardsInterpolatedWalkDistance(f);
@@ -537,14 +545,17 @@ public class GameRenderer implements Projector, AutoCloseable {
 				&& !this.minecraft.options.hideGui
 				&& this.minecraft.gameMode.getPlayerMode() != GameType.SPECTATOR) {
 				this.lightTexture.turnOnLightLayer();
-				this.itemInHandRenderer
-					.renderHandsWithItems(
-						f,
-						poseStack,
-						this.minecraft.gameRenderer.getSubmitNodeStorage(),
-						this.minecraft.player,
-						this.minecraft.getEntityRenderDispatcher().getPackedLightCoords(this.minecraft.player, f)
-					);
+				// Iris: From MixinGameRenderer - disable vanilla hand rendering when shaders are active
+				if (!net.irisshaders.iris.Iris.isPackInUseQuick()) {
+					this.itemInHandRenderer
+						.renderHandsWithItems(
+							f,
+							poseStack,
+							this.minecraft.gameRenderer.getSubmitNodeStorage(),
+							this.minecraft.player,
+							this.minecraft.getEntityRenderDispatcher().getPackedLightCoords(this.minecraft.player, f)
+						);
+				}
 				this.lightTexture.turnOffLightLayer();
 			}
 
@@ -566,10 +577,19 @@ public class GameRenderer implements Projector, AutoCloseable {
 
 	public static float getNightVisionScale(LivingEntity livingEntity, float f) {
 		MobEffectInstance mobEffectInstance = livingEntity.getEffect(MobEffects.NIGHT_VISION);
+		// Iris: Origins compatibility - allow getNightVisionScale even if entity doesn't have night vision
+		if (mobEffectInstance == null) {
+			return 0.0F;
+		}
 		return !mobEffectInstance.endsWithin(200) ? 1.0F : 0.7F + Mth.sin((mobEffectInstance.getDuration() - f) * (float) Math.PI * 0.2F) * 0.3F;
 	}
 
 	public void render(DeltaTracker deltaTracker, boolean bl) {
+		// Iris: From MixinGameRenderer - set real tick delta and begin frame timers
+		net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setRealTickDelta(deltaTracker.getGameTimeDeltaPartialTick(true));
+		net.irisshaders.iris.uniforms.SystemTimeUniforms.COUNTER.beginFrame();
+		net.irisshaders.iris.uniforms.SystemTimeUniforms.TIMER.beginFrame(net.minecraft.Util.getNanos());
+		
 		if (!this.minecraft.isWindowActive()
 			&& this.minecraft.options.pauseOnLostFocus
 			&& (!this.minecraft.options.touchscreen().get() || !this.minecraft.mouseHandler.isRightPressed())) {
@@ -581,6 +601,13 @@ public class GameRenderer implements Projector, AutoCloseable {
 		}
 
 		if (!this.minecraft.noRender) {
+			// Iris: From MixinGameRenderer - modify blur for shader pack screen
+			int blurRadius = this.minecraft.options.getMenuBackgroundBlurriness();
+			if (this.minecraft.screen instanceof net.irisshaders.iris.gui.screen.ShaderPackScreen sps) {
+				float f = Math.min(this.minecraft.options.getMenuBackgroundBlurriness(), sps.blurTransition.getAsFloat());
+				blurRadius = (int) f;
+			}
+			
 			this.globalSettingsUniform
 				.update(
 					this.minecraft.getWindow().getWidth(),
@@ -588,7 +615,7 @@ public class GameRenderer implements Projector, AutoCloseable {
 					this.minecraft.options.glintStrength().get(),
 					this.minecraft.level == null ? 0L : this.minecraft.level.getGameTime(),
 					deltaTracker,
-					this.minecraft.options.getMenuBackgroundBlurriness()
+					blurRadius
 				);
 			ProfilerFiller profilerFiller = Profiler.get();
 			boolean bl2 = this.minecraft.isGameLoadFinished();
@@ -763,7 +790,7 @@ public class GameRenderer implements Projector, AutoCloseable {
 		}
 	}
 
-	private boolean shouldRenderBlockOutline() {
+	public boolean shouldRenderBlockOutline() { // Made public for Iris shader integration
 		if (!this.renderBlockOutline) {
 			return false;
 		} else {
@@ -790,6 +817,9 @@ public class GameRenderer implements Projector, AutoCloseable {
 	}
 
 	public void renderLevel(DeltaTracker deltaTracker) {
+		// Iris: Save shaders state (merged from MixinModelViewBobbing)
+		areShadersOn = net.irisshaders.iris.Iris.isPackInUseQuick();
+		
 		float f = deltaTracker.getGameTimeDeltaPartialTick(true);
 		LocalPlayer localPlayer = this.minecraft.player;
 		this.lightTexture.updateLightTexture(f);
@@ -811,13 +841,24 @@ public class GameRenderer implements Projector, AutoCloseable {
 		float h = this.getFov(this.mainCamera, f, true);
 		Matrix4f matrix4f = this.getProjectionMatrix(h);
 		PoseStack poseStack = new PoseStack();
+		
+		// Iris: Separate view bobbing for shaders (merged from MixinModelViewBobbing)
+		if (areShadersOn) {
+			poseStack.pushPose();
+			poseStack.last().pose().identity();
+		}
+		
 		this.bobHurt(poseStack, this.mainCamera.getPartialTickTime());
 		if (this.minecraft.options.bobView().get()) {
-			this.bobView(poseStack, this.mainCamera.getPartialTickTime());
+			// Iris: Skip bobView when shaders are active (merged from MixinModelViewBobbing)
+			if (!areShadersOn) {
+				this.bobView(poseStack, this.mainCamera.getPartialTickTime());
+			}
 		}
 
 		matrix4f.mul(poseStack.last().pose());
-		float i = this.minecraft.options.screenEffectScale().get().floatValue();
+		// Iris: Disable screen effect scale when shaders are on (merged from MixinModelViewBobbing)
+		float i = areShadersOn ? 0.0f : this.minecraft.options.screenEffectScale().get().floatValue();
 		float j = Mth.lerp(f, localPlayer.oPortalEffectIntensity, localPlayer.portalEffectIntensity);
 		float k = localPlayer.getEffectBlendFactor(MobEffects.NAUSEA, f);
 		float l = Math.max(j, k) * (i * i);
@@ -833,7 +874,40 @@ public class GameRenderer implements Projector, AutoCloseable {
 
 		RenderSystem.setProjectionMatrix(this.levelProjectionMatrixBuffer.getBuffer(matrix4f), ProjectionType.PERSPECTIVE);
 		Quaternionf quaternionf = this.mainCamera.rotation().conjugate(new Quaternionf());
-		Matrix4f matrix4f2 = new Matrix4f().rotation(quaternionf);
+		Matrix4f matrix4f2 = new Matrix4f();
+		
+		// Iris: Apply bobbing to model view when shaders are on (merged from MixinModelViewBobbing)
+		if (areShadersOn) {
+			PoseStack stack = new PoseStack();
+			stack.last().pose().set(matrix4f2);
+
+			float tickDelta = this.mainCamera.getPartialTickTime();
+
+			this.bobHurt(stack, tickDelta);
+			if (this.minecraft.options.bobView().get()) {
+				this.bobView(stack, tickDelta);
+			}
+
+			matrix4f2.set(stack.last().pose());
+
+			float i2 = this.minecraft.options.screenEffectScale().get().floatValue();
+			float j2 = Mth.lerp(f, localPlayer.oPortalEffectIntensity, localPlayer.portalEffectIntensity);
+			float k2 = localPlayer.getEffectBlendFactor(MobEffects.NAUSEA, f);
+			float l2 = Math.max(j2, k2) * i2 * i2;
+			if (l2 > 0.0F) {
+				float m2 = 5.0F / (l2 * l2 + 5.0F) - l2 * 0.04F;
+				m2 *= m2;
+				Vector3f vector3f2 = new Vector3f(0.0F, Mth.SQRT_OF_TWO / 2.0F, Mth.SQRT_OF_TWO / 2.0F);
+				float n2 = (this.spinningEffectTime + f * this.spinningEffectSpeed) * ((float)Math.PI / 180F);
+				matrix4f2.rotate(n2, vector3f2);
+				matrix4f2.scale(1.0F / m2, 1.0F, 1.0F);
+				matrix4f2.rotate(-n2, vector3f2);
+			}
+
+			matrix4f2.rotate(quaternionf);
+		} else {
+			matrix4f2.rotation(quaternionf);
+		}
 		profilerFiller.popPush("fog");
 		boolean bl2 = this.minecraft.level.effects().isFoggyAt(this.mainCamera.getBlockPosition().getX(), this.mainCamera.getBlockPosition().getZ())
 			|| this.minecraft.gui.getBossOverlay().shouldCreateWorldFog();
@@ -867,6 +941,9 @@ public class GameRenderer implements Projector, AutoCloseable {
 			&& !this.minecraft.options.hideGui) {
 			this.minecraft.getDebugOverlay().render3dCrosshair(this.mainCamera);
 		}
+		
+		// Iris: From MixinGameRenderer - finalize game rendering for color space conversion
+		net.irisshaders.iris.Iris.getPipelineManager().getPipeline().ifPresent(net.irisshaders.iris.pipeline.WorldRenderingPipeline::finalizeGameRendering);
 	}
 
 	private void extractCamera(float f) {
@@ -957,5 +1034,11 @@ public class GameRenderer implements Projector, AutoCloseable {
 
 	public synchronized PanoramaRenderer getPanorama() {
 		return this.panorama;
+	}
+
+	@Override
+	public net.caffeinemc.mods.sodium.client.util.FogParameters sodium$getFogParameters() {
+		// Use the hook-based fog parameter storage instead of mixin
+		return net.caffeinemc.mods.sodium.fabric.SodiumFogRenderHook.getFogParameters();
 	}
 }

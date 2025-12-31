@@ -8,6 +8,11 @@ import java.util.concurrent.TimeUnit;
 
 public record TracingExecutor(ExecutorService service) implements Executor {
 	public Executor forName(String string) {
+		// DH: Run world gen tasks on current thread instead of MC thread pools
+		if (com.seibel.distanthorizons.common.wrappers.worldGeneration.BatchGenerationEnvironment.isThisDhWorldGenThread()) {
+			return new com.seibel.distanthorizons.core.util.objects.RunOnThisThreadExecutorService();
+		}
+		
 		if (SharedConstants.IS_RUNNING_IN_IDE) {
 			return runnable -> this.service.execute(() -> {
 				Thread thread = Thread.currentThread();

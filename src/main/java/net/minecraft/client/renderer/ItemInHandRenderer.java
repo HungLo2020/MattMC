@@ -390,6 +390,17 @@ public class ItemInHandRenderer {
 		SubmitNodeCollector submitNodeCollector,
 		int j
 	) {
+		// Iris: Skip translucent hands in solid pass and vice versa
+		if (net.irisshaders.iris.Iris.isPackInUseQuick()) {
+			if (net.irisshaders.iris.pathways.HandRenderer.INSTANCE.isRenderingSolid() && 
+				net.irisshaders.iris.pathways.HandRenderer.INSTANCE.isHandTranslucent(interactionHand)) {
+				return;
+			} else if (!net.irisshaders.iris.pathways.HandRenderer.INSTANCE.isRenderingSolid() && 
+					   !net.irisshaders.iris.pathways.HandRenderer.INSTANCE.isHandTranslucent(interactionHand)) {
+				return;
+			}
+		}
+		
 		if (!abstractClientPlayer.isScoping()) {
 			boolean bl = interactionHand == InteractionHand.MAIN_HAND;
 			HumanoidArm humanoidArm = bl ? abstractClientPlayer.getMainArm() : abstractClientPlayer.getMainArm().getOpposite();

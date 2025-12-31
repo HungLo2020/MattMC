@@ -285,6 +285,9 @@ public class SkyRenderer implements AutoCloseable {
 	}
 
 	public void renderSkyDisc(float f, float g, float h) {
+		// Iris: Set rendering phase to SKY (from MixinSkyRenderer)
+		iris$setPhase(net.irisshaders.iris.pipeline.WorldRenderingPhase.SKY);
+		
 		GpuBufferSlice gpuBufferSlice = RenderSystem.getDynamicUniforms()
 			.writeTransform(RenderSystem.getModelViewMatrix(), new Vector4f(f, g, h, 1.0F), new Vector3f(), new Matrix4f(), 0.0F);
 		GpuTextureView gpuTextureView = Minecraft.getInstance().getMainRenderTarget().getColorTextureView();
@@ -331,6 +334,9 @@ public class SkyRenderer implements AutoCloseable {
 	}
 
 	public void renderDarkDisc() {
+		// Iris: Set rendering phase to VOID (from MixinSkyRenderer)
+		iris$setPhase(net.irisshaders.iris.pipeline.WorldRenderingPhase.VOID);
+		
 		Matrix4fStack matrix4fStack = RenderSystem.getModelViewStack();
 		matrix4fStack.pushMatrix();
 		matrix4fStack.translate(0.0F, 12.0F, 0.0F);
@@ -356,6 +362,8 @@ public class SkyRenderer implements AutoCloseable {
 		poseStack.pushPose();
 		poseStack.mulPose(Axis.YP.rotationDegrees(-90.0F));
 		poseStack.mulPose(Axis.XP.rotationDegrees(f * 360.0F));
+		// Iris: Apply sun path rotation (from MixinSkyRenderer)
+		poseStack.mulPose(com.mojang.math.Axis.ZP.rotationDegrees(iris$getSunPathRotation()));
 		this.renderSun(g, poseStack);
 		this.renderMoon(i, g, poseStack);
 		if (h > 0.0F) {
@@ -366,6 +374,13 @@ public class SkyRenderer implements AutoCloseable {
 	}
 
 	private void renderSun(float f, PoseStack poseStack) {
+		// Iris: Allow shaders to disable sun rendering (from MixinSkyRenderer)
+		if (!net.irisshaders.iris.Iris.getPipelineManager().getPipeline().map(net.irisshaders.iris.pipeline.WorldRenderingPipeline::shouldRenderSun).orElse(true)) {
+			return;
+		}
+		// Iris: Set rendering phase to SUN (from MixinSkyRenderer)
+		iris$setPhase(net.irisshaders.iris.pipeline.WorldRenderingPhase.SUN);
+		
 		if (this.sunTexture != null) {
 			Matrix4fStack matrix4fStack = RenderSystem.getModelViewStack();
 			matrix4fStack.pushMatrix();
@@ -395,6 +410,13 @@ public class SkyRenderer implements AutoCloseable {
 	}
 
 	private void renderMoon(int i, float f, PoseStack poseStack) {
+		// Iris: Allow shaders to disable moon rendering (from MixinSkyRenderer)
+		if (!net.irisshaders.iris.Iris.getPipelineManager().getPipeline().map(net.irisshaders.iris.pipeline.WorldRenderingPipeline::shouldRenderMoon).orElse(true)) {
+			return;
+		}
+		// Iris: Set rendering phase to MOON (from MixinSkyRenderer)
+		iris$setPhase(net.irisshaders.iris.pipeline.WorldRenderingPhase.MOON);
+		
 		if (this.moonTexture != null) {
 			int j = i & 7;
 			int k = j * 4;
@@ -426,6 +448,9 @@ public class SkyRenderer implements AutoCloseable {
 	}
 
 	private void renderStars(float f, PoseStack poseStack) {
+		// Iris: Set rendering phase to STARS (from MixinSkyRenderer)
+		iris$setPhase(net.irisshaders.iris.pipeline.WorldRenderingPhase.STARS);
+		
 		Matrix4fStack matrix4fStack = RenderSystem.getModelViewStack();
 		matrix4fStack.pushMatrix();
 		matrix4fStack.mul(poseStack.last().pose());
@@ -451,6 +476,9 @@ public class SkyRenderer implements AutoCloseable {
 	}
 
 	public void renderSunriseAndSunset(PoseStack poseStack, float f, int i) {
+		// Iris: Set rendering phase to SUNSET (from MixinSkyRenderer)
+		iris$setPhase(net.irisshaders.iris.pipeline.WorldRenderingPhase.SUNSET);
+		
 		float g = ARGB.alphaFloat(i);
 		if (!(g <= 0.001F)) {
 			float h = ARGB.redFloat(i);
@@ -547,5 +575,16 @@ public class SkyRenderer implements AutoCloseable {
 		this.endSkyBuffer.close();
 		this.sunriseBuffer.close();
 		this.endFlashBuffer.close();
+	}
+	
+	// Iris: Helper methods from MixinSkyRenderer
+	private float iris$getSunPathRotation() {
+		if (net.irisshaders.iris.Iris.getPipelineManager().getPipelineNullable() == null) return 0;
+		return net.irisshaders.iris.Iris.getPipelineManager().getPipelineNullable().getSunPathRotation();
+	}
+
+	private void iris$setPhase(net.irisshaders.iris.pipeline.WorldRenderingPhase phase) {
+		if (net.irisshaders.iris.Iris.getPipelineManager().getPipelineNullable() == null) return;
+		net.irisshaders.iris.Iris.getPipelineManager().getPipelineNullable().setPhase(phase);
 	}
 }

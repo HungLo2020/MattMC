@@ -95,6 +95,42 @@ public class BakedSheetGlyph implements BakedGlyph, EffectGlyph {
 	}
 
 	private void render(boolean bl, float f, float g, float h, Matrix4f matrix4f, VertexConsumer vertexConsumer, int i, boolean bl2, int j) {
+		// Sodium: Use fast intrinsics path if available (merged from BakedGlyphMixin)
+		var writer = net.caffeinemc.mods.sodium.client.render.vertex.VertexConsumerUtils.convertOrLog(vertexConsumer);
+
+		if (writer != null) {
+			float x1 = f + this.left;
+			float x2 = f + this.right;
+			float h1 = g + this.up;
+			float h2 = g + this.down;
+			float w1 = bl ? this.shearTop() : 0.0F;
+			float w2 = bl ? this.shearBottom() : 0.0F;
+			float offset = bl2 ? 0.1F : 0.0F;
+
+			int color = net.sodium.api.util.ColorARGB.toABGR(i);
+
+			try (org.lwjgl.system.MemoryStack stack = org.lwjgl.system.MemoryStack.stackPush()) {
+				long buffer = stack.nmalloc(4 * net.sodium.api.vertex.format.common.GlyphVertex.STRIDE);
+				long ptr = buffer;
+
+				sodium$writeGlyphVertex(ptr, matrix4f, x1 + w1 - offset, h1 - offset, h, color, this.u0, this.v0, j);
+				ptr += net.sodium.api.vertex.format.common.GlyphVertex.STRIDE;
+
+				sodium$writeGlyphVertex(ptr, matrix4f, x1 + w2 - offset, h2 + offset, h, color, this.u0, this.v1, j);
+				ptr += net.sodium.api.vertex.format.common.GlyphVertex.STRIDE;
+
+				sodium$writeGlyphVertex(ptr, matrix4f, x2 + w2 + offset, h2 + offset, h, color, this.u1, this.v1, j);
+				ptr += net.sodium.api.vertex.format.common.GlyphVertex.STRIDE;
+
+				sodium$writeGlyphVertex(ptr, matrix4f, x2 + w1 + offset, h1 - offset, h, color, this.u1, this.v0, j);
+				ptr += net.sodium.api.vertex.format.common.GlyphVertex.STRIDE;
+
+				writer.push(stack, buffer, 4, net.sodium.api.vertex.format.common.GlyphVertex.FORMAT);
+			}
+			return;
+		}
+
+		// Fallback to vanilla rendering
 		float k = f + this.left;
 		float l = f + this.right;
 		float m = g + this.up;
@@ -131,10 +167,53 @@ public class BakedSheetGlyph implements BakedGlyph, EffectGlyph {
 	}
 
 	private void buildEffect(BakedSheetGlyph.EffectInstance effectInstance, float f, float g, int i, VertexConsumer vertexConsumer, int j, Matrix4f matrix4f) {
+		// Sodium: Use fast intrinsics path if available (merged from BakedGlyphMixin)
+		var writer = net.caffeinemc.mods.sodium.client.render.vertex.VertexConsumerUtils.convertOrLog(vertexConsumer);
+
+		if (writer != null) {
+			float x1 = effectInstance.x0;
+			float x2 = effectInstance.x1;
+			float h1 = effectInstance.y1; // Yes, this is swapped in 1.21.6+.
+			float h2 = effectInstance.y0;
+			float z = g;
+
+			int color = net.sodium.api.util.ColorARGB.toABGR(i);
+
+			try (org.lwjgl.system.MemoryStack stack = org.lwjgl.system.MemoryStack.stackPush()) {
+				long buffer = stack.nmalloc(4 * net.sodium.api.vertex.format.common.GlyphVertex.STRIDE);
+				long ptr = buffer;
+
+				sodium$writeGlyphVertex(ptr, matrix4f, x1 + f, h1 + f, z, color, this.u0, this.v0, j);
+				ptr += net.sodium.api.vertex.format.common.GlyphVertex.STRIDE;
+
+				sodium$writeGlyphVertex(ptr, matrix4f, x2 + f, h1 + f, z, color, this.u0, this.v1, j);
+				ptr += net.sodium.api.vertex.format.common.GlyphVertex.STRIDE;
+
+				sodium$writeGlyphVertex(ptr, matrix4f, x2 + f, h2 + f, z, color, this.u1, this.v1, j);
+				ptr += net.sodium.api.vertex.format.common.GlyphVertex.STRIDE;
+
+				sodium$writeGlyphVertex(ptr, matrix4f, x1 + f, h2 + f, z, color, this.u1, this.v0, j);
+				ptr += net.sodium.api.vertex.format.common.GlyphVertex.STRIDE;
+
+				writer.push(stack, buffer, 4, net.sodium.api.vertex.format.common.GlyphVertex.FORMAT);
+			}
+			return;
+		}
+
+		// Fallback to vanilla rendering
 		vertexConsumer.addVertex(matrix4f, effectInstance.x0 + f, effectInstance.y1 + f, g).setColor(i).setUv(this.u0, this.v0).setLight(j);
 		vertexConsumer.addVertex(matrix4f, effectInstance.x1 + f, effectInstance.y1 + f, g).setColor(i).setUv(this.u0, this.v1).setLight(j);
 		vertexConsumer.addVertex(matrix4f, effectInstance.x1 + f, effectInstance.y0 + f, g).setColor(i).setUv(this.u1, this.v1).setLight(j);
 		vertexConsumer.addVertex(matrix4f, effectInstance.x0 + f, effectInstance.y0 + f, g).setColor(i).setUv(this.u1, this.v0).setLight(j);
+	}
+
+	// Sodium: Helper method for fast glyph rendering (merged from BakedGlyphMixin)
+	private static void sodium$writeGlyphVertex(long buffer, Matrix4f matrix, float x, float y, float z, int color, float u, float v, int light) {
+		float x2 = net.sodium.api.math.MatrixHelper.transformPositionX(matrix, x, y, z);
+		float y2 = net.sodium.api.math.MatrixHelper.transformPositionY(matrix, x, y, z);
+		float z2 = net.sodium.api.math.MatrixHelper.transformPositionZ(matrix, x, y, z);
+
+		net.sodium.api.vertex.format.common.GlyphVertex.put(buffer, x2, y2, z2, color, u, v, light);
 	}
 
 	@Override

@@ -48,8 +48,16 @@ public class EndFlashState {
 		return this.xAngle;
 	}
 
+	public void setXAngle(float xAngle) {
+		this.xAngle = xAngle;
+	}
+
 	public float getYAngle() {
 		return this.yAngle;
+	}
+
+	public void setYAngle(float yAngle) {
+		this.yAngle = yAngle;
 	}
 
 	public float getIntensity(float f) {

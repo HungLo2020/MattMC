@@ -52,6 +52,8 @@ public class TitleScreen extends Screen {
 	private boolean fading;
 	private long fadeInStart;
 	private final LogoRenderer logoRenderer;
+	// Iris: Track if this is the first title screen initialization
+	private static boolean iris$hasFirstInit;
 
 	public TitleScreen() {
 		this(false);
@@ -118,6 +120,12 @@ public class TitleScreen extends Screen {
 		this.addRenderableWidget(
 			new PlainTextButton(j, this.height - 10, i, 10, COPYRIGHT_TEXT, button -> this.minecraft.setScreen(new CreditsAndAttributionScreen(this)), this.font)
 		);
+		
+		// Iris: On first title screen init, complete loading
+		if (!iris$hasFirstInit) {
+			net.irisshaders.iris.Iris.onLoadingComplete();
+		}
+		iris$hasFirstInit = true;
 	}
 
 	private int createTestWorldButton(int i, int j) {

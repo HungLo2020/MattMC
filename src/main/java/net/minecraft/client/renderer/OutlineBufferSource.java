@@ -2,9 +2,15 @@ package net.minecraft.client.renderer;
 
 import com.mojang.blaze3d.vertex.ByteBufferBuilder;
 import com.mojang.blaze3d.vertex.VertexConsumer;
+import com.mojang.blaze3d.vertex.VertexFormat;
+import com.mojang.blaze3d.vertex.VertexFormatElement;
 import java.util.Optional;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
+import net.sodium.api.util.ColorARGB;
+import net.sodium.api.vertex.attributes.common.ColorAttribute;
+import net.sodium.api.vertex.buffer.VertexBufferWriter;
+import org.lwjgl.system.MemoryStack;
 
 @Environment(EnvType.CLIENT)
 public class OutlineBufferSource implements MultiBufferSource {
@@ -36,7 +42,13 @@ public class OutlineBufferSource implements MultiBufferSource {
 	}
 
 	@Environment(EnvType.CLIENT)
-	record EntityOutlineGenerator(VertexConsumer delegate, int color) implements VertexConsumer {
+	record EntityOutlineGenerator(VertexConsumer delegate, int color) implements VertexConsumer, VertexBufferWriter {
+		// Sodium: VertexBufferWriter optimization
+		@Override
+		public boolean canUseIntrinsics() {
+			return VertexBufferWriter.tryOf(this.delegate) != null;
+		}
+		
 		@Override
 		public VertexConsumer addVertex(float f, float g, float h) {
 			this.delegate.addVertex(f, g, h).setColor(this.color);
@@ -67,6 +79,33 @@ public class OutlineBufferSource implements MultiBufferSource {
 		@Override
 		public VertexConsumer setNormal(float f, float g, float h) {
 			return this;
+		}
+		
+		// Sodium: VertexBufferWriter implementation for fast vertex processing
+		@Override
+		public void push(MemoryStack stack, long ptr, int count, VertexFormat format) {
+			transform(ptr, count, format, this.color);
+			
+			VertexBufferWriter.of(this.delegate)
+					.push(stack, ptr, count, format);
+		}
+		
+		/**
+		 * Transforms the color element of each vertex to use the specified value.
+		 *
+		 * @param ptr    The buffer of vertices to transform
+		 * @param count  The number of vertices to transform
+		 * @param format The format of the vertices
+		 * @param color  The packed color to use for transforming the vertices
+		 */
+		private static void transform(long ptr, int count, VertexFormat format, int color) {
+			long stride = format.getVertexSize();
+			long offsetColor = format.getOffset(VertexFormatElement.COLOR);
+			
+			for (int vertexIndex = 0; vertexIndex < count; vertexIndex++) {
+				ColorAttribute.set(ptr + offsetColor, ColorARGB.toABGR(color));
+				ptr += stride;
+			}
 		}
 	}
 }

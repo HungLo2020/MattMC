@@ -779,6 +779,10 @@ public class ChunkMap extends ChunkStorage implements ChunkHolder.PlayerProvider
 					return null;
 				});
 				this.markPosition(chunkPos, chunkStatus.getChunkType());
+				
+				// DH: Fire chunk save event
+				fireChunkSaveEvent(this.level, chunkAccess);
+				
 				return true;
 			} catch (Exception var6) {
 				this.level.getServer().reportChunkSaveFailure(var6, this.storageInfo(), chunkPos);
@@ -1400,5 +1404,32 @@ public class ChunkMap extends ChunkStorage implements ChunkHolder.PlayerProvider
 				this.updatePlayer(serverPlayer);
 			}
 		}
+	}
+	
+	// DH: Helper method to fire chunk save events
+	private static void fireChunkSaveEvent(net.minecraft.server.level.ServerLevel level, net.minecraft.world.level.chunk.ChunkAccess chunk) {
+		// Skip if chunk is already being updated
+		if (com.seibel.distanthorizons.core.api.internal.SharedApi.isChunkAtChunkPosAlreadyUpdating(chunk.getPos().x, chunk.getPos().z)) {
+			return;
+		}
+		
+		// Validate chunk is complete and not corrupted
+		if (chunk.isUnsaved() || chunk.isUpgrading() || !chunk.isLightCorrect()) {
+			return;
+		}
+		
+		// Validate biomes are set up
+		try {
+			chunk.getNoiseBiome(0, 0, 0);
+		} catch (Exception e) {
+			return;
+		}
+		
+		// Fire the event
+		com.seibel.distanthorizons.core.api.internal.ServerApi.INSTANCE.serverChunkSaveEvent(
+			new com.seibel.distanthorizons.common.wrappers.chunk.ChunkWrapper(chunk, 
+				com.seibel.distanthorizons.common.wrappers.world.ServerLevelWrapper.getWrapper(level)),
+			com.seibel.distanthorizons.common.wrappers.world.ServerLevelWrapper.getWrapper(level)
+		);
 	}
 }

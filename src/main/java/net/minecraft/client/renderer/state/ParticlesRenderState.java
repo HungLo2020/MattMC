@@ -7,7 +7,7 @@ import net.minecraft.api.Environment;
 import net.minecraft.client.renderer.SubmitNodeStorage;
 
 @Environment(EnvType.CLIENT)
-public class ParticlesRenderState {
+public class ParticlesRenderState implements net.irisshaders.iris.mixinterface.ParticleRenderStateExtension {
 	public final List<ParticleGroupRenderState> particles = new ArrayList();
 
 	public void reset() {
@@ -22,6 +22,16 @@ public class ParticlesRenderState {
 	public void submit(SubmitNodeStorage submitNodeStorage, CameraRenderState cameraRenderState) {
 		for (ParticleGroupRenderState particleGroupRenderState : this.particles) {
 			particleGroupRenderState.submit(submitNodeStorage, cameraRenderState);
+		}
+	}
+	
+	// Iris: ParticleRenderStateExtension implementation
+	@Override
+	public void submitWithoutItems(SubmitNodeStorage submitNodeStorage, CameraRenderState cameraRenderState) {
+		for (ParticleGroupRenderState particleGroupRenderState : this.particles) {
+			if (!(particleGroupRenderState instanceof net.minecraft.client.particle.ItemPickupParticleGroup.State)) {
+				particleGroupRenderState.submit(submitNodeStorage, cameraRenderState);
+			}
 		}
 	}
 }

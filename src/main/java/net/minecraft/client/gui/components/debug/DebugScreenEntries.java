@@ -9,7 +9,7 @@ import org.jetbrains.annotations.Nullable;
 
 @Environment(EnvType.CLIENT)
 public class DebugScreenEntries {
-	private static final Map<ResourceLocation, DebugScreenEntry> ENTRIES_BY_LOCATION = new HashMap();
+	public static final Map<ResourceLocation, DebugScreenEntry> ENTRIES_BY_LOCATION = new HashMap(); // Made public for Sodium debug screen integration
 	public static final ResourceLocation GAME_VERSION = register("game_version", new DebugEntryVersion());
 	public static final ResourceLocation FPS = register("fps", new DebugEntryFps());
 	public static final ResourceLocation TPS = register("tps", new DebugEntryTps());
@@ -40,6 +40,11 @@ public class DebugScreenEntries {
 	public static final ResourceLocation SIMPLE_PERFORMANCE_IMPACTORS = register("simple_performance_impactors", new DebugEntrySimplePerformanceImpactors());
 	public static final ResourceLocation CHUNK_SECTION_OCTREE = register("chunk_section_octree", new DebugEntryNoop());
 	public static final ResourceLocation CHUNK_SECTION_VISIBILITY = register("chunk_section_visibility", new DebugEntryNoop());
+	
+	// Iris debug entries
+	public static final ResourceLocation IRIS = register(ResourceLocation.fromNamespaceAndPath("iris", "iris"), new net.irisshaders.iris.gui.debug.IrisDebugEntry());
+	public static final ResourceLocation IRIS_DEBUG = register(ResourceLocation.fromNamespaceAndPath("iris", "debug"), new net.irisshaders.iris.gui.debug.IrisTrueDebugEntry());
+	
 	public static final Map<DebugScreenProfile, Map<ResourceLocation, DebugScreenEntryStatus>> PROFILES;
 
 	private static ResourceLocation register(String string, DebugScreenEntry debugScreenEntry) {

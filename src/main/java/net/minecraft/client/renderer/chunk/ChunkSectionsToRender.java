@@ -15,16 +15,39 @@ import net.minecraft.api.Environment;
 import net.minecraft.SharedConstants;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.RenderPipelines;
+import net.minecraft.hooks.ChunkRenderLayerHooks;
+import net.minecraft.hooks.HookRegistry;
 
 @Environment(EnvType.CLIENT)
 public record ChunkSectionsToRender(
 	EnumMap<ChunkSectionLayer, List<RenderPass.Draw<GpuBufferSlice[]>>> drawsPerLayer, int maxIndicesRequired, GpuBufferSlice[] dynamicTransforms
-) {
+) implements net.caffeinemc.mods.sodium.client.util.SodiumChunkSection {
+	// Sodium: SodiumChunkSection interface implementation (from ChunkSectionsToRenderMixin)
+	private static net.caffeinemc.mods.sodium.client.render.SodiumWorldRenderer renderer;
+	private static net.caffeinemc.mods.sodium.client.render.chunk.ChunkRenderMatrices matrices;
+	private static double x;
+	private static double y;
+	private static double z;
+	
 	public void renderGroup(ChunkSectionLayerGroup chunkSectionLayerGroup) {
-		// Call registered chunk render layer hooks before rendering
-		for (net.minecraft.hooks.ChunkRenderLayerHooks hook : net.minecraft.hooks.HookRegistry.getChunkRenderLayerHooks()) {
+		// Sodium: Call DH hooks before Sodium rendering (from ChunkSectionsToRenderMixin)
+		for (ChunkRenderLayerHooks hook : HookRegistry.getChunkRenderLayerHooks()) {
 			hook.onBeforeRenderLayer(chunkSectionLayerGroup);
 		}
+		
+		// Sodium: Let Sodium renderer handle if active (from ChunkSectionsToRenderMixin)
+		if (renderer != null) {
+			net.caffeinemc.mods.sodium.client.gl.device.RenderDevice.enterManagedCode();
+			try {
+				renderer.drawChunkLayer(chunkSectionLayerGroup, matrices, x, y, z);
+			} finally {
+				net.caffeinemc.mods.sodium.client.gl.device.RenderDevice.exitManagedCode();
+			}
+			return;
+		}
+		
+		// NOTE: Hook calls are in Sodium's ChunkSectionsToRenderMixin
+		// Sodium cancels this method when active, so hooks must run before cancellation
 		
 		RenderSystem.AutoStorageIndexBuffer autoStorageIndexBuffer = RenderSystem.getSequentialBuffer(VertexFormat.Mode.QUADS);
 		GpuBuffer gpuBuffer = this.maxIndicesRequired == 0 ? null : autoStorageIndexBuffer.getBuffer(this.maxIndicesRequired);
@@ -59,5 +82,15 @@ public record ChunkSectionsToRender(
 				}
 			}
 		}
+	}
+	
+	// Sodium: SodiumChunkSection interface method (from ChunkSectionsToRenderMixin)
+	@Override
+	public void sodium$setRendering(net.caffeinemc.mods.sodium.client.render.SodiumWorldRenderer renderer, net.caffeinemc.mods.sodium.client.render.chunk.ChunkRenderMatrices matrices, double x, double y, double z) {
+		ChunkSectionsToRender.renderer = renderer;
+		ChunkSectionsToRender.matrices = matrices;
+		ChunkSectionsToRender.x = x;
+		ChunkSectionsToRender.y = y;
+		ChunkSectionsToRender.z = z;
 	}
 }

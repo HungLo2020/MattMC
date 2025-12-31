@@ -108,7 +108,7 @@ import org.joml.Vector4f;
 import org.slf4j.Logger;
 
 @Environment(EnvType.CLIENT)
-public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseable {
+public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseable, net.irisshaders.iris.shadows.CullingDataCache, net.caffeinemc.mods.sodium.client.world.LevelRendererExtension {
 	private static final Logger LOGGER = LogUtils.getLogger();
 	private static final ResourceLocation TRANSPARENCY_POST_CHAIN_ID = ResourceLocation.withDefaultNamespace("transparency");
 	private static final ResourceLocation ENTITY_OUTLINE_POST_CHAIN_ID = ResourceLocation.withDefaultNamespace("entity_outline");
@@ -117,9 +117,9 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 	public static final int NEARBY_SECTION_DISTANCE_IN_BLOCKS = 32;
 	private static final int MINIMUM_TRANSPARENT_SORT_COUNT = 15;
 	private final Minecraft minecraft;
-	private final EntityRenderDispatcher entityRenderDispatcher;
+	public final EntityRenderDispatcher entityRenderDispatcher; // Made public for Iris shadow rendering
 	private final BlockEntityRenderDispatcher blockEntityRenderDispatcher;
-	private RenderBuffers renderBuffers; // Non-final to allow Iris shadow rendering to swap buffers
+	public RenderBuffers renderBuffers; // Made public for Iris shadow rendering (already non-final)
 	private final SkyRenderer skyRenderer = new SkyRenderer();
 	private final CloudRenderer cloudRenderer = new CloudRenderer();
 	private final WorldBorderRenderer worldBorderRenderer = new WorldBorderRenderer();
@@ -128,7 +128,7 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 	public final DebugRenderer debugRenderer = new DebugRenderer();
 	public final GameTestBlockHighlightRenderer gameTestBlockHighlightRenderer = new GameTestBlockHighlightRenderer();
 	@Nullable
-	public ClientLevel level;
+	public ClientLevel level; // Already public
 	private final SectionOcclusionGraph sectionOcclusionGraph = new SectionOcclusionGraph();
 	private final ObjectArrayList<SectionRenderDispatcher.RenderSection> visibleSections = new ObjectArrayList<>(10000);
 	private final ObjectArrayList<SectionRenderDispatcher.RenderSection> nearbyVisibleSections = new ObjectArrayList<>(50);
@@ -136,7 +136,7 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 	private ViewArea viewArea;
 	private int ticks;
 	private final Int2ObjectMap<BlockDestructionProgress> destroyingBlocks = new Int2ObjectOpenHashMap<>();
-	private final Long2ObjectMap<SortedSet<BlockDestructionProgress>> destructionProgress = new Long2ObjectOpenHashMap<>();
+	public final Long2ObjectMap<SortedSet<BlockDestructionProgress>> destructionProgress = new Long2ObjectOpenHashMap<>(); // Made public for Iris shadow rendering
 	@Nullable
 	private RenderTarget entityOutlineTarget;
 	private final LevelTargetBundle targets = new LevelTargetBundle();
@@ -160,6 +160,21 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 	private final LevelRenderState levelRenderState;
 	private final SubmitNodeStorage submitNodeStorage;
 	private final FeatureRenderDispatcher featureRenderDispatcher;
+	
+	// Iris: From shadows.MixinLevelRenderer - fields for shadow culling data cache
+	private ObjectArrayList<SectionRenderDispatcher.RenderSection> iris$savedRenderChunks = new ObjectArrayList<>(69696);
+	private double iris$savedLastCameraPitch;
+	private double iris$savedLastCameraYaw;
+	
+	// Iris: From MixinLevelRenderer (main) - fields for main Iris pipeline integration
+	private net.irisshaders.iris.pipeline.WorldRenderingPipeline pipeline;
+	private boolean disableFrustumCulling;
+	private boolean warned;
+	
+	// Sodium: From LevelRendererMixin - fields for Sodium world renderer integration
+	private static final EnumMap<ChunkSectionLayer, List<RenderPass.Draw<GpuBufferSlice[]>>> SODIUM_STATIC_MAP = new EnumMap<>(ChunkSectionLayer.class);
+	private net.caffeinemc.mods.sodium.client.render.SodiumWorldRenderer renderer;
+	private net.caffeinemc.mods.sodium.client.render.chunk.ChunkRenderMatrices matrices;
 
 	public LevelRenderer(
 		Minecraft minecraft,
@@ -176,6 +191,9 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 		this.submitNodeStorage = featureRenderDispatcher.getSubmitNodeStorage();
 		this.levelRenderState = levelRenderState;
 		this.featureRenderDispatcher = featureRenderDispatcher;
+		
+		// Sodium: Initialize SodiumWorldRenderer
+		this.renderer = new net.caffeinemc.mods.sodium.client.render.SodiumWorldRenderer(minecraft);
 	}
 
 	public void close() {
@@ -186,8 +204,26 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 		this.skyRenderer.close();
 		this.cloudRenderer.close();
 	}
+	
+	// Iris: Helper method to disable fabulous graphics when shaders are enabled
+	private void disableFabulousGraphicsIfNeeded() {
+		net.minecraft.client.Options options = this.minecraft.options;
+		
+		if (!net.irisshaders.iris.Iris.getIrisConfig().areShadersEnabled()) {
+			// Nothing to do here, shaders are disabled.
+			return;
+		}
+		
+		if (options.graphicsMode().get() == GraphicsStatus.FABULOUS) {
+			// Disable fabulous graphics when shaders are enabled.
+			options.graphicsMode().set(GraphicsStatus.FANCY);
+		}
+	}
 
 	public void onResourceManagerReload(ResourceManager resourceManager) {
+		// Iris: Disable fabulous graphics when shaders are enabled
+		disableFabulousGraphicsIfNeeded();
+		
 		this.initOutline();
 		this.skyRenderer.initTextures();
 	}
@@ -249,6 +285,14 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 		}
 
 		this.gameTestBlockHighlightRenderer.clear();
+		
+		// Sodium: Update renderer when world changes
+		net.caffeinemc.mods.sodium.client.gl.device.RenderDevice.enterManagedCode();
+		try {
+			this.renderer.setLevel(clientLevel);
+		} finally {
+			net.caffeinemc.mods.sodium.client.gl.device.RenderDevice.exitManagedCode();
+		}
 	}
 
 	private void clearVisibleSections() {
@@ -257,6 +301,9 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 	}
 
 	public void allChanged() {
+		// Iris: Disable fabulous graphics when shaders are enabled
+		disableFabulousGraphicsIfNeeded();
+		
 		if (this.level != null) {
 			this.level.clearTintCaches();
 			if (this.sectionRenderDispatcher == null) {
@@ -275,11 +322,20 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 			}
 
 			this.sectionRenderDispatcher.clearCompileQueue();
-			this.viewArea = new ViewArea(this.sectionRenderDispatcher, this.level, this.minecraft.options.getEffectiveRenderDistance(), this);
+			// Sodium: Nullify vanilla chunk storage allocation (return 0 for render distance)
+			this.viewArea = new ViewArea(this.sectionRenderDispatcher, this.level, 0, this);
 			this.sectionOcclusionGraph.waitAndReset(this.viewArea);
 			this.clearVisibleSections();
 			Camera camera = this.minecraft.gameRenderer.getMainCamera();
 			this.viewArea.repositionCamera(SectionPos.of(camera.getPosition()));
+		}
+		
+		// Sodium: Reload renderer
+		net.caffeinemc.mods.sodium.client.gl.device.RenderDevice.enterManagedCode();
+		try {
+			this.renderer.reload();
+		} finally {
+			net.caffeinemc.mods.sodium.client.gl.device.RenderDevice.exitManagedCode();
 		}
 	}
 
@@ -292,21 +348,8 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 
 	@Nullable
 	public String getSectionStatistics() {
-		if (this.viewArea == null) {
-			return null;
-		} else {
-			int i = this.viewArea.sections.length;
-			int j = this.countRenderedSections();
-			return String.format(
-				Locale.ROOT,
-				"C: %d/%d %sD: %d, %s",
-				j,
-				i,
-				this.minecraft.smartCull ? "(s) " : "",
-				this.lastViewDistance,
-				this.sectionRenderDispatcher == null ? "null" : this.sectionRenderDispatcher.getStats()
-			);
-		}
+		// Sodium: Return renderer debug string
+		return this.renderer.getChunksDebugString();
 	}
 
 	@Nullable
@@ -323,15 +366,8 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 	}
 
 	public int countRenderedSections() {
-		int i = 0;
-
-		for (SectionRenderDispatcher.RenderSection renderSection : this.visibleSections) {
-			if (renderSection.getSectionMesh().hasRenderableLayers()) {
-				i++;
-			}
-		}
-
-		return i;
+		// Sodium: Redirect to our renderer
+		return this.renderer.getVisibleChunkCount();
 	}
 
 	@Nullable
@@ -341,56 +377,28 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 			: "E: " + this.levelRenderState.entityRenderStates.size() + "/" + this.level.getEntityCount() + ", SD: " + this.level.getServerSimulationDistance();
 	}
 
-	private void cullTerrain(Camera camera, Frustum frustum, boolean bl) {
-		Vec3 vec3 = camera.getPosition();
-		if (this.minecraft.options.getEffectiveRenderDistance() != this.lastViewDistance) {
-			this.allChanged();
-		}
+public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // Made public for Iris shadow rendering
+// Sodium: Redirect terrain setup to our renderer
+	var viewport = ((net.caffeinemc.mods.sodium.client.render.viewport.ViewportProvider) frustum).sodium$createViewport();
+	var updateChunksImmediately = net.caffeinemc.mods.sodium.client.util.FlawlessFrames.isActive();
 
-		ProfilerFiller profilerFiller = Profiler.get();
-		profilerFiller.push("repositionCamera");
-		int i = SectionPos.posToSectionCoord(vec3.x());
-		int j = SectionPos.posToSectionCoord(vec3.y());
-		int k = SectionPos.posToSectionCoord(vec3.z());
-		if (this.lastCameraSectionX != i || this.lastCameraSectionY != j || this.lastCameraSectionZ != k) {
-			this.lastCameraSectionX = i;
-			this.lastCameraSectionY = j;
-			this.lastCameraSectionZ = k;
-			this.viewArea.repositionCamera(SectionPos.of(vec3));
-			this.worldBorderRenderer.invalidate();
-		}
+	int sectionX = SectionPos.posToSectionCoord(camera.getPosition().x());
+	int sectionY = SectionPos.posToSectionCoord(camera.getPosition().y());
+	int sectionZ = SectionPos.posToSectionCoord(camera.getPosition().z());
 
-		this.sectionRenderDispatcher.setCameraPosition(vec3);
-		double d = Math.floor(vec3.x / 8.0);
-		double e = Math.floor(vec3.y / 8.0);
-		double f = Math.floor(vec3.z / 8.0);
-		if (d != this.prevCamX || e != this.prevCamY || f != this.prevCamZ) {
-			this.sectionOcclusionGraph.invalidate();
-		}
+	if (this.lastCameraSectionX != sectionX || this.lastCameraSectionY != sectionY || this.lastCameraSectionZ != sectionZ) {
+	this.lastCameraSectionX = sectionX;
+	this.lastCameraSectionY = sectionY;
+	this.lastCameraSectionZ = sectionZ;
+	this.worldBorderRenderer.invalidate();
+	}
 
-		this.prevCamX = d;
-		this.prevCamY = e;
-		this.prevCamZ = f;
-		profilerFiller.pop();
-		if (this.capturedFrustum == null) {
-			boolean bl2 = this.minecraft.smartCull;
-			if (bl && this.level.getBlockState(camera.getBlockPosition()).isSolidRender()) {
-				bl2 = false;
-			}
-
-			profilerFiller.push("updateSOG");
-			this.sectionOcclusionGraph.update(bl2, camera, frustum, this.visibleSections, this.level.getChunkSource().getLoadedEmptySections());
-			profilerFiller.pop();
-			double g = Math.floor(camera.getXRot() / 2.0F);
-			double h = Math.floor(camera.getYRot() / 2.0F);
-			if (this.sectionOcclusionGraph.consumeFrustumUpdate() || g != this.prevCamRotX || h != this.prevCamRotY) {
-				profilerFiller.push("applyFrustum");
-				this.applyFrustum(offsetFrustum(frustum));
-				profilerFiller.pop();
-				this.prevCamRotX = g;
-				this.prevCamRotY = h;
-			}
-		}
+	net.caffeinemc.mods.sodium.client.gl.device.RenderDevice.enterManagedCode();
+	try {
+	this.renderer.setupTerrain(camera, viewport, net.caffeinemc.mods.sodium.fabric.SodiumFogRenderHook.getFogParameters(), spectator, updateChunksImmediately, matrices);
+	} finally {
+	net.caffeinemc.mods.sodium.client.gl.device.RenderDevice.exitManagedCode();
+	}
 	}
 
 	public static Frustum offsetFrustum(Frustum frustum) {
@@ -411,6 +419,13 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 	}
 
 	private Frustum prepareCullFrustum(Matrix4f matrix4f, Matrix4f matrix4f2, Vec3 vec3) {
+		// Iris: From MixinLevelRenderer - Disable frustum culling when Iris pipeline requests it
+		if (this.disableFrustumCulling) {
+			net.irisshaders.iris.shadows.frustum.fallback.NonCullingFrustum f = new net.irisshaders.iris.shadows.frustum.fallback.NonCullingFrustum();
+			f.prepare(vec3.x(), vec3.y(), vec3.z());
+			return f;
+		}
+		
 		Frustum frustum;
 		if (this.capturedFrustum != null && !this.captureFrustum) {
 			frustum = this.capturedFrustum;
@@ -439,6 +454,34 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 		Vector4f vector4f,
 		boolean bl2
 	) {
+		// Iris: From MixinLevelRenderer - Setup Iris pipeline at the beginning
+		net.irisshaders.iris.compat.dh.DHCompat.checkFrame();
+		net.irisshaders.iris.uniforms.IrisTimeUniforms.updateTime();
+		net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setGbufferModelView(matrix4f);
+		net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setGbufferProjection(matrix4f2);
+		float fakeTickDelta = deltaTracker.getGameTimeDeltaPartialTick(false);
+		net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setTickDelta(fakeTickDelta);
+		net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setCloudTime((this.ticks + fakeTickDelta) * 0.03F);
+		
+		this.pipeline = net.irisshaders.iris.Iris.getPipelineManager().preparePipeline(net.irisshaders.iris.Iris.getCurrentDimension());
+		this.disableFrustumCulling = this.pipeline.shouldDisableFrustumCulling();
+		
+		this.pipeline.beginLevelRendering();
+		this.pipeline.setPhase(net.irisshaders.iris.pipeline.WorldRenderingPhase.NONE);
+		net.irisshaders.iris.gl.IrisRenderSystem.backupAndDisableCullingState(this.pipeline.shouldDisableOcclusionCulling());
+		
+		if (net.irisshaders.iris.Iris.shouldActivateWireframe() && this.minecraft.isLocalServer()) {
+			net.irisshaders.iris.gl.IrisRenderSystem.setPolygonMode(org.lwjgl.opengl.GL43C.GL_LINE);
+		}
+		
+		// Iris: Begin level render immediate state (from MixinLevelRenderer vertices.immediate)
+		net.irisshaders.iris.vertices.ImmediateState.isRenderingLevel = true;
+		
+		// Call registered hooks before rendering level
+		for (net.minecraft.hooks.LevelRendererHooks hook : net.minecraft.hooks.HookRegistry.getLevelRendererHooks()) {
+			hook.onBeforeRenderLevel(camera, matrix4f, matrix4f2);
+		}
+		
 		float f = deltaTracker.getGameTimeDeltaPartialTick(false);
 		this.levelRenderState.reset();
 		this.blockEntityRenderDispatcher.prepare(camera);
@@ -451,8 +494,22 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 		profilerFiller.popPush("prepareCullFrustum");
 		Vec3 vec3 = camera.getPosition();
 		Frustum frustum = this.prepareCullFrustum(matrix4f, matrix4f3, vec3);
+		
+		// Sodium: Store matrices for setupTerrain (from LevelRendererMixin @Inject at="INVOKE cullTerrain")
+		this.matrices = new net.caffeinemc.mods.sodium.client.render.chunk.ChunkRenderMatrices(matrix4f2, matrix4f);
+		
+		// Iris: From MixinLevelRenderer - Render shadow terrain after frustum preparation
+		this.pipeline.renderShadows(this, camera, this.levelRenderState.cameraRenderState);
+		
 		profilerFiller.popPush("cullTerrain");
-		this.cullTerrain(camera, frustum, this.minecraft.player.isSpectator());
+		// Iris: From MixinLevelRenderer_SkipRendering - skip terrain culling if pipeline requests
+		if (net.irisshaders.iris.Iris.getPipelineManager().getPipelineNullable() instanceof net.irisshaders.iris.pipeline.IrisRenderingPipeline pipeline) {
+			if (!pipeline.skipAllRendering()) {
+				this.cullTerrain(camera, frustum, this.minecraft.player.isSpectator());
+			}
+		} else {
+			this.cullTerrain(camera, frustum, this.minecraft.player.isSpectator());
+		}
 		profilerFiller.popPush("compileSections");
 		this.compileSections(camera);
 		profilerFiller.popPush("extract");
@@ -506,6 +563,17 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 					);
 			}
 		);
+		
+		// Iris: From MixinLevelRenderer - Add iris_setup pass after clear
+		FramePass irisSetupPass = frameGraphBuilder.addPass("iris_setup");
+		this.targets.main = irisSetupPass.readsAndWrites(this.targets.main);
+		irisSetupPass.requires(framePass);
+		irisSetupPass.executes(() -> {
+			GpuBufferSlice params = RenderSystem.getShaderFog();
+			this.pipeline.onBeginClear();
+			RenderSystem.setShaderFog(params);
+		});
+		
 		if (bl2) {
 			this.addSkyPass(frameGraphBuilder, camera, gpuBufferSlice);
 		}
@@ -547,8 +615,41 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 			}
 		});
 		this.targets.clear();
+		
+		// Iris: From MixinLevelRenderer - Finalize Iris rendering before popping matrix
+		net.irisshaders.iris.pathways.HandRenderer.INSTANCE.renderTranslucent(
+			matrix4f,
+			deltaTracker.getGameTimeDeltaPartialTick(true),
+			camera,
+			this.minecraft.gameRenderer,
+			this.pipeline
+		);
+		net.minecraft.util.profiling.Profiler.get().popPush("iris_final");
+		
+		if (net.irisshaders.iris.Iris.shouldActivateWireframe() && this.minecraft.isLocalServer()) {
+			net.irisshaders.iris.gl.IrisRenderSystem.setPolygonMode(org.lwjgl.opengl.GL43C.GL_FILL);
+		}
+		this.pipeline.finalizeLevelRendering();
+		
+		// Show beta warning once
+		if (!this.warned) {
+			this.warned = true;
+			net.irisshaders.iris.Iris.getUpdateChecker().getBetaInfo().ifPresent(info ->
+				net.minecraft.client.Minecraft.getInstance().gui.getChat().addMessage(
+					net.minecraft.network.chat.Component.literal("A new beta is out for Iris " + info.betaTag + ". Please redownload it.")
+						.withStyle(net.minecraft.ChatFormatting.BOLD, net.minecraft.ChatFormatting.RED)
+				)
+			);
+		}
+		
+		net.irisshaders.iris.gl.IrisRenderSystem.restoreCullingState();
+		this.pipeline = null;
+		
 		matrix4fStack.popMatrix();
 		profilerFiller.pop();
+		
+		// Iris: End level render immediate state (from MixinLevelRenderer vertices.immediate)
+		net.irisshaders.iris.vertices.ImmediateState.isRenderingLevel = false;
 	}
 
 	private void addMainPass(
@@ -577,6 +678,16 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 
 		if (levelRenderState.haveGlowingEntities && this.targets.entityOutline != null) {
 			this.targets.entityOutline = framePass.readsAndWrites(this.targets.entityOutline);
+		}
+		
+		// Iris: From MixinLevelRenderer (fantastic) - Add particle target for BEFORE rendering
+		net.irisshaders.iris.shaderpack.properties.ParticleRenderingSettings settings = net.irisshaders.iris.Iris.getPipelineManager().getPipeline()
+			.map(net.irisshaders.iris.pipeline.WorldRenderingPipeline::getParticleRenderingSettings)
+			.orElse(net.irisshaders.iris.shaderpack.properties.ParticleRenderingSettings.MIXED);
+		if (settings == net.irisshaders.iris.shaderpack.properties.ParticleRenderingSettings.BEFORE) {
+			if (this.targets.particles != null) {
+				this.targets.particles = framePass.readsAndWrites(this.targets.particles);
+			}
 		}
 
 		ResourceHandle<RenderTarget> resourceHandle = this.targets.main;
@@ -671,6 +782,14 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 	}
 
 	private void addParticlesPass(FrameGraphBuilder frameGraphBuilder, GpuBufferSlice gpuBufferSlice) {
+		// Iris: From MixinLevelRenderer (fantastic) - Disable particles pass if rendering BEFORE
+		net.irisshaders.iris.shaderpack.properties.ParticleRenderingSettings settings = net.irisshaders.iris.Iris.getPipelineManager().getPipeline()
+			.map(net.irisshaders.iris.pipeline.WorldRenderingPipeline::getParticleRenderingSettings)
+			.orElse(net.irisshaders.iris.shaderpack.properties.ParticleRenderingSettings.MIXED);
+		if (settings == net.irisshaders.iris.shaderpack.properties.ParticleRenderingSettings.BEFORE) {
+			return; // Cancel this pass - particles already rendered in main pass
+		}
+		
 		FramePass framePass = frameGraphBuilder.addPass("particles");
 		if (this.targets.particles != null) {
 			this.targets.particles = framePass.readsAndWrites(this.targets.particles);
@@ -702,7 +821,14 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 			this.targets.main = framePass.readsAndWrites(this.targets.main);
 		}
 
-		framePass.executes(() -> { iris$renderCloudsPassBody(); this.cloudRenderer.render(i, cloudStatus, g, vec3, f); });
+		framePass.executes(() -> { 
+			iris$renderCloudsPassBody(); 
+			this.cloudRenderer.render(i, cloudStatus, g, vec3, f);
+			// Iris: Reset phase after clouds rendering
+			if (LevelRenderer.this.pipeline != null) {
+				LevelRenderer.this.pipeline.setPhase(net.irisshaders.iris.pipeline.WorldRenderingPhase.NONE);
+			}
+		});
 	}
 
 	private void addWeatherPass(FrameGraphBuilder frameGraphBuilder, Vec3 vec3, GpuBufferSlice gpuBufferSlice) {
@@ -720,8 +846,16 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 			RenderSystem.setShaderFog(gpuBufferSlice);
 			MultiBufferSource.BufferSource bufferSource = this.renderBuffers.bufferSource();
 			this.weatherEffectRenderer.render(bufferSource, vec3, this.levelRenderState.weatherRenderState);
+			// Iris: Reset phase after weather, before world border
+			if (LevelRenderer.this.pipeline != null) {
+				LevelRenderer.this.pipeline.setPhase(net.irisshaders.iris.pipeline.WorldRenderingPhase.NONE);
+			}
 			iris$renderWorldBorderBody();
 			this.worldBorderRenderer.render(this.levelRenderState.worldBorderRenderState, vec3, i, f);
+			// Iris: Reset phase after world border
+			if (LevelRenderer.this.pipeline != null) {
+				LevelRenderer.this.pipeline.setPhase(net.irisshaders.iris.pipeline.WorldRenderingPhase.NONE);
+			}
 			bufferSource.endBatch();
 		});
 	}
@@ -757,7 +891,15 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 		boolean bl = this.shouldShowEntityOutlines();
 		Entity.setViewScale(Mth.clamp(this.minecraft.options.getEffectiveRenderDistance() / 8.0, 1.0, 2.5) * this.minecraft.options.entityDistanceScaling().get());
 
-		for (Entity entity : this.level.entitiesForRendering()) {
+		// Iris: From MixinLevelRenderer_SkipRendering - skip entity extraction if pipeline requests
+		Iterable<Entity> entities;
+		if (net.irisshaders.iris.Iris.getPipelineManager().getPipelineNullable() instanceof net.irisshaders.iris.pipeline.IrisRenderingPipeline pipeline && pipeline.skipAllRendering()) {
+			entities = java.util.Collections.emptyList();
+		} else {
+			entities = this.level.entitiesForRendering();
+		}
+
+		for (Entity entity : entities) {
 			if (this.entityRenderDispatcher.shouldRender(entity, frustum, d, e, f) || entity.hasIndirectPassenger(this.minecraft.player)) {
 				BlockPos blockPos = entity.blockPosition();
 				if ((this.level.isOutsideBuildHeight(blockPos.getY()) || this.isSectionCompiled(blockPos))
@@ -804,7 +946,7 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 		}
 	}
 
-	private void extractVisibleBlockEntities(Camera camera, float f, LevelRenderState levelRenderState) {
+	public void extractVisibleBlockEntities(Camera camera, float f, LevelRenderState levelRenderState) { // Made public for Iris shadow rendering
 		Vec3 vec3 = camera.getPosition();
 		double d = vec3.x();
 		double e = vec3.y();
@@ -933,11 +1075,23 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 			if (blockOutlineRenderState.isTranslucent() == bl) {
 				Vec3 vec3 = levelRenderState.cameraRenderState.pos;
 				if (blockOutlineRenderState.highContrast()) {
-					VertexConsumer vertexConsumer = bufferSource.getBuffer(RenderType.secondaryBlockOutline());
+					// Iris: Wrap with outline render state shard
+					RenderType wrappedType = new net.irisshaders.iris.layer.OuterWrappedRenderType(
+						"iris:is_outline",
+						RenderType.secondaryBlockOutline(),
+						net.irisshaders.iris.layer.IsOutlineRenderStateShard.INSTANCE
+					);
+					VertexConsumer vertexConsumer = bufferSource.getBuffer(wrappedType);
 					this.renderHitOutline(poseStack, vertexConsumer, vec3.x, vec3.y, vec3.z, blockOutlineRenderState, -16777216);
 				}
 
-				VertexConsumer vertexConsumer = bufferSource.getBuffer(RenderType.lines());
+				// Iris: Wrap with outline render state shard
+				RenderType wrappedType = new net.irisshaders.iris.layer.OuterWrappedRenderType(
+					"iris:is_outline",
+					RenderType.lines(),
+					net.irisshaders.iris.layer.IsOutlineRenderStateShard.INSTANCE
+				);
+				VertexConsumer vertexConsumer = bufferSource.getBuffer(wrappedType);
 				int i = blockOutlineRenderState.highContrast() ? -11010079 : ARGB.color(102, -16777216);
 				this.renderHitOutline(poseStack, vertexConsumer, vec3.x, vec3.y, vec3.z, blockOutlineRenderState, i);
 				bufferSource.endLastBatch();
@@ -988,66 +1142,16 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 		}
 	}
 
-	private ChunkSectionsToRender prepareChunkRenders(Matrix4fc matrix4fc, double d, double e, double f) {
-		ObjectListIterator<SectionRenderDispatcher.RenderSection> objectListIterator = this.visibleSections.listIterator(0);
-		EnumMap<ChunkSectionLayer, List<RenderPass.Draw<GpuBufferSlice[]>>> enumMap = new EnumMap(ChunkSectionLayer.class);
-		int i = 0;
-
-		for (ChunkSectionLayer chunkSectionLayer : ChunkSectionLayer.values()) {
-			enumMap.put(chunkSectionLayer, new ArrayList());
+	private ChunkSectionsToRender prepareChunkRenders(Matrix4fc matrix4fc, double x, double y, double z) {
+		// Sodium: Redirect to our renderer
+		// Call Distant Horizons hooks before Sodium's terrain preparation
+		for (net.minecraft.hooks.LevelRendererHooks hook : net.minecraft.hooks.HookRegistry.getLevelRendererHooks()) {
+			hook.onBeforePrepareChunkRenders(matrix4fc, x, y, z);
 		}
-
-		List<DynamicUniforms.Transform> list = new ArrayList();
-		Vector4f vector4f = new Vector4f(1.0F, 1.0F, 1.0F, 1.0F);
-		Matrix4f matrix4f = new Matrix4f();
-
-		while (objectListIterator.hasNext()) {
-			SectionRenderDispatcher.RenderSection renderSection = (SectionRenderDispatcher.RenderSection)objectListIterator.next();
-			SectionMesh sectionMesh = renderSection.getSectionMesh();
-
-			for (ChunkSectionLayer chunkSectionLayer2 : ChunkSectionLayer.values()) {
-				SectionBuffers sectionBuffers = sectionMesh.getBuffers(chunkSectionLayer2);
-				if (sectionBuffers != null) {
-					GpuBuffer gpuBuffer;
-					VertexFormat.IndexType indexType;
-					if (sectionBuffers.getIndexBuffer() == null) {
-						if (sectionBuffers.getIndexCount() > i) {
-							i = sectionBuffers.getIndexCount();
-						}
-
-						gpuBuffer = null;
-						indexType = null;
-					} else {
-						gpuBuffer = sectionBuffers.getIndexBuffer();
-						indexType = sectionBuffers.getIndexType();
-					}
-
-					BlockPos blockPos = renderSection.getRenderOrigin();
-					int j = list.size();
-					list.add(
-						new DynamicUniforms.Transform(
-							matrix4fc, vector4f, new Vector3f((float)(blockPos.getX() - d), (float)(blockPos.getY() - e), (float)(blockPos.getZ() - f)), matrix4f, 1.0F
-						)
-					);
-					((List)enumMap.get(chunkSectionLayer2))
-						.add(
-							new RenderPass.Draw<GpuBufferSlice[]>(
-								0,
-								sectionBuffers.getVertexBuffer(),
-								gpuBuffer,
-								indexType,
-								0,
-								sectionBuffers.getIndexCount(),
-								(gpuBufferSlicesx, uniformUploader) -> uniformUploader.upload("DynamicTransforms", gpuBufferSlicesx[j])
-							)
-						);
-				}
-			}
-		}
-
-		GpuBufferSlice[] gpuBufferSlices = RenderSystem.getDynamicUniforms()
-			.writeTransforms((DynamicUniforms.Transform[])list.toArray(new DynamicUniforms.Transform[0]));
-		return new ChunkSectionsToRender(enumMap, i, gpuBufferSlices);
+		
+		ChunkSectionsToRender chunkSectionsToRender = new ChunkSectionsToRender(SODIUM_STATIC_MAP, -1, new GpuBufferSlice[0]);
+		((net.caffeinemc.mods.sodium.client.util.SodiumChunkSection) (Object) chunkSectionsToRender).sodium$setRendering(renderer, matrices, x, y, z);
+		return chunkSectionsToRender;
 	}
 
 	public void endFrame() {
@@ -1111,7 +1215,7 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 							if (skyRenderState.endFlashIntensity > 1.0E-5F) {
 								PoseStack poseStack = new PoseStack();
 								this.skyRenderer.renderEndFlash(poseStack, skyRenderState.endFlashIntensity, skyRenderState.endFlashXAngle, skyRenderState.endFlashYAngle);
-							}
+			}
 						} else {
 							PoseStack poseStack = new PoseStack();
 							float f = ARGB.redFloat(skyRenderState.skyColor);
@@ -1128,13 +1232,17 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 								this.skyRenderer.renderDarkDisc();
 							}
 						}
+						// Iris: Reset phase after sky rendering
+						if (LevelRenderer.this.pipeline != null) {
+							LevelRenderer.this.pipeline.setPhase(net.irisshaders.iris.pipeline.WorldRenderingPhase.NONE);
+						}
 					}
 				);
 			}
 		}
 	}
 
-	private boolean doesMobEffectBlockSky(Camera camera) {
+	public boolean doesMobEffectBlockSky(Camera camera) { // Made public for Iris sky rendering
 		return !(camera.getEntity() instanceof LivingEntity livingEntity)
 			? false
 			: livingEntity.hasEffect(MobEffects.BLINDNESS) || livingEntity.hasEffect(MobEffects.DARKNESS);
@@ -1250,24 +1358,22 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 		}
 	}
 
-	public void setBlocksDirty(int i, int j, int k, int l, int m, int n) {
-		for (int o = k - 1; o <= n + 1; o++) {
-			for (int p = i - 1; p <= l + 1; p++) {
-				for (int q = j - 1; q <= m + 1; q++) {
-					this.setSectionDirty(SectionPos.blockToSectionCoord(p), SectionPos.blockToSectionCoord(q), SectionPos.blockToSectionCoord(o));
-				}
-			}
-		}
+	public void setBlocksDirty(int minX, int minY, int minZ, int maxX, int maxY, int maxZ) {
+		// Sodium: Redirect chunk updates to our renderer
+		this.renderer.scheduleRebuildForBlockArea(minX, minY, minZ, maxX, maxY, maxZ, false);
 	}
 
 	public void setBlockDirty(BlockPos blockPos, BlockState blockState, BlockState blockState2) {
 		if (this.minecraft.getModelManager().requiresRender(blockState, blockState2)) {
-			this.setBlocksDirty(blockPos.getX(), blockPos.getY(), blockPos.getZ(), blockPos.getX(), blockPos.getY(), blockPos.getZ());
+			// Sodium: Redirect chunk updates to our renderer
+			this.renderer.scheduleRebuildForBlockArea(blockPos.getX() - 1, blockPos.getY() - 1, blockPos.getZ() - 1, 
+				blockPos.getX() + 1, blockPos.getY() + 1, blockPos.getZ() + 1, true);
 		}
 	}
 
-	public void setSectionDirtyWithNeighbors(int i, int j, int k) {
-		this.setSectionRangeDirty(i - 1, j - 1, k - 1, i + 1, j + 1, k + 1);
+	public void setSectionDirtyWithNeighbors(int x, int y, int z) {
+		// Sodium: Redirect chunk updates to our renderer  
+		this.renderer.scheduleRebuildForChunks(x - 1, y - 1, z - 1, x + 1, y + 1, z + 1, false);
 	}
 
 	public void setSectionRangeDirty(int i, int j, int k, int l, int m, int n) {
@@ -1284,8 +1390,9 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 		this.setSectionDirty(i, j, k, false);
 	}
 
-	private void setSectionDirty(int i, int j, int k, boolean bl) {
-		this.viewArea.setDirty(i, j, k, bl);
+	private void setSectionDirty(int x, int y, int z, boolean important) {
+		// Sodium: Redirect to renderer
+		this.renderer.scheduleRebuildForChunk(x, y, z, important);
 	}
 
 	public void onSectionBecomingNonEmpty(long l) {
@@ -1324,7 +1431,8 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 	}
 
 	public boolean hasRenderedAllSections() {
-		return this.sectionRenderDispatcher.isQueueEmpty();
+		// Sodium: Redirect to our renderer
+		return this.renderer.isTerrainRenderComplete();
 	}
 
 	public void onChunkReadyToRender(ChunkPos chunkPos) {
@@ -1334,6 +1442,8 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 	public void needsUpdate() {
 		this.sectionOcclusionGraph.invalidate();
 		this.cloudRenderer.markForRebuild();
+		// Sodium: Schedule terrain update
+		this.renderer.scheduleTerrainUpdate();
 	}
 
 	public static int getLightColor(BlockAndTintGetter blockAndTintGetter, BlockPos blockPos) {
@@ -1359,8 +1469,8 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 	}
 
 	public boolean isSectionCompiled(BlockPos blockPos) {
-		SectionRenderDispatcher.RenderSection renderSection = this.viewArea.getRenderSectionAt(blockPos);
-		return renderSection != null && renderSection.sectionMesh.get() != CompiledSectionMesh.UNCOMPILED;
+		// Sodium: Redirect to renderer
+		return this.renderer.isSectionReady(blockPos.getX() >> 4, blockPos.getY() >> 4, blockPos.getZ() >> 4);
 	}
 
 	@Nullable
@@ -1428,8 +1538,42 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 	// These are called from the lambda bodies to provide stable mixin targets
 	
 	public void iris$renderSkyPassBody() {
+		// Iris: From MixinLevelRenderer - Set CUSTOM_SKY phase
+		if (this.pipeline != null) {
+			this.pipeline.setPhase(net.irisshaders.iris.pipeline.WorldRenderingPhase.CUSTOM_SKY);
+		}
+		
+		// Sodium + Iris: Prevents the sky layer from rendering when the fog distance is reduced
+		// Fixes MC-152504 by canceling sky rendering when camera is submersed
+		Camera camera = Minecraft.getInstance().gameRenderer.getMainCamera();
+		
+		// When Iris pack is NOT active, use the advanced fog checks
+		if (net.irisshaders.iris.Iris.getCurrentPack().isEmpty()) {
+			net.minecraft.world.phys.Vec3 cameraPosition = camera.getPosition();
+			boolean isSubmersed = camera.getFluidInCamera() != net.minecraft.world.level.material.FogType.NONE;
+			boolean blockSky = this.doesMobEffectBlockSky(camera);
+			boolean useThickFog = this.minecraft.level.effects().isFoggyAt(net.minecraft.util.Mth.floor(cameraPosition.x()),
+				net.minecraft.util.Mth.floor(cameraPosition.y())) || this.minecraft.gui.getBossOverlay().shouldCreateWorldFog();
+			
+			if (isSubmersed || blockSky || useThickFog) {
+				if (this.pipeline != null) {
+					this.pipeline.setPhase(net.irisshaders.iris.pipeline.WorldRenderingPhase.NONE);
+				}
+				return; // Early exit cancels sky rendering
+			}
+		} else {
+			// When Iris pack is active, use simple submersion check
+			if (camera.getFluidInCamera() != net.minecraft.world.level.material.FogType.NONE || this.doesMobEffectBlockSky(camera)) {
+				if (this.pipeline != null) {
+					this.pipeline.setPhase(net.irisshaders.iris.pipeline.WorldRenderingPhase.NONE);
+				}
+				return; // Early exit cancels sky rendering
+			}
+		}
+		
 		// This method is injected into by Iris mixins for sky rendering phase changes
 		// The actual sky rendering happens in addSkyPass lambda
+		// Reset phase after sky rendering in the lambda - see addSkyPass
 	}
 	
 	public void iris$renderMainPassBody() {
@@ -1438,11 +1582,19 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 	}
 	
 	public void iris$renderWeatherPassBody() {
+		// Iris: From MixinLevelRenderer - Set RAIN_SNOW phase
+		if (this.pipeline != null) {
+			this.pipeline.setPhase(net.irisshaders.iris.pipeline.WorldRenderingPhase.RAIN_SNOW);
+		}
 		// This method is injected into by Iris mixins for weather rendering phase changes
 		// The actual weather rendering happens in addWeatherPass lambda
 	}
 	
 	public void iris$renderCloudsPassBody() {
+		// Iris: From MixinLevelRenderer - Set CLOUDS phase
+		if (this.pipeline != null) {
+			this.pipeline.setPhase(net.irisshaders.iris.pipeline.WorldRenderingPhase.CLOUDS);
+		}
 		// This method is injected into by Iris mixins for clouds rendering phase changes
 		// The actual clouds rendering happens in addCloudsPass lambda
 	}
@@ -1457,42 +1609,174 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 	}
 	
 	public void iris$renderWorldBorderBody() {
+		// Iris: From MixinLevelRenderer - Set WORLD_BORDER phase
+		if (this.pipeline != null) {
+			this.pipeline.setPhase(net.irisshaders.iris.pipeline.WorldRenderingPhase.WORLD_BORDER);
+		}
 		// This method is injected into by Iris mixins for world border rendering phase changes
 		// The actual world border rendering happens in addWeatherPass lambda
 	}
 	
 	public void iris$beginDebugRender() {
+		// Iris: From MixinLevelRenderer - Set DEBUG phase
+		if (this.pipeline != null) {
+			this.pipeline.setPhase(net.irisshaders.iris.pipeline.WorldRenderingPhase.DEBUG);
+		}
 		// This method is injected into by Iris mixins for debug rendering phase changes
 		// The actual debug rendering happens in addMainPass lambda
 	}
 	
 	public void iris$endDebugRender() {
+		// Iris: From MixinLevelRenderer - Reset to NONE phase
+		if (this.pipeline != null) {
+			this.pipeline.setPhase(net.irisshaders.iris.pipeline.WorldRenderingPhase.NONE);
+		}
 		// This method is injected into by Iris mixins for debug rendering phase changes
 		// The actual debug rendering happens in addMainPass lambda
 	}
 	
 	public void iris$beginTranslucents() {
+		// Iris: From MixinLevelRenderer - Begin hand and translucents
+		if (this.pipeline != null) {
+			this.pipeline.beginHand();
+			net.irisshaders.iris.pathways.HandRenderer.INSTANCE.renderSolid(
+				net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.getGbufferModelView(),
+				net.minecraft.client.Minecraft.getInstance().getDeltaTracker().getGameTimeDeltaPartialTick(true),
+				net.minecraft.client.Minecraft.getInstance().gameRenderer.getMainCamera(),
+				net.minecraft.client.Minecraft.getInstance().gameRenderer,
+				this.pipeline
+			);
+			net.minecraft.util.profiling.Profiler.get().popPush("iris_pre_translucent");
+			this.pipeline.beginTranslucents();
+		}
 		// This method is injected into by Iris mixins for translucent rendering phase changes
 		// The actual translucent rendering happens in addMainPass lambda
 	}
 	
 	// Wrapper method for terrain chunk rendering - allows Iris mixins to intercept
 	public void iris$renderTerrainGroup(ChunkSectionsToRender chunkSectionsToRender, ChunkSectionLayerGroup group) {
-		chunkSectionsToRender.renderGroup(group);
+		// Iris: From MixinLevelRenderer - Set phase based on terrain render type
+		if (this.pipeline != null) {
+			this.pipeline.setPhase(net.irisshaders.iris.pipeline.WorldRenderingPhase.fromTerrainRenderType(group));
+		}
+		
+		// Iris: From MixinLevelRenderer_SkipRendering - skip chunk rendering if pipeline requests
+		if (net.irisshaders.iris.Iris.getPipelineManager().getPipelineNullable() instanceof net.irisshaders.iris.pipeline.IrisRenderingPipeline pipeline) {
+			if (!pipeline.skipAllRendering()) {
+				chunkSectionsToRender.renderGroup(group);
+			}
+		} else {
+			chunkSectionsToRender.renderGroup(group);
+		}
+		
+		// Iris: Reset phase after rendering
+		if (this.pipeline != null) {
+			this.pipeline.setPhase(net.irisshaders.iris.pipeline.WorldRenderingPhase.NONE);
+		}
 	}
 	
 	// Wrapper method for feature rendering in main pass - allows Iris mixins to intercept
 	public void iris$renderAllFeaturesMain() {
-		this.featureRenderDispatcher.renderAllFeatures();
+		// Iris: From MixinLevelRenderer (fantastic) - Handle particle rendering phases
+		net.irisshaders.iris.shaderpack.properties.ParticleRenderingSettings settings = net.irisshaders.iris.Iris.getPipelineManager().getPipeline()
+			.map(net.irisshaders.iris.pipeline.WorldRenderingPipeline::getParticleRenderingSettings)
+			.orElse(net.irisshaders.iris.shaderpack.properties.ParticleRenderingSettings.MIXED);
+		
+		if (settings == net.irisshaders.iris.shaderpack.properties.ParticleRenderingSettings.AFTER) {
+			// After mode: just render features normally
+			this.featureRenderDispatcher.renderAllFeatures();
+			return;
+		} else {
+			// Before or Mixed mode: submit particles first, then render with phase control
+			this.particlesRenderState.submit(this.submitNodeStorage, this.levelRenderState.cameraRenderState);
+			((net.irisshaders.iris.fantastic.PhasedParticleEngine) this.featureRenderDispatcher.particleFeatureRenderer)
+				.setParticleRenderingPhase(settings == net.irisshaders.iris.shaderpack.properties.ParticleRenderingSettings.BEFORE 
+					? net.irisshaders.iris.fantastic.ParticleRenderingPhase.EVERYTHING 
+					: net.irisshaders.iris.fantastic.ParticleRenderingPhase.OPAQUE);
+			this.featureRenderDispatcher.renderAllFeatures();
+			((net.irisshaders.iris.fantastic.PhasedParticleEngine) this.featureRenderDispatcher.particleFeatureRenderer)
+				.setParticleRenderingPhase(net.irisshaders.iris.fantastic.ParticleRenderingPhase.EVERYTHING);
+			
+			if (settings == net.irisshaders.iris.shaderpack.properties.ParticleRenderingSettings.BEFORE) {
+				this.particlesRenderState.reset();
+			}
+		}
 	}
 	
 	// Wrapper method for particle submission - allows Iris mixins to intercept
 	public void iris$submitParticles() {
-		this.particlesRenderState.submit(this.submitNodeStorage, this.levelRenderState.cameraRenderState);
+		// Iris: From MixinLevelRenderer (fantastic) - Redirect to avoid item pickup particles in Mixed mode
+		net.irisshaders.iris.shaderpack.properties.ParticleRenderingSettings settings = net.irisshaders.iris.Iris.getPipelineManager().getPipeline()
+			.map(net.irisshaders.iris.pipeline.WorldRenderingPipeline::getParticleRenderingSettings)
+			.orElse(net.irisshaders.iris.shaderpack.properties.ParticleRenderingSettings.MIXED);
+		
+		if (settings == net.irisshaders.iris.shaderpack.properties.ParticleRenderingSettings.MIXED) {
+			((net.irisshaders.iris.mixinterface.ParticleRenderStateExtension) this.particlesRenderState)
+				.submitWithoutItems(this.submitNodeStorage, this.levelRenderState.cameraRenderState);
+		} else {
+			this.particlesRenderState.submit(this.submitNodeStorage, this.levelRenderState.cameraRenderState);
+		}
 	}
 	
 	// Wrapper method for feature rendering in particles pass - allows Iris mixins to intercept
 	public void iris$renderAllFeaturesParticles() {
+		// Iris: From MixinLevelRenderer (fantastic) - Render translucent particles with phase control
+		net.irisshaders.iris.shaderpack.properties.ParticleRenderingSettings settings = net.irisshaders.iris.Iris.getPipelineManager().getPipeline()
+			.map(net.irisshaders.iris.pipeline.WorldRenderingPipeline::getParticleRenderingSettings)
+			.orElse(net.irisshaders.iris.shaderpack.properties.ParticleRenderingSettings.MIXED);
+		
+		((net.irisshaders.iris.fantastic.PhasedParticleEngine) this.featureRenderDispatcher.particleFeatureRenderer)
+			.setParticleRenderingPhase(settings == net.irisshaders.iris.shaderpack.properties.ParticleRenderingSettings.AFTER 
+				? net.irisshaders.iris.fantastic.ParticleRenderingPhase.EVERYTHING 
+				: net.irisshaders.iris.fantastic.ParticleRenderingPhase.TRANSLUCENT);
 		this.featureRenderDispatcher.renderAllFeatures();
+		((net.irisshaders.iris.fantastic.PhasedParticleEngine) this.featureRenderDispatcher.particleFeatureRenderer)
+			.setParticleRenderingPhase(net.irisshaders.iris.fantastic.ParticleRenderingPhase.EVERYTHING);
+	}
+	
+	// Iris: From shadows.MixinLevelRenderer - implement CullingDataCache interface
+	@Override
+	public void saveState() {
+		iris$swap();
+	}
+
+	@Override
+	public void restoreState() {
+		iris$swap();
+	}
+
+	private void iris$swap() {
+		// Swap the contents of the lists, not the references (visibleSections is final)
+		ObjectArrayList<SectionRenderDispatcher.RenderSection> tmpList = new ObjectArrayList<>(visibleSections);
+		visibleSections.clear();
+		visibleSections.addAll(iris$savedRenderChunks);
+		iris$savedRenderChunks.clear();
+		iris$savedRenderChunks.addAll(tmpList);
+		
+		double tmp;
+
+		tmp = prevCamRotX;
+		prevCamRotX = iris$savedLastCameraPitch;
+		iris$savedLastCameraPitch = tmp;
+
+		tmp = prevCamRotY;
+		prevCamRotY = iris$savedLastCameraYaw;
+		iris$savedLastCameraYaw = tmp;
+	}
+
+	// Sodium: LevelRendererExtension interface implementation
+	@Override
+	public net.caffeinemc.mods.sodium.client.render.SodiumWorldRenderer sodium$getWorldRenderer() {
+		return this.renderer;
+	}
+
+	@Override
+	public void sodium$setMatrices(net.caffeinemc.mods.sodium.client.render.chunk.ChunkRenderMatrices matrices) {
+		this.matrices = matrices;
+	}
+
+	@Override
+	public net.caffeinemc.mods.sodium.client.render.chunk.ChunkRenderMatrices sodium$getMatrices() {
+		return this.matrices;
 	}
 }

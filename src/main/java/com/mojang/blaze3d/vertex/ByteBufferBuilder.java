@@ -13,7 +13,7 @@ import org.lwjgl.system.MemoryUtil.MemoryAllocator;
 import org.slf4j.Logger;
 
 @Environment(EnvType.CLIENT)
-public class ByteBufferBuilder implements AutoCloseable {
+public class ByteBufferBuilder implements AutoCloseable, net.irisshaders.iris.vertices.MojangBufferAccessor {
 	private static final MemoryPool MEMORY_POOL = TracyClient.createMemoryPool("ByteBufferBuilder");
 	private static final Logger LOGGER = LogUtils.getLogger();
 	private static final MemoryAllocator ALLOCATOR = MemoryUtil.getAllocator(false);
@@ -175,5 +175,11 @@ public class ByteBufferBuilder implements AutoCloseable {
 				}
 			}
 		}
+	}
+	
+	// Iris: Implementation of MojangBufferAccessor
+	@Override
+	public long getPointer() {
+		return this.pointer;
 	}
 }

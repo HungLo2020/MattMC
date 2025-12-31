@@ -123,6 +123,12 @@ public class FireworkParticles {
 				this.engine.add(sparkParticle);
 			}
 		}
+		
+		// Iris: April Fools override - use TERRAIN layer when IS_FOOL is enabled
+		@Override
+		public Layer getLayer() {
+			return net.irisshaders.iris.Iris.IS_FOOL ? Layer.TERRAIN : Layer.OPAQUE;
+		}
 	}
 
 	@Environment(EnvType.CLIENT)

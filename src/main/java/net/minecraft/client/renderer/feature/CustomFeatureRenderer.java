@@ -26,9 +26,16 @@ public class CustomFeatureRenderer {
 			VertexConsumer vertexConsumer = bufferSource.getBuffer((RenderType)entry.getKey());
 
 			for (SubmitNodeStorage.CustomGeometrySubmit customGeometrySubmit : (List<SubmitNodeStorage.CustomGeometrySubmit>)entry.getValue()) {
+				// Iris: Set model storage before rendering
+				((net.irisshaders.iris.mixinterface.ModelStorage) (Object) customGeometrySubmit).iris$set();
 				customGeometrySubmit.customGeometryRenderer().render(customGeometrySubmit.pose(), vertexConsumer);
 			}
 		}
+		
+		// Iris: Clear captured rendering state
+		net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setCurrentRenderedItem(0);
+		net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setCurrentEntity(0);
+		net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setCurrentBlockEntity(0);
 	}
 
 	@Environment(EnvType.CLIENT)

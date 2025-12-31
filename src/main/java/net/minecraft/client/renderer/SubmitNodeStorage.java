@@ -28,11 +28,23 @@ import org.joml.Quaternionf;
 import org.joml.Vector3f;
 
 @Environment(EnvType.CLIENT)
-public class SubmitNodeStorage implements SubmitNodeCollector {
+public class SubmitNodeStorage implements SubmitNodeCollector, net.caffeinemc.mods.sodium.client.render.frapi.render.OrderedSubmitNodeCollectorExtension {
 	private final Int2ObjectAVLTreeMap<SubmitNodeCollection> submitsPerOrder = new Int2ObjectAVLTreeMap<>();
 
 	public SubmitNodeCollection order(int i) {
 		return this.submitsPerOrder.computeIfAbsent(i, ix -> new SubmitNodeCollection(this));
+	}
+	
+	// Sodium FRAPI: Ordered item submission support
+	@Override
+	public void fabric_submitItem(PoseStack matrices, ItemDisplayContext displayContext, int light, int overlay, int outlineColors, int[] tintLayers, List<BakedQuad> quads, RenderType renderLayer, ItemStackRenderState.FoilType foilType, net.fabricmc.fabric.api.renderer.v1.mesh.MeshView mesh) {
+		SubmitNodeCollection queue = order(0);
+
+		if (queue instanceof net.caffeinemc.mods.sodium.client.render.frapi.render.OrderedSubmitNodeCollectorExtension access) {
+			access.fabric_submitItem(matrices, displayContext, light, overlay, outlineColors, tintLayers, quads, renderLayer, foilType, mesh);
+		} else {
+			queue.submitItem(matrices, displayContext, light, overlay, outlineColors, tintLayers, quads, renderLayer, foilType);
+		}
 	}
 
 	@Override
@@ -166,7 +178,47 @@ public class SubmitNodeStorage implements SubmitNodeCollector {
 	}
 
 	@Environment(EnvType.CLIENT)
-	public record CustomGeometrySubmit(PoseStack.Pose pose, SubmitNodeCollector.CustomGeometryRenderer customGeometryRenderer) {
+	public record CustomGeometrySubmit(PoseStack.Pose pose, SubmitNodeCollector.CustomGeometryRenderer customGeometryRenderer) implements net.irisshaders.iris.mixinterface.ModelStorage {
+		private static final java.util.WeakHashMap<CustomGeometrySubmit, ModelStorageData> STORAGE = new java.util.WeakHashMap<>();
+		
+		public CustomGeometrySubmit {
+			// Iris: Capture state on construction
+			ModelStorageData data = STORAGE.computeIfAbsent(this, k -> new ModelStorageData());
+			data.entityId = net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.getCurrentRenderedEntity();
+			data.beId = net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.getCurrentRenderedBlockEntity();
+			data.itemId = net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.getCurrentRenderedItem();
+			data.isRenderingBEs = net.irisshaders.iris.vertices.ImmediateState.isRenderingBEs;
+		}
+		
+		@Override
+		public void iris$capture() {
+			ModelStorageData data = STORAGE.computeIfAbsent(this, k -> new ModelStorageData());
+			data.entityId = net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.getCurrentRenderedEntity();
+			data.beId = net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.getCurrentRenderedBlockEntity();
+			data.itemId = net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.getCurrentRenderedItem();
+			data.isRenderingBEs = net.irisshaders.iris.vertices.ImmediateState.isRenderingBEs;
+		}
+		
+		@Override
+		public void iris$set() {
+			ModelStorageData data = STORAGE.get(this);
+			if (data != null) {
+				net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setCurrentEntity(data.entityId);
+				net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setCurrentBlockEntity(data.beId);
+				net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setCurrentRenderedItem(data.itemId);
+			}
+		}
+		
+		@Override
+		public boolean iris$wasBE() {
+			ModelStorageData data = STORAGE.get(this);
+			return data != null && data.isRenderingBEs;
+		}
+		
+		private static class ModelStorageData {
+			int entityId, beId, itemId;
+			boolean isRenderingBEs;
+		}
 	}
 
 	@Environment(EnvType.CLIENT)
@@ -188,7 +240,39 @@ public class SubmitNodeStorage implements SubmitNodeCollector {
 		List<BakedQuad> quads,
 		RenderType renderType,
 		ItemStackRenderState.FoilType foilType
-	) {
+	) implements net.irisshaders.iris.mixinterface.ModelStorage {
+		// Iris: ModelStorage implementation using WeakHashMap to store per-instance state
+		private static final java.util.WeakHashMap<ItemSubmit, ModelStorageData> STORAGE = new java.util.WeakHashMap<>();
+		
+		@Override
+		public void iris$capture() {
+			ModelStorageData data = STORAGE.computeIfAbsent(this, k -> new ModelStorageData());
+			data.entityId = net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.getCurrentRenderedEntity();
+			data.beId = net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.getCurrentRenderedBlockEntity();
+			data.itemId = net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.getCurrentRenderedItem();
+			data.isRenderingBEs = net.irisshaders.iris.vertices.ImmediateState.isRenderingBEs;
+		}
+		
+		@Override
+		public void iris$set() {
+			ModelStorageData data = STORAGE.get(this);
+			if (data != null) {
+				net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setCurrentEntity(data.entityId);
+				net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setCurrentBlockEntity(data.beId);
+				net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setCurrentRenderedItem(data.itemId);
+			}
+		}
+		
+		@Override
+		public boolean iris$wasBE() {
+			ModelStorageData data = STORAGE.get(this);
+			return data != null && data.isRenderingBEs;
+		}
+		
+		private static class ModelStorageData {
+			int entityId, beId, itemId;
+			boolean isRenderingBEs;
+		}
 	}
 
 	@Environment(EnvType.CLIENT)
@@ -207,7 +291,38 @@ public class SubmitNodeStorage implements SubmitNodeCollector {
 		int tintedColor,
 		@Nullable ModelFeatureRenderer.CrumblingOverlay crumblingOverlay,
 		int outlineColor
-	) {
+	) implements net.irisshaders.iris.mixinterface.ModelStorage {
+		private static final java.util.WeakHashMap<ModelPartSubmit, ModelStorageData> STORAGE = new java.util.WeakHashMap<>();
+		
+		@Override
+		public void iris$capture() {
+			ModelStorageData data = STORAGE.computeIfAbsent(this, k -> new ModelStorageData());
+			data.entityId = net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.getCurrentRenderedEntity();
+			data.beId = net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.getCurrentRenderedBlockEntity();
+			data.itemId = net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.getCurrentRenderedItem();
+			data.isRenderingBEs = net.irisshaders.iris.vertices.ImmediateState.isRenderingBEs;
+		}
+		
+		@Override
+		public void iris$set() {
+			ModelStorageData data = STORAGE.get(this);
+			if (data != null) {
+				net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setCurrentEntity(data.entityId);
+				net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setCurrentBlockEntity(data.beId);
+				net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setCurrentRenderedItem(data.itemId);
+			}
+		}
+		
+		@Override
+		public boolean iris$wasBE() {
+			ModelStorageData data = STORAGE.get(this);
+			return data != null && data.isRenderingBEs;
+		}
+		
+		private static class ModelStorageData {
+			int entityId, beId, itemId;
+			boolean isRenderingBEs;
+		}
 	}
 
 	@Environment(EnvType.CLIENT)
@@ -221,7 +336,38 @@ public class SubmitNodeStorage implements SubmitNodeCollector {
 		@Nullable TextureAtlasSprite sprite,
 		int outlineColor,
 		@Nullable ModelFeatureRenderer.CrumblingOverlay crumblingOverlay
-	) {
+	) implements net.irisshaders.iris.mixinterface.ModelStorage {
+		private static final java.util.WeakHashMap<ModelSubmit<?>, ModelStorageData> STORAGE = new java.util.WeakHashMap<>();
+		
+		@Override
+		public void iris$capture() {
+			ModelStorageData data = STORAGE.computeIfAbsent(this, k -> new ModelStorageData());
+			data.entityId = net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.getCurrentRenderedEntity();
+			data.beId = net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.getCurrentRenderedBlockEntity();
+			data.itemId = net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.getCurrentRenderedItem();
+			data.isRenderingBEs = net.irisshaders.iris.vertices.ImmediateState.isRenderingBEs;
+		}
+		
+		@Override
+		public void iris$set() {
+			ModelStorageData data = STORAGE.get(this);
+			if (data != null) {
+				net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setCurrentEntity(data.entityId);
+				net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setCurrentBlockEntity(data.beId);
+				net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setCurrentRenderedItem(data.itemId);
+			}
+		}
+		
+		@Override
+		public boolean iris$wasBE() {
+			ModelStorageData data = STORAGE.get(this);
+			return data != null && data.isRenderingBEs;
+		}
+		
+		private static class ModelStorageData {
+			int entityId, beId, itemId;
+			boolean isRenderingBEs;
+		}
 	}
 
 	@Environment(EnvType.CLIENT)
@@ -248,7 +394,38 @@ public class SubmitNodeStorage implements SubmitNodeCollector {
 		int color,
 		int backgroundColor,
 		int outlineColor
-	) {
+	) implements net.irisshaders.iris.mixinterface.ModelStorage {
+		private static final java.util.WeakHashMap<TextSubmit, ModelStorageData> STORAGE = new java.util.WeakHashMap<>();
+		
+		@Override
+		public void iris$capture() {
+			ModelStorageData data = STORAGE.computeIfAbsent(this, k -> new ModelStorageData());
+			data.entityId = net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.getCurrentRenderedEntity();
+			data.beId = net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.getCurrentRenderedBlockEntity();
+			data.itemId = net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.getCurrentRenderedItem();
+			data.isRenderingBEs = net.irisshaders.iris.vertices.ImmediateState.isRenderingBEs;
+		}
+		
+		@Override
+		public void iris$set() {
+			ModelStorageData data = STORAGE.get(this);
+			if (data != null) {
+				net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setCurrentEntity(data.entityId);
+				net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setCurrentBlockEntity(data.beId);
+				net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setCurrentRenderedItem(data.itemId);
+			}
+		}
+		
+		@Override
+		public boolean iris$wasBE() {
+			ModelStorageData data = STORAGE.get(this);
+			return data != null && data.isRenderingBEs;
+		}
+		
+		private static class ModelStorageData {
+			int entityId, beId, itemId;
+			boolean isRenderingBEs;
+		}
 	}
 
 	@Environment(EnvType.CLIENT)

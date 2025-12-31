@@ -28,7 +28,7 @@ import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 
 @Environment(EnvType.CLIENT)
-public class TextureAtlas extends AbstractTexture implements Dumpable, Tickable {
+public class TextureAtlas extends AbstractTexture implements Dumpable, Tickable, net.irisshaders.iris.pbr.texture.TextureAtlasExtension {
 	private static final Logger LOGGER = LogUtils.getLogger();
 	@Deprecated
 	public static final ResourceLocation LOCATION_BLOCKS = ResourceLocation.withDefaultNamespace("textures/atlas/blocks.png");
@@ -36,14 +36,18 @@ public class TextureAtlas extends AbstractTexture implements Dumpable, Tickable 
 	public static final ResourceLocation LOCATION_PARTICLES = ResourceLocation.withDefaultNamespace("textures/atlas/particles.png");
 	private List<SpriteContents> sprites = List.of();
 	private List<TextureAtlasSprite.Ticker> animatedTextures = List.of();
-	private Map<ResourceLocation, TextureAtlasSprite> texturesByName = Map.of();
+	public Map<ResourceLocation, TextureAtlasSprite> texturesByName = Map.of();
 	@Nullable
 	private TextureAtlasSprite missingSprite;
 	private final ResourceLocation location;
 	private final int maxSupportedTextureSize;
-	private int width;
-	private int height;
-	private int mipLevel;
+	public int width;
+	public int height;
+	public int mipLevel;
+	
+	// Iris PBR: From texture.pbr.MixinTextureAtlas - PBR atlas holder
+	@Nullable
+	private net.irisshaders.iris.pbr.texture.PBRAtlasHolder iris$pbrHolder;
 
 	public TextureAtlas(ResourceLocation resourceLocation) {
 		this.location = resourceLocation;
@@ -110,6 +114,9 @@ public class TextureAtlas extends AbstractTexture implements Dumpable, Tickable 
 		for (TextureAtlasHooks hook : HookRegistry.getTextureAtlasHooks()) {
 			hook.onAtlasUpload(this, this.location, preparations);
 		}
+		
+		// Iris PBR: From texture.pbr.MixinTextureAtlas - track texture after upload
+		net.irisshaders.iris.pbr.TextureTracker.INSTANCE.trackTexture(texture.iris$getGlId(), this);
 	}
 
 	@Override
@@ -166,6 +173,10 @@ public class TextureAtlas extends AbstractTexture implements Dumpable, Tickable 
 				ticker.tickAndUpload(this.texture);
 			}
 		}
+		// Iris PBR: From texture.pbr.MixinTextureAtlas - cycle PBR animation frames
+		if (iris$pbrHolder != null) {
+			iris$pbrHolder.cycleAnimationFrames();
+		}
 	}
 
 	@Override
@@ -208,11 +219,26 @@ public class TextureAtlas extends AbstractTexture implements Dumpable, Tickable 
 		return this.maxSupportedTextureSize;
 	}
 
-	int getWidth() {
+	public int getWidth() {
 		return this.width;
 	}
 
-	int getHeight() {
+	public int getHeight() {
 		return this.height;
+	}
+	
+	// Iris PBR: From texture.pbr.MixinTextureAtlas - PBR holder interface implementation
+	@Override
+	@Nullable
+	public net.irisshaders.iris.pbr.texture.PBRAtlasHolder getPBRHolder() {
+		return iris$pbrHolder;
+	}
+	
+	@Override
+	public net.irisshaders.iris.pbr.texture.PBRAtlasHolder getOrCreatePBRHolder() {
+		if (iris$pbrHolder == null) {
+			iris$pbrHolder = new net.irisshaders.iris.pbr.texture.PBRAtlasHolder();
+		}
+		return iris$pbrHolder;
 	}
 }

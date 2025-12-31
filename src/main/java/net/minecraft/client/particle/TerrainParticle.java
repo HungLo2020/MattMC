@@ -17,6 +17,8 @@ public class TerrainParticle extends SingleQuadParticle {
 	private final BlockPos pos;
 	private final float uo;
 	private final float vo;
+	// Iris: Track whether particle is opaque (from MixinTerrainParticle)
+	private boolean isOpaque;
 
 	public TerrainParticle(ClientLevel clientLevel, double d, double e, double f, double g, double h, double i, BlockState blockState) {
 		this(clientLevel, d, e, f, g, h, i, blockState, BlockPos.containing(d, e, f));
@@ -39,10 +41,22 @@ public class TerrainParticle extends SingleQuadParticle {
 		this.quadSize /= 2.0F;
 		this.uo = this.random.nextFloat() * 3.0F;
 		this.vo = this.random.nextFloat() * 3.0F;
+		
+		// Iris: Resolve translucency (from MixinTerrainParticle)
+		net.minecraft.client.renderer.chunk.ChunkSectionLayer type = net.minecraft.client.renderer.ItemBlockRenderTypes.getChunkRenderType(blockState);
+		if (type == net.minecraft.client.renderer.chunk.ChunkSectionLayer.SOLID || 
+		    type == net.minecraft.client.renderer.chunk.ChunkSectionLayer.CUTOUT || 
+		    type == net.minecraft.client.renderer.chunk.ChunkSectionLayer.CUTOUT_MIPPED) {
+			isOpaque = true;
+		}
 	}
 
 	@Override
 	public SingleQuadParticle.Layer getLayer() {
+		// Iris: Override particle sheet for opaque particles (from MixinTerrainParticle)
+		if (isOpaque) {
+			return net.irisshaders.iris.fantastic.IrisParticleRenderTypes.TERRAIN_OPAQUE;
+		}
 		return SingleQuadParticle.Layer.TERRAIN;
 	}
 

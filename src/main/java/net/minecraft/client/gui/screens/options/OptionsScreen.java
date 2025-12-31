@@ -98,6 +98,34 @@ public class OptionsScreen extends Screen {
 			AbstractWidget var10000 = this.addRenderableWidget(guiEventListener);
 		});
 		this.repositionElements();
+		
+		// DH: Add options button if enabled
+		if (com.seibel.distanthorizons.core.config.Config.Client.showDhOptionsButtonInMinecraftUi.get()) {
+			com.seibel.distanthorizons.common.wrappers.gui.TexturedButtonWidget dhButton = createDhOptionsButton();
+			this.addRenderableWidget(dhButton);
+			
+			// Add to layout - to the left of FOV slider
+			LinearLayout headerLayout = (LinearLayout) this.layout.headerFrame.children.get(0).child;
+			java.util.concurrent.atomic.AtomicInteger width = new java.util.concurrent.atomic.AtomicInteger(0);
+			headerLayout.visitChildren(x -> { width.addAndGet(x.getWidth()); });
+			width.addAndGet(-10); // padding between DH button and FOV slider
+			
+			headerLayout.wrapped.addChild(dhButton, 1, 2, (settings) -> { settings.paddingLeft(width.get() * -1); });
+			headerLayout.arrangeElements();
+		}
+	}
+	
+	private com.seibel.distanthorizons.common.wrappers.gui.TexturedButtonWidget createDhOptionsButton() {
+		net.minecraft.resources.ResourceLocation iconTexture = net.minecraft.resources.ResourceLocation.fromNamespaceAndPath("minecraft", "textures/gui/distanthorizons_button.png");
+		return new com.seibel.distanthorizons.common.wrappers.gui.TexturedButtonWidget(
+			this.width / 2 - 180, this.height / 6 - 12,
+			20, 20,
+			0, 0,
+			20, iconTexture, 20, 40,
+			(buttonWidget) -> java.util.Objects.requireNonNull(this.minecraft).setScreen(
+				com.seibel.distanthorizons.common.wrappers.gui.GetConfigScreen.getScreen(this)),
+			net.minecraft.network.chat.Component.translatable(com.seibel.distanthorizons.coreapi.ModInfo.ID + ".title")
+		);
 	}
 
 	@Override

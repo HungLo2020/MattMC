@@ -26,6 +26,8 @@ public class ItemRenderer {
 	public static final float SPECIAL_FOIL_FIRST_PERSON_SCALE = 0.75F;
 	public static final float SPECIAL_FOIL_TEXTURE_SCALE = 0.0078125F;
 	public static final int NO_TINT = -1;
+	// Sodium: Thread-local random for fast item rendering (merged from ItemRendererMixin)
+	private static final ThreadLocal<net.minecraft.util.RandomSource> sodium$random = ThreadLocal.withInitial(() -> new net.minecraft.world.level.levelgen.SingleThreadedRandomSource(42L));
 
 	public static void renderItem(
 		ItemDisplayContext itemDisplayContext,
@@ -55,7 +57,7 @@ public class ItemRenderer {
 		renderQuadList(poseStack, vertexConsumer, list, is, i, j);
 	}
 
-	private static VertexConsumer getSpecialFoilBuffer(MultiBufferSource multiBufferSource, RenderType renderType, PoseStack.Pose pose) {
+	public static VertexConsumer getSpecialFoilBuffer(MultiBufferSource multiBufferSource, RenderType renderType, PoseStack.Pose pose) { // Made public for Sodium FRAPI integration
 		return VertexMultiConsumer.create(
 			new SheetedDecalTextureGenerator(
 				multiBufferSource.getBuffer(useTransparentGlint(renderType) ? RenderType.glintTranslucent() : RenderType.glint()), pose, 0.0078125F
@@ -93,6 +95,15 @@ public class ItemRenderer {
 	}
 
 	private static void renderQuadList(PoseStack poseStack, VertexConsumer vertexConsumer, List<BakedQuad> list, int[] is, int i, int j) {
+		// Sodium: Use fast rendering path if available (merged from ItemRendererMixin)
+		var writer = net.caffeinemc.mods.sodium.client.render.vertex.VertexConsumerUtils.convertOrLog(vertexConsumer);
+
+		if (writer != null && !list.isEmpty()) {
+			sodium$renderBakedItemQuads(poseStack.last(), writer, list, is, i, j);
+			return;
+		}
+
+		// Fallback to vanilla rendering
 		PoseStack.Pose pose = poseStack.last();
 
 		for (BakedQuad bakedQuad : list) {
@@ -114,6 +125,32 @@ public class ItemRenderer {
 			}
 
 			vertexConsumer.putBulkData(pose, bakedQuad, g, h, l, f, i, j);
+		}
+	}
+
+	// Sodium: Fast item quad rendering (merged from ItemRendererMixin)
+	@SuppressWarnings("ForLoopReplaceableByForEach")
+	private static void sodium$renderBakedItemQuads(PoseStack.Pose matrices, net.sodium.api.vertex.buffer.VertexBufferWriter writer, List<BakedQuad> quads, int[] colors, int light, int overlay) {
+		for (int i = 0; i < quads.size(); i++) {
+			BakedQuad bakedQuad = quads.get(i);
+
+			if (bakedQuad.vertices().length < 32) {
+				continue; // ignore bad quads
+			}
+
+			net.caffeinemc.mods.sodium.client.model.quad.BakedQuadView quad = (net.caffeinemc.mods.sodium.client.model.quad.BakedQuadView) (Object) bakedQuad;
+
+			int color = 0xFFFFFFFF;
+
+			if (bakedQuad.isTinted()) {
+				color = net.sodium.api.util.ColorARGB.toABGR(getLayerColorSafe(colors, bakedQuad.tintIndex()));
+			}
+
+			net.caffeinemc.mods.sodium.client.render.immediate.model.BakedModelEncoder.writeQuadVertices(writer, matrices, quad, color, light, overlay, net.caffeinemc.mods.sodium.client.render.immediate.model.BakedModelEncoder.shouldMultiplyAlpha());
+
+			if (quad.getSprite() != null) {
+				net.sodium.api.texture.SpriteUtil.INSTANCE.markSpriteActive(quad.getSprite());
+			}
 		}
 	}
 }

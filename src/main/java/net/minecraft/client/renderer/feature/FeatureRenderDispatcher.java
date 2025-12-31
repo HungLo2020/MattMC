@@ -30,7 +30,7 @@ public class FeatureRenderDispatcher implements AutoCloseable {
 	private final ItemFeatureRenderer itemFeatureRenderer = new ItemFeatureRenderer();
 	private final CustomFeatureRenderer customFeatureRenderer = new CustomFeatureRenderer();
 	private final BlockFeatureRenderer blockFeatureRenderer = new BlockFeatureRenderer();
-	private final ParticleFeatureRenderer particleFeatureRenderer = new ParticleFeatureRenderer();
+	public final ParticleFeatureRenderer particleFeatureRenderer = new ParticleFeatureRenderer(); // Made public for Iris particle rendering integration
 
 	public FeatureRenderDispatcher(
 		SubmitNodeStorage submitNodeStorage,

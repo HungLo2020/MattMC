@@ -1,15 +1,19 @@
 package net.minecraft.client.renderer.culling;
 
+import net.caffeinemc.mods.sodium.client.render.viewport.Viewport;
+import net.caffeinemc.mods.sodium.client.render.viewport.ViewportProvider;
+import net.caffeinemc.mods.sodium.client.render.viewport.frustum.SimpleFrustum;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.world.level.levelgen.structure.BoundingBox;
 import net.minecraft.world.phys.AABB;
 import org.joml.FrustumIntersection;
 import org.joml.Matrix4f;
+import org.joml.Vector3d;
 import org.joml.Vector4f;
 
 @Environment(EnvType.CLIENT)
-public class Frustum {
+public class Frustum implements ViewportProvider {
 	public static final int OFFSET_STEP = 4;
 	private final FrustumIntersection intersection = new FrustumIntersection();
 	private final Matrix4f matrix = new Matrix4f();
@@ -126,5 +130,10 @@ public class Frustum {
 
 	public double getCamZ() {
 		return this.camZ;
+	}
+
+	@Override
+	public Viewport sodium$createViewport() {
+		return new Viewport(new SimpleFrustum(this.intersection), new Vector3d(this.camX, this.camY, this.camZ));
 	}
 }

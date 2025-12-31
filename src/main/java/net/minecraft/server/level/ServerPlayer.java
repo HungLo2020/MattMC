@@ -202,7 +202,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 
-public class ServerPlayer extends Player {
+public class ServerPlayer extends Player implements com.seibel.distanthorizons.common.wrappers.misc.IMixinServerPlayer {
 	private static final Logger LOGGER = LogUtils.getLogger();
 	private static final int NEUTRAL_MOB_DEATH_NOTIFICATION_RADII_XZ = 32;
 	private static final int NEUTRAL_MOB_DEATH_NOTIFICATION_RADII_Y = 10;
@@ -248,6 +248,9 @@ public class ServerPlayer extends Player {
 	private Entity camera;
 	private boolean isChangingDimension;
 	public boolean seenCredits = false;
+	// DH: Track dimension change destination
+	@Nullable
+	private ServerLevel dimensionChangeDestination;
 	private final ServerRecipeBook recipeBook;
 	@Nullable
 	private Vec3 levitationStartPos;
@@ -1071,6 +1074,9 @@ public class ServerPlayer extends Player {
 
 	@Nullable
 	public ServerPlayer teleport(TeleportTransition teleportTransition) {
+		// DH: Track dimension change destination
+		this.dimensionChangeDestination = teleportTransition.newLevel();
+		
 		if (this.isRemoved()) {
 			return null;
 		} else {
@@ -1973,6 +1979,8 @@ public class ServerPlayer extends Player {
 	public void setServerLevel(ServerLevel serverLevel) {
 		this.setLevel(serverLevel);
 		this.gameMode.setLevel(serverLevel);
+		// DH: Clear dimension change destination after level is set
+		this.dimensionChangeDestination = null;
 	}
 
 	@Nullable
@@ -2241,6 +2249,13 @@ public class ServerPlayer extends Player {
 			Vec3 vec32 = Vec3.atBottomCenterOf(blockPos).subtract(vec3).normalize();
 			return (float)Mth.wrapDegrees(Mth.atan2(vec32.z, vec32.x) * 180.0F / (float)Math.PI - 90.0);
 		}
+	}
+
+	// DH: Implementation of IMixinServerPlayer interface
+	@Override
+	@org.jetbrains.annotations.Nullable
+	public ServerLevel distantHorizons$getDimensionChangeDestination() {
+		return this.dimensionChangeDestination;
 	}
 
 	public record SavedPosition(Optional<ResourceKey<Level>> dimension, Optional<Vec3> position, Optional<Vec2> rotation) {

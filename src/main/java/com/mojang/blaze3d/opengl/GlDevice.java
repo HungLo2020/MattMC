@@ -58,6 +58,8 @@ public class GlDevice implements GpuDevice {
 	private final BufferStorage bufferStorage;
 	private final Set<String> enabledExtensions = new HashSet();
 	private final int uniformOffsetAlignment;
+	// Iris: Track missing shaders to avoid log spam
+	private Set<RenderPipeline> missingShaders = new HashSet();
 
 	public GlDevice(long l, int i, boolean bl, BiFunction<ResourceLocation, ShaderType, String> biFunction, boolean bl2) {
 		GLFW.glfwMakeContextCurrent(l);
@@ -332,8 +334,37 @@ public class GlDevice implements GpuDevice {
 	}
 
 	protected GlRenderPipeline getOrCompilePipeline(RenderPipeline renderPipeline) {
+		// Iris: Check for shader overrides first
+		if (renderPipeline != net.irisshaders.iris.pipeline.CompositeRenderer.COMPOSITE_PIPELINE) {
+			net.irisshaders.iris.pipeline.WorldRenderingPipeline pipeline = net.irisshaders.iris.Iris.getPipelineManager().getPipelineNullable();
+
+			if (pipeline instanceof net.irisshaders.iris.pipeline.IrisRenderingPipeline irisPipeline 
+				&& irisPipeline.shouldOverrideShaders() 
+				&& !net.irisshaders.iris.vertices.ImmediateState.bypass) {
+				
+				GlProgram program = overrideIrisProgram(irisPipeline, renderPipeline);
+
+				if (program != null) {
+					return new GlRenderPipeline(renderPipeline, program);
+				} else if (missingShaders.add(renderPipeline)) {
+					if (renderPipeline.getLocation().getNamespace().equals("minecraft")) {
+						LOGGER.error("Missing program " + renderPipeline.getLocation() + " in Iris override list. This is likely an Iris bug!!!", new Throwable());
+					} else {
+						LOGGER.warn("Missing program " + renderPipeline.getLocation() + " in Iris override list. This is not a critical problem, but it could lead to weird rendering.", new Throwable());
+					}
+				}
+			}
+		}
+		
+		// Default vanilla behavior
 		return (GlRenderPipeline)this.pipelineCache
 			.computeIfAbsent(renderPipeline, renderPipeline2 -> this.compilePipeline(renderPipeline, this.defaultShaderSource));
+	}
+
+	// Iris: Override Iris program (merged from MixinShaderManager_Overrides)
+	private static GlProgram overrideIrisProgram(net.irisshaders.iris.pipeline.IrisRenderingPipeline pipeline, RenderPipeline shaderProgram) {
+		net.irisshaders.iris.pipeline.programs.ShaderKey shaderKey = net.irisshaders.iris.pipeline.IrisPipelines.getPipeline(pipeline, shaderProgram);
+		return shaderKey == null ? null : pipeline.getShaderMap().getShader(shaderKey);
 	}
 
 	protected GlShaderModule getOrCompileShader(

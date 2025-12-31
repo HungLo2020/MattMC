@@ -38,6 +38,9 @@ public class ModelPartFeatureRenderer {
 			VertexConsumer vertexConsumer = bufferSource.getBuffer(renderType);
 
 			for (SubmitNodeStorage.ModelPartSubmit modelPartSubmit : list) {
+				// Iris: Set model storage before rendering
+				((net.irisshaders.iris.mixinterface.ModelStorage) (Object) modelPartSubmit).iris$set();
+				
 				VertexConsumer vertexConsumer2;
 				if (modelPartSubmit.sprite() != null) {
 					if (modelPartSubmit.hasFoil()) {
@@ -78,6 +81,11 @@ public class ModelPartFeatureRenderer {
 				}
 			}
 		}
+		
+		// Iris: Clear captured rendering state
+		net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setCurrentRenderedItem(0);
+		net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setCurrentEntity(0);
+		net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setCurrentBlockEntity(0);
 	}
 
 	@Environment(EnvType.CLIENT)

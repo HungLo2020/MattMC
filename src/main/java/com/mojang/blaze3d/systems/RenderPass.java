@@ -15,7 +15,7 @@ import org.jetbrains.annotations.Nullable;
 
 @Environment(EnvType.CLIENT)
 @DontObfuscate
-public interface RenderPass extends AutoCloseable {
+public interface RenderPass extends AutoCloseable, net.irisshaders.iris.mixinterface.RenderPassInterface {
 	void pushDebugGroup(Supplier<String> supplier);
 
 	void popDebugGroup();
@@ -71,11 +71,11 @@ public interface RenderPass extends AutoCloseable {
 	}
 	
 	// Iris compatibility methods
-	default void iris$setCustomPass(Object pass) {
+	default void iris$setCustomPass(net.irisshaders.iris.mixinterface.CustomPass pass) {
 		// No-op by default - Iris mixin implementation
 	}
 	
-	default Object iris$getCustomPass() {
+	default net.irisshaders.iris.mixinterface.CustomPass iris$getCustomPass() {
 		return null;
 	}
 }

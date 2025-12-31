@@ -9,11 +9,14 @@ import net.minecraft.api.Environment;
 import org.jetbrains.annotations.Nullable;
 
 @Environment(EnvType.CLIENT)
-public abstract class AbstractTexture implements AutoCloseable {
+public abstract class AbstractTexture implements AutoCloseable, net.irisshaders.iris.mixinterface.AbstractTextureExtended {
 	@Nullable
 	protected GpuTexture texture;
 	@Nullable
 	protected GpuTextureView textureView;
+	
+	// Iris: From MixinAbstractTexture - texture tracking
+	private GpuTexture lastChecked;
 
 	public void setClamp(boolean bl) {
 		if (this.texture == null) {
@@ -55,6 +58,12 @@ public abstract class AbstractTexture implements AutoCloseable {
 		if (this.texture == null) {
 			throw new IllegalStateException("Texture does not exist, can't get it before something initializes it");
 		} else {
+			// Iris: From MixinAbstractTexture - track texture changes
+			if (lastChecked != this.texture) {
+				lastChecked = this.texture;
+				net.irisshaders.iris.pbr.TextureTracker.INSTANCE.trackTexture(lastChecked.iris$getGlId(), this);
+			}
+			
 			return this.texture;
 		}
 	}

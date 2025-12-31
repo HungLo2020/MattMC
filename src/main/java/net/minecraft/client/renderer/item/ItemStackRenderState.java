@@ -24,7 +24,7 @@ import org.joml.Vector3f;
 import org.joml.Vector3fc;
 
 @Environment(EnvType.CLIENT)
-public class ItemStackRenderState {
+public class ItemStackRenderState implements net.irisshaders.iris.mixinterface.ItemContextState {
 	ItemDisplayContext displayContext = ItemDisplayContext.NONE;
 	private int activeLayerCount;
 	private boolean animated;
@@ -32,6 +32,9 @@ public class ItemStackRenderState {
 	@Nullable
 	private AABB cachedModelBoundingBox;
 	private ItemStackRenderState.LayerRenderState[] layers = new ItemStackRenderState.LayerRenderState[]{new ItemStackRenderState.LayerRenderState()};
+	// Iris: ItemContextState fields
+	private net.minecraft.world.item.Item iris_displayStack;
+	private net.minecraft.resources.ResourceLocation iris_displayModelId;
 
 	public void ensureCapacity(int i) {
 		int j = this.layers.length;
@@ -61,6 +64,9 @@ public class ItemStackRenderState {
 		this.animated = false;
 		this.oversizedInGui = false;
 		this.cachedModelBoundingBox = null;
+		// Iris: Clear display stack
+		this.iris_displayStack = null;
+		this.iris_displayModelId = null;
 	}
 
 	public void setAnimated() {
@@ -94,6 +100,8 @@ public class ItemStackRenderState {
 	public void visitExtents(Consumer<Vector3fc> consumer) {
 		Vector3f vector3f = new Vector3f();
 		PoseStack.Pose pose = new PoseStack.Pose();
+		// Sodium FRAPI: QuadToPosPipe for mesh processing (merged from ItemRenderStateMixin)
+		net.caffeinemc.mods.sodium.client.render.frapi.render.QuadToPosPipe pipe = null;
 
 		for (int i = 0; i < this.activeLayerCount; i++) {
 			ItemStackRenderState.LayerRenderState layerRenderState = this.layers[i];
@@ -103,6 +111,18 @@ public class ItemStackRenderState {
 
 			for (Vector3f vector3f2 : vector3fs) {
 				consumer.accept(vector3f.set(vector3f2).mulPosition(matrix4f));
+			}
+
+			// Sodium FRAPI: Process mutable mesh before resetting pose (merged from ItemRenderStateMixin)
+			net.caffeinemc.mods.sodium.client.render.frapi.mesh.MutableMeshImpl mutableMesh = ((net.caffeinemc.mods.sodium.client.render.frapi.render.AccessLayerRenderState) layerRenderState).fabric_getMutableMesh();
+
+			if (mutableMesh.size() > 0) {
+				if (pipe == null) {
+					pipe = new net.caffeinemc.mods.sodium.client.render.frapi.render.QuadToPosPipe(consumer, vector3f);
+				}
+				pipe.matrix = matrix4f;
+				// Use the mutable version here as it does not use a ThreadLocal or cursor stack
+				mutableMesh.forEachMutable(pipe);
 			}
 
 			pose.setIdentity();
@@ -143,7 +163,7 @@ public class ItemStackRenderState {
 	}
 
 	@Environment(EnvType.CLIENT)
-	public class LayerRenderState {
+	public class LayerRenderState implements net.fabricmc.fabric.api.renderer.v1.render.FabricLayerRenderState, net.caffeinemc.mods.sodium.client.render.frapi.render.AccessLayerRenderState {
 		private static final Vector3f[] NO_EXTENTS = new Vector3f[0];
 		public static final Supplier<Vector3f[]> NO_EXTENTS_SUPPLIER = () -> NO_EXTENTS;
 		private final List<BakedQuad> quads = new ArrayList();
@@ -160,6 +180,8 @@ public class ItemStackRenderState {
 		@Nullable
 		private Object argumentForSpecialRendering;
 		Supplier<Vector3f[]> extents = NO_EXTENTS_SUPPLIER;
+		// Fabric Rendering API support (from ItemLayerRenderStateMixin)
+		private final net.caffeinemc.mods.sodium.client.render.frapi.mesh.MutableMeshImpl mutableMesh = new net.caffeinemc.mods.sodium.client.render.frapi.mesh.MutableMeshImpl();
 
 		public void clear() {
 			this.quads.clear();
@@ -172,6 +194,8 @@ public class ItemStackRenderState {
 			this.particleIcon = null;
 			this.transform = ItemTransform.NO_TRANSFORM;
 			this.extents = NO_EXTENTS_SUPPLIER;
+			// Clear mutable mesh (from ItemLayerRenderStateMixin)
+			this.mutableMesh.clear();
 		}
 
 		public List<BakedQuad> prepareQuadList() {
@@ -221,6 +245,10 @@ public class ItemStackRenderState {
 		}
 
 		void submit(PoseStack poseStack, SubmitNodeCollector submitNodeCollector, int i, int j, int k) {
+			// Iris: Save block entity state before rendering (from ItemStackStateLayerMixin)
+			int lastBState = net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.getCurrentRenderedBlockEntity();
+			iris$setupId(ItemStackRenderState.this.iris_displayStack, ItemStackRenderState.this.iris_displayModelId);
+			
 			poseStack.pushPose();
 			this.transform.apply(ItemStackRenderState.this.displayContext.leftHand(), poseStack.last());
 			if (this.specialRenderer != null) {
@@ -236,10 +264,57 @@ public class ItemStackRenderState {
 						k
 					);
 			} else if (this.renderType != null) {
-				submitNodeCollector.submitItem(poseStack, ItemStackRenderState.this.displayContext, i, j, k, this.tintLayers, this.quads, this.renderType, this.foilType);
+				// Fabric Rendering API support (from ItemLayerRenderStateMixin redirect)
+				if (this.mutableMesh.size() > 0 && submitNodeCollector instanceof net.caffeinemc.mods.sodium.client.render.frapi.render.OrderedSubmitNodeCollectorExtension access) {
+					// We don't have to copy the mesh here because vanilla doesn't copy the tint array or quad list either.
+					access.fabric_submitItem(poseStack, ItemStackRenderState.this.displayContext, i, j, k, this.tintLayers, this.quads, this.renderType, this.foilType, this.mutableMesh);
+				} else {
+					submitNodeCollector.submitItem(poseStack, ItemStackRenderState.this.displayContext, i, j, k, this.tintLayers, this.quads, this.renderType, this.foilType);
+				}
 			}
 
 			poseStack.popPose();
+			
+			// Iris: Restore state after rendering (from ItemStackStateLayerMixin)
+			net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setCurrentBlockEntity(lastBState);
+			net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setCurrentRenderedItem(0);
 		}
+		
+		// Iris: Helper method from ItemStackStateLayerMixin
+		private void iris$setupId(net.minecraft.world.item.Item item, net.minecraft.resources.ResourceLocation modelId) {
+			if (net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings.INSTANCE.getItemIds() == null) return;
+
+			if (item instanceof net.minecraft.world.item.BlockItem blockItem && !(item instanceof net.minecraft.world.item.SolidBucketItem)) {
+				if (net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings.INSTANCE.getBlockStateIds() == null) return;
+
+				net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setCurrentBlockEntity(1);
+				net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setCurrentRenderedItem(net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings.INSTANCE.getBlockStateIds().getOrDefault(blockItem.getBlock().defaultBlockState(), 0));
+			} else {
+				net.minecraft.resources.ResourceLocation location = modelId != null ? modelId : net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(item);
+				net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setCurrentRenderedItem(net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings.INSTANCE.getItemIds().applyAsInt(new net.irisshaders.iris.shaderpack.materialmap.NamespacedId(location.getNamespace(), location.getPath())));
+			}
+		}
+		
+		// Fabric Rendering API support (from ItemLayerRenderStateMixin)
+		@Override
+		public net.caffeinemc.mods.sodium.client.render.frapi.mesh.MutableMeshImpl fabric_getMutableMesh() {
+			return this.mutableMesh;
+		}
+	}
+	
+	// Iris: ItemContextState implementation
+	@Override
+	public void setDisplayItem(net.minecraft.world.item.Item itemStack, net.minecraft.resources.ResourceLocation modelId) {
+		this.iris_displayStack = itemStack;
+		this.iris_displayModelId = modelId;
+	}
+
+	@Override
+	public net.minecraft.world.item.Item getDisplayItem() {
+		return iris_displayStack;
+	}
+	
+	public net.minecraft.resources.ResourceLocation getDisplayItemModel() {
+		return iris_displayModelId;
 	}
 }

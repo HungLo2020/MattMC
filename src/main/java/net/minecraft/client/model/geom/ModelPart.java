@@ -162,9 +162,13 @@ public final class ModelPart {
 	}
 
 	public void translateAndRotate(PoseStack poseStack) {
-		poseStack.translate(this.x / 16.0F, this.y / 16.0F, this.z / 16.0F);
+		// Sodium: Optimized transform application (merged from ModelPartMixin)
+		if (this.x != 0.0F || this.y != 0.0F || this.z != 0.0F) {
+			poseStack.translate(this.x * (1.0f / 16.0f), this.y * (1.0f / 16.0f), this.z * (1.0f / 16.0f));
+		}
+
 		if (this.xRot != 0.0F || this.yRot != 0.0F || this.zRot != 0.0F) {
-			poseStack.mulPose(new Quaternionf().rotationZYX(this.zRot, this.yRot, this.xRot));
+			net.sodium.api.math.MatrixHelper.rotateZYX(poseStack.last(), this.zRot, this.yRot, this.xRot);
 		}
 
 		if (this.xScale != 1.0F || this.yScale != 1.0F || this.zScale != 1.0F) {
@@ -231,14 +235,19 @@ public final class ModelPart {
 	@Environment(EnvType.CLIENT)
 	public static class Cube {
 		public final ModelPart.Polygon[] polygons;
-		public final float minX;
+		public float minX;
 		public final float minY;
 		public final float minZ;
 		public final float maxX;
 		public final float maxY;
 		public final float maxZ;
+		// Sodium: Cuboid for fast rendering (merged from CubeMixin)
+		private net.caffeinemc.mods.sodium.client.render.immediate.model.ModelCuboid sodium$cuboid;
 
 		public Cube(int i, int j, float f, float g, float h, float k, float l, float m, float n, float o, float p, boolean bl, float q, float r, Set<Direction> set) {
+			// Sodium: Create cuboid before setting minX (merged from CubeMixin)
+			this.sodium$cuboid = new net.caffeinemc.mods.sodium.client.render.immediate.model.ModelCuboid(i, j, f, g, h, k, l, m, n, o, p, bl, q, r, set);
+
 			this.minX = f;
 			this.minY = g;
 			this.minZ = h;
@@ -305,6 +314,15 @@ public final class ModelPart {
 		}
 
 		public void compile(PoseStack.Pose pose, VertexConsumer vertexConsumer, int i, int j, int k) {
+			// Sodium: Use fast cuboid rendering if available (merged from CubeMixin)
+			net.sodium.api.vertex.buffer.VertexBufferWriter writer = net.caffeinemc.mods.sodium.client.render.vertex.VertexConsumerUtils.convertOrLog(vertexConsumer);
+
+			if (writer != null) {
+				net.caffeinemc.mods.sodium.client.render.immediate.model.EntityRenderer.renderCuboid(pose, writer, this.sodium$cuboid, i, j, net.sodium.api.util.ColorARGB.toABGR(k));
+				return;
+			}
+
+			// Fallback to vanilla rendering
 			Matrix4f matrix4f = pose.pose();
 			Vector3f vector3f = new Vector3f();
 

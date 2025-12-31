@@ -105,15 +105,30 @@ public class WeatherEffectRenderer {
 	}
 
 	public void render(MultiBufferSource multiBufferSource, Vec3 vec3, WeatherRenderState weatherRenderState) {
+		// Iris: Allow shaders to disable weather rendering (from MixinWeatherRenderer)
+		if (!net.irisshaders.iris.Iris.getPipelineManager().getPipeline().map(net.irisshaders.iris.pipeline.WorldRenderingPipeline::shouldRenderWeather).orElse(true)) {
+			return;
+		}
+		
 		if (!weatherRenderState.rainColumns.isEmpty()) {
-			RenderType renderType = RenderType.weather(RAIN_LOCATION, Minecraft.useShaderTransparency());
+			// Iris: Allow shaders to write to depth buffer (from MixinWeatherRenderer)
+			boolean useShaderTransparency = Minecraft.useShaderTransparency();
+			if (net.irisshaders.iris.Iris.getPipelineManager().getPipeline().map(net.irisshaders.iris.pipeline.WorldRenderingPipeline::shouldWriteRainAndSnowToDepthBuffer).orElse(false)) {
+				useShaderTransparency = true;
+			}
+			RenderType renderType = RenderType.weather(RAIN_LOCATION, useShaderTransparency);
 			this.renderInstances(
 				multiBufferSource.getBuffer(renderType), weatherRenderState.rainColumns, vec3, 1.0F, weatherRenderState.radius, weatherRenderState.intensity
 			);
 		}
 
 		if (!weatherRenderState.snowColumns.isEmpty()) {
-			RenderType renderType = RenderType.weather(SNOW_LOCATION, Minecraft.useShaderTransparency());
+			// Iris: Allow shaders to write to depth buffer (from MixinWeatherRenderer)
+			boolean useShaderTransparency = Minecraft.useShaderTransparency();
+			if (net.irisshaders.iris.Iris.getPipelineManager().getPipeline().map(net.irisshaders.iris.pipeline.WorldRenderingPipeline::shouldWriteRainAndSnowToDepthBuffer).orElse(false)) {
+				useShaderTransparency = true;
+			}
+			RenderType renderType = RenderType.weather(SNOW_LOCATION, useShaderTransparency);
 			this.renderInstances(
 				multiBufferSource.getBuffer(renderType), weatherRenderState.snowColumns, vec3, 0.8F, weatherRenderState.radius, weatherRenderState.intensity
 			);
@@ -166,6 +181,11 @@ public class WeatherEffectRenderer {
 	}
 
 	public void tickRainParticles(ClientLevel clientLevel, Camera camera, int i, ParticleStatus particleStatus) {
+		// Iris: Allow shaders to disable weather particles (from MixinWeatherRenderer)
+		if (!net.irisshaders.iris.Iris.getPipelineManager().getPipeline().map(net.irisshaders.iris.pipeline.WorldRenderingPipeline::shouldRenderWeatherParticles).orElse(true)) {
+			particleStatus = ParticleStatus.MINIMAL;
+		}
+		
 		boolean useFancy = Minecraft.useFancyGraphics();
 		
 		// HOOK: Allow mods to override weather quality

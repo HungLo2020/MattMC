@@ -32,7 +32,7 @@ public class BlockRenderDispatcher implements ResourceManagerReloadListener {
 	private final BlockModelShaper blockModelShaper;
 	private final MaterialSet materials;
 	private final ModelBlockRenderer modelRenderer;
-	private final Supplier<SpecialBlockModelRenderer> specialBlockModelRenderer;
+	public final Supplier<SpecialBlockModelRenderer> specialBlockModelRenderer;
 	private final LiquidBlockRenderer liquidBlockRenderer;
 	private final RandomSource singleThreadRandom = RandomSource.create();
 	private final List<BlockModelPart> singleThreadPartList = new ArrayList();
@@ -56,11 +56,8 @@ public class BlockRenderDispatcher implements ResourceManagerReloadListener {
 	) {
 		if (blockState.getRenderShape() == RenderShape.MODEL) {
 			BlockStateModel blockStateModel = this.blockModelShaper.getBlockModel(blockState);
-			this.singleThreadRandom.setSeed(blockState.getSeed(blockPos));
-			this.singleThreadPartList.clear();
-			blockStateModel.collectParts(this.singleThreadRandom, this.singleThreadPartList);
-			this.modelRenderer
-				.tesselateBlock(blockAndTintGetter, this.singleThreadPartList, blockState, blockPos, poseStack, vertexConsumer, true, OverlayTexture.NO_OVERLAY);
+			// FRAPI: Use Sodium FRAPI renderer for breaking texture (merged from BlockRenderDispatcherMixin)
+			((net.fabricmc.fabric.api.renderer.v1.render.FabricBlockModelRenderer) modelRenderer).render(blockAndTintGetter, blockStateModel, blockState, blockPos, poseStack, layer -> vertexConsumer, true, blockState.getSeed(blockPos), OverlayTexture.NO_OVERLAY);
 		}
 	}
 
@@ -110,7 +107,8 @@ public class BlockRenderDispatcher implements ResourceManagerReloadListener {
 			float f = (k >> 16 & 0xFF) / 255.0F;
 			float g = (k >> 8 & 0xFF) / 255.0F;
 			float h = (k & 0xFF) / 255.0F;
-			ModelBlockRenderer.renderModel(poseStack.last(), multiBufferSource.getBuffer(ItemBlockRenderTypes.getRenderType(blockState)), blockStateModel, f, g, h, i, j);
+			// FRAPI: Use Sodium FRAPI renderer (merged from BlockRenderDispatcherMixin)
+			net.fabricmc.fabric.api.renderer.v1.render.FabricBlockModelRenderer.render(poseStack.last(), layer -> multiBufferSource.getBuffer(net.fabricmc.fabric.api.renderer.v1.render.RenderLayerHelper.getEntityBlockLayer(layer)), blockStateModel, f, g, h, i, j, net.minecraft.world.level.EmptyBlockAndTintGetter.INSTANCE, BlockPos.ZERO, blockState);
 		}
 	}
 

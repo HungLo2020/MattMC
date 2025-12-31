@@ -33,16 +33,27 @@ import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 
 @Environment(EnvType.CLIENT)
-public class SpriteContents implements Stitcher.Entry, AutoCloseable {
+public class SpriteContents implements Stitcher.Entry, AutoCloseable, net.caffeinemc.mods.sodium.client.render.chunk.compile.pipeline.SpriteContentsExtension, net.irisshaders.iris.pbr.SpriteContentsExtension, net.irisshaders.iris.pbr.texture.SpriteContentsExtension {
 	private static final Logger LOGGER = LogUtils.getLogger();
 	final ResourceLocation name;
 	final int width;
 	final int height;
 	public final NativeImage originalImage;
-	NativeImage[] byMipLevel;
+	public NativeImage[] byMipLevel;
 	@Nullable
 	public final SpriteContents.AnimatedTexture animatedTexture;
 	private final List<WithValue<?>> additionalMetadata;
+	// Sodium: Transparency tracking (from SpriteContentsMixin scan package)
+	private boolean sodium$hasTransparentPixels = false;
+	private boolean sodium$hasTranslucentPixels = false;
+	
+	// Iris: From MixinSpriteContents - ticker tracking
+	@Nullable
+	private SpriteContents.Ticker createdTicker;
+	
+	// Iris PBR: From texture.pbr.MixinSpriteContents - PBR sprite holder
+	@Nullable
+	private net.irisshaders.iris.pbr.texture.PBRSpriteHolder iris$pbrHolder;
 
 	public SpriteContents(ResourceLocation resourceLocation, FrameSize frameSize, NativeImage nativeImage) {
 		this(resourceLocation, frameSize, nativeImage, Optional.empty(), List.of());
@@ -59,13 +70,37 @@ public class SpriteContents implements Stitcher.Entry, AutoCloseable {
 				animationMetadataSection -> this.createAnimatedTexture(frameSize, nativeImage.getWidth(), nativeImage.getHeight(), animationMetadataSection)
 			)
 			.orElse(null);
+		
+		// Sodium: Fill in transparent pixel colors before setting originalImage (from SpriteContentsMixin mipmaps)
+		sodium$fillInTransparentPixelColors(nativeImage);
+		
+		// Sodium: Scan sprite contents for transparency before setting originalImage (from SpriteContentsMixin scan)
+		sodium$scanSpriteContents(nativeImage);
+		
 		this.originalImage = nativeImage;
 		this.byMipLevel = new NativeImage[]{this.originalImage};
 	}
 
 	public void increaseMipLevel(int i) {
 		try {
-			this.byMipLevel = MipmapGenerator.generateMipLevels(this.byMipLevel, i);
+			// Iris: From MixinSpriteContents - redirect mipmap generation to custom generator if available
+			NativeImage[] result;
+			if (this instanceof net.irisshaders.iris.pbr.mipmap.CustomMipmapGenerator.Provider provider) {
+				net.irisshaders.iris.pbr.mipmap.CustomMipmapGenerator generator = provider.getMipmapGenerator();
+				if (generator != null) {
+					try {
+						result = generator.generateMipLevels(this.byMipLevel, i);
+					} catch (Exception e) {
+						net.irisshaders.iris.Iris.logger.error("ERROR MIPMAPPING", e);
+						result = MipmapGenerator.generateMipLevels(this.byMipLevel, i);
+					}
+				} else {
+					result = MipmapGenerator.generateMipLevels(this.byMipLevel, i);
+				}
+			} else {
+				result = MipmapGenerator.generateMipLevels(this.byMipLevel, i);
+			}
+			this.byMipLevel = result;
 		} catch (Throwable var5) {
 			CrashReport crashReport = CrashReport.forThrowable(var5, "Generating mipmaps for frame");
 			CrashReportCategory crashReportCategory = crashReport.addCategory("Frame being iterated");
@@ -139,7 +174,7 @@ public class SpriteContents implements Stitcher.Entry, AutoCloseable {
 		return list.size() <= 1 ? null : new SpriteContents.AnimatedTexture(List.copyOf(list), k, animationMetadataSection.interpolatedFrames());
 	}
 
-	void upload(int i, int j, int k, int l, NativeImage[] nativeImages, GpuTexture gpuTexture) {
+	public void upload(int i, int j, int k, int l, NativeImage[] nativeImages, GpuTexture gpuTexture) {
 		for (int m = 0; m < this.byMipLevel.length; m++) {
 			RenderSystem.getDevice()
 				.createCommandEncoder()
@@ -168,7 +203,14 @@ public class SpriteContents implements Stitcher.Entry, AutoCloseable {
 
 	@Nullable
 	public SpriteTicker createTicker() {
-		return this.animatedTexture != null ? this.animatedTexture.createTicker() : null;
+		SpriteTicker ticker = this.animatedTexture != null ? this.animatedTexture.createTicker() : null;
+		
+		// Iris: From MixinSpriteContents - track created ticker
+		if (ticker instanceof SpriteContents.Ticker innerTicker) {
+			createdTicker = innerTicker;
+		}
+		
+		return ticker;
 	}
 
 	public <T> Optional<T> getAdditionalMetadata(MetadataSectionType<T> metadataSectionType) {
@@ -185,6 +227,10 @@ public class SpriteContents implements Stitcher.Entry, AutoCloseable {
 	public void close() {
 		for (NativeImage nativeImage : this.byMipLevel) {
 			nativeImage.close();
+		}
+		// Iris PBR: From texture.pbr.MixinSpriteContents - close PBR holder
+		if (iris$pbrHolder != null) {
+			iris$pbrHolder.close();
 		}
 	}
 
@@ -214,7 +260,7 @@ public class SpriteContents implements Stitcher.Entry, AutoCloseable {
 	@Environment(EnvType.CLIENT)
 	public class AnimatedTexture {
 		public final List<SpriteContents.FrameInfo> frames;
-		private final int frameRowSize;
+		public final int frameRowSize;
 		private final boolean interpolateFrames;
 
 		AnimatedTexture(final List<SpriteContents.FrameInfo> list, final int i, final boolean bl) {
@@ -231,7 +277,7 @@ public class SpriteContents implements Stitcher.Entry, AutoCloseable {
 			return i / this.frameRowSize;
 		}
 
-		void uploadFrame(int i, int j, int k, GpuTexture gpuTexture) {
+		public void uploadFrame(int i, int j, int k, GpuTexture gpuTexture) {
 			int l = this.getFrameX(k) * SpriteContents.this.width;
 			int m = this.getFrameY(k) * SpriteContents.this.height;
 			SpriteContents.this.upload(i, j, l, m, SpriteContents.this.byMipLevel, gpuTexture);
@@ -257,8 +303,13 @@ public class SpriteContents implements Stitcher.Entry, AutoCloseable {
 	@Environment(EnvType.CLIENT)
 	public final class InterpolationData implements AutoCloseable {
 		private final NativeImage[] activeFrame = new NativeImage[SpriteContents.this.byMipLevel.length];
+		// Sodium: Parent reference for optimized interpolation (merged from SpriteContentsInterpolationMixin)
+		private SpriteContents parent;
+		private static final int STRIDE = 4;
 
 		InterpolationData() {
+			// Sodium: Assign parent (merged from SpriteContentsInterpolationMixin)
+			this.parent = SpriteContents.this;
 			for (int i = 0; i < this.activeFrame.length; i++) {
 				int j = SpriteContents.this.width >> i;
 				int k = SpriteContents.this.height >> i;
@@ -267,40 +318,65 @@ public class SpriteContents implements Stitcher.Entry, AutoCloseable {
 		}
 
 		void uploadInterpolatedFrame(int i, int j, SpriteContents.Ticker ticker, GpuTexture gpuTexture) {
-			SpriteContents.AnimatedTexture animatedTexture = ticker.animationInfo;
-			List<SpriteContents.FrameInfo> list = animatedTexture.frames;
-			SpriteContents.FrameInfo frameInfo = (SpriteContents.FrameInfo)list.get(ticker.frame);
-			float f = (float)ticker.subFrame / frameInfo.time;
-			int k = frameInfo.index;
-			int l = ((SpriteContents.FrameInfo)list.get((ticker.frame + 1) % list.size())).index;
-			if (k != l) {
-				for (int m = 0; m < this.activeFrame.length; m++) {
-					int n = SpriteContents.this.width >> m;
-					int o = SpriteContents.this.height >> m;
+			// Sodium: Optimized interpolated frame upload (merged from SpriteContentsInterpolationMixin)
+			SpriteContents.AnimatedTexture animation = ticker.animationInfo;
+			SpriteContents.AnimatedTexture animation2 = ticker.animationInfo;
+			List<SpriteContents.FrameInfo> frames = animation.frames;
+			SpriteContents.FrameInfo animationFrame = (SpriteContents.FrameInfo) (Object) frames.get(ticker.frame);
 
-					for (int p = 0; p < o; p++) {
-						for (int q = 0; q < n; q++) {
-							int r = this.getPixel(animatedTexture, k, m, q, p);
-							int s = this.getPixel(animatedTexture, l, m, q, p);
-							this.activeFrame[m].setPixel(q, p, ARGB.lerp(f, r, s));
-						}
-					}
-				}
+			int curIndex = animationFrame.index();
+			int nextIndex = ((SpriteContents.FrameInfo) (Object) animation2.frames.get((ticker.frame + 1) % frames.size())).index();
 
-				SpriteContents.this.upload(i, j, 0, 0, this.activeFrame, gpuTexture);
-				if (SharedConstants.DEBUG_DUMP_INTERPOLATED_TEXTURE_FRAMES) {
-					try {
-						Path path = TextureUtil.getDebugTexturePath();
-						Path path2 = path.resolve(SpriteContents.this.name.toDebugFileName());
-						Files.createDirectories(path2);
+			if (curIndex == nextIndex) {
+				return;
+			}
 
-						for (int o = 0; o < this.activeFrame.length; o++) {
-							this.activeFrame[o].writeToFile(path2.resolve(SpriteContents.this.name.toDebugFileName() + "_" + o + "_" + k + "_" + l + ".png"));
-						}
-					} catch (IOException var18) {
+			// The mix factor between the current and next frame
+			float mix = 1.0F - (float) ticker.subFrame / (float) animationFrame.time();
+
+			for (int layer = 0; layer < this.activeFrame.length; layer++) {
+				int width = this.parent.width() >> layer;
+				int height = this.parent.height() >> layer;
+
+				int curX = ((curIndex % animation2.frameRowSize) * width);
+				int curY = ((curIndex / animation2.frameRowSize) * height);
+
+				int nextX = ((nextIndex % animation2.frameRowSize) * width);
+				int nextY = ((nextIndex / animation2.frameRowSize) * height);
+
+				NativeImage src = this.parent.byMipLevel[layer];
+				NativeImage dst = this.activeFrame[layer];
+
+				long ppSrcPixel = net.caffeinemc.mods.sodium.client.util.NativeImageHelper.getPointerRGBA(src);
+				long ppDstPixel = net.caffeinemc.mods.sodium.client.util.NativeImageHelper.getPointerRGBA(dst);
+
+				for (int layerY = 0; layerY < height; layerY++) {
+					// Pointers to the pixel array for the current and next frame
+					long pRgba1 = ppSrcPixel + (curX + (long) (curY + layerY) * src.getWidth()) * STRIDE;
+					long pRgba2 = ppSrcPixel + (nextX + (long) (nextY + layerY) * src.getWidth()) * STRIDE;
+
+					for (int layerX = 0; layerX < width; layerX++) {
+						int rgba1 = org.lwjgl.system.MemoryUtil.memGetInt(pRgba1);
+						int rgba2 = org.lwjgl.system.MemoryUtil.memGetInt(pRgba2);
+
+						// Mix the RGB components and truncate the A component
+						int mixedRgb = net.sodium.api.util.ColorMixer.mix(rgba1, rgba2, mix) & 0x00FFFFFF;
+
+						// Take the A component from the source pixel
+						int alpha = rgba1 & 0xFF000000;
+
+						// Update the pixel within the interpolated frame using the combined RGB and A components
+						org.lwjgl.system.MemoryUtil.memPutInt(ppDstPixel, mixedRgb | alpha);
+
+						pRgba1 += STRIDE;
+						pRgba2 += STRIDE;
+
+						ppDstPixel += STRIDE;
 					}
 				}
 			}
+
+			this.parent.upload(i, j, 0, 0, this.activeFrame, gpuTexture);
 		}
 
 		private int getPixel(SpriteContents.AnimatedTexture animatedTexture, int i, int j, int k, int l) {
@@ -322,14 +398,31 @@ public class SpriteContents implements Stitcher.Entry, AutoCloseable {
 		public final SpriteContents.AnimatedTexture animationInfo;
 		@Nullable
 		public final SpriteContents.InterpolationData interpolationData;
+		
+		// Sodium: From SpriteContentsTickerMixin - parent tracking for on-demand animation
+		private SpriteContents parent;
 
 		Ticker(final SpriteContents.AnimatedTexture animatedTexture, @Nullable final SpriteContents.InterpolationData interpolationData) {
 			this.animationInfo = animatedTexture;
 			this.interpolationData = interpolationData;
+			// Sodium: From SpriteContentsTickerMixin - assign parent
+			this.parent = SpriteContents.this;
 		}
 
 		@Override
 		public void tickAndUpload(int i, int j, GpuTexture gpuTexture) {
+			// Sodium: From SpriteContentsTickerMixin - on-demand animation check
+			boolean onDemand = net.caffeinemc.mods.sodium.client.SodiumClientMod.options().performance.animateOnlyVisibleTextures;
+			
+			if (onDemand && !net.caffeinemc.mods.sodium.client.render.texture.SpriteContentsExtension.isActive(this.parent)) {
+				this.subFrame++;
+				if (this.subFrame >= ((SpriteContents.FrameInfo)this.animationInfo.frames.get(this.frame)).time()) {
+					this.frame = (this.frame + 1) % this.animationInfo.frames.size();
+					this.subFrame = 0;
+				}
+				return; // Skip the upload
+			}
+			
 			this.subFrame++;
 			SpriteContents.FrameInfo frameInfo = (SpriteContents.FrameInfo)this.animationInfo.frames.get(this.frame);
 			if (this.subFrame >= frameInfo.time) {
@@ -343,12 +436,151 @@ public class SpriteContents implements Stitcher.Entry, AutoCloseable {
 			} else if (this.interpolationData != null) {
 				this.interpolationData.uploadInterpolatedFrame(i, j, this, gpuTexture);
 			}
+			
+			// Sodium: From SpriteContentsTickerMixin - reset active flag after upload
+			net.caffeinemc.mods.sodium.client.render.texture.SpriteContentsExtension.setActive(this.parent, false);
 		}
 
 		@Override
 		public void close() {
 			if (this.interpolationData != null) {
 				this.interpolationData.close();
+			}
+		}
+	}
+	
+	// Sodium: Scan sprite contents for transparency (from SpriteContentsMixin scan package)
+	private void sodium$scanSpriteContents(NativeImage nativeImage) {
+		final long ppPixel = net.caffeinemc.mods.sodium.client.util.NativeImageHelper.getPointerRGBA(nativeImage);
+		final int pixelCount = nativeImage.getHeight() * nativeImage.getWidth();
+
+		for (int pixelIndex = 0; pixelIndex < pixelCount; pixelIndex++) {
+			int color = org.lwjgl.system.MemoryUtil.memGetInt(ppPixel + (pixelIndex * 4L));
+			int alpha = net.sodium.api.util.ColorABGR.unpackAlpha(color);
+
+			// 25 is used as the threshold since the alpha cutoff is 0.1
+			if (alpha <= 25) { // 0.1 * 255
+				this.sodium$hasTransparentPixels = true;
+			} else if (alpha < 255) {
+				this.sodium$hasTranslucentPixels = true;
+			}
+		}
+
+		// the image contains transparency also if there are translucent pixels,
+		// since translucent pixels prevent a downgrade to the opaque render pass just as transparent pixels do
+		this.sodium$hasTransparentPixels |= this.sodium$hasTranslucentPixels;
+	}
+
+	@Override
+	public boolean sodium$hasTransparentPixels() {
+		return this.sodium$hasTransparentPixels;
+	}
+
+	@Override
+	public boolean sodium$hasTranslucentPixels() {
+		return this.sodium$hasTranslucentPixels;
+	}
+
+	/**
+	 * Sodium: Fixes a common issue in image editing programs where fully transparent pixels are saved with fully black colors.
+	 * (Merged from SpriteContentsMixin mipmaps package)
+	 *
+	 * This causes issues with mipmapped texture filtering, since the black color is used to calculate the final color
+	 * even though the alpha value is zero. While ideally it would be disregarded, we do not control that. Instead,
+	 * this code tries to calculate a decent average color to assign to these fully-transparent pixels so that their
+	 * black color does not leak over into sampling.
+	 */
+	private static void sodium$fillInTransparentPixelColors(NativeImage nativeImage) {
+		final long ppPixel = net.caffeinemc.mods.sodium.client.util.NativeImageHelper.getPointerRGBA(nativeImage);
+		final int pixelCount = nativeImage.getHeight() * nativeImage.getWidth();
+
+		// Calculate an average color from all pixels that are not completely transparent.
+		// This average is weighted based on the (non-zero) alpha value of the pixel.
+		float r = 0.0f;
+		float g = 0.0f;
+		float b = 0.0f;
+
+		float totalWeight = 0.0f;
+
+		for (int pixelIndex = 0; pixelIndex < pixelCount; pixelIndex++) {
+			long pPixel = ppPixel + (pixelIndex * 4L);
+
+			int color = org.lwjgl.system.MemoryUtil.memGetInt(pPixel);
+			int alpha = net.sodium.api.util.ColorABGR.unpackAlpha(color);
+
+			// Ignore all fully-transparent pixels for the purposes of computing an average color.
+			if (alpha != 0) {
+				float weight = (float) alpha;
+
+				// Make sure to convert to linear space so that we don't lose brightness.
+				r += net.caffeinemc.mods.sodium.client.util.color.ColorSRGB.srgbToLinear(net.sodium.api.util.ColorABGR.unpackRed(color)) * weight;
+				g += net.caffeinemc.mods.sodium.client.util.color.ColorSRGB.srgbToLinear(net.sodium.api.util.ColorABGR.unpackGreen(color)) * weight;
+				b += net.caffeinemc.mods.sodium.client.util.color.ColorSRGB.srgbToLinear(net.sodium.api.util.ColorABGR.unpackBlue(color)) * weight;
+
+				totalWeight += weight;
+			}
+		}
+
+		// Bail if none of the pixels are semi-transparent.
+		if (totalWeight == 0.0f) {
+			return;
+		}
+
+		r /= totalWeight;
+		g /= totalWeight;
+		b /= totalWeight;
+
+		// Convert that color in linear space back to sRGB.
+		// Use an alpha value of zero - this works since we only replace pixels with an alpha value of 0.
+		int averageColor = net.caffeinemc.mods.sodium.client.util.color.ColorSRGB.linearToSrgb(r, g, b, 0);
+
+		for (int pixelIndex = 0; pixelIndex < pixelCount; pixelIndex++) {
+			long pPixel = ppPixel + (pixelIndex * 4);
+
+			int color = org.lwjgl.system.MemoryUtil.memGetInt(pPixel);
+			int alpha = net.sodium.api.util.ColorABGR.unpackAlpha(color);
+
+			// Replace the color values of pixels which are fully transparent, since they have no color data.
+			if (alpha == 0) {
+				org.lwjgl.system.MemoryUtil.memPutInt(pPixel, averageColor);
+			}
+		}
+	}
+	
+	// Iris: From MixinSpriteContents - provide access to created ticker
+	@Override
+	@Nullable
+	public SpriteContents.Ticker getCreatedTicker() {
+		return createdTicker;
+	}
+	
+	// Iris PBR: From texture.pbr.MixinSpriteContents - PBR holder interface implementation
+	@Override
+	@Nullable
+	public net.irisshaders.iris.pbr.texture.PBRSpriteHolder getPBRHolder() {
+		return iris$pbrHolder;
+	}
+	
+	@Override
+	public net.irisshaders.iris.pbr.texture.PBRSpriteHolder getOrCreatePBRHolder() {
+		if (iris$pbrHolder == null) {
+			iris$pbrHolder = new net.irisshaders.iris.pbr.texture.PBRSpriteHolder();
+		}
+		return iris$pbrHolder;
+	}
+	
+	// Iris PBR: From texture.pbr.MixinSpriteContents - Sodium active tracking hook
+	public void sodium$setActive(boolean active) {
+		// Mark PBR sprites active when main sprite is active
+		net.irisshaders.iris.pbr.texture.PBRSpriteHolder pbrHolder = getPBRHolder();
+		if (pbrHolder != null) {
+			net.minecraft.client.renderer.texture.TextureAtlasSprite normalSprite = pbrHolder.getNormalSprite();
+			net.minecraft.client.renderer.texture.TextureAtlasSprite specularSprite = pbrHolder.getSpecularSprite();
+			if (normalSprite != null) {
+				net.sodium.api.texture.SpriteUtil.INSTANCE.markSpriteActive(normalSprite);
+			}
+			if (specularSprite != null) {
+				net.sodium.api.texture.SpriteUtil.INSTANCE.markSpriteActive(specularSprite);
 			}
 		}
 	}

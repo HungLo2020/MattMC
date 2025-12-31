@@ -269,6 +269,10 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 	private static final Component SOCIAL_INTERACTIONS_NOT_AVAILABLE = Component.translatable("multiplayer.socialInteractions.not_available");
 	private static final Component SAVING_LEVEL = Component.translatable("menu.savingLevel");
 	public static final String UPDATE_DRIVERS_ADVICE = "Please make sure you have up-to-date drivers (see aka.ms/mcdriver for instructions).";
+	
+	// Iris: Early initialization flag
+	private static boolean iris$initialized;
+	
 	private final long canary = Double.doubleToLongBits(Math.PI);
 	private final Path resourcePackDirectory;
 	private final CompletableFuture<ProfileResult> profileFuture;
@@ -434,6 +438,13 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 		KeybindResolver.setKeyResolver(KeyMapping::createNameSupplier);
 		this.fixerUpper = DataFixers.getDataFixer();
 		this.gameThread = Thread.currentThread();
+		
+		// Iris: Early initialization before Options creation
+		if (!iris$initialized) {
+			iris$initialized = true;
+			new net.irisshaders.iris.Iris().onEarlyInitialize();
+		}
+		
 		this.options = new Options(this, this.gameDirectory);
 		this.debugEntries = new DebugScreenEntryList(this.gameDirectory);
 		this.toastManager = new ToastManager(this, this.options);
@@ -678,6 +689,15 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 		}
 
 		this.packetProcessor = new PacketProcessor(this.gameThread);
+		
+		// Iris: Setup GUI texture images
+		if (!net.irisshaders.iris.platform.IrisPlatformHelpers.getInstance().isModLoaded("fabric-resource-loader-v0")) {
+			try {
+				this.textureManager.register(net.minecraft.resources.ResourceLocation.fromNamespaceAndPath("iris", "textures/gui/widgets.png"), new net.irisshaders.iris.targets.backed.NativeImageBackedCustomTexture(new net.irisshaders.iris.shaderpack.texture.CustomTextureData.PngData(new net.irisshaders.iris.shaderpack.texture.TextureFilteringData(false, false), org.apache.commons.io.IOUtils.toByteArray(net.irisshaders.iris.Iris.class.getResourceAsStream("/assets/iris/textures/gui/widgets.png")))));
+			} catch (java.io.IOException e) {
+				throw new RuntimeException(e);
+			}
+		}
 	}
 
 	public boolean hasShiftDown() {
@@ -704,9 +724,54 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 
 	private void onGameLoadFinished(@Nullable Minecraft.GameLoadCookie gameLoadCookie) {
 		Runnable runnable = this.buildInitialScreens(gameLoadCookie);
+		
+		// DH auto updater: wrap the runnable if needed
+		runnable = wrapRunnableForDhUpdater(runnable);
+		
 		runnable.run();
 		this.options.startedCleanly = true;
 		this.options.save();
+	}
+	
+	/**
+	 * DH auto updater integration - wraps the initial screen runnable
+	 * to potentially show the updater screen first.
+	 */
+	private Runnable wrapRunnableForDhUpdater(Runnable originalRunnable) {
+		boolean showUpdater = com.seibel.distanthorizons.core.jar.updater.SelfUpdater.onStart();
+		
+		if (!showUpdater || !com.seibel.distanthorizons.core.config.Config.Client.Advanced.AutoUpdater.enableAutoUpdater.get()) {
+			return originalRunnable;
+		}
+		
+		// Wrap the runnable to show updater screen
+		return () -> {
+			try {
+				String versionId = null;
+				com.seibel.distanthorizons.api.enums.config.EDhApiUpdateBranch updateBranch = 
+					com.seibel.distanthorizons.api.enums.config.EDhApiUpdateBranch.convertAutoToStableOrNightly(
+						com.seibel.distanthorizons.core.config.Config.Client.Advanced.AutoUpdater.updateBranch.get());
+				
+				if (updateBranch == com.seibel.distanthorizons.api.enums.config.EDhApiUpdateBranch.STABLE) {
+					versionId = com.seibel.distanthorizons.core.jar.installer.ModrinthGetter.getLatestIDForVersion(
+						com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector.INSTANCE.get(
+							com.seibel.distanthorizons.core.wrapperInterfaces.IVersionConstants.class).getMinecraftVersion());
+				} else {
+					versionId = com.seibel.distanthorizons.core.jar.installer.GitlabGetter.INSTANCE.projectPipelines.get(0).get("sha");
+				}
+				
+				if (versionId != null) {
+					this.setScreen(new com.seibel.distanthorizons.common.wrappers.gui.updater.UpdateModScreen(
+						new net.minecraft.client.gui.screens.TitleScreen(false),
+						versionId
+					));
+				} else {
+					LOGGER.info("Unable to find new DH update for the [" + updateBranch + "] branch. Assuming DH is up to date...");
+				}
+			} catch (Exception e) {
+				LOGGER.info("Unable to show DH update screen, reason: [" + e.getMessage() + "].");
+			}
+		};
 	}
 
 	public boolean isGameLoadFinished() {
@@ -1190,6 +1255,9 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 	}
 
 	public void close() {
+		// DH auto updater cleanup
+		com.seibel.distanthorizons.core.jar.updater.SelfUpdater.onClose();
+		
 		if (this.currentFrameProfile != null) {
 			this.currentFrameProfile.cancel();
 		}
@@ -1839,6 +1907,11 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 		profilerFiller.popPush("keyboard");
 		this.keyboardHandler.tick();
 		profilerFiller.pop();
+		
+		// Iris: Check for keybinds at end of tick
+		profilerFiller.push("iris_keybinds");
+		net.irisshaders.iris.Iris.handleKeybinds(this);
+		profilerFiller.pop();
 	}
 
 	private boolean isLevelRunningNormally() {
@@ -2046,6 +2119,9 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 	}
 
 	public void setLevel(ClientLevel clientLevel) {
+		// Iris: From MixinMinecraft_PipelineManagement - track last dimension on level change
+		net.irisshaders.iris.Iris.lastDimension = net.irisshaders.iris.Iris.getCurrentDimension();
+		
 		this.level = clientLevel;
 		this.updateLevelInEngines(clientLevel);
 	}
@@ -2133,6 +2209,9 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 	}
 
 	public void clearClientLevel(Screen screen) {
+		// Iris: From MixinMinecraft_PipelineManagement - track last dimension on leave
+		net.irisshaders.iris.Iris.lastDimension = net.irisshaders.iris.Iris.getCurrentDimension();
+		
 		ClientPacketListener clientPacketListener = this.getConnection();
 		if (clientPacketListener != null) {
 			clientPacketListener.clearLevel();
@@ -2181,6 +2260,19 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 	}
 
 	private void updateLevelInEngines(@Nullable ClientLevel clientLevel) {
+		// Iris: From MixinMinecraft_PipelineManagement - reset pipeline on dimension change
+		if (net.irisshaders.iris.Iris.getCurrentDimension() != net.irisshaders.iris.Iris.lastDimension) {
+			net.irisshaders.iris.Iris.logger.info("Reloading pipeline on dimension change: " + net.irisshaders.iris.Iris.lastDimension + " => " + net.irisshaders.iris.Iris.getCurrentDimension());
+			// Destroy pipelines when changing dimensions.
+			net.irisshaders.iris.Iris.getPipelineManager().destroyPipeline();
+
+			// NB: We need create the pipeline immediately, so that it is ready by the time that Sodium starts trying to
+			// initialize its world renderer.
+			if (clientLevel != null) {
+				net.irisshaders.iris.Iris.getPipelineManager().preparePipeline(net.irisshaders.iris.Iris.getCurrentDimension());
+			}
+		}
+		
 		// Call registered level hooks before updating engines
 		for (net.minecraft.hooks.MinecraftLevelHooks hook : net.minecraft.hooks.HookRegistry.getMinecraftLevelHooks()) {
 			hook.onLevelUpdateInEngines(clientLevel);

@@ -427,6 +427,8 @@ public abstract class MinecraftServer extends ReentrantBlockableEventLoop<TickTa
 		LevelStem levelStem = registry.getValue(LevelStem.OVERWORLD);
 		ServerLevel serverLevel = new ServerLevel(this, this.executor, this.storageSource, serverLevelData, Level.OVERWORLD, levelStem, bl, m, list, true, null);
 		this.levels.put(Level.OVERWORLD, serverLevel);
+		// DH/Fabric: Fire ServerWorldEvents.LOAD for overworld
+		net.fabricmc.fabric.api.event.lifecycle.v1.ServerWorldEvents.LOAD.invoker().onWorldLoad(this, serverLevel);
 		DimensionDataStorage dimensionDataStorage = serverLevel.getDataStorage();
 		this.readScoreboard(dimensionDataStorage);
 		this.commandStorage = new CommandStorage(dimensionDataStorage);
@@ -470,6 +472,8 @@ public abstract class MinecraftServer extends ReentrantBlockableEventLoop<TickTa
 					this, this.executor, this.storageSource, derivedLevelData, resourceKey2, (LevelStem)entry.getValue(), bl, m, ImmutableList.of(), false, randomSequences
 				);
 				this.levels.put(resourceKey2, serverLevel2);
+				// DH/Fabric: Fire ServerWorldEvents.LOAD for other dimensions
+				net.fabricmc.fabric.api.event.lifecycle.v1.ServerWorldEvents.LOAD.invoker().onWorldLoad(this, serverLevel2);
 			} else {
 				serverLevel2 = serverLevel;
 			}
@@ -719,6 +723,9 @@ public abstract class MinecraftServer extends ReentrantBlockableEventLoop<TickTa
 	}
 
 	public void stopServer() {
+		// DH/Fabric: Fire SERVER_STOPPING event at start of shutdown
+		net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents.SERVER_STOPPING.invoker().onServerStopping(this);
+		
 		this.packetProcessor.close();
 		if (this.metricsRecorder.isRecording()) {
 			this.cancelRecordingMetrics();
@@ -772,6 +779,9 @@ public abstract class MinecraftServer extends ReentrantBlockableEventLoop<TickTa
 		} catch (IOException var4) {
 			LOGGER.error("Failed to unlock level {}", this.storageSource.getLevelId(), var4);
 		}
+		
+		// DH/Fabric: Fire SERVER_STOPPED event at end of shutdown
+		net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents.SERVER_STOPPED.invoker().onServerStopped(this);
 	}
 
 	public String getLocalIp() {
@@ -799,6 +809,9 @@ public abstract class MinecraftServer extends ReentrantBlockableEventLoop<TickTa
 
 	protected void runServer() {
 		try {
+			// DH/Fabric: Fire SERVER_STARTING event before server initialization
+			net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents.SERVER_STARTING.invoker().onServerStarting(this);
+			
 			if (!this.initServer()) {
 				throw new IllegalStateException("Failed to initialize server");
 			}
@@ -806,6 +819,9 @@ public abstract class MinecraftServer extends ReentrantBlockableEventLoop<TickTa
 			this.nextTickTimeNanos = Util.getNanos();
 			this.statusIcon = (ServerStatus.Favicon)this.loadStatusIcon().orElse(null);
 			this.status = this.buildServerStatus();
+			
+			// DH/Fabric: Fire SERVER_STARTED event after server status is built
+			net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents.SERVER_STARTED.invoker().onServerStarted(this);
 
 			while (this.running) {
 				long l;

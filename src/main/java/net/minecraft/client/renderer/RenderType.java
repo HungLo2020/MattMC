@@ -26,7 +26,7 @@ import org.joml.Vector3f;
 import org.joml.Vector4f;
 
 @Environment(EnvType.CLIENT)
-public abstract class RenderType extends RenderStateShard {
+public abstract class RenderType extends RenderStateShard implements net.irisshaders.iris.mixinterface.RenderTypeInterface {
 	private static final int MEGABYTE = 1048576;
 	public static final int BIG_BUFFER_SIZE = 4194304;
 	public static final int SMALL_BUFFER_SIZE = 786432;
@@ -1010,6 +1010,17 @@ public abstract class RenderType extends RenderStateShard {
 		@Override
 		public String toString() {
 			return "RenderType[" + this.name + ":" + this.state + "]";
+		}
+		
+		// Iris: Override to provide actual implementation
+		@Override
+		public com.mojang.blaze3d.pipeline.RenderTarget iris$getRenderTarget() {
+			return this.state.outputState.getRenderTarget();
+		}
+		
+		@Override
+		public com.mojang.blaze3d.pipeline.RenderPipeline iris$getPipeline() {
+			return this.renderPipeline;
 		}
 	}
 

@@ -212,6 +212,11 @@ public final class ResourceLocation implements Comparable<ResourceLocation> {
 	}
 
 	public static boolean isValidPath(String string) {
+		// Iris: Block "DUMMY" as invalid path
+		if (string.equals("DUMMY")) {
+			return false;
+		}
+		
 		for (int i = 0; i < string.length(); i++) {
 			if (!validPathChar(string.charAt(i))) {
 				return false;
@@ -240,6 +245,10 @@ public final class ResourceLocation implements Comparable<ResourceLocation> {
 	}
 
 	public static boolean validPathChar(char c) {
+		// Iris: Allow uppercase letters in resource paths
+		if (c >= 'A' && c <= 'Z') {
+			return true;
+		}
 		return c == '_' || c == '-' || c >= 'a' && c <= 'z' || c >= '0' && c <= '9' || c == '/' || c == '.';
 	}
 

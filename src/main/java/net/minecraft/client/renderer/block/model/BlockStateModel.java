@@ -19,9 +19,22 @@ import net.minecraft.util.RandomSource;
 import net.minecraft.util.random.Weighted;
 import net.minecraft.util.random.WeightedList;
 import net.minecraft.world.level.block.state.BlockState;
+// Sodium FRAPI imports
+import net.caffeinemc.mods.sodium.client.render.frapi.render.AbstractBlockRenderContext;
+import net.caffeinemc.mods.sodium.client.services.PlatformModelAccess;
+import net.fabricmc.fabric.api.renderer.v1.mesh.QuadEmitter;
+import net.fabricmc.fabric.api.renderer.v1.model.FabricBlockModelPart;
+import net.fabricmc.fabric.api.renderer.v1.model.FabricBlockStateModel;
+import net.minecraft.client.renderer.ItemBlockRenderTypes;
+import net.minecraft.client.renderer.chunk.ChunkSectionLayer;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.world.level.BlockAndTintGetter;
+import org.jetbrains.annotations.Nullable;
+import java.util.function.Predicate;
 
 @Environment(EnvType.CLIENT)
-public interface BlockStateModel {
+public interface BlockStateModel extends FabricBlockStateModel {
 	void collectParts(RandomSource randomSource, List<BlockModelPart> list);
 
 	default List<BlockModelPart> collectParts(RandomSource randomSource) {
@@ -31,6 +44,29 @@ public interface BlockStateModel {
 	}
 
 	TextureAtlasSprite particleIcon();
+	
+	// Sodium FRAPI: FabricBlockStateModel implementation for Fabric Rendering API
+	@Override
+	default void emitQuads(QuadEmitter emitter, BlockAndTintGetter blockView, BlockPos pos, BlockState state, 
+			RandomSource random, Predicate<@Nullable Direction> cullTest) {
+		List<BlockModelPart> parts = PlatformModelAccess.getInstance().collectPartsOf(this, blockView, pos, state, random, emitter);
+		int partCount = parts.size();
+
+		if (emitter instanceof AbstractBlockRenderContext.BlockEmitter be) {
+			ChunkSectionLayer type = ItemBlockRenderTypes.getChunkRenderType(state);
+
+			for (int i = 0; i < partCount; ++i) {
+				if (PlatformModelAccess.getInstance().getPartRenderType(parts.get(i), state, type) != type) {
+					be.markInvalidToDowngrade();
+					break;
+				}
+			}
+		}
+
+		for (int i = 0; i < partCount; ++i) {
+			((FabricBlockModelPart) parts.get(i)).emitQuads(emitter, cullTest);
+		}
+	}
 
 	@Environment(EnvType.CLIENT)
 	public static class SimpleCachedUnbakedRoot implements BlockStateModel.UnbakedRoot {

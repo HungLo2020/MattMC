@@ -1653,6 +1653,26 @@ public class Options {
 	}
 
 	public CloudStatus getCloudsType() {
+		// Iris: Override clouds type if shader pack specifies
+		if (renderDistance.get() >= 4) {
+			net.irisshaders.iris.pipeline.WorldRenderingPipeline pipeline = 
+				net.irisshaders.iris.Iris.getPipelineManager().getPipelineNullable();
+			if (pipeline != null) {
+				net.irisshaders.iris.shaderpack.properties.CloudSetting setting = pipeline.getCloudSetting();
+				
+				switch (setting) {
+					case OFF:
+						return CloudStatus.OFF;
+					case FAST:
+						return CloudStatus.FAST;
+					case FANCY:
+						return CloudStatus.FANCY;
+					case DEFAULT:
+						break;
+				}
+			}
+		}
+		
 		return this.cloudStatus.get();
 	}
 

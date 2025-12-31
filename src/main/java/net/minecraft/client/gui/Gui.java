@@ -214,6 +214,14 @@ public class Gui {
 	}
 
 	public void render(GuiGraphics guiGraphics, DeltaTracker deltaTracker) {
+		// Iris: Hide HUD for certain screens (from MixinGui)
+		if (this.minecraft.screen instanceof net.irisshaders.iris.gui.screen.HudHideable) {
+			return;
+		}
+		
+		// Iris: Add GL debug markers (from MixinGui)
+		net.irisshaders.iris.gl.GLDebug.pushGroup(1000, "GUI");
+		
 		if (!(this.minecraft.screen instanceof LevelLoadingScreen)) {
 			if (!this.minecraft.options.hideGui) {
 				this.renderCameraOverlays(guiGraphics, deltaTracker);
@@ -237,6 +245,9 @@ public class Gui {
 				this.renderSubtitleOverlay(guiGraphics, true);
 			}
 		}
+		
+		// Iris: End GL debug marker (from MixinGui)
+		net.irisshaders.iris.gl.GLDebug.popGroup();
 	}
 
 	private void renderBossOverlay(GuiGraphics guiGraphics, DeltaTracker deltaTracker) {
@@ -1047,6 +1058,14 @@ public class Gui {
 	}
 
 	private void renderVignette(GuiGraphics guiGraphics, @Nullable Entity entity) {
+		// Iris: Check if vignette should be rendered
+		net.irisshaders.iris.pipeline.WorldRenderingPipeline pipeline = 
+			net.irisshaders.iris.Iris.getPipelineManager().getPipelineNullable();
+		
+		if (pipeline != null && !pipeline.shouldRenderVignette()) {
+			return;
+		}
+		
 		WorldBorder worldBorder = this.minecraft.level.getWorldBorder();
 		float f = 0.0F;
 		if (entity != null) {

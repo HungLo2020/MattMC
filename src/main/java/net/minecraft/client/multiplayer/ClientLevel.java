@@ -866,6 +866,11 @@ public class ClientLevel extends Level implements CacheSlot.Cleaner<ClientLevel>
 	}
 
 	public float getShade(Direction direction, boolean bl) {
+		// Iris: Maybe disable directional shading (from MixinClientLevel)
+		if (net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings.INSTANCE.shouldDisableDirectionalShading()) {
+			bl = false;
+		}
+		
 		boolean bl2 = this.effects().constantAmbientLight();
 		if (!bl) {
 			return bl2 ? 0.9F : 1.0F;
@@ -1155,6 +1160,12 @@ public class ClientLevel extends Level implements CacheSlot.Cleaner<ClientLevel>
 		}
 
 		public double getHorizonHeight(LevelHeightAccessor levelHeightAccessor) {
+			// Iris: Disable void plane when submerged in fluid to avoid breaking fog illusion
+			net.minecraft.world.level.material.FogType fogType = net.minecraft.client.Minecraft.getInstance().gameRenderer.getMainCamera().getFluidInCamera();
+			if (fogType != net.minecraft.world.level.material.FogType.NONE) {
+				return Double.NEGATIVE_INFINITY;
+			}
+			
 			return this.isFlat ? levelHeightAccessor.getMinY() : 63.0;
 		}
 

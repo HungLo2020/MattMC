@@ -455,6 +455,9 @@ public class ClientPacketListener extends ClientCommonPacketListenerImpl impleme
 	}
 
 	public void close() {
+		// DH: Fire client disconnected event
+		com.seibel.distanthorizons.core.api.internal.ClientApi.INSTANCE.onClientOnlyDisconnected();
+		
 		this.closed = true;
 		this.clearLevel();
 	}
@@ -554,6 +557,27 @@ public class ClientPacketListener extends ClientCommonPacketListenerImpl impleme
 			this.minecraft.getToastManager().addToast(systemToast);
 			this.seenInsecureChatWarning = true;
 		}
+		
+		// Iris: Show update message and error messages
+		if (this.minecraft.player != null) {
+			net.irisshaders.iris.Iris.getUpdateChecker().getUpdateMessage().ifPresent(msg ->
+				this.minecraft.player.displayClientMessage(msg, false));
+
+			net.irisshaders.iris.Iris.getStoredError().ifPresent(e ->
+				this.minecraft.player.displayClientMessage(net.minecraft.network.chat.Component.translatable(e instanceof net.irisshaders.iris.gl.shader.ShaderCompileException ? "iris.load.failure.shader" : "iris.load.failure.generic").append(net.minecraft.network.chat.Component.literal("Copy Info").withStyle(arg -> arg.withUnderlined(true).withColor(net.minecraft.ChatFormatting.BLUE).withClickEvent(new net.minecraft.network.chat.ClickEvent.CopyToClipboard(e.getMessage())).withHoverEvent(new net.minecraft.network.chat.HoverEvent.ShowText(net.minecraft.network.chat.Component.translatable("chat.copy.click"))))), false));
+
+			if (net.irisshaders.iris.Iris.loadedIncompatiblePack()) {
+				this.minecraft.gui.setTimes(10, 70, 140);
+				net.irisshaders.iris.Iris.logger.warn("Incompatible pack for DH!");
+				this.minecraft.player.displayClientMessage(net.minecraft.network.chat.Component.literal("This pack doesn't have DH support.").withStyle(net.minecraft.ChatFormatting.BOLD, net.minecraft.ChatFormatting.RED), false);
+				this.minecraft.player.displayClientMessage(net.minecraft.network.chat.Component.literal("Distant Horizons (DH) chunks won't show up. This isn't a bug, get another shader.").withStyle(net.minecraft.ChatFormatting.RED), false);
+			}
+		}
+		
+		// DH: Fire client connected and level load events
+		com.seibel.distanthorizons.core.api.internal.ClientApi.INSTANCE.onClientOnlyConnected();
+		com.seibel.distanthorizons.core.api.internal.ClientApi.INSTANCE.clientLevelLoadEvent(
+			com.seibel.distanthorizons.common.wrappers.world.ClientLevelWrapper.getWrapper(this.level, true));
 	}
 
 	public void handleAddEntity(ClientboundAddEntityPacket clientboundAddEntityPacket) {
@@ -889,6 +913,19 @@ public class ClientPacketListener extends ClientCommonPacketListenerImpl impleme
 		}
 
 		this.level.setSectionRangeDirty(i - 1, this.level.getMinSectionY(), j - 1, i + 1, this.level.getMaxSectionY(), j + 1);
+		
+		// DH: Fire chunk load event on background thread
+		if (levelChunk != null) {
+			java.util.concurrent.AbstractExecutorService executor = com.seibel.distanthorizons.core.util.threading.ThreadPoolUtil.getFileHandlerExecutor();
+			if (executor != null) {
+				executor.execute(() -> {
+					com.seibel.distanthorizons.core.wrapperInterfaces.world.IClientLevelWrapper clientLevel = 
+						com.seibel.distanthorizons.common.wrappers.world.ClientLevelWrapper.getWrapper((net.minecraft.client.multiplayer.ClientLevel) this.level);
+					com.seibel.distanthorizons.core.api.internal.SharedApi.INSTANCE.chunkLoadEvent(
+						new com.seibel.distanthorizons.common.wrappers.chunk.ChunkWrapper(levelChunk, clientLevel), clientLevel);
+				});
+			}
+		}
 	}
 
 	public void handleForgetLevelChunk(ClientboundForgetLevelChunkPacket clientboundForgetLevelChunkPacket) {

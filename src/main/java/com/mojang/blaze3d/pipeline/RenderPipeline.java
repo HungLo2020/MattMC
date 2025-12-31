@@ -143,7 +143,20 @@ public class RenderPipeline {
 	}
 
 	public VertexFormat getVertexFormat() {
-		return this.vertexFormat;
+		VertexFormat vf = this.vertexFormat;
+		// Iris: Replace vertex format with extended versions when shader pack is active
+		if (net.irisshaders.iris.Iris.isPackInUseQuick() && 
+		    net.irisshaders.iris.vertices.ImmediateState.renderWithExtendedVertexFormat && 
+		    net.irisshaders.iris.vertices.ImmediateState.isRenderingLevel) {
+			if (vf == com.mojang.blaze3d.vertex.DefaultVertexFormat.BLOCK) {
+				return net.irisshaders.iris.vertices.IrisVertexFormats.TERRAIN;
+			} else if (vf == com.mojang.blaze3d.vertex.DefaultVertexFormat.POSITION_COLOR_TEX_LIGHTMAP) {
+				return net.irisshaders.iris.vertices.IrisVertexFormats.GLYPH;
+			} else if (vf == com.mojang.blaze3d.vertex.DefaultVertexFormat.NEW_ENTITY) {
+				return net.irisshaders.iris.vertices.IrisVertexFormats.ENTITY;
+			}
+		}
+		return vf;
 	}
 
 	public VertexFormat.Mode getVertexFormatMode() {

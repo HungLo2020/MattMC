@@ -10,15 +10,30 @@ import net.minecraft.world.level.block.state.BlockState;
 
 @Environment(EnvType.CLIENT)
 public class BlockMarker extends SingleQuadParticle {
+	// Iris: Track whether particle is opaque (from MixinStationaryItemParticle)
+	private boolean isOpaque;
+	
 	BlockMarker(ClientLevel clientLevel, double d, double e, double f, BlockState blockState) {
 		super(clientLevel, d, e, f, Minecraft.getInstance().getBlockRenderer().getBlockModelShaper().getParticleIcon(blockState));
 		this.gravity = 0.0F;
 		this.lifetime = 80;
 		this.hasPhysics = false;
+		
+		// Iris: Resolve translucency (from MixinStationaryItemParticle)
+		net.minecraft.client.renderer.chunk.ChunkSectionLayer type = net.minecraft.client.renderer.ItemBlockRenderTypes.getChunkRenderType(blockState);
+		if (type == net.minecraft.client.renderer.chunk.ChunkSectionLayer.SOLID || 
+		    type == net.minecraft.client.renderer.chunk.ChunkSectionLayer.CUTOUT || 
+		    type == net.minecraft.client.renderer.chunk.ChunkSectionLayer.CUTOUT_MIPPED) {
+			isOpaque = true;
+		}
 	}
 
 	@Override
 	public SingleQuadParticle.Layer getLayer() {
+		// Iris: Override particle render type for opaque particles (from MixinStationaryItemParticle)
+		if (isOpaque) {
+			return net.irisshaders.iris.fantastic.IrisParticleRenderTypes.TERRAIN_OPAQUE;
+		}
 		return SingleQuadParticle.Layer.TERRAIN;
 	}
 

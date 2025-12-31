@@ -20,7 +20,7 @@ import org.jetbrains.annotations.Nullable;
 
 @Environment(EnvType.CLIENT)
 @DontObfuscate
-public class VertexFormat {
+public class VertexFormat implements net.irisshaders.iris.pipeline.programs.VertexFormatExtension {
 	public static final int UNKNOWN_ELEMENT = -1;
 	private final List<VertexFormatElement> elements;
 	private final List<String> names;
@@ -142,6 +142,18 @@ public class VertexFormat {
 	public GpuBuffer uploadImmediateIndexBuffer(ByteBuffer byteBuffer) {
 		this.immediateDrawIndexBuffer = uploadToBuffer(this.immediateDrawIndexBuffer, byteBuffer, 72, () -> "Immediate index buffer for " + this);
 		return this.immediateDrawIndexBuffer;
+	}
+	
+	// Iris: VertexFormatExtension implementation
+	@Override
+	public void bindAttributesIris(boolean isFallback, int programId) {
+		com.google.common.collect.ImmutableSet<String> ATTRIBUTE_LIST = com.google.common.collect.ImmutableSet.of("Position", "Color", "Normal", "UV0", "UV1", "UV2");
+		int j = 0;
+
+		for (String string : this.getElementAttributeNames()) {
+			com.mojang.blaze3d.opengl.GlStateManager._glBindAttribLocation(programId, j, ATTRIBUTE_LIST.contains(string) && !isFallback ? "iris_" + string : string);
+			j++;
+		}
 	}
 
 	@Environment(EnvType.CLIENT)

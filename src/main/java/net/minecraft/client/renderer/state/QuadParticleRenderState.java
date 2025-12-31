@@ -114,14 +114,54 @@ public class QuadParticleRenderState implements SubmitNodeCollector.ParticleGrou
 		}
 	}
 
+	// Sodium: Optimized particle rendering (merged from QuadParticleRenderStateMixin)
+	private static final Quaternionf TEMP_QUAT = new Quaternionf();
+	private static final Vector3f TEMP_VECTOR = new Vector3f();
+
 	protected void renderRotatedQuad(
 		VertexConsumer vertexConsumer, float f, float g, float h, float i, float j, float k, float l, float m, float n, float o, float p, float q, int r, int s
 	) {
+		// Sodium: Use optimized rendering if available (merged from QuadParticleRenderStateMixin)
+		final var writer = net.caffeinemc.mods.sodium.client.render.vertex.VertexConsumerUtils.convertOrLog(vertexConsumer);
+
+		if (writer != null) {
+			TEMP_QUAT.set(i, j, k, l);
+			sodium$emitVertices(writer, f, g, h, m, n, o, p, q, net.sodium.api.util.ColorARGB.toABGR(r), s, TEMP_QUAT);
+			return;
+		}
+
+		// Fallback to vanilla rendering
 		Quaternionf quaternionf = new Quaternionf(i, j, k, l);
 		this.renderVertex(vertexConsumer, quaternionf, f, g, h, 1.0F, -1.0F, m, o, q, r, s);
 		this.renderVertex(vertexConsumer, quaternionf, f, g, h, 1.0F, 1.0F, m, o, p, r, s);
 		this.renderVertex(vertexConsumer, quaternionf, f, g, h, -1.0F, 1.0F, m, n, p, r, s);
 		this.renderVertex(vertexConsumer, quaternionf, f, g, h, -1.0F, -1.0F, m, n, q, r, s);
+	}
+
+	// Sodium: Optimized vertex emission (merged from QuadParticleRenderStateMixin)
+	private void sodium$emitVertices(net.sodium.api.vertex.buffer.VertexBufferWriter writer, float x, float y, float z, float size, float u0, float u1, float v0, float v1, int color, int light, Quaternionf quaternion) {
+		try (org.lwjgl.system.MemoryStack stack = org.lwjgl.system.MemoryStack.stackPush()) {
+			long buffer = stack.nmalloc(4 * net.sodium.api.vertex.format.common.ParticleVertex.STRIDE);
+			long ptr = buffer;
+
+			TEMP_VECTOR.set(1.0F, -1.0F, 0.0F).rotate(quaternion).mul(size).add(x, y, z);
+			net.sodium.api.vertex.format.common.ParticleVertex.put(ptr, TEMP_VECTOR.x, TEMP_VECTOR.y, TEMP_VECTOR.z, u1, v1, color, light);
+			ptr += net.sodium.api.vertex.format.common.ParticleVertex.STRIDE;
+
+			TEMP_VECTOR.set(1.0F, 1.0F, 0.0F).rotate(quaternion).mul(size).add(x, y, z);
+			net.sodium.api.vertex.format.common.ParticleVertex.put(ptr, TEMP_VECTOR.x, TEMP_VECTOR.y, TEMP_VECTOR.z, u1, v0, color, light);
+			ptr += net.sodium.api.vertex.format.common.ParticleVertex.STRIDE;
+
+			TEMP_VECTOR.set(-1.0F, 1.0F, 0.0F).rotate(quaternion).mul(size).add(x, y, z);
+			net.sodium.api.vertex.format.common.ParticleVertex.put(ptr, TEMP_VECTOR.x, TEMP_VECTOR.y, TEMP_VECTOR.z, u0, v0, color, light);
+			ptr += net.sodium.api.vertex.format.common.ParticleVertex.STRIDE;
+
+			TEMP_VECTOR.set(-1.0F, -1.0F, 0.0F).rotate(quaternion).mul(size).add(x, y, z);
+			net.sodium.api.vertex.format.common.ParticleVertex.put(ptr, TEMP_VECTOR.x, TEMP_VECTOR.y, TEMP_VECTOR.z, u0, v1, color, light);
+			ptr += net.sodium.api.vertex.format.common.ParticleVertex.STRIDE;
+
+			writer.push(stack, buffer, 4, net.sodium.api.vertex.format.common.ParticleVertex.FORMAT);
+		}
 	}
 
 	private void renderVertex(
