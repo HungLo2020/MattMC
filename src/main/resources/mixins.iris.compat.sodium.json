@@ -8,12 +8,9 @@
   "client": [
     "MixinBlockRenderer",
     "MixinChunkMeshBuildTask",
-    "MixinDefaultFluidRenderer",
     "MixinRenderRegion",
     "MixinRenderSectionManagerShadow",
-    "MixinShaderChunkRenderer",
-    "MixinSodiumGameOptionPages",
-    "MixinSodiumWorldRenderer"
+    "MixinSodiumGameOptionPages"
   ],
   "injectors": {
     "defaultRequire": 1

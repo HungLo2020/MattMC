@@ -85,16 +85,40 @@ public abstract class ShaderChunkRenderer implements ChunkRenderer {
     }
 
     protected void begin(TerrainRenderPass pass, FogParameters parameters) {
+        // Iris: From MixinShaderChunkRenderer - reset blend mode state
+        net.irisshaders.iris.gl.blending.BlendModeOverride.restore();
+        
         RenderTarget target = pass.getTarget();
 
-        GlStateManager._viewport(0, 0, target.getColorTexture().getWidth(0), target.getColorTexture().getHeight(0));
-        GlStateManager._glBindFramebuffer(GlConst.GL_FRAMEBUFFER, ((GlTexture) target.getColorTexture()).getFbo(((GlDevice) RenderSystem.getDevice()).directStateAccess(), target.getDepthTexture()));
+        // Iris: From MixinShaderChunkRenderer - viewport redirect (skip if in shadow pass)
+        if (!net.irisshaders.iris.shadows.ShadowRenderingState.areShadowsCurrentlyBeingRendered()) {
+            GlStateManager._viewport(0, 0, target.getColorTexture().getWidth(0), target.getColorTexture().getHeight(0));
+        }
+        
+        // Iris: From MixinShaderChunkRenderer - framebuffer binding is delayed/redirected
+        // The framebuffer binding is handled below in the compileProgram redirect
+        
         ((GlCommandEncoder) RenderSystem.getDevice().createCommandEncoder()).applyPipelineState(pass.getPipeline());
         ((GlCommandEncoder) RenderSystem.getDevice().createCommandEncoder()).lastProgram = null; // Direct field access - lastProgram is now public
 
         ChunkShaderOptions options = new ChunkShaderOptions(ChunkFogMode.SMOOTH, pass, this.vertexType);
 
-        this.activeProgram = this.compileProgram(options);
+        // Iris: From MixinShaderChunkRenderer - redirect program compilation to use Iris programs if available
+        net.irisshaders.iris.pipeline.WorldRenderingPipeline pipeline = net.irisshaders.iris.Iris.getPipelineManager().getPipelineNullable();
+
+        GlProgram<ChunkShaderInterface> program = null;
+
+        if (pipeline instanceof net.irisshaders.iris.pipeline.IrisRenderingPipeline irisRenderingPipeline) {
+            irisRenderingPipeline.getSodiumPrograms().getFramebuffer(pass).bind();
+            program = irisRenderingPipeline.getSodiumPrograms().getProgram(pass);
+        }
+
+        if (program == null) {
+            GlStateManager._glBindFramebuffer(GlConst.GL_FRAMEBUFFER, ((GlTexture) target.getColorTexture()).getFbo(((GlDevice) RenderSystem.getDevice()).directStateAccess(), target.getDepthTexture()));
+            program = this.compileProgram(options);
+        }
+
+        this.activeProgram = program;
         this.activeProgram.bind();
         this.activeProgram.getInterface()
                 .setupState(pass, parameters);

@@ -75,6 +75,9 @@ public class SodiumWorldRenderer {
     private boolean useEntityCulling;
 
     private RenderSectionManager renderSectionManager;
+    
+    // Iris: From MixinSodiumWorldRenderer - sun angle tracking for shadow pass
+    private float iris$lastSunAngle;
 
     /**
      * @return The SodiumWorldRenderer based on the current dimension
@@ -231,7 +234,21 @@ public class SodiumWorldRenderer {
         int maxChunkUpdates = updateChunksImmediately ? this.renderDistance : 1;
 
         for (int i = 0; i < maxChunkUpdates; i++) {
-            if (this.renderSectionManager.needsUpdate()) {
+            // Iris: From MixinSodiumWorldRenderer - force chunk graph rebuild in shadow pass when sun angle changes
+            boolean needsUpdate;
+            if (net.irisshaders.iris.shadows.ShadowRenderingState.areShadowsCurrentlyBeingRendered()) {
+                float sunAngle = this.client.level.getSunAngle(net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.getTickDelta());
+                if (iris$lastSunAngle != sunAngle) {
+                    iris$lastSunAngle = sunAngle;
+                    needsUpdate = true;
+                } else {
+                    needsUpdate = this.renderSectionManager.needsUpdate();
+                }
+            } else {
+                needsUpdate = this.renderSectionManager.needsUpdate();
+            }
+            
+            if (needsUpdate) {
                 profiler.popPush("chunk_render_lists");
 
                 this.renderSectionManager.update(camera, viewport, fogParameters, spectator);
@@ -246,7 +263,16 @@ public class SodiumWorldRenderer {
 
             this.renderSectionManager.uploadChunks();
 
-            if (!this.renderSectionManager.needsUpdate()) {
+            // Iris: From MixinSodiumWorldRenderer - skip end graph rebuild in shadow pass
+            boolean needsUpdateEnd;
+            if (net.irisshaders.iris.shadows.ShadowRenderingState.areShadowsCurrentlyBeingRendered()) {
+                // TODO: Detect when the sun/moon isn't moving
+                needsUpdateEnd = false;
+            } else {
+                needsUpdateEnd = this.renderSectionManager.needsUpdate();
+            }
+            
+            if (!needsUpdateEnd) {
                 break;
             }
         }
@@ -429,6 +455,11 @@ public class SodiumWorldRenderer {
      * @return True if the entity is visible, otherwise false
      */
     public <T extends Entity, S extends EntityRenderState> boolean isEntityVisible(EntityRenderer<T, S> renderer, T entity) {
+        // Iris: From MixinSodiumWorldRenderer - skip entity check in shadow pass
+        if (net.irisshaders.iris.shadows.ShadowRenderingState.areShadowsCurrentlyBeingRendered()) {
+            return true;
+        }
+        
         if (!this.useEntityCulling) {
             return true;
         }

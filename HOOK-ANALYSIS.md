@@ -6,8 +6,13 @@
 
 ### Mixin Conversion Status
 
-**Total Mixins:** 218 → **43 remaining** (175 removed)  
-**Conversion Progress:** 80.3% complete - **MILESTONE: 80% REACHED!** 🎉🎉🎉🎉🎉🎉
+**Total Mixins:** 218 → **40 remaining** (178 removed)  
+**Conversion Progress:** 81.7% complete - **MILESTONE: 81% REACHED!** 🎉🎉🎉🎉🎉🎉🎉
+
+#### Removed Mixins (Session 41 - 3 mixins):
+204. ✅ `MixinDefaultFluidRenderer` (Iris/Sodium) - Interface implementation + @ModifyArg + @Inject → DefaultFluidRenderer implements VertexEncoderInterface with brightness modification and vertex data setting
+205. ✅ `MixinShaderChunkRenderer` (Iris/Sodium) - 2 @Redirect + @Inject → Inlined blend mode restore, framebuffer binding delay, Iris program redirection, and viewport skip in shadow pass
+206. ✅ `MixinSodiumWorldRenderer` (Iris/Sodium) - 2 @Redirect + @Inject → Inlined chunk graph rebuild forcing in shadow pass and entity visibility skip
 
 #### Removed Mixins (Session 40 - 3 mixins):
 201. ✅ `MixinLevelRenderer` (Iris/fabric) - Deleted (entirely commented out, no active code)

@@ -36,7 +36,7 @@ import net.minecraft.world.phys.shapes.VoxelShape;
 import org.apache.commons.lang3.mutable.MutableFloat;
 import org.apache.commons.lang3.mutable.MutableInt;
 
-public class DefaultFluidRenderer {
+public class DefaultFluidRenderer implements net.irisshaders.iris.vertices.sodium.terrain.VertexEncoderInterface {
     // TODO: allow this to be changed by vertex format, WARNING: make sure TQuad knows about EPSILON
     // TODO: move fluid rendering to a separate render pass and control glPolygonOffset and glDepthFunc to fix this properly
     public static final float EPSILON = 0.001f;
@@ -57,6 +57,12 @@ public class DefaultFluidRenderer {
     private final float[] brightness = new float[4];
 
     private final ChunkVertexEncoder.Vertex[] vertices = ChunkVertexEncoder.Vertex.uninitializedQuad();
+    
+    // Iris: From MixinDefaultFluidRenderer - vertex encoder fields
+    private int iris$blockId;
+    private byte iris$isFluid;
+    private byte iris$lightEmission;
+    private int iris$localX, iris$localY, iris$localZ;
 
     public DefaultFluidRenderer(LightPipelineProvider lighters) {
         this.quad.setLightFace(Direction.UP);
@@ -342,7 +348,11 @@ public class DefaultFluidRenderer {
                 setVertex(quad, 2, x1, yOffset, z1, u1, v3);
                 setVertex(quad, 3, x1, c1, z1, u1, v1);
 
+                // Iris: From MixinDefaultFluidRenderer - modify brightness for directional shading
                 float br = dir.getAxis() == Direction.Axis.Z ? 0.8F : 0.6F;
+                if (net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings.INSTANCE.shouldDisableDirectionalShading()) {
+                    br = 1.0f;
+                }
 
                 ModelQuadFacing facing = ModelQuadFacing.fromDirection(dir);
 
@@ -394,6 +404,8 @@ public class DefaultFluidRenderer {
         for (int i = 0; i < 4; i++) {
             var out = vertices[flip ? (3 - i + 1) & 0b11 : i];
             out.x = offset.getX() + quad.getX(i);
+            // Iris: From MixinDefaultFluidRenderer - set vertex data after x is set
+            ((net.irisshaders.iris.vertices.sodium.terrain.ChunkVertexExtension) out).iris$setData(iris$lightEmission, iris$isFluid, iris$blockId, iris$localX, iris$localY, iris$localZ);
             out.y = offset.getY() + quad.getY(i);
             out.z = offset.getZ() + quad.getZ(i);
 
@@ -495,5 +507,16 @@ public class DefaultFluidRenderer {
             return 0.0f;
         }
         return -1.0f;
+    }
+    
+    // Iris: From MixinDefaultFluidRenderer - VertexEncoderInterface implementation
+    @Override
+    public void beginBlock(int blockId, byte isFluid, byte lightEmission, int x, int y, int z) {
+        this.iris$blockId = blockId;
+        this.iris$isFluid = isFluid;
+        this.iris$lightEmission = lightEmission;
+        this.iris$localX = x;
+        this.iris$localY = y;
+        this.iris$localZ = z;
     }
 }
