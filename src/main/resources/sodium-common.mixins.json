@@ -15,7 +15,6 @@
     "features.render.entity.ModelPartMixin",
     "features.render.frapi.BlockRenderDispatcherMixin",
     "features.render.frapi.ModelBlockRendererMixin",
-    "features.render.gui.outlines.LevelRendererMixin",
     "features.render.immediate.matrix_stack.VertexConsumerMixin",
     "features.render.model.item.ItemRendererMixin",
     "features.render.world.clouds.CloudRendererMixin",

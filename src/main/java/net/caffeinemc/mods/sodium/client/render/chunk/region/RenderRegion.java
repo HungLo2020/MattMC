@@ -21,7 +21,7 @@ import org.apache.commons.lang3.Validate;
 import java.util.Arrays;
 import java.util.Map;
 
-public class RenderRegion {
+public class RenderRegion implements net.irisshaders.iris.mixinterface.ShadowRenderRegion {
     public static final int SECTION_VERTEX_COUNT_ESTIMATE = 756;
     public static final int SECTION_INDEX_COUNT_ESTIMATE = (SECTION_VERTEX_COUNT_ESTIMATE / 4) * 6;
     public static final int SECTION_BUFFER_ESTIMATE = SECTION_VERTEX_COUNT_ESTIMATE * ChunkMeshFormats.COMPACT.getVertexFormat().getStride() + SECTION_INDEX_COUNT_ESTIMATE * Integer.BYTES;
@@ -49,7 +49,8 @@ public class RenderRegion {
     private final StagingBuffer stagingBuffer;
     private final int x, y, z;
 
-    private final ChunkRenderList renderList;
+    // Iris: Made non-final for shadow render list swapping (merged from MixinRenderRegion)
+    private ChunkRenderList renderList;
 
     private final RenderSection[] sections = new RenderSection[RenderRegion.REGION_SIZE];
     private int sectionCount;
@@ -57,7 +58,14 @@ public class RenderRegion {
     private final Map<TerrainRenderPass, SectionRenderDataStorage> sectionRenderData = new Reference2ReferenceOpenHashMap<>();
     private DeviceResources resources;
 
-    private final Map<TerrainRenderPass, MultiDrawBatch> cachedBatches = new Reference2ReferenceOpenHashMap<>();
+    // Iris: Made non-final for shadow batch swapping (merged from MixinRenderRegion)
+    private Map<TerrainRenderPass, MultiDrawBatch> cachedBatches = new Reference2ReferenceOpenHashMap<>();
+
+    // Iris: Shadow render list fields (merged from MixinRenderRegion)
+    private ChunkRenderList regularRenderList;
+    private ChunkRenderList shadowRenderList;
+    private Map<TerrainRenderPass, MultiDrawBatch> regularCachedBatches;
+    private Map<TerrainRenderPass, MultiDrawBatch> shadowCachedBatches;
 
     public RenderRegion(int x, int y, int z, StagingBuffer stagingBuffer) {
         this.x = x;
@@ -135,6 +143,19 @@ public class RenderRegion {
     }
 
     public void clearCachedBatchFor(TerrainRenderPass pass) {
+        // Iris: Also clear shadow batches (merged from MixinRenderRegion)
+        if (this.regularCachedBatches != null) {
+            for(MultiDrawBatch batch : this.regularCachedBatches.values()) {
+                batch.clear();
+            }
+        }
+
+        if (this.shadowCachedBatches != null) {
+            for(MultiDrawBatch batch : this.shadowCachedBatches.values()) {
+                batch.clear();
+            }
+        }
+
         var batch = this.cachedBatches.get(pass);
         if (batch != null) {
             batch.clear();
@@ -332,6 +353,58 @@ public class RenderRegion {
 
         public boolean shouldDelete() {
             return this.geometryArena.isEmpty() && this.indexArena.isEmpty();
+        }
+    }
+
+    // Iris: ShadowRenderRegion interface implementation (merged from MixinRenderRegion)
+    @Override
+    public void swapToShadowRenderList() {
+        this.regularRenderList = this.renderList;
+        this.renderList = this.shadowRenderList;
+        this.regularCachedBatches = this.cachedBatches;
+        this.cachedBatches = this.shadowCachedBatches;
+        this.shadowCachedBatches = null;
+        this.ensureRenderList();
+    }
+
+    @Override
+    public void swapToRegularRenderList() {
+        this.shadowRenderList = this.renderList;
+        this.renderList = this.regularRenderList;
+        this.shadowCachedBatches = this.cachedBatches;
+        this.cachedBatches = this.regularCachedBatches;
+        this.regularCachedBatches = null;
+        this.ensureRenderList();
+    }
+
+    private void ensureRenderList() {
+        if (this.renderList == null) {
+            this.renderList = new ChunkRenderList(this);
+        }
+
+        if (this.cachedBatches == null) {
+            this.cachedBatches = new Reference2ReferenceOpenHashMap<>();
+        }
+    }
+
+    @Override
+    public void iris$forceClearAllBatches() {
+        if (this.regularCachedBatches != null) {
+            for(MultiDrawBatch batch : this.regularCachedBatches.values()) {
+                batch.clear();
+            }
+        }
+
+        if (this.shadowCachedBatches != null) {
+            for(MultiDrawBatch batch : this.shadowCachedBatches.values()) {
+                batch.clear();
+            }
+        }
+
+        if (this.cachedBatches != null) {
+            for(MultiDrawBatch batch : this.cachedBatches.values()) {
+                batch.clear();
+            }
         }
     }
 }
