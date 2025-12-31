@@ -51,13 +51,19 @@ public interface MultiBufferSource {
 			} else {
 				ByteBufferBuilder byteBufferBuilder = (ByteBufferBuilder)this.fixedBuffers.get(renderType);
 				if (byteBufferBuilder != null) {
+					// Iris: From MixinBufferSource - skip extension when not rendering level
+					net.irisshaders.iris.vertices.ImmediateState.skipExtension.set(!net.irisshaders.iris.vertices.ImmediateState.isRenderingLevel);
 					bufferBuilder = new BufferBuilder(byteBufferBuilder, renderType.mode(), renderType.format());
+					net.irisshaders.iris.vertices.ImmediateState.skipExtension.set(false);
 				} else {
 					if (this.lastSharedType != null) {
 						this.endBatch(this.lastSharedType);
 					}
 
+					// Iris: From MixinBufferSource - skip extension when not rendering level
+					net.irisshaders.iris.vertices.ImmediateState.skipExtension.set(!net.irisshaders.iris.vertices.ImmediateState.isRenderingLevel);
 					bufferBuilder = new BufferBuilder(this.sharedBuffer, renderType.mode(), renderType.format());
+					net.irisshaders.iris.vertices.ImmediateState.skipExtension.set(false);
 					this.lastSharedType = renderType;
 				}
 
@@ -96,7 +102,18 @@ public interface MultiBufferSource {
 					meshData.sortQuads(byteBufferBuilder, RenderSystem.getProjectionType().vertexSorting());
 				}
 
+				// Iris: From MixinBufferSource - disable extended vertex format when not rendering level
+				boolean iris$notRenderingLevel = !net.irisshaders.iris.vertices.ImmediateState.isRenderingLevel;
+				if (iris$notRenderingLevel) {
+					net.irisshaders.iris.vertices.ImmediateState.renderWithExtendedVertexFormat = false;
+				}
+				
 				renderType.draw(meshData);
+				
+				// Iris: From MixinBufferSource - restore extended vertex format
+				if (iris$notRenderingLevel) {
+					net.irisshaders.iris.vertices.ImmediateState.renderWithExtendedVertexFormat = true;
+				}
 			}
 
 			if (renderType.equals(this.lastSharedType)) {

@@ -6,8 +6,13 @@
 
 ### Mixin Conversion Status
 
-**Total Mixins:** 218 → **40 remaining** (178 removed)  
-**Conversion Progress:** 81.7% complete - **MILESTONE: 81% REACHED!** 🎉🎉🎉🎉🎉🎉🎉
+**Total Mixins:** 218 → **37 remaining** (181 removed)  
+**Conversion Progress:** 83.0% complete - **MILESTONE: 83% REACHED!** 🎉🎉🎉🎉🎉🎉🎉🎉
+
+#### Removed Mixins (Session 42 - 3 mixins):
+207. ✅ `MixinChunkRebuildTask` (Iris) - Deleted dead code (unused fields with TODO comment, no active logic)
+208. ✅ `MixinBufferSource` (Iris) - @WrapOperation + 2 @Inject → Inlined skipExtension flag and renderWithExtendedVertexFormat toggle in MultiBufferSource.BufferSource
+209. ✅ `MixinBlockRenderer` (Iris/Sodium) - Interface implementation + 2 @Inject + @WrapOperation → BlockRenderer implements VertexEncoderInterface with override tracking and pass downgrade skip
 
 #### Removed Mixins (Session 41 - 3 mixins):
 204. ✅ `MixinDefaultFluidRenderer` (Iris/Sodium) - Interface implementation + @ModifyArg + @Inject → DefaultFluidRenderer implements VertexEncoderInterface with brightness modification and vertex data setting

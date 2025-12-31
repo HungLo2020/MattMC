@@ -6,9 +6,7 @@
   "plugin": "net.irisshaders.iris.mixin.IrisMixinPlugin",
   "refmap": "iris.refmap.json",
   "client": [
-    "MixinBufferBuilder",
-    "block_rendering.MixinChunkRebuildTask",
-    "immediate.MixinBufferSource"
+    "MixinBufferBuilder"
   ],
   "injectors": {
     "defaultRequire": 1

@@ -39,7 +39,7 @@ import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Vector3f;
 
-public class BlockRenderer extends AbstractBlockRenderContext {
+public class BlockRenderer extends AbstractBlockRenderContext implements net.irisshaders.iris.vertices.sodium.terrain.VertexEncoderInterface {
     private final ColorProviderRegistry colorProviderRegistry;
     private final int[] vertexColors = new int[4];
     private final ChunkVertexEncoder.Vertex[] vertices = ChunkVertexEncoder.Vertex.uninitializedQuad();
@@ -51,6 +51,13 @@ public class BlockRenderer extends AbstractBlockRenderContext {
     @Nullable
     private ColorProvider<BlockState> colorProvider;
     private TranslucentGeometryCollector collector;
+    
+    // Iris: From MixinBlockRenderer - vertex encoder fields
+    private boolean iris$hasOverride;
+    private int iris$blockId;
+    private byte iris$isFluid;
+    private byte iris$lightEmission;
+    private int iris$localX, iris$localY, iris$localZ;
 
     public BlockRenderer(ColorProviderRegistry colorRegistry, LightPipelineProvider lighters) {
         this.colorProviderRegistry = colorRegistry;
@@ -74,6 +81,11 @@ public class BlockRenderer extends AbstractBlockRenderContext {
     }
 
     public void renderModel(BlockStateModel model, BlockState state, BlockPos pos, BlockPos origin) {
+        // Iris: From MixinBlockRenderer - check for block type override at HEAD
+        if (net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings.INSTANCE.getBlockTypeIds().containsKey(state.getBlock())) {
+            iris$hasOverride = true;
+        }
+        
         this.state = state;
         this.pos = pos;
 
@@ -98,6 +110,9 @@ public class BlockRenderer extends AbstractBlockRenderContext {
         ((FabricBlockStateModel) model).emitQuads(getEmitter(), this.level, pos, state, this.random, this::isFaceCulled);
 
         this.defaultRenderType = null;
+        
+        // Iris: From MixinBlockRenderer - clear override flag at TAIL
+        iris$hasOverride = false;
     }
 
     /**
@@ -151,6 +166,8 @@ public class BlockRenderer extends AbstractBlockRenderContext {
 
             ChunkVertexEncoder.Vertex out = vertices[dstIndex];
             out.x = quad.x(srcIndex) + offset.x;
+            // Iris: From MixinBlockRenderer - set vertex data after x is set
+            ((net.irisshaders.iris.vertices.sodium.terrain.ChunkVertexExtension) out).iris$setData(iris$lightEmission, iris$isFluid, iris$blockId, iris$localX, iris$localY, iris$localZ);
             out.y = quad.y(srcIndex) + offset.y;
             out.z = quad.z(srcIndex) + offset.z;
 
@@ -171,7 +188,8 @@ public class BlockRenderer extends AbstractBlockRenderContext {
         // attempt render pass downgrade if possible
         var pass = material.pass;
 
-        var downgradedPass = attemptPassDowngrade(atlasSprite, pass);
+        // Iris: From MixinBlockRenderer - skip pass downgrade when hasOverride
+        var downgradedPass = iris$hasOverride ? null : attemptPassDowngrade(atlasSprite, pass);
         if (downgradedPass != null) {
             pass = downgradedPass;
         }
@@ -263,5 +281,16 @@ public class BlockRenderer extends AbstractBlockRenderContext {
         }
 
         return pass;
+    }
+    
+    // Iris: From MixinBlockRenderer - VertexEncoderInterface implementation
+    @Override
+    public void beginBlock(int blockId, byte isFluid, byte lightEmission, int x, int y, int z) {
+        this.iris$blockId = blockId;
+        this.iris$isFluid = isFluid;
+        this.iris$lightEmission = lightEmission;
+        this.iris$localX = x;
+        this.iris$localY = y;
+        this.iris$localZ = z;
     }
 }
