@@ -116,6 +116,8 @@ public class GameRenderer implements Projector, AutoCloseable, net.caffeinemc.mo
 	private final RenderBuffers renderBuffers;
 	private float spinningEffectTime;
 	private float spinningEffectSpeed;
+	// Iris: Merged from MixinModelViewBobbing
+	private boolean areShadersOn;
 	private float fovModifier;
 	private float oldFovModifier;
 	private float darkenWorldAmount;
@@ -815,6 +817,9 @@ public class GameRenderer implements Projector, AutoCloseable, net.caffeinemc.mo
 	}
 
 	public void renderLevel(DeltaTracker deltaTracker) {
+		// Iris: Save shaders state (merged from MixinModelViewBobbing)
+		areShadersOn = net.irisshaders.iris.Iris.isPackInUseQuick();
+		
 		float f = deltaTracker.getGameTimeDeltaPartialTick(true);
 		LocalPlayer localPlayer = this.minecraft.player;
 		this.lightTexture.updateLightTexture(f);
@@ -836,13 +841,24 @@ public class GameRenderer implements Projector, AutoCloseable, net.caffeinemc.mo
 		float h = this.getFov(this.mainCamera, f, true);
 		Matrix4f matrix4f = this.getProjectionMatrix(h);
 		PoseStack poseStack = new PoseStack();
+		
+		// Iris: Separate view bobbing for shaders (merged from MixinModelViewBobbing)
+		if (areShadersOn) {
+			poseStack.pushPose();
+			poseStack.last().pose().identity();
+		}
+		
 		this.bobHurt(poseStack, this.mainCamera.getPartialTickTime());
 		if (this.minecraft.options.bobView().get()) {
-			this.bobView(poseStack, this.mainCamera.getPartialTickTime());
+			// Iris: Skip bobView when shaders are active (merged from MixinModelViewBobbing)
+			if (!areShadersOn) {
+				this.bobView(poseStack, this.mainCamera.getPartialTickTime());
+			}
 		}
 
 		matrix4f.mul(poseStack.last().pose());
-		float i = this.minecraft.options.screenEffectScale().get().floatValue();
+		// Iris: Disable screen effect scale when shaders are on (merged from MixinModelViewBobbing)
+		float i = areShadersOn ? 0.0f : this.minecraft.options.screenEffectScale().get().floatValue();
 		float j = Mth.lerp(f, localPlayer.oPortalEffectIntensity, localPlayer.portalEffectIntensity);
 		float k = localPlayer.getEffectBlendFactor(MobEffects.NAUSEA, f);
 		float l = Math.max(j, k) * (i * i);
@@ -858,7 +874,40 @@ public class GameRenderer implements Projector, AutoCloseable, net.caffeinemc.mo
 
 		RenderSystem.setProjectionMatrix(this.levelProjectionMatrixBuffer.getBuffer(matrix4f), ProjectionType.PERSPECTIVE);
 		Quaternionf quaternionf = this.mainCamera.rotation().conjugate(new Quaternionf());
-		Matrix4f matrix4f2 = new Matrix4f().rotation(quaternionf);
+		Matrix4f matrix4f2 = new Matrix4f();
+		
+		// Iris: Apply bobbing to model view when shaders are on (merged from MixinModelViewBobbing)
+		if (areShadersOn) {
+			PoseStack stack = new PoseStack();
+			stack.last().pose().set(matrix4f2);
+
+			float tickDelta = this.mainCamera.getPartialTickTime();
+
+			this.bobHurt(stack, tickDelta);
+			if (this.minecraft.options.bobView().get()) {
+				this.bobView(stack, tickDelta);
+			}
+
+			matrix4f2.set(stack.last().pose());
+
+			float i2 = this.minecraft.options.screenEffectScale().get().floatValue();
+			float j2 = Mth.lerp(f, localPlayer.oPortalEffectIntensity, localPlayer.portalEffectIntensity);
+			float k2 = localPlayer.getEffectBlendFactor(MobEffects.NAUSEA, f);
+			float l2 = Math.max(j2, k2) * i2 * i2;
+			if (l2 > 0.0F) {
+				float m2 = 5.0F / (l2 * l2 + 5.0F) - l2 * 0.04F;
+				m2 *= m2;
+				Vector3f vector3f2 = new Vector3f(0.0F, Mth.SQRT_OF_TWO / 2.0F, Mth.SQRT_OF_TWO / 2.0F);
+				float n2 = (this.spinningEffectTime + f * this.spinningEffectSpeed) * ((float)Math.PI / 180F);
+				matrix4f2.rotate(n2, vector3f2);
+				matrix4f2.scale(1.0F / m2, 1.0F, 1.0F);
+				matrix4f2.rotate(-n2, vector3f2);
+			}
+
+			matrix4f2.rotate(quaternionf);
+		} else {
+			matrix4f2.rotation(quaternionf);
+		}
 		profilerFiller.popPush("fog");
 		boolean bl2 = this.minecraft.level.effects().isFoggyAt(this.mainCamera.getBlockPosition().getX(), this.mainCamera.getBlockPosition().getZ())
 			|| this.minecraft.gui.getBossOverlay().shouldCreateWorldFog();
