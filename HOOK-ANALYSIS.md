@@ -6,8 +6,14 @@
 
 ### Mixin Conversion Status
 
-**Total Mixins:** 218 → **78 remaining** (140 removed)  
-**Conversion Progress:** 64.2% complete - **MILESTONE: 64% REACHED!** 🎉🎉🎉
+**Total Mixins:** 218 → **74 remaining** (144 removed)  
+**Conversion Progress:** 66.1% complete - **MILESTONE: 66% REACHED!** 🎉🎉🎉🎉
+
+#### Removed Mixins (Session 32 - 4 mixins):
+169. ✅ `FogRendererMixin` - Interface implementation (FogStorage) + @Inject → Inlined fog parameter storage into FogRenderer.setupFog()
+170. ✅ `ChunkSectionsToRenderMixin` - Interface implementation (SodiumChunkSection) + @Inject → Inlined Sodium chunk rendering into ChunkSectionsToRender.renderGroup()
+171. ✅ `WindowMixin` - @Redirect + @WrapOperation → Inlined NVIDIA workarounds into Window constructor's glfwCreateWindow call
+172. ✅ `RenderSystemMixin` - 2 @Inject (RETURN) → Inlined GL context info logging and WGL context security checks into RenderSystem.initRenderer() and flipFrame()
 
 #### Removed Mixins (Session 31 - 2 mixins):
 167. ✅ `MixinGui` - @WrapMethod for render() → Inlined HUD hiding for HudHideable screens and GL debug markers into Gui.render()
