@@ -22,8 +22,6 @@
     "MixinShaderManager_Overrides",
     "MixinRenderSystem",
     "MixinCompiledShaderProgram",
-    "MixinSkyRenderer",
-    "MixinWeatherRenderer",
     "entity_render_context.MixinBlockEntityRenderDispatcher",
     "entity_render_context.MixinEnderDragonRenderer",
     "entity_render_context.MixinEntityRenderDispatcher",
