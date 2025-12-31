@@ -28,7 +28,6 @@
     "features.render.world.clouds.CloudRendererMixin",
     "features.textures.animations.tracking.SpriteContentsTickerMixin",
     "features.textures.animations.upload.SpriteContentsInterpolationMixin",
-    "features.textures.mipmaps.MipmapGeneratorMixin",
     "features.textures.mipmaps.SpriteContentsMixin",
     "workarounds.context_creation.WindowMixin",
     "workarounds.context_creation.RenderSystemMixin"

@@ -9,11 +9,6 @@ import net.minecraft.util.ARGB;
 @Environment(EnvType.CLIENT)
 public class MipmapGenerator {
 	private static final int ALPHA_CUTOUT_CUTOFF = 96;
-	private static final float[] POW22 = (float[])Util.make(new float[256], fs -> {
-		for (int i = 0; i < fs.length; i++) {
-			fs[i] = (float)Math.pow(i / 255.0F, 2.2);
-		}
-	});
 
 	private MipmapGenerator() {
 	}
@@ -71,72 +66,71 @@ public class MipmapGenerator {
 		return false;
 	}
 
-	private static int alphaBlend(int i, int j, int k, int l, boolean bl) {
-		if (bl) {
-			float f = 0.0F;
-			float g = 0.0F;
-			float h = 0.0F;
-			float m = 0.0F;
-			if (i >> 24 != 0) {
-				f += getPow22(i >> 24);
-				g += getPow22(i >> 16);
-				h += getPow22(i >> 8);
-				m += getPow22(i >> 0);
-			}
+	private static int alphaBlend(int one, int two, int three, int four, boolean checkAlpha) {
+		// Sodium: Enhanced mipmap downsampling (from MipmapGeneratorMixin)
+		// Combines linear color spaces with alpha-weighted blending for minimal visual artifacts
+		// First blend horizontally, then blend vertically.
+		// This works well for the case where our change is the most impactful (grass side overlays)
+		return weightedAverageColor(weightedAverageColor(one, two), weightedAverageColor(three, four));
+	}
 
-			if (j >> 24 != 0) {
-				f += getPow22(j >> 24);
-				g += getPow22(j >> 16);
-				h += getPow22(j >> 8);
-				m += getPow22(j >> 0);
-			}
+	private static int weightedAverageColor(int one, int two) {
+		int alphaOne = net.sodium.api.util.ColorABGR.unpackAlpha(one);
+		int alphaTwo = net.sodium.api.util.ColorABGR.unpackAlpha(two);
 
-			if (k >> 24 != 0) {
-				f += getPow22(k >> 24);
-				g += getPow22(k >> 16);
-				h += getPow22(k >> 8);
-				m += getPow22(k >> 0);
-			}
-
-			if (l >> 24 != 0) {
-				f += getPow22(l >> 24);
-				g += getPow22(l >> 16);
-				h += getPow22(l >> 8);
-				m += getPow22(l >> 0);
-			}
-
-			f /= 4.0F;
-			g /= 4.0F;
-			h /= 4.0F;
-			m /= 4.0F;
-			int n = (int)(Math.pow(f, 0.45454545454545453) * 255.0);
-			int o = (int)(Math.pow(g, 0.45454545454545453) * 255.0);
-			int p = (int)(Math.pow(h, 0.45454545454545453) * 255.0);
-			int q = (int)(Math.pow(m, 0.45454545454545453) * 255.0);
-			if (n < 96) {
-				n = 0;
-			}
-
-			return ARGB.color(n, o, p, q);
-		} else {
-			int r = gammaBlend(i, j, k, l, 24);
-			int s = gammaBlend(i, j, k, l, 16);
-			int t = gammaBlend(i, j, k, l, 8);
-			int u = gammaBlend(i, j, k, l, 0);
-			return ARGB.color(r, s, t, u);
+		// In the case where the alpha values of the same, we can get by with an unweighted average.
+		if (alphaOne == alphaTwo) {
+			return averageRgb(one, two, alphaOne);
 		}
+
+		// If one of our pixels is fully transparent, ignore it.
+		// We just take the value of the other pixel as-is. To compensate for not changing the color value, we
+		// divide the alpha value by 4 instead of 2.
+		if (alphaOne == 0) {
+			return (two & 0x00FFFFFF) | ((alphaTwo >> 2) << 24);
+		}
+
+		if (alphaTwo == 0) {
+			return (one & 0x00FFFFFF) | ((alphaOne >> 2) << 24);
+		}
+
+		// Use the alpha values to compute relative weights of each color.
+		float scale = 1.0f / (alphaOne + alphaTwo);
+
+		float relativeWeightOne = alphaOne * scale;
+		float relativeWeightTwo = alphaTwo * scale;
+
+		// Convert the color components into linear space, then multiply the corresponding weight.
+		float oneR = net.caffeinemc.mods.sodium.client.util.color.ColorSRGB.srgbToLinear(net.sodium.api.util.ColorABGR.unpackRed(one)) * relativeWeightOne;
+		float oneG = net.caffeinemc.mods.sodium.client.util.color.ColorSRGB.srgbToLinear(net.sodium.api.util.ColorABGR.unpackGreen(one)) * relativeWeightOne;
+		float oneB = net.caffeinemc.mods.sodium.client.util.color.ColorSRGB.srgbToLinear(net.sodium.api.util.ColorABGR.unpackBlue(one)) * relativeWeightOne;
+
+		float twoR = net.caffeinemc.mods.sodium.client.util.color.ColorSRGB.srgbToLinear(net.sodium.api.util.ColorABGR.unpackRed(two)) * relativeWeightTwo;
+		float twoG = net.caffeinemc.mods.sodium.client.util.color.ColorSRGB.srgbToLinear(net.sodium.api.util.ColorABGR.unpackGreen(two)) * relativeWeightTwo;
+		float twoB = net.caffeinemc.mods.sodium.client.util.color.ColorSRGB.srgbToLinear(net.sodium.api.util.ColorABGR.unpackBlue(two)) * relativeWeightTwo;
+
+		// Combine the color components of each color
+		float linearR = oneR + twoR;
+		float linearG = oneG + twoG;
+		float linearB = oneB + twoB;
+
+		// Take the average alpha of both alpha values
+		int averageAlpha = (alphaOne + alphaTwo) >> 1;
+
+		// Convert to sRGB and pack the colors back into an integer.
+		return net.caffeinemc.mods.sodium.client.util.color.ColorSRGB.linearToSrgb(linearR, linearG, linearB, averageAlpha);
 	}
 
-	private static int gammaBlend(int i, int j, int k, int l, int m) {
-		float f = getPow22(i >> m);
-		float g = getPow22(j >> m);
-		float h = getPow22(k >> m);
-		float n = getPow22(l >> m);
-		float o = (float)((float)Math.pow((f + g + h + n) * 0.25, 0.45454545454545453));
-		return (int)(o * 255.0);
-	}
+	// Computes a non-weighted average of the two sRGB colors in linear space, avoiding brightness losses.
+	private static int averageRgb(int a, int b, int alpha) {
+		float ar = net.caffeinemc.mods.sodium.client.util.color.ColorSRGB.srgbToLinear(net.sodium.api.util.ColorABGR.unpackRed(a));
+		float ag = net.caffeinemc.mods.sodium.client.util.color.ColorSRGB.srgbToLinear(net.sodium.api.util.ColorABGR.unpackGreen(a));
+		float ab = net.caffeinemc.mods.sodium.client.util.color.ColorSRGB.srgbToLinear(net.sodium.api.util.ColorABGR.unpackBlue(a));
 
-	private static float getPow22(int i) {
-		return POW22[i & 0xFF];
+		float br = net.caffeinemc.mods.sodium.client.util.color.ColorSRGB.srgbToLinear(net.sodium.api.util.ColorABGR.unpackRed(b));
+		float bg = net.caffeinemc.mods.sodium.client.util.color.ColorSRGB.srgbToLinear(net.sodium.api.util.ColorABGR.unpackGreen(b));
+		float bb = net.caffeinemc.mods.sodium.client.util.color.ColorSRGB.srgbToLinear(net.sodium.api.util.ColorABGR.unpackBlue(b));
+
+		return net.caffeinemc.mods.sodium.client.util.color.ColorSRGB.linearToSrgb((ar + br) * 0.5f, (ag + bg) * 0.5f, (ab + bb) * 0.5f, alpha);
 	}
 }
