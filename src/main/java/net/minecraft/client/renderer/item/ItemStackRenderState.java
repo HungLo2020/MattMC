@@ -227,6 +227,10 @@ public class ItemStackRenderState implements net.irisshaders.iris.mixinterface.I
 		}
 
 		void submit(PoseStack poseStack, SubmitNodeCollector submitNodeCollector, int i, int j, int k) {
+			// Iris: Save block entity state before rendering (from ItemStackStateLayerMixin)
+			int lastBState = net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.getCurrentRenderedBlockEntity();
+			iris$setupId(ItemStackRenderState.this.iris_displayStack, ItemStackRenderState.this.iris_displayModelId);
+			
 			poseStack.pushPose();
 			this.transform.apply(ItemStackRenderState.this.displayContext.leftHand(), poseStack.last());
 			if (this.specialRenderer != null) {
@@ -246,6 +250,25 @@ public class ItemStackRenderState implements net.irisshaders.iris.mixinterface.I
 			}
 
 			poseStack.popPose();
+			
+			// Iris: Restore state after rendering (from ItemStackStateLayerMixin)
+			net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setCurrentBlockEntity(lastBState);
+			net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setCurrentRenderedItem(0);
+		}
+		
+		// Iris: Helper method from ItemStackStateLayerMixin
+		private void iris$setupId(net.minecraft.world.item.Item item, net.minecraft.resources.ResourceLocation modelId) {
+			if (net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings.INSTANCE.getItemIds() == null) return;
+
+			if (item instanceof net.minecraft.world.item.BlockItem blockItem && !(item instanceof net.minecraft.world.item.SolidBucketItem)) {
+				if (net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings.INSTANCE.getBlockStateIds() == null) return;
+
+				net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setCurrentBlockEntity(1);
+				net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setCurrentRenderedItem(net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings.INSTANCE.getBlockStateIds().getOrDefault(blockItem.getBlock().defaultBlockState(), 0));
+			} else {
+				net.minecraft.resources.ResourceLocation location = modelId != null ? modelId : net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(item);
+				net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setCurrentRenderedItem(net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings.INSTANCE.getItemIds().applyAsInt(new net.irisshaders.iris.shaderpack.materialmap.NamespacedId(location.getNamespace(), location.getPath())));
+			}
 		}
 	}
 	
