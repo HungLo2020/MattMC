@@ -6,14 +6,17 @@
 
 ### Mixin Conversion Status
 
-**Total Mixins:** 218 → **108 remaining** (110 removed)  
-**Conversion Progress:** 50.5% complete - **SURPASSED 50%!** 🎉
+**Total Mixins:** 218 → **105 remaining** (113 removed)  
+**Conversion Progress:** 51.8% complete - **OVER HALFWAY!** 🎉
 
-#### Removed Mixins (Session 24 - 4 conversions, 2 files):
+#### Removed Mixins (Session 24 - 7 conversions, 5 files):
 135. ✅ `MixinOptions_CloudsOverride` - HEAD inject → Inlined cloud status override into Options.getCloudsType()
 136. ✅ `MixinGui` (partial) - Removed HEAD inject from renderVignette → Inlined vignette check into Gui.renderVignette() (WrapMethod remains)
 137. ✅ `MixinChunkVertexConsumer` - Interface implementation → ChunkVertexConsumer implements BlockSensitiveBufferBuilder with delegation
 138. ✅ `MixinBufferBuilder_SeparateAo` - Override method → BufferBuilder.putBulkData() with separate AO handling
+139. ✅ `MixinCustomFeatureRenderer` - HEAD + RETURN injects → Inlined model storage set/clear into CustomFeatureRenderer.render()
+140. ✅ `MixinItemFeatureRenderer` - HEAD + RETURN injects → Inlined model storage set/clear into ItemFeatureRenderer.render()
+141. ✅ `MixinModelPartFeatureRenderer` - HEAD + RETURN injects → Inlined model storage set/clear into ModelPartFeatureRenderer.render()
 
 #### Removed Mixins (Session 23 - 1 mixin):
 134. ✅ `MixinCustomGeometrySubmit` - Record interface implementation → SubmitNodeStorage.CustomGeometrySubmit implements ModelStorage with constructor capture

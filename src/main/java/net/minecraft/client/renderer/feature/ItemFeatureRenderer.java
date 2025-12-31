@@ -16,6 +16,9 @@ public class ItemFeatureRenderer {
 
 	public void render(SubmitNodeCollection submitNodeCollection, MultiBufferSource.BufferSource bufferSource, OutlineBufferSource outlineBufferSource) {
 		for (SubmitNodeStorage.ItemSubmit itemSubmit : submitNodeCollection.getItemSubmits()) {
+			// Iris: Set model storage before rendering
+			((net.irisshaders.iris.mixinterface.ModelStorage) (Object) itemSubmit).iris$set();
+			
 			this.poseStack.pushPose();
 			this.poseStack.last().set(itemSubmit.pose());
 			ItemRenderer.renderItem(
@@ -46,5 +49,10 @@ public class ItemFeatureRenderer {
 
 			this.poseStack.popPose();
 		}
+		
+		// Iris: Clear captured rendering state
+		net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setCurrentRenderedItem(0);
+		net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setCurrentEntity(0);
+		net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setCurrentBlockEntity(0);
 	}
 }
