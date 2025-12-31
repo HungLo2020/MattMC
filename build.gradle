@@ -249,8 +249,7 @@ dependencies {
         
         // NOTE: Access Widener removed - access modifications already applied in source
         
-        // Tiny Mappings Parser - legacy mapping parser
-        implementation files('libraries/deps/tiny-mappings-parser-0.3.0+build.17.jar')
+        // NOTE: Tiny Mappings Parser removed - superseded by mapping-io with built-in Tiny v1 support
         
         // Note: Fabric API stubs are in src/main/java/net/fabricmc/fabric/api/
         // No external Fabric API JARs needed - using Mojang-mapped stubs
@@ -273,8 +272,7 @@ dependencies {
         
         // NOTE: Access Widener removed - access modifications already applied in source
         
-        // Tiny Mappings Parser - legacy mapping parser (requires Fabric Maven)
-        implementation 'net.fabricmc:tiny-mappings-parser:0.3.0+build.17'
+        // NOTE: Tiny Mappings Parser removed - superseded by mapping-io with built-in Tiny v1 support
     }
     
     // Fabric implementation dependencies (available on Maven Central)
