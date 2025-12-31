@@ -315,18 +315,67 @@ public class BufferBuilder implements VertexConsumer, BufferBuilderExtension {
 				.serialize(src, dst, count);
 	}
 	
-	// Iris: Override putBulkData to support separate AO
+	// Merged from Sodium BufferBuilderMixin (intrinsics) + Iris separate AO
 	@Override
-	public void putBulkData(PoseStack.Pose matrixEntry, net.minecraft.client.renderer.block.model.BakedQuad quad, float[] brightnesses, float red, float green,
-							float blue, float alpha, int[] lights, int overlay, boolean useQuadColorData) {
-		if (net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings.INSTANCE.shouldUseSeparateAo()) {
-			float[] brightnesses1 = brightnesses;
-			int brightnessIndex = 0;
+	public void putBulkData(PoseStack.Pose matrices, net.minecraft.client.renderer.block.model.BakedQuad bakedQuad, float r, float g, float b, float a, int light, int overlay) {
+		// Sodium fast path
+		if (this.fastFormat) {
+			if (bakedQuad.vertices().length < 32) {
+				return; // we do not accept quads with less than 4 properly sized vertices
+			}
 
-			brightnesses = new float[brightnesses.length];
-			java.util.Arrays.fill(brightnesses, 1.0f);
+			net.sodium.api.vertex.buffer.VertexBufferWriter writer = net.sodium.api.vertex.buffer.VertexBufferWriter.of(this);
+			net.caffeinemc.mods.sodium.client.model.quad.ModelQuadView quad = (net.caffeinemc.mods.sodium.client.model.quad.ModelQuadView) (Object) bakedQuad;
+
+			int color = net.sodium.api.util.ColorABGR.pack(r, g, b, a);
+			net.caffeinemc.mods.sodium.client.render.immediate.model.BakedModelEncoder.writeQuadVertices(writer, matrices, quad, color, light, overlay, false);
+
+			if (quad.getSprite() != null) {
+				net.sodium.api.texture.SpriteUtil.INSTANCE.markSpriteActive(quad.getSprite());
+			}
+			return;
 		}
 
-		VertexConsumer.super.putBulkData(matrixEntry, quad, brightnesses, red, green, blue, alpha, lights, overlay, useQuadColorData);
+		// Fallback to default
+		VertexConsumer.super.putBulkData(matrices, bakedQuad, r, g, b, a, light, overlay);
+
+		if (bakedQuad.sprite() != null) {
+			net.sodium.api.texture.SpriteUtil.INSTANCE.markSpriteActive(bakedQuad.sprite());
+		}
+	}
+
+	@Override
+	public void putBulkData(PoseStack.Pose matrices, net.minecraft.client.renderer.block.model.BakedQuad bakedQuad, float[] brightnessTable, float red, float green,
+							float blue, float alpha, int[] lights, int overlay, boolean colorize) {
+		// Iris: Apply separate AO if needed
+		if (net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings.INSTANCE.shouldUseSeparateAo()) {
+			float[] modifiedBrightness = new float[brightnessTable.length];
+			java.util.Arrays.fill(modifiedBrightness, 1.0f);
+			brightnessTable = modifiedBrightness;
+		}
+
+		// Sodium fast path
+		if (this.fastFormat) {
+			if (bakedQuad.vertices().length < 32) {
+				return; // we do not accept quads with less than 4 properly sized vertices
+			}
+
+			net.sodium.api.vertex.buffer.VertexBufferWriter writer = net.sodium.api.vertex.buffer.VertexBufferWriter.of(this);
+			net.caffeinemc.mods.sodium.client.model.quad.ModelQuadView quad = (net.caffeinemc.mods.sodium.client.model.quad.ModelQuadView) (Object) bakedQuad;
+
+			net.caffeinemc.mods.sodium.client.render.immediate.model.BakedModelEncoder.writeQuadVertices(writer, matrices, quad, red, green, blue, alpha, brightnessTable, colorize, lights, overlay);
+
+			if (quad.getSprite() != null) {
+				net.sodium.api.texture.SpriteUtil.INSTANCE.markSpriteActive(quad.getSprite());
+			}
+			return;
+		}
+
+		// Fallback to default
+		VertexConsumer.super.putBulkData(matrices, bakedQuad, brightnessTable, red, green, blue, alpha, lights, overlay, colorize);
+
+		if (bakedQuad.sprite() != null) {
+			net.sodium.api.texture.SpriteUtil.INSTANCE.markSpriteActive(bakedQuad.sprite());
+		}
 	}
 }
