@@ -157,10 +157,7 @@ class BuiltinMetadataWrapper extends AbstractModMetadata implements LoaderModMet
 		return Collections.emptyList();
 	}
 
-	@Override
-	public String getClassTweaker() {
-		return null;
-	}
+	// NOTE: getClassTweaker() removed - access modifications already applied in source
 
 	@Override
 	public boolean loadsInEnvironment(EnvType type) {

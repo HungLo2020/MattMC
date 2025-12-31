@@ -62,7 +62,7 @@ final class V1ModMetadataParser {
 		Map<String, List<EntrypointMetadata>> entrypoints = new HashMap<>();
 		List<NestedJarEntry> jars = new ArrayList<>();
 		List<V1ModMetadata.MixinEntry> mixins = new ArrayList<>();
-		String classTweaker = null;
+		// NOTE: classTweaker variable removed - access modifications already applied in source
 
 		// Optional (dependency resolution)
 		List<ModDependency> dependencies = new ArrayList<>();
@@ -141,11 +141,11 @@ final class V1ModMetadataParser {
 				readMixinConfigs(warnings, reader, mixins);
 				break;
 			case "accessWidener":
+				// NOTE: Access widener parsing removed - access modifications already applied in source
 				if (reader.peek() != JsonToken.STRING) {
 					throw new ParseMetadataException("Access Widener file must be a string", reader);
 				}
-
-				classTweaker = reader.nextString();
+				reader.nextString(); // Consume the value but don't use it
 				break;
 			case "depends":
 				readDependenciesContainer(reader, ModDependency.Kind.DEPENDS, dependencies);
@@ -223,7 +223,7 @@ final class V1ModMetadataParser {
 		ModMetadataParser.logWarningMessages(id, warnings);
 
 		return new V1ModMetadata(id, version, provides,
-				environment, entrypoints, jars, mixins, classTweaker,
+				environment, entrypoints, jars, mixins,
 				dependencies, hasRequires,
 				name, description, authors, contributors, contact, license, icon, languageAdapters, customValues);
 	}

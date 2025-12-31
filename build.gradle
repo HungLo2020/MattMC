@@ -239,11 +239,7 @@ dependencies {
         implementation files('libraries/deps/asm-tree-9.9.jar')
         implementation files('libraries/deps/asm-util-9.9.jar')
         
-        // Tiny Remapper - class/method/field remapping
-        implementation files('libraries/deps/tiny-remapper-0.11.2.jar')
-        
-        // Class Tweaker - class access modification
-        implementation files('libraries/deps/class-tweaker-0.2.jar')
+        // NOTE: Class Tweaker removed - access modifications already applied in source
         
         // Mapping IO - mapping file I/O
         implementation files('libraries/deps/mapping-io-0.7.1.jar')
@@ -251,11 +247,9 @@ dependencies {
         // Launchwrapper - legacy launch wrapper
         implementation files('libraries/deps/launchwrapper-1.12.jar')
         
-        // Access Widener - access modification
-        implementation files('libraries/deps/access-widener-2.1.0.jar')
+        // NOTE: Access Widener removed - access modifications already applied in source
         
-        // Tiny Mappings Parser - legacy mapping parser
-        implementation files('libraries/deps/tiny-mappings-parser-0.3.0+build.17.jar')
+        // NOTE: Tiny Mappings Parser removed - superseded by mapping-io with built-in Tiny v1 support
         
         // Note: Fabric API stubs are in src/main/java/net/fabricmc/fabric/api/
         // No external Fabric API JARs needed - using Mojang-mapped stubs
@@ -268,11 +262,7 @@ dependencies {
         implementation 'org.ow2.asm:asm-tree:9.9'
         implementation 'org.ow2.asm:asm-util:9.9'
         
-        // Tiny Remapper - class/method/field remapping (requires Fabric Maven)
-        implementation 'net.fabricmc:tiny-remapper:0.11.2'
-        
-        // Class Tweaker - class access modification (requires Fabric Maven)
-        implementation 'net.fabricmc:class-tweaker:0.2'
+        // NOTE: Class Tweaker removed - access modifications already applied in source
         
         // Mapping IO - mapping file I/O (requires Fabric Maven)
         implementation 'net.fabricmc:mapping-io:0.7.1'
@@ -280,11 +270,9 @@ dependencies {
         // Launchwrapper - legacy launch wrapper (requires Minecraft Libraries)
         implementation 'net.minecraft:launchwrapper:1.12'
         
-        // Access Widener - access modification (requires Fabric Maven)
-        implementation 'net.fabricmc:access-widener:2.1.0'
+        // NOTE: Access Widener removed - access modifications already applied in source
         
-        // Tiny Mappings Parser - legacy mapping parser (requires Fabric Maven)
-        implementation 'net.fabricmc:tiny-mappings-parser:0.3.0+build.17'
+        // NOTE: Tiny Mappings Parser removed - superseded by mapping-io with built-in Tiny v1 support
     }
     
     // Fabric implementation dependencies (available on Maven Central)

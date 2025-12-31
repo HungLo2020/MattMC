@@ -49,8 +49,7 @@ final class V1ModMetadata extends AbstractModMetadata implements LoaderModMetada
 	private final Map<String, List<EntrypointMetadata>> entrypoints;
 	private final Collection<NestedJarEntry> jars;
 	private final Collection<MixinEntry> mixins;
-	/* @Nullable */
-	private final String classTweaker;
+	// NOTE: classTweaker field removed - access modifications already applied in source
 
 	// Optional (dependency resolution)
 	private Collection<ModDependency> dependencies;
@@ -75,7 +74,7 @@ final class V1ModMetadata extends AbstractModMetadata implements LoaderModMetada
 
 	V1ModMetadata(String id, Version version, Collection<String> provides,
 			ModEnvironment environment, Map<String, List<EntrypointMetadata>> entrypoints, Collection<NestedJarEntry> jars,
-			Collection<MixinEntry> mixins, /* @Nullable */ String classTweaker,
+			Collection<MixinEntry> mixins,
 			Collection<ModDependency> dependencies, boolean hasRequires,
 			/* @Nullable */ String name, /* @Nullable */String description,
 			Collection<Person> authors, Collection<Person> contributors, /* @Nullable */ContactInformation contact, Collection<String> license, IconEntry icon,
@@ -88,7 +87,7 @@ final class V1ModMetadata extends AbstractModMetadata implements LoaderModMetada
 		this.entrypoints = Collections.unmodifiableMap(entrypoints);
 		this.jars = Collections.unmodifiableCollection(jars);
 		this.mixins = Collections.unmodifiableCollection(mixins);
-		this.classTweaker = classTweaker;
+		// NOTE: classTweaker assignment removed - access modifications already applied in source
 		this.dependencies = Collections.unmodifiableCollection(dependencies);
 		this.hasRequires = hasRequires;
 		this.name = name;
@@ -243,10 +242,7 @@ final class V1ModMetadata extends AbstractModMetadata implements LoaderModMetada
 		return mixinConfigs;
 	}
 
-	@Override
-	public String getClassTweaker() {
-		return this.classTweaker;
-	}
+	// NOTE: getClassTweaker() removed - access modifications already applied in source
 
 	@Override
 	public Collection<String> getOldInitializers() {

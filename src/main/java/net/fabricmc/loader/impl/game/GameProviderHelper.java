@@ -50,13 +50,7 @@ import net.fabricmc.loader.impl.util.UrlConversionException;
 import net.fabricmc.loader.impl.util.UrlUtil;
 import net.fabricmc.loader.impl.util.log.Log;
 import net.fabricmc.loader.impl.util.log.LogCategory;
-import net.fabricmc.loader.impl.util.log.TinyRemapperLoggerAdapter;
 import net.fabricmc.mappingio.tree.MappingTree;
-import net.fabricmc.tinyremapper.InputTag;
-import net.fabricmc.tinyremapper.NonClassCopyMode;
-import net.fabricmc.tinyremapper.OutputConsumerPath;
-import net.fabricmc.tinyremapper.TinyRemapper;
-import net.fabricmc.tinyremapper.TinyUtils;
 
 public final class GameProviderHelper {
 	private GameProviderHelper() { }
@@ -322,98 +316,14 @@ public final class GameProviderHelper {
 
 	private static void deobfuscate0(List<Path> inputFiles, List<Path> outputFiles, List<Path> tmpFiles,
 			MappingTree mappings, String sourceNamespace, String targetNamespace, FabricLauncher launcher) throws IOException {
-		TinyRemapper remapper = TinyRemapper.newRemapper(new TinyRemapperLoggerAdapter(LogCategory.GAME_REMAP))
-				.withMappings(TinyUtils.createMappingProvider(mappings, sourceNamespace, targetNamespace))
-				.rebuildSourceFilenames(true)
-				.build();
-
-		Set<Path> depPaths = new HashSet<>();
-
-		if (SystemProperties.isSet(SystemProperties.DEBUG_DEOBFUSCATE_WITH_CLASSPATH)) {
-			for (Path path : launcher.getClassPath()) {
-				if (!inputFiles.contains(path)) {
-					depPaths.add(path);
-
-					Log.debug(LogCategory.GAME_REMAP, "Appending '%s' to remapper classpath", path);
-					remapper.readClassPathAsync(path);
-				}
-			}
-		}
-
-		List<OutputConsumerPath> outputConsumers = new ArrayList<>(inputFiles.size());
-		List<InputTag> inputTags = new ArrayList<>(inputFiles.size());
-
-		try {
-			for (int i = 0; i < inputFiles.size(); i++) {
-				Path inputFile = inputFiles.get(i);
-				Path tmpFile = tmpFiles.get(i);
-
-				InputTag inputTag = remapper.createInputTag();
-				OutputConsumerPath outputConsumer = new OutputConsumerPath.Builder(tmpFile)
-						// force jar despite the .tmp extension
-						.assumeArchive(true)
-						.build();
-
-				outputConsumers.add(outputConsumer);
-				inputTags.add(inputTag);
-
-				outputConsumer.addNonClassFiles(inputFile, NonClassCopyMode.FIX_META_INF, remapper);
-				remapper.readInputsAsync(inputTag, inputFile);
-			}
-
-			for (int i = 0; i < inputFiles.size(); i++) {
-				remapper.apply(outputConsumers.get(i), inputTags.get(i));
-			}
-		} finally {
-			for (OutputConsumerPath outputConsumer : outputConsumers) {
-				outputConsumer.close();
-			}
-
-			remapper.finish();
-		}
-
-		// Minecraft doesn't tend to check if a ZipFileSystem is already present,
-		// so we clean up here.
-
-		depPaths.addAll(tmpFiles);
-
-		for (Path p : depPaths) {
-			try {
-				p.getFileSystem().close();
-			} catch (Exception e) {
-				// pass
-			}
-
-			try {
-				FileSystems.getFileSystem(new URI("jar:" + p.toUri())).close();
-			} catch (Exception e) {
-				// pass
-			}
-		}
-
-		List<Path> missing = new ArrayList<>();
-
-		for (int i = 0; i < inputFiles.size(); i++) {
-			Path inputFile = inputFiles.get(i);
-			Path tmpFile = tmpFiles.get(i);
-			Path outputFile = outputFiles.get(i);
-
-			boolean found;
-
-			try (JarFile jar = new JarFile(tmpFile.toFile())) {
-				found = jar.stream().anyMatch((e) -> e.getName().endsWith(".class"));
-			}
-
-			if (!found) {
-				missing.add(inputFile);
-				Files.delete(tmpFile);
-			} else {
-				Files.move(tmpFile, outputFile);
-			}
-		}
-
-		if (!missing.isEmpty()) {
-			throw new RuntimeException("Generated deobfuscated JARs contain no classes: "+missing);
-		}
+		// NOTE: TinyRemapper removed - unified build approach means all code uses
+		// consistent mappings at compile time. This method should never be called
+		// because deobfuscate() returns early when sourceNamespace equals targetNamespace.
+		// If this is reached, it indicates a configuration error.
+		throw new UnsupportedOperationException(
+			"Runtime deobfuscation not supported in unified build. " +
+			"All code should already use correct mappings at compile time. " +
+			"Source namespace: " + sourceNamespace + ", Target namespace: " + targetNamespace
+		);
 	}
 }
