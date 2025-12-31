@@ -11,12 +11,9 @@
   },
   "client": [
     "core.render.world.LevelRendererMixin",
-    "features.render.entity.CubeMixin",
-    "features.render.entity.ModelPartMixin",
     "features.render.frapi.BlockRenderDispatcherMixin",
     "features.render.frapi.ModelBlockRendererMixin",
     "features.render.immediate.matrix_stack.VertexConsumerMixin",
-    "features.render.model.item.ItemRendererMixin",
     "features.render.world.clouds.CloudRendererMixin",
     "features.textures.animations.upload.SpriteContentsInterpolationMixin"
   ]
