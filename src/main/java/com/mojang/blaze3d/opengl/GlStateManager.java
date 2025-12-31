@@ -95,16 +95,31 @@ public class GlStateManager {
 
 	public static void _disableBlend() {
 		RenderSystem.assertOnRenderThread();
+		// Iris: Check blend lock (from MixinGlStateManager_BlendOverride)
+		if (net.irisshaders.iris.gl.blending.BlendModeStorage.isBlendLocked()) {
+			net.irisshaders.iris.gl.blending.BlendModeStorage.deferBlendModeToggle(false);
+			return;
+		}
 		BLEND.mode.disable();
 	}
 
 	public static void _enableBlend() {
 		RenderSystem.assertOnRenderThread();
+		// Iris: Check blend lock (from MixinGlStateManager_BlendOverride)
+		if (net.irisshaders.iris.gl.blending.BlendModeStorage.isBlendLocked()) {
+			net.irisshaders.iris.gl.blending.BlendModeStorage.deferBlendModeToggle(true);
+			return;
+		}
 		BLEND.mode.enable();
 	}
 
 	public static void _blendFuncSeparate(int i, int j, int k, int l) {
 		RenderSystem.assertOnRenderThread();
+		// Iris: Check blend lock (from MixinGlStateManager_BlendOverride)
+		if (net.irisshaders.iris.gl.blending.BlendModeStorage.isBlendLocked()) {
+			net.irisshaders.iris.gl.blending.BlendModeStorage.deferBlendFunc(i, j, k, l);
+			return;
+		}
 		if (i != BLEND.srcRgb || j != BLEND.dstRgb || k != BLEND.srcAlpha || l != BLEND.dstAlpha) {
 			BLEND.srcRgb = i;
 			BLEND.dstRgb = j;

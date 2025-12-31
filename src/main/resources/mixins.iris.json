@@ -11,7 +11,6 @@
     "MixinEntityRenderDispatcher",
     "MixinGameRenderer",
     "MixinGlCommandEncoder",
-    "MixinGlStateManager_BlendOverride",
     "MixinGlStateManager_DepthColorOverride",
     "MixinGlStateManager_FramebufferBinding",
     "MixinLevelRenderer",
