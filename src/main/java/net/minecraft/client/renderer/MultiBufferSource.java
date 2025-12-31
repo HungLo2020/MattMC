@@ -99,7 +99,14 @@ public interface MultiBufferSource {
 			if (meshData != null) {
 				if (renderType.sortOnUpload()) {
 					ByteBufferBuilder byteBufferBuilder = (ByteBufferBuilder)this.fixedBuffers.getOrDefault(renderType, this.sharedBuffer);
-					meshData.sortQuads(byteBufferBuilder, RenderSystem.getProjectionType().vertexSorting());
+					
+					// Sodium: Use accelerated sorting if available (merged from MultiBufferSourceMixin)
+					com.mojang.blaze3d.vertex.VertexSorting sorting = RenderSystem.getProjectionType().vertexSorting();
+					if (sorting instanceof net.caffeinemc.mods.sodium.client.util.sorting.VertexSortingExtended sortingExtended) {
+						sodium$acceleratedSort(meshData, byteBufferBuilder, sortingExtended);
+					} else {
+						meshData.sortQuads(byteBufferBuilder, sorting);
+					}
 				}
 
 				// Iris: From MixinBufferSource - disable extended vertex format when not rendering level
@@ -118,6 +125,61 @@ public interface MultiBufferSource {
 
 			if (renderType.equals(this.lastSharedType)) {
 				this.lastSharedType = null;
+			}
+		}
+
+		// Sodium: Accelerated sorting (merged from MultiBufferSourceMixin)
+		private static final int VERTICES_PER_QUAD = 6;
+
+		private static void sodium$acceleratedSort(MeshData meshData, ByteBufferBuilder bufferBuilder, net.caffeinemc.mods.sodium.client.util.sorting.VertexSortingExtended sorting) {
+			final var drawState = meshData.drawState();
+
+			if (drawState.mode() != com.mojang.blaze3d.vertex.VertexFormat.Mode.QUADS) {
+				// Only quad lists can be sorted.
+				return;
+			}
+
+			var sortedPrimitiveIds = net.caffeinemc.mods.sodium.client.util.sorting.VertexSorters.sort(meshData.vertexBuffer(), drawState.vertexCount(), drawState.format().getVertexSize(), sorting);
+			var sortedIndexBuffer = sodium$buildSortedIndexBuffer(meshData, bufferBuilder, sortedPrimitiveIds);
+			meshData.indexBuffer = sortedIndexBuffer; // Direct field access - indexBuffer is now public
+		}
+
+		private static ByteBufferBuilder.Result sodium$buildSortedIndexBuffer(MeshData meshData, ByteBufferBuilder bufferBuilder, int[] primitiveIds) {
+			final var indexType = meshData.drawState().indexType();
+			final var ptr = bufferBuilder.reserve((primitiveIds.length * VERTICES_PER_QUAD) * indexType.bytes);
+
+			if (indexType == com.mojang.blaze3d.vertex.VertexFormat.IndexType.SHORT) {
+				sodium$writeIndexBufferShort(ptr, primitiveIds);
+			} else if (indexType == com.mojang.blaze3d.vertex.VertexFormat.IndexType.INT) {
+				sodium$writeIndexBufferInt(ptr, primitiveIds);
+			} else {
+				throw new UnsupportedOperationException();
+			}
+
+			return bufferBuilder.build();
+		}
+
+		private static void sodium$writeIndexBufferInt(long ptr, int[] primitiveIds) {
+			for (int primitiveId : primitiveIds) {
+				org.lwjgl.system.MemoryUtil.memPutInt(ptr +  0L, (primitiveId * 4) + 0);
+				org.lwjgl.system.MemoryUtil.memPutInt(ptr +  4L, (primitiveId * 4) + 1);
+				org.lwjgl.system.MemoryUtil.memPutInt(ptr +  8L, (primitiveId * 4) + 2);
+				org.lwjgl.system.MemoryUtil.memPutInt(ptr + 12L, (primitiveId * 4) + 2);
+				org.lwjgl.system.MemoryUtil.memPutInt(ptr + 16L, (primitiveId * 4) + 3);
+				org.lwjgl.system.MemoryUtil.memPutInt(ptr + 20L, (primitiveId * 4) + 0);
+				ptr += 24L;
+			}
+		}
+
+		private static void sodium$writeIndexBufferShort(long ptr, int[] primitiveIds) {
+			for (int primitiveId : primitiveIds) {
+				org.lwjgl.system.MemoryUtil.memPutShort(ptr +  0L, (short) ((primitiveId * 4) + 0));
+				org.lwjgl.system.MemoryUtil.memPutShort(ptr +  2L, (short) ((primitiveId * 4) + 1));
+				org.lwjgl.system.MemoryUtil.memPutShort(ptr +  4L, (short) ((primitiveId * 4) + 2));
+				org.lwjgl.system.MemoryUtil.memPutShort(ptr +  6L, (short) ((primitiveId * 4) + 2));
+				org.lwjgl.system.MemoryUtil.memPutShort(ptr +  8L, (short) ((primitiveId * 4) + 3));
+				org.lwjgl.system.MemoryUtil.memPutShort(ptr + 10L, (short) ((primitiveId * 4) + 0));
+				ptr += 12L;
 			}
 		}
 	}
