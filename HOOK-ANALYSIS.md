@@ -6,8 +6,14 @@
 
 ### Mixin Conversion Status
 
-**Total Mixins:** 218 → **60 remaining** (158 removed)  
-**Conversion Progress:** 72.5% complete - **MILESTONE: 72% REACHED!** 🎉🎉🎉🎉🎉
+**Total Mixins:** 218 → **56 remaining** (162 removed)  
+**Conversion Progress:** 74.3% complete - **MILESTONE: 74% REACHED!** 🎉🎉🎉🎉🎉
+
+#### Removed Mixins (Session 36 - 4 mixins):
+187. ✅ `SpriteContentsTickerMixin` (Sodium) - 3 @Inject (init/HEAD/TAIL) → Inlined on-demand texture animation into SpriteContents.Ticker constructor and tickAndUpload()
+188. ✅ `MixinParticleEngine` (Iris) - Deleted (entirely commented out dead code, fabric config)
+189. ✅ `MixinRenderTarget_StencilBufferTest` (Iris) - Deleted (integration test not loaded in production)
+190. ✅ `MixinEntityRenderDispatcher` (Iris) - @WrapWithCondition → Inlined shadow suppression check into EntityRenderDispatcher.submit()
 
 #### Removed Mixins (Session 35 - 9 mixins):
 178. ✅ `MixinGlStateManager_FramebufferBinding` (Iris) - 3 @Inject (HEAD cancellable) → Inlined program/viewport state tracking and texture validation into GlStateManager

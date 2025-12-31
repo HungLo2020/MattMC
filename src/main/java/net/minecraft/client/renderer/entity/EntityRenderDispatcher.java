@@ -194,8 +194,14 @@ public class EntityRenderDispatcher implements ResourceManagerReloadListener {
 				poseStack.translate(-vec3.x(), -vec3.y(), -vec3.z());
 			}
 
+			// Iris: From MixinEntityRenderDispatcher (main package) - suppress shadows if pipeline requests
 			if (!entityRenderState.shadowPieces.isEmpty()) {
-				submitNodeCollector.submitShadow(poseStack, entityRenderState.shadowRadius, entityRenderState.shadowPieces);
+				net.irisshaders.iris.pipeline.WorldRenderingPipeline pipeline = net.irisshaders.iris.Iris.getPipelineManager().getPipelineNullable();
+				boolean suppressShadows = pipeline != null && pipeline.shouldDisableVanillaEntityShadows();
+				
+				if (!suppressShadows) {
+					submitNodeCollector.submitShadow(poseStack, entityRenderState.shadowRadius, entityRenderState.shadowPieces);
+				}
 			}
 
 			if (!(entityRenderState instanceof AvatarRenderState)) {
