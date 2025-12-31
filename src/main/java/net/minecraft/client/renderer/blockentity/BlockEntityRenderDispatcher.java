@@ -100,6 +100,14 @@ public class BlockEntityRenderDispatcher implements ResourceManagerReloadListene
 	) {
 		BlockEntityRenderer<?, S> blockEntityRenderer = this.getRenderer(blockEntityRenderState);
 		if (blockEntityRenderer != null) {
+			// Iris: From MixinBlockEntityRenderDispatcher - begin entity render tracking
+			it.unimi.dsi.fastutil.objects.Object2IntMap<net.minecraft.world.level.block.state.BlockState> blockStateIds = net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings.INSTANCE.getBlockStateIds();
+			net.irisshaders.iris.vertices.ImmediateState.isRenderingBEs = true;
+			if (blockStateIds != null && net.irisshaders.iris.vertices.ImmediateState.isRenderingLevel) {
+				int intId = blockStateIds.applyAsInt(blockEntityRenderState.blockState);
+				net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setCurrentBlockEntity(intId);
+			}
+			
 			try {
 				blockEntityRenderer.submit(blockEntityRenderState, poseStack, submitNodeCollector, cameraRenderState);
 			} catch (Throwable var9) {
@@ -107,6 +115,10 @@ public class BlockEntityRenderDispatcher implements ResourceManagerReloadListene
 				CrashReportCategory crashReportCategory = crashReport.addCategory("Block Entity Details");
 				blockEntityRenderState.fillCrashReportCategory(crashReportCategory);
 				throw new ReportedException(crashReport);
+			} finally {
+				// Iris: From MixinBlockEntityRenderDispatcher - end entity render tracking
+				net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setCurrentBlockEntity(0);
+				net.irisshaders.iris.vertices.ImmediateState.isRenderingBEs = false;
 			}
 		}
 	}

@@ -161,6 +161,30 @@ public class EntityRenderDispatcher implements ResourceManagerReloadListener {
 			double i = f + vec3.z();
 			poseStack.pushPose();
 			poseStack.translate(g, h, i);
+			
+			// Iris: From MixinEntityRenderDispatcher - begin entity render tracking
+			it.unimi.dsi.fastutil.objects.Object2IntFunction<net.irisshaders.iris.shaderpack.materialmap.NamespacedId> entityIds = net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings.INSTANCE.getEntityIds();
+			if (entityIds != null && net.irisshaders.iris.vertices.ImmediateState.isRenderingLevel) {
+				int intId;
+				net.irisshaders.iris.shaderpack.materialmap.NamespacedId CURRENT_PLAYER = new net.irisshaders.iris.shaderpack.materialmap.NamespacedId("minecraft", "current_player");
+				net.irisshaders.iris.shaderpack.materialmap.NamespacedId CONVERTING_VILLAGER = new net.irisshaders.iris.shaderpack.materialmap.NamespacedId("minecraft", "zombie_villager_converting");
+				
+				if (entityRenderState instanceof net.minecraft.client.renderer.entity.state.ZombieVillagerRenderState zombie && zombie.isConverting && net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings.INSTANCE.hasVillagerConversionId()) {
+					intId = entityIds.applyAsInt(CONVERTING_VILLAGER);
+				} else if (entityRenderState instanceof net.minecraft.client.renderer.entity.state.AvatarRenderState ars && net.minecraft.client.Minecraft.getInstance().getCameraEntity() instanceof net.minecraft.client.player.AbstractClientPlayer acs && acs.getId() == ars.id) {
+					if (entityIds.containsKey(CURRENT_PLAYER)) {
+						intId = entityIds.getInt(CURRENT_PLAYER);
+					} else {
+						net.minecraft.resources.ResourceLocation entityId = net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.getKey(entityRenderState.entityType);
+						intId = entityIds.applyAsInt(new net.irisshaders.iris.shaderpack.materialmap.NamespacedId(entityId.getNamespace(), entityId.getPath()));
+					}
+				} else {
+					net.minecraft.resources.ResourceLocation entityId = net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.getKey(entityRenderState.entityType);
+					intId = entityIds.applyAsInt(new net.irisshaders.iris.shaderpack.materialmap.NamespacedId(entityId.getNamespace(), entityId.getPath()));
+				}
+				net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setCurrentEntity(intId);
+			}
+			
 			entityRenderer.submit(entityRenderState, poseStack, submitNodeCollector, cameraRenderState);
 			if (entityRenderState.displayFireAnimation) {
 				submitNodeCollector.submitFlame(poseStack, entityRenderState, Mth.rotationAroundAxis(Mth.Y_AXIS, cameraRenderState.orientation, new Quaternionf()));
@@ -183,6 +207,10 @@ public class EntityRenderDispatcher implements ResourceManagerReloadListener {
 			}
 
 			poseStack.popPose();
+			
+			// Iris: From MixinEntityRenderDispatcher - end entity render tracking
+			net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setCurrentEntity(0);
+			net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setCurrentRenderedItem(0);
 		} catch (Throwable var19) {
 			CrashReport crashReport = CrashReport.forThrowable(var19, "Rendering entity in world");
 			CrashReportCategory crashReportCategory = crashReport.addCategory("EntityRenderState being rendered");

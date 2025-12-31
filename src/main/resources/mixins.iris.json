@@ -16,8 +16,6 @@
     "MixinModelViewBobbing",
     "MixinShaderManager_Overrides",
     "MixinCompiledShaderProgram",
-    "entity_render_context.MixinBlockEntityRenderDispatcher",
-    "entity_render_context.MixinEntityRenderDispatcher",
     "entity_render_context.MixinModelStorageTrigger",
     "shadows.MixinLevelRenderer",
     "texture.pbr.MixinDirectoryLister",
