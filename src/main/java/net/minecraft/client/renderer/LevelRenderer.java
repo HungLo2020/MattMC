@@ -108,7 +108,7 @@ import org.joml.Vector4f;
 import org.slf4j.Logger;
 
 @Environment(EnvType.CLIENT)
-public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseable, net.irisshaders.iris.shadows.CullingDataCache {
+public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseable, net.irisshaders.iris.shadows.CullingDataCache, net.caffeinemc.mods.sodium.client.world.LevelRendererExtension {
 	private static final Logger LOGGER = LogUtils.getLogger();
 	private static final ResourceLocation TRANSPARENCY_POST_CHAIN_ID = ResourceLocation.withDefaultNamespace("transparency");
 	private static final ResourceLocation ENTITY_OUTLINE_POST_CHAIN_ID = ResourceLocation.withDefaultNamespace("entity_outline");
@@ -170,6 +170,11 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 	private net.irisshaders.iris.pipeline.WorldRenderingPipeline pipeline;
 	private boolean disableFrustumCulling;
 	private boolean warned;
+	
+	// Sodium: From LevelRendererMixin - fields for Sodium world renderer integration
+	private static final EnumMap<ChunkSectionLayer, List<RenderPass.Draw<GpuBufferSlice[]>>> SODIUM_STATIC_MAP = new EnumMap<>(ChunkSectionLayer.class);
+	private net.caffeinemc.mods.sodium.client.render.SodiumWorldRenderer renderer;
+	private net.caffeinemc.mods.sodium.client.render.chunk.ChunkRenderMatrices matrices;
 
 	public LevelRenderer(
 		Minecraft minecraft,
@@ -186,6 +191,9 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 		this.submitNodeStorage = featureRenderDispatcher.getSubmitNodeStorage();
 		this.levelRenderState = levelRenderState;
 		this.featureRenderDispatcher = featureRenderDispatcher;
+		
+		// Sodium: Initialize SodiumWorldRenderer
+		this.renderer = new net.caffeinemc.mods.sodium.client.render.SodiumWorldRenderer(minecraft);
 	}
 
 	public void close() {
@@ -277,6 +285,14 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 		}
 
 		this.gameTestBlockHighlightRenderer.clear();
+		
+		// Sodium: Update renderer when world changes
+		net.caffeinemc.mods.sodium.client.gl.device.RenderDevice.enterManagedCode();
+		try {
+			this.renderer.setLevel(clientLevel);
+		} finally {
+			net.caffeinemc.mods.sodium.client.gl.device.RenderDevice.exitManagedCode();
+		}
 	}
 
 	private void clearVisibleSections() {
@@ -306,11 +322,20 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 			}
 
 			this.sectionRenderDispatcher.clearCompileQueue();
-			this.viewArea = new ViewArea(this.sectionRenderDispatcher, this.level, this.minecraft.options.getEffectiveRenderDistance(), this);
+			// Sodium: Nullify vanilla chunk storage allocation (return 0 for render distance)
+			this.viewArea = new ViewArea(this.sectionRenderDispatcher, this.level, 0, this);
 			this.sectionOcclusionGraph.waitAndReset(this.viewArea);
 			this.clearVisibleSections();
 			Camera camera = this.minecraft.gameRenderer.getMainCamera();
 			this.viewArea.repositionCamera(SectionPos.of(camera.getPosition()));
+		}
+		
+		// Sodium: Reload renderer
+		net.caffeinemc.mods.sodium.client.gl.device.RenderDevice.enterManagedCode();
+		try {
+			this.renderer.reload();
+		} finally {
+			net.caffeinemc.mods.sodium.client.gl.device.RenderDevice.exitManagedCode();
 		}
 	}
 
@@ -323,21 +348,8 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 
 	@Nullable
 	public String getSectionStatistics() {
-		if (this.viewArea == null) {
-			return null;
-		} else {
-			int i = this.viewArea.sections.length;
-			int j = this.countRenderedSections();
-			return String.format(
-				Locale.ROOT,
-				"C: %d/%d %sD: %d, %s",
-				j,
-				i,
-				this.minecraft.smartCull ? "(s) " : "",
-				this.lastViewDistance,
-				this.sectionRenderDispatcher == null ? "null" : this.sectionRenderDispatcher.getStats()
-			);
-		}
+		// Sodium: Return renderer debug string
+		return this.renderer.getChunksDebugString();
 	}
 
 	@Nullable
@@ -354,15 +366,8 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 	}
 
 	public int countRenderedSections() {
-		int i = 0;
-
-		for (SectionRenderDispatcher.RenderSection renderSection : this.visibleSections) {
-			if (renderSection.getSectionMesh().hasRenderableLayers()) {
-				i++;
-			}
-		}
-
-		return i;
+		// Sodium: Redirect to our renderer
+		return this.renderer.getVisibleChunkCount();
 	}
 
 	@Nullable
@@ -372,56 +377,28 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 			: "E: " + this.levelRenderState.entityRenderStates.size() + "/" + this.level.getEntityCount() + ", SD: " + this.level.getServerSimulationDistance();
 	}
 
-	public void cullTerrain(Camera camera, Frustum frustum, boolean bl) { // Made public for Iris shadow rendering
-		Vec3 vec3 = camera.getPosition();
-		if (this.minecraft.options.getEffectiveRenderDistance() != this.lastViewDistance) {
-			this.allChanged();
-		}
+public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // Made public for Iris shadow rendering
+// Sodium: Redirect terrain setup to our renderer
+	var viewport = ((net.caffeinemc.mods.sodium.client.render.viewport.ViewportProvider) frustum).sodium$createViewport();
+	var updateChunksImmediately = net.caffeinemc.mods.sodium.client.util.FlawlessFrames.isActive();
 
-		ProfilerFiller profilerFiller = Profiler.get();
-		profilerFiller.push("repositionCamera");
-		int i = SectionPos.posToSectionCoord(vec3.x());
-		int j = SectionPos.posToSectionCoord(vec3.y());
-		int k = SectionPos.posToSectionCoord(vec3.z());
-		if (this.lastCameraSectionX != i || this.lastCameraSectionY != j || this.lastCameraSectionZ != k) {
-			this.lastCameraSectionX = i;
-			this.lastCameraSectionY = j;
-			this.lastCameraSectionZ = k;
-			this.viewArea.repositionCamera(SectionPos.of(vec3));
-			this.worldBorderRenderer.invalidate();
-		}
+	int sectionX = SectionPos.posToSectionCoord(camera.getPosition().x());
+	int sectionY = SectionPos.posToSectionCoord(camera.getPosition().y());
+	int sectionZ = SectionPos.posToSectionCoord(camera.getPosition().z());
 
-		this.sectionRenderDispatcher.setCameraPosition(vec3);
-		double d = Math.floor(vec3.x / 8.0);
-		double e = Math.floor(vec3.y / 8.0);
-		double f = Math.floor(vec3.z / 8.0);
-		if (d != this.prevCamX || e != this.prevCamY || f != this.prevCamZ) {
-			this.sectionOcclusionGraph.invalidate();
-		}
+	if (this.lastCameraSectionX != sectionX || this.lastCameraSectionY != sectionY || this.lastCameraSectionZ != sectionZ) {
+	this.lastCameraSectionX = sectionX;
+	this.lastCameraSectionY = sectionY;
+	this.lastCameraSectionZ = sectionZ;
+	this.worldBorderRenderer.invalidate();
+	}
 
-		this.prevCamX = d;
-		this.prevCamY = e;
-		this.prevCamZ = f;
-		profilerFiller.pop();
-		if (this.capturedFrustum == null) {
-			boolean bl2 = this.minecraft.smartCull;
-			if (bl && this.level.getBlockState(camera.getBlockPosition()).isSolidRender()) {
-				bl2 = false;
-			}
-
-			profilerFiller.push("updateSOG");
-			this.sectionOcclusionGraph.update(bl2, camera, frustum, this.visibleSections, this.level.getChunkSource().getLoadedEmptySections());
-			profilerFiller.pop();
-			double g = Math.floor(camera.getXRot() / 2.0F);
-			double h = Math.floor(camera.getYRot() / 2.0F);
-			if (this.sectionOcclusionGraph.consumeFrustumUpdate() || g != this.prevCamRotX || h != this.prevCamRotY) {
-				profilerFiller.push("applyFrustum");
-				this.applyFrustum(offsetFrustum(frustum));
-				profilerFiller.pop();
-				this.prevCamRotX = g;
-				this.prevCamRotY = h;
-			}
-		}
+	net.caffeinemc.mods.sodium.client.gl.device.RenderDevice.enterManagedCode();
+	try {
+	this.renderer.setupTerrain(camera, viewport, net.caffeinemc.mods.sodium.fabric.SodiumFogRenderHook.getFogParameters(), spectator, updateChunksImmediately, matrices);
+	} finally {
+	net.caffeinemc.mods.sodium.client.gl.device.RenderDevice.exitManagedCode();
+	}
 	}
 
 	public static Frustum offsetFrustum(Frustum frustum) {
@@ -1162,68 +1139,16 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 		}
 	}
 
-	private ChunkSectionsToRender prepareChunkRenders(Matrix4fc matrix4fc, double d, double e, double f) {
-		// NOTE: This method is overwritten by Sodium's LevelRendererMixin
-		// The hook call is made in Sodium's version instead
-		ObjectListIterator<SectionRenderDispatcher.RenderSection> objectListIterator = this.visibleSections.listIterator(0);
-		EnumMap<ChunkSectionLayer, List<RenderPass.Draw<GpuBufferSlice[]>>> enumMap = new EnumMap(ChunkSectionLayer.class);
-		int i = 0;
-
-		for (ChunkSectionLayer chunkSectionLayer : ChunkSectionLayer.values()) {
-			enumMap.put(chunkSectionLayer, new ArrayList());
+	private ChunkSectionsToRender prepareChunkRenders(Matrix4fc matrix4fc, double x, double y, double z) {
+		// Sodium: Redirect to our renderer
+		// Call Distant Horizons hooks before Sodium's terrain preparation
+		for (net.minecraft.hooks.LevelRendererHooks hook : net.minecraft.hooks.HookRegistry.getLevelRendererHooks()) {
+			hook.onBeforePrepareChunkRenders(matrix4fc, x, y, z);
 		}
-
-		List<DynamicUniforms.Transform> list = new ArrayList();
-		Vector4f vector4f = new Vector4f(1.0F, 1.0F, 1.0F, 1.0F);
-		Matrix4f matrix4f = new Matrix4f();
-
-		while (objectListIterator.hasNext()) {
-			SectionRenderDispatcher.RenderSection renderSection = (SectionRenderDispatcher.RenderSection)objectListIterator.next();
-			SectionMesh sectionMesh = renderSection.getSectionMesh();
-
-			for (ChunkSectionLayer chunkSectionLayer2 : ChunkSectionLayer.values()) {
-				SectionBuffers sectionBuffers = sectionMesh.getBuffers(chunkSectionLayer2);
-				if (sectionBuffers != null) {
-					GpuBuffer gpuBuffer;
-					VertexFormat.IndexType indexType;
-					if (sectionBuffers.getIndexBuffer() == null) {
-						if (sectionBuffers.getIndexCount() > i) {
-							i = sectionBuffers.getIndexCount();
-						}
-
-						gpuBuffer = null;
-						indexType = null;
-					} else {
-						gpuBuffer = sectionBuffers.getIndexBuffer();
-						indexType = sectionBuffers.getIndexType();
-					}
-
-					BlockPos blockPos = renderSection.getRenderOrigin();
-					int j = list.size();
-					list.add(
-						new DynamicUniforms.Transform(
-							matrix4fc, vector4f, new Vector3f((float)(blockPos.getX() - d), (float)(blockPos.getY() - e), (float)(blockPos.getZ() - f)), matrix4f, 1.0F
-						)
-					);
-					((List)enumMap.get(chunkSectionLayer2))
-						.add(
-							new RenderPass.Draw<GpuBufferSlice[]>(
-								0,
-								sectionBuffers.getVertexBuffer(),
-								gpuBuffer,
-								indexType,
-								0,
-								sectionBuffers.getIndexCount(),
-								(gpuBufferSlicesx, uniformUploader) -> uniformUploader.upload("DynamicTransforms", gpuBufferSlicesx[j])
-							)
-						);
-				}
-			}
-		}
-
-		GpuBufferSlice[] gpuBufferSlices = RenderSystem.getDynamicUniforms()
-			.writeTransforms((DynamicUniforms.Transform[])list.toArray(new DynamicUniforms.Transform[0]));
-		return new ChunkSectionsToRender(enumMap, i, gpuBufferSlices);
+		
+		ChunkSectionsToRender chunkSectionsToRender = new ChunkSectionsToRender(SODIUM_STATIC_MAP, -1, new GpuBufferSlice[0]);
+		((net.caffeinemc.mods.sodium.client.util.SodiumChunkSection) (Object) chunkSectionsToRender).sodium$setRendering(renderer, matrices, x, y, z);
+		return chunkSectionsToRender;
 	}
 
 	public void endFrame() {
@@ -1430,24 +1355,22 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 		}
 	}
 
-	public void setBlocksDirty(int i, int j, int k, int l, int m, int n) {
-		for (int o = k - 1; o <= n + 1; o++) {
-			for (int p = i - 1; p <= l + 1; p++) {
-				for (int q = j - 1; q <= m + 1; q++) {
-					this.setSectionDirty(SectionPos.blockToSectionCoord(p), SectionPos.blockToSectionCoord(q), SectionPos.blockToSectionCoord(o));
-				}
-			}
-		}
+	public void setBlocksDirty(int minX, int minY, int minZ, int maxX, int maxY, int maxZ) {
+		// Sodium: Redirect chunk updates to our renderer
+		this.renderer.scheduleRebuildForBlockArea(minX, minY, minZ, maxX, maxY, maxZ, false);
 	}
 
 	public void setBlockDirty(BlockPos blockPos, BlockState blockState, BlockState blockState2) {
 		if (this.minecraft.getModelManager().requiresRender(blockState, blockState2)) {
-			this.setBlocksDirty(blockPos.getX(), blockPos.getY(), blockPos.getZ(), blockPos.getX(), blockPos.getY(), blockPos.getZ());
+			// Sodium: Redirect chunk updates to our renderer
+			this.renderer.scheduleRebuildForBlockArea(blockPos.getX() - 1, blockPos.getY() - 1, blockPos.getZ() - 1, 
+				blockPos.getX() + 1, blockPos.getY() + 1, blockPos.getZ() + 1, true);
 		}
 	}
 
-	public void setSectionDirtyWithNeighbors(int i, int j, int k) {
-		this.setSectionRangeDirty(i - 1, j - 1, k - 1, i + 1, j + 1, k + 1);
+	public void setSectionDirtyWithNeighbors(int x, int y, int z) {
+		// Sodium: Redirect chunk updates to our renderer  
+		this.renderer.scheduleRebuildForChunks(x - 1, y - 1, z - 1, x + 1, y + 1, z + 1, false);
 	}
 
 	public void setSectionRangeDirty(int i, int j, int k, int l, int m, int n) {
@@ -1464,8 +1387,9 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 		this.setSectionDirty(i, j, k, false);
 	}
 
-	private void setSectionDirty(int i, int j, int k, boolean bl) {
-		this.viewArea.setDirty(i, j, k, bl);
+	private void setSectionDirty(int x, int y, int z, boolean important) {
+		// Sodium: Redirect to renderer
+		this.renderer.scheduleRebuildForChunk(x, y, z, important);
 	}
 
 	public void onSectionBecomingNonEmpty(long l) {
@@ -1504,7 +1428,8 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 	}
 
 	public boolean hasRenderedAllSections() {
-		return this.sectionRenderDispatcher.isQueueEmpty();
+		// Sodium: Redirect to our renderer
+		return this.renderer.isTerrainRenderComplete();
 	}
 
 	public void onChunkReadyToRender(ChunkPos chunkPos) {
@@ -1514,6 +1439,8 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 	public void needsUpdate() {
 		this.sectionOcclusionGraph.invalidate();
 		this.cloudRenderer.markForRebuild();
+		// Sodium: Schedule terrain update
+		this.renderer.scheduleTerrainUpdate();
 	}
 
 	public static int getLightColor(BlockAndTintGetter blockAndTintGetter, BlockPos blockPos) {
@@ -1539,8 +1466,8 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 	}
 
 	public boolean isSectionCompiled(BlockPos blockPos) {
-		SectionRenderDispatcher.RenderSection renderSection = this.viewArea.getRenderSectionAt(blockPos);
-		return renderSection != null && renderSection.sectionMesh.get() != CompiledSectionMesh.UNCOMPILED;
+		// Sodium: Redirect to renderer
+		return this.renderer.isSectionReady(blockPos.getX() >> 4, blockPos.getY() >> 4, blockPos.getZ() >> 4);
 	}
 
 	@Nullable
@@ -1832,5 +1759,21 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 		tmp = prevCamRotY;
 		prevCamRotY = iris$savedLastCameraYaw;
 		iris$savedLastCameraYaw = tmp;
+	}
+
+	// Sodium: LevelRendererExtension interface implementation
+	@Override
+	public net.caffeinemc.mods.sodium.client.render.SodiumWorldRenderer sodium$getWorldRenderer() {
+		return this.renderer;
+	}
+
+	@Override
+	public void sodium$setMatrices(net.caffeinemc.mods.sodium.client.render.chunk.ChunkRenderMatrices matrices) {
+		this.matrices = matrices;
+	}
+
+	@Override
+	public net.caffeinemc.mods.sodium.client.render.chunk.ChunkRenderMatrices sodium$getMatrices() {
+		return this.matrices;
 	}
 }
