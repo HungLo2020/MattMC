@@ -6,8 +6,12 @@
 
 ### Mixin Conversion Status
 
-**Total Mixins:** 218 → **80 remaining** (138 removed)  
-**Conversion Progress:** 63.3% complete - **MILESTONE: 63% REACHED!** 🎉🎉🎉
+**Total Mixins:** 218 → **78 remaining** (140 removed)  
+**Conversion Progress:** 64.2% complete - **MILESTONE: 64% REACHED!** 🎉🎉🎉
+
+#### Removed Mixins (Session 31 - 2 mixins):
+167. ✅ `MixinGui` - @WrapMethod for render() → Inlined HUD hiding for HudHideable screens and GL debug markers into Gui.render()
+168. ✅ `MixinTextureManager` - 3 @Inject (RETURN/TAIL) → Inlined PBR texture lifecycle management into TextureManager (reload, dumpAllSheets, close)
 
 #### Removed Mixins (Session 30 - 3 mixins):
 164. ✅ `DirectionMixin` - @Overwrite of getApproximateNearest() → Inlined optimized direction calculation into Direction class (10.4% → 1.5% performance improvement)
