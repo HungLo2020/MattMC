@@ -15,7 +15,7 @@ issueTrackerURL = "${issues}"
     displayURL = "${homepage}"
     description = "${description}" #//mandatory. The description text for the mod
     logoFile = "assets/distanthorizons/logo.png"
-    catalogueImageIcon = "assets/distanthorizons/icon.png"
+    catalogueImageIcon = "assets/minecraft/textures/gui/distanthorizons_icon.png"
     credits = "Massive thanks to all the developers for their hard work to bring Distant Horizons to where it is today. - James"
     #// if not set defaults to "false"
     clientSideOnly = "true"

@@ -1,0 +1,17 @@
+{
+  "feature": "dwho:block_column/support_chain_jungle",
+  "placement": [
+    {
+      "type": "minecraft:block_predicate_filter",
+      "predicate": {
+        "type": "minecraft:matching_blocks",
+        "blocks": "minecraft:jungle_planks",
+        "offset": [0,-1,0]
+      }
+    },
+    {
+      "type": "minecraft:count",
+      "count": 20
+    }
+  ]
+}

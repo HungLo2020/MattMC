@@ -1,0 +1,16 @@
+{
+  "feature": "dwho:patch/cactus",
+  "placement": [
+    {
+      "type": "minecraft:count_on_every_layer",
+      "count": 3
+    },
+    {
+      "type": "minecraft:rarity_filter",
+      "chance": 5
+    },
+    {
+      "type": "minecraft:biome"
+    }
+  ]
+}

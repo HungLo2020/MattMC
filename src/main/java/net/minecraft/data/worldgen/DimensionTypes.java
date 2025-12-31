@@ -1,0 +1,121 @@
+package net.minecraft.data.worldgen;
+
+import java.util.Optional;
+import java.util.OptionalLong;
+import net.minecraft.core.HolderGetter;
+import net.minecraft.data.worldgen.BootstrapContext;
+import net.minecraft.tags.BlockTags;
+import net.minecraft.util.valueproviders.ConstantInt;
+import net.minecraft.util.valueproviders.UniformInt;
+import net.minecraft.world.level.dimension.BuiltinDimensionTypes;
+import net.minecraft.world.level.dimension.DimensionType;
+
+public class DimensionTypes {
+	public static void bootstrap(BootstrapContext<DimensionType> bootstrapContext) {
+		bootstrapContext.register(
+			BuiltinDimensionTypes.OVERWORLD,
+			new DimensionType(
+				OptionalLong.empty(),
+				true,
+				false,
+				false,
+				true,
+				1.0,
+				true,
+				false,
+				-64,
+				384,
+				384,
+				BlockTags.INFINIBURN_OVERWORLD,
+				BuiltinDimensionTypes.OVERWORLD_EFFECTS,
+				0.0F,
+				Optional.of(192),
+				new DimensionType.MonsterSettings(false, true, UniformInt.of(0, 7), 0)
+			)
+		);
+		bootstrapContext.register(
+			BuiltinDimensionTypes.NETHER,
+			new DimensionType(
+				OptionalLong.of(18000L),
+				false,
+				true,
+				true,
+				false,
+				8.0,
+				false,
+				true,
+				0,
+				256,
+				128,
+				BlockTags.INFINIBURN_NETHER,
+				BuiltinDimensionTypes.NETHER_EFFECTS,
+				0.1F,
+				Optional.empty(),
+				new DimensionType.MonsterSettings(true, false, ConstantInt.of(7), 15)
+			)
+		);
+		bootstrapContext.register(
+			BuiltinDimensionTypes.END,
+			new DimensionType(
+				OptionalLong.of(6000L),
+				true,
+				false,
+				false,
+				false,
+				1.0,
+				false,
+				false,
+				0,
+				256,
+				256,
+				BlockTags.INFINIBURN_END,
+				BuiltinDimensionTypes.END_EFFECTS,
+				0.25F,
+				Optional.empty(),
+				new DimensionType.MonsterSettings(false, true, ConstantInt.of(15), 0)
+			)
+		);
+		bootstrapContext.register(
+			BuiltinDimensionTypes.OVERWORLD_CAVES,
+			new DimensionType(
+				OptionalLong.empty(),
+				true,
+				true,
+				false,
+				true,
+				1.0,
+				true,
+				false,
+				-64,
+				384,
+				384,
+				BlockTags.INFINIBURN_OVERWORLD,
+				BuiltinDimensionTypes.OVERWORLD_EFFECTS,
+				0.0F,
+				Optional.of(192),
+				new DimensionType.MonsterSettings(false, true, UniformInt.of(0, 7), 0)
+			)
+		);
+		bootstrapContext.register(
+			BuiltinDimensionTypes.PRIMORDIAL_CAVES,
+			new DimensionType(
+				OptionalLong.of(18000L),
+				false,
+				true,
+				false,
+				true,
+				1.0,
+				false,
+				false,
+				0,
+				256,
+				128,
+				BlockTags.INFINIBURN_OVERWORLD,
+				BuiltinDimensionTypes.PRIMORDIAL_CAVES_EFFECTS,
+				0.1F,
+				Optional.empty(),
+				new DimensionType.MonsterSettings(false, true, UniformInt.of(0, 7), 0)
+			)
+		);
+	}
+}

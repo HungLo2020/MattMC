@@ -5,9 +5,10 @@ profile.POTATO=§aPotato
 profile.VERYLOW=§aVery Low
 profile.LOW=§aLow
 profile.MEDIUM=§aMedium
-profile.HIGH=§eHigh (Default)
+profile.HIGH=§eHigh
 profile.VERYHIGH=§cVery High
 profile.ULTRA=§4§lUltra
+profile.MATTMC=§4§lMATTMC (Default)
 profile.COMPLEMENTARY=§4§l§n§oComplementary
 profile.comment=Shader profiles change performance settings with the most optimised visual fidelity to performance ratio. §e[*]§r It's recommended to use one of these profiles for your settings unless you know what you are doing. §e[*]§r All affected settings can all be found in the "Performance Settings" menu.
 

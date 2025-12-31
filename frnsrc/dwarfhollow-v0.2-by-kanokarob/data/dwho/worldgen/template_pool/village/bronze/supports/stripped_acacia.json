@@ -1,0 +1,13 @@
+{
+  "fallback": "dwho:village/bronze/supports/stripped_acacia",
+  "elements": [
+    {
+      "weight": 1,
+      "element": {
+        "element_type": "minecraft:feature_pool_element",
+        "feature": "dwho:block_column/support_stripped_acacia",
+        "projection": "rigid"
+      }
+    }
+  ]
+}

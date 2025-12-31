@@ -1,0 +1,13 @@
+{
+  "fallback": "dwho:village/honey/supports/stripped_oak",
+  "elements": [
+    {
+      "weight": 1,
+      "element": {
+        "element_type": "minecraft:feature_pool_element",
+        "feature": "dwho:block_column/support_stripped_oak",
+        "projection": "rigid"
+      }
+    }
+  ]
+}

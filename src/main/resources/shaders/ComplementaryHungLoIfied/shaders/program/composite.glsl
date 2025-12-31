@@ -56,7 +56,7 @@ vec2 view = vec2(viewWidth, viewHeight);
     #include "/lib/atmospherics/volumetricLight.glsl"
 #endif
 
-#if WATER_MAT_QUALITY >= 3 || defined NETHER_STORM || defined COLORED_LIGHT_FOG
+#if WATER_MAT_QUALITY >= 3 || defined NETHER_STORM || defined PRIMORDIAL_STEAM || defined COLORED_LIGHT_FOG
     #include "/lib/util/spaceConversion.glsl"
 #endif
 
@@ -66,6 +66,10 @@ vec2 view = vec2(viewWidth, viewHeight);
 
 #ifdef NETHER_STORM
     #include "/lib/atmospherics/netherStorm.glsl"
+#endif
+
+#ifdef PRIMORDIAL_STEAM
+    #include "/lib/atmospherics/primordialSteam.glsl"
 #endif
 
 #ifdef ATM_COLOR_MULTS
@@ -135,7 +139,7 @@ void main() {
         float VdotL = dot(nViewPos, lightVec);
     #endif
 
-    #if defined NETHER_STORM || defined COLORED_LIGHT_FOG
+    #if defined NETHER_STORM || defined PRIMORDIAL_STEAM || defined COLORED_LIGHT_FOG
         vec3 playerPos = ViewToPlayer(viewPos1.xyz);
         vec3 nPlayerPos = normalize(playerPos);
     #endif
@@ -151,8 +155,12 @@ void main() {
         volumetricEffect = GetVolumetricLight(color, vlFactorM, translucentMult, lViewPos, lViewPos1, nViewPos, VdotL, VdotU, texCoord, z0, z1, dither);
     #endif
 
-    #ifdef NETHER_STORM
+    #if defined NETHER_STORM && defined NETHER
         volumetricEffect = GetNetherStorm(color, translucentMult, nPlayerPos, playerPos, lViewPos, lViewPos1, dither);
+    #endif
+
+    #if defined PRIMORDIAL_STEAM && defined PRIMORDIAL_CAVES
+        volumetricEffect = GetPrimordialSteam(color, translucentMult, nPlayerPos, playerPos, lViewPos, lViewPos1, dither);
     #endif
 
     #ifdef ATM_COLOR_MULTS
@@ -162,7 +170,7 @@ void main() {
         volumetricEffect.rgb *= moonPhaseInfluence;
     #endif
 
-    #ifdef NETHER_STORM
+    #if defined NETHER_STORM && defined NETHER || defined PRIMORDIAL_STEAM && defined PRIMORDIAL_CAVES
         color = mix(color, volumetricEffect.rgb, volumetricEffect.a);
     #endif
 

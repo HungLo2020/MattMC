@@ -1,0 +1,13 @@
+{
+  "values": [
+    "#minecraft:air",
+    "#dwho:ores",
+    "minecraft:light",
+    "minecraft:bedrock",
+    "minecraft:amethyst_block",
+    "minecraft:budding_amethyst",
+    "minecraft:basalt",
+    "minecraft:purple_stained_glass",
+    "minecraft:pearlescent_froglight"
+  ]
+}

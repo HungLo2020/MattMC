@@ -1,0 +1,18 @@
+{
+  "feature": "dwho:disk/ice_water",
+  "placement": [
+    {
+      "type": "minecraft:count_on_every_layer",
+      "count": 12
+    },
+    {
+      "type": "minecraft:height_range",
+      "height": {
+        "absolute": -7
+      }
+    },
+    {
+      "type": "minecraft:biome"
+    }
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "type": "minecraft:disk",
+  "config": {
+    "state_provider": {
+      "fallback": {
+        "type": "minecraft:simple_state_provider",
+        "state": {
+          "Name": "minecraft:light",
+          "Properties": {
+            "level": "15",
+            "waterlogged": "false"
+          }
+        }
+      },
+      "rules": []
+    },
+    "radius": 5,
+    "half_height": 0,
+    "target": {
+      "type": "minecraft:matching_blocks",
+      "blocks": "#minecraft:air"
+    }
+  }
+}

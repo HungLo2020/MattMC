@@ -104,6 +104,10 @@ void main() {
         vec4 color = vec4(0.0);
     #endif
 
+    #ifdef PRIMORDIAL_CAVES
+        vec4 color = vec4(0.0);
+    #endif
+
     #ifdef END
         vec4 color = vec4(endSkyColor, 1.0);
     #endif

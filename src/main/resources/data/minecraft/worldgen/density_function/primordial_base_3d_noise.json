@@ -1,0 +1,51 @@
+{
+  "type": "minecraft:cache_once",
+  "argument": {
+    "type": "minecraft:add",
+    "argument1": {
+      "type": "minecraft:add",
+      "argument1": {
+        "type": "minecraft:add",
+        "argument1": {
+          "type": "minecraft:add",
+          "argument1": {
+            "type": "minecraft:add",
+            "argument1": {
+              "type": "minecraft:noise",
+              "noise": "minecraft:primordial_rocks",
+              "xz_scale": 2,
+              "y_scale": 7
+            },
+            "argument2": {
+              "type": "minecraft:mul",
+              "argument1": -0.925,
+              "argument2": "minecraft:primordial_erosion"
+            }
+          },
+          "argument2": {
+            "type": "minecraft:mul",
+            "argument1": 0.325,
+            "argument2": {
+              "type": "minecraft:noise",
+              "noise": "minecraft:primordial_ridge",
+              "xz_scale": 7,
+              "y_scale": 16
+            }
+          }
+        },
+        "argument2": 0.235
+      },
+      "argument2": {
+        "type": "minecraft:mul",
+        "argument1": 0.725,
+        "argument2": "minecraft:primordial_continents"
+      }
+    },
+    "argument2": {
+      "type": "minecraft:noise",
+      "noise": "minecraft:primordial_rocks",
+      "xz_scale": 5,
+      "y_scale": 21
+    }
+  }
+}

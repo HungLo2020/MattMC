@@ -17,6 +17,10 @@
             vec3 netherLightMult = vec3(LIGHT_NETHER_R, LIGHT_NETHER_G, LIGHT_NETHER_B) * LIGHT_NETHER_I;
 
             lightColorMult = netherLightMult;
+        #elif defined PRIMORDIAL_CAVES
+            vec3 netherLightMult = vec3(LIGHT_NETHER_R, LIGHT_NETHER_G, LIGHT_NETHER_B) * LIGHT_NETHER_I;
+
+            lightColorMult = netherLightMult;
         #elif defined END
             vec3 endLightMult = vec3(LIGHT_END_R, LIGHT_END_G, LIGHT_END_B) * LIGHT_END_I;
 
@@ -39,6 +43,10 @@
             atmColorMult = mix(nightAtmMult, atmColorMult, sunVisibility2);
             atmColorMult = mix(atmColorMult, dot(atmColorMult, vec3(0.33333)) * rainAtmMult, rainFactor);
         #elif defined NETHER
+            vec3 netherAtmMult = vec3(ATM_NETHER_R, ATM_NETHER_G, ATM_NETHER_B) * ATM_NETHER_I;
+
+            atmColorMult = netherAtmMult;
+        #elif defined PRIMORDIAL_CAVES
             vec3 netherAtmMult = vec3(ATM_NETHER_R, ATM_NETHER_G, ATM_NETHER_B) * ATM_NETHER_I;
 
             atmColorMult = netherAtmMult;
