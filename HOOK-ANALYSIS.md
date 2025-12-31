@@ -6,8 +6,13 @@
 
 ### Mixin Conversion Status
 
-**Total Mixins:** 218 → **18 remaining** (200 removed)  
-**Conversion Progress:** 91.7% complete - **MILESTONE: 91% REACHED!** 🎉🎉🎉🎉🎉🎉🎉🎉🎉
+**Total Mixins:** 218 → **15 remaining** (203 removed)  
+**Conversion Progress:** 93.1% complete - **MILESTONE: 93% REACHED!** 🎉🎉🎉🎉🎉🎉🎉🎉🎉
+
+#### Removed Mixins (Session 47 - 3 mixins):
+228. ✅ `VertexConsumerMixin` (Sodium) - 2 @Overwrite → Inlined Sodium MatrixHelper transforms into VertexConsumer.addVertex() and setNormal() to avoid Vector3f allocations
+229. ✅ `CloudRendererMixin` (Sodium) - 1 @Overwrite → Inlined Sodium optimized cloud meshing with direct memory access into CloudRenderer.buildMesh()
+230. ✅ `SpriteContentsInterpolationMixin` (Sodium) - 1 @Inject + 1 @Overwrite → Inlined Sodium optimized sprite interpolation with ColorMixer into SpriteContents.InterpolationData
 
 #### Removed Mixins (Session 46 - 4 mixins):
 224. ✅ `ModelPartMixin` (Sodium) - 1 @Overwrite → Inlined Sodium optimized transform with MatrixHelper.rotateZYX into ModelPart.translateAndRotate()
