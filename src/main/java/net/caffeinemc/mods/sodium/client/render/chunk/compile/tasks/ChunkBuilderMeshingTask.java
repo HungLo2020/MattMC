@@ -116,16 +116,53 @@ public class ChunkBuilderMeshingTask extends ChunkBuilderTask<ChunkBuildOutput> 
 
                         blockPos.set(x, y, z);
                         modelOffset.set(x & 15, y & 15, z & 15);
+                        
+                        // Iris: Handle light block voxelization (merged from MixinChunkMeshBuildTask)
+                        if (net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings.INSTANCE.getBlockStateIds() != null) {
+                            if (net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings.INSTANCE.shouldVoxelizeLightBlocks() 
+                                && blockState.getBlock() instanceof net.minecraft.world.level.block.LightBlock) {
+                                net.caffeinemc.mods.sodium.client.render.chunk.compile.buffers.ChunkModelBuilder buildBuffers = buffers.get(net.caffeinemc.mods.sodium.client.render.chunk.terrain.material.DefaultMaterials.CUTOUT);
+                                int id = net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings.INSTANCE.getBlockStateIds().getInt(blockState);
+                                net.caffeinemc.mods.sodium.client.render.chunk.vertex.format.ChunkVertexEncoder.Vertex[] vertices = net.caffeinemc.mods.sodium.client.render.chunk.vertex.format.ChunkVertexEncoder.Vertex.uninitializedQuad();
+                                for (int i = 0; i < 4; i++) {
+                                    ((net.irisshaders.iris.vertices.sodium.terrain.ChunkVertexExtension) vertices[i]).iris$ignoresMidBlock(true);
+                                    ((net.irisshaders.iris.vertices.sodium.terrain.ChunkVertexExtension) vertices[i]).iris$setData(
+                                        (byte) blockState.getLightEmission(), (byte) 0, id,
+                                        (blockPos.getX() & 15), (blockPos.getY() & 15), (blockPos.getZ() & 15));
+                                    vertices[i].x = (float) ((blockPos.getX() & 15)) + 0.25f;
+                                    vertices[i].y = (float) ((blockPos.getY() & 15)) + 0.25f;
+                                    vertices[i].z = (float) ((blockPos.getZ() & 15)) + 0.25f;
+                                    vertices[i].u = 0;
+                                    vertices[i].v = 0;
+                                    vertices[i].color = 0;
+                                    vertices[i].light = blockState.getLightEmission() << 4 | blockState.getLightEmission() << 20;
+                                }
+                                buildBuffers.getVertexBuffer(net.caffeinemc.mods.sodium.client.model.quad.properties.ModelQuadFacing.UNASSIGNED)
+                                    .push(vertices, net.caffeinemc.mods.sodium.client.render.chunk.terrain.material.DefaultMaterials.CUTOUT);
+                            }
+                        }
 
                         if (blockState.getRenderShape() == RenderShape.MODEL) {
                             BlockStateModel model = cache.getBlockModels()
                                     .getBlockModel(blockState);
+                            // Iris: Begin block data for Iris shaders (merged from MixinChunkMeshBuildTask)
+                            if (net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings.INSTANCE.getBlockStateIds() != null) {
+                                ((net.irisshaders.iris.vertices.sodium.terrain.VertexEncoderInterface) blockRenderer).beginBlock(
+                                    net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings.INSTANCE.getBlockStateIds().getOrDefault(blockState, -1),
+                                    (byte) 0, (byte) blockState.getLightEmission(), blockPos.getX(), blockPos.getY(), blockPos.getZ());
+                            }
                             blockRenderer.renderModel(model, blockState, blockPos, modelOffset);
                         }
 
                         FluidState fluidState = blockState.getFluidState();
 
                         if (!fluidState.isEmpty()) {
+                            // Iris: Begin block data for fluids (merged from MixinChunkMeshBuildTask)
+                            if (net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings.INSTANCE.getBlockStateIds() != null) {
+                                ((net.irisshaders.iris.vertices.sodium.terrain.VertexEncoderInterface) cache.getFluidRenderer()).beginBlock(
+                                    net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings.INSTANCE.getBlockStateIds().getInt(fluidState.createLegacyBlock()),
+                                    (byte) 1, (byte) blockState.getLightEmission(), blockPos.getX(), blockPos.getY(), blockPos.getZ());
+                            }
                             cache.getFluidRenderer().render(slice, blockState, fluidState, blockPos, modelOffset, collector, buffers);
                         }
 
