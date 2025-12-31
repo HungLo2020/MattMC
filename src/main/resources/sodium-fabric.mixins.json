@@ -9,6 +9,5 @@
     "conformVisibility": true
   },
   "client": [
-    "features.render.model.block.ModelBlockRendererMixin"
   ]
 }

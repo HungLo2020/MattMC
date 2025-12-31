@@ -323,13 +323,15 @@ public class ModelBlockRenderer {
 	}
 
 	public static void renderModel(PoseStack.Pose pose, VertexConsumer vertexConsumer, BlockStateModel blockStateModel, float f, float g, float h, int i, int j) {
-		for (BlockModelPart blockModelPart : blockStateModel.collectParts(RandomSource.create(42L))) {
-			for (Direction direction : DIRECTIONS) {
-				renderQuadList(pose, vertexConsumer, f, g, h, blockModelPart.getQuads(direction), i, j);
-			}
-
-			renderQuadList(pose, vertexConsumer, f, g, h, blockModelPart.getQuads(null), i, j);
+		// Sodium: Use optimized vertex writer intrinsics if available (merged from ModelBlockRendererMixin model.block)
+		var writer = net.caffeinemc.mods.sodium.client.render.vertex.VertexConsumerUtils.convertOrLog(vertexConsumer);
+		if (writer != null) {
+			sodium$renderFast(pose, writer, blockStateModel, f, g, h, i, j);
+			return;
 		}
+
+		// FRAPI: Use Sodium fast path for FRAPI rendering (merged from ModelBlockRendererMixin frapi)
+		net.caffeinemc.mods.sodium.client.render.frapi.render.SimpleBlockRenderContext.POOL.get().bufferModel(pose, layer -> vertexConsumer, blockStateModel, f, g, h, i, j, net.minecraft.world.level.EmptyBlockAndTintGetter.INSTANCE, net.minecraft.core.BlockPos.ZERO, net.minecraft.world.level.block.Blocks.AIR.defaultBlockState());
 	}
 
 	private static void renderQuadList(PoseStack.Pose pose, VertexConsumer vertexConsumer, float f, float g, float h, List<BakedQuad> list, int i, int j) {
@@ -989,6 +991,65 @@ public class ModelBlockRenderer {
 
 		private SizeInfo(final int j) {
 			this.index = j;
+		}
+	}
+
+	// Sodium: Fast model rendering helpers (merged from ModelBlockRendererMixin model.block)
+	private static final ThreadLocal<net.minecraft.util.RandomSource> SODIUM$RANDOM = ThreadLocal.withInitial(() -> new net.minecraft.world.level.levelgen.SingleThreadedRandomSource(42L));
+	private static final ThreadLocal<java.util.List<BlockModelPart>> SODIUM$LIST = ThreadLocal.withInitial(() -> new it.unimi.dsi.fastutil.objects.ObjectArrayList<>());
+
+	@SuppressWarnings("ForLoopReplaceableByForEach")
+	private static void sodium$renderQuads(PoseStack.Pose matrices, net.sodium.api.vertex.buffer.VertexBufferWriter writer, int defaultColor, java.util.List<BakedQuad> quads, int light, int overlay) {
+		for (int i = 0; i < quads.size(); i++) {
+			BakedQuad bakedQuad = quads.get(i);
+
+			if (bakedQuad.vertices().length < 32) {
+				continue; // ignore bad quads
+			}
+
+			net.caffeinemc.mods.sodium.client.model.quad.BakedQuadView quad = (net.caffeinemc.mods.sodium.client.model.quad.BakedQuadView) (Object) bakedQuad;
+
+			int color = quad.hasColor() ? defaultColor : 0xFFFFFFFF;
+
+			net.caffeinemc.mods.sodium.client.render.immediate.model.BakedModelEncoder.writeQuadVertices(writer, matrices, quad, color, light, overlay, false);
+
+			if (quad.getSprite() != null) {
+				net.sodium.api.texture.SpriteUtil.INSTANCE.markSpriteActive(quad.getSprite());
+			}
+		}
+	}
+
+	private static void sodium$renderFast(PoseStack.Pose entry, net.sodium.api.vertex.buffer.VertexBufferWriter writer, BlockStateModel bakedModel, float red, float green, float blue, int light, int overlay) {
+		net.minecraft.util.RandomSource random = SODIUM$RANDOM.get();
+
+		// Clamp color ranges
+		red = net.minecraft.util.Mth.clamp(red, 0.0F, 1.0F);
+		green = net.minecraft.util.Mth.clamp(green, 0.0F, 1.0F);
+		blue = net.minecraft.util.Mth.clamp(blue, 0.0F, 1.0F);
+
+		int defaultColor = net.sodium.api.util.ColorABGR.pack(red, green, blue, 1.0F);
+		random.setSeed(42L);
+
+		java.util.List<BlockModelPart> list = SODIUM$LIST.get();
+
+		list.clear();
+
+		bakedModel.collectParts(random, list);
+
+		for (BlockModelPart part : list) {
+			for (Direction direction : net.sodium.api.util.DirectionUtil.ALL_DIRECTIONS) {
+				java.util.List<BakedQuad> quads = part.getQuads(direction);
+
+				if (!quads.isEmpty()) {
+					sodium$renderQuads(entry, writer, defaultColor, quads, light, overlay);
+				}
+			}
+
+			java.util.List<BakedQuad> quads = part.getQuads(null);
+
+			if (!quads.isEmpty()) {
+				sodium$renderQuads(entry, writer, defaultColor, quads, light, overlay);
+			}
 		}
 	}
 }

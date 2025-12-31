@@ -23,11 +23,18 @@ import net.minecraft.client.renderer.texture.TextureManager;
 import org.jetbrains.annotations.Nullable;
 
 @Environment(EnvType.CLIENT)
-public class ParticleFeatureRenderer implements AutoCloseable {
+public class ParticleFeatureRenderer implements AutoCloseable, net.irisshaders.iris.fantastic.PhasedParticleEngine {
 	private final Queue<ParticleFeatureRenderer.ParticleBufferCache> availableBuffers = new ArrayDeque();
 	private final List<ParticleFeatureRenderer.ParticleBufferCache> usedBuffers = new ArrayList();
 	// Iris: Track particle rendering phase (from MixinParticleEngine)
 	private net.irisshaders.iris.pipeline.WorldRenderingPhase lastPhase = net.irisshaders.iris.pipeline.WorldRenderingPhase.NONE;
+	// Iris: Phased particle rendering (merged from MixinParticleFeatureRenderer)
+	private net.irisshaders.iris.fantastic.ParticleRenderingPhase phase = net.irisshaders.iris.fantastic.ParticleRenderingPhase.EVERYTHING;
+
+	@Override
+	public void setParticleRenderingPhase(net.irisshaders.iris.fantastic.ParticleRenderingPhase phase) {
+		this.phase = phase;
+	}
 
 	public void render(SubmitNodeCollection submitNodeCollection) {
 		// Iris: Set particles rendering phase (from MixinParticleEngine)
@@ -41,7 +48,8 @@ public class ParticleFeatureRenderer implements AutoCloseable {
 			Minecraft minecraft = Minecraft.getInstance();
 			TextureManager textureManager = minecraft.getTextureManager();
 			RenderTarget renderTarget = minecraft.getMainRenderTarget();
-			RenderTarget renderTarget2 = minecraft.levelRenderer.getParticlesTarget();
+			// Iris: Prevent fabulous crash (merged from MixinParticleFeatureRenderer)
+			RenderTarget renderTarget2 = phase == net.irisshaders.iris.fantastic.ParticleRenderingPhase.OPAQUE ? null : minecraft.levelRenderer.getParticlesTarget();
 
 			for (SubmitNodeCollector.ParticleGroupRenderer particleGroupRenderer : submitNodeCollection.getParticleGroupRenderers()) {
 				ParticleFeatureRenderer.ParticleBufferCache particleBufferCache = (ParticleFeatureRenderer.ParticleBufferCache)this.availableBuffers.poll();
@@ -50,26 +58,23 @@ public class ParticleFeatureRenderer implements AutoCloseable {
 				}
 
 				this.usedBuffers.add(particleBufferCache);
+				// Iris: Override particle rendering code (merged from MixinParticleFeatureRenderer)
 				QuadParticleRenderState.PreparedBuffers preparedBuffers = particleGroupRenderer.prepare(particleBufferCache);
 				if (preparedBuffers != null) {
-					try (RenderPass renderPass = gpuDevice.createCommandEncoder()
-							.createRenderPass(
-								() -> "Particles - Main", renderTarget.getColorTextureView(), OptionalInt.empty(), renderTarget.getDepthTextureView(), OptionalDouble.empty()
-							)) {
+					try (RenderPass renderPass = gpuDevice.createCommandEncoder().createRenderPass(() -> "Particles - Main", renderTarget.getColorTextureView(), OptionalInt.empty(), renderTarget.getDepthTextureView(), OptionalDouble.empty())) {
 						this.prepareRenderPass(renderPass);
-						particleGroupRenderer.render(preparedBuffers, particleBufferCache, renderPass, textureManager, false);
-						if (renderTarget2 == null) {
+						if (phase == net.irisshaders.iris.fantastic.ParticleRenderingPhase.EVERYTHING || phase == net.irisshaders.iris.fantastic.ParticleRenderingPhase.OPAQUE) {
+							particleGroupRenderer.render(preparedBuffers, particleBufferCache, renderPass, textureManager, false);
+						}
+						if (renderTarget2 == null && (phase == net.irisshaders.iris.fantastic.ParticleRenderingPhase.EVERYTHING || phase == net.irisshaders.iris.fantastic.ParticleRenderingPhase.TRANSLUCENT)) {
 							particleGroupRenderer.render(preparedBuffers, particleBufferCache, renderPass, textureManager, true);
 						}
 					}
 
-					if (renderTarget2 != null) {
-						try (RenderPass renderPassx = gpuDevice.createCommandEncoder()
-								.createRenderPass(
-									() -> "Particles - Transparent", renderTarget2.getColorTextureView(), OptionalInt.empty(), renderTarget2.getDepthTextureView(), OptionalDouble.empty()
-								)) {
-							this.prepareRenderPass(renderPassx);
-							particleGroupRenderer.render(preparedBuffers, particleBufferCache, renderPassx, textureManager, true);
+					if (renderTarget2 != null && (phase == net.irisshaders.iris.fantastic.ParticleRenderingPhase.EVERYTHING || phase == net.irisshaders.iris.fantastic.ParticleRenderingPhase.TRANSLUCENT)) {
+						try (RenderPass renderPass = gpuDevice.createCommandEncoder().createRenderPass(() -> "Particles - Transparent", renderTarget2.getColorTextureView(), OptionalInt.empty(), renderTarget2.getDepthTextureView(), OptionalDouble.empty())) {
+							this.prepareRenderPass(renderPass);
+							particleGroupRenderer.render(preparedBuffers, particleBufferCache, renderPass, textureManager, true);
 						}
 					}
 				}
