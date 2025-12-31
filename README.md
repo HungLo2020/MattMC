@@ -266,7 +266,7 @@ MattMC uses the official Minecraft dependencies with careful version management:
 #### Core Mojang Libraries
 - **Brigadier 1.3.10**: Command parsing and execution
 - **DataFixerUpper 8.0.16**: World data migration and fixes
-- **Authlib 6.0.55**: Authentication (offline mode supported)
+- **Custom PlayerProfile System**: Replaces Authlib - Authentication and player profiles (offline mode supported)
 - **JTracy 1.0.29**: Performance profiling integration
 
 #### Graphics & Audio (Client)

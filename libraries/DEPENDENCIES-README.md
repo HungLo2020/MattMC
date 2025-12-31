@@ -32,18 +32,17 @@ This downloads all required dependencies (~30+ JARs total):
 **Mojang Libraries:**
 - brigadier-1.3.10.jar
 - datafixerupper-8.0.16.jar
-- authlib-6.0.55.jar
 - logging-1.2.7.jar
 - jtracy-1.0.29.jar
 - blocklist-1.0.10.jar
 - patchy-2.2.10.jar
-- text2speech-1.17.9.jar
 - launchwrapper-1.12.jar
 
 **Fabric Loader Dependencies (for integrated Fabric source):**
 - mapping-io-0.7.1.jar (net.fabricmc.mappingio.* - mapping I/O with built-in Tiny v1/v2 support)
 
-**Note:** tiny-remapper, class-tweaker, access-widener, tiny-mappings-parser, sponge-mixin, mixinextras, and text2speech removed:
+**Note:** authlib, tiny-remapper, class-tweaker, access-widener, tiny-mappings-parser, sponge-mixin, mixinextras, and text2speech removed:
+- authlib replaced with custom PlayerProfile system (see net.minecraft.server.profile.PlayerProfile)
 - All modifications (namespace mappings and access widening) are permanently applied in the Minecraft source code at compile time
 - The mixin system is completely bypassed - all mixins have been converted to a hook-based architecture (see FabricMixinBootstrap.java)
 - text2speech is not used - only translation keys like "narrator.*" are referenced
@@ -117,11 +116,8 @@ libraries/
 └── deps/                        # Downloaded JARs (gitignored)
     ├── brigadier-1.3.10.jar
     ├── datafixerupper-8.0.16.jar
-    ├── authlib-6.0.55.jar
-    ├── sponge-mixin-0.16.5+mixin.0.8.7.jar
-    ├── tiny-remapper-0.11.2.jar
-    ├── class-tweaker-0.2.jar
     ├── mapping-io-0.7.1.jar
+    ├── asm-9.9.jar
     └── ... (more JARs)
 ```
 

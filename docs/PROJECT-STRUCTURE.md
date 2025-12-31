@@ -21,7 +21,6 @@ MattMC/
 │           └── version.json  # Version information
 ├── com/                      # Mojang library code
 │   └── mojang/
-│       ├── authlib/          # Authentication library
 │       ├── blaze3d/          # 3D rendering engine (OpenGL wrapper)
 │       ├── logging/          # Logging utilities
 │       ├── math/             # Math utilities (vectors, matrices, transformations)
@@ -128,8 +127,9 @@ MattMC/
 Low-level engine code maintained by Mojang, including:
 - **blaze3d**: OpenGL rendering abstraction layer
 - **math**: Mathematical utilities (matrices, vectors, quaternions)
-- **authlib**: Authentication and profile management
 - **realmsclient**: Minecraft Realms integration
+
+**Note**: Authentication is handled by the custom PlayerProfile system in `net.minecraft.server.profile`
 
 ### 2. Client Code (`net.minecraft.client`)
 Client-specific functionality:
