@@ -8,8 +8,7 @@
   "client": [
     "MixinGlCommandEncoder",
     "MixinLevelRenderer",
-    "MixinModelViewBobbing",
-    "MixinCompiledShaderProgram"
+    "MixinModelViewBobbing"
   ],
   "injectors": {
     "defaultRequire": 1,
