@@ -6,8 +6,16 @@
 
 ### Mixin Conversion Status
 
-**Total Mixins:** 218 → **34 remaining** (184 removed)  
-**Conversion Progress:** 84.4% complete - **MILESTONE: 84% REACHED!** 🎉🎉🎉🎉🎉🎉🎉🎉🎉
+**Total Mixins:** 218 → **27 remaining** (191 removed)  
+**Conversion Progress:** 87.6% complete - **MILESTONE: 87% REACHED!** 🎉🎉🎉🎉🎉🎉🎉🎉🎉
+
+#### Removed Mixins (Session 44 - 6 mixins):
+213. ✅ `BufferBuilderMixin` (Sodium/intrinsics) - 2 @Override methods → Merged Sodium fast path into BufferBuilder.putBulkData() with Iris AO support
+214. ✅ `MixinShaderManager_Overrides` (Iris) - 1 @Inject HEAD → Inlined Iris shader override logic into GlDevice.getOrCompilePipeline()
+215. ✅ `MultiBufferSourceMixin` (Sodium/sorting) - 1 @WrapOperation → Inlined Sodium accelerated vertex sorting into MultiBufferSource.BufferSource.endBatch()
+216. ✅ `ItemFeatureRendererMixin` (Sodium/FRAPI) - 1 @Inject RETURN → Inlined Sodium FRAPI mesh item command rendering into ItemFeatureRenderer.render()
+217. ✅ `BakedQuadMixin` (Sodium/core) - Interface implementation + 1 @Inject → Converted BakedQuad record to class implementing BakedQuadView with Sodium optimizations
+218. ✅ `QuadParticleRenderStateMixin` (Sodium) - 1 @Inject HEAD → Inlined Sodium optimized particle rendering into QuadParticleRenderState.renderRotatedQuad()
 
 #### Removed Mixins (Session 43 - 3 mixins):
 210. ✅ `MixinDirectoryLister` (Iris/PBR) - @ModifyArgs → Inlined PBR texture filtering into DirectoryLister.run() to skip PBR suffix textures when base exists
