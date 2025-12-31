@@ -33,7 +33,7 @@ import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 
 @Environment(EnvType.CLIENT)
-public class SpriteContents implements Stitcher.Entry, AutoCloseable, net.caffeinemc.mods.sodium.client.render.chunk.compile.pipeline.SpriteContentsExtension {
+public class SpriteContents implements Stitcher.Entry, AutoCloseable, net.caffeinemc.mods.sodium.client.render.chunk.compile.pipeline.SpriteContentsExtension, net.irisshaders.iris.pbr.SpriteContentsExtension {
 	private static final Logger LOGGER = LogUtils.getLogger();
 	final ResourceLocation name;
 	final int width;
@@ -46,6 +46,10 @@ public class SpriteContents implements Stitcher.Entry, AutoCloseable, net.caffei
 	// Sodium: Transparency tracking (from SpriteContentsMixin scan package)
 	private boolean sodium$hasTransparentPixels = false;
 	private boolean sodium$hasTranslucentPixels = false;
+	
+	// Iris: From MixinSpriteContents - ticker tracking
+	@Nullable
+	private SpriteContents.Ticker createdTicker;
 
 	public SpriteContents(ResourceLocation resourceLocation, FrameSize frameSize, NativeImage nativeImage) {
 		this(resourceLocation, frameSize, nativeImage, Optional.empty(), List.of());
@@ -72,7 +76,24 @@ public class SpriteContents implements Stitcher.Entry, AutoCloseable, net.caffei
 
 	public void increaseMipLevel(int i) {
 		try {
-			this.byMipLevel = MipmapGenerator.generateMipLevels(this.byMipLevel, i);
+			// Iris: From MixinSpriteContents - redirect mipmap generation to custom generator if available
+			NativeImage[] result;
+			if (this instanceof net.irisshaders.iris.pbr.mipmap.CustomMipmapGenerator.Provider provider) {
+				net.irisshaders.iris.pbr.mipmap.CustomMipmapGenerator generator = provider.getMipmapGenerator();
+				if (generator != null) {
+					try {
+						result = generator.generateMipLevels(this.byMipLevel, i);
+					} catch (Exception e) {
+						net.irisshaders.iris.Iris.logger.error("ERROR MIPMAPPING", e);
+						result = MipmapGenerator.generateMipLevels(this.byMipLevel, i);
+					}
+				} else {
+					result = MipmapGenerator.generateMipLevels(this.byMipLevel, i);
+				}
+			} else {
+				result = MipmapGenerator.generateMipLevels(this.byMipLevel, i);
+			}
+			this.byMipLevel = result;
 		} catch (Throwable var5) {
 			CrashReport crashReport = CrashReport.forThrowable(var5, "Generating mipmaps for frame");
 			CrashReportCategory crashReportCategory = crashReport.addCategory("Frame being iterated");
@@ -175,7 +196,14 @@ public class SpriteContents implements Stitcher.Entry, AutoCloseable, net.caffei
 
 	@Nullable
 	public SpriteTicker createTicker() {
-		return this.animatedTexture != null ? this.animatedTexture.createTicker() : null;
+		SpriteTicker ticker = this.animatedTexture != null ? this.animatedTexture.createTicker() : null;
+		
+		// Iris: From MixinSpriteContents - track created ticker
+		if (ticker instanceof SpriteContents.Ticker innerTicker) {
+			createdTicker = innerTicker;
+		}
+		
+		return ticker;
 	}
 
 	public <T> Optional<T> getAdditionalMetadata(MetadataSectionType<T> metadataSectionType) {
@@ -390,5 +418,12 @@ public class SpriteContents implements Stitcher.Entry, AutoCloseable, net.caffei
 	@Override
 	public boolean sodium$hasTranslucentPixels() {
 		return this.sodium$hasTranslucentPixels;
+	}
+	
+	// Iris: From MixinSpriteContents - provide access to created ticker
+	@Override
+	@Nullable
+	public SpriteContents.Ticker getCreatedTicker() {
+		return createdTicker;
 	}
 }
