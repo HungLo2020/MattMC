@@ -13,12 +13,15 @@ import net.minecraft.api.Environment;
 import org.jetbrains.annotations.Nullable;
 
 @Environment(EnvType.CLIENT)
-public class GlTexture extends GpuTexture {
+public class GlTexture extends GpuTexture implements net.irisshaders.iris.mixinterface.GpuTextureInterface {
 	protected final int id;
 	private final Int2IntMap fboCache = new Int2IntOpenHashMap();
 	protected boolean closed;
 	protected boolean modesDirty = true;
 	private int views;
+	
+	// Iris: From MixinGpuTexture - mipmap non-linear flag
+	private boolean iris$mipmapNonLinear;
 
 	protected GlTexture(int i, String string, TextureFormat textureFormat, int j, int k, int l, int m, int n) {
 		super(i, string, textureFormat, j, k, l, m);
@@ -61,35 +64,62 @@ public class GlTexture extends GpuTexture {
 
 	public void flushModeChanges(int i) {
 		if (this.modesDirty) {
-			GlStateManager._texParameter(i, 10242, GlConst.toGl(this.addressModeU));
-			GlStateManager._texParameter(i, 10243, GlConst.toGl(this.addressModeV));
+			// Iris: From MixinGpuTexture - use IrisRenderSystem.texParameteri instead of GlStateManager._texParameter
+			iris$texParameterDSA(i, 10242, GlConst.toGl(this.addressModeU));
+			iris$texParameterDSA(i, 10243, GlConst.toGl(this.addressModeV));
 			switch (this.minFilter) {
 				case NEAREST:
-					GlStateManager._texParameter(i, 10241, this.useMipmaps ? 9986 : 9728);
+					iris$texParameterDSA(i, 10241, this.useMipmaps ? 9986 : 9728);
 					break;
 				case LINEAR:
-					GlStateManager._texParameter(i, 10241, this.useMipmaps ? 9987 : 9729);
+					iris$texParameterDSA(i, 10241, this.useMipmaps ? 9987 : 9729);
 			}
 
 			switch (this.magFilter) {
 				case NEAREST:
-					GlStateManager._texParameter(i, 10240, 9728);
+					iris$texParameterDSA(i, 10240, 9728);
 					break;
 				case LINEAR:
-					GlStateManager._texParameter(i, 10240, 9729);
+					iris$texParameterDSA(i, 10240, 9729);
 			}
 
 			this.modesDirty = false;
 		}
+	}
+	
+	// Iris: From MixinGpuTexture - helper method for DSA texture parameter setting with mipmap non-linear handling
+	private void iris$texParameterDSA(int target, int pname, int param) {
+		int newId = param;
+
+		// Handle mipmap non-linear flag
+		if (this.iris$mipmapNonLinear && (param == 9987 || param == 9986)) { // GL_LINEAR_MIPMAP_LINEAR or GL_NEAREST_MIPMAP_LINEAR
+			newId = (param == 9987 ? 9985 : 9984); // GL_LINEAR_MIPMAP_NEAREST or GL_NEAREST_MIPMAP_NEAREST
+		}
+
+		net.irisshaders.iris.gl.IrisRenderSystem.texParameteri(this.id, target, pname, newId);
 	}
 
 	public int glId() {
 		return this.id;
 	}
 
+	// Iris: From MixinGpuTexture - GpuTextureInterface implementation
 	@Override
 	public int iris$getGlId() {
-		return this.id;
+		this.flushModeChanges(org.lwjgl.opengl.GL46C.GL_TEXTURE_2D);
+		return this.glId();
+	}
+	
+	@Override
+	public void iris$markMipmapNonLinear() {
+		boolean wasNonLinear = this.iris$mipmapNonLinear;
+		this.iris$mipmapNonLinear = true;
+		this.modesDirty = modesDirty || !wasNonLinear;
+	}
+
+	@Override
+	public void iris$copyStateTo(GpuTexture texture) {
+		texture.setTextureFilter(this.minFilter, this.magFilter, this.useMipmaps);
 	}
 
 	@Override

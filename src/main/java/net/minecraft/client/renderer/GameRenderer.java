@@ -180,6 +180,12 @@ public class GameRenderer implements Projector, AutoCloseable, net.caffeinemc.mo
 				new GuiProfilerChartRenderer(bufferSource)
 			)
 		);
+		
+		// Iris: From MixinGameRenderer - log hardware information
+		net.irisshaders.iris.Iris.logger.info("Hardware information:");
+		net.irisshaders.iris.Iris.logger.info("CPU: " + com.mojang.blaze3d.platform.GLX._getCpuInfo());
+		net.irisshaders.iris.Iris.logger.info("GPU: " + com.mojang.blaze3d.systems.RenderSystem.getDevice().getRenderer() + " (Supports OpenGL " + com.mojang.blaze3d.systems.RenderSystem.getDevice().getVersion() + ")");
+		net.irisshaders.iris.Iris.logger.info("OS: " + System.getProperty("os.name") + " (" + System.getProperty("os.version") + ")");
 		this.screenEffectRenderer = new ScreenEffectRenderer(minecraft, atlasManager, bufferSource);
 		this.cubeMap = this.createCubeMap(minecraft.options.panoramaTheme().get());
 		this.panorama = new PanoramaRenderer(this.cubeMap);
@@ -537,14 +543,17 @@ public class GameRenderer implements Projector, AutoCloseable, net.caffeinemc.mo
 				&& !this.minecraft.options.hideGui
 				&& this.minecraft.gameMode.getPlayerMode() != GameType.SPECTATOR) {
 				this.lightTexture.turnOnLightLayer();
-				this.itemInHandRenderer
-					.renderHandsWithItems(
-						f,
-						poseStack,
-						this.minecraft.gameRenderer.getSubmitNodeStorage(),
-						this.minecraft.player,
-						this.minecraft.getEntityRenderDispatcher().getPackedLightCoords(this.minecraft.player, f)
-					);
+				// Iris: From MixinGameRenderer - disable vanilla hand rendering when shaders are active
+				if (!net.irisshaders.iris.Iris.isPackInUseQuick()) {
+					this.itemInHandRenderer
+						.renderHandsWithItems(
+							f,
+							poseStack,
+							this.minecraft.gameRenderer.getSubmitNodeStorage(),
+							this.minecraft.player,
+							this.minecraft.getEntityRenderDispatcher().getPackedLightCoords(this.minecraft.player, f)
+						);
+				}
 				this.lightTexture.turnOffLightLayer();
 			}
 
@@ -574,6 +583,11 @@ public class GameRenderer implements Projector, AutoCloseable, net.caffeinemc.mo
 	}
 
 	public void render(DeltaTracker deltaTracker, boolean bl) {
+		// Iris: From MixinGameRenderer - set real tick delta and begin frame timers
+		net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setRealTickDelta(deltaTracker.getGameTimeDeltaPartialTick(true));
+		net.irisshaders.iris.uniforms.SystemTimeUniforms.COUNTER.beginFrame();
+		net.irisshaders.iris.uniforms.SystemTimeUniforms.TIMER.beginFrame(net.minecraft.Util.getNanos());
+		
 		if (!this.minecraft.isWindowActive()
 			&& this.minecraft.options.pauseOnLostFocus
 			&& (!this.minecraft.options.touchscreen().get() || !this.minecraft.mouseHandler.isRightPressed())) {
@@ -585,6 +599,13 @@ public class GameRenderer implements Projector, AutoCloseable, net.caffeinemc.mo
 		}
 
 		if (!this.minecraft.noRender) {
+			// Iris: From MixinGameRenderer - modify blur for shader pack screen
+			int blurRadius = this.minecraft.options.getMenuBackgroundBlurriness();
+			if (this.minecraft.screen instanceof net.irisshaders.iris.gui.screen.ShaderPackScreen sps) {
+				float f = Math.min(this.minecraft.options.getMenuBackgroundBlurriness(), sps.blurTransition.getAsFloat());
+				blurRadius = (int) f;
+			}
+			
 			this.globalSettingsUniform
 				.update(
 					this.minecraft.getWindow().getWidth(),
@@ -592,7 +613,7 @@ public class GameRenderer implements Projector, AutoCloseable, net.caffeinemc.mo
 					this.minecraft.options.glintStrength().get(),
 					this.minecraft.level == null ? 0L : this.minecraft.level.getGameTime(),
 					deltaTracker,
-					this.minecraft.options.getMenuBackgroundBlurriness()
+					blurRadius
 				);
 			ProfilerFiller profilerFiller = Profiler.get();
 			boolean bl2 = this.minecraft.isGameLoadFinished();
@@ -871,6 +892,9 @@ public class GameRenderer implements Projector, AutoCloseable, net.caffeinemc.mo
 			&& !this.minecraft.options.hideGui) {
 			this.minecraft.getDebugOverlay().render3dCrosshair(this.mainCamera);
 		}
+		
+		// Iris: From MixinGameRenderer - finalize game rendering for color space conversion
+		net.irisshaders.iris.Iris.getPipelineManager().getPipeline().ifPresent(net.irisshaders.iris.pipeline.WorldRenderingPipeline::finalizeGameRendering);
 	}
 
 	private void extractCamera(float f) {

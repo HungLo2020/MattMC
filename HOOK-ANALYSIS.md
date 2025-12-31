@@ -6,8 +6,13 @@
 
 ### Mixin Conversion Status
 
-**Total Mixins:** 218 → **46 remaining** (172 removed)  
-**Conversion Progress:** 78.9% complete - **MILESTONE: 78% REACHED!** 🎉🎉🎉🎉🎉
+**Total Mixins:** 218 → **43 remaining** (175 removed)  
+**Conversion Progress:** 80.3% complete - **MILESTONE: 80% REACHED!** 🎉🎉🎉🎉🎉🎉
+
+#### Removed Mixins (Session 40 - 3 mixins):
+201. ✅ `MixinLevelRenderer` (Iris/fabric) - Deleted (entirely commented out, no active code)
+202. ✅ `MixinGpuTexture` (Iris) - Interface implementation + @Redirect → GlTexture implements GpuTextureInterface with DSA texture parameter handling and mipmap non-linear support
+203. ✅ `MixinGameRenderer` (Iris) - Multiple @Inject + @Redirect + @ModifyArgs → Inlined frame timing, hardware logging, blur modification, hand rendering disable, and color space finalization
 
 #### Removed Mixins (Session 39 - 1 mixin):
 200. ✅ `MixinLevelRenderer` (Iris/shadows) - Interface implementation → LevelRenderer implements CullingDataCache with state save/restore for shadow rendering
