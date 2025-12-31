@@ -35,7 +35,7 @@ import org.joml.Vector4f;
 import org.lwjgl.system.MemoryStack;
 
 @Environment(EnvType.CLIENT)
-public class FogRenderer implements AutoCloseable {
+public class FogRenderer implements AutoCloseable, net.caffeinemc.mods.sodium.client.util.FogStorage {
 	public static final int FOG_UBO_SIZE = new Std140SizeCalculator().putVec4().putFloat().putFloat().putFloat().putFloat().putFloat().putFloat().get();
 	private static final List<FogEnvironment> FOG_ENVIRONMENTS = Lists.<FogEnvironment>newArrayList(
 		new LavaFogEnvironment(),
@@ -49,6 +49,8 @@ public class FogRenderer implements AutoCloseable {
 	private static boolean fogEnabled = true;
 	private final GpuBuffer emptyBuffer;
 	private final MappableRingBuffer regularBuffer;
+	// Sodium: FogStorage interface implementation (from FogRendererMixin)
+	private net.caffeinemc.mods.sodium.client.util.FogParameters parameters = net.caffeinemc.mods.sodium.client.util.FogParameters.NONE;
 
 	public FogRenderer() {
 		GpuDevice gpuDevice = RenderSystem.getDevice();
@@ -227,6 +229,8 @@ public class FogRenderer implements AutoCloseable {
 				fogData.skyEnd,
 				fogData.cloudEnd
 			);
+			// Sodium: Store fog parameters (from FogRendererMixin)
+			parameters = new net.caffeinemc.mods.sodium.client.util.FogParameters(vector4f.x, vector4f.y, vector4f.z, vector4f.w, fogData.environmentalStart, fogData.environmentalEnd, fogData.renderDistanceStart, fogData.renderDistanceEnd);
 		}
 		
 		// Iris: Capture fog color
@@ -264,6 +268,12 @@ public class FogRenderer implements AutoCloseable {
 		cancelFog = cancelFog && !com.seibel.distanthorizons.core.config.Config.Client.Advanced.Graphics.Fog.enableVanillaFog.get();
 		
 		return cancelFog;
+	}
+	
+	// Sodium: FogStorage interface method (from FogRendererMixin)
+	@Override
+	public net.caffeinemc.mods.sodium.client.util.FogParameters sodium$getFogParameters() {
+		return parameters;
 	}
 
 	@Environment(EnvType.CLIENT)
