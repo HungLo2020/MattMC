@@ -11,10 +11,7 @@
     "MixinModelViewBobbing",
     "MixinShaderManager_Overrides",
     "MixinCompiledShaderProgram",
-    "entity_render_context.MixinModelStorageTrigger",
-    "texture.pbr.MixinDirectoryLister",
-    "texture.pbr.MixinSpriteContents",
-    "texture.pbr.MixinTextureAtlas"
+    "entity_render_context.MixinModelStorageTrigger"
   ],
   "injectors": {
     "defaultRequire": 1,

@@ -33,7 +33,7 @@ import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 
 @Environment(EnvType.CLIENT)
-public class SpriteContents implements Stitcher.Entry, AutoCloseable, net.caffeinemc.mods.sodium.client.render.chunk.compile.pipeline.SpriteContentsExtension, net.irisshaders.iris.pbr.SpriteContentsExtension {
+public class SpriteContents implements Stitcher.Entry, AutoCloseable, net.caffeinemc.mods.sodium.client.render.chunk.compile.pipeline.SpriteContentsExtension, net.irisshaders.iris.pbr.SpriteContentsExtension, net.irisshaders.iris.pbr.texture.SpriteContentsExtension {
 	private static final Logger LOGGER = LogUtils.getLogger();
 	final ResourceLocation name;
 	final int width;
@@ -50,6 +50,10 @@ public class SpriteContents implements Stitcher.Entry, AutoCloseable, net.caffei
 	// Iris: From MixinSpriteContents - ticker tracking
 	@Nullable
 	private SpriteContents.Ticker createdTicker;
+	
+	// Iris PBR: From texture.pbr.MixinSpriteContents - PBR sprite holder
+	@Nullable
+	private net.irisshaders.iris.pbr.texture.PBRSpriteHolder iris$pbrHolder;
 
 	public SpriteContents(ResourceLocation resourceLocation, FrameSize frameSize, NativeImage nativeImage) {
 		this(resourceLocation, frameSize, nativeImage, Optional.empty(), List.of());
@@ -220,6 +224,10 @@ public class SpriteContents implements Stitcher.Entry, AutoCloseable, net.caffei
 	public void close() {
 		for (NativeImage nativeImage : this.byMipLevel) {
 			nativeImage.close();
+		}
+		// Iris PBR: From texture.pbr.MixinSpriteContents - close PBR holder
+		if (iris$pbrHolder != null) {
+			iris$pbrHolder.close();
 		}
 	}
 
@@ -445,5 +453,36 @@ public class SpriteContents implements Stitcher.Entry, AutoCloseable, net.caffei
 	@Nullable
 	public SpriteContents.Ticker getCreatedTicker() {
 		return createdTicker;
+	}
+	
+	// Iris PBR: From texture.pbr.MixinSpriteContents - PBR holder interface implementation
+	@Override
+	@Nullable
+	public net.irisshaders.iris.pbr.texture.PBRSpriteHolder getPBRHolder() {
+		return iris$pbrHolder;
+	}
+	
+	@Override
+	public net.irisshaders.iris.pbr.texture.PBRSpriteHolder getOrCreatePBRHolder() {
+		if (iris$pbrHolder == null) {
+			iris$pbrHolder = new net.irisshaders.iris.pbr.texture.PBRSpriteHolder();
+		}
+		return iris$pbrHolder;
+	}
+	
+	// Iris PBR: From texture.pbr.MixinSpriteContents - Sodium active tracking hook
+	public void sodium$setActive(boolean active) {
+		// Mark PBR sprites active when main sprite is active
+		net.irisshaders.iris.pbr.texture.PBRSpriteHolder pbrHolder = getPBRHolder();
+		if (pbrHolder != null) {
+			net.minecraft.client.renderer.texture.TextureAtlasSprite normalSprite = pbrHolder.getNormalSprite();
+			net.minecraft.client.renderer.texture.TextureAtlasSprite specularSprite = pbrHolder.getSpecularSprite();
+			if (normalSprite != null) {
+				net.sodium.api.texture.SpriteUtil.INSTANCE.markSpriteActive(normalSprite);
+			}
+			if (specularSprite != null) {
+				net.sodium.api.texture.SpriteUtil.INSTANCE.markSpriteActive(specularSprite);
+			}
+		}
 	}
 }

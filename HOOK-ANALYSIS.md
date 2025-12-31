@@ -6,8 +6,13 @@
 
 ### Mixin Conversion Status
 
-**Total Mixins:** 218 → **37 remaining** (181 removed)  
-**Conversion Progress:** 83.0% complete - **MILESTONE: 83% REACHED!** 🎉🎉🎉🎉🎉🎉🎉🎉
+**Total Mixins:** 218 → **34 remaining** (184 removed)  
+**Conversion Progress:** 84.4% complete - **MILESTONE: 84% REACHED!** 🎉🎉🎉🎉🎉🎉🎉🎉🎉
+
+#### Removed Mixins (Session 43 - 3 mixins):
+210. ✅ `MixinDirectoryLister` (Iris/PBR) - @ModifyArgs → Inlined PBR texture filtering into DirectoryLister.run() to skip PBR suffix textures when base exists
+211. ✅ `MixinSpriteContents` (Iris/PBR) - Interface implementation + 2 @Inject → SpriteContents implements SpriteContentsExtension with PBR holder management and Sodium active tracking
+212. ✅ `MixinTextureAtlas` (Iris/PBR) - Interface implementation + 2 @Inject → TextureAtlas implements TextureAtlasExtension with PBR holder, animation cycling, and texture tracking
 
 #### Removed Mixins (Session 42 - 3 mixins):
 207. ✅ `MixinChunkRebuildTask` (Iris) - Deleted dead code (unused fields with TODO comment, no active logic)
