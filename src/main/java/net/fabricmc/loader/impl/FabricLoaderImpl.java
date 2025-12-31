@@ -39,8 +39,6 @@ import org.jetbrains.annotations.VisibleForTesting;
 import org.objectweb.asm.Opcodes;
 
 import net.fabricmc.api.EnvType;
-import net.fabricmc.classtweaker.api.ClassTweaker;
-import net.fabricmc.classtweaker.api.ClassTweakerReader;
 import net.fabricmc.loader.api.LanguageAdapter;
 import net.fabricmc.loader.api.MappingResolver;
 import net.fabricmc.loader.api.ModContainer;
@@ -89,7 +87,6 @@ public final class FabricLoaderImpl extends net.fabricmc.loader.FabricLoader {
 
 	private final Map<String, LanguageAdapter> adapterMap = new HashMap<>();
 	private final EntrypointStorage entrypointStorage = new EntrypointStorage();
-	private final ClassTweaker classTweaker = ClassTweaker.newInstance();
 
 	private final ObjectShare objectShare = new ObjectShareImpl();
 
@@ -509,24 +506,7 @@ public final class FabricLoaderImpl extends net.fabricmc.loader.FabricLoader {
 		}
 	}
 
-	public void loadClassTweakers() {
-		ClassTweakerReader ctReader = ClassTweakerReader.create(classTweaker);
-
-		for (net.fabricmc.loader.api.ModContainer modContainer : getAllMods()) {
-			LoaderModMetadata modMetadata = (LoaderModMetadata) modContainer.getMetadata();
-			String location = modMetadata.getClassTweaker();
-			if (location == null) continue;
-
-			Path path = modContainer.findPath(location).orElse(null);
-			if (path == null) throw new RuntimeException(String.format("Missing classTweaker file %s from mod %s", location, modContainer.getMetadata().getId()));
-
-			try (BufferedReader reader = Files.newBufferedReader(path)) {
-				ctReader.read(reader, FabricLauncherBase.getLauncher().getMappingConfiguration().getRuntimeNamespace());
-			} catch (Exception e) {
-				throw new RuntimeException("Failed to read classTweaker file from mod " + modMetadata.getId(), e);
-			}
-		}
-	}
+	// NOTE: loadClassTweakers() removed - access modifications already applied in source
 
 	public void prepareModInit(Path newRunDir, Object gameInstance) {
 		if (!frozen) {
@@ -583,9 +563,7 @@ public final class FabricLoaderImpl extends net.fabricmc.loader.FabricLoader {
 		}
 	}
 
-	public ClassTweaker getClassTweaker() {
-		return classTweaker;
-	}
+	// NOTE: getClassTweaker() removed - access modifications already applied in source
 
 	/**
 	 * Sets the game instance. This is only used in 20w22a+ by the dedicated server and should not be called by anything else.

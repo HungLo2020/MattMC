@@ -42,13 +42,11 @@ This downloads all required dependencies (~30+ JARs total):
 
 **Fabric Loader Dependencies (for integrated Fabric source):**
 - sponge-mixin-0.16.5+mixin.0.8.7.jar (org.spongepowered.asm.* - bytecode transformation)
-- class-tweaker-0.2.jar (net.fabricmc.classtweaker.* - access modification)
 - mapping-io-0.7.1.jar (net.fabricmc.mappingio.* - mapping I/O)
 - mixinextras-fabric-0.5.0.jar (com.llamalad7.mixinextras.* - mixin extensions)
-- access-widener-2.1.0.jar (access widening)
 - tiny-mappings-parser-0.3.0+build.17.jar (legacy mapping parser)
 
-**Note:** tiny-remapper removed - unified build approach means all code uses consistent mappings at compile time, making runtime remapping unnecessary.
+**Note:** tiny-remapper, class-tweaker, and access-widener removed - all modifications (namespace mappings and access widening) are permanently applied in the Minecraft source code at compile time.
 
 **ASM Libraries (bytecode manipulation, required by Mixin):**
 - asm-9.9.jar
@@ -148,11 +146,10 @@ If you get compilation errors about missing classes, a transitive dependency may
 
 If Fabric Loader source fails to compile, ensure all Fabric dependencies are downloaded:
 - sponge-mixin (provides org.spongepowered.asm.*)
-- class-tweaker (provides net.fabricmc.classtweaker.*)
 - mapping-io (provides net.fabricmc.mappingio.*)
 - launchwrapper (provides net.minecraft.launchwrapper.*)
 
-**Note:** tiny-remapper is no longer needed due to unified build approach.
+**Note:** tiny-remapper, class-tweaker, and access-widener are no longer needed due to unified build approach with all modifications applied in source.
 
 ## Comparison with Other Solutions
 

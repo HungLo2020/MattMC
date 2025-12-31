@@ -122,9 +122,7 @@ download_jar "${FABRIC_BASE}/net/fabricmc/sponge-mixin/0.16.5+mixin.0.8.7/sponge
 # NOTE: Tiny Remapper removed - unified build approach means all code uses
 # consistent mappings at compile time, making runtime remapping unnecessary
 
-# Class Tweaker - class access modification (required by Fabric Loader)
-# Provides: net.fabricmc.classtweaker.* packages
-download_jar "${FABRIC_BASE}/net/fabricmc/class-tweaker/0.2/class-tweaker-0.2.jar" "class-tweaker-0.2.jar"
+# NOTE: Class Tweaker removed - access modifications already applied in source
 
 # Mapping IO - mapping file I/O (required by Fabric Loader)
 # Provides: net.fabricmc.mappingio.* packages
@@ -138,8 +136,7 @@ download_jar "${FABRIC_BASE}/io/github/llamalad7/mixinextras-fabric/0.5.0/mixine
 # Provides: net.minecraft.launchwrapper.* packages
 download_jar "${MOJANG_BASE}/net/minecraft/launchwrapper/1.12/launchwrapper-1.12.jar" "launchwrapper-1.12.jar"
 
-# Access Widener - access modification (required by Fabric Loader)
-download_jar "${FABRIC_BASE}/net/fabricmc/access-widener/2.1.0/access-widener-2.1.0.jar" "access-widener-2.1.0.jar"
+# NOTE: Access Widener removed - access modifications already applied in source
 
 # Tiny Mappings Parser - legacy mapping parser
 download_jar "${FABRIC_BASE}/net/fabricmc/tiny-mappings-parser/0.3.0+build.17/tiny-mappings-parser-0.3.0+build.17.jar" "tiny-mappings-parser-0.3.0+build.17.jar"

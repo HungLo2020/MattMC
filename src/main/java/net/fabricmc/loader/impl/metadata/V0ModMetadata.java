@@ -246,10 +246,7 @@ final class V0ModMetadata extends AbstractModMetadata implements LoaderModMetada
 		return mixinConfigs;
 	}
 
-	@Override
-	public String getClassTweaker() {
-		return null; // intentional null
-	}
+	// NOTE: getClassTweaker() removed - access modifications already applied in source
 
 	static final class Mixins {
 		final Collection<String> client;
