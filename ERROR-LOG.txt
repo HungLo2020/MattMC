@@ -1,52 +1,443 @@
-A mod crashed on startup!
-net.fabricmc.loader.impl.FormattedException: java.lang.RuntimeException: Could not execute entrypoint stage 'preLaunch' due to errors, provided by 'mattmc' at 'net.caffeinemc.mods.sodium.fabric.SodiumPreLaunch'!
-	at net.fabricmc.loader.impl.FormattedException.ofLocalized(FormattedException.java:63)
-	at net.fabricmc.loader.impl.launch.knot.Knot.init(Knot.java:158)
-	at net.fabricmc.loader.impl.launch.knot.Knot.launch(Knot.java:66)
-	at net.fabricmc.loader.impl.launch.knot.KnotClient.main(KnotClient.java:23)
-Caused by: java.lang.RuntimeException: Could not execute entrypoint stage 'preLaunch' due to errors, provided by 'mattmc' at 'net.caffeinemc.mods.sodium.fabric.SodiumPreLaunch'!
-	at net.fabricmc.loader.impl.FabricLoaderImpl.lambda$invokeEntrypoints$2(FabricLoaderImpl.java:409)
-	at net.fabricmc.loader.impl.util.ExceptionUtil.gatherExceptions(ExceptionUtil.java:33)
-	at net.fabricmc.loader.impl.FabricLoaderImpl.invokeEntrypoints(FabricLoaderImpl.java:407)
-	at net.fabricmc.loader.impl.launch.knot.Knot.init(Knot.java:156)
-	... 2 more
-Caused by: net.fabricmc.loader.api.EntrypointException: Exception while loading entries for entrypoint 'preLaunch' provided by 'mattmc'
-	at net.fabricmc.loader.impl.entrypoint.EntrypointContainerImpl.getEntrypoint(EntrypointContainerImpl.java:56)
-	at net.fabricmc.loader.impl.FabricLoaderImpl.invokeEntrypoints(FabricLoaderImpl.java:405)
-	... 3 more
-Caused by: java.lang.RuntimeException: Mixin transformation of net.caffeinemc.mods.sodium.fabric.SodiumPreLaunch failed
-	at net.fabricmc.loader.impl.launch.knot.KnotClassDelegate.getPostMixinClassByteArray(KnotClassDelegate.java:454)
-	at net.fabricmc.loader.impl.launch.knot.KnotClassDelegate.tryLoadClass(KnotClassDelegate.java:350)
-	at net.fabricmc.loader.impl.launch.knot.KnotClassDelegate.loadClass(KnotClassDelegate.java:231)
-	at net.fabricmc.loader.impl.launch.knot.KnotClassLoader.loadClass(KnotClassLoader.java:119)
-	at java.base/java.lang.ClassLoader.loadClass(ClassLoader.java:526)
-	at java.base/java.lang.Class.forName0(Native Method)
-	at java.base/java.lang.Class.forName(Class.java:534)
-	at java.base/java.lang.Class.forName(Class.java:513)
-	at net.fabricmc.loader.impl.util.DefaultLanguageAdapter.create(DefaultLanguageAdapter.java:50)
-	at net.fabricmc.loader.impl.entrypoint.EntrypointStorage$NewEntry.getOrCreate(EntrypointStorage.java:124)
-	at net.fabricmc.loader.impl.entrypoint.EntrypointContainerImpl.getEntrypoint(EntrypointContainerImpl.java:53)
-	... 4 more
-Caused by: org.spongepowered.asm.mixin.throwables.MixinApplyError: Mixin [mixins.iris.fabric.json:MixinLevelRenderer from mod mattmc] from phase [DEFAULT] in config [mixins.iris.fabric.json] FAILED during PREPARE
-	at org.spongepowered.asm.mixin.transformer.MixinProcessor.handleMixinError(MixinProcessor.java:686)
-	at org.spongepowered.asm.mixin.transformer.MixinProcessor.handleMixinPrepareError(MixinProcessor.java:633)
-	at org.spongepowered.asm.mixin.transformer.MixinProcessor.prepareConfigs(MixinProcessor.java:591)
-	at org.spongepowered.asm.mixin.transformer.MixinProcessor.select(MixinProcessor.java:510)
-	at org.spongepowered.asm.mixin.transformer.MixinProcessor.checkSelect(MixinProcessor.java:486)
-	at org.spongepowered.asm.mixin.transformer.MixinProcessor.lockAndSelect(MixinProcessor.java:438)
-	at org.spongepowered.asm.mixin.transformer.MixinProcessor.couldTransformClass(MixinProcessor.java:398)
-	at org.spongepowered.asm.mixin.transformer.MixinTransformer.couldTransformClass(MixinTransformer.java:265)
-	at org.spongepowered.asm.mixin.transformer.MixinTransformer.transformClass(MixinTransformer.java:233)
-	at org.spongepowered.asm.mixin.transformer.MixinTransformer.transformClassBytes(MixinTransformer.java:202)
-	at net.fabricmc.loader.impl.launch.knot.KnotClassDelegate.getPostMixinClassByteArray(KnotClassDelegate.java:449)
-	... 14 more
-Caused by: org.spongepowered.asm.mixin.transformer.throwables.InvalidMixinException: The specified mixin 'net.irisshaders.iris.mixin.fabric.MixinLevelRenderer' was not found
-	at org.spongepowered.asm.mixin.transformer.MixinInfo.<init>(MixinInfo.java:864)
-	at org.spongepowered.asm.mixin.transformer.MixinConfig.prepareMixins(MixinConfig.java:933)
-	at org.spongepowered.asm.mixin.transformer.MixinConfig.prepare(MixinConfig.java:862)
-	at org.spongepowered.asm.mixin.transformer.MixinProcessor.prepareConfigs(MixinProcessor.java:588)
-	... 22 more
-Caused by: java.lang.ClassNotFoundException: The specified mixin 'net.irisshaders.iris.mixin.fabric.MixinLevelRenderer' was not found
-	at org.spongepowered.asm.mixin.transformer.MixinInfo.loadMixinClass(MixinInfo.java:1318)
-	at org.spongepowered.asm.mixin.transformer.MixinInfo.<init>(MixinInfo.java:857)
-	... 25 more
+2:07:03] [Render thread/INFO]: [DH-CLIENT-CONNECT] ========== CLIENT ONLY CONNECTED ==========
+[12:07:03] [Render thread/INFO]: [DH-CLIENT-CONNECT] Thread: Render thread (ID: 1)
+[12:07:03] [Render thread/INFO]: [DH-CLIENT-CONNECT] Connected to dedicated server: false
+[12:07:03] [Render thread/INFO]: [DH-CLIENT-CONNECT] Connected to replay: false
+[12:07:03] [Render thread/INFO]: [DH-CLIENT-CONNECT] Not connected to dedicated server or replay - skipping DhClientWorld creation
+[12:07:03] [Render thread/INFO]: [DH-CLIENT-CONNECT] This is expected for integrated/singleplayer - world should be created by ServerApi
+[12:07:03] [Render thread/INFO]: Loaded [0] waiting chunk wrappers.
+[12:07:03] [Render thread/WARN]: Ignoring chat session from Player692 due to missing Services public key
+[12:07:03] [Render thread/INFO]: [System] [CHAT] Player692 has reached the goal [Sky's the Limit]
+[12:07:03] [Render thread/INFO]: Loaded 23 advancements
+[12:07:03] [Render thread/WARN]: Error while parsing the block ID map entry for "block.10104":
+[12:07:03] [Render thread/WARN]: - The block minecraft:stone_slab has no property with the name variant, ignoring!
+[12:07:03] [Render thread/WARN]: Error while parsing the block ID map entry for "block.10944":
+[12:07:03] [Render thread/WARN]: - The block minecraft:creaking_heart has no property with the name active, ignoring!
+[12:07:03] [Render thread/WARN]: Error while parsing the block ID map entry for "block.10948":
+[12:07:03] [Render thread/WARN]: - The block minecraft:creaking_heart has no property with the name active, ignoring!
+[12:07:03] [Render thread/INFO]: Stopping worker threads
+[12:07:03] [Render thread/INFO]: Started 10 worker threads
+[12:07:03] [Render thread/ERROR]: Unreported exception thrown!
+java.lang.NullPointerException: Cannot invoke "net.caffeinemc.mods.sodium.client.render.chunk.ChunkRenderMatrices.projection()" because "matrices" is null
+        at knot/net.caffeinemc.mods.sodium.client.render.SodiumWorldRenderer.setupTerrain(SodiumWorldRenderer.java:212) ~[MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.renderer.LevelRenderer.cullTerrain(LevelRenderer.java:398) ~[MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.renderer.LevelRenderer.renderLevel(LevelRenderer.java:505) ~[MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.renderer.GameRenderer.renderLevel(GameRenderer.java:920) ~[MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.renderer.GameRenderer.render(GameRenderer.java:626) ~[MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.Minecraft.runTick(Minecraft.java:1352) ~[MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.Minecraft.run(Minecraft.java:945) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.main.Main.main(Main.java:258) [MattMC-1.21.10.jar:?]
+        at net.fabricmc.loader.impl.game.minecraft.MinecraftGameProvider.launch(MinecraftGameProvider.java:560) [MattMC-1.21.10.jar:1.21.10]
+        at net.fabricmc.loader.impl.launch.knot.Knot.launch(Knot.java:72) [MattMC-1.21.10.jar:1.21.10]
+        at net.fabricmc.loader.impl.launch.knot.KnotClient.main(KnotClient.java:23) [MattMC-1.21.10.jar:1.21.10]
+[12:07:04] [Server thread/INFO]: Stopping server
+[12:07:04] [Server thread/INFO]: Saving players
+[12:07:04] [Server thread/INFO]: Saving worlds
+[12:07:04] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:overworld
+[12:07:05] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:the_nether
+[12:07:05] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:the_end
+[12:07:05] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:primordial_caves
+[12:07:05] [Server thread/INFO]: ThreadedAnvilChunkStorage (New World (4)): All chunks are saved
+[12:07:05] [Server thread/INFO]: ThreadedAnvilChunkStorage (DIM-1): All chunks are saved
+[12:07:05] [Server thread/INFO]: ThreadedAnvilChunkStorage (DIM1): All chunks are saved
+[12:07:05] [Server thread/INFO]: ThreadedAnvilChunkStorage (primordial_caves): All chunks are saved
+[12:07:05] [Server thread/INFO]: ThreadedAnvilChunkStorage: All dimensions are saved
+[12:07:05] [level shutdown/INFO]: Shutting down ClientRenderState
+[12:07:05] [level shutdown/INFO]: Shutting down LodQuadTree...
+[12:07:05] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[New World]@minecraft:the_nether}].
+[12:07:05] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[New World]@minecraft:primordial_caves}].
+[12:07:05] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[New World]@minecraft:the_nether}
+[12:07:05] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[New World]@minecraft:primordial_caves}
+[12:07:05] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[New World]@minecraft:the_end}].
+[12:07:05] [level shutdown/INFO]: Finished shutting down LodQuadTree
+[12:07:05] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[New World]@minecraft:the_end}
+[12:07:05] [level shutdown/INFO]: Closing world gen queue
+[12:07:05] [level shutdown/INFO]: Closing WorldGenerationQueue...
+[12:07:05] [level shutdown/INFO]: Shutting down world generator thread pool...
+[12:07:05] [level shutdown/INFO]: World generator thread pool shutdown with [0] incomplete tasks.
+[12:07:05] [level shutdown/INFO]: [BatchGenerator] shutting down...
+[12:07:05] [level shutdown/INFO]: Closing [BatchGenerationEnvironment]
+[12:07:05] [level shutdown/INFO]: Finished closing WorldGenerationQueue
+[12:07:05] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[New World]@minecraft:overworld}].
+[12:07:05] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[New World]@minecraft:overworld}
+[12:07:05] [Server thread/INFO]: Closed DhWorld of type [CLIENT_SERVER].
+[12:07:05] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[New World]@minecraft:the_end}].
+[12:07:05] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[New World]@minecraft:primordial_caves}].
+[12:07:05] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[New World]@minecraft:overworld}].
+[12:07:05] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[New World]@minecraft:the_nether}].
+[12:07:05] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[New World]@minecraft:the_end}
+[12:07:05] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[New World]@minecraft:overworld}
+[12:07:05] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[New World]@minecraft:primordial_caves}
+[12:07:05] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[New World]@minecraft:the_nether}
+[12:07:05] [Server thread/INFO]: Closed DhWorld of type [CLIENT_SERVER].
+[12:07:05] [Server thread/INFO]: Shutting down PriorityTaskPicker thread pool...
+[12:07:05] [Server thread/INFO]: Closing all [4] database connections...
+[12:07:05] [Server thread/INFO]: Closing database connection: [jdbc:sqlite:/home/matt/Documents/Repos/MattMC/run/saves/New World (4)/data/DistantHorizons.sqlite]
+[12:07:05] [Server thread/INFO]: Closing database connection: [jdbc:sqlite:/home/matt/Documents/Repos/MattMC/run/saves/New World (4)/DIM1/data/DistantHorizons.sqlite]
+[12:07:05] [Server thread/INFO]: Closing database connection: [jdbc:sqlite:/home/matt/Documents/Repos/MattMC/run/saves/New World (4)/DIM-1/data/DistantHorizons.sqlite]
+[12:07:05] [Server thread/INFO]: Closing database connection: [jdbc:sqlite:/home/matt/Documents/Repos/MattMC/run/saves/New World (4)/dimensions/minecraft/primordial_caves/data/DistantHorizons.sqlite]
+[12:07:05] [Render thread/ERROR]: Missing program minecraft:pipeline/panorama in Iris override list. This is likely an Iris bug!!!
+java.lang.Throwable: null
+        at knot/com.mojang.blaze3d.opengl.GlDevice.getOrCompilePipeline(GlDevice.java:351) [MattMC-1.21.10.jar:?]
+        at knot/com.mojang.blaze3d.opengl.GlRenderPass.setPipeline(GlRenderPass.java:77) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.renderer.CubeMap.render(CubeMap.java:64) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.renderer.PanoramaRenderer.render(PanoramaRenderer.java:29) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.gui.screens.Screen.renderPanorama(Screen.java:443) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.gui.screens.GenericMessageScreen.renderBackground(GenericMessageScreen.java:45) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.gui.screens.Screen.renderWithTooltipAndSubtitles(Screen.java:102) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.renderer.GameRenderer.render(GameRenderer.java:662) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.Minecraft.runTick(Minecraft.java:1352) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.Minecraft.setScreenAndShow(Minecraft.java:2244) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.Minecraft.disconnect(Minecraft.java:2196) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.Minecraft.disconnectWithSavingScreen(Minecraft.java:2151) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.Minecraft.emergencySave(Minecraft.java:1496) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.Minecraft.emergencySaveAndCrash(Minecraft.java:1024) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.Minecraft.run(Minecraft.java:982) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.main.Main.main(Main.java:258) [MattMC-1.21.10.jar:?]
+        at net.fabricmc.loader.impl.game.minecraft.MinecraftGameProvider.launch(MinecraftGameProvider.java:560) [MattMC-1.21.10.jar:1.21.10]
+        at net.fabricmc.loader.impl.launch.knot.Knot.launch(Knot.java:72) [MattMC-1.21.10.jar:1.21.10]
+        at net.fabricmc.loader.impl.launch.knot.KnotClient.main(KnotClient.java:23) [MattMC-1.21.10.jar:1.21.10]
+[12:07:05] [Render thread/INFO]: Resizing Dynamic Transforms UBO, capacity limit of 2 reached during a single frame. New capacity will be 4.
+[12:07:05] [Render thread/ERROR]: Missing program minecraft:blur/0 in Iris override list. This is likely an Iris bug!!!
+java.lang.Throwable: null
+        at knot/com.mojang.blaze3d.opengl.GlDevice.getOrCompilePipeline(GlDevice.java:351) ~[MattMC-1.21.10.jar:?]
+        at knot/com.mojang.blaze3d.opengl.GlRenderPass.setPipeline(GlRenderPass.java:77) ~[MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.renderer.PostPass.lambda$addToFrame$5(PostPass.java:111) ~[MattMC-1.21.10.jar:?]
+        at knot/com.mojang.blaze3d.framegraph.FrameGraphBuilder.execute(FrameGraphBuilder.java:71) [MattMC-1.21.10.jar:?]
+        at knot/com.mojang.blaze3d.framegraph.FrameGraphBuilder.execute(FrameGraphBuilder.java:50) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.renderer.PostChain.process(PostChain.java:148) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.renderer.GameRenderer.processBlurEffect(GameRenderer.java:316) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.gui.render.GuiRenderer.draw(GuiRenderer.java:239) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.gui.render.GuiRenderer.render(GuiRenderer.java:154) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.renderer.GameRenderer.render(GameRenderer.java:725) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.Minecraft.runTick(Minecraft.java:1352) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.Minecraft.setScreenAndShow(Minecraft.java:2244) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.Minecraft.disconnect(Minecraft.java:2196) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.Minecraft.disconnectWithSavingScreen(Minecraft.java:2151) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.Minecraft.emergencySave(Minecraft.java:1496) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.Minecraft.emergencySaveAndCrash(Minecraft.java:1024) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.Minecraft.run(Minecraft.java:982) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.main.Main.main(Main.java:258) [MattMC-1.21.10.jar:?]
+        at net.fabricmc.loader.impl.game.minecraft.MinecraftGameProvider.launch(MinecraftGameProvider.java:560) [MattMC-1.21.10.jar:1.21.10]
+        at net.fabricmc.loader.impl.launch.knot.Knot.launch(Knot.java:72) [MattMC-1.21.10.jar:1.21.10]
+        at net.fabricmc.loader.impl.launch.knot.KnotClient.main(KnotClient.java:23) [MattMC-1.21.10.jar:1.21.10]
+[12:07:05] [Render thread/ERROR]: Missing program minecraft:blur/1 in Iris override list. This is likely an Iris bug!!!
+java.lang.Throwable: null
+        at knot/com.mojang.blaze3d.opengl.GlDevice.getOrCompilePipeline(GlDevice.java:351) ~[MattMC-1.21.10.jar:?]
+        at knot/com.mojang.blaze3d.opengl.GlRenderPass.setPipeline(GlRenderPass.java:77) ~[MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.renderer.PostPass.lambda$addToFrame$5(PostPass.java:111) ~[MattMC-1.21.10.jar:?]
+        at knot/com.mojang.blaze3d.framegraph.FrameGraphBuilder.execute(FrameGraphBuilder.java:71) [MattMC-1.21.10.jar:?]
+        at knot/com.mojang.blaze3d.framegraph.FrameGraphBuilder.execute(FrameGraphBuilder.java:50) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.renderer.PostChain.process(PostChain.java:148) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.renderer.GameRenderer.processBlurEffect(GameRenderer.java:316) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.gui.render.GuiRenderer.draw(GuiRenderer.java:239) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.gui.render.GuiRenderer.render(GuiRenderer.java:154) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.renderer.GameRenderer.render(GameRenderer.java:725) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.Minecraft.runTick(Minecraft.java:1352) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.Minecraft.setScreenAndShow(Minecraft.java:2244) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.Minecraft.disconnect(Minecraft.java:2196) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.Minecraft.disconnectWithSavingScreen(Minecraft.java:2151) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.Minecraft.emergencySave(Minecraft.java:1496) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.Minecraft.emergencySaveAndCrash(Minecraft.java:1024) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.Minecraft.run(Minecraft.java:982) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.main.Main.main(Main.java:258) [MattMC-1.21.10.jar:?]
+        at net.fabricmc.loader.impl.game.minecraft.MinecraftGameProvider.launch(MinecraftGameProvider.java:560) [MattMC-1.21.10.jar:1.21.10]
+        at net.fabricmc.loader.impl.launch.knot.Knot.launch(Knot.java:72) [MattMC-1.21.10.jar:1.21.10]
+        at net.fabricmc.loader.impl.launch.knot.KnotClient.main(KnotClient.java:23) [MattMC-1.21.10.jar:1.21.10]
+[12:07:05] [Render thread/ERROR]: Missing program minecraft:blur/2 in Iris override list. This is likely an Iris bug!!!
+java.lang.Throwable: null
+        at knot/com.mojang.blaze3d.opengl.GlDevice.getOrCompilePipeline(GlDevice.java:351) ~[MattMC-1.21.10.jar:?]
+        at knot/com.mojang.blaze3d.opengl.GlRenderPass.setPipeline(GlRenderPass.java:77) ~[MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.renderer.PostPass.lambda$addToFrame$5(PostPass.java:111) ~[MattMC-1.21.10.jar:?]
+        at knot/com.mojang.blaze3d.framegraph.FrameGraphBuilder.execute(FrameGraphBuilder.java:71) [MattMC-1.21.10.jar:?]
+        at knot/com.mojang.blaze3d.framegraph.FrameGraphBuilder.execute(FrameGraphBuilder.java:50) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.renderer.PostChain.process(PostChain.java:148) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.renderer.GameRenderer.processBlurEffect(GameRenderer.java:316) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.gui.render.GuiRenderer.draw(GuiRenderer.java:239) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.gui.render.GuiRenderer.render(GuiRenderer.java:154) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.renderer.GameRenderer.render(GameRenderer.java:725) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.Minecraft.runTick(Minecraft.java:1352) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.Minecraft.setScreenAndShow(Minecraft.java:2244) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.Minecraft.disconnect(Minecraft.java:2196) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.Minecraft.disconnectWithSavingScreen(Minecraft.java:2151) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.Minecraft.emergencySave(Minecraft.java:1496) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.Minecraft.emergencySaveAndCrash(Minecraft.java:1024) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.Minecraft.run(Minecraft.java:982) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.main.Main.main(Main.java:258) [MattMC-1.21.10.jar:?]
+        at net.fabricmc.loader.impl.game.minecraft.MinecraftGameProvider.launch(MinecraftGameProvider.java:560) [MattMC-1.21.10.jar:1.21.10]
+        at net.fabricmc.loader.impl.launch.knot.Knot.launch(Knot.java:72) [MattMC-1.21.10.jar:1.21.10]
+        at net.fabricmc.loader.impl.launch.knot.KnotClient.main(KnotClient.java:23) [MattMC-1.21.10.jar:1.21.10]
+[12:07:05] [Render thread/ERROR]: Missing program minecraft:blur/3 in Iris override list. This is likely an Iris bug!!!
+java.lang.Throwable: null
+        at knot/com.mojang.blaze3d.opengl.GlDevice.getOrCompilePipeline(GlDevice.java:351) ~[MattMC-1.21.10.jar:?]
+        at knot/com.mojang.blaze3d.opengl.GlRenderPass.setPipeline(GlRenderPass.java:77) ~[MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.renderer.PostPass.lambda$addToFrame$5(PostPass.java:111) ~[MattMC-1.21.10.jar:?]
+        at knot/com.mojang.blaze3d.framegraph.FrameGraphBuilder.execute(FrameGraphBuilder.java:71) [MattMC-1.21.10.jar:?]
+        at knot/com.mojang.blaze3d.framegraph.FrameGraphBuilder.execute(FrameGraphBuilder.java:50) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.renderer.PostChain.process(PostChain.java:148) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.renderer.GameRenderer.processBlurEffect(GameRenderer.java:316) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.gui.render.GuiRenderer.draw(GuiRenderer.java:239) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.gui.render.GuiRenderer.render(GuiRenderer.java:154) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.renderer.GameRenderer.render(GameRenderer.java:725) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.Minecraft.runTick(Minecraft.java:1352) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.Minecraft.setScreenAndShow(Minecraft.java:2244) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.Minecraft.disconnect(Minecraft.java:2196) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.Minecraft.disconnectWithSavingScreen(Minecraft.java:2151) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.Minecraft.emergencySave(Minecraft.java:1496) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.Minecraft.emergencySaveAndCrash(Minecraft.java:1024) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.Minecraft.run(Minecraft.java:982) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.main.Main.main(Main.java:258) [MattMC-1.21.10.jar:?]
+        at net.fabricmc.loader.impl.game.minecraft.MinecraftGameProvider.launch(MinecraftGameProvider.java:560) [MattMC-1.21.10.jar:1.21.10]
+        at net.fabricmc.loader.impl.launch.knot.Knot.launch(Knot.java:72) [MattMC-1.21.10.jar:1.21.10]
+        at net.fabricmc.loader.impl.launch.knot.KnotClient.main(KnotClient.java:23) [MattMC-1.21.10.jar:1.21.10]
+[12:07:05] [Render thread/ERROR]: Missing program minecraft:blur/4 in Iris override list. This is likely an Iris bug!!!
+java.lang.Throwable: null
+        at knot/com.mojang.blaze3d.opengl.GlDevice.getOrCompilePipeline(GlDevice.java:351) ~[MattMC-1.21.10.jar:?]
+        at knot/com.mojang.blaze3d.opengl.GlRenderPass.setPipeline(GlRenderPass.java:77) ~[MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.renderer.PostPass.lambda$addToFrame$5(PostPass.java:111) ~[MattMC-1.21.10.jar:?]
+        at knot/com.mojang.blaze3d.framegraph.FrameGraphBuilder.execute(FrameGraphBuilder.java:71) [MattMC-1.21.10.jar:?]
+        at knot/com.mojang.blaze3d.framegraph.FrameGraphBuilder.execute(FrameGraphBuilder.java:50) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.renderer.PostChain.process(PostChain.java:148) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.renderer.GameRenderer.processBlurEffect(GameRenderer.java:316) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.gui.render.GuiRenderer.draw(GuiRenderer.java:239) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.gui.render.GuiRenderer.render(GuiRenderer.java:154) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.renderer.GameRenderer.render(GameRenderer.java:725) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.Minecraft.runTick(Minecraft.java:1352) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.Minecraft.setScreenAndShow(Minecraft.java:2244) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.Minecraft.disconnect(Minecraft.java:2196) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.Minecraft.disconnectWithSavingScreen(Minecraft.java:2151) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.Minecraft.emergencySave(Minecraft.java:1496) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.Minecraft.emergencySaveAndCrash(Minecraft.java:1024) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.Minecraft.run(Minecraft.java:982) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.main.Main.main(Main.java:258) [MattMC-1.21.10.jar:?]
+        at net.fabricmc.loader.impl.game.minecraft.MinecraftGameProvider.launch(MinecraftGameProvider.java:560) [MattMC-1.21.10.jar:1.21.10]
+        at net.fabricmc.loader.impl.launch.knot.Knot.launch(Knot.java:72) [MattMC-1.21.10.jar:1.21.10]
+        at net.fabricmc.loader.impl.launch.knot.KnotClient.main(KnotClient.java:23) [MattMC-1.21.10.jar:1.21.10]
+[12:07:05] [Render thread/ERROR]: Missing program minecraft:blur/5 in Iris override list. This is likely an Iris bug!!!
+java.lang.Throwable: null
+        at knot/com.mojang.blaze3d.opengl.GlDevice.getOrCompilePipeline(GlDevice.java:351) ~[MattMC-1.21.10.jar:?]
+        at knot/com.mojang.blaze3d.opengl.GlRenderPass.setPipeline(GlRenderPass.java:77) ~[MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.renderer.PostPass.lambda$addToFrame$5(PostPass.java:111) ~[MattMC-1.21.10.jar:?]
+        at knot/com.mojang.blaze3d.framegraph.FrameGraphBuilder.execute(FrameGraphBuilder.java:71) [MattMC-1.21.10.jar:?]
+        at knot/com.mojang.blaze3d.framegraph.FrameGraphBuilder.execute(FrameGraphBuilder.java:50) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.renderer.PostChain.process(PostChain.java:148) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.renderer.GameRenderer.processBlurEffect(GameRenderer.java:316) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.gui.render.GuiRenderer.draw(GuiRenderer.java:239) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.gui.render.GuiRenderer.render(GuiRenderer.java:154) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.renderer.GameRenderer.render(GameRenderer.java:725) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.Minecraft.runTick(Minecraft.java:1352) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.Minecraft.setScreenAndShow(Minecraft.java:2244) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.Minecraft.disconnect(Minecraft.java:2196) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.Minecraft.disconnectWithSavingScreen(Minecraft.java:2151) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.Minecraft.emergencySave(Minecraft.java:1496) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.Minecraft.emergencySaveAndCrash(Minecraft.java:1024) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.Minecraft.run(Minecraft.java:982) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.main.Main.main(Main.java:258) [MattMC-1.21.10.jar:?]
+        at net.fabricmc.loader.impl.game.minecraft.MinecraftGameProvider.launch(MinecraftGameProvider.java:560) [MattMC-1.21.10.jar:1.21.10]
+        at net.fabricmc.loader.impl.launch.knot.Knot.launch(Knot.java:72) [MattMC-1.21.10.jar:1.21.10]
+        at net.fabricmc.loader.impl.launch.knot.KnotClient.main(KnotClient.java:23) [MattMC-1.21.10.jar:1.21.10]
+[12:07:05] [Render thread/ERROR]: Missing program minecraft:pipeline/gui_textured in Iris override list. This is likely an Iris bug!!!
+java.lang.Throwable: null
+        at knot/com.mojang.blaze3d.opengl.GlDevice.getOrCompilePipeline(GlDevice.java:351) [MattMC-1.21.10.jar:?]
+        at knot/com.mojang.blaze3d.opengl.GlRenderPass.setPipeline(GlRenderPass.java:77) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.gui.render.GuiRenderer.executeDraw(GuiRenderer.java:622) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.gui.render.GuiRenderer.executeDrawRange(GuiRenderer.java:272) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.gui.render.GuiRenderer.draw(GuiRenderer.java:240) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.gui.render.GuiRenderer.render(GuiRenderer.java:154) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.renderer.GameRenderer.render(GameRenderer.java:725) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.Minecraft.runTick(Minecraft.java:1352) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.Minecraft.setScreenAndShow(Minecraft.java:2244) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.Minecraft.disconnect(Minecraft.java:2196) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.Minecraft.disconnectWithSavingScreen(Minecraft.java:2151) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.Minecraft.emergencySave(Minecraft.java:1496) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.Minecraft.emergencySaveAndCrash(Minecraft.java:1024) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.Minecraft.run(Minecraft.java:982) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.main.Main.main(Main.java:258) [MattMC-1.21.10.jar:?]
+        at net.fabricmc.loader.impl.game.minecraft.MinecraftGameProvider.launch(MinecraftGameProvider.java:560) [MattMC-1.21.10.jar:1.21.10]
+        at net.fabricmc.loader.impl.launch.knot.Knot.launch(Knot.java:72) [MattMC-1.21.10.jar:1.21.10]
+        at net.fabricmc.loader.impl.launch.knot.KnotClient.main(KnotClient.java:23) [MattMC-1.21.10.jar:1.21.10]
+[12:07:05] [Render thread/ERROR]: Missing program minecraft:pipeline/gui in Iris override list. This is likely an Iris bug!!!
+java.lang.Throwable: null
+        at knot/com.mojang.blaze3d.opengl.GlDevice.getOrCompilePipeline(GlDevice.java:351) [MattMC-1.21.10.jar:?]
+        at knot/com.mojang.blaze3d.opengl.GlRenderPass.setPipeline(GlRenderPass.java:77) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.gui.render.GuiRenderer.executeDraw(GuiRenderer.java:622) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.gui.render.GuiRenderer.executeDrawRange(GuiRenderer.java:272) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.gui.render.GuiRenderer.draw(GuiRenderer.java:240) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.gui.render.GuiRenderer.render(GuiRenderer.java:154) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.renderer.GameRenderer.render(GameRenderer.java:725) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.Minecraft.runTick(Minecraft.java:1352) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.Minecraft.setScreenAndShow(Minecraft.java:2244) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.Minecraft.disconnect(Minecraft.java:2196) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.Minecraft.disconnectWithSavingScreen(Minecraft.java:2151) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.Minecraft.emergencySave(Minecraft.java:1496) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.Minecraft.emergencySaveAndCrash(Minecraft.java:1024) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.Minecraft.run(Minecraft.java:982) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.main.Main.main(Main.java:258) [MattMC-1.21.10.jar:?]
+        at net.fabricmc.loader.impl.game.minecraft.MinecraftGameProvider.launch(MinecraftGameProvider.java:560) [MattMC-1.21.10.jar:1.21.10]
+        at net.fabricmc.loader.impl.launch.knot.Knot.launch(Knot.java:72) [MattMC-1.21.10.jar:1.21.10]
+        at net.fabricmc.loader.impl.launch.knot.KnotClient.main(KnotClient.java:23) [MattMC-1.21.10.jar:1.21.10]
+[12:07:05] [Render thread/ERROR]: Missing program minecraft:pipeline/gui_text in Iris override list. This is likely an Iris bug!!!
+java.lang.Throwable: null
+        at knot/com.mojang.blaze3d.opengl.GlDevice.getOrCompilePipeline(GlDevice.java:351) [MattMC-1.21.10.jar:?]
+        at knot/com.mojang.blaze3d.opengl.GlRenderPass.setPipeline(GlRenderPass.java:77) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.gui.render.GuiRenderer.executeDraw(GuiRenderer.java:622) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.gui.render.GuiRenderer.executeDrawRange(GuiRenderer.java:272) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.gui.render.GuiRenderer.draw(GuiRenderer.java:240) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.gui.render.GuiRenderer.render(GuiRenderer.java:154) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.renderer.GameRenderer.render(GameRenderer.java:725) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.Minecraft.runTick(Minecraft.java:1352) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.Minecraft.setScreenAndShow(Minecraft.java:2244) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.Minecraft.disconnect(Minecraft.java:2196) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.Minecraft.disconnectWithSavingScreen(Minecraft.java:2151) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.Minecraft.emergencySave(Minecraft.java:1496) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.Minecraft.emergencySaveAndCrash(Minecraft.java:1024) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.Minecraft.run(Minecraft.java:982) [MattMC-1.21.10.jar:?]
+        at knot/net.minecraft.client.main.Main.main(Main.java:258) [MattMC-1.21.10.jar:?]
+        at net.fabricmc.loader.impl.game.minecraft.MinecraftGameProvider.launch(MinecraftGameProvider.java:560) [MattMC-1.21.10.jar:1.21.10]
+        at net.fabricmc.loader.impl.launch.knot.Knot.launch(Knot.java:72) [MattMC-1.21.10.jar:1.21.10]
+        at net.fabricmc.loader.impl.launch.knot.KnotClient.main(KnotClient.java:23) [MattMC-1.21.10.jar:1.21.10]
+[12:07:05] [Render thread/INFO]: Unloading client level [ClientLevelWrapper]-[t4s12lasvv7dg@minecraft:overworld].
+[12:07:05] [Render thread/INFO]: Stopping worker threads
+---- Minecraft Crash Report ----
+// Uh... Did I do that?
+
+Time: 2025-12-31 12:07:05
+Description: Unexpected error
+
+java.lang.NullPointerException: Cannot invoke "net.caffeinemc.mods.sodium.client.render.chunk.ChunkRenderMatrices.projection()" because "matrices" is null
+        at knot//net.caffeinemc.mods.sodium.client.render.SodiumWorldRenderer.setupTerrain(SodiumWorldRenderer.java:212)
+        at knot//net.minecraft.client.renderer.LevelRenderer.cullTerrain(LevelRenderer.java:398)
+        at knot//net.minecraft.client.renderer.LevelRenderer.renderLevel(LevelRenderer.java:505)
+        at knot//net.minecraft.client.renderer.GameRenderer.renderLevel(GameRenderer.java:920)
+        at knot//net.minecraft.client.renderer.GameRenderer.render(GameRenderer.java:626)
+        at knot//net.minecraft.client.Minecraft.runTick(Minecraft.java:1352)
+        at knot//net.minecraft.client.Minecraft.run(Minecraft.java:945)
+        at knot//net.minecraft.client.main.Main.main(Main.java:258)
+        at net.fabricmc.loader.impl.game.minecraft.MinecraftGameProvider.launch(MinecraftGameProvider.java:560)
+        at net.fabricmc.loader.impl.launch.knot.Knot.launch(Knot.java:72)
+        at net.fabricmc.loader.impl.launch.knot.KnotClient.main(KnotClient.java:23)
+
+
+A detailed walkthrough of the error, its code path and all known details is as follows:
+---------------------------------------------------------------------------------------
+
+-- Head --
+Thread: Render thread
+Stacktrace:
+        at knot//net.caffeinemc.mods.sodium.client.render.SodiumWorldRenderer.setupTerrain(SodiumWorldRenderer.java:212)
+        at knot//net.minecraft.client.renderer.LevelRenderer.cullTerrain(LevelRenderer.java:398)
+        at knot//net.minecraft.client.renderer.LevelRenderer.renderLevel(LevelRenderer.java:505)
+        at knot//net.minecraft.client.renderer.GameRenderer.renderLevel(GameRenderer.java:920)
+
+-- Uptime --
+Details:
+        JVM uptime: 17.233s
+        Wall uptime: 13.517s
+        High-res time: 13.183s
+        Client ticks: 173 ticks / 8.650s
+Stacktrace:
+        at knot//net.minecraft.client.Minecraft.fillReport(Minecraft.java:2373)
+        at knot//net.minecraft.client.Minecraft.emergencySaveAndCrash(Minecraft.java:1023)
+        at knot//net.minecraft.client.Minecraft.run(Minecraft.java:982)
+        at knot//net.minecraft.client.main.Main.main(Main.java:258)
+        at net.fabricmc.loader.impl.game.minecraft.MinecraftGameProvider.launch(MinecraftGameProvider.java:560)
+        at net.fabricmc.loader.impl.launch.knot.Knot.launch(Knot.java:72)
+        at net.fabricmc.loader.impl.launch.knot.KnotClient.main(KnotClient.java:23)
+
+-- Affected level --
+Details:
+        All players: 1 total; LocalPlayer{name=Player692, id=a2831e23-8b0f-3ec4-8539-58e8d4db780a, pos=(-51.705721681053575, 96.1068590705051, -48.60000014988485), mode=SPECTATOR, permission=4}
+        Chunk stats: 729, 181
+        Level dimension: minecraft:overworld
+        Level spawn location: World: (0,75,0), Section: (at 0,11,0 in 0,4,0; chunk contains blocks 0,-64,0 to 15,319,15), Region: (0,0; contains chunks 0,0 to 31,31, blocks 0,-64,0 to 511,319,511)
+        Level time: 16923 game time, 1145 day time
+        Server brand: fabric
+        Server type: Integrated singleplayer server
+        Tracked entity count: 76
+
+-- Last reload --
+Details:
+        Reload number: 1
+        Reload reason: initial
+        Finished: Yes
+        Packs: vanilla
+
+-- System Details --
+Details:
+        Minecraft Version: 1.21.10
+        Minecraft Version ID: 1.21.10
+        Operating System: Linux (amd64) version 6.14.0-37-generic
+        Java Version: 21.0.5, Eclipse Adoptium
+        Java VM Version: OpenJDK 64-Bit Server VM (mixed mode, sharing), Eclipse Adoptium
+        Memory: 1902116864 bytes (1814 MiB) / 4294967296 bytes (4096 MiB) up to 8589934592 bytes (8192 MiB)
+        CPUs: 20
+        Processor Vendor: GenuineIntel
+        Processor Name: 12th Gen Intel(R) Core(TM) i7-12700K
+        Identifier: Intel64 Family 6 Model 151 Stepping 2
+        Microarchitecture: Alder Lake
+        Frequency (GHz): 4.90
+        Number of physical packages: 1
+        Number of physical CPUs: 12
+        Number of logical CPUs: 20
+        Graphics card #0 name: GA102 [GeForce RTX 3080 Ti]
+        Graphics card #0 vendor: NVIDIA Corporation (0x10de)
+        Graphics card #0 VRAM (MiB): 16416.00
+        Graphics card #0 deviceId: 0x2208
+        Graphics card #0 versionInfo: unknown
+        Virtual memory max (MiB): 32300.84
+        Virtual memory used (MiB): 28971.64
+        Swap memory total (MiB): 16384.00
+        Swap memory used (MiB): 4915.61
+        Space in storage for jna.tmpdir (MiB): <path not set>
+        Space in storage for org.lwjgl.system.SharedLibraryExtractPath (MiB): <path not set>
+        Space in storage for io.netty.native.workdir (MiB): <path not set>
+        Space in storage for java.io.tmpdir (MiB): available: 15856.80, total: 15916.84
+        Space in storage for workdir (MiB): available: 280398.22, total: 937500.69
+        JVM Flags: 4 total; -XX:+UseZGC -XX:+ZGenerational -Xms4G -Xmx8G
+        Debug Flags: 0 total;
+        Loaded Shaderpack: ComplementaryHungLoIfied.zip
+                Profile: MATTMC (+0 options changed by user)
+        Launched Version: 1.21.10
+        Backend library: LWJGL version 3.3.3-snapshot
+        Backend API: NVIDIA GeForce RTX 3080 Ti/PCIe/SSE2 GL version 3.3.0 NVIDIA 580.95.05, NVIDIA Corporation
+        Window size: 1920x1080
+        GFLW Platform: x11
+        Render Extensions: GL_ARB_buffer_storage, GL_KHR_debug, GL_ARB_vertex_attrib_binding, GL_ARB_direct_state_access
+        GL debug messages:
+        Is Modded: Definitely; Client brand changed to 'fabric'; Server brand changed to 'fabric'
+        Universe: 400921fb54442d18
+        Type: Integrated Server (map_client.txt)
+        Graphics mode: fancy
+        Render Distance: 10/10 chunks
+        Resource Packs: vanilla
+        Current Language: en_us
+        Locale: en_US
+        System encoding: UTF-8
+        File encoding: UTF-8
+        CPU: 20x 12th Gen Intel(R) Core(TM) i7-12700K
+        Server Running: true
+        Player Count: 1 / 8; [ServerPlayer['Player692'/127, l='ServerLevel[New World]', x=-51.71, y=96.11, z=-48.60]]
+        Active Data Packs: vanilla
+        Available Data Packs: minecart_improvements, redstone_experiments, trade_rebalance, vanilla
+        Enabled Feature Flags: minecraft:vanilla
+        World Generation: Stable
+        World Seed: -4287532483329339035
+        Suppressed Exceptions: ~~NONE~~
+#@!@# Game crashed! Crash report saved to: #@!@# /home/matt/Documents/Repos/MattMC/run/crash-reports/crash-2025-12-31_12.07.05-client.txt
+
+> Task :runClient FAILED
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':runClient'.
+> Process 'command '/home/matt/Documents/Repos/MattMC/run/jdk-21/bin/java'' finished with non-zero exit value 255
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights.
+> Get more help at https://help.gradle.org.
+
+BUILD FAILED in 48s
+7 actionable tasks: 7 executed
+matt@HungLoDE:~/Documents/Repos/MattMC$
