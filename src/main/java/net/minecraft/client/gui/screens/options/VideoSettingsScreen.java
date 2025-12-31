@@ -34,7 +34,8 @@ public class VideoSettingsScreen extends OptionsSubScreen {
 	private final int oldMipmaps;
 
 	private static OptionInstance<?>[] options(Options options) {
-		return new OptionInstance[]{
+		// Iris: Add shader pack selection button (from MixinVideoSettingsScreen)
+		OptionInstance<?>[] baseOptions = new OptionInstance[]{
 			options.graphicsMode(),
 			options.renderDistance(),
 			options.prioritizeChunkUpdates(),
@@ -62,6 +63,13 @@ public class VideoSettingsScreen extends OptionsSubScreen {
 			options.bobView(),
 			options.cloudRange()
 		};
+		
+		// Add Iris shader pack button and render distance option
+		OptionInstance<?>[] extendedOptions = new OptionInstance[baseOptions.length + 2];
+		System.arraycopy(baseOptions, 0, extendedOptions, 0, baseOptions.length);
+		extendedOptions[extendedOptions.length - 2] = new OptionInstance<>("options.iris.shaderPackSelection", OptionInstance.cachedConstantTooltip(net.minecraft.network.chat.Component.empty()), (arg, object) -> net.minecraft.network.chat.Component.empty(), OptionInstance.BOOLEAN_VALUES, true, (parent) -> net.minecraft.client.Minecraft.getInstance().setScreen(new net.irisshaders.iris.gui.screen.ShaderPackScreen((net.minecraft.client.gui.screens.Screen) parent)));
+		extendedOptions[extendedOptions.length - 1] = net.irisshaders.iris.gui.option.IrisVideoSettings.RENDER_DISTANCE;
+		return extendedOptions;
 	}
 
 	public VideoSettingsScreen(Screen screen, Minecraft minecraft, Options options) {

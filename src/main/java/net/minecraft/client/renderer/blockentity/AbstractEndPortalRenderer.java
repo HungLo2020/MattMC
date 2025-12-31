@@ -36,6 +36,12 @@ public abstract class AbstractEndPortalRenderer<T extends TheEndPortalBlockEntit
 	}
 
 	public void submit(S endPortalRenderState, PoseStack poseStack, SubmitNodeCollector submitNodeCollector, CameraRenderState cameraRenderState) {
+		// Iris: Cancel default rendering when shader pack is loaded (from MixinTheEndPortalRenderer)
+		if (net.irisshaders.iris.Iris.getCurrentPack().isPresent()) {
+			// Custom rendering is handled by the renderType override which returns RenderType.entitySolid()
+			return;
+		}
+		
 		submitNodeCollector.submitCustomGeometry(
 			poseStack, this.renderType(), (pose, vertexConsumer) -> this.renderCube(endPortalRenderState.facesToShow, pose.pose(), vertexConsumer)
 		);
@@ -83,6 +89,10 @@ public abstract class AbstractEndPortalRenderer<T extends TheEndPortalBlockEntit
 	}
 
 	protected RenderType renderType() {
+		// Iris: Use entitySolid render type when shader pack is loaded (from MixinTheEndPortalRenderer)
+		if (net.irisshaders.iris.Iris.getCurrentPack().isPresent()) {
+			return net.minecraft.client.renderer.RenderType.entitySolid(net.minecraft.client.renderer.blockentity.TheEndPortalRenderer.END_PORTAL_LOCATION);
+		}
 		return RenderType.endPortal();
 	}
 }
