@@ -460,6 +460,9 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 		Vector4f vector4f,
 		boolean bl2
 	) {
+		// Iris: Begin level render immediate state (from MixinLevelRenderer vertices.immediate)
+		net.irisshaders.iris.vertices.ImmediateState.isRenderingLevel = true;
+		
 		// Call registered hooks before rendering level
 		for (net.minecraft.hooks.LevelRendererHooks hook : net.minecraft.hooks.HookRegistry.getLevelRendererHooks()) {
 			hook.onBeforeRenderLevel(camera, matrix4f, matrix4f2);
@@ -575,6 +578,9 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 		this.targets.clear();
 		matrix4fStack.popMatrix();
 		profilerFiller.pop();
+		
+		// Iris: End level render immediate state (from MixinLevelRenderer vertices.immediate)
+		net.irisshaders.iris.vertices.ImmediateState.isRenderingLevel = false;
 	}
 
 	private void addMainPass(

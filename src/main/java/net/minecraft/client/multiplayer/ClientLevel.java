@@ -866,6 +866,11 @@ public class ClientLevel extends Level implements CacheSlot.Cleaner<ClientLevel>
 	}
 
 	public float getShade(Direction direction, boolean bl) {
+		// Iris: Maybe disable directional shading (from MixinClientLevel)
+		if (net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings.INSTANCE.shouldDisableDirectionalShading()) {
+			bl = false;
+		}
+		
 		boolean bl2 = this.effects().constantAmbientLight();
 		if (!bl) {
 			return bl2 ? 0.9F : 1.0F;

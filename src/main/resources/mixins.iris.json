@@ -24,7 +24,6 @@
     "entity_render_context.MixinModelStorageTrigger",
     "shadows.MixinLevelRenderer",
     "texture.MixinAbstractTexture",
-    "texture.MixinGlStateManager",
     "texture.MixinSpriteContents",
     "texture.pbr.MixinDirectoryLister",
     "texture.pbr.MixinSpriteContents",

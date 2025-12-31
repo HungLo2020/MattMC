@@ -448,6 +448,11 @@ public class GlStateManager {
 
 		numTextures--;
 		PLOT_TEXTURES.setValue(numTextures);
+		
+		// Iris: Track texture deletion (from MixinGlStateManager texture)
+		net.irisshaders.iris.pbr.TextureTracker.INSTANCE.onDeleteTexture(i);
+		net.irisshaders.iris.pbr.TextureInfoCache.INSTANCE.onDeleteTexture(i);
+		net.irisshaders.iris.pbr.texture.PBRTextureManager.INSTANCE.onDeleteTexture(i);
 	}
 
 	public static void _bindTexture(int i) {
@@ -461,6 +466,9 @@ public class GlStateManager {
 	public static void _texImage2D(int i, int j, int k, int l, int m, int n, int o, int p, @Nullable ByteBuffer byteBuffer) {
 		RenderSystem.assertOnRenderThread();
 		GL11.glTexImage2D(i, j, k, l, m, n, o, p, byteBuffer);
+		
+		// Iris: Track texture image data (from MixinGlStateManager texture)
+		net.irisshaders.iris.pbr.TextureInfoCache.INSTANCE.onTexImage2D(i, j, k, l, m, n, o, p, byteBuffer);
 	}
 
 	public static void _texSubImage2D(int i, int j, int k, int l, int m, int n, int o, int p, long q) {
