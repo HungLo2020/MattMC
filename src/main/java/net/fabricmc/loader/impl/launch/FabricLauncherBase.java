@@ -23,7 +23,6 @@ import java.lang.reflect.Method;
 import java.util.Map;
 
 import org.jetbrains.annotations.VisibleForTesting;
-import org.spongepowered.asm.mixin.MixinEnvironment;
 
 import net.fabricmc.loader.impl.FabricLoaderImpl;
 import net.fabricmc.loader.impl.FormattedException;
@@ -133,20 +132,15 @@ public abstract class FabricLauncherBase implements FabricLauncher {
 		});
 	}
 
+	/**
+	 * Stubbed version - mixin bootstrapping is bypassed as all mixins have been converted to hooks.
+	 */
 	protected static void finishMixinBootstrapping() {
 		if (mixinReady) {
 			throw new RuntimeException("Must not call FabricLauncherBase.finishMixinBootstrapping() twice!");
 		}
 
-		try {
-			Method m = MixinEnvironment.class.getDeclaredMethod("gotoPhase", MixinEnvironment.Phase.class);
-			m.setAccessible(true);
-			m.invoke(null, MixinEnvironment.Phase.INIT);
-			m.invoke(null, MixinEnvironment.Phase.DEFAULT);
-		} catch (Exception e) {
-			throw new RuntimeException(e);
-		}
-
+		// No-op: Mixin system bypassed, using hook-based architecture
 		mixinReady = true;
 	}
 

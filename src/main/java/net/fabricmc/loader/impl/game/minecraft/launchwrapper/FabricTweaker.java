@@ -34,10 +34,6 @@ import java.util.jar.JarEntry;
 import java.util.jar.JarInputStream;
 import java.util.jar.Manifest;
 
-import org.spongepowered.asm.launch.MixinBootstrap;
-import org.spongepowered.asm.mixin.MixinEnvironment;
-import org.spongepowered.asm.mixin.transformer.Proxy;
-
 import net.minecraft.launchwrapper.IClassTransformer;
 import net.minecraft.launchwrapper.ITweaker;
 import net.minecraft.launchwrapper.Launch;
@@ -142,10 +138,8 @@ public abstract class FabricTweaker extends FabricLauncherBase implements ITweak
 		launchClassLoader.registerTransformer(FabricClassTransformer.class.getName());
 		FabricLoaderImpl.INSTANCE.loadClassTweakers();
 
-		// Setup Mixin environment
-		MixinBootstrap.init();
+		// Setup Mixin environment (stubbed - using hook-based architecture)
 		FabricMixinBootstrap.init(getEnvironmentType(), FabricLoaderImpl.INSTANCE);
-		MixinEnvironment.getDefaultEnvironment().setSide(getEnvironmentType() == EnvType.CLIENT ? MixinEnvironment.Side.CLIENT : MixinEnvironment.Side.SERVER);
 
 		provider.unlockClassPath(this);
 
@@ -213,8 +207,10 @@ public abstract class FabricTweaker extends FabricLauncherBase implements ITweak
 
 		if (runTransformers) {
 			for (IClassTransformer transformer : launchClassLoader.getTransformers()) {
-				if (transformer instanceof Proxy) {
-					continue; // skip mixin as per method contract
+				// Skip any mixin-related transformers
+				String transformerName = transformer.getClass().getName();
+				if (transformerName.contains("mixin") || transformerName.contains("Mixin")) {
+					continue;
 				}
 
 				classBytes = transformer.transform(name, transformedName, classBytes);

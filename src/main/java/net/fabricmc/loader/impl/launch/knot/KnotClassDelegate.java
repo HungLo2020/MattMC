@@ -46,8 +46,6 @@ import java.util.zip.CRC32;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
-import org.spongepowered.asm.mixin.transformer.IMixinTransformer;
-
 import net.fabricmc.api.EnvType;
 import net.fabricmc.loader.impl.FabricLoaderImpl;
 import net.fabricmc.loader.impl.game.GameProvider;
@@ -90,7 +88,7 @@ final class KnotClassDelegate<T extends ClassLoader & KnotClassDelegate.ClassLoa
 	private final GameProvider provider;
 	private final boolean isDevelopment;
 	private final EnvType envType;
-	private IMixinTransformer mixinTransformer;
+	// mixinTransformer removed - mixin system bypassed
 	private boolean transformInitialized = false;
 	private volatile Set<Path> codeSources = Collections.emptySet();
 	private volatile Set<Path> validParentCodeSources = null; // null = disabled isolation, game provider has to set it to opt in
@@ -117,28 +115,20 @@ final class KnotClassDelegate<T extends ClassLoader & KnotClassDelegate.ClassLoa
 	public void initializeTransformers() {
 		if (transformInitialized) throw new IllegalStateException("Cannot initialize KnotClassDelegate twice!");
 
-		mixinTransformer = MixinServiceKnot.getTransformer();
-
-		if (mixinTransformer == null) {
-			try { // reflective instantiation for older mixin versions
-				@SuppressWarnings("unchecked")
-				Constructor<IMixinTransformer> ctor = (Constructor<IMixinTransformer>) Class.forName("org.spongepowered.asm.mixin.transformer.MixinTransformer").getConstructor();
-				ctor.setAccessible(true);
-				mixinTransformer = ctor.newInstance();
-			} catch (ReflectiveOperationException e) {
-				Log.debug(LogCategory.KNOT, "Can't create Mixin transformer through reflection (only applicable for 0.8-0.8.2): %s", e);
-
-				// both lookups failed (not received through IMixinService.offer and not found through reflection)
-				throw new IllegalStateException("mixin transformer unavailable?");
-			}
-		}
+		// Mixin transformer initialization bypassed - using hook-based architecture
+		Log.info(LogCategory.KNOT, "Mixin transformation disabled - using hook-based architecture");
 
 		transformInitialized = true;
 	}
 
-	private IMixinTransformer getMixinTransformer() {
-		assert mixinTransformer != null;
-		return mixinTransformer;
+	/**
+	 * Stubbed - mixin transformer not needed (using hook-based architecture).
+	 * @deprecated Mixin system bypassed
+	 */
+	@Deprecated
+	private Object getMixinTransformer() {
+		// Return null - mixin transformation is bypassed
+		return null;
 	}
 
 	@Override
@@ -438,6 +428,10 @@ final class KnotClassDelegate<T extends ClassLoader & KnotClassDelegate.ClassLoa
 		});
 	}
 
+	/**
+	 * Stubbed - mixin transformation bypassed (using hook-based architecture).
+	 * Returns the pre-mixin class bytes unchanged.
+	 */
 	private byte[] getPostMixinClassByteArray(String name, boolean allowFromParent) {
 		byte[] transformedClassArray = getPreMixinClassByteArray(name, allowFromParent);
 
@@ -445,14 +439,8 @@ final class KnotClassDelegate<T extends ClassLoader & KnotClassDelegate.ClassLoa
 			return transformedClassArray;
 		}
 
-		try {
-			return getMixinTransformer().transformClassBytes(name, name, transformedClassArray);
-		} catch (Throwable t) {
-			String msg = String.format("Mixin transformation of %s failed", name);
-			if (LOG_TRANSFORM_ERRORS) Log.warn(LogCategory.KNOT, msg, t);
-
-			throw new RuntimeException(msg, t);
-		}
+		// Mixin transformation bypassed - all mixins converted to hooks
+		return transformedClassArray;
 	}
 
 	@Override

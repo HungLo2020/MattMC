@@ -1,6 +1,6 @@
 package net.caffeinemc.mods.sodium.client.render;
 
-import com.llamalad7.mixinextras.sugar.ref.LocalBooleanRef;
+// Removed unused mixinextras import - mixin system bypassed
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.SheetedDecalTextureGenerator;

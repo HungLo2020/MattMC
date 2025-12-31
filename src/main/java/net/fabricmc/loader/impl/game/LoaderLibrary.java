@@ -26,7 +26,6 @@ import org.objectweb.asm.tree.analysis.Analyzer;
 import org.objectweb.asm.util.CheckClassAdapter;
 import org.sat4j.pb.SolverFactory;
 import org.sat4j.specs.ContradictionException;
-import org.spongepowered.asm.launch.MixinBootstrap;
 
 import net.fabricmc.api.EnvType;
 import net.fabricmc.classtweaker.api.ClassTweaker;
@@ -38,7 +37,7 @@ import net.fabricmc.tinyremapper.TinyRemapper;
 enum LoaderLibrary {
 	FABRIC_LOADER(UrlUtil.LOADER_CODE_SOURCE),
 	MAPPING_IO(MappingTree.class),
-	SPONGE_MIXIN(MixinBootstrap.class),
+	// SPONGE_MIXIN removed - mixin system bypassed
 	TINY_REMAPPER(TinyRemapper.class),
 	CLASS_TWEAKER(ClassTweaker.class),
 	ASM(ClassReader.class),
