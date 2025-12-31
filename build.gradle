@@ -239,9 +239,6 @@ dependencies {
         implementation files('libraries/deps/asm-tree-9.9.jar')
         implementation files('libraries/deps/asm-util-9.9.jar')
         
-        // Mixin - runtime bytecode transformation (required by Fabric Loader)
-        implementation files('libraries/deps/sponge-mixin-0.16.5+mixin.0.8.7.jar')
-        
         // Tiny Remapper - class/method/field remapping
         implementation files('libraries/deps/tiny-remapper-0.11.2.jar')
         
@@ -250,9 +247,6 @@ dependencies {
         
         // Mapping IO - mapping file I/O
         implementation files('libraries/deps/mapping-io-0.7.1.jar')
-        
-        // MixinExtras - additional Mixin functionality
-        implementation files('libraries/deps/mixinextras-fabric-0.5.0.jar')
         
         // Launchwrapper - legacy launch wrapper
         implementation files('libraries/deps/launchwrapper-1.12.jar')
@@ -274,9 +268,6 @@ dependencies {
         implementation 'org.ow2.asm:asm-tree:9.9'
         implementation 'org.ow2.asm:asm-util:9.9'
         
-        // Mixin - runtime bytecode transformation (requires Fabric Maven)
-        implementation 'net.fabricmc:sponge-mixin:0.16.5+mixin.0.8.7'
-        
         // Tiny Remapper - class/method/field remapping (requires Fabric Maven)
         implementation 'net.fabricmc:tiny-remapper:0.11.2'
         
@@ -285,9 +276,6 @@ dependencies {
         
         // Mapping IO - mapping file I/O (requires Fabric Maven)
         implementation 'net.fabricmc:mapping-io:0.7.1'
-        
-        // MixinExtras - additional Mixin functionality (requires Fabric Maven)
-        implementation 'io.github.llamalad7:mixinextras-fabric:0.5.0'
         
         // Launchwrapper - legacy launch wrapper (requires Minecraft Libraries)
         implementation 'net.minecraft:launchwrapper:1.12'
