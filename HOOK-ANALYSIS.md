@@ -6,8 +6,14 @@
 
 ### Mixin Conversion Status
 
-**Total Mixins:** 218 → **22 remaining** (196 removed)  
-**Conversion Progress:** 89.9% complete - **MILESTONE: 89% REACHED!** 🎉🎉🎉🎉🎉🎉🎉🎉🎉
+**Total Mixins:** 218 → **18 remaining** (200 removed)  
+**Conversion Progress:** 91.7% complete - **MILESTONE: 91% REACHED!** 🎉🎉🎉🎉🎉🎉🎉🎉🎉
+
+#### Removed Mixins (Session 46 - 4 mixins):
+224. ✅ `ModelPartMixin` (Sodium) - 1 @Overwrite → Inlined Sodium optimized transform with MatrixHelper.rotateZYX into ModelPart.translateAndRotate()
+225. ✅ `CubeMixin` (Sodium) - 1 @Redirect + 1 @Inject → Added ModelCuboid field and fast EntityRenderer.renderCuboid() in ModelPart.Cube.compile()
+226. ✅ `ItemRendererMixin` (Sodium) - 1 @WrapOperation → Inlined Sodium fast item quad rendering into ItemRenderer.renderQuadList()
+227. ✅ `BiomeMixin` (Sodium) - 1 @Inject + 2 @Overwrite → Inlined biome color caching with BiomeColorMaps into Biome.getGrassColor() and getFoliageColor()
 
 #### Removed Mixins (Session 45 - 5 mixins):
 219. ✅ `SpriteContentsMixin` (Sodium/mipmaps) - 1 @WrapOperation → Inlined transparent pixel color filling into SpriteContents constructor to fix black bleeding in mipmaps
