@@ -26,8 +26,16 @@ import org.jetbrains.annotations.Nullable;
 public class ParticleFeatureRenderer implements AutoCloseable {
 	private final Queue<ParticleFeatureRenderer.ParticleBufferCache> availableBuffers = new ArrayDeque();
 	private final List<ParticleFeatureRenderer.ParticleBufferCache> usedBuffers = new ArrayList();
+	// Iris: Track particle rendering phase (from MixinParticleEngine)
+	private net.irisshaders.iris.pipeline.WorldRenderingPhase lastPhase = net.irisshaders.iris.pipeline.WorldRenderingPhase.NONE;
 
 	public void render(SubmitNodeCollection submitNodeCollection) {
+		// Iris: Set particles rendering phase (from MixinParticleEngine)
+		net.irisshaders.iris.Iris.getPipelineManager().getPipeline().ifPresent(pipeline -> {
+			lastPhase = pipeline.getPhase();
+			pipeline.setPhase(net.irisshaders.iris.pipeline.WorldRenderingPhase.PARTICLES);
+		});
+		
 		if (!submitNodeCollection.getParticleGroupRenderers().isEmpty()) {
 			GpuDevice gpuDevice = RenderSystem.getDevice();
 			Minecraft minecraft = Minecraft.getInstance();
@@ -67,6 +75,9 @@ public class ParticleFeatureRenderer implements AutoCloseable {
 				}
 			}
 		}
+		
+		// Iris: Restore previous rendering phase (from MixinParticleEngine)
+		net.irisshaders.iris.Iris.getPipelineManager().getPipeline().ifPresent(pipeline -> pipeline.setPhase(lastPhase));
 	}
 
 	public void endFrame() {

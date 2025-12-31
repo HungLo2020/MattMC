@@ -286,6 +286,13 @@ public class RenderSystem {
 
 		net.sodium.client.compatibility.checks.PostLaunchChecks.onContextInitialized(handle, context);
 		net.sodium.client.compatibility.checks.ModuleScanner.checkModules(handle);
+		
+		// Iris: Post-renderer initialization (from MixinRenderSystem)
+		net.irisshaders.iris.Iris.duringRenderSystemInit();
+		net.irisshaders.iris.gl.GLDebug.reloadDebugState();
+		net.irisshaders.iris.gl.IrisRenderSystem.initRenderer();
+		net.irisshaders.iris.samplers.IrisSamplers.initRenderer();
+		net.irisshaders.iris.Iris.onRenderSystemInit();
 	}
 
 	public static void setErrorCallback(GLFWErrorCallbackI gLFWErrorCallbackI) {
@@ -312,6 +319,9 @@ public class RenderSystem {
 		if (i >= 0 && i < shaderTextures.length) {
 			shaderTextures[i] = gpuTextureView;
 		}
+		
+		// Iris: Track shader texture changes (from MixinRenderSystem)
+		net.irisshaders.iris.pbr.TextureTracker.INSTANCE.onSetShaderTexture(i, gpuTextureView);
 	}
 
 	@Nullable
