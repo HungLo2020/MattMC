@@ -6,24 +6,16 @@
 
 ### Mixin Conversion Status
 
-**Total Mixins:** 218 → **4 remaining** (214 removed)  
-**Conversion Progress:** 98.2% complete - **MILESTONE: 98% REACHED!** 🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉
+**Total Mixins:** 218 → **2 remaining** (216 removed)  
+**Conversion Progress:** 99.1% complete - **MILESTONE: 99% REACHED!** 🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉
 
-#### Remaining Mixins (Final 4 - Extremely Complex Core Shader Pipeline Integration):
+#### Remaining Mixins (Final 2 - Extremely Complex Core Rendering Pipeline):
 
-**Status: IN PROGRESS - Sessions 51+ targeting completion**
+**Status: IN PROGRESS - Sessions 52+ targeting 100% completion**
 
-These remaining 4 mixins represent the absolute most complex and deeply integrated parts of the Iris shader pipeline and Sodium rendering system. Each requires extensive testing with shaders active to ensure 100% identical behavior.
+These final 2 mixins represent the absolute most complex and deeply integrated parts of the Iris shader pipeline and Sodium rendering system. Each requires extensive testing with shaders active to ensure 100% identical behavior.
 
-1. **MixinBufferBuilder** (Iris/vertices) - 264 lines, 1 @ModifyVariable + 1 @Redirect + 3 @Inject (5 hooks total)
-   - Extended vertex format injection (TERRAIN, ENTITY, GLYPH formats)
-   - MID_BLOCK, ENTITY_ELEMENT, ENTITY_ID_ELEMENT injection
-   - Tangent and mid-texture calculation
-   - Normal recalculation for smooth shading
-   - Implements BlockSensitiveBufferBuilder interface
-   - Complexity: VERY HIGH - Core vertex data extension system for shaders
-
-2. **MixinLevelRenderer** (Iris/main) - 264 lines, 15 @Inject + 1 @WrapOperation + 1 @ModifyArg + 1 @ModifyVariable (18 hooks total)
+1. **MixinLevelRenderer** (Iris/main) - 264 lines, 15 @Inject + 1 @WrapOperation + 1 @ModifyArg + 1 @ModifyVariable (18 hooks total)
    - Main Iris rendering pipeline integration
    - Shadow pass setup and management
    - Terrain rendering hooks
@@ -31,23 +23,20 @@ These remaining 4 mixins represent the absolute most complex and deeply integrat
    - Hand rendering separation
    - Complexity: VERY HIGH - Primary Iris integration point
 
-3. **LevelRendererMixin** (Sodium/core) - 292 lines, 10 @Overwrite + 7 @Inject + 1 @Redirect (17+ hooks total)
+2. **LevelRendererMixin** (Sodium/core) - 292 lines, 10 @Overwrite + 7 @Inject + 1 @Redirect (17+ hooks total)
    - Core Sodium LevelRenderer complete rewrite
    - Chunk rendering system override
    - Terrain batching and sorting
    - Translucent rendering modifications
    - Complexity: EXTREMELY HIGH - Core Sodium rendering system
 
-4. **MixinRenderSectionManagerShadow** (Iris/Sodium) - 170 lines, 6 @Inject + 6 @Redirect (12 hooks total)
-   - Shadow pass chunk rendering
-   - Render list swapping for shadow passes
-   - Task queue management for shadows
-   - Section visibility in shadow pass
-   - Complexity: VERY HIGH - Sodium + Iris shadow integration
-
 ---
 
 ## Detailed Conversion History
+
+#### Removed Mixins (Session 52 - 2 mixins):
+242. ✅ `MixinBufferBuilder` (Iris/vertices) - 1 @ModifyVariable + 1 @Redirect + 3 @Inject + 1 @Dynamic (5 hooks) → Inlined Iris extended vertex format support (TERRAIN/ENTITY/GLYPH), MID_BLOCK/ENTITY_ELEMENT/ENTITY_ID_ELEMENT injection, tangent/mid-texture calculation, and BlockSensitiveBufferBuilder interface implementation into BufferBuilder
+243. ✅ `MixinRenderSectionManagerShadow` (Iris/Sodium) - 6 @Inject + 6 @Redirect + 1 @WrapMethod (12 hooks) → Inlined Iris shadow rendering with separate shadow/regular render lists and task lists, render list state swapping, occlusion culling disabling, and chunk update/upload skipping during shadow pass into RenderSectionManager
 
 #### Removed Mixins (Session 51 - 2 mixins):
 240. ✅ `MixinLevelRenderer` (Iris/fantastic) - 1 @Inject + 1 @Redirect + 2 @WrapOperation (5 hooks) → Inlined Iris particle phase rendering (BEFORE/AFTER/MIXED modes) with opaque/translucent separation into LevelRenderer wrapper methods
