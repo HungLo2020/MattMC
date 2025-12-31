@@ -28,7 +28,6 @@
     "entity_render_context.MixinBlockEntityRenderDispatcher",
     "entity_render_context.MixinEnderDragonRenderer",
     "entity_render_context.MixinEntityRenderDispatcher",
-    "entity_render_context.MixinEquipmentLayerRenderer",
     "entity_render_context.MixinGlyphRenderType",
     "entity_render_context.MixinTextFeatureRenderer",
     "entity_render_context.MixinModelFeatureRenderer",
