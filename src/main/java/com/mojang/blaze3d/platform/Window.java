@@ -107,7 +107,14 @@ public final class Window implements AutoCloseable {
 			hook.onBeforeWindowCreate();
 		}
 		
-		this.handle = GLFW.glfwCreateWindow(this.width, this.height, string2, this.fullscreen && monitor != null ? monitor.getMonitor() : 0L, 0L);
+		// Sodium: Apply NVIDIA workarounds (from WindowMixin)
+		net.sodium.client.compatibility.workarounds.nvidia.NvidiaWorkarounds.applyEnvironmentChanges();
+		try {
+			this.handle = GLFW.glfwCreateWindow(this.width, this.height, string2, this.fullscreen && monitor != null ? monitor.getMonitor() : 0L, 0L);
+		} finally {
+			net.sodium.client.compatibility.workarounds.nvidia.NvidiaWorkarounds.undoEnvironmentChanges();
+		}
+		
 		if (monitor != null) {
 			VideoMode videoMode = monitor.getPreferredVidMode(this.fullscreen ? this.preferredFullscreenVideoMode : Optional.empty());
 			this.windowedX = this.x = monitor.getX() + videoMode.getWidth() / 2 - this.width / 2;

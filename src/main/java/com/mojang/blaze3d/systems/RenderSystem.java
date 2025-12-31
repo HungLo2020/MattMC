@@ -46,6 +46,8 @@ public class RenderSystem {
 	static final Logger LOGGER = LogUtils.getLogger();
 	public static final int MINIMUM_ATLAS_TEXTURE_SIZE = 1024;
 	public static final int PROJECTION_MATRIX_UBO_SIZE = new Std140SizeCalculator().putMat4f().get();
+	// Sodium: Track WGL context for security checks (from RenderSystemMixin)
+	private static long wglPrevContext = MemoryUtil.NULL;
 	@Nullable
 	private static Thread renderThread;
 	@Nullable
@@ -172,6 +174,24 @@ public class RenderSystem {
 		dynamicUniforms.reset();
 		Minecraft.getInstance().levelRenderer.endFrame();
 		pollEvents();
+		
+		// Sodium: Check for context replacement (from RenderSystemMixin)
+		if (wglPrevContext != MemoryUtil.NULL) {
+			var context = org.lwjgl.opengl.WGL.wglGetCurrentContext();
+
+			if (wglPrevContext != context) {
+				// Something has decided to replace the OpenGL context, which is not a good sign
+				LOGGER.warn("The OpenGL context appears to have been suddenly replaced! Something has likely just injected into the game process.");
+
+				// Likely, this indicates a module was injected into the current process. We should check that
+				// nothing problematic was just installed.
+				net.sodium.client.compatibility.checks.ModuleScanner.checkModules(() -> org.lwjgl.glfw.GLFWNativeWin32.glfwGetWin32Window(window.handle()));
+
+				// If we didn't find anything problematic (which would have thrown an exception), then let's just record
+				// the new context pointer and carry on.
+				wglPrevContext = context;
+			}
+		}
 	}
 
 	public static void limitDisplayFPS(int i) {
@@ -248,6 +268,24 @@ public class RenderSystem {
 		DEVICE = new GlDevice(l, i, bl, biFunction, bl2);
 		apiDescription = getDevice().getImplementationInformation();
 		dynamicUniforms = new DynamicUniforms();
+		
+		// Sodium: Post-context initialization (from RenderSystemMixin)
+		net.sodium.client.compatibility.environment.GlContextInfo context = net.sodium.client.compatibility.environment.GlContextInfo.create();
+		LOGGER.info("OpenGL Vendor: {}", context.vendor());
+		LOGGER.info("OpenGL Renderer: {}", context.renderer());
+		LOGGER.info("OpenGL Version: {}", context.version());
+
+		// Capture the current WGL context so that we can detect it being replaced later.
+		if (Util.getPlatform() == Util.OS.WINDOWS) {
+			wglPrevContext = org.lwjgl.opengl.WGL.wglGetCurrentContext();
+		} else {
+			wglPrevContext = MemoryUtil.NULL;
+		}
+
+		net.sodium.client.platform.NativeWindowHandle handle = () -> org.lwjgl.glfw.GLFWNativeWin32.glfwGetWin32Window(l);
+
+		net.sodium.client.compatibility.checks.PostLaunchChecks.onContextInitialized(handle, context);
+		net.sodium.client.compatibility.checks.ModuleScanner.checkModules(handle);
 	}
 
 	public static void setErrorCallback(GLFWErrorCallbackI gLFWErrorCallbackI) {
