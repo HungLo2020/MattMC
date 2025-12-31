@@ -573,6 +573,21 @@ public class BufferBuilder implements VertexConsumer, BufferBuilderExtension, Bl
 		this.currentLocalPosZ = 0;
 	}
 	
+	@Override
+	public void overrideBlock(int block) {
+		// Iris: Override current block temporarily (unused in BufferBuilder, but required by interface)
+	}
+	
+	@Override
+	public void restoreBlock() {
+		// Iris: Restore previously overridden block (unused in BufferBuilder, but required by interface)
+	}
+	
+	@Override
+	public void ignoreMidBlock(boolean b) {
+		// Iris: Control whether to ignore mid-block data (unused in BufferBuilder, but required by interface)
+	}
+	
 	// Sodium: Skip endLastVertex when Sodium calls push() - used by dynamic remap
 	public void push() {
 		// This method is called by Sodium via mixin - skip the next endLastVertex call
