@@ -6,8 +6,12 @@
 
 ### Mixin Conversion Status
 
-**Total Mixins:** 218 → **74 remaining** (144 removed)  
-**Conversion Progress:** 66.1% complete - **MILESTONE: 66% REACHED!** 🎉🎉🎉🎉
+**Total Mixins:** 218 → **72 remaining** (146 removed)  
+**Conversion Progress:** 67.0% complete - **MILESTONE: 67% REACHED!** 🎉🎉🎉🎉
+
+#### Removed Mixins (Session 33 - 2 mixins):
+173. ✅ `MixinParticleEngine` (Iris) - 2 @Inject (HEAD/RETURN) → Inlined particle rendering phase tracking into ParticleFeatureRenderer.render()
+174. ✅ `MixinRenderSystem` (Iris) - 2 @Inject (RETURN) → Inlined Iris initialization and texture tracking into RenderSystem.initRenderer() and setShaderTexture()
 
 #### Removed Mixins (Session 32 - 4 mixins):
 169. ✅ `FogRendererMixin` - Interface implementation (FogStorage) + @Inject → Inlined fog parameter storage into FogRenderer.setupFog()
