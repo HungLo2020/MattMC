@@ -6,8 +6,15 @@
 
 ### Mixin Conversion Status
 
-**Total Mixins:** 218 → **27 remaining** (191 removed)  
-**Conversion Progress:** 87.6% complete - **MILESTONE: 87% REACHED!** 🎉🎉🎉🎉🎉🎉🎉🎉🎉
+**Total Mixins:** 218 → **22 remaining** (196 removed)  
+**Conversion Progress:** 89.9% complete - **MILESTONE: 89% REACHED!** 🎉🎉🎉🎉🎉🎉🎉🎉🎉
+
+#### Removed Mixins (Session 45 - 5 mixins):
+219. ✅ `SpriteContentsMixin` (Sodium/mipmaps) - 1 @WrapOperation → Inlined transparent pixel color filling into SpriteContents constructor to fix black bleeding in mipmaps
+220. ✅ `BakedGlyphMixin` (Sodium) - 2 @Inject HEAD → Inlined Sodium fast glyph rendering with intrinsics into BakedSheetGlyph.render() and buildEffect()
+221. ✅ `ItemRenderStateMixin` (Sodium/FRAPI) - 1 @Inject → Inlined Sodium FRAPI mesh processing into ItemStackRenderState.visitExtents()
+222. ✅ `LevelRendererMixin` (Sodium/gui.outlines) - 1 @Inject HEAD → Inlined Sodium fast line box rendering with intrinsics into ShapeRenderer.renderLineBox()
+223. ✅ `MixinRenderRegion` (Iris/Sodium) - Interface + 1 @Inject → RenderRegion implements ShadowRenderRegion with shadow/regular render list and batch swapping
 
 #### Removed Mixins (Session 44 - 6 mixins):
 213. ✅ `BufferBuilderMixin` (Sodium/intrinsics) - 2 @Override methods → Merged Sodium fast path into BufferBuilder.putBulkData() with Iris AO support
