@@ -6,8 +6,11 @@
 
 ### Mixin Conversion Status
 
-**Total Mixins:** 218 → **47 remaining** (171 removed)  
-**Conversion Progress:** 78.4% complete - **MILESTONE: 78% REACHED!** 🎉🎉🎉🎉🎉
+**Total Mixins:** 218 → **46 remaining** (172 removed)  
+**Conversion Progress:** 78.9% complete - **MILESTONE: 78% REACHED!** 🎉🎉🎉🎉🎉
+
+#### Removed Mixins (Session 39 - 1 mixin):
+200. ✅ `MixinLevelRenderer` (Iris/shadows) - Interface implementation → LevelRenderer implements CullingDataCache with state save/restore for shadow rendering
 
 #### Removed Mixins (Session 38 - 3 mixins):
 197. ✅ `MixinSodiumOptionsGUI` (Iris) - 2 @Inject (init/HEAD) → Inlined Iris shader packs page into SodiumOptionsGUI constructor and setPage()

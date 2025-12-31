@@ -14,7 +14,6 @@
     "MixinShaderManager_Overrides",
     "MixinCompiledShaderProgram",
     "entity_render_context.MixinModelStorageTrigger",
-    "shadows.MixinLevelRenderer",
     "texture.pbr.MixinDirectoryLister",
     "texture.pbr.MixinSpriteContents",
     "texture.pbr.MixinTextureAtlas"

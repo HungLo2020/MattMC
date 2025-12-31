@@ -108,7 +108,7 @@ import org.joml.Vector4f;
 import org.slf4j.Logger;
 
 @Environment(EnvType.CLIENT)
-public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseable {
+public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseable, net.irisshaders.iris.shadows.CullingDataCache {
 	private static final Logger LOGGER = LogUtils.getLogger();
 	private static final ResourceLocation TRANSPARENCY_POST_CHAIN_ID = ResourceLocation.withDefaultNamespace("transparency");
 	private static final ResourceLocation ENTITY_OUTLINE_POST_CHAIN_ID = ResourceLocation.withDefaultNamespace("entity_outline");
@@ -160,6 +160,11 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 	private final LevelRenderState levelRenderState;
 	private final SubmitNodeStorage submitNodeStorage;
 	private final FeatureRenderDispatcher featureRenderDispatcher;
+	
+	// Iris: From shadows.MixinLevelRenderer - fields for shadow culling data cache
+	private ObjectArrayList<SectionRenderDispatcher.RenderSection> iris$savedRenderChunks = new ObjectArrayList<>(69696);
+	private double iris$savedLastCameraPitch;
+	private double iris$savedLastCameraYaw;
 
 	public LevelRenderer(
 		Minecraft minecraft,
@@ -1572,5 +1577,35 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 	// Wrapper method for feature rendering in particles pass - allows Iris mixins to intercept
 	public void iris$renderAllFeaturesParticles() {
 		this.featureRenderDispatcher.renderAllFeatures();
+	}
+	
+	// Iris: From shadows.MixinLevelRenderer - implement CullingDataCache interface
+	@Override
+	public void saveState() {
+		iris$swap();
+	}
+
+	@Override
+	public void restoreState() {
+		iris$swap();
+	}
+
+	private void iris$swap() {
+		// Swap the contents of the lists, not the references (visibleSections is final)
+		ObjectArrayList<SectionRenderDispatcher.RenderSection> tmpList = new ObjectArrayList<>(visibleSections);
+		visibleSections.clear();
+		visibleSections.addAll(iris$savedRenderChunks);
+		iris$savedRenderChunks.clear();
+		iris$savedRenderChunks.addAll(tmpList);
+		
+		double tmp;
+
+		tmp = prevCamRotX;
+		prevCamRotX = iris$savedLastCameraPitch;
+		iris$savedLastCameraPitch = tmp;
+
+		tmp = prevCamRotY;
+		prevCamRotY = iris$savedLastCameraYaw;
+		iris$savedLastCameraYaw = tmp;
 	}
 }
