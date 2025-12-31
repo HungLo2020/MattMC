@@ -18,7 +18,6 @@
     "features.render.frapi.ModelBlockRendererMixin",
     "features.render.frapi.ItemFeatureRendererMixin",
     "features.render.frapi.ItemRenderStateMixin",
-    "features.render.frapi.ItemLayerRenderStateMixin",
     "features.render.gui.font.BakedGlyphMixin",
     "features.render.gui.outlines.LevelRendererMixin",
     "features.render.immediate.DirectionMixin",
