@@ -1047,6 +1047,14 @@ public class Gui {
 	}
 
 	private void renderVignette(GuiGraphics guiGraphics, @Nullable Entity entity) {
+		// Iris: Check if vignette should be rendered
+		net.irisshaders.iris.pipeline.WorldRenderingPipeline pipeline = 
+			net.irisshaders.iris.Iris.getPipelineManager().getPipelineNullable();
+		
+		if (pipeline != null && !pipeline.shouldRenderVignette()) {
+			return;
+		}
+		
 		WorldBorder worldBorder = this.minecraft.level.getWorldBorder();
 		float f = 0.0F;
 		if (entity != null) {

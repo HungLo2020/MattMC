@@ -6,8 +6,12 @@
 
 ### Mixin Conversion Status
 
-**Total Mixins:** 218 → **110 remaining** (108 removed)  
-**Conversion Progress:** 49.5% complete - **PASSED 50% MILESTONE!** 🎉
+**Total Mixins:** 218 → **109 remaining** (109 removed)  
+**Conversion Progress:** 50.0% complete - **EXACTLY 50% MILESTONE!** 🎉
+
+#### Removed Mixins (Session 24 - 2 conversions):
+135. ✅ `MixinOptions_CloudsOverride` - HEAD inject → Inlined cloud status override into Options.getCloudsType()
+136. ✅ `MixinGui` (partial) - Removed HEAD inject from renderVignette → Inlined vignette check into Gui.renderVignette() (WrapMethod remains)
 
 #### Removed Mixins (Session 23 - 1 mixin):
 134. ✅ `MixinCustomGeometrySubmit` - Record interface implementation → SubmitNodeStorage.CustomGeometrySubmit implements ModelStorage with constructor capture

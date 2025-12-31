@@ -48,7 +48,6 @@
     "gui.MixinVideoSettingsScreen",
     "shadows.MixinLevelRenderer",
     "shadows.MixinPreventRebuildNearInShadowPass",
-    "sky.MixinOptions_CloudsOverride",
     "texture.MixinAbstractTexture",
     "texture.MixinGlStateManager",
     "texture.MixinSpriteContents",

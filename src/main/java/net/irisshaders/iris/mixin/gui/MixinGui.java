@@ -45,13 +45,4 @@ public class MixinGui {
 
 		GLDebug.popGroup();
 	}
-
-	@Inject(method = "renderVignette", at = @At("HEAD"), cancellable = true)
-	private void iris$disableVignetteRendering(GuiGraphics pGui0, Entity pEntity1, CallbackInfo ci) {
-		WorldRenderingPipeline pipeline = Iris.getPipelineManager().getPipelineNullable();
-
-		if (pipeline != null && !pipeline.shouldRenderVignette()) {
-			ci.cancel();
-		}
-	}
 }
