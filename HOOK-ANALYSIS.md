@@ -6,8 +6,14 @@
 
 ### Mixin Conversion Status
 
-**Total Mixins:** 218 → **102 remaining** (116 removed)  
-**Conversion Progress:** 53.2% complete - **OVER HALFWAY!** 🎉
+**Total Mixins:** 218 → **98 remaining** (120 removed)  
+**Conversion Progress:** 55.0% complete - **SURPASSED 55%!** 🎉
+
+#### Removed Mixins (Session 26 - 4 mixins):
+145. ✅ `MixinCapeLayer` - HEAD + RETURN injects → Inlined cape item context set/clear into CapeLayer.submit()
+146. ✅ `MixinElytraLayer` - HEAD + RETURN injects → Inlined elytra item context set/clear into WingsLayer.submit() (with cape check)
+147. ✅ `MixinFlameFeatureRenderer` - HEAD + RETURN injects → Inlined flame entity context set/clear into FlameFeatureRenderer.render()
+148. ✅ `MixinHorseArmorLayer` (SimpleEquipmentLayer) - INVOKE + TAIL injects → Inlined item context set/clear into SimpleEquipmentLayer.submit()
 
 #### Removed Mixins (Session 25 - 3 mixins):
 142. ✅ `MixinEntityRenderer` - Empty mixin (unused fields only) → Deleted entirely

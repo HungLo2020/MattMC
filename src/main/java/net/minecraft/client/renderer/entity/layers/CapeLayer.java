@@ -1,6 +1,9 @@
 package net.minecraft.client.renderer.entity.layers;
 
 import com.mojang.blaze3d.vertex.PoseStack;
+import net.irisshaders.iris.shaderpack.materialmap.NamespacedId;
+import net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings;
+import net.irisshaders.iris.uniforms.CapturedRenderingState;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.client.model.HumanoidModel;
@@ -24,6 +27,8 @@ import net.minecraft.world.item.equipment.Equippable;
 
 @Environment(EnvType.CLIENT)
 public class CapeLayer extends RenderLayer<AvatarRenderState, PlayerModel> {
+	private static final NamespacedId CAPE_LOCATION = new NamespacedId("minecraft", "player_cape");
+	
 	private final HumanoidModel<AvatarRenderState> model;
 	private final EquipmentAssetManager equipmentAssets;
 
@@ -50,6 +55,11 @@ public class CapeLayer extends RenderLayer<AvatarRenderState, PlayerModel> {
 			PlayerSkin playerSkin = avatarRenderState.skin;
 			if (playerSkin.cape() != null) {
 				if (!this.hasLayer(avatarRenderState.chestEquipment, EquipmentClientInfo.LayerType.WINGS)) {
+					// Iris: Set cape item context
+					if (WorldRenderingSettings.INSTANCE.getItemIds() != null) {
+						CapturedRenderingState.INSTANCE.setCurrentRenderedItem(WorldRenderingSettings.INSTANCE.getItemIds().applyAsInt(CAPE_LOCATION));
+					}
+					
 					poseStack.pushPose();
 					if (this.hasLayer(avatarRenderState.chestEquipment, EquipmentClientInfo.LayerType.HUMANOID)) {
 						poseStack.translate(0.0F, -0.053125F, 0.06875F);
@@ -66,6 +76,9 @@ public class CapeLayer extends RenderLayer<AvatarRenderState, PlayerModel> {
 						null
 					);
 					poseStack.popPose();
+					
+					// Iris: Clear cape item context
+					CapturedRenderingState.INSTANCE.setCurrentRenderedItem(0);
 				}
 			}
 		}

@@ -2,6 +2,9 @@ package net.minecraft.client.renderer.feature;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
+import net.irisshaders.iris.shaderpack.materialmap.NamespacedId;
+import net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings;
+import net.irisshaders.iris.uniforms.CapturedRenderingState;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.client.renderer.MultiBufferSource;
@@ -16,10 +19,20 @@ import org.joml.Quaternionf;
 
 @Environment(EnvType.CLIENT)
 public class FlameFeatureRenderer {
+	private static final NamespacedId FLAME_ID = new NamespacedId("minecraft", "entity_flame");
+	
 	public void render(SubmitNodeCollection submitNodeCollection, MultiBufferSource.BufferSource bufferSource, AtlasManager atlasManager) {
+		// Iris: Set flame entity context
+		if (WorldRenderingSettings.INSTANCE.getEntityIds() != null) {
+			CapturedRenderingState.INSTANCE.setCurrentEntity(WorldRenderingSettings.INSTANCE.getEntityIds().applyAsInt(FLAME_ID));
+		}
+		
 		for (SubmitNodeStorage.FlameSubmit flameSubmit : submitNodeCollection.getFlameSubmits()) {
 			this.renderFlame(flameSubmit.pose(), bufferSource, flameSubmit.entityRenderState(), flameSubmit.rotation(), atlasManager);
 		}
+		
+		// Iris: Clear flame entity context
+		CapturedRenderingState.INSTANCE.setCurrentEntity(0);
 	}
 
 	private void renderFlame(
