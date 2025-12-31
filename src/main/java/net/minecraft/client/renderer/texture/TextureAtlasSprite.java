@@ -11,7 +11,7 @@ import net.minecraft.resources.ResourceLocation;
 import org.jetbrains.annotations.Nullable;
 
 @Environment(EnvType.CLIENT)
-public class TextureAtlasSprite {
+public class TextureAtlasSprite implements net.caffeinemc.mods.sodium.client.render.chunk.compile.pipeline.TextureAtlasSpriteExtension {
 	private final ResourceLocation atlasLocation;
 	private final SpriteContents contents;
 	final int x;
@@ -20,6 +20,8 @@ public class TextureAtlasSprite {
 	private final float u1;
 	private final float v0;
 	private final float v1;
+	// Sodium: Track if sprite has unknown image contents (from TextureAtlasSpriteMixin)
+	private boolean hasUnknownImageContents;
 
 	protected TextureAtlasSprite(ResourceLocation resourceLocation, SpriteContents spriteContents, int i, int j, int k, int l) {
 		this.atlasLocation = resourceLocation;
@@ -55,6 +57,11 @@ public class TextureAtlasSprite {
 	@Nullable
 	public TextureAtlasSprite.Ticker createTicker() {
 		final SpriteTicker spriteTicker = this.contents.createTicker();
+		// Sodium: Track if ticker is of an unknown type (from TextureAtlasSpriteMixin)
+		if (spriteTicker != null && !(spriteTicker instanceof SpriteContents.Ticker)) {
+			this.hasUnknownImageContents = true;
+		}
+		
 		return spriteTicker != null ? new TextureAtlasSprite.Ticker() {
 			@Override
 			public void tickAndUpload(GpuTexture gpuTexture) {
@@ -135,6 +142,12 @@ public class TextureAtlasSprite {
 		}
 		
 		return new SpriteCoordinateExpander(vertexConsumer, this);
+	}
+	
+	// Sodium: TextureAtlasSpriteExtension implementation (from TextureAtlasSpriteMixin)
+	@Override
+	public boolean sodium$hasUnknownImageContents() {
+		return this.hasUnknownImageContents;
 	}
 
 	@Environment(EnvType.CLIENT)

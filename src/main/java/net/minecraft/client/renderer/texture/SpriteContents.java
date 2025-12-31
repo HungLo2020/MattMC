@@ -33,7 +33,7 @@ import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 
 @Environment(EnvType.CLIENT)
-public class SpriteContents implements Stitcher.Entry, AutoCloseable {
+public class SpriteContents implements Stitcher.Entry, AutoCloseable, net.caffeinemc.mods.sodium.client.render.chunk.compile.pipeline.SpriteContentsExtension {
 	private static final Logger LOGGER = LogUtils.getLogger();
 	final ResourceLocation name;
 	final int width;
@@ -43,6 +43,9 @@ public class SpriteContents implements Stitcher.Entry, AutoCloseable {
 	@Nullable
 	public final SpriteContents.AnimatedTexture animatedTexture;
 	private final List<WithValue<?>> additionalMetadata;
+	// Sodium: Transparency tracking (from SpriteContentsMixin scan package)
+	private boolean sodium$hasTransparentPixels = false;
+	private boolean sodium$hasTranslucentPixels = false;
 
 	public SpriteContents(ResourceLocation resourceLocation, FrameSize frameSize, NativeImage nativeImage) {
 		this(resourceLocation, frameSize, nativeImage, Optional.empty(), List.of());
@@ -59,6 +62,10 @@ public class SpriteContents implements Stitcher.Entry, AutoCloseable {
 				animationMetadataSection -> this.createAnimatedTexture(frameSize, nativeImage.getWidth(), nativeImage.getHeight(), animationMetadataSection)
 			)
 			.orElse(null);
+		
+		// Sodium: Scan sprite contents for transparency before setting originalImage (from SpriteContentsMixin)
+		sodium$scanSpriteContents(nativeImage);
+		
 		this.originalImage = nativeImage;
 		this.byMipLevel = new NativeImage[]{this.originalImage};
 	}
@@ -351,5 +358,37 @@ public class SpriteContents implements Stitcher.Entry, AutoCloseable {
 				this.interpolationData.close();
 			}
 		}
+	}
+	
+	// Sodium: Scan sprite contents for transparency (from SpriteContentsMixin scan package)
+	private void sodium$scanSpriteContents(NativeImage nativeImage) {
+		final long ppPixel = net.caffeinemc.mods.sodium.client.util.NativeImageHelper.getPointerRGBA(nativeImage);
+		final int pixelCount = nativeImage.getHeight() * nativeImage.getWidth();
+
+		for (int pixelIndex = 0; pixelIndex < pixelCount; pixelIndex++) {
+			int color = org.lwjgl.system.MemoryUtil.memGetInt(ppPixel + (pixelIndex * 4L));
+			int alpha = net.sodium.api.util.ColorABGR.unpackAlpha(color);
+
+			// 25 is used as the threshold since the alpha cutoff is 0.1
+			if (alpha <= 25) { // 0.1 * 255
+				this.sodium$hasTransparentPixels = true;
+			} else if (alpha < 255) {
+				this.sodium$hasTranslucentPixels = true;
+			}
+		}
+
+		// the image contains transparency also if there are translucent pixels,
+		// since translucent pixels prevent a downgrade to the opaque render pass just as transparent pixels do
+		this.sodium$hasTransparentPixels |= this.sodium$hasTranslucentPixels;
+	}
+
+	@Override
+	public boolean sodium$hasTransparentPixels() {
+		return this.sodium$hasTransparentPixels;
+	}
+
+	@Override
+	public boolean sodium$hasTranslucentPixels() {
+		return this.sodium$hasTranslucentPixels;
 	}
 }
