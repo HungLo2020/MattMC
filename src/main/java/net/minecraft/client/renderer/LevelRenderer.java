@@ -165,6 +165,11 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 	private ObjectArrayList<SectionRenderDispatcher.RenderSection> iris$savedRenderChunks = new ObjectArrayList<>(69696);
 	private double iris$savedLastCameraPitch;
 	private double iris$savedLastCameraYaw;
+	
+	// Iris: From MixinLevelRenderer (main) - fields for main Iris pipeline integration
+	private net.irisshaders.iris.pipeline.WorldRenderingPipeline pipeline;
+	private boolean disableFrustumCulling;
+	private boolean warned;
 
 	public LevelRenderer(
 		Minecraft minecraft,
@@ -437,6 +442,13 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 	}
 
 	private Frustum prepareCullFrustum(Matrix4f matrix4f, Matrix4f matrix4f2, Vec3 vec3) {
+		// Iris: From MixinLevelRenderer - Disable frustum culling when Iris pipeline requests it
+		if (this.disableFrustumCulling) {
+			net.irisshaders.iris.shadows.frustum.fallback.NonCullingFrustum f = new net.irisshaders.iris.shadows.frustum.fallback.NonCullingFrustum();
+			f.prepare(vec3.x(), vec3.y(), vec3.z());
+			return f;
+		}
+		
 		Frustum frustum;
 		if (this.capturedFrustum != null && !this.captureFrustum) {
 			frustum = this.capturedFrustum;
@@ -465,6 +477,26 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 		Vector4f vector4f,
 		boolean bl2
 	) {
+		// Iris: From MixinLevelRenderer - Setup Iris pipeline at the beginning
+		net.irisshaders.iris.compat.dh.DHCompat.checkFrame();
+		net.irisshaders.iris.uniforms.IrisTimeUniforms.updateTime();
+		net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setGbufferModelView(matrix4f);
+		net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setGbufferProjection(matrix4f2);
+		float fakeTickDelta = deltaTracker.getGameTimeDeltaPartialTick(false);
+		net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setTickDelta(fakeTickDelta);
+		net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.setCloudTime((this.ticks + fakeTickDelta) * 0.03F);
+		
+		this.pipeline = net.irisshaders.iris.Iris.getPipelineManager().preparePipeline(net.irisshaders.iris.Iris.getCurrentDimension());
+		this.disableFrustumCulling = this.pipeline.shouldDisableFrustumCulling();
+		
+		this.pipeline.beginLevelRendering();
+		this.pipeline.setPhase(net.irisshaders.iris.pipeline.WorldRenderingPhase.NONE);
+		net.irisshaders.iris.gl.IrisRenderSystem.backupAndDisableCullingState(this.pipeline.shouldDisableOcclusionCulling());
+		
+		if (net.irisshaders.iris.Iris.shouldActivateWireframe() && this.minecraft.isLocalServer()) {
+			net.irisshaders.iris.gl.IrisRenderSystem.setPolygonMode(org.lwjgl.opengl.GL43C.GL_LINE);
+		}
+		
 		// Iris: Begin level render immediate state (from MixinLevelRenderer vertices.immediate)
 		net.irisshaders.iris.vertices.ImmediateState.isRenderingLevel = true;
 		
@@ -485,6 +517,10 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 		profilerFiller.popPush("prepareCullFrustum");
 		Vec3 vec3 = camera.getPosition();
 		Frustum frustum = this.prepareCullFrustum(matrix4f, matrix4f3, vec3);
+		
+		// Iris: From MixinLevelRenderer - Render shadow terrain after frustum preparation
+		this.pipeline.renderShadows(this, camera, this.levelRenderState.cameraRenderState);
+		
 		profilerFiller.popPush("cullTerrain");
 		// Iris: From MixinLevelRenderer_SkipRendering - skip terrain culling if pipeline requests
 		if (net.irisshaders.iris.Iris.getPipelineManager().getPipelineNullable() instanceof net.irisshaders.iris.pipeline.IrisRenderingPipeline pipeline) {
@@ -547,6 +583,17 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 					);
 			}
 		);
+		
+		// Iris: From MixinLevelRenderer - Add iris_setup pass after clear
+		FramePass irisSetupPass = frameGraphBuilder.addPass("iris_setup");
+		this.targets.main = irisSetupPass.readsAndWrites(this.targets.main);
+		irisSetupPass.requires(framePass);
+		irisSetupPass.executes(() -> {
+			GpuBufferSlice params = RenderSystem.getShaderFog();
+			this.pipeline.onBeginClear();
+			RenderSystem.setShaderFog(params);
+		});
+		
 		if (bl2) {
 			this.addSkyPass(frameGraphBuilder, camera, gpuBufferSlice);
 		}
@@ -588,6 +635,36 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 			}
 		});
 		this.targets.clear();
+		
+		// Iris: From MixinLevelRenderer - Finalize Iris rendering before popping matrix
+		net.irisshaders.iris.pathways.HandRenderer.INSTANCE.renderTranslucent(
+			matrix4f,
+			deltaTracker.getGameTimeDeltaPartialTick(true),
+			camera,
+			this.minecraft.gameRenderer,
+			this.pipeline
+		);
+		net.minecraft.util.profiling.Profiler.get().popPush("iris_final");
+		
+		if (net.irisshaders.iris.Iris.shouldActivateWireframe() && this.minecraft.isLocalServer()) {
+			net.irisshaders.iris.gl.IrisRenderSystem.setPolygonMode(org.lwjgl.opengl.GL43C.GL_FILL);
+		}
+		this.pipeline.finalizeLevelRendering();
+		
+		// Show beta warning once
+		if (!this.warned) {
+			this.warned = true;
+			net.irisshaders.iris.Iris.getUpdateChecker().getBetaInfo().ifPresent(info ->
+				net.minecraft.client.Minecraft.getInstance().gui.getChat().addMessage(
+					net.minecraft.network.chat.Component.literal("A new beta is out for Iris " + info.betaTag + ". Please redownload it.")
+						.withStyle(net.minecraft.ChatFormatting.BOLD, net.minecraft.ChatFormatting.RED)
+				)
+			);
+		}
+		
+		net.irisshaders.iris.gl.IrisRenderSystem.restoreCullingState();
+		this.pipeline = null;
+		
 		matrix4fStack.popMatrix();
 		profilerFiller.pop();
 		
@@ -764,7 +841,14 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 			this.targets.main = framePass.readsAndWrites(this.targets.main);
 		}
 
-		framePass.executes(() -> { iris$renderCloudsPassBody(); this.cloudRenderer.render(i, cloudStatus, g, vec3, f); });
+		framePass.executes(() -> { 
+			iris$renderCloudsPassBody(); 
+			this.cloudRenderer.render(i, cloudStatus, g, vec3, f);
+			// Iris: Reset phase after clouds rendering
+			if (LevelRenderer.this.pipeline != null) {
+				LevelRenderer.this.pipeline.setPhase(net.irisshaders.iris.pipeline.WorldRenderingPhase.NONE);
+			}
+		});
 	}
 
 	private void addWeatherPass(FrameGraphBuilder frameGraphBuilder, Vec3 vec3, GpuBufferSlice gpuBufferSlice) {
@@ -782,8 +866,16 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 			RenderSystem.setShaderFog(gpuBufferSlice);
 			MultiBufferSource.BufferSource bufferSource = this.renderBuffers.bufferSource();
 			this.weatherEffectRenderer.render(bufferSource, vec3, this.levelRenderState.weatherRenderState);
+			// Iris: Reset phase after weather, before world border
+			if (LevelRenderer.this.pipeline != null) {
+				LevelRenderer.this.pipeline.setPhase(net.irisshaders.iris.pipeline.WorldRenderingPhase.NONE);
+			}
 			iris$renderWorldBorderBody();
 			this.worldBorderRenderer.render(this.levelRenderState.worldBorderRenderState, vec3, i, f);
+			// Iris: Reset phase after world border
+			if (LevelRenderer.this.pipeline != null) {
+				LevelRenderer.this.pipeline.setPhase(net.irisshaders.iris.pipeline.WorldRenderingPhase.NONE);
+			}
 			bufferSource.endBatch();
 		});
 	}
@@ -1003,11 +1095,23 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 			if (blockOutlineRenderState.isTranslucent() == bl) {
 				Vec3 vec3 = levelRenderState.cameraRenderState.pos;
 				if (blockOutlineRenderState.highContrast()) {
-					VertexConsumer vertexConsumer = bufferSource.getBuffer(RenderType.secondaryBlockOutline());
+					// Iris: Wrap with outline render state shard
+					RenderType wrappedType = new net.irisshaders.iris.layer.OuterWrappedRenderType(
+						"iris:is_outline",
+						RenderType.secondaryBlockOutline(),
+						net.irisshaders.iris.layer.IsOutlineRenderStateShard.INSTANCE
+					);
+					VertexConsumer vertexConsumer = bufferSource.getBuffer(wrappedType);
 					this.renderHitOutline(poseStack, vertexConsumer, vec3.x, vec3.y, vec3.z, blockOutlineRenderState, -16777216);
 				}
 
-				VertexConsumer vertexConsumer = bufferSource.getBuffer(RenderType.lines());
+				// Iris: Wrap with outline render state shard
+				RenderType wrappedType = new net.irisshaders.iris.layer.OuterWrappedRenderType(
+					"iris:is_outline",
+					RenderType.lines(),
+					net.irisshaders.iris.layer.IsOutlineRenderStateShard.INSTANCE
+				);
+				VertexConsumer vertexConsumer = bufferSource.getBuffer(wrappedType);
 				int i = blockOutlineRenderState.highContrast() ? -11010079 : ARGB.color(102, -16777216);
 				this.renderHitOutline(poseStack, vertexConsumer, vec3.x, vec3.y, vec3.z, blockOutlineRenderState, i);
 				bufferSource.endLastBatch();
@@ -1183,7 +1287,7 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 							if (skyRenderState.endFlashIntensity > 1.0E-5F) {
 								PoseStack poseStack = new PoseStack();
 								this.skyRenderer.renderEndFlash(poseStack, skyRenderState.endFlashIntensity, skyRenderState.endFlashXAngle, skyRenderState.endFlashYAngle);
-							}
+			}
 						} else {
 							PoseStack poseStack = new PoseStack();
 							float f = ARGB.redFloat(skyRenderState.skyColor);
@@ -1199,6 +1303,10 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 							if (skyRenderState.shouldRenderDarkDisc) {
 								this.skyRenderer.renderDarkDisc();
 							}
+						}
+						// Iris: Reset phase after sky rendering
+						if (LevelRenderer.this.pipeline != null) {
+							LevelRenderer.this.pipeline.setPhase(net.irisshaders.iris.pipeline.WorldRenderingPhase.NONE);
 						}
 					}
 				);
@@ -1500,6 +1608,11 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 	// These are called from the lambda bodies to provide stable mixin targets
 	
 	public void iris$renderSkyPassBody() {
+		// Iris: From MixinLevelRenderer - Set CUSTOM_SKY phase
+		if (this.pipeline != null) {
+			this.pipeline.setPhase(net.irisshaders.iris.pipeline.WorldRenderingPhase.CUSTOM_SKY);
+		}
+		
 		// Sodium + Iris: Prevents the sky layer from rendering when the fog distance is reduced
 		// Fixes MC-152504 by canceling sky rendering when camera is submersed
 		Camera camera = Minecraft.getInstance().gameRenderer.getMainCamera();
@@ -1513,17 +1626,24 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 				net.minecraft.util.Mth.floor(cameraPosition.y())) || this.minecraft.gui.getBossOverlay().shouldCreateWorldFog();
 			
 			if (isSubmersed || blockSky || useThickFog) {
+				if (this.pipeline != null) {
+					this.pipeline.setPhase(net.irisshaders.iris.pipeline.WorldRenderingPhase.NONE);
+				}
 				return; // Early exit cancels sky rendering
 			}
 		} else {
 			// When Iris pack is active, use simple submersion check
 			if (camera.getFluidInCamera() != net.minecraft.world.level.material.FogType.NONE || this.doesMobEffectBlockSky(camera)) {
+				if (this.pipeline != null) {
+					this.pipeline.setPhase(net.irisshaders.iris.pipeline.WorldRenderingPhase.NONE);
+				}
 				return; // Early exit cancels sky rendering
 			}
 		}
 		
 		// This method is injected into by Iris mixins for sky rendering phase changes
 		// The actual sky rendering happens in addSkyPass lambda
+		// Reset phase after sky rendering in the lambda - see addSkyPass
 	}
 	
 	public void iris$renderMainPassBody() {
@@ -1532,11 +1652,19 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 	}
 	
 	public void iris$renderWeatherPassBody() {
+		// Iris: From MixinLevelRenderer - Set RAIN_SNOW phase
+		if (this.pipeline != null) {
+			this.pipeline.setPhase(net.irisshaders.iris.pipeline.WorldRenderingPhase.RAIN_SNOW);
+		}
 		// This method is injected into by Iris mixins for weather rendering phase changes
 		// The actual weather rendering happens in addWeatherPass lambda
 	}
 	
 	public void iris$renderCloudsPassBody() {
+		// Iris: From MixinLevelRenderer - Set CLOUDS phase
+		if (this.pipeline != null) {
+			this.pipeline.setPhase(net.irisshaders.iris.pipeline.WorldRenderingPhase.CLOUDS);
+		}
 		// This method is injected into by Iris mixins for clouds rendering phase changes
 		// The actual clouds rendering happens in addCloudsPass lambda
 	}
@@ -1551,27 +1679,57 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 	}
 	
 	public void iris$renderWorldBorderBody() {
+		// Iris: From MixinLevelRenderer - Set WORLD_BORDER phase
+		if (this.pipeline != null) {
+			this.pipeline.setPhase(net.irisshaders.iris.pipeline.WorldRenderingPhase.WORLD_BORDER);
+		}
 		// This method is injected into by Iris mixins for world border rendering phase changes
 		// The actual world border rendering happens in addWeatherPass lambda
 	}
 	
 	public void iris$beginDebugRender() {
+		// Iris: From MixinLevelRenderer - Set DEBUG phase
+		if (this.pipeline != null) {
+			this.pipeline.setPhase(net.irisshaders.iris.pipeline.WorldRenderingPhase.DEBUG);
+		}
 		// This method is injected into by Iris mixins for debug rendering phase changes
 		// The actual debug rendering happens in addMainPass lambda
 	}
 	
 	public void iris$endDebugRender() {
+		// Iris: From MixinLevelRenderer - Reset to NONE phase
+		if (this.pipeline != null) {
+			this.pipeline.setPhase(net.irisshaders.iris.pipeline.WorldRenderingPhase.NONE);
+		}
 		// This method is injected into by Iris mixins for debug rendering phase changes
 		// The actual debug rendering happens in addMainPass lambda
 	}
 	
 	public void iris$beginTranslucents() {
+		// Iris: From MixinLevelRenderer - Begin hand and translucents
+		if (this.pipeline != null) {
+			this.pipeline.beginHand();
+			net.irisshaders.iris.pathways.HandRenderer.INSTANCE.renderSolid(
+				net.irisshaders.iris.uniforms.CapturedRenderingState.INSTANCE.getGbufferModelView(),
+				net.minecraft.client.Minecraft.getInstance().getDeltaTracker().getGameTimeDeltaPartialTick(true),
+				net.minecraft.client.Minecraft.getInstance().gameRenderer.getMainCamera(),
+				net.minecraft.client.Minecraft.getInstance().gameRenderer,
+				this.pipeline
+			);
+			net.minecraft.util.profiling.Profiler.get().popPush("iris_pre_translucent");
+			this.pipeline.beginTranslucents();
+		}
 		// This method is injected into by Iris mixins for translucent rendering phase changes
 		// The actual translucent rendering happens in addMainPass lambda
 	}
 	
 	// Wrapper method for terrain chunk rendering - allows Iris mixins to intercept
 	public void iris$renderTerrainGroup(ChunkSectionsToRender chunkSectionsToRender, ChunkSectionLayerGroup group) {
+		// Iris: From MixinLevelRenderer - Set phase based on terrain render type
+		if (this.pipeline != null) {
+			this.pipeline.setPhase(net.irisshaders.iris.pipeline.WorldRenderingPhase.fromTerrainRenderType(group));
+		}
+		
 		// Iris: From MixinLevelRenderer_SkipRendering - skip chunk rendering if pipeline requests
 		if (net.irisshaders.iris.Iris.getPipelineManager().getPipelineNullable() instanceof net.irisshaders.iris.pipeline.IrisRenderingPipeline pipeline) {
 			if (!pipeline.skipAllRendering()) {
@@ -1579,6 +1737,11 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 			}
 		} else {
 			chunkSectionsToRender.renderGroup(group);
+		}
+		
+		// Iris: Reset phase after rendering
+		if (this.pipeline != null) {
+			this.pipeline.setPhase(net.irisshaders.iris.pipeline.WorldRenderingPhase.NONE);
 		}
 	}
 	
