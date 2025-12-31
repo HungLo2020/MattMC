@@ -100,6 +100,8 @@ public class ItemStackRenderState implements net.irisshaders.iris.mixinterface.I
 	public void visitExtents(Consumer<Vector3fc> consumer) {
 		Vector3f vector3f = new Vector3f();
 		PoseStack.Pose pose = new PoseStack.Pose();
+		// Sodium FRAPI: QuadToPosPipe for mesh processing (merged from ItemRenderStateMixin)
+		net.caffeinemc.mods.sodium.client.render.frapi.render.QuadToPosPipe pipe = null;
 
 		for (int i = 0; i < this.activeLayerCount; i++) {
 			ItemStackRenderState.LayerRenderState layerRenderState = this.layers[i];
@@ -109,6 +111,18 @@ public class ItemStackRenderState implements net.irisshaders.iris.mixinterface.I
 
 			for (Vector3f vector3f2 : vector3fs) {
 				consumer.accept(vector3f.set(vector3f2).mulPosition(matrix4f));
+			}
+
+			// Sodium FRAPI: Process mutable mesh before resetting pose (merged from ItemRenderStateMixin)
+			net.caffeinemc.mods.sodium.client.render.frapi.mesh.MutableMeshImpl mutableMesh = ((net.caffeinemc.mods.sodium.client.render.frapi.render.AccessLayerRenderState) layerRenderState).fabric_getMutableMesh();
+
+			if (mutableMesh.size() > 0) {
+				if (pipe == null) {
+					pipe = new net.caffeinemc.mods.sodium.client.render.frapi.render.QuadToPosPipe(consumer, vector3f);
+				}
+				pipe.matrix = matrix4f;
+				// Use the mutable version here as it does not use a ThreadLocal or cursor stack
+				mutableMesh.forEachMutable(pipe);
 			}
 
 			pose.setIdentity();

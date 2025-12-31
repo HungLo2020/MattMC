@@ -71,7 +71,10 @@ public class SpriteContents implements Stitcher.Entry, AutoCloseable, net.caffei
 			)
 			.orElse(null);
 		
-		// Sodium: Scan sprite contents for transparency before setting originalImage (from SpriteContentsMixin)
+		// Sodium: Fill in transparent pixel colors before setting originalImage (from SpriteContentsMixin mipmaps)
+		sodium$fillInTransparentPixelColors(nativeImage);
+		
+		// Sodium: Scan sprite contents for transparency before setting originalImage (from SpriteContentsMixin scan)
 		sodium$scanSpriteContents(nativeImage);
 		
 		this.originalImage = nativeImage;
@@ -446,6 +449,72 @@ public class SpriteContents implements Stitcher.Entry, AutoCloseable, net.caffei
 	@Override
 	public boolean sodium$hasTranslucentPixels() {
 		return this.sodium$hasTranslucentPixels;
+	}
+
+	/**
+	 * Sodium: Fixes a common issue in image editing programs where fully transparent pixels are saved with fully black colors.
+	 * (Merged from SpriteContentsMixin mipmaps package)
+	 *
+	 * This causes issues with mipmapped texture filtering, since the black color is used to calculate the final color
+	 * even though the alpha value is zero. While ideally it would be disregarded, we do not control that. Instead,
+	 * this code tries to calculate a decent average color to assign to these fully-transparent pixels so that their
+	 * black color does not leak over into sampling.
+	 */
+	private static void sodium$fillInTransparentPixelColors(NativeImage nativeImage) {
+		final long ppPixel = net.caffeinemc.mods.sodium.client.util.NativeImageHelper.getPointerRGBA(nativeImage);
+		final int pixelCount = nativeImage.getHeight() * nativeImage.getWidth();
+
+		// Calculate an average color from all pixels that are not completely transparent.
+		// This average is weighted based on the (non-zero) alpha value of the pixel.
+		float r = 0.0f;
+		float g = 0.0f;
+		float b = 0.0f;
+
+		float totalWeight = 0.0f;
+
+		for (int pixelIndex = 0; pixelIndex < pixelCount; pixelIndex++) {
+			long pPixel = ppPixel + (pixelIndex * 4L);
+
+			int color = org.lwjgl.system.MemoryUtil.memGetInt(pPixel);
+			int alpha = net.sodium.api.util.ColorABGR.unpackAlpha(color);
+
+			// Ignore all fully-transparent pixels for the purposes of computing an average color.
+			if (alpha != 0) {
+				float weight = (float) alpha;
+
+				// Make sure to convert to linear space so that we don't lose brightness.
+				r += net.caffeinemc.mods.sodium.client.util.color.ColorSRGB.srgbToLinear(net.sodium.api.util.ColorABGR.unpackRed(color)) * weight;
+				g += net.caffeinemc.mods.sodium.client.util.color.ColorSRGB.srgbToLinear(net.sodium.api.util.ColorABGR.unpackGreen(color)) * weight;
+				b += net.caffeinemc.mods.sodium.client.util.color.ColorSRGB.srgbToLinear(net.sodium.api.util.ColorABGR.unpackBlue(color)) * weight;
+
+				totalWeight += weight;
+			}
+		}
+
+		// Bail if none of the pixels are semi-transparent.
+		if (totalWeight == 0.0f) {
+			return;
+		}
+
+		r /= totalWeight;
+		g /= totalWeight;
+		b /= totalWeight;
+
+		// Convert that color in linear space back to sRGB.
+		// Use an alpha value of zero - this works since we only replace pixels with an alpha value of 0.
+		int averageColor = net.caffeinemc.mods.sodium.client.util.color.ColorSRGB.linearToSrgb(r, g, b, 0);
+
+		for (int pixelIndex = 0; pixelIndex < pixelCount; pixelIndex++) {
+			long pPixel = ppPixel + (pixelIndex * 4);
+
+			int color = org.lwjgl.system.MemoryUtil.memGetInt(pPixel);
+			int alpha = net.sodium.api.util.ColorABGR.unpackAlpha(color);
+
+			// Replace the color values of pixels which are fully transparent, since they have no color data.
+			if (alpha == 0) {
+				org.lwjgl.system.MemoryUtil.memPutInt(pPixel, averageColor);
+			}
+		}
 	}
 	
 	// Iris: From MixinSpriteContents - provide access to created ticker
