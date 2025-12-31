@@ -25,12 +25,10 @@
     "entity_render_context.MixinBlockEntityRenderDispatcher",
     "entity_render_context.MixinEntityRenderDispatcher",
     "entity_render_context.MixinModelStorageTrigger",
-    "gui.MixinGui",
     "shadows.MixinLevelRenderer",
     "texture.MixinAbstractTexture",
     "texture.MixinGlStateManager",
     "texture.MixinSpriteContents",
-    "texture.MixinTextureManager",
     "texture.pbr.MixinDirectoryLister",
     "texture.pbr.MixinSpriteContents",
     "texture.pbr.MixinTextureAtlas"

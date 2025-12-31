@@ -120,6 +120,9 @@ public class TextureManager implements PreparableReloadListener, Tickable, AutoC
 		this.byPath.forEach(this::safeClose);
 		this.byPath.clear();
 		this.tickableTextures.clear();
+		
+		// Iris: Clear PBR textures on close (from MixinTextureManager)
+		net.irisshaders.iris.pbr.texture.PBRTextureManager.INSTANCE.close();
 	}
 
 	public CompletableFuture<Void> reload(SharedState sharedState, Executor executor, PreparationBarrier preparationBarrier, Executor executor2) {
@@ -130,13 +133,18 @@ public class TextureManager implements PreparableReloadListener, Tickable, AutoC
 				list.add(scheduleLoad(resourceManager, resourceLocation, reloadableTexture, executor));
 			}
 		});
-		return CompletableFuture.allOf((CompletableFuture[])list.stream().map(TextureManager.PendingReload::newContents).toArray(CompletableFuture[]::new))
+		CompletableFuture<Void> result = CompletableFuture.allOf((CompletableFuture[])list.stream().map(TextureManager.PendingReload::newContents).toArray(CompletableFuture[]::new))
 			.thenCompose(preparationBarrier::wait)
 			.thenAcceptAsync(void_ -> {
 				for (TextureManager.PendingReload pendingReload : list) {
 					pendingReload.texture.apply((TextureContents)pendingReload.newContents.join());
 				}
 			}, executor2);
+		
+		// Iris: Clear PBR textures on reload (from MixinTextureManager)
+		net.irisshaders.iris.pbr.texture.PBRTextureManager.INSTANCE.clear();
+		
+		return result;
 	}
 
 	public void dumpAllSheets(Path path) {
@@ -156,6 +164,9 @@ public class TextureManager implements PreparableReloadListener, Tickable, AutoC
 				}
 			}
 		});
+		
+		// Iris: Dump PBR textures (from MixinTextureManager)
+		net.irisshaders.iris.pbr.texture.PBRTextureManager.INSTANCE.dumpTextures(path);
 	}
 
 	private static TextureContents loadContents(ResourceManager resourceManager, ResourceLocation resourceLocation, ReloadableTexture reloadableTexture) throws IOException {
