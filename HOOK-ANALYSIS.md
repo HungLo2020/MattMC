@@ -6,8 +6,13 @@
 
 ### Mixin Conversion Status
 
-**Total Mixins:** 218 → **72 remaining** (146 removed)  
-**Conversion Progress:** 67.0% complete - **MILESTONE: 67% REACHED!** 🎉🎉🎉🎉
+**Total Mixins:** 218 → **69 remaining** (149 removed)  
+**Conversion Progress:** 68.3% complete - **MILESTONE: 68% REACHED!** 🎉🎉🎉🎉🎉
+
+#### Removed Mixins (Session 34 - 3 mixins):
+175. ✅ `MixinStationaryItemParticle` (Iris) - 2 @Inject (RETURN/HEAD) → Inlined particle opacity tracking into BlockMarker constructor and getLayer()
+176. ✅ `MixinTerrainParticle` (Iris) - 2 @Inject (RETURN/HEAD) → Inlined particle opacity tracking into TerrainParticle constructor and getLayer()
+177. ✅ `MixinGlStateManager_BlendOverride` (Iris) - 3 @Inject (HEAD cancellable) → Inlined blend lock checks into GlStateManager (_disableBlend, _enableBlend, _blendFuncSeparate)
 
 #### Removed Mixins (Session 33 - 2 mixins):
 173. ✅ `MixinParticleEngine` (Iris) - 2 @Inject (HEAD/RETURN) → Inlined particle rendering phase tracking into ParticleFeatureRenderer.render()
