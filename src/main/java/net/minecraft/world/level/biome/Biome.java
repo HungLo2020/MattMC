@@ -69,6 +69,13 @@ public final class Biome implements net.irisshaders.iris.mixinterface.ExtendedBi
 	private final BiomeSpecialEffects specialEffects;
 	// Iris: Track biome category
 	private int biomeCategory = -1;
+	// Sodium: Biome color caching fields (merged from BiomeMixin)
+	private boolean hasCustomGrassColor;
+	private int customGrassColor;
+	private boolean hasCustomFoliageColor;
+	private int customFoliageColor;
+	private int defaultColorIndex;
+	private BiomeSpecialEffects cachedSpecialEffects;
 	private final ThreadLocal<Long2FloatLinkedOpenHashMap> temperatureCache = ThreadLocal.withInitial(() -> Util.make(() -> {
 		Long2FloatLinkedOpenHashMap long2FloatLinkedOpenHashMap = new Long2FloatLinkedOpenHashMap(1024, 0.25F) {
 			@Override
@@ -89,6 +96,8 @@ public final class Biome implements net.irisshaders.iris.mixinterface.ExtendedBi
 		this.generationSettings = biomeGenerationSettings;
 		this.mobSettings = mobSpawnSettings;
 		this.specialEffects = biomeSpecialEffects;
+		// Sodium: Initialize biome colors (merged from BiomeMixin)
+		sodium$setupColors();
 	}
 
 	public int getSkyColor() {
@@ -206,8 +215,26 @@ public final class Biome implements net.irisshaders.iris.mixinterface.ExtendedBi
 	}
 
 	public int getGrassColor(double d, double e) {
-		int i = this.getBaseGrassColor();
-		return this.specialEffects.getGrassColorModifier().modifyColor(d, e, i);
+		// Sodium: Optimized grass color calculation (merged from BiomeMixin)
+		if (this.specialEffects != this.cachedSpecialEffects) {
+			sodium$setupColors();
+		}
+
+		int color;
+
+		if (this.hasCustomGrassColor) {
+			color = this.customGrassColor;
+		} else {
+			color = net.caffeinemc.mods.sodium.client.world.biome.BiomeColorMaps.getGrassColor(this.defaultColorIndex);
+		}
+
+		var modifier = this.cachedSpecialEffects.getGrassColorModifier();
+
+		if (modifier != BiomeSpecialEffects.GrassColorModifier.NONE) {
+			color = modifier.modifyColor(d, e, color);
+		}
+
+		return color;
 	}
 
 	private int getBaseGrassColor() {
@@ -222,7 +249,20 @@ public final class Biome implements net.irisshaders.iris.mixinterface.ExtendedBi
 	}
 
 	public int getFoliageColor() {
-		return (Integer)this.specialEffects.getFoliageColorOverride().orElseGet(this::getFoliageColorFromTexture);
+		// Sodium: Optimized foliage color calculation (merged from BiomeMixin)
+		if (this.specialEffects != this.cachedSpecialEffects) {
+			sodium$setupColors();
+		}
+
+		int color;
+
+		if (this.hasCustomFoliageColor) {
+			color = this.customFoliageColor;
+		} else {
+			color = net.caffeinemc.mods.sodium.client.world.biome.BiomeColorMaps.getFoliageColor(this.defaultColorIndex);
+		}
+
+		return color;
 	}
 
 	private int getFoliageColorFromTexture() {
@@ -451,5 +491,37 @@ public final class Biome implements net.irisshaders.iris.mixinterface.ExtendedBi
 	@Override
 	public float getDownfall() {
 		return this.climateSettings.downfall();
+	}
+
+	// Sodium: Setup color caching (merged from BiomeMixin)
+	private void sodium$setupColors() {
+		this.cachedSpecialEffects = specialEffects;
+
+		var grassColor = this.cachedSpecialEffects.getGrassColorOverride();
+
+		if (grassColor.isPresent()) {
+			this.hasCustomGrassColor = true;
+			this.customGrassColor = grassColor.get();
+		} else {
+			this.hasCustomGrassColor = false;
+		}
+
+		var foliageColor = this.cachedSpecialEffects.getFoliageColorOverride();
+
+		if (foliageColor.isPresent()) {
+			this.hasCustomFoliageColor = true;
+			this.customFoliageColor = foliageColor.get();
+		} else {
+			this.hasCustomFoliageColor = false;
+		}
+
+		this.defaultColorIndex = sodium$getDefaultColorIndex();
+	}
+
+	private int sodium$getDefaultColorIndex() {
+		double temperature = Mth.clamp(this.climateSettings.temperature(), 0.0F, 1.0F);
+		double humidity = Mth.clamp(this.climateSettings.downfall(), 0.0F, 1.0F);
+
+		return net.caffeinemc.mods.sodium.client.world.biome.BiomeColorMaps.getIndex(temperature, humidity);
 	}
 }
