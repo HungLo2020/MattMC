@@ -6,8 +6,13 @@
 
 ### Mixin Conversion Status
 
-**Total Mixins:** 218 → **50 remaining** (168 removed)  
-**Conversion Progress:** 77.1% complete - **MILESTONE: 77% REACHED!** 🎉🎉🎉🎉🎉
+**Total Mixins:** 218 → **47 remaining** (171 removed)  
+**Conversion Progress:** 78.4% complete - **MILESTONE: 78% REACHED!** 🎉🎉🎉🎉🎉
+
+#### Removed Mixins (Session 38 - 3 mixins):
+197. ✅ `MixinSodiumOptionsGUI` (Iris) - 2 @Inject (init/HEAD) → Inlined Iris shader packs page into SodiumOptionsGUI constructor and setPage()
+198. ✅ `MixinAbstractBlockRenderContext` (Iris) - Deleted (entirely commented out, no active code)
+199. ✅ `MixinMinecraft_PipelineManagement` (Iris) - 3 @Inject (HEAD) → Inlined dimension tracking and pipeline management into Minecraft (clearClientLevel, setLevel, updateLevelInEngines)
 
 #### Removed Mixins (Session 37 - 5 mixins):
 192. ✅ `MixinRenderRegionArenas` (Iris) - @Redirect → Inlined extended vertex format into RenderRegion.DeviceResources constructor

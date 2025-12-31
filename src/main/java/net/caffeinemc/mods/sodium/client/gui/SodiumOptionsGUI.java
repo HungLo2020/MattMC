@@ -55,6 +55,9 @@ public class SodiumOptionsGUI extends Screen implements ScreenPromptable {
     private ControlElement<?> hoveredElement;
 
     private @Nullable ScreenPrompt prompt;
+    
+    // Iris: From MixinSodiumOptionsGUI - shader packs page
+    private OptionPage iris$shaderPacks;
 
     private SodiumOptionsGUI(Screen prevScreen) {
         super(Component.literal("Sodium Renderer Settings"));
@@ -65,6 +68,11 @@ public class SodiumOptionsGUI extends Screen implements ScreenPromptable {
         this.pages.add(SodiumGameOptionPages.quality());
         this.pages.add(SodiumGameOptionPages.performance());
         this.pages.add(SodiumGameOptionPages.advanced());
+        
+        // Iris: From MixinSodiumOptionsGUI - add shader packs page
+        Component shaderPacksTranslated = Component.translatable("options.iris.shaderPackSelection");
+        iris$shaderPacks = new OptionPage(shaderPacksTranslated, com.google.common.collect.ImmutableList.of());
+        pages.add(iris$shaderPacks);
 
         this.checkPromptTimers();
     }
@@ -131,6 +139,12 @@ public class SodiumOptionsGUI extends Screen implements ScreenPromptable {
     }
 
     public void setPage(OptionPage page) {
+        // Iris: From MixinSodiumOptionsGUI - intercept shader packs page and open ShaderPackScreen
+        if (page == iris$shaderPacks) {
+            minecraft.setScreen(new net.irisshaders.iris.gui.screen.ShaderPackScreen(this));
+            return;
+        }
+        
         this.currentPage = page;
 
         this.rebuildGUI();

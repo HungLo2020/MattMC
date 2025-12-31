@@ -6,7 +6,6 @@
   "plugin": "net.irisshaders.iris.mixin.IrisMixinPlugin",
   "compatibilityLevel": "JAVA_8",
   "client": [
-    "MixinAbstractBlockRenderContext",
     "MixinBlockRenderer",
     "MixinChunkMeshBuildTask",
     "MixinDefaultFluidRenderer",
@@ -14,7 +13,6 @@
     "MixinRenderSectionManagerShadow",
     "MixinShaderChunkRenderer",
     "MixinSodiumGameOptionPages",
-    "MixinSodiumOptionsGUI",
     "MixinSodiumWorldRenderer"
   ],
   "injectors": {

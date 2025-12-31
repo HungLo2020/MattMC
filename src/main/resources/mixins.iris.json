@@ -10,7 +10,6 @@
     "MixinGameRenderer",
     "MixinGlCommandEncoder",
     "MixinLevelRenderer",
-    "MixinMinecraft_PipelineManagement",
     "MixinModelViewBobbing",
     "MixinShaderManager_Overrides",
     "MixinCompiledShaderProgram",

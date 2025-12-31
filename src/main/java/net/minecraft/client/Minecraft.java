@@ -2119,6 +2119,9 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 	}
 
 	public void setLevel(ClientLevel clientLevel) {
+		// Iris: From MixinMinecraft_PipelineManagement - track last dimension on level change
+		net.irisshaders.iris.Iris.lastDimension = net.irisshaders.iris.Iris.getCurrentDimension();
+		
 		this.level = clientLevel;
 		this.updateLevelInEngines(clientLevel);
 	}
@@ -2206,6 +2209,9 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 	}
 
 	public void clearClientLevel(Screen screen) {
+		// Iris: From MixinMinecraft_PipelineManagement - track last dimension on leave
+		net.irisshaders.iris.Iris.lastDimension = net.irisshaders.iris.Iris.getCurrentDimension();
+		
 		ClientPacketListener clientPacketListener = this.getConnection();
 		if (clientPacketListener != null) {
 			clientPacketListener.clearLevel();
@@ -2254,6 +2260,19 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 	}
 
 	private void updateLevelInEngines(@Nullable ClientLevel clientLevel) {
+		// Iris: From MixinMinecraft_PipelineManagement - reset pipeline on dimension change
+		if (net.irisshaders.iris.Iris.getCurrentDimension() != net.irisshaders.iris.Iris.lastDimension) {
+			net.irisshaders.iris.Iris.logger.info("Reloading pipeline on dimension change: " + net.irisshaders.iris.Iris.lastDimension + " => " + net.irisshaders.iris.Iris.getCurrentDimension());
+			// Destroy pipelines when changing dimensions.
+			net.irisshaders.iris.Iris.getPipelineManager().destroyPipeline();
+
+			// NB: We need create the pipeline immediately, so that it is ready by the time that Sodium starts trying to
+			// initialize its world renderer.
+			if (clientLevel != null) {
+				net.irisshaders.iris.Iris.getPipelineManager().preparePipeline(net.irisshaders.iris.Iris.getCurrentDimension());
+			}
+		}
+		
 		// Call registered level hooks before updating engines
 		for (net.minecraft.hooks.MinecraftLevelHooks hook : net.minecraft.hooks.HookRegistry.getMinecraftLevelHooks()) {
 			hook.onLevelUpdateInEngines(clientLevel);
