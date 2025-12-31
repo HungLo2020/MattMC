@@ -6,8 +6,13 @@
 
 ### Mixin Conversion Status
 
-**Total Mixins:** 218 → **9 remaining** (209 removed)  
-**Conversion Progress:** 95.9% complete - **MILESTONE: 95% REACHED!** 🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉
+**Total Mixins:** 218 → **6 remaining** (212 removed)  
+**Conversion Progress:** 97.2% complete - **MILESTONE: 97% REACHED!** 🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉🎉
+
+#### Removed Mixins (Session 50 - 3 mixins):
+237. ✅ `MixinCompiledShaderProgram` (Iris) - Interface + 2 @Inject + 2 @Redirect → GlProgram implements ShaderInstanceInterface with shader skip logic and uniform block handling
+238. ✅ `MixinChunkMeshBuildTask` (Iris/Sodium) - 4 @Inject → Inlined Iris block data capture and light block voxelization into ChunkBuilderMeshingTask.execute()
+239. ✅ `MixinModelViewBobbing` (Iris) - 1 @Inject + 4 @Redirect + 1 @ModifyArg → Inlined view bobbing application to model view matrix in GameRenderer.renderLevel() for OptiFine parity
 
 #### Removed Mixins (Session 49 - 3 mixins):
 234. ✅ `BlockRenderDispatcherMixin` (Sodium/FRAPI) - 1 @Inject + 1 @Redirect → Inlined Sodium FRAPI rendering into BlockRenderDispatcher.renderBreakingTexture() and renderSingleBlock()
