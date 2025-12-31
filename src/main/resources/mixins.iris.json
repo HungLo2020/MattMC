@@ -9,8 +9,7 @@
     "MixinGlCommandEncoder",
     "MixinLevelRenderer",
     "MixinModelViewBobbing",
-    "MixinCompiledShaderProgram",
-    "entity_render_context.MixinModelStorageTrigger"
+    "MixinCompiledShaderProgram"
   ],
   "injectors": {
     "defaultRequire": 1,

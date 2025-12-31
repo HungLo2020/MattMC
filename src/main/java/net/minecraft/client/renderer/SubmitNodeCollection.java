@@ -86,7 +86,10 @@ public class SubmitNodeCollection implements OrderedSubmitNodeCollector, Ordered
 		PoseStack poseStack, float f, float g, FormattedCharSequence formattedCharSequence, boolean bl, Font.DisplayMode displayMode, int i, int j, int k, int l
 	) {
 		this.wasUsed = true;
-		this.textSubmits.add(new SubmitNodeStorage.TextSubmit(new Matrix4f(poseStack.last().pose()), f, g, formattedCharSequence, bl, displayMode, i, j, k, l));
+		SubmitNodeStorage.TextSubmit textSubmit = new SubmitNodeStorage.TextSubmit(new Matrix4f(poseStack.last().pose()), f, g, formattedCharSequence, bl, displayMode, i, j, k, l);
+		// Iris: Capture model storage (merged from MixinModelStorageTrigger)
+		((net.irisshaders.iris.mixinterface.ModelStorage) textSubmit).iris$capture();
+		this.textSubmits.add(textSubmit);
 	}
 
 	@Override
@@ -114,10 +117,17 @@ public class SubmitNodeCollection implements OrderedSubmitNodeCollector, Ordered
 		int l,
 		@Nullable ModelFeatureRenderer.CrumblingOverlay crumblingOverlay
 	) {
+		// Iris: Change render type if rendering block entities (merged from MixinModelStorageTrigger)
+		if (net.irisshaders.iris.vertices.ImmediateState.isRenderingBEs) {
+			renderType = net.irisshaders.iris.layer.OuterWrappedRenderType.wrapExactlyOnce("iris:block_entity", renderType, net.irisshaders.iris.layer.BlockEntityRenderStateShard.INSTANCE);
+		}
+		
 		this.wasUsed = true;
 		SubmitNodeStorage.ModelSubmit<S> modelSubmit = new SubmitNodeStorage.ModelSubmit<>(
 			poseStack.last().copy(), model, object, i, j, k, textureAtlasSprite, l, crumblingOverlay
 		);
+		// Iris: Capture model storage (merged from MixinModelStorageTrigger)
+		((net.irisshaders.iris.mixinterface.ModelStorage) (Object) modelSubmit).iris$capture();
 		this.modelSubmits.add(renderType, modelSubmit);
 	}
 
@@ -136,8 +146,10 @@ public class SubmitNodeCollection implements OrderedSubmitNodeCollector, Ordered
 		int l
 	) {
 		this.wasUsed = true;
-		this.modelPartSubmits
-			.add(renderType, new SubmitNodeStorage.ModelPartSubmit(poseStack.last().copy(), modelPart, i, j, textureAtlasSprite, bl, bl2, k, crumblingOverlay, l));
+		SubmitNodeStorage.ModelPartSubmit modelPartSubmit = new SubmitNodeStorage.ModelPartSubmit(poseStack.last().copy(), modelPart, i, j, textureAtlasSprite, bl, bl2, k, crumblingOverlay, l);
+		// Iris: Capture model storage (merged from MixinModelStorageTrigger)
+		((net.irisshaders.iris.mixinterface.ModelStorage) (Object) modelPartSubmit).iris$capture();
+		this.modelPartSubmits.add(renderType, modelPartSubmit);
 	}
 
 	@Override
@@ -173,11 +185,19 @@ public class SubmitNodeCollection implements OrderedSubmitNodeCollector, Ordered
 		ItemStackRenderState.FoilType foilType
 	) {
 		this.wasUsed = true;
-		this.itemSubmits.add(new SubmitNodeStorage.ItemSubmit(poseStack.last().copy(), itemDisplayContext, i, j, k, is, list, renderType, foilType));
+		SubmitNodeStorage.ItemSubmit itemSubmit = new SubmitNodeStorage.ItemSubmit(poseStack.last().copy(), itemDisplayContext, i, j, k, is, list, renderType, foilType);
+		// Iris: Capture model storage (merged from MixinModelStorageTrigger)
+		((net.irisshaders.iris.mixinterface.ModelStorage) itemSubmit).iris$capture();
+		this.itemSubmits.add(itemSubmit);
 	}
 
 	@Override
 	public void submitCustomGeometry(PoseStack poseStack, RenderType renderType, SubmitNodeCollector.CustomGeometryRenderer customGeometryRenderer) {
+		// Iris: Change render type if rendering block entities (merged from MixinModelStorageTrigger)
+		if (net.irisshaders.iris.vertices.ImmediateState.isRenderingBEs) {
+			renderType = net.irisshaders.iris.layer.OuterWrappedRenderType.wrapExactlyOnce("iris:block_entity", renderType, net.irisshaders.iris.layer.BlockEntityRenderStateShard.INSTANCE);
+		}
+		
 		this.wasUsed = true;
 		this.customGeometrySubmits.add(poseStack, renderType, customGeometryRenderer);
 	}

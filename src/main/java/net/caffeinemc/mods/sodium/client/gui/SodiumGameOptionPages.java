@@ -48,6 +48,23 @@ public class SodiumGameOptionPages {
                         .setImpact(OptionImpact.HIGH)
                         .setFlags(OptionFlag.REQUIRES_RENDERER_RELOAD)
                         .build())
+                // Iris: Add max shadow distance option (merged from MixinSodiumGameOptionPages)
+                .add(OptionImpl.createBuilder(int.class, vanillaOpts)
+                        .setName(Component.translatable("options.iris.shadowDistance"))
+                        .setTooltip(Component.translatable("options.iris.shadowDistance.sodium_tooltip"))
+                        .setControl(option -> new SliderControl(option, 0, 32, 1, (v) -> v == 0 ? Component.literal("Disabled") : Component.translatable("options.chunks", v)))
+                        .setBinding((options, value) -> {
+                                    net.irisshaders.iris.gui.option.IrisVideoSettings.shadowDistance = value;
+                                    try {
+                                        net.irisshaders.iris.Iris.getIrisConfig().save();
+                                    } catch (java.io.IOException e) {
+                                        net.irisshaders.iris.Iris.logger.error("Failed to save Iris config!", e);
+                                    }
+                                },
+                                options -> net.irisshaders.iris.gui.option.IrisVideoSettings.getOverriddenShadowDistance(net.irisshaders.iris.gui.option.IrisVideoSettings.shadowDistance))
+                        .setImpact(OptionImpact.HIGH)
+                        .setEnabled(net.irisshaders.iris.gui.option.IrisVideoSettings::isShadowDistanceSliderEnabled)
+                        .build())
                 .add(OptionImpl.createBuilder(int.class, vanillaOpts)
                         .setName(Component.translatable("options.simulationDistance"))
                         .setTooltip(Component.translatable("sodium.options.simulation_distance.tooltip"))
@@ -174,7 +191,9 @@ public class SodiumGameOptionPages {
         List<OptionGroup> groups = new ArrayList<>();
 
         groups.add(OptionGroup.createBuilder()
-                .add(OptionImpl.createBuilder(GraphicsStatus.class, vanillaOpts)
+                // Iris: Replace graphics quality button when shaders enabled (merged from MixinSodiumGameOptionPages)
+                .add(!net.irisshaders.iris.Iris.getIrisConfig().areShadersEnabled() ? 
+                    OptionImpl.createBuilder(GraphicsStatus.class, vanillaOpts)
                         .setName(Component.translatable("options.graphics"))
                         .setTooltip(Component.translatable("sodium.options.graphics_quality.tooltip"))
                         .setControl(option -> {
@@ -189,7 +208,37 @@ public class SodiumGameOptionPages {
                                 opts -> opts.graphicsMode().get())
                         .setImpact(OptionImpact.HIGH)
                         .setFlags(OptionFlag.REQUIRES_RENDERER_RELOAD)
+                        .build()
+                    :
+                    OptionImpl.createBuilder(net.irisshaders.iris.fantastic.SupportedGraphicsMode.class, vanillaOpts)
+                        .setName(Component.translatable("options.graphics"))
+                        .setTooltip(Component.translatable("sodium.options.graphics_quality.tooltip"))
+                        .setControl(option -> new CyclingControl<>(option, net.irisshaders.iris.fantastic.SupportedGraphicsMode.class,
+                            new Component[]{Component.translatable("options.graphics.fast"), Component.translatable("options.graphics.fancy")}))
+                        .setBinding(
+                            (opts, value) -> opts.graphicsMode().set(value.toVanilla()),
+                            opts -> net.irisshaders.iris.fantastic.SupportedGraphicsMode.fromVanilla(opts.graphicsMode()))
+                        .setImpact(OptionImpact.HIGH)
+                        .setFlags(OptionFlag.REQUIRES_RENDERER_RELOAD)
                         .build())
+                // Iris: Add color space option (merged from MixinSodiumGameOptionPages)
+                .add(OptionImpl.createBuilder(net.irisshaders.iris.pathways.colorspace.ColorSpace.class, vanillaOpts)
+                    .setName(Component.translatable("options.iris.colorSpace"))
+                    .setTooltip(Component.translatable("options.iris.colorSpace.sodium_tooltip"))
+                    .setControl(option -> new CyclingControl<>(option, net.irisshaders.iris.pathways.colorspace.ColorSpace.class,
+                        new Component[]{Component.literal("sRGB"), Component.literal("DCI_P3"), Component.literal("Display P3"), Component.literal("REC2020"), Component.literal("Adobe RGB")}))
+                    .setBinding((options, value) -> {
+                                net.irisshaders.iris.gui.option.IrisVideoSettings.colorSpace = value;
+                                try {
+                                    net.irisshaders.iris.Iris.getIrisConfig().save();
+                                } catch (java.io.IOException e) {
+                                    net.irisshaders.iris.Iris.logger.error("Failed to save Iris config!", e);
+                                }
+                            },
+                            options -> net.irisshaders.iris.gui.option.IrisVideoSettings.colorSpace)
+                    .setImpact(OptionImpact.LOW)
+                    .setEnabled(() -> true)
+                    .build())
                 .build());
 
         groups.add(OptionGroup.createBuilder()

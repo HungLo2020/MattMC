@@ -10,7 +10,6 @@
     "conformVisibility": true
   },
   "client": [
-    "core.render.world.LevelRendererMixin",
-    "features.render.frapi.BlockRenderDispatcherMixin"
+    "core.render.world.LevelRendererMixin"
   ]
 }

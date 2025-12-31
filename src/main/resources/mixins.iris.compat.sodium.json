@@ -7,8 +7,7 @@
   "compatibilityLevel": "JAVA_8",
   "client": [
     "MixinChunkMeshBuildTask",
-    "MixinRenderSectionManagerShadow",
-    "MixinSodiumGameOptionPages"
+    "MixinRenderSectionManagerShadow"
   ],
   "injectors": {
     "defaultRequire": 1
