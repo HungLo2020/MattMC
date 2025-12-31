@@ -490,3 +490,6 @@ Hanz! Get Ze Flammenwerfer!
 Flammenwerfer: it werds flammen.
 Peace Sells!
 Tuesday's Gone
+Now with shaders!
+Now with Distant Horizons!
+LOD's!
