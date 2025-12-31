@@ -119,9 +119,8 @@ FABRIC_BASE="https://maven.fabricmc.net"
 # Provides: org.spongepowered.asm.* packages
 download_jar "${FABRIC_BASE}/net/fabricmc/sponge-mixin/0.16.5+mixin.0.8.7/sponge-mixin-0.16.5+mixin.0.8.7.jar" "sponge-mixin-0.16.5+mixin.0.8.7.jar"
 
-# Tiny Remapper - class/method/field remapping (required by Fabric Loader)
-# Provides: net.fabricmc.tinyremapper.* packages
-download_jar "${FABRIC_BASE}/net/fabricmc/tiny-remapper/0.11.2/tiny-remapper-0.11.2.jar" "tiny-remapper-0.11.2.jar"
+# NOTE: Tiny Remapper removed - unified build approach means all code uses
+# consistent mappings at compile time, making runtime remapping unnecessary
 
 # Class Tweaker - class access modification (required by Fabric Loader)
 # Provides: net.fabricmc.classtweaker.* packages

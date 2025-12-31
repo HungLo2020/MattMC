@@ -32,13 +32,12 @@ import net.fabricmc.classtweaker.api.ClassTweaker;
 import net.fabricmc.loader.impl.util.UrlConversionException;
 import net.fabricmc.loader.impl.util.UrlUtil;
 import net.fabricmc.mappingio.tree.MappingTree;
-import net.fabricmc.tinyremapper.TinyRemapper;
 
 enum LoaderLibrary {
 	FABRIC_LOADER(UrlUtil.LOADER_CODE_SOURCE),
 	MAPPING_IO(MappingTree.class),
 	// SPONGE_MIXIN removed - mixin system bypassed
-	TINY_REMAPPER(TinyRemapper.class),
+	// TINY_REMAPPER removed - no runtime remapping needed with unified build
 	CLASS_TWEAKER(ClassTweaker.class),
 	ASM(ClassReader.class),
 	ASM_ANALYSIS(Analyzer.class),

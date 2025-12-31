@@ -53,7 +53,6 @@ import net.fabricmc.loader.impl.discovery.ModCandidateImpl;
 import net.fabricmc.loader.impl.discovery.ModDiscoverer;
 import net.fabricmc.loader.impl.discovery.ModResolutionException;
 import net.fabricmc.loader.impl.discovery.ModResolver;
-import net.fabricmc.loader.impl.discovery.RuntimeModRemapper;
 import net.fabricmc.loader.impl.entrypoint.EntrypointStorage;
 import net.fabricmc.loader.impl.game.GameProvider;
 import net.fabricmc.loader.impl.launch.FabricLauncherBase;
@@ -241,15 +240,8 @@ public final class FabricLoaderImpl extends net.fabricmc.loader.FabricLoader {
 		Path cacheDir = gameDir.resolve(CACHE_DIR_NAME);
 		Path outputdir = cacheDir.resolve(PROCESSED_MODS_DIR_NAME);
 
-		// runtime mod remapping
-
-		if (remapRegularMods) {
-			if (System.getProperty(SystemProperties.REMAP_CLASSPATH_FILE) == null) {
-				Log.warn(LogCategory.MOD_REMAP, "Runtime mod remapping disabled due to no fabric.remapClasspathFile being specified. You may need to update loom.");
-			} else {
-				RuntimeModRemapper.remap(modCandidates, cacheDir.resolve(TMP_DIR_NAME), outputdir);
-			}
-		}
+		// Note: Runtime mod remapping removed - unified build approach means all code
+		// uses consistent mappings at compile time, making runtime remapping unnecessary
 
 		// shuffle mods in-dev to reduce the risk of false order reliance, apply late load requests
 

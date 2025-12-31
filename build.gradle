@@ -239,9 +239,6 @@ dependencies {
         implementation files('libraries/deps/asm-tree-9.9.jar')
         implementation files('libraries/deps/asm-util-9.9.jar')
         
-        // Tiny Remapper - class/method/field remapping
-        implementation files('libraries/deps/tiny-remapper-0.11.2.jar')
-        
         // Class Tweaker - class access modification
         implementation files('libraries/deps/class-tweaker-0.2.jar')
         
@@ -267,9 +264,6 @@ dependencies {
         implementation 'org.ow2.asm:asm-commons:9.9'
         implementation 'org.ow2.asm:asm-tree:9.9'
         implementation 'org.ow2.asm:asm-util:9.9'
-        
-        // Tiny Remapper - class/method/field remapping (requires Fabric Maven)
-        implementation 'net.fabricmc:tiny-remapper:0.11.2'
         
         // Class Tweaker - class access modification (requires Fabric Maven)
         implementation 'net.fabricmc:class-tweaker:0.2'
