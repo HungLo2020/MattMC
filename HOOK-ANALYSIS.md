@@ -6,8 +6,13 @@
 
 ### Mixin Conversion Status
 
-**Total Mixins:** 218 → **15 remaining** (203 removed)  
-**Conversion Progress:** 93.1% complete - **MILESTONE: 93% REACHED!** 🎉🎉🎉🎉🎉🎉🎉🎉🎉
+**Total Mixins:** 218 → **12 remaining** (206 removed)  
+**Conversion Progress:** 94.5% complete - **MILESTONE: 94% REACHED!** 🎉🎉🎉🎉🎉🎉🎉🎉🎉
+
+#### Removed Mixins (Session 48 - 3 mixins):
+231. ✅ `ModelBlockRendererMixin` (Sodium/FRAPI) - 1 @Overwrite → Inlined Sodium FRAPI rendering with SimpleBlockRenderContext into ModelBlockRenderer.renderModel()
+232. ✅ `ModelBlockRendererMixin` (Sodium/model.block) - 1 @Inject → Inlined Sodium fast model rendering with BakedModelEncoder into ModelBlockRenderer.renderModel()
+233. ✅ `MixinParticleFeatureRenderer` (Iris/fantastic) - Interface + 2 @WrapOperation → ParticleFeatureRenderer implements PhasedParticleEngine with opaque/translucent phase separation
 
 #### Removed Mixins (Session 47 - 3 mixins):
 228. ✅ `VertexConsumerMixin` (Sodium) - 2 @Overwrite → Inlined Sodium MatrixHelper transforms into VertexConsumer.addVertex() and setNormal() to avoid Vector3f allocations
