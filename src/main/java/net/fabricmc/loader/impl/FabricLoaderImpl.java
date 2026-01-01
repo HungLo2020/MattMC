@@ -46,7 +46,6 @@ import net.fabricmc.loader.api.ObjectShare;
 import net.fabricmc.loader.api.entrypoint.EntrypointContainer;
 import net.fabricmc.loader.impl.discovery.ArgumentModCandidateFinder;
 import net.fabricmc.loader.impl.discovery.ClasspathModCandidateFinder;
-import net.fabricmc.loader.impl.discovery.DirectoryModCandidateFinder;
 import net.fabricmc.loader.impl.discovery.ModCandidateImpl;
 import net.fabricmc.loader.impl.discovery.ModDiscoverer;
 import net.fabricmc.loader.impl.discovery.ModResolutionException;
@@ -211,7 +210,6 @@ public final class FabricLoaderImpl extends net.fabricmc.loader.FabricLoader {
 
 		ModDiscoverer discoverer = new ModDiscoverer(versionOverrides, depOverrides);
 		discoverer.addCandidateFinder(new ClasspathModCandidateFinder());
-		discoverer.addCandidateFinder(new DirectoryModCandidateFinder(getModsDirectory0(), remapRegularMods));
 		discoverer.addCandidateFinder(new ArgumentModCandidateFinder(remapRegularMods));
 
 		Map<String, Set<ModCandidateImpl>> envDisabledMods = new HashMap<>();
@@ -583,13 +581,6 @@ public final class FabricLoaderImpl extends net.fabricmc.loader.FabricLoader {
 	@Override
 	public String[] getLaunchArguments(boolean sanitize) {
 		return getGameProvider().getLaunchArguments(sanitize);
-	}
-
-	@Override
-	protected Path getModsDirectory0() {
-		String directory = System.getProperty(SystemProperties.MODS_FOLDER);
-
-		return directory != null ? Paths.get(directory) : gameDir.resolve("mods");
 	}
 
 	/**
