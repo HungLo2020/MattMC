@@ -28,9 +28,6 @@ def sodiumDir = 'modules/sodium-1.21.9'
 def irisVersion = '1.9.6'
 def irisDir = 'modules/Iris-1.21.9'
 
-// Distant Horizons toggle (controlled by gradle.properties)
-def enableDistantHorizons = project.findProperty('distanthorizons') == 'true'
-
 // Distant Horizons version (update this when upgrading Distant Horizons source)
 def distantHorizonsVersion = '2.4.4-b-dev'
 def distantHorizonsDir = 'modules/distant-horizons'
@@ -289,22 +286,20 @@ dependencies {
     
     // ===== DISTANT HORIZONS DEPENDENCIES =====
     // Additional dependencies required for Distant Horizons core
-    if (enableDistantHorizons) {
-        // LWJGL JAWT for embedded GUI frames (no natives needed - pure Java bridge)
-        implementation 'org.lwjgl:lwjgl-jawt:3.3.3'
-        
-        // Compression libraries
-        implementation 'com.github.luben:zstd-jni:1.5.7-6'
-        implementation 'org.lz4:lz4-java:1.8.0'
-        implementation 'org.tukaani:xz:1.9'
-        
-        // Database
-        implementation 'org.xerial:sqlite-jdbc:3.47.2.0'
-        
-        // Configuration
-        implementation 'com.electronwill.night-config:toml:3.6.6'
-        implementation 'com.electronwill.night-config:json:3.6.6'
-    }
+    // LWJGL JAWT for embedded GUI frames (no natives needed - pure Java bridge)
+    implementation 'org.lwjgl:lwjgl-jawt:3.3.3'
+    
+    // Compression libraries
+    implementation 'com.github.luben:zstd-jni:1.5.7-6'
+    implementation 'org.lz4:lz4-java:1.8.0'
+    implementation 'org.tukaani:xz:1.9'
+    
+    // Database
+    implementation 'org.xerial:sqlite-jdbc:3.47.2.0'
+    
+    // Configuration
+    implementation 'com.electronwill.night-config:toml:3.6.6'
+    implementation 'com.electronwill.night-config:json:3.6.6'
     
     // ===== TESTING DEPENDENCIES =====
     // Testing dependencies - only available in test scope, excluded from production builds
@@ -344,17 +339,6 @@ sourceSets {
             
             // Exclude bundled Mojang sources that shadow Maven dependencies
             exclude 'com/mojang/authlib/**'
-            
-            // Exclude DH implementation classes when Distant Horizons is disabled
-            // Keep DHCompat.java as it has fallback logic for when DH isn't present
-            if (!enableDistantHorizons) {
-                exclude '**/compat/dh/DHCompatInternal.java'
-                exclude '**/compat/dh/LodRendererEvents.java'
-                exclude '**/compat/dh/IrisLodRenderProgram.java'
-                exclude '**/compat/dh/IrisGenericRenderProgram.java'
-                exclude '**/compat/dh/DhFrameBufferWrapper.java'
-                exclude '**/compat/dh/DHMixinConfigPlugin.java'
-            }
         }
         resources {
             srcDir 'src/main/resources'
