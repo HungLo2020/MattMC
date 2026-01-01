@@ -13,9 +13,6 @@ public class CommonLinks {
 	public static final URI LICENSES = URI.create("https://aka.ms/MinecraftJavaLicenses");
 	public static final URI BUY_MINECRAFT_JAVA = URI.create("https://aka.ms/BuyMinecraftJava");
 	public static final URI ACCOUNT_SETTINGS = URI.create("https://aka.ms/JavaAccountSettings");
-	public static final URI SNAPSHOT_FEEDBACK = URI.create("https://aka.ms/snapshotfeedback?ref=game");
-	public static final URI RELEASE_FEEDBACK = URI.create("https://aka.ms/javafeedback?ref=game");
-	public static final URI SNAPSHOT_BUGS_FEEDBACK = URI.create("https://aka.ms/snapshotbugs?ref=game");
 	public static final URI GENERAL_HELP = URI.create("https://aka.ms/Minecraft-Support");
 	public static final URI ACCESSIBILITY_HELP = URI.create("https://aka.ms/MinecraftJavaAccessibility");
 	public static final URI REPORTING_HELP = URI.create("https://aka.ms/aboutjavareporting");
