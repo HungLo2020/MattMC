@@ -8,5 +8,5 @@ import net.minecraft.api.Environment;
 @DontObfuscate
 public enum PolygonMode {
 	FILL,
-	WIREFRAME;
+	WIREFRAME
 }

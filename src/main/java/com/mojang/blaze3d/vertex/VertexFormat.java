@@ -96,13 +96,11 @@ public class VertexFormat implements net.irisshaders.iris.pipeline.programs.Vert
 	}
 
 	public boolean equals(Object object) {
-		return this == object
-			? true
-			: object instanceof VertexFormat vertexFormat
-				&& this.elementsMask == vertexFormat.elementsMask
-				&& this.vertexSize == vertexFormat.vertexSize
-				&& this.names.equals(vertexFormat.names)
-				&& Arrays.equals(this.offsetsByElement, vertexFormat.offsetsByElement);
+		return this == object || object instanceof VertexFormat vertexFormat
+                && this.elementsMask == vertexFormat.elementsMask
+                && this.vertexSize == vertexFormat.vertexSize
+                && this.names.equals(vertexFormat.names)
+                && Arrays.equals(this.offsetsByElement, vertexFormat.offsetsByElement);
 	}
 
 	public int hashCode() {

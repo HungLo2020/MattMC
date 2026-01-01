@@ -149,9 +149,6 @@ public abstract class ChunkAccess implements BiomeManager.NoiseBiomeSource, Ligh
 		return -1;
 	}
 
-	@Deprecated(
-		forRemoval = true
-	)
 	public int getHighestSectionPosition() {
 		int i = this.getHighestFilledSectionIndex();
 		return i == -1 ? this.getMinY() : SectionPos.sectionToBlockCoord(this.getSectionYFromSectionIndex(i));

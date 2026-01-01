@@ -86,7 +86,7 @@ public enum VaultState implements StringRepresentable {
 					this.ejectResultItem(serverLevel, blockPos, vaultServerData.popNextItemToEject(), f);
 					vaultSharedData.setDisplayItem(vaultServerData.getNextItemToEject());
 					boolean bl = vaultServerData.getItemsToEject().isEmpty();
-					int i = bl ? 20 : 20;
+					int i = 20; //int i = bl ? 20 : 20;
 					vaultServerData.pauseStateUpdatingUntil(serverLevel.getGameTime() + i);
 					yield EJECTING;
 				}

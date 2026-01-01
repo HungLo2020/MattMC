@@ -8,5 +8,5 @@ import net.minecraft.api.Environment;
 @DontObfuscate
 public enum LogicOp {
 	NONE,
-	OR_REVERSE;
+	OR_REVERSE
 }

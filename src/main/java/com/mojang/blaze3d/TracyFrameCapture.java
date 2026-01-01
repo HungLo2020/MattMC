@@ -116,6 +116,6 @@ public class TracyFrameCapture implements AutoCloseable {
 	static enum Status {
 		WAITING_FOR_CAPTURE,
 		WAITING_FOR_COPY,
-		WAITING_FOR_UPLOAD;
-	}
+		WAITING_FOR_UPLOAD
+    }
 }

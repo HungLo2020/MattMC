@@ -37,7 +37,7 @@ public interface SignalGetter extends BlockGetter {
 							return i;
 						} else {
 							i = Math.max(i, this.getDirectSignal(blockPos.east(), Direction.EAST));
-							return i >= 15 ? i : i;
+							return i; //This line used to be this, changed for Conditional Expression with identical branches:  return i >= 15 ? i : i;
 						}
 					}
 				}

@@ -8,5 +8,5 @@ import net.minecraft.api.Environment;
 @DontObfuscate
 public enum AddressMode {
 	REPEAT,
-	CLAMP_TO_EDGE;
+	CLAMP_TO_EDGE
 }

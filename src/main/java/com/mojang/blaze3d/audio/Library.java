@@ -329,6 +329,6 @@ public class Library {
 	@Environment(EnvType.CLIENT)
 	public static enum Pool {
 		STATIC,
-		STREAMING;
-	}
+		STREAMING
+    }
 }
