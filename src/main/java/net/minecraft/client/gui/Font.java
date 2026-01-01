@@ -305,6 +305,16 @@ public class Font {
 		}
 
 		public boolean accept(int i, Style style, int j) {
+			// DEBUG: Log ALL accept calls to see what styles are being processed
+			char c = (char)j;
+			if (c == '6' || c == '8' || c == '5' || c == '[' || c == ']') {
+				System.out.println("=== FONT ACCEPT CALLED ===");
+				System.out.println("Character: " + c + " (code " + j + ")");
+				System.out.println("Style: " + style);
+				System.out.println("Style color: " + style.getColor());
+				System.out.println("Style clickEvent: " + style.getClickEvent());
+			}
+			
 			BakedGlyph bakedGlyph = Font.this.getGlyph(j, style);
 			return this.accept(i, style, bakedGlyph);
 		}
