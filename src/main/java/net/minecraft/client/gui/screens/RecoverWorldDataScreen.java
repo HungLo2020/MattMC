@@ -22,7 +22,6 @@ import net.minecraft.nbt.ReportedNbtException;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
-import net.minecraft.util.CommonLinks;
 import net.minecraft.world.level.storage.LevelStorageSource.LevelStorageAccess;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
@@ -32,7 +31,6 @@ public class RecoverWorldDataScreen extends Screen {
 	private static final Logger LOGGER = LogUtils.getLogger();
 	private static final int SCREEN_SIDE_MARGIN = 25;
 	private static final Component TITLE = Component.translatable("recover_world.title").withStyle(ChatFormatting.BOLD);
-	private static final Component BUGTRACKER_BUTTON = Component.translatable("recover_world.bug_tracker");
 	private static final Component RESTORE_BUTTON = Component.translatable("recover_world.restore");
 	private static final Component NO_FALLBACK_TOOLTIP = Component.translatable("recover_world.no_fallback");
 	private static final Component DONE_TITLE = Component.translatable("recover_world.done.title");
@@ -67,14 +65,13 @@ public class RecoverWorldDataScreen extends Screen {
 		this.layout.addChild(new StringWidget(this.title, minecraft.font));
 		this.layout.addChild(this.messageWidget.setCentered(true));
 		this.layout.addChild(this.issuesWidget);
-		LinearLayout linearLayout = LinearLayout.horizontal().spacing(5);
-		linearLayout.addChild(Button.builder(BUGTRACKER_BUTTON, ConfirmLinkScreen.confirmLink(this, CommonLinks.SNAPSHOT_BUGS_FEEDBACK)).size(120, 20).build());
-		linearLayout.addChild(
-				Button.builder(RESTORE_BUTTON, button -> this.attemptRestore(minecraft)).size(120, 20).tooltip(bl ? null : Tooltip.create(NO_FALLBACK_TOOLTIP)).build()
-			)
-			.active = bl;
-		this.layout.addChild(linearLayout);
-		this.layout.addChild(Button.builder(CommonComponents.GUI_BACK, button -> this.onClose()).size(120, 20).build());
+		this.layout.addChild(
+			Button.builder(RESTORE_BUTTON, button -> this.attemptRestore(minecraft))
+				.size(200, 20)
+				.tooltip(bl ? null : Tooltip.create(NO_FALLBACK_TOOLTIP))
+				.build()
+		).active = bl;
+		this.layout.addChild(Button.builder(CommonComponents.GUI_BACK, button -> this.onClose()).size(200, 20).build());
 		this.layout.visitWidgets(this::addRenderableWidget);
 	}
 

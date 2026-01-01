@@ -1,11 +1,9 @@
 package net.minecraft.client.gui.screens;
 
-import java.net.URI;
 import java.util.Optional;
 import java.util.function.Supplier;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
-import net.minecraft.SharedConstants;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.Options;
 import net.minecraft.client.gui.GuiGraphics;
@@ -15,26 +13,22 @@ import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.components.toasts.NowPlayingToast;
 import net.minecraft.client.gui.layouts.FrameLayout;
 import net.minecraft.client.gui.layouts.GridLayout;
-import net.minecraft.client.gui.layouts.HeaderAndFooterLayout;
 import net.minecraft.client.gui.screens.achievement.StatsScreen;
 import net.minecraft.client.gui.screens.advancements.AdvancementsScreen;
 import net.minecraft.client.gui.screens.options.OptionsScreen;
 import net.minecraft.client.gui.screens.social.SocialInteractionsScreen;
 import net.minecraft.client.multiplayer.ClientLevel;
-import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.core.Holder;
 import net.minecraft.core.HolderSet;
 import net.minecraft.core.Registry;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.ServerLinks;
 import net.minecraft.server.dialog.Dialog;
 import net.minecraft.server.dialog.Dialogs;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.tags.DialogTags;
-import net.minecraft.util.CommonLinks;
 import org.jetbrains.annotations.Nullable;
 
 @Environment(EnvType.CLIENT)
@@ -47,9 +41,6 @@ public class PauseScreen extends Screen {
 	private static final Component RETURN_TO_GAME = Component.translatable("menu.returnToGame");
 	private static final Component ADVANCEMENTS = Component.translatable("gui.advancements");
 	private static final Component STATS = Component.translatable("gui.stats");
-	private static final Component SEND_FEEDBACK = Component.translatable("menu.sendFeedback");
-	private static final Component REPORT_BUGS = Component.translatable("menu.reportBugs");
-	private static final Component FEEDBACK_SUBSCREEN = Component.translatable("menu.feedback");
 	private static final Component OPTIONS = Component.translatable("menu.options");
 	private static final Component SHARE_TO_LAN = Component.translatable("menu.shareToLan");
 	private static final Component PLAYER_REPORTING = Component.translatable("menu.playerReporting");
@@ -90,10 +81,8 @@ public class PauseScreen extends Screen {
 		rowHelper.addChild(this.openScreenButton(ADVANCEMENTS, () -> new AdvancementsScreen(this.minecraft.player.connection.getAdvancements(), this)));
 		rowHelper.addChild(this.openScreenButton(STATS, () -> new StatsScreen(this, this.minecraft.player.getStats())));
 		Optional<? extends Holder<Dialog>> optional = this.getCustomAdditions();
-		if (optional.isEmpty()) {
-			addFeedbackButtons(this, rowHelper);
-		} else {
-			this.addFeedbackSubscreenAndCustomDialogButtons(this.minecraft, (Holder<Dialog>)optional.get(), rowHelper);
+		if (optional.isPresent()) {
+			this.addCustomDialogButton(this.minecraft, (Holder<Dialog>)optional.get(), rowHelper);
 		}
 
 		rowHelper.addChild(this.openScreenButton(OPTIONS, () -> new OptionsScreen(this, this.minecraft.options)));
@@ -138,22 +127,13 @@ public class PauseScreen extends Screen {
 		return !serverLinks.isEmpty() ? registry.get(Dialogs.SERVER_LINKS) : Optional.empty();
 	}
 
-	static void addFeedbackButtons(Screen screen, GridLayout.RowHelper rowHelper) {
-		rowHelper.addChild(
-			openLinkButton(screen, SEND_FEEDBACK, SharedConstants.getCurrentVersion().stable() ? CommonLinks.RELEASE_FEEDBACK : CommonLinks.SNAPSHOT_FEEDBACK)
-		);
-		rowHelper.addChild(openLinkButton(screen, REPORT_BUGS, CommonLinks.SNAPSHOT_BUGS_FEEDBACK)).active = !SharedConstants.getCurrentVersion()
-			.dataVersion()
-			.isSideSeries();
-	}
-
-	private void addFeedbackSubscreenAndCustomDialogButtons(Minecraft minecraft, Holder<Dialog> holder, GridLayout.RowHelper rowHelper) {
-		rowHelper.addChild(this.openScreenButton(FEEDBACK_SUBSCREEN, () -> new PauseScreen.FeedbackSubScreen(this)));
+	private void addCustomDialogButton(Minecraft minecraft, Holder<Dialog> holder, GridLayout.RowHelper rowHelper) {
 		rowHelper.addChild(
 			Button.builder(((Dialog)holder.value()).common().computeExternalTitle(), button -> minecraft.player.connection.showDialog(holder, this))
-				.width(98)
+				.width(204)
 				.tooltip(CUSTOM_OPTIONS_TOOLTIP)
-				.build()
+				.build(),
+			2
 		);
 	}
 
@@ -188,43 +168,5 @@ public class PauseScreen extends Screen {
 
 	private Button openScreenButton(Component component, Supplier<Screen> supplier) {
 		return Button.builder(component, button -> this.minecraft.setScreen((Screen)supplier.get())).width(98).build();
-	}
-
-	private static Button openLinkButton(Screen screen, Component component, URI uRI) {
-		return Button.builder(component, ConfirmLinkScreen.confirmLink(screen, uRI)).width(98).build();
-	}
-
-	@Environment(EnvType.CLIENT)
-	static class FeedbackSubScreen extends Screen {
-		private static final Component TITLE = Component.translatable("menu.feedback.title");
-		public final Screen parent;
-		private final HeaderAndFooterLayout layout = new HeaderAndFooterLayout(this);
-
-		protected FeedbackSubScreen(Screen screen) {
-			super(TITLE);
-			this.parent = screen;
-		}
-
-		@Override
-		protected void init() {
-			this.layout.addTitleHeader(TITLE, this.font);
-			GridLayout gridLayout = this.layout.addToContents(new GridLayout());
-			gridLayout.defaultCellSetting().padding(4, 4, 4, 0);
-			GridLayout.RowHelper rowHelper = gridLayout.createRowHelper(2);
-			PauseScreen.addFeedbackButtons(this, rowHelper);
-			this.layout.addToFooter(Button.builder(CommonComponents.GUI_BACK, button -> this.onClose()).width(200).build());
-			this.layout.visitWidgets(this::addRenderableWidget);
-			this.repositionElements();
-		}
-
-		@Override
-		protected void repositionElements() {
-			this.layout.arrangeElements();
-		}
-
-		@Override
-		public void onClose() {
-			this.minecraft.setScreen(this.parent);
-		}
 	}
 }
