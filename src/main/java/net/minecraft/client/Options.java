@@ -306,30 +306,6 @@ public class Options {
 	private final OptionInstance<Boolean> highContrastBlockOutline = OptionInstance.createBoolean(
 		"options.accessibility.high_contrast_block_outline", OptionInstance.cachedConstantTooltip(HIGH_CONTRAST_BLOCK_OUTLINE_TOOLTIP), false
 	);
-	private static final Component DARK_MODE_TOOLTIP = Component.translatable("options.darkMode.tooltip");
-	
-	/**
-	 * Custom option for enabling dark mode in UI elements.
-	 * <p>
-	 * When enabled, applies color transformations to UI elements to create a dark theme.
-	 * The actual color transformation is handled in {@link net.minecraft.client.gui.GuiGraphics}
-	 * during rendering.
-	 * </p>
-	 * <p>
-	 * This is a MattMC custom feature not present in vanilla Minecraft.
-	 * Default value is {@code true} (dark mode enabled by default).
-	 * </p>
-	 * 
-	 * @see net.minecraft.client.gui.GuiGraphics Color rendering with dark mode support
-	 */
-	private final OptionInstance<Boolean> darkMode = OptionInstance.createBoolean(
-		"options.darkMode",
-		OptionInstance.cachedConstantTooltip(DARK_MODE_TOOLTIP),
-		true,
-		boolean_ -> {
-			// Trigger UI refresh when toggled (color transform happens in GuiGraphics)
-		}
-	);
 	@Nullable
 	public String fullscreenVideoModeString;
 	public boolean hideServerAddress;
@@ -916,20 +892,6 @@ public class Options {
 		return this.highContrastBlockOutline;
 	}
 
-	/**
-	 * Gets the dark mode option.
-	 * <p>
-	 * This is a MattMC custom option for enabling dark theme in UI elements.
-	 * When enabled, UI colors are transformed to darker variants for better readability
-	 * in low-light conditions.
-	 * </p>
-	 * 
-	 * @return The dark mode option instance
-	 */
-	public OptionInstance<Boolean> darkMode() {
-		return this.darkMode;
-	}
-
 	public OptionInstance<HumanoidArm> mainHand() {
 		return this.mainHand;
 	}
@@ -1303,7 +1265,6 @@ public class Options {
 		fieldAccess.process("damageTiltStrength", this.damageTiltStrength);
 		fieldAccess.process("highContrast", this.highContrast);
 		fieldAccess.process("highContrastBlockOutline", this.highContrastBlockOutline);
-		fieldAccess.process("darkMode", this.darkMode);
 		this.resourcePacks = fieldAccess.process("resourcePacks", this.resourcePacks, Options::readListOfStrings, GSON::toJson);
 		this.incompatibleResourcePacks = fieldAccess.process("incompatibleResourcePacks", this.incompatibleResourcePacks, Options::readListOfStrings, GSON::toJson);
 		this.lastMpIp = fieldAccess.process("lastServer", this.lastMpIp);
