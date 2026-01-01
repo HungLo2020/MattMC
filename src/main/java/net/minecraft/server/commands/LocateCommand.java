@@ -171,15 +171,43 @@ public class LocateCommand {
 		BlockPos blockPos2 = pair.getFirst();
 		int i = bl ? Mth.floor(Mth.sqrt((float)blockPos.distSqr(blockPos2))) : Mth.floor(dist(blockPos.getX(), blockPos.getZ(), blockPos2.getX(), blockPos2.getZ()));
 		String string3 = bl ? String.valueOf(blockPos2.getY()) : "~";
-		Component component = ComponentUtils.wrapInSquareBrackets(
-			Component.translatable("chat.coordinates", blockPos2.getX(), string3, blockPos2.getZ())
-				.withStyle(
-					style -> style.withColor(ChatFormatting.GREEN)
-						.withClickEvent(new ClickEvent.SuggestCommand("/tp @s " + blockPos2.getX() + " " + string3 + " " + blockPos2.getZ()))
-						.withHoverEvent(new HoverEvent.ShowText(Component.translatable("chat.coordinates.tooltip")))
-				)
-		);
-		commandSourceStack.sendSuccess(() -> Component.translatable(string, string2, component, i), false);
+		
+		// DEBUG: Create component with style
+		Component component = ComponentUtils.wrapInSquareBrackets(Component.translatable("chat.coordinates", blockPos2.getX(), string3, blockPos2.getZ()))
+			.withStyle(
+				style -> style.withColor(ChatFormatting.GREEN)
+					.withClickEvent(new ClickEvent.SuggestCommand("/tp @s " + blockPos2.getX() + " " + string3 + " " + blockPos2.getZ()))
+					.withHoverEvent(new HoverEvent.ShowText(Component.translatable("chat.coordinates.tooltip")))
+			);
+		
+		// DEBUG: Log component details immediately after creation
+		LOGGER.info("=== LOCATE COMMAND DEBUG ===");
+		LOGGER.info("Created component: {}", component);
+		LOGGER.info("Component style: {}", component.getStyle());
+		LOGGER.info("Style color: {}", component.getStyle().getColor());
+		LOGGER.info("Style click event: {}", component.getStyle().getClickEvent());
+		LOGGER.info("Style hover event: {}", component.getStyle().getHoverEvent());
+		LOGGER.info("Style is empty: {}", component.getStyle().isEmpty());
+		
+		commandSourceStack.sendSuccess(() -> {
+			Component finalMessage = Component.translatable(string, string2, component, i);
+			// DEBUG: Log final message details
+			LOGGER.info("=== FINAL MESSAGE DEBUG ===");
+			LOGGER.info("Final message: {}", finalMessage);
+			LOGGER.info("Final message style: {}", finalMessage.getStyle());
+			LOGGER.info("Siblings count: {}", finalMessage.getSiblings().size());
+			if (!finalMessage.getSiblings().isEmpty()) {
+				for (int j = 0; j < finalMessage.getSiblings().size(); j++) {
+					Component sibling = finalMessage.getSiblings().get(j);
+					LOGGER.info("Sibling {}: {}", j, sibling);
+					LOGGER.info("Sibling {} style: {}", j, sibling.getStyle());
+					LOGGER.info("Sibling {} style color: {}", j, sibling.getStyle().getColor());
+					LOGGER.info("Sibling {} click event: {}", j, sibling.getStyle().getClickEvent());
+				}
+			}
+			return finalMessage;
+		}, false);
+		
 		LOGGER.info("Locating element {} took {} ms", string2, duration.toMillis());
 		return i;
 	}
