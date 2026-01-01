@@ -165,6 +165,12 @@ public class SodiumGameOptionPages {
 
         groups.add(OptionGroup.createBuilder()
                 .add(OptionImpl.createBuilder(boolean.class, vanillaOpts)
+                        .setName(Component.translatable("options.darkMode"))
+                        .setTooltip(Component.translatable("options.darkMode.tooltip"))
+                        .setControl(TickBoxControl::new)
+                        .setBinding(new VanillaBooleanOptionBinding(Minecraft.getInstance().options.darkMode()))
+                        .build())
+                .add(OptionImpl.createBuilder(boolean.class, vanillaOpts)
                         .setName(Component.translatable("options.viewBobbing"))
                         .setTooltip(Component.translatable("sodium.options.view_bobbing.tooltip"))
                         .setControl(TickBoxControl::new)
