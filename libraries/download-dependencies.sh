@@ -128,9 +128,7 @@ download_jar "${FABRIC_BASE}/net/fabricmc/mapping-io/0.7.1/mapping-io-0.7.1.jar"
 
 # NOTE: MixinExtras removed - mixin system completely bypassed, all mixins converted to hooks
 
-# Launchwrapper - legacy launch wrapper (required for some Fabric Loader components)
-# Provides: net.minecraft.launchwrapper.* packages
-download_jar "${MOJANG_BASE}/net/minecraft/launchwrapper/1.12/launchwrapper-1.12.jar" "launchwrapper-1.12.jar"
+# NOTE: Launchwrapper removed - legacy code removed from Fabric Loader
 
 # NOTE: Access Widener removed - access modifications already applied in source
 
