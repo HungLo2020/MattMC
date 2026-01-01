@@ -18,12 +18,15 @@ EXCLUDES=(
 
 # --- Derive names/paths ---
 SCRIPT_DIR="$(cd -- "$(dirname -- "$0")" && pwd)"
-cd "$SCRIPT_DIR"
 
-REPO_NAME="$(basename "$SCRIPT_DIR")"   # should be "MattMC"
+# Find the git repository root
+REPO_ROOT="$(cd "$SCRIPT_DIR" && git rev-parse --show-toplevel 2>/dev/null || echo "$SCRIPT_DIR")"
+cd "$REPO_ROOT"
+
+REPO_NAME="$(basename "$REPO_ROOT")"   # should be "MattMC"
 TS="$(date +%Y%m%d-%H%M%S)"
 ARCHIVE_NAME="${REPO_NAME}-${TS}.zip"
-ARCHIVE_PATH="${SCRIPT_DIR}/${ARCHIVE_NAME}"
+ARCHIVE_PATH="${REPO_ROOT}/${ARCHIVE_NAME}"
 
 # --- Make sure destinations exist ---
 mkdir -p "$ONEDRIVE_DIR"
