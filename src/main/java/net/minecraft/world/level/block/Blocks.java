@@ -861,6 +861,7 @@ public class Blocks {
 			.sound(SoundType.GRASS)
 			.offsetType(BlockBehaviour.OffsetType.XZ)
 			.pushReaction(PushReaction.DESTROY)
+			.lightLevel(state -> 7)
 	);
 	public static final Block POPPY = register(
 		"poppy",
