@@ -233,6 +233,11 @@ public class ChatComponent {
 			i -= icon.width + 4 + 2;
 		}
 
+		// DEBUG: Check chat options
+		LOGGER.info("=== CHAT OPTIONS DEBUG ===");
+		LOGGER.info("chatColors enabled: {}", this.minecraft.options.chatColors().get());
+		LOGGER.info("chatLinks enabled: {}", this.minecraft.options.chatLinks().get());
+		
 		List<FormattedCharSequence> list = ComponentRenderUtils.wrapComponents(guiMessage.content(), i, this.minecraft.font);
 		boolean bl = this.isChatFocused();
 
