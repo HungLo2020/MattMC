@@ -8,9 +8,7 @@ public class DarkModeColorTransform {
 	private static final int BACKGROUND_DARKEN = 0x40;       // Darken backgrounds moderately
 	
 	/**
-	 * Transform a color for dark mode while preserving alpha channel.
-	 * Skips transformation for neutral white tints (used for texture rendering)
-	 * to prevent buttons and sprites from being darkened.
+	 * Transform a color for dark mode while preserving alpha channel
 	 */
 	public static int transformColor(int color, boolean isDarkMode) {
 		if (!isDarkMode) {
@@ -21,12 +19,6 @@ public class DarkModeColorTransform {
 		int red = ARGB.red(color);
 		int green = ARGB.green(color);
 		int blue = ARGB.blue(color);
-		
-		// Don't transform neutral white tints (used for texture rendering like buttons, icons, etc.)
-		// This preserves the original appearance of sprites and textures
-		if (red >= 250 && green >= 250 && blue >= 250) {
-			return color;  // Keep white/near-white tints unchanged
-		}
 		
 		// Calculate luminance to determine if color is light or dark
 		float luminance = (0.299f * red + 0.587f * green + 0.114f * blue) / 255.0f;
