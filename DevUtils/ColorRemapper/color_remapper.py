@@ -20,11 +20,6 @@ def hex_to_rgb(hex_color):
     return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
 
 
-def rgb_to_hex(rgb):
-    """Convert RGB tuple to hex color string."""
-    return '{:02x}{:02x}{:02x}'.format(rgb[0], rgb[1], rgb[2])
-
-
 def read_color_mappings(mapping_file):
     """
     Read color mappings from a text file.
