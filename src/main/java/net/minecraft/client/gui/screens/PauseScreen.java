@@ -43,7 +43,6 @@ public class PauseScreen extends Screen {
 	private static final Component STATS = Component.translatable("gui.stats");
 	private static final Component OPTIONS = Component.translatable("menu.options");
 	private static final Component SHARE_TO_LAN = Component.translatable("menu.shareToLan");
-	private static final Component PLAYER_REPORTING = Component.translatable("menu.playerReporting");
 	private static final Component GAME = Component.translatable("menu.game");
 	private static final Component PAUSED = Component.translatable("menu.paused");
 	private static final Component TAKE_PANORAMA = Component.translatable("menu.takePanorama");
