@@ -179,7 +179,7 @@ def main():
     
     print(f"ColorRemapper - Processing directory: {script_dir}")
     if all_colors_mode:
-        print("Mode: Darken ALL colors (--A switch enabled)")
+        print("Mode: Darken ALL colors (-A switch enabled)")
     else:
         print("Mode: Darken specific colors from mappings file")
     print("=" * 60)
