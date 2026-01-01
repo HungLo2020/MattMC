@@ -91,7 +91,7 @@ public class PauseScreen extends Screen {
 			Button.builder(TAKE_PANORAMA, button -> {
 				// Placeholder for panorama capture functionality
 				// TODO: Implement panorama capture
-			}).width(204).build(),
+			}).width(BUTTON_WIDTH_FULL).build(),
 			2
 		);
 		if (this.minecraft.hasSingleplayerServer() && !this.minecraft.getSingleplayerServer().isPublished()) {
