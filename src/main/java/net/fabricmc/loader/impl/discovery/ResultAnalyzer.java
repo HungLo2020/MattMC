@@ -38,7 +38,6 @@ import net.fabricmc.loader.api.metadata.version.VersionInterval;
 import net.fabricmc.loader.impl.discovery.ModSolver.AddModVar;
 import net.fabricmc.loader.impl.discovery.ModSolver.InactiveReason;
 import net.fabricmc.loader.impl.metadata.AbstractModMetadata;
-import net.fabricmc.loader.impl.util.Localization;
 import net.fabricmc.loader.impl.util.StringUtil;
 import net.fabricmc.loader.impl.util.version.VersionIntervalImpl;
 
@@ -56,11 +55,11 @@ final class ResultAnalyzer {
 			boolean suggestFix = true;
 
 			if (result.fix != null) {
-				pw.printf("\n%s", Localization.format("resolution.solutionHeader"));
+				pw.printf("\n%s", "A potential solution has been determined, this may resolve your problem:");
 
 				formatFix(result.fix, result, selectedMods, modsById, envDisabledMods, envType, pw);
 
-				pw.printf("\n%s", Localization.format("resolution.depListHeader"));
+				pw.printf("\n%s", "More details:");
 				prefix = "\t";
 				suggestFix = false;
 			}
@@ -85,7 +84,7 @@ final class ResultAnalyzer {
 			}
 
 			if (SHOW_INACTIVE && result.fix != null && !result.fix.inactiveMods.isEmpty()) {
-				pw.printf("\n%s", Localization.format("resolution.inactiveMods"));
+				pw.printf("\n%s", "Inactive mods:");
 
 				List<Entry<ModCandidateImpl, InactiveReason>> entries = new ArrayList<>(result.fix.inactiveMods.entrySet());
 
@@ -109,10 +108,10 @@ final class ResultAnalyzer {
 					InactiveReason reason = entry.getValue();
 					String reasonKey = String.format("resolution.inactive.%s", reason.id);
 
-					pw.printf("\n\t - %s", Localization.format("resolution.inactive",
+					pw.printf("\n\t - %s", formatEnglish("resolution.inactive",
 							getName(mod),
 							getVersion(mod),
-							Localization.format(reasonKey)));
+							formatEnglish(reasonKey)));
 					//appendJijInfo(mod, "\t", false, pw); TODO: show this without spamming too much
 				}
 			}
@@ -129,22 +128,22 @@ final class ResultAnalyzer {
 			Set<ModCandidateImpl> envDisabledAlternatives = envDisabledMods.get(mod.getId());
 
 			if (envDisabledAlternatives == null) {
-				pw.printf("\n\t - %s", Localization.format("resolution.solution.addMod",
+				pw.printf("\n\t - %s", formatEnglish("resolution.solution.addMod",
 						mod.getId(),
 						formatVersionRequirements(mod.getVersionIntervals())));
 			} else {
 				String envKey = String.format("environment.%s", envType.name().toLowerCase(Locale.ENGLISH));
 
-				pw.printf("\n\t - %s", Localization.format("resolution.solution.replaceModEnvDisabled",
+				pw.printf("\n\t - %s", formatEnglish("resolution.solution.replaceModEnvDisabled",
 						formatOldMods(envDisabledAlternatives),
 						mod.getId(),
 						formatVersionRequirements(mod.getVersionIntervals()),
-						Localization.format(envKey)));
+						formatEnglish(envKey)));
 			}
 		}
 
 		for (ModCandidateImpl mod : fix.modsToRemove) {
-			pw.printf("\n\t - %s", Localization.format("resolution.solution.removeMod", getName(mod), getVersion(mod), mod.getLocalPath()));
+			pw.printf("\n\t - %s", formatEnglish("resolution.solution.removeMod", getName(mod), getVersion(mod), mod.getLocalPath()));
 		}
 
 		for (Entry<AddModVar, List<ModCandidateImpl>> entry : fix.modReplacements.entrySet()) {
@@ -163,7 +162,7 @@ final class ResultAnalyzer {
 					if (alts != null && !alts.isEmpty()) newModName = getName(alts.get(0));
 				}
 
-				pw.printf("\n\t - %s", Localization.format("resolution.solution.replaceMod",
+				pw.printf("\n\t - %s", formatEnglish("resolution.solution.replaceMod",
 						oldModsFormatted,
 						newModName,
 						formatVersionRequirements(newMod.getVersionIntervals())));
@@ -173,11 +172,11 @@ final class ResultAnalyzer {
 						Collections.singletonList(new VersionIntervalImpl(oldMod.getVersion(), true, oldMod.getVersion(), true))).isEmpty();
 
 				if (!hasOverlap) { // required version range doesn't overlap installed version, recommend range as-is
-					pw.printf("\n\t - %s", Localization.format("resolution.solution.replaceModVersion",
+					pw.printf("\n\t - %s", formatEnglish("resolution.solution.replaceModVersion",
 							oldModsFormatted,
 							formatVersionRequirements(newMod.getVersionIntervals())));
 				} else { // required version range overlaps installed version, recommend range without
-					pw.printf("\n\t - %s", Localization.format("resolution.solution.replaceModVersionDifferent",
+					pw.printf("\n\t - %s", formatEnglish("resolution.solution.replaceModVersionDifferent",
 							oldModsFormatted,
 							formatVersionRequirements(newMod.getVersionIntervals())));
 
@@ -191,7 +190,7 @@ final class ResultAnalyzer {
 
 						if (mod != null) {
 							if (dep.matches(mod.getVersion()) != dep.getKind().isPositive()) {
-								pw.printf("\n\t\t - %s", Localization.format("resolution.solution.replaceModVersionDifferent.reqSupportedModVersion",
+								pw.printf("\n\t\t - %s", formatEnglish("resolution.solution.replaceModVersionDifferent.reqSupportedModVersion",
 										mod.getId(),
 										getVersion(mod)));
 								foundAny = true;
@@ -202,7 +201,7 @@ final class ResultAnalyzer {
 
 						for (AddModVar addMod : fix.modReplacements.keySet()) {
 							if (addMod.getId().equals(dep.getModId())) {
-								pw.printf("\n\t\t - %s", Localization.format("resolution.solution.replaceModVersionDifferent.reqSupportedModVersions",
+								pw.printf("\n\t\t - %s", formatEnglish("resolution.solution.replaceModVersionDifferent.reqSupportedModVersions",
 										addMod.getId(),
 										formatVersionRequirements(addMod.getVersionIntervals())));
 								foundAny = true;
@@ -212,7 +211,7 @@ final class ResultAnalyzer {
 					}
 
 					if (!foundAny) {
-						pw.printf("\n\t\t - %s", Localization.format("resolution.solution.replaceModVersionDifferent.unknown"));
+						pw.printf("\n\t\t - %s", "Other constraints that can't be automatically determined");
 					}
 				}
 			}
@@ -299,11 +298,11 @@ final class ResultAnalyzer {
 		}
 
 		String key = String.format("resolution.%s.%s", dep.getKind().getKey(), reason);
-		pw.printf("\n%s - %s", prefix, StringUtil.capitalize(Localization.format(key, args)));
+		pw.printf("\n%s - %s", prefix, StringUtil.capitalize(formatEnglish(key, args)));
 
 		if (suggestFix) {
 			key = String.format("resolution.%s.suggestion", dep.getKind().getKey());
-			pw.printf("\n%s\t - %s", prefix, StringUtil.capitalize(Localization.format(key, args)));
+			pw.printf("\n%s\t - %s", prefix, StringUtil.capitalize(formatEnglish(key, args)));
 		}
 
 		if (SHOW_PATH_INFO) {
@@ -367,15 +366,15 @@ final class ResultAnalyzer {
 
 		if (mentionMod) {
 			if (path == null) {
-				text = Localization.format(key, getName(mod), getVersion(mod));
+				text = formatEnglish(key, getName(mod), getVersion(mod));
 			} else {
-				text = Localization.format(key, getName(mod), getVersion(mod), path);
+				text = formatEnglish(key, getName(mod), getVersion(mod), path);
 			}
 		} else {
 			if (path == null) {
-				text = Localization.format(key);
+				text = formatEnglish(key);
 			} else {
-				text = Localization.format(key, path);
+				text = formatEnglish(key, path);
 			}
 		}
 
@@ -392,9 +391,9 @@ final class ResultAnalyzer {
 
 		for (ModCandidateImpl m : modsSorted) {
 			if (SHOW_PATH_INFO && m.hasPath() && !m.isBuiltin()) {
-				ret.add(Localization.format("resolution.solution.replaceMod.oldMod", getName(m), getVersion(m), m.getLocalPath()));
+				ret.add(formatEnglish("resolution.solution.replaceMod.oldMod", getName(m), getVersion(m), m.getLocalPath()));
 			} else {
-				ret.add(Localization.format("resolution.solution.replaceMod.oldModNoPath", getName(m), getVersion(m)));
+				ret.add(formatEnglish("resolution.solution.replaceMod.oldModNoPath", getName(m), getVersion(m)));
 			}
 		}
 
@@ -406,7 +405,7 @@ final class ResultAnalyzer {
 
 		switch (candidate.getMetadata().getType()) {
 		case AbstractModMetadata.TYPE_FABRIC_MOD:
-			typePrefix = String.format("%s ", Localization.format("resolution.type.mod"));
+			typePrefix = String.format("%s ", "mod");
 			break;
 		case AbstractModMetadata.TYPE_BUILTIN:
 		default:
@@ -435,43 +434,43 @@ final class ResultAnalyzer {
 				continue;
 			} else if (interval.getMin() == null) {
 				if (interval.getMax() == null) {
-					return Localization.format("resolution.version.any");
+					return "any version";
 				} else if (interval.isMaxInclusive()) {
-					str = Localization.format("resolution.version.lessEqual", interval.getMax());
+					str = formatEnglish("resolution.version.lessEqual", interval.getMax());
 				} else {
-					str = Localization.format("resolution.version.less", interval.getMax());
+					str = formatEnglish("resolution.version.less", interval.getMax());
 				}
 			} else if (interval.getMax() == null) {
 				if (interval.isMinInclusive()) {
-					str = Localization.format("resolution.version.greaterEqual", interval.getMin());
+					str = formatEnglish("resolution.version.greaterEqual", interval.getMin());
 				} else {
-					str = Localization.format("resolution.version.greater", interval.getMin());
+					str = formatEnglish("resolution.version.greater", interval.getMin());
 				}
 			} else if (interval.getMin().equals(interval.getMax())) {
 				if (interval.isMinInclusive() && interval.isMaxInclusive()) {
-					str = Localization.format("resolution.version.equal", interval.getMin());
+					str = formatEnglish("resolution.version.equal", interval.getMin());
 				} else {
 					// empty interval, skip
 					continue;
 				}
 			} else if (isWildcard(interval, 0)) { // major.x wildcard
 				SemanticVersion version = (SemanticVersion) interval.getMin();
-				str = Localization.format("resolution.version.major", version.getVersionComponent(0));
+				str = formatEnglish("resolution.version.major", version.getVersionComponent(0));
 			} else if (isWildcard(interval, 1)) { // major.minor.x wildcard
 				SemanticVersion version = (SemanticVersion) interval.getMin();
-				str = Localization.format("resolution.version.majorMinor", version.getVersionComponent(0), version.getVersionComponent(1));
+				str = formatEnglish("resolution.version.majorMinor", version.getVersionComponent(0), version.getVersionComponent(1));
 			} else {
 				String key = String.format("resolution.version.rangeMin%sMax%s",
 						(interval.isMinInclusive() ? "Inc" : "Exc"),
 						(interval.isMaxInclusive() ? "Inc" : "Exc"));
-				str = Localization.format(key, interval.getMin(), interval.getMax());
+				str = formatEnglish(key, interval.getMin(), interval.getMax());
 			}
 
 			ret.add(str);
 		}
 
 		if (ret.isEmpty()) {
-			return Localization.format("resolution.version.none");
+			return "an unsatisfiable version range";
 		} else {
 			return formatEnumeration(ret, false);
 		}
@@ -520,17 +519,88 @@ final class ResultAnalyzer {
 		switch (elements.size()) {
 		case 0: return "";
 		case 1: return Objects.toString(it.next());
-		case 2: return Localization.format(keyPrefix+"2", it.next(), it.next());
-		case 3: return Localization.format(keyPrefix+"3", it.next(), it.next(), it.next());
+		case 2: return formatEnglish(keyPrefix+"2", it.next(), it.next());
+		case 3: return formatEnglish(keyPrefix+"3", it.next(), it.next(), it.next());
 		}
 
-		String ret = Localization.format(keyPrefix+"nPrefix", it.next());
+		String ret = formatEnglish(keyPrefix+"nPrefix", it.next());
 
 		do {
 			Object next = it.next();
-			ret = Localization.format(it.hasNext() ? keyPrefix+"n" : keyPrefix+"nSuffix", ret, next);
+			ret = formatEnglish(it.hasNext() ? keyPrefix+"n" : keyPrefix+"nSuffix", ret, next);
 		} while (it.hasNext());
 
 		return ret;
+	}
+
+	/**
+	 * Helper method to format localized strings with English text.
+	 * Since localization has been removed, this returns hardcoded English strings.
+	 */
+	private static String formatEnglish(String key, Object... args) {
+		String format = getEnglishFormat(key);
+		if (args.length == 0) {
+			return format;
+		}
+		// Use String.format for simple replacements, java.text.MessageFormat would be more accurate but adds complexity
+		// Convert MessageFormat style {0} {1} to String.format style %s
+		String converted = format.replaceAll("\\{\\d+\\}", "%s");
+		// Handle choice format by just using the first option for simplicity
+		converted = converted.replaceAll("\\{\\d+,\\s*choice,.*?\\}", "s");
+		try {
+			return String.format(converted, args);
+		} catch (Exception e) {
+			// Fallback if format fails
+			return format + " " + String.join(", ", java.util.Arrays.stream(args).map(String::valueOf).toArray(String[]::new));
+		}
+	}
+
+	private static String getEnglishFormat(String key) {
+		// Hardcoded English translations
+		switch (key) {
+			case "resolution.solution.addMod": return "Install {0}, {1}.";
+			case "resolution.solution.removeMod": return "Remove {0} {1} ({2}).";
+			case "resolution.solution.replaceMod": return "Replace {0} with {1}, {2}.";
+			case "resolution.solution.replaceModVersion": return "Replace {0} with {1}.";
+			case "resolution.solution.replaceModVersionDifferent": return "Replace {0} with {1} that is compatible with:";
+			case "resolution.solution.replaceModVersionDifferent.reqSupportedModVersion": return "{0} {1}";
+			case "resolution.solution.replaceModVersionDifferent.reqSupportedModVersions": return "{0}, {1}";
+			case "resolution.solution.replaceModEnvDisabled": return "Replace {0} with {2} of {1} that can load in the current environment ({3}) or update/remove the mods depending on it. This happens because a mod wants to load in a {3} environment but depends on another mod that doesn't load in the {3} environment.";
+			case "resolution.solution.replaceMod.oldMod": return "{0} {1} ({2})";
+			case "resolution.solution.replaceMod.oldModNoPath": return "{0} {1}";
+			case "resolution.inactive": return "{0} {1}, reason: {2}";
+			case "resolution.inactive.inactive_parent": return "inactive parent mod (nested jar)";
+			case "resolution.inactive.incompatible": return "incompatible";
+			case "resolution.inactive.newer_active": return "newer version active";
+			case "resolution.inactive.same_active": return "same version active";
+			case "resolution.inactive.to_remove": return "to remove";
+			case "resolution.inactive.to_replace": return "to replace";
+			case "resolution.inactive.unknown": return "unknown";
+			case "resolution.inactive.wrong_environment": return "wrong environment (client/server only)";
+			case "resolution.version.equal": return "version {0}";
+			case "resolution.version.greater": return "any version after {0}";
+			case "resolution.version.greaterEqual": return "version {0} or later";
+			case "resolution.version.less": return "any version before {0}";
+			case "resolution.version.lessEqual": return "version {0} or earlier";
+			case "resolution.version.major": return "any {0}.x version";
+			case "resolution.version.majorMinor": return "any {0}.{1}.x version";
+			case "resolution.version.rangeMinIncMaxInc": return "any version between {0} (inclusive) and {1} (inclusive)";
+			case "resolution.version.rangeMinIncMaxExc": return "any version between {0} (inclusive) and {1} (exclusive)";
+			case "resolution.version.rangeMinExcMaxInc": return "any version between {0} (exclusive) and {1} (inclusive)";
+			case "resolution.version.rangeMinExcMaxExc": return "any version between {0} (exclusive) and {1} (exclusive)";
+			case "enumerationAnd.2": return "{0} and {1}";
+			case "enumerationAnd.3": return "{0}, {1} and {2}";
+			case "enumerationAnd.nPrefix": return "{0}";
+			case "enumerationAnd.n": return "{0}, {1}";
+			case "enumerationAnd.nSuffix": return "{0} and {1}";
+			case "enumerationOr.2": return "{0} or {1}";
+			case "enumerationOr.3": return "{0}, {1} or {2}";
+			case "enumerationOr.nPrefix": return "{0}";
+			case "enumerationOr.n": return "{0}, {1}";
+			case "enumerationOr.nSuffix": return "{0} or {1}";
+			case "environment.client": return "client";
+			case "environment.server": return "dedicated server";
+			default: return key; // fallback to key itself
+		}
 	}
 }

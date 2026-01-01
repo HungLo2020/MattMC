@@ -16,12 +16,9 @@
 
 package net.fabricmc.loader.impl;
 
-import net.fabricmc.loader.impl.util.Localization;
-
 @SuppressWarnings("serial")
 public final class FormattedException extends RuntimeException {
 	private final String mainText;
-	private String translatedText;
 
 	public FormattedException(String mainText, String message) {
 		super(message);
@@ -48,19 +45,35 @@ public final class FormattedException extends RuntimeException {
 	}
 
 	public static FormattedException ofLocalized(String key, String message) {
-		return new FormattedException(Localization.formatRoot(key), message).addTranslation(key);
+		// Localization removed - using hardcoded English strings
+		return new FormattedException(getEnglishText(key), message);
 	}
 
 	public static FormattedException ofLocalized(String key, String format, Object... args) {
-		return new FormattedException(Localization.formatRoot(key), format, args).addTranslation(key);
+		// Localization removed - using hardcoded English strings
+		return new FormattedException(getEnglishText(key), format, args);
 	}
 
 	public static FormattedException ofLocalized(String key, String message, Throwable cause) {
-		return new FormattedException(Localization.formatRoot(key), message, cause).addTranslation(key);
+		// Localization removed - using hardcoded English strings
+		return new FormattedException(getEnglishText(key), message, cause);
 	}
 
 	public static FormattedException ofLocalized(String key, Throwable cause) {
-		return new FormattedException(Localization.formatRoot(key), cause).addTranslation(key);
+		// Localization removed - using hardcoded English strings
+		return new FormattedException(getEnglishText(key), cause);
+	}
+
+	private static String getEnglishText(String key) {
+		// Hardcoded English translations for exception messages
+		switch (key) {
+			case "exception.incompatible": return "Incompatible mods found!";
+			case "exception.parsingOverride": return "Error parsing dependency overrides!";
+			case "exception.initializerFailure": return "A mod crashed on startup!";
+			case "exception.minecraft.invokeFailure": return "Failed to start Minecraft!";
+			case "exception.minecraft.generic": return "Minecraft has crashed!";
+			default: return key; // fallback to key itself
+		}
 	}
 
 	public String getMainText() {
@@ -68,11 +81,6 @@ public final class FormattedException extends RuntimeException {
 	}
 
 	public String getDisplayedText() {
-		return translatedText == null || translatedText.equals(mainText) ? mainText : translatedText + " (" + mainText + ")";
-	}
-
-	private FormattedException addTranslation(String key) {
-		this.translatedText = Localization.format(key);
-		return this;
+		return mainText;
 	}
 }
