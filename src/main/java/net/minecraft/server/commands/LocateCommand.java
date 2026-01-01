@@ -171,12 +171,14 @@ public class LocateCommand {
 		BlockPos blockPos2 = pair.getFirst();
 		int i = bl ? Mth.floor(Mth.sqrt((float)blockPos.distSqr(blockPos2))) : Mth.floor(dist(blockPos.getX(), blockPos.getZ(), blockPos2.getX(), blockPos2.getZ()));
 		String string3 = bl ? String.valueOf(blockPos2.getY()) : "~";
-		Component component = ComponentUtils.wrapInSquareBrackets(Component.translatable("chat.coordinates", blockPos2.getX(), string3, blockPos2.getZ()))
-			.withStyle(
-				style -> style.withColor(ChatFormatting.GREEN)
-					.withClickEvent(new ClickEvent.SuggestCommand("/tp @s " + blockPos2.getX() + " " + string3 + " " + blockPos2.getZ()))
-					.withHoverEvent(new HoverEvent.ShowText(Component.translatable("chat.coordinates.tooltip")))
-			);
+		Component component = ComponentUtils.wrapInSquareBrackets(
+			Component.translatable("chat.coordinates", blockPos2.getX(), string3, blockPos2.getZ())
+				.withStyle(
+					style -> style.withColor(ChatFormatting.GREEN)
+						.withClickEvent(new ClickEvent.SuggestCommand("/tp @s " + blockPos2.getX() + " " + string3 + " " + blockPos2.getZ()))
+						.withHoverEvent(new HoverEvent.ShowText(Component.translatable("chat.coordinates.tooltip")))
+				)
+		);
 		commandSourceStack.sendSuccess(() -> Component.translatable(string, string2, component, i), false);
 		LOGGER.info("Locating element {} took {} ms", string2, duration.toMillis());
 		return i;
