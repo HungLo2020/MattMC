@@ -31,7 +31,7 @@ import org.jetbrains.annotations.Nullable;
 public class TranslatableContents implements ComponentContents {
 	public static final Object[] NO_ARGS = new Object[0];
 	private static final Codec<Object> PRIMITIVE_ARG_CODEC = ExtraCodecs.JAVA.validate(TranslatableContents::filterAllowedArguments);
-	private static final Codec<Object> ARG_CODEC = Codec.either(PRIMITIVE_ARG_CODEC, ComponentSerialization.TRUSTED_CODEC)
+	private static final Codec<Object> ARG_CODEC = Codec.either(PRIMITIVE_ARG_CODEC, ComponentSerialization.CODEC)
 		.xmap(
 			either -> either.map(object -> object, component -> Objects.requireNonNullElse(component.tryCollapseToString(), component)),
 			object -> object instanceof Component component ? Either.right(component) : Either.left(object)
