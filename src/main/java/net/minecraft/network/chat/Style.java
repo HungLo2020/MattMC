@@ -620,7 +620,24 @@ public final class Style {
 				)
 				.apply(instance, Style::create)
 		);
+		public static final MapCodec<Style> TRUSTED_MAP_CODEC = RecordCodecBuilder.mapCodec(
+			instance -> instance.group(
+					TextColor.CODEC.optionalFieldOf("color").forGetter(style -> Optional.ofNullable(style.color)),
+					ExtraCodecs.ARGB_COLOR_CODEC.optionalFieldOf("shadow_color").forGetter(style -> Optional.ofNullable(style.shadowColor)),
+					Codec.BOOL.optionalFieldOf("bold").forGetter(style -> Optional.ofNullable(style.bold)),
+					Codec.BOOL.optionalFieldOf("italic").forGetter(style -> Optional.ofNullable(style.italic)),
+					Codec.BOOL.optionalFieldOf("underlined").forGetter(style -> Optional.ofNullable(style.underlined)),
+					Codec.BOOL.optionalFieldOf("strikethrough").forGetter(style -> Optional.ofNullable(style.strikethrough)),
+					Codec.BOOL.optionalFieldOf("obfuscated").forGetter(style -> Optional.ofNullable(style.obfuscated)),
+					ClickEvent.TRUSTED_CODEC.optionalFieldOf("click_event").forGetter(style -> Optional.ofNullable(style.clickEvent)),
+					HoverEvent.TRUSTED_CODEC.optionalFieldOf("hover_event").forGetter(style -> Optional.ofNullable(style.hoverEvent)),
+					Codec.STRING.optionalFieldOf("insertion").forGetter(style -> Optional.ofNullable(style.insertion)),
+					FontDescription.CODEC.optionalFieldOf("font").forGetter(style -> Optional.ofNullable(style.font))
+				)
+				.apply(instance, Style::create)
+		);
 		public static final Codec<Style> CODEC = MAP_CODEC.codec();
-		public static final StreamCodec<RegistryFriendlyByteBuf, Style> TRUSTED_STREAM_CODEC = ByteBufCodecs.fromCodecWithRegistriesTrusted(CODEC);
+		public static final Codec<Style> TRUSTED_CODEC = TRUSTED_MAP_CODEC.codec();
+		public static final StreamCodec<RegistryFriendlyByteBuf, Style> TRUSTED_STREAM_CODEC = ByteBufCodecs.fromCodecWithRegistriesTrusted(TRUSTED_CODEC);
 	}
 }

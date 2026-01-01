@@ -35,13 +35,14 @@ import net.minecraft.util.GsonHelper;
 
 public class ComponentSerialization {
 	public static final Codec<Component> CODEC = Codec.recursive("Component", ComponentSerialization::createCodec);
+	public static final Codec<Component> TRUSTED_CODEC = Codec.recursive("Component", ComponentSerialization::createTrustedCodec);
 	public static final StreamCodec<RegistryFriendlyByteBuf, Component> STREAM_CODEC = ByteBufCodecs.fromCodecWithRegistries(CODEC);
 	public static final StreamCodec<RegistryFriendlyByteBuf, Optional<Component>> OPTIONAL_STREAM_CODEC = STREAM_CODEC.apply(ByteBufCodecs::optional);
-	public static final StreamCodec<RegistryFriendlyByteBuf, Component> TRUSTED_STREAM_CODEC = ByteBufCodecs.fromCodecWithRegistriesTrusted(CODEC);
+	public static final StreamCodec<RegistryFriendlyByteBuf, Component> TRUSTED_STREAM_CODEC = ByteBufCodecs.fromCodecWithRegistriesTrusted(TRUSTED_CODEC);
 	public static final StreamCodec<RegistryFriendlyByteBuf, Optional<Component>> TRUSTED_OPTIONAL_STREAM_CODEC = TRUSTED_STREAM_CODEC.apply(
 		ByteBufCodecs::optional
 	);
-	public static final StreamCodec<ByteBuf, Component> TRUSTED_CONTEXT_FREE_STREAM_CODEC = ByteBufCodecs.fromCodecTrusted(CODEC);
+	public static final StreamCodec<ByteBuf, Component> TRUSTED_CONTEXT_FREE_STREAM_CODEC = ByteBufCodecs.fromCodecTrusted(TRUSTED_CODEC);
 
 	public static Codec<Component> flatRestrictedCodec(int i) {
 		return new Codec<Component>() {
@@ -99,6 +100,25 @@ public class ComponentSerialization {
 					mapCodec.forGetter(Component::getContents),
 					ExtraCodecs.nonEmptyList(codec.listOf()).optionalFieldOf("extra", List.of()).forGetter(Component::getSiblings),
 					Style.Serializer.MAP_CODEC.forGetter(Component::getStyle)
+				)
+				.apply(instance, MutableComponent::new)
+		);
+		return Codec.either(Codec.either(Codec.STRING, ExtraCodecs.nonEmptyList(codec.listOf())), codec2)
+			.xmap(either -> either.map(eitherx -> eitherx.map(Component::literal, ComponentSerialization::createFromList), component -> component), component -> {
+				String string = component.tryCollapseToString();
+				return string != null ? Either.left(Either.left(string)) : Either.right(component);
+			});
+	}
+
+	private static Codec<Component> createTrustedCodec(Codec<Component> codec) {
+		ExtraCodecs.LateBoundIdMapper<String, MapCodec<? extends ComponentContents>> lateBoundIdMapper = new ExtraCodecs.LateBoundIdMapper<>();
+		bootstrap(lateBoundIdMapper);
+		MapCodec<ComponentContents> mapCodec = createLegacyComponentMatcher(lateBoundIdMapper, ComponentContents::codec, "type");
+		Codec<Component> codec2 = RecordCodecBuilder.create(
+			instance -> instance.group(
+					mapCodec.forGetter(Component::getContents),
+					ExtraCodecs.nonEmptyList(codec.listOf()).optionalFieldOf("extra", List.of()).forGetter(Component::getSiblings),
+					Style.Serializer.TRUSTED_MAP_CODEC.forGetter(Component::getStyle)
 				)
 				.apply(instance, MutableComponent::new)
 		);
