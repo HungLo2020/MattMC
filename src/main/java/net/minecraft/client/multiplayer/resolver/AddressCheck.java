@@ -1,38 +1,27 @@
 package net.minecraft.client.multiplayer.resolver;
 
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Streams;
-import com.mojang.blocklist.BlockListSupplier;
-import java.util.Objects;
-import java.util.ServiceLoader;
-import java.util.function.Predicate;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 
 @Environment(EnvType.CLIENT)
 public interface AddressCheck {
+	/**
+	 * An AddressCheck implementation that allows all server addresses.
+	 * Used in development builds where server blocklist functionality is not needed.
+	 */
+	AddressCheck ALLOW_ALL = new AddressCheck() {
+		@Override
+		public boolean isAllowed(ResolvedServerAddress resolvedServerAddress) {
+			return true;
+		}
+
+		@Override
+		public boolean isAllowed(ServerAddress serverAddress) {
+			return true;
+		}
+	};
+
 	boolean isAllowed(ResolvedServerAddress resolvedServerAddress);
 
 	boolean isAllowed(ServerAddress serverAddress);
-
-	static AddressCheck createFromService() {
-		final ImmutableList<Predicate<String>> immutableList = (ImmutableList<Predicate<String>>)Streams.stream(ServiceLoader.load(BlockListSupplier.class))
-			.map(BlockListSupplier::createBlockList)
-			.filter(Objects::nonNull)
-			.collect(ImmutableList.toImmutableList());
-		return new AddressCheck() {
-			@Override
-			public boolean isAllowed(ResolvedServerAddress resolvedServerAddress) {
-				String string = resolvedServerAddress.getHostName();
-				String string2 = resolvedServerAddress.getHostIp();
-				return immutableList.stream().noneMatch(predicate -> predicate.test(string) || predicate.test(string2));
-			}
-
-			@Override
-			public boolean isAllowed(ServerAddress serverAddress) {
-				String string = serverAddress.getHost();
-				return immutableList.stream().noneMatch(predicate -> predicate.test(string));
-			}
-		};
-	}
 }

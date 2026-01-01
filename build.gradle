@@ -127,8 +127,8 @@ dependencies {
         // implementation files('libraries/deps/authlib-6.0.55.jar') // REMOVED - custom PlayerProfile system
         implementation files('libraries/deps/logging-1.2.7.jar')
         implementation files('libraries/deps/jtracy-1.0.29.jar')
-        implementation files('libraries/deps/blocklist-1.0.10.jar')
-        implementation files('libraries/deps/patchy-2.2.10.jar')
+        // implementation files('libraries/deps/blocklist-1.0.10.jar') // REMOVED - using ALLOW_ALL AddressCheck
+        // implementation files('libraries/deps/patchy-2.2.10.jar') // REMOVED - only contained blocklist functionality
         implementation files('libraries/deps/text2speech-1.17.9.jar')
     } else {
         // Remote Mojang libraries (authlib removed - using custom PlayerProfile)
@@ -137,8 +137,8 @@ dependencies {
         // implementation 'com.mojang:authlib:6.0.55' // REMOVED - custom PlayerProfile system
         implementation 'com.mojang:logging:1.2.7'
         implementation 'com.mojang:jtracy:1.0.29'
-        implementation 'com.mojang:blocklist:1.0.10'
-        implementation 'com.mojang:patchy:2.2.10'
+        // implementation 'com.mojang:blocklist:1.0.10' // REMOVED - using ALLOW_ALL AddressCheck
+        // implementation 'com.mojang:patchy:2.2.10' // REMOVED - only contained blocklist functionality
         implementation 'com.mojang:text2speech:1.17.9'
     }
     

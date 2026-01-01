@@ -8,7 +8,7 @@ import net.minecraft.api.Environment;
 @Environment(EnvType.CLIENT)
 public class ServerNameResolver {
 	public static final ServerNameResolver DEFAULT = new ServerNameResolver(
-		ServerAddressResolver.SYSTEM, ServerRedirectHandler.createDnsSrvRedirectHandler(), AddressCheck.createFromService()
+		ServerAddressResolver.SYSTEM, ServerRedirectHandler.createDnsSrvRedirectHandler(), AddressCheck.ALLOW_ALL
 	);
 	private final ServerAddressResolver resolver;
 	private final ServerRedirectHandler redirectHandler;
