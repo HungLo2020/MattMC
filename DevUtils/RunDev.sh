@@ -9,4 +9,4 @@ LOG_FILE="ERROR-LOG.txt"
 : > "$LOG_FILE"
 
 # Run Gradle and pipe all output (stdout + stderr) into the log file
-./gradlew runClient 2>&1 | tee "$LOG_FILE"
+./gradlew clean runClient 2>&1 | tee "$LOG_FILE"
