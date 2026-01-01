@@ -1,0 +1,13 @@
+# Color Mappings for ColorRemapper
+# Darkness percentage (how much darker to make each color)
+# Example: 40 means make colors 40% darker
+DARKNESS_PERCENT=55
+
+# Add your hex colors below (one per line)
+# Each color will be automatically darkened by the percentage above
+# The script will apply all mappings simultaneously to avoid color wipeout
+
+# Colors to darken
+8b8b8b
+c6c6c6
+ffffff
