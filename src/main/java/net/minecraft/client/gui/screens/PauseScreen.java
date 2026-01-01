@@ -87,6 +87,9 @@ public class PauseScreen extends Screen {
 		}
 
 		rowHelper.addChild(this.openScreenButton(OPTIONS, () -> new OptionsScreen(this, this.minecraft.options)));
+		if (this.minecraft.hasSingleplayerServer() && !this.minecraft.getSingleplayerServer().isPublished()) {
+			rowHelper.addChild(this.openScreenButton(SHARE_TO_LAN, () -> new ShareToLanScreen(this)));
+		}
 		rowHelper.addChild(
 			Button.builder(TAKE_PANORAMA, button -> {
 				// Placeholder for panorama capture functionality
@@ -94,11 +97,6 @@ public class PauseScreen extends Screen {
 			}).width(BUTTON_WIDTH_FULL).build(),
 			2
 		);
-		if (this.minecraft.hasSingleplayerServer() && !this.minecraft.getSingleplayerServer().isPublished()) {
-			rowHelper.addChild(this.openScreenButton(SHARE_TO_LAN, () -> new ShareToLanScreen(this)));
-		} else {
-			rowHelper.addChild(this.openScreenButton(PLAYER_REPORTING, () -> new SocialInteractionsScreen(this)));
-		}
 
 		this.disconnectButton = rowHelper.addChild(
 			Button.builder(
