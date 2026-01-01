@@ -8,3 +8,5 @@
 
 # Test mapping
 8b8b8b -> 555555
+c6c6c6 -> 8b8b8b
+ffffff -> c6c6c6
