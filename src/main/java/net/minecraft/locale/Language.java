@@ -57,7 +57,17 @@ public abstract class Language {
 			@Override
 			public FormattedCharSequence getVisualOrder(FormattedText formattedText) {
 				return formattedCharSink -> formattedText.visit(
-						(style, string) -> StringDecomposer.iterateFormatted(string, style, formattedCharSink) ? Optional.empty() : FormattedText.STOP_ITERATION, Style.EMPTY
+						(style, string) -> {
+							// DEBUG: Log style during FormattedCharSequence creation
+							if (string.contains("[") || string.contains("6") || string.contains("8") || string.contains("5")) {
+								System.out.println("=== LANGUAGE GET VISUAL ORDER ===");
+								System.out.println("String: " + string);
+								System.out.println("Style: " + style);
+								System.out.println("Style color: " + style.getColor());
+								System.out.println("Style clickEvent: " + style.getClickEvent());
+							}
+							return StringDecomposer.iterateFormatted(string, style, formattedCharSink) ? Optional.empty() : FormattedText.STOP_ITERATION;
+						}, Style.EMPTY
 					)
 					.isPresent();
 			}
