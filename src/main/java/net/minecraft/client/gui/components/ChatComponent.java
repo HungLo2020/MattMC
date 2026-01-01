@@ -190,6 +190,26 @@ public class ChatComponent {
 	}
 
 	public void addMessage(Component component, @Nullable MessageSignature messageSignature, @Nullable GuiMessageTag guiMessageTag) {
+		// DEBUG: Log what chat receives
+		LOGGER.info("=== CHAT COMPONENT ADDMESSAGE ===");
+		LOGGER.info("Component: {}", component);
+		LOGGER.info("Component style: {}", component.getStyle());
+		LOGGER.info("Component siblings count: {}", component.getSiblings().size());
+		
+		// Check if it's a translatable and log its args
+		if (component.getContents() instanceof net.minecraft.network.chat.contents.TranslatableContents translatable) {
+			LOGGER.info("Is translatable with key: {}", translatable.getKey());
+			Object[] args = translatable.getArgs();
+			LOGGER.info("Args count: {}", args.length);
+			for (int i = 0; i < args.length; i++) {
+				LOGGER.info("Arg {}: {}", i, args[i]);
+				if (args[i] instanceof Component argComp) {
+					LOGGER.info("Arg {} style: {}", i, argComp.getStyle());
+					LOGGER.info("Arg {} click event: {}", i, argComp.getStyle().getClickEvent());
+				}
+			}
+		}
+		
 		GuiMessage guiMessage = new GuiMessage(this.minecraft.gui.getGuiTicks(), component, messageSignature, guiMessageTag);
 		this.logChatMessage(guiMessage);
 		this.addMessageToDisplayQueue(guiMessage);
