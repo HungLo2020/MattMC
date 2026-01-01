@@ -20,7 +20,11 @@ EXCLUDES=(
 SCRIPT_DIR="$(cd -- "$(dirname -- "$0")" && pwd)"
 
 # Find the git repository root
-REPO_ROOT="$(cd "$SCRIPT_DIR" && git rev-parse --show-toplevel 2>/dev/null || echo "$SCRIPT_DIR")"
+REPO_ROOT="$(cd "$SCRIPT_DIR" && git rev-parse --show-toplevel 2>/dev/null)"
+if [ -z "$REPO_ROOT" ]; then
+    echo "ERROR: Not in a git repository" >&2
+    exit 1
+fi
 cd "$REPO_ROOT"
 
 REPO_NAME="$(basename "$REPO_ROOT")"   # should be "MattMC"
