@@ -88,7 +88,7 @@ echo ""
 
 # Download Mojang libraries from libraries.minecraft.net
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${BLUE}  Downloading Mojang Libraries (7 dependencies)${NC}"
+echo -e "${BLUE}  Downloading Mojang Libraries (5 dependencies)${NC}"
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 
 MOJANG_BASE="https://libraries.minecraft.net"
@@ -98,8 +98,8 @@ download_jar "${MOJANG_BASE}/com/mojang/datafixerupper/8.0.16/datafixerupper-8.0
 # NOTE: authlib removed - replaced with custom PlayerProfile system (net.minecraft.server.profile.PlayerProfile, ProfileProperty, ProfilePropertyMap)
 download_jar "${MOJANG_BASE}/com/mojang/logging/1.2.7/logging-1.2.7.jar" "logging-1.2.7.jar"
 download_jar "${MOJANG_BASE}/com/mojang/jtracy/1.0.29/jtracy-1.0.29.jar" "jtracy-1.0.29.jar"
-download_jar "${MOJANG_BASE}/com/mojang/blocklist/1.0.10/blocklist-1.0.10.jar" "blocklist-1.0.10.jar"
-download_jar "${MOJANG_BASE}/com/mojang/patchy/2.2.10/patchy-2.2.10.jar" "patchy-2.2.10.jar"
+# NOTE: blocklist removed - replaced with ALLOW_ALL AddressCheck (no server blocking in dev builds)
+# NOTE: patchy removed - only contained blocklist functionality
 # NOTE: text2speech removed - not used (only translation keys like "narrator.*" are referenced)
 
 echo ""
