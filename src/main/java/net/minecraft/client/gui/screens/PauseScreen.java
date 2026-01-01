@@ -46,6 +46,7 @@ public class PauseScreen extends Screen {
 	private static final Component PLAYER_REPORTING = Component.translatable("menu.playerReporting");
 	private static final Component GAME = Component.translatable("menu.game");
 	private static final Component PAUSED = Component.translatable("menu.paused");
+	private static final Component TAKE_PANORAMA = Component.translatable("menu.takePanorama");
 	private static final Tooltip CUSTOM_OPTIONS_TOOLTIP = Tooltip.create(Component.translatable("menu.custom_options.tooltip"));
 	private final boolean showPauseMenu;
 	@Nullable
@@ -86,6 +87,13 @@ public class PauseScreen extends Screen {
 		}
 
 		rowHelper.addChild(this.openScreenButton(OPTIONS, () -> new OptionsScreen(this, this.minecraft.options)));
+		rowHelper.addChild(
+			Button.builder(TAKE_PANORAMA, button -> {
+				// Placeholder for panorama capture functionality
+				// TODO: Implement panorama capture
+			}).width(204).build(),
+			2
+		);
 		if (this.minecraft.hasSingleplayerServer() && !this.minecraft.getSingleplayerServer().isPublished()) {
 			rowHelper.addChild(this.openScreenButton(SHARE_TO_LAN, () -> new ShareToLanScreen(this)));
 		} else {
