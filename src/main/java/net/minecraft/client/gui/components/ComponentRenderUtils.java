@@ -26,6 +26,13 @@ public class ComponentRenderUtils {
 	public static List<FormattedCharSequence> wrapComponents(FormattedText formattedText, int i, Font font) {
 		ComponentCollector componentCollector = new ComponentCollector();
 		formattedText.visit((style, string) -> {
+			// DEBUG: Log style details during visit
+			System.out.println("=== WRAP COMPONENTS VISIT ===");
+			System.out.println("String: " + string);
+			System.out.println("Style: " + style);
+			System.out.println("Style color: " + style.getColor());
+			System.out.println("Style click event: " + style.getClickEvent());
+			
 			componentCollector.append(FormattedText.of(stripColor(string), style));
 			return Optional.empty();
 		}, Style.EMPTY);
