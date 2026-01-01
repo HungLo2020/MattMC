@@ -1,12 +1,13 @@
 # Color Mappings for ColorRemapper
-# Format: source_hex -> target_hex
-# Example: 8b8b8b -> 555555
-#
-# Add your color mappings below (one per line)
-# The script will automatically apply all mappings simultaneously
-# to avoid color wipeout issues
+# Darkness percentage (how much darker to make each color)
+# Example: 40 means make colors 40% darker
+DARKNESS_PERCENT=40
 
-# Test mapping
+# Add your hex colors below (one per line)
+# Each color will be automatically darkened by the percentage above
+# The script will apply all mappings simultaneously to avoid color wipeout
+
+# Colors to darken
 8b8b8b
 c6c6c6
 ffffff

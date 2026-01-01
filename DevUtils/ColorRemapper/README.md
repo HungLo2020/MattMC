@@ -1,12 +1,13 @@
 # ColorRemapper
 
-A Python tool to remap colors in PNG images based on hex color mappings.
+A Python tool to darken colors in PNG images based on a configurable darkness percentage.
 
 ## Features
 
 - **Batch Processing**: Automatically processes all PNG files in the same directory
 - **Color Preservation**: Applies all mappings simultaneously to prevent color wipeout
-- **Dynamic Mappings**: Supports any number of color mappings read from a configuration file
+- **Configurable Darkness**: Easily adjust how much darker colors should become
+- **Dynamic Color List**: Supports any number of colors read from a configuration file
 - **In-Place Updates**: Overwrites original files without changing filenames
 
 ## Requirements
@@ -23,7 +24,7 @@ pip install Pillow
 
 1. Place the `color_remapper.py` script in a directory with your PNG files
 2. Create or edit `color_mappings.txt` in the same directory
-3. Add color mappings in the format: `source_hex -> target_hex`
+3. Set the `DARKNESS_PERCENT` variable and list the hex colors to darken
 4. Run the script:
    ```bash
    python3 color_remapper.py
@@ -31,46 +32,46 @@ pip install Pillow
 
 ## Color Mappings Format
 
-Edit `color_mappings.txt` to define your color mappings:
+Edit `color_mappings.txt` to define your darkness percentage and colors:
 
 ```
-# Comments start with #
-# Format: source_hex -> target_hex
-# You can omit the # prefix from hex colors
+# Set how much darker to make colors (0-100)
+DARKNESS_PERCENT=40
 
-8b8b8b -> 555555
-ff0000 -> 00ff00
-123456 -> abcdef
+# List hex colors to darken (one per line)
+# You can omit the # prefix from hex colors
+8b8b8b
+c6c6c6
+ffffff
 ```
 
 ## How It Works
 
-The script reads all color mappings from the configuration file and applies them **simultaneously** to each PNG image. This ensures that chained mappings (e.g., A→B, B→C) work correctly without causing color wipeout where A would incorrectly become C.
+The script reads the darkness percentage and color list from the configuration file. For each color listed, it calculates a darkened version by reducing the RGB values by the specified percentage. All mappings are then applied **simultaneously** to each PNG image.
 
-### Example
+### Darkening Calculation
 
-If you have mappings:
-- `8b8b8b -> 555555`
-- `555555 -> 333333`
+- **40% darker** means the color is reduced to 60% of its original brightness
+- For example: `#ffffff` (255, 255, 255) at 40% darker becomes `#999999` (153, 153, 153)
+- Formula: `new_value = original_value × (1 - darkness_percent / 100)`
 
-The script will:
-- Convert all `#8b8b8b` pixels to `#555555`
-- Convert all original `#555555` pixels to `#333333`
-- **NOT** convert the newly created `#555555` pixels (from step 1) to `#333333`
+### Color Preservation
 
-This is achieved by reading the original pixel values once and applying all transformations based on those original values.
+The script applies all mappings simultaneously based on original pixel values to prevent color wipeout. This ensures that if multiple colors in your list would create a chain (e.g., color A darkens to B, and B is also in the list), the colors won't cascade.
 
 ## Output
 
 The script will:
-- Display all loaded color mappings
+- Display the darkness percentage
+- Show all loaded color mappings (original -> darkened)
 - List all PNG files found in the directory
 - Process each PNG file and report which ones were modified
-- Overwrite the original files with the remapped versions
+- Overwrite the original files with the darkened versions
 
 ## Notes
 
 - The script only processes PNG files in the same directory (not subdirectories)
-- Only pixels that exactly match a source color will be remapped
+- Only pixels that exactly match a listed color will be darkened
 - Alpha channel (transparency) is preserved
 - Original files are overwritten - make backups if needed!
+- Darkness percentage can be any value from 0-100 (0 = no change, 100 = black)

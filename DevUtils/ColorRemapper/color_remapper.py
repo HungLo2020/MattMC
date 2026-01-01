@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """
-ColorRemapper - A tool to remap colors in PNG images based on hex color mappings.
+ColorRemapper - A tool to darken colors in PNG images based on a configurable percentage.
 
-This script reads color mappings from a text file and applies them to all PNG files
-in the same directory. It ensures that colors are not wiped out by applying all
-mappings simultaneously based on the original pixel values.
+This script reads hex colors from a text file and darkens them by a specified percentage,
+then applies these transformations to all PNG files in the same directory. It ensures 
+that colors are not wiped out by applying all mappings simultaneously based on the 
+original pixel values.
 """
 
 import os
@@ -20,13 +21,31 @@ def hex_to_rgb(hex_color):
     return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
 
 
+def darken_color(rgb, darkness_percent):
+    """
+    Darken an RGB color by a given percentage.
+    
+    Args:
+        rgb: Tuple of (r, g, b) values (0-255)
+        darkness_percent: Percentage to darken (0-100)
+    
+    Returns:
+        Tuple of (r, g, b) values for the darkened color
+    """
+    factor = 1.0 - (darkness_percent / 100.0)
+    return tuple(int(max(0, min(255, c * factor))) for c in rgb)
+
+
 def read_color_mappings(mapping_file):
     """
     Read color mappings from a text file.
-    Expected format: source_hex -> target_hex (one mapping per line)
-    Example: 8b8b8b -> 555555
+    Expected format: 
+    - DARKNESS_PERCENT=40 (at the top)
+    - Individual hex colors (one per line)
+    Each color will be darkened by the specified percentage.
     """
     mappings = {}
+    darkness_percent = 40  # Default value
     
     if not os.path.exists(mapping_file):
         print(f"Warning: Mapping file '{mapping_file}' not found.")
@@ -40,24 +59,22 @@ def read_color_mappings(mapping_file):
             if not line or line.startswith('#'):
                 continue
             
-            # Parse mapping (format: hex1 -> hex2)
-            if '->' not in line:
-                print(f"Warning: Line {line_num} invalid format (expected 'hex1 -> hex2'): {line}")
-                continue
+            # Check for darkness percentage setting
+            if line.startswith('DARKNESS_PERCENT='):
+                try:
+                    darkness_percent = float(line.split('=')[1].strip())
+                    print(f"Darkness percentage set to: {darkness_percent}%")
+                    continue
+                except (ValueError, IndexError) as e:
+                    print(f"Warning: Line {line_num} invalid DARKNESS_PERCENT format: {line}")
+                    continue
             
-            parts = line.split('->')
-            if len(parts) != 2:
-                print(f"Warning: Line {line_num} invalid format: {line}")
-                continue
-            
-            source_hex = parts[0].strip()
-            target_hex = parts[1].strip()
-            
+            # Parse hex color
             try:
-                source_rgb = hex_to_rgb(source_hex)
-                target_rgb = hex_to_rgb(target_hex)
+                source_rgb = hex_to_rgb(line)
+                target_rgb = darken_color(source_rgb, darkness_percent)
                 mappings[source_rgb] = target_rgb
-                print(f"Loaded mapping: #{source_hex} -> #{target_hex}")
+                print(f"Loaded mapping: #{line.lstrip('#')} -> #{'{:02x}{:02x}{:02x}'.format(*target_rgb)} ({darkness_percent}% darker)")
             except ValueError as e:
                 print(f"Warning: Line {line_num} error: {e}")
                 continue
@@ -128,8 +145,11 @@ def main():
     
     if not color_mappings:
         print("\nNo valid color mappings found. Please create a 'color_mappings.txt' file")
-        print("with mappings in the format: hex1 -> hex2")
-        print("Example: 8b8b8b -> 555555")
+        print("with hex colors (one per line) and DARKNESS_PERCENT setting")
+        print("Example:")
+        print("  DARKNESS_PERCENT=40")
+        print("  8b8b8b")
+        print("  c6c6c6")
         return
     
     print(f"\nTotal mappings loaded: {len(color_mappings)}")
