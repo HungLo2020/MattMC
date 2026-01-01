@@ -74,7 +74,7 @@ def read_color_mappings(mapping_file):
                 source_rgb = hex_to_rgb(line)
                 target_rgb = darken_color(source_rgb, darkness_percent)
                 mappings[source_rgb] = target_rgb
-                print(f"Loaded mapping: #{line.lstrip('#')} -> #{'{:02x}{:02x}{:02x}'.format(*target_rgb)} ({darkness_percent}% darker)")
+                print(f"Loaded mapping: #{line.lstrip('#')} -> #{target_rgb[0]:02x}{target_rgb[1]:02x}{target_rgb[2]:02x} ({darkness_percent}% darker)")
             except ValueError as e:
                 print(f"Warning: Line {line_num} error: {e}")
                 continue
