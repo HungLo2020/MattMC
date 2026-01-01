@@ -18,6 +18,7 @@ import org.jetbrains.annotations.Nullable;
 
 public interface HoverEvent {
 	Codec<HoverEvent> CODEC = HoverEvent.Action.CODEC.dispatch("action", HoverEvent::action, action -> action.codec);
+	Codec<HoverEvent> TRUSTED_CODEC = HoverEvent.Action.UNSAFE_CODEC.dispatch("action", HoverEvent::action, action -> action.codec);
 
 	HoverEvent.Action action();
 
