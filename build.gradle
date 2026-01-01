@@ -241,8 +241,7 @@ dependencies {
         // Mapping IO - mapping file I/O
         implementation files('libraries/deps/mapping-io-0.7.1.jar')
         
-        // Launchwrapper - legacy launch wrapper
-        implementation files('libraries/deps/launchwrapper-1.12.jar')
+        // NOTE: Launchwrapper removed - legacy code removed from Fabric Loader
         
         // NOTE: Access Widener removed - access modifications already applied in source
         
@@ -264,8 +263,7 @@ dependencies {
         // Mapping IO - mapping file I/O (requires Fabric Maven)
         implementation 'net.fabricmc:mapping-io:0.7.1'
         
-        // Launchwrapper - legacy launch wrapper (requires Minecraft Libraries)
-        implementation 'net.minecraft:launchwrapper:1.12'
+        // NOTE: Launchwrapper removed - legacy code removed from Fabric Loader
         
         // NOTE: Access Widener removed - access modifications already applied in source
         
