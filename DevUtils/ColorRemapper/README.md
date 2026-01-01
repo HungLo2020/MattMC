@@ -5,6 +5,7 @@ A Python tool to darken colors in PNG images based on a configurable darkness pe
 ## Features
 
 - **Batch Processing**: Automatically processes all PNG files in the same directory
+- **Two Modes**: Target specific colors OR darken all colors with `-A` switch
 - **Color Preservation**: Applies all mappings simultaneously to prevent color wipeout
 - **Configurable Darkness**: Easily adjust how much darker colors should become
 - **Dynamic Color List**: Supports any number of colors read from a configuration file
@@ -22,6 +23,8 @@ pip install Pillow
 
 ## Usage
 
+### Basic Mode (Specific Colors)
+
 1. Place the `color_remapper.py` script in a directory with your PNG files
 2. Create or edit `color_mappings.txt` in the same directory
 3. Set the `DARKNESS_PERCENT` variable and list the hex colors to darken
@@ -29,6 +32,19 @@ pip install Pillow
    ```bash
    python3 color_remapper.py
    ```
+
+### All Colors Mode
+
+To darken **ALL** colors in your PNG files (not just specific ones), use the `-A` switch:
+
+```bash
+python3 color_remapper.py -A
+```
+
+In this mode:
+- The script reads only the `DARKNESS_PERCENT` from `color_mappings.txt`
+- ALL colors in the PNG files are darkened by that percentage
+- Individual color listings in the file are ignored
 
 ## Color Mappings Format
 
@@ -71,7 +87,8 @@ The script will:
 ## Notes
 
 - The script only processes PNG files in the same directory (not subdirectories)
-- Only pixels that exactly match a listed color will be darkened
+- **Basic mode**: Only pixels that exactly match a listed color will be darkened
+- **All colors mode (`-A`)**: Every color in the image is darkened
 - Alpha channel (transparency) is preserved
 - Original files are overwritten - make backups if needed!
 - Darkness percentage can be any value from 0-100 (0 = no change, 100 = black)

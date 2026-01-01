@@ -9,6 +9,7 @@ original pixel values.
 """
 
 import os
+import sys
 from pathlib import Path
 from PIL import Image
 
@@ -36,19 +37,29 @@ def darken_color(rgb, darkness_percent):
     return tuple(int(max(0, min(255, c * factor))) for c in rgb)
 
 
-def read_color_mappings(mapping_file):
+def read_color_mappings(mapping_file, all_colors_mode=False):
     """
     Read color mappings from a text file.
     Expected format: 
     - DARKNESS_PERCENT=40 (at the top)
     - Individual hex colors (one per line)
     Each color will be darkened by the specified percentage.
+    
+    Args:
+        mapping_file: Path to the color mappings file
+        all_colors_mode: If True, only read DARKNESS_PERCENT and return it
+    
+    Returns:
+        If all_colors_mode is False: dictionary of color mappings
+        If all_colors_mode is True: tuple of (empty dict, darkness_percent)
     """
     mappings = {}
     darkness_percent = 40  # Default value
     
     if not os.path.exists(mapping_file):
         print(f"Warning: Mapping file '{mapping_file}' not found.")
+        if all_colors_mode:
+            return mappings, darkness_percent
         return mappings
     
     with open(mapping_file, 'r') as f:
@@ -69,6 +80,10 @@ def read_color_mappings(mapping_file):
                     print(f"Warning: Line {line_num} invalid DARKNESS_PERCENT format: {line}")
                     continue
             
+            # If in all_colors_mode, we only need the darkness percentage
+            if all_colors_mode:
+                continue
+            
             # Parse hex color
             try:
                 source_rgb = hex_to_rgb(line)
@@ -79,18 +94,26 @@ def read_color_mappings(mapping_file):
                 print(f"Warning: Line {line_num} error: {e}")
                 continue
     
+    if all_colors_mode:
+        return mappings, darkness_percent
     return mappings
 
 
-def remap_image_colors(image_path, color_mappings):
+def remap_image_colors(image_path, color_mappings, all_colors_mode=False, darkness_percent=40):
     """
     Remap colors in an image based on the provided color mappings.
     
     This function applies ALL mappings simultaneously based on the original
     pixel values to avoid the color wipeout problem where sequential mappings
     would cause colors to cascade (e.g., A->B, B->C would make A become C).
+    
+    Args:
+        image_path: Path to the image file
+        color_mappings: Dictionary of color mappings (original RGB -> darkened RGB)
+        all_colors_mode: If True, darken ALL colors regardless of mappings
+        darkness_percent: Darkness percentage to use in all_colors_mode
     """
-    if not color_mappings:
+    if not all_colors_mode and not color_mappings:
         print(f"No color mappings to apply for {image_path}")
         return False
     
@@ -105,17 +128,32 @@ def remap_image_colors(image_path, color_mappings):
         
         modified = False
         
-        # Apply all mappings simultaneously based on original pixel values
-        for y in range(height):
-            for x in range(width):
-                r, g, b, a = pixels[x, y]
-                original_color = (r, g, b)
-                
-                # Check if this color needs to be remapped
-                if original_color in color_mappings:
-                    new_color = color_mappings[original_color]
-                    pixels[x, y] = (new_color[0], new_color[1], new_color[2], a)
-                    modified = True
+        if all_colors_mode:
+            # Darken ALL colors in the image
+            for y in range(height):
+                for x in range(width):
+                    r, g, b, a = pixels[x, y]
+                    original_color = (r, g, b)
+                    
+                    # Darken the color
+                    new_color = darken_color(original_color, darkness_percent)
+                    
+                    # Only modify if the color actually changed
+                    if new_color != original_color:
+                        pixels[x, y] = (new_color[0], new_color[1], new_color[2], a)
+                        modified = True
+        else:
+            # Apply specific mappings only
+            for y in range(height):
+                for x in range(width):
+                    r, g, b, a = pixels[x, y]
+                    original_color = (r, g, b)
+                    
+                    # Check if this color needs to be remapped
+                    if original_color in color_mappings:
+                        new_color = color_mappings[original_color]
+                        pixels[x, y] = (new_color[0], new_color[1], new_color[2], a)
+                        modified = True
         
         if modified:
             # Save back to the same file
@@ -133,26 +171,44 @@ def remap_image_colors(image_path, color_mappings):
 
 def main():
     """Main function to process all PNG files in the current directory."""
+    # Parse command line arguments
+    all_colors_mode = '-A' in sys.argv
+    
     # Get the directory where this script is located
     script_dir = Path(__file__).parent.absolute()
     
     print(f"ColorRemapper - Processing directory: {script_dir}")
+    if all_colors_mode:
+        print("Mode: Darken ALL colors (--A switch enabled)")
+    else:
+        print("Mode: Darken specific colors from mappings file")
     print("=" * 60)
     
     # Read color mappings from text file
     mapping_file = script_dir / 'color_mappings.txt'
-    color_mappings = read_color_mappings(mapping_file)
     
-    if not color_mappings:
-        print("\nNo valid color mappings found. Please create a 'color_mappings.txt' file")
-        print("with hex colors (one per line) and DARKNESS_PERCENT setting")
-        print("Example:")
-        print("  DARKNESS_PERCENT=40")
-        print("  8b8b8b")
-        print("  c6c6c6")
-        return
+    if all_colors_mode:
+        # In all colors mode, we only need the darkness percentage
+        _, darkness_percent = read_color_mappings(mapping_file, all_colors_mode=True)
+        color_mappings = {}
+        print(f"\nDarkening ALL colors by {darkness_percent}%")
+    else:
+        # Normal mode - read specific color mappings
+        color_mappings = read_color_mappings(mapping_file, all_colors_mode=False)
+        darkness_percent = 40  # Default, not used in this mode
+        
+        if not color_mappings:
+            print("\nNo valid color mappings found. Please create a 'color_mappings.txt' file")
+            print("with hex colors (one per line) and DARKNESS_PERCENT setting")
+            print("Example:")
+            print("  DARKNESS_PERCENT=40")
+            print("  8b8b8b")
+            print("  c6c6c6")
+            print("\nOr use -A switch to darken ALL colors in the images.")
+            return
+        
+        print(f"\nTotal mappings loaded: {len(color_mappings)}")
     
-    print(f"\nTotal mappings loaded: {len(color_mappings)}")
     print("=" * 60)
     
     # Find all PNG files in the directory (excluding subdirectories)
@@ -173,7 +229,7 @@ def main():
     # Process each PNG file
     processed_count = 0
     for png_file in png_files:
-        if remap_image_colors(png_file, color_mappings):
+        if remap_image_colors(png_file, color_mappings, all_colors_mode, darkness_percent):
             processed_count += 1
     
     print("\n" + "=" * 60)
