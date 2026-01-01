@@ -314,6 +314,17 @@ public class Font {
 			boolean bl = style.isBold();
 			TextColor textColor = style.getColor();
 			int j = this.getTextColor(textColor);
+			
+			// DEBUG: Log color calculation for green text
+			if (textColor != null && textColor.getValue() == 5635925) { // green color
+				System.out.println("=== FONT ACCEPT DEBUG (GREEN TEXT) ===");
+				System.out.println("Style color object: " + textColor);
+				System.out.println("Style color value: " + textColor.getValue());
+				System.out.println("this.color (fallback): " + this.color);
+				System.out.println("Computed color j: " + j);
+				System.out.println("Alpha from this.color: " + ARGB.alpha(this.color));
+			}
+			
 			int k = this.getShadowColor(style, j);
 			float f = glyphInfo.getAdvance(bl);
 			float g = i == 0 ? this.x - 1.0F : this.x;
