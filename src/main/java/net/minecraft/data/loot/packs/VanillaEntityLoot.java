@@ -378,7 +378,20 @@ public class VanillaEntityLoot extends EntityLootSubProvider {
 						)
 				)
 		);
-		this.add(EntityType.GOAT, LootTable.lootTable());
+		this.add(
+			EntityType.GOAT,
+			LootTable.lootTable()
+				.withPool(
+					LootPool.lootPool()
+						.setRolls(ConstantValue.exactly(1.0F))
+						.add(
+							LootItem.lootTableItem(Items.MUTTON)
+								.apply(SetItemCountFunction.setCount(UniformGenerator.between(1.0F, 2.0F)))
+								.apply(SmeltItemFunction.smelted().when(this.shouldSmeltLoot()))
+								.apply(EnchantedCountIncreaseFunction.lootingMultiplier(this.registries, UniformGenerator.between(0.0F, 1.0F)))
+						)
+				)
+		);
 		this.add(
 			EntityType.GUARDIAN,
 			LootTable.lootTable()
