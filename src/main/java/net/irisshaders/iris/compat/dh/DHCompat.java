@@ -56,32 +56,24 @@ public class DHCompat {
 
 	public static void run() {
 		try {
-			if (IrisPlatformHelpers.getInstance().isModLoaded("distanthorizons")) {
-				deletePipeline = MethodHandles.lookup().findVirtual(Class.forName("net.irisshaders.iris.compat.dh.DHCompatInternal"), "clear", MethodType.methodType(void.class));
-				MethodHandle setupEventHandlers = MethodHandles.lookup().findStatic(Class.forName("net.irisshaders.iris.compat.dh.LodRendererEvents"), "setupEventHandlers", MethodType.methodType(void.class));
-				getDepthTex = MethodHandles.lookup().findVirtual(Class.forName("net.irisshaders.iris.compat.dh.DHCompatInternal"), "getStoredDepthTex", MethodType.methodType(int.class));
-				getRenderDistance = MethodHandles.lookup().findStatic(Class.forName("net.irisshaders.iris.compat.dh.DHCompatInternal"), "getRenderDistance", MethodType.methodType(int.class));
-				incompatible = MethodHandles.lookup().findVirtual(Class.forName("net.irisshaders.iris.compat.dh.DHCompatInternal"), "incompatiblePack", MethodType.methodType(boolean.class));
-				getFarPlane = MethodHandles.lookup().findStatic(Class.forName("net.irisshaders.iris.compat.dh.DHCompatInternal"), "getFarPlane", MethodType.methodType(float.class));
-				getNearPlane = MethodHandles.lookup().findStatic(Class.forName("net.irisshaders.iris.compat.dh.DHCompatInternal"), "getNearPlane", MethodType.methodType(float.class));
-				getDepthTexNoTranslucent = MethodHandles.lookup().findVirtual(Class.forName("net.irisshaders.iris.compat.dh.DHCompatInternal"), "getDepthTexNoTranslucent", MethodType.methodType(int.class));
-				checkFrame = MethodHandles.lookup().findStatic(Class.forName("net.irisshaders.iris.compat.dh.DHCompatInternal"), "checkFrame", MethodType.methodType(boolean.class));
+			deletePipeline = MethodHandles.lookup().findVirtual(Class.forName("net.irisshaders.iris.compat.dh.DHCompatInternal"), "clear", MethodType.methodType(void.class));
+			MethodHandle setupEventHandlers = MethodHandles.lookup().findStatic(Class.forName("net.irisshaders.iris.compat.dh.LodRendererEvents"), "setupEventHandlers", MethodType.methodType(void.class));
+			getDepthTex = MethodHandles.lookup().findVirtual(Class.forName("net.irisshaders.iris.compat.dh.DHCompatInternal"), "getStoredDepthTex", MethodType.methodType(int.class));
+			getRenderDistance = MethodHandles.lookup().findStatic(Class.forName("net.irisshaders.iris.compat.dh.DHCompatInternal"), "getRenderDistance", MethodType.methodType(int.class));
+			incompatible = MethodHandles.lookup().findVirtual(Class.forName("net.irisshaders.iris.compat.dh.DHCompatInternal"), "incompatiblePack", MethodType.methodType(boolean.class));
+			getFarPlane = MethodHandles.lookup().findStatic(Class.forName("net.irisshaders.iris.compat.dh.DHCompatInternal"), "getFarPlane", MethodType.methodType(float.class));
+			getNearPlane = MethodHandles.lookup().findStatic(Class.forName("net.irisshaders.iris.compat.dh.DHCompatInternal"), "getNearPlane", MethodType.methodType(float.class));
+			getDepthTexNoTranslucent = MethodHandles.lookup().findVirtual(Class.forName("net.irisshaders.iris.compat.dh.DHCompatInternal"), "getDepthTexNoTranslucent", MethodType.methodType(int.class));
+			checkFrame = MethodHandles.lookup().findStatic(Class.forName("net.irisshaders.iris.compat.dh.DHCompatInternal"), "checkFrame", MethodType.methodType(boolean.class));
 
-				setupEventHandlers.invoke();
-			} else {
-				dhPresent = false;
-			}
+			setupEventHandlers.invoke();
 		} catch (Throwable e) {
 			dhPresent = false;
 
-			if (IrisPlatformHelpers.getInstance().isModLoaded("distanthorizons")) {
-				if (e instanceof ExceptionInInitializerError eiie) {
-					throw new RuntimeException("Failure loading DH compat.", eiie.getCause());
-				} else {
-					throw new RuntimeException("DH found, but one or more API methods are missing. Iris requires DH [2.0.4] or DH API version [1.1.0] or newer. Please make sure you are on the latest version of DH and Iris.", e);
-				}
+			if (e instanceof ExceptionInInitializerError eiie) {
+				throw new RuntimeException("Failure loading DH compat.", eiie.getCause());
 			} else {
-				Iris.logger.info("DH not found, and classes not found.");
+				throw new RuntimeException("DH found, but one or more API methods are missing. Iris requires DH [2.0.4] or DH API version [1.1.0] or newer. Please make sure you are on the latest version of DH and Iris.", e);
 			}
 		}
 	}

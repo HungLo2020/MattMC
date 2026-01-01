@@ -58,17 +58,13 @@ public class StandardMacros {
 		define(standardDefines, "IRIS_TAG_SUPPORT", "2");
 
 
-		if (IrisPlatformHelpers.getInstance().isModLoaded("distanthorizons") && DHCompat.hasRenderingEnabled()) {
+		if (DHCompat.hasRenderingEnabled()) {
 			define(standardDefines, "DISTANT_HORIZONS");
 		}
 
-		if (IrisPlatformHelpers.getInstance().isModLoaded("continuity")) {
-			define(standardDefines, "IRIS_HAS_CONNECTED_TEXTURES");
-		}
+		define(standardDefines, "IRIS_HAS_CONNECTED_TEXTURES");
 
-		if (IrisPlatformHelpers.getInstance().isModLoaded("monocle")) {
-			define(standardDefines, "IS_MONOCLE");
-		}
+		define(standardDefines, "IS_MONOCLE");
 
 		if (Iris.getIrisConfig().shouldAllowUnknownShaders()) {
 			define(standardDefines, "ALLOWS_UNKNOWN_SHADERS");

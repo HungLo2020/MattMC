@@ -79,11 +79,9 @@ public class ChunkFileReader implements AutoCloseable
 	{
 		this.params = params;
 		
-		if (MOD_CHECKER.isModLoaded("c2me"))
-		{
-			LOGGER.info("C2ME detected: DH's pre-existing chunk accessing will use methods handled by C2ME.");
-			this.pullExistingChunkUsingMcAsyncMethod = true;
-		}
+		// C2ME is always present in this build
+		LOGGER.info("C2ME detected: DH's pre-existing chunk accessing will use methods handled by C2ME.");
+		this.pullExistingChunkUsingMcAsyncMethod = true;
 		
 	}
 	

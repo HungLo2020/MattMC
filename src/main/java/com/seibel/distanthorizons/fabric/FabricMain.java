@@ -78,25 +78,9 @@ public class FabricMain extends AbstractModInitializer implements ClientModIniti
 	@Override
 	protected void initializeModCompat()
 	{
-		IModChecker modChecker = SingletonInjector.INSTANCE.get(IModChecker.class);
-		if (modChecker.isModLoaded("sodium"))
-		{
-			ModAccessorInjector.INSTANCE.bind(ISodiumAccessor.class, new SodiumAccessor());
-			
-			// If sodium is installed Indium is also necessary for versions 0.5 and less in order to use the Fabric rendering API
-			if (!modChecker.isModLoaded("indium") && SodiumAccessor.isSodiumV5OrLess)
-			{
-				String indiumMissingMessage = ModInfo.READABLE_NAME + " needs Indium to work with Sodium.\nPlease install Indium manually.";
-				LOGGER.fatal(indiumMissingMessage);
-				
-				NativeDialogUtil.showDialog(ModInfo.READABLE_NAME, indiumMissingMessage, "ok", "error");
-				
-				IMinecraftClientWrapper mc = SingletonInjector.INSTANCE.get(IMinecraftClientWrapper.class);
-				String errorMessage = "loading Distant Horizons. Distant Horizons requires Indium in order to run with Sodium.";
-				String exceptionError = "Distant Horizons conditional mod Exception";
-				mc.crashMinecraft(errorMessage, new Exception(exceptionError));
-			}
-		}
+		ModAccessorInjector.INSTANCE.bind(ISodiumAccessor.class, new SodiumAccessor());
+		
+		// Note: Indium is always present in this build
 		
 		this.tryCreateModCompatAccessor("starlight", IStarlightAccessor.class, StarlightAccessor::new);
 		this.tryCreateModCompatAccessor("optifine", IOptifineAccessor.class, OptifineAccessor::new);
@@ -174,15 +158,12 @@ public class FabricMain extends AbstractModInitializer implements ClientModIniti
 	{
 		SingletonInjector.INSTANCE.runDelayedSetup();
 		
-		if (!Config.Client.Advanced.Graphics.Fog.enableVanillaFog.get() && SingletonInjector.INSTANCE.get(IModChecker.class).isModLoaded("bclib"))
+		if (!Config.Client.Advanced.Graphics.Fog.enableVanillaFog.get())
 		{
 			ModAccessorInjector.INSTANCE.get(IBCLibAccessor.class).setRenderCustomFog(false); // Remove BCLib's fog
 		}
 		
-		if (SingletonInjector.INSTANCE.get(IModChecker.class).isModLoaded("sodium"))
-		{
-			ModAccessorInjector.INSTANCE.get(ISodiumAccessor.class).setFogOcclusion(false);
-		}
+		ModAccessorInjector.INSTANCE.get(ISodiumAccessor.class).setFogOcclusion(false);
 	}
 	
 	@Override
