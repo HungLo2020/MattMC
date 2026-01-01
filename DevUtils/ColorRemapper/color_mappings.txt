@@ -1,0 +1,10 @@
+# Color Mappings for ColorRemapper
+# Format: source_hex -> target_hex
+# Example: 8b8b8b -> 555555
+#
+# Add your color mappings below (one per line)
+# The script will automatically apply all mappings simultaneously
+# to avoid color wipeout issues
+
+# Test mapping
+8b8b8b -> 555555
