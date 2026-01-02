@@ -1362,8 +1362,13 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 
 		profilerFiller.popPush("blit");
 		if (!this.window.isMinimized()) {
-			// Blit the main target (not panorama target) to screen
-			this.getMainRenderTarget().blitToScreen();
+			// Always blit the original main render target to screen, not the panorama target
+			// even if we rendered to panorama during capture
+			if (panoramaTarget != null) {
+				this.getMainRenderTarget().blitToScreen();
+			} else {
+				renderTarget.blitToScreen();
+			}
 		}
 
 		this.frameTimeNs = Util.getNanos() - l;

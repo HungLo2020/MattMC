@@ -226,9 +226,9 @@ public class PanoramaCapture {
 				Util.ioPool().execute(() -> {
 					try {
 						nativeImage.writeToFile(outputFile);
-						LOGGER.info("Saved panorama face {}: {}", faceIndex, outputFile.getName());
+						LOGGER.info("Saved panorama face {} to {}", faceIndex, outputFile.getAbsolutePath());
 					} catch (Exception e) {
-						LOGGER.error("Failed to save panorama face " + faceIndex, e);
+						LOGGER.error("Failed to save panorama face {} to {}: {}", faceIndex, outputFile.getAbsolutePath(), e.getMessage(), e);
 					} finally {
 						nativeImage.close();
 					}
