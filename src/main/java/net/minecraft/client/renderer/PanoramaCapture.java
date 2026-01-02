@@ -179,7 +179,7 @@ public class PanoramaCapture {
 			
 			// Manually resize the render target to exactly 1024x1024
 			// This bypasses window decoration issues
-			minecraft.getMainRenderTarget().resize(PANORAMA_SIZE, PANORAMA_SIZE, Minecraft.ON_OSX);
+			minecraft.getMainRenderTarget().resize(PANORAMA_SIZE, PANORAMA_SIZE);
 			
 			// CRITICAL: Call gameRenderer.resize() with exact dimensions to reinitialize shaders
 			// This is shader-safe because it goes through the proper GameRenderer pipeline
@@ -291,7 +291,7 @@ public class PanoramaCapture {
 				} else {
 					minecraft.getWindow().setWindowed(savedWidth, savedHeight);
 					// Restore render target to original size
-					minecraft.getMainRenderTarget().resize(savedWidth, savedHeight, Minecraft.ON_OSX);
+					minecraft.getMainRenderTarget().resize(savedWidth, savedHeight);
 					// Reinitialize game renderer with original dimensions
 					minecraft.gameRenderer.resize(savedWidth, savedHeight);
 				}
