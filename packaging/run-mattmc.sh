@@ -15,13 +15,11 @@ else
     echo "Using system Java"
 fi
 
-# Path to the Minecraft game JAR for Fabric Loader
-GAME_JAR="${SCRIPT_DIR}/lib/minecraft-@VERSION@.jar"
-
+# Launch the game with Fabric Loader
+# Note: Minecraft classes are included in the main JAR, no separate game JAR needed
 "$JAVA_CMD" -Xmx8G -Xms4G \
     -XX:+UseZGC \
     -XX:+ZGenerational \
-    -Dfabric.gameJarPath.client="${GAME_JAR}" \
     -Dfabric.development=true \
     -cp "@CLASSPATH_LINUX@" \
     net.fabricmc.loader.impl.launch.knot.KnotClient \
