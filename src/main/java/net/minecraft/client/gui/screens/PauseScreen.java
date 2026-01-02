@@ -91,6 +91,9 @@ public class PauseScreen extends Screen {
 		}
 		rowHelper.addChild(
 			Button.builder(TAKE_PANORAMA, button -> {
+				// Close the pause screen so the panorama captures the world, not the UI
+				this.minecraft.setScreen(null);
+				// Start panorama capture
 				net.minecraft.client.renderer.PanoramaCapture.start(this.minecraft);
 			}).width(BUTTON_WIDTH_FULL).build(),
 			2

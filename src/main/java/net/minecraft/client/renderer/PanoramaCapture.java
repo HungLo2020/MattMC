@@ -126,6 +126,8 @@ public class PanoramaCapture {
 	 * State machine for capturing panorama one face per frame.
 	 */
 	private static class PanoramaJob {
+		private static final int DELAY_FRAMES = 10; // ~0.5 seconds at 20 FPS (half a second delay)
+		
 		private final Minecraft minecraft;
 		private final File outputFolder;
 		
@@ -139,6 +141,7 @@ public class PanoramaCapture {
 		
 		private int currentFace = 0;
 		private boolean faceReady = false;
+		private int delayCounter = 0; // Counts frames to delay before capturing
 		
 		PanoramaJob(Minecraft minecraft) throws Exception {
 			this.minecraft = minecraft;
@@ -183,27 +186,39 @@ public class PanoramaCapture {
 				return;
 			}
 			
-			// Show progress
-			minecraft.gui.getChat().addMessage(
-				Component.literal("Capturing panorama... (" + (currentFace + 1) + "/" + FACE_COUNT + ")")
-					.withStyle(ChatFormatting.YELLOW)
-			);
-			
-			// Get the face index for proper ordering
-			int faceIndex = FACE_INDICES[currentFace];
-			float[] rotation = FACE_ROTATIONS[faceIndex];
-			
-			// Set camera rotation for this face
-			minecraft.player.setYRot(savedYaw + rotation[0]);
-			minecraft.player.setXRot(rotation[1]);
-			minecraft.player.setYHeadRot(savedYaw + rotation[0]);
-			
-			// Resize main render target to panorama size
-			RenderTarget mainTarget = minecraft.getMainRenderTarget();
-			mainTarget.resize(PANORAMA_SIZE, PANORAMA_SIZE);
-			
-			// Mark that this face is ready to be saved after rendering
-			faceReady = true;
+			// If we haven't set up the camera yet for this face, do it now
+			if (!faceReady && delayCounter == 0) {
+				// Show progress
+				minecraft.gui.getChat().addMessage(
+					Component.literal("Capturing panorama... (" + (currentFace + 1) + "/" + FACE_COUNT + ")")
+						.withStyle(ChatFormatting.YELLOW)
+				);
+				
+				// Get the face index for proper ordering
+				int faceIndex = FACE_INDICES[currentFace];
+				float[] rotation = FACE_ROTATIONS[faceIndex];
+				
+				// Set camera rotation for this face
+				minecraft.player.setYRot(savedYaw + rotation[0]);
+				minecraft.player.setXRot(rotation[1]);
+				minecraft.player.setYHeadRot(savedYaw + rotation[0]);
+				
+				// Resize main render target to panorama size
+				RenderTarget mainTarget = minecraft.getMainRenderTarget();
+				mainTarget.resize(PANORAMA_SIZE, PANORAMA_SIZE);
+				
+				// Start delay counter
+				delayCounter = 1;
+			}
+			// If we're in the delay period, increment counter
+			else if (delayCounter > 0 && delayCounter < DELAY_FRAMES) {
+				delayCounter++;
+			}
+			// If delay is complete, mark ready to capture
+			else if (delayCounter >= DELAY_FRAMES) {
+				faceReady = true;
+				delayCounter = 0; // Reset for next face
+			}
 		}
 		
 		/**
