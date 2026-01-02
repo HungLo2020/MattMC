@@ -202,13 +202,10 @@ public class PanoramaCapture {
 				minecraft.player.setXRot(rotation[1]);
 				minecraft.player.setYHeadRot(savedYaw + rotation[0]);
 				
-				// Change window size to panorama size (this properly handles all rendering state)
-				minecraft.getWindow().setWindowed(PANORAMA_SIZE, PANORAMA_SIZE);
-				
-				// Ensure the render target is exactly PANORAMA_SIZE x PANORAMA_SIZE
-				// (window decorations or scaling may cause framebuffer to be different size)
-				minecraft.getMainRenderTarget().resize(PANORAMA_SIZE, PANORAMA_SIZE);
-				minecraft.gameRenderer.resize(PANORAMA_SIZE, PANORAMA_SIZE);
+				// Change window size to compensate for window decorations
+				// Window decorations (title bar, borders) subtract ~21 pixels from height
+				// So we request 1045 to get a 1024x1024 framebuffer
+				minecraft.getWindow().setWindowed(PANORAMA_SIZE + 21, PANORAMA_SIZE + 21);
 				
 				// Start delay counter
 				delayCounter = 1;
