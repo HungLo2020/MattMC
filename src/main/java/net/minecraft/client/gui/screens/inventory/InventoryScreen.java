@@ -303,14 +303,18 @@ public class InventoryScreen extends AbstractRecipeBookScreen<InventoryMenu> {
 	public boolean mouseClicked(MouseButtonEvent mouseButtonEvent, boolean bl) {
 		if (mouseButtonEvent.button() == 0) {
 			// Check JEI panel clicks
-			if (this.handleJeiPanelClick(mouseButtonEvent.x(), mouseButtonEvent.y())) {
+			if (this.handleJeiPanelClick(mouseButtonEvent)) {
 				return true;
 			}
 		}
 		return super.mouseClicked(mouseButtonEvent, bl);
 	}
 	
-	private boolean handleJeiPanelClick(double mouseX, double mouseY) {
+	private boolean handleJeiPanelClick(MouseButtonEvent mouseButtonEvent) {
+		double mouseX = mouseButtonEvent.x();
+		double mouseY = mouseButtonEvent.y();
+		boolean isShiftDown = mouseButtonEvent.hasShiftDown();
+		
 		if (this.jeiColumns <= 0 || this.jeiRows <= 0 || this.allTabItems.isEmpty()) {
 			return false;
 		}
@@ -352,9 +356,18 @@ public class InventoryScreen extends AbstractRecipeBookScreen<InventoryMenu> {
 				
 				if (mouseX >= x && mouseX < x + 16 && mouseY >= y && mouseY < y + 16) {
 					ItemStack itemStack = this.allTabItems.get(index);
-					if (!itemStack.isEmpty()) {
-						// In creative mode, pick up full stack like in normal creative inventory
-						this.menu.setCarried(itemStack.copyWithCount(itemStack.getMaxStackSize()));
+					if (!itemStack.isEmpty() && this.minecraft != null && this.minecraft.player != null) {
+						// Determine how many items to give based on shift key
+						int count = isShiftDown ? itemStack.getMaxStackSize() : 1;
+						ItemStack itemToAdd = itemStack.copyWithCount(count);
+						
+						// Add to player inventory using smart stacking/placement logic
+						// This will:
+						// 1. First try to stack with existing items
+						// 2. Then add to first empty hotbar slot
+						// 3. Finally add to first empty inventory slot
+						this.minecraft.player.getInventory().add(itemToAdd);
+						
 						return true;
 					}
 				}
