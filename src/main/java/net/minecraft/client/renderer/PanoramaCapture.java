@@ -92,6 +92,13 @@ public class PanoramaCapture {
 	}
 	
 	/**
+	 * Returns true if we should clear the render target again after beforeRender resized it.
+	 */
+	public static boolean needsClear() {
+		return activeJob != null && activeJob.justResized;
+	}
+	
+	/**
 	 * Called after rendering finishes. Saves the captured frame if panorama capture is active.
 	 */
 	public static void afterRender(Minecraft minecraft) {
@@ -142,6 +149,7 @@ public class PanoramaCapture {
 		private int currentFace = 0;
 		private boolean faceReady = false;
 		private int delayCounter = 0; // Counts frames to delay before capturing
+		private boolean justResized = false; // Tracks if we just resized (needs clear)
 		
 		PanoramaJob(Minecraft minecraft) throws Exception {
 			this.minecraft = minecraft;
@@ -183,6 +191,7 @@ public class PanoramaCapture {
 		 */
 		void prepareNextFace(Minecraft minecraft) {
 			if (currentFace >= FACE_COUNT) {
+				justResized = false;
 				return;
 			}
 			
@@ -210,17 +219,24 @@ public class PanoramaCapture {
 				// Notify GameRenderer and LevelRenderer about the resize to clear internal state
 				minecraft.gameRenderer.resize(PANORAMA_SIZE, PANORAMA_SIZE);
 				
+				// Mark that we just resized so the render target needs to be cleared
+				justResized = true;
+				
 				// Start delay counter
 				delayCounter = 1;
 			}
 			// If we're in the delay period, increment counter
 			else if (delayCounter > 0 && delayCounter < DELAY_FRAMES) {
 				delayCounter++;
+				justResized = false; // Clear flag after first frame
 			}
 			// If delay is complete, mark ready to capture
 			else if (delayCounter >= DELAY_FRAMES) {
 				faceReady = true;
 				delayCounter = 0; // Reset for next face
+				justResized = false;
+			} else {
+				justResized = false;
 			}
 		}
 		
