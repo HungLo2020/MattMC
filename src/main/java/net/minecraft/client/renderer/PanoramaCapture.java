@@ -174,11 +174,16 @@ public class PanoramaCapture {
 			// Hide GUI
 			minecraft.options.hideGui = true;
 			
+			// Set window size immediately to ensure first face is captured at correct resolution
+			// Window decorations (title bar) subtract ~21 pixels from HEIGHT only
+			// So we request height of 1045 to get a 1024x1024 framebuffer
+			minecraft.getWindow().setWindowed(PANORAMA_SIZE, PANORAMA_SIZE + 21);
+			
 			LOGGER.info("Panorama capture initialized: output={}", this.outputFolder.getAbsolutePath());
 		}
 		
 		/**
-		 * Prepares for the next face capture. Sets window size, camera, and displays progress.
+		 * Prepares for the next face capture. Sets camera and displays progress.
 		 */
 		void prepareNextFace(Minecraft minecraft) {
 			if (currentFace >= FACE_COUNT) {
@@ -201,11 +206,6 @@ public class PanoramaCapture {
 				minecraft.player.setYRot(savedYaw + rotation[0]);
 				minecraft.player.setXRot(rotation[1]);
 				minecraft.player.setYHeadRot(savedYaw + rotation[0]);
-				
-				// Change window size to compensate for window decorations
-				// Window decorations (title bar, borders) subtract ~21 pixels from height
-				// So we request 1045 to get a 1024x1024 framebuffer
-				minecraft.getWindow().setWindowed(PANORAMA_SIZE + 21, PANORAMA_SIZE + 21);
 				
 				// Start delay counter
 				delayCounter = 1;
