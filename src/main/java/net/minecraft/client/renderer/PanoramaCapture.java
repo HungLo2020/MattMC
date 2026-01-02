@@ -178,6 +178,7 @@ public class PanoramaCapture {
 		
 		/**
 		 * Prepares for the next face capture. Sets camera and displays progress.
+		 * Uses /tp command to set rotation while game is in normal rendering mode.
 		 */
 		void prepareNextFace(Minecraft minecraft) {
 			if (currentFace >= FACE_COUNT) {
@@ -196,10 +197,19 @@ public class PanoramaCapture {
 				int faceIndex = FACE_INDICES[currentFace];
 				float[] rotation = FACE_ROTATIONS[faceIndex];
 				
-				// Set camera rotation for this face
-				minecraft.player.setYRot(savedYaw + rotation[0]);
-				minecraft.player.setXRot(rotation[1]);
-				minecraft.player.setYHeadRot(savedYaw + rotation[0]);
+				// Calculate target yaw and pitch
+				float targetYaw = savedYaw + rotation[0];
+				float targetPitch = rotation[1];
+				
+				// Use /tp command to set rotation BEFORE changing render state
+				// This ensures shaders see a proper camera state transition
+				// Format: /tp @s ~ ~ ~ <yaw> <pitch>
+				String tpCommand = String.format(java.util.Locale.US, "tp @s ~ ~ ~ %.2f %.2f", targetYaw, targetPitch);
+				
+				// Execute the teleport command
+				if (minecraft.getConnection() != null) {
+					minecraft.getConnection().sendCommand(tpCommand);
+				}
 				
 				// Set FOV to 90 for capture
 				minecraft.options.fov().set(90);
@@ -285,12 +295,15 @@ public class PanoramaCapture {
 		
 		/**
 		 * Restore state to normal (called after each face capture).
+		 * Uses /tp command to restore rotation properly.
 		 */
 		private void restoreState(Minecraft minecraft) {
-			// Restore camera
-			minecraft.player.setYRot(savedYaw);
-			minecraft.player.setXRot(savedPitch);
-			minecraft.player.setYHeadRot(savedYaw);
+			// Restore camera using /tp command (proper state transition for shaders)
+			// Format: /tp @s ~ ~ ~ <yaw> <pitch>
+			String tpCommand = String.format(java.util.Locale.US, "tp @s ~ ~ ~ %.2f %.2f", savedYaw, savedPitch);
+			if (minecraft.getConnection() != null) {
+				minecraft.getConnection().sendCommand(tpCommand);
+			}
 			
 			// Restore FOV
 			minecraft.options.fov().set(savedFov);
