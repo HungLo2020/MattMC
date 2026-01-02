@@ -1,6 +1,5 @@
 package net.minecraft.client.gui.screens;
 
-import com.mojang.logging.LogUtils;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.ChatFormatting;
@@ -22,11 +21,9 @@ import net.minecraft.util.Mth;
 import net.minecraft.util.StringUtil;
 import org.apache.commons.lang3.StringUtils;
 import org.jetbrains.annotations.Nullable;
-import org.slf4j.Logger;
 
 @Environment(EnvType.CLIENT)
 public class ChatScreen extends Screen {
-	private static final Logger LOGGER = LogUtils.getLogger();
 	public static final double MOUSE_SCROLL_SPEED = 7.0;
 	private static final Component USAGE_TEXT = Component.translatable("chat_screen.usage");
 	private static final int TOOLTIP_MAX_WIDTH = 210;
@@ -159,34 +156,19 @@ public class ChatScreen extends Screen {
 
 	@Override
 	public boolean mouseClicked(MouseButtonEvent mouseButtonEvent, boolean bl) {
-		LOGGER.info("[CHAT_STYLE_DEBUG] ChatScreen.mouseClicked called at ({}, {}), button: {}", 
-			mouseButtonEvent.x(), mouseButtonEvent.y(), mouseButtonEvent.button());
-		
 		if (this.commandSuggestions.mouseClicked(mouseButtonEvent)) {
-			LOGGER.info("[CHAT_STYLE_DEBUG] ChatScreen.mouseClicked - handled by command suggestions");
 			return true;
 		} else {
 			if (mouseButtonEvent.button() == 0) {
-				LOGGER.info("[CHAT_STYLE_DEBUG] ChatScreen.mouseClicked - left click detected");
 				ChatComponent chatComponent = this.minecraft.gui.getChat();
 				if (chatComponent.handleChatQueueClicked(mouseButtonEvent.x(), mouseButtonEvent.y())) {
-					LOGGER.info("[CHAT_STYLE_DEBUG] ChatScreen.mouseClicked - handled by chat queue");
 					return true;
 				}
 
 				Style style = this.getComponentStyleAt(mouseButtonEvent.x(), mouseButtonEvent.y());
-				LOGGER.info("[CHAT_STYLE_DEBUG] ChatScreen.mouseClicked - style at position: {}", style);
-				if (style != null) {
-					LOGGER.info("[CHAT_STYLE_DEBUG] ChatScreen.mouseClicked - style color: {}, clickEvent: {}, hoverEvent: {}", 
-						style.getColor(), style.getClickEvent(), style.getHoverEvent());
-					boolean handled = this.handleComponentClicked(style);
-					LOGGER.info("[CHAT_STYLE_DEBUG] ChatScreen.mouseClicked - handleComponentClicked returned: {}", handled);
-					if (handled) {
-						this.initial = this.input.getValue();
-						return true;
-					}
-				} else {
-					LOGGER.info("[CHAT_STYLE_DEBUG] ChatScreen.mouseClicked - no style found at click position");
+				if (style != null && this.handleComponentClicked(style)) {
+					this.initial = this.input.getValue();
+					return true;
 				}
 			}
 
@@ -269,14 +251,7 @@ public class ChatScreen extends Screen {
 
 	@Nullable
 	private Style getComponentStyleAt(double d, double e) {
-		LOGGER.info("[CHAT_STYLE_DEBUG] ChatScreen.getComponentStyleAt called at ({}, {})", d, e);
-		Style style = this.minecraft.gui.getChat().getClickedComponentStyleAt(d, e);
-		LOGGER.info("[CHAT_STYLE_DEBUG] ChatScreen.getComponentStyleAt - returned style: {}", style);
-		if (style != null) {
-			LOGGER.info("[CHAT_STYLE_DEBUG] ChatScreen.getComponentStyleAt - style details: color={}, clickEvent={}, hoverEvent={}", 
-				style.getColor(), style.getClickEvent(), style.getHoverEvent());
-		}
-		return style;
+		return this.minecraft.gui.getChat().getClickedComponentStyleAt(d, e);
 	}
 
 	public void handleChatInput(String string, boolean bl) {

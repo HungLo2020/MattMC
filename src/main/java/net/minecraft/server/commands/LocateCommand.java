@@ -24,9 +24,6 @@ import net.minecraft.network.chat.ClickEvent;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.ComponentUtils;
 import net.minecraft.network.chat.HoverEvent;
-import net.minecraft.network.chat.MutableComponent;
-import net.minecraft.network.chat.Style;
-import net.minecraft.network.chat.contents.TranslatableContents;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.ai.village.poi.PoiManager;
@@ -174,83 +171,13 @@ public class LocateCommand {
 		BlockPos blockPos2 = pair.getFirst();
 		int i = bl ? Mth.floor(Mth.sqrt((float)blockPos.distSqr(blockPos2))) : Mth.floor(dist(blockPos.getX(), blockPos.getZ(), blockPos2.getX(), blockPos2.getZ()));
 		String string3 = bl ? String.valueOf(blockPos2.getY()) : "~";
-		
-		LOGGER.info("[CHAT_STYLE_DEBUG] LocateCommand: Starting to create styled component for coordinates");
-		LOGGER.info("[CHAT_STYLE_DEBUG] LocateCommand: Coordinates - X: {}, Y: {}, Z: {}", blockPos2.getX(), string3, blockPos2.getZ());
-		
-		// Create the click event
-		ClickEvent.SuggestCommand clickEvent = new ClickEvent.SuggestCommand("/tp @s " + blockPos2.getX() + " " + string3 + " " + blockPos2.getZ());
-		LOGGER.info("[CHAT_STYLE_DEBUG] LocateCommand: Created ClickEvent.SuggestCommand with command: '{}'", clickEvent.command());
-		LOGGER.info("[CHAT_STYLE_DEBUG] LocateCommand: ClickEvent action type: {}", clickEvent.action());
-		
-		// Create the hover event
-		Component hoverText = Component.translatable("chat.coordinates.tooltip");
-		HoverEvent.ShowText hoverEvent = new HoverEvent.ShowText(hoverText);
-		LOGGER.info("[CHAT_STYLE_DEBUG] LocateCommand: Created HoverEvent.ShowText with text: '{}'", hoverText.getString());
-		LOGGER.info("[CHAT_STYLE_DEBUG] LocateCommand: HoverEvent action type: {}", hoverEvent.action());
-		
-		// Create the base coordinate component
-		Component coordinateComponent = Component.translatable("chat.coordinates", blockPos2.getX(), string3, blockPos2.getZ());
-		LOGGER.info("[CHAT_STYLE_DEBUG] LocateCommand: Created base coordinate component: '{}'", coordinateComponent.getString());
-		
-		// Wrap in square brackets
-		MutableComponent wrappedComponent = ComponentUtils.wrapInSquareBrackets(coordinateComponent);
-		LOGGER.info("[CHAT_STYLE_DEBUG] LocateCommand: Wrapped component in square brackets: '{}'", wrappedComponent.getString());
-		
-		// Apply style with color, click event, and hover event
-		MutableComponent component = wrappedComponent.withStyle(
-			style -> {
-				LOGGER.info("[CHAT_STYLE_DEBUG] LocateCommand: Applying style - Input style: {}", style);
-				Style styledResult = style.withColor(ChatFormatting.GREEN);
-				LOGGER.info("[CHAT_STYLE_DEBUG] LocateCommand: After withColor(GREEN): {}", styledResult);
-				styledResult = styledResult.withClickEvent(clickEvent);
-				LOGGER.info("[CHAT_STYLE_DEBUG] LocateCommand: After withClickEvent: {}", styledResult);
-				styledResult = styledResult.withHoverEvent(hoverEvent);
-				LOGGER.info("[CHAT_STYLE_DEBUG] LocateCommand: After withHoverEvent: {}", styledResult);
-				return styledResult;
-			}
-		);
-		
-		LOGGER.info("[CHAT_STYLE_DEBUG] LocateCommand: Final styled component: '{}'", component.getString());
-		LOGGER.info("[CHAT_STYLE_DEBUG] LocateCommand: Final styled component style: {}", component.getStyle());
-		LOGGER.info("[CHAT_STYLE_DEBUG] LocateCommand: Final style color: {}", component.getStyle().getColor());
-		LOGGER.info("[CHAT_STYLE_DEBUG] LocateCommand: Final style clickEvent: {}", component.getStyle().getClickEvent());
-		LOGGER.info("[CHAT_STYLE_DEBUG] LocateCommand: Final style hoverEvent: {}", component.getStyle().getHoverEvent());
-		
-		// Create the full message - DON'T resolve it, send the raw translatable component
-		// The client will resolve it and should preserve styles
-		Component fullMessage = Component.translatable(string, string2, component, i);
-		LOGGER.info("[CHAT_STYLE_DEBUG] LocateCommand: Full message to send: '{}'", fullMessage.getString());
-		LOGGER.info("[CHAT_STYLE_DEBUG] LocateCommand: Full message style: {}", fullMessage.getStyle());
-		LOGGER.info("[CHAT_STYLE_DEBUG] LocateCommand: Full message contents type: {}", fullMessage.getContents().getClass().getSimpleName());
-		
-		if (!fullMessage.getSiblings().isEmpty()) {
-			LOGGER.info("[CHAT_STYLE_DEBUG] LocateCommand: Full message has {} siblings", fullMessage.getSiblings().size());
-			for (int idx = 0; idx < fullMessage.getSiblings().size(); idx++) {
-				Component sibling = fullMessage.getSiblings().get(idx);
-				LOGGER.info("[CHAT_STYLE_DEBUG] LocateCommand: Sibling[{}]: '{}', style: {}", idx, sibling.getString(), sibling.getStyle());
-			}
-		}
-		
-		// Check if the translatable component has the styled component in its args
-		if (fullMessage.getContents() instanceof TranslatableContents translatableContents) {
-			Object[] args = translatableContents.getArgs();
-			LOGGER.info("[CHAT_STYLE_DEBUG] LocateCommand: TranslatableContents has {} args", args.length);
-			for (int idx = 0; idx < args.length; idx++) {
-				Object arg = args[idx];
-				if (arg instanceof Component argComponent) {
-					LOGGER.info("[CHAT_STYLE_DEBUG] LocateCommand: Arg[{}] is Component: '{}', style: {}", 
-						idx, argComponent.getString(), argComponent.getStyle());
-					LOGGER.info("[CHAT_STYLE_DEBUG] LocateCommand: Arg[{}] color: {}, clickEvent: {}, hoverEvent: {}", 
-						idx, argComponent.getStyle().getColor(), argComponent.getStyle().getClickEvent(), argComponent.getStyle().getHoverEvent());
-				} else {
-					LOGGER.info("[CHAT_STYLE_DEBUG] LocateCommand: Arg[{}] is {}: {}", idx, arg.getClass().getSimpleName(), arg);
-				}
-			}
-		}
-		
-		commandSourceStack.sendSuccess(() -> fullMessage, false);
-		
+		Component component = ComponentUtils.wrapInSquareBrackets(Component.translatable("chat.coordinates", blockPos2.getX(), string3, blockPos2.getZ()))
+			.withStyle(
+				style -> style.withColor(ChatFormatting.GREEN)
+					.withClickEvent(new ClickEvent.SuggestCommand("/tp @s " + blockPos2.getX() + " " + string3 + " " + blockPos2.getZ()))
+					.withHoverEvent(new HoverEvent.ShowText(Component.translatable("chat.coordinates.tooltip")))
+			);
+		commandSourceStack.sendSuccess(() -> Component.translatable(string, string2, component, i), false);
 		LOGGER.info("Locating element {} took {} ms", string2, duration.toMillis());
 		return i;
 	}

@@ -186,30 +186,10 @@ public class ChatComponent {
 	}
 
 	public void addMessage(Component component) {
-		LOGGER.info("[CHAT_STYLE_DEBUG] ChatComponent.addMessage(Component) called");
-		LOGGER.info("[CHAT_STYLE_DEBUG] ChatComponent.addMessage - component: '{}'", component.getString());
-		LOGGER.info("[CHAT_STYLE_DEBUG] ChatComponent.addMessage - component style: {}", component.getStyle());
-		LOGGER.info("[CHAT_STYLE_DEBUG] ChatComponent.addMessage - style color: {}, clickEvent: {}, hoverEvent: {}", 
-			component.getStyle().getColor(), component.getStyle().getClickEvent(), component.getStyle().getHoverEvent());
-		
-		// Log all siblings
-		if (!component.getSiblings().isEmpty()) {
-			LOGGER.info("[CHAT_STYLE_DEBUG] ChatComponent.addMessage - component has {} siblings", component.getSiblings().size());
-			for (int i = 0; i < component.getSiblings().size(); i++) {
-				Component sibling = component.getSiblings().get(i);
-				LOGGER.info("[CHAT_STYLE_DEBUG] ChatComponent.addMessage - sibling[{}]: '{}', style: {}", 
-					i, sibling.getString(), sibling.getStyle());
-				LOGGER.info("[CHAT_STYLE_DEBUG] ChatComponent.addMessage - sibling[{}] color: {}, clickEvent: {}, hoverEvent: {}", 
-					i, sibling.getStyle().getColor(), sibling.getStyle().getClickEvent(), sibling.getStyle().getHoverEvent());
-			}
-		}
-		
 		this.addMessage(component, null, this.minecraft.isSingleplayer() ? GuiMessageTag.systemSinglePlayer() : GuiMessageTag.system());
 	}
 
 	public void addMessage(Component component, @Nullable MessageSignature messageSignature, @Nullable GuiMessageTag guiMessageTag) {
-		LOGGER.info("[CHAT_STYLE_DEBUG] ChatComponent.addMessage(Component, MessageSignature, GuiMessageTag) called");
-		LOGGER.info("[CHAT_STYLE_DEBUG] ChatComponent.addMessage - creating GuiMessage with component: '{}'", component.getString());
 		GuiMessage guiMessage = new GuiMessage(this.minecraft.gui.getGuiTicks(), component, messageSignature, guiMessageTag);
 		this.logChatMessage(guiMessage);
 		this.addMessageToDisplayQueue(guiMessage);
@@ -227,24 +207,14 @@ public class ChatComponent {
 	}
 
 	private void addMessageToDisplayQueue(GuiMessage guiMessage) {
-		LOGGER.info("[CHAT_STYLE_DEBUG] ChatComponent.addMessageToDisplayQueue called");
-		LOGGER.info("[CHAT_STYLE_DEBUG] ChatComponent.addMessageToDisplayQueue - guiMessage content: '{}'", guiMessage.content().getString());
-		LOGGER.info("[CHAT_STYLE_DEBUG] ChatComponent.addMessageToDisplayQueue - current trimmedMessages size: {}", this.trimmedMessages.size());
-		
 		int i = Mth.floor(this.getWidth() / this.getScale());
-		LOGGER.info("[CHAT_STYLE_DEBUG] ChatComponent.addMessageToDisplayQueue - chat width: {}, scale: {}, wrapped width: {}", this.getWidth(), this.getScale(), i);
-		
 		GuiMessageTag.Icon icon = guiMessage.icon();
 		if (icon != null) {
 			i -= icon.width + 4 + 2;
-			LOGGER.info("[CHAT_STYLE_DEBUG] ChatComponent.addMessageToDisplayQueue - adjusted for icon, new width: {}", i);
 		}
 
 		List<FormattedCharSequence> list = ComponentRenderUtils.wrapComponents(guiMessage.content(), i, this.minecraft.font);
-		LOGGER.info("[CHAT_STYLE_DEBUG] ChatComponent.addMessageToDisplayQueue - wrapped into {} lines", list.size());
-		
 		boolean bl = this.isChatFocused();
-		LOGGER.info("[CHAT_STYLE_DEBUG] ChatComponent.addMessageToDisplayQueue - chat focused: {}", bl);
 
 		for (int j = 0; j < list.size(); j++) {
 			FormattedCharSequence formattedCharSequence = (FormattedCharSequence)list.get(j);
@@ -255,16 +225,11 @@ public class ChatComponent {
 
 			boolean bl2 = j == list.size() - 1;
 			this.trimmedMessages.add(0, new GuiMessage.Line(guiMessage.addedTime(), formattedCharSequence, guiMessage.tag(), bl2));
-			LOGGER.info("[CHAT_STYLE_DEBUG] ChatComponent.addMessageToDisplayQueue - added line {} to trimmedMessages", j);
 		}
-
-		LOGGER.info("[CHAT_STYLE_DEBUG] ChatComponent.addMessageToDisplayQueue - trimmedMessages size after add: {}", this.trimmedMessages.size());
 
 		while (this.trimmedMessages.size() > 100) {
 			this.trimmedMessages.remove(this.trimmedMessages.size() - 1);
 		}
-		
-		LOGGER.info("[CHAT_STYLE_DEBUG] ChatComponent.addMessageToDisplayQueue - final trimmedMessages size: {}", this.trimmedMessages.size());
 	}
 
 	private void addMessageToQueue(GuiMessage guiMessage) {
@@ -387,25 +352,13 @@ public class ChatComponent {
 
 	@Nullable
 	public Style getClickedComponentStyleAt(double d, double e) {
-		LOGGER.info("[CHAT_STYLE_DEBUG] ChatComponent.getClickedComponentStyleAt called at ({}, {})", d, e);
 		double f = this.screenToChatX(d);
 		double g = this.screenToChatY(e);
-		LOGGER.info("[CHAT_STYLE_DEBUG] ChatComponent.getClickedComponentStyleAt - converted to chat coords: ({}, {})", f, g);
 		int i = this.getMessageLineIndexAt(f, g);
-		LOGGER.info("[CHAT_STYLE_DEBUG] ChatComponent.getClickedComponentStyleAt - message line index: {}", i);
-		
 		if (i >= 0 && i < this.trimmedMessages.size()) {
 			GuiMessage.Line line = (GuiMessage.Line)this.trimmedMessages.get(i);
-			LOGGER.info("[CHAT_STYLE_DEBUG] ChatComponent.getClickedComponentStyleAt - found line: '{}'", line.content());
-			Style style = this.minecraft.font.getSplitter().componentStyleAtWidth(line.content(), Mth.floor(f));
-			LOGGER.info("[CHAT_STYLE_DEBUG] ChatComponent.getClickedComponentStyleAt - extracted style: {}", style);
-			if (style != null) {
-				LOGGER.info("[CHAT_STYLE_DEBUG] ChatComponent.getClickedComponentStyleAt - style color: {}, clickEvent: {}, hoverEvent: {}", 
-					style.getColor(), style.getClickEvent(), style.getHoverEvent());
-			}
-			return style;
+			return this.minecraft.font.getSplitter().componentStyleAtWidth(line.content(), Mth.floor(f));
 		} else {
-			LOGGER.info("[CHAT_STYLE_DEBUG] ChatComponent.getClickedComponentStyleAt - index out of bounds (size: {})", this.trimmedMessages.size());
 			return null;
 		}
 	}
@@ -468,36 +421,21 @@ public class ChatComponent {
 	}
 
 	private int getMessageLineIndexAt(double d, double e) {
-		LOGGER.info("[CHAT_STYLE_DEBUG] ChatComponent.getMessageLineIndexAt called at ({}, {})", d, e);
-		LOGGER.info("[CHAT_STYLE_DEBUG] ChatComponent.getMessageLineIndexAt - isChatFocused: {}, isChatHidden: {}", this.isChatFocused(), this.isChatHidden());
-		
 		if (this.isChatFocused() && !this.isChatHidden()) {
-			LOGGER.info("[CHAT_STYLE_DEBUG] ChatComponent.getMessageLineIndexAt - chat focused and not hidden");
 			if (!(d < -4.0) && !(d > Mth.floor(this.getWidth() / this.getScale()))) {
-				LOGGER.info("[CHAT_STYLE_DEBUG] ChatComponent.getMessageLineIndexAt - d in valid range");
 				int i = Math.min(this.getLinesPerPage(), this.trimmedMessages.size());
-				LOGGER.info("[CHAT_STYLE_DEBUG] ChatComponent.getMessageLineIndexAt - linesPerPage: {}, trimmedMessages.size: {}, min: {}", this.getLinesPerPage(), this.trimmedMessages.size(), i);
 				if (e >= 0.0 && e < i) {
-					LOGGER.info("[CHAT_STYLE_DEBUG] ChatComponent.getMessageLineIndexAt - e in valid range [0, {})", i);
 					int j = Mth.floor(e + this.chatScrollbarPos);
-					LOGGER.info("[CHAT_STYLE_DEBUG] ChatComponent.getMessageLineIndexAt - calculated index j: {}, chatScrollbarPos: {}", j, this.chatScrollbarPos);
 					if (j >= 0 && j < this.trimmedMessages.size()) {
-						LOGGER.info("[CHAT_STYLE_DEBUG] ChatComponent.getMessageLineIndexAt - returning valid index: {}", j);
 						return j;
-					} else {
-						LOGGER.info("[CHAT_STYLE_DEBUG] ChatComponent.getMessageLineIndexAt - j out of bounds, returning -1");
 					}
-				} else {
-					LOGGER.info("[CHAT_STYLE_DEBUG] ChatComponent.getMessageLineIndexAt - e out of range [0, {}), e={}, returning -1", i, e);
 				}
 
 				return -1;
 			} else {
-				LOGGER.info("[CHAT_STYLE_DEBUG] ChatComponent.getMessageLineIndexAt - d out of range, returning -1");
 				return -1;
 			}
 		} else {
-			LOGGER.info("[CHAT_STYLE_DEBUG] ChatComponent.getMessageLineIndexAt - chat not focused or is hidden, returning -1");
 			return -1;
 		}
 	}
