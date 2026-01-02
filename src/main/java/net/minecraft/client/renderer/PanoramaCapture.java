@@ -2,10 +2,8 @@ package net.minecraft.client.renderer;
 
 import com.mojang.blaze3d.pipeline.RenderTarget;
 import com.mojang.blaze3d.pipeline.TextureTarget;
-import com.mojang.blaze3d.platform.NativeImage;
 import com.mojang.logging.LogUtils;
 import java.io.File;
-import java.nio.file.Path;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import net.minecraft.ChatFormatting;
@@ -22,6 +20,10 @@ import org.slf4j.Logger;
 /**
  * Manages panorama capture for creating 6-face cubemaps.
  * Captures one face per frame to minimize hitching.
+ * 
+ * Integration point: Call {@link #beforeRender(Minecraft)} before rendering to check if
+ * panorama capture should redirect the render target, and call {@link #afterRender(Minecraft)}
+ * after rendering completes to save the captured frame.
  */
 @Environment(EnvType.CLIENT)
 public class PanoramaCapture {
@@ -30,18 +32,19 @@ public class PanoramaCapture {
 	private static final int FACE_COUNT = 6;
 	
 	// Face ordering matches CubeMapTexture.SUFFIXES: _1, _3, _5, _4, _0, _2
-	// which maps to indices: 1, 3, 5, 4, 0, 2
+	// Indices in order: 1, 3, 5, 4, 0, 2
+	// Corresponds to: right, left, up, down, front, back
 	private static final int[] FACE_INDICES = {1, 3, 5, 4, 0, 2};
 	
-	// Camera rotations for each face (yaw, pitch)
-	// Based on cubemap conventions: right, left, top, bottom, front, back
+	// Camera rotations for each face index (yaw offset from saved, pitch absolute)
+	// panorama_0 = front, panorama_1 = right, panorama_2 = back, panorama_3 = left, panorama_4 = up, panorama_5 = down
 	private static final float[][] FACE_ROTATIONS = {
-		{0.0F, 0.0F},      // panorama_0.png - front
-		{90.0F, 0.0F},     // panorama_1.png - right  
-		{180.0F, 0.0F},    // panorama_2.png - back
-		{270.0F, 0.0F},    // panorama_3.png - left
-		{0.0F, -90.0F},    // panorama_4.png - up
-		{0.0F, 90.0F}      // panorama_5.png - down
+		{0.0F, 0.0F},      // panorama_0.png - front (yaw+0, pitch=0)
+		{90.0F, 0.0F},     // panorama_1.png - right (yaw+90, pitch=0)
+		{180.0F, 0.0F},    // panorama_2.png - back (yaw+180, pitch=0)
+		{270.0F, 0.0F},    // panorama_3.png - left (yaw+270, pitch=0)
+		{0.0F, -90.0F},    // panorama_4.png - up (yaw+0, pitch=-90)
+		{0.0F, 90.0F}      // panorama_5.png - down (yaw+0, pitch=+90)
 	};
 	
 	@Nullable
@@ -71,23 +74,48 @@ public class PanoramaCapture {
 	}
 	
 	/**
-	 * Called each frame to process the active capture job.
+	 * Called before each frame renders. Returns the render target to use for this frame,
+	 * or null if normal rendering should proceed.
 	 */
-	public static void onFrame(Minecraft minecraft) {
-		if (activeJob != null) {
-			try {
-				boolean completed = activeJob.processNextFace(minecraft);
-				if (completed) {
-					activeJob.cleanup();
-					activeJob = null;
-				}
-			} catch (Exception e) {
-				LOGGER.error("Error during panorama capture", e);
-				minecraft.gui.getChat().addMessage(Component.literal("Panorama capture failed: " + e.getMessage()).withStyle(ChatFormatting.RED));
-				if (activeJob != null) {
-					activeJob.cleanup();
-					activeJob = null;
-				}
+	@Nullable
+	public static RenderTarget beforeRender(Minecraft minecraft) {
+		if (activeJob == null) {
+			return null;
+		}
+		
+		try {
+			return activeJob.prepareNextFace(minecraft);
+		} catch (Exception e) {
+			LOGGER.error("Error preparing panorama capture frame", e);
+			minecraft.gui.getChat().addMessage(Component.literal("Panorama capture failed: " + e.getMessage()).withStyle(ChatFormatting.RED));
+			if (activeJob != null) {
+				activeJob.cleanup();
+				activeJob = null;
+			}
+			return null;
+		}
+	}
+	
+	/**
+	 * Called after rendering finishes. Saves the captured frame if panorama capture is active.
+	 */
+	public static void afterRender(Minecraft minecraft) {
+		if (activeJob == null) {
+			return;
+		}
+		
+		try {
+			boolean completed = activeJob.saveCurrentFace(minecraft);
+			if (completed) {
+				activeJob.cleanup();
+				activeJob = null;
+			}
+		} catch (Exception e) {
+			LOGGER.error("Error saving panorama capture frame", e);
+			minecraft.gui.getChat().addMessage(Component.literal("Panorama capture failed: " + e.getMessage()).withStyle(ChatFormatting.RED));
+			if (activeJob != null) {
+				activeJob.cleanup();
+				activeJob = null;
 			}
 		}
 	}
@@ -105,15 +133,16 @@ public class PanoramaCapture {
 	private static class PanoramaJob {
 		private final Minecraft minecraft;
 		private final File outputFolder;
-		private final RenderTarget renderTarget;
+		private final RenderTarget panoramaTarget;
 		
 		// Saved state
 		private final float savedYaw;
 		private final float savedPitch;
-		private final float savedFov;
+		private final int savedFov;
 		private final boolean savedHideGui;
 		
 		private int currentFace = 0;
+		private boolean faceReady = false;
 		
 		PanoramaJob(Minecraft minecraft) throws Exception {
 			this.minecraft = minecraft;
@@ -136,7 +165,7 @@ public class PanoramaCapture {
 			}
 			
 			// Create offscreen render target
-			this.renderTarget = new TextureTarget("Panorama Capture", PANORAMA_SIZE, PANORAMA_SIZE, true);
+			this.panoramaTarget = new TextureTarget("PanoramaCapture", PANORAMA_SIZE, PANORAMA_SIZE, true);
 			
 			// Set FOV to 90 for capture
 			minecraft.options.fov().set(90);
@@ -148,89 +177,80 @@ public class PanoramaCapture {
 		}
 		
 		/**
-		 * Process the next face. Returns true when all faces are complete.
+		 * Prepares for the next face capture. Returns the render target to use, or null if done.
 		 */
-		boolean processNextFace(Minecraft minecraft) {
+		@Nullable
+		RenderTarget prepareNextFace(Minecraft minecraft) {
 			if (currentFace >= FACE_COUNT) {
-				return true;
+				return null;
 			}
 			
-			try {
-				// Show progress
-				minecraft.gui.getChat().addMessage(
-					Component.literal("Capturing panorama... (" + (currentFace + 1) + "/" + FACE_COUNT + ")")
-						.withStyle(ChatFormatting.YELLOW)
-				);
-				
-				// Get the face index for proper ordering
-				int faceIndex = FACE_INDICES[currentFace];
-				float[] rotation = FACE_ROTATIONS[faceIndex];
-				
-				// Set camera rotation
-				minecraft.player.setYRot(savedYaw + rotation[0]);
-				minecraft.player.setXRot(rotation[1]);
-				minecraft.player.setYHeadRot(savedYaw + rotation[0]);
-				
-				// Render to offscreen target
-				renderFace(minecraft);
-				
-				// Read pixels and save
-				Screenshot.takeScreenshot(renderTarget, nativeImage -> {
-					File outputFile = new File(outputFolder, "panorama_" + faceIndex + ".png");
+			// Show progress
+			minecraft.gui.getChat().addMessage(
+				Component.literal("Capturing panorama... (" + (currentFace + 1) + "/" + FACE_COUNT + ")")
+					.withStyle(ChatFormatting.YELLOW)
+			);
+			
+			// Get the face index for proper ordering
+			int faceIndex = FACE_INDICES[currentFace];
+			float[] rotation = FACE_ROTATIONS[faceIndex];
+			
+			// Set camera rotation for this face
+			minecraft.player.setYRot(savedYaw + rotation[0]);
+			minecraft.player.setXRot(rotation[1]);
+			minecraft.player.setYHeadRot(savedYaw + rotation[0]);
+			
+			// Mark that this face is ready to be saved after rendering
+			faceReady = true;
+			
+			// Return the panorama render target so rendering goes to it
+			return panoramaTarget;
+		}
+		
+		/**
+		 * Saves the currently captured face. Returns true if all faces are complete.
+		 */
+		boolean saveCurrentFace(Minecraft minecraft) {
+			if (!faceReady) {
+				return currentFace >= FACE_COUNT;
+			}
+			
+			faceReady = false;
+			
+			// Get the face index for proper file naming
+			int faceIndex = FACE_INDICES[currentFace];
+			
+			// Save the captured frame
+			Screenshot.takeScreenshot(panoramaTarget, nativeImage -> {
+				File outputFile = new File(outputFolder, "panorama_" + faceIndex + ".png");
+				Util.ioPool().execute(() -> {
 					try {
 						nativeImage.writeToFile(outputFile);
 						LOGGER.info("Saved panorama face {}: {}", faceIndex, outputFile.getName());
 					} catch (Exception e) {
 						LOGGER.error("Failed to save panorama face " + faceIndex, e);
-						throw new RuntimeException(e);
 					} finally {
 						nativeImage.close();
 					}
 				});
-				
-				currentFace++;
-				
-				// Check if complete
-				if (currentFace >= FACE_COUNT) {
-					Component folderComponent = Component.literal(outputFolder.getName())
-						.withStyle(ChatFormatting.UNDERLINE)
-						.withStyle(style -> style.withClickEvent(new ClickEvent.OpenFile(outputFolder.getAbsoluteFile())));
-					
-					minecraft.gui.getChat().addMessage(
-						Component.translatable("screenshot.success",
-							Component.literal("Saved panorama to: ").append(folderComponent))
-							.withStyle(ChatFormatting.GREEN)
-					);
-					return true;
-				}
-				
-				return false;
-			} catch (Exception e) {
-				throw new RuntimeException("Failed to process face " + currentFace, e);
-			}
-		}
-		
-		/**
-		 * Renders the current view to the offscreen render target.
-		 */
-		private void renderFace(Minecraft minecraft) {
-			// Store main render target
-			RenderTarget mainTarget = minecraft.getMainRenderTarget();
+			});
 			
-			try {
-				// Bind offscreen target
-				renderTarget.bindWrite(true);
+			currentFace++;
+			
+			// Check if complete
+			if (currentFace >= FACE_COUNT) {
+				Component folderComponent = Component.literal(outputFolder.getName())
+					.withStyle(ChatFormatting.UNDERLINE)
+					.withStyle(style -> style.withClickEvent(new ClickEvent.OpenFile(outputFolder.getAbsoluteFile())));
 				
-				// Render the world
-				GameRenderer gameRenderer = minecraft.gameRenderer;
-				gameRenderer.renderLevel(minecraft.getTimer().getGameTimeDeltaTicks());
-				
-				// Restore main target
-				mainTarget.bindWrite(true);
-			} catch (Exception e) {
-				mainTarget.bindWrite(true);
-				throw e;
+				minecraft.gui.getChat().addMessage(
+					Component.literal("Saved panorama to: ").append(folderComponent)
+						.withStyle(ChatFormatting.GREEN)
+				);
+				return true;
 			}
+			
+			return false;
 		}
 		
 		/**
@@ -242,12 +262,12 @@ public class PanoramaCapture {
 				minecraft.player.setYRot(savedYaw);
 				minecraft.player.setXRot(savedPitch);
 				minecraft.player.setYHeadRot(savedYaw);
-				minecraft.options.fov().set((int)savedFov);
+				minecraft.options.fov().set(savedFov);
 				minecraft.options.hideGui = savedHideGui;
 				
 				// Clean up render target
-				if (renderTarget != null) {
-					renderTarget.destroyBuffers();
+				if (panoramaTarget != null) {
+					panoramaTarget.destroyBuffers();
 				}
 				
 				LOGGER.info("Panorama capture cleanup complete");

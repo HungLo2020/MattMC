@@ -1345,16 +1345,25 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 			}
 		}
 
-		RenderTarget renderTarget = this.getMainRenderTarget();
+		// Panorama capture: Check if we should redirect rendering to panorama framebuffer
+		RenderTarget panoramaTarget = net.minecraft.client.renderer.PanoramaCapture.beforeRender(this);
+		RenderTarget renderTarget = panoramaTarget != null ? panoramaTarget : this.getMainRenderTarget();
+		
 		RenderSystem.getDevice().createCommandEncoder().clearColorAndDepthTextures(renderTarget.getColorTexture(), 0, renderTarget.getDepthTexture(), 1.0);
 		profilerFiller.push("gameRenderer");
 		if (!this.noRender) {
 			this.gameRenderer.render(this.deltaTracker, bl);
 		}
 
+		// Panorama capture: Save the captured frame if we just rendered to panorama target
+		if (panoramaTarget != null) {
+			net.minecraft.client.renderer.PanoramaCapture.afterRender(this);
+		}
+
 		profilerFiller.popPush("blit");
 		if (!this.window.isMinimized()) {
-			renderTarget.blitToScreen();
+			// Blit the main target (not panorama target) to screen
+			this.getMainRenderTarget().blitToScreen();
 		}
 
 		this.frameTimeNs = Util.getNanos() - l;
