@@ -26,6 +26,7 @@ import net.minecraft.network.chat.ComponentUtils;
 import net.minecraft.network.chat.HoverEvent;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.network.chat.Style;
+import net.minecraft.network.chat.contents.TranslatableContents;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.ai.village.poi.PoiManager;
@@ -216,49 +217,39 @@ public class LocateCommand {
 		LOGGER.info("[CHAT_STYLE_DEBUG] LocateCommand: Final style clickEvent: {}", component.getStyle().getClickEvent());
 		LOGGER.info("[CHAT_STYLE_DEBUG] LocateCommand: Final style hoverEvent: {}", component.getStyle().getHoverEvent());
 		
-		// Create the full message
+		// Create the full message - DON'T resolve it, send the raw translatable component
+		// The client will resolve it and should preserve styles
 		Component fullMessage = Component.translatable(string, string2, component, i);
 		LOGGER.info("[CHAT_STYLE_DEBUG] LocateCommand: Full message to send: '{}'", fullMessage.getString());
 		LOGGER.info("[CHAT_STYLE_DEBUG] LocateCommand: Full message style: {}", fullMessage.getStyle());
+		LOGGER.info("[CHAT_STYLE_DEBUG] LocateCommand: Full message contents type: {}", fullMessage.getContents().getClass().getSimpleName());
 		
-		// CRITICAL FIX: Resolve and flatten the translatable component on the server to preserve styled arguments
-		// The translatable component embeds styled arguments, but they need to be flattened into siblings
-		// for proper serialization and rendering on the client
-		try {
-			Component resolvedMessage = ComponentUtils.updateForEntity(commandSourceStack, fullMessage, commandSourceStack.getEntity(), 0);
-			LOGGER.info("[CHAT_STYLE_DEBUG] LocateCommand: Resolved message: '{}'", resolvedMessage.getString());
-			LOGGER.info("[CHAT_STYLE_DEBUG] LocateCommand: Resolved message style: {}", resolvedMessage.getStyle());
-			
-			// Flatten the component by visiting it and collecting styled parts as siblings
-			MutableComponent flattenedMessage = Component.literal("");
-			resolvedMessage.visit((style, text) -> {
-				if (!text.isEmpty()) {
-					flattenedMessage.append(Component.literal(text).setStyle(style));
-				}
-				return Optional.empty();
-			}, Style.EMPTY);
-			
-			LOGGER.info("[CHAT_STYLE_DEBUG] LocateCommand: Flattened message: '{}'", flattenedMessage.getString());
-			LOGGER.info("[CHAT_STYLE_DEBUG] LocateCommand: Flattened message style: {}", flattenedMessage.getStyle());
-			if (!flattenedMessage.getSiblings().isEmpty()) {
-				LOGGER.info("[CHAT_STYLE_DEBUG] LocateCommand: Flattened message has {} siblings", flattenedMessage.getSiblings().size());
-				for (int idx = 0; idx < flattenedMessage.getSiblings().size(); idx++) {
-					Component sibling = flattenedMessage.getSiblings().get(idx);
-					LOGGER.info("[CHAT_STYLE_DEBUG] LocateCommand: Sibling[{}]: '{}', style: {}", idx, sibling.getString(), sibling.getStyle());
-					LOGGER.info("[CHAT_STYLE_DEBUG] LocateCommand: Sibling[{}] color: {}, clickEvent: {}, hoverEvent: {}", 
-						idx, sibling.getStyle().getColor(), sibling.getStyle().getClickEvent(), sibling.getStyle().getHoverEvent());
+		if (!fullMessage.getSiblings().isEmpty()) {
+			LOGGER.info("[CHAT_STYLE_DEBUG] LocateCommand: Full message has {} siblings", fullMessage.getSiblings().size());
+			for (int idx = 0; idx < fullMessage.getSiblings().size(); idx++) {
+				Component sibling = fullMessage.getSiblings().get(idx);
+				LOGGER.info("[CHAT_STYLE_DEBUG] LocateCommand: Sibling[{}]: '{}', style: {}", idx, sibling.getString(), sibling.getStyle());
+			}
+		}
+		
+		// Check if the translatable component has the styled component in its args
+		if (fullMessage.getContents() instanceof TranslatableContents translatableContents) {
+			Object[] args = translatableContents.getArgs();
+			LOGGER.info("[CHAT_STYLE_DEBUG] LocateCommand: TranslatableContents has {} args", args.length);
+			for (int idx = 0; idx < args.length; idx++) {
+				Object arg = args[idx];
+				if (arg instanceof Component argComponent) {
+					LOGGER.info("[CHAT_STYLE_DEBUG] LocateCommand: Arg[{}] is Component: '{}', style: {}", 
+						idx, argComponent.getString(), argComponent.getStyle());
+					LOGGER.info("[CHAT_STYLE_DEBUG] LocateCommand: Arg[{}] color: {}, clickEvent: {}, hoverEvent: {}", 
+						idx, argComponent.getStyle().getColor(), argComponent.getStyle().getClickEvent(), argComponent.getStyle().getHoverEvent());
+				} else {
+					LOGGER.info("[CHAT_STYLE_DEBUG] LocateCommand: Arg[{}] is {}: {}", idx, arg.getClass().getSimpleName(), arg);
 				}
 			}
-			
-			commandSourceStack.sendSuccess(() -> {
-				LOGGER.info("[CHAT_STYLE_DEBUG] LocateCommand: Sending flattened message via sendSuccess");
-				return flattenedMessage;
-			}, false);
-		} catch (Exception e) {
-			LOGGER.error("[CHAT_STYLE_DEBUG] LocateCommand: Failed to resolve/flatten message", e);
-			// Fallback to original behavior
-			commandSourceStack.sendSuccess(() -> Component.translatable(string, string2, component, i), false);
 		}
+		
+		commandSourceStack.sendSuccess(() -> fullMessage, false);
 		
 		LOGGER.info("Locating element {} took {} ms", string2, duration.toMillis());
 		return i;
