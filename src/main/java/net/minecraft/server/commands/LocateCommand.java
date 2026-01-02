@@ -221,16 +221,29 @@ public class LocateCommand {
 		LOGGER.info("[CHAT_STYLE_DEBUG] LocateCommand: Full message to send: '{}'", fullMessage.getString());
 		LOGGER.info("[CHAT_STYLE_DEBUG] LocateCommand: Full message style: {}", fullMessage.getStyle());
 		
-		// CRITICAL FIX: Resolve the translatable component on the server to preserve styled arguments
-		// Without this, the translatable component is sent raw to the client and styled arguments are lost
+		// CRITICAL FIX: Resolve and flatten the translatable component on the server to preserve styled arguments
+		// The translatable component embeds styled arguments, but they need to be flattened into siblings
+		// for proper serialization and rendering on the client
 		try {
 			Component resolvedMessage = ComponentUtils.updateForEntity(commandSourceStack, fullMessage, commandSourceStack.getEntity(), 0);
 			LOGGER.info("[CHAT_STYLE_DEBUG] LocateCommand: Resolved message: '{}'", resolvedMessage.getString());
 			LOGGER.info("[CHAT_STYLE_DEBUG] LocateCommand: Resolved message style: {}", resolvedMessage.getStyle());
-			if (!resolvedMessage.getSiblings().isEmpty()) {
-				LOGGER.info("[CHAT_STYLE_DEBUG] LocateCommand: Resolved message has {} siblings", resolvedMessage.getSiblings().size());
-				for (int idx = 0; idx < resolvedMessage.getSiblings().size(); idx++) {
-					Component sibling = resolvedMessage.getSiblings().get(idx);
+			
+			// Flatten the component by visiting it and collecting styled parts as siblings
+			MutableComponent flattenedMessage = Component.literal("");
+			resolvedMessage.visit((style, text) -> {
+				if (!text.isEmpty()) {
+					flattenedMessage.append(Component.literal(text).setStyle(style));
+				}
+				return Optional.empty();
+			}, Style.EMPTY);
+			
+			LOGGER.info("[CHAT_STYLE_DEBUG] LocateCommand: Flattened message: '{}'", flattenedMessage.getString());
+			LOGGER.info("[CHAT_STYLE_DEBUG] LocateCommand: Flattened message style: {}", flattenedMessage.getStyle());
+			if (!flattenedMessage.getSiblings().isEmpty()) {
+				LOGGER.info("[CHAT_STYLE_DEBUG] LocateCommand: Flattened message has {} siblings", flattenedMessage.getSiblings().size());
+				for (int idx = 0; idx < flattenedMessage.getSiblings().size(); idx++) {
+					Component sibling = flattenedMessage.getSiblings().get(idx);
 					LOGGER.info("[CHAT_STYLE_DEBUG] LocateCommand: Sibling[{}]: '{}', style: {}", idx, sibling.getString(), sibling.getStyle());
 					LOGGER.info("[CHAT_STYLE_DEBUG] LocateCommand: Sibling[{}] color: {}, clickEvent: {}, hoverEvent: {}", 
 						idx, sibling.getStyle().getColor(), sibling.getStyle().getClickEvent(), sibling.getStyle().getHoverEvent());
@@ -238,11 +251,11 @@ public class LocateCommand {
 			}
 			
 			commandSourceStack.sendSuccess(() -> {
-				LOGGER.info("[CHAT_STYLE_DEBUG] LocateCommand: Sending resolved message via sendSuccess");
-				return resolvedMessage;
+				LOGGER.info("[CHAT_STYLE_DEBUG] LocateCommand: Sending flattened message via sendSuccess");
+				return flattenedMessage;
 			}, false);
 		} catch (Exception e) {
-			LOGGER.error("[CHAT_STYLE_DEBUG] LocateCommand: Failed to resolve message", e);
+			LOGGER.error("[CHAT_STYLE_DEBUG] LocateCommand: Failed to resolve/flatten message", e);
 			// Fallback to original behavior
 			commandSourceStack.sendSuccess(() -> Component.translatable(string, string2, component, i), false);
 		}
