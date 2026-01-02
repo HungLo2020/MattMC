@@ -9,6 +9,7 @@ import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.brigadier.exceptions.SimpleCommandExceptionType;
 import com.mojang.brigadier.suggestion.Suggestions;
 import com.mojang.brigadier.suggestion.SuggestionsBuilder;
+import com.mojang.logging.LogUtils;
 import java.util.Collection;
 import java.util.Objects;
 import java.util.Optional;
@@ -28,6 +29,7 @@ import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.ChatType;
 import net.minecraft.network.chat.Component;
+import org.slf4j.Logger;
 import net.minecraft.network.chat.ComponentUtils;
 import net.minecraft.network.chat.OutgoingChatMessage;
 import net.minecraft.resources.ResourceKey;
@@ -48,6 +50,7 @@ import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.Nullable;
 
 public class CommandSourceStack implements ExecutionCommandSource<CommandSourceStack>, PermissionSource, SharedSuggestionProvider {
+	private static final Logger LOGGER = LogUtils.getLogger();
 	public static final SimpleCommandExceptionType ERROR_NOT_PLAYER = new SimpleCommandExceptionType(Component.translatable("permissions.requires.player"));
 	public static final SimpleCommandExceptionType ERROR_NOT_ENTITY = new SimpleCommandExceptionType(Component.translatable("permissions.requires.entity"));
 	private final CommandSource source;
@@ -482,15 +485,37 @@ public class CommandSourceStack implements ExecutionCommandSource<CommandSourceS
 	public void sendSuccess(Supplier<Component> supplier, boolean bl) {
 		boolean bl2 = this.source.acceptsSuccess() && !this.silent;
 		boolean bl3 = bl && this.source.shouldInformAdmins() && !this.silent;
+		LOGGER.info("[CHAT_STYLE_DEBUG] CommandSourceStack.sendSuccess called - acceptsSuccess: {}, shouldBroadcast: {}", bl2, bl3);
+		
 		if (bl2 || bl3) {
 			Component component = (Component)supplier.get();
+			LOGGER.info("[CHAT_STYLE_DEBUG] CommandSourceStack.sendSuccess - component: '{}'", component.getString());
+			LOGGER.info("[CHAT_STYLE_DEBUG] CommandSourceStack.sendSuccess - component style: {}", component.getStyle());
+			LOGGER.info("[CHAT_STYLE_DEBUG] CommandSourceStack.sendSuccess - component style color: {}, clickEvent: {}, hoverEvent: {}", 
+				component.getStyle().getColor(), component.getStyle().getClickEvent(), component.getStyle().getHoverEvent());
+			
+			if (!component.getSiblings().isEmpty()) {
+				LOGGER.info("[CHAT_STYLE_DEBUG] CommandSourceStack.sendSuccess - component has {} siblings", component.getSiblings().size());
+				for (int i = 0; i < component.getSiblings().size(); i++) {
+					Component sibling = component.getSiblings().get(i);
+					LOGGER.info("[CHAT_STYLE_DEBUG] CommandSourceStack.sendSuccess - sibling[{}]: '{}', style: {}", 
+						i, sibling.getString(), sibling.getStyle());
+					LOGGER.info("[CHAT_STYLE_DEBUG] CommandSourceStack.sendSuccess - sibling[{}] color: {}, clickEvent: {}, hoverEvent: {}", 
+						i, sibling.getStyle().getColor(), sibling.getStyle().getClickEvent(), sibling.getStyle().getHoverEvent());
+				}
+			}
+			
 			if (bl2) {
+				LOGGER.info("[CHAT_STYLE_DEBUG] CommandSourceStack.sendSuccess - sending to command source");
 				this.source.sendSystemMessage(component);
 			}
 
 			if (bl3) {
+				LOGGER.info("[CHAT_STYLE_DEBUG] CommandSourceStack.sendSuccess - broadcasting to admins");
 				this.broadcastToAdmins(component);
 			}
+		} else {
+			LOGGER.info("[CHAT_STYLE_DEBUG] CommandSourceStack.sendSuccess - message not sent (silent or source doesn't accept)");
 		}
 	}
 

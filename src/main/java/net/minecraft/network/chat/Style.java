@@ -1,5 +1,6 @@
 package net.minecraft.network.chat;
 
+import com.mojang.logging.LogUtils;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
@@ -11,8 +12,10 @@ import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.util.ExtraCodecs;
 import org.jetbrains.annotations.Nullable;
+import org.slf4j.Logger;
 
 public final class Style {
+	private static final Logger LOGGER = LogUtils.getLogger();
 	public static final Style EMPTY = new Style(null, null, null, null, null, null, null, null, null, null, null);
 	@Nullable
 	final TextColor color;
@@ -150,9 +153,14 @@ public final class Style {
 	}
 
 	public Style withColor(@Nullable TextColor textColor) {
-		return Objects.equals(this.color, textColor)
-			? this
-			: checkEmptyAfterChange(
+		LOGGER.debug("[CHAT_STYLE_DEBUG] Style.withColor called - current color: {}, new color: {}", this.color, textColor);
+		boolean same = Objects.equals(this.color, textColor);
+		LOGGER.debug("[CHAT_STYLE_DEBUG] Style.withColor - colors are same: {}", same);
+		if (same) {
+			LOGGER.debug("[CHAT_STYLE_DEBUG] Style.withColor - returning this (no change)");
+			return this;
+		} else {
+			Style result = checkEmptyAfterChange(
 				new Style(
 					textColor,
 					this.shadowColor,
@@ -169,6 +177,9 @@ public final class Style {
 				this.color,
 				textColor
 			);
+			LOGGER.debug("[CHAT_STYLE_DEBUG] Style.withColor - created new Style: {}", result);
+			return result;
+		}
 	}
 
 	public Style withColor(@Nullable ChatFormatting chatFormatting) {
@@ -302,9 +313,14 @@ public final class Style {
 	}
 
 	public Style withClickEvent(@Nullable ClickEvent clickEvent) {
-		return Objects.equals(this.clickEvent, clickEvent)
-			? this
-			: checkEmptyAfterChange(
+		LOGGER.debug("[CHAT_STYLE_DEBUG] Style.withClickEvent called - current clickEvent: {}, new clickEvent: {}", this.clickEvent, clickEvent);
+		boolean same = Objects.equals(this.clickEvent, clickEvent);
+		LOGGER.debug("[CHAT_STYLE_DEBUG] Style.withClickEvent - clickEvents are same: {}", same);
+		if (same) {
+			LOGGER.debug("[CHAT_STYLE_DEBUG] Style.withClickEvent - returning this (no change)");
+			return this;
+		} else {
+			Style result = checkEmptyAfterChange(
 				new Style(
 					this.color,
 					this.shadowColor,
@@ -321,12 +337,21 @@ public final class Style {
 				this.clickEvent,
 				clickEvent
 			);
+			LOGGER.debug("[CHAT_STYLE_DEBUG] Style.withClickEvent - created new Style: {}", result);
+			LOGGER.debug("[CHAT_STYLE_DEBUG] Style.withClickEvent - new Style clickEvent field: {}", result.clickEvent);
+			return result;
+		}
 	}
 
 	public Style withHoverEvent(@Nullable HoverEvent hoverEvent) {
-		return Objects.equals(this.hoverEvent, hoverEvent)
-			? this
-			: checkEmptyAfterChange(
+		LOGGER.debug("[CHAT_STYLE_DEBUG] Style.withHoverEvent called - current hoverEvent: {}, new hoverEvent: {}", this.hoverEvent, hoverEvent);
+		boolean same = Objects.equals(this.hoverEvent, hoverEvent);
+		LOGGER.debug("[CHAT_STYLE_DEBUG] Style.withHoverEvent - hoverEvents are same: {}", same);
+		if (same) {
+			LOGGER.debug("[CHAT_STYLE_DEBUG] Style.withHoverEvent - returning this (no change)");
+			return this;
+		} else {
+			Style result = checkEmptyAfterChange(
 				new Style(
 					this.color,
 					this.shadowColor,
@@ -343,6 +368,10 @@ public final class Style {
 				this.hoverEvent,
 				hoverEvent
 			);
+			LOGGER.debug("[CHAT_STYLE_DEBUG] Style.withHoverEvent - created new Style: {}", result);
+			LOGGER.debug("[CHAT_STYLE_DEBUG] Style.withHoverEvent - new Style hoverEvent field: {}", result.hoverEvent);
+			return result;
+		}
 	}
 
 	public Style withInsertion(@Nullable String string) {
@@ -494,12 +523,16 @@ public final class Style {
 	}
 
 	public Style applyTo(Style style) {
+		LOGGER.debug("[CHAT_STYLE_DEBUG] Style.applyTo called - this: {}, target: {}", this, style);
 		if (this == EMPTY) {
+			LOGGER.debug("[CHAT_STYLE_DEBUG] Style.applyTo - this is EMPTY, returning target");
 			return style;
 		} else {
-			return style == EMPTY
-				? this
-				: new Style(
+			if (style == EMPTY) {
+				LOGGER.debug("[CHAT_STYLE_DEBUG] Style.applyTo - target is EMPTY, returning this");
+				return this;
+			} else {
+				Style result = new Style(
 					this.color != null ? this.color : style.color,
 					this.shadowColor != null ? this.shadowColor : style.shadowColor,
 					this.bold != null ? this.bold : style.bold,
@@ -512,6 +545,11 @@ public final class Style {
 					this.insertion != null ? this.insertion : style.insertion,
 					this.font != null ? this.font : style.font
 				);
+				LOGGER.debug("[CHAT_STYLE_DEBUG] Style.applyTo - result: {}", result);
+				LOGGER.debug("[CHAT_STYLE_DEBUG] Style.applyTo - result color: {}, clickEvent: {}, hoverEvent: {}", 
+					result.color, result.clickEvent, result.hoverEvent);
+				return result;
+			}
 		}
 	}
 

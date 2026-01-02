@@ -4,6 +4,7 @@ import com.google.common.collect.Lists;
 import com.mojang.brigadier.Message;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.datafixers.DataFixUtils;
+import com.mojang.logging.LogUtils;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -14,8 +15,10 @@ import net.minecraft.locale.Language;
 import net.minecraft.network.chat.contents.TranslatableContents;
 import net.minecraft.world.entity.Entity;
 import org.jetbrains.annotations.Nullable;
+import org.slf4j.Logger;
 
 public class ComponentUtils {
+	private static final Logger LOGGER = LogUtils.getLogger();
 	public static final String DEFAULT_SEPARATOR_TEXT = ", ";
 	public static final Component DEFAULT_SEPARATOR = Component.literal(", ").withStyle(ChatFormatting.GRAY);
 	public static final Component DEFAULT_NO_STYLE_SEPARATOR = Component.literal(", ");
@@ -41,7 +44,12 @@ public class ComponentUtils {
 	}
 
 	public static MutableComponent updateForEntity(@Nullable CommandSourceStack commandSourceStack, Component component, @Nullable Entity entity, int i) throws CommandSyntaxException {
+		LOGGER.debug("[CHAT_STYLE_DEBUG] ComponentUtils.updateForEntity called - recursion depth: {}", i);
+		LOGGER.debug("[CHAT_STYLE_DEBUG] ComponentUtils.updateForEntity - input component: '{}'", component.getString());
+		LOGGER.debug("[CHAT_STYLE_DEBUG] ComponentUtils.updateForEntity - input component style: {}", component.getStyle());
+		
 		if (i > MAX_RECURSION_DEPTH) {
+			LOGGER.warn("[CHAT_STYLE_DEBUG] ComponentUtils.updateForEntity - MAX_RECURSION_DEPTH exceeded, returning copy");
 			return component.copy();
 		} else {
 			MutableComponent mutableComponent = component.getContents().resolve(commandSourceStack, entity, i + 1);
@@ -50,15 +58,31 @@ public class ComponentUtils {
 				mutableComponent.append(updateForEntity(commandSourceStack, component2, entity, i + 1));
 			}
 
-			return mutableComponent.withStyle(resolveStyle(commandSourceStack, component.getStyle(), entity, i));
+			Style resolvedStyle = resolveStyle(commandSourceStack, component.getStyle(), entity, i);
+			LOGGER.debug("[CHAT_STYLE_DEBUG] ComponentUtils.updateForEntity - resolved style: {}", resolvedStyle);
+			LOGGER.debug("[CHAT_STYLE_DEBUG] ComponentUtils.updateForEntity - resolved style color: {}, clickEvent: {}, hoverEvent: {}", 
+				resolvedStyle.getColor(), resolvedStyle.getClickEvent(), resolvedStyle.getHoverEvent());
+			
+			MutableComponent result = mutableComponent.withStyle(resolvedStyle);
+			LOGGER.debug("[CHAT_STYLE_DEBUG] ComponentUtils.updateForEntity - result component: '{}'", result.getString());
+			LOGGER.debug("[CHAT_STYLE_DEBUG] ComponentUtils.updateForEntity - result style: {}", result.getStyle());
+			return result;
 		}
 	}
 
 	private static Style resolveStyle(@Nullable CommandSourceStack commandSourceStack, Style style, @Nullable Entity entity, int i) throws CommandSyntaxException {
+		LOGGER.debug("[CHAT_STYLE_DEBUG] ComponentUtils.resolveStyle called - input style: {}", style);
+		LOGGER.debug("[CHAT_STYLE_DEBUG] ComponentUtils.resolveStyle - style color: {}, clickEvent: {}, hoverEvent: {}", 
+			style.getColor(), style.getClickEvent(), style.getHoverEvent());
+		
 		if (style.getHoverEvent() instanceof HoverEvent.ShowText(Component hoverEvent2)) {
+			LOGGER.debug("[CHAT_STYLE_DEBUG] ComponentUtils.resolveStyle - resolving hover event text");
 			HoverEvent hoverEvent2x = new HoverEvent.ShowText(updateForEntity(commandSourceStack, hoverEvent2, entity, i + 1));
-			return style.withHoverEvent(hoverEvent2x);
+			Style result = style.withHoverEvent(hoverEvent2x);
+			LOGGER.debug("[CHAT_STYLE_DEBUG] ComponentUtils.resolveStyle - result after hover event resolution: {}", result);
+			return result;
 		} else {
+			LOGGER.debug("[CHAT_STYLE_DEBUG] ComponentUtils.resolveStyle - no hover event text to resolve, returning original style");
 			return style;
 		}
 	}

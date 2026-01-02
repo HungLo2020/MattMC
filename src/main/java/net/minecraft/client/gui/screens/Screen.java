@@ -238,27 +238,42 @@ public abstract class Screen extends AbstractContainerEventHandler implements Re
 	}
 
 	public boolean handleComponentClicked(Style style) {
+		LOGGER.info("[CHAT_STYLE_DEBUG] Screen.handleComponentClicked called with style: {}", style);
 		ClickEvent clickEvent = style.getClickEvent();
+		LOGGER.info("[CHAT_STYLE_DEBUG] Screen.handleComponentClicked - clickEvent from style: {}", clickEvent);
+		
 		if (this.minecraft.hasShiftDown()) {
+			LOGGER.info("[CHAT_STYLE_DEBUG] Screen.handleComponentClicked - Shift is held down");
 			if (style.getInsertion() != null) {
+				LOGGER.info("[CHAT_STYLE_DEBUG] Screen.handleComponentClicked - Inserting text: {}", style.getInsertion());
 				this.insertText(style.getInsertion(), false);
 			}
 		} else if (clickEvent != null) {
+			LOGGER.info("[CHAT_STYLE_DEBUG] Screen.handleComponentClicked - Click event exists, handling it");
+			LOGGER.info("[CHAT_STYLE_DEBUG] Screen.handleComponentClicked - Click event action: {}", clickEvent.action());
 			this.handleClickEvent(this.minecraft, clickEvent);
 			return true;
+		} else {
+			LOGGER.info("[CHAT_STYLE_DEBUG] Screen.handleComponentClicked - No click event in style");
 		}
 
 		return false;
 	}
 
 	protected void handleClickEvent(Minecraft minecraft, ClickEvent clickEvent) {
+		LOGGER.info("[CHAT_STYLE_DEBUG] Screen.handleClickEvent called with clickEvent: {}", clickEvent);
+		LOGGER.info("[CHAT_STYLE_DEBUG] Screen.handleClickEvent - clickEvent action: {}", clickEvent.action());
 		defaultHandleGameClickEvent(clickEvent, minecraft, this);
 	}
 
 	protected static void defaultHandleGameClickEvent(ClickEvent clickEvent, Minecraft minecraft, @Nullable Screen screen) {
+		LOGGER.info("[CHAT_STYLE_DEBUG] Screen.defaultHandleGameClickEvent called with clickEvent: {}", clickEvent);
+		LOGGER.info("[CHAT_STYLE_DEBUG] Screen.defaultHandleGameClickEvent - screen: {}", screen);
+		
 		LocalPlayer localPlayer = (LocalPlayer)Objects.requireNonNull(minecraft.player, "Player not available");
 		switch (clickEvent) {
 			case RunCommand var6:
+				LOGGER.info("[CHAT_STYLE_DEBUG] Screen.defaultHandleGameClickEvent - Handling RunCommand");
 				RunCommand var10000 = var6;
 				String var12;
 
@@ -269,25 +284,33 @@ public abstract class Screen extends AbstractContainerEventHandler implements Re
 				}
 
 				String var11 = var12;
+				LOGGER.info("[CHAT_STYLE_DEBUG] Screen.defaultHandleGameClickEvent - RunCommand command: {}", var11);
 				clickCommandAction(localPlayer, var11, screen);
 				break;
 			case ShowDialog showDialog:
+				LOGGER.info("[CHAT_STYLE_DEBUG] Screen.defaultHandleGameClickEvent - Handling ShowDialog");
 				localPlayer.connection.showDialog(showDialog.dialog(), screen);
 				break;
 			case Custom custom:
+				LOGGER.info("[CHAT_STYLE_DEBUG] Screen.defaultHandleGameClickEvent - Handling Custom");
 				localPlayer.connection.send(new ServerboundCustomClickActionPacket(custom.id(), custom.payload()));
 				if (minecraft.screen != screen) {
 					minecraft.setScreen(screen);
 				}
 				break;
 			default:
+				LOGGER.info("[CHAT_STYLE_DEBUG] Screen.defaultHandleGameClickEvent - Handling default case (other click events)");
 				defaultHandleClickEvent(clickEvent, minecraft, screen);
 		}
 	}
 
 	protected static void defaultHandleClickEvent(ClickEvent clickEvent, Minecraft minecraft, @Nullable Screen screen) {
+		LOGGER.info("[CHAT_STYLE_DEBUG] Screen.defaultHandleClickEvent called with clickEvent: {}", clickEvent);
+		LOGGER.info("[CHAT_STYLE_DEBUG] Screen.defaultHandleClickEvent - clickEvent type: {}", clickEvent.getClass().getSimpleName());
+		
 		boolean bl = switch (clickEvent) {
 			case OpenUrl var6 -> {
+				LOGGER.info("[CHAT_STYLE_DEBUG] Screen.defaultHandleClickEvent - Handling OpenUrl");
 				OpenUrl var23 = var6;
 				URI var24;
 
@@ -298,14 +321,17 @@ public abstract class Screen extends AbstractContainerEventHandler implements Re
 				}
 
 				URI var17 = var24;
+				LOGGER.info("[CHAT_STYLE_DEBUG] Screen.defaultHandleClickEvent - OpenUrl URI: {}", var17);
 				clickUrlAction(minecraft, screen, var17);
 				yield false;
 			}
 			case OpenFile openFile -> {
+				LOGGER.info("[CHAT_STYLE_DEBUG] Screen.defaultHandleClickEvent - Handling OpenFile");
 				Util.getPlatform().openFile(openFile.file());
 				yield true;
 			}
 			case SuggestCommand var9 -> {
+				LOGGER.info("[CHAT_STYLE_DEBUG] Screen.defaultHandleClickEvent - Handling SuggestCommand");
 				SuggestCommand var21 = var9;
 				String var22;
 
@@ -316,13 +342,19 @@ public abstract class Screen extends AbstractContainerEventHandler implements Re
 				}
 
 				String var18 = var22;
+				LOGGER.info("[CHAT_STYLE_DEBUG] Screen.defaultHandleClickEvent - SuggestCommand command: {}", var18);
+				LOGGER.info("[CHAT_STYLE_DEBUG] Screen.defaultHandleClickEvent - Current screen: {}", screen);
 				if (screen != null) {
+					LOGGER.info("[CHAT_STYLE_DEBUG] Screen.defaultHandleClickEvent - Inserting command to screen");
 					screen.insertText(var18, true);
+				} else {
+					LOGGER.warn("[CHAT_STYLE_DEBUG] Screen.defaultHandleClickEvent - Screen is null, cannot insert text");
 				}
 
 				yield true;
 			}
 			case CopyToClipboard var11 -> {
+				LOGGER.info("[CHAT_STYLE_DEBUG] Screen.defaultHandleClickEvent - Handling CopyToClipboard");
 				CopyToClipboard var19 = var11;
 				String var20;
 
@@ -337,10 +369,12 @@ public abstract class Screen extends AbstractContainerEventHandler implements Re
 				yield true;
 			}
 			default -> {
+				LOGGER.error("[CHAT_STYLE_DEBUG] Screen.defaultHandleClickEvent - Unknown click event type: {}", clickEvent);
 				LOGGER.error("Don't know how to handle {}", clickEvent);
 				yield true;
 			}
 		};
+		LOGGER.info("[CHAT_STYLE_DEBUG] Screen.defaultHandleClickEvent - Result: {}, screen changed: {}", bl, minecraft.screen != screen);
 		if (bl && minecraft.screen != screen) {
 			minecraft.setScreen(screen);
 		}
