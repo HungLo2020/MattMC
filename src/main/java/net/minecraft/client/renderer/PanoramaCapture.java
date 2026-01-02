@@ -174,11 +174,12 @@ public class PanoramaCapture {
 			// Hide GUI
 			minecraft.options.hideGui = true;
 			
-			// Set window size with compensation for window decorations
-			// Window decorations (title bar) subtract 21 pixels from height
-			// Request 1024x1045 to get framebuffer of 1024x1024
-			// ONLY using setWindowed() for shader compatibility - no manual setWidth/setHeight
-			minecraft.getWindow().setWindowed(PANORAMA_SIZE, PANORAMA_SIZE + 21);
+			// Resize window to 1024x1024
+			// Use the standard resize pipeline for shader compatibility
+			minecraft.getWindow().setWindowed(PANORAMA_SIZE, PANORAMA_SIZE);
+			// Call resizeDisplay() to properly resize render target and game renderer
+			// This triggers the full shader-safe resize pipeline
+			minecraft.resizeDisplay();
 			
 			LOGGER.info("Panorama capture initialized: output={}", this.outputFolder.getAbsolutePath());
 		}
@@ -285,6 +286,8 @@ public class PanoramaCapture {
 					minecraft.getWindow().toggleFullScreen();
 				} else {
 					minecraft.getWindow().setWindowed(savedWidth, savedHeight);
+					// Call resizeDisplay() to properly restore render target and game renderer
+					minecraft.resizeDisplay();
 				}
 				
 				LOGGER.info("Panorama capture cleanup complete");
