@@ -207,6 +207,9 @@ public class PanoramaCapture {
 				RenderTarget mainTarget = minecraft.getMainRenderTarget();
 				mainTarget.resize(PANORAMA_SIZE, PANORAMA_SIZE);
 				
+				// Notify GameRenderer and LevelRenderer about the resize to clear internal state
+				minecraft.gameRenderer.resize(PANORAMA_SIZE, PANORAMA_SIZE);
+				
 				// Start delay counter
 				delayCounter = 1;
 			}
@@ -283,6 +286,9 @@ public class PanoramaCapture {
 				// Restore original render target size
 				RenderTarget mainTarget = minecraft.getMainRenderTarget();
 				mainTarget.resize(savedWidth, savedHeight);
+				
+				// Notify GameRenderer and LevelRenderer about the resize to clear internal state
+				minecraft.gameRenderer.resize(savedWidth, savedHeight);
 				
 				LOGGER.info("Panorama capture cleanup complete");
 			} catch (Exception e) {
