@@ -361,12 +361,19 @@ public class InventoryScreen extends AbstractRecipeBookScreen<InventoryMenu> {
 						int count = isShiftDown ? itemStack.getMaxStackSize() : 1;
 						ItemStack itemToAdd = itemStack.copyWithCount(count);
 						
-						// Add to player inventory using smart stacking/placement logic
+						// Find the best slot to place the item using smart stacking/placement logic
 						// This will:
 						// 1. First try to stack with existing items
-						// 2. Then add to first empty hotbar slot
-						// 3. Finally add to first empty inventory slot
-						this.minecraft.player.getInventory().add(itemToAdd);
+						// 2. Then find first empty hotbar slot
+						// 3. Finally find first empty inventory slot
+						int targetSlot = this.findBestSlotForItem(itemToAdd);
+						
+						if (targetSlot != -1) {
+							// Use the creative mode packet to properly add the item server-side
+							// This ensures persistence across saves and proper placement
+							// Works in both creative and survival modes
+							this.minecraft.gameMode.handleCreativeModeItemAdd(itemToAdd, targetSlot);
+						}
 						
 						return true;
 					}
@@ -375,6 +382,36 @@ public class InventoryScreen extends AbstractRecipeBookScreen<InventoryMenu> {
 		}
 		
 		return false;
+	}
+	
+	/**
+	 * Finds the best slot to place an item using smart stacking/placement logic.
+	 * Returns the slot index (0-35 for inventory, 36+ for other slots) or -1 if no slot available.
+	 */
+	private int findBestSlotForItem(ItemStack itemStack) {
+		if (this.minecraft == null || this.minecraft.player == null) {
+			return -1;
+		}
+		
+		// Get the player's inventory
+		var inventory = this.minecraft.player.getInventory();
+		
+		// First, try to find an existing stack with remaining space
+		// Priority: selected slot, offhand, then all inventory slots
+		int slotWithSpace = inventory.getSlotWithRemainingSpace(itemStack);
+		if (slotWithSpace != -1) {
+			return slotWithSpace;
+		}
+		
+		// If no existing stack, find first empty slot
+		// This automatically prioritizes hotbar (0-8) over main inventory (9-35)
+		int freeSlot = inventory.getFreeSlot();
+		if (freeSlot != -1) {
+			return freeSlot;
+		}
+		
+		// No space available
+		return -1;
 	}
 	
 	@Override

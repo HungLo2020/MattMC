@@ -1875,28 +1875,29 @@ public class ServerGamePacketListenerImpl
 	@Override
 	public void handleSetCreativeModeSlot(ServerboundSetCreativeModeSlotPacket serverboundSetCreativeModeSlotPacket) {
 		PacketUtils.ensureRunningOnSameThread(serverboundSetCreativeModeSlotPacket, this, this.player.level());
-		if (this.player.hasInfiniteMaterials()) {
-			boolean bl = serverboundSetCreativeModeSlotPacket.slotNum() < 0;
-			ItemStack itemStack = serverboundSetCreativeModeSlotPacket.itemStack();
-			if (!itemStack.isItemEnabled(this.player.level().enabledFeatures())) {
-				return;
-			}
+		// Allow item spawning in both creative and survival modes for JEI-like functionality
+		// Original check: if (this.player.hasInfiniteMaterials()) {
+		boolean bl = serverboundSetCreativeModeSlotPacket.slotNum() < 0;
+		ItemStack itemStack = serverboundSetCreativeModeSlotPacket.itemStack();
+		if (!itemStack.isItemEnabled(this.player.level().enabledFeatures())) {
+			return;
+		}
 
-			boolean bl2 = serverboundSetCreativeModeSlotPacket.slotNum() >= 1 && serverboundSetCreativeModeSlotPacket.slotNum() <= 45;
-			boolean bl3 = itemStack.isEmpty() || itemStack.getCount() <= itemStack.getMaxStackSize();
-			if (bl2 && bl3) {
-				this.player.inventoryMenu.getSlot(serverboundSetCreativeModeSlotPacket.slotNum()).setByPlayer(itemStack);
-				this.player.inventoryMenu.setRemoteSlot(serverboundSetCreativeModeSlotPacket.slotNum(), itemStack);
-				this.player.inventoryMenu.broadcastChanges();
-			} else if (bl && bl3) {
-				if (this.dropSpamThrottler.isUnderThreshold()) {
-					this.dropSpamThrottler.increment();
-					this.player.drop(itemStack, true);
-				} else {
-					LOGGER.warn("Player {} was dropping items too fast in creative mode, ignoring.", this.player.getPlainTextName());
-				}
+		boolean bl2 = serverboundSetCreativeModeSlotPacket.slotNum() >= 1 && serverboundSetCreativeModeSlotPacket.slotNum() <= 45;
+		boolean bl3 = itemStack.isEmpty() || itemStack.getCount() <= itemStack.getMaxStackSize();
+		if (bl2 && bl3) {
+			this.player.inventoryMenu.getSlot(serverboundSetCreativeModeSlotPacket.slotNum()).setByPlayer(itemStack);
+			this.player.inventoryMenu.setRemoteSlot(serverboundSetCreativeModeSlotPacket.slotNum(), itemStack);
+			this.player.inventoryMenu.broadcastChanges();
+		} else if (bl && bl3) {
+			if (this.dropSpamThrottler.isUnderThreshold()) {
+				this.dropSpamThrottler.increment();
+				this.player.drop(itemStack, true);
+			} else {
+				LOGGER.warn("Player {} was dropping items too fast in creative mode, ignoring.", this.player.getPlainTextName());
 			}
 		}
+		// Removed closing brace of hasInfiniteMaterials check
 	}
 
 	@Override
