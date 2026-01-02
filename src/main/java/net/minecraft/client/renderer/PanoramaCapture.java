@@ -1,5 +1,6 @@
 package net.minecraft.client.renderer;
 
+import com.mojang.blaze3d.pipeline.RenderTarget;
 import com.mojang.logging.LogUtils;
 import java.io.File;
 import java.text.SimpleDateFormat;
@@ -19,8 +20,9 @@ import org.slf4j.Logger;
  * Manages panorama capture for creating 6-face cubemaps.
  * Captures one face per frame to minimize hitching.
  * 
- * Uses window resizing approach: temporarily sets window to 1024x1024,
- * which properly handles all rendering state through Minecraft's normal pipeline.
+ * Uses temporary render target resizing: resizes main target to exactly 1024x1024,
+ * calls gameRenderer.resize() for proper shader reinitialization, captures, then restores.
+ * This approach guarantees exact dimensions while maintaining shader compatibility.
  */
 @Environment(EnvType.CLIENT)
 public class PanoramaCapture {
@@ -137,7 +139,6 @@ public class PanoramaCapture {
 		private final boolean savedHideGui;
 		private final int savedWidth;
 		private final int savedHeight;
-		private final boolean savedFullscreen;
 		
 		private int currentFace = 0;
 		private boolean faceReady = false;
@@ -152,10 +153,10 @@ public class PanoramaCapture {
 			this.savedFov = minecraft.options.fov().get();
 			this.savedHideGui = minecraft.options.hideGui;
 			
-			// Save current window state
-			this.savedWidth = minecraft.getWindow().getWidth();
-			this.savedHeight = minecraft.getWindow().getHeight();
-			this.savedFullscreen = minecraft.getWindow().isFullscreen();
+			// Save current render target size
+			RenderTarget mainTarget = minecraft.getMainRenderTarget();
+			this.savedWidth = mainTarget.width;
+			this.savedHeight = mainTarget.height;
 			
 			// Create timestamped output folder
 			File screenshotsDir = new File(minecraft.gameDirectory, Screenshot.SCREENSHOT_DIR);
@@ -174,25 +175,8 @@ public class PanoramaCapture {
 			// Hide GUI
 			minecraft.options.hideGui = true;
 			
-			// IMPORTANT: First ensure we're in windowed mode (not fullscreen)
-			// This ensures window decorations are applied consistently
-			if (minecraft.getWindow().isFullscreen()) {
-				minecraft.getWindow().toggleFullScreen();
-			}
-			
-			// Now resize the windowed mode window
-			// Request slightly larger to compensate for title bar decorations  
-			// Title bar typically takes 21-23 pixels, so we request 1024x1045
-			// This should give us close to 1024x1024 after decorations
-			// Uses standard window resize for shader compatibility
-			minecraft.getWindow().setWindowed(PANORAMA_SIZE, PANORAMA_SIZE + 21);
-			
-			// CRITICAL: Start with delay counter at 1 to wait for window resize to complete
-			// This prevents panorama_1 from being captured at the old resolution
-			// The delay gives the window system time to apply the resize before first capture
-			delayCounter = 1;
-			
-			LOGGER.info("Panorama capture initialized: output={}", this.outputFolder.getAbsolutePath());
+			LOGGER.info("Panorama capture initialized: output={}, size={}x{}", 
+				this.outputFolder.getAbsolutePath(), PANORAMA_SIZE, PANORAMA_SIZE);
 		}
 		
 		/**
@@ -200,34 +184,6 @@ public class PanoramaCapture {
 		 */
 		void prepareNextFace(Minecraft minecraft) {
 			if (currentFace >= FACE_COUNT) {
-				return;
-			}
-			
-			// If we're in an initial delay (waiting for window resize), just increment
-			// This happens on the first face to ensure window has resized before capture
-			if (delayCounter > 0 && delayCounter < DELAY_FRAMES && currentFace == 0 && !faceReady) {
-				delayCounter++;
-				// When delay completes, set up the first face
-				if (delayCounter >= DELAY_FRAMES) {
-					// Show progress
-					minecraft.gui.getChat().addMessage(
-						Component.literal("Capturing panorama... (1/" + FACE_COUNT + ")")
-							.withStyle(ChatFormatting.YELLOW)
-					);
-					
-					// Get the face index for proper ordering
-					int faceIndex = FACE_INDICES[0];
-					float[] rotation = FACE_ROTATIONS[faceIndex];
-					
-					// Set camera rotation for this face
-					minecraft.player.setYRot(savedYaw + rotation[0]);
-					minecraft.player.setXRot(rotation[1]);
-					minecraft.player.setYHeadRot(savedYaw + rotation[0]);
-					
-					// Mark ready to capture on next frame
-					faceReady = true;
-					delayCounter = 0;
-				}
 				return;
 			}
 			
@@ -248,6 +204,24 @@ public class PanoramaCapture {
 				minecraft.player.setXRot(rotation[1]);
 				minecraft.player.setYHeadRot(savedYaw + rotation[0]);
 				
+				// Resize render target to exactly 1024x1024 for this frame
+				RenderTarget mainTarget = minecraft.getMainRenderTarget();
+				mainTarget.resize(PANORAMA_SIZE, PANORAMA_SIZE);
+				
+				// CRITICAL: Call gameRenderer.resize() to properly reinitialize shaders
+				// This ensures shaders work correctly with the new dimensions
+				minecraft.gameRenderer.resize(PANORAMA_SIZE, PANORAMA_SIZE);
+				
+				// Mark ready to capture on next frame and start delay
+				faceReady = true;
+				delayCounter = 1;
+			}
+			
+			// If delay is active, count down
+			if (delayCounter > 0) {
+				delayCounter++;
+			}
+		}
 				// Start delay counter
 				delayCounter = 1;
 			}
@@ -275,7 +249,7 @@ public class PanoramaCapture {
 			// Get the face index for proper file naming
 			int faceIndex = FACE_INDICES[currentFace];
 			
-			// Save the captured frame from the main render target
+			// Save the captured frame from the main render target (now 1024x1024)
 			Screenshot.takeScreenshot(minecraft.getMainRenderTarget(), nativeImage -> {
 				File outputFile = new File(outputFolder, "panorama_" + faceIndex + ".png");
 				Util.ioPool().execute(() -> {
@@ -313,19 +287,19 @@ public class PanoramaCapture {
 		 */
 		void cleanup() {
 			try {
+				// Restore render target to original size
+				RenderTarget mainTarget = minecraft.getMainRenderTarget();
+				mainTarget.resize(savedWidth, savedHeight);
+				
+				// Restore gameRenderer to original size (for shader reinitialization)
+				minecraft.gameRenderer.resize(savedWidth, savedHeight);
+				
 				// Restore saved state
 				minecraft.player.setYRot(savedYaw);
 				minecraft.player.setXRot(savedPitch);
 				minecraft.player.setYHeadRot(savedYaw);
 				minecraft.options.fov().set(savedFov);
 				minecraft.options.hideGui = savedHideGui;
-				
-				// Restore original window size
-				if (savedFullscreen) {
-					minecraft.getWindow().toggleFullScreen();
-				} else {
-					minecraft.getWindow().setWindowed(savedWidth, savedHeight);
-				}
 				
 				LOGGER.info("Panorama capture cleanup complete");
 			} catch (Exception e) {
