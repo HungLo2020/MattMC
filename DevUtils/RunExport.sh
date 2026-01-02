@@ -35,7 +35,7 @@ echo ""
 
 # Build the client distribution
 echo "[1/5] Building client distribution..."
-./gradlew clientDistZip --no-daemon
+./gradlew clean clientDistZip --no-daemon
 
 # Get the built zip file
 ZIP_FILE="build/distributions/MattMC-Client-$(./gradlew properties -q | grep '^version:' | awk '{print $2}').zip"
