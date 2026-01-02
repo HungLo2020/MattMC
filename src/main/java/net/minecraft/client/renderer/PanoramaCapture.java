@@ -222,7 +222,7 @@ public class PanoramaCapture {
 				mainTarget.resize(PANORAMA_SIZE, PANORAMA_SIZE);
 				
 				// CRITICAL: Call gameRenderer.resize() to properly reinitialize shaders
-				// This clears the resource pool and calls levelRenderer.resize()
+				// This triggers the shader pipeline to rebuild FBOs and depth buffers for the new size
 				minecraft.gameRenderer.resize(PANORAMA_SIZE, PANORAMA_SIZE);
 				
 				// Mark ready to capture on next frame and start delay
@@ -315,7 +315,9 @@ public class PanoramaCapture {
 			RenderTarget mainTarget = minecraft.getMainRenderTarget();
 			mainTarget.resize(savedWidth, savedHeight);
 			
-			// CRITICAL: Call gameRenderer.resize() to reinitialize everything back to normal
+			// CRITICAL: Call gameRenderer.resize() to force shader pipeline rebuild
+			// This ensures shaders rebuild their internal FBO graph for the restored size
+			// Critical for shader compatibility - each resize triggers full pipeline reinitialization
 			minecraft.gameRenderer.resize(savedWidth, savedHeight);
 		}
 		
