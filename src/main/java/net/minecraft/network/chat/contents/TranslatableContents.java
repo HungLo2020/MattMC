@@ -4,6 +4,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableList.Builder;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.datafixers.util.Either;
+import com.mojang.logging.LogUtils;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.DataResult;
 import com.mojang.serialization.MapCodec;
@@ -27,8 +28,10 @@ import net.minecraft.network.chat.Style;
 import net.minecraft.util.ExtraCodecs;
 import net.minecraft.world.entity.Entity;
 import org.jetbrains.annotations.Nullable;
+import org.slf4j.Logger;
 
 public class TranslatableContents implements ComponentContents {
+	private static final Logger LOGGER = LogUtils.getLogger();
 	public static final Object[] NO_ARGS = new Object[0];
 	private static final Codec<Object> PRIMITIVE_ARG_CODEC = ExtraCodecs.JAVA.validate(TranslatableContents::filterAllowedArguments);
 	private static final Codec<Object> ARG_CODEC = Codec.either(PRIMITIVE_ARG_CODEC, ComponentSerialization.CODEC)
@@ -194,18 +197,29 @@ public class TranslatableContents implements ComponentContents {
 
 	@Override
 	public MutableComponent resolve(@Nullable CommandSourceStack commandSourceStack, @Nullable Entity entity, int i) throws CommandSyntaxException {
+		LOGGER.info("[CHAT_STYLE_DEBUG] TranslatableContents.resolve called - key: '{}', args count: {}, recursion depth: {}", this.key, this.args.length, i);
+		LOGGER.info("[CHAT_STYLE_DEBUG] TranslatableContents.resolve - commandSourceStack: {}, entity: {}", commandSourceStack, entity);
+		
 		Object[] objects = new Object[this.args.length];
 
 		for (int j = 0; j < objects.length; j++) {
 			Object object = this.args[j];
+			LOGGER.info("[CHAT_STYLE_DEBUG] TranslatableContents.resolve - processing arg[{}]: type={}, value={}", j, object.getClass().getSimpleName(), object);
 			if (object instanceof Component component) {
+				LOGGER.info("[CHAT_STYLE_DEBUG] TranslatableContents.resolve - arg[{}] is Component: '{}', style: {}", j, component.getString(), component.getStyle());
+				LOGGER.info("[CHAT_STYLE_DEBUG] TranslatableContents.resolve - arg[{}] style color: {}, clickEvent: {}, hoverEvent: {}", 
+					j, component.getStyle().getColor(), component.getStyle().getClickEvent(), component.getStyle().getHoverEvent());
 				objects[j] = ComponentUtils.updateForEntity(commandSourceStack, component, entity, i);
+				LOGGER.info("[CHAT_STYLE_DEBUG] TranslatableContents.resolve - arg[{}] after updateForEntity: '{}', style: {}", 
+					j, ((Component)objects[j]).getString(), ((Component)objects[j]).getStyle());
 			} else {
 				objects[j] = object;
 			}
 		}
 
-		return MutableComponent.create(new TranslatableContents(this.key, this.fallback, objects));
+		MutableComponent result = MutableComponent.create(new TranslatableContents(this.key, this.fallback, objects));
+		LOGGER.info("[CHAT_STYLE_DEBUG] TranslatableContents.resolve - result component created: '{}'", result.getString());
+		return result;
 	}
 
 	public boolean equals(Object object) {
