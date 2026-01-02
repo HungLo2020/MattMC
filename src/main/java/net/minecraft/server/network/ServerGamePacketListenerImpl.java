@@ -1896,19 +1896,43 @@ public class ServerGamePacketListenerImpl
 		
 		if (bl2 && bl3) {
 			System.out.println("[JEI SERVER DEBUG] Setting item in slot " + serverboundSetCreativeModeSlotPacket.slotNum());
-			this.player.inventoryMenu.getSlot(serverboundSetCreativeModeSlotPacket.slotNum()).setByPlayer(itemStack);
-			this.player.inventoryMenu.setRemoteSlot(serverboundSetCreativeModeSlotPacket.slotNum(), itemStack);
-			this.player.inventoryMenu.broadcastChanges();
 			
-			// Force sync to client's current container (inventory screen)
-			this.player.containerMenu.broadcastChanges();
-			// Send the slot update directly to ensure immediate visibility
-			this.send(new net.minecraft.network.protocol.game.ClientboundContainerSetSlotPacket(
-				this.player.containerMenu.containerId,
-				this.player.containerMenu.incrementStateId(),
-				serverboundSetCreativeModeSlotPacket.slotNum(),
-				itemStack
-			));
+			// Get the current item in the slot
+			ItemStack currentStack = this.player.inventoryMenu.getSlot(serverboundSetCreativeModeSlotPacket.slotNum()).getItem();
+			System.out.println("[JEI SERVER DEBUG] Current stack in slot: " + currentStack);
+			
+			// If there's already an item of the same type, increment its count
+			if (!currentStack.isEmpty() && ItemStack.isSameItemSameComponents(currentStack, itemStack)) {
+				System.out.println("[JEI SERVER DEBUG] Item already exists, incrementing count");
+				int newCount = Math.min(currentStack.getCount() + itemStack.getCount(), currentStack.getMaxStackSize());
+				System.out.println("[JEI SERVER DEBUG] New count: " + newCount + " (was " + currentStack.getCount() + ", adding " + itemStack.getCount() + ")");
+				currentStack.setCount(newCount);
+				// Update both menus
+				this.player.inventoryMenu.setRemoteSlot(serverboundSetCreativeModeSlotPacket.slotNum(), currentStack);
+				this.player.inventoryMenu.broadcastChanges();
+				this.player.containerMenu.broadcastChanges();
+				// Send updated stack to client
+				this.send(new net.minecraft.network.protocol.game.ClientboundContainerSetSlotPacket(
+					this.player.containerMenu.containerId,
+					this.player.containerMenu.incrementStateId(),
+					serverboundSetCreativeModeSlotPacket.slotNum(),
+					currentStack
+				));
+			} else {
+				System.out.println("[JEI SERVER DEBUG] Setting new item stack");
+				// Set new item (slot is empty or different item)
+				this.player.inventoryMenu.getSlot(serverboundSetCreativeModeSlotPacket.slotNum()).setByPlayer(itemStack);
+				this.player.inventoryMenu.setRemoteSlot(serverboundSetCreativeModeSlotPacket.slotNum(), itemStack);
+				this.player.inventoryMenu.broadcastChanges();
+				this.player.containerMenu.broadcastChanges();
+				// Send packet directly to client to ensure immediate visibility
+				this.send(new net.minecraft.network.protocol.game.ClientboundContainerSetSlotPacket(
+					this.player.containerMenu.containerId,
+					this.player.containerMenu.incrementStateId(),
+					serverboundSetCreativeModeSlotPacket.slotNum(),
+					itemStack
+				));
+			}
 			System.out.println("[JEI SERVER DEBUG] Item set successfully and synced to client");
 		} else if (bl && bl3) {
 			System.out.println("[JEI SERVER DEBUG] Dropping item (negative slot)");
