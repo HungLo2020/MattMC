@@ -225,11 +225,12 @@ public class PanoramaCapture {
 				minecraft.getWindow().setWindowed(savedWidth, savedHeight);
 				
 				// STEP 5: Resize render target to exactly 1024x1024 for capture
+				// IMPORTANT: Do this AFTER window restore to ensure it stays at 1024x1024
 				RenderTarget mainTarget = minecraft.getMainRenderTarget();
 				mainTarget.resize(PANORAMA_SIZE, PANORAMA_SIZE);
 				
 				// CRITICAL: Call gameRenderer.resize() to properly reinitialize shaders
-				// This triggers the shader pipeline to rebuild FBOs and depth buffers for the new size
+				// This triggers the shader pipeline to rebuild FBOs and depth buffers for the 1024x1024 size
 				minecraft.gameRenderer.resize(PANORAMA_SIZE, PANORAMA_SIZE);
 				
 				// STEP 6: Mark ready to capture and start delay (wait 10 frames)
