@@ -187,6 +187,11 @@ public class PanoramaCapture {
 			// Uses standard window resize for shader compatibility
 			minecraft.getWindow().setWindowed(PANORAMA_SIZE, PANORAMA_SIZE + 21);
 			
+			// CRITICAL: Start with delay counter at 1 to wait for window resize to complete
+			// This prevents panorama_1 from being captured at the old resolution
+			// The delay gives the window system time to apply the resize before first capture
+			delayCounter = 1;
+			
 			LOGGER.info("Panorama capture initialized: output={}", this.outputFolder.getAbsolutePath());
 		}
 		
@@ -195,6 +200,34 @@ public class PanoramaCapture {
 		 */
 		void prepareNextFace(Minecraft minecraft) {
 			if (currentFace >= FACE_COUNT) {
+				return;
+			}
+			
+			// If we're in an initial delay (waiting for window resize), just increment
+			// This happens on the first face to ensure window has resized before capture
+			if (delayCounter > 0 && delayCounter < DELAY_FRAMES && currentFace == 0 && !faceReady) {
+				delayCounter++;
+				// When delay completes, set up the first face
+				if (delayCounter >= DELAY_FRAMES) {
+					// Show progress
+					minecraft.gui.getChat().addMessage(
+						Component.literal("Capturing panorama... (1/" + FACE_COUNT + ")")
+							.withStyle(ChatFormatting.YELLOW)
+					);
+					
+					// Get the face index for proper ordering
+					int faceIndex = FACE_INDICES[0];
+					float[] rotation = FACE_ROTATIONS[faceIndex];
+					
+					// Set camera rotation for this face
+					minecraft.player.setYRot(savedYaw + rotation[0]);
+					minecraft.player.setXRot(rotation[1]);
+					minecraft.player.setYHeadRot(savedYaw + rotation[0]);
+					
+					// Mark ready to capture on next frame
+					faceReady = true;
+					delayCounter = 0;
+				}
 				return;
 			}
 			
