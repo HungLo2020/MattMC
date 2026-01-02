@@ -217,22 +217,9 @@ public class PanoramaCapture {
 				delayCounter = 1;
 			}
 			
-			// If delay is active, count down
+			// If delay is active, increment counter
 			if (delayCounter > 0) {
 				delayCounter++;
-			}
-		}
-				// Start delay counter
-				delayCounter = 1;
-			}
-			// If we're in the delay period, increment counter
-			else if (delayCounter > 0 && delayCounter < DELAY_FRAMES) {
-				delayCounter++;
-			}
-			// If delay is complete, mark ready to capture
-			else if (delayCounter >= DELAY_FRAMES) {
-				faceReady = true;
-				delayCounter = 0; // Reset for next face
 			}
 		}
 		
