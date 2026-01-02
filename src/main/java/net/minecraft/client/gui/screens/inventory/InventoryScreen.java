@@ -386,7 +386,14 @@ public class InventoryScreen extends AbstractRecipeBookScreen<InventoryMenu> {
 	
 	/**
 	 * Finds the best slot to place an item using smart stacking/placement logic.
-	 * Returns the slot index (0-35 for inventory, 36+ for other slots) or -1 if no slot available.
+	 * Returns the container slot index (9-45 for valid inventory slots) or -1 if no slot available.
+	 * 
+	 * IMPORTANT: This returns CONTAINER slot indices, not inventory indices:
+	 * - Container slots 9-35: Main inventory
+	 * - Container slots 36-44: Hotbar
+	 * - Container slot 45: Offhand
+	 * 
+	 * We NEVER return crafting slots (0-4) or armor slots (5-8).
 	 */
 	private int findBestSlotForItem(ItemStack itemStack) {
 		if (this.minecraft == null || this.minecraft.player == null) {
@@ -397,20 +404,51 @@ public class InventoryScreen extends AbstractRecipeBookScreen<InventoryMenu> {
 		var inventory = this.minecraft.player.getInventory();
 		
 		// First, try to find an existing stack with remaining space
-		// Priority: selected slot, offhand, then all inventory slots
+		// This returns an inventory index (0-35 or 40 for offhand)
 		int slotWithSpace = inventory.getSlotWithRemainingSpace(itemStack);
 		if (slotWithSpace != -1) {
-			return slotWithSpace;
+			// Convert inventory index to container slot index
+			int containerSlot = inventoryIndexToContainerSlot(slotWithSpace);
+			if (containerSlot >= 9) { // Only use valid inventory slots (not crafting/armor)
+				return containerSlot;
+			}
 		}
 		
 		// If no existing stack, find first empty slot
-		// This automatically prioritizes hotbar (0-8) over main inventory (9-35)
+		// Prioritize hotbar (0-8) over main inventory (9-35)
 		int freeSlot = inventory.getFreeSlot();
 		if (freeSlot != -1) {
-			return freeSlot;
+			// Convert inventory index to container slot index
+			int containerSlot = inventoryIndexToContainerSlot(freeSlot);
+			if (containerSlot >= 9) { // Only use valid inventory slots (not crafting/armor)
+				return containerSlot;
+			}
 		}
 		
 		// No space available
+		return -1;
+	}
+	
+	/**
+	 * Converts an inventory index (0-35 for items, 40 for offhand) to a container slot index.
+	 * 
+	 * Inventory layout:
+	 * - 0-8: Hotbar → Container 36-44
+	 * - 9-35: Main inventory → Container 9-35
+	 * - 40: Offhand → Container 45
+	 */
+	private int inventoryIndexToContainerSlot(int inventoryIndex) {
+		if (inventoryIndex >= 0 && inventoryIndex <= 8) {
+			// Hotbar: inventory 0-8 → container 36-44
+			return inventoryIndex + 36;
+		} else if (inventoryIndex >= 9 && inventoryIndex <= 35) {
+			// Main inventory: stays the same
+			return inventoryIndex;
+		} else if (inventoryIndex == 40) {
+			// Offhand: inventory 40 → container 45
+			return 45;
+		}
+		// Invalid index
 		return -1;
 	}
 	
