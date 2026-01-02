@@ -1875,27 +1875,41 @@ public class ServerGamePacketListenerImpl
 	@Override
 	public void handleSetCreativeModeSlot(ServerboundSetCreativeModeSlotPacket serverboundSetCreativeModeSlotPacket) {
 		PacketUtils.ensureRunningOnSameThread(serverboundSetCreativeModeSlotPacket, this, this.player.level());
+		System.out.println("[JEI SERVER DEBUG] handleSetCreativeModeSlot called");
+		System.out.println("[JEI SERVER DEBUG] Slot number: " + serverboundSetCreativeModeSlotPacket.slotNum());
+		System.out.println("[JEI SERVER DEBUG] Item stack: " + serverboundSetCreativeModeSlotPacket.itemStack());
+		
 		// Allow item spawning in both creative and survival modes for JEI-like functionality
 		// Original check: if (this.player.hasInfiniteMaterials()) {
 		boolean bl = serverboundSetCreativeModeSlotPacket.slotNum() < 0;
 		ItemStack itemStack = serverboundSetCreativeModeSlotPacket.itemStack();
 		if (!itemStack.isItemEnabled(this.player.level().enabledFeatures())) {
+			System.out.println("[JEI SERVER DEBUG] Item not enabled for player features, returning");
 			return;
 		}
 
 		boolean bl2 = serverboundSetCreativeModeSlotPacket.slotNum() >= 1 && serverboundSetCreativeModeSlotPacket.slotNum() <= 45;
 		boolean bl3 = itemStack.isEmpty() || itemStack.getCount() <= itemStack.getMaxStackSize();
+		System.out.println("[JEI SERVER DEBUG] bl (negative slot): " + bl);
+		System.out.println("[JEI SERVER DEBUG] bl2 (slot 1-45): " + bl2);
+		System.out.println("[JEI SERVER DEBUG] bl3 (valid stack): " + bl3);
+		
 		if (bl2 && bl3) {
+			System.out.println("[JEI SERVER DEBUG] Setting item in slot " + serverboundSetCreativeModeSlotPacket.slotNum());
 			this.player.inventoryMenu.getSlot(serverboundSetCreativeModeSlotPacket.slotNum()).setByPlayer(itemStack);
 			this.player.inventoryMenu.setRemoteSlot(serverboundSetCreativeModeSlotPacket.slotNum(), itemStack);
 			this.player.inventoryMenu.broadcastChanges();
+			System.out.println("[JEI SERVER DEBUG] Item set successfully");
 		} else if (bl && bl3) {
+			System.out.println("[JEI SERVER DEBUG] Dropping item (negative slot)");
 			if (this.dropSpamThrottler.isUnderThreshold()) {
 				this.dropSpamThrottler.increment();
 				this.player.drop(itemStack, true);
 			} else {
 				LOGGER.warn("Player {} was dropping items too fast in creative mode, ignoring.", this.player.getPlainTextName());
 			}
+		} else {
+			System.out.println("[JEI SERVER DEBUG] No action taken - bl2=" + bl2 + ", bl3=" + bl3 + ", bl=" + bl);
 		}
 		// Removed closing brace of hasInfiniteMaterials check
 	}

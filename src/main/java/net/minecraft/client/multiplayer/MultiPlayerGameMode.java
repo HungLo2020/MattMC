@@ -483,10 +483,16 @@ public class MultiPlayerGameMode {
 	}
 
 	public void handleCreativeModeItemAdd(ItemStack itemStack, int i) {
+		System.out.println("[JEI CLIENT DEBUG] handleCreativeModeItemAdd called");
+		System.out.println("[JEI CLIENT DEBUG] Slot: " + i + ", Item: " + itemStack);
 		// Allow item addition in both creative and survival modes for JEI-like functionality
 		// Original check: if (this.minecraft.player.hasInfiniteMaterials() && this.connection.isFeatureEnabled(itemStack.getItem().requiredFeatures())) {
 		if (this.connection.isFeatureEnabled(itemStack.getItem().requiredFeatures())) {
+			System.out.println("[JEI CLIENT DEBUG] Sending ServerboundSetCreativeModeSlotPacket");
 			this.connection.send(new ServerboundSetCreativeModeSlotPacket(i, itemStack));
+			System.out.println("[JEI CLIENT DEBUG] Packet sent successfully");
+		} else {
+			System.out.println("[JEI CLIENT DEBUG] Item not enabled for features, packet NOT sent");
 		}
 	}
 
