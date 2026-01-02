@@ -227,14 +227,24 @@ public class ChatComponent {
 	}
 
 	private void addMessageToDisplayQueue(GuiMessage guiMessage) {
+		LOGGER.info("[CHAT_STYLE_DEBUG] ChatComponent.addMessageToDisplayQueue called");
+		LOGGER.info("[CHAT_STYLE_DEBUG] ChatComponent.addMessageToDisplayQueue - guiMessage content: '{}'", guiMessage.content().getString());
+		LOGGER.info("[CHAT_STYLE_DEBUG] ChatComponent.addMessageToDisplayQueue - current trimmedMessages size: {}", this.trimmedMessages.size());
+		
 		int i = Mth.floor(this.getWidth() / this.getScale());
+		LOGGER.info("[CHAT_STYLE_DEBUG] ChatComponent.addMessageToDisplayQueue - chat width: {}, scale: {}, wrapped width: {}", this.getWidth(), this.getScale(), i);
+		
 		GuiMessageTag.Icon icon = guiMessage.icon();
 		if (icon != null) {
 			i -= icon.width + 4 + 2;
+			LOGGER.info("[CHAT_STYLE_DEBUG] ChatComponent.addMessageToDisplayQueue - adjusted for icon, new width: {}", i);
 		}
 
 		List<FormattedCharSequence> list = ComponentRenderUtils.wrapComponents(guiMessage.content(), i, this.minecraft.font);
+		LOGGER.info("[CHAT_STYLE_DEBUG] ChatComponent.addMessageToDisplayQueue - wrapped into {} lines", list.size());
+		
 		boolean bl = this.isChatFocused();
+		LOGGER.info("[CHAT_STYLE_DEBUG] ChatComponent.addMessageToDisplayQueue - chat focused: {}", bl);
 
 		for (int j = 0; j < list.size(); j++) {
 			FormattedCharSequence formattedCharSequence = (FormattedCharSequence)list.get(j);
@@ -245,11 +255,16 @@ public class ChatComponent {
 
 			boolean bl2 = j == list.size() - 1;
 			this.trimmedMessages.add(0, new GuiMessage.Line(guiMessage.addedTime(), formattedCharSequence, guiMessage.tag(), bl2));
+			LOGGER.info("[CHAT_STYLE_DEBUG] ChatComponent.addMessageToDisplayQueue - added line {} to trimmedMessages", j);
 		}
+
+		LOGGER.info("[CHAT_STYLE_DEBUG] ChatComponent.addMessageToDisplayQueue - trimmedMessages size after add: {}", this.trimmedMessages.size());
 
 		while (this.trimmedMessages.size() > 100) {
 			this.trimmedMessages.remove(this.trimmedMessages.size() - 1);
 		}
+		
+		LOGGER.info("[CHAT_STYLE_DEBUG] ChatComponent.addMessageToDisplayQueue - final trimmedMessages size: {}", this.trimmedMessages.size());
 	}
 
 	private void addMessageToQueue(GuiMessage guiMessage) {
