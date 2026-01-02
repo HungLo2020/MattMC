@@ -1,6 +1,5 @@
 package net.minecraft.client.renderer;
 
-import com.mojang.blaze3d.pipeline.RenderTarget;
 import com.mojang.logging.LogUtils;
 import java.io.File;
 import java.text.SimpleDateFormat;
@@ -20,8 +19,8 @@ import org.slf4j.Logger;
  * Manages panorama capture for creating 6-face cubemaps.
  * Captures one face per frame to minimize hitching.
  * 
- * Integration: Temporarily resizes the main render target to PANORAMA_SIZE during capture,
- * allowing normal rendering to produce panorama images at the correct resolution.
+ * Uses window resizing approach: temporarily sets window to 1024x1024,
+ * which properly handles all rendering state through Minecraft's normal pipeline.
  */
 @Environment(EnvType.CLIENT)
 public class PanoramaCapture {
@@ -72,7 +71,7 @@ public class PanoramaCapture {
 	}
 	
 	/**
-	 * Called before each frame renders. Prepares camera and render target for panorama capture.
+	 * Called before each frame renders. Prepares camera for panorama capture.
 	 */
 	public static void beforeRender(Minecraft minecraft) {
 		if (activeJob == null) {
@@ -89,13 +88,6 @@ public class PanoramaCapture {
 				activeJob = null;
 			}
 		}
-	}
-	
-	/**
-	 * Returns true if we should clear the render target again after beforeRender resized it.
-	 */
-	public static boolean needsClear() {
-		return activeJob != null && activeJob.justResized;
 	}
 	
 	/**
@@ -145,11 +137,11 @@ public class PanoramaCapture {
 		private final boolean savedHideGui;
 		private final int savedWidth;
 		private final int savedHeight;
+		private final boolean savedFullscreen;
 		
 		private int currentFace = 0;
 		private boolean faceReady = false;
 		private int delayCounter = 0; // Counts frames to delay before capturing
-		private boolean justResized = false; // Tracks if we just resized (needs clear)
 		
 		PanoramaJob(Minecraft minecraft) throws Exception {
 			this.minecraft = minecraft;
@@ -160,10 +152,10 @@ public class PanoramaCapture {
 			this.savedFov = minecraft.options.fov().get();
 			this.savedHideGui = minecraft.options.hideGui;
 			
-			// Save current render target size
-			RenderTarget mainTarget = minecraft.getMainRenderTarget();
-			this.savedWidth = mainTarget.width;
-			this.savedHeight = mainTarget.height;
+			// Save current window state
+			this.savedWidth = minecraft.getWindow().getWidth();
+			this.savedHeight = minecraft.getWindow().getHeight();
+			this.savedFullscreen = minecraft.getWindow().isFullscreen();
 			
 			// Create timestamped output folder
 			File screenshotsDir = new File(minecraft.gameDirectory, Screenshot.SCREENSHOT_DIR);
@@ -186,12 +178,10 @@ public class PanoramaCapture {
 		}
 		
 		/**
-		 * Prepares for the next face capture. Resizes main render target, sets camera,
-		 * and displays progress message to the user.
+		 * Prepares for the next face capture. Sets window size, camera, and displays progress.
 		 */
 		void prepareNextFace(Minecraft minecraft) {
 			if (currentFace >= FACE_COUNT) {
-				justResized = false;
 				return;
 			}
 			
@@ -212,15 +202,8 @@ public class PanoramaCapture {
 				minecraft.player.setXRot(rotation[1]);
 				minecraft.player.setYHeadRot(savedYaw + rotation[0]);
 				
-				// Resize main render target to panorama size
-				RenderTarget mainTarget = minecraft.getMainRenderTarget();
-				mainTarget.resize(PANORAMA_SIZE, PANORAMA_SIZE);
-				
-				// Notify GameRenderer and LevelRenderer about the resize to clear internal state
-				minecraft.gameRenderer.resize(PANORAMA_SIZE, PANORAMA_SIZE);
-				
-				// Mark that we just resized so the render target needs to be cleared
-				justResized = true;
+				// Change window size to panorama size (this properly handles all rendering state)
+				minecraft.getWindow().setWindowed(PANORAMA_SIZE, PANORAMA_SIZE);
 				
 				// Start delay counter
 				delayCounter = 1;
@@ -228,15 +211,11 @@ public class PanoramaCapture {
 			// If we're in the delay period, increment counter
 			else if (delayCounter > 0 && delayCounter < DELAY_FRAMES) {
 				delayCounter++;
-				justResized = false; // Clear flag after first frame
 			}
 			// If delay is complete, mark ready to capture
 			else if (delayCounter >= DELAY_FRAMES) {
 				faceReady = true;
 				delayCounter = 0; // Reset for next face
-				justResized = false;
-			} else {
-				justResized = false;
 			}
 		}
 		
@@ -254,8 +233,7 @@ public class PanoramaCapture {
 			int faceIndex = FACE_INDICES[currentFace];
 			
 			// Save the captured frame from the main render target
-			RenderTarget mainTarget = minecraft.getMainRenderTarget();
-			Screenshot.takeScreenshot(mainTarget, nativeImage -> {
+			Screenshot.takeScreenshot(minecraft.getMainRenderTarget(), nativeImage -> {
 				File outputFile = new File(outputFolder, "panorama_" + faceIndex + ".png");
 				Util.ioPool().execute(() -> {
 					try {
@@ -299,12 +277,12 @@ public class PanoramaCapture {
 				minecraft.options.fov().set(savedFov);
 				minecraft.options.hideGui = savedHideGui;
 				
-				// Restore original render target size
-				RenderTarget mainTarget = minecraft.getMainRenderTarget();
-				mainTarget.resize(savedWidth, savedHeight);
-				
-				// Notify GameRenderer and LevelRenderer about the resize to clear internal state
-				minecraft.gameRenderer.resize(savedWidth, savedHeight);
+				// Restore original window size
+				if (savedFullscreen) {
+					minecraft.getWindow().toggleFullScreen();
+				} else {
+					minecraft.getWindow().setWindowed(savedWidth, savedHeight);
+				}
 				
 				LOGGER.info("Panorama capture cleanup complete");
 			} catch (Exception e) {

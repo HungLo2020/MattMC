@@ -1345,17 +1345,11 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 			}
 		}
 
-		// Panorama capture: Prepare for panorama capture (resize render target, set camera)
+		// Panorama capture: Prepare for panorama capture (set window size, camera)
 		net.minecraft.client.renderer.PanoramaCapture.beforeRender(this);
 		
 		RenderTarget renderTarget = this.getMainRenderTarget();
 		RenderSystem.getDevice().createCommandEncoder().clearColorAndDepthTextures(renderTarget.getColorTexture(), 0, renderTarget.getDepthTexture(), 1.0);
-		
-		// Panorama capture: If we just resized, clear again to ensure clean buffers (important for shaders)
-		if (net.minecraft.client.renderer.PanoramaCapture.needsClear()) {
-			RenderSystem.getDevice().createCommandEncoder().clearColorAndDepthTextures(renderTarget.getColorTexture(), 0, renderTarget.getDepthTexture(), 1.0);
-		}
-		
 		profilerFiller.push("gameRenderer");
 		if (!this.noRender) {
 			this.gameRenderer.render(this.deltaTracker, bl);
