@@ -392,21 +392,37 @@ public class CreativeModeInventoryScreen extends AbstractContainerScreen<Creativ
 		int screenWidth = this.width;
 		int screenHeight = this.height;
 		
-		// Position panel on right side of main inventory screen
-		this.jeiPanelX = this.leftPos + this.imageWidth + 4;
-		this.jeiPanelY = this.topPos;
+		// Position panel on right side with better spacing
+		// Use larger gap from inventory (16px instead of 4px) for better visual separation
+		int gapFromInventory = 16;
+		this.jeiPanelX = this.leftPos + this.imageWidth + gapFromInventory;
 		
-		// Calculate available space for panel
-		int availableWidth = screenWidth - this.jeiPanelX - 10; // Leave 10px margin on right
-		int availableHeight = this.imageHeight;
+		// Align panel top with screen top (or small margin from top)
+		int topMargin = Math.max(4, this.topPos - 10);
+		this.jeiPanelY = topMargin;
+		
+		// Calculate available space for panel - use more of the screen
+		// Leave reasonable margin from right edge (8px instead of 10px)
+		int rightMargin = 8;
+		int availableWidth = screenWidth - this.jeiPanelX - rightMargin;
+		
+		// Use full available height from top to bottom, not just inventory height
+		// Leave small bottom margin
+		int bottomMargin = Math.max(4, screenHeight - (this.topPos + this.imageHeight) - 10);
+		int availableHeight = screenHeight - this.jeiPanelY - bottomMargin;
 		
 		// Use standard Minecraft slot size (18x18)
-		// Could be made dynamic based on GUI scale if needed in the future
 		int slotSpacing = this.jeiSlotSize;
 		
 		// Calculate how many columns and rows we can fit
-		this.jeiColumns = Math.max(1, availableWidth / slotSpacing);
-		this.jeiRows = Math.max(1, (availableHeight - 20) / slotSpacing); // Leave space for scrollbar
+		// Subtract space for scrollbar (14px) from width calculation
+		int widthForSlots = availableWidth - 14;
+		this.jeiColumns = Math.max(1, widthForSlots / slotSpacing);
+		
+		// Calculate rows using full available height
+		// Leave small top/bottom padding (4px each = 8px total)
+		int heightForSlots = availableHeight - 8;
+		this.jeiRows = Math.max(1, heightForSlots / slotSpacing);
 		
 		// Limit columns to a reasonable number (like JEI does)
 		this.jeiColumns = Math.min(this.jeiColumns, 9);
@@ -428,6 +444,8 @@ public class CreativeModeInventoryScreen extends AbstractContainerScreen<Creativ
 
 		this.scrollOffs = this.menu.getScrollForRowIndex(k);
 		this.menu.scrollTo(this.scrollOffs);
+		// Recalculate JEI panel layout when screen is resized (including GUI scale changes)
+		this.calculateJeiPanelLayout();
 	}
 
 	@Override
