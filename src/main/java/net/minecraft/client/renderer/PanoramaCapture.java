@@ -194,13 +194,6 @@ public class PanoramaCapture {
 						.withStyle(ChatFormatting.YELLOW)
 				);
 				
-				// CRITICAL: Resize window to 1024x1024 and back to refresh shader state
-				// This ensures rendering pipeline is properly initialized for each face
-				// Window resizing triggered shader rebuilds that made captures work correctly
-				minecraft.getWindow().setWindowed(PANORAMA_SIZE, PANORAMA_SIZE);
-				// Let it settle for a frame, then restore
-				minecraft.getWindow().setWindowed(savedWidth, savedHeight);
-				
 				// Get the face index for proper ordering
 				int faceIndex = FACE_INDICES[currentFace];
 				float[] rotation = FACE_ROTATIONS[faceIndex];
@@ -209,7 +202,7 @@ public class PanoramaCapture {
 				float targetYaw = savedYaw + rotation[0];
 				float targetPitch = rotation[1];
 				
-				// Use /tp command to set rotation BEFORE changing render state
+				// STEP 1: Use /tp command to set rotation FIRST (in normal rendering mode)
 				// This ensures shaders see a proper camera state transition
 				// Format: /tp @s ~ ~ ~ <yaw> <pitch>
 				String tpCommand = String.format(java.util.Locale.US, "tp @s ~ ~ ~ %.2f %.2f", targetYaw, targetPitch);
@@ -219,13 +212,19 @@ public class PanoramaCapture {
 					minecraft.getConnection().sendCommand(tpCommand);
 				}
 				
-				// Set FOV to 90 for capture
-				minecraft.options.fov().set(90);
+				// STEP 2: Resize window to 1024x1024 to refresh shader state
+				// This ensures rendering pipeline is properly initialized for each face
+				minecraft.getWindow().setWindowed(PANORAMA_SIZE, PANORAMA_SIZE);
 				
-				// Hide GUI
+				// STEP 3: Set FOV to 90 for capture and hide GUI
+				minecraft.options.fov().set(90);
 				minecraft.options.hideGui = true;
 				
-				// Resize render target to exactly 1024x1024 for this frame
+				// STEP 4: Restore window size back to original
+				// This prevents final PNG dimension issues
+				minecraft.getWindow().setWindowed(savedWidth, savedHeight);
+				
+				// STEP 5: Resize render target to exactly 1024x1024 for capture
 				RenderTarget mainTarget = minecraft.getMainRenderTarget();
 				mainTarget.resize(PANORAMA_SIZE, PANORAMA_SIZE);
 				
@@ -233,7 +232,7 @@ public class PanoramaCapture {
 				// This triggers the shader pipeline to rebuild FBOs and depth buffers for the new size
 				minecraft.gameRenderer.resize(PANORAMA_SIZE, PANORAMA_SIZE);
 				
-				// Mark ready to capture on next frame and start delay
+				// STEP 6: Mark ready to capture and start delay (wait 10 frames)
 				faceReady = true;
 				delayCounter = 1;
 			}
