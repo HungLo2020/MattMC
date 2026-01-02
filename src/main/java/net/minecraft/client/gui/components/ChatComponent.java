@@ -468,21 +468,36 @@ public class ChatComponent {
 	}
 
 	private int getMessageLineIndexAt(double d, double e) {
+		LOGGER.info("[CHAT_STYLE_DEBUG] ChatComponent.getMessageLineIndexAt called at ({}, {})", d, e);
+		LOGGER.info("[CHAT_STYLE_DEBUG] ChatComponent.getMessageLineIndexAt - isChatFocused: {}, isChatHidden: {}", this.isChatFocused(), this.isChatHidden());
+		
 		if (this.isChatFocused() && !this.isChatHidden()) {
+			LOGGER.info("[CHAT_STYLE_DEBUG] ChatComponent.getMessageLineIndexAt - chat focused and not hidden");
 			if (!(d < -4.0) && !(d > Mth.floor(this.getWidth() / this.getScale()))) {
+				LOGGER.info("[CHAT_STYLE_DEBUG] ChatComponent.getMessageLineIndexAt - d in valid range");
 				int i = Math.min(this.getLinesPerPage(), this.trimmedMessages.size());
+				LOGGER.info("[CHAT_STYLE_DEBUG] ChatComponent.getMessageLineIndexAt - linesPerPage: {}, trimmedMessages.size: {}, min: {}", this.getLinesPerPage(), this.trimmedMessages.size(), i);
 				if (e >= 0.0 && e < i) {
+					LOGGER.info("[CHAT_STYLE_DEBUG] ChatComponent.getMessageLineIndexAt - e in valid range [0, {})", i);
 					int j = Mth.floor(e + this.chatScrollbarPos);
+					LOGGER.info("[CHAT_STYLE_DEBUG] ChatComponent.getMessageLineIndexAt - calculated index j: {}, chatScrollbarPos: {}", j, this.chatScrollbarPos);
 					if (j >= 0 && j < this.trimmedMessages.size()) {
+						LOGGER.info("[CHAT_STYLE_DEBUG] ChatComponent.getMessageLineIndexAt - returning valid index: {}", j);
 						return j;
+					} else {
+						LOGGER.info("[CHAT_STYLE_DEBUG] ChatComponent.getMessageLineIndexAt - j out of bounds, returning -1");
 					}
+				} else {
+					LOGGER.info("[CHAT_STYLE_DEBUG] ChatComponent.getMessageLineIndexAt - e out of range [0, {}), e={}, returning -1", i, e);
 				}
 
 				return -1;
 			} else {
+				LOGGER.info("[CHAT_STYLE_DEBUG] ChatComponent.getMessageLineIndexAt - d out of range, returning -1");
 				return -1;
 			}
 		} else {
+			LOGGER.info("[CHAT_STYLE_DEBUG] ChatComponent.getMessageLineIndexAt - chat not focused or is hidden, returning -1");
 			return -1;
 		}
 	}
