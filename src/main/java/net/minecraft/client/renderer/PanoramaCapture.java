@@ -169,11 +169,8 @@ public class PanoramaCapture {
 				throw new Exception("Failed to create output folder: " + this.outputFolder);
 			}
 			
-			// Set FOV to 90 for capture
-			minecraft.options.fov().set(90);
-			
-			// Hide GUI
-			minecraft.options.hideGui = true;
+			// NOTE: We don't set FOV/hide GUI here anymore - we do it fresh before each face
+			// This ensures each face starts from a clean state like the first one
 			
 			LOGGER.info("Panorama capture initialized: output={}, size={}x{}", 
 				this.outputFolder.getAbsolutePath(), PANORAMA_SIZE, PANORAMA_SIZE);
@@ -204,12 +201,18 @@ public class PanoramaCapture {
 				minecraft.player.setXRot(rotation[1]);
 				minecraft.player.setYHeadRot(savedYaw + rotation[0]);
 				
+				// Set FOV to 90 for capture
+				minecraft.options.fov().set(90);
+				
+				// Hide GUI
+				minecraft.options.hideGui = true;
+				
 				// Resize render target to exactly 1024x1024 for this frame
 				RenderTarget mainTarget = minecraft.getMainRenderTarget();
 				mainTarget.resize(PANORAMA_SIZE, PANORAMA_SIZE);
 				
 				// CRITICAL: Call gameRenderer.resize() to properly reinitialize shaders
-				// This ensures shaders work correctly with the new dimensions
+				// This clears the resource pool and calls levelRenderer.resize()
 				minecraft.gameRenderer.resize(PANORAMA_SIZE, PANORAMA_SIZE);
 				
 				// Mark ready to capture on next frame and start delay
@@ -258,6 +261,10 @@ public class PanoramaCapture {
 				});
 			});
 			
+			// CRITICAL: After capturing, restore state completely (like first screenshot worked)
+			// Then we'll set up fresh for the next face
+			restoreState(minecraft);
+			
 			currentFace++;
 			
 			// Check if complete
@@ -277,23 +284,35 @@ public class PanoramaCapture {
 		}
 		
 		/**
-		 * Clean up resources and restore state.
+		 * Restore state to normal (called after each face capture).
+		 */
+		private void restoreState(Minecraft minecraft) {
+			// Restore camera
+			minecraft.player.setYRot(savedYaw);
+			minecraft.player.setXRot(savedPitch);
+			minecraft.player.setYHeadRot(savedYaw);
+			
+			// Restore FOV
+			minecraft.options.fov().set(savedFov);
+			
+			// Restore GUI visibility
+			minecraft.options.hideGui = savedHideGui;
+			
+			// Restore render target size
+			RenderTarget mainTarget = minecraft.getMainRenderTarget();
+			mainTarget.resize(savedWidth, savedHeight);
+			
+			// CRITICAL: Call gameRenderer.resize() to reinitialize everything back to normal
+			minecraft.gameRenderer.resize(savedWidth, savedHeight);
+		}
+		
+		/**
+		 * Clean up resources and restore state (called at the very end).
 		 */
 		void cleanup() {
 			try {
-				// Restore render target to original size
-				RenderTarget mainTarget = minecraft.getMainRenderTarget();
-				mainTarget.resize(savedWidth, savedHeight);
-				
-				// Restore gameRenderer to original size (for shader reinitialization)
-				minecraft.gameRenderer.resize(savedWidth, savedHeight);
-				
-				// Restore saved state
-				minecraft.player.setYRot(savedYaw);
-				minecraft.player.setXRot(savedPitch);
-				minecraft.player.setYHeadRot(savedYaw);
-				minecraft.options.fov().set(savedFov);
-				minecraft.options.hideGui = savedHideGui;
+				// Final restore - make sure we're back to normal
+				restoreState(minecraft);
 				
 				LOGGER.info("Panorama capture cleanup complete");
 			} catch (Exception e) {
