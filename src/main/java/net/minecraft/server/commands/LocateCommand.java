@@ -221,11 +221,31 @@ public class LocateCommand {
 		LOGGER.info("[CHAT_STYLE_DEBUG] LocateCommand: Full message to send: '{}'", fullMessage.getString());
 		LOGGER.info("[CHAT_STYLE_DEBUG] LocateCommand: Full message style: {}", fullMessage.getStyle());
 		
-		commandSourceStack.sendSuccess(() -> {
-			Component msg = Component.translatable(string, string2, component, i);
-			LOGGER.info("[CHAT_STYLE_DEBUG] LocateCommand: Sending message via sendSuccess: '{}'", msg.getString());
-			return msg;
-		}, false);
+		// CRITICAL FIX: Resolve the translatable component on the server to preserve styled arguments
+		// Without this, the translatable component is sent raw to the client and styled arguments are lost
+		try {
+			Component resolvedMessage = ComponentUtils.updateForEntity(commandSourceStack, fullMessage, commandSourceStack.getEntity(), 0);
+			LOGGER.info("[CHAT_STYLE_DEBUG] LocateCommand: Resolved message: '{}'", resolvedMessage.getString());
+			LOGGER.info("[CHAT_STYLE_DEBUG] LocateCommand: Resolved message style: {}", resolvedMessage.getStyle());
+			if (!resolvedMessage.getSiblings().isEmpty()) {
+				LOGGER.info("[CHAT_STYLE_DEBUG] LocateCommand: Resolved message has {} siblings", resolvedMessage.getSiblings().size());
+				for (int idx = 0; idx < resolvedMessage.getSiblings().size(); idx++) {
+					Component sibling = resolvedMessage.getSiblings().get(idx);
+					LOGGER.info("[CHAT_STYLE_DEBUG] LocateCommand: Sibling[{}]: '{}', style: {}", idx, sibling.getString(), sibling.getStyle());
+					LOGGER.info("[CHAT_STYLE_DEBUG] LocateCommand: Sibling[{}] color: {}, clickEvent: {}, hoverEvent: {}", 
+						idx, sibling.getStyle().getColor(), sibling.getStyle().getClickEvent(), sibling.getStyle().getHoverEvent());
+				}
+			}
+			
+			commandSourceStack.sendSuccess(() -> {
+				LOGGER.info("[CHAT_STYLE_DEBUG] LocateCommand: Sending resolved message via sendSuccess");
+				return resolvedMessage;
+			}, false);
+		} catch (Exception e) {
+			LOGGER.error("[CHAT_STYLE_DEBUG] LocateCommand: Failed to resolve message", e);
+			// Fallback to original behavior
+			commandSourceStack.sendSuccess(() -> Component.translatable(string, string2, component, i), false);
+		}
 		
 		LOGGER.info("Locating element {} took {} ms", string2, duration.toMillis());
 		return i;
