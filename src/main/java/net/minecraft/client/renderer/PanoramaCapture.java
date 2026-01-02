@@ -20,7 +20,7 @@ import org.slf4j.Logger;
  * Manages panorama capture for creating 6-face cubemaps.
  * Captures one face per frame to minimize hitching.
  * 
- * Integration: Temporarily resizes the main render target to 1024x1024 during capture,
+ * Integration: Temporarily resizes the main render target to PANORAMA_SIZE during capture,
  * allowing normal rendering to produce panorama images at the correct resolution.
  */
 @Environment(EnvType.CLIENT)
@@ -175,7 +175,8 @@ public class PanoramaCapture {
 		}
 		
 		/**
-		 * Prepares for the next face capture. Resizes main render target and sets camera.
+		 * Prepares for the next face capture. Resizes main render target, sets camera,
+		 * and displays progress message to the user.
 		 */
 		void prepareNextFace(Minecraft minecraft) {
 			if (currentFace >= FACE_COUNT) {
