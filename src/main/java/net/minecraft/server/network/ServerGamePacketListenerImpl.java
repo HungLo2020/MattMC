@@ -1899,7 +1899,17 @@ public class ServerGamePacketListenerImpl
 			this.player.inventoryMenu.getSlot(serverboundSetCreativeModeSlotPacket.slotNum()).setByPlayer(itemStack);
 			this.player.inventoryMenu.setRemoteSlot(serverboundSetCreativeModeSlotPacket.slotNum(), itemStack);
 			this.player.inventoryMenu.broadcastChanges();
-			System.out.println("[JEI SERVER DEBUG] Item set successfully");
+			
+			// Force sync to client's current container (inventory screen)
+			this.player.containerMenu.broadcastChanges();
+			// Send the slot update directly to ensure immediate visibility
+			this.send(new net.minecraft.network.protocol.game.ClientboundContainerSetSlotPacket(
+				this.player.containerMenu.containerId,
+				this.player.containerMenu.incrementStateId(),
+				serverboundSetCreativeModeSlotPacket.slotNum(),
+				itemStack
+			));
+			System.out.println("[JEI SERVER DEBUG] Item set successfully and synced to client");
 		} else if (bl && bl3) {
 			System.out.println("[JEI SERVER DEBUG] Dropping item (negative slot)");
 			if (this.dropSpamThrottler.isUnderThreshold()) {
