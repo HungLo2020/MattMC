@@ -205,6 +205,11 @@ public class PanoramaCapture {
 				// Change window size to panorama size (this properly handles all rendering state)
 				minecraft.getWindow().setWindowed(PANORAMA_SIZE, PANORAMA_SIZE);
 				
+				// Ensure the render target is exactly PANORAMA_SIZE x PANORAMA_SIZE
+				// (window decorations or scaling may cause framebuffer to be different size)
+				minecraft.getMainRenderTarget().resize(PANORAMA_SIZE, PANORAMA_SIZE);
+				minecraft.gameRenderer.resize(PANORAMA_SIZE, PANORAMA_SIZE);
+				
 				// Start delay counter
 				delayCounter = 1;
 			}
