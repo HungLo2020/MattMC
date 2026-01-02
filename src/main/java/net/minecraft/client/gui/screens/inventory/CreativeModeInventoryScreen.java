@@ -50,6 +50,7 @@ import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.item.CreativeModeTabs;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.ItemStackLinkedSet;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.TooltipFlag;
 import net.minecraft.world.item.CreativeModeTab.Row;
@@ -104,6 +105,7 @@ public class CreativeModeInventoryScreen extends AbstractContainerScreen<Creativ
 	private static final int TAB_HEIGHT = 32;
 	private static final int SCROLLER_WIDTH = 12;
 	private static final int SCROLLER_HEIGHT = 15;
+	private static final int JEI_SLOT_SIZE = 18;
 	static final SimpleContainer CONTAINER = new SimpleContainer(45);
 	private static final Component TRASH_SLOT_TOOLTIP = Component.translatable("inventory.binSlot");
 	private static CreativeModeTab selectedTab = CreativeModeTabs.getDefaultTab();
@@ -126,7 +128,7 @@ public class CreativeModeInventoryScreen extends AbstractContainerScreen<Creativ
 	private boolean jeiScrolling = false;
 	private int jeiColumns = 0;
 	private int jeiRows = 0;
-	private int jeiSlotSize = 16;
+	private int jeiSlotSize = JEI_SLOT_SIZE;
 	private int jeiPanelX = 0;
 	private int jeiPanelY = 0;
 	private int jeiPanelWidth = 0;
@@ -179,7 +181,7 @@ public class CreativeModeInventoryScreen extends AbstractContainerScreen<Creativ
 
 	private void rebuildJeiItemList() {
 		this.allTabItems.clear();
-		Set<ItemStack> seenItems = new HashSet<>();
+		Set<ItemStack> seenItems = ItemStackLinkedSet.createTypeAndComponentsSet();
 		
 		// Iterate through all tabs in order
 		for (CreativeModeTab tab : CreativeModeTabs.allTabs()) {
@@ -190,20 +192,9 @@ public class CreativeModeInventoryScreen extends AbstractContainerScreen<Creativ
 			
 			// Add items from this tab
 			for (ItemStack item : tab.getDisplayItems()) {
-				if (!item.isEmpty()) {
-					// Check if we've already added this item (by type and components)
-					boolean alreadyAdded = false;
-					for (ItemStack seenItem : seenItems) {
-						if (ItemStack.isSameItemSameComponents(item, seenItem)) {
-							alreadyAdded = true;
-							break;
-						}
-					}
-					
-					if (!alreadyAdded) {
-						this.allTabItems.add(item.copy());
-						seenItems.add(item.copy());
-					}
+				if (!item.isEmpty() && !seenItems.contains(item)) {
+					this.allTabItems.add(item.copy());
+					seenItems.add(item); // Add original item, not copy
 				}
 			}
 		}
@@ -409,12 +400,11 @@ public class CreativeModeInventoryScreen extends AbstractContainerScreen<Creativ
 		int availableWidth = screenWidth - this.jeiPanelX - 10; // Leave 10px margin on right
 		int availableHeight = this.imageHeight;
 		
-		// Calculate slot size based on GUI scale - aim for 18x18 like vanilla but adjust if needed
-		int guiScale = (int)this.minecraft.getWindow().getGuiScale();
-		this.jeiSlotSize = 18; // Standard Minecraft slot size
+		// Use standard Minecraft slot size (18x18)
+		// Could be made dynamic based on GUI scale if needed in the future
+		int slotSpacing = this.jeiSlotSize;
 		
 		// Calculate how many columns and rows we can fit
-		int slotSpacing = this.jeiSlotSize; // Items are this far apart
 		this.jeiColumns = Math.max(1, availableWidth / slotSpacing);
 		this.jeiRows = Math.max(1, (availableHeight - 20) / slotSpacing); // Leave space for scrollbar
 		
@@ -607,7 +597,7 @@ public class CreativeModeInventoryScreen extends AbstractContainerScreen<Creativ
 			return false;
 		}
 		
-		int scrollRow = (int)(this.jeiScrollOffs * maxScroll);
+		int scrollRow = maxScroll > 0 ? (int)(this.jeiScrollOffs * maxScroll) : 0;
 		int startIndex = scrollRow * this.jeiColumns;
 		
 		for (int row = 0; row < this.jeiRows; row++) {
@@ -623,10 +613,8 @@ public class CreativeModeInventoryScreen extends AbstractContainerScreen<Creativ
 				if (mouseX >= x && mouseX < x + 16 && mouseY >= y && mouseY < y + 16) {
 					ItemStack itemStack = this.allTabItems.get(index);
 					if (!itemStack.isEmpty()) {
-						// Set the item in the carried slot (like clicking in creative inventory)
-						if (this.menu.getCarried().isEmpty()) {
-							this.menu.setCarried(itemStack.copyWithCount(itemStack.getMaxStackSize()));
-						}
+						// In creative mode, pick up full stack like in normal creative inventory
+						this.menu.setCarried(itemStack.copyWithCount(itemStack.getMaxStackSize()));
 						return true;
 					}
 				}
@@ -818,12 +806,19 @@ public class CreativeModeInventoryScreen extends AbstractContainerScreen<Creativ
 			return true;
 		} else if (this.jeiScrolling) {
 			// Handle JEI scrollbar dragging
+			if (this.jeiColumns <= 0) {
+				return true; // Prevent division by zero
+			}
+			
 			int scrollbarY = this.jeiPanelY + 2;
 			int scrollbarHeight = this.jeiPanelHeight - 4;
 			int totalRows = (int)Math.ceil((double)this.allTabItems.size() / this.jeiColumns);
 			int thumbHeight = Math.max(15, scrollbarHeight * this.jeiRows / totalRows);
-			this.jeiScrollOffs = ((float)mouseButtonEvent.y() - scrollbarY - thumbHeight / 2.0F) / (scrollbarHeight - thumbHeight);
-			this.jeiScrollOffs = Mth.clamp(this.jeiScrollOffs, 0.0F, 1.0F);
+			int scrollableHeight = scrollbarHeight - thumbHeight;
+			if (scrollableHeight > 0) {
+				this.jeiScrollOffs = ((float)mouseButtonEvent.y() - scrollbarY - thumbHeight * 0.5F) / scrollableHeight;
+				this.jeiScrollOffs = Mth.clamp(this.jeiScrollOffs, 0.0F, 1.0F);
+			}
 			return true;
 		} else {
 			return super.mouseDragged(mouseButtonEvent, d, e);
