@@ -174,11 +174,11 @@ public class PanoramaCapture {
 			// Hide GUI
 			minecraft.options.hideGui = true;
 			
-			// Set framebuffer size directly to ensure exact 1024x1024 render target
-			// We set both window size and framebuffer size to avoid issues with window decorations and DPI scaling
-			minecraft.getWindow().setWindowed(PANORAMA_SIZE, PANORAMA_SIZE);
-			minecraft.getWindow().setWidth(PANORAMA_SIZE);
-			minecraft.getWindow().setHeight(PANORAMA_SIZE);
+			// Set window size with compensation for window decorations
+			// Window decorations (title bar) subtract 21 pixels from height
+			// Request 1024x1045 to get framebuffer of 1024x1024
+			// ONLY using setWindowed() for shader compatibility - no manual setWidth/setHeight
+			minecraft.getWindow().setWindowed(PANORAMA_SIZE, PANORAMA_SIZE + 21);
 			
 			LOGGER.info("Panorama capture initialized: output={}", this.outputFolder.getAbsolutePath());
 		}
@@ -190,12 +190,6 @@ public class PanoramaCapture {
 			if (currentFace >= FACE_COUNT) {
 				return;
 			}
-			
-			// CRITICAL: Reset framebuffer dimensions before each capture
-			// Window decorations can cause the framebuffer to become 1024x1003 instead of 1024x1024
-			// We must set these dimensions every frame to maintain exact 1024x1024
-			minecraft.getWindow().setWidth(PANORAMA_SIZE);
-			minecraft.getWindow().setHeight(PANORAMA_SIZE);
 			
 			// If we haven't set up the camera yet for this face, do it now
 			if (!faceReady && delayCounter == 0) {
