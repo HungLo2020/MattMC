@@ -357,9 +357,12 @@ public class InventoryScreen extends AbstractRecipeBookScreen<InventoryMenu> {
 				if (mouseX >= x && mouseX < x + 16 && mouseY >= y && mouseY < y + 16) {
 					ItemStack itemStack = this.allTabItems.get(index);
 					if (!itemStack.isEmpty() && this.minecraft != null && this.minecraft.player != null) {
+						System.out.println("[JEI DEBUG] Item clicked: " + itemStack.getItem().toString());
+						
 						// Determine how many items to give based on shift key
 						int count = isShiftDown ? itemStack.getMaxStackSize() : 1;
 						ItemStack itemToAdd = itemStack.copyWithCount(count);
+						System.out.println("[JEI DEBUG] Item count to add: " + count);
 						
 						// Find the best slot to place the item using smart stacking/placement logic
 						// This will:
@@ -367,12 +370,17 @@ public class InventoryScreen extends AbstractRecipeBookScreen<InventoryMenu> {
 						// 2. Then find first empty hotbar slot
 						// 3. Finally find first empty inventory slot
 						int targetSlot = this.findBestSlotForItem(itemToAdd);
+						System.out.println("[JEI DEBUG] Target slot: " + targetSlot);
 						
 						if (targetSlot != -1) {
 							// Use the creative mode packet to properly add the item server-side
 							// This ensures persistence across saves and proper placement
 							// Works in both creative and survival modes
+							System.out.println("[JEI DEBUG] Calling handleCreativeModeItemAdd with slot " + targetSlot);
 							this.minecraft.gameMode.handleCreativeModeItemAdd(itemToAdd, targetSlot);
+							System.out.println("[JEI DEBUG] Item added successfully");
+						} else {
+							System.out.println("[JEI DEBUG] ERROR: No valid slot found for item!");
 						}
 						
 						return true;
@@ -397,6 +405,7 @@ public class InventoryScreen extends AbstractRecipeBookScreen<InventoryMenu> {
 	 */
 	private int findBestSlotForItem(ItemStack itemStack) {
 		if (this.minecraft == null || this.minecraft.player == null) {
+			System.out.println("[JEI DEBUG] findBestSlotForItem: minecraft or player is null");
 			return -1;
 		}
 		
@@ -406,26 +415,37 @@ public class InventoryScreen extends AbstractRecipeBookScreen<InventoryMenu> {
 		// First, try to find an existing stack with remaining space
 		// This returns an inventory index (0-35 or 40 for offhand)
 		int slotWithSpace = inventory.getSlotWithRemainingSpace(itemStack);
+		System.out.println("[JEI DEBUG] getSlotWithRemainingSpace returned: " + slotWithSpace);
 		if (slotWithSpace != -1) {
 			// Convert inventory index to container slot index
 			int containerSlot = inventoryIndexToContainerSlot(slotWithSpace);
-			if (containerSlot >= 9) { // Only use valid inventory slots (not crafting/armor)
+			System.out.println("[JEI DEBUG] Converted inventory index " + slotWithSpace + " to container slot " + containerSlot);
+			if (containerSlot != -1 && containerSlot >= 9) { // Only use valid inventory slots (not crafting/armor)
+				System.out.println("[JEI DEBUG] Using slot with space: " + containerSlot);
 				return containerSlot;
+			} else {
+				System.out.println("[JEI DEBUG] Slot with space rejected (containerSlot=" + containerSlot + ")");
 			}
 		}
 		
 		// If no existing stack, find first empty slot
 		// Prioritize hotbar (0-8) over main inventory (9-35)
 		int freeSlot = inventory.getFreeSlot();
+		System.out.println("[JEI DEBUG] getFreeSlot returned: " + freeSlot);
 		if (freeSlot != -1) {
 			// Convert inventory index to container slot index
 			int containerSlot = inventoryIndexToContainerSlot(freeSlot);
-			if (containerSlot >= 9) { // Only use valid inventory slots (not crafting/armor)
+			System.out.println("[JEI DEBUG] Converted inventory index " + freeSlot + " to container slot " + containerSlot);
+			if (containerSlot != -1 && containerSlot >= 9) { // Only use valid inventory slots (not crafting/armor)
+				System.out.println("[JEI DEBUG] Using free slot: " + containerSlot);
 				return containerSlot;
+			} else {
+				System.out.println("[JEI DEBUG] Free slot rejected (containerSlot=" + containerSlot + ")");
 			}
 		}
 		
 		// No space available
+		System.out.println("[JEI DEBUG] No space available, returning -1");
 		return -1;
 	}
 	
@@ -438,17 +458,23 @@ public class InventoryScreen extends AbstractRecipeBookScreen<InventoryMenu> {
 	 * - 40: Offhand → Container 45
 	 */
 	private int inventoryIndexToContainerSlot(int inventoryIndex) {
+		System.out.println("[JEI DEBUG] inventoryIndexToContainerSlot called with index: " + inventoryIndex);
 		if (inventoryIndex >= 0 && inventoryIndex <= 8) {
 			// Hotbar: inventory 0-8 → container 36-44
-			return inventoryIndex + 36;
+			int result = inventoryIndex + 36;
+			System.out.println("[JEI DEBUG] Hotbar conversion: " + inventoryIndex + " -> " + result);
+			return result;
 		} else if (inventoryIndex >= 9 && inventoryIndex <= 35) {
 			// Main inventory: stays the same
+			System.out.println("[JEI DEBUG] Main inventory conversion: " + inventoryIndex + " -> " + inventoryIndex);
 			return inventoryIndex;
 		} else if (inventoryIndex == 40) {
 			// Offhand: inventory 40 → container 45
+			System.out.println("[JEI DEBUG] Offhand conversion: 40 -> 45");
 			return 45;
 		}
 		// Invalid index
+		System.out.println("[JEI DEBUG] Invalid inventory index: " + inventoryIndex + ", returning -1");
 		return -1;
 	}
 	
