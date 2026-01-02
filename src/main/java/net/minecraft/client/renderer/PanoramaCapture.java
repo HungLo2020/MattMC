@@ -174,7 +174,14 @@ public class PanoramaCapture {
 			// Hide GUI
 			minecraft.options.hideGui = true;
 			
-			// Resize window - request slightly larger to compensate for decorations  
+			// IMPORTANT: First ensure we're in windowed mode (not fullscreen)
+			// This ensures window decorations are applied consistently
+			if (minecraft.getWindow().isFullscreen()) {
+				minecraft.getWindow().toggleFullScreen();
+			}
+			
+			// Now resize the windowed mode window
+			// Request slightly larger to compensate for title bar decorations  
 			// Title bar typically takes 21-23 pixels, so we request 1024x1045
 			// This should give us close to 1024x1024 after decorations
 			// Uses standard window resize for shader compatibility
