@@ -45,8 +45,8 @@ public interface FormattedText {
 			}
 
 			@Override
-			public <T> Optional<T> visit(FormattedText.StyledContentConsumer<T> styledContentConsumer, Style style) {
-				return styledContentConsumer.accept(style.applyTo(style), string);
+			public <T> Optional<T> visit(FormattedText.StyledContentConsumer<T> styledContentConsumer, Style parentStyle) {
+				return styledContentConsumer.accept(style.applyTo(parentStyle), string);
 			}
 		};
 	}
