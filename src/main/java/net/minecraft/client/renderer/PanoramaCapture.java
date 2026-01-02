@@ -179,6 +179,7 @@ public class PanoramaCapture {
 		/**
 		 * Prepares for the next face capture. Sets camera and displays progress.
 		 * Uses /tp command to set rotation while game is in normal rendering mode.
+		 * Resizes window to 1024x1024 and back before each capture to refresh shader state.
 		 */
 		void prepareNextFace(Minecraft minecraft) {
 			if (currentFace >= FACE_COUNT) {
@@ -192,6 +193,13 @@ public class PanoramaCapture {
 					Component.literal("Capturing panorama... (" + (currentFace + 1) + "/" + FACE_COUNT + ")")
 						.withStyle(ChatFormatting.YELLOW)
 				);
+				
+				// CRITICAL: Resize window to 1024x1024 and back to refresh shader state
+				// This ensures rendering pipeline is properly initialized for each face
+				// Window resizing triggered shader rebuilds that made captures work correctly
+				minecraft.getWindow().setWindowed(PANORAMA_SIZE, PANORAMA_SIZE);
+				// Let it settle for a frame, then restore
+				minecraft.getWindow().setWindowed(savedWidth, savedHeight);
 				
 				// Get the face index for proper ordering
 				int faceIndex = FACE_INDICES[currentFace];
