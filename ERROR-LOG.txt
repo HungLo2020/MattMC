@@ -2,8 +2,8 @@
 > Configure project :
 ✓ Using bundled dependencies from libraries/deps/
   Run './libraries/download-dependencies.sh' to update bundled dependencies
-Path for java installation '/usr/lib/jvm/openjdk-17' (Common Linux Locations) does not contain a java executable
 Path for java installation '/usr/lib/jvm/openjdk-21' (Common Linux Locations) does not contain a java executable
+Path for java installation '/usr/lib/jvm/openjdk-17' (Common Linux Locations) does not contain a java executable
 
 > Task :clean
 > Task :downloadJdk SKIPPED
@@ -41,51 +41,51 @@ Note: Recompile with -Xlint:unchecked for details.
 
 > Task :runClient
 Using bundled JDK from: /home/matt/Documents/Repos/MattMC/run/jdk-21
-[15:31:04] [main/WARN]: Class path entries reference missing files: /home/matt/Documents/Repos/MattMC/libraries/deps/text2speech-1.17.9.jar - the game may not load properly!
-[15:31:04] [main/INFO]: Detected integrated source mode - using Fabric Loader code source as game jar: /home/matt/Documents/Repos/MattMC/build/libs/MattMC-1.21.10.jar
-[15:31:04] [main/INFO]: Loading Minecraft 1.21.10 with Fabric Loader 0.18.2
-[15:31:04] [main/INFO]: Mappings not present!
-[15:31:04] [main/INFO]: Loading 3 mods:
+[15:38:57] [main/WARN]: Class path entries reference missing files: /home/matt/Documents/Repos/MattMC/libraries/deps/text2speech-1.17.9.jar - the game may not load properly!
+[15:38:57] [main/INFO]: Detected integrated source mode - using Fabric Loader code source as game jar: /home/matt/Documents/Repos/MattMC/build/libs/MattMC-1.21.10.jar
+[15:38:57] [main/INFO]: Loading Minecraft 1.21.10 with Fabric Loader 0.18.2
+[15:38:57] [main/INFO]: Mappings not present!
+[15:38:57] [main/INFO]: Loading 3 mods:
 	- java 21
 	- mattmc 1.21.10
 	- minecraft 1.21.10
-[15:31:04] [main/INFO]: Mixin system bypassed - all mixins converted to hook-based architecture
-[15:31:04] [main/INFO]: Mixin transformation disabled - using hook-based architecture
-[15:31:04] [main/INFO]: Searching for graphics cards...
-[15:31:04] [main/INFO]: Found graphics adapter: LinuxPciAdapterInfo[vendor=NVIDIA, name=GA102 [GeForce RTX 3080 Ti], pciVendorId=0x10de, pciDeviceId=0x2208]
-[15:31:04] [main/WARN]: Sodium has applied one or more workarounds to prevent crashes or other issues on your system: [NVIDIA_THREADED_OPTIMIZATIONS_BROKEN]
-[15:31:04] [main/WARN]: This is not necessarily an issue, but it may result in certain features or optimizations being disabled. You can sometimes fix these issues by upgrading your graphics driver.
-[15:31:05] [Datafixer Bootstrap/INFO]: 279 Datafixer optimizations took 191 milliseconds
-[15:31:07] [Render thread/INFO]: Setting user: Player966
-[15:31:07] [Render thread/INFO]: Initializing Distant Horizons client, firing DhApiBeforeDhInitEvent...
-[15:31:07] [Render thread/INFO]: Running library validation...
-[15:31:07] [Render thread/INFO]: Garbage collectors: [ZGC Minor Cycles, ZGC Minor Pauses, ZGC Major Cycles, ZGC Major Pauses]
-[15:31:07] [Render thread/INFO]: Distant Horizons, Version: 2.4.4-b
-[15:31:07] [Render thread/INFO]: Registering Fabric Client Events
-[15:31:07] [Render thread/INFO]: Registering Distant Horizons hooks
-[15:31:07] [Render thread/INFO]: [DH-EVENTS] ========== REGISTERING FABRIC SERVER EVENTS ==========
-[15:31:07] [Render thread/INFO]: [DH-EVENTS] isDedicatedServer: false
-[15:31:07] [Render thread/INFO]: [DH-EVENTS] Thread: Render thread (ID: 1)
-[15:31:07] [Render thread/INFO]: [DH-EVENTS] Registering SERVER_STARTING event...
-[15:31:07] [Render thread/INFO]: [DH-EVENTS] Registering SERVER_STOPPED event...
-[15:31:07] [Render thread/INFO]: [DH-EVENTS] Registering ServerWorldEvents.LOAD event...
-[15:31:07] [Render thread/INFO]: [DH-EVENTS] Registering ServerWorldEvents.UNLOAD event...
-[15:31:07] [Render thread/INFO]: [DH-EVENTS] Registering ServerChunkEvents.CHUNK_LOAD event...
-[15:31:07] [Render thread/INFO]: [DH-EVENTS] Registering ServerPlayConnectionEvents.JOIN event...
-[15:31:07] [Render thread/INFO]: [DH-EVENTS] Registering ServerPlayConnectionEvents.DISCONNECT event...
-[15:31:07] [Render thread/INFO]: [DH-EVENTS] Registering ServerEntityWorldChangeEvents.AFTER_PLAYER_CHANGE_WORLD event...
-[15:31:07] [Render thread/INFO]: [DH-EVENTS] Registering packet handlers...
-[15:31:07] [Render thread/INFO]: [DH-EVENTS] ========== FABRIC SERVER EVENTS REGISTERED ==========
-[15:31:07] [Render thread/INFO]: Registered mod compatibility accessor for: [Sodium-Fabric].
-[15:31:07] [Render thread/INFO]: Skipping mod compatibility accessor for: [starlight]
-[15:31:07] [Render thread/INFO]: Skipping mod compatibility accessor for: [optifine]
-[15:31:07] [Render thread/INFO]: Skipping mod compatibility accessor for: [bclib]
-[15:31:07] [Render thread/INFO]: Skipping mod compatibility accessor for: [c2me]
-[15:31:07] [Render thread/INFO]: Registered mod compatibility accessor for: [iris].
-[15:31:07] [Render thread/INFO]: Initialising config for [DistantHorizons]
-[15:31:07] [Render thread/INFO]: [DistantHorizons] Config initialised
-[15:31:07] [Render thread/INFO]: Applying config to loggers
-[15:31:07] [Render thread/INFO]: Distant Horizons client Initialized.
+[15:38:57] [main/INFO]: Mixin system bypassed - all mixins converted to hook-based architecture
+[15:38:57] [main/INFO]: Mixin transformation disabled - using hook-based architecture
+[15:38:57] [main/INFO]: Searching for graphics cards...
+[15:38:57] [main/INFO]: Found graphics adapter: LinuxPciAdapterInfo[vendor=NVIDIA, name=GA102 [GeForce RTX 3080 Ti], pciVendorId=0x10de, pciDeviceId=0x2208]
+[15:38:57] [main/WARN]: Sodium has applied one or more workarounds to prevent crashes or other issues on your system: [NVIDIA_THREADED_OPTIMIZATIONS_BROKEN]
+[15:38:57] [main/WARN]: This is not necessarily an issue, but it may result in certain features or optimizations being disabled. You can sometimes fix these issues by upgrading your graphics driver.
+[15:38:58] [Datafixer Bootstrap/INFO]: 279 Datafixer optimizations took 199 milliseconds
+[15:39:00] [Render thread/INFO]: Setting user: Player901
+[15:39:00] [Render thread/INFO]: Initializing Distant Horizons client, firing DhApiBeforeDhInitEvent...
+[15:39:00] [Render thread/INFO]: Running library validation...
+[15:39:00] [Render thread/INFO]: Garbage collectors: [ZGC Minor Cycles, ZGC Minor Pauses, ZGC Major Cycles, ZGC Major Pauses]
+[15:39:00] [Render thread/INFO]: Distant Horizons, Version: 2.4.4-b
+[15:39:00] [Render thread/INFO]: Registering Fabric Client Events
+[15:39:00] [Render thread/INFO]: Registering Distant Horizons hooks
+[15:39:00] [Render thread/INFO]: [DH-EVENTS] ========== REGISTERING FABRIC SERVER EVENTS ==========
+[15:39:00] [Render thread/INFO]: [DH-EVENTS] isDedicatedServer: false
+[15:39:00] [Render thread/INFO]: [DH-EVENTS] Thread: Render thread (ID: 1)
+[15:39:00] [Render thread/INFO]: [DH-EVENTS] Registering SERVER_STARTING event...
+[15:39:00] [Render thread/INFO]: [DH-EVENTS] Registering SERVER_STOPPED event...
+[15:39:00] [Render thread/INFO]: [DH-EVENTS] Registering ServerWorldEvents.LOAD event...
+[15:39:00] [Render thread/INFO]: [DH-EVENTS] Registering ServerWorldEvents.UNLOAD event...
+[15:39:00] [Render thread/INFO]: [DH-EVENTS] Registering ServerChunkEvents.CHUNK_LOAD event...
+[15:39:00] [Render thread/INFO]: [DH-EVENTS] Registering ServerPlayConnectionEvents.JOIN event...
+[15:39:00] [Render thread/INFO]: [DH-EVENTS] Registering ServerPlayConnectionEvents.DISCONNECT event...
+[15:39:00] [Render thread/INFO]: [DH-EVENTS] Registering ServerEntityWorldChangeEvents.AFTER_PLAYER_CHANGE_WORLD event...
+[15:39:00] [Render thread/INFO]: [DH-EVENTS] Registering packet handlers...
+[15:39:00] [Render thread/INFO]: [DH-EVENTS] ========== FABRIC SERVER EVENTS REGISTERED ==========
+[15:39:00] [Render thread/INFO]: Registered mod compatibility accessor for: [Sodium-Fabric].
+[15:39:00] [Render thread/INFO]: Skipping mod compatibility accessor for: [starlight]
+[15:39:00] [Render thread/INFO]: Skipping mod compatibility accessor for: [optifine]
+[15:39:00] [Render thread/INFO]: Skipping mod compatibility accessor for: [bclib]
+[15:39:00] [Render thread/INFO]: Skipping mod compatibility accessor for: [c2me]
+[15:39:00] [Render thread/INFO]: Registered mod compatibility accessor for: [iris].
+[15:39:00] [Render thread/INFO]: Initialising config for [DistantHorizons]
+[15:39:00] [Render thread/INFO]: [DistantHorizons] Config initialised
+[15:39:00] [Render thread/INFO]: Applying config to loggers
+[15:39:00] [Render thread/INFO]: Distant Horizons client Initialized.
 [LWJGL] Version: 3.3.3-snapshot
 	 OS: Linux v6.14.0-37-generic
 	JRE: Linux amd64 21.0.5
@@ -96,17 +96,17 @@ Using bundled JDK from: /home/matt/Documents/Repos/MattMC/run/jdk-21
 [LWJGL] Loading library: glfw
 	Module: org.lwjgl.glfw
 	Loaded from org.lwjgl.librarypath: /tmp/lwjgl_matt/3.3.3-snapshot/x64/libglfw.so
-[15:31:07] [Render thread/INFO]: Queuing DH event binding...
-[15:31:07] [Render thread/INFO]: Backend library: LWJGL version 3.3.3-snapshot
+[15:39:00] [Render thread/INFO]: Queuing DH event binding...
+[15:39:00] [Render thread/INFO]: Backend library: LWJGL version 3.3.3-snapshot
 [LWJGL] Loading library: jemalloc
 	Module: org.lwjgl.jemalloc
 	Loaded from org.lwjgl.librarypath: /tmp/lwjgl_matt/3.3.3-snapshot/x64/libjemalloc.so
 [LWJGL] MemoryUtil allocator: JEmallocAllocator
 [LWJGL] Java 9 check intrinsics enabled
 [LWJGL] Closure Registry: ConcurrentHashMap
-[15:31:07] [DH-Manual-Event-Trigger/INFO]: DH Ready, binding Iris event handlers...
-[15:31:07] [DH-Manual-Event-Trigger/INFO]: DH Iris events bound.
-[15:31:07] [Render thread/INFO]: Modifying process environment to apply workarounds for the NVIDIA graphics driver...
+[15:39:00] [Render thread/INFO]: Modifying process environment to apply workarounds for the NVIDIA graphics driver...
+[15:39:00] [DH-Manual-Event-Trigger/INFO]: DH Ready, binding Iris event handlers...
+[15:39:00] [DH-Manual-Event-Trigger/INFO]: DH Iris events bound.
 [LWJGL] Loading JNI library: lwjgl_stb
 	Module: org.lwjgl.stb
 	Loaded from org.lwjgl.librarypath: /tmp/lwjgl_matt/3.3.3-snapshot/x64/liblwjgl_stb.so
@@ -119,683 +119,683 @@ Using bundled JDK from: /home/matt/Documents/Repos/MattMC/run/jdk-21
 [LWJGL] Java 9 text decoding enabled
 	Loaded from system paths: /lib/x86_64-linux-gnu/libGLX.so.0
 [LWJGL] Java 10 multiplyHigh enabled
-[15:31:08] [Render thread/INFO]: OpenGL Vendor: NVIDIA Corporation
-[15:31:08] [Render thread/INFO]: OpenGL Renderer: NVIDIA GeForce RTX 3080 Ti/PCIe/SSE2
-[15:31:08] [Render thread/INFO]: OpenGL Version: 3.3.0 NVIDIA 580.95.05
-[15:31:08] [Render thread/INFO]: Modifying OpenGL context to apply workarounds for the NVIDIA graphics driver...
-[15:31:08] [Render thread/INFO]: Debug functionality is disabled.
-[15:31:08] [Render thread/INFO]: ARB_direct_state_access detected, enabling DSA.
-[15:31:08] [Render thread/INFO]: Using optional rendering extensions: GL_ARB_buffer_storage, GL_KHR_debug, GL_ARB_vertex_attrib_binding, GL_ARB_direct_state_access
-[15:31:08] [Render thread/INFO]: Loaded 20 skins (0 custom)
+[15:39:01] [Render thread/INFO]: OpenGL Vendor: NVIDIA Corporation
+[15:39:01] [Render thread/INFO]: OpenGL Renderer: NVIDIA GeForce RTX 3080 Ti/PCIe/SSE2
+[15:39:01] [Render thread/INFO]: OpenGL Version: 3.3.0 NVIDIA 580.95.05
+[15:39:01] [Render thread/INFO]: Modifying OpenGL context to apply workarounds for the NVIDIA graphics driver...
+[15:39:01] [Render thread/INFO]: Debug functionality is disabled.
+[15:39:01] [Render thread/INFO]: ARB_direct_state_access detected, enabling DSA.
+[15:39:01] [Render thread/INFO]: Using optional rendering extensions: GL_ARB_buffer_storage, GL_KHR_debug, GL_ARB_vertex_attrib_binding, GL_ARB_direct_state_access
+[15:39:01] [Render thread/INFO]: Loaded 20 skins (0 custom)
 [LWJGL] Loading library: openal
 	Module: org.lwjgl.openal
 	Loaded from org.lwjgl.librarypath: /tmp/lwjgl_matt/3.3.3-snapshot/x64/libopenal.so
 [LWJGL] [ALC] ALC_SOFT_reopen_device was reported as available but an entry point is missing.
-[15:31:08] [Render thread/INFO]: Hardware information:
-[15:31:08] [Render thread/INFO]: CPU: 20x 12th Gen Intel(R) Core(TM) i7-12700K
-[15:31:08] [Render thread/INFO]: GPU: NVIDIA GeForce RTX 3080 Ti/PCIe/SSE2 (Supports OpenGL 3.3.0 NVIDIA 580.95.05)
-[15:31:08] [Render thread/INFO]: OS: Linux (6.14.0-37-generic)
+[15:39:01] [Render thread/INFO]: Hardware information:
+[15:39:01] [Render thread/INFO]: CPU: 20x 12th Gen Intel(R) Core(TM) i7-12700K
+[15:39:01] [Render thread/INFO]: GPU: NVIDIA GeForce RTX 3080 Ti/PCIe/SSE2 (Supports OpenGL 3.3.0 NVIDIA 580.95.05)
+[15:39:01] [Render thread/INFO]: OS: Linux (6.14.0-37-generic)
 [LWJGL] Java 16 memcpy enabled
-[15:31:08] [Render thread/INFO]: Reloading ResourceManager: vanilla
-[15:31:08] [Worker-Main-18/INFO]: Found unifont_pua-16.0.03.hex, loading
-[15:31:08] [Worker-Main-5/INFO]: Found unifont_all_no_pua-16.0.03.hex, loading
-[15:31:08] [Worker-Main-13/INFO]: Found unifont_jp_patch-16.0.03.hex, loading
-[15:31:09] [Render thread/INFO]: Profile: MATTMC (+0 options changed by user)
-[15:31:09] [Render thread/INFO]: Using shaderpack: ComplementaryHungLoIfied.zip
-[15:31:09] [Render thread/INFO]: OpenAL initialized on device HT-S350
-[15:31:09] [Render thread/INFO]: Sound engine started
-[15:31:09] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/particles.png-atlas
-[15:31:09] [Render thread/INFO]: Created: 128x64x0 minecraft:textures/atlas/decorated_pot.png-atlas
-[15:31:09] [Render thread/INFO]: Created: 2048x1024x0 minecraft:textures/atlas/armor_trims.png-atlas
-[15:31:09] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/paintings.png-atlas
-[15:31:09] [Render thread/INFO]: Created: 512x512x0 minecraft:textures/atlas/shield_patterns.png-atlas
-[15:31:09] [Render thread/INFO]: Created: 1024x512x4 minecraft:textures/atlas/blocks.png-atlas
-[15:31:09] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/chest.png-atlas
-[15:31:09] [Render thread/INFO]: Created: 512x512x0 minecraft:textures/atlas/banner_patterns.png-atlas
-[15:31:09] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/beds.png-atlas
-[15:31:09] [Render thread/INFO]: Created: 1024x512x0 minecraft:textures/atlas/gui.png-atlas
-[15:31:09] [Render thread/INFO]: Created: 64x64x0 minecraft:textures/atlas/map_decorations.png-atlas
-[15:31:09] [Render thread/INFO]: Created: 256x256x0 minecraft:textures/atlas/signs.png-atlas
-[15:31:09] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/shulker_boxes.png-atlas
-[15:31:09] [Render thread/INFO]: Auto-updater has been disabled - no update checks will be performed
-[15:31:09] [Render thread/INFO]: Creating pipeline for dimension minecraft:overworld
-[15:31:10] [Render thread/WARN]: Type is VERTEX
-[15:31:10] [Render thread/WARN]: Type is FRAGMENT
-[15:31:10] [Render thread/INFO]: [DH-SHADER-UNIFORMS] Program: dh_terrain
-[15:31:10] [Render thread/INFO]: [DH-SHADER-UNIFORMS] dhProjection uniform location: -1
-[15:31:10] [Render thread/INFO]: [DH-SHADER-UNIFORMS] dhProjectionInverse uniform location: 3
-[15:31:10] [Render thread/INFO]: [DH-SHADER-UNIFORMS] iris_ProjectionMatrix uniform location: 19
-[15:31:10] [Render thread/INFO]: [DH-SHADER-UNIFORMS] iris_ProjectionMatrixInverse uniform location: -1
-[15:31:10] [Render thread/WARN]: Type is VERTEX
-[15:31:10] [Render thread/WARN]: Type is FRAGMENT
-[15:31:10] [Render thread/INFO]: [DH-SHADER-UNIFORMS-GENERIC] Program: dh_terrain_g
-[15:31:10] [Render thread/INFO]: [DH-SHADER-UNIFORMS-GENERIC] dhProjection uniform location: -1
-[15:31:10] [Render thread/INFO]: [DH-SHADER-UNIFORMS-GENERIC] dhProjectionInverse uniform location: 3
-[15:31:10] [Render thread/INFO]: [DH-SHADER-UNIFORMS-GENERIC] iris_ProjectionMatrix uniform location: 19
-[15:31:10] [Render thread/INFO]: [DH-SHADER-UNIFORMS-GENERIC] iris_ProjectionMatrixInverse uniform location: -1
-[15:31:10] [Render thread/WARN]: Type is VERTEX
-[15:31:10] [Render thread/WARN]: Type is FRAGMENT
-[15:31:10] [Render thread/INFO]: [DH-SHADER-UNIFORMS] Program: dh_water
-[15:31:10] [Render thread/INFO]: [DH-SHADER-UNIFORMS] dhProjection uniform location: 7
-[15:31:10] [Render thread/INFO]: [DH-SHADER-UNIFORMS] dhProjectionInverse uniform location: 8
-[15:31:10] [Render thread/INFO]: [DH-SHADER-UNIFORMS] iris_ProjectionMatrix uniform location: 33
-[15:31:10] [Render thread/INFO]: [DH-SHADER-UNIFORMS] iris_ProjectionMatrixInverse uniform location: -1
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in basic
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in basic
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in basic
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in basic
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in basic_color
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in basic_color
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in basic_color
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in basic_color
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in textured
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in textured
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in textured
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in textured
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in textured_color
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in textured_color
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in textured_color
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in textured_color
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in sps
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in sps
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in sps
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in sps
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in sky_basic
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in sky_basic
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in sky_basic
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in sky_basic
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in sky_basic_color
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in sky_basic_color
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in sky_basic_color
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in sky_basic_color
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in sky_textured
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in sky_textured
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in sky_textured
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in sky_textured
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in sky_textured_color
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in sky_textured_color
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in sky_textured_color
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in sky_textured_color
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_CloudInfo in clouds
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in clouds
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in clouds
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in clouds
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in clouds
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in clouds_sodium
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in clouds_sodium
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in clouds_sodium
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in clouds_sodium
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in terrain_solid
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in terrain_solid
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in terrain_solid
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in terrain_solid
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in terrain_cutout
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in terrain_cutout
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in terrain_cutout
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in terrain_cutout
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in terrain_translucent
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in terrain_translucent
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in terrain_translucent
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in terrain_translucent
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in moving_block
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in moving_block
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in moving_block
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in moving_block
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in entities_alpha
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in entities_alpha
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in entities_alpha
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in entities_alpha
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in entities_solid
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in entities_solid
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in entities_solid
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in entities_solid
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in entities_solid_diffuse
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in entities_solid_diffuse
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in entities_solid_diffuse
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in entities_solid_diffuse
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in entities_solid_bright
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in entities_solid_bright
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in entities_solid_bright
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in entities_solid_bright
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in entities_cutout
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in entities_cutout
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in entities_cutout
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in entities_cutout
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in entities_cutout_diffuse
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in entities_cutout_diffuse
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in entities_cutout_diffuse
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in entities_cutout_diffuse
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in entities_translucent
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in entities_translucent
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in entities_translucent
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in entities_translucent
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in entities_eyes
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in entities_eyes
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in entities_eyes
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in entities_eyes
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in entities_eyes_trans
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in entities_eyes_trans
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in entities_eyes_trans
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in entities_eyes_trans
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in hand_cutout
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in hand_cutout
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in hand_cutout
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in hand_cutout
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in hand_cutout_bright
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in hand_cutout_bright
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in hand_cutout_bright
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in hand_cutout_bright
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in hand_cutout_diffuse
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in hand_cutout_diffuse
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in hand_cutout_diffuse
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in hand_cutout_diffuse
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in hand_text
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in hand_text
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in hand_text
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in hand_text
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in hand_text_intensity
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in hand_text_intensity
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in hand_text_intensity
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in hand_text_intensity
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in hand_translucent
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in hand_translucent
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in hand_translucent
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in hand_translucent
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in hand_water_bright
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in hand_water_bright
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in hand_water_bright
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in hand_water_bright
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in hand_water_diffuse
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in hand_water_diffuse
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in hand_water_diffuse
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in hand_water_diffuse
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in lightning
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in lightning
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in lightning
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in lightning
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in leash
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in leash
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in leash
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in leash
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in text_bg
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in text_bg
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in text_bg
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in text_bg
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in particles
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in particles
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in particles
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in particles
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in particles_trans
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in particles_trans
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in particles_trans
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in particles_trans
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in weather
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in weather
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in weather
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in weather
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in crumbling
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in crumbling
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in crumbling
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in crumbling
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in text
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in text
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in text
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in text
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in text_intensity
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in text_intensity
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in text_intensity
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in text_intensity
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in text_be
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in text_be
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in text_be
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in text_be
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in text_intensity_be
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in text_intensity_be
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in text_intensity_be
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in text_intensity_be
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in block_entity
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in block_entity
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in block_entity
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in block_entity
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in block_entity_bright
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in block_entity_bright
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in block_entity_bright
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in block_entity_bright
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in block_entity_diffuse
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in block_entity_diffuse
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in block_entity_diffuse
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in block_entity_diffuse
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in be_translucent
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in be_translucent
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in be_translucent
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in be_translucent
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in beacon
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in beacon
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in beacon
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in beacon
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in glint
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in glint
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in glint
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in glint
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in lines
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in lines
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in lines
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in lines
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in ie_compat
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in ie_compat
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in ie_compat
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in ie_compat
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in mekanism_flame
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in mekanism_flame
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in mekanism_flame
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in mekanism_flame
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in shadow_terrain_cutout
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in shadow_terrain_cutout
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in shadow_terrain_cutout
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in shadow_terrain_cutout
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in shadow_translucent
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in shadow_translucent
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in shadow_translucent
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in shadow_translucent
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in shadow_entities_cutout
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in shadow_entities_cutout
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in shadow_entities_cutout
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in shadow_entities_cutout
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in shadow_block
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in shadow_block
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in shadow_block
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in shadow_block
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in shadow_beacon_beam
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in shadow_beacon_beam
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in shadow_beacon_beam
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in shadow_beacon_beam
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in shadow_basic
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in shadow_basic
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in shadow_basic
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in shadow_basic
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in shadow_basic_color
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in shadow_basic_color
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in shadow_basic_color
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in shadow_basic_color
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in shadow_tex
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in shadow_tex
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in shadow_tex
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in shadow_tex
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in shadow_tex_color
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in shadow_tex_color
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in shadow_tex_color
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in shadow_tex_color
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in shadow_clouds
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in shadow_clouds
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in shadow_clouds
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in shadow_clouds
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in shadow_lines
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in shadow_lines
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in shadow_lines
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in shadow_lines
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in shadow_leash
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in shadow_leash
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in shadow_leash
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in shadow_leash
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in shadow_lightning
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in shadow_lightning
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in shadow_lightning
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in shadow_lightning
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in shadow_particles
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in shadow_particles
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in shadow_particles
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in shadow_particles
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in shadow_text
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in shadow_text
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in shadow_text
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in shadow_text
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in shadow_text_bg
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in shadow_text_bg
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in shadow_text_bg
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in shadow_text_bg
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in shadow_text_intensity
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in shadow_text_intensity
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in shadow_text_intensity
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in shadow_text_intensity
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in ie_compat_shadow
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in ie_compat_shadow
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in ie_compat_shadow
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in ie_compat_shadow
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in mekanism_flame_shadow
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in mekanism_flame_shadow
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in mekanism_flame_shadow
-[15:31:11] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in mekanism_flame_shadow
-[15:31:15] [Render thread/INFO]: Loaded 1461 recipes
-[15:31:15] [Render thread/INFO]: Loaded 1574 advancements
-[15:31:15] [Server thread/INFO]: Started DhWorld of type CLIENT_SERVER
-[15:31:15] [Server thread/INFO]: Starting integrated minecraft server version 1.21.10
-[15:31:15] [Server thread/INFO]: Generating keypair
-[15:31:15] [DH-Full Data Migration Thread[0]/INFO]: No migration necessary.
-[15:31:15] [Server thread/INFO]: Started DhClientServerLevel for [Wrapped{ServerLevel[New World]@minecraft:overworld}] at [[LocalSaveStructure@(/home/matt/Documents/Repos/MattMC/run/saves/New World/data)]].
-[15:31:15] [DH-Full Data Migration Thread[0]/INFO]: No migration necessary.
-[15:31:15] [Server thread/INFO]: Started DhClientServerLevel for [Wrapped{ServerLevel[New World]@minecraft:primordial_caves}] at [[LocalSaveStructure@(/home/matt/Documents/Repos/MattMC/run/saves/New World/data;/home/matt/Documents/Repos/MattMC/run/saves/New World/dimensions/minecraft/primordial_caves/data)]].
-[15:31:15] [DH-Full Data Migration Thread[0]/INFO]: No migration necessary.
-[15:31:15] [Server thread/INFO]: Started DhClientServerLevel for [Wrapped{ServerLevel[New World]@minecraft:the_nether}] at [[LocalSaveStructure@(/home/matt/Documents/Repos/MattMC/run/saves/New World/DIM-1/data;/home/matt/Documents/Repos/MattMC/run/saves/New World/data;/home/matt/Documents/Repos/MattMC/run/saves/New World/dimensions/minecraft/primordial_caves/data)]].
-[15:31:15] [DH-Full Data Migration Thread[0]/INFO]: No migration necessary.
-[15:31:15] [Server thread/INFO]: Started DhClientServerLevel for [Wrapped{ServerLevel[New World]@minecraft:the_end}] at [[LocalSaveStructure@(/home/matt/Documents/Repos/MattMC/run/saves/New World/DIM-1/data;/home/matt/Documents/Repos/MattMC/run/saves/New World/DIM1/data;/home/matt/Documents/Repos/MattMC/run/saves/New World/data;/home/matt/Documents/Repos/MattMC/run/saves/New World/dimensions/minecraft/primordial_caves/data)]].
-[15:31:15] [Server thread/INFO]: Loading 0 persistent chunks...
-[15:31:16] [Server thread/INFO]: Loading 49 chunks for player spawn...
-[15:31:16] [Server thread/INFO]: Preparing spawn area: 16%
-[15:31:16] [Server thread/INFO]: Preparing spawn area: 100%
-[15:31:16] [Server thread/INFO]: Time elapsed: 511 ms
-[15:31:16] [Server thread/INFO]: Player966[local:E:bf42d6d6] logged in with entity id 92 at (468.75893549121264, 63.63093690827396, 883.1699125096536)
-[15:31:16] [Render thread/INFO]: Reloading pipeline on dimension change: minecraft:overworld => minecraft:overworld
-[15:31:16] [Render thread/INFO]: Destroying pipeline minecraft:overworld
-[15:31:16] [Server thread/INFO]: Player [Player966] joined.
-[15:31:16] [Render thread/INFO]: Creating pipeline for dimension minecraft:overworld
-[15:31:16] [Server thread/INFO]: Player966 joined the game
-[15:31:16] [Render thread/INFO]: [DH-SHADER-UNIFORMS] Program: dh_terrain
-[15:31:16] [Render thread/INFO]: [DH-SHADER-UNIFORMS] dhProjection uniform location: -1
-[15:31:16] [Server thread/INFO]: Player966 has reached the goal [Sky's the Limit]
-[15:31:16] [Render thread/INFO]: [DH-SHADER-UNIFORMS] dhProjectionInverse uniform location: 3
-[15:31:16] [Render thread/INFO]: [DH-SHADER-UNIFORMS] iris_ProjectionMatrix uniform location: 19
-[15:31:16] [Render thread/INFO]: [DH-SHADER-UNIFORMS] iris_ProjectionMatrixInverse uniform location: -1
-[15:31:16] [Render thread/INFO]: [DH-SHADER-UNIFORMS-GENERIC] Program: dh_terrain_g
-[15:31:16] [Render thread/INFO]: [DH-SHADER-UNIFORMS-GENERIC] dhProjection uniform location: -1
-[15:31:16] [Render thread/INFO]: [DH-SHADER-UNIFORMS-GENERIC] dhProjectionInverse uniform location: 3
-[15:31:16] [Render thread/INFO]: [DH-SHADER-UNIFORMS-GENERIC] iris_ProjectionMatrix uniform location: 19
-[15:31:16] [Render thread/INFO]: [DH-SHADER-UNIFORMS-GENERIC] iris_ProjectionMatrixInverse uniform location: -1
-[15:31:16] [Render thread/INFO]: [DH-SHADER-UNIFORMS] Program: dh_water
-[15:31:16] [Render thread/INFO]: [DH-SHADER-UNIFORMS] dhProjection uniform location: 7
-[15:31:16] [Render thread/INFO]: [DH-SHADER-UNIFORMS] dhProjectionInverse uniform location: 8
-[15:31:16] [Render thread/INFO]: [DH-SHADER-UNIFORMS] iris_ProjectionMatrix uniform location: 33
-[15:31:16] [Render thread/INFO]: [DH-SHADER-UNIFORMS] iris_ProjectionMatrixInverse uniform location: -1
-[15:31:16] [DH-Request Module Ticker [minecraft:overworld] Thread[0]/INFO]: Batch Chunk Generator initialized
-[15:31:16] [DH-Request Module Ticker [minecraft:overworld] Thread[0]/INFO]: Set world gen queue for level [minecraft:overworld].
-[15:31:16] [Server thread/INFO]: Changing simulation distance to 12, from 0
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in basic
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in basic
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in basic
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in basic
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in basic_color
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in basic_color
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in basic_color
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in basic_color
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in textured
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in textured
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in textured
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in textured
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in textured_color
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in textured_color
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in textured_color
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in textured_color
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in sps
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in sps
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in sps
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in sps
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in sky_basic
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in sky_basic
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in sky_basic
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in sky_basic
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in sky_basic_color
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in sky_basic_color
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in sky_basic_color
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in sky_basic_color
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in sky_textured
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in sky_textured
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in sky_textured
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in sky_textured
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in sky_textured_color
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in sky_textured_color
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in sky_textured_color
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in sky_textured_color
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_CloudInfo in clouds
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in clouds
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in clouds
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in clouds
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in clouds
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in clouds_sodium
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in clouds_sodium
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in clouds_sodium
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in clouds_sodium
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in terrain_solid
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in terrain_solid
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in terrain_solid
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in terrain_solid
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in terrain_cutout
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in terrain_cutout
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in terrain_cutout
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in terrain_cutout
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in terrain_translucent
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in terrain_translucent
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in terrain_translucent
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in terrain_translucent
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in moving_block
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in moving_block
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in moving_block
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in moving_block
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in entities_alpha
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in entities_alpha
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in entities_alpha
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in entities_alpha
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in entities_solid
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in entities_solid
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in entities_solid
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in entities_solid
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in entities_solid_diffuse
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in entities_solid_diffuse
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in entities_solid_diffuse
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in entities_solid_diffuse
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in entities_solid_bright
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in entities_solid_bright
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in entities_solid_bright
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in entities_solid_bright
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in entities_cutout
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in entities_cutout
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in entities_cutout
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in entities_cutout
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in entities_cutout_diffuse
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in entities_cutout_diffuse
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in entities_cutout_diffuse
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in entities_cutout_diffuse
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in entities_translucent
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in entities_translucent
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in entities_translucent
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in entities_translucent
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in entities_eyes
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in entities_eyes
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in entities_eyes
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in entities_eyes
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in entities_eyes_trans
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in entities_eyes_trans
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in entities_eyes_trans
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in entities_eyes_trans
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in hand_cutout
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in hand_cutout
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in hand_cutout
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in hand_cutout
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in hand_cutout_bright
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in hand_cutout_bright
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in hand_cutout_bright
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in hand_cutout_bright
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in hand_cutout_diffuse
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in hand_cutout_diffuse
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in hand_cutout_diffuse
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in hand_cutout_diffuse
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in hand_text
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in hand_text
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in hand_text
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in hand_text
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in hand_text_intensity
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in hand_text_intensity
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in hand_text_intensity
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in hand_text_intensity
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in hand_translucent
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in hand_translucent
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in hand_translucent
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in hand_translucent
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in hand_water_bright
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in hand_water_bright
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in hand_water_bright
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in hand_water_bright
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in hand_water_diffuse
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in hand_water_diffuse
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in hand_water_diffuse
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in hand_water_diffuse
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in lightning
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in lightning
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in lightning
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in lightning
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in leash
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in leash
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in leash
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in leash
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in text_bg
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in text_bg
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in text_bg
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in text_bg
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in particles
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in particles
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in particles
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in particles
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in particles_trans
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in particles_trans
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in particles_trans
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in particles_trans
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in weather
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in weather
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in weather
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in weather
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in crumbling
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in crumbling
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in crumbling
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in crumbling
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in text
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in text
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in text
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in text
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in text_intensity
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in text_intensity
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in text_intensity
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in text_intensity
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in text_be
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in text_be
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in text_be
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in text_be
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in text_intensity_be
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in text_intensity_be
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in text_intensity_be
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in text_intensity_be
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in block_entity
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in block_entity
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in block_entity
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in block_entity
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in block_entity_bright
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in block_entity_bright
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in block_entity_bright
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in block_entity_bright
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in block_entity_diffuse
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in block_entity_diffuse
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in block_entity_diffuse
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in block_entity_diffuse
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in be_translucent
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in be_translucent
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in be_translucent
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in be_translucent
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in beacon
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in beacon
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in beacon
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in beacon
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in glint
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in glint
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in glint
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in glint
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in lines
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in lines
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in lines
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in lines
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in ie_compat
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in ie_compat
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in ie_compat
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in ie_compat
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in mekanism_flame
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in mekanism_flame
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in mekanism_flame
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in mekanism_flame
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in shadow_terrain_cutout
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in shadow_terrain_cutout
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in shadow_terrain_cutout
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in shadow_terrain_cutout
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in shadow_translucent
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in shadow_translucent
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in shadow_translucent
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in shadow_translucent
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in shadow_entities_cutout
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in shadow_entities_cutout
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in shadow_entities_cutout
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in shadow_entities_cutout
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in shadow_block
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in shadow_block
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in shadow_block
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in shadow_block
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in shadow_beacon_beam
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in shadow_beacon_beam
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in shadow_beacon_beam
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in shadow_beacon_beam
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in shadow_basic
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in shadow_basic
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in shadow_basic
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in shadow_basic
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in shadow_basic_color
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in shadow_basic_color
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in shadow_basic_color
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in shadow_basic_color
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in shadow_tex
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in shadow_tex
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in shadow_tex
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in shadow_tex
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in shadow_tex_color
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in shadow_tex_color
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in shadow_tex_color
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in shadow_tex_color
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in shadow_clouds
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in shadow_clouds
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in shadow_clouds
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in shadow_clouds
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in shadow_lines
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in shadow_lines
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in shadow_lines
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in shadow_lines
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in shadow_leash
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in shadow_leash
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in shadow_leash
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in shadow_leash
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in shadow_lightning
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in shadow_lightning
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in shadow_lightning
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in shadow_lightning
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in shadow_particles
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in shadow_particles
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in shadow_particles
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in shadow_particles
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in shadow_text
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in shadow_text
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in shadow_text
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in shadow_text
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in shadow_text_bg
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in shadow_text_bg
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in shadow_text_bg
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in shadow_text_bg
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in shadow_text_intensity
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in shadow_text_intensity
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in shadow_text_intensity
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in shadow_text_intensity
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in ie_compat_shadow
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in ie_compat_shadow
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in ie_compat_shadow
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in ie_compat_shadow
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in mekanism_flame_shadow
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in mekanism_flame_shadow
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in mekanism_flame_shadow
-[15:31:16] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in mekanism_flame_shadow
-[15:31:17] [Render thread/INFO]: Loaded [0] waiting chunk wrappers.
-[15:31:17] [Render thread/INFO]: Started 10 worker threads
-[15:31:17] [Render thread/ERROR]: Failed to load skin texture data
+[15:39:01] [Render thread/INFO]: Reloading ResourceManager: vanilla
+[15:39:01] [Worker-Main-5/INFO]: Found unifont_all_no_pua-16.0.03.hex, loading
+[15:39:01] [Worker-Main-10/INFO]: Found unifont_pua-16.0.03.hex, loading
+[15:39:01] [Worker-Main-18/INFO]: Found unifont_jp_patch-16.0.03.hex, loading
+[15:39:02] [Render thread/INFO]: Profile: MATTMC (+0 options changed by user)
+[15:39:02] [Render thread/INFO]: Using shaderpack: ComplementaryHungLoIfied.zip
+[15:39:02] [Render thread/INFO]: OpenAL initialized on device HT-S350
+[15:39:02] [Render thread/INFO]: Sound engine started
+[15:39:02] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/particles.png-atlas
+[15:39:02] [Render thread/INFO]: Created: 128x64x0 minecraft:textures/atlas/decorated_pot.png-atlas
+[15:39:02] [Render thread/INFO]: Created: 2048x1024x0 minecraft:textures/atlas/armor_trims.png-atlas
+[15:39:02] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/paintings.png-atlas
+[15:39:02] [Render thread/INFO]: Created: 512x512x0 minecraft:textures/atlas/shield_patterns.png-atlas
+[15:39:02] [Render thread/INFO]: Created: 1024x512x4 minecraft:textures/atlas/blocks.png-atlas
+[15:39:02] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/chest.png-atlas
+[15:39:02] [Render thread/INFO]: Created: 512x512x0 minecraft:textures/atlas/banner_patterns.png-atlas
+[15:39:02] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/beds.png-atlas
+[15:39:02] [Render thread/INFO]: Created: 1024x512x0 minecraft:textures/atlas/gui.png-atlas
+[15:39:02] [Render thread/INFO]: Created: 64x64x0 minecraft:textures/atlas/map_decorations.png-atlas
+[15:39:02] [Render thread/INFO]: Created: 256x256x0 minecraft:textures/atlas/signs.png-atlas
+[15:39:02] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/shulker_boxes.png-atlas
+[15:39:02] [Render thread/INFO]: Auto-updater has been disabled - no update checks will be performed
+[15:39:02] [Render thread/INFO]: Creating pipeline for dimension minecraft:overworld
+[15:39:03] [Render thread/WARN]: Type is VERTEX
+[15:39:03] [Render thread/WARN]: Type is FRAGMENT
+[15:39:03] [Render thread/INFO]: [DH-SHADER-UNIFORMS] Program: dh_terrain
+[15:39:03] [Render thread/INFO]: [DH-SHADER-UNIFORMS] dhProjection uniform location: -1
+[15:39:03] [Render thread/INFO]: [DH-SHADER-UNIFORMS] dhProjectionInverse uniform location: 3
+[15:39:03] [Render thread/INFO]: [DH-SHADER-UNIFORMS] iris_ProjectionMatrix uniform location: 19
+[15:39:03] [Render thread/INFO]: [DH-SHADER-UNIFORMS] iris_ProjectionMatrixInverse uniform location: -1
+[15:39:03] [Render thread/WARN]: Type is VERTEX
+[15:39:03] [Render thread/WARN]: Type is FRAGMENT
+[15:39:03] [Render thread/INFO]: [DH-SHADER-UNIFORMS-GENERIC] Program: dh_terrain_g
+[15:39:03] [Render thread/INFO]: [DH-SHADER-UNIFORMS-GENERIC] dhProjection uniform location: -1
+[15:39:03] [Render thread/INFO]: [DH-SHADER-UNIFORMS-GENERIC] dhProjectionInverse uniform location: 3
+[15:39:03] [Render thread/INFO]: [DH-SHADER-UNIFORMS-GENERIC] iris_ProjectionMatrix uniform location: 19
+[15:39:03] [Render thread/INFO]: [DH-SHADER-UNIFORMS-GENERIC] iris_ProjectionMatrixInverse uniform location: -1
+[15:39:03] [Render thread/WARN]: Type is VERTEX
+[15:39:03] [Render thread/WARN]: Type is FRAGMENT
+[15:39:03] [Render thread/INFO]: [DH-SHADER-UNIFORMS] Program: dh_water
+[15:39:03] [Render thread/INFO]: [DH-SHADER-UNIFORMS] dhProjection uniform location: 7
+[15:39:03] [Render thread/INFO]: [DH-SHADER-UNIFORMS] dhProjectionInverse uniform location: 8
+[15:39:03] [Render thread/INFO]: [DH-SHADER-UNIFORMS] iris_ProjectionMatrix uniform location: 33
+[15:39:03] [Render thread/INFO]: [DH-SHADER-UNIFORMS] iris_ProjectionMatrixInverse uniform location: -1
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in basic
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in basic
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in basic
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in basic
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in basic_color
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in basic_color
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in basic_color
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in basic_color
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in textured
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in textured
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in textured
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in textured
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in textured_color
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in textured_color
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in textured_color
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in textured_color
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in sps
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in sps
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in sps
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in sps
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in sky_basic
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in sky_basic
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in sky_basic
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in sky_basic
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in sky_basic_color
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in sky_basic_color
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in sky_basic_color
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in sky_basic_color
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in sky_textured
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in sky_textured
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in sky_textured
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in sky_textured
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in sky_textured_color
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in sky_textured_color
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in sky_textured_color
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in sky_textured_color
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_CloudInfo in clouds
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in clouds
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in clouds
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in clouds
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in clouds
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in clouds_sodium
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in clouds_sodium
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in clouds_sodium
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in clouds_sodium
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in terrain_solid
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in terrain_solid
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in terrain_solid
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in terrain_solid
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in terrain_cutout
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in terrain_cutout
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in terrain_cutout
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in terrain_cutout
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in terrain_translucent
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in terrain_translucent
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in terrain_translucent
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in terrain_translucent
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in moving_block
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in moving_block
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in moving_block
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in moving_block
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in entities_alpha
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in entities_alpha
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in entities_alpha
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in entities_alpha
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in entities_solid
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in entities_solid
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in entities_solid
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in entities_solid
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in entities_solid_diffuse
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in entities_solid_diffuse
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in entities_solid_diffuse
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in entities_solid_diffuse
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in entities_solid_bright
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in entities_solid_bright
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in entities_solid_bright
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in entities_solid_bright
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in entities_cutout
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in entities_cutout
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in entities_cutout
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in entities_cutout
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in entities_cutout_diffuse
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in entities_cutout_diffuse
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in entities_cutout_diffuse
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in entities_cutout_diffuse
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in entities_translucent
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in entities_translucent
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in entities_translucent
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in entities_translucent
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in entities_eyes
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in entities_eyes
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in entities_eyes
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in entities_eyes
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in entities_eyes_trans
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in entities_eyes_trans
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in entities_eyes_trans
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in entities_eyes_trans
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in hand_cutout
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in hand_cutout
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in hand_cutout
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in hand_cutout
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in hand_cutout_bright
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in hand_cutout_bright
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in hand_cutout_bright
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in hand_cutout_bright
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in hand_cutout_diffuse
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in hand_cutout_diffuse
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in hand_cutout_diffuse
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in hand_cutout_diffuse
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in hand_text
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in hand_text
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in hand_text
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in hand_text
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in hand_text_intensity
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in hand_text_intensity
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in hand_text_intensity
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in hand_text_intensity
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in hand_translucent
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in hand_translucent
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in hand_translucent
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in hand_translucent
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in hand_water_bright
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in hand_water_bright
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in hand_water_bright
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in hand_water_bright
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in hand_water_diffuse
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in hand_water_diffuse
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in hand_water_diffuse
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in hand_water_diffuse
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in lightning
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in lightning
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in lightning
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in lightning
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in leash
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in leash
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in leash
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in leash
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in text_bg
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in text_bg
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in text_bg
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in text_bg
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in particles
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in particles
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in particles
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in particles
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in particles_trans
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in particles_trans
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in particles_trans
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in particles_trans
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in weather
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in weather
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in weather
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in weather
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in crumbling
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in crumbling
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in crumbling
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in crumbling
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in text
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in text
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in text
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in text
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in text_intensity
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in text_intensity
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in text_intensity
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in text_intensity
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in text_be
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in text_be
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in text_be
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in text_be
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in text_intensity_be
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in text_intensity_be
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in text_intensity_be
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in text_intensity_be
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in block_entity
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in block_entity
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in block_entity
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in block_entity
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in block_entity_bright
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in block_entity_bright
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in block_entity_bright
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in block_entity_bright
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in block_entity_diffuse
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in block_entity_diffuse
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in block_entity_diffuse
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in block_entity_diffuse
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in be_translucent
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in be_translucent
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in be_translucent
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in be_translucent
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in beacon
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in beacon
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in beacon
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in beacon
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in glint
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in glint
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in glint
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in glint
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in lines
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in lines
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in lines
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in lines
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in ie_compat
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in ie_compat
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in ie_compat
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in ie_compat
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in mekanism_flame
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in mekanism_flame
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in mekanism_flame
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in mekanism_flame
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in shadow_terrain_cutout
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in shadow_terrain_cutout
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in shadow_terrain_cutout
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in shadow_terrain_cutout
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in shadow_translucent
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in shadow_translucent
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in shadow_translucent
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in shadow_translucent
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in shadow_entities_cutout
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in shadow_entities_cutout
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in shadow_entities_cutout
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in shadow_entities_cutout
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in shadow_block
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in shadow_block
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in shadow_block
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in shadow_block
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in shadow_beacon_beam
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in shadow_beacon_beam
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in shadow_beacon_beam
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in shadow_beacon_beam
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in shadow_basic
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in shadow_basic
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in shadow_basic
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in shadow_basic
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in shadow_basic_color
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in shadow_basic_color
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in shadow_basic_color
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in shadow_basic_color
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in shadow_tex
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in shadow_tex
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in shadow_tex
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in shadow_tex
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in shadow_tex_color
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in shadow_tex_color
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in shadow_tex_color
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in shadow_tex_color
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in shadow_clouds
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in shadow_clouds
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in shadow_clouds
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in shadow_clouds
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in shadow_lines
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in shadow_lines
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in shadow_lines
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in shadow_lines
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in shadow_leash
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in shadow_leash
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in shadow_leash
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in shadow_leash
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in shadow_lightning
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in shadow_lightning
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in shadow_lightning
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in shadow_lightning
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in shadow_particles
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in shadow_particles
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in shadow_particles
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in shadow_particles
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in shadow_text
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in shadow_text
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in shadow_text
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in shadow_text
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in shadow_text_bg
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in shadow_text_bg
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in shadow_text_bg
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in shadow_text_bg
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in shadow_text_intensity
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in shadow_text_intensity
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in shadow_text_intensity
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in shadow_text_intensity
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in ie_compat_shadow
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in ie_compat_shadow
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in ie_compat_shadow
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in ie_compat_shadow
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in mekanism_flame_shadow
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in mekanism_flame_shadow
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in mekanism_flame_shadow
+[15:39:04] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in mekanism_flame_shadow
+[15:39:36] [Render thread/INFO]: Loaded 1461 recipes
+[15:39:36] [Render thread/INFO]: Loaded 1574 advancements
+[15:39:36] [Server thread/INFO]: Started DhWorld of type CLIENT_SERVER
+[15:39:36] [Server thread/INFO]: Starting integrated minecraft server version 1.21.10
+[15:39:36] [Server thread/INFO]: Generating keypair
+[15:39:36] [DH-Full Data Migration Thread[0]/INFO]: No migration necessary.
+[15:39:36] [Server thread/INFO]: Started DhClientServerLevel for [Wrapped{ServerLevel[New World]@minecraft:overworld}] at [[LocalSaveStructure@(/home/matt/Documents/Repos/MattMC/run/saves/New World/data)]].
+[15:39:36] [DH-Full Data Migration Thread[0]/INFO]: No migration necessary.
+[15:39:36] [Server thread/INFO]: Started DhClientServerLevel for [Wrapped{ServerLevel[New World]@minecraft:the_end}] at [[LocalSaveStructure@(/home/matt/Documents/Repos/MattMC/run/saves/New World/DIM1/data;/home/matt/Documents/Repos/MattMC/run/saves/New World/data)]].
+[15:39:36] [DH-Full Data Migration Thread[0]/INFO]: No migration necessary.
+[15:39:36] [Server thread/INFO]: Started DhClientServerLevel for [Wrapped{ServerLevel[New World]@minecraft:primordial_caves}] at [[LocalSaveStructure@(/home/matt/Documents/Repos/MattMC/run/saves/New World/DIM1/data;/home/matt/Documents/Repos/MattMC/run/saves/New World/data;/home/matt/Documents/Repos/MattMC/run/saves/New World/dimensions/minecraft/primordial_caves/data)]].
+[15:39:36] [DH-Full Data Migration Thread[0]/INFO]: No migration necessary.
+[15:39:36] [Server thread/INFO]: Started DhClientServerLevel for [Wrapped{ServerLevel[New World]@minecraft:the_nether}] at [[LocalSaveStructure@(/home/matt/Documents/Repos/MattMC/run/saves/New World/DIM-1/data;/home/matt/Documents/Repos/MattMC/run/saves/New World/DIM1/data;/home/matt/Documents/Repos/MattMC/run/saves/New World/data;/home/matt/Documents/Repos/MattMC/run/saves/New World/dimensions/minecraft/primordial_caves/data)]].
+[15:39:36] [Server thread/INFO]: Loading 0 persistent chunks...
+[15:39:36] [Server thread/INFO]: Preparing spawn area: 16%
+[15:39:37] [Server thread/INFO]: Loading 49 chunks for player spawn...
+[15:39:37] [Server thread/INFO]: Preparing spawn area: 16%
+[15:39:37] [Server thread/INFO]: Time elapsed: 665 ms
+[15:39:37] [Server thread/INFO]: Player901[local:E:dc0afb80] logged in with entity id 107 at (468.75893549121264, 63.63093690827396, 883.1699125096536)
+[15:39:37] [Server thread/INFO]: Player [Player901] joined.
+[15:39:37] [Server thread/INFO]: Player901 joined the game
+[15:39:37] [Render thread/INFO]: Reloading pipeline on dimension change: minecraft:overworld => minecraft:overworld
+[15:39:37] [Render thread/INFO]: Destroying pipeline minecraft:overworld
+[15:39:37] [Server thread/INFO]: Player901 has reached the goal [Sky's the Limit]
+[15:39:37] [Render thread/INFO]: Creating pipeline for dimension minecraft:overworld
+[15:39:37] [DH-Request Module Ticker [minecraft:overworld] Thread[0]/INFO]: Batch Chunk Generator initialized
+[15:39:37] [DH-Request Module Ticker [minecraft:overworld] Thread[0]/INFO]: Set world gen queue for level [minecraft:overworld].
+[15:39:37] [Render thread/INFO]: [DH-SHADER-UNIFORMS] Program: dh_terrain
+[15:39:37] [Render thread/INFO]: [DH-SHADER-UNIFORMS] dhProjection uniform location: -1
+[15:39:37] [Render thread/INFO]: [DH-SHADER-UNIFORMS] dhProjectionInverse uniform location: 3
+[15:39:37] [Render thread/INFO]: [DH-SHADER-UNIFORMS] iris_ProjectionMatrix uniform location: 19
+[15:39:37] [Render thread/INFO]: [DH-SHADER-UNIFORMS] iris_ProjectionMatrixInverse uniform location: -1
+[15:39:37] [Render thread/INFO]: [DH-SHADER-UNIFORMS-GENERIC] Program: dh_terrain_g
+[15:39:37] [Render thread/INFO]: [DH-SHADER-UNIFORMS-GENERIC] dhProjection uniform location: -1
+[15:39:37] [Render thread/INFO]: [DH-SHADER-UNIFORMS-GENERIC] dhProjectionInverse uniform location: 3
+[15:39:37] [Render thread/INFO]: [DH-SHADER-UNIFORMS-GENERIC] iris_ProjectionMatrix uniform location: 19
+[15:39:37] [Render thread/INFO]: [DH-SHADER-UNIFORMS-GENERIC] iris_ProjectionMatrixInverse uniform location: -1
+[15:39:37] [Render thread/INFO]: [DH-SHADER-UNIFORMS] Program: dh_water
+[15:39:37] [Render thread/INFO]: [DH-SHADER-UNIFORMS] dhProjection uniform location: 7
+[15:39:37] [Render thread/INFO]: [DH-SHADER-UNIFORMS] dhProjectionInverse uniform location: 8
+[15:39:37] [Render thread/INFO]: [DH-SHADER-UNIFORMS] iris_ProjectionMatrix uniform location: 33
+[15:39:37] [Render thread/INFO]: [DH-SHADER-UNIFORMS] iris_ProjectionMatrixInverse uniform location: -1
+[15:39:37] [Server thread/INFO]: Changing simulation distance to 12, from 0
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in basic
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in basic
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in basic
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in basic
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in basic_color
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in basic_color
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in basic_color
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in basic_color
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in textured
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in textured
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in textured
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in textured
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in textured_color
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in textured_color
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in textured_color
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in textured_color
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in sps
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in sps
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in sps
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in sps
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in sky_basic
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in sky_basic
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in sky_basic
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in sky_basic
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in sky_basic_color
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in sky_basic_color
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in sky_basic_color
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in sky_basic_color
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in sky_textured
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in sky_textured
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in sky_textured
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in sky_textured
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in sky_textured_color
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in sky_textured_color
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in sky_textured_color
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in sky_textured_color
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_CloudInfo in clouds
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in clouds
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in clouds
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in clouds
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in clouds
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in clouds_sodium
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in clouds_sodium
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in clouds_sodium
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in clouds_sodium
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in terrain_solid
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in terrain_solid
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in terrain_solid
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in terrain_solid
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in terrain_cutout
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in terrain_cutout
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in terrain_cutout
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in terrain_cutout
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in terrain_translucent
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in terrain_translucent
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in terrain_translucent
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in terrain_translucent
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in moving_block
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in moving_block
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in moving_block
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in moving_block
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in entities_alpha
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in entities_alpha
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in entities_alpha
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in entities_alpha
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in entities_solid
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in entities_solid
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in entities_solid
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in entities_solid
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in entities_solid_diffuse
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in entities_solid_diffuse
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in entities_solid_diffuse
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in entities_solid_diffuse
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in entities_solid_bright
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in entities_solid_bright
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in entities_solid_bright
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in entities_solid_bright
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in entities_cutout
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in entities_cutout
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in entities_cutout
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in entities_cutout
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in entities_cutout_diffuse
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in entities_cutout_diffuse
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in entities_cutout_diffuse
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in entities_cutout_diffuse
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in entities_translucent
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in entities_translucent
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in entities_translucent
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in entities_translucent
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in entities_eyes
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in entities_eyes
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in entities_eyes
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in entities_eyes
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in entities_eyes_trans
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in entities_eyes_trans
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in entities_eyes_trans
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in entities_eyes_trans
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in hand_cutout
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in hand_cutout
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in hand_cutout
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in hand_cutout
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in hand_cutout_bright
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in hand_cutout_bright
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in hand_cutout_bright
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in hand_cutout_bright
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in hand_cutout_diffuse
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in hand_cutout_diffuse
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in hand_cutout_diffuse
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in hand_cutout_diffuse
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in hand_text
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in hand_text
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in hand_text
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in hand_text
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in hand_text_intensity
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in hand_text_intensity
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in hand_text_intensity
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in hand_text_intensity
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in hand_translucent
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in hand_translucent
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in hand_translucent
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in hand_translucent
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in hand_water_bright
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in hand_water_bright
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in hand_water_bright
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in hand_water_bright
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in hand_water_diffuse
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in hand_water_diffuse
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in hand_water_diffuse
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in hand_water_diffuse
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in lightning
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in lightning
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in lightning
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in lightning
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in leash
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in leash
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in leash
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in leash
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in text_bg
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in text_bg
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in text_bg
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in text_bg
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in particles
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in particles
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in particles
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in particles
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in particles_trans
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in particles_trans
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in particles_trans
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in particles_trans
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in weather
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in weather
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in weather
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in weather
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in crumbling
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in crumbling
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in crumbling
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in crumbling
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in text
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in text
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in text
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in text
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in text_intensity
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in text_intensity
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in text_intensity
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in text_intensity
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in text_be
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in text_be
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in text_be
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in text_be
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in text_intensity_be
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in text_intensity_be
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in text_intensity_be
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in text_intensity_be
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in block_entity
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in block_entity
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in block_entity
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in block_entity
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in block_entity_bright
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in block_entity_bright
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in block_entity_bright
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in block_entity_bright
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in block_entity_diffuse
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in block_entity_diffuse
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in block_entity_diffuse
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in block_entity_diffuse
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in be_translucent
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in be_translucent
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in be_translucent
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in be_translucent
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in beacon
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in beacon
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in beacon
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in beacon
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in glint
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in glint
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in glint
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in glint
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in lines
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in lines
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in lines
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in lines
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in ie_compat
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in ie_compat
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in ie_compat
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in ie_compat
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in mekanism_flame
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in mekanism_flame
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in mekanism_flame
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in mekanism_flame
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in shadow_terrain_cutout
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in shadow_terrain_cutout
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in shadow_terrain_cutout
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in shadow_terrain_cutout
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in shadow_translucent
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in shadow_translucent
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in shadow_translucent
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in shadow_translucent
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in shadow_entities_cutout
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in shadow_entities_cutout
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in shadow_entities_cutout
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in shadow_entities_cutout
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in shadow_block
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in shadow_block
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in shadow_block
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in shadow_block
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in shadow_beacon_beam
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in shadow_beacon_beam
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in shadow_beacon_beam
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in shadow_beacon_beam
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in shadow_basic
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in shadow_basic
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in shadow_basic
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in shadow_basic
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in shadow_basic_color
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in shadow_basic_color
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in shadow_basic_color
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in shadow_basic_color
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in shadow_tex
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in shadow_tex
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in shadow_tex
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in shadow_tex
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in shadow_tex_color
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in shadow_tex_color
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in shadow_tex_color
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in shadow_tex_color
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in shadow_clouds
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in shadow_clouds
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in shadow_clouds
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in shadow_clouds
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in shadow_lines
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in shadow_lines
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in shadow_lines
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in shadow_lines
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in shadow_leash
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in shadow_leash
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in shadow_leash
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in shadow_leash
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in shadow_lightning
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in shadow_lightning
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in shadow_lightning
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in shadow_lightning
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in shadow_particles
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in shadow_particles
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in shadow_particles
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in shadow_particles
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in shadow_text
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in shadow_text
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in shadow_text
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in shadow_text
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in shadow_text_bg
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in shadow_text_bg
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in shadow_text_bg
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in shadow_text_bg
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in shadow_text_intensity
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in shadow_text_intensity
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in shadow_text_intensity
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in shadow_text_intensity
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in ie_compat_shadow
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in ie_compat_shadow
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in ie_compat_shadow
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in ie_compat_shadow
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_DynamicTransforms in mekanism_flame_shadow
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Fog in mekanism_flame_shadow
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Globals in mekanism_flame_shadow
+[15:39:38] [Render thread/WARN]: Found unknown and unsupported uniform iris_Projection in mekanism_flame_shadow
+[15:39:38] [Render thread/INFO]: Loaded [0] waiting chunk wrappers.
+[15:39:38] [Render thread/INFO]: Started 10 worker threads
+[15:39:38] [Render thread/ERROR]: Failed to load skin texture data
 java.io.FileNotFoundException: minecraft:entity/player/wide/hunglo
 	at knot/net.minecraft.server.packs.resources.ResourceProvider.lambda$getResourceOrThrow$1(ResourceProvider.java:18) ~[MattMC-1.21.10.jar:?]
 	at java.base/java.util.Optional.orElseThrow(Optional.java:403) ~[?:?]
@@ -813,28 +813,36 @@ java.io.FileNotFoundException: minecraft:entity/player/wide/hunglo
 	at net.fabricmc.loader.impl.game.minecraft.MinecraftGameProvider.launch(MinecraftGameProvider.java:560) [MattMC-1.21.10.jar:1.21.10]
 	at net.fabricmc.loader.impl.launch.knot.Knot.launch(Knot.java:72) [MattMC-1.21.10.jar:1.21.10]
 	at net.fabricmc.loader.impl.launch.knot.KnotClient.main(KnotClient.java:23) [MattMC-1.21.10.jar:1.21.10]
-[15:31:17] [Render thread/INFO]: [DH-CLIENT-CONNECT] ========== CLIENT ONLY CONNECTED ==========
-[15:31:17] [Render thread/INFO]: [DH-CLIENT-CONNECT] Thread: Render thread (ID: 1)
-[15:31:17] [Render thread/INFO]: [DH-CLIENT-CONNECT] Connected to dedicated server: false
-[15:31:17] [Render thread/INFO]: [DH-CLIENT-CONNECT] Connected to replay: false
-[15:31:17] [Render thread/INFO]: [DH-CLIENT-CONNECT] Not connected to dedicated server or replay - skipping DhClientWorld creation
-[15:31:17] [Render thread/INFO]: [DH-CLIENT-CONNECT] This is expected for integrated/singleplayer - world should be created by ServerApi
-[15:31:17] [Render thread/INFO]: Loaded [0] waiting chunk wrappers.
-[15:31:17] [Render thread/WARN]: Ignoring chat session from Player966 due to missing Services public key
-[15:31:17] [Render thread/INFO]: [System] [CHAT] Player966 has reached the goal [Sky's the Limit]
-[15:31:17] [Render thread/INFO]: Loaded 60 advancements
-[15:31:17] [Render thread/WARN]: Error while parsing the block ID map entry for "block.10104":
-[15:31:17] [Render thread/WARN]: - The block minecraft:stone_slab has no property with the name variant, ignoring!
-[15:31:17] [Render thread/WARN]: Error while parsing the block ID map entry for "block.10944":
-[15:31:17] [Render thread/WARN]: - The block minecraft:creaking_heart has no property with the name active, ignoring!
-[15:31:17] [Render thread/WARN]: Error while parsing the block ID map entry for "block.10948":
-[15:31:17] [Render thread/WARN]: - The block minecraft:creaking_heart has no property with the name active, ignoring!
-[15:31:17] [Render thread/INFO]: Stopping worker threads
-[15:31:17] [Render thread/INFO]: Started 10 worker threads
-[15:31:17] [Render thread/INFO]: Resizing Dynamic Transforms UBO, capacity limit of 2 reached during a single frame. New capacity will be 4.
-[15:31:17] [Render thread/INFO]: Creating GLProxy... If this is the last message you see there must have been an OpenGL error.
-[15:31:17] [Render thread/INFO]: Lod Render OpenGL version [3.3.0 NVIDIA 580.95.05].
-[15:31:17] [Render thread/INFO]: minecraftGlCapabilities:
+[15:39:38] [Render thread/INFO]: [DH-CLIENT-CONNECT] ========== CLIENT ONLY CONNECTED ==========
+[15:39:38] [Render thread/INFO]: [DH-CLIENT-CONNECT] Thread: Render thread (ID: 1)
+[15:39:38] [Render thread/INFO]: [DH-CLIENT-CONNECT] Connected to dedicated server: false
+[15:39:38] [Render thread/INFO]: [DH-CLIENT-CONNECT] Connected to replay: false
+[15:39:38] [Render thread/INFO]: [DH-CLIENT-CONNECT] Not connected to dedicated server or replay - skipping DhClientWorld creation
+[15:39:38] [Render thread/INFO]: [DH-CLIENT-CONNECT] This is expected for integrated/singleplayer - world should be created by ServerApi
+[15:39:38] [Render thread/INFO]: Loaded [0] waiting chunk wrappers.
+[15:39:38] [Render thread/WARN]: Ignoring chat session from Player901 due to missing Services public key
+[15:39:38] [Render thread/INFO]: [System] [CHAT] Player901 has reached the goal [Sky's the Limit]
+[15:39:38] [Render thread/INFO]: Loaded 63 advancements
+[15:39:38] [Render thread/WARN]: Error while parsing the block ID map entry for "block.10104":
+[15:39:38] [Render thread/WARN]: - The block minecraft:stone_slab has no property with the name variant, ignoring!
+[15:39:38] [Render thread/WARN]: Error while parsing the block ID map entry for "block.10944":
+[15:39:38] [Render thread/WARN]: - The block minecraft:creaking_heart has no property with the name active, ignoring!
+[15:39:38] [Render thread/WARN]: Error while parsing the block ID map entry for "block.10948":
+[15:39:38] [Render thread/WARN]: - The block minecraft:creaking_heart has no property with the name active, ignoring!
+[15:39:38] [Render thread/INFO]: Stopping worker threads
+[15:39:38] [Render thread/INFO]: Started 10 worker threads
+[15:39:38] [Render thread/WARN]: [DH-RENDER-VALIDATION] ========== VALIDATION FAILED ==========
+[15:39:38] [Render thread/WARN]: [DH-RENDER-VALIDATION] Reason: No Lightmap Loaded
+[15:39:38] [Render thread/WARN]: [DH-RENDER-VALIDATION] Current DH world: com.seibel.distanthorizons.core.world.DhClientServerWorld@12c5f324
+[15:39:38] [Render thread/WARN]: [DH-RENDER-VALIDATION] tryGetDhClientWorld: com.seibel.distanthorizons.core.world.DhClientServerWorld@12c5f324
+[15:39:38] [Render thread/WARN]: [DH-RENDER-VALIDATION] dhClientWorld from params: com.seibel.distanthorizons.core.world.DhClientServerWorld@12c5f324
+[15:39:38] [Render thread/WARN]: [DH-RENDER-VALIDATION] dhClientLevel from params: DhClientServerLevel{New_World_dv89624uldmkc@minecraft:overworld}
+[15:39:38] [Render thread/WARN]: [DH-RENDER-VALIDATION] clientLevelWrapper from params: Wrapped{ClientLevel@dv89624uldmkc@minecraft:overworld}
+[15:39:38] [Render thread/WARN]: [DH-RENDER-VALIDATION] ========================================
+[15:39:38] [Render thread/INFO]: Resizing Dynamic Transforms UBO, capacity limit of 2 reached during a single frame. New capacity will be 4.
+[15:39:38] [Render thread/INFO]: Creating GLProxy... If this is the last message you see there must have been an OpenGL error.
+[15:39:38] [Render thread/INFO]: Lod Render OpenGL version [3.3.0 NVIDIA 580.95.05].
+[15:39:38] [Render thread/INFO]: minecraftGlCapabilities:
 Your OpenGL support:
 openGL version 3.2+: [true] <- REQUIRED
 Vertex Attribute Buffer Binding: [true] <- optional improvement
@@ -842,120 +850,192 @@ Buffer Storage: [true] <- optional improvement
 
 [LWJGL] [GL] Using KHR_debug for error logging.
 [LWJGL] [GL] Warning: A non-debug context may not produce any debug output.
-[15:31:17] [Render thread/INFO]: GPU Vendor [NVIDIA CORPORATION] with OS [Linux], Preferred upload method is [BUFFER_STORAGE].
-[15:31:17] [Render thread/INFO]: GLProxy creation successful. OpenGL smiles upon you this day.
-[15:31:17] [Render thread/INFO]: Setting up renderer
-[15:31:17] [Render thread/INFO]: Loading shader with type: [35633]
-[15:31:17] [Render thread/INFO]: Shader loaded sucessfully.
-[15:31:17] [Render thread/INFO]: Loading shader with type: [35632]
-[15:31:17] [Render thread/INFO]: Shader loaded sucessfully.
-[15:31:17] [Render thread/INFO]: Vertex Attribute (GL43+) completed. It contains 1 binding points and a stride size of 16
-[15:31:17] [Render thread/INFO]: Renderer setup complete
-[15:31:17] [Render thread/ERROR]: Unexpected; somehow the Opaque + Translucent pass ran with shaders on.
-[15:31:17] [Render thread/INFO]: Loading shader with type: [35633]
-[15:31:17] [Render thread/INFO]: Shader loaded sucessfully.
-[15:31:17] [Render thread/INFO]: Loading shader with type: [35632]
-[15:31:17] [Render thread/INFO]: Shader loaded sucessfully.
-[15:31:17] [Render thread/INFO]: Vertex Attribute (GL43+) completed. It contains 1 binding points and a stride size of 12
-[15:31:17] [Render thread/INFO]: Loading shader with type: [35633]
-[15:31:17] [Render thread/INFO]: Shader loaded sucessfully.
-[15:31:17] [Render thread/INFO]: Loading shader with type: [35632]
-[15:31:17] [Render thread/INFO]: Shader loaded sucessfully.
-[15:31:17] [Render thread/INFO]: Vertex Attribute (GL43+) completed. It contains 1 binding points and a stride size of 12
-[15:31:17] [Render thread/INFO]: Resizing Dynamic Transforms UBO, capacity limit of 4 reached during a single frame. New capacity will be 8.
-[15:31:17] [Render thread/INFO]: Resizing Dynamic Transforms UBO, capacity limit of 8 reached during a single frame. New capacity will be 16.
-[15:31:20] [Render thread/INFO]: [STDOUT]: [JEI DEBUG] Item clicked: minecraft:stripped_acacia_wood
-[15:31:20] [Render thread/INFO]: [STDOUT]: [JEI DEBUG] Item count to add: 1
-[15:31:20] [Render thread/INFO]: [STDOUT]: [JEI DEBUG] getSlotWithRemainingSpace returned: -1
-[15:31:20] [Render thread/INFO]: [STDOUT]: [JEI DEBUG] getFreeSlot returned: 7
-[15:31:20] [Render thread/INFO]: [STDOUT]: [JEI DEBUG] inventoryIndexToContainerSlot called with index: 7
-[15:31:20] [Render thread/INFO]: [STDOUT]: [JEI DEBUG] Hotbar conversion: 7 -> 43
-[15:31:20] [Render thread/INFO]: [STDOUT]: [JEI DEBUG] Converted inventory index 7 to container slot 43
-[15:31:20] [Render thread/INFO]: [STDOUT]: [JEI DEBUG] Using free slot: 43
-[15:31:20] [Render thread/INFO]: [STDOUT]: [JEI DEBUG] Target slot: 43
-[15:31:20] [Render thread/INFO]: [STDOUT]: [JEI DEBUG] Calling handleCreativeModeItemAdd with slot 43
-[15:31:20] [Render thread/INFO]: [STDOUT]: [JEI DEBUG] Item added successfully
-[15:31:20] [Render thread/INFO]: Loaded 61 advancements
-[15:31:21] [Render thread/INFO]: [STDOUT]: [JEI DEBUG] Item clicked: minecraft:stripped_acacia_wood
-[15:31:21] [Render thread/INFO]: [STDOUT]: [JEI DEBUG] Item count to add: 1
-[15:31:21] [Render thread/INFO]: [STDOUT]: [JEI DEBUG] getSlotWithRemainingSpace returned: -1
-[15:31:21] [Render thread/INFO]: [STDOUT]: [JEI DEBUG] getFreeSlot returned: 7
-[15:31:21] [Render thread/INFO]: [STDOUT]: [JEI DEBUG] inventoryIndexToContainerSlot called with index: 7
-[15:31:21] [Render thread/INFO]: [STDOUT]: [JEI DEBUG] Hotbar conversion: 7 -> 43
-[15:31:21] [Render thread/INFO]: [STDOUT]: [JEI DEBUG] Converted inventory index 7 to container slot 43
-[15:31:21] [Render thread/INFO]: [STDOUT]: [JEI DEBUG] Using free slot: 43
-[15:31:21] [Render thread/INFO]: [STDOUT]: [JEI DEBUG] Target slot: 43
-[15:31:21] [Render thread/INFO]: [STDOUT]: [JEI DEBUG] Calling handleCreativeModeItemAdd with slot 43
-[15:31:21] [Render thread/INFO]: [STDOUT]: [JEI DEBUG] Item added successfully
-[15:31:21] [Render thread/INFO]: [STDOUT]: [JEI DEBUG] Item clicked: minecraft:stripped_acacia_wood
-[15:31:21] [Render thread/INFO]: [STDOUT]: [JEI DEBUG] Item count to add: 1
-[15:31:21] [Render thread/INFO]: [STDOUT]: [JEI DEBUG] getSlotWithRemainingSpace returned: -1
-[15:31:21] [Render thread/INFO]: [STDOUT]: [JEI DEBUG] getFreeSlot returned: 7
-[15:31:21] [Render thread/INFO]: [STDOUT]: [JEI DEBUG] inventoryIndexToContainerSlot called with index: 7
-[15:31:21] [Render thread/INFO]: [STDOUT]: [JEI DEBUG] Hotbar conversion: 7 -> 43
-[15:31:21] [Render thread/INFO]: [STDOUT]: [JEI DEBUG] Converted inventory index 7 to container slot 43
-[15:31:21] [Render thread/INFO]: [STDOUT]: [JEI DEBUG] Using free slot: 43
-[15:31:21] [Render thread/INFO]: [STDOUT]: [JEI DEBUG] Target slot: 43
-[15:31:21] [Render thread/INFO]: [STDOUT]: [JEI DEBUG] Calling handleCreativeModeItemAdd with slot 43
-[15:31:21] [Render thread/INFO]: [STDOUT]: [JEI DEBUG] Item added successfully
-[15:31:23] [Server thread/INFO]: Saving and pausing game...
-[15:31:23] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:overworld
-[15:31:23] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:primordial_caves
-[15:31:23] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:the_nether
-[15:31:23] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:the_end
-[15:31:24] [Render thread/INFO]: Client on ClientOnly mode disconnecting.
-[15:31:24] [Server thread/INFO]: Player966 lost connection: Disconnected
-[15:31:24] [Server thread/INFO]: Player966 left the game
-[15:31:24] [level shutdown/INFO]: Shutting down ClientRenderState
-[15:31:24] [level shutdown/INFO]: Shutting down LodQuadTree...
-[15:31:24] [level shutdown/INFO]: Finished shutting down LodQuadTree
-[15:31:24] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[New World]@minecraft:primordial_caves}].
-[15:31:24] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[New World]@minecraft:primordial_caves}
-[15:31:24] [level shutdown/INFO]: Closing world gen queue
-[15:31:24] [level shutdown/INFO]: Closing WorldGenerationQueue...
-[15:31:24] [level shutdown/INFO]: Shutting down world generator thread pool...
-[15:31:24] [level shutdown/INFO]: World generator thread pool shutdown with [0] incomplete tasks.
-[15:31:24] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[New World]@minecraft:the_end}].
-[15:31:24] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[New World]@minecraft:the_end}
-[15:31:24] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[New World]@minecraft:the_nether}].
-[15:31:24] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[New World]@minecraft:the_nether}
-[15:31:24] [level shutdown/INFO]: [BatchGenerator] shutting down...
-[15:31:24] [level shutdown/INFO]: Closing [BatchGenerationEnvironment]
-[15:31:24] [level shutdown/INFO]: Finished closing WorldGenerationQueue
-[15:31:24] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[New World]@minecraft:overworld}].
-[15:31:24] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[New World]@minecraft:overworld}
-[15:31:24] [Render thread/INFO]: Closed DhWorld of type [CLIENT_SERVER].
-[15:31:24] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[New World]@minecraft:overworld}].
-[15:31:24] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[New World]@minecraft:overworld}
-[15:31:24] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[New World]@minecraft:the_end}].
-[15:31:24] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[New World]@minecraft:the_end}
-[15:31:24] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[New World]@minecraft:primordial_caves}].
-[15:31:24] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[New World]@minecraft:primordial_caves}
-[15:31:24] [Server thread/INFO]: Stopping singleplayer server as player logged out
-[15:31:24] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[New World]@minecraft:the_nether}].
-[15:31:24] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[New World]@minecraft:the_nether}
-[15:31:24] [Render thread/INFO]: Closed DhWorld of type [CLIENT_SERVER].
-[15:31:24] [Render thread/INFO]: Shutting down PriorityTaskPicker thread pool...
-[15:31:24] [Server thread/INFO]: Stopping server
-[15:31:24] [Server thread/INFO]: Saving players
-[15:31:24] [Server thread/INFO]: Saving worlds
-[15:31:24] [Render thread/INFO]: Closing all [4] database connections...
-[15:31:24] [Render thread/INFO]: Closing database connection: [jdbc:sqlite:/home/matt/Documents/Repos/MattMC/run/saves/New World/DIM1/data/DistantHorizons.sqlite]
-[15:31:24] [Render thread/INFO]: Closing database connection: [jdbc:sqlite:/home/matt/Documents/Repos/MattMC/run/saves/New World/data/DistantHorizons.sqlite]
-[15:31:24] [Render thread/INFO]: Closing database connection: [jdbc:sqlite:/home/matt/Documents/Repos/MattMC/run/saves/New World/dimensions/minecraft/primordial_caves/data/DistantHorizons.sqlite]
-[15:31:24] [Render thread/INFO]: Closing database connection: [jdbc:sqlite:/home/matt/Documents/Repos/MattMC/run/saves/New World/DIM-1/data/DistantHorizons.sqlite]
-[15:31:24] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:overworld
-[15:31:24] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:primordial_caves
-[15:31:24] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:the_nether
-[15:31:24] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:the_end
-[15:31:24] [Server thread/INFO]: ThreadedAnvilChunkStorage (New World): All chunks are saved
-[15:31:24] [Server thread/INFO]: ThreadedAnvilChunkStorage (primordial_caves): All chunks are saved
-[15:31:24] [Server thread/INFO]: ThreadedAnvilChunkStorage (DIM-1): All chunks are saved
-[15:31:24] [Server thread/INFO]: ThreadedAnvilChunkStorage (DIM1): All chunks are saved
-[15:31:24] [Server thread/INFO]: ThreadedAnvilChunkStorage: All dimensions are saved
-[15:31:24] [Render thread/INFO]: Unloading client level [ClientLevelWrapper]-[dv89624uldmkc@minecraft:overworld].
-[15:31:24] [Render thread/INFO]: Stopping worker threads
-[15:31:26] [Render thread/INFO]: Stopping!
+[15:39:38] [Render thread/INFO]: GPU Vendor [NVIDIA CORPORATION] with OS [Linux], Preferred upload method is [BUFFER_STORAGE].
+[15:39:38] [Render thread/INFO]: GLProxy creation successful. OpenGL smiles upon you this day.
+[15:39:38] [Render thread/WARN]: [DH-RENDER-VALIDATION] ========== VALIDATION FAILED ==========
+[15:39:38] [Render thread/WARN]: [DH-RENDER-VALIDATION] Reason: No Lightmap Loaded
+[15:39:38] [Render thread/WARN]: [DH-RENDER-VALIDATION] Current DH world: com.seibel.distanthorizons.core.world.DhClientServerWorld@12c5f324
+[15:39:38] [Render thread/WARN]: [DH-RENDER-VALIDATION] tryGetDhClientWorld: com.seibel.distanthorizons.core.world.DhClientServerWorld@12c5f324
+[15:39:38] [Render thread/WARN]: [DH-RENDER-VALIDATION] dhClientWorld from params: com.seibel.distanthorizons.core.world.DhClientServerWorld@12c5f324
+[15:39:38] [Render thread/WARN]: [DH-RENDER-VALIDATION] dhClientLevel from params: DhClientServerLevel{New_World_dv89624uldmkc@minecraft:overworld}
+[15:39:38] [Render thread/WARN]: [DH-RENDER-VALIDATION] clientLevelWrapper from params: Wrapped{ClientLevel@dv89624uldmkc@minecraft:overworld}
+[15:39:38] [Render thread/WARN]: [DH-RENDER-VALIDATION] ========================================
+[15:39:38] [Render thread/INFO]: Resizing Dynamic Transforms UBO, capacity limit of 4 reached during a single frame. New capacity will be 8.
+[15:39:38] [Render thread/WARN]: [DH-RENDER-VALIDATION] ========== VALIDATION FAILED ==========
+[15:39:38] [Render thread/WARN]: [DH-RENDER-VALIDATION] Reason: No Lightmap Loaded
+[15:39:38] [Render thread/WARN]: [DH-RENDER-VALIDATION] Current DH world: com.seibel.distanthorizons.core.world.DhClientServerWorld@12c5f324
+[15:39:38] [Render thread/WARN]: [DH-RENDER-VALIDATION] tryGetDhClientWorld: com.seibel.distanthorizons.core.world.DhClientServerWorld@12c5f324
+[15:39:38] [Render thread/WARN]: [DH-RENDER-VALIDATION] dhClientWorld from params: com.seibel.distanthorizons.core.world.DhClientServerWorld@12c5f324
+[15:39:38] [Render thread/WARN]: [DH-RENDER-VALIDATION] dhClientLevel from params: DhClientServerLevel{New_World_dv89624uldmkc@minecraft:overworld}
+[15:39:38] [Render thread/WARN]: [DH-RENDER-VALIDATION] clientLevelWrapper from params: Wrapped{ClientLevel@dv89624uldmkc@minecraft:overworld}
+[15:39:38] [Render thread/WARN]: [DH-RENDER-VALIDATION] ========================================
+[15:39:38] [Render thread/INFO]: Setting up renderer
+[15:39:38] [Render thread/INFO]: Loading shader with type: [35633]
+[15:39:38] [Render thread/INFO]: Shader loaded sucessfully.
+[15:39:38] [Render thread/INFO]: Loading shader with type: [35632]
+[15:39:38] [Render thread/INFO]: Shader loaded sucessfully.
+[15:39:38] [Render thread/INFO]: Vertex Attribute (GL43+) completed. It contains 1 binding points and a stride size of 16
+[15:39:38] [Render thread/INFO]: Renderer setup complete
+[15:39:38] [Render thread/ERROR]: Unexpected; somehow the Opaque + Translucent pass ran with shaders on.
+[15:39:38] [Render thread/INFO]: Loading shader with type: [35633]
+[15:39:38] [Render thread/INFO]: Shader loaded sucessfully.
+[15:39:38] [Render thread/INFO]: Loading shader with type: [35632]
+[15:39:38] [Render thread/INFO]: Shader loaded sucessfully.
+[15:39:38] [Render thread/INFO]: Vertex Attribute (GL43+) completed. It contains 1 binding points and a stride size of 12
+[15:39:38] [Render thread/INFO]: Loading shader with type: [35633]
+[15:39:38] [Render thread/INFO]: Shader loaded sucessfully.
+[15:39:38] [Render thread/INFO]: Loading shader with type: [35632]
+[15:39:38] [Render thread/INFO]: Shader loaded sucessfully.
+[15:39:38] [Render thread/INFO]: Vertex Attribute (GL43+) completed. It contains 1 binding points and a stride size of 12
+[15:39:38] [Render thread/INFO]: Resizing Dynamic Transforms UBO, capacity limit of 8 reached during a single frame. New capacity will be 16.
+[15:39:40] [Render thread/INFO]: [STDOUT]: [JEI DEBUG] Item clicked: minecraft:stripped_acacia_wood
+[15:39:40] [Render thread/INFO]: [STDOUT]: [JEI DEBUG] Item count to add: 1
+[15:39:40] [Render thread/INFO]: [STDOUT]: [JEI DEBUG] getSlotWithRemainingSpace returned: 7
+[15:39:40] [Render thread/INFO]: [STDOUT]: [JEI DEBUG] inventoryIndexToContainerSlot called with index: 7
+[15:39:40] [Render thread/INFO]: [STDOUT]: [JEI DEBUG] Hotbar conversion: 7 -> 43
+[15:39:40] [Render thread/INFO]: [STDOUT]: [JEI DEBUG] Converted inventory index 7 to container slot 43
+[15:39:40] [Render thread/INFO]: [STDOUT]: [JEI DEBUG] Using slot with space: 43
+[15:39:40] [Render thread/INFO]: [STDOUT]: [JEI DEBUG] Target slot: 43
+[15:39:40] [Render thread/INFO]: [STDOUT]: [JEI DEBUG] Calling handleCreativeModeItemAdd with slot 43
+[15:39:40] [Render thread/INFO]: [STDOUT]: [JEI CLIENT DEBUG] handleCreativeModeItemAdd called
+[15:39:40] [Render thread/INFO]: [STDOUT]: [JEI CLIENT DEBUG] Slot: 43, Item: 1 minecraft:stripped_acacia_wood
+[15:39:40] [Render thread/INFO]: [STDOUT]: [JEI CLIENT DEBUG] Sending ServerboundSetCreativeModeSlotPacket
+[15:39:40] [Render thread/INFO]: [STDOUT]: [JEI CLIENT DEBUG] Packet sent successfully
+[15:39:40] [Render thread/INFO]: [STDOUT]: [JEI DEBUG] Item added successfully
+[15:39:40] [Server thread/INFO]: [STDOUT]: [JEI SERVER DEBUG] handleSetCreativeModeSlot called
+[15:39:40] [Server thread/INFO]: [STDOUT]: [JEI SERVER DEBUG] Slot number: 43
+[15:39:40] [Server thread/INFO]: [STDOUT]: [JEI SERVER DEBUG] Item stack: 1 minecraft:stripped_acacia_wood
+[15:39:40] [Server thread/INFO]: [STDOUT]: [JEI SERVER DEBUG] bl (negative slot): false
+[15:39:40] [Server thread/INFO]: [STDOUT]: [JEI SERVER DEBUG] bl2 (slot 1-45): true
+[15:39:40] [Server thread/INFO]: [STDOUT]: [JEI SERVER DEBUG] bl3 (valid stack): true
+[15:39:40] [Server thread/INFO]: [STDOUT]: [JEI SERVER DEBUG] Setting item in slot 43
+[15:39:40] [Server thread/INFO]: [STDOUT]: [JEI SERVER DEBUG] Item set successfully
+[15:39:40] [Render thread/INFO]: [STDOUT]: [JEI DEBUG] Item clicked: minecraft:stripped_acacia_wood
+[15:39:40] [Render thread/INFO]: [STDOUT]: [JEI DEBUG] Item count to add: 1
+[15:39:40] [Render thread/INFO]: [STDOUT]: [JEI DEBUG] getSlotWithRemainingSpace returned: 7
+[15:39:40] [Render thread/INFO]: [STDOUT]: [JEI DEBUG] inventoryIndexToContainerSlot called with index: 7
+[15:39:40] [Render thread/INFO]: [STDOUT]: [JEI DEBUG] Hotbar conversion: 7 -> 43
+[15:39:40] [Render thread/INFO]: [STDOUT]: [JEI DEBUG] Converted inventory index 7 to container slot 43
+[15:39:40] [Render thread/INFO]: [STDOUT]: [JEI DEBUG] Using slot with space: 43
+[15:39:40] [Render thread/INFO]: [STDOUT]: [JEI DEBUG] Target slot: 43
+[15:39:40] [Render thread/INFO]: [STDOUT]: [JEI DEBUG] Calling handleCreativeModeItemAdd with slot 43
+[15:39:40] [Render thread/INFO]: [STDOUT]: [JEI CLIENT DEBUG] handleCreativeModeItemAdd called
+[15:39:40] [Render thread/INFO]: [STDOUT]: [JEI CLIENT DEBUG] Slot: 43, Item: 1 minecraft:stripped_acacia_wood
+[15:39:40] [Render thread/INFO]: [STDOUT]: [JEI CLIENT DEBUG] Sending ServerboundSetCreativeModeSlotPacket
+[15:39:40] [Render thread/INFO]: [STDOUT]: [JEI CLIENT DEBUG] Packet sent successfully
+[15:39:40] [Render thread/INFO]: [STDOUT]: [JEI DEBUG] Item added successfully
+[15:39:40] [Server thread/INFO]: [STDOUT]: [JEI SERVER DEBUG] handleSetCreativeModeSlot called
+[15:39:40] [Server thread/INFO]: [STDOUT]: [JEI SERVER DEBUG] Slot number: 43
+[15:39:40] [Server thread/INFO]: [STDOUT]: [JEI SERVER DEBUG] Item stack: 1 minecraft:stripped_acacia_wood
+[15:39:40] [Server thread/INFO]: [STDOUT]: [JEI SERVER DEBUG] bl (negative slot): false
+[15:39:40] [Server thread/INFO]: [STDOUT]: [JEI SERVER DEBUG] bl2 (slot 1-45): true
+[15:39:40] [Server thread/INFO]: [STDOUT]: [JEI SERVER DEBUG] bl3 (valid stack): true
+[15:39:40] [Server thread/INFO]: [STDOUT]: [JEI SERVER DEBUG] Setting item in slot 43
+[15:39:40] [Server thread/INFO]: [STDOUT]: [JEI SERVER DEBUG] Item set successfully
+[15:39:44] [Render thread/INFO]: [STDOUT]: [JEI DEBUG] Item clicked: minecraft:oak_door
+[15:39:44] [Render thread/INFO]: [STDOUT]: [JEI DEBUG] Item count to add: 1
+[15:39:44] [Render thread/INFO]: [STDOUT]: [JEI DEBUG] getSlotWithRemainingSpace returned: -1
+[15:39:44] [Render thread/INFO]: [STDOUT]: [JEI DEBUG] getFreeSlot returned: 10
+[15:39:44] [Render thread/INFO]: [STDOUT]: [JEI DEBUG] inventoryIndexToContainerSlot called with index: 10
+[15:39:44] [Render thread/INFO]: [STDOUT]: [JEI DEBUG] Main inventory conversion: 10 -> 10
+[15:39:44] [Render thread/INFO]: [STDOUT]: [JEI DEBUG] Converted inventory index 10 to container slot 10
+[15:39:44] [Render thread/INFO]: [STDOUT]: [JEI DEBUG] Using free slot: 10
+[15:39:44] [Render thread/INFO]: [STDOUT]: [JEI DEBUG] Target slot: 10
+[15:39:44] [Render thread/INFO]: [STDOUT]: [JEI DEBUG] Calling handleCreativeModeItemAdd with slot 10
+[15:39:44] [Render thread/INFO]: [STDOUT]: [JEI CLIENT DEBUG] handleCreativeModeItemAdd called
+[15:39:44] [Render thread/INFO]: [STDOUT]: [JEI CLIENT DEBUG] Slot: 10, Item: 1 minecraft:oak_door
+[15:39:44] [Render thread/INFO]: [STDOUT]: [JEI CLIENT DEBUG] Sending ServerboundSetCreativeModeSlotPacket
+[15:39:44] [Render thread/INFO]: [STDOUT]: [JEI CLIENT DEBUG] Packet sent successfully
+[15:39:44] [Render thread/INFO]: [STDOUT]: [JEI DEBUG] Item added successfully
+[15:39:44] [Server thread/INFO]: [STDOUT]: [JEI SERVER DEBUG] handleSetCreativeModeSlot called
+[15:39:44] [Server thread/INFO]: [STDOUT]: [JEI SERVER DEBUG] Slot number: 10
+[15:39:44] [Server thread/INFO]: [STDOUT]: [JEI SERVER DEBUG] Item stack: 1 minecraft:oak_door
+[15:39:44] [Server thread/INFO]: [STDOUT]: [JEI SERVER DEBUG] bl (negative slot): false
+[15:39:44] [Server thread/INFO]: [STDOUT]: [JEI SERVER DEBUG] bl2 (slot 1-45): true
+[15:39:44] [Server thread/INFO]: [STDOUT]: [JEI SERVER DEBUG] bl3 (valid stack): true
+[15:39:44] [Server thread/INFO]: [STDOUT]: [JEI SERVER DEBUG] Setting item in slot 10
+[15:39:44] [Server thread/INFO]: [STDOUT]: [JEI SERVER DEBUG] Item set successfully
+[15:39:44] [Render thread/INFO]: [STDOUT]: [JEI DEBUG] Item clicked: minecraft:oak_door
+[15:39:44] [Render thread/INFO]: [STDOUT]: [JEI DEBUG] Item count to add: 1
+[15:39:44] [Render thread/INFO]: [STDOUT]: [JEI DEBUG] getSlotWithRemainingSpace returned: -1
+[15:39:44] [Render thread/INFO]: [STDOUT]: [JEI DEBUG] getFreeSlot returned: 10
+[15:39:44] [Render thread/INFO]: [STDOUT]: [JEI DEBUG] inventoryIndexToContainerSlot called with index: 10
+[15:39:44] [Render thread/INFO]: [STDOUT]: [JEI DEBUG] Main inventory conversion: 10 -> 10
+[15:39:44] [Render thread/INFO]: [STDOUT]: [JEI DEBUG] Converted inventory index 10 to container slot 10
+[15:39:44] [Render thread/INFO]: [STDOUT]: [JEI DEBUG] Using free slot: 10
+[15:39:44] [Render thread/INFO]: [STDOUT]: [JEI DEBUG] Target slot: 10
+[15:39:44] [Render thread/INFO]: [STDOUT]: [JEI DEBUG] Calling handleCreativeModeItemAdd with slot 10
+[15:39:44] [Render thread/INFO]: [STDOUT]: [JEI CLIENT DEBUG] handleCreativeModeItemAdd called
+[15:39:44] [Render thread/INFO]: [STDOUT]: [JEI CLIENT DEBUG] Slot: 10, Item: 1 minecraft:oak_door
+[15:39:44] [Render thread/INFO]: [STDOUT]: [JEI CLIENT DEBUG] Sending ServerboundSetCreativeModeSlotPacket
+[15:39:44] [Render thread/INFO]: [STDOUT]: [JEI CLIENT DEBUG] Packet sent successfully
+[15:39:44] [Render thread/INFO]: [STDOUT]: [JEI DEBUG] Item added successfully
+[15:39:44] [Server thread/INFO]: [STDOUT]: [JEI SERVER DEBUG] handleSetCreativeModeSlot called
+[15:39:44] [Server thread/INFO]: [STDOUT]: [JEI SERVER DEBUG] Slot number: 10
+[15:39:44] [Server thread/INFO]: [STDOUT]: [JEI SERVER DEBUG] Item stack: 1 minecraft:oak_door
+[15:39:44] [Server thread/INFO]: [STDOUT]: [JEI SERVER DEBUG] bl (negative slot): false
+[15:39:44] [Server thread/INFO]: [STDOUT]: [JEI SERVER DEBUG] bl2 (slot 1-45): true
+[15:39:44] [Server thread/INFO]: [STDOUT]: [JEI SERVER DEBUG] bl3 (valid stack): true
+[15:39:44] [Server thread/INFO]: [STDOUT]: [JEI SERVER DEBUG] Setting item in slot 10
+[15:39:44] [Server thread/INFO]: [STDOUT]: [JEI SERVER DEBUG] Item set successfully
+[15:39:44] [Server thread/INFO]: Saving and pausing game...
+[15:39:44] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:overworld
+[15:39:44] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:the_end
+[15:39:44] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:primordial_caves
+[15:39:44] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:the_nether
+[15:39:45] [Render thread/INFO]: Client on ClientOnly mode disconnecting.
+[15:39:45] [level shutdown/INFO]: Shutting down ClientRenderState
+[15:39:45] [level shutdown/INFO]: Shutting down LodQuadTree...
+[15:39:45] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[New World]@minecraft:the_end}].
+[15:39:45] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[New World]@minecraft:the_nether}].
+[15:39:45] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[New World]@minecraft:primordial_caves}].
+[15:39:45] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[New World]@minecraft:the_end}
+[15:39:45] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[New World]@minecraft:the_nether}
+[15:39:45] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[New World]@minecraft:primordial_caves}
+[15:39:45] [level shutdown/INFO]: Finished shutting down LodQuadTree
+[15:39:45] [level shutdown/INFO]: Closing world gen queue
+[15:39:45] [level shutdown/INFO]: Closing WorldGenerationQueue...
+[15:39:45] [level shutdown/INFO]: Shutting down world generator thread pool...
+[15:39:45] [level shutdown/INFO]: World generator thread pool shutdown with [0] incomplete tasks.
+[15:39:45] [level shutdown/INFO]: [BatchGenerator] shutting down...
+[15:39:45] [level shutdown/INFO]: Closing [BatchGenerationEnvironment]
+[15:39:45] [level shutdown/INFO]: Finished closing WorldGenerationQueue
+[15:39:45] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[New World]@minecraft:overworld}].
+[15:39:45] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[New World]@minecraft:overworld}
+[15:39:45] [Render thread/INFO]: Closed DhWorld of type [CLIENT_SERVER].
+[15:39:45] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[New World]@minecraft:the_end}].
+[15:39:45] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[New World]@minecraft:overworld}].
+[15:39:45] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[New World]@minecraft:primordial_caves}].
+[15:39:45] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[New World]@minecraft:overworld}
+[15:39:45] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[New World]@minecraft:the_end}
+[15:39:45] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[New World]@minecraft:the_nether}].
+[15:39:45] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[New World]@minecraft:primordial_caves}
+[15:39:45] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[New World]@minecraft:the_nether}
+[15:39:45] [Render thread/INFO]: Closed DhWorld of type [CLIENT_SERVER].
+[15:39:45] [Render thread/INFO]: Shutting down PriorityTaskPicker thread pool...
+[15:39:45] [Render thread/INFO]: Closing all [4] database connections...
+[15:39:45] [Render thread/INFO]: Closing database connection: [jdbc:sqlite:/home/matt/Documents/Repos/MattMC/run/saves/New World/dimensions/minecraft/primordial_caves/data/DistantHorizons.sqlite]
+[15:39:45] [Render thread/INFO]: Closing database connection: [jdbc:sqlite:/home/matt/Documents/Repos/MattMC/run/saves/New World/data/DistantHorizons.sqlite]
+[15:39:45] [Server thread/INFO]: Player901 lost connection: Disconnected
+[15:39:45] [Server thread/INFO]: Player901 left the game
+[15:39:45] [Render thread/INFO]: Closing database connection: [jdbc:sqlite:/home/matt/Documents/Repos/MattMC/run/saves/New World/DIM1/data/DistantHorizons.sqlite]
+[15:39:45] [Render thread/INFO]: Closing database connection: [jdbc:sqlite:/home/matt/Documents/Repos/MattMC/run/saves/New World/DIM-1/data/DistantHorizons.sqlite]
+[15:39:45] [Server thread/INFO]: Stopping singleplayer server as player logged out
+[15:39:45] [Server thread/INFO]: Stopping server
+[15:39:45] [Server thread/INFO]: Saving players
+[15:39:45] [Server thread/INFO]: Saving worlds
+[15:39:45] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:overworld
+[15:39:45] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:the_end
+[15:39:45] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:primordial_caves
+[15:39:45] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:the_nether
+[15:39:45] [Server thread/INFO]: ThreadedAnvilChunkStorage (New World): All chunks are saved
+[15:39:45] [Server thread/INFO]: ThreadedAnvilChunkStorage (DIM1): All chunks are saved
+[15:39:45] [Server thread/INFO]: ThreadedAnvilChunkStorage (primordial_caves): All chunks are saved
+[15:39:45] [Server thread/INFO]: ThreadedAnvilChunkStorage (DIM-1): All chunks are saved
+[15:39:45] [Server thread/INFO]: ThreadedAnvilChunkStorage: All dimensions are saved
+[15:39:45] [Render thread/INFO]: Unloading client level [ClientLevelWrapper]-[dv89624uldmkc@minecraft:overworld].
+[15:39:45] [Render thread/INFO]: Stopping worker threads
+[15:39:45] [Render thread/INFO]: Stopping!
 
-BUILD SUCCESSFUL in 53s
+BUILD SUCCESSFUL in 1m 19s
 7 actionable tasks: 7 executed
