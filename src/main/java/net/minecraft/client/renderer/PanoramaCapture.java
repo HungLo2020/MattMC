@@ -231,7 +231,14 @@ public class PanoramaCapture {
 				return currentFace >= FACE_COUNT;
 			}
 			
+			// Wait for delay to complete before capturing
+			if (delayCounter < DELAY_FRAMES) {
+				return false;
+			}
+			
+			// Reset for next face
 			faceReady = false;
+			delayCounter = 0;
 			
 			// Get the face index for proper file naming
 			int faceIndex = FACE_INDICES[currentFace];
