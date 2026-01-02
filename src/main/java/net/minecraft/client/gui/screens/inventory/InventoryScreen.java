@@ -54,8 +54,7 @@ public class InventoryScreen extends AbstractRecipeBookScreen<InventoryMenu> {
 		super(player.inventoryMenu, new CraftingRecipeBookComponent(player.inventoryMenu), player.getInventory(), Component.translatable("container.crafting"));
 		this.titleLabelX = 97;
 		this.effects = new EffectsInInventory(this);
-		// Initialize JEI item list
-		this.rebuildJeiItemList();
+		// JEI item list will be initialized in init() when minecraft instance is available
 	}
 
 	@Override
@@ -68,6 +67,18 @@ public class InventoryScreen extends AbstractRecipeBookScreen<InventoryMenu> {
 	protected void init() {
 		// No longer switch to creative inventory - stay in survival inventory even in creative mode
 		super.init();
+		
+		// Ensure creative tabs are built before accessing items
+		if (this.minecraft != null && this.minecraft.player != null && this.minecraft.player.connection != null) {
+			CreativeModeTabs.tryRebuildTabContents(
+				this.minecraft.player.connection.enabledFeatures(),
+				this.minecraft.player.canUseGameMasterBlocks(),
+				this.minecraft.player.level().registryAccess()
+			);
+		}
+		
+		// Now rebuild the JEI item list with the built tabs
+		this.rebuildJeiItemList();
 		this.calculateJeiPanelLayout();
 	}
 	
