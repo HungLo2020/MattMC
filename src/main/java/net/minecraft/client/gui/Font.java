@@ -305,6 +305,14 @@ public class Font {
 		}
 
 		public boolean accept(int i, Style style, int j) {
+			if (i < 10) { // Only log first 10 characters to avoid spam
+				org.slf4j.LoggerFactory.getLogger("Font").info("[CHAT_STYLE_DEBUG] Font.PreparedTextBuilder.accept - char: '{}' ({}), style: {}", 
+					(char)j, j, style);
+				if (style.getColor() != null) {
+					org.slf4j.LoggerFactory.getLogger("Font").info("[CHAT_STYLE_DEBUG] Font.PreparedTextBuilder.accept - style has color: {}", 
+						style.getColor());
+				}
+			}
 			BakedGlyph bakedGlyph = Font.this.getGlyph(j, style);
 			return this.accept(i, style, bakedGlyph);
 		}
