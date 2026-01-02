@@ -91,8 +91,7 @@ public class PauseScreen extends Screen {
 		}
 		rowHelper.addChild(
 			Button.builder(TAKE_PANORAMA, button -> {
-				// Placeholder for panorama capture functionality
-				// TODO: Implement panorama capture
+				net.minecraft.client.renderer.PanoramaCapture.start(this.minecraft);
 			}).width(BUTTON_WIDTH_FULL).build(),
 			2
 		);
