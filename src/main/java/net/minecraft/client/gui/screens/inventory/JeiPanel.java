@@ -215,11 +215,7 @@ public class JeiPanel {
 					int x = this.panelX + 2 + col * this.slotSize;
 					int y = this.panelY + 2 + row * this.slotSize;
 					
-					// Draw slot background
-					guiGraphics.fill(x, y, x + 16, y + 16, 0xFF8B8B8B);
-					guiGraphics.fill(x + 1, y + 1, x + 16, y + 16, 0xFF373737);
-					
-					// Render item
+					// Render item directly without slot background
 					guiGraphics.renderItem(itemStack, x, y);
 					guiGraphics.renderItemDecorations(this.font, itemStack, x, y);
 				}
