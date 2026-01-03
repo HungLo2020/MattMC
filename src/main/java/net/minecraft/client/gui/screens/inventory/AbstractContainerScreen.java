@@ -12,6 +12,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.BundleMouseActions;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.ItemSlotMouseAction;
+import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.inventory.tooltip.ClientTooltipComponent;
 import net.minecraft.client.input.CharacterEvent;
@@ -27,6 +28,7 @@ import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.ClickType;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.GameType;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Vector2i;
 
@@ -75,6 +77,10 @@ public abstract class AbstractContainerScreen<T extends AbstractContainerMenu> e
 	// JEI panel - available in all inventory screens
 	@Nullable
 	protected JeiPanel jeiPanel;
+	
+	// Game mode toggle button
+	@Nullable
+	private net.minecraft.client.gui.components.Button gameModeToggleButton;
 
 	public AbstractContainerScreen(T abstractContainerMenu, Inventory inventory, Component component) {
 		super(component);
@@ -101,6 +107,14 @@ public abstract class AbstractContainerScreen<T extends AbstractContainerMenu> e
 			this.jeiPanel.init();
 			this.jeiPanel.calculateLayout(this.width, this.height, this.leftPos + this.imageWidth, this.topPos);
 		}
+		
+		// Add game mode toggle button at top left
+		this.gameModeToggleButton = this.addRenderableWidget(
+			Button.builder(this.getGameModeButtonText(), button -> this.toggleGameMode())
+				.pos(4, 4)
+				.size(80, 20)
+				.build()
+		);
 	}
 
 	protected void addItemSlotMouseAction(ItemSlotMouseAction itemSlotMouseAction) {
@@ -752,6 +766,31 @@ public abstract class AbstractContainerScreen<T extends AbstractContainerMenu> e
 		}
 
 		super.onClose();
+	}
+	
+	private Component getGameModeButtonText() {
+		if (this.minecraft != null && this.minecraft.gameMode != null) {
+			GameType currentMode = this.minecraft.gameMode.getPlayerMode();
+			if (currentMode == GameType.CREATIVE) {
+				return Component.literal("Creative");
+			} else if (currentMode == GameType.SURVIVAL) {
+				return Component.literal("Survival");
+			}
+		}
+		return Component.literal("Mode");
+	}
+	
+	private void toggleGameMode() {
+		if (this.minecraft != null && this.minecraft.player != null && this.minecraft.player.connection != null) {
+			GameType currentMode = this.minecraft.gameMode.getPlayerMode();
+			String newMode = currentMode == GameType.CREATIVE ? "survival" : "creative";
+			this.minecraft.player.connection.sendCommand("gamemode " + newMode);
+			
+			// Update button text
+			if (this.gameModeToggleButton != null) {
+				this.gameModeToggleButton.setMessage(this.getGameModeButtonText());
+			}
+		}
 	}
 
 	@Environment(EnvType.CLIENT)
