@@ -7,9 +7,9 @@ pluginManagement {
 }
 
 // Enable automatic JDK provisioning for toolchains
-// This allows Gradle to automatically download Java 21 when not found locally
+// This allows Gradle to automatically download the configured Java version when not found locally
 plugins {
-    id 'org.gradle.toolchains.foojay-resolver-convention' version '0.8.0'
+    id 'org.gradle.toolchains.foojay-resolver-convention' version '1.0.0'
 }
 
 rootProject.name = 'MattMC'
