@@ -9,6 +9,8 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.navigation.ScreenPosition;
 import net.minecraft.client.gui.screens.recipebook.CraftingRecipeBookComponent;
+import net.minecraft.client.input.CharacterEvent;
+import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.client.renderer.entity.EntityRenderDispatcher;
@@ -619,19 +621,22 @@ public class InventoryScreen extends AbstractRecipeBookScreen<InventoryMenu> {
 	}
 	
 	@Override
-	public boolean charTyped(char c, int i) {
+	public boolean charTyped(CharacterEvent characterEvent) {
 		if (this.jeiSearchFocused) {
 			// Add character to search text
-			this.jeiSearchText += c;
+			this.jeiSearchText += characterEvent.codepointAsString();
 			this.updateFilteredItems();
 			return true;
 		}
-		return super.charTyped(c, i);
+		return super.charTyped(characterEvent);
 	}
 	
 	@Override
-	public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+	public boolean keyPressed(KeyEvent keyEvent) {
 		if (this.jeiSearchFocused) {
+			int keyCode = keyEvent.key();
+			int modifiers = keyEvent.modifiers();
+			
 			// Handle special keys
 			if (keyCode == 259) { // Backspace
 				if (!this.jeiSearchText.isEmpty()) {
@@ -676,7 +681,7 @@ public class InventoryScreen extends AbstractRecipeBookScreen<InventoryMenu> {
 				return true;
 			}
 		}
-		return super.keyPressed(keyCode, scanCode, modifiers);
+		return super.keyPressed(keyEvent);
 	}
 	
 	@Override
