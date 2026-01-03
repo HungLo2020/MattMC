@@ -169,9 +169,8 @@ public class InventoryScreen extends AbstractRecipeBookScreen<InventoryMenu> {
 		this.jeiColumns = Math.max(1, widthForSlots / slotSpacing);
 		
 		// Calculate rows using full available height
-		// Account for small top/bottom padding inside panel (2px each = 4px total)
 		// Reserve space for search bar at bottom (20px + 4px gap)
-		int heightForSlots = availableHeight - 4 - this.jeiSearchBarHeight - 4;
+		int heightForSlots = availableHeight - this.jeiSearchBarHeight - 4;
 		this.jeiRows = Math.max(1, heightForSlots / slotSpacing);
 		
 		// Limit columns to a reasonable number (like JEI does)
@@ -182,8 +181,8 @@ public class InventoryScreen extends AbstractRecipeBookScreen<InventoryMenu> {
 		// Recalculate X position to anchor to right edge with the final width
 		this.jeiPanelX = screenWidth - this.jeiPanelWidth - rightMargin;
 		
-		// Panel height = rows + padding + search bar + gap
-		this.jeiPanelHeight = this.jeiRows * slotSpacing + 4 + 4 + this.jeiSearchBarHeight;
+		// Panel height = exact rows height + gap + search bar (no extra padding to avoid black bar)
+		this.jeiPanelHeight = this.jeiRows * slotSpacing + 4 + this.jeiSearchBarHeight;
 	}
 
 	@Override
@@ -680,6 +679,9 @@ public class InventoryScreen extends AbstractRecipeBookScreen<InventoryMenu> {
 				}
 				return true;
 			}
+			// When search is focused, consume ALL key events to prevent them from
+			// triggering other actions (like 'E' closing the inventory)
+			return true;
 		}
 		return super.keyPressed(keyEvent);
 	}
