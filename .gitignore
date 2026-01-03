@@ -40,3 +40,4 @@ jmh-result.txt
 .jacoco/
 /Task
 *.inline_backup
+/libraries/jdk-25/
