@@ -524,7 +524,7 @@ public class JeiPanel {
 		int slotWithSpace = inventory.getSlotWithRemainingSpace(itemStack);
 		if (slotWithSpace != -1) {
 			int containerSlot = inventoryIndexToContainerSlot(slotWithSpace);
-			if (containerSlot != -1 && containerSlot >= 9) {
+			if (containerSlot != -1) {
 				return containerSlot;
 			}
 		}
@@ -533,7 +533,7 @@ public class JeiPanel {
 		int freeSlot = inventory.getFreeSlot();
 		if (freeSlot != -1) {
 			int containerSlot = inventoryIndexToContainerSlot(freeSlot);
-			if (containerSlot != -1 && containerSlot >= 9) {
+			if (containerSlot != -1) {
 				return containerSlot;
 			}
 		}
@@ -541,14 +541,34 @@ public class JeiPanel {
 		return -1;
 	}
 	
+	/**
+	 * Converts a player inventory index to the correct container slot index.
+	 * This dynamically finds where the player's inventory is in the current container.
+	 */
 	private int inventoryIndexToContainerSlot(int inventoryIndex) {
-		if (inventoryIndex >= 0 && inventoryIndex <= 8) {
-			return inventoryIndex + 36; // Hotbar
-		} else if (inventoryIndex >= 9 && inventoryIndex <= 35) {
-			return inventoryIndex; // Main inventory
-		} else if (inventoryIndex == 40) {
-			return 45; // Offhand
+		if (this.minecraft == null || this.minecraft.player == null) {
+			return -1;
 		}
+		
+		// Get the currently open container
+		var containerMenu = this.minecraft.player.containerMenu;
+		if (containerMenu == null) {
+			return -1;
+		}
+		
+		// Find which slot in the container corresponds to this inventory index
+		// by checking which slots belong to the player's inventory
+		for (int i = 0; i < containerMenu.slots.size(); i++) {
+			var slot = containerMenu.slots.get(i);
+			// Check if this slot belongs to the player's inventory
+			if (slot.container == this.minecraft.player.getInventory()) {
+				// Check if this is the slot we're looking for
+				if (slot.getContainerSlot() == inventoryIndex) {
+					return i;
+				}
+			}
+		}
+		
 		return -1;
 	}
 }
