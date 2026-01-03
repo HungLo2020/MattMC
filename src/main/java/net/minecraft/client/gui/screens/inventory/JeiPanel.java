@@ -524,7 +524,6 @@ public class JeiPanel {
 		int slotWithSpace = inventory.getSlotWithRemainingSpace(itemStack);
 		if (slotWithSpace != -1) {
 			int containerSlot = inventoryIndexToContainerSlot(slotWithSpace);
-			System.out.println("[JEI DEBUG] Found stack with space - inventory index: " + slotWithSpace + ", container slot: " + containerSlot);
 			if (containerSlot != -1) {
 				return containerSlot;
 			}
@@ -534,7 +533,6 @@ public class JeiPanel {
 		int freeSlot = inventory.getFreeSlot();
 		if (freeSlot != -1) {
 			int containerSlot = inventoryIndexToContainerSlot(freeSlot);
-			System.out.println("[JEI DEBUG] Found free slot - inventory index: " + freeSlot + ", container slot: " + containerSlot);
 			if (containerSlot != -1) {
 				return containerSlot;
 			}
@@ -560,23 +558,17 @@ public class JeiPanel {
 		
 		Inventory playerInventory = this.minecraft.player.getInventory();
 		
-		System.out.println("[JEI DEBUG] Looking for inventory index " + inventoryIndex + " in container with " + containerMenu.slots.size() + " slots");
-		
 		// Find which slot in the container corresponds to this inventory index
 		// by checking which slots belong to the player's inventory
 		int foundSlot = -1;
-		int matchCount = 0;
 		for (int i = 0; i < containerMenu.slots.size(); i++) {
 			var slot = containerMenu.slots.get(i);
 			// Check if this slot belongs to the player's inventory
 			if (slot.container == playerInventory) {
 				int slotIndex = slot.getContainerSlot();
-				System.out.println("[JEI DEBUG]   Container slot " + i + " -> inventory slot " + slotIndex);
 				// slot.getContainerSlot() gives the index within the inventory (0-40)
 				// We need to match it to our inventoryIndex
 				if (slotIndex == inventoryIndex) {
-					matchCount++;
-					System.out.println("[JEI DEBUG]   MATCH! (match #" + matchCount + ")");
 					// Only return the first match
 					if (foundSlot == -1) {
 						foundSlot = i;
@@ -585,11 +577,6 @@ public class JeiPanel {
 			}
 		}
 		
-		if (matchCount > 1) {
-			System.out.println("[JEI DEBUG] WARNING: Found " + matchCount + " slots matching inventory index " + inventoryIndex + "!");
-		}
-		
-		System.out.println("[JEI DEBUG] Returning container slot: " + foundSlot);
 		return foundSlot;
 	}
 }
