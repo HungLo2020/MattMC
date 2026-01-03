@@ -617,6 +617,7 @@ public class Options {
 	private CameraType cameraType = CameraType.FIRST_PERSON;
 	public String lastMpIp = "";
 	public String selectedSkin = "steve (Wide)";
+	public String playerName = "steve";
 	public boolean smoothCamera;
 	private final OptionInstance<Integer> fov = new OptionInstance<>(
 		"options.fov",
@@ -1269,6 +1270,7 @@ public class Options {
 		this.incompatibleResourcePacks = fieldAccess.process("incompatibleResourcePacks", this.incompatibleResourcePacks, Options::readListOfStrings, GSON::toJson);
 		this.lastMpIp = fieldAccess.process("lastServer", this.lastMpIp);
 		this.selectedSkin = fieldAccess.process("selectedSkin", this.selectedSkin);
+		this.playerName = fieldAccess.process("playerName", this.playerName);
 		fieldAccess.process("lang", this.languageCode);
 		this.languageCode = "en_us";
 		fieldAccess.process("chatVisibility", this.chatVisibility);

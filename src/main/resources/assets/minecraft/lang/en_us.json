@@ -4942,6 +4942,8 @@
   "menu.customize": "Customize",
   "menu.customize.skin": "Player Skin",
   "menu.customize.skin.description": "Select your player skin",
+  "menu.customize.playerName": "Player Name",
+  "menu.customize.playerName.description": "This name will be used in-game (requires restart)",
   "menu.customize.reloadSkins": "Reload Skins",
   "menu.custom_options": "Custom Options...",
   "menu.custom_options.title": "Custom Options",
