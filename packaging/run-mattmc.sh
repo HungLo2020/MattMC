@@ -1,15 +1,18 @@
 #!/bin/bash
 # MattMC Client Launcher
 
+# Java version used in this distribution
+JAVA_VERSION=25
+
 # Get the directory containing this script (should be project root in distribution)
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$SCRIPT_DIR"
 
 # Use bundled JDK if available, otherwise use system java
-BUNDLED_JAVA="${SCRIPT_DIR}/run/jdk-25/bin/java"
+BUNDLED_JAVA="${SCRIPT_DIR}/run/jdk-${JAVA_VERSION}/bin/java"
 if [[ -x "$BUNDLED_JAVA" ]]; then
     JAVA_CMD="$BUNDLED_JAVA"
-    echo "Using bundled JDK 25"
+    echo "Using bundled JDK ${JAVA_VERSION}"
 else
     JAVA_CMD="java"
     echo "Using system Java"
