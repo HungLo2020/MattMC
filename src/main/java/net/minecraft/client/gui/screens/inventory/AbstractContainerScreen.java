@@ -89,6 +89,7 @@ public abstract class AbstractContainerScreen<T extends AbstractContainerMenu> e
 	private Button nightButton;
 	@Nullable
 	private Button weatherButton;
+	private boolean isWeatherClear = true; // Track weather state for toggling
 
 	public AbstractContainerScreen(T abstractContainerMenu, Inventory inventory, Component component) {
 		super(component);
@@ -840,7 +841,13 @@ public abstract class AbstractContainerScreen<T extends AbstractContainerMenu> e
 	private void toggleWeather() {
 		if (this.minecraft != null && this.minecraft.player != null && this.minecraft.player.connection != null) {
 			// Toggle between clear and rain
-			this.minecraft.player.connection.sendCommand("weather thunder");
+			if (this.isWeatherClear) {
+				this.minecraft.player.connection.sendCommand("weather rain");
+				this.isWeatherClear = false;
+			} else {
+				this.minecraft.player.connection.sendCommand("weather clear");
+				this.isWeatherClear = true;
+			}
 		}
 	}
 
