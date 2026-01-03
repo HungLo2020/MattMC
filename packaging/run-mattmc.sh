@@ -34,7 +34,6 @@ echo "Using bundled JDK ${JAVA_VERSION}"
 # Note: JVM_ARGS is intentionally not quoted to allow word splitting
 $JAVA_CMD -Xmx8G -Xms4G \
     -XX:+UseZGC \
-    -XX:+ZGenerational \
     -XX:+UseCompactObjectHeaders \
     -Dfabric.development=true \
     -cp "@CLASSPATH_LINUX@" \

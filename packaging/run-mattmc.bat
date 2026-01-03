@@ -25,7 +25,6 @@ REM Launch the game with Fabric Loader
 REM Note: Minecraft classes are included in the main JAR, no separate game JAR needed
 "%JAVA_CMD%" -Xmx8G -Xms4G ^
     -XX:+UseZGC ^
-    -XX:+ZGenerational ^
     -XX:+UseCompactObjectHeaders ^
     -Dfabric.development=true ^
     -cp "@CLASSPATH_WINDOWS@" ^

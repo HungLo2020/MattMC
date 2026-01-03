@@ -116,7 +116,6 @@ dependencies {
         implementation files('libraries/deps/jtracy-1.0.29.jar')
         // implementation files('libraries/deps/blocklist-1.0.10.jar') // REMOVED - using ALLOW_ALL AddressCheck
         // implementation files('libraries/deps/patchy-2.2.10.jar') // REMOVED - only contained blocklist functionality
-        implementation files('libraries/deps/text2speech-1.17.9.jar')
     } else {
         // Remote Mojang libraries (authlib removed - using custom PlayerProfile)
         implementation 'com.mojang:brigadier:1.3.10'
@@ -126,7 +125,6 @@ dependencies {
         implementation 'com.mojang:jtracy:1.0.29'
         // implementation 'com.mojang:blocklist:1.0.10' // REMOVED - using ALLOW_ALL AddressCheck
         // implementation 'com.mojang:patchy:2.2.10' // REMOVED - only contained blocklist functionality
-        implementation 'com.mojang:text2speech:1.17.9'
     }
     
     // Google libraries
@@ -417,7 +415,6 @@ def serverJvmArgs = [
     '-Xmx2G',
     '-Xms1G',
     '-XX:+UseZGC',
-    '-XX:+ZGenerational',
     '-XX:+UseCompactObjectHeaders'
 ]
 
@@ -426,7 +423,6 @@ def clientJvmArgs = [
     '-Xmx8G',
     '-Xms4G',
     '-XX:+UseZGC',
-    '-XX:+ZGenerational',
     '-XX:+UseCompactObjectHeaders',
     '-Dorg.lwjgl.util.Debug=true'
 ]
