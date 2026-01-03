@@ -483,8 +483,11 @@ public class MultiPlayerGameMode {
 	}
 
 	public void handleCreativeModeItemAdd(ItemStack itemStack, int i) {
-		if (this.minecraft.player.hasInfiniteMaterials() && this.connection.isFeatureEnabled(itemStack.getItem().requiredFeatures())) {
+		// Allow item addition in both creative and survival modes for JEI-like functionality
+		// Original check: if (this.minecraft.player.hasInfiniteMaterials() && this.connection.isFeatureEnabled(itemStack.getItem().requiredFeatures())) {
+		if (this.connection.isFeatureEnabled(itemStack.getItem().requiredFeatures())) {
 			this.connection.send(new ServerboundSetCreativeModeSlotPacket(i, itemStack));
+		} else {
 		}
 	}
 

@@ -8,11 +8,14 @@ import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.ChatFormatting;
 import net.minecraft.Util;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.BundleMouseActions;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.ItemSlotMouseAction;
+import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.inventory.tooltip.ClientTooltipComponent;
+import net.minecraft.client.input.CharacterEvent;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.client.renderer.RenderPipelines;
@@ -25,6 +28,7 @@ import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.ClickType;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.GameType;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Vector2i;
 
@@ -69,6 +73,23 @@ public abstract class AbstractContainerScreen<T extends AbstractContainerMenu> e
 	private int quickCraftingRemainder;
 	private boolean doubleclick;
 	private ItemStack lastQuickMoved = ItemStack.EMPTY;
+	
+	// JEI panel - available in all inventory screens
+	@Nullable
+	protected JeiPanel jeiPanel;
+	
+	// Game mode toggle button
+	@Nullable
+	private Button gameModeToggleButton;
+	
+	// Time and weather control buttons
+	@Nullable
+	private Button dayButton;
+	@Nullable
+	private Button nightButton;
+	@Nullable
+	private Button weatherButton;
+	private boolean isWeatherClear = true; // Track weather state for toggling
 
 	public AbstractContainerScreen(T abstractContainerMenu, Inventory inventory, Component component) {
 		super(component);
@@ -88,6 +109,45 @@ public abstract class AbstractContainerScreen<T extends AbstractContainerMenu> e
 		this.topPos = (this.height - this.imageHeight) / 2;
 		this.itemSlotMouseActions.clear();
 		this.addItemSlotMouseAction(new BundleMouseActions(this.minecraft));
+		
+		// Initialize JEI panel for all inventory screens
+		if (this.minecraft != null) {
+			this.jeiPanel = new JeiPanel(this.minecraft, this.font, this);
+			this.jeiPanel.init();
+			this.jeiPanel.calculateLayout(this.width, this.height, this.leftPos + this.imageWidth, this.topPos);
+		}
+		
+		// Add game mode toggle button at top left
+		this.gameModeToggleButton = this.addRenderableWidget(
+			Button.builder(this.getGameModeButtonText(), button -> this.toggleGameMode())
+				.pos(4, 4)
+				.size(80, 20)
+				.build()
+		);
+		
+		// Add Day button (half width of gamemode button)
+		this.dayButton = this.addRenderableWidget(
+			Button.builder(Component.literal("Day"), button -> this.setTimeToDay())
+				.pos(88, 4) // 4 + 80 + 4 spacing
+				.size(40, 20)
+				.build()
+		);
+		
+		// Add Night button
+		this.nightButton = this.addRenderableWidget(
+			Button.builder(Component.literal("Night"), button -> this.setTimeToNight())
+				.pos(132, 4) // 88 + 40 + 4 spacing
+				.size(40, 20)
+				.build()
+		);
+		
+		// Add Weather button
+		this.weatherButton = this.addRenderableWidget(
+			Button.builder(Component.literal("Weather"), button -> this.toggleWeather())
+				.pos(176, 4) // 132 + 40 + 4 spacing
+				.size(50, 20) // Slightly wider for "Weather" text
+				.build()
+		);
 	}
 
 	protected void addItemSlotMouseAction(ItemSlotMouseAction itemSlotMouseAction) {
@@ -167,10 +227,20 @@ public abstract class AbstractContainerScreen<T extends AbstractContainerMenu> e
 	public void renderBackground(GuiGraphics guiGraphics, int i, int j, float f) {
 		super.renderBackground(guiGraphics, i, j, f);
 		this.renderBg(guiGraphics, f, i, j);
+		
+		// Render JEI panel
+		if (this.jeiPanel != null) {
+			this.jeiPanel.render(guiGraphics, i, j, f);
+		}
 	}
 
 	@Override
 	public boolean mouseScrolled(double d, double e, double f, double g) {
+		// Check JEI panel first
+		if (this.jeiPanel != null && this.jeiPanel.mouseScrolled(d, e, f, g)) {
+			return true;
+		}
+		
 		if (this.hoveredSlot != null && this.hoveredSlot.hasItem()) {
 			for (ItemSlotMouseAction itemSlotMouseAction : this.itemSlotMouseActions) {
 				if (itemSlotMouseAction.matches(this.hoveredSlot) && itemSlotMouseAction.onMouseScrolled(f, g, this.hoveredSlot.index, this.hoveredSlot.getItem())) {
@@ -195,6 +265,11 @@ public abstract class AbstractContainerScreen<T extends AbstractContainerMenu> e
 	}
 
 	protected void renderTooltip(GuiGraphics guiGraphics, int i, int j) {
+		// Render JEI panel tooltips first
+		if (this.jeiPanel != null) {
+			this.jeiPanel.renderTooltip(guiGraphics, i, j, this);
+		}
+		
 		if (this.hoveredSlot != null && this.hoveredSlot.hasItem()) {
 			ItemStack itemStack = this.hoveredSlot.getItem();
 			if (this.menu.getCarried().isEmpty() || this.showTooltipWithItemInHand(itemStack)) {
@@ -313,6 +388,11 @@ public abstract class AbstractContainerScreen<T extends AbstractContainerMenu> e
 
 	@Override
 	public boolean mouseClicked(MouseButtonEvent mouseButtonEvent, boolean bl) {
+		// Check JEI panel first
+		if (this.jeiPanel != null && this.jeiPanel.mouseClicked(mouseButtonEvent)) {
+			return true;
+		}
+		
 		if (super.mouseClicked(mouseButtonEvent, bl)) {
 			return true;
 		} else {
@@ -409,6 +489,11 @@ public abstract class AbstractContainerScreen<T extends AbstractContainerMenu> e
 
 	@Override
 	public boolean mouseDragged(MouseButtonEvent mouseButtonEvent, double d, double e) {
+		// Check JEI panel first
+		if (this.jeiPanel != null && this.jeiPanel.mouseDragged(mouseButtonEvent, d, e)) {
+			return true;
+		}
+		
 		Slot slot = this.getHoveredSlot(mouseButtonEvent.x(), mouseButtonEvent.y());
 		ItemStack itemStack = this.menu.getCarried();
 		if (this.clickedSlot != null && this.minecraft.options.touchscreen().get()) {
@@ -452,6 +537,11 @@ public abstract class AbstractContainerScreen<T extends AbstractContainerMenu> e
 
 	@Override
 	public boolean mouseReleased(MouseButtonEvent mouseButtonEvent) {
+		// Check JEI panel first
+		if (this.jeiPanel != null && this.jeiPanel.mouseReleased(mouseButtonEvent)) {
+			return true;
+		}
+		
 		Slot slot = this.getHoveredSlot(mouseButtonEvent.x(), mouseButtonEvent.y());
 		int i = this.leftPos;
 		int j = this.topPos;
@@ -606,6 +696,11 @@ public abstract class AbstractContainerScreen<T extends AbstractContainerMenu> e
 
 	@Override
 	public boolean keyPressed(KeyEvent keyEvent) {
+		// Check JEI panel first
+		if (this.jeiPanel != null && this.jeiPanel.keyPressed(keyEvent)) {
+			return true;
+		}
+		
 		if (super.keyPressed(keyEvent)) {
 			return true;
 		} else if (this.minecraft.options.keyInventory.matches(keyEvent)) {
@@ -641,6 +736,24 @@ public abstract class AbstractContainerScreen<T extends AbstractContainerMenu> e
 		}
 
 		return false;
+	}
+	
+	@Override
+	public boolean charTyped(CharacterEvent characterEvent) {
+		// Check JEI panel first
+		if (this.jeiPanel != null && this.jeiPanel.charTyped(characterEvent)) {
+			return true;
+		}
+		return super.charTyped(characterEvent);
+	}
+	
+	@Override
+	public void resize(Minecraft minecraft, int width, int height) {
+		super.resize(minecraft, width, height);
+		// Recalculate JEI panel layout when screen is resized
+		if (this.jeiPanel != null) {
+			this.jeiPanel.calculateLayout(this.width, this.height, this.leftPos + this.imageWidth, this.topPos);
+		}
 	}
 
 	@Override
@@ -686,6 +799,56 @@ public abstract class AbstractContainerScreen<T extends AbstractContainerMenu> e
 		}
 
 		super.onClose();
+	}
+	
+	private Component getGameModeButtonText() {
+		if (this.minecraft != null && this.minecraft.gameMode != null) {
+			GameType currentMode = this.minecraft.gameMode.getPlayerMode();
+			if (currentMode == GameType.CREATIVE) {
+				return Component.literal("Creative");
+			} else if (currentMode == GameType.SURVIVAL) {
+				return Component.literal("Survival");
+			}
+		}
+		return Component.literal("Mode");
+	}
+	
+	private void toggleGameMode() {
+		if (this.minecraft != null && this.minecraft.player != null && this.minecraft.player.connection != null) {
+			GameType currentMode = this.minecraft.gameMode.getPlayerMode();
+			String newMode = currentMode == GameType.CREATIVE ? "survival" : "creative";
+			this.minecraft.player.connection.sendCommand("gamemode " + newMode);
+			
+			// Update button text
+			if (this.gameModeToggleButton != null) {
+				this.gameModeToggleButton.setMessage(this.getGameModeButtonText());
+			}
+		}
+	}
+	
+	private void setTimeToDay() {
+		if (this.minecraft != null && this.minecraft.player != null && this.minecraft.player.connection != null) {
+			this.minecraft.player.connection.sendCommand("time set noon");
+		}
+	}
+	
+	private void setTimeToNight() {
+		if (this.minecraft != null && this.minecraft.player != null && this.minecraft.player.connection != null) {
+			this.minecraft.player.connection.sendCommand("time set midnight");
+		}
+	}
+	
+	private void toggleWeather() {
+		if (this.minecraft != null && this.minecraft.player != null && this.minecraft.player.connection != null) {
+			// Toggle between clear and rain
+			if (this.isWeatherClear) {
+				this.minecraft.player.connection.sendCommand("weather rain");
+				this.isWeatherClear = false;
+			} else {
+				this.minecraft.player.connection.sendCommand("weather clear");
+				this.isWeatherClear = true;
+			}
+		}
 	}
 
 	@Environment(EnvType.CLIENT)
