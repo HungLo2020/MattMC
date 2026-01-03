@@ -177,6 +177,18 @@ public class JeiPanel {
 			return;
 		}
 		
+		// Draw border around items area
+		int itemsAreaX = this.panelX;
+		int itemsAreaY = this.panelY;
+		int itemsAreaWidth = this.panelWidth;
+		int itemsAreaHeight = this.rows * this.slotSize + 4;
+		int borderColor = 0xFF8B8B8B;
+		
+		guiGraphics.fill(itemsAreaX, itemsAreaY, itemsAreaX + itemsAreaWidth, itemsAreaY + 1, borderColor);
+		guiGraphics.fill(itemsAreaX, itemsAreaY + itemsAreaHeight - 1, itemsAreaX + itemsAreaWidth, itemsAreaY + itemsAreaHeight, borderColor);
+		guiGraphics.fill(itemsAreaX, itemsAreaY, itemsAreaX + 1, itemsAreaY + itemsAreaHeight, borderColor);
+		guiGraphics.fill(itemsAreaX + itemsAreaWidth - 1, itemsAreaY, itemsAreaX + itemsAreaWidth, itemsAreaY + itemsAreaHeight, borderColor);
+		
 		// Render items
 		this.renderItems(guiGraphics);
 		
