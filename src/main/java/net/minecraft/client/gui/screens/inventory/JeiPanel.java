@@ -244,7 +244,7 @@ public class JeiPanel {
 	private void renderSearchBar(GuiGraphics guiGraphics, int mouseX, int mouseY) {
 		int searchBarX = this.panelX + 2;
 		int searchBarY = this.panelY + this.rows * this.slotSize + 4 + 4;
-		int searchBarWidth = this.panelWidth - 4;
+		int searchBarWidth = this.panelWidth - 4 - 14; // Reduce width to avoid scrollbar (14px for scrollbar)
 		
 		// Background
 		guiGraphics.fill(searchBarX, searchBarY, searchBarX + searchBarWidth, searchBarY + this.searchBarHeight, 0xFF1A1A1A);
