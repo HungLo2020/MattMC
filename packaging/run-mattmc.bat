@@ -2,6 +2,7 @@
 REM MattMC Client Launcher
 
 REM Java version used in this distribution
+REM Note: Hardcoded because gradle.properties is not included in distributions
 set JAVA_VERSION=25
 
 REM Get the directory containing this script (should be project root in distribution)

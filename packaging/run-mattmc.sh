@@ -2,6 +2,7 @@
 # MattMC Client Launcher
 
 # Java version used in this distribution
+# Note: Hardcoded because gradle.properties is not included in distributions
 JAVA_VERSION=25
 
 # Get the directory containing this script (should be project root in distribution)
