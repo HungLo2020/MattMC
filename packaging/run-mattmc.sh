@@ -27,9 +27,15 @@ else
     echo "Using system Java (bundled JDK not found at: $BUNDLED_JAVA)"
 fi
 
-# Detect Java version
+# Detect Java version (portable approach using sed/awk instead of grep -P)
 JAVA_VERSION_OUTPUT=$("$JAVA_CMD" -version 2>&1)
-DETECTED_JAVA_VERSION=$(echo "$JAVA_VERSION_OUTPUT" | grep -oP 'version "\K[0-9]+' | head -1)
+DETECTED_JAVA_VERSION=$(echo "$JAVA_VERSION_OUTPUT" | head -1 | sed -n 's/.*version "\([0-9]*\).*/\1/p')
+
+# Validate detected version is a number
+if ! [[ "$DETECTED_JAVA_VERSION" =~ ^[0-9]+$ ]]; then
+    echo "Warning: Could not detect Java version, using basic JVM arguments"
+    DETECTED_JAVA_VERSION=0
+fi
 
 # Build JVM arguments based on Java version
 JVM_ARGS="-Xmx8G -Xms4G"
@@ -43,7 +49,7 @@ fi
 if [[ "$DETECTED_JAVA_VERSION" -ge 25 ]]; then
     JVM_ARGS="$JVM_ARGS -XX:+UseCompactObjectHeaders"
     echo "Using Java $DETECTED_JAVA_VERSION with Compact Object Headers enabled"
-else
+elif [[ "$DETECTED_JAVA_VERSION" -gt 0 ]]; then
     echo "Warning: Java $DETECTED_JAVA_VERSION detected. Compact Object Headers requires Java 25+"
     echo "         Performance may be suboptimal. Consider using the bundled JDK."
 fi

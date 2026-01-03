@@ -19,14 +19,30 @@ if exist "%BUNDLED_JAVA%" (
     echo Using system Java (bundled JDK not found)
 )
 
-REM Detect Java version
-for /f "tokens=3" %%a in ('"%JAVA_CMD%" -version 2^>^&1 ^| findstr /i "version"') do (
-    set JAVA_VERSION_STRING=%%a
-    goto :version_found
+REM Detect Java version - more robust parsing
+set DETECTED_JAVA_VERSION=0
+for /f "tokens=*" %%a in ('"%JAVA_CMD%" -version 2^>^&1') do (
+    echo %%a | findstr /r "version" >nul
+    if not errorlevel 1 (
+        for /f "tokens=2 delims= " %%b in ("%%a") do (
+            set VERSION_STRING=%%b
+            goto :parse_version
+        )
+    )
 )
-:version_found
-set JAVA_VERSION_STRING=%JAVA_VERSION_STRING:"=%
-for /f "delims=. tokens=1" %%a in ("%JAVA_VERSION_STRING%") do set DETECTED_JAVA_VERSION=%%a
+
+:parse_version
+REM Remove quotes from version string
+set VERSION_STRING=%VERSION_STRING:"=%
+REM Extract major version number (first number before dot or plus)
+for /f "tokens=1 delims=.+" %%c in ("%VERSION_STRING%") do set DETECTED_JAVA_VERSION=%%c
+
+REM Validate version is numeric
+set "tempvar="&for /f "delims=0123456789" %%i in ("%DETECTED_JAVA_VERSION%") do set tempvar=%%i
+if defined tempvar (
+    echo Warning: Could not detect Java version, using basic JVM arguments
+    set DETECTED_JAVA_VERSION=0
+)
 
 REM Build JVM arguments based on Java version
 set JVM_ARGS=-Xmx8G -Xms4G
@@ -40,7 +56,7 @@ REM Add Compact Object Headers flag (only available in Java 25+)
 if %DETECTED_JAVA_VERSION% GEQ 25 (
     set JVM_ARGS=%JVM_ARGS% -XX:+UseCompactObjectHeaders
     echo Using Java %DETECTED_JAVA_VERSION% with Compact Object Headers enabled
-) else (
+) else if %DETECTED_JAVA_VERSION% GTR 0 (
     echo Warning: Java %DETECTED_JAVA_VERSION% detected. Compact Object Headers requires Java 25+
     echo          Performance may be suboptimal. Consider using the bundled JDK.
 )
