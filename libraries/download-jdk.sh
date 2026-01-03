@@ -1,13 +1,25 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Script to download Temurin OpenJDK 25 for Linux x64
+# Script to download Temurin OpenJDK for Linux x64
 # This script checks if the JDK is already present and downloads it if needed
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "$0")" && pwd)"
-JDK_DIR="${SCRIPT_DIR}/jdk-25"
+PROJECT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
-# JDK version configuration - change these to update version
+# Read Java version from gradle.properties
+if [[ -f "${PROJECT_DIR}/gradle.properties" ]]; then
+    JAVA_VERSION=$(grep '^java_version=' "${PROJECT_DIR}/gradle.properties" | cut -d'=' -f2)
+    echo "📋 Using Java version ${JAVA_VERSION} from gradle.properties"
+else
+    echo "⚠️  gradle.properties not found, using default Java version"
+    JAVA_VERSION=25
+fi
+
+JDK_DIR="${SCRIPT_DIR}/jdk-${JAVA_VERSION}"
+
+# JDK version configuration - Update these when a new Java version is released
+# This is the specific build version to download (e.g., 25.0.1+8)
 JDK_VERSION="25.0.1+8"
 JDK_BUILD="25.0.1_8"
 
@@ -18,13 +30,13 @@ OS="$(uname -s | tr '[:upper:]' '[:lower:]')"
 if [[ "$OS" == "linux" ]]; then
     if [[ "$ARCH" == "x86_64" || "$ARCH" == "amd64" ]]; then
         PLATFORM="linux-x64"
-        JDK_URL="https://github.com/adoptium/temurin25-binaries/releases/download/jdk-${JDK_VERSION}/OpenJDK25U-jdk_x64_linux_hotspot_${JDK_BUILD}.tar.gz"
-        JDK_ARCHIVE="OpenJDK25U-jdk_x64_linux_hotspot_${JDK_BUILD}.tar.gz"
+        JDK_URL="https://github.com/adoptium/temurin${JAVA_VERSION}-binaries/releases/download/jdk-${JDK_VERSION}/OpenJDK${JAVA_VERSION}U-jdk_x64_linux_hotspot_${JDK_BUILD}.tar.gz"
+        JDK_ARCHIVE="OpenJDK${JAVA_VERSION}U-jdk_x64_linux_hotspot_${JDK_BUILD}.tar.gz"
         JDK_EXTRACTED_DIR="jdk-${JDK_VERSION}"
     elif [[ "$ARCH" == "aarch64" || "$ARCH" == "arm64" ]]; then
         PLATFORM="linux-aarch64"
-        JDK_URL="https://github.com/adoptium/temurin25-binaries/releases/download/jdk-${JDK_VERSION}/OpenJDK25U-jdk_aarch64_linux_hotspot_${JDK_BUILD}.tar.gz"
-        JDK_ARCHIVE="OpenJDK25U-jdk_aarch64_linux_hotspot_${JDK_BUILD}.tar.gz"
+        JDK_URL="https://github.com/adoptium/temurin${JAVA_VERSION}-binaries/releases/download/jdk-${JDK_VERSION}/OpenJDK${JAVA_VERSION}U-jdk_aarch64_linux_hotspot_${JDK_BUILD}.tar.gz"
+        JDK_ARCHIVE="OpenJDK${JAVA_VERSION}U-jdk_aarch64_linux_hotspot_${JDK_BUILD}.tar.gz"
         JDK_EXTRACTED_DIR="jdk-${JDK_VERSION}"
     else
         echo "❌ Unsupported architecture: $ARCH" >&2
@@ -43,7 +55,7 @@ if [[ -d "$JDK_DIR" && -f "$JDK_DIR/bin/java" ]]; then
     exit 0
 fi
 
-echo "📥 Downloading Temurin OpenJDK 25 for $PLATFORM..."
+echo "📥 Downloading Temurin OpenJDK ${JAVA_VERSION} for $PLATFORM..."
 echo "   URL: $JDK_URL"
 
 # Create temporary directory
@@ -74,4 +86,4 @@ echo "✅ JDK installed successfully!"
 "$JDK_DIR/bin/java" -version
 
 echo ""
-echo "🎉 Temurin OpenJDK 25 is ready to use at: $JDK_DIR"
+echo "🎉 Temurin OpenJDK ${JAVA_VERSION} is ready to use at: $JDK_DIR"
