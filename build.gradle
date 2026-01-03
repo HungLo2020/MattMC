@@ -20,7 +20,7 @@ java {
     // Keep toolchain configuration for compilation
     // But we'll override at runtime for JavaExec tasks
     toolchain {
-        languageVersion = JavaLanguageVersion.of(21)
+        languageVersion = JavaLanguageVersion.of(25)
     }
 }
 
@@ -414,7 +414,8 @@ def serverJvmArgs = [
     '-Xmx2G',
     '-Xms1G',
     '-XX:+UseZGC',
-    '-XX:+ZGenerational'
+    '-XX:+ZGenerational',
+    '-XX:+UseCompactObjectHeaders'
 ]
 
 // Common JVM arguments for client tasks
@@ -423,12 +424,13 @@ def clientJvmArgs = [
     '-Xms4G',
     '-XX:+UseZGC',
     '-XX:+ZGenerational',
+    '-XX:+UseCompactObjectHeaders',
     '-Dorg.lwjgl.util.Debug=true'
 ]
 
 // Helper method to configure JavaExec tasks to use bundled JDK (if available) or toolchain
 def configureBundledJdk(JavaExec task) {
-    def bundledJdkDir = file('run/jdk-21')
+    def bundledJdkDir = file('run/jdk-25')
     def osName = System.getProperty('os.name').toLowerCase()
     def isWindows = osName.contains('windows') || osName.contains('win')
     
@@ -445,12 +447,12 @@ def configureBundledJdk(JavaExec task) {
             println "Using bundled JDK from: ${bundledJdkDir.absolutePath}"
         }
     } else {
-        // Use Gradle toolchain (will auto-download Java 21 if needed via Foojay resolver)
+        // Use Gradle toolchain (will auto-download Java 25 if needed via Foojay resolver)
         task.javaLauncher = javaToolchains.launcherFor {
-            languageVersion = JavaLanguageVersion.of(21)
+            languageVersion = JavaLanguageVersion.of(25)
         }
         task.doFirst {
-            println "Using Gradle toolchain for Java 21 (bundled JDK not found)"
+            println "Using Gradle toolchain for Java 25 (bundled JDK not found)"
             println "Toolchain will be auto-downloaded if not available locally"
             println ""
             println "💡 To use bundled JDK instead, run: ./gradlew downloadJdk copyJdkToRun"
@@ -661,9 +663,9 @@ tasks.register('runClientVanilla', JavaExec) {
 // Task to download bundled JDK if not present
 tasks.register('downloadJdk', Exec) {
     group = 'minecraft'
-    description = 'Downloads Temurin OpenJDK 21 if not already present'
+    description = 'Downloads Temurin OpenJDK 25 if not already present'
     
-    def jdkDir = file('libraries/jdk-21')
+    def jdkDir = file('libraries/jdk-25')
     def osName = System.getProperty('os.name').toLowerCase()
     def isWindows = osName.contains('windows') || osName.contains('win')
     def isLinux = osName.contains('linux')
@@ -710,8 +712,8 @@ tasks.register('copyJdkToRun') {
     
     dependsOn 'downloadJdk'
     
-    def srcJdkDir = file('libraries/jdk-21')
-    def destJdkDir = file('run/jdk-21')
+    def srcJdkDir = file('libraries/jdk-25')
+    def destJdkDir = file('run/jdk-25')
     def osName = System.getProperty('os.name').toLowerCase()
     def isWindows = osName.contains('windows') || osName.contains('win')
     
@@ -769,7 +771,7 @@ runServerGui.dependsOn acceptEula
 // Build task configuration
 tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
-    options.release = 21
+    options.release = 25
     options.fork = true
     options.forkOptions.memoryMaximumSize = "8g"
     options.compilerArgs += ['-Xlint:-deprecation', '-Xlint:-unchecked']
@@ -873,12 +875,12 @@ tasks.register('clientDist') {
         }
         
         // Copy bundled JDK to distribution
-        def srcJdkDir = file('libraries/jdk-21')
+        def srcJdkDir = file('libraries/jdk-25')
         if (srcJdkDir.exists()) {
             println "📂 Copying bundled JDK to distribution..."
             copy {
                 from srcJdkDir
-                into "${distDir}/run/jdk-21"
+                into "${distDir}/run/jdk-25"
             }
             println "✅ JDK copied to distribution"
         }

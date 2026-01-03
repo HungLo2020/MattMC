@@ -6,7 +6,7 @@ cd /d "%~dp0"
 set SCRIPT_DIR=%CD%
 
 REM Use bundled JDK if available, otherwise use system java
-set BUNDLED_JAVA=%SCRIPT_DIR%\run\jdk-21\bin\java.exe
+set BUNDLED_JAVA=%SCRIPT_DIR%\run\jdk-25\bin\java.exe
 if exist "%BUNDLED_JAVA%" (
     set JAVA_CMD=%BUNDLED_JAVA%
     echo Using bundled JDK
@@ -20,6 +20,7 @@ REM Note: Minecraft classes are included in the main JAR, no separate game JAR n
 "%JAVA_CMD%" -Xmx8G -Xms4G ^
     -XX:+UseZGC ^
     -XX:+ZGenerational ^
+    -XX:+UseCompactObjectHeaders ^
     -Dfabric.development=true ^
     -cp "@CLASSPATH_WINDOWS@" ^
     net.fabricmc.loader.impl.launch.knot.KnotClient ^

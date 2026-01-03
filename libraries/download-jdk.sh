@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Script to download Temurin OpenJDK 21 for Linux x64
+# Script to download Temurin OpenJDK 25 for Linux x64
 # This script checks if the JDK is already present and downloads it if needed
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "$0")" && pwd)"
-JDK_DIR="${SCRIPT_DIR}/jdk-21"
+JDK_DIR="${SCRIPT_DIR}/jdk-25"
 
 # JDK version configuration - change these to update version
-JDK_VERSION="21.0.5+11"
-JDK_BUILD="21.0.5_11"
+JDK_VERSION="25.0.0+36"
+JDK_BUILD="25_36"
 
 # Detect architecture
 ARCH="$(uname -m)"
@@ -18,13 +18,13 @@ OS="$(uname -s | tr '[:upper:]' '[:lower:]')"
 if [[ "$OS" == "linux" ]]; then
     if [[ "$ARCH" == "x86_64" || "$ARCH" == "amd64" ]]; then
         PLATFORM="linux-x64"
-        JDK_URL="https://github.com/adoptium/temurin21-binaries/releases/download/jdk-${JDK_VERSION}/OpenJDK21U-jdk_x64_linux_hotspot_${JDK_BUILD}.tar.gz"
-        JDK_ARCHIVE="OpenJDK21U-jdk_x64_linux_hotspot_${JDK_BUILD}.tar.gz"
+        JDK_URL="https://github.com/adoptium/temurin25-binaries/releases/download/jdk-${JDK_VERSION}/OpenJDK25U-jdk_x64_linux_hotspot_${JDK_BUILD}.tar.gz"
+        JDK_ARCHIVE="OpenJDK25U-jdk_x64_linux_hotspot_${JDK_BUILD}.tar.gz"
         JDK_EXTRACTED_DIR="jdk-${JDK_VERSION}"
     elif [[ "$ARCH" == "aarch64" || "$ARCH" == "arm64" ]]; then
         PLATFORM="linux-aarch64"
-        JDK_URL="https://github.com/adoptium/temurin21-binaries/releases/download/jdk-${JDK_VERSION}/OpenJDK21U-jdk_aarch64_linux_hotspot_${JDK_BUILD}.tar.gz"
-        JDK_ARCHIVE="OpenJDK21U-jdk_aarch64_linux_hotspot_${JDK_BUILD}.tar.gz"
+        JDK_URL="https://github.com/adoptium/temurin25-binaries/releases/download/jdk-${JDK_VERSION}/OpenJDK25U-jdk_aarch64_linux_hotspot_${JDK_BUILD}.tar.gz"
+        JDK_ARCHIVE="OpenJDK25U-jdk_aarch64_linux_hotspot_${JDK_BUILD}.tar.gz"
         JDK_EXTRACTED_DIR="jdk-${JDK_VERSION}"
     else
         echo "❌ Unsupported architecture: $ARCH" >&2
@@ -43,7 +43,7 @@ if [[ -d "$JDK_DIR" && -f "$JDK_DIR/bin/java" ]]; then
     exit 0
 fi
 
-echo "📥 Downloading Temurin OpenJDK 21 for $PLATFORM..."
+echo "📥 Downloading Temurin OpenJDK 25 for $PLATFORM..."
 echo "   URL: $JDK_URL"
 
 # Create temporary directory
@@ -74,4 +74,4 @@ echo "✅ JDK installed successfully!"
 "$JDK_DIR/bin/java" -version
 
 echo ""
-echo "🎉 Temurin OpenJDK 21 is ready to use at: $JDK_DIR"
+echo "🎉 Temurin OpenJDK 25 is ready to use at: $JDK_DIR"

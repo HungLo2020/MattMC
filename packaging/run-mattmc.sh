@@ -6,7 +6,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$SCRIPT_DIR"
 
 # Use bundled JDK if available, otherwise use system java
-BUNDLED_JAVA="${SCRIPT_DIR}/run/jdk-21/bin/java"
+BUNDLED_JAVA="${SCRIPT_DIR}/run/jdk-25/bin/java"
 if [[ -x "$BUNDLED_JAVA" ]]; then
     JAVA_CMD="$BUNDLED_JAVA"
     echo "Using bundled JDK"
@@ -20,6 +20,7 @@ fi
 "$JAVA_CMD" -Xmx8G -Xms4G \
     -XX:+UseZGC \
     -XX:+ZGenerational \
+    -XX:+UseCompactObjectHeaders \
     -Dfabric.development=true \
     -cp "@CLASSPATH_LINUX@" \
     net.fabricmc.loader.impl.launch.knot.KnotClient \
