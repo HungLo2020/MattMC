@@ -34,12 +34,20 @@ for /f "tokens=*" %%a in ('"%JAVA_CMD%" -version 2^>^&1') do (
 :parse_version
 REM Remove quotes from version string
 set VERSION_STRING=%VERSION_STRING:"=%
-REM Extract major version number (first number before dot or plus)
-for /f "tokens=1 delims=.+" %%c in ("%VERSION_STRING%") do set DETECTED_JAVA_VERSION=%%c
+REM Handle both legacy (1.8.0) and modern (11+) version formats
+REM Extract major version number
+echo %VERSION_STRING% | findstr /r "^1\." >nul
+if not errorlevel 1 (
+    REM Legacy format like 1.8.0 - extract second number
+    for /f "tokens=2 delims=._+" %%c in ("%VERSION_STRING%") do set DETECTED_JAVA_VERSION=%%c
+) else (
+    REM Modern format like 17.0.1 - extract first number
+    for /f "tokens=1 delims=._+" %%c in ("%VERSION_STRING%") do set DETECTED_JAVA_VERSION=%%c
+)
 
-REM Validate version is numeric
-set "tempvar="&for /f "delims=0123456789" %%i in ("%DETECTED_JAVA_VERSION%") do set tempvar=%%i
-if defined tempvar (
+REM Validate version is numeric using simpler approach
+echo %DETECTED_JAVA_VERSION% | findstr /r "^[0-9][0-9]*$" >nul
+if errorlevel 1 (
     echo Warning: Could not detect Java version, using basic JVM arguments
     set DETECTED_JAVA_VERSION=0
 )

@@ -28,8 +28,9 @@ else
 fi
 
 # Detect Java version (portable approach using sed/awk instead of grep -P)
+# Handles both legacy format (1.8.0) and modern format (11+, 17+, 21+, 25+)
 JAVA_VERSION_OUTPUT=$("$JAVA_CMD" -version 2>&1)
-DETECTED_JAVA_VERSION=$(echo "$JAVA_VERSION_OUTPUT" | head -1 | sed -n 's/.*version "\([0-9]*\).*/\1/p')
+DETECTED_JAVA_VERSION=$(echo "$JAVA_VERSION_OUTPUT" | head -1 | sed -n 's/.*version "\(1\.\)\?\([0-9]*\).*/\2/p')
 
 # Validate detected version is a number
 if ! [[ "$DETECTED_JAVA_VERSION" =~ ^[0-9]+$ ]]; then
@@ -56,7 +57,8 @@ fi
 
 # Launch the game with Fabric Loader
 # Note: Minecraft classes are included in the main JAR, no separate game JAR needed
-"$JAVA_CMD" $JVM_ARGS \
+# Note: JVM_ARGS is intentionally not quoted to allow word splitting
+$JAVA_CMD $JVM_ARGS \
     -Dfabric.development=true \
     -cp "@CLASSPATH_LINUX@" \
     net.fabricmc.loader.impl.launch.knot.KnotClient \
