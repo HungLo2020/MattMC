@@ -8,8 +8,8 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "$0")" && pwd)"
 JDK_DIR="${SCRIPT_DIR}/jdk-25"
 
 # JDK version configuration - change these to update version
-JDK_VERSION="25.0.0+36"
-JDK_BUILD="25_36"
+JDK_VERSION="25.0.1+8"
+JDK_BUILD="25.0.1_8"
 
 # Detect architecture
 ARCH="$(uname -m)"

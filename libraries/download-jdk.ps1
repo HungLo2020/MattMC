@@ -8,8 +8,8 @@ $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $JdkDir = Join-Path $ScriptDir "jdk-25"
 
 # JDK version configuration - change these to update version
-$JdkVersion = "25.0.0+36"
-$JdkBuild = "25_36"
+$JdkVersion = "25.0.1+8"
+$JdkBuild = "25.0.1_8"
 
 # Detect architecture
 $Arch = $env:PROCESSOR_ARCHITECTURE

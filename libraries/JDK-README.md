@@ -43,14 +43,14 @@ If automatic download doesn't work, download manually:
 ```bash
 cd libraries
 tar -xzf /path/to/OpenJDK25U-jdk_*.tar.gz
-mv jdk-25.0.0+36 jdk-25
+mv jdk-25.0.1+8 jdk-25
 ```
 
 ### Windows:
 ```cmd
 cd libraries
 "C:\Program Files\7-Zip\7z.exe" x C:\path\to\OpenJDK25U-jdk_*.zip
-move jdk-25.0.0+36 jdk-25
+move jdk-25.0.1+8 jdk-25
 ```
 
 ## Directory Structure
