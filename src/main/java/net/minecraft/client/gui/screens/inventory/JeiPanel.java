@@ -150,7 +150,7 @@ public class JeiPanel {
 		}
 		
 		// Calculate columns
-		int availableWidthForSlots = this.panelWidth - 4 - 14; // 4px padding, 14px scrollbar
+		int availableWidthForSlots = this.panelWidth - 2 - 14; // 2px padding (reduced from 4), 14px scrollbar
 		this.columns = Math.max(1, availableWidthForSlots / this.slotSize);
 		
 		// Calculate vertical layout
@@ -227,8 +227,8 @@ public class JeiPanel {
 		if (maxScroll > 0) {
 			int scrollbarX = this.panelX + this.panelWidth - 14;
 			int scrollbarY = this.panelY + 2;
-			int itemsAreaHeight = this.rows * this.slotSize + 4;
-			int scrollbarHeight = itemsAreaHeight - 4;
+			// Extend scrollbar to the bottom border (panelHeight - 2 for bottom border)
+			int scrollbarHeight = this.panelHeight - 4; // Full height minus top and bottom margins
 			
 			// Scrollbar track
 			guiGraphics.fill(scrollbarX, scrollbarY, scrollbarX + 12, scrollbarY + scrollbarHeight, 0xFF8B8B8B);
