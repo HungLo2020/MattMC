@@ -8,11 +8,13 @@ import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.ChatFormatting;
 import net.minecraft.Util;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.BundleMouseActions;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.ItemSlotMouseAction;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.inventory.tooltip.ClientTooltipComponent;
+import net.minecraft.client.input.CharacterEvent;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.client.renderer.RenderPipelines;
@@ -69,6 +71,10 @@ public abstract class AbstractContainerScreen<T extends AbstractContainerMenu> e
 	private int quickCraftingRemainder;
 	private boolean doubleclick;
 	private ItemStack lastQuickMoved = ItemStack.EMPTY;
+	
+	// JEI panel - available in all inventory screens
+	@Nullable
+	protected JeiPanel jeiPanel;
 
 	public AbstractContainerScreen(T abstractContainerMenu, Inventory inventory, Component component) {
 		super(component);
@@ -88,6 +94,13 @@ public abstract class AbstractContainerScreen<T extends AbstractContainerMenu> e
 		this.topPos = (this.height - this.imageHeight) / 2;
 		this.itemSlotMouseActions.clear();
 		this.addItemSlotMouseAction(new BundleMouseActions(this.minecraft));
+		
+		// Initialize JEI panel for all inventory screens
+		if (this.minecraft != null) {
+			this.jeiPanel = new JeiPanel(this.minecraft, this.font, this);
+			this.jeiPanel.init();
+			this.jeiPanel.calculateLayout(this.width, this.height, this.leftPos + this.imageWidth, this.topPos);
+		}
 	}
 
 	protected void addItemSlotMouseAction(ItemSlotMouseAction itemSlotMouseAction) {
@@ -167,10 +180,20 @@ public abstract class AbstractContainerScreen<T extends AbstractContainerMenu> e
 	public void renderBackground(GuiGraphics guiGraphics, int i, int j, float f) {
 		super.renderBackground(guiGraphics, i, j, f);
 		this.renderBg(guiGraphics, f, i, j);
+		
+		// Render JEI panel
+		if (this.jeiPanel != null) {
+			this.jeiPanel.render(guiGraphics, i, j, f);
+		}
 	}
 
 	@Override
 	public boolean mouseScrolled(double d, double e, double f, double g) {
+		// Check JEI panel first
+		if (this.jeiPanel != null && this.jeiPanel.mouseScrolled(d, e, f, g)) {
+			return true;
+		}
+		
 		if (this.hoveredSlot != null && this.hoveredSlot.hasItem()) {
 			for (ItemSlotMouseAction itemSlotMouseAction : this.itemSlotMouseActions) {
 				if (itemSlotMouseAction.matches(this.hoveredSlot) && itemSlotMouseAction.onMouseScrolled(f, g, this.hoveredSlot.index, this.hoveredSlot.getItem())) {
@@ -195,6 +218,11 @@ public abstract class AbstractContainerScreen<T extends AbstractContainerMenu> e
 	}
 
 	protected void renderTooltip(GuiGraphics guiGraphics, int i, int j) {
+		// Render JEI panel tooltips first
+		if (this.jeiPanel != null) {
+			this.jeiPanel.renderTooltip(guiGraphics, i, j, this);
+		}
+		
 		if (this.hoveredSlot != null && this.hoveredSlot.hasItem()) {
 			ItemStack itemStack = this.hoveredSlot.getItem();
 			if (this.menu.getCarried().isEmpty() || this.showTooltipWithItemInHand(itemStack)) {
@@ -313,6 +341,11 @@ public abstract class AbstractContainerScreen<T extends AbstractContainerMenu> e
 
 	@Override
 	public boolean mouseClicked(MouseButtonEvent mouseButtonEvent, boolean bl) {
+		// Check JEI panel first
+		if (this.jeiPanel != null && this.jeiPanel.mouseClicked(mouseButtonEvent)) {
+			return true;
+		}
+		
 		if (super.mouseClicked(mouseButtonEvent, bl)) {
 			return true;
 		} else {
@@ -409,6 +442,11 @@ public abstract class AbstractContainerScreen<T extends AbstractContainerMenu> e
 
 	@Override
 	public boolean mouseDragged(MouseButtonEvent mouseButtonEvent, double d, double e) {
+		// Check JEI panel first
+		if (this.jeiPanel != null && this.jeiPanel.mouseDragged(mouseButtonEvent, d, e)) {
+			return true;
+		}
+		
 		Slot slot = this.getHoveredSlot(mouseButtonEvent.x(), mouseButtonEvent.y());
 		ItemStack itemStack = this.menu.getCarried();
 		if (this.clickedSlot != null && this.minecraft.options.touchscreen().get()) {
@@ -452,6 +490,11 @@ public abstract class AbstractContainerScreen<T extends AbstractContainerMenu> e
 
 	@Override
 	public boolean mouseReleased(MouseButtonEvent mouseButtonEvent) {
+		// Check JEI panel first
+		if (this.jeiPanel != null && this.jeiPanel.mouseReleased(mouseButtonEvent)) {
+			return true;
+		}
+		
 		Slot slot = this.getHoveredSlot(mouseButtonEvent.x(), mouseButtonEvent.y());
 		int i = this.leftPos;
 		int j = this.topPos;
@@ -606,6 +649,11 @@ public abstract class AbstractContainerScreen<T extends AbstractContainerMenu> e
 
 	@Override
 	public boolean keyPressed(KeyEvent keyEvent) {
+		// Check JEI panel first
+		if (this.jeiPanel != null && this.jeiPanel.keyPressed(keyEvent)) {
+			return true;
+		}
+		
 		if (super.keyPressed(keyEvent)) {
 			return true;
 		} else if (this.minecraft.options.keyInventory.matches(keyEvent)) {
@@ -641,6 +689,24 @@ public abstract class AbstractContainerScreen<T extends AbstractContainerMenu> e
 		}
 
 		return false;
+	}
+	
+	@Override
+	public boolean charTyped(CharacterEvent characterEvent) {
+		// Check JEI panel first
+		if (this.jeiPanel != null && this.jeiPanel.charTyped(characterEvent)) {
+			return true;
+		}
+		return super.charTyped(characterEvent);
+	}
+	
+	@Override
+	public void resize(Minecraft minecraft, int width, int height) {
+		super.resize(minecraft, width, height);
+		// Recalculate JEI panel layout when screen is resized
+		if (this.jeiPanel != null) {
+			this.jeiPanel.calculateLayout(this.width, this.height, this.leftPos + this.imageWidth, this.topPos);
+		}
 	}
 
 	@Override
