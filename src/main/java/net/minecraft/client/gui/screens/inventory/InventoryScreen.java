@@ -40,6 +40,7 @@ public class InventoryScreen extends AbstractRecipeBookScreen<InventoryMenu> {
 	
 	// JEI-like item list fields
 	private final List<ItemStack> allTabItems = Lists.newArrayList();
+	private final List<ItemStack> filteredTabItems = Lists.newArrayList();
 	private float jeiScrollOffs = 0.0F;
 	private boolean jeiScrolling = false;
 	private int jeiColumns = 0;
@@ -49,6 +50,9 @@ public class InventoryScreen extends AbstractRecipeBookScreen<InventoryMenu> {
 	private int jeiPanelY = 0;
 	private int jeiPanelWidth = 0;
 	private int jeiPanelHeight = 0;
+	private String jeiSearchText = "";
+	private boolean jeiSearchFocused = false;
+	private int jeiSearchBarHeight = 20;
 
 	public InventoryScreen(Player player) {
 		super(player.inventoryMenu, new CraftingRecipeBookComponent(player.inventoryMenu), player.getInventory(), Component.translatable("container.crafting"));
@@ -101,6 +105,30 @@ public class InventoryScreen extends AbstractRecipeBookScreen<InventoryMenu> {
 				}
 			}
 		}
+		
+		// Update filtered items
+		this.updateFilteredItems();
+	}
+	
+	private void updateFilteredItems() {
+		this.filteredTabItems.clear();
+		String searchLower = this.jeiSearchText.toLowerCase();
+		
+		if (searchLower.isEmpty()) {
+			// No filter - show all items
+			this.filteredTabItems.addAll(this.allTabItems);
+		} else {
+			// Filter items by name
+			for (ItemStack item : this.allTabItems) {
+				String itemName = item.getHoverName().getString().toLowerCase();
+				if (itemName.contains(searchLower)) {
+					this.filteredTabItems.add(item);
+				}
+			}
+		}
+		
+		// Reset scroll when filter changes
+		this.jeiScrollOffs = 0.0F;
 	}
 	
 	private void calculateJeiPanelLayout() {
@@ -140,7 +168,8 @@ public class InventoryScreen extends AbstractRecipeBookScreen<InventoryMenu> {
 		
 		// Calculate rows using full available height
 		// Account for small top/bottom padding inside panel (2px each = 4px total)
-		int heightForSlots = availableHeight - 4;
+		// Reserve space for search bar at bottom (20px + 4px gap)
+		int heightForSlots = availableHeight - 4 - this.jeiSearchBarHeight - 4;
 		this.jeiRows = Math.max(1, heightForSlots / slotSpacing);
 		
 		// Limit columns to a reasonable number (like JEI does)
@@ -151,8 +180,8 @@ public class InventoryScreen extends AbstractRecipeBookScreen<InventoryMenu> {
 		// Recalculate X position to anchor to right edge with the final width
 		this.jeiPanelX = screenWidth - this.jeiPanelWidth - rightMargin;
 		
-		// Panel height exactly matches rows needed
-		this.jeiPanelHeight = this.jeiRows * slotSpacing + 4; // Exact height for rows + padding
+		// Panel height = rows + padding + search bar + gap
+		this.jeiPanelHeight = this.jeiRows * slotSpacing + 4 + 4 + this.jeiSearchBarHeight;
 	}
 
 	@Override
@@ -219,7 +248,7 @@ public class InventoryScreen extends AbstractRecipeBookScreen<InventoryMenu> {
 		guiGraphics.fill(this.jeiPanelX + this.jeiPanelWidth - 1, this.jeiPanelY, this.jeiPanelX + this.jeiPanelWidth, this.jeiPanelY + this.jeiPanelHeight, borderColor);
 		
 		// Calculate scroll position
-		int totalRows = (int)Math.ceil((double)this.allTabItems.size() / this.jeiColumns);
+		int totalRows = (int)Math.ceil((double)this.filteredTabItems.size() / this.jeiColumns);
 		int maxScroll = Math.max(0, totalRows - this.jeiRows);
 		int scrollRow = (int)(this.jeiScrollOffs * maxScroll);
 		
@@ -230,11 +259,11 @@ public class InventoryScreen extends AbstractRecipeBookScreen<InventoryMenu> {
 		for (int row = 0; row < this.jeiRows; row++) {
 			for (int col = 0; col < this.jeiColumns; col++) {
 				int index = startIndex + row * this.jeiColumns + col;
-				if (index >= this.allTabItems.size()) {
+				if (index >= this.filteredTabItems.size()) {
 					break;
 				}
 				
-				ItemStack itemStack = this.allTabItems.get(index);
+				ItemStack itemStack = this.filteredTabItems.get(index);
 				if (!itemStack.isEmpty()) {
 					int x = this.jeiPanelX + 2 + col * this.jeiSlotSize;
 					int y = this.jeiPanelY + 2 + row * this.jeiSlotSize;
@@ -254,7 +283,9 @@ public class InventoryScreen extends AbstractRecipeBookScreen<InventoryMenu> {
 		if (maxScroll > 0) {
 			int scrollbarX = this.jeiPanelX + this.jeiPanelWidth - 14;
 			int scrollbarY = this.jeiPanelY + 2;
-			int scrollbarHeight = this.jeiPanelHeight - 4;
+			// Scrollbar should not extend into search bar area
+			int itemsAreaHeight = this.jeiRows * this.jeiSlotSize + 4;
+			int scrollbarHeight = itemsAreaHeight - 4;
 			
 			// Scrollbar track
 			guiGraphics.fill(scrollbarX, scrollbarY, scrollbarX + 12, scrollbarY + scrollbarHeight, 0xFF8B8B8B);
@@ -266,10 +297,48 @@ public class InventoryScreen extends AbstractRecipeBookScreen<InventoryMenu> {
 			ResourceLocation scrollerSprite = SCROLLER_SPRITE;
 			guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, scrollerSprite, scrollbarX, thumbY, 12, 15);
 		}
+		
+		// Render search bar at bottom
+		this.renderJeiSearchBar(guiGraphics, mouseX, mouseY);
+	}
+	
+	private void renderJeiSearchBar(GuiGraphics guiGraphics, int mouseX, int mouseY) {
+		// Calculate search bar position (at bottom of panel)
+		int searchBarX = this.jeiPanelX + 2;
+		int searchBarY = this.jeiPanelY + this.jeiRows * this.jeiSlotSize + 4 + 4;
+		int searchBarWidth = this.jeiPanelWidth - 4;
+		int searchBarHeight = this.jeiSearchBarHeight;
+		
+		// Draw search bar background (darker than panel)
+		int searchBgColor = 0xFF1A1A1A;
+		guiGraphics.fill(searchBarX, searchBarY, searchBarX + searchBarWidth, searchBarY + searchBarHeight, searchBgColor);
+		
+		// Draw border
+		int borderColor = this.jeiSearchFocused ? 0xFFFFFFFF : 0xFF8B8B8B;
+		guiGraphics.fill(searchBarX, searchBarY, searchBarX + searchBarWidth, searchBarY + 1, borderColor);
+		guiGraphics.fill(searchBarX, searchBarY + searchBarHeight - 1, searchBarX + searchBarWidth, searchBarY + searchBarHeight, borderColor);
+		guiGraphics.fill(searchBarX, searchBarY, searchBarX + 1, searchBarY + searchBarHeight, borderColor);
+		guiGraphics.fill(searchBarX + searchBarWidth - 1, searchBarY, searchBarX + searchBarWidth, searchBarY + searchBarHeight, borderColor);
+		
+		// Draw text or placeholder
+		String displayText = this.jeiSearchText;
+		if (displayText.isEmpty() && !this.jeiSearchFocused) {
+			// Show placeholder
+			guiGraphics.drawString(this.font, "Search...", searchBarX + 4, searchBarY + 6, 0xFF666666, false);
+		} else {
+			// Show search text
+			guiGraphics.drawString(this.font, displayText, searchBarX + 4, searchBarY + 6, 0xFFFFFFFF, false);
+			
+			// Draw cursor if focused
+			if (this.jeiSearchFocused && (System.currentTimeMillis() / 500) % 2 == 0) {
+				int cursorX = searchBarX + 4 + this.font.width(displayText);
+				guiGraphics.fill(cursorX, searchBarY + 4, cursorX + 1, searchBarY + searchBarHeight - 4, 0xFFFFFFFF);
+			}
+		}
 	}
 	
 	private void renderJeiTooltip(GuiGraphics guiGraphics, int mouseX, int mouseY) {
-		if (this.jeiColumns <= 0 || this.jeiRows <= 0 || this.allTabItems.isEmpty()) {
+		if (this.jeiColumns <= 0 || this.jeiRows <= 0 || this.filteredTabItems.isEmpty()) {
 			return;
 		}
 		
@@ -280,7 +349,7 @@ public class InventoryScreen extends AbstractRecipeBookScreen<InventoryMenu> {
 		}
 		
 		// Calculate which item the mouse is over
-		int totalRows = (int)Math.ceil((double)this.allTabItems.size() / this.jeiColumns);
+		int totalRows = (int)Math.ceil((double)this.filteredTabItems.size() / this.jeiColumns);
 		int maxScroll = Math.max(0, totalRows - this.jeiRows);
 		int scrollRow = (int)(this.jeiScrollOffs * maxScroll);
 		int startIndex = scrollRow * this.jeiColumns;
@@ -288,7 +357,7 @@ public class InventoryScreen extends AbstractRecipeBookScreen<InventoryMenu> {
 		for (int row = 0; row < this.jeiRows; row++) {
 			for (int col = 0; col < this.jeiColumns; col++) {
 				int index = startIndex + row * this.jeiColumns + col;
-				if (index >= this.allTabItems.size()) {
+				if (index >= this.filteredTabItems.size()) {
 					break;
 				}
 				
@@ -296,7 +365,7 @@ public class InventoryScreen extends AbstractRecipeBookScreen<InventoryMenu> {
 				int y = this.jeiPanelY + 2 + row * this.jeiSlotSize;
 				
 				if (mouseX >= x && mouseX < x + 16 && mouseY >= y && mouseY < y + 16) {
-					ItemStack itemStack = this.allTabItems.get(index);
+					ItemStack itemStack = this.filteredTabItems.get(index);
 					if (!itemStack.isEmpty()) {
 						guiGraphics.setTooltipForNextFrame(this.font, this.getTooltipFromContainerItem(itemStack), itemStack.getTooltipImage(), mouseX, mouseY);
 					}
@@ -326,14 +395,31 @@ public class InventoryScreen extends AbstractRecipeBookScreen<InventoryMenu> {
 			return false;
 		}
 		
+		// Check if click is on search bar
+		int searchBarX = this.jeiPanelX + 2;
+		int searchBarY = this.jeiPanelY + this.jeiRows * this.jeiSlotSize + 4 + 4;
+		int searchBarWidth = this.jeiPanelWidth - 4;
+		int searchBarHeight = this.jeiSearchBarHeight;
+		
+		if (mouseX >= searchBarX && mouseX < searchBarX + searchBarWidth &&
+			mouseY >= searchBarY && mouseY < searchBarY + searchBarHeight) {
+			// Click in search bar - focus it
+			this.jeiSearchFocused = true;
+			return true;
+		} else {
+			// Click outside search bar - defocus it
+			this.jeiSearchFocused = false;
+		}
+		
 		// Check if click is on JEI scrollbar
-		int totalRows = (int)Math.ceil((double)this.allTabItems.size() / this.jeiColumns);
+		int totalRows = (int)Math.ceil((double)this.filteredTabItems.size() / this.jeiColumns);
 		int maxScroll = Math.max(0, totalRows - this.jeiRows);
 		
 		if (maxScroll > 0) {
 			int scrollbarX = this.jeiPanelX + this.jeiPanelWidth - 14;
 			int scrollbarY = this.jeiPanelY + 2;
-			int scrollbarHeight = this.jeiPanelHeight - 4;
+			int itemsAreaHeight = this.jeiRows * this.jeiSlotSize + 4;
+			int scrollbarHeight = itemsAreaHeight - 4;
 			
 			if (mouseX >= scrollbarX && mouseX < scrollbarX + 12 &&
 				mouseY >= scrollbarY && mouseY < scrollbarY + scrollbarHeight) {
@@ -344,7 +430,7 @@ public class InventoryScreen extends AbstractRecipeBookScreen<InventoryMenu> {
 		
 		// Check if click is on an item
 		if (mouseX < this.jeiPanelX || mouseX >= this.jeiPanelX + this.jeiPanelWidth - 14 ||
-			mouseY < this.jeiPanelY || mouseY >= this.jeiPanelY + this.jeiPanelHeight) {
+			mouseY < this.jeiPanelY || mouseY >= this.jeiPanelY + this.jeiRows * this.jeiSlotSize + 4) {
 			return false;
 		}
 		
@@ -354,7 +440,7 @@ public class InventoryScreen extends AbstractRecipeBookScreen<InventoryMenu> {
 		for (int row = 0; row < this.jeiRows; row++) {
 			for (int col = 0; col < this.jeiColumns; col++) {
 				int index = startIndex + row * this.jeiColumns + col;
-				if (index >= this.allTabItems.size()) {
+				if (index >= this.filteredTabItems.size()) {
 					break;
 				}
 				
@@ -362,7 +448,7 @@ public class InventoryScreen extends AbstractRecipeBookScreen<InventoryMenu> {
 				int y = this.jeiPanelY + 2 + row * this.jeiSlotSize;
 				
 				if (mouseX >= x && mouseX < x + 16 && mouseY >= y && mouseY < y + 16) {
-					ItemStack itemStack = this.allTabItems.get(index);
+					ItemStack itemStack = this.filteredTabItems.get(index);
 					if (!itemStack.isEmpty() && this.minecraft != null && this.minecraft.player != null) {
 						System.out.println("[JEI DEBUG] Item clicked: " + itemStack.getItem().toString());
 						
@@ -494,8 +580,8 @@ public class InventoryScreen extends AbstractRecipeBookScreen<InventoryMenu> {
 		// Check if scrolling in JEI panel
 		if (d >= this.jeiPanelX && d < this.jeiPanelX + this.jeiPanelWidth &&
 			e >= this.jeiPanelY && e < this.jeiPanelY + this.jeiPanelHeight) {
-			if (!this.allTabItems.isEmpty() && this.jeiColumns > 0 && this.jeiRows > 0) {
-				int totalRows = (int)Math.ceil((double)this.allTabItems.size() / this.jeiColumns);
+			if (!this.filteredTabItems.isEmpty() && this.jeiColumns > 0 && this.jeiRows > 0) {
+				int totalRows = (int)Math.ceil((double)this.filteredTabItems.size() / this.jeiColumns);
 				int maxScroll = Math.max(0, totalRows - this.jeiRows);
 				if (maxScroll > 0) {
 					this.jeiScrollOffs = Mth.clamp(this.jeiScrollOffs - (float)g / maxScroll, 0.0F, 1.0F);
@@ -517,8 +603,9 @@ public class InventoryScreen extends AbstractRecipeBookScreen<InventoryMenu> {
 			}
 			
 			int scrollbarY = this.jeiPanelY + 2;
-			int scrollbarHeight = this.jeiPanelHeight - 4;
-			int totalRows = (int)Math.ceil((double)this.allTabItems.size() / this.jeiColumns);
+			int itemsAreaHeight = this.jeiRows * this.jeiSlotSize + 4;
+			int scrollbarHeight = itemsAreaHeight - 4;
+			int totalRows = (int)Math.ceil((double)this.filteredTabItems.size() / this.jeiColumns);
 			int thumbHeight = Math.max(15, scrollbarHeight * this.jeiRows / totalRows);
 			int scrollableHeight = scrollbarHeight - thumbHeight;
 			if (scrollableHeight > 0) {
@@ -529,6 +616,67 @@ public class InventoryScreen extends AbstractRecipeBookScreen<InventoryMenu> {
 		} else {
 			return super.mouseDragged(mouseButtonEvent, d, e);
 		}
+	}
+	
+	@Override
+	public boolean charTyped(char c, int i) {
+		if (this.jeiSearchFocused) {
+			// Add character to search text
+			this.jeiSearchText += c;
+			this.updateFilteredItems();
+			return true;
+		}
+		return super.charTyped(c, i);
+	}
+	
+	@Override
+	public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+		if (this.jeiSearchFocused) {
+			// Handle special keys
+			if (keyCode == 259) { // Backspace
+				if (!this.jeiSearchText.isEmpty()) {
+					this.jeiSearchText = this.jeiSearchText.substring(0, this.jeiSearchText.length() - 1);
+					this.updateFilteredItems();
+				}
+				return true;
+			} else if (keyCode == 261) { // Delete
+				// Same as backspace for now
+				if (!this.jeiSearchText.isEmpty()) {
+					this.jeiSearchText = this.jeiSearchText.substring(0, this.jeiSearchText.length() - 1);
+					this.updateFilteredItems();
+				}
+				return true;
+			} else if (keyCode == 256) { // Escape
+				// Clear search
+				this.jeiSearchText = "";
+				this.updateFilteredItems();
+				this.jeiSearchFocused = false;
+				return true;
+			} else if (keyCode == 257 || keyCode == 335) { // Enter or Numpad Enter
+				// Defocus search
+				this.jeiSearchFocused = false;
+				return true;
+			} else if (keyCode == 65 && (modifiers & 2) != 0) { // Ctrl+A (select all)
+				// For now, we'll just keep the text as is
+				// Full implementation would need selection support
+				return true;
+			} else if (keyCode == 67 && (modifiers & 2) != 0) { // Ctrl+C (copy)
+				// Copy search text to clipboard
+				if (this.minecraft != null) {
+					this.minecraft.keyboardHandler.setClipboard(this.jeiSearchText);
+				}
+				return true;
+			} else if (keyCode == 86 && (modifiers & 2) != 0) { // Ctrl+V (paste)
+				// Paste from clipboard
+				if (this.minecraft != null) {
+					String clipboard = this.minecraft.keyboardHandler.getClipboard();
+					this.jeiSearchText += clipboard;
+					this.updateFilteredItems();
+				}
+				return true;
+			}
+		}
+		return super.keyPressed(keyCode, scanCode, modifiers);
 	}
 	
 	@Override
