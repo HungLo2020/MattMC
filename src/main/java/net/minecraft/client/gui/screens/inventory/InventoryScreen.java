@@ -105,32 +105,37 @@ public class InventoryScreen extends AbstractRecipeBookScreen<InventoryMenu> {
 	
 	private void calculateJeiPanelLayout() {
 		// Calculate the JEI panel position and size based on screen size
-		// Goal: Fill approximately right 1/3 of screen with minimal margins
+		// Goal: Anchor to right side of screen, fill space between inventory and right edge
 		int screenWidth = this.width;
 		int screenHeight = this.height;
 		
-		// Position panel on right side - minimal gap from inventory for better space utilization
-		int gapFromInventory = 12;
-		this.jeiPanelX = this.leftPos + this.imageWidth + gapFromInventory;
+		// Panel is anchored to right side of screen with small margin
+		int rightMargin = 8;
+		
+		// Calculate left edge - gap from inventory (larger for better separation)
+		int gapFromInventory = 16;
+		int panelLeftEdge = this.leftPos + this.imageWidth + gapFromInventory;
+		
+		// Panel width fills from left edge to right screen border
+		this.jeiPanelWidth = screenWidth - panelLeftEdge - rightMargin;
 		
 		// Minimal top margin - align near top of screen
 		int topMargin = 4;
 		this.jeiPanelY = topMargin;
 		
-		// Calculate available space - minimal right margin for maximum space utilization
-		int rightMargin = 4;
-		int availableWidth = screenWidth - this.jeiPanelX - rightMargin;
-		
 		// Use full available height from top to bottom with minimal margins
 		int bottomMargin = 4;
 		int availableHeight = screenHeight - topMargin - bottomMargin;
 		
+		// Position panel at right edge
+		this.jeiPanelX = screenWidth - this.jeiPanelWidth - rightMargin;
+		
 		// Use standard Minecraft slot size (18x18)
 		int slotSpacing = this.jeiSlotSize;
 		
-		// Calculate how many columns and rows we can fit
+		// Calculate how many columns we can fit
 		// Subtract space for scrollbar (14px) from width calculation
-		int widthForSlots = availableWidth - 14;
+		int widthForSlots = this.jeiPanelWidth - 14;
 		this.jeiColumns = Math.max(1, widthForSlots / slotSpacing);
 		
 		// Calculate rows using full available height
@@ -141,8 +146,12 @@ public class InventoryScreen extends AbstractRecipeBookScreen<InventoryMenu> {
 		// Limit columns to a reasonable number (like JEI does)
 		this.jeiColumns = Math.min(this.jeiColumns, 9);
 		
-		// Calculate actual panel dimensions based on available space
+		// Update panel width to match actual columns used (+ scrollbar space)
 		this.jeiPanelWidth = this.jeiColumns * slotSpacing + 18; // Add space for scrollbar
+		// Recalculate X position to anchor to right edge with the final width
+		this.jeiPanelX = screenWidth - this.jeiPanelWidth - rightMargin;
+		
+		// Panel height exactly matches rows needed
 		this.jeiPanelHeight = this.jeiRows * slotSpacing + 4; // Exact height for rows + padding
 	}
 
