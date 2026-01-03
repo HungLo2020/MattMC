@@ -78,6 +78,6 @@ public class Lighting implements AutoCloseable {
 		ITEMS_FLAT,
 		ITEMS_3D,
 		ENTITY_IN_UI,
-		PLAYER_SKIN;
-	}
+		PLAYER_SKIN
+    }
 }

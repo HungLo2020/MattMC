@@ -102,7 +102,7 @@ public class ArgumentModCandidateFinder implements ModCandidateFinder {
 					Files.walkFileTree(path, new SimpleFileVisitor<Path>() {
 						@Override
 						public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
-							if (DirectoryModCandidateFinder.isValidFile(file)) {
+							if (isValidFile(file)) {
 								out.accept(file, requiresRemap);
 							} else {
 								skipped.add(path.relativize(file).toString());
@@ -129,7 +129,7 @@ public class ArgumentModCandidateFinder implements ModCandidateFinder {
 				}
 			}
 		} else { // single file
-			if (!DirectoryModCandidateFinder.isValidFile(path)) {
+			if (!isValidFile(path)) {
 				Log.warn(LogCategory.DISCOVERY, "Incompatible file in %s provided mod path %s (non-jar or hidden)", source, path);
 			} else {
 				out.accept(path, requiresRemap);
@@ -144,5 +144,29 @@ public class ArgumentModCandidateFinder implements ModCandidateFinder {
 			Log.warn(LogCategory.DISCOVERY, "Error determining whether %s is hidden: %s", path, e);
 			return true;
 		}
+	}
+
+	private static boolean isValidFile(Path path) {
+		/*
+		 * We only propose a file as a possible mod in the following scenarios:
+		 * General: Must be a jar file
+		 *
+		 * Some OSes Generate metadata so consider the following because of OSes:
+		 * UNIX: Exclude if file is hidden; this occurs when starting a file name with `.`
+		 * MacOS: Exclude hidden + startsWith "." since Mac OS names their metadata files in the form of `.mod.jar`
+		 */
+
+		if (!Files.isRegularFile(path)) return false;
+
+		try {
+			if (Files.isHidden(path)) return false;
+		} catch (IOException e) {
+			Log.warn(LogCategory.DISCOVERY, "Error checking if file %s is hidden", path, e);
+			return false;
+		}
+
+		String fileName = path.getFileName().toString();
+
+		return fileName.endsWith(".jar") && !fileName.startsWith(".");
 	}
 }

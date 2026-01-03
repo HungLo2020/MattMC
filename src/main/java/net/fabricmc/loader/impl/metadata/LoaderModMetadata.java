@@ -39,7 +39,7 @@ public interface LoaderModMetadata extends net.fabricmc.loader.metadata.LoaderMo
 	Collection<NestedJarEntry> getJars();
 	Collection<String> getMixinConfigs(EnvType type);
 	/* @Nullable */
-	String getClassTweaker();
+	// NOTE: getClassTweaker() removed - access modifications already applied in source
 	@Override
 	boolean loadsInEnvironment(EnvType type);
 

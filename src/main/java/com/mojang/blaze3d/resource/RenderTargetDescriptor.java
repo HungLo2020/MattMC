@@ -28,8 +28,6 @@ public record RenderTargetDescriptor(int width, int height, boolean useDepth, in
 
 	@Override
 	public boolean canUsePhysicalResource(ResourceDescriptor<?> resourceDescriptor) {
-		return !(resourceDescriptor instanceof RenderTargetDescriptor renderTargetDescriptor)
-			? false
-			: this.width == renderTargetDescriptor.width && this.height == renderTargetDescriptor.height && this.useDepth == renderTargetDescriptor.useDepth;
+		return resourceDescriptor instanceof RenderTargetDescriptor renderTargetDescriptor && this.width == renderTargetDescriptor.width && this.height == renderTargetDescriptor.height && this.useDepth == renderTargetDescriptor.useDepth;
 	}
 }

@@ -16,25 +16,6 @@ def lwjglNatives = System.getProperty('os.name').toLowerCase().contains('mac')
             ? 'natives-linux-arm64' 
             : 'natives-linux'
 
-// Fabric Loader version (update this when upgrading Fabric Loader source)
-def fabricLoaderVersion = '0.18.2'
-def fabricLoaderDir = "modules/fabric-loader-${fabricLoaderVersion}"
-
-// Sodium version (update this when upgrading Sodium source)
-def sodiumVersion = '0.7.2'
-def sodiumDir = 'modules/sodium-1.21.9'
-
-// Iris version (update this when upgrading Iris source)
-def irisVersion = '1.9.6'
-def irisDir = 'modules/Iris-1.21.9'
-
-// Distant Horizons toggle (controlled by gradle.properties)
-def enableDistantHorizons = project.findProperty('distanthorizons') == 'true'
-
-// Distant Horizons version (update this when upgrading Distant Horizons source)
-def distantHorizonsVersion = '2.4.4-b-dev'
-def distantHorizonsDir = 'modules/distant-horizons'
-
 java {
     // Keep toolchain configuration for compilation
     // But we'll override at runtime for JavaExec tasks
@@ -130,8 +111,8 @@ dependencies {
         // implementation files('libraries/deps/authlib-6.0.55.jar') // REMOVED - custom PlayerProfile system
         implementation files('libraries/deps/logging-1.2.7.jar')
         implementation files('libraries/deps/jtracy-1.0.29.jar')
-        implementation files('libraries/deps/blocklist-1.0.10.jar')
-        implementation files('libraries/deps/patchy-2.2.10.jar')
+        // implementation files('libraries/deps/blocklist-1.0.10.jar') // REMOVED - using ALLOW_ALL AddressCheck
+        // implementation files('libraries/deps/patchy-2.2.10.jar') // REMOVED - only contained blocklist functionality
         implementation files('libraries/deps/text2speech-1.17.9.jar')
     } else {
         // Remote Mojang libraries (authlib removed - using custom PlayerProfile)
@@ -140,8 +121,8 @@ dependencies {
         // implementation 'com.mojang:authlib:6.0.55' // REMOVED - custom PlayerProfile system
         implementation 'com.mojang:logging:1.2.7'
         implementation 'com.mojang:jtracy:1.0.29'
-        implementation 'com.mojang:blocklist:1.0.10'
-        implementation 'com.mojang:patchy:2.2.10'
+        // implementation 'com.mojang:blocklist:1.0.10' // REMOVED - using ALLOW_ALL AddressCheck
+        // implementation 'com.mojang:patchy:2.2.10' // REMOVED - only contained blocklist functionality
         implementation 'com.mojang:text2speech:1.17.9'
     }
     
@@ -239,23 +220,16 @@ dependencies {
         implementation files('libraries/deps/asm-tree-9.9.jar')
         implementation files('libraries/deps/asm-util-9.9.jar')
         
-        // Tiny Remapper - class/method/field remapping
-        implementation files('libraries/deps/tiny-remapper-0.11.2.jar')
-        
-        // Class Tweaker - class access modification
-        implementation files('libraries/deps/class-tweaker-0.2.jar')
+        // NOTE: Class Tweaker removed - access modifications already applied in source
         
         // Mapping IO - mapping file I/O
         implementation files('libraries/deps/mapping-io-0.7.1.jar')
         
-        // Launchwrapper - legacy launch wrapper
-        implementation files('libraries/deps/launchwrapper-1.12.jar')
+        // NOTE: Launchwrapper removed - legacy code removed from Fabric Loader
         
-        // Access Widener - access modification
-        implementation files('libraries/deps/access-widener-2.1.0.jar')
+        // NOTE: Access Widener removed - access modifications already applied in source
         
-        // Tiny Mappings Parser - legacy mapping parser
-        implementation files('libraries/deps/tiny-mappings-parser-0.3.0+build.17.jar')
+        // NOTE: Tiny Mappings Parser removed - superseded by mapping-io with built-in Tiny v1 support
         
         // Note: Fabric API stubs are in src/main/java/net/fabricmc/fabric/api/
         // No external Fabric API JARs needed - using Mojang-mapped stubs
@@ -268,23 +242,16 @@ dependencies {
         implementation 'org.ow2.asm:asm-tree:9.9'
         implementation 'org.ow2.asm:asm-util:9.9'
         
-        // Tiny Remapper - class/method/field remapping (requires Fabric Maven)
-        implementation 'net.fabricmc:tiny-remapper:0.11.2'
-        
-        // Class Tweaker - class access modification (requires Fabric Maven)
-        implementation 'net.fabricmc:class-tweaker:0.2'
+        // NOTE: Class Tweaker removed - access modifications already applied in source
         
         // Mapping IO - mapping file I/O (requires Fabric Maven)
         implementation 'net.fabricmc:mapping-io:0.7.1'
         
-        // Launchwrapper - legacy launch wrapper (requires Minecraft Libraries)
-        implementation 'net.minecraft:launchwrapper:1.12'
+        // NOTE: Launchwrapper removed - legacy code removed from Fabric Loader
         
-        // Access Widener - access modification (requires Fabric Maven)
-        implementation 'net.fabricmc:access-widener:2.1.0'
+        // NOTE: Access Widener removed - access modifications already applied in source
         
-        // Tiny Mappings Parser - legacy mapping parser (requires Fabric Maven)
-        implementation 'net.fabricmc:tiny-mappings-parser:0.3.0+build.17'
+        // NOTE: Tiny Mappings Parser removed - superseded by mapping-io with built-in Tiny v1 support
     }
     
     // Fabric implementation dependencies (available on Maven Central)
@@ -301,22 +268,20 @@ dependencies {
     
     // ===== DISTANT HORIZONS DEPENDENCIES =====
     // Additional dependencies required for Distant Horizons core
-    if (enableDistantHorizons) {
-        // LWJGL JAWT for embedded GUI frames (no natives needed - pure Java bridge)
-        implementation 'org.lwjgl:lwjgl-jawt:3.3.3'
-        
-        // Compression libraries
-        implementation 'com.github.luben:zstd-jni:1.5.7-6'
-        implementation 'org.lz4:lz4-java:1.8.0'
-        implementation 'org.tukaani:xz:1.9'
-        
-        // Database
-        implementation 'org.xerial:sqlite-jdbc:3.47.2.0'
-        
-        // Configuration
-        implementation 'com.electronwill.night-config:toml:3.6.6'
-        implementation 'com.electronwill.night-config:json:3.6.6'
-    }
+    // LWJGL JAWT for embedded GUI frames (no natives needed - pure Java bridge)
+    implementation 'org.lwjgl:lwjgl-jawt:3.3.3'
+    
+    // Compression libraries
+    implementation 'com.github.luben:zstd-jni:1.5.7-6'
+    implementation 'org.lz4:lz4-java:1.8.0'
+    implementation 'org.tukaani:xz:1.9'
+    
+    // Database
+    implementation 'org.xerial:sqlite-jdbc:3.47.2.0'
+    
+    // Configuration
+    implementation 'com.electronwill.night-config:toml:3.6.6'
+    implementation 'com.electronwill.night-config:json:3.6.6'
     
     // ===== TESTING DEPENDENCIES =====
     // Testing dependencies - only available in test scope, excluded from production builds
@@ -356,17 +321,6 @@ sourceSets {
             
             // Exclude bundled Mojang sources that shadow Maven dependencies
             exclude 'com/mojang/authlib/**'
-            
-            // Exclude DH implementation classes when Distant Horizons is disabled
-            // Keep DHCompat.java as it has fallback logic for when DH isn't present
-            if (!enableDistantHorizons) {
-                exclude '**/compat/dh/DHCompatInternal.java'
-                exclude '**/compat/dh/LodRendererEvents.java'
-                exclude '**/compat/dh/IrisLodRenderProgram.java'
-                exclude '**/compat/dh/IrisGenericRenderProgram.java'
-                exclude '**/compat/dh/DhFrameBufferWrapper.java'
-                exclude '**/compat/dh/DHMixinConfigPlugin.java'
-            }
         }
         resources {
             srcDir 'src/main/resources'

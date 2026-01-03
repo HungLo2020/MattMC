@@ -78,6 +78,6 @@ public class FramerateLimitTracker {
 		WINDOW_ICONIFIED,
 		LONG_AFK,
 		SHORT_AFK,
-		OUT_OF_LEVEL_MENU;
-	}
+		OUT_OF_LEVEL_MENU
+    }
 }

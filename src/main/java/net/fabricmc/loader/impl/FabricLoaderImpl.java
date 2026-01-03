@@ -39,8 +39,6 @@ import org.jetbrains.annotations.VisibleForTesting;
 import org.objectweb.asm.Opcodes;
 
 import net.fabricmc.api.EnvType;
-import net.fabricmc.classtweaker.api.ClassTweaker;
-import net.fabricmc.classtweaker.api.ClassTweakerReader;
 import net.fabricmc.loader.api.LanguageAdapter;
 import net.fabricmc.loader.api.MappingResolver;
 import net.fabricmc.loader.api.ModContainer;
@@ -48,12 +46,10 @@ import net.fabricmc.loader.api.ObjectShare;
 import net.fabricmc.loader.api.entrypoint.EntrypointContainer;
 import net.fabricmc.loader.impl.discovery.ArgumentModCandidateFinder;
 import net.fabricmc.loader.impl.discovery.ClasspathModCandidateFinder;
-import net.fabricmc.loader.impl.discovery.DirectoryModCandidateFinder;
 import net.fabricmc.loader.impl.discovery.ModCandidateImpl;
 import net.fabricmc.loader.impl.discovery.ModDiscoverer;
 import net.fabricmc.loader.impl.discovery.ModResolutionException;
 import net.fabricmc.loader.impl.discovery.ModResolver;
-import net.fabricmc.loader.impl.discovery.RuntimeModRemapper;
 import net.fabricmc.loader.impl.entrypoint.EntrypointStorage;
 import net.fabricmc.loader.impl.game.GameProvider;
 import net.fabricmc.loader.impl.launch.FabricLauncherBase;
@@ -90,7 +86,6 @@ public final class FabricLoaderImpl extends net.fabricmc.loader.FabricLoader {
 
 	private final Map<String, LanguageAdapter> adapterMap = new HashMap<>();
 	private final EntrypointStorage entrypointStorage = new EntrypointStorage();
-	private final ClassTweaker classTweaker = ClassTweaker.newInstance();
 
 	private final ObjectShare objectShare = new ObjectShareImpl();
 
@@ -215,7 +210,6 @@ public final class FabricLoaderImpl extends net.fabricmc.loader.FabricLoader {
 
 		ModDiscoverer discoverer = new ModDiscoverer(versionOverrides, depOverrides);
 		discoverer.addCandidateFinder(new ClasspathModCandidateFinder());
-		discoverer.addCandidateFinder(new DirectoryModCandidateFinder(getModsDirectory0(), remapRegularMods));
 		discoverer.addCandidateFinder(new ArgumentModCandidateFinder(remapRegularMods));
 
 		Map<String, Set<ModCandidateImpl>> envDisabledMods = new HashMap<>();
@@ -241,15 +235,8 @@ public final class FabricLoaderImpl extends net.fabricmc.loader.FabricLoader {
 		Path cacheDir = gameDir.resolve(CACHE_DIR_NAME);
 		Path outputdir = cacheDir.resolve(PROCESSED_MODS_DIR_NAME);
 
-		// runtime mod remapping
-
-		if (remapRegularMods) {
-			if (System.getProperty(SystemProperties.REMAP_CLASSPATH_FILE) == null) {
-				Log.warn(LogCategory.MOD_REMAP, "Runtime mod remapping disabled due to no fabric.remapClasspathFile being specified. You may need to update loom.");
-			} else {
-				RuntimeModRemapper.remap(modCandidates, cacheDir.resolve(TMP_DIR_NAME), outputdir);
-			}
-		}
+		// Note: Runtime mod remapping removed - unified build approach means all code
+		// uses consistent mappings at compile time, making runtime remapping unnecessary
 
 		// shuffle mods in-dev to reduce the risk of false order reliance, apply late load requests
 
@@ -517,24 +504,7 @@ public final class FabricLoaderImpl extends net.fabricmc.loader.FabricLoader {
 		}
 	}
 
-	public void loadClassTweakers() {
-		ClassTweakerReader ctReader = ClassTweakerReader.create(classTweaker);
-
-		for (net.fabricmc.loader.api.ModContainer modContainer : getAllMods()) {
-			LoaderModMetadata modMetadata = (LoaderModMetadata) modContainer.getMetadata();
-			String location = modMetadata.getClassTweaker();
-			if (location == null) continue;
-
-			Path path = modContainer.findPath(location).orElse(null);
-			if (path == null) throw new RuntimeException(String.format("Missing classTweaker file %s from mod %s", location, modContainer.getMetadata().getId()));
-
-			try (BufferedReader reader = Files.newBufferedReader(path)) {
-				ctReader.read(reader, FabricLauncherBase.getLauncher().getMappingConfiguration().getRuntimeNamespace());
-			} catch (Exception e) {
-				throw new RuntimeException("Failed to read classTweaker file from mod " + modMetadata.getId(), e);
-			}
-		}
-	}
+	// NOTE: loadClassTweakers() removed - access modifications already applied in source
 
 	public void prepareModInit(Path newRunDir, Object gameInstance) {
 		if (!frozen) {
@@ -591,9 +561,7 @@ public final class FabricLoaderImpl extends net.fabricmc.loader.FabricLoader {
 		}
 	}
 
-	public ClassTweaker getClassTweaker() {
-		return classTweaker;
-	}
+	// NOTE: getClassTweaker() removed - access modifications already applied in source
 
 	/**
 	 * Sets the game instance. This is only used in 20w22a+ by the dedicated server and should not be called by anything else.
@@ -613,13 +581,6 @@ public final class FabricLoaderImpl extends net.fabricmc.loader.FabricLoader {
 	@Override
 	public String[] getLaunchArguments(boolean sanitize) {
 		return getGameProvider().getLaunchArguments(sanitize);
-	}
-
-	@Override
-	protected Path getModsDirectory0() {
-		String directory = System.getProperty(SystemProperties.MODS_FOLDER);
-
-		return directory != null ? Paths.get(directory) : gameDir.resolve("mods");
 	}
 
 	/**

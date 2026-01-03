@@ -206,7 +206,8 @@ public class GlProgram implements AutoCloseable, net.irisshaders.iris.mixinterfa
 		}
 	}
 	
-	private static boolean shouldOverrideShaders() {
+	@SuppressWarnings("BooleanMethodIsAlwaysInverted")
+    private static boolean shouldOverrideShaders() {
 		net.irisshaders.iris.pipeline.WorldRenderingPipeline pipeline = net.irisshaders.iris.Iris.getPipelineManager().getPipelineNullable();
 
 		if (pipeline instanceof net.irisshaders.iris.pipeline.ShaderRenderingPipeline) {
@@ -216,7 +217,8 @@ public class GlProgram implements AutoCloseable, net.irisshaders.iris.mixinterfa
 		}
 	}
 	
-	private boolean isKnownShader() {
+	@SuppressWarnings("BooleanMethodIsAlwaysInverted")
+    private boolean isKnownShader() {
 		return this instanceof net.irisshaders.iris.pipeline.programs.ExtendedShader || this instanceof net.irisshaders.iris.pipeline.programs.FallbackShader;
 	}
 }

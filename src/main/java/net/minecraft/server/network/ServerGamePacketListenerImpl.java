@@ -1875,28 +1875,146 @@ public class ServerGamePacketListenerImpl
 	@Override
 	public void handleSetCreativeModeSlot(ServerboundSetCreativeModeSlotPacket serverboundSetCreativeModeSlotPacket) {
 		PacketUtils.ensureRunningOnSameThread(serverboundSetCreativeModeSlotPacket, this, this.player.level());
-		if (this.player.hasInfiniteMaterials()) {
-			boolean bl = serverboundSetCreativeModeSlotPacket.slotNum() < 0;
-			ItemStack itemStack = serverboundSetCreativeModeSlotPacket.itemStack();
-			if (!itemStack.isItemEnabled(this.player.level().enabledFeatures())) {
-				return;
-			}
-
-			boolean bl2 = serverboundSetCreativeModeSlotPacket.slotNum() >= 1 && serverboundSetCreativeModeSlotPacket.slotNum() <= 45;
-			boolean bl3 = itemStack.isEmpty() || itemStack.getCount() <= itemStack.getMaxStackSize();
-			if (bl2 && bl3) {
-				this.player.inventoryMenu.getSlot(serverboundSetCreativeModeSlotPacket.slotNum()).setByPlayer(itemStack);
-				this.player.inventoryMenu.setRemoteSlot(serverboundSetCreativeModeSlotPacket.slotNum(), itemStack);
-				this.player.inventoryMenu.broadcastChanges();
-			} else if (bl && bl3) {
-				if (this.dropSpamThrottler.isUnderThreshold()) {
-					this.dropSpamThrottler.increment();
-					this.player.drop(itemStack, true);
-				} else {
-					LOGGER.warn("Player {} was dropping items too fast in creative mode, ignoring.", this.player.getPlainTextName());
-				}
-			}
+		
+		// Allow item spawning in both creative and survival modes for JEI-like functionality
+		// Original check: if (this.player.hasInfiniteMaterials()) {
+		boolean bl = serverboundSetCreativeModeSlotPacket.slotNum() < 0;
+		ItemStack itemStack = serverboundSetCreativeModeSlotPacket.itemStack();
+		if (!itemStack.isItemEnabled(this.player.level().enabledFeatures())) {
+			return;
 		}
+
+		boolean bl2 = serverboundSetCreativeModeSlotPacket.slotNum() >= 1 && serverboundSetCreativeModeSlotPacket.slotNum() <= 45;
+		boolean bl3 = itemStack.isEmpty() || itemStack.getCount() <= itemStack.getMaxStackSize();
+		
+		if (bl2 && bl3) {
+			
+			// Get the current item in the slot - use containerMenu (the currently open container)
+			// not inventoryMenu (which is always the player's base inventory)
+			ItemStack currentStack = this.player.containerMenu.getSlot(serverboundSetCreativeModeSlotPacket.slotNum()).getItem();
+			
+			// If there's already an item of the same type, increment its count
+			if (!currentStack.isEmpty() && ItemStack.isSameItemSameComponents(currentStack, itemStack)) {
+				int spaceAvailable = currentStack.getMaxStackSize() - currentStack.getCount();
+				int amountToAdd = Math.min(itemStack.getCount(), spaceAvailable);
+				int remainder = itemStack.getCount() - amountToAdd;
+				
+				
+				// Add what we can to current stack
+				currentStack.setCount(currentStack.getCount() + amountToAdd);
+				
+				// Update the container menu (the currently open container)
+				this.player.containerMenu.setRemoteSlot(serverboundSetCreativeModeSlotPacket.slotNum(), currentStack);
+				this.player.containerMenu.broadcastChanges();
+				// Send updated stack to client
+				this.send(new net.minecraft.network.protocol.game.ClientboundContainerSetSlotPacket(
+					this.player.containerMenu.containerId,
+					this.player.containerMenu.incrementStateId(),
+					serverboundSetCreativeModeSlotPacket.slotNum(),
+					currentStack
+				));
+				
+				// If there's a remainder, try to add it to player's inventory
+				if (remainder > 0) {
+					ItemStack remainderStack = itemStack.copy();
+					remainderStack.setCount(remainder);
+					
+					// Try to add remainder to player's inventory slots in the current container
+					// We need to find which slots in containerMenu belong to the player's inventory
+					boolean addedRemainder = false;
+					
+					// First, look for another stack with the same item that has room
+					for (int i = 0; i < this.player.containerMenu.slots.size(); i++) {
+						if (i == serverboundSetCreativeModeSlotPacket.slotNum()) continue; // Skip the slot we just filled
+						
+						var slot = this.player.containerMenu.getSlot(i);
+						// Only check slots that belong to player inventory
+						if (slot.container == this.player.getInventory()) {
+							ItemStack slotStack = slot.getItem();
+							if (!slotStack.isEmpty() && ItemStack.isSameItemSameComponents(slotStack, remainderStack)) {
+								int slotSpace = slotStack.getMaxStackSize() - slotStack.getCount();
+								if (slotSpace > 0) {
+									int amountToAddHere = Math.min(remainder, slotSpace);
+									slotStack.setCount(slotStack.getCount() + amountToAddHere);
+									remainder -= amountToAddHere;
+									
+									
+									// Sync this slot
+									this.player.containerMenu.setRemoteSlot(i, slotStack);
+									this.send(new net.minecraft.network.protocol.game.ClientboundContainerSetSlotPacket(
+										this.player.containerMenu.containerId,
+										this.player.containerMenu.incrementStateId(),
+										i,
+										slotStack
+									));
+									
+									if (remainder == 0) {
+										addedRemainder = true;
+										break;
+									}
+								}
+							}
+						}
+					}
+					
+					// If still has remainder, look for empty slots in player inventory
+					if (remainder > 0) {
+						for (int i = 0; i < this.player.containerMenu.slots.size(); i++) {
+							var slot = this.player.containerMenu.getSlot(i);
+							// Only check slots that belong to player inventory
+							if (slot.container == this.player.getInventory()) {
+								ItemStack slotStack = slot.getItem();
+								if (slotStack.isEmpty()) {
+									ItemStack newStack = remainderStack.copy();
+									newStack.setCount(remainder);
+									slot.setByPlayer(newStack);
+									this.player.containerMenu.setRemoteSlot(i, newStack);
+									
+									
+									// Sync this slot
+									this.send(new net.minecraft.network.protocol.game.ClientboundContainerSetSlotPacket(
+										this.player.containerMenu.containerId,
+										this.player.containerMenu.incrementStateId(),
+										i,
+										newStack
+									));
+									addedRemainder = true;
+									remainder = 0;
+									break;
+								}
+							}
+						}
+					}
+					
+					if (remainder > 0) {
+					}
+					
+					// Broadcast changes after all modifications
+					this.player.containerMenu.broadcastChanges();
+				}
+			} else {
+				// Set new item (slot is empty or different item)
+				this.player.containerMenu.getSlot(serverboundSetCreativeModeSlotPacket.slotNum()).setByPlayer(itemStack);
+				this.player.containerMenu.setRemoteSlot(serverboundSetCreativeModeSlotPacket.slotNum(), itemStack);
+				this.player.containerMenu.broadcastChanges();
+				// Send packet directly to client to ensure immediate visibility
+				this.send(new net.minecraft.network.protocol.game.ClientboundContainerSetSlotPacket(
+					this.player.containerMenu.containerId,
+					this.player.containerMenu.incrementStateId(),
+					serverboundSetCreativeModeSlotPacket.slotNum(),
+					itemStack
+				));
+			}
+		} else if (bl && bl3) {
+			if (this.dropSpamThrottler.isUnderThreshold()) {
+				this.dropSpamThrottler.increment();
+				this.player.drop(itemStack, true);
+			} else {
+				LOGGER.warn("Player {} was dropping items too fast in creative mode, ignoring.", this.player.getPlainTextName());
+			}
+		} else {
+		}
+		// Removed closing brace of hasInfiniteMaterials check
 	}
 
 	@Override

@@ -74,12 +74,10 @@ public class GraphicsWorkarounds {
 		} else if (string2.endsWith("gen11")) {
 			return true;
 		} else {
-			return !string2.contains("uhd graphics") && !string2.contains("iris")
-				? false
-				: string.contains("atom") && INTEL_GEN11_ATOM.stream().anyMatch(string::contains)
-					|| string.contains("celeron") && INTEL_GEN11_CELERON.stream().anyMatch(string::contains)
-					|| string.contains("pentium") && INTEL_GEN11_PENTIUM.stream().anyMatch(string::contains)
-					|| INTEL_GEN11_CORE.stream().anyMatch(string::contains);
+			return (string2.contains("uhd graphics") || string2.contains("iris")) && (string.contains("atom") && INTEL_GEN11_ATOM.stream().anyMatch(string::contains)
+                    || string.contains("celeron") && INTEL_GEN11_CELERON.stream().anyMatch(string::contains)
+                    || string.contains("pentium") && INTEL_GEN11_PENTIUM.stream().anyMatch(string::contains)
+                    || INTEL_GEN11_CORE.stream().anyMatch(string::contains));
 		}
 	}
 

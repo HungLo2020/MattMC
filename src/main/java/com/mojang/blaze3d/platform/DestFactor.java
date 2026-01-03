@@ -20,5 +20,5 @@ public enum DestFactor {
 	ONE_MINUS_SRC_COLOR,
 	SRC_ALPHA,
 	SRC_COLOR,
-	ZERO;
+	ZERO
 }

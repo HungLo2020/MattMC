@@ -97,39 +97,37 @@ public final class VideoMode {
 	}
 
 	public static Optional<VideoMode> read(@Nullable String string) {
-		if (string == null) {
-			return Optional.empty();
-		} else {
-			try {
-				Matcher matcher = PATTERN.matcher(string);
-				if (matcher.matches()) {
-					int i = Integer.parseInt(matcher.group(1));
-					int j = Integer.parseInt(matcher.group(2));
-					String string2 = matcher.group(3);
-					int k;
-					if (string2 == null) {
-						k = 60;
-					} else {
-						k = Integer.parseInt(string2);
-					}
+        if (string != null) {
+            try {
+                Matcher matcher = PATTERN.matcher(string);
+                if (matcher.matches()) {
+                    int i = Integer.parseInt(matcher.group(1));
+                    int j = Integer.parseInt(matcher.group(2));
+                    String string2 = matcher.group(3);
+                    int k;
+                    if (string2 == null) {
+                        k = 60;
+                    } else {
+                        k = Integer.parseInt(string2);
+                    }
 
-					String string3 = matcher.group(4);
-					int l;
-					if (string3 == null) {
-						l = 24;
-					} else {
-						l = Integer.parseInt(string3);
-					}
+                    String string3 = matcher.group(4);
+                    int l;
+                    if (string3 == null) {
+                        l = 24;
+                    } else {
+                        l = Integer.parseInt(string3);
+                    }
 
-					int m = l / 3;
-					return Optional.of(new VideoMode(i, j, m, m, m, k));
-				}
-			} catch (Exception var9) {
-			}
+                    int m = l / 3;
+                    return Optional.of(new VideoMode(i, j, m, m, m, k));
+                }
+            } catch (Exception var9) {
+            }
 
-			return Optional.empty();
-		}
-	}
+        }
+        return Optional.empty();
+    }
 
 	public String write() {
 		return String.format(Locale.ROOT, "%sx%s@%s:%s", this.width, this.height, this.refreshRate, this.redBits + this.greenBits + this.blueBits);

@@ -21,5 +21,5 @@ public enum SourceFactor {
 	SRC_ALPHA,
 	SRC_ALPHA_SATURATE,
 	SRC_COLOR,
-	ZERO;
+	ZERO
 }

@@ -6,6 +6,10 @@ This document contains helpful tips and tricks to improve your workflow as you d
 
 ## Useful Git Features
 
+### Git Blame
+
+'git blame' is a Git command that tells you who last changed each line in a file (can also specify file range) and which commit introduced that change (plus the timestamp).
+
 ### Git Bisect
 
 `git bisect` is a powerful debugging tool that uses binary search to identify the commit where a bug or issue was introduced. By marking a good commit and a bad commit, Git walks you step-by-step through intermediate commits, saving you time compared to checking every single one.

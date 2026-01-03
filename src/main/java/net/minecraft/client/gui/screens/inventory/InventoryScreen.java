@@ -35,24 +35,13 @@ public class InventoryScreen extends AbstractRecipeBookScreen<InventoryMenu> {
 	@Override
 	public void containerTick() {
 		super.containerTick();
-		if (this.minecraft.player.hasInfiniteMaterials()) {
-			this.minecraft
-				.setScreen(
-					new CreativeModeInventoryScreen(this.minecraft.player, this.minecraft.player.connection.enabledFeatures(), this.minecraft.options.operatorItemsTab().get())
-				);
-		}
+		// No longer switch to creative inventory - stay in survival inventory even in creative mode
 	}
 
 	@Override
 	protected void init() {
-		if (this.minecraft.player.hasInfiniteMaterials()) {
-			this.minecraft
-				.setScreen(
-					new CreativeModeInventoryScreen(this.minecraft.player, this.minecraft.player.connection.enabledFeatures(), this.minecraft.options.operatorItemsTab().get())
-				);
-		} else {
-			super.init();
-		}
+		// No longer switch to creative inventory - stay in survival inventory even in creative mode
+		super.init();
 	}
 
 	@Override
