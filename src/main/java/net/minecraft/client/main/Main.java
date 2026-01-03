@@ -201,8 +201,12 @@ public class Main {
 			String string9 = optionSet.valueOf(optionSpec20);
 			String string10 = parseArgument(optionSet, optionSpec5);
 			GameConfig.QuickPlayVariant quickPlayVariant = getQuickPlayVariant(optionSet, optionSpec6, optionSpec7, optionSpec8);
+			
+			// Read player name from options.txt, fallback to "steve" if not set
+			String playerName = readPlayerNameFromOptions(file);
+			
 			User user = new User(
-				optionSpec16.value(optionSet), uUID, optionSpec21.value(optionSet), emptyStringToEmptyOptional(string8), emptyStringToEmptyOptional(string9)
+				playerName, uUID, optionSpec21.value(optionSet), emptyStringToEmptyOptional(string8), emptyStringToEmptyOptional(string9)
 			);
 			gameConfig = new GameConfig(
 				new GameConfig.UserData(user, proxy),
@@ -331,6 +335,34 @@ public class Main {
 			logger.warn("Invalid UUID: '{}", optionSpec.value(optionSet));
 			return false;
 		}
+	}
+
+	/**
+	 * Read player name from options.txt file if it exists.
+	 * Returns "steve" as default if file doesn't exist or playerName is not set.
+	 */
+	private static String readPlayerNameFromOptions(File gameDirectory) {
+		File optionsFile = new File(gameDirectory, "options.txt");
+		if (!optionsFile.exists()) {
+			return "steve";
+		}
+
+		try {
+			Optional<String> playerNameLine = java.nio.file.Files.lines(optionsFile.toPath())
+				.filter(line -> line.startsWith("playerName:"))
+				.findFirst();
+			
+			if (playerNameLine.isPresent()) {
+				String[] parts = playerNameLine.get().split(":", 2);
+				if (parts.length == 2 && !parts[1].trim().isEmpty()) {
+					return parts[1].trim();
+				}
+			}
+		} catch (Exception e) {
+			// If we can't read the file, just use default
+		}
+
+		return "steve";
 	}
 
 	static {
