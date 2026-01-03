@@ -177,17 +177,12 @@ public class JeiPanel {
 			return;
 		}
 		
-		// Draw border around items area
-		int itemsAreaX = this.panelX;
-		int itemsAreaY = this.panelY;
-		int itemsAreaWidth = this.panelWidth;
-		int itemsAreaHeight = this.rows * this.slotSize + 4;
+		// Draw border around entire panel
 		int borderColor = 0xFF8B8B8B;
-		
-		guiGraphics.fill(itemsAreaX, itemsAreaY, itemsAreaX + itemsAreaWidth, itemsAreaY + 1, borderColor);
-		guiGraphics.fill(itemsAreaX, itemsAreaY + itemsAreaHeight - 1, itemsAreaX + itemsAreaWidth, itemsAreaY + itemsAreaHeight, borderColor);
-		guiGraphics.fill(itemsAreaX, itemsAreaY, itemsAreaX + 1, itemsAreaY + itemsAreaHeight, borderColor);
-		guiGraphics.fill(itemsAreaX + itemsAreaWidth - 1, itemsAreaY, itemsAreaX + itemsAreaWidth, itemsAreaY + itemsAreaHeight, borderColor);
+		guiGraphics.fill(this.panelX, this.panelY, this.panelX + this.panelWidth, this.panelY + 1, borderColor);
+		guiGraphics.fill(this.panelX, this.panelY + this.panelHeight - 1, this.panelX + this.panelWidth, this.panelY + this.panelHeight, borderColor);
+		guiGraphics.fill(this.panelX, this.panelY, this.panelX + 1, this.panelY + this.panelHeight, borderColor);
+		guiGraphics.fill(this.panelX + this.panelWidth - 1, this.panelY, this.panelX + this.panelWidth, this.panelY + this.panelHeight, borderColor);
 		
 		// Render items
 		this.renderItems(guiGraphics);
@@ -253,13 +248,6 @@ public class JeiPanel {
 		
 		// Background
 		guiGraphics.fill(searchBarX, searchBarY, searchBarX + searchBarWidth, searchBarY + this.searchBarHeight, 0xFF1A1A1A);
-		
-		// Border
-		int borderColor = this.searchFocused ? 0xFFFFFFFF : 0xFF8B8B8B;
-		guiGraphics.fill(searchBarX, searchBarY, searchBarX + searchBarWidth, searchBarY + 1, borderColor);
-		guiGraphics.fill(searchBarX, searchBarY + this.searchBarHeight - 1, searchBarX + searchBarWidth, searchBarY + this.searchBarHeight, borderColor);
-		guiGraphics.fill(searchBarX, searchBarY, searchBarX + 1, searchBarY + this.searchBarHeight, borderColor);
-		guiGraphics.fill(searchBarX + searchBarWidth - 1, searchBarY, searchBarX + searchBarWidth, searchBarY + this.searchBarHeight, borderColor);
 		
 		// Text
 		if (this.searchText.isEmpty() && !this.searchFocused) {
