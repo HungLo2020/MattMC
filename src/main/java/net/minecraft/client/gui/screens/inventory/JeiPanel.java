@@ -177,16 +177,6 @@ public class JeiPanel {
 			return;
 		}
 		
-		// Draw panel background
-		guiGraphics.fill(this.panelX, this.panelY, this.panelX + this.panelWidth, this.panelY + this.panelHeight, 0xC0101010);
-		
-		// Draw border
-		int borderColor = 0xFF8B8B8B;
-		guiGraphics.fill(this.panelX, this.panelY, this.panelX + this.panelWidth, this.panelY + 1, borderColor);
-		guiGraphics.fill(this.panelX, this.panelY + this.panelHeight - 1, this.panelX + this.panelWidth, this.panelY + this.panelHeight, borderColor);
-		guiGraphics.fill(this.panelX, this.panelY, this.panelX + 1, this.panelY + this.panelHeight, borderColor);
-		guiGraphics.fill(this.panelX + this.panelWidth - 1, this.panelY, this.panelX + this.panelWidth, this.panelY + this.panelHeight, borderColor);
-		
 		// Render items
 		this.renderItems(guiGraphics);
 		
