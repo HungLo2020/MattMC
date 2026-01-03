@@ -138,6 +138,7 @@ public class GlProgram implements AutoCloseable, net.irisshaders.iris.mixinterfa
 		}
 
 		int o = GlStateManager.glGetProgrami(this.programId, 35382);
+		boolean irisActive = shouldOverrideShaders();
 
 		for (int p = 0; p < o; p++) {
 			String string = GL31.glGetActiveUniformBlockName(this.programId, p);
@@ -146,7 +147,7 @@ public class GlProgram implements AutoCloseable, net.irisshaders.iris.mixinterfa
 					int n = i++;
 					GL31.glUniformBlockBinding(this.programId, p, n);
 					this.uniformsByName.put(string, new Uniform.Ubo(n));
-				} else if (string.startsWith("iris_") && shouldOverrideShaders()) {
+				} else if (string.startsWith("iris_") && irisActive) {
 					// Silently skip Iris-injected uniforms when Iris shaders are active
 					// These are managed by Iris's own pipeline
 				} else {
