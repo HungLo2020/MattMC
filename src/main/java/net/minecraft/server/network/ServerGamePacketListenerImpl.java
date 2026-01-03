@@ -1904,9 +1904,15 @@ public class ServerGamePacketListenerImpl
 			// If there's already an item of the same type, increment its count
 			if (!currentStack.isEmpty() && ItemStack.isSameItemSameComponents(currentStack, itemStack)) {
 				System.out.println("[JEI SERVER DEBUG] Item already exists, incrementing count");
-				int newCount = Math.min(currentStack.getCount() + itemStack.getCount(), currentStack.getMaxStackSize());
-				System.out.println("[JEI SERVER DEBUG] New count: " + newCount + " (was " + currentStack.getCount() + ", adding " + itemStack.getCount() + ")");
-				currentStack.setCount(newCount);
+				int spaceAvailable = currentStack.getMaxStackSize() - currentStack.getCount();
+				int amountToAdd = Math.min(itemStack.getCount(), spaceAvailable);
+				int remainder = itemStack.getCount() - amountToAdd;
+				
+				System.out.println("[JEI SERVER DEBUG] Space available: " + spaceAvailable + ", adding: " + amountToAdd + ", remainder: " + remainder);
+				
+				// Add what we can to current stack
+				currentStack.setCount(currentStack.getCount() + amountToAdd);
+				
 				// Update both menus
 				this.player.inventoryMenu.setRemoteSlot(serverboundSetCreativeModeSlotPacket.slotNum(), currentStack);
 				this.player.inventoryMenu.broadcastChanges();
@@ -1918,6 +1924,108 @@ public class ServerGamePacketListenerImpl
 					serverboundSetCreativeModeSlotPacket.slotNum(),
 					currentStack
 				));
+				
+				// If there's a remainder, try to add it to inventory
+				if (remainder > 0) {
+					System.out.println("[JEI SERVER DEBUG] Has remainder: " + remainder + ", trying to add to inventory");
+					ItemStack remainderStack = itemStack.copy();
+					remainderStack.setCount(remainder);
+					
+					// Try to add remainder to inventory
+					// First, look for another stack with the same item that has room
+					boolean addedRemainder = false;
+					for (int i = 9; i <= 44; i++) { // Slots 9-35 (main inventory) and 36-44 (hotbar)
+						if (i == serverboundSetCreativeModeSlotPacket.slotNum()) continue; // Skip the slot we just filled
+						
+						ItemStack slotStack = this.player.inventoryMenu.getSlot(i).getItem();
+						if (!slotStack.isEmpty() && ItemStack.isSameItemSameComponents(slotStack, remainderStack)) {
+							int slotSpace = slotStack.getMaxStackSize() - slotStack.getCount();
+							if (slotSpace > 0) {
+								int amountToAddHere = Math.min(remainder, slotSpace);
+								slotStack.setCount(slotStack.getCount() + amountToAddHere);
+								remainder -= amountToAddHere;
+								
+								System.out.println("[JEI SERVER DEBUG] Added " + amountToAddHere + " to slot " + i + ", remainder now: " + remainder);
+								
+								// Sync this slot
+								this.player.inventoryMenu.setRemoteSlot(i, slotStack);
+								this.send(new net.minecraft.network.protocol.game.ClientboundContainerSetSlotPacket(
+									this.player.containerMenu.containerId,
+									this.player.containerMenu.incrementStateId(),
+									i,
+									slotStack
+								));
+								
+								if (remainder == 0) {
+									addedRemainder = true;
+									break;
+								}
+							}
+						}
+					}
+					
+					// If still has remainder, look for empty slots
+					if (remainder > 0) {
+						System.out.println("[JEI SERVER DEBUG] Still has remainder: " + remainder + ", looking for empty slots");
+						for (int i = 36; i <= 44; i++) { // Try hotbar first (slots 36-44)
+							ItemStack slotStack = this.player.inventoryMenu.getSlot(i).getItem();
+							if (slotStack.isEmpty()) {
+								ItemStack newStack = remainderStack.copy();
+								newStack.setCount(remainder);
+								this.player.inventoryMenu.getSlot(i).setByPlayer(newStack);
+								this.player.inventoryMenu.setRemoteSlot(i, newStack);
+								
+								System.out.println("[JEI SERVER DEBUG] Added remainder to empty hotbar slot " + i);
+								
+								// Sync this slot
+								this.send(new net.minecraft.network.protocol.game.ClientboundContainerSetSlotPacket(
+									this.player.containerMenu.containerId,
+									this.player.containerMenu.incrementStateId(),
+									i,
+									newStack
+								));
+								addedRemainder = true;
+								remainder = 0;
+								break;
+							}
+						}
+					}
+					
+					// If still has remainder, try main inventory (slots 9-35)
+					if (remainder > 0) {
+						System.out.println("[JEI SERVER DEBUG] Still has remainder: " + remainder + ", checking main inventory");
+						for (int i = 9; i <= 35; i++) {
+							ItemStack slotStack = this.player.inventoryMenu.getSlot(i).getItem();
+							if (slotStack.isEmpty()) {
+								ItemStack newStack = remainderStack.copy();
+								newStack.setCount(remainder);
+								this.player.inventoryMenu.getSlot(i).setByPlayer(newStack);
+								this.player.inventoryMenu.setRemoteSlot(i, newStack);
+								
+								System.out.println("[JEI SERVER DEBUG] Added remainder to empty inventory slot " + i);
+								
+								// Sync this slot
+								this.send(new net.minecraft.network.protocol.game.ClientboundContainerSetSlotPacket(
+									this.player.containerMenu.containerId,
+									this.player.containerMenu.incrementStateId(),
+									i,
+									newStack
+								));
+								addedRemainder = true;
+								remainder = 0;
+								break;
+							}
+						}
+					}
+					
+					if (remainder > 0) {
+						System.out.println("[JEI SERVER DEBUG] Could not add all remainder, " + remainder + " items lost (inventory full)");
+					}
+					
+					// Broadcast changes after all modifications
+					this.player.inventoryMenu.broadcastChanges();
+					this.player.containerMenu.broadcastChanges();
+				}
 			} else {
 				System.out.println("[JEI SERVER DEBUG] Setting new item stack");
 				// Set new item (slot is empty or different item)
