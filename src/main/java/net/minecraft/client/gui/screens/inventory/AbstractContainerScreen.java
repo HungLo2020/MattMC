@@ -80,7 +80,15 @@ public abstract class AbstractContainerScreen<T extends AbstractContainerMenu> e
 	
 	// Game mode toggle button
 	@Nullable
-	private net.minecraft.client.gui.components.Button gameModeToggleButton;
+	private Button gameModeToggleButton;
+	
+	// Time and weather control buttons
+	@Nullable
+	private Button dayButton;
+	@Nullable
+	private Button nightButton;
+	@Nullable
+	private Button weatherButton;
 
 	public AbstractContainerScreen(T abstractContainerMenu, Inventory inventory, Component component) {
 		super(component);
@@ -113,6 +121,30 @@ public abstract class AbstractContainerScreen<T extends AbstractContainerMenu> e
 			Button.builder(this.getGameModeButtonText(), button -> this.toggleGameMode())
 				.pos(4, 4)
 				.size(80, 20)
+				.build()
+		);
+		
+		// Add Day button (half width of gamemode button)
+		this.dayButton = this.addRenderableWidget(
+			Button.builder(Component.literal("Day"), button -> this.setTimeToDay())
+				.pos(88, 4) // 4 + 80 + 4 spacing
+				.size(40, 20)
+				.build()
+		);
+		
+		// Add Night button
+		this.nightButton = this.addRenderableWidget(
+			Button.builder(Component.literal("Night"), button -> this.setTimeToNight())
+				.pos(132, 4) // 88 + 40 + 4 spacing
+				.size(40, 20)
+				.build()
+		);
+		
+		// Add Weather button
+		this.weatherButton = this.addRenderableWidget(
+			Button.builder(Component.literal("Weather"), button -> this.toggleWeather())
+				.pos(176, 4) // 132 + 40 + 4 spacing
+				.size(50, 20) // Slightly wider for "Weather" text
 				.build()
 		);
 	}
@@ -790,6 +822,25 @@ public abstract class AbstractContainerScreen<T extends AbstractContainerMenu> e
 			if (this.gameModeToggleButton != null) {
 				this.gameModeToggleButton.setMessage(this.getGameModeButtonText());
 			}
+		}
+	}
+	
+	private void setTimeToDay() {
+		if (this.minecraft != null && this.minecraft.player != null && this.minecraft.player.connection != null) {
+			this.minecraft.player.connection.sendCommand("time set noon");
+		}
+	}
+	
+	private void setTimeToNight() {
+		if (this.minecraft != null && this.minecraft.player != null && this.minecraft.player.connection != null) {
+			this.minecraft.player.connection.sendCommand("time set midnight");
+		}
+	}
+	
+	private void toggleWeather() {
+		if (this.minecraft != null && this.minecraft.player != null && this.minecraft.player.connection != null) {
+			// Toggle between clear and rain
+			this.minecraft.player.connection.sendCommand("weather thunder");
 		}
 	}
 

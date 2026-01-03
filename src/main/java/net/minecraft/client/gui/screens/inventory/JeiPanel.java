@@ -137,7 +137,7 @@ public class JeiPanel {
 	 */
 	public void calculateLayout(int screenWidth, int screenHeight, int inventoryRightEdge, int inventoryTopEdge) {
 		// Panel anchored to right side of screen
-		int rightMargin = 8;
+		int rightMargin = 2; // Reduced from 8 to allow extra column
 		int gapFromInventory = 16;
 		int panelLeftEdge = inventoryRightEdge + gapFromInventory;
 		
