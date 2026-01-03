@@ -105,27 +105,25 @@ public class InventoryScreen extends AbstractRecipeBookScreen<InventoryMenu> {
 	
 	private void calculateJeiPanelLayout() {
 		// Calculate the JEI panel position and size based on screen size
+		// Goal: Fill approximately right 1/3 of screen with minimal margins
 		int screenWidth = this.width;
 		int screenHeight = this.height;
 		
-		// Position panel on right side with better spacing
-		// Use larger gap from inventory (16px instead of 4px) for better visual separation
-		int gapFromInventory = 16;
+		// Position panel on right side - minimal gap from inventory for better space utilization
+		int gapFromInventory = 12;
 		this.jeiPanelX = this.leftPos + this.imageWidth + gapFromInventory;
 		
-		// Align panel top with screen top (or small margin from top)
-		int topMargin = Math.max(4, this.topPos - 10);
+		// Minimal top margin - align near top of screen
+		int topMargin = 4;
 		this.jeiPanelY = topMargin;
 		
-		// Calculate available space for panel - use more of the screen
-		// Leave reasonable margin from right edge (8px instead of 10px)
-		int rightMargin = 8;
+		// Calculate available space - minimal right margin for maximum space utilization
+		int rightMargin = 4;
 		int availableWidth = screenWidth - this.jeiPanelX - rightMargin;
 		
-		// Use full available height from top to bottom, not just inventory height
-		// Leave small bottom margin
-		int bottomMargin = Math.max(4, screenHeight - (this.topPos + this.imageHeight) - 10);
-		int availableHeight = screenHeight - this.jeiPanelY - bottomMargin;
+		// Use full available height from top to bottom with minimal margins
+		int bottomMargin = 4;
+		int availableHeight = screenHeight - topMargin - bottomMargin;
 		
 		// Use standard Minecraft slot size (18x18)
 		int slotSpacing = this.jeiSlotSize;
@@ -136,16 +134,16 @@ public class InventoryScreen extends AbstractRecipeBookScreen<InventoryMenu> {
 		this.jeiColumns = Math.max(1, widthForSlots / slotSpacing);
 		
 		// Calculate rows using full available height
-		// Leave small top/bottom padding (4px each = 8px total)
-		int heightForSlots = availableHeight - 8;
+		// Account for small top/bottom padding inside panel (2px each = 4px total)
+		int heightForSlots = availableHeight - 4;
 		this.jeiRows = Math.max(1, heightForSlots / slotSpacing);
 		
 		// Limit columns to a reasonable number (like JEI does)
 		this.jeiColumns = Math.min(this.jeiColumns, 9);
 		
-		// Calculate actual panel dimensions based on slots
+		// Calculate actual panel dimensions based on available space
 		this.jeiPanelWidth = this.jeiColumns * slotSpacing + 18; // Add space for scrollbar
-		this.jeiPanelHeight = availableHeight;
+		this.jeiPanelHeight = this.jeiRows * slotSpacing + 4; // Exact height for rows + padding
 	}
 
 	@Override
