@@ -166,11 +166,11 @@ public abstract class AbstractModInitializer
 		this.commandInitializer = new CommandInitializer();
 		this.subscribeRegisterCommandsEvent(dispatcher -> { this.commandInitializer.initCommands(dispatcher); });
 		
-		LOGGER.info("[DH-INIT] Subscribing to server starting event...");
+		//LOGGER.info("[DH-INIT] Subscribing to server starting event...");
 		this.subscribeServerStartingEvent(server -> 
 		{
-			LOGGER.info("[DH-EVENT] SERVER_STARTING callback triggered!");
-			LOGGER.info("[DH-EVENT] Thread: " + Thread.currentThread().getName() + " (ID: " + Thread.currentThread().getId() + ")");
+			//LOGGER.info("[DH-EVENT] SERVER_STARTING callback triggered!");
+			//LOGGER.info("[DH-EVENT] Thread: " + Thread.currentThread().getName() + " (ID: " + Thread.currentThread().getId() + ")");
 			
 			MinecraftServerWrapper.INSTANCE.dedicatedServer = (DedicatedServer)server;
 			

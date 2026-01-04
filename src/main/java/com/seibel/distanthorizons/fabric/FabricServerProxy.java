@@ -95,9 +95,9 @@ public class FabricServerProxy implements AbstractModInitializer.IEventProxy
 	@Override
 	public void registerEvents()
 	{
-		LOGGER.info("[DH-EVENTS] ========== REGISTERING FABRIC SERVER EVENTS ==========");
-		LOGGER.info("[DH-EVENTS] isDedicatedServer: " + this.isDedicatedServer);
-		LOGGER.info("[DH-EVENTS] Thread: " + Thread.currentThread().getName() + " (ID: " + Thread.currentThread().getId() + ")");
+		//LOGGER.info("[DH-EVENTS] ========== REGISTERING FABRIC SERVER EVENTS ==========");
+		//LOGGER.info("[DH-EVENTS] isDedicatedServer: " + this.isDedicatedServer);
+		//LOGGER.info("[DH-EVENTS] Thread: " + Thread.currentThread().getName() + " (ID: " + Thread.currentThread().getId() + ")");
 		
 		/* Register the mod needed event callbacks */
 		
@@ -106,11 +106,11 @@ public class FabricServerProxy implements AbstractModInitializer.IEventProxy
 		if (false)
 		{
 			// can be enabled to test overrides/events without having to build a separate API project 
-			LOGGER.info("[DH-EVENTS] Registering DhApiLevelLoadEvent handler (TestWorldGenBindingEvent)...");
+			//LOGGER.info("[DH-EVENTS] Registering DhApiLevelLoadEvent handler (TestWorldGenBindingEvent)...");
 			DhApiResult<Void> worldGenResult = DhApiEventRegister.on(DhApiLevelLoadEvent.class, new TestWorldGenBindingEvent());
 			if (worldGenResult.success)
 			{
-				LOGGER.info("[DH-EVENTS] TestWorldGenBindingEvent registered successfully");
+				//LOGGER.info("[DH-EVENTS] TestWorldGenBindingEvent registered successfully");
 			}
 			else
 			{
@@ -126,7 +126,7 @@ public class FabricServerProxy implements AbstractModInitializer.IEventProxy
 		
 		// ServerWorldLoadEvent
 		//TODO: Check if both of these use the correct timed events. (i.e. is it 'ed' or 'ing' one?)
-		LOGGER.info("[DH-EVENTS] Registering SERVER_STARTING event...");
+		//LOGGER.info("[DH-EVENTS] Registering SERVER_STARTING event...");
 		ServerLifecycleEvents.SERVER_STARTING.register((server) ->
 		{
 			//LOGGER.info("[DH-EVENT-CALLBACK] ========== SERVER_STARTING CALLBACK TRIGGERED ==========");
@@ -150,7 +150,7 @@ public class FabricServerProxy implements AbstractModInitializer.IEventProxy
 		});
 		
 		// ServerWorldUnloadEvent
-		LOGGER.info("[DH-EVENTS] Registering SERVER_STOPPED event...");
+		//LOGGER.info("[DH-EVENTS] Registering SERVER_STOPPED event...");
 		ServerLifecycleEvents.SERVER_STOPPED.register((server) ->
 		{
 			//LOGGER.info("[DH-EVENT-CALLBACK] SERVER_STOPPED callback triggered");
@@ -162,7 +162,7 @@ public class FabricServerProxy implements AbstractModInitializer.IEventProxy
 		});
 		
 		// ServerLevelLoadEvent
-		LOGGER.info("[DH-EVENTS] Registering ServerWorldEvents.LOAD event...");
+		//LOGGER.info("[DH-EVENTS] Registering ServerWorldEvents.LOAD event...");
 		ServerWorldEvents.LOAD.register((server, level) ->
 		{
 			//LOGGER.info("[DH-EVENT-CALLBACK] ServerWorldEvents.LOAD callback triggered for level: " + level);
@@ -174,7 +174,7 @@ public class FabricServerProxy implements AbstractModInitializer.IEventProxy
 		});
 		
 		// ServerLevelUnloadEvent
-		LOGGER.info("[DH-EVENTS] Registering ServerWorldEvents.UNLOAD event...");
+		//LOGGER.info("[DH-EVENTS] Registering ServerWorldEvents.UNLOAD event...");
 		ServerWorldEvents.UNLOAD.register((server, level) ->
 		{
 			//LOGGER.info("[DH-EVENT-CALLBACK] ServerWorldEvents.UNLOAD callback triggered for level: " + level);
@@ -185,7 +185,7 @@ public class FabricServerProxy implements AbstractModInitializer.IEventProxy
 		});
 		
 		// ServerChunkLoadEvent
-		LOGGER.info("[DH-EVENTS] Registering ServerChunkEvents.CHUNK_LOAD event...");
+		//LOGGER.info("[DH-EVENTS] Registering ServerChunkEvents.CHUNK_LOAD event...");
 		ServerChunkEvents.CHUNK_LOAD.register((server, chunk) ->
 		{
 			ILevelWrapper level = this.getServerLevelWrapper((ServerLevel) chunk.getLevel());
@@ -198,7 +198,7 @@ public class FabricServerProxy implements AbstractModInitializer.IEventProxy
 		});
 		// ServerChunkSaveEvent - Done in MixinChunkMap
 		
-		LOGGER.info("[DH-EVENTS] Registering ServerPlayConnectionEvents.JOIN event...");
+		//LOGGER.info("[DH-EVENTS] Registering ServerPlayConnectionEvents.JOIN event...");
 		ServerPlayConnectionEvents.JOIN.register((handler, sender, server) ->
 		{
 			//LOGGER.info("[DH-EVENT-CALLBACK] Player joined: " + handler.getName());
@@ -208,7 +208,7 @@ public class FabricServerProxy implements AbstractModInitializer.IEventProxy
 			}
 		});
 		
-		LOGGER.info("[DH-EVENTS] Registering ServerPlayConnectionEvents.DISCONNECT event...");
+		//LOGGER.info("[DH-EVENTS] Registering ServerPlayConnectionEvents.DISCONNECT event...");
 		ServerPlayConnectionEvents.DISCONNECT.register((handler, server) ->
 		{
 			//LOGGER.info("[DH-EVENT-CALLBACK] Player disconnected: " + handler.getName());
@@ -218,7 +218,7 @@ public class FabricServerProxy implements AbstractModInitializer.IEventProxy
 			}
 		});
 		
-		LOGGER.info("[DH-EVENTS] Registering ServerEntityWorldChangeEvents.AFTER_PLAYER_CHANGE_WORLD event...");
+		//LOGGER.info("[DH-EVENTS] Registering ServerEntityWorldChangeEvents.AFTER_PLAYER_CHANGE_WORLD event...");
 		ServerEntityWorldChangeEvents.AFTER_PLAYER_CHANGE_WORLD.register((player, originLevel, destinationLevel) ->
 		{
 			if (this.isValidTime())
@@ -231,7 +231,7 @@ public class FabricServerProxy implements AbstractModInitializer.IEventProxy
 			}
 		});
 		
-		LOGGER.info("[DH-EVENTS] Registering packet handlers...");
+		//LOGGER.info("[DH-EVENTS] Registering packet handlers...");
 		PayloadTypeRegistry.playC2S().register(CommonPacketPayload.TYPE, new CommonPacketPayload.Codec());
 		if (this.isDedicatedServer)
 		{
@@ -247,7 +247,7 @@ public class FabricServerProxy implements AbstractModInitializer.IEventProxy
 			ServerApi.INSTANCE.pluginMessageReceived(ServerPlayerWrapper.getWrapper(context.player()), payload.message());
 		});
 		
-		LOGGER.info("[DH-EVENTS] ========== FABRIC SERVER EVENTS REGISTERED ==========");
+		//LOGGER.info("[DH-EVENTS] ========== FABRIC SERVER EVENTS REGISTERED ==========");
 	}
 	
 }

@@ -378,9 +378,9 @@ public class ClientApi
 	/** Should be called before {@link ClientApi#renderDeferredLodsForShaders} */
 	public void renderLods() 
 	{ 
-		LOGGER.debug("[DH-RENDER] renderLods() called");
+		//LOGGER.debug("[DH-RENDER] renderLods() called");
 		this.renderLodLayer(false); 
-		LOGGER.debug("[DH-RENDER] renderLods() completed");
+		//LOGGER.debug("[DH-RENDER] renderLods() completed");
 	}
 	
 	/** 
