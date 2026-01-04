@@ -24,7 +24,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
-import java.util.zip.ZipError;
 
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
@@ -106,7 +105,7 @@ public class GameTransformer {
 
 			try (InputStream is = entry.getInputStream()) {
 				return readClass(new ClassReader(is));
-			} catch (IOException | ZipError e) {
+			} catch (IOException e) {
 				throw new RuntimeException(String.format("error reading %s in %s: %s", name, LoaderUtil.normalizePath(entry.getOrigin()), e), e);
 			}
 		} catch (IOException e) {
