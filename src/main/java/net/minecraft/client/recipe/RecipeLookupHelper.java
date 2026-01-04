@@ -64,33 +64,48 @@ public class RecipeLookupHelper {
 	 */
 	private static void rebuildCache(Level level) {
 		recipeCache.clear();
-		RecipeAccess recipeAccess = level.recipeAccess();
 		
 		System.out.println("DEBUG RecipeLookupHelper: Starting cache rebuild");
 		
-		// Get all recipes
-		if (recipeAccess instanceof net.minecraft.world.item.crafting.RecipeManager recipeManager) {
-			Collection<RecipeHolder<?>> allRecipes = recipeManager.getRecipes();
-			System.out.println("DEBUG RecipeLookupHelper: RecipeManager has " + allRecipes.size() + " total recipes");
-			
-			ContextMap contextMap = net.minecraft.world.item.crafting.display.SlotDisplayContext.fromLevel(level);
-			
-			int cached = 0;
-			for (RecipeHolder<?> recipeHolder : allRecipes) {
-				Recipe<?> recipe = recipeHolder.value();
-				
-				// Try to get the result item from recipe displays
-				ItemStack result = getRecipeResult(recipe, contextMap);
-				if (!result.isEmpty()) {
-					Item item = result.getItem();
-					recipeCache.computeIfAbsent(item, k -> new ArrayList<>()).add(recipeHolder);
-					cached++;
-				}
-			}
-			System.out.println("DEBUG RecipeLookupHelper: Cached " + cached + " recipes for " + recipeCache.size() + " items");
-		} else {
-			System.out.println("DEBUG RecipeLookupHelper: recipeAccess is not a RecipeManager: " + recipeAccess.getClass().getName());
+		// On client side, we need to get RecipeManager from Minecraft
+		net.minecraft.world.item.crafting.RecipeManager recipeManager = null;
+		
+		// Try to get RecipeManager from the integrated server (singleplayer)
+		net.minecraft.client.Minecraft minecraft = net.minecraft.client.Minecraft.getInstance();
+		if (minecraft != null && minecraft.getSingleplayerServer() != null) {
+			recipeManager = minecraft.getSingleplayerServer().getRecipeManager();
+			System.out.println("DEBUG RecipeLookupHelper: Got RecipeManager from singleplayer server");
 		}
+		// For multiplayer or if singleplayer server is not available yet,
+		// try getting from level's recipeAccess if it's a RecipeManager
+		else if (level.recipeAccess() instanceof net.minecraft.world.item.crafting.RecipeManager manager) {
+			recipeManager = manager;
+			System.out.println("DEBUG RecipeLookupHelper: Got RecipeManager from level.recipeAccess()");
+		}
+		
+		if (recipeManager == null) {
+			System.out.println("DEBUG RecipeLookupHelper: Could not get RecipeManager - cache will be empty");
+			return;
+		}
+		
+		Collection<RecipeHolder<?>> allRecipes = recipeManager.getRecipes();
+		System.out.println("DEBUG RecipeLookupHelper: RecipeManager has " + allRecipes.size() + " total recipes");
+		
+		ContextMap contextMap = net.minecraft.world.item.crafting.display.SlotDisplayContext.fromLevel(level);
+		
+		int cached = 0;
+		for (RecipeHolder<?> recipeHolder : allRecipes) {
+			Recipe<?> recipe = recipeHolder.value();
+			
+			// Try to get the result item from recipe displays
+			ItemStack result = getRecipeResult(recipe, contextMap);
+			if (!result.isEmpty()) {
+				Item item = result.getItem();
+				recipeCache.computeIfAbsent(item, k -> new ArrayList<>()).add(recipeHolder);
+				cached++;
+			}
+		}
+		System.out.println("DEBUG RecipeLookupHelper: Cached " + cached + " recipes for " + recipeCache.size() + " items");
 	}
 	
 	/**
