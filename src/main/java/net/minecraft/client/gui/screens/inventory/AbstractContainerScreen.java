@@ -696,11 +696,11 @@ public abstract class AbstractContainerScreen<T extends AbstractContainerMenu> e
 
 	@Override
 	public boolean keyPressed(KeyEvent keyEvent) {
-		// Check for 'R' key (key code 82) to open recipe viewer
-		if (keyEvent.key() == 82 && !keyEvent.hasControlDown() && !keyEvent.hasAltDown()) {
+		// Check for recipe viewer key to open recipe viewer
+		if (this.minecraft.options.keyRecipeViewer.matches(keyEvent)) {
 			ItemStack hoveredItem = getHoveredItemStack();
 			
-			System.out.println("DEBUG: R key pressed, hovered item: " + (!hoveredItem.isEmpty() ? hoveredItem.getItem() : "empty"));
+			System.out.println("DEBUG: Recipe viewer key pressed, hovered item: " + (!hoveredItem.isEmpty() ? hoveredItem.getItem() : "empty"));
 			
 			if (!hoveredItem.isEmpty()) {
 				boolean result = openRecipeViewer(hoveredItem);
