@@ -160,6 +160,7 @@ public abstract class AbstractContainerScreen<T extends AbstractContainerMenu> e
 		this.renderContents(guiGraphics, i, j, f);
 		this.renderCarriedItem(guiGraphics, i, j);
 		this.renderSnapbackItem(guiGraphics);
+		this.renderTooltip(guiGraphics, i, j);
 	}
 
 	public void renderContents(GuiGraphics guiGraphics, int i, int j, float f) {
