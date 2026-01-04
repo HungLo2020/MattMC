@@ -4,8 +4,6 @@ import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.navigation.ScreenPosition;
-import net.minecraft.client.gui.screens.recipebook.CraftingRecipeBookComponent;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.client.renderer.entity.EntityRenderDispatcher;
@@ -20,14 +18,14 @@ import org.joml.Quaternionf;
 import org.joml.Vector3f;
 
 @Environment(EnvType.CLIENT)
-public class InventoryScreen extends AbstractRecipeBookScreen<InventoryMenu> {
+public class InventoryScreen extends AbstractContainerScreen<InventoryMenu> {
 	private float xMouse;
 	private float yMouse;
 	private boolean buttonClicked;
 	private final EffectsInInventory effects;
 
 	public InventoryScreen(Player player) {
-		super(player.inventoryMenu, new CraftingRecipeBookComponent(player.inventoryMenu), player.getInventory(), Component.translatable("container.crafting"));
+		super(player.inventoryMenu, player.getInventory(), Component.translatable("container.crafting"));
 		this.titleLabelX = 97;
 		this.effects = new EffectsInInventory(this);
 	}
@@ -42,16 +40,6 @@ public class InventoryScreen extends AbstractRecipeBookScreen<InventoryMenu> {
 	protected void init() {
 		// No longer switch to creative inventory - stay in survival inventory even in creative mode
 		super.init();
-	}
-
-	@Override
-	protected ScreenPosition getRecipeBookButtonPosition() {
-		return new ScreenPosition(this.leftPos + 104, this.height / 2 - 22);
-	}
-
-	@Override
-	protected void onRecipeBookButtonClick() {
-		this.buttonClicked = true;
 	}
 
 	@Override
@@ -71,11 +59,6 @@ public class InventoryScreen extends AbstractRecipeBookScreen<InventoryMenu> {
 	@Override
 	public boolean showsActiveEffects() {
 		return this.effects.canSeeEffects();
-	}
-
-	@Override
-	protected boolean isBiggerResultSlot() {
-		return false;
 	}
 
 	@Override
