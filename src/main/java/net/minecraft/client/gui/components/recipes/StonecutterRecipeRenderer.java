@@ -19,7 +19,7 @@ public class StonecutterRecipeRenderer extends RecipeRenderer {
 	private static final ResourceLocation STONECUTTER_LOCATION = 
 		ResourceLocation.withDefaultNamespace("textures/gui/container/stonecutter.png");
 	private static final int GUI_WIDTH = 176;
-	private static final int GUI_HEIGHT = 166;
+	private static final int GUI_HEIGHT = 90; // Cut off player inventory (was 166)
 	
 	// Slot positions in the stonecutter GUI
 	private static final int INPUT_X = 20;
@@ -38,7 +38,7 @@ public class StonecutterRecipeRenderer extends RecipeRenderer {
 	@Override
 	public void render(GuiGraphics guiGraphics, int x, int y, 
 	                  RecipeHolder<?> recipe, int mouseX, int mouseY, long gameTime) {
-		// Draw stonecutter background
+		// Draw stonecutter background (only top portion, cutting off player inventory)
 		guiGraphics.blit(RenderPipelines.GUI_TEXTURED, STONECUTTER_LOCATION, 
 		                x, y, 0, 0, GUI_WIDTH, GUI_HEIGHT, 256, 256);
 		

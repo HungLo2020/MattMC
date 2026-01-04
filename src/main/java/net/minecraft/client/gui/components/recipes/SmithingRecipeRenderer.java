@@ -19,7 +19,7 @@ public class SmithingRecipeRenderer extends RecipeRenderer {
 	private static final ResourceLocation SMITHING_LOCATION = 
 		ResourceLocation.withDefaultNamespace("textures/gui/container/smithing.png");
 	private static final int GUI_WIDTH = 176;
-	private static final int GUI_HEIGHT = 166;
+	private static final int GUI_HEIGHT = 90; // Cut off player inventory (was 166)
 	
 	// Slot positions in the smithing table GUI
 	private static final int TEMPLATE_X = 8;
@@ -42,7 +42,7 @@ public class SmithingRecipeRenderer extends RecipeRenderer {
 	@Override
 	public void render(GuiGraphics guiGraphics, int x, int y, 
 	                  RecipeHolder<?> recipe, int mouseX, int mouseY, long gameTime) {
-		// Draw smithing table background
+		// Draw smithing table background (only top portion, cutting off player inventory)
 		guiGraphics.blit(RenderPipelines.GUI_TEXTURED, SMITHING_LOCATION, 
 		                x, y, 0, 0, GUI_WIDTH, GUI_HEIGHT, 256, 256);
 		

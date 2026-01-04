@@ -19,7 +19,7 @@ import net.minecraft.world.item.crafting.display.SlotDisplay;
  */
 public class FurnaceRecipeRenderer extends RecipeRenderer {
 	private static final int GUI_WIDTH = 176;
-	private static final int GUI_HEIGHT = 166;
+	private static final int GUI_HEIGHT = 90; // Cut off player inventory (was 166)
 	
 	// Slot positions in the furnace GUI
 	private static final int INPUT_X = 56;
@@ -42,7 +42,7 @@ public class FurnaceRecipeRenderer extends RecipeRenderer {
 	@Override
 	public void render(GuiGraphics guiGraphics, int x, int y, 
 	                  RecipeHolder<?> recipe, int mouseX, int mouseY, long gameTime) {
-		// Draw furnace background
+		// Draw furnace background (only top portion, cutting off player inventory)
 		guiGraphics.blit(RenderPipelines.GUI_TEXTURED, texture, 
 		                x, y, 0, 0, GUI_WIDTH, GUI_HEIGHT, 256, 256);
 		

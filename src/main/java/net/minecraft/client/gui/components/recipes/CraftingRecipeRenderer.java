@@ -20,7 +20,7 @@ public class CraftingRecipeRenderer extends RecipeRenderer {
 	private static final ResourceLocation CRAFTING_TABLE_LOCATION = 
 		ResourceLocation.withDefaultNamespace("textures/gui/container/crafting_table.png");
 	private static final int GUI_WIDTH = 176;
-	private static final int GUI_HEIGHT = 166;
+	private static final int GUI_HEIGHT = 90; // Cut off player inventory (was 166)
 	
 	// Slot positions in the crafting table GUI
 	private static final int GRID_START_X = 30;
@@ -40,7 +40,7 @@ public class CraftingRecipeRenderer extends RecipeRenderer {
 	@Override
 	public void render(GuiGraphics guiGraphics, int x, int y, 
 	                  RecipeHolder<?> recipe, int mouseX, int mouseY, long gameTime) {
-		// Draw crafting table background
+		// Draw crafting table background (only top portion, cutting off player inventory)
 		guiGraphics.blit(RenderPipelines.GUI_TEXTURED, CRAFTING_TABLE_LOCATION, 
 		                x, y, 0, 0, GUI_WIDTH, GUI_HEIGHT, 256, 256);
 		
