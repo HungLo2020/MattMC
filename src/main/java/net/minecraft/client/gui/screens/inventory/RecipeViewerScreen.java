@@ -214,8 +214,8 @@ public class RecipeViewerScreen extends Screen {
 	
 	@Override
 	public boolean keyPressed(KeyEvent keyEvent) {
-		// ESC closes the recipe viewer, not the parent screen
-		if (keyEvent.key() == 256) { // ESC
+		// ESC or inventory key (E) closes the recipe viewer, not the parent screen
+		if (keyEvent.key() == 256 || this.minecraft.options.keyInventory.matches(keyEvent)) { // ESC or E
 			this.minecraft.setScreen(parentScreen);
 			return true;
 		}

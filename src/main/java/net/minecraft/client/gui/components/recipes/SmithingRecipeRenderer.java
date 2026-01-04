@@ -19,7 +19,7 @@ public class SmithingRecipeRenderer extends RecipeRenderer {
 	private static final ResourceLocation SMITHING_LOCATION = 
 		ResourceLocation.withDefaultNamespace("textures/gui/container/smithing.png");
 	private static final int GUI_WIDTH = 176;
-	private static final int GUI_HEIGHT = 90; // Cut off player inventory (was 166)
+	private static final int GUI_HEIGHT = 75; // Cut off player inventory slots (was 166, then 90)
 	
 	// Slot positions in the smithing table GUI
 	private static final int TEMPLATE_X = 8;

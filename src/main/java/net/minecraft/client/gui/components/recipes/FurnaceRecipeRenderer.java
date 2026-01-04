@@ -19,7 +19,7 @@ import net.minecraft.world.item.crafting.display.SlotDisplay;
  */
 public class FurnaceRecipeRenderer extends RecipeRenderer {
 	private static final int GUI_WIDTH = 176;
-	private static final int GUI_HEIGHT = 90; // Cut off player inventory (was 166)
+	private static final int GUI_HEIGHT = 75; // Cut off player inventory slots (was 166, then 90)
 	
 	// Slot positions in the furnace GUI
 	private static final int INPUT_X = 56;
