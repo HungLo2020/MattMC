@@ -23,7 +23,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.zip.ZipEntry;
-import java.util.zip.ZipError;
 import java.util.zip.ZipFile;
 
 public final class SimpleClassPath implements Closeable {
@@ -76,7 +75,7 @@ public final class SimpleClassPath implements Closeable {
 
 					try {
 						openJars[i] = zf = new ZipFile(path.toFile());
-					} catch (IOException | ZipError e) {
+					} catch (IOException e) {
 						throw new IOException(String.format("error opening %s: %s", LoaderUtil.normalizePath(path), e), e);
 					}
 				}

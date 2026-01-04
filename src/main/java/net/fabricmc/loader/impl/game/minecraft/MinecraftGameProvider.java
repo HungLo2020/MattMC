@@ -543,10 +543,6 @@ public class MinecraftGameProvider implements GameProvider {
 	public void launch(ClassLoader loader) {
 		String targetClass = entrypoint;
 
-		if (envType == EnvType.CLIENT && targetClass.contains("Applet")) {
-			targetClass = "net.fabricmc.loader.impl.game.minecraft.applet.AppletMain";
-		}
-
 		MethodHandle invoker;
 
 		try {

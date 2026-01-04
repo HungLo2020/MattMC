@@ -31,6 +31,7 @@ import org.objectweb.asm.tree.InsnNode;
 import org.objectweb.asm.tree.LdcInsnNode;
 import org.objectweb.asm.tree.MethodInsnNode;
 import org.objectweb.asm.tree.MethodNode;
+import org.objectweb.asm.tree.TypeInsnNode;
 import org.objectweb.asm.tree.VarInsnNode;
 
 import net.fabricmc.api.EnvType;
@@ -497,17 +498,23 @@ public class EntrypointPatch extends GamePatch {
 					it.add(new InsnNode(Opcodes.DUP));
 					it.add(new LdcInsnNode("."));
 					it.add(new MethodInsnNode(Opcodes.INVOKESPECIAL, "java/io/File", "<init>", "(Ljava/lang/String;)V", false)); */
-				it.add(new InsnNode(Opcodes.ACONST_NULL));
-				it.add(new MethodInsnNode(Opcodes.INVOKESTATIC, "net/fabricmc/loader/impl/game/minecraft/applet/AppletMain", "hookGameDir", "(Ljava/io/File;)Ljava/io/File;", false));
+				// AppletMain removed - not needed for Minecraft 1.21.10
+				// it.add(new InsnNode(Opcodes.ACONST_NULL));
+				// it.add(new MethodInsnNode(Opcodes.INVOKESTATIC, "net/fabricmc/loader/impl/game/minecraft/applet/AppletMain", "hookGameDir", "(Ljava/io/File;)Ljava/io/File;", false));
+				it.add(new TypeInsnNode(Opcodes.NEW, "java/io/File"));
+				it.add(new InsnNode(Opcodes.DUP));
+				it.add(new LdcInsnNode("."));
+				it.add(new MethodInsnNode(Opcodes.INVOKESPECIAL, "java/io/File", "<init>", "(Ljava/lang/String;)V", false));
 				it.add(new VarInsnNode(Opcodes.ALOAD, 0));
 				finishEntrypoint(type, it);
 			} else {
 				// Indev and above.
 				ListIterator<AbstractInsnNode> it = gameConstructor.instructions.iterator();
 				moveAfter(it, Opcodes.INVOKESPECIAL); /* Object.init */
-				it.add(new FieldInsnNode(Opcodes.GETSTATIC, gameClass.name, runDirectory.name, runDirectory.desc));
-				it.add(new MethodInsnNode(Opcodes.INVOKESTATIC, "net/fabricmc/loader/impl/game/minecraft/applet/AppletMain", "hookGameDir", "(Ljava/io/File;)Ljava/io/File;", false));
-				it.add(new FieldInsnNode(Opcodes.PUTSTATIC, gameClass.name, runDirectory.name, runDirectory.desc));
+				// AppletMain.hookGameDir removed - not needed for Minecraft 1.21.10
+				// it.add(new FieldInsnNode(Opcodes.GETSTATIC, gameClass.name, runDirectory.name, runDirectory.desc));
+				// it.add(new MethodInsnNode(Opcodes.INVOKESTATIC, "net/fabricmc/loader/impl/game/minecraft/applet/AppletMain", "hookGameDir", "(Ljava/io/File;)Ljava/io/File;", false));
+				// it.add(new FieldInsnNode(Opcodes.PUTSTATIC, gameClass.name, runDirectory.name, runDirectory.desc));
 
 				it = gameMethod.instructions.iterator();
 
