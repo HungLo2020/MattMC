@@ -700,8 +700,12 @@ public abstract class AbstractContainerScreen<T extends AbstractContainerMenu> e
 		if (keyEvent.key() == 82 && !keyEvent.hasControlDown() && !keyEvent.hasAltDown()) {
 			ItemStack hoveredItem = getHoveredItemStack();
 			
+			System.out.println("DEBUG: R key pressed, hovered item: " + (!hoveredItem.isEmpty() ? hoveredItem.getItem() : "empty"));
+			
 			if (!hoveredItem.isEmpty()) {
-				if (openRecipeViewer(hoveredItem)) {
+				boolean result = openRecipeViewer(hoveredItem);
+				System.out.println("DEBUG: openRecipeViewer returned: " + result);
+				if (result) {
 					return true;
 				}
 			}
@@ -889,6 +893,7 @@ public abstract class AbstractContainerScreen<T extends AbstractContainerMenu> e
 	 */
 	private boolean openRecipeViewer(ItemStack item) {
 		if (this.minecraft == null || this.minecraft.level == null) {
+			System.out.println("DEBUG: minecraft or level is null");
 			return false;
 		}
 		
@@ -896,12 +901,19 @@ public abstract class AbstractContainerScreen<T extends AbstractContainerMenu> e
 		java.util.Map<net.minecraft.world.item.crafting.RecipeType<?>, java.util.List<net.minecraft.world.item.crafting.RecipeHolder<?>>> recipes = 
 			net.minecraft.client.recipe.RecipeLookupHelper.findRecipesFor(item.getItem(), this.minecraft.level);
 		
+		System.out.println("DEBUG: Found " + recipes.size() + " recipe types for item " + item.getItem());
+		for (var entry : recipes.entrySet()) {
+			System.out.println("DEBUG:   Recipe type " + entry.getKey() + ": " + entry.getValue().size() + " recipes");
+		}
+		
 		if (recipes.isEmpty()) {
 			// No recipes found - silently return false
+			System.out.println("DEBUG: No recipes found, returning false");
 			return false;
 		}
 		
 		// Open recipe viewer screen
+		System.out.println("DEBUG: Opening RecipeViewerScreen");
 		RecipeViewerScreen viewer = new RecipeViewerScreen(this, item, recipes);
 		this.minecraft.setScreen(viewer);
 		return true;

@@ -32,15 +32,19 @@ public class RecipeLookupHelper {
 	 */
 	public static Map<RecipeType<?>, List<RecipeHolder<?>>> findRecipesFor(Item item, Level level) {
 		if (level == null || level.recipeAccess() == null) {
+			System.out.println("DEBUG RecipeLookupHelper: level or recipeAccess is null");
 			return Map.of();
 		}
 		
 		if (cacheDirty) {
+			System.out.println("DEBUG RecipeLookupHelper: Cache is dirty, rebuilding...");
 			rebuildCache(level);
 			cacheDirty = false;
 		}
 		
 		List<RecipeHolder<?>> allRecipes = recipeCache.getOrDefault(item, List.of());
+		System.out.println("DEBUG RecipeLookupHelper: Found " + allRecipes.size() + " total recipes for item " + item);
+		
 		Map<RecipeType<?>, List<RecipeHolder<?>>> byType = new HashMap<>();
 		
 		for (RecipeHolder<?> recipe : allRecipes) {
@@ -51,6 +55,7 @@ public class RecipeLookupHelper {
 			}
 		}
 		
+		System.out.println("DEBUG RecipeLookupHelper: Returning " + byType.size() + " recipe types");
 		return byType;
 	}
 	
@@ -61,11 +66,16 @@ public class RecipeLookupHelper {
 		recipeCache.clear();
 		RecipeAccess recipeAccess = level.recipeAccess();
 		
+		System.out.println("DEBUG RecipeLookupHelper: Starting cache rebuild");
+		
 		// Get all recipes
 		if (recipeAccess instanceof net.minecraft.world.item.crafting.RecipeManager recipeManager) {
 			Collection<RecipeHolder<?>> allRecipes = recipeManager.getRecipes();
+			System.out.println("DEBUG RecipeLookupHelper: RecipeManager has " + allRecipes.size() + " total recipes");
+			
 			ContextMap contextMap = net.minecraft.world.item.crafting.display.SlotDisplayContext.fromLevel(level);
 			
+			int cached = 0;
 			for (RecipeHolder<?> recipeHolder : allRecipes) {
 				Recipe<?> recipe = recipeHolder.value();
 				
@@ -74,8 +84,12 @@ public class RecipeLookupHelper {
 				if (!result.isEmpty()) {
 					Item item = result.getItem();
 					recipeCache.computeIfAbsent(item, k -> new ArrayList<>()).add(recipeHolder);
+					cached++;
 				}
 			}
+			System.out.println("DEBUG RecipeLookupHelper: Cached " + cached + " recipes for " + recipeCache.size() + " items");
+		} else {
+			System.out.println("DEBUG RecipeLookupHelper: recipeAccess is not a RecipeManager: " + recipeAccess.getClass().getName());
 		}
 	}
 	

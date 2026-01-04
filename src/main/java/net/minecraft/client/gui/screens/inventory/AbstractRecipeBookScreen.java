@@ -81,7 +81,13 @@ public abstract class AbstractRecipeBookScreen<T extends RecipeBookMenu> extends
 
 	@Override
 	public boolean keyPressed(KeyEvent keyEvent) {
-		return this.recipeBookComponent.keyPressed(keyEvent) ? true : super.keyPressed(keyEvent);
+		// First check the recipe book component
+		if (this.recipeBookComponent.keyPressed(keyEvent)) {
+			return true;
+		}
+		
+		// Then call AbstractContainerScreen's keyPressed (which has 'R' key handling)
+		return super.keyPressed(keyEvent);
 	}
 
 	@Override
