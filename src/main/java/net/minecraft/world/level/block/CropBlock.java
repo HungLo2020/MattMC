@@ -33,6 +33,7 @@ public class CropBlock extends VegetationBlock implements BonemealableBlock {
 	public static final int MAX_AGE = 7;
 	public static final IntegerProperty AGE = BlockStateProperties.AGE_7;
 	private static final VoxelShape[] SHAPES = Block.boxes(7, i -> Block.column(16.0, 0.0, 2 + i * 2));
+	private static final int HOE_HARVEST_RADIUS = 1; // 3x3 grid centered on clicked position
 
 	@Override
 	public MapCodec<? extends CropBlock> codec() {
@@ -211,13 +212,16 @@ public class CropBlock extends VegetationBlock implements BonemealableBlock {
 		// Right-click with hoe: harvest in a 3x3 area
 		if (itemStack.getItem() instanceof HoeItem && this.isMaxAge(blockState)) {
 			if (level instanceof ServerLevel serverLevel) {
+				int cropsHarvested = 0;
+				
 				// Harvest the clicked crop
 				Block.dropResources(blockState, serverLevel, blockPos, null, player, itemStack);
 				level.setBlock(blockPos, this.getStateForAge(0), 2);
+				cropsHarvested++;
 				
 				// Check and harvest crops in a 3x3 grid centered on the clicked position
-				for (int dx = -1; dx <= 1; dx++) {
-					for (int dz = -1; dz <= 1; dz++) {
+				for (int dx = -HOE_HARVEST_RADIUS; dx <= HOE_HARVEST_RADIUS; dx++) {
+					for (int dz = -HOE_HARVEST_RADIUS; dz <= HOE_HARVEST_RADIUS; dz++) {
 						// Skip the center block (already harvested)
 						if (dx == 0 && dz == 0) {
 							continue;
@@ -227,17 +231,19 @@ public class CropBlock extends VegetationBlock implements BonemealableBlock {
 						BlockState neighborState = level.getBlockState(neighborPos);
 						
 						// Check if the neighbor is the same type of crop and is fully grown
+						// Using == to ensure we only harvest the same crop type (wheat, carrot, potato, etc.)
 						if (neighborState.getBlock() == this && this.isMaxAge(neighborState)) {
 							// Drop the loot for the neighbor crop
 							Block.dropResources(neighborState, serverLevel, neighborPos, null, player, itemStack);
 							// Reset the neighbor crop to age 0
 							level.setBlock(neighborPos, this.getStateForAge(0), 2);
+							cropsHarvested++;
 						}
 					}
 				}
 				
-				// Damage the hoe
-				itemStack.hurtAndBreak(1, player, interactionHand.asEquipmentSlot());
+				// Damage the hoe based on the number of crops harvested
+				itemStack.hurtAndBreak(cropsHarvested, player, interactionHand.asEquipmentSlot());
 			}
 			return InteractionResult.SUCCESS;
 		}
