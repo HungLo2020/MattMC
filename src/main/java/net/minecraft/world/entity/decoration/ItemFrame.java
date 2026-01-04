@@ -384,6 +384,7 @@ public class ItemFrame extends HangingEntity {
 			} else {
 				if (player.isShiftKeyDown()) {
 					this.setInvisible(!this.isInvisible());
+					this.playSound(this.getRotateItemSound(), 1.0F, 1.0F);
 					this.gameEvent(GameEvent.BLOCK_CHANGE, player);
 					return InteractionResult.SUCCESS;
 				} else {
