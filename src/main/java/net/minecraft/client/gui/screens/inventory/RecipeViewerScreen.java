@@ -177,13 +177,16 @@ public class RecipeViewerScreen extends Screen {
 		// Render JEI panel tooltips first (has priority over recipe tooltips)
 		// JEI panel will handle its own hover detection and tooltip rendering
 		if (this.parentJeiPanel != null) {
+			System.out.println("[RecipeViewerScreen] Calling JEI renderTooltip at mouse: " + mouseX + "," + mouseY);
 			this.parentJeiPanel.renderTooltip(guiGraphics, mouseX, mouseY, this);
 			
 			// Check if JEI has a hovered item - if so, skip recipe viewer tooltip
 			ItemStack jeiHoveredItem = this.parentJeiPanel.getHoveredItem();
+			System.out.println("[RecipeViewerScreen] JEI hovered item: " + (jeiHoveredItem.isEmpty() ? "EMPTY" : jeiHoveredItem.getDisplayName().getString()));
 			if (!jeiHoveredItem.isEmpty()) {
 				// Store JEI hovered item for 'R' key functionality
 				this.lastHoveredItem = jeiHoveredItem;
+				System.out.println("[RecipeViewerScreen] Stored JEI hovered item in lastHoveredItem for 'R' key");
 				return; // JEI tooltip is already rendered, don't render recipe tooltip
 			}
 		}
@@ -260,20 +263,31 @@ public class RecipeViewerScreen extends Screen {
 	
 	@Override
 	public boolean keyPressed(KeyEvent keyEvent) {
+		System.out.println("[RecipeViewerScreen] keyPressed: " + keyEvent.key());
+		
 		// Forward key events to JEI panel first (so 'R' key works on JEI items)
-		if (this.parentJeiPanel != null && this.parentJeiPanel.keyPressed(keyEvent)) {
-			return true;
+		if (this.parentJeiPanel != null) {
+			System.out.println("[RecipeViewerScreen] Forwarding keyPressed to JEI panel");
+			boolean jeiHandled = this.parentJeiPanel.keyPressed(keyEvent);
+			System.out.println("[RecipeViewerScreen] JEI handled key: " + jeiHandled);
+			if (jeiHandled) {
+				return true;
+			}
 		}
 		
 		// ESC or inventory key (E) closes the recipe viewer, not the parent screen
 		if (keyEvent.key() == 256 || this.minecraft.options.keyInventory.matches(keyEvent)) { // ESC or E
+			System.out.println("[RecipeViewerScreen] ESC or E pressed, closing recipe viewer");
 			this.minecraft.setScreen(parentScreen);
 			return true;
 		}
 		
 		// Recipe key (R) opens recipes for hovered item in recipe viewer
 		if (this.minecraft.options.keyRecipeViewer.matches(keyEvent)) {
+			System.out.println("[RecipeViewerScreen] Recipe viewer key pressed!");
+			System.out.println("[RecipeViewerScreen] lastHoveredItem: " + (this.lastHoveredItem.isEmpty() ? "EMPTY" : this.lastHoveredItem.getDisplayName().getString()));
 			if (!this.lastHoveredItem.isEmpty()) {
+				System.out.println("[RecipeViewerScreen] Opening recipe viewer for: " + this.lastHoveredItem.getDisplayName().getString());
 				if (openRecipeViewerForItem(this.lastHoveredItem)) {
 					return true;
 				}
