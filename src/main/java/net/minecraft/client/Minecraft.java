@@ -99,7 +99,6 @@ import net.minecraft.client.gui.screens.ProgressScreen;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.TitleScreen;
 import net.minecraft.client.gui.screens.advancements.AdvancementsScreen;
-import net.minecraft.client.gui.screens.inventory.CreativeModeInventoryScreen;
 import net.minecraft.client.gui.screens.inventory.InventoryScreen;
 import net.minecraft.client.gui.screens.multiplayer.JoinMultiplayerScreen;
 import net.minecraft.client.gui.screens.social.PlayerSocialManager;
@@ -237,9 +236,12 @@ import net.minecraft.world.InteractionResult.SwingSource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.player.ChatVisiblity;
+import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
+import net.minecraft.core.RegistryAccess;
+import net.minecraft.client.player.inventory.Hotbar;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.RenderShape;
@@ -1946,7 +1948,7 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 				} else if (!this.player.hasInfiniteMaterials() || this.screen != null || !bl2 && !bl) {
 					this.player.getInventory().setSelectedSlot(i);
 				} else {
-					CreativeModeInventoryScreen.handleHotbarLoadOrSave(this, i, bl2, bl);
+					handleHotbarLoadOrSave(this, i, bl2, bl);
 				}
 			}
 		}
@@ -2876,6 +2878,36 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 
 	public PacketProcessor packetProcessor() {
 		return this.packetProcessor;
+	}
+
+	/**
+	 * Handles hotbar save/load functionality for creative mode players.
+	 * Moved from CreativeModeInventoryScreen to support JEI panel integration.
+	 */
+	public static void handleHotbarLoadOrSave(Minecraft minecraft, int slotIndex, boolean load, boolean save) {
+		LocalPlayer localPlayer = minecraft.player;
+		RegistryAccess registryAccess = localPlayer.level().registryAccess();
+		HotbarManager hotbarManager = minecraft.getHotbarManager();
+		Hotbar hotbar = hotbarManager.get(slotIndex);
+		
+		if (load) {
+			List<ItemStack> items = hotbar.load(registryAccess);
+			
+			for (int j = 0; j < Inventory.getSelectionSize(); j++) {
+				ItemStack itemStack = items.get(j);
+				localPlayer.getInventory().setItem(j, itemStack);
+				minecraft.gameMode.handleCreativeModeItemAdd(itemStack, 36 + j);
+			}
+			
+			localPlayer.inventoryMenu.broadcastChanges();
+		} else if (save) {
+			hotbar.storeFrom(localPlayer.getInventory(), registryAccess);
+			Component slotKeyName = minecraft.options.keyHotbarSlots[slotIndex].getTranslatedKeyMessage();
+			Component saveKeyName = minecraft.options.keyLoadHotbarActivator.getTranslatedKeyMessage();
+			Component message = Component.translatable("inventory.hotbarSaved", saveKeyName, slotKeyName);
+			minecraft.gui.setOverlayMessage(message, false);
+			hotbarManager.save();
+		}
 	}
 
 	@Environment(EnvType.CLIENT)

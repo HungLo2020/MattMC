@@ -13,7 +13,6 @@ import net.minecraft.api.Environment;
 import net.minecraft.SharedConstants;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
-import net.minecraft.client.gui.screens.inventory.CreativeModeInventoryScreen;
 import net.minecraft.client.multiplayer.prediction.BlockStatePredictionHandler;
 import net.minecraft.client.multiplayer.prediction.PredictiveAction;
 import net.minecraft.client.player.LocalPlayer;
@@ -491,7 +490,8 @@ public class MultiPlayerGameMode {
 	}
 
 	public void handleCreativeModeItemDrop(ItemStack itemStack) {
-		boolean bl = this.minecraft.screen instanceof AbstractContainerScreen && !(this.minecraft.screen instanceof CreativeModeInventoryScreen);
+		// Creative inventory screen removed - check if any container screen is open
+		boolean bl = this.minecraft.screen instanceof AbstractContainerScreen;
 		if (this.minecraft.player.hasInfiniteMaterials() && !bl && !itemStack.isEmpty() && this.connection.isFeatureEnabled(itemStack.getItem().requiredFeatures())) {
 			this.connection.send(new ServerboundSetCreativeModeSlotPacket(-1, itemStack));
 			this.minecraft.player.getDropSpamThrottler().increment();

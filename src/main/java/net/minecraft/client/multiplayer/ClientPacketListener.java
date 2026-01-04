@@ -51,7 +51,6 @@ import net.minecraft.client.gui.screens.achievement.StatsScreen;
 import net.minecraft.client.gui.screens.dialog.DialogConnectionAccess;
 import net.minecraft.client.gui.screens.inventory.BookViewScreen;
 import net.minecraft.client.gui.screens.inventory.CommandBlockEditScreen;
-import net.minecraft.client.gui.screens.inventory.CreativeModeInventoryScreen;
 import net.minecraft.client.gui.screens.inventory.HorseInventoryScreen;
 import net.minecraft.client.gui.screens.inventory.TestInstanceBlockEditScreen;
 import net.minecraft.client.gui.screens.multiplayer.ServerReconfigScreen;
@@ -1403,12 +1402,8 @@ public class ClientPacketListener extends ClientCommonPacketListenerImpl impleme
 		ItemStack itemStack = clientboundContainerSetSlotPacket.getItem();
 		int i = clientboundContainerSetSlotPacket.getSlot();
 		this.minecraft.getTutorial().onGetItem(itemStack);
-		boolean bl;
-		if (this.minecraft.screen instanceof CreativeModeInventoryScreen creativeModeInventoryScreen) {
-			bl = !creativeModeInventoryScreen.isInventoryOpen();
-		} else {
-			bl = false;
-		}
+		// Creative inventory screen removed - JEI panel integrated into all inventories
+		boolean bl = false;
 
 		if (clientboundContainerSetSlotPacket.getContainerId() == 0) {
 			if (InventoryMenu.isHotbarSlot(i) && !itemStack.isEmpty()) {
@@ -1423,19 +1418,14 @@ public class ClientPacketListener extends ClientCommonPacketListenerImpl impleme
 			&& (clientboundContainerSetSlotPacket.getContainerId() != 0 || !bl)) {
 			player.containerMenu.setItem(i, clientboundContainerSetSlotPacket.getStateId(), itemStack);
 		}
-
-		if (this.minecraft.screen instanceof CreativeModeInventoryScreen) {
-			player.inventoryMenu.setRemoteSlot(i, itemStack);
-			player.inventoryMenu.broadcastChanges();
-		}
+		// Creative inventory screen removed - no special handling needed
 	}
 
 	public void handleSetCursorItem(ClientboundSetCursorItemPacket clientboundSetCursorItemPacket) {
 		PacketUtils.ensureRunningOnSameThread(clientboundSetCursorItemPacket, this, this.minecraft.packetProcessor());
 		this.minecraft.getTutorial().onGetItem(clientboundSetCursorItemPacket.contents());
-		if (!(this.minecraft.screen instanceof CreativeModeInventoryScreen)) {
-			this.minecraft.player.containerMenu.setCarried(clientboundSetCursorItemPacket.contents());
-		}
+		// Creative inventory screen removed - always set carried item
+		this.minecraft.player.containerMenu.setCarried(clientboundSetCursorItemPacket.contents());
 	}
 
 	public void handleSetPlayerInventory(ClientboundSetPlayerInventoryPacket clientboundSetPlayerInventoryPacket) {
