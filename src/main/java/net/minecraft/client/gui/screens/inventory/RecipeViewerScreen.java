@@ -117,6 +117,11 @@ public class RecipeViewerScreen extends Screen {
 	
 	@Override
 	public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
+		// Render parent screen first to keep JEI panel visible
+		if (this.parentScreen != null) {
+			this.parentScreen.render(guiGraphics, -1, -1, partialTick); // Use -1, -1 for mouse to prevent hover effects
+		}
+		
 		// Update fade animation
 		if (this.fadeProgress < 1.0F) {
 			this.fadeProgress = Math.min(this.fadeProgress + partialTick / FADE_DURATION_TICKS, 1.0F);
