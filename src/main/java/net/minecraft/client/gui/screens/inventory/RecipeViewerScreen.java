@@ -60,6 +60,9 @@ public class RecipeViewerScreen extends Screen {
 	private float fadeProgress = 0.0F;
 	private static final float FADE_DURATION_TICKS = 3.0F;
 	
+	// Flag to prevent rendering after screen is closed
+	private boolean isClosed = false;
+	
 	public RecipeViewerScreen(Screen parentScreen, ItemStack targetItem, 
 	                         Map<RecipeType<?>, List<RecipeHolder<?>>> recipes,
 	                         ContextMap contextMap) {
@@ -128,6 +131,11 @@ public class RecipeViewerScreen extends Screen {
 	
 	@Override
 	public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
+		// Don't render if screen has been closed
+		if (isClosed) {
+			return;
+		}
+		
 		// Update fade animation
 		if (this.fadeProgress < 1.0F) {
 			this.fadeProgress = Math.min(this.fadeProgress + partialTick / FADE_DURATION_TICKS, 1.0F);
@@ -141,18 +149,15 @@ public class RecipeViewerScreen extends Screen {
 		RecipeType<?> currentType = availableTabs.get(currentTabIndex);
 		List<RecipeHolder<?>> recipes = getCurrentRecipes();
 		if (recipes.isEmpty()) {
+			this.isClosed = true;
 			this.minecraft.setScreen(parentScreen);
 			return;
 		}
 		
 		RecipeHolder<?> recipe = recipes.get(currentRecipeIndex);
-		System.out.println("[RecipeViewerScreen] Rendering recipe: " + recipe.id());
-		System.out.println("[RecipeViewerScreen]   Recipe type: " + currentType);
-		System.out.println("[RecipeViewerScreen]   Recipe displays: " + recipe.value().display().size());
 		
 		// Render recipe (no scaling for simplicity)
 		RecipeRenderer renderer = getRendererForCurrentType();
-		System.out.println("[RecipeViewerScreen]   Using renderer: " + renderer.getClass().getSimpleName());
 		renderer.render(guiGraphics, this.centerX, this.centerY, recipe, mouseX, mouseY, 
 		               this.minecraft.level.getGameTime());
 		
@@ -174,20 +179,17 @@ public class RecipeViewerScreen extends Screen {
 			this.parentJeiPanel.render(guiGraphics, mouseX, mouseY, partialTick);
 		}
 		
-		// Render JEI panel tooltips first (has priority over recipe tooltips)
-		// JEI panel will handle its own hover detection and tooltip rendering
+		// Check if JEI has a hovered item first
+		ItemStack jeiHoveredItem = ItemStack.EMPTY;
 		if (this.parentJeiPanel != null) {
-			System.out.println("[RecipeViewerScreen] Calling JEI renderTooltip at mouse: " + mouseX + "," + mouseY);
-			this.parentJeiPanel.renderTooltip(guiGraphics, mouseX, mouseY, this);
-			
-			// Check if JEI has a hovered item - if so, skip recipe viewer tooltip
-			ItemStack jeiHoveredItem = this.parentJeiPanel.getHoveredItem();
-			System.out.println("[RecipeViewerScreen] JEI hovered item: " + (jeiHoveredItem.isEmpty() ? "EMPTY" : jeiHoveredItem.getDisplayName().getString()));
+			jeiHoveredItem = this.parentJeiPanel.getHoveredItem();
 			if (!jeiHoveredItem.isEmpty()) {
 				// Store JEI hovered item for 'R' key functionality
 				this.lastHoveredItem = jeiHoveredItem;
-				System.out.println("[RecipeViewerScreen] Stored JEI hovered item in lastHoveredItem for 'R' key");
-				return; // JEI tooltip is already rendered, don't render recipe tooltip
+				// Render JEI item tooltip
+				guiGraphics.setTooltipForNextFrame(this.font, getTooltipFromItem(this.minecraft, jeiHoveredItem), 
+				                                   jeiHoveredItem.getTooltipImage(), mouseX, mouseY);
+				return; // Don't render recipe tooltip
 			}
 		}
 		
@@ -263,13 +265,9 @@ public class RecipeViewerScreen extends Screen {
 	
 	@Override
 	public boolean keyPressed(KeyEvent keyEvent) {
-		System.out.println("[RecipeViewerScreen] keyPressed: " + keyEvent.key());
-		
 		// Forward key events to JEI panel first (so 'R' key works on JEI items)
 		if (this.parentJeiPanel != null) {
-			System.out.println("[RecipeViewerScreen] Forwarding keyPressed to JEI panel");
 			boolean jeiHandled = this.parentJeiPanel.keyPressed(keyEvent);
-			System.out.println("[RecipeViewerScreen] JEI handled key: " + jeiHandled);
 			if (jeiHandled) {
 				return true;
 			}
@@ -277,17 +275,14 @@ public class RecipeViewerScreen extends Screen {
 		
 		// ESC or inventory key (E) closes the recipe viewer, not the parent screen
 		if (keyEvent.key() == 256 || this.minecraft.options.keyInventory.matches(keyEvent)) { // ESC or E
-			System.out.println("[RecipeViewerScreen] ESC or E pressed, closing recipe viewer");
+			this.isClosed = true; // Mark as closed to stop rendering
 			this.minecraft.setScreen(parentScreen);
 			return true;
 		}
 		
 		// Recipe key (R) opens recipes for hovered item in recipe viewer
 		if (this.minecraft.options.keyRecipeViewer.matches(keyEvent)) {
-			System.out.println("[RecipeViewerScreen] Recipe viewer key pressed!");
-			System.out.println("[RecipeViewerScreen] lastHoveredItem: " + (this.lastHoveredItem.isEmpty() ? "EMPTY" : this.lastHoveredItem.getDisplayName().getString()));
 			if (!this.lastHoveredItem.isEmpty()) {
-				System.out.println("[RecipeViewerScreen] Opening recipe viewer for: " + this.lastHoveredItem.getDisplayName().getString());
 				if (openRecipeViewerForItem(this.lastHoveredItem)) {
 					return true;
 				}
@@ -382,6 +377,7 @@ public class RecipeViewerScreen extends Screen {
 		
 		// Click outside recipe viewer closes it
 		if (!isMouseOverRecipeArea(mouseX, mouseY)) {
+			this.isClosed = true; // Mark as closed to stop rendering
 			this.minecraft.setScreen(parentScreen);
 			return true;
 		}
