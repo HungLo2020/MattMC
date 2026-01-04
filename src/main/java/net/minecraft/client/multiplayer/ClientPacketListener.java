@@ -2069,7 +2069,7 @@ public class ClientPacketListener extends ClientCommonPacketListenerImpl impleme
 	 */
 	private byte[] loadSkinTextureData(net.minecraft.client.resources.SkinLoader.SkinEntry skinEntry) {
 		try {
-			net.minecraft.resources.ResourceLocation location = skinEntry.location();
+			net.minecraft.resources.ResourceLocation location = skinEntry.toPlayerSkin().body().texturePath();
 			java.io.InputStream stream;
 			
 			if (skinEntry.builtin()) {
