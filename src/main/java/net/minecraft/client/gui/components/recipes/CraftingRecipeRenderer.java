@@ -3,7 +3,6 @@ package net.minecraft.client.gui.components.recipes;
 import java.util.List;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.context.ContextMap;
 import net.minecraft.world.item.ItemStack;
@@ -13,20 +12,24 @@ import net.minecraft.world.item.crafting.display.ShapedCraftingRecipeDisplay;
 import net.minecraft.world.item.crafting.display.SlotDisplay;
 
 /**
- * Renderer for crafting recipes using the crafting table GUI texture.
+ * Renderer for crafting recipes using JEI-style layout.
  */
 public class CraftingRecipeRenderer extends RecipeRenderer {
-	private static final ResourceLocation CRAFTING_TABLE_LOCATION = 
-		ResourceLocation.withDefaultNamespace("textures/gui/container/crafting_table.png");
-	private static final int GUI_WIDTH = 176;
-	private static final int GUI_HEIGHT = 166;
+	private static final ResourceLocation JEI_SLOT = 
+		ResourceLocation.withDefaultNamespace("textures/gui/jei/slot.png");
+	private static final ResourceLocation JEI_OUTPUT_SLOT = 
+		ResourceLocation.withDefaultNamespace("textures/gui/jei/output_slot.png");
+	private static final ResourceLocation JEI_ARROW = 
+		ResourceLocation.withDefaultNamespace("textures/gui/jei/recipe_arrow.png");
 	
-	// Slot positions in the crafting table GUI
-	private static final int GRID_START_X = 30;
-	private static final int GRID_START_Y = 17;
+	// Layout for 3x3 crafting grid in JEI style
+	private static final int GRID_START_X = 20;
+	private static final int GRID_START_Y = 20;
 	private static final int SLOT_SIZE = 18;
-	private static final int RESULT_X = 124;
-	private static final int RESULT_Y = 35;
+	private static final int RESULT_X = 110;
+	private static final int RESULT_Y = 38;
+	private static final int ARROW_X = 80;
+	private static final int ARROW_Y = 38;
 	
 	private final ContextMap contextMap;
 	private final Font font;
@@ -39,10 +42,6 @@ public class CraftingRecipeRenderer extends RecipeRenderer {
 	@Override
 	public void render(GuiGraphics guiGraphics, int x, int y, 
 	                  RecipeHolder<?> recipe, int mouseX, int mouseY, long gameTime) {
-		// Draw crafting table background
-		guiGraphics.blit(RenderPipelines.GUI_TEXTURED, CRAFTING_TABLE_LOCATION, 
-		                x, y, 0, 0, GUI_WIDTH, GUI_HEIGHT, 256, 256);
-		
 		// Render recipe from display
 		if (!recipe.value().display().isEmpty()) {
 			RecipeDisplay display = recipe.value().display().get(0);
@@ -55,12 +54,18 @@ public class CraftingRecipeRenderer extends RecipeRenderer {
 				renderShapelessRecipe(guiGraphics, x, y, display, gameTime);
 			}
 			
-			// Render result
+			// Render arrow
+			guiGraphics.blit(JEI_ARROW, x + ARROW_X, y + ARROW_Y, 0, 0, 22, 16, 22, 16);
+			
+			// Render result slot background
+			guiGraphics.blit(JEI_OUTPUT_SLOT, x + RESULT_X, y + RESULT_Y, 0, 0, 26, 26, 26, 26);
+			
+			// Render result item
 			SlotDisplay resultDisplay = display.result();
 			ItemStack result = resultDisplay.resolveForFirstStack(contextMap);
 			if (!result.isEmpty()) {
-				guiGraphics.renderItem(result, x + RESULT_X, y + RESULT_Y);
-				guiGraphics.renderItemDecorations(font, result, x + RESULT_X, y + RESULT_Y);
+				guiGraphics.renderItem(result, x + RESULT_X + 5, y + RESULT_Y + 5);
+				guiGraphics.renderItemDecorations(font, result, x + RESULT_X + 5, y + RESULT_Y + 5);
 			}
 		}
 	}
@@ -75,6 +80,15 @@ public class CraftingRecipeRenderer extends RecipeRenderer {
 		int offsetX = (3 - width) / 2;
 		int offsetY = (3 - height) / 2;
 		
+		// Render all 9 slot backgrounds first
+		for (int row = 0; row < 3; row++) {
+			for (int col = 0; col < 3; col++) {
+				int slotX = x + GRID_START_X + col * SLOT_SIZE;
+				int slotY = y + GRID_START_Y + row * SLOT_SIZE;
+				guiGraphics.blit(JEI_SLOT, slotX, slotY, 0, 0, 18, 18, 18, 18);
+			}
+		}
+		
 		// Render ingredients in the grid
 		for (int i = 0; i < ingredients.size(); i++) {
 			SlotDisplay slotDisplay = ingredients.get(i);
@@ -86,16 +100,27 @@ public class CraftingRecipeRenderer extends RecipeRenderer {
 			int slotX = x + GRID_START_X + (gridX + offsetX) * SLOT_SIZE;
 			int slotY = y + GRID_START_Y + (gridY + offsetY) * SLOT_SIZE;
 			
-			// Render ingredient
-			renderSlotDisplay(guiGraphics, slotDisplay, slotX, slotY, gameTime);
+			// Render ingredient (slot background already drawn)
+			renderSlotDisplay(guiGraphics, slotDisplay, slotX + 1, slotY + 1, gameTime);
 		}
 	}
 	
 	private void renderShapelessRecipe(GuiGraphics guiGraphics, int x, int y, 
 	                                   RecipeDisplay display, long gameTime) {
-		// For shapeless recipes, try to get ingredients from recipe info
-		// This is a fallback - shapeless recipes should ideally have their own display type
-		// For now, we'll just skip rendering the ingredients or render in a 3x3 grid
+		// For shapeless recipes, we can't directly access ingredients from generic RecipeDisplay
+		// We'll just render the result and indicate it's shapeless
+		// A proper implementation would need ShapelessCraftingRecipeDisplay type
+		
+		// Render all 9 slot backgrounds as empty for now
+		for (int row = 0; row < 3; row++) {
+			for (int col = 0; col < 3; col++) {
+				int slotX = x + GRID_START_X + col * SLOT_SIZE;
+				int slotY = y + GRID_START_Y + row * SLOT_SIZE;
+				guiGraphics.blit(JEI_SLOT, slotX, slotY, 0, 0, 18, 18, 18, 18);
+			}
+		}
+		
+		// TODO: If Minecraft adds ShapelessCraftingRecipeDisplay, render ingredients here
 	}
 	
 	private void renderSlotDisplay(GuiGraphics guiGraphics, SlotDisplay slotDisplay, 
@@ -114,11 +139,11 @@ public class CraftingRecipeRenderer extends RecipeRenderer {
 	
 	@Override
 	public int getWidth() {
-		return GUI_WIDTH;
+		return 176;  // JEI standard width
 	}
 	
 	@Override
 	public int getHeight() {
-		return GUI_HEIGHT;
+		return 125;  // JEI standard height
 	}
 }

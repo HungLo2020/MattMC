@@ -26,10 +26,24 @@ import net.minecraft.world.item.crafting.display.SlotDisplayContext;
 
 /**
  * Screen that displays recipe information in an overlay format.
- * Shows recipes using authentic Minecraft GUI textures with tab support for multiple recipe types.
+ * Shows recipes using JEI-style GUI textures with tab support for multiple recipe types.
  */
 @Environment(EnvType.CLIENT)
 public class RecipeViewerScreen extends Screen {
+	// JEI texture locations
+	private static final ResourceLocation JEI_BACKGROUND = 
+		ResourceLocation.withDefaultNamespace("textures/gui/jei/single_recipe_background.png");
+	private static final ResourceLocation JEI_SLOT = 
+		ResourceLocation.withDefaultNamespace("textures/gui/jei/slot.png");
+	private static final ResourceLocation JEI_TAB_SELECTED = 
+		ResourceLocation.withDefaultNamespace("textures/gui/jei/tab_selected.png");
+	private static final ResourceLocation JEI_TAB_UNSELECTED = 
+		ResourceLocation.withDefaultNamespace("textures/gui/jei/tab_unselected.png");
+	private static final ResourceLocation JEI_ARROW_PREV = 
+		ResourceLocation.withDefaultNamespace("textures/gui/jei/icons/arrow_previous.png");
+	private static final ResourceLocation JEI_ARROW_NEXT = 
+		ResourceLocation.withDefaultNamespace("textures/gui/jei/icons/arrow_next.png");
+	
 	private final Screen parentScreen;
 	private final ItemStack targetItem;
 	private final Map<RecipeType<?>, List<RecipeHolder<?>>> recipesByType;
@@ -42,11 +56,11 @@ public class RecipeViewerScreen extends Screen {
 	// Recipe navigation (for multiple recipes of same type)
 	private int currentRecipeIndex = 0;
 	
-	// Layout
+	// Layout - JEI uses a consistent background size
 	private int centerX;
 	private int centerY;
-	private int guiWidth;
-	private int guiHeight;
+	private static final int GUI_WIDTH = 176;  // Standard JEI recipe width
+	private static final int GUI_HEIGHT = 125; // Standard JEI recipe height
 	
 	// Buttons
 	private Button prevButton;
@@ -69,14 +83,9 @@ public class RecipeViewerScreen extends Screen {
 	
 	@Override
 	protected void init() {
-		// Get current renderer to determine GUI size
-		RecipeRenderer renderer = getRendererForCurrentType();
-		this.guiWidth = renderer.getWidth();
-		this.guiHeight = renderer.getHeight();
-		
-		// Calculate centered position
-		this.centerX = (this.width - this.guiWidth) / 2;
-		this.centerY = (this.height - this.guiHeight) / 2;
+		// Calculate centered position with fixed JEI dimensions
+		this.centerX = (this.width - GUI_WIDTH) / 2;
+		this.centerY = (this.height - GUI_HEIGHT) / 2;
 		
 		// Add navigation buttons if multiple recipes of current type
 		updateNavigationButtons();
@@ -93,18 +102,18 @@ public class RecipeViewerScreen extends Screen {
 		
 		List<RecipeHolder<?>> currentRecipes = getCurrentRecipes();
 		if (currentRecipes.size() > 1) {
-			int buttonY = this.centerY + this.guiHeight + 10;
+			int buttonY = this.centerY + GUI_HEIGHT + 5;
 			
 			this.prevButton = this.addRenderableWidget(
 				Button.builder(Component.literal("<"), button -> previousRecipe())
-					.pos(this.centerX + this.guiWidth / 2 - 50, buttonY)
+					.pos(this.centerX + GUI_WIDTH / 2 - 50, buttonY)
 					.size(20, 20)
 					.build()
 			);
 			
 			this.nextButton = this.addRenderableWidget(
 				Button.builder(Component.literal(">"), button -> nextRecipe())
-					.pos(this.centerX + this.guiWidth / 2 + 30, buttonY)
+					.pos(this.centerX + GUI_WIDTH / 2 + 30, buttonY)
 					.size(20, 20)
 					.build()
 			);
@@ -132,7 +141,14 @@ public class RecipeViewerScreen extends Screen {
 		
 		RecipeHolder<?> recipe = recipes.get(currentRecipeIndex);
 		
-		// Render recipe (no scaling for simplicity)
+		// Render JEI-style background (64x64 texture scaled to GUI_WIDTH x GUI_HEIGHT)
+		guiGraphics.blit(JEI_BACKGROUND, 
+		                this.centerX, this.centerY, 
+		                0, 0, 
+		                GUI_WIDTH, GUI_HEIGHT, 
+		                64, 64);
+		
+		// Render recipe using renderer
 		RecipeRenderer renderer = getRendererForCurrentType();
 		renderer.render(guiGraphics, this.centerX, this.centerY, recipe, mouseX, mouseY, 
 		               this.minecraft.level.getGameTime());
@@ -152,33 +168,25 @@ public class RecipeViewerScreen extends Screen {
 	}
 	
 	private void renderTabs(GuiGraphics guiGraphics, int mouseX, int mouseY) {
-		int tabWidth = 28;
-		int tabHeight = 28;
-		int tabY = this.centerY - tabHeight - 2;
-		int totalTabsWidth = availableTabs.size() * tabWidth;
-		int tabX = this.centerX + (this.guiWidth - totalTabsWidth) / 2;
+		int tabWidth = 24;  // JEI tab texture is 24x24
+		int tabHeight = 24;
+		int tabY = this.centerY - tabHeight + 2;  // Overlap with main GUI
+		int totalTabsWidth = availableTabs.size() * (tabWidth + 2); // Small gap between tabs
+		int tabX = this.centerX + (GUI_WIDTH - totalTabsWidth) / 2;
 		
 		for (int i = 0; i < availableTabs.size(); i++) {
 			RecipeType<?> type = availableTabs.get(i);
 			boolean selected = (i == currentTabIndex);
-			int x = tabX + i * tabWidth;
+			int x = tabX + i * (tabWidth + 2);
 			
-			// Draw tab background
-			int color = selected ? 0xFFC6C6C6 : 0xFF8B8B8B;
-			guiGraphics.fill(x, tabY, x + tabWidth, tabY + tabHeight, color);
-			
-			// Draw tab border
-			guiGraphics.fill(x, tabY, x + tabWidth, tabY + 1, 0xFF373737);
-			guiGraphics.fill(x, tabY, x + 1, tabY + tabHeight, 0xFF373737);
-			guiGraphics.fill(x + tabWidth - 1, tabY, x + tabWidth, tabY + tabHeight, 0xFFFFFFFF);
-			if (!selected) {
-				guiGraphics.fill(x, tabY + tabHeight - 1, x + tabWidth, tabY + tabHeight, 0xFF373737);
-			}
+			// Draw JEI tab background
+			ResourceLocation tabTexture = selected ? JEI_TAB_SELECTED : JEI_TAB_UNSELECTED;
+			guiGraphics.blit(tabTexture, x, tabY, 0, 0, tabWidth, tabHeight, 24, 24);
 			
 			// Draw tab icon
 			ItemStack icon = getIconForRecipeType(type);
 			if (!icon.isEmpty()) {
-				guiGraphics.renderItem(icon, x + 6, tabY + 6);
+				guiGraphics.renderItem(icon, x + 4, tabY + 4);
 			}
 			
 			// Tooltip on hover
@@ -198,8 +206,8 @@ public class RecipeViewerScreen extends Screen {
 		int total = getCurrentRecipes().size();
 		String text = String.format("Recipe %d of %d", currentRecipeIndex + 1, total);
 		int textWidth = this.font.width(text);
-		int textX = this.centerX + (this.guiWidth - textWidth) / 2;
-		int textY = this.centerY - 20;
+		int textX = this.centerX + (GUI_WIDTH - textWidth) / 2;
+		int textY = this.centerY - 15;  // Above the tabs
 		
 		// Draw background
 		guiGraphics.fill(textX - 2, textY - 2, textX + textWidth + 2, textY + 10, 0x80000000);
@@ -245,14 +253,14 @@ public class RecipeViewerScreen extends Screen {
 		
 		// Check tab clicks
 		if (availableTabs.size() > 1) {
-			int tabWidth = 28;
-			int tabHeight = 28;
-			int tabY = this.centerY - tabHeight - 2;
-			int totalTabsWidth = availableTabs.size() * tabWidth;
-			int tabX = this.centerX + (this.guiWidth - totalTabsWidth) / 2;
+			int tabWidth = 24;
+			int tabHeight = 24;
+			int tabY = this.centerY - tabHeight + 2;
+			int totalTabsWidth = availableTabs.size() * (tabWidth + 2);
+			int tabX = this.centerX + (GUI_WIDTH - totalTabsWidth) / 2;
 			
 			for (int i = 0; i < availableTabs.size(); i++) {
-				int x = tabX + i * tabWidth;
+				int x = tabX + i * (tabWidth + 2);
 				if (isMouseOverTab((int)mouseX, (int)mouseY, x, tabY, tabWidth, tabHeight)) {
 					switchToTab(i);
 					return true;
@@ -272,9 +280,9 @@ public class RecipeViewerScreen extends Screen {
 	private boolean isMouseOverRecipeArea(double mouseX, double mouseY) {
 		// Include tabs area and navigation buttons
 		int minY = availableTabs.size() > 1 ? this.centerY - 30 : this.centerY;
-		int maxY = getCurrentRecipes().size() > 1 ? this.centerY + this.guiHeight + 35 : this.centerY + this.guiHeight;
+		int maxY = getCurrentRecipes().size() > 1 ? this.centerY + GUI_HEIGHT + 35 : this.centerY + GUI_HEIGHT;
 		
-		return mouseX >= this.centerX && mouseX < this.centerX + this.guiWidth &&
+		return mouseX >= this.centerX && mouseX < this.centerX + GUI_WIDTH &&
 		       mouseY >= minY && mouseY < maxY;
 	}
 	
@@ -316,18 +324,8 @@ public class RecipeViewerScreen extends Screen {
 	private RecipeRenderer getRendererForType(RecipeType<?> type) {
 		if (type == RecipeType.CRAFTING) {
 			return new CraftingRecipeRenderer(contextMap, font);
-		} else if (type == RecipeType.SMELTING) {
-			return new FurnaceRecipeRenderer(
-				ResourceLocation.withDefaultNamespace("textures/gui/container/furnace.png"), 
-				contextMap, font);
-		} else if (type == RecipeType.BLASTING) {
-			return new FurnaceRecipeRenderer(
-				ResourceLocation.withDefaultNamespace("textures/gui/container/blast_furnace.png"), 
-				contextMap, font);
-		} else if (type == RecipeType.SMOKING) {
-			return new FurnaceRecipeRenderer(
-				ResourceLocation.withDefaultNamespace("textures/gui/container/smoker.png"), 
-				contextMap, font);
+		} else if (type == RecipeType.SMELTING || type == RecipeType.BLASTING || type == RecipeType.SMOKING) {
+			return new FurnaceRecipeRenderer(contextMap, font);
 		} else if (type == RecipeType.STONECUTTING) {
 			return new StonecutterRecipeRenderer(contextMap, font);
 		} else if (type == RecipeType.SMITHING) {
