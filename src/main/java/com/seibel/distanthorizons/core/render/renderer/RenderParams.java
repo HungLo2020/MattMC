@@ -16,7 +16,7 @@ import com.seibel.distanthorizons.core.world.IDhClientWorld;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftClientWrapper;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftRenderWrapper;
 import com.seibel.distanthorizons.core.wrapperInterfaces.misc.ILightMapWrapper;
-import com.seibel.distanthorizons.core.wrapperInterfaces.modAccessor.AbstractOptifineAccessor;
+
 import com.seibel.distanthorizons.core.wrapperInterfaces.world.IClientLevelWrapper;
 
 /**
@@ -170,14 +170,6 @@ public class RenderParams extends DhApiRenderParam
 		{
 			LOGGER.debug("[DH-RENDER-VALIDATION] Failed: No MVM or Proj Matrix Given");
 			return "No MVM or Proj Matrix Given";
-		}
-		
-		if (AbstractOptifineAccessor.optifinePresent()
-			&& MC_RENDER.getTargetFramebuffer() == -1)
-		{
-			// wait for MC to finish setting up their renderer
-			LOGGER.debug("[DH-RENDER-VALIDATION] Failed: Optifine Target Frame Buffer not set");
-			return "Optifine Target Frame Buffer not set";
 		}
 		
 		LOGGER.debug("[DH-RENDER-VALIDATION] All validation checks passed!");

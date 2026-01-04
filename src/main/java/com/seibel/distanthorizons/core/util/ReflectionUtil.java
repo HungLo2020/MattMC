@@ -20,7 +20,7 @@
 package com.seibel.distanthorizons.core.util;
 
 import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
-import com.seibel.distanthorizons.core.wrapperInterfaces.modAccessor.AbstractOptifineAccessor;
+
 import com.seibel.distanthorizons.core.logging.DhLogger;
 
 import java.lang.invoke.MethodHandles;

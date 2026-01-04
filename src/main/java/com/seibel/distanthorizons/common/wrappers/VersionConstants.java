@@ -20,6 +20,7 @@
 package com.seibel.distanthorizons.common.wrappers;
 
 import com.seibel.distanthorizons.core.wrapperInterfaces.IVersionConstants;
+import net.minecraft.SharedConstants;
 
 /**
  * @author James Seibel
@@ -39,11 +40,8 @@ public class VersionConstants implements IVersionConstants
 	@Override
 	public String getMinecraftVersion()
 	{
-		// these values are hard-coded to prevent an issue with Forge (specifically 1.18.2) where
-		// it can't load client classes when running as a dedicated server,
-		// which was how we were dynamically accessing the MC version string
-		
-		return "1.21.10";
+		// Use Minecraft's native version detection
+		return SharedConstants.getCurrentVersion().name();
 	}
 	
 }
