@@ -276,7 +276,13 @@ public class RecipeViewerScreen extends Screen {
 		// ESC or inventory key (E) closes the recipe viewer, not the parent screen
 		if (keyEvent.key() == 256 || this.minecraft.options.keyInventory.matches(keyEvent)) { // ESC or E
 			this.isClosed = true; // Mark as closed to stop rendering
-			this.minecraft.setScreen(parentScreen);
+			// Close all nested recipe viewers - go back to the original parent (non-RecipeViewerScreen)
+			Screen targetScreen = parentScreen;
+			while (targetScreen instanceof RecipeViewerScreen recipeViewerScreen) {
+				recipeViewerScreen.isClosed = true; // Mark all parent viewers as closed
+				targetScreen = recipeViewerScreen.parentScreen;
+			}
+			this.minecraft.setScreen(targetScreen);
 			return true;
 		}
 		
@@ -378,7 +384,13 @@ public class RecipeViewerScreen extends Screen {
 		// Click outside recipe viewer closes it
 		if (!isMouseOverRecipeArea(mouseX, mouseY)) {
 			this.isClosed = true; // Mark as closed to stop rendering
-			this.minecraft.setScreen(parentScreen);
+			// Close all nested recipe viewers - go back to the original parent (non-RecipeViewerScreen)
+			Screen targetScreen = parentScreen;
+			while (targetScreen instanceof RecipeViewerScreen recipeViewerScreen) {
+				recipeViewerScreen.isClosed = true; // Mark all parent viewers as closed
+				targetScreen = recipeViewerScreen.parentScreen;
+			}
+			this.minecraft.setScreen(targetScreen);
 			return true;
 		}
 		
