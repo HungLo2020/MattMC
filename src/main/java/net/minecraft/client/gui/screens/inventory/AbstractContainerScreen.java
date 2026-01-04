@@ -901,9 +901,10 @@ public abstract class AbstractContainerScreen<T extends AbstractContainerMenu> e
 			return false;
 		}
 		
-		// Open recipe viewer screen - for now, just return true to indicate we handled the key
-		// TODO: Implement RecipeViewerScreen in next phase
-		return false; // Will be true once RecipeViewerScreen is implemented
+		// Open recipe viewer screen
+		RecipeViewerScreen viewer = new RecipeViewerScreen(this, item, recipes);
+		this.minecraft.setScreen(viewer);
+		return true;
 	}
 
 	@Environment(EnvType.CLIENT)
