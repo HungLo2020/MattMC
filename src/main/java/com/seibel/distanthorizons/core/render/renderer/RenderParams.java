@@ -124,51 +124,51 @@ public class RenderParams extends DhApiRenderParam
 		
 		if (!MC_CLIENT.playerExists())
 		{
-			LOGGER.debug("[DH-RENDER-VALIDATION] Failed: No Player Exists");
+			//LOGGER.debug("[DH-RENDER-VALIDATION] Failed: No Player Exists");
 			return "No Player Exists";
 		}
 		
 		if (this.dhClientWorld == null)
 		{
-			LOGGER.warn("[DH-RENDER-VALIDATION] Failed: No DH Client World Loaded");
-			LOGGER.warn("[DH-RENDER-VALIDATION] Current abstract world: " + SharedApi.getAbstractDhWorld());
+			//LOGGER.warn("[DH-RENDER-VALIDATION] Failed: No DH Client World Loaded");
+			//LOGGER.warn("[DH-RENDER-VALIDATION] Current abstract world: " + SharedApi.getAbstractDhWorld());
 			return "No DH Client World Loaded";
 		}
 		
 		if (this.dhClientLevel == null)
 		{
-			LOGGER.debug("[DH-RENDER-VALIDATION] Failed: No DH Client Level Loaded");
+			//LOGGER.debug("[DH-RENDER-VALIDATION] Failed: No DH Client Level Loaded");
 			return "No DH Client Level Loaded";
 		}
 		
 		if (this.clientLevelWrapper == null)
 		{
-			LOGGER.debug("[DH-RENDER-VALIDATION] Failed: No Client Level Wrapper Loaded");
+			//LOGGER.debug("[DH-RENDER-VALIDATION] Failed: No Client Level Wrapper Loaded");
 			return "No Client Level Wrapper Loaded";
 		}
 		
 		if (this.lightmap == null)
 		{
-			LOGGER.debug("[DH-RENDER-VALIDATION] Failed: No Lightmap Loaded");
+			//LOGGER.debug("[DH-RENDER-VALIDATION] Failed: No Lightmap Loaded");
 			return "No Lightmap Loaded";
 		}
 		
 		if (this.renderBufferHandler == null)
 		{
-			LOGGER.debug("[DH-RENDER-VALIDATION] Failed: No RenderBufferHandler Present");
+			//LOGGER.debug("[DH-RENDER-VALIDATION] Failed: No RenderBufferHandler Present");
 			return "No RenderBufferHandler Present";
 		}
 		
 		if (this.genericRenderer == null)
 		{
-			LOGGER.debug("[DH-RENDER-VALIDATION] Failed: No Generic Renderer Present");
+			//LOGGER.debug("[DH-RENDER-VALIDATION] Failed: No Generic Renderer Present");
 			return "No Generic Renderer Present";
 		}
 		
 		if (this.dhModelViewMatrix == null
 			|| this.mcModelViewMatrix == null)
 		{
-			LOGGER.debug("[DH-RENDER-VALIDATION] Failed: No MVM or Proj Matrix Given");
+			//LOGGER.debug("[DH-RENDER-VALIDATION] Failed: No MVM or Proj Matrix Given");
 			return "No MVM or Proj Matrix Given";
 		}
 		
