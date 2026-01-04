@@ -509,7 +509,6 @@ public class LodRenderer
 		// normal use case
 		this.framebuffer = new DhFramebuffer();
 		this.usingMcFramebuffer = false;
-		}
 		
 		// create and bind the necessary textures
 		this.createAndBindTextures();

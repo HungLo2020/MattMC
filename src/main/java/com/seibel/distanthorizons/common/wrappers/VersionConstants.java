@@ -41,7 +41,7 @@ public class VersionConstants implements IVersionConstants
 	public String getMinecraftVersion()
 	{
 		// Use Minecraft's native version detection
-		return SharedConstants.getCurrentVersion().getName();
+		return SharedConstants.getCurrentVersion().name();
 	}
 	
 }
