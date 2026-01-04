@@ -696,32 +696,58 @@ public abstract class AbstractContainerScreen<T extends AbstractContainerMenu> e
 
 	@Override
 	public boolean keyPressed(KeyEvent keyEvent) {
+		System.out.println("===== AbstractContainerScreen.keyPressed called =====");
+		System.out.println("  Key code: " + keyEvent.key());
+		System.out.println("  Screen class: " + this.getClass().getSimpleName());
+		System.out.println("  Minecraft options null? " + (this.minecraft == null ? "minecraft is null" : (this.minecraft.options == null ? "options is null" : "options OK")));
+		
+		if (this.minecraft != null && this.minecraft.options != null) {
+			System.out.println("  keyRecipeViewer null? " + (this.minecraft.options.keyRecipeViewer == null ? "YES" : "NO"));
+			if (this.minecraft.options.keyRecipeViewer != null) {
+				boolean matches = this.minecraft.options.keyRecipeViewer.matches(keyEvent);
+				System.out.println("  keyRecipeViewer.matches(keyEvent): " + matches);
+			}
+		}
+		
 		// Check for recipe viewer key to open recipe viewer
-		if (this.minecraft.options.keyRecipeViewer.matches(keyEvent)) {
+		if (this.minecraft != null && this.minecraft.options != null && 
+		    this.minecraft.options.keyRecipeViewer != null &&
+		    this.minecraft.options.keyRecipeViewer.matches(keyEvent)) {
+			
+			System.out.println("  >>> Recipe viewer key matched! <<<");
 			ItemStack hoveredItem = getHoveredItemStack();
 			
-			System.out.println("DEBUG: Recipe viewer key pressed, hovered item: " + (!hoveredItem.isEmpty() ? hoveredItem.getItem() : "empty"));
+			System.out.println("  Hovered item: " + (!hoveredItem.isEmpty() ? hoveredItem.getItem() : "EMPTY"));
 			
 			if (!hoveredItem.isEmpty()) {
 				boolean result = openRecipeViewer(hoveredItem);
-				System.out.println("DEBUG: openRecipeViewer returned: " + result);
+				System.out.println("  openRecipeViewer returned: " + result);
 				if (result) {
+					System.out.println("  Returning true - key consumed");
 					return true;
 				}
+			} else {
+				System.out.println("  No item hovered - not opening viewer");
 			}
 		}
 		
 		// Check JEI panel first
+		System.out.println("  Checking JEI panel (null? " + (this.jeiPanel == null ? "YES" : "NO") + ")");
 		if (this.jeiPanel != null && this.jeiPanel.keyPressed(keyEvent)) {
+			System.out.println("  JEI panel consumed the key");
 			return true;
 		}
 		
+		System.out.println("  Calling super.keyPressed (Screen)");
 		if (super.keyPressed(keyEvent)) {
+			System.out.println("  super.keyPressed returned true");
 			return true;
 		} else if (this.minecraft.options.keyInventory.matches(keyEvent)) {
+			System.out.println("  Inventory key pressed - closing");
 			this.onClose();
 			return true;
 		} else {
+			System.out.println("  Checking hotbar keys and item actions");
 			this.checkHotbarKeyPressed(keyEvent);
 			if (this.hoveredSlot != null && this.hoveredSlot.hasItem()) {
 				if (this.minecraft.options.keyPickItem.matches(keyEvent)) {
@@ -731,6 +757,7 @@ public abstract class AbstractContainerScreen<T extends AbstractContainerMenu> e
 				}
 			}
 
+			System.out.println("  Returning true (default)");
 			return true;
 		}
 	}
@@ -871,19 +898,25 @@ public abstract class AbstractContainerScreen<T extends AbstractContainerMenu> e
 	 * Checks in order: slot hover, JEI panel hover.
 	 */
 	private ItemStack getHoveredItemStack() {
+		System.out.println("  >> getHoveredItemStack called");
+		
 		// First check if hovering over a slot
 		if (this.hoveredSlot != null && this.hoveredSlot.hasItem()) {
-			return this.hoveredSlot.getItem();
+			ItemStack item = this.hoveredSlot.getItem();
+			System.out.println("     Found hovered slot item: " + item.getItem());
+			return item;
 		}
 		
 		// Check JEI panel
 		if (this.jeiPanel != null) {
 			ItemStack jeiItem = this.jeiPanel.getHoveredItem();
 			if (!jeiItem.isEmpty()) {
+				System.out.println("     Found JEI panel hovered item: " + jeiItem.getItem());
 				return jeiItem;
 			}
 		}
 		
+		System.out.println("     No hovered item found");
 		return ItemStack.EMPTY;
 	}
 	
@@ -892,31 +925,43 @@ public abstract class AbstractContainerScreen<T extends AbstractContainerMenu> e
 	 * Returns true if recipes were found and viewer opened.
 	 */
 	private boolean openRecipeViewer(ItemStack item) {
+		System.out.println("  >> openRecipeViewer called for item: " + item.getItem());
+		
 		if (this.minecraft == null || this.minecraft.level == null) {
-			System.out.println("DEBUG: minecraft or level is null");
+			System.out.println("     ERROR: minecraft or level is null (minecraft=" + (this.minecraft == null ? "null" : "OK") + 
+			                  ", level=" + (this.minecraft == null ? "N/A" : (this.minecraft.level == null ? "null" : "OK")) + ")");
 			return false;
 		}
 		
+		System.out.println("     Calling RecipeLookupHelper.findRecipesFor...");
 		// Find recipes for this item
 		java.util.Map<net.minecraft.world.item.crafting.RecipeType<?>, java.util.List<net.minecraft.world.item.crafting.RecipeHolder<?>>> recipes = 
 			net.minecraft.client.recipe.RecipeLookupHelper.findRecipesFor(item.getItem(), this.minecraft.level);
 		
-		System.out.println("DEBUG: Found " + recipes.size() + " recipe types for item " + item.getItem());
+		System.out.println("     Found " + recipes.size() + " recipe types");
 		for (var entry : recipes.entrySet()) {
-			System.out.println("DEBUG:   Recipe type " + entry.getKey() + ": " + entry.getValue().size() + " recipes");
+			System.out.println("       Recipe type " + entry.getKey() + ": " + entry.getValue().size() + " recipes");
 		}
 		
 		if (recipes.isEmpty()) {
 			// No recipes found - silently return false
-			System.out.println("DEBUG: No recipes found, returning false");
+			System.out.println("     No recipes found, returning false");
 			return false;
 		}
 		
 		// Open recipe viewer screen
-		System.out.println("DEBUG: Opening RecipeViewerScreen");
-		RecipeViewerScreen viewer = new RecipeViewerScreen(this, item, recipes);
-		this.minecraft.setScreen(viewer);
-		return true;
+		System.out.println("     Creating RecipeViewerScreen...");
+		try {
+			RecipeViewerScreen viewer = new RecipeViewerScreen(this, item, recipes);
+			System.out.println("     RecipeViewerScreen created successfully");
+			this.minecraft.setScreen(viewer);
+			System.out.println("     Screen set successfully - returning true");
+			return true;
+		} catch (Exception e) {
+			System.out.println("     ERROR creating or setting RecipeViewerScreen: " + e.getMessage());
+			e.printStackTrace();
+			return false;
+		}
 	}
 
 	@Environment(EnvType.CLIENT)

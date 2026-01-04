@@ -81,13 +81,21 @@ public abstract class AbstractRecipeBookScreen<T extends RecipeBookMenu> extends
 
 	@Override
 	public boolean keyPressed(KeyEvent keyEvent) {
+		System.out.println("===== AbstractRecipeBookScreen.keyPressed called =====");
+		System.out.println("  Key code: " + keyEvent.key());
+		System.out.println("  Screen class: " + this.getClass().getSimpleName());
+		
 		// First check the recipe book component
 		if (this.recipeBookComponent.keyPressed(keyEvent)) {
+			System.out.println("  Recipe book component consumed the key");
 			return true;
 		}
 		
+		System.out.println("  Calling super.keyPressed (AbstractContainerScreen)");
 		// Then call AbstractContainerScreen's keyPressed (which has 'R' key handling)
-		return super.keyPressed(keyEvent);
+		boolean result = super.keyPressed(keyEvent);
+		System.out.println("  super.keyPressed returned: " + result);
+		return result;
 	}
 
 	@Override
