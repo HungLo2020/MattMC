@@ -2,3 +2,75 @@ Creepers are afraid of cats!
 Its easiest to find diamonds at Y-level -58
 Use torches to light up dark areas and prevent mob spawning!
 Try throwing a pitcher pod in a Nether portal
+Right clicking on crops with a hoe harvests all crops in 3x3 grid!
+Try pressing "R" on an item in the inventory screen!
+Shift Right clicking on a item frame will make it invisible!
+Feeding baby animals will make them grow up faster!
+The bane of arthropods enchantment also increases damage against silverfish, endermites, and bees!
+Axolotls like to eat tropical fish!
+Fishing in a Jungle can give you different items compared to fishing in other biomes!
+Trying to sleep in other dimensions will end poorly...
+Sleeping in a bed will set your spawn point!
+Using bone meal on grass blocks can give different types of flowers!
+Blaze rods are good fuel for furnaces!
+Blazes take damage when hit by snowballs!
+Fish and axolotls can be safely picked up using buckets!
+Renaming a bucket with a mob inside will rename that mob as well
+Coarse dirt can be converted into normal dirt using a hoe
+Compasses point to the spawn point of your world
+Animals killed by fire damage usually drop cooked food
+Creepers will drop a music disc when killed by a skeletons arrow
+Crouching will prevent you from falling off the side of blocks
+You can deflect ghast fireballs by attacking them
+The lower a dog's tail, the less health they have left
+You can heal wolves by feeding them rotten flesh
+Pointed dripstone below lava will slowly drip lava particles. This can be used to fill a cauldron
+Campfires can be used to cook food
+Using fireworks while flying with an elytra can boost your speed!
+You cannot leave the end dimension without defeating the ender dragon.. or dying
+Endermen can not be hit by projectiles
+Wearing a carved pumpkin lowers the risk of enderman noticing you
+Enderman become hostile if you look them in the eyes
+Endermites may spawn when an enderman teleports or an enderpearl is used
+You can locate the Stronghold by throwing an Eye of Ender and following it...
+Large fossils can be found under swamps and deserts
+Leather armor can protect against freezing damage
+Goats can be milked using a bucket
+Falling blocks like sand and gravel instantly break when falling onto a torch
+Iron golems can be healed by giving them iron ingots
+Villagers lose their job site when changing dimensions
+Lava buckets can be used as fuel in the furnace
+Repeaters can be locked and kept in its state by powering the sides of it with another repeater
+Animals may follow you if you hold a food they like
+Be careful around goats. They like to push players and other animals off cliffs
+Red mooshrooms become brown, and brown mooshrooms become red, when struck by lightning
+Hostile mobs do not spawn on mushroom islands
+Lava spreads out faster in the nether
+Wet sponges will immediately dry when placed in the nether
+Traveling one block in the nether is equivalent to traveling eight blocks in the overworld
+The sound a note block makes will change based on the block beneath it
+Obsidian is formed when water hits a lava source block
+Some ores have a minimum required pickaxe tier to mine them
+TNT cannot damage players in peaceful mode
+Piglins really love gold
+Piglins are scared of soul fire blocks including the soul torch and soul lantern
+Zombies, skeletons, and spiders are all immune to poison damage
+By using water and lava buckets you can make an easy nether portal
+Old gold and iron equipment can be smelted into nuggets
+You can shear a mooshroom to turn it into a normal cow
+You can shear the ends of cave vines to stop them from growing
+You can put shears in a dispenser to shear sheep
+Shulkers take significantly less damage when their shells are closed
+Bees can be pacified by placing a campfire beneath their hive
+You can harvest infinite snowballs from a snow golems trail
+On rare occasions skeletons may ride spiders into combat!
+Wet sponge can be dried in a furnace by cooking it. If there is an empty bucket in the fuel slot the bucket will catch the water!
+Slimes can spawn in swamps during a full moon
+Turtles only drop scutes when a baby grows into an adult
+Undead mobs are damaged by health potions and healed by damage potions
+Undead mobs will not burn in daylight if they are wearing a helmet
+Honeycombs can be used to wax copper blocks. This prevents them from oxidizing
+Sleeping will clear up the sky and stop storm or rain
+The Sun, moon, and stars all move towards the west
+Villagers transform into witches when struck by lightning
+Old wooden tools can be used as fuel in the furnace
