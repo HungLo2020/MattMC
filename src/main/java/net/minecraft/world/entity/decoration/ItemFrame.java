@@ -382,10 +382,16 @@ public class ItemFrame extends HangingEntity {
 					return InteractionResult.PASS;
 				}
 			} else {
-				this.playSound(this.getRotateItemSound(), 1.0F, 1.0F);
-				this.setRotation(this.getRotation() + 1);
-				this.gameEvent(GameEvent.BLOCK_CHANGE, player);
-				return InteractionResult.SUCCESS;
+				if (player.isShiftKeyDown()) {
+					this.setInvisible(!this.isInvisible());
+					this.gameEvent(GameEvent.BLOCK_CHANGE, player);
+					return InteractionResult.SUCCESS;
+				} else {
+					this.playSound(this.getRotateItemSound(), 1.0F, 1.0F);
+					this.setRotation(this.getRotation() + 1);
+					this.gameEvent(GameEvent.BLOCK_CHANGE, player);
+					return InteractionResult.SUCCESS;
+				}
 			}
 		} else {
 			return (InteractionResult)(!bl && !bl2 ? InteractionResult.PASS : InteractionResult.SUCCESS);
