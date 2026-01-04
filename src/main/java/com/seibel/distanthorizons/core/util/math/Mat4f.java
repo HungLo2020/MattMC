@@ -26,7 +26,7 @@ import org.joml.Matrix4fc;
 import java.nio.FloatBuffer;
 
 /**
- * An (almost) exact copy of Minecraft's 1.16.5
+ * Implementation based on Minecraft's
  * implementation of a 4x4 float matrix.
  *
  * @author James Seibel

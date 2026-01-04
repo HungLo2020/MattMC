@@ -141,11 +141,11 @@ public class IrisLodRenderProgram {
 		dhProjectionInverseUniform = tryGetUniformLocation2("dhProjectionInverse");
 
 		// Log DH uniform locations for debugging
-		Iris.logger.info("[DH-SHADER-UNIFORMS] Program: " + name);
-		Iris.logger.info("[DH-SHADER-UNIFORMS] dhProjection uniform location: " + dhProjectionUniform);
-		Iris.logger.info("[DH-SHADER-UNIFORMS] dhProjectionInverse uniform location: " + dhProjectionInverseUniform);
-		Iris.logger.info("[DH-SHADER-UNIFORMS] iris_ProjectionMatrix uniform location: " + projectionUniform);
-		Iris.logger.info("[DH-SHADER-UNIFORMS] iris_ProjectionMatrixInverse uniform location: " + projectionInverseUniform);
+		//Iris.logger.info("[DH-SHADER-UNIFORMS] Program: " + name);
+		//Iris.logger.info("[DH-SHADER-UNIFORMS] dhProjection uniform location: " + dhProjectionUniform);
+		//Iris.logger.info("[DH-SHADER-UNIFORMS] dhProjectionInverse uniform location: " + dhProjectionInverseUniform);
+		//Iris.logger.info("[DH-SHADER-UNIFORMS] iris_ProjectionMatrix uniform location: " + projectionUniform);
+		//Iris.logger.info("[DH-SHADER-UNIFORMS] iris_ProjectionMatrixInverse uniform location: " + projectionInverseUniform);
 
 		// Fog/Clip Uniforms
 		clipDistanceUniform = tryGetUniformLocation2("clipDistance");

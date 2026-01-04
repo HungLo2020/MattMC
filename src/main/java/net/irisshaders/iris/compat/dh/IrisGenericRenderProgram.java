@@ -154,11 +154,11 @@ public class IrisGenericRenderProgram implements IDhApiGenericObjectShaderProgra
 		dhProjectionInverseUniform = tryGetUniformLocation2("dhProjectionInverse");
 
 		// Log DH uniform locations for debugging
-		Iris.logger.info("[DH-SHADER-UNIFORMS-GENERIC] Program: " + name);
-		Iris.logger.info("[DH-SHADER-UNIFORMS-GENERIC] dhProjection uniform location: " + dhProjectionUniform);
-		Iris.logger.info("[DH-SHADER-UNIFORMS-GENERIC] dhProjectionInverse uniform location: " + dhProjectionInverseUniform);
-		Iris.logger.info("[DH-SHADER-UNIFORMS-GENERIC] iris_ProjectionMatrix uniform location: " + projectionUniform);
-		Iris.logger.info("[DH-SHADER-UNIFORMS-GENERIC] iris_ProjectionMatrixInverse uniform location: " + projectionInverseUniform);
+		//Iris.logger.info("[DH-SHADER-UNIFORMS-GENERIC] Program: " + name);
+		//Iris.logger.info("[DH-SHADER-UNIFORMS-GENERIC] dhProjection uniform location: " + dhProjectionUniform);
+		//Iris.logger.info("[DH-SHADER-UNIFORMS-GENERIC] dhProjectionInverse uniform location: " + dhProjectionInverseUniform);
+		//Iris.logger.info("[DH-SHADER-UNIFORMS-GENERIC] iris_ProjectionMatrix uniform location: " + projectionUniform);
+		//Iris.logger.info("[DH-SHADER-UNIFORMS-GENERIC] iris_ProjectionMatrixInverse uniform location: " + projectionInverseUniform);
 
 		this.instancedShaderOffsetChunkUniform = this.tryGetUniformLocation2("uOffsetChunk");
 		this.instancedShaderOffsetSubChunkUniform = this.tryGetUniformLocation2("uOffsetSubChunk");

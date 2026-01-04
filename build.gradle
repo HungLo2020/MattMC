@@ -66,14 +66,6 @@ repositories {
                 includeGroup 'com.github.Mojang'
             }
         }
-        // Forge mirrors for Mojang libraries
-        maven { 
-            url = 'https://maven.minecraftforge.net/'
-            content {
-                includeGroup 'com.mojang'
-                includeGroup 'net.minecraftforge'
-            }
-        }
     }
     
     // Add bundled dependencies as a flat directory repository

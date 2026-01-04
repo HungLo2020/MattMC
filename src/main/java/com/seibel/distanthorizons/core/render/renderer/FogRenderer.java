@@ -109,7 +109,7 @@ public class FogRenderer
 	
 	public void render(Mat4f modelViewProjectionMatrix, float partialTicks)
 	{
-		// needed in MC 1.16.5 probably due to MC not manually setting each GL state they need before the next rendering step
+		// needed to preserve GL state - MC may not manually set each GL state before the next rendering step
 		GLState state = new GLState();
 		
 		this.init();

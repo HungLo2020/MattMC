@@ -263,7 +263,7 @@ public class FogShader extends AbstractShaderRenderer
 		GLMC.glBindTexture(LodRenderer.INSTANCE.getActiveDepthTextureId());
 		GL32.glUniform1i(this.uDepthMap, 0);
 		
-		// this is necessary for MC 1.16 (IE Legacy OpenGL)
+		// this is necessary for Legacy OpenGL support
 		// otherwise the framebuffer isn't cleared correctly and the fog smears across the screen
 		if (MC_RENDER.runningLegacyOpenGL())
 		{
