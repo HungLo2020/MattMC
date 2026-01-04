@@ -30,7 +30,7 @@ import net.minecraft.hooks.HookRegistry;
 import net.minecraft.hooks.ModelBlockRendererHooks;
 
 @Environment(EnvType.CLIENT)
-public class ModelBlockRenderer {
+public class ModelBlockRenderer implements net.fabricmc.fabric.api.renderer.v1.render.FabricBlockModelRenderer {
 	private static final Direction[] DIRECTIONS = Direction.values();
 	public final BlockColors blockColors; // Made public for Sodium FRAPI integration
 	private static final int CACHE_SIZE = 100;
