@@ -98,16 +98,17 @@ public class RecipeViewerScreen extends Screen {
 		if (currentRecipes.size() > 1) {
 			int buttonY = this.centerY + this.guiHeight + 10;
 			
+			// Position buttons further apart to not cover the recipe counter text
 			this.prevButton = this.addRenderableWidget(
 				Button.builder(Component.literal("<"), button -> previousRecipe())
-					.pos(this.centerX + this.guiWidth / 2 - 50, buttonY)
+					.pos(this.centerX + this.guiWidth / 2 - 70, buttonY)
 					.size(20, 20)
 					.build()
 			);
 			
 			this.nextButton = this.addRenderableWidget(
 				Button.builder(Component.literal(">"), button -> nextRecipe())
-					.pos(this.centerX + this.guiWidth / 2 + 30, buttonY)
+					.pos(this.centerX + this.guiWidth / 2 + 50, buttonY)
 					.size(20, 20)
 					.build()
 			);

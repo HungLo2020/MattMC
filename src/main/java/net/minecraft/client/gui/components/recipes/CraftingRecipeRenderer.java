@@ -158,17 +158,7 @@ public class CraftingRecipeRenderer extends RecipeRenderer {
 		
 		RecipeDisplay display = recipe.value().display().get(0);
 		
-		// Check shaped recipe ingredients
-		if (display instanceof ShapedCraftingRecipeDisplay shapedDisplay) {
-			return getHoveredItemFromShapedRecipe(x, y, mouseX, mouseY, shapedDisplay, gameTime);
-		}
-		
-		// Check shapeless recipe ingredients
-		if (display instanceof ShapelessCraftingRecipeDisplay shapelessDisplay) {
-			return getHoveredItemFromShapelessRecipe(x, y, mouseX, mouseY, shapelessDisplay, gameTime);
-		}
-		
-		// Check result slot
+		// Check result slot first (so it works for all recipe types)
 		SlotDisplay resultDisplay = display.result();
 		int resultX = x + RESULT_X;
 		int resultY = y + RESULT_Y;
@@ -176,6 +166,22 @@ public class CraftingRecipeRenderer extends RecipeRenderer {
 			ItemStack result = resultDisplay.resolveForFirstStack(contextMap);
 			if (!result.isEmpty()) {
 				return result;
+			}
+		}
+		
+		// Check shaped recipe ingredients
+		if (display instanceof ShapedCraftingRecipeDisplay shapedDisplay) {
+			ItemStack hoveredIngredient = getHoveredItemFromShapedRecipe(x, y, mouseX, mouseY, shapedDisplay, gameTime);
+			if (!hoveredIngredient.isEmpty()) {
+				return hoveredIngredient;
+			}
+		}
+		
+		// Check shapeless recipe ingredients
+		if (display instanceof ShapelessCraftingRecipeDisplay shapelessDisplay) {
+			ItemStack hoveredIngredient = getHoveredItemFromShapelessRecipe(x, y, mouseX, mouseY, shapelessDisplay, gameTime);
+			if (!hoveredIngredient.isEmpty()) {
+				return hoveredIngredient;
 			}
 		}
 		
