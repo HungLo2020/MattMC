@@ -5,9 +5,13 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.InsideBlockEffectApplier;
 import net.minecraft.world.entity.monster.Ravager;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.HoeItem;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.BlockGetter;
@@ -20,6 +24,7 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.StateDefinition;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.block.state.properties.IntegerProperty;
+import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.shapes.CollisionContext;
 import net.minecraft.world.phys.shapes.VoxelShape;
 
@@ -182,6 +187,61 @@ public class CropBlock extends VegetationBlock implements BonemealableBlock {
 	@Override
 	public void performBonemeal(ServerLevel serverLevel, RandomSource randomSource, BlockPos blockPos, BlockState blockState) {
 		this.growCrops(serverLevel, blockPos, blockState);
+	}
+
+	@Override
+	protected InteractionResult useWithoutItem(BlockState blockState, Level level, BlockPos blockPos, Player player, BlockHitResult blockHitResult) {
+		// Right-click harvest: reset crop to age 0 and drop loot
+		if (this.isMaxAge(blockState)) {
+			if (level instanceof ServerLevel serverLevel) {
+				// Drop the loot for the fully grown crop
+				Block.dropResources(blockState, serverLevel, blockPos, null, player, ItemStack.EMPTY);
+				// Reset the crop to age 0
+				level.setBlock(blockPos, this.getStateForAge(0), 2);
+			}
+			return InteractionResult.SUCCESS;
+		}
+		return InteractionResult.PASS;
+	}
+
+	@Override
+	protected InteractionResult useItemOn(
+		ItemStack itemStack, BlockState blockState, Level level, BlockPos blockPos, Player player, InteractionHand interactionHand, BlockHitResult blockHitResult
+	) {
+		// Right-click with hoe: harvest in a 3x3 area
+		if (itemStack.getItem() instanceof HoeItem && this.isMaxAge(blockState)) {
+			if (level instanceof ServerLevel serverLevel) {
+				// Harvest the clicked crop
+				Block.dropResources(blockState, serverLevel, blockPos, null, player, itemStack);
+				level.setBlock(blockPos, this.getStateForAge(0), 2);
+				
+				// Check and harvest crops in a 3x3 grid centered on the clicked position
+				for (int dx = -1; dx <= 1; dx++) {
+					for (int dz = -1; dz <= 1; dz++) {
+						// Skip the center block (already harvested)
+						if (dx == 0 && dz == 0) {
+							continue;
+						}
+						
+						BlockPos neighborPos = blockPos.offset(dx, 0, dz);
+						BlockState neighborState = level.getBlockState(neighborPos);
+						
+						// Check if the neighbor is the same type of crop and is fully grown
+						if (neighborState.getBlock() == this && this.isMaxAge(neighborState)) {
+							// Drop the loot for the neighbor crop
+							Block.dropResources(neighborState, serverLevel, neighborPos, null, player, itemStack);
+							// Reset the neighbor crop to age 0
+							level.setBlock(neighborPos, this.getStateForAge(0), 2);
+						}
+					}
+				}
+				
+				// Damage the hoe
+				itemStack.hurtAndBreak(1, player, interactionHand.asEquipmentSlot());
+			}
+			return InteractionResult.SUCCESS;
+		}
+		return super.useItemOn(itemStack, blockState, level, blockPos, player, interactionHand, blockHitResult);
 	}
 
 	@Override
