@@ -174,13 +174,18 @@ public class RecipeViewerScreen extends Screen {
 			this.parentJeiPanel.render(guiGraphics, mouseX, mouseY, partialTick);
 		}
 		
-		// Render tooltips for hovered items
+		// Render tooltips for hovered items in recipe viewer
 		ItemStack hoveredItem = renderer.getHoveredItem(this.centerX, this.centerY, mouseX, mouseY, 
 		                                               recipe, this.minecraft.level.getGameTime());
 		this.lastHoveredItem = hoveredItem; // Store for recipe lookup with 'R' key
 		if (!hoveredItem.isEmpty()) {
 			guiGraphics.setTooltipForNextFrame(this.font, getTooltipFromItem(this.minecraft, hoveredItem), 
 			                                   hoveredItem.getTooltipImage(), mouseX, mouseY);
+		}
+		
+		// Render JEI panel tooltips (must be after main render for proper layering)
+		if (this.parentJeiPanel != null) {
+			this.parentJeiPanel.renderTooltip(guiGraphics, mouseX, mouseY, this);
 		}
 	}
 	
