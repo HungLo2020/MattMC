@@ -100,15 +100,23 @@ public class CraftingRecipeRenderer extends RecipeRenderer {
 	
 	private void renderSlotDisplay(GuiGraphics guiGraphics, SlotDisplay slotDisplay, 
 	                              int slotX, int slotY, long gameTime) {
+		System.out.println("[CraftingRecipeRenderer] Rendering SlotDisplay: " + slotDisplay.getClass().getSimpleName());
+		System.out.println("[CraftingRecipeRenderer]   contextMap: " + (contextMap != null ? "present" : "NULL"));
+		
 		List<ItemStack> stacks = slotDisplay.resolveForStacks(contextMap);
+		System.out.println("[CraftingRecipeRenderer]   Resolved to " + stacks.size() + " stacks");
+		
 		if (!stacks.isEmpty()) {
 			// Cycle through options
 			int index = (int)((gameTime / 30) % stacks.size());
 			ItemStack item = stacks.get(index);
+			System.out.println("[CraftingRecipeRenderer]   Displaying item at index " + index + ": " + item);
 			if (!item.isEmpty()) {
 				guiGraphics.renderItem(item, slotX, slotY);
 				guiGraphics.renderItemDecorations(font, item, slotX, slotY);
 			}
+		} else {
+			System.out.println("[CraftingRecipeRenderer]   WARNING: No stacks resolved - slot will be empty!");
 		}
 	}
 	

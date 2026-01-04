@@ -131,9 +131,13 @@ public class RecipeViewerScreen extends Screen {
 		}
 		
 		RecipeHolder<?> recipe = recipes.get(currentRecipeIndex);
+		System.out.println("[RecipeViewerScreen] Rendering recipe: " + recipe.id());
+		System.out.println("[RecipeViewerScreen]   Recipe type: " + currentType);
+		System.out.println("[RecipeViewerScreen]   Recipe displays: " + recipe.value().display().size());
 		
 		// Render recipe (no scaling for simplicity)
 		RecipeRenderer renderer = getRendererForCurrentType();
+		System.out.println("[RecipeViewerScreen]   Using renderer: " + renderer.getClass().getSimpleName());
 		renderer.render(guiGraphics, this.centerX, this.centerY, recipe, mouseX, mouseY, 
 		               this.minecraft.level.getGameTime());
 		

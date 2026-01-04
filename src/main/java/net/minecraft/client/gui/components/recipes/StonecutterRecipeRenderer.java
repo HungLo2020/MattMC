@@ -49,7 +49,9 @@ public class StonecutterRecipeRenderer extends RecipeRenderer {
 			// Render input ingredient
 			if (display instanceof StonecutterRecipeDisplay stonecutterDisplay) {
 				SlotDisplay ingredientDisplay = stonecutterDisplay.input();
+				System.out.println("[StonecutterRecipeRenderer] Rendering ingredient SlotDisplay: " + ingredientDisplay.getClass().getSimpleName());
 				List<ItemStack> ingredients = ingredientDisplay.resolveForStacks(contextMap);
+				System.out.println("[StonecutterRecipeRenderer]   Resolved to " + ingredients.size() + " stacks");
 				if (!ingredients.isEmpty()) {
 					int index = (int)((gameTime / 30) % ingredients.size());
 					ItemStack item = ingredients.get(index);
@@ -57,6 +59,8 @@ public class StonecutterRecipeRenderer extends RecipeRenderer {
 						guiGraphics.renderItem(item, x + INPUT_X, y + INPUT_Y);
 						guiGraphics.renderItemDecorations(font, item, x + INPUT_X, y + INPUT_Y);
 					}
+				} else {
+					System.out.println("[StonecutterRecipeRenderer]   WARNING: No ingredients resolved - input slot will be empty!");
 				}
 			}
 			

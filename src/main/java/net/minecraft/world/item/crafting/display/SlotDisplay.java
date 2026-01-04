@@ -263,13 +263,46 @@ public interface SlotDisplay {
 
 		@Override
 		public <T> Stream<T> resolve(ContextMap contextMap, DisplayContentsFactory<T> displayContentsFactory) {
+			System.out.println("[TagSlotDisplay] Resolving tag: " + this.tag.location());
+			System.out.println("[TagSlotDisplay]   displayContentsFactory type: " + displayContentsFactory.getClass().getName());
+			System.out.println("[TagSlotDisplay]   contextMap: " + (contextMap != null ? "present" : "NULL"));
+			
 			if (displayContentsFactory instanceof DisplayContentsFactory.ForStacks<T> forStacks) {
+				System.out.println("[TagSlotDisplay]   displayContentsFactory IS ForStacks");
 				HolderLookup.Provider provider = contextMap.getOptional(SlotDisplayContext.REGISTRIES);
+				System.out.println("[TagSlotDisplay]   REGISTRIES provider: " + (provider != null ? "present" : "NULL"));
+				
 				if (provider != null) {
-					return provider.lookupOrThrow(Registries.ITEM).get(this.tag).map(named -> named.stream().map(forStacks::forStack)).stream().flatMap(stream -> stream);
+					try {
+						var itemRegistry = provider.lookupOrThrow(Registries.ITEM);
+						System.out.println("[TagSlotDisplay]   Item registry obtained");
+						
+						var tagOptional = itemRegistry.get(this.tag);
+						System.out.println("[TagSlotDisplay]   Tag lookup result: " + (tagOptional.isPresent() ? "PRESENT" : "EMPTY"));
+						
+						if (tagOptional.isPresent()) {
+							var holders = tagOptional.get();
+							long count = holders.size();
+							System.out.println("[TagSlotDisplay]   Tag contains " + count + " items");
+							
+							var result = holders.stream().map(forStacks::forStack).toList();
+							System.out.println("[TagSlotDisplay]   Resolved to " + result.size() + " stacks");
+							return result.stream();
+						} else {
+							System.out.println("[TagSlotDisplay]   WARNING: Tag " + this.tag.location() + " is empty or not found!");
+						}
+					} catch (Exception e) {
+						System.out.println("[TagSlotDisplay]   ERROR during tag resolution: " + e.getMessage());
+						e.printStackTrace();
+					}
+				} else {
+					System.out.println("[TagSlotDisplay]   ERROR: REGISTRIES provider is NULL - cannot resolve tags!");
 				}
+			} else {
+				System.out.println("[TagSlotDisplay]   displayContentsFactory is NOT ForStacks - returning empty");
 			}
 
+			System.out.println("[TagSlotDisplay]   Returning empty stream");
 			return Stream.empty();
 		}
 	}

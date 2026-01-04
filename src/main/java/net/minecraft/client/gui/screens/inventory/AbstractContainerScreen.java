@@ -953,7 +953,15 @@ public abstract class AbstractContainerScreen<T extends AbstractContainerMenu> e
 		// Open recipe viewer screen
 		System.out.println("     Creating RecipeViewerScreen...");
 		try {
+			System.out.println("     Creating ContextMap from level...");
 			ContextMap contextMap = net.minecraft.world.item.crafting.display.SlotDisplayContext.fromLevel(this.minecraft.level);
+			System.out.println("     ContextMap created: " + (contextMap != null ? "present" : "NULL"));
+			if (contextMap != null) {
+				var registries = contextMap.getOptional(net.minecraft.world.item.crafting.display.SlotDisplayContext.REGISTRIES);
+				System.out.println("     REGISTRIES in contextMap: " + (registries != null ? "present" : "NULL"));
+				var fuelValues = contextMap.getOptional(net.minecraft.world.item.crafting.display.SlotDisplayContext.FUEL_VALUES);
+				System.out.println("     FUEL_VALUES in contextMap: " + (fuelValues != null ? "present" : "NULL"));
+			}
 			RecipeViewerScreen viewer = new RecipeViewerScreen(this, item, recipes, contextMap);
 			System.out.println("     RecipeViewerScreen created successfully");
 			this.minecraft.setScreen(viewer);
