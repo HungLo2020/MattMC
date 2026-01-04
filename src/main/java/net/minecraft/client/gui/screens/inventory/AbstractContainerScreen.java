@@ -266,22 +266,20 @@ public abstract class AbstractContainerScreen<T extends AbstractContainerMenu> e
 	}
 
 	protected void renderTooltip(GuiGraphics guiGraphics, int i, int j) {
-		// Render JEI panel tooltips first
-		if (this.jeiPanel != null) {
-			this.jeiPanel.renderTooltip(guiGraphics, i, j, this);
-			// If JEI has a hovered item, don't render slot tooltips (they would override JEI tooltips)
-			if (!this.jeiPanel.getHoveredItem().isEmpty()) {
-				return;
-			}
-		}
-		
+		// Check if hovering over a slot first
 		if (this.hoveredSlot != null && this.hoveredSlot.hasItem()) {
 			ItemStack itemStack = this.hoveredSlot.getItem();
 			if (this.menu.getCarried().isEmpty() || this.showTooltipWithItemInHand(itemStack)) {
 				guiGraphics.setTooltipForNextFrame(
 					this.font, this.getTooltipFromContainerItem(itemStack), itemStack.getTooltipImage(), i, j, (ResourceLocation)itemStack.get(DataComponents.TOOLTIP_STYLE)
 				);
+				return; // Slot tooltip set, don't check JEI
 			}
+		}
+		
+		// If no slot tooltip, render JEI panel tooltips
+		if (this.jeiPanel != null) {
+			this.jeiPanel.renderTooltip(guiGraphics, i, j, this);
 		}
 	}
 
