@@ -148,4 +148,98 @@ public class CraftingRecipeRenderer extends RecipeRenderer {
 	public int getHeight() {
 		return GUI_HEIGHT;
 	}
+	
+	@Override
+	public ItemStack getHoveredItem(int x, int y, int mouseX, int mouseY, 
+	                               RecipeHolder<?> recipe, long gameTime) {
+		if (recipe.value().display().isEmpty()) {
+			return ItemStack.EMPTY;
+		}
+		
+		RecipeDisplay display = recipe.value().display().get(0);
+		
+		// Check shaped recipe ingredients
+		if (display instanceof ShapedCraftingRecipeDisplay shapedDisplay) {
+			return getHoveredItemFromShapedRecipe(x, y, mouseX, mouseY, shapedDisplay, gameTime);
+		}
+		
+		// Check shapeless recipe ingredients
+		if (display instanceof ShapelessCraftingRecipeDisplay shapelessDisplay) {
+			return getHoveredItemFromShapelessRecipe(x, y, mouseX, mouseY, shapelessDisplay, gameTime);
+		}
+		
+		// Check result slot
+		SlotDisplay resultDisplay = display.result();
+		int resultX = x + RESULT_X;
+		int resultY = y + RESULT_Y;
+		if (isHovering(resultX, resultY, 16, 16, mouseX, mouseY)) {
+			ItemStack result = resultDisplay.resolveForFirstStack(contextMap);
+			if (!result.isEmpty()) {
+				return result;
+			}
+		}
+		
+		return ItemStack.EMPTY;
+	}
+	
+	private ItemStack getHoveredItemFromShapedRecipe(int x, int y, int mouseX, int mouseY,
+	                                                 ShapedCraftingRecipeDisplay display, long gameTime) {
+		int width = display.width();
+		int height = display.height();
+		List<SlotDisplay> ingredients = display.ingredients();
+		
+		int offsetX = (3 - width) / 2;
+		int offsetY = (3 - height) / 2;
+		
+		for (int i = 0; i < ingredients.size(); i++) {
+			SlotDisplay slotDisplay = ingredients.get(i);
+			
+			int gridX = i % width;
+			int gridY = i / width;
+			
+			int slotX = x + GRID_START_X + (gridX + offsetX) * SLOT_SIZE;
+			int slotY = y + GRID_START_Y + (gridY + offsetY) * SLOT_SIZE;
+			
+			if (isHovering(slotX, slotY, 16, 16, mouseX, mouseY)) {
+				List<ItemStack> stacks = slotDisplay.resolveForStacks(contextMap);
+				if (!stacks.isEmpty()) {
+					int index = (int)((gameTime / 30) % stacks.size());
+					ItemStack item = stacks.get(index);
+					if (!item.isEmpty()) {
+						return item;
+					}
+				}
+			}
+		}
+		
+		return ItemStack.EMPTY;
+	}
+	
+	private ItemStack getHoveredItemFromShapelessRecipe(int x, int y, int mouseX, int mouseY,
+	                                                    ShapelessCraftingRecipeDisplay display, long gameTime) {
+		List<SlotDisplay> ingredients = display.ingredients();
+		
+		for (int i = 0; i < ingredients.size() && i < 9; i++) {
+			SlotDisplay slotDisplay = ingredients.get(i);
+			
+			int gridX = i % 3;
+			int gridY = i / 3;
+			
+			int slotX = x + GRID_START_X + gridX * SLOT_SIZE;
+			int slotY = y + GRID_START_Y + gridY * SLOT_SIZE;
+			
+			if (isHovering(slotX, slotY, 16, 16, mouseX, mouseY)) {
+				List<ItemStack> stacks = slotDisplay.resolveForStacks(contextMap);
+				if (!stacks.isEmpty()) {
+					int index = (int)((gameTime / 30) % stacks.size());
+					ItemStack item = stacks.get(index);
+					if (!item.isEmpty()) {
+						return item;
+					}
+				}
+			}
+		}
+		
+		return ItemStack.EMPTY;
+	}
 }

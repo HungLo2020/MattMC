@@ -91,4 +91,51 @@ public class FurnaceRecipeRenderer extends RecipeRenderer {
 	public int getHeight() {
 		return GUI_HEIGHT;
 	}
+	
+	@Override
+	public ItemStack getHoveredItem(int x, int y, int mouseX, int mouseY, 
+	                               RecipeHolder<?> recipe, long gameTime) {
+		if (recipe.value().display().isEmpty()) {
+			return ItemStack.EMPTY;
+		}
+		
+		RecipeDisplay display = recipe.value().display().get(0);
+		
+		if (display instanceof FurnaceRecipeDisplay furnaceDisplay) {
+			// Check input slot
+			int inputX = x + INPUT_X;
+			int inputY = y + INPUT_Y;
+			if (isHovering(inputX, inputY, 16, 16, mouseX, mouseY)) {
+				SlotDisplay ingredientDisplay = furnaceDisplay.ingredient();
+				List<ItemStack> ingredients = ingredientDisplay.resolveForStacks(contextMap);
+				if (!ingredients.isEmpty()) {
+					int index = (int)((gameTime / 30) % ingredients.size());
+					ItemStack item = ingredients.get(index);
+					if (!item.isEmpty()) {
+						return item;
+					}
+				}
+			}
+			
+			// Check fuel slot
+			int fuelX = x + FUEL_X;
+			int fuelY = x + FUEL_Y;
+			if (isHovering(fuelX, fuelY, 16, 16, mouseX, mouseY)) {
+				return new ItemStack(Items.COAL);
+			}
+		}
+		
+		// Check result slot
+		SlotDisplay resultDisplay = display.result();
+		int resultX = x + RESULT_X;
+		int resultY = y + RESULT_Y;
+		if (isHovering(resultX, resultY, 16, 16, mouseX, mouseY)) {
+			ItemStack result = resultDisplay.resolveForFirstStack(contextMap);
+			if (!result.isEmpty()) {
+				return result;
+			}
+		}
+		
+		return ItemStack.EMPTY;
+	}
 }

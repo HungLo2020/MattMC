@@ -42,6 +42,9 @@ public class RecipeViewerScreen extends Screen {
 	// Recipe navigation (for multiple recipes of same type)
 	private int currentRecipeIndex = 0;
 	
+	// Hover tracking for recipe lookup
+	private ItemStack lastHoveredItem = ItemStack.EMPTY;
+	
 	// Layout
 	private int centerX;
 	private int centerY;
@@ -153,6 +156,15 @@ public class RecipeViewerScreen extends Screen {
 		
 		// Render buttons and other widgets
 		super.render(guiGraphics, mouseX, mouseY, partialTick);
+		
+		// Render tooltips for hovered items
+		ItemStack hoveredItem = renderer.getHoveredItem(this.centerX, this.centerY, mouseX, mouseY, 
+		                                               recipe, this.minecraft.level.getGameTime());
+		this.lastHoveredItem = hoveredItem; // Store for recipe lookup with 'R' key
+		if (!hoveredItem.isEmpty()) {
+			guiGraphics.setTooltipForNextFrame(this.font, getTooltipFromItem(this.minecraft, hoveredItem), 
+			                                   hoveredItem.getTooltipImage(), mouseX, mouseY);
+		}
 	}
 	
 	private void renderTabs(GuiGraphics guiGraphics, int mouseX, int mouseY) {
@@ -220,6 +232,15 @@ public class RecipeViewerScreen extends Screen {
 			return true;
 		}
 		
+		// Recipe key (R) opens recipes for hovered item
+		if (this.minecraft.options.keyRecipeViewer.matches(keyEvent)) {
+			if (!this.lastHoveredItem.isEmpty()) {
+				if (openRecipeViewerForItem(this.lastHoveredItem)) {
+					return true;
+				}
+			}
+		}
+		
 		// Arrow keys for navigation
 		if (keyEvent.key() == 262) { // Right arrow
 			nextRecipe();
@@ -240,6 +261,34 @@ public class RecipeViewerScreen extends Screen {
 		}
 		
 		return super.keyPressed(keyEvent);
+	}
+	
+	/**
+	 * Open a new recipe viewer for the given item.
+	 * Creates a nested RecipeViewerScreen with this screen as the parent.
+	 */
+	private boolean openRecipeViewerForItem(ItemStack item) {
+		if (this.minecraft == null || this.minecraft.level == null) {
+			return false;
+		}
+		
+		// Find recipes for this item
+		java.util.Map<RecipeType<?>, java.util.List<RecipeHolder<?>>> recipes = 
+			net.minecraft.client.recipe.RecipeLookupHelper.findRecipesFor(item.getItem(), this.minecraft.level);
+		
+		if (recipes.isEmpty()) {
+			return false;
+		}
+		
+		// Create new RecipeViewerScreen with this screen as parent
+		try {
+			RecipeViewerScreen viewer = new RecipeViewerScreen(this, item, recipes, this.contextMap);
+			this.minecraft.setScreen(viewer);
+			return true;
+		} catch (Exception e) {
+			e.printStackTrace();
+			return false;
+		}
 	}
 	
 	@Override

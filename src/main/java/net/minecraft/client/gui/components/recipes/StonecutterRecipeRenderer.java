@@ -83,4 +83,44 @@ public class StonecutterRecipeRenderer extends RecipeRenderer {
 	public int getHeight() {
 		return GUI_HEIGHT;
 	}
+	
+	@Override
+	public ItemStack getHoveredItem(int x, int y, int mouseX, int mouseY, 
+	                               RecipeHolder<?> recipe, long gameTime) {
+		if (recipe.value().display().isEmpty()) {
+			return ItemStack.EMPTY;
+		}
+		
+		RecipeDisplay display = recipe.value().display().get(0);
+		
+		if (display instanceof StonecutterRecipeDisplay stonecutterDisplay) {
+			// Check input slot
+			int inputX = x + INPUT_X;
+			int inputY = y + INPUT_Y;
+			if (isHovering(inputX, inputY, 16, 16, mouseX, mouseY)) {
+				SlotDisplay ingredientDisplay = stonecutterDisplay.input();
+				List<ItemStack> ingredients = ingredientDisplay.resolveForStacks(contextMap);
+				if (!ingredients.isEmpty()) {
+					int index = (int)((gameTime / 30) % ingredients.size());
+					ItemStack item = ingredients.get(index);
+					if (!item.isEmpty()) {
+						return item;
+					}
+				}
+			}
+		}
+		
+		// Check result slot
+		SlotDisplay resultDisplay = display.result();
+		int resultX = x + RESULT_X;
+		int resultY = y + RESULT_Y;
+		if (isHovering(resultX, resultY, 16, 16, mouseX, mouseY)) {
+			ItemStack result = resultDisplay.resolveForFirstStack(contextMap);
+			if (!result.isEmpty()) {
+				return result;
+			}
+		}
+		
+		return ItemStack.EMPTY;
+	}
 }

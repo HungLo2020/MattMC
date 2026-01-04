@@ -100,4 +100,62 @@ public class SmithingRecipeRenderer extends RecipeRenderer {
 	public int getHeight() {
 		return GUI_HEIGHT;
 	}
+	
+	@Override
+	public ItemStack getHoveredItem(int x, int y, int mouseX, int mouseY, 
+	                               RecipeHolder<?> recipe, long gameTime) {
+		if (recipe.value().display().isEmpty()) {
+			return ItemStack.EMPTY;
+		}
+		
+		RecipeDisplay display = recipe.value().display().get(0);
+		
+		if (display instanceof SmithingRecipeDisplay smithingDisplay) {
+			// Check template slot
+			int templateX = x + TEMPLATE_X;
+			int templateY = y + TEMPLATE_Y;
+			if (isHovering(templateX, templateY, 16, 16, mouseX, mouseY)) {
+				return getItemFromSlotDisplay(smithingDisplay.template(), gameTime);
+			}
+			
+			// Check base slot
+			int baseX = x + BASE_X;
+			int baseY = y + BASE_Y;
+			if (isHovering(baseX, baseY, 16, 16, mouseX, mouseY)) {
+				return getItemFromSlotDisplay(smithingDisplay.base(), gameTime);
+			}
+			
+			// Check addition slot
+			int additionX = x + ADDITION_X;
+			int additionY = y + ADDITION_Y;
+			if (isHovering(additionX, additionY, 16, 16, mouseX, mouseY)) {
+				return getItemFromSlotDisplay(smithingDisplay.addition(), gameTime);
+			}
+		}
+		
+		// Check result slot
+		SlotDisplay resultDisplay = display.result();
+		int resultX = x + RESULT_X;
+		int resultY = y + RESULT_Y;
+		if (isHovering(resultX, resultY, 16, 16, mouseX, mouseY)) {
+			ItemStack result = resultDisplay.resolveForFirstStack(contextMap);
+			if (!result.isEmpty()) {
+				return result;
+			}
+		}
+		
+		return ItemStack.EMPTY;
+	}
+	
+	private ItemStack getItemFromSlotDisplay(SlotDisplay slotDisplay, long gameTime) {
+		List<ItemStack> stacks = slotDisplay.resolveForStacks(contextMap);
+		if (!stacks.isEmpty()) {
+			int index = (int)((gameTime / 30) % stacks.size());
+			ItemStack item = stacks.get(index);
+			if (!item.isEmpty()) {
+				return item;
+			}
+		}
+		return ItemStack.EMPTY;
+	}
 }
