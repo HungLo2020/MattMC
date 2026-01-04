@@ -34,6 +34,7 @@ public class RecipeViewerScreen extends Screen {
 	private final ItemStack targetItem;
 	private final Map<RecipeType<?>, List<RecipeHolder<?>>> recipesByType;
 	private final ContextMap contextMap;
+	private final JeiPanel parentJeiPanel; // Store reference to parent's JEI panel
 	
 	// Tab management
 	private final List<RecipeType<?>> availableTabs;
@@ -68,6 +69,16 @@ public class RecipeViewerScreen extends Screen {
 		this.recipesByType = recipes;
 		this.availableTabs = new ArrayList<>(recipes.keySet());
 		this.contextMap = contextMap;
+		
+		// Get JEI panel from parent if it's an AbstractContainerScreen
+		if (parentScreen instanceof AbstractContainerScreen<?> containerScreen) {
+			this.parentJeiPanel = containerScreen.jeiPanel;
+		} else if (parentScreen instanceof RecipeViewerScreen recipeViewerScreen) {
+			// If parent is another RecipeViewerScreen, get its JEI panel reference
+			this.parentJeiPanel = recipeViewerScreen.parentJeiPanel;
+		} else {
+			this.parentJeiPanel = null;
+		}
 	}
 	
 	@Override
@@ -117,11 +128,6 @@ public class RecipeViewerScreen extends Screen {
 	
 	@Override
 	public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
-		// Render parent screen first to keep JEI panel visible
-		if (this.parentScreen != null) {
-			this.parentScreen.render(guiGraphics, -1, -1, partialTick); // Use -1, -1 for mouse to prevent hover effects
-		}
-		
 		// Update fade animation
 		if (this.fadeProgress < 1.0F) {
 			this.fadeProgress = Math.min(this.fadeProgress + partialTick / FADE_DURATION_TICKS, 1.0F);
@@ -162,6 +168,11 @@ public class RecipeViewerScreen extends Screen {
 		
 		// Render buttons and other widgets
 		super.render(guiGraphics, mouseX, mouseY, partialTick);
+		
+		// Render JEI panel if available from parent
+		if (this.parentJeiPanel != null) {
+			this.parentJeiPanel.render(guiGraphics, mouseX, mouseY, partialTick);
+		}
 		
 		// Render tooltips for hovered items
 		ItemStack hoveredItem = renderer.getHoveredItem(this.centerX, this.centerY, mouseX, mouseY, 
@@ -270,6 +281,15 @@ public class RecipeViewerScreen extends Screen {
 		}
 		
 		return super.keyPressed(keyEvent);
+	}
+	
+	@Override
+	public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
+		// Forward scroll events to JEI panel if available
+		if (this.parentJeiPanel != null && this.parentJeiPanel.mouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount)) {
+			return true;
+		}
+		return super.mouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount);
 	}
 	
 	/**
