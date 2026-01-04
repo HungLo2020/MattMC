@@ -1,31 +1,33 @@
 package net.minecraft.client.gui.screens.recipebook;
 
 import java.util.List;
-import net.minecraft.api.EnvType;
-import net.minecraft.api.Environment;
+import java.util.function.Predicate;
 import net.minecraft.world.item.crafting.ExtendedRecipeBookCategory;
-import net.minecraft.world.item.crafting.RecipeBookCategories;
-import net.minecraft.world.item.crafting.RecipeBookCategory;
+import net.minecraft.world.item.crafting.display.RecipeDisplayEntry;
 
-@Environment(EnvType.CLIENT)
-public enum SearchRecipeBookCategory implements ExtendedRecipeBookCategory {
-	CRAFTING(
-		RecipeBookCategories.CRAFTING_EQUIPMENT,
-		RecipeBookCategories.CRAFTING_BUILDING_BLOCKS,
-		RecipeBookCategories.CRAFTING_MISC,
-		RecipeBookCategories.CRAFTING_REDSTONE
-	),
-	FURNACE(RecipeBookCategories.FURNACE_FOOD, RecipeBookCategories.FURNACE_BLOCKS, RecipeBookCategories.FURNACE_MISC),
-	BLAST_FURNACE(RecipeBookCategories.BLAST_FURNACE_BLOCKS, RecipeBookCategories.BLAST_FURNACE_MISC),
-	SMOKER(RecipeBookCategories.SMOKER_FOOD);
+/**
+ * Stub enum for backward compatibility.
+ * Recipe Book UI has been replaced by RecipeViewerScreen.
+ * This enum remains for backend recipe categorization only.
+ */
+public enum SearchRecipeBookCategory {
+	CRAFTING((recipeDisplayEntry) -> true),
+	FURNACE((recipeDisplayEntry) -> true),
+	BLAST_FURNACE((recipeDisplayEntry) -> true),
+	SMOKER((recipeDisplayEntry) -> true);
 
-	private final List<RecipeBookCategory> includedCategories;
+	private final Predicate<RecipeDisplayEntry> filter;
 
-	private SearchRecipeBookCategory(final RecipeBookCategory... recipeBookCategorys) {
-		this.includedCategories = List.of(recipeBookCategorys);
+	private SearchRecipeBookCategory(Predicate<RecipeDisplayEntry> predicate) {
+		this.filter = predicate;
 	}
 
-	public List<RecipeBookCategory> includedCategories() {
-		return this.includedCategories;
+	public boolean matches(RecipeDisplayEntry recipeDisplayEntry) {
+		return this.filter.test(recipeDisplayEntry);
+	}
+	
+	// Stub method for compatibility
+	public List<ExtendedRecipeBookCategory> includedCategories() {
+		return List.of();
 	}
 }

@@ -65,15 +65,8 @@ public class ClientRecipeBook extends RecipeBook {
 			)
 		);
 
-		for (SearchRecipeBookCategory searchRecipeBookCategory : SearchRecipeBookCategory.values()) {
-			map2.put(
-				searchRecipeBookCategory,
-				(List)searchRecipeBookCategory.includedCategories()
-					.stream()
-					.flatMap(recipeBookCategory -> ((List)map2.getOrDefault(recipeBookCategory, List.of())).stream())
-					.collect(ImmutableList.toImmutableList())
-			);
-		}
+		// Note: SearchRecipeBookCategory integration removed - Recipe Book UI is deprecated
+		// The new RecipeViewerScreen handles all recipe viewing
 
 		this.collectionsByTab = Map.copyOf(map2);
 		this.allCollections = builder.build();

@@ -57,6 +57,9 @@ public class JeiPanel {
 	private boolean searchFocused = false;
 	private final int searchBarHeight = 20;
 	
+	// Hover tracking for recipe viewer
+	private ItemStack hoveredItem = ItemStack.EMPTY;
+	
 	public JeiPanel(Minecraft minecraft, Font font, Screen parentScreen) {
 		this.minecraft = minecraft;
 		this.font = font;
@@ -176,6 +179,9 @@ public class JeiPanel {
 		if (this.columns <= 0 || this.rows <= 0 || this.allTabItems.isEmpty()) {
 			return;
 		}
+		
+		// Update hover tracking
+		updateHoverTracking(mouseX, mouseY);
 		
 		// Draw border around entire panel
 		int borderColor = 0xFF8B8B8B;
@@ -564,5 +570,51 @@ public class JeiPanel {
 		}
 		
 		return foundSlot;
+	}
+	
+	/**
+	 * Update hover tracking - determines which item the mouse is currently over.
+	 */
+	private void updateHoverTracking(int mouseX, int mouseY) {
+		this.hoveredItem = ItemStack.EMPTY;
+		
+		if (this.columns <= 0 || this.rows <= 0 || this.filteredTabItems.isEmpty()) {
+			return;
+		}
+		
+		if (mouseX < this.panelX || mouseX >= this.panelX + this.panelWidth ||
+			mouseY < this.panelY || mouseY >= this.panelY + this.panelHeight) {
+			return;
+		}
+		
+		int totalRows = (int)Math.ceil((double)this.filteredTabItems.size() / this.columns);
+		int maxScroll = Math.max(0, totalRows - this.rows);
+		int scrollRow = (int)(this.scrollOffs * maxScroll);
+		int startIndex = scrollRow * this.columns;
+		
+		for (int row = 0; row < this.rows; row++) {
+			for (int col = 0; col < this.columns; col++) {
+				int index = startIndex + row * this.columns + col;
+				if (index >= this.filteredTabItems.size()) {
+					break;
+				}
+				
+				int x = this.panelX + 2 + col * this.slotSize;
+				int y = this.panelY + 2 + row * this.slotSize;
+				
+				if (mouseX >= x && mouseX < x + 16 && mouseY >= y && mouseY < y + 16) {
+					this.hoveredItem = this.filteredTabItems.get(index);
+					return;
+				}
+			}
+		}
+	}
+	
+	/**
+	 * Get the currently hovered item in the JEI panel.
+	 * Returns ItemStack.EMPTY if no item is hovered.
+	 */
+	public ItemStack getHoveredItem() {
+		return this.hoveredItem;
 	}
 }

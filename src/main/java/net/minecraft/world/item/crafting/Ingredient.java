@@ -86,9 +86,20 @@ public final class Ingredient implements StackedContents.IngredientInfo<Holder<I
 	}
 
 	public SlotDisplay display() {
-		return this.values
+		SlotDisplay result = this.values
 			.unwrap()
-			.map(SlotDisplay.TagSlotDisplay::new, list -> new SlotDisplay.Composite(list.stream().map(Ingredient::displayForSingleItem).toList()));
+			.map(
+				tagKey -> {
+					System.out.println("[Ingredient] Creating TagSlotDisplay for tag: " + tagKey.location());
+					return new SlotDisplay.TagSlotDisplay(tagKey);
+				},
+				list -> {
+					System.out.println("[Ingredient] Creating Composite with " + list.size() + " items");
+					return new SlotDisplay.Composite(list.stream().map(Ingredient::displayForSingleItem).toList());
+				}
+			);
+		System.out.println("[Ingredient] display() returning: " + result.getClass().getSimpleName());
+		return result;
 	}
 
 	public static SlotDisplay optionalIngredientToDisplay(Optional<Ingredient> optional) {

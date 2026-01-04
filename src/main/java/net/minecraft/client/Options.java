@@ -564,6 +564,7 @@ public class Options {
 	public final KeyMapping keyFullscreen = new KeyMapping("key.fullscreen", 300, KeyMapping.Category.MISC);
 	public final KeyMapping keyAdvancements = new KeyMapping("key.advancements", 76, KeyMapping.Category.MISC);
 	public final KeyMapping keyQuickActions = new KeyMapping("key.quickActions", 71, KeyMapping.Category.MISC);
+	public final KeyMapping keyRecipeViewer = new KeyMapping("key.recipeViewer", 82, KeyMapping.Category.INVENTORY);
 	public final KeyMapping[] keyHotbarSlots = new KeyMapping[]{
 		new KeyMapping("key.hotbar.1", 49, KeyMapping.Category.INVENTORY),
 		new KeyMapping("key.hotbar.2", 50, KeyMapping.Category.INVENTORY),
@@ -607,7 +608,8 @@ public class Options {
 			this.keySaveHotbarActivator,
 			this.keyLoadHotbarActivator,
 			this.keyAdvancements,
-			this.keyQuickActions
+			this.keyQuickActions,
+			this.keyRecipeViewer
 		}),
 		(KeyMapping[])this.keyHotbarSlots
 	);

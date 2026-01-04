@@ -1,12 +1,17 @@
 package net.minecraft.client.gui.screens.recipebook;
 
-import net.minecraft.api.EnvType;
-import net.minecraft.api.Environment;
 import net.minecraft.world.item.crafting.display.RecipeDisplay;
 
-@Environment(EnvType.CLIENT)
+/**
+ * Stub interface for backward compatibility.
+ * Recipe Book UI has been replaced by RecipeViewerScreen.
+ * This interface remains for packet handling compatibility only.
+ */
 public interface RecipeUpdateListener {
 	void recipesUpdated();
-
-	void fillGhostRecipe(RecipeDisplay recipeDisplay);
+	
+	// Stub method for packet handling
+	default void fillGhostRecipe(RecipeDisplay recipeDisplay) {
+		// No-op: ghost recipe filling is not used anymore
+	}
 }
