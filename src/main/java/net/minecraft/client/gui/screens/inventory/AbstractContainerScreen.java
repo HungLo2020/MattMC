@@ -269,6 +269,10 @@ public abstract class AbstractContainerScreen<T extends AbstractContainerMenu> e
 		// Render JEI panel tooltips first
 		if (this.jeiPanel != null) {
 			this.jeiPanel.renderTooltip(guiGraphics, i, j, this);
+			// If JEI has a hovered item, don't render slot tooltips (they would override JEI tooltips)
+			if (!this.jeiPanel.getHoveredItem().isEmpty()) {
+				return;
+			}
 		}
 		
 		if (this.hoveredSlot != null && this.hoveredSlot.hasItem()) {
