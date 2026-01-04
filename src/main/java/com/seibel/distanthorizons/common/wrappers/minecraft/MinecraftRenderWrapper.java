@@ -39,7 +39,7 @@ import com.seibel.distanthorizons.core.wrapperInterfaces.misc.ILightMapWrapper;
 import net.minecraft.client.renderer.fog.FogRenderer;
 
 
-import com.seibel.distanthorizons.core.wrapperInterfaces.modAccessor.AbstractOptifineAccessor;
+
 import com.seibel.distanthorizons.core.wrapperInterfaces.world.IClientLevelWrapper;
 import com.seibel.distanthorizons.core.wrapperInterfaces.world.IDimensionTypeWrapper;
 import com.seibel.distanthorizons.core.wrapperInterfaces.world.ILevelWrapper;
@@ -208,12 +208,6 @@ public class MinecraftRenderWrapper implements IMinecraftRenderWrapper
 	@Override
 	public int getTargetFramebuffer()
 	{
-		// used so we can access the framebuffer shaders end up rendering to
-		if (AbstractOptifineAccessor.optifinePresent())
-		{
-			return this.finalLevelFrameBufferId;
-		}
-		
 		// MC renders to a texture and then directly to the default FBO now
 		// we need to draw to their texture instead of the FBO
 		return 0; // 0 is the ID for the default frame buffer

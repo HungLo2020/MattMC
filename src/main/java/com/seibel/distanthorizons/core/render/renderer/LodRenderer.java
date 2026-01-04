@@ -47,7 +47,7 @@ import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftGLW
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftRenderWrapper;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IProfilerWrapper;
 import com.seibel.distanthorizons.core.wrapperInterfaces.misc.ILightMapWrapper;
-import com.seibel.distanthorizons.core.wrapperInterfaces.modAccessor.AbstractOptifineAccessor;
+
 import com.seibel.distanthorizons.core.wrapperInterfaces.modAccessor.IIrisAccessor;
 import com.seibel.distanthorizons.coreapi.DependencyInjection.ApiEventInjector;
 import com.seibel.distanthorizons.coreapi.DependencyInjection.OverrideInjector;
@@ -506,18 +506,9 @@ public class LodRenderer
 		
 		
 		// create or get the frame buffer
-		if (AbstractOptifineAccessor.optifinePresent())
-		{
-			// use MC/Optifine's default Framebuffer so shaders won't remove the LODs
-			int currentFramebufferId = MC_RENDER.getTargetFramebuffer();
-			this.framebuffer = new DhFramebuffer(currentFramebufferId);
-			this.usingMcFramebuffer = true;
-		}
-		else 
-		{
-			// normal use case
-			this.framebuffer = new DhFramebuffer();
-			this.usingMcFramebuffer = false;
+		// normal use case
+		this.framebuffer = new DhFramebuffer();
+		this.usingMcFramebuffer = false;
 		}
 		
 		// create and bind the necessary textures

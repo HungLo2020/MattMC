@@ -99,7 +99,6 @@ public class FabricMain extends AbstractModInitializer implements ClientModIniti
 		}
 		
 		this.tryCreateModCompatAccessor("starlight", IStarlightAccessor.class, StarlightAccessor::new);
-		this.tryCreateModCompatAccessor("optifine", IOptifineAccessor.class, OptifineAccessor::new);
 		this.tryCreateModCompatAccessor("bclib", IBCLibAccessor.class, BCLibAccessor::new);
 		this.tryCreateModCompatAccessor("c2me", IC2meAccessor.class, C2meAccessor::new);
 		// 1.19.4 is the lowest version Iris supports DH
