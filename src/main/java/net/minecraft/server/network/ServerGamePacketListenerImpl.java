@@ -115,8 +115,6 @@ import net.minecraft.network.protocol.game.ServerboundPlayerActionPacket;
 import net.minecraft.network.protocol.game.ServerboundPlayerCommandPacket;
 import net.minecraft.network.protocol.game.ServerboundPlayerInputPacket;
 import net.minecraft.network.protocol.game.ServerboundPlayerLoadedPacket;
-import net.minecraft.network.protocol.game.ServerboundRecipeBookChangeSettingsPacket;
-import net.minecraft.network.protocol.game.ServerboundRecipeBookSeenRecipePacket;
 import net.minecraft.network.protocol.game.ServerboundRenameItemPacket;
 import net.minecraft.network.protocol.game.ServerboundSeenAdvancementsPacket;
 import net.minecraft.network.protocol.game.ServerboundSelectBundleItemPacket;
@@ -539,30 +537,9 @@ public class ServerGamePacketListenerImpl
 	}
 
 	@Override
-	public void handleRecipeBookSeenRecipePacket(ServerboundRecipeBookSeenRecipePacket serverboundRecipeBookSeenRecipePacket) {
-		PacketUtils.ensureRunningOnSameThread(serverboundRecipeBookSeenRecipePacket, this, this.player.level());
-		RecipeManager.ServerDisplayInfo serverDisplayInfo = this.server.getRecipeManager().getRecipeFromDisplay(serverboundRecipeBookSeenRecipePacket.recipe());
-		if (serverDisplayInfo != null) {
-			this.player.getRecipeBook().removeHighlight(serverDisplayInfo.parent().id());
-		}
-	}
-
-	@Override
 	public void handleBundleItemSelectedPacket(ServerboundSelectBundleItemPacket serverboundSelectBundleItemPacket) {
 		PacketUtils.ensureRunningOnSameThread(serverboundSelectBundleItemPacket, this, this.player.level());
 		this.player.containerMenu.setSelectedBundleItemIndex(serverboundSelectBundleItemPacket.slotId(), serverboundSelectBundleItemPacket.selectedItemIndex());
-	}
-
-	@Override
-	public void handleRecipeBookChangeSettingsPacket(ServerboundRecipeBookChangeSettingsPacket serverboundRecipeBookChangeSettingsPacket) {
-		PacketUtils.ensureRunningOnSameThread(serverboundRecipeBookChangeSettingsPacket, this, this.player.level());
-		this.player
-			.getRecipeBook()
-			.setBookSetting(
-				serverboundRecipeBookChangeSettingsPacket.getBookType(),
-				serverboundRecipeBookChangeSettingsPacket.isOpen(),
-				serverboundRecipeBookChangeSettingsPacket.isFiltering()
-			);
 	}
 
 	@Override

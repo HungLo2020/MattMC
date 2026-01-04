@@ -73,9 +73,6 @@ public class GamePacketTypes {
 	public static final PacketType<ClientboundPlayerLookAtPacket> CLIENTBOUND_PLAYER_LOOK_AT = createClientbound("player_look_at");
 	public static final PacketType<ClientboundPlayerPositionPacket> CLIENTBOUND_PLAYER_POSITION = createClientbound("player_position");
 	public static final PacketType<ClientboundPlayerRotationPacket> CLIENTBOUND_PLAYER_ROTATION = createClientbound("player_rotation");
-	public static final PacketType<ClientboundRecipeBookAddPacket> CLIENTBOUND_RECIPE_BOOK_ADD = createClientbound("recipe_book_add");
-	public static final PacketType<ClientboundRecipeBookRemovePacket> CLIENTBOUND_RECIPE_BOOK_REMOVE = createClientbound("recipe_book_remove");
-	public static final PacketType<ClientboundRecipeBookSettingsPacket> CLIENTBOUND_RECIPE_BOOK_SETTINGS = createClientbound("recipe_book_settings");
 	public static final PacketType<ClientboundRemoveEntitiesPacket> CLIENTBOUND_REMOVE_ENTITIES = createClientbound("remove_entities");
 	public static final PacketType<ClientboundRemoveMobEffectPacket> CLIENTBOUND_REMOVE_MOB_EFFECT = createClientbound("remove_mob_effect");
 	public static final PacketType<ClientboundRespawnPacket> CLIENTBOUND_RESPAWN = createClientbound("respawn");
@@ -175,10 +172,6 @@ public class GamePacketTypes {
 	public static final PacketType<ServerboundPlayerCommandPacket> SERVERBOUND_PLAYER_COMMAND = createServerbound("player_command");
 	public static final PacketType<ServerboundPlayerInputPacket> SERVERBOUND_PLAYER_INPUT = createServerbound("player_input");
 	public static final PacketType<ServerboundPlayerLoadedPacket> SERVERBOUND_PLAYER_LOADED = createServerbound("player_loaded");
-	public static final PacketType<ServerboundRecipeBookChangeSettingsPacket> SERVERBOUND_RECIPE_BOOK_CHANGE_SETTINGS = createServerbound(
-		"recipe_book_change_settings"
-	);
-	public static final PacketType<ServerboundRecipeBookSeenRecipePacket> SERVERBOUND_RECIPE_BOOK_SEEN_RECIPE = createServerbound("recipe_book_seen_recipe");
 	public static final PacketType<ServerboundRenameItemPacket> SERVERBOUND_RENAME_ITEM = createServerbound("rename_item");
 	public static final PacketType<ServerboundSeenAdvancementsPacket> SERVERBOUND_SEEN_ADVANCEMENTS = createServerbound("seen_advancements");
 	public static final PacketType<ServerboundSelectTradePacket> SERVERBOUND_SELECT_TRADE = createServerbound("select_trade");

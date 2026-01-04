@@ -173,9 +173,6 @@ import net.minecraft.network.protocol.game.ClientboundPlayerLookAtPacket;
 import net.minecraft.network.protocol.game.ClientboundPlayerPositionPacket;
 import net.minecraft.network.protocol.game.ClientboundPlayerRotationPacket;
 import net.minecraft.network.protocol.game.ClientboundProjectilePowerPacket;
-import net.minecraft.network.protocol.game.ClientboundRecipeBookAddPacket;
-import net.minecraft.network.protocol.game.ClientboundRecipeBookRemovePacket;
-import net.minecraft.network.protocol.game.ClientboundRecipeBookSettingsPacket;
 import net.minecraft.network.protocol.game.ClientboundRemoveEntitiesPacket;
 import net.minecraft.network.protocol.game.ClientboundRemoveMobEffectPacket;
 import net.minecraft.network.protocol.game.ClientboundResetScorePacket;
@@ -1707,53 +1704,6 @@ public class ClientPacketListener extends ClientCommonPacketListenerImpl impleme
 
 		if (this.minecraft.screen instanceof StatsScreen statsScreen) {
 			statsScreen.onStatsUpdated();
-		}
-	}
-
-	public void handleRecipeBookAdd(ClientboundRecipeBookAddPacket clientboundRecipeBookAddPacket) {
-		PacketUtils.ensureRunningOnSameThread(clientboundRecipeBookAddPacket, this, this.minecraft.packetProcessor());
-		ClientRecipeBook clientRecipeBook = this.minecraft.player.getRecipeBook();
-		if (clientboundRecipeBookAddPacket.replace()) {
-			clientRecipeBook.clear();
-		}
-
-		for (net.minecraft.network.protocol.game.ClientboundRecipeBookAddPacket.Entry entry : clientboundRecipeBookAddPacket.entries()) {
-			clientRecipeBook.add(entry.contents());
-			if (entry.highlight()) {
-				clientRecipeBook.addHighlight(entry.contents().id());
-			}
-
-			if (entry.notification()) {
-				RecipeToast.addOrUpdate(this.minecraft.getToastManager(), entry.contents().display());
-			}
-		}
-
-		this.refreshRecipeBook(clientRecipeBook);
-	}
-
-	public void handleRecipeBookRemove(ClientboundRecipeBookRemovePacket clientboundRecipeBookRemovePacket) {
-		PacketUtils.ensureRunningOnSameThread(clientboundRecipeBookRemovePacket, this, this.minecraft.packetProcessor());
-		ClientRecipeBook clientRecipeBook = this.minecraft.player.getRecipeBook();
-
-		for (RecipeDisplayId recipeDisplayId : clientboundRecipeBookRemovePacket.recipes()) {
-			clientRecipeBook.remove(recipeDisplayId);
-		}
-
-		this.refreshRecipeBook(clientRecipeBook);
-	}
-
-	public void handleRecipeBookSettings(ClientboundRecipeBookSettingsPacket clientboundRecipeBookSettingsPacket) {
-		PacketUtils.ensureRunningOnSameThread(clientboundRecipeBookSettingsPacket, this, this.minecraft.packetProcessor());
-		ClientRecipeBook clientRecipeBook = this.minecraft.player.getRecipeBook();
-		clientRecipeBook.setBookSettings(clientboundRecipeBookSettingsPacket.bookSettings());
-		this.refreshRecipeBook(clientRecipeBook);
-	}
-
-	private void refreshRecipeBook(ClientRecipeBook clientRecipeBook) {
-		clientRecipeBook.rebuildCollections();
-		this.searchTrees.updateRecipes(clientRecipeBook, this.level);
-		if (this.minecraft.screen instanceof RecipeUpdateListener recipeUpdateListener) {
-			recipeUpdateListener.recipesUpdated();
 		}
 	}
 
