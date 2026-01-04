@@ -246,13 +246,18 @@ public class RecipeViewerScreen extends Screen {
 	
 	@Override
 	public boolean keyPressed(KeyEvent keyEvent) {
+		// Forward key events to JEI panel first (so 'R' key works on JEI items)
+		if (this.parentJeiPanel != null && this.parentJeiPanel.keyPressed(keyEvent)) {
+			return true;
+		}
+		
 		// ESC or inventory key (E) closes the recipe viewer, not the parent screen
 		if (keyEvent.key() == 256 || this.minecraft.options.keyInventory.matches(keyEvent)) { // ESC or E
 			this.minecraft.setScreen(parentScreen);
 			return true;
 		}
 		
-		// Recipe key (R) opens recipes for hovered item
+		// Recipe key (R) opens recipes for hovered item in recipe viewer
 		if (this.minecraft.options.keyRecipeViewer.matches(keyEvent)) {
 			if (!this.lastHoveredItem.isEmpty()) {
 				if (openRecipeViewerForItem(this.lastHoveredItem)) {
@@ -324,6 +329,11 @@ public class RecipeViewerScreen extends Screen {
 	public boolean mouseClicked(MouseButtonEvent mouseButtonEvent, boolean bl) {
 		double mouseX = mouseButtonEvent.x();
 		double mouseY = mouseButtonEvent.y();
+		
+		// Forward mouse clicks to JEI panel first (for buttons and item clicks)
+		if (this.parentJeiPanel != null && this.parentJeiPanel.mouseClicked(mouseButtonEvent)) {
+			return true;
+		}
 		
 		// Check tab clicks
 		if (availableTabs.size() > 1) {
