@@ -9,34 +9,23 @@ import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.ChatFormatting;
 import net.minecraft.Util;
-import net.minecraft.client.ClientRecipeBook;
-import net.minecraft.client.gui.screens.recipebook.RecipeCollection;
 import net.minecraft.client.searchtree.FullTextSearchTree;
 import net.minecraft.client.searchtree.IdSearchTree;
 import net.minecraft.client.searchtree.SearchTree;
-import net.minecraft.core.Registry;
-import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.HolderLookup.Provider;
-import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.tags.TagKey;
-import net.minecraft.util.context.ContextMap;
-import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.TooltipFlag;
 import net.minecraft.world.item.Item.TooltipContext;
 import net.minecraft.world.item.TooltipFlag.Default;
-import net.minecraft.world.item.crafting.display.SlotDisplayContext;
-import net.minecraft.world.level.Level;
 
 @Environment(EnvType.CLIENT)
 public class SessionSearchTrees {
-	private static final SessionSearchTrees.Key RECIPE_COLLECTIONS = new SessionSearchTrees.Key();
 	private static final SessionSearchTrees.Key CREATIVE_NAMES = new SessionSearchTrees.Key();
 	private static final SessionSearchTrees.Key CREATIVE_TAGS = new SessionSearchTrees.Key();
 	private CompletableFuture<SearchTree<ItemStack>> creativeByNameSearch = CompletableFuture.completedFuture(SearchTree.empty());
 	private CompletableFuture<SearchTree<ItemStack>> creativeByTagSearch = CompletableFuture.completedFuture(SearchTree.empty());
-	private CompletableFuture<SearchTree<RecipeCollection>> recipeSearch = CompletableFuture.completedFuture(SearchTree.empty());
 	private final Map<SessionSearchTrees.Key, Runnable> reloaders = new IdentityHashMap();
 
 	private void register(SessionSearchTrees.Key key, Runnable runnable) {
@@ -54,39 +43,6 @@ public class SessionSearchTrees {
 		return stream.flatMap(itemStack -> itemStack.getTooltipLines(tooltipContext, null, tooltipFlag).stream())
 			.map(component -> ChatFormatting.stripFormatting(component.getString()).trim())
 			.filter(string -> !string.isEmpty());
-	}
-
-	public void updateRecipes(ClientRecipeBook clientRecipeBook, Level level) {
-		this.register(
-			RECIPE_COLLECTIONS,
-			() -> {
-				List<RecipeCollection> list = clientRecipeBook.getCollections();
-				RegistryAccess registryAccess = level.registryAccess();
-				Registry<Item> registry = registryAccess.lookupOrThrow(Registries.ITEM);
-				TooltipContext tooltipContext = TooltipContext.of(registryAccess);
-				ContextMap contextMap = SlotDisplayContext.fromLevel(level);
-				TooltipFlag tooltipFlag = Default.NORMAL;
-				CompletableFuture<?> completableFuture = this.recipeSearch;
-				this.recipeSearch = CompletableFuture.supplyAsync(
-					() -> new FullTextSearchTree<RecipeCollection>(
-						recipeCollection -> getTooltipLines(
-							recipeCollection.getRecipes().stream().flatMap(recipeDisplayEntry -> recipeDisplayEntry.resultItems(contextMap).stream()), tooltipContext, tooltipFlag
-						),
-						recipeCollection -> recipeCollection.getRecipes()
-							.stream()
-							.flatMap(recipeDisplayEntry -> recipeDisplayEntry.resultItems(contextMap).stream())
-							.map(itemStack -> registry.getKey(itemStack.getItem())),
-						list
-					),
-					Util.backgroundExecutor()
-				);
-				completableFuture.cancel(true);
-			}
-		);
-	}
-
-	public SearchTree<RecipeCollection> recipes() {
-		return (SearchTree<RecipeCollection>)this.recipeSearch.join();
 	}
 
 	public void updateCreativeTags(List<ItemStack> list) {

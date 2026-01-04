@@ -209,7 +209,7 @@ public abstract class PlayerList {
 		}
 		
 		serverPlayer.getStats().markAllDirty();
-		serverPlayer.getRecipeBook().sendInitialRecipeBook(serverPlayer);
+		// Recipe book removed - no longer sending initial recipe book data
 		this.updateEntireScoreboard(serverLevel.getScoreboard(), serverPlayer);
 		this.server.invalidateStatus();
 		MutableComponent mutableComponent;
@@ -892,7 +892,7 @@ public abstract class PlayerList {
 
 		for (ServerPlayer serverPlayer : this.players) {
 			serverPlayer.connection.send(clientboundUpdateRecipesPacket);
-			serverPlayer.getRecipeBook().sendInitialRecipeBook(serverPlayer);
+			// Recipe book removed - no longer sending initial recipe book data
 		}
 	}
 

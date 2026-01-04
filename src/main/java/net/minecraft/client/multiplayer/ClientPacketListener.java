@@ -33,7 +33,6 @@ import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.ChatFormatting;
 import net.minecraft.advancements.AdvancementHolder;
-import net.minecraft.client.ClientRecipeBook;
 import net.minecraft.client.DebugQueryHandler;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.Options;
@@ -52,11 +51,9 @@ import net.minecraft.client.gui.screens.achievement.StatsScreen;
 import net.minecraft.client.gui.screens.dialog.DialogConnectionAccess;
 import net.minecraft.client.gui.screens.inventory.BookViewScreen;
 import net.minecraft.client.gui.screens.inventory.CommandBlockEditScreen;
-import net.minecraft.client.gui.screens.inventory.CreativeModeInventoryScreen;
 import net.minecraft.client.gui.screens.inventory.HorseInventoryScreen;
 import net.minecraft.client.gui.screens.inventory.TestInstanceBlockEditScreen;
 import net.minecraft.client.gui.screens.multiplayer.ServerReconfigScreen;
-import net.minecraft.client.gui.screens.recipebook.RecipeUpdateListener;
 import net.minecraft.client.particle.ItemPickupParticle;
 import net.minecraft.client.player.KeyboardInput;
 import net.minecraft.client.player.LocalPlayer;
@@ -173,9 +170,6 @@ import net.minecraft.network.protocol.game.ClientboundPlayerLookAtPacket;
 import net.minecraft.network.protocol.game.ClientboundPlayerPositionPacket;
 import net.minecraft.network.protocol.game.ClientboundPlayerRotationPacket;
 import net.minecraft.network.protocol.game.ClientboundProjectilePowerPacket;
-import net.minecraft.network.protocol.game.ClientboundRecipeBookAddPacket;
-import net.minecraft.network.protocol.game.ClientboundRecipeBookRemovePacket;
-import net.minecraft.network.protocol.game.ClientboundRecipeBookSettingsPacket;
 import net.minecraft.network.protocol.game.ClientboundRemoveEntitiesPacket;
 import net.minecraft.network.protocol.game.ClientboundRemoveMobEffectPacket;
 import net.minecraft.network.protocol.game.ClientboundResetScorePacket;
@@ -513,7 +507,7 @@ public class ClientPacketListener extends ClientCommonPacketListenerImpl impleme
 		);
 		this.minecraft.setLevel(this.level);
 		if (this.minecraft.player == null) {
-			this.minecraft.player = this.minecraft.gameMode.createPlayer(this.level, new StatsCounter(), new ClientRecipeBook());
+			this.minecraft.player = this.minecraft.gameMode.createPlayer(this.level, new StatsCounter());
 			this.minecraft.player.setYRot(-180.0F);
 			if (this.minecraft.getSingleplayerServer() != null) {
 				this.minecraft.getSingleplayerServer().setUUID(this.minecraft.player.getUUID());
@@ -1297,9 +1291,9 @@ public class ClientPacketListener extends ClientCommonPacketListenerImpl impleme
 		if (clientboundRespawnPacket.shouldKeep((byte)2)) {
 			localPlayer2 = this.minecraft
 				.gameMode
-				.createPlayer(this.level, localPlayer.getStats(), localPlayer.getRecipeBook(), localPlayer.getLastSentInput(), localPlayer.isSprinting());
+				.createPlayer(this.level, localPlayer.getStats(), localPlayer.getLastSentInput(), localPlayer.isSprinting());
 		} else {
-			localPlayer2 = this.minecraft.gameMode.createPlayer(this.level, localPlayer.getStats(), localPlayer.getRecipeBook());
+			localPlayer2 = this.minecraft.gameMode.createPlayer(this.level, localPlayer.getStats());
 		}
 
 		this.startWaitingForNewLevel(localPlayer2, this.level, reason);
@@ -1408,12 +1402,8 @@ public class ClientPacketListener extends ClientCommonPacketListenerImpl impleme
 		ItemStack itemStack = clientboundContainerSetSlotPacket.getItem();
 		int i = clientboundContainerSetSlotPacket.getSlot();
 		this.minecraft.getTutorial().onGetItem(itemStack);
-		boolean bl;
-		if (this.minecraft.screen instanceof CreativeModeInventoryScreen creativeModeInventoryScreen) {
-			bl = !creativeModeInventoryScreen.isInventoryOpen();
-		} else {
-			bl = false;
-		}
+		// Creative inventory screen removed - JEI panel integrated into all inventories
+		boolean bl = false;
 
 		if (clientboundContainerSetSlotPacket.getContainerId() == 0) {
 			if (InventoryMenu.isHotbarSlot(i) && !itemStack.isEmpty()) {
@@ -1428,19 +1418,14 @@ public class ClientPacketListener extends ClientCommonPacketListenerImpl impleme
 			&& (clientboundContainerSetSlotPacket.getContainerId() != 0 || !bl)) {
 			player.containerMenu.setItem(i, clientboundContainerSetSlotPacket.getStateId(), itemStack);
 		}
-
-		if (this.minecraft.screen instanceof CreativeModeInventoryScreen) {
-			player.inventoryMenu.setRemoteSlot(i, itemStack);
-			player.inventoryMenu.broadcastChanges();
-		}
+		// Creative inventory screen removed - no special handling needed
 	}
 
 	public void handleSetCursorItem(ClientboundSetCursorItemPacket clientboundSetCursorItemPacket) {
 		PacketUtils.ensureRunningOnSameThread(clientboundSetCursorItemPacket, this, this.minecraft.packetProcessor());
 		this.minecraft.getTutorial().onGetItem(clientboundSetCursorItemPacket.contents());
-		if (!(this.minecraft.screen instanceof CreativeModeInventoryScreen)) {
-			this.minecraft.player.containerMenu.setCarried(clientboundSetCursorItemPacket.contents());
-		}
+		// Creative inventory screen removed - always set carried item
+		this.minecraft.player.containerMenu.setCarried(clientboundSetCursorItemPacket.contents());
 	}
 
 	public void handleSetPlayerInventory(ClientboundSetPlayerInventoryPacket clientboundSetPlayerInventoryPacket) {
@@ -1707,53 +1692,6 @@ public class ClientPacketListener extends ClientCommonPacketListenerImpl impleme
 
 		if (this.minecraft.screen instanceof StatsScreen statsScreen) {
 			statsScreen.onStatsUpdated();
-		}
-	}
-
-	public void handleRecipeBookAdd(ClientboundRecipeBookAddPacket clientboundRecipeBookAddPacket) {
-		PacketUtils.ensureRunningOnSameThread(clientboundRecipeBookAddPacket, this, this.minecraft.packetProcessor());
-		ClientRecipeBook clientRecipeBook = this.minecraft.player.getRecipeBook();
-		if (clientboundRecipeBookAddPacket.replace()) {
-			clientRecipeBook.clear();
-		}
-
-		for (net.minecraft.network.protocol.game.ClientboundRecipeBookAddPacket.Entry entry : clientboundRecipeBookAddPacket.entries()) {
-			clientRecipeBook.add(entry.contents());
-			if (entry.highlight()) {
-				clientRecipeBook.addHighlight(entry.contents().id());
-			}
-
-			if (entry.notification()) {
-				RecipeToast.addOrUpdate(this.minecraft.getToastManager(), entry.contents().display());
-			}
-		}
-
-		this.refreshRecipeBook(clientRecipeBook);
-	}
-
-	public void handleRecipeBookRemove(ClientboundRecipeBookRemovePacket clientboundRecipeBookRemovePacket) {
-		PacketUtils.ensureRunningOnSameThread(clientboundRecipeBookRemovePacket, this, this.minecraft.packetProcessor());
-		ClientRecipeBook clientRecipeBook = this.minecraft.player.getRecipeBook();
-
-		for (RecipeDisplayId recipeDisplayId : clientboundRecipeBookRemovePacket.recipes()) {
-			clientRecipeBook.remove(recipeDisplayId);
-		}
-
-		this.refreshRecipeBook(clientRecipeBook);
-	}
-
-	public void handleRecipeBookSettings(ClientboundRecipeBookSettingsPacket clientboundRecipeBookSettingsPacket) {
-		PacketUtils.ensureRunningOnSameThread(clientboundRecipeBookSettingsPacket, this, this.minecraft.packetProcessor());
-		ClientRecipeBook clientRecipeBook = this.minecraft.player.getRecipeBook();
-		clientRecipeBook.setBookSettings(clientboundRecipeBookSettingsPacket.bookSettings());
-		this.refreshRecipeBook(clientRecipeBook);
-	}
-
-	private void refreshRecipeBook(ClientRecipeBook clientRecipeBook) {
-		clientRecipeBook.rebuildCollections();
-		this.searchTrees.updateRecipes(clientRecipeBook, this.level);
-		if (this.minecraft.screen instanceof RecipeUpdateListener recipeUpdateListener) {
-			recipeUpdateListener.recipesUpdated();
 		}
 	}
 
@@ -2417,12 +2355,7 @@ public class ClientPacketListener extends ClientCommonPacketListenerImpl impleme
 
 	public void handlePlaceRecipe(ClientboundPlaceGhostRecipePacket clientboundPlaceGhostRecipePacket) {
 		PacketUtils.ensureRunningOnSameThread(clientboundPlaceGhostRecipePacket, this, this.minecraft.packetProcessor());
-		AbstractContainerMenu abstractContainerMenu = this.minecraft.player.containerMenu;
-		if (abstractContainerMenu.containerId == clientboundPlaceGhostRecipePacket.containerId()) {
-			if (this.minecraft.screen instanceof RecipeUpdateListener recipeUpdateListener) {
-				recipeUpdateListener.fillGhostRecipe(clientboundPlaceGhostRecipePacket.recipeDisplay());
-			}
-		}
+		// Recipe book UI removed - ghost recipe placement no longer supported
 	}
 
 	public void handleLightUpdatePacket(ClientboundLightUpdatePacket clientboundLightUpdatePacket) {

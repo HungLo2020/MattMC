@@ -30,7 +30,7 @@ import net.minecraft.hooks.HookRegistry;
 import net.minecraft.hooks.ModelBlockRendererHooks;
 
 @Environment(EnvType.CLIENT)
-public class ModelBlockRenderer {
+public class ModelBlockRenderer implements net.fabricmc.fabric.api.renderer.v1.render.FabricBlockModelRenderer {
 	private static final Direction[] DIRECTIONS = Direction.values();
 	public final BlockColors blockColors; // Made public for Sodium FRAPI integration
 	private static final int CACHE_SIZE = 100;
@@ -38,6 +38,19 @@ public class ModelBlockRenderer {
 
 	public ModelBlockRenderer(BlockColors blockColors) {
 		this.blockColors = blockColors;
+	}
+
+	@Override
+	public void render(net.minecraft.world.level.BlockAndTintGetter blockView, net.minecraft.client.renderer.block.model.BlockStateModel model, 
+	                   net.minecraft.world.level.block.state.BlockState state, net.minecraft.core.BlockPos pos, 
+	                   com.mojang.blaze3d.vertex.PoseStack matrices, 
+	                   net.fabricmc.fabric.api.renderer.v1.render.BlockVertexConsumerProvider vertexConsumers, 
+	                   boolean cull, long seed, int overlay) {
+		// Override the default implementation to pass 'this' instead of null
+		net.fabricmc.fabric.api.renderer.v1.Renderer renderer = net.fabricmc.fabric.api.renderer.v1.Renderer.get();
+		if (renderer != null) {
+			renderer.render(this, blockView, model, state, pos, matrices, vertexConsumers, cull, seed, overlay);
+		}
 	}
 
 	public void tesselateBlock(
