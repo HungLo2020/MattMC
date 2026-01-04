@@ -119,7 +119,7 @@ public class FurnaceRecipeRenderer extends RecipeRenderer {
 			
 			// Check fuel slot
 			int fuelX = x + FUEL_X;
-			int fuelY = x + FUEL_Y;
+			int fuelY = y + FUEL_Y;
 			if (isHovering(fuelX, fuelY, 16, 16, mouseX, mouseY)) {
 				return new ItemStack(Items.COAL);
 			}

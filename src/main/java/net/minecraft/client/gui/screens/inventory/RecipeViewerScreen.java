@@ -214,8 +214,11 @@ public class RecipeViewerScreen extends Screen {
 		int total = getCurrentRecipes().size();
 		String text = String.format("Recipe %d of %d", currentRecipeIndex + 1, total);
 		int textWidth = this.font.width(text);
+		
+		// Position between the navigation buttons at the bottom
+		int buttonY = this.centerY + this.guiHeight + 10;
 		int textX = this.centerX + (this.guiWidth - textWidth) / 2;
-		int textY = this.centerY - 20;
+		int textY = buttonY + 2; // Align with buttons
 		
 		// Draw background
 		guiGraphics.fill(textX - 2, textY - 2, textX + textWidth + 2, textY + 10, 0x80000000);
