@@ -97,12 +97,12 @@ public class CraftingRecipeRenderer extends RecipeRenderer {
 		// For shapeless recipes, get ingredients and render in a 3x3 grid
 		if (display instanceof ShapelessCraftingRecipeDisplay shapelessDisplay) {
 			List<SlotDisplay> ingredients = shapelessDisplay.ingredients();
-			System.out.println("[CraftingRecipeRenderer] renderShapelessRecipe - " + ingredients.size() + " ingredients");
+			//System.out.println("[CraftingRecipeRenderer] renderShapelessRecipe - " + ingredients.size() + " ingredients");
 			
 			// Render ingredients in a 3x3 grid layout
 			for (int i = 0; i < ingredients.size() && i < 9; i++) {
 				SlotDisplay slotDisplay = ingredients.get(i);
-				System.out.println("[CraftingRecipeRenderer]   Ingredient " + i + " type: " + slotDisplay.getClass().getSimpleName());
+				//System.out.println("[CraftingRecipeRenderer]   Ingredient " + i + " type: " + slotDisplay.getClass().getSimpleName());
 				
 				// Calculate position in 3x3 grid
 				int gridX = i % 3;
@@ -119,23 +119,23 @@ public class CraftingRecipeRenderer extends RecipeRenderer {
 	
 	private void renderSlotDisplay(GuiGraphics guiGraphics, SlotDisplay slotDisplay, 
 	                              int slotX, int slotY, long gameTime) {
-		System.out.println("[CraftingRecipeRenderer] Rendering SlotDisplay: " + slotDisplay.getClass().getSimpleName());
-		System.out.println("[CraftingRecipeRenderer]   contextMap: " + (contextMap != null ? "present" : "NULL"));
+		//System.out.println("[CraftingRecipeRenderer] Rendering SlotDisplay: " + slotDisplay.getClass().getSimpleName());
+		//System.out.println("[CraftingRecipeRenderer]   contextMap: " + (contextMap != null ? "present" : "NULL"));
 		
 		List<ItemStack> stacks = slotDisplay.resolveForStacks(contextMap);
-		System.out.println("[CraftingRecipeRenderer]   Resolved to " + stacks.size() + " stacks");
+		//System.out.println("[CraftingRecipeRenderer]   Resolved to " + stacks.size() + " stacks");
 		
 		if (!stacks.isEmpty()) {
 			// Cycle through options
 			int index = (int)((gameTime / 30) % stacks.size());
 			ItemStack item = stacks.get(index);
-			System.out.println("[CraftingRecipeRenderer]   Displaying item at index " + index + ": " + item);
+			//System.out.println("[CraftingRecipeRenderer]   Displaying item at index " + index + ": " + item);
 			if (!item.isEmpty()) {
 				guiGraphics.renderItem(item, slotX, slotY);
 				guiGraphics.renderItemDecorations(font, item, slotX, slotY);
 			}
 		} else {
-			System.out.println("[CraftingRecipeRenderer]   WARNING: No stacks resolved - slot will be empty!");
+			//System.out.println("[CraftingRecipeRenderer]   WARNING: No stacks resolved - slot will be empty!");
 		}
 	}
 	

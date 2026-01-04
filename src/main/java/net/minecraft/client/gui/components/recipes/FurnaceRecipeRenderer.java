@@ -53,9 +53,9 @@ public class FurnaceRecipeRenderer extends RecipeRenderer {
 			// Render input ingredient
 			if (display instanceof FurnaceRecipeDisplay furnaceDisplay) {
 				SlotDisplay ingredientDisplay = furnaceDisplay.ingredient();
-				System.out.println("[FurnaceRecipeRenderer] Rendering ingredient SlotDisplay: " + ingredientDisplay.getClass().getSimpleName());
+				//System.out.println("[FurnaceRecipeRenderer] Rendering ingredient SlotDisplay: " + ingredientDisplay.getClass().getSimpleName());
 				List<ItemStack> ingredients = ingredientDisplay.resolveForStacks(contextMap);
-				System.out.println("[FurnaceRecipeRenderer]   Resolved to " + ingredients.size() + " stacks");
+				//System.out.println("[FurnaceRecipeRenderer]   Resolved to " + ingredients.size() + " stacks");
 				if (!ingredients.isEmpty()) {
 					int index = (int)((gameTime / 30) % ingredients.size());
 					ItemStack item = ingredients.get(index);

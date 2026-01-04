@@ -49,9 +49,9 @@ public class StonecutterRecipeRenderer extends RecipeRenderer {
 			// Render input ingredient
 			if (display instanceof StonecutterRecipeDisplay stonecutterDisplay) {
 				SlotDisplay ingredientDisplay = stonecutterDisplay.input();
-				System.out.println("[StonecutterRecipeRenderer] Rendering ingredient SlotDisplay: " + ingredientDisplay.getClass().getSimpleName());
+				//System.out.println("[StonecutterRecipeRenderer] Rendering ingredient SlotDisplay: " + ingredientDisplay.getClass().getSimpleName());
 				List<ItemStack> ingredients = ingredientDisplay.resolveForStacks(contextMap);
-				System.out.println("[StonecutterRecipeRenderer]   Resolved to " + ingredients.size() + " stacks");
+				//System.out.println("[StonecutterRecipeRenderer]   Resolved to " + ingredients.size() + " stacks");
 				if (!ingredients.isEmpty()) {
 					int index = (int)((gameTime / 30) % ingredients.size());
 					ItemStack item = ingredients.get(index);

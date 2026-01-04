@@ -76,9 +76,9 @@ public class SmithingRecipeRenderer extends RecipeRenderer {
 	
 	private void renderSlotDisplay(GuiGraphics guiGraphics, SlotDisplay slotDisplay, 
 	                              int slotX, int slotY, long gameTime) {
-		System.out.println("[SmithingRecipeRenderer] Rendering SlotDisplay: " + slotDisplay.getClass().getSimpleName());
+		//System.out.println("[SmithingRecipeRenderer] Rendering SlotDisplay: " + slotDisplay.getClass().getSimpleName());
 		List<ItemStack> stacks = slotDisplay.resolveForStacks(contextMap);
-		System.out.println("[SmithingRecipeRenderer]   Resolved to " + stacks.size() + " stacks");
+		//System.out.println("[SmithingRecipeRenderer]   Resolved to " + stacks.size() + " stacks");
 		if (!stacks.isEmpty()) {
 			int index = (int)((gameTime / 30) % stacks.size());
 			ItemStack item = stacks.get(index);
@@ -87,7 +87,7 @@ public class SmithingRecipeRenderer extends RecipeRenderer {
 				guiGraphics.renderItemDecorations(font, item, slotX, slotY);
 			}
 		} else {
-			System.out.println("[SmithingRecipeRenderer]   WARNING: No stacks resolved - slot will be empty!");
+			//System.out.println("[SmithingRecipeRenderer]   WARNING: No stacks resolved - slot will be empty!");
 		}
 	}
 	

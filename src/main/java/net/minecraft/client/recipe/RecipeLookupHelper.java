@@ -32,18 +32,18 @@ public class RecipeLookupHelper {
 	 */
 	public static Map<RecipeType<?>, List<RecipeHolder<?>>> findRecipesFor(Item item, Level level) {
 		if (level == null || level.recipeAccess() == null) {
-			System.out.println("DEBUG RecipeLookupHelper: level or recipeAccess is null");
+			//System.out.println("DEBUG RecipeLookupHelper: level or recipeAccess is null");
 			return Map.of();
 		}
 		
 		if (cacheDirty) {
-			System.out.println("DEBUG RecipeLookupHelper: Cache is dirty, rebuilding...");
+			//System.out.println("DEBUG RecipeLookupHelper: Cache is dirty, rebuilding...");
 			rebuildCache(level);
 			cacheDirty = false;
 		}
 		
 		List<RecipeHolder<?>> allRecipes = recipeCache.getOrDefault(item, List.of());
-		System.out.println("DEBUG RecipeLookupHelper: Found " + allRecipes.size() + " total recipes for item " + item);
+		//System.out.println("DEBUG RecipeLookupHelper: Found " + allRecipes.size() + " total recipes for item " + item);
 		
 		Map<RecipeType<?>, List<RecipeHolder<?>>> byType = new HashMap<>();
 		
@@ -55,7 +55,7 @@ public class RecipeLookupHelper {
 			}
 		}
 		
-		System.out.println("DEBUG RecipeLookupHelper: Returning " + byType.size() + " recipe types");
+		//System.out.println("DEBUG RecipeLookupHelper: Returning " + byType.size() + " recipe types");
 		return byType;
 	}
 	
@@ -65,7 +65,7 @@ public class RecipeLookupHelper {
 	private static void rebuildCache(Level level) {
 		recipeCache.clear();
 		
-		System.out.println("DEBUG RecipeLookupHelper: Starting cache rebuild");
+		//System.out.println("DEBUG RecipeLookupHelper: Starting cache rebuild");
 		
 		// On client side, we need to get RecipeManager from Minecraft
 		net.minecraft.world.item.crafting.RecipeManager recipeManager = null;
@@ -74,22 +74,22 @@ public class RecipeLookupHelper {
 		net.minecraft.client.Minecraft minecraft = net.minecraft.client.Minecraft.getInstance();
 		if (minecraft != null && minecraft.getSingleplayerServer() != null) {
 			recipeManager = minecraft.getSingleplayerServer().getRecipeManager();
-			System.out.println("DEBUG RecipeLookupHelper: Got RecipeManager from singleplayer server");
+			//System.out.println("DEBUG RecipeLookupHelper: Got RecipeManager from singleplayer server");
 		}
 		// For multiplayer or if singleplayer server is not available yet,
 		// try getting from level's recipeAccess if it's a RecipeManager
 		else if (level.recipeAccess() instanceof net.minecraft.world.item.crafting.RecipeManager manager) {
 			recipeManager = manager;
-			System.out.println("DEBUG RecipeLookupHelper: Got RecipeManager from level.recipeAccess()");
+			//System.out.println("DEBUG RecipeLookupHelper: Got RecipeManager from level.recipeAccess()");
 		}
 		
 		if (recipeManager == null) {
-			System.out.println("DEBUG RecipeLookupHelper: Could not get RecipeManager - cache will be empty");
+			//System.out.println("DEBUG RecipeLookupHelper: Could not get RecipeManager - cache will be empty");
 			return;
 		}
 		
 		Collection<RecipeHolder<?>> allRecipes = recipeManager.getRecipes();
-		System.out.println("DEBUG RecipeLookupHelper: RecipeManager has " + allRecipes.size() + " total recipes");
+		//System.out.println("DEBUG RecipeLookupHelper: RecipeManager has " + allRecipes.size() + " total recipes");
 		
 		ContextMap contextMap = net.minecraft.world.item.crafting.display.SlotDisplayContext.fromLevel(level);
 		
@@ -105,7 +105,7 @@ public class RecipeLookupHelper {
 				cached++;
 			}
 		}
-		System.out.println("DEBUG RecipeLookupHelper: Cached " + cached + " recipes for " + recipeCache.size() + " items");
+		//System.out.println("DEBUG RecipeLookupHelper: Cached " + cached + " recipes for " + recipeCache.size() + " items");
 	}
 	
 	/**
