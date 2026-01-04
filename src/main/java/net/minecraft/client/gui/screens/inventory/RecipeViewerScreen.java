@@ -57,13 +57,14 @@ public class RecipeViewerScreen extends Screen {
 	private static final float FADE_DURATION_TICKS = 3.0F;
 	
 	public RecipeViewerScreen(Screen parentScreen, ItemStack targetItem, 
-	                         Map<RecipeType<?>, List<RecipeHolder<?>>> recipes) {
+	                         Map<RecipeType<?>, List<RecipeHolder<?>>> recipes,
+	                         ContextMap contextMap) {
 		super(Component.literal("Recipe Viewer"));
 		this.parentScreen = parentScreen;
 		this.targetItem = targetItem;
 		this.recipesByType = recipes;
 		this.availableTabs = new ArrayList<>(recipes.keySet());
-		this.contextMap = SlotDisplayContext.fromLevel(minecraft.level);
+		this.contextMap = contextMap;
 	}
 	
 	@Override

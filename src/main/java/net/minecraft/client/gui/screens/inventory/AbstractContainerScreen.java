@@ -23,6 +23,7 @@ import net.minecraft.core.component.DataComponents;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
+import net.minecraft.util.context.ContextMap;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.ClickType;
@@ -952,7 +953,8 @@ public abstract class AbstractContainerScreen<T extends AbstractContainerMenu> e
 		// Open recipe viewer screen
 		System.out.println("     Creating RecipeViewerScreen...");
 		try {
-			RecipeViewerScreen viewer = new RecipeViewerScreen(this, item, recipes);
+			ContextMap contextMap = net.minecraft.world.item.crafting.display.SlotDisplayContext.fromLevel(this.minecraft.level);
+			RecipeViewerScreen viewer = new RecipeViewerScreen(this, item, recipes, contextMap);
 			System.out.println("     RecipeViewerScreen created successfully");
 			this.minecraft.setScreen(viewer);
 			System.out.println("     Screen set successfully - returning true");
