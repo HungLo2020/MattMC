@@ -28,7 +28,7 @@ public class StarlightAccessor implements IStarlightAccessor
 	@Override
 	public String getModName()
 	{
-		return "Starlight-Fabric-1.18.X";
+		return "Starlight-Fabric";
 	}
 	
 	public StarlightAccessor()

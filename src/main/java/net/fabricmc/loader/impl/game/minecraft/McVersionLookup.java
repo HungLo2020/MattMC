@@ -48,41 +48,26 @@ import net.fabricmc.loader.impl.util.version.SemanticVersionImpl;
 import net.fabricmc.loader.impl.util.version.VersionPredicateParser;
 
 public final class McVersionLookup {
+	// Simplified version detection for modern Minecraft (1.x releases only)
+	// Removed legacy patterns: Pre-Classic, Classic, Indev, Infdev, Alpha, Beta (targeting 1.21.10 only)
 	private static final Pattern DATE_BASED_PATTERN = Pattern.compile("(\\d{2}\\.\\d+(?:\\.\\d+)?)(?:-(snapshot|pre|rc)-(\\d+))?");
-	private static final Pattern RELEASE_PATTERN = Pattern.compile("(1\\.(\\d+)(?:\\.(\\d+))?)(?:-(\\d+))?(?:[ _]([Uu]nobfuscated))?"); // 1.6, 1.16.5, 1,16+231620, 1.21.11_unobfuscated
-	private static final Pattern TEST_BUILD_PATTERN = Pattern.compile(".+(?:-tb| Test Build )(\\d+)?(?:-(\\d+))?"); // ... Test Build 1, ...-tb2, ...-tb3-1234
-	private static final Pattern PRE_RELEASE_PATTERN = Pattern.compile(".+(?:-pre| Pre-?[Rr]elease ?)(?:(\\d+)(?: ;\\))?)?(?:-(\\d+))?(?:[ _]([Uu]nobfuscated))?"); // ... Prerelease, ... Pre-release 1, ... Pre-Release 2, ...-pre3, ...-pre4-1234, ...-pre1_unobfuscated
-	private static final Pattern RELEASE_CANDIDATE_PATTERN = Pattern.compile(".+(?:-rc| RC| [Rr]elease Candidate )(\\d+)(?:-(\\d+))?(?:[ _]([Uu]nobfuscated))?"); // ... RC1, ... Release Candidate 2, ...-rc3, ...-rc4-1234, ...-rc1_unobfuscated
-	private static final Pattern SNAPSHOT_PATTERN = Pattern.compile("(?:Snapshot )?(\\d+)w0?(0|[1-9]\\d*)([a-z])(?:-(\\d+)|[ _]([Uu]nobfuscated))?"); // Snapshot 16w02a, 20w13b, 22w18c-1234, 25w45a Unobfuscated
-	private static final Pattern EXPERIMENTAL_PATTERN = Pattern.compile(".+(?:-exp|(?:_deep_dark)?_experimental[_-]snapshot-|(?: Deep Dark)? [Ee]xperimental [Ss]napshot )(\\d+)"); // 1.18 Experimental Snapshot 1, 1.18_experimental-snapshot-2, 1.18-exp3, 1.19 Deep Dark Experimental Snapshot 1
-	private static final Pattern BETA_PATTERN = Pattern.compile("(?:b|Beta v?)1\\.((\\d+)(?:\\.(\\d+))?(_0\\d)?)([a-z])?(?:-(\\d+))?(?:-(launcher))?"); // Beta 1.2, b1.2_02-launcher, b1.3b, b1.3-1731, Beta v1.5_02, b1.8.1
-	private static final Pattern ALPHA_PATTERN = Pattern.compile("(?:(?:server-)?a|Alpha v?)[01]\\.(\\d+\\.\\d+(?:_0\\d)?)([a-z])?(?:-(\\d+))?(?:-(launcher))?"); // Alpha v1.0.1, Alpha 1.0.1_01, a1.0.4-launcher, a1.1.0-131933, a1.2.2a, a1.2.3_05, Alpha 0.1.0, server-a0.2.8
-	private static final Pattern INDEV_PATTERN = Pattern.compile("(?:inf?-|Inf?dev )(?:0\\.31 )?(\\d+)(?:-(\\d+))?"); // Indev 0.31 200100110, in-20100124-2310, Infdev 0.31 20100227-1433, inf-20100611
-	private static final Pattern CLASSIC_SERVER_PATTERN = Pattern.compile("(?:(?:server-)?c)1\\.(\\d\\d?(?:\\.\\d)?)(?:-(\\d+))?"); // c1.0, server-c1.3, server-c1.5-1301, c1.8.1, c1.10.1
-	private static final Pattern LATE_CLASSIC_PATTERN = Pattern.compile("(?:c?0\\.)(\\d\\d?)(?:_0(\\d))?(?:_st)?(?:_0(\\d))?([a-z])?(?:-([cs]))?(?:-(\\d+))?(?:-(renew))?"); // c0.24_st, 0.24_st_03, 0.25_st-1658, c0.25_05_st, 0.29, c0.30-s, 0.30-c-renew, c0.30_01c
-	private static final Pattern EARLY_CLASSIC_PATTERN = Pattern.compile("(?:c?0\\.0\\.)(\\d\\d?)a(?:_0(\\d))?(?:-(\\d+))?(?:-(launcher))?"); // c0.0.11a, c0.0.13a_03-launcher, c0.0.17a-2014, 0.0.18a_02
-	private static final Pattern PRE_CLASSIC_PATTERN = Pattern.compile("(?:rd|pc)-(\\d+)(?:-(launcher))?"); // rd-132211, pc-132011-launcher
+	private static final Pattern RELEASE_PATTERN = Pattern.compile("(1\\.(\\d+)(?:\\.(\\d+))?)(?:-(\\d+))?(?:[ _]([Uu]nobfuscated))?"); // 1.6, 1.16.5, 1.21.10_unobfuscated
+	private static final Pattern TEST_BUILD_PATTERN = Pattern.compile(".+(?:-tb| Test Build )(\\d+)?(?:-(\\d+))?");
+	private static final Pattern PRE_RELEASE_PATTERN = Pattern.compile(".+(?:-pre| Pre-?[Rr]elease ?)(?:(\\d+)(?: ;\\))?)?(?:-(\\d+))?(?:[ _]([Uu]nobfuscated))?");
+	private static final Pattern RELEASE_CANDIDATE_PATTERN = Pattern.compile(".+(?:-rc| RC| [Rr]elease Candidate )(\\d+)(?:-(\\d+))?(?:[ _]([Uu]nobfuscated))?");
+	private static final Pattern SNAPSHOT_PATTERN = Pattern.compile("(?:Snapshot )?(\\d+)w0?(0|[1-9]\\d*)([a-z])(?:-(\\d+)|[ _]([Uu]nobfuscated))?");
+	private static final Pattern EXPERIMENTAL_PATTERN = Pattern.compile(".+(?:-exp|(?:_deep_dark)?_experimental[_-]snapshot-|(?: Deep Dark)? [Ee]xperimental [Ss]napshot )(\\d+)");
 	private static final Pattern TIMESTAMP_PATTERN = Pattern.compile("(.+)(?:-(\\d+))");
 	private static final String STRING_DESC = "Ljava/lang/String;";
+	// Simplified VERSION_PATTERN - only modern versions (1.x)
 	private static final Pattern VERSION_PATTERN = Pattern.compile(
-			PRE_CLASSIC_PATTERN.pattern()
-			+ "|" + EARLY_CLASSIC_PATTERN.pattern()
-			+ "|" + LATE_CLASSIC_PATTERN.pattern()
-			+ "|" + CLASSIC_SERVER_PATTERN.pattern()
-			+ "|" + INDEV_PATTERN.pattern()
-			+ "|" + ALPHA_PATTERN.pattern()
-			+ "|" + BETA_PATTERN.pattern()
-			+ "(" + TEST_BUILD_PATTERN.pattern().substring(2) + ")?"
-			+ "(" + PRE_RELEASE_PATTERN.pattern().substring(2) + ")?"
-			+ "(" + RELEASE_CANDIDATE_PATTERN.pattern().substring(2) + ")?"
-			+ "|" + RELEASE_PATTERN.pattern()
+			RELEASE_PATTERN.pattern()
 			+ "(" + TEST_BUILD_PATTERN.pattern().substring(2) + ")?"
 			+ "(" + PRE_RELEASE_PATTERN.pattern().substring(2) + ")?"
 			+ "(" + RELEASE_CANDIDATE_PATTERN.pattern().substring(2) + ")?"
 			+ "(" + EXPERIMENTAL_PATTERN.pattern().substring(2) + ")?"
 			+ "|" + SNAPSHOT_PATTERN.pattern()
 			+ "|" + "[Cc]ombat(?: Test )?\\d[a-z]?" // combat snapshots
-			+ "|" + "Minecraft RC\\d" // special case for 1.0.0 release candidates
 			+ "|" + "2.0|1\\.RV-Pre1|3D Shareware v1\\.34|20w14~|22w13oneBlockAtATime|23w13a_or_b|24w14potato|25w14craftmine" // odd exceptions
 			+ "(" + TIMESTAMP_PATTERN.pattern() + ")?");
 

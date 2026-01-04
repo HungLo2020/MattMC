@@ -92,8 +92,7 @@ public interface IDhApiWorldGenerator extends Closeable, IDhApiOverrideable
 	 * <strong>Note:</strong> these objects are minecraft version dependent and <i>will</i> change without notice!
 	 * Please run your generator in game at least once to confirm the objects you are returning are correct. <br><br>
 	 *
-	 * Consumer expected inputs for each minecraft version (in order): <br>
-	 * <strong>1.16</strong>, <strong>1.17</strong>, <strong>1.18</strong>, <strong>1.19</strong>, <strong>1.20</strong>: <br>
+	 * Consumer expected inputs (in order): <br>
 	 *  - [net.minecraft.world.level.chunk.ChunkAccess] <br>
 	 *  - [net.minecraft.world.level.ServerLevel] or [net.minecraft.world.level.ClientLevel] <br>
 	 *
