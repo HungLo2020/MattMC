@@ -11,7 +11,6 @@ import java.util.Objects;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.SharedConstants;
-import net.minecraft.client.ClientRecipeBook;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.client.gui.screens.inventory.CreativeModeInventoryScreen;
@@ -410,12 +409,12 @@ public class MultiPlayerGameMode {
 		}
 	}
 
-	public LocalPlayer createPlayer(ClientLevel clientLevel, StatsCounter statsCounter, ClientRecipeBook clientRecipeBook) {
-		return this.createPlayer(clientLevel, statsCounter, clientRecipeBook, Input.EMPTY, false);
+	public LocalPlayer createPlayer(ClientLevel clientLevel, StatsCounter statsCounter) {
+		return this.createPlayer(clientLevel, statsCounter, Input.EMPTY, false);
 	}
 
-	public LocalPlayer createPlayer(ClientLevel clientLevel, StatsCounter statsCounter, ClientRecipeBook clientRecipeBook, Input input, boolean bl) {
-		return new LocalPlayer(this.minecraft, clientLevel, this.connection, statsCounter, clientRecipeBook, input, bl);
+	public LocalPlayer createPlayer(ClientLevel clientLevel, StatsCounter statsCounter, Input input, boolean bl) {
+		return new LocalPlayer(this.minecraft, clientLevel, this.connection, statsCounter, input, bl);
 	}
 
 	public void attack(Player player, Entity entity) {

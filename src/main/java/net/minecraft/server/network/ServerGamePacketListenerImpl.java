@@ -1813,21 +1813,20 @@ public class ServerGamePacketListenerImpl
 				RecipeManager.ServerDisplayInfo serverDisplayInfo = this.server.getRecipeManager().getRecipeFromDisplay(serverboundPlaceRecipePacket.recipe());
 				if (serverDisplayInfo != null) {
 					RecipeHolder<?> recipeHolder = serverDisplayInfo.parent();
-					if (this.player.getRecipeBook().contains(recipeHolder.id())) {
-						if (this.player.containerMenu instanceof RecipeBookMenu recipeBookMenu) {
-							if (recipeHolder.value().placementInfo().isImpossibleToPlace()) {
+					// Recipe book removed - allow all recipes to be placed
+					if (this.player.containerMenu instanceof RecipeBookMenu recipeBookMenu) {
+						if (recipeHolder.value().placementInfo().isImpossibleToPlace()) {
 								LOGGER.debug("Player {} tried to place impossible recipe {}", this.player, recipeHolder.id().location());
 								return;
 							}
 
-							RecipeBookMenu.PostPlaceAction postPlaceAction = recipeBookMenu.handlePlacement(
+						RecipeBookMenu.PostPlaceAction postPlaceAction = recipeBookMenu.handlePlacement(
 								serverboundPlaceRecipePacket.useMaxItems(), this.player.isCreative(), recipeHolder, this.player.level(), this.player.getInventory()
 							);
 							if (postPlaceAction == RecipeBookMenu.PostPlaceAction.PLACE_GHOST_RECIPE) {
 								this.send(new ClientboundPlaceGhostRecipePacket(this.player.containerMenu.containerId, serverDisplayInfo.display().display()));
 							}
 						}
-					}
 				}
 			}
 		}

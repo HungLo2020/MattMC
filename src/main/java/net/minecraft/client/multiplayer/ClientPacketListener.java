@@ -33,7 +33,6 @@ import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.ChatFormatting;
 import net.minecraft.advancements.AdvancementHolder;
-import net.minecraft.client.ClientRecipeBook;
 import net.minecraft.client.DebugQueryHandler;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.Options;
@@ -56,7 +55,6 @@ import net.minecraft.client.gui.screens.inventory.CreativeModeInventoryScreen;
 import net.minecraft.client.gui.screens.inventory.HorseInventoryScreen;
 import net.minecraft.client.gui.screens.inventory.TestInstanceBlockEditScreen;
 import net.minecraft.client.gui.screens.multiplayer.ServerReconfigScreen;
-import net.minecraft.client.gui.screens.recipebook.RecipeUpdateListener;
 import net.minecraft.client.particle.ItemPickupParticle;
 import net.minecraft.client.player.KeyboardInput;
 import net.minecraft.client.player.LocalPlayer;
@@ -510,7 +508,7 @@ public class ClientPacketListener extends ClientCommonPacketListenerImpl impleme
 		);
 		this.minecraft.setLevel(this.level);
 		if (this.minecraft.player == null) {
-			this.minecraft.player = this.minecraft.gameMode.createPlayer(this.level, new StatsCounter(), new ClientRecipeBook());
+			this.minecraft.player = this.minecraft.gameMode.createPlayer(this.level, new StatsCounter());
 			this.minecraft.player.setYRot(-180.0F);
 			if (this.minecraft.getSingleplayerServer() != null) {
 				this.minecraft.getSingleplayerServer().setUUID(this.minecraft.player.getUUID());
@@ -1294,9 +1292,9 @@ public class ClientPacketListener extends ClientCommonPacketListenerImpl impleme
 		if (clientboundRespawnPacket.shouldKeep((byte)2)) {
 			localPlayer2 = this.minecraft
 				.gameMode
-				.createPlayer(this.level, localPlayer.getStats(), localPlayer.getRecipeBook(), localPlayer.getLastSentInput(), localPlayer.isSprinting());
+				.createPlayer(this.level, localPlayer.getStats(), localPlayer.getLastSentInput(), localPlayer.isSprinting());
 		} else {
-			localPlayer2 = this.minecraft.gameMode.createPlayer(this.level, localPlayer.getStats(), localPlayer.getRecipeBook());
+			localPlayer2 = this.minecraft.gameMode.createPlayer(this.level, localPlayer.getStats());
 		}
 
 		this.startWaitingForNewLevel(localPlayer2, this.level, reason);
@@ -2367,12 +2365,7 @@ public class ClientPacketListener extends ClientCommonPacketListenerImpl impleme
 
 	public void handlePlaceRecipe(ClientboundPlaceGhostRecipePacket clientboundPlaceGhostRecipePacket) {
 		PacketUtils.ensureRunningOnSameThread(clientboundPlaceGhostRecipePacket, this, this.minecraft.packetProcessor());
-		AbstractContainerMenu abstractContainerMenu = this.minecraft.player.containerMenu;
-		if (abstractContainerMenu.containerId == clientboundPlaceGhostRecipePacket.containerId()) {
-			if (this.minecraft.screen instanceof RecipeUpdateListener recipeUpdateListener) {
-				recipeUpdateListener.fillGhostRecipe(clientboundPlaceGhostRecipePacket.recipeDisplay());
-			}
-		}
+		// Recipe book UI removed - ghost recipe placement no longer supported
 	}
 
 	public void handleLightUpdatePacket(ClientboundLightUpdatePacket clientboundLightUpdatePacket) {

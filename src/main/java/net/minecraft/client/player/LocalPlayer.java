@@ -8,7 +8,6 @@ import java.util.Objects;
 import java.util.stream.StreamSupport;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
-import net.minecraft.client.ClientRecipeBook;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.LevelLoadingScreen;
@@ -48,7 +47,6 @@ import net.minecraft.network.protocol.game.ServerboundPlayerAbilitiesPacket;
 import net.minecraft.network.protocol.game.ServerboundPlayerActionPacket;
 import net.minecraft.network.protocol.game.ServerboundPlayerCommandPacket;
 import net.minecraft.network.protocol.game.ServerboundPlayerInputPacket;
-import net.minecraft.network.protocol.game.ServerboundRecipeBookSeenRecipePacket;
 import net.minecraft.network.protocol.game.ServerboundSwingPacket;
 import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket.Pos;
 import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket.PosRot;
@@ -113,7 +111,6 @@ public class LocalPlayer extends AbstractClientPlayer implements net.irisshaders
 	public static final float USING_ITEM_SPEED_FACTOR = 0.2F;
 	public final ClientPacketListener connection;
 	private final StatsCounter stats;
-	private final ClientRecipeBook recipeBook;
 	private final TickThrottler dropSpamThrottler = new TickThrottler(20, 1280);
 	private final List<AmbientSoundHandler> ambientSoundHandlers = Lists.<AmbientSoundHandler>newArrayList();
 	private int permissionLevel = 0;
@@ -157,7 +154,6 @@ public class LocalPlayer extends AbstractClientPlayer implements net.irisshaders
 		ClientLevel clientLevel,
 		ClientPacketListener clientPacketListener,
 		StatsCounter statsCounter,
-		ClientRecipeBook clientRecipeBook,
 		Input input,
 		boolean bl
 	) {
@@ -165,7 +161,6 @@ public class LocalPlayer extends AbstractClientPlayer implements net.irisshaders
 		this.minecraft = minecraft;
 		this.connection = clientPacketListener;
 		this.stats = statsCounter;
-		this.recipeBook = clientRecipeBook;
 		this.lastSentInput = input;
 		this.wasSprinting = bl;
 		this.ambientSoundHandlers.add(new UnderwaterAmbientSoundHandler(this, minecraft.getSoundManager()));
@@ -373,16 +368,6 @@ public class LocalPlayer extends AbstractClientPlayer implements net.irisshaders
 		return this.stats;
 	}
 
-	public ClientRecipeBook getRecipeBook() {
-		return this.recipeBook;
-	}
-
-	public void removeRecipeHighlight(RecipeDisplayId recipeDisplayId) {
-		if (this.recipeBook.willHighlight(recipeDisplayId)) {
-			this.recipeBook.removeHighlight(recipeDisplayId);
-			this.connection.send(new ServerboundRecipeBookSeenRecipePacket(recipeDisplayId));
-		}
-	}
 
 	public int getPermissionLevel() {
 		return this.permissionLevel;

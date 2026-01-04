@@ -99,7 +99,6 @@ import net.minecraft.server.players.PlayerList;
 import net.minecraft.server.waypoints.ServerWaypointManager;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundSource;
-import net.minecraft.stats.ServerRecipeBook;
 import net.minecraft.stats.ServerStatsCounter;
 import net.minecraft.stats.Stat;
 import net.minecraft.stats.Stats;
@@ -251,7 +250,6 @@ public class ServerPlayer extends Player implements com.seibel.distanthorizons.c
 	// DH: Track dimension change destination
 	@Nullable
 	private ServerLevel dimensionChangeDestination;
-	private final ServerRecipeBook recipeBook;
 	@Nullable
 	private Vec3 levitationStartPos;
 	private int levitationStartTime;
@@ -381,7 +379,6 @@ public class ServerPlayer extends Player implements com.seibel.distanthorizons.c
 		this.textFilter = minecraftServer.createTextFilterForPlayer(this);
 		this.gameMode = minecraftServer.createGameModeForPlayer(this);
 		this.gameMode.setGameModeForPlayer(this.calculateGameModeForNewPlayer(null), null);
-		this.recipeBook = new ServerRecipeBook((resourceKey, consumer) -> minecraftServer.getRecipeManager().listDisplaysForRecipe(resourceKey, consumer));
 		this.stats = minecraftServer.getPlayerList().getPlayerStats(this);
 		this.advancements = minecraftServer.getPlayerList().getPlayerAdvancements(this);
 		this.updateOptions(clientInformation);
@@ -401,8 +398,7 @@ public class ServerPlayer extends Player implements com.seibel.distanthorizons.c
 		this.wardenSpawnTracker = (WardenSpawnTracker)valueInput.read("warden_spawn_tracker", WardenSpawnTracker.CODEC).orElseGet(WardenSpawnTracker::new);
 		this.enteredNetherPosition = (Vec3)valueInput.read("entered_nether_pos", Vec3.CODEC).orElse(null);
 		this.seenCredits = valueInput.getBooleanOr("seenCredits", false);
-		valueInput.read("recipeBook", ServerRecipeBook.Packed.CODEC)
-			.ifPresent(packed -> this.recipeBook.loadUntrusted(packed, resourceKey -> this.server.getRecipeManager().byKey(resourceKey).isPresent()));
+		// Recipe book removed - skip loading recipe book data
 		if (this.isSleeping()) {
 			this.stopSleeping();
 		}
@@ -424,7 +420,7 @@ public class ServerPlayer extends Player implements com.seibel.distanthorizons.c
 		valueOutput.putBoolean("seenCredits", this.seenCredits);
 		valueOutput.storeNullable("entered_nether_pos", Vec3.CODEC, this.enteredNetherPosition);
 		this.saveParentVehicle(valueOutput);
-		valueOutput.store("recipeBook", ServerRecipeBook.Packed.CODEC, this.recipeBook.pack());
+		// Recipe book removed - skip saving recipe book data
 		valueOutput.putString("Dimension", this.level().dimension().location().toString());
 		valueOutput.storeNullable("respawn", ServerPlayer.RespawnConfig.CODEC, this.respawnConfig);
 		valueOutput.putBoolean("spawn_extra_particles_on_fall", this.spawnExtraParticlesOnFall);
@@ -1473,7 +1469,8 @@ public class ServerPlayer extends Player implements com.seibel.distanthorizons.c
 
 	@Override
 	public int awardRecipes(Collection<RecipeHolder<?>> collection) {
-		return this.recipeBook.addRecipes(collection, this);
+		// Recipe book removed - no longer tracking known recipes
+		return 0;
 	}
 
 	@Override
@@ -1491,7 +1488,8 @@ public class ServerPlayer extends Player implements com.seibel.distanthorizons.c
 
 	@Override
 	public int resetRecipes(Collection<RecipeHolder<?>> collection) {
-		return this.recipeBook.removeRecipes(collection, this);
+		// Recipe book removed - no longer tracking known recipes
+		return 0;
 	}
 
 	@Override
@@ -1591,7 +1589,7 @@ public class ServerPlayer extends Player implements com.seibel.distanthorizons.c
 		this.lastSentExp = -1;
 		this.lastSentHealth = -1.0F;
 		this.lastSentFood = -1;
-		this.recipeBook.copyOverData(serverPlayer.recipeBook);
+		// Recipe book removed - no longer copying recipe book data
 		this.seenCredits = serverPlayer.seenCredits;
 		this.enteredNetherPosition = serverPlayer.enteredNetherPosition;
 		this.chunkTrackingView = serverPlayer.chunkTrackingView;
@@ -1831,10 +1829,6 @@ public class ServerPlayer extends Player implements com.seibel.distanthorizons.c
 
 	public ServerStatsCounter getStats() {
 		return this.stats;
-	}
-
-	public ServerRecipeBook getRecipeBook() {
-		return this.recipeBook;
 	}
 
 	@Override
