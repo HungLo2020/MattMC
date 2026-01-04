@@ -93,9 +93,27 @@ public class CraftingRecipeRenderer extends RecipeRenderer {
 	
 	private void renderShapelessRecipe(GuiGraphics guiGraphics, int x, int y, 
 	                                   RecipeDisplay display, long gameTime) {
-		// For shapeless recipes, try to get ingredients from recipe info
-		// This is a fallback - shapeless recipes should ideally have their own display type
-		// For now, we'll just skip rendering the ingredients or render in a 3x3 grid
+		// For shapeless recipes, get ingredients and render in a 3x3 grid
+		if (display instanceof ShapelessCraftingRecipeDisplay shapelessDisplay) {
+			List<SlotDisplay> ingredients = shapelessDisplay.ingredients();
+			System.out.println("[CraftingRecipeRenderer] renderShapelessRecipe - " + ingredients.size() + " ingredients");
+			
+			// Render ingredients in a 3x3 grid layout
+			for (int i = 0; i < ingredients.size() && i < 9; i++) {
+				SlotDisplay slotDisplay = ingredients.get(i);
+				System.out.println("[CraftingRecipeRenderer]   Ingredient " + i + " type: " + slotDisplay.getClass().getSimpleName());
+				
+				// Calculate position in 3x3 grid
+				int gridX = i % 3;
+				int gridY = i / 3;
+				
+				int slotX = x + GRID_START_X + gridX * SLOT_SIZE;
+				int slotY = y + GRID_START_Y + gridY * SLOT_SIZE;
+				
+				// Render ingredient
+				renderSlotDisplay(guiGraphics, slotDisplay, slotX, slotY, gameTime);
+			}
+		}
 	}
 	
 	private void renderSlotDisplay(GuiGraphics guiGraphics, SlotDisplay slotDisplay, 
