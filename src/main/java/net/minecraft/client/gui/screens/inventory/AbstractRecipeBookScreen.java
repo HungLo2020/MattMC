@@ -39,14 +39,8 @@ public abstract class AbstractRecipeBookScreen<T extends RecipeBookMenu> extends
 	protected abstract ScreenPosition getRecipeBookButtonPosition();
 
 	private void initButton() {
-		ScreenPosition screenPosition = this.getRecipeBookButtonPosition();
-		this.addRenderableWidget(new ImageButton(screenPosition.x(), screenPosition.y(), 20, 18, RecipeBookComponent.RECIPE_BUTTON_SPRITES, button -> {
-			this.recipeBookComponent.toggleVisibility();
-			this.leftPos = this.recipeBookComponent.updateScreenPosition(this.width, this.imageWidth);
-			ScreenPosition screenPositionx = this.getRecipeBookButtonPosition();
-			button.setPosition(screenPositionx.x(), screenPositionx.y());
-			this.onRecipeBookButtonClick();
-		}));
+		// Recipe book button disabled - replaced by recipe viewer (press 'R' on items)
+		// Still add the recipe book component widget for compatibility, but without the button
 		this.addWidget(this.recipeBookComponent);
 	}
 

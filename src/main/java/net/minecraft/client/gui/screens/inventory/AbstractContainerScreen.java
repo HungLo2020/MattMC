@@ -696,6 +696,17 @@ public abstract class AbstractContainerScreen<T extends AbstractContainerMenu> e
 
 	@Override
 	public boolean keyPressed(KeyEvent keyEvent) {
+		// Check for 'R' key (key code 82) to open recipe viewer
+		if (keyEvent.key() == 82 && !keyEvent.hasControlDown() && !keyEvent.hasAltDown()) {
+			ItemStack hoveredItem = getHoveredItemStack();
+			
+			if (!hoveredItem.isEmpty()) {
+				if (openRecipeViewer(hoveredItem)) {
+					return true;
+				}
+			}
+		}
+		
 		// Check JEI panel first
 		if (this.jeiPanel != null && this.jeiPanel.keyPressed(keyEvent)) {
 			return true;
@@ -849,6 +860,50 @@ public abstract class AbstractContainerScreen<T extends AbstractContainerMenu> e
 				this.isWeatherClear = true;
 			}
 		}
+	}
+	
+	/**
+	 * Get the ItemStack currently hovered by the mouse.
+	 * Checks in order: slot hover, JEI panel hover.
+	 */
+	private ItemStack getHoveredItemStack() {
+		// First check if hovering over a slot
+		if (this.hoveredSlot != null && this.hoveredSlot.hasItem()) {
+			return this.hoveredSlot.getItem();
+		}
+		
+		// Check JEI panel
+		if (this.jeiPanel != null) {
+			ItemStack jeiItem = this.jeiPanel.getHoveredItem();
+			if (!jeiItem.isEmpty()) {
+				return jeiItem;
+			}
+		}
+		
+		return ItemStack.EMPTY;
+	}
+	
+	/**
+	 * Open the recipe viewer for the given item.
+	 * Returns true if recipes were found and viewer opened.
+	 */
+	private boolean openRecipeViewer(ItemStack item) {
+		if (this.minecraft == null || this.minecraft.level == null) {
+			return false;
+		}
+		
+		// Find recipes for this item
+		java.util.Map<net.minecraft.world.item.crafting.RecipeType<?>, java.util.List<net.minecraft.world.item.crafting.RecipeHolder<?>>> recipes = 
+			net.minecraft.client.recipe.RecipeLookupHelper.findRecipesFor(item.getItem(), this.minecraft.level);
+		
+		if (recipes.isEmpty()) {
+			// No recipes found - silently return false
+			return false;
+		}
+		
+		// Open recipe viewer screen - for now, just return true to indicate we handled the key
+		// TODO: Implement RecipeViewerScreen in next phase
+		return false; // Will be true once RecipeViewerScreen is implemented
 	}
 
 	@Environment(EnvType.CLIENT)
