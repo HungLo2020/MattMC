@@ -565,8 +565,8 @@ public class JeiPanel {
 					// Only return the first match, and only if it's not an armor slot
 					if (foundSlot == -1) {
 						// Check if this is an ArmorSlot - if so, skip it
-						// ArmorSlot is a package-private class, so we check by class name
-						if (slot.getClass().getSimpleName().equals("ArmorSlot")) {
+						// ArmorSlot is a package-private class, so we check by full class name
+						if (slot.getClass().getName().equals("net.minecraft.world.inventory.ArmorSlot")) {
 							return -1; // Don't allow items to go into armor slots
 						}
 						foundSlot = i;
