@@ -35,18 +35,17 @@ public class EffectsInInventory {
 	}
 
 	public boolean canSeeEffects() {
-		int i = this.screen.leftPos + this.screen.imageWidth + 2;
-		int j = this.screen.width - i;
-		return j >= 32;
+		int i = this.screen.leftPos - 2;
+		return i >= 32;
 	}
 
 	public void renderEffects(GuiGraphics guiGraphics, int i, int j) {
 		this.hoveredEffect = null;
-		int k = this.screen.leftPos + this.screen.imageWidth + 2;
-		int l = this.screen.width - k;
+		int l = this.screen.leftPos - 2;
 		Collection<MobEffectInstance> collection = this.minecraft.player.getActiveEffects();
 		if (!collection.isEmpty() && l >= 32) {
 			boolean bl = l >= 120;
+			int k = this.screen.leftPos - 2 - (bl ? 120 : 32);
 			int m = 33;
 			if (collection.size() > 5) {
 				m = 132 / (collection.size() - 1);
