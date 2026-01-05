@@ -832,6 +832,10 @@ public abstract class MinecraftServer extends ReentrantBlockableEventLoop<TickTa
 			// WorldEdit: Initialize WorldEdit system
 			net.minecraft.worldedit.core.WorldEdit.initialize(this);
 			LOGGER.info("WorldEdit initialized");
+			
+			// WorldEdit: Register commands after initialization
+			net.minecraft.worldedit.command.WorldEditCommands.register(this.getCommands().getDispatcher());
+			LOGGER.info("WorldEdit commands registered");
 
 			while (this.running) {
 				long l;

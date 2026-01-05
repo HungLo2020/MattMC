@@ -248,10 +248,11 @@ public class Commands {
 		WeatherCommand.register(this.dispatcher);
 		WorldBorderCommand.register(this.dispatcher);
 		
-		// WorldEdit: Register WorldEdit commands
-		if (net.minecraft.worldedit.core.WorldEdit.isInitialized()) {
-			net.minecraft.worldedit.command.WorldEditCommands.register(this.dispatcher);
-		}
+		// WorldEdit: Commands will be registered after WorldEdit initializes in MinecraftServer.runServer()
+		// This is commented out because WorldEdit isn't initialized yet during Commands construction
+		// if (net.minecraft.worldedit.core.WorldEdit.isInitialized()) {
+		// 	net.minecraft.worldedit.command.WorldEditCommands.register(this.dispatcher);
+		// }
 		
 		if (JvmProfiler.INSTANCE.isAvailable()) {
 			JfrCommand.register(this.dispatcher);
