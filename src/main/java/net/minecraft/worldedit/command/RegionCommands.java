@@ -94,18 +94,16 @@ public class RegionCommands {
         
         BlockState state = block.defaultBlockState();
         
+        // Create edit session
+        net.minecraft.worldedit.core.EditSession editSession = 
+            new net.minecraft.worldedit.core.EditSession(world, session.getDefaultChangeLimit());
+        editSession.setFastMode(session.isFastMode());
+        
         // Set blocks
-        int count = 0;
-        for (BlockVector3 pos : region) {
-            world.setBlock(pos.toBlockPos(), state, 3);
-            count++;
-            
-            // Limit to prevent server lag (temporary)
-            if (count > 100000) {
-                player.sendSystemMessage(Component.literal("§cWarning: Operation limited to 100,000 blocks"));
-                break;
-            }
-        }
+        int count = editSession.setBlocks(region, state);
+        
+        // Remember for undo
+        session.remember(editSession);
         
         player.sendSystemMessage(Component.literal(String.format("Set %d blocks", count)));
         
@@ -144,23 +142,19 @@ public class RegionCommands {
             return 0;
         }
         
+        BlockState fromState = from.defaultBlockState();
         BlockState toState = to.defaultBlockState();
         
+        // Create edit session
+        net.minecraft.worldedit.core.EditSession editSession = 
+            new net.minecraft.worldedit.core.EditSession(world, session.getDefaultChangeLimit());
+        editSession.setFastMode(session.isFastMode());
+        
         // Replace blocks
-        int count = 0;
-        for (BlockVector3 pos : region) {
-            BlockState current = world.getBlockState(pos.toBlockPos());
-            if (current.getBlock() == from) {
-                world.setBlock(pos.toBlockPos(), toState, 3);
-                count++;
-            }
-            
-            // Limit to prevent server lag (temporary)
-            if (count > 100000) {
-                player.sendSystemMessage(Component.literal("§cWarning: Operation limited to 100,000 blocks"));
-                break;
-            }
-        }
+        int count = editSession.replaceBlocks(region, fromState, toState);
+        
+        // Remember for undo
+        session.remember(editSession);
         
         player.sendSystemMessage(Component.literal(String.format("Replaced %d blocks", count)));
         

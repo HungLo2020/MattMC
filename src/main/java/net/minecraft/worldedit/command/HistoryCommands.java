@@ -42,8 +42,20 @@ public class HistoryCommands {
      */
     private static int undo(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
         ServerPlayer player = context.getSource().getPlayerOrException();
-        player.sendSystemMessage(Component.literal("//undo not yet implemented - history system pending"));
-        // TODO: Implement undo when history system is ready
+        
+        net.minecraft.worldedit.session.LocalSession session = 
+            net.minecraft.worldedit.core.WorldEdit.getInstance().getSessionManager().get(player);
+        
+        net.minecraft.worldedit.core.EditSession editSession = session.undo();
+        
+        if (editSession == null) {
+            player.sendSystemMessage(Component.literal("Nothing to undo"));
+            return 0;
+        }
+        
+        int blocks = editSession.getBlockChangeCount();
+        player.sendSystemMessage(Component.literal(String.format("Undid %d blocks", blocks)));
+        
         return Command.SINGLE_SUCCESS;
     }
     
@@ -52,8 +64,20 @@ public class HistoryCommands {
      */
     private static int redo(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
         ServerPlayer player = context.getSource().getPlayerOrException();
-        player.sendSystemMessage(Component.literal("//redo not yet implemented - history system pending"));
-        // TODO: Implement redo when history system is ready
+        
+        net.minecraft.worldedit.session.LocalSession session = 
+            net.minecraft.worldedit.core.WorldEdit.getInstance().getSessionManager().get(player);
+        
+        net.minecraft.worldedit.core.EditSession editSession = session.redo();
+        
+        if (editSession == null) {
+            player.sendSystemMessage(Component.literal("Nothing to redo"));
+            return 0;
+        }
+        
+        int blocks = editSession.getBlockChangeCount();
+        player.sendSystemMessage(Component.literal(String.format("Redid %d blocks", blocks)));
+        
         return Command.SINGLE_SUCCESS;
     }
     
@@ -62,8 +86,13 @@ public class HistoryCommands {
      */
     private static int clearHistory(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
         ServerPlayer player = context.getSource().getPlayerOrException();
+        
+        net.minecraft.worldedit.session.LocalSession session = 
+            net.minecraft.worldedit.core.WorldEdit.getInstance().getSessionManager().get(player);
+        
+        session.clearHistory();
         player.sendSystemMessage(Component.literal("History cleared"));
-        // TODO: Implement clear history when history system is ready
+        
         return Command.SINGLE_SUCCESS;
     }
     

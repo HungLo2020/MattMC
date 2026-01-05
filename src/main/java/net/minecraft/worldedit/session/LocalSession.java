@@ -1,6 +1,7 @@
 package net.minecraft.worldedit.session;
 
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.worldedit.core.EditSession;
 import net.minecraft.worldedit.region.Region;
 import net.minecraft.worldedit.region.RegionSelector;
 import net.minecraft.worldedit.region.selector.CuboidRegionSelector;
@@ -20,8 +21,8 @@ public class LocalSession {
     // Tool bindings
     private final Map<Item, Tool> toolBindings;
     
-    // History
-    private final Deque<Object> history; // TODO: Change to EditSession when implemented
+    // History - stores completed EditSessions for undo/redo
+    private final List<EditSession> history;
     private int historyPointer;
     private final int maxHistorySize;
     
@@ -36,7 +37,7 @@ public class LocalSession {
     public LocalSession() {
         this.selectors = new HashMap<>();
         this.toolBindings = new HashMap<>();
-        this.history = new LinkedList<>();
+        this.history = new ArrayList<>();
         this.historyPointer = 0;
         this.maxHistorySize = 15;
         this.fastMode = false;
@@ -175,5 +176,75 @@ public class LocalSession {
      */
     public boolean hasClipboard() {
         return clipboard != null;
+    }
+    
+    /**
+     * Remember an edit session for undo/redo.
+     */
+    public void remember(EditSession editSession) {
+        // Remove any redo history
+        while (history.size() > historyPointer) {
+            history.remove(history.size() - 1);
+        }
+        
+        // Add new session
+        history.add(editSession);
+        historyPointer++;
+        
+        // Enforce size limit
+        while (history.size() > maxHistorySize) {
+            history.remove(0);
+            historyPointer--;
+        }
+    }
+    
+    /**
+     * Undo the last edit.
+     * @return the edit session that was undone, or null if nothing to undo
+     */
+    public EditSession undo() {
+        if (historyPointer > 0) {
+            historyPointer--;
+            EditSession session = history.get(historyPointer);
+            session.undo();
+            return session;
+        }
+        return null;
+    }
+    
+    /**
+     * Redo the last undone edit.
+     * @return the edit session that was redone, or null if nothing to redo
+     */
+    public EditSession redo() {
+        if (historyPointer < history.size()) {
+            EditSession session = history.get(historyPointer);
+            session.redo();
+            historyPointer++;
+            return session;
+        }
+        return null;
+    }
+    
+    /**
+     * Clear the edit history.
+     */
+    public void clearHistory() {
+        history.clear();
+        historyPointer = 0;
+    }
+    
+    /**
+     * Get the number of edits that can be undone.
+     */
+    public int getUndoCount() {
+        return historyPointer;
+    }
+    
+    /**
+     * Get the number of edits that can be redone.
+     */
+    public int getRedoCount() {
+        return history.size() - historyPointer;
     }
 }
