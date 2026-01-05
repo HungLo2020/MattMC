@@ -263,6 +263,8 @@ public class ServerGamePacketListenerImpl
 	private final MessageSignatureCache messageSignatureCache = MessageSignatureCache.createDefault();
 	private final FutureChain chatMessageChain;
 	private boolean waitingForSwitchToConfig;
+	// WorldEdit: Track swing packets to suppress after certain actions
+	private int worldEdit_ignoreSwingPackets = 0;
 
 	public ServerGamePacketListenerImpl(
 		MinecraftServer minecraftServer, Connection connection, ServerPlayer serverPlayer, CommonListenerCookie commonListenerCookie
@@ -1180,6 +1182,18 @@ public class ServerGamePacketListenerImpl
 			BlockPos blockPos = serverboundPlayerActionPacket.getPos();
 			this.player.resetLastActionTime();
 			ServerboundPlayerActionPacket.Action action = serverboundPlayerActionPacket.getAction();
+			
+			// WorldEdit: Increment swing packet counter for certain actions
+			switch (action) {
+				case DROP_ITEM:
+				case DROP_ALL_ITEMS:
+				case START_DESTROY_BLOCK:
+					this.worldEdit_ignoreSwingPackets++;
+					break;
+				default:
+					break;
+			}
+			
 			switch (action) {
 				case SWAP_ITEM_WITH_OFFHAND:
 					if (!this.player.isSpectator()) {
@@ -1328,6 +1342,8 @@ public class ServerGamePacketListenerImpl
 	@Override
 	public void onDisconnect(DisconnectionDetails disconnectionDetails) {
 		LOGGER.info("{} lost connection: {}", this.player.getPlainTextName(), disconnectionDetails.reason().getString());
+		// WorldEdit: Handle player disconnect
+		net.minecraft.worldedit.platform.WorldEditIntegration.onPlayerDisconnect(this.player);
 		this.removePlayerFromWorld();
 		super.onDisconnect(disconnectionDetails);
 	}
@@ -1571,6 +1587,25 @@ public class ServerGamePacketListenerImpl
 	public void handleAnimate(ServerboundSwingPacket serverboundSwingPacket) {
 		PacketUtils.ensureRunningOnSameThread(serverboundSwingPacket, this, this.player.level());
 		this.player.resetLastActionTime();
+		
+		// WorldEdit: Handle left-click air for wand
+		if (this.worldEdit_ignoreSwingPackets > 0) {
+			this.worldEdit_ignoreSwingPackets--;
+		} else {
+			// Check if player is holding a wand
+			net.minecraft.world.item.ItemStack stack = this.player.getItemInHand(serverboundSwingPacket.getHand());
+			if (stack.getItem() instanceof net.minecraft.world.item.WandItem) {
+				// Handle wand left-click (set secondary position)
+				net.minecraft.world.phys.HitResult hitResult = this.player.pick(100, 0, false);
+				if (hitResult instanceof net.minecraft.world.phys.BlockHitResult blockHit) {
+					net.minecraft.worldedit.platform.WorldEditIntegration.handleWandLeftClick(this.player, blockHit.getBlockPos());
+					return; // Don't swing arm for wand
+				}
+			}
+			// Also check for general tool activation
+			net.minecraft.worldedit.platform.WorldEditIntegration.onLeftClickAir(this.player, serverboundSwingPacket.getHand());
+		}
+		
 		this.player.swing(serverboundSwingPacket.getHand());
 	}
 
