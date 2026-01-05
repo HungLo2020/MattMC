@@ -166,8 +166,66 @@ public class RegionCommands {
      */
     private static int walls(CommandContext<CommandSourceStack> context, String blockName) throws CommandSyntaxException {
         ServerPlayer player = context.getSource().getPlayerOrException();
-        player.sendSystemMessage(Component.literal("//walls not yet fully implemented"));
-        // TODO: Implement walls logic
+        ServerLevel world = player.level();
+        
+        LocalSession session = WorldEdit.getInstance().getSessionManager().get(player);
+        Region region = session.getSelection(world);
+        
+        if (region == null) {
+            player.sendSystemMessage(Component.literal("No selection defined"));
+            return 0;
+        }
+        
+        // Parse block
+        ResourceLocation blockId = parseBlockId(blockName);
+        if (blockId == null) {
+            player.sendSystemMessage(Component.literal("Invalid block: " + blockName));
+            return 0;
+        }
+        
+        Block block = BuiltInRegistries.BLOCK.getValue(blockId);
+        if (block == null) {
+            player.sendSystemMessage(Component.literal("Unknown block: " + blockName));
+            return 0;
+        }
+        
+        BlockState state = block.defaultBlockState();
+        
+        // Create edit session
+        net.minecraft.worldedit.core.EditSession editSession = 
+            new net.minecraft.worldedit.core.EditSession(world, session.getDefaultChangeLimit());
+        editSession.setFastMode(session.isFastMode());
+        
+        // Build walls (only the vertical sides, not floor/ceiling)
+        BlockVector3 min = region.getMinimumPoint();
+        BlockVector3 max = region.getMaximumPoint();
+        int count = 0;
+        
+        // Walls along X axis (north and south sides)
+        for (int x = min.getX(); x <= max.getX(); x++) {
+            for (int y = min.getY(); y <= max.getY(); y++) {
+                // South wall (min Z)
+                if (editSession.setBlock(BlockVector3.at(x, y, min.getZ()), state)) count++;
+                // North wall (max Z)
+                if (editSession.setBlock(BlockVector3.at(x, y, max.getZ()), state)) count++;
+            }
+        }
+        
+        // Walls along Z axis (east and west sides)
+        for (int z = min.getZ() + 1; z < max.getZ(); z++) {
+            for (int y = min.getY(); y <= max.getY(); y++) {
+                // West wall (min X)
+                if (editSession.setBlock(BlockVector3.at(min.getX(), y, z), state)) count++;
+                // East wall (max X)
+                if (editSession.setBlock(BlockVector3.at(max.getX(), y, z), state)) count++;
+            }
+        }
+        
+        // Remember for undo
+        session.remember(editSession);
+        
+        player.sendSystemMessage(Component.literal(String.format("Created walls: %d blocks", count)));
+        
         return Command.SINGLE_SUCCESS;
     }
     
@@ -176,8 +234,70 @@ public class RegionCommands {
      */
     private static int faces(CommandContext<CommandSourceStack> context, String blockName) throws CommandSyntaxException {
         ServerPlayer player = context.getSource().getPlayerOrException();
-        player.sendSystemMessage(Component.literal("//faces not yet fully implemented"));
-        // TODO: Implement faces logic
+        ServerLevel world = player.level();
+        
+        LocalSession session = WorldEdit.getInstance().getSessionManager().get(player);
+        Region region = session.getSelection(world);
+        
+        if (region == null) {
+            player.sendSystemMessage(Component.literal("No selection defined"));
+            return 0;
+        }
+        
+        // Parse block
+        ResourceLocation blockId = parseBlockId(blockName);
+        if (blockId == null) {
+            player.sendSystemMessage(Component.literal("Invalid block: " + blockName));
+            return 0;
+        }
+        
+        Block block = BuiltInRegistries.BLOCK.getValue(blockId);
+        if (block == null) {
+            player.sendSystemMessage(Component.literal("Unknown block: " + blockName));
+            return 0;
+        }
+        
+        BlockState state = block.defaultBlockState();
+        
+        // Create edit session
+        net.minecraft.worldedit.core.EditSession editSession = 
+            new net.minecraft.worldedit.core.EditSession(world, session.getDefaultChangeLimit());
+        editSession.setFastMode(session.isFastMode());
+        
+        // Build all 6 faces
+        BlockVector3 min = region.getMinimumPoint();
+        BlockVector3 max = region.getMaximumPoint();
+        int count = 0;
+        
+        // Bottom and top faces
+        for (int x = min.getX(); x <= max.getX(); x++) {
+            for (int z = min.getZ(); z <= max.getZ(); z++) {
+                // Bottom
+                if (editSession.setBlock(BlockVector3.at(x, min.getY(), z), state)) count++;
+                // Top
+                if (editSession.setBlock(BlockVector3.at(x, max.getY(), z), state)) count++;
+            }
+        }
+        
+        // Side faces (excluding edges already covered by top/bottom)
+        for (int y = min.getY() + 1; y < max.getY(); y++) {
+            for (int x = min.getX(); x <= max.getX(); x++) {
+                // South and north
+                if (editSession.setBlock(BlockVector3.at(x, y, min.getZ()), state)) count++;
+                if (editSession.setBlock(BlockVector3.at(x, y, max.getZ()), state)) count++;
+            }
+            for (int z = min.getZ() + 1; z < max.getZ(); z++) {
+                // West and east
+                if (editSession.setBlock(BlockVector3.at(min.getX(), y, z), state)) count++;
+                if (editSession.setBlock(BlockVector3.at(max.getX(), y, z), state)) count++;
+            }
+        }
+        
+        // Remember for undo
+        session.remember(editSession);
+        
+        player.sendSystemMessage(Component.literal(String.format("Created faces: %d blocks", count)));
+        
         return Command.SINGLE_SUCCESS;
     }
     
@@ -186,8 +306,67 @@ public class RegionCommands {
      */
     private static int overlay(CommandContext<CommandSourceStack> context, String blockName) throws CommandSyntaxException {
         ServerPlayer player = context.getSource().getPlayerOrException();
-        player.sendSystemMessage(Component.literal("//overlay not yet fully implemented"));
-        // TODO: Implement overlay logic
+        ServerLevel world = player.level();
+        
+        LocalSession session = WorldEdit.getInstance().getSessionManager().get(player);
+        Region region = session.getSelection(world);
+        
+        if (region == null) {
+            player.sendSystemMessage(Component.literal("No selection defined"));
+            return 0;
+        }
+        
+        // Parse block
+        ResourceLocation blockId = parseBlockId(blockName);
+        if (blockId == null) {
+            player.sendSystemMessage(Component.literal("Invalid block: " + blockName));
+            return 0;
+        }
+        
+        Block block = BuiltInRegistries.BLOCK.getValue(blockId);
+        if (block == null) {
+            player.sendSystemMessage(Component.literal("Unknown block: " + blockName));
+            return 0;
+        }
+        
+        BlockState state = block.defaultBlockState();
+        
+        // Create edit session
+        net.minecraft.worldedit.core.EditSession editSession = 
+            new net.minecraft.worldedit.core.EditSession(world, session.getDefaultChangeLimit());
+        editSession.setFastMode(session.isFastMode());
+        
+        // Place overlay on top of solid blocks
+        BlockVector3 min = region.getMinimumPoint();
+        BlockVector3 max = region.getMaximumPoint();
+        int count = 0;
+        
+        for (int x = min.getX(); x <= max.getX(); x++) {
+            for (int z = min.getZ(); z <= max.getZ(); z++) {
+                // Find the highest solid block in this column
+                for (int y = max.getY(); y >= min.getY(); y--) {
+                    BlockVector3 pos = BlockVector3.at(x, y, z);
+                    BlockState current = editSession.getBlock(pos);
+                    
+                    if (!current.isAir() && current.blocksMotion()) {
+                        // Place overlay block on top
+                        BlockVector3 above = pos.add(0, 1, 0);
+                        if (above.getY() <= world.getMaxY()) {
+                            if (editSession.setBlock(above, state)) {
+                                count++;
+                            }
+                        }
+                        break; // Move to next column
+                    }
+                }
+            }
+        }
+        
+        // Remember for undo
+        session.remember(editSession);
+        
+        player.sendSystemMessage(Component.literal(String.format("Created overlay: %d blocks", count)));
+        
         return Command.SINGLE_SUCCESS;
     }
     

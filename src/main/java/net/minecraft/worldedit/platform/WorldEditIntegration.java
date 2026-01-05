@@ -7,6 +7,8 @@ import net.minecraft.worldedit.core.WorldEdit;
 import net.minecraft.worldedit.math.BlockVector3;
 import net.minecraft.worldedit.session.LocalSession;
 import net.minecraft.worldedit.tool.Tool;
+import net.minecraft.worldedit.tool.SuperPickaxeTool;
+import net.minecraft.worldedit.tool.BrushTool;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 
@@ -64,9 +66,60 @@ public class WorldEditIntegration {
         LocalSession session = WorldEdit.getInstance().getSessionManager().get(player);
         Tool tool = session.getTool(stack.getItem());
         
-        if (tool != null) {
-            // TODO: Implement tool activation
+        if (tool != null && tool.canUse(player)) {
+            tool.actPrimary(player);
         }
+    }
+    
+    /**
+     * Handle block break (for super pickaxe).
+     */
+    public static boolean onBlockBreak(ServerPlayer player, BlockPos pos) {
+        if (!WorldEdit.isInitialized()) {
+            return false;
+        }
+        
+        ItemStack stack = player.getMainHandItem();
+        if (stack.isEmpty()) {
+            return false;
+        }
+        
+        LocalSession session = WorldEdit.getInstance().getSessionManager().get(player);
+        Tool tool = session.getTool(stack.getItem());
+        
+        if (tool instanceof SuperPickaxeTool superPickaxe) {
+            if (tool.canUse(player)) {
+                superPickaxe.breakBlock(player, pos);
+                return true; // Cancel default break behavior
+            }
+        }
+        
+        return false;
+    }
+    
+    /**
+     * Handle right-click on block (for brushes).
+     */
+    public static boolean onRightClickBlock(ServerPlayer player, BlockPos pos, InteractionHand hand) {
+        if (!WorldEdit.isInitialized()) {
+            return false;
+        }
+        
+        ItemStack stack = player.getItemInHand(hand);
+        if (stack.isEmpty()) {
+            return false;
+        }
+        
+        LocalSession session = WorldEdit.getInstance().getSessionManager().get(player);
+        Tool tool = session.getTool(stack.getItem());
+        
+        if (tool instanceof BrushTool) {
+            if (tool.canUse(player)) {
+                return tool.actSecondary(player);
+            }
+        }
+        
+        return false;
     }
     
     /**

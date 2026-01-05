@@ -33,6 +33,9 @@ public class WorldEditCommands {
         // Navigation commands
         NavigationCommands.register(dispatcher);
         
+        // Tool commands
+        ToolCommands.register(dispatcher);
+        
         // Future: Add more command groups as they're implemented
         // GenerationCommands.register(dispatcher);
         // UtilityCommands.register(dispatcher);
