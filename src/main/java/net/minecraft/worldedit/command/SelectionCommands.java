@@ -29,6 +29,11 @@ public class SelectionCommands {
      * Register all selection commands.
      */
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
+        // //wand command - give the player the selection wand
+        dispatcher.register(Commands.literal("/wand")
+            .requires(source -> source.isPlayer() && hasPermission(source, "worldedit.wand"))
+            .executes(SelectionCommands::giveWand));
+        
         // //pos1 command
         dispatcher.register(Commands.literal("/pos1")
             .requires(source -> source.isPlayer() && hasPermission(source, "worldedit.selection.pos"))
@@ -75,6 +80,26 @@ public class SelectionCommands {
         dispatcher.register(Commands.literal("/size")
             .requires(source -> source.isPlayer() && hasPermission(source, "worldedit.selection.size"))
             .executes(SelectionCommands::size));
+    }
+    
+    /**
+     * Give the player the WorldEdit selection wand.
+     */
+    private static int giveWand(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+        ServerPlayer player = context.getSource().getPlayerOrException();
+        
+        // Create wand item stack
+        net.minecraft.world.item.ItemStack wandStack = new net.minecraft.world.item.ItemStack(
+            net.minecraft.world.item.Items.WAND, 1);
+        
+        // Give it to the player
+        if (player.getInventory().add(wandStack)) {
+            player.sendSystemMessage(Component.literal("§aGave you the WorldEdit wand!"));
+        } else {
+            player.sendSystemMessage(Component.literal("§cYour inventory is full!"));
+        }
+        
+        return Command.SINGLE_SUCCESS;
     }
     
     /**
