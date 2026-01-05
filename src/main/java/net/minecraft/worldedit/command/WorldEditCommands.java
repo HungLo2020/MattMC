@@ -21,8 +21,13 @@ public class WorldEditCommands {
         // History commands
         HistoryCommands.register(dispatcher);
         
+        // Clipboard commands
+        ClipboardCommands.register(dispatcher);
+        
+        // Generation commands
+        GenerationCommands.register(dispatcher);
+        
         // Future: Add more command groups as they're implemented
-        // ClipboardCommands.register(dispatcher);
         // GenerationCommands.register(dispatcher);
         // UtilityCommands.register(dispatcher);
         // ToolCommands.register(dispatcher);
