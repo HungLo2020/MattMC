@@ -42,7 +42,8 @@ public class EnderDragonRenderer extends EntityRenderer<EnderDragon, EnderDragon
 	private static final RenderType EYES = RenderType.eyes(DRAGON_EYES_LOCATION);
 	private static final RenderType BEAM = RenderType.entitySmoothCutout(CRYSTAL_BEAM_LOCATION);
 	private static final float HALF_SQRT_3 = (float)(Math.sqrt(3.0) / 2.0);
-	private final EnderDragonModel model;
+	// VoxelMap: Made accessible
+	public final EnderDragonModel model;
 
 	public EnderDragonRenderer(EntityRendererProvider.Context context) {
 		super(context);

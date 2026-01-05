@@ -4,7 +4,7 @@ import com.mamiyaotaru.voxelmap.VoxelConstants;
 import com.mamiyaotaru.voxelmap.util.DimensionContainer;
 import com.mamiyaotaru.voxelmap.util.DimensionManager;
 import com.mojang.blaze3d.platform.cursor.CursorTypes;
-import net.minecraft.client.GameNarrator;
+// import net.minecraft.client.GameNarrator; // VoxelMap: Class doesn't exist in MattMC 1.21.10
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.AbstractSelectionList;
 import net.minecraft.client.gui.narration.NarrationElementOutput;
@@ -59,8 +59,9 @@ class GuiSlotDimensions extends AbstractSelectionList<GuiSlotDimensions.Dimensio
     public void setSelected(DimensionItem entry) {
         super.setSelected(entry);
         if (this.getSelected() instanceof DimensionItem) {
-            GameNarrator narratorManager = new GameNarrator(VoxelConstants.getMinecraft());
-            narratorManager.sayChatQueued(Component.translatable("narrator.select", (this.getSelected()).dim.name));
+            // VoxelMap: GameNarrator doesn't exist in MattMC 1.21.10 - narration disabled for now
+            // GameNarrator narratorManager = new GameNarrator(VoxelConstants.getMinecraft());
+            // narratorManager.sayChatQueued(Component.translatable("narrator.select", (this.getSelected()).dim.name));
         }
 
         this.parentGui.setSelectedDimension(entry.dim);

@@ -43,6 +43,15 @@ client.getConnection().send(new ServerboundCustomPayloadPacket(payload));
 }
 
 /**
+ * Checks if a packet type can be sent to the server.
+ */
+public static boolean canSend(CustomPacketPayload.Type<?> type) {
+// Stub: always return true for simplicity
+Minecraft client = Minecraft.getInstance();
+return client != null && client.getConnection() != null;
+}
+
+/**
  * Sends a packet to the server via a channel.
  */
 public static void send(ResourceLocation channel, FriendlyByteBuf buf) {

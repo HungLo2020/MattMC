@@ -190,7 +190,8 @@ public class EntityMapImageManager {
         if (renderer instanceof LivingEntityRenderer renderer2) {
             return renderer2.getModel();
         } else if (renderer instanceof EnderDragonRenderer renderer2) {
-            return ((AccessorEnderDragonRenderer) renderer2).getModel();
+            // VoxelMap: Access model directly (made public in EnderDragonRenderer)
+            return renderer2.model;
         }
         return null;
     }

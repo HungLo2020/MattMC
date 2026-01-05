@@ -46,9 +46,13 @@ public final class VoxelConstants {
 
     public static boolean isSinglePlayer() { return getMinecraft().isLocalServer(); }
     public static boolean isRealmServer() {
+        // VoxelMap: Realms not supported in MattMC (ServerData.Type doesn't have REALM)
+        return false;
+        /* Original code:
         ClientPacketListener playNetworkHandler = getMinecraft().getConnection();
         ServerData serverInfo = playNetworkHandler != null ? getMinecraft().getConnection().getServerData() : null;
         return serverInfo != null && serverInfo.isRealm();
+        */
     }
 
     @NotNull
