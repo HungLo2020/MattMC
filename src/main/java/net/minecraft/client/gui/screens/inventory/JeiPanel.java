@@ -378,9 +378,9 @@ public class JeiPanel {
 						int count = isShiftDown ? itemStack.getMaxStackSize() : 1;
 						ItemStack itemToAdd = itemStack.copyWithCount(count);
 						
-						System.out.println("=== JEI CLICK DEBUG ===");
-						System.out.println("Shift down: " + isShiftDown);
-						System.out.println("Item to add: " + itemToAdd.getItem() + " x" + count);
+						//System.out.println("=== JEI CLICK DEBUG ===");
+						//System.out.println("Shift down: " + isShiftDown);
+						//System.out.println("Item to add: " + itemToAdd.getItem() + " x" + count);
 						
 						// Find the best slot and add only what fits to prevent overflow to armor slots
 						this.addItemToInventorySafe(itemToAdd);
@@ -527,11 +527,11 @@ public class JeiPanel {
 		int remainingCount = itemToAdd.getCount();
 		boolean isShiftClick = remainingCount > 1;
 		
-		System.out.println("addItemToInventorySafe called:");
-		System.out.println("  Item: " + itemToAdd.getItem());
-		System.out.println("  Initial count: " + remainingCount);
-		System.out.println("  Is shift click: " + isShiftClick);
-		System.out.println("  Container slots: " + containerMenu.slots.size());
+		//System.out.println("addItemToInventorySafe called:");
+		//System.out.println("  Item: " + itemToAdd.getItem());
+		//System.out.println("  Initial count: " + remainingCount);
+		//System.out.println("  Is shift click: " + isShiftClick);
+		//System.out.println("  Container slots: " + containerMenu.slots.size());
 		
 		// Phase 1: Fill existing partial stacks (excluding armor slots)
 		for (int i = 0; i < containerMenu.slots.size() && remainingCount > 0; i++) {
@@ -544,7 +544,7 @@ public class JeiPanel {
 			String slotClassName = slot.getClass().getName();
 			boolean isArmorSlot = slotClassName.equals(ARMOR_SLOT_CLASS_NAME);
 			if (isArmorSlot) {
-				System.out.println("  Slot " + i + ": SKIPPED (ArmorSlot)");
+				//System.out.println("  Slot " + i + ": SKIPPED (ArmorSlot)");
 				continue;
 			}
 			
@@ -553,7 +553,7 @@ public class JeiPanel {
 				int maxStackSize = Math.min(slotStack.getMaxStackSize(), slot.getMaxStackSize(slotStack));
 				int spaceInSlot = maxStackSize - slotStack.getCount();
 				
-				System.out.println("  Slot " + i + ": Has matching item " + slotStack.getItem() + " (" + slotStack.getCount() + "/" + maxStackSize + "), space: " + spaceInSlot);
+				//System.out.println("  Slot " + i + ": Has matching item " + slotStack.getItem() + " (" + slotStack.getCount() + "/" + maxStackSize + "), space: " + spaceInSlot);
 				
 				if (spaceInSlot > 0) {
 					int amountToAdd = Math.min(spaceInSlot, remainingCount);
@@ -561,23 +561,23 @@ public class JeiPanel {
 					// So we pass just the amount to add, not the total
 					ItemStack stackToAdd = itemToAdd.copyWithCount(amountToAdd);
 					
-					System.out.println("    Adding " + amountToAdd + " items to slot " + i);
+					//System.out.println("    Adding " + amountToAdd + " items to slot " + i);
 					
 					this.minecraft.gameMode.handleCreativeModeItemAdd(stackToAdd, i);
 					remainingCount -= amountToAdd;
 					
-					System.out.println("    Remaining: " + remainingCount);
+					//System.out.println("    Remaining: " + remainingCount);
 					
 					// For regular clicks, only add to one slot and return immediately
 					if (!isShiftClick) {
-						System.out.println("    Regular click - returning immediately");
+						//System.out.println("    Regular click - returning immediately");
 						return;
 					}
 				}
 			}
 		}
 		
-		System.out.println("  Phase 1 complete, remaining: " + remainingCount);
+		//System.out.println("  Phase 1 complete, remaining: " + remainingCount);
 		
 		// Phase 2: Fill empty slots (excluding armor slots)
 		for (int i = 0; i < containerMenu.slots.size() && remainingCount > 0; i++) {
@@ -590,7 +590,7 @@ public class JeiPanel {
 			String slotClassName = slot.getClass().getName();
 			boolean isArmorSlot = slotClassName.equals(ARMOR_SLOT_CLASS_NAME);
 			if (isArmorSlot) {
-				System.out.println("  Slot " + i + ": SKIPPED (ArmorSlot in phase 2)");
+				//System.out.println("  Slot " + i + ": SKIPPED (ArmorSlot in phase 2)");
 				continue;
 			}
 			
@@ -600,23 +600,23 @@ public class JeiPanel {
 				int amountToAdd = Math.min(maxStackSize, remainingCount);
 				ItemStack newStack = itemToAdd.copyWithCount(amountToAdd);
 				
-				System.out.println("  Slot " + i + ": Empty, adding " + amountToAdd + " items");
+				//System.out.println("  Slot " + i + ": Empty, adding " + amountToAdd + " items");
 				
 				this.minecraft.gameMode.handleCreativeModeItemAdd(newStack, i);
 				remainingCount -= amountToAdd;
 				
-				System.out.println("    Remaining: " + remainingCount);
+				//System.out.println("    Remaining: " + remainingCount);
 				
 				// For regular clicks, only add to one slot and return immediately
 				if (!isShiftClick) {
-					System.out.println("    Regular click - returning immediately");
+					//System.out.println("    Regular click - returning immediately");
 					return;
 				}
 			}
 		}
 		
-		System.out.println("  Phase 2 complete, final remaining: " + remainingCount);
-		System.out.println("=== END DEBUG ===");
+		//System.out.println("  Phase 2 complete, final remaining: " + remainingCount);
+		//System.out.println("=== END DEBUG ===");
 	}
 	
 	/**
