@@ -557,11 +557,13 @@ public class JeiPanel {
 				
 				if (spaceInSlot > 0) {
 					int amountToAdd = Math.min(spaceInSlot, remainingCount);
-					ItemStack newStack = slotStack.copyWithCount(slotStack.getCount() + amountToAdd);
+					// BUG FIX: handleCreativeModeItemAdd ADDS to the slot, not SETS it
+					// So we pass just the amount to add, not the total
+					ItemStack stackToAdd = itemToAdd.copyWithCount(amountToAdd);
 					
-					System.out.println("    Adding " + amountToAdd + " items to slot " + i + " (new count: " + newStack.getCount() + ")");
+					System.out.println("    Adding " + amountToAdd + " items to slot " + i);
 					
-					this.minecraft.gameMode.handleCreativeModeItemAdd(newStack, i);
+					this.minecraft.gameMode.handleCreativeModeItemAdd(stackToAdd, i);
 					remainingCount -= amountToAdd;
 					
 					System.out.println("    Remaining: " + remainingCount);
