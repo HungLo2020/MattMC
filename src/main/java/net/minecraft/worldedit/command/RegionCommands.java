@@ -31,13 +31,13 @@ public class RegionCommands {
      */
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
         // //set command
-        dispatcher.register(Commands.literal("set")
+        dispatcher.register(Commands.literal("/set")
             .requires(source -> source.isPlayer() && hasPermission(source, "worldedit.region.set"))
             .then(Commands.argument("block", StringArgumentType.word())
                 .executes(ctx -> set(ctx, StringArgumentType.getString(ctx, "block")))));
         
         // //replace command
-        dispatcher.register(Commands.literal("replace")
+        dispatcher.register(Commands.literal("/replace")
             .requires(source -> source.isPlayer() && hasPermission(source, "worldedit.region.replace"))
             .then(Commands.argument("from", StringArgumentType.word())
                 .then(Commands.argument("to", StringArgumentType.word())
@@ -46,57 +46,57 @@ public class RegionCommands {
                         StringArgumentType.getString(ctx, "to"))))));
         
         // //walls command
-        dispatcher.register(Commands.literal("walls")
+        dispatcher.register(Commands.literal("/walls")
             .requires(source -> source.isPlayer() && hasPermission(source, "worldedit.region.walls"))
             .then(Commands.argument("block", StringArgumentType.word())
                 .executes(ctx -> walls(ctx, StringArgumentType.getString(ctx, "block")))));
         
         // //faces command
-        dispatcher.register(Commands.literal("faces")
+        dispatcher.register(Commands.literal("/faces")
             .requires(source -> source.isPlayer() && hasPermission(source, "worldedit.region.faces"))
             .then(Commands.argument("block", StringArgumentType.word())
                 .executes(ctx -> faces(ctx, StringArgumentType.getString(ctx, "block")))));
         
         // //overlay command
-        dispatcher.register(Commands.literal("overlay")
+        dispatcher.register(Commands.literal("/overlay")
             .requires(source -> source.isPlayer() && hasPermission(source, "worldedit.region.overlay"))
             .then(Commands.argument("block", StringArgumentType.word())
                 .executes(ctx -> overlay(ctx, StringArgumentType.getString(ctx, "block")))));
         
         // //move command (stubbed - to be fully implemented)
-        dispatcher.register(Commands.literal("move")
+        dispatcher.register(Commands.literal("/move")
             .requires(source -> source.isPlayer() && hasPermission(source, "worldedit.region.move"))
             .executes(ctx -> notImplemented(ctx, "move")));
         
         // //stack command (stubbed - to be fully implemented)
-        dispatcher.register(Commands.literal("stack")
+        dispatcher.register(Commands.literal("/stack")
             .requires(source -> source.isPlayer() && hasPermission(source, "worldedit.region.stack"))
             .executes(ctx -> notImplemented(ctx, "stack")));
         
         // //line command (stubbed - placeholder block argument for future implementation)
-        dispatcher.register(Commands.literal("line")
+        dispatcher.register(Commands.literal("/line")
             .requires(source -> source.isPlayer() && hasPermission(source, "worldedit.region.line"))
             .then(Commands.argument("block", StringArgumentType.word())
                 .executes(ctx -> notImplemented(ctx, "line"))));
         
         // //hollow command (stubbed - to be fully implemented)
-        dispatcher.register(Commands.literal("hollow")
+        dispatcher.register(Commands.literal("/hollow")
             .requires(source -> source.isPlayer() && hasPermission(source, "worldedit.region.hollow"))
             .executes(ctx -> notImplemented(ctx, "hollow")));
         
         // //naturalize command (stubbed - to be fully implemented)
-        dispatcher.register(Commands.literal("naturalize")
+        dispatcher.register(Commands.literal("/naturalize")
             .requires(source -> source.isPlayer() && hasPermission(source, "worldedit.region.naturalize"))
             .executes(ctx -> notImplemented(ctx, "naturalize")));
         
         // //center command (stubbed - placeholder block argument for future implementation)
-        dispatcher.register(Commands.literal("center")
+        dispatcher.register(Commands.literal("/center")
             .requires(source -> source.isPlayer() && hasPermission(source, "worldedit.region.center"))
             .then(Commands.argument("block", StringArgumentType.word())
                 .executes(ctx -> notImplemented(ctx, "center"))));
         
         // //distr command (stubbed - to be fully implemented)
-        dispatcher.register(Commands.literal("distr")
+        dispatcher.register(Commands.literal("/distr")
             .requires(source -> source.isPlayer() && hasPermission(source, "worldedit.analysis.distr"))
             .executes(ctx -> notImplemented(ctx, "distr")));
     }

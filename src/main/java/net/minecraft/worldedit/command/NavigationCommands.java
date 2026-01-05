@@ -28,37 +28,37 @@ public class NavigationCommands {
      */
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
         // //unstuck command
-        dispatcher.register(Commands.literal("unstuck")
+        dispatcher.register(Commands.literal("/unstuck")
             .requires(source -> source.isPlayer() && hasPermission(source, "worldedit.navigation.unstuck"))
             .executes(NavigationCommands::unstuck));
         
         // //ascend command
-        dispatcher.register(Commands.literal("ascend")
+        dispatcher.register(Commands.literal("/ascend")
             .requires(source -> source.isPlayer() && hasPermission(source, "worldedit.navigation.ascend"))
             .executes(ctx -> ascend(ctx, 1))
             .then(Commands.argument("levels", IntegerArgumentType.integer(1, 10))
                 .executes(ctx -> ascend(ctx, IntegerArgumentType.getInteger(ctx, "levels")))));
         
         // //descend command
-        dispatcher.register(Commands.literal("descend")
+        dispatcher.register(Commands.literal("/descend")
             .requires(source -> source.isPlayer() && hasPermission(source, "worldedit.navigation.descend"))
             .executes(ctx -> descend(ctx, 1))
             .then(Commands.argument("levels", IntegerArgumentType.integer(1, 10))
                 .executes(ctx -> descend(ctx, IntegerArgumentType.getInteger(ctx, "levels")))));
         
         // //up command
-        dispatcher.register(Commands.literal("up")
+        dispatcher.register(Commands.literal("/up")
             .requires(source -> source.isPlayer() && hasPermission(source, "worldedit.navigation.up"))
             .then(Commands.argument("distance", IntegerArgumentType.integer(1, 256))
                 .executes(ctx -> up(ctx, IntegerArgumentType.getInteger(ctx, "distance")))));
         
         // //jumpto command
-        dispatcher.register(Commands.literal("jumpto")
+        dispatcher.register(Commands.literal("/jumpto")
             .requires(source -> source.isPlayer() && hasPermission(source, "worldedit.navigation.jumpto"))
             .executes(NavigationCommands::jumpTo));
         
         // //thru command
-        dispatcher.register(Commands.literal("thru")
+        dispatcher.register(Commands.literal("/thru")
             .requires(source -> source.isPlayer() && hasPermission(source, "worldedit.navigation.thru"))
             .executes(NavigationCommands::thru));
     }

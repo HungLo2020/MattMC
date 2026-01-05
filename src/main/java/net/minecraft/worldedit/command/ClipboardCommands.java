@@ -32,28 +32,28 @@ public class ClipboardCommands {
      */
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
         // //copy command
-        dispatcher.register(Commands.literal("copy")
+        dispatcher.register(Commands.literal("/copy")
             .requires(source -> source.isPlayer() && hasPermission(source, "worldedit.clipboard.copy"))
             .executes(ClipboardCommands::copy));
         
         // //cut command
-        dispatcher.register(Commands.literal("cut")
+        dispatcher.register(Commands.literal("/cut")
             .requires(source -> source.isPlayer() && hasPermission(source, "worldedit.clipboard.cut"))
             .executes(ClipboardCommands::cut));
         
         // //paste command
-        dispatcher.register(Commands.literal("paste")
+        dispatcher.register(Commands.literal("/paste")
             .requires(source -> source.isPlayer() && hasPermission(source, "worldedit.clipboard.paste"))
             .executes(ClipboardCommands::paste));
         
         // //rotate command
-        dispatcher.register(Commands.literal("rotate")
+        dispatcher.register(Commands.literal("/rotate")
             .requires(source -> source.isPlayer() && hasPermission(source, "worldedit.clipboard.rotate"))
             .then(Commands.argument("degrees", IntegerArgumentType.integer())
                 .executes(ctx -> rotate(ctx, IntegerArgumentType.getInteger(ctx, "degrees")))));
         
         // //flip command  
-        dispatcher.register(Commands.literal("flip")
+        dispatcher.register(Commands.literal("/flip")
             .requires(source -> source.isPlayer() && hasPermission(source, "worldedit.clipboard.flip"))
             .executes(ClipboardCommands::flip));
     }

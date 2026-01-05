@@ -28,47 +28,47 @@ public class SchematicCommands {
      */
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
         // //schematic save command
-        dispatcher.register(Commands.literal("schematic")
-            .then(Commands.literal("save")
+        dispatcher.register(Commands.literal("/schematic")
+            .then(Commands.literal("/save")
                 .requires(source -> source.isPlayer() && hasPermission(source, "worldedit.schematic.save"))
                 .then(Commands.argument("name", StringArgumentType.word())
                     .executes(ctx -> save(ctx, StringArgumentType.getString(ctx, "name"))))));
         
         // //schematic load command
-        dispatcher.register(Commands.literal("schematic")
-            .then(Commands.literal("load")
+        dispatcher.register(Commands.literal("/schematic")
+            .then(Commands.literal("/load")
                 .requires(source -> source.isPlayer() && hasPermission(source, "worldedit.schematic.load"))
                 .then(Commands.argument("name", StringArgumentType.word())
                     .executes(ctx -> load(ctx, StringArgumentType.getString(ctx, "name"))))));
         
         // //schematic list command
-        dispatcher.register(Commands.literal("schematic")
-            .then(Commands.literal("list")
+        dispatcher.register(Commands.literal("/schematic")
+            .then(Commands.literal("/list")
                 .requires(source -> source.isPlayer() && hasPermission(source, "worldedit.schematic.list"))
                 .executes(SchematicCommands::list)));
         
         // //schematic delete command
-        dispatcher.register(Commands.literal("schematic")
-            .then(Commands.literal("delete")
+        dispatcher.register(Commands.literal("/schematic")
+            .then(Commands.literal("/delete")
                 .requires(source -> source.isPlayer() && hasPermission(source, "worldedit.schematic.delete"))
                 .then(Commands.argument("name", StringArgumentType.word())
                     .executes(ctx -> delete(ctx, StringArgumentType.getString(ctx, "name"))))));
         
         // Alias: //schem
-        dispatcher.register(Commands.literal("schem")
+        dispatcher.register(Commands.literal("/schem")
             .requires(source -> source.isPlayer())
-            .then(Commands.literal("save")
+            .then(Commands.literal("/save")
                 .requires(source -> hasPermission(source, "worldedit.schematic.save"))
                 .then(Commands.argument("name", StringArgumentType.word())
                     .executes(ctx -> save(ctx, StringArgumentType.getString(ctx, "name")))))
-            .then(Commands.literal("load")
+            .then(Commands.literal("/load")
                 .requires(source -> hasPermission(source, "worldedit.schematic.load"))
                 .then(Commands.argument("name", StringArgumentType.word())
                     .executes(ctx -> load(ctx, StringArgumentType.getString(ctx, "name")))))
-            .then(Commands.literal("list")
+            .then(Commands.literal("/list")
                 .requires(source -> hasPermission(source, "worldedit.schematic.list"))
                 .executes(SchematicCommands::list))
-            .then(Commands.literal("delete")
+            .then(Commands.literal("/delete")
                 .requires(source -> hasPermission(source, "worldedit.schematic.delete"))
                 .then(Commands.argument("name", StringArgumentType.word())
                     .executes(ctx -> delete(ctx, StringArgumentType.getString(ctx, "name"))))));

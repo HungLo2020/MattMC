@@ -35,13 +35,13 @@ public class UtilityCommands {
      */
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
         // //drain command
-        dispatcher.register(Commands.literal("drain")
+        dispatcher.register(Commands.literal("/drain")
             .requires(source -> source.isPlayer() && hasPermission(source, "worldedit.drain"))
             .then(Commands.argument("radius", IntegerArgumentType.integer(1, 100))
                 .executes(ctx -> drain(ctx, IntegerArgumentType.getInteger(ctx, "radius")))));
         
         // //fill command  
-        dispatcher.register(Commands.literal("fill")
+        dispatcher.register(Commands.literal("/fill")
             .requires(source -> source.isPlayer() && hasPermission(source, "worldedit.fill"))
             .then(Commands.argument("block", StringArgumentType.word())
                 .then(Commands.argument("radius", IntegerArgumentType.integer(1, 100))
@@ -50,33 +50,33 @@ public class UtilityCommands {
                         IntegerArgumentType.getInteger(ctx, "radius"))))));
         
         // //fixwater command
-        dispatcher.register(Commands.literal("fixwater")
+        dispatcher.register(Commands.literal("/fixwater")
             .requires(source -> source.isPlayer() && hasPermission(source, "worldedit.fixwater"))
             .then(Commands.argument("radius", IntegerArgumentType.integer(1, 100))
                 .executes(ctx -> fixFluid(ctx, IntegerArgumentType.getInteger(ctx, "radius"), true))));
         
         // //fixlava command
-        dispatcher.register(Commands.literal("fixlava")
+        dispatcher.register(Commands.literal("/fixlava")
             .requires(source -> source.isPlayer() && hasPermission(source, "worldedit.fixlava"))
             .then(Commands.argument("radius", IntegerArgumentType.integer(1, 100))
                 .executes(ctx -> fixFluid(ctx, IntegerArgumentType.getInteger(ctx, "radius"), false))));
         
         // //removeabove command
-        dispatcher.register(Commands.literal("removeabove")
+        dispatcher.register(Commands.literal("/removeabove")
             .requires(source -> source.isPlayer() && hasPermission(source, "worldedit.removeabove"))
             .executes(ctx -> removeAbove(ctx, 256))
             .then(Commands.argument("height", IntegerArgumentType.integer(1, 320))
                 .executes(ctx -> removeAbove(ctx, IntegerArgumentType.getInteger(ctx, "height")))));
         
         // //removebelow command
-        dispatcher.register(Commands.literal("removebelow")
+        dispatcher.register(Commands.literal("/removebelow")
             .requires(source -> source.isPlayer() && hasPermission(source, "worldedit.removebelow"))
             .executes(ctx -> removeBelow(ctx, 256))
             .then(Commands.argument("depth", IntegerArgumentType.integer(1, 320))
                 .executes(ctx -> removeBelow(ctx, IntegerArgumentType.getInteger(ctx, "depth")))));
         
         // //replacenear command
-        dispatcher.register(Commands.literal("replacenear")
+        dispatcher.register(Commands.literal("/replacenear")
             .requires(source -> source.isPlayer() && hasPermission(source, "worldedit.replacenear"))
             .then(Commands.argument("radius", IntegerArgumentType.integer(1, 100))
                 .then(Commands.argument("from", StringArgumentType.word())

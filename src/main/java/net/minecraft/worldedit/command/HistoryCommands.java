@@ -22,17 +22,17 @@ public class HistoryCommands {
      */
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
         // //undo command
-        dispatcher.register(Commands.literal("undo")
+        dispatcher.register(Commands.literal("/undo")
             .requires(source -> source.isPlayer() && hasPermission(source, "worldedit.history.undo"))
             .executes(HistoryCommands::undo));
         
         // //redo command
-        dispatcher.register(Commands.literal("redo")
+        dispatcher.register(Commands.literal("/redo")
             .requires(source -> source.isPlayer() && hasPermission(source, "worldedit.history.redo"))
             .executes(HistoryCommands::redo));
         
         // //clearhistory command
-        dispatcher.register(Commands.literal("clearhistory")
+        dispatcher.register(Commands.literal("/clearhistory")
             .requires(source -> source.isPlayer() && hasPermission(source, "worldedit.history.clear"))
             .executes(HistoryCommands::clearHistory));
     }

@@ -34,7 +34,7 @@ public class GenerationCommands {
      */
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
         // //sphere command
-        dispatcher.register(Commands.literal("sphere")
+        dispatcher.register(Commands.literal("/sphere")
             .requires(source -> source.isPlayer() && hasPermission(source, "worldedit.generation.sphere"))
             .then(Commands.argument("block", StringArgumentType.word())
                 .then(Commands.argument("radius", IntegerArgumentType.integer(1, 100))
@@ -44,7 +44,7 @@ public class GenerationCommands {
                         false)))));
         
         // //hsphere command (hollow sphere)
-        dispatcher.register(Commands.literal("hsphere")
+        dispatcher.register(Commands.literal("/hsphere")
             .requires(source -> source.isPlayer() && hasPermission(source, "worldedit.generation.sphere"))
             .then(Commands.argument("block", StringArgumentType.word())
                 .then(Commands.argument("radius", IntegerArgumentType.integer(1, 100))
@@ -54,7 +54,7 @@ public class GenerationCommands {
                         true)))));
         
         // //cyl command (cylinder)
-        dispatcher.register(Commands.literal("cyl")
+        dispatcher.register(Commands.literal("/cyl")
             .requires(source -> source.isPlayer() && hasPermission(source, "worldedit.generation.cylinder"))
             .then(Commands.argument("block", StringArgumentType.word())
                 .then(Commands.argument("radius", IntegerArgumentType.integer(1, 100))
@@ -66,7 +66,7 @@ public class GenerationCommands {
                             false))))));
         
         // //hcyl command (hollow cylinder)
-        dispatcher.register(Commands.literal("hcyl")
+        dispatcher.register(Commands.literal("/hcyl")
             .requires(source -> source.isPlayer() && hasPermission(source, "worldedit.generation.cylinder"))
             .then(Commands.argument("block", StringArgumentType.word())
                 .then(Commands.argument("radius", IntegerArgumentType.integer(1, 100))
@@ -78,7 +78,7 @@ public class GenerationCommands {
                             true))))));
         
         // //pyramid command
-        dispatcher.register(Commands.literal("pyramid")
+        dispatcher.register(Commands.literal("/pyramid")
             .requires(source -> source.isPlayer() && hasPermission(source, "worldedit.generation.pyramid"))
             .then(Commands.argument("block", StringArgumentType.word())
                 .then(Commands.argument("size", IntegerArgumentType.integer(1, 100))

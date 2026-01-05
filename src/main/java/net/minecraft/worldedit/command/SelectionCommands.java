@@ -30,49 +30,49 @@ public class SelectionCommands {
      */
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
         // //pos1 command
-        dispatcher.register(Commands.literal("pos1")
+        dispatcher.register(Commands.literal("/pos1")
             .requires(source -> source.isPlayer() && hasPermission(source, "worldedit.selection.pos"))
             .executes(SelectionCommands::pos1));
         
         // //pos2 command
-        dispatcher.register(Commands.literal("pos2")
+        dispatcher.register(Commands.literal("/pos2")
             .requires(source -> source.isPlayer() && hasPermission(source, "worldedit.selection.pos"))
             .executes(SelectionCommands::pos2));
         
         // //chunk command
-        dispatcher.register(Commands.literal("chunk")
+        dispatcher.register(Commands.literal("/chunk")
             .requires(source -> source.isPlayer() && hasPermission(source, "worldedit.selection.chunk"))
             .executes(SelectionCommands::chunk));
         
         // //sel command (show selection info)
-        dispatcher.register(Commands.literal("sel")
+        dispatcher.register(Commands.literal("/sel")
             .requires(source -> source.isPlayer() && hasPermission(source, "worldedit.selection.pos"))
             .executes(SelectionCommands::selectionInfo));
         
         // //desel command (clear selection)
-        dispatcher.register(Commands.literal("desel")
+        dispatcher.register(Commands.literal("/desel")
             .requires(source -> source.isPlayer() && hasPermission(source, "worldedit.selection.pos"))
             .executes(SelectionCommands::deselect));
         
         // //expand command
-        dispatcher.register(Commands.literal("expand")
+        dispatcher.register(Commands.literal("/expand")
             .requires(source -> source.isPlayer() && hasPermission(source, "worldedit.selection.expand"))
             .then(Commands.argument("amount", IntegerArgumentType.integer(1))
                 .executes(ctx -> expand(ctx, IntegerArgumentType.getInteger(ctx, "amount")))));
         
         // //contract command
-        dispatcher.register(Commands.literal("contract")
+        dispatcher.register(Commands.literal("/contract")
             .requires(source -> source.isPlayer() && hasPermission(source, "worldedit.selection.contract"))
             .then(Commands.argument("amount", IntegerArgumentType.integer(1))
                 .executes(ctx -> contract(ctx, IntegerArgumentType.getInteger(ctx, "amount")))));
         
         // //count command
-        dispatcher.register(Commands.literal("count")
+        dispatcher.register(Commands.literal("/count")
             .requires(source -> source.isPlayer() && hasPermission(source, "worldedit.analysis.count"))
             .executes(SelectionCommands::count));
         
         // //size command
-        dispatcher.register(Commands.literal("size")
+        dispatcher.register(Commands.literal("/size")
             .requires(source -> source.isPlayer() && hasPermission(source, "worldedit.selection.size"))
             .executes(SelectionCommands::size));
     }
