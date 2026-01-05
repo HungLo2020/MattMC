@@ -2395,6 +2395,9 @@ public class Items {
 	public static final Item TRIAL_KEY = registerItem("trial_key");
 	public static final Item OMINOUS_TRIAL_KEY = registerItem("ominous_trial_key");
 	public static final Item VAULT = registerBlock(Blocks.VAULT);
+	// WorldEdit wand item
+	public static final Item WAND = registerItem("wand", WandItem::new, new Item.Properties().stacksTo(1));
+	
 	public static final Item OMINOUS_BOTTLE = registerItem(
 		"ominous_bottle",
 		new Item.Properties()

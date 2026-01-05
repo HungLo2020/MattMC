@@ -208,6 +208,9 @@ public abstract class PlayerList {
 			// Ignore - event handlers should not break player join
 		}
 		
+		// WorldEdit: Initialize session for player
+		net.minecraft.worldedit.platform.WorldEditIntegration.onPlayerJoin(serverPlayer);
+		
 		serverPlayer.getStats().markAllDirty();
 		// Recipe book removed - no longer sending initial recipe book data
 		this.updateEntireScoreboard(serverLevel.getScoreboard(), serverPlayer);
