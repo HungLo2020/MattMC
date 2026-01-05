@@ -544,8 +544,8 @@ public class JeiPanel {
 					this.minecraft.gameMode.handleCreativeModeItemAdd(newStack, i);
 					remainingCount -= amountToAdd;
 					
-					// For regular clicks, only add to one slot
-					if (!isShiftClick && remainingCount == 0) {
+					// For regular clicks, only add to one slot and return immediately
+					if (!isShiftClick) {
 						return;
 					}
 				}
@@ -570,8 +570,8 @@ public class JeiPanel {
 				this.minecraft.gameMode.handleCreativeModeItemAdd(newStack, i);
 				remainingCount -= amountToAdd;
 				
-				// For regular clicks, only add to one slot
-				if (!isShiftClick && remainingCount == 0) {
+				// For regular clicks, only add to one slot and return immediately
+				if (!isShiftClick) {
 					return;
 				}
 			}
