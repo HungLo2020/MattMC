@@ -30,6 +30,7 @@ import net.minecraft.world.item.ItemStackLinkedSet;
 public class JeiPanel {
 	private static final ResourceLocation SCROLLER_SPRITE = ResourceLocation.withDefaultNamespace("container/creative_inventory/scroller");
 	private static final int JEI_SLOT_SIZE = 18;
+	private static final String ARMOR_SLOT_CLASS_NAME = "net.minecraft.world.inventory.ArmorSlot";
 	
 	private final Minecraft minecraft;
 	private final Font font;
@@ -377,10 +378,12 @@ public class JeiPanel {
 						int count = isShiftDown ? itemStack.getMaxStackSize() : 1;
 						ItemStack itemToAdd = itemStack.copyWithCount(count);
 						
-						int targetSlot = this.findBestSlotForItem(itemToAdd);
-						if (targetSlot != -1) {
-							this.minecraft.gameMode.handleCreativeModeItemAdd(itemToAdd, targetSlot);
-						}
+						//System.out.println("=== JEI CLICK DEBUG ===");
+						//System.out.println("Shift down: " + isShiftDown);
+						//System.out.println("Item to add: " + itemToAdd.getItem() + " x" + count);
+						
+						// Find the best slot and add only what fits to prevent overflow to armor slots
+						this.addItemToInventorySafe(itemToAdd);
 						
 						return true;
 					}
@@ -505,71 +508,115 @@ public class JeiPanel {
 		return false;
 	}
 	
-	private int findBestSlotForItem(ItemStack itemStack) {
-		if (this.minecraft == null || this.minecraft.player == null) {
-			return -1;
-		}
-		
-		Inventory inventory = this.minecraft.player.getInventory();
-		
-		// Try to find existing stack with space
-		int slotWithSpace = inventory.getSlotWithRemainingSpace(itemStack);
-		if (slotWithSpace != -1) {
-			int containerSlot = inventoryIndexToContainerSlot(slotWithSpace);
-			if (containerSlot != -1) {
-				return containerSlot;
-			}
-		}
-		
-		// Find first empty slot
-		int freeSlot = inventory.getFreeSlot();
-		if (freeSlot != -1) {
-			int containerSlot = inventoryIndexToContainerSlot(freeSlot);
-			if (containerSlot != -1) {
-				return containerSlot;
-			}
-		}
-		
-		return -1;
-	}
-	
 	/**
-	 * Converts a player inventory index to the correct container slot index.
-	 * This dynamically finds where the player's inventory is in the current container.
+	 * Safely adds items to inventory, calculating exact fit to prevent server-side overflow.
+	 * For regular clicks: adds to first available slot only (max 1 item).
+	 * For shift-clicks: distributes across multiple slots as needed.
 	 */
-	private int inventoryIndexToContainerSlot(int inventoryIndex) {
-		if (this.minecraft == null || this.minecraft.player == null) {
-			return -1;
+	private void addItemToInventorySafe(ItemStack itemToAdd) {
+		if (this.minecraft == null || this.minecraft.player == null || itemToAdd.isEmpty()) {
+			return;
 		}
 		
-		// Get the currently open container
 		var containerMenu = this.minecraft.player.containerMenu;
 		if (containerMenu == null) {
-			return -1;
+			return;
 		}
 		
 		Inventory playerInventory = this.minecraft.player.getInventory();
+		int remainingCount = itemToAdd.getCount();
+		boolean isShiftClick = remainingCount > 1;
 		
-		// Find which slot in the container corresponds to this inventory index
-		// by checking which slots belong to the player's inventory
-		int foundSlot = -1;
-		for (int i = 0; i < containerMenu.slots.size(); i++) {
+		//System.out.println("addItemToInventorySafe called:");
+		//System.out.println("  Item: " + itemToAdd.getItem());
+		//System.out.println("  Initial count: " + remainingCount);
+		//System.out.println("  Is shift click: " + isShiftClick);
+		//System.out.println("  Container slots: " + containerMenu.slots.size());
+		
+		// Phase 1: Fill existing partial stacks (excluding armor slots)
+		for (int i = 0; i < containerMenu.slots.size() && remainingCount > 0; i++) {
 			var slot = containerMenu.slots.get(i);
-			// Check if this slot belongs to the player's inventory
-			if (slot.container == playerInventory) {
-				int slotIndex = slot.getContainerSlot();
-				// slot.getContainerSlot() gives the index within the inventory (0-40)
-				// We need to match it to our inventoryIndex
-				if (slotIndex == inventoryIndex) {
-					// Only return the first match
-					if (foundSlot == -1) {
-						foundSlot = i;
+			
+			// Skip if not player inventory
+			if (slot.container != playerInventory) continue;
+			
+			// Skip armor slots
+			String slotClassName = slot.getClass().getName();
+			boolean isArmorSlot = slotClassName.equals(ARMOR_SLOT_CLASS_NAME);
+			if (isArmorSlot) {
+				//System.out.println("  Slot " + i + ": SKIPPED (ArmorSlot)");
+				continue;
+			}
+			
+			ItemStack slotStack = slot.getItem();
+			if (!slotStack.isEmpty() && ItemStack.isSameItemSameComponents(slotStack, itemToAdd)) {
+				int maxStackSize = Math.min(slotStack.getMaxStackSize(), slot.getMaxStackSize(slotStack));
+				int spaceInSlot = maxStackSize - slotStack.getCount();
+				
+				//System.out.println("  Slot " + i + ": Has matching item " + slotStack.getItem() + " (" + slotStack.getCount() + "/" + maxStackSize + "), space: " + spaceInSlot);
+				
+				if (spaceInSlot > 0) {
+					int amountToAdd = Math.min(spaceInSlot, remainingCount);
+					// BUG FIX: handleCreativeModeItemAdd ADDS to the slot, not SETS it
+					// So we pass just the amount to add, not the total
+					ItemStack stackToAdd = itemToAdd.copyWithCount(amountToAdd);
+					
+					//System.out.println("    Adding " + amountToAdd + " items to slot " + i);
+					
+					this.minecraft.gameMode.handleCreativeModeItemAdd(stackToAdd, i);
+					remainingCount -= amountToAdd;
+					
+					//System.out.println("    Remaining: " + remainingCount);
+					
+					// For regular clicks, only add to one slot and return immediately
+					if (!isShiftClick) {
+						//System.out.println("    Regular click - returning immediately");
+						return;
 					}
 				}
 			}
 		}
 		
-		return foundSlot;
+		//System.out.println("  Phase 1 complete, remaining: " + remainingCount);
+		
+		// Phase 2: Fill empty slots (excluding armor slots)
+		for (int i = 0; i < containerMenu.slots.size() && remainingCount > 0; i++) {
+			var slot = containerMenu.slots.get(i);
+			
+			// Skip if not player inventory
+			if (slot.container != playerInventory) continue;
+			
+			// Skip armor slots
+			String slotClassName = slot.getClass().getName();
+			boolean isArmorSlot = slotClassName.equals(ARMOR_SLOT_CLASS_NAME);
+			if (isArmorSlot) {
+				//System.out.println("  Slot " + i + ": SKIPPED (ArmorSlot in phase 2)");
+				continue;
+			}
+			
+			ItemStack slotStack = slot.getItem();
+			if (slotStack.isEmpty()) {
+				int maxStackSize = Math.min(itemToAdd.getMaxStackSize(), slot.getMaxStackSize(itemToAdd));
+				int amountToAdd = Math.min(maxStackSize, remainingCount);
+				ItemStack newStack = itemToAdd.copyWithCount(amountToAdd);
+				
+				//System.out.println("  Slot " + i + ": Empty, adding " + amountToAdd + " items");
+				
+				this.minecraft.gameMode.handleCreativeModeItemAdd(newStack, i);
+				remainingCount -= amountToAdd;
+				
+				//System.out.println("    Remaining: " + remainingCount);
+				
+				// For regular clicks, only add to one slot and return immediately
+				if (!isShiftClick) {
+					//System.out.println("    Regular click - returning immediately");
+					return;
+				}
+			}
+		}
+		
+		//System.out.println("  Phase 2 complete, final remaining: " + remainingCount);
+		//System.out.println("=== END DEBUG ===");
 	}
 	
 	/**

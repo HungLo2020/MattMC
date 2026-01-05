@@ -19,7 +19,7 @@ import net.minecraft.world.item.crafting.display.SlotDisplay;
  */
 public class FurnaceRecipeRenderer extends RecipeRenderer {
 	private static final int GUI_WIDTH = 176;
-	private static final int GUI_HEIGHT = 75; // Cut off player inventory slots (was 166, then 90)
+	private static final int GUI_HEIGHT = 166; // Cut off player inventory slots (was 166, then 90)
 	
 	// Slot positions in the furnace GUI
 	private static final int INPUT_X = 56;
@@ -64,7 +64,7 @@ public class FurnaceRecipeRenderer extends RecipeRenderer {
 						guiGraphics.renderItemDecorations(font, item, x + INPUT_X, y + INPUT_Y);
 					}
 				} else {
-					System.out.println("[FurnaceRecipeRenderer]   WARNING: No ingredients resolved - input slot will be empty!");
+					//System.out.println("[FurnaceRecipeRenderer]   WARNING: No ingredients resolved - input slot will be empty!");
 				}
 			}
 			

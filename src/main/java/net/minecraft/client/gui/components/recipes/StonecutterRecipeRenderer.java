@@ -17,9 +17,9 @@ import net.minecraft.world.item.crafting.display.StonecutterRecipeDisplay;
  */
 public class StonecutterRecipeRenderer extends RecipeRenderer {
 	private static final ResourceLocation STONECUTTER_LOCATION = 
-		ResourceLocation.withDefaultNamespace("textures/gui/container/stonecutter.png");
+		ResourceLocation.withDefaultNamespace("textures/gui/container/jei/stonecutter.png");
 	private static final int GUI_WIDTH = 176;
-	private static final int GUI_HEIGHT = 75; // Cut off player inventory slots (was 166, then 90)
+	private static final int GUI_HEIGHT = 166; // Cut off player inventory slots (was 166, then 90)
 	
 	// Slot positions in the stonecutter GUI
 	private static final int INPUT_X = 20;
