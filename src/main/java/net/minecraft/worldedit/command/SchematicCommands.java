@@ -107,11 +107,13 @@ public class SchematicCommands {
         // Save schematic
         try {
             SchematicHandler handler = new SchematicHandler(world.getServer().getServerDirectory().toFile());
+            System.out.println("Saving schematic '" + name + "' with " + clipboard.getVolume() + " blocks from clipboard");
             handler.save(clipboard, name);
             player.sendSystemMessage(Component.literal(String.format("§aSchematic saved as '%s'", name)));
             return Command.SINGLE_SUCCESS;
         } catch (Exception e) {
             player.sendSystemMessage(Component.literal("§cFailed to save schematic: " + e.getMessage()));
+            e.printStackTrace();
             return 0;
         }
     }
@@ -128,11 +130,13 @@ public class SchematicCommands {
             SchematicHandler handler = new SchematicHandler(world.getServer().getServerDirectory().toFile());
             Clipboard clipboard = handler.load(name);
             
+            System.out.println("Loaded schematic '" + name + "' into clipboard with " + clipboard.getVolume() + " blocks");
             session.setClipboard(clipboard);
             player.sendSystemMessage(Component.literal(String.format("§aSchematic '%s' loaded into clipboard", name)));
             return Command.SINGLE_SUCCESS;
         } catch (Exception e) {
             player.sendSystemMessage(Component.literal("§cFailed to load schematic: " + e.getMessage()));
+            e.printStackTrace();
             return 0;
         }
     }
