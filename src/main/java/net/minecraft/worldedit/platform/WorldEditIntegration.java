@@ -19,7 +19,7 @@ import net.minecraft.world.item.ItemStack;
 public class WorldEditIntegration {
     
     /**
-     * Handle wand left-click (set secondary position).
+     * Handle wand left-click (set primary position - pos1).
      */
     public static void handleWandLeftClick(ServerPlayer player, BlockPos pos) {
         System.out.println("WorldEditIntegration.handleWandLeftClick called - pos: " + pos);
@@ -32,15 +32,15 @@ public class WorldEditIntegration {
         LocalSession session = WorldEdit.getInstance().getSessionManager().get(player);
         BlockVector3 blockPos = BlockVector3.from(pos);
         
-        System.out.println("Setting secondary position to: " + blockPos);
+        System.out.println("Setting primary position (pos1) to: " + blockPos);
         
-        if (session.getCurrentSelector().selectSecondary(blockPos)) {
-            session.getCurrentSelector().explainSecondarySelection(player, blockPos);
+        if (session.getCurrentSelector().selectPrimary(blockPos)) {
+            session.getCurrentSelector().explainPrimarySelection(player, blockPos);
         }
     }
     
     /**
-     * Handle wand right-click (set primary position).
+     * Handle wand right-click (set secondary position - pos2).
      */
     public static void handleWandRightClick(ServerPlayer player, BlockPos pos) {
         System.out.println("WorldEditIntegration.handleWandRightClick called - pos: " + pos);
@@ -53,10 +53,10 @@ public class WorldEditIntegration {
         LocalSession session = WorldEdit.getInstance().getSessionManager().get(player);
         BlockVector3 blockPos = BlockVector3.from(pos);
         
-        System.out.println("Setting primary position to: " + blockPos);
+        System.out.println("Setting secondary position (pos2) to: " + blockPos);
         
-        if (session.getCurrentSelector().selectPrimary(blockPos)) {
-            session.getCurrentSelector().explainPrimarySelection(player, blockPos);
+        if (session.getCurrentSelector().selectSecondary(blockPos)) {
+            session.getCurrentSelector().explainSecondarySelection(player, blockPos);
         }
     }
     
