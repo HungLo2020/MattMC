@@ -1588,21 +1588,10 @@ public class ServerGamePacketListenerImpl
 		PacketUtils.ensureRunningOnSameThread(serverboundSwingPacket, this, this.player.level());
 		this.player.resetLastActionTime();
 		
-		// WorldEdit: Handle left-click air for wand
+		// WorldEdit: Handle general tool activation on left-click air
 		if (this.worldEdit_ignoreSwingPackets > 0) {
 			this.worldEdit_ignoreSwingPackets--;
 		} else {
-			// Check if player is holding a wand
-			net.minecraft.world.item.ItemStack stack = this.player.getItemInHand(serverboundSwingPacket.getHand());
-			if (stack.getItem() instanceof net.minecraft.world.item.WandItem) {
-				// Handle wand left-click (set secondary position)
-				net.minecraft.world.phys.HitResult hitResult = this.player.pick(100, 0, false);
-				if (hitResult instanceof net.minecraft.world.phys.BlockHitResult blockHit) {
-					net.minecraft.worldedit.platform.WorldEditIntegration.handleWandLeftClick(this.player, blockHit.getBlockPos());
-					return; // Don't swing arm for wand
-				}
-			}
-			// Also check for general tool activation
 			net.minecraft.worldedit.platform.WorldEditIntegration.onLeftClickAir(this.player, serverboundSwingPacket.getHand());
 		}
 		

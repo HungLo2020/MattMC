@@ -1,15 +1,18 @@
 package net.minecraft.worldedit.schematic;
 
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.NbtAccounter;
 import net.minecraft.nbt.NbtIo;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.worldedit.clipboard.Clipboard;
 import net.minecraft.worldedit.math.BlockVector3;
+import net.minecraft.worldedit.region.CuboidRegion;
 
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
@@ -50,12 +53,12 @@ public class SchematicHandler {
         root.putShort("Height", (short) dimensions.getY());
         root.putShort("Length", (short) dimensions.getZ());
         
-        // Offset (origin)
+        // Offset (origin) - store as relative to schematic coordinates
+        // For schematics, we want origin at the minimum corner
         int[] offset = new int[3];
-        BlockVector3 origin = clipboard.getOrigin();
-        offset[0] = origin.getX();
-        offset[1] = origin.getY();
-        offset[2] = origin.getZ();
+        offset[0] = 0;
+        offset[1] = 0;
+        offset[2] = 0;
         root.putIntArray("Offset", offset);
         
         // Save palette and block data
@@ -84,7 +87,9 @@ public class SchematicHandler {
         // Write palette
         CompoundTag paletteTag = new CompoundTag();
         for (Map.Entry<BlockState, Integer> entry : palette.entrySet()) {
-            String blockName = entry.getKey().getBlock().getDescriptionId();
+            Block block = entry.getKey().getBlock();
+            ResourceLocation blockId = BuiltInRegistries.BLOCK.getKey(block);
+            String blockName = blockId.toString();
             paletteTag.putInt(blockName, entry.getValue());
         }
         root.put("Palette", paletteTag);
@@ -92,15 +97,14 @@ public class SchematicHandler {
         // Write block data
         root.putByteArray("BlockData", blocks);
         
-        // Save to file
-        try (FileOutputStream fos = new FileOutputStream(file)) {
-            NbtIo.writeCompressed(root, fos);
-        }
+        // Save to file using Path API
+        NbtIo.writeCompressed(root, file.toPath());
+        
+        System.out.println("Saved schematic '" + name + "' with " + palette.size() + " unique blocks and " + blocks.length + " total blocks");
     }
     
     /**
      * Load a schematic file into a clipboard.
-     * TODO: Implement full loading functionality
      */
     public Clipboard load(String name) throws IOException {
         File file = new File(schematicDirectory, name + ".schem");
@@ -108,15 +112,79 @@ public class SchematicHandler {
             throw new IOException("Schematic file not found: " + name);
         }
         
-        // Stub: Create empty clipboard for now
-        // Full implementation would parse NBT and reconstruct blocks
-        Clipboard clipboard = new Clipboard(
-            new net.minecraft.worldedit.region.CuboidRegion(
-                BlockVector3.at(0, 0, 0),
-                BlockVector3.at(10, 10, 10)
-            ),
-            BlockVector3.at(0, 0, 0)
-        );
+        // Read NBT data using Path API
+        CompoundTag root = NbtIo.readCompressed(file.toPath(), NbtAccounter.unlimitedHeap());
+        
+        // Read dimensions
+        short width = root.getShortOr("Width", (short) 0);
+        short height = root.getShortOr("Height", (short) 0);
+        short length = root.getShortOr("Length", (short) 0);
+        
+        // Read offset (origin) - for schematics, origin should be at (0,0,0)
+        int[] offsetArray = root.getIntArray("Offset").orElse(new int[]{0, 0, 0});
+        BlockVector3 origin = BlockVector3.ZERO;
+        if (offsetArray.length >= 3) {
+            origin = BlockVector3.at(offsetArray[0], offsetArray[1], offsetArray[2]);
+        }
+        
+        // Create region and clipboard
+        BlockVector3 min = BlockVector3.ZERO;
+        BlockVector3 max = min.add(width - 1, height - 1, length - 1);
+        CuboidRegion region = new CuboidRegion(min, max);
+        Clipboard clipboard = new Clipboard(region, origin);
+        
+        // Read palette
+        CompoundTag paletteTag = root.getCompoundOrEmpty("Palette");
+        Map<Integer, BlockState> palette = new HashMap<>();
+        
+        for (String blockName : paletteTag.keySet()) {
+            int paletteId = paletteTag.getIntOr(blockName, 0);
+            
+            // Parse block name to get BlockState
+            ResourceLocation blockId = ResourceLocation.tryParse(blockName);
+            if (blockId == null) {
+                System.err.println("Warning: Invalid block ID in schematic: " + blockName);
+                palette.put(paletteId, Blocks.AIR.defaultBlockState());
+                continue;
+            }
+            
+            Block block = BuiltInRegistries.BLOCK.getValue(blockId);
+            if (block == null) {
+                System.err.println("Warning: Unknown block in schematic: " + blockName);
+                palette.put(paletteId, Blocks.AIR.defaultBlockState());
+                continue;
+            }
+            
+            palette.put(paletteId, block.defaultBlockState());
+        }
+        
+        // Read block data
+        byte[] blocks = root.getByteArray("BlockData").orElse(new byte[0]);
+        
+        // Reconstruct blocks in clipboard
+        int blockIndex = 0;
+        boolean arrayTooShort = false;
+        for (int y = 0; y < height && !arrayTooShort; y++) {
+            for (int z = 0; z < length && !arrayTooShort; z++) {
+                for (int x = 0; x < width; x++) {
+                    if (blockIndex >= blocks.length) {
+                        System.err.println("Warning: Block data array is shorter than expected");
+                        arrayTooShort = true;
+                        break;
+                    }
+                    
+                    int paletteId = blocks[blockIndex++] & 0xFF; // Convert byte to unsigned
+                    BlockState state = palette.get(paletteId);
+                    
+                    if (state != null) {
+                        BlockVector3 pos = min.add(x, y, z);
+                        clipboard.setBlock(pos, state);
+                    }
+                }
+            }
+        }
+        
+        System.out.println("Loaded schematic '" + name + "' with " + clipboard.getVolume() + " blocks");
         
         return clipboard;
     }

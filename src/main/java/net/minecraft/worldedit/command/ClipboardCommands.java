@@ -151,6 +151,9 @@ public class ClipboardCommands {
         
         Clipboard clipboard = (Clipboard) session.getClipboard();
         
+        System.out.println("Pasting clipboard with " + clipboard.getVolume() + " blocks");
+        System.out.println("Clipboard blocks map size: " + clipboard.getBlocks().size());
+        
         // Create edit session for pasting
         EditSession editSession = new EditSession(world, session.getDefaultChangeLimit());
         editSession.setFastMode(session.isFastMode());
@@ -171,6 +174,8 @@ public class ClipboardCommands {
                 count++;
             }
         }
+        
+        System.out.println("Pasted " + count + " blocks");
         
         // Remember for undo
         session.remember(editSession);
