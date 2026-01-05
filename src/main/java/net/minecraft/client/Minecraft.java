@@ -700,6 +700,13 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 				throw new RuntimeException(e);
 			}
 		}
+		
+		// VoxelMap: Initialize early (similar to Iris pattern)
+		try {
+			com.mamiyaotaru.voxelmap.VoxelMapInitializer.initialize();
+		} catch (Exception e) {
+			LOGGER.error("Failed to initialize VoxelMap", e);
+		}
 	}
 
 	public boolean hasShiftDown() {
