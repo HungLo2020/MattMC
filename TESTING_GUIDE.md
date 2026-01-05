@@ -2,6 +2,19 @@
 
 This guide explains how to test WorldEdit functionality in MattMC to verify commands are working correctly.
 
+## ⚠️ IMPORTANT: Command Registration Fix
+
+**Latest Fix (Commit 74466652)**: Resolved timing issue where WorldEdit commands weren't being registered.
+
+**Verification Steps**:
+1. Check server console on startup for these messages:
+   ```
+   [Server thread/INFO]: WorldEdit initialized
+   [Server thread/INFO]: WorldEdit commands registered
+   ```
+2. If you see both messages, commands should work!
+3. If you only see "WorldEdit initialized" without "WorldEdit commands registered", you need to update your code.
+
 ## Prerequisites
 
 1. **Start the Server**
