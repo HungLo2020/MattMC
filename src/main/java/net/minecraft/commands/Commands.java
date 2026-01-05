@@ -247,6 +247,12 @@ public class Commands {
 		WaypointCommand.register(this.dispatcher, commandBuildContext);
 		WeatherCommand.register(this.dispatcher);
 		WorldBorderCommand.register(this.dispatcher);
+		
+		// WorldEdit: Register WorldEdit commands
+		if (net.minecraft.worldedit.core.WorldEdit.isInitialized()) {
+			net.minecraft.worldedit.command.WorldEditCommands.register(this.dispatcher);
+		}
+		
 		if (JvmProfiler.INSTANCE.isAvailable()) {
 			JfrCommand.register(this.dispatcher);
 		}
