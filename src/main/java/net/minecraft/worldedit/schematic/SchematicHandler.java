@@ -163,11 +163,13 @@ public class SchematicHandler {
         
         // Reconstruct blocks in clipboard
         int blockIndex = 0;
-        for (int y = 0; y < height; y++) {
-            for (int z = 0; z < length; z++) {
+        boolean arrayTooShort = false;
+        for (int y = 0; y < height && !arrayTooShort; y++) {
+            for (int z = 0; z < length && !arrayTooShort; z++) {
                 for (int x = 0; x < width; x++) {
                     if (blockIndex >= blocks.length) {
                         System.err.println("Warning: Block data array is shorter than expected");
+                        arrayTooShort = true;
                         break;
                     }
                     
