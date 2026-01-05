@@ -378,10 +378,8 @@ public class JeiPanel {
 						int count = isShiftDown ? itemStack.getMaxStackSize() : 1;
 						ItemStack itemToAdd = itemStack.copyWithCount(count);
 						
-						int targetSlot = this.findBestSlotForItem(itemToAdd);
-						if (targetSlot != -1) {
-							this.minecraft.gameMode.handleCreativeModeItemAdd(itemToAdd, targetSlot);
-						}
+						// Add items intelligently - fill existing stacks first, then empty slots
+						this.addItemToInventory(itemToAdd);
 						
 						return true;
 					}
@@ -504,6 +502,66 @@ public class JeiPanel {
 			return true;
 		}
 		return false;
+	}
+	
+	/**
+	 * Intelligently adds items to the player's inventory.
+	 * First fills existing partial stacks, then fills empty slots.
+	 * Properly handles overflow by distributing across multiple slots.
+	 * Excludes armor slots.
+	 */
+	private void addItemToInventory(ItemStack itemToAdd) {
+		if (this.minecraft == null || this.minecraft.player == null || itemToAdd.isEmpty()) {
+			return;
+		}
+		
+		int remainingCount = itemToAdd.getCount();
+		Inventory inventory = this.minecraft.player.getInventory();
+		var containerMenu = this.minecraft.player.containerMenu;
+		
+		if (containerMenu == null) {
+			return;
+		}
+		
+		// Phase 1: Fill existing partial stacks (excluding armor slots)
+		for (int i = 0; i < containerMenu.slots.size() && remainingCount > 0; i++) {
+			var slot = containerMenu.slots.get(i);
+			
+			// Skip if not player inventory or if it's an armor slot
+			if (slot.container != inventory) continue;
+			if (slot.getClass().getName().equals(ARMOR_SLOT_CLASS_NAME)) continue;
+			
+			ItemStack slotStack = slot.getItem();
+			if (!slotStack.isEmpty() && ItemStack.isSameItemSameComponents(slotStack, itemToAdd)) {
+				int maxStackSize = Math.min(slotStack.getMaxStackSize(), slot.getMaxStackSize(slotStack));
+				int spaceInSlot = maxStackSize - slotStack.getCount();
+				
+				if (spaceInSlot > 0) {
+					int amountToAdd = Math.min(spaceInSlot, remainingCount);
+					ItemStack newStack = slotStack.copyWithCount(slotStack.getCount() + amountToAdd);
+					this.minecraft.gameMode.handleCreativeModeItemAdd(newStack, i);
+					remainingCount -= amountToAdd;
+				}
+			}
+		}
+		
+		// Phase 2: Fill empty slots (excluding armor slots)
+		for (int i = 0; i < containerMenu.slots.size() && remainingCount > 0; i++) {
+			var slot = containerMenu.slots.get(i);
+			
+			// Skip if not player inventory or if it's an armor slot
+			if (slot.container != inventory) continue;
+			if (slot.getClass().getName().equals(ARMOR_SLOT_CLASS_NAME)) continue;
+			
+			ItemStack slotStack = slot.getItem();
+			if (slotStack.isEmpty()) {
+				int maxStackSize = Math.min(itemToAdd.getMaxStackSize(), slot.getMaxStackSize(itemToAdd));
+				int amountToAdd = Math.min(maxStackSize, remainingCount);
+				ItemStack newStack = itemToAdd.copyWithCount(amountToAdd);
+				this.minecraft.gameMode.handleCreativeModeItemAdd(newStack, i);
+				remainingCount -= amountToAdd;
+			}
+		}
 	}
 	
 	private int findBestSlotForItem(ItemStack itemStack) {
