@@ -5,7 +5,7 @@ import com.mamiyaotaru.voxelmap.textures.TextureAtlas;
 import com.mamiyaotaru.voxelmap.util.TextUtils;
 import com.mamiyaotaru.voxelmap.util.Waypoint;
 import com.mojang.blaze3d.platform.cursor.CursorTypes;
-import net.minecraft.client.GameNarrator;
+// import net.minecraft.client.GameNarrator; // VoxelMap: Class doesn't exist in 1.21.10
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.AbstractSelectionList;
 import net.minecraft.client.gui.narration.NarrationElementOutput;
@@ -65,8 +65,9 @@ class GuiSlotWaypoints extends AbstractSelectionList<GuiSlotWaypoints.WaypointIt
     public void setSelected(WaypointItem entry) {
         super.setSelected(entry);
         if (this.getSelected() instanceof WaypointItem) {
-            GameNarrator narratorManager = new GameNarrator(VoxelConstants.getMinecraft());
-            narratorManager.sayChatQueued(Component.translatable("narrator.select", this.getSelected().waypoint.name)); // FIXME 1.21.6 narrator?
+            // VoxelMap: GameNarrator doesn't exist in 1.21.10 - narration disabled for now
+            // GameNarrator narratorManager = new GameNarrator(VoxelConstants.getMinecraft());
+            // narratorManager.sayChatQueued(Component.translatable("narrator.select", this.getSelected().waypoint.name));
         }
 
         this.parentGui.setSelectedWaypoint(entry.waypoint);

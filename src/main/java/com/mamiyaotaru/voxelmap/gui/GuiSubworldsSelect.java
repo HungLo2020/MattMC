@@ -6,7 +6,7 @@ import com.mamiyaotaru.voxelmap.gui.overridden.GuiScreenMinimap;
 import it.unimi.dsi.fastutil.booleans.BooleanConsumer;
 import java.util.ArrayList;
 import net.minecraft.client.CameraType;
-import net.minecraft.client.ClientRecipeBook;
+// import net.minecraft.client.ClientRecipeBook; // VoxelMap: Removed from MattMC project
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
@@ -44,7 +44,8 @@ public class GuiSubworldsSelect extends GuiScreenMinimap implements BooleanConsu
         this.setParentScreen(this.parent);
 
         this.thePlayer = VoxelConstants.getPlayer();
-        this.camera = new LocalPlayer(VoxelConstants.getMinecraft(), clientWorld, VoxelConstants.getMinecraft().getConnection(), this.thePlayer.getStats(), new ClientRecipeBook(), Input.EMPTY, false);
+        // VoxelMap: ClientRecipeBook parameter removed from LocalPlayer constructor in MattMC
+        this.camera = new LocalPlayer(VoxelConstants.getMinecraft(), clientWorld, VoxelConstants.getMinecraft().getConnection(), this.thePlayer.getStats(), Input.EMPTY, false);
         this.camera.input = new KeyboardInput(VoxelConstants.getMinecraft().options);
         this.camera.moveOrInterpolateTo(new Vec3(this.thePlayer.getX(), this.thePlayer.getY() + 0.35, this.thePlayer.getZ()), this.thePlayer.getYRot(), 0.0F);
         this.yaw = this.thePlayer.getYRot();

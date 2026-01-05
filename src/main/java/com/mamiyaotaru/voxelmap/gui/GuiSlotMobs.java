@@ -5,7 +5,7 @@ import com.mamiyaotaru.voxelmap.VoxelMap;
 import com.mamiyaotaru.voxelmap.textures.Sprite;
 import com.mamiyaotaru.voxelmap.util.MobCategory;
 import com.mojang.blaze3d.platform.cursor.CursorTypes;
-import net.minecraft.client.GameNarrator;
+// import net.minecraft.client.GameNarrator; // VoxelMap: Class doesn't exist in 1.21.10
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.AbstractSelectionList;
@@ -61,8 +61,9 @@ class GuiSlotMobs extends AbstractSelectionList<GuiSlotMobs.MobItem> {
     public void setSelected(MobItem entry) {
         super.setSelected(entry);
         if (this.getSelected() != null) {
-            GameNarrator narratorManager = new GameNarrator(VoxelConstants.getMinecraft());
-            narratorManager.sayChatQueued(Component.translatable("narrator.select", this.getSelected().name));
+            // VoxelMap: GameNarrator doesn't exist in 1.21.10 - narration disabled for now
+            // GameNarrator narratorManager = new GameNarrator(VoxelConstants.getMinecraft());
+            // narratorManager.sayChatQueued(Component.translatable("narrator.select", this.getSelected().name));
         }
 
         this.parentGui.setSelectedMob(entry.id);

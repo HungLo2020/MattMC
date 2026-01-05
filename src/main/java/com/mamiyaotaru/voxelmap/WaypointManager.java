@@ -11,9 +11,10 @@ import com.mamiyaotaru.voxelmap.util.TextUtils;
 import com.mamiyaotaru.voxelmap.util.Waypoint;
 import com.mamiyaotaru.voxelmap.util.WaypointContainer;
 import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.realmsclient.client.RealmsClient;
-import com.mojang.realmsclient.dto.RealmsServer;
-import com.mojang.realmsclient.dto.RealmsServerList;
+// VoxelMap: Realms client not available in MattMC
+// import com.mojang.realmsclient.client.RealmsClient;
+// import com.mojang.realmsclient.dto.RealmsServer;
+// import com.mojang.realmsclient.dto.RealmsServerList;
 import java.awt.Graphics;
 import java.awt.Image;
 import java.awt.image.BufferedImage;
@@ -201,7 +202,10 @@ public class WaypointManager {
                     VoxelConstants.getLogger().warn("LAN server detected!");
                     serverName = serverData.name;
                 } else if (isRealm) {
-                    VoxelConstants.getLogger().info("Server is a Realm.");
+                    // VoxelMap: Realms client not available in MattMC - using fallback
+                    VoxelConstants.getLogger().info("Server is a Realm (Realms client unavailable - using server name).");
+                    serverName = "Realm_" + serverData.name;
+                    /* Original Realms code (disabled):
                     RealmsClient realmsClient = RealmsClient.getOrCreate(Minecraft.getInstance());
                     RealmsServerList realmsServerList = realmsClient.listRealms();
                     for (RealmsServer realmsServer : realmsServerList.servers) {
@@ -210,6 +214,7 @@ public class WaypointManager {
                             break;
                         }
                     }
+                    */
                 } else {
                     serverName = serverData.ip;
                 }
