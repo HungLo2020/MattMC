@@ -69,7 +69,17 @@ public class ToolCommands {
                     .then(Commands.argument("radius", IntegerArgumentType.integer(1, 10))
                         .executes(ctx -> brushSphere(ctx,
                             StringArgumentType.getString(ctx, "block"),
-                            IntegerArgumentType.getInteger(ctx, "radius")))))));
+                            IntegerArgumentType.getInteger(ctx, "radius"))))))
+            .then(Commands.literal("cylinder")
+                .then(Commands.argument("block", StringArgumentType.word())
+                    .then(Commands.argument("radius", IntegerArgumentType.integer(1, 10))
+                        .executes(ctx -> brushCylinder(ctx,
+                            StringArgumentType.getString(ctx, "block"),
+                            IntegerArgumentType.getInteger(ctx, "radius"))))))
+            .then(Commands.literal("smooth")
+                .then(Commands.argument("radius", IntegerArgumentType.integer(1, 10))
+                    .executes(ctx -> brushSmooth(ctx,
+                        IntegerArgumentType.getInteger(ctx, "radius"))))));
     }
     
     /**
@@ -185,6 +195,71 @@ public class ToolCommands {
         player.sendSystemMessage(Component.literal(
             String.format("§aSphere brush bound to %s (radius: %d, block: %s)", 
                 item.getHoverName().getString(), radius, blockName)
+        ));
+        
+        return Command.SINGLE_SUCCESS;
+    }
+    
+    /**
+     * Bind cylinder brush to item.
+     */
+    private static int brushCylinder(CommandContext<CommandSourceStack> context, String blockName, int radius) throws CommandSyntaxException {
+        ServerPlayer player = context.getSource().getPlayerOrException();
+        LocalSession session = WorldEdit.getInstance().getSessionManager().get(player);
+        
+        ItemStack item = player.getMainHandItem();
+        if (item.isEmpty()) {
+            player.sendSystemMessage(Component.literal("Hold an item to bind brush"));
+            return 0;
+        }
+        
+        // Parse block
+        ResourceLocation blockId = parseBlockId(blockName);
+        if (blockId == null) {
+            player.sendSystemMessage(Component.literal("Invalid block: " + blockName));
+            return 0;
+        }
+        
+        Block block = BuiltInRegistries.BLOCK.getValue(blockId);
+        if (block == null) {
+            player.sendSystemMessage(Component.literal("Unknown block: " + blockName));
+            return 0;
+        }
+        
+        BlockState state = block.defaultBlockState();
+        
+        // Create and bind brush
+        BrushTool brush = new BrushTool("cylinder", state, radius);
+        session.setTool(item.getItem(), brush);
+        
+        player.sendSystemMessage(Component.literal(
+            String.format("§aCylinder brush bound to %s (radius: %d, block: %s)", 
+                item.getHoverName().getString(), radius, blockName)
+        ));
+        
+        return Command.SINGLE_SUCCESS;
+    }
+    
+    /**
+     * Bind smooth brush to item.
+     */
+    private static int brushSmooth(CommandContext<CommandSourceStack> context, int radius) throws CommandSyntaxException {
+        ServerPlayer player = context.getSource().getPlayerOrException();
+        LocalSession session = WorldEdit.getInstance().getSessionManager().get(player);
+        
+        ItemStack item = player.getMainHandItem();
+        if (item.isEmpty()) {
+            player.sendSystemMessage(Component.literal("Hold an item to bind brush"));
+            return 0;
+        }
+        
+        // Create and bind brush (smooth doesn't need a block)
+        BrushTool brush = new BrushTool("smooth", net.minecraft.world.level.block.Blocks.STONE.defaultBlockState(), radius);
+        session.setTool(item.getItem(), brush);
+        
+        player.sendSystemMessage(Component.literal(
+            String.format("§aSmooth brush bound to %s (radius: %d)", 
+                item.getHoverName().getString(), radius)
         ));
         
         return Command.SINGLE_SUCCESS;

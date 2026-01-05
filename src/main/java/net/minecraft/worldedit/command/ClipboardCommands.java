@@ -187,8 +187,31 @@ public class ClipboardCommands {
      */
     private static int rotate(CommandContext<CommandSourceStack> context, int degrees) throws CommandSyntaxException {
         ServerPlayer player = context.getSource().getPlayerOrException();
-        player.sendSystemMessage(Component.literal("//rotate not yet fully implemented"));
-        // TODO: Implement rotation logic
+        LocalSession session = WorldEdit.getInstance().getSessionManager().get(player);
+        
+        if (!session.hasClipboard()) {
+            player.sendSystemMessage(Component.literal("§cNo clipboard available. Use //copy first."));
+            return 0;
+        }
+        
+        Clipboard clipboard = (Clipboard) session.getClipboard();
+        
+        // Normalize degrees to 0, 90, 180, 270
+        int normalizedDegrees = ((degrees % 360) + 360) % 360;
+        if (normalizedDegrees % 90 != 0) {
+            player.sendSystemMessage(Component.literal("§cDegrees must be a multiple of 90"));
+            return 0;
+        }
+        
+        // Apply rotation transform to clipboard
+        net.minecraft.worldedit.math.transform.AffineTransform transform = 
+            net.minecraft.worldedit.math.transform.AffineTransform.rotateY(normalizedDegrees);
+        clipboard.setTransform(transform);
+        
+        player.sendSystemMessage(Component.literal(
+            String.format("§aClipboard rotated %d degrees", normalizedDegrees)
+        ));
+        
         return Command.SINGLE_SUCCESS;
     }
     
@@ -197,8 +220,32 @@ public class ClipboardCommands {
      */
     private static int flip(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
         ServerPlayer player = context.getSource().getPlayerOrException();
-        player.sendSystemMessage(Component.literal("//flip not yet fully implemented"));
-        // TODO: Implement flip logic
+        LocalSession session = WorldEdit.getInstance().getSessionManager().get(player);
+        
+        if (!session.hasClipboard()) {
+            player.sendSystemMessage(Component.literal("§cNo clipboard available. Use //copy first."));
+            return 0;
+        }
+        
+        Clipboard clipboard = (Clipboard) session.getClipboard();
+        
+        // Apply flip transform based on player's facing direction
+        net.minecraft.worldedit.math.transform.AffineTransform transform;
+        float yaw = player.getYRot();
+        
+        // Determine flip axis based on player's facing direction
+        if ((yaw >= -45 && yaw < 45) || (yaw >= 135 || yaw < -135)) {
+            // Facing north/south, flip along Z axis
+            transform = net.minecraft.worldedit.math.transform.AffineTransform.flipZ();
+        } else {
+            // Facing east/west, flip along X axis
+            transform = net.minecraft.worldedit.math.transform.AffineTransform.flipX();
+        }
+        
+        clipboard.setTransform(transform);
+        
+        player.sendSystemMessage(Component.literal("§aClipboard flipped"));
+        
         return Command.SINGLE_SUCCESS;
     }
     

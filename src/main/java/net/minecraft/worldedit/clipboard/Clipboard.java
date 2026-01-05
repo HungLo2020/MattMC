@@ -2,6 +2,7 @@ package net.minecraft.worldedit.clipboard;
 
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.worldedit.math.BlockVector3;
+import net.minecraft.worldedit.math.transform.AffineTransform;
 import net.minecraft.worldedit.region.Region;
 import java.util.HashMap;
 import java.util.Map;
@@ -16,10 +17,12 @@ public class Clipboard {
     private final BlockVector3 maximumPoint;
     private final BlockVector3 dimensions;
     private final BlockVector3 offset;
+    private AffineTransform transform;
     
     public Clipboard(Region region, BlockVector3 origin) {
         this.blocks = new HashMap<>();
         this.origin = origin;
+        this.transform = null;
         
         BlockVector3 min = region.getMinimumPoint();
         BlockVector3 max = region.getMaximumPoint();
@@ -104,5 +107,26 @@ public class Clipboard {
      */
     public boolean isEmpty() {
         return blocks.isEmpty();
+    }
+    
+    /**
+     * Set the transformation to apply when pasting.
+     */
+    public void setTransform(AffineTransform transform) {
+        this.transform = transform;
+    }
+    
+    /**
+     * Get the current transformation.
+     */
+    public AffineTransform getTransform() {
+        return transform;
+    }
+    
+    /**
+     * Check if a transformation is set.
+     */
+    public boolean hasTransform() {
+        return transform != null;
     }
 }

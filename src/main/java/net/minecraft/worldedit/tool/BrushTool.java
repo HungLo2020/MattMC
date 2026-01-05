@@ -4,9 +4,15 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.worldedit.brush.Brush;
+import net.minecraft.worldedit.brush.SphereBrush;
+import net.minecraft.worldedit.brush.CylinderBrush;
+import net.minecraft.worldedit.brush.SmoothBrush;
 import net.minecraft.worldedit.core.EditSession;
 import net.minecraft.worldedit.core.WorldEdit;
 import net.minecraft.worldedit.math.BlockVector3;
+import net.minecraft.worldedit.pattern.Pattern;
+import net.minecraft.worldedit.pattern.SingleBlockPattern;
 import net.minecraft.worldedit.session.LocalSession;
 
 /**
@@ -16,11 +22,29 @@ public class BrushTool implements Tool {
     private final String type;
     private final BlockState material;
     private final int radius;
+    private Brush brush;
+    private Pattern pattern;
     
     public BrushTool(String type, BlockState material, int radius) {
         this.type = type;
         this.material = material;
         this.radius = radius;
+        this.pattern = new SingleBlockPattern(material);
+        
+        // Initialize brush based on type
+        switch (type) {
+            case "sphere":
+                this.brush = new SphereBrush(false);
+                break;
+            case "smooth":
+                this.brush = new SmoothBrush(3);
+                break;
+            case "cylinder":
+                this.brush = new CylinderBrush(radius, false);
+                break;
+            default:
+                this.brush = new SphereBrush(false);
+        }
     }
     
     @Override
@@ -56,24 +80,8 @@ public class BrushTool implements Tool {
         
         BlockVector3 center = BlockVector3.from(target);
         
-        switch (type) {
-            case "sphere":
-                // Create a sphere of blocks
-                for (int x = -radius; x <= radius; x++) {
-                    for (int y = -radius; y <= radius; y++) {
-                        for (int z = -radius; z <= radius; z++) {
-                            double distance = Math.sqrt(x * x + y * y + z * z);
-                            if (distance <= radius) {
-                                BlockVector3 pos = center.add(x, y, z);
-                                editSession.setBlock(pos, material);
-                            }
-                        }
-                    }
-                }
-                break;
-                
-            // Future: Add more brush types (cylinder, smooth, etc.)
-        }
+        // Use the brush interface for flexible brush types
+        brush.build(editSession, center, pattern, radius);
         
         // Remember for undo
         if (editSession.getBlockChangeCount() > 0) {
