@@ -992,6 +992,7 @@ public class GuiGraphics {
 	}
 
 	@Environment(EnvType.CLIENT)
+	// VoxelMap: access widener
 	public static class ScissorStack {
 		private final Deque<ScreenRectangle> stack = new ArrayDeque();
 

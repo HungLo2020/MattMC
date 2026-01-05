@@ -186,6 +186,13 @@ public class ChatComponent {
 	}
 
 	public void addMessage(Component component) {
+		// VoxelMap: Check for permission messages
+		try {
+			com.mamiyaotaru.voxelmap.VoxelMap.checkPermissionMessages(component);
+		} catch (Exception e) {
+			// Silently catch to avoid crashes
+		}
+		
 		this.addMessage(component, null, this.minecraft.isSingleplayer() ? GuiMessageTag.systemSinglePlayer() : GuiMessageTag.system());
 	}
 

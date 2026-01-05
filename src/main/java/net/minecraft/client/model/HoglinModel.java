@@ -19,7 +19,7 @@ public class HoglinModel extends EntityModel<HoglinRenderState> {
 	public static final MeshTransformer BABY_TRANSFORMER = new BabyModelTransform(true, 8.0F, 6.0F, 1.9F, 2.0F, 24.0F, Set.of("head"));
 	private static final float DEFAULT_HEAD_X_ROT = 0.87266463F;
 	private static final float ATTACK_HEAD_X_ROT_END = (float) (-Math.PI / 9);
-	private final ModelPart head;
+	public final ModelPart head; // VoxelMap: access widener
 	private final ModelPart rightEar;
 	private final ModelPart leftEar;
 	private final ModelPart body;

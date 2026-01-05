@@ -2643,6 +2643,11 @@ public class ClientPacketListener extends ClientCommonPacketListenerImpl impleme
 	}
 
 	public void sendCommand(String string) {
+		// VoxelMap: Parse custom commands
+		if (!com.mamiyaotaru.voxelmap.VoxelConstants.onSendChatMessage(string)) {
+			return; // Command was handled by VoxelMap
+		}
+		
 		SignableCommand<ClientSuggestionProvider> signableCommand = SignableCommand.of(this.commands.parse(string, this.suggestionsProvider));
 		if (signableCommand.arguments().isEmpty()) {
 			this.send(new ServerboundChatCommandPacket(string));
@@ -2659,6 +2664,12 @@ public class ClientPacketListener extends ClientCommonPacketListenerImpl impleme
 	}
 
 	public void sendUnattendedCommand(String string, @Nullable Screen screen) {
+		// VoxelMap: Parse custom commands
+		if (!com.mamiyaotaru.voxelmap.VoxelConstants.onSendChatMessage(string)) {
+			this.minecraft.setScreen(screen);
+			return; // Command was handled by VoxelMap
+		}
+		
 		switch (this.verifyCommand(string)) {
 			case NO_ISSUES:
 				this.send(new ServerboundChatCommandPacket(string));

@@ -1928,6 +1928,15 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 		profilerFiller.push("iris_keybinds");
 		net.irisshaders.iris.Iris.handleKeybinds(this);
 		profilerFiller.pop();
+		
+		// VoxelMap: Client tick hook
+		profilerFiller.push("voxelmap_tick");
+		try {
+			com.mamiyaotaru.voxelmap.VoxelConstants.clientTick();
+		} catch (Exception e) {
+			// Silently catch to avoid crashes
+		}
+		profilerFiller.pop();
 	}
 
 	private boolean isLevelRunningNormally() {

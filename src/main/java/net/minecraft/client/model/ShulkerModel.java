@@ -17,7 +17,7 @@ public class ShulkerModel extends EntityModel<ShulkerRenderState> {
 	public static final String LID = "lid";
 	private static final String BASE = "base";
 	private final ModelPart lid;
-	private final ModelPart head;
+	public final ModelPart head; // VoxelMap: access widener
 
 	public ShulkerModel(ModelPart modelPart) {
 		super(modelPart, RenderType::entityCutoutNoCullZOffset);

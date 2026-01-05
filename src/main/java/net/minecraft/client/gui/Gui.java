@@ -727,6 +727,10 @@ public class Gui {
 		int m = lvs.length;
 		int n = m * 9;
 		int o = guiGraphics.guiHeight() / 2 + n / 3;
+		
+		// VoxelMap: Move scoreboard to make room for minimap
+		o = com.mamiyaotaru.voxelmap.VoxelConstants.moveScoreboard(o, n);
+		
 		int p = 3;
 		int q = guiGraphics.guiWidth() - j - 3;
 		int r = guiGraphics.guiWidth() - 3 + 2;
