@@ -53,12 +53,12 @@ public class SchematicHandler {
         root.putShort("Height", (short) dimensions.getY());
         root.putShort("Length", (short) dimensions.getZ());
         
-        // Offset (origin)
+        // Offset (origin) - store as relative to schematic coordinates
+        // For schematics, we want origin at the minimum corner
         int[] offset = new int[3];
-        BlockVector3 origin = clipboard.getOrigin();
-        offset[0] = origin.getX();
-        offset[1] = origin.getY();
-        offset[2] = origin.getZ();
+        offset[0] = 0;
+        offset[1] = 0;
+        offset[2] = 0;
         root.putIntArray("Offset", offset);
         
         // Save palette and block data
@@ -120,18 +120,18 @@ public class SchematicHandler {
         short height = root.getShortOr("Height", (short) 0);
         short length = root.getShortOr("Length", (short) 0);
         
-        // Read offset (origin)
+        // Read offset (origin) - for schematics, origin should be at (0,0,0)
         int[] offsetArray = root.getIntArray("Offset").orElse(new int[]{0, 0, 0});
-        BlockVector3 offset = BlockVector3.ZERO;
+        BlockVector3 origin = BlockVector3.ZERO;
         if (offsetArray.length >= 3) {
-            offset = BlockVector3.at(offsetArray[0], offsetArray[1], offsetArray[2]);
+            origin = BlockVector3.at(offsetArray[0], offsetArray[1], offsetArray[2]);
         }
         
         // Create region and clipboard
         BlockVector3 min = BlockVector3.ZERO;
         BlockVector3 max = min.add(width - 1, height - 1, length - 1);
         CuboidRegion region = new CuboidRegion(min, max);
-        Clipboard clipboard = new Clipboard(region, offset);
+        Clipboard clipboard = new Clipboard(region, origin);
         
         // Read palette
         CompoundTag paletteTag = root.getCompoundOrEmpty("Palette");
