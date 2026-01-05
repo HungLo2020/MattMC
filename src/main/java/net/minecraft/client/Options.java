@@ -580,7 +580,8 @@ public class Options {
 	public final KeyMapping keyLoadHotbarActivator = new KeyMapping("key.loadToolbarActivator", 88, KeyMapping.Category.CREATIVE);
 	public final KeyMapping keySpectatorOutlines = new KeyMapping("key.spectatorOutlines", InputConstants.UNKNOWN.getValue(), KeyMapping.Category.SPECTATOR);
 	public final KeyMapping keySpectatorHotbar = new KeyMapping("key.spectatorHotbar", InputConstants.Type.MOUSE, 2, KeyMapping.Category.SPECTATOR);
-	public final KeyMapping[] keyMappings = ArrayUtils.addAll(
+	// VoxelMap: Made mutable (removed final)
+	public KeyMapping[] keyMappings = ArrayUtils.addAll(
 		(KeyMapping[])(new KeyMapping[]{
 			this.keyAttack,
 			this.keyUse,

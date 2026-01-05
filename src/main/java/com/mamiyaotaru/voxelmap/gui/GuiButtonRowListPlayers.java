@@ -1,7 +1,8 @@
 package com.mamiyaotaru.voxelmap.gui;
 
 import com.mamiyaotaru.voxelmap.VoxelConstants;
-import com.mojang.authlib.GameProfile;
+// VoxelMap: Using PlayerProfile instead of authlib GameProfile
+import net.minecraft.server.profile.PlayerProfile;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.AbstractSelectionList;
 import net.minecraft.client.gui.components.Button;
@@ -164,9 +165,9 @@ public class GuiButtonRowListPlayers extends AbstractSelectionList<GuiButtonRowL
 
         private void drawIconForButton(GuiGraphics drawContext, Button button, int id) {
             PlayerInfo networkPlayerInfo = GuiButtonRowListPlayers.this.playersFiltered.get(id);
-            GameProfile gameProfile = networkPlayerInfo.getProfile();
-            Player entityPlayer = VoxelConstants.getPlayer().level().getPlayerByUUID(gameProfile.id());
-            Optional<PlayerSkin> optionalSkin = VoxelConstants.getMinecraft().getSkinManager().get(gameProfile).getNow(Optional.empty());
+            PlayerProfile playerProfile = networkPlayerInfo.getProfile();
+            Player entityPlayer = VoxelConstants.getPlayer().level().getPlayerByUUID(playerProfile.id());
+            Optional<PlayerSkin> optionalSkin = VoxelConstants.getMinecraft().getSkinManager().get(playerProfile).getNow(Optional.empty());
             if (optionalSkin.isPresent()) {
                 ResourceLocation skinIdentifier = optionalSkin.get().body().texturePath();
                 drawContext.blit(RenderPipelines.GUI_TEXTURED, skinIdentifier, button.getX() + 6, button.getY() + 6, 8.0F, 8.0F, 8, 8, 8, 8, 64, 64);

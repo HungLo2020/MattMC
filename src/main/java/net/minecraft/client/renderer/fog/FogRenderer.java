@@ -85,7 +85,8 @@ public class FogRenderer implements AutoCloseable, net.caffeinemc.mods.sodium.cl
 		}
 	}
 
-	private Vector4f computeFogColor(Camera camera, float f, ClientLevel clientLevel, int i, float g, boolean bl) {
+	// VoxelMap: Made accessible
+	public Vector4f computeFogColor(Camera camera, float f, ClientLevel clientLevel, int i, float g, boolean bl) {
 		FogType fogType = this.getFogType(camera, bl);
 		Entity entity = camera.getEntity();
 		FogEnvironment fogEnvironment = null;
