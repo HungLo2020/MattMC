@@ -30,6 +30,7 @@ import net.minecraft.world.item.ItemStackLinkedSet;
 public class JeiPanel {
 	private static final ResourceLocation SCROLLER_SPRITE = ResourceLocation.withDefaultNamespace("container/creative_inventory/scroller");
 	private static final int JEI_SLOT_SIZE = 18;
+	private static final String ARMOR_SLOT_CLASS_NAME = "net.minecraft.world.inventory.ArmorSlot";
 	
 	private final Minecraft minecraft;
 	private final Font font;
@@ -566,7 +567,7 @@ public class JeiPanel {
 					if (foundSlot == -1) {
 						// Check if this is an ArmorSlot - if so, skip it
 						// ArmorSlot is a package-private class, so we check by full class name
-						if (slot.getClass().getName().equals("net.minecraft.world.inventory.ArmorSlot")) {
+						if (slot.getClass().getName().equals(ARMOR_SLOT_CLASS_NAME)) {
 							return -1; // Don't allow items to go into armor slots
 						}
 						foundSlot = i;
