@@ -46,8 +46,12 @@ public class SelectionWand implements Tool {
         
         System.out.println("SelectionWand: Setting primary position (pos1) to: " + blockPos);
         
-        if (session.getCurrentSelector().selectPrimary(blockPos)) {
-            session.getCurrentSelector().explainPrimarySelection(player, blockPos);
+        // Get the region selector for the player's world
+        net.minecraft.server.level.ServerLevel world = player.level();
+        net.minecraft.worldedit.region.RegionSelector selector = session.getRegionSelector(world);
+        
+        if (selector.selectPrimary(blockPos)) {
+            selector.explainPrimarySelection(player, blockPos);
         }
     }
     
@@ -64,8 +68,12 @@ public class SelectionWand implements Tool {
         
         System.out.println("SelectionWand: Setting secondary position (pos2) to: " + blockPos);
         
-        if (session.getCurrentSelector().selectSecondary(blockPos)) {
-            session.getCurrentSelector().explainSecondarySelection(player, blockPos);
+        // Get the region selector for the player's world
+        net.minecraft.server.level.ServerLevel world = player.level();
+        net.minecraft.worldedit.region.RegionSelector selector = session.getRegionSelector(world);
+        
+        if (selector.selectSecondary(blockPos)) {
+            selector.explainSecondarySelection(player, blockPos);
         }
     }
 }
