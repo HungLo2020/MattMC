@@ -62,6 +62,64 @@ public class RegionCommands {
             .requires(source -> source.isPlayer() && hasPermission(source, "worldedit.region.overlay"))
             .then(Commands.argument("block", StringArgumentType.word())
                 .executes(ctx -> overlay(ctx, StringArgumentType.getString(ctx, "block")))));
+        
+        // //move command (stubbed - to be fully implemented)
+        dispatcher.register(Commands.literal("move")
+            .requires(source -> source.isPlayer() && hasPermission(source, "worldedit.region.move"))
+            .executes(ctx -> {
+                ctx.getSource().getPlayerOrException().sendSystemMessage(Component.literal("//move not yet fully implemented"));
+                return Command.SINGLE_SUCCESS;
+            }));
+        
+        // //stack command (stubbed - to be fully implemented)
+        dispatcher.register(Commands.literal("stack")
+            .requires(source -> source.isPlayer() && hasPermission(source, "worldedit.region.stack"))
+            .executes(ctx -> {
+                ctx.getSource().getPlayerOrException().sendSystemMessage(Component.literal("//stack not yet fully implemented"));
+                return Command.SINGLE_SUCCESS;
+            }));
+        
+        // //line command (stubbed - to be fully implemented)
+        dispatcher.register(Commands.literal("line")
+            .requires(source -> source.isPlayer() && hasPermission(source, "worldedit.region.line"))
+            .then(Commands.argument("block", StringArgumentType.word())
+                .executes(ctx -> {
+                    ctx.getSource().getPlayerOrException().sendSystemMessage(Component.literal("//line not yet fully implemented"));
+                    return Command.SINGLE_SUCCESS;
+                })));
+        
+        // //hollow command (stubbed - to be fully implemented)
+        dispatcher.register(Commands.literal("hollow")
+            .requires(source -> source.isPlayer() && hasPermission(source, "worldedit.region.hollow"))
+            .executes(ctx -> {
+                ctx.getSource().getPlayerOrException().sendSystemMessage(Component.literal("//hollow not yet fully implemented"));
+                return Command.SINGLE_SUCCESS;
+            }));
+        
+        // //naturalize command (stubbed - to be fully implemented)
+        dispatcher.register(Commands.literal("naturalize")
+            .requires(source -> source.isPlayer() && hasPermission(source, "worldedit.region.naturalize"))
+            .executes(ctx -> {
+                ctx.getSource().getPlayerOrException().sendSystemMessage(Component.literal("//naturalize not yet fully implemented"));
+                return Command.SINGLE_SUCCESS;
+            }));
+        
+        // //center command (stubbed - to be fully implemented)
+        dispatcher.register(Commands.literal("center")
+            .requires(source -> source.isPlayer() && hasPermission(source, "worldedit.region.center"))
+            .then(Commands.argument("block", StringArgumentType.word())
+                .executes(ctx -> {
+                    ctx.getSource().getPlayerOrException().sendSystemMessage(Component.literal("//center not yet fully implemented"));
+                    return Command.SINGLE_SUCCESS;
+                })));
+        
+        // //distr command (stubbed - to be fully implemented)
+        dispatcher.register(Commands.literal("distr")
+            .requires(source -> source.isPlayer() && hasPermission(source, "worldedit.analysis.distr"))
+            .executes(ctx -> {
+                ctx.getSource().getPlayerOrException().sendSystemMessage(Component.literal("//distr not yet fully implemented"));
+                return Command.SINGLE_SUCCESS;
+            }));
     }
     
     /**
