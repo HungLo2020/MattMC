@@ -1,0 +1,8 @@
+name: WorldEdit
+main: com.sk89q.worldedit.bukkit.WorldEditPlugin
+version: "${internalVersion}"
+load: STARTUP
+api-version: 1.21.3
+softdepend: [Vault]
+author: EngineHub
+website: https://enginehub.org/worldedit

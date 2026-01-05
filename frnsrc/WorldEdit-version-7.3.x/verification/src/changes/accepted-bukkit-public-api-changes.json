@@ -1,0 +1,25 @@
+{
+    "Incorrect removal detection due to problems with classpath": [
+        {
+            "type": "com.sk89q.worldedit.bukkit.BukkitWorld",
+            "member": "Method com.sk89q.worldedit.bukkit.BukkitWorld.fullySupports3DBiomes()",
+            "changes": [
+                "METHOD_REMOVED"
+            ]
+        },
+        {
+            "type": "com.sk89q.worldedit.bukkit.BukkitServerInterface",
+            "member": "Method com.sk89q.worldedit.bukkit.BukkitServerInterface.getId()",
+            "changes": [
+                "METHOD_REMOVED"
+            ]
+        },
+        {
+            "type": "com.sk89q.worldedit.bukkit.BukkitWorld",
+            "member": "Method com.sk89q.worldedit.bukkit.BukkitWorld.getId()",
+            "changes": [
+                "METHOD_REMOVED"
+            ]
+        }
+    ]
+}
