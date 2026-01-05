@@ -378,8 +378,8 @@ public class JeiPanel {
 						int count = isShiftDown ? itemStack.getMaxStackSize() : 1;
 						ItemStack itemToAdd = itemStack.copyWithCount(count);
 						
-						// Add items intelligently - fill existing stacks first, then empty slots
-						this.addItemToInventory(itemToAdd);
+						// Find the best slot and add only what fits to prevent overflow to armor slots
+						this.addItemToInventorySafe(itemToAdd);
 						
 						return true;
 					}
@@ -505,30 +505,32 @@ public class JeiPanel {
 	}
 	
 	/**
-	 * Intelligently adds items to the player's inventory.
-	 * First fills existing partial stacks, then fills empty slots.
-	 * Properly handles overflow by distributing across multiple slots.
-	 * Excludes armor slots.
+	 * Safely adds items to inventory, calculating exact fit to prevent server-side overflow.
+	 * For regular clicks: adds to first available slot only (max 1 item).
+	 * For shift-clicks: distributes across multiple slots as needed.
 	 */
-	private void addItemToInventory(ItemStack itemToAdd) {
+	private void addItemToInventorySafe(ItemStack itemToAdd) {
 		if (this.minecraft == null || this.minecraft.player == null || itemToAdd.isEmpty()) {
 			return;
 		}
 		
-		int remainingCount = itemToAdd.getCount();
-		Inventory inventory = this.minecraft.player.getInventory();
 		var containerMenu = this.minecraft.player.containerMenu;
-		
 		if (containerMenu == null) {
 			return;
 		}
+		
+		Inventory playerInventory = this.minecraft.player.getInventory();
+		int remainingCount = itemToAdd.getCount();
+		boolean isShiftClick = remainingCount > 1;
 		
 		// Phase 1: Fill existing partial stacks (excluding armor slots)
 		for (int i = 0; i < containerMenu.slots.size() && remainingCount > 0; i++) {
 			var slot = containerMenu.slots.get(i);
 			
-			// Skip if not player inventory or if it's an armor slot
-			if (slot.container != inventory) continue;
+			// Skip if not player inventory
+			if (slot.container != playerInventory) continue;
+			
+			// Skip armor slots
 			if (slot.getClass().getName().equals(ARMOR_SLOT_CLASS_NAME)) continue;
 			
 			ItemStack slotStack = slot.getItem();
@@ -541,6 +543,11 @@ public class JeiPanel {
 					ItemStack newStack = slotStack.copyWithCount(slotStack.getCount() + amountToAdd);
 					this.minecraft.gameMode.handleCreativeModeItemAdd(newStack, i);
 					remainingCount -= amountToAdd;
+					
+					// For regular clicks, only add to one slot
+					if (!isShiftClick && remainingCount == 0) {
+						return;
+					}
 				}
 			}
 		}
@@ -549,8 +556,10 @@ public class JeiPanel {
 		for (int i = 0; i < containerMenu.slots.size() && remainingCount > 0; i++) {
 			var slot = containerMenu.slots.get(i);
 			
-			// Skip if not player inventory or if it's an armor slot
-			if (slot.container != inventory) continue;
+			// Skip if not player inventory
+			if (slot.container != playerInventory) continue;
+			
+			// Skip armor slots
 			if (slot.getClass().getName().equals(ARMOR_SLOT_CLASS_NAME)) continue;
 			
 			ItemStack slotStack = slot.getItem();
@@ -560,6 +569,11 @@ public class JeiPanel {
 				ItemStack newStack = itemToAdd.copyWithCount(amountToAdd);
 				this.minecraft.gameMode.handleCreativeModeItemAdd(newStack, i);
 				remainingCount -= amountToAdd;
+				
+				// For regular clicks, only add to one slot
+				if (!isShiftClick && remainingCount == 0) {
+					return;
+				}
 			}
 		}
 	}
