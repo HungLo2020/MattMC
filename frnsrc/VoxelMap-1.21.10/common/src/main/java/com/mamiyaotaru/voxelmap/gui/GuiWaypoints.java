@@ -1,0 +1,322 @@
+package com.mamiyaotaru.voxelmap.gui;
+
+import com.mamiyaotaru.voxelmap.MapSettingsManager;
+import com.mamiyaotaru.voxelmap.VoxelConstants;
+import com.mamiyaotaru.voxelmap.WaypointManager;
+import com.mamiyaotaru.voxelmap.gui.overridden.GuiScreenMinimap;
+import com.mamiyaotaru.voxelmap.util.CommandUtils;
+import com.mamiyaotaru.voxelmap.util.DimensionContainer;
+import com.mamiyaotaru.voxelmap.util.GameVariableAccessShim;
+import com.mamiyaotaru.voxelmap.util.Waypoint;
+import java.util.Optional;
+import java.util.Random;
+import java.util.TreeSet;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.components.EditBox;
+import net.minecraft.client.gui.screens.ConfirmScreen;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.input.CharacterEvent;
+import net.minecraft.client.input.KeyEvent;
+import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.client.resources.language.I18n;
+import net.minecraft.client.server.IntegratedServer;
+import net.minecraft.network.chat.Component;
+
+public class GuiWaypoints extends GuiScreenMinimap implements IGuiWaypoints {
+    private final Screen parentScreen;
+    protected final MapSettingsManager options;
+    protected final WaypointManager waypointManager;
+    protected Component screenTitle;
+    private GuiSlotWaypoints waypointList;
+    private Button buttonEdit;
+    private boolean editClicked;
+    private Button buttonDelete;
+    private boolean deleteClicked;
+    private Button buttonHighlight;
+    private Button buttonShare;
+    private Button buttonTeleport;
+    private Button buttonSortName;
+    private Button buttonSortCreated;
+    private Button buttonSortDistance;
+    private Button buttonSortColor;
+    protected EditBox filter;
+    private boolean addClicked;
+    private Component tooltip;
+    protected Waypoint selectedWaypoint;
+    protected Waypoint highlightedWaypoint;
+    protected Waypoint newWaypoint;
+    private final Random generator = new Random();
+    private boolean changedSort;
+
+    public GuiWaypoints(Screen parentScreen) {
+        this.parentScreen = parentScreen;
+        this.setParentScreen(this.parentScreen);
+
+        this.options = VoxelConstants.getVoxelMapInstance().getMapOptions();
+        this.waypointManager = VoxelConstants.getVoxelMapInstance().getWaypointManager();
+        this.highlightedWaypoint = this.waypointManager.getHighlightedWaypoint();
+    }
+
+    @Override
+    public void tick() {
+    }
+
+    @Override
+    public void init() {
+        this.screenTitle = Component.translatable("minimap.waypoints.title");
+        this.waypointList = new GuiSlotWaypoints(this);
+        this.addRenderableWidget(this.buttonSortName = new Button.Builder(Component.translatable("minimap.waypoints.sortByName"), button -> this.sortClicked(2)).bounds(this.getWidth() / 2 - 154, 34, 77, 20).build());
+        this.addRenderableWidget(this.buttonSortDistance = new Button.Builder(Component.translatable("minimap.waypoints.sortByDistance"), button -> this.sortClicked(3)).bounds(this.getWidth() / 2 - 77, 34, 77, 20).build());
+        this.addRenderableWidget(this.buttonSortCreated = new Button.Builder(Component.translatable("minimap.waypoints.sortByCreated"), button -> this.sortClicked(1)).bounds(this.getWidth() / 2, 34, 77, 20).build());
+        this.addRenderableWidget(this.buttonSortColor = new Button.Builder(Component.translatable("minimap.waypoints.sortByColor"), button -> this.sortClicked(4)).bounds(this.getWidth() / 2 + 77, 34, 77, 20).build());
+        int filterStringWidth = this.getFont().width(I18n.get("minimap.waypoints.filter") + ":");
+        this.filter = new EditBox(this.getFont(), this.getWidth() / 2 - 153 + filterStringWidth + 5, this.getHeight() - 80, 305 - filterStringWidth - 5, 20, Component.empty());
+        this.filter.setMaxLength(35);
+        this.addRenderableWidget(this.filter);
+        this.addRenderableWidget(new Button.Builder(Component.translatable("minimap.waypoints.add"), button -> this.addWaypoint()).bounds(this.getWidth() / 2 - 154, this.getHeight() - 52, 74, 20).build());
+        this.addRenderableWidget(this.buttonEdit = new Button.Builder(Component.translatable("selectServer.edit"), button -> this.editWaypoint(this.selectedWaypoint)).bounds(this.getWidth() / 2 - 76, this.getHeight() - 52, 74, 20).build());
+        this.addRenderableWidget(this.buttonDelete = new Button.Builder(Component.translatable("selectServer.delete"), button -> this.deleteClicked()).bounds(this.getWidth() / 2 + 2, this.getHeight() - 52, 74, 20).build());
+        this.addRenderableWidget(this.buttonHighlight = new Button.Builder(Component.translatable("minimap.waypoints.highlight"), button -> this.setHighlightedWaypoint()).bounds(this.getWidth() / 2 + 80, this.getHeight() - 52, 74, 20).build());
+        this.addRenderableWidget(this.buttonTeleport = new Button.Builder(Component.translatable("minimap.waypoints.teleportTo"), button -> this.teleportClicked()).bounds(this.getWidth() / 2 - 154, this.getHeight() - 28, 74, 20).build());
+        this.addRenderableWidget(this.buttonShare = new Button.Builder(Component.translatable("minimap.waypoints.share"), button -> CommandUtils.sendWaypoint(this.selectedWaypoint)).bounds(this.getWidth() / 2 - 76, this.getHeight() - 28, 74, 20).build());
+        this.addRenderableWidget(new Button.Builder(Component.translatable("menu.options"), button -> VoxelConstants.getMinecraft().setScreen(new GuiWaypointsOptions(this, this.options))).bounds(this.getWidth() / 2 + 2, this.getHeight() - 28, 74, 20).build());
+        this.addRenderableWidget(new Button.Builder(Component.translatable("gui.done"), button -> VoxelConstants.getMinecraft().setScreen(this.parentScreen)).bounds(this.getWidth() / 2 + 80, this.getHeight() - 28, 74, 20).build());
+        this.setFocused(this.filter);
+        this.filter.setFocused(true);
+        boolean isSomethingSelected = this.selectedWaypoint != null;
+        this.buttonEdit.active = isSomethingSelected;
+        this.buttonDelete.active = isSomethingSelected;
+        this.buttonHighlight.active = isSomethingSelected;
+        this.buttonShare.active = isSomethingSelected;
+        this.buttonTeleport.active = isSomethingSelected && this.canTeleport();
+        this.sort();
+    }
+
+    private void sort() {
+        int sortKey = Math.abs(this.options.sort);
+        boolean ascending = this.options.sort > 0;
+        this.waypointList.sortBy(sortKey, ascending);
+        String arrow = ascending ? "↑" : "↓";
+        if (sortKey == 2) {
+            this.buttonSortName.setMessage(Component.literal(arrow + " " + I18n.get("minimap.waypoints.sortByName") + " " + arrow));
+        } else {
+            this.buttonSortName.setMessage(Component.translatable("minimap.waypoints.sortByName"));
+        }
+
+        if (sortKey == 3) {
+            this.buttonSortDistance.setMessage(Component.literal(arrow + " " + I18n.get("minimap.waypoints.sortByDistance") + " " + arrow));
+        } else {
+            this.buttonSortDistance.setMessage(Component.translatable("minimap.waypoints.sortByDistance"));
+        }
+
+        if (sortKey == 1) {
+            this.buttonSortCreated.setMessage(Component.literal(arrow + " " + I18n.get("minimap.waypoints.sortByCreated") + " " + arrow));
+        } else {
+            this.buttonSortCreated.setMessage(Component.translatable("minimap.waypoints.sortByCreated"));
+        }
+
+        if (sortKey == 4) {
+            this.buttonSortColor.setMessage(Component.literal(arrow + " " + I18n.get("minimap.waypoints.sortByColor") + " " + arrow));
+        } else {
+            this.buttonSortColor.setMessage(Component.translatable("minimap.waypoints.sortByColor"));
+        }
+
+    }
+
+    private void deleteClicked() {
+        String var2 = this.selectedWaypoint.name;
+        if (var2 != null) {
+            this.deleteClicked = true;
+            Component title = Component.translatable("minimap.waypoints.deleteConfirm");
+            Component explanation = Component.translatable("selectServer.deleteWarning", var2);
+            Component affirm = Component.translatable("selectServer.deleteButton");
+            Component deny = Component.translatable("gui.cancel");
+            ConfirmScreen confirmScreen = new ConfirmScreen(this, title, explanation, affirm, deny);
+            VoxelConstants.getMinecraft().setScreen(confirmScreen);
+        }
+
+    }
+
+    private void teleportClicked() {
+        int y = selectedWaypoint.getY() > VoxelConstants.getPlayer().level().getMinY() ? selectedWaypoint.getY() : (!(VoxelConstants.getPlayer().level().dimensionType().hasCeiling()) ? VoxelConstants.getPlayer().level().getMaxY() : 64);
+        VoxelConstants.playerRunTeleportCommand(selectedWaypoint.getX(), y, selectedWaypoint.getZ());
+        VoxelConstants.getMinecraft().setScreen(null);
+    }
+
+    protected void sortClicked(int id) {
+        this.options.setSort(id);
+        this.changedSort = true;
+        this.sort();
+    }
+
+    @Override
+    public boolean keyPressed(KeyEvent keyEvent) {
+        boolean OK = super.keyPressed(keyEvent);
+        if (this.filter.isFocused()) {
+            this.waypointList.updateFilter(this.filter.getValue().toLowerCase());
+        }
+
+        return OK;
+    }
+
+    @Override
+    public boolean charTyped(CharacterEvent characterEvent) {
+        boolean OK = super.charTyped(characterEvent);
+        if (this.filter.isFocused()) {
+            this.waypointList.updateFilter(this.filter.getValue().toLowerCase());
+        }
+
+        return OK;
+    }
+
+    @Override
+    public boolean mouseClicked(MouseButtonEvent mouseButtonEvent, boolean bl) {
+        this.waypointList.mouseClicked(mouseButtonEvent, bl);
+        return super.mouseClicked(mouseButtonEvent, bl);
+    }
+
+    @Override
+    public boolean mouseReleased(MouseButtonEvent mouseButtonEvent) {
+        this.waypointList.mouseReleased(mouseButtonEvent);
+        return super.mouseReleased(mouseButtonEvent);
+    }
+
+    @Override
+    public boolean mouseDragged(MouseButtonEvent mouseButtonEvent, double d, double e) {
+        return this.waypointList.mouseDragged(mouseButtonEvent, d, e);
+    }
+
+    @Override
+    public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double amount) {
+        return this.waypointList.mouseScrolled(mouseX, mouseY, 0, amount);
+    }
+
+    @Override
+    public boolean isEditing() {
+        return this.editClicked;
+    }
+
+    @Override
+    public void accept(boolean b) {
+        if (this.deleteClicked) {
+            this.deleteClicked = false;
+            if (b) {
+                this.waypointManager.deleteWaypoint(this.selectedWaypoint);
+                this.selectedWaypoint = null;
+            }
+
+            VoxelConstants.getMinecraft().setScreen(this);
+        }
+
+        if (this.editClicked) {
+            this.editClicked = false;
+            if (b) {
+                this.waypointManager.saveWaypoints();
+            }
+
+            VoxelConstants.getMinecraft().setScreen(this);
+        }
+
+        if (this.addClicked) {
+            this.addClicked = false;
+            if (b) {
+                this.waypointManager.addWaypoint(this.newWaypoint);
+                this.setSelectedWaypoint(this.newWaypoint);
+            }
+
+            VoxelConstants.getMinecraft().setScreen(this);
+        }
+
+    }
+
+    protected void setSelectedWaypoint(Waypoint waypoint) {
+        this.selectedWaypoint = waypoint;
+        boolean isSomethingSelected = this.selectedWaypoint != null;
+        this.buttonEdit.active = isSomethingSelected;
+        this.buttonDelete.active = isSomethingSelected;
+        this.buttonHighlight.active = isSomethingSelected;
+        this.buttonHighlight.setMessage(Component.translatable(isSomethingSelected && this.selectedWaypoint == this.highlightedWaypoint ? "minimap.waypoints.removeHighlight" : "minimap.waypoints.highlight"));
+        this.buttonShare.active = isSomethingSelected;
+        this.buttonTeleport.active = isSomethingSelected && this.canTeleport();
+    }
+
+    protected void setHighlightedWaypoint() {
+        this.waypointManager.setHighlightedWaypoint(this.selectedWaypoint, true);
+        this.highlightedWaypoint = this.waypointManager.getHighlightedWaypoint();
+        boolean isSomethingSelected = this.selectedWaypoint != null;
+        this.buttonHighlight.setMessage(Component.translatable(isSomethingSelected && this.selectedWaypoint == this.highlightedWaypoint ? "minimap.waypoints.removeHighlight" : "minimap.waypoints.highlight"));
+    }
+
+    protected void editWaypoint(Waypoint waypoint) {
+        this.editClicked = true;
+        VoxelConstants.getMinecraft().setScreen(new GuiAddWaypoint(this, waypoint, true));
+    }
+
+    protected void addWaypoint() {
+        this.addClicked = true;
+        float r;
+        float g;
+        float b;
+        if (this.waypointManager.getWaypoints().isEmpty()) {
+            r = 0.0F;
+            g = 1.0F;
+            b = 0.0F;
+        } else {
+            r = this.generator.nextFloat();
+            g = this.generator.nextFloat();
+            b = this.generator.nextFloat();
+        }
+
+        TreeSet<DimensionContainer> dimensions = new TreeSet<>();
+        dimensions.add(VoxelConstants.getVoxelMapInstance().getDimensionManager().getDimensionContainerByWorld(VoxelConstants.getPlayer().level()));
+        double dimensionScale = VoxelConstants.getPlayer().level().dimensionType().coordinateScale();
+        this.newWaypoint = new Waypoint("", (int) (GameVariableAccessShim.xCoord() * dimensionScale), (int) (GameVariableAccessShim.zCoord() * dimensionScale), GameVariableAccessShim.yCoord(), true, r, g, b, "", VoxelConstants.getVoxelMapInstance().getWaypointManager().getCurrentSubworldDescriptor(false), dimensions);
+        VoxelConstants.getMinecraft().setScreen(new GuiAddWaypoint(this, this.newWaypoint, false));
+    }
+
+    protected void toggleWaypointVisibility() {
+        this.selectedWaypoint.enabled = !this.selectedWaypoint.enabled;
+        this.waypointManager.saveWaypoints();
+    }
+
+    @Override
+    public void render(GuiGraphics drawContext, int mouseX, int mouseY, float delta) {
+        this.tooltip = null;
+        this.waypointList.render(drawContext, mouseX, mouseY, delta);
+        drawContext.drawCenteredString(this.getFont(), this.screenTitle, this.getWidth() / 2, 20, 0xFFFFFFFF);
+        super.render(drawContext, mouseX, mouseY, delta);
+        drawContext.drawString(this.getFont(), I18n.get("minimap.waypoints.filter") + ":", this.getWidth() / 2 - 153, this.getHeight() - 75, 0xFFA0A0A0);
+        this.filter.render(drawContext, mouseX, mouseY, delta);
+        if (this.tooltip != null) {
+            this.renderTooltip(drawContext, this.tooltip, mouseX, mouseY);
+        }
+
+    }
+
+    static void setTooltip(GuiWaypoints par0GuiWaypoints, Component par1Str) {
+        par0GuiWaypoints.tooltip = par1Str;
+    }
+
+    public boolean canTeleport() {
+        Optional<IntegratedServer> integratedServer = VoxelConstants.getIntegratedServer();
+
+        if (integratedServer.isEmpty()) {
+            return true;
+        }
+
+        try {
+            return integratedServer.get().getPlayerList().isOp(VoxelConstants.getPlayer().nameAndId());
+        } catch (RuntimeException exception) {
+            return integratedServer.get().getWorldData().isAllowCommands();
+        }
+    }
+
+    @Override
+    public void removed() {
+
+        if (changedSort) {
+            super.removed();
+        }
+    }
+}
