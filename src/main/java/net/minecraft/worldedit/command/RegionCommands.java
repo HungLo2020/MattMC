@@ -66,60 +66,49 @@ public class RegionCommands {
         // //move command (stubbed - to be fully implemented)
         dispatcher.register(Commands.literal("move")
             .requires(source -> source.isPlayer() && hasPermission(source, "worldedit.region.move"))
-            .executes(ctx -> {
-                ctx.getSource().getPlayerOrException().sendSystemMessage(Component.literal("//move not yet fully implemented"));
-                return Command.SINGLE_SUCCESS;
-            }));
+            .executes(ctx -> notImplemented(ctx, "move")));
         
         // //stack command (stubbed - to be fully implemented)
         dispatcher.register(Commands.literal("stack")
             .requires(source -> source.isPlayer() && hasPermission(source, "worldedit.region.stack"))
-            .executes(ctx -> {
-                ctx.getSource().getPlayerOrException().sendSystemMessage(Component.literal("//stack not yet fully implemented"));
-                return Command.SINGLE_SUCCESS;
-            }));
+            .executes(ctx -> notImplemented(ctx, "stack")));
         
-        // //line command (stubbed - to be fully implemented)
+        // //line command (stubbed - placeholder block argument for future implementation)
         dispatcher.register(Commands.literal("line")
             .requires(source -> source.isPlayer() && hasPermission(source, "worldedit.region.line"))
             .then(Commands.argument("block", StringArgumentType.word())
-                .executes(ctx -> {
-                    ctx.getSource().getPlayerOrException().sendSystemMessage(Component.literal("//line not yet fully implemented"));
-                    return Command.SINGLE_SUCCESS;
-                })));
+                .executes(ctx -> notImplemented(ctx, "line"))));
         
         // //hollow command (stubbed - to be fully implemented)
         dispatcher.register(Commands.literal("hollow")
             .requires(source -> source.isPlayer() && hasPermission(source, "worldedit.region.hollow"))
-            .executes(ctx -> {
-                ctx.getSource().getPlayerOrException().sendSystemMessage(Component.literal("//hollow not yet fully implemented"));
-                return Command.SINGLE_SUCCESS;
-            }));
+            .executes(ctx -> notImplemented(ctx, "hollow")));
         
         // //naturalize command (stubbed - to be fully implemented)
         dispatcher.register(Commands.literal("naturalize")
             .requires(source -> source.isPlayer() && hasPermission(source, "worldedit.region.naturalize"))
-            .executes(ctx -> {
-                ctx.getSource().getPlayerOrException().sendSystemMessage(Component.literal("//naturalize not yet fully implemented"));
-                return Command.SINGLE_SUCCESS;
-            }));
+            .executes(ctx -> notImplemented(ctx, "naturalize")));
         
-        // //center command (stubbed - to be fully implemented)
+        // //center command (stubbed - placeholder block argument for future implementation)
         dispatcher.register(Commands.literal("center")
             .requires(source -> source.isPlayer() && hasPermission(source, "worldedit.region.center"))
             .then(Commands.argument("block", StringArgumentType.word())
-                .executes(ctx -> {
-                    ctx.getSource().getPlayerOrException().sendSystemMessage(Component.literal("//center not yet fully implemented"));
-                    return Command.SINGLE_SUCCESS;
-                })));
+                .executes(ctx -> notImplemented(ctx, "center"))));
         
         // //distr command (stubbed - to be fully implemented)
         dispatcher.register(Commands.literal("distr")
             .requires(source -> source.isPlayer() && hasPermission(source, "worldedit.analysis.distr"))
-            .executes(ctx -> {
-                ctx.getSource().getPlayerOrException().sendSystemMessage(Component.literal("//distr not yet fully implemented"));
-                return Command.SINGLE_SUCCESS;
-            }));
+            .executes(ctx -> notImplemented(ctx, "distr")));
+    }
+    
+    /**
+     * Helper method for stubbed commands - consistent "not implemented" message.
+     */
+    private static int notImplemented(CommandContext<CommandSourceStack> context, String commandName) throws CommandSyntaxException {
+        context.getSource().getPlayerOrException().sendSystemMessage(
+            Component.literal(String.format("§e//%s command not yet implemented", commandName))
+        );
+        return Command.SINGLE_SUCCESS;
     }
     
     /**
