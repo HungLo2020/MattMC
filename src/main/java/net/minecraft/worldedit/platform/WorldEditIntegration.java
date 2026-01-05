@@ -22,12 +22,17 @@ public class WorldEditIntegration {
      * Handle wand left-click (set secondary position).
      */
     public static void handleWandLeftClick(ServerPlayer player, BlockPos pos) {
+        System.out.println("WorldEditIntegration.handleWandLeftClick called - pos: " + pos);
+        
         if (!WorldEdit.isInitialized()) {
+            System.out.println("WorldEdit not initialized!");
             return;
         }
         
         LocalSession session = WorldEdit.getInstance().getSessionManager().get(player);
         BlockVector3 blockPos = BlockVector3.from(pos);
+        
+        System.out.println("Setting secondary position to: " + blockPos);
         
         if (session.getCurrentSelector().selectSecondary(blockPos)) {
             session.getCurrentSelector().explainSecondarySelection(player, blockPos);
@@ -38,12 +43,17 @@ public class WorldEditIntegration {
      * Handle wand right-click (set primary position).
      */
     public static void handleWandRightClick(ServerPlayer player, BlockPos pos) {
+        System.out.println("WorldEditIntegration.handleWandRightClick called - pos: " + pos);
+        
         if (!WorldEdit.isInitialized()) {
+            System.out.println("WorldEdit not initialized!");
             return;
         }
         
         LocalSession session = WorldEdit.getInstance().getSessionManager().get(player);
         BlockVector3 blockPos = BlockVector3.from(pos);
+        
+        System.out.println("Setting primary position to: " + blockPos);
         
         if (session.getCurrentSelector().selectPrimary(blockPos)) {
             session.getCurrentSelector().explainPrimarySelection(player, blockPos);

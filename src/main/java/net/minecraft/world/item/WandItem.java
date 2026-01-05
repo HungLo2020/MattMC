@@ -33,6 +33,9 @@ public class WandItem extends Item {
         
         BlockPos pos = context.getClickedPos();
         
+        // Debug logging
+        System.out.println("WandItem.useOn called - Right-click at " + pos);
+        
         // Right-click sets primary position
         WorldEditIntegration.handleWandRightClick(serverPlayer, pos);
         
