@@ -1264,6 +1264,13 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 	}
 
 	public void close() {
+		// VoxelMap: Call client stopping event
+		try {
+			net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents.CLIENT_STOPPING.invoker().onClientStopping(this);
+		} catch (Exception e) {
+			LOGGER.error("Error calling VoxelMap CLIENT_STOPPING event", e);
+		}
+		
 		// DH auto updater cleanup
 		com.seibel.distanthorizons.core.jar.updater.SelfUpdater.onClose();
 		

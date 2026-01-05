@@ -422,6 +422,14 @@ public class ClientPacketListener extends ClientCommonPacketListenerImpl impleme
 
 	public ClientPacketListener(Minecraft minecraft, Connection connection, CommonListenerCookie commonListenerCookie) {
 		super(minecraft, connection, commonListenerCookie);
+		
+		// VoxelMap: Call INIT event
+		try {
+			net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents.INIT.invokeAll(this, minecraft);
+		} catch (Exception e) {
+			LOGGER.error("Error calling VoxelMap INIT event", e);
+		}
+		
 		this.clientSkinCache = new ClientSkinCache(minecraft);
 		this.localGameProfile = commonListenerCookie.localGameProfile();
 		this.registryAccess = commonListenerCookie.receivedRegistries();
@@ -457,6 +465,13 @@ public class ClientPacketListener extends ClientCommonPacketListenerImpl impleme
 	}
 
 	public void clearLevel() {
+		// VoxelMap: Call DISCONNECT event
+		try {
+			net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents.DISCONNECT.invokeAll(this, this.minecraft);
+		} catch (Exception e) {
+			LOGGER.error("Error calling VoxelMap DISCONNECT event", e);
+		}
+		
 		this.clearCacheSlots();
 		this.level = null;
 		this.levelLoadTracker = null;
@@ -517,6 +532,15 @@ public class ClientPacketListener extends ClientCommonPacketListenerImpl impleme
 		this.debugSubscriber.clear();
 		this.minecraft.levelRenderer.debugRenderer.refreshRendererList();
 		this.minecraft.player.resetPos();
+		
+		// VoxelMap: Call JOIN event
+		try {
+			net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents.JOIN.invokeAll(
+				this, net.minecraft.network.protocol.PacketFlow.CLIENTBOUND, this.minecraft);
+		} catch (Exception e) {
+			LOGGER.error("Error calling VoxelMap JOIN event", e);
+		}
+		
 		this.minecraft.player.setId(clientboundLoginPacket.playerId());
 		this.level.addEntity(this.minecraft.player);
 		this.minecraft.player.input = new KeyboardInput(this.minecraft.options);
