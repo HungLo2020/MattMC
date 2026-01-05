@@ -534,11 +534,29 @@ public class JeiPanel {
 	}
 	
 	/**
+	 * Checks if an inventory index is an armor or equipment slot.
+	 * Armor slots: 36-39 (FEET, LEGS, CHEST, HEAD)
+	 * Equipment slots: 40+ (OFFHAND, BODY_ARMOR, SADDLE, etc.)
+	 */
+	private boolean isArmorOrEquipmentSlot(int inventoryIndex) {
+		// Slots 36-39 are armor (FEET, LEGS, CHEST, HEAD)
+		// Slot 40+ are offhand and other equipment
+		// We want to exclude armor slots (36-39) but allow offhand (40)
+		return inventoryIndex >= 36 && inventoryIndex <= 39;
+	}
+	
+	/**
 	 * Converts a player inventory index to the correct container slot index.
 	 * This dynamically finds where the player's inventory is in the current container.
+	 * Excludes armor slots (36-39) to prevent items from being placed in armor slots.
 	 */
 	private int inventoryIndexToContainerSlot(int inventoryIndex) {
 		if (this.minecraft == null || this.minecraft.player == null) {
+			return -1;
+		}
+		
+		// Don't allow items to go into armor slots
+		if (isArmorOrEquipmentSlot(inventoryIndex)) {
 			return -1;
 		}
 		
