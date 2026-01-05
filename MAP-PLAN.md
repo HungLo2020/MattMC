@@ -1,1024 +1,1427 @@
-# Map System Implementation Plan for MattMC
+# VoxelMap Integration Plan for MattMC 1.21.10
+
+**Project**: MattMC VoxelMap Integration  
+**Date**: 2026-01-05  
+**Status**: Planning Phase - Detailed Implementation Strategy
+
+---
 
 ## Executive Summary
 
-This document outlines the architectural design and feature set for implementing a standalone world map system into MattMC (Minecraft 1.21.10). Similar to how JourneyMap and Xaero's World Map operate as independent systems, this implementation will be a self-contained map mod built directly into the base game source code, without relying on vanilla map or waypoint systems.
+This document outlines a comprehensive plan to integrate VoxelMap 1.15.9 for Minecraft 1.21.10 directly into the MattMC source tree. VoxelMap is a minimap and world map mod with waypoint management, currently located in `frnsrc/VoxelMap-1.21.10/`. The integration follows the same pattern used for other mods in this project (Iris, Sodium, Distant Horizons, WorldEdit) - **no mixins, no real Fabric API, direct source integration**.
 
-**Core Features:**
-- Full-screen world map accessible via M key
-- Progressive map exploration (reveals as player explores)
-- Mouse wheel zoom with maximum detail at 1 pixel per block
-- Waypoint creation with teleportation support via dedicated menu
-- Multi-dimension support (Overworld, Nether, End)
-- Persistent storage across game sessions (save-specific for single player, server-specific for multiplayer)
-- No minimap or cave layer complexity
+### Key Challenges
+1. **Mixin Elimination**: VoxelMap has 7 mixin classes that modify Minecraft rendering
+2. **Fabric API Dependencies**: VoxelMap relies on Fabric API events and HUD rendering hooks
+3. **Access Wideners**: VoxelMap requires 32 access widener declarations
+4. **Multi-Module Structure**: VoxelMap is split between common, fabric, and neoforge modules
 
-**Key Architectural Decision:**
-This system will be **completely independent** from vanilla Minecraft's map items and waypoint systems. It will implement its own chunk scanning, tile rendering, waypoint management, and data persistence - similar to how external map mods operate, but with the advantage of direct source code integration.
+### Integration Approach
+- Convert all mixins to direct source modifications (following the Iris/Sodium pattern)
+- Replace Fabric API event system with direct initialization hooks
+- Apply access widener changes directly to Minecraft source classes
+- Merge common and fabric modules into unified source in `src/main/java`
 
 ---
 
 ## Table of Contents
 
-1. [Research Summary](#research-summary)
-2. [Core Architecture](#core-architecture)
-3. [Feature Specifications](#feature-specifications)
-4. [System Components](#system-components)
-5. [User Interface Design](#user-interface-design)
-6. [Data Persistence](#data-persistence)
-7. [Performance Requirements](#performance-requirements)
-8. [Implementation Phases](#implementation-phases)
-9. [Integration Points](#integration-points)
+1. [VoxelMap Architecture Analysis](#1-voxelmap-architecture-analysis)
+2. [MattMC Integration Context](#2-mattmc-integration-context)
+3. [Mixin Elimination Strategy](#3-mixin-elimination-strategy)
+4. [Fabric API Replacement Strategy](#4-fabric-api-replacement-strategy)
+5. [Access Widener Integration](#5-access-widener-integration)
+6. [Source Code Migration Plan](#6-source-code-migration-plan)
+7. [Resource and Asset Migration](#7-resource-and-asset-migration)
+8. [Initialization and Lifecycle](#8-initialization-and-lifecycle)
+9. [Testing and Validation Strategy](#9-testing-and-validation-strategy)
+10. [Implementation Phases](#10-implementation-phases)
 
 ---
 
-## Research Summary
+## 1. VoxelMap Architecture Analysis
 
-### JourneyMap Zoom System
+### 1.1 Module Structure
 
-**Zoom Implementation:**
-- Mouse wheel controls zoom in/out
-- Discrete zoom levels with smooth transitions
-- Center-on-mouse zoom behavior (point under cursor stays fixed)
-- Zoom range typically from 1 pixel = multiple blocks to 1 pixel = 1 block
-- Configuration for custom zoom steps and ranges
+**Common Module** (`common/src/main/java`)
+- 120 Java files
+- Core VoxelMap logic, rendering, and data management
+- Location: `com.mamiyaotaru.voxelmap.*`
+- **Independent of Fabric/Forge** - uses abstraction layer
 
-**Detail Levels:**
-- Maximum zoom: 1 pixel per block (highest detail)
-- Minimum zoom: Up to hundreds of blocks per pixel (overview)
-- Dynamic tile rendering adjusts to zoom level
-- Smooth interpolation between zoom levels
+**Fabric Module** (`fabric/src/main/java`)
+- 7 Java files
+- Fabric-specific initialization and event handling
+- Location: `com.mamiyaotaru.voxelmap.fabric.*`
+- **Fabric API dependent** - needs replacement
 
-### Xaero's World Map Zoom System
+**Key Packages**:
+```
+com.mamiyaotaru.voxelmap/
+├── VoxelMap.java              (Core singleton)
+├── VoxelConstants.java        (Static utilities, abstraction layer)
+├── Map.java                   (Minimap renderer)
+├── Radar.java                 (Entity radar)
+├── WaypointManager.java       (Waypoint management)
+├── ColorManager.java          (Block color management)
+├── MapSettingsManager.java    (Configuration)
+├── RadarSettingsManager.java  (Radar configuration)
+├── gui/                       (17 GUI classes)
+├── persistent/                (11 persistent map classes)
+├── util/                      (42 utility classes)
+├── mixins/                    (7 mixin classes - TO BE ELIMINATED)
+├── interfaces/                (5 interface definitions)
+├── packets/                   (4 packet handlers)
+├── entityrender/              (6 entity rendering classes)
+└── textures/                  (6 texture management classes)
+```
 
-**Zoom Characteristics:**
-- Google Maps-like zooming experience
-- Mouse wheel for continuous zoom control
-- Maximum detail: Pixel-perfect block representation
-- Massive zoom-out: Can display up to ~760,000 blocks with extensions
-- Standard display: ~30,000 blocks wide at full zoom-out
+### 1.2 Mixin Analysis
 
-**Rendering Approach:**
-- Dynamic scaling based on zoom level
-- Tile-based rendering with multiple resolution levels
-- Resource-intensive at extreme zoom-out levels
-- Configurable zoom range in settings
+VoxelMap uses 7 mixins to inject into Minecraft's rendering pipeline:
 
-### Key Takeaways for MattMC
+| Mixin Class | Target Class | Purpose | Integration Strategy |
+|-------------|--------------|---------|---------------------|
+| **MixinInGameHud** | `net.minecraft.client.gui.Gui` | Move scoreboard for minimap | Direct modification |
+| **MixinWorldRenderer** | `net.minecraft.client.renderer.LevelRenderer` | Render waypoint beacons in world | Direct hook addition |
+| **MixinChatHud** | `net.minecraft.client.gui.components.ChatComponent` | Adjust chat position for minimap | Direct modification |
+| **APIMixinMinecraftClient** | `net.minecraft.client.Minecraft` | Track dimension changes | Direct field/method addition |
+| **APIMixinNetHandlerPlayClient** | `net.minecraft.client.multiplayer.ClientPacketListener` | Intercept network packets | Direct hook addition |
+| **APIMixinChatListenerHud** | `net.minecraft.client.gui.components.ChatListener` | Filter chat messages | Direct modification |
+| **AccessorEnderDragonRenderer** | `net.minecraft.client.renderer.entity.EnderDragonRenderer` | Access private fields | Make fields accessible |
 
-**Zoom System Design:**
-1. Mouse wheel as primary zoom control
-2. Maximum detail level: 1 pixel = 1 block (highest zoom)
-3. Smooth zoom transitions with center-on-mouse behavior
-4. Configurable zoom range
-5. Dynamic tile rendering based on zoom level
+**Fabric-specific Mixin**:
+- **MixinRenderPipelines** (`fabric` module only): Injects into render pipeline creation - can be replaced with direct modification
 
-**Architecture Patterns:**
-1. Independent chunk scanning system
-2. Multi-resolution tile generation
-3. Asynchronous background processing
-4. Separate storage from vanilla game data
-5. Custom rendering pipeline
+### 1.3 Fabric API Dependencies
+
+VoxelMap uses these Fabric API features:
+
+```java
+// Event Registration (FabricEvents.java)
+ClientLifecycleEvents.CLIENT_STOPPING
+ClientPlayConnectionEvents.DISCONNECT
+ClientPlayConnectionEvents.INIT
+ClientPlayConnectionEvents.JOIN
+ClientConfigurationConnectionEvents.INIT
+
+// HUD Rendering (FabricEvents.java)
+HudElementRegistry.attachElementAfter(...)
+HudElement.render(GuiGraphics, DeltaTracker)
+
+// Network Packets (FabricPacketBridge.java, VoxelmapSettingsChannelHandler.java)
+ClientPlayNetworking.registerGlobalReceiver(...)
+ClientConfigurationNetworking.registerGlobalReceiver(...)
+```
+
+**Replacement Strategy**: All Fabric API events can be replaced with direct method calls at appropriate lifecycle points in Minecraft's client code.
+
+### 1.4 Access Widener Requirements
+
+VoxelMap requires 32 access widener declarations from `voxelmap.accesswidener`:
+
+**Categories**:
+- **Biome Access**: 2 declarations (climate settings access)
+- **GUI Components**: 2 declarations (selection list, scissors stack)
+- **Entity Models**: 14 declarations (head/body parts for various mobs)
+- **Client Rendering**: 9 declarations (render types, pipelines, fog renderer)
+- **Input/Options**: 1 declaration (key mappings array)
+- **World/Level**: 1 declaration (biome zoom seed)
+
+**Integration Strategy**: Apply these access changes directly to the Minecraft source files by changing visibility modifiers.
+
+### 1.5 Resource Files
+
+**Assets** (`common/src/main/resources/assets/voxelmap/`):
+- Images: 40+ PNG files (waypoint icons, radar icons, UI elements)
+- Configuration: `biomecolors.txt` (biome color mappings)
+- Icon: `icon.png` (mod icon)
+
+**Configuration Files**:
+- `mixin.voxelmap.json` - Common mixin config (DELETE after integration)
+- `mixin.voxelmap.fabric.json` - Fabric mixin config (DELETE after integration)
+- `voxelmap.accesswidener` - Access widener (APPLY to source, then delete)
+- `fabric.mod.json` - Fabric mod metadata (DELETE after integration)
 
 ---
 
-## Core Architecture
+## 2. MattMC Integration Context
 
-### System Overview
+### 2.1 Project Architecture
+
+**MattMC is a unified source build** with all mods integrated into a single compilation unit:
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│              MattMC Standalone Map System                    │
-├─────────────────────────────────────────────────────────────┤
-│                                                              │
-│  Input Layer                                                 │
-│  ┌─────────────────────────────────────────────┐            │
-│  │ - M Key (registered with vanilla keys)      │            │
-│  │ - Mouse Wheel (zoom control)                │            │
-│  │ - Mouse Drag (pan control)                  │            │
-│  │ - Mouse Click (waypoint interaction)        │            │
-│  └─────────────────────────────────────────────┘            │
-│                         ↓                                    │
-│  GUI Layer                                                   │
-│  ┌─────────────────────────────────────────────┐            │
-│  │ - World Map Screen (full-screen)            │            │
-│  │ - Waypoints Menu (create/manage/teleport)   │            │
-│  │ - Dimension Selector                        │            │
-│  │ - Zoom Controls & Display                   │            │
-│  └─────────────────────────────────────────────┘            │
-│                         ↓                                    │
-│  Rendering Layer                                             │
-│  ┌─────────────────────────────────────────────┐            │
-│  │ - Tile Renderer (OpenGL/LWJGL)              │            │
-│  │ - Waypoint Overlay Renderer                 │            │
-│  │ - Player Position Marker                    │            │
-│  │ - Viewport Management                       │            │
-│  └─────────────────────────────────────────────┘            │
-│                         ↓                                    │
-│  Data Layer                                                  │
-│  ┌─────────────────────────────────────────────┐            │
-│  │ - World Chunk Scanner (async)               │            │
-│  │ - Tile Generator (multi-resolution)         │            │
-│  │ - Tile Cache (LRU, in-memory)               │            │
-│  │ - Waypoint Manager                          │            │
-│  └─────────────────────────────────────────────┘            │
-│                         ↓                                    │
-│  Storage Layer                                               │
-│  ┌─────────────────────────────────────────────┐            │
-│  │ - PNG Tile Files                            │            │
-│  │ - Waypoint JSON                             │            │
-│  │ - Explored Chunks Metadata                  │            │
-│  │ - Configuration Files                       │            │
-│  └─────────────────────────────────────────────┘            │
-│                                                              │
-└─────────────────────────────────────────────────────────────┘
-
-Note: This system does NOT use:
-  ❌ vanilla MapRenderer
-  ❌ vanilla MapColor  
-  ❌ vanilla map items
-  ❌ vanilla waypoint systems (ClientWaypointManager, ServerWaypointManager)
-  ❌ vanilla waypoint data structures
+MattMC/
+├── src/main/java/
+│   ├── net/minecraft/        (Minecraft 1.21.10 source)
+│   ├── com/mojang/           (Mojang libraries)
+│   ├── net/fabricmc/         (Fabric Loader + minimal API stubs)
+│   ├── net/irisshaders/      (Iris shader mod - integrated)
+│   ├── net/caffeinemc/       (Sodium renderer - integrated)
+│   ├── com/seibel/           (Distant Horizons - integrated)
+│   └── [TO ADD] com/mamiyaotaru/voxelmap/
+├── src/main/resources/
+│   └── assets/
+│       └── [TO ADD] voxelmap/
+└── frnsrc/                   (Reference source - NOT compiled)
+    ├── VoxelMap-1.21.10/
+    ├── WorldEdit-version-7.3.x/
+    ├── fabric-1.21.10/
+    └── dwarfhollow-v0.2-by-kanokarob/
 ```
 
-### Directory Structure
+### 2.2 No Mixin System
 
-**Single Player (Save-Specific):**
-```
-<minecraft_root>/
-  └── mattmc_map/
-      └── saves/
-          └── <world_name>/           # Save-specific directory
-              ├── overworld/
-              │   ├── tiles/
-              │   │   ├── zoom_0/     # 1:1 pixel per block (highest detail)
-              │   │   ├── zoom_1/     # 1:2 pixel per block
-              │   │   ├── zoom_2/     # 1:4 pixel per block
-              │   │   └── zoom_n/     # Progressive zoom-out levels
-              │   └── explored.dat
-              ├── the_nether/
-              ├── the_end/
-              ├── waypoints.json
-              └── config.json
-```
+**Key Fact**: MattMC does NOT use mixins at runtime. All mod integrations are done through:
+1. **Direct source code modifications** (e.g., Iris adds hooks directly into shader compilation)
+2. **Direct field/method additions** to Minecraft classes
+3. **Interface implementations** on existing classes
 
-**Multiplayer/Dedicated Server (Server-Specific):**
-```
-<minecraft_root>/
-  └── mattmc_map/
-      └── servers/
-          └── <server_address>/       # Server-specific directory (not world-specific)
-              ├── overworld/
-              │   ├── tiles/
-              │   │   ├── zoom_0/
-              │   │   ├── zoom_1/
-              │   │   └── zoom_n/
-              │   └── explored.dat
-              ├── the_nether/
-              ├── the_end/
-              ├── waypoints.json
-              └── config.json
+**Evidence**:
+- `FabricMixinBootstrap.java` exists but mixin application is bypassed
+- Comments in source: `"// Removed unused mixinextras import - mixin system bypassed"`
+- Iris uses `mixinterface` pattern for shader customization points
+
+**Pattern to Follow**:
+```java
+// Instead of @Mixin + @Inject
+// Add direct method calls in Minecraft source:
+
+// In net.minecraft.client.gui.Gui.java:
+public void render(GuiGraphics graphics, DeltaTracker deltaTracker) {
+    // ... existing code ...
+    
+    // VoxelMap minimap rendering
+    com.mamiyaotaru.voxelmap.VoxelConstants.renderOverlay(graphics);
+    
+    // ... rest of code ...
+}
 ```
 
-**Server Address Format:**
-- IP-based: `192.168.1.100_25565` (IP_PORT)
-- Domain-based: `play.example.com_25565`
-- Localhost: `localhost_25565`
+### 2.3 Limited Fabric API
 
-**Directory Selection Logic:**
-- Single player: Use `saves/<world_name>/`
-- Multiplayer: Use `servers/<server_address>/`
-- This ensures each server maintains its own separate map data
+MattMC has **minimal Fabric API stubs** in `src/main/java/net/fabricmc/api/`:
+- `ClientModInitializer.java` - Interface for client mod initialization
+- `Environment.java` / `EnvType.java` - Environment annotations
+- `ModInitializer.java` - Interface for mod initialization
+
+**What's Missing** (that VoxelMap needs):
+- `net.fabricmc.fabric.api.client.event.lifecycle.v1.*` - Lifecycle events
+- `net.fabricmc.fabric.api.client.rendering.v1.hud.*` - HUD element registration
+- `net.fabricmc.fabric.api.client.networking.v1.*` - Network packet handling
+
+**Solution**: Create minimal stub interfaces OR replace with direct initialization calls.
+
+### 2.4 Successful Integration Examples
+
+**Iris Shaders Integration**:
+- Uses `mixinterface` pattern: interfaces like `CustomPass`, `ShaderInstanceInterface`
+- Direct modifications to `GlProgram.java`, `GlRenderPass.java`, etc.
+- NO mixin files in `src/main/java`
+
+**Sodium Integration**:
+- Comment in source: `"// Removed unused mixinextras import - mixin system bypassed"`
+- Direct integration into Minecraft's chunk rendering
+
+**Distant Horizons Integration**:
+- Uses `IMixinServerPlayer` interface but applied directly to source
+- No actual mixin application at runtime
+
+**WorldEdit Integration** (from IMPLEMENTATION_STATUS.md):
+- 42 Java classes integrated directly
+- Commands registered via direct server hooks
+- Zero mixin usage
 
 ---
 
-## Feature Specifications
+## 3. Mixin Elimination Strategy
 
-### 1. Map Display
+### 3.1 General Approach
 
-**Core Functionality:**
-- Full-screen map interface (replaces entire game view)
-- Real-time rendering of explored terrain
-- Smooth panning with mouse drag
-- Player position indicator (always visible)
-- Dimension indicator (shows current dimension)
-- Coordinate display (updates on mouse hover)
+For each mixin, we will:
+1. **Identify the target method** in Minecraft source
+2. **Add direct method calls** at injection points
+3. **Make fields/methods accessible** as needed
+4. **Delete the mixin class** after integration
 
-**Visual Elements:**
-- Block-accurate terrain coloring
-- Biome-aware grass and water colors
-- Height-based shading (brighter = higher, darker = lower)
-- Structure highlighting (optional)
-- Grid overlay (optional, shows chunk boundaries)
+### 3.2 Mixin-by-Mixin Conversion Plan
 
-### 2. Zoom System
+#### 3.2.1 MixinInGameHud
 
-**Zoom Levels:**
-- **Maximum Zoom (Zoom 0):** 1 pixel = 1 block (highest detail)
-- **Progressive Zoom Out:** Each level reduces detail (1:2, 1:4, 1:8, 1:16, etc.)
-- **Minimum Zoom:** Configurable, default ~1:64 (large area overview)
+**Original Mixin**:
+```java
+@Mixin(Gui.class)
+public class MixinInGameHud {
+    @ModifyVariable(method = "displayScoreboardSidebar(...)")
+    private int injected(int bottomX, @Local int entriesHeight) {
+        return VoxelConstants.moveScoreboard(bottomX, entriesHeight);
+    }
+}
+```
 
-**Zoom Controls:**
-- **Mouse Wheel:** Primary zoom control
-  - Scroll up: Zoom in (increase detail)
-  - Scroll down: Zoom out (decrease detail)
-- **Keyboard:** Secondary zoom control (+ and - keys)
-- **UI Buttons:** Zoom in/out buttons with current zoom level display
+**Target File**: `src/main/java/net/minecraft/client/gui/Gui.java`
 
-**Zoom Behavior:**
-- Center-on-mouse: Point under cursor remains stationary during zoom
-- Smooth transitions between zoom levels
-- Configurable zoom speed (sensitivity)
-- Zoom limits to prevent over-zoom or excessive zoom-out
+**Integration Steps**:
+1. Open `Gui.java`, locate method `displayScoreboardSidebar(GuiGraphics, Objective)`
+2. Find the line: `int o = guiGraphics.guiHeight() / 2 + n / 3;` (where `n` is entries height)
+3. Replace with:
+   ```java
+   int o = com.mamiyaotaru.voxelmap.VoxelConstants.moveScoreboard(
+       guiGraphics.guiHeight() / 2 + n / 3, 
+       n
+   );
+   ```
+4. Delete `MixinInGameHud.java`
 
-### 3. Waypoint System
-
-**Waypoint Menu:**
-- Dedicated "Waypoints" button in map interface
-- Opens full waypoint management screen
-- List view of all waypoints (grouped by dimension)
-- Search/filter functionality
-- Sort options (name, distance, dimension, creation date)
-
-**Waypoint Creation:**
-- Click "Create Waypoint" in waypoints menu
-- Or right-click on map to create at location
-- Customization options:
-  - Name (text input)
-  - Color (color picker with presets)
-  - Dimension (auto-detected, read-only)
-  - Coordinates (auto-filled from click location)
-
-**Waypoint Actions:**
-- **Teleport:** Instant teleportation to waypoint
-  - Requires creative mode or teleport permission
-  - Handles cross-dimension teleport automatically
-  - Confirmation dialog for long-distance teleports
-- **Edit:** Modify waypoint properties
-- **Delete:** Remove waypoint (with confirmation)
-- **Share:** Copy coordinates to chat/clipboard
-- **Navigate:** Show path/direction to waypoint
-
-**Waypoint Display:**
-- Waypoint icon with user-selected color displayed on map
-- Single default icon design (not configurable by user)
-- Name labels (toggle-able)
-- Distance indicator when hovering
-- Visual effects (glow, pulse) for selected waypoint
-- Dim/hide disabled waypoints
-
-### 4. Dimension Support
-
-**Dimension Switching:**
-- Dropdown menu in map header
-- Keyboard shortcuts (Tab to cycle)
-- Quick-switch to player's current dimension
-- Remembers last viewed position per dimension
-
-**Coordinate Conversion:**
-- Automatic Nether ↔ Overworld conversion (1:8 ratio)
-- Visual indicator when viewing different dimension
-- "Show Equivalent Position" feature (overlay other dimension coordinates)
-
-**Dimension-Specific Features:**
-- Separate explored area per dimension
-- Independent waypoint lists
-- Dimension-appropriate coloring (Nether = red tint, End = purple tint)
-
-### 5. Exploration Tracking
-
-**Progressive Revelation:**
-- Map initially blank/unexplored
-- Reveals as player enters chunks
-- Explored areas persist across sessions
-- Visual distinction between explored and unexplored
-
-**Update Mechanisms:**
-- Real-time update as chunks load
-- Background scanning of loaded chunks
-- Manual refresh option
-- Auto-update while map is open
-
-### 6. Save/Server Management
-
-**Single Player:**
-- Maps stored per world save
-- Each world has its own independent map data
-- Waypoints unique to each world
-
-**Multiplayer/Servers:**
-- Maps stored per server address (not per world)
-- Server-specific map persists across reconnections
-- Waypoints shared across all worlds on same server
-- Separate map data for each server you connect to
+**Impact**: Adjusts scoreboard Y position to avoid overlap with minimap
 
 ---
 
-## System Components
+#### 3.2.2 MixinWorldRenderer
 
-### Component 1: World Chunk Scanner
+**Purpose**: Render waypoint beacons in the 3D world
 
-**Purpose:** Asynchronously scan loaded chunks and extract map data
+**Target File**: `src/main/java/net/minecraft/client/renderer/LevelRenderer.java`
 
-**Responsibilities:**
-- Monitor chunk load events
-- Extract block surface data (top-most solid block)
-- Gather biome information
-- Calculate height values for shading
-- Mark chunks as explored
-- Queue tile regeneration
+**Integration Steps**:
+1. Locate the method `renderLevel(...)` or similar world rendering method
+2. After world geometry rendering, add:
+   ```java
+   // VoxelMap: Render waypoint beacons
+   com.mamiyaotaru.voxelmap.VoxelConstants.renderWorldWaypoints(
+       poseStack, 
+       bufferSource, 
+       camera, 
+       partialTick
+   );
+   ```
+3. Delete `MixinWorldRenderer.java`
 
-**Processing Flow:**
-1. Chunk loads in game world
-2. Scanner detects load event
-3. Scan scheduled in background thread
-4. Block data extracted (top-down scan)
-5. Color and height information stored
-6. Affected tiles marked dirty
-7. Tile regeneration queued
-
-**Performance Characteristics:**
-- Non-blocking (runs in separate thread)
-- Configurable scan priority
-- Batch processing for multiple chunks
-- Throttling to prevent CPU overload
-
-### Component 2: Block Color Mapper
-
-**Purpose:** Independent color mapping system for all Minecraft blocks
-
-**Responsibilities:**
-- Maintain color database for all blocks
-- Handle biome-specific colors (grass, leaves, water)
-- Apply height-based shading
-- Support resource pack color extraction
-
-**Color Categories:**
-- Stone variants (granite, andesite, diorite, deepslate)
-- Wood types (oak, spruce, birch, jungle, etc.)
-- Terrain (dirt, sand, gravel, clay)
-- Foliage (grass, leaves - biome-aware)
-- Water (biome-aware, depth-aware)
-- Special blocks (ores, structures)
-
-**Biome Coloring:**
-- Grass: Temperature and humidity-based interpolation
-- Leaves: Biome foliage color
-- Water: Biome water color
-- Other biome-specific blocks
-
-### Component 3: Tile Generator
-
-**Purpose:** Generate multi-resolution PNG tiles from chunk data
-
-**Tile Specifications:**
-- Base tile size: 512×512 pixels
-- Multiple zoom levels (0 to n)
-- Zoom 0: 512×512 blocks (1 pixel = 1 block)
-- Zoom 1: 1024×1024 blocks (1 pixel = 2 blocks)
-- Zoom n: Progressive scaling
-
-**Generation Process:**
-1. Receive tile request (dimension, coordinates, zoom level)
-2. Load chunk data for tile coverage area
-3. Apply color mapping to blocks
-4. Apply height-based shading
-5. Generate PNG image
-6. Cache in memory
-7. Save to disk (async)
-
-**Optimization:**
-- Generate only requested zoom levels
-- Lazy generation (on-demand)
-- Incremental updates (only changed areas)
-- Multi-threaded generation
-
-### Component 4: Tile Cache
-
-**Purpose:** In-memory LRU cache for fast tile access
-
-**Characteristics:**
-- Size: Configurable, default 256 tiles (~512MB at 512×512 px)
-- Eviction: Least Recently Used (LRU)
-- Write-back: Save dirty tiles before eviction
-- Preload: Load tiles around viewport
-
-**Cache Strategies:**
-- Viewport-based priority (visible tiles stay in cache)
-- Adjacent tile preloading (smooth panning)
-- Zoom-level awareness (cache relevant zoom level)
-- Dimension isolation (clear cache on dimension switch)
-
-### Component 5: Waypoint Manager
-
-**Purpose:** Manage user-created waypoints
-
-**Data Model:**
-- UUID (unique identifier)
-- Name (user-defined string)
-- Dimension (world key)
-- Position (x, y, z coordinates)
-- Color (RGB integer)
-- Creation timestamp
-- Enabled flag
-
-**Operations:**
-- Create waypoint
-- Read waypoint (by ID, by name, by dimension)
-- Update waypoint (rename, recolor)
-- Delete waypoint
-- List waypoints (filtered, sorted)
-- Teleport to waypoint
-
-**Persistence:**
-- JSON file format
-- Save on modification
-- Load on world load
-- Backup/restore functionality
-
-### Component 6: Map Renderer
-
-**Purpose:** Render map tiles and overlays to screen
-
-**Rendering Pipeline:**
-1. Calculate visible viewport (based on center position and zoom)
-2. Determine required tiles (tile coordinates)
-3. Load tiles from cache (or queue generation)
-4. Render tiles to screen (OpenGL texture quads)
-5. Render waypoint markers and labels
-6. Render player marker
-7. Render UI elements (controls, info)
-
-**Rendering Optimizations:**
-- Batch tile rendering (single draw call)
-- Texture atlas for UI elements
-- Frustum culling (skip offscreen tiles)
-- LOD (level of detail) based on zoom
-
-### Component 7: Viewport Manager
-
-**Purpose:** Manage map viewport (position, zoom, transform)
-
-**State:**
-- Center position (world X, Z coordinates)
-- Zoom level (0 to max)
-- Screen dimensions
-- Current dimension
-
-**Coordinate Transformations:**
-- World to screen (blocks → pixels)
-- Screen to world (pixels → blocks)
-- Tile to world (tile coordinates → block coordinates)
-- World to tile (block coordinates → tile coordinates)
-
-**Viewport Operations:**
-- Pan (translate center position)
-- Zoom (change zoom level, adjust center)
-- Center on position (player, waypoint)
-- Fit bounds (show specific area)
-
-### Component 8: Save/Server Directory Manager
-
-**Purpose:** Determine correct storage directory based on connection type
-
-**Responsibilities:**
-- Detect if player is in single player or multiplayer
-- Generate appropriate directory path
-- Handle server address formatting
-- Create directories as needed
-
-**Directory Logic:**
-- Single player: Use world save name
-- Multiplayer: Use server IP:port or domain:port
-- Sanitize addresses (replace invalid filesystem characters)
+**Impact**: Renders waypoint beams/markers visible through terrain
 
 ---
 
-## User Interface Design
+#### 3.2.3 MixinChatHud
 
-### Main Map Screen Layout
+**Purpose**: Adjust chat component position to avoid minimap overlap
 
-```
-┌──────────────────────────────────────────────────────────────┐
-│  [X] World Map          Overworld ▼    Waypoints  Settings   │ Header (40px)
-├──────────────────────────────────────────────────────────────┤
-│                                                               │
-│                                                               │
-│                    MAP VIEWPORT                               │
-│                                                               │
-│               [Rendered tiles, waypoints,                     │ Main Area
-│                player position]                               │
-│                                                               │
-│                                                               │
-│                                                               │
-├──────────────────────────────────────────────────────────────┤
-│ Zoom: [-] 100% (1:1) [+]  │  X: 1234, Z: 5678  │  [Center]  │ Footer (35px)
-└──────────────────────────────────────────────────────────────┘
-```
+**Target File**: `src/main/java/net/minecraft/client/gui/components/ChatComponent.java`
 
-**Header Elements:**
-- Close button (X) - top left
-- Title "World Map" - left
-- Dimension selector dropdown - center
-- "Waypoints" button - right of center
-- "Settings" button - top right
+**Integration Steps**:
+1. Locate chat rendering method (likely in `render()` or position calculation)
+2. Add hook to adjust Y position based on minimap configuration
+3. May need to add field for position offset
+4. Delete `MixinChatHud.java`
 
-**Footer Elements:**
-- Zoom controls (- button, level display, + button) - left
-- Coordinate display (updates on hover) - center
-- "Center on Player" button - right
-
-### Waypoints Menu
-
-```
-┌──────────────────────────────────────────────────────────────┐
-│  Waypoints                                        [X] Close   │
-├──────────────────────────────────────────────────────────────┤
-│  [Search...]                    [+ Create Waypoint]           │
-├──────────────────────────────────────────────────────────────┤
-│                                                               │
-│  Overworld (3)                                                │
-│    ● Home Base          X: 100, Y: 64, Z: 200     [Teleport] │
-│    ● Mine Entrance      X: -50, Y: 12, Z: 300     [Teleport] │
-│    ● Castle             X: 500, Y: 80, Z: -100    [Teleport] │
-│                                                               │
-│  The Nether (1)                                               │
-│    ● Nether Hub         X: 12, Y: 64, Z: 25       [Teleport] │
-│                                                               │
-│  The End (0)                                                  │
-│    (No waypoints)                                             │
-│                                                               │
-├──────────────────────────────────────────────────────────────┤
-│  Selected: Home Base                [Edit]  [Delete]          │
-└──────────────────────────────────────────────────────────────┘
-```
-
-**Features:**
-- Search bar (filter by name)
-- Create button (opens creation dialog)
-- Grouped by dimension (collapsible sections)
-- Each waypoint row shows: waypoint icon (colored), name, coordinates, teleport button
-- Selection highlights row
-- Edit/Delete buttons for selected waypoint
-
-**Note:** Waypoints use a single default icon design, colored by user choice (not configurable icons)
-
-### Create/Edit Waypoint Dialog
-
-```
-┌─────────────────────────────────────────┐
-│  Create Waypoint              [X] Close  │
-├─────────────────────────────────────────┤
-│  Name: [_________________________]       │
-│                                          │
-│  Color: [●●●●●●●●●●●●] Custom: [    ]  │
-│         Red Orange Yellow Green          │
-│         Blue Purple Pink White           │
-│                                          │
-│  Location:                               │
-│    Dimension: Overworld                  │
-│    X: 123   Y: 64   Z: 456               │
-│                                          │
-│              [Cancel]  [Create]          │
-└─────────────────────────────────────────┘
-```
-
-**Fields:**
-- Name (text input, required)
-- Color (preset palette + custom color picker)
-- Location (auto-filled, can be edited)
-
-**Note:** Uses single default icon design - only color is customizable
-
-### Settings Panel
-
-```
-┌─────────────────────────────────────────┐
-│  Map Settings                 [X] Close  │
-├─────────────────────────────────────────┤
-│  Display                                 │
-│    [ ] Show chunk grid                   │
-│    [✓] Show waypoint labels              │
-│    [✓] Show player marker                │
-│    [ ] Show coordinates                  │
-│                                          │
-│  Zoom                                    │
-│    Min Zoom: [1:64 ▼]                    │
-│    Max Zoom: [1:1  ▼]                    │
-│    Zoom Speed: [Normal ▼]                │
-│                                          │
-│  Performance                             │
-│    Tile Cache: [256 tiles ▼]             │
-│    [ ] High quality rendering            │
-│                                          │
-│              [Reset]  [Apply]            │
-└─────────────────────────────────────────┘
-```
-
-**Settings Categories:**
-- Display options (toggles for various visual elements)
-- Zoom configuration (range and speed)
-- Performance tuning (cache size, quality)
-
-### Visual Design Guidelines
-
-**Color Scheme:**
-- Background: Semi-transparent dark overlay (#000000CC)
-- UI panels: Dark gray (#2B2B2B)
-- Text: White (#FFFFFF) and light gray (#CCCCCC)
-- Accents: Minecraft green (#55FF55)
-- Buttons: Minecraft button style (matching vanilla)
-
-**Typography:**
-- UI text: Minecraft font
-- Coordinates: Monospace for alignment
-- Headers: Bold variant
-
-**Waypoint Markers:**
-- Single default icon design (e.g., pin/marker shape)
-- Size: 12-16 pixels
-- Colors: User-selectable from palette
-- Icon design not configurable (always same shape, just different colors)
+**Impact**: Moves chat up/down based on minimap position settings
 
 ---
 
-## Data Persistence
+#### 3.2.4 APIMixinMinecraftClient
 
-### File Formats
+**Purpose**: Track world/dimension changes for VoxelMap
 
-**Tile Files:**
-- Format: PNG (compressed)
-- Location (Single Player): `mattmc_map/saves/<world_name>/<dimension>/tiles/zoom_<level>/<region>/tile_<x>_<z>.png`
-- Location (Multiplayer): `mattmc_map/servers/<server_address>/<dimension>/tiles/zoom_<level>/<region>/tile_<x>_<z>.png`
-- Naming: Tile coordinates in file name
-- Organization: Grouped by region (32×32 tiles per region directory)
+**Target File**: `src/main/java/net/minecraft/client/Minecraft.java`
 
-**Waypoint File:**
-- Format: JSON
-- Location (Single Player): `mattmc_map/saves/<world_name>/waypoints.json`
-- Location (Multiplayer): `mattmc_map/servers/<server_address>/waypoints.json`
-- Structure:
-  ```json
-  {
-    "version": 1,
-    "waypoints": [
-      {
-        "id": "uuid-string",
-        "name": "Home Base",
-        "dimension": "minecraft:overworld",
-        "x": 123, "y": 64, "z": 456,
-        "color": 16711680,
-        "created": 1234567890000,
-        "enabled": true
-      }
-    ]
-  }
-  ```
+**Integration Steps**:
+1. Locate world change/join methods (`setLevel()`, etc.)
+2. Add direct calls:
+   ```java
+   if (this.level != newLevel) {
+       com.mamiyaotaru.voxelmap.VoxelConstants.onWorldChange(newLevel);
+   }
+   ```
+3. Consider adding interface `IVoxelMapMinecraft` for cleaner separation
+4. Delete `APIMixinMinecraftClient.java`
 
-**Explored Chunks:**
-- Format: Custom binary format (compact)
-- Location (Single Player): `mattmc_map/saves/<world_name>/<dimension>/explored.dat`
-- Location (Multiplayer): `mattmc_map/servers/<server_address>/<dimension>/explored.dat`
-- Content: Bitset of explored chunk coordinates
-
-**Configuration:**
-- Format: JSON
-- Location: Per-world/server config and global config
-- Settings: Zoom ranges, display options, performance tuning
-
-### Save/Load Strategy
-
-**When to Save:**
-- Tile generation: Save immediately after generation
-- Waypoint changes: Save on create/edit/delete
-- Explored chunks: Periodic save (every 60 seconds) + on world save
-- Configuration: Save on settings change
-
-**When to Load:**
-- World load: Load waypoints and explored chunks
-- Map open: Load configuration
-- Tile display: Load tiles on-demand (lazy loading)
-
-**Error Handling:**
-- Corrupted files: Fallback to empty/default state
-- Missing files: Create new with defaults
-- Version mismatch: Attempt migration or reset
-
-### Directory Management
-
-**Single Player Detection:**
-- Check if connected to integrated server
-- Use world save name for directory
-
-**Multiplayer Detection:**
-- Check if connected to dedicated server
-- Extract server address (IP:port or domain:port)
-- Sanitize address for filesystem compatibility
-- Create server-specific directory
+**Impact**: Notifies VoxelMap when player changes dimensions (Overworld ↔ Nether ↔ End)
 
 ---
 
-## Performance Requirements
+#### 3.2.5 APIMixinNetHandlerPlayClient
 
-### Target Metrics
+**Purpose**: Intercept network packets for server→client communication
 
-**Rendering:**
-- 60 FPS minimum while map is open
-- < 100ms time to open map screen
-- < 16ms per frame rendering time
-- Smooth pan and zoom (no stuttering)
+**Target File**: `src/main/java/net/minecraft/client/multiplayer/ClientPacketListener.java`
 
-**Tile Generation:**
-- < 500ms to generate single tile (zoom 0)
-- < 2 seconds for full viewport (typical 3×3 tiles)
-- Background generation doesn't impact game FPS
+**Integration Steps**:
+1. Locate packet handling methods
+2. Add hooks for custom VoxelMap packets:
+   ```java
+   if (packet instanceof CustomPayloadPacket customPayload) {
+       if (com.mamiyaotaru.voxelmap.VoxelConstants.handleCustomPacket(customPayload)) {
+           return; // Packet handled by VoxelMap
+       }
+   }
+   ```
+3. Delete `APIMixinNetHandlerPlayClient.java`
 
-**Memory:**
-- < 200MB total map system overhead
-- Tile cache: Configurable, default 256 tiles (~512MB)
-- Waypoint data: < 1MB (thousands of waypoints)
-
-**Storage:**
-- < 10MB per 1000 explored chunks (tiles + metadata)
-- PNG compression for efficient disk usage
-- Incremental saves (only changed data)
-
-### Optimization Strategies
-
-**Rendering Optimizations:**
-- Texture atlas for UI elements
-- Batch rendering (minimize draw calls)
-- Viewport culling (don't render offscreen content)
-- LOD system (lower detail for distant areas)
-
-**Generation Optimizations:**
-- Multi-threaded tile generation
-- Incremental updates (only regenerate changed areas)
-- Lazy generation (generate only when needed)
-- Caching intermediate results
-
-**Memory Optimizations:**
-- LRU cache with aggressive eviction
-- Lazy loading (load tiles on-demand)
-- Unload tiles outside viewport margin
-- Compress data in memory where possible
+**Impact**: Allows server to send waypoint data, world IDs to client
 
 ---
 
-## Implementation Phases
+#### 3.2.6 APIMixinChatListenerHud
 
-### Phase 1: Core Infrastructure (Weeks 1-2)
+**Purpose**: Filter/process chat messages for commands
 
-**Focus:** Foundation and data collection
+**Target File**: `src/main/java/net/minecraft/client/gui/components/ChatListener.java`
 
-**Deliverables:**
-- World chunk scanner (async background processing)
-- Block color mapper (complete block palette)
-- Chunk data extraction and storage
-- Explored chunk tracking
-- File system structure setup (with save/server detection)
+**Integration Steps**:
+1. Locate chat message processing
+2. Add VoxelMap message handler hook before/after vanilla processing
+3. Delete `APIMixinChatListenerHud.java`
 
-**Validation:**
-- Chunks scanned without blocking game
-- Colors accurate for all block types
-- Explored chunks persist across sessions
-- Correct directory used for single player vs multiplayer
-
-### Phase 2: Tile System (Weeks 3-4)
-
-**Focus:** Multi-resolution tile generation and caching
-
-**Deliverables:**
-- Tile generator for multiple zoom levels
-- PNG encoding/decoding
-- Tile cache with LRU eviction
-- Directory organization for tiles
-- Height-based shading algorithm
-
-**Validation:**
-- Tiles generate at all zoom levels
-- 1:1 pixel-per-block at zoom 0
-- Cache eviction works correctly
-- Tiles save/load from disk
-
-### Phase 3: Map GUI (Weeks 5-6)
-
-**Focus:** User interface and rendering
-
-**Deliverables:**
-- World map screen (full-screen interface)
-- Viewport management (pan, zoom)
-- Tile rendering (OpenGL)
-- Mouse controls (drag, wheel, click)
-- Coordinate display and UI elements
-
-**Validation:**
-- Map opens with M key
-- Smooth panning with mouse drag
-- Mouse wheel zoom works correctly
-- Center-on-mouse zoom behavior
-- 60 FPS rendering achieved
-
-### Phase 4: Waypoint System (Weeks 7-8)
-
-**Focus:** Waypoint creation and management
-
-**Deliverables:**
-- Waypoint data model (color selection only)
-- Waypoint manager (CRUD operations)
-- Waypoints menu UI
-- Waypoint creation/edit dialog
-- Waypoint rendering on map (single icon design, user-colored)
-- JSON persistence
-
-**Validation:**
-- Create waypoints via menu
-- Edit and delete waypoints
-- Waypoints render on map with default icon in chosen color
-- Waypoints persist across sessions
-- Search and filter work
-
-### Phase 5: Teleportation (Week 9)
-
-**Focus:** Waypoint teleportation functionality
-
-**Deliverables:**
-- Teleport command integration
-- Cross-dimension teleport handling
-- Permission system integration
-- Teleport confirmation dialogs
-- Coordinate conversion (Nether/Overworld)
-
-**Validation:**
-- Teleport within dimension
-- Cross-dimension teleport
-- Nether coordinates convert correctly (1:8)
-- Permission checks work
-
-### Phase 6: Polish & Configuration (Week 10)
-
-**Focus:** Settings, optimization, and final polish
-
-**Deliverables:**
-- Settings menu
-- Configuration persistence
-- Performance optimizations
-- Visual polish and animations
-- Help/tutorial screen
-- Documentation
-
-**Validation:**
-- Settings save and load
-- Performance targets met
-- UI is polished and consistent
-- No major bugs
+**Impact**: Allows VoxelMap to process commands like `/newWaypoint`
 
 ---
 
-## Integration Points
+#### 3.2.7 AccessorEnderDragonRenderer
 
-### 1. Key Registration
+**Purpose**: Access private fields in ender dragon renderer
 
-**Location:** Register with vanilla key bindings system
+**Target File**: `src/main/java/net/minecraft/client/renderer/entity/EnderDragonRenderer.java`
 
-**Implementation Approach:**
-- Register M key in the same place vanilla keys are registered
-- Use Minecraft's `KeyMapping` system
-- Category: Custom "MattMC Map" category or "Gameplay" category
-- Binding: Default to M, user-configurable
+**Integration Steps**:
+1. Make accessed fields public or package-private
+2. This is effectively an access widener, just apply visibility change
+3. Delete `AccessorEnderDragonRenderer.java`
 
-**Registration Point:**
-- Client initialization phase
-- Alongside vanilla key bindings (movement, inventory, etc.)
-- Before main menu displays
-
-### 2. Chunk Load Events
-
-**Hook:** Client-side chunk load events
-
-**Purpose:** Trigger chunk scanning when chunks load
-
-**Integration:**
-- Subscribe to chunk load events (Forge/Fabric event bus)
-- Filter for client-side only
-- Trigger async scan in background
-
-### 3. Client Tick
-
-**Hook:** Client tick event
-
-**Purpose:** Update systems, process queues
-
-**Tasks:**
-- Process tile generation queue
-- Update tile cache
-- Handle async operation completion
-- Update UI animations
-
-### 4. World Load/Unload
-
-**Hook:** World load and unload events
-
-**Purpose:** Load/save map data, determine directory
-
-**Actions on Load:**
-- Detect single player vs multiplayer
-- Determine appropriate directory path
-- Load waypoints from JSON
-- Load explored chunks metadata
-- Load configuration
-- Initialize map systems
-
-**Actions on Unload:**
-- Save modified tiles
-- Save waypoints
-- Save explored chunks
-- Save configuration
-- Clean up resources
-
-### 5. Render Pipeline
-
-**Integration:** Custom screen rendering
-
-**Approach:**
-- Map screen extends vanilla `Screen` class
-- Custom rendering using `GuiGraphics` and OpenGL
-- Integrates with vanilla GUI rendering system
+**Impact**: Allows VoxelMap to render dragon head correctly on radar
 
 ---
 
-## Conclusion
+#### 3.2.8 MixinRenderPipelines (Fabric-specific)
 
-This map system is designed as a completely **standalone, independent system** that operates similarly to JourneyMap and Xaero's World Map, but with the advantage of being integrated directly into MattMC's source code.
+**Purpose**: Inject custom render pipeline for VoxelMap UI
 
-### Key Design Principles
+**Target File**: `src/main/java/net/minecraft/client/renderer/RenderPipelines.java`
 
-1. **Independence from Vanilla:**
-   - No dependencies on vanilla map or waypoint systems
-   - Custom chunk scanning and data extraction
-   - Independent color mapping and rendering
+**Integration Steps**:
+1. Locate pipeline initialization
+2. Add VoxelMap pipeline registration:
+   ```java
+   com.mamiyaotaru.voxelmap.util.VoxelMapPipelines.register();
+   ```
+3. Delete `MixinRenderPipelines.java` from fabric module
 
-2. **Feature-Focused:**
-   - Essential features only (no minimap, no cave layers)
-   - Mouse wheel zoom with 1 pixel per block maximum detail
-   - Dedicated waypoints menu for creation and teleportation
-   - Single default waypoint icon design (color customizable, shape not)
-   - Multi-dimension support with coordinate conversion
-   - Save-specific maps for single player, server-specific for multiplayer
-
-3. **Performance-Oriented:**
-   - Async processing to avoid blocking game
-   - Efficient tile caching and rendering
-   - Configurable performance tuning
-   - Target: 60 FPS with < 200MB overhead
-
-4. **User-Friendly:**
-   - Intuitive controls (M key, mouse wheel, drag)
-   - Clear UI with dedicated waypoints menu
-   - Smooth zoom and pan
-   - Integrated with vanilla key bindings
-   - Single default waypoint icon (visible, color customizable)
-
-### Storage Strategy
-
-**Single Player:**
-- Maps saved per world in `mattmc_map/saves/<world_name>/`
-- Each world has independent map data
-
-**Multiplayer:**
-- Maps saved per server in `mattmc_map/servers/<server_address>/`
-- Server maps persist across reconnections
-- Not world-specific - all worlds on same server share map data
-
-### Timeline
-
-**Total Duration:** 10 weeks
-
-**Major Milestones:**
-- Week 2: Core data collection working with save/server detection
-- Week 4: Tiles generating at all zoom levels
-- Week 6: Map GUI functional with zoom
-- Week 8: Waypoint system complete (default icon, color customizable)
-- Week 9: Teleportation working
-- Week 10: Polish and release
-
-### Success Criteria
-
-- Map opens instantly with M key
-- Smooth 60 FPS rendering during pan/zoom
-- Maximum zoom shows 1 pixel per block detail
-- Waypoints menu allows easy creation and teleportation
-- Waypoints display with default icon in user-selected color
-- Multi-dimension support with proper coordinate conversion
-- Data persists correctly across sessions
-- Correct directory used for single player vs multiplayer
-- Memory usage stays under budget
-
-This architecture provides a solid foundation for a high-performance, user-friendly map system that rivals external mods while benefiting from direct source code integration.
+**Impact**: Registers custom shaders/render states for map rendering
 
 ---
 
-*Document Version: 4.1*  
-*Updated: December 2024*  
-*For: MattMC (Minecraft 1.21.10)*  
-*Focus: Architecture & Design (Single default icon, Save/Server-specific storage)*
+### 3.3 Mixin Deletion Checklist
+
+After all integrations:
+- [ ] Delete `frnsrc/VoxelMap-1.21.10/common/src/main/java/com/mamiyaotaru/voxelmap/mixins/` (entire folder)
+- [ ] Delete `frnsrc/VoxelMap-1.21.10/fabric/src/main/java/com/mamiyaotaru/voxelmap/fabric/mixins/` (entire folder)
+- [ ] Delete `common/src/main/resources/mixin.voxelmap.json`
+- [ ] Delete `fabric/src/main/resources/mixin.voxelmap.fabric.json`
+- [ ] Remove mixin references from VoxelMap code (if any)
+
+---
+
+## 4. Fabric API Replacement Strategy
+
+### 4.1 Event System Replacement
+
+VoxelMap uses Fabric lifecycle events in `FabricEvents.java`:
+
+**Original Fabric Events**:
+```java
+ClientLifecycleEvents.CLIENT_STOPPING.register(client -> map.onClientStopping());
+ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> map.onDisconnect());
+ClientConfigurationConnectionEvents.INIT.register((handler, client) -> map.onConfigurationInit());
+ClientPlayConnectionEvents.INIT.register((handler, client) -> map.onPlayInit());
+ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> map.onJoinServer());
+```
+
+**Replacement Strategy**:
+
+Create `VoxelMapClientHooks.java` in Minecraft client code:
+
+```java
+// In src/main/java/net/minecraft/client/VoxelMapClientHooks.java
+package net.minecraft.client;
+
+import com.mamiyaotaru.voxelmap.VoxelConstants;
+
+public class VoxelMapClientHooks {
+    public static void onClientStopping() {
+        VoxelConstants.getVoxelMapInstance().onClientStopping();
+    }
+    
+    public static void onDisconnect() {
+        VoxelConstants.getVoxelMapInstance().onDisconnect();
+    }
+    
+    public static void onConfigurationInit() {
+        VoxelConstants.getVoxelMapInstance().onConfigurationInit();
+    }
+    
+    public static void onPlayInit() {
+        VoxelConstants.getVoxelMapInstance().onPlayInit();
+    }
+    
+    public static void onJoinServer() {
+        VoxelConstants.getVoxelMapInstance().onJoinServer();
+    }
+}
+```
+
+**Integration Points**:
+
+| Event | Target File | Method | Hook Location |
+|-------|-------------|--------|---------------|
+| CLIENT_STOPPING | `Minecraft.java` | `stop()` | End of method |
+| DISCONNECT | `ClientPacketListener.java` | `onDisconnect()` | In disconnect handler |
+| CONFIGURATION_INIT | `ClientPacketListener.java` | Constructor or init | After configuration setup |
+| PLAY_INIT | `ClientPacketListener.java` | Constructor or init | After play setup |
+| JOIN | `ClientPacketListener.java` | `handleLogin()` | After successful join |
+
+### 4.2 HUD Rendering Replacement
+
+**Original Fabric HUD System**:
+```java
+ResourceLocation voxelMapMinimapLayer = ResourceLocation.parse("voxelmap:minimap");
+HudElementRegistry.attachElementAfter(VanillaHudElements.BOSS_BAR, voxelMapMinimapLayer, new HudElement() {
+    @Override
+    public void render(GuiGraphics context, DeltaTracker tickCounter) {
+        VoxelConstants.renderOverlay(context);
+    }
+});
+```
+
+**Replacement**: Direct call in `Gui.java` (already has example from other mods)
+
+```java
+// In src/main/java/net/minecraft/client/gui/Gui.java
+public void render(GuiGraphics guiGraphics, DeltaTracker deltaTracker) {
+    // ... existing HUD rendering ...
+    
+    // VoxelMap minimap overlay (rendered after boss bar, before chat)
+    com.mamiyaotaru.voxelmap.VoxelConstants.renderOverlay(guiGraphics);
+    
+    // ... rest of HUD ...
+}
+```
+
+**Ordering**: Insert after boss bar rendering, before debug screen/chat.
+
+### 4.3 Network Packet Replacement
+
+**Original Fabric Networking**:
+```java
+// VoxelmapSettingsChannelHandler.java
+ClientConfigurationNetworking.registerGlobalReceiver(
+    CHANNEL, 
+    (client, handler, buf, responseSender) -> { ... }
+);
+
+// VoxelmapWorldIdChannelHandler.java
+ClientPlayNetworking.registerGlobalReceiver(
+    CHANNEL, 
+    (client, handler, buf, responseSender) -> { ... }
+);
+```
+
+**Replacement Strategy**:
+
+1. **Create packet classes** in `com.mamiyaotaru.voxelmap.packets/` (already exist)
+2. **Register with Minecraft's packet system** directly in `ClientPacketListener.java`
+3. **Add handler in packet processing** pipeline
+
+Example:
+```java
+// In ClientPacketListener.java, packet handling method:
+if (packet instanceof ClientboundCustomPayloadPacket customPayload) {
+    ResourceLocation channel = customPayload.type().id();
+    
+    if (channel.equals(ResourceLocation.parse("voxelmap:settings"))) {
+        com.mamiyaotaru.voxelmap.VoxelConstants.handleSettingsPacket(customPayload);
+        return;
+    }
+    
+    if (channel.equals(ResourceLocation.parse("voxelmap:worldid"))) {
+        com.mamiyaotaru.voxelmap.VoxelConstants.handleWorldIdPacket(customPayload);
+        return;
+    }
+}
+```
+
+### 4.4 Fabric API Stub Creation (Alternative)
+
+**If direct replacement is complex**, create minimal stubs:
+
+```java
+// src/main/java/net/fabricmc/fabric/api/client/event/lifecycle/v1/ClientLifecycleEvents.java
+package net.fabricmc.fabric.api.client.event.lifecycle.v1;
+
+import net.minecraft.client.Minecraft;
+import java.util.ArrayList;
+import java.util.List;
+
+public class ClientLifecycleEvents {
+    public interface ClientStopping {
+        void onClientStopping(Minecraft client);
+    }
+    
+    public static final Event<ClientStopping> CLIENT_STOPPING = new Event<>();
+    
+    // Simple event implementation
+    public static class Event<T> {
+        private final List<T> listeners = new ArrayList<>();
+        
+        public void register(T listener) {
+            listeners.add(listener);
+        }
+        
+        public void invoker() {
+            return (T) listeners; // Simplified
+        }
+    }
+}
+```
+
+Then call event invokers from integration points.
+
+**Recommendation**: Use **direct replacement** (4.1-4.3) for cleaner code, stubs only if needed.
+
+---
+
+## 5. Access Widener Integration
+
+### 5.1 Access Widener File Analysis
+
+From `voxelmap.accesswidener`:
+
+```
+accessWidener   v2  named
+
+# Biome access (2)
+accessible class net/minecraft/world/level/biome/Biome$ClimateSettings
+accessible field net/minecraft/world/level/biome/Biome climateSettings
+
+# GUI (2)
+accessible class net/minecraft/client/gui/components/AbstractSelectionList$Entry
+accessible class net/minecraft/client/gui/GuiGraphics$ScissorStack
+accessible field net/minecraft/client/gui/GuiGraphics scissorStack
+
+# Entity models (14)
+accessible field net/minecraft/client/model/WolfModel head
+accessible field net/minecraft/client/model/QuadrupedModel head
+accessible field net/minecraft/client/model/LavaSlimeModel bodyCubes
+# ... (11 more model fields)
+
+# Rendering (9)
+accessible field net/minecraft/client/Options keyMappings
+accessible field net/minecraft/client/renderer/RenderPipelines GUI_TEXTURED_SNIPPET
+accessible method net/minecraft/client/renderer/RenderType$CompositeState$CompositeStateBuilder setTextureState(...)
+# ... (6 more rendering access wideners)
+
+# World (1)
+accessible field net/minecraft/world/level/biome/BiomeManager biomeZoomSeed
+```
+
+### 5.2 Application Strategy
+
+**For each access widener**:
+1. Locate the class/field/method in `src/main/java`
+2. Change visibility:
+   - `private` → `public` (or `protected` if appropriate)
+   - `package-private` → `public`
+3. Document change with comment: `// VoxelMap: Made accessible`
+
+**Example Changes**:
+
+```java
+// In src/main/java/net/minecraft/world/level/biome/Biome.java
+public static class ClimateSettings {  // Changed from package-private
+    // VoxelMap: Made accessible
+    // ...
+}
+
+// In src/main/java/net/minecraft/world/level/biome/Biome.java
+public final ClimateSettings climateSettings;  // Changed from private
+// VoxelMap: Made accessible
+```
+
+### 5.3 Access Widener Application Checklist
+
+**Biome Package**:
+- [ ] Make `Biome$ClimateSettings` class public
+- [ ] Make `Biome.climateSettings` field public
+
+**GUI Package**:
+- [ ] Make `AbstractSelectionList$Entry` class public
+- [ ] Make `GuiGraphics$ScissorStack` class public
+- [ ] Make `GuiGraphics.scissorStack` field public
+
+**Model Package** (14 changes):
+- [ ] Make `WolfModel.head` field public
+- [ ] Make `QuadrupedModel.head` field public
+- [ ] Make `LavaSlimeModel.bodyCubes` field public
+- [ ] Make `FelineModel.head` field public
+- [ ] Make `HoglinModel.head` field public
+- [ ] Make `ChickenModel.head` field public
+- [ ] Make `BeeModel.bone` field public
+- [ ] Make `AxolotlModel.head` field public
+- [ ] Make `ModelPart.children` field public
+- [ ] Make `SkullModel.head` field public
+- [ ] Make `ShulkerModel.head` field public
+- [ ] Make `AbstractEquineModel.headParts` field public
+- [ ] Make `SlimeOuterLayer.model` field public
+- [ ] Make `LivingEntityRenderer.layers` field public
+
+**Renderer Package** (9 changes):
+- [ ] Make `Options.keyMappings` field mutable (already might be)
+- [ ] Make `RenderPipelines.GUI_TEXTURED_SNIPPET` field accessible
+- [ ] Make `RenderType$CompositeState$CompositeStateBuilder.setTextureState()` accessible
+- [ ] Make `RenderType$CompositeState$CompositeStateBuilder.createCompositeState()` accessible
+- [ ] Make `GameRenderer.fogRenderer` field accessible
+- [ ] Make `GuiGraphics.guiRenderState` field accessible
+- [ ] Make `FogRenderer.computeFogColor()` method accessible
+
+**World Package**:
+- [ ] Make `BiomeManager.biomeZoomSeed` field public
+
+### 5.4 Verification
+
+After applying all access wideners:
+- [ ] Run `./gradlew compileJava` to verify no compilation errors
+- [ ] Delete `voxelmap.accesswidener` file
+- [ ] VoxelMap code should compile without access errors
+
+---
+
+## 6. Source Code Migration Plan
+
+### 6.1 Directory Structure
+
+**Source Modules to Merge**:
+```
+frnsrc/VoxelMap-1.21.10/
+├── common/src/main/java/com/mamiyaotaru/voxelmap/  → MOVE to src/main/java
+└── fabric/src/main/java/com/mamiyaotaru/voxelmap/fabric/  → MERGE into src/main/java
+```
+
+**Destination**:
+```
+src/main/java/com/mamiyaotaru/voxelmap/
+├── VoxelMap.java
+├── VoxelConstants.java
+├── Map.java
+├── Radar.java
+├── [... all 120 common files ...]
+├── [... 7 fabric files merged/adapted ...]
+└── [NO mixin files]
+```
+
+### 6.2 File-by-File Migration Strategy
+
+#### 6.2.1 Common Module Files (120 files)
+
+**Package**: `com.mamiyaotaru.voxelmap.*`
+
+**Migration Steps**:
+1. Copy all files from `frnsrc/VoxelMap-1.21.10/common/src/main/java/com/mamiyaotaru/voxelmap/` to `src/main/java/com/mamiyaotaru/voxelmap/`
+2. **EXCLUDE** the `mixins/` folder (7 files) - these will be deleted
+3. Review imports for Fabric dependencies - most should be fine as VoxelMap common is platform-agnostic
+
+**Files to Copy** (excluding mixins):
+```
+✓ VoxelMap.java
+✓ VoxelConstants.java
+✓ Map.java
+✓ Radar.java
+✓ RadarSimple.java
+✓ WaypointManager.java
+✓ MapSettingsManager.java
+✓ RadarSettingsManager.java
+✓ ColorManager.java
+✓ Events.java (interface)
+✓ ModApiBridge.java (interface)
+✓ PacketBridge.java (interface)
+✓ SettingsAndLightingChangeNotifier.java
+✓ DebugRenderState.java
+
+✓ gui/ (17 files - all GUI screens)
+✓ persistent/ (11 files - map storage)
+✓ util/ (42 files - utilities)
+✓ interfaces/ (5 files)
+✓ packets/ (4 files)
+✓ entityrender/ (6 files)
+✓ textures/ (6 files)
+```
+
+**Total**: 113 files to copy directly
+
+#### 6.2.2 Fabric Module Files (7 files)
+
+**Package**: `com.mamiyaotaru.voxelmap.fabric.*`
+
+These files implement Fabric-specific functionality and need adaptation:
+
+| File | Purpose | Migration Strategy |
+|------|---------|-------------------|
+| **VoxelmapFabricMod.java** | Fabric mod initializer | Replace with direct initialization in `Minecraft.java` |
+| **FabricEvents.java** | Event registration | Delete - use direct hooks (Section 4.1) |
+| **FabricPacketBridge.java** | Packet handling | Adapt to Minecraft's packet system |
+| **FabricModApiBridge.java** | Mod API bridge | Review and possibly stub out |
+| **VoxelmapSettingsChannelHandler.java** | Settings packet handler | Adapt packet registration |
+| **VoxelmapWorldIdChannelHandler.java** | World ID packet handler | Adapt packet registration |
+| **MixinRenderPipelines.java** | Render pipeline mixin | Convert to direct registration |
+
+**Adaptation Strategy**:
+
+1. **VoxelmapFabricMod.java** → Delete, move initialization to:
+   ```java
+   // In Minecraft.java constructor or init method:
+   public Minecraft(...) {
+       // ... existing code ...
+       
+       // Initialize VoxelMap
+       com.mamiyaotaru.voxelmap.VoxelMapInitializer.initialize();
+   }
+   ```
+
+2. **Create VoxelMapInitializer.java**:
+   ```java
+   package com.mamiyaotaru.voxelmap;
+   
+   public class VoxelMapInitializer {
+       private static boolean initialized = false;
+       
+       public static void initialize() {
+           if (initialized) return;
+           initialized = true;
+           
+           // Original FabricMod.onInitializeClient() code:
+           new VoxelmapSettingsChannelHandler();  // Adapt this
+           new VoxelmapWorldIdChannelHandler();   // Adapt this
+           VoxelConstants.setEvents(new DirectEvents());  // New implementation
+           VoxelConstants.setPacketBridge(new DirectPacketBridge());  // New implementation
+           VoxelConstants.setModApiBridge(new DirectModApiBridge());  // New implementation
+       }
+   }
+   ```
+
+3. **FabricEvents.java** → Create `DirectEvents.java`:
+   ```java
+   package com.mamiyaotaru.voxelmap;
+   
+   public class DirectEvents implements Events {
+       @Override
+       public void initEvents(VoxelMap map) {
+           // Events are handled via direct hooks in Minecraft classes
+           // This is just a no-op implementation
+       }
+   }
+   ```
+
+4. **FabricPacketBridge.java** → Create `DirectPacketBridge.java`:
+   - Implement packet sending using Minecraft's native packet system
+   - Register custom packet types
+
+5. **Packet Handlers** → Integrate into `ClientPacketListener.java`:
+   - Move channel registration to Minecraft's packet init
+   - Keep packet processing logic
+
+#### 6.2.3 Files to Delete
+
+After migration:
+- [ ] `frnsrc/VoxelMap-1.21.10/common/src/main/java/com/mamiyaotaru/voxelmap/mixins/` (entire folder)
+- [ ] `frnsrc/VoxelMap-1.21.10/fabric/src/main/java/com/mamiyaotaru/voxelmap/fabric/mixins/` (entire folder)
+- [ ] `frnsrc/VoxelMap-1.21.10/fabric/src/main/java/com/mamiyaotaru/voxelmap/fabric/FabricEvents.java` (replaced)
+- [ ] `frnsrc/VoxelMap-1.21.10/fabric/src/main/java/com/mamiyaotaru/voxelmap/fabric/VoxelmapFabricMod.java` (replaced)
+
+### 6.3 Import Resolution
+
+**Common Import Issues**:
+
+1. **Mixin imports**: Delete any remaining `import org.spongepowered.asm.mixin.*`
+2. **Fabric API imports**: Replace with stubs or direct Minecraft calls
+3. **Access widener references**: Should work after applying access wideners
+
+**Verification**:
+```bash
+# Check for problematic imports
+grep -r "import org.spongepowered.asm.mixin" src/main/java/com/mamiyaotaru/voxelmap/
+# Should return nothing
+
+grep -r "import net.fabricmc.fabric.api" src/main/java/com/mamiyaotaru/voxelmap/
+# Should only find minimal stub references
+```
+
+### 6.4 Package Verification Checklist
+
+After migration, verify:
+- [ ] All 113 common files copied to `src/main/java/com/mamiyaotaru/voxelmap/`
+- [ ] No `mixins/` folder in `src/main/java/com/mamiyaotaru/voxelmap/`
+- [ ] Fabric-specific files adapted and placed appropriately
+- [ ] New initialization files created (`VoxelMapInitializer.java`, `DirectEvents.java`, etc.)
+- [ ] No compilation errors: `./gradlew compileJava`
+
+---
+
+## 7. Resource and Asset Migration
+
+### 7.1 Asset Files
+
+**Source**: `frnsrc/VoxelMap-1.21.10/common/src/main/resources/assets/voxelmap/`
+
+**Destination**: `src/main/resources/assets/voxelmap/`
+
+**Contents**:
+```
+assets/voxelmap/
+├── conf/
+│   └── biomecolors.txt          (Biome color configuration)
+├── images/
+│   ├── circle.png               (UI elements)
+│   ├── colorpicker.png
+│   ├── square.png
+│   ├── roundmap.png
+│   ├── squaremap.png
+│   ├── radar/                   (7 radar icon PNGs)
+│   │   ├── contact.png
+│   │   ├── contact_facing.png
+│   │   ├── glow.png
+│   │   ├── hostile.png
+│   │   ├── neutral.png
+│   │   ├── solid.png
+│   │   └── tame.png
+│   └── waypoints/               (30+ waypoint icon PNGs)
+│       ├── waypointaxe.png
+│       ├── waypointskull.png
+│       ├── target.png
+│       └── ... (more icons)
+└── icon.png                     (Mod icon - not needed in integration)
+```
+
+**Migration Steps**:
+1. Copy entire `assets/voxelmap/` folder to `src/main/resources/assets/voxelmap/`
+2. **EXCLUDE**: `icon.png` (only used for mod listing)
+3. Verify file count: ~40 files total
+
+**Resource Loading**:
+VoxelMap uses `ResourceLocation.parse("voxelmap:images/...")` which will work automatically after assets are in place.
+
+### 7.2 Configuration Files to Delete
+
+**DO NOT COPY** these files (Fabric/mixin metadata):
+- `fabric.mod.json`
+- `pack.mcmeta`
+- `mixin.voxelmap.json`
+- `mixin.voxelmap.fabric.json`
+- `voxelmap.accesswidener`
+
+These are only needed for standalone mod loading and are not relevant for integrated builds.
+
+### 7.3 Verification
+
+After migration:
+```bash
+# Verify assets are in place
+ls -R src/main/resources/assets/voxelmap/
+
+# Expected output:
+# conf/biomecolors.txt
+# images/circle.png, colorpicker.png, square.png, roundmap.png, squaremap.png
+# images/radar/[7 files]
+# images/waypoints/[30+ files]
+```
+
+---
+
+## 8. Initialization and Lifecycle
+
+### 8.1 Initialization Flow
+
+**Original Flow** (Fabric mod):
+```
+1. Fabric Loader calls VoxelmapFabricMod.onInitializeClient()
+2. VoxelmapFabricMod registers event handlers
+3. FabricEvents registers HUD overlay
+4. ClientLifecycleEvents.CLIENT_STARTING triggers VoxelMap.lateInit()
+```
+
+**New Flow** (Direct integration):
+```
+1. Minecraft.java constructor/init calls VoxelMapInitializer.initialize()
+2. VoxelMapInitializer sets up VoxelConstants abstraction layer
+3. VoxelMap.lateInit() called after client resources loaded
+4. Direct hooks in Minecraft classes call VoxelMap methods
+```
+
+### 8.2 Initialization Code
+
+**Create**: `src/main/java/com/mamiyaotaru/voxelmap/VoxelMapInitializer.java`
+
+```java
+package com.mamiyaotaru.voxelmap;
+
+import com.mamiyaotaru.voxelmap.util.BiomeRepository;
+import net.minecraft.client.Minecraft;
+
+public class VoxelMapInitializer {
+    private static boolean initialized = false;
+    private static VoxelMap voxelMapInstance;
+    
+    public static void initialize() {
+        if (initialized) {
+            VoxelConstants.getLogger().warn("VoxelMap already initialized!");
+            return;
+        }
+        
+        VoxelConstants.getLogger().info("Initializing VoxelMap...");
+        
+        // Set up abstraction layer
+        VoxelConstants.setEvents(new DirectEvents());
+        VoxelConstants.setPacketBridge(new DirectPacketBridge());
+        VoxelConstants.setModApiBridge(new DirectModApiBridge());
+        
+        // Register packet handlers
+        VoxelmapPacketRegistry.registerClientPackets();
+        
+        initialized = true;
+        VoxelConstants.getLogger().info("VoxelMap initialization complete");
+    }
+    
+    public static void lateInit() {
+        if (voxelMapInstance != null) return;
+        
+        VoxelConstants.getLogger().info("VoxelMap late initialization...");
+        
+        // Create VoxelMap instance and initialize
+        voxelMapInstance = VoxelConstants.getVoxelMapInstance();
+        voxelMapInstance.lateInit(
+            false,  // showUnderMenus - can be configured
+            false   // isFair - can be configured
+        );
+        
+        VoxelConstants.getLogger().info("VoxelMap fully initialized");
+    }
+    
+    public static VoxelMap getVoxelMapInstance() {
+        return voxelMapInstance;
+    }
+}
+```
+
+### 8.3 Integration Points in Minecraft
+
+**In `net.minecraft.client.Minecraft.java`**:
+
+```java
+public Minecraft(...) {
+    // ... existing constructor code ...
+    
+    // Initialize VoxelMap early
+    com.mamiyaotaru.voxelmap.VoxelMapInitializer.initialize();
+    
+    // ... rest of constructor ...
+}
+
+// After resources loaded:
+private void finishInitialization() {
+    // ... existing code ...
+    
+    // Late initialization for VoxelMap
+    com.mamiyaotaru.voxelmap.VoxelMapInitializer.lateInit();
+}
+
+public void stop() {
+    // ... existing shutdown code ...
+    
+    // VoxelMap cleanup
+    com.mamiyaotaru.voxelmap.VoxelMapClientHooks.onClientStopping();
+    
+    // ... rest of shutdown ...
+}
+```
+
+### 8.4 Lifecycle Hook Summary
+
+| Lifecycle Event | Minecraft Hook Location | VoxelMap Handler |
+|----------------|------------------------|------------------|
+| **Mod Init** | `Minecraft.java` constructor | `VoxelMapInitializer.initialize()` |
+| **Late Init** | `Minecraft.finishInitialization()` | `VoxelMapInitializer.lateInit()` |
+| **World Join** | `ClientPacketListener.handleLogin()` | `VoxelMapClientHooks.onJoinServer()` |
+| **World Change** | `Minecraft.setLevel()` | `VoxelMapClientHooks.onWorldChange()` |
+| **Disconnect** | `ClientPacketListener.onDisconnect()` | `VoxelMapClientHooks.onDisconnect()` |
+| **Client Stop** | `Minecraft.stop()` | `VoxelMapClientHooks.onClientStopping()` |
+| **HUD Render** | `Gui.render()` | `VoxelConstants.renderOverlay()` |
+| **World Render** | `LevelRenderer.renderLevel()` | `VoxelConstants.renderWorldWaypoints()` |
+
+---
+
+## 9. Testing and Validation Strategy
+
+### 9.1 Compilation Testing
+
+**Step 1**: Verify compilation after each phase
+```bash
+./gradlew compileJava
+```
+
+**Expected Issues During Migration**:
+- Missing access wideners → Apply access widener changes
+- Mixin references → Remove or convert to direct calls
+- Fabric API references → Replace with stubs or direct calls
+
+### 9.2 Runtime Testing
+
+**Minimal Test** (after each phase):
+1. Run client: `./gradlew runClient`
+2. Verify VoxelMap initialization logs appear
+3. Check for crash/errors in console
+
+**Full Feature Tests**:
+
+| Feature | Test Procedure | Success Criteria |
+|---------|----------------|------------------|
+| **Minimap Display** | Launch game, create world | Minimap visible in corner |
+| **Waypoint Creation** | Press waypoint key, create waypoint | Waypoint appears on map |
+| **World Map** | Press M (or configured key) | Full-screen map opens |
+| **Radar** | Enable radar, spawn mobs | Entities appear on radar |
+| **Map Persistence** | Create waypoints, quit, rejoin | Waypoints persist |
+| **Multi-dimension** | Go to Nether/End | Separate maps for each dimension |
+| **Zoom** | Mouse wheel on map | Zoom in/out works |
+| **Scoreboard Position** | Open scoreboard (tab) | Doesn't overlap minimap |
+| **Chat Position** | Send chat message | Chat doesn't overlap minimap |
+
+### 9.3 Regression Testing
+
+**Verify No Breaks**:
+- [ ] Minecraft client launches
+- [ ] Existing mods still work (Iris, Sodium, Distant Horizons, WorldEdit)
+- [ ] Vanilla features unaffected (GUI, rendering, etc.)
+- [ ] Performance is acceptable (no major FPS drops)
+
+### 9.4 Debug Mode
+
+VoxelMap has debug mode in `VoxelConstants.DEBUG`. 
+
+**Enable for testing**:
+```java
+// In VoxelConstants.java
+public static final boolean DEBUG = true;  // Change from false
+```
+
+This enables verbose logging for troubleshooting.
+
+---
+
+## 10. Implementation Phases
+
+### Phase 1: Preparation and Planning ✅
+**Status**: Complete (this document)
+
+- [x] Research VoxelMap source code structure
+- [x] Analyze mixin usage and conversion strategy
+- [x] Document Fabric API dependencies
+- [x] Create comprehensive migration plan
+
+**Deliverable**: This MAP-PLAN.md document
+
+---
+
+### Phase 2: Access Widener Application
+**Estimated Time**: 1-2 hours
+
+**Steps**:
+1. [ ] Apply all 32 access widener changes to Minecraft source files
+2. [ ] Document each change with `// VoxelMap: Made accessible` comments
+3. [ ] Compile and verify no errors: `./gradlew compileJava`
+4. [ ] Delete `voxelmap.accesswidener` file
+
+**Success Criteria**: All access widener targets are now accessible, compilation succeeds
+
+---
+
+### Phase 3: Source Code Migration (No Mixins)
+**Estimated Time**: 30 minutes
+
+**Steps**:
+1. [ ] Copy all 113 files from `common/src/main/java/com/mamiyaotaru/voxelmap/` to `src/main/java/com/mamiyaotaru/voxelmap/`
+2. [ ] **EXCLUDE** the `mixins/` folder
+3. [ ] Create new abstraction implementations:
+   - [ ] `DirectEvents.java`
+   - [ ] `DirectPacketBridge.java`
+   - [ ] `DirectModApiBridge.java`
+   - [ ] `VoxelMapInitializer.java`
+   - [ ] `VoxelMapClientHooks.java`
+4. [ ] Verify compilation (will have errors due to missing mixins - that's expected)
+
+**Success Criteria**: All non-mixin VoxelMap code is in `src/main/java/`, new abstraction files created
+
+---
+
+### Phase 4: Mixin Elimination - Part 1 (HUD/GUI)
+**Estimated Time**: 2-3 hours
+
+**Steps**:
+1. [ ] **MixinInGameHud**: Modify `Gui.java` scoreboard positioning
+2. [ ] **MixinChatHud**: Modify `ChatComponent.java` chat positioning
+3. [ ] Add HUD rendering hook in `Gui.render()` for minimap overlay
+4. [ ] Test: Run client, verify minimap renders, scoreboard/chat don't overlap
+
+**Success Criteria**: Minimap displays correctly, scoreboard and chat positioning work
+
+---
+
+### Phase 5: Mixin Elimination - Part 2 (World Rendering)
+**Estimated Time**: 2-3 hours
+
+**Steps**:
+1. [ ] **MixinWorldRenderer**: Add waypoint beacon rendering in `LevelRenderer.java`
+2. [ ] **MixinRenderPipelines**: Add VoxelMap pipeline registration in `RenderPipelines.java`
+3. [ ] Test: Create waypoints, verify beacons render in 3D world
+
+**Success Criteria**: Waypoint beacons visible through terrain
+
+---
+
+### Phase 6: Mixin Elimination - Part 3 (Lifecycle & Network)
+**Estimated Time**: 3-4 hours
+
+**Steps**:
+1. [ ] **APIMixinMinecraftClient**: Add world change hooks in `Minecraft.java`
+2. [ ] **APIMixinNetHandlerPlayClient**: Add packet handling in `ClientPacketListener.java`
+3. [ ] **APIMixinChatListenerHud**: Add chat message filtering in `ChatListener.java`
+4. [ ] **AccessorEnderDragonRenderer**: Already covered by access wideners (verify)
+5. [ ] Add lifecycle hooks (join, disconnect, stop) in appropriate locations
+6. [ ] Test: Join/leave worlds, verify dimension changes work
+
+**Success Criteria**: All lifecycle events trigger correctly, packets handled, dimension switching works
+
+---
+
+### Phase 7: Initialization Integration
+**Estimated Time**: 1-2 hours
+
+**Steps**:
+1. [ ] Add `VoxelMapInitializer.initialize()` call in `Minecraft.java` constructor
+2. [ ] Add `VoxelMapInitializer.lateInit()` call after resource loading
+3. [ ] Add `VoxelMapClientHooks.onClientStopping()` in `Minecraft.stop()`
+4. [ ] Test: Launch client, check logs for VoxelMap initialization messages
+
+**Success Criteria**: VoxelMap initializes properly, no errors in logs
+
+---
+
+### Phase 8: Resource Migration
+**Estimated Time**: 30 minutes
+
+**Steps**:
+1. [ ] Copy `assets/voxelmap/` folder to `src/main/resources/assets/voxelmap/`
+2. [ ] Exclude `icon.png`, `fabric.mod.json`, `pack.mcmeta`, mixin configs
+3. [ ] Verify ~40 asset files copied (images, biomecolors.txt)
+4. [ ] Test: Check that waypoint icons and UI elements load correctly
+
+**Success Criteria**: All VoxelMap textures and configs load from resources
+
+---
+
+### Phase 9: Cleanup and Deletion
+**Estimated Time**: 15 minutes
+
+**Steps**:
+1. [ ] Delete all mixin files from source tree
+2. [ ] Delete mixin config JSON files
+3. [ ] Delete `voxelmap.accesswidener`
+4. [ ] Delete Fabric-specific files (`fabric.mod.json`, etc.)
+5. [ ] Remove any remaining Fabric API import statements
+6. [ ] Final compilation check: `./gradlew clean build`
+
+**Success Criteria**: No mixin files remain, clean build succeeds
+
+---
+
+### Phase 10: Testing and Validation
+**Estimated Time**: 2-3 hours
+
+**Steps**:
+1. [ ] Run all feature tests (Section 9.2)
+2. [ ] Test minimap rendering
+3. [ ] Test waypoint creation/deletion
+4. [ ] Test world map (full-screen)
+5. [ ] Test radar functionality
+6. [ ] Test dimension switching (Overworld/Nether/End)
+7. [ ] Test multiplayer compatibility
+8. [ ] Test persistence (quit and rejoin)
+9. [ ] Performance testing (FPS impact)
+10. [ ] Regression testing (verify other mods still work)
+
+**Success Criteria**: All features work as expected, no regressions
+
+---
+
+### Phase 11: Documentation and Polish
+**Estimated Time**: 1 hour
+
+**Steps**:
+1. [ ] Update README.md to mention VoxelMap integration
+2. [ ] Document keybindings
+3. [ ] Create VOXELMAP.md integration summary (similar to WORLDEDIT.md)
+4. [ ] Add VoxelMap to IMPLEMENTATION_STATUS.md
+5. [ ] Document any known issues or limitations
+
+**Success Criteria**: Documentation complete and accurate
+
+---
+
+## Total Estimated Time: 15-20 hours
+
+---
+
+## Risk Assessment and Mitigation
+
+### High Risk Items
+
+| Risk | Impact | Mitigation |
+|------|--------|------------|
+| **Mixin conversion breaks rendering** | High | Incremental testing after each mixin, debug mode enabled |
+| **Packet handling incompatibility** | Medium | Use Minecraft's native packet system, test multiplayer |
+| **Access widener incomplete** | Medium | Careful review of all 32 wideners, compilation checks |
+| **Resource loading fails** | Low | Verify asset paths match, test early |
+
+### Dependencies
+
+**VoxelMap depends on**:
+- OpenGL rendering (already available)
+- Minecraft's chunk system (already available)
+- Biome data (already available)
+- Entity rendering (already available)
+
+**No external dependencies needed** - VoxelMap is self-contained.
+
+---
+
+## Success Criteria Summary
+
+**The integration is successful when**:
+
+1. ✅ VoxelMap compiles cleanly with Minecraft source
+2. ✅ No mixin files remain in source tree
+3. ✅ Minimap displays correctly in-game
+4. ✅ World map opens and functions (zoom, pan, waypoints)
+5. ✅ Waypoints can be created, edited, deleted
+6. ✅ Waypoint beacons render in 3D world
+7. ✅ Radar shows nearby entities
+8. ✅ Multi-dimension support works (separate maps)
+9. ✅ Map data persists across sessions
+10. ✅ No regressions in existing mods (Iris, Sodium, DH, WorldEdit)
+11. ✅ Performance is acceptable (<5% FPS impact)
+12. ✅ Scoreboard and chat don't overlap minimap
+
+---
+
+## Notes and Considerations
+
+### 1. Code Ownership
+- VoxelMap code remains in `com.mamiyaotaru.voxelmap` package
+- Clear separation from Minecraft and other mods
+- Original authorship preserved in source files
+
+### 2. Maintainability
+- Direct integration makes debugging easier (no mixin indirection)
+- Changes to Minecraft source are clearly marked with comments
+- VoxelMap updates can be merged by comparing against frnsrc/
+
+### 3. Performance
+- Direct calls are faster than mixin injections
+- No runtime bytecode manipulation overhead
+- VoxelMap's own performance is well-optimized
+
+### 4. Compatibility
+- VoxelMap should not interfere with other integrated mods
+- Rendering hooks are added at appropriate pipeline stages
+- Packet system uses custom channel IDs to avoid conflicts
+
+### 5. Future Updates
+- When Minecraft updates, affected hooks need review
+- VoxelMap updates can be merged from upstream
+- Access wideners may need updates for new Minecraft versions
+
+---
+
+## Appendix A: File Checklist
+
+### Files to Copy (113 from common)
+- [x] All `.java` files in `com.mamiyaotaru.voxelmap/` (excluding `mixins/`)
+- [x] All subdirectories: `gui/`, `persistent/`, `util/`, `interfaces/`, `packets/`, `entityrender/`, `textures/`
+
+### Files to Create (7 new)
+- [ ] `VoxelMapInitializer.java`
+- [ ] `VoxelMapClientHooks.java`
+- [ ] `DirectEvents.java`
+- [ ] `DirectPacketBridge.java`
+- [ ] `DirectModApiBridge.java`
+- [ ] `VoxelmapPacketRegistry.java`
+- [ ] Any needed Fabric API stubs
+
+### Files to Delete (after integration)
+- [ ] All mixin files (7 from common, 1 from fabric)
+- [ ] `mixin.voxelmap.json`
+- [ ] `mixin.voxelmap.fabric.json`
+- [ ] `voxelmap.accesswidener`
+- [ ] `fabric.mod.json`
+- [ ] `pack.mcmeta`
+
+### Files to Modify (Minecraft source)
+- [ ] `net.minecraft.client.Minecraft` (initialization, lifecycle)
+- [ ] `net.minecraft.client.gui.Gui` (HUD rendering, scoreboard position)
+- [ ] `net.minecraft.client.renderer.LevelRenderer` (waypoint beacons)
+- [ ] `net.minecraft.client.multiplayer.ClientPacketListener` (packets, events)
+- [ ] `net.minecraft.client.gui.components.ChatComponent` (chat position)
+- [ ] `net.minecraft.client.gui.components.ChatListener` (chat filtering)
+- [ ] `net.minecraft.client.renderer.RenderPipelines` (pipeline registration)
+- [ ] 32 files for access widener changes
+
+---
+
+## Appendix B: Key VoxelMap Classes
+
+### Core Classes
+- **VoxelMap**: Main singleton, manages all sub-systems
+- **VoxelConstants**: Static utilities and abstraction layer
+- **Map**: Minimap rendering logic
+- **Radar**: Entity radar system
+- **WaypointManager**: Waypoint CRUD operations
+- **ColorManager**: Block color calculation
+
+### Abstraction Interfaces
+- **Events**: Lifecycle event interface (FabricEvents implements this)
+- **PacketBridge**: Packet sending interface (FabricPacketBridge implements this)
+- **ModApiBridge**: Mod API integration interface
+
+### Persistent Storage
+- **PersistentMap**: World map storage and rendering
+- **CachedRegion**: Region-based map tile cache
+- **ThreadManager**: Background thread management
+
+### GUI Classes
+- **GuiAddWaypoint**: Waypoint creation screen
+- **GuiWaypoints**: Waypoint list screen
+- **GuiMinimapOptions**: Minimap settings
+- **GuiPersistentMap**: Full-screen world map
+
+---
+
+## Appendix C: Configuration Files
+
+VoxelMap stores configuration in `run/config/voxelmap/`:
+- `voxelmap.properties` - Main settings
+- `waypointSubworldsAuto.txt` - Auto-generated world IDs
+- Per-world folders with waypoints and cache data
+
+**No changes needed** - VoxelMap's file I/O works independently.
+
+---
+
+## End of Plan
+
+This plan provides a comprehensive, step-by-step approach to integrating VoxelMap into MattMC. Each phase is independent and testable, allowing for incremental progress and early problem detection.
+
+**Next Steps**: Begin Phase 2 (Access Widener Application) after approval of this plan.
