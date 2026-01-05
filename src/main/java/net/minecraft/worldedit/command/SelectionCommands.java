@@ -84,6 +84,7 @@ public class SelectionCommands {
     
     /**
      * Give the player the WorldEdit selection wand.
+     * The wand automatically has the SelectionWand tool bound to it.
      */
     private static int giveWand(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
         ServerPlayer player = context.getSource().getPlayerOrException();
@@ -92,7 +93,7 @@ public class SelectionCommands {
         net.minecraft.world.item.ItemStack wandStack = new net.minecraft.world.item.ItemStack(
             net.minecraft.world.item.Items.WAND, 1);
         
-        // Give it to the player
+        // Give it to the player (tool binding happens automatically when used)
         if (player.getInventory().add(wandStack)) {
             player.sendSystemMessage(Component.literal("§aGave you the WorldEdit wand!"));
         } else {
