@@ -36,6 +36,9 @@ public class WorldEditCommands {
         // Tool commands
         ToolCommands.register(dispatcher);
         
+        // Schematic commands
+        SchematicCommands.register(dispatcher);
+        
         // Future: Add more command groups as they're implemented
         // GenerationCommands.register(dispatcher);
         // UtilityCommands.register(dispatcher);

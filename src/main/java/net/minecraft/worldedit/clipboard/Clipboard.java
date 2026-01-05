@@ -12,6 +12,8 @@ import java.util.Map;
 public class Clipboard {
     private final Map<BlockVector3, BlockState> blocks;
     private final BlockVector3 origin;
+    private final BlockVector3 minimumPoint;
+    private final BlockVector3 maximumPoint;
     private final BlockVector3 dimensions;
     private final BlockVector3 offset;
     
@@ -21,6 +23,9 @@ public class Clipboard {
         
         BlockVector3 min = region.getMinimumPoint();
         BlockVector3 max = region.getMaximumPoint();
+        
+        this.minimumPoint = min;
+        this.maximumPoint = max;
         
         this.dimensions = BlockVector3.at(
             max.getX() - min.getX() + 1,
@@ -57,6 +62,20 @@ public class Clipboard {
      */
     public BlockVector3 getOrigin() {
         return origin;
+    }
+    
+    /**
+     * Get the minimum point.
+     */
+    public BlockVector3 getMinimumPoint() {
+        return minimumPoint;
+    }
+    
+    /**
+     * Get the maximum point.
+     */
+    public BlockVector3 getMaximumPoint() {
+        return maximumPoint;
     }
     
     /**
