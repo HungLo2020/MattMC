@@ -23,45 +23,45 @@ Note: Recompile with -Xlint:unchecked for details.
 
 > Task :runClient
 Using bundled JDK from: /home/matt/Documents/Repos/MattMC/run/jdk-25
-[18:03:44] [main/INFO]: Detected integrated source mode - using Fabric Loader code source as game jar: /home/matt/Documents/Repos/MattMC/build/libs/MattMC-1.21.10.jar
-[18:03:44] [main/INFO]: Loading Minecraft 1.21.10 with Fabric Loader 0.18.2
-[18:03:44] [main/INFO]: Mappings not present!
-[18:03:44] [main/INFO]: Loading 3 mods:
+[12:50:15] [main/INFO]: Detected integrated source mode - using Fabric Loader code source as game jar: /home/matt/Documents/Repos/MattMC/build/libs/MattMC-1.21.10.jar
+[12:50:15] [main/INFO]: Loading Minecraft 1.21.10 with Fabric Loader 0.18.2
+[12:50:15] [main/INFO]: Mappings not present!
+[12:50:15] [main/INFO]: Loading 3 mods:
 	- java 25
 	- mattmc 1.21.10
 	- minecraft 1.21.10
-[18:03:44] [main/INFO]: Mixin system bypassed - all mixins converted to hook-based architecture
-[18:03:44] [main/INFO]: Mixin transformation disabled - using hook-based architecture
-[18:03:44] [main/INFO]: Searching for graphics cards...
-[18:03:44] [main/INFO]: Found graphics adapter: LinuxPciAdapterInfo[vendor=NVIDIA, name=GA102 [GeForce RTX 3080 Ti], pciVendorId=0x10de, pciDeviceId=0x2208]
-[18:03:44] [main/WARN]: Sodium has applied one or more workarounds to prevent crashes or other issues on your system: [NVIDIA_THREADED_OPTIMIZATIONS_BROKEN]
-[18:03:44] [main/WARN]: This is not necessarily an issue, but it may result in certain features or optimizations being disabled. You can sometimes fix these issues by upgrading your graphics driver.
+[12:50:15] [main/INFO]: Mixin system bypassed - all mixins converted to hook-based architecture
+[12:50:15] [main/INFO]: Mixin transformation disabled - using hook-based architecture
+[12:50:15] [main/INFO]: Searching for graphics cards...
+[12:50:15] [main/INFO]: Found graphics adapter: LinuxPciAdapterInfo[vendor=NVIDIA, name=GA102 [GeForce RTX 3080 Ti], pciVendorId=0x10de, pciDeviceId=0x2208]
+[12:50:15] [main/WARN]: Sodium has applied one or more workarounds to prevent crashes or other issues on your system: [NVIDIA_THREADED_OPTIMIZATIONS_BROKEN]
+[12:50:15] [main/WARN]: This is not necessarily an issue, but it may result in certain features or optimizations being disabled. You can sometimes fix these issues by upgrading your graphics driver.
 WARNING: A restricted method in java.lang.System has been called
 WARNING: java.lang.System::load has been called by com.sun.jna.Native in an unnamed module (file:/home/matt/.gradle/caches/modules-2/files-2.1/net.java.dev.jna/jna/5.14.0/67bf3eaea4f0718cb376a181a629e5f88fa1c9dd/jna-5.14.0.jar)
 WARNING: Use --enable-native-access=ALL-UNNAMED to avoid a warning for callers in this module
 WARNING: Restricted methods will be blocked in a future release unless native access is enabled
 
-[18:03:45] [Datafixer Bootstrap/INFO]: 279 Datafixer optimizations took 175 milliseconds
+[12:50:16] [Datafixer Bootstrap/INFO]: 279 Datafixer optimizations took 184 milliseconds
 WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
 WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.joml.MemUtil$MemUtilUnsafe (file:/home/matt/.gradle/caches/modules-2/files-2.1/org.joml/joml/1.10.5/22566d58af70ad3d72308bab63b8339906deb649/joml-1.10.5.jar)
 WARNING: Please consider reporting this to the maintainers of class org.joml.MemUtil$MemUtilUnsafe
 WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
-[18:03:47] [Render thread/INFO]: Setting user: HungLo
-[18:03:47] [Render thread/INFO]: Initializing Distant Horizons client, firing DhApiBeforeDhInitEvent...
-[18:03:47] [Render thread/INFO]: Running library validation...
-[18:03:47] [Render thread/INFO]: Garbage collectors: [ZGC Minor Cycles, ZGC Minor Pauses, ZGC Major Cycles, ZGC Major Pauses]
-[18:03:47] [Render thread/INFO]: Distant Horizons, Version: 2.4.4-b
-[18:03:47] [Render thread/INFO]: Registering Fabric Client Events
-[18:03:47] [Render thread/INFO]: Registering Distant Horizons hooks
-[18:03:47] [Render thread/INFO]: Registered mod compatibility accessor for: [Sodium-Fabric].
-[18:03:47] [Render thread/INFO]: Skipping mod compatibility accessor for: [starlight]
-[18:03:47] [Render thread/INFO]: Skipping mod compatibility accessor for: [bclib]
-[18:03:47] [Render thread/INFO]: Skipping mod compatibility accessor for: [c2me]
-[18:03:47] [Render thread/INFO]: Registered mod compatibility accessor for: [iris].
-[18:03:47] [Render thread/INFO]: Initialising config for [DistantHorizons]
-[18:03:47] [Render thread/INFO]: [DistantHorizons] Config initialised
-[18:03:47] [Render thread/INFO]: Applying config to loggers
-[18:03:47] [Render thread/INFO]: Distant Horizons client Initialized.
+[12:50:18] [Render thread/INFO]: Setting user: HungLo
+[12:50:18] [Render thread/INFO]: Initializing Distant Horizons client, firing DhApiBeforeDhInitEvent...
+[12:50:18] [Render thread/INFO]: Running library validation...
+[12:50:18] [Render thread/INFO]: Garbage collectors: [ZGC Minor Cycles, ZGC Minor Pauses, ZGC Major Cycles, ZGC Major Pauses]
+[12:50:18] [Render thread/INFO]: Distant Horizons, Version: 2.4.4-b
+[12:50:18] [Render thread/INFO]: Registering Fabric Client Events
+[12:50:18] [Render thread/INFO]: Registering Distant Horizons hooks
+[12:50:18] [Render thread/INFO]: Registered mod compatibility accessor for: [Sodium-Fabric].
+[12:50:18] [Render thread/INFO]: Skipping mod compatibility accessor for: [starlight]
+[12:50:18] [Render thread/INFO]: Skipping mod compatibility accessor for: [bclib]
+[12:50:18] [Render thread/INFO]: Skipping mod compatibility accessor for: [c2me]
+[12:50:18] [Render thread/INFO]: Registered mod compatibility accessor for: [iris].
+[12:50:18] [Render thread/INFO]: Initialising config for [DistantHorizons]
+[12:50:18] [Render thread/INFO]: [DistantHorizons] Config initialised
+[12:50:18] [Render thread/INFO]: Applying config to loggers
+[12:50:18] [Render thread/INFO]: Distant Horizons client Initialized.
 [LWJGL] Version: 3.3.3-snapshot
 	 OS: Linux v6.14.0-37-generic
 	JRE: Linux amd64 25.0.1
@@ -72,17 +72,17 @@ WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
 [LWJGL] Loading library: glfw
 	Module: org.lwjgl.glfw
 	Loaded from org.lwjgl.librarypath: /tmp/lwjgl_matt/3.3.3-snapshot/x64/libglfw.so
-[18:03:47] [Render thread/INFO]: Queuing DH event binding...
-[18:03:47] [Render thread/INFO]: Backend library: LWJGL version 3.3.3-snapshot
+[12:50:18] [Render thread/INFO]: Queuing DH event binding...
+[12:50:18] [Render thread/INFO]: Backend library: LWJGL version 3.3.3-snapshot
 [LWJGL] Loading library: jemalloc
 	Module: org.lwjgl.jemalloc
 	Loaded from org.lwjgl.librarypath: /tmp/lwjgl_matt/3.3.3-snapshot/x64/libjemalloc.so
 [LWJGL] MemoryUtil allocator: JEmallocAllocator
 [LWJGL] Java 9 check intrinsics enabled
 [LWJGL] Closure Registry: ConcurrentHashMap
-[18:03:47] [DH-Manual-Event-Trigger/INFO]: DH Ready, binding Iris event handlers...
-[18:03:47] [DH-Manual-Event-Trigger/INFO]: DH Iris events bound.
-[18:03:47] [Render thread/INFO]: Modifying process environment to apply workarounds for the NVIDIA graphics driver...
+[12:50:18] [Render thread/INFO]: Modifying process environment to apply workarounds for the NVIDIA graphics driver...
+[12:50:18] [DH-Manual-Event-Trigger/INFO]: DH Ready, binding Iris event handlers...
+[12:50:18] [DH-Manual-Event-Trigger/INFO]: DH Iris events bound.
 [LWJGL] Loading JNI library: lwjgl_stb
 	Module: org.lwjgl.stb
 	Loaded from org.lwjgl.librarypath: /tmp/lwjgl_matt/3.3.3-snapshot/x64/liblwjgl_stb.so
@@ -94,105 +94,107 @@ WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
 	libGLX.so.0 not found in org.lwjgl.librarypath=/tmp/lwjgl_matt/3.3.3-snapshot/x64
 [LWJGL] Java 9 text decoding enabled
 	Loaded from system paths: /lib/x86_64-linux-gnu/libGLX.so.0
-[18:03:47] [Render thread/INFO]: [STDERR]: [LWJGL] [ThreadLocalUtil] Unsupported JNI version detected, this may result in a crash. Please inform LWJGL developers.
+[12:50:18] [Render thread/INFO]: [STDERR]: [LWJGL] [ThreadLocalUtil] Unsupported JNI version detected, this may result in a crash. Please inform LWJGL developers.
 [LWJGL] Java 10 multiplyHigh enabled
-[18:03:47] [Render thread/INFO]: OpenGL Vendor: NVIDIA Corporation
-[18:03:47] [Render thread/INFO]: OpenGL Renderer: NVIDIA GeForce RTX 3080 Ti/PCIe/SSE2
-[18:03:47] [Render thread/INFO]: OpenGL Version: 3.3.0 NVIDIA 580.95.05
-[18:03:47] [Render thread/INFO]: Modifying OpenGL context to apply workarounds for the NVIDIA graphics driver...
-[18:03:47] [Render thread/INFO]: Debug functionality is disabled.
-[18:03:47] [Render thread/INFO]: ARB_direct_state_access detected, enabling DSA.
-[18:03:47] [Render thread/INFO]: Using optional rendering extensions: GL_ARB_buffer_storage, GL_KHR_debug, GL_ARB_vertex_attrib_binding, GL_ARB_direct_state_access
-[18:03:47] [Render thread/INFO]: Loaded 20 skins (0 custom)
+[12:50:19] [Render thread/INFO]: OpenGL Vendor: NVIDIA Corporation
+[12:50:19] [Render thread/INFO]: OpenGL Renderer: NVIDIA GeForce RTX 3080 Ti/PCIe/SSE2
+[12:50:19] [Render thread/INFO]: OpenGL Version: 3.3.0 NVIDIA 580.95.05
+[12:50:19] [Render thread/INFO]: Modifying OpenGL context to apply workarounds for the NVIDIA graphics driver...
+[12:50:19] [Render thread/INFO]: Debug functionality is disabled.
+[12:50:19] [Render thread/INFO]: ARB_direct_state_access detected, enabling DSA.
+[12:50:19] [Render thread/INFO]: Using optional rendering extensions: GL_ARB_buffer_storage, GL_KHR_debug, GL_ARB_vertex_attrib_binding, GL_ARB_direct_state_access
+[12:50:19] [Render thread/INFO]: Loaded 20 skins (0 custom)
 [LWJGL] Loading library: openal
 	Module: org.lwjgl.openal
 	Loaded from org.lwjgl.librarypath: /tmp/lwjgl_matt/3.3.3-snapshot/x64/libopenal.so
 [LWJGL] [ALC] ALC_SOFT_reopen_device was reported as available but an entry point is missing.
-[18:03:47] [Render thread/INFO]: Hardware information:
-[18:03:47] [Render thread/INFO]: CPU: 20x 12th Gen Intel(R) Core(TM) i7-12700K
-[18:03:47] [Render thread/INFO]: GPU: NVIDIA GeForce RTX 3080 Ti/PCIe/SSE2 (Supports OpenGL 3.3.0 NVIDIA 580.95.05)
-[18:03:47] [Render thread/INFO]: OS: Linux (6.14.0-37-generic)
+[12:50:19] [Render thread/INFO]: Hardware information:
+[12:50:19] [Render thread/INFO]: CPU: 20x 12th Gen Intel(R) Core(TM) i7-12700K
+[12:50:19] [Render thread/INFO]: GPU: NVIDIA GeForce RTX 3080 Ti/PCIe/SSE2 (Supports OpenGL 3.3.0 NVIDIA 580.95.05)
+[12:50:19] [Render thread/INFO]: OS: Linux (6.14.0-37-generic)
 [LWJGL] Java 16 memcpy enabled
-[18:03:47] [Render thread/INFO]: Reloading ResourceManager: vanilla
-[18:03:47] [Worker-Main-19/INFO]: Found unifont_all_no_pua-16.0.03.hex, loading
-[18:03:47] [Worker-Main-15/INFO]: Found unifont_pua-16.0.03.hex, loading
-[18:03:48] [Worker-Main-11/INFO]: Found unifont_jp_patch-16.0.03.hex, loading
-[18:03:48] [Render thread/INFO]: Profile: MATTMC (+0 options changed by user)
-[18:03:48] [Render thread/INFO]: Using shaderpack: ComplementaryHungLoIfied.zip
-[18:03:48] [Render thread/INFO]: OpenAL initialized on device HT-S350
-[18:03:48] [Render thread/INFO]: Sound engine started
-[18:03:48] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/particles.png-atlas
-[18:03:48] [Render thread/INFO]: Created: 128x64x0 minecraft:textures/atlas/decorated_pot.png-atlas
-[18:03:48] [Render thread/INFO]: Created: 2048x1024x0 minecraft:textures/atlas/armor_trims.png-atlas
-[18:03:48] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/paintings.png-atlas
-[18:03:48] [Render thread/INFO]: Created: 512x512x0 minecraft:textures/atlas/shield_patterns.png-atlas
-[18:03:48] [Render thread/INFO]: Created: 1024x512x4 minecraft:textures/atlas/blocks.png-atlas
-[18:03:48] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/chest.png-atlas
-[18:03:48] [Render thread/INFO]: Created: 512x512x0 minecraft:textures/atlas/banner_patterns.png-atlas
-[18:03:48] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/beds.png-atlas
-[18:03:48] [Render thread/INFO]: Created: 1024x512x0 minecraft:textures/atlas/gui.png-atlas
-[18:03:48] [Render thread/INFO]: Created: 64x64x0 minecraft:textures/atlas/map_decorations.png-atlas
-[18:03:48] [Render thread/INFO]: Created: 256x256x0 minecraft:textures/atlas/signs.png-atlas
-[18:03:48] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/shulker_boxes.png-atlas
-[18:03:48] [Render thread/INFO]: Auto-updater has been disabled - no update checks will be performed
-[18:03:48] [Render thread/INFO]: Creating pipeline for dimension minecraft:overworld
-[18:03:49] [Render thread/WARN]: Type is VERTEX
-[18:03:49] [Render thread/WARN]: Type is FRAGMENT
-[18:03:49] [Render thread/WARN]: Type is VERTEX
-[18:03:49] [Render thread/WARN]: Type is FRAGMENT
-[18:03:49] [Render thread/WARN]: Type is VERTEX
-[18:03:49] [Render thread/WARN]: Type is FRAGMENT
-[18:03:55] [Render thread/INFO]: Loaded 1461 recipes
-[18:03:55] [Render thread/INFO]: Loaded 1574 advancements
-[18:03:55] [Server thread/INFO]: Started DhWorld of type CLIENT_SERVER
-[18:03:55] [Server thread/INFO]: Starting integrated minecraft server version 1.21.10
-[18:03:55] [Server thread/INFO]: Generating keypair
-[18:03:55] [DH-Full Data Migration Thread[0]/INFO]: No migration necessary.
-[18:03:55] [Server thread/INFO]: Started DhClientServerLevel for [Wrapped{ServerLevel[New World]@minecraft:overworld}] at [[LocalSaveStructure@(/home/matt/Documents/Repos/MattMC/run/saves/New World/data)]].
-[18:03:55] [DH-Full Data Migration Thread[0]/INFO]: No migration necessary.
-[18:03:55] [Server thread/INFO]: Started DhClientServerLevel for [Wrapped{ServerLevel[New World]@minecraft:the_nether}] at [[LocalSaveStructure@(/home/matt/Documents/Repos/MattMC/run/saves/New World/data;/home/matt/Documents/Repos/MattMC/run/saves/New World/DIM-1/data)]].
-[18:03:55] [DH-Full Data Migration Thread[0]/INFO]: No migration necessary.
-[18:03:55] [Server thread/INFO]: Started DhClientServerLevel for [Wrapped{ServerLevel[New World]@minecraft:the_end}] at [[LocalSaveStructure@(/home/matt/Documents/Repos/MattMC/run/saves/New World/data;/home/matt/Documents/Repos/MattMC/run/saves/New World/DIM-1/data;/home/matt/Documents/Repos/MattMC/run/saves/New World/DIM1/data)]].
-[18:03:56] [DH-Full Data Migration Thread[0]/INFO]: No migration necessary.
-[18:03:56] [Server thread/INFO]: Started DhClientServerLevel for [Wrapped{ServerLevel[New World]@minecraft:primordial_caves}] at [[LocalSaveStructure@(/home/matt/Documents/Repos/MattMC/run/saves/New World/dimensions/minecraft/primordial_caves/data;/home/matt/Documents/Repos/MattMC/run/saves/New World/data;/home/matt/Documents/Repos/MattMC/run/saves/New World/DIM-1/data;/home/matt/Documents/Repos/MattMC/run/saves/New World/DIM1/data)]].
-[18:03:56] [Server thread/INFO]: Loading 0 persistent chunks...
-[18:03:56] [Server thread/INFO]: Preparing spawn area: 16%
-[18:03:56] [Server thread/INFO]: Loading 49 chunks for player spawn...
-[18:03:56] [Server thread/INFO]: Preparing spawn area: 88%
-[18:03:56] [Server thread/INFO]: Time elapsed: 564 ms
-[18:03:56] [Server thread/INFO]: HungLo[local:E:71c2be4a] logged in with entity id 105 at (-623.6290268943777, 82.49390748022948, 158.0459490617798)
-[18:03:56] [Render thread/INFO]: Reloading pipeline on dimension change: minecraft:overworld => minecraft:overworld
-[18:03:56] [Render thread/INFO]: Destroying pipeline minecraft:overworld
-[18:03:56] [Server thread/INFO]: Player [HungLo] joined.
-[18:03:56] [Render thread/INFO]: Creating pipeline for dimension minecraft:overworld
-[18:03:56] [Server thread/INFO]: HungLo joined the game
-[18:03:56] [DH-Request Module Ticker [minecraft:overworld] Thread[0]/INFO]: Batch Chunk Generator initialized
-[18:03:56] [DH-Request Module Ticker [minecraft:overworld] Thread[0]/INFO]: Set world gen queue for level [minecraft:overworld].
-[18:03:56] [Server thread/INFO]: Changing simulation distance to 12, from 0
-[18:03:57] [Render thread/INFO]: Loaded [0] waiting chunk wrappers.
-[18:03:57] [Render thread/INFO]: Started 10 worker threads
-[18:03:57] [Render thread/INFO]: Sent player skin to server: hunglo (Wide)
-[18:03:57] [Render thread/INFO]: [DH-CLIENT-CONNECT] ========== CLIENT ONLY CONNECTED ==========
-[18:03:57] [Render thread/INFO]: [DH-CLIENT-CONNECT] Thread: Render thread (ID: 3)
-[18:03:57] [Render thread/INFO]: [DH-CLIENT-CONNECT] Connected to dedicated server: false
-[18:03:57] [Render thread/INFO]: [DH-CLIENT-CONNECT] Connected to replay: false
-[18:03:57] [Render thread/INFO]: [DH-CLIENT-CONNECT] Not connected to dedicated server or replay - skipping DhClientWorld creation
-[18:03:57] [Render thread/INFO]: [DH-CLIENT-CONNECT] This is expected for integrated/singleplayer - world should be created by ServerApi
-[18:03:57] [Render thread/INFO]: Loaded [0] waiting chunk wrappers.
-[18:03:57] [Render thread/WARN]: Ignoring chat session from HungLo due to missing Services public key
-[18:03:57] [Render thread/INFO]: Loaded 41 advancements
-[18:03:57] [Render thread/WARN]: Error while parsing the block ID map entry for "block.10104":
-[18:03:57] [Render thread/WARN]: - The block minecraft:stone_slab has no property with the name variant, ignoring!
-[18:03:57] [Render thread/WARN]: Error while parsing the block ID map entry for "block.10944":
-[18:03:57] [Render thread/WARN]: - The block minecraft:creaking_heart has no property with the name active, ignoring!
-[18:03:57] [Render thread/WARN]: Error while parsing the block ID map entry for "block.10948":
-[18:03:57] [Render thread/WARN]: - The block minecraft:creaking_heart has no property with the name active, ignoring!
-[18:03:57] [Render thread/INFO]: Stopping worker threads
-[18:03:57] [Render thread/INFO]: Started 10 worker threads
-[18:03:57] [Render thread/INFO]: Resizing Dynamic Transforms UBO, capacity limit of 2 reached during a single frame. New capacity will be 4.
-[18:03:57] [Render thread/INFO]: Creating GLProxy... If this is the last message you see there must have been an OpenGL error.
-[18:03:57] [Render thread/INFO]: Lod Render OpenGL version [3.3.0 NVIDIA 580.95.05].
-[18:03:57] [Render thread/INFO]: minecraftGlCapabilities:
+[12:50:19] [Render thread/INFO]: Reloading ResourceManager: vanilla
+[12:50:19] [Worker-Main-19/INFO]: Found unifont_pua-16.0.03.hex, loading
+[12:50:19] [Worker-Main-7/INFO]: Found unifont_all_no_pua-16.0.03.hex, loading
+[12:50:19] [Worker-Main-18/INFO]: Found unifont_jp_patch-16.0.03.hex, loading
+[12:50:19] [Render thread/INFO]: Profile: MATTMC (+0 options changed by user)
+[12:50:20] [Render thread/INFO]: Using shaderpack: ComplementaryHungLoIfied.zip
+[12:50:20] [Render thread/INFO]: OpenAL initialized on device HT-S350
+[12:50:20] [Render thread/INFO]: Sound engine started
+[12:50:20] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/particles.png-atlas
+[12:50:20] [Render thread/INFO]: Created: 128x64x0 minecraft:textures/atlas/decorated_pot.png-atlas
+[12:50:20] [Render thread/INFO]: Created: 2048x1024x0 minecraft:textures/atlas/armor_trims.png-atlas
+[12:50:20] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/paintings.png-atlas
+[12:50:20] [Render thread/INFO]: Created: 512x512x0 minecraft:textures/atlas/shield_patterns.png-atlas
+[12:50:20] [Render thread/INFO]: Created: 1024x512x4 minecraft:textures/atlas/blocks.png-atlas
+[12:50:20] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/chest.png-atlas
+[12:50:20] [Render thread/INFO]: Created: 512x512x0 minecraft:textures/atlas/banner_patterns.png-atlas
+[12:50:20] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/beds.png-atlas
+[12:50:20] [Render thread/INFO]: Created: 1024x512x0 minecraft:textures/atlas/gui.png-atlas
+[12:50:20] [Render thread/INFO]: Created: 64x64x0 minecraft:textures/atlas/map_decorations.png-atlas
+[12:50:20] [Render thread/INFO]: Created: 256x256x0 minecraft:textures/atlas/signs.png-atlas
+[12:50:20] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/shulker_boxes.png-atlas
+[12:50:20] [Render thread/INFO]: Auto-updater has been disabled - no update checks will be performed
+[12:50:20] [Render thread/INFO]: Creating pipeline for dimension minecraft:overworld
+[12:50:20] [Render thread/WARN]: Type is VERTEX
+[12:50:20] [Render thread/WARN]: Type is FRAGMENT
+[12:50:20] [Render thread/WARN]: Type is VERTEX
+[12:50:20] [Render thread/WARN]: Type is FRAGMENT
+[12:50:20] [Render thread/WARN]: Type is VERTEX
+[12:50:20] [Render thread/WARN]: Type is FRAGMENT
+[12:50:28] [Render thread/INFO]: Loaded 1461 recipes
+[12:50:28] [Render thread/INFO]: Loaded 1574 advancements
+[12:50:28] [Server thread/INFO]: Started DhWorld of type CLIENT_SERVER
+[12:50:28] [Server thread/INFO]: Starting integrated minecraft server version 1.21.10
+[12:50:28] [Server thread/INFO]: Generating keypair
+[12:50:28] [DH-Full Data Migration Thread[0]/INFO]: No migration necessary.
+[12:50:28] [Server thread/INFO]: Started DhClientServerLevel for [Wrapped{ServerLevel[New World]@minecraft:overworld}] at [[LocalSaveStructure@(/home/matt/Documents/Repos/MattMC/run/saves/New World/data)]].
+[12:50:28] [DH-Full Data Migration Thread[0]/INFO]: No migration necessary.
+[12:50:28] [Server thread/INFO]: Started DhClientServerLevel for [Wrapped{ServerLevel[New World]@minecraft:the_end}] at [[LocalSaveStructure@(/home/matt/Documents/Repos/MattMC/run/saves/New World/data;/home/matt/Documents/Repos/MattMC/run/saves/New World/DIM1/data)]].
+[12:50:28] [DH-Full Data Migration Thread[0]/INFO]: No migration necessary.
+[12:50:28] [Server thread/INFO]: Started DhClientServerLevel for [Wrapped{ServerLevel[New World]@minecraft:the_nether}] at [[LocalSaveStructure@(/home/matt/Documents/Repos/MattMC/run/saves/New World/data;/home/matt/Documents/Repos/MattMC/run/saves/New World/DIM1/data;/home/matt/Documents/Repos/MattMC/run/saves/New World/DIM-1/data)]].
+[12:50:28] [DH-Full Data Migration Thread[0]/INFO]: No migration necessary.
+[12:50:28] [Server thread/INFO]: Started DhClientServerLevel for [Wrapped{ServerLevel[New World]@minecraft:primordial_caves}] at [[LocalSaveStructure@(/home/matt/Documents/Repos/MattMC/run/saves/New World/data;/home/matt/Documents/Repos/MattMC/run/saves/New World/DIM1/data;/home/matt/Documents/Repos/MattMC/run/saves/New World/dimensions/minecraft/primordial_caves/data;/home/matt/Documents/Repos/MattMC/run/saves/New World/DIM-1/data)]].
+[12:50:28] [Server thread/INFO]: Loading 0 persistent chunks...
+[12:50:28] [Server thread/INFO]: Preparing spawn area: 16%
+[12:50:28] [Server thread/INFO]: WorldEdit initialized
+[12:50:28] [Server thread/INFO]: WorldEdit commands registered
+[12:50:29] [Server thread/INFO]: Loading 49 chunks for player spawn...
+[12:50:29] [Server thread/INFO]: Preparing spawn area: 45%
+[12:50:29] [Server thread/INFO]: Time elapsed: 565 ms
+[12:50:29] [Server thread/INFO]: HungLo[local:E:88e9e831] logged in with entity id 97 at (-596.4366877001999, 93.0, 183.36353956191826)
+[12:50:29] [Server thread/INFO]: Player [HungLo] joined.
+[12:50:29] [Server thread/INFO]: HungLo joined the game
+[12:50:29] [Render thread/INFO]: Reloading pipeline on dimension change: minecraft:overworld => minecraft:overworld
+[12:50:29] [Render thread/INFO]: Destroying pipeline minecraft:overworld
+[12:50:29] [Render thread/INFO]: Creating pipeline for dimension minecraft:overworld
+[12:50:29] [DH-Request Module Ticker [minecraft:overworld] Thread[0]/INFO]: Batch Chunk Generator initialized
+[12:50:29] [DH-Request Module Ticker [minecraft:overworld] Thread[0]/INFO]: Set world gen queue for level [minecraft:overworld].
+[12:50:29] [Server thread/INFO]: Changing simulation distance to 12, from 0
+[12:50:29] [Render thread/INFO]: Loaded [0] waiting chunk wrappers.
+[12:50:29] [Render thread/INFO]: Started 10 worker threads
+[12:50:29] [Render thread/INFO]: Sent player skin to server: hunglo (Wide)
+[12:50:29] [Render thread/INFO]: [DH-CLIENT-CONNECT] ========== CLIENT ONLY CONNECTED ==========
+[12:50:29] [Render thread/INFO]: [DH-CLIENT-CONNECT] Thread: Render thread (ID: 3)
+[12:50:29] [Render thread/INFO]: [DH-CLIENT-CONNECT] Connected to dedicated server: false
+[12:50:29] [Render thread/INFO]: [DH-CLIENT-CONNECT] Connected to replay: false
+[12:50:29] [Render thread/INFO]: [DH-CLIENT-CONNECT] Not connected to dedicated server or replay - skipping DhClientWorld creation
+[12:50:29] [Render thread/INFO]: [DH-CLIENT-CONNECT] This is expected for integrated/singleplayer - world should be created by ServerApi
+[12:50:29] [Render thread/INFO]: Loaded [0] waiting chunk wrappers.
+[12:50:29] [Render thread/WARN]: Ignoring chat session from HungLo due to missing Services public key
+[12:50:29] [Render thread/INFO]: Loaded 41 advancements
+[12:50:29] [Render thread/WARN]: Error while parsing the block ID map entry for "block.10104":
+[12:50:29] [Render thread/WARN]: - The block minecraft:stone_slab has no property with the name variant, ignoring!
+[12:50:29] [Render thread/WARN]: Error while parsing the block ID map entry for "block.10944":
+[12:50:29] [Render thread/WARN]: - The block minecraft:creaking_heart has no property with the name active, ignoring!
+[12:50:29] [Render thread/WARN]: Error while parsing the block ID map entry for "block.10948":
+[12:50:29] [Render thread/WARN]: - The block minecraft:creaking_heart has no property with the name active, ignoring!
+[12:50:29] [Render thread/INFO]: Stopping worker threads
+[12:50:29] [Render thread/INFO]: Started 10 worker threads
+[12:50:29] [Render thread/INFO]: Resizing Dynamic Transforms UBO, capacity limit of 2 reached during a single frame. New capacity will be 4.
+[12:50:29] [Render thread/INFO]: Creating GLProxy... If this is the last message you see there must have been an OpenGL error.
+[12:50:29] [Render thread/INFO]: Lod Render OpenGL version [3.3.0 NVIDIA 580.95.05].
+[12:50:29] [Render thread/INFO]: minecraftGlCapabilities:
 Your OpenGL support:
 openGL version 3.2+: [true] <- REQUIRED
 Vertex Attribute Buffer Binding: [true] <- optional improvement
@@ -200,86 +202,87 @@ Buffer Storage: [true] <- optional improvement
 
 [LWJGL] [GL] Using KHR_debug for error logging.
 [LWJGL] [GL] Warning: A non-debug context may not produce any debug output.
-[18:03:57] [Render thread/INFO]: GPU Vendor [NVIDIA CORPORATION] with OS [Linux], Preferred upload method is [BUFFER_STORAGE].
-[18:03:57] [Render thread/INFO]: GLProxy creation successful. OpenGL smiles upon you this day.
-[18:03:57] [Render thread/INFO]: Resizing Dynamic Transforms UBO, capacity limit of 4 reached during a single frame. New capacity will be 8.
-[18:03:57] [Render thread/WARN]: Skipping DH render to prevent GL_INVALID_OPERATION during shader transition (shouldOverride=true but renderPass=OPAQUE_AND_TRANSPARENT)
-[18:03:57] [Render thread/INFO]: Setting up renderer
-[18:03:57] [Render thread/INFO]: Loading shader with type: [35633]
-[18:03:57] [Render thread/INFO]: Shader loaded sucessfully.
-[18:03:57] [Render thread/INFO]: Loading shader with type: [35632]
-[18:03:57] [Render thread/INFO]: Shader loaded sucessfully.
-[18:03:57] [Render thread/INFO]: Vertex Attribute (GL43+) completed. It contains 1 binding points and a stride size of 16
-[18:03:57] [Render thread/INFO]: Renderer setup complete
-[18:03:57] [Render thread/INFO]: Resizing Dynamic Transforms UBO, capacity limit of 8 reached during a single frame. New capacity will be 16.
-[18:03:57] [Render thread/INFO]: Loading shader with type: [35633]
-[18:03:57] [Render thread/INFO]: Shader loaded sucessfully.
-[18:03:57] [Render thread/INFO]: Loading shader with type: [35632]
-[18:03:57] [Render thread/INFO]: Shader loaded sucessfully.
-[18:03:57] [Render thread/INFO]: Vertex Attribute (GL43+) completed. It contains 1 binding points and a stride size of 12
-[18:03:57] [Render thread/INFO]: Loading shader with type: [35633]
-[18:03:57] [Render thread/INFO]: Shader loaded sucessfully.
-[18:03:57] [Render thread/INFO]: Loading shader with type: [35632]
-[18:03:57] [Render thread/INFO]: Shader loaded sucessfully.
-[18:03:57] [Render thread/INFO]: Vertex Attribute (GL43+) completed. It contains 1 binding points and a stride size of 12
-[18:04:21] [Server thread/INFO]: Saving and pausing game...
-[18:04:21] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:overworld
-[18:04:21] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:the_nether
-[18:04:21] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:the_end
-[18:04:21] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:primordial_caves
-[18:04:22] [Render thread/INFO]: Client on ClientOnly mode disconnecting.
-[18:04:22] [level shutdown/INFO]: Shutting down ClientRenderState
-[18:04:22] [level shutdown/INFO]: Shutting down LodQuadTree...
-[18:04:22] [level shutdown/INFO]: Finished shutting down LodQuadTree
-[18:04:22] [level shutdown/INFO]: Closing world gen queue
-[18:04:22] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[New World]@minecraft:the_end}].
-[18:04:22] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[New World]@minecraft:the_nether}].
-[18:04:22] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[New World]@minecraft:the_end}
-[18:04:22] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[New World]@minecraft:the_nether}
-[18:04:22] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[New World]@minecraft:primordial_caves}].
-[18:04:22] [level shutdown/INFO]: Closing WorldGenerationQueue...
-[18:04:22] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[New World]@minecraft:primordial_caves}
-[18:04:22] [level shutdown/INFO]: Shutting down world generator thread pool...
-[18:04:22] [level shutdown/INFO]: World generator thread pool shutdown with [0] incomplete tasks.
-[18:04:22] [level shutdown/INFO]: [BatchGenerator] shutting down...
-[18:04:22] [level shutdown/INFO]: Closing [BatchGenerationEnvironment]
-[18:04:22] [level shutdown/INFO]: Finished closing WorldGenerationQueue
-[18:04:22] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[New World]@minecraft:overworld}].
-[18:04:22] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[New World]@minecraft:overworld}
-[18:04:22] [Render thread/INFO]: Closed DhWorld of type [CLIENT_SERVER].
-[18:04:22] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[New World]@minecraft:overworld}].
-[18:04:22] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[New World]@minecraft:primordial_caves}].
-[18:04:22] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[New World]@minecraft:overworld}
-[18:04:22] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[New World]@minecraft:the_nether}].
-[18:04:22] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[New World]@minecraft:primordial_caves}
-[18:04:22] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[New World]@minecraft:the_nether}
-[18:04:22] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[New World]@minecraft:the_end}].
-[18:04:22] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[New World]@minecraft:the_end}
-[18:04:22] [Render thread/INFO]: Closed DhWorld of type [CLIENT_SERVER].
-[18:04:22] [Render thread/INFO]: Shutting down PriorityTaskPicker thread pool...
-[18:04:22] [Render thread/INFO]: Closing all [4] database connections...
-[18:04:22] [Render thread/INFO]: Closing database connection: [jdbc:sqlite:/home/matt/Documents/Repos/MattMC/run/saves/New World/DIM1/data/DistantHorizons.sqlite]
-[18:04:22] [Render thread/INFO]: Closing database connection: [jdbc:sqlite:/home/matt/Documents/Repos/MattMC/run/saves/New World/DIM-1/data/DistantHorizons.sqlite]
-[18:04:22] [Render thread/INFO]: Closing database connection: [jdbc:sqlite:/home/matt/Documents/Repos/MattMC/run/saves/New World/data/DistantHorizons.sqlite]
-[18:04:22] [Render thread/INFO]: Closing database connection: [jdbc:sqlite:/home/matt/Documents/Repos/MattMC/run/saves/New World/dimensions/minecraft/primordial_caves/data/DistantHorizons.sqlite]
-[18:04:22] [Server thread/INFO]: HungLo lost connection: Disconnected
-[18:04:22] [Server thread/INFO]: HungLo left the game
-[18:04:22] [Server thread/INFO]: Stopping singleplayer server as player logged out
-[18:04:22] [Server thread/INFO]: Stopping server
-[18:04:22] [Server thread/INFO]: Saving players
-[18:04:22] [Server thread/INFO]: Saving worlds
-[18:04:22] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:overworld
-[18:04:22] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:the_nether
-[18:04:22] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:the_end
-[18:04:22] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:primordial_caves
-[18:04:22] [Server thread/INFO]: ThreadedAnvilChunkStorage (New World): All chunks are saved
-[18:04:22] [Server thread/INFO]: ThreadedAnvilChunkStorage (DIM-1): All chunks are saved
-[18:04:22] [Server thread/INFO]: ThreadedAnvilChunkStorage (DIM1): All chunks are saved
-[18:04:22] [Server thread/INFO]: ThreadedAnvilChunkStorage (primordial_caves): All chunks are saved
-[18:04:22] [Server thread/INFO]: ThreadedAnvilChunkStorage: All dimensions are saved
-[18:04:22] [Render thread/INFO]: Unloading client level [ClientLevelWrapper]-[9p2b15v5d28je@minecraft:overworld].
-[18:04:22] [Render thread/INFO]: Stopping worker threads
-[18:04:23] [Render thread/INFO]: Stopping!
+[12:50:29] [Render thread/INFO]: GPU Vendor [NVIDIA CORPORATION] with OS [Linux], Preferred upload method is [BUFFER_STORAGE].
+[12:50:29] [Render thread/INFO]: GLProxy creation successful. OpenGL smiles upon you this day.
+[12:50:29] [Render thread/INFO]: Resizing Dynamic Transforms UBO, capacity limit of 4 reached during a single frame. New capacity will be 8.
+[12:50:30] [Render thread/WARN]: Skipping DH render to prevent GL_INVALID_OPERATION during shader transition (shouldOverride=true but renderPass=OPAQUE_AND_TRANSPARENT)
+[12:50:30] [Render thread/INFO]: Setting up renderer
+[12:50:30] [Render thread/INFO]: Loading shader with type: [35633]
+[12:50:30] [Render thread/INFO]: Shader loaded sucessfully.
+[12:50:30] [Render thread/INFO]: Loading shader with type: [35632]
+[12:50:30] [Render thread/INFO]: Shader loaded sucessfully.
+[12:50:30] [Render thread/INFO]: Vertex Attribute (GL43+) completed. It contains 1 binding points and a stride size of 16
+[12:50:30] [Render thread/INFO]: Renderer setup complete
+[12:50:30] [Render thread/INFO]: Loading shader with type: [35633]
+[12:50:30] [Render thread/INFO]: Shader loaded sucessfully.
+[12:50:30] [Render thread/INFO]: Loading shader with type: [35632]
+[12:50:30] [Render thread/INFO]: Shader loaded sucessfully.
+[12:50:30] [Render thread/INFO]: Vertex Attribute (GL43+) completed. It contains 1 binding points and a stride size of 12
+[12:50:30] [Render thread/INFO]: Loading shader with type: [35633]
+[12:50:30] [Render thread/INFO]: Shader loaded sucessfully.
+[12:50:30] [Render thread/INFO]: Loading shader with type: [35632]
+[12:50:30] [Render thread/INFO]: Shader loaded sucessfully.
+[12:50:30] [Render thread/INFO]: Vertex Attribute (GL43+) completed. It contains 1 binding points and a stride size of 12
+[12:50:31] [Render thread/INFO]: Resizing Dynamic Transforms UBO, capacity limit of 8 reached during a single frame. New capacity will be 16.
+[12:50:40] [Server thread/INFO]: Saving and pausing game...
+[12:50:40] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:overworld
+[12:50:40] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:the_end
+[12:50:40] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:the_nether
+[12:50:40] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:primordial_caves
+[12:50:42] [Render thread/INFO]: Client on ClientOnly mode disconnecting.
+[12:50:42] [level shutdown/INFO]: Shutting down ClientRenderState
+[12:50:42] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[New World]@minecraft:the_end}].
+[12:50:42] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[New World]@minecraft:the_nether}].
+[12:50:42] [level shutdown/INFO]: Shutting down LodQuadTree...
+[12:50:42] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[New World]@minecraft:the_end}
+[12:50:42] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[New World]@minecraft:the_nether}
+[12:50:42] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[New World]@minecraft:primordial_caves}].
+[12:50:42] [level shutdown/INFO]: Finished shutting down LodQuadTree
+[12:50:42] [level shutdown/INFO]: Closing world gen queue
+[12:50:42] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[New World]@minecraft:primordial_caves}
+[12:50:42] [level shutdown/INFO]: Closing WorldGenerationQueue...
+[12:50:42] [level shutdown/INFO]: Shutting down world generator thread pool...
+[12:50:42] [level shutdown/INFO]: World generator thread pool shutdown with [0] incomplete tasks.
+[12:50:42] [level shutdown/INFO]: [BatchGenerator] shutting down...
+[12:50:42] [level shutdown/INFO]: Closing [BatchGenerationEnvironment]
+[12:50:42] [level shutdown/INFO]: Finished closing WorldGenerationQueue
+[12:50:42] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[New World]@minecraft:overworld}].
+[12:50:42] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[New World]@minecraft:overworld}
+[12:50:42] [Render thread/INFO]: Closed DhWorld of type [CLIENT_SERVER].
+[12:50:42] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[New World]@minecraft:the_end}].
+[12:50:42] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[New World]@minecraft:primordial_caves}].
+[12:50:42] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[New World]@minecraft:the_end}
+[12:50:42] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[New World]@minecraft:the_nether}].
+[12:50:42] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[New World]@minecraft:overworld}].
+[12:50:42] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[New World]@minecraft:primordial_caves}
+[12:50:42] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[New World]@minecraft:the_nether}
+[12:50:42] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[New World]@minecraft:overworld}
+[12:50:42] [Render thread/INFO]: Closed DhWorld of type [CLIENT_SERVER].
+[12:50:42] [Render thread/INFO]: Shutting down PriorityTaskPicker thread pool...
+[12:50:42] [Render thread/INFO]: Closing all [4] database connections...
+[12:50:42] [Render thread/INFO]: Closing database connection: [jdbc:sqlite:/home/matt/Documents/Repos/MattMC/run/saves/New World/data/DistantHorizons.sqlite]
+[12:50:42] [Server thread/INFO]: HungLo lost connection: Disconnected
+[12:50:42] [Server thread/INFO]: HungLo left the game
+[12:50:42] [Render thread/INFO]: Closing database connection: [jdbc:sqlite:/home/matt/Documents/Repos/MattMC/run/saves/New World/DIM-1/data/DistantHorizons.sqlite]
+[12:50:42] [Render thread/INFO]: Closing database connection: [jdbc:sqlite:/home/matt/Documents/Repos/MattMC/run/saves/New World/dimensions/minecraft/primordial_caves/data/DistantHorizons.sqlite]
+[12:50:42] [Render thread/INFO]: Closing database connection: [jdbc:sqlite:/home/matt/Documents/Repos/MattMC/run/saves/New World/DIM1/data/DistantHorizons.sqlite]
+[12:50:42] [Server thread/INFO]: Stopping singleplayer server as player logged out
+[12:50:42] [Server thread/INFO]: WorldEdit shutdown
+[12:50:42] [Server thread/INFO]: Stopping server
+[12:50:42] [Server thread/INFO]: Saving players
+[12:50:42] [Server thread/INFO]: Saving worlds
+[12:50:42] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:overworld
+[12:50:42] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:the_end
+[12:50:42] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:the_nether
+[12:50:42] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:primordial_caves
+[12:50:42] [Server thread/INFO]: ThreadedAnvilChunkStorage (New World): All chunks are saved
+[12:50:42] [Server thread/INFO]: ThreadedAnvilChunkStorage (DIM1): All chunks are saved
+[12:50:42] [Server thread/INFO]: ThreadedAnvilChunkStorage (DIM-1): All chunks are saved
+[12:50:42] [Server thread/INFO]: ThreadedAnvilChunkStorage (primordial_caves): All chunks are saved
+[12:50:42] [Server thread/INFO]: ThreadedAnvilChunkStorage: All dimensions are saved
+[12:50:42] [Render thread/INFO]: Unloading client level [ClientLevelWrapper]-[9p2b15v5d28je@minecraft:overworld].
+[12:50:42] [Render thread/INFO]: Stopping worker threads
+[12:50:44] [Render thread/INFO]: Stopping!
 
 [Incubating] Problems report is available at: file:///home/matt/Documents/Repos/MattMC/build/reports/problems/problems-report.html
 
@@ -289,6 +292,6 @@ You can use '--warning-mode all' to show the individual deprecation warnings and
 
 For more on this, please refer to https://docs.gradle.org/9.1.0/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
 
-BUILD SUCCESSFUL in 1m 9s
+BUILD SUCCESSFUL in 1m 8s
 7 actionable tasks: 7 executed
 Consider enabling configuration cache to speed up this build: https://docs.gradle.org/9.1.0/userguide/configuration_cache_enabling.html
