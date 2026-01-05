@@ -441,15 +441,15 @@ public class RecipeViewerScreen extends Screen {
 			return new CraftingRecipeRenderer(contextMap, font);
 		} else if (type == RecipeType.SMELTING) {
 			return new FurnaceRecipeRenderer(
-				ResourceLocation.withDefaultNamespace("textures/gui/container/furnace.png"), 
+				ResourceLocation.withDefaultNamespace("textures/gui/container/jei/furnace.png"),
 				contextMap, font);
 		} else if (type == RecipeType.BLASTING) {
 			return new FurnaceRecipeRenderer(
-				ResourceLocation.withDefaultNamespace("textures/gui/container/blast_furnace.png"), 
+				ResourceLocation.withDefaultNamespace("textures/gui/container/jei/furnace.png"),
 				contextMap, font);
 		} else if (type == RecipeType.SMOKING) {
 			return new FurnaceRecipeRenderer(
-				ResourceLocation.withDefaultNamespace("textures/gui/container/smoker.png"), 
+				ResourceLocation.withDefaultNamespace("textures/gui/container/jei/furnace.png"),
 				contextMap, font);
 		} else if (type == RecipeType.STONECUTTING) {
 			return new StonecutterRecipeRenderer(contextMap, font);

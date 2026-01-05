@@ -18,9 +18,9 @@ import net.minecraft.world.item.crafting.display.SlotDisplay;
  */
 public class CraftingRecipeRenderer extends RecipeRenderer {
 	private static final ResourceLocation CRAFTING_TABLE_LOCATION = 
-		ResourceLocation.withDefaultNamespace("textures/gui/container/crafting_table.png");
+		ResourceLocation.withDefaultNamespace("textures/gui/container/jei/crafting_table.png");
 	private static final int GUI_WIDTH = 176;
-	private static final int GUI_HEIGHT = 75; // Cut off player inventory slots (was 166, then 90)
+	private static final int GUI_HEIGHT = 166; // Cut off player inventory slots (was 166, then 90)
 	
 	// Slot positions in the crafting table GUI
 	private static final int GRID_START_X = 30;

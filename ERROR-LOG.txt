@@ -23,45 +23,45 @@ Note: Recompile with -Xlint:unchecked for details.
 
 > Task :runClient
 Using bundled JDK from: /home/matt/Documents/Repos/MattMC/run/jdk-25
-[15:16:00] [main/INFO]: Detected integrated source mode - using Fabric Loader code source as game jar: /home/matt/Documents/Repos/MattMC/build/libs/MattMC-1.21.10.jar
-[15:16:00] [main/INFO]: Loading Minecraft 1.21.10 with Fabric Loader 0.18.2
-[15:16:00] [main/INFO]: Mappings not present!
-[15:16:01] [main/INFO]: Loading 3 mods:
+[17:50:05] [main/INFO]: Detected integrated source mode - using Fabric Loader code source as game jar: /home/matt/Documents/Repos/MattMC/build/libs/MattMC-1.21.10.jar
+[17:50:05] [main/INFO]: Loading Minecraft 1.21.10 with Fabric Loader 0.18.2
+[17:50:05] [main/INFO]: Mappings not present!
+[17:50:05] [main/INFO]: Loading 3 mods:
 	- java 25
 	- mattmc 1.21.10
 	- minecraft 1.21.10
-[15:16:01] [main/INFO]: Mixin system bypassed - all mixins converted to hook-based architecture
-[15:16:01] [main/INFO]: Mixin transformation disabled - using hook-based architecture
-[15:16:01] [main/INFO]: Searching for graphics cards...
-[15:16:01] [main/INFO]: Found graphics adapter: LinuxPciAdapterInfo[vendor=NVIDIA, name=GA102 [GeForce RTX 3080 Ti], pciVendorId=0x10de, pciDeviceId=0x2208]
-[15:16:01] [main/WARN]: Sodium has applied one or more workarounds to prevent crashes or other issues on your system: [NVIDIA_THREADED_OPTIMIZATIONS_BROKEN]
-[15:16:01] [main/WARN]: This is not necessarily an issue, but it may result in certain features or optimizations being disabled. You can sometimes fix these issues by upgrading your graphics driver.
+[17:50:05] [main/INFO]: Mixin system bypassed - all mixins converted to hook-based architecture
+[17:50:05] [main/INFO]: Mixin transformation disabled - using hook-based architecture
+[17:50:05] [main/INFO]: Searching for graphics cards...
+[17:50:05] [main/INFO]: Found graphics adapter: LinuxPciAdapterInfo[vendor=NVIDIA, name=GA102 [GeForce RTX 3080 Ti], pciVendorId=0x10de, pciDeviceId=0x2208]
+[17:50:05] [main/WARN]: Sodium has applied one or more workarounds to prevent crashes or other issues on your system: [NVIDIA_THREADED_OPTIMIZATIONS_BROKEN]
+[17:50:05] [main/WARN]: This is not necessarily an issue, but it may result in certain features or optimizations being disabled. You can sometimes fix these issues by upgrading your graphics driver.
 WARNING: A restricted method in java.lang.System has been called
 WARNING: java.lang.System::load has been called by com.sun.jna.Native in an unnamed module (file:/home/matt/.gradle/caches/modules-2/files-2.1/net.java.dev.jna/jna/5.14.0/67bf3eaea4f0718cb376a181a629e5f88fa1c9dd/jna-5.14.0.jar)
 WARNING: Use --enable-native-access=ALL-UNNAMED to avoid a warning for callers in this module
 WARNING: Restricted methods will be blocked in a future release unless native access is enabled
 
-[15:16:01] [Datafixer Bootstrap/INFO]: 279 Datafixer optimizations took 170 milliseconds
+[17:50:06] [Datafixer Bootstrap/INFO]: 279 Datafixer optimizations took 163 milliseconds
 WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
 WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.joml.MemUtil$MemUtilUnsafe (file:/home/matt/.gradle/caches/modules-2/files-2.1/org.joml/joml/1.10.5/22566d58af70ad3d72308bab63b8339906deb649/joml-1.10.5.jar)
 WARNING: Please consider reporting this to the maintainers of class org.joml.MemUtil$MemUtilUnsafe
 WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
-[15:16:03] [Render thread/INFO]: Setting user: HungLo
-[15:16:03] [Render thread/INFO]: Initializing Distant Horizons client, firing DhApiBeforeDhInitEvent...
-[15:16:03] [Render thread/INFO]: Running library validation...
-[15:16:03] [Render thread/INFO]: Garbage collectors: [ZGC Minor Cycles, ZGC Minor Pauses, ZGC Major Cycles, ZGC Major Pauses]
-[15:16:03] [Render thread/INFO]: Distant Horizons, Version: 2.4.4-b
-[15:16:03] [Render thread/INFO]: Registering Fabric Client Events
-[15:16:03] [Render thread/INFO]: Registering Distant Horizons hooks
-[15:16:03] [Render thread/INFO]: Registered mod compatibility accessor for: [Sodium-Fabric].
-[15:16:03] [Render thread/INFO]: Skipping mod compatibility accessor for: [starlight]
-[15:16:03] [Render thread/INFO]: Skipping mod compatibility accessor for: [bclib]
-[15:16:03] [Render thread/INFO]: Skipping mod compatibility accessor for: [c2me]
-[15:16:03] [Render thread/INFO]: Registered mod compatibility accessor for: [iris].
-[15:16:03] [Render thread/INFO]: Initialising config for [DistantHorizons]
-[15:16:03] [Render thread/INFO]: [DistantHorizons] Config initialised
-[15:16:03] [Render thread/INFO]: Applying config to loggers
-[15:16:03] [Render thread/INFO]: Distant Horizons client Initialized.
+[17:50:08] [Render thread/INFO]: Setting user: HungLo
+[17:50:08] [Render thread/INFO]: Initializing Distant Horizons client, firing DhApiBeforeDhInitEvent...
+[17:50:08] [Render thread/INFO]: Running library validation...
+[17:50:08] [Render thread/INFO]: Garbage collectors: [ZGC Minor Cycles, ZGC Minor Pauses, ZGC Major Cycles, ZGC Major Pauses]
+[17:50:08] [Render thread/INFO]: Distant Horizons, Version: 2.4.4-b
+[17:50:08] [Render thread/INFO]: Registering Fabric Client Events
+[17:50:08] [Render thread/INFO]: Registering Distant Horizons hooks
+[17:50:08] [Render thread/INFO]: Registered mod compatibility accessor for: [Sodium-Fabric].
+[17:50:08] [Render thread/INFO]: Skipping mod compatibility accessor for: [starlight]
+[17:50:08] [Render thread/INFO]: Skipping mod compatibility accessor for: [bclib]
+[17:50:08] [Render thread/INFO]: Skipping mod compatibility accessor for: [c2me]
+[17:50:08] [Render thread/INFO]: Registered mod compatibility accessor for: [iris].
+[17:50:08] [Render thread/INFO]: Initialising config for [DistantHorizons]
+[17:50:08] [Render thread/INFO]: [DistantHorizons] Config initialised
+[17:50:08] [Render thread/INFO]: Applying config to loggers
+[17:50:08] [Render thread/INFO]: Distant Horizons client Initialized.
 [LWJGL] Version: 3.3.3-snapshot
 	 OS: Linux v6.14.0-37-generic
 	JRE: Linux amd64 25.0.1
@@ -72,17 +72,17 @@ WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
 [LWJGL] Loading library: glfw
 	Module: org.lwjgl.glfw
 	Loaded from org.lwjgl.librarypath: /tmp/lwjgl_matt/3.3.3-snapshot/x64/libglfw.so
-[15:16:03] [Render thread/INFO]: Queuing DH event binding...
-[15:16:03] [Render thread/INFO]: Backend library: LWJGL version 3.3.3-snapshot
+[17:50:08] [Render thread/INFO]: Queuing DH event binding...
+[17:50:08] [Render thread/INFO]: Backend library: LWJGL version 3.3.3-snapshot
 [LWJGL] Loading library: jemalloc
 	Module: org.lwjgl.jemalloc
 	Loaded from org.lwjgl.librarypath: /tmp/lwjgl_matt/3.3.3-snapshot/x64/libjemalloc.so
 [LWJGL] MemoryUtil allocator: JEmallocAllocator
 [LWJGL] Java 9 check intrinsics enabled
 [LWJGL] Closure Registry: ConcurrentHashMap
-[15:16:03] [DH-Manual-Event-Trigger/INFO]: DH Ready, binding Iris event handlers...
-[15:16:03] [Render thread/INFO]: Modifying process environment to apply workarounds for the NVIDIA graphics driver...
-[15:16:03] [DH-Manual-Event-Trigger/INFO]: DH Iris events bound.
+[17:50:08] [Render thread/INFO]: Modifying process environment to apply workarounds for the NVIDIA graphics driver...
+[17:50:08] [DH-Manual-Event-Trigger/INFO]: DH Ready, binding Iris event handlers...
+[17:50:08] [DH-Manual-Event-Trigger/INFO]: DH Iris events bound.
 [LWJGL] Loading JNI library: lwjgl_stb
 	Module: org.lwjgl.stb
 	Loaded from org.lwjgl.librarypath: /tmp/lwjgl_matt/3.3.3-snapshot/x64/liblwjgl_stb.so
@@ -94,568 +94,428 @@ WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
 	libGLX.so.0 not found in org.lwjgl.librarypath=/tmp/lwjgl_matt/3.3.3-snapshot/x64
 [LWJGL] Java 9 text decoding enabled
 	Loaded from system paths: /lib/x86_64-linux-gnu/libGLX.so.0
-[15:16:04] [Render thread/INFO]: [STDERR]: [LWJGL] [ThreadLocalUtil] Unsupported JNI version detected, this may result in a crash. Please inform LWJGL developers.
+[17:50:09] [Render thread/INFO]: [STDERR]: [LWJGL] [ThreadLocalUtil] Unsupported JNI version detected, this may result in a crash. Please inform LWJGL developers.
 [LWJGL] Java 10 multiplyHigh enabled
-[15:16:04] [Render thread/INFO]: OpenGL Vendor: NVIDIA Corporation
-[15:16:04] [Render thread/INFO]: OpenGL Renderer: NVIDIA GeForce RTX 3080 Ti/PCIe/SSE2
-[15:16:04] [Render thread/INFO]: OpenGL Version: 3.3.0 NVIDIA 580.95.05
-[15:16:04] [Render thread/INFO]: Modifying OpenGL context to apply workarounds for the NVIDIA graphics driver...
-[15:16:04] [Render thread/INFO]: Debug functionality is disabled.
-[15:16:04] [Render thread/INFO]: ARB_direct_state_access detected, enabling DSA.
-[15:16:04] [Render thread/INFO]: Using optional rendering extensions: GL_ARB_buffer_storage, GL_KHR_debug, GL_ARB_vertex_attrib_binding, GL_ARB_direct_state_access
-[15:16:04] [Render thread/INFO]: Loaded 20 skins (0 custom)
+[17:50:09] [Render thread/INFO]: OpenGL Vendor: NVIDIA Corporation
+[17:50:09] [Render thread/INFO]: OpenGL Renderer: NVIDIA GeForce RTX 3080 Ti/PCIe/SSE2
+[17:50:09] [Render thread/INFO]: OpenGL Version: 3.3.0 NVIDIA 580.95.05
+[17:50:09] [Render thread/INFO]: Modifying OpenGL context to apply workarounds for the NVIDIA graphics driver...
+[17:50:09] [Render thread/INFO]: Debug functionality is disabled.
+[17:50:09] [Render thread/INFO]: ARB_direct_state_access detected, enabling DSA.
+[17:50:09] [Render thread/INFO]: Using optional rendering extensions: GL_ARB_buffer_storage, GL_KHR_debug, GL_ARB_vertex_attrib_binding, GL_ARB_direct_state_access
+[17:50:09] [Render thread/INFO]: Loaded 20 skins (0 custom)
 [LWJGL] Loading library: openal
 	Module: org.lwjgl.openal
 	Loaded from org.lwjgl.librarypath: /tmp/lwjgl_matt/3.3.3-snapshot/x64/libopenal.so
 [LWJGL] [ALC] ALC_SOFT_reopen_device was reported as available but an entry point is missing.
-[15:16:04] [Render thread/INFO]: Hardware information:
-[15:16:04] [Render thread/INFO]: CPU: 20x 12th Gen Intel(R) Core(TM) i7-12700K
-[15:16:04] [Render thread/INFO]: GPU: NVIDIA GeForce RTX 3080 Ti/PCIe/SSE2 (Supports OpenGL 3.3.0 NVIDIA 580.95.05)
-[15:16:04] [Render thread/INFO]: OS: Linux (6.14.0-37-generic)
+[17:50:09] [Render thread/INFO]: Hardware information:
+[17:50:09] [Render thread/INFO]: CPU: 20x 12th Gen Intel(R) Core(TM) i7-12700K
+[17:50:09] [Render thread/INFO]: GPU: NVIDIA GeForce RTX 3080 Ti/PCIe/SSE2 (Supports OpenGL 3.3.0 NVIDIA 580.95.05)
+[17:50:09] [Render thread/INFO]: OS: Linux (6.14.0-37-generic)
 [LWJGL] Java 16 memcpy enabled
-[15:16:04] [Render thread/INFO]: Reloading ResourceManager: vanilla
-[15:16:04] [Worker-Main-19/INFO]: Found unifont_all_no_pua-16.0.03.hex, loading
-[15:16:04] [Worker-Main-18/INFO]: Found unifont_pua-16.0.03.hex, loading
-[15:16:04] [Worker-Main-7/INFO]: Found unifont_jp_patch-16.0.03.hex, loading
-[15:16:04] [Render thread/INFO]: Profile: MATTMC (+0 options changed by user)
-[15:16:05] [Render thread/INFO]: Using shaderpack: ComplementaryHungLoIfied.zip
-[15:16:05] [Render thread/INFO]: OpenAL initialized on device HT-S350
-[15:16:05] [Render thread/INFO]: Sound engine started
-[15:16:05] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/particles.png-atlas
-[15:16:05] [Render thread/INFO]: Created: 128x64x0 minecraft:textures/atlas/decorated_pot.png-atlas
-[15:16:05] [Render thread/INFO]: Created: 2048x1024x0 minecraft:textures/atlas/armor_trims.png-atlas
-[15:16:05] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/paintings.png-atlas
-[15:16:05] [Render thread/INFO]: Created: 512x512x0 minecraft:textures/atlas/shield_patterns.png-atlas
-[15:16:05] [Render thread/INFO]: Created: 1024x512x4 minecraft:textures/atlas/blocks.png-atlas
-[15:16:05] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/chest.png-atlas
-[15:16:05] [Render thread/INFO]: Created: 512x512x0 minecraft:textures/atlas/banner_patterns.png-atlas
-[15:16:05] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/beds.png-atlas
-[15:16:05] [Render thread/INFO]: Created: 1024x512x0 minecraft:textures/atlas/gui.png-atlas
-[15:16:05] [Render thread/INFO]: Created: 64x64x0 minecraft:textures/atlas/map_decorations.png-atlas
-[15:16:05] [Render thread/INFO]: Created: 256x256x0 minecraft:textures/atlas/signs.png-atlas
-[15:16:05] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/shulker_boxes.png-atlas
-[15:16:05] [Render thread/INFO]: Auto-updater has been disabled - no update checks will be performed
-[15:16:05] [Render thread/INFO]: Creating pipeline for dimension minecraft:overworld
-[15:16:05] [Render thread/WARN]: Type is VERTEX
-[15:16:05] [Render thread/WARN]: Type is FRAGMENT
-[15:16:05] [Render thread/WARN]: Type is VERTEX
-[15:16:05] [Render thread/WARN]: Type is FRAGMENT
-[15:16:05] [Render thread/WARN]: Type is VERTEX
-[15:16:05] [Render thread/WARN]: Type is FRAGMENT
-[15:16:40] [Render thread/INFO]: Loaded 1461 recipes
-[15:16:40] [Render thread/INFO]: Loaded 1574 advancements
-[15:16:40] [Server thread/INFO]: Started DhWorld of type CLIENT_SERVER
-[15:16:40] [Server thread/INFO]: Starting integrated minecraft server version 1.21.10
-[15:16:40] [Server thread/INFO]: Generating keypair
-[15:16:41] [DH-Full Data Migration Thread[0]/INFO]: No migration necessary.
-[15:16:41] [Server thread/INFO]: Started DhClientServerLevel for [Wrapped{ServerLevel[New World]@minecraft:overworld}] at [[LocalSaveStructure@(/home/matt/Documents/Repos/MattMC/run/saves/New World/data)]].
-[15:16:41] [DH-Full Data Migration Thread[0]/INFO]: No migration necessary.
-[15:16:41] [Server thread/INFO]: Started DhClientServerLevel for [Wrapped{ServerLevel[New World]@minecraft:the_end}] at [[LocalSaveStructure@(/home/matt/Documents/Repos/MattMC/run/saves/New World/data;/home/matt/Documents/Repos/MattMC/run/saves/New World/DIM1/data)]].
-[15:16:41] [DH-Full Data Migration Thread[0]/INFO]: No migration necessary.
-[15:16:41] [Server thread/INFO]: Started DhClientServerLevel for [Wrapped{ServerLevel[New World]@minecraft:primordial_caves}] at [[LocalSaveStructure@(/home/matt/Documents/Repos/MattMC/run/saves/New World/data;/home/matt/Documents/Repos/MattMC/run/saves/New World/dimensions/minecraft/primordial_caves/data;/home/matt/Documents/Repos/MattMC/run/saves/New World/DIM1/data)]].
-[15:16:41] [Server thread/INFO]: Started DhClientServerLevel for [Wrapped{ServerLevel[New World]@minecraft:the_nether}] at [[LocalSaveStructure@(/home/matt/Documents/Repos/MattMC/run/saves/New World/data;/home/matt/Documents/Repos/MattMC/run/saves/New World/dimensions/minecraft/primordial_caves/data;/home/matt/Documents/Repos/MattMC/run/saves/New World/DIM-1/data;/home/matt/Documents/Repos/MattMC/run/saves/New World/DIM1/data)]].
-[15:16:41] [DH-Full Data Migration Thread[0]/INFO]: No migration necessary.
-[15:16:41] [Server thread/INFO]: Loading 0 persistent chunks...
-[15:16:41] [Server thread/INFO]: Loading 49 chunks for player spawn...
-[15:16:41] [Server thread/INFO]: Preparing spawn area: 16%
-[15:16:41] [Server thread/INFO]: Preparing spawn area: 100%
-[15:16:41] [Server thread/INFO]: Time elapsed: 511 ms
-[15:16:41] [Server thread/INFO]: HungLo[local:E:0706ef3b] logged in with entity id 69 at (-72.93902242797618, 113.0, -84.69999998807907)
-[15:16:41] [Server thread/INFO]: Player [HungLo] joined.
-[15:16:41] [Render thread/INFO]: Reloading pipeline on dimension change: minecraft:overworld => minecraft:overworld
-[15:16:41] [Render thread/INFO]: Destroying pipeline minecraft:overworld
-[15:16:41] [Server thread/INFO]: HungLo joined the game
-[15:16:41] [Render thread/INFO]: Creating pipeline for dimension minecraft:overworld
-[15:16:41] [DH-Request Module Ticker [minecraft:overworld] Thread[0]/INFO]: Batch Chunk Generator initialized
-[15:16:41] [DH-Request Module Ticker [minecraft:overworld] Thread[0]/INFO]: Set world gen queue for level [minecraft:overworld].
-[15:16:41] [Server thread/INFO]: Changing simulation distance to 12, from 0
-[15:16:42] [Render thread/INFO]: Loaded [0] waiting chunk wrappers.
-[15:16:42] [Render thread/INFO]: Started 10 worker threads
-[15:16:42] [Render thread/INFO]: Sent player skin to server: hunglo (Wide)
-[15:16:42] [Render thread/INFO]: [DH-CLIENT-CONNECT] ========== CLIENT ONLY CONNECTED ==========
-[15:16:42] [Render thread/INFO]: [DH-CLIENT-CONNECT] Thread: Render thread (ID: 3)
-[15:16:42] [Render thread/INFO]: [DH-CLIENT-CONNECT] Connected to dedicated server: false
-[15:16:42] [Render thread/INFO]: [DH-CLIENT-CONNECT] Connected to replay: false
-[15:16:42] [Render thread/INFO]: [DH-CLIENT-CONNECT] Not connected to dedicated server or replay - skipping DhClientWorld creation
-[15:16:42] [Render thread/INFO]: [DH-CLIENT-CONNECT] This is expected for integrated/singleplayer - world should be created by ServerApi
-[15:16:42] [Render thread/INFO]: Loaded [0] waiting chunk wrappers.
-[15:16:42] [Render thread/WARN]: Ignoring chat session from HungLo due to missing Services public key
-[15:16:42] [Render thread/INFO]: Loaded 37 advancements
-[15:16:42] [Render thread/WARN]: Error while parsing the block ID map entry for "block.10104":
-[15:16:42] [Render thread/WARN]: - The block minecraft:stone_slab has no property with the name variant, ignoring!
-[15:16:42] [Render thread/WARN]: Error while parsing the block ID map entry for "block.10944":
-[15:16:42] [Render thread/WARN]: - The block minecraft:creaking_heart has no property with the name active, ignoring!
-[15:16:42] [Render thread/WARN]: Error while parsing the block ID map entry for "block.10948":
-[15:16:42] [Render thread/WARN]: - The block minecraft:creaking_heart has no property with the name active, ignoring!
-[15:16:42] [Render thread/INFO]: Stopping worker threads
-[15:16:42] [Render thread/INFO]: Started 10 worker threads
-[15:16:42] [Render thread/INFO]: Resizing Dynamic Transforms UBO, capacity limit of 2 reached during a single frame. New capacity will be 4.
-[15:16:42] [Render thread/INFO]: Creating GLProxy... If this is the last message you see there must have been an OpenGL error.
-[15:16:42] [Render thread/INFO]: Lod Render OpenGL version [3.3.0 NVIDIA 580.95.05].
-[15:16:42] [Render thread/INFO]: minecraftGlCapabilities:
+[17:50:09] [Render thread/INFO]: Reloading ResourceManager: vanilla
+[17:50:09] [Worker-Main-19/INFO]: Found unifont_pua-16.0.03.hex, loading
+[17:50:09] [Worker-Main-17/INFO]: Found unifont_all_no_pua-16.0.03.hex, loading
+[17:50:09] [Worker-Main-14/INFO]: Found unifont_jp_patch-16.0.03.hex, loading
+[17:50:09] [Render thread/INFO]: Profile: MATTMC (+0 options changed by user)
+[17:50:10] [Render thread/INFO]: Using shaderpack: ComplementaryHungLoIfied.zip
+[17:50:10] [Render thread/INFO]: OpenAL initialized on device HT-S350
+[17:50:10] [Render thread/INFO]: Sound engine started
+[17:50:10] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/particles.png-atlas
+[17:50:10] [Render thread/INFO]: Created: 128x64x0 minecraft:textures/atlas/decorated_pot.png-atlas
+[17:50:10] [Render thread/INFO]: Created: 2048x1024x0 minecraft:textures/atlas/armor_trims.png-atlas
+[17:50:10] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/paintings.png-atlas
+[17:50:10] [Render thread/INFO]: Created: 512x512x0 minecraft:textures/atlas/shield_patterns.png-atlas
+[17:50:10] [Render thread/INFO]: Created: 1024x512x4 minecraft:textures/atlas/blocks.png-atlas
+[17:50:10] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/chest.png-atlas
+[17:50:10] [Render thread/INFO]: Created: 512x512x0 minecraft:textures/atlas/banner_patterns.png-atlas
+[17:50:10] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/beds.png-atlas
+[17:50:10] [Render thread/INFO]: Created: 1024x512x0 minecraft:textures/atlas/gui.png-atlas
+[17:50:10] [Render thread/INFO]: Created: 64x64x0 minecraft:textures/atlas/map_decorations.png-atlas
+[17:50:10] [Render thread/INFO]: Created: 256x256x0 minecraft:textures/atlas/signs.png-atlas
+[17:50:10] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/shulker_boxes.png-atlas
+[17:50:10] [Render thread/INFO]: Auto-updater has been disabled - no update checks will be performed
+[17:50:10] [Render thread/INFO]: Creating pipeline for dimension minecraft:overworld
+[17:50:11] [Render thread/WARN]: Type is VERTEX
+[17:50:11] [Render thread/WARN]: Type is FRAGMENT
+[17:50:11] [Render thread/WARN]: Type is VERTEX
+[17:50:11] [Render thread/WARN]: Type is FRAGMENT
+[17:50:11] [Render thread/WARN]: Type is VERTEX
+[17:50:11] [Render thread/WARN]: Type is FRAGMENT
+[17:50:22] [Render thread/INFO]: Loaded 1461 recipes
+[17:50:22] [Render thread/INFO]: Loaded 1574 advancements
+[17:50:22] [Server thread/INFO]: Started DhWorld of type CLIENT_SERVER
+[17:50:22] [Server thread/INFO]: Starting integrated minecraft server version 1.21.10
+[17:50:22] [Server thread/INFO]: Generating keypair
+[17:50:22] [DH-Full Data Migration Thread[0]/INFO]: No migration necessary.
+[17:50:22] [Server thread/INFO]: Started DhClientServerLevel for [Wrapped{ServerLevel[New World]@minecraft:overworld}] at [[LocalSaveStructure@(/home/matt/Documents/Repos/MattMC/run/saves/New World/data)]].
+[17:50:22] [DH-Full Data Migration Thread[0]/INFO]: No migration necessary.
+[17:50:22] [Server thread/INFO]: Started DhClientServerLevel for [Wrapped{ServerLevel[New World]@minecraft:the_end}] at [[LocalSaveStructure@(/home/matt/Documents/Repos/MattMC/run/saves/New World/data;/home/matt/Documents/Repos/MattMC/run/saves/New World/DIM1/data)]].
+[17:50:22] [DH-Full Data Migration Thread[0]/INFO]: No migration necessary.
+[17:50:22] [Server thread/INFO]: Started DhClientServerLevel for [Wrapped{ServerLevel[New World]@minecraft:primordial_caves}] at [[LocalSaveStructure@(/home/matt/Documents/Repos/MattMC/run/saves/New World/dimensions/minecraft/primordial_caves/data;/home/matt/Documents/Repos/MattMC/run/saves/New World/data;/home/matt/Documents/Repos/MattMC/run/saves/New World/DIM1/data)]].
+[17:50:22] [Server thread/INFO]: Started DhClientServerLevel for [Wrapped{ServerLevel[New World]@minecraft:the_nether}] at [[LocalSaveStructure@(/home/matt/Documents/Repos/MattMC/run/saves/New World/DIM-1/data;/home/matt/Documents/Repos/MattMC/run/saves/New World/dimensions/minecraft/primordial_caves/data;/home/matt/Documents/Repos/MattMC/run/saves/New World/data;/home/matt/Documents/Repos/MattMC/run/saves/New World/DIM1/data)]].
+[17:50:22] [DH-Full Data Migration Thread[0]/INFO]: No migration necessary.
+[17:50:22] [Server thread/INFO]: Loading 0 persistent chunks...
+[17:50:22] [Server thread/INFO]: Preparing spawn area: 16%
+[17:50:22] [Server thread/INFO]: Loading 49 chunks for player spawn...
+[17:50:23] [Server thread/INFO]: Preparing spawn area: 100%
+[17:50:23] [Server thread/INFO]: Time elapsed: 516 ms
+[17:50:23] [Server thread/INFO]: HungLo[local:E:aa2e9f4c] logged in with entity id 91 at (-623.6290268943777, 82.49390748022948, 158.0459490617798)
+[17:50:23] [Server thread/INFO]: Player [HungLo] joined.
+[17:50:23] [Render thread/INFO]: Reloading pipeline on dimension change: minecraft:overworld => minecraft:overworld
+[17:50:23] [Server thread/INFO]: HungLo joined the game
+[17:50:23] [Render thread/INFO]: Destroying pipeline minecraft:overworld
+[17:50:23] [Render thread/INFO]: Creating pipeline for dimension minecraft:overworld
+[17:50:23] [DH-Request Module Ticker [minecraft:overworld] Thread[0]/INFO]: Batch Chunk Generator initialized
+[17:50:23] [DH-Request Module Ticker [minecraft:overworld] Thread[0]/INFO]: Set world gen queue for level [minecraft:overworld].
+[17:50:23] [Server thread/INFO]: Changing simulation distance to 12, from 0
+[17:50:23] [Render thread/INFO]: Loaded [0] waiting chunk wrappers.
+[17:50:23] [Render thread/INFO]: Started 10 worker threads
+[17:50:23] [Render thread/INFO]: Sent player skin to server: hunglo (Wide)
+[17:50:23] [Render thread/INFO]: [DH-CLIENT-CONNECT] ========== CLIENT ONLY CONNECTED ==========
+[17:50:23] [Render thread/INFO]: [DH-CLIENT-CONNECT] Thread: Render thread (ID: 3)
+[17:50:23] [Render thread/INFO]: [DH-CLIENT-CONNECT] Connected to dedicated server: false
+[17:50:23] [Render thread/INFO]: [DH-CLIENT-CONNECT] Connected to replay: false
+[17:50:23] [Render thread/INFO]: [DH-CLIENT-CONNECT] Not connected to dedicated server or replay - skipping DhClientWorld creation
+[17:50:23] [Render thread/INFO]: [DH-CLIENT-CONNECT] This is expected for integrated/singleplayer - world should be created by ServerApi
+[17:50:23] [Render thread/INFO]: Loaded [0] waiting chunk wrappers.
+[17:50:23] [Render thread/WARN]: Ignoring chat session from HungLo due to missing Services public key
+[17:50:23] [Render thread/INFO]: Loaded 41 advancements
+[17:50:23] [Render thread/WARN]: Error while parsing the block ID map entry for "block.10104":
+[17:50:23] [Render thread/WARN]: - The block minecraft:stone_slab has no property with the name variant, ignoring!
+[17:50:23] [Render thread/WARN]: Error while parsing the block ID map entry for "block.10944":
+[17:50:23] [Render thread/WARN]: - The block minecraft:creaking_heart has no property with the name active, ignoring!
+[17:50:23] [Render thread/WARN]: Error while parsing the block ID map entry for "block.10948":
+[17:50:23] [Render thread/WARN]: - The block minecraft:creaking_heart has no property with the name active, ignoring!
+[17:50:23] [Render thread/INFO]: Stopping worker threads
+[17:50:23] [Render thread/INFO]: Started 10 worker threads
+[17:50:23] [Render thread/INFO]: Resizing Dynamic Transforms UBO, capacity limit of 2 reached during a single frame. New capacity will be 4.
+[17:50:23] [Render thread/INFO]: Creating GLProxy... If this is the last message you see there must have been an OpenGL error.
+[17:50:23] [Render thread/INFO]: Lod Render OpenGL version [3.3.0 NVIDIA 580.95.05].
+[17:50:23] [Render thread/INFO]: minecraftGlCapabilities:
 Your OpenGL support:
 openGL version 3.2+: [true] <- REQUIRED
 Vertex Attribute Buffer Binding: [true] <- optional improvement
 Buffer Storage: [true] <- optional improvement
 
-[15:16:42] [Render thread/INFO]: GPU Vendor [NVIDIA CORPORATION] with OS [Linux], Preferred upload method is [BUFFER_STORAGE].
-[15:16:42] [Render thread/INFO]: GLProxy creation successful. OpenGL smiles upon you this day.
 [LWJGL] [GL] Using KHR_debug for error logging.
 [LWJGL] [GL] Warning: A non-debug context may not produce any debug output.
-[15:16:42] [Render thread/INFO]: Resizing Dynamic Transforms UBO, capacity limit of 4 reached during a single frame. New capacity will be 8.
-[15:16:42] [Render thread/WARN]: Skipping DH render to prevent GL_INVALID_OPERATION during shader transition (shouldOverride=true but renderPass=OPAQUE_AND_TRANSPARENT)
-[15:16:42] [Render thread/INFO]: Setting up renderer
-[15:16:42] [Render thread/INFO]: Loading shader with type: [35633]
-[15:16:42] [Render thread/INFO]: Shader loaded sucessfully.
-[15:16:42] [Render thread/INFO]: Loading shader with type: [35632]
-[15:16:42] [Render thread/INFO]: Shader loaded sucessfully.
-[15:16:42] [Render thread/INFO]: Vertex Attribute (GL43+) completed. It contains 1 binding points and a stride size of 16
-[15:16:42] [Render thread/INFO]: Renderer setup complete
-[15:16:42] [Render thread/INFO]: Resizing Dynamic Transforms UBO, capacity limit of 8 reached during a single frame. New capacity will be 16.
-[15:16:42] [Render thread/INFO]: Loading shader with type: [35633]
-[15:16:42] [Render thread/INFO]: Shader loaded sucessfully.
-[15:16:42] [Render thread/INFO]: Loading shader with type: [35632]
-[15:16:42] [Render thread/INFO]: Shader loaded sucessfully.
-[15:16:42] [Render thread/INFO]: Vertex Attribute (GL43+) completed. It contains 1 binding points and a stride size of 12
-[15:16:42] [Render thread/INFO]: Loading shader with type: [35633]
-[15:16:42] [Render thread/INFO]: Shader loaded sucessfully.
-[15:16:42] [Render thread/INFO]: Loading shader with type: [35632]
-[15:16:42] [Render thread/INFO]: Shader loaded sucessfully.
-[15:16:42] [Render thread/INFO]: Vertex Attribute (GL43+) completed. It contains 1 binding points and a stride size of 12
-[15:16:43] [Render thread/ERROR]: Unreported exception thrown!
-java.lang.NullPointerException: Cannot read field "blockColors" because "modelBlockRenderer" is null
-	at knot/net.caffeinemc.mods.sodium.client.render.frapi.SodiumRenderer.render(SodiumRenderer.java:72) ~[MattMC-1.21.10.jar:?]
-	at knot/net.fabricmc.fabric.api.renderer.v1.render.FabricBlockModelRenderer.render(FabricBlockModelRenderer.java:41) ~[MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.renderer.block.BlockRenderDispatcher.renderBreakingTexture(BlockRenderDispatcher.java:60) ~[MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.renderer.LevelRenderer.renderBlockDestroyAnimation(LevelRenderer.java:1003) ~[MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.renderer.LevelRenderer.lambda$addMainPass$0(LevelRenderer.java:760) ~[MattMC-1.21.10.jar:?]
-	at knot/com.mojang.blaze3d.framegraph.FrameGraphBuilder.execute(FrameGraphBuilder.java:71) ~[MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.renderer.LevelRenderer.renderLevel(LevelRenderer.java:606) ~[MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.renderer.GameRenderer.renderLevel(GameRenderer.java:891) ~[MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.renderer.GameRenderer.render(GameRenderer.java:608) ~[MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.Minecraft.runTick(Minecraft.java:1352) ~[MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.Minecraft.run(Minecraft.java:945) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.main.Main.main(Main.java:262) [MattMC-1.21.10.jar:?]
-	at net.fabricmc.loader.impl.game.minecraft.MinecraftGameProvider.launch(MinecraftGameProvider.java:554) [MattMC-1.21.10.jar:1.21.10]
-	at net.fabricmc.loader.impl.launch.knot.Knot.launch(Knot.java:72) [MattMC-1.21.10.jar:1.21.10]
-	at net.fabricmc.loader.impl.launch.knot.KnotClient.main(KnotClient.java:23) [MattMC-1.21.10.jar:1.21.10]
-[15:16:44] [Server thread/INFO]: Stopping server
-[15:16:44] [Server thread/INFO]: Saving players
-[15:16:44] [Server thread/INFO]: Saving worlds
-[15:16:44] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:overworld
-[15:16:44] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:the_end
-[15:16:44] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:primordial_caves
-[15:16:44] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:the_nether
-[15:16:44] [Server thread/INFO]: ThreadedAnvilChunkStorage (New World): All chunks are saved
-[15:16:44] [Server thread/INFO]: ThreadedAnvilChunkStorage (DIM1): All chunks are saved
-[15:16:44] [Server thread/INFO]: ThreadedAnvilChunkStorage (primordial_caves): All chunks are saved
-[15:16:44] [Server thread/INFO]: ThreadedAnvilChunkStorage (DIM-1): All chunks are saved
-[15:16:44] [Server thread/INFO]: ThreadedAnvilChunkStorage: All dimensions are saved
-[15:16:45] [level shutdown/INFO]: Shutting down ClientRenderState
-[15:16:45] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[New World]@minecraft:the_nether}].
-[15:16:45] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[New World]@minecraft:the_end}].
-[15:16:45] [level shutdown/INFO]: Shutting down LodQuadTree...
-[15:16:45] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[New World]@minecraft:primordial_caves}].
-[15:16:45] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[New World]@minecraft:the_end}
-[15:16:45] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[New World]@minecraft:the_nether}
-[15:16:45] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[New World]@minecraft:primordial_caves}
-[15:16:45] [level shutdown/INFO]: Finished shutting down LodQuadTree
-[15:16:45] [level shutdown/INFO]: Closing world gen queue
-[15:16:45] [level shutdown/INFO]: Closing WorldGenerationQueue...
-[15:16:45] [level shutdown/INFO]: Shutting down world generator thread pool...
-[15:16:45] [level shutdown/INFO]: World generator thread pool shutdown with [0] incomplete tasks.
-[15:16:45] [level shutdown/INFO]: [BatchGenerator] shutting down...
-[15:16:45] [level shutdown/INFO]: Closing [BatchGenerationEnvironment]
-[15:16:45] [level shutdown/INFO]: Finished closing WorldGenerationQueue
-[15:16:45] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[New World]@minecraft:overworld}].
-[15:16:45] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[New World]@minecraft:overworld}
-[15:16:45] [Server thread/INFO]: Closed DhWorld of type [CLIENT_SERVER].
-[15:16:45] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[New World]@minecraft:overworld}].
-[15:16:45] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[New World]@minecraft:primordial_caves}].
-[15:16:45] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[New World]@minecraft:overworld}
-[15:16:45] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[New World]@minecraft:primordial_caves}
-[15:16:45] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[New World]@minecraft:the_nether}].
-[15:16:45] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[New World]@minecraft:the_nether}
-[15:16:45] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[New World]@minecraft:the_end}].
-[15:16:45] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[New World]@minecraft:the_end}
-[15:16:45] [Server thread/INFO]: Closed DhWorld of type [CLIENT_SERVER].
-[15:16:45] [Server thread/INFO]: Shutting down PriorityTaskPicker thread pool...
-[15:16:45] [Server thread/INFO]: Closing all [4] database connections...
-[15:16:45] [Server thread/INFO]: Closing database connection: [jdbc:sqlite:/home/matt/Documents/Repos/MattMC/run/saves/New World/DIM1/data/DistantHorizons.sqlite]
-[15:16:45] [Server thread/INFO]: Closing database connection: [jdbc:sqlite:/home/matt/Documents/Repos/MattMC/run/saves/New World/dimensions/minecraft/primordial_caves/data/DistantHorizons.sqlite]
-[15:16:45] [Server thread/INFO]: Closing database connection: [jdbc:sqlite:/home/matt/Documents/Repos/MattMC/run/saves/New World/data/DistantHorizons.sqlite]
-[15:16:45] [Server thread/INFO]: Closing database connection: [jdbc:sqlite:/home/matt/Documents/Repos/MattMC/run/saves/New World/DIM-1/data/DistantHorizons.sqlite]
-[15:16:45] [Render thread/ERROR]: Missing program minecraft:pipeline/panorama in Iris override list. This is likely an Iris bug!!!
-java.lang.Throwable: null
-	at knot/com.mojang.blaze3d.opengl.GlDevice.getOrCompilePipeline(GlDevice.java:351) [MattMC-1.21.10.jar:?]
-	at knot/com.mojang.blaze3d.opengl.GlRenderPass.setPipeline(GlRenderPass.java:77) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.renderer.CubeMap.render(CubeMap.java:64) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.renderer.PanoramaRenderer.render(PanoramaRenderer.java:29) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.gui.screens.Screen.renderPanorama(Screen.java:443) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.gui.screens.GenericMessageScreen.renderBackground(GenericMessageScreen.java:45) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.gui.screens.Screen.renderWithTooltipAndSubtitles(Screen.java:102) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.renderer.GameRenderer.render(GameRenderer.java:644) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.Minecraft.runTick(Minecraft.java:1352) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.Minecraft.setScreenAndShow(Minecraft.java:2244) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.Minecraft.disconnect(Minecraft.java:2196) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.Minecraft.disconnectWithSavingScreen(Minecraft.java:2151) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.Minecraft.emergencySave(Minecraft.java:1496) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.Minecraft.emergencySaveAndCrash(Minecraft.java:1024) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.Minecraft.run(Minecraft.java:982) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.main.Main.main(Main.java:262) [MattMC-1.21.10.jar:?]
-	at net.fabricmc.loader.impl.game.minecraft.MinecraftGameProvider.launch(MinecraftGameProvider.java:554) [MattMC-1.21.10.jar:1.21.10]
-	at net.fabricmc.loader.impl.launch.knot.Knot.launch(Knot.java:72) [MattMC-1.21.10.jar:1.21.10]
-	at net.fabricmc.loader.impl.launch.knot.KnotClient.main(KnotClient.java:23) [MattMC-1.21.10.jar:1.21.10]
-[15:16:45] [Render thread/ERROR]: Missing program minecraft:blur/0 in Iris override list. This is likely an Iris bug!!!
-java.lang.Throwable: null
-	at knot/com.mojang.blaze3d.opengl.GlDevice.getOrCompilePipeline(GlDevice.java:351) [MattMC-1.21.10.jar:?]
-	at knot/com.mojang.blaze3d.opengl.GlRenderPass.setPipeline(GlRenderPass.java:77) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.renderer.PostPass.lambda$addToFrame$1(PostPass.java:111) [MattMC-1.21.10.jar:?]
-	at knot/com.mojang.blaze3d.framegraph.FrameGraphBuilder.execute(FrameGraphBuilder.java:71) [MattMC-1.21.10.jar:?]
-	at knot/com.mojang.blaze3d.framegraph.FrameGraphBuilder.execute(FrameGraphBuilder.java:50) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.renderer.PostChain.process(PostChain.java:148) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.renderer.GameRenderer.processBlurEffect(GameRenderer.java:298) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.gui.render.GuiRenderer.draw(GuiRenderer.java:239) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.gui.render.GuiRenderer.render(GuiRenderer.java:154) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.renderer.GameRenderer.render(GameRenderer.java:707) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.Minecraft.runTick(Minecraft.java:1352) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.Minecraft.setScreenAndShow(Minecraft.java:2244) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.Minecraft.disconnect(Minecraft.java:2196) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.Minecraft.disconnectWithSavingScreen(Minecraft.java:2151) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.Minecraft.emergencySave(Minecraft.java:1496) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.Minecraft.emergencySaveAndCrash(Minecraft.java:1024) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.Minecraft.run(Minecraft.java:982) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.main.Main.main(Main.java:262) [MattMC-1.21.10.jar:?]
-	at net.fabricmc.loader.impl.game.minecraft.MinecraftGameProvider.launch(MinecraftGameProvider.java:554) [MattMC-1.21.10.jar:1.21.10]
-	at net.fabricmc.loader.impl.launch.knot.Knot.launch(Knot.java:72) [MattMC-1.21.10.jar:1.21.10]
-	at net.fabricmc.loader.impl.launch.knot.KnotClient.main(KnotClient.java:23) [MattMC-1.21.10.jar:1.21.10]
-[15:16:45] [Render thread/ERROR]: Missing program minecraft:blur/1 in Iris override list. This is likely an Iris bug!!!
-java.lang.Throwable: null
-	at knot/com.mojang.blaze3d.opengl.GlDevice.getOrCompilePipeline(GlDevice.java:351) [MattMC-1.21.10.jar:?]
-	at knot/com.mojang.blaze3d.opengl.GlRenderPass.setPipeline(GlRenderPass.java:77) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.renderer.PostPass.lambda$addToFrame$1(PostPass.java:111) [MattMC-1.21.10.jar:?]
-	at knot/com.mojang.blaze3d.framegraph.FrameGraphBuilder.execute(FrameGraphBuilder.java:71) [MattMC-1.21.10.jar:?]
-	at knot/com.mojang.blaze3d.framegraph.FrameGraphBuilder.execute(FrameGraphBuilder.java:50) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.renderer.PostChain.process(PostChain.java:148) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.renderer.GameRenderer.processBlurEffect(GameRenderer.java:298) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.gui.render.GuiRenderer.draw(GuiRenderer.java:239) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.gui.render.GuiRenderer.render(GuiRenderer.java:154) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.renderer.GameRenderer.render(GameRenderer.java:707) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.Minecraft.runTick(Minecraft.java:1352) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.Minecraft.setScreenAndShow(Minecraft.java:2244) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.Minecraft.disconnect(Minecraft.java:2196) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.Minecraft.disconnectWithSavingScreen(Minecraft.java:2151) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.Minecraft.emergencySave(Minecraft.java:1496) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.Minecraft.emergencySaveAndCrash(Minecraft.java:1024) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.Minecraft.run(Minecraft.java:982) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.main.Main.main(Main.java:262) [MattMC-1.21.10.jar:?]
-	at net.fabricmc.loader.impl.game.minecraft.MinecraftGameProvider.launch(MinecraftGameProvider.java:554) [MattMC-1.21.10.jar:1.21.10]
-	at net.fabricmc.loader.impl.launch.knot.Knot.launch(Knot.java:72) [MattMC-1.21.10.jar:1.21.10]
-	at net.fabricmc.loader.impl.launch.knot.KnotClient.main(KnotClient.java:23) [MattMC-1.21.10.jar:1.21.10]
-[15:16:45] [Render thread/ERROR]: Missing program minecraft:blur/2 in Iris override list. This is likely an Iris bug!!!
-java.lang.Throwable: null
-	at knot/com.mojang.blaze3d.opengl.GlDevice.getOrCompilePipeline(GlDevice.java:351) [MattMC-1.21.10.jar:?]
-	at knot/com.mojang.blaze3d.opengl.GlRenderPass.setPipeline(GlRenderPass.java:77) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.renderer.PostPass.lambda$addToFrame$1(PostPass.java:111) [MattMC-1.21.10.jar:?]
-	at knot/com.mojang.blaze3d.framegraph.FrameGraphBuilder.execute(FrameGraphBuilder.java:71) [MattMC-1.21.10.jar:?]
-	at knot/com.mojang.blaze3d.framegraph.FrameGraphBuilder.execute(FrameGraphBuilder.java:50) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.renderer.PostChain.process(PostChain.java:148) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.renderer.GameRenderer.processBlurEffect(GameRenderer.java:298) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.gui.render.GuiRenderer.draw(GuiRenderer.java:239) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.gui.render.GuiRenderer.render(GuiRenderer.java:154) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.renderer.GameRenderer.render(GameRenderer.java:707) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.Minecraft.runTick(Minecraft.java:1352) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.Minecraft.setScreenAndShow(Minecraft.java:2244) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.Minecraft.disconnect(Minecraft.java:2196) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.Minecraft.disconnectWithSavingScreen(Minecraft.java:2151) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.Minecraft.emergencySave(Minecraft.java:1496) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.Minecraft.emergencySaveAndCrash(Minecraft.java:1024) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.Minecraft.run(Minecraft.java:982) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.main.Main.main(Main.java:262) [MattMC-1.21.10.jar:?]
-	at net.fabricmc.loader.impl.game.minecraft.MinecraftGameProvider.launch(MinecraftGameProvider.java:554) [MattMC-1.21.10.jar:1.21.10]
-	at net.fabricmc.loader.impl.launch.knot.Knot.launch(Knot.java:72) [MattMC-1.21.10.jar:1.21.10]
-	at net.fabricmc.loader.impl.launch.knot.KnotClient.main(KnotClient.java:23) [MattMC-1.21.10.jar:1.21.10]
-[15:16:45] [Render thread/ERROR]: Missing program minecraft:blur/3 in Iris override list. This is likely an Iris bug!!!
-java.lang.Throwable: null
-	at knot/com.mojang.blaze3d.opengl.GlDevice.getOrCompilePipeline(GlDevice.java:351) [MattMC-1.21.10.jar:?]
-	at knot/com.mojang.blaze3d.opengl.GlRenderPass.setPipeline(GlRenderPass.java:77) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.renderer.PostPass.lambda$addToFrame$1(PostPass.java:111) [MattMC-1.21.10.jar:?]
-	at knot/com.mojang.blaze3d.framegraph.FrameGraphBuilder.execute(FrameGraphBuilder.java:71) [MattMC-1.21.10.jar:?]
-	at knot/com.mojang.blaze3d.framegraph.FrameGraphBuilder.execute(FrameGraphBuilder.java:50) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.renderer.PostChain.process(PostChain.java:148) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.renderer.GameRenderer.processBlurEffect(GameRenderer.java:298) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.gui.render.GuiRenderer.draw(GuiRenderer.java:239) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.gui.render.GuiRenderer.render(GuiRenderer.java:154) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.renderer.GameRenderer.render(GameRenderer.java:707) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.Minecraft.runTick(Minecraft.java:1352) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.Minecraft.setScreenAndShow(Minecraft.java:2244) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.Minecraft.disconnect(Minecraft.java:2196) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.Minecraft.disconnectWithSavingScreen(Minecraft.java:2151) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.Minecraft.emergencySave(Minecraft.java:1496) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.Minecraft.emergencySaveAndCrash(Minecraft.java:1024) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.Minecraft.run(Minecraft.java:982) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.main.Main.main(Main.java:262) [MattMC-1.21.10.jar:?]
-	at net.fabricmc.loader.impl.game.minecraft.MinecraftGameProvider.launch(MinecraftGameProvider.java:554) [MattMC-1.21.10.jar:1.21.10]
-	at net.fabricmc.loader.impl.launch.knot.Knot.launch(Knot.java:72) [MattMC-1.21.10.jar:1.21.10]
-	at net.fabricmc.loader.impl.launch.knot.KnotClient.main(KnotClient.java:23) [MattMC-1.21.10.jar:1.21.10]
-[15:16:45] [Render thread/ERROR]: Missing program minecraft:blur/4 in Iris override list. This is likely an Iris bug!!!
-java.lang.Throwable: null
-	at knot/com.mojang.blaze3d.opengl.GlDevice.getOrCompilePipeline(GlDevice.java:351) [MattMC-1.21.10.jar:?]
-	at knot/com.mojang.blaze3d.opengl.GlRenderPass.setPipeline(GlRenderPass.java:77) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.renderer.PostPass.lambda$addToFrame$1(PostPass.java:111) [MattMC-1.21.10.jar:?]
-	at knot/com.mojang.blaze3d.framegraph.FrameGraphBuilder.execute(FrameGraphBuilder.java:71) [MattMC-1.21.10.jar:?]
-	at knot/com.mojang.blaze3d.framegraph.FrameGraphBuilder.execute(FrameGraphBuilder.java:50) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.renderer.PostChain.process(PostChain.java:148) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.renderer.GameRenderer.processBlurEffect(GameRenderer.java:298) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.gui.render.GuiRenderer.draw(GuiRenderer.java:239) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.gui.render.GuiRenderer.render(GuiRenderer.java:154) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.renderer.GameRenderer.render(GameRenderer.java:707) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.Minecraft.runTick(Minecraft.java:1352) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.Minecraft.setScreenAndShow(Minecraft.java:2244) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.Minecraft.disconnect(Minecraft.java:2196) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.Minecraft.disconnectWithSavingScreen(Minecraft.java:2151) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.Minecraft.emergencySave(Minecraft.java:1496) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.Minecraft.emergencySaveAndCrash(Minecraft.java:1024) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.Minecraft.run(Minecraft.java:982) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.main.Main.main(Main.java:262) [MattMC-1.21.10.jar:?]
-	at net.fabricmc.loader.impl.game.minecraft.MinecraftGameProvider.launch(MinecraftGameProvider.java:554) [MattMC-1.21.10.jar:1.21.10]
-	at net.fabricmc.loader.impl.launch.knot.Knot.launch(Knot.java:72) [MattMC-1.21.10.jar:1.21.10]
-	at net.fabricmc.loader.impl.launch.knot.KnotClient.main(KnotClient.java:23) [MattMC-1.21.10.jar:1.21.10]
-[15:16:45] [Render thread/ERROR]: Missing program minecraft:blur/5 in Iris override list. This is likely an Iris bug!!!
-java.lang.Throwable: null
-	at knot/com.mojang.blaze3d.opengl.GlDevice.getOrCompilePipeline(GlDevice.java:351) [MattMC-1.21.10.jar:?]
-	at knot/com.mojang.blaze3d.opengl.GlRenderPass.setPipeline(GlRenderPass.java:77) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.renderer.PostPass.lambda$addToFrame$1(PostPass.java:111) [MattMC-1.21.10.jar:?]
-	at knot/com.mojang.blaze3d.framegraph.FrameGraphBuilder.execute(FrameGraphBuilder.java:71) [MattMC-1.21.10.jar:?]
-	at knot/com.mojang.blaze3d.framegraph.FrameGraphBuilder.execute(FrameGraphBuilder.java:50) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.renderer.PostChain.process(PostChain.java:148) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.renderer.GameRenderer.processBlurEffect(GameRenderer.java:298) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.gui.render.GuiRenderer.draw(GuiRenderer.java:239) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.gui.render.GuiRenderer.render(GuiRenderer.java:154) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.renderer.GameRenderer.render(GameRenderer.java:707) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.Minecraft.runTick(Minecraft.java:1352) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.Minecraft.setScreenAndShow(Minecraft.java:2244) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.Minecraft.disconnect(Minecraft.java:2196) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.Minecraft.disconnectWithSavingScreen(Minecraft.java:2151) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.Minecraft.emergencySave(Minecraft.java:1496) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.Minecraft.emergencySaveAndCrash(Minecraft.java:1024) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.Minecraft.run(Minecraft.java:982) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.main.Main.main(Main.java:262) [MattMC-1.21.10.jar:?]
-	at net.fabricmc.loader.impl.game.minecraft.MinecraftGameProvider.launch(MinecraftGameProvider.java:554) [MattMC-1.21.10.jar:1.21.10]
-	at net.fabricmc.loader.impl.launch.knot.Knot.launch(Knot.java:72) [MattMC-1.21.10.jar:1.21.10]
-	at net.fabricmc.loader.impl.launch.knot.KnotClient.main(KnotClient.java:23) [MattMC-1.21.10.jar:1.21.10]
-[15:16:45] [Render thread/ERROR]: Missing program minecraft:pipeline/gui_textured in Iris override list. This is likely an Iris bug!!!
-java.lang.Throwable: null
-	at knot/com.mojang.blaze3d.opengl.GlDevice.getOrCompilePipeline(GlDevice.java:351) [MattMC-1.21.10.jar:?]
-	at knot/com.mojang.blaze3d.opengl.GlRenderPass.setPipeline(GlRenderPass.java:77) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.gui.render.GuiRenderer.executeDraw(GuiRenderer.java:622) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.gui.render.GuiRenderer.executeDrawRange(GuiRenderer.java:272) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.gui.render.GuiRenderer.draw(GuiRenderer.java:240) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.gui.render.GuiRenderer.render(GuiRenderer.java:154) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.renderer.GameRenderer.render(GameRenderer.java:707) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.Minecraft.runTick(Minecraft.java:1352) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.Minecraft.setScreenAndShow(Minecraft.java:2244) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.Minecraft.disconnect(Minecraft.java:2196) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.Minecraft.disconnectWithSavingScreen(Minecraft.java:2151) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.Minecraft.emergencySave(Minecraft.java:1496) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.Minecraft.emergencySaveAndCrash(Minecraft.java:1024) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.Minecraft.run(Minecraft.java:982) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.main.Main.main(Main.java:262) [MattMC-1.21.10.jar:?]
-	at net.fabricmc.loader.impl.game.minecraft.MinecraftGameProvider.launch(MinecraftGameProvider.java:554) [MattMC-1.21.10.jar:1.21.10]
-	at net.fabricmc.loader.impl.launch.knot.Knot.launch(Knot.java:72) [MattMC-1.21.10.jar:1.21.10]
-	at net.fabricmc.loader.impl.launch.knot.KnotClient.main(KnotClient.java:23) [MattMC-1.21.10.jar:1.21.10]
-[15:16:45] [Render thread/ERROR]: Missing program minecraft:pipeline/gui in Iris override list. This is likely an Iris bug!!!
-java.lang.Throwable: null
-	at knot/com.mojang.blaze3d.opengl.GlDevice.getOrCompilePipeline(GlDevice.java:351) [MattMC-1.21.10.jar:?]
-	at knot/com.mojang.blaze3d.opengl.GlRenderPass.setPipeline(GlRenderPass.java:77) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.gui.render.GuiRenderer.executeDraw(GuiRenderer.java:622) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.gui.render.GuiRenderer.executeDrawRange(GuiRenderer.java:272) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.gui.render.GuiRenderer.draw(GuiRenderer.java:240) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.gui.render.GuiRenderer.render(GuiRenderer.java:154) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.renderer.GameRenderer.render(GameRenderer.java:707) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.Minecraft.runTick(Minecraft.java:1352) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.Minecraft.setScreenAndShow(Minecraft.java:2244) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.Minecraft.disconnect(Minecraft.java:2196) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.Minecraft.disconnectWithSavingScreen(Minecraft.java:2151) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.Minecraft.emergencySave(Minecraft.java:1496) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.Minecraft.emergencySaveAndCrash(Minecraft.java:1024) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.Minecraft.run(Minecraft.java:982) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.main.Main.main(Main.java:262) [MattMC-1.21.10.jar:?]
-	at net.fabricmc.loader.impl.game.minecraft.MinecraftGameProvider.launch(MinecraftGameProvider.java:554) [MattMC-1.21.10.jar:1.21.10]
-	at net.fabricmc.loader.impl.launch.knot.Knot.launch(Knot.java:72) [MattMC-1.21.10.jar:1.21.10]
-	at net.fabricmc.loader.impl.launch.knot.KnotClient.main(KnotClient.java:23) [MattMC-1.21.10.jar:1.21.10]
-[15:16:45] [Render thread/ERROR]: Missing program minecraft:pipeline/gui_text in Iris override list. This is likely an Iris bug!!!
-java.lang.Throwable: null
-	at knot/com.mojang.blaze3d.opengl.GlDevice.getOrCompilePipeline(GlDevice.java:351) [MattMC-1.21.10.jar:?]
-	at knot/com.mojang.blaze3d.opengl.GlRenderPass.setPipeline(GlRenderPass.java:77) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.gui.render.GuiRenderer.executeDraw(GuiRenderer.java:622) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.gui.render.GuiRenderer.executeDrawRange(GuiRenderer.java:272) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.gui.render.GuiRenderer.draw(GuiRenderer.java:240) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.gui.render.GuiRenderer.render(GuiRenderer.java:154) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.renderer.GameRenderer.render(GameRenderer.java:707) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.Minecraft.runTick(Minecraft.java:1352) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.Minecraft.setScreenAndShow(Minecraft.java:2244) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.Minecraft.disconnect(Minecraft.java:2196) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.Minecraft.disconnectWithSavingScreen(Minecraft.java:2151) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.Minecraft.emergencySave(Minecraft.java:1496) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.Minecraft.emergencySaveAndCrash(Minecraft.java:1024) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.Minecraft.run(Minecraft.java:982) [MattMC-1.21.10.jar:?]
-	at knot/net.minecraft.client.main.Main.main(Main.java:262) [MattMC-1.21.10.jar:?]
-	at net.fabricmc.loader.impl.game.minecraft.MinecraftGameProvider.launch(MinecraftGameProvider.java:554) [MattMC-1.21.10.jar:1.21.10]
-	at net.fabricmc.loader.impl.launch.knot.Knot.launch(Knot.java:72) [MattMC-1.21.10.jar:1.21.10]
-	at net.fabricmc.loader.impl.launch.knot.KnotClient.main(KnotClient.java:23) [MattMC-1.21.10.jar:1.21.10]
-[15:16:45] [Render thread/INFO]: Unloading client level [ClientLevelWrapper]-[9p2b15v5d28je@minecraft:overworld].
-[15:16:45] [Render thread/INFO]: Stopping worker threads
----- Minecraft Crash Report ----
-// Don't be sad. I'll do better next time, I promise!
-
-Time: 2026-01-04 15:16:45
-Description: Unexpected error
-
-java.lang.NullPointerException: Cannot read field "blockColors" because "modelBlockRenderer" is null
-	at knot//net.caffeinemc.mods.sodium.client.render.frapi.SodiumRenderer.render(SodiumRenderer.java:72)
-	at knot//net.fabricmc.fabric.api.renderer.v1.render.FabricBlockModelRenderer.render(FabricBlockModelRenderer.java:41)
-	at knot//net.minecraft.client.renderer.block.BlockRenderDispatcher.renderBreakingTexture(BlockRenderDispatcher.java:60)
-	at knot//net.minecraft.client.renderer.LevelRenderer.renderBlockDestroyAnimation(LevelRenderer.java:1003)
-	at knot//net.minecraft.client.renderer.LevelRenderer.lambda$addMainPass$0(LevelRenderer.java:760)
-	at knot//com.mojang.blaze3d.framegraph.FrameGraphBuilder.execute(FrameGraphBuilder.java:71)
-	at knot//net.minecraft.client.renderer.LevelRenderer.renderLevel(LevelRenderer.java:606)
-	at knot//net.minecraft.client.renderer.GameRenderer.renderLevel(GameRenderer.java:891)
-	at knot//net.minecraft.client.renderer.GameRenderer.render(GameRenderer.java:608)
-	at knot//net.minecraft.client.Minecraft.runTick(Minecraft.java:1352)
-	at knot//net.minecraft.client.Minecraft.run(Minecraft.java:945)
-	at knot//net.minecraft.client.main.Main.main(Main.java:262)
-	at net.fabricmc.loader.impl.game.minecraft.MinecraftGameProvider.launch(MinecraftGameProvider.java:554)
-	at net.fabricmc.loader.impl.launch.knot.Knot.launch(Knot.java:72)
-	at net.fabricmc.loader.impl.launch.knot.KnotClient.main(KnotClient.java:23)
-
-
-A detailed walkthrough of the error, its code path and all known details is as follows:
----------------------------------------------------------------------------------------
-
--- Head --
-Thread: Render thread
-Stacktrace:
-	at knot//net.caffeinemc.mods.sodium.client.render.frapi.SodiumRenderer.render(SodiumRenderer.java:72)
-	at knot//net.fabricmc.fabric.api.renderer.v1.render.FabricBlockModelRenderer.render(FabricBlockModelRenderer.java:41)
-	at knot//net.minecraft.client.renderer.block.BlockRenderDispatcher.renderBreakingTexture(BlockRenderDispatcher.java:60)
-	at knot//net.minecraft.client.renderer.LevelRenderer.renderBlockDestroyAnimation(LevelRenderer.java:1003)
-	at knot//net.minecraft.client.renderer.LevelRenderer.lambda$addMainPass$0(LevelRenderer.java:760)
-	at knot//com.mojang.blaze3d.framegraph.FrameGraphBuilder.execute(FrameGraphBuilder.java:71)
-	at knot//net.minecraft.client.renderer.LevelRenderer.renderLevel(LevelRenderer.java:606)
-	at knot//net.minecraft.client.renderer.GameRenderer.renderLevel(GameRenderer.java:891)
-
--- Uptime --
-Details:
-	JVM uptime: 44.650s
-	Wall uptime: 41.328s
-	High-res time: 41.005s
-	Client ticks: 752 ticks / 37.600s
-Stacktrace:
-	at knot//net.minecraft.client.Minecraft.fillReport(Minecraft.java:2373)
-	at knot//net.minecraft.client.Minecraft.emergencySaveAndCrash(Minecraft.java:1023)
-	at knot//net.minecraft.client.Minecraft.run(Minecraft.java:982)
-	at knot//net.minecraft.client.main.Main.main(Main.java:262)
-	at net.fabricmc.loader.impl.game.minecraft.MinecraftGameProvider.launch(MinecraftGameProvider.java:554)
-	at net.fabricmc.loader.impl.launch.knot.Knot.launch(Knot.java:72)
-	at net.fabricmc.loader.impl.launch.knot.KnotClient.main(KnotClient.java:23)
-
--- Affected level --
-Details:
-	All players: 1 total; LocalPlayer{name=HungLo, id=b63c1160-7834-3764-9276-2fb9c5acd6ce, pos=(-72.93902242797618, 113.0, -84.69999998807907), mode=SURVIVAL, permission=4}
-	Chunk stats: 729, 473
-	Level dimension: minecraft:overworld
-	Level spawn location: World: (28,69,7), Section: (at 12,5,7 in 1,4,0; chunk contains blocks 16,-64,0 to 31,319,15), Region: (0,0; contains chunks 0,0 to 31,31, blocks 0,-64,0 to 511,319,511)
-	Level time: 26094 game time, 10636 day time
-	Server brand: fabric
-	Server type: Integrated singleplayer server
-	Tracked entity count: 171
-
--- Last reload --
-Details:
-	Reload number: 1
-	Reload reason: initial
-	Finished: Yes
-	Packs: vanilla
-
--- System Details --
-Details:
-	Minecraft Version: 1.21.10
-	Minecraft Version ID: 1.21.10
-	Operating System: Linux (amd64) version 6.14.0-37-generic
-	Java Version: 25.0.1, Eclipse Adoptium
-	Java VM Version: OpenJDK 64-Bit Server VM (mixed mode, sharing), Eclipse Adoptium
-	Memory: 2661285888 bytes (2538 MiB) / 4294967296 bytes (4096 MiB) up to 8589934592 bytes (8192 MiB)
-	CPUs: 20
-	Processor Vendor: GenuineIntel
-	Processor Name: 12th Gen Intel(R) Core(TM) i7-12700K
-	Identifier: Intel64 Family 6 Model 151 Stepping 2
-	Microarchitecture: Alder Lake
-	Frequency (GHz): 4.90
-	Number of physical packages: 1
-	Number of physical CPUs: 12
-	Number of logical CPUs: 20
-	Graphics card #0 name: GA102 [GeForce RTX 3080 Ti]
-	Graphics card #0 vendor: NVIDIA Corporation (0x10de)
-	Graphics card #0 VRAM (MiB): 16416.00
-	Graphics card #0 deviceId: 0x2208
-	Graphics card #0 versionInfo: unknown
-	Virtual memory max (MiB): 32300.84
-	Virtual memory used (MiB): 31796.08
-	Swap memory total (MiB): 16384.00
-	Swap memory used (MiB): 10043.53
-	Space in storage for jna.tmpdir (MiB): <path not set>
-	Space in storage for org.lwjgl.system.SharedLibraryExtractPath (MiB): <path not set>
-	Space in storage for io.netty.native.workdir (MiB): <path not set>
-	Space in storage for java.io.tmpdir (MiB): available: 14347.32, total: 15916.84
-	Space in storage for workdir (MiB): available: 270400.47, total: 937500.69
-	JVM Flags: 4 total; -XX:+UseZGC -XX:+UseCompactObjectHeaders -Xms4G -Xmx8G
-	Debug Flags: 0 total; 
-	Loaded Shaderpack: ComplementaryHungLoIfied.zip
-		Profile: MATTMC (+0 options changed by user)
-	Launched Version: 1.21.10
-	Backend library: LWJGL version 3.3.3-snapshot
-	Backend API: NVIDIA GeForce RTX 3080 Ti/PCIe/SSE2 GL version 3.3.0 NVIDIA 580.95.05, NVIDIA Corporation
-	Window size: 1920x1080
-	GFLW Platform: x11
-	Render Extensions: GL_ARB_buffer_storage, GL_KHR_debug, GL_ARB_vertex_attrib_binding, GL_ARB_direct_state_access
-	GL debug messages: 
-	Is Modded: Definitely; Client brand changed to 'fabric'; Server brand changed to 'fabric'
-	Universe: 400921fb54442d18
-	Type: Integrated Server (map_client.txt)
-	Graphics mode: fancy
-	Render Distance: 10/10 chunks
-	Resource Packs: vanilla
-	Current Language: en_us
-	Locale: en_US
-	System encoding: UTF-8
-	File encoding: UTF-8
-	CPU: 20x 12th Gen Intel(R) Core(TM) i7-12700K
-	Server Running: true
-	Player Count: 1 / 8; [ServerPlayer['HungLo'/69, l='ServerLevel[New World]', x=-72.94, y=113.00, z=-84.70]]
-	Active Data Packs: vanilla
-	Available Data Packs: minecart_improvements, redstone_experiments, trade_rebalance, vanilla
-	Enabled Feature Flags: minecraft:vanilla
-	World Generation: Stable
-	World Seed: 7681151486149180170
-	Suppressed Exceptions: ~~NONE~~
-#@!@# Game crashed! Crash report saved to: #@!@# /home/matt/Documents/Repos/MattMC/run/crash-reports/crash-2026-01-04_15.16.45-client.txt
-
-> Task :runClient FAILED
+[17:50:23] [Render thread/INFO]: GPU Vendor [NVIDIA CORPORATION] with OS [Linux], Preferred upload method is [BUFFER_STORAGE].
+[17:50:23] [Render thread/INFO]: GLProxy creation successful. OpenGL smiles upon you this day.
+[17:50:23] [Render thread/WARN]: Skipping DH render to prevent GL_INVALID_OPERATION during shader transition (shouldOverride=true but renderPass=OPAQUE_AND_TRANSPARENT)
+[17:50:23] [Render thread/INFO]: Resizing Dynamic Transforms UBO, capacity limit of 4 reached during a single frame. New capacity will be 8.
+[17:50:23] [Render thread/INFO]: Setting up renderer
+[17:50:23] [Render thread/INFO]: Loading shader with type: [35633]
+[17:50:23] [Render thread/INFO]: Shader loaded sucessfully.
+[17:50:23] [Render thread/INFO]: Loading shader with type: [35632]
+[17:50:23] [Render thread/INFO]: Shader loaded sucessfully.
+[17:50:23] [Render thread/INFO]: Vertex Attribute (GL43+) completed. It contains 1 binding points and a stride size of 16
+[17:50:23] [Render thread/INFO]: Renderer setup complete
+[17:50:24] [Render thread/INFO]: Loading shader with type: [35633]
+[17:50:24] [Render thread/INFO]: Shader loaded sucessfully.
+[17:50:24] [Render thread/INFO]: Loading shader with type: [35632]
+[17:50:24] [Render thread/INFO]: Shader loaded sucessfully.
+[17:50:24] [Render thread/INFO]: Vertex Attribute (GL43+) completed. It contains 1 binding points and a stride size of 12
+[17:50:24] [Render thread/INFO]: Loading shader with type: [35633]
+[17:50:24] [Render thread/INFO]: Shader loaded sucessfully.
+[17:50:24] [Render thread/INFO]: Loading shader with type: [35632]
+[17:50:24] [Render thread/INFO]: Shader loaded sucessfully.
+[17:50:24] [Render thread/INFO]: Vertex Attribute (GL43+) completed. It contains 1 binding points and a stride size of 12
+[17:50:24] [Render thread/INFO]: Resizing Dynamic Transforms UBO, capacity limit of 8 reached during a single frame. New capacity will be 16.
+[17:50:28] [Render thread/INFO]: [STDOUT]: === JEI CLICK DEBUG ===
+[17:50:28] [Render thread/INFO]: [STDOUT]: Shift down: false
+[17:50:28] [Render thread/INFO]: [STDOUT]: Item to add: minecraft:mangrove_button x1
+[17:50:28] [Render thread/INFO]: [STDOUT]: addItemToInventorySafe called:
+[17:50:28] [Render thread/INFO]: [STDOUT]:   Item: minecraft:mangrove_button
+[17:50:28] [Render thread/INFO]: [STDOUT]:   Initial count: 1
+[17:50:28] [Render thread/INFO]: [STDOUT]:   Is shift click: false
+[17:50:28] [Render thread/INFO]: [STDOUT]:   Container slots: 46
+[17:50:28] [Render thread/INFO]: [STDOUT]:   Slot 5: SKIPPED (ArmorSlot)
+[17:50:28] [Render thread/INFO]: [STDOUT]:   Slot 6: SKIPPED (ArmorSlot)
+[17:50:28] [Render thread/INFO]: [STDOUT]:   Slot 7: SKIPPED (ArmorSlot)
+[17:50:28] [Render thread/INFO]: [STDOUT]:   Slot 8: SKIPPED (ArmorSlot)
+[17:50:28] [Render thread/INFO]: [STDOUT]:   Phase 1 complete, remaining: 1
+[17:50:28] [Render thread/INFO]: [STDOUT]:   Slot 5: SKIPPED (ArmorSlot in phase 2)
+[17:50:28] [Render thread/INFO]: [STDOUT]:   Slot 6: SKIPPED (ArmorSlot in phase 2)
+[17:50:28] [Render thread/INFO]: [STDOUT]:   Slot 7: SKIPPED (ArmorSlot in phase 2)
+[17:50:28] [Render thread/INFO]: [STDOUT]:   Slot 8: SKIPPED (ArmorSlot in phase 2)
+[17:50:28] [Render thread/INFO]: [STDOUT]:   Slot 18: Empty, adding 1 items
+[17:50:28] [Render thread/INFO]: [STDOUT]:     Remaining: 0
+[17:50:28] [Render thread/INFO]: [STDOUT]:     Regular click - returning immediately
+[17:50:28] [Render thread/INFO]: [STDOUT]: === JEI CLICK DEBUG ===
+[17:50:28] [Render thread/INFO]: [STDOUT]: Shift down: false
+[17:50:28] [Render thread/INFO]: [STDOUT]: Item to add: minecraft:mangrove_button x1
+[17:50:28] [Render thread/INFO]: [STDOUT]: addItemToInventorySafe called:
+[17:50:28] [Render thread/INFO]: [STDOUT]:   Item: minecraft:mangrove_button
+[17:50:28] [Render thread/INFO]: [STDOUT]:   Initial count: 1
+[17:50:28] [Render thread/INFO]: [STDOUT]:   Is shift click: false
+[17:50:28] [Render thread/INFO]: [STDOUT]:   Container slots: 46
+[17:50:28] [Render thread/INFO]: [STDOUT]:   Slot 5: SKIPPED (ArmorSlot)
+[17:50:28] [Render thread/INFO]: [STDOUT]:   Slot 6: SKIPPED (ArmorSlot)
+[17:50:28] [Render thread/INFO]: [STDOUT]:   Slot 7: SKIPPED (ArmorSlot)
+[17:50:28] [Render thread/INFO]: [STDOUT]:   Slot 8: SKIPPED (ArmorSlot)
+[17:50:28] [Render thread/INFO]: [STDOUT]:   Slot 18: Has matching item minecraft:mangrove_button (1/64), space: 63
+[17:50:28] [Render thread/INFO]: [STDOUT]:     Adding 1 items to slot 18 (new count: 2)
+[17:50:28] [Render thread/INFO]: [STDOUT]:     Remaining: 0
+[17:50:28] [Render thread/INFO]: [STDOUT]:     Regular click - returning immediately
+[17:50:28] [Render thread/INFO]: [STDOUT]: === JEI CLICK DEBUG ===
+[17:50:28] [Render thread/INFO]: [STDOUT]: Shift down: false
+[17:50:28] [Render thread/INFO]: [STDOUT]: Item to add: minecraft:mangrove_button x1
+[17:50:28] [Render thread/INFO]: [STDOUT]: addItemToInventorySafe called:
+[17:50:28] [Render thread/INFO]: [STDOUT]:   Item: minecraft:mangrove_button
+[17:50:28] [Render thread/INFO]: [STDOUT]:   Initial count: 1
+[17:50:28] [Render thread/INFO]: [STDOUT]:   Is shift click: false
+[17:50:28] [Render thread/INFO]: [STDOUT]:   Container slots: 46
+[17:50:28] [Render thread/INFO]: [STDOUT]:   Slot 5: SKIPPED (ArmorSlot)
+[17:50:28] [Render thread/INFO]: [STDOUT]:   Slot 6: SKIPPED (ArmorSlot)
+[17:50:28] [Render thread/INFO]: [STDOUT]:   Slot 7: SKIPPED (ArmorSlot)
+[17:50:28] [Render thread/INFO]: [STDOUT]:   Slot 8: SKIPPED (ArmorSlot)
+[17:50:28] [Render thread/INFO]: [STDOUT]:   Slot 18: Has matching item minecraft:mangrove_button (3/64), space: 61
+[17:50:28] [Render thread/INFO]: [STDOUT]:     Adding 1 items to slot 18 (new count: 4)
+[17:50:28] [Render thread/INFO]: [STDOUT]:     Remaining: 0
+[17:50:28] [Render thread/INFO]: [STDOUT]:     Regular click - returning immediately
+[17:50:29] [Render thread/INFO]: [STDOUT]: === JEI CLICK DEBUG ===
+[17:50:29] [Render thread/INFO]: [STDOUT]: Shift down: true
+[17:50:29] [Render thread/INFO]: [STDOUT]: Item to add: minecraft:mangrove_button x64
+[17:50:29] [Render thread/INFO]: [STDOUT]: addItemToInventorySafe called:
+[17:50:29] [Render thread/INFO]: [STDOUT]:   Item: minecraft:mangrove_button
+[17:50:29] [Render thread/INFO]: [STDOUT]:   Initial count: 64
+[17:50:29] [Render thread/INFO]: [STDOUT]:   Is shift click: true
+[17:50:29] [Render thread/INFO]: [STDOUT]:   Container slots: 46
+[17:50:29] [Render thread/INFO]: [STDOUT]:   Slot 5: SKIPPED (ArmorSlot)
+[17:50:29] [Render thread/INFO]: [STDOUT]:   Slot 6: SKIPPED (ArmorSlot)
+[17:50:29] [Render thread/INFO]: [STDOUT]:   Slot 7: SKIPPED (ArmorSlot)
+[17:50:29] [Render thread/INFO]: [STDOUT]:   Slot 8: SKIPPED (ArmorSlot)
+[17:50:29] [Render thread/INFO]: [STDOUT]:   Slot 18: Has matching item minecraft:mangrove_button (7/64), space: 57
+[17:50:29] [Render thread/INFO]: [STDOUT]:     Adding 57 items to slot 18 (new count: 64)
+[17:50:29] [Render thread/INFO]: [STDOUT]:     Remaining: 7
+[17:50:29] [Render thread/INFO]: [STDOUT]:   Phase 1 complete, remaining: 7
+[17:50:29] [Render thread/INFO]: [STDOUT]:   Slot 5: SKIPPED (ArmorSlot in phase 2)
+[17:50:29] [Render thread/INFO]: [STDOUT]:   Slot 6: SKIPPED (ArmorSlot in phase 2)
+[17:50:29] [Render thread/INFO]: [STDOUT]:   Slot 7: SKIPPED (ArmorSlot in phase 2)
+[17:50:29] [Render thread/INFO]: [STDOUT]:   Slot 8: SKIPPED (ArmorSlot in phase 2)
+[17:50:29] [Render thread/INFO]: [STDOUT]:   Slot 19: Empty, adding 7 items
+[17:50:29] [Render thread/INFO]: [STDOUT]:     Remaining: 0
+[17:50:29] [Render thread/INFO]: [STDOUT]:   Phase 2 complete, final remaining: 0
+[17:50:29] [Render thread/INFO]: [STDOUT]: === END DEBUG ===
+[17:50:29] [Render thread/INFO]: [STDOUT]: === JEI CLICK DEBUG ===
+[17:50:29] [Render thread/INFO]: [STDOUT]: Shift down: true
+[17:50:29] [Render thread/INFO]: [STDOUT]: Item to add: minecraft:mangrove_button x64
+[17:50:29] [Render thread/INFO]: [STDOUT]: addItemToInventorySafe called:
+[17:50:29] [Render thread/INFO]: [STDOUT]:   Item: minecraft:mangrove_button
+[17:50:29] [Render thread/INFO]: [STDOUT]:   Initial count: 64
+[17:50:29] [Render thread/INFO]: [STDOUT]:   Is shift click: true
+[17:50:29] [Render thread/INFO]: [STDOUT]:   Container slots: 46
+[17:50:29] [Render thread/INFO]: [STDOUT]:   Slot 5: SKIPPED (ArmorSlot)
+[17:50:29] [Render thread/INFO]: [STDOUT]:   Slot 6: SKIPPED (ArmorSlot)
+[17:50:29] [Render thread/INFO]: [STDOUT]:   Slot 7: SKIPPED (ArmorSlot)
+[17:50:29] [Render thread/INFO]: [STDOUT]:   Slot 8: SKIPPED (ArmorSlot)
+[17:50:29] [Render thread/INFO]: [STDOUT]:   Slot 18: Has matching item minecraft:mangrove_button (64/64), space: 0
+[17:50:29] [Render thread/INFO]: [STDOUT]:   Slot 19: Has matching item minecraft:mangrove_button (7/64), space: 57
+[17:50:29] [Render thread/INFO]: [STDOUT]:     Adding 57 items to slot 19 (new count: 64)
+[17:50:29] [Render thread/INFO]: [STDOUT]:     Remaining: 7
+[17:50:29] [Render thread/INFO]: [STDOUT]:   Phase 1 complete, remaining: 7
+[17:50:29] [Render thread/INFO]: [STDOUT]:   Slot 5: SKIPPED (ArmorSlot in phase 2)
+[17:50:29] [Render thread/INFO]: [STDOUT]:   Slot 6: SKIPPED (ArmorSlot in phase 2)
+[17:50:29] [Render thread/INFO]: [STDOUT]:   Slot 7: SKIPPED (ArmorSlot in phase 2)
+[17:50:29] [Render thread/INFO]: [STDOUT]:   Slot 8: SKIPPED (ArmorSlot in phase 2)
+[17:50:29] [Render thread/INFO]: [STDOUT]:   Slot 20: Empty, adding 7 items
+[17:50:29] [Render thread/INFO]: [STDOUT]:     Remaining: 0
+[17:50:29] [Render thread/INFO]: [STDOUT]:   Phase 2 complete, final remaining: 0
+[17:50:29] [Render thread/INFO]: [STDOUT]: === END DEBUG ===
+[17:50:29] [Render thread/INFO]: [STDOUT]: === JEI CLICK DEBUG ===
+[17:50:29] [Render thread/INFO]: [STDOUT]: Shift down: false
+[17:50:29] [Render thread/INFO]: [STDOUT]: Item to add: minecraft:mangrove_button x1
+[17:50:29] [Render thread/INFO]: [STDOUT]: addItemToInventorySafe called:
+[17:50:29] [Render thread/INFO]: [STDOUT]:   Item: minecraft:mangrove_button
+[17:50:29] [Render thread/INFO]: [STDOUT]:   Initial count: 1
+[17:50:29] [Render thread/INFO]: [STDOUT]:   Is shift click: false
+[17:50:29] [Render thread/INFO]: [STDOUT]:   Container slots: 46
+[17:50:29] [Render thread/INFO]: [STDOUT]:   Slot 5: SKIPPED (ArmorSlot)
+[17:50:29] [Render thread/INFO]: [STDOUT]:   Slot 6: SKIPPED (ArmorSlot)
+[17:50:29] [Render thread/INFO]: [STDOUT]:   Slot 7: SKIPPED (ArmorSlot)
+[17:50:29] [Render thread/INFO]: [STDOUT]:   Slot 8: SKIPPED (ArmorSlot)
+[17:50:29] [Render thread/INFO]: [STDOUT]:   Slot 18: Has matching item minecraft:mangrove_button (64/64), space: 0
+[17:50:29] [Render thread/INFO]: [STDOUT]:   Slot 19: Has matching item minecraft:mangrove_button (64/64), space: 0
+[17:50:29] [Render thread/INFO]: [STDOUT]:   Slot 20: Has matching item minecraft:mangrove_button (7/64), space: 57
+[17:50:29] [Render thread/INFO]: [STDOUT]:     Adding 1 items to slot 20 (new count: 8)
+[17:50:29] [Render thread/INFO]: [STDOUT]:     Remaining: 0
+[17:50:29] [Render thread/INFO]: [STDOUT]:     Regular click - returning immediately
+[17:50:30] [Render thread/INFO]: [STDOUT]: === JEI CLICK DEBUG ===
+[17:50:30] [Render thread/INFO]: [STDOUT]: Shift down: false
+[17:50:30] [Render thread/INFO]: [STDOUT]: Item to add: minecraft:mangrove_button x1
+[17:50:30] [Render thread/INFO]: [STDOUT]: addItemToInventorySafe called:
+[17:50:30] [Render thread/INFO]: [STDOUT]:   Item: minecraft:mangrove_button
+[17:50:30] [Render thread/INFO]: [STDOUT]:   Initial count: 1
+[17:50:30] [Render thread/INFO]: [STDOUT]:   Is shift click: false
+[17:50:30] [Render thread/INFO]: [STDOUT]:   Container slots: 46
+[17:50:30] [Render thread/INFO]: [STDOUT]:   Slot 5: SKIPPED (ArmorSlot)
+[17:50:30] [Render thread/INFO]: [STDOUT]:   Slot 6: SKIPPED (ArmorSlot)
+[17:50:30] [Render thread/INFO]: [STDOUT]:   Slot 7: SKIPPED (ArmorSlot)
+[17:50:30] [Render thread/INFO]: [STDOUT]:   Slot 8: SKIPPED (ArmorSlot)
+[17:50:30] [Render thread/INFO]: [STDOUT]:   Slot 18: Has matching item minecraft:mangrove_button (64/64), space: 0
+[17:50:30] [Render thread/INFO]: [STDOUT]:   Slot 19: Has matching item minecraft:mangrove_button (64/64), space: 0
+[17:50:30] [Render thread/INFO]: [STDOUT]:   Slot 20: Has matching item minecraft:mangrove_button (15/64), space: 49
+[17:50:30] [Render thread/INFO]: [STDOUT]:     Adding 1 items to slot 20 (new count: 16)
+[17:50:30] [Render thread/INFO]: [STDOUT]:     Remaining: 0
+[17:50:30] [Render thread/INFO]: [STDOUT]:     Regular click - returning immediately
+[17:50:30] [Render thread/INFO]: [STDOUT]: === JEI CLICK DEBUG ===
+[17:50:30] [Render thread/INFO]: [STDOUT]: Shift down: false
+[17:50:30] [Render thread/INFO]: [STDOUT]: Item to add: minecraft:mangrove_button x1
+[17:50:30] [Render thread/INFO]: [STDOUT]: addItemToInventorySafe called:
+[17:50:30] [Render thread/INFO]: [STDOUT]:   Item: minecraft:mangrove_button
+[17:50:30] [Render thread/INFO]: [STDOUT]:   Initial count: 1
+[17:50:30] [Render thread/INFO]: [STDOUT]:   Is shift click: false
+[17:50:30] [Render thread/INFO]: [STDOUT]:   Container slots: 46
+[17:50:30] [Render thread/INFO]: [STDOUT]:   Slot 5: SKIPPED (ArmorSlot)
+[17:50:30] [Render thread/INFO]: [STDOUT]:   Slot 6: SKIPPED (ArmorSlot)
+[17:50:30] [Render thread/INFO]: [STDOUT]:   Slot 7: SKIPPED (ArmorSlot)
+[17:50:30] [Render thread/INFO]: [STDOUT]:   Slot 8: SKIPPED (ArmorSlot)
+[17:50:30] [Render thread/INFO]: [STDOUT]:   Slot 18: Has matching item minecraft:mangrove_button (64/64), space: 0
+[17:50:30] [Render thread/INFO]: [STDOUT]:   Slot 19: Has matching item minecraft:mangrove_button (64/64), space: 0
+[17:50:30] [Render thread/INFO]: [STDOUT]:   Slot 20: Has matching item minecraft:mangrove_button (31/64), space: 33
+[17:50:30] [Render thread/INFO]: [STDOUT]:     Adding 1 items to slot 20 (new count: 32)
+[17:50:30] [Render thread/INFO]: [STDOUT]:     Remaining: 0
+[17:50:30] [Render thread/INFO]: [STDOUT]:     Regular click - returning immediately
+[17:50:30] [Render thread/INFO]: [STDOUT]: === JEI CLICK DEBUG ===
+[17:50:30] [Render thread/INFO]: [STDOUT]: Shift down: false
+[17:50:30] [Render thread/INFO]: [STDOUT]: Item to add: minecraft:mangrove_button x1
+[17:50:30] [Render thread/INFO]: [STDOUT]: addItemToInventorySafe called:
+[17:50:30] [Render thread/INFO]: [STDOUT]:   Item: minecraft:mangrove_button
+[17:50:30] [Render thread/INFO]: [STDOUT]:   Initial count: 1
+[17:50:30] [Render thread/INFO]: [STDOUT]:   Is shift click: false
+[17:50:30] [Render thread/INFO]: [STDOUT]:   Container slots: 46
+[17:50:30] [Render thread/INFO]: [STDOUT]:   Slot 5: SKIPPED (ArmorSlot)
+[17:50:30] [Render thread/INFO]: [STDOUT]:   Slot 6: SKIPPED (ArmorSlot)
+[17:50:30] [Render thread/INFO]: [STDOUT]:   Slot 7: SKIPPED (ArmorSlot)
+[17:50:30] [Render thread/INFO]: [STDOUT]:   Slot 8: SKIPPED (ArmorSlot)
+[17:50:30] [Render thread/INFO]: [STDOUT]:   Slot 18: Has matching item minecraft:mangrove_button (64/64), space: 0
+[17:50:30] [Render thread/INFO]: [STDOUT]:   Slot 19: Has matching item minecraft:mangrove_button (64/64), space: 0
+[17:50:30] [Render thread/INFO]: [STDOUT]:   Slot 20: Has matching item minecraft:mangrove_button (63/64), space: 1
+[17:50:30] [Render thread/INFO]: [STDOUT]:     Adding 1 items to slot 20 (new count: 64)
+[17:50:30] [Render thread/INFO]: [STDOUT]:     Remaining: 0
+[17:50:30] [Render thread/INFO]: [STDOUT]:     Regular click - returning immediately
+[17:50:30] [Render thread/INFO]: [STDOUT]: === JEI CLICK DEBUG ===
+[17:50:30] [Render thread/INFO]: [STDOUT]: Shift down: false
+[17:50:30] [Render thread/INFO]: [STDOUT]: Item to add: minecraft:mangrove_button x1
+[17:50:30] [Render thread/INFO]: [STDOUT]: addItemToInventorySafe called:
+[17:50:30] [Render thread/INFO]: [STDOUT]:   Item: minecraft:mangrove_button
+[17:50:30] [Render thread/INFO]: [STDOUT]:   Initial count: 1
+[17:50:30] [Render thread/INFO]: [STDOUT]:   Is shift click: false
+[17:50:30] [Render thread/INFO]: [STDOUT]:   Container slots: 46
+[17:50:30] [Render thread/INFO]: [STDOUT]:   Slot 5: SKIPPED (ArmorSlot)
+[17:50:30] [Render thread/INFO]: [STDOUT]:   Slot 6: SKIPPED (ArmorSlot)
+[17:50:30] [Render thread/INFO]: [STDOUT]:   Slot 7: SKIPPED (ArmorSlot)
+[17:50:30] [Render thread/INFO]: [STDOUT]:   Slot 8: SKIPPED (ArmorSlot)
+[17:50:30] [Render thread/INFO]: [STDOUT]:   Slot 18: Has matching item minecraft:mangrove_button (64/64), space: 0
+[17:50:30] [Render thread/INFO]: [STDOUT]:   Slot 19: Has matching item minecraft:mangrove_button (64/64), space: 0
+[17:50:30] [Render thread/INFO]: [STDOUT]:   Slot 20: Has matching item minecraft:mangrove_button (64/64), space: 0
+[17:50:30] [Render thread/INFO]: [STDOUT]:   Phase 1 complete, remaining: 1
+[17:50:30] [Render thread/INFO]: [STDOUT]:   Slot 5: SKIPPED (ArmorSlot in phase 2)
+[17:50:30] [Render thread/INFO]: [STDOUT]:   Slot 6: SKIPPED (ArmorSlot in phase 2)
+[17:50:30] [Render thread/INFO]: [STDOUT]:   Slot 7: SKIPPED (ArmorSlot in phase 2)
+[17:50:30] [Render thread/INFO]: [STDOUT]:   Slot 8: SKIPPED (ArmorSlot in phase 2)
+[17:50:30] [Render thread/INFO]: [STDOUT]:   Slot 21: Empty, adding 1 items
+[17:50:30] [Render thread/INFO]: [STDOUT]:     Remaining: 0
+[17:50:30] [Render thread/INFO]: [STDOUT]:     Regular click - returning immediately
+[17:50:31] [Render thread/INFO]: [STDOUT]: === JEI CLICK DEBUG ===
+[17:50:31] [Render thread/INFO]: [STDOUT]: Shift down: false
+[17:50:31] [Render thread/INFO]: [STDOUT]: Item to add: minecraft:mangrove_button x1
+[17:50:31] [Render thread/INFO]: [STDOUT]: addItemToInventorySafe called:
+[17:50:31] [Render thread/INFO]: [STDOUT]:   Item: minecraft:mangrove_button
+[17:50:31] [Render thread/INFO]: [STDOUT]:   Initial count: 1
+[17:50:31] [Render thread/INFO]: [STDOUT]:   Is shift click: false
+[17:50:31] [Render thread/INFO]: [STDOUT]:   Container slots: 46
+[17:50:31] [Render thread/INFO]: [STDOUT]:   Slot 5: SKIPPED (ArmorSlot)
+[17:50:31] [Render thread/INFO]: [STDOUT]:   Slot 6: SKIPPED (ArmorSlot)
+[17:50:31] [Render thread/INFO]: [STDOUT]:   Slot 7: SKIPPED (ArmorSlot)
+[17:50:31] [Render thread/INFO]: [STDOUT]:   Slot 8: SKIPPED (ArmorSlot)
+[17:50:31] [Render thread/INFO]: [STDOUT]:   Slot 18: Has matching item minecraft:mangrove_button (64/64), space: 0
+[17:50:31] [Render thread/INFO]: [STDOUT]:   Slot 19: Has matching item minecraft:mangrove_button (64/64), space: 0
+[17:50:31] [Render thread/INFO]: [STDOUT]:   Slot 20: Has matching item minecraft:mangrove_button (64/64), space: 0
+[17:50:31] [Render thread/INFO]: [STDOUT]:   Slot 21: Has matching item minecraft:mangrove_button (1/64), space: 63
+[17:50:31] [Render thread/INFO]: [STDOUT]:     Adding 1 items to slot 21 (new count: 2)
+[17:50:31] [Render thread/INFO]: [STDOUT]:     Remaining: 0
+[17:50:31] [Render thread/INFO]: [STDOUT]:     Regular click - returning immediately
+[17:50:31] [Render thread/INFO]: [STDOUT]: === JEI CLICK DEBUG ===
+[17:50:31] [Render thread/INFO]: [STDOUT]: Shift down: false
+[17:50:31] [Render thread/INFO]: [STDOUT]: Item to add: minecraft:mangrove_button x1
+[17:50:31] [Render thread/INFO]: [STDOUT]: addItemToInventorySafe called:
+[17:50:31] [Render thread/INFO]: [STDOUT]:   Item: minecraft:mangrove_button
+[17:50:31] [Render thread/INFO]: [STDOUT]:   Initial count: 1
+[17:50:31] [Render thread/INFO]: [STDOUT]:   Is shift click: false
+[17:50:31] [Render thread/INFO]: [STDOUT]:   Container slots: 46
+[17:50:31] [Render thread/INFO]: [STDOUT]:   Slot 5: SKIPPED (ArmorSlot)
+[17:50:31] [Render thread/INFO]: [STDOUT]:   Slot 6: SKIPPED (ArmorSlot)
+[17:50:31] [Render thread/INFO]: [STDOUT]:   Slot 7: SKIPPED (ArmorSlot)
+[17:50:31] [Render thread/INFO]: [STDOUT]:   Slot 8: SKIPPED (ArmorSlot)
+[17:50:31] [Render thread/INFO]: [STDOUT]:   Slot 18: Has matching item minecraft:mangrove_button (64/64), space: 0
+[17:50:31] [Render thread/INFO]: [STDOUT]:   Slot 19: Has matching item minecraft:mangrove_button (64/64), space: 0
+[17:50:31] [Render thread/INFO]: [STDOUT]:   Slot 20: Has matching item minecraft:mangrove_button (64/64), space: 0
+[17:50:31] [Render thread/INFO]: [STDOUT]:   Slot 21: Has matching item minecraft:mangrove_button (3/64), space: 61
+[17:50:31] [Render thread/INFO]: [STDOUT]:     Adding 1 items to slot 21 (new count: 4)
+[17:50:31] [Render thread/INFO]: [STDOUT]:     Remaining: 0
+[17:50:31] [Render thread/INFO]: [STDOUT]:     Regular click - returning immediately
+[17:50:31] [Server thread/INFO]: Saving and pausing game...
+[17:50:32] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:overworld
+[17:50:32] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:the_end
+[17:50:32] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:primordial_caves
+[17:50:32] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:the_nether
+[17:50:33] [Render thread/INFO]: Client on ClientOnly mode disconnecting.
+[17:50:33] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[New World]@minecraft:the_nether}].
+[17:50:33] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[New World]@minecraft:primordial_caves}].
+[17:50:33] [level shutdown/INFO]: Shutting down ClientRenderState
+[17:50:33] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[New World]@minecraft:the_nether}
+[17:50:33] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[New World]@minecraft:the_end}].
+[17:50:33] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[New World]@minecraft:primordial_caves}
+[17:50:33] [level shutdown/INFO]: Shutting down LodQuadTree...
+[17:50:33] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[New World]@minecraft:the_end}
+[17:50:33] [level shutdown/INFO]: Finished shutting down LodQuadTree
+[17:50:33] [level shutdown/INFO]: Closing world gen queue
+[17:50:33] [level shutdown/INFO]: Closing WorldGenerationQueue...
+[17:50:33] [level shutdown/INFO]: Shutting down world generator thread pool...
+[17:50:33] [level shutdown/INFO]: World generator thread pool shutdown with [0] incomplete tasks.
+[17:50:33] [level shutdown/INFO]: [BatchGenerator] shutting down...
+[17:50:33] [level shutdown/INFO]: Closing [BatchGenerationEnvironment]
+[17:50:33] [level shutdown/INFO]: Finished closing WorldGenerationQueue
+[17:50:33] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[New World]@minecraft:overworld}].
+[17:50:33] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[New World]@minecraft:overworld}
+[17:50:33] [Render thread/INFO]: Closed DhWorld of type [CLIENT_SERVER].
+[17:50:33] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[New World]@minecraft:overworld}].
+[17:50:33] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[New World]@minecraft:the_end}].
+[17:50:33] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[New World]@minecraft:overworld}
+[17:50:33] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[New World]@minecraft:the_nether}].
+[17:50:33] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[New World]@minecraft:primordial_caves}].
+[17:50:33] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[New World]@minecraft:the_nether}
+[17:50:33] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[New World]@minecraft:primordial_caves}
+[17:50:33] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[New World]@minecraft:the_end}
+[17:50:33] [Render thread/INFO]: Closed DhWorld of type [CLIENT_SERVER].
+[17:50:33] [Render thread/INFO]: Shutting down PriorityTaskPicker thread pool...
+[17:50:33] [Render thread/INFO]: Closing all [4] database connections...
+[17:50:33] [Render thread/INFO]: Closing database connection: [jdbc:sqlite:/home/matt/Documents/Repos/MattMC/run/saves/New World/DIM1/data/DistantHorizons.sqlite]
+[17:50:33] [Render thread/INFO]: Closing database connection: [jdbc:sqlite:/home/matt/Documents/Repos/MattMC/run/saves/New World/data/DistantHorizons.sqlite]
+[17:50:33] [Render thread/INFO]: Closing database connection: [jdbc:sqlite:/home/matt/Documents/Repos/MattMC/run/saves/New World/DIM-1/data/DistantHorizons.sqlite]
+[17:50:33] [Render thread/INFO]: Closing database connection: [jdbc:sqlite:/home/matt/Documents/Repos/MattMC/run/saves/New World/dimensions/minecraft/primordial_caves/data/DistantHorizons.sqlite]
+[17:50:33] [Server thread/INFO]: HungLo lost connection: Disconnected
+[17:50:33] [Server thread/INFO]: HungLo left the game
+[17:50:33] [Server thread/INFO]: Stopping singleplayer server as player logged out
+[17:50:33] [Server thread/INFO]: Stopping server
+[17:50:33] [Server thread/INFO]: Saving players
+[17:50:33] [Server thread/INFO]: Saving worlds
+[17:50:33] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:overworld
+[17:50:33] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:the_end
+[17:50:33] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:primordial_caves
+[17:50:33] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:the_nether
+[17:50:33] [Server thread/INFO]: ThreadedAnvilChunkStorage (New World): All chunks are saved
+[17:50:33] [Server thread/INFO]: ThreadedAnvilChunkStorage (DIM1): All chunks are saved
+[17:50:33] [Server thread/INFO]: ThreadedAnvilChunkStorage (primordial_caves): All chunks are saved
+[17:50:33] [Server thread/INFO]: ThreadedAnvilChunkStorage (DIM-1): All chunks are saved
+[17:50:33] [Server thread/INFO]: ThreadedAnvilChunkStorage: All dimensions are saved
+[17:50:33] [Render thread/INFO]: Unloading client level [ClientLevelWrapper]-[9p2b15v5d28je@minecraft:overworld].
+[17:50:33] [Render thread/INFO]: Stopping worker threads
+[17:50:34] [Render thread/INFO]: Stopping!
 
 [Incubating] Problems report is available at: file:///home/matt/Documents/Repos/MattMC/build/reports/problems/problems-report.html
-
-FAILURE: Build failed with an exception.
-
-* What went wrong:
-Execution failed for task ':runClient'.
-> Process 'command '/home/matt/Documents/Repos/MattMC/run/jdk-25/bin/java'' finished with non-zero exit value 255
-
-* Try:
-> Run with --stacktrace option to get the stack trace.
-> Run with --info or --debug option to get more log output.
-> Run with --scan to generate a Build Scan (Powered by Develocity).
-> Get more help at https://help.gradle.org.
 
 Deprecated Gradle features were used in this build, making it incompatible with Gradle 10.
 
@@ -663,5 +523,6 @@ You can use '--warning-mode all' to show the individual deprecation warnings and
 
 For more on this, please refer to https://docs.gradle.org/9.1.0/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
 
-BUILD FAILED in 1m 15s
+BUILD SUCCESSFUL in 1m
 7 actionable tasks: 7 executed
+Consider enabling configuration cache to speed up this build: https://docs.gradle.org/9.1.0/userguide/configuration_cache_enabling.html
