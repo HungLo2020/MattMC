@@ -94,27 +94,9 @@ public final class VoxelConstants {
         return OPTIONS_BACKGROUND_TEXTURE;
     }
 
-    private static int initAttempts = 0;
-    private static final int MAX_INIT_ATTEMPTS = 5;
-    
     public static void lateInit() {
-        if (initialized) {
-            return; // Already initialized, prevent double initialization
-        }
-        
-        try {
-            VoxelConstants.getVoxelMapInstance().lateInit(true, false);
-            initialized = true; // Only set to true AFTER successful initialization
-            VoxelConstants.getLogger().info("VoxelMap successfully initialized after {} attempt(s)", initAttempts + 1);
-        } catch (Exception e) {
-            initAttempts++;
-            if (initAttempts >= MAX_INIT_ATTEMPTS) {
-                initialized = true; // Stop retrying after max attempts to prevent infinite loop
-                VoxelConstants.getLogger().error("VoxelMap failed to initialize after {} attempts. Giving up to prevent infinite loop.", MAX_INIT_ATTEMPTS, e);
-            } else {
-                VoxelConstants.getLogger().warn("VoxelMap initialization attempt {} failed. Will retry on next tick.", initAttempts, e);
-            }
-        }
+        initialized = true;
+        VoxelConstants.getVoxelMapInstance().lateInit(true, false);
     }
 
     public static void clientTick() {
@@ -122,7 +104,7 @@ public final class VoxelConstants {
             lateInit();
         }
 
-        if (initialized && VoxelConstants.getVoxelMapInstance().getMap() != null) {
+        if (initialized) {
             VoxelConstants.getVoxelMapInstance().onTick();
         }
 

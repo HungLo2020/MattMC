@@ -739,12 +739,7 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 		
 		runnable.run();
 		
-		// VoxelMap: Late initialization after resources are loaded
-		try {
-			com.mamiyaotaru.voxelmap.VoxelMapInitializer.lateInit();
-		} catch (Exception e) {
-			LOGGER.error("Failed to late-initialize VoxelMap", e);
-		}
+		// VoxelMap: Removed manual lateInit() call - let original pattern work (first render/tick triggers it)
 		
 		this.options.startedCleanly = true;
 		this.options.save();
