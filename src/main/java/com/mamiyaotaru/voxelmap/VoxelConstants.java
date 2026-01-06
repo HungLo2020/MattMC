@@ -95,6 +95,9 @@ public final class VoxelConstants {
     }
 
     public static void lateInit() {
+        if (initialized) {
+            return; // Already initialized, prevent double initialization
+        }
         initialized = true;
         VoxelConstants.getVoxelMapInstance().lateInit(true, false);
     }
