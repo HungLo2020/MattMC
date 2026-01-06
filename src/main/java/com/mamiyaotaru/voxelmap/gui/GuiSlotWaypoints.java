@@ -173,7 +173,15 @@ class GuiSlotWaypoints extends AbstractSelectionList<GuiSlotWaypoints.WaypointIt
                 }
             }
             drawContext.blit(RenderPipelines.GUI_TEXTURED, this.waypoint.enabled ? GuiSlotWaypoints.this.visibleIconIdentifier : GuiSlotWaypoints.this.invisibleIconIdentifier, x + 198, y - 2, 0.0F, 0.0F, 18, 18, 18, 18);
-            textureAtlas.getAtlasSprite("voxelmap:images/waypoints/waypoint" + waypoint.imageSuffix + ".png").blit(drawContext, RenderPipelines.GUI_TEXTURED, x, y - 2, 18, 18, waypoint.getUnifiedColor());
+            // VoxelMap: Add null check to prevent crash when texture atlas is empty
+            try {
+                com.mamiyaotaru.voxelmap.textures.Sprite sprite = textureAtlas.getAtlasSprite("voxelmap:images/waypoints/waypoint" + waypoint.imageSuffix + ".png");
+                if (sprite != null) {
+                    sprite.blit(drawContext, RenderPipelines.GUI_TEXTURED, x, y - 2, 18, 18, waypoint.getUnifiedColor());
+                }
+            } catch (Exception e) {
+                // Texture not available, skip rendering waypoint icon
+            }
 
             if (this.waypoint == this.parentGui.highlightedWaypoint) {
                 drawContext.blit(RenderPipelines.GUI_TEXTURED, targetIconLocation, x, y - 2, 0.0F, 1.0F, 18, 18, 18, 18, 0xFFFF0000);

@@ -35,7 +35,8 @@
     "sodium",
     "iris",
     "distanthorizons",
-    "lod"
+    "lod",
+    "voxelmap"
   ],
 
   "depends": {
