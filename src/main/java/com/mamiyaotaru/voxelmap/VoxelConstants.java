@@ -98,8 +98,8 @@ public final class VoxelConstants {
         if (initialized) {
             return; // Already initialized, prevent double initialization
         }
-        initialized = true;
         VoxelConstants.getVoxelMapInstance().lateInit(true, false);
+        initialized = true; // Only set to true AFTER successful initialization
     }
 
     public static void clientTick() {
