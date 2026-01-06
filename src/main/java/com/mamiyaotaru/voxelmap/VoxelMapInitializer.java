@@ -33,9 +33,9 @@ public class VoxelMapInitializer {
     public static void lateInit() {
         VoxelConstants.getLogger().info("VoxelMap late initialization...");
         
-        // VoxelMap instance is created lazily via VoxelConstants.getVoxelMapInstance()
-        // which calls lateInit internally when needed
-        VoxelMap voxelMapInstance = VoxelConstants.getVoxelMapInstance();
+        // Call VoxelConstants.lateInit() which properly initializes the VoxelMap instance
+        // with showUnderMenus=true and isFair=false
+        VoxelConstants.lateInit();
         
         VoxelConstants.getLogger().info("VoxelMap fully initialized");
     }
