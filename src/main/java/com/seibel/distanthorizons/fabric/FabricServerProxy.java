@@ -1,10 +1,6 @@
 package com.seibel.distanthorizons.fabric;
 
 import com.seibel.distanthorizons.api.DhApi;
-import com.seibel.distanthorizons.api.methods.events.abstractEvents.DhApiChunkProcessingEvent;
-import com.seibel.distanthorizons.api.methods.events.DhApiEventRegister;
-import com.seibel.distanthorizons.api.methods.events.abstractEvents.DhApiLevelLoadEvent;
-import com.seibel.distanthorizons.api.objects.DhApiResult;
 import com.seibel.distanthorizons.common.AbstractModInitializer;
 import com.seibel.distanthorizons.common.wrappers.chunk.ChunkWrapper;
 import com.seibel.distanthorizons.common.wrappers.misc.ServerPlayerWrapper;
@@ -17,8 +13,6 @@ import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
 import com.seibel.distanthorizons.core.wrapperInterfaces.misc.IPluginPacketSender;
 import com.seibel.distanthorizons.core.wrapperInterfaces.world.IClientLevelWrapper;
 import com.seibel.distanthorizons.core.wrapperInterfaces.world.ILevelWrapper;
-import com.seibel.distanthorizons.fabric.testing.TestChunkInputReplacerEvent;
-import com.seibel.distanthorizons.fabric.testing.TestWorldGenBindingEvent;
 import net.fabricmc.fabric.api.entity.event.v1.ServerEntityWorldChangeEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerChunkEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
@@ -100,28 +94,6 @@ public class FabricServerProxy implements AbstractModInitializer.IEventProxy
 		//LOGGER.info("[DH-EVENTS] Thread: " + Thread.currentThread().getName() + " (ID: " + Thread.currentThread().getId() + ")");
 		
 		/* Register the mod needed event callbacks */
-		
-		// NOTE: TestWorldGenBindingEvent is for testing only and should NOT be enabled in production
-		// It creates flat colored planes instead of proper terrain generation
-		if (false)
-		{
-			// can be enabled to test overrides/events without having to build a separate API project 
-			//LOGGER.info("[DH-EVENTS] Registering DhApiLevelLoadEvent handler (TestWorldGenBindingEvent)...");
-			DhApiResult<Void> worldGenResult = DhApiEventRegister.on(DhApiLevelLoadEvent.class, new TestWorldGenBindingEvent());
-			if (worldGenResult.success)
-			{
-				//LOGGER.info("[DH-EVENTS] TestWorldGenBindingEvent registered successfully");
-			}
-			else
-			{
-				LOGGER.error("[DH-EVENTS] Failed to register TestWorldGenBindingEvent: " + worldGenResult.message);
-			}
-		}
-		
-		if (false)
-		{
-			DhApi.events.bind(DhApiChunkProcessingEvent.class, new TestChunkInputReplacerEvent());
-		}
 		
 		
 		// ServerWorldLoadEvent
