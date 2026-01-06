@@ -61,32 +61,38 @@ public final class BiomeRepository {
         }
 
         try {
-            InputStream is = VoxelConstants.getMinecraft().getResourceManager().getResource(ResourceLocation.fromNamespaceAndPath("voxelmap", "conf/biomecolors.txt")).get().open();
-            BufferedReader br = new BufferedReader(new InputStreamReader(is));
+            // VoxelMap: Use orElse to handle case where resource is not yet loaded
+            var resourceOptional = VoxelConstants.getMinecraft().getResourceManager().getResource(ResourceLocation.fromNamespaceAndPath("voxelmap", "conf/biomecolors.txt"));
+            if (resourceOptional.isPresent()) {
+                InputStream is = resourceOptional.get().open();
+                BufferedReader br = new BufferedReader(new InputStreamReader(is));
 
-            String sCurrentLine;
-            while ((sCurrentLine = br.readLine()) != null) {
-                String[] curLine = sCurrentLine.split("=");
-                if (curLine.length == 2) {
-                    String name = curLine[0];
-                    int color;
+                String sCurrentLine;
+                while ((sCurrentLine = br.readLine()) != null) {
+                    String[] curLine = sCurrentLine.split("=");
+                    if (curLine.length == 2) {
+                        String name = curLine[0];
+                        int color;
 
-                    try {
-                        color = Integer.decode(curLine[1]);
-                    } catch (NumberFormatException var9) {
-                        VoxelConstants.getLogger().warn("Error decoding integer string for biome colors; " + curLine[1]);
-                        color = 0;
-                    }
+                        try {
+                            color = Integer.decode(curLine[1]);
+                        } catch (NumberFormatException var9) {
+                            VoxelConstants.getLogger().warn("Error decoding integer string for biome colors; " + curLine[1]);
+                            color = 0;
+                        }
 
-                    if (nameToColor.get(name) == null) {
-                        nameToColor.put(name, color);
-                        dirty = true;
+                        if (nameToColor.get(name) == null) {
+                            nameToColor.put(name, color);
+                            dirty = true;
+                        }
                     }
                 }
-            }
 
-            br.close();
-            is.close();
+                br.close();
+                is.close();
+            } else {
+                VoxelConstants.getLogger().warn("VoxelMap biomecolors.txt resource not found - using defaults");
+            }
         } catch (IOException var11) {
             VoxelConstants.getLogger().error("Error loading biome color config file from litemod!", var11);
         }
