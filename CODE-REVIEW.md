@@ -3,6 +3,7 @@
 **Date:** January 6, 2026  
 **Version:** 1.21.10  
 **Focus:** Dead Code, Duplication, Line Count & Complexity Reduction  
+**Status:** Phase 1 In Progress - Dead Code Deletion
 
 ---
 
@@ -13,12 +14,53 @@ Deep inspection of MattMC codebase focused on **reducing bloat and complexity**.
 **Key Findings:**
 - **~50+ files** can be deleted (dead code, unused mixins, empty interfaces)
 - **137 utility/helper classes** - significant consolidation opportunity
-- **14 mixinterface files** in Iris - remnants of removed mixin system
+- **14 mixinterface files** in Iris - remnants of removed mixin system (VERIFIED: Actually used, not dead code)
 - **6 God classes** over 3000 lines - prime splitting candidates
 - **979 interfaces** with many small/marker interfaces
 - **47 wrapper classes** - potential for consolidation
 
 **Potential Reduction:** Estimated 10-15% code reduction (800-1200 files, 50K-100K lines)
+
+**Progress Update:**
+- ✅ **9 files deleted** so far (verified dead code, 0 external references)
+- ✅ **Build successful** after deletions
+- 🔄 **Phase 1 ongoing** - continuing dead code removal
+
+---
+
+## Files Deleted (Dead Code Verified)
+
+### Batch 1 (Commit 75d808c)
+1. `VisibleChunkCollector.java` - 0 lines, completely empty file
+2. `EDhApiVanillaOverdraw.java` - Deprecated enum, marked "not currently in use", 0 external refs
+
+### Batch 2 (Commit a0f4fc3)
+3. `EMinecraftColor.java` - Empty class with TODO, 0 external refs
+4. `TropicalFishVariantDataFactory.java` - Stub class with TODO, 0 external refs
+5. `ModelQuadWinding.java` - Unused enum, 0 external refs
+6. `WeightedRandomListExtension.java` - Unused interface, 0 external refs
+7. `IrisShadowProgram.java` - Unused enum, 0 external refs
+
+### Batch 3 (Commit 705fa31)
+8. `BoolType.java` - Unused utility class, 0 external refs
+9. `BasicVariableExpression.java` - Unused class, 0 external refs
+
+**Total Removed:** 9 files, ~167 lines of code
+
+---
+
+## Verified NOT Dead Code (Initially Suspected)
+
+During analysis, these were checked but found to be actively used:
+
+- ❌ `IMixinServerPlayer.java` - **USED** (4 refs, implemented by ServerPlayer)
+- ❌ `FabricMixinBootstrap.java` - **USED** (called from Knot.java)
+- ❌ Iris `mixinterface/` directory (14 files) - **ALL USED** (hook-based architecture interfaces)
+- ❌ `PacketBridge.java` - **USED** (9 refs)
+- ❌ `OldUsersConverter.java`, `OldMinecartBehavior.java`, `OldImageButton.java` - **ALL USED**
+- ❌ `WorldGenTaskGroup.java` - **USED** (13 refs, despite @Deprecated annotation)
+
+**Learning:** Many files appear unused by simple searches but are referenced via reflection, inheritance, or dynamic loading. Always verify compilation after deletion.
 
 ---
 
