@@ -22,9 +22,9 @@ Deep inspection of MattMC codebase focused on **reducing bloat and complexity**.
 **Potential Reduction:** Estimated 10-15% code reduction (800-1200 files, 50K-100K lines)
 
 **Progress Update:**
-- ✅ **9 files deleted** so far (verified dead code, 0 external references)
-- ✅ **Build successful** after deletions
-- 🔄 **Phase 1 ongoing** - continuing dead code removal
+- ✅ **15 files deleted** (9 dead code + 2 deprecated wrappers + 4 test files)
+- ✅ **Build successful** after all deletions
+- ✅ **Phase 1 complete** - dead code elimination and utility analysis
 
 ---
 
@@ -51,7 +51,37 @@ Deep inspection of MattMC codebase focused on **reducing bloat and complexity**.
 ### Batch 5: Utility Consolidation (Commit fbf745b)
 11. `net.fabricmc.loader.util.UrlUtil` - Deprecated Fabric internal API wrapper
 
-**Total Removed:** 11 files, ~229 lines of code
+### Batch 6: Test Files in Main Source (Commit 1308bc1)
+12. `TestGenericWorldGenerator.java` - Test world generator, wrapped in `if(false)`, 0 external refs
+13. `TestChunkWorldGenerator.java` - Test chunk generator, 0 external refs
+14. `TestChunkInputReplacerEvent.java` - Test event handler, wrapped in `if(false)`
+15. `TestWorldGenBindingEvent.java` - Test event handler, wrapped in `if(false)`
+- Also removed testing/ directory and cleaned up 6 unused imports + 2 dead code blocks from FabricServerProxy
+
+**Total Removed:** 15 files, ~700 lines of code
+
+---
+
+## Test Files Removed from Main Source
+
+**Issue:** Test files were located in `src/main/java` instead of `src/test/`
+
+**Files Deleted:**
+- All 4 test files in `com.seibel.distanthorizons.fabric.testing` package
+- TestGenericWorldGenerator.java (157 lines)
+- TestChunkWorldGenerator.java (105 lines)
+- TestChunkInputReplacerEvent.java (95 lines)
+- TestWorldGenBindingEvent.java (114 lines)
+
+**Verification:**
+- TestWorldGenBindingEvent and TestChunkInputReplacerEvent were referenced in FabricServerProxy.java but wrapped in `if (false)` blocks (completely disabled)
+- TestGenericWorldGenerator and TestChunkWorldGenerator had 0 external references
+- All test code was for development/testing purposes only and explicitly marked as such
+
+**Cleanup:**
+- Removed 6 unused imports from FabricServerProxy.java
+- Removed 2 dead `if (false)` code blocks
+- Deleted empty testing/ directory
 
 ---
 
