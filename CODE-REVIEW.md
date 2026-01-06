@@ -48,14 +48,19 @@
 
 ### 1.2 Deprecated Code
 **Found:** 242 `@Deprecated` annotations across codebase
-**Status:** Mixed - some are Minecraft API deprecations (must keep), others are internal
+**Status:** Investigation complete - most are still actively used
 
-**High-Value Targets for Removal:**
-1. **Fabric Loader internals** - 15+ deprecated classes/methods not used externally
-2. **Distant Horizons deprecated APIs** - 8 classes marked for future removal
+**Analysis Results:**
+1. **Fabric Loader internals** - Deprecated classes are compatibility/migration layer, still used internally
+   - ✅ **Deleted:** DependencyException.java (1 file, 0 external references)
+   - Kept: FabricLoader, ModContainer, DefaultLanguageAdapter, UrlConversionException (all used as base classes or internal APIs)
+2. **Distant Horizons deprecated APIs** - All classes still heavily used (16-39 references each)
+   - WorldGenTaskGroup: 11 references, actively used
+   - API enums (EDhApiDataCompressionMode, etc.): 16-39 references
+   - Pooling classes (PhantomArrayListCheckout, RenderBoxArrayCache): 5-28 references
 3. **Sodium deprecated utilities** - Already removed SpriteUtil, UrlUtil in previous cleanup
 
-**Recommendation:** 🟡 Low priority - most deprecations are external API compatibility
+**Recommendation:** ✅ Complete - only 1 truly unused deprecated class found and deleted
 
 ### 1.3 TODO/FIXME Comments
 **Found:** 507 TODO/FIXME/XXX/HACK comments throughout codebase
