@@ -396,11 +396,6 @@ public class Map implements Runnable, IChangeObserver {
             }
         }
 
-        if (minecraft.screen == null && this.options.keyBindMobToggle.consumeClick()) {
-            VoxelConstants.getVoxelMapInstance().getRadarOptions().setOptionValue(EnumOptionsMinimap.SHOW_RADAR);
-            this.options.saveAll();
-        }
-
         if (minecraft.screen == null && this.options.keyBindWaypointToggle.consumeClick()) {
             this.options.toggleIngameWaypoints();
         }
@@ -1667,11 +1662,6 @@ public class Map implements Runnable, IChangeObserver {
         guiGraphics.pose().popMatrix();
 
         VoxelMapGuiGraphics.blitFloat(guiGraphics, RenderPipelines.GUI_TEXTURED, fboTextureView, x - 32, y - 32, 64, 64, 0, 1, 0, 1, 0xffffffff);
-
-        if (VoxelConstants.getVoxelMapInstance().getRadar() != null) {
-            this.layoutVariables.updateVars(scScale, x, y, this.zoomScale, this.zoomScaleAdjusted);
-            VoxelConstants.getVoxelMapInstance().getRadar().onTickInGame(guiGraphics, this.layoutVariables, 1.0F);
-        }
 
         double guiScale = (double) minecraft.getWindow().getWidth() / this.scWidth;
         minTablistOffset = guiScale * 63;
