@@ -108,8 +108,8 @@ public class WaypointManager {
             }
 
             VoxelConstants.getLogger().info("VoxelMap: Attempting to load marker icons...");
-            Sprite markerIcon = textureAtlas.registerIconForResource(ResourceLocation.fromNamespaceAndPath("voxelmap", "images/waypoints/marker.png"));
-            Sprite markerIconSmall = textureAtlas.registerIconForResource(ResourceLocation.fromNamespaceAndPath("voxelmap", "images/waypoints/markersmall.png"));
+            Sprite markerIcon = textureAtlas.registerIconForResource(ResourceLocation.fromNamespaceAndPath("voxelmap", "textures/images/waypoints/marker.png"));
+            Sprite markerIconSmall = textureAtlas.registerIconForResource(ResourceLocation.fromNamespaceAndPath("voxelmap", "textures/images/waypoints/markersmall.png"));
 
             for (ResourceLocation resourceLocation : images) {
                 Sprite icon = textureAtlas.registerIconForResource(resourceLocation);
@@ -787,7 +787,7 @@ public class WaypointManager {
             Graphics gfx = mapImage.createGraphics();
             gfx.drawImage(image, 0, 0, null);
             gfx.dispose();
-            is = VoxelConstants.getMinecraft().getResourceManager().getResource(ResourceLocation.fromNamespaceAndPath("voxelmap", "images/backgroundmaps/" + path + "/map.txt")).get().open();
+            is = VoxelConstants.getMinecraft().getResourceManager().getResource(ResourceLocation.fromNamespaceAndPath("voxelmap", "textures/images/backgroundmaps/" + path + "/map.txt")).get().open();
             InputStreamReader isr = new InputStreamReader(is);
             Properties mapProperties = new Properties();
             mapProperties.load(isr);

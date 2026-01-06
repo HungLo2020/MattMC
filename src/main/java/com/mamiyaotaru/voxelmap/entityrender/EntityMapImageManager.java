@@ -116,9 +116,9 @@ public class EntityMapImageManager {
         }
 
         this.textureAtlas.reset();
-        this.textureAtlas.registerIconForBufferedImage("hostile", ImageUtils.loadImage(ResourceLocation.fromNamespaceAndPath("voxelmap", "images/radar/hostile.png"), 0, 0, 16, 16, 16, 16));
-        this.textureAtlas.registerIconForBufferedImage("neutral", ImageUtils.loadImage(ResourceLocation.fromNamespaceAndPath("voxelmap", "images/radar/neutral.png"), 0, 0, 16, 16, 16, 16));
-        this.textureAtlas.registerIconForBufferedImage("tame", ImageUtils.loadImage(ResourceLocation.fromNamespaceAndPath("voxelmap", "images/radar/tame.png"), 0, 0, 16, 16, 16, 16));
+        this.textureAtlas.registerIconForBufferedImage("hostile", ImageUtils.loadImage(ResourceLocation.fromNamespaceAndPath("voxelmap", "textures/images/radar/hostile.png"), 0, 0, 16, 16, 16, 16));
+        this.textureAtlas.registerIconForBufferedImage("neutral", ImageUtils.loadImage(ResourceLocation.fromNamespaceAndPath("voxelmap", "textures/images/radar/neutral.png"), 0, 0, 16, 16, 16, 16));
+        this.textureAtlas.registerIconForBufferedImage("tame", ImageUtils.loadImage(ResourceLocation.fromNamespaceAndPath("voxelmap", "textures/images/radar/tame.png"), 0, 0, 16, 16, 16, 16));
         this.textureAtlas.stitch();
 
         mobPropertiesMap.clear();

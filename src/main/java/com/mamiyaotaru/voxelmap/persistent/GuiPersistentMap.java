@@ -767,7 +767,7 @@ public class GuiPersistentMap extends PopupGuiScreen implements IGuiWaypoints {
             }
 
             if (this.waypointManager.getHighlightedWaypoint() != null) {
-                this.drawWaypoint(guiGraphics, this.waypointManager.getHighlightedWaypoint(), cursorCoordX, cursorCoordZ, VoxelConstants.getVoxelMapInstance().getWaypointManager().getTextureAtlas().getAtlasSprite("voxelmap:images/waypoints/target.png"));
+                this.drawWaypoint(guiGraphics, this.waypointManager.getHighlightedWaypoint(), cursorCoordX, cursorCoordZ, VoxelConstants.getVoxelMapInstance().getWaypointManager().getTextureAtlas().getAtlasSprite("voxelmap:textures/images/waypoints/target.png"));
             }
         }
 
@@ -875,9 +875,9 @@ public class GuiPersistentMap extends PopupGuiScreen implements IGuiWaypoints {
         boolean target = false;
         TextureAtlas atlas = VoxelConstants.getVoxelMapInstance().getWaypointManager().getTextureAtlas();
         if (icon == null) {
-            icon = atlas.getAtlasSprite("voxelmap:images/waypoints/waypoint" + pt.imageSuffix + ".png");
+            icon = atlas.getAtlasSprite("voxelmap:textures/images/waypoints/waypoint" + pt.imageSuffix + ".png");
             if (icon == atlas.getMissingImage()) {
-                icon = atlas.getAtlasSprite("voxelmap:images/waypoints/waypoint.png");
+                icon = atlas.getAtlasSprite("voxelmap:textures/images/waypoints/waypoint.png");
             }
         } else {
             if (name.isEmpty()) {

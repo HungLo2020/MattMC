@@ -284,7 +284,12 @@ public class ColorManager {
 
     private void loadColorPicker() {
         try {
-            InputStream is = VoxelConstants.getMinecraft().getResourceManager().getResource(ResourceLocation.fromNamespaceAndPath("voxelmap", "images/colorpicker.png")).get().open();
+            var resourceOptional = VoxelConstants.getMinecraft().getResourceManager().getResource(ResourceLocation.fromNamespaceAndPath("voxelmap", "textures/images/colorpicker.png"));
+            if (resourceOptional.isEmpty()) {
+                VoxelConstants.getLogger().error("Error loading color picker: Resource not found");
+                return;
+            }
+            InputStream is = resourceOptional.get().open();
             Image picker = ImageIO.read(is);
             is.close();
             this.colorPicker = new BufferedImage(picker.getWidth(null), picker.getHeight(null), 2);
