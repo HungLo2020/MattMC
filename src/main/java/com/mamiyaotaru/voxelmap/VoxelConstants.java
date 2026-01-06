@@ -115,6 +115,10 @@ public final class VoxelConstants {
             lateInit();
         }
 
+        if (!initialized) {
+            return; // Failed to initialize, skip rendering
+        }
+
         try {
             VoxelConstants.getVoxelMapInstance().onTickInGame(guiGraphics);
         } catch (RuntimeException e) {
@@ -139,6 +143,10 @@ public final class VoxelConstants {
     }
 
     public static void onRenderWaypoints(float gameTimeDeltaPartialTick, PoseStack poseStack, BufferSource bufferSource, Camera camera) {
+        if (!initialized) {
+            return; // Not initialized yet, skip rendering
+        }
+        
         try {
             VoxelConstants.getVoxelMapInstance().getWaypointManager().renderWaypoints(gameTimeDeltaPartialTick, poseStack, bufferSource, camera);
         } catch (RuntimeException e) {
