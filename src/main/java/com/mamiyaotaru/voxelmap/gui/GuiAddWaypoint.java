@@ -331,6 +331,8 @@ public class GuiAddWaypoint extends GuiScreenMinimap implements IPopupGuiScreen 
                 return this.colorManager.getColorPicker().getRGB(pickPointX, pickPointY);
             } else {
                 VoxelConstants.getLogger().warn("ColorPicker not loaded, cannot pick color");
+                // Return current waypoint color as fallback
+                return ARGB.color((int)(red * 255), (int)(green * 255), (int)(blue * 255));
             }
         }
 
