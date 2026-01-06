@@ -167,9 +167,17 @@ public class ClipboardCommands {
             BlockVector3 clipboardPos = entry.getKey();
             BlockState block = entry.getValue();
             
-            // Calculate paste position: target + (clipboardPos - origin)
+            // Calculate relative position from origin
+            BlockVector3 relativePos = clipboardPos.subtract(origin);
+            
+            // Apply transformation if set (for rotate/flip)
+            if (clipboard.hasTransform()) {
+                relativePos = clipboard.getTransform().apply(relativePos);
+            }
+            
+            // Calculate final paste position: target + transformedRelativePos
             // This makes the clipboard paste relative to where the player is standing
-            BlockVector3 pastePos = target.add(clipboardPos.subtract(origin));
+            BlockVector3 pastePos = target.add(relativePos);
             
             if (editSession.setBlock(pastePos, block)) {
                 count++;
