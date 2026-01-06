@@ -98,10 +98,10 @@ public class WaypointManager {
         List<ResourceLocation> images = new ArrayList<>();
         IIconCreator iconCreator = textureAtlas -> {
 
-            Map<ResourceLocation, Resource> resourceMap = VoxelConstants.getMinecraft().getResourceManager().listResources("images", asset -> asset.getPath().endsWith(".png"));
+            Map<ResourceLocation, Resource> resourceMap = VoxelConstants.getMinecraft().getResourceManager().listResources("textures", asset -> asset.getPath().endsWith(".png"));
             VoxelConstants.getLogger().info("VoxelMap: Found {} image resources", resourceMap.size());
             for (ResourceLocation candidate : resourceMap.keySet()) {
-                if (candidate.getNamespace().equals("voxelmap") && candidate.getPath().contains("images/waypoints")) {
+                if (candidate.getNamespace().equals("voxelmap") && candidate.getPath().contains("textures/images/waypoints")) {
                     images.add(candidate);
                     VoxelConstants.getLogger().info("VoxelMap: Adding waypoint image: {}", candidate);
                 }
