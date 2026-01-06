@@ -16,6 +16,7 @@ import net.minecraft.worldedit.clipboard.Clipboard;
 import net.minecraft.worldedit.core.EditSession;
 import net.minecraft.worldedit.core.WorldEdit;
 import net.minecraft.worldedit.math.BlockVector3;
+import net.minecraft.worldedit.math.transform.AffineTransform;
 import net.minecraft.worldedit.platform.MattMCPlatform;
 import net.minecraft.worldedit.region.Region;
 import net.minecraft.worldedit.session.LocalSession;
@@ -161,6 +162,7 @@ public class ClipboardCommands {
         // Paste blocks
         BlockVector3 target = BlockVector3.from(player.blockPosition());
         BlockVector3 origin = clipboard.getOrigin();
+        AffineTransform transform = clipboard.getTransform();
         
         int count = 0;
         for (Map.Entry<BlockVector3, BlockState> entry : clipboard.getBlocks().entrySet()) {
@@ -171,8 +173,8 @@ public class ClipboardCommands {
             BlockVector3 relativePos = clipboardPos.subtract(origin);
             
             // Apply transformation if set (for rotate/flip)
-            if (clipboard.hasTransform()) {
-                relativePos = clipboard.getTransform().apply(relativePos);
+            if (transform != null) {
+                relativePos = transform.apply(relativePos);
             }
             
             // Calculate final paste position: target + transformedRelativePos
