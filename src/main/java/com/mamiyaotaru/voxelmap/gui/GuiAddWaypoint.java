@@ -23,8 +23,8 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.ARGB;
 
 public class GuiAddWaypoint extends GuiScreenMinimap implements IPopupGuiScreen {
-    private static final ResourceLocation PICKER = ResourceLocation.parse("mattmc:images/colorpicker.png");
-    private static final ResourceLocation TARGET = ResourceLocation.parse("mattmc:images/waypoints/target.png");
+    private static final ResourceLocation PICKER = ResourceLocation.parse("voxelmap:images/colorpicker.png");
+    private static final ResourceLocation TARGET = ResourceLocation.parse("voxelmap:images/waypoints/target.png");
     final WaypointManager waypointManager;
     final ColorManager colorManager;
     private final IGuiWaypoints parentGui;
@@ -270,7 +270,7 @@ public class GuiAddWaypoint extends GuiScreenMinimap implements IPopupGuiScreen 
 
         drawContext.fill(this.getWidth() / 2 - 25, buttonListY + 24 + 5, this.getWidth() / 2 - 25 + 16, buttonListY + 24 + 5 + 10, color);
         try {
-            waypointManager.getTextureAtlasChooser().getAtlasSprite("mattmc:images/waypoints/waypoint" + this.waypoint.imageSuffix + ".png").blit(drawContext, RenderPipelines.GUI_TEXTURED, this.getWidth() / 2 - 25, buttonListY + 48 + 2, 16, 16, color);
+            waypointManager.getTextureAtlasChooser().getAtlasSprite("voxelmap:images/waypoints/waypoint" + this.waypoint.imageSuffix + ".png").blit(drawContext, RenderPipelines.GUI_TEXTURED, this.getWidth() / 2 - 25, buttonListY + 48 + 2, 16, 16, color);
         } catch (IllegalStateException e) {
             // VoxelMap: Texture atlas not ready yet - skip rendering icon preview
         }

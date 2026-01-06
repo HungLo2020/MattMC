@@ -30,7 +30,7 @@ public class CompressibleGLBufferedImage {
     private final Object bufferLock = new Object();
     private boolean isCompressed;
     private final boolean compressNotDelete;
-    private final ResourceLocation location = ResourceLocation.fromNamespaceAndPath("mattmc", "mapimage/" + UUID.randomUUID());
+    private final ResourceLocation location = ResourceLocation.fromNamespaceAndPath("voxelmap", "mapimage/" + UUID.randomUUID());
     private DynamicTexture texture;
 
     public CompressibleGLBufferedImage(int width, int height, int imageType) {

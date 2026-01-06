@@ -17,7 +17,7 @@ import net.minecraft.resources.ResourceLocation;
 
 public class FabricEvents implements Events {
     public FabricEvents() {
-        ResourceLocation voxelMapMinimapLayer = ResourceLocation.parse("mattmc:minimap");
+        ResourceLocation voxelMapMinimapLayer = ResourceLocation.parse("voxelmap:minimap");
         HudElementRegistry.attachElementAfter(VanillaHudElements.BOSS_BAR, voxelMapMinimapLayer, new HudElement() {
             @Override
             public void render(GuiGraphics context, DeltaTracker tickCounter) {

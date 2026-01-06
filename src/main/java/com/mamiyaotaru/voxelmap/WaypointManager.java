@@ -81,8 +81,8 @@ public class WaypointManager {
     private File settingsFile;
     private Long lastNewWorldNameTime = 0L;
     private final Object waypointLock = new Object();
-    public static final ResourceLocation resourceTextureAtlasWaypoints = ResourceLocation.fromNamespaceAndPath("mattmc", "atlas/waypoints");
-    public static final ResourceLocation resourceTextureAtlasWaypointChooser = ResourceLocation.fromNamespaceAndPath("mattmc", "atlas/waypoint-chooser");
+    public static final ResourceLocation resourceTextureAtlasWaypoints = ResourceLocation.fromNamespaceAndPath("voxelmap", "atlas/waypoints");
+    public static final ResourceLocation resourceTextureAtlasWaypointChooser = ResourceLocation.fromNamespaceAndPath("voxelmap", "atlas/waypoint-chooser");
     public final Minecraft minecraft = Minecraft.getInstance();
 
     public WaypointManager() {
@@ -108,8 +108,8 @@ public class WaypointManager {
             }
 
             VoxelConstants.getLogger().info("VoxelMap: Attempting to load marker icons...");
-            Sprite markerIcon = textureAtlas.registerIconForResource(ResourceLocation.fromNamespaceAndPath("mattmc", "images/waypoints/marker.png"));
-            Sprite markerIconSmall = textureAtlas.registerIconForResource(ResourceLocation.fromNamespaceAndPath("mattmc", "images/waypoints/markersmall.png"));
+            Sprite markerIcon = textureAtlas.registerIconForResource(ResourceLocation.fromNamespaceAndPath("voxelmap", "images/waypoints/marker.png"));
+            Sprite markerIconSmall = textureAtlas.registerIconForResource(ResourceLocation.fromNamespaceAndPath("voxelmap", "images/waypoints/markersmall.png"));
 
             for (ResourceLocation resourceLocation : images) {
                 Sprite icon = textureAtlas.registerIconForResource(resourceLocation);
@@ -776,7 +776,7 @@ public class WaypointManager {
             }
             path = path + "/" + this.currentDimension.getStorageName();
             String tempPath = "images/backgroundmaps/" + path + "/map.png";
-            ResourceLocation identifier = ResourceLocation.fromNamespaceAndPath("mattmc", tempPath);
+            ResourceLocation identifier = ResourceLocation.fromNamespaceAndPath("voxelmap", tempPath);
 
             Minecraft.getInstance().getResourceManager().getResourceOrThrow(identifier); // check if it exists
 
@@ -787,7 +787,7 @@ public class WaypointManager {
             Graphics gfx = mapImage.createGraphics();
             gfx.drawImage(image, 0, 0, null);
             gfx.dispose();
-            is = VoxelConstants.getMinecraft().getResourceManager().getResource(ResourceLocation.fromNamespaceAndPath("mattmc", "images/backgroundmaps/" + path + "/map.txt")).get().open();
+            is = VoxelConstants.getMinecraft().getResourceManager().getResource(ResourceLocation.fromNamespaceAndPath("voxelmap", "images/backgroundmaps/" + path + "/map.txt")).get().open();
             InputStreamReader isr = new InputStreamReader(is);
             Properties mapProperties = new Properties();
             mapProperties.load(isr);

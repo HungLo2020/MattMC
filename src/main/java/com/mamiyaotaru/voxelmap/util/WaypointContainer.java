@@ -253,9 +253,9 @@ public class WaypointContainer {
         float g = target ? 0.0F : pt.green;
         float b = target ? 0.0F : pt.blue;
         TextureAtlas textureAtlas = VoxelConstants.getVoxelMapInstance().getWaypointManager().getTextureAtlas();
-        Sprite icon = target ? textureAtlas.getAtlasSprite("mattmc:images/waypoints/target.png") : textureAtlas.getAtlasSprite("mattmc:images/waypoints/waypoint" + pt.imageSuffix + ".png");
+        Sprite icon = target ? textureAtlas.getAtlasSprite("voxelmap:images/waypoints/target.png") : textureAtlas.getAtlasSprite("voxelmap:images/waypoints/waypoint" + pt.imageSuffix + ".png");
         if (icon == textureAtlas.getMissingImage()) {
-            icon = textureAtlas.getAtlasSprite("mattmc:images/waypoints/waypoint.png");
+            icon = textureAtlas.getAtlasSprite("voxelmap:images/waypoints/waypoint.png");
         }
 
         RenderType renderType = VoxelMapRenderTypes.WAYPOINT_ICON_DEPTHTEST.apply(icon.getResourceLocation());

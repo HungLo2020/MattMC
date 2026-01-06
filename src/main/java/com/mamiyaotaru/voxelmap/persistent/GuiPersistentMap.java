@@ -125,7 +125,7 @@ public class GuiPersistentMap extends PopupGuiScreen implements IGuiWaypoints {
     public boolean passEvents;
     private PopupGuiButton buttonWaypoints;
     private final Minecraft minecraft = Minecraft.getInstance();
-    private final ResourceLocation voxelmapSkinLocation = ResourceLocation.fromNamespaceAndPath("mattmc", "persistentmap/playerskin");
+    private final ResourceLocation voxelmapSkinLocation = ResourceLocation.fromNamespaceAndPath("voxelmap", "persistentmap/playerskin");
     private final ResourceLocation crosshairResource = ResourceLocation.parse("textures/gui/sprites/hud/crosshair.png");
     private boolean currentDragging;
     private boolean keySprintPressed;
@@ -767,7 +767,7 @@ public class GuiPersistentMap extends PopupGuiScreen implements IGuiWaypoints {
             }
 
             if (this.waypointManager.getHighlightedWaypoint() != null) {
-                this.drawWaypoint(guiGraphics, this.waypointManager.getHighlightedWaypoint(), cursorCoordX, cursorCoordZ, VoxelConstants.getVoxelMapInstance().getWaypointManager().getTextureAtlas().getAtlasSprite("mattmc:images/waypoints/target.png"));
+                this.drawWaypoint(guiGraphics, this.waypointManager.getHighlightedWaypoint(), cursorCoordX, cursorCoordZ, VoxelConstants.getVoxelMapInstance().getWaypointManager().getTextureAtlas().getAtlasSprite("voxelmap:images/waypoints/target.png"));
             }
         }
 
@@ -875,9 +875,9 @@ public class GuiPersistentMap extends PopupGuiScreen implements IGuiWaypoints {
         boolean target = false;
         TextureAtlas atlas = VoxelConstants.getVoxelMapInstance().getWaypointManager().getTextureAtlas();
         if (icon == null) {
-            icon = atlas.getAtlasSprite("mattmc:images/waypoints/waypoint" + pt.imageSuffix + ".png");
+            icon = atlas.getAtlasSprite("voxelmap:images/waypoints/waypoint" + pt.imageSuffix + ".png");
             if (icon == atlas.getMissingImage()) {
-                icon = atlas.getAtlasSprite("mattmc:images/waypoints/waypoint.png");
+                icon = atlas.getAtlasSprite("voxelmap:images/waypoints/waypoint.png");
             }
         } else {
             if (name.isEmpty()) {
