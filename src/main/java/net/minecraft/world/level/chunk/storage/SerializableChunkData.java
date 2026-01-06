@@ -335,7 +335,7 @@ public record SerializableChunkData(
 	}
 
 	private static void logErrors(ChunkPos chunkPos, int i, String string) {
-		LOGGER.error("Recoverable errors when loading section [{}, {}, {}]: {}", chunkPos.x, i, chunkPos.z, string);
+		//LOGGER.error("Recoverable errors when loading section [{}, {}, {}]: {}", chunkPos.x, i, chunkPos.z, string);
 	}
 
 	public static SerializableChunkData copyOf(ServerLevel serverLevel, ChunkAccess chunkAccess) {
