@@ -1920,6 +1920,7 @@ public class CreativeModeTabs {
 							output.accept(Items.CHAIN_COMMAND_BLOCK);
 							output.accept(Items.REPEATING_COMMAND_BLOCK);
 							output.accept(Items.COMMAND_BLOCK_MINECART);
+							output.accept(Items.WAND); // WorldEdit wand
 							output.accept(Items.JIGSAW);
 							output.accept(Items.STRUCTURE_BLOCK);
 							output.accept(Items.STRUCTURE_VOID);

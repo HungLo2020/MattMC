@@ -9,6 +9,8 @@ import net.minecraft.network.protocol.PacketType;
 import net.minecraft.network.protocol.common.custom.BrandPayload;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.network.protocol.common.custom.DiscardedPayload;
+// VoxelMap: Import VoxelMap packet types
+import com.mamiyaotaru.voxelmap.packets.WorldIdC2S;
 
 public record ServerboundCustomPayloadPacket(CustomPacketPayload payload) implements Packet<ServerCommonPacketListener> {
 	private static final int MAX_PAYLOAD_SIZE = 32767;
@@ -16,9 +18,13 @@ public record ServerboundCustomPayloadPacket(CustomPacketPayload payload) implem
 			resourceLocation -> DiscardedPayload.codec(resourceLocation, 32767),
 			Util.make(
 				Lists.<CustomPacketPayload.TypeAndCodec<? super FriendlyByteBuf, ?>>newArrayList(
-					new CustomPacketPayload.TypeAndCodec<>(BrandPayload.TYPE, BrandPayload.STREAM_CODEC)
+					new CustomPacketPayload.TypeAndCodec<>(BrandPayload.TYPE, BrandPayload.STREAM_CODEC),
+					// VoxelMap: Register VoxelMap packet type
+					new CustomPacketPayload.TypeAndCodec<>(WorldIdC2S.PACKET_ID, WorldIdC2S.PACKET_CODEC)
 				),
-				arrayList -> {}
+				arrayList -> {
+					// VoxelMap: Packet types registered above
+				}
 			)
 		)
 		.map(ServerboundCustomPayloadPacket::new, ServerboundCustomPayloadPacket::payload);

@@ -95,6 +95,14 @@ public class LodRendererEvents {
 				
 				DhApi.Delayed.renderProxy.setDeferTransparentRendering(irisShaderActive);
 				DhApi.Delayed.configs.graphics().fog().drawMode().setValue(instance.shouldOverride ? EDhApiFogDrawMode.FOG_DISABLED : EDhApiFogDrawMode.FOG_ENABLED);
+				
+				// Prevent GL_INVALID_OPERATION during shader switching: if shaders are active but DH is about to
+				// render with OPAQUE_AND_TRANSPARENT pass (instead of separate passes), cancel this frame's render.
+				// This handles the race condition where pipeline state changes but render mode hasn't updated yet.
+				if (instance.shouldOverride && event.value.renderPass == EDhApiRenderPass.OPAQUE_AND_TRANSPARENT) {
+					Iris.logger.warn("Skipping DH render to prevent GL_INVALID_OPERATION during shader transition (shouldOverride=true but renderPass=OPAQUE_AND_TRANSPARENT)");
+					event.cancelEvent();
+				}
 			}
 		};
 
@@ -300,7 +308,8 @@ public class LodRendererEvents {
 					DhApi.Delayed.configs.graphics().fog().drawMode().setValue(EDhApiFogDrawMode.FOG_DISABLED);
 
 					if (event.value.renderPass == EDhApiRenderPass.OPAQUE_AND_TRANSPARENT) {
-						Iris.logger.error("Unexpected; somehow the Opaque + Translucent pass ran with shaders on.");
+						// This should now be prevented by the check in DhApiBeforeRenderEvent, but log if it still happens
+						Iris.logger.error("Unexpected: OPAQUE_AND_TRANSPARENT pass ran with shaders on despite preventive check. This may cause GL_INVALID_OPERATION errors.");
 					}
 				} else {
 					DhApi.Delayed.configs.graphics().ambientOcclusion().enabled().clearValue();

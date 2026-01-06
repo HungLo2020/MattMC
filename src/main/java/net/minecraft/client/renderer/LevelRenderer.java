@@ -650,6 +650,18 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 		
 		// Iris: End level render immediate state (from MixinLevelRenderer vertices.immediate)
 		net.irisshaders.iris.vertices.ImmediateState.isRenderingLevel = false;
+		
+		// VoxelMap: Render waypoint beacons after level rendering
+		try {
+			com.mojang.blaze3d.vertex.PoseStack voxelmap_poseStack = new com.mojang.blaze3d.vertex.PoseStack();
+			voxelmap_poseStack.pushPose();
+			voxelmap_poseStack.last().pose().set(matrix4f);
+			net.minecraft.client.renderer.MultiBufferSource.BufferSource bufferSource = this.minecraft.renderBuffers().bufferSource();
+			com.mamiyaotaru.voxelmap.VoxelConstants.onRenderWaypoints(deltaTracker.getGameTimeDeltaPartialTick(false), voxelmap_poseStack, bufferSource, camera);
+			voxelmap_poseStack.popPose();
+		} catch (Exception e) {
+			// Silently catch to avoid crashes
+		}
 	}
 
 	private void addMainPass(
@@ -947,49 +959,9 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 	}
 
 	public void extractVisibleBlockEntities(Camera camera, float f, LevelRenderState levelRenderState) { // Made public for Iris shadow rendering
-		Vec3 vec3 = camera.getPosition();
-		double d = vec3.x();
-		double e = vec3.y();
-		double g = vec3.z();
-		PoseStack poseStack = new PoseStack();
-
-		for (SectionRenderDispatcher.RenderSection renderSection : this.visibleSections) {
-			List<BlockEntity> list = renderSection.getSectionMesh().getRenderableBlockEntities();
-			if (!list.isEmpty()) {
-				for (BlockEntity blockEntity : list) {
-					BlockPos blockPos = blockEntity.getBlockPos();
-					SortedSet<BlockDestructionProgress> sortedSet = this.destructionProgress.get(blockPos.asLong());
-					ModelFeatureRenderer.CrumblingOverlay crumblingOverlay;
-					if (sortedSet != null && !sortedSet.isEmpty()) {
-						poseStack.pushPose();
-						poseStack.translate(blockPos.getX() - d, blockPos.getY() - e, blockPos.getZ() - g);
-						crumblingOverlay = new ModelFeatureRenderer.CrumblingOverlay(((BlockDestructionProgress)sortedSet.last()).getProgress(), poseStack.last());
-						poseStack.popPose();
-					} else {
-						crumblingOverlay = null;
-					}
-
-					BlockEntityRenderState blockEntityRenderState = this.blockEntityRenderDispatcher.tryExtractRenderState(blockEntity, f, crumblingOverlay);
-					if (blockEntityRenderState != null) {
-						levelRenderState.blockEntityRenderStates.add(blockEntityRenderState);
-					}
-				}
-			}
-		}
-
-		Iterator<BlockEntity> iterator = this.level.getGloballyRenderedBlockEntities().iterator();
-
-		while (iterator.hasNext()) {
-			BlockEntity blockEntity2 = (BlockEntity)iterator.next();
-			if (blockEntity2.isRemoved()) {
-				iterator.remove();
-			} else {
-				BlockEntityRenderState blockEntityRenderState2 = this.blockEntityRenderDispatcher.tryExtractRenderState(blockEntity2, f, null);
-				if (blockEntityRenderState2 != null) {
-					levelRenderState.blockEntityRenderStates.add(blockEntityRenderState2);
-				}
-			}
-		}
+		// Sodium: Redirect to SodiumWorldRenderer instead of using vanilla visibleSections
+		// This was previously done via LevelRendererMixin but has been inlined
+		this.renderer.extractBlockEntities(camera, f, this.destructionProgress, levelRenderState);
 	}
 
 	private void submitBlockEntities(PoseStack poseStack, LevelRenderState levelRenderState, SubmitNodeStorage submitNodeStorage) {
@@ -1393,6 +1365,15 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 	private void setSectionDirty(int x, int y, int z, boolean important) {
 		// Sodium: Redirect to renderer
 		this.renderer.scheduleRebuildForChunk(x, y, z, important);
+		
+		// VoxelMap: Notify world update listener for chunk changes
+		try {
+			if (com.mamiyaotaru.voxelmap.VoxelConstants.getVoxelMapInstance().getWorldUpdateListener() != null) {
+				com.mamiyaotaru.voxelmap.VoxelConstants.getVoxelMapInstance().getWorldUpdateListener().notifyObservers(x, z);
+			}
+		} catch (Exception e) {
+			// Silently catch to avoid crashes
+		}
 	}
 
 	public void onSectionBecomingNonEmpty(long l) {

@@ -33,7 +33,6 @@ import java.util.Set;
 import java.util.jar.JarFile;
 import java.util.jar.Manifest;
 import java.util.zip.ZipEntry;
-import java.util.zip.ZipError;
 import java.util.zip.ZipFile;
 
 import net.fabricmc.api.EnvType;
@@ -211,7 +210,7 @@ public final class LibClassifier<L extends Enum<L> & LibClassifier.LibraryType> 
 						}
 					}
 				}
-			} catch (ZipError | IOException e) {
+			} catch (IOException e) {
 				throw new IOException("error reading "+path, e);
 			}
 		}

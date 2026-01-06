@@ -1,0 +1,49 @@
+{
+    "schemaVersion": 1,
+    "id": "worldedit",
+    "version": "${version}",
+
+    "name": "WorldEdit",
+    "description": "WorldEdit is an easy-to-use in-game world editor for Minecraft, supporting both single- and multi-player.",
+    "authors": [
+        "EngineHub"
+    ],
+    "contact": {
+        "homepage": "https://enginehub.org/worldedit/",
+        "sources": "https://github.com/EngineHub/WorldEdit"
+    },
+    "custom": {
+      "modmenu": {
+        "links": {
+          "modmenu.discord": "https://discord.gg/enginehub"
+        }
+      }
+    },
+
+    "license": "GPL3",
+    "icon": "assets/worldedit/icon.png",
+
+    "environment": "*",
+    "entrypoints": {
+        "main": [
+            "com.sk89q.worldedit.fabric.FabricWorldEdit"
+        ]
+    },
+
+    "depends": {
+        "worldeditcui_protocol": "*",
+        "fabricloader": ">=0.4.0",
+        "fabric-api-base": "*",
+        "fabric-command-api-v2": "*",
+        "fabric-lifecycle-events-v1": "*",
+        "fabric-events-interaction-v0": "*",
+        "fabric-networking-api-v1": "*"
+    },
+    "suggests": {
+        "fabric-permissions-api-v0": "*"
+    },
+    "mixins": [
+        "worldedit-fabric.mixins.json"
+    ],
+    "accessWidener" : "worldedit.accesswidener"
+}

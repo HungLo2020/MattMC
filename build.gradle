@@ -16,11 +16,14 @@ def lwjglNatives = System.getProperty('os.name').toLowerCase().contains('mac')
             ? 'natives-linux-arm64' 
             : 'natives-linux'
 
+// Read Java version from gradle.properties and make it available throughout the build script
+ext.targetJavaVersion = project.hasProperty('java_version') ? Integer.parseInt(project.property('java_version').toString()) : 25
+
 java {
     // Keep toolchain configuration for compilation
     // But we'll override at runtime for JavaExec tasks
     toolchain {
-        languageVersion = JavaLanguageVersion.of(21)
+        languageVersion = JavaLanguageVersion.of(targetJavaVersion)
     }
 }
 
@@ -61,14 +64,6 @@ repositories {
             url = 'https://jitpack.io'
             content {
                 includeGroup 'com.github.Mojang'
-            }
-        }
-        // Forge mirrors for Mojang libraries
-        maven { 
-            url = 'https://maven.minecraftforge.net/'
-            content {
-                includeGroup 'com.mojang'
-                includeGroup 'net.minecraftforge'
             }
         }
     }
@@ -113,7 +108,6 @@ dependencies {
         implementation files('libraries/deps/jtracy-1.0.29.jar')
         // implementation files('libraries/deps/blocklist-1.0.10.jar') // REMOVED - using ALLOW_ALL AddressCheck
         // implementation files('libraries/deps/patchy-2.2.10.jar') // REMOVED - only contained blocklist functionality
-        implementation files('libraries/deps/text2speech-1.17.9.jar')
     } else {
         // Remote Mojang libraries (authlib removed - using custom PlayerProfile)
         implementation 'com.mojang:brigadier:1.3.10'
@@ -123,7 +117,6 @@ dependencies {
         implementation 'com.mojang:jtracy:1.0.29'
         // implementation 'com.mojang:blocklist:1.0.10' // REMOVED - using ALLOW_ALL AddressCheck
         // implementation 'com.mojang:patchy:2.2.10' // REMOVED - only contained blocklist functionality
-        implementation 'com.mojang:text2speech:1.17.9'
     }
     
     // Google libraries
@@ -414,7 +407,7 @@ def serverJvmArgs = [
     '-Xmx2G',
     '-Xms1G',
     '-XX:+UseZGC',
-    '-XX:+ZGenerational'
+    '-XX:+UseCompactObjectHeaders'
 ]
 
 // Common JVM arguments for client tasks
@@ -422,13 +415,13 @@ def clientJvmArgs = [
     '-Xmx8G',
     '-Xms4G',
     '-XX:+UseZGC',
-    '-XX:+ZGenerational',
+    '-XX:+UseCompactObjectHeaders',
     '-Dorg.lwjgl.util.Debug=true'
 ]
 
 // Helper method to configure JavaExec tasks to use bundled JDK (if available) or toolchain
 def configureBundledJdk(JavaExec task) {
-    def bundledJdkDir = file('run/jdk-21')
+    def bundledJdkDir = file("run/jdk-${targetJavaVersion}")
     def osName = System.getProperty('os.name').toLowerCase()
     def isWindows = osName.contains('windows') || osName.contains('win')
     
@@ -445,12 +438,12 @@ def configureBundledJdk(JavaExec task) {
             println "Using bundled JDK from: ${bundledJdkDir.absolutePath}"
         }
     } else {
-        // Use Gradle toolchain (will auto-download Java 21 if needed via Foojay resolver)
+        // Use Gradle toolchain (will auto-download Java if needed via Foojay resolver)
         task.javaLauncher = javaToolchains.launcherFor {
-            languageVersion = JavaLanguageVersion.of(21)
+            languageVersion = JavaLanguageVersion.of(targetJavaVersion)
         }
         task.doFirst {
-            println "Using Gradle toolchain for Java 21 (bundled JDK not found)"
+            println "Using Gradle toolchain for Java ${targetJavaVersion} (bundled JDK not found)"
             println "Toolchain will be auto-downloaded if not available locally"
             println ""
             println "💡 To use bundled JDK instead, run: ./gradlew downloadJdk copyJdkToRun"
@@ -661,9 +654,9 @@ tasks.register('runClientVanilla', JavaExec) {
 // Task to download bundled JDK if not present
 tasks.register('downloadJdk', Exec) {
     group = 'minecraft'
-    description = 'Downloads Temurin OpenJDK 21 if not already present'
+    description = "Downloads Temurin OpenJDK ${targetJavaVersion} if not already present"
     
-    def jdkDir = file('libraries/jdk-21')
+    def jdkDir = file("libraries/jdk-${targetJavaVersion}")
     def osName = System.getProperty('os.name').toLowerCase()
     def isWindows = osName.contains('windows') || osName.contains('win')
     def isLinux = osName.contains('linux')
@@ -710,8 +703,8 @@ tasks.register('copyJdkToRun') {
     
     dependsOn 'downloadJdk'
     
-    def srcJdkDir = file('libraries/jdk-21')
-    def destJdkDir = file('run/jdk-21')
+    def srcJdkDir = file("libraries/jdk-${targetJavaVersion}")
+    def destJdkDir = file("run/jdk-${targetJavaVersion}")
     def osName = System.getProperty('os.name').toLowerCase()
     def isWindows = osName.contains('windows') || osName.contains('win')
     
@@ -902,7 +895,7 @@ tasks.register('runDatagenAll') {
 // Build task configuration
 tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
-    options.release = 21
+    options.release = targetJavaVersion
     options.fork = true
     options.forkOptions.memoryMaximumSize = "8g"
     options.compilerArgs += ['-Xlint:-deprecation', '-Xlint:-unchecked']
@@ -1006,12 +999,12 @@ tasks.register('clientDist') {
         }
         
         // Copy bundled JDK to distribution
-        def srcJdkDir = file('libraries/jdk-21')
+        def srcJdkDir = file("libraries/jdk-${targetJavaVersion}")
         if (srcJdkDir.exists()) {
             println "📂 Copying bundled JDK to distribution..."
             copy {
                 from srcJdkDir
-                into "${distDir}/run/jdk-21"
+                into "${distDir}/run/jdk-${targetJavaVersion}"
             }
             println "✅ JDK copied to distribution"
         }

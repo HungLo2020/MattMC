@@ -31,7 +31,7 @@ public class FelineModel<T extends FelineRenderState> extends EntityModel<T> {
 	protected final ModelPart rightFrontLeg;
 	protected final ModelPart tail1;
 	protected final ModelPart tail2;
-	protected final ModelPart head;
+	public final ModelPart head; // VoxelMap: access widener
 	protected final ModelPart body;
 
 	public FelineModel(ModelPart modelPart) {

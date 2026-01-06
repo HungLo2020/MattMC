@@ -37,7 +37,7 @@ public final class ModelPart {
 	public boolean visible = true;
 	public boolean skipDraw;
 	private final List<ModelPart.Cube> cubes;
-	private final Map<String, ModelPart> children;
+	public final Map<String, ModelPart> children; // VoxelMap: access widener
 	private PartPose initialPose = PartPose.ZERO;
 
 	public ModelPart(List<ModelPart.Cube> list, Map<String, ModelPart> map) {

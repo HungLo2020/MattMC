@@ -6,6 +6,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.CycleButton;
+import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.resources.SkinLoader;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
@@ -13,12 +14,13 @@ import net.minecraft.network.chat.Component;
 import java.util.List;
 
 /**
- * Screen for customizing player appearance (skin selection).
+ * Screen for customizing player appearance (skin selection and player name).
  */
 @Environment(EnvType.CLIENT)
 public class CustomizeScreen extends Screen {
 	private final Screen lastScreen;
 	private CycleButton<String> skinSelector;
+	private EditBox playerNameField;
 	
 	public CustomizeScreen(Screen lastScreen) {
 		super(Component.translatable("menu.customize"));
@@ -59,21 +61,41 @@ public class CustomizeScreen extends Screen {
 			);
 		this.addRenderableWidget(this.skinSelector);
 		
-		// Add "Done" button
-		this.addRenderableWidget(
-			Button.builder(CommonComponents.GUI_DONE, button -> this.minecraft.setScreen(this.lastScreen))
-				.bounds(this.width / 2 - 100, this.height / 6 + 168, 200, 20)
-				.build()
+		// Create player name text field
+		this.playerNameField = new EditBox(
+			this.font,
+			this.width / 2 - 100,
+			this.height / 6 + 72,
+			200,
+			20,
+			Component.translatable("menu.customize.playerName")
 		);
+		this.playerNameField.setMaxLength(16); // Standard Minecraft username length
+		this.playerNameField.setValue(this.minecraft.options.playerName);
+		this.playerNameField.setResponder(text -> {
+			// Validate and update player name
+			if (text != null && !text.trim().isEmpty()) {
+				this.minecraft.options.playerName = text.trim();
+				this.minecraft.options.save();
+			}
+		});
+		this.addRenderableWidget(this.playerNameField);
 		
-		// Add "Reload Skins" button to pick up custom skins added while game is running
+		// Add "Reload Skins" button
 		this.addRenderableWidget(
 			Button.builder(Component.translatable("menu.customize.reloadSkins"), button -> {
 				skinLoader.reload();
 				this.minecraft.setScreen(new CustomizeScreen(this.lastScreen));
 			})
-			.bounds(this.width / 2 - 100, this.height / 6 + 48, 200, 20)
+			.bounds(this.width / 2 - 100, this.height / 6 + 120, 200, 20)
 			.build()
+		);
+		
+		// Add "Done" button
+		this.addRenderableWidget(
+			Button.builder(CommonComponents.GUI_DONE, button -> this.minecraft.setScreen(this.lastScreen))
+				.bounds(this.width / 2 - 100, this.height / 6 + 168, 200, 20)
+				.build()
 		);
 	}
 	
@@ -94,11 +116,31 @@ public class CustomizeScreen extends Screen {
 	public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
 		super.render(guiGraphics, mouseX, mouseY, partialTick);
 		guiGraphics.drawCenteredString(this.font, this.title, this.width / 2, 20, 0xFFFFFF);
+		
+		// Skin selector description
 		guiGraphics.drawCenteredString(
 			this.font,
 			Component.translatable("menu.customize.skin.description"),
 			this.width / 2,
 			this.height / 6 + 12,
+			0xA0A0A0
+		);
+		
+		// Player name label
+		guiGraphics.drawString(
+			this.font,
+			Component.translatable("menu.customize.playerName"),
+			this.width / 2 - 100,
+			this.height / 6 + 60,
+			0xFFFFFF
+		);
+		
+		// Player name description (restart required)
+		guiGraphics.drawCenteredString(
+			this.font,
+			Component.translatable("menu.customize.playerName.description"),
+			this.width / 2,
+			this.height / 6 + 96,
 			0xA0A0A0
 		);
 	}

@@ -16,7 +16,7 @@ import com.seibel.distanthorizons.core.world.IDhClientWorld;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftClientWrapper;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftRenderWrapper;
 import com.seibel.distanthorizons.core.wrapperInterfaces.misc.ILightMapWrapper;
-import com.seibel.distanthorizons.core.wrapperInterfaces.modAccessor.AbstractOptifineAccessor;
+
 import com.seibel.distanthorizons.core.wrapperInterfaces.world.IClientLevelWrapper;
 
 /**
@@ -61,12 +61,12 @@ public class RenderParams extends DhApiRenderParam
 			RenderUtil.createLodProjectionMatrix(newMcProjectionMatrix, newPartialTicks), RenderUtil.createLodModelViewMatrix(newMcModelViewMatrix),
 			clientLevelWrapper.getMinHeight());
 		
-		LOGGER.debug("[DH-RENDER-PARAMS] ========== CREATING RENDER PARAMS ==========");
-		LOGGER.debug("[DH-RENDER-PARAMS] renderPass: " + renderPass);
-		LOGGER.debug("[DH-RENDER-PARAMS] clientLevelWrapper: " + clientLevelWrapper);
+		//LOGGER.debug("[DH-RENDER-PARAMS] ========== CREATING RENDER PARAMS ==========");
+		//LOGGER.debug("[DH-RENDER-PARAMS] renderPass: " + renderPass);
+		//LOGGER.debug("[DH-RENDER-PARAMS] clientLevelWrapper: " + clientLevelWrapper);
 		
 		this.dhClientWorld = SharedApi.tryGetDhClientWorld();
-		LOGGER.debug("[DH-RENDER-PARAMS] dhClientWorld from SharedApi: " + this.dhClientWorld);
+		//LOGGER.debug("[DH-RENDER-PARAMS] dhClientWorld from SharedApi: " + this.dhClientWorld);
 		
 		if (this.dhClientWorld != null)
 		{
@@ -74,14 +74,14 @@ public class RenderParams extends DhApiRenderParam
 			//  however this may break how other level handling is done so James doesn't want to change it.
 			//  Special handling may be necessary when Immersive Portals is present, although additional testing is needed.
 			this.dhClientLevel = (IDhClientLevel) this.dhClientWorld.getLevel(clientLevelWrapper);
-			LOGGER.debug("[DH-RENDER-PARAMS] dhClientLevel: " + this.dhClientLevel);
+			//LOGGER.debug("[DH-RENDER-PARAMS] dhClientLevel: " + this.dhClientLevel);
 			
 			if (this.dhClientLevel != null)
 			{
 				this.renderBufferHandler = this.dhClientLevel.getRenderBufferHandler();
 				this.genericRenderer = this.dhClientLevel.getGenericRenderer();
-				LOGGER.debug("[DH-RENDER-PARAMS] renderBufferHandler: " + this.renderBufferHandler);
-				LOGGER.debug("[DH-RENDER-PARAMS] genericRenderer: " + this.genericRenderer);
+				//LOGGER.debug("[DH-RENDER-PARAMS] renderBufferHandler: " + this.renderBufferHandler);
+				//LOGGER.debug("[DH-RENDER-PARAMS] genericRenderer: " + this.genericRenderer);
 			}
 			else
 			{
@@ -101,7 +101,7 @@ public class RenderParams extends DhApiRenderParam
 			this.exactCameraPosition = MC_RENDER.getCameraExactPosition();
 		}
 		
-		LOGGER.debug("[DH-RENDER-PARAMS] ========== RENDER PARAMS CREATED ==========");
+		//LOGGER.debug("[DH-RENDER-PARAMS] ========== RENDER PARAMS CREATED ==========");
 	}
 	
 	
@@ -120,67 +120,59 @@ public class RenderParams extends DhApiRenderParam
 		
 		this.validationRun = true;
 		
-		LOGGER.debug("[DH-RENDER-VALIDATION] Running validation checks...");
+		//LOGGER.debug("[DH-RENDER-VALIDATION] Running validation checks...");
 		
 		if (!MC_CLIENT.playerExists())
 		{
-			LOGGER.debug("[DH-RENDER-VALIDATION] Failed: No Player Exists");
+			//LOGGER.debug("[DH-RENDER-VALIDATION] Failed: No Player Exists");
 			return "No Player Exists";
 		}
 		
 		if (this.dhClientWorld == null)
 		{
-			LOGGER.warn("[DH-RENDER-VALIDATION] Failed: No DH Client World Loaded");
-			LOGGER.warn("[DH-RENDER-VALIDATION] Current abstract world: " + SharedApi.getAbstractDhWorld());
+			//LOGGER.warn("[DH-RENDER-VALIDATION] Failed: No DH Client World Loaded");
+			//LOGGER.warn("[DH-RENDER-VALIDATION] Current abstract world: " + SharedApi.getAbstractDhWorld());
 			return "No DH Client World Loaded";
 		}
 		
 		if (this.dhClientLevel == null)
 		{
-			LOGGER.debug("[DH-RENDER-VALIDATION] Failed: No DH Client Level Loaded");
+			//LOGGER.debug("[DH-RENDER-VALIDATION] Failed: No DH Client Level Loaded");
 			return "No DH Client Level Loaded";
 		}
 		
 		if (this.clientLevelWrapper == null)
 		{
-			LOGGER.debug("[DH-RENDER-VALIDATION] Failed: No Client Level Wrapper Loaded");
+			//LOGGER.debug("[DH-RENDER-VALIDATION] Failed: No Client Level Wrapper Loaded");
 			return "No Client Level Wrapper Loaded";
 		}
 		
 		if (this.lightmap == null)
 		{
-			LOGGER.debug("[DH-RENDER-VALIDATION] Failed: No Lightmap Loaded");
+			//LOGGER.debug("[DH-RENDER-VALIDATION] Failed: No Lightmap Loaded");
 			return "No Lightmap Loaded";
 		}
 		
 		if (this.renderBufferHandler == null)
 		{
-			LOGGER.debug("[DH-RENDER-VALIDATION] Failed: No RenderBufferHandler Present");
+			//LOGGER.debug("[DH-RENDER-VALIDATION] Failed: No RenderBufferHandler Present");
 			return "No RenderBufferHandler Present";
 		}
 		
 		if (this.genericRenderer == null)
 		{
-			LOGGER.debug("[DH-RENDER-VALIDATION] Failed: No Generic Renderer Present");
+			//LOGGER.debug("[DH-RENDER-VALIDATION] Failed: No Generic Renderer Present");
 			return "No Generic Renderer Present";
 		}
 		
 		if (this.dhModelViewMatrix == null
 			|| this.mcModelViewMatrix == null)
 		{
-			LOGGER.debug("[DH-RENDER-VALIDATION] Failed: No MVM or Proj Matrix Given");
+			//LOGGER.debug("[DH-RENDER-VALIDATION] Failed: No MVM or Proj Matrix Given");
 			return "No MVM or Proj Matrix Given";
 		}
 		
-		if (AbstractOptifineAccessor.optifinePresent()
-			&& MC_RENDER.getTargetFramebuffer() == -1)
-		{
-			// wait for MC to finish setting up their renderer
-			LOGGER.debug("[DH-RENDER-VALIDATION] Failed: Optifine Target Frame Buffer not set");
-			return "Optifine Target Frame Buffer not set";
-		}
-		
-		LOGGER.debug("[DH-RENDER-VALIDATION] All validation checks passed!");
+		//LOGGER.debug("[DH-RENDER-VALIDATION] All validation checks passed!");
 		
 		return null;
 	}

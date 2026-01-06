@@ -13,7 +13,7 @@ import net.minecraft.util.Mth;
 
 @Environment(EnvType.CLIENT)
 public class QuadrupedModel<T extends LivingEntityRenderState> extends EntityModel<T> {
-	protected final ModelPart head;
+	public final ModelPart head; // VoxelMap: access widener
 	protected final ModelPart body;
 	protected final ModelPart rightHindLeg;
 	protected final ModelPart leftHindLeg;

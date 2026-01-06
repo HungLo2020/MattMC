@@ -15,7 +15,8 @@ import net.minecraft.client.renderer.entity.state.SlimeRenderState;
 
 @Environment(EnvType.CLIENT)
 public class SlimeOuterLayer extends RenderLayer<SlimeRenderState, SlimeModel> {
-	private final SlimeModel model;
+	// VoxelMap: Made accessible
+	public final SlimeModel model;
 
 	public SlimeOuterLayer(RenderLayerParent<SlimeRenderState, SlimeModel> renderLayerParent, EntityModelSet entityModelSet) {
 		super(renderLayerParent);

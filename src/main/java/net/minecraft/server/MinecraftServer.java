@@ -726,6 +726,12 @@ public abstract class MinecraftServer extends ReentrantBlockableEventLoop<TickTa
 		// DH/Fabric: Fire SERVER_STOPPING event at start of shutdown
 		net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents.SERVER_STOPPING.invoker().onServerStopping(this);
 		
+		// WorldEdit: Shutdown WorldEdit system
+		if (net.minecraft.worldedit.core.WorldEdit.isInitialized()) {
+			net.minecraft.worldedit.core.WorldEdit.shutdown();
+			LOGGER.info("WorldEdit shutdown");
+		}
+		
 		this.packetProcessor.close();
 		if (this.metricsRecorder.isRecording()) {
 			this.cancelRecordingMetrics();
@@ -822,6 +828,14 @@ public abstract class MinecraftServer extends ReentrantBlockableEventLoop<TickTa
 			
 			// DH/Fabric: Fire SERVER_STARTED event after server status is built
 			net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents.SERVER_STARTED.invoker().onServerStarted(this);
+			
+			// WorldEdit: Initialize WorldEdit system
+			net.minecraft.worldedit.core.WorldEdit.initialize(this);
+			LOGGER.info("WorldEdit initialized");
+			
+			// WorldEdit: Register commands after initialization
+			net.minecraft.worldedit.command.WorldEditCommands.register(this.getCommands().getDispatcher());
+			LOGGER.info("WorldEdit commands registered");
 
 			while (this.running) {
 				long l;

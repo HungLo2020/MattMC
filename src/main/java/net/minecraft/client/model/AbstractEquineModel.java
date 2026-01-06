@@ -23,7 +23,7 @@ public abstract class AbstractEquineModel<T extends EquineRenderState> extends E
 	protected static final String HEAD_PARTS = "head_parts";
 	protected static final MeshTransformer BABY_TRANSFORMER = new BabyModelTransform(true, 16.2F, 1.36F, 2.7272F, 2.0F, 20.0F, Set.of("head_parts"));
 	protected final ModelPart body;
-	protected final ModelPart headParts;
+	public final ModelPart headParts; // VoxelMap: access widener
 	private final ModelPart rightHindLeg;
 	private final ModelPart leftHindLeg;
 	private final ModelPart rightFrontLeg;

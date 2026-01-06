@@ -1,12 +1,8 @@
 package net.minecraft.client.gui.screens.inventory;
 
-import java.util.List;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.navigation.ScreenPosition;
-import net.minecraft.client.gui.screens.recipebook.FurnaceRecipeBookComponent;
-import net.minecraft.client.gui.screens.recipebook.RecipeBookComponent;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
@@ -15,7 +11,7 @@ import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.inventory.AbstractFurnaceMenu;
 
 @Environment(EnvType.CLIENT)
-public abstract class AbstractFurnaceScreen<T extends AbstractFurnaceMenu> extends AbstractRecipeBookScreen<T> {
+public abstract class AbstractFurnaceScreen<T extends AbstractFurnaceMenu> extends AbstractContainerScreen<T> {
 	private final ResourceLocation texture;
 	private final ResourceLocation litProgressSprite;
 	private final ResourceLocation burnProgressSprite;
@@ -24,13 +20,11 @@ public abstract class AbstractFurnaceScreen<T extends AbstractFurnaceMenu> exten
 		T abstractFurnaceMenu,
 		Inventory inventory,
 		Component component,
-		Component component2,
 		ResourceLocation resourceLocation,
 		ResourceLocation resourceLocation2,
-		ResourceLocation resourceLocation3,
-		List<RecipeBookComponent.TabInfo> list
+		ResourceLocation resourceLocation3
 	) {
-		super(abstractFurnaceMenu, new FurnaceRecipeBookComponent(abstractFurnaceMenu, component2, list), inventory, component);
+		super(abstractFurnaceMenu, inventory, component);
 		this.texture = resourceLocation;
 		this.litProgressSprite = resourceLocation2;
 		this.burnProgressSprite = resourceLocation3;
@@ -40,11 +34,6 @@ public abstract class AbstractFurnaceScreen<T extends AbstractFurnaceMenu> exten
 	public void init() {
 		super.init();
 		this.titleLabelX = (this.imageWidth - this.font.width(this.title)) / 2;
-	}
-
-	@Override
-	protected ScreenPosition getRecipeBookButtonPosition() {
-		return new ScreenPosition(this.leftPos + 20, this.height / 2 - 49);
 	}
 
 	@Override

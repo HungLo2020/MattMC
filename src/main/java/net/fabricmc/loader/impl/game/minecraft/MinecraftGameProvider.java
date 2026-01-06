@@ -46,7 +46,6 @@ import net.fabricmc.loader.impl.game.GameProviderHelper;
 import net.fabricmc.loader.impl.game.LibClassifier;
 import net.fabricmc.loader.impl.game.minecraft.patch.BrandingPatch;
 import net.fabricmc.loader.impl.game.minecraft.patch.EntrypointPatch;
-import net.fabricmc.loader.impl.game.minecraft.patch.EntrypointPatchFML125;
 import net.fabricmc.loader.impl.game.minecraft.patch.TinyFDPatch;
 import net.fabricmc.loader.impl.game.patch.GameTransformer;
 import net.fabricmc.loader.impl.launch.FabricLauncher;
@@ -92,7 +91,6 @@ public class MinecraftGameProvider implements GameProvider {
 	private final GameTransformer transformer = new GameTransformer(
 			new EntrypointPatch(this),
 			new BrandingPatch(),
-			new EntrypointPatchFML125(),
 			new TinyFDPatch());
 
 	@Override
@@ -542,10 +540,6 @@ public class MinecraftGameProvider implements GameProvider {
 	@Override
 	public void launch(ClassLoader loader) {
 		String targetClass = entrypoint;
-
-		if (envType == EnvType.CLIENT && targetClass.contains("Applet")) {
-			targetClass = "net.fabricmc.loader.impl.game.minecraft.applet.AppletMain";
-		}
 
 		MethodHandle invoker;
 

@@ -27,13 +27,8 @@ public interface RecipeCraftingHolder {
 	}
 
 	default boolean setRecipeUsed(ServerPlayer serverPlayer, RecipeHolder<?> recipeHolder) {
-		if (!recipeHolder.value().isSpecial()
-			&& serverPlayer.level().getGameRules().getBoolean(GameRules.RULE_LIMITED_CRAFTING)
-			&& !serverPlayer.getRecipeBook().contains(recipeHolder.id())) {
-			return false;
-		} else {
-			this.setRecipeUsed(recipeHolder);
-			return true;
-		}
+		// Recipe book removed - all recipes treated as known, ignore limited crafting checks
+		this.setRecipeUsed(recipeHolder);
+		return true;
 	}
 }

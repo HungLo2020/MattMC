@@ -34,14 +34,16 @@ import org.joml.Vector3f;
 public class EnderDragonRenderer extends EntityRenderer<EnderDragon, EnderDragonRenderState> {
 	public static final ResourceLocation CRYSTAL_BEAM_LOCATION = ResourceLocation.withDefaultNamespace("textures/entity/end_crystal/end_crystal_beam.png");
 	private static final ResourceLocation DRAGON_EXPLODING_LOCATION = ResourceLocation.withDefaultNamespace("textures/entity/enderdragon/dragon_exploding.png");
-	private static final ResourceLocation DRAGON_LOCATION = ResourceLocation.withDefaultNamespace("textures/entity/enderdragon/dragon.png");
+	// VoxelMap: Made accessible
+	public static final ResourceLocation DRAGON_LOCATION = ResourceLocation.withDefaultNamespace("textures/entity/enderdragon/dragon.png");
 	private static final ResourceLocation DRAGON_EYES_LOCATION = ResourceLocation.withDefaultNamespace("textures/entity/enderdragon/dragon_eyes.png");
 	private static final RenderType RENDER_TYPE = RenderType.entityCutoutNoCull(DRAGON_LOCATION);
 	private static final RenderType DECAL = RenderType.entityDecal(DRAGON_LOCATION);
 	private static final RenderType EYES = RenderType.eyes(DRAGON_EYES_LOCATION);
 	private static final RenderType BEAM = RenderType.entitySmoothCutout(CRYSTAL_BEAM_LOCATION);
 	private static final float HALF_SQRT_3 = (float)(Math.sqrt(3.0) / 2.0);
-	private final EnderDragonModel model;
+	// VoxelMap: Made accessible
+	public final EnderDragonModel model;
 
 	public EnderDragonRenderer(EntityRendererProvider.Context context) {
 		super(context);

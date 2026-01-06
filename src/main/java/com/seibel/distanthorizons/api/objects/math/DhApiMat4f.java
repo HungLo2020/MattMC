@@ -22,8 +22,8 @@ package com.seibel.distanthorizons.api.objects.math;
 import com.seibel.distanthorizons.api.interfaces.util.IDhApiCopyable;
 
 /**
- * An (almost) exact copy of Minecraft's 1.16.5
- * implementation of a 4x4 float matrix. <br><br>
+ * An implementation of a 4x4 float matrix
+ * based on Minecraft's matrix implementation. <br><br>
  *
  * <code>
  * m00, m10, m20, m30,  <br>

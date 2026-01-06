@@ -246,6 +246,15 @@ public class Gui {
 			}
 		}
 		
+		// VoxelMap: Render minimap overlay (after boss bar, before debug overlay)
+		if (!this.minecraft.options.hideGui) {
+			try {
+				net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry.renderAll(guiGraphics, deltaTracker);
+			} catch (Exception e) {
+				// Silently ignore errors to avoid crashing the game
+			}
+		}
+		
 		// Iris: End GL debug marker (from MixinGui)
 		net.irisshaders.iris.gl.GLDebug.popGroup();
 	}
@@ -718,6 +727,10 @@ public class Gui {
 		int m = lvs.length;
 		int n = m * 9;
 		int o = guiGraphics.guiHeight() / 2 + n / 3;
+		
+		// VoxelMap: Move scoreboard to make room for minimap
+		o = com.mamiyaotaru.voxelmap.VoxelConstants.moveScoreboard(o, n);
+		
 		int p = 3;
 		int q = guiGraphics.guiWidth() - j - 3;
 		int r = guiGraphics.guiWidth() - 3 + 2;

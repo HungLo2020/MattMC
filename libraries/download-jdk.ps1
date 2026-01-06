@@ -1,27 +1,40 @@
-# PowerShell script to download Temurin OpenJDK 21 for Windows
+# PowerShell script to download Temurin OpenJDK for Windows
 # This script checks if the JDK is already present and downloads it if needed
 
 $ErrorActionPreference = "Stop"
 
-# Get script directory
+# Get script directory and project directory
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-$JdkDir = Join-Path $ScriptDir "jdk-21"
+$ProjectDir = Split-Path -Parent $ScriptDir
 
-# JDK version configuration - change these to update version
-$JdkVersion = "21.0.5+11"
-$JdkBuild = "21.0.5_11"
+# Read Java version from gradle.properties
+$GradlePropertiesPath = Join-Path $ProjectDir "gradle.properties"
+if (Test-Path $GradlePropertiesPath) {
+    $JavaVersion = (Select-String -Path $GradlePropertiesPath -Pattern '^java_version=(.+)$').Matches.Groups[1].Value
+    Write-Host "[INFO] Using Java version $JavaVersion from gradle.properties" -ForegroundColor Cyan
+} else {
+    Write-Host "[WARNING] gradle.properties not found, using default Java version" -ForegroundColor Yellow
+    $JavaVersion = "25"
+}
+
+$JdkDir = Join-Path $ScriptDir "jdk-$JavaVersion"
+
+# JDK version configuration - Update these when a new Java version is released
+# This is the specific build version to download (e.g., 25.0.1+8)
+$JdkVersion = "25.0.1+8"
+$JdkBuild = "25.0.1_8"
 
 # Detect architecture
 $Arch = $env:PROCESSOR_ARCHITECTURE
 if ($Arch -eq "AMD64") {
     $Platform = "windows-x64"
-    $JdkUrl = "https://github.com/adoptium/temurin21-binaries/releases/download/jdk-$JdkVersion/OpenJDK21U-jdk_x64_windows_hotspot_$JdkBuild.zip"
-    $JdkArchive = "OpenJDK21U-jdk_x64_windows_hotspot_$JdkBuild.zip"
+    $JdkUrl = "https://github.com/adoptium/temurin$JavaVersion-binaries/releases/download/jdk-$JdkVersion/OpenJDK$($JavaVersion)U-jdk_x64_windows_hotspot_$JdkBuild.zip"
+    $JdkArchive = "OpenJDK$($JavaVersion)U-jdk_x64_windows_hotspot_$JdkBuild.zip"
     $JdkExtractedDir = "jdk-$JdkVersion"
 } elseif ($Arch -eq "ARM64") {
     $Platform = "windows-aarch64"
-    $JdkUrl = "https://github.com/adoptium/temurin21-binaries/releases/download/jdk-$JdkVersion/OpenJDK21U-jdk_aarch64_windows_hotspot_$JdkBuild.zip"
-    $JdkArchive = "OpenJDK21U-jdk_aarch64_windows_hotspot_$JdkBuild.zip"
+    $JdkUrl = "https://github.com/adoptium/temurin$JavaVersion-binaries/releases/download/jdk-$JdkVersion/OpenJDK$($JavaVersion)U-jdk_aarch64_windows_hotspot_$JdkBuild.zip"
+    $JdkArchive = "OpenJDK$($JavaVersion)U-jdk_aarch64_windows_hotspot_$JdkBuild.zip"
     $JdkExtractedDir = "jdk-$JdkVersion"
 } else {
     Write-Host "[ERROR] Unsupported architecture: $Arch" -ForegroundColor Red
@@ -35,7 +48,7 @@ if ((Test-Path $JdkDir) -and (Test-Path $JavaExe)) {
     exit 0
 }
 
-Write-Host "[DOWNLOAD] Downloading Temurin OpenJDK 21 for $Platform..." -ForegroundColor Cyan
+Write-Host "[DOWNLOAD] Downloading Temurin OpenJDK $JavaVersion for $Platform..." -ForegroundColor Cyan
 Write-Host "   URL: $JdkUrl"
 
 # Create temporary directory
@@ -74,7 +87,7 @@ try {
     & $JavaExe -version
     
     Write-Host ""
-    Write-Host "[SUCCESS] Temurin OpenJDK 21 is ready to use at: $JdkDir" -ForegroundColor Green
+    Write-Host "[SUCCESS] Temurin OpenJDK $JavaVersion is ready to use at: $JdkDir" -ForegroundColor Green
     
 } finally {
     # Clean up temporary directory

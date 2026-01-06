@@ -115,8 +115,6 @@ import net.minecraft.network.protocol.game.ServerboundPlayerActionPacket;
 import net.minecraft.network.protocol.game.ServerboundPlayerCommandPacket;
 import net.minecraft.network.protocol.game.ServerboundPlayerInputPacket;
 import net.minecraft.network.protocol.game.ServerboundPlayerLoadedPacket;
-import net.minecraft.network.protocol.game.ServerboundRecipeBookChangeSettingsPacket;
-import net.minecraft.network.protocol.game.ServerboundRecipeBookSeenRecipePacket;
 import net.minecraft.network.protocol.game.ServerboundRenameItemPacket;
 import net.minecraft.network.protocol.game.ServerboundSeenAdvancementsPacket;
 import net.minecraft.network.protocol.game.ServerboundSelectBundleItemPacket;
@@ -265,6 +263,8 @@ public class ServerGamePacketListenerImpl
 	private final MessageSignatureCache messageSignatureCache = MessageSignatureCache.createDefault();
 	private final FutureChain chatMessageChain;
 	private boolean waitingForSwitchToConfig;
+	// WorldEdit: Track swing packets to suppress after certain actions
+	private int worldEdit_ignoreSwingPackets = 0;
 
 	public ServerGamePacketListenerImpl(
 		MinecraftServer minecraftServer, Connection connection, ServerPlayer serverPlayer, CommonListenerCookie commonListenerCookie
@@ -539,30 +539,9 @@ public class ServerGamePacketListenerImpl
 	}
 
 	@Override
-	public void handleRecipeBookSeenRecipePacket(ServerboundRecipeBookSeenRecipePacket serverboundRecipeBookSeenRecipePacket) {
-		PacketUtils.ensureRunningOnSameThread(serverboundRecipeBookSeenRecipePacket, this, this.player.level());
-		RecipeManager.ServerDisplayInfo serverDisplayInfo = this.server.getRecipeManager().getRecipeFromDisplay(serverboundRecipeBookSeenRecipePacket.recipe());
-		if (serverDisplayInfo != null) {
-			this.player.getRecipeBook().removeHighlight(serverDisplayInfo.parent().id());
-		}
-	}
-
-	@Override
 	public void handleBundleItemSelectedPacket(ServerboundSelectBundleItemPacket serverboundSelectBundleItemPacket) {
 		PacketUtils.ensureRunningOnSameThread(serverboundSelectBundleItemPacket, this, this.player.level());
 		this.player.containerMenu.setSelectedBundleItemIndex(serverboundSelectBundleItemPacket.slotId(), serverboundSelectBundleItemPacket.selectedItemIndex());
-	}
-
-	@Override
-	public void handleRecipeBookChangeSettingsPacket(ServerboundRecipeBookChangeSettingsPacket serverboundRecipeBookChangeSettingsPacket) {
-		PacketUtils.ensureRunningOnSameThread(serverboundRecipeBookChangeSettingsPacket, this, this.player.level());
-		this.player
-			.getRecipeBook()
-			.setBookSetting(
-				serverboundRecipeBookChangeSettingsPacket.getBookType(),
-				serverboundRecipeBookChangeSettingsPacket.isOpen(),
-				serverboundRecipeBookChangeSettingsPacket.isFiltering()
-			);
 	}
 
 	@Override
@@ -1203,6 +1182,18 @@ public class ServerGamePacketListenerImpl
 			BlockPos blockPos = serverboundPlayerActionPacket.getPos();
 			this.player.resetLastActionTime();
 			ServerboundPlayerActionPacket.Action action = serverboundPlayerActionPacket.getAction();
+			
+			// WorldEdit: Increment swing packet counter for certain actions
+			switch (action) {
+				case DROP_ITEM:
+				case DROP_ALL_ITEMS:
+				case START_DESTROY_BLOCK:
+					this.worldEdit_ignoreSwingPackets++;
+					break;
+				default:
+					break;
+			}
+			
 			switch (action) {
 				case SWAP_ITEM_WITH_OFFHAND:
 					if (!this.player.isSpectator()) {
@@ -1351,6 +1342,8 @@ public class ServerGamePacketListenerImpl
 	@Override
 	public void onDisconnect(DisconnectionDetails disconnectionDetails) {
 		LOGGER.info("{} lost connection: {}", this.player.getPlainTextName(), disconnectionDetails.reason().getString());
+		// WorldEdit: Handle player disconnect
+		net.minecraft.worldedit.platform.WorldEditIntegration.onPlayerDisconnect(this.player);
 		this.removePlayerFromWorld();
 		super.onDisconnect(disconnectionDetails);
 	}
@@ -1594,6 +1587,14 @@ public class ServerGamePacketListenerImpl
 	public void handleAnimate(ServerboundSwingPacket serverboundSwingPacket) {
 		PacketUtils.ensureRunningOnSameThread(serverboundSwingPacket, this, this.player.level());
 		this.player.resetLastActionTime();
+		
+		// WorldEdit: Handle general tool activation on left-click air
+		if (this.worldEdit_ignoreSwingPackets > 0) {
+			this.worldEdit_ignoreSwingPackets--;
+		} else {
+			net.minecraft.worldedit.platform.WorldEditIntegration.onLeftClickAir(this.player, serverboundSwingPacket.getHand());
+		}
+		
 		this.player.swing(serverboundSwingPacket.getHand());
 	}
 
@@ -1836,21 +1837,20 @@ public class ServerGamePacketListenerImpl
 				RecipeManager.ServerDisplayInfo serverDisplayInfo = this.server.getRecipeManager().getRecipeFromDisplay(serverboundPlaceRecipePacket.recipe());
 				if (serverDisplayInfo != null) {
 					RecipeHolder<?> recipeHolder = serverDisplayInfo.parent();
-					if (this.player.getRecipeBook().contains(recipeHolder.id())) {
-						if (this.player.containerMenu instanceof RecipeBookMenu recipeBookMenu) {
-							if (recipeHolder.value().placementInfo().isImpossibleToPlace()) {
+					// Recipe book removed - allow all recipes to be placed
+					if (this.player.containerMenu instanceof RecipeBookMenu recipeBookMenu) {
+						if (recipeHolder.value().placementInfo().isImpossibleToPlace()) {
 								LOGGER.debug("Player {} tried to place impossible recipe {}", this.player, recipeHolder.id().location());
 								return;
 							}
 
-							RecipeBookMenu.PostPlaceAction postPlaceAction = recipeBookMenu.handlePlacement(
+						RecipeBookMenu.PostPlaceAction postPlaceAction = recipeBookMenu.handlePlacement(
 								serverboundPlaceRecipePacket.useMaxItems(), this.player.isCreative(), recipeHolder, this.player.level(), this.player.getInventory()
 							);
 							if (postPlaceAction == RecipeBookMenu.PostPlaceAction.PLACE_GHOST_RECIPE) {
 								this.send(new ClientboundPlaceGhostRecipePacket(this.player.containerMenu.containerId, serverDisplayInfo.display().display()));
 							}
 						}
-					}
 				}
 			}
 		}

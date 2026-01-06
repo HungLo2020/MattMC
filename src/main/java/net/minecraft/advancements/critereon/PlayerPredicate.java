@@ -27,7 +27,6 @@ import net.minecraft.server.PlayerAdvancements;
 import net.minecraft.server.ServerAdvancementManager;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.stats.ServerRecipeBook;
 import net.minecraft.stats.Stat;
 import net.minecraft.stats.StatType;
 import net.minecraft.stats.StatsCounter;
@@ -83,13 +82,8 @@ public record PlayerPredicate(
 				}
 			}
 
-			ServerRecipeBook serverRecipeBook = serverPlayer.getRecipeBook();
-
-			for (Entry<ResourceKey<Recipe<?>>> entry : this.recipes.object2BooleanEntrySet()) {
-				if (serverRecipeBook.contains((ResourceKey<Recipe<?>>)entry.getKey()) != entry.getBooleanValue()) {
-					return false;
-				}
-			}
+			// Recipe book removed - recipe knowledge checks always pass
+			// If any advancement uses recipe predicates, they will no longer work
 
 			if (!this.advancements.isEmpty()) {
 				PlayerAdvancements playerAdvancements = serverPlayer.getAdvancements();

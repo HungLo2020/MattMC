@@ -1,23 +1,9 @@
 package net.sodium.api.memory;
 
-import sun.misc.Unsafe;
-
-import java.lang.reflect.Field;
+import java.lang.foreign.MemorySegment;
+import java.lang.foreign.ValueLayout;
 
 public class MemoryIntrinsics {
-    private static final Unsafe UNSAFE;
-
-    static {
-        try {
-            Field field = Unsafe.class.getDeclaredField("theUnsafe");
-            field.setAccessible(true);
-
-            UNSAFE = (Unsafe) field.get(null);
-        } catch (NoSuchFieldException | IllegalAccessException e) {
-            throw new RuntimeException("Couldn't obtain reference to sun.misc.Unsafe", e);
-        }
-    }
-
     /**
      * Copies the number of bytes specified by {@param length} between off-heap buffers {@param src} and {@param dst}.
      * <p>
@@ -29,7 +15,10 @@ public class MemoryIntrinsics {
      * @param length The number of bytes to copy
      */
     public static void copyMemory(long src, long dst, int length) {
-        // This seems to be faster than MemoryUtil.copyMemory in all cases.
-        UNSAFE.copyMemory(src, dst, length);
+        // Use the Foreign Function & Memory API (standard since Java 22)
+        // This is the modern, safe replacement for sun.misc.Unsafe.copyMemory
+        MemorySegment srcSegment = MemorySegment.ofAddress(src).reinterpret(length);
+        MemorySegment dstSegment = MemorySegment.ofAddress(dst).reinterpret(length);
+        dstSegment.copyFrom(srcSegment);
     }
 }

@@ -208,8 +208,11 @@ public abstract class PlayerList {
 			// Ignore - event handlers should not break player join
 		}
 		
+		// WorldEdit: Initialize session for player
+		net.minecraft.worldedit.platform.WorldEditIntegration.onPlayerJoin(serverPlayer);
+		
 		serverPlayer.getStats().markAllDirty();
-		serverPlayer.getRecipeBook().sendInitialRecipeBook(serverPlayer);
+		// Recipe book removed - no longer sending initial recipe book data
 		this.updateEntireScoreboard(serverLevel.getScoreboard(), serverPlayer);
 		this.server.invalidateStatus();
 		MutableComponent mutableComponent;
@@ -892,7 +895,7 @@ public abstract class PlayerList {
 
 		for (ServerPlayer serverPlayer : this.players) {
 			serverPlayer.connection.send(clientboundUpdateRecipesPacket);
-			serverPlayer.getRecipeBook().sendInitialRecipeBook(serverPlayer);
+			// Recipe book removed - no longer sending initial recipe book data
 		}
 	}
 

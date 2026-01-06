@@ -564,6 +564,7 @@ public class Options {
 	public final KeyMapping keyFullscreen = new KeyMapping("key.fullscreen", 300, KeyMapping.Category.MISC);
 	public final KeyMapping keyAdvancements = new KeyMapping("key.advancements", 76, KeyMapping.Category.MISC);
 	public final KeyMapping keyQuickActions = new KeyMapping("key.quickActions", 71, KeyMapping.Category.MISC);
+	public final KeyMapping keyRecipeViewer = new KeyMapping("key.recipeViewer", 82, KeyMapping.Category.INVENTORY);
 	public final KeyMapping[] keyHotbarSlots = new KeyMapping[]{
 		new KeyMapping("key.hotbar.1", 49, KeyMapping.Category.INVENTORY),
 		new KeyMapping("key.hotbar.2", 50, KeyMapping.Category.INVENTORY),
@@ -579,7 +580,8 @@ public class Options {
 	public final KeyMapping keyLoadHotbarActivator = new KeyMapping("key.loadToolbarActivator", 88, KeyMapping.Category.CREATIVE);
 	public final KeyMapping keySpectatorOutlines = new KeyMapping("key.spectatorOutlines", InputConstants.UNKNOWN.getValue(), KeyMapping.Category.SPECTATOR);
 	public final KeyMapping keySpectatorHotbar = new KeyMapping("key.spectatorHotbar", InputConstants.Type.MOUSE, 2, KeyMapping.Category.SPECTATOR);
-	public final KeyMapping[] keyMappings = ArrayUtils.addAll(
+	// VoxelMap: Made mutable (removed final)
+	public KeyMapping[] keyMappings = ArrayUtils.addAll(
 		(KeyMapping[])(new KeyMapping[]{
 			this.keyAttack,
 			this.keyUse,
@@ -607,7 +609,8 @@ public class Options {
 			this.keySaveHotbarActivator,
 			this.keyLoadHotbarActivator,
 			this.keyAdvancements,
-			this.keyQuickActions
+			this.keyQuickActions,
+			this.keyRecipeViewer
 		}),
 		(KeyMapping[])this.keyHotbarSlots
 	);
@@ -617,6 +620,7 @@ public class Options {
 	private CameraType cameraType = CameraType.FIRST_PERSON;
 	public String lastMpIp = "";
 	public String selectedSkin = "steve (Wide)";
+	public String playerName = "steve";
 	public boolean smoothCamera;
 	private final OptionInstance<Integer> fov = new OptionInstance<>(
 		"options.fov",
@@ -1269,6 +1273,7 @@ public class Options {
 		this.incompatibleResourcePacks = fieldAccess.process("incompatibleResourcePacks", this.incompatibleResourcePacks, Options::readListOfStrings, GSON::toJson);
 		this.lastMpIp = fieldAccess.process("lastServer", this.lastMpIp);
 		this.selectedSkin = fieldAccess.process("selectedSkin", this.selectedSkin);
+		this.playerName = fieldAccess.process("playerName", this.playerName);
 		fieldAccess.process("lang", this.languageCode);
 		this.languageCode = "en_us";
 		fieldAccess.process("chatVisibility", this.chatVisibility);

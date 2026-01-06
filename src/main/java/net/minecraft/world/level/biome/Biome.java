@@ -60,7 +60,8 @@ public final class Biome implements net.irisshaders.iris.mixinterface.ExtendedBi
 	);
 	public static final PerlinSimplexNoise BIOME_INFO_NOISE = new PerlinSimplexNoise(new WorldgenRandom(new LegacyRandomSource(2345L)), ImmutableList.of(0));
 	private static final int TEMPERATURE_CACHE_SIZE = 1024;
-	private final Biome.ClimateSettings climateSettings;
+	// VoxelMap: Made accessible
+	public final Biome.ClimateSettings climateSettings;
 	private final BiomeGenerationSettings generationSettings;
 	private final MobSpawnSettings mobSettings;
 	private final BiomeSpecialEffects specialEffects;

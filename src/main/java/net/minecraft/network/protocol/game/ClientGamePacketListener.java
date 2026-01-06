@@ -20,12 +20,6 @@ public interface ClientGamePacketListener extends ClientCommonPacketListener, Cl
 
 	void handleAwardStats(ClientboundAwardStatsPacket clientboundAwardStatsPacket);
 
-	void handleRecipeBookAdd(ClientboundRecipeBookAddPacket clientboundRecipeBookAddPacket);
-
-	void handleRecipeBookRemove(ClientboundRecipeBookRemovePacket clientboundRecipeBookRemovePacket);
-
-	void handleRecipeBookSettings(ClientboundRecipeBookSettingsPacket clientboundRecipeBookSettingsPacket);
-
 	void handleBlockDestruction(ClientboundBlockDestructionPacket clientboundBlockDestructionPacket);
 
 	void handleOpenSignEditor(ClientboundOpenSignEditorPacket clientboundOpenSignEditorPacket);

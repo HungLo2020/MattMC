@@ -1,6 +1,6 @@
 # Bundled JDK Setup
 
-This project uses Temurin OpenJDK 21 bundled with the application to ensure consistent Java runtime across all environments.
+This project uses Temurin OpenJDK 25 bundled with the application to ensure consistent Java runtime across all environments.
 
 ## Automatic Download (Windows/Linux/macOS)
 
@@ -31,26 +31,26 @@ If automatic download doesn't work, download manually:
 
 1. Go to: https://adoptium.net/temurin/releases/
 2. Select:
-   - **Version:** 21 LTS
+   - **Version:** 25
    - **Operating System:** Your OS (Linux, Windows, macOS)
    - **Architecture:** x64 or aarch64 (ARM)
    - **Package Type:** JDK
    - **Archive Type:** .tar.gz (Linux/macOS) or .zip (Windows)
 
-3. Download and extract to `libraries/jdk-21/`
+3. Download and extract to `libraries/jdk-25/`
 
 ### Linux/macOS:
 ```bash
 cd libraries
-tar -xzf /path/to/OpenJDK21U-jdk_*.tar.gz
-mv jdk-21.0.5+11 jdk-21
+tar -xzf /path/to/OpenJDK25U-jdk_*.tar.gz
+mv jdk-25.0.1+8 jdk-25
 ```
 
 ### Windows:
 ```cmd
 cd libraries
-"C:\Program Files\7-Zip\7z.exe" x C:\path\to\OpenJDK21U-jdk_*.zip
-move jdk-21.0.5+11 jdk-21
+"C:\Program Files\7-Zip\7z.exe" x C:\path\to\OpenJDK25U-jdk_*.zip
+move jdk-25.0.1+8 jdk-25
 ```
 
 ## Directory Structure
@@ -58,7 +58,7 @@ move jdk-21.0.5+11 jdk-21
 ```
 MattMC/
 ├── libraries/
-│   ├── jdk-21/              # Bundled JDK (not committed to git)
+│   ├── jdk-25/              # Bundled JDK (not committed to git)
 │   │   ├── bin/
 │   │   │   ├── java         # Java executable (Linux/macOS)
 │   │   │   └── java.exe     # Java executable (Windows)
@@ -67,7 +67,7 @@ MattMC/
 │   ├── download-jdk.sh      # Automatic download script (Linux/macOS)
 │   └── download-jdk.ps1     # Automatic download script (Windows)
 └── run/
-    └── jdk-21/              # JDK copied here at runtime (not committed to git)
+    └── jdk-25/              # JDK copied here at runtime (not committed to git)
         ├── bin/
         └── ...
 ```
@@ -76,7 +76,8 @@ MattMC/
 
 1. **Consistency:** Everyone uses the same Java version
 2. **Portability:** No need to install Java separately
-3. **Version Control:** Specific Java 21 features and behaviors are guaranteed
+3. **Version Control:** Specific Java 25 features and behaviors are guaranteed
+4. **Performance:** Java 25 includes Compact Object Headers (JEP 519) for improved memory efficiency and performance
 
 ## Note
 

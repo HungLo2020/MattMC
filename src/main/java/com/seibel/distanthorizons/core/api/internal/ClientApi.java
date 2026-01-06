@@ -378,9 +378,9 @@ public class ClientApi
 	/** Should be called before {@link ClientApi#renderDeferredLodsForShaders} */
 	public void renderLods() 
 	{ 
-		LOGGER.debug("[DH-RENDER] renderLods() called");
+		//LOGGER.debug("[DH-RENDER] renderLods() called");
 		this.renderLodLayer(false); 
-		LOGGER.debug("[DH-RENDER] renderLods() completed");
+		//LOGGER.debug("[DH-RENDER] renderLods() completed");
 	}
 	
 	/** 
@@ -486,14 +486,14 @@ public class ClientApi
 		String validationMessage = renderParams.getValidationErrorMessage();
 		if (validationMessage != null)
 		{
-			LOGGER.warn("[DH-RENDER-VALIDATION] ========== VALIDATION FAILED ==========");
-			LOGGER.warn("[DH-RENDER-VALIDATION] Reason: " + validationMessage);
-			LOGGER.warn("[DH-RENDER-VALIDATION] Current DH world: " + SharedApi.getAbstractDhWorld());
-			LOGGER.warn("[DH-RENDER-VALIDATION] tryGetDhClientWorld: " + SharedApi.tryGetDhClientWorld());
-			LOGGER.warn("[DH-RENDER-VALIDATION] dhClientWorld from params: " + renderParams.dhClientWorld);
-			LOGGER.warn("[DH-RENDER-VALIDATION] dhClientLevel from params: " + renderParams.dhClientLevel);
-			LOGGER.warn("[DH-RENDER-VALIDATION] clientLevelWrapper from params: " + renderParams.clientLevelWrapper);
-			LOGGER.warn("[DH-RENDER-VALIDATION] ========================================");
+			//LOGGER.warn("[DH-RENDER-VALIDATION] ========== VALIDATION FAILED ==========");
+			//LOGGER.warn("[DH-RENDER-VALIDATION] Reason: " + validationMessage);
+			//LOGGER.warn("[DH-RENDER-VALIDATION] Current DH world: " + SharedApi.getAbstractDhWorld());
+			//LOGGER.warn("[DH-RENDER-VALIDATION] tryGetDhClientWorld: " + SharedApi.tryGetDhClientWorld());
+			//LOGGER.warn("[DH-RENDER-VALIDATION] dhClientWorld from params: " + renderParams.dhClientWorld);
+			//LOGGER.warn("[DH-RENDER-VALIDATION] dhClientLevel from params: " + renderParams.dhClientLevel);
+			//LOGGER.warn("[DH-RENDER-VALIDATION] clientLevelWrapper from params: " + renderParams.clientLevelWrapper);
+			//LOGGER.warn("[DH-RENDER-VALIDATION] ========================================");
 			
 			this.lastRenderParamValidationMessage = validationMessage;
 			return;

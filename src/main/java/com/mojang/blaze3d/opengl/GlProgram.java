@@ -146,6 +146,9 @@ public class GlProgram implements AutoCloseable, net.irisshaders.iris.mixinterfa
 					int n = i++;
 					GL31.glUniformBlockBinding(this.programId, p, n);
 					this.uniformsByName.put(string, new Uniform.Ubo(n));
+				} else if (string.startsWith("iris_")) {
+					// Silently skip Iris-injected uniforms
+					// These uniforms are managed by Iris's own pipeline
 				} else {
 					LOGGER.warn("Found unknown and unsupported uniform {} in {}", string, this.debugLabel);
 				}

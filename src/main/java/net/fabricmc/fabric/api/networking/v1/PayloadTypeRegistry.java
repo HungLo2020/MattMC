@@ -4,7 +4,7 @@ import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 
 /**
  * Registry for custom payload types.
- * Simplified stub for Distant Horizons compatibility.
+ * Simplified stub for Distant Horizons and VoxelMap compatibility.
  */
 public final class PayloadTypeRegistry<B> {
 	
@@ -21,6 +21,20 @@ public final class PayloadTypeRegistry<B> {
 	 * Gets the registry for server-to-client packets.
 	 */
 	public static PayloadTypeRegistry<CustomPacketPayload> playS2C() {
+		return new PayloadTypeRegistry<>();
+	}
+	
+	/**
+	 * Gets the registry for client-to-server configuration packets.
+	 */
+	public static PayloadTypeRegistry<CustomPacketPayload> configurationC2S() {
+		return new PayloadTypeRegistry<>();
+	}
+	
+	/**
+	 * Gets the registry for server-to-client configuration packets.
+	 */
+	public static PayloadTypeRegistry<CustomPacketPayload> configurationS2C() {
 		return new PayloadTypeRegistry<>();
 	}
 	

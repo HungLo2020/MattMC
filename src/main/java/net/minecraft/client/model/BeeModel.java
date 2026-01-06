@@ -23,7 +23,7 @@ public class BeeModel extends EntityModel<BeeRenderState> {
 	private static final String FRONT_LEGS = "front_legs";
 	private static final String MIDDLE_LEGS = "middle_legs";
 	private static final String BACK_LEGS = "back_legs";
-	private final ModelPart bone;
+	public final ModelPart bone; // VoxelMap: access widener
 	private final ModelPart rightWing;
 	private final ModelPart leftWing;
 	private final ModelPart frontLeg;
