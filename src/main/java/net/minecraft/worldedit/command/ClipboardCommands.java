@@ -16,6 +16,7 @@ import net.minecraft.worldedit.clipboard.Clipboard;
 import net.minecraft.worldedit.core.EditSession;
 import net.minecraft.worldedit.core.WorldEdit;
 import net.minecraft.worldedit.math.BlockVector3;
+import net.minecraft.worldedit.math.transform.AffineTransform;
 import net.minecraft.worldedit.platform.MattMCPlatform;
 import net.minecraft.worldedit.region.Region;
 import net.minecraft.worldedit.session.LocalSession;
@@ -160,15 +161,25 @@ public class ClipboardCommands {
         
         // Paste blocks
         BlockVector3 target = BlockVector3.from(player.blockPosition());
-        BlockVector3 offset = clipboard.getOffset();
+        BlockVector3 origin = clipboard.getOrigin();
+        AffineTransform transform = clipboard.getTransform();
         
         int count = 0;
         for (Map.Entry<BlockVector3, BlockState> entry : clipboard.getBlocks().entrySet()) {
             BlockVector3 clipboardPos = entry.getKey();
             BlockState block = entry.getValue();
             
-            // Calculate paste position
-            BlockVector3 pastePos = target.add(clipboardPos.subtract(clipboard.getOrigin()).add(offset));
+            // Calculate relative position from origin
+            BlockVector3 relativePos = clipboardPos.subtract(origin);
+            
+            // Apply transformation if set (for rotate/flip)
+            if (transform != null) {
+                relativePos = transform.apply(relativePos);
+            }
+            
+            // Calculate final paste position: target + transformedRelativePos
+            // This makes the clipboard paste relative to where the player is standing
+            BlockVector3 pastePos = target.add(relativePos);
             
             if (editSession.setBlock(pastePos, block)) {
                 count++;
@@ -209,9 +220,16 @@ public class ClipboardCommands {
         }
         
         // Apply rotation transform to clipboard
-        net.minecraft.worldedit.math.transform.AffineTransform transform = 
-            net.minecraft.worldedit.math.transform.AffineTransform.rotateY(normalizedDegrees);
-        clipboard.setTransform(transform);
+        // Create new rotation transform
+        AffineTransform newRotation = AffineTransform.rotateY(normalizedDegrees);
+        
+        // Combine with existing transform (if any) to allow stacking rotations
+        AffineTransform existingTransform = clipboard.getTransform();
+        if (existingTransform != null) {
+            clipboard.setTransform(existingTransform.combine(newRotation));
+        } else {
+            clipboard.setTransform(newRotation);
+        }
         
         player.sendSystemMessage(Component.literal(
             String.format("§aClipboard rotated %d degrees", normalizedDegrees)
@@ -235,19 +253,25 @@ public class ClipboardCommands {
         Clipboard clipboard = (Clipboard) session.getClipboard();
         
         // Apply flip transform based on player's facing direction
-        net.minecraft.worldedit.math.transform.AffineTransform transform;
+        AffineTransform newFlip;
         float yaw = player.getYRot();
         
         // Determine flip axis based on player's facing direction
         if ((yaw >= -45 && yaw < 45) || (yaw >= 135 || yaw < -135)) {
             // Facing north/south, flip along Z axis
-            transform = net.minecraft.worldedit.math.transform.AffineTransform.flipZ();
+            newFlip = AffineTransform.flipZ();
         } else {
             // Facing east/west, flip along X axis
-            transform = net.minecraft.worldedit.math.transform.AffineTransform.flipX();
+            newFlip = AffineTransform.flipX();
         }
         
-        clipboard.setTransform(transform);
+        // Combine with existing transform (if any) to allow stacking transforms
+        AffineTransform existingTransform = clipboard.getTransform();
+        if (existingTransform != null) {
+            clipboard.setTransform(existingTransform.combine(newFlip));
+        } else {
+            clipboard.setTransform(newFlip);
+        }
         
         player.sendSystemMessage(Component.literal("§aClipboard flipped"));
         
