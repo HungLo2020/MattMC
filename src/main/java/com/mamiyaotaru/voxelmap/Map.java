@@ -247,20 +247,38 @@ public class Map implements Runnable, IChangeObserver {
         // this.fboTexture = fboTexture.getTexture();
         this.projection = new VoxelMapCachedOrthoProjectionMatrixBuffer("VoxelMap Map To Screen Proj", -256.0F, 256.0F, 256.0F, -256.0F, 1000.0F, 21000.0F);
 
+        // VoxelMap: Load map textures - check if resources exist first before loading
         try {
-            DynamicTexture arrowTexture = new DynamicTexture(() -> "Minimap Arrow", TextureContents.load(Minecraft.getInstance().getResourceManager(), resourceArrow).image());
-            arrowTexture.setFilter(true, false);
-            minecraft.getTextureManager().register(resourceArrow, arrowTexture);
+            var resourceManager = Minecraft.getInstance().getResourceManager();
+            
+            // Check if arrow texture resource exists
+            if (resourceManager.getResource(resourceArrow).isPresent()) {
+                DynamicTexture arrowTexture = new DynamicTexture(() -> "Minimap Arrow", TextureContents.load(resourceManager, resourceArrow).image());
+                arrowTexture.setFilter(true, false);
+                minecraft.getTextureManager().register(resourceArrow, arrowTexture);
+            } else {
+                VoxelConstants.getLogger().warn("VoxelMap arrow texture resource not found: {}", resourceArrow);
+            }
 
-            DynamicTexture squareMapTexture = new DynamicTexture(() -> "Minimap Square Map Frame", TextureContents.load(Minecraft.getInstance().getResourceManager(), resourceSquareMap).image());
-            squareMapTexture.setFilter(true, false);
-            minecraft.getTextureManager().register(resourceSquareMap, squareMapTexture);
+            // Check if square map texture resource exists
+            if (resourceManager.getResource(resourceSquareMap).isPresent()) {
+                DynamicTexture squareMapTexture = new DynamicTexture(() -> "Minimap Square Map Frame", TextureContents.load(resourceManager, resourceSquareMap).image());
+                squareMapTexture.setFilter(true, false);
+                minecraft.getTextureManager().register(resourceSquareMap, squareMapTexture);
+            } else {
+                VoxelConstants.getLogger().warn("VoxelMap square map texture resource not found: {}", resourceSquareMap);
+            }
 
-            DynamicTexture roundMapTexture = new DynamicTexture(() -> "Minimap Round Map Frame", TextureContents.load(Minecraft.getInstance().getResourceManager(), resourceRoundMap).image());
-            roundMapTexture.setFilter(true, false);
-            minecraft.getTextureManager().register(resourceRoundMap, roundMapTexture);
+            // Check if round map texture resource exists
+            if (resourceManager.getResource(resourceRoundMap).isPresent()) {
+                DynamicTexture roundMapTexture = new DynamicTexture(() -> "Minimap Round Map Frame", TextureContents.load(resourceManager, resourceRoundMap).image());
+                roundMapTexture.setFilter(true, false);
+                minecraft.getTextureManager().register(resourceRoundMap, roundMapTexture);
+            } else {
+                VoxelConstants.getLogger().warn("VoxelMap round map texture resource not found: {}", resourceRoundMap);
+            }
         } catch (Exception exception) {
-            VoxelConstants.getLogger().error("Failed getting map images " + exception.getLocalizedMessage(), exception);
+            VoxelConstants.getLogger().error("Failed loading map textures", exception);
         }
     }
 
