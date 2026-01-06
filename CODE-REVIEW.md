@@ -30,22 +30,58 @@ Deep inspection of MattMC codebase focused on **reducing bloat and complexity**.
 
 ## Files Deleted (Dead Code Verified)
 
-### Batch 1 (Commit 75d808c)
+### Batch 1: Dead Code (Commit 75d808c)
 1. `VisibleChunkCollector.java` - 0 lines, completely empty file
 2. `EDhApiVanillaOverdraw.java` - Deprecated enum, marked "not currently in use", 0 external refs
 
-### Batch 2 (Commit a0f4fc3)
+### Batch 2: Dead Code (Commit a0f4fc3)
 3. `EMinecraftColor.java` - Empty class with TODO, 0 external refs
 4. `TropicalFishVariantDataFactory.java` - Stub class with TODO, 0 external refs
 5. `ModelQuadWinding.java` - Unused enum, 0 external refs
 6. `WeightedRandomListExtension.java` - Unused interface, 0 external refs
 7. `IrisShadowProgram.java` - Unused enum, 0 external refs
 
-### Batch 3 (Commit 705fa31)
+### Batch 3: Dead Code (Commit 705fa31)
 8. `BoolType.java` - Unused utility class, 0 external refs
 9. `BasicVariableExpression.java` - Unused class, 0 external refs
 
-**Total Removed:** 9 files, ~167 lines of code
+### Batch 4: Utility Consolidation (Commit 78b07f0)
+10. `net.caffeinemc.mods.sodium.client.render.texture.SpriteUtil` - Deprecated wrapper, delegated to API version
+
+### Batch 5: Utility Consolidation (Commit fbf745b)
+11. `net.fabricmc.loader.util.UrlUtil` - Deprecated Fabric internal API wrapper
+
+**Total Removed:** 11 files, ~229 lines of code
+
+---
+
+## Utility Consolidation Analysis
+
+**Target:** 137 utility/helper classes identified  
+**Result:** Most utilities are NOT duplicates
+
+### Key Findings:
+
+**No True Duplicates Found:**
+Despite similar naming patterns (MathUtil, StringUtil, FileUtil, ColorUtil, etc.), each utility class has **unique, non-overlapping methods** tailored to its domain:
+
+- `MathUtil` (DH): clamp, pow2, log2, fastInvSqrt
+- `MathUtil` (Sodium): isPowerOfTwo, align, floatToComparableInt
+- `FileUtil` (Minecraft): path validation, sanitization
+- `FileUtil` (DH): corruption handling, renaming
+- `FileUtil` (Sodium): atomic write operations
+
+**Refactoring Opportunities (Not Pursued):**
+- Could replace `MathUtil.clamp` (15 DH usages) with `Mth.clamp` (vanilla)
+- Risk: Requires testing all call sites, potential behavior differences
+- Decision: Keep mod-specific utilities for now
+
+**Deleted Items:**
+- 2 deprecated wrappers (SpriteUtil, UrlUtil)
+- Both marked for removal, 0 external usages
+
+**Conclusion:**
+The 137 utility classes are **domain-specific** and serve different purposes. Further consolidation would require significant refactoring with testing overhead.
 
 ---
 
