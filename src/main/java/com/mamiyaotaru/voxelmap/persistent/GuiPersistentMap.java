@@ -208,8 +208,8 @@ public class GuiPersistentMap extends PopupGuiScreen implements IGuiWaypoints {
         this.addRenderableWidget(new PopupGuiButton(this.sideMargin + 3 * (this.buttonWidth + this.buttonSeparation), this.getHeight() - 28, this.buttonWidth, 20, Component.translatable("menu.options"), button -> minecraft.setScreen(new GuiMinimapOptions(this)), this));
         this.addRenderableWidget(new PopupGuiButton(this.sideMargin + 4 * (this.buttonWidth + this.buttonSeparation), this.getHeight() - 28, this.buttonWidth, 20, Component.translatable("gui.done"), button -> minecraft.setScreen(parent), this));
         this.coordinates = new EditBox(this.getFont(), this.sideMargin, 10, 140, 20, null);
-        this.top = 32;
-        this.bottom = this.getHeight() - 32;
+        this.top = 0;
+        this.bottom = this.getHeight();
         this.centerX = this.getWidth() / 2;
         this.centerY = (this.bottom - this.top) / 2;
         this.scScale = (float) minecraft.getWindow().getGuiScale();
@@ -812,8 +812,6 @@ public class GuiPersistentMap extends PopupGuiScreen implements IGuiWaypoints {
             this.switchToMouseInput();
         }
 
-        this.overlayBackground(guiGraphics, 0, this.top, 255, 255);
-        this.overlayBackground(guiGraphics, this.bottom, this.getHeight(), 255, 255);
         if (VoxelMap.mapOptions.worldmapAllowed) {
             guiGraphics.drawCenteredString(this.getFont(), this.screenTitle, this.getWidth() / 2, 16, 0xFFFFFFFF);
             int x = (int) Math.floor(cursorCoordX);
@@ -939,14 +937,6 @@ public class GuiPersistentMap extends PopupGuiScreen implements IGuiWaypoints {
 
     public void renderBackground(GuiGraphics drawContext) {
         drawContext.fill(0, 0, this.getWidth(), this.getHeight(), 0xff000000);
-    }
-
-    protected void overlayBackground(GuiGraphics guiGraphics, int startY, int endY, int startAlpha, int endAlpha) {
-        int colorBase = 0x404040;
-        int colorStart = (startAlpha << 24) | colorBase;
-        int colorEnd = (endAlpha << 24) | colorBase;
-        float renderedTextureSize = 32.0F;
-        VoxelMapGuiGraphics.blitFloatGradient(guiGraphics, RenderPipelines.GUI_TEXTURED, VoxelConstants.getOptionsBackgroundTexture(), 0, startY, this.getWidth(), endY, 0, this.width / renderedTextureSize, 0, endY / renderedTextureSize, colorStart, colorEnd);
     }
 
     @Override
