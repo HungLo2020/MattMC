@@ -193,7 +193,7 @@ public class KeyMapping implements Comparable<KeyMapping> {
 
 	@Environment(EnvType.CLIENT)
 	public record Category(ResourceLocation id) {
-		static final List<KeyMapping.Category> SORT_ORDER = new ArrayList();
+		public static final List<KeyMapping.Category> SORT_ORDER = new ArrayList(); // VoxelMap: Made public to allow checking for existing categories
 		public static final KeyMapping.Category MOVEMENT = register("movement");
 		public static final KeyMapping.Category MISC = register("misc");
 		public static final KeyMapping.Category MULTIPLAYER = register("multiplayer");

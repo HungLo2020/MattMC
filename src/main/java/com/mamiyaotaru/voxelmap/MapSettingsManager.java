@@ -88,7 +88,22 @@ public class MapSettingsManager implements ISettingsManager {
 
     public MapSettingsManager() {
         instance = this;
-        KeyMapping.Category category = KeyMapping.Category.register(ResourceLocation.fromNamespaceAndPath("voxelmap", "controls.title"));
+        // VoxelMap: Check if category already exists before registering to prevent double registration error
+        ResourceLocation categoryId = ResourceLocation.fromNamespaceAndPath("voxelmap", "controls.title");
+        KeyMapping.Category category = null;
+        
+        // Try to find existing category
+        for (KeyMapping.Category existingCategory : KeyMapping.Category.SORT_ORDER) {
+            if (existingCategory.id().equals(categoryId)) {
+                category = existingCategory;
+                break;
+            }
+        }
+        
+        // If not found, register new category
+        if (category == null) {
+            category = KeyMapping.Category.register(categoryId);
+        }
 
         keyBindZoom = new KeyMapping("key.minimap.zoom", InputConstants.getKey("key.keyboard.z").getValue(), category);
         keyBindFullscreen = new KeyMapping("key.minimap.toggleFullscreen", InputConstants.getKey("key.keyboard.x").getValue(), category);
