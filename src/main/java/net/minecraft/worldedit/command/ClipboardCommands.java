@@ -160,15 +160,16 @@ public class ClipboardCommands {
         
         // Paste blocks
         BlockVector3 target = BlockVector3.from(player.blockPosition());
-        BlockVector3 offset = clipboard.getOffset();
+        BlockVector3 origin = clipboard.getOrigin();
         
         int count = 0;
         for (Map.Entry<BlockVector3, BlockState> entry : clipboard.getBlocks().entrySet()) {
             BlockVector3 clipboardPos = entry.getKey();
             BlockState block = entry.getValue();
             
-            // Calculate paste position
-            BlockVector3 pastePos = target.add(clipboardPos.subtract(clipboard.getOrigin()).add(offset));
+            // Calculate paste position: target + (clipboardPos - origin)
+            // This makes the clipboard paste relative to where the player is standing
+            BlockVector3 pastePos = target.add(clipboardPos.subtract(origin));
             
             if (editSession.setBlock(pastePos, block)) {
                 count++;
