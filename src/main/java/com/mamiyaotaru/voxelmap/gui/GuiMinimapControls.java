@@ -21,7 +21,7 @@ public class GuiMinimapControls extends GuiScreenMinimap {
 
     public void init() {
         this.addRenderableWidget(new Button.Builder(Component.translatable("gui.done"), button -> VoxelConstants.getMinecraft().setScreen(this.parentScreen)).bounds(this.getWidth() / 2 - 100, this.getHeight() - 28, 200, 20).build());
-        this.screenTitle = I18n.get("key.category.voxelmap.controls.title");
+        this.screenTitle = I18n.get("voxelmap.key.category.voxelmap.controls.title");
 
         this.keymapList = new GuiButtonRowListKeys(this);
         this.addRenderableWidget(this.keymapList);
@@ -38,8 +38,8 @@ public class GuiMinimapControls extends GuiScreenMinimap {
 
     public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float delta) {
         super.render(guiGraphics, mouseX, mouseY, delta);
-        guiGraphics.drawCenteredString(this.getFont(), I18n.get("controls.minimap.unbind1"), this.getWidth() / 2, this.getHeight() - 64, 0xFFFFFFFF);
-        guiGraphics.drawCenteredString(this.getFont(), "§e" + I18n.get("controls.minimap.unbind2"), this.getWidth() / 2, this.getHeight() - 48, 0xFFFFFFFF);
+        guiGraphics.drawCenteredString(this.getFont(), I18n.get("voxelmap.controls.minimap.unbind1"), this.getWidth() / 2, this.getHeight() - 64, 0xFFFFFFFF);
+        guiGraphics.drawCenteredString(this.getFont(), "§e" + I18n.get("voxelmap.controls.minimap.unbind2"), this.getWidth() / 2, this.getHeight() - 48, 0xFFFFFFFF);
         guiGraphics.drawCenteredString(this.getFont(), this.screenTitle, this.getWidth() / 2, 20, 0xFFFFFFFF);
     }
 }

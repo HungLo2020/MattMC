@@ -28,7 +28,7 @@ public class GuiMinimapOptions extends GuiScreenMinimap {
     @Override
     public void init() {
         EnumOptionsMinimap[] relevantOptions = { EnumOptionsMinimap.SHOW_COORDS, EnumOptionsMinimap.HIDE_MINIMAP, EnumOptionsMinimap.LOCATION, EnumOptionsMinimap.SIZE, EnumOptionsMinimap.SQUARE_MAP, EnumOptionsMinimap.ROTATES, EnumOptionsMinimap.IN_GAME_WAYPOINTS, EnumOptionsMinimap.CAVE_MODE, EnumOptionsMinimap.MOVE_MAP_DOWN_WHILE_STATUS_EFFECT, EnumOptionsMinimap.MOVE_SCOREBOARD_DOWN};
-        this.screenTitle = I18n.get("options.minimap.title");
+        this.screenTitle = I18n.get("voxelmap.options.minimap.title");
 
         for (int i = 0; i < relevantOptions.length; i++) {
             EnumOptionsMinimap option = relevantOptions[i];
@@ -46,12 +46,12 @@ public class GuiMinimapOptions extends GuiScreenMinimap {
             }
         }
 
-        Button radarOptionsButton = new Button.Builder(Component.translatable("options.minimap.radar"), button -> VoxelConstants.getMinecraft().setScreen(new GuiRadarOptions(this))).bounds(this.getWidth() / 2 - 155, this.getHeight() / 6 + 135 - 6, 150, 20).build();
+        Button radarOptionsButton = new Button.Builder(Component.translatable("voxelmap.options.minimap.radar"), button -> VoxelConstants.getMinecraft().setScreen(new GuiRadarOptions(this))).bounds(this.getWidth() / 2 - 155, this.getHeight() / 6 + 135 - 6, 150, 20).build();
         radarOptionsButton.active = VoxelConstants.getVoxelMapInstance().getRadarOptions().radarAllowed || VoxelConstants.getVoxelMapInstance().getRadarOptions().radarMobsAllowed || VoxelConstants.getVoxelMapInstance().getRadarOptions().radarPlayersAllowed;
         this.addRenderableWidget(radarOptionsButton);
-        this.addRenderableWidget(new Button.Builder(Component.translatable("options.minimap.detailsPerformance"), button -> VoxelConstants.getMinecraft().setScreen(new GuiMinimapPerformance(this))).bounds(this.getWidth() / 2 + 5, this.getHeight() / 6 + 135 - 6, 150, 20).build());
+        this.addRenderableWidget(new Button.Builder(Component.translatable("voxelmap.options.minimap.detailsPerformance"), button -> VoxelConstants.getMinecraft().setScreen(new GuiMinimapPerformance(this))).bounds(this.getWidth() / 2 + 5, this.getHeight() / 6 + 135 - 6, 150, 20).build());
         this.addRenderableWidget(new Button.Builder(Component.translatable("options.controls"), button -> VoxelConstants.getMinecraft().setScreen(new GuiMinimapControls(this))).bounds(this.getWidth() / 2 - 155, this.getHeight() / 6 + 159 - 6, 150, 20).build());
-        Button worldMapButton = new Button.Builder(Component.translatable("options.minimap.worldmap"), button -> VoxelConstants.getMinecraft().setScreen(new GuiPersistentMapOptions(this))).bounds(this.getWidth() / 2 + 5, this.getHeight() / 6 + 159 - 6, 150, 20).build();
+        Button worldMapButton = new Button.Builder(Component.translatable("voxelmap.options.minimap.worldmap"), button -> VoxelConstants.getMinecraft().setScreen(new GuiPersistentMapOptions(this))).bounds(this.getWidth() / 2 + 5, this.getHeight() / 6 + 159 - 6, 150, 20).build();
         worldMapButton.active = VoxelMap.mapOptions.worldmapAllowed;
         this.addRenderableWidget(worldMapButton);
         this.addRenderableWidget(new Button.Builder(Component.translatable("gui.done"), button -> VoxelConstants.getMinecraft().setScreen(this.parent)).bounds(this.getWidth() / 2 - 100, this.getHeight() - 28, 200, 20).build());

@@ -529,7 +529,7 @@ public class WaypointManager {
 
             out.close();
         } catch (FileNotFoundException var12) {
-            MessageUtils.chatInfo("§C" + I18n.get("minimap.waypoints.errorSavingWaypoints"));
+            MessageUtils.chatInfo("§C" + I18n.get("voxelmap.minimap.waypoints.errorSavingWaypoints"));
             VoxelConstants.getLogger().error(var12);
         }
 
@@ -558,7 +558,7 @@ public class WaypointManager {
             worldNameStandard = TextUtils.scrubNameFile(worldNameStandard);
             loaded = this.loadWaypointsExtensible(worldNameStandard);
             if (!loaded) {
-                MessageUtils.chatInfo("§E" + I18n.get("minimap.waypoints.noWaypointsExist"));
+                MessageUtils.chatInfo("§E" + I18n.get("voxelmap.minimap.waypoints.noWaypointsExist"));
             }
         }
 
@@ -688,7 +688,7 @@ public class WaypointManager {
                     in.close();
                     return true;
                 } catch (IOException var25) {
-                    MessageUtils.chatInfo("§C" + I18n.get("minimap.waypoints.errorLoadingWaypoints"));
+                    MessageUtils.chatInfo("§C" + I18n.get("voxelmap.minimap.waypoints.errorLoadingWaypoints"));
                     VoxelConstants.getLogger().error("waypoint load error: " + var25.getLocalizedMessage(), var25);
                     return false;
                 }

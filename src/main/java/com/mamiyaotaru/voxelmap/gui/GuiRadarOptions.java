@@ -32,7 +32,7 @@ public class GuiRadarOptions extends GuiScreenMinimap {
         clearWidgets();
         children().clear();
 
-        this.screenTitle = Component.translatable("options.minimap.radar.title");
+        this.screenTitle = Component.translatable("voxelmap.options.minimap.radar.title");
 
         EnumOptionsMinimap[] relevantOptions = options.radarMode == 2 ? FULL_RELEVANT_OPTIONS : SIMPLE_RELEVANT_OPTIONS;
 
@@ -42,7 +42,7 @@ public class GuiRadarOptions extends GuiScreenMinimap {
 
             // TODO: remove this code after radar helmet icon implementation
             switch (option) {
-                case SHOW_MOB_HELMETS, SHOW_PLAYER_HELMETS -> optionButton.setTooltip(Tooltip.create(Component.translatable("minimap.ui.workInProgress")));
+                case SHOW_MOB_HELMETS, SHOW_PLAYER_HELMETS -> optionButton.setTooltip(Tooltip.create(Component.translatable("voxelmap.minimap.ui.workInProgress")));
             }
             //
 
@@ -52,7 +52,7 @@ public class GuiRadarOptions extends GuiScreenMinimap {
         iterateButtonOptions();
 
         if (options.radarMode == 2) {
-            addRenderableWidget(new Button.Builder(Component.translatable("options.minimap.radar.selectMobs"), x -> VoxelConstants.getMinecraft().setScreen(new GuiMobs(this, options))).bounds(getWidth() / 2 - 155, getHeight() / 6 + 135 - 6, 150, 20).build());
+            addRenderableWidget(new Button.Builder(Component.translatable("voxelmap.options.minimap.radar.selectMobs"), x -> VoxelConstants.getMinecraft().setScreen(new GuiMobs(this, options))).bounds(getWidth() / 2 - 155, getHeight() / 6 + 135 - 6, 150, 20).build());
         }
 
         addRenderableWidget(new Button.Builder(Component.translatable("gui.done"), x -> VoxelConstants.getMinecraft().setScreen(parent)).bounds(getWidth() / 2 - 100, getHeight() - 28, 200, 20).build());

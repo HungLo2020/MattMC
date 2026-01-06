@@ -29,7 +29,7 @@ public class GuiWaypointsOptions extends GuiScreenMinimap {
     @Override
     public void init() {
         int var2 = 0;
-        this.screenTitle = Component.translatable("options.minimap.waypoints.title");
+        this.screenTitle = Component.translatable("voxelmap.options.minimap.waypoints.title");
 
         for (EnumOptionsMinimap option : relevantOptions) {
             if (option.isFloat()) {
@@ -49,8 +49,8 @@ public class GuiWaypointsOptions extends GuiScreenMinimap {
                 GuiOptionButtonMinimap optionButton = new GuiOptionButtonMinimap(this.getWidth() / 2 - 155 + var2 % 2 * 160, this.getHeight() / 6 + 24 * (var2 >> 1), option, Component.literal(this.options.getKeyText(option)), this::optionClicked);
 
                 switch (option) {
-                    case DEATHPOINTS -> optionButton.setTooltip(Tooltip.create(Component.translatable("options.minimap.waypoints.deathpoints.tooltip")));
-                    case DISTANCE_UNIT_CONVERSION -> optionButton.setTooltip(Tooltip.create(Component.translatable("options.minimap.waypoints.distanceUnitConversion.tooltip")));
+                    case DEATHPOINTS -> optionButton.setTooltip(Tooltip.create(Component.translatable("voxelmap.options.minimap.waypoints.deathpoints.tooltip")));
+                    case DISTANCE_UNIT_CONVERSION -> optionButton.setTooltip(Tooltip.create(Component.translatable("voxelmap.options.minimap.waypoints.distanceUnitConversion.tooltip")));
                 }
 
                 this.addRenderableWidget(optionButton);

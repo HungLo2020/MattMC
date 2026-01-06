@@ -38,10 +38,10 @@ public class GuiWelcomeScreen extends GuiScreenMinimap {
         String maintainers = "Fantahund, Brokkonaut, Gamja";
         this.welcomeTexts.clear();
         this.welcomeTexts.add(Component.literal("VoxelMap!").withStyle(ChatFormatting.RED));
-        this.welcomeTexts.add(Component.translatable("minimap.ui.welcome1", maintainers));
-        this.welcomeTexts.add(Component.translatable("minimap.ui.welcome2"));
-        this.welcomeTexts.add(Component.translatable("minimap.ui.welcome3"));
-        this.welcomeTexts.add(Component.translatable("minimap.ui.welcome4"));
+        this.welcomeTexts.add(Component.translatable("voxelmap.minimap.ui.welcome1", maintainers));
+        this.welcomeTexts.add(Component.translatable("voxelmap.minimap.ui.welcome2"));
+        this.welcomeTexts.add(Component.translatable("voxelmap.minimap.ui.welcome3"));
+        this.welcomeTexts.add(Component.translatable("voxelmap.minimap.ui.welcome4"));
         this.welcomeTexts.add(Component.empty());
         KeyMapping[] sortedKeys = Arrays.stream(options.keyBindings).sorted().toArray(KeyMapping[]::new);
         int count = 0;
@@ -63,7 +63,7 @@ public class GuiWelcomeScreen extends GuiScreenMinimap {
             ++count;
         }
 
-        Component closeThisMessage = Component.translatable("minimap.ui.welcome5").withStyle(ChatFormatting.GRAY);
+        Component closeThisMessage = Component.translatable("voxelmap.minimap.ui.welcome5").withStyle(ChatFormatting.GRAY);
         this.addRenderableWidget(this.closeButton = new PlainTextButton(getWidth() / 2 - 110, getHeight() / 2, 100, 10, closeThisMessage, button -> {
             this.options.setOptionValue(EnumOptionsMinimap.WELCOME_SCREEN);
             this.options.saveAll();

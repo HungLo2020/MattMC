@@ -29,9 +29,9 @@ public class GuiButtonRowListPlayers extends AbstractSelectionList<GuiButtonRowL
     private ArrayList<PlayerInfo> playersFiltered;
     final GuiSelectPlayer parentGui;
     final Row everyoneRow;
-    static final Component EVERYONE = Component.translatable("minimap.waypointShare.all");
-    static final Component CONFIRM_TITLE = Component.translatable("minimap.waypointShare.shareWithEveryone");
-    static final Component CONFIRM_EXPLANATION = Component.translatable("minimap.waypointShare.shareWithEveryone2");
+    static final Component EVERYONE = Component.translatable("voxelmap.minimap.waypointShare.all");
+    static final Component CONFIRM_TITLE = Component.translatable("voxelmap.minimap.waypointShare.shareWithEveryone");
+    static final Component CONFIRM_EXPLANATION = Component.translatable("voxelmap.minimap.waypointShare.shareWithEveryone2");
     static final Component CONFIRM_AFFIRM = Component.translatable("gui.yes");
     static final Component CONFIRM_DENY = Component.translatable("gui.cancel");
 
@@ -46,7 +46,7 @@ public class GuiButtonRowListPlayers extends AbstractSelectionList<GuiButtonRowL
             public void onPress(InputWithModifiers inputWithModifiers) {
             }
         };
-        everyoneButton.setTooltip(Tooltip.create(Component.translatable("minimap.waypointShare.shareWithName", EVERYONE)));
+        everyoneButton.setTooltip(Tooltip.create(Component.translatable("voxelmap.minimap.waypointShare.shareWithName", EVERYONE)));
         this.everyoneRow = new Row(everyoneButton, -1);
         this.updateFilter("");
     }
@@ -61,7 +61,7 @@ public class GuiButtonRowListPlayers extends AbstractSelectionList<GuiButtonRowL
         } else {
             Component name = this.getPlayerName(ScoreboardEntry);
             Button btn = new Button.Builder(name, button -> {}).bounds(x, y, 150, 20).build();
-            btn.setTooltip(Tooltip.create(Component.translatable("minimap.waypointShare.shareWithName", name)));
+            btn.setTooltip(Tooltip.create(Component.translatable("voxelmap.minimap.waypointShare.shareWithName", name)));
             return btn;
         }
     }

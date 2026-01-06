@@ -23,10 +23,10 @@ public class GuiSelectPlayer extends GuiScreenMinimap implements BooleanConsumer
     protected EditBox message;
     protected EditBox filter;
     private final String locInfo;
-    static final MutableComponent SHARE_MESSAGE = (Component.translatable("minimap.waypointShare.shareMessage")).append(":");
-    static final Component SHARE_WITH = Component.translatable("minimap.waypointShare.shareWith");
-    static final Component SHARE_WAYPOINT = Component.translatable("minimap.waypointShare.title");
-    static final Component SHARE_COORDINATES = Component.translatable("minimap.waypointShare.titleCoordinate");
+    static final MutableComponent SHARE_MESSAGE = (Component.translatable("voxelmap.minimap.waypointShare.shareMessage")).append(":");
+    static final Component SHARE_WITH = Component.translatable("voxelmap.minimap.waypointShare.shareWith");
+    static final Component SHARE_WAYPOINT = Component.translatable("voxelmap.minimap.waypointShare.title");
+    static final Component SHARE_COORDINATES = Component.translatable("voxelmap.minimap.waypointShare.titleCoordinate");
 
     public GuiSelectPlayer(Screen parentScreen, String locInfo, boolean sharingWaypoint) {
         this.parentScreen = parentScreen;
@@ -44,11 +44,11 @@ public class GuiSelectPlayer extends GuiScreenMinimap implements BooleanConsumer
     public void init() {
         this.screenTitle = this.sharingWaypoint ? SHARE_WAYPOINT : SHARE_COORDINATES;
         this.playerList = new GuiButtonRowListPlayers(this);
-        int messageStringWidth = this.getFont().width(I18n.get("minimap.waypointShare.shareMessage") + ":");
+        int messageStringWidth = this.getFont().width(I18n.get("voxelmap.minimap.waypointShare.shareMessage") + ":");
         this.message = new EditBox(this.getFont(), this.getWidth() / 2 - 153 + messageStringWidth + 5, 34, 305 - messageStringWidth - 5, 20, null);
         this.message.setMaxLength(78);
         this.addRenderableWidget(this.message);
-        int filterStringWidth = this.getFont().width(I18n.get("minimap.waypoints.filter") + ":");
+        int filterStringWidth = this.getFont().width(I18n.get("voxelmap.minimap.waypoints.filter") + ":");
         this.filter = new EditBox(this.getFont(), this.getWidth() / 2 - 153 + filterStringWidth + 5, this.getHeight() - 55, 305 - filterStringWidth - 5, 20, null);
         this.filter.setMaxLength(35);
         this.addRenderableWidget(this.filter);
@@ -140,7 +140,7 @@ public class GuiSelectPlayer extends GuiScreenMinimap implements BooleanConsumer
         drawContext.drawString(this.getFont(), SHARE_MESSAGE, this.getWidth() / 2 - 153, 39, 0xFFA0A0A0);
         this.message.render(drawContext, mouseX, mouseY, delta);
         drawContext.drawCenteredString(this.getFont(), SHARE_WITH, this.getWidth() / 2, 75, 0xFFFFFFFF);
-        drawContext.drawString(this.getFont(), I18n.get("minimap.waypoints.filter") + ":", this.getWidth() / 2 - 153, this.getHeight() - 50, 0xFFA0A0A0);
+        drawContext.drawString(this.getFont(), I18n.get("voxelmap.minimap.waypoints.filter") + ":", this.getWidth() / 2 - 153, this.getHeight() - 50, 0xFFA0A0A0);
         this.filter.render(drawContext, mouseX, mouseY, delta);
 
     }

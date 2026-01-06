@@ -135,20 +135,20 @@ public class RadarSettingsManager implements ISubSettingsManager {
         switch (par1EnumOptions) {
             case RADAR_MODE -> {
                 if (this.radarMode == 2) {
-                    return I18n.get("options.minimap.radar.radarMode.full");
+                    return I18n.get("voxelmap.options.minimap.radar.radarMode.full");
                 }
 
-                return I18n.get("options.minimap.radar.radarMode.simple");
+                return I18n.get("voxelmap.options.minimap.radar.radarMode.simple");
             }
             case SHOW_MOBS -> {
                 if (!this.showHostiles && !this.showNeutrals) {
                     return I18n.get("options.off");
                 } else if (this.showHostiles && !this.showNeutrals) {
-                    return I18n.get("options.minimap.radar.showMobs.showHostiles");
+                    return I18n.get("voxelmap.options.minimap.radar.showMobs.showHostiles");
                 } else if (!this.showHostiles) {
-                    return I18n.get("options.minimap.radar.showMobs.showNeutrals");
+                    return I18n.get("voxelmap.options.minimap.radar.showMobs.showNeutrals");
                 } else {
-                    return I18n.get("options.minimap.radar.showMobs.showAll");
+                    return I18n.get("voxelmap.options.minimap.radar.showMobs.showAll");
                 }
             }
         }

@@ -16,8 +16,8 @@ import net.minecraft.resources.ResourceLocation;
 import java.util.ArrayList;
 
 class GuiSlotDimensions extends AbstractSelectionList<GuiSlotDimensions.DimensionItem> {
-    private static final Component APPLIES = Component.translatable("minimap.waypoints.dimension.applies");
-    private static final Component NOT_APPLIES = Component.translatable("minimap.waypoints.dimension.notApplies");
+    private static final Component APPLIES = Component.translatable("voxelmap.minimap.waypoints.dimension.applies");
+    private static final Component NOT_APPLIES = Component.translatable("voxelmap.minimap.waypoints.dimension.notApplies");
     private static final ResourceLocation CONFIRM = ResourceLocation.parse("textures/gui/sprites/container/beacon/confirm.png");
     private static final ResourceLocation CANCEL = ResourceLocation.parse("textures/gui/sprites/container/beacon/cancel.png");
 

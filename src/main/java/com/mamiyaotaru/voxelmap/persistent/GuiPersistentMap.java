@@ -190,17 +190,17 @@ public class GuiPersistentMap extends PopupGuiScreen implements IGuiWaypoints {
             this.closed = false;
         }
 
-        this.screenTitle = I18n.get("worldmap.title");
+        this.screenTitle = I18n.get("voxelmap.worldmap.title");
         this.buildWorldName();
         this.leftMouseButtonDown = false;
         this.sideMargin = 10;
         this.buttonCount = 5;
         this.buttonSeparation = 4;
         this.buttonWidth = (this.width - this.sideMargin * 2 - this.buttonSeparation * (this.buttonCount - 1)) / this.buttonCount;
-        this.buttonWaypoints = new PopupGuiButton(this.sideMargin, this.getHeight() - 28, this.buttonWidth, 20, Component.translatable("options.minimap.waypoints"), button -> minecraft.setScreen(new GuiWaypoints(this)), this);
+        this.buttonWaypoints = new PopupGuiButton(this.sideMargin, this.getHeight() - 28, this.buttonWidth, 20, Component.translatable("voxelmap.options.minimap.waypoints"), button -> minecraft.setScreen(new GuiWaypoints(this)), this);
         this.addRenderableWidget(this.buttonWaypoints);
-        this.multiworldButtonName = Component.translatable(VoxelConstants.isRealmServer() ? "menu.online" : "options.worldmap.multiworld");
-        this.multiworldButtonNameRed = (Component.translatable(VoxelConstants.isRealmServer() ? "menu.online" : "options.worldmap.multiworld")).withStyle(ChatFormatting.RED);
+        this.multiworldButtonName = Component.translatable(VoxelConstants.isRealmServer() ? "menu.online" : "voxelmap.options.worldmap.multiworld");
+        this.multiworldButtonNameRed = (Component.translatable(VoxelConstants.isRealmServer() ? "menu.online" : "voxelmap.options.worldmap.multiworld")).withStyle(ChatFormatting.RED);
         if (!minecraft.hasSingleplayerServer() && !VoxelConstants.getVoxelMapInstance().getWaypointManager().receivedAutoSubworldName()) {
             this.addRenderableWidget(this.buttonMultiworld = new PopupGuiButton(this.sideMargin + (this.buttonWidth + this.buttonSeparation), this.getHeight() - 28, this.buttonWidth, 20, this.multiworldButtonName, button -> minecraft.setScreen(new GuiSubworldsSelect(this)), this));
         }
@@ -845,7 +845,7 @@ public class GuiPersistentMap extends PopupGuiScreen implements IGuiWaypoints {
                 }
             }
         } else {
-            guiGraphics.drawString(this.getFont(), Component.translatable("worldmap.disabled"), this.sideMargin, 16, 0xFFFFFFFF);
+            guiGraphics.drawString(this.getFont(), Component.translatable("voxelmap.worldmap.disabled"), this.sideMargin, 16, 0xFFFFFFFF);
         }
         super.render(guiGraphics, mouseX, mouseY, delta);
     }
@@ -983,16 +983,16 @@ public class GuiPersistentMap extends PopupGuiScreen implements IGuiWaypoints {
             entries.add(entry);
             entry = new Popup.PopupEntry(I18n.get("selectServer.delete"), 5, true, true);
             entries.add(entry);
-            entry = new Popup.PopupEntry(I18n.get(hovered != this.waypointManager.getHighlightedWaypoint() ? "minimap.waypoints.highlight" : "minimap.waypoints.removeHighlight"), 1, true, true);
+            entry = new Popup.PopupEntry(I18n.get(hovered != this.waypointManager.getHighlightedWaypoint() ? "voxelmap.minimap.waypoints.highlight" : "voxelmap.minimap.waypoints.removeHighlight"), 1, true, true);
         } else {
-            entry = new Popup.PopupEntry(I18n.get("minimap.waypoints.newWaypoint"), 0, true, VoxelMap.mapOptions.waypointsAllowed);
+            entry = new Popup.PopupEntry(I18n.get("voxelmap.minimap.waypoints.newWaypoint"), 0, true, VoxelMap.mapOptions.waypointsAllowed);
             entries.add(entry);
-            entry = new Popup.PopupEntry(I18n.get(hovered == null ? "minimap.waypoints.highlight" : "minimap.waypoints.removeHighlight"), 1, true, VoxelMap.mapOptions.waypointsAllowed);
+            entry = new Popup.PopupEntry(I18n.get(hovered == null ? "voxelmap.minimap.waypoints.highlight" : "voxelmap.minimap.waypoints.removeHighlight"), 1, true, VoxelMap.mapOptions.waypointsAllowed);
         }
         entries.add(entry);
-        entry = new Popup.PopupEntry(I18n.get("minimap.waypoints.teleportTo"), 3, true, true);
+        entry = new Popup.PopupEntry(I18n.get("voxelmap.minimap.waypoints.teleportTo"), 3, true, true);
         entries.add(entry);
-        entry = new Popup.PopupEntry(I18n.get("minimap.waypoints.share"), 2, true, true);
+        entry = new Popup.PopupEntry(I18n.get("voxelmap.minimap.waypoints.share"), 2, true, true);
         entries.add(entry);
 
         this.createPopup(x, y, directX, directY, 60, entries);
@@ -1124,7 +1124,7 @@ public class GuiPersistentMap extends PopupGuiScreen implements IGuiWaypoints {
                 if (hovered != null) {
                     this.deleteClicked = true;
                     this.selectedWaypoint = hovered;
-                    Component title = Component.translatable("minimap.waypoints.deleteConfirm");
+                    Component title = Component.translatable("voxelmap.minimap.waypoints.deleteConfirm");
                     Component explanation = Component.translatable("selectServer.deleteWarning", this.selectedWaypoint.name);
                     Component affirm = Component.translatable("selectServer.deleteButton");
                     Component deny = Component.translatable("gui.cancel");

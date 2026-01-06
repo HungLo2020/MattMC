@@ -88,8 +88,8 @@ public class GuiAddWaypoint extends GuiScreenMinimap implements IPopupGuiScreen 
         this.addRenderableWidget(this.waypointZ);
         int buttonListY = this.getHeight() / 6 + 82 + 6;
         this.addRenderableWidget(this.buttonEnabled = new PopupGuiButton(this.getWidth() / 2 - 101, buttonListY, 100, 20, Component.literal("Enabled: " + (this.waypoint.enabled ? "On" : "Off")), button -> this.waypoint.enabled = !this.waypoint.enabled, this));
-        this.addRenderableWidget(new PopupGuiButton(this.getWidth() / 2 - 101, buttonListY + 24, 100, 20, Component.literal(I18n.get("minimap.waypoints.sortByColor") + ":     "), button -> this.choosingColor = true, this));
-        this.addRenderableWidget(new PopupGuiButton(this.getWidth() / 2 - 101, buttonListY + 48, 100, 20, Component.literal(I18n.get("minimap.waypoints.sortByIcon") + ":     "), button -> this.choosingIcon = true, this));
+        this.addRenderableWidget(new PopupGuiButton(this.getWidth() / 2 - 101, buttonListY + 24, 100, 20, Component.literal(I18n.get("voxelmap.minimap.waypoints.sortByColor") + ":     "), button -> this.choosingColor = true, this));
+        this.addRenderableWidget(new PopupGuiButton(this.getWidth() / 2 - 101, buttonListY + 48, 100, 20, Component.literal(I18n.get("voxelmap.minimap.waypoints.sortByIcon") + ":     "), button -> this.choosingIcon = true, this));
         this.doneButton = new PopupGuiButton(this.getWidth() / 2 - 155, this.getHeight() - 28, 150, 20, Component.translatable("gui.done"), button -> this.acceptWaypoint(), this);
         this.addRenderableWidget(this.doneButton);
         this.addRenderableWidget(new PopupGuiButton(this.getWidth() / 2 + 5, this.getHeight() - 28, 150, 20, Component.translatable("gui.cancel"), button -> this.cancelWaypoint(), this));
@@ -256,10 +256,10 @@ public class GuiAddWaypoint extends GuiScreenMinimap implements IPopupGuiScreen 
     @Override
     public void render(GuiGraphics drawContext, int mouseX, int mouseY, float delta) {
         this.tooltip = null;
-        this.buttonEnabled.setMessage(Component.literal(I18n.get("minimap.waypoints.enabled") + " " + (this.waypoint.enabled ? I18n.get("options.on") : I18n.get("options.off"))));
+        this.buttonEnabled.setMessage(Component.literal(I18n.get("voxelmap.minimap.waypoints.enabled") + " " + (this.waypoint.enabled ? I18n.get("options.on") : I18n.get("options.off"))));
 
-        drawContext.drawCenteredString(this.getFont(), (this.parentGui == null || !this.parentGui.isEditing()) && !this.editing ? I18n.get("minimap.waypoints.new") : I18n.get("minimap.waypoints.edit"), this.getWidth() / 2, 20, 0xFFFFFFFF);
-        drawContext.drawString(this.getFont(), I18n.get("minimap.waypoints.name"), this.getWidth() / 2 - 100, this.getHeight() / 6, 0xFFFFFFFF);
+        drawContext.drawCenteredString(this.getFont(), (this.parentGui == null || !this.parentGui.isEditing()) && !this.editing ? I18n.get("voxelmap.minimap.waypoints.new") : I18n.get("voxelmap.minimap.waypoints.edit"), this.getWidth() / 2, 20, 0xFFFFFFFF);
+        drawContext.drawString(this.getFont(), I18n.get("voxelmap.minimap.waypoints.name"), this.getWidth() / 2 - 100, this.getHeight() / 6, 0xFFFFFFFF);
         drawContext.drawString(this.getFont(), "X", this.getWidth() / 2 - 100, this.getHeight() / 6 + 41, 0xFFFFFFFF);
         drawContext.drawString(this.getFont(), "Y", this.getWidth() / 2 - 28, this.getHeight() / 6 + 41, 0xFFFFFFFF);
         drawContext.drawString(this.getFont(), "Z", this.getWidth() / 2 + 44, this.getHeight() / 6 + 41, 0xFFFFFFFF);
@@ -304,7 +304,7 @@ public class GuiAddWaypoint extends GuiScreenMinimap implements IPopupGuiScreen 
                     int iconPreviewY = pickedIcon.getOriginY() + anchorY;
                     pickedIcon.blit(drawContext, RenderPipelines.GUI_TEXTURED, iconPreviewX - 4, iconPreviewY - 4, 40, 40, color);
 
-                    this.tooltip = Component.translatable(((String) (pickedIcon.getIconName())).replace("voxelmap:images/waypoints/", "minimap.waypoints.").replace(".png", ""));
+                    this.tooltip = Component.translatable(((String) (pickedIcon.getIconName())).replace("voxelmap:images/waypoints/", "voxelmap.minimap.waypoints.").replace(".png", ""));
                 }
             }
         }
