@@ -99,12 +99,15 @@ public class WaypointManager {
         IIconCreator iconCreator = textureAtlas -> {
 
             Map<ResourceLocation, Resource> resourceMap = VoxelConstants.getMinecraft().getResourceManager().listResources("images", asset -> asset.getPath().endsWith(".png"));
+            VoxelConstants.getLogger().info("VoxelMap: Found {} image resources", resourceMap.size());
             for (ResourceLocation candidate : resourceMap.keySet()) {
                 if (candidate.getNamespace().equals("voxelmap") && candidate.getPath().contains("images/waypoints")) {
                     images.add(candidate);
+                    VoxelConstants.getLogger().info("VoxelMap: Adding waypoint image: {}", candidate);
                 }
             }
 
+            VoxelConstants.getLogger().info("VoxelMap: Attempting to load marker icons...");
             Sprite markerIcon = textureAtlas.registerIconForResource(ResourceLocation.fromNamespaceAndPath("voxelmap", "images/waypoints/marker.png"));
             Sprite markerIconSmall = textureAtlas.registerIconForResource(ResourceLocation.fromNamespaceAndPath("voxelmap", "images/waypoints/markersmall.png"));
 

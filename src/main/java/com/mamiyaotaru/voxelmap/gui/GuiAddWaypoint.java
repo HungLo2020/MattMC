@@ -269,7 +269,11 @@ public class GuiAddWaypoint extends GuiScreenMinimap implements IPopupGuiScreen 
         int color = this.waypoint.getUnifiedColor();
 
         drawContext.fill(this.getWidth() / 2 - 25, buttonListY + 24 + 5, this.getWidth() / 2 - 25 + 16, buttonListY + 24 + 5 + 10, color);
-        waypointManager.getTextureAtlasChooser().getAtlasSprite("voxelmap:images/waypoints/waypoint" + this.waypoint.imageSuffix + ".png").blit(drawContext, RenderPipelines.GUI_TEXTURED, this.getWidth() / 2 - 25, buttonListY + 48 + 2, 16, 16, color);
+        try {
+            waypointManager.getTextureAtlasChooser().getAtlasSprite("voxelmap:images/waypoints/waypoint" + this.waypoint.imageSuffix + ".png").blit(drawContext, RenderPipelines.GUI_TEXTURED, this.getWidth() / 2 - 25, buttonListY + 48 + 2, 16, 16, color);
+        } catch (IllegalStateException e) {
+            // VoxelMap: Texture atlas not ready yet - skip rendering icon preview
+        }
 
         if (this.choosingColor || this.choosingIcon) {
             this.renderTransparentBackground(drawContext);

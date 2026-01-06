@@ -238,8 +238,14 @@ public class TextureAtlas extends AbstractTexture {
                 icon = Sprite.spriteFromResourceLocation(resourceLocation, this);
 
                 try {
-                    TextureContents image = TextureContents.load(Minecraft.getInstance().getResourceManager(), resourceLocation);
-                    icon.setTextureData(image.image());
+                    // VoxelMap: Try to load the resource, check if it exists first
+                    var resourceOpt = Minecraft.getInstance().getResourceManager().getResource(resourceLocation);
+                    if (resourceOpt.isPresent()) {
+                        TextureContents image = TextureContents.load(Minecraft.getInstance().getResourceManager(), resourceLocation);
+                        icon.setTextureData(image.image());
+                    } else {
+                        VoxelConstants.getLogger().warn("Resource not found: " + resourceLocation + " - will use missing texture");
+                    }
                 } catch (RuntimeException var6) {
                     VoxelConstants.getLogger().error("Unable to parse metadata from " + resourceLocation, var6);
                 } catch (IOException var7) {
