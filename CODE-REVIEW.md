@@ -1,202 +1,467 @@
-# MattMC - Comprehensive Code Audit & Review
+# MattMC - Code Reduction & Cleanup Audit
 
 **Date:** January 6, 2026  
 **Version:** 1.21.10  
-**Auditor:** Code Analysis Agent  
+**Focus:** Dead Code, Duplication, Line Count & Complexity Reduction  
 
 ---
 
 ## Executive Summary
 
-This is a comprehensive audit of the MattMC project - a custom fork of Minecraft Java Edition 1.21.10 with Fabric and multiple integrated mods. The codebase consists of **8,218 Java files** across **848 unique packages**, with significant integration of third-party mods into the main source tree.
+Deep inspection of MattMC codebase focused on **reducing bloat and complexity**. This audit identifies specific files, classes, and patterns that can be eliminated or consolidated to reduce the codebase size.
 
-**Overall Assessment:** The project is functionally complete but exhibits organizational issues typical of a rapidly-developed custom fork with heavy feature integration. Significant cleanup and refactoring opportunities exist.
+**Key Findings:**
+- **~50+ files** can be deleted (dead code, unused mixins, empty interfaces)
+- **137 utility/helper classes** - significant consolidation opportunity
+- **14 mixinterface files** in Iris - remnants of removed mixin system
+- **6 God classes** over 3000 lines - prime splitting candidates
+- **979 interfaces** with many small/marker interfaces
+- **47 wrapper classes** - potential for consolidation
 
----
-
-## 1. Project Structure & Organization
-
-### 1.1 Overall Structure ✅ GOOD
-- **Single unified source set:** All code (Fabric Loader, Minecraft, mods) compiles together
-- **Clear build configuration:** Well-documented Gradle build with comprehensive tasks
-- **Proper separation:** Client/server entry points are clearly defined
-- **Documentation:** Good documentation in `/docs` directory with system-specific guides
-
-### 1.2 Package Organization ⚠️ NEEDS IMPROVEMENT
-
-**Current State:**
-```
-src/main/java/
-├── com/                      (848 files - Mojang libraries & integrated mods)
-│   ├── mojang/              (Blaze3D, logging, math utilities)
-│   ├── seibel/              (590 files - Distant Horizons mod)
-│   └── mamiyaotaru/         (121 files - VoxelMap mod)
-├── net/                      (7,312 files - Minecraft core & mods)
-│   ├── minecraft/           (Core Minecraft)
-│   ├── irisshaders/         (445 files - Iris Shaders mod)
-│   ├── caffeinemc/          (408 files - Sodium mod)
-│   ├── fabricmc/            (Fabric Loader & API)
-│   └── distant_horizons/    (Additional DH code)
-└── kroppeb/                  (58 files - StarEval expression parser)
-```
-
-**Issues:**
-- **Multiple packages for same mod:** Distant Horizons code split between `com.seibel.distanthorizons` and `net.distant_horizons`
-- **Inconsistent organization:** Some mods in vendor packages, others in feature packages
-- **Unclear ownership:** Mixed Mojang, Minecraft, and third-party code without clear boundaries
-
-**Recommendations:**
-1. Document which code comes from which source (Mojang, Minecraft, third-party mods)
-2. Consider adding package-level README files explaining each major package's purpose
-3. Consolidate duplicate organizational patterns (e.g., both `util` and `utils` directories exist)
+**Potential Reduction:** Estimated 10-15% code reduction (800-1200 files, 50K-100K lines)
 
 ---
 
-## 2. Code Quality Issues
+## 1. Dead Code - High Priority Deletions 🔴
 
-### 2.1 Technical Debt Indicators
+### 1.1 Mixin System Remnants (DELETE)
 
-| Metric | Count | Severity |
-|--------|-------|----------|
-| TODO/FIXME comments | 233 files | ⚠️ MEDIUM |
-| System.out/err.println | 38 files | ⚠️ MEDIUM |
-| printStackTrace() | 27 files | 🔴 HIGH |
-| @Deprecated annotations | 159 files | ℹ️ INFO |
-| @SuppressWarnings | 161 files | ⚠️ MEDIUM |
-| Wildcard imports (.*) | 143 files | ⚠️ MEDIUM |
-| Empty catch blocks | Multiple | 🔴 HIGH |
+**Files to Delete:**
+```
+src/main/java/com/seibel/distanthorizons/common/wrappers/misc/IMixinServerPlayer.java
+  ├─ Only 4 references, can be refactored to direct hooks
+  └─ Leftover from mixin → hook-based architecture migration
 
-### 2.2 TODO/FIXME Analysis
+src/main/java/net/fabricmc/loader/impl/launch/FabricMixinBootstrap.java
+  ├─ Part of disabled mixin system (logs say "Mixin system bypassed")
+  └─ No active @Mixin annotations found in codebase
+```
 
-**Sample Critical TODOs:**
+**Iris Mixinterface Directory (14 files - DELETE OR REFACTOR):**
+```
+src/main/java/net/irisshaders/iris/mixinterface/
+├── AbstractTextureExtended.java
+├── BiomeAmbienceInterface.java
+├── CustomPass.java
+├── ExtendedBiome.java
+├── GpuTextureInterface.java
+├── ItemContextState.java
+├── LocalPlayerInterface.java
+├── ModelStorage.java
+├── ParticleRenderStateExtension.java
+├── RenderPassInterface.java
+├── RenderTargetInterface.java
+├── RenderTypeInterface.java
+├── ShaderInstanceInterface.java
+└── ShadowRenderRegion.java
+```
+
+**Impact:** These are mixin target interfaces. With hook-based architecture, these should either:
+- Be deleted if hooks are in place
+- Be migrated to proper extension interfaces
+- Be documented as intentional bridge interfaces
+
+**Action:** Review each file's usage and delete or refactor
+
+**Estimated Savings:** 14-16 files, ~2,000-3,000 lines
+
+### 1.2 Code Explicitly Marked for Removal
+
+**Found Comments:**
+```java
+// From config enums:
+@Deprecated // not currently in use, if the config this enum represents 
+            // is re-implemented, the deprecated flag can be removed
+public boolean namedObjectSupported = false; // ~OpenGL 4.5 (UNUSED CURRENTLY)
+
+// From WorldGenerationQueue:
+private final IDhClientLevel level; //FIXME: Proper hierarchy to remove this reference!
+
+// From VoxelMap (3 instances):
+// TODO: remove this code after radar helmet icon implementation
+
+// From pooling:
+private static final long UNUSED_LOCK_TIMEOUT_IN_MS = 10_000; // 10 seconds
+```
+
+**Action:**
+1. Search all "TODO.*remove", "UNUSED", "DEAD CODE" comments
+2. Implement removals or update comments with justification
+3. Remove deprecated unused config options
+
+**Estimated Savings:** 20-30 small code blocks, scattered throughout
+
+### 1.3 Tiny Files (Potential Dead Code)
+
+**Files Under 5 Lines:**
+```
+0 lines: src/main/java/net/caffeinemc/mods/sodium/client/render/chunk/lists/VisibleChunkCollector.java
+3 lines: src/main/java/net/sodium/api/internal/package-info.java
+4 lines: src/main/java/com/mamiyaotaru/voxelmap/PacketBridge.java
+4 lines: src/main/java/kroppeb/stareval/element/AccessibleExpressionElement.java
+4 lines: src/main/java/kroppeb/stareval/element/Element.java
+4 lines: src/main/java/kroppeb/stareval/element/ExpressionElement.java
+4 lines: src/main/java/net/irisshaders/iris/gl/buffer/BuiltShaderStorageInfo.java
+4 lines: src/main/java/net/irisshaders/iris/gl/buffer/ShaderStorageInfo.java
+4 lines: src/main/java/net/minecraft/network/SkipPacketException.java
+4 lines: src/main/java/net/minecraft/util/VisibleForDebug.java
+...and 20+ more
+```
+
+**Analysis:**
+- **VisibleChunkCollector.java (0 lines):** Empty file - DELETE
+- **Marker interfaces (4 lines):** Review if they can be replaced with annotations
+- **Simple exceptions:** Verify they're used, consolidate similar ones
+
+**Action:** Review each file under 10 lines to determine if it's:
+1. Actually used (check references)
+2. Can be replaced with annotation or standard class
+3. Can be deleted
+
+**Estimated Savings:** 30-50 files, ~100-200 lines
+
+### 1.4 Deprecated Classes Still in Use
+
+**Count:** 159 files with @Deprecated
+
+**High-Priority Removals:**
 ```java
 // From Distant Horizons:
-"TODO only run thread if modifications happened recently"
-"TODO this logic isn't great and can cause a limit to how many threads could be used"
-"FIXME concurrency issue"
-"FIXME: This may cause init issue..."
+@Deprecated // TODO look into how these are used and if they should continue to be used
+public class WorldGenTaskGroup { ... }
 
-// From Fabric integration:
-"TODO we shouldn't be filtering keys on the Forge/Fabric side"
-"FIXME: Use better hooks so it doesn't trigger key press events in text boxes"
+// Config enums marked deprecated and unused
+@Deprecated // not currently in use
+public enum EDhApiVanillaOverdraw { ... }
 ```
 
-**Recommendations:**
-1. Create GitHub issues for each critical TODO/FIXME
-2. Categorize by priority: critical bugs, performance issues, tech debt
-3. Remove or implement low-priority TODOs older than 6 months
+**Action:**
+1. List all @Deprecated with "remove" or "unused" comments
+2. Check for zero or low usage
+3. Delete or implement replacement
 
-### 2.3 Logging Issues 🔴 CRITICAL
-
-**Problems:**
-- **27 files with printStackTrace():** Prints stack traces directly to stderr instead of using proper logging
-- **38 files with System.out.println:** Bypasses the logging framework
-- **Inconsistent logging:** Mix of Log4j2, SLF4J, and direct console output
-
-**Examples:**
-```
-src/main/java/com/seibel/distanthorizons/core/jar/JarMain.java
-src/main/java/com/mamiyaotaru/voxelmap/entityrender/EntityMapImageManager.java
-src/main/java/net/minecraft/worldedit/command/SchematicCommands.java
-```
-
-**Recommendations:**
-1. Replace all `printStackTrace()` calls with proper logger.error() calls
-2. Replace all `System.out.println()` with appropriate log levels
-3. Standardize on SLF4J facade with Log4j2 backend (already configured)
-4. Add logging guidelines to project documentation
-
-### 2.4 Security Concerns ⚠️ MEDIUM PRIORITY
-
-**Findings:**
-- **Math.random() usage:** 34 files use `Math.random()` instead of `SecureRandom` for randomness
-  - Generally acceptable for game mechanics
-  - Would be problematic if used for security-sensitive operations
-  
-- **No hardcoded credentials found:** ✅ Good - password/secret searches came up clean
-
-- **No sun.* imports found:** ✅ Good - no usage of internal Java APIs
-
-**Recommendations:**
-1. Review `Math.random()` usage to ensure none are security-critical
-2. Add security scanning to CI/CD pipeline
-3. Document secure coding practices
+**Estimated Savings:** 15-25 classes, 2,000-5,000 lines
 
 ---
 
-## 3. Code Duplication & Redundancy
+## 2. Code Duplication - Consolidation Opportunities ⚠️
 
-### 3.1 Utility Class Proliferation
+### 2.1 Utility Class Explosion
 
 **Current State:**
-- **140 utility/helper classes** across the codebase
+- **137 utility/helper classes**
 - **20+ util/utils/helper/helpers packages**
+
+**Specific Examples:**
+```
+Distant Horizons (5 util packages):
+├── com/seibel/distanthorizons/api/interfaces/util/
+├── com/seibel/distanthorizons/coreapi/util/
+├── com/seibel/distanthorizons/core/sql/dto/util/
+├── com/seibel/distanthorizons/core/util/
+└── com/seibel/distanthorizons/common/util/
+
+Sodium (4 util packages):
+├── net/caffeinemc/mods/sodium/client/render/frapi/helper/
+├── net/caffeinemc/mods/sodium/client/render/util/
+├── net/caffeinemc/mods/sodium/client/gl/util/
+└── net/caffeinemc/mods/sodium/client/util/
+
+And 10+ more...
+```
+
+**Common Patterns to Consolidate:**
+1. **Math utilities:** Multiple Vec3 helpers, coordinate converters
+2. **String utilities:** Formatting, parsing across different packages
+3. **Collection utilities:** List/map helpers duplicated
+4. **File I/O utilities:** Path handling, directory management
+5. **Color utilities:** RGB/HSV conversion in multiple places
+
+**Action:**
+1. Audit all *Util*.java and *Helper*.java files
+2. Identify duplicate functionality
+3. Create consolidated utility packages per domain:
+   - `util.math` - all math helpers
+   - `util.io` - all file operations
+   - `util.color` - all color operations
+   - `util.collections` - all collection helpers
+4. Migrate code and delete duplicates
+
+**Estimated Savings:** 30-50 utility classes, 5,000-10,000 lines
+
+### 2.2 Wrapper Class Proliferation
+
+**Count:** 47 wrapper classes
 
 **Examples:**
 ```
-com/seibel/distanthorizons/api/interfaces/util/
-com/seibel/distanthorizons/coreapi/util/
-com/seibel/distanthorizons/core/util/
-com/seibel/distanthorizons/common/util/
-net/caffeinemc/mods/sodium/client/util/
-net/irisshaders/iris/helpers/
-net/minecraft/util/
+BlockState wrappers (multiple implementations)
+Biome wrappers (multiple mods)
+Level wrappers (Distant Horizons, Minecraft core)
+Texture wrappers (Iris, Sodium)
 ```
 
-**Recommendations:**
-1. Audit utility classes for duplication
-2. Consider consolidating common utilities into shared packages
-3. Document when to create new utility classes vs. using existing ones
+**Issue:** Same wrapping pattern implemented multiple times
 
-### 3.2 Manager Pattern Overuse
+**Action:**
+1. Identify wrapper interfaces with multiple implementations
+2. Determine if all implementations are necessary
+3. Consolidate where possible or document why separate
 
-**Findings:**
-- **75 classes with "Manager" in the name**
-- Many could be better named to reflect their actual responsibility
+**Estimated Savings:** 5-10 wrapper classes, 1,000-2,000 lines
+
+### 2.3 Similar Exception Classes
+
+**Count:** 74 exception files, 85 custom exception classes
 
 **Examples:**
 ```java
-GlStateManager
-ScreenManager
-ClipboardManager
-PregenManager
-ChunkUpdateQueueManager
-KeyedClientLevelManager
-WaypointManager
-ColorManager
-ThreadManager
+// Networking exceptions:
+NetworkException
+PacketException  
+SkipPacketException
+ConnectionException
+... (many more)
+
+// Rendering exceptions:
+RenderException
+ShaderCompileException
+TextureException
+...
 ```
 
-**Recommendations:**
-1. Review each Manager class for Single Responsibility Principle violations
-2. Consider more specific names (e.g., `ChunkUpdateQueue` instead of `ChunkUpdateQueueManager`)
-3. Document manager pattern usage guidelines
+**Action:**
+1. Review all custom exceptions
+2. Consolidate similar exceptions
+3. Use standard Java exceptions where appropriate
+4. Keep only domain-specific exceptions that add value
+
+**Estimated Savings:** 15-20 exception classes, 500-1,000 lines
+
+### 2.4 Similar Manager Classes
+
+**Count:** 75 Manager classes
+
+**Consolidation Opportunities:**
+```
+Memory/Pool Managers (5-7 classes):
+├── ThreadManager (VoxelMap)
+├── RenderBufferHandler (DH)
+├── Various cache managers
+└── Pool managers
+
+Settings Managers (4+ classes):
+├── MapSettingsManager
+├── RadarSettingsManager  
+├── PersistentMapSettingsManager
+└── Multiple config managers
+
+Level/Dimension Managers:
+├── DimensionManager (VoxelMap)
+├── KeyedClientLevelManager (DH)
+├── Various level tracking
+```
+
+**Action:**
+1. Identify managers with overlapping responsibility
+2. Consolidate into fewer, more focused managers
+3. Use composition over duplication
+
+**Estimated Savings:** 10-15 manager classes, 2,000-4,000 lines
 
 ---
 
-## 4. Testing & Quality Assurance
+## 3. God Classes - Must Split 🔴
 
-### 4.1 Test Infrastructure ✅ ADEQUATE
+**Files Over 3,000 Lines:**
 
-**Current State:**
-- **4 test files** in `src/test/`
-- JUnit 5, AssertJ, Mockito properly configured
-- Separate performance test task configured
-- Test documentation in `docs/HOWTO-TESTING.md`
+### 3.1 BlockStateData.java - 9,174 lines 🔴🔴🔴
+```
+src/main/java/net/minecraft/util/datafix/fixes/BlockStateData.java
+```
 
-**Test Coverage:**
-- Minimal unit tests for core functionality
-- Performance tests separated from regular tests ✅
-- Testing primarily done through integration testing
+**Issue:** Massive data class with block state mappings
 
-**Recommendations:**
-1. Increase unit test coverage for critical game systems
-2. Add integration tests for mod interactions
-3. Document testing strategy and coverage goals
+**Solution:**
+1. Split into separate files per block category
+2. Use data files (JSON/properties) instead of Java code
+3. Generate from external data source
 
-### 4.2 Test Files in Main Source ⚠️ ISSUE
+**Estimated Reduction:** 8,000+ lines moved to data files or split into 20+ smaller files
 
-**Problem:** Test-related files found in `src/main/java`:
+### 3.2 Blocks.java - 6,866 lines
+```
+src/main/java/net/minecraft/world/level/block/Blocks.java
+```
+
+**Issue:** Registry class with all block definitions
+
+**Solution:**
+- This is somewhat acceptable as a registry
+- Could be generated from data
+- Consider splitting into block categories
+
+**Estimated Reduction:** 0-2,000 lines (low priority)
+
+### 3.3 BlockModelGenerators.java - 4,437 lines
+```
+src/main/java/net/minecraft/client/data/models/BlockModelGenerators.java
+```
+
+**Issue:** Data generation class, too large
+
+**Solution:**
+1. Split by block category (wood, stone, metal, etc.)
+2. Extract helper methods to utility classes
+3. Use builder pattern more effectively
+
+**Estimated Reduction:** 2,000-3,000 lines via splitting
+
+### 3.4 Entity.java - 4,052 lines
+```
+src/main/java/net/minecraft/world/entity/Entity.java
+```
+
+**Issue:** Core entity class with too many responsibilities
+
+**Solution:**
+1. Extract behaviors to separate classes (movement, collision, etc.)
+2. Use composition for complex behaviors
+3. Move rendering logic to separate class
+
+**Estimated Reduction:** 1,500-2,500 lines via extraction
+
+### 3.5 LivingEntity.java - 3,742 lines
+```
+src/main/java/net/minecraft/world/entity/LivingEntity.java
+```
+
+**Issue:** Similar to Entity.java - too much in one class
+
+**Solution:**
+1. Extract AI/behavior systems
+2. Separate effects handling
+3. Separate combat logic
+
+**Estimated Reduction:** 1,500-2,000 lines via extraction
+
+### 3.6 SoundEvents.java - 5,606 lines (massive registry)
+```
+src/main/java/net/minecraft/sounds/SoundEvents.java
+```
+
+**Issue:** All sound event registrations
+
+**Solution:**
+- Generate from data files
+- Or split by category
+
+**Estimated Reduction:** Low priority, registry class
+
+**Total from God Classes:** 10,000-15,000 lines reducible
+
+---
+
+## 4. Interface Bloat
+
+**Statistics:**
+- **979 total interfaces**
+- Many are very small (marker interfaces or single method)
+
+### 4.1 Marker Interfaces (Candidates for Deletion/Annotation)
+
+**Examples of 4-line interfaces:**
+```java
+public interface SpawnGroupData { }
+public interface Npc { }
+public interface PlayerRideable { }
+public interface GameMasterBlock { }
+public interface TooltipComponent { }
+public interface TickContainerAccess { }
+```
+
+**Action:**
+1. Review all interfaces under 15 lines
+2. Convert marker interfaces to annotations where appropriate
+3. Consolidate similar single-method interfaces to functional interfaces
+
+**Estimated Savings:** 50-80 tiny interfaces, 500-1,000 lines
+
+### 4.2 Interface Naming Inconsistency
+
+**Pattern:**
+- Distant Horizons: `IDhApi*` prefix (80+ interfaces)
+- VoxelMap: `I*` prefix (few interfaces)
+- Minecraft: No prefix
+- Iris/Sodium: No prefix
+
+**Issue:** Inconsistent, and Hungarian notation ("I" prefix) is outdated
+
+**Action:**
+1. Document decision: Keep or remove "I" prefix?
+2. If removing, plan migration
+3. If keeping, document why
+
+**No line savings, but improves consistency**
+
+---
+
+## 5. Package Structure Issues
+
+### 5.1 Duplicate Packages for Same Feature
+
+**Distant Horizons Split:**
+```
+com.seibel.distanthorizons (590 files)
+net.distant_horizons (small)
+```
+
+**Action:** Consolidate into one package hierarchy
+
+**Estimated Savings:** Cleaner structure, possibly 2-5 redundant bridging files
+
+### 5.2 Multiple "util" Variants
+
+**Found:**
+- `util` packages: 15+
+- `utils` packages: 5+
+- `helper` packages: 3+
+- `helpers` packages: 2+
+
+**Action:** Standardize on `util` (singular)
+
+**No direct line savings, but improves navigation**
+
+---
+
+## 6. Specific Dead Code Candidates
+
+### 6.1 Empty or Near-Empty File
+
+**Zero-line file (DELETE):**
+```
+src/main/java/net/caffeinemc/mods/sodium/client/render/chunk/lists/VisibleChunkCollector.java
+```
+
+### 6.2 Old/Legacy Code
+
+**Files with "Old" in name:**
+```
+src/main/java/net/minecraft/server/players/OldUsersConverter.java
+src/main/java/net/minecraft/world/entity/vehicle/OldMinecartBehavior.java
+src/main/java/net/irisshaders/iris/gui/OldImageButton.java
+```
+
+**Action:**
+1. Check if these are still used
+2. If used, rename (remove "Old")
+3. If not used, delete
+
+**Estimated Savings:** 1-3 files, 200-500 lines
+
+### 6.3 Phantom/Test Code in Main
+
+**Test files in main source:**
 ```
 src/main/java/com/seibel/distanthorizons/fabric/testing/TestGenericWorldGenerator.java
 src/main/java/com/seibel/distanthorizons/fabric/testing/TestChunkWorldGenerator.java
@@ -205,626 +470,320 @@ src/main/java/com/seibel/distanthorizons/fabric/testing/TestWorldGenBindingEvent
 src/main/java/com/seibel/distanthorizons/core/render/renderer/TestRenderer.java
 ```
 
-**Impact:**
-- These are included in production builds
-- Bloats the final JAR unnecessarily
-- Could expose test-only code paths
+**Action:**
+1. Move to `src/test/` if they're actual tests
+2. Delete if they're obsolete test code
+3. Rename if they're production "test" features (game testing framework)
 
-**Note:** Some "Test" files are legitimate Minecraft game testing framework classes (e.g., `TestBlockEditScreen`, `GameTestSequence`), not unit tests.
-
-**Recommendations:**
-1. Move test-only classes to `src/test/` directory
-2. Keep legitimate game testing framework classes in main
-3. Document which "Test" classes are production vs. testing
+**Estimated Savings:** 0-5 files (if deleted), 500-1,500 lines
 
 ---
 
-## 5. Dependencies & Build Configuration
+## 7. Complexity Reduction Opportunities
 
-### 5.1 Build Configuration ✅ EXCELLENT
+### 7.1 Reduce Method Complexity
 
-**Strengths:**
-- **Well-documented build.gradle:** 1,082 lines with extensive comments
-- **Bundled dependencies:** Offline-capable with `libraries/deps/` 
-- **Bundled JDK:** Optional bundled JDK for consistent runtime
-- **Multiple run configurations:** Server, client, vanilla client variants
-- **Clear dependency strategy:** Remote vs. bundled dependencies documented
+**Files with High Cyclomatic Complexity:**
 
-### 5.2 Dependency Management ✅ GOOD
+Target files over 3,000 lines likely have methods with:
+- 100+ line methods
+- 10+ levels of nesting
+- Complex conditional logic
 
-**Current State:**
-- **All dependencies declared explicitly** with version numbers
-- **Dependency conflicts handled:** Force resolution for ASM, Brigadier, DataFixerUpper
-- **Removed dependencies documented:** Comments explain why authlib, blocklist, patchy removed
-- **Offline build support:** Can build without internet using bundled deps
+**Action:**
+1. Run complexity analysis on God classes
+2. Extract complex methods to smaller methods
+3. Use early returns to reduce nesting
+4. Extract validation logic
 
-**Potential Issues:**
-- **ASM excluded from runtime classpath** might cause issues with some mods
-- **Multiple LWJGL native configurations** could be simplified
+**Estimated Reduction:** 5,000-10,000 lines more readable, easier to maintain
 
-**Recommendations:**
-1. Document all dependency removals and customizations
-2. Consider dependency update policy (security patches, version upgrades)
-3. Add dependency vulnerability scanning
+### 7.2 Remove Commented-Out Code
 
-### 5.3 Resource Management ⚠️ REVIEW NEEDED
-
-**Findings:**
-- Shader files (`.fsh`, `.vsh`, `.csh`) in resources root instead of shaders directory
-- Multiple logging configurations: `log4j2.xml` AND `log4jConfig.xml`
-- Large shader pack structure in resources
-
-**Recommendations:**
-1. Consolidate logging configuration into single file
-2. Review resource organization for clarity
-3. Document resource loading strategy
-
----
-
-## 6. Documentation Quality
-
-### 6.1 Project Documentation ✅ GOOD
-
-**Strengths:**
-- **Comprehensive README.md:** Clear quick start, build instructions
-- **System documentation:** 13 detailed guides in `/docs`:
-  - COMMAND-SYSTEM.md (493 lines)
-  - DATA-SYSTEM.md (694 lines)
-  - ENTITY-SYSTEM.md (524 lines)
-  - RENDER-SYSTEM.md (454 lines)
-  - And more...
-- **Dependency documentation:** Libraries and JDK setup documented
-- **Testing guide:** HOWTO-TESTING.md with 872 lines
-
-**Weaknesses:**
-- **396 package-info.java files:** Good package documentation exists
-- **No architecture diagram:** High-level system architecture not visualized
-- **Mod integration undocumented:** How mods interact is unclear
-- **ERROR-LOG.txt in repo:** 515-line error log committed to repository
-
-### 6.2 Code Documentation ⚠️ MIXED
-
-**Findings:**
-- **Package-level documentation:** 396 package-info.java files ✅
-- **Class/method documentation:** Inconsistent JavaDoc coverage
-- **Inline comments:** Mix of helpful and outdated comments
-
-**Recommendations:**
-1. Add JavaDoc to all public APIs
-2. Remove or update outdated comments
-3. Document critical algorithms and design decisions
-4. Add architecture decision records (ADRs)
-
----
-
-## 7. File Organization Issues
-
-### 7.1 Root Directory Clutter ⚠️ MINOR
-
-**Current State:**
-```
-CHANGE-DH-LOD-DISTANCE.md
-ERROR-LOG.txt               ← Should be in logs/ or .gitignored
-MAP-PLAN.md
-README.md
-STANDARD-COPILOT-PROMPTS.md
-```
-
-**Recommendations:**
-1. Move `ERROR-LOG.txt` to `.gitignore` (already has `*.log` ignored but this is `.txt`)
-2. Consider moving planning documents to `docs/planning/`
-3. Keep root directory minimal and professional
-
-### 7.2 DevUtils Directory ✅ ACCEPTABLE
-
-**Current Contents:**
-```
-DevUtils/
-├── Backup.sh
-├── ClearOldBranches.sh
-├── ColorRemapper/
-├── RunDev.sh
-└── RunExport.sh
-```
-
-**Purpose:** Developer convenience scripts
-**Status:** Acceptable but could be better organized
-
-**Recommendations:**
-1. Document each script's purpose in a README
-2. Consider moving to `scripts/` or `tools/` for clarity
-3. Add error handling and validation to scripts
-
-### 7.3 .gitignore Configuration ⚠️ INCOMPLETE
-
-**Current State:**
-- Basic patterns covered (build/, .gradle/, run/)
-- JDK directories excluded
-- Test outputs excluded
-
-**Missing:**
-- **ERROR-LOG.txt pattern** (file exists but not ignored)
-- **Temporary markdown files** (*.inline_backup exists but as specific line)
-- **IDE-specific files** (.vscode/, *.code-workspace)
-
-**Recommendations:**
-1. Add `*.txt` to ignore logs like ERROR-LOG.txt
-2. Add common IDE patterns for VS Code, Eclipse
-3. Add pattern for backup files (`*.backup`, `*.bak`)
-
----
-
-## 8. Integrated Mods Analysis
-
-### 8.1 Mod Integration Overview
-
-| Mod | Files | Package | Status |
-|-----|-------|---------|--------|
-| Distant Horizons | 590 | com.seibel.distanthorizons | ✅ Well-integrated |
-| Iris Shaders | 445 | net.irisshaders.iris | ✅ Well-integrated |
-| Sodium | 408 | net.caffeinemc.mods.sodium | ✅ Well-integrated |
-| VoxelMap | 121 | com.mamiyaotaru.voxelmap | ✅ Well-integrated |
-| Fabric Loader | ~200 | net.fabricmc.loader | ✅ Core integration |
-| WorldEdit | 3 | net.minecraft.worldedit | ⚠️ Minimal/incomplete |
-| StarEval | 58 | kroppeb.stareval | ℹ️ Utility library |
-
-### 8.2 Integration Quality Assessment
-
-**Distant Horizons (590 files):**
-- ✅ Well-structured API layer (`api/interfaces/`)
-- ✅ Clear separation: core, fabric, common packages
-- ⚠️ Split across two top-level packages (com.seibel and net.distant_horizons)
-- ⚠️ Many TODO/FIXME comments indicating ongoing development
-- ⚠️ Test files in main source tree
-
-**Iris Shaders (445 files):**
-- ✅ Cohesive package structure
-- ✅ Good helper/utility organization
-- ✅ PBR (Physically Based Rendering) support
-- ⚠️ Complex shader transformation pipeline could use documentation
-
-**Sodium (408 files):**
-- ✅ Clean architecture with clear API boundary
-- ✅ Performance-focused design evident
-- ✅ Good use of interfaces for extensibility
-- ℹ️ Some deprecated desktop utilities
-
-**VoxelMap (121 files):**
-- ✅ Self-contained implementation
-- ⚠️ Some old-style System.out.println usage
-- ⚠️ Could benefit from modernization
-
-**WorldEdit Integration (3 files):**
-- ⚠️ **Minimal integration** - only 3 files:
-  - SchematicCommands.java
-  - SelectionWand.java  
-  - WorldEditIntegration.java
-- ⚠️ Unclear if this is complete or placeholder
-- 📝 **Note:** WORLDEDIT.md was deleted per user request
-
-**Recommendations:**
-1. Document mod integration strategy and boundaries
-2. Clarify WorldEdit integration status and goals
-3. Standardize mod code organization (all under net.modname or com.vendor)
-4. Create integration testing suite for mod interactions
-
----
-
-## 9. Performance Considerations
-
-### 9.1 JVM Configuration ✅ EXCELLENT
-
-**Client Configuration:**
-```gradle
--Xmx8G -Xms4G
--XX:+UseZGC
--XX:+UseCompactObjectHeaders
-```
-
-**Server Configuration:**
-```gradle
--Xmx2G -Xms1G
--XX:+UseZGC
--XX:+UseCompactObjectHeaders
-```
-
-**Assessment:**
-- ✅ Modern Z Garbage Collector for low-latency
-- ✅ Compact object headers for memory efficiency (Java 25 feature)
-- ✅ Appropriate heap sizes for client vs. server
-- ✅ Gradle daemon optimized with 8GB heap
-
-### 9.2 Build Performance ✅ GOOD
-
-**Optimizations:**
-- ✅ Gradle parallel builds enabled
-- ✅ Build caching enabled
-- ✅ Incremental compilation
-- ✅ 8GB fork for Java compiler
-
-**Potential Issues:**
-- ⚠️ 8,218 files take time to compile initially
-- ⚠️ No mention of compile avoidance strategies
-
-### 9.3 Runtime Performance ⚠️ NEEDS PROFILING
-
-**Observations:**
-- Multiple render mods (Iris, Sodium) integrated - potential conflicts?
-- Large LOD system (Distant Horizons) - memory intensive
-- No performance testing documentation
-- No profiling results in repository
-
-**Recommendations:**
-1. Add performance benchmarking suite
-2. Document expected performance characteristics
-3. Profile memory usage with all mods active
-4. Test for mod interaction performance issues
-
----
-
-## 10. Code Smells & Anti-Patterns
-
-### 10.1 God Classes 🔴 FOUND
-
-**Largest Files:**
-| File | Lines | Issue |
-|------|-------|-------|
-| BlockStateData.java | 9,174 | Massive data class |
-| Blocks.java | 6,866 | Registry class - acceptable |
-| BlockModelGenerators.java | 4,437 | Data generation - acceptable |
-| Entity.java | 4,052 | Core entity logic - complex |
-| LivingEntity.java | 3,742 | Core entity logic - complex |
-
-**Recommendations:**
-1. Review BlockStateData.java for possible splitting
-2. Entity/LivingEntity complexity is somewhat inherent to Minecraft
-3. Consider extracting behavior into separate classes where possible
-
-### 10.2 Magic Numbers ⚠️ PREVALENT
-
-**Examples from logs:**
+**Common pattern found:**
 ```java
-byte lowestDataDetail() { return LodUtil.BLOCK_DETAIL_LEVEL + 12; } // TODO document magic number
+// REMOVED - using custom PlayerProfile system
+// implementation 'com.mojang:authlib:6.0.55'
+
+// FIXME: Use better hooks...
+// TODO: remove this code after...
 ```
 
-**Impact:** Reduced code readability and maintainability
+**Action:**
+1. Search for large blocks of commented code
+2. Delete if not needed (it's in git history)
+3. Convert important comments to documentation
 
-**Recommendations:**
-1. Extract magic numbers into named constants
-2. Document meaning of constants
-3. Use enums for related constant groups
-
-### 10.3 Exception Handling 🔴 CRITICAL
-
-**Issues:**
-- Empty catch blocks found in codebase
-- printStackTrace() used instead of logging
-- Inconsistent exception handling patterns
-
-**Recommendations:**
-1. Never use empty catch blocks - at minimum, log the exception
-2. Standardize exception handling strategy
-3. Document when to catch vs. propagate exceptions
+**Estimated Savings:** 1,000-2,000 lines of dead comments
 
 ---
 
-## 11. Fabric Integration
+## 8. Build Configuration Cleanup
 
-### 11.1 Fabric Loader Implementation ✅ CUSTOM
+### 8.1 Unused Dependencies
 
-**Status:**
-- ✅ Custom implementation without external Fabric dependencies
-- ✅ Mixin system bypassed - hook-based architecture
-- ✅ API stubs in `net/fabricmc/fabric/api/`
-- ✅ Environment annotations (@Environment) custom implemented
-
-**Assessment:**
-This is a sophisticated custom integration that maintains Fabric API compatibility while using direct source integration.
-
-### 11.2 Mod Loading ℹ️ SIMPLIFIED
-
-**From logs:**
-```
-Loading 3 mods:
-  - java 25
-  - mattmc 1.21.10
-  - minecraft 1.21.10
+**From build.gradle (commented out):**
+```gradle
+// implementation files('libraries/deps/authlib-6.0.55.jar') // REMOVED
+// implementation 'com.mojang:blocklist:1.0.10' // REMOVED  
+// implementation 'com.mojang:patchy:2.2.10' // REMOVED
 ```
 
-**Observations:**
-- Simplified mod list (all mods integrated into main JAR)
-- No external mod loading from mods/ folder
-- All features compiled into single artifact
+**Action:**
+1. Remove commented dependency declarations
+2. Clean up libraries/deps/ folder of unused JARs
+3. Update documentation
 
-**Benefits:**
-- ✅ No mod loading complexity
-- ✅ No version conflicts between mods
-- ✅ Optimal performance (no runtime bytecode manipulation)
+**Estimated Savings:** 50-100 lines in build.gradle, cleanup of binary files
 
-**Drawbacks:**
-- ⚠️ Cannot add/remove mods without recompiling
-- ⚠️ Harder to update individual mod components
-- ⚠️ Increased build complexity
+### 8.2 Wildcard Imports
+
+**Count:** 143 files
+
+**Impact:** Makes it unclear what's actually used
+
+**Action:**
+1. Configure IDE to expand wildcard imports
+2. Batch convert to explicit imports
+3. Verify no unused imports remain
+
+**Estimated Savings:** 0 lines (just cleaner), but helps identify unused classes
 
 ---
 
-## 12. Security Assessment
+## 9. Consolidation Targets - Top Priorities
 
-### 12.1 Security Issues Found ⚠️ LOW-MEDIUM
+### Priority 1: Quick Wins (1-2 days effort) 🎯
 
-**Findings:**
-1. **Math.random() usage (34 files):** Not cryptographically secure
-   - ℹ️ Acceptable for game mechanics
-   - 🔴 Would be problematic for authentication/encryption
-   
-2. **No input validation audited:** Requires deeper analysis
-   
-3. **Network code:** Needs security review for packet handling
+1. **Delete empty/near-empty files** (30-50 files)
+   - Start with VisibleChunkCollector.java (0 lines)
+   - Review all files under 10 lines
 
-**No Critical Issues Found:**
-- ✅ No hardcoded credentials
-- ✅ No SQL injection vectors (uses prepared statements in SQLite code)
-- ✅ No obvious command injection risks
+2. **Delete mixin remnants** (14-16 files)
+   - Iris mixinterface directory
+   - IMixinServerPlayer.java
+   - FabricMixinBootstrap.java (if confirmed unused)
 
-### 12.2 Warnings in Runtime ⚠️ NOTED
+3. **Remove explicitly marked dead code**
+   - Search "UNUSED", "TODO remove", "DELETE"
+   - 20-30 code blocks
 
-**From ERROR-LOG.txt:**
+4. **Delete Old* files if unused**
+   - OldUsersConverter, OldMinecartBehavior, OldImageButton
+   - Verify no references first
+
+**Estimated Impact:** 60-100 files, 5,000-8,000 lines
+
+### Priority 2: Medium Effort (1 week) ⚠️
+
+5. **Consolidate utility classes**
+   - Create common utility packages
+   - Merge duplicate math/string/collection utils
+   - 30-50 utility classes
+
+6. **Consolidate exceptions**
+   - Review 74 exception files
+   - Merge similar exceptions
+   - 15-20 exception classes
+
+7. **Split BlockStateData.java**
+   - Biggest file at 9,174 lines
+   - Convert to data files or split
+   - Could reduce by 8,000+ lines
+
+8. **Move test files from main**
+   - 5 test files in src/main/java
+   - Move to src/test/ or delete
+
+**Estimated Impact:** 50-80 files, 15,000-25,000 lines
+
+### Priority 3: Long-term Refactoring (2-4 weeks) 📋
+
+9. **Split Entity/LivingEntity God classes**
+   - Extract behaviors, collision, AI, effects
+   - 3,000-5,000 lines reducible
+
+10. **Consolidate manager classes**
+    - Merge overlapping managers
+    - 10-15 manager classes
+
+11. **Interface cleanup**
+    - Convert marker interfaces to annotations
+    - Consolidate single-method interfaces
+    - 50-80 tiny interfaces
+
+12. **Package reorganization**
+    - Consolidate Distant Horizons packages
+    - Standardize util/utils/helper naming
+    - Better structure, easier navigation
+
+**Estimated Impact:** 100-150 files refactored/consolidated, 20,000-30,000 lines
+
+---
+
+## 10. Measurable Goals
+
+### Phase 1 Goals (Quick Wins - Week 1)
+- ✅ Delete 60-100 dead code files
+- ✅ Remove 5,000-8,000 lines of unused code
+- ✅ Delete all mixin remnants (14+ files)
+- ✅ Remove all code marked "UNUSED" or "TODO remove"
+
+### Phase 2 Goals (Consolidation - Week 2-3)
+- ✅ Consolidate 30-50 utility classes → 10-15 classes
+- ✅ Reduce exception classes by 15-20
+- ✅ Split BlockStateData.java (9,174 lines → multiple small files or data)
+- ✅ Remove 15,000-25,000 lines via consolidation
+
+### Phase 3 Goals (Major Refactoring - Month 1-2)
+- ✅ Refactor Entity/LivingEntity God classes
+- ✅ Consolidate manager classes
+- ✅ Clean up 50-80 marker interfaces
+- ✅ Remove 20,000-30,000 lines via refactoring
+
+### Overall Target
+**From:** 8,218 files, ~2.8M lines  
+**To:** ~7,000-7,500 files, ~2.4-2.6M lines  
+**Reduction:** 10-15% (700-1,200 files, 200K-400K lines)
+
+---
+
+## 11. Methodology for Finding Dead Code
+
+### 11.1 Static Analysis Approach
+
+**Recommended tools:**
+```bash
+# Find unused imports
+./gradlew build -x test 2>&1 | grep "unused import"
+
+# Find unused private methods (requires IDE analysis)
+# IntelliJ: Analyze → Run Inspection by Name → "Unused declaration"
+
+# Find unreferenced classes
+grep -r "import.*ClassName" src/ | wc -l  # Should be > 0 if used
+
+# Find classes with no usages
+# (Manual review needed - check git blame for context)
 ```
-WARNING: A restricted method in java.lang.System has been called
-WARNING: java.lang.System::load has been called by com.sun.jna.Native
-WARNING: Restricted methods will be blocked in a future release
 
-WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
-WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.joml.MemUtil$MemUtilUnsafe
+### 11.2 Dynamic Analysis
+
+**Steps:**
+1. Run full test suite with code coverage
+2. Identify 0% coverage files
+3. Verify they're not used at runtime
+4. Delete or add tests
+
+### 11.3 Git History Analysis
+
+**Find recently unused code:**
+```bash
+# Files not modified in 12+ months
+git log --since="12 months ago" --name-only --pretty=format: | \
+  sort -u > recent_files.txt
+find src/main/java -name "*.java" | \
+  grep -v -f recent_files.txt
 ```
 
-**Analysis:**
-- These are library warnings (JNA, JOML)
-- Expected in low-level libraries for performance
-- May break in future Java versions (Java 26+)
+---
 
-**Recommendations:**
-1. Monitor library updates for Java 25+ compatibility
-2. Add `--enable-native-access=ALL-UNNAMED` to reduce warnings
-3. Plan migration strategy for deprecated Unsafe usage
+## 12. Action Plan
+
+### Week 1: Quick Wins
+1. **Day 1:** Delete empty files and mixin remnants (14-50 files)
+2. **Day 2-3:** Remove code marked "UNUSED", "TODO remove" (20-30 blocks)
+3. **Day 4:** Delete or refactor Old* files (1-3 files)
+4. **Day 5:** Move test files from main, expand wildcard imports
+
+**Deliverable:** 60-100 files deleted, 5,000-8,000 lines removed
+
+### Week 2-3: Consolidation
+1. **Week 2:** Audit and consolidate utility classes (30-50 → 10-15)
+2. **Week 3:** Consolidate exception classes (15-20 merged)
+3. **Week 3:** Split BlockStateData.java into data files or smaller classes
+
+**Deliverable:** 50-80 files consolidated, 15,000-25,000 lines removed
+
+### Week 4-8: Major Refactoring
+1. **Week 4-5:** Refactor Entity/LivingEntity (extract behaviors)
+2. **Week 6:** Consolidate manager classes
+3. **Week 7:** Clean up marker interfaces and package structure
+4. **Week 8:** Final review and documentation
+
+**Deliverable:** 100-150 files refactored, 20,000-30,000 lines cleaner code
 
 ---
 
-## 13. Maintainability Assessment
+## 13. Risk Assessment
 
-### 13.1 Maintainability Score: **6.5/10** ⚠️
+### Low Risk (Safe to Delete)
+- ✅ Empty files (0 lines)
+- ✅ Files explicitly marked "UNUSED" or "DELETE"
+- ✅ Mixin system remnants (confirmed system is disabled)
 
-**Strengths (+):**
-- ✅ Comprehensive documentation
-- ✅ Clear build system
-- ✅ Good package structure at high level
-- ✅ Active development (recent TODOs)
+### Medium Risk (Requires Testing)
+- ⚠️ Old* files (may have legacy compatibility)
+- ⚠️ Small marker interfaces (check for reflection usage)
+- ⚠️ Test files in main (verify they're not production testing framework)
 
-**Weaknesses (-):**
-- ⚠️ High complexity (8,218 files)
-- ⚠️ Inconsistent code quality across mods
-- ⚠️ 233 TODOs indicating incomplete work
-- ⚠️ Multiple coding styles from different mod sources
-- ⚠️ Limited test coverage
-
-### 13.2 Technical Debt Estimate
-
-**High Priority Debt:**
-- Fix logging anti-patterns (27 printStackTrace, 38 System.out)
-- Address concurrency FIXMEs in critical paths
-- Move test files from main source
-- Resolve empty catch blocks
-
-**Medium Priority Debt:**
-- Consolidate utility classes
-- Standardize exception handling
-- Improve test coverage
-- Document mod integration boundaries
-
-**Low Priority Debt:**
-- Clean up old TODOs
-- Refactor God classes
-- Improve JavaDoc coverage
-- Consolidate wildcard imports
-
-**Estimated Effort:** 4-6 weeks of focused refactoring work
+### High Risk (Requires Careful Refactoring)
+- 🔴 God class splitting (Entity, LivingEntity)
+- 🔴 Manager class consolidation (complex interactions)
+- 🔴 Utility class merging (verify no behavior changes)
 
 ---
 
-## 14. Recommendations by Priority
+## 14. Success Metrics
 
-### 14.1 Critical (Fix Immediately) 🔴
+### Quantitative Metrics
+- **Files:** Reduce from 8,218 to ~7,000 (15% reduction)
+- **Lines:** Reduce by 200K-400K lines (10-15% reduction)
+- **Packages:** Consolidate 848 → ~700 packages
+- **Utility classes:** 137 → ~40-50
+- **Interfaces:** 979 → ~800-850 (remove tiny/marker interfaces)
 
-1. **Fix logging anti-patterns**
-   - Replace all `printStackTrace()` with proper logging
-   - Replace all `System.out.println()` with logger calls
-   - **Estimated effort:** 2-3 days
+### Qualitative Metrics
+- ✅ No mixinterface packages (clean hook-based architecture)
+- ✅ No code marked "UNUSED" or "TODO remove"
+- ✅ All files over 3,000 lines have refactoring plan
+- ✅ Consistent package naming (util vs utils)
+- ✅ Single package hierarchy per mod
 
-2. **Address concurrency issues**
-   - Review and fix all FIXME comments related to concurrency
-   - Add proper synchronization or concurrent data structures
-   - **Estimated effort:** 3-5 days
-
-3. **Fix empty catch blocks**
-   - Add logging at minimum to all catch blocks
-   - Handle or propagate exceptions properly
-   - **Estimated effort:** 1-2 days
-
-### 14.2 High Priority (Address Soon) ⚠️
-
-4. **Move test files to test source set**
-   - Move testing classes from main to test
-   - Update build configuration
-   - **Estimated effort:** 1 day
-
-5. **Clean up root directory**
-   - Move/delete ERROR-LOG.txt
-   - Update .gitignore
-   - Organize planning documents
-   - **Estimated effort:** 2 hours
-
-6. **Improve .gitignore**
-   - Add missing patterns
-   - Document ignored file types
-   - **Estimated effort:** 1 hour
-
-7. **Document mod integration**
-   - Create mod integration guide
-   - Document boundaries and interactions
-   - Clarify WorldEdit status
-   - **Estimated effort:** 1-2 days
-
-### 14.3 Medium Priority (Plan & Schedule) ℹ️
-
-8. **Increase test coverage**
-   - Add unit tests for core systems
-   - Add integration tests for mods
-   - Target 60%+ coverage for critical paths
-   - **Estimated effort:** 2-3 weeks
-
-9. **Consolidate utility classes**
-   - Audit 140 utility classes for duplication
-   - Merge common functionality
-   - Document utility usage guidelines
-   - **Estimated effort:** 1 week
-
-10. **Standardize exception handling**
-    - Create exception handling guidelines
-    - Refactor inconsistent patterns
-    - **Estimated effort:** 3-4 days
-
-11. **Address technical TODOs**
-    - Create GitHub issues for each TODO
-    - Prioritize and schedule work
-    - Remove obsolete TODOs
-    - **Estimated effort:** 1 week planning + ongoing work
-
-### 14.4 Low Priority (Nice to Have) ✅
-
-12. **Improve JavaDoc coverage**
-    - Document all public APIs
-    - Add class-level documentation
-    - **Estimated effort:** 2-3 weeks
-
-13. **Refactor God classes**
-    - Split large classes (BlockStateData.java)
-    - Extract behavior into separate classes
-    - **Estimated effort:** 1-2 weeks
-
-14. **Add architecture documentation**
-    - Create system architecture diagrams
-    - Document design decisions
-    - Add ADRs (Architecture Decision Records)
-    - **Estimated effort:** 1 week
-
-15. **Performance profiling**
-    - Profile memory usage
-    - Identify bottlenecks
-    - Optimize hot paths
-    - **Estimated effort:** 1-2 weeks
+### Build/Performance Metrics
+- ⚠️ Build time should decrease (fewer files to compile)
+- ✅ JAR size should decrease (less code)
+- ✅ Test coverage can increase (less code to cover)
 
 ---
 
-## 15. Positive Aspects (What's Done Well) ✅
+## 15. Conclusion
 
-Despite the issues identified, many aspects of this project are excellent:
+This codebase has significant opportunities for reduction through:
 
-1. **Build System Excellence**
-   - Comprehensive Gradle configuration with excellent documentation
-   - Offline build capability with bundled dependencies
-   - Multiple run configurations for different use cases
-   - Bundled JDK for consistent runtime environment
+1. **Dead code elimination:** 60-100 files can be safely deleted
+2. **Duplicate code consolidation:** 80-100 files can be merged
+3. **God class refactoring:** 10K-15K lines can be better organized
+4. **Interface cleanup:** 50-80 tiny interfaces can be removed/simplified
 
-2. **Documentation Quality**
-   - 13 detailed system documentation files (4,500+ lines total)
-   - Comprehensive README with quick start guide
-   - Well-documented build and dependency setup
-   - Testing guide with 872 lines of documentation
+**Recommended Approach:**
+Start with low-risk quick wins (empty files, mixin remnants, explicitly marked unused code) to build momentum and confidence. Then move to medium-risk consolidations (utilities, exceptions). Finally, tackle high-risk refactorings (God classes, managers) with proper testing.
 
-3. **Modern Tooling**
-   - Java 25 with latest features (ZGC, compact object headers)
-   - JUnit 5, AssertJ, Mockito for testing
-   - Proper dependency management
-   - Gradle performance optimizations enabled
+**Expected Outcome:**
+- 10-15% reduction in codebase size
+- More maintainable and navigable code structure
+- Faster build times
+- Clearer architecture with less duplication
 
-4. **Mod Integration Achievement**
-   - Successfully integrated 5+ major mods into unified codebase
-   - Maintained Fabric API compatibility
-   - Custom hook-based architecture instead of runtime mixins
-   - Single JAR deployment model
-
-5. **Project Structure**
-   - Clear client/server separation
-   - Proper resource organization
-   - Package-level documentation (396 package-info.java files)
-   - Logical directory structure
+**Next Steps:**
+1. Review and approve this analysis
+2. Create GitHub issues for each major task
+3. Begin with Week 1 quick wins
+4. Measure progress weekly
 
 ---
 
-## 16. Conclusion
+**End of Code Reduction Audit**
 
-### Overall Assessment: **B- (Good with Issues)** 📊
-
-MattMC is an ambitious and largely successful integration of Minecraft 1.21.10 with multiple high-profile mods (Distant Horizons, Iris, Sodium, VoxelMap). The project demonstrates:
-
-**Strengths:**
-- ✅ Sophisticated build system and tooling
-- ✅ Comprehensive documentation
-- ✅ Successful mod integration
-- ✅ Modern Java features utilized
-
-**Critical Weaknesses:**
-- 🔴 Logging anti-patterns (printStackTrace, System.out)
-- 🔴 Concurrency issues flagged in comments
-- 🔴 Empty catch blocks
-
-**Significant Issues:**
-- ⚠️ 233 TODO/FIXME comments indicating incomplete work
-- ⚠️ Limited test coverage
-- ⚠️ Inconsistent code quality across integrated mods
-- ⚠️ High complexity (8,218 files) requiring ongoing maintenance
-
-### Recommended Next Steps:
-
-1. **Immediate Actions (This Week):**
-   - Fix all logging anti-patterns
-   - Address empty catch blocks
-   - Clean up root directory
-   - Update .gitignore
-
-2. **Short Term (Next Month):**
-   - Review and fix concurrency issues
-   - Move test files to proper location
-   - Document mod integration strategy
-   - Create GitHub issues for all TODOs
-
-3. **Medium Term (Next Quarter):**
-   - Increase test coverage significantly
-   - Consolidate utility classes
-   - Standardize exception handling
-   - Address high-priority technical debt
-
-4. **Long Term (Next 6 Months):**
-   - Refactor God classes
-   - Complete JavaDoc coverage
-   - Add architecture documentation
-   - Performance optimization
-
-### Final Notes:
-
-This codebase represents a significant engineering achievement - successfully integrating multiple complex mods into a unified Minecraft fork. However, the rapid development pace has accumulated technical debt that should be addressed systematically to ensure long-term maintainability.
-
-The project would benefit from:
-- A dedicated refactoring sprint to address critical issues
-- Establishing coding standards and guidelines
-- Regular code quality audits
-- Automated quality gates in CI/CD
-
-With focused effort on the critical and high-priority recommendations, this project can evolve from "good with issues" to "excellent."
-
----
-
-**End of Code Audit Report**
-
-*Generated by automated code analysis with manual review and recommendations*
-*For questions or clarifications, please refer to specific sections above*
+*Focus: Low-hanging fruit for immediate code size reduction*  
+*Methodology: Static analysis, pattern matching, manual review*
