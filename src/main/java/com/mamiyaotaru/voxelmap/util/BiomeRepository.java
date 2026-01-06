@@ -62,7 +62,7 @@ public final class BiomeRepository {
 
         try {
             // VoxelMap: Use orElse to handle case where resource is not yet loaded
-            var resourceOptional = VoxelConstants.getMinecraft().getResourceManager().getResource(ResourceLocation.fromNamespaceAndPath("voxelmap", "conf/biomecolors.txt"));
+            var resourceOptional = VoxelConstants.getMinecraft().getResourceManager().getResource(ResourceLocation.fromNamespaceAndPath("mattmc", "conf/biomecolors.txt"));
             if (resourceOptional.isPresent()) {
                 InputStream is = resourceOptional.get().open();
                 BufferedReader br = new BufferedReader(new InputStreamReader(is));

@@ -34,7 +34,7 @@ class GuiSlotWaypoints extends AbstractSelectionList<GuiSlotWaypoints.WaypointIt
     final ResourceLocation invisibleIconIdentifier = ResourceLocation.parse("textures/gui/sprites/container/beacon/cancel.png");
     protected long lastClicked;
     public boolean doubleClicked;
-    private final ResourceLocation targetIconLocation = ResourceLocation.fromNamespaceAndPath("voxelmap", "images/waypoints/target.png");
+    private final ResourceLocation targetIconLocation = ResourceLocation.fromNamespaceAndPath("mattmc", "images/waypoints/target.png");
     private final TextureAtlas textureAtlas;
 
     GuiSlotWaypoints(GuiWaypoints par1GuiWaypoints) {
@@ -175,7 +175,7 @@ class GuiSlotWaypoints extends AbstractSelectionList<GuiSlotWaypoints.WaypointIt
             drawContext.blit(RenderPipelines.GUI_TEXTURED, this.waypoint.enabled ? GuiSlotWaypoints.this.visibleIconIdentifier : GuiSlotWaypoints.this.invisibleIconIdentifier, x + 198, y - 2, 0.0F, 0.0F, 18, 18, 18, 18);
             // VoxelMap: Add null check to prevent crash when texture atlas is empty
             try {
-                com.mamiyaotaru.voxelmap.textures.Sprite sprite = textureAtlas.getAtlasSprite("voxelmap:images/waypoints/waypoint" + waypoint.imageSuffix + ".png");
+                com.mamiyaotaru.voxelmap.textures.Sprite sprite = textureAtlas.getAtlasSprite("mattmc:images/waypoints/waypoint" + waypoint.imageSuffix + ".png");
                 if (sprite != null) {
                     sprite.blit(drawContext, RenderPipelines.GUI_TEXTURED, x, y - 2, 18, 18, waypoint.getUnifiedColor());
                 }

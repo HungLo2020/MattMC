@@ -90,11 +90,11 @@ public class Map implements Runnable, IChangeObserver {
     private final Minecraft minecraft = Minecraft.getInstance();
     private final float[] lastLightBrightnessTable = new float[16];
     private final Object coordinateLock = new Object();
-    private final ResourceLocation resourceArrow = ResourceLocation.fromNamespaceAndPath("voxelmap", "images/mmarrow.png");
-    private final ResourceLocation resourceSquareMap = ResourceLocation.fromNamespaceAndPath("voxelmap", "images/squaremap.png");
-    private final ResourceLocation resourceRoundMap = ResourceLocation.fromNamespaceAndPath("voxelmap", "images/roundmap.png");
-    private final ResourceLocation squareStencil = ResourceLocation.fromNamespaceAndPath("voxelmap", "images/square.png");
-    private final ResourceLocation circleStencil = ResourceLocation.fromNamespaceAndPath("voxelmap", "images/circle.png");
+    private final ResourceLocation resourceArrow = ResourceLocation.fromNamespaceAndPath("mattmc", "images/mmarrow.png");
+    private final ResourceLocation resourceSquareMap = ResourceLocation.fromNamespaceAndPath("mattmc", "images/squaremap.png");
+    private final ResourceLocation resourceRoundMap = ResourceLocation.fromNamespaceAndPath("mattmc", "images/roundmap.png");
+    private final ResourceLocation squareStencil = ResourceLocation.fromNamespaceAndPath("mattmc", "images/square.png");
+    private final ResourceLocation circleStencil = ResourceLocation.fromNamespaceAndPath("mattmc", "images/circle.png");
     private ClientLevel world;
     private final MapSettingsManager options;
     private final LayoutVariables layoutVariables;
@@ -166,16 +166,16 @@ public class Map implements Runnable, IChangeObserver {
     private VoxelMapCachedOrthoProjectionMatrixBuffer projection;
 
     public Map() {
-        resourceMapImageFiltered[0] = ResourceLocation.fromNamespaceAndPath("voxelmap", "map/filtered/0");
-        resourceMapImageFiltered[1] = ResourceLocation.fromNamespaceAndPath("voxelmap", "map/filtered/1");
-        resourceMapImageFiltered[2] = ResourceLocation.fromNamespaceAndPath("voxelmap", "map/filtered/2");
-        resourceMapImageFiltered[3] = ResourceLocation.fromNamespaceAndPath("voxelmap", "map/filtered/3");
-        resourceMapImageFiltered[4] = ResourceLocation.fromNamespaceAndPath("voxelmap", "map/filtered/4");
-        resourceMapImageUnfiltered[0] = ResourceLocation.fromNamespaceAndPath("voxelmap", "map/unfiltered/0");
-        resourceMapImageUnfiltered[1] = ResourceLocation.fromNamespaceAndPath("voxelmap", "map/unfiltered/1");
-        resourceMapImageUnfiltered[2] = ResourceLocation.fromNamespaceAndPath("voxelmap", "map/unfiltered/2");
-        resourceMapImageUnfiltered[3] = ResourceLocation.fromNamespaceAndPath("voxelmap", "map/unfiltered/3");
-        resourceMapImageUnfiltered[4] = ResourceLocation.fromNamespaceAndPath("voxelmap", "map/unfiltered/4");
+        resourceMapImageFiltered[0] = ResourceLocation.fromNamespaceAndPath("mattmc", "map/filtered/0");
+        resourceMapImageFiltered[1] = ResourceLocation.fromNamespaceAndPath("mattmc", "map/filtered/1");
+        resourceMapImageFiltered[2] = ResourceLocation.fromNamespaceAndPath("mattmc", "map/filtered/2");
+        resourceMapImageFiltered[3] = ResourceLocation.fromNamespaceAndPath("mattmc", "map/filtered/3");
+        resourceMapImageFiltered[4] = ResourceLocation.fromNamespaceAndPath("mattmc", "map/filtered/4");
+        resourceMapImageUnfiltered[0] = ResourceLocation.fromNamespaceAndPath("mattmc", "map/unfiltered/0");
+        resourceMapImageUnfiltered[1] = ResourceLocation.fromNamespaceAndPath("mattmc", "map/unfiltered/1");
+        resourceMapImageUnfiltered[2] = ResourceLocation.fromNamespaceAndPath("mattmc", "map/unfiltered/2");
+        resourceMapImageUnfiltered[3] = ResourceLocation.fromNamespaceAndPath("mattmc", "map/unfiltered/3");
+        resourceMapImageUnfiltered[4] = ResourceLocation.fromNamespaceAndPath("mattmc", "map/unfiltered/4");
 
         this.options = VoxelConstants.getVoxelMapInstance().getMapOptions();
         this.colorManager = VoxelConstants.getVoxelMapInstance().getColorManager();
@@ -1693,7 +1693,7 @@ public class Map implements Runnable, IChangeObserver {
             }
 
             if (highlightedPoint != null) {
-                this.drawWaypoint(guiGraphics, highlightedPoint, textureAtlas, x, y, scScale, lastXDouble, lastZDouble, textureAtlas.getAtlasSprite("voxelmap:images/waypoints/target.png"), 1.0F, 0.0F, 0.0F);
+                this.drawWaypoint(guiGraphics, highlightedPoint, textureAtlas, x, y, scScale, lastXDouble, lastZDouble, textureAtlas.getAtlasSprite("mattmc:images/waypoints/target.png"), 1.0F, 0.0F, 0.0F);
             }
         }
         guiGraphics.pose().popMatrix();
@@ -1744,16 +1744,16 @@ public class Map implements Runnable, IChangeObserver {
         if (far) {
             if (icon == null) {
                 if (scScale >= 3) {
-                    icon = textureAtlas.getAtlasSprite("voxelmap:images/waypoints/marker" + pt.imageSuffix + ".png");
+                    icon = textureAtlas.getAtlasSprite("mattmc:images/waypoints/marker" + pt.imageSuffix + ".png");
                 } else {
-                    icon = textureAtlas.getAtlasSprite("voxelmap:images/waypoints/marker" + pt.imageSuffix + "Small.png");
+                    icon = textureAtlas.getAtlasSprite("mattmc:images/waypoints/marker" + pt.imageSuffix + "Small.png");
                 }
 
                 if (icon == textureAtlas.getMissingImage()) {
                     if (scScale >= 3) {
-                        icon = textureAtlas.getAtlasSprite("voxelmap:images/waypoints/marker.png");
+                        icon = textureAtlas.getAtlasSprite("mattmc:images/waypoints/marker.png");
                     } else {
-                        icon = textureAtlas.getAtlasSprite("voxelmap:images/waypoints/markerSmall.png");
+                        icon = textureAtlas.getAtlasSprite("mattmc:images/waypoints/markerSmall.png");
                     }
                 }
             } else {
@@ -1783,16 +1783,16 @@ public class Map implements Runnable, IChangeObserver {
         } else {
             if (icon == null) {
                 if (scScale >= 3) {
-                    icon = textureAtlas.getAtlasSprite("voxelmap:images/waypoints/waypoint" + pt.imageSuffix + ".png");
+                    icon = textureAtlas.getAtlasSprite("mattmc:images/waypoints/waypoint" + pt.imageSuffix + ".png");
                 } else {
-                    icon = textureAtlas.getAtlasSprite("voxelmap:images/waypoints/waypoint" + pt.imageSuffix + "Small.png");
+                    icon = textureAtlas.getAtlasSprite("mattmc:images/waypoints/waypoint" + pt.imageSuffix + "Small.png");
                 }
 
                 if (icon == textureAtlas.getMissingImage()) {
                     if (scScale >= 3) {
-                        icon = textureAtlas.getAtlasSprite("voxelmap:images/waypoints/waypoint.png");
+                        icon = textureAtlas.getAtlasSprite("mattmc:images/waypoints/waypoint.png");
                     } else {
-                        icon = textureAtlas.getAtlasSprite("voxelmap:images/waypoints/waypointSmall.png");
+                        icon = textureAtlas.getAtlasSprite("mattmc:images/waypoints/waypointSmall.png");
                     }
                 }
             } else {

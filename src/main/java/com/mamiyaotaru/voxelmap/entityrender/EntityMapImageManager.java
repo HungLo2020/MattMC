@@ -75,12 +75,12 @@ import java.util.Properties;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 public class EntityMapImageManager {
-    public static final ResourceLocation resourceTextureAtlasMarker = ResourceLocation.fromNamespaceAndPath("voxelmap", "atlas/mobs");
+    public static final ResourceLocation resourceTextureAtlasMarker = ResourceLocation.fromNamespaceAndPath("mattmc", "atlas/mobs");
     private final TextureAtlas textureAtlas;
     private final Minecraft minecraft = Minecraft.getInstance();
     private GpuTexture fboDepthTexture;
     private GpuTexture fboTexture;
-    private final ResourceLocation resourceFboTexture = ResourceLocation.fromNamespaceAndPath("voxelmap", "entityimagemanager/fbo");
+    private final ResourceLocation resourceFboTexture = ResourceLocation.fromNamespaceAndPath("mattmc", "entityimagemanager/fbo");
     private Tesselator fboTessellator = new Tesselator(4096);
     private int imageCreationRequests;
     private int fulfilledImageCreationRequests;
@@ -116,9 +116,9 @@ public class EntityMapImageManager {
         }
 
         this.textureAtlas.reset();
-        this.textureAtlas.registerIconForBufferedImage("hostile", ImageUtils.loadImage(ResourceLocation.fromNamespaceAndPath("voxelmap", "images/radar/hostile.png"), 0, 0, 16, 16, 16, 16));
-        this.textureAtlas.registerIconForBufferedImage("neutral", ImageUtils.loadImage(ResourceLocation.fromNamespaceAndPath("voxelmap", "images/radar/neutral.png"), 0, 0, 16, 16, 16, 16));
-        this.textureAtlas.registerIconForBufferedImage("tame", ImageUtils.loadImage(ResourceLocation.fromNamespaceAndPath("voxelmap", "images/radar/tame.png"), 0, 0, 16, 16, 16, 16));
+        this.textureAtlas.registerIconForBufferedImage("hostile", ImageUtils.loadImage(ResourceLocation.fromNamespaceAndPath("mattmc", "images/radar/hostile.png"), 0, 0, 16, 16, 16, 16));
+        this.textureAtlas.registerIconForBufferedImage("neutral", ImageUtils.loadImage(ResourceLocation.fromNamespaceAndPath("mattmc", "images/radar/neutral.png"), 0, 0, 16, 16, 16, 16));
+        this.textureAtlas.registerIconForBufferedImage("tame", ImageUtils.loadImage(ResourceLocation.fromNamespaceAndPath("mattmc", "images/radar/tame.png"), 0, 0, 16, 16, 16, 16));
         this.textureAtlas.stitch();
 
         mobPropertiesMap.clear();

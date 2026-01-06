@@ -89,7 +89,7 @@ public class MapSettingsManager implements ISettingsManager {
     public MapSettingsManager() {
         instance = this;
         // VoxelMap: Check if category already exists before registering to prevent double registration error
-        ResourceLocation categoryId = ResourceLocation.fromNamespaceAndPath("voxelmap", "controls.title");
+        ResourceLocation categoryId = ResourceLocation.fromNamespaceAndPath("mattmc", "controls.title");
         KeyMapping.Category category = null;
         
         // Try to find existing category
