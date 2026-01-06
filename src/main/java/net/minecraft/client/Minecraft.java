@@ -700,6 +700,13 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 				throw new RuntimeException(e);
 			}
 		}
+		
+		// VoxelMap: Initialize early (similar to Iris pattern)
+		try {
+			com.mamiyaotaru.voxelmap.VoxelMapInitializer.initialize();
+		} catch (Exception e) {
+			LOGGER.error("Failed to initialize VoxelMap", e);
+		}
 	}
 
 	public boolean hasShiftDown() {
@@ -731,6 +738,9 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 		runnable = wrapRunnableForDhUpdater(runnable);
 		
 		runnable.run();
+		
+		// VoxelMap: Removed manual lateInit() call - let original pattern work (first render/tick triggers it)
+		
 		this.options.startedCleanly = true;
 		this.options.save();
 	}
@@ -1257,6 +1267,13 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 	}
 
 	public void close() {
+		// VoxelMap: Call client stopping event
+		try {
+			net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents.CLIENT_STOPPING.invoker().onClientStopping(this);
+		} catch (Exception e) {
+			LOGGER.error("Error calling VoxelMap CLIENT_STOPPING event", e);
+		}
+		
 		// DH auto updater cleanup
 		com.seibel.distanthorizons.core.jar.updater.SelfUpdater.onClose();
 		
@@ -1913,6 +1930,15 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 		// Iris: Check for keybinds at end of tick
 		profilerFiller.push("iris_keybinds");
 		net.irisshaders.iris.Iris.handleKeybinds(this);
+		profilerFiller.pop();
+		
+		// VoxelMap: Client tick hook
+		profilerFiller.push("voxelmap_tick");
+		try {
+			com.mamiyaotaru.voxelmap.VoxelConstants.clientTick();
+		} catch (Exception e) {
+			// Silently catch to avoid crashes
+		}
 		profilerFiller.pop();
 	}
 

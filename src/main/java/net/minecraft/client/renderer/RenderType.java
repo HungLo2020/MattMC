@@ -1070,7 +1070,8 @@ public abstract class RenderType extends RenderStateShard implements net.irissha
 			CompositeStateBuilder() {
 			}
 
-			public RenderType.CompositeState.CompositeStateBuilder setTextureState(RenderStateShard.EmptyTextureStateShard emptyTextureStateShard) {
+			public RenderType.CompositeState.CompositeStateBuilder setTextureState( // VoxelMap: access widener
+			RenderStateShard.EmptyTextureStateShard emptyTextureStateShard) {
 				this.textureState = emptyTextureStateShard;
 				return this;
 			}

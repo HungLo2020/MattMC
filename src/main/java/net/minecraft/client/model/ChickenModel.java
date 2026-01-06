@@ -18,7 +18,7 @@ public class ChickenModel extends EntityModel<ChickenRenderState> {
 	public static final String RED_THING = "red_thing";
 	public static final float Y_OFFSET = 16.0F;
 	public static final MeshTransformer BABY_TRANSFORMER = new BabyModelTransform(false, 5.0F, 2.0F, 2.0F, 1.99F, 24.0F, Set.of("head", "beak", "red_thing"));
-	private final ModelPart head;
+	public final ModelPart head; // VoxelMap: access widener
 	private final ModelPart rightLeg;
 	private final ModelPart leftLeg;
 	private final ModelPart rightWing;

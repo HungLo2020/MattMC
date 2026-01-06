@@ -46,7 +46,8 @@ public abstract class LivingEntityRenderer<T extends LivingEntity, S extends Liv
 	private static final float EYE_BED_OFFSET = 0.1F;
 	protected M model;
 	protected final ItemModelResolver itemModelResolver;
-	protected final List<RenderLayer<S, M>> layers = Lists.<RenderLayer<S, M>>newArrayList();
+	// VoxelMap: Made accessible
+	public final List<RenderLayer<S, M>> layers = Lists.<RenderLayer<S, M>>newArrayList();
 
 	public LivingEntityRenderer(EntityRendererProvider.Context context, M entityModel, float f) {
 		super(context);

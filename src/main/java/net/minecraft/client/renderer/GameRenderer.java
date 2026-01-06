@@ -132,7 +132,8 @@ public class GameRenderer implements Projector, AutoCloseable, net.caffeinemc.mo
 	protected CubeMap cubeMap;
 	protected PanoramaRenderer panorama;
 	public final CrossFrameResourcePool resourcePool = new CrossFrameResourcePool(3); // Made public for Iris shader integration
-	private final FogRenderer fogRenderer = new FogRenderer();
+	// VoxelMap: Made accessible
+	public final FogRenderer fogRenderer = new FogRenderer();
 	private final GuiRenderer guiRenderer;
 	private final GuiRenderState guiRenderState;
 	private final LevelRenderState levelRenderState = new LevelRenderState();

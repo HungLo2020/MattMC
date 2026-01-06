@@ -73,7 +73,7 @@ public class ClientPackSource extends BuiltInPackSource {
 	private static VanillaPackResources createVanillaPackSource(Path path) {
 		VanillaPackResourcesBuilder vanillaPackResourcesBuilder = new VanillaPackResourcesBuilder()
 			.setMetadata(BUILT_IN_METADATA)
-			.exposeNamespace(new String[]{"minecraft"});
+			.exposeNamespace(new String[]{"minecraft", "voxelmap", "sodium", "iris", "distanthorizons"});
 		return vanillaPackResourcesBuilder.applyDevelopmentConfig().pushJarResources().pushAssetPath(PackType.CLIENT_RESOURCES, path).build(VANILLA_PACK_INFO);
 	}
 

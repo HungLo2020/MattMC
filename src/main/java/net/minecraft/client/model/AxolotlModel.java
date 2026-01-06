@@ -23,7 +23,7 @@ public class AxolotlModel extends EntityModel<AxolotlRenderState> {
 	private final ModelPart leftFrontLeg;
 	private final ModelPart rightFrontLeg;
 	private final ModelPart body;
-	private final ModelPart head;
+	public final ModelPart head; // VoxelMap: access widener
 	private final ModelPart topGills;
 	private final ModelPart leftGills;
 	private final ModelPart rightGills;

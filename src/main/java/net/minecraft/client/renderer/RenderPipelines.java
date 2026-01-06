@@ -20,6 +20,16 @@ import net.minecraft.resources.ResourceLocation;
 @Environment(EnvType.CLIENT)
 public class RenderPipelines {
 	private static final Map<ResourceLocation, RenderPipeline> PIPELINES_BY_LOCATION = new HashMap();
+	
+	// VoxelMap: Initialize ModApiBridge when RenderPipelines is loaded
+	static {
+		try {
+			com.mamiyaotaru.voxelmap.VoxelConstants.setModApiBride(new com.mamiyaotaru.voxelmap.fabric.FabricModApiBridge());
+		} catch (Exception e) {
+			// Silently catch to avoid crashes
+		}
+	}
+	
 	public static final RenderPipeline.Snippet MATRICES_PROJECTION_SNIPPET = RenderPipeline.builder()
 		.withUniform("DynamicTransforms", UniformType.UNIFORM_BUFFER)
 		.withUniform("Projection", UniformType.UNIFORM_BUFFER)

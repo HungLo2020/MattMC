@@ -650,6 +650,18 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 		
 		// Iris: End level render immediate state (from MixinLevelRenderer vertices.immediate)
 		net.irisshaders.iris.vertices.ImmediateState.isRenderingLevel = false;
+		
+		// VoxelMap: Render waypoint beacons after level rendering
+		try {
+			com.mojang.blaze3d.vertex.PoseStack voxelmap_poseStack = new com.mojang.blaze3d.vertex.PoseStack();
+			voxelmap_poseStack.pushPose();
+			voxelmap_poseStack.last().pose().set(matrix4f);
+			net.minecraft.client.renderer.MultiBufferSource.BufferSource bufferSource = this.minecraft.renderBuffers().bufferSource();
+			com.mamiyaotaru.voxelmap.VoxelConstants.onRenderWaypoints(deltaTracker.getGameTimeDeltaPartialTick(false), voxelmap_poseStack, bufferSource, camera);
+			voxelmap_poseStack.popPose();
+		} catch (Exception e) {
+			// Silently catch to avoid crashes
+		}
 	}
 
 	private void addMainPass(
@@ -1353,6 +1365,15 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 	private void setSectionDirty(int x, int y, int z, boolean important) {
 		// Sodium: Redirect to renderer
 		this.renderer.scheduleRebuildForChunk(x, y, z, important);
+		
+		// VoxelMap: Notify world update listener for chunk changes
+		try {
+			if (com.mamiyaotaru.voxelmap.VoxelConstants.getVoxelMapInstance().getWorldUpdateListener() != null) {
+				com.mamiyaotaru.voxelmap.VoxelConstants.getVoxelMapInstance().getWorldUpdateListener().notifyObservers(x, z);
+			}
+		} catch (Exception e) {
+			// Silently catch to avoid crashes
+		}
 	}
 
 	public void onSectionBecomingNonEmpty(long l) {

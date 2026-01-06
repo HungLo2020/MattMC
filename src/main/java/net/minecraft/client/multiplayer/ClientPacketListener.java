@@ -422,6 +422,14 @@ public class ClientPacketListener extends ClientCommonPacketListenerImpl impleme
 
 	public ClientPacketListener(Minecraft minecraft, Connection connection, CommonListenerCookie commonListenerCookie) {
 		super(minecraft, connection, commonListenerCookie);
+		
+		// VoxelMap: Call INIT event
+		try {
+			net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents.INIT.invokeAll(this, minecraft);
+		} catch (Exception e) {
+			LOGGER.error("Error calling VoxelMap INIT event", e);
+		}
+		
 		this.clientSkinCache = new ClientSkinCache(minecraft);
 		this.localGameProfile = commonListenerCookie.localGameProfile();
 		this.registryAccess = commonListenerCookie.receivedRegistries();
@@ -457,6 +465,13 @@ public class ClientPacketListener extends ClientCommonPacketListenerImpl impleme
 	}
 
 	public void clearLevel() {
+		// VoxelMap: Call DISCONNECT event
+		try {
+			net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents.DISCONNECT.invokeAll(this, this.minecraft);
+		} catch (Exception e) {
+			LOGGER.error("Error calling VoxelMap DISCONNECT event", e);
+		}
+		
 		this.clearCacheSlots();
 		this.level = null;
 		this.levelLoadTracker = null;
@@ -517,6 +532,15 @@ public class ClientPacketListener extends ClientCommonPacketListenerImpl impleme
 		this.debugSubscriber.clear();
 		this.minecraft.levelRenderer.debugRenderer.refreshRendererList();
 		this.minecraft.player.resetPos();
+		
+		// VoxelMap: Call JOIN event
+		try {
+			net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents.JOIN.invokeAll(
+				this, net.minecraft.network.protocol.PacketFlow.CLIENTBOUND, this.minecraft);
+		} catch (Exception e) {
+			LOGGER.error("Error calling VoxelMap JOIN event", e);
+		}
+		
 		this.minecraft.player.setId(clientboundLoginPacket.playerId());
 		this.level.addEntity(this.minecraft.player);
 		this.minecraft.player.input = new KeyboardInput(this.minecraft.options);
@@ -2619,6 +2643,11 @@ public class ClientPacketListener extends ClientCommonPacketListenerImpl impleme
 	}
 
 	public void sendCommand(String string) {
+		// VoxelMap: Parse custom commands
+		if (!com.mamiyaotaru.voxelmap.VoxelConstants.onSendChatMessage(string)) {
+			return; // Command was handled by VoxelMap
+		}
+		
 		SignableCommand<ClientSuggestionProvider> signableCommand = SignableCommand.of(this.commands.parse(string, this.suggestionsProvider));
 		if (signableCommand.arguments().isEmpty()) {
 			this.send(new ServerboundChatCommandPacket(string));
@@ -2635,6 +2664,12 @@ public class ClientPacketListener extends ClientCommonPacketListenerImpl impleme
 	}
 
 	public void sendUnattendedCommand(String string, @Nullable Screen screen) {
+		// VoxelMap: Parse custom commands
+		if (!com.mamiyaotaru.voxelmap.VoxelConstants.onSendChatMessage(string)) {
+			this.minecraft.setScreen(screen);
+			return; // Command was handled by VoxelMap
+		}
+		
 		switch (this.verifyCommand(string)) {
 			case NO_ISSUES:
 				this.send(new ServerboundChatCommandPacket(string));
