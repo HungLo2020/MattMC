@@ -10,12 +10,23 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.jetbrains.annotations.NotNull;
 
 public final class ThreadManager {
-    static final int concurrentThreads = Math.min(Math.max(Runtime.getRuntime().availableProcessors() / 2, 1), 4);
+    static int concurrentThreads = 8; // Performance: Default increased from 4 to 8, will be updated from config
     static final LinkedBlockingQueue<Runnable> queue = new LinkedBlockingQueue<>();
-    public static final ThreadPoolExecutor executorService = new ThreadPoolExecutor(0, concurrentThreads, 60L, TimeUnit.SECONDS, queue);
+    public static ThreadPoolExecutor executorService = new ThreadPoolExecutor(0, concurrentThreads, 60L, TimeUnit.SECONDS, queue);
     public static ThreadPoolExecutor saveExecutorService = new ThreadPoolExecutor(0, concurrentThreads, 60L, TimeUnit.SECONDS, new LinkedBlockingQueue<>());
 
     private ThreadManager() {}
+    
+    public static void updateThreadPoolSize(int newSize) {
+        int clampedSize = Math.max(1, Math.min(16, newSize));
+        if (clampedSize != concurrentThreads) {
+            concurrentThreads = clampedSize;
+            // Update executor services with new size
+            executorService.setMaximumPoolSize(concurrentThreads);
+            saveExecutorService.setMaximumPoolSize(concurrentThreads);
+            VoxelConstants.getLogger().info("VoxelMap thread pool size updated to: " + concurrentThreads);
+        }
+    }
 
     public static void emptyQueue() {
         for (Runnable runnable : queue) {

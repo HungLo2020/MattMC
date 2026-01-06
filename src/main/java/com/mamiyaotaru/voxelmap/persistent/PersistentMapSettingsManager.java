@@ -19,6 +19,7 @@ public class PersistentMapSettingsManager implements ISubSettingsManager {
     protected float minZoom = 0.5F;
     protected float maxZoom = 16.0F;
     protected int cacheSize = 500;
+    protected int threadPoolSize = 8; // Performance: Increased from 4, configurable
     protected boolean outputImages;
     public boolean showWaypoints = true;
     public boolean showWaypointNames = true;
@@ -36,6 +37,7 @@ public class PersistentMapSettingsManager implements ISubSettingsManager {
                     case "Worldmap Minimum Zoom" -> this.minZoom = Float.parseFloat(curLine[1]);
                     case "Worldmap Maximum Zoom" -> this.maxZoom = Float.parseFloat(curLine[1]);
                     case "Worldmap Cache Size" -> this.cacheSize = Integer.parseInt(curLine[1]);
+                    case "Worldmap Thread Pool Size" -> this.threadPoolSize = Integer.parseInt(curLine[1]);
                     case "Show Worldmap Waypoints" -> this.showWaypoints = Boolean.parseBoolean(curLine[1]);
                     case "Show Worldmap Waypoint Names" -> this.showWaypointNames = Boolean.parseBoolean(curLine[1]);
                     case "Output Images" -> this.outputImages = Boolean.parseBoolean(curLine[1]);
@@ -57,6 +59,19 @@ public class PersistentMapSettingsManager implements ISubSettingsManager {
 
         this.bindCacheSize();
         this.bindZoom();
+        this.bindThreadPoolSize();
+        
+        // Update ThreadManager with configured size
+        ThreadManager.updateThreadPoolSize(this.threadPoolSize);
+    }
+    
+    public int getThreadPoolSize() {
+        return this.threadPoolSize;
+    }
+    
+    private void bindThreadPoolSize() {
+        // Clamp thread pool size between 1 and 16
+        this.threadPoolSize = Math.max(1, Math.min(16, this.threadPoolSize));
     }
 
     @Override
@@ -65,6 +80,7 @@ public class PersistentMapSettingsManager implements ISubSettingsManager {
         out.println("Worldmap Minimum Zoom:" + this.minZoom);
         out.println("Worldmap Maximum Zoom:" + this.maxZoom);
         out.println("Worldmap Cache Size:" + this.cacheSize);
+        out.println("Worldmap Thread Pool Size:" + this.threadPoolSize);
         out.println("Show Worldmap Waypoints:" + this.showWaypoints);
         out.println("Show Worldmap Waypoint Names:" + this.showWaypointNames);
     }
