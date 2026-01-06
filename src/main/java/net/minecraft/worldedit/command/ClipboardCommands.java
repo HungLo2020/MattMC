@@ -221,11 +221,10 @@ public class ClipboardCommands {
         
         // Apply rotation transform to clipboard
         // Create new rotation transform
-        net.minecraft.worldedit.math.transform.AffineTransform newRotation = 
-            net.minecraft.worldedit.math.transform.AffineTransform.rotateY(normalizedDegrees);
+        AffineTransform newRotation = AffineTransform.rotateY(normalizedDegrees);
         
         // Combine with existing transform (if any) to allow stacking rotations
-        net.minecraft.worldedit.math.transform.AffineTransform existingTransform = clipboard.getTransform();
+        AffineTransform existingTransform = clipboard.getTransform();
         if (existingTransform != null) {
             clipboard.setTransform(existingTransform.combine(newRotation));
         } else {
@@ -254,20 +253,20 @@ public class ClipboardCommands {
         Clipboard clipboard = (Clipboard) session.getClipboard();
         
         // Apply flip transform based on player's facing direction
-        net.minecraft.worldedit.math.transform.AffineTransform newFlip;
+        AffineTransform newFlip;
         float yaw = player.getYRot();
         
         // Determine flip axis based on player's facing direction
         if ((yaw >= -45 && yaw < 45) || (yaw >= 135 || yaw < -135)) {
             // Facing north/south, flip along Z axis
-            newFlip = net.minecraft.worldedit.math.transform.AffineTransform.flipZ();
+            newFlip = AffineTransform.flipZ();
         } else {
             // Facing east/west, flip along X axis
-            newFlip = net.minecraft.worldedit.math.transform.AffineTransform.flipX();
+            newFlip = AffineTransform.flipX();
         }
         
         // Combine with existing transform (if any) to allow stacking transforms
-        net.minecraft.worldedit.math.transform.AffineTransform existingTransform = clipboard.getTransform();
+        AffineTransform existingTransform = clipboard.getTransform();
         if (existingTransform != null) {
             clipboard.setTransform(existingTransform.combine(newFlip));
         } else {
