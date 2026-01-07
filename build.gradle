@@ -78,10 +78,8 @@ repositories {
 
 configurations.all {
     resolutionStrategy {
-        // force 'com.mojang:authlib:6.0.55' // REMOVED - using custom PlayerProfile system
         force 'com.mojang:brigadier:1.3.10'
         force 'com.mojang:datafixerupper:8.0.16'
-        // Force ASM 9.9 for Fabric Loader compatibility (avoid duplicate classes)
         force 'org.ow2.asm:asm:9.9'
         force 'org.ow2.asm:asm-analysis:9.9'
         force 'org.ow2.asm:asm-commons:9.9'
@@ -100,23 +98,13 @@ configurations.runtimeClasspath {
 dependencies {
     // Mojang libraries - use bundled JARs if available, otherwise use Maven coordinates
     if (useBundledDeps) {
-        // Bundled Mojang libraries from libraries/deps/ (authlib removed - using custom PlayerProfile)
         implementation files('libraries/deps/brigadier-1.3.10.jar')
         implementation files('libraries/deps/datafixerupper-8.0.16.jar')
-        // implementation files('libraries/deps/authlib-6.0.55.jar') // REMOVED - custom PlayerProfile system
-        implementation files('libraries/deps/logging-1.2.7.jar')
         implementation files('libraries/deps/jtracy-1.0.29.jar')
-        // implementation files('libraries/deps/blocklist-1.0.10.jar') // REMOVED - using ALLOW_ALL AddressCheck
-        // implementation files('libraries/deps/patchy-2.2.10.jar') // REMOVED - only contained blocklist functionality
     } else {
-        // Remote Mojang libraries (authlib removed - using custom PlayerProfile)
         implementation 'com.mojang:brigadier:1.3.10'
         implementation 'com.mojang:datafixerupper:8.0.16'
-        // implementation 'com.mojang:authlib:6.0.55' // REMOVED - custom PlayerProfile system
-        implementation 'com.mojang:logging:1.2.7'
         implementation 'com.mojang:jtracy:1.0.29'
-        // implementation 'com.mojang:blocklist:1.0.10' // REMOVED - using ALLOW_ALL AddressCheck
-        // implementation 'com.mojang:patchy:2.2.10' // REMOVED - only contained blocklist functionality
     }
     
     // Google libraries
@@ -213,16 +201,8 @@ dependencies {
         implementation files('libraries/deps/asm-tree-9.9.jar')
         implementation files('libraries/deps/asm-util-9.9.jar')
         
-        // NOTE: Class Tweaker removed - access modifications already applied in source
-        
         // Mapping IO - mapping file I/O
         implementation files('libraries/deps/mapping-io-0.7.1.jar')
-        
-        // NOTE: Launchwrapper removed - legacy code removed from Fabric Loader
-        
-        // NOTE: Access Widener removed - access modifications already applied in source
-        
-        // NOTE: Tiny Mappings Parser removed - superseded by mapping-io with built-in Tiny v1 support
         
         // Note: Fabric API stubs are in src/main/java/net/fabricmc/fabric/api/
         // No external Fabric API JARs needed - using Mojang-mapped stubs
@@ -235,16 +215,8 @@ dependencies {
         implementation 'org.ow2.asm:asm-tree:9.9'
         implementation 'org.ow2.asm:asm-util:9.9'
         
-        // NOTE: Class Tweaker removed - access modifications already applied in source
-        
         // Mapping IO - mapping file I/O (requires Fabric Maven)
         implementation 'net.fabricmc:mapping-io:0.7.1'
-        
-        // NOTE: Launchwrapper removed - legacy code removed from Fabric Loader
-        
-        // NOTE: Access Widener removed - access modifications already applied in source
-        
-        // NOTE: Tiny Mappings Parser removed - superseded by mapping-io with built-in Tiny v1 support
     }
     
     // Fabric implementation dependencies (available on Maven Central)
@@ -595,53 +567,6 @@ tasks.register('runClient', JavaExec) {
             from file("${buildDir}/shaderpacks")
             into shaderpacksDir
             include '*.zip'
-        }
-    }
-    
-    standardInput = System.in
-    
-    // Configure to use bundled JDK
-    configureBundledJdk(it)
-}
-
-// Task to run the Minecraft client WITHOUT Fabric Loader (vanilla mode)
-tasks.register('runClientVanilla', JavaExec) {
-    group = 'minecraft'
-    description = 'Runs the Minecraft client without Fabric Loader (vanilla mode)'
-    
-    dependsOn 'classes', 'copyJdkToRun'
-    
-    // Explicitly declare dependency on the classes output to ensure proper task ordering
-    inputs.files(sourceSets.main.output.classesDirs)
-    
-    classpath = sourceSets.main.runtimeClasspath
-    mainClass = 'net.minecraft.client.main.Main'
-    
-    workingDir = file('run')
-    jvmArgs = clientJvmArgs
-    
-    // Required client arguments
-    args = [
-        '--version', '1.21.10',
-        '--accessToken', '0',
-        '--gameDir', file('run').absolutePath,
-        '--assetsDir', file('run/assets').absolutePath,
-        '--assetIndex', '27'
-    ]
-    
-    doFirst {
-        verifyMainClassExists('net/minecraft/client/main/Main.class', 'Client main class')
-        workingDir.mkdirs()
-        file('run/assets').mkdirs()
-        file('run/resourcepacks').mkdirs()
-        
-        // Copy assets from src/main/resources/assets to run/assets for dev environment
-        def resourcesAssetsDir = file('src/main/resources/assets')
-        if (resourcesAssetsDir.exists() && resourcesAssetsDir.isDirectory()) {
-            copy {
-                from resourcesAssetsDir
-                into file('run/assets')
-            }
         }
     }
     
