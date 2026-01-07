@@ -48,7 +48,7 @@ MattMC/
 │       │   ├── chat/         # Chat system
 │       │   ├── codec/        # Packet encoding/decoding
 │       │   └── syncher/      # Entity data synchronization
-│       ├── obfuscate/        # Obfuscation annotations
+│       ├── obfuscate/        # Obfuscation annotations (vestigial, see OBFUSCATION-ANNOTATIONS.md)
 │       ├── realms/           # Realms integration
 │       ├── recipebook/       # Recipe book UI
 │       ├── references/       # Reference tracking
@@ -244,3 +244,4 @@ For detailed information about specific systems, see:
 - [Data System](DATA-SYSTEM.md)
 - [Inventory System](INVENTORY-SYSTEM.md)
 - [Server System](SERVER-SYSTEM.md)
+- [Obfuscation Annotations](OBFUSCATION-ANNOTATIONS.md)
