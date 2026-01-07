@@ -53,7 +53,7 @@ import net.minecraft.client.renderer.chunk.ChunkSectionLayer;
 import net.minecraft.client.renderer.chunk.ChunkSectionLayerGroup;
 import net.minecraft.client.renderer.chunk.ChunkSectionsToRender;
 import net.minecraft.client.renderer.chunk.CompiledSectionMesh;
-import net.minecraft.client.renderer.chunk.RenderRegionCache;
+
 import net.minecraft.client.renderer.chunk.SectionBuffers;
 import net.minecraft.client.renderer.chunk.SectionMesh;
 import net.minecraft.client.renderer.chunk.SectionRenderDispatcher;
@@ -1221,42 +1221,13 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 	}
 
 	private void compileSections(Camera camera) {
+		// Sodium: This method is a no-op since visibleSections is always empty (ViewArea has 0 render distance)
+		// All chunk compilation is handled by SodiumWorldRenderer.setupTerrain()
+		// We keep the profiler calls for compatibility and call scheduleTranslucentSectionResort which has its own empty check
 		ProfilerFiller profilerFiller = Profiler.get();
 		profilerFiller.push("populateSectionsToCompile");
-		RenderRegionCache renderRegionCache = new RenderRegionCache();
-		BlockPos blockPos = camera.getBlockPosition();
-		List<SectionRenderDispatcher.RenderSection> list = Lists.<SectionRenderDispatcher.RenderSection>newArrayList();
-
-		for (SectionRenderDispatcher.RenderSection renderSection : this.visibleSections) {
-			if (renderSection.isDirty() && (renderSection.getSectionMesh() != CompiledSectionMesh.UNCOMPILED || renderSection.hasAllNeighbors())) {
-				boolean bl = false;
-				if (this.minecraft.options.prioritizeChunkUpdates().get() == PrioritizeChunkUpdates.NEARBY) {
-					BlockPos blockPos2 = SectionPos.of(renderSection.getSectionNode()).center();
-					bl = blockPos2.distSqr(blockPos) < 768.0 || renderSection.isDirtyFromPlayer();
-				} else if (this.minecraft.options.prioritizeChunkUpdates().get() == PrioritizeChunkUpdates.PLAYER_AFFECTED) {
-					bl = renderSection.isDirtyFromPlayer();
-				}
-
-				if (bl) {
-					profilerFiller.push("compileSectionSynchronously");
-					this.sectionRenderDispatcher.rebuildSectionSync(renderSection, renderRegionCache);
-					renderSection.setNotDirty();
-					profilerFiller.pop();
-				} else {
-					list.add(renderSection);
-				}
-			}
-		}
-
 		profilerFiller.popPush("uploadSectionMeshes");
-		this.sectionRenderDispatcher.uploadAllPendingUploads();
 		profilerFiller.popPush("scheduleAsyncCompile");
-
-		for (SectionRenderDispatcher.RenderSection renderSectionx : list) {
-			renderSectionx.rebuildSectionAsync(renderRegionCache);
-			renderSectionx.setNotDirty();
-		}
-
 		profilerFiller.popPush("scheduleTranslucentResort");
 		this.scheduleTranslucentSectionResort(camera.getPosition());
 		profilerFiller.pop();
