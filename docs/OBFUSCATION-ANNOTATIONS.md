@@ -33,7 +33,7 @@ Key characteristics:
 
 ## Usage in MattMC
 
-The `@DontObfuscate` annotation is used throughout the codebase on **44 files**, primarily on:
+The `@DontObfuscate` annotation is used throughout the codebase on **45 files**, primarily on:
 
 1. **Main entry point classes**:
    - `net.minecraft.server.Main`
@@ -101,7 +101,7 @@ The `@DontObfuscate` annotation exists in the codebase because:
 
 ## Summary
 
-The `obfuscate/DontObfuscate.java` file defines an annotation that **marks code elements that should not be renamed during obfuscation**. While this annotation appears throughout the codebase on 44+ files, **MattMC does not currently use any obfuscation tools**.
+The `obfuscate/DontObfuscate.java` files (two versions in different packages) define an annotation that **marks code elements that should not be renamed during obfuscation**. While this annotation appears throughout the codebase on 45 files, **MattMC does not currently use any obfuscation tools**.
 
 The annotations are **vestigial remnants from the original Minecraft codebase** where they served an important purpose. In MattMC, they primarily serve as:
 - Documentation of external contracts
