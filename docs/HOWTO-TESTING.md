@@ -383,6 +383,74 @@ class MthPerformanceTest {
 - **JMH** (`*Benchmark.java`): For accurate microbenchmarks, statistical analysis, and comparing implementations
 - **JUnit Performance Tests** (`*PerformanceTest.java`): For simple timing measurements and regression detection in CI
 
+### JSON Resource Loading Performance Test
+
+The `JsonResourceLoadingPerformanceTest` measures the time it takes to load all JSON resources in the game (approximately 13,000 files).
+
+**Location**: `src/test/performance/net/minecraft/resources/JsonResourceLoadingPerformanceTest.java`
+
+**What it tests:**
+- File I/O time for reading all JSON files
+- Parsing time for converting JSON text to objects
+- Total end-to-end time for complete resource loading
+- Percentage breakdown showing which stage is the bottleneck
+
+**Run the test:**
+```bash
+./gradlew performanceTest --tests "JsonResourceLoadingPerformanceTest"
+```
+
+**Example output:**
+```
+=== Loading All Game JSON Resources ===
+Total JSON files: 12,995
+Test iterations: 3
+
+Iteration 1/3...
+  Loaded: 12,995 files (100.0%)
+  Failed: 0 files
+  Time: 358.75 ms
+
+Iteration 2/3...
+  Loaded: 12,995 files (100.0%)
+  Failed: 0 files
+  Time: 152.52 ms
+
+Iteration 3/3...
+  Loaded: 12,995 files (100.0%)
+  Failed: 0 files
+  Time: 143.79 ms
+
+=== Performance Summary ===
+Total Time (All Files) Performance Summary:
+  Iterations: 3
+  Average:    218.35 ms
+  Median:     152.52 ms
+  
+Total File I/O Performance Summary:
+  Average:    121.56 ms
+  
+Total Parsing Performance Summary:
+  Average:    87.90 ms
+
+Percentage Breakdown:
+  File I/O: 55.7%
+  Parsing:  40.3%
+
+Average per file: 16.80 μs
+```
+
+**What the metrics mean:**
+- **First iteration is slower**: JIT compilation and cache warming effects
+- **Subsequent iterations**: More representative of runtime performance
+- **Percentage breakdown**: Shows whether file I/O or parsing is the bottleneck
+- **Average per file**: Useful for estimating impact of adding more resources
+
+**Performance tips:**
+- If File I/O is > 70%, consider caching or resource pre-loading
+- If Parsing is > 70%, consider using a faster JSON parser or caching parsed objects
+- Monitor the average per file metric when adding large numbers of new JSON resources
+
 ### Parameterized Test Example
 
 ```java

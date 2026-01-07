@@ -1,199 +1,145 @@
 package net.minecraft.resources;
 
-import com.electronwill.nightconfig.core.Config;
-import com.electronwill.nightconfig.core.io.ParsingMode;
-import com.electronwill.nightconfig.json.JsonFormat;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-import com.google.gson.JsonObject;
+import com.google.gson.JsonElement;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.io.*;
+import java.net.URISyntaxException;
+import java.net.URL;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Paths;
+import java.nio.file.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.stream.Stream;
 
 /**
- * Performance tests for JSON resource loading.
- * Tests the complete pipeline: File I/O → Parsing → Object Construction
+ * Performance test for loading ALL JSON resources in the game.
+ * Measures the complete pipeline: File I/O → Parsing → Object Construction
  * 
- * This test measures realistic JSON loading scenarios that occur during
- * Minecraft resource pack loading, including language files, sounds,
- * models, and configuration files.
- * 
- * Note: Code is intentionally inlined in timing loops (not extracted to methods)
- * to avoid method call overhead that would skew performance measurements.
+ * This test loads all ~13,000 JSON files from the actual game resources
+ * including language files, models, sounds, advancements, recipes, etc.
  */
-@DisplayName("JSON Resource Loading Performance Tests")
+@DisplayName("JSON Resource Loading Performance Test")
 class JsonResourceLoadingPerformanceTest {
     
-    private static final int WARMUP_ITERATIONS = 10;
-    private static final int TEST_ITERATIONS = 100;
-    
-    private static final String SMALL_JSON = "/json_performance_tests/small.json";
-    private static final String MEDIUM_JSON = "/json_performance_tests/medium.json";
-    private static final String LARGE_JSON = "/json_performance_tests/large.json";
+    private static final int TEST_ITERATIONS = 3;
     
     private Gson gson;
-    private JsonFormat nightConfigJsonFormat;
+    private List<String> allJsonPaths;
     
     @BeforeEach
-    void setUp() {
+    void setUp() throws Exception {
         gson = new GsonBuilder().create();
-        nightConfigJsonFormat = JsonFormat.minimalInstance();
+        allJsonPaths = findAllJsonResources();
+        System.out.printf("Found %,d JSON files to load%n", allJsonPaths.size());
     }
     
-    @Test
-    @DisplayName("should load small JSON files quickly with Gson")
-    void testSmallJsonWithGson() throws IOException {
-        System.out.println("\n=== Small JSON Loading Performance (Gson) ===");
-        testJsonLoadingWithGson(SMALL_JSON, "Small JSON");
-    }
-    
-    @Test
-    @DisplayName("should load medium JSON files quickly with Gson")
-    void testMediumJsonWithGson() throws IOException {
-        System.out.println("\n=== Medium JSON Loading Performance (Gson) ===");
-        testJsonLoadingWithGson(MEDIUM_JSON, "Medium JSON");
-    }
-    
-    @Test
-    @DisplayName("should load large JSON files quickly with Gson")
-    void testLargeJsonWithGson() throws IOException {
-        System.out.println("\n=== Large JSON Loading Performance (Gson) ===");
-        testJsonLoadingWithGson(LARGE_JSON, "Large JSON");
-    }
-    
-    @Test
-    @DisplayName("should load small JSON files quickly with NightConfig")
-    void testSmallJsonWithNightConfig() throws IOException {
-        System.out.println("\n=== Small JSON Loading Performance (NightConfig) ===");
-        testJsonLoadingWithNightConfig(SMALL_JSON, "Small JSON");
-    }
-    
-    @Test
-    @DisplayName("should load medium JSON files quickly with NightConfig")
-    void testMediumJsonWithNightConfig() throws IOException {
-        System.out.println("\n=== Medium JSON Loading Performance (NightConfig) ===");
-        testJsonLoadingWithNightConfig(MEDIUM_JSON, "Medium JSON");
-    }
-    
-    @Test
-    @DisplayName("should load large JSON files quickly with NightConfig")
-    void testLargeJsonWithNightConfig() throws IOException {
-        System.out.println("\n=== Large JSON Loading Performance (NightConfig) ===");
-        testJsonLoadingWithNightConfig(LARGE_JSON, "Large JSON");
-    }
-    
-    @Test
-    @DisplayName("should measure file I/O separately from parsing")
-    void testFileIOVsParsing() throws IOException {
-        System.out.println("\n=== File I/O vs Parsing Performance Breakdown ===");
+    /**
+     * Finds all JSON files in the resources directory.
+     */
+    private List<String> findAllJsonResources() throws Exception {
+        List<String> jsonPaths = new ArrayList<>();
         
-        String resourcePath = LARGE_JSON;
-        InputStream inputStream = getClass().getResourceAsStream(resourcePath);
-        if (inputStream == null) {
-            throw new IOException("Could not find resource: " + resourcePath);
+        // Get the main resources path from the build output
+        Path resourcesPath = Paths.get("build/resources/main");
+        
+        if (!Files.exists(resourcesPath)) {
+            // If build output doesn't exist, try source directory
+            resourcesPath = Paths.get("src/main/resources");
         }
         
-        // Pre-read the content into memory
-        String jsonContent = new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
-        inputStream.close();
-        
-        // Test File I/O (reading from resource stream)
-        PerformanceTimer fileIOTimer = new PerformanceTimer();
-        PerformanceTimer.warmup(WARMUP_ITERATIONS, () -> {
-            try {
-                InputStream is = getClass().getResourceAsStream(resourcePath);
-                byte[] bytes = is.readAllBytes();
-                is.close();
-            } catch (IOException e) {
-                throw new UncheckedIOException(e);
-            }
-        });
-        
-        for (int i = 0; i < TEST_ITERATIONS; i++) {
-            fileIOTimer.time(() -> {
-                try {
-                    InputStream is = getClass().getResourceAsStream(resourcePath);
-                    byte[] bytes = is.readAllBytes();
-                    is.close();
-                } catch (IOException e) {
-                    throw new UncheckedIOException(e);
-                }
-            });
+        if (!Files.exists(resourcesPath)) {
+            throw new IOException("Could not find resources directory");
         }
         
-        // Test Parsing (from pre-loaded string)
-        PerformanceTimer parsingTimer = new PerformanceTimer();
-        PerformanceTimer.warmup(WARMUP_ITERATIONS, () -> {
-            gson.fromJson(jsonContent, JsonObject.class);
-        });
+        final Path finalResourcesPath = resourcesPath;
         
-        for (int i = 0; i < TEST_ITERATIONS; i++) {
-            parsingTimer.time(() -> {
-                gson.fromJson(jsonContent, JsonObject.class);
-            });
+        // Find all .json files
+        try (Stream<Path> paths = Files.walk(resourcesPath)) {
+            paths.filter(Files::isRegularFile)
+                 .filter(p -> p.toString().endsWith(".json"))
+                 .forEach(p -> {
+                     // Convert to resource path format (starting with /)
+                     String relative = finalResourcesPath.relativize(p).toString().replace('\\', '/');
+                     jsonPaths.add("/" + relative);
+                 });
         }
         
-        fileIOTimer.printSummary("File I/O");
-        parsingTimer.printSummary("Parsing");
-        
-        System.out.printf("%nTotal Pipeline (I/O + Parsing): %s average%n", 
-            PerformanceTimer.formatDuration(fileIOTimer.getAverage() + parsingTimer.getAverage()));
+        return jsonPaths;
     }
     
     @Test
-    @DisplayName("should measure complete end-to-end resource loading")
-    void testCompleteResourceLoading() throws IOException {
-        System.out.println("\n=== Complete End-to-End Resource Loading ===");
+    @DisplayName("should load all JSON resources from the game")
+    void testLoadAllGameJsonResources() throws Exception {
+        System.out.println("\n=== Loading All Game JSON Resources ===");
+        System.out.printf("Total JSON files: %,d%n", allJsonPaths.size());
+        System.out.printf("Test iterations: %d%n%n", TEST_ITERATIONS);
         
         PerformanceTimer totalTimer = new PerformanceTimer();
         PerformanceTimer ioTimer = new PerformanceTimer();
         PerformanceTimer parseTimer = new PerformanceTimer();
         
-        String resourcePath = LARGE_JSON;
+        // Get the base path for resources
+        Path basePath = Files.exists(Paths.get("build/resources/main")) 
+            ? Paths.get("build/resources/main") 
+            : Paths.get("src/main/resources");
         
-        // Warmup
-        PerformanceTimer.warmup(WARMUP_ITERATIONS, () -> {
-            try {
-                InputStream is = getClass().getResourceAsStream(resourcePath);
-                Reader reader = new InputStreamReader(is, StandardCharsets.UTF_8);
-                JsonObject obj = gson.fromJson(reader, JsonObject.class);
-                reader.close();
-            } catch (IOException e) {
-                throw new UncheckedIOException(e);
+        for (int iteration = 0; iteration < TEST_ITERATIONS; iteration++) {
+            System.out.printf("Iteration %d/%d...%n", iteration + 1, TEST_ITERATIONS);
+            
+            long iterationStart = System.nanoTime();
+            long totalIO = 0;
+            long totalParse = 0;
+            int successCount = 0;
+            int failCount = 0;
+            
+            for (String resourcePath : allJsonPaths) {
+                try {
+                    // Remove leading slash and construct full path
+                    Path jsonPath = basePath.resolve(resourcePath.substring(1));
+                    
+                    // Stage 1: File I/O
+                    long ioStart = System.nanoTime();
+                    String content = Files.readString(jsonPath, StandardCharsets.UTF_8);
+                    long ioTime = System.nanoTime() - ioStart;
+                    totalIO += ioTime;
+                    
+                    // Stage 2: Parsing
+                    long parseStart = System.nanoTime();
+                    JsonElement element = gson.fromJson(content, JsonElement.class);
+                    long parseTime = System.nanoTime() - parseStart;
+                    totalParse += parseTime;
+                    
+                    successCount++;
+                } catch (Exception e) {
+                    // Some JSON files may be malformed or have special formats
+                    failCount++;
+                }
             }
-        });
-        
-        // Test with separate timing for each stage
-        for (int i = 0; i < TEST_ITERATIONS; i++) {
-            long totalStart = System.nanoTime();
             
-            // Stage 1: File I/O
-            long ioStart = System.nanoTime();
-            InputStream is = getClass().getResourceAsStream(resourcePath);
-            String content = new String(is.readAllBytes(), StandardCharsets.UTF_8);
-            is.close();
-            long ioDuration = System.nanoTime() - ioStart;
-            ioTimer.addMeasurement(ioDuration);
+            long iterationTime = System.nanoTime() - iterationStart;
             
-            // Stage 2: Parsing
-            long parseStart = System.nanoTime();
-            JsonObject obj = gson.fromJson(content, JsonObject.class);
-            long parseDuration = System.nanoTime() - parseStart;
-            parseTimer.addMeasurement(parseDuration);
+            // Record measurements for this iteration
+            totalTimer.addMeasurement(iterationTime);
+            ioTimer.addMeasurement(totalIO);
+            parseTimer.addMeasurement(totalParse);
             
-            long totalDuration = System.nanoTime() - totalStart;
-            totalTimer.addMeasurement(totalDuration);
+            System.out.printf("  Loaded: %,d files (%.1f%%)%n", successCount, 
+                (successCount * 100.0) / allJsonPaths.size());
+            System.out.printf("  Failed: %,d files%n", failCount);
+            System.out.printf("  Time: %s%n%n", PerformanceTimer.formatDuration(iterationTime));
         }
         
-        System.out.println("\nPerformance Breakdown:");
-        ioTimer.printSummary("  Stage 1 - File I/O");
-        parseTimer.printSummary("  Stage 2 - Parsing");
-        totalTimer.printSummary("  Total (All Stages)");
+        // Print summary
+        System.out.println("=== Performance Summary ===");
+        totalTimer.printSummary("Total Time (All Files)");
+        ioTimer.printSummary("Total File I/O");
+        parseTimer.printSummary("Total Parsing");
         
         double ioPercent = (ioTimer.getAverage() / totalTimer.getAverage()) * 100;
         double parsePercent = (parseTimer.getAverage() / totalTimer.getAverage()) * 100;
@@ -201,77 +147,9 @@ class JsonResourceLoadingPerformanceTest {
         System.out.printf("%nPercentage Breakdown:%n");
         System.out.printf("  File I/O: %.1f%%%n", ioPercent);
         System.out.printf("  Parsing:  %.1f%%%n", parsePercent);
-    }
-    
-    private void testJsonLoadingWithGson(String resourcePath, String label) throws IOException {
-        PerformanceTimer timer = new PerformanceTimer();
         
-        // Warmup
-        PerformanceTimer.warmup(WARMUP_ITERATIONS, () -> {
-            try {
-                InputStream is = getClass().getResourceAsStream(resourcePath);
-                if (is == null) throw new IOException("Resource not found: " + resourcePath);
-                Reader reader = new InputStreamReader(is, StandardCharsets.UTF_8);
-                JsonObject obj = gson.fromJson(reader, JsonObject.class);
-                reader.close();
-            } catch (IOException e) {
-                throw new UncheckedIOException(e);
-            }
-        });
-        
-        // Actual measurements
-        for (int i = 0; i < TEST_ITERATIONS; i++) {
-            timer.time(() -> {
-                try {
-                    InputStream is = getClass().getResourceAsStream(resourcePath);
-                    if (is == null) throw new IOException("Resource not found: " + resourcePath);
-                    Reader reader = new InputStreamReader(is, StandardCharsets.UTF_8);
-                    JsonObject obj = gson.fromJson(reader, JsonObject.class);
-                    reader.close();
-                } catch (IOException e) {
-                    throw new UncheckedIOException(e);
-                }
-            });
-        }
-        
-        timer.printSummary(label + " (Gson)");
-    }
-    
-    private void testJsonLoadingWithNightConfig(String resourcePath, String label) throws IOException {
-        PerformanceTimer timer = new PerformanceTimer();
-        
-        // Warmup
-        PerformanceTimer.warmup(WARMUP_ITERATIONS, () -> {
-            try {
-                InputStream is = getClass().getResourceAsStream(resourcePath);
-                if (is == null) throw new IOException("Resource not found: " + resourcePath);
-                String content = new String(is.readAllBytes(), StandardCharsets.UTF_8);
-                is.close();
-                
-                Config config = Config.inMemory();
-                nightConfigJsonFormat.createParser().parse(content, config, ParsingMode.REPLACE);
-            } catch (IOException e) {
-                throw new UncheckedIOException(e);
-            }
-        });
-        
-        // Actual measurements
-        for (int i = 0; i < TEST_ITERATIONS; i++) {
-            timer.time(() -> {
-                try {
-                    InputStream is = getClass().getResourceAsStream(resourcePath);
-                    if (is == null) throw new IOException("Resource not found: " + resourcePath);
-                    String content = new String(is.readAllBytes(), StandardCharsets.UTF_8);
-                    is.close();
-                    
-                    Config config = Config.inMemory();
-                    nightConfigJsonFormat.createParser().parse(content, config, ParsingMode.REPLACE);
-                } catch (IOException e) {
-                    throw new UncheckedIOException(e);
-                }
-            });
-        }
-        
-        timer.printSummary(label + " (NightConfig)");
+        // Calculate per-file average
+        double avgPerFile = totalTimer.getAverage() / allJsonPaths.size();
+        System.out.printf("%nAverage per file: %s%n", PerformanceTimer.formatDuration(avgPerFile));
     }
 }

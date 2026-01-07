@@ -195,49 +195,6 @@ The `gradle.properties` file configures Gradle for optimal build speeds:
 
 ## Development
 
-### Testing
-
-MattMC includes comprehensive testing infrastructure:
-
-```bash
-# Run unit tests
-./gradlew test
-
-# Run performance tests
-./gradlew performanceTest
-
-# Run all tests (unit + performance)
-./gradlew testAll
-```
-
-#### Performance Testing
-
-The project includes a robust performance testing framework for measuring JSON resource loading times:
-
-```bash
-# Run all JSON performance tests
-./gradlew performanceTest --tests "JsonResourceLoadingPerformanceTest"
-```
-
-For detailed documentation on performance testing:
-- **[JSON Performance Testing Guide](docs/JSON_PERFORMANCE_TESTING.md)** - Complete guide to measuring JSON loading performance
-- **[Performance Testing Quick Reference](docs/PERFORMANCE_TESTING_QUICKREF.md)** - Quick reference for creating performance tests
-
-Example output:
-```
-=== Large JSON Loading Performance (Gson) ===
-  Iterations: 100
-  Average:    175.85 μs
-  Median:     160.34 μs
-  P95:        256.93 μs
-```
-
-The performance testing infrastructure includes:
-- **Timing utilities** with statistical analysis (avg, median, P95, P99)
-- **Sample JSON files** of various sizes (small, medium, large)
-- **Parser comparison** tests (Gson vs NightConfig)
-- **Performance breakdown** (File I/O vs Parsing vs Total)
-
 ### Modifying Source Code
 
 The entire Minecraft codebase is available in the `src/main/java/` directory using standard Maven/Gradle structure:
