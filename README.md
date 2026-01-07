@@ -416,9 +416,6 @@ A: Review Minecraft's EULA and terms of service. This is for educational and dev
 **Q: What about game assets?**  
 A: Assets (textures, sounds, models) are not included. You need a legitimate Minecraft installation or asset pack.
 
-**Q: What is `obfuscate/DontObfuscate.java` used for?**  
-A: It's a vestigial annotation from Minecraft's original obfuscated builds. MattMC doesn't use obfuscation - these annotations just serve as documentation. See [docs/FAQ-OBFUSCATE.md](docs/FAQ-OBFUSCATE.md) for details.
-
 ## Acknowledgments
 
 - **Mojang Studios / Microsoft**: Original Minecraft creators

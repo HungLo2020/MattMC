@@ -1,11 +1,9 @@
 package com.mojang.blaze3d.textures;
 
-import com.mojang.blaze3d.DontObfuscate;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 
 @Environment(EnvType.CLIENT)
-@DontObfuscate
 public abstract class GpuTextureView implements AutoCloseable {
 	private final GpuTexture texture;
 	private final int baseMipLevel;

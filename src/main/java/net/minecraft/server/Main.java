@@ -31,7 +31,6 @@ import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.NbtException;
 import net.minecraft.nbt.ReportedNbtException;
 import net.minecraft.network.chat.Component;
-import net.minecraft.obfuscate.DontObfuscate;
 import net.minecraft.server.dedicated.DedicatedServer;
 import net.minecraft.server.dedicated.DedicatedServerProperties;
 import net.minecraft.server.dedicated.DedicatedServerSettings;
@@ -116,7 +115,6 @@ public class Main {
 	@SuppressForbidden(
 		reason = "System.out needed before bootstrap"
 	)
-	@DontObfuscate
 	public static void main(String[] strings) {
 		SharedConstants.tryDetectVersion();
 		OptionParser optionParser = new OptionParser();

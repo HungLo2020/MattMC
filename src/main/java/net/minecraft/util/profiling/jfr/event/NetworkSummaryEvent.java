@@ -10,14 +10,12 @@ import jdk.jfr.Label;
 import jdk.jfr.Name;
 import jdk.jfr.Period;
 import jdk.jfr.StackTrace;
-import net.minecraft.obfuscate.DontObfuscate;
 
 @Name("minecraft.NetworkSummary")
 @Label("Network Summary")
 @Category({"Minecraft", "Network"})
 @StackTrace(false)
 @Period("10 s")
-@DontObfuscate
 public class NetworkSummaryEvent extends Event {
 	public static final String EVENT_NAME = "minecraft.NetworkSummary";
 	public static final EventType TYPE = EventType.getEventType(NetworkSummaryEvent.class);

@@ -1,6 +1,5 @@
 package com.mojang.blaze3d.systems;
 
-import com.mojang.blaze3d.DontObfuscate;
 import com.mojang.blaze3d.buffers.GpuBuffer;
 import com.mojang.blaze3d.buffers.GpuBufferSlice;
 import com.mojang.blaze3d.buffers.GpuFence;
@@ -16,7 +15,6 @@ import net.minecraft.api.Environment;
 import org.jetbrains.annotations.Nullable;
 
 @Environment(EnvType.CLIENT)
-@DontObfuscate
 public interface CommandEncoder {
 	RenderPass createRenderPass(Supplier<String> supplier, GpuTextureView gpuTextureView, OptionalInt optionalInt);
 

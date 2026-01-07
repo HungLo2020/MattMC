@@ -1,6 +1,5 @@
 package com.mojang.blaze3d.vertex;
 
-import com.mojang.blaze3d.DontObfuscate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Stream;
@@ -9,7 +8,6 @@ import net.minecraft.api.Environment;
 import org.jetbrains.annotations.Nullable;
 
 @Environment(EnvType.CLIENT)
-@DontObfuscate
 public record VertexFormatElement(int id, int index, VertexFormatElement.Type type, VertexFormatElement.Usage usage, int count) {
 	public static final int MAX_COUNT = 32;
 	private static final VertexFormatElement[] BY_ID = new VertexFormatElement[32];
@@ -77,7 +75,6 @@ public record VertexFormatElement(int id, int index, VertexFormatElement.Type ty
 	}
 
 	@Environment(EnvType.CLIENT)
-	@DontObfuscate
 	public static enum Type {
 		FLOAT(4, "Float"),
 		UBYTE(1, "Unsigned Byte"),
@@ -105,7 +102,6 @@ public record VertexFormatElement(int id, int index, VertexFormatElement.Type ty
 	}
 
 	@Environment(EnvType.CLIENT)
-	@DontObfuscate
 	public static enum Usage {
 		POSITION("Position"),
 		NORMAL("Normal"),

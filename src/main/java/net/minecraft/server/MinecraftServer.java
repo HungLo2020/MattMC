@@ -87,7 +87,6 @@ import net.minecraft.network.protocol.game.ClientboundChangeDifficultyPacket;
 import net.minecraft.network.protocol.game.ClientboundSetDefaultSpawnPositionPacket;
 import net.minecraft.network.protocol.game.ClientboundSetTimePacket;
 import net.minecraft.network.protocol.status.ServerStatus;
-import net.minecraft.obfuscate.DontObfuscate;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.bossevents.CustomBossEvents;
@@ -1339,7 +1338,6 @@ public abstract class MinecraftServer extends ReentrantBlockableEventLoop<TickTa
 		return this.playerList.getPlayerNamesArray();
 	}
 
-	@DontObfuscate
 	public String getServerModName() {
 		return "vanilla";
 	}

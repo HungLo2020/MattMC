@@ -1,6 +1,5 @@
 package com.mojang.blaze3d.buffers;
 
-import com.mojang.blaze3d.DontObfuscate;
 import java.nio.ByteBuffer;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
@@ -15,7 +14,6 @@ import org.joml.Vector4ic;
 import org.lwjgl.system.MemoryStack;
 
 @Environment(EnvType.CLIENT)
-@DontObfuscate
 public class Std140Builder {
 	private final ByteBuffer buffer;
 	private final int start;

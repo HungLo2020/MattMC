@@ -16,12 +16,10 @@ import net.minecraft.client.data.models.ModelProvider;
 import net.minecraft.client.data.models.WaypointStyleProvider;
 import net.minecraft.data.DataGenerator;
 import net.minecraft.data.DataGenerator.PackGenerator;
-import net.minecraft.obfuscate.DontObfuscate;
 import net.minecraft.server.Bootstrap;
 
 @Environment(EnvType.CLIENT)
 public class Main {
-	@DontObfuscate
 	@SuppressForbidden(
 		reason = "System.out needed before bootstrap"
 	)

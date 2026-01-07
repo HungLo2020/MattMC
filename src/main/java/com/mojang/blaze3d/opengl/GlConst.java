@@ -1,6 +1,5 @@
 package com.mojang.blaze3d.opengl;
 
-import com.mojang.blaze3d.DontObfuscate;
 import com.mojang.blaze3d.platform.DepthTestFunction;
 import com.mojang.blaze3d.platform.DestFactor;
 import com.mojang.blaze3d.platform.NativeImage;
@@ -15,7 +14,6 @@ import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 
 @Environment(EnvType.CLIENT)
-@DontObfuscate
 public class GlConst {
 	public static final int GL_READ_FRAMEBUFFER = 36008;
 	public static final int GL_DRAW_FRAMEBUFFER = 36009;

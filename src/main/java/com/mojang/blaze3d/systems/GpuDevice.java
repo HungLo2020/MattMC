@@ -1,6 +1,5 @@
 package com.mojang.blaze3d.systems;
 
-import com.mojang.blaze3d.DontObfuscate;
 import com.mojang.blaze3d.buffers.GpuBuffer;
 import com.mojang.blaze3d.pipeline.CompiledRenderPipeline;
 import com.mojang.blaze3d.pipeline.RenderPipeline;
@@ -18,7 +17,6 @@ import net.minecraft.resources.ResourceLocation;
 import org.jetbrains.annotations.Nullable;
 
 @Environment(EnvType.CLIENT)
-@DontObfuscate
 public interface GpuDevice {
 	CommandEncoder createCommandEncoder();
 
