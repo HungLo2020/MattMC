@@ -22,6 +22,9 @@ import java.nio.file.Paths;
  * This test measures realistic JSON loading scenarios that occur during
  * Minecraft resource pack loading, including language files, sounds,
  * models, and configuration files.
+ * 
+ * Note: Code is intentionally inlined in timing loops (not extracted to methods)
+ * to avoid method call overhead that would skew performance measurements.
  */
 @DisplayName("JSON Resource Loading Performance Tests")
 class JsonResourceLoadingPerformanceTest {
