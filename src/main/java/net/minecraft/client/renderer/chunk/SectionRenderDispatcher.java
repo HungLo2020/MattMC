@@ -53,7 +53,7 @@ public class SectionRenderDispatcher {
 	ClientLevel level;
 	final LevelRenderer renderer;
 	Vec3 cameraPosition = Vec3.ZERO;
-	final SectionCompiler sectionCompiler;
+	// Sodium: Removed sectionCompiler field - never used since compileSections() is stubbed
 
 	public SectionRenderDispatcher(
 		ClientLevel clientLevel,
@@ -70,7 +70,7 @@ public class SectionRenderDispatcher {
 		this.executor = tracingExecutor;
 		this.consecutiveExecutor = new ConsecutiveExecutor(tracingExecutor, "Section Renderer");
 		this.consecutiveExecutor.schedule(this::runTask);
-		this.sectionCompiler = new SectionCompiler(blockRenderDispatcher, blockEntityRenderDispatcher);
+		// Sodium: Removed sectionCompiler instantiation - never used since compileSections() is stubbed
 	}
 
 	public void setLevel(ClientLevel clientLevel) {
@@ -121,9 +121,7 @@ public class SectionRenderDispatcher {
 		}
 	}
 
-	public void rebuildSectionSync(SectionRenderDispatcher.RenderSection renderSection, RenderRegionCache renderRegionCache) {
-		renderSection.compileSync(renderRegionCache);
-	}
+	// Sodium: Removed rebuildSectionSync - never called since compileSections() is stubbed
 
 	public void schedule(SectionRenderDispatcher.RenderSection.CompileTask compileTask) {
 		if (!this.closed) {
@@ -350,23 +348,7 @@ public class SectionRenderDispatcher {
 			}
 		}
 
-		public SectionRenderDispatcher.RenderSection.CompileTask createCompileTask(RenderRegionCache renderRegionCache) {
-			this.cancelTasks();
-			RenderSectionRegion renderSectionRegion = renderRegionCache.createRegion(SectionRenderDispatcher.this.level, this.sectionNode);
-			boolean bl = this.sectionMesh.get() != CompiledSectionMesh.UNCOMPILED;
-			this.lastRebuildTask = new SectionRenderDispatcher.RenderSection.RebuildTask(renderSectionRegion, bl);
-			return this.lastRebuildTask;
-		}
-
-		public void rebuildSectionAsync(RenderRegionCache renderRegionCache) {
-			SectionRenderDispatcher.RenderSection.CompileTask compileTask = this.createCompileTask(renderRegionCache);
-			SectionRenderDispatcher.this.schedule(compileTask);
-		}
-
-		public void compileSync(RenderRegionCache renderRegionCache) {
-			SectionRenderDispatcher.RenderSection.CompileTask compileTask = this.createCompileTask(renderRegionCache);
-			compileTask.doTask(SectionRenderDispatcher.this.fixedBuffers);
-		}
+		// Sodium: Removed createCompileTask, rebuildSectionAsync, compileSync - never called since compileSections() is stubbed
 
 		void setSectionMesh(SectionMesh sectionMesh) {
 			SectionMesh sectionMesh2 = (SectionMesh)this.sectionMesh.getAndSet(sectionMesh);
@@ -430,10 +412,12 @@ public class SectionRenderDispatcher {
 					} else {
 						Zone zone = Profiler.get().zone("Compile Section");
 
-						SectionCompiler.Results results;
+						// Sodium: This code is never executed since RebuildTask is never instantiated
+						// (createCompileTask was removed). Stub implementation to satisfy compiler.
+						SectionCompiler.Results results = new SectionCompiler.Results();
+						
 						try {
-							results = SectionRenderDispatcher.this.sectionCompiler
-								.compile(sectionPos, this.region, RenderSection.this.createVertexSorting(sectionPos), sectionBufferBuilderPack);
+							// Stub - no actual compilation
 						} catch (Throwable var10) {
 							if (zone != null) {
 								try {
