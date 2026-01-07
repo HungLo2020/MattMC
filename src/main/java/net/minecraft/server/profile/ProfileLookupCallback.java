@@ -2,7 +2,7 @@ package net.minecraft.server.profile;
 
 /**
  * Stub for ProfileLookupCallback - not used in offline mode.
- * Kept for compilation compatibility with legacy code.
+ * Kept for compilation compatibility with legacy player data converters.
  */
 public interface ProfileLookupCallback {
     void onProfileLookupSucceeded(PlayerProfile playerProfile);
