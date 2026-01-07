@@ -1,7 +1,6 @@
 package net.sodium.api.memory;
 
 import java.lang.foreign.MemorySegment;
-import java.lang.foreign.ValueLayout;
 
 public class MemoryIntrinsics {
     /**

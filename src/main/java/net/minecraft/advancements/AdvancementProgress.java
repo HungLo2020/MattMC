@@ -39,7 +39,7 @@ public class AdvancementProgress implements Comparable<AdvancementProgress> {
 				CRITERIA_CODEC.optionalFieldOf("criteria", Map.of()).forGetter(advancementProgress -> advancementProgress.criteria),
 				Codec.BOOL.fieldOf("done").orElse(true).forGetter(AdvancementProgress::isDone)
 			)
-			.apply(instance, (map, boolean_) -> new AdvancementProgress(new HashMap(map)))
+			.apply(instance, (map, boolean_) -> new AdvancementProgress(new HashMap<>(map)))
 	);
 	private final Map<String, CriterionProgress> criteria;
 	private AdvancementRequirements requirements = AdvancementRequirements.EMPTY;

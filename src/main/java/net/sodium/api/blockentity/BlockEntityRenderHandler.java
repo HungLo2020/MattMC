@@ -11,6 +11,7 @@ public interface BlockEntityRenderHandler {
     BlockEntityRenderHandler INSTANCE = DependencyInjection.load(BlockEntityRenderHandler.class,
             "net.caffeinemc.mods.sodium.client.render.chunk.BlockEntityRenderHandlerImpl");
 
+    @SuppressWarnings("SameReturnValue")
     static BlockEntityRenderHandler instance() {
         return INSTANCE;
     }

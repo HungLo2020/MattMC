@@ -72,7 +72,7 @@ public class TreeNodePosition {
 			}
 
 			this.executeShifts();
-			float f = (((TreeNodePosition)this.children.get(0)).y + ((TreeNodePosition)this.children.get(this.children.size() - 1)).y) / 2.0F;
+			float f = (((TreeNodePosition)this.children.getFirst()).y + ((TreeNodePosition)this.children.getLast()).y) / 2.0F;
 			if (this.previousSibling != null) {
 				this.y = this.previousSibling.y + 1.0F;
 				this.mod = this.y - f;
@@ -122,7 +122,7 @@ public class TreeNodePosition {
 		if (this.thread != null) {
 			return this.thread;
 		} else {
-			return !this.children.isEmpty() ? (TreeNodePosition)this.children.get(0) : null;
+			return !this.children.isEmpty() ? (TreeNodePosition)this.children.getFirst() : null;
 		}
 	}
 
@@ -131,7 +131,7 @@ public class TreeNodePosition {
 		if (this.thread != null) {
 			return this.thread;
 		} else {
-			return !this.children.isEmpty() ? (TreeNodePosition)this.children.get(this.children.size() - 1) : null;
+			return !this.children.isEmpty() ? (TreeNodePosition)this.children.getLast() : null;
 		}
 	}
 
@@ -142,7 +142,7 @@ public class TreeNodePosition {
 			TreeNodePosition treeNodePosition2 = this;
 			TreeNodePosition treeNodePosition3 = this;
 			TreeNodePosition treeNodePosition4 = this.previousSibling;
-			TreeNodePosition treeNodePosition5 = (TreeNodePosition)this.parent.children.get(0);
+			TreeNodePosition treeNodePosition5 = (TreeNodePosition)this.parent.children.getFirst();
 			float f = this.mod;
 			float g = this.mod;
 			float h = treeNodePosition4.mod;
@@ -195,7 +195,8 @@ public class TreeNodePosition {
 	}
 
 	private TreeNodePosition getAncestor(TreeNodePosition treeNodePosition, TreeNodePosition treeNodePosition2) {
-		return this.ancestor != null && treeNodePosition.parent.children.contains(this.ancestor) ? this.ancestor : treeNodePosition2;
+        //noinspection ConstantValue
+        return this.ancestor != null && treeNodePosition.parent.children.contains(this.ancestor) ? this.ancestor : treeNodePosition2;
 	}
 
 	private void finalizePosition() {

@@ -1,5 +1,6 @@
 package net.sodium.client.platform.windows.api.version;
 
+import org.jetbrains.annotations.NotNull;
 import org.lwjgl.system.MemoryUtil;
 import org.lwjgl.system.Struct;
 
@@ -81,7 +82,7 @@ public class VersionFixedFileInfoStruct extends Struct<VersionFixedFileInfoStruc
     }
 
     @Override
-    protected VersionFixedFileInfoStruct create(long address, ByteBuffer container) {
+    protected @NotNull VersionFixedFileInfoStruct create(long address, ByteBuffer container) {
         return new VersionFixedFileInfoStruct(address, container);
     }
 

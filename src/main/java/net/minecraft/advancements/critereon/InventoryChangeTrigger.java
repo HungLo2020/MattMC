@@ -100,7 +100,7 @@ public class InventoryChangeTrigger extends SimpleCriterionTrigger<InventoryChan
 
 				return list.isEmpty();
 			} else {
-				return !itemStack.isEmpty() && ((ItemPredicate)this.items.get(0)).test(itemStack);
+				return !itemStack.isEmpty() && ((ItemPredicate)this.items.getFirst()).test(itemStack);
 			}
 		}
 

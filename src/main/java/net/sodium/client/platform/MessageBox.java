@@ -55,9 +55,7 @@ public class MessageBox {
             final MsgBoxCallback msgBoxCallback;
 
             if (helpUrl != null) {
-                msgBoxCallback = MsgBoxCallback.create(lpHelpInfo -> {
-                    Shell32.browseUrl(window, helpUrl);
-                });
+                msgBoxCallback = MsgBoxCallback.create(lpHelpInfo -> Shell32.browseUrl(window, helpUrl));
             } else {
                 msgBoxCallback = null;
             }

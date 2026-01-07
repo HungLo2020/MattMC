@@ -101,7 +101,7 @@ public class LaunchWarn {
                                      int messageType,
                                      String[] options,
                                      Object initialValue) {
-        JOptionPane pane = new JOptionPane(message, messageType, optionType, null, options, initialValue);
+        @SuppressWarnings("MagicConstant") JOptionPane pane = new JOptionPane(message, messageType, optionType, null, options, initialValue);
 
         JDialog dialog = pane.createDialog(title);
         dialog.setVisible(true);

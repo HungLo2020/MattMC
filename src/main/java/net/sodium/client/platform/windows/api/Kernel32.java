@@ -10,7 +10,7 @@ public class Kernel32 {
 
     private static final int MAX_PATH = 32767;
 
-    private static final int GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT = 1 << 0;
+    private static final int GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT = 1;
     private static final int GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS = 1 << 2;
 
     private static final long PFN_GetCommandLineW;
@@ -76,12 +76,10 @@ public class Kernel32 {
             if (result == 0) {
                 var error = getLastError();
 
-                switch (error) {
-                    case 126 /* ERROR_MOD_NOT_FOUND */:
-                        return MemoryUtil.NULL;
-                    default:
-                        throw new RuntimeException("GetModuleHandleEx failed, error=" + error);
-                }
+                return switch (error) {
+                    case 126 /* ERROR_MOD_NOT_FOUND */ -> MemoryUtil.NULL;
+                    default -> throw new RuntimeException("GetModuleHandleEx failed, error=" + error);
+                };
             }
 
             return phModule.get(0);

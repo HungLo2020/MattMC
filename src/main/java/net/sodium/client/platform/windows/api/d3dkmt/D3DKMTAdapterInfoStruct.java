@@ -46,7 +46,7 @@ class D3DKMTAdapterInfoStruct extends Struct<D3DKMTAdapterInfoStruct> {
     }
 
     @Override
-    protected D3DKMTAdapterInfoStruct create(long address, ByteBuffer container) {
+    protected @NotNull D3DKMTAdapterInfoStruct create(long address, ByteBuffer container) {
         return new D3DKMTAdapterInfoStruct(address, container);
     }
 

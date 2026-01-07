@@ -1,6 +1,7 @@
 package net.sodium.client.compatibility.workarounds.nvidia;
 
 import net.sodium.client.platform.windows.WindowsFileVersion;
+import org.jetbrains.annotations.NotNull;
 
 public record NvidiaDriverVersion(int major, int minor) {
     public static NvidiaDriverVersion parse(WindowsFileVersion version) {
@@ -15,7 +16,7 @@ public record NvidiaDriverVersion(int major, int minor) {
     }
 
     @Override
-    public String toString() {
+    public @NotNull String toString() {
         return "%d.%d".formatted(this.major, this.minor);
     }
 }

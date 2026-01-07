@@ -7,6 +7,7 @@ public interface VertexSerializerRegistry {
     VertexSerializerRegistry INSTANCE = DependencyInjection.load(VertexSerializerRegistry.class,
             "net.caffeinemc.mods.sodium.client.render.vertex.serializers.VertexSerializerRegistryImpl");
 
+    @SuppressWarnings("SameReturnValue")
     static VertexSerializerRegistry instance() {
         return INSTANCE;
     }

@@ -87,7 +87,7 @@ public interface MinMaxBounds<T extends Number & Comparable<T>> {
 					)
 					.apply(instance, MinMaxBounds.Bounds::new)
 			);
-			return Codec.either(codec2, codec).xmap(either -> either.map(bounds -> bounds, object -> exactly(object)), bounds -> {
+			return Codec.either(codec2, codec).xmap(either -> either.map(bounds -> bounds, Bounds::exactly), bounds -> {
 				Optional<T> optional = bounds.asPoint();
 				return optional.isPresent() ? Either.<MinMaxBounds.Bounds<T>, T>right(optional.get()) : Either.<MinMaxBounds.Bounds<T>, T>left(bounds);
 			});

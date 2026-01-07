@@ -28,7 +28,7 @@ public class IntelWorkarounds {
                     // https://www.intel.com/content/www/us/en/support/articles/000005654/graphics.html
                     // Anything which matches the 15.33 driver scheme (WDDM x.y.10.w) should be checked
                     // Drivers before build 5161 are assumed to have bugs with synchronization primitives
-                    if (driverVersion.z() == 10 && driverVersion.w() < 5161) {
+                    if (driverVersion != null && driverVersion.z() == 10 && driverVersion.w() < 5161) {
                         return driverVersion;
                     }
                 }

@@ -45,7 +45,7 @@ public class NvidiaWorkarounds {
             if (adapter instanceof D3DKMT.WDDMAdapterInfo wddmAdapterInfo) {
                 var driverVersion = wddmAdapterInfo.openglIcdVersion();
 
-                if (driverVersion.z() == 15) { // Only match 5XX.XX drivers
+                if (driverVersion != null && driverVersion.z() == 15) { // Only match 5XX.XX drivers
                     // Broken in x.y.15.2647 (526.47)
                     // Fixed in x.y.15.3623 (536.23)
                     if (driverVersion.w() >= 2647 && driverVersion.w() < 3623) {
