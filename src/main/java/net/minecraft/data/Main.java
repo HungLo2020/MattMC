@@ -51,7 +51,6 @@ import net.minecraft.data.tags.VanillaEnchantmentTagsProvider;
 import net.minecraft.data.tags.VanillaItemTagsProvider;
 import net.minecraft.data.tags.WorldPresetTagsProvider;
 import net.minecraft.network.chat.Component;
-import net.minecraft.obfuscate.DontObfuscate;
 import net.minecraft.server.jsonrpc.dataprovider.JsonRpcApiSchema;
 import net.minecraft.world.flag.FeatureFlagSet;
 import net.minecraft.world.flag.FeatureFlags;
@@ -65,7 +64,6 @@ public class Main {
 	@SuppressForbidden(
 		reason = "System.out needed before bootstrap"
 	)
-	@DontObfuscate
 	public static void main(String[] strings) throws IOException {
 		SharedConstants.tryDetectVersion();
 		OptionParser optionParser = new OptionParser();

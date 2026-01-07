@@ -1,11 +1,9 @@
 package com.mojang.blaze3d.buffers;
 
-import com.mojang.blaze3d.DontObfuscate;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 
 @Environment(EnvType.CLIENT)
-@DontObfuscate
 public record GpuBufferSlice(GpuBuffer buffer, int offset, int length) {
 	public GpuBufferSlice slice(int i, int j) {
 		if (i >= 0 && j >= 0 && i + j < this.length) {

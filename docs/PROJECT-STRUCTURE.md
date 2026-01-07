@@ -48,7 +48,6 @@ MattMC/
 │       │   ├── chat/         # Chat system
 │       │   ├── codec/        # Packet encoding/decoding
 │       │   └── syncher/      # Entity data synchronization
-│       ├── obfuscate/        # Obfuscation annotations
 │       ├── realms/           # Realms integration
 │       ├── recipebook/       # Recipe book UI
 │       ├── references/       # Reference tracking

@@ -8,14 +8,12 @@ import jdk.jfr.Name;
 import jdk.jfr.Period;
 import jdk.jfr.StackTrace;
 import jdk.jfr.Timespan;
-import net.minecraft.obfuscate.DontObfuscate;
 
 @Name("minecraft.ServerTickTime")
 @Label("Server Tick Time")
 @Category({"Minecraft", "Ticking"})
 @StackTrace(false)
 @Period("1 s")
-@DontObfuscate
 public class ServerTickTimeEvent extends Event {
 	public static final String EVENT_NAME = "minecraft.ServerTickTime";
 	public static final EventType TYPE = EventType.getEventType(ServerTickTimeEvent.class);

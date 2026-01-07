@@ -1,6 +1,5 @@
 package com.mojang.blaze3d.platform;
 
-import com.mojang.blaze3d.DontObfuscate;
 import com.mojang.blaze3d.buffers.GpuBuffer;
 import com.mojang.blaze3d.systems.CommandEncoder;
 import com.mojang.blaze3d.systems.RenderSystem;
@@ -21,7 +20,6 @@ import org.lwjgl.system.MemoryUtil;
 import org.slf4j.Logger;
 
 @Environment(EnvType.CLIENT)
-@DontObfuscate
 public class TextureUtil {
 	private static final Logger LOGGER = LogUtils.getLogger();
 	public static final int MIN_MIPMAP_LEVEL = 0;

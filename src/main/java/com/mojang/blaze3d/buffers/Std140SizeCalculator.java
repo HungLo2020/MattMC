@@ -1,12 +1,10 @@
 package com.mojang.blaze3d.buffers;
 
-import com.mojang.blaze3d.DontObfuscate;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.util.Mth;
 
 @Environment(EnvType.CLIENT)
-@DontObfuscate
 public class Std140SizeCalculator {
 	private int size;
 

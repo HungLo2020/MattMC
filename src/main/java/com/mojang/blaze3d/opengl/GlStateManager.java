@@ -1,7 +1,6 @@
 package com.mojang.blaze3d.opengl;
 
 import com.google.common.base.Charsets;
-import com.mojang.blaze3d.DontObfuscate;
 import com.mojang.blaze3d.platform.MacosUtil;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.jtracy.Plot;
@@ -24,7 +23,6 @@ import org.lwjgl.system.MemoryStack;
 import org.lwjgl.system.MemoryUtil;
 
 @Environment(EnvType.CLIENT)
-@DontObfuscate
 public class GlStateManager {
 	private static final Plot PLOT_TEXTURES = TracyClient.createPlot("GPU Textures");
 	private static int numTextures = 0;
