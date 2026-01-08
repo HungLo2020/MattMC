@@ -2181,11 +2181,7 @@ public abstract class MinecraftServer extends ReentrantBlockableEventLoop<TickTa
 		ProfilerFiller profiler = SingleTickProfiler.decorateFiller(this.metricsRecorder.getProfiler(), SingleTickProfiler.createTickProfiler("Server"));
 		
 		// Wrap with custom profiler collector if profiling is active
-		net.minecraft.util.profiling.custom.ProfilerCollectorWrapper wrapper = 
-			net.minecraft.util.profiling.custom.ProfilerManager.getMainThreadWrapper();
-		if (wrapper != null) {
-			return wrapper;
-		}
+		profiler = net.minecraft.util.profiling.custom.ProfilerManager.wrapMainThreadProfiler(profiler);
 		
 		return profiler;
 	}

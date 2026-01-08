@@ -46,14 +46,9 @@ public class ProfilerManager {
                 // Initialize main thread profiler with wrapper
                 mainThreadProfiler = new MainThreadProfiler();
                 
-                // Wrap the current profiler to capture hierarchical data
-                ProfilerFiller currentProfiler = Profiler.get();
-                mainThreadWrapper = new ProfilerCollectorWrapper(currentProfiler);
+                // Create wrapper for main thread - it will wrap the profiler when createProfiler() is called
+                // We initialize it here so it's ready to use
                 
-                // Use the wrapper as the active profiler for the main thread
-                // This is done by the server tick loop calling Profiler.use()
-                // We'll inject our wrapper there
-
                 // Initialize render thread profiler (will be used if on client)
                 renderThreadProfiler = new RenderThreadProfiler();
 
@@ -102,14 +97,18 @@ public class ProfilerManager {
                     currentSession.setRenderThreadHierarchicalOperations(renderThreadWrapper.getOperations());
                 }
 
-                // Generate report
-                ProfilerReportGenerator generator = new ProfilerReportGenerator();
-                Path reportPath = generator.generate(currentSession);
+                // Generate reports (both text and HTML)
+                ProfilerReportGenerator textGenerator = new ProfilerReportGenerator();
+                Path textReportPath = textGenerator.generate(currentSession);
+                
+                HtmlProfilerReportGenerator htmlGenerator = new HtmlProfilerReportGenerator();
+                Path htmlReportPath = htmlGenerator.generate(currentSession);
 
-                LOGGER.info("Profiling session stopped: {}, report: {}", 
-                    currentSession.getSessionId(), reportPath);
+                LOGGER.info("Profiling session stopped: {}", currentSession.getSessionId());
+                LOGGER.info("Text report: {}", textReportPath);
+                LOGGER.info("HTML report: {}", htmlReportPath);
 
-                return reportPath;
+                return htmlReportPath; // Return HTML report path as primary
             } finally {
                 // Cleanup
                 currentSession = null;
@@ -135,21 +134,35 @@ public class ProfilerManager {
     }
     
     /**
-     * Get the profiler wrapper for the render thread.
-     * This should be used to wrap the active profiler.
+     * Wrap the main thread profiler with the collector wrapper.
+     * Creates wrapper on first call if profiling session is active.
      */
-    public static ProfilerCollectorWrapper getRenderThreadWrapper() {
-        return renderThreadWrapper;
+    public static ProfilerFiller wrapMainThreadProfiler(ProfilerFiller profiler) {
+        if (currentSession == null) {
+            return profiler;
+        }
+        
+        if (mainThreadWrapper == null) {
+            mainThreadWrapper = new ProfilerCollectorWrapper(profiler);
+        }
+        
+        return mainThreadWrapper;
     }
     
     /**
-     * Initialize the render thread wrapper (called from client thread).
+     * Wrap the render thread profiler with the collector wrapper.
+     * Creates wrapper on first call if profiling session is active.
      */
-    public static void initializeRenderThreadWrapper() {
-        if (currentSession != null && renderThreadWrapper == null) {
-            ProfilerFiller currentProfiler = Profiler.get();
-            renderThreadWrapper = new ProfilerCollectorWrapper(currentProfiler);
+    public static ProfilerFiller wrapRenderThreadProfiler(ProfilerFiller profiler) {
+        if (currentSession == null) {
+            return profiler;
         }
+        
+        if (renderThreadWrapper == null) {
+            renderThreadWrapper = new ProfilerCollectorWrapper(profiler);
+        }
+        
+        return renderThreadWrapper;
     }
 
     // Called by instrumented code to record operations
