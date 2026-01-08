@@ -42,16 +42,6 @@ public final class StringUtil {
 		return ret.toString();
 	}
 
-	public static String[] splitNamespaced(String s, String defaultNamespace) {
-		int i = s.indexOf(':');
-
-		if (i >= 0) {
-			return new String[] { s.substring(0, i), s.substring(i + 1) };
-		} else {
-			return new String[] { defaultNamespace, s };
-		}
-	}
-
 	public static String wrapLines(String str, int limit) {
 		if (str.length() < limit) return str;
 
