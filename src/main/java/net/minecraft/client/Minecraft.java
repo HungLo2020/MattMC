@@ -1309,6 +1309,8 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 	}
 
 	private void runTick(boolean bl) {
+		long frameStart = Util.getNanos();
+		
 		// HOOK: Call registered hooks at beginning of tick
 		for (GameHooks hook : HookRegistry.getGameHooks()) {
 			hook.beforeRunTick(this, bl);
@@ -1327,9 +1329,14 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 
 		int i = this.deltaTracker.advanceTime(Util.getMillis(), bl);
 		ProfilerFiller profilerFiller = Profiler.get();
+		long startTime;
+		
 		if (bl) {
 			profilerFiller.push("scheduledPacketProcessing");
+			startTime = Util.getNanos();
 			this.packetProcessor.processQueuedPackets();
+			net.minecraft.util.profiling.custom.ProfilerManager.recordRenderThreadOperation("frame.packetProcessing", Util.getNanos() - startTime);
+			
 			profilerFiller.popPush("scheduledExecutables");
 			this.runAllTasks();
 			profilerFiller.popPush("tick");
@@ -1367,9 +1374,11 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 		RenderTarget renderTarget = this.getMainRenderTarget();
 		RenderSystem.getDevice().createCommandEncoder().clearColorAndDepthTextures(renderTarget.getColorTexture(), 0, renderTarget.getDepthTexture(), 1.0);
 		profilerFiller.push("gameRenderer");
+		startTime = Util.getNanos();
 		if (!this.noRender) {
 			this.gameRenderer.render(this.deltaTracker, bl);
 		}
+		net.minecraft.util.profiling.custom.ProfilerManager.recordRenderThreadOperation("frame.gameRenderer", Util.getNanos() - startTime);
 
 		profilerFiller.popPush("blit");
 		if (!this.window.isMinimized()) {
@@ -1377,6 +1386,8 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 		}
 
 		this.frameTimeNs = Util.getNanos() - l;
+		net.minecraft.util.profiling.custom.ProfilerManager.recordRenderThreadFrame(Util.getNanos() - frameStart);
+		
 		if (bl2) {
 			this.currentFrameProfile = TimerQuery.getInstance().endProfile();
 		}

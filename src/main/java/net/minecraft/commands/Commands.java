@@ -96,6 +96,7 @@ import net.minecraft.server.commands.PerfCommand;
 import net.minecraft.server.commands.PermissionCheck;
 import net.minecraft.server.commands.PlaceCommand;
 import net.minecraft.server.commands.PlaySoundCommand;
+import net.minecraft.server.commands.ProfileCommand;
 import net.minecraft.server.commands.PublishCommand;
 import net.minecraft.server.commands.RaidCommand;
 import net.minecraft.server.commands.RandomCommand;
@@ -257,6 +258,9 @@ public class Commands {
 		if (JvmProfiler.INSTANCE.isAvailable()) {
 			JfrCommand.register(this.dispatcher);
 		}
+
+		// Custom profiler command
+		ProfileCommand.register(this.dispatcher);
 
 		if (SharedConstants.DEBUG_CHASE_COMMAND) {
 			ChaseCommand.register(this.dispatcher);
