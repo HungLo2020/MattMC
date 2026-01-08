@@ -15,7 +15,7 @@ import java.util.function.Supplier;
  * This wrapper intercepts all push/pop calls to build a complete timing tree.
  */
 public class ProfilerCollectorWrapper implements ProfilerFiller {
-    private final ProfilerFiller delegate;
+    private ProfilerFiller delegate;
     private final Map<String, OperationRecord> operations;
     private final ThreadLocal<Deque<Long>> startTimes;
     private final ThreadLocal<Deque<String>> pathStack;
@@ -27,6 +27,21 @@ public class ProfilerCollectorWrapper implements ProfilerFiller {
         this.startTimes = ThreadLocal.withInitial(ArrayDeque::new);
         this.pathStack = ThreadLocal.withInitial(ArrayDeque::new);
         this.pathBuilder = ThreadLocal.withInitial(StringBuilder::new);
+    }
+    
+    /**
+     * Update the delegate profiler. This allows the wrapper to adapt when
+     * the underlying profiler changes (e.g., from InactiveProfiler to ActiveProfiler).
+     */
+    public void setDelegate(ProfilerFiller newDelegate) {
+        this.delegate = newDelegate;
+    }
+    
+    /**
+     * Get the current delegate profiler.
+     */
+    public ProfilerFiller getDelegate() {
+        return delegate;
     }
     
     @Override

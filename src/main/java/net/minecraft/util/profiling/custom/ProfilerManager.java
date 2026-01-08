@@ -153,11 +153,12 @@ public class ProfilerManager {
         
         if (mainThreadWrapper == null) {
             mainThreadWrapper = new ProfilerCollectorWrapper(profiler);
+            LOGGER.info("Created main thread wrapper with delegate: {}", profiler.getClass().getSimpleName());
             return mainThreadWrapper;
         }
         
-        // Wrapper already exists, update its delegate if it's a wrapper
-        // Just return the existing wrapper to maintain consistency
+        // Wrapper exists, update its delegate to handle profiler changes
+        mainThreadWrapper.setDelegate(profiler);
         return mainThreadWrapper;
     }
     
@@ -172,10 +173,13 @@ public class ProfilerManager {
         
         if (renderThreadWrapper == null) {
             renderThreadWrapper = new ProfilerCollectorWrapper(profiler);
+            LOGGER.info("Created render thread wrapper with delegate: {}", profiler.getClass().getSimpleName());
             return renderThreadWrapper;
         }
         
-        // Wrapper already exists, return it to maintain consistency
+        // Wrapper exists, update its delegate to handle profiler changes  
+        renderThreadWrapper.setDelegate(profiler);
+        LOGGER.debug("Updated render thread wrapper delegate to: {}", profiler.getClass().getSimpleName());
         return renderThreadWrapper;
     }
 
