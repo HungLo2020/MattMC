@@ -132,12 +132,12 @@ MattMC uses several thread pools and execution contexts:
 
 **Core Thread Pools (from `Util.java`):**
 - `BACKGROUND_EXECUTOR` - Main background worker pool (ForkJoinPool)
-  - Thread naming: "Worker-Main-N"
+  - Thread naming pattern: "Worker-Main-N" (verified in Util.makeExecutor())
   - Size: CPU cores - 1, max 255
 - `IO_POOL` - I/O worker pool (CachedThreadPool)
-  - Thread naming: "IO-Worker-N"
+  - Thread naming pattern: "IO-Worker-N" (verified in Util.makeIoExecutor())
 - `DOWNLOAD_POOL` - Download worker pool (CachedThreadPool)
-  - Thread naming: "Download-N"
+  - Thread naming pattern: "Download-N" (verified in Util.makeIoExecutor())
 
 **Game Threads:**
 - Main Server Thread: "Server thread" (from MinecraftServer)
@@ -334,12 +334,12 @@ public class ProfilingSession {
 
 **Target Directory:** `debug/profiling/` (similar to existing perf command)
 
-- Aligns with existing profiling infrastructure (`MetricsPersister.PROFILING_RESULTS_DIR`)
+- Aligns with existing profiling infrastructure (`MetricsPersister.PROFILING_RESULTS_DIR` - verified to be `Paths.get("debug/profiling")`)
 - Accessible in both dev and production
-- Automatically created if missing
+- Automatically created if missing (see MetricsPersister.saveReports() which calls `Files.createDirectories(PROFILING_RESULTS_DIR)`)
 - Gitignored by default
 
-**Alternative (as mentioned in requirements):** Could use `crash-reports/` if preferred, but `debug/profiling/` is more semantically appropriate.
+**Alternative (as mentioned in requirements):** Could use `crash-reports/` if preferred, but `debug/profiling/` is more semantically appropriate and consistent with existing profiling tools.
 
 #### Report Format
 
@@ -996,14 +996,19 @@ public class MainThreadProfiler {
             this::recordOperation
         );
         
-        // Replace profiler (would need server modification to support this)
-        // For now, this is a placeholder for the concept
-        // server.setProfiler(wrappedProfiler);
+        // NOTE: MinecraftServer does not expose a setProfiler() method
+        // Alternative approaches:
+        // 1. Add setProfiler() method to MinecraftServer (requires minimal modification)
+        // 2. Use instrumentation hooks at key tick operations instead
+        // 3. Use byte code instrumentation (more complex, not recommended)
+        // Recommended: Add simple setProfiler() method to MinecraftServer
     }
 
     public void detach() {
+        // Restore original profiler if we added setProfiler() capability
+        // Otherwise, just clean up local references
         if (server != null && originalProfiler != null) {
-            // server.setProfiler(originalProfiler);
+            // server.setProfiler(originalProfiler);  // if method is added
         }
     }
 
@@ -1148,12 +1153,18 @@ Key sections:
 
 1. `src/main/java/net/minecraft/commands/Commands.java`
    - Add `ProfileCommand.register(dispatcher);`
-   - Location: ~line 150 with other command registrations
+   - Location: In the Commands() constructor, add with other command registrations (currently lines 183-290)
+   - Suggested placement: After JfrCommand.register() (around line 258) since it's related profiling functionality
    - Change: 1 line added
 
 2. `src/main/java/net/minecraft/server/MinecraftServer.java`
    - Add profiling hooks to `tickServer()`
-   - Add optional: `setProfiler()` method
+   - Add RECOMMENDED: `setProfiler(ProfilerFiller profiler)` method to enable profiler swapping
+     ```java
+     public void setProfiler(ProfilerFiller profiler) {
+         this.profiler = profiler;
+     }
+     ```
    - Changes: ~10-20 lines
 
 3. `src/main/java/net/minecraft/client/Minecraft.java`
