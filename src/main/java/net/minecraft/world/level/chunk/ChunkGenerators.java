@@ -5,11 +5,13 @@ import net.minecraft.core.Registry;
 import net.minecraft.world.level.levelgen.DebugLevelSource;
 import net.minecraft.world.level.levelgen.FlatLevelSource;
 import net.minecraft.world.level.levelgen.NoiseBasedChunkGenerator;
+import net.minecraft.world.level.levelgen.SkyblockChunkGenerator;
 
 public class ChunkGenerators {
 	public static MapCodec<? extends ChunkGenerator> bootstrap(Registry<MapCodec<? extends ChunkGenerator>> registry) {
 		Registry.register(registry, "noise", NoiseBasedChunkGenerator.CODEC);
 		Registry.register(registry, "flat", FlatLevelSource.CODEC);
+		Registry.register(registry, "skyblock", SkyblockChunkGenerator.CODEC);
 		return Registry.register(registry, "debug", DebugLevelSource.CODEC);
 	}
 }

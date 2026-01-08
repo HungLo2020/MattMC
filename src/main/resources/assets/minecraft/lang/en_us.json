@@ -3834,6 +3834,7 @@
   "generator.minecraft.large_biomes": "Large Biomes",
   "generator.minecraft.normal": "Default",
   "generator.minecraft.single_biome_surface": "Single Biome",
+  "generator.minecraft.skyblock": "Skyblock",
   "generator.single_biome_caves": "Caves",
   "generator.single_biome_floating_islands": "Floating Islands",
   "gui.acknowledge": "Acknowledge",
