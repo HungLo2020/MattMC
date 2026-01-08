@@ -191,8 +191,18 @@ public class ProfilerReportGenerator {
         
         sb.append("\n");
 
+        // Show hierarchical breakdown if available
+        Map<String, OperationRecord> hierarchicalOps = session.getMainThreadHierarchicalOperations();
+        if (hierarchicalOps != null && !hierarchicalOps.isEmpty()) {
+            sb.append("Detailed Hierarchical Breakdown:\n\n");
+            generateHierarchicalBreakdown(sb, hierarchicalOps);
+            sb.append("\n");
+        }
+
+        // Show top-level operations
         Map<String, OperationRecord> ops = session.getMainThreadOperations();
         if (!ops.isEmpty()) {
+            sb.append("Top-Level Operations:\n\n");
             generateOperationBreakdown(sb, ops, activeSeconds);
         }
         
@@ -221,8 +231,18 @@ public class ProfilerReportGenerator {
         
         sb.append("\n");
 
+        // Show hierarchical breakdown if available
+        Map<String, OperationRecord> hierarchicalOps = session.getRenderThreadHierarchicalOperations();
+        if (hierarchicalOps != null && !hierarchicalOps.isEmpty()) {
+            sb.append("Detailed Hierarchical Breakdown:\n\n");
+            generateHierarchicalBreakdown(sb, hierarchicalOps);
+            sb.append("\n");
+        }
+
+        // Show top-level operations
         Map<String, OperationRecord> ops = session.getRenderThreadOperations();
         if (!ops.isEmpty()) {
+            sb.append("Top-Level Operations:\n\n");
             generateOperationBreakdown(sb, ops, activeSeconds);
         }
         
@@ -303,6 +323,135 @@ public class ProfilerReportGenerator {
 
         sb.append("Profiling completed successfully.\n");
         sb.append("Review the operation breakdowns above to identify performance bottlenecks.\n\n");
+    }
+    
+    /**
+     * Generate hierarchical breakdown of operations in a tree structure.
+     */
+    private void generateHierarchicalBreakdown(StringBuilder sb, Map<String, OperationRecord> operations) {
+        // Build a tree structure from the flat map
+        HierarchicalNode root = buildHierarchy(operations);
+        
+        // Calculate total time for percentage calculations
+        long totalNanos = operations.values().stream()
+            .mapToLong(OperationRecord::getTotalTime)
+            .sum();
+        
+        // Render the tree, limiting to top entries
+        renderHierarchicalTree(sb, root, totalNanos, 0, 100);
+    }
+    
+    /**
+     * Build a hierarchical tree from flat operation paths.
+     */
+    private HierarchicalNode buildHierarchy(Map<String, OperationRecord> operations) {
+        HierarchicalNode root = new HierarchicalNode("root");
+        
+        for (Map.Entry<String, OperationRecord> entry : operations.entrySet()) {
+            String path = entry.getKey();
+            OperationRecord record = entry.getValue();
+            
+            // Split path into components
+            String[] parts = path.split("\\.");
+            
+            // Navigate/create tree nodes
+            HierarchicalNode current = root;
+            for (String part : parts) {
+                current = current.getOrCreateChild(part);
+            }
+            
+            // Set the operation record
+            current.record = record;
+        }
+        
+        return root;
+    }
+    
+    /**
+     * Render hierarchical tree with indentation.
+     */
+    private void renderHierarchicalTree(StringBuilder sb, HierarchicalNode node, long totalNanos, int depth, int maxEntries) {
+        if (depth > 10 || maxEntries <= 0) { // Limit depth to prevent huge reports
+            return;
+        }
+        
+        // Sort children by total time (descending)
+        List<HierarchicalNode> sortedChildren = new ArrayList<>(node.children.values());
+        sortedChildren.sort((a, b) -> {
+            long timeA = a.record != null ? a.record.getTotalTime() : a.getTotalTimeRecursive();
+            long timeB = b.record != null ? b.record.getTotalTime() : b.getTotalTimeRecursive();
+            return Long.compare(timeB, timeA);
+        });
+        
+        // Limit to top entries at each level
+        int entriesToShow = Math.min(maxEntries, sortedChildren.size());
+        
+        for (int i = 0; i < entriesToShow; i++) {
+            HierarchicalNode child = sortedChildren.get(i);
+            long childTime = child.record != null ? child.record.getTotalTime() : child.getTotalTimeRecursive();
+            
+            if (childTime == 0) continue;
+            
+            double seconds = childTime / (double) NANOS_PER_SECOND;
+            double percent = (childTime / (double) totalNanos) * 100;
+            
+            // Indentation
+            String indent = "  ".repeat(depth);
+            String prefix = depth == 0 ? "" : "├─ ";
+            
+            // Format: indent + prefix + name + time + percentage
+            sb.append(String.format("%s%s%-40s %8.2fs  %6.2f%%\n", 
+                indent, prefix, truncate(child.name, 40), seconds, percent));
+            
+            // Render children (reduce maxEntries for deeper levels)
+            if (!child.children.isEmpty()) {
+                renderHierarchicalTree(sb, child, totalNanos, depth + 1, Math.max(10, maxEntries - 10));
+            }
+        }
+        
+        // Show "other" if there are more entries
+        if (sortedChildren.size() > entriesToShow) {
+            long otherTime = 0;
+            for (int i = entriesToShow; i < sortedChildren.size(); i++) {
+                HierarchicalNode child = sortedChildren.get(i);
+                otherTime += child.record != null ? child.record.getTotalTime() : child.getTotalTimeRecursive();
+            }
+            
+            if (otherTime > 0) {
+                double seconds = otherTime / (double) NANOS_PER_SECOND;
+                double percent = (otherTime / (double) totalNanos) * 100;
+                String indent = "  ".repeat(depth);
+                String prefix = depth == 0 ? "" : "└─ ";
+                
+                sb.append(String.format("%s%s%-40s %8.2fs  %6.2f%%\n", 
+                    indent, prefix, "... and " + (sortedChildren.size() - entriesToShow) + " more", seconds, percent));
+            }
+        }
+    }
+    
+    /**
+     * Tree node for hierarchical operations.
+     */
+    private static class HierarchicalNode {
+        String name;
+        OperationRecord record;
+        Map<String, HierarchicalNode> children = new LinkedHashMap<>();
+        
+        HierarchicalNode(String name) {
+            this.name = name;
+        }
+        
+        HierarchicalNode getOrCreateChild(String childName) {
+            return children.computeIfAbsent(childName, HierarchicalNode::new);
+        }
+        
+        long getTotalTimeRecursive() {
+            long total = record != null ? record.getTotalTime() : 0;
+            for (HierarchicalNode child : children.values()) {
+                total += child.getTotalTimeRecursive();
+            }
+            return total;
+        }
     }
 
     private void generateFooter(StringBuilder sb, Path reportPath) {

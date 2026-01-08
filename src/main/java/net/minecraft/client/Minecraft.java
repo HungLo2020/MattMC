@@ -1450,7 +1450,9 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 	private ProfilerFiller constructProfiler(boolean bl, @Nullable SingleTickProfiler singleTickProfiler) {
 		if (!bl) {
 			this.fpsPieProfiler.disable();
-			if (!this.metricsRecorder.isRecording() && singleTickProfiler == null) {
+			// Don't return InactiveProfiler if custom profiling is active
+			if (!this.metricsRecorder.isRecording() && singleTickProfiler == null 
+				&& !net.minecraft.util.profiling.custom.ProfilerManager.isRunning()) {
 				return InactiveProfiler.INSTANCE;
 			}
 		}
@@ -1465,14 +1467,29 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 			this.fpsPieRenderTicks++;
 			profilerFiller = this.fpsPieProfiler.getFiller();
 		} else {
-			profilerFiller = InactiveProfiler.INSTANCE;
+			// Use fpsPieProfiler even when debug overlay is off if custom profiling is active
+			if (net.minecraft.util.profiling.custom.ProfilerManager.isRunning()) {
+				if (!this.fpsPieProfiler.isEnabled()) {
+					this.fpsPieProfiler.enable();
+				}
+				profilerFiller = this.fpsPieProfiler.getFiller();
+			} else {
+				profilerFiller = InactiveProfiler.INSTANCE;
+			}
 		}
 
 		if (this.metricsRecorder.isRecording()) {
 			profilerFiller = ProfilerFiller.combine(profilerFiller, this.metricsRecorder.getProfiler());
 		}
 
-		return SingleTickProfiler.decorateFiller(profilerFiller, singleTickProfiler);
+		ProfilerFiller result = SingleTickProfiler.decorateFiller(profilerFiller, singleTickProfiler);
+		
+		// Wrap with custom profiler collector if profiling is active
+		if (net.minecraft.util.profiling.custom.ProfilerManager.isRunning()) {
+			result = net.minecraft.util.profiling.custom.ProfilerManager.wrapRenderThreadProfiler(result);
+		}
+		
+		return result;
 	}
 
 	private void finishProfilers(boolean bl, @Nullable SingleTickProfiler singleTickProfiler) {

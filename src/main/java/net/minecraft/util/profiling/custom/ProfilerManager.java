@@ -3,9 +3,12 @@ package net.minecraft.util.profiling.custom;
 import com.mojang.logging.LogUtils;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.util.profiling.Profiler;
+import net.minecraft.util.profiling.ProfilerFiller;
 import org.slf4j.Logger;
 
 import java.nio.file.Path;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -19,6 +22,10 @@ public class ProfilerManager {
     private static ThreadTracker threadTracker;
     private static MainThreadProfiler mainThreadProfiler;
     private static RenderThreadProfiler renderThreadProfiler;
+    private static ProfilerCollectorWrapper mainThreadWrapper;
+    private static ProfilerCollectorWrapper renderThreadWrapper;
+    private static Profiler.Scope mainThreadProfilerScope;
+    private static Profiler.Scope renderThreadProfilerScope;
 
     public static boolean start(CommandSourceStack initiator) {
         synchronized (sessionLock) {
@@ -37,9 +44,12 @@ public class ProfilerManager {
                 threadTracker = new ThreadTracker();
                 threadTracker.start();
 
-                // Initialize main thread profiler
+                // Initialize main thread profiler with wrapper
                 mainThreadProfiler = new MainThreadProfiler();
-
+                
+                // Create wrapper for main thread - it will wrap the profiler when createProfiler() is called
+                // We initialize it here so it's ready to use
+                
                 // Initialize render thread profiler (will be used if on client)
                 renderThreadProfiler = new RenderThreadProfiler();
 
@@ -71,33 +81,106 @@ public class ProfilerManager {
                     currentSession.setTotalTicks(mainThreadProfiler.getTickCount());
                     currentSession.setAvgTickTime(mainThreadProfiler.getAvgTickTime());
                 }
+                
+                // Collect hierarchical data from wrapper
+                if (mainThreadWrapper != null) {
+                    Map<String, OperationRecord> mainOps = mainThreadWrapper.getOperations();
+                    LOGGER.info("Main thread hierarchical operations collected: {} entries", mainOps.size());
+                    currentSession.setMainThreadHierarchicalOperations(mainOps);
+                } else {
+                    LOGGER.warn("Main thread wrapper is null");
+                }
 
                 if (renderThreadProfiler != null) {
                     currentSession.setRenderThreadOperations(renderThreadProfiler.getOperations());
                     currentSession.setTotalFrames(renderThreadProfiler.getFrameCount());
                     currentSession.setAvgFrameTime(renderThreadProfiler.getAvgFrameTime());
                 }
+                
+                // Collect hierarchical data from render wrapper
+                if (renderThreadWrapper != null) {
+                    Map<String, OperationRecord> renderOps = renderThreadWrapper.getOperations();
+                    LOGGER.info("Render thread hierarchical operations collected: {} entries", renderOps.size());
+                    currentSession.setRenderThreadHierarchicalOperations(renderOps);
+                } else {
+                    LOGGER.warn("Render thread wrapper is null, no hierarchical data collected for render thread");
+                }
 
-                // Generate report
-                ProfilerReportGenerator generator = new ProfilerReportGenerator();
-                Path reportPath = generator.generate(currentSession);
+                // Generate reports (both text and HTML)
+                ProfilerReportGenerator textGenerator = new ProfilerReportGenerator();
+                Path textReportPath = textGenerator.generate(currentSession);
+                
+                HtmlProfilerReportGenerator htmlGenerator = new HtmlProfilerReportGenerator();
+                Path htmlReportPath = htmlGenerator.generate(currentSession);
 
-                LOGGER.info("Profiling session stopped: {}, report: {}", 
-                    currentSession.getSessionId(), reportPath);
+                LOGGER.info("Profiling session stopped: {}", currentSession.getSessionId());
+                LOGGER.info("Text report: {}", textReportPath);
+                LOGGER.info("HTML report: {}", htmlReportPath);
 
-                return reportPath;
+                return htmlReportPath; // Return HTML report path as primary
             } finally {
                 // Cleanup
                 currentSession = null;
                 threadTracker = null;
                 mainThreadProfiler = null;
                 renderThreadProfiler = null;
+                mainThreadWrapper = null;
+                renderThreadWrapper = null;
             }
         }
     }
 
     public static boolean isRunning() {
         return currentSession != null;
+    }
+    
+    /**
+     * Get the profiler wrapper for the main thread.
+     * This should be used to wrap the active profiler.
+     */
+    public static ProfilerCollectorWrapper getMainThreadWrapper() {
+        return mainThreadWrapper;
+    }
+    
+    /**
+     * Wrap the main thread profiler with the collector wrapper.
+     * Creates wrapper on first call if profiling session is active.
+     */
+    public static ProfilerFiller wrapMainThreadProfiler(ProfilerFiller profiler) {
+        if (currentSession == null) {
+            return profiler;
+        }
+        
+        if (mainThreadWrapper == null) {
+            mainThreadWrapper = new ProfilerCollectorWrapper(profiler);
+            LOGGER.info("Created main thread wrapper with delegate: {}", profiler.getClass().getSimpleName());
+            return mainThreadWrapper;
+        }
+        
+        // Wrapper exists, update its delegate to handle profiler changes
+        mainThreadWrapper.setDelegate(profiler);
+        return mainThreadWrapper;
+    }
+    
+    /**
+     * Wrap the render thread profiler with the collector wrapper.
+     * Creates wrapper on first call if profiling session is active.
+     */
+    public static ProfilerFiller wrapRenderThreadProfiler(ProfilerFiller profiler) {
+        if (currentSession == null) {
+            return profiler;
+        }
+        
+        if (renderThreadWrapper == null) {
+            renderThreadWrapper = new ProfilerCollectorWrapper(profiler);
+            LOGGER.info("Created render thread wrapper with delegate: {}", profiler.getClass().getSimpleName());
+            return renderThreadWrapper;
+        }
+        
+        // Wrapper exists, update its delegate to handle profiler changes  
+        renderThreadWrapper.setDelegate(profiler);
+        LOGGER.debug("Updated render thread wrapper delegate to: {}", profiler.getClass().getSimpleName());
+        return renderThreadWrapper;
     }
 
     // Called by instrumented code to record operations
