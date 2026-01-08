@@ -774,11 +774,8 @@ tasks.register('clientDist') {
             into "${distDir}/lib"
         }
         
-        // Copy resources
-        copy {
-            from 'src/main/resources'
-            into "${distDir}/resources"
-        }
+        // All resources (assets, data, shaders, etc.) are already in the JAR
+        // No need to copy them separately to the distribution
         
         // Copy bundled JDK to distribution
         def srcJdkDir = file("libraries/jdk-${targetJavaVersion}")
