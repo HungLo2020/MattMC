@@ -1128,6 +1128,9 @@ public abstract class MinecraftServer extends ReentrantBlockableEventLoop<TickTa
 		this.smoothedTickTimeMillis = this.smoothedTickTimeMillis * 0.8F + (float)m / (float)TimeUtil.NANOSECONDS_PER_MILLISECOND * 0.19999999F;
 		this.logTickMethodTime(l);
 		profilerFiller.pop();
+		
+		// Custom profiler hook
+		net.minecraft.util.profiling.custom.ProfilerManager.recordMainThreadTick(m);
 	}
 
 	private void autoSave() {
@@ -1204,8 +1207,14 @@ public abstract class MinecraftServer extends ReentrantBlockableEventLoop<TickTa
 	protected void tickChildren(BooleanSupplier booleanSupplier) {
 		ProfilerFiller profilerFiller = Profiler.get();
 		this.getPlayerList().getPlayers().forEach(serverPlayerx -> serverPlayerx.connection.suspendFlushing());
+		
+		long startTime;
+		
 		profilerFiller.push("commandFunctions");
+		startTime = Util.getNanos();
 		this.getFunctions().tick();
+		net.minecraft.util.profiling.custom.ProfilerManager.recordMainThreadOperation("tick.commandFunctions", Util.getNanos() - startTime);
+		
 		profilerFiller.popPush("levels");
 		this.updateEffectiveRespawnData();
 
@@ -1218,6 +1227,7 @@ public abstract class MinecraftServer extends ReentrantBlockableEventLoop<TickTa
 			}
 
 			profilerFiller.push("tick");
+			startTime = Util.getNanos();
 
 			try {
 				serverLevel.tick(booleanSupplier);
@@ -1226,15 +1236,23 @@ public abstract class MinecraftServer extends ReentrantBlockableEventLoop<TickTa
 				serverLevel.fillReportDetails(crashReport);
 				throw new ReportedException(crashReport);
 			}
+			
+			net.minecraft.util.profiling.custom.ProfilerManager.recordMainThreadOperation("tick.level", Util.getNanos() - startTime);
 
 			profilerFiller.pop();
 			profilerFiller.pop();
 		}
 
 		profilerFiller.popPush("connection");
+		startTime = Util.getNanos();
 		this.tickConnection();
+		net.minecraft.util.profiling.custom.ProfilerManager.recordMainThreadOperation("tick.connection", Util.getNanos() - startTime);
+		
 		profilerFiller.popPush("players");
+		startTime = Util.getNanos();
 		this.playerList.tick();
+		net.minecraft.util.profiling.custom.ProfilerManager.recordMainThreadOperation("tick.players", Util.getNanos() - startTime);
+		
 		profilerFiller.popPush("debugSubscribers");
 		this.debugSubscribers.tick();
 		if (this.tickRateManager.runsNormally()) {
@@ -1249,11 +1267,14 @@ public abstract class MinecraftServer extends ReentrantBlockableEventLoop<TickTa
 		}
 
 		profilerFiller.popPush("send chunks");
+		startTime = Util.getNanos();
 
 		for (ServerPlayer serverPlayer : this.playerList.getPlayers()) {
 			serverPlayer.connection.chunkSender.sendNextChunks(serverPlayer);
 			serverPlayer.connection.resumeFlushing();
 		}
+		
+		net.minecraft.util.profiling.custom.ProfilerManager.recordMainThreadOperation("tick.sendChunks", Util.getNanos() - startTime);
 
 		profilerFiller.pop();
 	}
