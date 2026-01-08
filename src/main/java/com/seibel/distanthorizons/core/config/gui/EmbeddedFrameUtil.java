@@ -1,22 +1,3 @@
-/*
- *    This file is part of the Distant Horizons mod
- *    licensed under the GNU LGPL v3 License.
- *
- *    Copyright (C) 2020 James Seibel
- *
- *    This program is free software: you can redistribute it and/or modify
- *    it under the terms of the GNU Lesser General Public License as published by
- *    the Free Software Foundation, version 3.
- *
- *    This program is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    GNU Lesser General Public License for more details.
- *
- *    You should have received a copy of the GNU Lesser General Public License
- *    along with this program.  If not, see <https://www.gnu.org/licenses/>.
- */
-
 package com.seibel.distanthorizons.core.config.gui;
 
 import com.seibel.distanthorizons.core.jar.EPlatform;
@@ -34,9 +15,6 @@ import static org.lwjgl.glfw.GLFWNativeX11.*;
 import static org.lwjgl.system.JNI.*;
 import static org.lwjgl.system.jawt.JAWTFunctions.*;
 import static org.lwjgl.system.macosx.ObjCRuntime.*;
-
-// Some of the code is from https://github.com/LWJGL/lwjgl3/blob/master/modules/samples/src/test/java/org/lwjgl/demo/system/jawt/EmbeddedFrameUtil.java
-// which is licensed under https://www.lwjgl.org/license
 
 /**
  * Some utils for embedding awt and swing items into lwjgl windows
