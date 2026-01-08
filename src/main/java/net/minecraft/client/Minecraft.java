@@ -1450,7 +1450,9 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 	private ProfilerFiller constructProfiler(boolean bl, @Nullable SingleTickProfiler singleTickProfiler) {
 		if (!bl) {
 			this.fpsPieProfiler.disable();
-			if (!this.metricsRecorder.isRecording() && singleTickProfiler == null) {
+			// Don't return InactiveProfiler if custom profiling is active
+			if (!this.metricsRecorder.isRecording() && singleTickProfiler == null 
+				&& !net.minecraft.util.profiling.custom.ProfilerManager.isRunning()) {
 				return InactiveProfiler.INSTANCE;
 			}
 		}
@@ -1465,7 +1467,15 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 			this.fpsPieRenderTicks++;
 			profilerFiller = this.fpsPieProfiler.getFiller();
 		} else {
-			profilerFiller = InactiveProfiler.INSTANCE;
+			// Use fpsPieProfiler even when debug overlay is off if custom profiling is active
+			if (net.minecraft.util.profiling.custom.ProfilerManager.isRunning()) {
+				if (!this.fpsPieProfiler.isEnabled()) {
+					this.fpsPieProfiler.enable();
+				}
+				profilerFiller = this.fpsPieProfiler.getFiller();
+			} else {
+				profilerFiller = InactiveProfiler.INSTANCE;
+			}
 		}
 
 		if (this.metricsRecorder.isRecording()) {
