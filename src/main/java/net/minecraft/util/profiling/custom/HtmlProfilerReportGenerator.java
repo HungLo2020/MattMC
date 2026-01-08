@@ -110,11 +110,14 @@ public class HtmlProfilerReportGenerator {
                                        double avgTime, long sessionDuration, boolean isMainThread) {
         double activeSeconds = thread.getTotalCpuTime() / (double) NANOS_PER_SECOND;
         double totalSeconds = sessionDuration / (double) NANOS_PER_SECOND;
-        double activePercent = (activeSeconds / totalSeconds) * 100;
+        
+        // Calculate utilization - cap at 100% to avoid confusion
+        // (CPU time can exceed wall time due to concurrent operations, but we display capped percentage)
+        double activePercent = Math.min((activeSeconds / totalSeconds) * 100, 100.0);
         
         html.append("            <h2>").append(threadName).append("</h2>\n");
         html.append("            <div class=\"thread-stats\">\n");
-        html.append("                <div class=\"stat\"><span class=\"label\">Active Time:</span> ").append(String.format("%.2f", activeSeconds)).append(" seconds (").append(String.format("%.2f", activePercent)).append("% of session)</div>\n");
+        html.append("                <div class=\"stat\"><span class=\"label\">Active Time:</span> ").append(String.format("%.2f", activeSeconds)).append(" seconds (").append(String.format("%.2f", activePercent)).append("% utilized)</div>\n");
         
         if (isMainThread) {
             html.append("                <div class=\"stat\"><span class=\"label\">Total Ticks:</span> ").append(String.format("%,d", ticksOrFrames)).append("</div>\n");
@@ -138,6 +141,16 @@ public class HtmlProfilerReportGenerator {
             html.append("            <div class=\"operations\">\n");
             HierarchicalNode root = buildHierarchy(hierarchicalOps);
             generateHierarchicalHtml(html, root, hierarchicalOps, 0);
+            html.append("            </div>\n");
+        } else {
+            html.append("            <div class=\"operations\">\n");
+            html.append("                <div class=\"operation-item\">\n");
+            html.append("                    <span class=\"toggle-placeholder\"></span>\n");
+            html.append("                    <span class=\"operation-name\" style=\"color: #999; font-style: italic;\">No hierarchical profiling data available for this thread</span>\n");
+            html.append("                    <span class=\"operation-time\"></span>\n");
+            html.append("                    <span class=\"operation-percent\"></span>\n");
+            html.append("                    <span class=\"operation-calls\"></span>\n");
+            html.append("                </div>\n");
             html.append("            </div>\n");
         }
     }

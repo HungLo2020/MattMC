@@ -8,6 +8,7 @@ import net.minecraft.util.profiling.ProfilerFiller;
 import org.slf4j.Logger;
 
 import java.nio.file.Path;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -83,7 +84,11 @@ public class ProfilerManager {
                 
                 // Collect hierarchical data from wrapper
                 if (mainThreadWrapper != null) {
-                    currentSession.setMainThreadHierarchicalOperations(mainThreadWrapper.getOperations());
+                    Map<String, OperationRecord> mainOps = mainThreadWrapper.getOperations();
+                    LOGGER.info("Main thread hierarchical operations collected: {} entries", mainOps.size());
+                    currentSession.setMainThreadHierarchicalOperations(mainOps);
+                } else {
+                    LOGGER.warn("Main thread wrapper is null");
                 }
 
                 if (renderThreadProfiler != null) {
@@ -94,7 +99,11 @@ public class ProfilerManager {
                 
                 // Collect hierarchical data from render wrapper
                 if (renderThreadWrapper != null) {
-                    currentSession.setRenderThreadHierarchicalOperations(renderThreadWrapper.getOperations());
+                    Map<String, OperationRecord> renderOps = renderThreadWrapper.getOperations();
+                    LOGGER.info("Render thread hierarchical operations collected: {} entries", renderOps.size());
+                    currentSession.setRenderThreadHierarchicalOperations(renderOps);
+                } else {
+                    LOGGER.warn("Render thread wrapper is null, no hierarchical data collected for render thread");
                 }
 
                 // Generate reports (both text and HTML)
@@ -144,8 +153,11 @@ public class ProfilerManager {
         
         if (mainThreadWrapper == null) {
             mainThreadWrapper = new ProfilerCollectorWrapper(profiler);
+            return mainThreadWrapper;
         }
         
+        // Wrapper already exists, update its delegate if it's a wrapper
+        // Just return the existing wrapper to maintain consistency
         return mainThreadWrapper;
     }
     
@@ -160,8 +172,10 @@ public class ProfilerManager {
         
         if (renderThreadWrapper == null) {
             renderThreadWrapper = new ProfilerCollectorWrapper(profiler);
+            return renderThreadWrapper;
         }
         
+        // Wrapper already exists, return it to maintain consistency
         return renderThreadWrapper;
     }
 
