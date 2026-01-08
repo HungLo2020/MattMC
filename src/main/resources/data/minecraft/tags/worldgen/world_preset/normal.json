@@ -4,6 +4,7 @@
     "minecraft:flat",
     "minecraft:large_biomes",
     "minecraft:amplified",
-    "minecraft:single_biome_surface"
+    "minecraft:single_biome_surface",
+    "minecraft:skyblock"
   ]
 }
