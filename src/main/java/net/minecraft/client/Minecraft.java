@@ -1472,7 +1472,20 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 			profilerFiller = ProfilerFiller.combine(profilerFiller, this.metricsRecorder.getProfiler());
 		}
 
-		return SingleTickProfiler.decorateFiller(profilerFiller, singleTickProfiler);
+		ProfilerFiller result = SingleTickProfiler.decorateFiller(profilerFiller, singleTickProfiler);
+		
+		// Wrap with custom profiler collector if profiling is active
+		// Initialize render thread wrapper on first use
+		if (net.minecraft.util.profiling.custom.ProfilerManager.isRunning()) {
+			net.minecraft.util.profiling.custom.ProfilerManager.initializeRenderThreadWrapper();
+			net.minecraft.util.profiling.custom.ProfilerCollectorWrapper wrapper = 
+				net.minecraft.util.profiling.custom.ProfilerManager.getRenderThreadWrapper();
+			if (wrapper != null) {
+				return wrapper;
+			}
+		}
+		
+		return result;
 	}
 
 	private void finishProfilers(boolean bl, @Nullable SingleTickProfiler singleTickProfiler) {

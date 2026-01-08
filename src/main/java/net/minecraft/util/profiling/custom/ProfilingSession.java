@@ -22,6 +22,10 @@ public class ProfilingSession {
     private Map<String, OperationRecord> renderThreadOperations;
     private Map<String, OperationRecord> otherOperations;
     
+    // Hierarchical operation data (from ProfilerCollectorWrapper)
+    private Map<String, OperationRecord> mainThreadHierarchicalOperations;
+    private Map<String, OperationRecord> renderThreadHierarchicalOperations;
+    
     // Aggregate statistics
     private int totalTicks;
     private int totalFrames;
@@ -38,6 +42,8 @@ public class ProfilingSession {
         this.mainThreadOperations = new HashMap<>();
         this.renderThreadOperations = new HashMap<>();
         this.otherOperations = new HashMap<>();
+        this.mainThreadHierarchicalOperations = new HashMap<>();
+        this.renderThreadHierarchicalOperations = new HashMap<>();
         this.totalTicks = 0;
         this.totalFrames = 0;
         this.avgTickTime = 0.0;
@@ -63,6 +69,14 @@ public class ProfilingSession {
 
     public void setOtherOperations(Map<String, OperationRecord> operations) {
         this.otherOperations = operations;
+    }
+    
+    public void setMainThreadHierarchicalOperations(Map<String, OperationRecord> operations) {
+        this.mainThreadHierarchicalOperations = operations;
+    }
+    
+    public void setRenderThreadHierarchicalOperations(Map<String, OperationRecord> operations) {
+        this.renderThreadHierarchicalOperations = operations;
     }
 
     public void setTotalTicks(int totalTicks) {
@@ -120,6 +134,14 @@ public class ProfilingSession {
 
     public Map<String, OperationRecord> getOtherOperations() {
         return otherOperations;
+    }
+    
+    public Map<String, OperationRecord> getMainThreadHierarchicalOperations() {
+        return mainThreadHierarchicalOperations;
+    }
+    
+    public Map<String, OperationRecord> getRenderThreadHierarchicalOperations() {
+        return renderThreadHierarchicalOperations;
     }
 
     public int getTotalTicks() {

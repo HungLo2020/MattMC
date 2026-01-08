@@ -2178,7 +2178,16 @@ public abstract class MinecraftServer extends ReentrantBlockableEventLoop<TickTa
 		}
 
 		this.metricsRecorder.startTick();
-		return SingleTickProfiler.decorateFiller(this.metricsRecorder.getProfiler(), SingleTickProfiler.createTickProfiler("Server"));
+		ProfilerFiller profiler = SingleTickProfiler.decorateFiller(this.metricsRecorder.getProfiler(), SingleTickProfiler.createTickProfiler("Server"));
+		
+		// Wrap with custom profiler collector if profiling is active
+		net.minecraft.util.profiling.custom.ProfilerCollectorWrapper wrapper = 
+			net.minecraft.util.profiling.custom.ProfilerManager.getMainThreadWrapper();
+		if (wrapper != null) {
+			return wrapper;
+		}
+		
+		return profiler;
 	}
 
 	public void endMetricsRecordingTick() {
