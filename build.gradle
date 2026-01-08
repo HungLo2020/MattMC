@@ -536,29 +536,19 @@ tasks.register('runClient', JavaExec) {
     ]
     
     // Required client arguments - these get passed through Knot to Minecraft
+    // Note: No --assetsDir argument - assets are loaded from JAR classpath
     args = [
         '--version', '1.21.10',
         '--accessToken', '0',
-        '--gameDir', file('run').absolutePath,
-        '--assetsDir', file('run/assets').absolutePath,
-        '--assetIndex', '27'
+        '--gameDir', file('run').absolutePath
     ]
     
     doFirst {
         workingDir.mkdirs()
-        file('run/assets').mkdirs()
         file('run/resourcepacks').mkdirs()
         
         // Note: No mods folder needed! Everything is in the main JAR
-        
-        // Copy assets from src/main/resources/assets to run/assets for dev environment
-        def resourcesAssetsDir = file('src/main/resources/assets')
-        if (resourcesAssetsDir.exists() && resourcesAssetsDir.isDirectory()) {
-            copy {
-                from resourcesAssetsDir
-                into file('run/assets')
-            }
-        }
+        // Note: Assets are loaded from JAR - no need to copy to filesystem
         
         // Create shaderpacks directory and copy shader pack zip
         def shaderpacksDir = file('run/shaderpacks')
@@ -766,10 +756,10 @@ tasks.register('clientDist') {
         // Create directory structure
         file("${distDir}/lib").mkdirs()
         file("${distDir}/run").mkdirs()
-        file("${distDir}/run/assets").mkdirs()
         file("${distDir}/run/resourcepacks").mkdirs()
         file("${distDir}/run/shaderpacks").mkdirs()
         // Note: No run/mods directory needed - everything in ONE JAR!
+        // Note: No run/assets directory needed - assets loaded from JAR!
         
         // Copy the ONE JAR containing everything
         copy {
@@ -801,17 +791,8 @@ tasks.register('clientDist') {
             println "✅ JDK copied to distribution"
         }
         
-        // Copy assets from src/main/resources/assets directory
-        // This is where Minecraft assets (sounds, textures, etc.) are stored
-        // Assets should be in the standard Minecraft structure: indexes/, objects/, files/
-        def resourcesAssetsDir = file('src/main/resources/assets')
-        if (resourcesAssetsDir.exists() && resourcesAssetsDir.isDirectory()) {
-            copy {
-                from resourcesAssetsDir
-                into "${distDir}/run/assets"
-            }
-            println "Copied assets from ${resourcesAssetsDir.absolutePath}"
-        }
+        // Assets are now loaded directly from the JAR - no filesystem copy needed!
+        // This eliminates 407MB of duplication
         
         // Copy shader pack zip to shaderpacks directory
         copy {
@@ -826,9 +807,6 @@ tasks.register('clientDist') {
         def mainJarName = jar.archiveFile.get().asFile.name
         def classpathLinux = "lib/${mainJarName}:lib/" + configurations.runtimeClasspath.files.collect { it.name }.join(':lib/')
         def classpathWindows = "lib\\${mainJarName};lib\\" + configurations.runtimeClasspath.files.collect { it.name }.join(';lib\\')
-        
-        // Asset index - this should match the index file in assets/indexes/<assetIndex>.json
-        def assetIndex = '27'
         
         // Copy and process launch scripts from packaging directory
         // Process each script file in the packaging directory
@@ -846,7 +824,6 @@ tasks.register('clientDist') {
                 linuxScript.text = linuxScriptTemplate
                     .replace('@CLASSPATH_LINUX@', classpathLinux)
                     .replace('@VERSION@', version)
-                    .replace('@ASSET_INDEX@', assetIndex)
                 linuxScript.setExecutable(true)
             } else if (scriptFile.name.endsWith('.bat')) {
                 // Windows script - process template placeholders
@@ -855,7 +832,6 @@ tasks.register('clientDist') {
                 windowsScript.text = windowsScriptTemplate
                     .replace('@CLASSPATH_WINDOWS@', classpathWindows)
                     .replace('@VERSION@', version)
-                    .replace('@ASSET_INDEX@', assetIndex)
             } else {
                 // Copy any other files as-is (e.g., README, documentation)
                 copy {
