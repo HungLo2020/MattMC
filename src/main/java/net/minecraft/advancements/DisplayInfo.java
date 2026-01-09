@@ -117,7 +117,7 @@ public class DisplayInfo {
 			i |= 2;
 		}
 
-		if (this.hidden) {
+		if (this.isHidden()) {
 			i |= 4;
 		}
 
