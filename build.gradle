@@ -828,7 +828,7 @@ tasks.register('clientDist') {
                 def linuxScriptTemplate = scriptFile.text
                 
                 // Determine if this is a client or server script
-                if (scriptFile.name.contains('server')) {
+                if (scriptFile.name.startsWith('run-server')) {
                     // Server script - place in server directory with server classpath
                     def linuxScript = file("${distDir}/server/${scriptFile.name}")
                     linuxScript.text = linuxScriptTemplate
@@ -848,7 +848,7 @@ tasks.register('clientDist') {
                 def windowsScriptTemplate = scriptFile.text
                 
                 // Determine if this is a client or server script
-                if (scriptFile.name.contains('server')) {
+                if (scriptFile.name.startsWith('run-server')) {
                     // Server script - place in server directory with server classpath
                     def windowsScript = file("${distDir}/server/${scriptFile.name}")
                     windowsScript.text = windowsScriptTemplate
