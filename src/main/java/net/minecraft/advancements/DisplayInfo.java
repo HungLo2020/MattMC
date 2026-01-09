@@ -100,7 +100,7 @@ public class DisplayInfo {
 	}
 
 	public boolean isHidden() {
-		return this.hidden;
+		return false; // Always show all advancements
 	}
 
 	private void serializeToNetwork(RegistryFriendlyByteBuf registryFriendlyByteBuf) {
@@ -117,7 +117,7 @@ public class DisplayInfo {
 			i |= 2;
 		}
 
-		if (this.hidden) {
+		if (this.isHidden()) {
 			i |= 4;
 		}
 
