@@ -42,7 +42,21 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.players.PlayerList;
 import net.minecraft.util.StrictJsonParser;
 import net.minecraft.util.datafix.DataFixTypes;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.sounds.SoundSource;
+import net.minecraft.world.entity.item.ItemEntity;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.GameRules;
+import net.minecraft.world.level.chunk.ChunkGenerator;
+import net.minecraft.world.level.levelgen.SkyblockChunkGenerator;
+import net.minecraft.world.level.storage.loot.LootParams;
+import net.minecraft.world.level.storage.loot.LootTable;
+import net.minecraft.world.level.storage.loot.parameters.LootContextParamSets;
+import net.minecraft.world.level.storage.loot.parameters.LootContextParams;
+import java.util.Optional;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 
@@ -212,6 +226,8 @@ public class PlayerAdvancements {
 						this.playerList.broadcastSystemMessage(displayInfo.getType().createAnnouncement(advancementHolder, this.player), false);
 					}
 				});
+				// Skyblock advancement loot system
+				this.grantSkyblockAdvancementLoot(advancementHolder);
 			}
 		}
 
@@ -361,5 +377,74 @@ public class PlayerAdvancements {
 				.sorted(Entry.comparingByValue())
 				.forEach(entry -> biConsumer.accept((ResourceLocation)entry.getKey(), (AdvancementProgress)entry.getValue()));
 		}
+	}
+
+	/**
+	 * Grants skyblock-specific loot when an advancement is completed in a skyblock world.
+	 * Checks if the player is in a skyblock world and attempts to load a loot table
+	 * from minecraft:skyblock_advancement/<advancement_id>.
+	 * If the loot table exists, items are dropped at the player's position.
+	 */
+	private void grantSkyblockAdvancementLoot(AdvancementHolder advancementHolder) {
+		ServerLevel serverLevel = this.player.level();
+		ChunkGenerator chunkGenerator = serverLevel.getChunkSource().getGenerator();
+		
+		// Check if this is a skyblock world
+		if (!(chunkGenerator instanceof SkyblockChunkGenerator)) {
+			return; // Not a skyblock world, skip
+		}
+		
+		// Construct the skyblock advancement loot table resource location
+		// Convert advancement ID to loot table path: minecraft:story/mine_stone -> minecraft:skyblock_advancement/story/mine_stone
+		ResourceLocation advancementId = advancementHolder.id();
+		ResourceLocation lootTableId = ResourceLocation.fromNamespaceAndPath(
+			advancementId.getNamespace(),
+			"skyblock_advancement/" + advancementId.getPath()
+		);
+		
+		// Create loot context
+		LootParams lootParams = new LootParams.Builder(serverLevel)
+			.withParameter(LootContextParams.THIS_ENTITY, this.player)
+			.withParameter(LootContextParams.ORIGIN, this.player.position())
+			.create(LootContextParamSets.ADVANCEMENT_REWARD);
+		
+		// Try to get the loot table (will return LootTable.EMPTY if not found)
+		MinecraftServer minecraftServer = serverLevel.getServer();
+		LootTable lootTable = minecraftServer.reloadableRegistries().getLootTable(
+			ResourceKey.create(Registries.LOOT_TABLE, lootTableId)
+		);
+		
+		// Check if this is an empty loot table (not found)
+		if (lootTable == LootTable.EMPTY) {
+			// No loot table defined for this advancement in skyblock, which is fine
+			return;
+		}
+		
+		// Generate and drop loot
+		for (ItemStack itemStack : lootTable.getRandomItems(lootParams)) {
+			if (this.player.addItem(itemStack)) {
+				// Item added to player inventory successfully
+				serverLevel.playSound(
+					null,
+					this.player.getX(),
+					this.player.getY(),
+					this.player.getZ(),
+					SoundEvents.ITEM_PICKUP,
+					SoundSource.PLAYERS,
+					0.2F,
+					((this.player.getRandom().nextFloat() - this.player.getRandom().nextFloat()) * 0.7F + 1.0F) * 2.0F
+				);
+			} else {
+				// Drop item on ground if inventory is full
+				ItemEntity itemEntity = this.player.drop(itemStack, false);
+				if (itemEntity != null) {
+					itemEntity.setNoPickUpDelay();
+					itemEntity.setTarget(this.player.getUUID());
+				}
+			}
+		}
+		
+		// Broadcast inventory changes
+		this.player.containerMenu.broadcastChanges();
 	}
 }
