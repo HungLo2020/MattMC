@@ -61,16 +61,39 @@ public class SystemReport {
 		this.setDetail("JVM Flags", (Supplier<String>)(() -> printJvmFlags(string -> string.startsWith("-X"))));
 		this.setDetail("Debug Flags", (Supplier<String>)(() -> printJvmFlags(string -> string.startsWith("-DMC_DEBUG_"))));
 		
-		// Iris: Add shaderpack info to crash reports
-		if (net.irisshaders.iris.Iris.getCurrentPackName() != null) {
-			this.setDetail("Loaded Shaderpack", () -> {
-				StringBuilder sb = new StringBuilder(net.irisshaders.iris.Iris.getCurrentPackName() + (net.irisshaders.iris.Iris.isFallback() ? " (fallback)" : ""));
-				net.irisshaders.iris.Iris.getCurrentPack().ifPresent(pack -> {
-					sb.append("\n\t\t");
-					sb.append(pack.getProfileInfo());
-				});
-				return sb.toString();
-			});
+		// Iris: Add shaderpack info to crash reports (client-side only)
+		// Only attempt to load Iris on the client to avoid server startup issues
+		if (isClientSide()) {
+			try {
+				if (net.irisshaders.iris.Iris.getCurrentPackName() != null) {
+					this.setDetail("Loaded Shaderpack", () -> {
+						StringBuilder sb = new StringBuilder(net.irisshaders.iris.Iris.getCurrentPackName() + (net.irisshaders.iris.Iris.isFallback() ? " (fallback)" : ""));
+						net.irisshaders.iris.Iris.getCurrentPack().ifPresent(pack -> {
+							sb.append("\n\t\t");
+							sb.append(pack.getProfileInfo());
+						});
+						return sb.toString();
+					});
+				}
+			} catch (Throwable t) {
+				// Silently ignore - Iris may not be fully initialized
+				LOGGER.debug("Failed to get Iris shaderpack information", t);
+			}
+		}
+	}
+
+	/**
+	 * Check if we're running on the client side by attempting to access the Minecraft class.
+	 * This avoids initializing client-only classes when running as a dedicated server.
+	 */
+	private static boolean isClientSide() {
+		try {
+			// Try to load the Minecraft client class - only available on client
+			Class.forName("net.minecraft.client.Minecraft");
+			return true;
+		} catch (ClassNotFoundException e) {
+			// Class not available - we're on the server
+			return false;
 		}
 	}
 
