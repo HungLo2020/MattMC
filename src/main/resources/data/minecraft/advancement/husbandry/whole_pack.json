@@ -157,7 +157,8 @@
     },
     "title": {
       "translate": "advancements.husbandry.whole_pack.title"
-    }
+    },
+    "hidden": false
   },
   "requirements": [
     [

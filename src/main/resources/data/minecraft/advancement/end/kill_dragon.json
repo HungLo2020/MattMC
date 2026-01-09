@@ -26,7 +26,8 @@
     },
     "title": {
       "translate": "advancements.end.kill_dragon.title"
-    }
+    },
+    "hidden": false
   },
   "requirements": [
     [

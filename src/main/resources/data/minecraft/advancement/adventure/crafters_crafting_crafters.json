@@ -18,7 +18,8 @@
     },
     "title": {
       "translate": "advancements.adventure.crafters_crafting_crafters.title"
-    }
+    },
+    "hidden": false
   },
   "requirements": [
     [

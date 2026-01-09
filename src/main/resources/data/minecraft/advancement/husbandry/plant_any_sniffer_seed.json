@@ -28,7 +28,7 @@
     "description": {
       "translate": "advancements.husbandry.plant_any_sniffer_seed.description"
     },
-    "hidden": true,
+    "hidden": false,
     "icon": {
       "count": 1,
       "id": "minecraft:pitcher_pod"

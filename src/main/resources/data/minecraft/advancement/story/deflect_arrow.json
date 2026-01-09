@@ -28,7 +28,8 @@
     },
     "title": {
       "translate": "advancements.story.deflect_arrow.title"
-    }
+    },
+    "hidden": false
   },
   "requirements": [
     [

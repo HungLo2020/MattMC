@@ -22,7 +22,8 @@
     },
     "title": {
       "translate": "advancements.nether.obtain_blaze_rod.title"
-    }
+    },
+    "hidden": false
   },
   "requirements": [
     [

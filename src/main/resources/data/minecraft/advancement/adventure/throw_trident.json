@@ -30,7 +30,8 @@
     },
     "title": {
       "translate": "advancements.adventure.throw_trident.title"
-    }
+    },
+    "hidden": false
   },
   "requirements": [
     [

@@ -43,7 +43,8 @@
     },
     "title": {
       "translate": "advancements.adventure.lightning_rod_with_villager_no_fire.title"
-    }
+    },
+    "hidden": false
   },
   "requirements": [
     [

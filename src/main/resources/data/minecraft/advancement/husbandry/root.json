@@ -17,7 +17,8 @@
     "show_toast": false,
     "title": {
       "translate": "advancements.husbandry.root.title"
-    }
+    },
+    "hidden": false
   },
   "requirements": [
     [

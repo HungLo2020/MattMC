@@ -37,7 +37,8 @@
     },
     "title": {
       "translate": "advancements.nether.all_potions.title"
-    }
+    },
+    "hidden": false
   },
   "requirements": [
     [

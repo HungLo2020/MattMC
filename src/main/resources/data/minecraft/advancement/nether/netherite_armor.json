@@ -32,7 +32,8 @@
     },
     "title": {
       "translate": "advancements.nether.netherite_armor.title"
-    }
+    },
+    "hidden": false
   },
   "requirements": [
     [

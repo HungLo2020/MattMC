@@ -22,7 +22,8 @@
     },
     "title": {
       "translate": "advancements.story.mine_stone.title"
-    }
+    },
+    "hidden": false
   },
   "requirements": [
     [

@@ -26,7 +26,8 @@
     },
     "title": {
       "translate": "advancements.husbandry.kill_axolotl_target.title"
-    }
+    },
+    "hidden": false
   },
   "requirements": [
     [

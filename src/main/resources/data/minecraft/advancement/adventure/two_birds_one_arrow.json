@@ -41,7 +41,8 @@
     },
     "title": {
       "translate": "advancements.adventure.two_birds_one_arrow.title"
-    }
+    },
+    "hidden": false
   },
   "requirements": [
     [

@@ -31,7 +31,8 @@
     },
     "title": {
       "translate": "advancements.adventure.whos_the_pillager_now.title"
-    }
+    },
+    "hidden": false
   },
   "requirements": [
     [

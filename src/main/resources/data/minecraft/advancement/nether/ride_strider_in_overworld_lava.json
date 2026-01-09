@@ -36,7 +36,8 @@
     },
     "title": {
       "translate": "advancements.nether.ride_strider_in_overworld_lava.title"
-    }
+    },
+    "hidden": false
   },
   "requirements": [
     [

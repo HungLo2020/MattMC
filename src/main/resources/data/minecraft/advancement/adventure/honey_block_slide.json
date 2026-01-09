@@ -18,7 +18,8 @@
     },
     "title": {
       "translate": "advancements.adventure.honey_block_slide.title"
-    }
+    },
+    "hidden": false
   },
   "requirements": [
     [

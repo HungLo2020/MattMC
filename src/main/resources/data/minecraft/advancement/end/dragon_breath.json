@@ -23,7 +23,8 @@
     },
     "title": {
       "translate": "advancements.end.dragon_breath.title"
-    }
+    },
+    "hidden": false
   },
   "requirements": [
     [

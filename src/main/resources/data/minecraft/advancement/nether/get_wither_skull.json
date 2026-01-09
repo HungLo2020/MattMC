@@ -22,7 +22,8 @@
     },
     "title": {
       "translate": "advancements.nether.get_wither_skull.title"
-    }
+    },
+    "hidden": false
   },
   "requirements": [
     [

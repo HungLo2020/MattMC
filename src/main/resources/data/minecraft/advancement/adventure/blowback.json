@@ -38,7 +38,8 @@
     },
     "title": {
       "translate": "advancements.adventure.blowback.title"
-    }
+    },
+    "hidden": false
   },
   "requirements": [
     [

@@ -28,7 +28,8 @@
     },
     "title": {
       "translate": "advancements.adventure.minecraft_trials_edition.title"
-    }
+    },
+    "hidden": false
   },
   "requirements": [
     [

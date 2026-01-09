@@ -390,7 +390,8 @@
     },
     "title": {
       "translate": "advancements.husbandry.breed_all_animals.title"
-    }
+    },
+    "hidden": false
   },
   "requirements": [
     [

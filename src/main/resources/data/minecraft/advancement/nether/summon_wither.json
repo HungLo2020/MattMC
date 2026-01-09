@@ -26,7 +26,8 @@
     },
     "title": {
       "translate": "advancements.nether.summon_wither.title"
-    }
+    },
+    "hidden": false
   },
   "requirements": [
     [

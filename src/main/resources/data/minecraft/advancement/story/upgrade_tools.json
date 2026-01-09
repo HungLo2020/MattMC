@@ -22,7 +22,8 @@
     },
     "title": {
       "translate": "advancements.story.upgrade_tools.title"
-    }
+    },
+    "hidden": false
   },
   "requirements": [
     [

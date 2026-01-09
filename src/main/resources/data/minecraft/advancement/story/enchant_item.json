@@ -15,7 +15,8 @@
     },
     "title": {
       "translate": "advancements.story.enchant_item.title"
-    }
+    },
+    "hidden": false
   },
   "requirements": [
     [

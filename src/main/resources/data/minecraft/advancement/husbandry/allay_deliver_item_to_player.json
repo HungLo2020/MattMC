@@ -20,7 +20,7 @@
     "description": {
       "translate": "advancements.husbandry.allay_deliver_item_to_player.description"
     },
-    "hidden": true,
+    "hidden": false,
     "icon": {
       "count": 1,
       "id": "minecraft:cookie"

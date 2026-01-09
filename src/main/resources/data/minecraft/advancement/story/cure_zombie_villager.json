@@ -16,7 +16,8 @@
     },
     "title": {
       "translate": "advancements.story.cure_zombie_villager.title"
-    }
+    },
+    "hidden": false
   },
   "requirements": [
     [

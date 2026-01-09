@@ -34,7 +34,8 @@
     },
     "title": {
       "translate": "advancements.husbandry.safely_harvest_honey.title"
-    }
+    },
+    "hidden": false
   },
   "requirements": [
     [

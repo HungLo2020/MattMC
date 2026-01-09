@@ -20,7 +20,8 @@
     "show_toast": false,
     "title": {
       "translate": "advancements.nether.root.title"
-    }
+    },
+    "hidden": false
   },
   "requirements": [
     [

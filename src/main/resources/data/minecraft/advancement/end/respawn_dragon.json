@@ -27,7 +27,8 @@
     },
     "title": {
       "translate": "advancements.end.respawn_dragon.title"
-    }
+    },
+    "hidden": false
   },
   "requirements": [
     [

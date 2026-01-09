@@ -22,7 +22,8 @@
     },
     "title": {
       "translate": "advancements.nether.obtain_ancient_debris.title"
-    }
+    },
+    "hidden": false
   },
   "requirements": [
     [

@@ -29,7 +29,8 @@
     },
     "title": {
       "translate": "advancements.husbandry.remove_wolf_armor.title"
-    }
+    },
+    "hidden": false
   },
   "requirements": [
     [

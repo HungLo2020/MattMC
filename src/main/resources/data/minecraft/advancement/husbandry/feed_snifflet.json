@@ -26,7 +26,7 @@
     "description": {
       "translate": "advancements.husbandry.feed_snifflet.description"
     },
-    "hidden": true,
+    "hidden": false,
     "icon": {
       "count": 1,
       "id": "minecraft:torchflower_seeds"

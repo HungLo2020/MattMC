@@ -93,7 +93,8 @@
     },
     "title": {
       "translate": "advancements.nether.explore_nether.title"
-    }
+    },
+    "hidden": false
   },
   "requirements": [
     [

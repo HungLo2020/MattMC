@@ -333,7 +333,8 @@
     },
     "title": {
       "translate": "advancements.husbandry.balanced_diet.title"
-    }
+    },
+    "hidden": false
   },
   "requirements": [
     [

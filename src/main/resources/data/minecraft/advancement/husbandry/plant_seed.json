@@ -89,7 +89,8 @@
     },
     "title": {
       "translate": "advancements.husbandry.plant_seed.title"
-    }
+    },
+    "hidden": false
   },
   "requirements": [
     [

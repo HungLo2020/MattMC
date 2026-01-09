@@ -26,7 +26,8 @@
     },
     "title": {
       "translate": "advancements.husbandry.place_dried_ghast_in_water.title"
-    }
+    },
+    "hidden": false
   },
   "requirements": [
     [

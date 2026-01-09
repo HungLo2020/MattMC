@@ -20,7 +20,8 @@
     },
     "title": {
       "translate": "advancements.adventure.ol_betsy.title"
-    }
+    },
+    "hidden": false
   },
   "requirements": [
     [

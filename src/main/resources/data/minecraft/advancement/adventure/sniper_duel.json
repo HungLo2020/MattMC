@@ -40,7 +40,8 @@
     },
     "title": {
       "translate": "advancements.adventure.sniper_duel.title"
-    }
+    },
+    "hidden": false
   },
   "requirements": [
     [

@@ -72,7 +72,8 @@
     },
     "title": {
       "translate": "advancements.husbandry.leash_all_frog_variants.title"
-    }
+    },
+    "hidden": false
   },
   "requirements": [
     [

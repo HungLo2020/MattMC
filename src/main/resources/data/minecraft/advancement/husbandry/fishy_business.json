@@ -44,7 +44,8 @@
     },
     "title": {
       "translate": "advancements.husbandry.fishy_business.title"
-    }
+    },
+    "hidden": false
   },
   "requirements": [
     [

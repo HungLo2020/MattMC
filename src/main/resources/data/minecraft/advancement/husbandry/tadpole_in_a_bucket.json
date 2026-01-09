@@ -20,7 +20,8 @@
     },
     "title": {
       "translate": "advancements.husbandry.tadpole_in_a_bucket.title"
-    }
+    },
+    "hidden": false
   },
   "requirements": [
     [

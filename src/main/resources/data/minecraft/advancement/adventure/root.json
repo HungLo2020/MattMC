@@ -20,7 +20,8 @@
     "show_toast": false,
     "title": {
       "translate": "advancements.adventure.root.title"
-    }
+    },
+    "hidden": false
   },
   "requirements": [
     [

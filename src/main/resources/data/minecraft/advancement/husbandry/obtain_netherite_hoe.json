@@ -23,7 +23,8 @@
     },
     "title": {
       "translate": "advancements.husbandry.netherite_hoe.title"
-    }
+    },
+    "hidden": false
   },
   "requirements": [
     [

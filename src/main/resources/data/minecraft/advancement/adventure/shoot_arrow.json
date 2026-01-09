@@ -30,7 +30,8 @@
     },
     "title": {
       "translate": "advancements.adventure.shoot_arrow.title"
-    }
+    },
+    "hidden": false
   },
   "requirements": [
     [

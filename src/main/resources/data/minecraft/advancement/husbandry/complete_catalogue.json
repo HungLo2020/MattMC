@@ -189,7 +189,8 @@
     },
     "title": {
       "translate": "advancements.husbandry.complete_catalogue.title"
-    }
+    },
+    "hidden": false
   },
   "requirements": [
     [

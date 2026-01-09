@@ -22,7 +22,8 @@
     },
     "title": {
       "translate": "advancements.story.lava_bucket.title"
-    }
+    },
+    "hidden": false
   },
   "requirements": [
     [

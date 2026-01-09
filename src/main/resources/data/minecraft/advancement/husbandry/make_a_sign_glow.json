@@ -33,7 +33,8 @@
     },
     "title": {
       "translate": "advancements.husbandry.make_a_sign_glow.title"
-    }
+    },
+    "hidden": false
   },
   "requirements": [
     [

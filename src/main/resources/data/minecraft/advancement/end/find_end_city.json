@@ -28,7 +28,8 @@
     },
     "title": {
       "translate": "advancements.end.find_end_city.title"
-    }
+    },
+    "hidden": false
   },
   "requirements": [
     [

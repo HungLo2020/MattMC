@@ -19,7 +19,8 @@
     },
     "title": {
       "translate": "advancements.nether.create_full_beacon.title"
-    }
+    },
+    "hidden": false
   },
   "requirements": [
     [

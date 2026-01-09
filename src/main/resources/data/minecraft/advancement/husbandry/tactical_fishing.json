@@ -44,7 +44,8 @@
     },
     "title": {
       "translate": "advancements.husbandry.tactical_fishing.title"
-    }
+    },
+    "hidden": false
   },
   "requirements": [
     [

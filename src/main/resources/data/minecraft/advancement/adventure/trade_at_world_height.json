@@ -32,7 +32,8 @@
     },
     "title": {
       "translate": "advancements.adventure.trade_at_world_height.title"
-    }
+    },
+    "hidden": false
   },
   "requirements": [
     [

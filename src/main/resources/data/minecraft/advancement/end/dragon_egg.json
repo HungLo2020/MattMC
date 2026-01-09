@@ -23,7 +23,8 @@
     },
     "title": {
       "translate": "advancements.end.dragon_egg.title"
-    }
+    },
+    "hidden": false
   },
   "requirements": [
     [

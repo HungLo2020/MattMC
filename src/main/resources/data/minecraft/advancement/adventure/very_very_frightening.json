@@ -28,7 +28,8 @@
     },
     "title": {
       "translate": "advancements.adventure.very_very_frightening.title"
-    }
+    },
+    "hidden": false
   },
   "requirements": [
     [

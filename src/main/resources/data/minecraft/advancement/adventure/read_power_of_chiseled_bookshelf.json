@@ -172,7 +172,8 @@
     },
     "title": {
       "translate": "advancements.adventure.read_power_from_chiseled_bookshelf.title"
-    }
+    },
+    "hidden": false
   },
   "requirements": [
     [

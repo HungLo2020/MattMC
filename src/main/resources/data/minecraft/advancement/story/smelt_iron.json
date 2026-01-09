@@ -22,7 +22,8 @@
     },
     "title": {
       "translate": "advancements.story.smelt_iron.title"
-    }
+    },
+    "hidden": false
   },
   "requirements": [
     [

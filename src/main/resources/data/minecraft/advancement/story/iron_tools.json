@@ -22,7 +22,8 @@
     },
     "title": {
       "translate": "advancements.story.iron_tools.title"
-    }
+    },
+    "hidden": false
   },
   "requirements": [
     [

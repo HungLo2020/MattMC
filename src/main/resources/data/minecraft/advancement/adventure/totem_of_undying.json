@@ -21,7 +21,8 @@
     },
     "title": {
       "translate": "advancements.adventure.totem_of_undying.title"
-    }
+    },
+    "hidden": false
   },
   "requirements": [
     [

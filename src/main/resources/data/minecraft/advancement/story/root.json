@@ -24,7 +24,8 @@
     "show_toast": false,
     "title": {
       "translate": "advancements.story.root.title"
-    }
+    },
+    "hidden": false
   },
   "requirements": [
     [

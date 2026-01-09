@@ -120,7 +120,8 @@
     },
     "title": {
       "translate": "advancements.adventure.trim_with_any_armor_pattern.title"
-    }
+    },
+    "hidden": false
   },
   "requirements": [
     [

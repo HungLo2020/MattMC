@@ -58,7 +58,8 @@
     },
     "title": {
       "translate": "advancements.adventure.salvage_sherd.title"
-    }
+    },
+    "hidden": false
   },
   "requirements": [
     [

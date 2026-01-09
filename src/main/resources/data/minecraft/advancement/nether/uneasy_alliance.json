@@ -30,7 +30,8 @@
     },
     "title": {
       "translate": "advancements.nether.uneasy_alliance.title"
-    }
+    },
+    "hidden": false
   },
   "requirements": [
     [
