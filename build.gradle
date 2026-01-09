@@ -754,13 +754,17 @@ tasks.register('clientDist') {
     outputs.dir distDir
     
     doLast {
-        // Create directory structure
+        // Create directory structure for client
         file("${distDir}/lib").mkdirs()
         file("${distDir}/run").mkdirs()
         file("${distDir}/run/resourcepacks").mkdirs()
         file("${distDir}/run/shaderpacks").mkdirs()
         // Note: No run/mods directory needed - everything in ONE JAR!
         // Note: No run/assets directory needed - assets loaded from JAR!
+        
+        // Create directory structure for server
+        file("${distDir}/server").mkdirs()
+        file("${distDir}/server/run").mkdirs()
         
         // Copy the ONE JAR containing everything
         copy {
@@ -806,6 +810,10 @@ tasks.register('clientDist') {
         def classpathLinux = "lib/${mainJarName}:lib/" + configurations.runtimeClasspath.files.collect { it.name }.join(':lib/')
         def classpathWindows = "lib\\${mainJarName};lib\\" + configurations.runtimeClasspath.files.collect { it.name }.join(';lib\\')
         
+        // Build classpath for server scripts (relative to server directory)
+        def serverClasspathLinux = "../lib/${mainJarName}:../lib/" + configurations.runtimeClasspath.files.collect { it.name }.join(':../lib/')
+        def serverClasspathWindows = "..\\lib\\${mainJarName};..\\lib\\" + configurations.runtimeClasspath.files.collect { it.name }.join(';..\\lib\\')
+        
         // Copy and process launch scripts from packaging directory
         // Process each script file in the packaging directory
         def packagingDir = file('packaging')
@@ -818,26 +826,60 @@ tasks.register('clientDist') {
             if (scriptFile.name.endsWith('.sh')) {
                 // Linux script - process template placeholders
                 def linuxScriptTemplate = scriptFile.text
-                def linuxScript = file("${distDir}/${scriptFile.name}")
-                linuxScript.text = linuxScriptTemplate
-                    .replace('@CLASSPATH_LINUX@', classpathLinux)
-                    .replace('@VERSION@', version)
-                linuxScript.setExecutable(true)
+                
+                // Determine if this is a client or server script
+                if (scriptFile.name.startsWith('run-server')) {
+                    // Server script - place in server directory with server classpath
+                    def linuxScript = file("${distDir}/server/${scriptFile.name}")
+                    linuxScript.text = linuxScriptTemplate
+                        .replace('@CLASSPATH_LINUX@', serverClasspathLinux)
+                        .replace('@VERSION@', version)
+                    linuxScript.setExecutable(true)
+                } else {
+                    // Client script - place in root directory
+                    def linuxScript = file("${distDir}/${scriptFile.name}")
+                    linuxScript.text = linuxScriptTemplate
+                        .replace('@CLASSPATH_LINUX@', classpathLinux)
+                        .replace('@VERSION@', version)
+                    linuxScript.setExecutable(true)
+                }
             } else if (scriptFile.name.endsWith('.bat')) {
                 // Windows script - process template placeholders
                 def windowsScriptTemplate = scriptFile.text
-                def windowsScript = file("${distDir}/${scriptFile.name}")
-                windowsScript.text = windowsScriptTemplate
-                    .replace('@CLASSPATH_WINDOWS@', classpathWindows)
-                    .replace('@VERSION@', version)
+                
+                // Determine if this is a client or server script
+                if (scriptFile.name.startsWith('run-server')) {
+                    // Server script - place in server directory with server classpath
+                    def windowsScript = file("${distDir}/server/${scriptFile.name}")
+                    windowsScript.text = windowsScriptTemplate
+                        .replace('@CLASSPATH_WINDOWS@', serverClasspathWindows)
+                        .replace('@VERSION@', version)
+                } else {
+                    // Client script - place in root directory
+                    def windowsScript = file("${distDir}/${scriptFile.name}")
+                    windowsScript.text = windowsScriptTemplate
+                        .replace('@CLASSPATH_WINDOWS@', classpathWindows)
+                        .replace('@VERSION@', version)
+                }
             } else {
                 // Copy any other files as-is (e.g., README, documentation)
-                copy {
-                    from scriptFile
-                    into distDir
+                // Special handling for SERVER-README.md
+                if (scriptFile.name == 'SERVER-README.md') {
+                    copy {
+                        from scriptFile
+                        into "${distDir}/server"
+                        rename { 'README.md' }
+                    }
+                } else {
+                    copy {
+                        from scriptFile
+                        into distDir
+                    }
                 }
             }
         }
+        
+        println "✅ Server files created in ${distDir}/server"
     }
 }
 
