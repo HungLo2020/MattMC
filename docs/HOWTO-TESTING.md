@@ -845,6 +845,177 @@ void testAsyncOperation() {
 - Use mocks instead of real dependencies
 - Run tests in parallel (advanced configuration)
 
+## Chunk Generation Performance Tests
+
+MattMC includes specialized performance tests for chunk generation that use the actual Minecraft world generation pathways. These tests are designed to provide realistic performance metrics for chunk generation under real-world conditions.
+
+### Overview
+
+Unlike simplified chunk operation tests, the chunk generation performance tests:
+- Create a full Minecraft server environment
+- Use the real world generation pipeline (terrain, features, structures, lighting)
+- Generate chunks with a fixed seed for reproducibility
+- Provide comprehensive timing metrics
+
+### Available Tests
+
+#### 1. ChunkGenerationPerformanceTest
+
+**Purpose**: Measures performance for generating 100 chunks in a single run.
+
+**What it does**:
+- Creates a Minecraft server with a test world (seed: 12345)
+- Generates 100 chunks through the complete generation pipeline
+- Tracks individual chunk generation times
+- Reports: total time, average time, fastest chunk, slowest chunk
+
+**Running the test**:
+```bash
+./gradlew performanceTest --tests "ChunkGenerationPerformanceTest"
+```
+
+**Expected output**:
+```
+========================================
+Chunk Generation Performance Test Results
+========================================
+World Seed: 12345
+Chunks Generated: 100
+Total Time: 15234.56 ms (15.23 seconds)
+Average Time per Chunk: 152.35 ms
+Fastest Chunk: 45.23 ms
+Slowest Chunk: 456.78 ms
+Chunks per Second: 6.56
+========================================
+```
+
+#### 2. ChunkGenerationBatchPerformanceTest
+
+**Purpose**: Provides statistically stable metrics by running the 100-chunk test 20 times and averaging results.
+
+**What it does**:
+- Runs 20 iterations of the 100-chunk generation test
+- Creates a fresh world for each iteration
+- Aggregates timing data across all runs
+- Calculates averages and standard deviations
+- Reports: average total time, average time per chunk, average fastest, average slowest
+
+**Running the test**:
+```bash
+./gradlew performanceTest --tests "ChunkGenerationBatchPerformanceTest"
+```
+
+**Expected output**:
+```
+========================================
+Chunk Generation Batch Performance Test
+========================================
+Configuration: 20 runs × 100 chunks
+World Seed: 12345
+========================================
+...
+(Progress for each run)
+...
+========================================
+Batch Test Aggregate Results
+========================================
+Runs Completed: 20
+Total Chunks Generated: 2000
+----------------------------------------
+Average Total Time: 15100.45 ms (±345.67 ms)
+Average Time per Chunk: 151.00 ms (±3.46 ms)
+Average Fastest Chunk: 44.56 ms
+Average Slowest Chunk: 458.90 ms
+Average Chunks per Second: 6.62
+========================================
+```
+
+### Test Configuration
+
+Both tests use the following configuration:
+- **Fixed Seed**: `12345` for reproducibility
+- **Chunk Status**: `ChunkStatus.FULL` (complete generation including lighting)
+- **World Type**: Normal Overworld generation
+- **Game Mode**: Creative
+- **Difficulty**: Normal
+
+### Technical Details
+
+#### Server Environment
+
+These tests create a minimal test server environment that includes:
+- Bootstrap initialization of Minecraft registries
+- World data loading and configuration
+- Chunk generation pipeline with all standard features
+- Lighting calculations
+- Structure generation
+- Feature placement
+
+#### Graphics Context
+
+While these tests initialize the full Minecraft server, they run in a headless mode suitable for CI/CD environments. The "graphics context" mentioned in the requirements refers to the internal rendering pipeline used during chunk generation, which is automatically handled by the test setup.
+
+#### Test Data
+
+The tests create temporary world data in:
+- `test-chunk-gen-world/` (single run test)
+- `test-chunk-gen-batch-world/` (batch test)
+
+These directories are automatically cleaned up after each test run.
+
+### Interpreting Results
+
+**Total Time**: The complete duration for generating all chunks, including server initialization overhead.
+
+**Average Time per Chunk**: The mean generation time across all chunks. This is the most useful metric for comparing performance across different systems or code changes.
+
+**Fastest/Slowest Chunk**: The minimum and maximum generation times. Variation is expected due to:
+- Chunk complexity (terrain features, structures, caves)
+- JVM warmup and JIT compilation
+- Garbage collection pauses
+- System load
+
+**Chunks per Second**: Throughput metric useful for estimating world generation speed.
+
+### Use Cases
+
+**Single Run Test** (`ChunkGenerationPerformanceTest`):
+- Quick performance checks during development
+- Testing specific chunk generation scenarios
+- Debugging performance issues
+- Profiling with external tools
+
+**Batch Test** (`ChunkGenerationBatchPerformanceTest`):
+- Stable performance baselines for regression testing
+- Comparing performance across code changes
+- Benchmarking different hardware configurations
+- Statistical analysis of generation performance
+
+### Running Both Tests
+
+To run all chunk generation performance tests:
+```bash
+./gradlew performanceTest --tests "*ChunkGeneration*PerformanceTest"
+```
+
+### CI/CD Integration
+
+These tests can run in automated environments:
+```bash
+# Run tests and save output
+./gradlew performanceTest --tests "ChunkGenerationPerformanceTest" > chunk_perf_results.txt
+
+# Run batch tests for stable metrics
+./gradlew performanceTest --tests "ChunkGenerationBatchPerformanceTest" > chunk_batch_results.txt
+```
+
+### Notes
+
+- First run may be slower due to JVM warmup - the batch test accounts for this
+- Results will vary based on hardware, JVM version, and system load
+- For consistent results, run tests on a quiet system with minimal background processes
+- The fixed seed ensures the same chunks are generated each time for reproducibility
+
 ## Summary
 
 The MattMC testing infrastructure provides:
@@ -854,7 +1025,8 @@ The MattMC testing infrastructure provides:
 ✅ **Clear organization** with separate directories for different test types  
 ✅ **Multiple execution modes** for different testing scenarios  
 ✅ **IDE integration** for efficient development workflow  
-✅ **Comprehensive documentation** to get started quickly
+✅ **Comprehensive documentation** to get started quickly  
+✅ **Realistic chunk generation performance tests** using actual Minecraft pathways
 
 ## Additional Resources
 
@@ -867,6 +1039,6 @@ The MattMC testing infrastructure provides:
 
 ---
 
-**Document Version**: 1.0  
-**Last Updated**: December 2024  
+**Document Version**: 1.1  
+**Last Updated**: January 2025  
 **Author**: MattMC Development Team
