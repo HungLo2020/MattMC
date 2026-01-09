@@ -8,6 +8,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import net.minecraft.core.BlockPos;
 import net.minecraft.core.QuartPos;
 import net.minecraft.core.SectionPos;
 import net.minecraft.server.level.ColumnPos;
@@ -521,6 +522,56 @@ public class NoiseChunk implements DensityFunction.ContextProvider, DensityFunct
 		@Override
 		public DensityFunctions.Marker.Type type() {
 			return DensityFunctions.Marker.Type.Cache2D;
+		}
+	}
+
+	static class Cache3D implements DensityFunctions.MarkerOrMarked, NoiseChunk.NoiseChunkDensityFunction {
+		private final DensityFunction function;
+		private static final int CACHE_SIZE = 4;
+		private final long[] cachedPositions = new long[CACHE_SIZE];
+		private final double[] cachedValues = new double[CACHE_SIZE];
+		private int cacheIndex = 0;
+
+		Cache3D(DensityFunction densityFunction) {
+			this.function = densityFunction;
+			Arrays.fill(this.cachedPositions, Long.MIN_VALUE);
+		}
+
+		@Override
+		public double compute(DensityFunction.FunctionContext functionContext) {
+			int i = functionContext.blockX();
+			int j = functionContext.blockY();
+			int k = functionContext.blockZ();
+			long posKey = BlockPos.asLong(i, j, k);
+			
+			// Check cache
+			for (int idx = 0; idx < CACHE_SIZE; idx++) {
+				if (this.cachedPositions[idx] == posKey) {
+					return this.cachedValues[idx];
+				}
+			}
+			
+			// Cache miss - compute and store
+			double result = this.function.compute(functionContext);
+			this.cachedPositions[this.cacheIndex] = posKey;
+			this.cachedValues[this.cacheIndex] = result;
+			this.cacheIndex = (this.cacheIndex + 1) % CACHE_SIZE;
+			return result;
+		}
+
+		@Override
+		public void fillArray(double[] ds, DensityFunction.ContextProvider contextProvider) {
+			this.function.fillArray(ds, contextProvider);
+		}
+
+		@Override
+		public DensityFunction wrapped() {
+			return this.function;
+		}
+
+		@Override
+		public DensityFunctions.Marker.Type type() {
+			return DensityFunctions.Marker.Type.Cache2D;  // Reuse Cache2D type
 		}
 	}
 
