@@ -2,6 +2,7 @@ package net.minecraft.world.level.chunk;
 
 import com.mojang.logging.LogUtils;
 import com.mojang.serialization.Lifecycle;
+import net.minecraft.SharedConstants;
 import net.minecraft.Util;
 import net.minecraft.SystemReport;
 import net.minecraft.commands.Commands;
@@ -14,13 +15,15 @@ import net.minecraft.server.Services;
 import net.minecraft.server.WorldLoader;
 import net.minecraft.server.WorldStem;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.progress.LoggingLevelLoadListener;
+import net.minecraft.server.notifications.EmptyNotificationService;
 import net.minecraft.server.packs.repository.PackRepository;
 import net.minecraft.server.packs.repository.ServerPacksSource;
 import net.minecraft.core.MappedRegistry;
 import net.minecraft.core.Registry;
 import net.minecraft.core.registries.Registries;
-import net.minecraft.server.level.progress.LoggingLevelLoadListener;
 import net.minecraft.server.players.NameAndId;
+import net.minecraft.server.players.PlayerList;
 import net.minecraft.server.profile.PlayerProfile;
 import net.minecraft.server.players.ProfileResolver;
 import net.minecraft.server.players.UserNameToIdResolver;
@@ -87,6 +90,7 @@ public class ChunkGenerationPerformanceTest {
     @BeforeAll
     static void setup() throws IOException {
         // Bootstrap Minecraft
+        SharedConstants.tryDetectVersion();
         Bootstrap.bootStrap();
         Util.startTimerHackThread();
         
@@ -316,6 +320,8 @@ public class ChunkGenerationPerformanceTest {
         
         @Override
         public boolean initServer() {
+            // Initialize player list before loading the world
+            this.setPlayerList(new PlayerList(this, this.registries(), this.playerDataStorage, new EmptyNotificationService()) {});
             // Initialize and load the world
             this.loadLevel();
             return true;
