@@ -38,6 +38,13 @@ public class SystemReport {
 		+ System.getProperty("java.vm.info")
 		+ "), "
 		+ System.getProperty("java.vm.vendor");
+	
+	/**
+	 * Cached result of client-side detection. The environment doesn't change during runtime,
+	 * so we can safely cache this to avoid repeated class loading attempts.
+	 */
+	private static final boolean IS_CLIENT_SIDE = detectClientSide();
+	
 	private final Map<String, String> entries = Maps.<String, String>newLinkedHashMap();
 
 	public SystemReport() {
@@ -61,16 +68,40 @@ public class SystemReport {
 		this.setDetail("JVM Flags", (Supplier<String>)(() -> printJvmFlags(string -> string.startsWith("-X"))));
 		this.setDetail("Debug Flags", (Supplier<String>)(() -> printJvmFlags(string -> string.startsWith("-DMC_DEBUG_"))));
 		
-		// Iris: Add shaderpack info to crash reports
-		if (net.irisshaders.iris.Iris.getCurrentPackName() != null) {
-			this.setDetail("Loaded Shaderpack", () -> {
-				StringBuilder sb = new StringBuilder(net.irisshaders.iris.Iris.getCurrentPackName() + (net.irisshaders.iris.Iris.isFallback() ? " (fallback)" : ""));
-				net.irisshaders.iris.Iris.getCurrentPack().ifPresent(pack -> {
-					sb.append("\n\t\t");
-					sb.append(pack.getProfileInfo());
-				});
-				return sb.toString();
-			});
+		// Iris: Add shaderpack info to crash reports (client-side only)
+		// Only attempt to load Iris on the client to avoid server startup issues
+		if (IS_CLIENT_SIDE) {
+			try {
+				if (net.irisshaders.iris.Iris.getCurrentPackName() != null) {
+					this.setDetail("Loaded Shaderpack", () -> {
+						StringBuilder sb = new StringBuilder(net.irisshaders.iris.Iris.getCurrentPackName() + (net.irisshaders.iris.Iris.isFallback() ? " (fallback)" : ""));
+						net.irisshaders.iris.Iris.getCurrentPack().ifPresent(pack -> {
+							sb.append("\n\t\t");
+							sb.append(pack.getProfileInfo());
+						});
+						return sb.toString();
+					});
+				}
+			} catch (Throwable t) {
+				// Log debug information if Iris fails to initialize
+				LOGGER.debug("Failed to get Iris shaderpack information", t);
+			}
+		}
+	}
+
+	/**
+	 * Detect if we're running on the client side by checking for the Minecraft client class.
+	 * This is called once during class initialization to avoid repeated class loading attempts.
+	 */
+	private static boolean detectClientSide() {
+		try {
+			// Try to load the Minecraft client class - only available on client
+			Class.forName("net.minecraft.client.Minecraft");
+			return true;
+		} catch (ClassNotFoundException | LinkageError e) {
+			// Class not available or failed to load - we're on the server
+			// LinkageError covers ExceptionInInitializerError and other linkage issues
+			return false;
 		}
 	}
 
