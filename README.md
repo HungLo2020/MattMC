@@ -248,10 +248,6 @@ The distribution includes:
 
 ## Notes
 
-### EULA
-
-By running the server, you automatically accept the [Minecraft EULA](https://aka.ms/MinecraftEULA). The `acceptEula` task creates the required `eula.txt` file.
-
 ### Legal Notice
 
 This source code is for educational and development purposes. Minecraft is a trademark of Mojang Studios/Microsoft. Please ensure you have the appropriate rights to use this code.
@@ -398,7 +394,7 @@ While this is a personal port, contributions are welcome:
 ## FAQ
 
 **Q: Can I use this for multiplayer servers?**  
-A: Yes, the server component is fully functional. Remember to accept the EULA.
+A: Yes, the server component is fully functional.
 
 **Q: Does this support mods?**  
 A: This is vanilla source code. For mod support, consider Fabric or Forge integration.
@@ -410,7 +406,7 @@ A: Minecraft 1.21+ officially requires Java 21 for modern JVM features and perfo
 A: This is decompiled source code for development and research. It's functionally equivalent to vanilla Minecraft.
 
 **Q: Can I distribute modified versions?**  
-A: Review Minecraft's EULA and terms of service. This is for educational and development purposes.
+A: This is for educational and development purposes. Review applicable terms and licenses.
 
 **Q: What about game assets?**  
 A: Assets (textures, sounds, models) are not included. You need a legitimate Minecraft installation or asset pack.
@@ -425,7 +421,5 @@ A: Assets (textures, sounds, models) are not included. You need a legitimate Min
 ## License & Legal
 
 This is decompiled Minecraft source code provided for educational and development purposes. Minecraft is a trademark of Mojang Studios/Microsoft.
-
-**Important**: By using this code and running the server, you agree to the [Minecraft EULA](https://aka.ms/MinecraftEULA). Ensure you have appropriate rights and comply with Mojang's terms of service.
 
 This project is not affiliated with or endorsed by Mojang Studios or Microsoft.
