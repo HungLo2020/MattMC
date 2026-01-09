@@ -37,22 +37,23 @@ public class DeltaFeature extends Feature<DeltaFeatureConfiguration> {
 		int k = deltaFeatureConfiguration.size().sample(randomSource);
 		int l = deltaFeatureConfiguration.size().sample(randomSource);
 		int m = Math.max(k, l);
+		BlockPos.MutableBlockPos mutableBlockPos = new BlockPos.MutableBlockPos();
 
 		for (BlockPos blockPos2 : BlockPos.withinManhattan(blockPos, k, 0, l)) {
 			if (blockPos2.distManhattan(blockPos) > m) {
 				break;
 			}
 
-			if (isClear(worldGenLevel, blockPos2, deltaFeatureConfiguration)) {
+			if (isClear(worldGenLevel, blockPos2, deltaFeatureConfiguration, mutableBlockPos)) {
 				if (bl3) {
 					bl = true;
 					this.setBlock(worldGenLevel, blockPos2, deltaFeatureConfiguration.rim());
 				}
 
-				BlockPos blockPos3 = blockPos2.offset(i, 0, j);
-				if (isClear(worldGenLevel, blockPos3, deltaFeatureConfiguration)) {
+				mutableBlockPos.set(blockPos2).move(i, 0, j);
+				if (isClear(worldGenLevel, mutableBlockPos, deltaFeatureConfiguration, mutableBlockPos)) {
 					bl = true;
-					this.setBlock(worldGenLevel, blockPos3, deltaFeatureConfiguration.contents());
+					this.setBlock(worldGenLevel, mutableBlockPos, deltaFeatureConfiguration.contents());
 				}
 			}
 		}
@@ -60,7 +61,7 @@ public class DeltaFeature extends Feature<DeltaFeatureConfiguration> {
 		return bl;
 	}
 
-	private static boolean isClear(LevelAccessor levelAccessor, BlockPos blockPos, DeltaFeatureConfiguration deltaFeatureConfiguration) {
+	private static boolean isClear(LevelAccessor levelAccessor, BlockPos blockPos, DeltaFeatureConfiguration deltaFeatureConfiguration, BlockPos.MutableBlockPos scratchPos) {
 		BlockState blockState = levelAccessor.getBlockState(blockPos);
 		if (blockState.is(deltaFeatureConfiguration.contents().getBlock())) {
 			return false;
@@ -68,7 +69,8 @@ public class DeltaFeature extends Feature<DeltaFeatureConfiguration> {
 			return false;
 		} else {
 			for (Direction direction : DIRECTIONS) {
-				boolean bl = levelAccessor.getBlockState(blockPos.relative(direction)).isAir();
+				scratchPos.setWithOffset(blockPos, direction);
+				boolean bl = levelAccessor.getBlockState(scratchPos).isAir();
 				if (bl && direction != Direction.UP || !bl && direction == Direction.UP) {
 					return false;
 				}

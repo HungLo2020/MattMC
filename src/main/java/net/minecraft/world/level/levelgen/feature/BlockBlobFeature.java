@@ -31,15 +31,28 @@ public class BlockBlobFeature extends Feature<BlockStateConfiguration> {
 		if (blockPos.getY() <= worldGenLevel.getMinY() + 3) {
 			return false;
 		} else {
+			BlockPos.MutableBlockPos mutableBlockPos = new BlockPos.MutableBlockPos();
 			for (int i = 0; i < 3; i++) {
 				int j = randomSource.nextInt(2);
 				int k = randomSource.nextInt(2);
 				int l = randomSource.nextInt(2);
 				float f = (j + k + l) * 0.333F + 0.5F;
 
-				for (BlockPos blockPos2 : BlockPos.betweenClosed(blockPos.offset(-j, -k, -l), blockPos.offset(j, k, l))) {
-					if (blockPos2.distSqr(blockPos) <= f * f) {
-						worldGenLevel.setBlock(blockPos2, blockStateConfiguration.state, 3);
+				int minX = blockPos.getX() - j;
+				int maxX = blockPos.getX() + j;
+				int minY = blockPos.getY() - k;
+				int maxY = blockPos.getY() + k;
+				int minZ = blockPos.getZ() - l;
+				int maxZ = blockPos.getZ() + l;
+
+				for (int x = minX; x <= maxX; x++) {
+					for (int y = minY; y <= maxY; y++) {
+						for (int z = minZ; z <= maxZ; z++) {
+							mutableBlockPos.set(x, y, z);
+							if (mutableBlockPos.distSqr(blockPos) <= f * f) {
+								worldGenLevel.setBlock(mutableBlockPos, blockStateConfiguration.state, 3);
+							}
+						}
 					}
 				}
 

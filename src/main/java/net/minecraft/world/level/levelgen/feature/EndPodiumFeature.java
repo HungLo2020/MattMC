@@ -29,34 +29,45 @@ public class EndPodiumFeature extends Feature<NoneFeatureConfiguration> {
 	public boolean place(FeaturePlaceContext<NoneFeatureConfiguration> featurePlaceContext) {
 		BlockPos blockPos = featurePlaceContext.origin();
 		WorldGenLevel worldGenLevel = featurePlaceContext.level();
+		BlockPos.MutableBlockPos mutableBlockPos = new BlockPos.MutableBlockPos();
 
-		for (BlockPos blockPos2 : BlockPos.betweenClosed(
-			new BlockPos(blockPos.getX() - 4, blockPos.getY() - 1, blockPos.getZ() - 4), new BlockPos(blockPos.getX() + 4, blockPos.getY() + 32, blockPos.getZ() + 4)
-		)) {
-			boolean bl = blockPos2.closerThan(blockPos, 2.5);
-			if (bl || blockPos2.closerThan(blockPos, 3.5)) {
-				if (blockPos2.getY() < blockPos.getY()) {
-					if (bl) {
-						this.setBlock(worldGenLevel, blockPos2, Blocks.BEDROCK.defaultBlockState());
-					} else if (blockPos2.getY() < blockPos.getY()) {
-						if (this.active) {
-							this.dropPreviousAndSetBlock(worldGenLevel, blockPos2, Blocks.END_STONE);
+		int minX = blockPos.getX() - 4;
+		int maxX = blockPos.getX() + 4;
+		int minY = blockPos.getY() - 1;
+		int maxY = blockPos.getY() + 32;
+		int minZ = blockPos.getZ() - 4;
+		int maxZ = blockPos.getZ() + 4;
+
+		for (int x = minX; x <= maxX; x++) {
+			for (int y = minY; y <= maxY; y++) {
+				for (int z = minZ; z <= maxZ; z++) {
+					mutableBlockPos.set(x, y, z);
+					boolean bl = mutableBlockPos.closerThan(blockPos, 2.5);
+					if (bl || mutableBlockPos.closerThan(blockPos, 3.5)) {
+						if (y < blockPos.getY()) {
+							if (bl) {
+								this.setBlock(worldGenLevel, mutableBlockPos, Blocks.BEDROCK.defaultBlockState());
+							} else if (y < blockPos.getY()) {
+								if (this.active) {
+									this.dropPreviousAndSetBlock(worldGenLevel, mutableBlockPos, Blocks.END_STONE);
+								} else {
+									this.setBlock(worldGenLevel, mutableBlockPos, Blocks.END_STONE.defaultBlockState());
+								}
+							}
+						} else if (y > blockPos.getY()) {
+							if (this.active) {
+								this.dropPreviousAndSetBlock(worldGenLevel, mutableBlockPos, Blocks.AIR);
+							} else {
+								this.setBlock(worldGenLevel, mutableBlockPos, Blocks.AIR.defaultBlockState());
+							}
+						} else if (!bl) {
+							this.setBlock(worldGenLevel, mutableBlockPos, Blocks.BEDROCK.defaultBlockState());
+						} else if (this.active) {
+							this.dropPreviousAndSetBlock(worldGenLevel, mutableBlockPos.immutable(), Blocks.END_PORTAL);
 						} else {
-							this.setBlock(worldGenLevel, blockPos2, Blocks.END_STONE.defaultBlockState());
+							this.setBlock(worldGenLevel, mutableBlockPos, Blocks.AIR.defaultBlockState());
 						}
 					}
-				} else if (blockPos2.getY() > blockPos.getY()) {
-					if (this.active) {
-						this.dropPreviousAndSetBlock(worldGenLevel, blockPos2, Blocks.AIR);
-					} else {
-						this.setBlock(worldGenLevel, blockPos2, Blocks.AIR.defaultBlockState());
-					}
-				} else if (!bl) {
-					this.setBlock(worldGenLevel, blockPos2, Blocks.BEDROCK.defaultBlockState());
-				} else if (this.active) {
-					this.dropPreviousAndSetBlock(worldGenLevel, new BlockPos(blockPos2), Blocks.END_PORTAL);
-				} else {
-					this.setBlock(worldGenLevel, new BlockPos(blockPos2), Blocks.AIR.defaultBlockState());
 				}
 			}
 		}
