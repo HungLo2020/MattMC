@@ -863,9 +863,18 @@ tasks.register('clientDist') {
                 }
             } else {
                 // Copy any other files as-is (e.g., README, documentation)
-                copy {
-                    from scriptFile
-                    into distDir
+                // Special handling for SERVER-README.md
+                if (scriptFile.name == 'SERVER-README.md') {
+                    copy {
+                        from scriptFile
+                        into "${distDir}/server"
+                        rename { 'README.md' }
+                    }
+                } else {
+                    copy {
+                        from scriptFile
+                        into distDir
+                    }
                 }
             }
         }
