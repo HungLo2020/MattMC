@@ -6,21 +6,7 @@
       "entries": [
         {
           "type": "minecraft:item",
-          "name": "minecraft:end_stone",
-          "functions": [
-            {
-              "function": "minecraft:set_count",
-              "count": {
-                "type": "minecraft:uniform",
-                "min": 64,
-                "max": 96
-              }
-            }
-          ]
-        },
-        {
-          "type": "minecraft:item",
-          "name": "minecraft:chorus_fruit",
+          "name": "minecraft:diamond",
           "functions": [
             {
               "function": "minecraft:set_count",
@@ -34,14 +20,38 @@
         },
         {
           "type": "minecraft:item",
-          "name": "minecraft:ender_pearl",
+          "name": "minecraft:golden_apple",
           "functions": [
             {
               "function": "minecraft:set_count",
               "count": {
                 "type": "minecraft:uniform",
-                "min": 8,
-                "max": 12
+                "min": 4,
+                "max": 8
+              }
+            }
+          ]
+        },
+        {
+          "type": "minecraft:item",
+          "name": "minecraft:enchanted_golden_apple",
+          "functions": [
+            {
+              "function": "minecraft:set_count",
+              "count": 1
+            }
+          ]
+        },
+        {
+          "type": "minecraft:item",
+          "name": "minecraft:experience_bottle",
+          "functions": [
+            {
+              "function": "minecraft:set_count",
+              "count": {
+                "type": "minecraft:uniform",
+                "min": 32,
+                "max": 48
               }
             }
           ]
@@ -50,5 +60,5 @@
       "rolls": 1.0
     }
   ],
-  "random_sequence": "minecraft:skyblock_advancement/story/enter_the_end"
+  "random_sequence": "minecraft:skyblock_advancement/end/kill_dragon"
 }

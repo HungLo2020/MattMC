@@ -6,21 +6,11 @@
       "entries": [
         {
           "type": "minecraft:item",
-          "name": "minecraft:blaze_rod",
-          "functions": [
-            {
-              "function": "minecraft:set_count",
-              "count": {
-                "type": "minecraft:uniform",
-                "min": 8,
-                "max": 12
-              }
-            }
-          ]
+          "name": "minecraft:bucket"
         },
         {
           "type": "minecraft:item",
-          "name": "minecraft:ender_pearl",
+          "name": "minecraft:iron_ingot",
           "functions": [
             {
               "function": "minecraft:set_count",
@@ -34,11 +24,21 @@
         },
         {
           "type": "minecraft:item",
-          "name": "minecraft:brewing_stand"
+          "name": "minecraft:redstone",
+          "functions": [
+            {
+              "function": "minecraft:set_count",
+              "count": {
+                "type": "minecraft:uniform",
+                "min": 16,
+                "max": 24
+              }
+            }
+          ]
         }
       ],
       "rolls": 1.0
     }
   ],
-  "random_sequence": "minecraft:skyblock_advancement/nether/obtain_blaze_rod"
+  "random_sequence": "minecraft:skyblock_advancement/story/iron_tools"
 }

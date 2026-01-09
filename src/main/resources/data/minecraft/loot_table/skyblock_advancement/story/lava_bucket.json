@@ -6,29 +6,25 @@
       "entries": [
         {
           "type": "minecraft:item",
-          "name": "minecraft:iron_ore",
+          "name": "minecraft:water_bucket",
           "functions": [
             {
               "function": "minecraft:set_count",
-              "count": {
-                "type": "minecraft:uniform",
-                "min": 24,
-                "max": 32
-              }
+              "count": 2
             }
           ]
         },
         {
           "type": "minecraft:item",
-          "name": "minecraft:coal",
+          "name": "minecraft:lava_bucket"
+        },
+        {
+          "type": "minecraft:item",
+          "name": "minecraft:bucket",
           "functions": [
             {
               "function": "minecraft:set_count",
-              "count": {
-                "type": "minecraft:uniform",
-                "min": 16,
-                "max": 24
-              }
+              "count": 2
             }
           ]
         }
@@ -36,5 +32,5 @@
       "rolls": 1.0
     }
   ],
-  "random_sequence": "minecraft:skyblock_advancement/story/upgrade_tools"
+  "random_sequence": "minecraft:skyblock_advancement/story/lava_bucket"
 }

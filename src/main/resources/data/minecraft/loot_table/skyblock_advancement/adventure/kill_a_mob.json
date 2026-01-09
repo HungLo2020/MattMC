@@ -6,39 +6,49 @@
       "entries": [
         {
           "type": "minecraft:item",
-          "name": "minecraft:blaze_rod",
+          "name": "minecraft:string",
           "functions": [
             {
               "function": "minecraft:set_count",
               "count": {
                 "type": "minecraft:uniform",
-                "min": 8,
-                "max": 12
+                "min": 16,
+                "max": 24
               }
             }
           ]
         },
         {
           "type": "minecraft:item",
-          "name": "minecraft:ender_pearl",
+          "name": "minecraft:bone",
           "functions": [
             {
               "function": "minecraft:set_count",
               "count": {
                 "type": "minecraft:uniform",
-                "min": 12,
-                "max": 16
+                "min": 16,
+                "max": 24
               }
             }
           ]
         },
         {
           "type": "minecraft:item",
-          "name": "minecraft:brewing_stand"
+          "name": "minecraft:arrow",
+          "functions": [
+            {
+              "function": "minecraft:set_count",
+              "count": {
+                "type": "minecraft:uniform",
+                "min": 32,
+                "max": 48
+              }
+            }
+          ]
         }
       ],
       "rolls": 1.0
     }
   ],
-  "random_sequence": "minecraft:skyblock_advancement/nether/obtain_blaze_rod"
+  "random_sequence": "minecraft:skyblock_advancement/adventure/kill_a_mob"
 }

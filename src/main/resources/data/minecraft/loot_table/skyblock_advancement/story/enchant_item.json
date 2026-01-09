@@ -6,7 +6,7 @@
       "entries": [
         {
           "type": "minecraft:item",
-          "name": "minecraft:blaze_rod",
+          "name": "minecraft:iron_ingot",
           "functions": [
             {
               "function": "minecraft:set_count",
@@ -20,25 +20,25 @@
         },
         {
           "type": "minecraft:item",
-          "name": "minecraft:ender_pearl",
+          "name": "minecraft:diamond",
           "functions": [
             {
               "function": "minecraft:set_count",
               "count": {
                 "type": "minecraft:uniform",
-                "min": 12,
-                "max": 16
+                "min": 2,
+                "max": 4
               }
             }
           ]
         },
         {
           "type": "minecraft:item",
-          "name": "minecraft:brewing_stand"
+          "name": "minecraft:enchanting_table"
         }
       ],
       "rolls": 1.0
     }
   ],
-  "random_sequence": "minecraft:skyblock_advancement/nether/obtain_blaze_rod"
+  "random_sequence": "minecraft:skyblock_advancement/story/enchant_item"
 }
