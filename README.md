@@ -94,7 +94,6 @@ The client will:
 
 The first run will:
 - Create a `run/` directory for server files
-- Automatically accept the EULA (by setting `eula=true` in `run/eula.txt`)
 - Start the server
 
 ## Configuration
