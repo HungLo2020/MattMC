@@ -184,7 +184,7 @@ public class AdvancementsScreen extends Screen implements ClientAdvancements.Lis
 		// Scale the window texture by 2x
 		guiGraphics.pose().pushMatrix();
 		guiGraphics.pose().translate(i, j);
-		guiGraphics.pose().scale(2.0F, 2.0F, 1.0F);
+		guiGraphics.pose().scale(2.0F, 2.0F);
 		guiGraphics.blit(RenderPipelines.GUI_TEXTURED, WINDOW_LOCATION, 0, 0, 0.0F, 0.0F, 252, 140, 256, 256);
 		guiGraphics.pose().popMatrix();
 		
