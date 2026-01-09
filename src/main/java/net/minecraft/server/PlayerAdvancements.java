@@ -106,6 +106,8 @@ public class PlayerAdvancements {
 		this.lastSelectedTab = null;
 		this.tree = serverAdvancementManager.tree();
 		this.load(serverAdvancementManager);
+		// Mark all roots for visibility update so all advancements are evaluated and sent to client
+		this.tree.roots().forEach(this.rootsToUpdate::add);
 	}
 
 	private void registerListeners(ServerAdvancementManager serverAdvancementManager) {
