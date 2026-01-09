@@ -66,36 +66,28 @@ public class BasaltColumnsFeature extends Feature<ColumnFeatureConfiguration> {
 
 	private boolean placeColumn(LevelAccessor levelAccessor, int i, BlockPos blockPos, int j, int k) {
 		boolean bl = false;
-		BlockPos.MutableBlockPos mutableBlockPos2 = new BlockPos.MutableBlockPos();
 
-		int minX = blockPos.getX() - k;
-		int maxX = blockPos.getX() + k;
-		int y = blockPos.getY();
-		int minZ = blockPos.getZ() - k;
-		int maxZ = blockPos.getZ() + k;
+		for (BlockPos blockPos2 : BlockPos.betweenClosed(
+			blockPos.getX() - k, blockPos.getY(), blockPos.getZ() - k, blockPos.getX() + k, blockPos.getY(), blockPos.getZ() + k
+		)) {
+			int l = blockPos2.distManhattan(blockPos);
+			BlockPos blockPos3 = isAirOrLavaOcean(levelAccessor, i, blockPos2)
+				? findSurface(levelAccessor, i, blockPos2.mutable(), l)
+				: findAir(levelAccessor, blockPos2.mutable(), l);
+			if (blockPos3 != null) {
+				int m = j - l / 2;
 
-		for (int x = minX; x <= maxX; x++) {
-			for (int z = minZ; z <= maxZ; z++) {
-				mutableBlockPos2.set(x, y, z);
-				int l = mutableBlockPos2.distManhattan(blockPos);
-				BlockPos blockPos3 = isAirOrLavaOcean(levelAccessor, i, mutableBlockPos2)
-					? findSurface(levelAccessor, i, mutableBlockPos2.mutable(), l)
-					: findAir(levelAccessor, mutableBlockPos2.mutable(), l);
-				if (blockPos3 != null) {
-					int m = j - l / 2;
-
-					for (BlockPos.MutableBlockPos mutableBlockPos = blockPos3.mutable(); m >= 0; m--) {
-						if (isAirOrLavaOcean(levelAccessor, i, mutableBlockPos)) {
-							this.setBlock(levelAccessor, mutableBlockPos, Blocks.BASALT.defaultBlockState());
-							mutableBlockPos.move(Direction.UP);
-							bl = true;
-						} else {
-							if (!levelAccessor.getBlockState(mutableBlockPos).is(Blocks.BASALT)) {
-								break;
-							}
-
-							mutableBlockPos.move(Direction.UP);
+				for (BlockPos.MutableBlockPos mutableBlockPos = blockPos3.mutable(); m >= 0; m--) {
+					if (isAirOrLavaOcean(levelAccessor, i, mutableBlockPos)) {
+						this.setBlock(levelAccessor, mutableBlockPos, Blocks.BASALT.defaultBlockState());
+						mutableBlockPos.move(Direction.UP);
+						bl = true;
+					} else {
+						if (!levelAccessor.getBlockState(mutableBlockPos).is(Blocks.BASALT)) {
+							break;
 						}
+
+						mutableBlockPos.move(Direction.UP);
 					}
 				}
 			}

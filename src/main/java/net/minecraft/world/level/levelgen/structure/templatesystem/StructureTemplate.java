@@ -108,34 +108,21 @@ public class StructureTemplate {
 			this.size = vec3i;
 
 			try (ProblemReporter.ScopedCollector scopedCollector = new ProblemReporter.ScopedCollector(LOGGER)) {
-				BlockPos.MutableBlockPos mutableBlockPos = new BlockPos.MutableBlockPos();
-				int minX = blockPos3.getX();
-				int maxX = blockPos4.getX();
-				int minY = blockPos3.getY();
-				int maxY = blockPos4.getY();
-				int minZ = blockPos3.getZ();
-				int maxZ = blockPos4.getZ();
-
-				for (int x = minX; x <= maxX; x++) {
-					for (int y = minY; y <= maxY; y++) {
-						for (int z = minZ; z <= maxZ; z++) {
-							mutableBlockPos.set(x, y, z);
-							BlockPos blockPos6 = mutableBlockPos.subtract(blockPos3);
-							BlockState blockState = level.getBlockState(mutableBlockPos);
-							if (!list.stream().anyMatch(blockState::is)) {
-								BlockEntity blockEntity = level.getBlockEntity(mutableBlockPos);
-								StructureTemplate.StructureBlockInfo structureBlockInfo;
-								if (blockEntity != null) {
-									TagValueOutput tagValueOutput = TagValueOutput.createWithContext(scopedCollector, level.registryAccess());
-									blockEntity.saveWithId(tagValueOutput);
-									structureBlockInfo = new StructureTemplate.StructureBlockInfo(blockPos6, blockState, tagValueOutput.buildResult());
-								} else {
-									structureBlockInfo = new StructureTemplate.StructureBlockInfo(blockPos6, blockState, null);
-								}
-
-								addToLists(structureBlockInfo, list2, list3, list4);
-							}
+				for (BlockPos blockPos5 : BlockPos.betweenClosed(blockPos3, blockPos4)) {
+					BlockPos blockPos6 = blockPos5.subtract(blockPos3);
+					BlockState blockState = level.getBlockState(blockPos5);
+					if (!list.stream().anyMatch(blockState::is)) {
+						BlockEntity blockEntity = level.getBlockEntity(blockPos5);
+						StructureTemplate.StructureBlockInfo structureBlockInfo;
+						if (blockEntity != null) {
+							TagValueOutput tagValueOutput = TagValueOutput.createWithContext(scopedCollector, level.registryAccess());
+							blockEntity.saveWithId(tagValueOutput);
+							structureBlockInfo = new StructureTemplate.StructureBlockInfo(blockPos6, blockState, tagValueOutput.buildResult());
+						} else {
+							structureBlockInfo = new StructureTemplate.StructureBlockInfo(blockPos6, blockState, null);
 						}
+
+						addToLists(structureBlockInfo, list2, list3, list4);
 					}
 				}
 

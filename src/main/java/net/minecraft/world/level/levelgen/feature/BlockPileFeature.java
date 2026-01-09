@@ -26,27 +26,14 @@ public class BlockPileFeature extends Feature<BlockPileConfiguration> {
 		} else {
 			int i = 2 + randomSource.nextInt(2);
 			int j = 2 + randomSource.nextInt(2);
-			BlockPos.MutableBlockPos mutableBlockPos = new BlockPos.MutableBlockPos();
 
-			int minX = blockPos.getX() - i;
-			int maxX = blockPos.getX() + i;
-			int minY = blockPos.getY();
-			int maxY = blockPos.getY() + 1;
-			int minZ = blockPos.getZ() - j;
-			int maxZ = blockPos.getZ() + j;
-
-			for (int x = minX; x <= maxX; x++) {
-				for (int y = minY; y <= maxY; y++) {
-					for (int z = minZ; z <= maxZ; z++) {
-						mutableBlockPos.set(x, y, z);
-						int k = blockPos.getX() - x;
-						int l = blockPos.getZ() - z;
-						if (k * k + l * l <= randomSource.nextFloat() * 10.0F - randomSource.nextFloat() * 6.0F) {
-							this.tryPlaceBlock(worldGenLevel, mutableBlockPos, randomSource, blockPileConfiguration);
-						} else if (randomSource.nextFloat() < 0.031) {
-							this.tryPlaceBlock(worldGenLevel, mutableBlockPos, randomSource, blockPileConfiguration);
-						}
-					}
+			for (BlockPos blockPos2 : BlockPos.betweenClosed(blockPos.offset(-i, 0, -j), blockPos.offset(i, 1, j))) {
+				int k = blockPos.getX() - blockPos2.getX();
+				int l = blockPos.getZ() - blockPos2.getZ();
+				if (k * k + l * l <= randomSource.nextFloat() * 10.0F - randomSource.nextFloat() * 6.0F) {
+					this.tryPlaceBlock(worldGenLevel, blockPos2, randomSource, blockPileConfiguration);
+				} else if (randomSource.nextFloat() < 0.031) {
+					this.tryPlaceBlock(worldGenLevel, blockPos2, randomSource, blockPileConfiguration);
 				}
 			}
 

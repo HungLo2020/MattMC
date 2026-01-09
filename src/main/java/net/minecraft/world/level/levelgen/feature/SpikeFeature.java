@@ -69,25 +69,15 @@ public class SpikeFeature extends Feature<SpikeConfiguration> {
 		ServerLevelAccessor serverLevelAccessor, RandomSource randomSource, SpikeConfiguration spikeConfiguration, SpikeFeature.EndSpike endSpike
 	) {
 		int i = endSpike.getRadius();
-		BlockPos.MutableBlockPos mutableBlockPos = new BlockPos.MutableBlockPos();
 
-		int minX = endSpike.getCenterX() - i;
-		int maxX = endSpike.getCenterX() + i;
-		int minY = serverLevelAccessor.getMinY();
-		int maxY = endSpike.getHeight() + 10;
-		int minZ = endSpike.getCenterZ() - i;
-		int maxZ = endSpike.getCenterZ() + i;
-
-		for (int x = minX; x <= maxX; x++) {
-			for (int y = minY; y <= maxY; y++) {
-				for (int z = minZ; z <= maxZ; z++) {
-					mutableBlockPos.set(x, y, z);
-					if (mutableBlockPos.distToLowCornerSqr(endSpike.getCenterX(), y, endSpike.getCenterZ()) <= i * i + 1 && y < endSpike.getHeight()) {
-						this.setBlock(serverLevelAccessor, mutableBlockPos, Blocks.OBSIDIAN.defaultBlockState());
-					} else if (y > 65) {
-						this.setBlock(serverLevelAccessor, mutableBlockPos, Blocks.AIR.defaultBlockState());
-					}
-				}
+		for (BlockPos blockPos : BlockPos.betweenClosed(
+			new BlockPos(endSpike.getCenterX() - i, serverLevelAccessor.getMinY(), endSpike.getCenterZ() - i),
+			new BlockPos(endSpike.getCenterX() + i, endSpike.getHeight() + 10, endSpike.getCenterZ() + i)
+		)) {
+			if (blockPos.distToLowCornerSqr(endSpike.getCenterX(), blockPos.getY(), endSpike.getCenterZ()) <= i * i + 1 && blockPos.getY() < endSpike.getHeight()) {
+				this.setBlock(serverLevelAccessor, blockPos, Blocks.OBSIDIAN.defaultBlockState());
+			} else if (blockPos.getY() > 65) {
+				this.setBlock(serverLevelAccessor, blockPos, Blocks.AIR.defaultBlockState());
 			}
 		}
 
@@ -95,7 +85,7 @@ public class SpikeFeature extends Feature<SpikeConfiguration> {
 			int j = -2;
 			int k = 2;
 			int l = 3;
-			BlockPos.MutableBlockPos mutableBlockPos2 = new BlockPos.MutableBlockPos();
+			BlockPos.MutableBlockPos mutableBlockPos = new BlockPos.MutableBlockPos();
 
 			for (int m = -2; m <= 2; m++) {
 				for (int n = -2; n <= 2; n++) {
@@ -112,7 +102,7 @@ public class SpikeFeature extends Feature<SpikeConfiguration> {
 								.setValue(IronBarsBlock.SOUTH, bl4 && n != 2)
 								.setValue(IronBarsBlock.WEST, bl5 && m != -2)
 								.setValue(IronBarsBlock.EAST, bl5 && m != 2);
-							this.setBlock(serverLevelAccessor, mutableBlockPos2.set(endSpike.getCenterX() + m, endSpike.getHeight() + o, endSpike.getCenterZ() + n), blockState);
+							this.setBlock(serverLevelAccessor, mutableBlockPos.set(endSpike.getCenterX() + m, endSpike.getHeight() + o, endSpike.getCenterZ() + n), blockState);
 						}
 					}
 				}

@@ -45,26 +45,16 @@ public class AttachedToLeavesDecorator extends TreeDecorator {
 	public void place(TreeDecorator.Context context) {
 		Set<BlockPos> set = new HashSet();
 		RandomSource randomSource = context.random();
-		BlockPos.MutableBlockPos mutableBlockPos = new BlockPos.MutableBlockPos();
 
 		for (BlockPos blockPos : Util.shuffledCopy(context.leaves(), randomSource)) {
 			Direction direction = Util.getRandom(this.directions, randomSource);
 			BlockPos blockPos2 = blockPos.relative(direction);
 			if (!set.contains(blockPos2) && randomSource.nextFloat() < this.probability && this.hasRequiredEmptyBlocks(context, blockPos, direction)) {
-				int minX = blockPos2.getX() - this.exclusionRadiusXZ;
-				int maxX = blockPos2.getX() + this.exclusionRadiusXZ;
-				int minY = blockPos2.getY() - this.exclusionRadiusY;
-				int maxY = blockPos2.getY() + this.exclusionRadiusY;
-				int minZ = blockPos2.getZ() - this.exclusionRadiusXZ;
-				int maxZ = blockPos2.getZ() + this.exclusionRadiusXZ;
+				BlockPos blockPos3 = blockPos2.offset(-this.exclusionRadiusXZ, -this.exclusionRadiusY, -this.exclusionRadiusXZ);
+				BlockPos blockPos4 = blockPos2.offset(this.exclusionRadiusXZ, this.exclusionRadiusY, this.exclusionRadiusXZ);
 
-				for (int x = minX; x <= maxX; x++) {
-					for (int y = minY; y <= maxY; y++) {
-						for (int z = minZ; z <= maxZ; z++) {
-							mutableBlockPos.set(x, y, z);
-							set.add(mutableBlockPos.immutable());
-						}
-					}
+				for (BlockPos blockPos5 : BlockPos.betweenClosed(blockPos3, blockPos4)) {
+					set.add(blockPos5.immutable());
 				}
 
 				context.setBlock(blockPos2, this.blockProvider.getState(randomSource, blockPos2));
@@ -73,14 +63,9 @@ public class AttachedToLeavesDecorator extends TreeDecorator {
 	}
 
 	private boolean hasRequiredEmptyBlocks(TreeDecorator.Context context, BlockPos blockPos, Direction direction) {
-		BlockPos.MutableBlockPos mutableBlockPos = new BlockPos.MutableBlockPos();
 		for (int i = 1; i <= this.requiredEmptyBlocks; i++) {
-			mutableBlockPos.set(
-				blockPos.getX() + direction.getStepX() * i,
-				blockPos.getY() + direction.getStepY() * i,
-				blockPos.getZ() + direction.getStepZ() * i
-			);
-			if (!context.isAir(mutableBlockPos)) {
+			BlockPos blockPos2 = blockPos.relative(direction, i);
+			if (!context.isAir(blockPos2)) {
 				return false;
 			}
 		}

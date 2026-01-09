@@ -17,38 +17,28 @@ public class EndGatewayFeature extends Feature<EndGatewayConfiguration> {
 		BlockPos blockPos = featurePlaceContext.origin();
 		WorldGenLevel worldGenLevel = featurePlaceContext.level();
 		EndGatewayConfiguration endGatewayConfiguration = featurePlaceContext.config();
-		BlockPos.MutableBlockPos mutableBlockPos = new BlockPos.MutableBlockPos();
 
-		int originX = blockPos.getX();
-		int originY = blockPos.getY();
-		int originZ = blockPos.getZ();
-
-		for (int x = originX - 1; x <= originX + 1; x++) {
-			for (int y = originY - 2; y <= originY + 2; y++) {
-				for (int z = originZ - 1; z <= originZ + 1; z++) {
-					mutableBlockPos.set(x, y, z);
-					boolean bl = x == originX;
-					boolean bl2 = y == originY;
-					boolean bl3 = z == originZ;
-					boolean bl4 = Math.abs(y - originY) == 2;
-					if (bl && bl2 && bl3) {
-						BlockPos blockPos3 = mutableBlockPos.immutable();
-						this.setBlock(worldGenLevel, blockPos3, Blocks.END_GATEWAY.defaultBlockState());
-						endGatewayConfiguration.getExit().ifPresent(blockPos2x -> {
-							if (worldGenLevel.getBlockEntity(blockPos3) instanceof TheEndGatewayBlockEntity theEndGatewayBlockEntity) {
-								theEndGatewayBlockEntity.setExitPosition(blockPos2x, endGatewayConfiguration.isExitExact());
-							}
-						});
-					} else if (bl2) {
-						this.setBlock(worldGenLevel, mutableBlockPos, Blocks.AIR.defaultBlockState());
-					} else if (bl4 && bl && bl3) {
-						this.setBlock(worldGenLevel, mutableBlockPos, Blocks.BEDROCK.defaultBlockState());
-					} else if ((bl || bl3) && !bl4) {
-						this.setBlock(worldGenLevel, mutableBlockPos, Blocks.BEDROCK.defaultBlockState());
-					} else {
-						this.setBlock(worldGenLevel, mutableBlockPos, Blocks.AIR.defaultBlockState());
+		for (BlockPos blockPos2 : BlockPos.betweenClosed(blockPos.offset(-1, -2, -1), blockPos.offset(1, 2, 1))) {
+			boolean bl = blockPos2.getX() == blockPos.getX();
+			boolean bl2 = blockPos2.getY() == blockPos.getY();
+			boolean bl3 = blockPos2.getZ() == blockPos.getZ();
+			boolean bl4 = Math.abs(blockPos2.getY() - blockPos.getY()) == 2;
+			if (bl && bl2 && bl3) {
+				BlockPos blockPos3 = blockPos2.immutable();
+				this.setBlock(worldGenLevel, blockPos3, Blocks.END_GATEWAY.defaultBlockState());
+				endGatewayConfiguration.getExit().ifPresent(blockPos2x -> {
+					if (worldGenLevel.getBlockEntity(blockPos3) instanceof TheEndGatewayBlockEntity theEndGatewayBlockEntity) {
+						theEndGatewayBlockEntity.setExitPosition(blockPos2x, endGatewayConfiguration.isExitExact());
 					}
-				}
+				});
+			} else if (bl2) {
+				this.setBlock(worldGenLevel, blockPos2, Blocks.AIR.defaultBlockState());
+			} else if (bl4 && bl && bl3) {
+				this.setBlock(worldGenLevel, blockPos2, Blocks.BEDROCK.defaultBlockState());
+			} else if ((bl || bl3) && !bl4) {
+				this.setBlock(worldGenLevel, blockPos2, Blocks.BEDROCK.defaultBlockState());
+			} else {
+				this.setBlock(worldGenLevel, blockPos2, Blocks.AIR.defaultBlockState());
 			}
 		}
 

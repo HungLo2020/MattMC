@@ -348,33 +348,25 @@ public class OceanRuinPieces {
 			int j = 512;
 			int k = i - 1;
 			int l = 0;
-			BlockPos.MutableBlockPos iterPos = new BlockPos.MutableBlockPos();
 
-			int minX = Math.min(blockPos.getX(), blockPos2.getX());
-			int maxX = Math.max(blockPos.getX(), blockPos2.getX());
-			int minZ = Math.min(blockPos.getZ(), blockPos2.getZ());
-			int maxZ = Math.max(blockPos.getZ(), blockPos2.getZ());
+			for (BlockPos blockPos3 : BlockPos.betweenClosed(blockPos, blockPos2)) {
+				int m = blockPos3.getX();
+				int n = blockPos3.getZ();
+				int o = blockPos.getY() - 1;
+				BlockPos.MutableBlockPos mutableBlockPos = new BlockPos.MutableBlockPos(m, o, n);
+				BlockState blockState = blockGetter.getBlockState(mutableBlockPos);
 
-			for (int x = minX; x <= maxX; x++) {
-				for (int z = minZ; z <= maxZ; z++) {
-					int m = x;
-					int n = z;
-					int o = blockPos.getY() - 1;
-					BlockPos.MutableBlockPos mutableBlockPos = new BlockPos.MutableBlockPos(m, o, n);
-					BlockState blockState = blockGetter.getBlockState(mutableBlockPos);
+				for (FluidState fluidState = blockGetter.getFluidState(mutableBlockPos);
+					(blockState.isAir() || fluidState.is(FluidTags.WATER) || blockState.is(BlockTags.ICE)) && o > blockGetter.getMinY() + 1;
+					fluidState = blockGetter.getFluidState(mutableBlockPos)
+				) {
+					mutableBlockPos.set(m, --o, n);
+					blockState = blockGetter.getBlockState(mutableBlockPos);
+				}
 
-					for (FluidState fluidState = blockGetter.getFluidState(mutableBlockPos);
-						(blockState.isAir() || fluidState.is(FluidTags.WATER) || blockState.is(BlockTags.ICE)) && o > blockGetter.getMinY() + 1;
-						fluidState = blockGetter.getFluidState(mutableBlockPos)
-					) {
-						mutableBlockPos.set(m, --o, n);
-						blockState = blockGetter.getBlockState(mutableBlockPos);
-					}
-
-					j = Math.min(j, o);
-					if (o < k - 2) {
-						l++;
-					}
+				j = Math.min(j, o);
+				if (o < k - 2) {
+					l++;
 				}
 			}
 
