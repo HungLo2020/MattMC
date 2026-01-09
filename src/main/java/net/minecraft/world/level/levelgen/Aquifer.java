@@ -99,6 +99,14 @@ public interface Aquifer {
 		private final int minGridZ;
 		private final int gridSizeX;
 		private final int gridSizeZ;
+		
+		// Performance optimization: Cache last computeSubstance results
+		private static final int SUBSTANCE_CACHE_SIZE = 8;
+		private final long[] substanceCachePositions = new long[SUBSTANCE_CACHE_SIZE];
+		private final BlockState[] substanceCacheResults = new BlockState[SUBSTANCE_CACHE_SIZE];
+		private final double[] substanceCacheDensities = new double[SUBSTANCE_CACHE_SIZE];
+		private int substanceCacheIndex = 0;
+		
 		private static final int[][] SURFACE_SAMPLING_OFFSETS_IN_CHUNKS = new int[][]{
 			{0, 0}, {-2, -1}, {-1, -1}, {0, -1}, {1, -1}, {-3, 0}, {-2, 0}, {-1, 0}, {1, 0}, {-2, 1}, {-1, 1}, {0, 1}, {1, 1}
 		};
@@ -139,6 +147,9 @@ public interface Aquifer {
 			);
 			int q = gridY(p + 12) - -1;
 			this.skipSamplingAboveY = fromGridY(q, 11) - 1;
+			
+			// Initialize substance cache with invalid positions
+			Arrays.fill(this.substanceCachePositions, Long.MIN_VALUE);
 		}
 
 		private int getIndex(int i, int j, int k) {
@@ -158,13 +169,29 @@ public interface Aquifer {
 				int i = functionContext.blockX();
 				int j = functionContext.blockY();
 				int k = functionContext.blockZ();
+				
+				// Check cache for recent computations with same position and density
+				long posKey = BlockPos.asLong(i, j, k);
+				for (int cacheIdx = 0; cacheIdx < SUBSTANCE_CACHE_SIZE; cacheIdx++) {
+					if (this.substanceCachePositions[cacheIdx] == posKey && 
+						Math.abs(this.substanceCacheDensities[cacheIdx] - d) < 0.001) {
+						return this.substanceCacheResults[cacheIdx];
+					}
+				}
+				
+				// Cache miss - compute the result
 				Aquifer.FluidStatus fluidStatus = this.globalFluidPicker.computeFluid(i, j, k);
 				if (j > this.skipSamplingAboveY) {
 					this.shouldScheduleFluidUpdate = false;
-					return fluidStatus.at(j);
+					BlockState result = fluidStatus.at(j);
+					// Cache the result
+					this.cacheSubstanceResult(posKey, d, result);
+					return result;
 				} else if (fluidStatus.at(j).is(Blocks.LAVA)) {
 					this.shouldScheduleFluidUpdate = false;
-					return SharedConstants.DEBUG_DISABLE_FLUID_GENERATION ? Blocks.AIR.defaultBlockState() : Blocks.LAVA.defaultBlockState();
+					BlockState result = SharedConstants.DEBUG_DISABLE_FLUID_GENERATION ? Blocks.AIR.defaultBlockState() : Blocks.LAVA.defaultBlockState();
+					this.cacheSubstanceResult(posKey, d, result);
+					return result;
 				} else {
 					int l = gridX(i + -5);
 					int m = gridY(j + 1);
@@ -287,6 +314,13 @@ public interface Aquifer {
 					}
 				}
 			}
+		}
+		
+		private void cacheSubstanceResult(long position, double density, BlockState result) {
+			this.substanceCachePositions[this.substanceCacheIndex] = position;
+			this.substanceCacheDensities[this.substanceCacheIndex] = density;
+			this.substanceCacheResults[this.substanceCacheIndex] = result;
+			this.substanceCacheIndex = (this.substanceCacheIndex + 1) % SUBSTANCE_CACHE_SIZE;
 		}
 
 		@Override
