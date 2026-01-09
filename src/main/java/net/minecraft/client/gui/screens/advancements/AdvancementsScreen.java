@@ -185,7 +185,7 @@ public class AdvancementsScreen extends Screen implements ClientAdvancements.Lis
 		guiGraphics.pose().pushMatrix();
 		guiGraphics.pose().translate(i, j);
 		guiGraphics.pose().scale(2.0F, 2.0F);
-		guiGraphics.blit(RenderPipelines.GUI_TEXTURED, WINDOW_LOCATION, 0, 0, 0.0F, 0.0F, 252, 140, 256, 256);
+		guiGraphics.blit(RenderPipelines.GUI_TEXTURED, WINDOW_LOCATION, 0, 0, 0.0F, 0.0F, WINDOW_WIDTH / 2, WINDOW_HEIGHT / 2, BACKGROUND_TEXTURE_WIDTH, BACKGROUND_TEXTURE_HEIGHT);
 		guiGraphics.pose().popMatrix();
 		
 		if (this.tabs.size() > 1) {

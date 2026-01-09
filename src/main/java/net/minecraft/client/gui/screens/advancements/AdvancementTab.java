@@ -104,12 +104,16 @@ public class AdvancementTab {
 			.orElse(TextureManager.INTENTIONAL_MISSING_TEXTURE);
 		int k = Mth.floor(this.scrollX);
 		int l = Mth.floor(this.scrollY);
-		int m = k % 16;
-		int n = l % 16;
+		int m = k % AdvancementsScreen.BACKGROUND_TILE_WIDTH;
+		int n = l % AdvancementsScreen.BACKGROUND_TILE_HEIGHT;
+		
+		// Calculate how many tiles we need to cover the inside area
+		int tilesX = (AdvancementsScreen.WINDOW_INSIDE_WIDTH / AdvancementsScreen.BACKGROUND_TILE_WIDTH) + 2;
+		int tilesY = (AdvancementsScreen.WINDOW_INSIDE_HEIGHT / AdvancementsScreen.BACKGROUND_TILE_HEIGHT) + 2;
 
-		for (int o = -1; o <= 30; o++) {
-			for (int p = -1; p <= 16; p++) {
-				guiGraphics.blit(RenderPipelines.GUI_TEXTURED, resourceLocation, m + 16 * o, n + 16 * p, 0.0F, 0.0F, 16, 16, 16, 16);
+		for (int o = -1; o <= tilesX; o++) {
+			for (int p = -1; p <= tilesY; p++) {
+				guiGraphics.blit(RenderPipelines.GUI_TEXTURED, resourceLocation, m + AdvancementsScreen.BACKGROUND_TILE_WIDTH * o, n + AdvancementsScreen.BACKGROUND_TILE_HEIGHT * p, 0.0F, 0.0F, AdvancementsScreen.BACKGROUND_TILE_WIDTH, AdvancementsScreen.BACKGROUND_TILE_HEIGHT, AdvancementsScreen.BACKGROUND_TILE_WIDTH, AdvancementsScreen.BACKGROUND_TILE_HEIGHT);
 			}
 		}
 
