@@ -52,6 +52,10 @@ public class AdvancementsScreen extends Screen implements ClientAdvancements.Lis
 	@Nullable
 	private AdvancementTab selectedTab;
 	private boolean isScrolling;
+	private int windowWidth;
+	private int windowHeight;
+	private int windowInsideWidth;
+	private int windowInsideHeight;
 
 	public AdvancementsScreen(ClientAdvancements clientAdvancements) {
 		this(clientAdvancements, null);
@@ -63,8 +67,24 @@ public class AdvancementsScreen extends Screen implements ClientAdvancements.Lis
 		this.lastScreen = screen;
 	}
 
+	private void calculateWindowSize() {
+		// Scale to use most of the screen (about 90% width and 85% height)
+		// Ensure it's at least the original size and respects the aspect ratio
+		int maxWidth = (int)(this.width * 0.9);
+		int maxHeight = (int)(this.height * 0.85);
+		
+		// Apply minimum size based on original dimensions
+		this.windowWidth = Math.max(WINDOW_WIDTH * 2, maxWidth);
+		this.windowHeight = Math.max(WINDOW_HEIGHT * 2, maxHeight);
+		
+		// Calculate inside dimensions maintaining the same border proportions
+		this.windowInsideWidth = this.windowWidth - (WINDOW_WIDTH - WINDOW_INSIDE_WIDTH);
+		this.windowInsideHeight = this.windowHeight - (WINDOW_HEIGHT - WINDOW_INSIDE_HEIGHT);
+	}
+
 	@Override
 	protected void init() {
+		this.calculateWindowSize();
 		this.layout.addTitleHeader(TITLE, this.font);
 		this.tabs.clear();
 		this.selectedTab = null;
@@ -105,8 +125,8 @@ public class AdvancementsScreen extends Screen implements ClientAdvancements.Lis
 	@Override
 	public boolean mouseClicked(MouseButtonEvent mouseButtonEvent, boolean bl) {
 		if (mouseButtonEvent.button() == 0) {
-			int i = (this.width - 252) / 2;
-			int j = (this.height - 140) / 2;
+			int i = (this.width - this.windowWidth) / 2;
+			int j = (this.height - this.windowHeight) / 2;
 
 			for (AdvancementTab advancementTab : this.tabs.values()) {
 				if (advancementTab.isMouseOver(i, j, mouseButtonEvent.x(), mouseButtonEvent.y())) {
@@ -133,8 +153,8 @@ public class AdvancementsScreen extends Screen implements ClientAdvancements.Lis
 	@Override
 	public void render(GuiGraphics guiGraphics, int i, int j, float f) {
 		super.render(guiGraphics, i, j, f);
-		int k = (this.width - 252) / 2;
-		int l = (this.height - 140) / 2;
+		int k = (this.width - this.windowWidth) / 2;
+		int l = (this.height - this.windowHeight) / 2;
 		guiGraphics.nextStratum();
 		this.renderInside(guiGraphics, k, l);
 		guiGraphics.nextStratum();
@@ -171,17 +191,67 @@ public class AdvancementsScreen extends Screen implements ClientAdvancements.Lis
 	private void renderInside(GuiGraphics guiGraphics, int i, int j) {
 		AdvancementTab advancementTab = this.selectedTab;
 		if (advancementTab == null) {
-			guiGraphics.fill(i + 9, j + 18, i + 9 + 234, j + 18 + 113, -16777216);
-			int k = i + 9 + 117;
-			guiGraphics.drawCenteredString(this.font, NO_ADVANCEMENTS_LABEL, k, j + 18 + 56 - 9 / 2, -1);
-			guiGraphics.drawCenteredString(this.font, VERY_SAD_LABEL, k, j + 18 + 113 - 9, -1);
+			guiGraphics.fill(i + WINDOW_INSIDE_X, j + WINDOW_INSIDE_Y, i + WINDOW_INSIDE_X + this.windowInsideWidth, j + WINDOW_INSIDE_Y + this.windowInsideHeight, -16777216);
+			int k = i + WINDOW_INSIDE_X + this.windowInsideWidth / 2;
+			guiGraphics.drawCenteredString(this.font, NO_ADVANCEMENTS_LABEL, k, j + WINDOW_INSIDE_Y + this.windowInsideHeight / 2 - 9 / 2, -1);
+			guiGraphics.drawCenteredString(this.font, VERY_SAD_LABEL, k, j + WINDOW_INSIDE_Y + this.windowInsideHeight - 9, -1);
 		} else {
-			advancementTab.drawContents(guiGraphics, i + 9, j + 18);
+			advancementTab.drawContents(guiGraphics, i + WINDOW_INSIDE_X, j + WINDOW_INSIDE_Y);
 		}
 	}
 
 	public void renderWindow(GuiGraphics guiGraphics, int i, int j) {
-		guiGraphics.blit(RenderPipelines.GUI_TEXTURED, WINDOW_LOCATION, i, j, 0.0F, 0.0F, 252, 140, 256, 256);
+		// Draw the window frame by tiling the texture
+		// Top-left corner
+		guiGraphics.blit(RenderPipelines.GUI_TEXTURED, WINDOW_LOCATION, i, j, 0.0F, 0.0F, WINDOW_INSIDE_X, WINDOW_INSIDE_Y, BACKGROUND_TEXTURE_WIDTH, BACKGROUND_TEXTURE_HEIGHT);
+		
+		// Top edge
+		for (int x = WINDOW_INSIDE_X; x < this.windowWidth - WINDOW_INSIDE_X; x += BACKGROUND_TILE_WIDTH) {
+			int width = Math.min(BACKGROUND_TILE_WIDTH, this.windowWidth - WINDOW_INSIDE_X - x);
+			guiGraphics.blit(RenderPipelines.GUI_TEXTURED, WINDOW_LOCATION, i + x, j, WINDOW_INSIDE_X, 0.0F, width, WINDOW_INSIDE_Y, BACKGROUND_TEXTURE_WIDTH, BACKGROUND_TEXTURE_HEIGHT);
+		}
+		
+		// Top-right corner
+		guiGraphics.blit(RenderPipelines.GUI_TEXTURED, WINDOW_LOCATION, i + this.windowWidth - WINDOW_INSIDE_X, j, 
+			WINDOW_WIDTH - WINDOW_INSIDE_X, 0.0F, WINDOW_INSIDE_X, WINDOW_INSIDE_Y, BACKGROUND_TEXTURE_WIDTH, BACKGROUND_TEXTURE_HEIGHT);
+		
+		// Left edge
+		for (int y = WINDOW_INSIDE_Y; y < this.windowHeight - WINDOW_INSIDE_Y; y += BACKGROUND_TILE_HEIGHT) {
+			int height = Math.min(BACKGROUND_TILE_HEIGHT, this.windowHeight - WINDOW_INSIDE_Y - y);
+			guiGraphics.blit(RenderPipelines.GUI_TEXTURED, WINDOW_LOCATION, i, j + y, 0.0F, WINDOW_INSIDE_Y, WINDOW_INSIDE_X, height, BACKGROUND_TEXTURE_WIDTH, BACKGROUND_TEXTURE_HEIGHT);
+		}
+		
+		// Center (background)
+		for (int y = WINDOW_INSIDE_Y; y < this.windowHeight - WINDOW_INSIDE_Y; y += BACKGROUND_TILE_HEIGHT) {
+			int height = Math.min(BACKGROUND_TILE_HEIGHT, this.windowHeight - WINDOW_INSIDE_Y - y);
+			for (int x = WINDOW_INSIDE_X; x < this.windowWidth - WINDOW_INSIDE_X; x += BACKGROUND_TILE_WIDTH) {
+				int width = Math.min(BACKGROUND_TILE_WIDTH, this.windowWidth - WINDOW_INSIDE_X - x);
+				guiGraphics.blit(RenderPipelines.GUI_TEXTURED, WINDOW_LOCATION, i + x, j + y, WINDOW_INSIDE_X, WINDOW_INSIDE_Y, width, height, BACKGROUND_TEXTURE_WIDTH, BACKGROUND_TEXTURE_HEIGHT);
+			}
+		}
+		
+		// Right edge
+		for (int y = WINDOW_INSIDE_Y; y < this.windowHeight - WINDOW_INSIDE_Y; y += BACKGROUND_TILE_HEIGHT) {
+			int height = Math.min(BACKGROUND_TILE_HEIGHT, this.windowHeight - WINDOW_INSIDE_Y - y);
+			guiGraphics.blit(RenderPipelines.GUI_TEXTURED, WINDOW_LOCATION, i + this.windowWidth - WINDOW_INSIDE_X, j + y, 
+				WINDOW_WIDTH - WINDOW_INSIDE_X, WINDOW_INSIDE_Y, WINDOW_INSIDE_X, height, BACKGROUND_TEXTURE_WIDTH, BACKGROUND_TEXTURE_HEIGHT);
+		}
+		
+		// Bottom-left corner
+		guiGraphics.blit(RenderPipelines.GUI_TEXTURED, WINDOW_LOCATION, i, j + this.windowHeight - WINDOW_INSIDE_Y, 
+			0.0F, WINDOW_HEIGHT - WINDOW_INSIDE_Y, WINDOW_INSIDE_X, WINDOW_INSIDE_Y, BACKGROUND_TEXTURE_WIDTH, BACKGROUND_TEXTURE_HEIGHT);
+		
+		// Bottom edge
+		for (int x = WINDOW_INSIDE_X; x < this.windowWidth - WINDOW_INSIDE_X; x += BACKGROUND_TILE_WIDTH) {
+			int width = Math.min(BACKGROUND_TILE_WIDTH, this.windowWidth - WINDOW_INSIDE_X - x);
+			guiGraphics.blit(RenderPipelines.GUI_TEXTURED, WINDOW_LOCATION, i + x, j + this.windowHeight - WINDOW_INSIDE_Y, 
+				WINDOW_INSIDE_X, WINDOW_HEIGHT - WINDOW_INSIDE_Y, width, WINDOW_INSIDE_Y, BACKGROUND_TEXTURE_WIDTH, BACKGROUND_TEXTURE_HEIGHT);
+		}
+		
+		// Bottom-right corner
+		guiGraphics.blit(RenderPipelines.GUI_TEXTURED, WINDOW_LOCATION, i + this.windowWidth - WINDOW_INSIDE_X, j + this.windowHeight - WINDOW_INSIDE_Y, 
+			WINDOW_WIDTH - WINDOW_INSIDE_X, WINDOW_HEIGHT - WINDOW_INSIDE_Y, WINDOW_INSIDE_X, WINDOW_INSIDE_Y, BACKGROUND_TEXTURE_WIDTH, BACKGROUND_TEXTURE_HEIGHT);
+		
 		if (this.tabs.size() > 1) {
 			for (AdvancementTab advancementTab : this.tabs.values()) {
 				advancementTab.drawTab(guiGraphics, i, j, advancementTab == this.selectedTab);
@@ -192,15 +262,15 @@ public class AdvancementsScreen extends Screen implements ClientAdvancements.Lis
 			}
 		}
 
-		guiGraphics.drawString(this.font, this.selectedTab != null ? this.selectedTab.getTitle() : TITLE, i + 8, j + 6, -12566464, false);
+		guiGraphics.drawString(this.font, this.selectedTab != null ? this.selectedTab.getTitle() : TITLE, i + WINDOW_TITLE_X, j + WINDOW_TITLE_Y, -12566464, false);
 	}
 
 	private void renderTooltips(GuiGraphics guiGraphics, int i, int j, int k, int l) {
 		if (this.selectedTab != null) {
 			guiGraphics.pose().pushMatrix();
-			guiGraphics.pose().translate(k + 9, l + 18);
+			guiGraphics.pose().translate(k + WINDOW_INSIDE_X, l + WINDOW_INSIDE_Y);
 			guiGraphics.nextStratum();
-			this.selectedTab.drawTooltips(guiGraphics, i - k - 9, j - l - 18, k, l);
+			this.selectedTab.drawTooltips(guiGraphics, i - k - WINDOW_INSIDE_X, j - l - WINDOW_INSIDE_Y, k, l);
 			guiGraphics.pose().popMatrix();
 		}
 
@@ -261,5 +331,13 @@ public class AdvancementsScreen extends Screen implements ClientAdvancements.Lis
 	private AdvancementTab getTab(AdvancementNode advancementNode) {
 		AdvancementNode advancementNode2 = advancementNode.root();
 		return (AdvancementTab)this.tabs.get(advancementNode2.holder());
+	}
+
+	public int getWindowInsideWidth() {
+		return this.windowInsideWidth;
+	}
+
+	public int getWindowInsideHeight() {
+		return this.windowInsideHeight;
 	}
 }

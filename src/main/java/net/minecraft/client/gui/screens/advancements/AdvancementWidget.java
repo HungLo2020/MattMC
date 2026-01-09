@@ -193,7 +193,7 @@ public class AdvancementWidget {
 		boolean bl = k + i + this.x + this.width + 26 >= this.tab.getScreen().width;
 		Component component = this.progress == null ? null : this.progress.getProgressText();
 		int r = component == null ? 0 : font.width(component);
-		boolean bl2 = o + q >= 113;
+		boolean bl2 = o + q >= this.tab.getScreen().getWindowInsideHeight();
 		float g = this.progress == null ? 0.0F : this.progress.getPercent();
 		int s = Mth.floor(g * this.width);
 		AdvancementWidgetType advancementWidgetType;

@@ -89,13 +89,16 @@ public class AdvancementTab {
 	}
 
 	public void drawContents(GuiGraphics guiGraphics, int i, int j) {
+		int contentWidth = this.screen.getWindowInsideWidth();
+		int contentHeight = this.screen.getWindowInsideHeight();
+		
 		if (!this.centered) {
-			this.scrollX = 117 - (this.maxX + this.minX) / 2;
-			this.scrollY = 56 - (this.maxY + this.minY) / 2;
+			this.scrollX = (contentWidth / 2) - (this.maxX + this.minX) / 2;
+			this.scrollY = (contentHeight / 2) - (this.maxY + this.minY) / 2;
 			this.centered = true;
 		}
 
-		guiGraphics.enableScissor(i, j, i + 234, j + 113);
+		guiGraphics.enableScissor(i, j, i + contentWidth, j + contentHeight);
 		guiGraphics.pose().pushMatrix();
 		guiGraphics.pose().translate(i, j);
 		ResourceLocation resourceLocation = (ResourceLocation)this.display
@@ -107,8 +110,11 @@ public class AdvancementTab {
 		int m = k % 16;
 		int n = l % 16;
 
-		for (int o = -1; o <= 15; o++) {
-			for (int p = -1; p <= 8; p++) {
+		int tilesX = (contentWidth / 16) + 2;
+		int tilesY = (contentHeight / 16) + 2;
+		
+		for (int o = -1; o <= tilesX; o++) {
+			for (int p = -1; p <= tilesY; p++) {
 				guiGraphics.blit(RenderPipelines.GUI_TEXTURED, resourceLocation, m + 16 * o, n + 16 * p, 0.0F, 0.0F, 16, 16, 16, 16);
 			}
 		}
@@ -121,11 +127,14 @@ public class AdvancementTab {
 	}
 
 	public void drawTooltips(GuiGraphics guiGraphics, int i, int j, int k, int l) {
-		guiGraphics.fill(0, 0, 234, 113, Mth.floor(this.fade * 255.0F) << 24);
+		int contentWidth = this.screen.getWindowInsideWidth();
+		int contentHeight = this.screen.getWindowInsideHeight();
+		
+		guiGraphics.fill(0, 0, contentWidth, contentHeight, Mth.floor(this.fade * 255.0F) << 24);
 		boolean bl = false;
 		int m = Mth.floor(this.scrollX);
 		int n = Mth.floor(this.scrollY);
-		if (i > 0 && i < 234 && j > 0 && j < 113) {
+		if (i > 0 && i < contentWidth && j > 0 && j < contentHeight) {
 			for (AdvancementWidget advancementWidget : this.widgets.values()) {
 				if (advancementWidget.isMouseOver(m, n, i, j)) {
 					bl = true;
@@ -165,12 +174,15 @@ public class AdvancementTab {
 	}
 
 	public void scroll(double d, double e) {
-		if (this.maxX - this.minX > 234) {
-			this.scrollX = Mth.clamp(this.scrollX + d, -(this.maxX - 234), 0.0);
+		int contentWidth = this.screen.getWindowInsideWidth();
+		int contentHeight = this.screen.getWindowInsideHeight();
+		
+		if (this.maxX - this.minX > contentWidth) {
+			this.scrollX = Mth.clamp(this.scrollX + d, -(this.maxX - contentWidth), 0.0);
 		}
 
-		if (this.maxY - this.minY > 113) {
-			this.scrollY = Mth.clamp(this.scrollY + e, -(this.maxY - 113), 0.0);
+		if (this.maxY - this.minY > contentHeight) {
+			this.scrollY = Mth.clamp(this.scrollY + e, -(this.maxY - contentHeight), 0.0);
 		}
 	}
 
