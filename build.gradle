@@ -925,6 +925,10 @@ tasks.register('performanceTest', Test) {
     
     // More memory for performance tests
     maxHeapSize = "4g"
+    
+    // Performance tests should always run to get fresh measurements
+    // This prevents Gradle from marking the task as UP-TO-DATE
+    outputs.upToDateWhen { false }
 }
 
 // Task to run all tests (both misc and performance)
