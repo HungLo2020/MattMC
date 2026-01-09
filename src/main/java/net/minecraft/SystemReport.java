@@ -98,8 +98,9 @@ public class SystemReport {
 			// Try to load the Minecraft client class - only available on client
 			Class.forName("net.minecraft.client.Minecraft");
 			return true;
-		} catch (ClassNotFoundException e) {
-			// Class not available - we're on the server
+		} catch (ClassNotFoundException | LinkageError e) {
+			// Class not available or failed to load - we're on the server
+			// LinkageError covers ExceptionInInitializerError and other linkage issues
 			return false;
 		}
 	}
