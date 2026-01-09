@@ -1,10 +1,8 @@
 # MattMC Testing Infrastructure Guide
 
 ## Table of Contents
-- [Overview](#overview)
 - [Testing Infrastructure Architecture](#testing-infrastructure-architecture)
 - [Directory Structure](#directory-structure)
-- [Testing Frameworks and Libraries](#testing-frameworks-and-libraries)
 - [Writing Tests](#writing-tests)
 - [Running Tests](#running-tests)
 - [Test Isolation from Production Builds](#test-isolation-from-production-builds)
@@ -12,16 +10,6 @@
 - [Best Practices](#best-practices)
 - [Advanced Topics](#advanced-topics)
 - [Troubleshooting](#troubleshooting)
-
-## Overview
-
-MattMC uses a comprehensive testing infrastructure built on industry-standard Java testing frameworks. The testing system is designed to:
-
-- **Separate concerns**: Performance tests are isolated from pass/fail tests
-- **Exclude from production**: Tests are never included in production builds or distributions
-- **Support multiple test types**: Unit tests, integration tests, and performance benchmarks
-- **Provide clear output**: Formatted, actionable test results
-- **Integrate with IDEs**: Works seamlessly with IntelliJ IDEA and Eclipse
 
 ## Testing Infrastructure Architecture
 
@@ -53,31 +41,6 @@ sourceSets {
 ```
 
 This ensures that test code is never compiled into production JARs.
-
-### 2. **Test Dependencies**
-
-All testing dependencies use the `testImplementation` or `testRuntimeOnly` configurations, which means they are only available during testing and never included in production builds:
-
-```gradle
-// JUnit 5 (Jupiter) - Core testing framework
-testImplementation 'org.junit.jupiter:junit-jupiter-api:5.10.1'
-testImplementation 'org.junit.jupiter:junit-jupiter-params:5.10.1'
-testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.10.1'
-
-// AssertJ - Fluent assertions library
-testImplementation 'org.assertj:assertj-core:3.25.1'
-
-// Mockito - Mocking framework
-testImplementation 'org.mockito:mockito-core:5.8.0'
-testImplementation 'org.mockito:mockito-junit-jupiter:5.8.0'
-
-// JMH - Java Microbenchmark Harness for performance testing
-testImplementation 'org.openjdk.jmh:jmh-core:1.37'
-testAnnotationProcessor 'org.openjdk.jmh:jmh-generator-annprocess:1.37'
-
-// Awaitility - Async testing utilities
-testImplementation 'org.awaitility:awaitility:4.2.0'
-```
 
 ### 3. **Test Tasks**
 
@@ -114,104 +77,6 @@ src/test/
 - **`src/test/misc/`**: Contains traditional unit tests, integration tests, and other pass/fail tests that verify correctness of functionality using JUnit 5.
 
 - **`src/test/resources/`**: Contains test-specific resources like test data, configuration files, and fixtures that are loaded during test execution.
-
-## Testing Frameworks and Libraries
-
-### JUnit 5 (Jupiter)
-
-**Purpose**: Core testing framework for writing and running tests.
-
-**Why JUnit 5?**
-- Industry standard for Java testing
-- Modern API with improved annotations
-- Excellent IDE integration
-- Strong assertion library
-- Supports parameterized tests and test suites
-- Compatible with Java 21
-
-**Key Annotations**:
-- `@Test`: Marks a method as a test
-- `@DisplayName`: Provides human-readable test names
-- `@BeforeEach`/`@AfterEach`: Setup and teardown before/after each test
-- `@BeforeAll`/`@AfterAll`: Setup and teardown before/after all tests
-- `@ParameterizedTest`: Run test with multiple parameter sets
-- `@Tag`: Categorize tests (e.g., "fast", "slow", "integration")
-
-### AssertJ
-
-**Purpose**: Fluent assertion library for more readable test assertions.
-
-**Why AssertJ?**
-- Fluent, chainable API
-- Better error messages than standard JUnit assertions
-- Rich assertion methods for collections, strings, and objects
-- Minimal learning curve
-
-**Example Usage**:
-```java
-assertThat(result).isNotNull();
-assertThat(value).isEqualTo(expected);
-assertThat(list).hasSize(3).contains("item1", "item2");
-assertThat(number).isCloseTo(5.0, within(0.001));
-```
-
-### Mockito
-
-**Purpose**: Mocking framework for creating test doubles.
-
-**Why Mockito?**
-- Most popular mocking framework for Java
-- Simple API for creating mocks and stubs
-- Useful for isolating code under test
-- Good integration with JUnit 5
-
-**Example Usage**:
-```java
-// Create a mock
-MyService mockService = mock(MyService.class);
-
-// Define behavior
-when(mockService.getData()).thenReturn("test data");
-
-// Verify interactions
-verify(mockService).getData();
-```
-
-### JMH (Java Microbenchmark Harness)
-
-**Purpose**: Performance benchmarking framework.
-
-**Why JMH?**
-- Developed by Oracle/OpenJDK team specifically for microbenchmarking
-- Prevents JVM optimization pitfalls
-- Accurate warmup and measurement phases
-- Statistical analysis of results
-- Standard format for performance benchmarks
-
-**Key Annotations**:
-- `@Benchmark`: Marks a method as a benchmark
-- `@State`: Defines benchmark state
-- `@Setup`/`@TearDown`: Setup and teardown for benchmarks
-- `@Warmup`: Configure warmup iterations
-- `@Measurement`: Configure measurement iterations
-- `@BenchmarkMode`: Define what to measure (throughput, average time, etc.)
-
-### Awaitility
-
-**Purpose**: Testing asynchronous operations.
-
-**Why Awaitility?**
-- Simplifies testing of asynchronous code
-- Useful for Minecraft's networked and threaded components
-- Avoids Thread.sleep() in tests
-- Provides clear, readable syntax
-
-**Example Usage**:
-```java
-await()
-    .atMost(Duration.ofSeconds(5))
-    .until(() -> asyncOperation.isComplete());
-```
 
 ## Writing Tests
 
@@ -552,98 +417,6 @@ The following **are** included in production builds:
 - Production dependencies
 - Resources from `src/main/resources/`
 
-## IDE Integration
-
-### IntelliJ IDEA
-
-#### Setting Up
-
-1. Open the project in IntelliJ IDEA
-2. IntelliJ will automatically detect the Gradle configuration
-3. Test source roots will be marked in blue/green
-
-#### Running Tests
-
-- **Run single test**: Right-click on a test method → "Run 'testName()'"
-- **Run test class**: Right-click on a test class → "Run 'ClassName'"
-- **Run all tests in package**: Right-click on a package → "Run Tests in 'package'"
-- **Debug tests**: Right-click → "Debug" instead of "Run"
-- **Run with coverage**: Right-click → "Run with Coverage"
-
-#### Gradle Tasks
-
-Use the Gradle tool window (View → Tool Windows → Gradle) to run test tasks:
-- Navigate to MattMC → Tasks → verification
-- Double-click on `test`, `performanceTest`, or `testAll`
-
-#### Keyboard Shortcuts
-
-- `Ctrl+Shift+F10` (Windows/Linux) or `Cmd+Shift+R` (Mac): Run test at cursor
-- `Shift+F10` (Windows/Linux) or `Ctrl+R` (Mac): Re-run last test
-
-### Eclipse
-
-#### Setting Up
-
-1. Import the project as a Gradle project (File → Import → Gradle → Existing Gradle Project)
-2. Eclipse will configure the test source folders automatically
-
-#### Running Tests
-
-- **Run single test**: Right-click on test class → "Run As → JUnit Test"
-- **Run all tests**: Right-click on `src/test` → "Run As → JUnit Test"
-
-#### Gradle Tasks
-
-Use the Gradle Tasks view (Window → Show View → Gradle Tasks):
-- Expand MattMC → verification
-- Double-click on test tasks to run them
-
-## Best Practices
-
-### Test Organization
-
-1. **Mirror package structure**: Test packages should match the code they test
-   ```
-   src/main/java/net/minecraft/util/Mth.java
-   src/test/misc/net/minecraft/util/MthTest.java
-   ```
-
-2. **Use descriptive names**: Test class and method names should clearly describe what they test
-   ```java
-   @Test
-   @DisplayName("should clamp negative values to minimum bound")
-   void testClampNegativeValue() { ... }
-   ```
-
-3. **Follow naming conventions** (REQUIRED):
-   - Unit tests: `[ClassName]Test.java` - runs with `./gradlew test`
-   - Integration tests: `[Feature]IntegrationTest.java` - runs with `./gradlew test`
-   - JUnit Performance tests: `[Feature]PerformanceTest.java` - runs with `./gradlew performanceTest`
-   - JMH Benchmarks: `[Feature]Benchmark.java` - included in `performanceTest` filter but must be run via main()
-   
-   The naming convention determines which Gradle task will execute the test.
-
-### Test Structure
-
-Use the **Arrange-Act-Assert** (AAA) pattern:
-
-```java
-@Test
-void testBlockPosCreation() {
-    // Arrange: Set up test data
-    int x = 100, y = 64, z = 200;
-    
-    // Act: Execute the code under test
-    BlockPos pos = new BlockPos(x, y, z);
-    
-    // Assert: Verify the results
-    assertThat(pos.getX()).isEqualTo(x);
-    assertThat(pos.getY()).isEqualTo(y);
-    assertThat(pos.getZ()).isEqualTo(z);
-}
-```
-
 ### Test Independence
 
 - Each test should be independent and not rely on other tests
@@ -781,69 +554,176 @@ void testAsyncOperation() {
 }
 ```
 
-## Troubleshooting
+## Chunk Generation Performance Tests
 
-### Tests Not Running
+MattMC includes specialized performance tests for chunk generation that use the actual Minecraft world generation pathways. These tests are designed to provide realistic performance metrics for chunk generation under real-world conditions.
 
-**Problem**: `./gradlew test` reports "NO-SOURCE" or doesn't find tests.
+### Overview
 
-**Solution**:
-- Verify test classes are in `src/test/misc/` or `src/test/performance/`
-- Ensure test classes have `Test` suffix
-- Check that test methods have `@Test` annotation
-- Verify no compilation errors in test code
+Unlike simplified chunk operation tests, the chunk generation performance tests:
+- Create a full Minecraft server environment
+- Use the real world generation pipeline (terrain, features, structures, lighting)
+- Generate chunks with a fixed seed for reproducibility
+- Provide comprehensive timing metrics
 
-### Dependencies Not Found
+### Available Tests
 
-**Problem**: Test dependencies not available during compilation.
+#### 1. ChunkGenerationPerformanceTest
 
-**Solution**:
-- Verify dependencies are in `testImplementation` configuration
-- Run `./gradlew clean build` to refresh dependencies
-- Check that `useJUnitPlatform()` is configured in test task
+**Purpose**: Measures performance for generating 100 chunks in a single run.
 
-### Performance Tests Not Running
+**What it does**:
+- Creates a Minecraft server with a test world (seed: 12345)
+- Generates 100 chunks through the complete generation pipeline
+- Tracks individual chunk generation times
+- Reports: total time, average time, fastest chunk, slowest chunk
 
-**Problem**: `./gradlew performanceTest` reports NO-SOURCE.
+**Running the test**:
+```bash
+./gradlew performanceTest --tests "net.minecraft.world.level.chunk.ChunkGenerationPerformanceTest"
+```
 
-**Solution**:
-- Performance tests need to be in `src/test/performance/` directory
-- If using JUnit tags, tests need `@Tag("performance")` annotation
-- JMH benchmarks don't work with `performanceTest` task by default - run them directly with their `main()` method
+**Expected output**:
+```
+========================================
+Chunk Generation Performance Test Results
+========================================
+World Seed: 12345
+Chunks Generated: 100
+Total Time: 15234.56 ms (15.23 seconds)
+Average Time per Chunk: 152.35 ms
+Fastest Chunk: 45.23 ms
+Slowest Chunk: 456.78 ms
+Chunks per Second: 6.56
+========================================
+```
 
-### Test Classes in Production JAR
+#### 2. ChunkGenerationBatchPerformanceTest
 
-**Problem**: Test classes appear in the production JAR file.
+**Purpose**: Provides statistically stable metrics by running the 100-chunk test 20 times and averaging results.
 
-**Solution**:
-- Verify `exclude 'src/test/**'` is in main source set
-- Ensure production tasks use `sourceSets.main.output`
-- Run `./gradlew clean` and rebuild
+**What it does**:
+- Runs 20 iterations of the 100-chunk generation test
+- Creates a fresh world for each iteration
+- Aggregates timing data across all runs
+- Calculates averages and standard deviations
+- Reports: average total time, average time per chunk, average fastest, average slowest
 
-### OutOfMemoryError During Tests
+**Running the test**:
+```bash
+./gradlew performanceTest --tests "net.minecraft.world.level.chunk.ChunkGenerationBatchPerformanceTest"
+```
 
-**Problem**: Tests fail with heap space errors.
+**Expected output**:
+```
+========================================
+Chunk Generation Batch Performance Test
+========================================
+Configuration: 20 runs × 100 chunks
+World Seed: 12345
+========================================
+...
+(Progress for each run)
+...
+========================================
+Batch Test Aggregate Results
+========================================
+Runs Completed: 20
+Total Chunks Generated: 2000
+----------------------------------------
+Average Total Time: 15100.45 ms (±345.67 ms)
+Average Time per Chunk: 151.00 ms (±3.46 ms)
+Average Fastest Chunk: 44.56 ms
+Average Slowest Chunk: 458.90 ms
+Average Chunks per Second: 6.62
+========================================
+```
 
-**Solution**:
-- Increase heap size in test task:
-  ```gradle
-  test {
-      maxHeapSize = "4g"
-  }
-  ```
-- Split tests into smaller suites
-- Check for memory leaks in test setup
+### Test Configuration
 
-### Slow Tests
+Both tests use the following configuration:
+- **Fixed Seed**: `12345` for reproducibility
+- **Chunk Status**: `ChunkStatus.FULL` (complete generation including lighting)
+- **World Type**: Normal Overworld generation
+- **Game Mode**: Creative
+- **Difficulty**: Normal
 
-**Problem**: Tests take too long to run.
+### Technical Details
 
-**Solutions**:
-- Run only changed tests during development
-- Use tags to separate fast and slow tests
-- Optimize test setup and teardown
-- Use mocks instead of real dependencies
-- Run tests in parallel (advanced configuration)
+#### Server Environment
+
+These tests create a minimal test server environment that includes:
+- Bootstrap initialization of Minecraft registries
+- World data loading and configuration
+- Chunk generation pipeline with all standard features
+- Lighting calculations
+- Structure generation
+- Feature placement
+
+#### Graphics Context
+
+While these tests initialize the full Minecraft server, they run in a headless mode suitable for CI/CD environments. The "graphics context" mentioned in the requirements refers to the internal rendering pipeline used during chunk generation, which is automatically handled by the test setup.
+
+#### Test Data
+
+The tests create temporary world data in:
+- `test-chunk-gen-world/` (single run test)
+- `test-chunk-gen-batch-world/` (batch test)
+
+These directories are automatically cleaned up after each test run.
+
+### Interpreting Results
+
+**Total Time**: The complete duration for generating all chunks, including server initialization overhead.
+
+**Average Time per Chunk**: The mean generation time across all chunks. This is the most useful metric for comparing performance across different systems or code changes.
+
+**Fastest/Slowest Chunk**: The minimum and maximum generation times. Variation is expected due to:
+- Chunk complexity (terrain features, structures, caves)
+- JVM warmup and JIT compilation
+- Garbage collection pauses
+- System load
+
+**Chunks per Second**: Throughput metric useful for estimating world generation speed.
+
+### Use Cases
+
+**Single Run Test** (`ChunkGenerationPerformanceTest`):
+- Quick performance checks during development
+- Testing specific chunk generation scenarios
+- Debugging performance issues
+- Profiling with external tools
+
+**Batch Test** (`ChunkGenerationBatchPerformanceTest`):
+- Stable performance baselines for regression testing
+- Comparing performance across code changes
+- Benchmarking different hardware configurations
+- Statistical analysis of generation performance
+
+### Running Both Tests
+
+To run all chunk generation performance tests:
+```bash
+./gradlew performanceTest --tests "net.minecraft.world.level.chunk.*ChunkGeneration*PerformanceTest"
+```
+
+### CI/CD Integration
+
+These tests can run in automated environments:
+```bash
+# Run tests and save output
+./gradlew performanceTest --tests "net.minecraft.world.level.chunk.ChunkGenerationPerformanceTest" > chunk_perf_results.txt
+
+# Run batch tests for stable metrics
+./gradlew performanceTest --tests "net.minecraft.world.level.chunk.ChunkGenerationBatchPerformanceTest" > chunk_batch_results.txt
+```
+
+### Notes
+
+- First run may be slower due to JVM warmup - the batch test accounts for this
+- Results will vary based on hardware, JVM version, and system load
+- For consistent results, run tests on a quiet system with minimal background processes
+- The fixed seed ensures the same chunks are generated each time for reproducibility
 
 ## Summary
 
@@ -854,7 +734,8 @@ The MattMC testing infrastructure provides:
 ✅ **Clear organization** with separate directories for different test types  
 ✅ **Multiple execution modes** for different testing scenarios  
 ✅ **IDE integration** for efficient development workflow  
-✅ **Comprehensive documentation** to get started quickly
+✅ **Comprehensive documentation** to get started quickly  
+✅ **Realistic chunk generation performance tests** using actual Minecraft pathways
 
 ## Additional Resources
 
@@ -867,6 +748,6 @@ The MattMC testing infrastructure provides:
 
 ---
 
-**Document Version**: 1.0  
-**Last Updated**: December 2024  
+**Document Version**: 1.1  
+**Last Updated**: January 2025  
 **Author**: MattMC Development Team
