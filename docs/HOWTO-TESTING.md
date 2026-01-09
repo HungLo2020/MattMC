@@ -871,7 +871,7 @@ Unlike simplified chunk operation tests, the chunk generation performance tests:
 
 **Running the test**:
 ```bash
-./gradlew performanceTest --tests "ChunkGenerationPerformanceTest"
+./gradlew performanceTest --tests "net.minecraft.world.level.chunk.ChunkGenerationPerformanceTest"
 ```
 
 **Expected output**:
@@ -902,7 +902,7 @@ Chunks per Second: 6.56
 
 **Running the test**:
 ```bash
-./gradlew performanceTest --tests "ChunkGenerationBatchPerformanceTest"
+./gradlew performanceTest --tests "net.minecraft.world.level.chunk.ChunkGenerationBatchPerformanceTest"
 ```
 
 **Expected output**:
@@ -995,7 +995,7 @@ These directories are automatically cleaned up after each test run.
 
 To run all chunk generation performance tests:
 ```bash
-./gradlew performanceTest --tests "*ChunkGeneration*PerformanceTest"
+./gradlew performanceTest --tests "net.minecraft.world.level.chunk.*ChunkGeneration*PerformanceTest"
 ```
 
 ### CI/CD Integration
@@ -1003,10 +1003,10 @@ To run all chunk generation performance tests:
 These tests can run in automated environments:
 ```bash
 # Run tests and save output
-./gradlew performanceTest --tests "ChunkGenerationPerformanceTest" > chunk_perf_results.txt
+./gradlew performanceTest --tests "net.minecraft.world.level.chunk.ChunkGenerationPerformanceTest" > chunk_perf_results.txt
 
 # Run batch tests for stable metrics
-./gradlew performanceTest --tests "ChunkGenerationBatchPerformanceTest" > chunk_batch_results.txt
+./gradlew performanceTest --tests "net.minecraft.world.level.chunk.ChunkGenerationBatchPerformanceTest" > chunk_batch_results.txt
 ```
 
 ### Notes
