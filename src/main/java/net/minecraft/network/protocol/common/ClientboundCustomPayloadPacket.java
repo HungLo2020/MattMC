@@ -26,7 +26,7 @@ public record ClientboundCustomPayloadPacket(CustomPacketPayload payload) implem
 					// VoxelMap: Register VoxelMap packet type
 					new CustomPacketPayload.TypeAndCodec<>(WorldIdS2C.PACKET_ID, WorldIdS2C.PACKET_CODEC),
 					// Distant Horizons: Register Distant Horizons packet type
-					new CustomPacketPayload.TypeAndCodec<>(CommonPacketPayload.TYPE, new CommonPacketPayload.Codec())
+					new CustomPacketPayload.TypeAndCodec<>(CommonPacketPayload.TYPE, CommonPacketPayload.STREAM_CODEC)
 				),
 				arrayList -> {
 					// VoxelMap: Packet types registered above
@@ -41,7 +41,7 @@ public record ClientboundCustomPayloadPacket(CustomPacketPayload payload) implem
 				// VoxelMap: Register VoxelMap packet type for configuration phase
 				new CustomPacketPayload.TypeAndCodec<>(WorldIdS2C.PACKET_ID, WorldIdS2C.PACKET_CODEC),
 				// Distant Horizons: Register Distant Horizons packet type for configuration phase
-				new CustomPacketPayload.TypeAndCodec<>(CommonPacketPayload.TYPE, new CommonPacketPayload.Codec())
+				new CustomPacketPayload.TypeAndCodec<>(CommonPacketPayload.TYPE, CommonPacketPayload.STREAM_CODEC)
 			)
 		)
 		.map(ClientboundCustomPayloadPacket::new, ClientboundCustomPayloadPacket::payload);

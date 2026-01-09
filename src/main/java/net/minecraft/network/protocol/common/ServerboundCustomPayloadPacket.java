@@ -24,7 +24,7 @@ public record ServerboundCustomPayloadPacket(CustomPacketPayload payload) implem
 					// VoxelMap: Register VoxelMap packet type
 					new CustomPacketPayload.TypeAndCodec<>(WorldIdC2S.PACKET_ID, WorldIdC2S.PACKET_CODEC),
 					// Distant Horizons: Register Distant Horizons packet type
-					new CustomPacketPayload.TypeAndCodec<>(CommonPacketPayload.TYPE, new CommonPacketPayload.Codec())
+					new CustomPacketPayload.TypeAndCodec<>(CommonPacketPayload.TYPE, CommonPacketPayload.STREAM_CODEC)
 				),
 				arrayList -> {
 					// VoxelMap: Packet types registered above

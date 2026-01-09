@@ -13,6 +13,7 @@ import org.jetbrains.annotations.Nullable;
 public record CommonPacketPayload(@Nullable AbstractNetworkMessage message) implements CustomPacketPayload
 {
 	public static final Type<CommonPacketPayload> TYPE = new Type<>(AbstractPluginPacketSender.WRAPPER_PACKET_RESOURCE);
+	public static final StreamCodec<FriendlyByteBuf, CommonPacketPayload> STREAM_CODEC = new Codec();
 	private static final AbstractPluginPacketSender PACKET_SENDER = (AbstractPluginPacketSender) SingletonInjector.INSTANCE.get(IPluginPacketSender.class);
 	
 	@NotNull
