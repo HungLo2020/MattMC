@@ -216,6 +216,8 @@ public class FabricClientProxy implements AbstractModInitializer.IEventProxy
 		// networking event //
 		//==================//
 		
+		// Register for both directions: client needs C2S to send packets, S2C to receive packets
+		PayloadTypeRegistry.playC2S().register(CommonPacketPayload.TYPE, new CommonPacketPayload.Codec());
 		PayloadTypeRegistry.playS2C().register(CommonPacketPayload.TYPE, new CommonPacketPayload.Codec());
 		ClientPlayNetworking.registerGlobalReceiver(CommonPacketPayload.TYPE, (payload, context) ->
 		{
