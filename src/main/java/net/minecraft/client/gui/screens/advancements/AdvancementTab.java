@@ -90,12 +90,12 @@ public class AdvancementTab {
 
 	public void drawContents(GuiGraphics guiGraphics, int i, int j) {
 		if (!this.centered) {
-			this.scrollX = 117 - (this.maxX + this.minX) / 2;
-			this.scrollY = 56 - (this.maxY + this.minY) / 2;
+			this.scrollX = (AdvancementsScreen.WINDOW_INSIDE_WIDTH / 2) - (this.maxX + this.minX) / 2;
+			this.scrollY = (AdvancementsScreen.WINDOW_INSIDE_HEIGHT / 2) - (this.maxY + this.minY) / 2;
 			this.centered = true;
 		}
 
-		guiGraphics.enableScissor(i, j, i + 234, j + 113);
+		guiGraphics.enableScissor(i, j, i + AdvancementsScreen.WINDOW_INSIDE_WIDTH, j + AdvancementsScreen.WINDOW_INSIDE_HEIGHT);
 		guiGraphics.pose().pushMatrix();
 		guiGraphics.pose().translate(i, j);
 		ResourceLocation resourceLocation = (ResourceLocation)this.display
@@ -107,8 +107,8 @@ public class AdvancementTab {
 		int m = k % 16;
 		int n = l % 16;
 
-		for (int o = -1; o <= 15; o++) {
-			for (int p = -1; p <= 8; p++) {
+		for (int o = -1; o <= 30; o++) {
+			for (int p = -1; p <= 16; p++) {
 				guiGraphics.blit(RenderPipelines.GUI_TEXTURED, resourceLocation, m + 16 * o, n + 16 * p, 0.0F, 0.0F, 16, 16, 16, 16);
 			}
 		}
@@ -121,11 +121,11 @@ public class AdvancementTab {
 	}
 
 	public void drawTooltips(GuiGraphics guiGraphics, int i, int j, int k, int l) {
-		guiGraphics.fill(0, 0, 234, 113, Mth.floor(this.fade * 255.0F) << 24);
+		guiGraphics.fill(0, 0, AdvancementsScreen.WINDOW_INSIDE_WIDTH, AdvancementsScreen.WINDOW_INSIDE_HEIGHT, Mth.floor(this.fade * 255.0F) << 24);
 		boolean bl = false;
 		int m = Mth.floor(this.scrollX);
 		int n = Mth.floor(this.scrollY);
-		if (i > 0 && i < 234 && j > 0 && j < 113) {
+		if (i > 0 && i < AdvancementsScreen.WINDOW_INSIDE_WIDTH && j > 0 && j < AdvancementsScreen.WINDOW_INSIDE_HEIGHT) {
 			for (AdvancementWidget advancementWidget : this.widgets.values()) {
 				if (advancementWidget.isMouseOver(m, n, i, j)) {
 					bl = true;
@@ -165,12 +165,12 @@ public class AdvancementTab {
 	}
 
 	public void scroll(double d, double e) {
-		if (this.maxX - this.minX > 234) {
-			this.scrollX = Mth.clamp(this.scrollX + d, -(this.maxX - 234), 0.0);
+		if (this.maxX - this.minX > AdvancementsScreen.WINDOW_INSIDE_WIDTH) {
+			this.scrollX = Mth.clamp(this.scrollX + d, -(this.maxX - AdvancementsScreen.WINDOW_INSIDE_WIDTH), 0.0);
 		}
 
-		if (this.maxY - this.minY > 113) {
-			this.scrollY = Mth.clamp(this.scrollY + e, -(this.maxY - 113), 0.0);
+		if (this.maxY - this.minY > AdvancementsScreen.WINDOW_INSIDE_HEIGHT) {
+			this.scrollY = Mth.clamp(this.scrollY + e, -(this.maxY - AdvancementsScreen.WINDOW_INSIDE_HEIGHT), 0.0);
 		}
 	}
 
