@@ -69,13 +69,13 @@ public class AdvancementsScreen extends Screen implements ClientAdvancements.Lis
 
 	private void calculateWindowSize() {
 		// Scale to use most of the screen (about 90% width and 85% height)
-		// Ensure it's at least the original size and respects the aspect ratio
-		int maxWidth = (int)(this.width * 0.9);
-		int maxHeight = (int)(this.height * 0.85);
+		// Ensure it's at least double the original size
+		int targetWidth = (int)(this.width * 0.9);
+		int targetHeight = (int)(this.height * 0.85);
 		
-		// Apply minimum size based on original dimensions
-		this.windowWidth = Math.max(WINDOW_WIDTH * 2, maxWidth);
-		this.windowHeight = Math.max(WINDOW_HEIGHT * 2, maxHeight);
+		// Apply minimum size (at least 2x original) and maximum (90% of screen)
+		this.windowWidth = Math.max(WINDOW_WIDTH * 2, Math.min(targetWidth, this.width - 20));
+		this.windowHeight = Math.max(WINDOW_HEIGHT * 2, Math.min(targetHeight, this.height - 40));
 		
 		// Calculate inside dimensions maintaining the same border proportions
 		this.windowInsideWidth = this.windowWidth - (WINDOW_WIDTH - WINDOW_INSIDE_WIDTH);
