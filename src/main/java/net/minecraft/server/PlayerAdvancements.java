@@ -84,6 +84,9 @@ public class PlayerAdvancements {
 		int i = 1343;
 		this.codec = DataFixTypes.ADVANCEMENTS.wrapCodec(PlayerAdvancements.Data.CODEC, dataFixer, 1343);
 		this.load(serverAdvancementManager);
+		// Mark all roots for visibility evaluation. Without this, rootsToUpdate is empty and
+		// flushDirty() never calls updateTreeVisibility(), so no advancements are sent to client on first join.
+		this.tree.roots().forEach(this.rootsToUpdate::add);
 	}
 
 	public void setPlayer(ServerPlayer serverPlayer) {
