@@ -28,8 +28,7 @@
     },
     "title": {
       "translate": "advancements.nether.find_bastion.title"
-    },
-    "hidden": false
+    }
   },
   "requirements": [
     [

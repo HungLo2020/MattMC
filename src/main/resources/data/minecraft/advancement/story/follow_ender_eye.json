@@ -28,8 +28,7 @@
     },
     "title": {
       "translate": "advancements.story.follow_ender_eye.title"
-    },
-    "hidden": false
+    }
   },
   "requirements": [
     [

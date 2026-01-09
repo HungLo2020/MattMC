@@ -15,8 +15,7 @@
     },
     "title": {
       "translate": "advancements.adventure.avoid_vibration.title"
-    },
-    "hidden": false
+    }
   },
   "requirements": [
     [

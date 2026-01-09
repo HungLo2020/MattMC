@@ -531,8 +531,7 @@
     },
     "title": {
       "translate": "advancements.adventure.kill_all_mobs.title"
-    },
-    "hidden": false
+    }
   },
   "requirements": [
     [

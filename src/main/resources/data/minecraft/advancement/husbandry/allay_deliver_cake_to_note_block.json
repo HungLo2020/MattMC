@@ -27,7 +27,7 @@
     "description": {
       "translate": "advancements.husbandry.allay_deliver_cake_to_note_block.description"
     },
-    "hidden": false,
+    "hidden": true,
     "icon": {
       "count": 1,
       "id": "minecraft:note_block"

@@ -51,8 +51,7 @@
     },
     "title": {
       "translate": "advancements.adventure.lighten_up.title"
-    },
-    "hidden": false
+    }
   },
   "requirements": [
     [

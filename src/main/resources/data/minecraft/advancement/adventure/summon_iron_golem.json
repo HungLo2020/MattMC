@@ -27,8 +27,7 @@
     },
     "title": {
       "translate": "advancements.adventure.summon_iron_golem.title"
-    },
-    "hidden": false
+    }
   },
   "requirements": [
     [

@@ -31,8 +31,7 @@
     },
     "title": {
       "translate": "advancements.nether.ride_strider.title"
-    },
-    "hidden": false
+    }
   },
   "requirements": [
     [

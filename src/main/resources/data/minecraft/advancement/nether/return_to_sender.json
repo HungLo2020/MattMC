@@ -38,8 +38,7 @@
     },
     "title": {
       "translate": "advancements.nether.return_to_sender.title"
-    },
-    "hidden": false
+    }
   },
   "requirements": [
     [

@@ -52,8 +52,7 @@
     },
     "title": {
       "translate": "advancements.story.shiny_gear.title"
-    },
-    "hidden": false
+    }
   },
   "requirements": [
     [

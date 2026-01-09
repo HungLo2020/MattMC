@@ -33,8 +33,7 @@
     },
     "title": {
       "translate": "advancements.adventure.use_lodestone.title"
-    },
-    "hidden": false
+    }
   },
   "requirements": [
     [

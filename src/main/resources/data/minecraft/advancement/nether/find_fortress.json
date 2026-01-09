@@ -28,8 +28,7 @@
     },
     "title": {
       "translate": "advancements.nether.find_fortress.title"
-    },
-    "hidden": false
+    }
   },
   "requirements": [
     [

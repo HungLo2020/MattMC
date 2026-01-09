@@ -36,8 +36,7 @@
     },
     "title": {
       "translate": "advancements.adventure.play_jukebox_in_meadows.title"
-    },
-    "hidden": false
+    }
   },
   "requirements": [
     [

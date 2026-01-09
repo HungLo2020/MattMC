@@ -15,8 +15,7 @@
     },
     "title": {
       "translate": "advancements.adventure.trade.title"
-    },
-    "hidden": false
+    }
   },
   "requirements": [
     [

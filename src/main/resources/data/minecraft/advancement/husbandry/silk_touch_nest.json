@@ -31,8 +31,7 @@
     },
     "title": {
       "translate": "advancements.husbandry.silk_touch_nest.title"
-    },
-    "hidden": false
+    }
   },
   "requirements": [
     [

@@ -292,8 +292,7 @@
     },
     "title": {
       "translate": "advancements.adventure.heart_transplanter.title"
-    },
-    "hidden": false
+    }
   },
   "requirements": [
     [

@@ -94,8 +94,7 @@
     },
     "title": {
       "translate": "advancements.husbandry.wax_on.title"
-    },
-    "hidden": false
+    }
   },
   "requirements": [
     [

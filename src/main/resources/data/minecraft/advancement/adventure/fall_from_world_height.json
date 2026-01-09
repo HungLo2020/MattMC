@@ -44,8 +44,7 @@
     },
     "title": {
       "translate": "advancements.adventure.fall_from_world_height.title"
-    },
-    "hidden": false
+    }
   },
   "requirements": [
     [

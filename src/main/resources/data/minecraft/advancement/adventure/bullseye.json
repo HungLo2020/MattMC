@@ -32,8 +32,7 @@
     },
     "title": {
       "translate": "advancements.adventure.bullseye.title"
-    },
-    "hidden": false
+    }
   },
   "requirements": [
     [

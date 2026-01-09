@@ -34,8 +34,7 @@
     },
     "title": {
       "translate": "advancements.adventure.spyglass_at_parrot.title"
-    },
-    "hidden": false
+    }
   },
   "requirements": [
     [

@@ -22,8 +22,7 @@
     },
     "title": {
       "translate": "advancements.story.mine_diamond.title"
-    },
-    "hidden": false
+    }
   },
   "requirements": [
     [

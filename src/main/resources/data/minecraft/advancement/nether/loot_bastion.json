@@ -36,8 +36,7 @@
     },
     "title": {
       "translate": "advancements.nether.loot_bastion.title"
-    },
-    "hidden": false
+    }
   },
   "requirements": [
     [

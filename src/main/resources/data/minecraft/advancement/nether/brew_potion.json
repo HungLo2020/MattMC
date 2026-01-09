@@ -15,8 +15,7 @@
     },
     "title": {
       "translate": "advancements.nether.brew_potion.title"
-    },
-    "hidden": false
+    }
   },
   "requirements": [
     [

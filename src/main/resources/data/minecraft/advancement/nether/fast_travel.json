@@ -23,8 +23,7 @@
     },
     "title": {
       "translate": "advancements.nether.fast_travel.title"
-    },
-    "hidden": false
+    }
   },
   "requirements": [
     [

@@ -15,8 +15,7 @@
     },
     "title": {
       "translate": "advancements.adventure.sleep_in_bed.title"
-    },
-    "hidden": false
+    }
   },
   "requirements": [
     [

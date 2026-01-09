@@ -37,8 +37,7 @@
     },
     "title": {
       "translate": "advancements.adventure.revaulting.title"
-    },
-    "hidden": false
+    }
   },
   "requirements": [
     [

@@ -23,8 +23,7 @@
     },
     "title": {
       "translate": "advancements.end.elytra.title"
-    },
-    "hidden": false
+    }
   },
   "requirements": [
     [

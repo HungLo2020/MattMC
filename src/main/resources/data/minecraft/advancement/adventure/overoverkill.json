@@ -39,8 +39,7 @@
     },
     "title": {
       "translate": "advancements.adventure.overoverkill.title"
-    },
-    "hidden": false
+    }
   },
   "requirements": [
     [

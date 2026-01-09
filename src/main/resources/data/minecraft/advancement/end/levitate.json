@@ -23,8 +23,7 @@
     },
     "title": {
       "translate": "advancements.end.levitate.title"
-    },
-    "hidden": false
+    }
   },
   "requirements": [
     [

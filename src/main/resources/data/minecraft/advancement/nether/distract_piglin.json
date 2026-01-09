@@ -168,8 +168,7 @@
     },
     "title": {
       "translate": "advancements.nether.distract_piglin.title"
-    },
-    "hidden": false
+    }
   },
   "requirements": [
     [

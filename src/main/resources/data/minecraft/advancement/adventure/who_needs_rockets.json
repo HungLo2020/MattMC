@@ -31,8 +31,7 @@
     },
     "title": {
       "translate": "advancements.adventure.who_needs_rockets.title"
-    },
-    "hidden": false
+    }
   },
   "requirements": [
     [

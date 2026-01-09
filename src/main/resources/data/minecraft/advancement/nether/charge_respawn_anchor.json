@@ -36,8 +36,7 @@
     },
     "title": {
       "translate": "advancements.nether.charge_respawn_anchor.title"
-    },
-    "hidden": false
+    }
   },
   "requirements": [
     [

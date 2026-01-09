@@ -52,8 +52,7 @@
     },
     "title": {
       "translate": "advancements.story.obtain_armor.title"
-    },
-    "hidden": false
+    }
   },
   "requirements": [
     [

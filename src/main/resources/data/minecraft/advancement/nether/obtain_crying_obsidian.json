@@ -22,8 +22,7 @@
     },
     "title": {
       "translate": "advancements.nether.obtain_crying_obsidian.title"
-    },
-    "hidden": false
+    }
   },
   "requirements": [
     [

@@ -102,8 +102,7 @@
     },
     "title": {
       "translate": "advancements.husbandry.wax_off.title"
-    },
-    "hidden": false
+    }
   },
   "requirements": [
     [

@@ -22,8 +22,7 @@
     },
     "title": {
       "translate": "advancements.story.form_obsidian.title"
-    },
-    "hidden": false
+    }
   },
   "requirements": [
     [

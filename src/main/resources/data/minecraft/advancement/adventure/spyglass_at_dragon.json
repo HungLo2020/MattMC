@@ -34,8 +34,7 @@
     },
     "title": {
       "translate": "advancements.adventure.spyglass_at_dragon.title"
-    },
-    "hidden": false
+    }
   },
   "requirements": [
     [

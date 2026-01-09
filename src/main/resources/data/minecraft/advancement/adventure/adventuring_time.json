@@ -877,8 +877,7 @@
     },
     "title": {
       "translate": "advancements.adventure.adventuring_time.title"
-    },
-    "hidden": false
+    }
   },
   "requirements": [
     [

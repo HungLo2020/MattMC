@@ -29,8 +29,7 @@
     },
     "title": {
       "translate": "advancements.husbandry.froglights.title"
-    },
-    "hidden": false
+    }
   },
   "requirements": [
     [
