@@ -38,6 +38,13 @@ public class SystemReport {
 		+ System.getProperty("java.vm.info")
 		+ "), "
 		+ System.getProperty("java.vm.vendor");
+	
+	/**
+	 * Cached result of client-side detection. The environment doesn't change during runtime,
+	 * so we can safely cache this to avoid repeated class loading attempts.
+	 */
+	private static final boolean IS_CLIENT_SIDE = detectClientSide();
+	
 	private final Map<String, String> entries = Maps.<String, String>newLinkedHashMap();
 
 	public SystemReport() {
@@ -63,7 +70,7 @@ public class SystemReport {
 		
 		// Iris: Add shaderpack info to crash reports (client-side only)
 		// Only attempt to load Iris on the client to avoid server startup issues
-		if (isClientSide()) {
+		if (IS_CLIENT_SIDE) {
 			try {
 				if (net.irisshaders.iris.Iris.getCurrentPackName() != null) {
 					this.setDetail("Loaded Shaderpack", () -> {
@@ -76,17 +83,17 @@ public class SystemReport {
 					});
 				}
 			} catch (Throwable t) {
-				// Silently ignore - Iris may not be fully initialized
+				// Log debug information if Iris fails to initialize
 				LOGGER.debug("Failed to get Iris shaderpack information", t);
 			}
 		}
 	}
 
 	/**
-	 * Check if we're running on the client side by attempting to access the Minecraft class.
-	 * This avoids initializing client-only classes when running as a dedicated server.
+	 * Detect if we're running on the client side by checking for the Minecraft client class.
+	 * This is called once during class initialization to avoid repeated class loading attempts.
 	 */
-	private static boolean isClientSide() {
+	private static boolean detectClientSide() {
 		try {
 			// Try to load the Minecraft client class - only available on client
 			Class.forName("net.minecraft.client.Minecraft");
