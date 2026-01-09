@@ -11,6 +11,8 @@ import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.network.protocol.common.custom.DiscardedPayload;
 // VoxelMap: Import VoxelMap packet types
 import com.mamiyaotaru.voxelmap.packets.WorldIdC2S;
+// Distant Horizons: Import Distant Horizons packet type
+import com.seibel.distanthorizons.common.CommonPacketPayload;
 
 public record ServerboundCustomPayloadPacket(CustomPacketPayload payload) implements Packet<ServerCommonPacketListener> {
 	private static final int MAX_PAYLOAD_SIZE = 32767;
@@ -20,7 +22,9 @@ public record ServerboundCustomPayloadPacket(CustomPacketPayload payload) implem
 				Lists.<CustomPacketPayload.TypeAndCodec<? super FriendlyByteBuf, ?>>newArrayList(
 					new CustomPacketPayload.TypeAndCodec<>(BrandPayload.TYPE, BrandPayload.STREAM_CODEC),
 					// VoxelMap: Register VoxelMap packet type
-					new CustomPacketPayload.TypeAndCodec<>(WorldIdC2S.PACKET_ID, WorldIdC2S.PACKET_CODEC)
+					new CustomPacketPayload.TypeAndCodec<>(WorldIdC2S.PACKET_ID, WorldIdC2S.PACKET_CODEC),
+					// Distant Horizons: Register Distant Horizons packet type
+					new CustomPacketPayload.TypeAndCodec<>(CommonPacketPayload.TYPE, new CommonPacketPayload.Codec())
 				),
 				arrayList -> {
 					// VoxelMap: Packet types registered above

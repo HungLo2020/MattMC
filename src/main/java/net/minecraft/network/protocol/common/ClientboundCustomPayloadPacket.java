@@ -13,6 +13,8 @@ import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.network.protocol.common.custom.DiscardedPayload;
 // VoxelMap: Import VoxelMap packet types
 import com.mamiyaotaru.voxelmap.packets.WorldIdS2C;
+// Distant Horizons: Import Distant Horizons packet type
+import com.seibel.distanthorizons.common.CommonPacketPayload;
 
 public record ClientboundCustomPayloadPacket(CustomPacketPayload payload) implements Packet<ClientCommonPacketListener> {
 	private static final int MAX_PAYLOAD_SIZE = 1048576;
@@ -22,7 +24,9 @@ public record ClientboundCustomPayloadPacket(CustomPacketPayload payload) implem
 				Lists.<CustomPacketPayload.TypeAndCodec<? super RegistryFriendlyByteBuf, ?>>newArrayList(
 					new CustomPacketPayload.TypeAndCodec<>(BrandPayload.TYPE, BrandPayload.STREAM_CODEC),
 					// VoxelMap: Register VoxelMap packet type
-					new CustomPacketPayload.TypeAndCodec<>(WorldIdS2C.PACKET_ID, WorldIdS2C.PACKET_CODEC)
+					new CustomPacketPayload.TypeAndCodec<>(WorldIdS2C.PACKET_ID, WorldIdS2C.PACKET_CODEC),
+					// Distant Horizons: Register Distant Horizons packet type
+					new CustomPacketPayload.TypeAndCodec<>(CommonPacketPayload.TYPE, new CommonPacketPayload.Codec())
 				),
 				arrayList -> {
 					// VoxelMap: Packet types registered above
@@ -35,7 +39,9 @@ public record ClientboundCustomPayloadPacket(CustomPacketPayload payload) implem
 			List.of(
 				new CustomPacketPayload.TypeAndCodec<>(BrandPayload.TYPE, BrandPayload.STREAM_CODEC),
 				// VoxelMap: Register VoxelMap packet type for configuration phase
-				new CustomPacketPayload.TypeAndCodec<>(WorldIdS2C.PACKET_ID, WorldIdS2C.PACKET_CODEC)
+				new CustomPacketPayload.TypeAndCodec<>(WorldIdS2C.PACKET_ID, WorldIdS2C.PACKET_CODEC),
+				// Distant Horizons: Register Distant Horizons packet type for configuration phase
+				new CustomPacketPayload.TypeAndCodec<>(CommonPacketPayload.TYPE, new CommonPacketPayload.Codec())
 			)
 		)
 		.map(ClientboundCustomPayloadPacket::new, ClientboundCustomPayloadPacket::payload);
