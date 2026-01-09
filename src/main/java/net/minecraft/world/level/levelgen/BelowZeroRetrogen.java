@@ -62,22 +62,32 @@ public final class BelowZeroRetrogen {
 
 	public static void replaceOldBedrock(ProtoChunk protoChunk) {
 		int i = 4;
-		BlockPos.betweenClosed(0, 0, 0, 15, 4, 15).forEach(blockPos -> {
-			if (protoChunk.getBlockState(blockPos).is(Blocks.BEDROCK)) {
-				protoChunk.setBlockState(blockPos, Blocks.DEEPSLATE.defaultBlockState());
+		BlockPos.MutableBlockPos mutableBlockPos = new BlockPos.MutableBlockPos();
+		for (int x = 0; x <= 15; x++) {
+			for (int y = 0; y <= 4; y++) {
+				for (int z = 0; z <= 15; z++) {
+					mutableBlockPos.set(x, y, z);
+					if (protoChunk.getBlockState(mutableBlockPos).is(Blocks.BEDROCK)) {
+						protoChunk.setBlockState(mutableBlockPos, Blocks.DEEPSLATE.defaultBlockState());
+					}
+				}
 			}
-		});
+		}
 	}
 
 	public void applyBedrockMask(ProtoChunk protoChunk) {
 		LevelHeightAccessor levelHeightAccessor = protoChunk.getHeightAccessorForGeneration();
 		int i = levelHeightAccessor.getMinY();
 		int j = levelHeightAccessor.getMaxY();
+		BlockPos.MutableBlockPos mutableBlockPos = new BlockPos.MutableBlockPos();
 
 		for (int k = 0; k < 16; k++) {
 			for (int l = 0; l < 16; l++) {
 				if (this.hasBedrockHole(k, l)) {
-					BlockPos.betweenClosed(k, i, l, k, j, l).forEach(blockPos -> protoChunk.setBlockState(blockPos, Blocks.AIR.defaultBlockState()));
+					for (int y = i; y <= j; y++) {
+						mutableBlockPos.set(k, y, l);
+						protoChunk.setBlockState(mutableBlockPos, Blocks.AIR.defaultBlockState());
+					}
 				}
 			}
 		}

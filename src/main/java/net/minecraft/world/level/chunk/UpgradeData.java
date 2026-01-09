@@ -124,17 +124,26 @@ public class UpgradeData {
 			int n = chunkPos.getMinBlockZ() + (!bl5 || !bl && !bl2 ? (bl4 ? 0 : 15) : 14);
 			Direction[] directions = Direction.values();
 			BlockPos.MutableBlockPos mutableBlockPos = new BlockPos.MutableBlockPos();
+			BlockPos.MutableBlockPos neighborPos = new BlockPos.MutableBlockPos();
 
-			for (BlockPos blockPos : BlockPos.betweenClosed(k, level.getMinY(), m, l, level.getMaxY(), n)) {
-				BlockState blockState = level.getBlockState(blockPos);
-				BlockState blockState2 = blockState;
+			int minY = level.getMinY();
+			int maxY = level.getMaxY();
 
-				for (Direction direction : directions) {
-					mutableBlockPos.setWithOffset(blockPos, direction);
-					blockState2 = updateState(blockState2, direction, level, blockPos, mutableBlockPos);
+			for (int x = k; x <= l; x++) {
+				for (int y = minY; y <= maxY; y++) {
+					for (int z = m; z <= n; z++) {
+						mutableBlockPos.set(x, y, z);
+						BlockState blockState = level.getBlockState(mutableBlockPos);
+						BlockState blockState2 = blockState;
+
+						for (Direction direction : directions) {
+							neighborPos.setWithOffset(mutableBlockPos, direction);
+							blockState2 = updateState(blockState2, direction, level, mutableBlockPos, neighborPos);
+						}
+
+						Block.updateOrDestroy(blockState, blockState2, level, mutableBlockPos, 18);
+					}
 				}
-
-				Block.updateOrDestroy(blockState, blockState2, level, blockPos, 18);
 			}
 		}
 	}

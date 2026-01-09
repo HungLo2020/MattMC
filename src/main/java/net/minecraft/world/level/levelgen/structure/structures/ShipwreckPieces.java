@@ -147,11 +147,20 @@ public class ShipwreckPieces {
 					j = worldGenLevel.getHeight(types, this.templatePosition.getX(), this.templatePosition.getZ());
 				} else {
 					BlockPos blockPos2 = this.templatePosition.offset(vec3i.getX() - 1, 0, vec3i.getZ() - 1);
+					BlockPos.MutableBlockPos mutableBlockPos = new BlockPos.MutableBlockPos();
 
-					for (BlockPos blockPos3 : BlockPos.betweenClosed(this.templatePosition, blockPos2)) {
-						int l = worldGenLevel.getHeight(types, blockPos3.getX(), blockPos3.getZ());
-						j += l;
-						i = Math.min(i, l);
+					int minX = Math.min(this.templatePosition.getX(), blockPos2.getX());
+					int maxX = Math.max(this.templatePosition.getX(), blockPos2.getX());
+					int minZ = Math.min(this.templatePosition.getZ(), blockPos2.getZ());
+					int maxZ = Math.max(this.templatePosition.getZ(), blockPos2.getZ());
+
+					for (int x = minX; x <= maxX; x++) {
+						for (int z = minZ; z <= maxZ; z++) {
+							mutableBlockPos.set(x, 0, z);
+							int l = worldGenLevel.getHeight(types, x, z);
+							j += l;
+							i = Math.min(i, l);
+						}
 					}
 
 					j /= k;
