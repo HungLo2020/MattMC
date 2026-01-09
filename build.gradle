@@ -925,6 +925,7 @@ tasks.register('performanceTest', Test) {
     
     // More memory for performance tests
     maxHeapSize = "4g"
+    outputs.upToDateWhen { false }  // Always run performance tests to get fresh results
 }
 
 // Task to run all tests (both misc and performance)
