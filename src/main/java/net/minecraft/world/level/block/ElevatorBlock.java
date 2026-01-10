@@ -7,6 +7,7 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.Vec3;
 
 public class ElevatorBlock extends Block {
 	public static final MapCodec<ElevatorBlock> CODEC = simpleCodec(ElevatorBlock::new);
@@ -31,7 +32,7 @@ public class ElevatorBlock extends Block {
 			if (!level.isClientSide()) {
 				teleportPlayerToElevator(player, targetPos);
 			}
-			// Return true on both client and server to cancel the jump
+			// Return true on both client and server to prevent jump execution and maintain sync
 			return true;
 		}
 		return false;
@@ -101,6 +102,6 @@ public class ElevatorBlock extends Block {
 		player.teleportTo(x, y, z);
 		player.resetFallDistance();
 		// Reset ALL velocity to prevent any movement after teleportation
-		player.setDeltaMovement(0.0, 0.0, 0.0);
+		player.setDeltaMovement(Vec3.ZERO);
 	}
 }
