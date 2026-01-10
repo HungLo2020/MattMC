@@ -26,11 +26,13 @@ public class ElevatorBlock extends Block {
 	public void stepOn(Level level, BlockPos blockPos, BlockState blockState, Entity entity) {
 		if (!level.isClientSide() && entity instanceof Player player) {
 			// Check if player is jumping (wants to go up)
-			// We check if the player is a LivingEntity with the jumping flag set
-			if (entity instanceof LivingEntity livingEntity && livingEntity.isJumping() && player.onGround()) {
+			// We check if the player is jumping - this flag is set when they press space
+			if (entity instanceof LivingEntity livingEntity && livingEntity.isJumping()) {
 				BlockPos targetPos = findElevatorAbove(level, blockPos);
 				if (targetPos != null) {
 					teleportPlayerToElevator(player, targetPos);
+					// Reset jumping flag to prevent multiple teleports
+					livingEntity.setJumping(false);
 				}
 			}
 			// Check if player is sneaking (wants to go down)
