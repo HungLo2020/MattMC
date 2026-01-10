@@ -1,0 +1,22 @@
+{
+  "block.elevatorid.elevator_white": "Weisser Aufzug",
+  "block.elevatorid.elevator_black": "Schwarzer Aufzug",
+  "block.elevatorid.elevator_blue": "Blauer Aufzug",
+  "block.elevatorid.elevator_brown": "Brauner Aufzug",
+  "block.elevatorid.elevator_cyan": "Türkiser Aufzug",
+  "block.elevatorid.elevator_gray": "Grauer Aufzug",
+  "block.elevatorid.elevator_green": "Grüner Aufzug",
+  "block.elevatorid.elevator_light_blue": "Hellblauer Aufzug",
+  "block.elevatorid.elevator_lime": "Hellgrüner Aufzug",
+  "block.elevatorid.elevator_magenta": "Magenta Aufzug",
+  "block.elevatorid.elevator_orange": "Oranger Aufzug",
+  "block.elevatorid.elevator_pink": "Pinker Aufzug",
+  "block.elevatorid.elevator_purple": "Violetter Aufzug",
+  "block.elevatorid.elevator_red": "Roter Aufzug",
+  "block.elevatorid.elevator_light_gray": "Hellgrauer Aufzug",
+  "block.elevatorid.elevator_yellow": "Gelber Aufzug",
+
+  "elevatorid.subtitle.teleport": "Aufzug benutzt",
+
+  "itemGroup.elevators_tab": "Aufzüge"
+}

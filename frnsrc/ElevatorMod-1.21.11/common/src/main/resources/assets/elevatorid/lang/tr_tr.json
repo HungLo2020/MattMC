@@ -1,0 +1,34 @@
+{
+  "block.elevatorid.elevator_white": "Beyaz Asansör",
+  "block.elevatorid.elevator_black": "Siyah Asansör",
+  "block.elevatorid.elevator_blue": "Mavi Asansör",
+  "block.elevatorid.elevator_brown": "Kahverengi Asansör",
+  "block.elevatorid.elevator_cyan": "Camgöbeği Asansör",
+  "block.elevatorid.elevator_gray": "Gri Asansör",
+  "block.elevatorid.elevator_green": "Yeşil Asansör",
+  "block.elevatorid.elevator_light_blue": "Açık Mavi Asansör",
+  "block.elevatorid.elevator_lime": "Açık Yeşil Asansör",
+  "block.elevatorid.elevator_magenta": "Pembe Asansör",
+  "block.elevatorid.elevator_orange": "Turuncu Asansör",
+  "block.elevatorid.elevator_pink": "Eflatun Asansör",
+  "block.elevatorid.elevator_purple": "Mor Asansör",
+  "block.elevatorid.elevator_red": "Kırmızı Asansör",
+  "block.elevatorid.elevator_light_gray": "Açık Gri Asansör",
+  "block.elevatorid.elevator_yellow": "Sarı Asansör",
+
+  "elevatorid.subtitle.teleport": "Asansör Kullanımı",
+  "elevatorid.subtitle.camouflage": "Asansör kamuflajı",
+
+  "screen.elevatorid.elevator": "Asansör Ayarları",
+  "screen.elevatorid.elevator.directional": "Directional",
+  "screen.elevatorid.elevator.directional_north": "K",
+  "screen.elevatorid.elevator.directional_east": "D",
+  "screen.elevatorid.elevator.directional_south": "G",
+  "screen.elevatorid.elevator.directional_west": "B",
+  "screen.elevatorid.elevator.hide_arrow": "Oku gizle",
+  "screen.elevatorid.elevator.reset_camo": "Kamuflajı kaldır",
+
+  "elevatorid.message.missing_xp": "Işınlanmak için yeterli tecrübe puanınız yok",
+
+  "itemGroup.elevators_tab": "Asansörler"
+}
