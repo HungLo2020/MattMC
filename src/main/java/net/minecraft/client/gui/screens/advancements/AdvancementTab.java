@@ -107,9 +107,9 @@ public class AdvancementTab {
 		int m = Math.floorMod(k, AdvancementsScreen.BACKGROUND_TILE_WIDTH);
 		int n = Math.floorMod(l, AdvancementsScreen.BACKGROUND_TILE_HEIGHT);
 		
-		// Calculate how many tiles we need to cover the inside area, adding 1 extra to ensure full coverage
-		int tilesX = (AdvancementsScreen.WINDOW_INSIDE_WIDTH / AdvancementsScreen.BACKGROUND_TILE_WIDTH) + 3;
-		int tilesY = (AdvancementsScreen.WINDOW_INSIDE_HEIGHT / AdvancementsScreen.BACKGROUND_TILE_HEIGHT) + 3;
+		// Calculate how many tiles we need to cover the inside area, adding extra to ensure full coverage
+		int tilesX = (AdvancementsScreen.WINDOW_INSIDE_WIDTH / AdvancementsScreen.BACKGROUND_TILE_WIDTH) + 5;
+		int tilesY = (AdvancementsScreen.WINDOW_INSIDE_HEIGHT / AdvancementsScreen.BACKGROUND_TILE_HEIGHT) + 5;
 
 		for (int o = -1; o <= tilesX; o++) {
 			for (int p = -1; p <= tilesY; p++) {
