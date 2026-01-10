@@ -521,7 +521,7 @@ public class Map implements Runnable, IChangeObserver {
     }
 
     private void setZoomScale() {
-        this.zoomScale = Math.pow(2.0, this.zoom) / 2.0;
+        this.zoomScale = Math.pow(2.0, this.zoom) / 2.0 * 2.0;
         if (this.options.squareMap && this.options.rotates) {
             this.zoomScaleAdjusted = this.zoomScale / 1.4142F;
         } else {
