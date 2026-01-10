@@ -28,12 +28,12 @@ public class AdvancementsScreen extends Screen implements ClientAdvancements.Lis
 	private static final ResourceLocation WINDOW_LOCATION = ResourceLocation.withDefaultNamespace("textures/gui/advancements/window.png");
 	public static final int WINDOW_WIDTH = 504;
 	public static final int WINDOW_HEIGHT = 280;
-	private static final int WINDOW_INSIDE_X = 9;
-	private static final int WINDOW_INSIDE_Y = 18;
+	private static final int WINDOW_INSIDE_X = 18;
+	private static final int WINDOW_INSIDE_Y = 36;
 	public static final int WINDOW_INSIDE_WIDTH = 468;
 	public static final int WINDOW_INSIDE_HEIGHT = 226;
-	private static final int WINDOW_TITLE_X = 8;
-	private static final int WINDOW_TITLE_Y = 6;
+	private static final int WINDOW_TITLE_X = 16;
+	private static final int WINDOW_TITLE_Y = 12;
 	private static final int BACKGROUND_TEXTURE_WIDTH = 256;
 	private static final int BACKGROUND_TEXTURE_HEIGHT = 256;
 	public static final int BACKGROUND_TILE_WIDTH = 16;
