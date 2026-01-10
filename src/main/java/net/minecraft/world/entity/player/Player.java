@@ -453,6 +453,17 @@ public abstract class Player extends Avatar implements ContainerUser {
 			this.jumpTriggerTime--;
 		}
 
+		// Handle elevator teleportation before jump logic
+		if (this.jumping && this.onGround()) {
+			BlockPos blockBelow = this.getBlockPosBelowThatAffectsMyMovement();
+			if (this.level() != null && this.level().getBlockState(blockBelow).getBlock() instanceof net.minecraft.world.level.block.ElevatorBlock elevatorBlock) {
+				if (elevatorBlock.tryTeleportUp(this.level(), blockBelow, this)) {
+					// Teleportation happened, cancel the jump completely
+					this.setJumping(false);
+				}
+			}
+		}
+
 		this.tickRegeneration();
 		this.inventory.tick();
 		if (this.abilities.flying && !this.isPassenger()) {
@@ -498,17 +509,7 @@ public abstract class Player extends Avatar implements ContainerUser {
 
 	@Override
 	public void jumpFromGround() {
-		// Check if player is standing on an elevator block
-		BlockPos blockBelow = this.getBlockPosBelowThatAffectsMyMovement();
-		if (this.level() != null && this.level().getBlockState(blockBelow).getBlock() instanceof net.minecraft.world.level.block.ElevatorBlock elevatorBlock) {
-			// Call the elevator block's method to handle teleportation
-			if (elevatorBlock.tryTeleportUp(this.level(), blockBelow, this)) {
-				// Teleportation happened, cancel the jump completely
-				this.setJumping(false);
-				return;
-			}
-		}
-		// Otherwise, do normal jump
+		// Normal jump - elevator handling is done in aiStep()
 		super.jumpFromGround();
 	}
 
