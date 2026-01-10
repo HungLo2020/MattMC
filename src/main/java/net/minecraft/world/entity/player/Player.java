@@ -499,7 +499,8 @@ public abstract class Player extends Avatar implements ContainerUser {
 	@Override
 	public void jumpFromGround() {
 		// Check if player is standing on an elevator block
-		BlockPos blockBelow = this.getBlockPosBelowThatAffectsMyMovement();
+		// Use direct position calculation for reliable detection
+		BlockPos blockBelow = BlockPos.containing(this.getX(), this.getY() - 0.1, this.getZ());
 		if (this.level() != null && this.level().getBlockState(blockBelow).getBlock() instanceof net.minecraft.world.level.block.ElevatorBlock elevatorBlock) {
 			// Call the elevator block's method to handle teleportation
 			if (elevatorBlock.tryTeleportUp(this.level(), blockBelow, this)) {
