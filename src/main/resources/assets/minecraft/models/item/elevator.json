@@ -1,3 +1,6 @@
 {
-  "parent": "minecraft:block/elevator"
+  "parent": "minecraft:item/generated",
+  "textures": {
+    "layer0": "minecraft:block/elevator"
+  }
 }
