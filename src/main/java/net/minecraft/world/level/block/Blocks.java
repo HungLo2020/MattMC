@@ -4622,6 +4622,11 @@ public class Blocks {
 		properties -> new ConcretePowderBlock(BLACK_CONCRETE, properties),
 		BlockBehaviour.Properties.of().mapColor(DyeColor.BLACK).instrument(NoteBlockInstrument.SNARE).strength(0.5F).sound(SoundType.SAND)
 	);
+	public static final Block ELEVATOR = register(
+		"elevator",
+		ElevatorBlock::new,
+		BlockBehaviour.Properties.of().mapColor(DyeColor.WHITE).instrument(NoteBlockInstrument.BASEDRUM).requiresCorrectToolForDrops().strength(1.8F)
+	);
 	public static final Block KELP = register(
 		"kelp",
 		KelpBlock::new,

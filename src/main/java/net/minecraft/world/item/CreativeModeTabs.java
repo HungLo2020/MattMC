@@ -1196,6 +1196,7 @@ public class CreativeModeTabs {
 						output.accept(Items.PIGLIN_HEAD);
 						output.accept(Items.DRAGON_HEAD);
 						output.accept(Items.DRAGON_EGG);
+						output.accept(Items.ELEVATOR);
 						output.accept(Items.END_PORTAL_FRAME);
 						output.accept(Items.ENDER_EYE);
 						output.accept(Items.VAULT);
