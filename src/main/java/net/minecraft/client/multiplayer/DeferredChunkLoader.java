@@ -48,9 +48,14 @@ public class DeferredChunkLoader {
      * Enable or disable deferred chunk loading
      */
     public void setEnabled(boolean enabled) {
-        this.enabled = enabled;
-        if (!enabled) {
-            clearDeferredChunks();
+        if (this.enabled != enabled) {
+            this.enabled = enabled;
+            if (enabled) {
+                LOGGER.info("Deferred chunk loading enabled with distance: {}", deferredDistance);
+            } else {
+                LOGGER.info("Deferred chunk loading disabled");
+                clearDeferredChunks();
+            }
         }
     }
     
@@ -178,7 +183,38 @@ public class DeferredChunkLoader {
         ClientChunkCache chunkCache = (ClientChunkCache) minecraft.level.getChunkSource();
         chunkCache.addDeferredChunk(emptyChunk);
         
+        // Notify VoxelMap of the new chunk
+        notifyVoxelMap(pos.x, pos.z);
+        
         LOGGER.debug("Created minimal deferred chunk at {}", pos);
+    }
+    
+    /**
+     * Notify VoxelMap that a deferred chunk was loaded
+     */
+    private void notifyVoxelMap(int chunkX, int chunkZ) {
+        try {
+            // Use VoxelMap's WorldUpdateListener if available
+            Object voxelMapInstance = Class.forName("com.mamiyaotaru.voxelmap.VoxelConstants")
+                .getMethod("getVoxelMapInstance")
+                .invoke(null);
+            
+            if (voxelMapInstance != null) {
+                Object worldUpdateListener = voxelMapInstance.getClass()
+                    .getMethod("getWorldUpdateListener")
+                    .invoke(voxelMapInstance);
+                
+                if (worldUpdateListener != null) {
+                    worldUpdateListener.getClass()
+                        .getMethod("notifyObservers", int.class, int.class)
+                        .invoke(worldUpdateListener, chunkX, chunkZ);
+                    LOGGER.debug("Notified VoxelMap of deferred chunk at {}, {}", chunkX, chunkZ);
+                }
+            }
+        } catch (Exception e) {
+            // VoxelMap not available or error occurred - silently continue
+            LOGGER.trace("Could not notify VoxelMap of deferred chunk", e);
+        }
     }
     
     /**
