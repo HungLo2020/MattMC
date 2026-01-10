@@ -385,6 +385,20 @@ public class SodiumOptionsGUI extends Screen implements ScreenPromptable {
         for (OptionStorage<?> storage : dirtyStorages) {
             storage.save();
         }
+        
+        // Apply deferred chunk loader settings
+        try {
+            net.minecraft.client.multiplayer.DeferredChunkLoader loader = 
+                net.minecraft.client.multiplayer.DeferredChunkLoader.getInstance();
+            net.caffeinemc.mods.sodium.client.SodiumClientMod sodiumMod = 
+                net.caffeinemc.mods.sodium.client.SodiumClientMod.class.newInstance();
+            net.caffeinemc.mods.sodium.client.gui.SodiumGameOptions options = 
+                net.caffeinemc.mods.sodium.client.SodiumClientMod.options();
+            loader.setDeferredDistance(options.deferredChunks.deferredRenderDistance);
+            loader.setEnabled(options.deferredChunks.deferredRenderDistance > 0);
+        } catch (Exception e) {
+            // Silently catch to avoid crashes
+        }
     }
 
     private void undoChanges() {

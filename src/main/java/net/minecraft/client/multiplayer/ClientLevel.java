@@ -296,6 +296,13 @@ public class ClientLevel extends Level implements CacheSlot.Cleaner<ClientLevel>
 			this.tickTime();
 		}
 
+		// Tick deferred chunk loader for VoxelMap
+		try {
+			DeferredChunkLoader.getInstance().tick();
+		} catch (Exception e) {
+			// Silently catch to avoid crashes
+		}
+
 		if (this.skyFlashTime > 0) {
 			this.setSkyFlashTime(this.skyFlashTime - 1);
 		}

@@ -25,6 +25,16 @@ public class SodiumClientMod {
         MOD_VERSION = version;
 
         CONFIG = loadConfig();
+        
+        // Initialize deferred chunk loader with saved settings
+        try {
+            net.minecraft.client.multiplayer.DeferredChunkLoader loader = 
+                net.minecraft.client.multiplayer.DeferredChunkLoader.getInstance();
+            loader.setDeferredDistance(CONFIG.deferredChunks.deferredRenderDistance);
+            loader.setEnabled(CONFIG.deferredChunks.deferredRenderDistance > 0);
+        } catch (Exception e) {
+            LOGGER.error("Failed to initialize deferred chunk loader", e);
+        }
 
         try {
             updateFingerprint();

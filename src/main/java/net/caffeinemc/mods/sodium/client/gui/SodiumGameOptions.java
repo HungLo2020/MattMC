@@ -27,6 +27,7 @@ public class SodiumGameOptions {
     public final PerformanceSettings performance = new PerformanceSettings();
     public final NotificationSettings notifications = new NotificationSettings();
     public @NotNull DebugSettings debug = new DebugSettings();
+    public final DeferredChunkSettings deferredChunks = new DeferredChunkSettings();
 
     private boolean readOnly;
 
@@ -72,6 +73,11 @@ public class SodiumGameOptions {
     public static class NotificationSettings {
         public boolean hasClearedDonationButton = false;
         public boolean hasSeenDonationPrompt = false;
+    }
+
+    public static class DeferredChunkSettings {
+        public int deferredRenderDistance = 0; // 0 = disabled, 1-32 chunks beyond render distance
+        public boolean enableDeferredChunkLoading = false;
     }
 
     public enum WeatherQuality implements TextProvider {
