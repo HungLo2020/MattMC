@@ -4,7 +4,6 @@ import com.mojang.logging.LogUtils;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.ChunkPos;
-import net.minecraft.world.level.chunk.ChunkStatus;
 import net.minecraft.world.level.chunk.LevelChunk;
 import org.slf4j.Logger;
 
@@ -101,10 +100,15 @@ public class DeferredChunkLoader {
         }
         
         // Cleanup chunks that are too far away
+        ClientChunkCache chunkCache = (ClientChunkCache) minecraft.level.getChunkSource();
         loadedDeferredChunks.removeIf(pos -> {
             int dx = pos.x - playerChunkX;
             int dz = pos.z - playerChunkZ;
-            return dx * dx + dz * dz > (totalDistance + 2) * (totalDistance + 2);
+            boolean tooFar = dx * dx + dz * dz > (totalDistance + 2) * (totalDistance + 2);
+            if (tooFar) {
+                chunkCache.removeDeferredChunk(pos);
+            }
+            return tooFar;
         });
     }
     
@@ -129,23 +133,52 @@ public class DeferredChunkLoader {
     
     /**
      * Load a chunk to ChunkStatus.SURFACE level (sufficient for VoxelMap)
-     * Uses Distant Horizons API if available, otherwise uses vanilla generation
+     * Uses Distant Horizons API if available, otherwise creates a minimal chunk
      */
     private void loadDeferredChunk(ChunkPos pos) {
         if (minecraft.level == null) {
             return;
         }
         
-        // Try to use Distant Horizons chunk generation if available
+        // Try to use Distant Horizons chunk data if available
         if (tryLoadWithDistantHorizons(pos)) {
             return;
         }
         
-        // Fallback: Request chunk from server (if in multiplayer)
-        // or generate locally (if in singleplayer with access to generator)
-        // For now, we'll just mark it as requested - actual generation would
-        // require deeper integration with the chunk loading system
-        LOGGER.debug("Requested deferred chunk at {} (waiting for data)", pos);
+        // Create a minimal chunk for VoxelMap
+        // This will just be a placeholder with basic heightmap data
+        try {
+            createMinimalDeferredChunk(pos);
+        } catch (Exception e) {
+            LOGGER.error("Failed to create minimal deferred chunk at {}", pos, e);
+        }
+    }
+    
+    /**
+     * Create a minimal chunk with basic heightmap data
+     * This is a placeholder until we can get real chunk data
+     */
+    private void createMinimalDeferredChunk(ChunkPos pos) {
+        if (minecraft.level == null) {
+            return;
+        }
+        
+        // For now, we create an empty chunk
+        // A full implementation would generate terrain data here
+        // or request it from the server
+        net.minecraft.world.level.chunk.EmptyLevelChunk emptyChunk = 
+            new net.minecraft.world.level.chunk.EmptyLevelChunk(
+                minecraft.level, 
+                pos, 
+                minecraft.level.registryAccess().lookupOrThrow(net.minecraft.core.registries.Registries.BIOME)
+                    .getOrThrow(net.minecraft.world.level.biome.Biomes.PLAINS)
+            );
+        
+        // Add to deferred chunk storage
+        ClientChunkCache chunkCache = (ClientChunkCache) minecraft.level.getChunkSource();
+        chunkCache.addDeferredChunk(emptyChunk);
+        
+        LOGGER.debug("Created minimal deferred chunk at {}", pos);
     }
     
     /**
@@ -160,6 +193,7 @@ public class DeferredChunkLoader {
             // If DH is available, it should already be handling LOD chunks
             // We don't want to interfere with DH's system, so just return true
             // DH chunks will be accessible through its own API
+            // VoxelMap would need to integrate with DH separately
             LOGGER.debug("Distant Horizons detected, deferring to DH for chunk at {}", pos);
             return true;
         } catch (ClassNotFoundException e) {
@@ -175,6 +209,12 @@ public class DeferredChunkLoader {
         pendingChunks.values().forEach(future -> future.cancel(true));
         pendingChunks.clear();
         loadedDeferredChunks.clear();
+        
+        // Clear deferred chunks from ClientChunkCache
+        if (minecraft.level != null) {
+            ClientChunkCache chunkCache = (ClientChunkCache) minecraft.level.getChunkSource();
+            chunkCache.clearDeferredChunks();
+        }
     }
     
     /**

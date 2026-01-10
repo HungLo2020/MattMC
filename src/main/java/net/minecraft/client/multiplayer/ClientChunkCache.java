@@ -37,6 +37,8 @@ public class ClientChunkCache extends ChunkSource {
 	private final LevelLightEngine lightEngine;
 	volatile ClientChunkCache.Storage storage;
 	final ClientLevel level;
+	// Storage for deferred chunks (beyond render distance, for VoxelMap)
+	private final java.util.concurrent.ConcurrentHashMap<ChunkPos, LevelChunk> deferredChunks = new java.util.concurrent.ConcurrentHashMap<>();
 
 	public ClientChunkCache(ClientLevel clientLevel, int i) {
 		this.level = clientLevel;
@@ -75,6 +77,12 @@ public class ClientChunkCache extends ChunkSource {
 			if (isValidChunk(levelChunk, i, j)) {
 				return levelChunk;
 			}
+		}
+		
+		// Check deferred chunks for VoxelMap
+		LevelChunk deferredChunk = this.deferredChunks.get(new ChunkPos(i, j));
+		if (deferredChunk != null) {
+			return deferredChunk;
 		}
 
 		return bl ? this.emptyChunk : null;
@@ -316,5 +324,33 @@ public class ClientChunkCache extends ChunkSource {
 				ClientChunkCache.LOGGER.error("Failed to dump chunks to file {}", string, var10);
 			}
 		}
+	}
+	
+	/**
+	 * Add a deferred chunk for VoxelMap access
+	 */
+	public void addDeferredChunk(LevelChunk chunk) {
+		this.deferredChunks.put(chunk.getPos(), chunk);
+	}
+	
+	/**
+	 * Remove a deferred chunk
+	 */
+	public void removeDeferredChunk(ChunkPos pos) {
+		this.deferredChunks.remove(pos);
+	}
+	
+	/**
+	 * Clear all deferred chunks
+	 */
+	public void clearDeferredChunks() {
+		this.deferredChunks.clear();
+	}
+	
+	/**
+	 * Get the deferred chunk storage for direct access
+	 */
+	public java.util.Map<ChunkPos, LevelChunk> getDeferredChunks() {
+		return this.deferredChunks;
 	}
 }
