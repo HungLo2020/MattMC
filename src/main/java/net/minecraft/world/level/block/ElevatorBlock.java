@@ -101,7 +101,8 @@ public class ElevatorBlock extends Block {
 		
 		player.teleportTo(x, y, z);
 		player.resetFallDistance();
-		// Reset ALL velocity to prevent any movement after teleportation
+		// Reset ALL velocity (x, y, z) to zero to prevent any movement after teleportation
+		// This ensures the player doesn't jump or maintain momentum after being teleported
 		player.setDeltaMovement(Vec3.ZERO);
 	}
 }
