@@ -82,15 +82,36 @@ public class SkyblockChunkGenerator extends ChunkGenerator {
 		int chunkX = chunkPos.x;
 		int chunkZ = chunkPos.z;
 		
-		// Only generate platform if this chunk contains the center position (0, 0)
-		if (chunkX == 0 && chunkZ == 0) {
+		// Calculate the block coordinate range for this chunk
+		int chunkMinX = chunkX * 16;
+		int chunkMaxX = chunkMinX + 15;
+		int chunkMinZ = chunkZ * 16;
+		int chunkMaxZ = chunkMinZ + 15;
+		
+		// Platform coordinates: x and z from -1 to 1 (3x3 centered at 0,0)
+		int platformMinX = -1;
+		int platformMaxX = 1;
+		int platformMinZ = -1;
+		int platformMaxZ = 1;
+		
+		// Check if this chunk intersects with the platform
+		boolean intersects = !(chunkMaxX < platformMinX || chunkMinX > platformMaxX || 
+		                       chunkMaxZ < platformMinZ || chunkMinZ > platformMaxZ);
+		
+		if (intersects) {
 			BlockPos.MutableBlockPos mutableBlockPos = new BlockPos.MutableBlockPos();
+			
+			// Only place blocks that are within both the chunk and the platform
+			int startX = Math.max(platformMinX, chunkMinX);
+			int endX = Math.min(platformMaxX, chunkMaxX);
+			int startZ = Math.max(platformMinZ, chunkMinZ);
+			int endZ = Math.min(platformMaxZ, chunkMaxZ);
 			
 			// Place 3x3 platform centered at (0, 0)
 			// Bottom 2 layers: dirt at Y=64 and Y=65
 			// Top layer: grass at Y=66
-			for (int x = -1; x <= 1; x++) {
-				for (int z = -1; z <= 1; z++) {
+			for (int x = startX; x <= endX; x++) {
+				for (int z = startZ; z <= endZ; z++) {
 					// 2 layers of dirt
 					chunkAccess.setBlockState(mutableBlockPos.set(x, PLATFORM_Y, z), Blocks.DIRT.defaultBlockState());
 					chunkAccess.setBlockState(mutableBlockPos.set(x, PLATFORM_Y + 1, z), Blocks.DIRT.defaultBlockState());
