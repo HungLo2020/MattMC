@@ -25,12 +25,12 @@ public class ElevatorBlock extends Block {
 	 * @return true if teleportation occurred, false otherwise
 	 */
 	public boolean tryTeleportUp(Level level, BlockPos blockPos, Player player) {
-		BlockPos targetPos = findElevatorAbove(level, blockPos);
-		if (targetPos != null) {
-			if (!level.isClientSide()) {
+		if (!level.isClientSide()) {
+			BlockPos targetPos = findElevatorAbove(level, blockPos);
+			if (targetPos != null) {
 				teleportPlayerToElevator(player, targetPos);
+				return true;
 			}
-			return true;
 		}
 		return false;
 	}
@@ -98,8 +98,7 @@ public class ElevatorBlock extends Block {
 		
 		player.teleportTo(x, y, z);
 		player.resetFallDistance();
-		// Reset vertical velocity to prevent jump after teleportation
-		var movement = player.getDeltaMovement();
-		player.setDeltaMovement(movement.x, 0.0, movement.z);
+		// Reset ALL velocity to prevent any movement after teleportation
+		player.setDeltaMovement(0.0, 0.0, 0.0);
 	}
 }
