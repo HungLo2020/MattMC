@@ -521,6 +521,8 @@ public class Map implements Runnable, IChangeObserver {
     }
 
     private void setZoomScale() {
+        // Divide by 4.0 instead of 2.0 to halve the zoomScale, which doubles the viewing distance
+        // (zoomScale is used inversely in rendering: multi = 1.0 / zoomScale)
         this.zoomScale = Math.pow(2.0, this.zoom) / 4.0;
         if (this.options.squareMap && this.options.rotates) {
             this.zoomScaleAdjusted = this.zoomScale / 1.4142F;
