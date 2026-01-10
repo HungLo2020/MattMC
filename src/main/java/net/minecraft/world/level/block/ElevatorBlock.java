@@ -23,16 +23,18 @@ public class ElevatorBlock extends Block {
 	@Override
 	public void stepOn(Level level, BlockPos blockPos, BlockState blockState, Entity entity) {
 		if (!level.isClientSide() && entity instanceof Player player) {
+			double yVelocity = player.getDeltaMovement().y;
+			
 			// Check if player has upward velocity (jumping) - wants to go up
-			// Small positive Y velocity indicates jump
-			if (player.getDeltaMovement().y > 0.1) {
+			// Any positive Y velocity indicates upward movement
+			if (yVelocity > 0.0) {
 				BlockPos targetPos = findElevatorAbove(level, blockPos);
 				if (targetPos != null) {
 					teleportPlayerToElevator(player, targetPos);
 				}
 			}
 			// Check if player is sneaking (wants to go down)
-			else if (player.isSteppingCarefully()) {
+			else if (player.isSteppingCarefully() && yVelocity <= 0.0) {
 				BlockPos targetPos = findElevatorBelow(level, blockPos);
 				if (targetPos != null) {
 					teleportPlayerToElevator(player, targetPos);
