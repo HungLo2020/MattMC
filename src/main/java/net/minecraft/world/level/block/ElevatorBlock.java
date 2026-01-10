@@ -81,15 +81,9 @@ public class ElevatorBlock extends Block {
 	}
 
 	private boolean isSpaceClearAbove(Level level, BlockPos elevatorPos) {
-		// Check if the 2 blocks above the elevator are empty (air or replaceable)
-		BlockPos above1 = elevatorPos.above();
-		BlockPos above2 = elevatorPos.above(2);
-		
-		BlockState state1 = level.getBlockState(above1);
-		BlockState state2 = level.getBlockState(above2);
-		
-		return (state1.isAir() || state1.canBeReplaced()) && 
-		       (state2.isAir() || state2.canBeReplaced());
+		// Check if space above elevator is clear - matches reference mod's isValidPos check
+		// Reference: TeleportPacket.java line 150
+		return !level.getBlockState(elevatorPos.above()).isSuffocating(level, elevatorPos.above());
 	}
 
 	private void teleportPlayerToElevator(Player player, BlockPos elevatorPos) {
@@ -101,8 +95,7 @@ public class ElevatorBlock extends Block {
 		
 		player.teleportTo(x, y, z);
 		player.resetFallDistance();
-		// Reset ALL velocity (x, y, z) to zero to prevent any movement after teleportation
-		// This ensures the player doesn't jump or maintain momentum after being teleported
-		player.setDeltaMovement(Vec3.ZERO);
+		// Preserve horizontal movement (X, Z) but zero out vertical (Y) - matches reference ElevatorMod
+		player.setDeltaMovement(player.getDeltaMovement().multiply(1.0, 0.0, 1.0));
 	}
 }
