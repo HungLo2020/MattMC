@@ -25,12 +25,12 @@ public class ElevatorBlock extends Block {
 	 * @return true if teleportation occurred, false otherwise
 	 */
 	public boolean tryTeleportUp(Level level, BlockPos blockPos, Player player) {
-		if (!level.isClientSide()) {
-			BlockPos targetPos = findElevatorAbove(level, blockPos);
-			if (targetPos != null) {
+		BlockPos targetPos = findElevatorAbove(level, blockPos);
+		if (targetPos != null) {
+			if (!level.isClientSide()) {
 				teleportPlayerToElevator(player, targetPos);
-				return true;
 			}
+			return true;
 		}
 		return false;
 	}
