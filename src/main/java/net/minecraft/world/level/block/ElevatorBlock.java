@@ -20,21 +20,26 @@ public class ElevatorBlock extends Block {
 		super(properties);
 	}
 
+	/**
+	 * Called when a player tries to jump while standing on this elevator.
+	 * @return true if teleportation occurred, false otherwise
+	 */
+	public boolean tryTeleportUp(Level level, BlockPos blockPos, Player player) {
+		if (!level.isClientSide()) {
+			BlockPos targetPos = findElevatorAbove(level, blockPos);
+			if (targetPos != null) {
+				teleportPlayerToElevator(player, targetPos);
+				return true;
+			}
+		}
+		return false;
+	}
+
 	@Override
 	public void stepOn(Level level, BlockPos blockPos, BlockState blockState, Entity entity) {
 		if (!level.isClientSide() && entity instanceof Player player) {
-			double yVelocity = player.getDeltaMovement().y;
-			
-			// Check if player has upward velocity (jumping) - wants to go up
-			// Any positive Y velocity indicates upward movement
-			if (yVelocity > 0.0) {
-				BlockPos targetPos = findElevatorAbove(level, blockPos);
-				if (targetPos != null) {
-					teleportPlayerToElevator(player, targetPos);
-				}
-			}
 			// Check if player is sneaking (wants to go down)
-			else if (player.isSteppingCarefully() && yVelocity <= 0.0) {
+			if (player.isSteppingCarefully()) {
 				BlockPos targetPos = findElevatorBelow(level, blockPos);
 				if (targetPos != null) {
 					teleportPlayerToElevator(player, targetPos);
