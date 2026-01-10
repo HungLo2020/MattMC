@@ -454,7 +454,7 @@ public abstract class Player extends Avatar implements ContainerUser {
 		}
 
 		// Handle elevator teleportation before jump logic
-		if (this.jumping && this.onGround()) {
+		if (this.jumping) {
 			BlockPos blockBelow = this.getBlockPosBelowThatAffectsMyMovement();
 			if (this.level() != null && this.level().getBlockState(blockBelow).getBlock() instanceof net.minecraft.world.level.block.ElevatorBlock elevatorBlock) {
 				if (elevatorBlock.tryTeleportUp(this.level(), blockBelow, this)) {
