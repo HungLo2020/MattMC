@@ -98,5 +98,7 @@ public class ElevatorBlock extends Block {
 		
 		player.teleportTo(x, y, z);
 		player.resetFallDistance();
+		// Reset vertical velocity to prevent jump after teleportation
+		player.setDeltaMovement(player.getDeltaMovement().x, 0.0, player.getDeltaMovement().z);
 	}
 }
