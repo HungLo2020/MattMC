@@ -104,8 +104,8 @@ public class AdvancementTab {
 			.orElse(TextureManager.INTENTIONAL_MISSING_TEXTURE);
 		int k = Mth.floor(this.scrollX);
 		int l = Mth.floor(this.scrollY);
-		int m = k % AdvancementsScreen.BACKGROUND_TILE_WIDTH;
-		int n = l % AdvancementsScreen.BACKGROUND_TILE_HEIGHT;
+		int m = Math.floorMod(k, AdvancementsScreen.BACKGROUND_TILE_WIDTH);
+		int n = Math.floorMod(l, AdvancementsScreen.BACKGROUND_TILE_HEIGHT);
 		
 		// Calculate how many tiles we need to cover the inside area, adding 1 extra to ensure full coverage
 		int tilesX = (AdvancementsScreen.WINDOW_INSIDE_WIDTH / AdvancementsScreen.BACKGROUND_TILE_WIDTH) + 3;
