@@ -3,9 +3,7 @@ package net.minecraft.world.level.block;
 import com.mojang.serialization.MapCodec;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.block.state.BlockState;
@@ -25,14 +23,12 @@ public class ElevatorBlock extends Block {
 	@Override
 	public void stepOn(Level level, BlockPos blockPos, BlockState blockState, Entity entity) {
 		if (!level.isClientSide() && entity instanceof Player player) {
-			// Check if player is jumping (wants to go up)
-			// We check if the player is jumping - this flag is set when they press space
-			if (entity instanceof LivingEntity livingEntity && livingEntity.isJumping()) {
+			// Check if player has upward velocity (jumping) - wants to go up
+			// Small positive Y velocity indicates jump
+			if (player.getDeltaMovement().y > 0.1) {
 				BlockPos targetPos = findElevatorAbove(level, blockPos);
 				if (targetPos != null) {
 					teleportPlayerToElevator(player, targetPos);
-					// Reset jumping flag to prevent multiple teleports
-					livingEntity.setJumping(false);
 				}
 			}
 			// Check if player is sneaking (wants to go down)
