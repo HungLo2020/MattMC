@@ -503,7 +503,8 @@ public abstract class Player extends Avatar implements ContainerUser {
 		if (this.level() != null && this.level().getBlockState(blockBelow).getBlock() instanceof net.minecraft.world.level.block.ElevatorBlock elevatorBlock) {
 			// Call the elevator block's method to handle teleportation
 			if (elevatorBlock.tryTeleportUp(this.level(), blockBelow, this)) {
-				// Teleportation happened, don't jump
+				// Teleportation happened, cancel the jump completely
+				this.setJumping(false);
 				return;
 			}
 		}
