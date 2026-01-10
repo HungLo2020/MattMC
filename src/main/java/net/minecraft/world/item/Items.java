@@ -816,6 +816,7 @@ public class Items {
 	public static final Item GREEN_CONCRETE_POWDER = registerBlock(Blocks.GREEN_CONCRETE_POWDER);
 	public static final Item RED_CONCRETE_POWDER = registerBlock(Blocks.RED_CONCRETE_POWDER);
 	public static final Item BLACK_CONCRETE_POWDER = registerBlock(Blocks.BLACK_CONCRETE_POWDER);
+	public static final Item ELEVATOR = registerBlock(Blocks.ELEVATOR);
 	public static final Item TURTLE_EGG = registerBlock(Blocks.TURTLE_EGG);
 	public static final Item SNIFFER_EGG = registerBlock(Blocks.SNIFFER_EGG, (UnaryOperator<Item.Properties>)(properties -> properties.rarity(Rarity.UNCOMMON)));
 	public static final Item DRIED_GHAST = registerBlock(Blocks.DRIED_GHAST);
