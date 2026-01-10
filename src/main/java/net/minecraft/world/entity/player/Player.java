@@ -146,6 +146,7 @@ public abstract class Player extends Avatar implements ContainerUser {
 	private static final int DEFAULT_SCORE = 0;
 	private static final boolean DEFAULT_IGNORE_FALL_DAMAGE_FROM_CURRENT_IMPULSE = false;
 	private static final int DEFAULT_CURRENT_IMPULSE_CONTEXT_RESET_GRACE_TIME = 0;
+	private static final double ELEVATOR_DETECTION_OFFSET = 0.1;
 	final Inventory inventory;
 	protected PlayerEnderChestContainer enderChestInventory = new PlayerEnderChestContainer();
 	public final InventoryMenu inventoryMenu;
@@ -453,6 +454,17 @@ public abstract class Player extends Avatar implements ContainerUser {
 			this.jumpTriggerTime--;
 		}
 
+		// Handle elevator teleportation BEFORE jump logic
+		if (this.jumping && !this.abilities.flying) {
+			BlockPos blockBelow = BlockPos.containing(this.getX(), this.getY() - ELEVATOR_DETECTION_OFFSET, this.getZ());
+			if (this.level() != null && this.level().getBlockState(blockBelow).getBlock() instanceof net.minecraft.world.level.block.ElevatorBlock elevatorBlock) {
+				if (elevatorBlock.tryTeleportUp(this.level(), blockBelow, this)) {
+					// Teleportation succeeded, cancel jump
+					this.setJumping(false);
+				}
+			}
+		}
+
 		this.tickRegeneration();
 		this.inventory.tick();
 		if (this.abilities.flying && !this.isPassenger()) {
@@ -498,17 +510,7 @@ public abstract class Player extends Avatar implements ContainerUser {
 
 	@Override
 	public void jumpFromGround() {
-		// Check if player is standing on an elevator block
-		// Use direct position calculation for reliable detection
-		BlockPos blockBelow = BlockPos.containing(this.getX(), this.getY() - 0.1, this.getZ());
-		if (this.level() != null && this.level().getBlockState(blockBelow).getBlock() instanceof net.minecraft.world.level.block.ElevatorBlock elevatorBlock) {
-			// Call the elevator block's method to handle teleportation
-			if (elevatorBlock.tryTeleportUp(this.level(), blockBelow, this)) {
-				// Teleportation happened, don't jump
-				return;
-			}
-		}
-		// Otherwise, do normal jump
+		// Normal jump - elevator handling is done in aiStep()
 		super.jumpFromGround();
 	}
 
