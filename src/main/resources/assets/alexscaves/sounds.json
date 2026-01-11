@@ -1,0 +1,47 @@
+{
+  "subterranodon_idle": {
+    "sounds": [
+      "alexscaves:mob/subterranodon/subterranodon_idle_0",
+      "alexscaves:mob/subterranodon/subterranodon_idle_1",
+      "alexscaves:mob/subterranodon/subterranodon_idle_2",
+      "alexscaves:mob/subterranodon/subterranodon_idle_3"
+    ],
+    "subtitle": "alexscaves.sound.subtitle.subterranodon_idle"
+  },
+  "subterranodon_hurt": {
+    "sounds": [
+      "alexscaves:mob/subterranodon/subterranodon_hurt_0",
+      "alexscaves:mob/subterranodon/subterranodon_hurt_1",
+      "alexscaves:mob/subterranodon/subterranodon_hurt_2"
+    ],
+    "subtitle": "alexscaves.sound.subtitle.subterranodon_hurt"
+  },
+  "subterranodon_death": {
+    "sounds": [
+      "alexscaves:mob/subterranodon/subterranodon_death_0",
+      "alexscaves:mob/subterranodon/subterranodon_death_1",
+      "alexscaves:mob/subterranodon/subterranodon_death_2"
+    ],
+    "subtitle": "alexscaves.sound.subtitle.subterranodon_death"
+  },
+  "subterranodon_flap": {
+    "sounds": [
+      "alexscaves:mob/subterranodon/subterranodon_flap_0",
+      "alexscaves:mob/subterranodon/subterranodon_flap_1",
+      "alexscaves:mob/subterranodon/subterranodon_flap_2",
+      "alexscaves:mob/subterranodon/subterranodon_flap_3",
+      "alexscaves:mob/subterranodon/subterranodon_flap_4",
+      "alexscaves:mob/subterranodon/subterranodon_flap_5"
+    ],
+    "subtitle": "alexscaves.sound.subtitle.subterranodon_flap"
+  },
+  "subterranodon_attack": {
+    "sounds": [
+      "alexscaves:mob/subterranodon/subterranodon_attack_0",
+      "alexscaves:mob/subterranodon/subterranodon_attack_1",
+      "alexscaves:mob/subterranodon/subterranodon_attack_2",
+      "alexscaves:mob/subterranodon/subterranodon_attack_3"
+    ],
+    "subtitle": "alexscaves.sound.subtitle.subterranodon_attack"
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "block.alexscaves.cave_painting_subterranodon.desc": "\"Subterranodon\"",
+  "block.alexscaves.cave_painting_subterranodon_ride.desc": "\"Subterranodon Ride\"",
+  "block.alexscaves.subterranodon_egg": "Subterranodon Egg",
+  "item.alexscaves.spawn_egg_subterranodon": "Subterranodon Spawn Egg",
+  "entity.alexscaves.subterranodon": "Subterranodon",
+  "entity.alexscaves.subterranodon.mount_message": "%s to Ascend, %s to Descend, %s to Dismount",
+  "advancements.alexscaves.tame_subterranodon.title": "Prehistoric Elytra",
+  "advancements.alexscaves.tame_subterranodon.desc": "Tame a Subterranodon using Cod",
+  "alexscaves.sound.subtitle.subterranodon_idle": "Subterranodon gaggles",
+  "alexscaves.sound.subtitle.subterranodon_hurt": "Subterranodon warbles",
+  "alexscaves.sound.subtitle.subterranodon_death": "Subterranodon hisses",
+  "alexscaves.sound.subtitle.subterranodon_flap": "Subterranodon flaps wings",
+  "alexscaves.sound.subtitle.subterranodon_attack": "Subterranodon gnaps"
+}
