@@ -9,7 +9,8 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.Level;
-import net.neoforged.neoforge.network.PacketDistributor;
+// TODO: Replace with Fabric Networking API
+// import net.neoforged.neoforge.network.PacketDistributor;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -41,7 +42,8 @@ public class ServerTickRateTracker extends TickRateTracker {
 
     @Override
     protected void sync() {
-        PacketDistributor.sendToAllPlayers(new SyncClientTickRateMessage(toTag()));
+        // TODO: Send to all players with Fabric networking
+        // PacketDistributor.sendToAllPlayers(new SyncClientTickRateMessage(toTag()));
     }
 
     public int getServerTickLengthMs() {

@@ -1,18 +1,29 @@
 package com.github.alexthe666.citadel.config;
 
-import net.neoforged.neoforge.common.ModConfigSpec;
+// TODO: Replace with Fabric config system
+// import net.neoforged.neoforge.common.ModConfigSpec;
 
+// TODO: This class uses NeoForge's ModConfigSpec - needs Fabric replacement
+// For now, static config values are set in Citadel.initConfig()
 public class ServerConfig {
 
-    public final ModConfigSpec.BooleanValue citadelEntityTracker;
-    public final ModConfigSpec.BooleanValue skipDatapackWarnings;
-    public final ModConfigSpec.DoubleValue chunkGenSpawnModifier;
-    public final ModConfigSpec.BooleanValue aprilFoolsContent;
-    public static boolean citadelEntityTrack;
-    public static boolean skipWarnings;
+    // TODO: Replace with Fabric config values
+    // public final ModConfigSpec.BooleanValue citadelEntityTracker;
+    // public final ModConfigSpec.BooleanValue skipDatapackWarnings;
+    // public final ModConfigSpec.DoubleValue chunkGenSpawnModifier;
+    // public final ModConfigSpec.BooleanValue aprilFoolsContent;
+    
+    public static boolean citadelEntityTrack = true;
+    public static boolean skipWarnings = false;
     public static double chunkGenSpawnModifierVal = 1.0D;
-    public static boolean aprilFools;
+    public static boolean aprilFools = false;
 
+    // Default constructor for placeholder usage
+    public ServerConfig() {
+        // Defaults already set in static fields
+    }
+
+    /* Original NeoForge config initialization
     public ServerConfig(final ModConfigSpec.Builder builder) {
         builder.push("general");
         this.citadelEntityTracker = buildBoolean(builder, "Track Entities", "all", true, "True if citadel tracks entity properties(freezing, stone mobs, etc) on server. Turn this to false to solve some server lag, may break some stuff.");
@@ -24,4 +35,5 @@ public class ServerConfig {
     private static ModConfigSpec.BooleanValue buildBoolean(ModConfigSpec.Builder builder, String name, String catagory, boolean defaultValue, String comment){
         return builder.comment(comment).translation(name).define(name, defaultValue);
     }
+    */
 }
