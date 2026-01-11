@@ -208,9 +208,6 @@ public class LocalPlayer extends AbstractClientPlayer implements net.irisshaders
 		if (this.hasClientLoaded()) {
 			this.dropSpamThrottler.tick();
 			
-			// Handle elevator teleportation - matches reference ElevatorMod's ElevatorHandler.handleInput()
-			this.handleElevatorInput();
-			
 			super.tick();
 			if (!this.lastSentInput.equals(this.input.keyPresses)) {
 				this.connection.send(new ServerboundPlayerInputPacket(this.input.keyPresses));
@@ -1058,7 +1055,8 @@ public class LocalPlayer extends AbstractClientPlayer implements net.irisshaders
 	}
 
 	// Elevator handling - matches reference ElevatorMod's ElevatorHandler.handleInput()
-	private void handleElevatorInput() {
+	// Matches reference ElevatorMod's ElevatorHandler.handleInput() - called at END of client tick
+	public void handleElevatorInput() {
 		if (this == null || this.isSpectator() || !this.isAlive() || this.input == null) {
 			return;
 		}
