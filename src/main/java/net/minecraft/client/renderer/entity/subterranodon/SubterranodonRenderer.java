@@ -12,29 +12,29 @@ import net.minecraft.world.entity.animal.subterranodon.SubterranodonEntity;
 
 /**
  * Renderer for Subterranodon entity.
- * 
- * NOTE: This uses a simplified SubterranodonModel.
- * TODO: Port the full SubterranodonModel.java from AlexsCaves mod which includes:
- *  - Custom bone structure
- *  - Wing animations
- *  - Flying/hovering animations
- *  - Tail movements
- *  - Rider positioning
- *  - Baby scaling
- * 
- * The original AlexsCaves SubterranodonModel is 18,480 characters of complex animation code.
+ * Ported from AlexsCaves mod.
  */
 @Environment(EnvType.CLIENT)
 public class SubterranodonRenderer extends MobRenderer<SubterranodonEntity, SubterranodonRenderState, SubterranodonModel> {
-    private static final ResourceLocation SUBTERRANODON_LOCATION = ResourceLocation.withDefaultNamespace("textures/entity/subterranodon/subterranodon.png");
+    private static final ResourceLocation TEXTURE = ResourceLocation.withDefaultNamespace("textures/entity/subterranodon/subterranodon.png");
+    private static final ResourceLocation TEXTURE_RETRO = ResourceLocation.withDefaultNamespace("textures/entity/subterranodon/subterranodon_retro.png");
+    private static final ResourceLocation TEXTURE_TECTONIC = ResourceLocation.withDefaultNamespace("textures/entity/subterranodon/subterranodon_tectonic.png");
     
     public SubterranodonRenderer(EntityRendererProvider.Context context) {
         super(context, new SubterranodonModel(context.bakeLayer(ModelLayers.SUBTERRANODON)), 0.5F);
+        // TODO: Add SubterranodonRiderLayer when rider positioning is fully implemented
+        // this.addLayer(new SubterranodonRiderLayer(this));
     }
     
     @Override
     public ResourceLocation getTextureLocation(SubterranodonRenderState renderState) {
-        return SUBTERRANODON_LOCATION;
+        // Use alternate skins if available
+        if (renderState.altSkin == 1) {
+            return TEXTURE_RETRO;
+        } else if (renderState.altSkin == 2) {
+            return TEXTURE_TECTONIC;
+        }
+        return TEXTURE;
     }
     
     @Override
@@ -47,6 +47,7 @@ public class SubterranodonRenderer extends MobRenderer<SubterranodonEntity, Subt
         super.extractRenderState(entity, renderState, partialTick);
         renderState.isFlying = entity.isFlying();
         renderState.isHovering = entity.isHovering();
-        // TODO: Extract additional animation state when proper model is implemented
+        renderState.flapAmount = entity.getFlyProgress(partialTick);
+        renderState.altSkin = entity.getAltSkin();
     }
 }

@@ -12,6 +12,7 @@ public class SubterranodonRenderState extends LivingEntityRenderState {
     public boolean isFlying;
     public boolean isHovering;
     public float flapAmount;
+    public int altSkin; // 0 = normal, 1 = retro, 2 = tectonic
     
     public SubterranodonRenderState() {
     }

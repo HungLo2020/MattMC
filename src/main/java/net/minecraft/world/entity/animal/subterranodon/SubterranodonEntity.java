@@ -43,6 +43,7 @@ public class SubterranodonEntity extends TamableAnimal implements FlyingAnimal, 
     private static final EntityDataAccessor<Boolean> HOVERING = SynchedEntityData.defineId(SubterranodonEntity.class, EntityDataSerializers.BOOLEAN);
     private static final EntityDataAccessor<Float> METER_AMOUNT = SynchedEntityData.defineId(SubterranodonEntity.class, EntityDataSerializers.FLOAT);
     private static final EntityDataAccessor<Boolean> HAS_EGG = SynchedEntityData.defineId(SubterranodonEntity.class, EntityDataSerializers.BOOLEAN);
+    private static final EntityDataAccessor<Integer> ALT_SKIN = SynchedEntityData.defineId(SubterranodonEntity.class, EntityDataSerializers.INT);
     
     // Navigation
     private boolean isLandNavigator;
@@ -107,6 +108,7 @@ public class SubterranodonEntity extends TamableAnimal implements FlyingAnimal, 
         builder.define(HOVERING, false);
         builder.define(METER_AMOUNT, 1.0F);
         builder.define(HAS_EGG, false);
+        builder.define(ALT_SKIN, 0);
     }
     
     @Override
@@ -269,6 +271,31 @@ public class SubterranodonEntity extends TamableAnimal implements FlyingAnimal, 
             hovering = false;
         }
         this.entityData.set(HOVERING, hovering);
+    }
+    
+    /**
+     * Gets the fly progress for smooth animation interpolation.
+     * @param partialTick Partial tick for interpolation
+     * @return Progress value between prevFlyProgress and flyProgress
+     */
+    public float getFlyProgress(float partialTick) {
+        return Mth.lerp(partialTick, this.prevFlyProgress, this.flyProgress);
+    }
+    
+    /**
+     * Gets the alternate skin index.
+     * @return 0 for normal, 1 for retro, 2 for tectonic
+     */
+    public int getAltSkin() {
+        return this.entityData.get(ALT_SKIN);
+    }
+    
+    /**
+     * Sets the alternate skin index.
+     * @param skinIndex 0 for normal, 1 for retro, 2 for tectonic
+     */
+    public void setAltSkin(int skinIndex) {
+        this.entityData.set(ALT_SKIN, skinIndex);
     }
     
     // Pack Animal implementation
