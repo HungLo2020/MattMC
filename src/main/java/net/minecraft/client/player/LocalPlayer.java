@@ -143,9 +143,9 @@ public class LocalPlayer extends AbstractClientPlayer implements net.irisshaders
 	private InteractionHand usingItemHand;
 	private boolean handsBusy;
 	private boolean autoJumpEnabled = true;
-	// Elevator handling - matches reference ElevatorMod
-	private boolean lastElevatorJumping = false;
-	private boolean lastElevatorSneaking = false;
+	// Elevator handling - STATIC fields like reference ElevatorMod (ElevatorHandler.java lines 14-15)
+	private static boolean lastElevatorJumping = false;
+	private static boolean lastElevatorSneaking = false;
 	private int autoJumpTime;
 	private boolean wasFallFlying;
 	private int waterVisionTime;
