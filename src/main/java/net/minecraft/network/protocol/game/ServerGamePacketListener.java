@@ -117,4 +117,6 @@ public interface ServerGamePacketListener extends ServerCommonPacketListener, Se
 	void handleDebugSubscriptionRequest(ServerboundDebugSubscriptionRequestPacket serverboundDebugSubscriptionRequestPacket);
 
 	void handleClientTickEnd(ServerboundClientTickEndPacket serverboundClientTickEndPacket);
+
+	void handleElevatorTeleport(ServerboundElevatorTeleportPacket serverboundElevatorTeleportPacket);
 }
