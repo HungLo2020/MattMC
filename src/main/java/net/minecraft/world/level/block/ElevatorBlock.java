@@ -86,7 +86,7 @@ public class ElevatorBlock extends Block {
 		return !level.getBlockState(elevatorPos.above()).isSuffocating(level, elevatorPos.above());
 	}
 
-	private void teleportPlayerToElevator(Player player, BlockPos elevatorPos) {
+	public void teleportPlayerToElevator(Player player, BlockPos elevatorPos) {
 		// Teleport player to stand on top of the elevator block
 		// Position is center of block (x + 0.5, z + 0.5) and on top of block (y + 1.0)
 		double x = elevatorPos.getX() + 0.5;

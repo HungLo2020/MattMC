@@ -1090,10 +1090,12 @@ public class LocalPlayer extends AbstractClientPlayer implements net.irisshaders
 
 			if (this.level().getBlockState(toPos).getBlock() instanceof net.minecraft.world.level.block.ElevatorBlock) {
 				if (this.isValidElevatorPos(toPos)) {
-					// Call the elevator block to handle teleportation
-					net.minecraft.world.level.block.ElevatorBlock elevatorBlock =
-						(net.minecraft.world.level.block.ElevatorBlock) this.level().getBlockState(toPos).getBlock();
-					elevatorBlock.tryTeleportUp(this.level(), fromPos, this);
+					// Found valid target - teleport directly on server side only
+					if (!this.level().isClientSide()) {
+						net.minecraft.world.level.block.ElevatorBlock elevatorBlock =
+							(net.minecraft.world.level.block.ElevatorBlock) this.level().getBlockState(toPos).getBlock();
+						elevatorBlock.teleportPlayerToElevator(this, toPos.immutable());
+					}
 					break;
 				}
 			}
