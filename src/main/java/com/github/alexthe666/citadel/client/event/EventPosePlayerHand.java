@@ -1,12 +1,12 @@
 package com.github.alexthe666.citadel.client.event;
 
+import com.github.alexthe666.citadel.server.event.EventMergeStructureSpawns.TriState;
 import net.minecraft.client.model.HumanoidModel;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
-import net.neoforged.bus.api.Event;
-import net.neoforged.neoforge.common.util.TriState;
 
-public class EventPosePlayerHand extends Event {
+// TODO: Integrate with Fabric rendering events
+public class EventPosePlayerHand {
     private LivingEntity entityIn;
     private HumanoidModel model;
     private boolean left;

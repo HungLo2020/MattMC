@@ -5,11 +5,13 @@ import com.mojang.serialization.MapCodec;
 import net.minecraft.core.Holder;
 import net.minecraft.util.Mth;
 import net.minecraft.world.level.biome.Biome;
-import net.neoforged.neoforge.common.world.BiomeModifier;
-import net.neoforged.neoforge.common.world.ModifiableBiomeInfo;
 
-public class SpawnProbabilityModifier implements BiomeModifier {
-
+// TODO: Implement with Fabric Biome API - NeoForge BiomeModifier doesn't exist
+// This class modifies spawn probabilities in biomes during worldgen
+// For now, this functionality is disabled until Fabric biome modification is implemented
+public class SpawnProbabilityModifier {
+    
+    /* Original NeoForge implementation - commented out
     @Override
     public void modify(Holder<Biome> biome, Phase phase, ModifiableBiomeInfo.BiomeInfo.Builder builder) {
         float probability = (float) (ServerConfig.chunkGenSpawnModifierVal) * builder.getMobSpawnSettings().getProbability();
@@ -22,6 +24,7 @@ public class SpawnProbabilityModifier implements BiomeModifier {
     public MapCodec<? extends BiomeModifier> codec() {
         return makeCodec();
     }
+    */
 
     public static MapCodec<SpawnProbabilityModifier> makeCodec() {
         return MapCodec.unit(SpawnProbabilityModifier::new);

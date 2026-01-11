@@ -4,9 +4,9 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.model.EntityModel;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.world.entity.LivingEntity;
-import net.neoforged.bus.api.Event;
 
-public class EventLivingRenderer extends Event {
+// TODO: Integrate with Fabric rendering events
+public class EventLivingRenderer {
 
     private LivingEntity entity;
     private EntityModel model;

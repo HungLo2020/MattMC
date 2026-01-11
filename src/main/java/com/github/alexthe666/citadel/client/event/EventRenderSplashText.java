@@ -1,10 +1,10 @@
 package com.github.alexthe666.citadel.client.event;
 
+import com.github.alexthe666.citadel.server.event.EventMergeStructureSpawns.TriState;
 import net.minecraft.client.gui.GuiGraphics;
-import net.neoforged.bus.api.Event;
-import net.neoforged.neoforge.common.util.TriState;
 
-public class EventRenderSplashText extends Event {
+// TODO: Integrate with Fabric rendering events
+public class EventRenderSplashText {
     private String splashText;
 
     private GuiGraphics guiGraphics;

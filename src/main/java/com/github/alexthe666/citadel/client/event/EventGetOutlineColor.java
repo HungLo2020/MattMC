@@ -1,10 +1,10 @@
 package com.github.alexthe666.citadel.client.event;
 
+import com.github.alexthe666.citadel.server.event.EventMergeStructureSpawns.TriState;
 import net.minecraft.world.entity.Entity;
-import net.neoforged.bus.api.Event;
-import net.neoforged.neoforge.common.util.TriState;
 
-public class EventGetOutlineColor extends Event {
+// TODO: Integrate with Fabric rendering events
+public class EventGetOutlineColor {
     private Entity entityIn;
     private int color;
     private TriState result = TriState.DEFAULT;

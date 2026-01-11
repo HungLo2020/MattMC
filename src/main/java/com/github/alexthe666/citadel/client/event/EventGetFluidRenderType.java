@@ -1,14 +1,14 @@
 package com.github.alexthe666.citadel.client.event;
 
+import com.github.alexthe666.citadel.server.event.EventMergeStructureSpawns.TriState;
+import net.fabricmc.api.EnvType;
+import net.fabricmc.api.Environment;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.world.level.material.FluidState;
-import net.neoforged.api.distmarker.Dist;
-import net.neoforged.api.distmarker.OnlyIn;
-import net.neoforged.bus.api.Event;
-import net.neoforged.neoforge.common.util.TriState;
 
-@OnlyIn(Dist.CLIENT)
-public class EventGetFluidRenderType extends Event {
+// TODO: Integrate with Fabric rendering events
+@Environment(EnvType.CLIENT)
+public class EventGetFluidRenderType {
     private FluidState fluidState;
     private RenderType renderType;
     private TriState result = TriState.DEFAULT;
