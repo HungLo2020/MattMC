@@ -10,7 +10,8 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
-import net.neoforged.neoforge.common.NeoForge;
+// TODO: Replace with Fabric event system
+// import net.neoforged.neoforge.common.NeoForge;
 
 public class ServerProxy {
     public ServerProxy() {
@@ -59,8 +60,9 @@ public class ServerProxy {
                 return false;
             } else if (!tracker.hasNormalTickRate(entity)) {
                 EventChangeEntityTickRate event = new EventChangeEntityTickRate(entity, tracker.getEntityTickLengthModifier(entity));
-                NeoForge.EVENT_BUS.post(event);
-                if (event.isCanceled()) {
+                // TODO: Post event to Fabric event bus
+                // NeoForge.EVENT_BUS.post(event);
+                if (event.isCancelled()) {
                     return true;
                 } else {
                     tracker.addTickBlockedEntity(entity);
