@@ -925,15 +925,22 @@ public abstract class BlockBehaviour implements FeatureElement {
 		static final class Cache {
 			private static final Direction[] DIRECTIONS = Direction.values();
 			private static final int SUPPORT_TYPE_COUNT = SupportType.values().length;
-			protected final VoxelShape collisionShape;
+			protected VoxelShape collisionShape;
 			protected final boolean largeCollisionShape;
-			private final boolean[] faceSturdy;
+			private boolean[] faceSturdy;
 			protected final boolean isCollisionShapeFullBlock;
 
 			Cache(BlockState blockState) {
 				Block block = blockState.getBlock();
-				this.collisionShape = block.getCollisionShape(blockState, EmptyBlockGetter.INSTANCE, BlockPos.ZERO, CollisionContext.empty());
-				if (!this.collisionShape.isEmpty() && blockState.hasOffsetFunction()) {
+				VoxelShape tempCollisionShape = block.getCollisionShape(blockState, EmptyBlockGetter.INSTANCE, BlockPos.ZERO, CollisionContext.empty());
+				boolean[] tempFaceSturdy = new boolean[DIRECTIONS.length * SUPPORT_TYPE_COUNT];
+				
+				// FerriteCore optimization #7: Track before cache init for deduplication
+				net.minecraft.world.level.block.state.BlockStateCacheDeduplication.beforeCacheInit(
+					this.collisionShape, this.faceSturdy
+				);
+				
+				if (!tempCollisionShape.isEmpty() && blockState.hasOffsetFunction()) {
 					throw new IllegalStateException(
 						String.format(
 							Locale.ROOT, "%s has a collision shape and an offset type, but is not marked as dynamicShape in its properties.", BuiltInRegistries.BLOCK.getKey(block)
@@ -941,16 +948,22 @@ public abstract class BlockBehaviour implements FeatureElement {
 					);
 				} else {
 					this.largeCollisionShape = Arrays.stream(Direction.Axis.values())
-						.anyMatch(axis -> this.collisionShape.min(axis) < 0.0 || this.collisionShape.max(axis) > 1.0);
-					this.faceSturdy = new boolean[DIRECTIONS.length * SUPPORT_TYPE_COUNT];
+						.anyMatch(axis -> tempCollisionShape.min(axis) < 0.0 || tempCollisionShape.max(axis) > 1.0);
 
 					for (Direction direction : DIRECTIONS) {
 						for (SupportType supportType : SupportType.values()) {
-							this.faceSturdy[getFaceSupportIndex(direction, supportType)] = supportType.isSupporting(blockState, EmptyBlockGetter.INSTANCE, BlockPos.ZERO, direction);
+							tempFaceSturdy[getFaceSupportIndex(direction, supportType)] = supportType.isSupporting(blockState, EmptyBlockGetter.INSTANCE, BlockPos.ZERO, direction);
 						}
 					}
 
 					this.isCollisionShapeFullBlock = Block.isShapeFullBlock(blockState.getCollisionShape(EmptyBlockGetter.INSTANCE, BlockPos.ZERO));
+					
+					// FerriteCore optimization #7: Deduplicate shapes and arrays
+					var result = net.minecraft.world.level.block.state.BlockStateCacheDeduplication.afterCacheInit(
+						tempCollisionShape, tempFaceSturdy
+					);
+					this.collisionShape = result.collisionShape;
+					this.faceSturdy = result.faceSturdy;
 				}
 			}
 

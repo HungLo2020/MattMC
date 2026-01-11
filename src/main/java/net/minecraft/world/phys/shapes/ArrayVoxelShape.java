@@ -7,9 +7,9 @@ import net.minecraft.Util;
 import net.minecraft.core.Direction;
 
 public class ArrayVoxelShape extends VoxelShape {
-	private final DoubleList xs;
-	private final DoubleList ys;
-	private final DoubleList zs;
+	private DoubleList xs;
+	private DoubleList ys;
+	private DoubleList zs;
 
 	protected ArrayVoxelShape(DiscreteVoxelShape discreteVoxelShape, double[] ds, double[] es, double[] fs) {
 		this(
@@ -41,5 +41,19 @@ public class ArrayVoxelShape extends VoxelShape {
 			case Y -> this.ys;
 			case Z -> this.zs;
 		};
+	}
+	
+	// FerriteCore optimization #7: Allow replacing internals for deduplication
+	// This is safe because VoxelShapes are treated as immutable
+	public void ferritecore$setXCoords(DoubleList coords) {
+		this.xs = coords;
+	}
+	
+	public void ferritecore$setYCoords(DoubleList coords) {
+		this.ys = coords;
+	}
+	
+	public void ferritecore$setZCoords(DoubleList coords) {
+		this.zs = coords;
 	}
 }
