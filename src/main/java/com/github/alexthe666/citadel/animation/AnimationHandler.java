@@ -2,8 +2,10 @@ package com.github.alexthe666.citadel.animation;
 
 import com.github.alexthe666.citadel.server.message.AnimationMessage;
 import net.minecraft.world.entity.Entity;
-import net.neoforged.neoforge.common.NeoForge;
-import net.neoforged.neoforge.network.PacketDistributor;
+// TODO: Replace with Fabric
+// import net.neoforged.neoforge.common.NeoForge;
+// TODO: Replace with Fabric
+// import net.neoforged.neoforge.network.PacketDistributor;
 import org.apache.commons.lang3.ArrayUtils;
 
 /**

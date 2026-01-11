@@ -4,10 +4,14 @@ import com.github.alexthe666.citadel.client.shader.CitadelInternalShaders;
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import net.minecraft.client.renderer.ShaderInstance;
 import net.minecraft.resources.ResourceLocation;
-import net.neoforged.api.distmarker.Dist;
-import net.neoforged.bus.api.SubscribeEvent;
-import net.neoforged.fml.common.EventBusSubscriber;
-import net.neoforged.neoforge.client.event.RegisterShadersEvent;
+// TODO: Replace with Fabric
+// import net.neoforged.api.distmarker.Dist;
+// TODO: Replace with Fabric
+// import net.neoforged.bus.api.SubscribeEvent;
+// TODO: Replace with Fabric
+// import net.neoforged.fml.common.EventBusSubscriber;
+// TODO: Replace with Fabric
+// import net.neoforged.neoforge.client.event.RegisterShadersEvent;
 
 @EventBusSubscriber(value = Dist.CLIENT, bus = EventBusSubscriber.Bus.MOD)
 public class ClientEvents {

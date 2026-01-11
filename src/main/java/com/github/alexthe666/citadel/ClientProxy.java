@@ -42,11 +42,16 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.player.PlayerModelPart;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
-import net.neoforged.bus.api.EventPriority;
-import net.neoforged.bus.api.SubscribeEvent;
-import net.neoforged.neoforge.client.event.*;
-import net.neoforged.neoforge.common.NeoForge;
-import net.neoforged.neoforge.common.util.TriState;
+// TODO: Replace with Fabric
+// import net.neoforged.bus.api.EventPriority;
+// TODO: Replace with Fabric
+// import net.neoforged.bus.api.SubscribeEvent;
+// TODO: Replace with Fabric
+// import net.neoforged.neoforge.client.event.*;
+// TODO: Replace with Fabric
+// import net.neoforged.neoforge.common.NeoForge;
+// TODO: Replace with Fabric
+// import net.neoforged.neoforge.common.util.TriState;
 
 import java.awt.*;
 import java.io.IOException;
