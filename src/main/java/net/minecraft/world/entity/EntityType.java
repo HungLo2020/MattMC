@@ -53,6 +53,7 @@ import net.minecraft.world.entity.animal.Rabbit;
 import net.minecraft.world.entity.animal.Salmon;
 import net.minecraft.world.entity.animal.SnowGolem;
 import net.minecraft.world.entity.animal.Squid;
+import net.minecraft.world.entity.animal.subterranodon.SubterranodonEntity;
 import net.minecraft.world.entity.animal.TropicalFish;
 import net.minecraft.world.entity.animal.Turtle;
 import net.minecraft.world.entity.animal.allay.Allay;
@@ -894,6 +895,13 @@ public class EntityType<T extends Entity> implements FeatureElement, EntityTypeT
 	);
 	public static final EntityType<Squid> SQUID = register(
 		"squid", EntityType.Builder.of(Squid::new, MobCategory.WATER_CREATURE).sized(0.8F, 0.8F).eyeHeight(0.4F).clientTrackingRange(8)
+	);
+	public static final EntityType<net.minecraft.world.entity.animal.subterranodon.SubterranodonEntity> SUBTERRANODON = register(
+		"subterranodon", 
+		EntityType.Builder.of(net.minecraft.world.entity.animal.subterranodon.SubterranodonEntity::new, MobCategory.CREATURE)
+			.sized(1.0F, 1.2F)
+			.eyeHeight(0.9F)
+			.clientTrackingRange(10)
 	);
 	public static final EntityType<Stray> STRAY = register(
 		"stray",
