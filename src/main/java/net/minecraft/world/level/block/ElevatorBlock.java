@@ -87,15 +87,22 @@ public class ElevatorBlock extends Block {
 	}
 
 	public void teleportPlayerToElevator(Player player, BlockPos elevatorPos) {
-		// Teleport player to stand on top of the elevator block
-		// Position is center of block (x + 0.5, z + 0.5) and on top of block (y + 1.0)
-		double x = elevatorPos.getX() + 0.5;
-		double y = elevatorPos.getY() + 1.0;
-		double z = elevatorPos.getZ() + 0.5;
+		// EXACT copy of reference mod's TeleportPacket.handle() teleportation logic
+		Level level = player.level();
+		BlockState toState = level.getBlockState(elevatorPos);
 		
-		player.teleportTo(x, y, z);
+		// X and Z positioning - reference mod uses precisionTarget config, defaulting to center
+		double toX = elevatorPos.getX() + 0.5;
+		double toZ = elevatorPos.getZ() + 0.5;
+		
+		// Y positioning - EXACT match to reference mod (TeleportPacket.java line 80-81)
+		double blockYOffset = toState.getBlockSupportShape(level, elevatorPos).max(net.minecraft.core.Direction.Axis.Y);
+		double toY = Math.max(elevatorPos.getY(), elevatorPos.getY() + blockYOffset);
+		
+		player.teleportTo(toX, toY, toZ);
 		player.resetFallDistance();
-		// Preserve horizontal movement (X, Z) but zero out vertical (Y) - matches reference ElevatorMod
-		player.setDeltaMovement(player.getDeltaMovement().multiply(1.0, 0.0, 1.0));
+		
+		// EXACT copy from reference mod (TeleportPacket.java line 107)
+		player.setDeltaMovement(player.getDeltaMovement().multiply(new Vec3(1.0, 0.0, 1.0)));
 	}
 }
