@@ -1091,8 +1091,8 @@ public class LocalPlayer extends AbstractClientPlayer implements net.irisshaders
 
 		BlockPos.MutableBlockPos toPos = fromPos.mutable();
 
-		// Search for elevator in the specified direction
-		int range = 64; // Max search range
+		// Search for elevator in the specified direction - range from Config.GENERAL.range (default 384)
+		int range = 384;
 		while (true) {
 			toPos.setY(toPos.getY() + facing.getStepY());
 			if (this.level().isOutsideBuildHeight(toPos) || Math.abs(toPos.getY() - fromPos.getY()) > range) {
@@ -1116,7 +1116,7 @@ public class LocalPlayer extends AbstractClientPlayer implements net.irisshaders
 	// Matches reference ElevatorMod's ElevatorHandler.getOriginElevator()
 	private BlockPos getOriginElevator() {
 		BlockPos pos = this.blockPosition();
-		int activationRange = 3; // Check up to 2 blocks below
+		int activationRange = 6; // From Config.GENERAL.activationRange (default 6)
 
 		for (int i = 0; i < activationRange; i++) {
 			if (this.level().getBlockState(pos).getBlock() instanceof net.minecraft.world.level.block.ElevatorBlock) {
