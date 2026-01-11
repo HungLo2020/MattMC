@@ -146,7 +146,6 @@ public abstract class Player extends Avatar implements ContainerUser {
 	private static final int DEFAULT_SCORE = 0;
 	private static final boolean DEFAULT_IGNORE_FALL_DAMAGE_FROM_CURRENT_IMPULSE = false;
 	private static final int DEFAULT_CURRENT_IMPULSE_CONTEXT_RESET_GRACE_TIME = 0;
-	private boolean lastJumpingState = false;  // Track previous jump state for elevator detection
 	final Inventory inventory;
 	protected PlayerEnderChestContainer enderChestInventory = new PlayerEnderChestContainer();
 	public final InventoryMenu inventoryMenu;
@@ -454,33 +453,6 @@ public abstract class Player extends Avatar implements ContainerUser {
 			this.jumpTriggerTime--;
 		}
 
-		// Handle elevator teleportation - check for jump key press (edge detection)
-		boolean currentlyJumping = this.jumping;
-		if (currentlyJumping && !this.lastJumpingState && !this.abilities.flying) {
-			// Jump key was just pressed - check for elevator
-			BlockPos playerPos = this.blockPosition();
-			BlockPos elevatorPos = null;
-			
-			// Search up to 2 blocks below player position (similar to reference ElevatorMod)
-			for (int i = 0; i < 3 && this.level() != null; i++) {
-				BlockPos checkPos = playerPos.below(i);
-				if (this.level().getBlockState(checkPos).getBlock() instanceof net.minecraft.world.level.block.ElevatorBlock) {
-					elevatorPos = checkPos;
-					break;
-				}
-			}
-			
-			if (elevatorPos != null) {
-				net.minecraft.world.level.block.ElevatorBlock elevatorBlock = 
-					(net.minecraft.world.level.block.ElevatorBlock) this.level().getBlockState(elevatorPos).getBlock();
-				if (elevatorBlock.tryTeleportUp(this.level(), elevatorPos, this)) {
-					// Teleportation successful - cancel the jump
-					this.setJumping(false);
-				}
-			}
-		}
-		this.lastJumpingState = currentlyJumping;
-
 		this.tickRegeneration();
 		this.inventory.tick();
 		if (this.abilities.flying && !this.isPassenger()) {
@@ -526,7 +498,16 @@ public abstract class Player extends Avatar implements ContainerUser {
 
 	@Override
 	public void jumpFromGround() {
-		// Elevator handling is done in aiStep() with edge detection
+		// Check if player is standing on an elevator block
+		BlockPos blockBelow = this.getBlockPosBelowThatAffectsMyMovement();
+		if (this.level() != null && this.level().getBlockState(blockBelow).getBlock() instanceof net.minecraft.world.level.block.ElevatorBlock elevatorBlock) {
+			// Call the elevator block's method to handle teleportation
+			if (elevatorBlock.tryTeleportUp(this.level(), blockBelow, this)) {
+				// Teleportation happened, don't jump
+				return;
+			}
+		}
+		// Otherwise, do normal jump
 		super.jumpFromGround();
 	}
 

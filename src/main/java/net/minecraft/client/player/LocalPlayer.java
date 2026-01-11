@@ -143,6 +143,8 @@ public class LocalPlayer extends AbstractClientPlayer implements net.irisshaders
 	private InteractionHand usingItemHand;
 	private boolean handsBusy;
 	private boolean autoJumpEnabled = true;
+	// Elevator handling - matches reference ElevatorMod
+	private boolean lastElevatorJumping = false;
 	private int autoJumpTime;
 	private boolean wasFallFlying;
 	private int waterVisionTime;
@@ -204,6 +206,10 @@ public class LocalPlayer extends AbstractClientPlayer implements net.irisshaders
 		this.tickClientLoadTimeout();
 		if (this.hasClientLoaded()) {
 			this.dropSpamThrottler.tick();
+			
+			// Handle elevator teleportation - matches reference ElevatorMod's ElevatorHandler.handleInput()
+			this.handleElevatorInput();
+			
 			super.tick();
 			if (!this.lastSentInput.equals(this.input.keyPresses)) {
 				this.connection.send(new ServerboundPlayerInputPacket(this.input.keyPresses));
@@ -1048,6 +1054,73 @@ public class LocalPlayer extends AbstractClientPlayer implements net.irisshaders
 		if (gameType == GameType.SPECTATOR) {
 			this.setDeltaMovement(this.getDeltaMovement().with(Axis.Y, 0.0));
 		}
+	}
+
+	// Elevator handling - matches reference ElevatorMod's ElevatorHandler.handleInput()
+	private void handleElevatorInput() {
+		if (this == null || this.isSpectator() || !this.isAlive() || this.input == null) {
+			return;
+		}
+
+		boolean jumping = this.input.keyPresses.jump();
+		if (this.lastElevatorJumping != jumping) {
+			this.lastElevatorJumping = jumping;
+			if (jumping) {
+				this.tryElevatorTeleport(Direction.UP);
+			}
+		}
+	}
+
+	// Matches reference ElevatorMod's ElevatorHandler.tryTeleport()
+	private void tryElevatorTeleport(Direction facing) {
+		BlockPos fromPos = this.getOriginElevator();
+		if (fromPos == null) {
+			return;
+		}
+
+		BlockPos.MutableBlockPos toPos = fromPos.mutable();
+
+		// Search for elevator in the specified direction
+		int range = 64; // Max search range
+		while (true) {
+			toPos.setY(toPos.getY() + facing.getStepY());
+			if (this.level().isOutsideBuildHeight(toPos) || Math.abs(toPos.getY() - fromPos.getY()) > range) {
+				break;
+			}
+
+			if (this.level().getBlockState(toPos).getBlock() instanceof net.minecraft.world.level.block.ElevatorBlock) {
+				if (this.isValidElevatorPos(toPos)) {
+					// Call the elevator block to handle teleportation
+					net.minecraft.world.level.block.ElevatorBlock elevatorBlock =
+						(net.minecraft.world.level.block.ElevatorBlock) this.level().getBlockState(toPos).getBlock();
+					elevatorBlock.tryTeleportUp(this.level(), fromPos, this);
+					break;
+				}
+			}
+		}
+	}
+
+	// Matches reference ElevatorMod's ElevatorHandler.getOriginElevator()
+	private BlockPos getOriginElevator() {
+		BlockPos pos = this.blockPosition();
+		int activationRange = 3; // Check up to 2 blocks below
+
+		for (int i = 0; i < activationRange; i++) {
+			if (this.level().getBlockState(pos).getBlock() instanceof net.minecraft.world.level.block.ElevatorBlock) {
+				if (!this.isValidElevatorPos(pos)) {
+					return null;
+				}
+				return pos;
+			}
+			pos = pos.below();
+		}
+
+		return null;
+	}
+
+	// Matches reference ElevatorMod's TeleportPacket.isValidPos()
+	private boolean isValidElevatorPos(BlockPos pos) {
+		return !this.level().getBlockState(pos.above()).isSuffocating(this.level(), pos.above());
 	}
 
 	public boolean isUnderWater() {
