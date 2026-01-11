@@ -2,7 +2,6 @@ package com.github.alexthe666.citadel.item;
 
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
-import net.minecraft.world.InteractionResultHolder;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
@@ -15,10 +14,10 @@ public class ItemCitadelDebug extends Item {
     }
 
     @Override
-    public InteractionResultHolder<ItemStack> use(Level worldIn, Player playerIn, InteractionHand handIn) {
+    public InteractionResult use(Level worldIn, Player playerIn, InteractionHand handIn) {
         ItemStack itemStackIn = playerIn.getItemInHand(handIn);
         playerIn.getCooldowns().addCooldown(this, 15);
-        return new InteractionResultHolder<>(InteractionResult.PASS, itemStackIn);
+        return InteractionResult.PASS;
     }
 
 }
