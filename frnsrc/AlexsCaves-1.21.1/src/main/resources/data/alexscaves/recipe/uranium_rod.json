@@ -1,0 +1,23 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "UIU",
+    "UBU",
+    "UIU"
+  ],
+  "key": {
+    "U": {
+      "tag": "c:raw_materials/uranium"
+    },
+    "B": {
+      "item": "minecraft:blaze_rod"
+    },
+    "I": {
+      "tag": "c:ingots/iron"
+    }
+  },
+  "result": {
+    "id": "alexscaves:uranium_rod",
+    "count": 1
+  }
+}

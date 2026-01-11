@@ -1,0 +1,1 @@
+Simply paste this in the colormap folder to replace the current colormap file.

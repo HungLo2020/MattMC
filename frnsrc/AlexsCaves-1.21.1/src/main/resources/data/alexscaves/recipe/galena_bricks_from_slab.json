@@ -1,0 +1,16 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "G",
+    "G"
+  ],
+  "key": {
+    "G": {
+      "item": "alexscaves:galena_brick_slab"
+    }
+  },
+  "result": {
+    "count": 1,
+    "id": "alexscaves:galena_bricks"
+  }
+}

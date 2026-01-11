@@ -1,0 +1,16 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "GG",
+    "GG"
+  ],
+  "key": {
+    "G": {
+      "item": "alexscaves:scrap_metal"
+    }
+  },
+  "result": {
+    "count": 4,
+    "id": "alexscaves:scrap_metal_plate"
+  }
+}

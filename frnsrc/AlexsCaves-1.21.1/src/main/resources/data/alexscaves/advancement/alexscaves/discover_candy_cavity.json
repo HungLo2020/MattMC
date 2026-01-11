@@ -1,0 +1,36 @@
+{
+  "display": {
+    "icon": {
+      "id": "citadel:icon_item",
+      "components": {
+        "citadel:icon_location": "alexscaves:textures/misc/advancement/icon/candy_cavity.png"
+      }
+    },
+    "title": {
+      "translate": "advancements.alexscaves.discover_candy_cavity.title"
+    },
+    "description": {
+      "translate": "advancements.alexscaves.discover_candy_cavity.desc"
+    },
+    "frame": "goal"
+  },
+  "parent": "alexscaves:alexscaves/cave_map",
+  "criteria": {
+    "discover": {
+      "conditions": {
+        "player": [
+          {
+            "condition": "minecraft:entity_properties",
+            "entity": "this",
+            "predicate": {
+              "location": {
+                "biomes": "alexscaves:candy_cavity"
+              }
+            }
+          }
+        ]
+      },
+      "trigger": "minecraft:location"
+    }
+  }
+}

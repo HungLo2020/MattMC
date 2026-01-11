@@ -1,0 +1,50 @@
+name: Bug Report
+description: File a bug report.
+title: "[Bug]: "
+body:
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What had happened?
+      description: What you have done and what happen
+    validations:
+      required: true
+  - type: dropdown
+    id: mc-version
+    attributes:
+      label: Minecraft Version
+      options:
+        - 1.20.1
+    validations:
+      required: true
+  - type: input
+    id: ac-version
+    attributes:
+      label: Alex's Cave Version
+      placeholder: 1.0.0
+    validations:
+      required: true
+  - type: input
+    id: citadel-version
+    attributes:
+      label: Citadel Version
+      placeholder: 1.0.0
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Game Log / Crash Report
+      description: Recommended to upload them onto mclo.gs, pastebin and so on.
+    validations:
+      required: false
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Check List
+      description: These will provide extra information.
+      options:
+        - label: I have removed Optifine.
+          required: true
+        - label: I have installed other mods (Please also provide mod list)
+        - label: This is a conflict with other mods and no issue occurred when running standalone.

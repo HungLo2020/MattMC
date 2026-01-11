@@ -1,0 +1,66 @@
+{
+  "pools": [
+    {
+      "name": "gummy_bear_gelatin",
+      "bonus_rolls": 0.0,
+      "entries": [
+        {
+          "type": "minecraft:item",
+          "name": "alexscaves:gelatin_red",
+          "functions": [
+            {
+              "function": "minecraft:set_count",
+              "count": {
+                "min": 0,
+                "max": 3
+              }
+            },
+            {
+              "function": "minecraft:enchanted_count_increase",
+              "enchantment": "minecraft:looting",
+              "count": {
+                "min": 0,
+                "max": 1
+              }
+            },
+            {
+              "function": "alexscaves:gummy_colors"
+            }
+          ]
+        }
+      ],
+      "rolls": 1.0
+    },
+    {
+      "name": "gummy_bear_fish",
+      "bonus_rolls": 0.0,
+      "entries": [
+        {
+          "type": "minecraft:item",
+          "name": "alexscaves:sweetish_fish_red",
+          "functions": [
+            {
+              "function": "minecraft:set_count",
+              "count": {
+                "min": 0,
+                "max": 1
+              }
+            },
+            {
+              "function": "minecraft:enchanted_count_increase",
+              "enchantment": "minecraft:looting",
+              "count": {
+                "min": 0,
+                "max": 1
+              }
+            },
+            {
+              "function": "alexscaves:gummy_colors"
+            }
+          ]
+        }
+      ],
+      "rolls": 1.0
+    }
+  ]
+}

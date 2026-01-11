@@ -1,0 +1,19 @@
+{
+  "type": "alexscaves:cave_tablet",
+  "biome": "alexscaves:abyssal_chasm",
+  "replace": false,
+  "conditions": [
+    {
+      "condition": "c:loot_table_id",
+      "loot_table_id": "minecraft:chests/underwater_ruin_big"
+    },
+    {
+      "condition": "c:loot_table_id",
+      "loot_table_id": "minecraft:chests/underwater_ruin_small"
+    },
+    {
+      "condition": "c:loot_table_id",
+      "loot_table_id": "minecraft:chests/buried_treasure"
+    }
+  ]
+}

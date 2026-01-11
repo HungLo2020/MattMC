@@ -1,0 +1,12 @@
+{
+  "pack": {
+    "description": "alexscaves resources",
+    "pack_format": 34,
+    "forge:resource_pack_format": 15,
+    "forge:data_pack_format": 15,
+    "supported_formats": {
+      "min_inclusive": 34,
+      "max_inclusive": 34
+    }
+  }
+}

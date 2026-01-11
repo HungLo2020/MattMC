@@ -1,0 +1,11 @@
+{
+  "type": "minecraft:stonecutting",
+  "count": 2,
+  "ingredient": {
+    "item": "alexscaves:abyssmarine"
+  },
+  "result": {
+    "id": "alexscaves:abyssmarine_brick_slab",
+    "count": 1
+  }
+}

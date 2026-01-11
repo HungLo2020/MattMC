@@ -1,0 +1,19 @@
+{
+  "description": {
+    "translate": "enchantment.alexscaves.chomping_spirit"
+  },
+  "supported_items": "#alexscaves:extinction_spear_enchantable",
+  "weight": 2,
+  "max_level": 2,
+  "min_cost": {
+    "base": 1,
+    "per_level_above_first": 10
+  },
+  "max_cost": {
+    "base": 31,
+    "per_level_above_first": 10
+  },
+  "anvil_cost": 2,
+  "slots": ["mainhand"],
+  "effects": {}
+}

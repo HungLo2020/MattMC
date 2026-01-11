@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "SSS",
+    "SSS",
+    "SSS"
+  ],
+  "key": {
+    "S": {
+      "tag": "c:dusts/sulfur"
+    }
+  },
+  "result": {
+    "id": "alexscaves:sulfur",
+    "count": 1
+  }
+}

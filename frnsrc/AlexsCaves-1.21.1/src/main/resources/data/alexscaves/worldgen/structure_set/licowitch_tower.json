@@ -1,0 +1,14 @@
+{
+  "structures": [
+    {
+      "structure": "alexscaves:licowitch_tower",
+      "weight": 1
+    }
+  ],
+  "placement": {
+    "type": "minecraft:random_spread",
+    "salt": 23916271,
+    "spacing": 21,
+    "separation": 16
+  }
+}

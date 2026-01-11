@@ -1,0 +1,12 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "ingredients": [
+    {
+      "tag": "alexscaves:large_bone_blocks"
+    }
+  ],
+  "result": {
+    "count": 8,
+    "id": "minecraft:bone_meal"
+  }
+}

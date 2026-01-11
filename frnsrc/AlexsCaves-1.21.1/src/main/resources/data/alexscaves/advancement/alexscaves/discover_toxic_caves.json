@@ -1,0 +1,36 @@
+{
+  "display": {
+    "icon": {
+      "id": "citadel:icon_item",
+      "components": {
+        "citadel:icon_location": "alexscaves:textures/misc/advancement/icon/toxic_caves.png"
+      }
+    },
+    "title": {
+      "translate": "advancements.alexscaves.discover_toxic_caves.title"
+    },
+    "description": {
+      "translate": "advancements.alexscaves.discover_toxic_caves.desc"
+    },
+    "frame": "goal"
+  },
+  "parent": "alexscaves:alexscaves/cave_map",
+  "criteria": {
+    "discover": {
+      "conditions": {
+        "player": [
+          {
+            "condition": "minecraft:entity_properties",
+            "entity": "this",
+            "predicate": {
+              "location": {
+                "biomes": "alexscaves:toxic_caves"
+              }
+            }
+          }
+        ]
+      },
+      "trigger": "minecraft:location"
+    }
+  }
+}

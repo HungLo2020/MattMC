@@ -1,0 +1,19 @@
+{
+  "description": {
+    "translate": "enchantment.alexscaves.lasting_morale"
+  },
+  "supported_items": "#alexscaves:magic_conch_enchantable",
+  "weight": 2,
+  "max_level": 3,
+  "min_cost": {
+    "base": 1,
+    "per_level_above_first": 8
+  },
+  "max_cost": {
+    "base": 31,
+    "per_level_above_first": 8
+  },
+  "anvil_cost": 2,
+  "slots": ["mainhand"],
+  "effects": {}
+}

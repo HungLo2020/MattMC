@@ -1,0 +1,20 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "  C",
+    " C ",
+    "B  "
+  ],
+  "key": {
+    "B": {
+      "item": "alexscaves:heavy_bone"
+    },
+    "C": {
+      "item": "alexscaves:cycad"
+    }
+  },
+  "result": {
+    "id": "alexscaves:primitive_club",
+    "count": 1
+  }
+}

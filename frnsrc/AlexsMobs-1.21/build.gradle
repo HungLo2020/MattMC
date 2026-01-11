@@ -1,0 +1,136 @@
+plugins {
+    id 'java-library'
+    id 'eclipse'
+    id 'idea'
+    id 'maven-publish'
+    id 'net.neoforged.moddev' version '2.0.42-beta'
+}
+
+version = '1.22.9'
+group = 'com.github.alexthe667'
+
+repositories {
+    mavenLocal()
+    maven {
+        name = "CurseMaven"
+        url = "https://www.cursemaven.com"
+        content {
+            includeGroup "curse.maven"
+        }
+    }
+    maven {
+        name = "ModMaven"
+        url = "https://modmaven.dev"
+    }
+}
+
+base {
+    archivesName = 'alexsmobs'
+}
+
+java.toolchain.languageVersion = JavaLanguageVersion.of(21)
+
+neoForge {
+    version = project.neo_version
+
+    parchment {
+        mappingsVersion = project.parchment_mappings_version
+        minecraftVersion = project.parchment_minecraft_version
+    }
+
+    runs {
+        client {
+            client()
+            systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
+        }
+
+        server {
+            server()
+            programArgument '--nogui'
+            systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
+        }
+
+        data {
+            data()
+            programArguments.addAll '--mod', project.mod_id, '--all', '--output', file('src/generated/resources/').getAbsolutePath(), '--existing', file('src/main/resources/').getAbsolutePath()
+        }
+    }
+
+    mods {
+        "${mod_id}" {
+            sourceSet sourceSets.main
+        }
+    }
+}
+
+sourceSets.main.resources { srcDir 'src/generated/resources' }
+
+dependencies {
+    // Citadel dependency - use local Citadel jar from sibling project
+    implementation files('../Citadel/build/libs/citadel-1.21.1-2.7.0.jar')
+    
+    // JEI for 1.21.1 (optional, for recipe viewing)
+    compileOnly "mezz.jei:jei-${minecraft_version}-common-api:${jei_version}"
+    compileOnly "mezz.jei:jei-${minecraft_version}-neoforge-api:${jei_version}"
+    runtimeOnly "mezz.jei:jei-${minecraft_version}-neoforge:${jei_version}"
+}
+
+var generateModMetadata = tasks.register("generateModMetadata", ProcessResources) {
+    var replaceProperties = [
+            minecraft_version      : minecraft_version,
+            minecraft_version_range: minecraft_version_range,
+            neo_version            : neo_version,
+            neo_version_range      : neo_version_range,
+            loader_version_range   : loader_version_range,
+            mod_id                 : mod_id,
+            mod_name               : mod_name,
+            mod_license            : mod_license,
+            mod_version            : mod_version,
+            mod_authors            : mod_authors,
+            mod_description        : mod_description
+    ]
+    inputs.properties replaceProperties
+    expand replaceProperties
+    from "src/main/templates"
+    into "build/generated/sources/modMetadata"
+}
+
+sourceSets.main.resources.srcDir generateModMetadata
+neoForge.ideSyncTask generateModMetadata
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}
+
+idea {
+    module {
+        downloadSources = true
+        downloadJavadoc = true
+    }
+}
+
+jar {
+    manifest {
+        attributes([
+            "Specification-Title"     : project.mod_id,
+            "Specification-Vendor"    : mod_authors,
+            "Specification-Version"   : "1",
+            "Implementation-Title"    : project.name,
+            "Implementation-Version"  : project.jar.archiveVersion,
+            "Implementation-Vendor"   : mod_authors
+        ])
+    }
+}
+
+publishing {
+    publications {
+        register('mavenJava', MavenPublication) {
+            from components.java
+        }
+    }
+    repositories {
+        maven {
+            url "file:///${project.projectDir}/mcmodsrepo"
+        }
+    }
+}

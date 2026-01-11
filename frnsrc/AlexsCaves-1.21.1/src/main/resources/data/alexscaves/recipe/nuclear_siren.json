@@ -1,0 +1,23 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "CUC",
+    " I ",
+    " I "
+  ],
+  "key": {
+    "C": {
+      "item": "alexscaves:charred_remnant"
+    },
+    "U": {
+      "tag": "c:raw_materials/uranium"
+    },
+    "I": {
+      "tag": "c:ingots/iron"
+    }
+  },
+  "result": {
+    "id": "alexscaves:nuclear_siren",
+    "count": 1
+  }
+}

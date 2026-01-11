@@ -1,0 +1,23 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "R",
+    "T",
+    "N"
+  ],
+  "key": {
+    "R": {
+      "item": "alexscaves:notor_gizmo"
+    },
+    "N": {
+      "item": "alexscaves:azure_neodymium_ingot"
+    },
+    "T": {
+      "item": "alexscaves:telecore"
+    }
+  },
+  "result": {
+    "count": 1,
+    "id": "alexscaves:holocoder"
+  }
+}

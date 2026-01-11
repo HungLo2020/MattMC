@@ -1,0 +1,19 @@
+{
+  "description": {
+    "translate": "enchantment.alexscaves.bouncy_ball"
+  },
+  "supported_items": "#alexscaves:shot_gum_enchantable",
+  "weight": 10,
+  "max_level": 3,
+  "min_cost": {
+    "base": 1,
+    "per_level_above_first": 7
+  },
+  "max_cost": {
+    "base": 31,
+    "per_level_above_first": 7
+  },
+  "anvil_cost": 2,
+  "slots": ["mainhand"],
+  "effects": {}
+}

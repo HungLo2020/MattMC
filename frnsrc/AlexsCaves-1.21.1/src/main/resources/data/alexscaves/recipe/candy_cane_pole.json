@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "C",
+    "C",
+    "C"
+  ],
+  "key": {
+    "C": {
+      "item": "alexscaves:candy_cane"
+    }
+  },
+  "result": {
+    "id": "alexscaves:candy_cane_pole",
+    "count": 1
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "ingredients": [
+    {
+      "item": "minecraft:book"
+    },
+    {
+      "item": "alexscaves:cave_tablet"
+    },
+    {
+      "tag": "c:nuggets/gold"
+    }
+  ],
+  "result": {
+    "id": "alexscaves:cave_book",
+    "count": 1
+  }
+}

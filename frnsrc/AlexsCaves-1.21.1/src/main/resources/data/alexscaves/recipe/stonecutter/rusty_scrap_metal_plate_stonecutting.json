@@ -1,0 +1,11 @@
+{
+  "type": "minecraft:stonecutting",
+  "count": 2,
+  "ingredient": {
+    "item": "alexscaves:rusty_scrap_metal"
+  },
+  "result": {
+    "id": "alexscaves:rusty_scrap_metal_plate",
+    "count": 1
+  }
+}

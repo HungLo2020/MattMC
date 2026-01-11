@@ -1,0 +1,19 @@
+{
+  "description": {
+    "translate": "enchantment.alexscaves.sharp_cane"
+  },
+  "supported_items": "#alexscaves:candy_cane_hook_enchantable",
+  "weight": 10,
+  "max_level": 2,
+  "min_cost": {
+    "base": 1,
+    "per_level_above_first": 8
+  },
+  "max_cost": {
+    "base": 31,
+    "per_level_above_first": 8
+  },
+  "anvil_cost": 2,
+  "slots": ["mainhand"],
+  "effects": {}
+}

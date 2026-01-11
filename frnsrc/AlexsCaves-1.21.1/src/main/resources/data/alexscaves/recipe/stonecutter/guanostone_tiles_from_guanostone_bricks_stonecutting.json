@@ -1,0 +1,11 @@
+{
+  "type": "minecraft:stonecutting",
+  "count": 1,
+  "ingredient": {
+    "item": "alexscaves:guanostone_bricks"
+  },
+  "result": {
+    "id": "alexscaves:guanostone_tiles",
+    "count": 1
+  }
+}
