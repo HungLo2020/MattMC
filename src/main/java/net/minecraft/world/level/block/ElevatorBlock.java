@@ -40,15 +40,7 @@ public class ElevatorBlock extends Block {
 
 	@Override
 	public void stepOn(Level level, BlockPos blockPos, BlockState blockState, Entity entity) {
-		if (!level.isClientSide() && entity instanceof Player player) {
-			// Check if player is sneaking (wants to go down)
-			if (player.isSteppingCarefully()) {
-				BlockPos targetPos = findElevatorBelow(level, blockPos);
-				if (targetPos != null) {
-					teleportPlayerToElevator(player, targetPos);
-				}
-			}
-		}
+		// Sneak handling is done client-side in LocalPlayer.handleElevatorInput()
 		super.stepOn(level, blockPos, blockState, entity);
 	}
 
@@ -56,20 +48,6 @@ public class ElevatorBlock extends Block {
 		// Search up to 64 blocks above
 		for (int i = 1; i <= 64; i++) {
 			BlockPos checkPos = startPos.above(i);
-			if (level.getBlockState(checkPos).getBlock() instanceof ElevatorBlock) {
-				// Check if there are at least 2 empty blocks above the elevator
-				if (isSpaceClearAbove(level, checkPos)) {
-					return checkPos;
-				}
-			}
-		}
-		return null;
-	}
-
-	private BlockPos findElevatorBelow(Level level, BlockPos startPos) {
-		// Search up to 64 blocks below
-		for (int i = 1; i <= 64; i++) {
-			BlockPos checkPos = startPos.below(i);
 			if (level.getBlockState(checkPos).getBlock() instanceof ElevatorBlock) {
 				// Check if there are at least 2 empty blocks above the elevator
 				if (isSpaceClearAbove(level, checkPos)) {

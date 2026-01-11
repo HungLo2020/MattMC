@@ -145,6 +145,7 @@ public class LocalPlayer extends AbstractClientPlayer implements net.irisshaders
 	private boolean autoJumpEnabled = true;
 	// Elevator handling - matches reference ElevatorMod
 	private boolean lastElevatorJumping = false;
+	private boolean lastElevatorSneaking = false;
 	private int autoJumpTime;
 	private boolean wasFallFlying;
 	private int waterVisionTime;
@@ -1062,6 +1063,16 @@ public class LocalPlayer extends AbstractClientPlayer implements net.irisshaders
 			return;
 		}
 
+		// Handle sneak (going down) - EXACT copy from ElevatorHandler.java lines 22-28
+		boolean sneaking = this.input.keyPresses.shift();
+		if (this.lastElevatorSneaking != sneaking) {
+			this.lastElevatorSneaking = sneaking;
+			if (sneaking) {
+				this.tryElevatorTeleport(Direction.DOWN);
+			}
+		}
+
+		// Handle jump (going up) - EXACT copy from ElevatorHandler.java lines 30-36
 		boolean jumping = this.input.keyPresses.jump();
 		if (this.lastElevatorJumping != jumping) {
 			this.lastElevatorJumping = jumping;
