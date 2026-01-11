@@ -1885,6 +1885,7 @@ public class CreativeModeTabs {
 					output.accept(Items.SNOW_GOLEM_SPAWN_EGG);
 					output.accept(Items.SPIDER_SPAWN_EGG);
 					output.accept(Items.SQUID_SPAWN_EGG);
+					output.accept(Items.SUBTERRANODON_SPAWN_EGG);
 					output.accept(Items.STRAY_SPAWN_EGG);
 					output.accept(Items.STRIDER_SPAWN_EGG);
 					output.accept(Items.TADPOLE_SPAWN_EGG);
