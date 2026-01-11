@@ -1,0 +1,28 @@
+name: 'Build'
+
+on: [ push ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions: { contents: write }
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+      - uses: gradle/actions/setup-gradle@v4
+      - run: ./gradlew build
+
+      - uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: |
+            **/fabric/build/libs/*-${{ github.ref_name }}.jar
+            **/neoforge/build/libs/*-${{ github.ref_name }}.jar
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          draft: true

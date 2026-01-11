@@ -103,6 +103,7 @@ public class GameProtocols {
 			.addPacket(GamePacketTypes.SERVERBOUND_PLAYER_INPUT, ServerboundPlayerInputPacket.STREAM_CODEC)
 			.addPacket(GamePacketTypes.SERVERBOUND_PLAYER_LOADED, ServerboundPlayerLoadedPacket.STREAM_CODEC)
 			.addPacket(GamePacketTypes.SERVERBOUND_PLAYER_SKIN, ServerboundPlayerSkinPacket.STREAM_CODEC)
+			.addPacket(GamePacketTypes.SERVERBOUND_ELEVATOR_TELEPORT, ServerboundElevatorTeleportPacket.STREAM_CODEC)
 			.addPacket(CommonPacketTypes.SERVERBOUND_PONG, ServerboundPongPacket.STREAM_CODEC)
 			.addPacket(GamePacketTypes.SERVERBOUND_RENAME_ITEM, ServerboundRenameItemPacket.STREAM_CODEC)
 			.addPacket(CommonPacketTypes.SERVERBOUND_RESOURCE_PACK, ServerboundResourcePackPacket.STREAM_CODEC)

@@ -1968,6 +1968,13 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 			// Silently catch to avoid crashes
 		}
 		profilerFiller.pop();
+		
+		// Elevator: Handle elevator input at END of client tick (matches ElevatorMod's ClientTickEvents.END_CLIENT_TICK)
+		profilerFiller.push("elevator_input");
+		if (this.player instanceof net.minecraft.client.player.LocalPlayer localPlayer) {
+			localPlayer.handleElevatorInput();
+		}
+		profilerFiller.pop();
 	}
 
 	private boolean isLevelRunningNormally() {
