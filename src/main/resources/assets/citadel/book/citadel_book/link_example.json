@@ -1,0 +1,109 @@
+{
+  "parent": "root.json",
+  "text": "link_example.txt",
+  "title": "Link Example",
+  "title_locale": "book.citadel_book.link_example",
+  "linked_page_buttons": [
+  ],
+  "images": [
+  ],
+  "item_renders": [
+    {
+      "item" : "citadel:effect_item",
+      "x": 5,
+      "y": 20,
+      "page" : 0,
+      "scale": 2.5
+    },
+    {
+      "item" : "citadel:effect_item",
+      "item_components": {
+        "citadel:display_effect": "minecraft:luck"
+      },
+      "x": 25,
+      "y": 20,
+      "page" : 0,
+      "scale": 2.5
+    },
+    {
+      "item" : "citadel:fancy_item",
+      "item_components": {
+        "citadel:custom_render_display": {
+          "item": "citadel:citadel_book",
+          "bob": true,
+          "zoom": true,
+          "scale": 0.8,
+          "spin": false,
+          "shake": false
+        }
+      },
+      "x": 45,
+      "y": 22,
+      "page" : 0,
+      "scale": 2.5
+    },
+    {
+      "item" : "citadel:fancy_item",
+      "item_components": {
+        "citadel:custom_render_display": {
+          "item": "minecraft:feather",
+          "bob": false,
+          "zoom": true,
+          "scale": 0.65,
+          "spin": true,
+          "shake": false
+        }
+      },
+      "x": 60,
+      "y": 20,
+      "page" : 0,
+      "scale": 2.5
+    },
+    {
+      "item" : "citadel:icon_item",
+      "x": 10,
+      "y": 55,
+      "page" : 1,
+      "scale": 2.5
+    },
+    {
+      "item" : "citadel:icon_item",
+      "item_components": {
+        "citadel:icon_location": "minecraft:textures/map/map_background.png"
+      },
+      "x": 50,
+      "y": 55,
+      "page" : 1,
+      "scale": 2.5
+    }
+  ],
+  "recipes": [
+  ],
+  "tabula_renders": [
+  ],
+  "entity_renders": [
+    {
+      "entity": "minecraft:bee",
+      "x": 230,
+      "y": 120,
+      "page" : 1,
+      "scale": 1.7,
+      "rot_x": 30,
+      "rot_y": 135,
+      "rot_z": 0,
+      "follow_cursor": true
+    },
+    {
+      "entity": "minecraft:skeleton",
+      "entity_data": "{ArmorItems:[{},{},{},{count:1b,id:\"minecraft:diamond_helmet\"}], HandItems:[{count:1b,id:\"minecraft:shield\"},{}]}",
+      "x": 230,
+      "y": 70,
+      "page" : 1,
+      "scale": 0.9,
+      "rot_x": 30,
+      "rot_y": 225,
+      "rot_z": 0,
+      "follow_cursor": false
+    }
+  ]
+}
