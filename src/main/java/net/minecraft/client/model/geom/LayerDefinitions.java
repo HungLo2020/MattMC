@@ -192,6 +192,7 @@ public class LayerDefinitions {
 		LayerDefinition layerDefinition49 = DrownedModel.createBodyLayer(CubeDeformation.NONE);
 		LayerDefinition layerDefinition50 = DrownedModel.createBodyLayer(new CubeDeformation(0.25F));
 		LayerDefinition layerDefinition51 = SquidModel.createBodyLayer();
+		LayerDefinition layerDefinition_subterranodon = net.minecraft.client.model.subterranodon.SubterranodonModel.createBodyLayer();
 		LayerDefinition layerDefinition52 = DolphinModel.createBodyLayer();
 		LayerDefinition layerDefinition53 = SalmonModel.createBodyLayer();
 		builder.put(ModelLayers.ALLAY, AllayModel.createBodyLayer());
@@ -403,6 +404,7 @@ public class LayerDefinitions {
 		builder.put(ModelLayers.SPIDER, layerDefinition30);
 		builder.put(ModelLayers.SQUID, layerDefinition51);
 		builder.put(ModelLayers.SQUID_BABY, layerDefinition51.apply(SquidModel.BABY_TRANSFORMER));
+		builder.put(ModelLayers.SUBTERRANODON, layerDefinition_subterranodon);
 		builder.put(ModelLayers.STRAY, layerDefinition27);
 		ModelLayers.STRAY_ARMOR.putFrom(armorModelSet, builder);
 		builder.put(ModelLayers.STRAY_OUTER_LAYER, LayerDefinition.create(HumanoidModel.createMesh(new CubeDeformation(0.25F), 0.0F), 64, 32));

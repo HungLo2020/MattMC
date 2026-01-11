@@ -200,6 +200,7 @@ public class EntityRenderers {
 			EntityType.SQUID,
 			context -> new SquidRenderer(context, new SquidModel(context.bakeLayer(ModelLayers.SQUID)), new SquidModel(context.bakeLayer(ModelLayers.SQUID_BABY)))
 		);
+		register(EntityType.SUBTERRANODON, net.minecraft.client.renderer.entity.subterranodon.SubterranodonRenderer::new);
 		register(EntityType.STRAY, StrayRenderer::new);
 		register(EntityType.STRIDER, StriderRenderer::new);
 		register(EntityType.TADPOLE, TadpoleRenderer::new);

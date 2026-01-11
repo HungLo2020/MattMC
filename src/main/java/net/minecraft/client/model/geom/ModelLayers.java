@@ -238,6 +238,7 @@ public class ModelLayers {
 	public static final ModelLayerLocation SPRUCE_CHEST_BOAT = register("chest_boat/spruce");
 	public static final ModelLayerLocation SQUID = register("squid");
 	public static final ModelLayerLocation SQUID_BABY = register("squid_baby");
+	public static final ModelLayerLocation SUBTERRANODON = register("subterranodon");
 	public static final ModelLayerLocation STRAY = register("stray");
 	public static final ArmorModelSet<ModelLayerLocation> STRAY_ARMOR = registerArmorSet("stray");
 	public static final ModelLayerLocation STRAY_OUTER_LAYER = register("stray", "outer");
