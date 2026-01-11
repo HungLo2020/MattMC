@@ -18,17 +18,21 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.LecternBlock;
 import net.minecraft.world.level.block.entity.LecternBlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
-import net.neoforged.bus.api.EventPriority;
-import net.neoforged.bus.api.SubscribeEvent;
-import net.neoforged.neoforge.event.entity.player.PlayerEvent;
-import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
-import net.neoforged.neoforge.event.tick.EntityTickEvent;
-import net.neoforged.neoforge.event.tick.ServerTickEvent;
+// TODO: Replace with Fabric event callbacks
+// import net.neoforged.bus.api.EventPriority;
+// import net.neoforged.bus.api.SubscribeEvent;
+// import net.neoforged.neoforge.event.entity.player.PlayerEvent;
+// import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
+// import net.neoforged.neoforge.event.tick.EntityTickEvent;
+// import net.neoforged.neoforge.event.tick.ServerTickEvent;
 
+// TODO: This class needs to be converted to use Fabric event callbacks
+// For now, event handlers are commented out
 public class CitadelEvents {
 
     private int updateTimer;
 
+    /* TODO: Convert to Fabric EntityTickCallback
     @SubscribeEvent
     public void onEntityUpdateDebug(EntityTickEvent.Post event) {
         if (CitadelConstants.DEBUG) {
@@ -39,14 +43,16 @@ public class CitadelEvents {
             }
         }
     }
+    */
 
+    /* TODO: Convert to Fabric UseBlockCallback
     @SubscribeEvent
     public void onRightClickBlock(PlayerInteractEvent.RightClickBlock event) {
         if (event.getLevel().getBlockState(event.getPos()).is(Blocks.LECTERN) && LecternBooks.isLecternBook(event.getItemStack())) {
             event.getEntity().getCooldowns().addCooldown(event.getItemStack().getItem(), 1);
             BlockState oldLectern = event.getLevel().getBlockState(event.getPos());
             if (event.getLevel().getBlockEntity(event.getPos()) instanceof LecternBlockEntity oldBe && !oldBe.hasBook()) {
-                BlockState newLectern = Citadel.LECTERN.get().defaultBlockState().setValue(CitadelLecternBlock.FACING, oldLectern.getValue(LecternBlock.FACING)).setValue(CitadelLecternBlock.POWERED, oldLectern.getValue(LecternBlock.POWERED)).setValue(CitadelLecternBlock.HAS_BOOK, true);
+                BlockState newLectern = Citadel.LECTERN.defaultBlockState().setValue(CitadelLecternBlock.FACING, oldLectern.getValue(LecternBlock.FACING)).setValue(CitadelLecternBlock.POWERED, oldLectern.getValue(LecternBlock.POWERED)).setValue(CitadelLecternBlock.HAS_BOOK, true);
                 event.getLevel().setBlockAndUpdate(event.getPos(), newLectern);
                 CitadelLecternBlockEntity newBe = new CitadelLecternBlockEntity(event.getPos(), newLectern);
                 ItemStack bookCopy = event.getItemStack().copy();
@@ -61,14 +67,18 @@ public class CitadelEvents {
             }
         }
     }
+    */
 
+    /* TODO: Convert to Fabric ServerPlayerEvents.COPY_FROM
     @SubscribeEvent
     public void onPlayerClone(PlayerEvent.Clone event) {
         if (CitadelEntityData.getCitadelTag(event.getOriginal()) != null) {
             CitadelEntityData.setCitadelTag(event.getEntity(), CitadelEntityData.getCitadelTag(event.getOriginal()));
         }
     }
+    */
 
+    /* TODO: Convert to Fabric ServerTickEvents.START_SERVER_TICK
     @SubscribeEvent(priority = EventPriority.LOWEST)
     public void onServerTick(ServerTickEvent.Pre event) {
         if (event.getServer().isRunning()) {
@@ -86,4 +96,5 @@ public class CitadelEvents {
             }
         }
     }
+    */
 }

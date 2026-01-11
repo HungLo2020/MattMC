@@ -1,10 +1,11 @@
 package com.github.alexthe666.citadel.animation;
 
 import net.minecraft.world.entity.Entity;
-import net.neoforged.bus.api.Event;
-import net.neoforged.bus.api.ICancellableEvent;
+// TODO: Integrate with Fabric event system
+// import net.neoforged.bus.api.Event;
+// import net.neoforged.bus.api.ICancellableEvent;
 
-public class AnimationEvent<T extends Entity & IAnimatedEntity> extends Event {
+public class AnimationEvent<T extends Entity & IAnimatedEntity> {
     protected Animation animation;
     private T entity;
 
@@ -21,13 +22,23 @@ public class AnimationEvent<T extends Entity & IAnimatedEntity> extends Event {
         return this.animation;
     }
 
-    public static class Start<T extends Entity & IAnimatedEntity> extends AnimationEvent<T> implements ICancellableEvent {
+    public static class Start<T extends Entity & IAnimatedEntity> extends AnimationEvent<T> {
+        private boolean cancelled = false;
+        
         public Start(T entity, Animation animation) {
             super(entity, animation);
         }
 
         public void setAnimation(Animation animation) {
             this.animation = animation;
+        }
+        
+        public boolean isCancelled() {
+            return cancelled;
+        }
+        
+        public void setCancelled(boolean cancelled) {
+            this.cancelled = cancelled;
         }
     }
 

@@ -1,11 +1,14 @@
 package com.github.alexthe666.citadel.server.item;
 
 import net.minecraft.tags.TagKey;
-import net.minecraft.world.item.Tier;
+// TODO: Tier is a NeoForge interface - needs replacement or removal
+// import net.minecraft.world.item.Tier;
 import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.world.level.block.Block;
 
-public class CustomToolMaterial implements Tier {
+// TODO: This class implements NeoForge's Tier interface which doesn't exist in vanilla
+// For now, it's a standalone class. May need to be refactored when tool customization is needed.
+public class CustomToolMaterial {
    private String name;
    private int harvestLevel;
    private int durability;
@@ -29,22 +32,18 @@ public class CustomToolMaterial implements Tier {
         return name;
     }
 
-    @Override
     public int getUses() {
         return durability;
     }
 
-    @Override
     public float getSpeed() {
         return speed;
     }
 
-    @Override
     public float getAttackDamageBonus() {
         return damage;
     }
 
-    @Override
     public TagKey<Block> getIncorrectBlocksForDrops() {
         return incorrectDrops;
     }
@@ -53,12 +52,10 @@ public class CustomToolMaterial implements Tier {
         return harvestLevel;
     }
 
-    @Override
     public int getEnchantmentValue() {
         return enchantability;
     }
 
-    @Override
     public Ingredient getRepairIngredient() {
         return ingredient == null ? Ingredient.EMPTY : ingredient;
     }
