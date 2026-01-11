@@ -19,12 +19,17 @@
     "James Seibel"
   ],
   "entrypoints": {
+    "main": [
+      "com.github.alexthe666.citadel.fabric.CitadelFabricMod"
+    ],
     "client": [
       "net.caffeinemc.mods.sodium.fabric.SodiumFabricMod",
-      "com.seibel.distanthorizons.fabric.FabricMain"
+      "com.seibel.distanthorizons.fabric.FabricMain",
+      "com.github.alexthe666.citadel.fabric.CitadelFabricMod"
     ],
     "server": [
-      "com.seibel.distanthorizons.fabric.FabricMain"
+      "com.seibel.distanthorizons.fabric.FabricMain",
+      "com.github.alexthe666.citadel.fabric.CitadelFabricMod"
     ],
     "preLaunch": [
       "net.caffeinemc.mods.sodium.fabric.SodiumPreLaunch"
@@ -36,7 +41,8 @@
     "iris",
     "distanthorizons",
     "lod",
-    "voxelmap"
+    "voxelmap",
+    "citadel"
   ],
 
   "depends": {
