@@ -5,7 +5,8 @@ import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
-import net.neoforged.neoforge.network.handling.IPayloadContext;
+// TODO: Replace with Fabric Networking API
+// import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 public class AnimationMessage implements CustomPacketPayload {
 
@@ -34,7 +35,8 @@ public class AnimationMessage implements CustomPacketPayload {
         return TYPE;
     }
 
-    public static void handle(final AnimationMessage message, IPayloadContext context) {
+    // TODO: Replace with Fabric ServerPlayNetworking handler
+    public static void handle(final AnimationMessage message, PropertiesMessage.PayloadContext context) {
         context.enqueueWork(() -> Citadel.PROXY.handleAnimationPacket(message.entityID, message.index));
     }
 }

@@ -6,7 +6,8 @@ import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
-import net.neoforged.neoforge.network.handling.IPayloadContext;
+// TODO: Replace with Fabric Networking API
+// import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 public class SyncClientTickRateMessage implements CustomPacketPayload {
     public static final CustomPacketPayload.Type<SyncClientTickRateMessage> TYPE = new CustomPacketPayload.Type<>(ResourceLocation.fromNamespaceAndPath("citadel", "tick_rate"));
@@ -30,9 +31,9 @@ public class SyncClientTickRateMessage implements CustomPacketPayload {
         return TYPE;
     }
 
-    public static void handle(final SyncClientTickRateMessage message, IPayloadContext context) {
+    public static void handle(final SyncClientTickRateMessage message, PropertiesMessage.PayloadContext context) {
         context.enqueueWork(() -> {
-            if (context.flow().isClientbound()) {
+            if (context.isClientbound()) {
                 Citadel.PROXY.handleClientTickRatePacket(message.compound);
             }
         });

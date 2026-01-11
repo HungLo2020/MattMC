@@ -7,7 +7,8 @@ import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
-import net.neoforged.neoforge.network.handling.IPayloadContext;
+// TODO: Replace with Fabric Networking API
+// import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -90,9 +91,9 @@ public class SyncePathMessage implements CustomPacketPayload{
         return TYPE;
     }
 
-    public static void handle(final SyncePathMessage message, IPayloadContext context) {
+    public static void handle(final SyncePathMessage message, PropertiesMessage.PayloadContext context) {
         context.enqueueWork(() -> {
-            if (context.flow().isClientbound()) {
+            if (context.isClientbound()) {
                 PathfindingDebugRenderer.lastDebugNodesVisited = message.lastDebugNodesVisited;
                 PathfindingDebugRenderer.lastDebugNodesNotVisited = message.lastDebugNodesNotVisited;
                 PathfindingDebugRenderer.lastDebugNodesPath = message.lastDebugNodesPath;
