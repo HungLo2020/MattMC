@@ -36,6 +36,10 @@ public abstract class StateHolder<O, S> {
 	private final Reference2ObjectArrayMap<Property<?>, Comparable<?>> values;
 	private Map<Property<?>, S[]> neighbours;
 	protected final MapCodec<S> propertiesCodec;
+	
+	// FerriteCore optimization: FastMap for efficient neighbor lookup
+	private int ferritecore_globalTableIndex;
+	private FastMap<S> ferritecore_globalTable;
 
 	protected StateHolder(O object, Reference2ObjectArrayMap<Property<?>, Comparable<?>> reference2ObjectArrayMap, MapCodec<S> mapCodec) {
 		this.owner = object;
@@ -121,6 +125,18 @@ public abstract class StateHolder<O, S> {
 		if (comparable2.equals(comparable)) {
 			return (S)this;
 		} else {
+			// FerriteCore optimization: Use FastMap for neighbor lookup if available
+			if (ferritecore_globalTable != null) {
+				S newState = ferritecore_globalTable.with(ferritecore_globalTableIndex, property, comparable);
+				if (newState == null) {
+					throw new IllegalArgumentException(
+						"Cannot set property " + property + " to " + comparable + " on " + this.owner + ", it is not an allowed value"
+					);
+				}
+				return newState;
+			}
+			
+			// Fallback to vanilla neighbor table
 			int i = property.getInternalIndex((T)comparable);
 			if (i < 0) {
 				throw new IllegalArgumentException("Cannot set property " + property + " to " + comparable + " on " + this.owner + ", it is not an allowed value");
@@ -134,21 +150,64 @@ public abstract class StateHolder<O, S> {
 		if (this.neighbours != null) {
 			throw new IllegalStateException();
 		} else {
-			Map<Property<?>, S[]> map2 = new Reference2ObjectArrayMap<>(this.values.size());
-
-			for (Entry<Property<?>, Comparable<?>> entry : this.values.entrySet()) {
-				Property<?> property = (Property<?>)entry.getKey();
-				List<?> possibles = property.getPossibleValues();
-				S[] arr = (S[]) new StateHolder[possibles.size()];
-				int idx = 0;
-				for (Object comparable : possibles) {
-					arr[idx++] = map.get(this.makeNeighbourValues(property, (Comparable<?>) comparable));
-				}
-				map2.put(property, arr);
+			// FerriteCore optimization: Use shared FastMap instead of per-state neighbor tables
+			if (map.size() == 1) {
+				// Only one state => setValue will never be successful, no need for FastMap
+				this.neighbours = Collections.emptyMap();
+				return;
 			}
-
-			this.neighbours = map2;
+			
+			// Use ThreadLocal to share FastMap across all states of the same block
+			Map<Map<Property<?>, Comparable<?>>, S> lastStateMap = getLastStateMap();
+			if (lastStateMap == map) {
+				// Reuse the same FastMap for all states of this block
+				this.ferritecore_globalTable = getLastFastMap();
+			} else {
+				// Create new FastMap for this block type
+				setLastStateMap(map);
+				// Use bitmask mode by default (faster, slightly more memory than compact mode)
+				FastMap<S> globalTable = new FastMap<>(this.values.keySet(), map, false);
+				this.ferritecore_globalTable = globalTable;
+				setLastFastMap(globalTable);
+			}
+			
+			// Set this state's index in the FastMap
+			this.ferritecore_globalTableIndex = ferritecore_globalTable.getIndexOf(this.values);
+			
+			// Set empty neighbor map (FastMap handles neighbor lookups)
+			this.neighbours = Collections.emptyMap();
 		}
+	}
+	
+	// ThreadLocal storage for sharing FastMaps across states of the same block
+	private static final ThreadLocal<Map<Map<Property<?>, Comparable<?>>, ?>> LAST_STATE_MAP = new ThreadLocal<>();
+	private static final ThreadLocal<FastMap<?>> LAST_FAST_MAP = new ThreadLocal<>();
+	
+	@SuppressWarnings("unchecked")
+	private Map<Map<Property<?>, Comparable<?>>, S> getLastStateMap() {
+		return (Map<Map<Property<?>, Comparable<?>>, S>) LAST_STATE_MAP.get();
+	}
+	
+	private void setLastStateMap(Map<Map<Property<?>, Comparable<?>>, S> map) {
+		LAST_STATE_MAP.set(map);
+	}
+	
+	@SuppressWarnings("unchecked")
+	private <T> FastMap<T> getLastFastMap() {
+		return (FastMap<T>) LAST_FAST_MAP.get();
+	}
+	
+	private <T> void setLastFastMap(FastMap<T> fastMap) {
+		LAST_FAST_MAP.set(fastMap);
+	}
+	
+	// Accessor methods for FastMapEntryMap
+	public FastMap<S> getFastMap() {
+		return ferritecore_globalTable;
+	}
+	
+	public int getStateIndex() {
+		return ferritecore_globalTableIndex;
 	}
 
 	private Map<Property<?>, Comparable<?>> makeNeighbourValues(Property<?> property, Comparable<?> comparable) {

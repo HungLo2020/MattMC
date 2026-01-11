@@ -22,18 +22,44 @@ import net.minecraft.util.ThreadingDetector;
 import net.minecraft.util.ZeroBitStorage;
 import org.jetbrains.annotations.Nullable;
 
-public class PalettedContainer<T> implements PaletteResize<T>, PalettedContainerRO<T>, net.caffeinemc.mods.sodium.client.world.PalettedContainerROExtension<T> {
+public class PalettedContainer<T> implements PaletteResize<T>, PalettedContainerRO<T>, net.caffeinemc.mods.sodium.client.world.PalettedContainerROExtension<T>, net.minecraft.util.SmallThreadingDetector.SmallThreadDetectable {
 	private static final int MIN_PALETTE_BITS = 0;
 	private volatile PalettedContainer.Data<T> data;
 	private final Strategy<T> strategy;
-	private final ThreadingDetector threadingDetector = new ThreadingDetector("PalettedContainer");
+	
+	// FerriteCore optimization #9: Use byte field instead of ThreadingDetector object
+	// Saves ~48 bytes per container (scales with loaded chunks)
+	// Note: Disabled by default in FerriteCore due to rare race conditions
+	// Can be controlled via config if needed
+	private static final boolean USE_SMALL_THREADING_DETECTOR = Boolean.getBoolean("ferritecore.useSmallThreadingDetector");
+	private final ThreadingDetector threadingDetector = USE_SMALL_THREADING_DETECTOR ? null : new ThreadingDetector("PalettedContainer");
+	private byte ferritecore$threadingState = net.minecraft.util.SmallThreadingDetector.UNLOCKED;
 
 	public void acquire() {
-		this.threadingDetector.checkAndLock();
+		if (USE_SMALL_THREADING_DETECTOR) {
+			net.minecraft.util.SmallThreadingDetector.acquire(this, "PalettedContainer");
+		} else {
+			this.threadingDetector.checkAndLock();
+		}
 	}
 
 	public void release() {
-		this.threadingDetector.checkAndUnlock();
+		if (USE_SMALL_THREADING_DETECTOR) {
+			net.minecraft.util.SmallThreadingDetector.release(this);
+		} else {
+			this.threadingDetector.checkAndUnlock();
+		}
+	}
+	
+	// SmallThreadDetectable implementation
+	@Override
+	public byte ferritecore$getState() {
+		return ferritecore$threadingState;
+	}
+	
+	@Override
+	public void ferritecore$setState(byte newState) {
+		ferritecore$threadingState = newState;
 	}
 
 	public static <T> Codec<PalettedContainer<T>> codecRW(Codec<T> codec, Strategy<T> strategy, T object) {
