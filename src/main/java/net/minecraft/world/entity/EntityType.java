@@ -896,9 +896,9 @@ public class EntityType<T extends Entity> implements FeatureElement, EntityTypeT
 	public static final EntityType<Squid> SQUID = register(
 		"squid", EntityType.Builder.of(Squid::new, MobCategory.WATER_CREATURE).sized(0.8F, 0.8F).eyeHeight(0.4F).clientTrackingRange(8)
 	);
-	public static final EntityType<net.minecraft.world.entity.animal.subterranodon.SubterranodonEntity> SUBTERRANODON = register(
+	public static final EntityType<SubterranodonEntity> SUBTERRANODON = register(
 		"subterranodon", 
-		EntityType.Builder.of(net.minecraft.world.entity.animal.subterranodon.SubterranodonEntity::new, MobCategory.CREATURE)
+		EntityType.Builder.of(SubterranodonEntity::new, MobCategory.CREATURE)
 			.sized(1.0F, 1.2F)
 			.eyeHeight(0.9F)
 			.clientTrackingRange(10)
