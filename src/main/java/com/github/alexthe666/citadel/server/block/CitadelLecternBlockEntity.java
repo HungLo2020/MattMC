@@ -140,7 +140,7 @@ public class CitadelLecternBlockEntity extends BlockEntity implements Clearable,
     protected void saveAdditional(net.minecraft.world.level.storage.ValueOutput valueOutput) {
         super.saveAdditional(valueOutput);
         if (!this.getBook().isEmpty()) {
-            valueOutput.write("Book", ItemStack.CODEC, this.getBook());
+            valueOutput.store("Book", ItemStack.CODEC, this.getBook());
         }
     }
 

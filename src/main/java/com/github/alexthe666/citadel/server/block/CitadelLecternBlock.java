@@ -41,7 +41,7 @@ public class CitadelLecternBlock extends LecternBlock {
 
 
     @Override
-    public int getAnalogOutputSignal(BlockState state, Level level, BlockPos pos) {
+    protected int getAnalogOutputSignal(BlockState state, Level level, BlockPos pos, Direction direction) {
         if (state.getValue(HAS_BOOK)) {
             BlockEntity blockentity = level.getBlockEntity(pos);
             if (blockentity instanceof CitadelLecternBlockEntity) {
@@ -53,18 +53,11 @@ public class CitadelLecternBlock extends LecternBlock {
     }
 
     @Override
-    public void onRemove(BlockState state, Level level, BlockPos pos, BlockState replaceState, boolean b) {
-        if (!state.is(replaceState.getBlock())) {
-            if (state.getValue(HAS_BOOK)) {
-                this.popCitadelBook(state, level, pos);
-            }
-
-            if (state.getValue(POWERED)) {
-                level.updateNeighborsAt(pos.below(), this);
-            }
-
-            super.onRemove(state, level, pos, replaceState, b);
+    protected void affectNeighborsAfterRemoval(BlockState state, net.minecraft.server.level.ServerLevel level, BlockPos pos, boolean movedByPiston) {
+        if (state.getValue(HAS_BOOK)) {
+            this.popCitadelBook(state, level, pos);
         }
+        super.affectNeighborsAfterRemoval(state, level, pos, movedByPiston);
     }
 
     private void popCitadelBook(BlockState state, Level level, BlockPos pos) {
