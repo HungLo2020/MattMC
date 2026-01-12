@@ -24,8 +24,9 @@ public class LocalEntityTickRateModifier extends LocalTickRateModifier {
 
     public LocalEntityTickRateModifier(CompoundTag tag) {
         super(tag);
-        this.entityId = tag.getInt("EntityId");
-        this.expectedEntityType = BuiltInRegistries.ENTITY_TYPE.get(ResourceLocation.parse(tag.getString("EntityType")));
+        this.entityId = tag.contains("EntityId") ? tag.getInt("EntityId") : 0;
+        String entityTypeStr = tag.contains("EntityType") ? tag.getString("EntityType") : "minecraft:pig";
+        this.expectedEntityType = BuiltInRegistries.ENTITY_TYPE.get(ResourceLocation.parse(entityTypeStr));
     }
 
     @Override
