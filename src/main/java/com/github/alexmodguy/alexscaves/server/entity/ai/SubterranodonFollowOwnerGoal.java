@@ -141,7 +141,10 @@ public class SubterranodonFollowOwnerGoal extends Goal {
         } else if (!this.isTeleportFriendlyBlock(new BlockPos(x, y, z))) {
             return false;
         } else {
-            this.subterranodon.moveTo((double) x + 0.5D, (double) y, (double) z + 0.5D, this.subterranodon.getYRot(), this.subterranodon.getXRot());
+            // moveTo() renamed to setPos() in 1.21; rotation set separately
+            this.subterranodon.setPos((double) x + 0.5D, (double) y, (double) z + 0.5D);
+            this.subterranodon.setYRot(this.subterranodon.getYRot());
+            this.subterranodon.setXRot(this.subterranodon.getXRot());
             this.navigator.stop();
             return true;
         }

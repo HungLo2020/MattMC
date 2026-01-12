@@ -5,6 +5,7 @@ import com.github.alexthe666.citadel.client.model.container.TabulaCubeContainer;
 import com.github.alexthe666.citadel.client.model.container.TabulaCubeGroupContainer;
 import com.github.alexthe666.citadel.client.model.container.TabulaModelContainer;
 import com.google.common.collect.ImmutableList;
+import net.minecraft.client.renderer.entity.state.EntityRenderState;
 import net.minecraft.world.entity.Entity;
 
 import java.util.ArrayList;
@@ -16,7 +17,7 @@ import java.util.Map;
  * @author gegy1000
  * @since 1.0.0
  */
-public class TabulaModel extends AdvancedEntityModel {
+public class TabulaModel extends AdvancedEntityModel<EntityRenderState> {
     protected Map<String, AdvancedModelBox> cubes = new HashMap<>();
     protected List<AdvancedModelBox> rootBoxes = new ArrayList<>();
     protected ITabulaModelAnimator tabulaAnimator;
@@ -81,10 +82,9 @@ public class TabulaModel extends AdvancedEntityModel {
     }
 
     @Override
-    public void setupAnim(Entity entity, float limbSwing, float limbSwingAmount, float ageInTicks, float rotationYaw, float rotationPitch) {
-        if (this.tabulaAnimator != null) {
-            this.tabulaAnimator.setRotationAngles(this, entity, limbSwing, limbSwingAmount, ageInTicks, rotationYaw, rotationPitch, 1.0F);
-        }
+    public void setupAnim(EntityRenderState renderState) {
+        // TODO: TabulaModel is not used by Subteranadon - stub for now
+        // If needed, extract animation data from renderState and call tabulaAnimator
     }
 
     public AdvancedModelBox getCube(String name) {

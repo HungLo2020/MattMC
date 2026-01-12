@@ -94,7 +94,9 @@ public class ACMath {
 
     public static Vec3 getGroundBelowPosition(BlockGetter level, Vec3 in) {
         BlockPos pos = BlockPos.containing(in);
-        while (pos.getY() > level.getMinBuildHeight() && level.getBlockState(pos).getCollisionShape(level, pos).isEmpty()) {
+        // In 1.21, getMinBuildHeight() is on LevelHeightAccessor, not BlockGetter
+        int minHeight = (level instanceof net.minecraft.world.level.LevelHeightAccessor lha) ? lha.getMinBuildHeight() : -64;
+        while (pos.getY() > minHeight && level.getBlockState(pos).getCollisionShape(level, pos).isEmpty()) {
             pos = pos.below();
         }
         float top;

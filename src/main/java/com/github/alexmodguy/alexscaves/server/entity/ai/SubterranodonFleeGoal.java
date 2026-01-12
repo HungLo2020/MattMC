@@ -25,7 +25,8 @@ public class SubterranodonFleeGoal extends Goal {
             return false;
         }
         AABB aabb = subterranodon.getBoundingBox().inflate(7);
-        List<Entity> list = subterranodon.level().getEntitiesOfClass(Entity.class, aabb, (entity -> entity.getType().is(EntityTypeTags.RAIDERS)));
+        // EntityTypeTags.RAIDERS was removed - use direct class check instead
+        List<Entity> list = subterranodon.level().getEntitiesOfClass(Entity.class, aabb, (entity -> entity instanceof net.minecraft.world.entity.monster.Monster || entity instanceof net.minecraft.world.entity.monster.Enemy));
         return !list.isEmpty();
     }
 
