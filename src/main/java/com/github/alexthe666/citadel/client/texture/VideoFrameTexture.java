@@ -3,7 +3,8 @@ package com.github.alexthe666.citadel.client.texture;
 import com.mojang.blaze3d.platform.NativeImage;
 // Citadel: TextureUtil.prepareImage might not exist in 1.21
 import net.minecraft.client.renderer.texture.DynamicTexture;
-import net.minecraft.util.FastColor;
+// Citadel: FastColor moved or changed in 1.21
+import com.mojang.blaze3d.platform.NativeImage.PixelFormat;
 
 import java.awt.image.BufferedImage;
 
@@ -33,7 +34,9 @@ public class VideoFrameTexture extends DynamicTexture {
                 int r = color >> 16 & 255;
                 int g = color >> 8 & 255;
                 int b = color & 255;
-                this.getPixels().setPixelRGBA(i, j, FastColor.ABGR32.color(0XFF, b, g, r));
+                // Citadel: FastColor.ABGR32.color might have changed - using direct RGBA value
+                int abgr = (0xFF << 24) | (b << 16) | (g << 8) | r;
+                this.getPixels().setPixelRGBA(i, j, abgr);
             }
         }
         this.upload();

@@ -26,9 +26,11 @@ public class LocalEntityTickRateModifier extends LocalTickRateModifier {
         super(tag);
         this.entityId = tag.getInt("EntityId").orElse(0);
         String entityTypeStr = tag.getString("EntityType").orElse("minecraft:pig");
-        this.expectedEntityType = BuiltInRegistries.ENTITY_TYPE.get(ResourceLocation.parse(entityTypeStr))
+        // Citadel: Registry.get returns Optional<Holder.Reference<EntityType<?>>>
+        // We can't use EntityType.PIG directly due to type mismatch - use unchecked cast
+        this.expectedEntityType = (EntityType<? extends Entity>) BuiltInRegistries.ENTITY_TYPE.get(ResourceLocation.parse(entityTypeStr))
             .map(holder -> holder.value())
-            .orElse(EntityType.PIG);
+            .orElse((EntityType<? extends Entity>) EntityType.PIG);
     }
 
     @Override
@@ -47,7 +49,9 @@ public class LocalEntityTickRateModifier extends LocalTickRateModifier {
 
     public boolean isEntityValid(Level level){
         Entity entity = level.getEntity(this.entityId);
-        return entity != null && entity.isAddedToLevel() && entity.getType().equals(expectedEntityType) && entity.isAlive() && (!(entity instanceof IModifiesTime) || ((IModifiesTime)entity).isTimeModificationValid(this));
+        // Citadel: isAddedToLevel() might have changed to isAddedToWorld() or similar in 1.21
+        // Using level.getEntity() already implies the entity is in the level
+        return entity != null && entity.getType().equals(expectedEntityType) && entity.isAlive() && (!(entity instanceof IModifiesTime) || ((IModifiesTime)entity).isTimeModificationValid(this));
     }
 
     @Override

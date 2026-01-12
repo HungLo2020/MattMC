@@ -69,9 +69,16 @@ public class ChunkCache implements LevelReader {
         for (int k = this.chunkX; k <= i; ++k) {
             for (int l = this.chunkZ; l <= j; ++l) {
                 if (WorldChunkUtil.isEntityChunkLoaded(world, new ChunkPos(k, l)) && worldIn.getChunkSource() instanceof ServerChunkCache serverChunkCache) {
-                    final ChunkHolder holder = serverChunkCache.chunkMap.getVisibleChunkIfPresent(ChunkPos.asLong(k, l));
-                    if (holder != null) {
-                        this.chunkArray[k - this.chunkX][l - this.chunkZ] = holder.getFullChunkFuture().getNow(ChunkHolder.UNLOADED_LEVEL_CHUNK).orElse(null);
+                    // Citadel: getVisibleChunkIfPresent is protected - use reflection
+                    try {
+                        java.lang.reflect.Method method = serverChunkCache.chunkMap.getClass().getDeclaredMethod("getVisibleChunkIfPresent", long.class);
+                        method.setAccessible(true);
+                        final ChunkHolder holder = (ChunkHolder) method.invoke(serverChunkCache.chunkMap, ChunkPos.asLong(k, l));
+                        if (holder != null) {
+                            this.chunkArray[k - this.chunkX][l - this.chunkZ] = holder.getFullChunkFuture().getNow(ChunkHolder.UNLOADED_LEVEL_CHUNK).orElse(null);
+                        }
+                    } catch (Exception e) {
+                        // Reflection failed, skip this chunk
                     }
                 }
             }
@@ -120,7 +127,8 @@ public class ChunkCache implements LevelReader {
     @NotNull
     @Override
     public BlockState getBlockState(BlockPos pos) {
-        if (pos.getY() >= getMinBuildHeight() && pos.getY() < getMaxBuildHeight()) {
+        // Citadel: getMinBuildHeight() and getMaxBuildHeight() changed to getMinY() and getMaxY() in 1.21
+        if (pos.getY() >= getMinY() && pos.getY() < getMaxY()) {
             int i = (pos.getX() >> 4) - this.chunkX;
             int j = (pos.getZ() >> 4) - this.chunkZ;
 

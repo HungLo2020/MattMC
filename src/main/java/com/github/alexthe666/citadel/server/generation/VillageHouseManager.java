@@ -61,7 +61,11 @@ public class VillageHouseManager {
     public static void addAllHouses(RegistryAccess registryAccess) {
         try {
             for (ResourceLocation villagePool : VILLAGE_REPLACEMENT_POOLS) {
-                StructureTemplatePool pool = registryAccess.registryOrThrow(Registries.TEMPLATE_POOL).getOptional(villagePool).orElse(null);
+                // Citadel: registryOrThrow signature may have changed in 1.21
+                StructureTemplatePool pool = registryAccess.lookup(Registries.TEMPLATE_POOL)
+                    .flatMap(registry -> registry.get(villagePool))
+                    .map(holder -> holder.value())
+                    .orElse(null);
                 if (pool != null) {
                     for (Pair<ResourceLocation, Consumer<StructureTemplatePool>> pair : REGISTRY) {
                         if (villagePool.equals(pair.getFirst())) {

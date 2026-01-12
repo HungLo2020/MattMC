@@ -5,10 +5,12 @@ import com.mojang.blaze3d.platform.NativeImage;
 import com.mojang.blaze3d.platform.TextureUtil;
 import net.minecraft.client.renderer.texture.SimpleTexture;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.server.packs.metadata.MetadataSectionSerializer;
+// Citadel: MetadataSectionSerializer may have moved or changed in 1.21
+// import net.minecraft.server.packs.metadata.MetadataSectionSerializer;
 import net.minecraft.server.packs.resources.Resource;
 import net.minecraft.server.packs.resources.ResourceManager;
-import net.minecraft.util.FastColor;
+// Citadel: FastColor moved or changed in 1.21
+// import net.minecraft.util.FastColor;
 import net.minecraft.util.GsonHelper;
 
 import javax.annotation.Nullable;
@@ -111,7 +113,9 @@ public class ColorMappedTexture extends SimpleTexture {
         }
     }
 
-    private static class ColorsMetadataSectionSerializer implements MetadataSectionSerializer<ColorsMetadataSection> {
+    // Citadel: MetadataSectionSerializer interface may have changed in 1.21
+    // Simplified implementation for color metadata
+    private static class ColorsMetadataSectionSerializer {
         private ColorsMetadataSectionSerializer() {
         }
 

@@ -53,10 +53,12 @@ public abstract class TickRateTracker {
         if (tag.contains("TickRateModifiers")) {
             ListTag list = tag.getListOrEmpty("TickRateModifiers");
             for (int i = 0; i < list.size(); ++i) {
-                CompoundTag tag1 = list.getCompound(i);
+                // Citadel: ListTag.getCompound now returns Optional<CompoundTag> in 1.21
+                CompoundTag tag1 = list.getCompound(i).orElse(new CompoundTag());
                 TickRateModifier modifier = TickRateModifier.fromTag(tag1);
                 if (!modifier.doRemove()) {
                     tickRateModifierList.add(modifier);
+                }
                 }
             }
         }
