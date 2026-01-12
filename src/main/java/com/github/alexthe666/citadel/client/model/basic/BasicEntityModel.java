@@ -47,8 +47,9 @@ public abstract class BasicEntityModel<T extends EntityRenderState> extends Enti
         public void render(PoseStack poseStack, VertexConsumer vertexConsumer, int packedLight, int packedOverlay, int color) {
             if (owner != null) {
                 // Render all BasicModelPart children instead of vanilla ModelPart children
+                // Pass the color parameter to ensure proper texture rendering
                 for (BasicModelPart part : owner.parts()) {
-                    part.render(poseStack, vertexConsumer, packedLight, packedOverlay);
+                    part.render(poseStack, vertexConsumer, packedLight, packedOverlay, color);
                 }
             }
         }
