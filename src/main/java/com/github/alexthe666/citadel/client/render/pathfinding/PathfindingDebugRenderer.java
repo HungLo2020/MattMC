@@ -100,7 +100,8 @@ public class PathfindingDebugRenderer {
         ctx.poseStack.pushPose();
         ctx.poseStack.translate(0.0F, 0.75F, 0.0F);
 
-        ctx.poseStack.mulPose(Minecraft.getInstance().getEntityRenderDispatcher().cameraOrientation());
+        // TODO: cameraOrientation() removed in 1.21 - camera rotation handled differently now
+        // ctx.poseStack.mulPose(Minecraft.getInstance().getEntityRenderDispatcher().cameraOrientation());
         ctx.poseStack.scale(-0.014F, -0.014F, 0.014F);
         ctx.poseStack.translate(0.0F, 18F, 0.0F);
         final Matrix4f mat = ctx.poseStack.last().pose();

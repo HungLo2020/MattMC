@@ -35,12 +35,12 @@ public class VanillaTabulaModel implements UnbakedModel {
         return ImmutableList.of();
     }
 
-    @Override
+    // Citadel: Removed @Override - method signature changed in parent class in 1.21
     public void resolveParents(Function<ResourceLocation, UnbakedModel> p_119538_) {
 
     }
 
-    @Override
+    // Citadel: Removed @Override - method signature changed in parent class in 1.21
     public @Nullable BakedTabulaModel bake(ModelBaker baker, Function<Material, TextureAtlasSprite> spriteGetter, ModelState state) {
         // Citadel: Simplified - full implementation would require adapting to 1.21's model system
         // TODO: Implement proper baking if Tabula models are needed

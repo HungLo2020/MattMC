@@ -29,9 +29,9 @@ public class LocalEntityTickRateModifier extends LocalTickRateModifier {
         // Citadel: Registry.get returns Optional<Holder.Reference<EntityType<?>>>
         // Cast using unchecked suppression to handle wildcard generics
         @SuppressWarnings("unchecked")
-        EntityType<? extends Entity> type = BuiltInRegistries.ENTITY_TYPE.get(ResourceLocation.parse(entityTypeStr))
-            .map(holder -> (EntityType<? extends Entity>) holder.value())
-            .orElse(EntityType.PIG);
+        EntityType<? extends Entity> type = (EntityType<? extends Entity>) BuiltInRegistries.ENTITY_TYPE.get(ResourceLocation.parse(entityTypeStr))
+            .map(holder -> holder.value())
+            .orElse((Object) EntityType.PIG);
         this.expectedEntityType = type;
     }
 

@@ -24,7 +24,9 @@ import java.util.zip.ZipInputStream;
 public enum TabulaModelHandler implements JsonDeserializationContext {
     INSTANCE;
 
-    private Gson gson = new GsonBuilder().registerTypeAdapter(ItemTransform.class, new ItemTransform.Deserializer()).registerTypeAdapter(ItemTransforms.class, new ItemTransforms.Deserializer()).create();
+    // Citadel: Simplified for 1.21 - ItemTransform/ItemTransforms Deserializer classes are now protected
+    // This is optional Tabula model loading functionality
+    private Gson gson = new GsonBuilder().create();
     private JsonParser parser = new JsonParser();
     private TabulaModelBlock.Deserializer TabulaModelBlockDeserializer = new TabulaModelBlock.Deserializer();
     private ResourceManager manager;

@@ -1,22 +1,20 @@
 package com.github.alexthe666.citadel.client.shader;
 
 import com.github.alexthe666.citadel.Citadel;
-import com.google.gson.JsonSyntaxException;
 import com.mojang.blaze3d.pipeline.RenderTarget;
-// Citadel: GlStateManager removed in 1.21
 import com.mojang.blaze3d.systems.RenderSystem;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.PostChain;
 import net.minecraft.resources.ResourceLocation;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 // Citadel: Post-processing effects system for shaders
-// GlStateManager removed in 1.21, using RenderSystem for GL operations
+// Simplified for 1.21 - PostChain API completely redesigned
+// Full implementation would require adapting to 1.21's new shader system
 public class PostEffectRegistry {
 
     private static List<ResourceLocation> registry = new ArrayList<>();
@@ -38,28 +36,32 @@ public class PostEffectRegistry {
         clear();
         Minecraft minecraft = Minecraft.getInstance();
         for (ResourceLocation resourceLocation : registry) {
+            // TODO: PostChain constructor changed in 1.21 - now requires List<PostPass> instead of TextureManager
+            // Full implementation would require adapting to new PostChain/PostPass system
+            // For now, skip shader loading
+            Citadel.LOGGER.warn("Shader loading not yet adapted for 1.21: {}", resourceLocation);
+            /*
             PostChain postChain;
             RenderTarget renderTarget;
             try {
-                postChain = new PostChain(minecraft.getTextureManager(), minecraft.getResourceManager(), minecraft.getMainRenderTarget(), resourceLocation);
-                postChain.resize(minecraft.getWindow().getWidth(), minecraft.getWindow().getHeight());
-                renderTarget = postChain.getTempTarget("final");
-            } catch (IOException ioexception) {
-                Citadel.LOGGER.warn("Failed to load shader: {}", resourceLocation, ioexception);
+                // PostChain constructor signature changed:
+                // Old: new PostChain(TextureManager, ResourceManager, RenderTarget, ResourceLocation)
+                // New: new PostChain(List<PostPass>)
+                postChain = null; // TODO: Implement with new API
+                renderTarget = null;
+            } catch (Exception e) {
+                Citadel.LOGGER.warn("Failed to load shader: {}", resourceLocation, e);
                 postChain = null;
                 renderTarget = null;
-            } catch (JsonSyntaxException jsonsyntaxexception) {
-                Citadel.LOGGER.warn("Failed to parse shader: {}", resourceLocation, jsonsyntaxexception);
-                postChain = null;
-                renderTarget = null;
-            }
-            postEffects.put(resourceLocation, new PostEffect(postChain, renderTarget, false));
+            */
+            postEffects.put(resourceLocation, new PostEffect(null, null, false));
         }
     }
 
     public static void resize(int x, int y) {
+        // TODO: Implement resize with new PostChain API
         for (PostEffect postEffect : postEffects.values()) {
-            postEffect.resize(x, y);
+            // postEffect.resize(x, y); // Method signature may have changed
         }
     }
 
@@ -76,37 +78,48 @@ public class PostEffectRegistry {
     }
 
     public static void blitEffects() {
-        RenderSystem.enableBlend();
-        RenderSystem.enableDepthTest();
-        RenderSystem.blendFuncSeparate(GlStateManager.SourceFactor.SRC_ALPHA, GlStateManager.DestFactor.ONE, GlStateManager.SourceFactor.ONE, GlStateManager.DestFactor.ZERO);
+        // TODO: Adapt for 1.21 - many RenderSystem methods removed
+        // RenderSystem.enableBlend() - REMOVED
+        // RenderSystem.enableDepthTest() - REMOVED  
+        // GlStateManager - REMOVED
+        // RenderTarget.blitToScreen() signature changed
+        // Minecraft.ON_OSX - REMOVED
+        // RenderTarget.bindWrite() - REMOVED
+        /*
         for (PostEffect postEffect : postEffects.values()) {
             if (postEffect.postChain != null && postEffect.isEnabled()) {
-                postEffect.getRenderTarget().blitToScreen(Minecraft.getInstance().getWindow().getWidth(), Minecraft.getInstance().getWindow().getHeight(), false);
-                postEffect.getRenderTarget().clear(Minecraft.ON_OSX);
-                Minecraft.getInstance().getMainRenderTarget().bindWrite(false);
+                postEffect.getRenderTarget().blitToScreen(); // No parameters in 1.21
+                postEffect.getRenderTarget().clear(); // No parameter
+                // Minecraft.getInstance().getMainRenderTarget().bindWrite(false); - REMOVED
                 postEffect.setEnabled(false);
             }
         }
-        RenderSystem.disableBlend();
-        RenderSystem.defaultBlendFunc();
+        */
     }
 
     public static void clearAndBindWrite(RenderTarget mainTarget) {
+        // TODO: Adapt for 1.21 - bindWrite() and clear() methods changed
+        /*
         for (PostEffect postEffect : postEffects.values()) {
             if (postEffect.isEnabled() && postEffect.postChain != null) {
-                postEffect.getRenderTarget().clear(Minecraft.ON_OSX);
-                mainTarget.bindWrite(false);
+                // postEffect.getRenderTarget().clear(); // Minecraft.ON_OSX removed
+                // mainTarget.bindWrite(false); // bindWrite() removed
             }
         }
+        */
     }
 
     public static void processEffects(RenderTarget mainTarget) {
+        // TODO: Adapt for 1.21 - PostChain.process() and Timer API changed
+        /*
         for (PostEffect postEffect : postEffects.values()) {
             if (postEffect.isEnabled() && postEffect.postChain != null) {
-                postEffect.postChain.process(Minecraft.getInstance().getTimer().getGameTimeDeltaTicks());
-                mainTarget.bindWrite(false);
+                // Minecraft.getTimer() → getDeltaTracker()
+                // postEffect.postChain.process(...); // Method signature may have changed
+                // mainTarget.bindWrite(false); // bindWrite() removed
             }
         }
+        */
     }
 
     private static class PostEffect {
@@ -143,9 +156,10 @@ public class PostEffectRegistry {
         }
 
         public void resize(int x, int y) {
-            if (postChain != null) {
-                postChain.resize(x, y);
-            }
+            // TODO: PostChain.resize() may have changed in 1.21
+            // if (postChain != null) {
+            //     postChain.resize(x, y);
+            // }
         }
     }
 }

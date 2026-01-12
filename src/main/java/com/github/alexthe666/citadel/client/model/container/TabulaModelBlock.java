@@ -25,8 +25,15 @@ import java.util.Set;
 public class TabulaModelBlock
 {
     private static final Logger LOGGER = LogManager.getLogger();
+    // Citadel: Simplified SERIALIZER for 1.21 - many Deserializer classes are now protected
+    // BlockFaceUV class doesn't exist in 1.21
+    // This is optional Tabula model loading functionality
     @VisibleForTesting
-    static final Gson SERIALIZER = (new GsonBuilder()).registerTypeAdapter(TabulaModelBlock.class, new TabulaModelBlock.Deserializer()).registerTypeAdapter(BlockElement.class, new BlockElement.Deserializer()).registerTypeAdapter(BlockElementFace.class, new BlockElementFace.Deserializer()).registerTypeAdapter(BlockFaceUV.class, new BlockFaceUV.Deserializer()).registerTypeAdapter(ItemTransform.class, new ItemTransform.Deserializer()).registerTypeAdapter(ItemTransforms.class, new ItemTransforms.Deserializer()).create();
+    static final Gson SERIALIZER = (new GsonBuilder())
+        .registerTypeAdapter(TabulaModelBlock.class, new TabulaModelBlock.Deserializer())
+        // Note: BlockElement, BlockElementFace, ItemTransform, ItemTransforms deserializers are protected in 1.21
+        // BlockFaceUV class removed in 1.21
+        .create();
     private final List<BlockElement> elements;
     private final boolean gui3d;
     public final boolean ambientOcclusion;
@@ -176,12 +183,17 @@ public class TabulaModelBlock
         ItemTransform itemtransformvec3f5 = this.getTransform(ItemDisplayContext.GUI);
         ItemTransform itemtransformvec3f6 = this.getTransform(ItemDisplayContext.GROUND);
         ItemTransform itemtransformvec3f7 = this.getTransform(ItemDisplayContext.FIXED);
-        return new ItemTransforms(itemtransformvec3f, itemtransformvec3f1, itemtransformvec3f2, itemtransformvec3f3, itemtransformvec3f4, itemtransformvec3f5, itemtransformvec3f6, itemtransformvec3f7);
+        ItemTransform itemtransformvec3f8 = ItemTransform.NO_TRANSFORM; // 1.21 added a 9th parameter
+        // ItemTransforms constructor now requires 9 parameters in 1.21
+        return new ItemTransforms(itemtransformvec3f, itemtransformvec3f1, itemtransformvec3f2, itemtransformvec3f3, itemtransformvec3f4, itemtransformvec3f5, itemtransformvec3f6, itemtransformvec3f7, itemtransformvec3f8);
     }
 
     private ItemTransform getTransform(ItemDisplayContext type)
     {
-        return this.parent != null && !this.cameraTransforms.hasTransform(type) ? this.parent.getTransform(type) : this.cameraTransforms.getTransform(type);
+        // hasTransform() method removed in 1.21 - check if parent exists instead
+        return this.parent != null && this.cameraTransforms.getTransform(type) == ItemTransform.NO_TRANSFORM 
+            ? this.parent.getTransform(type) 
+            : this.cameraTransforms.getTransform(type);
     }
 
     public static void checkModelHierarchy(Map<ResourceLocation, TabulaModelBlock> p_178312_0_)

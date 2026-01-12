@@ -109,8 +109,10 @@ public class JsonUtils
     @Nullable
     public static Item getByNameOrId(String id)
     {
-
-        return BuiltInRegistries.ITEM.get(ResourceLocation.parse(id));
+        // Registry.get() now returns Optional<Reference<T>>
+        return BuiltInRegistries.ITEM.get(ResourceLocation.parse(id))
+            .map(holder -> holder.value())
+            .orElse(null);
     }
 
     public static Item getItem(JsonElement json, String memberName)
