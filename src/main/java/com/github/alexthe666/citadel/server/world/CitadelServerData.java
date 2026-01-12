@@ -1,11 +1,14 @@
 package com.github.alexthe666.citadel.server.world;
 
 import com.github.alexthe666.citadel.server.tick.ServerTickRateTracker;
+import com.mojang.serialization.Codec;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.util.datafix.DataFixTypes;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.saveddata.SavedData;
+import net.minecraft.world.level.saveddata.SavedDataType;
 import net.minecraft.world.level.storage.DimensionDataStorage;
 
 import java.util.HashMap;
@@ -25,16 +28,25 @@ public class CitadelServerData extends SavedData {
         this.server = server;
     }
 
-
-    public static SavedData.Factory<CitadelServerData> factory(MinecraftServer level) {
-        return new SavedData.Factory<>(() -> new CitadelServerData(level), (tag, provider) -> load(level, tag), null);
+    // Create SavedDataType for vanilla 1.21 API
+    public static SavedDataType<CitadelServerData> type(MinecraftServer server) {
+        // Using the constructor that takes Supplier and Codec
+        return new SavedDataType<>(
+            IDENTIFIER,
+            () -> new CitadelServerData(server),
+            CompoundTag.CODEC.xmap(
+                tag -> load(server, tag),
+                data -> data.save(new CompoundTag(), null)
+            ),
+            DataFixTypes.SAVED_DATA_RANDOM_SEQUENCES
+        );
     }
     
     public static CitadelServerData get(MinecraftServer server) {
         CitadelServerData fromMap = dataMap.get(server);
         if(fromMap == null){
             DimensionDataStorage storage = server.getLevel(Level.OVERWORLD).getDataStorage();
-            CitadelServerData data = storage.computeIfAbsent(factory(server), IDENTIFIER);
+            CitadelServerData data = storage.computeIfAbsent(type(server));
             data.setDirty();
             dataMap.put(server, data);
             return data;
