@@ -57,7 +57,7 @@ public class CustomToolMaterial {
     }
 
     public Ingredient getRepairIngredient() {
-        return ingredient == null ? Ingredient.EMPTY : ingredient;
+        return ingredient == null ? Ingredient.of() : ingredient;
     }
 
     public void setRepairMaterial(Ingredient ingredient){

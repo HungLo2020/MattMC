@@ -78,8 +78,8 @@ public class ChunkCache implements LevelReader {
         }
         this.dimType = type;
 
-        minBuildHeight = worldIn.getMinBuildHeight();
-        maxBuildHeight = worldIn.getMaxBuildHeight();
+        minBuildHeight = worldIn.getMinY();
+        maxBuildHeight = worldIn.getMaxY();
     }
 
     /**
@@ -108,12 +108,12 @@ public class ChunkCache implements LevelReader {
     }
 
     @Override
-    public int getMinBuildHeight() {
+    public int getMinY() {
         return minBuildHeight;
     }
 
     @Override
-    public int getMaxBuildHeight() {
+    public int getMaxY() {
         return maxBuildHeight;
     }
 

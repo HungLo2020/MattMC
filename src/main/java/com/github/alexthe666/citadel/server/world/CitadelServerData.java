@@ -57,7 +57,8 @@ public class CitadelServerData extends SavedData {
     public static CitadelServerData load(MinecraftServer server, CompoundTag tag) {
         CitadelServerData data = new CitadelServerData(server);
         if(tag.contains("TickRateTracker")){
-            data.tickRateTracker = new ServerTickRateTracker(server, tag.getCompound("TickRateTracker"));
+            CompoundTag trackerTag = tag.getCompound("TickRateTracker").orElse(new CompoundTag());
+            data.tickRateTracker = new ServerTickRateTracker(server, trackerTag);
         }else{
             data.tickRateTracker = new ServerTickRateTracker(server);
         }
@@ -71,7 +72,6 @@ public class CitadelServerData extends SavedData {
         return tickRateTracker;
     }
 
-    @Override
     public CompoundTag save(CompoundTag tag, HolderLookup.Provider registries) {
         if(tickRateTracker != null){
             tag.put("TickRateTracker", tickRateTracker.toTag());

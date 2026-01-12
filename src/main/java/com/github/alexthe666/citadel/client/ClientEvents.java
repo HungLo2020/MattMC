@@ -1,6 +1,6 @@
-package com.github.alexthe666/citadel.client;
+package com.github.alexthe666.citadel.client;
 
-import com.github.alexthe666/citadel.client.shader.CitadelInternalShaders;
+import com.github.alexthe666.citadel.client.shader.CitadelInternalShaders;
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.api.EnvType;
