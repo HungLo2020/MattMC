@@ -31,9 +31,16 @@ public class BookBlit {
     }
 
     private static void blitWithColor(GuiGraphics guiGraphics, ResourceLocation texture, int startX, int endX, int startY, int endY, int zLevel, float u0, float u1, float v0, float v1, int r, int g, int b, int a) {
+        // Citadel: 1.21 API - RenderSystem.setShaderTexture() now requires GpuTextureView not ResourceLocation
+        // Citadel: 1.21 API - GameRenderer::getPositionTexColorShader() method reference invalid - shader system redesigned
+        // Citadel: 1.21 API - RenderSystem.enableBlend() and disableBlend() removed - blending controlled through RenderState
+        // TODO: Adapt to 1.21's new shader/texture system or use GuiGraphics methods instead
+        // Commenting out for now as this requires major rework for 1.21's rendering pipeline
+        /*
         RenderSystem.setShaderTexture(0, texture);
         RenderSystem.setShader(GameRenderer::getPositionTexColorShader);
         RenderSystem.enableBlend();
+        */
         Matrix4f matrix4f = guiGraphics.pose().last().pose();
         BufferBuilder bufferbuilder = Tesselator.getInstance().begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX_COLOR);
         bufferbuilder.addVertex(matrix4f, (float)startX, (float)startY, (float)zLevel).setUv(u0, v0).setColor(r, g, b, a);
@@ -41,6 +48,8 @@ public class BookBlit {
         bufferbuilder.addVertex(matrix4f, (float)endX, (float)endY, (float)zLevel).setUv(u1, v1).setColor(r, g, b, a);
         bufferbuilder.addVertex(matrix4f, (float)endX, (float)startY, (float)zLevel).setUv(u1, v0).setColor(r, g, b, a);
         BufferUploader.drawWithShader(bufferbuilder.buildOrThrow());
+        /*
         RenderSystem.disableBlend();
+        */
     }
 }

@@ -30,13 +30,14 @@ public class GuiCitadelPatreonConfig extends OptionsSubScreen {
     public GuiCitadelPatreonConfig(Screen parentScreenIn, Options gameSettingsIn) {
         super(parentScreenIn, gameSettingsIn, Component.translatable("citadel.gui.patreon_customization"));
         CompoundTag tag = CitadelEntityData.getOrCreateCitadelTag(Minecraft.getInstance().player);
-        float distance = tag.contains("CitadelRotateDistance") ? tag.getFloat("CitadelRotateDistance") : 2F;
-        float speed = tag.contains("CitadelRotateSpeed") ? tag.getFloat("CitadelRotateSpeed") : 1;
-        float height = tag.contains("CitadelRotateHeight") ? tag.getFloat("CitadelRotateHeight") : 1F;
+        // Citadel: 1.21 API - CompoundTag.getFloat() and getString() now return Optional
+        float distance = tag.contains("CitadelRotateDistance") ? tag.getFloat("CitadelRotateDistance").orElse(2F) : 2F;
+        float speed = tag.contains("CitadelRotateSpeed") ? tag.getFloat("CitadelRotateSpeed").orElse(1F) : 1F;
+        float height = tag.contains("CitadelRotateHeight") ? tag.getFloat("CitadelRotateHeight").orElse(1F) : 1F;
         rotateDist = roundTo(distance, 3);
         rotateSpeed = roundTo(speed, 3);
         rotateHeight = roundTo(height, 3);
-        followType = tag.contains("CitadelFollowerType") ? tag.getString("CitadelFollowerType") : "citadel";
+        followType = tag.contains("CitadelFollowerType") ? tag.getString("CitadelFollowerType").orElse("citadel") : "citadel";
     }
 
     private void setSliderValue(int i, float sliderValue) {

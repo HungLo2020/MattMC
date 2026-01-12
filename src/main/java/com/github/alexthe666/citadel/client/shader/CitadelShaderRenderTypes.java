@@ -9,11 +9,12 @@ import net.minecraft.resources.ResourceLocation;
 // No longer extends RenderType as it's not meant to be extended in 1.21
 public class CitadelShaderRenderTypes {
 
-    // Citadel: Rainbow aura render type - simplified to use vanilla translucent type
+    // Citadel: Rainbow aura render type - simplified to use vanilla entity translucent type
     // Full custom shader support would require adapting to 1.21's resource pack based shader system
     public static RenderType getRainbowAura(ResourceLocation locationIn) {
         // TODO: Implement proper rainbow aura shader using 1.21's resource pack based shader system
-        // For now, return translucent render type as fallback
-        return RenderType.translucent();
+        // For now, return entity translucent render type as fallback
+        // Note: RenderType.translucent() was removed in 1.21, use entityTranslucent() instead
+        return RenderType.entityTranslucent(locationIn);
     }
 }

@@ -30,7 +30,7 @@ public class LocalEntityTickRateModifier extends LocalTickRateModifier {
         // Cast using unchecked suppression to handle wildcard generics
         @SuppressWarnings("unchecked")
         EntityType<? extends Entity> type = (EntityType<? extends Entity>) BuiltInRegistries.ENTITY_TYPE.get(ResourceLocation.parse(entityTypeStr))
-            .map(holder -> holder.value())
+            .map(holder -> (Object) holder.value())
             .orElse((Object) EntityType.PIG);
         this.expectedEntityType = type;
     }

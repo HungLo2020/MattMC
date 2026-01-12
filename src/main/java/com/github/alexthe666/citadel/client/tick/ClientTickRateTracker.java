@@ -8,6 +8,7 @@ import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.resources.sounds.SoundInstance;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.level.Level;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -43,10 +44,16 @@ public class ClientTickRateTracker extends TickRateTracker {
 
     public void masterTick(){
         super.masterTick();
-        if(client.getTimer() instanceof DeltaTracker.Timer timer){
-            timer.msPerTick = getClientTickRate();
-
+        // Citadel: 1.21 API - Minecraft.getTimer() was removed, use getDeltaTracker() instead
+        // DeltaTracker.Timer.msPerTick is now private, cannot modify directly
+        // TODO: Find alternative way to modify tick rate in 1.21 or use different approach
+        // Commenting out for now as this feature requires access to private fields
+        /*
+        if(client.getDeltaTracker() instanceof DeltaTracker deltaTracker){
+            // Cannot access msPerTick as it's private in 1.21
+            // Would need to modify vanilla DeltaTracker class to make it public
         }
+        */
     }
 
     public float getClientTickRate(){
@@ -77,8 +84,10 @@ public class ClientTickRateTracker extends TickRateTracker {
 
     @Override
     public void tickEntityAtCustomRate(Entity entity) {
-        if(entity.level().isClientSide && entity.level() instanceof ClientLevel){
-            ((ClientLevel)entity.level()).tickNonPassenger(entity);
+        // Citadel: 1.21 API - Level.isClientSide is now private, use isClient() method instead
+        Level level = entity.level();
+        if(level.isClient() && level instanceof ClientLevel){
+            ((ClientLevel)level).tickNonPassenger(entity);
         }
     }
 }
