@@ -51,18 +51,11 @@ public final class Pathfinding {
 
         @Override
         public Thread newThread(final @NotNull Runnable runnable) throws RuntimeException {
-            // In 1.21, LogicalSidedProvider doesn't exist - using MinecraftServer directly
-            BlockableEventLoop<?> workqueue = net.minecraft.server.MinecraftServer.getServer();
-            ClassLoader classLoader;
-            if (workqueue != null && workqueue.isSameThread()) {
-                classLoader = Thread.currentThread().getContextClassLoader();
-            } else if (workqueue instanceof MinecraftServer server){
-               classLoader = server.getRunningThread().getContextClassLoader();
-            } else {
-                classLoader = CompletableFuture.supplyAsync(() -> Thread.currentThread().getContextClassLoader(), workqueue).orTimeout(10, TimeUnit.SECONDS).exceptionally((ex)-> {
-                    throw new RuntimeException(String.format("Couldn't join threads within timeout range. Tried joining '%s' on '%s'", Thread.currentThread().getName(), workqueue.name()));
-                }).join();
-            }
+            // In 1.21, LogicalSidedProvider doesn't exist
+            // Pathfinding threads don't need server context loader for this project
+            BlockableEventLoop<?> workqueue = null;
+            ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
+            
             final Thread thread = new Thread(runnable, "Citadel Pathfinding Worker #" + (id++));
             thread.setDaemon(true);
             thread.setPriority(Thread.MAX_PRIORITY);

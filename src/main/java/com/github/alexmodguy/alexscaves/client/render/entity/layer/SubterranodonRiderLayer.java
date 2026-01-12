@@ -17,7 +17,7 @@ public class SubterranodonRiderLayer extends RenderLayer<SubterranodonRenderStat
     }
 
     @Override
-    public void render(PoseStack poseStack, MultiBufferSource bufferSource, int packedLight, SubterranodonRenderState renderState, float p_225628_5_, float p_225628_6_) {
+    public void submit(PoseStack poseStack, net.minecraft.client.renderer.SubmitNodeCollector collector, int packedLight, SubterranodonRenderState renderState, float p_225628_5_, float p_225628_6_) {
         // TODO: Implement rider rendering using data from renderState
         // Need to store passenger data in SubterranodonRenderState during extractRenderState()
         // For now, no rider rendering (mob still rideable, just riders won't visually show)

@@ -196,9 +196,8 @@ public class DinosaurSpiritEntity extends Entity {
 
     @Override
     protected void readAdditionalSaveData(net.minecraft.world.level.storage.ValueInput tag) {
-        if (tag.contains("UsingPlayerID")) {
-            this.setPlayerID(tag.getIntOr("UsingPlayerID", -1));
-        }
+        // ValueInput doesn't have contains(), use getInt() which returns Optional
+        tag.getInt("UsingPlayerID").ifPresent(this::setPlayerID);
         this.setDinosaurTypeInt(tag.getIntOr("DinosaurType", 0));
     }
 
@@ -319,6 +318,12 @@ public class DinosaurSpiritEntity extends Entity {
 
     public float getAbilityProgress(float partialTicks) {
         return (prevAbilityProgress + (abilityProgress - prevAbilityProgress) * partialTicks) * 0.2F;
+    }
+
+    @Override
+    public boolean hurtServer(ServerLevel level, DamageSource source, float amount) {
+        // Spirit entities cannot be hurt
+        return false;
     }
 
     public enum DinosaurType {

@@ -107,12 +107,11 @@ public class ChunkCache implements LevelReader {
         return this.chunkArray[i][j].getBlockEntity(pos, createType);
     }
 
-    @Override
+    // Height accessor methods (not part of LevelReader interface in 1.21)
     public int getMinBuildHeight() {
         return minBuildHeight;
     }
 
-    @Override
     public int getMaxBuildHeight() {
         return maxBuildHeight;
     }
