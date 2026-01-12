@@ -9,9 +9,9 @@ import net.minecraft.resources.ResourceLocation;
 // TODO: Fix layer to work with render state system
 // this.addLayer(new SubterranodonRiderLayer(this));
 public class SubterranodonRenderer extends MobRenderer<SubterranodonEntity, SubterranodonRenderState, SubterranodonModel> {
-    private static final ResourceLocation TEXTURE = ResourceLocation.fromNamespaceAndPath("alexscaves", "textures/entity/subterranodon.png");
-    private static final ResourceLocation TEXTURE_RETRO = ResourceLocation.fromNamespaceAndPath("alexscaves", "textures/entity/subterranodon_retro.png");
-    private static final ResourceLocation TEXTURE_TECTONIC = ResourceLocation.fromNamespaceAndPath("alexscaves", "textures/entity/subterranodon_tectonic.png");
+    private static final ResourceLocation TEXTURE = ResourceLocation.withDefaultNamespace("textures/entity/subterranodon.png");
+    private static final ResourceLocation TEXTURE_RETRO = ResourceLocation.withDefaultNamespace("textures/entity/subterranodon_retro.png");
+    private static final ResourceLocation TEXTURE_TECTONIC = ResourceLocation.withDefaultNamespace("textures/entity/subterranodon_tectonic.png");
 
     public SubterranodonRenderer(EntityRendererProvider.Context renderManagerIn) {
         super(renderManagerIn, new SubterranodonModel(), 0.5F);
