@@ -161,7 +161,7 @@ public abstract class AbstractPathJob implements Callable<Path> {
         this.restrictionType = AbstractAdvancedPathNavigate.RestrictionType.NONE;
         this.hardXzRestriction = false;
 
-        this.world = new ChunkCache(world, new BlockPos(minX, ((net.minecraft.world.level.LevelHeightAccessor) world).getMinBuildHeight(), minZ), new BlockPos(maxX, ((net.minecraft.world.level.LevelHeightAccessor) world).getMaxBuildHeight(), maxZ), range);
+        this.world = new ChunkCache(world, new BlockPos(minX, ((net.minecraft.world.level.LevelHeightAccessor) world).getMinY(), minZ), new BlockPos(maxX, ((net.minecraft.world.level.LevelHeightAccessor) world).getMaxY(), maxZ), range);
 
         this.start = new BlockPos(start);
         this.end = end;
@@ -258,7 +258,7 @@ public abstract class AbstractPathJob implements Callable<Path> {
         this.restrictionType = restrictionType;
         this.hardXzRestriction = hardRestriction;
 
-        this.world = new ChunkCache(world, new BlockPos(minX, ((net.minecraft.world.level.LevelHeightAccessor) world).getMinBuildHeight(), minZ), new BlockPos(maxX, ((net.minecraft.world.level.LevelHeightAccessor) world).getMaxBuildHeight(), maxZ), range);
+        this.world = new ChunkCache(world, new BlockPos(minX, ((net.minecraft.world.level.LevelHeightAccessor) world).getMinY(), minZ), new BlockPos(maxX, ((net.minecraft.world.level.LevelHeightAccessor) world).getMaxY(), maxZ), range);
 
         this.start = start;
 
@@ -336,7 +336,7 @@ public abstract class AbstractPathJob implements Callable<Path> {
             bs = down;
             down = world.getBlockState(pos.below());
 
-            if (pos.getY() < ((net.minecraft.world.level.LevelHeightAccessor) world).getMinBuildHeight()) {
+            if (pos.getY() < ((net.minecraft.world.level.LevelHeightAccessor) world).getMinY()) {
                 return entity.blockPosition();
             }
         }
@@ -887,7 +887,7 @@ public abstract class AbstractPathJob implements Callable<Path> {
         //  Can we traverse into this node?  Fix the y up
         final int newY = getGroundHeight(parent, pos);
 
-        if (newY < ((net.minecraft.world.level.LevelHeightAccessor) world).getMinBuildHeight()) {
+        if (newY < ((net.minecraft.world.level.LevelHeightAccessor) world).getMinY()) {
             return false;
         }
 

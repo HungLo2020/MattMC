@@ -138,7 +138,7 @@ public class SubterranodonFlightGoal extends Goal {
             Vec3 ground = groundPosition(heightAdjusted);
             BlockPos ceiling = BlockPos.containing(ground).above(2);
             // In 1.21, getMaxBuildHeight() is on Level (which implements LevelHeightAccessor)
-            while (ceiling.getY() < ((net.minecraft.world.level.LevelHeightAccessor) entity.level()).getMaxBuildHeight() && !entity.level().getBlockState(ceiling).isSolid()) {
+            while (ceiling.getY() < ((net.minecraft.world.level.LevelHeightAccessor) entity.level()).getMaxY() && !entity.level().getBlockState(ceiling).isSolid()) {
                 ceiling = ceiling.above();
             }
             float randCeilVal = 0.5F + entity.getRandom().nextFloat() * 0.2F;
@@ -184,10 +184,10 @@ public class SubterranodonFlightGoal extends Goal {
     private boolean isOverWaterOrVoid() {
         BlockPos position = entity.blockPosition();
         // Level implements LevelHeightAccessor, so getMinBuildHeight() should work
-        while (position.getY() > ((net.minecraft.world.level.LevelHeightAccessor) entity.level()).getMinBuildHeight() && entity.level().isEmptyBlock(position) && entity.level().getFluidState(position).isEmpty()) {
+        while (position.getY() > ((net.minecraft.world.level.LevelHeightAccessor) entity.level()).getMinY() && entity.level().isEmptyBlock(position) && entity.level().getFluidState(position).isEmpty()) {
             position = position.below();
         }
-        return !entity.level().getFluidState(position).isEmpty() || entity.level().getBlockState(position).is(Blocks.VINE) || position.getY() <= ((net.minecraft.world.level.LevelHeightAccessor) entity.level()).getMinBuildHeight();
+        return !entity.level().getFluidState(position).isEmpty() || entity.level().getBlockState(position).is(Blocks.VINE) || position.getY() <= ((net.minecraft.world.level.LevelHeightAccessor) entity.level()).getMinY();
     }
 
     public Vec3 groundPosition(Vec3 airPosition) {
@@ -195,12 +195,12 @@ public class SubterranodonFlightGoal extends Goal {
         ground.set(airPosition.x, airPosition.y, airPosition.z);
         boolean flag = false;
         // Level implements LevelHeightAccessor, so getMaxBuildHeight()/getMinBuildHeight() should work
-        while (ground.getY() < ((net.minecraft.world.level.LevelHeightAccessor) entity.level()).getMaxBuildHeight() && !entity.level().getBlockState(ground).isSolid() && entity.level().getFluidState(ground).isEmpty()){
+        while (ground.getY() < ((net.minecraft.world.level.LevelHeightAccessor) entity.level()).getMaxY() && !entity.level().getBlockState(ground).isSolid() && entity.level().getFluidState(ground).isEmpty()){
             ground.move(0, 1, 0);
             flag = true;
         }
         ground.move(0, -1, 0);
-        while (ground.getY() > ((net.minecraft.world.level.LevelHeightAccessor) entity.level()).getMinBuildHeight() && !entity.level().getBlockState(ground).isSolid() && entity.level().getFluidState(ground).isEmpty()) {
+        while (ground.getY() > ((net.minecraft.world.level.LevelHeightAccessor) entity.level()).getMinY() && !entity.level().getBlockState(ground).isSolid() && entity.level().getFluidState(ground).isEmpty()) {
             ground.move(0, -1, 0);
         }
         return Vec3.atCenterOf(flag ? ground.above() : ground.below());
