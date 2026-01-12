@@ -204,12 +204,13 @@ public class ClientProxy extends ServerProxy {
         }
     }
 
-    // Citadel: Converted from NeoForge @SubscribeEvent - TODO: Wire to Fabric splash text rendering
+    // Citadel: Converted from NeoForge @SubscribeEvent - TODO: Wire to splash text rendering in vanilla TitleScreen
     public void renderSplashTextBefore(EventRenderSplashText.Pre event) {
         if (CitadelConstants.isAprilFools() && aprilFoolsTetrisGame != null) {
             event.setResult(TriState.TRUE);
             float hue = (System.currentTimeMillis() % 6000) / 6000f;
-            event.getGuiGraphics().pose().mulPose(Axis.ZP.rotationDegrees((float) Math.sin(hue * Math.PI) * 360));
+            // TODO: This needs to be wired into vanilla TitleScreen rendering
+            // event.getGuiGraphics().pose().mulPose(Axis.ZP.rotationDegrees((float) Math.sin(hue * Math.PI) * 360));
             if (!aprilFoolsTetrisGame.isStarted()) {
                 event.setSplashText("Psst... press 'T' ;)");
             } else {
@@ -355,7 +356,7 @@ public class ClientProxy extends ServerProxy {
             EventChangeEntityTickRate event = new EventChangeEntityTickRate(entity, tracker.getEntityTickLengthModifier(entity));
             // Citadel: TODO: Post event to Fabric event bus when implemented
             // NeoForge.EVENT_BUS.post(event);
-            if (event.isCanceled()) {
+            if (event.isCancelled()) {
                 return true;
             } else {
                 tracker.addTickBlockedEntity(entity);
