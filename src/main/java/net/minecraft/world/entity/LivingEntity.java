@@ -139,7 +139,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 
-public abstract class LivingEntity extends Entity implements Attackable, WaypointTransmitter {
+public abstract class LivingEntity extends Entity implements Attackable, WaypointTransmitter, com.github.alexthe666.citadel.server.entity.ICitadelDataEntity {
 	private static final Logger LOGGER = LogUtils.getLogger();
 	private static final String TAG_ACTIVE_EFFECTS = "active_effects";
 	public static final String TAG_ATTRIBUTES = "attributes";
@@ -185,6 +185,8 @@ public abstract class LivingEntity extends Entity implements Attackable, Waypoin
 	private static final EntityDataAccessor<Optional<BlockPos>> SLEEPING_POS_ID = SynchedEntityData.defineId(
 		LivingEntity.class, EntityDataSerializers.OPTIONAL_BLOCK_POS
 	);
+	// Citadel: Entity data for storing custom Citadel data (inlined from LivingEntityMixin)
+	private static final EntityDataAccessor<net.minecraft.nbt.CompoundTag> CITADEL_DATA = SynchedEntityData.defineId(LivingEntity.class, EntityDataSerializers.COMPOUND_TAG);
 	private static final int PARTICLE_FREQUENCY_WHEN_INVISIBLE = 15;
 	protected static final EntityDimensions SLEEPING_DIMENSIONS = EntityDimensions.fixed(0.2F, 0.2F).withEyeHeight(0.2F);
 	public static final float EXTRA_RENDER_CULLING_SIZE_WITH_BIG_HAT = 0.5F;
@@ -321,6 +323,8 @@ public abstract class LivingEntity extends Entity implements Attackable, Waypoin
 		builder.define(DATA_STINGER_COUNT_ID, 0);
 		builder.define(DATA_HEALTH_ID, 1.0F);
 		builder.define(SLEEPING_POS_ID, Optional.empty());
+		// Citadel: Register Citadel data (inlined from LivingEntityMixin)
+		builder.define(CITADEL_DATA, new net.minecraft.nbt.CompoundTag());
 	}
 
 	public static AttributeSupplier.Builder createLivingAttributes() {
@@ -759,6 +763,12 @@ public abstract class LivingEntity extends Entity implements Attackable, Waypoin
 		if (this.locatorBarIcon.hasData()) {
 			valueOutput.store("locator_bar_icon", Waypoint.Icon.CODEC, this.locatorBarIcon);
 		}
+		
+		// Citadel: Save Citadel data (inlined from LivingEntityMixin)
+		net.minecraft.nbt.CompoundTag citadelData = getCitadelEntityData();
+		if (citadelData != null && !citadelData.isEmpty()) {
+			valueOutput.write("CitadelData", net.minecraft.nbt.CompoundTag.CODEC, citadelData);
+		}
 	}
 
 	@Nullable
@@ -819,6 +829,9 @@ public abstract class LivingEntity extends Entity implements Attackable, Waypoin
 		this.lastHurtByMobTimestamp = valueInput.getIntOr("ticks_since_last_hurt_by_mob", 0) + this.tickCount;
 		this.equipment.setAll((EntityEquipment)valueInput.read("equipment", EntityEquipment.CODEC).orElseGet(EntityEquipment::new));
 		this.locatorBarIcon = (Waypoint.Icon)valueInput.read("locator_bar_icon", Waypoint.Icon.CODEC).orElseGet(Waypoint.Icon::new);
+		
+		// Citadel: Load Citadel data (inlined from LivingEntityMixin)
+		valueInput.read("CitadelData", net.minecraft.nbt.CompoundTag.CODEC).ifPresent(this::setCitadelEntityData);
 	}
 
 	protected void tickEffects() {
@@ -3735,6 +3748,17 @@ public abstract class LivingEntity extends Entity implements Attackable, Waypoin
 	@Override
 	public Waypoint.Icon waypointIcon() {
 		return this.locatorBarIcon;
+	}
+
+	// Citadel: ICitadelDataEntity implementation (inlined from LivingEntityMixin)
+	@Override
+	public net.minecraft.nbt.CompoundTag getCitadelEntityData() {
+		return this.entityData.get(CITADEL_DATA);
+	}
+
+	@Override
+	public void setCitadelEntityData(net.minecraft.nbt.CompoundTag nbt) {
+		this.entityData.set(CITADEL_DATA, nbt);
 	}
 
 	public record Fallsounds(SoundEvent small, SoundEvent big) {
