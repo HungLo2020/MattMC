@@ -190,6 +190,7 @@ public class EntityRenderers {
 		register(EntityType.SNIFFER, SnifferRenderer::new);
 		register(EntityType.SNOWBALL, ThrownItemRenderer::new);
 		register(EntityType.SNOW_GOLEM, SnowGolemRenderer::new);
+		register(EntityType.SUBTERRANODON, com.github.alexmodguy.alexscaves.client.render.entity.SubterranodonRenderer::new);
 		register(EntityType.SPAWNER_MINECART, context -> new MinecartRenderer(context, ModelLayers.SPAWNER_MINECART));
 		register(EntityType.SPECTRAL_ARROW, SpectralArrowRenderer::new);
 		register(EntityType.SPIDER, SpiderRenderer::new);
