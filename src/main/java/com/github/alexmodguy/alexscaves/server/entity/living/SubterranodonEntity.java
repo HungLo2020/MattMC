@@ -1,17 +1,11 @@
 package com.github.alexmodguy.alexscaves.server.entity.living;
 
-import com.github.alexmodguy.alexscaves.AlexsCaves;
-import com.github.alexmodguy.alexscaves.server.block.ACBlockRegistry;
 import com.github.alexmodguy.alexscaves.server.block.MultipleDinosaurEggsBlock;
-import com.github.alexmodguy.alexscaves.server.entity.ACEntityRegistry;
 import com.github.alexmodguy.alexscaves.server.entity.ai.*;
 import com.github.alexmodguy.alexscaves.server.entity.util.FlyingMount;
 import com.github.alexmodguy.alexscaves.server.entity.util.KeybindUsingMount;
 import com.github.alexmodguy.alexscaves.server.entity.util.PackAnimal;
-import com.github.alexmodguy.alexscaves.server.item.ACItemRegistry;
 import com.github.alexmodguy.alexscaves.server.message.MountedEntityKeyMessage;
-import com.github.alexmodguy.alexscaves.server.misc.ACSoundRegistry;
-import com.github.alexmodguy.alexscaves.server.misc.ACTagRegistry;
 import com.github.alexthe666.citadel.server.entity.pathfinding.raycoms.AdvancedPathNavigate;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
@@ -20,6 +14,7 @@ import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundEvent;
+import net.minecraft.sounds.SoundEvents;
 import net.minecraft.tags.BlockTags;
 import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;
@@ -106,7 +101,8 @@ public class SubterranodonEntity extends DinosaurEntity implements PackAnimal, F
 
     public static boolean checkSubterranodonSpawnRules(EntityType<? extends Animal> type, LevelAccessor levelAccessor, EntitySpawnReason mobType, BlockPos pos, RandomSource randomSource) {
         BlockState below = levelAccessor.getBlockState(pos.below());
-        return (below.is(ACTagRegistry.DINOSAURS_SPAWNABLE_ON) || below.is(ACBlockRegistry.PEWEN_BRANCH.get()) || below.is(BlockTags.LEAVES)) && levelAccessor.getFluidState(pos).isEmpty() && levelAccessor.getFluidState(pos.below()).isEmpty();
+        // Check if below block is suitable for spawning (leaves, grass, dirt, stone, etc.)
+        return (below.is(BlockTags.LEAVES) || below.is(BlockTags.DIRT) || below.is(BlockTags.BASE_STONE_OVERWORLD)) && levelAccessor.getFluidState(pos).isEmpty() && levelAccessor.getFluidState(pos.below()).isEmpty();
     }
 
     protected void registerGoals() {
@@ -116,7 +112,7 @@ public class SubterranodonEntity extends DinosaurEntity implements PackAnimal, F
         this.goalSelector.addGoal(3, new SubterranodonFollowOwnerGoal(this, 1.2D, 5.0F, 2.0F, true));
         this.goalSelector.addGoal(4, new AnimalJoinPackGoal(this, 30, 5));
         this.goalSelector.addGoal(5, new AnimalBreedEggsGoal(this, 1));
-        this.goalSelector.addGoal(6, new TemptGoal(this, 1.1D, Ingredient.of(Items.COD, Items.COOKED_COD, ACItemRegistry.COOKED_TRILOCARIS_TAIL.get(), ACItemRegistry.TRILOCARIS_TAIL.get()), false));
+        this.goalSelector.addGoal(6, new TemptGoal(this, 1.1D, Ingredient.of(Items.COD, Items.COOKED_COD), false));
         this.goalSelector.addGoal(7, new AnimalLayEggGoal(this, 100, 1));
         this.goalSelector.addGoal(8, new SubterranodonFleeGoal(this));
         this.goalSelector.addGoal(9, new SubterranodonFlightGoal(this));
@@ -204,7 +200,7 @@ public class SubterranodonEntity extends DinosaurEntity implements PackAnimal, F
         }
         if (isFlying()) {
             if(timeFlying % 10 == 0 && (flapAmount > 0 || controlUpTicks > 0)){
-                this.playSound(ACSoundRegistry.SUBTERRANODON_FLAP.get());
+                this.playSound(SoundEvents.PARROT_FLY);
             }
             timeFlying++;
             if (this.isLandNavigator) {
@@ -265,16 +261,16 @@ public class SubterranodonEntity extends DinosaurEntity implements PackAnimal, F
             } else {
                 this.reapplyPosition();
             }
-            Player player = AlexsCaves.PROXY.getClientSidePlayer();
+            Player player = null // TODO: getClientSidePlayer();
             if (player != null && player.isPassengerOfSameVehicle(this)) {
-                if (AlexsCaves.PROXY.isKeyDown(0) && !AlexsCaves.PROXY.isKeyDown(1) && controlUpTicks < 2 && getMeterAmount() > 0.1F) {
+                if (false // TODO: isKeyDown(0) && !false // TODO: isKeyDown(1) && controlUpTicks < 2 && getMeterAmount() > 0.1F) {
                     if (getMeterAmount() > 0.1F) {
-                        AlexsCaves.sendMSGToServer(new MountedEntityKeyMessage(this.getId(), player.getId(), 0));
+                        // TODO: sendMSGToServer(new MountedEntityKeyMessage(this.getId(), player.getId(), 0));
                         controlUpTicks = 5;
                     }
                 }
-                if (AlexsCaves.PROXY.isKeyDown(1) && !AlexsCaves.PROXY.isKeyDown(0) && controlDownTicks < 2) {
-                    AlexsCaves.sendMSGToServer(new MountedEntityKeyMessage(this.getId(), player.getId(), 1));
+                if (false // TODO: isKeyDown(1) && !false // TODO: isKeyDown(0) && controlDownTicks < 2) {
+                    // TODO: sendMSGToServer(new MountedEntityKeyMessage(this.getId(), player.getId(), 1));
                     controlDownTicks = 5;
                 }
             }
@@ -301,7 +297,7 @@ public class SubterranodonEntity extends DinosaurEntity implements PackAnimal, F
             LivingEntity target = this.getTarget();
             if (attackProgress == 5F && target != null && this.distanceTo(target) < 3D + target.getBbWidth() && this.hasLineOfSight(target)) {
                 target.hurt(this.damageSources().mobAttack(this), (float) this.getAttribute(Attributes.ATTACK_DAMAGE).getValue());
-                this.playSound(ACSoundRegistry.SUBTERRANODON_ATTACK.get());
+                this.playSound(SoundEvents.PARROT_IMITATE_PHANTOM);
             }
             if (attackProgress > 0F) {
                 attackProgress--;
@@ -497,7 +493,7 @@ public class SubterranodonEntity extends DinosaurEntity implements PackAnimal, F
     @Nullable
     @Override
     public AgeableMob getBreedOffspring(ServerLevel serverLevel, AgeableMob mob) {
-        return ACEntityRegistry.SUBTERRANODON.get().create(serverLevel);
+        return EntityType.SUBTERRANODON.create(serverLevel);
     }
 
     public AABB getBoundingBoxForCulling() {
@@ -510,7 +506,7 @@ public class SubterranodonEntity extends DinosaurEntity implements PackAnimal, F
 
     @Override
     public BlockState createEggBlockState() {
-        return ACBlockRegistry.SUBTERRANODON_EGG.get().defaultBlockState().setValue(MultipleDinosaurEggsBlock.EGGS, 1 + random.nextInt(3));
+        return null // TODO: SUBTERRANODON_EGG block.defaultBlockState().setValue(MultipleDinosaurEggsBlock.EGGS, 1 + random.nextInt(3));
     }
 
     @Override
@@ -518,7 +514,7 @@ public class SubterranodonEntity extends DinosaurEntity implements PackAnimal, F
         InteractionResult prev = super.mobInteract(player, hand);
         if (prev != InteractionResult.SUCCESS) {
             ItemStack itemStack = player.getItemInHand(hand);
-            if (!this.isTame() && (itemStack.is(ACItemRegistry.TRILOCARIS_TAIL.get()) || itemStack.is(ACItemRegistry.COOKED_TRILOCARIS_TAIL.get()))) {
+            if (!this.isTame() && (itemStack.is(Items.COD) || itemStack.is(Items.COOKED_COD))) {
                 this.usePlayerItem(player, hand, itemStack);
                 if (getRandom().nextInt(3) == 0) {
                     this.tame(player);
@@ -635,15 +631,15 @@ public class SubterranodonEntity extends DinosaurEntity implements PackAnimal, F
     }
 
     protected SoundEvent getAmbientSound() {
-        return ACSoundRegistry.SUBTERRANODON_IDLE.get();
+        return SoundEvents.PARROT_AMBIENT;
     }
 
     protected SoundEvent getHurtSound(DamageSource damageSource) {
-        return ACSoundRegistry.SUBTERRANODON_HURT.get();
+        return SoundEvents.PARROT_HURT;
     }
 
     protected SoundEvent getDeathSound() {
-        return ACSoundRegistry.SUBTERRANODON_DEATH.get();
+        return SoundEvents.PARROT_DEATH;
     }
 
 

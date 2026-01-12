@@ -1,6 +1,5 @@
 package com.github.alexmodguy.alexscaves.client.render.entity.layer;
 
-import com.github.alexmodguy.alexscaves.AlexsCaves;
 import com.github.alexmodguy.alexscaves.client.model.SubterranodonModel;
 import com.github.alexmodguy.alexscaves.client.render.entity.SubterranodonRenderer;
 import com.github.alexmodguy.alexscaves.server.entity.living.SubterranodonEntity;

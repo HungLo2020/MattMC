@@ -1,7 +1,6 @@
 package com.github.alexmodguy.alexscaves.server.entity.ai;
 
 import com.github.alexmodguy.alexscaves.server.entity.living.SubterranodonEntity;
-import com.github.alexmodguy.alexscaves.server.misc.ACTagRegistry;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.ai.goal.Goal;
 import net.minecraft.world.phys.AABB;
@@ -26,7 +25,7 @@ public class SubterranodonFleeGoal extends Goal {
             return false;
         }
         AABB aabb = subterranodon.getBoundingBox().inflate(7);
-        List<Entity> list = subterranodon.level().getEntitiesOfClass(Entity.class, aabb, (entity -> entity.getType().is(ACTagRegistry.SUBTERRANODON_FLEES)));
+        List<Entity> list = subterranodon.level().getEntitiesOfClass(Entity.class, aabb, (entity -> entity.getType().is(EntityTypeTags.RAIDERS)));
         return !list.isEmpty();
     }
 

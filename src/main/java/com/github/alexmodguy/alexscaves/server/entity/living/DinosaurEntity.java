@@ -1,16 +1,9 @@
 package com.github.alexmodguy.alexscaves.server.entity.living;
 
-import com.github.alexmodguy.alexscaves.client.particle.ACParticleRegistry;
-import com.github.alexmodguy.alexscaves.server.block.ACBlockRegistry;
-import com.github.alexmodguy.alexscaves.server.entity.ACEntityRegistry;
 import com.github.alexmodguy.alexscaves.server.entity.util.LaysEggs;
 import com.github.alexmodguy.alexscaves.server.entity.util.RidingMeterMount;
-import com.github.alexmodguy.alexscaves.server.item.ACItemRegistry;
 import com.github.alexmodguy.alexscaves.server.level.storage.ACWorldData;
-import com.github.alexmodguy.alexscaves.server.misc.ACAdvancementTriggerRegistry;
 import com.github.alexmodguy.alexscaves.server.misc.ACMath;
-import com.github.alexmodguy.alexscaves.server.misc.ACSoundRegistry;
-import com.github.alexmodguy.alexscaves.server.misc.ACTagRegistry;
 import com.github.alexthe666.citadel.server.entity.IDancesToJukebox;
 import com.github.alexthe666.citadel.server.entity.pathfinding.raycoms.IAdvancedPathingMob;
 import net.minecraft.core.BlockPos;
@@ -36,6 +29,7 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LevelAccessor;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.sounds.SoundEvents;
 import net.minecraft.world.level.storage.ValueInput;
 import net.minecraft.world.level.storage.ValueOutput;
 import net.minecraft.world.phys.Vec3;
@@ -72,7 +66,7 @@ public abstract class DinosaurEntity extends TamableAnimal implements IDancesToJ
     }
 
     public static boolean checkPrehistoricSpawnRules(EntityType<? extends Animal> type, LevelAccessor levelAccessor, EntitySpawnReason mobType, BlockPos pos, RandomSource randomSource) {
-        return levelAccessor.getBlockState(pos.below()).is(ACTagRegistry.DINOSAURS_SPAWNABLE_ON) && levelAccessor.getFluidState(pos).isEmpty() && levelAccessor.getFluidState(pos.below()).isEmpty();
+        return levelAccessor.getBlockState(pos.below()).is(BlockTags.DIRT) && levelAccessor.getFluidState(pos).isEmpty() && levelAccessor.getFluidState(pos.below()).isEmpty();
     }
 
     public static boolean checkPrehistoricPostBossSpawnRules(EntityType<? extends Animal> type, LevelAccessor levelAccessor, EntitySpawnReason mobType, BlockPos pos, RandomSource randomSource) {
@@ -254,9 +248,9 @@ public abstract class DinosaurEntity extends TamableAnimal implements IDancesToJ
         } else if (b == 82 || b == 83) {
             ParticleOptions options;
             if(b == 82){
-                options = ACParticleRegistry.DINOSAUR_TRANSFORMATION_AMBER.get();
+                options = ParticleTypes.WAX_ON;
             }else {
-                options = ACParticleRegistry.DINOSAUR_TRANSFORMATION_TECTONIC.get();
+                options = ParticleTypes.GUST_EMITTER_SMALL;
             }
             for (int i = 0; i < 15 + level().random.nextInt(5); i++) {
                 this.level().addParticle(options, this.getX(), this.getY(0.5F), this.getZ(), this.getId(), 0, 0);
@@ -275,9 +269,9 @@ public abstract class DinosaurEntity extends TamableAnimal implements IDancesToJ
     }
 
     public int getAltSkinForItem(ItemStack stack) {
-        if (stack.is(ACItemRegistry.AMBER_CURIOSITY.get())) {
+        if (stack.is(Items.AMETHYST_SHARD)) {
             return 1;
-        } else if (stack.is(ACItemRegistry.TECTONIC_SHARD.get())) {
+        } else if (stack.is(Items.PRISMARINE_SHARD)) {
             return 2;
         } else {
             return 0;
@@ -285,7 +279,7 @@ public abstract class DinosaurEntity extends TamableAnimal implements IDancesToJ
     }
 
     public BlockState createEggBeddingBlockState() {
-        return ACBlockRegistry.FERN_THATCH.get().defaultBlockState();
+        return Blocks.HAY_BLOCK.defaultBlockState();
     }
 
     public InteractionResult mobInteract(Player player, InteractionHand hand) {
@@ -296,7 +290,7 @@ public abstract class DinosaurEntity extends TamableAnimal implements IDancesToJ
             int altSkinFromItem = getAltSkinForItem(itemstack);
             if (altSkinFromItem > 0) {
                 this.usePlayerItem(player, hand, itemstack);
-                this.playSound(altSkinFromItem == 2 ? ACSoundRegistry.TECTONIC_SHARD_TRANSFORM.get() : ACSoundRegistry.AMBER_MONOLITH_SUMMON.get());
+                this.playSound(altSkinFromItem == 2 ? SoundEvents.PORTAL_TRIGGER : SoundEvents.ENDER_DRAGON_GROWL);
                 if (!level().isClientSide()) {
                     if(altSkinFromItem == this.getAltSkin()){
                         this.setAltSkin(0);
@@ -321,7 +315,7 @@ public abstract class DinosaurEntity extends TamableAnimal implements IDancesToJ
                     }
                     return InteractionResult.SUCCESS;
                 } else if (canOwnerMount(player)) {
-                    if (this.getType() == ACEntityRegistry.SUBTERRANODON.get() && this.canAddPassenger(player)) {
+                    if (this.getType() == EntityType.SUBTERRANODON && this.canAddPassenger(player)) {
                         this.moveTo(this.getX(), this.getY() + player.getBbHeight() + 0.5F, this.getZ());
                     }
                     if (!level().isClientSide() && player.startRiding(this)) {
@@ -347,7 +341,7 @@ public abstract class DinosaurEntity extends TamableAnimal implements IDancesToJ
             if (nearbyDinosaurEntityTypes.size() >= 5) {
                 for (Player player : level().getEntitiesOfClass(Player.class, this.getBoundingBox().inflate(advancementRange))) {
                     if (player.distanceTo(this) < advancementRange) {
-                        ACAdvancementTriggerRegistry.DINOSAURS_MINECART.get().triggerForEntity(player);
+                        // TODO: DINOSAURS_MINECART advancement: //(player);
                     }
                 }
 
