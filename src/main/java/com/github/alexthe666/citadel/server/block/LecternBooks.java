@@ -13,7 +13,7 @@ public class LecternBooks {
     public static Map<ResourceLocation, BookData> BOOKS = new HashMap<>();
 
     public static void init(){
-        BOOKS.put(Citadel.CITADEL_BOOK.getId(), new BookData(0X64A27B, 0XD6D6D6));
+        BOOKS.put(BuiltInRegistries.ITEM.getKey(Citadel.CITADEL_BOOK), new BookData(0X64A27B, 0XD6D6D6));
     }
 
     public static boolean isLecternBook(ItemStack stack){

@@ -102,7 +102,7 @@ public class CitadelLecternBlockEntity extends BlockEntity implements Clearable,
     };
 
     public CitadelLecternBlockEntity(BlockPos pos, BlockState state) {
-        super(Citadel.LECTERN_BE.get(), pos, state);
+        super(Citadel.LECTERN_BE, pos, state);
     }
 
     public ItemStack getBook() {
@@ -131,20 +131,16 @@ public class CitadelLecternBlockEntity extends BlockEntity implements Clearable,
     }
 
     @Override
-    public void loadAdditional(CompoundTag tag, HolderLookup.Provider registries) {
-        super.loadAdditional(tag, registries);
-        if (tag.contains("Book", 10)) {
-            this.book = ItemStack.parse(registries, tag.getCompound("Book")).orElse(ItemStack.EMPTY);
-        } else {
-            this.book = ItemStack.EMPTY;
-        }
+    protected void loadAdditional(net.minecraft.world.level.storage.ValueInput valueInput) {
+        super.loadAdditional(valueInput);
+        this.book = valueInput.read("Book", ItemStack.CODEC).orElse(ItemStack.EMPTY);
     }
 
     @Override
-    protected void saveAdditional(CompoundTag tag, HolderLookup.Provider registries) {
-        super.saveAdditional(tag, registries);
+    protected void saveAdditional(net.minecraft.world.level.storage.ValueOutput valueOutput) {
+        super.saveAdditional(valueOutput);
         if (!this.getBook().isEmpty()) {
-            tag.put("Book", this.getBook().save(registries));
+            valueOutput.write("Book", ItemStack.CODEC, this.getBook());
         }
     }
 
