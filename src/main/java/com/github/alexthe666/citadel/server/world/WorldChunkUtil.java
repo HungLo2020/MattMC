@@ -34,12 +34,20 @@ public class WorldChunkUtil {
      * @return true if loaded
      */
     public static boolean isChunkLoaded(final LevelAccessor world, final int x, final int z) {
-        if (world.getChunkSource() instanceof ServerChunkCache) {
-            final ChunkHolder holder = ((ServerChunkCache) world.getChunkSource()).chunkMap.getVisibleChunkIfPresent(ChunkPos.asLong(x, z));
-            if (holder != null) {
-                return holder.getFullChunkFuture().getNow(ChunkHolder.UNLOADED_LEVEL_CHUNK).isSuccess();
+        if (world.getChunkSource() instanceof ServerChunkCache serverChunkCache) {
+            try {
+                // Citadel: getVisibleChunkIfPresent is protected in ChunkMap
+                // Using reflection to access it (zero access wideners requirement)
+                java.lang.reflect.Method method = net.minecraft.server.level.ChunkMap.class.getDeclaredMethod("getVisibleChunkIfPresent", long.class);
+                method.setAccessible(true);
+                final ChunkHolder holder = (ChunkHolder) method.invoke(serverChunkCache.chunkMap, ChunkPos.asLong(x, z));
+                if (holder != null) {
+                    return holder.getFullChunkFuture().getNow(ChunkHolder.UNLOADED_LEVEL_CHUNK).isSuccess();
+                }
+            } catch (Exception e) {
+                // Fallback to standard check if reflection fails
+                return world.getChunk(x, z, ChunkStatus.FULL, false) != null;
             }
-
             return false;
         }
         return world.getChunk(x, z, ChunkStatus.FULL, false) != null;

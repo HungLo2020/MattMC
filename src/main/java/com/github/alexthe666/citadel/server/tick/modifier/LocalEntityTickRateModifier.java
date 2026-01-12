@@ -27,10 +27,11 @@ public class LocalEntityTickRateModifier extends LocalTickRateModifier {
         this.entityId = tag.getInt("EntityId").orElse(0);
         String entityTypeStr = tag.getString("EntityType").orElse("minecraft:pig");
         // Citadel: Registry.get returns Optional<Holder.Reference<EntityType<?>>>
-        // We can't use EntityType.PIG directly due to type mismatch - use unchecked cast
+        // Use raw type to avoid generic type mismatch
+        EntityType<?> defaultType = EntityType.PIG;
         this.expectedEntityType = (EntityType<? extends Entity>) BuiltInRegistries.ENTITY_TYPE.get(ResourceLocation.parse(entityTypeStr))
-            .map(holder -> holder.value())
-            .orElse((EntityType<? extends Entity>) EntityType.PIG);
+            .map(holder -> (EntityType<?>) holder.value())
+            .orElse(defaultType);
     }
 
     @Override

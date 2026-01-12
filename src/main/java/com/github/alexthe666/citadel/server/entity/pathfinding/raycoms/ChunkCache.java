@@ -146,7 +146,7 @@ public class ChunkCache implements LevelReader {
 
     @Override
     public FluidState getFluidState(final BlockPos pos) {
-        if (pos.getY() >= getMinBuildHeight() && pos.getY() < getMaxBuildHeight()) {
+        if (pos.getY() >= getMinY() && pos.getY() < getMaxY()) {
             int i = (pos.getX() >> 4) - this.chunkX;
             int j = (pos.getZ() >> 4) - this.chunkZ;
 
