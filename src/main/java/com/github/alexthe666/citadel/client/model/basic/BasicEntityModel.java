@@ -13,6 +13,7 @@ import java.util.function.Function;
 public abstract class BasicEntityModel<T extends EntityRenderState> extends EntityModel<T> {
     public int textureWidth = 64;
     public int textureHeight = 32;
+    private final ModelPart customRoot;
 
     protected BasicEntityModel() {
         this(RenderType::entityCutoutNoCull);
@@ -20,13 +21,23 @@ public abstract class BasicEntityModel<T extends EntityRenderState> extends Enti
 
     protected BasicEntityModel(Function<ResourceLocation, RenderType> renderType) {
         // In 1.21, EntityModel requires a ModelPart root
-        // Create empty dummy root since BasicEntityModel uses its own part system
-        super(new ModelPart(java.util.Collections.emptyList(), java.util.Collections.emptyMap()), renderType);
+        // Create a custom root that will render our BasicModelPart parts
+        super(createCustomRoot(), renderType);
+        this.customRoot = root;
     }
 
-    // Note: Model has final renderToBuffer methods, so we can't override them
-    // Parts are rendered via root() method which returns our dummy ModelPart
-    // Actual rendering happens through AdvancedEntityModel which overrides root()
+    private static ModelPart createCustomRoot() {
+        // Create a wrapper ModelPart that will be used to render BasicModelPart parts
+        return new ModelPart(java.util.Collections.emptyList(), java.util.Collections.emptyMap());
+    }
+
+    @Override
+    public void renderToBuffer(PoseStack poseStack, VertexConsumer vertexConsumer, int packedLight, int packedOverlay, int color) {
+        // Render all our custom BasicModelPart parts
+        for (BasicModelPart part : parts()) {
+            part.render(poseStack, vertexConsumer, packedLight, packedOverlay, color);
+        }
+    }
 
     public abstract Iterable<BasicModelPart> parts();
 
