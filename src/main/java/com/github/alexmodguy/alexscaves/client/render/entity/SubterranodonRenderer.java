@@ -30,7 +30,7 @@ public class SubterranodonRenderer extends MobRenderer<SubterranodonEntity, Subt
         renderState.isFlying = entity.isFlying();
         renderState.isSitting = entity.isInSittingPose();
         renderState.flapProgress = entity.getFlapAmount(partialTick);
-        renderState.attackProgress = entity.getAttackProgress(partialTick);
+        renderState.attackProgress = entity.getBiteProgress(partialTick); // getBiteProgress, not getAttackProgress
         renderState.sitProgress = entity.getSitProgress(partialTick);
         renderState.danceProgress = entity.getDanceProgress(partialTick);
     }

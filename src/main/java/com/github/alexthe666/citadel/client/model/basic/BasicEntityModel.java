@@ -24,11 +24,9 @@ public abstract class BasicEntityModel<T extends EntityRenderState> extends Enti
         super(new ModelPart(java.util.Collections.emptyList(), java.util.Collections.emptyMap()), renderType);
     }
 
-
-    @Override
-    public void renderToBuffer(PoseStack poseStack, VertexConsumer vertexConsumer, int packedLightIn, int packedOverlayIn) {
-        this.parts().forEach((part) -> part.render(poseStack, vertexConsumer, packedLightIn, packedOverlayIn));
-    }
+    // Note: Model has final renderToBuffer methods, so we can't override them
+    // Parts are rendered via root() method which returns our dummy ModelPart
+    // Actual rendering happens through AdvancedEntityModel which overrides root()
 
     public abstract Iterable<BasicModelPart> parts();
 

@@ -158,7 +158,9 @@ public class ModelAnimator {
                     box.rotationPointZ += transform.getOffsetZ();
                 }
             } else {
-                float frameTime = Minecraft.getInstance().getTimer().getGameTimeDeltaTicks();
+                // TODO AC-TODO.md: Minecraft.getInstance().getTimer() removed in 1.21
+                // Using default frame time of 1.0F for now - animations may be less smooth
+                float frameTime = 1.0F; // Minecraft.getInstance().getTimer().getGameTimeDeltaTicks();
                 float tick = (animationTick - this.prevTempTick + frameTime) / (this.tempTick - this.prevTempTick);
                 float inc = Mth.sin((float) (tick * Math.PI / 2.0F)), dec = 1.0F - inc;
                 for (AdvancedModelBox box : this.prevTransformMap.keySet()) {
