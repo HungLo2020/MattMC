@@ -1,12 +1,16 @@
 package com.github.alexthe666.citadel.animation;
 
 import net.minecraft.world.entity.Entity;
-// REMOVED NeoForge: import net.neoforged.bus.api.Event;
-// REMOVED NeoForge: import net.neoforged.bus.api.ICancellableEvent;
 
-public class AnimationEvent<T extends Entity & IAnimatedEntity> extends Event {
+/**
+ * Inlined replacement for Forge Event system - simple base class for animation events
+ * No actual event bus - just a data holder for animation state
+ * Forge Event and ICancellableEvent functionality inlined directly
+ */
+public class AnimationEvent<T extends Entity & IAnimatedEntity> {
     protected Animation animation;
     private T entity;
+    private boolean cancelled = false;
 
     AnimationEvent(T entity, Animation animation) {
         this.entity = entity;
@@ -21,7 +25,15 @@ public class AnimationEvent<T extends Entity & IAnimatedEntity> extends Event {
         return this.animation;
     }
 
-    public static class Start<T extends Entity & IAnimatedEntity> extends AnimationEvent<T> implements ICancellableEvent {
+    public boolean isCanceled() {
+        return this.cancelled;
+    }
+
+    public void setCanceled(boolean cancel) {
+        this.cancelled = cancel;
+    }
+
+    public static class Start<T extends Entity & IAnimatedEntity> extends AnimationEvent<T> {
         public Start(T entity, Animation animation) {
             super(entity, animation);
         }

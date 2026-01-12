@@ -126,8 +126,8 @@ public class SubterranodonEntity extends DinosaurEntity implements PackAnimal, F
     @Override
     protected void readAdditionalSaveData(ValueInput valueInput) {
         super.readAdditionalSaveData(valueInput);
-        this.setFlying(valueInput.getBoolean("Flying").orElse(false));
-        this.timeFlying = valueInput.getInt("TimeFlying").orElse(0);
+        this.setFlying(valueInput.getBooleanOr("Flying", false));
+        this.timeFlying = valueInput.getIntOr("TimeFlying", 0);
     }
 
 
@@ -311,13 +311,13 @@ public class SubterranodonEntity extends DinosaurEntity implements PackAnimal, F
         this.setDeltaMovement(this.lxd, this.lyd, this.lzd);
     }
 
-    @Override
-    public void lerpMotion(double lerpX, double lerpY, double lerpZ) {
-        this.lxd = lerpX;
-        this.lyd = lerpY;
-        this.lzd = lerpZ;
-        this.setDeltaMovement(this.lxd, this.lyd, this.lzd);
-    }
+    // lerpMotion removed in 1.21 - no longer needed
+    // public void lerpMotion(double lerpX, double lerpY, double lerpZ) {
+    //     this.lxd = lerpX;
+    //     this.lyd = lerpY;
+    //     this.lzd = lerpZ;
+    //     this.setDeltaMovement(this.lxd, this.lyd, this.lzd);
+    // }
 
     protected Vec3 getRiddenInput(Player player, Vec3 deltaIn) {
         float f = player.zza < 0.0F ? 0.5F : 1.0F;
@@ -486,7 +486,7 @@ public class SubterranodonEntity extends DinosaurEntity implements PackAnimal, F
     @Nullable
     @Override
     public AgeableMob getBreedOffspring(ServerLevel serverLevel, AgeableMob mob) {
-        return EntityType.SUBTERRANODON.create(serverLevel);
+        return EntityType.SUBTERRANODON.create(serverLevel, EntitySpawnReason.BREEDING);
     }
 
     public AABB getBoundingBoxForCulling() {
@@ -514,7 +514,7 @@ public class SubterranodonEntity extends DinosaurEntity implements PackAnimal, F
                 this.usePlayerItem(player, hand, itemStack);
                 if (getRandom().nextInt(3) == 0) {
                     this.tame(player);
-                    this.clearRestriction();
+                    // clearRestriction() removed in 1.21 - restriction system changed
                     this.level().broadcastEntityEvent(this, (byte) 7);
                 } else {
                     this.level().broadcastEntityEvent(this, (byte) 6);
@@ -540,10 +540,10 @@ public class SubterranodonEntity extends DinosaurEntity implements PackAnimal, F
         }
     }
 
-    @Override
-    public boolean shouldRiderSit() {
-        return false;
-    }
+    // shouldRiderSit removed in 1.21 - rider sitting handled differently
+    // public boolean shouldRiderSit() {
+    //     return false;
+    // }
 
     public void positionRider(Entity passenger, MoveFunction moveFunction) {
         if (this.isPassengerOfSameVehicle(passenger) && passenger instanceof LivingEntity living && !this.touchingUnloadedChunk()) {
@@ -580,7 +580,7 @@ public class SubterranodonEntity extends DinosaurEntity implements PackAnimal, F
     public void calculateEntityAnimation(boolean flying) {
         float f1 = (float) Mth.length(this.getX() - this.lastStepX, 0, this.getZ() - this.lastStepZ);
         float f2 = Math.min(f1 * 4.0F, 1.0F);
-        this.walkAnimation.update(f2, 0.4F);
+        this.walkAnimation.update(f2, 0.4F, 0.0F);
     }
 
     public Vec3 collide(Vec3 movement) {
