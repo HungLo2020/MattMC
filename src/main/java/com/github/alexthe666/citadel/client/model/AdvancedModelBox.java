@@ -43,6 +43,8 @@ public class AdvancedModelBox extends BasicModelPart {
         super(model);
         this.textureWidth = model.texWidth;
         this.textureHeight = model.texHeight;
+        // Also update parent BasicModelPart's texture dimensions
+        this.setTextureSize(model.texWidth, model.texHeight);
         this.model = model;
         this.cubeList = new ObjectArrayList();
         this.childModels = new ObjectArrayList();
@@ -53,6 +55,8 @@ public class AdvancedModelBox extends BasicModelPart {
         this(model, null);
         this.textureWidth = model.texWidth;
         this.textureHeight = model.texHeight;
+        // Also update parent BasicModelPart's texture dimensions
+        this.setTextureSize(model.texWidth, model.texHeight);
         this.cubeList = new ObjectArrayList();
         this.childModels = new ObjectArrayList();
     }
@@ -61,6 +65,8 @@ public class AdvancedModelBox extends BasicModelPart {
         this(model);
         this.textureWidth = model.texWidth;
         this.textureHeight = model.texHeight;
+        // Also update parent BasicModelPart's texture dimensions
+        this.setTextureSize(model.texWidth, model.texHeight);
         this.setTextureOffset(textureOffsetX, textureOffsetY);
         this.cubeList = new ObjectArrayList();
         this.childModels = new ObjectArrayList();
