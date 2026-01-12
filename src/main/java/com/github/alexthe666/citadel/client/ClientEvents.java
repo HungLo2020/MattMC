@@ -1,26 +1,20 @@
-package com.github.alexthe666.citadel.client;
+package com.github.alexthe666/citadel.client;
 
-import com.github.alexthe666.citadel.client.shader.CitadelInternalShaders;
+import com.github.alexthe666/citadel.client.shader.CitadelInternalShaders;
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
-import net.minecraft.client.renderer.ShaderInstance;
 import net.minecraft.resources.ResourceLocation;
-// TODO: Replace with Fabric
-// import net.neoforged.api.distmarker.Dist;
-// TODO: Replace with Fabric
-// import net.neoforged.bus.api.SubscribeEvent;
-// TODO: Replace with Fabric
-// import net.neoforged.fml.common.EventBusSubscriber;
-// TODO: Replace with Fabric
-// import net.neoforged.neoforge.client.event.RegisterShadersEvent;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 
-@EventBusSubscriber(value = Dist.CLIENT, bus = EventBusSubscriber.Bus.MOD)
+// Citadel: Shader registration moved to different system in 1.21
+// Shaders are now registered through resource packs and CoreShaders
+// TODO: Wire to Fabric's ResourceManagerHelper when shader support is needed
+@Environment(EnvType.CLIENT)
 public class ClientEvents {
-    @SubscribeEvent
-    public static void registerShaders(final RegisterShadersEvent e) {
-        try {
-            e.registerShader(new ShaderInstance(e.getResourceProvider(), ResourceLocation.parse("citadel:rendertype_rainbow_aura"), DefaultVertexFormat.POSITION_TEX_COLOR), CitadelInternalShaders::setRenderTypeRainbowAura);
-        } catch (Exception exception) {
-            exception.printStackTrace();
-        }
+    // Placeholder - shader registration happens differently in 1.21
+    public static void registerShaders() {
+        // In 1.21, shaders are loaded from resource packs automatically
+        // Custom shaders need to be registered through CoreShaders
+        // This is a placeholder for future implementation
     }
 }
