@@ -21,9 +21,8 @@ public abstract class AdvancedEntityModel<T extends EntityRenderState> extends B
     public int texHeight = 32;
     public AdvancedEntityModel(){
         super();
-        // Synchronize texture dimensions with parent class
-        this.textureWidth = this.texWidth;
-        this.textureHeight = this.texHeight;
+        // NOTE: Do NOT synchronize here - child classes set texWidth/texHeight in their constructors
+        // and synchronization must happen AFTER those values are set
     }
 
     public void updateDefaultPose() {

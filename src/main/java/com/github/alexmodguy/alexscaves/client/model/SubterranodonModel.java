@@ -37,9 +37,11 @@ public class SubterranodonModel extends AdvancedEntityModel<SubterranodonRenderS
     private final AdvancedModelBox tailTip;
 
     public SubterranodonModel() {
+        // Set texture dimensions FIRST, before creating any model boxes
         texWidth = 256;
         texHeight = 256;
-        // Synchronize with parent class texture dimensions for proper UV mapping
+        // CRITICAL: Synchronize parent class fields AFTER setting texWidth/texHeight
+        // This ensures BasicModelPart uses correct dimensions for UV calculations
         this.textureWidth = 256;
         this.textureHeight = 256;
 
