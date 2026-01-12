@@ -20,7 +20,7 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.LivingEntity;
-import net.neoforged.neoforge.network.PacketDistributor;
+// Citadel: PacketDistributor is NeoForge - will use Fabric networking later
 import org.joml.Matrix4fStack;
 import org.joml.Quaternionf;
 

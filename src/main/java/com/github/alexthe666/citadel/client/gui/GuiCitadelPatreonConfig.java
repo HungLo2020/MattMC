@@ -7,19 +7,20 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.Options;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.components.AbstractSliderButton;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.options.OptionsSubScreen;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
-import net.neoforged.neoforge.client.gui.widget.ExtendedSlider;
-import net.neoforged.neoforge.network.PacketDistributor;
+// Citadel: ExtendedSlider doesn't exist in vanilla - using vanilla AbstractSliderButton
+// PacketDistributor is NeoForge - will use Fabric networking later
 
 public class GuiCitadelPatreonConfig extends OptionsSubScreen {
 
-    private ExtendedSlider distSlider;
-    private ExtendedSlider speedSlider;
-    private ExtendedSlider heightSlider;
+    private CitadelSlider distSlider;
+    private CitadelSlider speedSlider;
+    private CitadelSlider heightSlider;
     private Button changeButton;
     private float rotateDist;
     private float rotateSpeed;
@@ -39,23 +40,20 @@ public class GuiCitadelPatreonConfig extends OptionsSubScreen {
     }
 
     private void setSliderValue(int i, float sliderValue) {
-        boolean flag = false;
         CompoundTag tag = CitadelEntityData.getOrCreateCitadelTag(Minecraft.getInstance().player);
         if (i == 0) {
             rotateDist = roundTo(sliderValue, 3);
             tag.putFloat("CitadelRotateDistance", rotateDist);
-            //distSlider.isHovered = false;
         } else if (i == 1) {
             rotateSpeed = roundTo(sliderValue, 3);
             tag.putFloat("CitadelRotateSpeed", rotateSpeed);
-            //speedSlider.isHovered = false;
         } else {
             rotateHeight = roundTo(sliderValue, 3);
             tag.putFloat("CitadelRotateHeight", rotateHeight);
-            //heightSlider.isHovered = false;
         }
         CitadelEntityData.setCitadelTag(Minecraft.getInstance().player, tag);
-        PacketDistributor.sendToServer(new PropertiesMessage("CitadelPatreonConfig", tag, Minecraft.getInstance().player.getId()));
+        // TODO: Wire to Fabric networking
+        // PacketDistributor.sendToServer(new PropertiesMessage("CitadelPatreonConfig", tag, Minecraft.getInstance().player.getId()));
     }
 
     public static float roundTo(float value, int places) {
@@ -74,30 +72,31 @@ public class GuiCitadelPatreonConfig extends OptionsSubScreen {
         int j = this.height / 6;
         Button doneButton = Button.builder(CommonComponents.GUI_DONE, (p_213079_1_) -> this.minecraft.setScreen(this.lastScreen)).size(200, 20).pos(i - 100, j + 120).build();
         this.addRenderableWidget(doneButton);
-        this.addRenderableWidget(distSlider = new ExtendedSlider(i - 150 / 2 - 25, j + 30, 150, 20, Component.translatable("citadel.gui.orbit_dist").append(Component.translatable(": ")), Component.translatable(""), 0.125F, 5F, rotateDist, 0.1D, 1, true) {
+        
+        this.addRenderableWidget(distSlider = new CitadelSlider(i - 150 / 2 - 25, j + 30, 150, 20, Component.translatable("citadel.gui.orbit_dist").append(Component.translatable(": ")), 0.125F, 5F, rotateDist) {
             @Override
             protected void applyValue() {
-                GuiCitadelPatreonConfig.this.setSliderValue(0, (float) getValue());
+                GuiCitadelPatreonConfig.this.setSliderValue(0, (float) this.getValue());
             }
         });
 
         Button reset1Button = Button.builder(Component.translatable("citadel.gui.reset"), (p_213079_1_) -> this.setSliderValue(0, 0.4F)).size(40, 20).pos(i - 150 / 2 + 135, j + 30).build();
         this.addRenderableWidget(reset1Button);
 
-        this.addRenderableWidget(speedSlider = new ExtendedSlider(i - 150 / 2 - 25, j + 60, 150, 20, Component.translatable("citadel.gui.orbit_speed").append(Component.translatable(": ")), Component.translatable(""), 0.0F, 5F, rotateSpeed, 0.1D, 2, true) {
+        this.addRenderableWidget(speedSlider = new CitadelSlider(i - 150 / 2 - 25, j + 60, 150, 20, Component.translatable("citadel.gui.orbit_speed").append(Component.translatable(": ")), 0.0F, 5F, rotateSpeed) {
             @Override
             protected void applyValue() {
-                GuiCitadelPatreonConfig.this.setSliderValue(1, (float) getValue());
+                GuiCitadelPatreonConfig.this.setSliderValue(1, (float) this.getValue());
             }
         });
 
         Button reset2Button = Button.builder(Component.translatable("citadel.gui.reset"), (p_213079_1_) -> this.setSliderValue(1, 1F / 5F)).size(40, 20).pos(i - 150 / 2 + 135, j + 60).build();
         this.addRenderableWidget(reset2Button);
 
-        this.addRenderableWidget(heightSlider = new ExtendedSlider(i - 150 / 2 - 25, j + 90, 150, 20, Component.translatable("citadel.gui.orbit_height").append(Component.translatable(": ")), Component.translatable(""), 0.0F, 2F, rotateHeight, 0.1D, 2, true) {
+        this.addRenderableWidget(heightSlider = new CitadelSlider(i - 150 / 2 - 25, j + 90, 150, 20, Component.translatable("citadel.gui.orbit_height").append(Component.translatable(": ")), 0.0F, 2F, rotateHeight) {
             @Override
             protected void applyValue() {
-                GuiCitadelPatreonConfig.this.setSliderValue(2, (float) getValue());
+                GuiCitadelPatreonConfig.this.setSliderValue(2, (float) this.getValue());
             }
         });
 
@@ -109,7 +108,8 @@ public class GuiCitadelPatreonConfig extends OptionsSubScreen {
             CompoundTag tag = CitadelEntityData.getOrCreateCitadelTag(Minecraft.getInstance().player);
             tag.putString("CitadelFollowerType", followType);
             CitadelEntityData.setCitadelTag(Minecraft.getInstance().player, tag);
-            PacketDistributor.sendToServer(new PropertiesMessage("CitadelPatreonConfig", tag, Minecraft.getInstance().player.getId()));
+            // TODO: Wire to Fabric networking
+            // PacketDistributor.sendToServer(new PropertiesMessage("CitadelPatreonConfig", tag, Minecraft.getInstance().player.getId()));
             changeButton.setMessage(getTypeText());
         }).size(200, 20).pos(i - 100, j).build();
         this.addRenderableWidget(changeButton);
@@ -122,5 +122,29 @@ public class GuiCitadelPatreonConfig extends OptionsSubScreen {
 
     private Component getTypeText() {
         return Component.translatable("citadel.gui.follower_type").append(Component.translatable("citadel.follower." + followType));
+    }
+    
+    // Citadel: Simple slider implementation to replace NeoForge ExtendedSlider
+    private static abstract class CitadelSlider extends AbstractSliderButton {
+        private final Component prefix;
+        private final float minValue;
+        private final float maxValue;
+        
+        public CitadelSlider(int x, int y, int width, int height, Component prefix, float minValue, float maxValue, float currentValue) {
+            super(x, y, width, height, prefix, (currentValue - minValue) / (maxValue - minValue));
+            this.prefix = prefix;
+            this.minValue = minValue;
+            this.maxValue = maxValue;
+            this.updateMessage();
+        }
+        
+        public double getValue() {
+            return minValue + (maxValue - minValue) * this.value;
+        }
+        
+        @Override
+        protected void updateMessage() {
+            this.setMessage(prefix.copy().append(String.format("%.2f", getValue())));
+        }
     }
 }

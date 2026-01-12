@@ -34,7 +34,9 @@ public class CitadelItemstackRenderer extends BlockEntityWithoutLevelRenderer {
     private static List<Holder.Reference<MobEffect>> mobEffectList = null;
 
     public CitadelItemstackRenderer() {
-        super(null, null);
+        // Citadel: In 1.21, BlockEntityWithoutLevelRenderer constructor requires BlockEntityRenderDispatcher and EntityModelSet
+        // We pass null for now since we don't use block entity rendering here
+        super(Minecraft.getInstance().getBlockEntityRenderDispatcher(), Minecraft.getInstance().getEntityModels());
     }
 
     @Override
@@ -42,7 +44,7 @@ public class CitadelItemstackRenderer extends BlockEntityWithoutLevelRenderer {
         float partialTicks = Minecraft.getInstance().getTimer().getGameTimeDeltaTicks();
         float ticksExisted = Util.getMillis() / 50F + partialTicks;
         int id = Minecraft.getInstance().player == null ? 0 : Minecraft.getInstance().player.getId();
-        if (stack.getItem() == Citadel.FANCY_ITEM.get()) {
+        if (stack.getItem() == Citadel.FANCY_ITEM) {
             Random random = new Random();
             boolean animateAnyways = false;
 
@@ -74,7 +76,7 @@ public class CitadelItemstackRenderer extends BlockEntityWithoutLevelRenderer {
             Minecraft.getInstance().getItemRenderer().renderStatic(display.item(), displayContext, packedLight, packedOverlay, poseStack, buffer, null, id);
             poseStack.popPose();
         }
-        if (stack.getItem() == Citadel.EFFECT_ITEM.get()) {
+        if (stack.getItem() == Citadel.EFFECT_ITEM) {
             RenderSystem.enableBlend();
             RenderSystem.defaultBlendFunc();
             RenderSystem.disableCull();
@@ -113,7 +115,7 @@ public class CitadelItemstackRenderer extends BlockEntityWithoutLevelRenderer {
             BufferUploader.drawWithShader(bufferbuilder.buildOrThrow());
             poseStack.popPose();
         }
-        if (stack.getItem() == Citadel.ICON_ITEM.get()) {
+        if (stack.getItem() == Citadel.ICON_ITEM) {
             ResourceLocation texture = stack.getOrDefault(Citadel.ICON_LOCATION, DEFAULT_ICON_TEXTURE);
             poseStack.pushPose();
             poseStack.translate(0, 0, 0.5F);
