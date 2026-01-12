@@ -4,8 +4,9 @@ import com.github.alexthe666.citadel.animation.IAnimatedEntity;
 import com.github.alexthe666.citadel.client.CitadelItemRenderProperties;
 import com.github.alexthe666.citadel.client.event.EventRenderSplashText;
 import com.github.alexthe666.citadel.client.game.Tetris;
-import com.github.alexthe666.citadel.client.gui.GuiCitadelBook;
-import com.github.alexthe666.citadel.client.gui.GuiCitadelCapesConfig;
+// Citadel: Disabled GUI book classes (optional feature - requires major 1.21 GuiGraphics rewrite)
+// import com.github.alexthe666.citadel.client.gui.GuiCitadelBook;
+// import com.github.alexthe666.citadel.client.gui.GuiCitadelCapesConfig;
 import com.github.alexthe666.citadel.client.gui.GuiCitadelPatreonConfig;
 import com.github.alexthe666.citadel.client.model.TabulaModel;
 import com.github.alexthe666.citadel.client.model.TabulaModelHandler;
@@ -112,11 +113,14 @@ public class ClientProxy extends ServerProxy {
                     // TODO: Add button to screen
                     height += 25;
                 }
+                // Citadel: GuiCitadelCapesConfig disabled (optional feature)
+                /*
                 if (!CitadelCapes.getCapesFor(Minecraft.getInstance().player.getUUID()).isEmpty()) {
                     Button button2 = Button.builder(Component.translatable("citadel.gui.capes_option").withStyle(ChatFormatting.GREEN), (p_213080_2_) -> Minecraft.getInstance().setScreen(new GuiCitadelCapesConfig(screen, Minecraft.getInstance().options))).size(200, 20).pos(screen.width / 2 - 100, screen.height / 6 + 150 + height).build();
                     // TODO: Add button to screen
                     height += 25;
                 }
+                */
             } catch (Exception e) {
                 e.printStackTrace();
             }
@@ -337,7 +341,9 @@ public class ClientProxy extends ServerProxy {
 
     @Override
     public void openBookGUI(ItemStack book) {
-        Minecraft.getInstance().setScreen(new GuiCitadelBook(book));
+        // Citadel: GuiCitadelBook disabled (optional feature - requires major 1.21 GuiGraphics rewrite)
+        // Minecraft.getInstance().setScreen(new GuiCitadelBook(book));
+        Citadel.LOGGER.warn("Book GUI is disabled in this build - requires 1.21 GuiGraphics API rewrite");
     }
 
     public boolean isGamePaused() {

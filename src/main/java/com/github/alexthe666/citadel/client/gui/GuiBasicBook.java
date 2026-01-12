@@ -221,7 +221,7 @@ public abstract class GuiBasicBook extends Screen {
     }
 
     private void addLinkButtons() {
-        this.renderables.clear();
+        // Citadel: 1.21 API - Screen.renderables is now private, just use clearWidgets()
         this.clearWidgets();
         addNextPreviousButtons();
         int k = (this.width - this.xSize) / 2;

@@ -52,7 +52,8 @@ public class SpawnBiomeConfig {
     }
 
     private File getConfigDirFile() {
-        Path configPath = FMLPaths.CONFIGDIR.get();
+        // Citadel: 1.21 API - FMLPaths doesn't exist in Fabric, use Java Paths instead
+        Path configPath = Paths.get("config");
         Path jsonPath = Paths.get(configPath.toAbsolutePath().toString(), fileName.getNamespace());
         return jsonPath.toFile();
     }

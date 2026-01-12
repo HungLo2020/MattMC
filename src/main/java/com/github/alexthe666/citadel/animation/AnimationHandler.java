@@ -23,7 +23,8 @@ public enum AnimationHandler {
      * @param <T>       the entity type
      */
     public <T extends Entity & IAnimatedEntity> void sendAnimationMessage(T entity, Animation animation) {
-        if (entity.level().isClientSide) {
+        // Citadel: 1.21 API - Level.isClientSide is now private, check instanceof
+        if (entity.level() instanceof net.minecraft.client.multiplayer.ClientLevel) {
             return;
         }
         entity.setAnimation(animation);
@@ -43,13 +44,15 @@ public enum AnimationHandler {
             if (entity.getAnimation() != IAnimatedEntity.NO_ANIMATION) {
                 if (entity.getAnimationTick() == 0) {
                     AnimationEvent.Start event = new AnimationEvent.Start<>(entity, entity.getAnimation());
-                    if (!NeoForge.EVENT_BUS.post(event).isCanceled()) {
+                    // Citadel: TODO - Wire to Fabric event system
+                    // if (!NeoForge.EVENT_BUS.post(event).isCanceled()) {
                         this.sendAnimationMessage(entity, event.getAnimation());
-                    }
+                    // }
                 }
                 if (entity.getAnimationTick() < entity.getAnimation().getDuration()) {
                     entity.setAnimationTick(entity.getAnimationTick() + 1);
-                    NeoForge.EVENT_BUS.post(new AnimationEvent.Tick<>(entity, entity.getAnimation(), entity.getAnimationTick()));
+                    // Citadel: TODO - Wire to Fabric event system
+                    // NeoForge.EVENT_BUS.post(new AnimationEvent.Tick<>(entity, entity.getAnimation(), entity.getAnimationTick()));
                 }
                 if (entity.getAnimationTick() == entity.getAnimation().getDuration()) {
                     entity.setAnimationTick(0);

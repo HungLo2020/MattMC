@@ -84,10 +84,10 @@ public class ClientTickRateTracker extends TickRateTracker {
 
     @Override
     public void tickEntityAtCustomRate(Entity entity) {
-        // Citadel: 1.21 API - Level.isClientSide is now private, use isClient() method instead
+        // Citadel: 1.21 API - Level.isClientSide is now private, check instanceof instead
         Level level = entity.level();
-        if(level.isClient() && level instanceof ClientLevel){
-            ((ClientLevel)level).tickNonPassenger(entity);
+        if(level instanceof ClientLevel clientLevel){
+            clientLevel.tickNonPassenger(entity);
         }
     }
 }
