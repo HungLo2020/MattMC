@@ -59,7 +59,6 @@ public abstract class TickRateTracker {
                 if (!modifier.doRemove()) {
                     tickRateModifierList.add(modifier);
                 }
-                }
             }
         }
     }

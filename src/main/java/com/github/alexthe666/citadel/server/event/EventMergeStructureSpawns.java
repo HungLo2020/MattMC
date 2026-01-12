@@ -76,12 +76,13 @@ public class EventMergeStructureSpawns {
                 list.add(spawnData);
             }
         }
-        // Citadel: WeightedList.of() needs proper type - create weighted list from entries
-        WeightedList<MobSpawnSettings.SpawnerData> weightedList = WeightedList.create();
+        // Citadel: WeightedList.builder() to create weighted list properly
+        WeightedList.Builder<MobSpawnSettings.SpawnerData> builder = WeightedList.builder();
         for (MobSpawnSettings.SpawnerData data : list) {
-            weightedList.add(data, data.getWeight().asInt());
+            // All spawner data gets weight of 1 by default
+            builder.add(data, 1);
         }
-        this.setStructureSpawns(weightedList);
+        this.setStructureSpawns(builder.build());
     }
 
     public WeightedList<MobSpawnSettings.SpawnerData> getBiomeSpawns() {

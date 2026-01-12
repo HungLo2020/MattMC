@@ -3,8 +3,7 @@ package com.github.alexthe666.citadel.client.texture;
 import com.mojang.blaze3d.platform.NativeImage;
 // Citadel: TextureUtil.prepareImage might not exist in 1.21
 import net.minecraft.client.renderer.texture.DynamicTexture;
-// Citadel: FastColor moved or changed in 1.21
-import com.mojang.blaze3d.platform.NativeImage.PixelFormat;
+// Citadel: FastColor and PixelFormat may have changed in 1.21
 
 import java.awt.image.BufferedImage;
 
