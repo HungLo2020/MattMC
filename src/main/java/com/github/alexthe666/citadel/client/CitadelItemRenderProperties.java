@@ -1,15 +1,13 @@
 package com.github.alexthe666.citadel.client;
 
-import net.minecraft.client.renderer.BlockEntityWithoutLevelRenderer;
-
-// Citadel: IClientItemExtensions doesn't exist in vanilla 1.21 - this class is not used
-// Item rendering is now handled directly through BlockEntityWithoutLevelRenderer
-// which is registered via Item.Properties in item registration
+// Citadel: IClientItemExtensions and BlockEntityWithoutLevelRenderer don't exist in vanilla 1.21
+// This class is not used in vanilla 1.21 - item rendering handled differently
+// Kept as placeholder for API compatibility
 public class CitadelItemRenderProperties {
 
-    private final BlockEntityWithoutLevelRenderer renderer = new CitadelItemstackRenderer();
+    private final CitadelItemstackRenderer renderer = new CitadelItemstackRenderer();
 
-    public BlockEntityWithoutLevelRenderer getCustomRenderer() {
+    public CitadelItemstackRenderer getCustomRenderer() {
         return renderer;
     }
 }
