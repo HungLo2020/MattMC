@@ -3,7 +3,7 @@ package com.github.alexthe666.citadel.client.shader;
 import com.github.alexthe666.citadel.Citadel;
 import com.google.gson.JsonSyntaxException;
 import com.mojang.blaze3d.pipeline.RenderTarget;
-import com.mojang.blaze3d.platform.GlStateManager;
+// Citadel: GlStateManager removed in 1.21
 import com.mojang.blaze3d.systems.RenderSystem;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.PostChain;
@@ -15,6 +15,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+// Citadel: Post-processing effects system for shaders
+// GlStateManager removed in 1.21, using RenderSystem for GL operations
 public class PostEffectRegistry {
 
     private static List<ResourceLocation> registry = new ArrayList<>();

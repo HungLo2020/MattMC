@@ -13,6 +13,8 @@ import java.util.Collection;
 import java.util.function.Function;
 
 /**
+ * Citadel: Simplified for 1.21 - BakedModel interface changed significantly
+ * This is for Tabula model loading which is not critical for core functionality
  * @author pau101
  * @since 1.0.0
  */
@@ -39,7 +41,9 @@ public class VanillaTabulaModel implements UnbakedModel {
     }
 
     @Override
-    public @Nullable BakedModel bake(ModelBaker baker, Function<Material, TextureAtlasSprite> spriteGetter, ModelState state) {
+    public @Nullable BakedTabulaModel bake(ModelBaker baker, Function<Material, TextureAtlasSprite> spriteGetter, ModelState state) {
+        // Citadel: Simplified - full implementation would require adapting to 1.21's model system
+        // TODO: Implement proper baking if Tabula models are needed
         return null;
     }
 

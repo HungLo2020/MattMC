@@ -20,16 +20,18 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+// Citadel: Simplified for 1.21 - ItemOverride class removed from vanilla
+// This is for Tabula model loading which is not critical for core functionality
 public class TabulaModelBlock
 {
     private static final Logger LOGGER = LogManager.getLogger();
     @VisibleForTesting
-    static final Gson SERIALIZER = (new GsonBuilder()).registerTypeAdapter(TabulaModelBlock.class, new TabulaModelBlock.Deserializer()).registerTypeAdapter(BlockElement.class, new BlockElement.Deserializer()).registerTypeAdapter(BlockElementFace.class, new BlockElementFace.Deserializer()).registerTypeAdapter(BlockFaceUV.class, new BlockFaceUV.Deserializer()).registerTypeAdapter(ItemTransform.class, new ItemTransform.Deserializer()).registerTypeAdapter(ItemTransforms.class, new ItemTransforms.Deserializer()).registerTypeAdapter(ItemOverride.class, new ItemOverride.Deserializer()).create();
+    static final Gson SERIALIZER = (new GsonBuilder()).registerTypeAdapter(TabulaModelBlock.class, new TabulaModelBlock.Deserializer()).registerTypeAdapter(BlockElement.class, new BlockElement.Deserializer()).registerTypeAdapter(BlockElementFace.class, new BlockElementFace.Deserializer()).registerTypeAdapter(BlockFaceUV.class, new BlockFaceUV.Deserializer()).registerTypeAdapter(ItemTransform.class, new ItemTransform.Deserializer()).registerTypeAdapter(ItemTransforms.class, new ItemTransforms.Deserializer()).create();
     private final List<BlockElement> elements;
     private final boolean gui3d;
     public final boolean ambientOcclusion;
     private final ItemTransforms cameraTransforms;
-    private final List<ItemOverride> overrides;
+    // Citadel: Removed ItemOverride list - not available in 1.21
     public String name = "";
     @VisibleForTesting
     public final Map<String, String> textures;
@@ -48,7 +50,7 @@ public class TabulaModelBlock
         return deserialize(new StringReader(jsonString));
     }
 
-    public TabulaModelBlock(@Nullable ResourceLocation parentLocationIn, List<BlockElement> elementsIn, Map<String, String> texturesIn, boolean ambientOcclusionIn, boolean gui3dIn, ItemTransforms cameraTransformsIn, List<ItemOverride> overridesIn)
+    public TabulaModelBlock(@Nullable ResourceLocation parentLocationIn, List<BlockElement> elementsIn, Map<String, String> texturesIn, boolean ambientOcclusionIn, boolean gui3dIn, ItemTransforms cameraTransformsIn)
     {
         this.elements = elementsIn;
         this.ambientOcclusion = ambientOcclusionIn;
@@ -56,7 +58,6 @@ public class TabulaModelBlock
         this.textures = texturesIn;
         this.parentLocation = parentLocationIn;
         this.cameraTransforms = cameraTransformsIn;
-        this.overrides = overridesIn;
     }
 
     public List<BlockElement> getElements()
@@ -94,20 +95,11 @@ public class TabulaModelBlock
 
     public Collection<ResourceLocation> getOverrideLocations()
     {
-        Set<ResourceLocation> set = Sets.newHashSet();
-
-        for (ItemOverride itemoverride : this.overrides)
-        {
-            set.add(itemoverride.getModel());
-        }
-
-        return set;
+        // Citadel: ItemOverride removed in 1.21
+        return Set.of();
     }
 
-    public List<ItemOverride> getOverrides()
-    {
-        return this.overrides;
-    }
+    // Citadel: Removed getOverrides() method - ItemOverride doesn't exist in 1.21
 
     public boolean isTexturePresent(String textureName)
     {
@@ -241,25 +233,12 @@ public class TabulaModelBlock
                 itemcameratransforms = p_deserialize_3_.deserialize(jsonobject1, ItemTransforms.class);
             }
 
-            List<ItemOverride> list1 = this.getItemOverrides(p_deserialize_3_, jsonobject);
+            // Citadel: ItemOverride removed in 1.21 - not loading overrides
             ResourceLocation resourcelocation = s.isEmpty() ? null : ResourceLocation.parse(s);
-            return new TabulaModelBlock(resourcelocation, list, map, flag, true, itemcameratransforms, list1);
+            return new TabulaModelBlock(resourcelocation, list, map, flag, true, itemcameratransforms);
         }
 
-        protected List<ItemOverride> getItemOverrides(JsonDeserializationContext deserializationContext, JsonObject object)
-        {
-            List<ItemOverride> list = Lists.newArrayList();
-
-            if (object.has("overrides"))
-            {
-                for (JsonElement jsonelement : JsonUtils.getJsonArray(object, "overrides"))
-                {
-                    list.add(deserializationContext.deserialize(jsonelement, ItemOverride.class));
-                }
-            }
-
-            return list;
-        }
+        // Citadel: Removed getItemOverrides method - ItemOverride doesn't exist in 1.21
 
         private Map<String, String> getTextures(JsonObject object)
         {

@@ -7,8 +7,9 @@ import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.phys.Vec3;
-import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
 
+// Citadel: Removed RenderLevelStageEvent - NeoForge event class
+// This will be called from ClientProxy's Fabric event handler
 public class WorldEventContext {
     public static final WorldEventContext INSTANCE = new WorldEventContext();
 
@@ -30,14 +31,15 @@ public class WorldEventContext {
      */
     int clientRenderDist;
 
-    public void renderWorldLastEvent(final RenderLevelStageEvent event)
+    // Citadel: Simplified for 1.21 - will be called from Fabric WorldRenderEvents
+    public void renderWorldLastEvent(PoseStack poseStack, float partialTicks)
     {
-        bufferSource = WorldRenderMacros.getBufferSource();
-        poseStack = event.getPoseStack();
-        partialTicks = event.getPartialTick().getGameTimeDeltaTicks();
-        clientLevel = Minecraft.getInstance().level;
-        clientPlayer = Minecraft.getInstance().player;
-        mainHandItem = clientPlayer.getMainHandItem();
+        this.bufferSource = WorldRenderMacros.getBufferSource();
+        this.poseStack = poseStack;
+        this.partialTicks = partialTicks;
+        this.clientLevel = Minecraft.getInstance().level;
+        this.clientPlayer = Minecraft.getInstance().player;
+        this.mainHandItem = clientPlayer.getMainHandItem();
         clientRenderDist = Minecraft.getInstance().options.renderDistance().get();
 
         final Vec3 cameraPos = Minecraft.getInstance().gameRenderer.getMainCamera().getPosition();

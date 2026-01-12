@@ -74,11 +74,11 @@ public class UiRenderMacros {
             return;
         }
 
-        RenderSystem.setShader(GameRenderer::getPositionColorShader);
+        // Citadel: GameRenderer shader methods changed in 1.21 - using default shader
         if (alphaStart != 255 || alphaEnd != 255) {
-            RenderSystem.enableBlend();
+            // Citadel: RenderSystem.enableBlend() removed in 1.21 - handled by RenderState
         } else {
-            RenderSystem.disableBlend();
+            // Citadel: RenderSystem.disableBlend() removed in 1.21
         }
 
         final Matrix4f m = ps.last().pose();
@@ -100,7 +100,7 @@ public class UiRenderMacros {
         buffer2.addVertex(m, x, y + h, 0).setColor(redEnd, greenEnd, blueEnd, alphaEnd);
 //        Tesselator.getInstance().end();
 
-        RenderSystem.disableBlend();
+        // Citadel: RenderSystem.disableBlend() removed in 1.21
     }
 
     public static void drawLineRect(final PoseStack ps, final int x, final int y, final int w, final int h, final int argbColor) {
@@ -140,11 +140,11 @@ public class UiRenderMacros {
             return;
         }
 
-        RenderSystem.setShader(GameRenderer::getPositionColorShader);
+        // Citadel: GameRenderer shader methods changed in 1.21 - using default shader
         if (alpha != 255) {
-            RenderSystem.enableBlend();
+            // Citadel: RenderSystem.enableBlend() removed in 1.21 - handled by RenderState
         } else {
-            RenderSystem.disableBlend();
+            // Citadel: RenderSystem.disableBlend() removed in 1.21
         }
 
         final Matrix4f m = ps.last().pose();
@@ -166,7 +166,7 @@ public class UiRenderMacros {
         buffer2.addVertex(m, x, y + h, 0).setColor(red, green, blue, alpha);
 //        Tesselator.getInstance().end();
 
-        RenderSystem.disableBlend();
+        // Citadel: RenderSystem.disableBlend() removed in 1.21
     }
 
     public static void fill(final PoseStack ps, final int x, final int y, final int w, final int h, final int argbColor) {
@@ -186,11 +186,11 @@ public class UiRenderMacros {
             return;
         }
 
-        RenderSystem.setShader(GameRenderer::getPositionColorShader);
+        // Citadel: GameRenderer shader methods changed in 1.21 - using default shader
         if (alpha != 255) {
-            RenderSystem.enableBlend();
+            // Citadel: RenderSystem.enableBlend() removed in 1.21 - handled by RenderState
         } else {
-            RenderSystem.disableBlend();
+            // Citadel: RenderSystem.disableBlend() removed in 1.21
         }
 
         final Matrix4f m = ps.last().pose();
@@ -201,7 +201,7 @@ public class UiRenderMacros {
         buffer.addVertex(m, x + w, y, 0).setColor(red, green, blue, alpha);
 //        Tesselator.getInstance().end();
 
-        RenderSystem.disableBlend();
+        // Citadel: RenderSystem.disableBlend() removed in 1.21
     }
 
 
@@ -244,11 +244,11 @@ public class UiRenderMacros {
             return;
         }
 
-        RenderSystem.setShader(GameRenderer::getPositionColorShader);
+        // Citadel: GameRenderer shader methods changed in 1.21 - using default shader
         if (alphaStart != 255 || alphaEnd != 255) {
-            RenderSystem.enableBlend();
+            // Citadel: RenderSystem.enableBlend() removed in 1.21 - handled by RenderState
         } else {
-            RenderSystem.disableBlend();
+            // Citadel: RenderSystem.disableBlend() removed in 1.21
         }
 
         final Matrix4f m = ps.last().pose();
@@ -259,7 +259,7 @@ public class UiRenderMacros {
         buffer.addVertex(m, x + w, y, 0).setColor(redStart, greenStart, blueStart, alphaStart);
 //        Tesselator.getInstance().end();
 
-        RenderSystem.disableBlend();
+        // Citadel: RenderSystem.disableBlend() removed in 1.21
     }
 
     public static void hLine(final PoseStack ps, final int x, final int xEnd, final int y, final int argbColor) {
@@ -309,11 +309,11 @@ public class UiRenderMacros {
             return;
         }
 
-        RenderSystem.setShader(GameRenderer::getPositionColorShader);
+        // Citadel: GameRenderer shader methods changed in 1.21 - using default shader
         if (alpha != 255) {
-            RenderSystem.enableBlend();
+            // Citadel: RenderSystem.enableBlend() removed in 1.21 - handled by RenderState
         } else {
-            RenderSystem.disableBlend();
+            // Citadel: RenderSystem.disableBlend() removed in 1.21
         }
 
         final Matrix4f m = ps.last().pose();
@@ -322,7 +322,7 @@ public class UiRenderMacros {
         buffer.addVertex(m, xEnd, yEnd, 0).setColor(red, green, blue, alpha);
 //        Tesselator.getInstance().end();
 
-        RenderSystem.disableBlend();
+        // Citadel: RenderSystem.disableBlend() removed in 1.21
     }
 
     public static void blit(final PoseStack ps, final ResourceLocation rl, final int x, final int y, final int w, final int h) {
