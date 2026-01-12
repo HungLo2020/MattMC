@@ -28,19 +28,31 @@ public class VillageHouseManager {
     }
 
     public static StructureTemplatePool addToPool(StructureTemplatePool pool, StructurePoolElement element, int weight) {
-        if (weight > 0) {
-            if (pool != null) {
-                ObjectArrayList<StructurePoolElement> templates = new ObjectArrayList<>(pool.templates);
+        if (weight > 0 && pool != null) {
+            try {
+                // Use reflection to access private fields (no access wideners as requested)
+                var templatesField = StructureTemplatePool.class.getDeclaredField("templates");
+                templatesField.setAccessible(true);
+                var rawTemplatesField = StructureTemplatePool.class.getDeclaredField("rawTemplates");
+                rawTemplatesField.setAccessible(true);
+                
+                @SuppressWarnings("unchecked")
+                ObjectArrayList<StructurePoolElement> templates = new ObjectArrayList<>((List<StructurePoolElement>) templatesField.get(pool));
+                
                 if (!templates.contains(element)) {
                     for (int i = 0; i < weight; i++) {
                         templates.add(element);
                     }
-                    List<Pair<StructurePoolElement, Integer>> rawTemplates = new ArrayList(pool.rawTemplates);
+                    @SuppressWarnings("unchecked")
+                    List<Pair<StructurePoolElement, Integer>> rawTemplates = new ArrayList<>((List<Pair<StructurePoolElement, Integer>>) rawTemplatesField.get(pool));
                     rawTemplates.add(new Pair<>(element, weight));
-                    pool.templates = templates;
-                    pool.rawTemplates = rawTemplates;
+                    
+                    templatesField.set(pool, templates);
+                    rawTemplatesField.set(pool, rawTemplates);
                     Citadel.LOGGER.info("Added to village structure pool");
                 }
+            } catch (Exception e) {
+                Citadel.LOGGER.error("Failed to add to village structure pool - reflection failed", e);
             }
         }
         return pool;

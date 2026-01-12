@@ -67,11 +67,11 @@ public class EventMergeStructureSpawns {
 
     public void mergeSpawns() {
         List<MobSpawnSettings.SpawnerData> list = new ArrayList<>();
-        for (MobSpawnSettings.SpawnerData entry : biomeSpawns.unwrap()) {
-            list.add(entry.data());
+        for (var entry : biomeSpawns.unwrap()) {
+            list.add(entry.value());
         }
-        for (MobSpawnSettings.SpawnerData structureSpawn : structureSpawns.unwrap()) {
-            MobSpawnSettings.SpawnerData spawnData = structureSpawn.data();
+        for (var structureSpawn : structureSpawns.unwrap()) {
+            MobSpawnSettings.SpawnerData spawnData = structureSpawn.value();
             if (!list.contains(spawnData)) {
                 list.add(spawnData);
             }

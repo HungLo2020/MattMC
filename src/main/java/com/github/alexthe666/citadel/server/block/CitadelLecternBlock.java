@@ -29,13 +29,13 @@ public class CitadelLecternBlock extends LecternBlock {
 
     public InteractionResult use(BlockState state, Level level, BlockPos pos, Player player, InteractionHand hand, BlockHitResult hitResult) {
         BlockEntity blockEntity = level.getBlockEntity(pos);
-        if (level.isClientSide && blockEntity instanceof CitadelLecternBlockEntity lecternBlockEntity && lecternBlockEntity.hasBook()) {
+        if (level.isClientSide() && blockEntity instanceof CitadelLecternBlockEntity lecternBlockEntity && lecternBlockEntity.hasBook()) {
             ItemStack book = lecternBlockEntity.getBook();
-            if (!book.isEmpty() && !player.getCooldowns().isOnCooldown(book.getItem())) {
+            if (!book.isEmpty() && !player.getCooldowns().isOnCooldown(book)) {
                 book.use(level, player, hand);
             }
         }
-        return InteractionResult.sidedSuccess(level.isClientSide);
+        return level.isClientSide() ? InteractionResult.SUCCESS : InteractionResult.SUCCESS_SERVER;
 
     }
 
