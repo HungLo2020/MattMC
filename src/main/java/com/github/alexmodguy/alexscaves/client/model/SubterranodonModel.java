@@ -39,6 +39,9 @@ public class SubterranodonModel extends AdvancedEntityModel<SubterranodonRenderS
     public SubterranodonModel() {
         texWidth = 256;
         texHeight = 256;
+        // Synchronize with parent class texture dimensions for proper UV mapping
+        this.textureWidth = 256;
+        this.textureHeight = 256;
 
         body = new AdvancedModelBox(this);
         body.setRotationPoint(0.0F, 19.0F, -1.0F);
