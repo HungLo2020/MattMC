@@ -9,6 +9,8 @@ import com.github.alexmodguy.alexscaves.server.message.MountedEntityKeyMessage;
 import com.github.alexthe666.citadel.server.entity.pathfinding.raycoms.AdvancedPathNavigate;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
@@ -121,17 +123,19 @@ public class SubterranodonEntity extends DinosaurEntity implements PackAnimal, F
         this.targetSelector.addGoal(1, new HurtByTargetGoal(this));
     }
 
-    public void readAdditionalSaveData(CompoundTag compound) {
-        super.readAdditionalSaveData(compound);
-        this.setFlying(compound.getBoolean("Flying"));
-        this.timeFlying = compound.getInt("TimeFlying");
+    @Override
+    protected void readAdditionalSaveData(ValueInput valueInput) {
+        super.readAdditionalSaveData(valueInput);
+        this.setFlying(valueInput.getBoolean("Flying").orElse(false));
+        this.timeFlying = valueInput.getInt("TimeFlying").orElse(0);
     }
 
 
-    public void addAdditionalSaveData(CompoundTag compound) {
-        super.addAdditionalSaveData(compound);
-        compound.putBoolean("Flying", this.isFlying());
-        compound.putInt("TimeFlying", this.timeFlying);
+    @Override
+    protected void addAdditionalSaveData(ValueOutput valueOutput) {
+        super.addAdditionalSaveData(valueOutput);
+        valueOutput.putBoolean("Flying", this.isFlying());
+        valueOutput.putInt("TimeFlying", this.timeFlying);
     }
 
     @Override
