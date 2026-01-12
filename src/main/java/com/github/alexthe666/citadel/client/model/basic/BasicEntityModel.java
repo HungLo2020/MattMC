@@ -32,10 +32,10 @@ public abstract class BasicEntityModel<T extends EntityRenderState> extends Enti
     }
 
     @Override
-    public void renderToBuffer(PoseStack poseStack, VertexConsumer vertexConsumer, int packedLight, int packedOverlay, int color) {
+    public void renderToBuffer(PoseStack poseStack, VertexConsumer vertexConsumer, int packedLight, int packedOverlay) {
         // Render all our custom BasicModelPart parts
         for (BasicModelPart part : parts()) {
-            part.render(poseStack, vertexConsumer, packedLight, packedOverlay, color);
+            part.render(poseStack, vertexConsumer, packedLight, packedOverlay);
         }
     }
 
