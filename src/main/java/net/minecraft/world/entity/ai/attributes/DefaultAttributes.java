@@ -155,7 +155,7 @@ public class DefaultAttributes {
 		.put(EntityType.SKELETON_HORSE, SkeletonHorse.createAttributes().build())
 		.put(EntityType.SLIME, Monster.createMonsterAttributes().build())
 		.put(EntityType.SNIFFER, Sniffer.createAttributes().build())
-		.put(EntityType.SUBTERRANODON, SubterranodonEntity.createLivingAttributes().build())
+		.put(EntityType.SUBTERRANODON, SubterranodonEntity.createAttributes().build())
 		.put(EntityType.SNOW_GOLEM, SnowGolem.createAttributes().build())
 		.put(EntityType.SPIDER, Spider.createAttributes().build())
 		.put(EntityType.SQUID, Squid.createAttributes().build())
