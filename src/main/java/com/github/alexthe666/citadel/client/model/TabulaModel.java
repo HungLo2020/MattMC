@@ -2,8 +2,8 @@ package com.github.alexthe666.citadel.client.model;
 
 import com.github.alexthe666.citadel.client.model.basic.BasicModelPart;
 import com.github.alexthe666.citadel.client.model.container.TabulaCubeContainer;
-import com.github.alexthe666/citadel/client/model/container.TabulaCubeGroupContainer;
-import com.github.alexthe666/citadel/client/model/container.TabulaModelContainer;
+import com.github.alexthe666.citadel.client.model.container.TabulaCubeGroupContainer;
+import com.github.alexthe666.citadel.client.model.container.TabulaModelContainer;
 import com.google.common.collect.ImmutableList;
 import net.minecraft.client.model.geom.ModelPart;
 import net.minecraft.client.renderer.entity.state.EntityRenderState;
