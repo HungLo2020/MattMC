@@ -12,7 +12,8 @@ import com.github.alexthe666.citadel.server.world.WorldChunkUtil;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.Vec3i;
-import net.minecraft.network.protocol.game.DebugPackets;
+// TODO: Replace with Fabric debug visualization
+// import net.minecraft.network.protocol.game.DebugPackets;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.Mob;
@@ -302,7 +303,8 @@ public class AdvancedPathNavigate extends AbstractAdvancedPathNavigate {
                 }
             }
 
-            DebugPackets.sendPathFindingPacket(this.level, this.mob, this.path, this.maxDistanceToWaypoint);
+            // TODO: Debug visualization - DebugPackets class doesn't exist in vanilla
+            // DebugPackets.sendPathFindingPacket(this.level, this.mob, this.path, this.maxDistanceToWaypoint);
             if (!this.isDone()) {
                 Vec3 vector3d2 = this.getEntityPosAtNode(this.path.getNextNodeIndex());
                 BlockPos blockpos = BlockPos.containing(vector3d2);

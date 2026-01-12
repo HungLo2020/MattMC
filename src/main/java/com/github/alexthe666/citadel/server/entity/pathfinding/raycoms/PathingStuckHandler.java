@@ -3,7 +3,8 @@ package com.github.alexthe666.citadel.server.entity.pathfinding.raycoms;
     All of this code is used with permission from Raycoms, one of the developers of the minecolonies project.
  */
 
-import com.github.alexthe666.citadel.mixin.BlockBehaviourAccessor;
+// Removed mixin accessor - using BlockState.canSurvive() instead
+// import com.github.alexthe666.citadel.mixin.BlockBehaviourAccessor;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.world.damagesource.DamageSource;
@@ -431,7 +432,8 @@ public class PathingStuckHandler implements IStuckHandler {
         if (state.getBlock() != Blocks.LADDER && !state.canOcclude() && world.getFluidState(pos).isEmpty()) {
             for (final Direction dir : directions) {
                 final BlockState toPlace = Blocks.LADDER.defaultBlockState().setValue(LadderBlock.FACING, dir.getOpposite());
-                if (world.getBlockState(pos.relative(dir)).isSolid() && ((BlockBehaviourAccessor) Blocks.LADDER).citadel_canSurvive(toPlace, world, pos)) {
+                // Use BlockState.canSurvive() instead of mixin accessor
+                if (world.getBlockState(pos.relative(dir)).isSolid() && toPlace.canSurvive(world, pos)) {
                     world.setBlockAndUpdate(pos, toPlace);
                     break;
                 }
