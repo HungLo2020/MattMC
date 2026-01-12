@@ -16,9 +16,10 @@ public abstract class NodeEvaluator {
 	protected PathfindingContext currentContext;
 	protected Mob mob;
 	protected final Int2ObjectMap<Node> nodes = new Int2ObjectOpenHashMap<>();
-	protected int entityWidth;
-	protected int entityHeight;
-	protected int entityDepth;
+	// Citadel: Made public for AdvancedPathNavigate access
+	public int entityWidth;
+	public int entityHeight;
+	public int entityDepth;
 	protected boolean canPassDoors = true;
 	protected boolean canOpenDoors;
 	protected boolean canFloat;

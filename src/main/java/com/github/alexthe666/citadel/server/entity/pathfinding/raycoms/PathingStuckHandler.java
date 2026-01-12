@@ -404,7 +404,8 @@ public class PathingStuckHandler implements IStuckHandler {
 
     public static Direction getFacing(final BlockPos pos, final BlockPos neighbor) {
         final BlockPos vector = neighbor.subtract(pos);
-        return Direction.getNearest(vector.getX(), vector.getY(), -vector.getZ());
+        // Citadel: Direction.getNearest now requires a nullable Direction parameter in 1.21
+        return Direction.getNearest(vector.getX(), vector.getY(), -vector.getZ(), null);
     }
 
     /**
@@ -579,7 +580,8 @@ public class PathingStuckHandler implements IStuckHandler {
             y_offset = y_offset > 0 ? y_offset + 1 : y_offset - 1;
             y_offset *= -1;
 
-            if (world.getMaxBuildHeight() <= start.getY() + y) {
+            // Citadel: getMaxBuildHeight -> getMaxY in 1.21
+            if (world.getMaxY() <= start.getY() + y) {
                 return null;
             }
         }
