@@ -3,6 +3,7 @@ package com.github.alexthe666.citadel.client.model.basic;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.minecraft.client.model.EntityModel;
+import net.minecraft.client.model.geom.ModelPart;
 import net.minecraft.client.renderer.entity.state.EntityRenderState;
 
 // Citadel: 1.21 API change - EntityModel<T> now requires T extends EntityRenderState (not Entity)
@@ -11,8 +12,8 @@ public abstract class BasicEntityModel<T extends EntityRenderState> extends Enti
     public int textureWidth = 64;
     public int textureHeight = 32;
 
-    protected BasicEntityModel() {
-        // Citadel: 1.21 - EntityModel constructor changed, using default constructor
+    protected BasicEntityModel(ModelPart root) {
+        super(root); // Citadel: 1.21 - EntityModel constructor requires ModelPart
     }
 
     // Citadel: 1.21 - renderToBuffer() is now FINAL in EntityModel, cannot override

@@ -2,9 +2,11 @@ package com.github.alexthe666.citadel.client.model;
 
 import com.github.alexthe666.citadel.client.model.basic.BasicModelPart;
 import com.github.alexthe666.citadel.client.model.container.TabulaCubeContainer;
-import com.github.alexthe666.citadel.client.model.container.TabulaCubeGroupContainer;
-import com.github.alexthe666.citadel.client.model.container.TabulaModelContainer;
+import com.github.alexthe666/citadel/client/model/container.TabulaCubeGroupContainer;
+import com.github.alexthe666/citadel/client/model/container.TabulaModelContainer;
 import com.google.common.collect.ImmutableList;
+import net.minecraft.client.model.geom.ModelPart;
+import net.minecraft.client.renderer.entity.state.EntityRenderState;
 import net.minecraft.world.entity.Entity;
 
 import java.util.ArrayList;
@@ -15,8 +17,11 @@ import java.util.Map;
 /**
  * @author gegy1000
  * @since 1.0.0
+ * 
+ * Citadel: 1.21 - Changed to use EntityRenderState instead of Entity
+ * Uses raw type since we don't know what specific EntityRenderState subclass will be used
  */
-public class TabulaModel extends AdvancedEntityModel {
+public class TabulaModel extends AdvancedEntityModel<EntityRenderState> {
     protected Map<String, AdvancedModelBox> cubes = new HashMap<>();
     protected List<AdvancedModelBox> rootBoxes = new ArrayList<>();
     protected ITabulaModelAnimator tabulaAnimator;
@@ -25,6 +30,7 @@ public class TabulaModel extends AdvancedEntityModel {
     protected double[] scale;
 
     public TabulaModel(TabulaModelContainer container, ITabulaModelAnimator tabulaAnimator) {
+        super(ModelPart.EMPTY); // Citadel: 1.21 - Use dummy ModelPart since Tabula builds custom structure
         this.texWidth = container.getTextureWidth();
         this.texHeight = container.getTextureHeight();
         this.tabulaAnimator = tabulaAnimator;
@@ -80,8 +86,18 @@ public class TabulaModel extends AdvancedEntityModel {
         return box;
     }
 
+    // Citadel: 1.21 - setupAnim now takes EntityRenderState, not Entity with animation parameters
+    // We keep the old logic in a separate method for animator compatibility
     @Override
-    public void setupAnim(Entity entity, float limbSwing, float limbSwingAmount, float ageInTicks, float rotationYaw, float rotationPitch) {
+    public void setupAnim(EntityRenderState state) {
+        // Citadel: In 1.21, state doesn't have the same animation data as before
+        // Call internal method with default values for now
+        // This would need proper integration with the state object in a full implementation
+        this.setupAnimInternal(null, 0, 0, 0, 0, 0);
+    }
+    
+    // Citadel: Internal method to keep compatibility with existing animator logic
+    private void setupAnimInternal(Entity entity, float limbSwing, float limbSwingAmount, float ageInTicks, float rotationYaw, float rotationPitch) {
         if (this.tabulaAnimator != null) {
             this.tabulaAnimator.setRotationAngles(this, entity, limbSwing, limbSwingAmount, ageInTicks, rotationYaw, rotationPitch, 1.0F);
         }
