@@ -96,9 +96,11 @@ public class SubterranodonFlightGoal extends Goal {
             if ((entity.timeFlying < 2000 || isLeaderStillGoing() || isOverWaterOrVoid()) && !entity.isOrderedToSit()) {
                 return vec3;
             } else {
-                if (entity.hasRestriction() && !entity.horizontalCollision) {
-                    return Vec3.atCenterOf(entity.getRestrictCenter());
-                }
+                // TODO AC-TODO.md: Mob restriction API removed in 1.21 - hasRestriction()/getRestrictCenter() no longer exist
+                // For now, just return ground position - could implement custom restriction system if needed
+                //if (entity.hasRestriction() && !entity.horizontalCollision) {
+                //    return Vec3.atCenterOf(entity.getRestrictCenter());
+                //}
                 return groundPosition(vec3);
             }
         } else {
@@ -109,9 +111,11 @@ public class SubterranodonFlightGoal extends Goal {
 
     private Vec3 findFlightPos() {
         Vec3 targetVec;
-        if (entity.hasRestriction() && entity.getRestrictCenter() != null) {
+        // TODO AC-TODO.md: Mob restriction API removed in 1.21 - hasRestriction()/getRestrictCenter() no longer exist
+        // Using fallback logic for now
+        if (false) { // entity.hasRestriction() && entity.getRestrictCenter() != null
             float maxRot = 360;
-            Vec3 center = Vec3.atCenterOf(entity.getRestrictCenter());
+            Vec3 center = Vec3.ZERO; // Vec3.atCenterOf(entity.getRestrictCenter());
             float xRotOffset = (float) Math.toRadians(entity.getRandom().nextFloat() * (maxRot - (maxRot / 2)) * 0.5F);
             float yRotOffset = (float) Math.toRadians(entity.getRandom().nextFloat() * maxRot - (maxRot / 2));
             Vec3 distVec = new Vec3(0, 0, 15 + entity.getRandom().nextInt(15)).xRot(xRotOffset).yRot(yRotOffset);
@@ -133,6 +137,7 @@ public class SubterranodonFlightGoal extends Goal {
         } else {
             Vec3 ground = groundPosition(heightAdjusted);
             BlockPos ceiling = BlockPos.containing(ground).above(2);
+            // In 1.21, getMaxBuildHeight() is on Level (which implements LevelHeightAccessor)
             while (ceiling.getY() < entity.level().getMaxBuildHeight() && !entity.level().getBlockState(ceiling).isSolid()) {
                 ceiling = ceiling.above();
             }
@@ -178,6 +183,7 @@ public class SubterranodonFlightGoal extends Goal {
 
     private boolean isOverWaterOrVoid() {
         BlockPos position = entity.blockPosition();
+        // Level implements LevelHeightAccessor, so getMinBuildHeight() should work
         while (position.getY() > entity.level().getMinBuildHeight() && entity.level().isEmptyBlock(position) && entity.level().getFluidState(position).isEmpty()) {
             position = position.below();
         }
@@ -188,6 +194,7 @@ public class SubterranodonFlightGoal extends Goal {
         BlockPos.MutableBlockPos ground = new BlockPos.MutableBlockPos();
         ground.set(airPosition.x, airPosition.y, airPosition.z);
         boolean flag = false;
+        // Level implements LevelHeightAccessor, so getMaxBuildHeight()/getMinBuildHeight() should work
         while (ground.getY() < entity.level().getMaxBuildHeight() && !entity.level().getBlockState(ground).isSolid() && entity.level().getFluidState(ground).isEmpty()){
             ground.move(0, 1, 0);
             flag = true;

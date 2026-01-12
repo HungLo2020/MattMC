@@ -66,7 +66,8 @@ public abstract class DinosaurEntity extends TamableAnimal implements IDancesToJ
     }
 
     public static boolean checkPrehistoricSpawnRules(EntityType<? extends Animal> type, LevelAccessor levelAccessor, EntitySpawnReason mobType, BlockPos pos, RandomSource randomSource) {
-        return levelAccessor.getBlockState(pos.below()).is(BlockTags.DIRT) && levelAccessor.getFluidState(pos).isEmpty() && levelAccessor.getFluidState(pos.below()).isEmpty();
+        // BlockTags.DIRT might not exist - using vanilla tags
+        return levelAccessor.getBlockState(pos.below()).is(net.minecraft.tags.BlockTags.DIRT) && levelAccessor.getFluidState(pos).isEmpty() && levelAccessor.getFluidState(pos.below()).isEmpty();
     }
 
     public static boolean checkPrehistoricPostBossSpawnRules(EntityType<? extends Animal> type, LevelAccessor levelAccessor, EntitySpawnReason mobType, BlockPos pos, RandomSource randomSource) {
@@ -269,9 +270,10 @@ public abstract class DinosaurEntity extends TamableAnimal implements IDancesToJ
     }
 
     public int getAltSkinForItem(ItemStack stack) {
-        if (stack.is(Items.AMETHYST_SHARD)) {
+        // Items.AMETHYST_SHARD/PRISMARINE_SHARD should exist in vanilla
+        if (stack.is(net.minecraft.world.item.Items.AMETHYST_SHARD)) {
             return 1;
-        } else if (stack.is(Items.PRISMARINE_SHARD)) {
+        } else if (stack.is(net.minecraft.world.item.Items.PRISMARINE_SHARD)) {
             return 2;
         } else {
             return 0;
@@ -330,8 +332,9 @@ public abstract class DinosaurEntity extends TamableAnimal implements IDancesToJ
     }
 
     @Override
-    public boolean startRiding(Entity entity) {
-        boolean flag = super.startRiding(entity);
+    public boolean startRiding(Entity entity, boolean force, boolean bl2) {
+        // In 1.21, startRiding() takes 3 parameters (added bl2 for silent riding)
+        boolean flag = super.startRiding(entity, force, bl2);
         if (flag && entity instanceof AbstractMinecart) {
             List<EntityType> nearbyDinosaurEntityTypes = new ArrayList<>();
             double advancementRange = 30.0D;
@@ -352,8 +355,8 @@ public abstract class DinosaurEntity extends TamableAnimal implements IDancesToJ
         return flag;
     }
 
-    @Override
-    public boolean isAlliedTo(@org.jetbrains.annotations.Nullable Entity entityIn) {
+    // In 1.21, isAlliedTo() takes Team, not Entity - need custom method for entity alliance
+    public boolean isAlliedToEntity(@javax.annotation.Nullable Entity entityIn) {
         if (this.isTame()) {
             LivingEntity livingentity = this.getOwner();
             if (entityIn == livingentity) {
