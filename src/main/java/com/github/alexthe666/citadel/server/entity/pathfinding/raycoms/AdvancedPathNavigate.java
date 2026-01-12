@@ -12,7 +12,8 @@ import com.github.alexthe666.citadel.server.world.WorldChunkUtil;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.Vec3i;
-import net.minecraft.network.protocol.game.DebugPackets;
+// import net.minecraft.network.protocol.game.DebugPackets; // Removed in 1.21
+import net.minecraft.tags.BlockTags;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.Mob;
@@ -22,6 +23,7 @@ import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LevelAccessor;
 import net.minecraft.world.level.block.LadderBlock;
+import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.pathfinder.*;
 import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.phys.shapes.VoxelShape;
@@ -302,7 +304,7 @@ public class AdvancedPathNavigate extends AbstractAdvancedPathNavigate {
                 }
             }
 
-            DebugPackets.sendPathFindingPacket(this.level, this.mob, this.path, this.maxDistanceToWaypoint);
+            // DebugPackets.sendPathFindingPacket(this.level, this.mob, this.path, this.maxDistanceToWaypoint); // Removed in 1.21
             if (!this.isDone()) {
                 Vec3 vector3d2 = this.getEntityPosAtNode(this.path.getNextNodeIndex());
                 BlockPos blockpos = BlockPos.containing(vector3d2);
@@ -537,7 +539,7 @@ public class AdvancedPathNavigate extends AbstractAdvancedPathNavigate {
 
 
             final BlockPos pos = new BlockPos(pEx.x, pEx.y, pEx.z);
-            if (pEx.isOnLadder() && pExNext != null && (pEx.y != pExNext.y || mob.getY() > pEx.y) && level.getBlockState(pos).isLadder(level, pos, ourEntity)) {
+            if (pEx.isOnLadder() && pExNext != null && (pEx.y != pExNext.y || mob.getY() > pEx.y) && level.getBlockState(pos).is(BlockTags.CLIMBABLE)) {
                 return handlePathPointOnLadder(pEx);
             } else if (ourEntity.isInWater()) {
                 return handleEntityInWater(oldIndex, pEx);
@@ -646,7 +648,7 @@ public class AdvancedPathNavigate extends AbstractAdvancedPathNavigate {
             }
             else
             {
-                if (level.getBlockState(entityPos.below()).isLadder(level, entityPos.below(), ourEntity)) {
+                if (level.getBlockState(entityPos.below()).is(BlockTags.CLIMBABLE)) {
                     this.ourEntity.setYya(-0.5f);
                 } else {
                     return false;

@@ -98,7 +98,7 @@ public class ACMath {
         // BlockGetter doesn't extend LevelHeightAccessor, use default of -64
         int minHeight = -64;
         if (level instanceof net.minecraft.world.level.LevelReader lr) {
-            minHeight = lr.getMinBuildHeight();
+            minHeight = ((net.minecraft.world.level.LevelHeightAccessor) lr).getMinBuildHeight();
         }
         while (pos.getY() > minHeight && level.getBlockState(pos).getCollisionShape(level, pos).isEmpty()) {
             pos = pos.below();
