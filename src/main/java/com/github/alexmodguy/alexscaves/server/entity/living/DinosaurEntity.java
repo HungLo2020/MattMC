@@ -36,6 +36,8 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LevelAccessor;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
 import net.minecraft.world.phys.Vec3;
 
 import java.util.ArrayList;
@@ -69,11 +71,11 @@ public abstract class DinosaurEntity extends TamableAnimal implements IDancesToJ
         builder.define(ALT_SKIN, 0);
     }
 
-    public static boolean checkPrehistoricSpawnRules(EntityType<? extends Animal> type, LevelAccessor levelAccessor, MobSpawnType mobType, BlockPos pos, RandomSource randomSource) {
+    public static boolean checkPrehistoricSpawnRules(EntityType<? extends Animal> type, LevelAccessor levelAccessor, EntitySpawnReason mobType, BlockPos pos, RandomSource randomSource) {
         return levelAccessor.getBlockState(pos.below()).is(ACTagRegistry.DINOSAURS_SPAWNABLE_ON) && levelAccessor.getFluidState(pos).isEmpty() && levelAccessor.getFluidState(pos.below()).isEmpty();
     }
 
-    public static boolean checkPrehistoricPostBossSpawnRules(EntityType<? extends Animal> type, LevelAccessor levelAccessor, MobSpawnType mobType, BlockPos pos, RandomSource randomSource) {
+    public static boolean checkPrehistoricPostBossSpawnRules(EntityType<? extends Animal> type, LevelAccessor levelAccessor, EntitySpawnReason mobType, BlockPos pos, RandomSource randomSource) {
         if (checkPrehistoricSpawnRules(type, levelAccessor, mobType, pos, randomSource) && levelAccessor instanceof ServerLevel serverLevel) {
             ACWorldData data = ACWorldData.get(serverLevel);
             return data != null && data.isPrimordialBossDefeatedOnce();
@@ -178,20 +180,22 @@ public abstract class DinosaurEntity extends TamableAnimal implements IDancesToJ
         super.travel(vec3d);
     }
 
-    public void addAdditionalSaveData(CompoundTag compound) {
-        super.addAdditionalSaveData(compound);
-        compound.putInt("Command", this.getCommand());
-        compound.putBoolean("Egg", this.hasEgg());
-        compound.putInt("AltSkin", this.getAltSkin());
+    @Override
+    protected void addAdditionalSaveData(ValueOutput valueOutput) {
+        super.addAdditionalSaveData(valueOutput);
+        valueOutput.putInt("Command", this.getCommand());
+        valueOutput.putBoolean("Egg", this.hasEgg());
+        valueOutput.putInt("AltSkin", this.getAltSkin());
     }
 
-    public void readAdditionalSaveData(CompoundTag compound) {
-        super.readAdditionalSaveData(compound);
-        this.setCommand(compound.getInt("Command"));
-        this.setHasEgg(compound.getBoolean("Egg"));
-        int altSkin = compound.getInt("AltSkin");
+    @Override
+    protected void readAdditionalSaveData(ValueInput valueInput) {
+        super.readAdditionalSaveData(valueInput);
+        this.setCommand(valueInput.getInt("Command").orElse(0));
+        this.setHasEgg(valueInput.getBoolean("Egg").orElse(false));
+        int altSkin = valueInput.getInt("AltSkin").orElse(0);
         //compatibility with pre 1.1.0 saves
-        if (compound.contains("Retro") && compound.getBoolean("Retro")) {
+        if (valueInput.getBoolean("Retro").orElse(false)) {
             altSkin = 1;
         }
         this.setAltSkin(altSkin);
@@ -240,7 +244,7 @@ public abstract class DinosaurEntity extends TamableAnimal implements IDancesToJ
                 BlockPos ground = BlockPos.containing(ACMath.getGroundBelowPosition(level(), new Vec3(Mth.floor(this.getX() + extraX), Mth.floor(this.getY() + extraY), Mth.floor(this.getZ() + extraZ))));
                 BlockState groundState = this.level().getBlockState(ground.below());
                 if (groundState.isSolid()) {
-                    if (level().isClientSide) {
+                    if (level().isClientSide()) {
                         level().addParticle(new BlockParticleOption(ParticleTypes.BLOCK, groundState), true, this.getX() + extraX, ground.getY(), this.getZ() + extraZ, motionX, motionY, motionZ);
                     }
                 }
@@ -293,7 +297,7 @@ public abstract class DinosaurEntity extends TamableAnimal implements IDancesToJ
             if (altSkinFromItem > 0) {
                 this.usePlayerItem(player, hand, itemstack);
                 this.playSound(altSkinFromItem == 2 ? ACSoundRegistry.TECTONIC_SHARD_TRANSFORM.get() : ACSoundRegistry.AMBER_MONOLITH_SUMMON.get());
-                if (!level().isClientSide) {
+                if (!level().isClientSide()) {
                     if(altSkinFromItem == this.getAltSkin()){
                         this.setAltSkin(0);
                     }else{
@@ -320,7 +324,7 @@ public abstract class DinosaurEntity extends TamableAnimal implements IDancesToJ
                     if (this.getType() == ACEntityRegistry.SUBTERRANODON.get() && this.canAddPassenger(player)) {
                         this.moveTo(this.getX(), this.getY() + player.getBbHeight() + 0.5F, this.getZ());
                     }
-                    if (!level().isClientSide && player.startRiding(this)) {
+                    if (!level().isClientSide() && player.startRiding(this)) {
                         return InteractionResult.CONSUME;
                     }
                     return InteractionResult.SUCCESS;

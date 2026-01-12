@@ -104,7 +104,7 @@ public class SubterranodonEntity extends DinosaurEntity implements PackAnimal, F
         prevTailYaw = this.yBodyRot;
     }
 
-    public static boolean checkSubterranodonSpawnRules(EntityType<? extends Animal> type, LevelAccessor levelAccessor, MobSpawnType mobType, BlockPos pos, RandomSource randomSource) {
+    public static boolean checkSubterranodonSpawnRules(EntityType<? extends Animal> type, LevelAccessor levelAccessor, EntitySpawnReason mobType, BlockPos pos, RandomSource randomSource) {
         BlockState below = levelAccessor.getBlockState(pos.below());
         return (below.is(ACTagRegistry.DINOSAURS_SPAWNABLE_ON) || below.is(ACBlockRegistry.PEWEN_BRANCH.get()) || below.is(BlockTags.LEAVES)) && levelAccessor.getFluidState(pos).isEmpty() && levelAccessor.getFluidState(pos.below()).isEmpty();
     }
@@ -217,7 +217,7 @@ public class SubterranodonEntity extends DinosaurEntity implements PackAnimal, F
                 this.setHovering(false);
                 this.setFlying(false);
             }
-            if (!level().isClientSide && this.onGround()) {
+            if (!!level().isClientSide() && this.onGround()) {
                 LivingEntity target = this.getTarget();
                 if (target != null && target.isAlive()) {
                     this.setHovering(false);
@@ -240,7 +240,7 @@ public class SubterranodonEntity extends DinosaurEntity implements PackAnimal, F
                 }
             }
         }
-        if (!level().isClientSide) {
+        if (!!level().isClientSide()) {
             this.setHovering(isHoveringFromServer() && isFlying());
             if (this.isHovering() && isFlying() && this.isAlive() && !this.isVehicle()) {
                 if (timeFlying < 30) {

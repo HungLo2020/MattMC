@@ -6,21 +6,31 @@ import com.github.alexmodguy.alexscaves.client.render.entity.layer.Subterranodon
 import com.github.alexmodguy.alexscaves.server.entity.living.SubterranodonEntity;
 import net.minecraft.client.renderer.entity.EntityRendererProvider;
 import net.minecraft.client.renderer.entity.MobRenderer;
+import net.minecraft.client.renderer.entity.state.LivingEntityRenderState;
 import net.minecraft.resources.ResourceLocation;
 
-public class SubterranodonRenderer extends MobRenderer<SubterranodonEntity, SubterranodonModel> {
+// TODO: Create custom SubterranodonRenderState extending LivingEntityRenderState
+// For now using base LivingEntityRenderState
+public class SubterranodonRenderer extends MobRenderer<SubterranodonEntity, LivingEntityRenderState, SubterranodonModel> {
     private static final ResourceLocation TEXTURE = ResourceLocation.fromNamespaceAndPath(AlexsCaves.MODID, "textures/entity/subterranodon.png");
     private static final ResourceLocation TEXTURE_RETRO = ResourceLocation.fromNamespaceAndPath(AlexsCaves.MODID, "textures/entity/subterranodon_retro.png");
     private static final ResourceLocation TEXTURE_TECTONIC = ResourceLocation.fromNamespaceAndPath(AlexsCaves.MODID, "textures/entity/subterranodon_tectonic.png");
 
     public SubterranodonRenderer(EntityRendererProvider.Context renderManagerIn) {
         super(renderManagerIn, new SubterranodonModel(), 0.5F);
-        this.addLayer(new SubterranodonRiderLayer(this));
-
+        // TODO: Fix layer to work with render state system
+        // this.addLayer(new SubterranodonRiderLayer(this));
     }
 
-    public ResourceLocation getTextureLocation(SubterranodonEntity entity) {
-        return entity.getAltSkin() == 1 ? TEXTURE_RETRO : entity.getAltSkin() == 2 ? TEXTURE_TECTONIC : TEXTURE;
+    @Override
+    public LivingEntityRenderState createRenderState() {
+        return new LivingEntityRenderState();
+    }
+
+    @Override
+    public ResourceLocation getTextureLocation(LivingEntityRenderState state) {
+        // TODO: Store skin variant in render state
+        return TEXTURE;
     }
 }
 

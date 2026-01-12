@@ -90,7 +90,7 @@ public class DinosaurSpiritEntity extends Entity {
         if (this.isFading() && fadeIn <= 0) {
             this.discard();
         }
-        if (level().isClientSide) {
+        if (!level().isClientSide()) {
             this.level().addParticle(ParticleTypes.FLAME, this.getRandomX(1.0F), this.getRandomY(), this.getRandomZ(1.0F), 0, 0, 0);
         }
         this.move(MoverType.SELF, this.getDeltaMovement());
@@ -110,7 +110,7 @@ public class DinosaurSpiritEntity extends Entity {
                     break;
             }
         }
-        if (this.level().isClientSide) {
+        if (!this.level().isClientSide()) {
             if (this.lSteps > 0) {
                 double d5 = this.getX() + (this.lx - this.getX()) / (double) this.lSteps;
                 double d6 = this.getY() + (this.ly - this.getY()) / (double) this.lSteps;
@@ -161,7 +161,7 @@ public class DinosaurSpiritEntity extends Entity {
         this.setXRot(10);
         this.setDeltaMovement(orbitTarget.scale(0.25F));
         this.noPhysics = true;
-        if(!level().isClientSide && !player.getUseItem().is(ACItemRegistry.EXTINCTION_SPEAR.get())){
+        if(!!level().isClientSide() && !player.getUseItem().is(ACItemRegistry.EXTINCTION_SPEAR.get())){
             this.setFading(true);
         }
     }
@@ -222,7 +222,7 @@ public class DinosaurSpiritEntity extends Entity {
         if (id == null) {
             return null;
         } else {
-            if (level().isClientSide) {
+            if (!level().isClientSide()) {
                 return level().getPlayerByUUID(id);
             } else {
                 return level().getServer().getPlayerList().getPlayer(id);
