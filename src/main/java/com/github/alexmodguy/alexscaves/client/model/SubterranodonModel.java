@@ -4,6 +4,7 @@ package com.github.alexmodguy.alexscaves.client.model;// Made with Blockbench 4.
 
 
 import com.github.alexmodguy.alexscaves.client.render.ColorUtil;
+import com.github.alexmodguy.alexscaves.client.render.entity.SubterranodonRenderState;
 import com.github.alexmodguy.alexscaves.server.entity.item.DinosaurSpiritEntity;
 import com.github.alexmodguy.alexscaves.server.entity.living.SubterranodonEntity;
 import com.github.alexmodguy.alexscaves.server.misc.ACMath;
@@ -17,7 +18,7 @@ import net.minecraft.util.Mth;
 import net.minecraft.world.phys.Vec3;
 import org.joml.Vector4f;
 
-public class SubterranodonModel extends AdvancedEntityModel<SubterranodonEntity> {
+public class SubterranodonModel extends AdvancedEntityModel<SubterranodonRenderState> {
     private final AdvancedModelBox body;
     private final AdvancedModelBox neck;
     private final AdvancedModelBox head;
@@ -135,26 +136,26 @@ public class SubterranodonModel extends AdvancedEntityModel<SubterranodonEntity>
     }
 
     @Override
-    public void setupAnim(SubterranodonEntity entity, float limbSwing, float limbSwingAmount, float ageInTicks, float netHeadYaw, float headPitch) {
+    public void setupAnim(SubterranodonRenderState renderState) {
         this.resetToDefaultPose();
         float walkSpeed = 1F;
         float walkDegree = 1F;
-        float partialTick = ageInTicks - entity.tickCount;
-        float flyProgress = entity.getFlyProgress(partialTick);
-        float buryEggsAmount = entity.getBuryEggsProgress(partialTick);
+        // All animation values should come from the render state
+        // For now, use default values until render state is properly populated
+        float flyProgress = renderState.isFlying ? 1.0F : 0.0F;
+        float buryEggsAmount = 0.0F;  // TODO: Add to render state
         float groundProgress = 1F - flyProgress;
-        float flapAmount = flyProgress * entity.getFlapAmount(partialTick);
-        float groundStill = groundProgress * (1F - limbSwingAmount);
-        float groundMove = groundProgress * limbSwingAmount;
+        float flapAmount = renderState.flapProgress;
+        float groundStill = groundProgress * (1F - renderState.walkAnimationSpeed);
+        float groundMove = groundProgress * renderState.walkAnimationSpeed;
         float glide = flyProgress * (1 - flapAmount);
-        float hoverProgress = flyProgress * entity.getHoverProgress(partialTick);
-        float openMouthProgress = entity.getBiteProgress(partialTick);
-        float sitProgress = entity.getSitProgress(partialTick) * groundProgress;
-        float rollAmount = entity.getFlightRoll(partialTick) / 57.295776F * flyProgress;
-        float pitchAmount = entity.getFlightPitch(partialTick) / 57.295776F * (flyProgress - hoverProgress);
-        float yaw = entity.yBodyRotO + (entity.yBodyRot - entity.yBodyRotO) * partialTick;
-        float tailYaw = Mth.wrapDegrees(entity.getTailYaw(partialTick) - yaw) / 57.295776F;
-        float danceAmount = entity.getDanceProgress(partialTick);
+        float hoverProgress = 0.0F; // TODO: Add to render state
+        float openMouthProgress = renderState.attackProgress;
+        float sitProgress = renderState.sitProgress * groundProgress;
+        float rollAmount = 0.0F; // TODO: Add to render state
+        float pitchAmount = 0.0F; // TODO: Add to render state
+        float tailYaw = 0.0F; // TODO: Add to render state
+        float danceAmount = renderState.danceProgress;
         float danceSpeed = 0.5F;
         progressPositionPrev(body, groundProgress, 0, -8, 2, 1F);
         progressPositionPrev(rwing, groundProgress, 3, -1, 1, 1F);
@@ -190,7 +191,7 @@ public class SubterranodonModel extends AdvancedEntityModel<SubterranodonEntity>
         progressRotationPrev(rwing, sitProgress, (float) Math.toRadians(40), (float) Math.toRadians(20), (float) Math.toRadians(-20), 1F);
         progressRotationPrev(lhand, sitProgress, (float) Math.toRadians(20), 0, 0, 1F);
         progressRotationPrev(rhand, sitProgress, (float) Math.toRadians(20), 0, 0, 1F);
-        animateFlight(ageInTicks, flyProgress, hoverProgress, glide, flapAmount, entity.isVehicle(), true);
+        animateFlight(renderState.ageInTicks, flyProgress, hoverProgress, glide, flapAmount, false, true);
         if (buryEggsAmount > 0.0F) {
             limbSwing = ageInTicks;
             groundMove = buryEggsAmount * 0.5F;
@@ -215,11 +216,11 @@ public class SubterranodonModel extends AdvancedEntityModel<SubterranodonEntity>
         this.bob(body, walkSpeed * 2F, walkDegree * 3, false, limbSwing, groundMove);
         this.bob(neck, 0.1F, 0.5F, false, ageInTicks, 1);
         this.faceTarget(netHeadYaw, headPitch, 1, head, neck);
-        this.swing(neck, danceSpeed, 0.5F, true, 0F, 0F, ageInTicks, danceAmount);
-        this.swing(head, danceSpeed, 0.25F, true, 1F, 0F, ageInTicks, danceAmount);
-        this.flap(head, danceSpeed, 0.25F, true, 1F, 0F, ageInTicks, danceAmount);
-        this.walk(jaw, danceSpeed, 0.25F, false, 2F, 0.2F, ageInTicks, danceAmount);
-        this.swing(body, danceSpeed, 0.1F, false, 1, 0, ageInTicks, danceAmount);
+        this.swing(neck, danceSpeed, 0.5F, true, 0F, 0F, renderState.ageInTicks, danceAmount);
+        this.swing(head, danceSpeed, 0.25F, true, 1F, 0F, renderState.ageInTicks, danceAmount);
+        this.flap(head, danceSpeed, 0.25F, true, 1F, 0F, renderState.ageInTicks, danceAmount);
+        this.walk(jaw, danceSpeed, 0.25F, false, 2F, 0.2F, renderState.ageInTicks, danceAmount);
+        this.swing(body, danceSpeed, 0.1F, false, 1, 0, renderState.ageInTicks, danceAmount);
         body.rotateAngleX += pitchAmount;
         body.rotateAngleZ += rollAmount;
         tail.rotateAngleY += tailYaw * 0.8F;

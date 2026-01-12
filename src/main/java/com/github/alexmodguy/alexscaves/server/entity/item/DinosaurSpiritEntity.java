@@ -1,14 +1,12 @@
 package com.github.alexmodguy.alexscaves.server.entity.item;
 
-import com.github.alexmodguy.alexscaves.server.entity.ACEntityRegistry;
-import com.github.alexmodguy.alexscaves.server.item.ACItemRegistry;
-import com.github.alexmodguy.alexscaves.server.misc.ACSoundRegistry;
 import net.minecraft.commands.arguments.EntityAnchorArgument;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
+import net.minecraft.sounds.SoundEvents;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
@@ -70,7 +68,7 @@ public class DinosaurSpiritEntity extends Entity {
             this.setDelaySpawn(this.getDelaySpawn() - 1);
             this.fadeIn = 0;
             if(this.getDelaySpawn() == 0){
-                this.playSound(ACSoundRegistry.EXTINCTION_SPEAR_SUMMON.get(), 1.0F, 1.0F);
+                this.playSound(SoundEvents.ENDER_DRAGON_GROWL, 1.0F, 1.0F);
             }
             return;
         }
