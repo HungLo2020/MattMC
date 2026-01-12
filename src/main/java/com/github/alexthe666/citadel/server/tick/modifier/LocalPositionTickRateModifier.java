@@ -16,7 +16,11 @@ public class LocalPositionTickRateModifier extends LocalTickRateModifier {
 
     public LocalPositionTickRateModifier(CompoundTag tag) {
         super(tag);
-        this.center = new Vec3(tag.getDouble("CenterX"), tag.getDouble("CenterY"), tag.getDouble("CenterZ"));
+        this.center = new Vec3(
+            tag.getDouble("CenterX").orElse(0.0), 
+            tag.getDouble("CenterY").orElse(0.0), 
+            tag.getDouble("CenterZ").orElse(0.0)
+        );
     }
 
     @Override
