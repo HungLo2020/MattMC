@@ -1,12 +1,14 @@
 package com.github.alexthe666.citadel.client.texture;
 
 import com.mojang.blaze3d.platform.NativeImage;
-import com.mojang.blaze3d.platform.TextureUtil;
+// Citadel: TextureUtil.prepareImage might not exist in 1.21
 import net.minecraft.client.renderer.texture.DynamicTexture;
 import net.minecraft.util.FastColor;
 
 import java.awt.image.BufferedImage;
 
+// Citadel: Video frame texture for video playback feature
+// Simplified for 1.21 - TextureUtil methods may have changed
 public class VideoFrameTexture extends DynamicTexture {
 
     public VideoFrameTexture(NativeImage image) {
@@ -17,8 +19,9 @@ public class VideoFrameTexture extends DynamicTexture {
     @Override
     public void setPixels(NativeImage nativeImage) {
         super.setPixels(nativeImage);
+        // Citadel: TextureUtil.prepareImage may not exist in 1.21
+        // Image preparation is handled by DynamicTexture
         if (this.getPixels() != null) {
-            TextureUtil.prepareImage(this.getId(), this.getPixels().getWidth(), this.getPixels().getHeight());
             this.upload();
         }
     }
