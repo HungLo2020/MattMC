@@ -42,12 +42,9 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.player.PlayerModelPart;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
-// Citadel: Using Fabric event callbacks instead of NeoForge events
-import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
-import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderEvents;
-import net.fabricmc.fabric.api.client.screen.v1.ScreenEvents;
-import net.fabricmc.fabric.api.client.screen.v1.ScreenKeyboardEvents;
-import com.github.alexthe666.citadel.server.event.TriState;
+// Citadel: Using custom event system since this is a Minecraft fork, not a Fabric mod
+// TODO: Wire these events into vanilla Minecraft classes directly
+import com.github.alexthe666.citadel.server.event.EventMergeStructureSpawns.TriState;
 
 import java.awt.*;
 import java.io.IOException;
@@ -75,7 +72,7 @@ public class ClientProxy extends ServerProxy {
         } catch (IOException e) {
             e.printStackTrace();
         }
-        BlockEntityRenderers.register(Citadel.LECTERN_BE.get(), CitadelLecternRenderer::new);
+        BlockEntityRenderers.register(Citadel.LECTERN_BE, CitadelLecternRenderer::new);
         CitadelPatreonRenderer.register("citadel", new SpaceStationPatreonRenderer(ResourceLocation.parse("citadel:patreon_space_station"), new int[]{}));
         CitadelPatreonRenderer.register("citadel_red", new SpaceStationPatreonRenderer(ResourceLocation.parse("citadel:patreon_space_station_red"), new int[]{0XB25048, 0X9D4540, 0X7A3631, 0X71302A}));
         CitadelPatreonRenderer.register("citadel_gray", new SpaceStationPatreonRenderer(ResourceLocation.parse("citadel:patreon_space_station_gray"), new int[]{0XA0A0A0, 0X888888, 0X646464, 0X575757}));
@@ -83,56 +80,26 @@ public class ClientProxy extends ServerProxy {
             PostEffectRegistry.registerEffect(RAINBOW_AURA_POST_SHADER);
         }
         
-        // Citadel: Wire Fabric event callbacks
-        registerFabricEvents();
+        // Citadel: Event wiring will be done by modifying vanilla Minecraft classes directly
+        // Since this is a Minecraft fork, not a Fabric mod, we don't have Fabric API
+        // TODO: Add hooks in Minecraft.java, Screen.java, etc. to call these methods
     }
     
-    private void registerFabricEvents() {
-        // Client tick event
-        ClientTickEvents.START_CLIENT_TICK.register(client -> {
-            if (!isGamePaused() && client.isRunning() && client.level != null && client.player != null) {
-                ClientTickRateTracker.getForClient(client).masterTick();
-                tickMouseOverAnimations();
-            }
-            if (!isGamePaused() && CitadelConstants.isAprilFools()) {
-                if (aprilFoolsTetrisGame != null) {
-                    if (client.screen instanceof TitleScreen) {
-                        aprilFoolsTetrisGame.tick();
-                    } else {
-                        aprilFoolsTetrisGame.reset();
-                    }
+    // Citadel: This method would be called from vanilla Minecraft.tick() via direct modification
+    public void onClientTick() {
+        if (!isGamePaused() && Minecraft.getInstance().isRunning() && Minecraft.getInstance().level != null && Minecraft.getInstance().player != null) {
+            ClientTickRateTracker.getForClient(Minecraft.getInstance()).masterTick();
+            tickMouseOverAnimations();
+        }
+        if (!isGamePaused() && CitadelConstants.isAprilFools()) {
+            if (aprilFoolsTetrisGame != null) {
+                if (Minecraft.getInstance().screen instanceof TitleScreen) {
+                    aprilFoolsTetrisGame.tick();
+                } else {
+                    aprilFoolsTetrisGame.reset();
                 }
             }
-        });
-        
-        // Screen initialization events
-        ScreenEvents.AFTER_INIT.register((client, screen, scaledWidth, scaledHeight) -> {
-            if (screen instanceof SkinCustomizationScreen && client.player != null) {
-                try {
-                    String username = client.player.getName().getString();
-                    int height = -20;
-                    if (Citadel.PATREONS.contains(username)) {
-                        Button button1 = Button.builder(Component.translatable("citadel.gui.patreon_rewards_option").withStyle(ChatFormatting.GREEN), (p_213080_2_) -> client.setScreen(new GuiCitadelPatreonConfig(screen, client.options))).size(200, 20).pos(screen.width / 2 - 100, screen.height / 6 + 150 + height).build();
-                        ScreenEvents.BEFORE_RENDER.register(screen, (s, guiGraphics, mouseX, mouseY, delta) -> {});
-                        height += 25;
-                    }
-                    if (!CitadelCapes.getCapesFor(client.player.getUUID()).isEmpty()) {
-                        Button button2 = Button.builder(Component.translatable("citadel.gui.capes_option").withStyle(ChatFormatting.GREEN), (p_213080_2_) -> client.setScreen(new GuiCitadelCapesConfig(screen, client.options))).size(200, 20).pos(screen.width / 2 - 100, screen.height / 6 + 150 + height).build();
-                        height += 25;
-                    }
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
-            }
-        });
-        
-        // World rendering events for pathfinding debug
-        WorldRenderEvents.AFTER_ENTITIES.register(context -> {
-            if (Pathfinding.isDebug()) {
-                // WorldEventContext.INSTANCE.renderWorldLastEvent would go here
-                // TODO: Adapt for Fabric WorldRenderContext
-            }
-        });
+        }
     }
     // Citadel: Converted from NeoForge @SubscribeEvent to Fabric callback (called from registerFabricEvents)
     public void screenOpen(net.minecraft.client.gui.screens.Screen screen) {
@@ -175,13 +142,14 @@ public class ClientProxy extends ServerProxy {
         }
         if (Citadel.PATREONS.contains(username)) {
             CompoundTag tag = CitadelEntityData.getOrCreateCitadelTag(Minecraft.getInstance().player);
-            String rendererName = tag.contains("CitadelFollowerType") ? tag.getString("CitadelFollowerType") : "citadel";
+            // Citadel: CompoundTag methods now return Optional in 1.21
+            String rendererName = tag.contains("CitadelFollowerType") ? tag.getString("CitadelFollowerType").orElse("citadel") : "citadel";
             if (!rendererName.equals("none") && !hideFollower) {
                 CitadelPatreonRenderer renderer = CitadelPatreonRenderer.get(rendererName);
                 if (renderer != null) {
-                    float distance = tag.contains("CitadelRotateDistance") ? tag.getFloat("CitadelRotateDistance") : 2F;
-                    float speed = tag.contains("CitadelRotateSpeed") ? tag.getFloat("CitadelRotateSpeed") : 0F;
-                    float height = tag.contains("CitadelRotateHeight") ? tag.getFloat("CitadelRotateHeight") : 1F;
+                    float distance = tag.contains("CitadelRotateDistance") ? tag.getFloat("CitadelRotateDistance").orElse(2F) : 2F;
+                    float speed = tag.contains("CitadelRotateSpeed") ? tag.getFloat("CitadelRotateSpeed").orElse(0F) : 0F;
+                    float height = tag.contains("CitadelRotateHeight") ? tag.getFloat("CitadelRotateHeight").orElse(1F) : 1F;
                     renderer.render(poseStack, bufferSource, packedLight, partialTick, player, distance, speed, height);
                 }
             }
@@ -204,13 +172,29 @@ public class ClientProxy extends ServerProxy {
                     MutableComponent title = Component.translatable("selectWorld.backupQuestion.experimental");
 
                     if (confirmBackupScreen.getTitle().equals(title)) {
-                        confirmBackupScreen.onProceed.proceed(false, true);
+                        // Citadel: Use reflection to access protected field onProceed
+                        try {
+                            var field = BackupConfirmScreen.class.getDeclaredField("onProceed");
+                            field.setAccessible(true);
+                            var onProceed = (BackupConfirmScreen.Listener) field.get(confirmBackupScreen);
+                            onProceed.proceed(false, true);
+                        } catch (Exception reflectionEx) {
+                            // If reflection fails, just skip
+                        }
                     }
                 }
                 if (screen instanceof ConfirmScreen confirmScreen) {
                     MutableComponent title = Component.translatable("selectWorld.backupQuestion.experimental");
                     if (confirmScreen.getTitle().equals(title)) {
-                        confirmScreen.callback.accept(true);
+                        // Citadel: Use reflection to access protected field callback
+                        try {
+                            var field = ConfirmScreen.class.getDeclaredField("callback");
+                            field.setAccessible(true);
+                            var callback = (java.util.function.Consumer<Boolean>) field.get(confirmScreen);
+                            callback.accept(true);
+                        } catch (Exception reflectionEx) {
+                            // If reflection fails, just skip
+                        }
                     }
                 }
             } catch (Exception e) {
