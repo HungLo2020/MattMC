@@ -185,11 +185,11 @@ public abstract class DinosaurEntity extends TamableAnimal implements IDancesToJ
     @Override
     protected void readAdditionalSaveData(ValueInput valueInput) {
         super.readAdditionalSaveData(valueInput);
-        this.setCommand(valueInput.getInt("Command").orElse(0));
-        this.setHasEgg(valueInput.getBoolean("Egg").orElse(false));
-        int altSkin = valueInput.getInt("AltSkin").orElse(0);
+        this.setCommand(valueInput.getIntOr("Command", 0));
+        this.setHasEgg(valueInput.getBooleanOr("Egg", false));
+        int altSkin = valueInput.getIntOr("AltSkin", 0);
         //compatibility with pre 1.1.0 saves
-        if (valueInput.getBoolean("Retro").orElse(false)) {
+        if (valueInput.getBooleanOr("Retro", false)) {
             altSkin = 1;
         }
         this.setAltSkin(altSkin);
@@ -316,7 +316,8 @@ public abstract class DinosaurEntity extends TamableAnimal implements IDancesToJ
                     return InteractionResult.SUCCESS;
                 } else if (canOwnerMount(player)) {
                     if (this.getType() == EntityType.SUBTERRANODON && this.canAddPassenger(player)) {
-                        this.moveTo(this.getX(), this.getY() + player.getBbHeight() + 0.5F, this.getZ());
+                        // moveTo changed in 1.21 - use setPos instead
+                        this.setPos(this.getX(), this.getY() + player.getBbHeight() + 0.5F, this.getZ());
                     }
                     if (!level().isClientSide() && player.startRiding(this)) {
                         return InteractionResult.CONSUME;
@@ -328,8 +329,9 @@ public abstract class DinosaurEntity extends TamableAnimal implements IDancesToJ
         return type;
     }
 
-    public boolean startRiding(Entity entity, boolean force) {
-        boolean flag = super.startRiding(entity, force);
+    @Override
+    public boolean startRiding(Entity entity) {
+        boolean flag = super.startRiding(entity);
         if (flag && entity instanceof AbstractMinecart) {
             List<EntityType> nearbyDinosaurEntityTypes = new ArrayList<>();
             double advancementRange = 30.0D;
@@ -351,7 +353,7 @@ public abstract class DinosaurEntity extends TamableAnimal implements IDancesToJ
     }
 
     @Override
-    public boolean isAlliedTo(Entity entityIn) {
+    public boolean isAlliedTo(@org.jetbrains.annotations.Nullable Entity entityIn) {
         if (this.isTame()) {
             LivingEntity livingentity = this.getOwner();
             if (entityIn == livingentity) {
