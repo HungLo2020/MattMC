@@ -17,10 +17,10 @@ public abstract class TickRateModifier {
     }
 
     public TickRateModifier(CompoundTag tag) {
-        this.type = TickRateModifierType.fromId(tag.contains("TickRateType") ? tag.getInt("TickRateType") : 0);
-        this.maxDuration = tag.contains("MaxDuration") ? tag.getFloat("MaxDuration") : 0F;
-        this.duration = tag.contains("Duration") ? tag.getFloat("Duration") : 0F;
-        this.tickRateMultiplier = tag.contains("SpeedMultiplier") ? tag.getFloat("SpeedMultiplier") : 1F;
+        this.type = TickRateModifierType.fromId(tag.getInt("TickRateType").orElse(0));
+        this.maxDuration = tag.getFloat("MaxDuration").orElse(0F);
+        this.duration = tag.getFloat("Duration").orElse(0F);
+        this.tickRateMultiplier = tag.getFloat("SpeedMultiplier").orElse(1F);
     }
 
     public TickRateModifierType getType() {
@@ -53,7 +53,7 @@ public abstract class TickRateModifier {
     }
 
     public static TickRateModifier fromTag(CompoundTag tag) {
-        TickRateModifierType typeFromNbt = TickRateModifierType.fromId(tag.contains("TickRateType") ? tag.getInt("TickRateType") : 0);
+        TickRateModifierType typeFromNbt = TickRateModifierType.fromId(tag.getInt("TickRateType").orElse(0));
         try {
             return typeFromNbt.getTickRateClass().getConstructor(CompoundTag.class).newInstance(tag);
         } catch (Exception e) {

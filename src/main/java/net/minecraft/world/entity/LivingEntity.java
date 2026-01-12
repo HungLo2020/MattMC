@@ -185,8 +185,25 @@ public abstract class LivingEntity extends Entity implements Attackable, Waypoin
 	private static final EntityDataAccessor<Optional<BlockPos>> SLEEPING_POS_ID = SynchedEntityData.defineId(
 		LivingEntity.class, EntityDataSerializers.OPTIONAL_BLOCK_POS
 	);
+	// Citadel: Custom EntityDataSerializer for CompoundTag (inlined from LivingEntityMixin)
+	private static final EntityDataSerializer<net.minecraft.nbt.CompoundTag> CITADEL_COMPOUND_TAG_SERIALIZER = new EntityDataSerializer<net.minecraft.nbt.CompoundTag>() {
+		@Override
+		public StreamCodec<? super net.minecraft.network.RegistryFriendlyByteBuf, net.minecraft.nbt.CompoundTag> codec() {
+			return new StreamCodec<net.minecraft.network.RegistryFriendlyByteBuf, net.minecraft.nbt.CompoundTag>() {
+				public net.minecraft.nbt.CompoundTag decode(net.minecraft.network.RegistryFriendlyByteBuf buf) {
+					return buf.readNbt();
+				}
+				public void encode(net.minecraft.network.RegistryFriendlyByteBuf buf, net.minecraft.nbt.CompoundTag tag) {
+					buf.writeNbt(tag);
+				}
+			};
+		}
+		public net.minecraft.nbt.CompoundTag copy(net.minecraft.nbt.CompoundTag tag) {
+			return tag.copy();
+		}
+	};
 	// Citadel: Entity data for storing custom Citadel data (inlined from LivingEntityMixin)
-	private static final EntityDataAccessor<net.minecraft.nbt.CompoundTag> CITADEL_DATA = SynchedEntityData.defineId(LivingEntity.class, EntityDataSerializers.COMPOUND_TAG);
+	private static final EntityDataAccessor<net.minecraft.nbt.CompoundTag> CITADEL_DATA = SynchedEntityData.defineId(LivingEntity.class, CITADEL_COMPOUND_TAG_SERIALIZER);
 	private static final int PARTICLE_FREQUENCY_WHEN_INVISIBLE = 15;
 	protected static final EntityDimensions SLEEPING_DIMENSIONS = EntityDimensions.fixed(0.2F, 0.2F).withEyeHeight(0.2F);
 	public static final float EXTRA_RENDER_CULLING_SIZE_WITH_BIG_HAT = 0.5F;
@@ -767,7 +784,7 @@ public abstract class LivingEntity extends Entity implements Attackable, Waypoin
 		// Citadel: Save Citadel data (inlined from LivingEntityMixin)
 		net.minecraft.nbt.CompoundTag citadelData = getCitadelEntityData();
 		if (citadelData != null && !citadelData.isEmpty()) {
-			valueOutput.write("CitadelData", net.minecraft.nbt.CompoundTag.CODEC, citadelData);
+			valueOutput.store("CitadelData", net.minecraft.nbt.CompoundTag.CODEC, citadelData);
 		}
 	}
 

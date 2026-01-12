@@ -29,10 +29,10 @@ public abstract class LocalTickRateModifier extends TickRateModifier {
 
     public LocalTickRateModifier(CompoundTag tag) {
         super(tag);
-        this.range = tag.contains("Range") ? tag.getDouble("Range") : 0.0;
+        this.range = tag.getDouble("Range").orElse(0.0);
         ResourceKey<Level> dimFromTag = Level.OVERWORLD;
         if(tag.contains("Dimension")){
-            String dimStr = tag.contains("dimension") ? tag.getString("dimension") : "minecraft:overworld";
+            String dimStr = tag.getString("dimension").orElse("minecraft:overworld");
             dimFromTag = ResourceKey.create(Registries.DIMENSION, ResourceLocation.parse(dimStr));
         }
         this.dimension = dimFromTag;
