@@ -3,6 +3,29 @@
 ## Overview
 This document tracks the implementation status of the Subteranadon mob from Alex's Caves mod into MattMC.
 
+## IMPORTANT NOTE
+This is an **EXTREMELY LARGE** task that requires:
+- Copying and adapting 100+ Java files from both Citadel and AlexsCaves
+- Removing all Forge/NeoForge dependencies (DeferredRegister, DeferredHolder, @EventBusSubscriber, etc.)
+- Replacing all mixins with direct source code modifications
+- Converting all registry systems to direct Minecraft registry calls
+- Adapting all mappings to match MattMC's codebase
+- Creating proper JSON files for models, textures, loot tables, recipes, etc.
+- Registering everything directly in Minecraft's EntityType, Items, DefaultAttributes classes
+
+**Estimated scope**: 50-100 hours of work for a complete implementation
+
+## Current Status
+**PHASE: Initial Planning and Structure**
+
+The Subteranadon implementation requires a massive dependency tree:
+1. Citadel animation/model system (~20 files)
+2. Citadel advanced pathfinding system (~15 files)  
+3. AlexsCaves base entity classes (~10 files)
+4. AlexsCaves AI goals (~8 files)
+5. Client rendering (~5 files)
+6. Assets (textures, models, sounds, JSONs) (~30+ files)
+
 ## Implementation Status
 
 ### Core Entity
