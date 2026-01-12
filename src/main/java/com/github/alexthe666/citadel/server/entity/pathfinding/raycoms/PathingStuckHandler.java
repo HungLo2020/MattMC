@@ -403,7 +403,7 @@ public class PathingStuckHandler implements IStuckHandler {
 
     public static Direction getFacing(final BlockPos pos, final BlockPos neighbor) {
         final BlockPos vector = neighbor.subtract(pos);
-        return Direction.getNearest(vector.getX(), vector.getY(), -vector.getZ());
+        return Direction.getNearest(vector.getX(), vector.getY(), -vector.getZ(), null);
     }
 
     /**
@@ -431,7 +431,7 @@ public class PathingStuckHandler implements IStuckHandler {
         if (state.getBlock() != Blocks.LADDER && !state.canOcclude() && world.getFluidState(pos).isEmpty()) {
             for (final Direction dir : directions) {
                 final BlockState toPlace = Blocks.LADDER.defaultBlockState().setValue(LadderBlock.FACING, dir.getOpposite());
-                if (world.getBlockState(pos.relative(dir)).isSolid() && ((BlockBehaviourAccessor) Blocks.LADDER).citadel_canSurvive(toPlace, world, pos)) {
+                if (world.getBlockState(pos.relative(dir)).isSolid() && toPlace.canSurvive(world, pos)) {
                     world.setBlockAndUpdate(pos, toPlace);
                     break;
                 }

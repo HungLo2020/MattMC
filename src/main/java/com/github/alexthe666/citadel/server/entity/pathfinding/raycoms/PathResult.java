@@ -173,9 +173,9 @@ public class PathResult<T extends Callable<Path>>
                 Citadel.LOGGER.error("Mod tried to move an entity from non server thread",e);
             } catch (RuntimeException e) {
                 threadException = true;
-                Citadel.LOGGER.catching(e);
+                Citadel.LOGGER.error("RuntimeException in pathfinding", e);
             } catch (Exception e) {
-                Citadel.LOGGER.catching(e);
+                Citadel.LOGGER.error("Exception in pathfinding", e);
             }
         }
     }
@@ -198,7 +198,7 @@ public class PathResult<T extends Callable<Path>>
         }
         catch (InterruptedException | ExecutionException e)
         {
-            Citadel.LOGGER.catching(e);
+            Citadel.LOGGER.error("Exception processing pathfinding calculation", e);
         }
     }
 

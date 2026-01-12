@@ -161,7 +161,7 @@ public abstract class AbstractPathJob implements Callable<Path> {
         this.restrictionType = AbstractAdvancedPathNavigate.RestrictionType.NONE;
         this.hardXzRestriction = false;
 
-        this.world = new ChunkCache(world, new BlockPos(minX, world.getMinBuildHeight(), minZ), new BlockPos(maxX, world.getMaxBuildHeight(), maxZ), range, world.dimensionType());
+        this.world = new ChunkCache(world, new BlockPos(minX, ((net.minecraft.world.level.LevelHeightAccessor) world).getMinBuildHeight(), minZ), new BlockPos(maxX, ((net.minecraft.world.level.LevelHeightAccessor) world).getMaxBuildHeight(), maxZ), range);
 
         this.start = new BlockPos(start);
         this.end = end;
@@ -258,7 +258,7 @@ public abstract class AbstractPathJob implements Callable<Path> {
         this.restrictionType = restrictionType;
         this.hardXzRestriction = hardRestriction;
 
-        this.world = new ChunkCache(world, new BlockPos(minX, world.getMinBuildHeight(), minZ), new BlockPos(maxX, world.getMaxBuildHeight(), maxZ), range, world.dimensionType());
+        this.world = new ChunkCache(world, new BlockPos(minX, ((net.minecraft.world.level.LevelHeightAccessor) world).getMinBuildHeight(), minZ), new BlockPos(maxX, ((net.minecraft.world.level.LevelHeightAccessor) world).getMaxBuildHeight(), maxZ), range);
 
         this.start = start;
 
@@ -290,11 +290,12 @@ public abstract class AbstractPathJob implements Callable<Path> {
             return;
         }
 
-        for (final Map.Entry<Player, UUID> entry : trackingMap.entrySet()) {
-            if (entry.getValue().equals(mob.getUUID())) {
-                PacketDistributor.sendToPlayer((ServerPlayer) entry.getKey(), new SyncPathReachedMessage(reached));
-            }
-        }
+        // Network sync commented out - not critical for pathfinding
+        // for (final Map.Entry<Player, UUID> entry : trackingMap.entrySet()) {
+        //     if (entry.getValue().equals(mob.getUUID())) {
+        //         PacketDistributor.sendToPlayer((ServerPlayer) entry.getKey(), new SyncPathReachedMessage(reached));
+        //     }
+        // }
     }
 
     /**
@@ -330,12 +331,12 @@ public abstract class AbstractPathJob implements Callable<Path> {
         }
 
         BlockState down = world.getBlockState(pos.below());
-        while (!bs.blocksMotion() && !down.blocksMotion() && !down.getBlock().isLadder(down, world, pos.below(), entity) && bs.getFluidState().isEmpty()) {
+        while (!bs.blocksMotion() && !down.blocksMotion() && !down.is(net.minecraft.tags.BlockTags.CLIMBABLE) && bs.getFluidState().isEmpty()) {
             pos.move(Direction.DOWN, 1);
             bs = down;
             down = world.getBlockState(pos.below());
 
-            if (pos.getY() < world.getMinBuildHeight()) {
+            if (pos.getY() < ((net.minecraft.world.level.LevelHeightAccessor) world).getMinBuildHeight()) {
                 return entity.blockPosition();
             }
         }
@@ -432,7 +433,7 @@ public abstract class AbstractPathJob implements Callable<Path> {
 
     public static Direction getXZFacing(final BlockPos pos, final BlockPos neighbor) {
         final BlockPos vector = neighbor.subtract(pos);
-        return Direction.getNearest(vector.getX(), 0, vector.getZ());
+        return Direction.getNearest(vector.getX(), 0, vector.getZ(), null);
     }
 
     /**
@@ -441,14 +442,15 @@ public abstract class AbstractPathJob implements Callable<Path> {
      * @param mob the tracked mob.
      */
     public void synchToClient(final LivingEntity mob) {
-        for (final Iterator<Map.Entry<Player, UUID>> iter = trackingMap.entrySet().iterator(); iter.hasNext(); ) {
-            final Map.Entry<Player, UUID> entry = iter.next();
-            if (entry.getKey().isRemoved()) {
-                iter.remove();
-            } else if (entry.getValue().equals(mob.getUUID())) {
-                PacketDistributor.sendToPlayer( (ServerPlayer) entry.getKey(), new SyncePathMessage(debugNodesVisited, debugNodesNotVisited, debugNodesPath));
-            }
-        }
+        // Network sync commented out - not critical for pathfinding
+        // for (final Iterator<Map.Entry<Player, UUID>> iter = trackingMap.entrySet().iterator(); iter.hasNext(); ) {
+        //     final Map.Entry<Player, UUID> entry = iter.next();
+        //     if (entry.getKey().isRemoved()) {
+        //         iter.remove();
+        //     } else if (entry.getValue().equals(mob.getUUID())) {
+        //         PacketDistributor.sendToPlayer( (ServerPlayer) entry.getKey(), new SyncePathMessage(debugNodesVisited, debugNodesNotVisited, debugNodesPath));
+        //     }
+        // }
     }
 
     protected boolean onLadderGoingUp(final MNode currentNode, final BlockPos dPos) {
@@ -885,7 +887,7 @@ public abstract class AbstractPathJob implements Callable<Path> {
         //  Can we traverse into this node?  Fix the y up
         final int newY = getGroundHeight(parent, pos);
 
-        if (newY < world.getMinBuildHeight()) {
+        if (newY < ((net.minecraft.world.level.LevelHeightAccessor) world).getMinBuildHeight()) {
             return false;
         }
 
@@ -1319,7 +1321,7 @@ public abstract class AbstractPathJob implements Callable<Path> {
 
                 // TODO: I'd be cool if dragons could squash multiple snow layers when walking over them
                 if (shape.isEmpty() || shape.max(Direction.Axis.Y) <= 0.125 && !isLiquid((block)) && (block.getBlock() != Blocks.SNOW || block.getValue(SnowLayerBlock.LAYERS) == 1)) {
-                    final PathType pathType = block.getBlockPathType(world, pos, null);
+                    final PathType pathType = net.minecraft.world.level.pathfinder.WalkNodeEvaluator.getPathType(world, pos);
                     return pathType == null;
                 }
                 return false;
@@ -1461,7 +1463,7 @@ public abstract class AbstractPathJob implements Callable<Path> {
      * @return true if the block is a ladder.
      */
     protected boolean isLadder(final Block block, final BlockPos pos) {
-        return block.isLadder(this.world.getBlockState(pos), world, pos, entity.get());
+        return this.world.getBlockState(pos).is(net.minecraft.tags.BlockTags.CLIMBABLE);
     }
 
     protected boolean isLadder(final BlockPos pos) {
