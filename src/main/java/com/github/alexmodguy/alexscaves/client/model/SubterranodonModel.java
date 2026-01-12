@@ -138,23 +138,26 @@ public class SubterranodonModel extends AdvancedEntityModel<SubterranodonRenderS
     @Override
     public void setupAnim(SubterranodonRenderState renderState) {
         this.resetToDefaultPose();
+        // Extract animation variables from render state
+        float ageInTicks = renderState.ageInTicks;
+        float limbSwing = renderState.walkAnimationPos;
+        float netHeadYaw = renderState.yRot;
+        float headPitch = renderState.xRot;
         float walkSpeed = 1F;
         float walkDegree = 1F;
-        // All animation values should come from the render state
-        // For now, use default values until render state is properly populated
         float flyProgress = renderState.isFlying ? 1.0F : 0.0F;
-        float buryEggsAmount = 0.0F;  // TODO: Add to render state
+        float buryEggsAmount = 0.0F;  // TODO: Add to render state if needed
         float groundProgress = 1F - flyProgress;
         float flapAmount = renderState.flapProgress;
         float groundStill = groundProgress * (1F - renderState.walkAnimationSpeed);
         float groundMove = groundProgress * renderState.walkAnimationSpeed;
         float glide = flyProgress * (1 - flapAmount);
-        float hoverProgress = 0.0F; // TODO: Add to render state
+        float hoverProgress = 0.0F; // TODO: Add to render state if needed
         float openMouthProgress = renderState.attackProgress;
         float sitProgress = renderState.sitProgress * groundProgress;
-        float rollAmount = 0.0F; // TODO: Add to render state
-        float pitchAmount = 0.0F; // TODO: Add to render state
-        float tailYaw = 0.0F; // TODO: Add to render state
+        float rollAmount = 0.0F; // TODO: Add to render state if needed
+        float pitchAmount = 0.0F; // TODO: Add to render state if needed
+        float tailYaw = 0.0F; // TODO: Add to render state if needed
         float danceAmount = renderState.danceProgress;
         float danceSpeed = 0.5F;
         progressPositionPrev(body, groundProgress, 0, -8, 2, 1F);
@@ -191,10 +194,10 @@ public class SubterranodonModel extends AdvancedEntityModel<SubterranodonRenderS
         progressRotationPrev(rwing, sitProgress, (float) Math.toRadians(40), (float) Math.toRadians(20), (float) Math.toRadians(-20), 1F);
         progressRotationPrev(lhand, sitProgress, (float) Math.toRadians(20), 0, 0, 1F);
         progressRotationPrev(rhand, sitProgress, (float) Math.toRadians(20), 0, 0, 1F);
-        animateFlight(renderState.ageInTicks, flyProgress, hoverProgress, glide, flapAmount, false, true);
+        animateFlight(ageInTicks, flyProgress, hoverProgress, glide, flapAmount, false, true);
         if (buryEggsAmount > 0.0F) {
-            limbSwing = ageInTicks;
-            groundMove = buryEggsAmount * 0.5F;
+            float buryLimbSwing = ageInTicks;
+            float buryGroundMove = buryEggsAmount * 0.5F;
             this.body.swing(0.25F, 0.4F, false, 0F, 0F, ageInTicks, buryEggsAmount);
             this.neck.swing(0.25F, 0.4F, true, -1F, 0F, ageInTicks, buryEggsAmount);
         }
@@ -216,8 +219,8 @@ public class SubterranodonModel extends AdvancedEntityModel<SubterranodonRenderS
         this.bob(body, walkSpeed * 2F, walkDegree * 3, false, limbSwing, groundMove);
         this.bob(neck, 0.1F, 0.5F, false, ageInTicks, 1);
         this.faceTarget(netHeadYaw, headPitch, 1, head, neck);
-        this.swing(neck, danceSpeed, 0.5F, true, 0F, 0F, renderState.ageInTicks, danceAmount);
-        this.swing(head, danceSpeed, 0.25F, true, 1F, 0F, renderState.ageInTicks, danceAmount);
+        this.swing(neck, danceSpeed, 0.5F, true, 0F, 0F, ageInTicks, danceAmount);
+        this.swing(head, danceSpeed, 0.25F, true, 1F, 0F, ageInTicks, danceAmount);
         this.flap(head, danceSpeed, 0.25F, true, 1F, 0F, renderState.ageInTicks, danceAmount);
         this.walk(jaw, danceSpeed, 0.25F, false, 2F, 0.2F, renderState.ageInTicks, danceAmount);
         this.swing(body, danceSpeed, 0.1F, false, 1, 0, renderState.ageInTicks, danceAmount);
@@ -278,27 +281,9 @@ public class SubterranodonModel extends AdvancedEntityModel<SubterranodonRenderS
         return vec3;
     }
 
-    public void renderToBuffer(PoseStack matrixStackIn, VertexConsumer bufferIn, int packedLightIn, int packedOverlayIn, float red, float green, float blue, float alpha) {
-        if (this.young) {
-            float f = 1.5F;
-            head.setScale(f, f, f);
-            head.setShouldScaleChildren(true);
-            matrixStackIn.pushPose();
-            matrixStackIn.scale(0.35F, 0.35F, 0.35F);
-            matrixStackIn.translate(0.0D, 2.75D, 0.125D);
-            parts().forEach((p_228292_8_) -> {
-                p_228292_8_.render(matrixStackIn, bufferIn, packedLightIn, packedOverlayIn, ColorUtil.packColor(red, green, blue, alpha));
-            });
-            matrixStackIn.popPose();
-            head.setScale(1, 1, 1);
-        } else {
-            matrixStackIn.pushPose();
-            parts().forEach((p_228290_8_) -> {
-                p_228290_8_.render(matrixStackIn, bufferIn, packedLightIn, packedOverlayIn, ColorUtil.packColor(red, green, blue, alpha));
-            });
-            matrixStackIn.popPose();
-        }
-    }
+    // renderToBuffer removed in 1.21 - rendering now handled by renderer with render state
+    // Baby scaling should be handled in the renderer's scale() method based on renderState.isBaby
+    // This custom renderToBuffer is no longer needed - EntityModel handles rendering through parts()
 
     @Override
     public Iterable<AdvancedModelBox> getAllParts() {
