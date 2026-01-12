@@ -224,7 +224,7 @@ public abstract class DinosaurEntity extends TamableAnimal implements IDancesToJ
     }
 
     public void onLayEggTick(BlockPos belowEgg, int time) {
-        this.walkAnimation.update(0.5F, 0.4F);
+        this.walkAnimation.update(0.5F, 0.4F, 1.0F);
         this.level().broadcastEntityEvent(this, (byte) 77);
     }
 
@@ -245,7 +245,7 @@ public abstract class DinosaurEntity extends TamableAnimal implements IDancesToJ
                 BlockState groundState = this.level().getBlockState(ground.below());
                 if (groundState.isSolid()) {
                     if (level().isClientSide()) {
-                        level().addParticle(new BlockParticleOption(ParticleTypes.BLOCK, groundState), true, this.getX() + extraX, ground.getY(), this.getZ() + extraZ, motionX, motionY, motionZ);
+                        level().addParticle(new BlockParticleOption(ParticleTypes.BLOCK, groundState), true, true, this.getX() + extraX, ground.getY(), this.getZ() + extraZ, motionX, motionY, motionZ);
                     }
                 }
             }

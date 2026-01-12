@@ -11,4 +11,6 @@ import net.minecraft.world.level.block.Block;
 public class ACTagRegistry {
     public static final TagKey<Block> DINOSAURS_SPAWNABLE_ON = BlockTags.create(ResourceLocation.fromNamespaceAndPath("alexscaves", "dinosaurs_spawnable_on"));
     public static final TagKey<EntityType<?>> FLEEABLE_FROM = EntityTypeTags.create(ResourceLocation.fromNamespaceAndPath("alexscaves", "fleeable_from"));
+    public static final TagKey<EntityType<?>> SUBTERRANODON_FLEES = EntityTypeTags.create(ResourceLocation.fromNamespaceAndPath("alexscaves", "subterranodon_flees"));
 }
+

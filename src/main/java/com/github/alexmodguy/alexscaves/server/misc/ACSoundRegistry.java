@@ -16,4 +16,6 @@ public class ACSoundRegistry {
     public static final SoundHolder SUBTERRANODON_DEATH = new SoundHolder(SoundEvents.PARROT_DEATH);
     public static final SoundHolder SUBTERRANODON_IDLE = new SoundHolder(SoundEvents.PARROT_AMBIENT);
     public static final SoundHolder SUBTERRANODON_FLAP = new SoundHolder(SoundEvents.PARROT_FLY);
+    public static final SoundHolder TECTONIC_SHARD_TRANSFORM = new SoundHolder(SoundEvents.PORTAL_TRIGGER);
+    public static final SoundHolder AMBER_MONOLITH_SUMMON = new SoundHolder(SoundEvents.ENDER_DRAGON_GROWL);
 }
