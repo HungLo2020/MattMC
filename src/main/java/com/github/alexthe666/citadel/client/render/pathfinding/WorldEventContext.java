@@ -46,16 +46,10 @@ public class WorldEventContext {
         poseStack.pushPose();
         poseStack.translate(-cameraPos.x(), -cameraPos.y(), -cameraPos.z());
 
-        if (event.getStage() == RenderLevelStageEvent.Stage.AFTER_CUTOUT_MIPPED_BLOCKS_BLOCKS)
-        {
-            PathfindingDebugRenderer.render(this);
-
-            bufferSource.endBatch();
-        }
-        else if (event.getStage() == RenderLevelStageEvent.Stage.AFTER_TRIPWIRE_BLOCKS)
-        {
-            bufferSource.endBatch();
-        }
+        // Citadel: 1.21 - RenderLevelStageEvent.Stage doesn't exist
+        // Just render once per call (will be called from appropriate Fabric event)
+        PathfindingDebugRenderer.render(this);
+        bufferSource.endBatch();
 
         poseStack.popPose();
     }

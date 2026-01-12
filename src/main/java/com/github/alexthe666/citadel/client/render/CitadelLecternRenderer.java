@@ -58,16 +58,30 @@ public class CitadelLecternRenderer implements BlockEntityRenderer<CitadelLecter
             poseStack.mulPose(Axis.YP.rotationDegrees(-renderState.yRot));
             poseStack.mulPose(Axis.ZP.rotationDegrees(67.5F));
             poseStack.translate(0.0D, -0.125D, 0.0D);
-            this.bookModel.setupAnim(0.0F, 0.1F, 0.9F, 1.2F);
+            // Citadel: 1.21 - BookModel.setupAnim now requires BookModel.State instead of floats
+            BookModel.State bookState = new BookModel.State(0.0F, 0.1F, 0.9F, 1.2F);
+            this.bookModel.setupAnim(bookState);
             
-            // Submit render nodes for pages and binding
-            submitNodeCollector.submitTriangles(
+            // Citadel: 1.21 - submitTriangles doesn't exist, use submitModel instead
+            submitNodeCollector.submitModel(
+                this.bookModel,
+                bookState,
+                poseStack,
                 RenderType.entityCutoutNoCull(BOOK_PAGE_TEXTURE),
-                (vertexConsumer) -> this.bookModel.render(poseStack, vertexConsumer, renderState.lightCoords, 0, bookData.getPageColor())
+                renderState.lightCoords,
+                0,
+                bookData.getPageColor(),
+                null
             );
-            submitNodeCollector.submitTriangles(
+            submitNodeCollector.submitModel(
+                this.bookModel,
+                bookState,
+                poseStack,
                 RenderType.entityCutoutNoCull(BOOK_BINDING_TEXTURE),
-                (vertexConsumer) -> this.bookModel.render(poseStack, vertexConsumer, renderState.lightCoords, 0, bookData.getBindingColor())
+                renderState.lightCoords,
+                0,
+                bookData.getBindingColor(),
+                null
             );
             poseStack.popPose();
         }
