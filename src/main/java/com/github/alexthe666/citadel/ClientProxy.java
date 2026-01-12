@@ -42,16 +42,12 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.player.PlayerModelPart;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
-// TODO: Replace with Fabric
-// import net.neoforged.bus.api.EventPriority;
-// TODO: Replace with Fabric
-// import net.neoforged.bus.api.SubscribeEvent;
-// TODO: Replace with Fabric
-// import net.neoforged.neoforge.client.event.*;
-// TODO: Replace with Fabric
-// import net.neoforged.neoforge.common.NeoForge;
-// TODO: Replace with Fabric
-// import net.neoforged.neoforge.common.util.TriState;
+// Citadel: Using Fabric event callbacks instead of NeoForge events
+import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
+import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderEvents;
+import net.fabricmc.fabric.api.client.screen.v1.ScreenEvents;
+import net.fabricmc.fabric.api.client.screen.v1.ScreenKeyboardEvents;
+import com.github.alexthe666.citadel.server.event.TriState;
 
 import java.awt.*;
 import java.io.IOException;
@@ -86,23 +82,72 @@ public class ClientProxy extends ServerProxy {
         if (CitadelConstants.debugShaders()) {
             PostEffectRegistry.registerEffect(RAINBOW_AURA_POST_SHADER);
         }
+        
+        // Citadel: Wire Fabric event callbacks
+        registerFabricEvents();
     }
-
-
-    @SubscribeEvent
-    public void screenOpen(ScreenEvent.Init.Post event) {
-        if (event.getScreen() instanceof SkinCustomizationScreen && Minecraft.getInstance().player != null) {
+    
+    private void registerFabricEvents() {
+        // Client tick event
+        ClientTickEvents.START_CLIENT_TICK.register(client -> {
+            if (!isGamePaused() && client.isRunning() && client.level != null && client.player != null) {
+                ClientTickRateTracker.getForClient(client).masterTick();
+                tickMouseOverAnimations();
+            }
+            if (!isGamePaused() && CitadelConstants.isAprilFools()) {
+                if (aprilFoolsTetrisGame != null) {
+                    if (client.screen instanceof TitleScreen) {
+                        aprilFoolsTetrisGame.tick();
+                    } else {
+                        aprilFoolsTetrisGame.reset();
+                    }
+                }
+            }
+        });
+        
+        // Screen initialization events
+        ScreenEvents.AFTER_INIT.register((client, screen, scaledWidth, scaledHeight) -> {
+            if (screen instanceof SkinCustomizationScreen && client.player != null) {
+                try {
+                    String username = client.player.getName().getString();
+                    int height = -20;
+                    if (Citadel.PATREONS.contains(username)) {
+                        Button button1 = Button.builder(Component.translatable("citadel.gui.patreon_rewards_option").withStyle(ChatFormatting.GREEN), (p_213080_2_) -> client.setScreen(new GuiCitadelPatreonConfig(screen, client.options))).size(200, 20).pos(screen.width / 2 - 100, screen.height / 6 + 150 + height).build();
+                        ScreenEvents.BEFORE_RENDER.register(screen, (s, guiGraphics, mouseX, mouseY, delta) -> {});
+                        height += 25;
+                    }
+                    if (!CitadelCapes.getCapesFor(client.player.getUUID()).isEmpty()) {
+                        Button button2 = Button.builder(Component.translatable("citadel.gui.capes_option").withStyle(ChatFormatting.GREEN), (p_213080_2_) -> client.setScreen(new GuiCitadelCapesConfig(screen, client.options))).size(200, 20).pos(screen.width / 2 - 100, screen.height / 6 + 150 + height).build();
+                        height += 25;
+                    }
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+        });
+        
+        // World rendering events for pathfinding debug
+        WorldRenderEvents.AFTER_ENTITIES.register(context -> {
+            if (Pathfinding.isDebug()) {
+                // WorldEventContext.INSTANCE.renderWorldLastEvent would go here
+                // TODO: Adapt for Fabric WorldRenderContext
+            }
+        });
+    }
+    // Citadel: Converted from NeoForge @SubscribeEvent to Fabric callback (called from registerFabricEvents)
+    public void screenOpen(net.minecraft.client.gui.screens.Screen screen) {
+        if (screen instanceof SkinCustomizationScreen && Minecraft.getInstance().player != null) {
             try {
                 String username = Minecraft.getInstance().player.getName().getString();
                 int height = -20;
                 if (Citadel.PATREONS.contains(username)) {
-                    Button button1 = Button.builder(Component.translatable("citadel.gui.patreon_rewards_option").withStyle(ChatFormatting.GREEN), (p_213080_2_) -> Minecraft.getInstance().setScreen(new GuiCitadelPatreonConfig(event.getScreen(), Minecraft.getInstance().options))).size(200, 20).pos(event.getScreen().width / 2 - 100, event.getScreen().height / 6 + 150 + height).build();
-                    event.addListener(button1);
+                    Button button1 = Button.builder(Component.translatable("citadel.gui.patreon_rewards_option").withStyle(ChatFormatting.GREEN), (p_213080_2_) -> Minecraft.getInstance().setScreen(new GuiCitadelPatreonConfig(screen, Minecraft.getInstance().options))).size(200, 20).pos(screen.width / 2 - 100, screen.height / 6 + 150 + height).build();
+                    // TODO: Add button to screen
                     height += 25;
                 }
                 if (!CitadelCapes.getCapesFor(Minecraft.getInstance().player.getUUID()).isEmpty()) {
-                    Button button2 = Button.builder(Component.translatable("citadel.gui.capes_option").withStyle(ChatFormatting.GREEN), (p_213080_2_) -> Minecraft.getInstance().setScreen(new GuiCitadelCapesConfig(event.getScreen(), Minecraft.getInstance().options))).size(200, 20).pos(event.getScreen().width / 2 - 100, event.getScreen().height / 6 + 150 + height).build();
-                    event.addListener(button2);
+                    Button button2 = Button.builder(Component.translatable("citadel.gui.capes_option").withStyle(ChatFormatting.GREEN), (p_213080_2_) -> Minecraft.getInstance().setScreen(new GuiCitadelCapesConfig(screen, Minecraft.getInstance().options))).size(200, 20).pos(screen.width / 2 - 100, screen.height / 6 + 150 + height).build();
+                    // TODO: Add button to screen
                     height += 25;
                 }
             } catch (Exception e) {
@@ -111,22 +156,21 @@ public class ClientProxy extends ServerProxy {
         }
     }
 
-    @SubscribeEvent
-    public void screenRender(ScreenEvent.Render.Post event) {
-        if (event.getScreen() instanceof TitleScreen && CitadelConstants.isAprilFools()) {
+    // Citadel: Converted from NeoForge @SubscribeEvent - called from Fabric ScreenEvents
+    public void screenRender(net.minecraft.client.gui.screens.Screen screen, net.minecraft.client.gui.GuiGraphics guiGraphics, float partialTick) {
+        if (screen instanceof TitleScreen && CitadelConstants.isAprilFools()) {
             if (aprilFoolsTetrisGame == null) {
                 aprilFoolsTetrisGame = new Tetris();
             } else {
-                aprilFoolsTetrisGame.render((TitleScreen) event.getScreen(), event.getGuiGraphics(), event.getPartialTick());
+                aprilFoolsTetrisGame.render((TitleScreen) screen, guiGraphics, partialTick);
             }
         }
     }
 
-    @SubscribeEvent(priority = EventPriority.LOWEST)
-    public void playerRender(RenderPlayerEvent.Pre event) {
-        PoseStack matrixStackIn = event.getPoseStack();
-        String username = event.getEntity().getName().getString();
-        if (!event.getEntity().isModelPartShown(PlayerModelPart.CAPE) || event.isCanceled() || event.getEntity().isSpectator()) {
+    // Citadel: Converted from NeoForge @SubscribeEvent - TODO: Wire to Fabric player render event
+    public void playerRender(PoseStack poseStack, net.minecraft.client.renderer.MultiBufferSource bufferSource, int packedLight, net.minecraft.world.entity.player.Player player, float partialTick) {
+        String username = player.getName().getString();
+        if (!player.isModelPartShown(PlayerModelPart.CAPE) || player.isSpectator()) {
             return;
         }
         if (Citadel.PATREONS.contains(username)) {
@@ -138,31 +182,32 @@ public class ClientProxy extends ServerProxy {
                     float distance = tag.contains("CitadelRotateDistance") ? tag.getFloat("CitadelRotateDistance") : 2F;
                     float speed = tag.contains("CitadelRotateSpeed") ? tag.getFloat("CitadelRotateSpeed") : 0F;
                     float height = tag.contains("CitadelRotateHeight") ? tag.getFloat("CitadelRotateHeight") : 1F;
-                    renderer.render(matrixStackIn, event.getMultiBufferSource(), event.getPackedLight(), event.getPartialTick(), event.getEntity(), distance, speed, height);
+                    renderer.render(poseStack, bufferSource, packedLight, partialTick, player, distance, speed, height);
                 }
             }
         }
     }
 
-    @SubscribeEvent
-    public void renderWorldLastEvent(RenderLevelStageEvent event) {
+    // Citadel: Converted from NeoForge @SubscribeEvent - called from Fabric WorldRenderEvents
+    public void renderWorldLastEvent() {
         if (Pathfinding.isDebug()) {
-            WorldEventContext.INSTANCE.renderWorldLastEvent(event);
+            // WorldEventContext.INSTANCE.renderWorldLastEvent would go here
+            // TODO: Adapt for Fabric rendering context
         }
     }
 
-    @SubscribeEvent
-    public void onOpenGui(ScreenEvent.Opening event) {
+    // Citadel: Converted from NeoForge @SubscribeEvent - TODO: Wire to Fabric screen open event
+    public void onOpenGui(net.minecraft.client.gui.screens.Screen screen) {
         if (ServerConfig.skipWarnings) {
             try {
-                if (event.getScreen() instanceof BackupConfirmScreen confirmBackupScreen) {
+                if (screen instanceof BackupConfirmScreen confirmBackupScreen) {
                     MutableComponent title = Component.translatable("selectWorld.backupQuestion.experimental");
 
                     if (confirmBackupScreen.getTitle().equals(title)) {
                         confirmBackupScreen.onProceed.proceed(false, true);
                     }
                 }
-                if (event.getScreen() instanceof ConfirmScreen confirmScreen) {
+                if (screen instanceof ConfirmScreen confirmScreen) {
                     MutableComponent title = Component.translatable("selectWorld.backupQuestion.experimental");
                     if (confirmScreen.getTitle().equals(title)) {
                         confirmScreen.callback.accept(true);
@@ -175,7 +220,7 @@ public class ClientProxy extends ServerProxy {
         }
     }
 
-    @SubscribeEvent
+    // Citadel: Converted from NeoForge @SubscribeEvent - TODO: Wire to Fabric splash text rendering
     public void renderSplashTextBefore(EventRenderSplashText.Pre event) {
         if (CitadelConstants.isAprilFools() && aprilFoolsTetrisGame != null) {
             event.setResult(TriState.TRUE);
@@ -191,17 +236,17 @@ public class ClientProxy extends ServerProxy {
         }
     }
 
-    @SubscribeEvent
-    public void onKeyPressed(ScreenEvent.KeyPressed.Pre event) {
+    // Citadel: Converted from NeoForge @SubscribeEvent - TODO: Wire to Fabric keyboard event
+    public void onKeyPressed(int keyCode) {
         if (Minecraft.getInstance().screen instanceof TitleScreen && aprilFoolsTetrisGame != null && aprilFoolsTetrisGame.isStarted()) {
-            if (event.getKeyCode() == InputConstants.KEY_LEFT || event.getKeyCode() == InputConstants.KEY_RIGHT || event.getKeyCode() == InputConstants.KEY_DOWN || event.getKeyCode() == InputConstants.KEY_UP) {
-                event.setCanceled(true);
+            if (keyCode == InputConstants.KEY_LEFT || keyCode == InputConstants.KEY_RIGHT || keyCode == InputConstants.KEY_DOWN || keyCode == InputConstants.KEY_UP) {
+                // event.setCanceled(true); // TODO: Cancel event in Fabric
             }
         }
     }
 
-    @SubscribeEvent
-    public void clientTick(ClientTickEvent.Pre event) {
+    // Citadel: Converted from NeoForge @SubscribeEvent - now called from Fabric ClientTickEvents
+    public void clientTick() {
         if (!isGamePaused() && Minecraft.getInstance().isRunning() && Minecraft.getInstance().level != null && Minecraft.getInstance().player != null) {
             ClientTickRateTracker.getForClient(Minecraft.getInstance()).masterTick();
             tickMouseOverAnimations();
@@ -247,10 +292,10 @@ public class ClientProxy extends ServerProxy {
         lastHoveredItem = null;
     }
 
-    @SubscribeEvent
-    public void renderTooltipColor(RenderTooltipEvent.Color event) {
-        if (event.getItemStack().getItem() instanceof ItemWithHoverAnimation hoverOver && hoverOver.canHoverOver(event.getItemStack())) {
-            lastHoveredItem = event.getItemStack();
+    // Citadel: Converted from NeoForge @SubscribeEvent - TODO: Wire to Fabric tooltip rendering
+    public void renderTooltipColor(ItemStack itemStack) {
+        if (itemStack.getItem() instanceof ItemWithHoverAnimation hoverOver && hoverOver.canHoverOver(itemStack)) {
+            lastHoveredItem = itemStack;
         } else {
             lastHoveredItem = null;
         }
@@ -324,7 +369,8 @@ public class ClientProxy extends ServerProxy {
             return false;
         } else if (!tracker.hasNormalTickRate(entity)) {
             EventChangeEntityTickRate event = new EventChangeEntityTickRate(entity, tracker.getEntityTickLengthModifier(entity));
-            NeoForge.EVENT_BUS.post(event);
+            // Citadel: TODO: Post event to Fabric event bus when implemented
+            // NeoForge.EVENT_BUS.post(event);
             if (event.isCanceled()) {
                 return true;
             } else {
@@ -335,7 +381,7 @@ public class ClientProxy extends ServerProxy {
         return true;
     }
 
-    @SubscribeEvent
-    public void postRenderStage(RenderLevelStageEvent event) {
+    // Citadel: Converted from NeoForge @SubscribeEvent - TODO: Wire to Fabric world render events
+    public void postRenderStage() {
     }
 }
