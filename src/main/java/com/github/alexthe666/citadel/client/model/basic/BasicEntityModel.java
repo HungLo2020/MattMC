@@ -3,36 +3,29 @@ package com.github.alexthe666.citadel.client.model.basic;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.minecraft.client.model.EntityModel;
-import net.minecraft.client.renderer.RenderType;
-import net.minecraft.resources.ResourceLocation;
-import net.minecraft.world.entity.Entity;
+import net.minecraft.client.renderer.entity.state.EntityRenderState;
 
-import java.util.function.Function;
-
-public abstract class BasicEntityModel<T extends Entity> extends EntityModel<T> {
+// Citadel: 1.21 API change - EntityModel<T> now requires T extends EntityRenderState (not Entity)
+// This is a major breaking change in the rendering system
+public abstract class BasicEntityModel<T extends EntityRenderState> extends EntityModel<T> {
     public int textureWidth = 64;
     public int textureHeight = 32;
 
     protected BasicEntityModel() {
-        this(RenderType::entityCutoutNoCull);
+        // Citadel: 1.21 - EntityModel constructor changed, using default constructor
     }
 
-    protected BasicEntityModel(Function<ResourceLocation, RenderType> p_102613_) {
-        super(p_102613_);
-    }
-
-
-    @Override
-    public void renderToBuffer(PoseStack poseStack, VertexConsumer vertexConsumer, int packedLightIn, int packedOverlayIn, int color) {
+    // Citadel: 1.21 - renderToBuffer() is now FINAL in EntityModel, cannot override
+    // Use root().render() instead for custom rendering
+    public void render(PoseStack poseStack, VertexConsumer vertexConsumer, int packedLightIn, int packedOverlayIn, int color) {
         this.parts().forEach((part) -> part.render(poseStack, vertexConsumer, packedLightIn, packedOverlayIn, color));
     }
 
     public abstract Iterable<BasicModelPart> parts();
 
+    // Citadel: 1.21 - setupAnim signature changed completely
+    // Old: setupAnim(T entity, float limbSwing, float limbSwingAmount, float ageInTicks, float netHeadYaw, float headPitch)
+    // New: setupAnim(T state) - all animation data is in the state object
     @Override
-    public abstract void setupAnim(T p_102618_, float p_102619_, float p_102620_, float p_102621_, float p_102622_, float p_102623_);
-
-    @Override
-    public void prepareMobModel(T p_102614_, float p_102615_, float p_102616_, float p_102617_) {
-    }
+    public abstract void setupAnim(T state);
 }
