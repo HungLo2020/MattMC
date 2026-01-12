@@ -261,19 +261,8 @@ public class SubterranodonEntity extends DinosaurEntity implements PackAnimal, F
             } else {
                 this.reapplyPosition();
             }
-            Player player = null // TODO: getClientSidePlayer();
-            if (player != null && player.isPassengerOfSameVehicle(this)) {
-                if (false // TODO: isKeyDown(0) && !false // TODO: isKeyDown(1) && controlUpTicks < 2 && getMeterAmount() > 0.1F) {
-                    if (getMeterAmount() > 0.1F) {
-                        // TODO: sendMSGToServer(new MountedEntityKeyMessage(this.getId(), player.getId(), 0));
-                        controlUpTicks = 5;
-                    }
-                }
-                if (false // TODO: isKeyDown(1) && !false // TODO: isKeyDown(0) && controlDownTicks < 2) {
-                    // TODO: sendMSGToServer(new MountedEntityKeyMessage(this.getId(), player.getId(), 1));
-                    controlDownTicks = 5;
-                }
-            }
+            // TODO: Implement client-side key handling for flying controls
+            // This requires client-side proxy implementation
         }
         if (controlDownTicks > 0) {
             controlDownTicks--;
@@ -506,7 +495,10 @@ public class SubterranodonEntity extends DinosaurEntity implements PackAnimal, F
 
     @Override
     public BlockState createEggBlockState() {
-        return null // TODO: SUBTERRANODON_EGG block.defaultBlockState().setValue(MultipleDinosaurEggsBlock.EGGS, 1 + random.nextInt(3));
+        // TODO: Create and register SUBTERRANODON_EGG block in Blocks.java
+        // For now, return null to disable egg laying
+        return null;
+        // return Blocks.SUBTERRANODON_EGG.defaultBlockState().setValue(MultipleDinosaurEggsBlock.EGGS, 1 + random.nextInt(3));
     }
 
     @Override

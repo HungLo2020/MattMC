@@ -1724,6 +1724,7 @@ public class Items {
 	);
 	public static final Item SLIME_SPAWN_EGG = registerItem("slime_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.SLIME));
 	public static final Item SNIFFER_SPAWN_EGG = registerItem("sniffer_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.SNIFFER));
+	public static final Item SUBTERRANODON_SPAWN_EGG = registerItem("subterranodon_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.SUBTERRANODON));
 	public static final Item SNOW_GOLEM_SPAWN_EGG = registerItem("snow_golem_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.SNOW_GOLEM));
 	public static final Item SPIDER_SPAWN_EGG = registerItem("spider_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.SPIDER));
 	public static final Item SQUID_SPAWN_EGG = registerItem("squid_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.SQUID));
