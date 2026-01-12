@@ -13,34 +13,44 @@ import java.util.function.Function;
 public abstract class BasicEntityModel<T extends EntityRenderState> extends EntityModel<T> {
     public int textureWidth = 64;
     public int textureHeight = 32;
-    private final ModelPart customRoot;
+    private final RenderingProxyModelPart proxyRoot;
 
     protected BasicEntityModel() {
         this(RenderType::entityCutoutNoCull);
     }
 
     protected BasicEntityModel(Function<ResourceLocation, RenderType> renderType) {
-        // In 1.21, EntityModel requires a ModelPart root
-        // Create a custom root that will render our BasicModelPart parts
-        super(createCustomRoot(), renderType);
-        this.customRoot = root;
-    }
-
-    private static ModelPart createCustomRoot() {
-        // Create a wrapper ModelPart that will be used to render BasicModelPart parts
-        return new ModelPart(java.util.Collections.emptyList(), java.util.Collections.emptyMap());
-    }
-
-    @Override
-    public void renderToBuffer(PoseStack poseStack, VertexConsumer vertexConsumer, int packedLight, int packedOverlay) {
-        // Render all our custom BasicModelPart parts
-        for (BasicModelPart part : parts()) {
-            part.render(poseStack, vertexConsumer, packedLight, packedOverlay);
-        }
+        // Create a special ModelPart that will proxy rendering to our BasicModelPart parts
+        super(new RenderingProxyModelPart(), renderType);
+        this.proxyRoot = (RenderingProxyModelPart) root();
+        this.proxyRoot.setOwner(this);
     }
 
     public abstract Iterable<BasicModelPart> parts();
 
     @Override
     public abstract void setupAnim(T renderState);
+    
+    // Special ModelPart that proxies rendering to BasicModelPart children
+    public static class RenderingProxyModelPart extends ModelPart {
+        private BasicEntityModel<?> owner;
+        
+        public RenderingProxyModelPart() {
+            super(java.util.Collections.emptyList(), java.util.Collections.emptyMap());
+        }
+        
+        public void setOwner(BasicEntityModel<?> owner) {
+            this.owner = owner;
+        }
+        
+        @Override
+        public void render(PoseStack poseStack, VertexConsumer vertexConsumer, int packedLight, int packedOverlay, int color) {
+            if (owner != null) {
+                // Render all BasicModelPart children instead of vanilla ModelPart children
+                for (BasicModelPart part : owner.parts()) {
+                    part.render(poseStack, vertexConsumer, packedLight, packedOverlay);
+                }
+            }
+        }
+    }
 }

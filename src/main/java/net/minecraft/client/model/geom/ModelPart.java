@@ -23,7 +23,7 @@ import org.joml.Vector3f;
 import org.joml.Vector3fc;
 
 @Environment(EnvType.CLIENT)
-public final class ModelPart {
+public class ModelPart {  // Changed from final to support Citadel's BasicEntityModel
 	public static final float DEFAULT_SCALE = 1.0F;
 	public float x;
 	public float y;
