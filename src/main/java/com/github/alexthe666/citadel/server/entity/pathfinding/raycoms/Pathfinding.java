@@ -51,9 +51,10 @@ public final class Pathfinding {
 
         @Override
         public Thread newThread(final @NotNull Runnable runnable) throws RuntimeException {
-            BlockableEventLoop<?> workqueue = LogicalSidedProvider.WORKQUEUE.get(LogicalSide.SERVER);
+            // In 1.21, LogicalSidedProvider doesn't exist - using MinecraftServer directly
+            BlockableEventLoop<?> workqueue = net.minecraft.server.MinecraftServer.getServer();
             ClassLoader classLoader;
-            if (workqueue.isSameThread()) {
+            if (workqueue != null && workqueue.isSameThread()) {
                 classLoader = Thread.currentThread().getContextClassLoader();
             } else if (workqueue instanceof MinecraftServer server){
                classLoader = server.getRunningThread().getContextClassLoader();

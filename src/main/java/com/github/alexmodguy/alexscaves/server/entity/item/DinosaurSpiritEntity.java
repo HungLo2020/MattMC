@@ -1,5 +1,8 @@
 package com.github.alexmodguy.alexscaves.server.entity.item;
 
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.damagesource.DamageTypes;
 import net.minecraft.commands.arguments.EntityAnchorArgument;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.nbt.CompoundTag;
@@ -20,7 +23,8 @@ import java.util.UUID;
 
 public class DinosaurSpiritEntity extends Entity {
 
-    private static final EntityDataAccessor<Optional<UUID>> PLAYER_ID = SynchedEntityData.defineId(DinosaurSpiritEntity.class, EntityDataSerializers.OPTIONAL_UUID);
+    // Use INT for player ID since OPTIONAL_UUID doesn't exist in 1.21
+    private static final EntityDataAccessor<Integer> PLAYER_ID = SynchedEntityData.defineId(DinosaurSpiritEntity.class, EntityDataSerializers.INT);
     private static final EntityDataAccessor<Integer> DINOSAUR_TYPE = SynchedEntityData.defineId(DinosaurSpiritEntity.class, EntityDataSerializers.INT);
     private static final EntityDataAccessor<Integer> ATTACKING_ENTITY_ID = SynchedEntityData.defineId(DinosaurSpiritEntity.class, EntityDataSerializers.INT);
     private static final EntityDataAccessor<Integer> DELAY_SPAWN = SynchedEntityData.defineId(DinosaurSpiritEntity.class, EntityDataSerializers.INT);
@@ -49,7 +53,7 @@ public class DinosaurSpiritEntity extends Entity {
 
     @Override
     protected void defineSynchedData(SynchedEntityData.Builder builder) {
-        builder.define(PLAYER_ID, Optional.empty());
+        builder.define(PLAYER_ID, -1);  // Store player entity ID instead of UUID
         builder.define(DINOSAUR_TYPE, 0);
         builder.define(ATTACKING_ENTITY_ID, -1);
         builder.define(DELAY_SPAWN, 0);
@@ -130,13 +134,14 @@ public class DinosaurSpiritEntity extends Entity {
         this.setDeltaMovement(this.lxd, this.lyd, this.lzd);
     }
 
-    @Override
-    public void lerpMotion(double lerpX, double lerpY, double lerpZ) {
-        this.lxd = lerpX;
-        this.lyd = lerpY;
-        this.lzd = lerpZ;
-        this.setDeltaMovement(this.lxd, this.lyd, this.lzd);
-    }
+    // lerpMotion removed in 1.21 - motion lerping handled differently
+    // @Override
+    // public void lerpMotion(double lerpX, double lerpY, double lerpZ) {
+    //     this.lxd = lerpX;
+    //     this.lyd = lerpY;
+    //     this.lzd = lerpZ;
+    //     this.setDeltaMovement(this.lxd, this.lyd, this.lzd);
+    // }
 
     private void tickSubterranodon(Player player) {
         Entity target = getAttackingEntity();
@@ -158,7 +163,7 @@ public class DinosaurSpiritEntity extends Entity {
         this.setXRot(10);
         this.setDeltaMovement(orbitTarget.scale(0.25F));
         this.noPhysics = true;
-        if(!!level().isClientSide() && !player.getUseItem().is(ACItemRegistry.EXTINCTION_SPEAR.get())){
+        if(!!level().isClientSide() && !player.getUseItem().is(net.minecraft.world.item.Items.TRIDENT)){  // TODO: Replace with EXTINCTION_SPEAR when item is implemented
             this.setFading(true);
         }
     }
@@ -178,7 +183,7 @@ public class DinosaurSpiritEntity extends Entity {
             }
             this.setUsingAbility(true);
             if (inRange && this.abilityProgress >= 5) {
-                if(!dealtDamage && target.hurt(ACDamageTypes.causeSpiritDinosaurDamage(level().registryAccess(), player), 3 + 2 * getEnchantmentLevel())){
+                if(!dealtDamage && target.hurtServer((ServerLevel) level(), new DamageSource(level().registryAccess().lookupOrThrow(net.minecraft.core.registries.Registries.DAMAGE_TYPE).getOrThrow(DamageTypes.PLAYER_ATTACK), player), 3 + 2 * getEnchantmentLevel())){
                     dealtDamage = true;
                 }
                 this.setFading(true);
@@ -190,40 +195,53 @@ public class DinosaurSpiritEntity extends Entity {
     }
 
     @Override
-    protected void readAdditionalSaveData(CompoundTag tag) {
-        if (tag.contains("UsingPlayerUUID")) {
-            this.setPlayerUUID(tag.getUUID("UsingPlayerUUID"));
+    protected void readAdditionalSaveData(net.minecraft.world.level.storage.ValueInput tag) {
+        if (tag.contains("UsingPlayerID")) {
+            this.setPlayerID(tag.getIntOr("UsingPlayerID", -1));
         }
-        this.setDinosaurTypeInt(tag.getInt("DinosaurType"));
+        this.setDinosaurTypeInt(tag.getIntOr("DinosaurType", 0));
     }
 
     @Override
-    protected void addAdditionalSaveData(CompoundTag tag) {
-        UUID uuid1 = getPlayerUUID();
-        if (uuid1 != null) {
-            tag.putUUID("UsingPlayerUUID", uuid1);
+    protected void addAdditionalSaveData(net.minecraft.world.level.storage.ValueOutput tag) {
+        int playerId = getPlayerID();
+        if (playerId != -1) {
+            tag.putInt("UsingPlayerID", playerId);
         }
         tag.putInt("DinosaurType", this.getDinosaurTypeInt());
     }
 
+    public void setPlayerID(int id) {
+        this.entityData.set(PLAYER_ID, id);
+    }
+
+    public int getPlayerID() {
+        return this.entityData.get(PLAYER_ID);
+    }
+
+    // Deprecated: Use setPlayerID/getPlayerID instead  
     public void setPlayerUUID(UUID uuid) {
-        this.entityData.set(PLAYER_ID, Optional.ofNullable(uuid));
+        // Convert UUID to entity - not ideal but needed for compatibility
+        if (uuid != null && !level().isClientSide()) {
+            Player player = level().getPlayerByUUID(uuid);
+            if (player != null) {
+                setPlayerID(player.getId());
+            }
+        }
     }
 
     public UUID getPlayerUUID() {
-        return this.entityData.get(PLAYER_ID).orElse(null);
+        Player player = getUsingPlayer();
+        return player != null ? player.getUUID() : null;
     }
 
     public Player getUsingPlayer() {
-        UUID id = getPlayerUUID();
-        if (id == null) {
+        int id = getPlayerID();
+        if (id == -1) {
             return null;
         } else {
-            if (!level().isClientSide()) {
-                return level().getPlayerByUUID(id);
-            } else {
-                return level().getServer().getPlayerList().getPlayer(id);
-            }
+            Entity entity = level().getEntity(id);
+            return entity instanceof Player player ? player : null;
         }
     }
 

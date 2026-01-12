@@ -109,8 +109,8 @@ public class JsonUtils
     @Nullable
     public static Item getByNameOrId(String id)
     {
-        // In 1.21, Registry.get() returns Holder<T>, need to call value() to get T
-        return BuiltInRegistries.ITEM.get(ResourceLocation.parse(id)).value();
+        // In 1.21, use getValue() which returns T directly (not Optional)
+        return BuiltInRegistries.ITEM.getValue(ResourceLocation.parse(id));
     }
 
     public static Item getItem(JsonElement json, String memberName)

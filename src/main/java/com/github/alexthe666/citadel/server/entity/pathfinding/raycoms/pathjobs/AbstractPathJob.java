@@ -161,7 +161,7 @@ public abstract class AbstractPathJob implements Callable<Path> {
         this.restrictionType = AbstractAdvancedPathNavigate.RestrictionType.NONE;
         this.hardXzRestriction = false;
 
-        this.world = new ChunkCache(world, new BlockPos(minX, ((net.minecraft.world.level.LevelHeightAccessor) world).getMinY(), minZ), new BlockPos(maxX, ((net.minecraft.world.level.LevelHeightAccessor) world).getMaxY(), maxZ), range);
+        this.world = new ChunkCache(world, new BlockPos(minX, ((net.minecraft.world.level.LevelHeightAccessor) world).getMinY(), minZ), new BlockPos(maxX, ((net.minecraft.world.level.LevelHeightAccessor) world).getMaxY(), maxZ), range, world.dimensionType());
 
         this.start = new BlockPos(start);
         this.end = end;
@@ -258,7 +258,7 @@ public abstract class AbstractPathJob implements Callable<Path> {
         this.restrictionType = restrictionType;
         this.hardXzRestriction = hardRestriction;
 
-        this.world = new ChunkCache(world, new BlockPos(minX, ((net.minecraft.world.level.LevelHeightAccessor) world).getMinY(), minZ), new BlockPos(maxX, ((net.minecraft.world.level.LevelHeightAccessor) world).getMaxY(), maxZ), range);
+        this.world = new ChunkCache(world, new BlockPos(minX, ((net.minecraft.world.level.LevelHeightAccessor) world).getMinY(), minZ), new BlockPos(maxX, ((net.minecraft.world.level.LevelHeightAccessor) world).getMaxY(), maxZ), range, world.dimensionType());
 
         this.start = start;
 
@@ -1321,8 +1321,12 @@ public abstract class AbstractPathJob implements Callable<Path> {
 
                 // TODO: I'd be cool if dragons could squash multiple snow layers when walking over them
                 if (shape.isEmpty() || shape.max(Direction.Axis.Y) <= 0.125 && !isLiquid((block)) && (block.getBlock() != Blocks.SNOW || block.getValue(SnowLayerBlock.LAYERS) == 1)) {
-                    final PathType pathType = net.minecraft.world.level.pathfinder.WalkNodeEvaluator.getPathType(world, pos);
-                    return pathType == null;
+                    LivingEntity livingEntity = entity.get();
+                    if (livingEntity instanceof net.minecraft.world.entity.Mob mob) {
+                        final PathType pathType = net.minecraft.world.level.pathfinder.WalkNodeEvaluator.getPathTypeStatic(mob, pos.mutable());
+                        return pathType == null;
+                    }
+                    return false;  // If no mob, assume not passable
                 }
                 return false;
             }
