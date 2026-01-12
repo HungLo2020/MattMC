@@ -30,7 +30,7 @@ public class TabulaModel extends AdvancedEntityModel<EntityRenderState> {
     protected double[] scale;
 
     public TabulaModel(TabulaModelContainer container, ITabulaModelAnimator tabulaAnimator) {
-        super(ModelPart.EMPTY); // Citadel: 1.21 - Use dummy ModelPart since Tabula builds custom structure
+        super(new ModelPart(List.of(), Map.of())); // Citadel: 1.21 - Create empty ModelPart since Tabula builds custom structure
         this.texWidth = container.getTextureWidth();
         this.texHeight = container.getTextureHeight();
         this.tabulaAnimator = tabulaAnimator;

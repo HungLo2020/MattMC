@@ -4,7 +4,9 @@ import com.mojang.blaze3d.platform.InputConstants;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.TitleScreen;
+import net.minecraft.client.resources.sounds.SimpleSoundInstance;
 import net.minecraft.core.Vec3i;
+import net.minecraft.sounds.SoundEvents;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.block.Rotation;
 import net.minecraft.world.level.block.state.BlockState;
@@ -57,7 +59,7 @@ public class Tetris {
                 fallingShape = null;
             } else {
                 float f = 0.15F;
-                if (InputConstants.isKeyDown(Minecraft.getInstance().getWindow().getWindow(), InputConstants.KEY_DOWN)) {
+                if (InputConstants.isKeyDown(Minecraft.getInstance().getWindow().handle(), InputConstants.KEY_DOWN)) {
                     f = 1F;
                 }
                 fallingY += f;
@@ -181,7 +183,7 @@ public class Tetris {
     }
 
     private boolean keyPressed(int keyId) {
-        if (keyCooldown == 0 && InputConstants.isKeyDown(Minecraft.getInstance().getWindow().getWindow(), keyId)) {
+        if (keyCooldown == 0 && InputConstants.isKeyDown(Minecraft.getInstance().getWindow().handle(), keyId)) {
             keyCooldown = 4;
             return true;
         }
