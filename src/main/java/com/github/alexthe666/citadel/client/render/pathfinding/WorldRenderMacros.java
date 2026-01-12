@@ -898,12 +898,15 @@ public class WorldRenderMacros extends UiRenderMacros {
 
         final EntityRenderDispatcher erm = Minecraft.getInstance().getEntityRenderDispatcher();
         final int cap = text.size();
-        if (cap > 0 && erm.distanceToSqr(pos.getX(), pos.getY(), pos.getZ()) <= MAX_DEBUG_TEXT_RENDER_DIST_SQUARED) {
+        // TODO: 1.21 - EntityRenderDispatcher.distanceToSqr() now requires Entity parameter not coordinates
+        // For now, skip distance check for debug text rendering
+        if (cap > 0) {  // Removed distance check: && erm.distanceToSqr(pos.getX(), pos.getY(), pos.getZ()) <= MAX_DEBUG_TEXT_RENDER_DIST_SQUARED
             final Font fontrenderer = Minecraft.getInstance().font;
 
             matrixStack.pushPose();
             matrixStack.translate(pos.getX() + 0.5d, pos.getY() + 0.75d, pos.getZ() + 0.5d);
-            matrixStack.mulPose(erm.cameraOrientation());
+            // TODO: 1.21 - EntityRenderDispatcher.cameraOrientation() removed
+            // matrixStack.mulPose(erm.cameraOrientation());
             matrixStack.scale(-0.014f, -0.014f, 0.014f);
             matrixStack.translate(0.0d, 18.0d, 0.0d);
 
@@ -937,138 +940,20 @@ public class WorldRenderMacros extends UiRenderMacros {
         }
     }
 
-    private static final class RenderTypes extends RenderType {
-        private RenderTypes(final String nameIn,
-                            final VertexFormat formatIn,
-                            final VertexFormat.Mode drawModeIn,
-                            final int bufferSizeIn,
-                            final boolean useDelegateIn,
-                            final boolean needsSortingIn,
-                            final Runnable setupTaskIn,
-                            final Runnable clearTaskIn) {
-            super(nameIn, formatIn, drawModeIn, bufferSizeIn, useDelegateIn, needsSortingIn, setupTaskIn, clearTaskIn);
+    // TODO: 1.21 - RenderType constructor and RenderStateShard system completely redesigned  
+    // Using vanilla RenderType instances instead of custom composite states for debug visualization
+    private static final class RenderTypes {
+        // Using vanilla RenderType instances  
+        private static final RenderType GLINT_LINES = RenderType.lines();
+        private static final RenderType GLINT_LINES_WITH_WIDTH = RenderType.lines();
+        private static final RenderType LINES = RenderType.lines();
+        private static final RenderType LINES_WITH_WIDTH = RenderType.lines();
+        private static final RenderType COLORED_TRIANGLES = RenderType.debugQuads();
+        private static final RenderType COLORED_TRIANGLES_NC_ND = RenderType.debugQuads();
+
+        private RenderTypes() {
             throw new IllegalStateException();
         }
-
-        private static final RenderType GLINT_LINES = create("structurize_glint_lines",
-                DefaultVertexFormat.POSITION_COLOR,
-                VertexFormat.Mode.DEBUG_LINES,
-                1 << 12,
-                false,
-                false,
-                RenderType.CompositeState.builder()
-                        .setTextureState(NO_TEXTURE)
-                        .setShaderState(POSITION_COLOR_SHADER)
-                        .setTransparencyState(GLINT_TRANSPARENCY)
-                        .setDepthTestState(NO_DEPTH_TEST)
-                        .setCullState(NO_CULL)
-                        .setLightmapState(NO_LIGHTMAP)
-                        .setOverlayState(NO_OVERLAY)
-                        .setLayeringState(NO_LAYERING)
-                        .setOutputState(MAIN_TARGET)
-                        .setTexturingState(DEFAULT_TEXTURING)
-                        .setWriteMaskState(COLOR_WRITE)
-                        .createCompositeState(false));
-
-        private static final RenderType GLINT_LINES_WITH_WIDTH = create("structurize_glint_lines_with_width",
-                DefaultVertexFormat.POSITION_COLOR,
-                VertexFormat.Mode.TRIANGLES,
-                1 << 13,
-                false,
-                false,
-                RenderType.CompositeState.builder()
-                        .setTextureState(NO_TEXTURE)
-                        .setShaderState(POSITION_COLOR_SHADER)
-                        .setTransparencyState(GLINT_TRANSPARENCY)
-                        .setDepthTestState(AlwaysDepthTestStateShard.ALWAYS_DEPTH_TEST)
-                        .setCullState(CULL)
-                        .setLightmapState(NO_LIGHTMAP)
-                        .setOverlayState(NO_OVERLAY)
-                        .setLayeringState(NO_LAYERING)
-                        .setOutputState(MAIN_TARGET)
-                        .setTexturingState(DEFAULT_TEXTURING)
-                        .setWriteMaskState(COLOR_DEPTH_WRITE)
-                        .createCompositeState(false));
-
-        private static final RenderType LINES = create("structurize_lines",
-                DefaultVertexFormat.POSITION_COLOR,
-                VertexFormat.Mode.DEBUG_LINES,
-                1 << 14,
-                false,
-                false,
-                RenderType.CompositeState.builder()
-                        .setTextureState(NO_TEXTURE)
-                        .setShaderState(POSITION_COLOR_SHADER)
-                        .setTransparencyState(TRANSLUCENT_TRANSPARENCY)
-                        .setDepthTestState(LEQUAL_DEPTH_TEST)
-                        .setCullState(NO_CULL)
-                        .setLightmapState(NO_LIGHTMAP)
-                        .setOverlayState(NO_OVERLAY)
-                        .setLayeringState(NO_LAYERING)
-                        .setOutputState(MAIN_TARGET)
-                        .setTexturingState(DEFAULT_TEXTURING)
-                        .setWriteMaskState(COLOR_WRITE)
-                        .createCompositeState(false));
-
-        private static final RenderType LINES_WITH_WIDTH = create("structurize_lines_with_width",
-                DefaultVertexFormat.POSITION_COLOR,
-                VertexFormat.Mode.TRIANGLES,
-                1 << 13,
-                false,
-                false,
-                RenderType.CompositeState.builder()
-                        .setTextureState(NO_TEXTURE)
-                        .setShaderState(POSITION_COLOR_SHADER)
-                        .setTransparencyState(TRANSLUCENT_TRANSPARENCY)
-                        .setDepthTestState(LEQUAL_DEPTH_TEST)
-                        .setCullState(CULL)
-                        .setLightmapState(NO_LIGHTMAP)
-                        .setOverlayState(NO_OVERLAY)
-                        .setLayeringState(NO_LAYERING)
-                        .setOutputState(MAIN_TARGET)
-                        .setTexturingState(DEFAULT_TEXTURING)
-                        .setWriteMaskState(COLOR_DEPTH_WRITE)
-                        .createCompositeState(false));
-
-        private static final RenderType COLORED_TRIANGLES = create("structurize_colored_triangles",
-                DefaultVertexFormat.POSITION_COLOR,
-                VertexFormat.Mode.TRIANGLES,
-                1 << 13,
-                false,
-                false,
-                RenderType.CompositeState.builder()
-                        .setTextureState(NO_TEXTURE)
-                        .setShaderState(POSITION_COLOR_SHADER)
-                        .setTransparencyState(TRANSLUCENT_TRANSPARENCY)
-                        .setDepthTestState(LEQUAL_DEPTH_TEST)
-                        .setCullState(CULL)
-                        .setLightmapState(NO_LIGHTMAP)
-                        .setOverlayState(NO_OVERLAY)
-                        .setLayeringState(NO_LAYERING)
-                        .setOutputState(MAIN_TARGET)
-                        .setTexturingState(DEFAULT_TEXTURING)
-                        .setWriteMaskState(COLOR_DEPTH_WRITE)
-                        .createCompositeState(false));
-
-        private static final RenderType COLORED_TRIANGLES_NC_ND = create("structurize_colored_triangles_nc_nd",
-                DefaultVertexFormat.POSITION_COLOR,
-                VertexFormat.Mode.TRIANGLES,
-                1 << 12,
-                false,
-                false,
-                RenderType.CompositeState.builder()
-                        .setTextureState(NO_TEXTURE)
-                        .setShaderState(POSITION_COLOR_SHADER)
-                        .setTransparencyState(TRANSLUCENT_TRANSPARENCY)
-                        .setDepthTestState(NO_DEPTH_TEST)
-                        .setCullState(NO_CULL)
-                        .setLightmapState(NO_LIGHTMAP)
-                        .setOverlayState(NO_OVERLAY)
-                        .setLayeringState(NO_LAYERING)
-                        .setOutputState(MAIN_TARGET)
-                        .setTexturingState(DEFAULT_TEXTURING)
-                        .setWriteMaskState(COLOR_WRITE)
-                        .createCompositeState(false));
     }
 
     // Citadel: DepthTestStateShard removed in 1.21

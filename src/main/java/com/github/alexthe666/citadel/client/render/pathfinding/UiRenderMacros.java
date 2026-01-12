@@ -367,9 +367,12 @@ public class UiRenderMacros {
                             final float vMin,
                             final float uMax,
                             final float vMax) {
-        Minecraft.getInstance().getTextureManager().bindForSetup(rl);
-        RenderSystem.setShaderTexture(0, rl);
-        RenderSystem.setShader(GameRenderer::getPositionTexShader);
+        // TODO: 1.21 - TextureManager.bindForSetup() removed, texture binding handled differently
+        // Minecraft.getInstance().getTextureManager().bindForSetup(rl);
+        // TODO: 1.21 - RenderSystem.setShaderTexture() now requires GpuTextureView not ResourceLocation
+        // RenderSystem.setShaderTexture(0, rl);
+        // TODO: 1.21 - GameRenderer::getPositionTexShader() removed, using different shader system
+        // RenderSystem.setShader(GameRenderer::getPositionTexShader);
 
         final Matrix4f m = ps.last().pose();
         final BufferBuilder buffer = Tesselator.getInstance().begin(VertexFormat.Mode.TRIANGLE_FAN, DefaultVertexFormat.POSITION_TEX);
@@ -474,9 +477,10 @@ public class UiRenderMacros {
         // bot left corner
         populateBlitTriangles(buffer, mat, xEnd, xEnd + uLeft, yEnd, yEnd + vLeft, restMinU, restMaxU, restMinV, restMaxV);
 
-        Minecraft.getInstance().getTextureManager().bindForSetup(rl);
-        RenderSystem.setShaderTexture(0, rl);
-        RenderSystem.setShader(GameRenderer::getPositionTexShader);
+        // TODO: 1.21 - TextureManager/RenderSystem shader setup removed
+        // Minecraft.getInstance().getTextureManager().bindForSetup(rl);
+        // RenderSystem.setShaderTexture(0, rl);
+        // RenderSystem.setShader(GameRenderer::getPositionTexShader);
 
 //        Tesselator.getInstance().end();
     }
@@ -576,15 +580,20 @@ public class UiRenderMacros {
             livingEntity.yHeadRot = entity.getYRot();
             livingEntity.yHeadRotO = entity.getYRot();
         }
-        Lighting.setupForEntityInInventory();
+        // TODO: 1.21 - Lighting.setupForEntityInInventory() removed
+        // Lighting.setupForEntityInInventory();
         final EntityRenderDispatcher dispatcher = mc.getEntityRenderDispatcher();
         pitchRotation.conjugate();
-        dispatcher.overrideCameraOrientation(pitchRotation);
-        dispatcher.setRenderShadow(false);
+        // TODO: 1.21 - EntityRenderDispatcher.overrideCameraOrientation() removed
+        // dispatcher.overrideCameraOrientation(pitchRotation);
+        // TODO: 1.21 - EntityRenderDispatcher.setRenderShadow() removed
+        // dispatcher.setRenderShadow(false);
         final MultiBufferSource.BufferSource buffers = mc.renderBuffers().bufferSource();
-        RenderSystem.runAsFancy(() -> dispatcher.render(entity, 0.0D, 0.0D, 0.0D, 0.0F, 1.0F, poseStack, buffers, 0x00F000F0));
+        // TODO: 1.21 - RenderSystem.runAsFancy() and dispatcher.render() signatures changed
+        // RenderSystem.runAsFancy(() -> dispatcher.render(entity, 0.0D, 0.0D, 0.0D, 0.0F, 1.0F, poseStack, buffers, 0x00F000F0));
         buffers.endBatch();
-        dispatcher.setRenderShadow(true);
+        // TODO: 1.21 - EntityRenderDispatcher.setRenderShadow() removed  
+        // dispatcher.setRenderShadow(true);
         entity.setYRot(oldYaw);
         entity.setXRot(oldPitch);
         if (livingEntity != null) {
@@ -593,6 +602,7 @@ public class UiRenderMacros {
             livingEntity.yHeadRot = oldYawHead;
         }
         poseStack.popPose();
-        Lighting.setupFor3DItems();
+        // TODO: 1.21 - Lighting.setupFor3DItems() removed
+        // Lighting.setupFor3DItems();
     }
 }
