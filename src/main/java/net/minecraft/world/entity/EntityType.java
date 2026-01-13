@@ -73,6 +73,7 @@ import net.minecraft.world.entity.animal.horse.ZombieHorse;
 import net.minecraft.world.entity.animal.sheep.Sheep;
 import net.minecraft.world.entity.animal.sniffer.Sniffer;
 import net.minecraft.world.entity.animal.wolf.Wolf;
+import com.github.alexmodguy.alexscaves.server.entity.living.GrottoceratopsEntity;
 import com.github.alexmodguy.alexscaves.server.entity.living.SubterranodonEntity;
 import com.github.alexmodguy.alexscaves.server.entity.living.VallumraptorEntity;
 import net.minecraft.world.entity.boss.enderdragon.EndCrystal;
@@ -522,6 +523,13 @@ public class EntityType<T extends Entity> implements FeatureElement, EntityTypeT
 	);
 	public static final EntityType<Goat> GOAT = register(
 		"goat", EntityType.Builder.of(Goat::new, MobCategory.CREATURE).sized(0.9F, 1.3F).passengerAttachments(1.1125F).clientTrackingRange(10)
+	);
+	public static final EntityType<GrottoceratopsEntity> GROTTOCERATOPS = register(
+		"grottoceratops",
+		EntityType.Builder.of(GrottoceratopsEntity::new, MobCategory.CREATURE)
+			.sized(2.5F, 2.0F)
+			.eyeHeight(1.5F)
+			.clientTrackingRange(10)
 	);
 	public static final EntityType<Guardian> GUARDIAN = register(
 		"guardian",

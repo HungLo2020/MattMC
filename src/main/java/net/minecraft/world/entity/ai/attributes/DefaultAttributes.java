@@ -45,6 +45,7 @@ import net.minecraft.world.entity.animal.horse.ZombieHorse;
 import net.minecraft.world.entity.animal.sheep.Sheep;
 import net.minecraft.world.entity.animal.sniffer.Sniffer;
 import net.minecraft.world.entity.animal.wolf.Wolf;
+import com.github.alexmodguy.alexscaves.server.entity.living.GrottoceratopsEntity;
 import com.github.alexmodguy.alexscaves.server.entity.living.SubterranodonEntity;
 import com.github.alexmodguy.alexscaves.server.entity.living.VallumraptorEntity;
 import net.minecraft.world.entity.boss.enderdragon.EnderDragon;
@@ -124,6 +125,7 @@ public class DefaultAttributes {
 		.put(EntityType.GIANT, Giant.createAttributes().build())
 		.put(EntityType.GLOW_SQUID, GlowSquid.createAttributes().build())
 		.put(EntityType.GOAT, Goat.createAttributes().build())
+		.put(EntityType.GROTTOCERATOPS, GrottoceratopsEntity.createAttributes().build())
 		.put(EntityType.GUARDIAN, Guardian.createAttributes().build())
 		.put(EntityType.HOGLIN, Hoglin.createAttributes().build())
 		.put(EntityType.HORSE, AbstractHorse.createBaseHorseAttributes().build())
