@@ -577,10 +577,15 @@ public class SubterranodonEntity extends DinosaurEntity implements PackAnimal, F
         return true;
     }
 
+    @Override
     public void calculateEntityAnimation(boolean flying) {
-        float f1 = (float) Mth.length(this.getX() - this.lastStepX, 0, this.getZ() - this.lastStepZ);
+        float f1 = (float) Mth.length(this.getX() - this.xo, flying ? this.getY() - this.yo : 0, this.getZ() - this.zo);
         float f2 = Math.min(f1 * 4.0F, 1.0F);
-        this.walkAnimation.update(f2, 0.4F, 0.0F);
+        if (!this.isPassenger() && this.isAlive()) {
+            this.walkAnimation.update(f2, 0.4F, 1.0F);
+        } else {
+            this.walkAnimation.stop();
+        }
     }
 
     public Vec3 collide(Vec3 movement) {
