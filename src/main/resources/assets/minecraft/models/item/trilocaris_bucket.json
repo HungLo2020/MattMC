@@ -1,7 +1,6 @@
 {
   "parent": "minecraft:item/generated",
   "textures": {
-    "layer0" : "minecraft:item/bucket",
-    "layer1" : "minecraft:item/bucket_content/trilocaris"
+    "layer0": "minecraft:item/trilocaris_bucket"
   }
 }
