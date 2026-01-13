@@ -10,4 +10,7 @@ public class SubterranodonRenderState extends LivingEntityRenderState {
     public boolean isFlying;
     public boolean isSitting;
     public float flapProgress;
+    public float flightPitch;
+    public float flightRoll;
+    public float tailYaw;
 }

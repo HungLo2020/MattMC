@@ -33,6 +33,9 @@ public class SubterranodonRenderer extends MobRenderer<SubterranodonEntity, Subt
         renderState.attackProgress = entity.getBiteProgress(partialTick); // getBiteProgress, not getAttackProgress
         renderState.sitProgress = entity.getSitProgress(partialTick);
         renderState.danceProgress = entity.getDanceProgress(partialTick);
+        renderState.flightPitch = entity.getFlightPitch(partialTick);
+        renderState.flightRoll = entity.getFlightRoll(partialTick);
+        renderState.tailYaw = entity.getTailYaw(partialTick);
     }
 
     @Override

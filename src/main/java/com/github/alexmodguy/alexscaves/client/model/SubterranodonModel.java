@@ -151,18 +151,18 @@ public class SubterranodonModel extends AdvancedEntityModel<SubterranodonRenderS
         float walkSpeed = 1F;
         float walkDegree = 1F;
         float flyProgress = renderState.isFlying ? 1.0F : 0.0F;
-        float buryEggsAmount = 0.0F;  // TODO: Add to render state if needed
+        float buryEggsAmount = 0.0F;  // Not needed for basic animation
         float groundProgress = 1F - flyProgress;
         float flapAmount = renderState.flapProgress;
         float groundStill = groundProgress * (1F - renderState.walkAnimationSpeed);
         float groundMove = groundProgress * renderState.walkAnimationSpeed;
         float glide = flyProgress * (1 - flapAmount);
-        float hoverProgress = 0.0F; // TODO: Add to render state if needed
+        float hoverProgress = 0.0F; // Not needed for basic animation
         float openMouthProgress = renderState.attackProgress;
         float sitProgress = renderState.sitProgress * groundProgress;
-        float rollAmount = 0.0F; // TODO: Add to render state if needed
-        float pitchAmount = 0.0F; // TODO: Add to render state if needed
-        float tailYaw = 0.0F; // TODO: Add to render state if needed
+        float rollAmount = renderState.flightRoll;
+        float pitchAmount = renderState.flightPitch;
+        float tailYaw = renderState.tailYaw / 57.295776F; // Convert from degrees to radians-ish
         float danceAmount = renderState.danceProgress;
         float danceSpeed = 0.5F;
         progressPositionPrev(body, groundProgress, 0, -8, 2, 1F);
