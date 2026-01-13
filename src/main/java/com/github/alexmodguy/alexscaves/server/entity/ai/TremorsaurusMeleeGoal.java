@@ -1,10 +1,10 @@
 package com.github.alexmodguy.alexscaves.server.entity.ai;
 
 import com.github.alexmodguy.alexscaves.server.entity.living.TremorsaurusEntity;
-import com.github.alexmodguy.alexscaves.server.misc.ACSoundRegistry;
 import com.github.alexthe666.citadel.animation.Animation;
 import com.github.alexthe666.citadel.animation.IAnimatedEntity;
 import net.minecraft.commands.arguments.EntityAnchorArgument;
+import net.minecraft.sounds.SoundEvents;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.ai.goal.Goal;
@@ -62,7 +62,7 @@ public class TremorsaurusMeleeGoal extends Goal {
 
     private void checkAndDealDamage(LivingEntity target) {
         if (tremorsaurus.hasLineOfSight(target) && tremorsaurus.distanceTo(target) < tremorsaurus.getBbWidth() + target.getBbWidth() + 2.0D) {
-            tremorsaurus.playSound(ACSoundRegistry.TREMORSAURUS_BITE.get());
+            tremorsaurus.playSound(SoundEvents.TREMORSAURUS_BITE);
             target.hurt(target.damageSources().mobAttack(tremorsaurus), (float) tremorsaurus.getAttribute(Attributes.ATTACK_DAMAGE).getValue());
             target.knockback(0.5D, tremorsaurus.getX() - target.getX(), tremorsaurus.getZ() - target.getZ());
         }

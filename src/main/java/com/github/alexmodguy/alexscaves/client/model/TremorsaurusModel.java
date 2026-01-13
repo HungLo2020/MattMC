@@ -1,6 +1,7 @@
 package com.github.alexmodguy.alexscaves.client.model;
 
 import com.github.alexmodguy.alexscaves.client.render.ColorUtil;
+import com.github.alexmodguy.alexscaves.client.render.entity.TremorsaurusRenderState;
 import com.github.alexmodguy.alexscaves.server.entity.item.DinosaurSpiritEntity;
 import com.github.alexmodguy.alexscaves.server.entity.living.TremorsaurusEntity;
 import com.github.alexmodguy.alexscaves.server.misc.ACMath;
@@ -17,7 +18,7 @@ import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.minecraft.world.phys.Vec3;
 import org.joml.Vector4f;
 
-public class TremorsaurusModel extends AdvancedEntityModel<TremorsaurusEntity> {
+public class TremorsaurusModel extends AdvancedEntityModel<TremorsaurusRenderState> {
     private final AdvancedModelBox body;
     private final AdvancedModelBox rarm;
     private final AdvancedModelBox larm;
@@ -311,15 +312,14 @@ public class TremorsaurusModel extends AdvancedEntityModel<TremorsaurusEntity> {
         }
     }
 
-    private void setupAnimForAnimation(TremorsaurusEntity entity, Animation animation, float limbSwing, float limbSwingAmount, float ageInTicks) {
-        float partialTick = ageInTicks - entity.tickCount;
-        if (entity.getAnimation() == TremorsaurusEntity.ANIMATION_ROAR) {
-            float animationIntensity = ACMath.cullAnimationTick(entity.getAnimationTick(), 1, animation, partialTick, 5, 40);
+    private void setupAnimForAnimation(TremorsaurusRenderState renderState, Animation animation, float limbSwing, float limbSwingAmount, float ageInTicks) {
+        if (renderState.animation == TremorsaurusEntity.ANIMATION_ROAR) {
+            float animationIntensity = renderState.animationTick / 55.0F; // Animation length is 55
             this.head.swing(1F, 0.1F, false, -1F, 0F, ageInTicks, animationIntensity);
             this.jaw.walk(2F, 0.1F, false, 1F, 0F, ageInTicks, animationIntensity);
         }
-        if (entity.getAnimation() == TremorsaurusEntity.ANIMATION_SHAKE_PREY) {
-            float animationIntensity = ACMath.cullAnimationTick(entity.getAnimationTick(), 1, animation, partialTick, 5, 30);
+        if (renderState.animation == TremorsaurusEntity.ANIMATION_SHAKE_PREY) {
+            float animationIntensity = renderState.animationTick / 40.0F; // Animation length is 40
             this.body.swing(0.6F, 0.8F, false, 0F, 0F, ageInTicks, animationIntensity);
             this.lleg.swing(0.6F, 0.8F, true, 0F, 0F, ageInTicks, animationIntensity);
             this.rleg.swing(0.6F, 0.8F, true, 0F, 0F, ageInTicks, animationIntensity);
@@ -331,16 +331,23 @@ public class TremorsaurusModel extends AdvancedEntityModel<TremorsaurusEntity> {
     }
 
     @Override
-    public void setupAnim(TremorsaurusEntity entity, float limbSwing, float limbSwingAmount, float ageInTicks, float netHeadYaw, float headPitch) {
+    public void setupAnim(TremorsaurusRenderState renderState) {
         this.resetToDefaultPose();
-        animate(entity);
-        if (entity.getAnimation() != IAnimatedEntity.NO_ANIMATION) {
-            setupAnimForAnimation(entity, entity.getAnimation(), limbSwing, limbSwingAmount, ageInTicks);
+        // Get values from render state
+        float limbSwing = renderState.walkAnimationPos;
+        float limbSwingAmount = renderState.walkAnimationSpeed;
+        float ageInTicks = renderState.ageInTicks;
+        float netHeadYaw = renderState.yRot;
+        float headPitch = renderState.xRot;
+        boolean isBaby = renderState.isBaby;
+        
+        // Note: animate method removed - needs entity reference which we don't have in render state
+        if (renderState.animation != IAnimatedEntity.NO_ANIMATION && renderState.animation != null) {
+            setupAnimForAnimation(renderState, renderState.animation, limbSwing, limbSwingAmount, ageInTicks);
         }
-        float partialTicks = ageInTicks - entity.tickCount;
-        float danceAmount = entity.getDanceProgress(partialTicks);
-        float sitAmount = entity.getSitProgress(partialTicks);
-        float buryEggsAmount = entity.getBuryEggsProgress(partialTicks);
+        float danceAmount = 0; // TODO: add to render state if needed
+        float sitAmount = 0; // TODO: add to render state if needed
+        float buryEggsAmount = 0; // TODO: add to render state if needed
         float danceSpeed = 0.5F;
         this.glasses.showModel = danceAmount > 0;
         float walkSpeed = 0.8F;
