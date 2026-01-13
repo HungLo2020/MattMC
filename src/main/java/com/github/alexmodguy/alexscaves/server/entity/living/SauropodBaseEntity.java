@@ -34,7 +34,6 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.pathfinder.PathType;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
-import net.neoforged.neoforge.entity.PartEntity;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -405,8 +404,7 @@ public abstract class SauropodBaseEntity extends DinosaurEntity implements Shake
         return true;
     }
 
-    @Override
-    public PartEntity<?>[] getParts() {
+    public SauropodPartEntity[] getParts() {
         return allParts;
     }
 

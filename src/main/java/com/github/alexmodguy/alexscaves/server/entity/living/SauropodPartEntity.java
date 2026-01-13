@@ -1,10 +1,10 @@
 package com.github.alexmodguy.alexscaves.server.entity.living;
 
-import com.github.alexmodguy.alexscaves.AlexsCaves;
-import com.github.alexmodguy.alexscaves.server.message.MultipartEntityMessage;
-import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.ClientGamePacketListener;
+import net.minecraft.network.syncher.SynchedEntityData;
+import net.minecraft.server.level.ServerEntity;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.tags.DamageTypeTags;
 import net.minecraft.util.Mth;
@@ -12,31 +12,49 @@ import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Entity;
-import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.world.entity.EntityDimensions;
 import net.minecraft.world.entity.Pose;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
-import net.neoforged.neoforge.entity.PartEntity;
+import org.jetbrains.annotations.Nullable;
 
-public class SauropodPartEntity extends PartEntity<SauropodBaseEntity> {
-
+public class SauropodPartEntity extends Entity {
+    public final SauropodBaseEntity parentMob;
     private final Entity connectedTo;
-    private EntityDimensions size;
+    private final EntityDimensions size;
     public float scale = 1;
+    public float yBodyRot;
+    public float yBodyRotO;
+    public float pitchAngle;
+    public float prevPitchAngle;
 
     public SauropodPartEntity(SauropodBaseEntity parent, Entity connectedTo, float sizeXZ, float sizeY) {
-        super(parent);
+        super(parent.getType(), parent.level());
+        this.parentMob = parent;
         this.blocksBuilding = true;
         this.connectedTo = connectedTo;
         this.size = EntityDimensions.scalable(sizeXZ, sizeY);
         this.refreshDimensions();
     }
 
+    @Override
+    protected void defineSynchedData(SynchedEntityData.Builder builder) {
+    }
+
+    @Override
+    protected void readAdditionalSaveData(ValueInput valueInput) {
+    }
+
+    @Override
+    protected void addAdditionalSaveData(ValueOutput valueOutput) {
+    }
+
     public EntityDimensions getDimensions(Pose pose) {
-        SauropodBaseEntity parent = this.getParent();
-        return parent == null ? size : size.scale(parent.getScale());
+        return parentMob == null ? size : size.scale(parentMob.getScale());
     }
 
     @Override
@@ -46,124 +64,78 @@ public class SauropodPartEntity extends PartEntity<SauropodBaseEntity> {
 
     @Override
     public InteractionResult interact(Player player, InteractionHand hand) {
-        SauropodBaseEntity parent = this.getParent();
-        if (parent == null) {
+        if (parentMob == null) {
             return InteractionResult.PASS;
         } else {
             this.playSound(SoundEvents.ITEM_BREAK);
-            if (player.level().isClientSide) {
-                AlexsCaves.sendMSGToServer(new MultipartEntityMessage(parent.getId(), player.getId(), 0));
-            }
-            return parent.interact(player, hand);
+            return parentMob.interact(player, hand);
         }
-    }
-
-    @Override
-    public boolean save(CompoundTag tag) {
-        return false;
     }
 
     @Override
     public boolean canBeCollidedWith() {
-        SauropodBaseEntity parent = this.getParent();
-        return parent != null && parent.canBeCollidedWith();
+        return parentMob != null && parentMob.canBeCollidedWith();
     }
-
 
     @Override
     public boolean isPickable() {
-        SauropodBaseEntity parent = this.getParent();
-        return parent != null && parent.isPickable();
+        return parentMob != null && parentMob.isPickable();
     }
 
-    public boolean isInvulnerableTo(DamageSource damageSource) {
-        SauropodBaseEntity parent = this.getParent();
-        return super.isInvulnerableTo(damageSource) || parent != null && parent.isInvulnerableTo(damageSource) || damageSource.getEntity() != null && parent != null && parent.isPassengerOfSameVehicle(damageSource.getEntity());
+    @Nullable
+    @Override
+    public ItemStack getPickResult() {
+        return parentMob != null ? parentMob.getPickResult() : null;
     }
 
-    public boolean is(Entity entityIn) {
-        return this == entityIn || this.getParent() == entityIn;
+    @Override
+    public boolean hurtServer(ServerLevel serverLevel, DamageSource damageSource, float f) {
+        if (this.isInvulnerableToBase(damageSource)) {
+            return false;
+        }
+        if (parentMob != null && !parentMob.isDeadOrDying()) {
+            damageSource = parentMob.level().damageSources().mobAttack(parentMob);
+            if (!damageSource.is(DamageTypeTags.NO_KNOCKBACK)) {
+                double entityX = damageSource.getEntity() != null ? damageSource.getEntity().getX() : this.getX();
+                double entityZ = damageSource.getEntity() != null ? damageSource.getEntity().getZ() : this.getZ();
+                double d0 = entityX - parentMob.getX();
+                double d1;
+                for (d1 = entityZ - parentMob.getZ(); d0 * d0 + d1 * d1 < 1.0E-4; d1 = (Math.random() - Math.random()) * 0.01) {
+                    d0 = (Math.random() - Math.random()) * 0.01;
+                }
+                parentMob.knockback(0.4F, d0, d1);
+            }
+            return parentMob.hurt(serverLevel, damageSource, f);
+        }
+        return false;
     }
 
-    public Packet<ClientGamePacketListener> getAddEntityPacket() {
+    @Override
+    public boolean is(Entity entity) {
+        return this == entity || this.parentMob == entity;
+    }
+
+    @Override
+    public Packet<ClientGamePacketListener> getAddEntityPacket(ServerEntity serverEntity) {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    protected void defineSynchedData(SynchedEntityData.Builder builder) {
-
-    }
-
-    @Override
-    protected void readAdditionalSaveData(CompoundTag compound) {
-
-    }
-
-    @Override
-    protected void addAdditionalSaveData(CompoundTag compound) {
-
-    }
-
-    @Override
-    public boolean hurt(DamageSource source, float amount) {
-        SauropodBaseEntity parent = this.getParent();
-        if(source.is(DamageTypeTags.IS_PROJECTILE)){
-            amount *= 0.33F;
-        }
-        if (!this.isInvulnerableTo(source) && parent != null) {
-            Entity player = source.getEntity();
-            if (player != null && !parent.isAlliedTo(player) && player.level().isClientSide) {
-                AlexsCaves.sendMSGToServer(new MultipartEntityMessage(parent.getId(), player.getId(), 1));
-            }
-        }
-        return false;
-    }
-
-
-    public AABB getBoundingBoxForCulling() {
-        return this.getBoundingBox().inflate(2.0D, 0.5D, 2.0D);
-    }
-
-    public float calculateAnimationAngle(float partialTicks, boolean pitch) {
-        SauropodBaseEntity parent = this.getParent();
-        float parentRot = 0;
-        Vec3 connection = connectedTo.getPosition(partialTicks).add(0, connectedTo.getBbHeight() * 0.5F, 0);
-        if (connectedTo == parent && parent != null) {
-            connection = connection.add(0, -parent.getLegSolverBodyOffset(), 0);
-        }
-        if (parent != null && this == parent.neckPart1) {
-            connection = connection.add(0, 2F * parent.getScale(), 0);
-        }
-        if(parent != null){
-            parentRot = -(parent.yBodyRotO + (parent.yBodyRot - parent.yBodyRotO) * partialTicks) - 90F;
-        }
-        Vec3 center = centeredPosition(partialTicks);
-        Vec3 offset = connection.subtract(center).normalize();
-        Vec3 back = center.add(offset.scale(-1 * this.getBbWidth()));
-        double d0 = connection.x - back.x;
-        double d1 = connection.y - back.y;
-        double d2 = connection.z - back.z;
-        if (pitch) {
-            double d3 = Mth.sqrt((float) (d0 * d0 + d2 * d2));
-            return Mth.wrapDegrees((float) (-(Mth.atan2(d1, d3) * 180.0F / (float) Math.PI)));
-        } else {
-            return (float) (Mth.atan2(d2, d0) * 57.2957763671875D) + parentRot;
-        }
-    }
-
     public boolean shouldBeSaved() {
         return false;
     }
 
-    public void setPosCenteredY(Vec3 pos) {
-        this.setPos(pos.x, pos.y - this.getBbHeight() * 0.5F, pos.z);
+    public void setPosition(double x, double y, double z) {
+        this.setPosRaw(x, y, z);
     }
 
-    public Vec3 centeredPosition() {
-        return this.position().add(0, this.getBbHeight() * 0.5F, 0);
+    public void setBoundingBox(AABB aabb) {
+        this.bb = aabb;
     }
 
-    public Vec3 centeredPosition(float partialTicks) {
-        return this.getPosition(partialTicks).add(0, this.getBbHeight() * 0.5F, 0);
+    public float calculateAnimationAngle(float partialTick, boolean pitch) {
+        float bodyRotInterp = Mth.rotLerp(partialTick, this.yBodyRotO, this.yBodyRot);
+        float pitchInterp = Mth.rotLerp(partialTick, this.prevPitchAngle, this.pitchAngle);
+        return pitch ? pitchInterp : bodyRotInterp;
     }
 }

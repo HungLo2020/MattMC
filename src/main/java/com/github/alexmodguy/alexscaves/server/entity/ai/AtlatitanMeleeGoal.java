@@ -2,8 +2,8 @@ package com.github.alexmodguy.alexscaves.server.entity.ai;
 
 import com.github.alexmodguy.alexscaves.server.entity.living.AtlatitanEntity;
 import com.github.alexmodguy.alexscaves.server.entity.living.SauropodBaseEntity;
-import com.github.alexmodguy.alexscaves.server.misc.ACSoundRegistry;
 import com.github.alexthe666.citadel.animation.IAnimatedEntity;
+import net.minecraft.sounds.SoundEvents;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.goal.Goal;
@@ -52,11 +52,13 @@ public class AtlatitanMeleeGoal extends Goal {
                 if(distance < attackDistance + 4.0D){
                     float random = this.atlatitan.getRandom().nextFloat();
                     if(random < 0.5F && distance < attackDistance + 1.0D){
-                        this.atlatitan.playSound(ACSoundRegistry.ATLATITAN_KICK.get(), 3.0F, atlatitan.getVoicePitch());
-                        this.atlatitan.setAnimation(this.atlatitan.getRandom().nextBoolean() ? AtlatitanEntity.ANIMATION_LEFT_KICK : AtlatitanEntity.ANIMATION_RIGHT_KICK);
+                        // Using ATLATITAN_STOMP as placeholder for kick sound
+                        this.atlatitan.playSound(SoundEvents.ATLATITAN_STOMP, 3.0F, atlatitan.getVoicePitch());
+                        this.atlatitan.setAnimation(this.atlatitan.getRandom().nextBoolean() ? SauropodBaseEntity.ANIMATION_LEFT_KICK : SauropodBaseEntity.ANIMATION_RIGHT_KICK);
                     }else{
-                        this.atlatitan.playSound(ACSoundRegistry.ATLATITAN_TAIL.get(), 3.0F, atlatitan.getVoicePitch());
-                        this.atlatitan.setAnimation(this.atlatitan.getRandom().nextBoolean() ? AtlatitanEntity.ANIMATION_RIGHT_WHIP : AtlatitanEntity.ANIMATION_LEFT_WHIP);
+                        // Using ATLATITAN_STOMP as placeholder for tail sound
+                        this.atlatitan.playSound(SoundEvents.ATLATITAN_STOMP, 3.0F, atlatitan.getVoicePitch());
+                        this.atlatitan.setAnimation(this.atlatitan.getRandom().nextBoolean() ? SauropodBaseEntity.ANIMATION_RIGHT_WHIP : SauropodBaseEntity.ANIMATION_LEFT_WHIP);
                     }
                 }
             }
