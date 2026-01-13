@@ -1617,6 +1617,10 @@ public class CreativeModeTabs {
 						output.accept(Items.COOKED_SALMON);
 						output.accept(Items.TROPICAL_FISH);
 						output.accept(Items.PUFFERFISH);
+						output.accept(Items.TRILOCARIS_TAIL);
+						output.accept(Items.COOKED_TRILOCARIS_TAIL);
+						output.accept(Items.PINE_NUTS);
+						output.accept(Items.DINOSAUR_NUGGET);
 						output.accept(Items.BREAD);
 						output.accept(Items.COOKIE);
 						output.accept(Items.CAKE);
@@ -1626,6 +1630,9 @@ public class CreativeModeTabs {
 						output.accept(Items.MUSHROOM_STEW);
 						output.accept(Items.BEETROOT_SOUP);
 						output.accept(Items.RABBIT_STEW);
+						output.accept(Items.SERENE_SALAD);
+						output.accept(Items.SEETHING_STEW);
+						output.accept(Items.PRIMORDIAL_SOUP);
 						generateSuspiciousStews(output, CreativeModeTab.TabVisibility.PARENT_AND_SEARCH_TABS);
 						output.accept(Items.MILK_BUCKET);
 						output.accept(Items.HONEY_BOTTLE);
@@ -1680,6 +1687,7 @@ public class CreativeModeTabs {
 					output.accept(Items.WHEAT);
 					output.accept(Items.BONE);
 					output.accept(Items.BONE_MEAL);
+					output.accept(Items.HEAVY_BONE);
 					output.accept(Items.STRING);
 					output.accept(Items.FEATHER);
 					output.accept(Items.SNOWBALL);
@@ -1688,8 +1696,11 @@ public class CreativeModeTabs {
 					output.accept(Items.BLUE_EGG);
 					output.accept(Items.LEATHER);
 					output.accept(Items.RABBIT_HIDE);
+					output.accept(Items.TOUGH_HIDE);
 					output.accept(Items.HONEYCOMB);
 					output.accept(Items.RESIN_CLUMP);
+					output.accept(Items.PEWEN_SAP);
+					output.accept(Items.AMBER_CURIOSITY);
 					output.accept(Items.INK_SAC);
 					output.accept(Items.GLOW_INK_SAC);
 					output.accept(Items.TURTLE_SCUTE);

@@ -1571,6 +1571,20 @@ public class Items {
 	public static final Item PUFFERFISH = registerItem("pufferfish", new Item.Properties().food(Foods.PUFFERFISH, Consumables.PUFFERFISH));
 	public static final Item COOKED_COD = registerItem("cooked_cod", new Item.Properties().food(Foods.COOKED_COD));
 	public static final Item COOKED_SALMON = registerItem("cooked_salmon", new Item.Properties().food(Foods.COOKED_SALMON));
+	
+	// Alex's Caves Primordial items
+	public static final Item TRILOCARIS_TAIL = registerItem("trilocaris_tail", new Item.Properties().food(Foods.TRILOCARIS_TAIL));
+	public static final Item COOKED_TRILOCARIS_TAIL = registerItem("cooked_trilocaris_tail", new Item.Properties().food(Foods.COOKED_TRILOCARIS_TAIL));
+	public static final Item PINE_NUTS = registerItem("pine_nuts", new Item.Properties().food(Foods.PINE_NUTS));
+	public static final Item PEWEN_SAP = registerItem("pewen_sap");
+	public static final Item AMBER_CURIOSITY = registerItem("amber_curiosity");
+	public static final Item DINOSAUR_NUGGET = registerItem("dinosaur_nugget", new Item.Properties().food(Foods.DINOSAUR_NUGGET));
+	public static final Item SERENE_SALAD = registerItem("serene_salad", new Item.Properties().food(Foods.SERENE_SALAD).stacksTo(1));
+	public static final Item SEETHING_STEW = registerItem("seething_stew", new Item.Properties().food(Foods.SEETHING_STEW).stacksTo(1));
+	public static final Item PRIMORDIAL_SOUP = registerItem("primordial_soup", new Item.Properties().food(Foods.PRIMORDIAL_SOUP).stacksTo(1));
+	public static final Item TOUGH_HIDE = registerItem("tough_hide");
+	public static final Item HEAVY_BONE = registerItem("heavy_bone", new Item.Properties().stacksTo(16));
+	
 	public static final Item INK_SAC = registerItem("ink_sac", InkSacItem::new);
 	public static final Item GLOW_INK_SAC = registerItem("glow_ink_sac", GlowInkSacItem::new);
 	public static final Item COCOA_BEANS = registerItem("cocoa_beans", createBlockItemWithCustomItemName(Blocks.COCOA));
