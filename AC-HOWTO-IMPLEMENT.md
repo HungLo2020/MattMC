@@ -11,9 +11,9 @@ Quick reference for implementing Alex's Caves mobs into MattMC's direct Minecraf
 ### 1. Copy Source Files
 - Copy all Java files for the mob from `frnsrc/` to `src/main/java/`
 - Copy required dependency files (base classes, AI goals, interfaces, utilities)
-- Copy Citadel model system files (BasicEntityModel, AdvancedEntityModel, AdvancedModelBox, BasicModelPart, etc.)
+- Copy Citadel model system files (BasicEntityModel, AdvancedEntityModel, AdvancedModelBox, BasicModelPart, etc.). Some of these may already be implemented.
 - Copy Citadel pathfinding system if needed (raycoms package)
-- Copy Tabula model container files (8 files: JsonUtils, TabulaModelContainer, etc.)
+- Copy Tabula model container files (8 files: JsonUtils, TabulaModelContainer, etc.) if needed.
 
 ### 2. Copy Asset Files
 - **CRITICAL**: Copy textures to `src/main/resources/assets/minecraft/textures/entity/` (NOT alexscaves/)
@@ -23,7 +23,7 @@ Quick reference for implementing Alex's Caves mobs into MattMC's direct Minecraf
 ### 3. Remove/Replace All Custom Registries
 - Delete ACEntityRegistry, ACItemRegistry, ACBlockRegistry, etc.
 - Delete AlexsCaves main class
-- Replace all registry references with vanilla Minecraft equivalents:
+- Replace all registry references with vanilla Minecraft equivalents and register everything needed in vanilla source:
   - `ACEntityRegistry.ENTITY` → `EntityType.ENTITY_NAME`
   - `ACItemRegistry.ITEM` → `Items.ITEM_NAME`
   - `ACSoundRegistry.SOUND` → `SoundEvents.SOUND_NAME`
@@ -93,7 +93,7 @@ Quick reference for implementing Alex's Caves mobs into MattMC's direct Minecraf
 - Create minimal implementations for any missing utility classes
 - Stub out non-critical functionality to reduce implementation scope
 
-## Common Pitfalls
+## Common Pitfalls and notes. MUST READ BEFORE IMPLEMENTING
 
 1. **Black Textures**: Usually namespace issue - verify using `minecraft:` not `alexscaves:`
 2. **Invisible Models**: Missing renderToBuffer() implementation or renderer not registered
@@ -101,6 +101,11 @@ Quick reference for implementing Alex's Caves mobs into MattMC's direct Minecraf
 4. **Texture Dimension Mismatch**: Ensure textureWidth/textureHeight synchronized across model hierarchy
 5. **Missing in Creative Tab**: Must manually add to CreativeModeTabs
 6. **Summon Command Fails**: Check DefaultAttributes method name and registration
+7. **Pathfinding Issues**: Ensure correct use of new pathfinding APIs and parameters
+8. **Improper Animations**: Verify animations and rotations for model, etc are properly set up and configured.
+9. **No Spawn Egg**: Ensure spawn egg item is registered in Items.java and added to CreativeModeTabs. copy zombie spawn egg texture for the egg texture for whatever mob is being added. copy an existing mob spawn egg for the 3 json locations such as Subteranodon.
+10. **No translations**: If adding new items or entities, ensure to add translation keys to the main en_us json language file.
+11. **Must use original sounds**: add the original sounds to the project, register them in the vanilla registery, and add them to the sounds.json and ensure the mob being added correctly references them and calls them.
 
 ## Validation
 
