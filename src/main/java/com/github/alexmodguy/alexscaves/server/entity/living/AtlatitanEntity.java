@@ -227,9 +227,8 @@ public class AtlatitanEntity extends SauropodBaseEntity implements KeybindUsingM
         InteractionResult prev = super.mobInteract(player, hand);
         ItemStack itemstack = player.getItemInHand(hand);
         if (!prev.consumesAction() && itemstack.is(Items.GOLDEN_APPLE) && !this.isBaby()) {
-            if (!itemstack.getCraftingRemainingItem().isEmpty()) {
-                this.spawnAtLocation(itemstack.getCraftingRemainingItem().copy());
-            }
+            // Give rideable effect
+            this.setRideableFor(12000); // 10 minutes
             // Use standard item consumption
             if (!player.getAbilities().instabuild) {
                 itemstack.shrink(1);

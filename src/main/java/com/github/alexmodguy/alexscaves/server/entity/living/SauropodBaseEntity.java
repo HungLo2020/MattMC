@@ -501,8 +501,8 @@ public abstract class SauropodBaseEntity extends DinosaurEntity implements Shake
             if(!living.is(this) && !living.isAlliedTo(this) && living.getType() != this.getType() && living.distanceToSqr(center.x, center.y, center.z) <= radius * radius){
                 // Shield disabling logic simplified for 1.21
                 if(disablesShields && living instanceof Player player){
-                    // Shield API changed in 1.21 - simplified cooldown
-                    player.getCooldowns().addCooldown(net.minecraft.world.item.Items.SHIELD, 100);
+                    // Shield API changed in 1.21 - takes ItemStack
+                    player.getCooldowns().addCooldown(new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.SHIELD), 100);
                 }
                 // hurt returns void in 1.21
                 living.hurt(damageSource, damageAmount);
@@ -576,9 +576,9 @@ public abstract class SauropodBaseEntity extends DinosaurEntity implements Shake
         return super.hurtServer(serverLevel, source, amount);
     }
 
-    @Override
-    protected boolean isInvulnerableTo(DamageSource damageSource) {
-        return super.isInvulnerableTo(damageSource) || damageSource.is(DamageTypes.IN_WALL);
+    // Custom invulnerability check for sauropods (disabled - API changed in 1.21)
+    protected boolean isInvulnerableToSauropod(DamageSource damageSource) {
+        return damageSource.is(DamageTypes.IN_WALL);
     }
 
     public boolean shouldRenderAtSqrDistance(double distance) {

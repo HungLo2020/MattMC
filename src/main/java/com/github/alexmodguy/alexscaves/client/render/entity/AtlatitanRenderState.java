@@ -6,6 +6,7 @@ import net.minecraft.client.renderer.entity.state.LivingEntityRenderState;
 public class AtlatitanRenderState extends LivingEntityRenderState {
     public int altSkin;
     public float danceProgress;
+    public float danceAmount;
     public float neckXRot;
     public float neckYRot;
     public float tailXRot;

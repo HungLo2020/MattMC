@@ -1,6 +1,6 @@
 package com.github.alexmodguy.alexscaves.client.model;
 
-import com.github.alexmodguy.alexscaves.client.render.entity.AtlatitanRenderState;
+import com.github.alexmodguy.alexscaves.server.entity.living.SauropodBaseEntity;
 import com.github.alexmodguy.alexscaves.server.misc.ACMath;
 import com.github.alexthe666.citadel.animation.Animation;
 import com.github.alexthe666.citadel.animation.IAnimatedEntity;
@@ -162,232 +162,73 @@ public abstract class SauropodBaseModel<T extends LivingEntityRenderState> exten
         animator = ModelAnimator.create();
     }
 
-    // animate method removed - using render state instead
-        animator.setAnimation(SauropodBaseEntity.ANIMATION_SPEAK);
-        animator.startKeyframe(3);
-        animator.rotate(head, (float) Math.toRadians(10), 0, 0);
-        animator.endKeyframe();
-        animator.startKeyframe(7);
-        animator.rotate(head, (float) Math.toRadians(-10), 0, 0);
-        animator.rotate(jaw, (float) Math.toRadians(40), 0, 0);
-        animator.endKeyframe();
-        animator.resetKeyframe(5);
-        animator.setAnimation(SauropodBaseEntity.ANIMATION_ROAR);
-        animator.startKeyframe(5);
-        animator.rotate(head, (float) Math.toRadians(10), 0, 0);
-        animator.endKeyframe();
-        animator.startKeyframe(5);
-        animator.rotate(head, (float) Math.toRadians(-50), 0, 0);
-        animator.rotate(jaw, (float) Math.toRadians(40), 0, 0);
-        animator.endKeyframe();
-        animator.setStaticKeyframe(40);
-        animator.resetKeyframe(10);
-        animator.setAnimation(SauropodBaseEntity.ANIMATION_EPIC_DEATH);
-        animator.startKeyframe(5);
-        animator.rotate(head, (float) Math.toRadians(10), 0, 0);
-        animator.endKeyframe();
-        animator.startKeyframe(5);
-        animator.rotate(head, (float) Math.toRadians(-50), 0, 0);
-        animator.rotate(neck, (float) Math.toRadians(-10), 0, 0);
-        animator.rotate(neck2, (float) Math.toRadians(-10), 0, 0);
-        animator.rotate(jaw, (float) Math.toRadians(40), 0, 0);
-        animator.endKeyframe();
-        animator.setStaticKeyframe(100);
-        animator.resetKeyframe(10);
-        animator.setAnimation(SauropodBaseEntity.ANIMATION_SUMMON);
-        animator.startKeyframe(0);
-        animator.move(body, 0, 200, 0);
-        animator.move(neck2, 0, -5, -5);
-        animator.rotate(neck, (float) Math.toRadians(-50), 0, 0);
-        animator.rotate(neck2, (float) Math.toRadians(120), 0, 0);
-        animator.rotate(head, (float) Math.toRadians(50), 0, 0);
-        animator.endKeyframe();
-        animator.resetKeyframe(120);
-        animator.setAnimation(SauropodBaseEntity.ANIMATION_STOMP);
-        animator.startKeyframe(20);
-        animator.move(body, 0, -25, -23);
-        animator.move(chest, 0, 2, 4);
-        animator.move(head, 0, 5, -5);
-        animator.move(left_Leg, 0, 0, -5);
-        animator.move(right_Leg, 0, 0, -5);
-        animator.move(left_Arm, 0, 10, -5);
-        animator.move(right_Arm, 0, 10, -5);
-        animator.rotate(body, (float) Math.toRadians(-40), 0, 0);
-        animator.rotate(neck, (float) Math.toRadians(50), 0, 0);
-        animator.rotate(neck2, (float) Math.toRadians(10), 0, 0);
-        animator.rotate(tail, (float) Math.toRadians(20), 0, 0);
-        animator.rotate(tail3, (float) Math.toRadians(20), 0, 0);
-        animator.rotate(head, (float) Math.toRadians(30), 0, 0);
-        animator.rotate(chest, (float) Math.toRadians(-20), 0, 0);
-        animator.rotate(left_Leg, (float) Math.toRadians(40), 0, 0);
-        animator.rotate(right_Leg, (float) Math.toRadians(40), 0, 0);
-        animator.rotate(left_Arm, (float) Math.toRadians(-20), (float) Math.toRadians(-20), (float) Math.toRadians(-20));
-        animator.rotate(right_Arm, (float) Math.toRadians(-20), (float) Math.toRadians(20), (float) Math.toRadians(20));
-        animator.rotate(left_Hand, (float) Math.toRadians(50), 0, 0);
-        animator.rotate(right_Hand, (float) Math.toRadians(50), 0, 0);
-        animator.endKeyframe();
-        animator.setStaticKeyframe(5);
-        animator.startKeyframe(5);
-        animator.move(body, 0, 10, 0);
-        animator.move(right_Leg, 0, -10, 0);
-        animator.move(left_Leg, 0, -10, 0);
-        animator.move(right_Arm, -2, -10, -7);
-        animator.move(left_Arm, 2, -10, -7);
-        animator.rotate(left_Arm, 0, 0, (float) Math.toRadians(-20));
-        animator.rotate(right_Arm, 0, 0, (float) Math.toRadians(20));
-        animator.rotate(left_Hand, 0, 0, (float) Math.toRadians(20));
-        animator.rotate(right_Hand, 0, 0, (float) Math.toRadians(-20));
-        animator.endKeyframe();
-        animator.setStaticKeyframe(10);
-        animator.resetKeyframe(10);
-        animator.setAnimation(SauropodBaseEntity.ANIMATION_SPEW_FLAMES);
-        animator.startKeyframe(5);
-        animator.rotate(head, (float) Math.toRadians(10), 0, 0);
-        animator.endKeyframe();
-        animator.startKeyframe(5);
-        animator.rotate(head, (float) Math.toRadians(-30), 0, 0);
-        animator.rotate(jaw, (float) Math.toRadians(60), 0, 0);
-        animator.endKeyframe();
-        animator.setStaticKeyframe(60);
-        animator.resetKeyframe(10);
-        animator.setAnimation(SauropodBaseEntity.ANIMATION_JUMP);
-        animator.startKeyframe(10);
-        animator.move(body, 0, 10, 0);
-        animator.move(right_Leg, 0, -9, 0);
-        animator.move(left_Leg, 0, -9, 0);
-        animator.move(right_Arm, -2, -6, -4);
-        animator.move(left_Arm, 2, -6, -4);
-        animator.rotate(left_Arm, 0, 0, (float) Math.toRadians(-20));
-        animator.rotate(right_Arm, 0, 0, (float) Math.toRadians(20));
-        animator.rotate(left_Hand, 0, 0, (float) Math.toRadians(20));
-        animator.rotate(right_Hand, 0, 0, (float) Math.toRadians(-20));
-        animator.rotate(left_Leg, 0, 0, (float) Math.toRadians(-10));
-        animator.rotate(right_Leg, 0, 0, (float) Math.toRadians(10));
-        animator.rotate(left_Foot, 0, 0, (float) Math.toRadians(10));
-        animator.rotate(right_Foot, 0, 0, (float) Math.toRadians(-10));
-        animator.rotate(neck, (float) Math.toRadians(-15), 0, 0);
-        animator.rotate(tail, (float) Math.toRadians(10), 0, 0);
-        animator.rotate(neck2, (float) Math.toRadians(20), 0, 0);
-        animator.rotate(head, (float) Math.toRadians(10), 0, 0);
-        animator.endKeyframe();
-        animator.setStaticKeyframe(10);
-        animator.startKeyframe(5);
-        animator.move(body, 0, -10, 0);
-        animator.rotate(left_Arm, (float) Math.toRadians(-30), 0, (float) Math.toRadians(-10));
-        animator.rotate(right_Arm, (float) Math.toRadians(-30), 0, (float) Math.toRadians(10));
-        animator.rotate(right_Leg, (float) Math.toRadians(30), 0, (float) Math.toRadians(-10));
-        animator.rotate(left_Leg, (float) Math.toRadians(30), 0, (float) Math.toRadians(10));
-        animator.endKeyframe();
-        animator.setStaticKeyframe(5);
-        animator.startKeyframe(5);
-        animator.move(body, 0, 10, 0);
-        animator.move(right_Leg, 0, -9, 0);
-        animator.move(left_Leg, 0, -9, 0);
-        animator.move(right_Arm, -2, -6, -4);
-        animator.move(left_Arm, 2, -6, -4);
-        animator.rotate(left_Arm, 0, 0, (float) Math.toRadians(-20));
-        animator.rotate(right_Arm, 0, 0, (float) Math.toRadians(20));
-        animator.rotate(left_Hand, 0, 0, (float) Math.toRadians(20));
-        animator.rotate(right_Hand, 0, 0, (float) Math.toRadians(-20));
-        animator.rotate(left_Leg, 0, 0, (float) Math.toRadians(-10));
-        animator.rotate(right_Leg, 0, 0, (float) Math.toRadians(10));
-        animator.rotate(left_Foot, 0, 0, (float) Math.toRadians(10));
-        animator.rotate(right_Foot, 0, 0, (float) Math.toRadians(-10));
-        animator.rotate(neck, (float) Math.toRadians(-15), 0, 0);
-        animator.rotate(tail, (float) Math.toRadians(10), 0, 0);
-        animator.rotate(neck2, (float) Math.toRadians(20), 0, 0);
-        animator.rotate(head, (float) Math.toRadians(10), 0, 0);
-        animator.endKeyframe();
-        animator.resetKeyframe(10);
-        animator.setAnimation(SauropodBaseEntity.ANIMATION_LEFT_KICK);
-        animator.startKeyframe(4);
-        animator.move(left_Arm, 3, 3, -3);
-        animator.rotate(left_Arm,  (float) Math.toRadians(-30), (float) Math.toRadians(-40), 0);
-        animator.rotate(left_Hand,  (float) Math.toRadians(40), 0, (float) Math.toRadians(10));
-        animator.rotate(body,  0, (float) Math.toRadians(10), 0);
-        animator.rotate(tail,  0, (float) Math.toRadians(10), 0);
-        animator.rotate(neck,  0, (float) Math.toRadians(-5), 0);
-        animator.endKeyframe();
-        animator.startKeyframe(6);
-        animator.move(left_Arm, 0, -5, -3);
-        animator.rotate(left_Arm,  (float) Math.toRadians(-80), (float) Math.toRadians(0), 0);
-        animator.rotate(left_Hand,  (float) Math.toRadians(10), 0, (float) Math.toRadians(10));
-        animator.endKeyframe();
-        animator.resetKeyframe(10);
-        animator.setAnimation(SauropodBaseEntity.ANIMATION_RIGHT_KICK);
-        animator.startKeyframe(5);
-        animator.move(right_Arm, -3, 3, -3);
-        animator.rotate(right_Arm,  (float) Math.toRadians(-30), (float) Math.toRadians(40), 0);
-        animator.rotate(right_Hand,  (float) Math.toRadians(40), 0, (float) Math.toRadians(-10));
-        animator.rotate(body,  0, (float) Math.toRadians(-10), 0);
-        animator.rotate(tail,  0, (float) Math.toRadians(-10), 0);
-        animator.rotate(neck,  0, (float) Math.toRadians(5), 0);
-        animator.endKeyframe();
-        animator.startKeyframe(4);
-        animator.move(right_Arm, 0, -5, -3);
-        animator.rotate(right_Arm,  (float) Math.toRadians(-80), (float) Math.toRadians(0), 0);
-        animator.rotate(right_Hand,  (float) Math.toRadians(10), 0, (float) Math.toRadians(-10));
-        animator.endKeyframe();
-        animator.resetKeyframe(6);
-        animator.setAnimation(SauropodBaseEntity.ANIMATION_EAT_LEAVES);
-        animator.startKeyframe(15);
-        animator.rotate(neck, (float) Math.toRadians(-20), 0, 0);
-        animator.rotate(neck2, (float) Math.toRadians(10), 0, 0);
-        animator.rotate(head, (float) Math.toRadians(10), 0, 0);
-        animator.rotate(jaw, (float) Math.toRadians(40), 0, 0);
-        animator.endKeyframe();
-        animator.startKeyframe(10);
-        animator.rotate(head, (float) Math.toRadians(20), 0, 0);
-        animator.rotate(jaw, (float) Math.toRadians(-10), 0, 0);
-        animator.move(jaw, 0, 0, 1);
-        animator.endKeyframe();
-        animator.resetKeyframe(10);
-
-    }
+    // animate method removed - converted to setupAnimForAnimation using render state
 
     @Override
     public void setupAnim(T renderState) {
+        // This method should be overridden by subclasses with specific render state types
         this.resetToDefaultPose();
-        // Animation handling - check if renderState has animation data
-        if (renderState instanceof AtlatitanRenderState atlatitanState) {
-            if (atlatitanState.animation != null) {
-                setupAnimForAnimation(atlatitanState, atlatitanState.animation, renderState.walkAnimationPos, renderState.walkAnimationSpeed, renderState.ageInTicks);
-            }
-            float idleSpeed = 0.05F;
-            float walkSpeed = 0.05F;
-            float walkDegree = 3F;
-            float walk = atlatitanState.walkAnimPosition;
-            float walkAmount = Math.min(atlatitanState.walkAnimSpeed, 1F);
-            float armsWalkAmount = walkAmount;
-            float raiseArmsAmount = atlatitanState.raiseArmsAmount;
-            float legBack = atlatitanState.legBackAmount;
-            float danceAmount = atlatitanState.danceProgress;
-            float buryEggsAmount = 0.0F; // Not used for atlatitan
-            positionNeckAndTailFromState(atlatitanState);
-            articulateLegsFromState(atlatitanState, raiseArmsAmount);
-            if (buryEggsAmount > 0.0F) {
-                // Not used for atlatitan
-            }
-            this.walk(neck, idleSpeed, 0.03F, true, 0F, 0F, renderState.ageInTicks, 1);
-            this.walk(neck2, idleSpeed, 0.02F, true, -1F, -0.03F, renderState.ageInTicks, 1);
-            this.walk(head, idleSpeed, 0.01F, true, -2F, 0.02F, renderState.ageInTicks, 1);
-            this.flap(dewlap, 0.14F, 0.1F, true, 0F, 0.0F, renderState.ageInTicks, 1);
-            this.walk(dewlap, 0.14F, 0.05F, true, 1F, -0.1F, renderState.ageInTicks, 1);
-            this.walk(tail, idleSpeed, 0.03F, true, 3F, 0F, renderState.ageInTicks, 1);
-            this.walk(tail2, idleSpeed, 0.03F, true, 2F, 0F, renderState.ageInTicks, 1);
-            this.walk(tail3, idleSpeed, 0.03F, true, 2F, 0F, renderState.ageInTicks, 1);
-            this.swing(tail, idleSpeed, 0.03F, true, 4F, 0F, renderState.ageInTicks, 1);
-            this.swing(tail2, idleSpeed, 0.03F, true, 3F, 0F, renderState.ageInTicks, 1);
-            this.swing(tail3, idleSpeed, 0.03F, true, 2F, 0F, renderState.ageInTicks, 1);
-            this.dewlap.rotationPointY += ACMath.walkValue(renderState.ageInTicks, 1F, 0.1F, -1.5F, 1, false);
-            float legAnimSeperation = 0.5F;
-            animateLegWalking(right_Arm, right_Hand, legAnimSeperation * 3, walkSpeed, walkDegree, walk, armsWalkAmount, true, false, legBack);
-            animateLegWalking(right_Leg, right_Foot, legAnimSeperation * 2, walkSpeed, walkDegree, walk, walkAmount, false, false, legBack);
-            animateLegWalking(left_Arm, left_Hand, legAnimSeperation, walkSpeed, walkDegree, walk, armsWalkAmount, true, true, legBack);
-            animateLegWalking(left_Leg, left_Foot, 0, walkSpeed, walkDegree, walk, walkAmount, false, true, legBack);
-            animateDancingFromState(atlatitanState, danceAmount, renderState.ageInTicks);
+    }
+    
+    // Subclasses can call this helper with their specific render state type
+    protected void setupAnimSauropod(com.github.alexmodguy.alexscaves.client.render.entity.AtlatitanRenderState renderState) {
+        this.resetToDefaultPose();
+        
+        // Extract values from render state
+        float limbSwing = renderState.walkAnimationPos;
+        float limbSwingAmount = renderState.walkAnimationSpeed;
+        float ageInTicks = renderState.ageInTicks;
+        float idleSpeed = 0.05F;
+        float walkSpeed = 0.05F;
+        float walkDegree = 3F;
+        float walk = limbSwing;
+        float walkAmount = Math.min(limbSwingAmount, 1F);
+        float armsWalkAmount = walkAmount;
+        float raiseArmsAmount = renderState.raiseArmsAmount;
+        float legBack = renderState.legBackAmount;
+        float danceAmount = renderState.danceAmount;
+        
+        // Neck and tail positioning from pre-calculated render state
+        if (!straighten) {
+            neck.rotateAngleY += (float) Math.toRadians(renderState.neckYRot);
+            neck.rotateAngleX += (float) Math.toRadians(renderState.neckXRot);
+            tail.rotateAngleY += (float) Math.toRadians(renderState.tailYRot);
+            tail.rotateAngleX += (float) Math.toRadians(renderState.tailXRot);
+        }
+        
+        // Idle animations
+        this.walk(neck, idleSpeed, 0.03F, true, 0F, 0F, ageInTicks, 1);
+        this.walk(neck2, idleSpeed, 0.02F, true, -1F, -0.03F, ageInTicks, 1);
+        this.walk(head, idleSpeed, 0.01F, true, -2F, 0.02F, ageInTicks, 1);
+        this.flap(dewlap, 0.14F, 0.1F, true, 0F, 0.0F, ageInTicks, 1);
+        this.walk(dewlap, 0.14F, 0.05F, true, 1F, -0.1F, ageInTicks, 1);
+        this.walk(tail, idleSpeed, 0.03F, true, 3F, 0F, ageInTicks, 1);
+        this.walk(tail2, idleSpeed, 0.03F, true, 2F, 0F, ageInTicks, 1);
+        this.walk(tail3, idleSpeed, 0.03F, true, 2F, 0F, ageInTicks, 1);
+        this.swing(tail, idleSpeed, 0.03F, true, 4F, 0F, ageInTicks, 1);
+        this.swing(tail2, idleSpeed, 0.03F, true, 3F, 0F, ageInTicks, 1);
+        this.swing(tail3, idleSpeed, 0.03F, true, 2F, 0F, ageInTicks, 1);
+        this.dewlap.rotationPointY += ACMath.walkValue(ageInTicks, 1F, 0.1F, -1.5F, 1, false);
+        
+        // Walking animations
+        float legAnimSeperation = 0.5F;
+        animateLegWalking(right_Arm, right_Hand, legAnimSeperation * 3, walkSpeed, walkDegree, walk, armsWalkAmount, true, false, legBack);
+        animateLegWalking(right_Leg, right_Foot, legAnimSeperation * 2, walkSpeed, walkDegree, walk, walkAmount, false, false, legBack);
+        animateLegWalking(left_Arm, left_Hand, legAnimSeperation, walkSpeed, walkDegree, walk, armsWalkAmount, true, true, legBack);
+        animateLegWalking(left_Leg, left_Foot, 0, walkSpeed, walkDegree, walk, walkAmount, false, true, legBack);
+        
+        // Dancing animation
+        if (danceAmount > 0.0F) {
+            float ageSine = Mth.clamp((float) Math.sin(ageInTicks * 0.08F) * 2F, 0, 1);
+            float gangnam1 = danceAmount * ageSine;
+            this.body.swing(0.65F, 0.05F, false, 0F, 0F, ageInTicks, danceAmount);
         }
     }
+
+
+    // private void setupAnimForAnimation(SauropodBaseEntity entity - removed, using render state instead
+
+    // private void positionNeckAndTail(SauropodBaseEntity entity - removed, using render state instead
 
     private void animateLegWalking(AdvancedModelBox leg, AdvancedModelBox foot, float offset, float speed, float degree, float limbSwing, float limbSwingAmount, boolean front, boolean left, float legBack) {
         float leg1 = Math.min(0, ACMath.walkValue(limbSwing, limbSwingAmount, speed, Mth.PI * (offset + 0.3333F), 1F, true) + 0.75F) * 4;
@@ -417,6 +258,10 @@ public abstract class SauropodBaseModel<T extends LivingEntityRenderState> exten
         leg.rotationPointY -= (squish2 - 1) * 30;
     }
 
+    // private float articulateLegs(LuxtructosaurusLegSolver legs - removed, using render state instead
+
+
+    // private void animateDancing(SauropodBaseEntity entity - removed, using render state instead
 
     @Override
     public Iterable<BasicModelPart> parts() {
@@ -438,28 +283,6 @@ public abstract class SauropodBaseModel<T extends LivingEntityRenderState> exten
         Vec3 vec3 = new Vec3(-armOffsetVec.x(), -armOffsetVec.y(), armOffsetVec.z());
         translationStack.popPose();
         return vec3.add(0, 5, -1F);
-    }
-
-    // Helper methods for render state conversion
-    private void positionNeckAndTailFromState(AtlatitanRenderState renderState) {
-        if (!straighten) {
-            neck.rotateAngleY += (float) Math.toRadians(renderState.neckYRot);
-            neck.rotateAngleX += (float) Math.toRadians(renderState.neckXRot);
-            tail.rotateAngleY += (float) Math.toRadians(renderState.tailYRot);
-            tail.rotateAngleX += (float) Math.toRadians(renderState.tailXRot);
-        }
-    }
-
-    private void articulateLegsFromState(AtlatitanRenderState renderState, float raiseArmsAmount) {
-        // Simplified leg articulation without entity legSolver
-    }
-
-    private void animateDancingFromState(AtlatitanRenderState renderState, float danceAmount, float ageInTicks) {
-        // Simplified dancing animation
-    }
-
-    private void setupAnimForAnimation(AtlatitanRenderState renderState, Animation animation, float limbSwing, float limbSwingAmount, float ageInTicks) {
-        // Simplified animation handling
     }
 
 }

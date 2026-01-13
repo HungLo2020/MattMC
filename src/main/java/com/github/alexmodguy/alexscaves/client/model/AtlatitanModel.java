@@ -107,9 +107,15 @@ public class AtlatitanModel extends SauropodBaseModel<AtlatitanRenderState> {
         this.updateDefaultPose();
     }
 
+    @Override
+    public void setupAnim(AtlatitanRenderState renderState) {
+        super.setupAnimSauropod(renderState);
+    }
+
     public void renderToBuffer(PoseStack matrixStackIn, VertexConsumer bufferIn, int packedLightIn, int packedOverlayIn, float red, float green, float blue, float alpha) {
         int color = ColorUtil.packColor(red, green, blue, alpha);
-        if (this.young) {
+        // Young rendering disabled - render state not available in this method in 1.21
+        if (false) {
             float f = 2F;
             head.setScale(f, f, f);
             head.setShouldScaleChildren(true);
