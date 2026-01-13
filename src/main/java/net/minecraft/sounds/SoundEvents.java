@@ -1281,6 +1281,12 @@ public class SoundEvents {
 	public static final SoundEvent RAVAGER_STEP = register("entity.ravager.step");
 	public static final SoundEvent RAVAGER_STUNNED = register("entity.ravager.stunned");
 	public static final SoundEvent RAVAGER_ROAR = register("entity.ravager.roar");
+	public static final SoundEvent RELICHEIRUS_IDLE = register("entity.relicheirus.idle");
+	public static final SoundEvent RELICHEIRUS_HURT = register("entity.relicheirus.hurt");
+	public static final SoundEvent RELICHEIRUS_DEATH = register("entity.relicheirus.death");
+	public static final SoundEvent RELICHEIRUS_STEP = register("entity.relicheirus.step");
+	public static final SoundEvent RELICHEIRUS_SCRATCH = register("entity.relicheirus.scratch");
+	public static final SoundEvent RELICHEIRUS_TOPPLE = register("entity.relicheirus.topple");
 	public static final SoundEvent NETHER_GOLD_ORE_BREAK = register("block.nether_gold_ore.break");
 	public static final SoundEvent NETHER_GOLD_ORE_FALL = register("block.nether_gold_ore.fall");
 	public static final SoundEvent NETHER_GOLD_ORE_HIT = register("block.nether_gold_ore.hit");

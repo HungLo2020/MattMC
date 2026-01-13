@@ -18849,6 +18849,55 @@
     ],
     "subtitle": "subtitles.entity.ravager.stunned"
   },
+  "entity.relicheirus.idle": {
+    "sounds": [
+      "minecraft:entity/relicheirus/relicheirus_idle_0",
+      "minecraft:entity/relicheirus/relicheirus_idle_1",
+      "minecraft:entity/relicheirus/relicheirus_idle_2"
+    ],
+    "subtitle": "subtitles.entity.relicheirus.ambient"
+  },
+  "entity.relicheirus.hurt": {
+    "sounds": [
+      "minecraft:entity/relicheirus/relicheirus_hurt_0",
+      "minecraft:entity/relicheirus/relicheirus_hurt_1",
+      "minecraft:entity/relicheirus/relicheirus_hurt_2"
+    ],
+    "subtitle": "subtitles.entity.relicheirus.hurt"
+  },
+  "entity.relicheirus.death": {
+    "sounds": [
+      "minecraft:entity/relicheirus/relicheirus_death_0",
+      "minecraft:entity/relicheirus/relicheirus_death_1",
+      "minecraft:entity/relicheirus/relicheirus_death_2"
+    ],
+    "subtitle": "subtitles.entity.relicheirus.death"
+  },
+  "entity.relicheirus.step": {
+    "sounds": [
+      "minecraft:entity/relicheirus/relicheirus_step_0",
+      "minecraft:entity/relicheirus/relicheirus_step_1",
+      "minecraft:entity/relicheirus/relicheirus_step_2",
+      "minecraft:entity/relicheirus/relicheirus_step_3"
+    ],
+    "subtitle": "subtitles.entity.relicheirus.step"
+  },
+  "entity.relicheirus.scratch": {
+    "sounds": [
+      "minecraft:entity/relicheirus/relicheirus_scratch_0",
+      "minecraft:entity/relicheirus/relicheirus_scratch_1",
+      "minecraft:entity/relicheirus/relicheirus_scratch_2"
+    ],
+    "subtitle": "subtitles.entity.relicheirus.scratch"
+  },
+  "entity.relicheirus.topple": {
+    "sounds": [
+      "minecraft:entity/relicheirus/relicheirus_topple_0",
+      "minecraft:entity/relicheirus/relicheirus_topple_1",
+      "minecraft:entity/relicheirus/relicheirus_topple_2"
+    ],
+    "subtitle": "subtitles.entity.relicheirus.topple"
+  },
   "entity.salmon.ambient": {
     "sounds": []
   },

@@ -74,6 +74,7 @@ import net.minecraft.world.entity.animal.sheep.Sheep;
 import net.minecraft.world.entity.animal.sniffer.Sniffer;
 import net.minecraft.world.entity.animal.wolf.Wolf;
 import com.github.alexmodguy.alexscaves.server.entity.living.GrottoceratopsEntity;
+import com.github.alexmodguy.alexscaves.server.entity.living.RelicheirusEntity;
 import com.github.alexmodguy.alexscaves.server.entity.living.SubterranodonEntity;
 import com.github.alexmodguy.alexscaves.server.entity.living.TrilocarisEntity;
 import com.github.alexmodguy.alexscaves.server.entity.living.VallumraptorEntity;
@@ -806,6 +807,13 @@ public class EntityType<T extends Entity> implements FeatureElement, EntityTypeT
 			.passengerAttachments(new Vec3(0.0, 2.2625, -0.0625))
 			.clientTrackingRange(10)
 			.notInPeaceful()
+	);
+	public static final EntityType<RelicheirusEntity> RELICHEIRUS = register(
+		"relicheirus",
+		EntityType.Builder.of(RelicheirusEntity::new, MobCategory.CREATURE)
+			.sized(3.5F, 3.5F)
+			.eyeHeight(3.0F)
+			.clientTrackingRange(10)
 	);
 	public static final EntityType<Salmon> SALMON = register(
 		"salmon", EntityType.Builder.of(Salmon::new, MobCategory.WATER_AMBIENT).sized(0.7F, 0.4F).eyeHeight(0.26F).clientTrackingRange(4)

@@ -46,6 +46,7 @@ import net.minecraft.world.entity.animal.sheep.Sheep;
 import net.minecraft.world.entity.animal.sniffer.Sniffer;
 import net.minecraft.world.entity.animal.wolf.Wolf;
 import com.github.alexmodguy.alexscaves.server.entity.living.GrottoceratopsEntity;
+import com.github.alexmodguy.alexscaves.server.entity.living.RelicheirusEntity;
 import com.github.alexmodguy.alexscaves.server.entity.living.SubterranodonEntity;
 import com.github.alexmodguy.alexscaves.server.entity.living.TremorsaurusEntity;
 import com.github.alexmodguy.alexscaves.server.entity.living.TrilocarisEntity;
@@ -152,6 +153,7 @@ public class DefaultAttributes {
 		.put(EntityType.PUFFERFISH, AbstractFish.createAttributes().build())
 		.put(EntityType.RABBIT, Rabbit.createAttributes().build())
 		.put(EntityType.RAVAGER, Ravager.createAttributes().build())
+		.put(EntityType.RELICHEIRUS, RelicheirusEntity.createAttributes().build())
 		.put(EntityType.SALMON, AbstractFish.createAttributes().build())
 		.put(EntityType.SHEEP, Sheep.createAttributes().build())
 		.put(EntityType.SHULKER, Shulker.createAttributes().build())
