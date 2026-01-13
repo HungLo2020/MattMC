@@ -221,6 +221,13 @@ public class EntityType<T extends Entity> implements FeatureElement, EntityTypeT
 			.clientTrackingRange(10)
 			.updateInterval(Integer.MAX_VALUE)
 	);
+	public static final EntityType<com.github.alexmodguy.alexscaves.server.entity.living.AtlatitanEntity> ATLATITAN = register(
+		"atlatitan",
+		EntityType.Builder.of(com.github.alexmodguy.alexscaves.server.entity.living.AtlatitanEntity::new, MobCategory.CREATURE)
+			.sized(5.0F, 8.0F)
+			.eyeHeight(7.0F)
+			.clientTrackingRange(11)
+	);
 	public static final EntityType<Armadillo> ARMADILLO = register(
 		"armadillo", EntityType.Builder.of(Armadillo::new, MobCategory.CREATURE).sized(0.7F, 0.65F).eyeHeight(0.26F).clientTrackingRange(10)
 	);
@@ -458,6 +465,31 @@ public class EntityType<T extends Entity> implements FeatureElement, EntityTypeT
 			.sized(0.98F, 0.98F)
 			.clientTrackingRange(10)
 			.updateInterval(20)
+	);
+	public static final EntityType<com.github.alexmodguy.alexscaves.server.entity.item.CrushedBlockEntity> CRUSHED_BLOCK = register(
+		"crushed_block",
+		EntityType.Builder.<com.github.alexmodguy.alexscaves.server.entity.item.CrushedBlockEntity>of(com.github.alexmodguy.alexscaves.server.entity.item.CrushedBlockEntity::new, MobCategory.MISC)
+			.noLootTable()
+			.sized(0.98F, 0.98F)
+			.clientTrackingRange(10)
+			.updateInterval(20)
+	);
+	public static final EntityType<com.github.alexmodguy.alexscaves.server.entity.item.FallingTreeBlockEntity> FALLING_TREE_BLOCK = register(
+		"falling_tree_block",
+		EntityType.Builder.<com.github.alexmodguy.alexscaves.server.entity.item.FallingTreeBlockEntity>of(com.github.alexmodguy.alexscaves.server.entity.item.FallingTreeBlockEntity::new, MobCategory.MISC)
+			.noLootTable()
+			.sized(0.98F, 0.98F)
+			.clientTrackingRange(10)
+			.updateInterval(20)
+	);
+	public static final EntityType<com.github.alexmodguy.alexscaves.server.entity.living.SauropodPartEntity> SAUROPOD_PART = register(
+		"sauropod_part",
+		EntityType.Builder.<com.github.alexmodguy.alexscaves.server.entity.living.SauropodPartEntity>of(com.github.alexmodguy.alexscaves.server.entity.living.SauropodPartEntity::new, MobCategory.MISC)
+			.noLootTable()
+			.noSave()
+			.fireImmune()
+			.sized(1.0F, 1.0F)
+			.clientTrackingRange(10)
 	);
 	public static final EntityType<LargeFireball> FIREBALL = register(
 		"fireball",

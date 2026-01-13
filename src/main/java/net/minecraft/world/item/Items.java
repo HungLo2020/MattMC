@@ -1656,6 +1656,7 @@ public class Items {
 	public static final Item CAULDRON = registerBlock(Blocks.CAULDRON, Blocks.WATER_CAULDRON, Blocks.LAVA_CAULDRON, Blocks.POWDER_SNOW_CAULDRON);
 	public static final Item ENDER_EYE = registerItem("ender_eye", EnderEyeItem::new);
 	public static final Item GLISTERING_MELON_SLICE = registerItem("glistering_melon_slice");
+	public static final Item ATLATITAN_SPAWN_EGG = registerItem("atlatitan_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.ATLATITAN));
 	public static final Item ARMADILLO_SPAWN_EGG = registerItem("armadillo_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.ARMADILLO));
 	public static final Item ALLAY_SPAWN_EGG = registerItem("allay_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.ALLAY));
 	public static final Item AXOLOTL_SPAWN_EGG = registerItem("axolotl_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.AXOLOTL));

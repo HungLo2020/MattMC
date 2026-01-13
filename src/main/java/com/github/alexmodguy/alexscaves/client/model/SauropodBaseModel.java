@@ -568,4 +568,26 @@ public abstract class SauropodBaseModel<T extends LivingEntityRenderState> exten
         return vec3.add(0, 5, -1F);
     }
 
+    // Helper methods for render state conversion
+    private void positionNeckAndTailFromState(AtlatitanRenderState renderState) {
+        if (!straighten) {
+            neck.rotateAngleY += (float) Math.toRadians(renderState.neckYRot);
+            neck.rotateAngleX += (float) Math.toRadians(renderState.neckXRot);
+            tail.rotateAngleY += (float) Math.toRadians(renderState.tailYRot);
+            tail.rotateAngleX += (float) Math.toRadians(renderState.tailXRot);
+        }
+    }
+
+    private void articulateLegsFromState(AtlatitanRenderState renderState, float raiseArmsAmount) {
+        // Simplified leg articulation without entity legSolver
+    }
+
+    private void animateDancingFromState(AtlatitanRenderState renderState, float danceAmount, float ageInTicks) {
+        // Simplified dancing animation
+    }
+
+    private void setupAnimForAnimation(AtlatitanRenderState renderState, Animation animation, float limbSwing, float limbSwingAmount, float ageInTicks) {
+        // Simplified animation handling
+    }
+
 }

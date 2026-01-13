@@ -15907,6 +15907,47 @@
     ],
     "subtitle": "subtitles.block.generic.footsteps"
   },
+  "entity.atlatitan.idle": {
+    "sounds": [
+      "minecraft:mob/atlatitan/atlatitan_idle_0",
+      "minecraft:mob/atlatitan/atlatitan_idle_1",
+      "minecraft:mob/atlatitan/atlatitan_idle_2"
+    ],
+    "subtitle": "subtitles.entity.atlatitan.ambient"
+  },
+  "entity.atlatitan.hurt": {
+    "sounds": [
+      "minecraft:mob/atlatitan/atlatitan_hurt_0",
+      "minecraft:mob/atlatitan/atlatitan_hurt_1",
+      "minecraft:mob/atlatitan/atlatitan_hurt_2"
+    ],
+    "subtitle": "subtitles.entity.atlatitan.hurt"
+  },
+  "entity.atlatitan.death": {
+    "sounds": [
+      "minecraft:mob/atlatitan/atlatitan_death_0",
+      "minecraft:mob/atlatitan/atlatitan_death_1"
+    ],
+    "subtitle": "subtitles.entity.atlatitan.death"
+  },
+  "entity.atlatitan.step": {
+    "sounds": [
+      "minecraft:mob/atlatitan/atlatitan_step_0",
+      "minecraft:mob/atlatitan/atlatitan_step_1",
+      "minecraft:mob/atlatitan/atlatitan_step_2",
+      "minecraft:mob/atlatitan/atlatitan_step_3",
+      "minecraft:mob/atlatitan/atlatitan_step_4",
+      "minecraft:mob/atlatitan/atlatitan_step_5"
+    ],
+    "subtitle": "subtitles.entity.atlatitan.step"
+  },
+  "entity.atlatitan.stomp": {
+    "sounds": [
+      "minecraft:mob/atlatitan/atlatitan_stomp_0",
+      "minecraft:mob/atlatitan/atlatitan_stomp_1"
+    ],
+    "subtitle": "subtitles.entity.atlatitan.stomp"
+  },
   "entity.grottoceratops.idle": {
     "sounds": [
       "minecraft:entity/grottoceratops/grottoceratops_idle_0",

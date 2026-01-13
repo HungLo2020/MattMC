@@ -96,6 +96,7 @@ public class DefaultAttributes {
 	private static final Logger LOGGER = LogUtils.getLogger();
 	private static final Map<EntityType<? extends LivingEntity>, AttributeSupplier> SUPPLIERS = ImmutableMap.<EntityType<? extends LivingEntity>, AttributeSupplier>builder()
 		.put(EntityType.ALLAY, Allay.createAttributes().build())
+		.put(EntityType.ATLATITAN, com.github.alexmodguy.alexscaves.server.entity.living.AtlatitanEntity.createAttributes().build())
 		.put(EntityType.ARMADILLO, Armadillo.createAttributes().build())
 		.put(EntityType.ARMOR_STAND, ArmorStand.createAttributes().build())
 		.put(EntityType.AXOLOTL, Axolotl.createAttributes().build())
