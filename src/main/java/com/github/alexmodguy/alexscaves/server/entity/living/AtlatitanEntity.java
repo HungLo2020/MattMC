@@ -53,7 +53,7 @@ public class AtlatitanEntity extends SauropodBaseEntity implements KeybindUsingM
         this.goalSelector.addGoal(1, new AtlatitanMeleeGoal(this));
         this.goalSelector.addGoal(2, new AnimalBreedEggsGoal(this, 1));
         this.goalSelector.addGoal(3, new AnimalLayEggGoal(this, 100, 1));
-        this.goalSelector.addGoal(4, new TemptGoal(this, 1.1D, Ingredient.of(Items.SWEET_BERRIES), false));
+        this.goalSelector.addGoal(4, new TemptGoal(this, 1.1D, Ingredient.of(Items.PINE_NUTS), false));
         this.goalSelector.addGoal(5, new AtlatitanNibbleTreesGoal(this, 30));
         this.goalSelector.addGoal(6, new RandomStrollGoal(this, 1.0D, 50) {
             protected Vec3 getPosition() {
@@ -187,8 +187,8 @@ public class AtlatitanEntity extends SauropodBaseEntity implements KeybindUsingM
 
     @Override
     public boolean onFeedMixture(ItemStack itemStack, Player player) {
-        // SERENE_SALAD replaced with GOLDEN_APPLE as vanilla equivalent
-        if (itemStack.is(Items.GOLDEN_APPLE)) {
+        // SERENE_SALAD makes Atlatitan rideable
+        if (itemStack.is(Items.SERENE_SALAD)) {
             this.setRideableFor(12000);
             return true;
         }
@@ -196,7 +196,7 @@ public class AtlatitanEntity extends SauropodBaseEntity implements KeybindUsingM
     }
 
     public boolean isFood(ItemStack stack) {
-        return stack.is(Items.SWEET_BERRIES);
+        return stack.is(Items.PINE_NUTS);
     }
 
     @Override
@@ -231,7 +231,7 @@ public class AtlatitanEntity extends SauropodBaseEntity implements KeybindUsingM
     public InteractionResult mobInteract(Player player, InteractionHand hand) {
         InteractionResult prev = super.mobInteract(player, hand);
         ItemStack itemstack = player.getItemInHand(hand);
-        if (!prev.consumesAction() && itemstack.is(Items.GOLDEN_APPLE) && !this.isBaby()) {
+        if (!prev.consumesAction() && itemstack.is(Items.SERENE_SALAD) && !this.isBaby()) {
             // Give rideable effect
             this.setRideableFor(12000); // 10 minutes
             // Use standard item consumption

@@ -78,7 +78,7 @@ public class GrottoceratopsEntity extends DinosaurEntity implements IAnimatedEnt
         this.goalSelector.addGoal(1, new GrottoceratopsMeleeGoal(this));
         this.goalSelector.addGoal(2, new AnimalBreedEggsGoal(this, 1));
         this.goalSelector.addGoal(3, new AnimalLayEggGoal(this, 100, 1));
-        this.goalSelector.addGoal(4, new TemptGoal(this, 1.1D, Ingredient.of(Items.SWEET_BERRIES), false));
+        this.goalSelector.addGoal(4, new TemptGoal(this, 1.1D, Ingredient.of(Items.PINE_NUTS), false));
         this.goalSelector.addGoal(5, new GrottoceratopsEatPlantsGoal(this, 16));
         this.goalSelector.addGoal(6, new RandomStrollGoal(this, 1.0D, 45));
         this.goalSelector.addGoal(7, new LookAtPlayerGoal(this, Player.class, 8.0F));
@@ -197,7 +197,7 @@ public class GrottoceratopsEntity extends DinosaurEntity implements IAnimatedEnt
     }
 
     public boolean isFood(ItemStack stack) {
-        return stack.is(Items.SWEET_BERRIES);
+        return stack.is(Items.PINE_NUTS);
     }
 
     public void calculateEntityAnimation(boolean flying) {

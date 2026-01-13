@@ -78,7 +78,7 @@ public class RelicheirusEntity extends DinosaurEntity implements IAnimatedEntity
         this.goalSelector.addGoal(1, new RelicheirusMeleeGoal(this));
         this.goalSelector.addGoal(2, new AnimalBreedEggsGoal(this, 1));
         this.goalSelector.addGoal(3, new AnimalLayEggGoal(this, 100, 1));
-        this.goalSelector.addGoal(4, new TemptGoal(this, 1.1D, Ingredient.of(Items.SWEET_BERRIES), false));
+        this.goalSelector.addGoal(4, new TemptGoal(this, 1.1D, Ingredient.of(Items.PINE_NUTS), false));
         this.goalSelector.addGoal(5, new RelicheirusPushTreesGoal(this, 25));
         this.goalSelector.addGoal(6, new RelicheirusNibblePewensGoal(this, 20));
         this.goalSelector.addGoal(7, new RandomStrollGoal(this, 1.0D, 45));
@@ -104,7 +104,7 @@ public class RelicheirusEntity extends DinosaurEntity implements IAnimatedEntity
 
     @Override
     public boolean onFeedMixture(ItemStack itemStack, Player player) {
-        if (itemStack.is(Items.GOLDEN_APPLE)) {
+        if (itemStack.is(Items.PRIMORDIAL_SOUP)) {
             this.setPushingTreesFor(1200);
             return true;
         }
@@ -114,7 +114,7 @@ public class RelicheirusEntity extends DinosaurEntity implements IAnimatedEntity
     public InteractionResult mobInteract(Player player, InteractionHand hand) {
         InteractionResult prev = super.mobInteract(player, hand);
         ItemStack itemstack = player.getItemInHand(hand);
-        if (!prev.consumesAction() && itemstack.is(Items.GOLDEN_APPLE)) {
+        if (!prev.consumesAction() && itemstack.is(Items.PRIMORDIAL_SOUP)) {
             // Simplified - removed crafting remaining item check
             this.usePlayerItem(player, hand, itemstack);
             return InteractionResult.SUCCESS;
@@ -340,7 +340,7 @@ public class RelicheirusEntity extends DinosaurEntity implements IAnimatedEntity
     }
 
     public boolean isFood(ItemStack stack) {
-        return stack.is(Items.SWEET_BERRIES);
+        return stack.is(Items.PINE_NUTS);
     }
 
     @Override

@@ -133,7 +133,7 @@ public class VallumraptorEntity extends DinosaurEntity implements IAnimatedEntit
         this.goalSelector.addGoal(4, new AnimalLayEggGoal(this, 100, 1));
         this.goalSelector.addGoal(5, new AnimalJoinPackGoal(this, 60, 8));
         this.goalSelector.addGoal(6, new FleeGoal());
-        this.goalSelector.addGoal(7, new TemptGoal(this, 1.1D, Ingredient.of(Items.COOKED_CHICKEN), false));
+        this.goalSelector.addGoal(7, new TemptGoal(this, 1.1D, Ingredient.of(Items.DINOSAUR_NUGGET), false));
         this.goalSelector.addGoal(8, new VallumraptorMeleeGoal(this));
         this.goalSelector.addGoal(9, new VallumraptorWanderGoal(this, 1D, 25));
         this.goalSelector.addGoal(10, new VallumraptorOpenDoorGoal(this));
@@ -271,7 +271,7 @@ public class VallumraptorEntity extends DinosaurEntity implements IAnimatedEntit
                 ItemStack stack = this.getMainHandItem();
                 this.level().broadcastEntityEvent(this, (byte) 45);
                 this.heal(5);
-                if (stack.is(Items.COOKED_CHICKEN) && justLootedChest) {
+                if (stack.is(Items.DINOSAUR_NUGGET) && justLootedChest) {
                     this.setRelaxedForTime(200 + random.nextInt(200));
                 }
                 if (!this.level().isClientSide()) {
@@ -530,7 +530,7 @@ public class VallumraptorEntity extends DinosaurEntity implements IAnimatedEntit
         fleeFromPosition = Vec3.atCenterOf(stealPos);
         fleeTicks = 300 + random.nextInt(80);
         justLootedChest = true;
-        if (this.getItemInHand(InteractionHand.MAIN_HAND).is(Items.COOKED_CHICKEN)) {
+        if (this.getItemInHand(InteractionHand.MAIN_HAND).is(Items.DINOSAUR_NUGGET)) {
             eatHeldItemIn = 40 + random.nextInt(20);
         } else {
             eatHeldItemIn = 100 + random.nextInt(80);
@@ -612,7 +612,7 @@ public class VallumraptorEntity extends DinosaurEntity implements IAnimatedEntit
     }
 
     public boolean isFood(ItemStack stack) {
-        return this.isTame() && stack.is(Items.COOKED_CHICKEN);
+        return this.isTame() && stack.is(Items.DINOSAUR_NUGGET);
     }
 
     public int getRelaxedFor() {
@@ -646,7 +646,7 @@ public class VallumraptorEntity extends DinosaurEntity implements IAnimatedEntit
 
     @Override
     public boolean onFeedMixture(ItemStack itemStack, Player player) {
-        if (itemStack.is(Items.SUSPICIOUS_STEW) && this.getRelaxedFor() > 0 && !this.isTame()) {
+        if (itemStack.is(Items.SERENE_SALAD) && this.getRelaxedFor() > 0 && !this.isTame()) {
             this.heal(5);
             this.setRelaxedForTime(0);
             this.tame(player);

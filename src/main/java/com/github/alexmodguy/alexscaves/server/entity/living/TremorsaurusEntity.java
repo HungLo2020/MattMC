@@ -96,7 +96,7 @@ public class TremorsaurusEntity extends DinosaurEntity implements KeybindUsingMo
         });
         this.goalSelector.addGoal(4, new AnimalBreedEggsGoal(this, 1));
         this.goalSelector.addGoal(5, new AnimalLayEggGoal(this, 100, 1));
-        this.goalSelector.addGoal(6, new TemptGoal(this, 1.1D, Ingredient.of(Items.COOKED_PORKCHOP, Items.PORKCHOP), false));
+        this.goalSelector.addGoal(6, new TemptGoal(this, 1.1D, Ingredient.of(Items.DINOSAUR_NUGGET), false));
         this.goalSelector.addGoal(7, new RandomStrollGoal(this, 1.0D, 30));
         this.goalSelector.addGoal(8, new LookAtPlayerGoal(this, Player.class, 8.0F));
         this.goalSelector.addGoal(9, new RandomLookAroundGoal(this));
@@ -554,7 +554,7 @@ public class TremorsaurusEntity extends DinosaurEntity implements KeybindUsingMo
     }
 
     public boolean isFood(ItemStack stack) {
-        return this.isTame() && (stack.is(Items.COOKED_PORKCHOP) || stack.is(Items.PORKCHOP));
+        return this.isTame() && stack.is(Items.DINOSAUR_NUGGET);
     }
 
     public boolean canOwnerMount(Player player) {

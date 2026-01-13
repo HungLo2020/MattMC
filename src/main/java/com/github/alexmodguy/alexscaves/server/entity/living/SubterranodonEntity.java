@@ -114,7 +114,7 @@ public class SubterranodonEntity extends DinosaurEntity implements PackAnimal, F
         this.goalSelector.addGoal(3, new SubterranodonFollowOwnerGoal(this, 1.2D, 5.0F, 2.0F, true));
         this.goalSelector.addGoal(4, new AnimalJoinPackGoal(this, 30, 5));
         this.goalSelector.addGoal(5, new AnimalBreedEggsGoal(this, 1));
-        this.goalSelector.addGoal(6, new TemptGoal(this, 1.1D, Ingredient.of(Items.COD, Items.COOKED_COD), false));
+        this.goalSelector.addGoal(6, new TemptGoal(this, 1.1D, Ingredient.of(Items.TRILOCARIS_TAIL, Items.COOKED_TRILOCARIS_TAIL), false));
         this.goalSelector.addGoal(7, new AnimalLayEggGoal(this, 100, 1));
         this.goalSelector.addGoal(8, new SubterranodonFleeGoal(this));
         this.goalSelector.addGoal(9, new SubterranodonFlightGoal(this));
@@ -510,7 +510,7 @@ public class SubterranodonEntity extends DinosaurEntity implements PackAnimal, F
         InteractionResult prev = super.mobInteract(player, hand);
         if (prev != InteractionResult.SUCCESS) {
             ItemStack itemStack = player.getItemInHand(hand);
-            if (!this.isTame() && (itemStack.is(Items.COD) || itemStack.is(Items.COOKED_COD))) {
+            if (!this.isTame() && (itemStack.is(Items.TRILOCARIS_TAIL) || itemStack.is(Items.COOKED_TRILOCARIS_TAIL))) {
                 this.usePlayerItem(player, hand, itemStack);
                 if (getRandom().nextInt(3) == 0) {
                     this.tame(player);
@@ -628,7 +628,7 @@ public class SubterranodonEntity extends DinosaurEntity implements PackAnimal, F
     }
 
     public boolean isFood(ItemStack stack) {
-        return stack.is(Items.COD) || stack.is(Items.COOKED_COD);
+        return stack.is(Items.TRILOCARIS_TAIL) || stack.is(Items.COOKED_TRILOCARIS_TAIL);
     }
 
     protected SoundEvent getAmbientSound() {

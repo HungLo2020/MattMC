@@ -7824,5 +7824,16 @@
   "subtitles.entity.vallumraptor.call": "Vallumraptor trills",
   "subtitles.entity.vallumraptor.attack": "Vallumraptor pounces",
   "subtitles.entity.vallumraptor.scratch": "Vallumraptor scratches",
-  "subtitles.entity.vallumraptor.sleep": "Vallumraptor snores"
+  "subtitles.entity.vallumraptor.sleep": "Vallumraptor snores",
+  "item.minecraft.amber_curiosity": "Amber Curiosity",
+  "item.minecraft.cooked_trilocaris_tail": "Cooked Trilocaris Tail",
+  "item.minecraft.dinosaur_nugget": "Dinosaur Nugget",
+  "item.minecraft.heavy_bone": "Heavy Bone",
+  "item.minecraft.pewen_sap": "Pewen Sap",
+  "item.minecraft.pine_nuts": "Pine Nuts",
+  "item.minecraft.primordial_soup": "Primordial Soup",
+  "item.minecraft.serene_salad": "Serene Salad",
+  "item.minecraft.seething_stew": "Seething Stew",
+  "item.minecraft.tough_hide": "Tough Hide",
+  "item.minecraft.trilocaris_tail": "Trilocaris Tail"
 }
