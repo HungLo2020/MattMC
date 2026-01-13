@@ -35,7 +35,6 @@ import net.minecraft.world.entity.ai.goal.*;
 import net.minecraft.world.entity.ai.goal.target.HurtByTargetGoal;
 import net.minecraft.world.entity.ai.goal.target.OwnerHurtByTargetGoal;
 import net.minecraft.world.entity.ai.goal.target.OwnerHurtTargetGoal;
-import net.minecraft.world.entity.ai.navigation.GroundPathNavigation;
 import net.minecraft.world.entity.ai.navigation.PathNavigation;
 import net.minecraft.world.entity.ai.util.LandRandomPos;
 import net.minecraft.world.entity.item.ItemEntity;
@@ -113,10 +112,7 @@ public class VallumraptorEntity extends DinosaurEntity implements IAnimatedEntit
     }
 
     protected PathNavigation createNavigation(Level level) {
-        GroundPathNavigation navigation = new GroundPathNavigatorNoSpin(this, level);
-        navigation.setCanOpenDoors(true);
-        // Note: setCanPassDoors() was removed in 1.21
-        return navigation;
+        return new AdvancedPathNavigateNoTeleport(this, level);
     }
 
     protected void registerGoals() {
