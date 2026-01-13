@@ -74,6 +74,7 @@ import net.minecraft.world.entity.animal.sheep.Sheep;
 import net.minecraft.world.entity.animal.sniffer.Sniffer;
 import net.minecraft.world.entity.animal.wolf.Wolf;
 import com.github.alexmodguy.alexscaves.server.entity.living.SubterranodonEntity;
+import com.github.alexmodguy.alexscaves.server.entity.living.VallumraptorEntity;
 import net.minecraft.world.entity.boss.enderdragon.EndCrystal;
 import net.minecraft.world.entity.boss.enderdragon.EnderDragon;
 import net.minecraft.world.entity.boss.wither.WitherBoss;
@@ -859,6 +860,13 @@ public class EntityType<T extends Entity> implements FeatureElement, EntityTypeT
 			.sized(1.75F, 1.2F)
 			.eyeHeight(0.8F)
 			.clientTrackingRange(12)
+	);
+	public static final EntityType<VallumraptorEntity> VALLUMRAPTOR = register(
+		"vallumraptor",
+		EntityType.Builder.of(VallumraptorEntity::new, MobCategory.CREATURE)
+			.sized(0.8F, 1.5F)
+			.eyeHeight(1.2F)
+			.clientTrackingRange(10)
 	);
 	public static final EntityType<Snowball> SNOWBALL = register(
 		"snowball", EntityType.Builder.<Snowball>of(Snowball::new, MobCategory.MISC).noLootTable().sized(0.25F, 0.25F).clientTrackingRange(4).updateInterval(10)
