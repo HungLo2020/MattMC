@@ -10,7 +10,8 @@ public class SubterranodonRenderState extends LivingEntityRenderState {
     public boolean isFlying;
     public boolean isSitting;
     public float flapProgress;
-    public float flightPitch;
-    public float flightRoll;
-    public float tailYaw;
+    public float hoverProgress;
+    public float rollAmount;     // Pre-calculated: flightRoll / 57.295776F * flyProgress
+    public float pitchAmount;    // Pre-calculated: flightPitch / 57.295776F * (flyProgress - hoverProgress)
+    public float tailYawRadians; // Pre-calculated: wrapDegrees(tailYaw - yaw) / 57.295776F
 }

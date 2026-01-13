@@ -33,9 +33,21 @@ public class SubterranodonRenderer extends MobRenderer<SubterranodonEntity, Subt
         renderState.attackProgress = entity.getBiteProgress(partialTick); // getBiteProgress, not getAttackProgress
         renderState.sitProgress = entity.getSitProgress(partialTick);
         renderState.danceProgress = entity.getDanceProgress(partialTick);
-        renderState.flightPitch = entity.getFlightPitch(partialTick);
-        renderState.flightRoll = entity.getFlightRoll(partialTick);
-        renderState.tailYaw = entity.getTailYaw(partialTick);
+        
+        // Calculate animation values properly as done in source model
+        float flyProgress = renderState.isFlying ? 1.0F : 0.0F;
+        float hoverProgress = entity.getHoverProgress(partialTick) * flyProgress;
+        renderState.hoverProgress = hoverProgress;
+        
+        float flightPitch = entity.getFlightPitch(partialTick);
+        float flightRoll = entity.getFlightRoll(partialTick);
+        float yaw = entity.yBodyRotO + (entity.yBodyRot - entity.yBodyRotO) * partialTick;
+        float tailYaw = entity.getTailYaw(partialTick);
+        
+        // Pre-calculate animation amounts as in source
+        renderState.rollAmount = flightRoll / 57.295776F * flyProgress;
+        renderState.pitchAmount = flightPitch / 57.295776F * (flyProgress - hoverProgress);
+        renderState.tailYawRadians = net.minecraft.util.Mth.wrapDegrees(tailYaw - yaw) / 57.295776F;
     }
 
     @Override

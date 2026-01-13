@@ -472,7 +472,7 @@ public class VallumraptorModel extends AdvancedEntityModel<VallumraptorRenderSta
         float buryEggsAmount = 0.0F; // Simplified - would need in render state
         float puzzleRotRad = (float) Math.toRadians(puzzleRot);
         float puzzleRotPoint = puzzleRot * 0.05F;
-        float tailYaw = renderState.tailYaw / 57.295776F; // Already computed in renderer
+        float tailYaw = renderState.tailYawRadians; // Pre-calculated in renderer
         float danceAmount = 0.0F; // Simplified - would need getDanceProgress in render state
         float danceSpeed = 0.5F;
         if (animation != null && animation != IAnimatedEntity.NO_ANIMATION) {

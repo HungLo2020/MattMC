@@ -8,7 +8,7 @@ public class VallumraptorRenderState extends LivingEntityRenderState {
     public float runProgress;
     public float relaxedProgress;
     public float hideProgress;
-    public float tailYaw;
+    public float tailYawRadians; // Pre-calculated: wrapDegrees(tailYaw - yaw) / 57.295776F
     public float puzzledHeadYRot;
     public int altSkin;
     public boolean isRunning;

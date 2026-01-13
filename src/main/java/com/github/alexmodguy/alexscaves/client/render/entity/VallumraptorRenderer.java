@@ -38,10 +38,14 @@ public class VallumraptorRenderer extends MobRenderer<VallumraptorEntity, Vallum
         renderState.runProgress = entity.getRunProgress(partialTick);
         renderState.relaxedProgress = entity.getRelaxedProgress(partialTick);
         renderState.hideProgress = entity.getHideProgress(partialTick);
-        renderState.tailYaw = entity.getTailYaw(partialTick);
         renderState.puzzledHeadYRot = entity.getPuzzledHeadRot(partialTick);
         renderState.animation = entity.getAnimation();
         renderState.animationTick = entity.getAnimationTick();
+        
+        // Pre-calculate tail yaw properly as in source
+        float yaw = entity.yBodyRotO + (entity.yBodyRot - entity.yBodyRotO) * partialTick;
+        float tailYaw = entity.getTailYaw(partialTick);
+        renderState.tailYawRadians = net.minecraft.util.Mth.wrapDegrees(tailYaw - yaw) / 57.295776F;
         
         // Set alpha based on hide progress
         float alpha = 1.0F - 0.9F * renderState.hideProgress;
