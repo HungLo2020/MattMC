@@ -15962,6 +15962,56 @@
     ],
     "subtitle": "subtitles.block.generic.footsteps"
   },
+  "entity.tremorsaurus.idle": {
+    "sounds": [
+      "minecraft:entity/tremorsaurus/tremorsaurus_idle_0",
+      "minecraft:entity/tremorsaurus/tremorsaurus_idle_1",
+      "minecraft:entity/tremorsaurus/tremorsaurus_idle_2"
+    ],
+    "subtitle": "subtitles.entity.tremorsaurus.ambient"
+  },
+  "entity.tremorsaurus.hurt": {
+    "sounds": [
+      "minecraft:entity/tremorsaurus/tremorsaurus_hurt_0",
+      "minecraft:entity/tremorsaurus/tremorsaurus_hurt_1"
+    ],
+    "subtitle": "subtitles.entity.tremorsaurus.hurt"
+  },
+  "entity.tremorsaurus.death": {
+    "sounds": [
+      "minecraft:entity/tremorsaurus/tremorsaurus_death"
+    ],
+    "subtitle": "subtitles.entity.tremorsaurus.death"
+  },
+  "entity.tremorsaurus.roar": {
+    "sounds": [
+      "minecraft:entity/tremorsaurus/tremorsaurus_roar_0",
+      "minecraft:entity/tremorsaurus/tremorsaurus_roar_1",
+      "minecraft:entity/tremorsaurus/tremorsaurus_roar_2"
+    ],
+    "subtitle": "subtitles.entity.tremorsaurus.roar"
+  },
+  "entity.tremorsaurus.stomp": {
+    "sounds": [
+      "minecraft:entity/tremorsaurus/tremorsaurus_stomp_0",
+      "minecraft:entity/tremorsaurus/tremorsaurus_stomp_1",
+      "minecraft:entity/tremorsaurus/tremorsaurus_stomp_2",
+      "minecraft:entity/tremorsaurus/tremorsaurus_stomp_3"
+    ],
+    "subtitle": "subtitles.entity.tremorsaurus.stomp"
+  },
+  "entity.tremorsaurus.bite": {
+    "sounds": [
+      "minecraft:entity/tremorsaurus/tremorsaurus_bite"
+    ],
+    "subtitle": "subtitles.entity.tremorsaurus.bite"
+  },
+  "entity.tremorsaurus.throw": {
+    "sounds": [
+      "minecraft:entity/tremorsaurus/tremorsaurus_throw"
+    ],
+    "subtitle": "subtitles.entity.tremorsaurus.throw"
+  },
   "entity.guardian.ambient": {
     "sounds": [
       "mob/guardian/guardian_idle1",
