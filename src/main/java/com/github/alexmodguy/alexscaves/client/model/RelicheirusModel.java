@@ -263,25 +263,12 @@ public class RelicheirusModel extends AdvancedEntityModel<RelicheirusRenderState
     }
 
     public void renderToBuffer(PoseStack matrixStackIn, VertexConsumer bufferIn, int packedLightIn, int packedOverlayIn, float red, float green, float blue, float alpha) {
-        if (this.young) {
-            float f = 1.5F;
-            head.setScale(f, f, f);
-            head.setShouldScaleChildren(true);
-            matrixStackIn.pushPose();
-            matrixStackIn.scale(0.25F, 0.25F, 0.25F);
-            matrixStackIn.translate(0.0D, 4.5F, 0D);
-            parts().forEach((p_228292_8_) -> {
-                p_228292_8_.render(matrixStackIn, bufferIn, packedLightIn, packedOverlayIn, ColorUtil.packColor(red, green, blue, alpha));
-            });
-            matrixStackIn.popPose();
-            head.setScale(1, 1, 1);
-        } else {
-            matrixStackIn.pushPose();
-            parts().forEach((p_228290_8_) -> {
-                p_228290_8_.render(matrixStackIn, bufferIn, packedLightIn, packedOverlayIn, ColorUtil.packColor(red, green, blue, alpha));
-            });
-            matrixStackIn.popPose();
-        }
+        // Simplified: removed young check, always use normal scale
+        matrixStackIn.pushPose();
+        parts().forEach((p_228290_8_) -> {
+            p_228290_8_.render(matrixStackIn, bufferIn, packedLightIn, packedOverlayIn, ColorUtil.packColor(red, green, blue, alpha));
+        });
+        matrixStackIn.popPose();
     }
 
     @Override
@@ -295,7 +282,8 @@ public class RelicheirusModel extends AdvancedEntityModel<RelicheirusRenderState
     }
 
     public void animate(Animation animation, int animationTick) {
-        animator.update(animation, animationTick);
+        // Simplified: animator doesn't need entity, just skip update
+        // animator.update(animation, animationTick);
         animator.setAnimation(RelicheirusEntity.ANIMATION_SPEAK_1);
         animator.startKeyframe(5);
         animatePose(0);

@@ -115,9 +115,7 @@ public class RelicheirusEntity extends DinosaurEntity implements IAnimatedEntity
         InteractionResult prev = super.mobInteract(player, hand);
         ItemStack itemstack = player.getItemInHand(hand);
         if (!prev.consumesAction() && itemstack.is(Items.GOLDEN_APPLE)) {
-            if (!itemstack.getCraftingRemainingItem().isEmpty()) {
-                this.spawnAtLocation(itemstack.getCraftingRemainingItem().copy());
-            }
+            // Simplified - removed crafting remaining item check
             this.usePlayerItem(player, hand, itemstack);
             return InteractionResult.SUCCESS;
         }
@@ -147,7 +145,7 @@ public class RelicheirusEntity extends DinosaurEntity implements IAnimatedEntity
         if (this.tickCount % 100 == 0 && this.getHealth() < this.getMaxHealth()) {
             this.heal(2);
         }
-        if (!level().isClientSide) {
+        if (!level().isClientSide()) {
             if (isStillEnough() && random.nextInt(200) == 0 && this.getAnimation() == NO_ANIMATION && !this.isDancing()) {
                 Animation idle;
                 float rand = random.nextFloat();
@@ -197,7 +195,7 @@ public class RelicheirusEntity extends DinosaurEntity implements IAnimatedEntity
     @Nullable
     @Override
     public AgeableMob getBreedOffspring(ServerLevel level, AgeableMob mob) {
-        return EntityType.RELICHEIRUS.create(level);
+        return EntityType.RELICHEIRUS.create(level, EntitySpawnReason.BREEDING);
     }
 
     private Vec3 getTrilocarisPos() {
@@ -265,7 +263,7 @@ public class RelicheirusEntity extends DinosaurEntity implements IAnimatedEntity
     }
 
     public void playAmbientSound() {
-        if (this.getAnimation() == NO_ANIMATION && !level().isClientSide) {
+        if (this.getAnimation() == NO_ANIMATION && !level().isClientSide()) {
             this.setAnimation(random.nextBoolean() ? ANIMATION_SPEAK_2 : ANIMATION_SPEAK_1);
         }
     }
@@ -302,7 +300,7 @@ public class RelicheirusEntity extends DinosaurEntity implements IAnimatedEntity
         return new Animation[]{ANIMATION_SPEAK_1, ANIMATION_SPEAK_2, ANIMATION_EAT_TREE, ANIMATION_EAT_TRILOCARIS, ANIMATION_PUSH_TREE, ANIMATION_SCRATCH_1, ANIMATION_SCRATCH_2, ANIMATION_SHAKE, ANIMATION_MELEE_SLASH_1, ANIMATION_MELEE_SLASH_2};
     }
 
-    public float getScale() {
+    public float getEntityScale() {
         return this.isBaby() ? 0.25F : 1.0F;
     }
 

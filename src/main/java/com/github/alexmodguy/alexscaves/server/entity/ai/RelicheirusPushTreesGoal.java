@@ -97,7 +97,8 @@ public class RelicheirusPushTreesGoal extends MoveToBlockGoal {
     }
 
     private BlockPos getBottomOfTree(LevelReader worldIn, BlockPos pos) {
-        while (pos.getY() > worldIn.getMinBuildHeight() && (worldIn.getBlockState(pos).is(BlockTags.LEAVES) || worldIn.getBlockState(pos).isAir() || worldIn.getBlockState(pos).is(BlockTags.LOGS))) {
+        int minY = worldIn instanceof net.minecraft.world.level.LevelHeightAccessor ? ((net.minecraft.world.level.LevelHeightAccessor)worldIn).getMinY() : -64;
+        while (pos.getY() > minY && (worldIn.getBlockState(pos).is(BlockTags.LEAVES) || worldIn.getBlockState(pos).isAir() || worldIn.getBlockState(pos).is(BlockTags.LOGS))) {
             pos = pos.below();
         }
         return pos;
@@ -105,9 +106,10 @@ public class RelicheirusPushTreesGoal extends MoveToBlockGoal {
 
     @Override
     protected boolean isValidTarget(LevelReader worldIn, BlockPos pos) {
+        int maxY = worldIn instanceof net.minecraft.world.level.LevelHeightAccessor ? ((net.minecraft.world.level.LevelHeightAccessor)worldIn).getMaxY() : 320;
         if (worldIn.getBlockState(pos).is(BlockTags.LOGS)) {
             BlockPos treeTop = new BlockPos(pos);
-            while (worldIn.getBlockState(treeTop).is(BlockTags.LOGS) && treeTop.getY() < worldIn.getMaxBuildHeight()) {
+            while (worldIn.getBlockState(treeTop).is(BlockTags.LOGS) && treeTop.getY() < maxY) {
                 treeTop = treeTop.above();
             }
             if (worldIn.getBlockState(treeTop).is(BlockTags.LEAVES)) {

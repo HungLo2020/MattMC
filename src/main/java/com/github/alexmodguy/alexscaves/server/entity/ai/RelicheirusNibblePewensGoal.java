@@ -112,7 +112,8 @@ public class RelicheirusNibblePewensGoal extends MoveToBlockGoal {
 
     private int getHeightOfBlock(LevelReader worldIn, BlockPos pos) {
         int i = 0;
-        while (pos.getY() > worldIn.getMinBuildHeight() && (worldIn.getBlockState(pos).is(BlockTags.LEAVES) || worldIn.getBlockState(pos).isAir() || worldIn.getBlockState(pos).is(BlockTags.LOGS))) {
+        int minY = worldIn instanceof net.minecraft.world.level.LevelHeightAccessor ? ((net.minecraft.world.level.LevelHeightAccessor)worldIn).getMinY() : -64;
+        while (pos.getY() > minY && (worldIn.getBlockState(pos).is(BlockTags.LEAVES) || worldIn.getBlockState(pos).isAir() || worldIn.getBlockState(pos).is(BlockTags.LOGS))) {
             pos = pos.below();
             i++;
         }
