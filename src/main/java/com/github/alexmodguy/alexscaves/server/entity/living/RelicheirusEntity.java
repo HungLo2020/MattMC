@@ -70,7 +70,7 @@ public class RelicheirusEntity extends DinosaurEntity implements IAnimatedEntity
     }
 
     public static AttributeSupplier.Builder createAttributes() {
-        return Monster.createMonsterAttributes().add(Attributes.ATTACK_DAMAGE, 12.0D).add(Attributes.MOVEMENT_SPEED, 0.2D).add(Attributes.MAX_HEALTH, 120.0D);
+        return Monster.createMonsterAttributes().add(Attributes.ATTACK_DAMAGE, 12.0D).add(Attributes.MOVEMENT_SPEED, 0.2D).add(Attributes.MAX_HEALTH, 120.0D).add(Attributes.TEMPT_RANGE, 10.0D);
     }
 
     protected void registerGoals() {
