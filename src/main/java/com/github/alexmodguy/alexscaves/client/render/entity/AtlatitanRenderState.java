@@ -11,8 +11,7 @@ public class AtlatitanRenderState extends LivingEntityRenderState {
     public float neckYRot;
     public float tailXRot;
     public float tailYRot;
-    public float walkAnimPosition;
-    public float walkAnimSpeed;
+    // walkAnimationPos and walkAnimationSpeed inherited from LivingEntityRenderState
     public float legBackAmount;
     public float raiseArmsAmount;
     public Animation animation;

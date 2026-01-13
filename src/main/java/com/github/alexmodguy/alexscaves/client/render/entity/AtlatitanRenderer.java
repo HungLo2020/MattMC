@@ -27,12 +27,14 @@ public class AtlatitanRenderer extends MobRenderer<AtlatitanEntity, AtlatitanRen
         super.extractRenderState(entity, renderState, partialTick);
         renderState.altSkin = entity.getAltSkin();
         renderState.danceProgress = entity.getDanceProgress(partialTick);
+        renderState.danceAmount = entity.getDanceProgress(partialTick);
         renderState.neckXRot = entity.neckXRot;
         renderState.neckYRot = entity.neckYRot;
         renderState.tailXRot = entity.tailXRot;
         renderState.tailYRot = entity.tailYRot;
-        renderState.walkAnimPosition = entity.getWalkAnimPosition(partialTick);
-        renderState.walkAnimSpeed = entity.getWalkAnimSpeed(partialTick);
+        // Override parent's walkAnimation values with custom entity tracking
+        renderState.walkAnimationPos = entity.getWalkAnimPosition(partialTick);
+        renderState.walkAnimationSpeed = entity.getWalkAnimSpeed(partialTick);
         renderState.legBackAmount = entity.getLegBackAmount(partialTick);
         renderState.raiseArmsAmount = entity.getRaiseArmsAmount(partialTick);
         renderState.animation = entity.getAnimation();
