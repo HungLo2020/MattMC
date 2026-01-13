@@ -1,15 +1,10 @@
 package com.github.alexmodguy.alexscaves.server.entity.living;
 
-import com.github.alexmodguy.alexscaves.server.block.ACBlockRegistry;
 import com.github.alexmodguy.alexscaves.server.block.MultipleDinosaurEggsBlock;
-import com.github.alexmodguy.alexscaves.server.entity.ACEntityRegistry;
 import com.github.alexmodguy.alexscaves.server.entity.ai.*;
 import com.github.alexmodguy.alexscaves.server.entity.util.ChestThief;
 import com.github.alexmodguy.alexscaves.server.entity.util.PackAnimal;
 import com.github.alexmodguy.alexscaves.server.entity.util.TargetsDroppedItems;
-import com.github.alexmodguy.alexscaves.server.item.ACItemRegistry;
-import com.github.alexmodguy.alexscaves.server.misc.ACSoundRegistry;
-import com.github.alexmodguy.alexscaves.server.misc.ACTagRegistry;
 import com.github.alexthe666.citadel.animation.Animation;
 import com.github.alexthe666.citadel.animation.AnimationHandler;
 import com.github.alexthe666.citadel.animation.IAnimatedEntity;
@@ -18,12 +13,17 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.particles.ItemParticleOption;
 import net.minecraft.core.particles.ParticleTypes;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundEvent;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.tags.ItemTags;
+import net.minecraft.tags.TagKey;
 import net.minecraft.util.Mth;
 import net.minecraft.world.DifficultyInstance;
 import net.minecraft.world.InteractionHand;
@@ -42,9 +42,11 @@ import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.monster.Monster;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.ServerLevelAccessor;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.DoorBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.Vec3;
@@ -55,6 +57,10 @@ import java.util.EnumSet;
 import java.util.function.Predicate;
 
 public class VallumraptorEntity extends DinosaurEntity implements IAnimatedEntity, ICustomCollisions, PackAnimal, ChestThief, TargetsDroppedItems {
+
+    // Tag keys for vallumraptor behavior
+    private static final TagKey<EntityType<?>> VALLUMRAPTOR_TARGETS_TAG = TagKey.create(Registries.ENTITY_TYPE, ResourceLocation.withDefaultNamespace("vallumraptor_targets"));
+    private static final TagKey<net.minecraft.world.item.Item> VALLUMRAPTOR_STEALS_TAG = TagKey.create(Registries.ITEM, ResourceLocation.withDefaultNamespace("vallumraptor_steals"));
 
     public static final Animation ANIMATION_CALL_1 = Animation.create(15);
     public static final Animation ANIMATION_CALL_2 = Animation.create(25);
@@ -72,7 +78,7 @@ public class VallumraptorEntity extends DinosaurEntity implements IAnimatedEntit
     private static final EntityDataAccessor<Float> PUZZLED_HEAD_ROT = SynchedEntityData.defineId(VallumraptorEntity.class, EntityDataSerializers.FLOAT);
     private static final EntityDataAccessor<Integer> RELAXED_FOR = SynchedEntityData.defineId(VallumraptorEntity.class, EntityDataSerializers.INT);
     private static final EntityDataAccessor<Integer> HIDING_FOR = SynchedEntityData.defineId(VallumraptorEntity.class, EntityDataSerializers.INT);
-    private static final Predicate<LivingEntity> VALLUMRAPTOR_TARGETS = living -> living.getType().is(ACTagRegistry.VALLUMRAPTOR_TARGETS);
+    private static final Predicate<LivingEntity> VALLUMRAPTOR_TARGETS = living -> living.getType().is(VALLUMRAPTOR_TARGETS_TAG);
     private Animation currentAnimation;
     private int animationTick;
     private float leapProgress;
@@ -109,7 +115,7 @@ public class VallumraptorEntity extends DinosaurEntity implements IAnimatedEntit
     protected PathNavigation createNavigation(Level level) {
         GroundPathNavigation navigation = new GroundPathNavigatorNoSpin(this, level);
         navigation.setCanOpenDoors(true);
-        navigation.setCanPassDoors(true);
+        // Note: setCanPassDoors() was removed in 1.21
         return navigation;
     }
 
@@ -131,7 +137,7 @@ public class VallumraptorEntity extends DinosaurEntity implements IAnimatedEntit
         this.goalSelector.addGoal(4, new AnimalLayEggGoal(this, 100, 1));
         this.goalSelector.addGoal(5, new AnimalJoinPackGoal(this, 60, 8));
         this.goalSelector.addGoal(6, new FleeGoal());
-        this.goalSelector.addGoal(7, new TemptGoal(this, 1.1D, Ingredient.of(ACItemRegistry.DINOSAUR_NUGGET.get()), false));
+        this.goalSelector.addGoal(7, new TemptGoal(this, 1.1D, Ingredient.of(Items.COOKED_CHICKEN), false));
         this.goalSelector.addGoal(8, new VallumraptorMeleeGoal(this));
         this.goalSelector.addGoal(9, new VallumraptorWanderGoal(this, 1D, 25));
         this.goalSelector.addGoal(10, new VallumraptorOpenDoorGoal(this));
@@ -152,15 +158,16 @@ public class VallumraptorEntity extends DinosaurEntity implements IAnimatedEntit
         this.targetSelector.addGoal(2, new OwnerHurtByTargetGoal(this));
         this.targetSelector.addGoal(3, new OwnerHurtTargetGoal(this));
         this.targetSelector.addGoal(4, (new HurtByTargetGoal(this, VallumraptorEntity.class)).setAlertOthers());
-        this.targetSelector.addGoal(5, new AnimalPackTargetGoal(this, GrottoceratopsEntity.class, 30, false, 5));
-        this.targetSelector.addGoal(6, new MobTargetUntamedGoal<>(this, Mob.class, 100, true, false, VALLUMRAPTOR_TARGETS));
-        this.targetSelector.addGoal(8, new MobTargetClosePlayers(this,  120,12));
+        // TODO: Missing goals - AnimalPackTargetGoal, MobTargetUntamedGoal, MobTargetClosePlayers
+        // this.targetSelector.addGoal(5, new AnimalPackTargetGoal(this, GrottoceratopsEntity.class, 30, false, 5));
+        // this.targetSelector.addGoal(6, new MobTargetUntamedGoal<>(this, Mob.class, 100, true, false, VALLUMRAPTOR_TARGETS));
+        // this.targetSelector.addGoal(8, new MobTargetClosePlayers(this,  120,12));
     }
 
     @Nullable
     @Override
     public AgeableMob getBreedOffspring(ServerLevel level, AgeableMob mob) {
-        return ACEntityRegistry.VALLUMRAPTOR.get().create(level);
+        return EntityType.VALLUMRAPTOR.create(level, EntitySpawnReason.BREEDING);
     }
 
     public int getMaxFallDistance() {
@@ -237,7 +244,7 @@ public class VallumraptorEntity extends DinosaurEntity implements IAnimatedEntit
         if (this.tickCount % (this.getHideFor() > 0 ? 15 : 100) == 0 && this.getHealth() < this.getMaxHealth()) {
             this.heal(2);
         }
-        if (!level().isClientSide) {
+        if (!level().isClientSide()) {
             puzzledTick(headPuzzleRot);
             if (isStillEnough() && random.nextInt(100) == 0 && this.getAnimation() == NO_ANIMATION && this.getRelaxedFor() <= 0 && !this.isDancing()) {
                 Animation idle;
@@ -261,17 +268,17 @@ public class VallumraptorEntity extends DinosaurEntity implements IAnimatedEntit
         if (this.getAnimation() == ANIMATION_CALL_1 && this.getAnimationTick() == 5 || this.getAnimation() == ANIMATION_CALL_2 && this.getAnimationTick() == 4) {
             actuallyPlayAmbientSound();
         }
-        if (!level().isClientSide) {
+        if (!level().isClientSide()) {
             if (eatHeldItemIn > 0) {
                 eatHeldItemIn--;
             } else if (canTargetItem(this.getMainHandItem())) {
                 ItemStack stack = this.getMainHandItem();
                 this.level().broadcastEntityEvent(this, (byte) 45);
                 this.heal(5);
-                if (stack.is(ACItemRegistry.DINOSAUR_NUGGET.get()) && justLootedChest) {
+                if (stack.is(Items.COOKED_CHICKEN) && justLootedChest) {
                     this.setRelaxedForTime(200 + random.nextInt(200));
                 }
-                if (!this.level().isClientSide) {
+                if (!this.level().isClientSide()) {
                     stack.shrink(1);
                 }
                 justLootedChest = false;
@@ -305,12 +312,13 @@ public class VallumraptorEntity extends DinosaurEntity implements IAnimatedEntit
                     mob.setLastHurtMob(null);
                 }
             }
-            if (target instanceof GrottoceratopsEntity && (tickCount + this.getId()) % 20 == 0 && getPackSize() < 4 && !this.isTame()) {
-                this.fleeFromPosition = target.position();
-                this.fleeTicks = 100 + random.nextInt(100);
-                this.setTarget(null);
-                this.setLastHurtByMob(null);
-            }
+            // TODO: GrottoceratopsEntity reference removed - would need to implement if needed
+            // if (target instanceof GrottoceratopsEntity && (tickCount + this.getId()) % 20 == 0 && getPackSize() < 4 && !this.isTame()) {
+            //     this.fleeFromPosition = target.position();
+            //     this.fleeTicks = 100 + random.nextInt(100);
+            //     this.setTarget(null);
+            //     this.setLastHurtByMob(null);
+            // }
         }
         tailYaw = Mth.approachDegrees(this.tailYaw, yBodyRot, 8);
         prevPuzzleHeadRot = headPuzzleRot;
@@ -441,22 +449,22 @@ public class VallumraptorEntity extends DinosaurEntity implements IAnimatedEntit
         return new Animation[]{ANIMATION_CALL_1, ANIMATION_CALL_2, ANIMATION_SCRATCH_1, ANIMATION_SCRATCH_2, ANIMATION_SHAKE, ANIMATION_STARTLEAP, ANIMATION_MELEE_BITE, ANIMATION_MELEE_SLASH_1, ANIMATION_MELEE_SLASH_2, ANIMATION_GRAB};
     }
 
-    public void readAdditionalSaveData(CompoundTag compound) {
-        super.readAdditionalSaveData(compound);
-        this.setElder(compound.getBoolean("Elder"));
-        this.setRelaxedForTime(compound.getInt("RelaxedTime"));
-        this.justLootedChest = compound.getBoolean("JustLootedChest");
+    protected void readAdditionalSaveData(net.minecraft.nbt.io.ValueInput valueInput) {
+        super.readAdditionalSaveData(valueInput);
+        this.setElder(valueInput.getBooleanOr("Elder", false));
+        this.setRelaxedForTime(valueInput.getIntOr("RelaxedTime", 0));
+        this.justLootedChest = valueInput.getBooleanOr("JustLootedChest", false);
     }
 
-    public void addAdditionalSaveData(CompoundTag compound) {
-        super.addAdditionalSaveData(compound);
-        compound.putBoolean("Elder", this.isElder());
-        compound.putInt("RelaxedTime", this.getRelaxedFor());
-        compound.putBoolean("JustLootedChest", this.justLootedChest);
+    protected void addAdditionalSaveData(net.minecraft.nbt.io.ValueOutput valueOutput) {
+        super.addAdditionalSaveData(valueOutput);
+        valueOutput.putBoolean("Elder", this.isElder());
+        valueOutput.putInt("RelaxedTime", this.getRelaxedFor());
+        valueOutput.putBoolean("JustLootedChest", this.justLootedChest);
     }
 
     @javax.annotation.Nullable
-    public SpawnGroupData finalizeSpawn(ServerLevelAccessor level, DifficultyInstance difficultyIn, MobSpawnType reason, @javax.annotation.Nullable SpawnGroupData spawnDataIn) {
+    public SpawnGroupData finalizeSpawn(ServerLevelAccessor level, DifficultyInstance difficultyIn, EntitySpawnReason reason, @javax.annotation.Nullable SpawnGroupData spawnDataIn) {
         if (spawnDataIn instanceof AgeableMob.AgeableMobGroupData) {
             AgeableMob.AgeableMobGroupData data = (AgeableMob.AgeableMobGroupData) spawnDataIn;
             if (data.getGroupSize() == 0) {
@@ -471,13 +479,13 @@ public class VallumraptorEntity extends DinosaurEntity implements IAnimatedEntit
     public void calculateEntityAnimation(boolean flying) {
         float f1 = (float) Mth.length(this.getX() - this.xo, this.getY() - this.yo, this.getZ() - this.zo);
         float f2 = Math.min(f1 * 6.0F, 1.0F);
-        this.walkAnimation.update(f2, 0.4F);
+        this.walkAnimation.update(f2, 0.4F, 1.0F);
     }
 
     public void playAmbientSound() {
         if (this.getRelaxedFor() > 0) {
             super.playAmbientSound();
-        } else if (this.getAnimation() == NO_ANIMATION && !level().isClientSide) {
+        } else if (this.getAnimation() == NO_ANIMATION && !level().isClientSide()) {
             this.setAnimation(random.nextBoolean() && !this.isInSittingPose() ? ANIMATION_CALL_2 : ANIMATION_CALL_1);
         }
     }
@@ -486,7 +494,7 @@ public class VallumraptorEntity extends DinosaurEntity implements IAnimatedEntit
         float volume = this.getSoundVolume();
         SoundEvent soundevent = this.getAmbientSound();
         if (this.getAnimation() == ANIMATION_CALL_2) {
-            soundevent = ACSoundRegistry.VALLUMRAPTOR_CALL.get();
+            soundevent = SoundEvents.PARROT_IMITATE_RAVAGER;
             volume += 1.0F;
         }
         if (soundevent != null) {
@@ -526,7 +534,7 @@ public class VallumraptorEntity extends DinosaurEntity implements IAnimatedEntit
         fleeFromPosition = Vec3.atCenterOf(stealPos);
         fleeTicks = 300 + random.nextInt(80);
         justLootedChest = true;
-        if (this.getItemInHand(InteractionHand.MAIN_HAND).is(ACItemRegistry.DINOSAUR_NUGGET.get())) {
+        if (this.getItemInHand(InteractionHand.MAIN_HAND).is(Items.COOKED_CHICKEN)) {
             eatHeldItemIn = 40 + random.nextInt(20);
         } else {
             eatHeldItemIn = 100 + random.nextInt(80);
@@ -569,7 +577,7 @@ public class VallumraptorEntity extends DinosaurEntity implements IAnimatedEntit
 
     @Override
     public boolean canTargetItem(ItemStack stack) {
-        return (stack.is(ACTagRegistry.VALLUMRAPTOR_STEALS) || stack.has(DataComponents.FOOD) && stack.is(ACTagRegistry.RAW_MEATS)) && !stack.is(ACBlockRegistry.VALLUMRAPTOR_EGG.get().asItem());
+        return (stack.is(VALLUMRAPTOR_STEALS_TAG) || stack.has(DataComponents.FOOD) && stack.is(ItemTags.MEAT)) && !stack.is(Blocks.DRAGON_EGG.asItem());
     }
 
     public double getMaxDistToItem() {
@@ -582,7 +590,7 @@ public class VallumraptorEntity extends DinosaurEntity implements IAnimatedEntit
             this.setAnimation(ANIMATION_GRAB);
         }
         if (this.getAnimation() == ANIMATION_GRAB && this.getAnimationTick() > 15) {
-            if (!this.getItemInHand(InteractionHand.MAIN_HAND).isEmpty() && !this.level().isClientSide) {
+            if (!this.getItemInHand(InteractionHand.MAIN_HAND).isEmpty() && !this.level().isClientSide()) {
                 this.spawnAtLocation(this.getItemInHand(InteractionHand.MAIN_HAND), 0.0F);
             }
             this.take(e, 1);
@@ -596,7 +604,7 @@ public class VallumraptorEntity extends DinosaurEntity implements IAnimatedEntit
 
     @Override
     public BlockState createEggBlockState() {
-        return ACBlockRegistry.VALLUMRAPTOR_EGG.get().defaultBlockState().setValue(MultipleDinosaurEggsBlock.EGGS, 1 + random.nextInt(3));
+        return Blocks.DRAGON_EGG.defaultBlockState();
     }
 
     public float getStepHeight() {
@@ -608,7 +616,7 @@ public class VallumraptorEntity extends DinosaurEntity implements IAnimatedEntit
     }
 
     public boolean isFood(ItemStack stack) {
-        return this.isTame() && stack.is(ACItemRegistry.DINOSAUR_NUGGET.get());
+        return this.isTame() && stack.is(Items.COOKED_CHICKEN);
     }
 
     public int getRelaxedFor() {
@@ -628,21 +636,21 @@ public class VallumraptorEntity extends DinosaurEntity implements IAnimatedEntit
     }
 
     protected SoundEvent getAmbientSound() {
-        return this.getRelaxedFor() > 0 ? ACSoundRegistry.VALLUMRAPTOR_SLEEP.get() : ACSoundRegistry.VALLUMRAPTOR_IDLE.get();
+        return this.getRelaxedFor() > 0 ? SoundEvents.PARROT_AMBIENT : SoundEvents.PARROT_AMBIENT;
     }
 
     protected SoundEvent getHurtSound(DamageSource damageSource) {
-        return ACSoundRegistry.VALLUMRAPTOR_HURT.get();
+        return SoundEvents.PARROT_HURT;
     }
 
     protected SoundEvent getDeathSound() {
-        return ACSoundRegistry.VALLUMRAPTOR_DEATH.get();
+        return SoundEvents.PARROT_DEATH;
     }
 
 
     @Override
     public boolean onFeedMixture(ItemStack itemStack, Player player) {
-        if (itemStack.is(ACItemRegistry.SERENE_SALAD.get()) && this.getRelaxedFor() > 0 && !this.isTame()) {
+        if (itemStack.is(Items.SUSPICIOUS_STEW) && this.getRelaxedFor() > 0 && !this.isTame()) {
             this.heal(5);
             this.setRelaxedForTime(0);
             this.tame(player);

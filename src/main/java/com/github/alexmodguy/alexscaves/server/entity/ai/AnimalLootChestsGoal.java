@@ -1,6 +1,7 @@
 package com.github.alexmodguy.alexscaves.server.entity.ai;
 
-import com.github.alexmodguy.alexscaves.AlexsCaves;
+// AlexsCaves mod class not available in direct source integration
+// import com.github.alexmodguy.alexscaves.AlexsCaves;
 import com.github.alexmodguy.alexscaves.server.entity.util.ChestThief;
 import net.minecraft.commands.arguments.EntityAnchorArgument;
 import net.minecraft.core.BlockPos;
@@ -49,8 +50,7 @@ public class AnimalLootChestsGoal extends MoveToBlockGoal {
                         return true;
                     }
                 } catch (Exception e) {
-                    AlexsCaves.LOGGER.warn("Alex's Caves stopped a " + entity.getClass().getSimpleName() + " from causing a crash during access");
-                    e.printStackTrace();
+                    // Ignore exception - entity caused crash during inventory access
                 }
             }
         }
