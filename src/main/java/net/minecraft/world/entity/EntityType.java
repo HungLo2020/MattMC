@@ -969,6 +969,13 @@ public class EntityType<T extends Entity> implements FeatureElement, EntityTypeT
 			.clientTrackingRange(4)
 			.updateInterval(20)
 	);
+	public static final EntityType<com.github.alexmodguy.alexscaves.server.entity.living.TremorsaurusEntity> TREMORSAURUS = register(
+		"tremorsaurus",
+		EntityType.Builder.of(com.github.alexmodguy.alexscaves.server.entity.living.TremorsaurusEntity::new, MobCategory.CREATURE)
+			.sized(3.5F, 4.5F)
+			.eyeHeight(4.0F)
+			.clientTrackingRange(10)
+	);
 	public static final EntityType<TropicalFish> TROPICAL_FISH = register(
 		"tropical_fish", EntityType.Builder.of(TropicalFish::new, MobCategory.WATER_AMBIENT).sized(0.5F, 0.4F).eyeHeight(0.26F).clientTrackingRange(4)
 	);

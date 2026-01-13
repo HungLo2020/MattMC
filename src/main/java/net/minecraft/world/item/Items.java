@@ -1736,6 +1736,7 @@ public class Items {
 	public static final Item TRADER_LLAMA_SPAWN_EGG = registerItem(
 		"trader_llama_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.TRADER_LLAMA)
 	);
+	public static final Item TREMORSAURUS_SPAWN_EGG = registerItem("tremorsaurus_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.TREMORSAURUS));
 	public static final Item TROPICAL_FISH_SPAWN_EGG = registerItem(
 		"tropical_fish_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.TROPICAL_FISH)
 	);

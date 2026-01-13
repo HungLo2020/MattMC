@@ -47,6 +47,7 @@ import net.minecraft.world.entity.animal.sniffer.Sniffer;
 import net.minecraft.world.entity.animal.wolf.Wolf;
 import com.github.alexmodguy.alexscaves.server.entity.living.GrottoceratopsEntity;
 import com.github.alexmodguy.alexscaves.server.entity.living.SubterranodonEntity;
+import com.github.alexmodguy.alexscaves.server.entity.living.TremorsaurusEntity;
 import com.github.alexmodguy.alexscaves.server.entity.living.VallumraptorEntity;
 import net.minecraft.world.entity.boss.enderdragon.EnderDragon;
 import net.minecraft.world.entity.boss.wither.WitherBoss;
@@ -159,6 +160,7 @@ public class DefaultAttributes {
 		.put(EntityType.SLIME, Monster.createMonsterAttributes().build())
 		.put(EntityType.SNIFFER, Sniffer.createAttributes().build())
 		.put(EntityType.SUBTERRANODON, SubterranodonEntity.createAttributes().build())
+		.put(EntityType.TREMORSAURUS, TremorsaurusEntity.createAttributes().build())
 		.put(EntityType.VALLUMRAPTOR, VallumraptorEntity.createAttributes().build())
 		.put(EntityType.SNOW_GOLEM, SnowGolem.createAttributes().build())
 		.put(EntityType.SPIDER, Spider.createAttributes().build())

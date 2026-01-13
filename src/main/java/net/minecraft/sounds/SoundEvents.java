@@ -720,6 +720,13 @@ public class SoundEvents {
 	public static final SoundEvent GROTTOCERATOPS_ATTACK = register("entity.grottoceratops.attack");
 	public static final SoundEvent GROTTOCERATOPS_GRAZE = register("entity.grottoceratops.graze");
 	public static final SoundEvent GROTTOCERATOPS_STEP = register("entity.grottoceratops.step");
+	public static final SoundEvent TREMORSAURUS_IDLE = register("entity.tremorsaurus.idle");
+	public static final SoundEvent TREMORSAURUS_HURT = register("entity.tremorsaurus.hurt");
+	public static final SoundEvent TREMORSAURUS_DEATH = register("entity.tremorsaurus.death");
+	public static final SoundEvent TREMORSAURUS_ROAR = register("entity.tremorsaurus.roar");
+	public static final SoundEvent TREMORSAURUS_STOMP = register("entity.tremorsaurus.stomp");
+	public static final SoundEvent TREMORSAURUS_BITE = register("entity.tremorsaurus.bite");
+	public static final SoundEvent TREMORSAURUS_THROW = register("entity.tremorsaurus.throw");
 	public static final SoundEvent GRASS_BREAK = register("block.grass.break");
 	public static final SoundEvent GRASS_FALL = register("block.grass.fall");
 	public static final SoundEvent GRASS_HIT = register("block.grass.hit");
