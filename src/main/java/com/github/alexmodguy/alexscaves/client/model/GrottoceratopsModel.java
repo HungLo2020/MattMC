@@ -301,29 +301,6 @@ public class GrottoceratopsModel extends AdvancedEntityModel<GrottoceratopsRende
         animator.resetKeyframe(5);
     }
 
-    public void renderToBuffer(PoseStack matrixStackIn, VertexConsumer bufferIn, int packedLightIn, int packedOverlayIn, int packedColor) {
-        if (this.young) {
-            float f = 1.5F;
-            head.setScale(f, f, f);
-            head.setShouldScaleChildren(true);
-
-            matrixStackIn.pushPose();
-            matrixStackIn.scale(0.5F, 0.5F, 0.5F);
-            matrixStackIn.translate(0.0D, 1.5D, 0D);
-            parts().forEach((p_228292_8_) -> {
-                p_228292_8_.render(matrixStackIn, bufferIn, packedLightIn, packedOverlayIn, packedColor);
-            });
-            matrixStackIn.popPose();
-            head.setScale(1, 1, 1);
-        } else {
-            matrixStackIn.pushPose();
-            parts().forEach((p_228290_8_) -> {
-                p_228290_8_.render(matrixStackIn, bufferIn, packedLightIn, packedOverlayIn, packedColor);
-            });
-            matrixStackIn.popPose();
-        }
-    }
-
     private void setupAnimForAnimation(GrottoceratopsRenderState renderState, Animation animation, float limbSwing, float limbSwingAmount, float ageInTicks) {
         boolean chewing = animation == GrottoceratopsEntity.ANIMATION_CHEW_FROM_GROUND || animation == GrottoceratopsEntity.ANIMATION_CHEW;
         if (chewing) {
@@ -348,6 +325,7 @@ public class GrottoceratopsModel extends AdvancedEntityModel<GrottoceratopsRende
         float ageInTicks = renderState.ageInTicks;
         float netHeadYaw = renderState.yRot;
         float headPitch = renderState.xRot;
+        boolean isBaby = renderState.isBaby;
         
         float walkSpeed = 0.5F;
         float walkDegree = 1F;
@@ -363,6 +341,16 @@ public class GrottoceratopsModel extends AdvancedEntityModel<GrottoceratopsRende
         this.body.rotateAngleY += tailSwingYaw;
         this.grassBunch.showModel = showGrass;
         this.grassBunch2.showModel = showGrass;
+        
+        // Handle baby scaling
+        if (isBaby) {
+            float f = 1.5F;
+            head.setScale(f, f, f);
+            head.setShouldScaleChildren(true);
+        } else {
+            head.setScale(1, 1, 1);
+        }
+        
         if (buryEggsAmount > 0.0F) {
             limbSwing = ageInTicks;
             limbSwingAmount = buryEggsAmount * 0.5F;
@@ -416,30 +404,5 @@ public class GrottoceratopsModel extends AdvancedEntityModel<GrottoceratopsRende
         this.swing(tail, danceSpeed, 0.5F, false, 1, 0, ageInTicks, danceAmount);
         this.swing(tail2, danceSpeed, 0.5F, false, 1, 0, ageInTicks, danceAmount);
 
-    }
-
-    private void articulateLegs(LegSolverQuadruped legs, float partialTick) {
-        float heightBackLeft = legs.backLeft.getHeight(partialTick);
-        float heightBackRight = legs.backRight.getHeight(partialTick);
-        float heightFrontLeft = legs.frontLeft.getHeight(partialTick);
-        float heightFrontRight = legs.frontRight.getHeight(partialTick);
-        float max = Math.max(Math.max(heightBackLeft, heightBackRight), Math.max(heightFrontLeft, heightFrontRight)) * 0.8F;
-        body.rotationPointY += max * 16;
-        rarm.rotationPointY += (heightFrontRight - max) * 16;
-        larm.rotationPointY += (heightFrontLeft - max) * 16;
-        rleg.rotationPointY += (heightBackRight - max) * 16;
-        lleg.rotationPointY += (heightBackLeft - max) * 16;
-
-    }
-
-    public void animateSpirit(DinosaurSpiritEntity entityIn, float partialTicks) {
-        this.resetToDefaultPose();
-    }
-
-    public void renderSpiritToBuffer(PoseStack poseStack, VertexConsumer ivertexbuilder, int packedLightIn, int packedOverlayIn, int packedColor) {
-        poseStack.pushPose();
-        poseStack.translate(0, 1.3F, 1);
-        head.render(poseStack, ivertexbuilder, packedLightIn, packedOverlayIn, packedColor);
-        poseStack.popPose();
     }
 }

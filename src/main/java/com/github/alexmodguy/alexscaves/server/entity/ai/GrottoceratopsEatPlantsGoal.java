@@ -66,7 +66,7 @@ public class GrottoceratopsEatPlantsGoal extends MoveToBlockGoal {
     protected boolean isValidTarget(LevelReader worldIn, BlockPos pos) {
         if (pos != null) {
             BlockState state = worldIn.getBlockState(pos.above());
-            return state.is(BlockTags.FLOWERS) || state.is(BlockTags.TALL_FLOWERS);
+            return state.is(BlockTags.FLOWERS) || state.is(BlockTags.SMALL_FLOWERS);
         }
         return false;
     }

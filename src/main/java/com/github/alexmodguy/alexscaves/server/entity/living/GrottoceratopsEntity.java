@@ -86,13 +86,6 @@ public class GrottoceratopsEntity extends DinosaurEntity implements IAnimatedEnt
         this.targetSelector.addGoal(1, (new HurtByTargetGoal(this, GrottoceratopsEntity.class)).setAlertOthers());
     }
 
-    public boolean hurt(DamageSource damageSource, float f) {
-        if (damageSource.getDirectEntity() instanceof VallumraptorEntity) {
-            f *= 0.75F;
-        }
-        return super.hurt(damageSource, f);
-    }
-
     public void tick() {
         super.tick();
         float tailSwing = getTailSwingRot();
@@ -125,7 +118,7 @@ public class GrottoceratopsEntity extends DinosaurEntity implements IAnimatedEnt
         }
         if (resetAttackerCooldown > 0) {
             resetAttackerCooldown--;
-        } else if (!level().isClientSide && !this.isBaby() && (this.getLastHurtByMob() == null || !this.getLastHurtByMob().isAlive())) {
+        } else if (!level().isClientSide() && !this.isBaby() && (this.getLastHurtByMob() == null || !this.getLastHurtByMob().isAlive())) {
             this.setTarget(this.getLastHurtByMob());
             resetAttackerCooldown = 600;
         }
@@ -156,7 +149,8 @@ public class GrottoceratopsEntity extends DinosaurEntity implements IAnimatedEnt
     @Nullable
     @Override
     public AgeableMob getBreedOffspring(ServerLevel level, AgeableMob mob) {
-        return EntityType.GROTTOCERATOPS.create(level);
+        GrottoceratopsEntity baby = new GrottoceratopsEntity(EntityType.GROTTOCERATOPS, level);
+        return baby;
     }
 
     @Override
@@ -185,7 +179,7 @@ public class GrottoceratopsEntity extends DinosaurEntity implements IAnimatedEnt
     }
 
     public void playAmbientSound() {
-        if (this.getAnimation() == NO_ANIMATION && !level().isClientSide) {
+        if (this.getAnimation() == NO_ANIMATION && !level().isClientSide()) {
             this.setAnimation(random.nextBoolean() ? ANIMATION_SPEAK_2 : ANIMATION_SPEAK_1);
         }
     }
@@ -209,7 +203,7 @@ public class GrottoceratopsEntity extends DinosaurEntity implements IAnimatedEnt
     public void calculateEntityAnimation(boolean flying) {
         float f1 = (float) Mth.length(this.getX() - this.xo, flying ? this.getY() - this.yo : 0, this.getZ() - this.zo);
         float f2 = Math.min(f1 * 8.0F, 1.0F);
-        this.walkAnimation.update(f2, 0.4F);
+        this.walkAnimation.update(f2, 0.4F, 2.5F);
     }
 
 
