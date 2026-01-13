@@ -75,6 +75,7 @@ import net.minecraft.world.entity.animal.sniffer.Sniffer;
 import net.minecraft.world.entity.animal.wolf.Wolf;
 import com.github.alexmodguy.alexscaves.server.entity.living.GrottoceratopsEntity;
 import com.github.alexmodguy.alexscaves.server.entity.living.SubterranodonEntity;
+import com.github.alexmodguy.alexscaves.server.entity.living.TrilocarisEntity;
 import com.github.alexmodguy.alexscaves.server.entity.living.VallumraptorEntity;
 import net.minecraft.world.entity.boss.enderdragon.EndCrystal;
 import net.minecraft.world.entity.boss.enderdragon.EnderDragon;
@@ -975,6 +976,13 @@ public class EntityType<T extends Entity> implements FeatureElement, EntityTypeT
 			.sized(3.5F, 4.5F)
 			.eyeHeight(4.0F)
 			.clientTrackingRange(10)
+	);
+	public static final EntityType<TrilocarisEntity> TRILOCARIS = register(
+		"trilocaris",
+		EntityType.Builder.of(TrilocarisEntity::new, MobCategory.WATER_CREATURE)
+			.sized(0.8F, 0.4F)
+			.eyeHeight(0.2F)
+			.clientTrackingRange(8)
 	);
 	public static final EntityType<TropicalFish> TROPICAL_FISH = register(
 		"tropical_fish", EntityType.Builder.of(TropicalFish::new, MobCategory.WATER_AMBIENT).sized(0.5F, 0.4F).eyeHeight(0.26F).clientTrackingRange(4)

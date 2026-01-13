@@ -1473,6 +1473,11 @@ public class Items {
 		properties -> new MobBucketItem(EntityType.COD, Fluids.WATER, SoundEvents.BUCKET_EMPTY_FISH, properties),
 		new Item.Properties().stacksTo(1).component(DataComponents.BUCKET_ENTITY_DATA, CustomData.EMPTY)
 	);
+	public static final Item TRILOCARIS_BUCKET = registerItem(
+		"trilocaris_bucket",
+		properties -> new MobBucketItem(EntityType.TRILOCARIS, Fluids.WATER, SoundEvents.BUCKET_EMPTY_FISH, properties),
+		new Item.Properties().stacksTo(1).component(DataComponents.BUCKET_ENTITY_DATA, CustomData.EMPTY)
+	);
 	public static final Item TROPICAL_FISH_BUCKET = registerItem(
 		"tropical_fish_bucket",
 		properties -> new MobBucketItem(EntityType.TROPICAL_FISH, Fluids.WATER, SoundEvents.BUCKET_EMPTY_FISH, properties),
@@ -1737,6 +1742,7 @@ public class Items {
 		"trader_llama_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.TRADER_LLAMA)
 	);
 	public static final Item TREMORSAURUS_SPAWN_EGG = registerItem("tremorsaurus_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.TREMORSAURUS));
+	public static final Item TRILOCARIS_SPAWN_EGG = registerItem("trilocaris_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.TRILOCARIS));
 	public static final Item TROPICAL_FISH_SPAWN_EGG = registerItem(
 		"tropical_fish_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.TROPICAL_FISH)
 	);

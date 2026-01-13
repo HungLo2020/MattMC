@@ -16012,6 +16012,31 @@
     ],
     "subtitle": "subtitles.entity.tremorsaurus.throw"
   },
+  "entity.trilocaris.hurt": {
+    "sounds": [
+      "minecraft:entity/trilocaris/trilocaris_hurt_0",
+      "minecraft:entity/trilocaris/trilocaris_hurt_1",
+      "minecraft:entity/trilocaris/trilocaris_hurt_2"
+    ],
+    "subtitle": "subtitles.entity.trilocaris.hurt"
+  },
+  "entity.trilocaris.death": {
+    "sounds": [
+      "minecraft:entity/trilocaris/trilocaris_death_0",
+      "minecraft:entity/trilocaris/trilocaris_death_1",
+      "minecraft:entity/trilocaris/trilocaris_death_2"
+    ],
+    "subtitle": "subtitles.entity.trilocaris.death"
+  },
+  "entity.trilocaris.step": {
+    "sounds": [
+      "minecraft:entity/trilocaris/trilocaris_step_0",
+      "minecraft:entity/trilocaris/trilocaris_step_1",
+      "minecraft:entity/trilocaris/trilocaris_step_2",
+      "minecraft:entity/trilocaris/trilocaris_step_3"
+    ],
+    "subtitle": "subtitles.entity.trilocaris.step"
+  },
   "entity.guardian.ambient": {
     "sounds": [
       "mob/guardian/guardian_idle1",

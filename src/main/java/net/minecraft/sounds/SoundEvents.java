@@ -727,6 +727,9 @@ public class SoundEvents {
 	public static final SoundEvent TREMORSAURUS_STOMP = register("entity.tremorsaurus.stomp");
 	public static final SoundEvent TREMORSAURUS_BITE = register("entity.tremorsaurus.bite");
 	public static final SoundEvent TREMORSAURUS_THROW = register("entity.tremorsaurus.throw");
+	public static final SoundEvent TRILOCARIS_HURT = register("entity.trilocaris.hurt");
+	public static final SoundEvent TRILOCARIS_DEATH = register("entity.trilocaris.death");
+	public static final SoundEvent TRILOCARIS_STEP = register("entity.trilocaris.step");
 	public static final SoundEvent GRASS_BREAK = register("block.grass.break");
 	public static final SoundEvent GRASS_FALL = register("block.grass.fall");
 	public static final SoundEvent GRASS_HIT = register("block.grass.hit");

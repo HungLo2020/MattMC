@@ -1372,6 +1372,7 @@ public class CreativeModeTabs {
 						output.accept(Items.COD_BUCKET);
 						output.accept(Items.SALMON_BUCKET);
 						output.accept(Items.TROPICAL_FISH_BUCKET);
+						output.accept(Items.TRILOCARIS_BUCKET);
 						output.accept(Items.PUFFERFISH_BUCKET);
 						output.accept(Items.AXOLOTL_BUCKET);
 						output.accept(Items.TADPOLE_BUCKET);
@@ -1893,6 +1894,7 @@ public class CreativeModeTabs {
 					output.accept(Items.TADPOLE_SPAWN_EGG);
 					output.accept(Items.TRADER_LLAMA_SPAWN_EGG);
 					output.accept(Items.TREMORSAURUS_SPAWN_EGG);
+					output.accept(Items.TRILOCARIS_SPAWN_EGG);
 					output.accept(Items.TROPICAL_FISH_SPAWN_EGG);
 					output.accept(Items.TURTLE_SPAWN_EGG);
 					output.accept(Items.VEX_SPAWN_EGG);
