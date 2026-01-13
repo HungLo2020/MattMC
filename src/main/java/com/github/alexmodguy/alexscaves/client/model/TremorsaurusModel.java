@@ -179,8 +179,10 @@ public class TremorsaurusModel extends AdvancedEntityModel<TremorsaurusRenderSta
         animator = ModelAnimator.create();
     }
 
+    private boolean isBaby = false;
+
     public void renderToBuffer(PoseStack matrixStackIn, VertexConsumer bufferIn, int packedLightIn, int packedOverlayIn, float red, float green, float blue, float alpha) {
-        if (this.young) {
+        if (this.isBaby) {
             float f = 1.5F;
             head.setScale(f, f, f);
             head.setShouldScaleChildren(true);
@@ -339,7 +341,7 @@ public class TremorsaurusModel extends AdvancedEntityModel<TremorsaurusRenderSta
         float ageInTicks = renderState.ageInTicks;
         float netHeadYaw = renderState.yRot;
         float headPitch = renderState.xRot;
-        boolean isBaby = renderState.isBaby;
+        this.isBaby = renderState.isBaby;
         
         // Note: animate method removed - needs entity reference which we don't have in render state
         if (renderState.animation != IAnimatedEntity.NO_ANIMATION && renderState.animation != null) {
@@ -406,7 +408,7 @@ public class TremorsaurusModel extends AdvancedEntityModel<TremorsaurusRenderSta
         this.flap(rarm, walkSpeed, walkDegree * 0.1F, false, -1.5F, 0.2F, limbSwing, limbSwingAmount);
         this.flap(larm, walkSpeed, walkDegree * 0.1F, true, -1.5F, 0.2F, limbSwing, limbSwingAmount);
         this.faceTarget(netHeadYaw, headPitch, 1, neck, head);
-        articulateLegs(entity.legSolver, partialTicks);
+        // articulateLegs removed - requires entity reference, would need leg solver data in render state
         this.walk(neck, danceSpeed, 0.5F, false, 1F, 0.2F, ageInTicks, danceAmount);
         this.swing(neck, danceSpeed, 0.35F, false, 0F, 0F, ageInTicks, danceAmount);
         this.walk(head, danceSpeed, 0.5F, true, 1F, 0.2F, ageInTicks, danceAmount);

@@ -16,6 +16,8 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.tags.BlockTags;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
@@ -128,12 +130,12 @@ public class TremorsaurusEntity extends DinosaurEntity implements KeybindUsingMo
         super.tick();
         prevScreenShakeAmount = screenShakeAmount;
         this.yBodyRot = Mth.approachDegrees(this.yBodyRotO, yBodyRot, getHeadRotSpeed());
-        this.legSolver.update(this, this.yBodyRot, this.getScale());
+        this.legSolver.update(this, this.yBodyRot, this.getEntityScale());
         AnimationHandler.INSTANCE.updateAnimations(this);
         if (screenShakeAmount > 0) {
             screenShakeAmount = Math.max(0, screenShakeAmount - 0.34F);
         }
-        if (this.onGround() && !this.isInFluidType() && this.walkAnimation.speed() > 0.1F && !this.isBaby()) {
+        if (this.onGround() && !this.isInWater() && this.walkAnimation.speed() > 0.1F && !this.isBaby()) {
             float f = (float) Math.cos(this.walkAnimation.position() * 0.8F - 1.5F);
             if (Math.abs(f) < 0.2) {
                 if (screenShakeAmount <= 0.3) {
@@ -160,7 +162,7 @@ public class TremorsaurusEntity extends DinosaurEntity implements KeybindUsingMo
         if (this.getAnimation() == ANIMATION_ROAR && this.getAnimationTick() >= 5 && this.getAnimationTick() <= 40 && !this.isBaby()) {
             screenShakeAmount = 1F;
             roarScatterTime = 30;
-            if (this.getAnimationTick() % 5 == 0 && level().isClientSide) {
+            if (this.getAnimationTick() % 5 == 0 && level().isClientSide()) {
                 this.shakeWater();
             }
         }
@@ -171,7 +173,7 @@ public class TremorsaurusEntity extends DinosaurEntity implements KeybindUsingMo
         if (this.getAnimation() == ANIMATION_SPEAK && this.getAnimationTick() == 5) {
             actuallyPlayAmbientSound();
         }
-        if (!level().isClientSide) {
+        if (!level().isClientSide()) {
             if (this.getDeltaMovement().horizontalDistance() < 0.05 && this.getAnimation() == NO_ANIMATION && !this.isDancing() && !this.isInSittingPose()) {
                 if (random.nextInt(180) == 0) {
                     this.setAnimation(ANIMATION_SNIFF);
@@ -275,14 +277,14 @@ public class TremorsaurusEntity extends DinosaurEntity implements KeybindUsingMo
     }
 
     private void shakeWater() {
-        if (level().isClientSide) {
+        if (level().isClientSide()) {
             BlockPos.MutableBlockPos mutableBlockPos = new BlockPos.MutableBlockPos();
             int radius = 8;
             for (int x = -radius; x <= radius; x++) {
                 for (int z = -radius; z <= radius; z++) {
                     if (x * x + z * z <= radius * radius) {
                         mutableBlockPos.set(this.getX() + x, this.getY() + 5, this.getZ() + z);
-                        while (mutableBlockPos.getY() > level().getMinBuildHeight() && level().getBlockState(mutableBlockPos).isAir()) {
+                        while (mutableBlockPos.getY() > level().getMinY() && level().getBlockState(mutableBlockPos).isAir()) {
                             mutableBlockPos.move(Direction.DOWN);
                         }
                         float water = getWaterLevelForBlock(level(), mutableBlockPos);
@@ -377,7 +379,7 @@ public class TremorsaurusEntity extends DinosaurEntity implements KeybindUsingMo
         super.travel(vec3d);
     }
 
-    public float getScale() {
+    public float getEntityScale() {
         return this.isBaby() ? 0.25F : 1.0F;
     }
 
@@ -390,11 +392,11 @@ public class TremorsaurusEntity extends DinosaurEntity implements KeybindUsingMo
             walkSpeed = 2.0F;
         }
         float f2 = Math.min(f1 * walkSpeed, 1.0F);
-        walkAnimation.update(f2, 0.4F);
+        walkAnimation.update(f2, 0.4F, flying ? 1.0F : 0.0F);
     }
 
     public void playAmbientSound() {
-        if (this.getAnimation() == NO_ANIMATION && !level().isClientSide) {
+        if (this.getAnimation() == NO_ANIMATION && !level().isClientSide()) {
             this.setAnimation(ANIMATION_SPEAK);
         }
     }
@@ -446,14 +448,14 @@ public class TremorsaurusEntity extends DinosaurEntity implements KeybindUsingMo
         }
     }
 
-    public void addAdditionalSaveData(CompoundTag compound) {
-        super.addAdditionalSaveData(compound);
-        compound.putInt("TameAttempts", this.getTameAttempts());
+    public void addAdditionalSaveData(ValueOutput valueOutput) {
+        super.addAdditionalSaveData(valueOutput);
+        valueOutput.putInt("TameAttempts", this.getTameAttempts());
     }
 
-    public void readAdditionalSaveData(CompoundTag compound) {
-        super.readAdditionalSaveData(compound);
-        this.setTameAttempts(compound.getInt("TameAttempts"));
+    public void readAdditionalSaveData(ValueInput valueInput) {
+        super.readAdditionalSaveData(valueInput);
+        this.setTameAttempts(valueInput.getIntOr("TameAttempts", 0));
     }
 
     @Override
