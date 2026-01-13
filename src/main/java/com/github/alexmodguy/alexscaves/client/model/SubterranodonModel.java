@@ -5,7 +5,6 @@ package com.github.alexmodguy.alexscaves.client.model;// Made with Blockbench 4.
 
 import com.github.alexmodguy.alexscaves.client.render.ColorUtil;
 import com.github.alexmodguy.alexscaves.client.render.entity.SubterranodonRenderState;
-import com.github.alexmodguy.alexscaves.server.entity.item.DinosaurSpiritEntity;
 import com.github.alexmodguy.alexscaves.server.entity.living.SubterranodonEntity;
 import com.github.alexmodguy.alexscaves.server.misc.ACMath;
 import com.github.alexthe666.citadel.client.model.AdvancedEntityModel;
@@ -295,13 +294,4 @@ public class SubterranodonModel extends AdvancedEntityModel<SubterranodonRenderS
         return ImmutableList.of(body, tail, tailTip, lleg, rleg, ltalon, rtalon, neck, head, jaw, lwing, lwingTip, lhand, rwing, rwingTip, rhand);
     }
 
-    public void animateSpirit(DinosaurSpiritEntity entityIn, float partialTicks) {
-        this.resetToDefaultPose();
-        float ageInTicks = entityIn.tickCount + partialTicks;
-        float flyProgress = 1f;
-        float flapAmount = flyProgress;
-        float hoverProgress = 1F;
-        this.body.rotationPointY -= 16;
-        animateFlight(ageInTicks, flyProgress, hoverProgress, 0F, flapAmount, true, false);
-    }
 }

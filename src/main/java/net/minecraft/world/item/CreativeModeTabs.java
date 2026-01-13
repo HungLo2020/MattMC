@@ -1825,6 +1825,7 @@ public class CreativeModeTabs {
 					output.accept(Items.TRIAL_SPAWNER);
 					output.accept(Items.CREAKING_HEART);
 					output.accept(Items.ALLAY_SPAWN_EGG);
+					output.accept(Items.ATLATITAN_SPAWN_EGG);
 					output.accept(Items.ARMADILLO_SPAWN_EGG);
 					output.accept(Items.AXOLOTL_SPAWN_EGG);
 					output.accept(Items.BAT_SPAWN_EGG);

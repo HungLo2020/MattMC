@@ -221,6 +221,13 @@ public class EntityType<T extends Entity> implements FeatureElement, EntityTypeT
 			.clientTrackingRange(10)
 			.updateInterval(Integer.MAX_VALUE)
 	);
+	public static final EntityType<com.github.alexmodguy.alexscaves.server.entity.living.AtlatitanEntity> ATLATITAN = register(
+		"atlatitan",
+		EntityType.Builder.of(com.github.alexmodguy.alexscaves.server.entity.living.AtlatitanEntity::new, MobCategory.CREATURE)
+			.sized(5.0F, 8.0F)
+			.eyeHeight(7.0F)
+			.clientTrackingRange(11)
+	);
 	public static final EntityType<Armadillo> ARMADILLO = register(
 		"armadillo", EntityType.Builder.of(Armadillo::new, MobCategory.CREATURE).sized(0.7F, 0.65F).eyeHeight(0.26F).clientTrackingRange(10)
 	);
@@ -459,6 +466,7 @@ public class EntityType<T extends Entity> implements FeatureElement, EntityTypeT
 			.clientTrackingRange(10)
 			.updateInterval(20)
 	);
+	// CRUSHED_BLOCK and FALLING_TREE_BLOCK removed - falling trees functionality not needed
 	public static final EntityType<LargeFireball> FIREBALL = register(
 		"fireball",
 		EntityType.Builder.<LargeFireball>of(LargeFireball::new, MobCategory.MISC).noLootTable().sized(1.0F, 1.0F).clientTrackingRange(4).updateInterval(10)

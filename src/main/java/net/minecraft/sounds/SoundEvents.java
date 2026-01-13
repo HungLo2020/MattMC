@@ -713,6 +713,11 @@ public class SoundEvents {
 	public static final SoundEvent GOAT_SCREAMING_PREPARE_RAM = register("entity.goat.screaming.prepare_ram");
 	public static final SoundEvent GOAT_SCREAMING_RAM_IMPACT = register("entity.goat.screaming.ram_impact");
 	public static final SoundEvent GOAT_STEP = register("entity.goat.step");
+	public static final SoundEvent ATLATITAN_IDLE = register("entity.atlatitan.idle");
+	public static final SoundEvent ATLATITAN_HURT = register("entity.atlatitan.hurt");
+	public static final SoundEvent ATLATITAN_DEATH = register("entity.atlatitan.death");
+	public static final SoundEvent ATLATITAN_STEP = register("entity.atlatitan.step");
+	public static final SoundEvent ATLATITAN_STOMP = register("entity.atlatitan.stomp");
 	public static final SoundEvent GROTTOCERATOPS_IDLE = register("entity.grottoceratops.idle");
 	public static final SoundEvent GROTTOCERATOPS_HURT = register("entity.grottoceratops.hurt");
 	public static final SoundEvent GROTTOCERATOPS_DEATH = register("entity.grottoceratops.death");
