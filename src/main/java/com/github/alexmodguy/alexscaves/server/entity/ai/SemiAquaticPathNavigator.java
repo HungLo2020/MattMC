@@ -32,7 +32,7 @@ public class SemiAquaticPathNavigator extends WaterBoundPathNavigation {
 
     @Override
     protected Vec3 getTempMobPos() {
-        return this.mob.isInWaterOrBubble() ? super.getTempMobPos() :  new Vec3(this.mob.getX(), Math.floor(this.mob.getY() + 0.5D), this.mob.getZ());
+        return this.mob.isInWater() ? super.getTempMobPos() :  new Vec3(this.mob.getX(), Math.floor(this.mob.getY() + 0.5D), this.mob.getZ());
     }
 
 

@@ -114,14 +114,14 @@ public class TrilocarisEntity extends WaterAnimal implements Bucketable {
         builder.define(ATTACK_TICK, 0);
     }
 
-    public void addAdditionalSaveData(CompoundTag compound) {
-        super.addAdditionalSaveData(compound);
-        compound.putBoolean("FromBucket", this.fromBucket());
+    public void addAdditionalSaveData(net.minecraft.world.level.storage.ValueOutput valueOutput) {
+        super.addAdditionalSaveData(valueOutput);
+        valueOutput.putBoolean("FromBucket", this.fromBucket());
     }
 
-    public void readAdditionalSaveData(CompoundTag compound) {
-        super.readAdditionalSaveData(compound);
-        this.setFromBucket(compound.getBoolean("FromBucket"));
+    public void readAdditionalSaveData(net.minecraft.world.level.storage.ValueInput valueInput) {
+        super.readAdditionalSaveData(valueInput);
+        this.setFromBucket(valueInput.getBooleanOr("FromBucket", false));
     }
 
     public void tick() {
@@ -149,7 +149,7 @@ public class TrilocarisEntity extends WaterAnimal implements Bucketable {
         }
         if (!level().isClientSide()) {
             float delta = (float) this.getDeltaMovement().horizontalDistance();
-            if (crawling || !this.isInWaterOrBubble()) {
+            if (crawling || !this.isInWater()) {
                 timeSwimming = 0;
                 if(delta > 0.01F){
                     if(tickCount - lastStepSoundTimestamp > 10){
@@ -174,7 +174,7 @@ public class TrilocarisEntity extends WaterAnimal implements Bucketable {
     }
 
     public void travel(Vec3 travelVector) {
-        if (this.isEffectiveAi() && this.isInWaterOrBubble()) {
+        if (this.isEffectiveAi() && this.isInWater()) {
             this.moveRelative(this.getSpeed(), travelVector);
             Vec3 delta = this.getDeltaMovement();
             this.move(MoverType.SELF, delta);
@@ -246,7 +246,10 @@ public class TrilocarisEntity extends WaterAnimal implements Bucketable {
 
     public boolean doHurtTarget(Entity entityIn) {
         this.entityData.set(ATTACK_TICK, 5);
-        return super.doHurtTarget(entityIn);
+        if (!level().isClientSide() && level() instanceof net.minecraft.server.level.ServerLevel serverLevel) {
+            return super.doHurtTarget(serverLevel, entityIn);
+        }
+        return false;
     }
 
 
@@ -254,7 +257,7 @@ public class TrilocarisEntity extends WaterAnimal implements Bucketable {
         float speedMod = !this.onGround() ? 4.0F : 16.0F;
         float f1 = (float) Mth.length(this.getX() - this.xo, this.getY() - this.yo, this.getZ() - this.zo);
         float f2 = Math.min(f1 * speedMod, 1.0F);
-        this.walkAnimation.update(f2, 0.4F);
+        this.walkAnimation.update(f2, 0.4F, 1.0F);
 
     }
 
@@ -317,7 +320,7 @@ public class TrilocarisEntity extends WaterAnimal implements Bucketable {
             int range = 10;
             for (int i = 0; i < 15; i++) {
                 BlockPos blockPos = TrilocarisEntity.this.blockPosition().offset(random.nextInt(range) - range / 2, random.nextInt(range) - range / 2, random.nextInt(range) - range / 2);
-                if (TrilocarisEntity.this.level().getFluidState(blockPos).is(FluidTags.WATER) && blockPos.getY() > level().getMinBuildHeight() + 1) {
+                if (TrilocarisEntity.this.level().getFluidState(blockPos).is(FluidTags.WATER) && blockPos.getY() > level().getMinY() + 1) {
                     result = blockPos;
                 }
             }
@@ -327,12 +330,12 @@ public class TrilocarisEntity extends WaterAnimal implements Bucketable {
         @Nullable
         protected Vec3 getPosition() {
             BlockPos water = findWaterBlock();
-            if (TrilocarisEntity.this.isInWaterOrBubble()) {
+            if (TrilocarisEntity.this.isInWater()) {
                 if (water == null) {
                     return null;
                 }
                 if (this.isCrawling) {
-                    while (TrilocarisEntity.this.level().getFluidState(water.below()).is(FluidTags.WATER) && water.getY() > level().getMinBuildHeight() + 1) {
+                    while (TrilocarisEntity.this.level().getFluidState(water.below()).is(FluidTags.WATER) && water.getY() > level().getMinY() + 1) {
                         water = water.below();
                     }
                     water = water.above();
@@ -363,7 +366,7 @@ public class TrilocarisEntity extends WaterAnimal implements Bucketable {
             duration++;
             LivingEntity target = TrilocarisEntity.this.getTarget();
             if (target != null && target.isAlive()) {
-                if (target.isInWaterOrBubble()) {
+                if (target.isInWater()) {
                     TrilocarisEntity.this.getNavigation().moveTo(target, 1F);
                 }
                 if (TrilocarisEntity.this.distanceTo(target) < 1.2F && cooldown == 0) {
