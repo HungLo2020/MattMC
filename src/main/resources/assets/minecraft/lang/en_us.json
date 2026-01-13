@@ -7770,5 +7770,21 @@
   "voxelmap.worldmap.multiworld.unknownSubworld": "Unknown world!  Please select your current world in the Multiworld screen.",
   "voxelmap.worldmap.subworld.edit": "Edit Multiworld Name",
   "voxelmap.worldmap.subworld.name": "Multiworld Name",
-  "voxelmap.worldmap.subworld.deleteConfirm": "Confirm Delete Multiworld"
+  "voxelmap.worldmap.subworld.deleteConfirm": "Confirm Delete Multiworld",
+  "item.minecraft.subterranodon_spawn_egg": "Subterranodon Spawn Egg",
+  "item.minecraft.vallumraptor_spawn_egg": "Vallumraptor Spawn Egg",
+  "entity.minecraft.subterranodon": "Subterranodon",
+  "entity.minecraft.vallumraptor": "Vallumraptor",
+  "subtitles.entity.subterranodon.idle": "Subterranodon gaggles",
+  "subtitles.entity.subterranodon.hurt": "Subterranodon warbles",
+  "subtitles.entity.subterranodon.death": "Subterranodon hisses",
+  "subtitles.entity.subterranodon.flap": "Subterranodon flaps wings",
+  "subtitles.entity.subterranodon.attack": "Subterranodon gnaps",
+  "subtitles.entity.vallumraptor.idle": "Vallumraptor hisses",
+  "subtitles.entity.vallumraptor.hurt": "Vallumraptor groans",
+  "subtitles.entity.vallumraptor.death": "Vallumraptor screams",
+  "subtitles.entity.vallumraptor.call": "Vallumraptor trills",
+  "subtitles.entity.vallumraptor.attack": "Vallumraptor pounces",
+  "subtitles.entity.vallumraptor.scratch": "Vallumraptor scratches",
+  "subtitles.entity.vallumraptor.sleep": "Vallumraptor snores"
 }
