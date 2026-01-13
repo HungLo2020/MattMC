@@ -1,0 +1,12 @@
+{
+  "type": "minecraft:smelting",
+  "ingredient": {
+    "item": "minecraft:trilocaris_tail"
+  },
+  "result": {
+    "id": "minecraft:cooked_trilocaris_tail",
+    "count": 1
+  },
+  "experience": 0.15,
+  "cookingtime": 200
+}
