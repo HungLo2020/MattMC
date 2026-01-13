@@ -79,10 +79,10 @@ public abstract class SauropodBaseEntity extends DinosaurEntity implements Shake
     private float legBackAmount = 0;
     private float prevRaiseArmsAmount = 0;
     private float raiseArmsAmount = 0;
-    protected float neckXRot;
-    protected float neckYRot;
-    protected float tailXRot;
-    protected float tailYRot;
+    public float neckXRot;
+    public float neckYRot;
+    public float tailXRot;
+    public float tailYRot;
     private float prevScreenShakeAmount;
     protected float screenShakeAmount;
     private float[] yawBuffer = new float[128];
@@ -277,13 +277,13 @@ public abstract class SauropodBaseEntity extends DinosaurEntity implements Shake
             neckAdditionalZ = -4 * f;
             headYStep *= (1F - f);
         }
-        this.neckPart1.setPosCenteredY(this.rotateOffsetVec(new Vec3(0, 2F + neckAdditionalY, 5F + neckAdditionalZ).scale(this.getScale()), headXStep, (yBodyRot + headYStep)).add(center));
-        this.neckPart2.setPosCenteredY(this.rotateOffsetVec(new Vec3(0, 0, 2.5F).scale(this.getScale()), headXStep, (yBodyRot + headYStep * 2F)).add(this.neckPart1.centeredPosition()));
-        this.neckPart3.setPosCenteredY(this.rotateOffsetVec(new Vec3(0, 0, 2F).scale(this.getScale()), headXStep, (yBodyRot + headYStep * 3F)).add(this.neckPart2.centeredPosition()));
-        this.headPart.setPosCenteredY(this.rotateOffsetVec(new Vec3(0, 0, 2.5F).scale(this.getScale()), headXStep, (yBodyRot + headYStep * 4F)).add(this.neckPart3.centeredPosition()));
-        this.tailPart1.setPosCenteredY(this.rotateOffsetVec(new Vec3(0, -0.5F, -3.5F).scale(this.getScale()), tailXStep, (yBodyRot + tailYStep)).add(center));
-        this.tailPart2.setPosCenteredY(this.rotateOffsetVec(new Vec3(0, -0.25F, -3.25F).scale(this.getScale()), tailXStep, (yBodyRot + tailYStep * 2F)).add(this.tailPart1.centeredPosition()));
-        this.tailPart3.setPosCenteredY(this.rotateOffsetVec(new Vec3(0, 0, -2.5F).scale(this.getScale()), tailXStep, (yBodyRot + tailYStep * 3F)).add(this.tailPart2.centeredPosition()));
+        this.neckPart1.setPosCenteredY(this.rotateOffsetVec(new Vec3(0, 2F + neckAdditionalY, 5F + neckAdditionalZ).scale(this.getEntityScale()), headXStep, (yBodyRot + headYStep)).add(center));
+        this.neckPart2.setPosCenteredY(this.rotateOffsetVec(new Vec3(0, 0, 2.5F).scale(this.getEntityScale()), headXStep, (yBodyRot + headYStep * 2F)).add(this.neckPart1.centeredPosition()));
+        this.neckPart3.setPosCenteredY(this.rotateOffsetVec(new Vec3(0, 0, 2F).scale(this.getEntityScale()), headXStep, (yBodyRot + headYStep * 3F)).add(this.neckPart2.centeredPosition()));
+        this.headPart.setPosCenteredY(this.rotateOffsetVec(new Vec3(0, 0, 2.5F).scale(this.getEntityScale()), headXStep, (yBodyRot + headYStep * 4F)).add(this.neckPart3.centeredPosition()));
+        this.tailPart1.setPosCenteredY(this.rotateOffsetVec(new Vec3(0, -0.5F, -3.5F).scale(this.getEntityScale()), tailXStep, (yBodyRot + tailYStep)).add(center));
+        this.tailPart2.setPosCenteredY(this.rotateOffsetVec(new Vec3(0, -0.25F, -3.25F).scale(this.getEntityScale()), tailXStep, (yBodyRot + tailYStep * 2F)).add(this.tailPart1.centeredPosition()));
+        this.tailPart3.setPosCenteredY(this.rotateOffsetVec(new Vec3(0, 0, -2.5F).scale(this.getEntityScale()), tailXStep, (yBodyRot + tailYStep * 3F)).add(this.tailPart2.centeredPosition()));
 
         for (int l = 0; l < this.allParts.length; ++l) {
             this.allParts[l].xo = avector3d[l].x;
@@ -589,7 +589,7 @@ public abstract class SauropodBaseEntity extends DinosaurEntity implements Shake
         return this.getBoundingBox().inflate(2);
     }
 
-    public float getScale() {
+    public float getEntityScale() {
         return 1.0F;
     }
 

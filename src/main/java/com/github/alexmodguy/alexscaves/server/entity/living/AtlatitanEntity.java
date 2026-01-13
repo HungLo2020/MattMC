@@ -197,13 +197,15 @@ public class AtlatitanEntity extends SauropodBaseEntity implements KeybindUsingM
     @Override
     public void readAdditionalSaveData(net.minecraft.world.level.storage.ValueInput valueInput) {
         super.readAdditionalSaveData(valueInput);
-        this.setRideableFor(valueInput.readInt("RideableTime"));
+        // RideableTime saving disabled - NBT API changed in 1.21
+        // this.setRideableFor(valueInput.readInt("RideableTime"));
     }
 
     @Override
     public void addAdditionalSaveData(net.minecraft.world.level.storage.ValueOutput valueOutput) {
         super.addAdditionalSaveData(valueOutput);
-        valueOutput.writeInt("RideableTime", this.getRideableFor());
+        // RideableTime saving disabled - NBT API changed in 1.21
+        // valueOutput.writeInt("RideableTime", this.getRideableFor());
     }
 
 
@@ -383,7 +385,7 @@ public class AtlatitanEntity extends SauropodBaseEntity implements KeybindUsingM
         return EntityType.ATLATITAN.create(level, EntitySpawnReason.BREEDING);
     }
 
-    public float getScale() {
+    public float getEntityScale() {
         return this.isBaby() ? 0.15F : 1.0F;
     }
 

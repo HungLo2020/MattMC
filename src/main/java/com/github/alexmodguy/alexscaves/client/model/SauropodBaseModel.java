@@ -162,8 +162,7 @@ public abstract class SauropodBaseModel<T extends LivingEntityRenderState> exten
         animator = ModelAnimator.create();
     }
 
-    public void animate(IAnimatedEntity entity) {
-        animator.update(entity);
+    // animate method removed - using render state instead
         animator.setAnimation(SauropodBaseEntity.ANIMATION_SPEAK);
         animator.startKeyframe(3);
         animator.rotate(head, (float) Math.toRadians(10), 0, 0);

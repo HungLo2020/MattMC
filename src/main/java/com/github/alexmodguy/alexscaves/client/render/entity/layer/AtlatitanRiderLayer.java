@@ -13,7 +13,8 @@ public class AtlatitanRiderLayer extends RenderLayer<AtlatitanRenderState, Atlat
         super(render);
     }
 
-    public void render(PoseStack poseStack, MultiBufferSource bufferIn, int packedLightIn, AtlatitanRenderState renderState, float f1, float f2) {
+    @Override
+    public void submit(PoseStack poseStack, net.minecraft.client.renderer.entity.layers.SubmitNodeCollector collector, int packedLightIn, AtlatitanRenderState renderState, float f1, float f2) {
         // Rider rendering disabled for now - requires more complex 1.21 render state updates
     }
 }
