@@ -55,7 +55,7 @@ public class VallumraptorRenderer extends MobRenderer<VallumraptorEntity, Vallum
 
     @Override
     public ResourceLocation getTextureLocation(VallumraptorRenderState state) {
-        boolean isAlan = state.nameTag != null && "alan".equalsIgnoreCase(state.nameTag);
+        boolean isAlan = state.nameTag != null && "alan".equalsIgnoreCase(state.nameTag.getString());
         if (isAlan) {
             return state.isElder ? TEXTURE_ALAN_ELDER : TEXTURE_ALAN;
         } else if (state.altSkin == 1) {

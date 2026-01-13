@@ -449,14 +449,14 @@ public class VallumraptorEntity extends DinosaurEntity implements IAnimatedEntit
         return new Animation[]{ANIMATION_CALL_1, ANIMATION_CALL_2, ANIMATION_SCRATCH_1, ANIMATION_SCRATCH_2, ANIMATION_SHAKE, ANIMATION_STARTLEAP, ANIMATION_MELEE_BITE, ANIMATION_MELEE_SLASH_1, ANIMATION_MELEE_SLASH_2, ANIMATION_GRAB};
     }
 
-    protected void readAdditionalSaveData(net.minecraft.nbt.io.ValueInput valueInput) {
+    protected void readAdditionalSaveData(net.minecraft.world.level.storage.ValueInput valueInput) {
         super.readAdditionalSaveData(valueInput);
         this.setElder(valueInput.getBooleanOr("Elder", false));
         this.setRelaxedForTime(valueInput.getIntOr("RelaxedTime", 0));
         this.justLootedChest = valueInput.getBooleanOr("JustLootedChest", false);
     }
 
-    protected void addAdditionalSaveData(net.minecraft.nbt.io.ValueOutput valueOutput) {
+    protected void addAdditionalSaveData(net.minecraft.world.level.storage.ValueOutput valueOutput) {
         super.addAdditionalSaveData(valueOutput);
         valueOutput.putBoolean("Elder", this.isElder());
         valueOutput.putInt("RelaxedTime", this.getRelaxedFor());
@@ -591,7 +591,7 @@ public class VallumraptorEntity extends DinosaurEntity implements IAnimatedEntit
         }
         if (this.getAnimation() == ANIMATION_GRAB && this.getAnimationTick() > 15) {
             if (!this.getItemInHand(InteractionHand.MAIN_HAND).isEmpty() && !this.level().isClientSide()) {
-                this.spawnAtLocation(this.getItemInHand(InteractionHand.MAIN_HAND), 0.0F);
+                this.spawnAtLocation((ServerLevel)this.level(), this.getItemInHand(InteractionHand.MAIN_HAND));
             }
             this.take(e, 1);
             ItemStack duplicate = e.getItem().copy();

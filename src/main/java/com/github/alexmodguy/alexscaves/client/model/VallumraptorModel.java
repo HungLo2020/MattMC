@@ -181,7 +181,7 @@ public class VallumraptorModel extends AdvancedEntityModel<VallumraptorRenderSta
     }
 
     public void renderToBuffer(PoseStack matrixStackIn, VertexConsumer bufferIn, int packedLightIn, int packedOverlayIn, float red, float green, float blue, float alphaIn) {
-        if (this.young) {
+        if (false) {
             float f = 1.5F;
             head.setScale(f, f, f);
             head.setShouldScaleChildren(true);
@@ -589,7 +589,8 @@ public class VallumraptorModel extends AdvancedEntityModel<VallumraptorRenderSta
         this.neck.rotateAngleX -= Math.abs(puzzleRotRad * 0.3F);
         tail.rotateAngleY += tailYaw * 0.8F;
         tailTip.rotateAngleY += tailYaw * 0.2F;
-        this.faceTarget(netHeadYaw, headPitch, 1, neck, head);
+        // Apply head rotation from render state
+        this.faceTarget(renderState.yRot, renderState.xRot, 1, neck, head);
         this.swing(body, danceSpeed, 0.1F, false, 1, 0, ageInTicks, danceAmount);
         this.flap(rarm, danceSpeed, 0.5F, false, 0, 0, ageInTicks, danceAmount);
         this.flap(larm, danceSpeed, 0.5F, false, 0, 0, ageInTicks, danceAmount);

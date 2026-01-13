@@ -5,6 +5,7 @@ package com.github.alexmodguy.alexscaves.server.entity.ai;
 import com.github.alexmodguy.alexscaves.server.entity.util.ChestThief;
 import net.minecraft.commands.arguments.EntityAnchorArgument;
 import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.Container;
 import net.minecraft.world.InteractionHand;
@@ -142,8 +143,8 @@ public class AnimalLootChestsGoal extends MoveToBlockGoal {
                         } else {
                             ItemStack duplicate = stack.copy();
                             duplicate.setCount(1);
-                            if (!this.entity.getItemInHand(InteractionHand.MAIN_HAND).isEmpty() && !this.entity.level().isClientSide) {
-                                this.entity.spawnAtLocation(this.entity.getItemInHand(InteractionHand.MAIN_HAND), 0.0F);
+                            if (!this.entity.getItemInHand(InteractionHand.MAIN_HAND).isEmpty() && !this.entity.level().isClientSide()) {
+                                this.entity.spawnAtLocation((ServerLevel)this.entity.level(), this.entity.getItemInHand(InteractionHand.MAIN_HAND));
                             }
                             this.entity.setItemInHand(InteractionHand.MAIN_HAND, duplicate);
                             stack.shrink(1);
