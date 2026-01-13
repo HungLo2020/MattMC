@@ -392,7 +392,7 @@ public class TremorsaurusEntity extends DinosaurEntity implements KeybindUsingMo
             walkSpeed = 2.0F;
         }
         float f2 = Math.min(f1 * walkSpeed, 1.0F);
-        walkAnimation.update(f2, 0.4F, flying ? 1.0F : 0.0F);
+        walkAnimation.update(f2, 0.4F, this.isBaby() ? 3.0F : 1.0F);
     }
 
     public void playAmbientSound() {
