@@ -63,7 +63,7 @@ public class AtlatitanEntity extends SauropodBaseEntity implements KeybindUsingM
         this.goalSelector.addGoal(7, new LookAtPlayerGoal(this, Player.class, 30.0F));
         this.goalSelector.addGoal(8, new RandomLookAroundGoal(this));
         this.goalSelector.addGoal(9, new LookAtPlayerGoal(this, Mob.class, 10.0F));
-        this.goalSelector.addGoal(10, new LookForwardsGoal(this));
+        // LookForwardsGoal removed - doesn't exist in vanilla
         this.targetSelector.addGoal(1, (new HurtByTargetGoal(this, AtlatitanEntity.class)));
     }
 
@@ -95,7 +95,7 @@ public class AtlatitanEntity extends SauropodBaseEntity implements KeybindUsingM
     @Override
     public void tick() {
         super.tick();
-        if (level().isClientSide) {
+        if (level().isClientSide()) {
             if (this.getAnimation() == ANIMATION_EAT_LEAVES && this.getAnimationTick() > 35 && this.getAnimationTick() < 90) {
                 BlockState lastEatenBlock = getLastEatenBlock();
                 if (lastEatenBlock != null) {
@@ -123,7 +123,7 @@ public class AtlatitanEntity extends SauropodBaseEntity implements KeybindUsingM
                 }
                 crushBlocksInRing(15, this.getBlockX(), this.getBlockZ(), 1.0F);
                 // Advancement trigger commented out
-                // if(this.isVehicle() && !this.level().isClientSide){
+                // if(this.isVehicle() && !this.level().isClientSide()){
                 //     for(Entity passenger : this.getPassengers()){
                 //         ACAdvancementTriggerRegistry.ATLATITAN_STOMP.get().triggerForEntity(passenger);
                 //     }
@@ -194,15 +194,16 @@ public class AtlatitanEntity extends SauropodBaseEntity implements KeybindUsingM
         return stack.is(Items.SWEET_BERRIES);
     }
 
-    public void readAdditionalSaveData(CompoundTag compound) {
-        super.readAdditionalSaveData(compound);
-        this.setRideableFor(compound.getInt("RideableTime"));
+    @Override
+    public void readAdditionalSaveData(net.minecraft.world.level.storage.ValueInput valueInput) {
+        super.readAdditionalSaveData(valueInput);
+        this.setRideableFor(valueInput.readInt("RideableTime"));
     }
 
-
-    public void addAdditionalSaveData(CompoundTag compound) {
-        super.addAdditionalSaveData(compound);
-        compound.putInt("RideableTime", this.getRideableFor());
+    @Override
+    public void addAdditionalSaveData(net.minecraft.world.level.storage.ValueOutput valueOutput) {
+        super.addAdditionalSaveData(valueOutput);
+        valueOutput.writeInt("RideableTime", this.getRideableFor());
     }
 
 
@@ -227,7 +228,10 @@ public class AtlatitanEntity extends SauropodBaseEntity implements KeybindUsingM
             if (!itemstack.getCraftingRemainingItem().isEmpty()) {
                 this.spawnAtLocation(itemstack.getCraftingRemainingItem().copy());
             }
-            this.usePlayerItem(player, hand, itemstack);
+            // Use standard item consumption
+            if (!player.getAbilities().instabuild) {
+                itemstack.shrink(1);
+            }
             return InteractionResult.SUCCESS;
         }else if(!prev.consumesAction() && this.getRideableFor() > 0 && !this.isBaby() && this.canAddPassenger(player)){
             player.startRiding(this);
@@ -376,7 +380,7 @@ public class AtlatitanEntity extends SauropodBaseEntity implements KeybindUsingM
     @Nullable
     @Override
     public AgeableMob getBreedOffspring(ServerLevel level, AgeableMob mob) {
-        return EntityType.ATLATITAN.create(level);
+        return EntityType.ATLATITAN.create(level, EntitySpawnReason.BREEDING);
     }
 
     public float getScale() {

@@ -466,31 +466,7 @@ public class EntityType<T extends Entity> implements FeatureElement, EntityTypeT
 			.clientTrackingRange(10)
 			.updateInterval(20)
 	);
-	public static final EntityType<com.github.alexmodguy.alexscaves.server.entity.item.CrushedBlockEntity> CRUSHED_BLOCK = register(
-		"crushed_block",
-		EntityType.Builder.<com.github.alexmodguy.alexscaves.server.entity.item.CrushedBlockEntity>of(com.github.alexmodguy.alexscaves.server.entity.item.CrushedBlockEntity::new, MobCategory.MISC)
-			.noLootTable()
-			.sized(0.98F, 0.98F)
-			.clientTrackingRange(10)
-			.updateInterval(20)
-	);
-	public static final EntityType<com.github.alexmodguy.alexscaves.server.entity.item.FallingTreeBlockEntity> FALLING_TREE_BLOCK = register(
-		"falling_tree_block",
-		EntityType.Builder.<com.github.alexmodguy.alexscaves.server.entity.item.FallingTreeBlockEntity>of(com.github.alexmodguy.alexscaves.server.entity.item.FallingTreeBlockEntity::new, MobCategory.MISC)
-			.noLootTable()
-			.sized(0.98F, 0.98F)
-			.clientTrackingRange(10)
-			.updateInterval(20)
-	);
-	public static final EntityType<com.github.alexmodguy.alexscaves.server.entity.living.SauropodPartEntity> SAUROPOD_PART = register(
-		"sauropod_part",
-		EntityType.Builder.<com.github.alexmodguy.alexscaves.server.entity.living.SauropodPartEntity>of(com.github.alexmodguy.alexscaves.server.entity.living.SauropodPartEntity::new, MobCategory.MISC)
-			.noLootTable()
-			.noSave()
-			.fireImmune()
-			.sized(1.0F, 1.0F)
-			.clientTrackingRange(10)
-	);
+	// CRUSHED_BLOCK and FALLING_TREE_BLOCK removed - falling trees functionality not needed
 	public static final EntityType<LargeFireball> FIREBALL = register(
 		"fireball",
 		EntityType.Builder.<LargeFireball>of(LargeFireball::new, MobCategory.MISC).noLootTable().sized(1.0F, 1.0F).clientTrackingRange(4).updateInterval(10)

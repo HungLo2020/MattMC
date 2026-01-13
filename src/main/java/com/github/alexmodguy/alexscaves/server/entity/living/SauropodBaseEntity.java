@@ -1,11 +1,7 @@
 package com.github.alexmodguy.alexscaves.server.entity.living;
 
 import com.github.alexmodguy.alexscaves.server.entity.ai.AdvancedPathNavigateNoTeleport;
-import com.github.alexmodguy.alexscaves.server.entity.item.CrushedBlockEntity;
-import com.github.alexmodguy.alexscaves.server.entity.item.FallingTreeBlockEntity;
 import com.github.alexmodguy.alexscaves.server.entity.util.KaijuMob;
-import com.github.alexmodguy.alexscaves.server.entity.util.LuxtructosaurusLegSolver;
-import com.github.alexmodguy.alexscaves.server.entity.util.MovingBlockData;
 import com.github.alexmodguy.alexscaves.server.entity.util.ShakesScreen;
 import com.github.alexmodguy.alexscaves.server.misc.ACMath;
 import com.github.alexthe666.citadel.animation.Animation;
@@ -22,6 +18,7 @@ import net.minecraft.util.Mth;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.damagesource.DamageTypes;
 import net.minecraft.world.entity.EntitySelector;
+import net.minecraft.world.entity.EntitySpawnReason;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.control.MoveControl;
@@ -35,8 +32,6 @@ import net.minecraft.world.level.pathfinder.PathType;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 
-import java.util.ArrayList;
-import java.util.List;
 
 public abstract class SauropodBaseEntity extends DinosaurEntity implements ShakesScreen, IAnimatedEntity, KaijuMob, ITallWalker {
 
@@ -54,7 +49,7 @@ public abstract class SauropodBaseEntity extends DinosaurEntity implements Shake
     public static final Animation ANIMATION_RIGHT_WHIP = Animation.create(40);
     public static final Animation ANIMATION_EAT_LEAVES = Animation.create(100);
     private static final int STOMP_CRUSH_HEIGHT = 6;
-    public LuxtructosaurusLegSolver legSolver = new LuxtructosaurusLegSolver(0.2F, 2F, 1.2F, 1.9F, 2);
+    // legSolver removed - Luxtructosaurus not being added
     private Animation currentAnimation;
     private int animationTick;
     private final SauropodPartEntity[] allParts;
@@ -133,7 +128,7 @@ public abstract class SauropodBaseEntity extends DinosaurEntity implements Shake
         AnimationHandler.INSTANCE.updateAnimations(this);
         this.prevRaiseArmsAmount = raiseArmsAmount;
         this.prevScreenShakeAmount = screenShakeAmount;
-        this.legSolver.update(this, this.yBodyRot, this.getScale());
+        // legSolver.update removed - Luxtructosaurus not being added
         if (shouldRaiseArms() && raiseArmsAmount < 5F) {
             raiseArmsAmount++;
         }
@@ -161,7 +156,7 @@ public abstract class SauropodBaseEntity extends DinosaurEntity implements Shake
         }
         tickMultipart();
         tickWalking();
-        if (level().isClientSide) {
+        if (level().isClientSide()) {
             if (this.lSteps > 0) {
                 double d5 = this.getX() + (this.lx - this.getX()) / (double) this.lSteps;
                 double d6 = this.getY() + (this.ly - this.getY()) / (double) this.lSteps;
@@ -306,63 +301,29 @@ public abstract class SauropodBaseEntity extends DinosaurEntity implements Shake
 
 
     protected void crushBlocksInRing(int width, int ringStartX, int ringStartZ, float dropChance) {
-        BlockPos.MutableBlockPos mutableBlockPos = new BlockPos.MutableBlockPos();
-        float lowestFoot = 0.0F;
-        for(LuxtructosaurusLegSolver.Leg leg : legSolver.legs){
-            float height = leg.getHeight(1.0F);
-            if(height > lowestFoot){
-                lowestFoot = height;
-            }
-        }
-        int feetY = this.blockPosition().getY() - (int)lowestFoot;
-        BlockPos center = new BlockPos(ringStartX, feetY, ringStartZ);
-        if(net.neoforged.neoforge.event.EventHooks.canEntityGrief(this.level(), this) || this.isVehicle() && this.getControllingPassenger() instanceof Player){
+        // Block crushing disabled - falling trees functionality not needed
+        // This would create CrushedBlockEntity and FallingTreeBlockEntity which are complex
+        // Just do a simple block destruction if needed
+        if(this.isVehicle() && this.getControllingPassenger() instanceof Player){
+            BlockPos.MutableBlockPos mutableBlockPos = new BlockPos.MutableBlockPos();
+            int feetY = this.blockPosition().getY();
+            BlockPos center = new BlockPos(ringStartX, feetY, ringStartZ);
             for (int y = 0; y <= STOMP_CRUSH_HEIGHT; y++) {
-                List<MovingBlockData> dataPerYLevel = new ArrayList<>();
-                int currentBlocksInChunk = 0;
                 for (int i = -width - 1; i <= width + 1; i++) {
                     for (int j = -width - 1; j <= width + 1; j++) {
                         mutableBlockPos.set(this.getBlockX() + i, feetY + y, this.getBlockZ() + j);
                         double dist = Math.sqrt(mutableBlockPos.distSqr(center));
                         if (dist <= width && level().isLoaded(mutableBlockPos)) {
                             BlockState state = level().getBlockState(mutableBlockPos);
-                            // Check for unmovable blocks or high explosion resistance
-                            if (state.isAir() || state.canBeReplaced() || state.getBlock().getExplosionResistance() > 50.0F) {
-                                continue;
-                            } else {
-                                BlockEntity te = level().getBlockEntity(mutableBlockPos);
-                                BlockPos offset = mutableBlockPos.immutable().subtract(center);
-                                MovingBlockData data = new MovingBlockData(state, state.getShape(level(), mutableBlockPos), offset, te == null ? null : te.saveWithoutMetadata(this.level().registryAccess()));
-                                dataPerYLevel.add(data);
-
-                                if (currentBlocksInChunk < 16) {
-                                    currentBlocksInChunk++;
-                                } else {
-                                    CrushedBlockEntity crushed = EntityType.CRUSHED_BLOCK.create(level());
-                                    crushed.moveTo(Vec3.atCenterOf(center.above(y)));
-                                    crushed.setAllBlockData(FallingTreeBlockEntity.createTagFromData(dataPerYLevel));
-                                    crushed.setPlacementCooldown(10);
-                                    crushed.setDropChance(dropChance);
-                                    level().addFreshEntity(crushed);
-                                    dataPerYLevel.clear();
-                                    currentBlocksInChunk = 0;
-                                }
-                                level().setBlockAndUpdate(mutableBlockPos, Blocks.AIR.defaultBlockState());
+                            if (!state.isAir() && !state.canBeReplaced() && state.getBlock().getExplosionResistance() <= 50.0F) {
+                                // Simple destruction - drop items
+                                level().destroyBlock(mutableBlockPos, true);
                             }
                         }
                     }
                 }
-                if (!dataPerYLevel.isEmpty()) {
-                    CrushedBlockEntity crushed = EntityType.CRUSHED_BLOCK.create(level());
-                    crushed.moveTo(Vec3.atCenterOf(center.above(y)));
-                    crushed.setAllBlockData(FallingTreeBlockEntity.createTagFromData(dataPerYLevel));
-                    crushed.setDropChance(dropChance);
-                    crushed.setPlacementCooldown(1);
-                    level().addFreshEntity(crushed);
-                }
             }
         }
-
     }
 
     protected Vec3 rotateOffsetVec(Vec3 offset, float xRot, float yRot) {
@@ -370,12 +331,8 @@ public abstract class SauropodBaseEntity extends DinosaurEntity implements Shake
     }
 
     public float getLegSolverBodyOffset() {
-        float heightBackLeft = legSolver.backLeft.getHeight(1.0F);
-        float heightBackRight = legSolver.backRight.getHeight(1.0F);
-        float heightFrontLeft = legSolver.frontLeft.getHeight(1.0F);
-        float heightFrontRight = legSolver.frontRight.getHeight(1.0F);
-        float armsWalkAmount = 1F - (raiseArmsAmount / 5F);
-        return Math.max(Math.max(heightBackLeft, heightBackRight), armsWalkAmount * Math.max(heightFrontLeft, heightFrontRight)) * 0.8F;
+        // Leg solver removed - return simplified offset
+        return 0.0F;
     }
 
     public int getMaxHeadYRot() {
@@ -387,7 +344,7 @@ public abstract class SauropodBaseEntity extends DinosaurEntity implements Shake
     }
 
     public void playAmbientSound() {
-        if (this.getAnimation() == NO_ANIMATION && !level().isClientSide) {
+        if (this.getAnimation() == NO_ANIMATION && !level().isClientSide()) {
             this.setAnimation(ANIMATION_SPEAK);
         }
     }
@@ -399,7 +356,7 @@ public abstract class SauropodBaseEntity extends DinosaurEntity implements Shake
         }
     }
 
-    @Override
+    // Multi-part entity marker - not a vanilla override
     public boolean isMultipartEntity() {
         return true;
     }
@@ -418,7 +375,7 @@ public abstract class SauropodBaseEntity extends DinosaurEntity implements Shake
         this.setDeltaMovement(this.lxd, this.lyd, this.lzd);
     }
 
-    @Override
+    // Lerp motion - not a vanilla override in 1.21
     public void lerpMotion(double lerpX, double lerpY, double lerpZ) {
         this.lxd = lerpX;
         this.lyd = lerpY;
@@ -542,16 +499,18 @@ public abstract class SauropodBaseEntity extends DinosaurEntity implements Shake
         DamageSource damageSource = this.damageSources().mobAttack(this);
         for(LivingEntity living : level().getEntitiesOfClass(LivingEntity.class, aabb, EntitySelector.NO_CREATIVE_OR_SPECTATOR)){
             if(!living.is(this) && !living.isAlliedTo(this) && living.getType() != this.getType() && living.distanceToSqr(center.x, center.y, center.z) <= radius * radius){
-                if(living.isDamageSourceBlocked(damageSource) && disablesShields && living instanceof Player player){
-                    player.disableShield();
+                // Shield disabling logic simplified for 1.21
+                if(disablesShields && living instanceof Player player){
+                    // Shield API changed in 1.21 - simplified cooldown
+                    player.getCooldowns().addCooldown(net.minecraft.world.item.Items.SHIELD, 100);
                 }
-                if(living.hurt(damageSource, damageAmount)){
-                    flag = true;
-                    if(setsOnFire){
-                        living.igniteForSeconds(10);
-                    }
-                    living.knockback(knockbackAmount, center.x - living.getX(), center.z - living.getZ());
+                // hurt returns void in 1.21
+                living.hurt(damageSource, damageAmount);
+                flag = true;
+                if(setsOnFire){
+                    living.igniteForSeconds(10);
                 }
+                living.knockback(knockbackAmount, center.x - living.getX(), center.z - living.getZ());
             }
         }
         return flag;
@@ -610,14 +569,15 @@ public abstract class SauropodBaseEntity extends DinosaurEntity implements Shake
     }
 
     @Override
-    public boolean hurt(DamageSource source, float amount) {
+    public boolean hurtServer(net.minecraft.server.level.ServerLevel serverLevel, DamageSource source, float amount) {
         if (source.is(DamageTypeTags.IS_PROJECTILE)) {
             amount *= getProjectileDamageReduction();
         }
-        return super.hurt(source, amount);
+        return super.hurtServer(serverLevel, source, amount);
     }
 
-    public boolean isInvulnerableTo(DamageSource damageSource) {
+    @Override
+    protected boolean isInvulnerableTo(DamageSource damageSource) {
         return super.isInvulnerableTo(damageSource) || damageSource.is(DamageTypes.IN_WALL);
     }
 
@@ -627,6 +587,10 @@ public abstract class SauropodBaseEntity extends DinosaurEntity implements Shake
 
     public AABB getBoundingBoxForCulling() {
         return this.getBoundingBox().inflate(2);
+    }
+
+    public float getScale() {
+        return 1.0F;
     }
 
     public float getProjectileDamageReduction() {

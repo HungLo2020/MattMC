@@ -1,7 +1,6 @@
 package com.github.alexmodguy.alexscaves.client.model;
 
 import com.github.alexmodguy.alexscaves.client.render.entity.AtlatitanRenderState;
-import com.github.alexmodguy.alexscaves.server.entity.util.LuxtructosaurusLegSolver;
 import com.github.alexmodguy.alexscaves.server.misc.ACMath;
 import com.github.alexthe666.citadel.animation.Animation;
 import com.github.alexthe666.citadel.animation.IAnimatedEntity;
@@ -391,72 +390,6 @@ public abstract class SauropodBaseModel<T extends LivingEntityRenderState> exten
         }
     }
 
-    private void setupAnimForAnimation(SauropodBaseEntity entity, Animation animation, float limbSwing, float limbSwingAmount, float ageInTicks) {
-        float partialTick = ageInTicks - entity.tickCount;
-        if (entity.getAnimation() == SauropodBaseEntity.ANIMATION_ROAR) {
-            float animationIntensity = ACMath.cullAnimationTick(entity.getAnimationTick(), 1, animation, partialTick, 5, 50);
-            this.head.swing(1F, 0.1F, false, -1F, 0F, ageInTicks, animationIntensity);
-            this.jaw.walk(2F, 0.1F, false, 1F, 0F, ageInTicks, animationIntensity);
-            this.dewlap.flap(2F, 0.1F, false, 2F, 0F, ageInTicks, animationIntensity);
-            this.neck.flap(0.5F, 0.1F, false, -3F, 0F, ageInTicks, animationIntensity);
-            this.neck2.flap(0.5F, 0.1F, false, -2F, 0F, ageInTicks, animationIntensity);
-        }
-        if (entity.getAnimation() == SauropodBaseEntity.ANIMATION_EPIC_DEATH) {
-            float animationIntensity = ACMath.cullAnimationTick(entity.getAnimationTick(), 1, animation, partialTick, 5, 110);
-            this.head.swing(0.4F, 0.1F, false, -1F, 0F, ageInTicks, animationIntensity);
-            this.jaw.walk(1F, 0.1F, false, 1F, 0F, ageInTicks, animationIntensity);
-            this.dewlap.flap(1F, 0.1F, false, 2F, 0F, ageInTicks, animationIntensity);
-            this.neck.swing(0.1F, 0.2F, false, -1F, 0F, ageInTicks, animationIntensity);
-            this.neck.flap(0.25F, 0.1F, false, -3F, 0F, ageInTicks, animationIntensity);
-            this.neck2.swing(0.1F, 0.2F, false, -1F, 0F, ageInTicks, animationIntensity);
-            this.neck2.flap(0.25F, 0.1F, false, -2F, 0F, ageInTicks, animationIntensity);
-        }
-        if (entity.getAnimation() == SauropodBaseEntity.ANIMATION_SPEW_FLAMES) {
-            float animationIntensity = ACMath.cullAnimationTick(entity.getAnimationTick(), 1, animation, partialTick, 5, 70);
-            this.head.walk(2F, 0.05F, false, 1F, 0F, ageInTicks, animationIntensity);
-            this.head.swing(2F, 0.05F, false, 1F, 0F, ageInTicks, animationIntensity);
-            this.dewlap.flap(2F, 0.1F, false, 2F, 0F, ageInTicks, animationIntensity);
-            this.neck.flap(1F, 0.05F, false, -3F, 0F, ageInTicks, animationIntensity);
-            this.neck2.flap(1F, 0.05F, false, -2F, 0F, ageInTicks, animationIntensity);
-        }
-        if (entity.getAnimation() == SauropodBaseEntity.ANIMATION_EAT_LEAVES) {
-            float animationIntensity = ACMath.cullAnimationTick(entity.getAnimationTick(), 3, animation, partialTick, 35);
-            float jawDown = Math.min(0, ACMath.walkValue(ageInTicks, animationIntensity, 0.4F, 2F, 1F, true));
-            this.jaw.walk(0.5F, 0.1F, false, 1F, 0.1F, ageInTicks, animationIntensity);
-            this.head.rotateAngleX += ACMath.walkValue(ageInTicks, animationIntensity, 0.4F, 2F, 0.05F, false);
-            this.jaw.rotationPointZ += animationIntensity * 2F + ACMath.walkValue(ageInTicks, animationIntensity, 0.4F, 0.5F, 1F, false);
-        }
-    }
-
-    private void positionNeckAndTail(SauropodBaseEntity entity, float netHeadYaw, float headPitch, float partialTicks) {
-        if (!straighten && !entity.isFakeEntity()) {
-            float neckPart1Pitch = (float) Math.toRadians(entity.neckPart1.calculateAnimationAngle(partialTicks, true)) * 0.5F;
-            float neckPart2Pitch = (float) Math.toRadians(entity.neckPart2.calculateAnimationAngle(partialTicks, true)) * 0.5F;
-            float neckPart3Pitch = (float) Math.toRadians(entity.neckPart3.calculateAnimationAngle(partialTicks, true)) * 0.5F;
-            float tailPart1Pitch = (float) Math.toRadians(entity.tailPart1.calculateAnimationAngle(partialTicks, true)) + 0.141F;
-            float tailPart2Pitch = (float) Math.toRadians(entity.tailPart2.calculateAnimationAngle(partialTicks, true)) + 0.076F;
-            float tailPart3Pitch = (float) Math.toRadians(entity.tailPart3.calculateAnimationAngle(partialTicks, true)) * 0.5F;
-            float neckPart2Yaw = entity.neckPart2.calculateAnimationAngle(partialTicks, false);
-            float pitchAmount = entity.getAnimation() == SauropodBaseEntity.ANIMATION_SPEW_FLAMES ? 0.0F : Mth.clamp(headPitch, -30, 30) / 57.295776F;
-            float headApproach = Mth.approachDegrees(neckPart2Yaw, entity.headPart.calculateAnimationAngle(partialTicks, false), 45F) - neckPart2Yaw;
-            neck.rotateAngleX -= neckPart1Pitch + neckPart2Pitch;
-            neck.rotateAngleY += Math.toRadians(180F + entity.neckPart1.calculateAnimationAngle(partialTicks, false)) - this.chest.rotateAngleY - this.body.rotateAngleY - this.root.rotateAngleY;
-            neck2.rotateAngleX -= neckPart2Pitch;
-            neck2.rotateAngleY += Math.toRadians(180F + neckPart2Yaw);
-            head.rotateAngleX += pitchAmount + neckPart1Pitch + neckPart2Pitch + neckPart3Pitch - (float) Math.toRadians(entity.headPart.calculateAnimationAngle(partialTicks, true)) * 0.2F;
-            head.rotateAngleY += Math.toRadians(headApproach);
-            if (neckPart2Pitch > 0F) {
-                neck2.rotationPointZ += Math.min(neckPart2Pitch * 50F, 50F);
-            }
-            tail.rotateAngleY += Math.toRadians(entity.tailPart1.calculateAnimationAngle(partialTicks, false));
-            tail2.rotateAngleY += Math.toRadians(entity.tailPart2.calculateAnimationAngle(partialTicks, false));
-            tail3.rotateAngleY += Math.toRadians(entity.tailPart3.calculateAnimationAngle(partialTicks, false) - entity.tailPart2.calculateAnimationAngle(partialTicks, false));
-            tail.rotateAngleX += tailPart1Pitch;
-            tail2.rotateAngleX += tailPart2Pitch;
-            tail3.rotateAngleX += tailPart3Pitch;
-        }
-    }
-
     private void animateLegWalking(AdvancedModelBox leg, AdvancedModelBox foot, float offset, float speed, float degree, float limbSwing, float limbSwingAmount, boolean front, boolean left, float legBack) {
         float leg1 = Math.min(0, ACMath.walkValue(limbSwing, limbSwingAmount, speed, Mth.PI * (offset + 0.3333F), 1F, true) + 0.75F) * 4;
         float leg1Delayed = Math.min(0, ACMath.walkValue(limbSwing, limbSwingAmount, speed, Mth.PI * offset, 1F, true) + 0.75F) * 4;
@@ -485,66 +418,6 @@ public abstract class SauropodBaseModel<T extends LivingEntityRenderState> exten
         leg.rotationPointY -= (squish2 - 1) * 30;
     }
 
-    private float articulateLegs(LuxtructosaurusLegSolver legs, float raiseArmsAmount, float partialTick) {
-        float armsArticulateAmount = 1F - raiseArmsAmount;
-        float heightBackLeft = legs.backLeft.getHeight(partialTick);
-        float heightBackRight = legs.backRight.getHeight(partialTick);
-        float heightFrontLeft = legs.frontLeft.getHeight(partialTick);
-        float heightFrontRight = legs.frontRight.getHeight(partialTick);
-        float max = Math.max(Math.max(heightBackLeft, heightBackRight), armsArticulateAmount * Math.max(heightFrontLeft, heightFrontRight)) * 0.75F;
-        body.rotationPointY += max * 16;
-        right_Arm.rotationPointY += (heightFrontRight - max) * armsArticulateAmount * 16;
-        left_Arm.rotationPointY += (heightFrontLeft - max) * armsArticulateAmount * 16;
-        right_Leg.rotationPointY += (heightBackRight - max) * 16;
-        left_Leg.rotationPointY += (heightBackLeft - max) * 16;
-        return max * 16;
-    }
-
-
-    private void animateDancing(SauropodBaseEntity entity, float danceAmount, float ageInTicks) {
-        float ageSine = Mth.clamp((float) Math.sin(ageInTicks * 0.08F) * 2F, 0, 1);
-        float gangnam1 = danceAmount * ageSine;
-        float gangnam2 = danceAmount * (1 - ageSine);
-        float gangnamSpeed = 0.65F;
-        progressPositionPrev(body, danceAmount, 0, -37, -23, 1F);
-        progressRotationPrev(body, danceAmount, (float) Math.toRadians(-50), 0, 0, 1F);
-        progressRotationPrev(left_Leg, danceAmount, (float) Math.toRadians(50), 0, 0, 1F);
-        progressRotationPrev(right_Leg, danceAmount, (float) Math.toRadians(50), 0, 0, 1F);
-        progressRotationPrev(tail, danceAmount, (float) Math.toRadians(50), 0, 0, 1F);
-        progressRotationPrev(neck, danceAmount, (float) Math.toRadians(30), 0, 0, 1F);
-        progressRotationPrev(neck2, danceAmount, (float) Math.toRadians(30), 0, 0, 1F);
-
-        progressPositionPrev(left_Arm, gangnam1, 2, 0, -5, 1F);
-        progressPositionPrev(right_Arm, gangnam1, -2, 0, -5, 1F);
-        progressRotationPrev(left_Arm, gangnam1, (float) Math.toRadians(-5), 0, (float) Math.toRadians(10), 1F);
-        progressRotationPrev(right_Arm, gangnam1, (float) Math.toRadians(-20), 0, (float) Math.toRadians(-10), 1F);
-        progressRotationPrev(left_Hand, gangnam1, (float) Math.toRadians(10), 0, (float) Math.toRadians(30), 1F);
-        progressRotationPrev(right_Hand, gangnam1, (float) Math.toRadians(-20), 0, (float) Math.toRadians(-30), 1F);
-        this.body.swing(gangnamSpeed, 0.05F, false, 0F, 0F, ageInTicks, danceAmount);
-        this.tail.flap(gangnamSpeed, 0.1F, true, 1F, 0F, ageInTicks, danceAmount);
-        this.tail2.swing(gangnamSpeed, 0.1F, true, 1F, 0F, ageInTicks, danceAmount);
-        this.tail3.swing(gangnamSpeed, 0.1F, true, 1F, 0F, ageInTicks, danceAmount);
-        this.left_Arm.walk(gangnamSpeed, 0.2F, false, 2F, -0.3F, ageInTicks, danceAmount);
-        this.right_Arm.walk(gangnamSpeed, 0.2F, false, 2F, -0.3F, ageInTicks, gangnam1);
-        this.left_Hand.walk(gangnamSpeed, 0.1F, false, 1F, -0.1F, ageInTicks, danceAmount);
-        this.right_Hand.walk(gangnamSpeed, 0.1F, false, 1F, -0.1F, ageInTicks, gangnam1);
-        this.left_Leg.walk(gangnamSpeed, 0.3F, false, 1F, -0.1F, ageInTicks, danceAmount);
-        this.right_Leg.walk(gangnamSpeed, 0.3F, true, 1F, -0.1F, ageInTicks, danceAmount);
-        this.body.bob(gangnamSpeed, 10, false, ageInTicks, danceAmount);
-
-        progressPositionPrev(left_Arm, gangnam2, 2, 20, -5, 1F);
-        progressPositionPrev(left_Hand, gangnam2, 0, -4, -4, 1F);
-        progressPositionPrev(right_Arm, gangnam2, 2, 0, -10, 1F);
-        progressPositionPrev(right_Hand, gangnam2, 3, -3, 3, 1F);
-        progressRotationPrev(left_Arm, gangnam2, (float) Math.toRadians(-10), 0, (float) Math.toRadians(-30), 1F);
-        progressRotationPrev(left_Hand, gangnam2, (float) Math.toRadians(-10), 0, (float) Math.toRadians(90), 1F);
-        progressRotationPrev(right_Arm, gangnam2, (float) Math.toRadians(-80), (float) Math.toRadians(40), (float) Math.toRadians(-20), 1F);
-        progressRotationPrev(right_Hand, gangnam2, (float) Math.toRadians(-40), (float) Math.toRadians(-40), (float) Math.toRadians(20), 1F);
-        this.right_Arm.flap(gangnamSpeed, 0.5F, false, 1F, 0F, ageInTicks, gangnam2);
-        this.right_Arm.swing(gangnamSpeed, 0.5F, false, 0F, 0F, ageInTicks, gangnam2);
-        this.right_Hand.flap(gangnamSpeed, 0.2F, false, 3F, -0.1F, ageInTicks, gangnam2);
-
-    }
 
     @Override
     public Iterable<BasicModelPart> parts() {

@@ -2,7 +2,6 @@ package com.github.alexmodguy.alexscaves.client.model;
 
 import com.github.alexmodguy.alexscaves.client.render.ColorUtil;
 import com.github.alexmodguy.alexscaves.client.render.entity.GrottoceratopsRenderState;
-import com.github.alexmodguy.alexscaves.server.entity.item.DinosaurSpiritEntity;
 import com.github.alexmodguy.alexscaves.server.entity.living.GrottoceratopsEntity;
 import com.github.alexmodguy.alexscaves.server.misc.ACMath;
 import com.github.alexthe666.citadel.animation.Animation;

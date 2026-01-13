@@ -114,7 +114,7 @@ public class AtlatitanNibbleTreesGoal extends MoveToBlockGoal {
     private int getHeightOfBlock(LevelReader worldIn, BlockPos pos) {
         int i = 0;
         // Use vanilla LEAVES tag instead of RELICHEIRUS_NIBBLES, and vanilla logs instead of KNOCKABLE_LOGS
-        while (pos.getY() > worldIn.getMinBuildHeight() && (worldIn.getBlockState(pos).is(BlockTags.LEAVES) || worldIn.getBlockState(pos).isAir() || worldIn.getBlockState(pos).is(BlockTags.LOGS))) {
+        while (pos.getY() > -64 && (worldIn.getBlockState(pos).is(BlockTags.LEAVES) || worldIn.getBlockState(pos).isAir() || worldIn.getBlockState(pos).is(BlockTags.LOGS))) {
             pos = pos.below();
             i++;
         }

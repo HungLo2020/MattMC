@@ -67,15 +67,12 @@ public class SauropodPartEntity extends Entity {
         if (parentMob == null) {
             return InteractionResult.PASS;
         } else {
-            this.playSound(SoundEvents.ITEM_BREAK);
+            this.playSound(net.minecraft.sounds.SoundEvents.ITEM_BREAK.value());
             return parentMob.interact(player, hand);
         }
     }
 
-    @Override
-    public boolean canBeCollidedWith() {
-        return parentMob != null && parentMob.canBeCollidedWith();
-    }
+    // canBeCollidedWith removed in 1.21 - collision handled differently
 
     @Override
     public boolean isPickable() {
@@ -105,7 +102,7 @@ public class SauropodPartEntity extends Entity {
                 }
                 parentMob.knockback(0.4F, d0, d1);
             }
-            return parentMob.hurt(serverLevel, damageSource, f);
+            return parentMob.hurtServer(serverLevel, damageSource, f);
         }
         return false;
     }
@@ -129,8 +126,16 @@ public class SauropodPartEntity extends Entity {
         this.setPosRaw(x, y, z);
     }
 
-    public void setBoundingBox(AABB aabb) {
-        this.bb = aabb;
+    public void setPosCenteredY(Vec3 vec3) {
+        this.setPosition(vec3.x, vec3.y - this.getBbHeight() / 2.0, vec3.z);
+        float sizeXZ = size.width() / 2.0F;
+        float sizeY = size.height();
+        // Can't call setBoundingBox directly - use setPos which updates BB
+        this.setPos(vec3.x, vec3.y, vec3.z);
+    }
+
+    public Vec3 centeredPosition() {
+        return new Vec3(this.getX(), this.getY() + this.getBbHeight() / 2.0, this.getZ());
     }
 
     public float calculateAnimationAngle(float partialTick, boolean pitch) {
