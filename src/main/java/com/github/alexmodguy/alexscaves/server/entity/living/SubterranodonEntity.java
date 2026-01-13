@@ -204,7 +204,7 @@ public class SubterranodonEntity extends DinosaurEntity implements PackAnimal, F
         }
         if (isFlying()) {
             if(timeFlying % 10 == 0 && (flapAmount > 0 || controlUpTicks > 0)){
-                this.playSound(SoundEvents.PARROT_FLY);
+                this.playSound(SoundEvents.SUBTERRANODON_FLAP);
             }
             timeFlying++;
             if (this.isLandNavigator) {
@@ -290,7 +290,7 @@ public class SubterranodonEntity extends DinosaurEntity implements PackAnimal, F
             LivingEntity target = this.getTarget();
             if (attackProgress == 5F && target != null && this.distanceTo(target) < 3D + target.getBbWidth() && this.hasLineOfSight(target)) {
                 target.hurt(this.damageSources().mobAttack(this), (float) this.getAttribute(Attributes.ATTACK_DAMAGE).getValue());
-                this.playSound(SoundEvents.PARROT_IMITATE_PHANTOM);
+                this.playSound(SoundEvents.SUBTERRANODON_ATTACK);
             }
             if (attackProgress > 0F) {
                 attackProgress--;
@@ -632,15 +632,15 @@ public class SubterranodonEntity extends DinosaurEntity implements PackAnimal, F
     }
 
     protected SoundEvent getAmbientSound() {
-        return SoundEvents.PARROT_AMBIENT;
+        return SoundEvents.SUBTERRANODON_IDLE;
     }
 
     protected SoundEvent getHurtSound(DamageSource damageSource) {
-        return SoundEvents.PARROT_HURT;
+        return SoundEvents.SUBTERRANODON_HURT;
     }
 
     protected SoundEvent getDeathSound() {
-        return SoundEvents.PARROT_DEATH;
+        return SoundEvents.SUBTERRANODON_DEATH;
     }
 
 

@@ -47,7 +47,7 @@ public class VallumraptorMeleeGoal extends Goal {
                 raptor.lookAt(EntityAnchorArgument.Anchor.EYES, target.getEyePosition());
                 if (raptor.getAnimationTick() > 15 && raptor.onGround()) {
                     raptor.setLeaping(true);
-                    raptor.playSound(SoundEvents.PARROT_IMITATE_RAVAGER);
+                    raptor.playSound(SoundEvents.VALLUMRAPTOR_ATTACK);
                     Vec3 vector3d = raptor.getDeltaMovement();
                     Vec3 vector3d1 = new Vec3(target.getX() - raptor.getX(), 0.0D, target.getZ() - raptor.getZ());
                     if (vector3d1.lengthSqr() > 1.0E-7D) {
@@ -77,7 +77,7 @@ public class VallumraptorMeleeGoal extends Goal {
 
     private void checkAndDealDamage(LivingEntity target) {
         if (raptor.hasLineOfSight(target) && raptor.distanceTo(target) < raptor.getBbWidth() + target.getBbWidth() + 1) {
-            raptor.playSound(SoundEvents.PARROT_IMITATE_RAVAGER);
+            raptor.playSound(SoundEvents.VALLUMRAPTOR_ATTACK);
             target.hurt(target.damageSources().mobAttack(raptor), (float) raptor.getAttribute(Attributes.ATTACK_DAMAGE).getValue());
         }
     }

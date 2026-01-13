@@ -1462,6 +1462,11 @@ public class SoundEvents {
 	public static final SoundEvent SNIFFER_EGG_PLOP = register("block.sniffer_egg.plop");
 	public static final SoundEvent SNIFFER_EGG_CRACK = register("block.sniffer_egg.crack");
 	public static final SoundEvent SNIFFER_EGG_HATCH = register("block.sniffer_egg.hatch");
+	public static final SoundEvent SUBTERRANODON_IDLE = register("entity.subterranodon.idle");
+	public static final SoundEvent SUBTERRANODON_HURT = register("entity.subterranodon.hurt");
+	public static final SoundEvent SUBTERRANODON_DEATH = register("entity.subterranodon.death");
+	public static final SoundEvent SUBTERRANODON_FLAP = register("entity.subterranodon.flap");
+	public static final SoundEvent SUBTERRANODON_ATTACK = register("entity.subterranodon.attack");
 	public static final SoundEvent SNOWBALL_THROW = register("entity.snowball.throw");
 	public static final SoundEvent SNOW_BREAK = register("block.snow.break");
 	public static final SoundEvent SNOW_FALL = register("block.snow.fall");
@@ -1584,6 +1589,13 @@ public class SoundEvents {
 	public static final SoundEvent VEX_CHARGE = register("entity.vex.charge");
 	public static final SoundEvent VEX_DEATH = register("entity.vex.death");
 	public static final SoundEvent VEX_HURT = register("entity.vex.hurt");
+	public static final SoundEvent VALLUMRAPTOR_IDLE = register("entity.vallumraptor.idle");
+	public static final SoundEvent VALLUMRAPTOR_HURT = register("entity.vallumraptor.hurt");
+	public static final SoundEvent VALLUMRAPTOR_DEATH = register("entity.vallumraptor.death");
+	public static final SoundEvent VALLUMRAPTOR_CALL = register("entity.vallumraptor.call");
+	public static final SoundEvent VALLUMRAPTOR_ATTACK = register("entity.vallumraptor.attack");
+	public static final SoundEvent VALLUMRAPTOR_SCRATCH = register("entity.vallumraptor.scratch");
+	public static final SoundEvent VALLUMRAPTOR_SLEEP = register("entity.vallumraptor.sleep");
 	public static final SoundEvent VILLAGER_AMBIENT = register("entity.villager.ambient");
 	public static final SoundEvent VILLAGER_CELEBRATE = register("entity.villager.celebrate");
 	public static final SoundEvent VILLAGER_DEATH = register("entity.villager.death");

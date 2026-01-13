@@ -490,7 +490,7 @@ public class VallumraptorEntity extends DinosaurEntity implements IAnimatedEntit
         float volume = this.getSoundVolume();
         SoundEvent soundevent = this.getAmbientSound();
         if (this.getAnimation() == ANIMATION_CALL_2) {
-            soundevent = SoundEvents.PARROT_IMITATE_RAVAGER;
+            soundevent = SoundEvents.VALLUMRAPTOR_CALL;
             volume += 1.0F;
         }
         if (soundevent != null) {
@@ -632,15 +632,15 @@ public class VallumraptorEntity extends DinosaurEntity implements IAnimatedEntit
     }
 
     protected SoundEvent getAmbientSound() {
-        return this.getRelaxedFor() > 0 ? SoundEvents.PARROT_AMBIENT : SoundEvents.PARROT_AMBIENT;
+        return this.getRelaxedFor() > 0 ? SoundEvents.VALLUMRAPTOR_SLEEP : SoundEvents.VALLUMRAPTOR_IDLE;
     }
 
     protected SoundEvent getHurtSound(DamageSource damageSource) {
-        return SoundEvents.PARROT_HURT;
+        return SoundEvents.VALLUMRAPTOR_HURT;
     }
 
     protected SoundEvent getDeathSound() {
-        return SoundEvents.PARROT_DEATH;
+        return SoundEvents.VALLUMRAPTOR_DEATH;
     }
 
 

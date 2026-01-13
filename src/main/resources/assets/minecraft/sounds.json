@@ -24577,5 +24577,105 @@
       "ambient/weather/rain4"
     ],
     "subtitle": "subtitles.weather.rain"
+  },
+  "entity.subterranodon.idle": {
+    "sounds": [
+      "minecraft:entity/subterranodon/subterranodon_idle_0",
+      "minecraft:entity/subterranodon/subterranodon_idle_1",
+      "minecraft:entity/subterranodon/subterranodon_idle_2",
+      "minecraft:entity/subterranodon/subterranodon_idle_3"
+    ],
+    "subtitle": "subtitles.entity.subterranodon.ambient"
+  },
+  "entity.subterranodon.hurt": {
+    "sounds": [
+      "minecraft:entity/subterranodon/subterranodon_hurt_0",
+      "minecraft:entity/subterranodon/subterranodon_hurt_1",
+      "minecraft:entity/subterranodon/subterranodon_hurt_2"
+    ],
+    "subtitle": "subtitles.entity.subterranodon.hurt"
+  },
+  "entity.subterranodon.death": {
+    "sounds": [
+      "minecraft:entity/subterranodon/subterranodon_death_0",
+      "minecraft:entity/subterranodon/subterranodon_death_1",
+      "minecraft:entity/subterranodon/subterranodon_death_2"
+    ],
+    "subtitle": "subtitles.entity.subterranodon.death"
+  },
+  "entity.subterranodon.flap": {
+    "sounds": [
+      "minecraft:entity/subterranodon/subterranodon_flap_0",
+      "minecraft:entity/subterranodon/subterranodon_flap_1",
+      "minecraft:entity/subterranodon/subterranodon_flap_2",
+      "minecraft:entity/subterranodon/subterranodon_flap_3",
+      "minecraft:entity/subterranodon/subterranodon_flap_4",
+      "minecraft:entity/subterranodon/subterranodon_flap_5"
+    ],
+    "subtitle": "subtitles.entity.subterranodon.flap"
+  },
+  "entity.subterranodon.attack": {
+    "sounds": [
+      "minecraft:entity/subterranodon/subterranodon_attack_0",
+      "minecraft:entity/subterranodon/subterranodon_attack_1",
+      "minecraft:entity/subterranodon/subterranodon_attack_2",
+      "minecraft:entity/subterranodon/subterranodon_attack_3"
+    ],
+    "subtitle": "subtitles.entity.subterranodon.attack"
+  },
+  "entity.vallumraptor.idle": {
+    "sounds": [
+      "minecraft:entity/vallumraptor/vallumraptor_idle_0",
+      "minecraft:entity/vallumraptor/vallumraptor_idle_1",
+      "minecraft:entity/vallumraptor/vallumraptor_idle_2"
+    ],
+    "subtitle": "subtitles.entity.vallumraptor.ambient"
+  },
+  "entity.vallumraptor.hurt": {
+    "sounds": [
+      "minecraft:entity/vallumraptor/vallumraptor_hurt_0",
+      "minecraft:entity/vallumraptor/vallumraptor_hurt_1",
+      "minecraft:entity/vallumraptor/vallumraptor_hurt_2"
+    ],
+    "subtitle": "subtitles.entity.vallumraptor.hurt"
+  },
+  "entity.vallumraptor.death": {
+    "sounds": [
+      "minecraft:entity/vallumraptor/vallumraptor_death_0",
+      "minecraft:entity/vallumraptor/vallumraptor_death_1"
+    ],
+    "subtitle": "subtitles.entity.vallumraptor.death"
+  },
+  "entity.vallumraptor.call": {
+    "sounds": [
+      "minecraft:entity/vallumraptor/vallumraptor_call_0",
+      "minecraft:entity/vallumraptor/vallumraptor_call_1",
+      "minecraft:entity/vallumraptor/vallumraptor_call_2"
+    ],
+    "subtitle": "subtitles.entity.vallumraptor.call"
+  },
+  "entity.vallumraptor.attack": {
+    "sounds": [
+      "minecraft:entity/vallumraptor/vallumraptor_attack_0",
+      "minecraft:entity/vallumraptor/vallumraptor_attack_1",
+      "minecraft:entity/vallumraptor/vallumraptor_attack_2"
+    ],
+    "subtitle": "subtitles.entity.vallumraptor.attack"
+  },
+  "entity.vallumraptor.scratch": {
+    "sounds": [
+      "minecraft:entity/vallumraptor/vallumraptor_scratch_0",
+      "minecraft:entity/vallumraptor/vallumraptor_scratch_1",
+      "minecraft:entity/vallumraptor/vallumraptor_scratch_2"
+    ],
+    "subtitle": "subtitles.entity.vallumraptor.scratch"
+  },
+  "entity.vallumraptor.sleep": {
+    "sounds": [
+      "minecraft:entity/vallumraptor/vallumraptor_sleep_0",
+      "minecraft:entity/vallumraptor/vallumraptor_sleep_1",
+      "minecraft:entity/vallumraptor/vallumraptor_sleep_2"
+    ],
+    "subtitle": "subtitles.entity.vallumraptor.sleep"
   }
 }
