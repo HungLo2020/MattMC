@@ -7204,14 +7204,14 @@ public class Blocks {
 	}
 
 	static {
-		// Initialize Alex's Caves tree features
-		net.minecraft.world.level.levelgen.feature.ACFeatures.init();
-		
 		for (Block block : BuiltInRegistries.BLOCK) {
 			for (BlockState blockState : block.getStateDefinition().getPossibleStates()) {
 				Block.BLOCK_STATE_REGISTRY.add(blockState);
 				blockState.initCache();
 			}
 		}
+		
+		// Initialize Alex's Caves tree features AFTER all blocks are registered
+		net.minecraft.world.level.levelgen.feature.ACFeatures.init();
 	}
 }
