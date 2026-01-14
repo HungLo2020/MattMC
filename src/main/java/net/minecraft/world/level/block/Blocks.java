@@ -717,10 +717,10 @@ public class Blocks {
 	);
 	
 	// Alex's Caves primordial blocks - plants
-	public static final Block FIDDLEHEAD = register("fiddlehead", properties -> new FiddleheadBlock(), BlockBehaviour.Properties.of().mapColor(MapColor.GRASS).noCollision().instabreak().sound(SoundType.GRASS).offsetType(BlockBehaviour.OffsetType.XZ));
-	public static final Block FLYTRAP = register("flytrap", properties -> new FlytrapBlock(), BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_RED).instabreak().sound(SoundType.ROOTS).randomTicks().offsetType(BlockBehaviour.OffsetType.XZ).noOcclusion().noCollision());
-	public static final Block TREE_STAR = register("tree_star", properties -> new TreeStarBlock(), BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_GREEN).instabreak().sound(SoundType.GRASS).noOcclusion().noCollision());
-	public static final Block CYCAD = register("cycad", properties -> new CycadBlock(), BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_LIGHT_GREEN).strength(1F, 2.0F).sound(SoundType.WOOD).offsetType(BlockBehaviour.OffsetType.XZ));
+	public static final Block FIDDLEHEAD = register("fiddlehead", props -> new FiddleheadBlock(), BlockBehaviour.Properties.of());
+	public static final Block FLYTRAP = register("flytrap", props -> new FlytrapBlock(), BlockBehaviour.Properties.of());
+	public static final Block TREE_STAR = register("tree_star", props -> new TreeStarBlock(), BlockBehaviour.Properties.of());
+	public static final Block CYCAD = register("cycad", props -> new CycadBlock(), BlockBehaviour.Properties.of());
 	
 	public static final Block BUSH = register(
 		"bush",
@@ -5826,7 +5826,7 @@ public class Blocks {
 	);
 	
 	// Alex's Caves primordial blocks - decorative
-	public static final Block AMBER = register("amber", TransparentBlock::new, BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_ORANGE).noOcclusion().requiresCorrectToolForDrops().strength(0.3F, 2.0F).sound(SoundType.GLASS));
+	public static final Block AMBER = register("amber", props -> new TransparentBlock(props), BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_ORANGE).noOcclusion().requiresCorrectToolForDrops().strength(0.3F, 2.0F).sound(SoundType.GLASS));
 	
 	public static final Block BUDDING_AMETHYST = register(
 		"budding_amethyst",
