@@ -717,10 +717,10 @@ public class Blocks {
 	);
 	
 	// Alex's Caves primordial blocks - plants
-	public static final Block FIDDLEHEAD = register("fiddlehead", props -> new FiddleheadBlock(), BlockBehaviour.Properties.of());
-	public static final Block FLYTRAP = register("flytrap", props -> new FlytrapBlock(), BlockBehaviour.Properties.of());
-	public static final Block TREE_STAR = register("tree_star", props -> new TreeStarBlock(), BlockBehaviour.Properties.of());
-	public static final Block CYCAD = register("cycad", props -> new CycadBlock(), BlockBehaviour.Properties.of());
+	public static final Block FIDDLEHEAD = register("fiddlehead", FiddleheadBlock::new, BlockBehaviour.Properties.of().mapColor(MapColor.GRASS).noCollision().instabreak().sound(SoundType.GRASS).offsetType(BlockBehaviour.OffsetType.XZ));
+	public static final Block FLYTRAP = register("flytrap", FlytrapBlock::new, BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_RED).instabreak().sound(SoundType.ROOTS).randomTicks().offsetType(BlockBehaviour.OffsetType.XZ).noOcclusion().noCollision());
+	public static final Block TREE_STAR = register("tree_star", TreeStarBlock::new, BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_GREEN).instabreak().sound(SoundType.GRASS).noOcclusion().noCollision());
+	public static final Block CYCAD = register("cycad", CycadBlock::new, BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_LIGHT_GREEN).dynamicShape().strength(1F, 2.0F).sound(SoundType.WOOD).offsetType(BlockBehaviour.OffsetType.XZ));
 	
 	public static final Block BUSH = register(
 		"bush",

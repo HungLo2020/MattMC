@@ -23,13 +23,13 @@ public class FiddleheadBlock extends BushBlock {
 
     protected static final VoxelShape SHAPE = Block.box(6.0D, 0.0D, 6.0D, 10.0D, 8.0D, 10.0D);
 
-    public FiddleheadBlock() {
-        super(BlockBehaviour.Properties.of().mapColor(MapColor.GRASS).noCollision().instabreak().sound(SoundType.GRASS).offsetType(BlockBehaviour.OffsetType.XZ));
+    public FiddleheadBlock(BlockBehaviour.Properties properties) {
+        super(properties);
     }
 
     @Override
     public MapCodec<BushBlock> codec() {
-        return (MapCodec<BushBlock>)(MapCodec<?>)simpleCodec(props -> new FiddleheadBlock());
+        return (MapCodec<BushBlock>)(MapCodec<?>)simpleCodec(FiddleheadBlock::new);
     }
 
     public VoxelShape getShape(BlockState state, BlockGetter getter, BlockPos pos, CollisionContext context) {

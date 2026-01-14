@@ -27,7 +27,7 @@ import net.minecraft.world.phys.shapes.VoxelShape;
  */
 public class FlytrapBlock extends BushBlock implements BonemealableBlock {
 
-    public static final MapCodec<FlytrapBlock> CODEC = simpleCodec((properties) -> new FlytrapBlock());
+    public static final MapCodec<FlytrapBlock> CODEC = simpleCodec(FlytrapBlock::new);
     public static final BooleanProperty OPEN = BooleanProperty.create("open");
     public static final VoxelShape SHAPE = Block.box(3.5, 0, 3.5, 12.5, 21, 12.5);
 
@@ -36,8 +36,8 @@ public class FlytrapBlock extends BushBlock implements BonemealableBlock {
         return (MapCodec<BushBlock>)(MapCodec<?>)CODEC;
     }
 
-    public FlytrapBlock() {
-        super(BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_RED).instabreak().sound(SoundType.ROOTS).randomTicks().offsetType(BlockBehaviour.OffsetType.XZ).noOcclusion().noCollision());
+    public FlytrapBlock(BlockBehaviour.Properties properties) {
+        super(properties);
         this.registerDefaultState(this.defaultBlockState().setValue(OPEN, Boolean.valueOf(true)));
     }
 

@@ -16,6 +16,7 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.BonemealableBlock;
 import net.minecraft.world.level.block.BushBlock;
 import net.minecraft.world.level.block.SoundType;
+import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.StateDefinition;
 import net.minecraft.world.level.block.state.properties.BooleanProperty;
@@ -43,14 +44,14 @@ public class CycadBlock extends BushBlock implements BonemealableBlock {
             Block.box(0, 8, 0, 16, 10, 16)
     );
 
-    public CycadBlock() {
-        super(Properties.of().mapColor(MapColor.COLOR_LIGHT_GREEN).dynamicShape().strength(1F, 2.0F).sound(SoundType.WOOD).offsetType(OffsetType.XZ));
+    public CycadBlock(BlockBehaviour.Properties properties) {
+        super(properties);
         this.registerDefaultState(this.defaultBlockState().setValue(TOP, Boolean.valueOf(true)));
     }
 
     @Override
     public MapCodec<BushBlock> codec() {
-        return (MapCodec<BushBlock>)(MapCodec<?>)simpleCodec(props -> new CycadBlock());
+        return (MapCodec<BushBlock>)(MapCodec<?>)simpleCodec(CycadBlock::new);
     }
 
     public boolean propagatesSkylightDown(BlockState state, BlockGetter getter, BlockPos blockPos) {
