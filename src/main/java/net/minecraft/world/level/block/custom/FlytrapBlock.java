@@ -32,8 +32,8 @@ public class FlytrapBlock extends BushBlock implements BonemealableBlock {
     public static final VoxelShape SHAPE = Block.box(3.5, 0, 3.5, 12.5, 21, 12.5);
 
     @Override
-    public MapCodec<? extends BushBlock> codec() {
-        return CODEC;
+    public MapCodec<BushBlock> codec() {
+        return (MapCodec<BushBlock>)(MapCodec<?>)CODEC;
     }
 
     public FlytrapBlock() {
@@ -42,7 +42,7 @@ public class FlytrapBlock extends BushBlock implements BonemealableBlock {
     }
 
     public VoxelShape getShape(BlockState state, BlockGetter getter, BlockPos pos, CollisionContext context) {
-        Vec3 vec3 = state.getOffset(getter, pos);
+        Vec3 vec3 = state.getOffset(pos);
         return SHAPE.move(vec3.x, vec3.y, vec3.z);
     }
 
@@ -65,7 +65,7 @@ public class FlytrapBlock extends BushBlock implements BonemealableBlock {
 
     public void animateTick(BlockState state, Level level, BlockPos pos, RandomSource randomSource) {
         if (state.getValue(OPEN) && randomSource.nextInt(3) == 0) {
-            Vec3 center = Vec3.upFromBottomCenterOf(pos, 1).add(state.getOffset(level, pos));
+            Vec3 center = Vec3.upFromBottomCenterOf(pos, 1).add(state.getOffset(pos));
             level.addParticle(ParticleTypes.FLY, center.x, center.y, center.z, center.x, center.y, center.z);
         }
     }

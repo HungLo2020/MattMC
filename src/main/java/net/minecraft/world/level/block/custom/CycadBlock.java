@@ -11,6 +11,7 @@ import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LevelAccessor;
 import net.minecraft.world.level.LevelReader;
+import net.minecraft.world.level.ScheduledTickAccess;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.BonemealableBlock;
 import net.minecraft.world.level.block.BushBlock;
@@ -62,7 +63,7 @@ public class CycadBlock extends BushBlock implements BonemealableBlock {
 
     @Override
     public VoxelShape getShape(BlockState state, BlockGetter getter, BlockPos pos, CollisionContext context) {
-        Vec3 vec3 = state.getOffset(getter, pos);
+        Vec3 vec3 = state.getOffset(pos);
         VoxelShape shape = state.getValue(TOP) ? SHAPE_TOP : SHAPE;
         return shape.move(vec3.x, vec3.y, vec3.z);
     }
@@ -82,11 +83,19 @@ public class CycadBlock extends BushBlock implements BonemealableBlock {
         return 0.2F;
     }
 
-    @Override
-    public BlockState updateShape(BlockState state, Direction direction, BlockState state1, LevelAccessor levelAccessor, BlockPos blockPos, BlockPos blockPos1) {
-        BlockState prev = super.updateShape(state, direction, state1, levelAccessor, blockPos, blockPos1);
+    protected BlockState updateShape(
+        BlockState state,
+        LevelReader level,
+        ScheduledTickAccess tickAccess,
+        BlockPos pos,
+        Direction direction,
+        BlockPos neighborPos,
+        BlockState neighborState,
+        RandomSource random
+    ) {
+        BlockState prev = super.updateShape(state, level, tickAccess, pos, direction, neighborPos, neighborState, random);
         if (prev.getBlock() == this) {
-            if (levelAccessor.getBlockState(blockPos.above()).getBlock() == this) {
+            if (level.getBlockState(pos.above()).getBlock() == this) {
                 prev = prev.setValue(TOP, false);
             } else {
                 prev = prev.setValue(TOP, true);
@@ -120,7 +129,7 @@ public class CycadBlock extends BushBlock implements BonemealableBlock {
             int size = 0;
             BlockPos.MutableBlockPos mutable = new BlockPos.MutableBlockPos();
             mutable.set(blockPos);
-            while(level.getBlockState(mutable).is(this) && mutable.getY() > level.getMinBuildHeight()){
+            while(level.getBlockState(mutable).is(this) && mutable.getY() > level.getMinY()){
                 mutable.move(0, -1, 0);
                 size++;
             }
