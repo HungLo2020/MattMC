@@ -49,6 +49,11 @@ import net.minecraft.world.level.block.custom.TreeStarBlock;
 import net.minecraft.world.level.block.custom.CycadBlock;
 import com.github.alexmodguy.alexscaves.server.block.DinosaurEggBlock;
 import com.github.alexmodguy.alexscaves.server.block.MultipleDinosaurEggsBlock;
+import com.github.alexmodguy.alexscaves.server.block.SubterranodonEggBlock;
+import com.github.alexmodguy.alexscaves.server.block.VallumraptorEggBlock;
+import com.github.alexmodguy.alexscaves.server.block.GrottoceratopsEggBlock;
+import com.github.alexmodguy.alexscaves.server.block.TremorsaurusEggBlock;
+import com.github.alexmodguy.alexscaves.server.block.RelicheirusEggBlock;
 import com.github.alexmodguy.alexscaves.server.block.DinosaurChopBlock;
 import com.github.alexmodguy.alexscaves.server.block.AmbersolBlock;
 import com.github.alexmodguy.alexscaves.server.block.AmbersolLightBlock;
@@ -4735,27 +4740,27 @@ public class Blocks {
 	);
 	public static final Block SUBTERRANODON_EGG = register(
 		"subterranodon_egg",
-		properties -> new MultipleDinosaurEggsBlock(properties, EntityType.SUBTERRANODON, 4),
+		SubterranodonEggBlock::new,
 		BlockBehaviour.Properties.of().mapColor(MapColor.TERRACOTTA_WHITE).strength(0.5F).sound(SoundType.METAL).randomTicks().noOcclusion()
 	);
 	public static final Block VALLUMRAPTOR_EGG = register(
 		"vallumraptor_egg",
-		properties -> new MultipleDinosaurEggsBlock(properties, EntityType.VALLUMRAPTOR, 4),
+		VallumraptorEggBlock::new,
 		BlockBehaviour.Properties.of().mapColor(MapColor.TERRACOTTA_WHITE).strength(0.5F).sound(SoundType.METAL).randomTicks().noOcclusion()
 	);
 	public static final Block GROTTOCERATOPS_EGG = register(
 		"grottoceratops_egg",
-		properties -> new DinosaurEggBlock(properties, EntityType.GROTTOCERATOPS, 8, 10),
+		GrottoceratopsEggBlock::new,
 		BlockBehaviour.Properties.of().mapColor(MapColor.TERRACOTTA_WHITE).strength(0.5F).sound(SoundType.METAL).randomTicks().noOcclusion()
 	);
 	public static final Block TREMORSAURUS_EGG = register(
 		"tremorsaurus_egg",
-		properties -> new DinosaurEggBlock(properties, EntityType.TREMORSAURUS, 10, 16),
+		TremorsaurusEggBlock::new,
 		BlockBehaviour.Properties.of().mapColor(MapColor.TERRACOTTA_WHITE).strength(0.5F).sound(SoundType.METAL).randomTicks().noOcclusion()
 	);
 	public static final Block RELICHEIRUS_EGG = register(
 		"relicheirus_egg",
-		properties -> new DinosaurEggBlock(properties, EntityType.RELICHEIRUS, 14, 16),
+		RelicheirusEggBlock::new,
 		BlockBehaviour.Properties.of().mapColor(MapColor.TERRACOTTA_WHITE).strength(0.5F).sound(SoundType.METAL).randomTicks().noOcclusion()
 	);
 	public static final Block DRIED_GHAST = register(

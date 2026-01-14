@@ -19,7 +19,7 @@ import net.minecraft.world.entity.EntityType;
 
 import javax.annotation.Nullable;
 
-public class MultipleDinosaurEggsBlock extends DinosaurEggBlock {
+public abstract class MultipleDinosaurEggsBlock extends DinosaurEggBlock {
 
     public static final IntegerProperty EGGS = BlockStateProperties.EGGS;
 
@@ -28,8 +28,8 @@ public class MultipleDinosaurEggsBlock extends DinosaurEggBlock {
     private static final VoxelShape ONE_EGG_SHAPE = Block.box(4.0D, 0.0D, 4.0D, 12.0D, 9.0D, 12.0D);
     private static final VoxelShape MULTI_EGG_SHAPE = Block.box(1.0D, 0.0D, 1.0D, 15.0D, 7.0D, 15.0D);
 
-    public MultipleDinosaurEggsBlock(Properties properties, EntityType<?> births, int maxEggs) {
-        super(properties, births, Shapes.block());
+    protected MultipleDinosaurEggsBlock(Properties properties, int maxEggs) {
+        super(properties, Shapes.block());
         this.maxEggs = maxEggs;
         this.registerDefaultState(this.defaultBlockState().setValue(HATCH, Integer.valueOf(0)).setValue(EGGS, 1).setValue(NEEDS_PLAYER, false));
     }

@@ -30,28 +30,30 @@ import net.minecraft.world.phys.shapes.VoxelShape;
 import javax.annotation.Nullable;
 import java.util.List;
 
-public class DinosaurEggBlock extends Block {
+public abstract class DinosaurEggBlock extends Block {
     public static final IntegerProperty HATCH = BlockStateProperties.HATCH;
     public static final BooleanProperty NEEDS_PLAYER = BooleanProperty.create("needs_player");
 
     private final VoxelShape voxelShape;
 
-    private final EntityType<?> births;
-
-    public DinosaurEggBlock(Properties properties, EntityType<?> births, VoxelShape voxelShape) {
+    protected DinosaurEggBlock(Properties properties, VoxelShape voxelShape) {
         super(properties);
         this.registerDefaultState(this.defaultBlockState().setValue(HATCH, Integer.valueOf(0)).setValue(NEEDS_PLAYER, false));
-        this.births = births;
         this.voxelShape = voxelShape;
     }
 
-    public DinosaurEggBlock(Properties properties, EntityType<?> births, int widthPx, int heightPx) {
+    protected DinosaurEggBlock(Properties properties, int widthPx, int heightPx) {
         super(properties);
         this.registerDefaultState(this.defaultBlockState().setValue(HATCH, Integer.valueOf(0)).setValue(NEEDS_PLAYER, false));
-        this.births = births;
         int px = (16 - widthPx) / 2;
         this.voxelShape = Block.box(px, 0, px, 16 - px, heightPx, 16 - px);
     }
+
+    /**
+     * Returns the EntityType that this egg hatches into.
+     * This method is called at runtime (not during class loading) to avoid circular dependencies.
+     */
+    protected abstract EntityType<?> getEntityType();
 
     public boolean isProperHabitat(BlockGetter reader, BlockPos pos) {
         BlockState state = reader.getBlockState(pos.below());
@@ -85,7 +87,7 @@ public class DinosaurEggBlock extends Block {
             if (worldIn instanceof ServerLevel && worldIn.random.nextInt(chances) == 0) {
                 AABB bb = new AABB(pos.getX(), pos.getY(), pos.getZ(), pos.getX() + 1, pos.getY() + 1, pos.getZ() + 1).inflate(25, 25, 25);
                 if (trampler instanceof LivingEntity && !(trampler instanceof Player player && player.isCreative())) {
-                    List<Mob> list = worldIn.getEntitiesOfClass(Mob.class, bb, living -> living.isAlive() && living.getType() == births);
+                    List<Mob> list = worldIn.getEntitiesOfClass(Mob.class, bb, living -> living.isAlive() && living.getType() == getEntityType());
                     for (Mob living : list) {
                         if (!(living instanceof TamableAnimal) || !((TamableAnimal) living).isTame() || !((TamableAnimal) living).isOwnedBy((LivingEntity) trampler)) {
                             living.setTarget((LivingEntity) trampler);
@@ -124,7 +126,7 @@ public class DinosaurEggBlock extends Block {
         level.removeBlock(pos, false);
         for (int j = 0; j < getDinosaursBornFrom(state); ++j) {
             level.levelEvent(2001, pos, Block.getId(state));
-            Entity fromType = births.create(level, EntitySpawnReason.BREEDING);
+            Entity fromType = getEntityType().create(level, EntitySpawnReason.BREEDING);
             if (fromType instanceof Animal animal) {
                 animal.setAge(-24000);
             }
