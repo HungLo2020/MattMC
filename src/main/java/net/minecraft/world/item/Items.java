@@ -127,6 +127,8 @@ public class Items {
 	public static final Item BAMBOO_MOSAIC = registerBlock(Blocks.BAMBOO_MOSAIC);
 	public static final Item OAK_SAPLING = registerBlock(Blocks.OAK_SAPLING);
 	public static final Item SPRUCE_SAPLING = registerBlock(Blocks.SPRUCE_SAPLING);
+	public static final Item PEWEN_SAPLING = registerBlock(Blocks.PEWEN_SAPLING);
+	public static final Item ANCIENT_SAPLING = registerBlock(Blocks.ANCIENT_SAPLING);
 	public static final Item BIRCH_SAPLING = registerBlock(Blocks.BIRCH_SAPLING);
 	public static final Item JUNGLE_SAPLING = registerBlock(Blocks.JUNGLE_SAPLING);
 	public static final Item ACACIA_SAPLING = registerBlock(Blocks.ACACIA_SAPLING);

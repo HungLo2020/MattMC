@@ -209,6 +209,16 @@ public class Blocks {
 		properties -> new SaplingBlock(TreeGrower.SPRUCE, properties),
 		BlockBehaviour.Properties.of().mapColor(MapColor.PLANT).noCollision().randomTicks().instabreak().sound(SoundType.GRASS).pushReaction(PushReaction.DESTROY)
 	);
+	public static final Block PEWEN_SAPLING = register(
+		"pewen_sapling",
+		properties -> new SaplingBlock(com.github.alexmodguy.alexscaves.server.block.grower.PewenGrower.GROWER, properties),
+		BlockBehaviour.Properties.of().mapColor(MapColor.GRASS).noCollision().randomTicks().instabreak().sound(SoundType.GRASS).pushReaction(PushReaction.DESTROY)
+	);
+	public static final Block ANCIENT_SAPLING = register(
+		"ancient_sapling",
+		properties -> new SaplingBlock(com.github.alexmodguy.alexscaves.server.block.grower.AncientTreeGrower.GROWER, properties),
+		BlockBehaviour.Properties.of().mapColor(MapColor.GRASS).noCollision().randomTicks().instabreak().sound(SoundType.GRASS).pushReaction(PushReaction.DESTROY)
+	);
 	public static final Block BIRCH_SAPLING = register(
 		"birch_sapling",
 		properties -> new SaplingBlock(TreeGrower.BIRCH, properties),
@@ -2629,6 +2639,12 @@ public class Blocks {
 	public static final Block POTTED_OAK_SAPLING = register("potted_oak_sapling", properties -> new FlowerPotBlock(OAK_SAPLING, properties), flowerPotProperties());
 	public static final Block POTTED_SPRUCE_SAPLING = register(
 		"potted_spruce_sapling", properties -> new FlowerPotBlock(SPRUCE_SAPLING, properties), flowerPotProperties()
+	);
+	public static final Block POTTED_PEWEN_SAPLING = register(
+		"potted_pewen_sapling", properties -> new FlowerPotBlock(PEWEN_SAPLING, properties), flowerPotProperties()
+	);
+	public static final Block POTTED_ANCIENT_SAPLING = register(
+		"potted_ancient_sapling", properties -> new FlowerPotBlock(ANCIENT_SAPLING, properties), flowerPotProperties()
 	);
 	public static final Block POTTED_BIRCH_SAPLING = register(
 		"potted_birch_sapling", properties -> new FlowerPotBlock(BIRCH_SAPLING, properties), flowerPotProperties()
@@ -7188,6 +7204,9 @@ public class Blocks {
 	}
 
 	static {
+		// Initialize Alex's Caves tree features
+		net.minecraft.world.level.levelgen.feature.ACFeatures.init();
+		
 		for (Block block : BuiltInRegistries.BLOCK) {
 			for (BlockState blockState : block.getStateDefinition().getPossibleStates()) {
 				Block.BLOCK_STATE_REGISTRY.add(blockState);

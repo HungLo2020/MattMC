@@ -1,6 +1,6 @@
 {
   "parent": "minecraft:item/generated",
   "textures": {
-    "layer0": "minecraft:block/pewen_sapling"
+    "layer0": "minecraft:block/ancient_sapling"
   }
 }

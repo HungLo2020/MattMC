@@ -871,6 +871,8 @@ public class CreativeModeTabs {
 					output.accept(Items.SHROOMLIGHT);
 					output.accept(Items.OAK_SAPLING);
 					output.accept(Items.SPRUCE_SAPLING);
+					output.accept(Items.PEWEN_SAPLING);
+					output.accept(Items.ANCIENT_SAPLING);
 					output.accept(Items.BIRCH_SAPLING);
 					output.accept(Items.JUNGLE_SAPLING);
 					output.accept(Items.ACACIA_SAPLING);
