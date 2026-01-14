@@ -944,6 +944,11 @@ public class CreativeModeTabs {
 					output.accept(Items.FROGSPAWN);
 					output.accept(Items.TURTLE_EGG);
 					output.accept(Items.SNIFFER_EGG);
+					output.accept(Items.SUBTERRANODON_EGG);
+					output.accept(Items.VALLUMRAPTOR_EGG);
+					output.accept(Items.GROTTOCERATOPS_EGG);
+					output.accept(Items.TREMORSAURUS_EGG);
+					output.accept(Items.RELICHEIRUS_EGG);
 					output.accept(Items.DRIED_GHAST);
 					output.accept(Items.WHEAT_SEEDS);
 					output.accept(Items.COCOA_BEANS);

@@ -1,0 +1,6 @@
+{
+	"parent": "minecraft:block/small_dinosaur_egg_4_template",
+	"textures": {
+		"egg": "minecraft:block/egg/vallumraptor_egg_very_cracked"
+	}
+}

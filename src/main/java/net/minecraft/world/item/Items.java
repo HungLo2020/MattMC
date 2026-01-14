@@ -860,6 +860,11 @@ public class Items {
 	public static final Item ELEVATOR = registerBlock(Blocks.ELEVATOR);
 	public static final Item TURTLE_EGG = registerBlock(Blocks.TURTLE_EGG);
 	public static final Item SNIFFER_EGG = registerBlock(Blocks.SNIFFER_EGG, (UnaryOperator<Item.Properties>)(properties -> properties.rarity(Rarity.UNCOMMON)));
+	public static final Item SUBTERRANODON_EGG = registerBlock(Blocks.SUBTERRANODON_EGG);
+	public static final Item VALLUMRAPTOR_EGG = registerBlock(Blocks.VALLUMRAPTOR_EGG);
+	public static final Item GROTTOCERATOPS_EGG = registerBlock(Blocks.GROTTOCERATOPS_EGG);
+	public static final Item TREMORSAURUS_EGG = registerBlock(Blocks.TREMORSAURUS_EGG);
+	public static final Item RELICHEIRUS_EGG = registerBlock(Blocks.RELICHEIRUS_EGG);
 	public static final Item DRIED_GHAST = registerBlock(Blocks.DRIED_GHAST);
 	public static final Item DEAD_TUBE_CORAL_BLOCK = registerBlock(Blocks.DEAD_TUBE_CORAL_BLOCK);
 	public static final Item DEAD_BRAIN_CORAL_BLOCK = registerBlock(Blocks.DEAD_BRAIN_CORAL_BLOCK);

@@ -1,0 +1,11 @@
+{
+	"parent": "minecraft:block/tremorsaurus_egg_template",
+	"textures": {
+		"east": "minecraft:block/egg/tremorsaurus_egg_east_very_cracked",
+		"south": "minecraft:block/egg/tremorsaurus_egg_south_very_cracked",
+		"west": "minecraft:block/egg/tremorsaurus_egg_west_very_cracked",
+		"north": "minecraft:block/egg/tremorsaurus_egg_north_very_cracked",
+		"bottom" : "minecraft:block/egg/tremorsaurus_egg_bottom_very_cracked",
+		"top" : "minecraft:block/egg/tremorsaurus_egg_top_very_cracked"
+	}
+}
