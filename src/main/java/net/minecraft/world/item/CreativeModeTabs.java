@@ -1010,6 +1010,7 @@ public class CreativeModeTabs {
 					output.accept(Items.OCHRE_FROGLIGHT);
 					output.accept(Items.VERDANT_FROGLIGHT);
 					output.accept(Items.PEARLESCENT_FROGLIGHT);
+					output.accept(Items.CARMINE_FROGLIGHT);
 					output.accept(Items.SCULK);
 					output.accept(Items.SCULK_VEIN);
 					output.accept(Items.SCULK_CATALYST);
@@ -1671,6 +1672,8 @@ public class CreativeModeTabs {
 						output.accept(Items.BREAD);
 						output.accept(Items.COOKIE);
 						output.accept(Items.CAKE);
+						output.accept(Items.DINOSAUR_CHOP);
+						output.accept(Items.COOKED_DINOSAUR_CHOP);
 						output.accept(Items.PUMPKIN_PIE);
 						output.accept(Items.ROTTEN_FLESH);
 						output.accept(Items.SPIDER_EYE);

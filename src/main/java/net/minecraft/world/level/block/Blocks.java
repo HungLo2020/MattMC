@@ -49,6 +49,7 @@ import net.minecraft.world.level.block.custom.TreeStarBlock;
 import net.minecraft.world.level.block.custom.CycadBlock;
 import com.github.alexmodguy.alexscaves.server.block.DinosaurEggBlock;
 import com.github.alexmodguy.alexscaves.server.block.MultipleDinosaurEggsBlock;
+import com.github.alexmodguy.alexscaves.server.block.DinosaurChopBlock;
 import net.minecraft.world.level.material.Fluids;
 import net.minecraft.world.level.material.MapColor;
 import net.minecraft.world.level.material.PushReaction;
@@ -2086,6 +2087,16 @@ public class Blocks {
 	);
 	public static final Block CAKE = register(
 		"cake", CakeBlock::new, BlockBehaviour.Properties.of().forceSolidOn().strength(0.5F).sound(SoundType.WOOL).pushReaction(PushReaction.DESTROY)
+	);
+	public static final Block DINOSAUR_CHOP = register(
+		"dinosaur_chop",
+		properties -> new DinosaurChopBlock(properties, 3, 0.2F, false),
+		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_RED).strength(1F, 1.0F).sound(SoundType.CANDLE).noOcclusion().dynamicShape().randomTicks()
+	);
+	public static final Block COOKED_DINOSAUR_CHOP = register(
+		"cooked_dinosaur_chop",
+		properties -> new DinosaurChopBlock(properties, 7, 0.35F, true),
+		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_BROWN).strength(1F, 1.0F).sound(SoundType.CANDLE).noOcclusion().dynamicShape()
 	);
 	public static final Block REPEATER = register(
 		"repeater", RepeaterBlock::new, BlockBehaviour.Properties.of().instabreak().sound(SoundType.STONE).pushReaction(PushReaction.DESTROY)
@@ -6640,6 +6651,11 @@ public class Blocks {
 		"pearlescent_froglight",
 		RotatedPillarBlock::new,
 		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_PINK).strength(0.3F).lightLevel(blockStatex -> 15).sound(SoundType.FROGLIGHT)
+	);
+	public static final Block CARMINE_FROGLIGHT = register(
+		"carmine_froglight",
+		RotatedPillarBlock::new,
+		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_YELLOW).strength(0.3F).lightLevel(blockStatex -> 15).sound(SoundType.FROGLIGHT)
 	);
 	public static final Block FROGSPAWN = register(
 		"frogspawn",

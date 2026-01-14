@@ -1654,6 +1654,8 @@ public class Items {
 	public static final Item BONE = registerItem("bone");
 	public static final Item SUGAR = registerItem("sugar");
 	public static final Item CAKE = registerBlock(Blocks.CAKE, new Item.Properties().stacksTo(1));
+	public static final Item DINOSAUR_CHOP = registerBlock(Blocks.DINOSAUR_CHOP, new Item.Properties().stacksTo(1));
+	public static final Item COOKED_DINOSAUR_CHOP = registerBlock(Blocks.COOKED_DINOSAUR_CHOP, new Item.Properties().stacksTo(1));
 	public static final Item WHITE_BED = registerBlock(Blocks.WHITE_BED, BedItem::new, new Item.Properties().stacksTo(1));
 	public static final Item ORANGE_BED = registerBlock(Blocks.ORANGE_BED, BedItem::new, new Item.Properties().stacksTo(1));
 	public static final Item MAGENTA_BED = registerBlock(Blocks.MAGENTA_BED, BedItem::new, new Item.Properties().stacksTo(1));
@@ -2317,6 +2319,7 @@ public class Items {
 	public static final Item OCHRE_FROGLIGHT = registerBlock(Blocks.OCHRE_FROGLIGHT);
 	public static final Item VERDANT_FROGLIGHT = registerBlock(Blocks.VERDANT_FROGLIGHT);
 	public static final Item PEARLESCENT_FROGLIGHT = registerBlock(Blocks.PEARLESCENT_FROGLIGHT);
+	public static final Item CARMINE_FROGLIGHT = registerBlock(Blocks.CARMINE_FROGLIGHT);
 	public static final Item FROGSPAWN = registerBlock(Blocks.FROGSPAWN, PlaceOnWaterBlockItem::new);
 	public static final Item ECHO_SHARD = registerItem("echo_shard", new Item.Properties().rarity(Rarity.UNCOMMON));
 	public static final Item OMINOUS_CATALYST = registerItem("ominous_catalyst", new Item.Properties().rarity(Rarity.UNCOMMON).fireResistant());
