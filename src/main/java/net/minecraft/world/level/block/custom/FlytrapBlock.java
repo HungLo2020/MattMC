@@ -66,7 +66,7 @@ public class FlytrapBlock extends BushBlock implements BonemealableBlock {
     public void animateTick(BlockState state, Level level, BlockPos pos, RandomSource randomSource) {
         if (state.getValue(OPEN) && randomSource.nextInt(3) == 0) {
             Vec3 center = Vec3.upFromBottomCenterOf(pos, 1).add(state.getOffset(pos));
-            level.addParticle(ParticleTypes.FLY, center.x, center.y, center.z, center.x, center.y, center.z);
+            level.addParticle(ParticleTypes.FLY, center.x, center.y, center.z, 0.0, 0.0, 0.0);
         }
     }
 
