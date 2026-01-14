@@ -812,6 +812,7 @@ public class CreativeModeTabs {
 					output.accept(Items.RAW_GOLD_BLOCK);
 					output.accept(Items.GLOWSTONE);
 					output.accept(Items.AMETHYST_BLOCK);
+					output.accept(Items.AMBER);
 					output.accept(Items.BUDDING_AMETHYST);
 					output.accept(Items.SMALL_AMETHYST_BUD);
 					output.accept(Items.MEDIUM_AMETHYST_BUD);
@@ -864,6 +865,10 @@ public class CreativeModeTabs {
 					output.accept(Items.WARPED_FUNGUS);
 					output.accept(Items.SHORT_GRASS);
 					output.accept(Items.FERN);
+					output.accept(Items.FIDDLEHEAD);
+					output.accept(Items.TREE_STAR);
+					output.accept(Items.FLYTRAP);
+					output.accept(Items.CYCAD);
 					output.accept(Items.DRY_SHORT_GRASS);
 					output.accept(Items.BUSH);
 					output.accept(Items.DEAD_BUSH);

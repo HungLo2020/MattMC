@@ -43,6 +43,10 @@ import net.minecraft.world.level.block.state.properties.SculkSensorPhase;
 import net.minecraft.world.level.block.state.properties.WoodType;
 import net.minecraft.world.level.block.custom.DirectionalFacingBlock;
 import net.minecraft.world.level.block.custom.SmoothLimestoneBlock;
+import net.minecraft.world.level.block.custom.FlytrapBlock;
+import net.minecraft.world.level.block.custom.FiddleheadBlock;
+import net.minecraft.world.level.block.custom.TreeStarBlock;
+import net.minecraft.world.level.block.custom.CycadBlock;
 import net.minecraft.world.level.material.Fluids;
 import net.minecraft.world.level.material.MapColor;
 import net.minecraft.world.level.material.PushReaction;
@@ -108,6 +112,13 @@ public class Blocks {
 	public static final Block SMOOTH_LIMESTONE_STAIRS = registerLegacyStair("smooth_limestone_stairs", SMOOTH_LIMESTONE);
 	public static final Block SMOOTH_LIMESTONE_SLAB = register("smooth_limestone_slab", SlabBlock::new, BlockBehaviour.Properties.ofLegacyCopy(SMOOTH_LIMESTONE));
 	public static final Block SMOOTH_LIMESTONE_WALL = register("smooth_limestone_wall", WallBlock::new, BlockBehaviour.Properties.ofLegacyCopy(SMOOTH_LIMESTONE).forceSolidOn());
+	
+	// Alex's Caves primordial blocks - plants
+	public static final Block FIDDLEHEAD = register("fiddlehead", FiddleheadBlock::new, BlockBehaviour.Properties.of().mapColor(MapColor.GRASS).noCollision().instabreak().sound(SoundType.GRASS).offsetType(BlockBehaviour.OffsetType.XZ));
+	public static final Block FLYTRAP = register("flytrap", FlytrapBlock::new, BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_RED).instabreak().sound(SoundType.ROOTS).randomTicks().offsetType(BlockBehaviour.OffsetType.XZ).noOcclusion().noCollision());
+	public static final Block TREE_STAR = register("tree_star", TreeStarBlock::new, BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_GREEN).instabreak().sound(SoundType.GRASS).noOcclusion().noCollision());
+	public static final Block CYCAD = register("cycad", CycadBlock::new, BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_LIGHT_GREEN).strength(1F, 2.0F).sound(SoundType.WOOD).offsetType(BlockBehaviour.OffsetType.XZ));
+	public static final Block AMBER = register("amber", TransparentBlock::new, BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_ORANGE).noOcclusion().requiresCorrectToolForDrops().strength(0.3F, 2.0F).sound(SoundType.GLASS));
 	
 	public static final Block GRASS_BLOCK = register(
 		"grass_block", GrassBlock::new, BlockBehaviour.Properties.of().mapColor(MapColor.GRASS).randomTicks().strength(0.6F).sound(SoundType.GRASS)

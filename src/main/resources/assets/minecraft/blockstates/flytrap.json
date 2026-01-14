@@ -1,0 +1,12 @@
+{
+  "variants": {
+    "open=true": [
+      { "model": "minecraft:block/flytrap_open" },
+      { "model": "minecraft:block/flytrap_open", "y": 90 }
+    ],
+    "open=false": [
+      { "model": "minecraft:block/flytrap_closed" },
+      { "model": "minecraft:block/flytrap_closed", "y": 90 }
+    ]
+  }
+}

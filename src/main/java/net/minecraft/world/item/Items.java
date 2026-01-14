@@ -78,6 +78,11 @@ public class Items {
 	public static final Item SMOOTH_LIMESTONE_STAIRS = registerBlock(Blocks.SMOOTH_LIMESTONE_STAIRS);
 	public static final Item SMOOTH_LIMESTONE_SLAB = registerBlock(Blocks.SMOOTH_LIMESTONE_SLAB);
 	public static final Item SMOOTH_LIMESTONE_WALL = registerBlock(Blocks.SMOOTH_LIMESTONE_WALL);
+	public static final Item FIDDLEHEAD = registerBlock(Blocks.FIDDLEHEAD);
+	public static final Item FLYTRAP = registerBlock(Blocks.FLYTRAP);
+	public static final Item TREE_STAR = registerBlock(Blocks.TREE_STAR);
+	public static final Item CYCAD = registerBlock(Blocks.CYCAD);
+	public static final Item AMBER = registerBlock(Blocks.AMBER);
 	public static final Item DEEPSLATE = registerBlock(Blocks.DEEPSLATE);
 	public static final Item COBBLED_DEEPSLATE = registerBlock(Blocks.COBBLED_DEEPSLATE);
 	public static final Item POLISHED_DEEPSLATE = registerBlock(Blocks.POLISHED_DEEPSLATE);

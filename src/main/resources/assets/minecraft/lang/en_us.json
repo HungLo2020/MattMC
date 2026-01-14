@@ -7845,5 +7845,10 @@
   "block.minecraft.smooth_limestone": "Smooth Limestone",
   "block.minecraft.smooth_limestone_stairs": "Smooth Limestone Stairs",
   "block.minecraft.smooth_limestone_slab": "Smooth Limestone Slab",
-  "block.minecraft.smooth_limestone_wall": "Smooth Limestone Wall"
+  "block.minecraft.smooth_limestone_wall": "Smooth Limestone Wall",
+  "block.minecraft.fiddlehead": "Fiddlehead",
+  "block.minecraft.flytrap": "Flytrap",
+  "block.minecraft.tree_star": "Tree Star",
+  "block.minecraft.cycad": "Cycad",
+  "block.minecraft.amber": "Amber"
 }
