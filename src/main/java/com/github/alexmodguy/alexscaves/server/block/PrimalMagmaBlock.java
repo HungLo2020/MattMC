@@ -102,12 +102,7 @@ public class PrimalMagmaBlock extends Block {
     }
 
     public static boolean isBossActive(Level level) {
-        if(level instanceof ServerLevel serverLevel){
-            ACWorldData worldData = ACWorldData.get(serverLevel);
-            if(worldData != null){
-                return worldData.isPrimordialBossActive();
-            }
-        }
+        // Simplified: boss is never active
         return false;
     }
 

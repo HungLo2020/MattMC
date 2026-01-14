@@ -28,8 +28,6 @@ import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.StateDefinition;
 import net.minecraft.world.level.block.state.properties.IntegerProperty;
-import net.minecraft.world.level.block.state.properties.NoteBlockInstrument;
-import net.minecraft.world.level.material.MapColor;
 import net.minecraft.world.level.pathfinder.PathType;
 import net.minecraft.world.level.pathfinder.PathComputationType;
 import net.minecraft.world.phys.Vec3;
@@ -46,12 +44,8 @@ public class FissurePrimalMagmaBlock extends Block {
 
     public static final IntegerProperty REGEN_HEIGHT = IntegerProperty.create("regen_height", 0, 4);
 
-    public FissurePrimalMagmaBlock() {
-        super(BlockBehaviour.Properties.of().mapColor(MapColor.NETHER).instrument(NoteBlockInstrument.BASEDRUM).requiresCorrectToolForDrops().lightLevel((state) -> {
-            return 5;
-        }).strength(0.5F).isValidSpawn((state, getter, pos, entityType) -> {
-            return entityType.fireImmune();
-        }).hasPostProcess((state, getter, pos) -> true).emissiveRendering((state, getter, pos) -> true).sound(ACSoundTypes.FLOOD_BASALT).randomTicks());
+    public FissurePrimalMagmaBlock(BlockBehaviour.Properties properties) {
+        super(properties);
         this.registerDefaultState(this.defaultBlockState().setValue(REGEN_HEIGHT, 0));
     }
 
@@ -157,7 +151,7 @@ public class FissurePrimalMagmaBlock extends Block {
         return new ItemStack(Blocks.PRIMAL_MAGMA);
     }
 
-    public boolean isPathfindable(BlockState blockState, BlockGetter getter, BlockPos blockPos, PathComputationType computationType) {
+    public boolean isPathfindable(BlockState blockState, PathComputationType computationType) {
         return false;
     }
 
@@ -173,4 +167,3 @@ public class FissurePrimalMagmaBlock extends Block {
         builder.add(REGEN_HEIGHT);
     }
 }
-
