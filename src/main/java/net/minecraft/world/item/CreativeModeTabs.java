@@ -1763,6 +1763,7 @@ public class CreativeModeTabs {
 					output.accept(Items.SHULKER_SHELL);
 					output.accept(Items.POPPED_CHORUS_FRUIT);
 					output.accept(Items.ECHO_SHARD);
+					output.accept(Items.OMINOUS_CATALYST);
 					output.accept(Items.DISC_FRAGMENT_5);
 					output.accept(Items.WHITE_DYE);
 					output.accept(Items.LIGHT_GRAY_DYE);
@@ -1838,6 +1839,8 @@ public class CreativeModeTabs {
 					output.accept(Items.SHELTER_POTTERY_SHERD);
 					output.accept(Items.SKULL_POTTERY_SHERD);
 					output.accept(Items.SNORT_POTTERY_SHERD);
+					output.accept(Items.DINOSAUR_POTTERY_SHERD);
+					output.accept(Items.FOOTPRINT_POTTERY_SHERD);
 					output.accept(Items.NETHERITE_UPGRADE_SMITHING_TEMPLATE);
 					output.accept(Items.SENTRY_ARMOR_TRIM_SMITHING_TEMPLATE);
 					output.accept(Items.VEX_ARMOR_TRIM_SMITHING_TEMPLATE);

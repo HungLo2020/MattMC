@@ -2314,6 +2314,7 @@ public class Items {
 	public static final Item PEARLESCENT_FROGLIGHT = registerBlock(Blocks.PEARLESCENT_FROGLIGHT);
 	public static final Item FROGSPAWN = registerBlock(Blocks.FROGSPAWN, PlaceOnWaterBlockItem::new);
 	public static final Item ECHO_SHARD = registerItem("echo_shard", new Item.Properties().rarity(Rarity.UNCOMMON));
+	public static final Item OMINOUS_CATALYST = registerItem("ominous_catalyst", new Item.Properties().rarity(Rarity.UNCOMMON).fireResistant());
 	public static final Item BRUSH = registerItem("brush", BrushItem::new, new Item.Properties().durability(64));
 	public static final Item NETHERITE_UPGRADE_SMITHING_TEMPLATE = registerItem(
 		"netherite_upgrade_smithing_template", SmithingTemplateItem::createNetheriteUpgradeTemplate, new Item.Properties().rarity(Rarity.UNCOMMON)
@@ -2395,6 +2396,8 @@ public class Items {
 	public static final Item SHELTER_POTTERY_SHERD = registerItem("shelter_pottery_sherd", new Item.Properties().rarity(Rarity.UNCOMMON));
 	public static final Item SKULL_POTTERY_SHERD = registerItem("skull_pottery_sherd", new Item.Properties().rarity(Rarity.UNCOMMON));
 	public static final Item SNORT_POTTERY_SHERD = registerItem("snort_pottery_sherd", new Item.Properties().rarity(Rarity.UNCOMMON));
+	public static final Item DINOSAUR_POTTERY_SHERD = registerItem("dinosaur_pottery_sherd", new Item.Properties().rarity(Rarity.UNCOMMON));
+	public static final Item FOOTPRINT_POTTERY_SHERD = registerItem("footprint_pottery_sherd", new Item.Properties().rarity(Rarity.UNCOMMON));
 	public static final Item COPPER_GRATE = registerBlock(Blocks.COPPER_GRATE);
 	public static final Item EXPOSED_COPPER_GRATE = registerBlock(Blocks.EXPOSED_COPPER_GRATE);
 	public static final Item WEATHERED_COPPER_GRATE = registerBlock(Blocks.WEATHERED_COPPER_GRATE);
