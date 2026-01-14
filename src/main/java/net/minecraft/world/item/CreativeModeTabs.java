@@ -233,6 +233,20 @@ public class CreativeModeTabs {
 					output.accept(Items.WARPED_TRAPDOOR);
 					output.accept(Items.WARPED_PRESSURE_PLATE);
 					output.accept(Items.WARPED_BUTTON);
+					// Alex's Caves: Pewen Wood Set
+					output.accept(Items.PEWEN_LOG);
+					output.accept(Items.PEWEN_WOOD);
+					output.accept(Items.STRIPPED_PEWEN_LOG);
+					output.accept(Items.STRIPPED_PEWEN_WOOD);
+					output.accept(Items.PEWEN_PLANKS);
+					output.accept(Items.PEWEN_STAIRS);
+					output.accept(Items.PEWEN_SLAB);
+					output.accept(Items.PEWEN_FENCE);
+					output.accept(Items.PEWEN_FENCE_GATE);
+					output.accept(Items.PEWEN_DOOR);
+					output.accept(Items.PEWEN_TRAPDOOR);
+					output.accept(Items.PEWEN_PRESSURE_PLATE);
+					output.accept(Items.PEWEN_BUTTON);
 					output.accept(Items.STONE);
 					output.accept(Items.STONE_STAIRS);
 					output.accept(Items.STONE_SLAB);
@@ -384,6 +398,8 @@ public class CreativeModeTabs {
 					output.accept(Items.BASALT);
 					output.accept(Items.SMOOTH_BASALT);
 					output.accept(Items.POLISHED_BASALT);
+					// Alex's Caves: Flood Basalt
+					output.accept(Items.FLOOD_BASALT);
 					output.accept(Items.BLACKSTONE);
 					output.accept(Items.GILDED_BLACKSTONE);
 					output.accept(Items.BLACKSTONE_STAIRS);
@@ -776,6 +792,8 @@ public class CreativeModeTabs {
 					output.accept(Items.POINTED_DRIPSTONE);
 					output.accept(Items.PRISMARINE);
 					output.accept(Items.MAGMA_BLOCK);
+					// Alex's Caves: Primal Magma
+					output.accept(Items.PRIMAL_MAGMA);
 					output.accept(Items.OBSIDIAN);
 					output.accept(Items.CRYING_OBSIDIAN);
 					output.accept(Items.NETHERRACK);
@@ -843,6 +861,8 @@ public class CreativeModeTabs {
 					output.accept(Items.PALE_OAK_LEAVES);
 					output.accept(Items.AZALEA_LEAVES);
 					output.accept(Items.FLOWERING_AZALEA_LEAVES);
+					// Alex's Caves: Ancient Leaves
+					output.accept(Items.ANCIENT_LEAVES);
 					output.accept(Items.BROWN_MUSHROOM_BLOCK);
 					output.accept(Items.RED_MUSHROOM_BLOCK);
 					output.accept(Items.NETHER_WART_BLOCK);
@@ -903,6 +923,10 @@ public class CreativeModeTabs {
 					output.accept(Items.WEEPING_VINES);
 					output.accept(Items.TWISTING_VINES);
 					output.accept(Items.VINE);
+					// Alex's Caves: Archaic Vine and Pewen Pines
+					output.accept(Items.ARCHAIC_VINE);
+					output.accept(Items.PEWEN_PINES);
+					output.accept(Items.PEWEN_BRANCH);
 					output.accept(Items.TALL_GRASS);
 					output.accept(Items.LARGE_FERN);
 					output.accept(Items.DRY_TALL_GRASS);
@@ -1124,6 +1148,9 @@ public class CreativeModeTabs {
 						output.accept(Items.CRIMSON_HANGING_SIGN);
 						output.accept(Items.WARPED_SIGN);
 						output.accept(Items.WARPED_HANGING_SIGN);
+						// Alex's Caves: Pewen Signs
+						output.accept(Items.PEWEN_SIGN);
+						output.accept(Items.PEWEN_HANGING_SIGN);
 						output.accept(Items.CHEST);
 						output.accept(Items.COPPER_CHEST);
 						output.accept(Items.EXPOSED_COPPER_CHEST);

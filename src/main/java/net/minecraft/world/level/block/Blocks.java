@@ -6738,6 +6738,233 @@ public class Blocks {
 			.pushReaction(PushReaction.DESTROY)
 	);
 
+	// Alex's Caves Blocks
+	public static final Block PRIMAL_MAGMA = register(
+		"primal_magma",
+		com.github.alexmodguy.alexscaves.server.block.PrimalMagmaBlock::new,
+		BlockBehaviour.Properties.of()
+			.mapColor(MapColor.NETHER)
+			.instrument(NoteBlockInstrument.BASEDRUM)
+			.requiresCorrectToolForDrops()
+			.lightLevel(state -> 5)
+			.strength(0.5F)
+			.isValidSpawn((state, getter, pos, entityType) -> entityType.fireImmune())
+			.hasPostProcess((state, getter, pos) -> true)
+			.emissiveRendering((state, getter, pos) -> true)
+			.sound(com.github.alexmodguy.alexscaves.server.block.ACSoundTypes.FLOOD_BASALT)
+			.randomTicks()
+	);
+	public static final Block FISSURE_PRIMAL_MAGMA = register(
+		"fissure_primal_magma",
+		com.github.alexmodguy.alexscaves.server.block.FissurePrimalMagmaBlock::new,
+		BlockBehaviour.Properties.of()
+			.mapColor(MapColor.NETHER)
+			.instrument(NoteBlockInstrument.BASEDRUM)
+			.requiresCorrectToolForDrops()
+			.lightLevel(state -> 5)
+			.strength(0.5F)
+			.isValidSpawn((state, getter, pos, entityType) -> entityType.fireImmune())
+			.hasPostProcess((state, getter, pos) -> true)
+			.emissiveRendering((state, getter, pos) -> true)
+			.sound(com.github.alexmodguy.alexscaves.server.block.ACSoundTypes.FLOOD_BASALT)
+			.randomTicks()
+	);
+	public static final Block FLOOD_BASALT = register(
+		"flood_basalt",
+		RotatedPillarBlock::new,
+		BlockBehaviour.Properties.of()
+			.mapColor(MapColor.TERRACOTTA_RED)
+			.strength(3.0F, 100.0F)
+			.sound(com.github.alexmodguy.alexscaves.server.block.ACSoundTypes.FLOOD_BASALT)
+			.requiresCorrectToolForDrops()
+	);
+	public static final Block ANCIENT_LEAVES = register(
+		"ancient_leaves",
+		LeavesBlock::new,
+		BlockBehaviour.Properties.of()
+			.mapColor(MapColor.GRASS)
+			.strength(0.2F)
+			.randomTicks()
+			.sound(SoundType.GRASS)
+			.noOcclusion()
+			.isSuffocating((blockState, getter, pos) -> false)
+	);
+	public static final Block ARCHAIC_VINE = register(
+		"archaic_vine",
+		com.github.alexmodguy.alexscaves.server.block.ArchaicVineBlock::new,
+		BlockBehaviour.Properties.of()
+			.mapColor(MapColor.COLOR_GREEN)
+			.randomTicks()
+			.noCollision()
+			.instabreak()
+			.sound(SoundType.VINE)
+	);
+	public static final Block ARCHAIC_VINE_PLANT = register(
+		"archaic_vine_plant",
+		com.github.alexmodguy.alexscaves.server.block.ArchaicVinePlantBlock::new,
+		BlockBehaviour.Properties.of()
+			.mapColor(MapColor.COLOR_GREEN)
+			.randomTicks()
+			.noCollision()
+			.instabreak()
+			.sound(SoundType.VINE)
+	);
+	// Pewen Wood Set
+	public static final Block PEWEN_LOG = register(
+		"pewen_log",
+		RotatedPillarBlock::new,
+		BlockBehaviour.Properties.of()
+			.mapColor(MapColor.WOOD)
+			.strength(2.0F)
+			.sound(SoundType.CHERRY_WOOD)
+			.instrument(NoteBlockInstrument.BASS)
+	);
+	public static final Block PEWEN_WOOD = register(
+		"pewen_wood",
+		RotatedPillarBlock::new,
+		BlockBehaviour.Properties.of()
+			.mapColor(MapColor.WOOD)
+			.strength(2.0F)
+			.sound(SoundType.CHERRY_WOOD)
+			.instrument(NoteBlockInstrument.BASS)
+	);
+	public static final Block STRIPPED_PEWEN_LOG = register(
+		"stripped_pewen_log",
+		RotatedPillarBlock::new,
+		BlockBehaviour.Properties.of()
+			.mapColor(MapColor.WOOD)
+			.strength(2.0F)
+			.sound(SoundType.CHERRY_WOOD)
+			.instrument(NoteBlockInstrument.BASS)
+	);
+	public static final Block STRIPPED_PEWEN_WOOD = register(
+		"stripped_pewen_wood",
+		RotatedPillarBlock::new,
+		BlockBehaviour.Properties.of()
+			.mapColor(MapColor.WOOD)
+			.strength(2.0F)
+			.sound(SoundType.CHERRY_WOOD)
+			.instrument(NoteBlockInstrument.BASS)
+	);
+	public static final Block PEWEN_PLANKS = register(
+		"pewen_planks",
+		BlockBehaviour.Properties.of()
+			.mapColor(MapColor.WOOD)
+			.strength(2.0F, 3.0F)
+			.sound(SoundType.CHERRY_WOOD)
+			.instrument(NoteBlockInstrument.BASS)
+	);
+	public static final Block PEWEN_STAIRS = registerLegacyStair("pewen_stairs", PEWEN_PLANKS);
+	public static final Block PEWEN_SLAB = register(
+		"pewen_slab",
+		SlabBlock::new,
+		BlockBehaviour.Properties.ofLegacyCopy(PEWEN_PLANKS)
+	);
+	public static final Block PEWEN_FENCE = register(
+		"pewen_fence",
+		FenceBlock::new,
+		BlockBehaviour.Properties.ofLegacyCopy(PEWEN_PLANKS)
+	);
+	public static final Block PEWEN_FENCE_GATE = register(
+		"pewen_fence_gate",
+		properties -> new FenceGateBlock(WoodType.OAK, properties, SoundEvents.CHERRY_WOOD_FENCE_GATE_CLOSE, SoundEvents.CHERRY_WOOD_FENCE_GATE_OPEN),
+		BlockBehaviour.Properties.ofLegacyCopy(PEWEN_PLANKS).strength(2.0F, 3.0F).sound(SoundType.CHERRY_WOOD).forceSolidOn()
+	);
+	public static final Block PEWEN_DOOR = register(
+		"pewen_door",
+		properties -> new DoorBlock(BlockSetType.CHERRY, properties),
+		BlockBehaviour.Properties.ofLegacyCopy(PEWEN_PLANKS).strength(3.0F).sound(SoundType.CHERRY_WOOD).noOcclusion()
+	);
+	public static final Block PEWEN_TRAPDOOR = register(
+		"pewen_trapdoor",
+		properties -> new TrapDoorBlock(BlockSetType.CHERRY, properties),
+		BlockBehaviour.Properties.of()
+			.mapColor(MapColor.WOOD)
+			.strength(3.0F)
+			.sound(SoundType.CHERRY_WOOD)
+			.noOcclusion()
+	);
+	public static final Block PEWEN_BUTTON = register(
+		"pewen_button",
+		properties -> new ButtonBlock(BlockSetType.CHERRY, 30, properties),
+		BlockBehaviour.Properties.of()
+			.mapColor(MapColor.WOOD)
+			.noCollision()
+			.strength(0.5F)
+			.sound(SoundType.CHERRY_WOOD)
+	);
+	public static final Block PEWEN_PRESSURE_PLATE = register(
+		"pewen_pressure_plate",
+		properties -> new PressurePlateBlock(BlockSetType.CHERRY, properties),
+		BlockBehaviour.Properties.ofLegacyCopy(PEWEN_PLANKS).noCollision().strength(0.5F).sound(SoundType.CHERRY_WOOD)
+	);
+	public static final Block PEWEN_SIGN = register(
+		"pewen_sign",
+		properties -> new StandingSignBlock(WoodType.OAK, properties),
+		BlockBehaviour.Properties.of()
+			.mapColor(MapColor.WOOD)
+			.noCollision()
+			.strength(1.0F)
+			.sound(SoundType.CHERRY_WOOD)
+	);
+	public static final Block PEWEN_WALL_SIGN = register(
+		"pewen_wall_sign",
+		properties -> new WallSignBlock(WoodType.OAK, properties),
+		BlockBehaviour.Properties.of()
+			.mapColor(MapColor.WOOD)
+			.noCollision()
+			.strength(1.0F)
+			.sound(SoundType.CHERRY_WOOD)
+	);
+	public static final Block PEWEN_HANGING_SIGN = register(
+		"pewen_hanging_sign",
+		properties -> new CeilingHangingSignBlock(WoodType.OAK, properties),
+		BlockBehaviour.Properties.of()
+			.mapColor(MapColor.WOOD)
+			.forceSolidOn()
+			.instrument(NoteBlockInstrument.BASS)
+			.noCollision()
+			.strength(1.0F)
+	);
+	public static final Block PEWEN_WALL_HANGING_SIGN = register(
+		"pewen_wall_hanging_sign",
+		properties -> new WallHangingSignBlock(WoodType.OAK, properties),
+		BlockBehaviour.Properties.of()
+			.mapColor(MapColor.WOOD)
+			.forceSolidOn()
+			.instrument(NoteBlockInstrument.BASS)
+			.noCollision()
+			.strength(1.0F)
+			.dropsLike(PEWEN_HANGING_SIGN)
+	);
+	public static final Block PEWEN_BRANCH = register(
+		"pewen_branch",
+		com.github.alexmodguy.alexscaves.server.block.PewenBranchBlock::new,
+		BlockBehaviour.Properties.of()
+			.mapColor(DyeColor.GREEN)
+			.strength(1.0F)
+			.sound(com.github.alexmodguy.alexscaves.server.block.ACSoundTypes.PEWEN_BRANCH)
+			.randomTicks()
+	);
+	public static final Block PEWEN_PINES = register(
+		"pewen_pines",
+		com.github.alexmodguy.alexscaves.server.block.PewenPinesBlock::new,
+		BlockBehaviour.Properties.of()
+			.mapColor(DyeColor.GREEN)
+			.instabreak()
+			.sound(SoundType.ROOTS)
+			.randomTicks()
+			.offsetType(BlockBehaviour.OffsetType.XZ)
+			.noOcclusion()
+			.replaceable()
+			.noCollision()
+	);
+	public static final Block POTTED_PEWEN_PINES = register(
+		"potted_pewen_pines",
+		properties -> new FlowerPotBlock(PEWEN_PINES, properties),
+		flowerPotProperties()
+	);
+
 	public static ToIntFunction<BlockState> litBlockEmission(int i) {
 		return blockState -> blockState.getValue(BlockStateProperties.LIT) ? i : 0;
 	}

@@ -284,6 +284,32 @@ public class Items {
 	public static final Item FLOWERING_AZALEA = registerBlock(Blocks.FLOWERING_AZALEA);
 	public static final Item DEAD_BUSH = registerBlock(Blocks.DEAD_BUSH);
 	public static final Item FIREFLY_BUSH = registerBlock(Blocks.FIREFLY_BUSH);
+	// Alex's Caves Items
+	public static final Item PRIMAL_MAGMA = registerBlock(Blocks.PRIMAL_MAGMA);
+	public static final Item FLOOD_BASALT = registerBlock(Blocks.FLOOD_BASALT);
+	public static final Item ANCIENT_LEAVES = registerBlock(Blocks.ANCIENT_LEAVES);
+	public static final Item ARCHAIC_VINE = registerBlock(Blocks.ARCHAIC_VINE);
+	public static final Item PEWEN_LOG = registerBlock(Blocks.PEWEN_LOG);
+	public static final Item PEWEN_WOOD = registerBlock(Blocks.PEWEN_WOOD);
+	public static final Item STRIPPED_PEWEN_LOG = registerBlock(Blocks.STRIPPED_PEWEN_LOG);
+	public static final Item STRIPPED_PEWEN_WOOD = registerBlock(Blocks.STRIPPED_PEWEN_WOOD);
+	public static final Item PEWEN_PLANKS = registerBlock(Blocks.PEWEN_PLANKS);
+	public static final Item PEWEN_STAIRS = registerBlock(Blocks.PEWEN_STAIRS);
+	public static final Item PEWEN_SLAB = registerBlock(Blocks.PEWEN_SLAB);
+	public static final Item PEWEN_FENCE = registerBlock(Blocks.PEWEN_FENCE);
+	public static final Item PEWEN_FENCE_GATE = registerBlock(Blocks.PEWEN_FENCE_GATE);
+	public static final Item PEWEN_DOOR = registerBlock(Blocks.PEWEN_DOOR, new Item.Properties().stacksTo(16));
+	public static final Item PEWEN_TRAPDOOR = registerBlock(Blocks.PEWEN_TRAPDOOR);
+	public static final Item PEWEN_BUTTON = registerBlock(Blocks.PEWEN_BUTTON);
+	public static final Item PEWEN_PRESSURE_PLATE = registerBlock(Blocks.PEWEN_PRESSURE_PLATE);
+	public static final Item PEWEN_SIGN = registerBlock(
+		Blocks.PEWEN_SIGN, (block, properties) -> new SignItem(block, Blocks.PEWEN_WALL_SIGN, properties), new Item.Properties().stacksTo(16)
+	);
+	public static final Item PEWEN_HANGING_SIGN = registerBlock(
+		Blocks.PEWEN_HANGING_SIGN, (block, properties) -> new HangingSignItem(block, Blocks.PEWEN_WALL_HANGING_SIGN, properties), new Item.Properties().stacksTo(16)
+	);
+	public static final Item PEWEN_BRANCH = registerBlock(Blocks.PEWEN_BRANCH);
+	public static final Item PEWEN_PINES = registerBlock(Blocks.PEWEN_PINES);
 	public static final Item DRY_SHORT_GRASS = registerBlock(Blocks.SHORT_DRY_GRASS);
 	public static final Item DRY_TALL_GRASS = registerBlock(Blocks.TALL_DRY_GRASS);
 	public static final Item SEAGRASS = registerBlock(Blocks.SEAGRASS);
