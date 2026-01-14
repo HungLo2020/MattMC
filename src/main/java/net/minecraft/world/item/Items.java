@@ -761,6 +761,7 @@ public class Items {
 	public static final Item WARPED_WART_BLOCK = registerBlock(Blocks.WARPED_WART_BLOCK);
 	public static final Item RED_NETHER_BRICKS = registerBlock(Blocks.RED_NETHER_BRICKS);
 	public static final Item BONE_BLOCK = registerBlock(Blocks.BONE_BLOCK);
+	public static final Item THIN_BONE = registerBlock(Blocks.THIN_BONE);
 	public static final Item STRUCTURE_VOID = registerBlock(Blocks.STRUCTURE_VOID, new Item.Properties().rarity(Rarity.EPIC));
 	public static final Item SHULKER_BOX = registerBlock(
 		Blocks.SHULKER_BOX, new Item.Properties().stacksTo(1).component(DataComponents.CONTAINER, ItemContainerContents.EMPTY)

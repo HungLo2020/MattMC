@@ -170,7 +170,7 @@ public class DinosaurChopBlock extends Block implements SimpleWaterloggedBlock {
             } else {
                 levelAccessor.removeBlock(blockPos, false);
                 // Leave a bone block behind when fully eaten
-                levelAccessor.setBlock(blockPos, net.minecraft.world.level.block.Blocks.BONE_BLOCK.defaultBlockState().setValue(RotatedPillarBlock.AXIS, blockState.getValue(FACING).getAxis()), 4);
+                levelAccessor.setBlock(blockPos, net.minecraft.world.level.block.Blocks.THIN_BONE.defaultBlockState().setValue(RotatedPillarBlock.AXIS, blockState.getValue(FACING).getAxis()), 4);
                 levelAccessor.gameEvent(player, GameEvent.BLOCK_DESTROY, blockPos);
             }
             return InteractionResult.SUCCESS;

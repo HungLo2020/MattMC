@@ -4335,6 +4335,16 @@ public class Blocks {
 			.strength(2.0F)
 			.sound(SoundType.BONE_BLOCK)
 	);
+	public static final Block THIN_BONE = register(
+		"thin_bone",
+		RotatedPillarBlock::new,
+		BlockBehaviour.Properties.of()
+			.mapColor(MapColor.SAND)
+			.instrument(NoteBlockInstrument.XYLOPHONE)
+			.requiresCorrectToolForDrops()
+			.strength(0.4F)
+			.sound(SoundType.BONE_BLOCK)
+	);
 	public static final Block STRUCTURE_VOID = register(
 		"structure_void",
 		StructureVoidBlock::new,

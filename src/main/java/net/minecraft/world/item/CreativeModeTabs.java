@@ -802,6 +802,7 @@ public class CreativeModeTabs {
 					output.accept(Items.SOUL_SAND);
 					output.accept(Items.SOUL_SOIL);
 					output.accept(Items.BONE_BLOCK);
+					output.accept(Items.THIN_BONE);
 					output.accept(Items.BLACKSTONE);
 					output.accept(Items.BASALT);
 					output.accept(Items.SMOOTH_BASALT);
