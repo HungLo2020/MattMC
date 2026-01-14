@@ -1,0 +1,10 @@
+{
+  "variants": {
+    "active=false": {
+      "model": "minecraft:block/primal_magma"
+    },
+    "active=true": {
+      "model": "minecraft:block/primal_magma_active"
+    }
+  }
+}
