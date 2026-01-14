@@ -1,0 +1,13 @@
+{
+  "variants": {
+    "type=bottom": {
+      "model": "minecraft:block/limestone_slab"
+    },
+    "type=double": {
+      "model": "minecraft:block/limestone"
+    },
+    "type=top": {
+      "model": "minecraft:block/limestone_slab_top"
+    }
+  }
+}

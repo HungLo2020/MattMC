@@ -279,6 +279,16 @@ public class CreativeModeTabs {
 					output.accept(Items.POLISHED_ANDESITE);
 					output.accept(Items.POLISHED_ANDESITE_STAIRS);
 					output.accept(Items.POLISHED_ANDESITE_SLAB);
+					output.accept(Items.LIMESTONE);
+					output.accept(Items.LIMESTONE_STAIRS);
+					output.accept(Items.LIMESTONE_SLAB);
+					output.accept(Items.LIMESTONE_WALL);
+					output.accept(Items.LIMESTONE_PILLAR);
+					output.accept(Items.LIMESTONE_CHISELED);
+					output.accept(Items.SMOOTH_LIMESTONE);
+					output.accept(Items.SMOOTH_LIMESTONE_STAIRS);
+					output.accept(Items.SMOOTH_LIMESTONE_SLAB);
+					output.accept(Items.SMOOTH_LIMESTONE_WALL);
 					output.accept(Items.DEEPSLATE);
 					output.accept(Items.COBBLED_DEEPSLATE);
 					output.accept(Items.COBBLED_DEEPSLATE_STAIRS);

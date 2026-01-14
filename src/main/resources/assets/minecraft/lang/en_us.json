@@ -7835,5 +7835,15 @@
   "item.minecraft.serene_salad": "Serene Salad",
   "item.minecraft.seething_stew": "Seething Stew",
   "item.minecraft.tough_hide": "Tough Hide",
-  "item.minecraft.trilocaris_tail": "Trilocaris Tail"
+  "item.minecraft.trilocaris_tail": "Trilocaris Tail",
+  "block.minecraft.limestone": "Limestone",
+  "block.minecraft.limestone_stairs": "Limestone Stairs",
+  "block.minecraft.limestone_slab": "Limestone Slab",
+  "block.minecraft.limestone_wall": "Limestone Wall",
+  "block.minecraft.limestone_pillar": "Limestone Pillar",
+  "block.minecraft.limestone_chiseled": "Chiseled Limestone",
+  "block.minecraft.smooth_limestone": "Smooth Limestone",
+  "block.minecraft.smooth_limestone_stairs": "Smooth Limestone Stairs",
+  "block.minecraft.smooth_limestone_slab": "Smooth Limestone Slab",
+  "block.minecraft.smooth_limestone_wall": "Smooth Limestone Wall"
 }

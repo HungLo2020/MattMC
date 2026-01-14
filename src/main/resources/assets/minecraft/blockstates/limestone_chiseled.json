@@ -1,0 +1,27 @@
+{
+  "variants": {
+    "facing=down": {
+      "model": "minecraft:block/limestone_chiseled",
+      "x": 90
+    },
+    "facing=east": {
+      "model": "minecraft:block/limestone_chiseled",
+      "y": 90
+    },
+    "facing=north": {
+      "model": "minecraft:block/limestone_chiseled"
+    },
+    "facing=south": {
+      "model": "minecraft:block/limestone_chiseled",
+      "y": 180
+    },
+    "facing=up": {
+      "model": "minecraft:block/limestone_chiseled",
+      "x": 270
+    },
+    "facing=west": {
+      "model": "minecraft:block/limestone_chiseled",
+      "y": 270
+    }
+  }
+}

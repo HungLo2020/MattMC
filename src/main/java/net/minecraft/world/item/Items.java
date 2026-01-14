@@ -68,6 +68,16 @@ public class Items {
 	public static final Item POLISHED_DIORITE = registerBlock(Blocks.POLISHED_DIORITE);
 	public static final Item ANDESITE = registerBlock(Blocks.ANDESITE);
 	public static final Item POLISHED_ANDESITE = registerBlock(Blocks.POLISHED_ANDESITE);
+	public static final Item LIMESTONE = registerBlock(Blocks.LIMESTONE);
+	public static final Item LIMESTONE_STAIRS = registerBlock(Blocks.LIMESTONE_STAIRS);
+	public static final Item LIMESTONE_SLAB = registerBlock(Blocks.LIMESTONE_SLAB);
+	public static final Item LIMESTONE_WALL = registerBlock(Blocks.LIMESTONE_WALL);
+	public static final Item LIMESTONE_PILLAR = registerBlock(Blocks.LIMESTONE_PILLAR);
+	public static final Item LIMESTONE_CHISELED = registerBlock(Blocks.LIMESTONE_CHISELED);
+	public static final Item SMOOTH_LIMESTONE = registerBlock(Blocks.SMOOTH_LIMESTONE);
+	public static final Item SMOOTH_LIMESTONE_STAIRS = registerBlock(Blocks.SMOOTH_LIMESTONE_STAIRS);
+	public static final Item SMOOTH_LIMESTONE_SLAB = registerBlock(Blocks.SMOOTH_LIMESTONE_SLAB);
+	public static final Item SMOOTH_LIMESTONE_WALL = registerBlock(Blocks.SMOOTH_LIMESTONE_WALL);
 	public static final Item DEEPSLATE = registerBlock(Blocks.DEEPSLATE);
 	public static final Item COBBLED_DEEPSLATE = registerBlock(Blocks.COBBLED_DEEPSLATE);
 	public static final Item POLISHED_DEEPSLATE = registerBlock(Blocks.POLISHED_DEEPSLATE);

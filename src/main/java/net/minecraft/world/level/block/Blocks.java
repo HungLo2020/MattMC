@@ -41,6 +41,8 @@ import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.block.state.properties.NoteBlockInstrument;
 import net.minecraft.world.level.block.state.properties.SculkSensorPhase;
 import net.minecraft.world.level.block.state.properties.WoodType;
+import net.minecraft.world.level.block.custom.DirectionalFacingBlock;
+import net.minecraft.world.level.block.custom.SmoothLimestoneBlock;
 import net.minecraft.world.level.material.Fluids;
 import net.minecraft.world.level.material.MapColor;
 import net.minecraft.world.level.material.PushReaction;
@@ -79,6 +81,34 @@ public class Blocks {
 		"polished_andesite",
 		BlockBehaviour.Properties.of().mapColor(MapColor.STONE).instrument(NoteBlockInstrument.BASEDRUM).requiresCorrectToolForDrops().strength(1.5F, 6.0F)
 	);
+	
+	// Alex's Caves Limestone blocks
+	public static final Block LIMESTONE = register(
+		"limestone",
+		BlockBehaviour.Properties.of().mapColor(MapColor.TERRACOTTA_YELLOW).instrument(NoteBlockInstrument.BASEDRUM).requiresCorrectToolForDrops().strength(1.2F, 4.5F).sound(SoundType.DRIPSTONE_BLOCK)
+	);
+	public static final Block LIMESTONE_STAIRS = registerLegacyStair("limestone_stairs", LIMESTONE);
+	public static final Block LIMESTONE_SLAB = register("limestone_slab", SlabBlock::new, BlockBehaviour.Properties.ofLegacyCopy(LIMESTONE));
+	public static final Block LIMESTONE_WALL = register("limestone_wall", WallBlock::new, BlockBehaviour.Properties.ofLegacyCopy(LIMESTONE).forceSolidOn());
+	public static final Block LIMESTONE_PILLAR = register(
+		"limestone_pillar",
+		RotatedPillarBlock::new,
+		BlockBehaviour.Properties.ofLegacyCopy(LIMESTONE)
+	);
+	public static final Block LIMESTONE_CHISELED = register(
+		"limestone_chiseled",
+		properties -> new DirectionalFacingBlock(properties, true),
+		BlockBehaviour.Properties.ofLegacyCopy(LIMESTONE)
+	);
+	public static final Block SMOOTH_LIMESTONE = register(
+		"smooth_limestone",
+		SmoothLimestoneBlock::new,
+		BlockBehaviour.Properties.ofLegacyCopy(LIMESTONE)
+	);
+	public static final Block SMOOTH_LIMESTONE_STAIRS = registerLegacyStair("smooth_limestone_stairs", SMOOTH_LIMESTONE);
+	public static final Block SMOOTH_LIMESTONE_SLAB = register("smooth_limestone_slab", SlabBlock::new, BlockBehaviour.Properties.ofLegacyCopy(SMOOTH_LIMESTONE));
+	public static final Block SMOOTH_LIMESTONE_WALL = register("smooth_limestone_wall", WallBlock::new, BlockBehaviour.Properties.ofLegacyCopy(SMOOTH_LIMESTONE).forceSolidOn());
+	
 	public static final Block GRASS_BLOCK = register(
 		"grass_block", GrassBlock::new, BlockBehaviour.Properties.of().mapColor(MapColor.GRASS).randomTicks().strength(0.6F).sound(SoundType.GRASS)
 	);
