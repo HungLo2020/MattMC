@@ -1002,6 +1002,7 @@ public class CreativeModeTabs {
 					output.accept(Items.CARVED_PUMPKIN);
 					output.accept(Items.JACK_O_LANTERN);
 					output.accept(Items.HAY_BLOCK);
+					output.accept(Items.FERN_THATCH);
 					output.accept(Items.BEE_NEST);
 					output.accept(Items.HONEYCOMB_BLOCK);
 					output.accept(Items.SLIME_BLOCK);

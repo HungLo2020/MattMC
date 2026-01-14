@@ -289,6 +289,7 @@ public class Items {
 	public static final Item FLOOD_BASALT = registerBlock(Blocks.FLOOD_BASALT);
 	public static final Item ANCIENT_LEAVES = registerBlock(Blocks.ANCIENT_LEAVES);
 	public static final Item ARCHAIC_VINE = registerBlock(Blocks.ARCHAIC_VINE);
+	public static final Item FERN_THATCH = registerBlock(Blocks.FERN_THATCH);
 	public static final Item PEWEN_LOG = registerBlock(Blocks.PEWEN_LOG);
 	public static final Item PEWEN_WOOD = registerBlock(Blocks.PEWEN_WOOD);
 	public static final Item STRIPPED_PEWEN_LOG = registerBlock(Blocks.STRIPPED_PEWEN_LOG);

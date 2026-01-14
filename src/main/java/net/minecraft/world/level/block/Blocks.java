@@ -6852,6 +6852,15 @@ public class Blocks {
 			.instabreak()
 			.sound(SoundType.VINE)
 	);
+	public static final Block FERN_THATCH = register(
+		"fern_thatch",
+		Block::new,
+		BlockBehaviour.Properties.of()
+			.mapColor(MapColor.COLOR_GREEN)
+			.strength(0.5F)
+			.sound(SoundType.GRASS)
+			.noOcclusion()
+	);
 	// Pewen Wood Set
 	public static final Block PEWEN_LOG = register(
 		"pewen_log",
