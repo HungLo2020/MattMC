@@ -83,6 +83,7 @@ public class Items {
 	public static final Item TREE_STAR = registerBlock(Blocks.TREE_STAR);
 	public static final Item CYCAD = registerBlock(Blocks.CYCAD);
 	public static final Item AMBER = registerBlock(Blocks.AMBER);
+	public static final Item AMBERSOL = registerBlock(Blocks.AMBERSOL);
 	public static final Item DEEPSLATE = registerBlock(Blocks.DEEPSLATE);
 	public static final Item COBBLED_DEEPSLATE = registerBlock(Blocks.COBBLED_DEEPSLATE);
 	public static final Item POLISHED_DEEPSLATE = registerBlock(Blocks.POLISHED_DEEPSLATE);
@@ -1250,6 +1251,12 @@ public class Items {
 	);
 	public static final Item BAMBOO_CHEST_RAFT = registerItem(
 		"bamboo_chest_raft", properties -> new BoatItem(EntityType.BAMBOO_CHEST_RAFT, properties), new Item.Properties().stacksTo(1)
+	);
+	public static final Item PEWEN_BOAT = registerItem(
+		"pewen_boat", properties -> new BoatItem(EntityType.PEWEN_BOAT, properties), new Item.Properties().stacksTo(1)
+	);
+	public static final Item PEWEN_CHEST_BOAT = registerItem(
+		"pewen_chest_boat", properties -> new BoatItem(EntityType.PEWEN_CHEST_BOAT, properties), new Item.Properties().stacksTo(1)
 	);
 	public static final Item STRUCTURE_BLOCK = registerBlock(Blocks.STRUCTURE_BLOCK, GameMasterBlockItem::new, new Item.Properties().rarity(Rarity.EPIC));
 	public static final Item JIGSAW = registerBlock(Blocks.JIGSAW, GameMasterBlockItem::new, new Item.Properties().rarity(Rarity.EPIC));

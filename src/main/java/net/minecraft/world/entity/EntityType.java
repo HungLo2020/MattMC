@@ -735,6 +735,22 @@ public class EntityType<T extends Entity> implements FeatureElement, EntityTypeT
 			.eyeHeight(0.5625F)
 			.clientTrackingRange(10)
 	);
+	public static final EntityType<Boat> PEWEN_BOAT = register(
+		"pewen_boat",
+		EntityType.Builder.of(boatFactory(() -> Items.PEWEN_BOAT), MobCategory.MISC)
+			.noLootTable()
+			.sized(1.375F, 0.5625F)
+			.eyeHeight(0.5625F)
+			.clientTrackingRange(10)
+	);
+	public static final EntityType<ChestBoat> PEWEN_CHEST_BOAT = register(
+		"pewen_chest_boat",
+		EntityType.Builder.of(chestBoatFactory(() -> Items.PEWEN_CHEST_BOAT), MobCategory.MISC)
+			.noLootTable()
+			.sized(1.375F, 0.5625F)
+			.eyeHeight(0.5625F)
+			.clientTrackingRange(10)
+	);
 	public static final EntityType<Panda> PANDA = register(
 		"panda", EntityType.Builder.of(Panda::new, MobCategory.CREATURE).sized(1.3F, 1.25F).clientTrackingRange(10)
 	);

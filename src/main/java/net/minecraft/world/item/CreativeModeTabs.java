@@ -831,6 +831,7 @@ public class CreativeModeTabs {
 					output.accept(Items.GLOWSTONE);
 					output.accept(Items.AMETHYST_BLOCK);
 					output.accept(Items.AMBER);
+					output.accept(Items.AMBERSOL);
 					output.accept(Items.BUDDING_AMETHYST);
 					output.accept(Items.SMALL_AMETHYST_BUD);
 					output.accept(Items.MEDIUM_AMETHYST_BUD);
@@ -1503,6 +1504,8 @@ public class CreativeModeTabs {
 						output.accept(Items.PALE_OAK_CHEST_BOAT);
 						output.accept(Items.BAMBOO_RAFT);
 						output.accept(Items.BAMBOO_CHEST_RAFT);
+						output.accept(Items.PEWEN_BOAT);
+						output.accept(Items.PEWEN_CHEST_BOAT);
 						output.accept(Items.RAIL);
 						output.accept(Items.POWERED_RAIL);
 						output.accept(Items.DETECTOR_RAIL);

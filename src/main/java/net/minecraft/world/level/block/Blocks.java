@@ -50,6 +50,8 @@ import net.minecraft.world.level.block.custom.CycadBlock;
 import com.github.alexmodguy.alexscaves.server.block.DinosaurEggBlock;
 import com.github.alexmodguy.alexscaves.server.block.MultipleDinosaurEggsBlock;
 import com.github.alexmodguy.alexscaves.server.block.DinosaurChopBlock;
+import com.github.alexmodguy.alexscaves.server.block.AmbersolBlock;
+import com.github.alexmodguy.alexscaves.server.block.AmbersolLightBlock;
 import net.minecraft.world.level.material.Fluids;
 import net.minecraft.world.level.material.MapColor;
 import net.minecraft.world.level.material.PushReaction;
@@ -5865,6 +5867,8 @@ public class Blocks {
 	
 	// Alex's Caves primordial blocks - decorative
 	public static final Block AMBER = register("amber", props -> new TransparentBlock(props), BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_ORANGE).noOcclusion().requiresCorrectToolForDrops().strength(0.3F, 2.0F).sound(SoundType.GLASS));
+	public static final Block AMBERSOL = register("ambersol", AmbersolBlock::new, BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_YELLOW).requiresCorrectToolForDrops().strength(3F, 10.0F).randomTicks().sound(SoundType.GLASS).lightLevel((state) -> 15).emissiveRendering((state, getter, pos) -> true));
+	public static final Block AMBERSOL_LIGHT = register("ambersol_light", AmbersolLightBlock::new, BlockBehaviour.Properties.of().replaceable().noCollision().noLootTable().lightLevel((state) -> 15).air());
 	
 	public static final Block BUDDING_AMETHYST = register(
 		"budding_amethyst",

@@ -1,0 +1,16 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "group": "chest_boat",
+  "ingredients": [
+    {
+      "item": "minecraft:chest"
+    },
+    {
+      "item": "minecraft:pewen_boat"
+    }
+  ],
+  "result": {
+    "id": "minecraft:pewen_chest_boat",
+    "count": 1
+  }
+}
