@@ -1,0 +1,26 @@
+package com.github.alexmodguy.alexscaves.server.block;
+
+import com.mojang.serialization.MapCodec;
+import net.minecraft.core.Direction;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.GrowingPlantBodyBlock;
+import net.minecraft.world.level.block.GrowingPlantHeadBlock;
+import net.minecraft.world.level.block.state.BlockBehaviour;
+import net.minecraft.world.phys.shapes.VoxelShape;
+
+public class ArchaicVinePlantBlock extends GrowingPlantBodyBlock {
+    public static final VoxelShape SHAPE = Block.box(1.0D, 0.0D, 1.0D, 15.0D, 16.0D, 15.0D);
+
+    public ArchaicVinePlantBlock(BlockBehaviour.Properties properties) {
+        super(properties, Direction.DOWN, SHAPE, false);
+    }
+
+    @Override
+    protected MapCodec<? extends GrowingPlantBodyBlock> codec() {
+        return MapCodec.unit(this);
+    }
+
+    protected GrowingPlantHeadBlock getHeadBlock() {
+        return (GrowingPlantHeadBlock) net.minecraft.world.level.block.Blocks.ARCHAIC_VINE;
+    }
+}

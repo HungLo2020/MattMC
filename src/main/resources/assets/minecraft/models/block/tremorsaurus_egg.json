@@ -1,0 +1,11 @@
+{
+	"parent": "minecraft:block/tremorsaurus_egg_template",
+	"textures": {
+		"east": "minecraft:block/egg/tremorsaurus_egg_east",
+		"south": "minecraft:block/egg/tremorsaurus_egg_south",
+		"west": "minecraft:block/egg/tremorsaurus_egg_west",
+		"north": "minecraft:block/egg/tremorsaurus_egg_north",
+		"bottom" : "minecraft:block/egg/tremorsaurus_egg_bottom",
+		"top" : "minecraft:block/egg/tremorsaurus_egg_top"
+	}
+}

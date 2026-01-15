@@ -65,6 +65,7 @@ public class EntityRenderers {
 		register(EntityType.ACACIA_CHEST_BOAT, context -> new BoatRenderer(context, ModelLayers.ACACIA_CHEST_BOAT));
 		register(EntityType.ALLAY, AllayRenderer::new);
 		register(EntityType.AREA_EFFECT_CLOUD, NoopRenderer::new);
+		register(EntityType.ATLATITAN, com.github.alexmodguy.alexscaves.client.render.entity.AtlatitanRenderer::new);
 		register(EntityType.ARMADILLO, ArmadilloRenderer::new);
 		register(EntityType.ARMOR_STAND, ArmorStandRenderer::new);
 		register(EntityType.ARROW, TippableArrowRenderer::new);
@@ -129,6 +130,7 @@ public class EntityRenderers {
 			)
 		);
 		register(EntityType.GOAT, GoatRenderer::new);
+		register(EntityType.GROTTOCERATOPS, com.github.alexmodguy.alexscaves.client.render.entity.GrottoceratopsRenderer::new);
 		register(EntityType.GUARDIAN, GuardianRenderer::new);
 		register(EntityType.HOGLIN, HoglinRenderer::new);
 		register(EntityType.HOPPER_MINECART, context -> new MinecartRenderer(context, ModelLayers.HOPPER_MINECART));
@@ -178,6 +180,7 @@ public class EntityRenderers {
 		register(EntityType.PUFFERFISH, PufferfishRenderer::new);
 		register(EntityType.RABBIT, RabbitRenderer::new);
 		register(EntityType.RAVAGER, RavagerRenderer::new);
+		register(EntityType.RELICHEIRUS, com.github.alexmodguy.alexscaves.client.render.entity.RelicheirusRenderer::new);
 		register(EntityType.SALMON, SalmonRenderer::new);
 		register(EntityType.SHEEP, SheepRenderer::new);
 		register(EntityType.SHULKER, ShulkerRenderer::new);
@@ -190,6 +193,10 @@ public class EntityRenderers {
 		register(EntityType.SNIFFER, SnifferRenderer::new);
 		register(EntityType.SNOWBALL, ThrownItemRenderer::new);
 		register(EntityType.SNOW_GOLEM, SnowGolemRenderer::new);
+		register(EntityType.SUBTERRANODON, com.github.alexmodguy.alexscaves.client.render.entity.SubterranodonRenderer::new);
+		register(EntityType.TREMORSAURUS, com.github.alexmodguy.alexscaves.client.render.entity.TremorsaurusRenderer::new);
+		register(EntityType.TRILOCARIS, com.github.alexmodguy.alexscaves.client.render.entity.TrilocarisRenderer::new);
+		register(EntityType.VALLUMRAPTOR, com.github.alexmodguy.alexscaves.client.render.entity.VallumraptorRenderer::new);
 		register(EntityType.SPAWNER_MINECART, context -> new MinecartRenderer(context, ModelLayers.SPAWNER_MINECART));
 		register(EntityType.SPECTRAL_ARROW, SpectralArrowRenderer::new);
 		register(EntityType.SPIDER, SpiderRenderer::new);

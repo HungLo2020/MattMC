@@ -1,0 +1,8 @@
+{
+  "__comment": "all non-meat items that vallumraptors will steal from chests - using vanilla eggs and chicken",
+  "values": [
+    "#minecraft:eggs",
+    "minecraft:cooked_chicken",
+    "minecraft:chicken"
+  ]
+}

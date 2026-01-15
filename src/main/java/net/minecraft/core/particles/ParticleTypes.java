@@ -154,6 +154,9 @@ public class ParticleTypes {
 		"block_crumble", false, BlockParticleOption::codec, BlockParticleOption::streamCodec
 	);
 	public static final SimpleParticleType FIREFLY = register("firefly", false);
+	// Alex's Caves primordial particles
+	public static final SimpleParticleType FLY = register("fly", false);
+	
 	public static final Codec<ParticleOptions> CODEC = BuiltInRegistries.PARTICLE_TYPE
 		.byNameCodec()
 		.dispatch("type", ParticleOptions::getType, ParticleType::codec);

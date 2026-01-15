@@ -251,7 +251,7 @@ public class ChunkMap extends ChunkStorage implements ChunkHolder.PlayerProvider
 	}
 
 	@Nullable
-	protected ChunkHolder getVisibleChunkIfPresent(long l) {
+	public ChunkHolder getVisibleChunkIfPresent(long l) {
 		return this.visibleChunkMap.get(l);
 	}
 

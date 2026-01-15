@@ -1,0 +1,16 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "FF",
+    "FF"
+  ],
+  "key": {
+    "F": {
+      "tag": "minecraft:ferns"
+    }
+  },
+  "result": {
+    "id": "minecraft:fern_thatch",
+    "count": 1
+  }
+}

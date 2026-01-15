@@ -233,6 +233,20 @@ public class CreativeModeTabs {
 					output.accept(Items.WARPED_TRAPDOOR);
 					output.accept(Items.WARPED_PRESSURE_PLATE);
 					output.accept(Items.WARPED_BUTTON);
+					// Alex's Caves: Pewen Wood Set
+					output.accept(Items.PEWEN_LOG);
+					output.accept(Items.PEWEN_WOOD);
+					output.accept(Items.STRIPPED_PEWEN_LOG);
+					output.accept(Items.STRIPPED_PEWEN_WOOD);
+					output.accept(Items.PEWEN_PLANKS);
+					output.accept(Items.PEWEN_STAIRS);
+					output.accept(Items.PEWEN_SLAB);
+					output.accept(Items.PEWEN_FENCE);
+					output.accept(Items.PEWEN_FENCE_GATE);
+					output.accept(Items.PEWEN_DOOR);
+					output.accept(Items.PEWEN_TRAPDOOR);
+					output.accept(Items.PEWEN_PRESSURE_PLATE);
+					output.accept(Items.PEWEN_BUTTON);
 					output.accept(Items.STONE);
 					output.accept(Items.STONE_STAIRS);
 					output.accept(Items.STONE_SLAB);
@@ -279,6 +293,16 @@ public class CreativeModeTabs {
 					output.accept(Items.POLISHED_ANDESITE);
 					output.accept(Items.POLISHED_ANDESITE_STAIRS);
 					output.accept(Items.POLISHED_ANDESITE_SLAB);
+					output.accept(Items.LIMESTONE);
+					output.accept(Items.LIMESTONE_STAIRS);
+					output.accept(Items.LIMESTONE_SLAB);
+					output.accept(Items.LIMESTONE_WALL);
+					output.accept(Items.LIMESTONE_PILLAR);
+					output.accept(Items.LIMESTONE_CHISELED);
+					output.accept(Items.SMOOTH_LIMESTONE);
+					output.accept(Items.SMOOTH_LIMESTONE_STAIRS);
+					output.accept(Items.SMOOTH_LIMESTONE_SLAB);
+					output.accept(Items.SMOOTH_LIMESTONE_WALL);
 					output.accept(Items.DEEPSLATE);
 					output.accept(Items.COBBLED_DEEPSLATE);
 					output.accept(Items.COBBLED_DEEPSLATE_STAIRS);
@@ -374,6 +398,8 @@ public class CreativeModeTabs {
 					output.accept(Items.BASALT);
 					output.accept(Items.SMOOTH_BASALT);
 					output.accept(Items.POLISHED_BASALT);
+					// Alex's Caves: Flood Basalt
+					output.accept(Items.FLOOD_BASALT);
 					output.accept(Items.BLACKSTONE);
 					output.accept(Items.GILDED_BLACKSTONE);
 					output.accept(Items.BLACKSTONE_STAIRS);
@@ -766,6 +792,8 @@ public class CreativeModeTabs {
 					output.accept(Items.POINTED_DRIPSTONE);
 					output.accept(Items.PRISMARINE);
 					output.accept(Items.MAGMA_BLOCK);
+					// Alex's Caves: Primal Magma
+					output.accept(Items.PRIMAL_MAGMA);
 					output.accept(Items.OBSIDIAN);
 					output.accept(Items.CRYING_OBSIDIAN);
 					output.accept(Items.NETHERRACK);
@@ -774,6 +802,7 @@ public class CreativeModeTabs {
 					output.accept(Items.SOUL_SAND);
 					output.accept(Items.SOUL_SOIL);
 					output.accept(Items.BONE_BLOCK);
+					output.accept(Items.THIN_BONE);
 					output.accept(Items.BLACKSTONE);
 					output.accept(Items.BASALT);
 					output.accept(Items.SMOOTH_BASALT);
@@ -802,6 +831,8 @@ public class CreativeModeTabs {
 					output.accept(Items.RAW_GOLD_BLOCK);
 					output.accept(Items.GLOWSTONE);
 					output.accept(Items.AMETHYST_BLOCK);
+					output.accept(Items.AMBER);
+					output.accept(Items.AMBERSOL);
 					output.accept(Items.BUDDING_AMETHYST);
 					output.accept(Items.SMALL_AMETHYST_BUD);
 					output.accept(Items.MEDIUM_AMETHYST_BUD);
@@ -832,6 +863,8 @@ public class CreativeModeTabs {
 					output.accept(Items.PALE_OAK_LEAVES);
 					output.accept(Items.AZALEA_LEAVES);
 					output.accept(Items.FLOWERING_AZALEA_LEAVES);
+					// Alex's Caves: Ancient Leaves
+					output.accept(Items.ANCIENT_LEAVES);
 					output.accept(Items.BROWN_MUSHROOM_BLOCK);
 					output.accept(Items.RED_MUSHROOM_BLOCK);
 					output.accept(Items.NETHER_WART_BLOCK);
@@ -839,6 +872,8 @@ public class CreativeModeTabs {
 					output.accept(Items.SHROOMLIGHT);
 					output.accept(Items.OAK_SAPLING);
 					output.accept(Items.SPRUCE_SAPLING);
+					output.accept(Items.PEWEN_SAPLING);
+					output.accept(Items.ANCIENT_SAPLING);
 					output.accept(Items.BIRCH_SAPLING);
 					output.accept(Items.JUNGLE_SAPLING);
 					output.accept(Items.ACACIA_SAPLING);
@@ -854,6 +889,10 @@ public class CreativeModeTabs {
 					output.accept(Items.WARPED_FUNGUS);
 					output.accept(Items.SHORT_GRASS);
 					output.accept(Items.FERN);
+					output.accept(Items.FIDDLEHEAD);
+					output.accept(Items.TREE_STAR);
+					output.accept(Items.FLYTRAP);
+					output.accept(Items.CYCAD);
 					output.accept(Items.DRY_SHORT_GRASS);
 					output.accept(Items.BUSH);
 					output.accept(Items.DEAD_BUSH);
@@ -888,6 +927,10 @@ public class CreativeModeTabs {
 					output.accept(Items.WEEPING_VINES);
 					output.accept(Items.TWISTING_VINES);
 					output.accept(Items.VINE);
+					// Alex's Caves: Archaic Vine and Pewen Pines
+					output.accept(Items.ARCHAIC_VINE);
+					output.accept(Items.PEWEN_PINES);
+					output.accept(Items.PEWEN_BRANCH);
 					output.accept(Items.TALL_GRASS);
 					output.accept(Items.LARGE_FERN);
 					output.accept(Items.DRY_TALL_GRASS);
@@ -905,6 +948,11 @@ public class CreativeModeTabs {
 					output.accept(Items.FROGSPAWN);
 					output.accept(Items.TURTLE_EGG);
 					output.accept(Items.SNIFFER_EGG);
+					output.accept(Items.SUBTERRANODON_EGG);
+					output.accept(Items.VALLUMRAPTOR_EGG);
+					output.accept(Items.GROTTOCERATOPS_EGG);
+					output.accept(Items.TREMORSAURUS_EGG);
+					output.accept(Items.RELICHEIRUS_EGG);
 					output.accept(Items.DRIED_GHAST);
 					output.accept(Items.WHEAT_SEEDS);
 					output.accept(Items.COCOA_BEANS);
@@ -958,6 +1006,7 @@ public class CreativeModeTabs {
 					output.accept(Items.CARVED_PUMPKIN);
 					output.accept(Items.JACK_O_LANTERN);
 					output.accept(Items.HAY_BLOCK);
+					output.accept(Items.FERN_THATCH);
 					output.accept(Items.BEE_NEST);
 					output.accept(Items.HONEYCOMB_BLOCK);
 					output.accept(Items.SLIME_BLOCK);
@@ -966,6 +1015,7 @@ public class CreativeModeTabs {
 					output.accept(Items.OCHRE_FROGLIGHT);
 					output.accept(Items.VERDANT_FROGLIGHT);
 					output.accept(Items.PEARLESCENT_FROGLIGHT);
+					output.accept(Items.CARMINE_FROGLIGHT);
 					output.accept(Items.SCULK);
 					output.accept(Items.SCULK_VEIN);
 					output.accept(Items.SCULK_CATALYST);
@@ -1109,6 +1159,9 @@ public class CreativeModeTabs {
 						output.accept(Items.CRIMSON_HANGING_SIGN);
 						output.accept(Items.WARPED_SIGN);
 						output.accept(Items.WARPED_HANGING_SIGN);
+						// Alex's Caves: Pewen Signs
+						output.accept(Items.PEWEN_SIGN);
+						output.accept(Items.PEWEN_HANGING_SIGN);
 						output.accept(Items.CHEST);
 						output.accept(Items.COPPER_CHEST);
 						output.accept(Items.EXPOSED_COPPER_CHEST);
@@ -1372,6 +1425,7 @@ public class CreativeModeTabs {
 						output.accept(Items.COD_BUCKET);
 						output.accept(Items.SALMON_BUCKET);
 						output.accept(Items.TROPICAL_FISH_BUCKET);
+						output.accept(Items.TRILOCARIS_BUCKET);
 						output.accept(Items.PUFFERFISH_BUCKET);
 						output.accept(Items.AXOLOTL_BUCKET);
 						output.accept(Items.TADPOLE_BUCKET);
@@ -1453,6 +1507,8 @@ public class CreativeModeTabs {
 						output.accept(Items.PALE_OAK_CHEST_BOAT);
 						output.accept(Items.BAMBOO_RAFT);
 						output.accept(Items.BAMBOO_CHEST_RAFT);
+						output.accept(Items.PEWEN_BOAT);
+						output.accept(Items.PEWEN_CHEST_BOAT);
 						output.accept(Items.RAIL);
 						output.accept(Items.POWERED_RAIL);
 						output.accept(Items.DETECTOR_RAIL);
@@ -1616,15 +1672,24 @@ public class CreativeModeTabs {
 						output.accept(Items.COOKED_SALMON);
 						output.accept(Items.TROPICAL_FISH);
 						output.accept(Items.PUFFERFISH);
+						output.accept(Items.TRILOCARIS_TAIL);
+						output.accept(Items.COOKED_TRILOCARIS_TAIL);
+						output.accept(Items.PINE_NUTS);
+						output.accept(Items.DINOSAUR_NUGGET);
 						output.accept(Items.BREAD);
 						output.accept(Items.COOKIE);
 						output.accept(Items.CAKE);
+						output.accept(Items.DINOSAUR_CHOP);
+						output.accept(Items.COOKED_DINOSAUR_CHOP);
 						output.accept(Items.PUMPKIN_PIE);
 						output.accept(Items.ROTTEN_FLESH);
 						output.accept(Items.SPIDER_EYE);
 						output.accept(Items.MUSHROOM_STEW);
 						output.accept(Items.BEETROOT_SOUP);
 						output.accept(Items.RABBIT_STEW);
+						output.accept(Items.SERENE_SALAD);
+						output.accept(Items.SEETHING_STEW);
+						output.accept(Items.PRIMORDIAL_SOUP);
 						generateSuspiciousStews(output, CreativeModeTab.TabVisibility.PARENT_AND_SEARCH_TABS);
 						output.accept(Items.MILK_BUCKET);
 						output.accept(Items.HONEY_BOTTLE);
@@ -1679,6 +1744,7 @@ public class CreativeModeTabs {
 					output.accept(Items.WHEAT);
 					output.accept(Items.BONE);
 					output.accept(Items.BONE_MEAL);
+					output.accept(Items.HEAVY_BONE);
 					output.accept(Items.STRING);
 					output.accept(Items.FEATHER);
 					output.accept(Items.SNOWBALL);
@@ -1687,8 +1753,11 @@ public class CreativeModeTabs {
 					output.accept(Items.BLUE_EGG);
 					output.accept(Items.LEATHER);
 					output.accept(Items.RABBIT_HIDE);
+					output.accept(Items.TOUGH_HIDE);
 					output.accept(Items.HONEYCOMB);
 					output.accept(Items.RESIN_CLUMP);
+					output.accept(Items.PEWEN_SAP);
+					output.accept(Items.AMBER_CURIOSITY);
 					output.accept(Items.INK_SAC);
 					output.accept(Items.GLOW_INK_SAC);
 					output.accept(Items.TURTLE_SCUTE);
@@ -1709,6 +1778,7 @@ public class CreativeModeTabs {
 					output.accept(Items.SHULKER_SHELL);
 					output.accept(Items.POPPED_CHORUS_FRUIT);
 					output.accept(Items.ECHO_SHARD);
+					output.accept(Items.OMINOUS_CATALYST);
 					output.accept(Items.DISC_FRAGMENT_5);
 					output.accept(Items.WHITE_DYE);
 					output.accept(Items.LIGHT_GRAY_DYE);
@@ -1784,6 +1854,8 @@ public class CreativeModeTabs {
 					output.accept(Items.SHELTER_POTTERY_SHERD);
 					output.accept(Items.SKULL_POTTERY_SHERD);
 					output.accept(Items.SNORT_POTTERY_SHERD);
+					output.accept(Items.DINOSAUR_POTTERY_SHERD);
+					output.accept(Items.FOOTPRINT_POTTERY_SHERD);
 					output.accept(Items.NETHERITE_UPGRADE_SMITHING_TEMPLATE);
 					output.accept(Items.SENTRY_ARMOR_TRIM_SMITHING_TEMPLATE);
 					output.accept(Items.VEX_ARMOR_TRIM_SMITHING_TEMPLATE);
@@ -1824,6 +1896,7 @@ public class CreativeModeTabs {
 					output.accept(Items.TRIAL_SPAWNER);
 					output.accept(Items.CREAKING_HEART);
 					output.accept(Items.ALLAY_SPAWN_EGG);
+					output.accept(Items.ATLATITAN_SPAWN_EGG);
 					output.accept(Items.ARMADILLO_SPAWN_EGG);
 					output.accept(Items.AXOLOTL_SPAWN_EGG);
 					output.accept(Items.BAT_SPAWN_EGG);
@@ -1852,6 +1925,7 @@ public class CreativeModeTabs {
 					output.accept(Items.GHAST_SPAWN_EGG);
 					output.accept(Items.GLOW_SQUID_SPAWN_EGG);
 					output.accept(Items.GOAT_SPAWN_EGG);
+					output.accept(Items.GROTTOCERATOPS_SPAWN_EGG);
 					output.accept(Items.GUARDIAN_SPAWN_EGG);
 					output.accept(Items.HAPPY_GHAST_SPAWN_EGG);
 					output.accept(Items.HOGLIN_SPAWN_EGG);
@@ -1874,6 +1948,7 @@ public class CreativeModeTabs {
 					output.accept(Items.PUFFERFISH_SPAWN_EGG);
 					output.accept(Items.RABBIT_SPAWN_EGG);
 					output.accept(Items.RAVAGER_SPAWN_EGG);
+					output.accept(Items.RELICHEIRUS_SPAWN_EGG);
 					output.accept(Items.SALMON_SPAWN_EGG);
 					output.accept(Items.SHEEP_SPAWN_EGG);
 					output.accept(Items.SHULKER_SPAWN_EGG);
@@ -1882,6 +1957,8 @@ public class CreativeModeTabs {
 					output.accept(Items.SKELETON_HORSE_SPAWN_EGG);
 					output.accept(Items.SLIME_SPAWN_EGG);
 					output.accept(Items.SNIFFER_SPAWN_EGG);
+					output.accept(Items.SUBTERRANODON_SPAWN_EGG);
+					output.accept(Items.VALLUMRAPTOR_SPAWN_EGG);
 					output.accept(Items.SNOW_GOLEM_SPAWN_EGG);
 					output.accept(Items.SPIDER_SPAWN_EGG);
 					output.accept(Items.SQUID_SPAWN_EGG);
@@ -1889,6 +1966,8 @@ public class CreativeModeTabs {
 					output.accept(Items.STRIDER_SPAWN_EGG);
 					output.accept(Items.TADPOLE_SPAWN_EGG);
 					output.accept(Items.TRADER_LLAMA_SPAWN_EGG);
+					output.accept(Items.TREMORSAURUS_SPAWN_EGG);
+					output.accept(Items.TRILOCARIS_SPAWN_EGG);
 					output.accept(Items.TROPICAL_FISH_SPAWN_EGG);
 					output.accept(Items.TURTLE_SPAWN_EGG);
 					output.accept(Items.VEX_SPAWN_EGG);

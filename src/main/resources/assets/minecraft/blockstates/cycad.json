@@ -1,0 +1,10 @@
+{
+  "variants": {
+    "top=false": {
+      "model": "minecraft:block/cycad_trunk"
+    },
+    "top=true": {
+      "model": "minecraft:block/cycad_top"
+    }
+  }
+}

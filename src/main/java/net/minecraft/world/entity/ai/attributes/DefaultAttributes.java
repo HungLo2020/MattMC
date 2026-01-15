@@ -45,6 +45,12 @@ import net.minecraft.world.entity.animal.horse.ZombieHorse;
 import net.minecraft.world.entity.animal.sheep.Sheep;
 import net.minecraft.world.entity.animal.sniffer.Sniffer;
 import net.minecraft.world.entity.animal.wolf.Wolf;
+import com.github.alexmodguy.alexscaves.server.entity.living.GrottoceratopsEntity;
+import com.github.alexmodguy.alexscaves.server.entity.living.RelicheirusEntity;
+import com.github.alexmodguy.alexscaves.server.entity.living.SubterranodonEntity;
+import com.github.alexmodguy.alexscaves.server.entity.living.TremorsaurusEntity;
+import com.github.alexmodguy.alexscaves.server.entity.living.TrilocarisEntity;
+import com.github.alexmodguy.alexscaves.server.entity.living.VallumraptorEntity;
 import net.minecraft.world.entity.boss.enderdragon.EnderDragon;
 import net.minecraft.world.entity.boss.wither.WitherBoss;
 import net.minecraft.world.entity.decoration.ArmorStand;
@@ -90,6 +96,7 @@ public class DefaultAttributes {
 	private static final Logger LOGGER = LogUtils.getLogger();
 	private static final Map<EntityType<? extends LivingEntity>, AttributeSupplier> SUPPLIERS = ImmutableMap.<EntityType<? extends LivingEntity>, AttributeSupplier>builder()
 		.put(EntityType.ALLAY, Allay.createAttributes().build())
+		.put(EntityType.ATLATITAN, com.github.alexmodguy.alexscaves.server.entity.living.AtlatitanEntity.createAttributes().build())
 		.put(EntityType.ARMADILLO, Armadillo.createAttributes().build())
 		.put(EntityType.ARMOR_STAND, ArmorStand.createAttributes().build())
 		.put(EntityType.AXOLOTL, Axolotl.createAttributes().build())
@@ -122,6 +129,7 @@ public class DefaultAttributes {
 		.put(EntityType.GIANT, Giant.createAttributes().build())
 		.put(EntityType.GLOW_SQUID, GlowSquid.createAttributes().build())
 		.put(EntityType.GOAT, Goat.createAttributes().build())
+		.put(EntityType.GROTTOCERATOPS, GrottoceratopsEntity.createAttributes().build())
 		.put(EntityType.GUARDIAN, Guardian.createAttributes().build())
 		.put(EntityType.HOGLIN, Hoglin.createAttributes().build())
 		.put(EntityType.HORSE, AbstractHorse.createBaseHorseAttributes().build())
@@ -146,6 +154,7 @@ public class DefaultAttributes {
 		.put(EntityType.PUFFERFISH, AbstractFish.createAttributes().build())
 		.put(EntityType.RABBIT, Rabbit.createAttributes().build())
 		.put(EntityType.RAVAGER, Ravager.createAttributes().build())
+		.put(EntityType.RELICHEIRUS, RelicheirusEntity.createAttributes().build())
 		.put(EntityType.SALMON, AbstractFish.createAttributes().build())
 		.put(EntityType.SHEEP, Sheep.createAttributes().build())
 		.put(EntityType.SHULKER, Shulker.createAttributes().build())
@@ -154,6 +163,10 @@ public class DefaultAttributes {
 		.put(EntityType.SKELETON_HORSE, SkeletonHorse.createAttributes().build())
 		.put(EntityType.SLIME, Monster.createMonsterAttributes().build())
 		.put(EntityType.SNIFFER, Sniffer.createAttributes().build())
+		.put(EntityType.SUBTERRANODON, SubterranodonEntity.createAttributes().build())
+		.put(EntityType.TREMORSAURUS, TremorsaurusEntity.createAttributes().build())
+		.put(EntityType.TRILOCARIS, TrilocarisEntity.createAttributes().build())
+		.put(EntityType.VALLUMRAPTOR, VallumraptorEntity.createAttributes().build())
 		.put(EntityType.SNOW_GOLEM, SnowGolem.createAttributes().build())
 		.put(EntityType.SPIDER, Spider.createAttributes().build())
 		.put(EntityType.SQUID, Squid.createAttributes().build())
