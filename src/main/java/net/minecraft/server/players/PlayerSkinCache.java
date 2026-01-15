@@ -1,6 +1,6 @@
 package net.minecraft.server.players;
 
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import org.slf4j.Logger;
 
 import java.util.Map;

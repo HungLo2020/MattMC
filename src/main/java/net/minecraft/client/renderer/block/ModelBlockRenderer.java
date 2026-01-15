@@ -1,7 +1,7 @@
 package net.minecraft.client.renderer.block;
 
-import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.blaze3d.vertex.VertexConsumer;
+import net.blaze3d.vertex.PoseStack;
+import net.blaze3d.vertex.VertexConsumer;
 import it.unimi.dsi.fastutil.longs.Long2FloatLinkedOpenHashMap;
 import it.unimi.dsi.fastutil.longs.Long2IntLinkedOpenHashMap;
 import java.util.List;
@@ -22,7 +22,6 @@ import net.minecraft.core.Direction;
 import net.minecraft.core.BlockPos.MutableBlockPos;
 import net.minecraft.util.ARGB;
 import net.minecraft.util.Mth;
-import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.BlockAndTintGetter;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
@@ -43,7 +42,7 @@ public class ModelBlockRenderer implements net.fabricmc.fabric.api.renderer.v1.r
 	@Override
 	public void render(net.minecraft.world.level.BlockAndTintGetter blockView, net.minecraft.client.renderer.block.model.BlockStateModel model, 
 	                   net.minecraft.world.level.block.state.BlockState state, net.minecraft.core.BlockPos pos, 
-	                   com.mojang.blaze3d.vertex.PoseStack matrices, 
+	                   PoseStack matrices,
 	                   net.fabricmc.fabric.api.renderer.v1.render.BlockVertexConsumerProvider vertexConsumers, 
 	                   boolean cull, long seed, int overlay) {
 		// Override the default implementation to pass 'this' instead of null

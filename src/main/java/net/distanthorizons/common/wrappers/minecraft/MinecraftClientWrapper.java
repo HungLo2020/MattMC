@@ -1,0 +1,281 @@
+package net.distanthorizons.common.wrappers.minecraft;
+
+import java.io.File;
+
+import net.distanthorizons.common.wrappers.world.ClientLevelWrapper;
+import net.distanthorizons.core.file.structure.ClientOnlySaveStructure;
+import net.distanthorizons.core.render.glObject.GLProxy;
+import net.distanthorizons.core.wrapperInterfaces.world.IClientLevelWrapper;
+import net.distanthorizons.coreapi.ModInfo;
+import net.distanthorizons.core.logging.DhLoggerBuilder;
+import net.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftClientWrapper;
+import net.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftSharedWrapper;
+import net.distanthorizons.core.wrapperInterfaces.minecraft.IProfilerWrapper;
+import net.distanthorizons.core.pos.blockPos.DhBlockPos;
+import net.distanthorizons.core.pos.DhChunkPos;
+import net.distanthorizons.core.logging.DhLogger;
+
+import net.minecraft.CrashReport;
+import net.minecraft.client.CloudStatus;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.multiplayer.ClientLevel;
+import net.minecraft.client.multiplayer.ServerData;
+import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.core.BlockPos;
+import net.minecraft.util.profiling.ProfilerFiller;
+import net.minecraft.world.level.ChunkPos;
+
+import org.jetbrains.annotations.Nullable;
+
+
+import net.minecraft.util.profiling.Profiler;
+
+/**
+ * A singleton that wraps the Minecraft object.
+ *
+ * @author James Seibel
+ */
+public class MinecraftClientWrapper implements IMinecraftClientWrapper, IMinecraftSharedWrapper
+{
+	private static final DhLogger LOGGER = new DhLoggerBuilder().build();
+	private static final Minecraft MINECRAFT = Minecraft.getInstance();
+	
+	public static final MinecraftClientWrapper INSTANCE = new MinecraftClientWrapper();
+	
+	
+	private ProfilerWrapper profilerWrapper;
+	
+	
+	
+	//======================//
+	// multiplayer handling //
+	//======================//
+	
+	@Override
+	public boolean hasSinglePlayerServer() { return MINECRAFT.hasSingleplayerServer(); }
+	@Override
+	public boolean clientConnectedToDedicatedServer() 
+	{ 
+		return MINECRAFT.getCurrentServer() != null 
+				&& !this.hasSinglePlayerServer(); 
+	}
+	@Override
+	public boolean connectedToReplay() 
+	{ 
+		return MINECRAFT.getCurrentServer() == null
+				&& !this.hasSinglePlayerServer() ; 
+	}
+	
+	@Override
+	public String getCurrentServerName() 
+	{
+		if (this.connectedToReplay())
+		{
+			return ClientOnlySaveStructure.REPLAY_SERVER_FOLDER_NAME;
+		}
+		else
+		{
+			ServerData server = MINECRAFT.getCurrentServer();
+			return (server != null) ? server.name : "NULL";
+		}
+	}
+	@Override
+	public String getCurrentServerIp() 
+	{
+		if (this.connectedToReplay())
+		{
+			return "";
+		}
+		else
+		{
+			ServerData server = MINECRAFT.getCurrentServer();
+			return (server != null) ? server.ip : "NA";
+		}
+	}
+	@Override
+	public String getCurrentServerVersion()
+	{
+		ServerData server = MINECRAFT.getCurrentServer();
+		return (server != null) ? server.version.getString() : "UNKOWN";
+	}
+	
+	
+	
+	//=================//
+	// player handling //
+	//=================//
+	
+	public LocalPlayer getPlayer() { return MINECRAFT.player; }
+	
+	@Override
+	public boolean playerExists() { return MINECRAFT.player != null; }
+	
+	@Override
+	public DhBlockPos getPlayerBlockPos()
+	{
+		LocalPlayer player = this.getPlayer();
+		if (player == null)
+		{
+			return new DhBlockPos(0, 0, 0);	
+		}
+		
+		BlockPos playerPos = player.blockPosition();
+		return new DhBlockPos(playerPos.getX(), playerPos.getY(), playerPos.getZ());
+	}
+	
+	@Override
+	public DhChunkPos getPlayerChunkPos()
+	{
+		LocalPlayer player = this.getPlayer();
+		if (player == null)
+		{
+			return new DhChunkPos(0, 0);
+		}
+		
+		ChunkPos playerPos = player.chunkPosition();
+		return new DhChunkPos(playerPos.x, playerPos.z);
+	}
+	
+	
+	
+	//================//
+	// level handling //
+	//================//
+	
+	@Nullable
+	@Override
+	public IClientLevelWrapper getWrappedClientLevel() { return this.getWrappedClientLevel(false); }
+	
+	@Override
+	@Nullable
+	public IClientLevelWrapper getWrappedClientLevel(boolean bypassLevelKeyManager)
+	{
+		ClientLevel level = MINECRAFT.level;
+		if (level == null)
+		{
+			return null;
+		}
+		
+		return ClientLevelWrapper.getWrapper(level, bypassLevelKeyManager);
+	}
+	
+	
+	
+	//===========//
+	// messaging //
+	//===========//
+	
+	@Override
+	public void sendChatMessage(String string)
+	{
+		LocalPlayer player = this.getPlayer();
+		if (player == null)
+		{
+			return;
+		}
+		
+		
+		GLProxy.queueRunningOnRenderThread(() -> 
+		{
+			player.displayClientMessage(net.minecraft.network.chat.Component.translatable(string), /*isOverlay*/false);
+		});
+	}
+	
+	@Override
+	public void sendOverlayMessage(String string)
+	{
+		LocalPlayer player = this.getPlayer();
+		if (player == null)
+		{
+			return;
+		}
+		
+		player.displayClientMessage(net.minecraft.network.chat.Component.translatable(string), /*isOverlay*/true);
+	}
+	
+	
+	
+	//==========================//
+	// vanilla option overrides //
+	//==========================//
+	
+	public void disableVanillaClouds()
+	{
+		MINECRAFT.options.cloudStatus().set(CloudStatus.OFF);
+	}
+	
+	public void disableVanillaChunkFadeIn()
+	{
+		// chunk fade in was added MC 1.21.11
+	}
+	
+	
+	
+	//======//
+	// misc //
+	//======//
+	
+	@Override
+	public IProfilerWrapper getProfiler()
+	{
+		ProfilerFiller profiler;
+		profiler = Profiler.get();
+		
+		if (this.profilerWrapper == null)
+		{
+			this.profilerWrapper = new ProfilerWrapper(profiler);
+		}
+		else if (profiler != this.profilerWrapper.profiler)
+		{
+			this.profilerWrapper.profiler = profiler;
+		}
+		
+		return this.profilerWrapper;
+	}
+	
+	@Override
+	public void crashMinecraft(String errorMessage, Throwable exception)
+	{
+		LOGGER.fatal(ModInfo.READABLE_NAME + " had the following error: [" + errorMessage + "]. Crashing Minecraft...", exception);
+		CrashReport report = new CrashReport(errorMessage, exception);
+		MINECRAFT.delayCrash(report);
+	}
+	
+	
+	
+	//=============//
+	// mod support //
+	//=============//
+	
+	@Override
+	public Object getOptionsObject() { return MINECRAFT.options; }
+	
+	
+	
+	//========//
+	// shared //
+	//========//
+	
+	@Override
+	public boolean isDedicatedServer() { return false; }
+	
+	@Override
+	public File getInstallationDirectory() { return MINECRAFT.gameDirectory; }
+	
+	@Override
+	public int getPlayerCount()
+	{
+		// can be null if the server hasn't finished booting up yet
+		if (MINECRAFT.getSingleplayerServer() == null)
+		{
+			return 1;
+		}
+		else
+		{
+			return MINECRAFT.getSingleplayerServer().getPlayerCount();
+		}
+	}
+	
+	
+	
+}

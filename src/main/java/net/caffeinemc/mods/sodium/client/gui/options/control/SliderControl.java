@@ -1,6 +1,5 @@
 package net.caffeinemc.mods.sodium.client.gui.options.control;
 
-import com.mojang.blaze3d.platform.InputConstants;
 import net.caffeinemc.mods.sodium.client.gui.options.Option;
 import net.caffeinemc.mods.sodium.client.util.Dim2i;
 import net.minecraft.ChatFormatting;

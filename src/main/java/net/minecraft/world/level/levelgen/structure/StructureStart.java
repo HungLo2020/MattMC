@@ -1,6 +1,6 @@
 package net.minecraft.world.level.levelgen.structure;
 
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import java.util.List;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Registry;

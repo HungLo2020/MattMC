@@ -1,6 +1,6 @@
 package net.minecraft.network.protocol.game;
 
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import net.minecraft.ReportedException;
 import net.minecraft.network.ServerboundPacketListener;
 import net.minecraft.network.protocol.Packet;

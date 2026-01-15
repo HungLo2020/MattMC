@@ -1,6 +1,6 @@
 package net.minecraft.server.packs.resources;
 
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;

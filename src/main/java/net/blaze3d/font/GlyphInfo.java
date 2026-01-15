@@ -1,0 +1,25 @@
+package net.blaze3d.font;
+
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
+
+@Environment(EnvType.CLIENT)
+public interface GlyphInfo {
+	float getAdvance();
+
+	default float getAdvance(boolean bl) {
+		return this.getAdvance() + (bl ? this.getBoldOffset() : 0.0F);
+	}
+
+	default float getBoldOffset() {
+		return 1.0F;
+	}
+
+	default float getShadowOffset() {
+		return 1.0F;
+	}
+
+	static GlyphInfo simple(float f) {
+		return () -> f;
+	}
+}

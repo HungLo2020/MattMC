@@ -1,7 +1,7 @@
 package net.minecraft.client.multiplayer.resolver;
 
 import com.google.common.net.HostAndPort;
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import java.net.IDN;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;

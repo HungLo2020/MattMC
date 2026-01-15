@@ -2,7 +2,7 @@ package net.minecraft.world.level.storage;
 
 import com.google.common.collect.Iterables;
 import com.mojang.datafixers.DataFixer;
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import com.mojang.serialization.Codec;
 import it.unimi.dsi.fastutil.objects.Object2ObjectArrayMap;
 import java.io.DataInputStream;

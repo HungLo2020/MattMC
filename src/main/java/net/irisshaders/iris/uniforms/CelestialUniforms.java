@@ -1,6 +1,6 @@
 package net.irisshaders.iris.uniforms;
 
-import com.mojang.math.Axis;
+import net.math.Axis;
 import net.irisshaders.iris.Iris;
 import net.irisshaders.iris.gl.uniform.UniformHolder;
 import net.irisshaders.iris.pipeline.WorldRenderingPipeline;

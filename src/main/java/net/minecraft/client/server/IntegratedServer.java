@@ -3,7 +3,7 @@ package net.minecraft.client.server;
 import com.google.common.base.MoreObjects;
 import com.google.common.collect.Lists;
 import net.minecraft.server.profile.PlayerProfile;
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.UUID;

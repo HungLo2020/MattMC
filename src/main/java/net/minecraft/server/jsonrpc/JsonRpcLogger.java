@@ -1,6 +1,6 @@
 package net.minecraft.server.jsonrpc;
 
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;

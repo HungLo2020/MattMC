@@ -4,7 +4,6 @@ package com.github.alexthe666.citadel.server.entity.pathfinding.raycoms.pathjobs
  */
 
 import com.github.alexthe666.citadel.Citadel;
-import com.github.alexthe666.citadel.server.entity.pathfinding.raycoms.*;
 import com.github.alexthe666.citadel.server.message.SyncePathMessage;
 import com.github.alexthe666.citadel.server.message.SyncPathReachedMessage;
 import com.mojang.datafixers.util.Pair;
@@ -36,7 +35,6 @@ import java.lang.ref.WeakReference;
 import java.util.*;
 import java.util.concurrent.Callable;
 
-import static com.github.alexthe666.citadel.server.entity.pathfinding.raycoms.PathfindingConstants.*;
 import static com.github.alexthe666.citadel.server.entity.pathfinding.raycoms.SurfaceType.getSurfaceType;
 import static com.github.alexthe666.citadel.server.entity.pathfinding.raycoms.SurfaceType.isWater;
 

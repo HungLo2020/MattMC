@@ -1,7 +1,7 @@
 package net.minecraft.server.network;
 
 import net.minecraft.server.profile.PlayerProfile;
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import io.netty.channel.ChannelFutureListener;
 import net.minecraft.CrashReport;
 import net.minecraft.CrashReportCategory;

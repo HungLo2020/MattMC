@@ -1,7 +1,7 @@
 package net.minecraft.util.thread;
 
 import com.google.common.collect.ImmutableList;
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import java.util.List;
 import java.util.concurrent.Executor;
 import java.util.concurrent.RejectedExecutionException;

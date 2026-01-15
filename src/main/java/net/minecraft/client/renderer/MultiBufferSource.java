@@ -1,14 +1,13 @@
 package net.minecraft.client.renderer;
 
-import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.vertex.BufferBuilder;
-import com.mojang.blaze3d.vertex.ByteBufferBuilder;
-import com.mojang.blaze3d.vertex.MeshData;
-import com.mojang.blaze3d.vertex.VertexConsumer;
+import net.blaze3d.systems.RenderSystem;
+import net.blaze3d.vertex.*;
+import net.blaze3d.vertex.ByteBufferBuilder;
 import it.unimi.dsi.fastutil.objects.Object2ObjectSortedMaps;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.SequencedMap;
+
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import org.jetbrains.annotations.Nullable;
@@ -101,7 +100,7 @@ public interface MultiBufferSource {
 					ByteBufferBuilder byteBufferBuilder = (ByteBufferBuilder)this.fixedBuffers.getOrDefault(renderType, this.sharedBuffer);
 					
 					// Sodium: Use accelerated sorting if available (merged from MultiBufferSourceMixin)
-					com.mojang.blaze3d.vertex.VertexSorting sorting = RenderSystem.getProjectionType().vertexSorting();
+					VertexSorting sorting = RenderSystem.getProjectionType().vertexSorting();
 					if (sorting instanceof net.caffeinemc.mods.sodium.client.util.sorting.VertexSortingExtended sortingExtended) {
 						sodium$acceleratedSort(meshData, byteBufferBuilder, sortingExtended);
 					} else {
@@ -134,7 +133,7 @@ public interface MultiBufferSource {
 		private static void sodium$acceleratedSort(MeshData meshData, ByteBufferBuilder bufferBuilder, net.caffeinemc.mods.sodium.client.util.sorting.VertexSortingExtended sorting) {
 			final var drawState = meshData.drawState();
 
-			if (drawState.mode() != com.mojang.blaze3d.vertex.VertexFormat.Mode.QUADS) {
+			if (drawState.mode() != VertexFormat.Mode.QUADS) {
 				// Only quad lists can be sorted.
 				return;
 			}
@@ -148,9 +147,9 @@ public interface MultiBufferSource {
 			final var indexType = meshData.drawState().indexType();
 			final var ptr = bufferBuilder.reserve((primitiveIds.length * VERTICES_PER_QUAD) * indexType.bytes);
 
-			if (indexType == com.mojang.blaze3d.vertex.VertexFormat.IndexType.SHORT) {
+			if (indexType == VertexFormat.IndexType.SHORT) {
 				sodium$writeIndexBufferShort(ptr, primitiveIds);
-			} else if (indexType == com.mojang.blaze3d.vertex.VertexFormat.IndexType.INT) {
+			} else if (indexType == VertexFormat.IndexType.INT) {
 				sodium$writeIndexBufferInt(ptr, primitiveIds);
 			} else {
 				throw new UnsupportedOperationException();

@@ -1,6 +1,6 @@
 package net.minecraft.server.jsonrpc.security;
 
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;

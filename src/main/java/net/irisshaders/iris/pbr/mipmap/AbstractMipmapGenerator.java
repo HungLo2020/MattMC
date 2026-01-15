@@ -1,6 +1,6 @@
 package net.irisshaders.iris.pbr.mipmap;
 
-import com.mojang.blaze3d.platform.NativeImage;
+import net.blaze3d.platform.NativeImage;
 
 public abstract class AbstractMipmapGenerator implements CustomMipmapGenerator {
 	@Override

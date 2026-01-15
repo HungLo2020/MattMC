@@ -1,10 +1,10 @@
 package net.minecraft.client.renderer.texture;
 
-import com.mojang.blaze3d.platform.TextureUtil;
-import com.mojang.blaze3d.systems.GpuDevice;
-import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.textures.TextureFormat;
-import com.mojang.logging.LogUtils;
+import net.blaze3d.platform.TextureUtil;
+import net.blaze3d.systems.GpuDevice;
+import net.blaze3d.systems.RenderSystem;
+import net.blaze3d.textures.TextureFormat;
+import net.logging.LogUtils;
 import java.io.IOException;
 import java.io.Writer;
 import java.nio.file.Files;

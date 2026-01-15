@@ -1,7 +1,6 @@
 package com.github.alexthe666.citadel.client.gui;
 
 import com.github.alexthe666.citadel.Citadel;
-import com.github.alexthe666.citadel.client.gui.data.*;
 import com.github.alexthe666.citadel.client.model.TabulaModel;
 import com.github.alexthe666.citadel.client.model.TabulaModelHandler;
 import com.github.alexthe666.citadel.recipe.SpecialRecipeInGuideBook;

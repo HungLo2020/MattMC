@@ -12,9 +12,9 @@ import net.minecraft.network.protocol.common.custom.BrandPayload;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.network.protocol.common.custom.DiscardedPayload;
 // VoxelMap: Import VoxelMap packet types
-import com.mamiyaotaru.voxelmap.packets.WorldIdS2C;
+import net.voxelmap.packets.WorldIdS2C;
 // Distant Horizons: Import Distant Horizons packet type
-import com.seibel.distanthorizons.common.CommonPacketPayload;
+import net.distanthorizons.common.CommonPacketPayload;
 
 public record ClientboundCustomPayloadPacket(CustomPacketPayload payload) implements Packet<ClientCommonPacketListener> {
 	private static final int MAX_PAYLOAD_SIZE = 1048576;

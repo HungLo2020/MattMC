@@ -2,6 +2,10 @@ package net.minecraft.world.level.block;
 
 import java.util.function.Function;
 import java.util.function.ToIntFunction;
+
+import net.alexscaves.server.block.*;
+import net.alexscaves.server.block.grower.AncientTreeGrower;
+import net.alexscaves.server.block.grower.PewenGrower;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.Registry;
@@ -47,16 +51,9 @@ import net.minecraft.world.level.block.custom.FlytrapBlock;
 import net.minecraft.world.level.block.custom.FiddleheadBlock;
 import net.minecraft.world.level.block.custom.TreeStarBlock;
 import net.minecraft.world.level.block.custom.CycadBlock;
-import com.github.alexmodguy.alexscaves.server.block.DinosaurEggBlock;
-import com.github.alexmodguy.alexscaves.server.block.MultipleDinosaurEggsBlock;
-import com.github.alexmodguy.alexscaves.server.block.SubterranodonEggBlock;
-import com.github.alexmodguy.alexscaves.server.block.VallumraptorEggBlock;
-import com.github.alexmodguy.alexscaves.server.block.GrottoceratopsEggBlock;
-import com.github.alexmodguy.alexscaves.server.block.TremorsaurusEggBlock;
-import com.github.alexmodguy.alexscaves.server.block.RelicheirusEggBlock;
-import com.github.alexmodguy.alexscaves.server.block.DinosaurChopBlock;
-import com.github.alexmodguy.alexscaves.server.block.AmbersolBlock;
-import com.github.alexmodguy.alexscaves.server.block.AmbersolLightBlock;
+import net.alexscaves.server.block.RelicheirusEggBlock;
+import net.alexscaves.server.block.DinosaurChopBlock;
+import net.alexscaves.server.block.AmbersolLightBlock;
 import net.minecraft.world.level.material.Fluids;
 import net.minecraft.world.level.material.MapColor;
 import net.minecraft.world.level.material.PushReaction;
@@ -216,12 +213,12 @@ public class Blocks {
 	);
 	public static final Block PEWEN_SAPLING = register(
 		"pewen_sapling",
-		properties -> new SaplingBlock(com.github.alexmodguy.alexscaves.server.block.grower.PewenGrower.GROWER, properties),
+		properties -> new SaplingBlock(PewenGrower.GROWER, properties),
 		BlockBehaviour.Properties.of().mapColor(MapColor.GRASS).noCollision().randomTicks().instabreak().sound(SoundType.GRASS).pushReaction(PushReaction.DESTROY)
 	);
 	public static final Block ANCIENT_SAPLING = register(
 		"ancient_sapling",
-		properties -> new SaplingBlock(com.github.alexmodguy.alexscaves.server.block.grower.AncientTreeGrower.GROWER, properties),
+		properties -> new SaplingBlock(AncientTreeGrower.GROWER, properties),
 		BlockBehaviour.Properties.of().mapColor(MapColor.GRASS).noCollision().randomTicks().instabreak().sound(SoundType.GRASS).pushReaction(PushReaction.DESTROY)
 	);
 	public static final Block BIRCH_SAPLING = register(
@@ -6819,7 +6816,7 @@ public class Blocks {
 	// Alex's Caves Blocks
 	public static final Block PRIMAL_MAGMA = register(
 		"primal_magma",
-		com.github.alexmodguy.alexscaves.server.block.PrimalMagmaBlock::new,
+		PrimalMagmaBlock::new,
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.NETHER)
 			.instrument(NoteBlockInstrument.BASEDRUM)
@@ -6829,12 +6826,12 @@ public class Blocks {
 			.isValidSpawn((state, getter, pos, entityType) -> entityType.fireImmune())
 			.hasPostProcess((state, getter, pos) -> true)
 			.emissiveRendering((state, getter, pos) -> true)
-			.sound(com.github.alexmodguy.alexscaves.server.block.ACSoundTypes.FLOOD_BASALT)
+			.sound(ACSoundTypes.FLOOD_BASALT)
 			.randomTicks()
 	);
 	public static final Block FISSURE_PRIMAL_MAGMA = register(
 		"fissure_primal_magma",
-		com.github.alexmodguy.alexscaves.server.block.FissurePrimalMagmaBlock::new,
+		FissurePrimalMagmaBlock::new,
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.NETHER)
 			.instrument(NoteBlockInstrument.BASEDRUM)
@@ -6844,7 +6841,7 @@ public class Blocks {
 			.isValidSpawn((state, getter, pos, entityType) -> entityType.fireImmune())
 			.hasPostProcess((state, getter, pos) -> true)
 			.emissiveRendering((state, getter, pos) -> true)
-			.sound(com.github.alexmodguy.alexscaves.server.block.ACSoundTypes.FLOOD_BASALT)
+			.sound(ACSoundTypes.FLOOD_BASALT)
 			.randomTicks()
 	);
 	public static final Block FLOOD_BASALT = register(
@@ -6853,7 +6850,7 @@ public class Blocks {
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.TERRACOTTA_RED)
 			.strength(3.0F, 100.0F)
-			.sound(com.github.alexmodguy.alexscaves.server.block.ACSoundTypes.FLOOD_BASALT)
+			.sound(ACSoundTypes.FLOOD_BASALT)
 			.requiresCorrectToolForDrops()
 	);
 	public static final Block ANCIENT_LEAVES = register(
@@ -6869,7 +6866,7 @@ public class Blocks {
 	);
 	public static final Block ARCHAIC_VINE = register(
 		"archaic_vine",
-		properties -> new com.github.alexmodguy.alexscaves.server.block.ArchaicVineBlock(properties),
+		properties -> new ArchaicVineBlock(properties),
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.COLOR_GREEN)
 			.randomTicks()
@@ -6879,7 +6876,7 @@ public class Blocks {
 	);
 	public static final Block ARCHAIC_VINE_PLANT = register(
 		"archaic_vine_plant",
-		properties -> new com.github.alexmodguy.alexscaves.server.block.ArchaicVinePlantBlock(properties),
+		properties -> new ArchaicVinePlantBlock(properties),
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.COLOR_GREEN)
 			.randomTicks()
@@ -7025,16 +7022,16 @@ public class Blocks {
 	);
 	public static final Block PEWEN_BRANCH = register(
 		"pewen_branch",
-		com.github.alexmodguy.alexscaves.server.block.PewenBranchBlock::new,
+		PewenBranchBlock::new,
 		BlockBehaviour.Properties.of()
 			.mapColor(DyeColor.GREEN)
 			.strength(1.0F)
-			.sound(com.github.alexmodguy.alexscaves.server.block.ACSoundTypes.PEWEN_BRANCH)
+			.sound(ACSoundTypes.PEWEN_BRANCH)
 			.randomTicks()
 	);
 	public static final Block PEWEN_PINES = register(
 		"pewen_pines",
-		com.github.alexmodguy.alexscaves.server.block.PewenPinesBlock::new,
+		PewenPinesBlock::new,
 		BlockBehaviour.Properties.of()
 			.mapColor(DyeColor.GREEN)
 			.instabreak()

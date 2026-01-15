@@ -2,6 +2,9 @@ package net.minecraft;
 
 import com.mojang.jtracy.TracyClient;
 import com.mojang.jtracy.Zone;
+import net.distanthorizons.common.wrappers.worldGeneration.BatchGenerationEnvironment;
+import net.distanthorizons.core.util.objects.RunOnThisThreadExecutorService;
+
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -9,8 +12,8 @@ import java.util.concurrent.TimeUnit;
 public record TracingExecutor(ExecutorService service) implements Executor {
 	public Executor forName(String string) {
 		// DH: Run world gen tasks on current thread instead of MC thread pools
-		if (com.seibel.distanthorizons.common.wrappers.worldGeneration.BatchGenerationEnvironment.isThisDhWorldGenThread()) {
-			return new com.seibel.distanthorizons.core.util.objects.RunOnThisThreadExecutorService();
+		if (BatchGenerationEnvironment.isThisDhWorldGenThread()) {
+			return new RunOnThisThreadExecutorService();
 		}
 		
 		if (SharedConstants.IS_RUNNING_IN_IDE) {

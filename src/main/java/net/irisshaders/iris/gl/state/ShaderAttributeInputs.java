@@ -1,7 +1,7 @@
 package net.irisshaders.iris.gl.state;
 
-import com.mojang.blaze3d.vertex.DefaultVertexFormat;
-import com.mojang.blaze3d.vertex.VertexFormat;
+import net.blaze3d.vertex.DefaultVertexFormat;
+import net.blaze3d.vertex.VertexFormat;
 
 public class ShaderAttributeInputs {
 	private boolean ie;

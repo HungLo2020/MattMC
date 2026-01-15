@@ -4,6 +4,12 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import com.google.common.hash.HashCode;
+import net.distanthorizons.common.wrappers.chunk.ChunkWrapper;
+import net.distanthorizons.common.wrappers.world.ClientLevelWrapper;
+import net.distanthorizons.core.api.internal.ClientApi;
+import net.distanthorizons.core.api.internal.SharedApi;
+import net.distanthorizons.core.util.threading.ThreadPoolUtil;
+import net.distanthorizons.core.wrapperInterfaces.world.IClientLevelWrapper;
 import net.minecraft.server.profile.PlayerProfile;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.ParseResults;
@@ -11,7 +17,7 @@ import com.mojang.brigadier.arguments.ArgumentType;
 import com.mojang.brigadier.builder.ArgumentBuilder;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.builder.RequiredArgumentBuilder;
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import it.unimi.dsi.fastutil.objects.ReferenceOpenHashSet;
 import it.unimi.dsi.fastutil.objects.Object2IntMap.Entry;
 import java.lang.ref.WeakReference;
@@ -37,7 +43,6 @@ import net.minecraft.client.DebugQueryHandler;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.Options;
 import net.minecraft.client.gui.components.ChatComponent;
-import net.minecraft.client.gui.components.toasts.RecipeToast;
 import net.minecraft.client.gui.components.toasts.SystemToast;
 import net.minecraft.client.gui.screens.ChatScreen;
 import net.minecraft.client.gui.screens.ConfirmScreen;
@@ -309,7 +314,6 @@ import net.minecraft.world.item.Items;
 import net.minecraft.world.item.alchemy.PotionBrewing;
 import net.minecraft.world.item.crafting.RecipeAccess;
 import net.minecraft.world.item.crafting.SelectableRecipe.SingleInputSet;
-import net.minecraft.world.item.crafting.display.RecipeDisplayId;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.Level;
@@ -333,6 +337,7 @@ import net.minecraft.world.scores.ScoreAccess;
 import net.minecraft.world.scores.ScoreHolder;
 import net.minecraft.world.scores.Scoreboard;
 import net.minecraft.world.scores.criteria.ObjectiveCriteria;
+import net.voxelmap.VoxelConstants;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 
@@ -458,7 +463,7 @@ public class ClientPacketListener extends ClientCommonPacketListenerImpl impleme
 
 	public void close() {
 		// DH: Fire client disconnected event
-		com.seibel.distanthorizons.core.api.internal.ClientApi.INSTANCE.onClientOnlyDisconnected();
+		ClientApi.INSTANCE.onClientOnlyDisconnected();
 		
 		this.closed = true;
 		this.clearLevel();
@@ -593,9 +598,9 @@ public class ClientPacketListener extends ClientCommonPacketListenerImpl impleme
 		}
 		
 		// DH: Fire client connected and level load events
-		com.seibel.distanthorizons.core.api.internal.ClientApi.INSTANCE.onClientOnlyConnected();
-		com.seibel.distanthorizons.core.api.internal.ClientApi.INSTANCE.clientLevelLoadEvent(
-			com.seibel.distanthorizons.common.wrappers.world.ClientLevelWrapper.getWrapper(this.level, true));
+		ClientApi.INSTANCE.onClientOnlyConnected();
+		ClientApi.INSTANCE.clientLevelLoadEvent(
+			ClientLevelWrapper.getWrapper(this.level, true));
 	}
 
 	public void handleAddEntity(ClientboundAddEntityPacket clientboundAddEntityPacket) {
@@ -934,13 +939,13 @@ public class ClientPacketListener extends ClientCommonPacketListenerImpl impleme
 		
 		// DH: Fire chunk load event on background thread
 		if (levelChunk != null) {
-			java.util.concurrent.AbstractExecutorService executor = com.seibel.distanthorizons.core.util.threading.ThreadPoolUtil.getFileHandlerExecutor();
+			java.util.concurrent.AbstractExecutorService executor = ThreadPoolUtil.getFileHandlerExecutor();
 			if (executor != null) {
 				executor.execute(() -> {
-					com.seibel.distanthorizons.core.wrapperInterfaces.world.IClientLevelWrapper clientLevel = 
-						com.seibel.distanthorizons.common.wrappers.world.ClientLevelWrapper.getWrapper((net.minecraft.client.multiplayer.ClientLevel) this.level);
-					com.seibel.distanthorizons.core.api.internal.SharedApi.INSTANCE.chunkLoadEvent(
-						new com.seibel.distanthorizons.common.wrappers.chunk.ChunkWrapper(levelChunk, clientLevel), clientLevel);
+					IClientLevelWrapper clientLevel =
+						ClientLevelWrapper.getWrapper((net.minecraft.client.multiplayer.ClientLevel) this.level);
+					SharedApi.INSTANCE.chunkLoadEvent(
+						new ChunkWrapper(levelChunk, clientLevel), clientLevel);
 				});
 			}
 		}
@@ -2644,7 +2649,7 @@ public class ClientPacketListener extends ClientCommonPacketListenerImpl impleme
 
 	public void sendCommand(String string) {
 		// VoxelMap: Parse custom commands
-		if (!com.mamiyaotaru.voxelmap.VoxelConstants.onSendChatMessage(string)) {
+		if (!VoxelConstants.onSendChatMessage(string)) {
 			return; // Command was handled by VoxelMap
 		}
 		
@@ -2665,7 +2670,7 @@ public class ClientPacketListener extends ClientCommonPacketListenerImpl impleme
 
 	public void sendUnattendedCommand(String string, @Nullable Screen screen) {
 		// VoxelMap: Parse custom commands
-		if (!com.mamiyaotaru.voxelmap.VoxelConstants.onSendChatMessage(string)) {
+		if (!VoxelConstants.onSendChatMessage(string)) {
 			this.minecraft.setScreen(screen);
 			return; // Command was handled by VoxelMap
 		}

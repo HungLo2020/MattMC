@@ -1,0 +1,311 @@
+package net.distanthorizons.common.wrappers;
+
+import net.distanthorizons.api.interfaces.block.IDhApiBiomeWrapper;
+import net.distanthorizons.api.interfaces.block.IDhApiBlockStateWrapper;
+import net.distanthorizons.api.interfaces.override.worldGenerator.IDhApiWorldGenerator;
+import net.distanthorizons.api.interfaces.world.IDhApiLevelWrapper;
+import net.distanthorizons.api.interfaces.factories.IDhApiWrapperFactory;
+import net.distanthorizons.common.wrappers.block.BiomeWrapper;
+import net.distanthorizons.common.wrappers.block.BlockStateWrapper;
+import net.distanthorizons.common.wrappers.chunk.ChunkWrapper;
+import net.distanthorizons.common.wrappers.world.ClientLevelWrapper;
+import net.distanthorizons.common.wrappers.world.ServerLevelWrapper;
+import net.distanthorizons.common.wrappers.worldGeneration.BatchGenerationEnvironment;
+import net.distanthorizons.core.level.IDhLevel;
+import net.distanthorizons.core.level.IDhServerLevel;
+import net.distanthorizons.core.util.LodUtil;
+import net.distanthorizons.core.wrapperInterfaces.IWrapperFactory;
+import net.distanthorizons.core.wrapperInterfaces.block.IBlockStateWrapper;
+import net.distanthorizons.core.wrapperInterfaces.chunk.IChunkWrapper;
+import net.distanthorizons.core.wrapperInterfaces.world.IBiomeWrapper;
+import net.distanthorizons.core.wrapperInterfaces.world.ILevelWrapper;
+import net.distanthorizons.core.wrapperInterfaces.worldGeneration.IBatchGeneratorEnvironmentWrapper;
+import net.minecraft.client.multiplayer.ClientLevel;
+import net.minecraft.core.Holder;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.biome.Biome;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.chunk.ChunkAccess;
+
+import java.io.IOException;
+import java.util.HashSet;
+
+/**
+ * This handles creating abstract wrapper objects.
+ */
+public class WrapperFactory implements IWrapperFactory
+{
+	public static final WrapperFactory INSTANCE = new WrapperFactory();
+	
+	
+	
+	//==============//
+	// core methods //
+	//==============//
+	
+	@Override
+	public IBatchGeneratorEnvironmentWrapper createBatchGenerator(IDhLevel targetLevel)
+	{
+		if (targetLevel instanceof IDhServerLevel)
+		{
+			return new BatchGenerationEnvironment((IDhServerLevel) targetLevel);
+		}
+		else
+		{
+			throw new IllegalArgumentException("The target level must be a server-side level.");
+		}
+	}
+	
+	@Override
+	public IDhApiBiomeWrapper getBiomeWrapper(String resourceLocationString, IDhApiLevelWrapper levelWrapper) throws IOException, ClassCastException
+	{
+		if (!(levelWrapper instanceof ILevelWrapper))
+		{
+			throw new ClassCastException("levelWrapper must be returned by DH and of type ["+ILevelWrapper.class.getName()+"].");
+		}
+		
+		return BiomeWrapper.deserialize(resourceLocationString, (ILevelWrapper)levelWrapper); 
+	}
+	@Override
+	public IDhApiBlockStateWrapper getDefaultBlockStateWrapper(String resourceLocationString, IDhApiLevelWrapper levelWrapper) throws IOException, ClassCastException
+	{
+		if (!(levelWrapper instanceof ILevelWrapper))
+		{
+			throw new ClassCastException("Invalid ["+IDhApiLevelWrapper.class.getSimpleName()+"] value given. Level wrapper object must be one given by the DH API (it can't be a custom implementation), specifically of type ["+ILevelWrapper.class.getName()+"].");
+		}
+		
+		return BlockStateWrapper.deserialize(resourceLocationString, (ILevelWrapper)levelWrapper); 
+	}
+	
+	@Override
+	public IBiomeWrapper deserializeBiomeWrapper(String str, ILevelWrapper levelWrapper) throws IOException { return BiomeWrapper.deserialize(str, levelWrapper); }
+	@Override 
+	public IBiomeWrapper getPlainsBiomeWrapper(ILevelWrapper levelWrapper) // TODO is there a way we could get this without the levelWrapper? it isn't necessary but would clean up the code a bit
+	{
+		try
+		{
+			return BiomeWrapper.deserialize(BiomeWrapper.PLAINS_RESOURCE_LOCATION_STRING, levelWrapper);
+		}
+		catch (IOException e) 
+		{
+			throw new LodUtil.AssertFailureException("Unable to parse plains resource string ["+BiomeWrapper.PLAINS_RESOURCE_LOCATION_STRING+"], error:\n " + e.getMessage());
+		}
+	}
+	
+	@Override
+	public IBlockStateWrapper deserializeBlockStateWrapper(String str, ILevelWrapper levelWrapper) throws IOException { return BlockStateWrapper.deserialize(str, levelWrapper); }
+	@Override
+	public IBlockStateWrapper getAirBlockStateWrapper() { return BlockStateWrapper.AIR; }
+	
+	@Override
+	public HashSet<IBlockStateWrapper> getRendererIgnoredBlocks(ILevelWrapper levelWrapper) { return BlockStateWrapper.getRendererIgnoredBlocks(levelWrapper); }
+	@Override
+	public HashSet<IBlockStateWrapper> getRendererIgnoredCaveBlocks(ILevelWrapper levelWrapper) { return BlockStateWrapper.getRendererIgnoredCaveBlocks(levelWrapper); }
+	
+	@Override
+	public void resetRendererIgnoredCaveBlocks() { BlockStateWrapper.clearRendererIgnoredCaveBlocks(); }
+	@Override
+	public void resetRendererIgnoredBlocksSet() { BlockStateWrapper.clearRendererIgnoredBlocks(); }
+	
+	
+	/**
+	 * Note: when this is updated for different MC versions, make sure you also update the documentation in
+	 * {@link IDhApiWorldGenerator#generateChunks} and the type list in {@link WrapperFactory#createChunkWrapperErrorMessage}. <br><br>
+	 *
+	 * For full method documentation please see: {@link IWrapperFactory#createChunkWrapper}
+	 *
+	 * @see IWrapperFactory#createChunkWrapper
+	 */
+	public IChunkWrapper createChunkWrapper(Object[] objectArray) throws ClassCastException
+	{
+		if (objectArray.length == 1 && objectArray[0] instanceof IChunkWrapper)
+		{
+			try
+			{
+				// this path should only happen when called by Distant Horizons code
+				// API implementors should never hit this path
+				return (IChunkWrapper) objectArray[0];
+			}
+			catch (Exception e)
+			{
+				throw new ClassCastException(createChunkWrapperErrorMessage(objectArray));
+			}
+		}
+		
+		//#if MC_VER <= MC_1_XX_X
+		else if (objectArray.length == 2)
+		{
+			// correct number of parameters from the API
+			
+			// chunk
+			if (!(objectArray[0] instanceof ChunkAccess))
+			{
+				throw new ClassCastException(createChunkWrapperErrorMessage(objectArray));
+			}
+			ChunkAccess chunk = (ChunkAccess) objectArray[0];
+			
+			// level / light source
+			if (!(objectArray[1] instanceof Level))
+			{
+				throw new ClassCastException(createChunkWrapperErrorMessage(objectArray));
+			}
+			// the level is needed for the DH level wrapper...
+			Level level = (Level) objectArray[1];
+			
+			
+			// level wrapper
+			ILevelWrapper levelWrapper = level.isClientSide()
+					? ClientLevelWrapper.getWrapper((ClientLevel)level)
+					: ServerLevelWrapper.getWrapper((ServerLevel)level);
+			
+			
+			return new ChunkWrapper(chunk, levelWrapper);
+		}
+		// incorrect number of parameters from the API
+		else
+		{
+			throw new ClassCastException(createChunkWrapperErrorMessage(objectArray));
+		}
+		//#endif
+	}
+	/**
+	 * Note: when this is updated for different MC versions,
+	 * make sure you also update the documentation in {@link IDhApiWorldGenerator#generateChunks}.
+	 */
+	private static String createChunkWrapperErrorMessage(Object[] objectArray)
+	{
+		String[] expectedClassNames;
+		
+		//#if MC_VER <= MC_1_XX_X
+		expectedClassNames = new String[] 
+		{
+			ChunkAccess.class.getName(),
+			"[ServerLevel] or [ClientLevel]" // Classes are not referenced by names to avoid exception when one of them is missing
+		};
+		//#endif
+		
+		return createWrapperErrorMessage("Chunk wrapper", expectedClassNames, objectArray);
+	}
+	
+	
+	
+	//=============//
+	// api methods //
+	//=============//
+	
+	// documentation should be in the API interface
+	
+	public IDhApiBiomeWrapper getBiomeWrapper(Object[] objectArray, IDhApiLevelWrapper levelWrapper) 
+	{
+		// confirm the API level wrapper is also a Core wrapper 
+		if (!(levelWrapper instanceof ILevelWrapper))
+		{
+			throw new ClassCastException("Invalid ["+IDhApiLevelWrapper.class.getSimpleName()+"] value given. Level wrapper object must be one given by the DH API (it can't be a custom implementation), specifically of type ["+ILevelWrapper.class.getName()+"].");
+		}
+		ILevelWrapper coreLevelWrapper = (ILevelWrapper) levelWrapper;
+		
+		
+		
+		
+		if (!(objectArray[0] instanceof Holder) || !(((Holder<?>) objectArray[0]).value() instanceof Biome))
+		{
+			throw new ClassCastException(createBiomeWrapperErrorMessage(objectArray));
+		}
+		
+		Holder<Biome> biomeHolder = (Holder<Biome>) objectArray[0];
+		return BiomeWrapper.getBiomeWrapper(biomeHolder, coreLevelWrapper);
+	}
+	/**
+	 * Note: when this is updated for different MC versions,
+	 * make sure you also update the documentation in {@link IDhApiWrapperFactory#getBiomeWrapper}.
+	 */
+	private static String createBiomeWrapperErrorMessage(Object[] objectArray)
+	{
+		String[] expectedClassNames;
+		
+		expectedClassNames = new String[] { Holder.class.getName()+"<"+Biome.class.getName()+">" };
+		
+		return createWrapperErrorMessage("Biome wrapper", expectedClassNames, objectArray);
+	}
+	
+	public IDhApiBlockStateWrapper getBlockStateWrapper(Object[] objectArray, IDhApiLevelWrapper levelWrapper)
+	{
+		// confirm the API level wrapper is also a Core wrapper 
+		if (!(levelWrapper instanceof ILevelWrapper))
+		{
+			throw new ClassCastException("Invalid ["+IDhApiLevelWrapper.class.getSimpleName()+"] value given. Level wrapper object must be one given by the DH API (it can't be a custom implementation), specifically of type ["+ILevelWrapper.class.getName()+"].");
+		}
+		ILevelWrapper coreLevelWrapper = (ILevelWrapper) levelWrapper;
+		
+		
+		
+		//#if MC_VER <= MC_1_XX_X
+		if (objectArray.length != 1)
+		{
+			throw new ClassCastException(createBlockStateWrapperErrorMessage(objectArray));
+		}
+		if (!(objectArray[0] instanceof BlockState))
+		{
+			throw new ClassCastException(createBlockStateWrapperErrorMessage(objectArray));
+		}
+		
+		BlockState blockState = (BlockState) objectArray[0];
+		return BlockStateWrapper.fromBlockState(blockState, coreLevelWrapper);
+		//#endif
+	}
+	/**
+	 * Note: when this is updated for different MC versions,
+	 * make sure you also update the documentation in {@link IDhApiWrapperFactory#getBlockStateWrapper}.
+	 */
+	private static String createBlockStateWrapperErrorMessage(Object[] objectArray)
+	{
+		String[] expectedClassNames;
+		
+		expectedClassNames = new String[] { Holder.class.getName()+"<"+Biome.class.getName()+">" };
+		
+		return createWrapperErrorMessage("BlockState wrapper", expectedClassNames, objectArray);
+	}
+	
+	
+	
+	
+	//================//
+	// helper methods //
+	//================//
+	
+	private static String createWrapperErrorMessage(String wrapperName, String[] expectedClassNames, Object[] objectArray)
+	{
+		// error header
+		StringBuilder message = new StringBuilder(
+				wrapperName + " creation failed. \n" +
+						"Expected object array parameters: \n");
+		
+		
+		// expected parameters
+		for (String expectedClassName : expectedClassNames)
+		{
+			message.append("[").append(expectedClassName).append("], \n");
+		}
+		
+		
+		// given parameters
+		if (objectArray.length != 0)
+		{
+			message.append("Given parameters: ");
+			for (Object obj : objectArray)
+			{
+				String objClassName = (obj != null) ? obj.getClass().getName() : "NULL";
+				message.append("[").append(objClassName).append("], ");
+			}
+		}
+		else
+		{
+			message.append(" No parameters given.");
+		}
+		
+		
+		return message.toString();
+	}
+	
+}

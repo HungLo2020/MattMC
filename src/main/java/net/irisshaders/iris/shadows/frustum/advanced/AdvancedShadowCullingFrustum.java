@@ -4,6 +4,8 @@ import com.sun.management.HotSpotDiagnosticMXBean;
 import com.sun.management.VMOption;
 import net.caffeinemc.mods.sodium.client.render.viewport.Viewport;
 import net.caffeinemc.mods.sodium.client.render.viewport.ViewportProvider;
+import net.distanthorizons.api.interfaces.override.rendering.IDhApiShadowCullingFrustum;
+import net.distanthorizons.api.objects.math.DhApiMat4f;
 import net.irisshaders.iris.shadows.frustum.BoxCuller;
 import net.minecraft.client.renderer.culling.Frustum;
 import net.minecraft.world.phys.AABB;
@@ -35,7 +37,7 @@ import java.lang.management.ManagementFactory;
  * are not sensitive to the specific internal ordering of planes and corners, in order to avoid potential bugs at the
  * cost of slightly more computations.</p>
  */
-public class AdvancedShadowCullingFrustum extends Frustum implements net.caffeinemc.mods.sodium.client.render.viewport.frustum.Frustum, ViewportProvider, com.seibel.distanthorizons.api.interfaces.override.rendering.IDhApiShadowCullingFrustum {
+public class AdvancedShadowCullingFrustum extends Frustum implements net.caffeinemc.mods.sodium.client.render.viewport.frustum.Frustum, ViewportProvider, IDhApiShadowCullingFrustum {
 	private static final int MAX_CLIPPING_PLANES = 13;
 	protected final BoxCuller boxCuller;
 	// DH integration fields
@@ -455,7 +457,7 @@ public class AdvancedShadowCullingFrustum extends Frustum implements net.caffein
 
 	// DH API implementation
 	@Override
-	public void update(int worldMinBlockY, int worldMaxBlockY, com.seibel.distanthorizons.api.objects.math.DhApiMat4f worldViewProjection) {
+	public void update(int worldMinBlockY, int worldMaxBlockY, DhApiMat4f worldViewProjection) {
 		this.worldMinYDH = worldMinBlockY;
 		this.worldMaxYDH = worldMaxBlockY;
 	}

@@ -2,7 +2,7 @@ package net.minecraft.data.structures;
 
 import com.google.common.hash.Hashing;
 import com.google.common.hash.HashingOutputStream;
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;

@@ -1,11 +1,8 @@
 package net.minecraft.hooks;
 
-import com.mojang.blaze3d.buffers.GpuBufferSlice;
 import net.minecraft.client.Camera;
-import net.minecraft.client.DeltaTracker;
 import org.joml.Matrix4f;
 import org.joml.Matrix4fc;
-import org.joml.Vector4f;
 
 /**
  * Hook interface for LevelRenderer rendering events.

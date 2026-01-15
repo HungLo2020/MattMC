@@ -1,6 +1,6 @@
 package net.caffeinemc.mods.sodium.client.render.util;
 
-import com.mojang.blaze3d.systems.RenderSystem;
+import net.blaze3d.systems.RenderSystem;
 
 public class RenderAsserts {
     /**

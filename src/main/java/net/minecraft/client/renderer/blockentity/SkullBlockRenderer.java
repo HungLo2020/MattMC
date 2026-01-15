@@ -1,7 +1,7 @@
 package net.minecraft.client.renderer.blockentity;
 
 import com.google.common.collect.Maps;
-import com.mojang.blaze3d.vertex.PoseStack;
+import net.blaze3d.vertex.PoseStack;
 import java.util.Map;
 import java.util.function.Function;
 import net.minecraft.api.EnvType;

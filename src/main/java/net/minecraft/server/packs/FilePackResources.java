@@ -2,7 +2,7 @@ package net.minecraft.server.packs;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Sets;
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;

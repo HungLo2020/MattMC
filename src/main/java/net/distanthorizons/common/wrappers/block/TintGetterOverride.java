@@ -1,0 +1,136 @@
+package net.distanthorizons.common.wrappers.block;
+
+import net.distanthorizons.core.dataObjects.fullData.sources.FullDataSourceV2;
+import net.distanthorizons.core.wrapperInterfaces.world.IClientLevelWrapper;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.world.level.*;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.entity.BlockEntityType;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.lighting.LevelLightEngine;
+import net.minecraft.world.level.material.FluidState;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.phys.shapes.VoxelShape;
+import org.jetbrains.annotations.Nullable;
+
+import java.util.Optional;
+import java.util.function.Supplier;
+import java.util.stream.Stream;
+
+public class TintGetterOverride extends AbstractDhTintGetter
+{
+	private LevelReader parent;
+	
+	
+	
+	//=============//
+	// constructor //
+	//=============//
+	
+	public TintGetterOverride() { }
+	
+	public void update(LevelReader parent, BiomeWrapper biomeWrapper, BlockStateWrapper blockStateWrapper, FullDataSourceV2 fullDataSource, IClientLevelWrapper clientLevelWrapper)
+	{
+		super.update(biomeWrapper, blockStateWrapper, fullDataSource, clientLevelWrapper);
+		this.parent = parent;
+	}
+	
+	
+	
+	//=========//
+	// methods //
+	//=========//
+	
+	@Override
+	public float getShade(Direction direction, boolean bl) { return this.parent.getShade(direction, bl); }
+	
+	@Override
+	public LevelLightEngine getLightEngine() { return this.parent.getLightEngine(); }
+	
+	@Override
+	public int getBrightness(LightLayer lightLayer, BlockPos blockPos) { return this.parent.getBrightness(lightLayer, blockPos); }
+	
+	@Override
+	public int getRawBrightness(BlockPos blockPos, int i) { return this.parent.getRawBrightness(blockPos, i); }
+	
+	@Override
+	public boolean canSeeSky(BlockPos blockPos) { return this.parent.canSeeSky(blockPos); }
+	
+	@Override
+	@Nullable
+	public BlockEntity getBlockEntity(BlockPos blockPos) { return this.parent.getBlockEntity(blockPos); }
+	
+	@Override
+	public BlockState getBlockState(BlockPos blockPos) { return this.parent.getBlockState(blockPos); }
+	
+	@Override
+	public FluidState getFluidState(BlockPos blockPos) { return this.parent.getFluidState(blockPos); }
+	
+	@Override
+	public int getLightEmission(BlockPos blockPos) { return this.parent.getLightEmission(blockPos); }
+	
+	
+	@Override
+	public Stream<BlockState> getBlockStates(AABB aABB) { return this.parent.getBlockStates(aABB); }
+	
+	@Override
+	public BlockHitResult clip(ClipContext clipContext) { return this.parent.clip(clipContext); }
+	
+	@Override
+	@Nullable
+	public BlockHitResult clipWithInteractionOverride(Vec3 vec3, Vec3 vec32, BlockPos blockPos, VoxelShape voxelShape, BlockState blockState)
+	{
+		return this.parent.clipWithInteractionOverride(vec3, vec32, blockPos, voxelShape, blockState);
+	}
+	
+	@Override
+	public double getBlockFloorHeight(VoxelShape voxelShape, Supplier<VoxelShape> supplier) { return this.parent.getBlockFloorHeight(voxelShape, supplier); }
+	
+	@Override
+	public double getBlockFloorHeight(BlockPos blockPos) { return this.parent.getBlockFloorHeight(blockPos); }
+	
+	@Override
+	public int getMaxY() { return this.parent.getMaxY(); }
+	
+	@Override
+	public <T extends BlockEntity> Optional<T> getBlockEntity(BlockPos blockPos, BlockEntityType<T> blockEntityType) { return this.parent.getBlockEntity(blockPos, blockEntityType); }
+	
+	@Override
+	public BlockHitResult isBlockInLine(ClipBlockStateContext clipBlockStateContext) { return this.parent.isBlockInLine(clipBlockStateContext); }
+	
+	@Override
+	public int getHeight() { return this.parent.getHeight(); }
+	
+	@Override
+	public int getMinY() { return this.parent.getMinY(); }
+	
+	@Override
+	public int getSectionsCount() { return this.parent.getSectionsCount(); }
+	
+	@Override
+	public int getMinSectionY() { return super.getMinSectionY(); }	
+	
+	@Override
+	public int getMaxSectionY() { return this.parent.getMaxSectionY(); }
+	
+	@Override
+	public boolean isOutsideBuildHeight(BlockPos blockPos) { return this.parent.isOutsideBuildHeight(blockPos); }
+	
+	@Override
+	public boolean isOutsideBuildHeight(int i) { return this.parent.isOutsideBuildHeight(i); }
+	
+	@Override
+	public int getSectionIndex(int i) { return this.parent.getSectionIndex(i); }
+	
+	@Override
+	public int getSectionIndexFromSectionY(int i) { return this.parent.getSectionIndexFromSectionY(i); }
+	
+	@Override
+	public int getSectionYFromSectionIndex(int i) { return this.parent.getSectionYFromSectionIndex(i); }
+	
+	
+	
+}

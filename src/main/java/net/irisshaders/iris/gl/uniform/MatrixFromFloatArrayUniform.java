@@ -1,7 +1,5 @@
 package net.irisshaders.iris.gl.uniform;
 
-import com.mojang.blaze3d.opengl.GlStateManager;
-import com.mojang.blaze3d.systems.RenderSystem;
 import org.lwjgl.BufferUtils;
 import org.lwjgl.opengl.GL46C;
 

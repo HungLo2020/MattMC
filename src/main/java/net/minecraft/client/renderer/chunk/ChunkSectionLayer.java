@@ -1,7 +1,7 @@
 package net.minecraft.client.renderer.chunk;
 
-import com.mojang.blaze3d.pipeline.RenderPipeline;
-import com.mojang.blaze3d.textures.GpuTextureView;
+import net.blaze3d.pipeline.RenderPipeline;
+import net.blaze3d.textures.GpuTextureView;
 import java.util.Locale;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;

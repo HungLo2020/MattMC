@@ -1,7 +1,7 @@
 package net.minecraft.client.renderer.texture.atlas.sources;
 
-import com.mojang.blaze3d.platform.NativeImage;
-import com.mojang.logging.LogUtils;
+import net.blaze3d.platform.NativeImage;
+import net.logging.LogUtils;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;

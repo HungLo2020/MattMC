@@ -1,8 +1,8 @@
 package net.minecraft.client.renderer;
 
-import com.mojang.blaze3d.buffers.GpuBufferSlice;
-import com.mojang.blaze3d.buffers.Std140Builder;
-import com.mojang.blaze3d.buffers.Std140SizeCalculator;
+import net.blaze3d.buffers.GpuBufferSlice;
+import net.blaze3d.buffers.Std140Builder;
+import net.blaze3d.buffers.Std140SizeCalculator;
 import java.nio.ByteBuffer;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;

@@ -1,6 +1,11 @@
 package net.minecraft.client.gui.screens.options;
 
 import java.util.function.Supplier;
+
+import net.distanthorizons.common.wrappers.gui.GetConfigScreen;
+import net.distanthorizons.common.wrappers.gui.TexturedButtonWidget;
+import net.distanthorizons.core.config.Config;
+import net.distanthorizons.coreapi.ModInfo;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.client.Minecraft;
@@ -10,7 +15,6 @@ import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.CycleButton;
 import net.minecraft.client.gui.components.LockIconButton;
 import net.minecraft.client.gui.components.StringWidget;
-import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.layouts.EqualSpacingLayout;
 import net.minecraft.client.gui.layouts.GridLayout;
 import net.minecraft.client.gui.layouts.HeaderAndFooterLayout;
@@ -100,8 +104,8 @@ public class OptionsScreen extends Screen {
 		this.repositionElements();
 		
 		// DH: Add options button if enabled
-		if (com.seibel.distanthorizons.core.config.Config.Client.showDhOptionsButtonInMinecraftUi.get()) {
-			com.seibel.distanthorizons.common.wrappers.gui.TexturedButtonWidget dhButton = createDhOptionsButton();
+		if (Config.Client.showDhOptionsButtonInMinecraftUi.get()) {
+			TexturedButtonWidget dhButton = createDhOptionsButton();
 			this.addRenderableWidget(dhButton);
 			
 			// Add to layout - to the left of FOV slider
@@ -115,16 +119,16 @@ public class OptionsScreen extends Screen {
 		}
 	}
 	
-	private com.seibel.distanthorizons.common.wrappers.gui.TexturedButtonWidget createDhOptionsButton() {
+	private TexturedButtonWidget createDhOptionsButton() {
 		net.minecraft.resources.ResourceLocation iconTexture = net.minecraft.resources.ResourceLocation.fromNamespaceAndPath("minecraft", "textures/gui/distanthorizons_button.png");
-		return new com.seibel.distanthorizons.common.wrappers.gui.TexturedButtonWidget(
+		return new TexturedButtonWidget(
 			this.width / 2 - 180, this.height / 6 - 12,
 			20, 20,
 			0, 0,
 			20, iconTexture, 20, 40,
 			(buttonWidget) -> java.util.Objects.requireNonNull(this.minecraft).setScreen(
-				com.seibel.distanthorizons.common.wrappers.gui.GetConfigScreen.getScreen(this)),
-			net.minecraft.network.chat.Component.translatable(com.seibel.distanthorizons.coreapi.ModInfo.ID + ".title")
+				GetConfigScreen.getScreen(this)),
+			net.minecraft.network.chat.Component.translatable(ModInfo.ID + ".title")
 		);
 	}
 

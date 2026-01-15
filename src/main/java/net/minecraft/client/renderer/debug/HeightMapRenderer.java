@@ -1,7 +1,7 @@
 package net.minecraft.client.renderer.debug;
 
-import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.blaze3d.vertex.VertexConsumer;
+import net.blaze3d.vertex.PoseStack;
+import net.blaze3d.vertex.VertexConsumer;
 import java.util.Map.Entry;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;

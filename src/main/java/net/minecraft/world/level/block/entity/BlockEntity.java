@@ -1,6 +1,6 @@
 package net.minecraft.world.level.block.entity;
 
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import com.mojang.serialization.Codec;
 import java.util.HashSet;
 import java.util.Set;

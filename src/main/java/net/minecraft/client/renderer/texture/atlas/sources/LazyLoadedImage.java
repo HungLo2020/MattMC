@@ -1,6 +1,6 @@
 package net.minecraft.client.renderer.texture.atlas.sources;
 
-import com.mojang.blaze3d.platform.NativeImage;
+import net.blaze3d.platform.NativeImage;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.concurrent.atomic.AtomicInteger;

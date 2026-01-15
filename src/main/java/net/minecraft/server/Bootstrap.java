@@ -1,6 +1,6 @@
 package net.minecraft.server;
 
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import java.io.PrintStream;
 import java.time.Duration;
 import java.time.Instant;

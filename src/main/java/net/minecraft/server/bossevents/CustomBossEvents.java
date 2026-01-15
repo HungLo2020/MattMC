@@ -1,7 +1,7 @@
 package net.minecraft.server.bossevents;
 
 import com.google.common.collect.Maps;
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import com.mojang.serialization.Codec;
 import java.util.Collection;
 import java.util.Map;

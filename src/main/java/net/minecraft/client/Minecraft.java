@@ -2,6 +2,14 @@ package net.minecraft.client;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
+import net.distanthorizons.api.enums.config.EDhApiUpdateBranch;
+import net.distanthorizons.common.wrappers.gui.updater.UpdateModScreen;
+import net.distanthorizons.core.config.Config;
+import net.distanthorizons.core.dependencyInjection.SingletonInjector;
+import net.distanthorizons.core.jar.installer.GitlabGetter;
+import net.distanthorizons.core.jar.installer.ModrinthGetter;
+import net.distanthorizons.core.jar.updater.SelfUpdater;
+import net.distanthorizons.core.wrapperInterfaces.IVersionConstants;
 import net.minecraft.server.profile.PlayerProfile;
 
 import net.minecraft.client.auth.BanDetails;
@@ -13,25 +21,25 @@ import net.minecraft.client.auth.ProfileResult;
 import net.minecraft.hooks.GameHooks;
 import net.minecraft.hooks.HookRegistry;
 
-import com.mojang.blaze3d.TracyFrameCapture;
-import com.mojang.blaze3d.pipeline.MainTarget;
-import com.mojang.blaze3d.pipeline.RenderTarget;
-import com.mojang.blaze3d.platform.ClientShutdownWatchdog;
-import com.mojang.blaze3d.platform.DisplayData;
-import com.mojang.blaze3d.platform.FramerateLimitTracker;
-import com.mojang.blaze3d.platform.GLX;
-import com.mojang.blaze3d.platform.IconSet;
-import com.mojang.blaze3d.platform.InputConstants;
-import com.mojang.blaze3d.platform.Window;
-import com.mojang.blaze3d.platform.WindowEventHandler;
-import com.mojang.blaze3d.systems.GpuDevice;
-import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.systems.TimerQuery;
-import com.mojang.blaze3d.vertex.Tesselator;
+import net.blaze3d.TracyFrameCapture;
+import net.blaze3d.pipeline.MainTarget;
+import net.blaze3d.pipeline.RenderTarget;
+import net.blaze3d.platform.ClientShutdownWatchdog;
+import net.blaze3d.platform.DisplayData;
+import net.blaze3d.platform.FramerateLimitTracker;
+import net.blaze3d.platform.GLX;
+import net.blaze3d.platform.IconSet;
+import net.blaze3d.platform.InputConstants;
+import net.blaze3d.platform.Window;
+import net.blaze3d.platform.WindowEventHandler;
+import net.blaze3d.systems.GpuDevice;
+import net.blaze3d.systems.RenderSystem;
+import net.blaze3d.systems.TimerQuery;
+import net.blaze3d.vertex.Tesselator;
 import com.mojang.datafixers.DataFixer;
 import com.mojang.jtracy.DiscontinuousFrame;
 import com.mojang.jtracy.TracyClient;
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -48,7 +56,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.MissingResourceException;
 import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
@@ -253,6 +260,8 @@ import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.EntityHitResult;
 import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.HitResult.Type;
+import net.voxelmap.VoxelConstants;
+import net.voxelmap.VoxelMapInitializer;
 import org.apache.commons.io.FileUtils;
 import org.jetbrains.annotations.Nullable;
 import org.lwjgl.util.tinyfd.TinyFileDialogs;
@@ -703,7 +712,7 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 		
 		// VoxelMap: Initialize early (similar to Iris pattern)
 		try {
-			com.mamiyaotaru.voxelmap.VoxelMapInitializer.initialize();
+			VoxelMapInitializer.initialize();
 		} catch (Exception e) {
 			LOGGER.error("Failed to initialize VoxelMap", e);
 		}
@@ -750,9 +759,9 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 	 * to potentially show the updater screen first.
 	 */
 	private Runnable wrapRunnableForDhUpdater(Runnable originalRunnable) {
-		boolean showUpdater = com.seibel.distanthorizons.core.jar.updater.SelfUpdater.onStart();
+		boolean showUpdater = SelfUpdater.onStart();
 		
-		if (!showUpdater || !com.seibel.distanthorizons.core.config.Config.Client.Advanced.AutoUpdater.enableAutoUpdater.get()) {
+		if (!showUpdater || !Config.Client.Advanced.AutoUpdater.enableAutoUpdater.get()) {
 			return originalRunnable;
 		}
 		
@@ -760,20 +769,20 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 		return () -> {
 			try {
 				String versionId = null;
-				com.seibel.distanthorizons.api.enums.config.EDhApiUpdateBranch updateBranch = 
-					com.seibel.distanthorizons.api.enums.config.EDhApiUpdateBranch.convertAutoToStableOrNightly(
-						com.seibel.distanthorizons.core.config.Config.Client.Advanced.AutoUpdater.updateBranch.get());
+				EDhApiUpdateBranch updateBranch =
+					EDhApiUpdateBranch.convertAutoToStableOrNightly(
+						Config.Client.Advanced.AutoUpdater.updateBranch.get());
 				
-				if (updateBranch == com.seibel.distanthorizons.api.enums.config.EDhApiUpdateBranch.STABLE) {
-					versionId = com.seibel.distanthorizons.core.jar.installer.ModrinthGetter.getLatestIDForVersion(
-						com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector.INSTANCE.get(
-							com.seibel.distanthorizons.core.wrapperInterfaces.IVersionConstants.class).getMinecraftVersion());
+				if (updateBranch == EDhApiUpdateBranch.STABLE) {
+					versionId = ModrinthGetter.getLatestIDForVersion(
+						SingletonInjector.INSTANCE.get(
+							IVersionConstants.class).getMinecraftVersion());
 				} else {
-					versionId = com.seibel.distanthorizons.core.jar.installer.GitlabGetter.INSTANCE.projectPipelines.get(0).get("sha");
+					versionId = GitlabGetter.INSTANCE.projectPipelines.get(0).get("sha");
 				}
 				
 				if (versionId != null) {
-					this.setScreen(new com.seibel.distanthorizons.common.wrappers.gui.updater.UpdateModScreen(
+					this.setScreen(new UpdateModScreen(
 						new net.minecraft.client.gui.screens.TitleScreen(false),
 						versionId
 					));
@@ -1275,7 +1284,7 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 		}
 		
 		// DH auto updater cleanup
-		com.seibel.distanthorizons.core.jar.updater.SelfUpdater.onClose();
+		SelfUpdater.onClose();
 		
 		if (this.currentFrameProfile != null) {
 			this.currentFrameProfile.cancel();
@@ -1963,7 +1972,7 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 		// VoxelMap: Client tick hook
 		profilerFiller.push("voxelmap_tick");
 		try {
-			com.mamiyaotaru.voxelmap.VoxelConstants.clientTick();
+			VoxelConstants.clientTick();
 		} catch (Exception e) {
 			// Silently catch to avoid crashes
 		}

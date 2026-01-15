@@ -1,6 +1,6 @@
 package net.sodium.api.vertex.format;
 
-import com.mojang.blaze3d.vertex.VertexFormat;
+import net.blaze3d.vertex.VertexFormat;
 import net.sodium.api.internal.DependencyInjection;
 
 public interface VertexFormatRegistry {

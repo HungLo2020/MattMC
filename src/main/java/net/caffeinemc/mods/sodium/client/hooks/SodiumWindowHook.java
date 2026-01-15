@@ -1,6 +1,6 @@
 package net.caffeinemc.mods.sodium.client.hooks;
 
-import com.mojang.blaze3d.platform.Window;
+import net.blaze3d.platform.Window;
 import net.caffeinemc.mods.sodium.client.SodiumClientMod;
 import net.minecraft.hooks.WindowHooks;
 import net.sodium.client.compatibility.workarounds.Workarounds;

@@ -1,6 +1,6 @@
 package net.minecraft.util.profiling.jfr;
 
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;

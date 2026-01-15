@@ -2,7 +2,7 @@ package net.minecraft.server.packs;
 
 import com.google.common.base.Joiner;
 import com.google.common.collect.Sets;
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.DirectoryStream;

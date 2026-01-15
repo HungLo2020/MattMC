@@ -2,13 +2,15 @@ package net.minecraft.world.item;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Maps;
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.DataResult;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Consumer;
+
+import net.irisshaders.api.v0.item.IrisItemLightProvider;
 import net.minecraft.SharedConstants;
 import net.minecraft.Util;
 import net.minecraft.core.BlockPos;
@@ -86,7 +88,7 @@ import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 
-public class Item implements FeatureElement, ItemLike, net.iris.api.v0.item.IrisItemLightProvider {
+public class Item implements FeatureElement, ItemLike, IrisItemLightProvider {
 	public static final Codec<Holder<Item>> CODEC = BuiltInRegistries.ITEM
 		.holderByNameCodec()
 		.validate(holder -> holder.is(Items.AIR.builtInRegistryHolder()) ? DataResult.error(() -> "Item must not be minecraft:air") : DataResult.success(holder));

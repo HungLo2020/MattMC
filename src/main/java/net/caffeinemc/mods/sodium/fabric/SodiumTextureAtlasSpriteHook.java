@@ -1,6 +1,6 @@
 package net.caffeinemc.mods.sodium.fabric;
 
-import com.mojang.blaze3d.vertex.VertexConsumer;
+import net.blaze3d.vertex.VertexConsumer;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.hooks.TextureAtlasSpriteHooks;
 import net.sodium.api.texture.SpriteUtil;

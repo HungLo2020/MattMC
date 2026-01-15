@@ -1,6 +1,6 @@
 package net.caffeinemc.mods.sodium.fabric;
 
-import com.mojang.blaze3d.pipeline.RenderPipeline;
+import net.blaze3d.pipeline.RenderPipeline;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.hooks.GuiGraphicsHooks;
 import net.sodium.api.texture.SpriteUtil;

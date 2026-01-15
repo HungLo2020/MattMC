@@ -1,6 +1,6 @@
 package net.irisshaders.iris.compat.dh;
 
-import com.seibel.distanthorizons.api.interfaces.override.rendering.IDhApiFramebuffer;
+import net.distanthorizons.api.interfaces.override.rendering.IDhApiFramebuffer;
 import net.irisshaders.iris.gl.framebuffer.GlFramebuffer;
 import org.lwjgl.opengl.GL32;
 

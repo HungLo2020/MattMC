@@ -1,14 +1,14 @@
 package net.minecraft.client.renderer.state;
 
-import com.mojang.blaze3d.buffers.GpuBufferSlice;
-import com.mojang.blaze3d.systems.RenderPass;
-import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.vertex.BufferBuilder;
-import com.mojang.blaze3d.vertex.ByteBufferBuilder;
-import com.mojang.blaze3d.vertex.DefaultVertexFormat;
-import com.mojang.blaze3d.vertex.MeshData;
-import com.mojang.blaze3d.vertex.VertexConsumer;
-import com.mojang.blaze3d.vertex.VertexFormat;
+import net.blaze3d.buffers.GpuBufferSlice;
+import net.blaze3d.systems.RenderPass;
+import net.blaze3d.systems.RenderSystem;
+import net.blaze3d.vertex.BufferBuilder;
+import net.blaze3d.vertex.ByteBufferBuilder;
+import net.blaze3d.vertex.DefaultVertexFormat;
+import net.blaze3d.vertex.MeshData;
+import net.blaze3d.vertex.VertexConsumer;
+import net.blaze3d.vertex.VertexFormat;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;

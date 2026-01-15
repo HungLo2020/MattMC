@@ -1,7 +1,8 @@
 package net.minecraft.world.entity;
 
 import com.google.common.collect.ImmutableSet;
-import com.mojang.logging.LogUtils;
+import net.alexscaves.server.entity.living.*;
+import net.logging.LogUtils;
 import com.mojang.serialization.Codec;
 import java.util.Optional;
 import java.util.Set;
@@ -73,11 +74,6 @@ import net.minecraft.world.entity.animal.horse.ZombieHorse;
 import net.minecraft.world.entity.animal.sheep.Sheep;
 import net.minecraft.world.entity.animal.sniffer.Sniffer;
 import net.minecraft.world.entity.animal.wolf.Wolf;
-import com.github.alexmodguy.alexscaves.server.entity.living.GrottoceratopsEntity;
-import com.github.alexmodguy.alexscaves.server.entity.living.RelicheirusEntity;
-import com.github.alexmodguy.alexscaves.server.entity.living.SubterranodonEntity;
-import com.github.alexmodguy.alexscaves.server.entity.living.TrilocarisEntity;
-import com.github.alexmodguy.alexscaves.server.entity.living.VallumraptorEntity;
 import net.minecraft.world.entity.boss.enderdragon.EndCrystal;
 import net.minecraft.world.entity.boss.enderdragon.EnderDragon;
 import net.minecraft.world.entity.boss.wither.WitherBoss;
@@ -221,9 +217,9 @@ public class EntityType<T extends Entity> implements FeatureElement, EntityTypeT
 			.clientTrackingRange(10)
 			.updateInterval(Integer.MAX_VALUE)
 	);
-	public static final EntityType<com.github.alexmodguy.alexscaves.server.entity.living.AtlatitanEntity> ATLATITAN = register(
+	public static final EntityType<AtlatitanEntity> ATLATITAN = register(
 		"atlatitan",
-		EntityType.Builder.of(com.github.alexmodguy.alexscaves.server.entity.living.AtlatitanEntity::new, MobCategory.CREATURE)
+		EntityType.Builder.of(AtlatitanEntity::new, MobCategory.CREATURE)
 			.sized(5.0F, 8.0F)
 			.eyeHeight(7.0F)
 			.clientTrackingRange(11)
@@ -1002,9 +998,9 @@ public class EntityType<T extends Entity> implements FeatureElement, EntityTypeT
 			.clientTrackingRange(4)
 			.updateInterval(20)
 	);
-	public static final EntityType<com.github.alexmodguy.alexscaves.server.entity.living.TremorsaurusEntity> TREMORSAURUS = register(
+	public static final EntityType<TremorsaurusEntity> TREMORSAURUS = register(
 		"tremorsaurus",
-		EntityType.Builder.of(com.github.alexmodguy.alexscaves.server.entity.living.TremorsaurusEntity::new, MobCategory.CREATURE)
+		EntityType.Builder.of(TremorsaurusEntity::new, MobCategory.CREATURE)
 			.sized(3.5F, 4.5F)
 			.eyeHeight(4.0F)
 			.clientTrackingRange(10)

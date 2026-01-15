@@ -1,6 +1,6 @@
 package net.caffeinemc.mods.sodium.client.render.immediate.model;
 
-import com.mojang.blaze3d.vertex.PoseStack;
+import net.blaze3d.vertex.PoseStack;
 import net.sodium.api.math.MatrixHelper;
 import net.sodium.api.vertex.buffer.VertexBufferWriter;
 import net.sodium.api.vertex.format.common.EntityVertex;

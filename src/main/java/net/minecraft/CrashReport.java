@@ -1,7 +1,7 @@
 package net.minecraft;
 
 import com.google.common.collect.Lists;
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.io.Writer;

@@ -1,6 +1,6 @@
 package net.minecraft.gametest.framework;
 
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import net.minecraft.Util;
 import org.slf4j.Logger;
 

@@ -1,6 +1,6 @@
 package net.minecraft.world.level.chunk.status;
 
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import java.util.EnumSet;
 import java.util.concurrent.CompletableFuture;
 import net.minecraft.SharedConstants;

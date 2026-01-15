@@ -1,6 +1,5 @@
 package com.github.alexthe666.citadel.client.gui;
 
-import com.github.alexthe666.citadel.client.gui.data.*;
 import com.google.gson.*;
 import com.mojang.datafixers.util.Either;
 import com.mojang.serialization.Codec;

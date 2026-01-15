@@ -1,6 +1,6 @@
 package net.minecraft.world.level.validation;
 
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import java.io.BufferedReader;
 import java.nio.file.FileSystem;
 import java.nio.file.Path;

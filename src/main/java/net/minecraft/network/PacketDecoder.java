@@ -1,6 +1,6 @@
 package net.minecraft.network;
 
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.ByteToMessageDecoder;

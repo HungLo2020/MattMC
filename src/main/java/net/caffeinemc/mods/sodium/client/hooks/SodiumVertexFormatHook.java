@@ -1,6 +1,6 @@
 package net.caffeinemc.mods.sodium.client.hooks;
 
-import com.mojang.blaze3d.vertex.VertexFormat;
+import net.blaze3d.vertex.VertexFormat;
 import net.minecraft.hooks.VertexFormatHooks;
 import net.sodium.api.vertex.format.VertexFormatRegistry;
 

@@ -19,6 +19,8 @@ import java.util.Set;
 import java.util.function.BiConsumer;
 import java.util.function.LongPredicate;
 import java.util.function.Predicate;
+
+import net.distanthorizons.common.wrappers.worldGeneration.BatchGenerationEnvironment;
 import net.minecraft.Util;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.SectionPos;
@@ -75,7 +77,7 @@ public class LevelTicks<T> implements LevelTickAccess<T> {
 		// In MC 1.21.4 an error check was added to log attempting to schedule ticks for unloaded chunks
 		// this caused a lot of unnecessary errors when generating sand (FallingBlock.class).
 		// Skip scheduling if this is a DH world gen thread
-		if (com.seibel.distanthorizons.common.wrappers.worldGeneration.BatchGenerationEnvironment.isThisDhWorldGenThread()) {
+		if (BatchGenerationEnvironment.isThisDhWorldGenThread()) {
 			return;
 		}
 		

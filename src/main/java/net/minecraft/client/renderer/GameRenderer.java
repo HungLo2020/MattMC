@@ -1,18 +1,19 @@
 package net.minecraft.client.renderer;
 
-import com.mojang.blaze3d.ProjectionType;
-import com.mojang.blaze3d.buffers.GpuBufferSlice;
-import com.mojang.blaze3d.pipeline.RenderTarget;
-import com.mojang.blaze3d.platform.Lighting;
-import com.mojang.blaze3d.platform.NativeImage;
-import com.mojang.blaze3d.resource.CrossFrameResourcePool;
-import com.mojang.blaze3d.shaders.ShaderType;
-import com.mojang.blaze3d.systems.GpuDevice;
-import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.vertex.PoseStack;
+import net.blaze3d.ProjectionType;
+import net.blaze3d.buffers.GpuBufferSlice;
+import net.blaze3d.pipeline.RenderTarget;
+import net.blaze3d.platform.Lighting;
+import net.blaze3d.platform.NativeImage;
+import net.blaze3d.platform.GLX;
+import net.blaze3d.resource.CrossFrameResourcePool;
+import net.blaze3d.shaders.ShaderType;
+import net.blaze3d.systems.GpuDevice;
+import net.blaze3d.systems.RenderSystem;
+import net.blaze3d.vertex.PoseStack;
 import com.mojang.jtracy.TracyClient;
-import com.mojang.logging.LogUtils;
-import com.mojang.math.Axis;
+import net.logging.LogUtils;
+import net.math.Axis;
 import java.io.IOException;
 import java.io.Reader;
 import java.nio.file.Files;
@@ -183,8 +184,8 @@ public class GameRenderer implements Projector, AutoCloseable, net.caffeinemc.mo
 		
 		// Iris: From MixinGameRenderer - log hardware information
 		net.irisshaders.iris.Iris.logger.info("Hardware information:");
-		net.irisshaders.iris.Iris.logger.info("CPU: " + com.mojang.blaze3d.platform.GLX._getCpuInfo());
-		net.irisshaders.iris.Iris.logger.info("GPU: " + com.mojang.blaze3d.systems.RenderSystem.getDevice().getRenderer() + " (Supports OpenGL " + com.mojang.blaze3d.systems.RenderSystem.getDevice().getVersion() + ")");
+		net.irisshaders.iris.Iris.logger.info("CPU: " + GLX._getCpuInfo());
+		net.irisshaders.iris.Iris.logger.info("GPU: " + RenderSystem.getDevice().getRenderer() + " (Supports OpenGL " + RenderSystem.getDevice().getVersion() + ")");
 		net.irisshaders.iris.Iris.logger.info("OS: " + System.getProperty("os.name") + " (" + System.getProperty("os.version") + ")");
 		this.screenEffectRenderer = new ScreenEffectRenderer(minecraft, atlasManager, bufferSource);
 		this.cubeMap = this.createCubeMap(minecraft.options.panoramaTheme().get());

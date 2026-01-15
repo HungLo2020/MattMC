@@ -1,11 +1,11 @@
 package net.caffeinemc.mods.sodium.client.gui;
 
 import com.google.common.collect.ImmutableList;
-import com.mojang.blaze3d.pipeline.RenderTarget;
-import com.mojang.blaze3d.platform.Monitor;
-import com.mojang.blaze3d.platform.VideoMode;
-import com.mojang.blaze3d.platform.Window;
-import com.mojang.blaze3d.systems.RenderSystem;
+import net.blaze3d.pipeline.RenderTarget;
+import net.blaze3d.platform.Monitor;
+import net.blaze3d.platform.VideoMode;
+import net.blaze3d.platform.Window;
+import net.blaze3d.systems.RenderSystem;
 import net.caffeinemc.mods.sodium.client.SodiumClientMod;
 import net.sodium.client.compatibility.environment.OsUtils;
 import net.sodium.client.compatibility.workarounds.Workarounds;

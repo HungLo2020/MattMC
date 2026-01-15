@@ -1,7 +1,7 @@
 package net.minecraft.client.multiplayer;
 
 import net.minecraft.server.profile.PlayerProfile;
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import java.util.List;
 import java.util.function.Function;
 import net.minecraft.api.EnvType;

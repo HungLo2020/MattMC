@@ -1,6 +1,6 @@
 package net.minecraft.server.rcon.thread;
 
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import java.util.concurrent.atomic.AtomicInteger;
 import net.minecraft.DefaultUncaughtExceptionHandlerWithName;
 import org.jetbrains.annotations.Nullable;

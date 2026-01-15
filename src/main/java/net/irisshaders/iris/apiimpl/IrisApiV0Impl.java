@@ -1,11 +1,11 @@
 package net.irisshaders.iris.apiimpl;
 
-import com.mojang.blaze3d.pipeline.RenderPipeline;
+import net.blaze3d.pipeline.RenderPipeline;
 import net.irisshaders.iris.Iris;
-import net.iris.api.v0.IrisApi;
-import net.iris.api.v0.IrisApiConfig;
-import net.iris.api.v0.IrisProgram;
-import net.iris.api.v0.IrisTextVertexSink;
+import net.irisshaders.api.v0.IrisApi;
+import net.irisshaders.api.v0.IrisApiConfig;
+import net.irisshaders.api.v0.IrisProgram;
+import net.irisshaders.api.v0.IrisTextVertexSink;
 import net.irisshaders.iris.gui.screen.ShaderPackScreen;
 import net.irisshaders.iris.pipeline.IrisPipelines;
 import net.irisshaders.iris.pipeline.VanillaRenderingPipeline;

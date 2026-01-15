@@ -1,7 +1,7 @@
 package net.minecraft.client.renderer.blockentity;
 
-import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.math.Axis;
+import net.blaze3d.vertex.PoseStack;
+import net.math.Axis;
 import it.unimi.dsi.fastutil.ints.Int2IntFunction;
 import java.util.Set;
 import net.minecraft.api.EnvType;

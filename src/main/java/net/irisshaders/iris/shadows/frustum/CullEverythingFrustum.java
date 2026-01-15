@@ -2,13 +2,15 @@ package net.irisshaders.iris.shadows.frustum;
 
 import net.caffeinemc.mods.sodium.client.render.viewport.Viewport;
 import net.caffeinemc.mods.sodium.client.render.viewport.ViewportProvider;
+import net.distanthorizons.api.interfaces.override.rendering.IDhApiShadowCullingFrustum;
+import net.distanthorizons.api.objects.math.DhApiMat4f;
 import net.minecraft.client.renderer.culling.Frustum;
 import net.minecraft.world.phys.AABB;
 import org.joml.FrustumIntersection;
 import org.joml.Matrix4f;
 import org.joml.Vector3d;
 
-public class CullEverythingFrustum extends Frustum implements ViewportProvider, net.caffeinemc.mods.sodium.client.render.viewport.frustum.Frustum, com.seibel.distanthorizons.api.interfaces.override.rendering.IDhApiShadowCullingFrustum {
+public class CullEverythingFrustum extends Frustum implements ViewportProvider, net.caffeinemc.mods.sodium.client.render.viewport.frustum.Frustum, IDhApiShadowCullingFrustum {
 	private final Vector3d position = new Vector3d();
 
 	public CullEverythingFrustum() {
@@ -47,7 +49,7 @@ public class CullEverythingFrustum extends Frustum implements ViewportProvider, 
 	
 	// DH API integration: Shadow culling frustum - cull everything
 	@Override
-	public void update(int worldMinBlockY, int worldMaxBlockY, com.seibel.distanthorizons.api.objects.math.DhApiMat4f worldViewProjection) {
+	public void update(int worldMinBlockY, int worldMaxBlockY, DhApiMat4f worldViewProjection) {
 		// Empty implementation - no update needed for cull-everything frustum
 	}
 	

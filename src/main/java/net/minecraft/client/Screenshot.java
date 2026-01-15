@@ -1,12 +1,12 @@
 package net.minecraft.client;
 
-import com.mojang.blaze3d.buffers.GpuBuffer;
-import com.mojang.blaze3d.pipeline.RenderTarget;
-import com.mojang.blaze3d.platform.NativeImage;
-import com.mojang.blaze3d.systems.CommandEncoder;
-import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.textures.GpuTexture;
-import com.mojang.logging.LogUtils;
+import net.blaze3d.buffers.GpuBuffer;
+import net.blaze3d.pipeline.RenderTarget;
+import net.blaze3d.platform.NativeImage;
+import net.blaze3d.systems.CommandEncoder;
+import net.blaze3d.systems.RenderSystem;
+import net.blaze3d.textures.GpuTexture;
+import net.logging.LogUtils;
 import java.io.File;
 import java.util.function.Consumer;
 import net.minecraft.api.EnvType;

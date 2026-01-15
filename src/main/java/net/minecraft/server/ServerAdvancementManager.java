@@ -2,7 +2,7 @@ package net.minecraft.server;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableMap.Builder;
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import java.util.Collection;
 import java.util.Map;
 import net.minecraft.advancements.Advancement;

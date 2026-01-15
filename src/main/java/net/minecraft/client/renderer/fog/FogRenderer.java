@@ -1,14 +1,18 @@
 package net.minecraft.client.renderer.fog;
 
 import com.google.common.collect.Lists;
-import com.mojang.blaze3d.buffers.GpuBuffer;
-import com.mojang.blaze3d.buffers.GpuBufferSlice;
-import com.mojang.blaze3d.buffers.Std140Builder;
-import com.mojang.blaze3d.buffers.Std140SizeCalculator;
-import com.mojang.blaze3d.systems.GpuDevice;
-import com.mojang.blaze3d.systems.RenderSystem;
+import net.blaze3d.buffers.GpuBuffer;
+import net.blaze3d.buffers.GpuBufferSlice;
+import net.blaze3d.buffers.Std140Builder;
+import net.blaze3d.buffers.Std140SizeCalculator;
+import net.blaze3d.systems.GpuDevice;
+import net.blaze3d.systems.RenderSystem;
 import java.nio.ByteBuffer;
 import java.util.List;
+
+import net.distanthorizons.core.config.Config;
+import net.distanthorizons.core.dependencyInjection.SingletonInjector;
+import net.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftRenderWrapper;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.client.Camera;
@@ -264,9 +268,9 @@ public class FogRenderer implements AutoCloseable, net.caffeinemc.mods.sodium.cl
 		
 		boolean cancelFog = !isSpecialFog;
 		cancelFog = cancelFog && cameraNotInFluid;
-		cancelFog = cancelFog && !com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector.INSTANCE.get(
-			com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftRenderWrapper.class).isFogStateSpecial();
-		cancelFog = cancelFog && !com.seibel.distanthorizons.core.config.Config.Client.Advanced.Graphics.Fog.enableVanillaFog.get();
+		cancelFog = cancelFog && !SingletonInjector.INSTANCE.get(
+			IMinecraftRenderWrapper.class).isFogStateSpecial();
+		cancelFog = cancelFog && !Config.Client.Advanced.Graphics.Fog.enableVanillaFog.get();
 		
 		return cancelFog;
 	}

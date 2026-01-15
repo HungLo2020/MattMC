@@ -1,6 +1,6 @@
 package net.minecraft.world.level.entity;
 
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import java.util.Collection;
 import java.util.stream.Stream;
 import net.minecraft.util.AbortableIterationConsumer;

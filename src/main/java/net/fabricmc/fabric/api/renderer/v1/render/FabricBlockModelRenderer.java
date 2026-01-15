@@ -1,6 +1,6 @@
 package net.fabricmc.fabric.api.renderer.v1.render;
 
-import com.mojang.blaze3d.vertex.PoseStack;
+import net.blaze3d.vertex.PoseStack;
 import net.fabricmc.fabric.api.renderer.v1.Renderer;
 import net.minecraft.client.renderer.block.model.BlockStateModel;
 import net.minecraft.core.BlockPos;

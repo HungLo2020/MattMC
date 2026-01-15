@@ -1,6 +1,6 @@
 package net.minecraft.client.renderer.item;
 
-import com.mojang.blaze3d.vertex.PoseStack;
+import net.blaze3d.vertex.PoseStack;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;

@@ -1,6 +1,6 @@
 package net.caffeinemc.mods.sodium.client.render.chunk.compile.buffers;
 
-import com.mojang.blaze3d.vertex.VertexConsumer;
+import net.blaze3d.vertex.VertexConsumer;
 import net.sodium.api.util.ColorABGR;
 import net.sodium.api.util.ColorARGB;
 import net.sodium.api.util.NormI8;

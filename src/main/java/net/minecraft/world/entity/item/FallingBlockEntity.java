@@ -1,6 +1,6 @@
 package net.minecraft.world.entity.item;
 
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import java.util.function.Predicate;
 import net.minecraft.CrashReportCategory;
 import net.minecraft.core.BlockPos;

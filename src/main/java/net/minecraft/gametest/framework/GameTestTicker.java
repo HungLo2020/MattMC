@@ -1,7 +1,7 @@
 package net.minecraft.gametest.framework;
 
 import com.google.common.collect.Lists;
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import java.util.Collection;
 import net.minecraft.Util;
 import org.jetbrains.annotations.Nullable;

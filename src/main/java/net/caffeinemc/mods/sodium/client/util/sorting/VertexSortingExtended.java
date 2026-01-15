@@ -1,6 +1,6 @@
 package net.caffeinemc.mods.sodium.client.util.sorting;
 
-import com.mojang.blaze3d.vertex.VertexSorting;
+import net.blaze3d.vertex.VertexSorting;
 import org.joml.Vector3f;
 
 public interface VertexSortingExtended extends VertexSorting {

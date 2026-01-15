@@ -1,6 +1,6 @@
 package net.minecraft.client.renderer;
 
-import com.mojang.blaze3d.vertex.PoseStack;
+import net.blaze3d.vertex.PoseStack;
 import it.unimi.dsi.fastutil.ints.Int2ObjectAVLTreeMap;
 import java.util.List;
 import net.minecraft.api.EnvType;

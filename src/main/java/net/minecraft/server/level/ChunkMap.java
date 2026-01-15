@@ -6,7 +6,11 @@ import com.google.common.collect.Queues;
 import com.google.common.collect.Sets;
 import com.google.common.collect.ImmutableList.Builder;
 import com.mojang.datafixers.DataFixer;
-import com.mojang.logging.LogUtils;
+import net.distanthorizons.common.wrappers.chunk.ChunkWrapper;
+import net.distanthorizons.common.wrappers.world.ServerLevelWrapper;
+import net.distanthorizons.core.api.internal.ServerApi;
+import net.distanthorizons.core.api.internal.SharedApi;
+import net.logging.LogUtils;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.longs.Long2ByteMap;
@@ -1409,7 +1413,7 @@ public class ChunkMap extends ChunkStorage implements ChunkHolder.PlayerProvider
 	// DH: Helper method to fire chunk save events
 	private static void fireChunkSaveEvent(net.minecraft.server.level.ServerLevel level, net.minecraft.world.level.chunk.ChunkAccess chunk) {
 		// Skip if chunk is already being updated
-		if (com.seibel.distanthorizons.core.api.internal.SharedApi.isChunkAtChunkPosAlreadyUpdating(chunk.getPos().x, chunk.getPos().z)) {
+		if (SharedApi.isChunkAtChunkPosAlreadyUpdating(chunk.getPos().x, chunk.getPos().z)) {
 			return;
 		}
 		
@@ -1426,10 +1430,10 @@ public class ChunkMap extends ChunkStorage implements ChunkHolder.PlayerProvider
 		}
 		
 		// Fire the event
-		com.seibel.distanthorizons.core.api.internal.ServerApi.INSTANCE.serverChunkSaveEvent(
-			new com.seibel.distanthorizons.common.wrappers.chunk.ChunkWrapper(chunk, 
-				com.seibel.distanthorizons.common.wrappers.world.ServerLevelWrapper.getWrapper(level)),
-			com.seibel.distanthorizons.common.wrappers.world.ServerLevelWrapper.getWrapper(level)
+		ServerApi.INSTANCE.serverChunkSaveEvent(
+			new ChunkWrapper(chunk,
+				ServerLevelWrapper.getWrapper(level)),
+			ServerLevelWrapper.getWrapper(level)
 		);
 	}
 }

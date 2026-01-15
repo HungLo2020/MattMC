@@ -1,7 +1,7 @@
 package net.minecraft.client.gui.components;
 
 import com.google.common.collect.Lists;
-import com.mojang.blaze3d.audio.ListenerTransform;
+import net.blaze3d.audio.ListenerTransform;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Iterator;

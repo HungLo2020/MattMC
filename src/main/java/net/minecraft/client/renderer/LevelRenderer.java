@@ -2,23 +2,21 @@ package net.minecraft.client.renderer;
 
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
-import com.mojang.blaze3d.buffers.GpuBuffer;
-import com.mojang.blaze3d.buffers.GpuBufferSlice;
-import com.mojang.blaze3d.framegraph.FrameGraphBuilder;
-import com.mojang.blaze3d.framegraph.FramePass;
-import com.mojang.blaze3d.pipeline.RenderTarget;
-import com.mojang.blaze3d.pipeline.TextureTarget;
-import com.mojang.blaze3d.platform.Lighting;
-import com.mojang.blaze3d.resource.GraphicsResourceAllocator;
-import com.mojang.blaze3d.resource.RenderTargetDescriptor;
-import com.mojang.blaze3d.resource.ResourceHandle;
-import com.mojang.blaze3d.systems.RenderPass;
-import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.blaze3d.vertex.SheetedDecalTextureGenerator;
-import com.mojang.blaze3d.vertex.VertexConsumer;
-import com.mojang.blaze3d.vertex.VertexFormat;
-import com.mojang.logging.LogUtils;
+import net.blaze3d.buffers.GpuBufferSlice;
+import net.blaze3d.framegraph.FrameGraphBuilder;
+import net.blaze3d.framegraph.FramePass;
+import net.blaze3d.pipeline.RenderTarget;
+import net.blaze3d.pipeline.TextureTarget;
+import net.blaze3d.platform.Lighting;
+import net.blaze3d.resource.GraphicsResourceAllocator;
+import net.blaze3d.resource.RenderTargetDescriptor;
+import net.blaze3d.resource.ResourceHandle;
+import net.blaze3d.systems.RenderPass;
+import net.blaze3d.systems.RenderSystem;
+import net.blaze3d.vertex.PoseStack;
+import net.blaze3d.vertex.SheetedDecalTextureGenerator;
+import net.blaze3d.vertex.VertexConsumer;
+import net.logging.LogUtils;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectFunction;
@@ -26,12 +24,10 @@ import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap.Entry;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
-import it.unimi.dsi.fastutil.objects.ObjectListIterator;
-import java.util.ArrayList;
+
 import java.util.EnumMap;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Locale;
 import java.util.Optional;
 import java.util.Set;
 import java.util.SortedSet;
@@ -54,8 +50,6 @@ import net.minecraft.client.renderer.chunk.ChunkSectionLayerGroup;
 import net.minecraft.client.renderer.chunk.ChunkSectionsToRender;
 import net.minecraft.client.renderer.chunk.CompiledSectionMesh;
 import net.minecraft.client.renderer.chunk.RenderRegionCache;
-import net.minecraft.client.renderer.chunk.SectionBuffers;
-import net.minecraft.client.renderer.chunk.SectionMesh;
 import net.minecraft.client.renderer.chunk.SectionRenderDispatcher;
 import net.minecraft.client.renderer.chunk.TranslucencyPointOfView;
 import net.minecraft.client.renderer.culling.Frustum;
@@ -64,7 +58,6 @@ import net.minecraft.client.renderer.debug.GameTestBlockHighlightRenderer;
 import net.minecraft.client.renderer.entity.EntityRenderDispatcher;
 import net.minecraft.client.renderer.entity.state.EntityRenderState;
 import net.minecraft.client.renderer.feature.FeatureRenderDispatcher;
-import net.minecraft.client.renderer.feature.ModelFeatureRenderer;
 import net.minecraft.client.renderer.state.BlockBreakingRenderState;
 import net.minecraft.client.renderer.state.BlockOutlineRenderState;
 import net.minecraft.client.renderer.state.LevelRenderState;
@@ -91,7 +84,6 @@ import net.minecraft.world.level.BlockAndTintGetter;
 import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.LightLayer;
-import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.material.FogType;
 import net.minecraft.world.phys.BlockHitResult;
@@ -99,11 +91,11 @@ import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.phys.HitResult.Type;
 import net.minecraft.world.phys.shapes.CollisionContext;
 import net.minecraft.world.phys.shapes.VoxelShape;
+import net.voxelmap.VoxelConstants;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix4f;
 import org.joml.Matrix4fStack;
 import org.joml.Matrix4fc;
-import org.joml.Vector3f;
 import org.joml.Vector4f;
 import org.slf4j.Logger;
 
@@ -653,11 +645,11 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 		
 		// VoxelMap: Render waypoint beacons after level rendering
 		try {
-			com.mojang.blaze3d.vertex.PoseStack voxelmap_poseStack = new com.mojang.blaze3d.vertex.PoseStack();
+			PoseStack voxelmap_poseStack = new PoseStack();
 			voxelmap_poseStack.pushPose();
 			voxelmap_poseStack.last().pose().set(matrix4f);
 			net.minecraft.client.renderer.MultiBufferSource.BufferSource bufferSource = this.minecraft.renderBuffers().bufferSource();
-			com.mamiyaotaru.voxelmap.VoxelConstants.onRenderWaypoints(deltaTracker.getGameTimeDeltaPartialTick(false), voxelmap_poseStack, bufferSource, camera);
+			VoxelConstants.onRenderWaypoints(deltaTracker.getGameTimeDeltaPartialTick(false), voxelmap_poseStack, bufferSource, camera);
 			voxelmap_poseStack.popPose();
 		} catch (Exception e) {
 			// Silently catch to avoid crashes
@@ -1368,8 +1360,8 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 		
 		// VoxelMap: Notify world update listener for chunk changes
 		try {
-			if (com.mamiyaotaru.voxelmap.VoxelConstants.getVoxelMapInstance().getWorldUpdateListener() != null) {
-				com.mamiyaotaru.voxelmap.VoxelConstants.getVoxelMapInstance().getWorldUpdateListener().notifyObservers(x, z);
+			if (VoxelConstants.getVoxelMapInstance().getWorldUpdateListener() != null) {
+				VoxelConstants.getVoxelMapInstance().getWorldUpdateListener().notifyObservers(x, z);
 			}
 		} catch (Exception e) {
 			// Silently catch to avoid crashes

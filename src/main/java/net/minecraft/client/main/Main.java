@@ -1,12 +1,10 @@
 package net.minecraft.client.main;
 
-import com.google.common.base.Stopwatch;
-import com.google.common.base.Ticker;
-import com.mojang.blaze3d.TracyBootstrap;
-import com.mojang.blaze3d.platform.DisplayData;
-import com.mojang.blaze3d.systems.RenderSystem;
+import net.blaze3d.TracyBootstrap;
+import net.blaze3d.platform.DisplayData;
+import net.blaze3d.systems.RenderSystem;
 import com.mojang.jtracy.TracyClient;
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import net.minecraft.util.UndashedUuid;
 import java.io.File;
 import java.net.Authenticator;

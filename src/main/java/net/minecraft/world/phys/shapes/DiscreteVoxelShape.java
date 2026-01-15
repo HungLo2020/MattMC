@@ -1,6 +1,6 @@
 package net.minecraft.world.phys.shapes;
 
-import com.mojang.math.OctahedralGroup;
+import net.math.OctahedralGroup;
 import net.minecraft.core.AxisCycle;
 import net.minecraft.core.Direction;
 

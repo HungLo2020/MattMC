@@ -1,6 +1,6 @@
 package net.minecraft.client.gui.contextualbar;
 
-import com.mojang.blaze3d.platform.Window;
+import net.blaze3d.platform.Window;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.client.DeltaTracker;

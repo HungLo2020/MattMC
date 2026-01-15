@@ -1,6 +1,6 @@
 package net.minecraft.client.quickplay;
 
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 import net.minecraft.api.EnvType;

@@ -1,11 +1,11 @@
 package net.caffeinemc.mods.sodium.client.render.chunk;
 
-import com.mojang.blaze3d.opengl.GlConst;
-import com.mojang.blaze3d.opengl.GlDevice;
-import com.mojang.blaze3d.opengl.GlStateManager;
-import com.mojang.blaze3d.opengl.GlTexture;
-import com.mojang.blaze3d.pipeline.RenderTarget;
-import com.mojang.blaze3d.systems.RenderSystem;
+import net.blaze3d.opengl.GlConst;
+import net.blaze3d.opengl.GlDevice;
+import net.blaze3d.opengl.GlStateManager;
+import net.blaze3d.opengl.GlTexture;
+import net.blaze3d.pipeline.RenderTarget;
+import net.blaze3d.systems.RenderSystem;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import net.caffeinemc.mods.sodium.client.gl.attribute.GlVertexFormat;
 import net.caffeinemc.mods.sodium.client.gl.device.CommandList;
@@ -15,7 +15,7 @@ import net.caffeinemc.mods.sodium.client.render.chunk.terrain.TerrainRenderPass;
 import net.caffeinemc.mods.sodium.client.render.chunk.vertex.format.ChunkVertexType;
 import net.caffeinemc.mods.sodium.client.gl.shader.*;
 import net.caffeinemc.mods.sodium.client.util.FogParameters;
-import com.mojang.blaze3d.opengl.GlCommandEncoder;
+import net.blaze3d.opengl.GlCommandEncoder;
 import net.minecraft.resources.ResourceLocation;
 import java.util.Map;
 

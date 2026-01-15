@@ -1,6 +1,6 @@
 package net.minecraft.util.monitoring.jmx;
 
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import java.lang.management.ManagementFactory;
 import java.util.Arrays;
 import java.util.List;

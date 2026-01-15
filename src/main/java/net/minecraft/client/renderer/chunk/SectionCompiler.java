@@ -1,12 +1,12 @@
 package net.minecraft.client.renderer.chunk;
 
-import com.mojang.blaze3d.vertex.BufferBuilder;
-import com.mojang.blaze3d.vertex.ByteBufferBuilder;
-import com.mojang.blaze3d.vertex.DefaultVertexFormat;
-import com.mojang.blaze3d.vertex.MeshData;
-import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.blaze3d.vertex.VertexFormat;
-import com.mojang.blaze3d.vertex.VertexSorting;
+import net.blaze3d.vertex.BufferBuilder;
+import net.blaze3d.vertex.ByteBufferBuilder;
+import net.blaze3d.vertex.DefaultVertexFormat;
+import net.blaze3d.vertex.MeshData;
+import net.blaze3d.vertex.PoseStack;
+import net.blaze3d.vertex.VertexFormat;
+import net.blaze3d.vertex.VertexSorting;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import java.util.ArrayList;
 import java.util.EnumMap;

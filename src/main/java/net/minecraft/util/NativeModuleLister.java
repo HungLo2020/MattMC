@@ -2,7 +2,7 @@ package net.minecraft.util;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableList.Builder;
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import com.sun.jna.Memory;
 import com.sun.jna.Native;
 import com.sun.jna.Platform;

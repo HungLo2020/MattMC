@@ -1,8 +1,8 @@
 package net.minecraft.core;
 
 import com.google.common.collect.Maps;
-import com.mojang.math.MatrixUtil;
-import com.mojang.math.Transformation;
+import net.math.MatrixUtil;
+import net.math.Transformation;
 import java.util.Map;
 import net.minecraft.Util;
 import org.joml.Matrix4f;

@@ -1,6 +1,5 @@
 package net.irisshaders.iris.uniforms;
 
-import com.mojang.blaze3d.systems.RenderSystem;
 import net.caffeinemc.mods.sodium.client.util.FogStorage;
 import net.irisshaders.iris.gl.state.FogMode;
 import net.irisshaders.iris.gl.state.StateUpdateNotifiers;

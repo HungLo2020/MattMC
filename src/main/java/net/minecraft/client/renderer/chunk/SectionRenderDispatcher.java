@@ -1,9 +1,9 @@
 package net.minecraft.client.renderer.chunk;
 
 import com.google.common.collect.Queues;
-import com.mojang.blaze3d.vertex.ByteBufferBuilder;
-import com.mojang.blaze3d.vertex.MeshData;
-import com.mojang.blaze3d.vertex.VertexSorting;
+import net.blaze3d.vertex.ByteBufferBuilder;
+import net.blaze3d.vertex.MeshData;
+import net.blaze3d.vertex.VertexSorting;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;

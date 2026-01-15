@@ -1,7 +1,7 @@
 package net.minecraft.client.renderer.chunk;
 
-import com.mojang.blaze3d.buffers.GpuBuffer;
-import com.mojang.blaze3d.vertex.VertexFormat;
+import net.blaze3d.buffers.GpuBuffer;
+import net.blaze3d.vertex.VertexFormat;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import org.jetbrains.annotations.Nullable;

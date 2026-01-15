@@ -2,7 +2,7 @@ package net.minecraft.nbt;
 
 import com.google.common.base.Strings;
 import com.google.common.collect.Lists;
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Iterator;

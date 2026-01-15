@@ -1,9 +1,9 @@
 package net.minecraft.client.renderer.texture;
 
-import com.mojang.blaze3d.platform.NativeImage;
-import com.mojang.blaze3d.systems.GpuDevice;
-import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.textures.TextureFormat;
+import net.blaze3d.platform.NativeImage;
+import net.blaze3d.systems.GpuDevice;
+import net.blaze3d.systems.RenderSystem;
+import net.blaze3d.textures.TextureFormat;
 import java.io.IOException;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;

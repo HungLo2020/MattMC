@@ -1,6 +1,6 @@
 package net.minecraft.client.gui.font.providers;
 
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import org.lwjgl.PointerBuffer;

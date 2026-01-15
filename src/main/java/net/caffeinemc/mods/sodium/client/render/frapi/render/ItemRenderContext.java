@@ -1,8 +1,8 @@
 package net.caffeinemc.mods.sodium.client.render.frapi.render;
 
-import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.blaze3d.vertex.VertexConsumer;
-import com.mojang.math.MatrixUtil;
+import net.blaze3d.vertex.PoseStack;
+import net.blaze3d.vertex.VertexConsumer;
+import net.math.MatrixUtil;
 import net.sodium.api.texture.SpriteUtil;
 import net.sodium.api.util.ColorMixer;
 import net.caffeinemc.mods.sodium.client.render.frapi.helper.ColorHelper;

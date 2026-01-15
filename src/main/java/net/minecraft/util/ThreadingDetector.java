@@ -1,6 +1,6 @@
 package net.minecraft.util;
 
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import java.util.Arrays;
 import java.util.Objects;
 import java.util.concurrent.Semaphore;

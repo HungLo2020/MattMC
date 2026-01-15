@@ -1,13 +1,12 @@
 package net.irisshaders.iris.pbr;
 
-import com.mojang.blaze3d.opengl.GlStateManager;
+import net.blaze3d.opengl.GlStateManager;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import org.jetbrains.annotations.Nullable;
 import org.lwjgl.opengl.GL20C;
 
 import java.nio.ByteBuffer;
-import java.nio.IntBuffer;
 
 public class TextureInfoCache {
 	public static final TextureInfoCache INSTANCE = new TextureInfoCache();

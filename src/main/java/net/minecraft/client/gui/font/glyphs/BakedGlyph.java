@@ -1,6 +1,6 @@
 package net.minecraft.client.gui.font.glyphs;
 
-import com.mojang.blaze3d.font.GlyphInfo;
+import net.blaze3d.font.GlyphInfo;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.client.gui.font.TextRenderable;

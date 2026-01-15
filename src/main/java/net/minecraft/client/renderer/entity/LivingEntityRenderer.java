@@ -2,8 +2,8 @@ package net.minecraft.client.renderer.entity;
 
 import com.google.common.collect.Lists;
 import com.google.common.collect.ImmutableList.Builder;
-import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.math.Axis;
+import net.blaze3d.vertex.PoseStack;
+import net.math.Axis;
 import java.util.List;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;

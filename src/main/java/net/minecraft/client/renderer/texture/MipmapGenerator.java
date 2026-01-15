@@ -1,9 +1,8 @@
 package net.minecraft.client.renderer.texture;
 
-import com.mojang.blaze3d.platform.NativeImage;
+import net.blaze3d.platform.NativeImage;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
-import net.minecraft.Util;
 import net.minecraft.util.ARGB;
 
 @Environment(EnvType.CLIENT)

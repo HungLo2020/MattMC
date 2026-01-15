@@ -2,13 +2,15 @@ package net.irisshaders.iris.shadows.frustum.fallback;
 
 import net.caffeinemc.mods.sodium.client.render.viewport.Viewport;
 import net.caffeinemc.mods.sodium.client.render.viewport.ViewportProvider;
+import net.distanthorizons.api.interfaces.override.rendering.IDhApiShadowCullingFrustum;
+import net.distanthorizons.api.objects.math.DhApiMat4f;
 import net.irisshaders.iris.shadows.frustum.BoxCuller;
 import net.minecraft.client.renderer.culling.Frustum;
 import net.minecraft.world.phys.AABB;
 import org.joml.Matrix4f;
 import org.joml.Vector3d;
 
-public class BoxCullingFrustum extends Frustum implements net.caffeinemc.mods.sodium.client.render.viewport.frustum.Frustum, ViewportProvider, com.seibel.distanthorizons.api.interfaces.override.rendering.IDhApiShadowCullingFrustum {
+public class BoxCullingFrustum extends Frustum implements net.caffeinemc.mods.sodium.client.render.viewport.frustum.Frustum, ViewportProvider, IDhApiShadowCullingFrustum {
 	private final BoxCuller boxCuller;
 	private final Vector3d position = new Vector3d();
 	// DH integration fields
@@ -55,7 +57,7 @@ public class BoxCullingFrustum extends Frustum implements net.caffeinemc.mods.so
 
 	// DH API implementation
 	@Override
-	public void update(int worldMinBlockY, int worldMaxBlockY, com.seibel.distanthorizons.api.objects.math.DhApiMat4f worldViewProjection) {
+	public void update(int worldMinBlockY, int worldMaxBlockY, DhApiMat4f worldViewProjection) {
 		this.worldMinYDH = worldMinBlockY;
 		this.worldMaxYDH = worldMaxBlockY;
 	}

@@ -1,10 +1,10 @@
 package net.minecraft.client.renderer.entity;
 
-import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.blaze3d.vertex.SheetedDecalTextureGenerator;
-import com.mojang.blaze3d.vertex.VertexConsumer;
-import com.mojang.blaze3d.vertex.VertexMultiConsumer;
-import com.mojang.math.MatrixUtil;
+import net.blaze3d.vertex.PoseStack;
+import net.blaze3d.vertex.SheetedDecalTextureGenerator;
+import net.blaze3d.vertex.VertexConsumer;
+import net.blaze3d.vertex.VertexMultiConsumer;
+import net.math.MatrixUtil;
 import java.util.List;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;

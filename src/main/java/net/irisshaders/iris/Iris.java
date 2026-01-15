@@ -1,11 +1,11 @@
 package net.irisshaders.iris;
 
 import com.google.common.base.Throwables;
-import com.mojang.blaze3d.opengl.GlDebug;
-import com.mojang.blaze3d.opengl.GlDevice;
-import com.mojang.blaze3d.platform.InputConstants;
-import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.vertex.DefaultVertexFormat;
+import net.blaze3d.opengl.GlDebug;
+import net.blaze3d.opengl.GlDevice;
+import net.blaze3d.platform.InputConstants;
+import net.blaze3d.systems.RenderSystem;
+import net.blaze3d.vertex.DefaultVertexFormat;
 import net.sodium.api.vertex.serializer.VertexSerializerRegistry;
 import net.irisshaders.iris.compat.dh.DHCompat;
 import net.irisshaders.iris.config.IrisConfig;

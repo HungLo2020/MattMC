@@ -1,8 +1,8 @@
 package net.caffeinemc.mods.sodium.client.render.frapi.mesh;
 
 import com.google.common.base.Preconditions;
-import com.mojang.blaze3d.vertex.DefaultVertexFormat;
-import com.mojang.blaze3d.vertex.VertexFormat;
+import net.blaze3d.vertex.DefaultVertexFormat;
+import net.blaze3d.vertex.VertexFormat;
 import net.caffeinemc.mods.sodium.client.model.quad.properties.ModelQuadFacing;
 import net.caffeinemc.mods.sodium.client.render.frapi.helper.GeometryHelper;
 import net.minecraft.client.renderer.chunk.ChunkSectionLayer;

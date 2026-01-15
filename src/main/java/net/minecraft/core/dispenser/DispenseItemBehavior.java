@@ -1,6 +1,6 @@
 package net.minecraft.core.dispenser;
 
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Consumer;

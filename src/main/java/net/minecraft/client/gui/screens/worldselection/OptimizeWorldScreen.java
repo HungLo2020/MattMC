@@ -1,7 +1,7 @@
 package net.minecraft.client.gui.screens.worldselection;
 
 import com.mojang.datafixers.DataFixer;
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import it.unimi.dsi.fastutil.booleans.BooleanConsumer;
 import it.unimi.dsi.fastutil.objects.Reference2IntOpenHashMap;
 import java.util.function.ToIntFunction;

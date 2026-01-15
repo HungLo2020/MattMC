@@ -1,6 +1,6 @@
 package net.minecraft.client.multiplayer;
 
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import java.util.concurrent.TimeUnit;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
@@ -12,7 +12,6 @@ import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.progress.ChunkLoadStatusView;
 import net.minecraft.server.level.progress.LevelLoadListener;
 import net.minecraft.server.level.progress.LevelLoadProgressTracker;
-import net.minecraft.server.level.progress.LevelLoadListener.Stage;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import org.jetbrains.annotations.Nullable;

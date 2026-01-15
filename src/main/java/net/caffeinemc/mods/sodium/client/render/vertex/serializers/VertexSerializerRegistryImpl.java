@@ -1,6 +1,6 @@
 package net.caffeinemc.mods.sodium.client.render.vertex.serializers;
 
-import com.mojang.blaze3d.vertex.VertexFormat;
+import net.blaze3d.vertex.VertexFormat;
 import it.unimi.dsi.fastutil.longs.Long2ReferenceMap;
 import it.unimi.dsi.fastutil.longs.Long2ReferenceOpenHashMap;
 import net.sodium.api.vertex.format.VertexFormatExtensions;

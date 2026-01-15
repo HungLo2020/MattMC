@@ -4,7 +4,7 @@ import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import net.minecraft.server.profile.PlayerProfile;
-import com.mojang.blaze3d.textures.GpuTextureView;
+import net.blaze3d.textures.GpuTextureView;
 import java.time.Duration;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;

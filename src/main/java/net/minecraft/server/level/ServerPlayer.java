@@ -5,9 +5,10 @@ import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.google.common.hash.HashCode;
 import com.google.common.net.InetAddresses;
+import net.distanthorizons.common.wrappers.misc.IMixinServerPlayer;
 import net.minecraft.server.profile.PlayerProfile;
 import com.mojang.datafixers.util.Either;
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.DynamicOps;
 import com.mojang.serialization.MapCodec;
@@ -201,7 +202,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 
-public class ServerPlayer extends Player implements com.seibel.distanthorizons.common.wrappers.misc.IMixinServerPlayer {
+public class ServerPlayer extends Player implements IMixinServerPlayer {
 	private static final Logger LOGGER = LogUtils.getLogger();
 	private static final int NEUTRAL_MOB_DEATH_NOTIFICATION_RADII_XZ = 32;
 	private static final int NEUTRAL_MOB_DEATH_NOTIFICATION_RADII_Y = 10;

@@ -1,9 +1,9 @@
 package net.minecraft.client.gui.font.glyphs;
 
-import com.mojang.blaze3d.font.GlyphInfo;
-import com.mojang.blaze3d.pipeline.RenderPipeline;
-import com.mojang.blaze3d.textures.GpuTextureView;
-import com.mojang.blaze3d.vertex.VertexConsumer;
+import net.blaze3d.font.GlyphInfo;
+import net.blaze3d.pipeline.RenderPipeline;
+import net.blaze3d.textures.GpuTextureView;
+import net.blaze3d.vertex.VertexConsumer;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.client.gui.Font;
