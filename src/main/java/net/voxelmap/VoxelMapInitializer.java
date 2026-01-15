@@ -1,6 +1,6 @@
 package net.voxelmap;
 
-import com.mamiyaotaru.voxelmap.fabric.*;
+import net.voxelmap.fabric.*;
 import net.voxelmap.fabric.*;
 
 /**

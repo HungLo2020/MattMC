@@ -4,7 +4,7 @@ import net.distanthorizons.api.methods.events.abstractEvents.DhApiLevelLoadEvent
 import net.distanthorizons.api.methods.events.abstractEvents.DhApiLevelUnloadEvent;
 import net.distanthorizons.core.network.messages.AbstractNetworkMessage;
 import net.distanthorizons.core.network.messages.MessageRegistry;
-import com.seibel.distanthorizons.core.world.*;
+import net.distanthorizons.core.world.*;
 import net.distanthorizons.core.world.*;
 import net.distanthorizons.core.wrapperInterfaces.misc.IServerPlayerWrapper;
 import net.distanthorizons.coreapi.DependencyInjection.ApiEventInjector;

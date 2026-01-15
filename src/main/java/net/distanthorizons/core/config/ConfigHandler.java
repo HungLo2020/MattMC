@@ -1,7 +1,7 @@
 package net.distanthorizons.core.config;
 
 import net.distanthorizons.core.config.file.ConfigFileHandler;
-import com.seibel.distanthorizons.core.config.types.*;
+import net.distanthorizons.core.config.types.*;
 import net.distanthorizons.core.config.types.*;
 import net.distanthorizons.core.dependencyInjection.SingletonInjector;
 import net.distanthorizons.core.logging.DhLoggerBuilder;

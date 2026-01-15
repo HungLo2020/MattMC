@@ -8,7 +8,7 @@ import net.distanthorizons.common.wrappers.block.ClientBlockStateColorCache;
 import net.distanthorizons.common.wrappers.chunk.ChunkWrapper;
 import net.distanthorizons.core.dataObjects.fullData.sources.FullDataSourceV2;
 import net.distanthorizons.core.dependencyInjection.SingletonInjector;
-import com.seibel.distanthorizons.core.level.*;
+import net.distanthorizons.core.level.*;
 import net.distanthorizons.core.level.IDhLevel;
 import net.distanthorizons.core.level.IKeyedClientLevelManager;
 import net.distanthorizons.core.level.IServerKeyedClientLevel;

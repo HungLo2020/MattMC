@@ -1,10 +1,10 @@
 package net.distanthorizons.core.api.external.methods.config.client;
 
-import com.seibel.distanthorizons.api.enums.config.*;
+import net.distanthorizons.api.enums.config.*;
 import net.distanthorizons.api.enums.config.*;
 import net.distanthorizons.api.enums.rendering.EDhApiTransparency;
 import net.distanthorizons.api.interfaces.config.IDhApiConfigValue;
-import com.seibel.distanthorizons.api.interfaces.config.client.*;
+import net.distanthorizons.api.interfaces.config.client.*;
 import net.distanthorizons.api.interfaces.config.client.*;
 import net.distanthorizons.core.config.api.DhApiConfigValue;
 import net.distanthorizons.api.enums.rendering.EDhApiRendererMode;

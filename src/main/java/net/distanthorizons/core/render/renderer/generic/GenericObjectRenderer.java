@@ -5,7 +5,7 @@ import net.distanthorizons.api.enums.rendering.EDhApiBlockMaterial;
 import net.distanthorizons.api.interfaces.override.rendering.IDhApiGenericObjectShaderProgram;
 import net.distanthorizons.api.interfaces.render.IDhApiRenderableBoxGroup;
 import net.distanthorizons.api.interfaces.render.IDhApiCustomRenderRegister;
-import com.seibel.distanthorizons.api.methods.events.abstractEvents.*;
+import net.distanthorizons.api.methods.events.abstractEvents.*;
 import net.distanthorizons.api.methods.events.abstractEvents.DhApiBeforeGenericObjectRenderEvent;
 import net.distanthorizons.api.methods.events.abstractEvents.DhApiBeforeGenericRenderCleanupEvent;
 import net.distanthorizons.api.methods.events.abstractEvents.DhApiBeforeGenericRenderSetupEvent;

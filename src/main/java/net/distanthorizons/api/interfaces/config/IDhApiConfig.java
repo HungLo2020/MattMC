@@ -1,7 +1,7 @@
 package net.distanthorizons.api.interfaces.config;
 
 import net.distanthorizons.api.interfaces.config.both.IDhApiWorldGenerationConfig;
-import com.seibel.distanthorizons.api.interfaces.config.client.*;
+import net.distanthorizons.api.interfaces.config.client.*;
 import net.distanthorizons.api.interfaces.config.client.IDhApiDebuggingConfig;
 import net.distanthorizons.api.interfaces.config.client.IDhApiGraphicsConfig;
 import net.distanthorizons.api.interfaces.config.client.IDhApiMultiThreadingConfig;

@@ -1,17 +1,17 @@
 package net.distanthorizons.core.config;
 
 import net.distanthorizons.api.DhApi;
-import com.seibel.distanthorizons.api.enums.config.*;
-import com.seibel.distanthorizons.api.enums.config.quickOptions.*;
-import com.seibel.distanthorizons.api.enums.rendering.*;
+import net.distanthorizons.api.enums.config.*;
+import net.distanthorizons.api.enums.config.quickOptions.*;
+import net.distanthorizons.api.enums.rendering.*;
 import net.distanthorizons.api.enums.config.*;
 import net.distanthorizons.api.enums.config.quickOptions.EDhApiQualityPreset;
 import net.distanthorizons.api.enums.config.quickOptions.EDhApiThreadPreset;
 import net.distanthorizons.api.enums.rendering.*;
 import net.distanthorizons.api.enums.worldGeneration.EDhApiDistantGeneratorMode;
 import net.distanthorizons.api.enums.worldGeneration.EDhApiDistantGeneratorProgressDisplayLocation;
-import com.seibel.distanthorizons.core.config.eventHandlers.*;
-import com.seibel.distanthorizons.core.config.eventHandlers.presets.*;
+import net.distanthorizons.core.config.eventHandlers.*;
+import net.distanthorizons.core.config.eventHandlers.presets.*;
 import net.distanthorizons.core.config.eventHandlers.QuickRenderToggleConfigEventHandler;
 import net.distanthorizons.core.config.eventHandlers.ReloadLodsConfigEventHandler;
 import net.distanthorizons.core.config.eventHandlers.UnsafeValuesConfigListener;
@@ -19,8 +19,8 @@ import net.distanthorizons.core.config.eventHandlers.WorldCurvatureConfigEventHa
 import net.distanthorizons.core.config.eventHandlers.presets.RenderQualityPresetConfigEventHandler;
 import net.distanthorizons.core.config.eventHandlers.presets.ThreadPresetConfigEventHandler;
 import net.distanthorizons.core.config.listeners.ConfigChangeListener;
-import com.seibel.distanthorizons.core.config.types.*;
-import com.seibel.distanthorizons.core.config.types.enums.*;
+import net.distanthorizons.core.config.types.*;
+import net.distanthorizons.core.config.types.enums.*;
 import net.distanthorizons.core.config.types.*;
 import net.distanthorizons.core.config.types.enums.EConfigCommentTextPosition;
 import net.distanthorizons.core.config.types.enums.EConfigEntryAppearance;

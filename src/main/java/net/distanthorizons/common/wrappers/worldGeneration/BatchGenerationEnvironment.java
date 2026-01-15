@@ -6,7 +6,7 @@ import net.distanthorizons.api.enums.worldGeneration.EDhApiDistantGeneratorMode;
 import net.distanthorizons.api.enums.worldGeneration.EDhApiWorldGenerationStep;
 import net.distanthorizons.common.wrappers.world.ServerLevelWrapper;
 import net.distanthorizons.common.wrappers.worldGeneration.chunkFileHandling.ChunkFileReader;
-import com.seibel.distanthorizons.common.wrappers.worldGeneration.mimicObject.*;
+import net.distanthorizons.common.wrappers.worldGeneration.mimicObject.*;
 import net.distanthorizons.common.wrappers.worldGeneration.mimicObject.DhLitWorldGenRegion;
 import net.distanthorizons.common.wrappers.worldGeneration.mimicObject.DummyLightEngine;
 import net.distanthorizons.common.wrappers.worldGeneration.mimicObject.LightGetterAdaptor;

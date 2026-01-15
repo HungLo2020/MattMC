@@ -7,7 +7,7 @@ import net.distanthorizons.core.dependencyInjection.SingletonInjector;
 import net.distanthorizons.core.jar.EPlatform;
 import net.distanthorizons.core.logging.DhLogger;
 import net.distanthorizons.core.logging.DhLoggerBuilder;
-import com.seibel.distanthorizons.core.util.objects.GLMessages.*;
+import net.distanthorizons.core.util.objects.GLMessages.*;
 import net.distanthorizons.core.util.objects.GLMessages.*;
 import net.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftClientWrapper;
 import net.distanthorizons.coreapi.ModInfo;

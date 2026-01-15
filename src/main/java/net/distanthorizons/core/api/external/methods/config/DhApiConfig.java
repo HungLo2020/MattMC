@@ -2,8 +2,8 @@ package net.distanthorizons.core.api.external.methods.config;
 
 import net.distanthorizons.api.interfaces.config.IDhApiConfig;
 import net.distanthorizons.api.interfaces.config.both.IDhApiWorldGenerationConfig;
-import com.seibel.distanthorizons.api.interfaces.config.client.*;
-import com.seibel.distanthorizons.core.api.external.methods.config.client.*;
+import net.distanthorizons.api.interfaces.config.client.*;
+import net.distanthorizons.core.api.external.methods.config.client.*;
 import net.distanthorizons.api.interfaces.config.client.IDhApiDebuggingConfig;
 import net.distanthorizons.api.interfaces.config.client.IDhApiGraphicsConfig;
 import net.distanthorizons.api.interfaces.config.client.IDhApiMultiThreadingConfig;

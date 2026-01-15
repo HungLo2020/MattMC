@@ -15,7 +15,7 @@ import net.distanthorizons.api.enums.config.DisallowSelectingViaConfigGui;
 import net.distanthorizons.common.wrappers.gui.config.ConfigGuiInfo;
 import net.distanthorizons.core.config.Config;
 import net.distanthorizons.core.config.ConfigHandler;
-import com.seibel.distanthorizons.core.config.types.*;
+import net.distanthorizons.core.config.types.*;
 import net.distanthorizons.common.wrappers.gui.updater.ChangelogScreen;
 
 import net.distanthorizons.core.config.types.*;

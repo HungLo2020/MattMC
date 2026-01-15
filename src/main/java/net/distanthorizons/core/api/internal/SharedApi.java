@@ -20,7 +20,7 @@ import net.distanthorizons.core.util.LodUtil;
 import net.distanthorizons.core.util.objects.Pair;
 import net.distanthorizons.core.util.threading.PriorityTaskPicker;
 import net.distanthorizons.core.util.threading.ThreadPoolUtil;
-import com.seibel.distanthorizons.core.world.*;
+import net.distanthorizons.core.world.*;
 import net.distanthorizons.core.world.*;
 import net.distanthorizons.core.wrapperInterfaces.chunk.IChunkWrapper;
 import net.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftClientWrapper;

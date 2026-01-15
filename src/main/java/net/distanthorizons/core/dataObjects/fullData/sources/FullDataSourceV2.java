@@ -19,7 +19,7 @@ import net.distanthorizons.core.pos.DhLodPos;
 import net.distanthorizons.core.pos.DhSectionPos;
 import net.distanthorizons.core.pos.blockPos.DhBlockPos;
 import net.distanthorizons.core.sql.dto.util.FullDataMinMaxPosUtil;
-import com.seibel.distanthorizons.core.util.*;
+import net.distanthorizons.core.util.*;
 import net.distanthorizons.core.util.*;
 import net.distanthorizons.core.util.objects.DataCorruptedException;
 import net.distanthorizons.core.wrapperInterfaces.chunk.IChunkWrapper;

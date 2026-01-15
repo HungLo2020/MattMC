@@ -12,7 +12,7 @@ import net.distanthorizons.core.pooling.PhantomArrayListCheckout;
 import net.distanthorizons.core.pooling.PhantomArrayListPool;
 import net.distanthorizons.core.pos.DhSectionPos;
 import net.distanthorizons.core.pos.blockPos.DhBlockPosMutable;
-import com.seibel.distanthorizons.core.util.*;
+import net.distanthorizons.core.util.*;
 import net.distanthorizons.core.util.ColorUtil;
 import net.distanthorizons.core.util.FullDataPointUtil;
 import net.distanthorizons.core.util.LodUtil;
