@@ -100,12 +100,12 @@ public class ColorMixer {
      * @return The product of the two colors
      */
     public static int mulComponentWise(int color0, int color1) {
-        int comp0 = ((((color0 >>>  0) & 0xFF) * ((color1 >>>  0) & 0xFF)) + 0xFF) >>> 8;
+        int comp0 = ((((color0) & 0xFF) * ((color1) & 0xFF)) + 0xFF) >>> 8;
         int comp1 = ((((color0 >>>  8) & 0xFF) * ((color1 >>>  8) & 0xFF)) + 0xFF) >>> 8;
         int comp2 = ((((color0 >>> 16) & 0xFF) * ((color1 >>> 16) & 0xFF)) + 0xFF) >>> 8;
         int comp3 = ((((color0 >>> 24) & 0xFF) * ((color1 >>> 24) & 0xFF)) + 0xFF) >>> 8;
 
-        return (comp0 << 0) | (comp1 << 8) | (comp2 << 16) | (comp3 << 24);
+        return (comp0) | (comp1 << 8) | (comp2 << 16) | (comp3 << 24);
     }
 
     /**

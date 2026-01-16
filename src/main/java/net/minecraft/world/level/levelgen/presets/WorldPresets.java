@@ -25,6 +25,7 @@ import net.minecraft.world.level.levelgen.DebugLevelSource;
 import net.minecraft.world.level.levelgen.FlatLevelSource;
 import net.minecraft.world.level.levelgen.NoiseBasedChunkGenerator;
 import net.minecraft.world.level.levelgen.NoiseGeneratorSettings;
+import net.minecraft.world.level.levelgen.SkyblockChunkGenerator;
 import net.minecraft.world.level.levelgen.WorldDimensions;
 import net.minecraft.world.level.levelgen.flat.FlatLevelGeneratorSettings;
 import net.minecraft.world.level.levelgen.placement.PlacedFeature;
@@ -36,6 +37,7 @@ public class WorldPresets {
 	public static final ResourceKey<WorldPreset> LARGE_BIOMES = register("large_biomes");
 	public static final ResourceKey<WorldPreset> AMPLIFIED = register("amplified");
 	public static final ResourceKey<WorldPreset> SINGLE_BIOME_SURFACE = register("single_biome_surface");
+	public static final ResourceKey<WorldPreset> SKYBLOCK = register("skyblock");
 	public static final ResourceKey<WorldPreset> DEBUG = register("debug_all_block_states");
 
 	public static void bootstrap(BootstrapContext<WorldPreset> bootstrapContext) {
@@ -133,6 +135,10 @@ public class WorldPresets {
 			this.registerCustomOverworldPreset(WorldPresets.SINGLE_BIOME_SURFACE, this.makeNoiseBasedOverworld(new FixedBiomeSource(reference2), holder));
 			this.registerCustomOverworldPreset(
 				WorldPresets.FLAT, this.makeOverworld(new FlatLevelSource(FlatLevelGeneratorSettings.getDefault(this.biomes, this.structureSets, this.placedFeatures)))
+			);
+			// Register Skyblock with MultiNoiseBiomeSource so all biomes exist for mob spawning
+			this.registerCustomOverworldPreset(
+				WorldPresets.SKYBLOCK, this.makeOverworld(new SkyblockChunkGenerator(MultiNoiseBiomeSource.createFromPreset(reference)))
 			);
 			this.registerCustomOverworldPreset(WorldPresets.DEBUG, this.makeOverworld(new DebugLevelSource(reference2)));
 		}

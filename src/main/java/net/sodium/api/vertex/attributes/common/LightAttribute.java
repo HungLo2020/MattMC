@@ -4,7 +4,7 @@ import org.lwjgl.system.MemoryUtil;
 
 public class LightAttribute {
     public static void set(long ptr, int light) {
-        MemoryUtil.memPutInt(ptr + 0, light);
+        MemoryUtil.memPutInt(ptr, light);
     }
 
     public static int get(long ptr) {

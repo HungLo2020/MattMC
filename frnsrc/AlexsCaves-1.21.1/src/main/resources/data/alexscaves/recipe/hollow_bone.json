@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "BBB",
+    "B B",
+    "BBB"
+  ],
+  "key": {
+    "B": {
+      "item": "minecraft:bone_block"
+    }
+  },
+  "result": {
+    "count": 8,
+    "id": "alexscaves:hollow_bone"
+  }
+}

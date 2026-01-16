@@ -1,12 +1,10 @@
 package com.mojang.blaze3d.buffers;
 
-import com.mojang.blaze3d.DontObfuscate;
 import java.nio.ByteBuffer;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 
 @Environment(EnvType.CLIENT)
-@DontObfuscate
 public abstract class GpuBuffer implements AutoCloseable {
 	public static final int USAGE_MAP_READ = 1;
 	public static final int USAGE_MAP_WRITE = 2;
@@ -50,7 +48,6 @@ public abstract class GpuBuffer implements AutoCloseable {
 	}
 
 	@Environment(EnvType.CLIENT)
-	@DontObfuscate
 	public interface MappedView extends AutoCloseable {
 		ByteBuffer data();
 

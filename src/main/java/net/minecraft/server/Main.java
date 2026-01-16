@@ -31,7 +31,6 @@ import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.NbtException;
 import net.minecraft.nbt.ReportedNbtException;
 import net.minecraft.network.chat.Component;
-import net.minecraft.obfuscate.DontObfuscate;
 import net.minecraft.server.dedicated.DedicatedServer;
 import net.minecraft.server.dedicated.DedicatedServerProperties;
 import net.minecraft.server.dedicated.DedicatedServerSettings;
@@ -84,7 +83,7 @@ import org.slf4j.Logger;
  * 
  * <p><strong>Maintenance Operations:</strong></p>
  * <pre>
- * --initSettings    Create default server.properties and eula.txt, then exit
+ * --initSettings    Create default server.properties, then exit
  * --forceUpgrade    Upgrade world to current version
  * --eraseCache      Clear cached data
  * --safeMode        Load with vanilla datapack only
@@ -116,12 +115,11 @@ public class Main {
 	@SuppressForbidden(
 		reason = "System.out needed before bootstrap"
 	)
-	@DontObfuscate
 	public static void main(String[] strings) {
 		SharedConstants.tryDetectVersion();
 		OptionParser optionParser = new OptionParser();
 		OptionSpec<Void> optionSpec = optionParser.accepts("nogui");
-		OptionSpec<Void> optionSpec2 = optionParser.accepts("initSettings", "Initializes 'server.properties' and 'eula.txt', then quits");
+		OptionSpec<Void> optionSpec2 = optionParser.accepts("initSettings", "Initializes 'server.properties', then quits");
 		OptionSpec<Void> optionSpec3 = optionParser.accepts("demo");
 		OptionSpec<Void> optionSpec4 = optionParser.accepts("bonusChest");
 		OptionSpec<Void> optionSpec5 = optionParser.accepts("forceUpgrade");
@@ -161,15 +159,8 @@ public class Main {
 			DedicatedServerSettings dedicatedServerSettings = new DedicatedServerSettings(path2);
 			dedicatedServerSettings.forceSave();
 			RegionFileVersion.configure(dedicatedServerSettings.getProperties().regionFileComression);
-			Path path3 = Paths.get("eula.txt");
-			Eula eula = new Eula(path3);
 			if (optionSet.has(optionSpec2)) {
-				LOGGER.info("Initialized '{}' and '{}'", path2.toAbsolutePath(), path3.toAbsolutePath());
-				return;
-			}
-
-			if (!eula.hasAgreedToEULA()) {
-				LOGGER.info("You need to agree to the EULA in order to run the server. Go to eula.txt for more info.");
+				LOGGER.info("Initialized '{}'", path2.toAbsolutePath());
 				return;
 			}
 

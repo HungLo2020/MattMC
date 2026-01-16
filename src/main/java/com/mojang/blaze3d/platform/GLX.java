@@ -2,7 +2,6 @@ package com.mojang.blaze3d.platform;
 
 import com.google.common.base.Joiner;
 import com.google.common.collect.Lists;
-import com.mojang.blaze3d.DontObfuscate;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.logging.LogUtils;
 import java.util.List;
@@ -24,7 +23,6 @@ import oshi.SystemInfo;
 import oshi.hardware.CentralProcessor;
 
 @Environment(EnvType.CLIENT)
-@DontObfuscate
 public class GLX {
 	private static final Logger LOGGER = LogUtils.getLogger();
 	@Nullable

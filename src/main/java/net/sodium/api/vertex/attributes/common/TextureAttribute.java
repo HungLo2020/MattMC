@@ -9,7 +9,7 @@ public class TextureAttribute {
     }
 
     public static void put(long ptr, float u, float v) {
-        MemoryUtil.memPutFloat(ptr + 0, u);
+        MemoryUtil.memPutFloat(ptr, u);
         MemoryUtil.memPutFloat(ptr + 4, v);
     }
 
@@ -18,7 +18,7 @@ public class TextureAttribute {
     }
 
     public static float getU(long ptr) {
-        return MemoryUtil.memGetFloat(ptr + 0);
+        return MemoryUtil.memGetFloat(ptr);
     }
 
     public static float getV(long ptr) {

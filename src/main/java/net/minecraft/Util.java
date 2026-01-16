@@ -33,9 +33,6 @@ import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.spi.FileSystemProvider;
-import java.security.AccessController;
-import java.security.PrivilegedActionException;
-import java.security.PrivilegedExceptionAction;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZonedDateTime;
@@ -1094,14 +1091,14 @@ public class Util {
 		@SuppressWarnings("removal")
 		public void openUri(URI uRI) {
 			try {
-				Process process = (Process)AccessController.doPrivileged((PrivilegedExceptionAction<Process>)() -> Runtime.getRuntime().exec(this.getOpenUriArguments(uRI)));
-				process.getInputStream().close();
-				process.getErrorStream().close();
-				process.getOutputStream().close();
-			} catch (IOException | PrivilegedActionException var3) {
-				Util.LOGGER.error("Couldn't open location '{}'", uRI, var3);
-			}
-		}
+				Process process = Runtime.getRuntime().exec(getOpenUriArguments(uRI));
+ 				process.getInputStream().close();
+ 				process.getErrorStream().close();
+ 				process.getOutputStream().close();
+ 			} catch (IOException var3) {
+ 				Util.LOGGER.error("Couldn't open location '{}'", uRI, var3);
+ 			}
+ 		}
 
 		public void openFile(File file) {
 			this.openUri(file.toURI());

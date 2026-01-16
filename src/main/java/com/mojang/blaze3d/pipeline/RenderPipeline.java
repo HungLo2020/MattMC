@@ -1,6 +1,5 @@
 package com.mojang.blaze3d.pipeline;
 
-import com.mojang.blaze3d.DontObfuscate;
 import com.mojang.blaze3d.platform.DepthTestFunction;
 import com.mojang.blaze3d.platform.LogicOp;
 import com.mojang.blaze3d.platform.PolygonMode;
@@ -21,7 +20,6 @@ import net.minecraft.resources.ResourceLocation;
 import org.jetbrains.annotations.Nullable;
 
 @Environment(EnvType.CLIENT)
-@DontObfuscate
 public class RenderPipeline {
 	private final ResourceLocation location;
 	private final ResourceLocation vertexShader;
@@ -198,7 +196,6 @@ public class RenderPipeline {
 	}
 
 	@Environment(EnvType.CLIENT)
-	@DontObfuscate
 	public static class Builder {
 		private static int nextPipelineSortKey;
 		private Optional<ResourceLocation> location = Optional.empty();
@@ -509,7 +506,6 @@ public class RenderPipeline {
 	}
 
 	@Environment(EnvType.CLIENT)
-	@DontObfuscate
 	public record Snippet(
 		Optional<ResourceLocation> vertexShader,
 		Optional<ResourceLocation> fragmentShader,
@@ -530,7 +526,6 @@ public class RenderPipeline {
 	}
 
 	@Environment(EnvType.CLIENT)
-	@DontObfuscate
 	public record UniformDescription(String name, UniformType type, @Nullable TextureFormat textureFormat) {
 		public UniformDescription(String string, UniformType uniformType) {
 			this(string, uniformType, null);

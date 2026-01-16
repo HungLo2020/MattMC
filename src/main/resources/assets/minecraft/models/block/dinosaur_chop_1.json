@@ -1,0 +1,7 @@
+{
+	"parent": "minecraft:block/dinosaur_chop_1_template",
+	"textures": {
+		"side": "minecraft:block/dinosaur_chop_raw_side",
+		"front": "minecraft:block/dinosaur_chop_raw"
+	}
+}

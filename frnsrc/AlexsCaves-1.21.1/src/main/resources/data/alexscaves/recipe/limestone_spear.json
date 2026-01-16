@@ -1,0 +1,20 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    " L ",
+    "LSL",
+    " S "
+  ],
+  "key": {
+    "L": {
+      "item": "alexscaves:limestone"
+    },
+    "S": {
+      "tag": "c:rods/wooden"
+    }
+  },
+  "result": {
+    "count": 4,
+    "id": "alexscaves:limestone_spear"
+  }
+}

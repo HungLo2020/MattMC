@@ -1,5 +1,6 @@
 package net.sodium.client.platform.windows.api.d3dkmt;
 
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.system.Struct;
@@ -46,7 +47,7 @@ class D3DKMTAdapterRegistryInfoStruct extends Struct<D3DKMTAdapterRegistryInfoSt
     }
 
     @Override
-    protected D3DKMTAdapterRegistryInfoStruct create(long address, ByteBuffer container) {
+    protected @NotNull D3DKMTAdapterRegistryInfoStruct create(long address, ByteBuffer container) {
         return new D3DKMTAdapterRegistryInfoStruct(address, container);
     }
 

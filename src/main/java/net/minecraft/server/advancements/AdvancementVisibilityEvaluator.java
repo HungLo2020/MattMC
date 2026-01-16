@@ -20,7 +20,7 @@ public class AdvancementVisibilityEvaluator {
 		} else {
 			return ((DisplayInfo)optional.get()).isHidden()
 				? AdvancementVisibilityEvaluator.VisibilityRule.HIDE
-				: AdvancementVisibilityEvaluator.VisibilityRule.NO_CHANGE;
+				: AdvancementVisibilityEvaluator.VisibilityRule.SHOW; // Always show non-hidden advancements
 		}
 	}
 

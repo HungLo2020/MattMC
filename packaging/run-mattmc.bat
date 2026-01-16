@@ -23,6 +23,7 @@ echo Using bundled JDK %JAVA_VERSION%
 
 REM Launch the game with Fabric Loader
 REM Note: Minecraft classes are included in the main JAR, no separate game JAR needed
+REM Note: Assets are loaded directly from JAR classpath - no --assetsDir needed
 "%JAVA_CMD%" -Xmx8G -Xms4G ^
     -XX:+UseZGC ^
     -XX:+UseCompactObjectHeaders ^
@@ -31,6 +32,4 @@ REM Note: Minecraft classes are included in the main JAR, no separate game JAR n
     net.fabricmc.loader.impl.launch.knot.KnotClient ^
     --version @VERSION@ ^
     --accessToken 0 ^
-    --gameDir run ^
-    --assetsDir run\assets ^
-    --assetIndex @ASSET_INDEX@
+    --gameDir run

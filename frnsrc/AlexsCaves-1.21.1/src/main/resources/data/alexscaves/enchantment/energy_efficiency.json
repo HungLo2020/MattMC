@@ -1,0 +1,19 @@
+{
+  "description": {
+    "translate": "enchantment.alexscaves.energy_efficiency"
+  },
+  "supported_items": "#alexscaves:raygun_enchantable",
+  "weight": 10,
+  "max_level": 3,
+  "min_cost": {
+    "base": 1,
+    "per_level_above_first": 5
+  },
+  "max_cost": {
+    "base": 31,
+    "per_level_above_first": 5
+  },
+  "anvil_cost": 2,
+  "slots": ["mainhand"],
+  "effects": {}
+}

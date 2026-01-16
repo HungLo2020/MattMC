@@ -1,0 +1,7 @@
+{
+	"parent": "minecraft:block/dinosaur_chop_3_template",
+	"textures": {
+		"side": "minecraft:block/dinosaur_chop_cooked_side",
+		"front": "minecraft:block/dinosaur_chop_cooked"
+	}
+}

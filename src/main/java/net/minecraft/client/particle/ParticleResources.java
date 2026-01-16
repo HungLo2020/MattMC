@@ -174,6 +174,7 @@ public class ParticleResources implements PreparableReloadListener {
 		this.register(ParticleTypes.OMINOUS_SPAWNING, FlyStraightTowardsParticle.OminousSpawnProvider::new);
 		this.register(ParticleTypes.BLOCK_CRUMBLE, new TerrainParticle.CrumblingProvider());
 		this.register(ParticleTypes.FIREFLY, FireflyParticle.FireflyProvider::new);
+		this.register(ParticleTypes.FLY, FlyParticle.Provider::new);
 	}
 
 	private <T extends ParticleOptions> void register(ParticleType<T> particleType, ParticleProvider<T> particleProvider) {

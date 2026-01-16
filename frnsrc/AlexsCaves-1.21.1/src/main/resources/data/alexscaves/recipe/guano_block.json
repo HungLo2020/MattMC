@@ -1,0 +1,16 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "NN",
+    "NN"
+  ],
+  "key": {
+    "N": {
+      "item": "alexscaves:guano"
+    }
+  },
+  "result": {
+    "count": 1,
+    "id": "alexscaves:guano_block"
+  }
+}

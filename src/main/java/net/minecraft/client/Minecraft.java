@@ -1309,6 +1309,8 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 	}
 
 	private void runTick(boolean bl) {
+		long frameStart = Util.getNanos();
+		
 		// HOOK: Call registered hooks at beginning of tick
 		for (GameHooks hook : HookRegistry.getGameHooks()) {
 			hook.beforeRunTick(this, bl);
@@ -1327,9 +1329,14 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 
 		int i = this.deltaTracker.advanceTime(Util.getMillis(), bl);
 		ProfilerFiller profilerFiller = Profiler.get();
+		long startTime;
+		
 		if (bl) {
 			profilerFiller.push("scheduledPacketProcessing");
+			startTime = Util.getNanos();
 			this.packetProcessor.processQueuedPackets();
+			net.minecraft.util.profiling.custom.ProfilerManager.recordRenderThreadOperation("frame.packetProcessing", Util.getNanos() - startTime);
+			
 			profilerFiller.popPush("scheduledExecutables");
 			this.runAllTasks();
 			profilerFiller.popPush("tick");
@@ -1367,9 +1374,11 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 		RenderTarget renderTarget = this.getMainRenderTarget();
 		RenderSystem.getDevice().createCommandEncoder().clearColorAndDepthTextures(renderTarget.getColorTexture(), 0, renderTarget.getDepthTexture(), 1.0);
 		profilerFiller.push("gameRenderer");
+		startTime = Util.getNanos();
 		if (!this.noRender) {
 			this.gameRenderer.render(this.deltaTracker, bl);
 		}
+		net.minecraft.util.profiling.custom.ProfilerManager.recordRenderThreadOperation("frame.gameRenderer", Util.getNanos() - startTime);
 
 		profilerFiller.popPush("blit");
 		if (!this.window.isMinimized()) {
@@ -1377,6 +1386,8 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 		}
 
 		this.frameTimeNs = Util.getNanos() - l;
+		net.minecraft.util.profiling.custom.ProfilerManager.recordRenderThreadFrame(Util.getNanos() - frameStart);
+		
 		if (bl2) {
 			this.currentFrameProfile = TimerQuery.getInstance().endProfile();
 		}
@@ -1439,7 +1450,9 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 	private ProfilerFiller constructProfiler(boolean bl, @Nullable SingleTickProfiler singleTickProfiler) {
 		if (!bl) {
 			this.fpsPieProfiler.disable();
-			if (!this.metricsRecorder.isRecording() && singleTickProfiler == null) {
+			// Don't return InactiveProfiler if custom profiling is active
+			if (!this.metricsRecorder.isRecording() && singleTickProfiler == null 
+				&& !net.minecraft.util.profiling.custom.ProfilerManager.isRunning()) {
 				return InactiveProfiler.INSTANCE;
 			}
 		}
@@ -1454,14 +1467,29 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 			this.fpsPieRenderTicks++;
 			profilerFiller = this.fpsPieProfiler.getFiller();
 		} else {
-			profilerFiller = InactiveProfiler.INSTANCE;
+			// Use fpsPieProfiler even when debug overlay is off if custom profiling is active
+			if (net.minecraft.util.profiling.custom.ProfilerManager.isRunning()) {
+				if (!this.fpsPieProfiler.isEnabled()) {
+					this.fpsPieProfiler.enable();
+				}
+				profilerFiller = this.fpsPieProfiler.getFiller();
+			} else {
+				profilerFiller = InactiveProfiler.INSTANCE;
+			}
 		}
 
 		if (this.metricsRecorder.isRecording()) {
 			profilerFiller = ProfilerFiller.combine(profilerFiller, this.metricsRecorder.getProfiler());
 		}
 
-		return SingleTickProfiler.decorateFiller(profilerFiller, singleTickProfiler);
+		ProfilerFiller result = SingleTickProfiler.decorateFiller(profilerFiller, singleTickProfiler);
+		
+		// Wrap with custom profiler collector if profiling is active
+		if (net.minecraft.util.profiling.custom.ProfilerManager.isRunning()) {
+			result = net.minecraft.util.profiling.custom.ProfilerManager.wrapRenderThreadProfiler(result);
+		}
+		
+		return result;
 	}
 
 	private void finishProfilers(boolean bl, @Nullable SingleTickProfiler singleTickProfiler) {
@@ -1938,6 +1966,13 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 			com.mamiyaotaru.voxelmap.VoxelConstants.clientTick();
 		} catch (Exception e) {
 			// Silently catch to avoid crashes
+		}
+		profilerFiller.pop();
+		
+		// Elevator: Handle elevator input at END of client tick (matches ElevatorMod's ClientTickEvents.END_CLIENT_TICK)
+		profilerFiller.push("elevator_input");
+		if (this.player instanceof net.minecraft.client.player.LocalPlayer localPlayer) {
+			localPlayer.handleElevatorInput();
 		}
 		profilerFiller.pop();
 	}

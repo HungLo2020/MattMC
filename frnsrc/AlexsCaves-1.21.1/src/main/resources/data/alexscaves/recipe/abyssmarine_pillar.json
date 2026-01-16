@@ -1,0 +1,16 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "A",
+    "A"
+  ],
+  "key": {
+    "A": {
+      "item": "alexscaves:abyssmarine"
+    }
+  },
+  "result": {
+    "count": 2,
+    "id": "alexscaves:abyssmarine_pillar"
+  }
+}

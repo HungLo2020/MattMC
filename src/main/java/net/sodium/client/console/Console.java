@@ -25,6 +25,7 @@ public class Console implements ConsoleSink {
         return this.messages;
     }
 
+    @SuppressWarnings("SameReturnValue")
     public static ConsoleSink instance() {
         return INSTANCE;
     }

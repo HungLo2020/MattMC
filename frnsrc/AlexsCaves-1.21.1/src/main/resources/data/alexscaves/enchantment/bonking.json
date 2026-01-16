@@ -1,0 +1,19 @@
+{
+  "description": {
+    "translate": "enchantment.alexscaves.bonking"
+  },
+  "supported_items": "#alexscaves:primitive_club_enchantable",
+  "weight": 1,
+  "max_level": 1,
+  "min_cost": {
+    "base": 1,
+    "per_level_above_first": 18
+  },
+  "max_cost": {
+    "base": 31,
+    "per_level_above_first": 18
+  },
+  "anvil_cost": 2,
+  "slots": ["mainhand"],
+  "effects": {}
+}

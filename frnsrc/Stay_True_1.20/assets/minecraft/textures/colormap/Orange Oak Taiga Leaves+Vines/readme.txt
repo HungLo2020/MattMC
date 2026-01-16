@@ -1,0 +1,1 @@
+This colormap file will make oak leaves in taiga/(cold) biomes orange, Simply paste this in the colormap folder to replace the current colormap file.

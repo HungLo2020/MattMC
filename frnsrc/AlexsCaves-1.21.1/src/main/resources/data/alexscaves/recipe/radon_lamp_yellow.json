@@ -1,0 +1,23 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "DRD",
+    "RGR",
+    "DRD"
+  ],
+  "key": {
+    "R": {
+      "item": "alexscaves:radon_bottle"
+    },
+    "G": {
+      "item": "minecraft:glowstone"
+    },
+    "D": {
+      "tag": "c:dyes/yellow"
+    }
+  },
+  "result": {
+    "count": 4,
+    "id": "alexscaves:radon_lamp_yellow"
+  }
+}

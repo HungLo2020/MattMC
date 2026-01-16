@@ -1,0 +1,6 @@
+{
+  "parent": "minecraft:block/cave_painting_base",
+  "textures": {
+    "painting": "minecraft:block/cave_painting/pewen"
+  }
+}

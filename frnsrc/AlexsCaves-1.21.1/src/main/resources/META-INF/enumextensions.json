@@ -1,0 +1,58 @@
+{
+  "entries": [
+    {
+      "enum": "net/minecraft/world/item/Rarity",
+      "name": "ALEXSCAVES_DEMONIC",
+      "constructor": "(ILjava/lang/String;Ljava/util/function/UnaryOperator;)V",
+      "parameters": {
+        "class": "com/github/alexmodguy/alexscaves/server/item/ACRarityEnumParams",
+        "method": "getDemonicRarityParameter"
+      }
+    },
+    {
+      "enum": "net/minecraft/world/item/Rarity",
+      "name": "ALEXSCAVES_NUCLEAR",
+      "constructor": "(ILjava/lang/String;Ljava/util/function/UnaryOperator;)V",
+      "parameters": {
+        "class": "com/github/alexmodguy/alexscaves/server/item/ACRarityEnumParams",
+        "method": "getNuclearRarityParameter"
+      }
+    },
+    {
+      "enum": "net/minecraft/world/item/Rarity",
+      "name": "ALEXSCAVES_SWEET",
+      "constructor": "(ILjava/lang/String;Ljava/util/function/UnaryOperator;)V",
+      "parameters": {
+        "class": "com/github/alexmodguy/alexscaves/server/item/ACRarityEnumParams",
+        "method": "getSweetRarityParameter"
+      }
+    },
+    {
+      "enum": "net/minecraft/world/item/Rarity",
+      "name": "ALEXSCAVES_RAINBOW",
+      "constructor": "(ILjava/lang/String;Ljava/util/function/UnaryOperator;)V",
+      "parameters": {
+        "class": "com/github/alexmodguy/alexscaves/server/item/ACRarityEnumParams",
+        "method": "getRainbowRarityParameter"
+      }
+    },
+    {
+      "enum": "net/minecraft/world/entity/MobCategory",
+      "name": "ALEXSCAVES_CAVE_CREATURE",
+      "constructor": "(Ljava/lang/String;IZZI)V",
+      "parameters": {
+        "class": "com/github/alexmodguy/alexscaves/server/entity/ACMobCategoryEnumParams",
+        "method": "getCaveCreatureParameter"
+      }
+    },
+    {
+      "enum": "net/minecraft/world/entity/MobCategory",
+      "name": "ALEXSCAVES_DEEP_SEA_CREATURE",
+      "constructor": "(Ljava/lang/String;IZZI)V",
+      "parameters": {
+        "class": "com/github/alexmodguy/alexscaves/server/entity/ACMobCategoryEnumParams",
+        "method": "getDeepSeaCreatureParameter"
+      }
+    }
+  ]
+}

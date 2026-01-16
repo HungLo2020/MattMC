@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    " G ",
+    " G ",
+    "GGG"
+  ],
+  "key": {
+    "G": {
+      "item": "alexscaves:galena"
+    }
+  },
+  "result": {
+    "count": 8,
+    "id": "alexscaves:galena_spire"
+  }
+}

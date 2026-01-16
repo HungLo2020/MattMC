@@ -496,6 +496,21 @@ public abstract class Player extends Avatar implements ContainerUser {
 	public void handleShoulderEntities() {
 	}
 
+	@Override
+	public void jumpFromGround() {
+		// Check if player is standing on an elevator block
+		BlockPos blockBelow = this.getBlockPosBelowThatAffectsMyMovement();
+		if (this.level() != null && this.level().getBlockState(blockBelow).getBlock() instanceof net.minecraft.world.level.block.ElevatorBlock elevatorBlock) {
+			// Call the elevator block's method to handle teleportation
+			if (elevatorBlock.tryTeleportUp(this.level(), blockBelow, this)) {
+				// Teleportation happened, don't jump
+				return;
+			}
+		}
+		// Otherwise, do normal jump
+		super.jumpFromGround();
+	}
+
 	protected void removeEntitiesOnShoulder() {
 	}
 

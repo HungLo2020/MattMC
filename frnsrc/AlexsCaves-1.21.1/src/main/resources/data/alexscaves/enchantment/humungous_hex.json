@@ -1,0 +1,19 @@
+{
+  "description": {
+    "translate": "enchantment.alexscaves.humungous_hex"
+  },
+  "supported_items": "#alexscaves:sugar_staff_enchantable",
+  "weight": 5,
+  "max_level": 2,
+  "min_cost": {
+    "base": 1,
+    "per_level_above_first": 9
+  },
+  "max_cost": {
+    "base": 31,
+    "per_level_above_first": 9
+  },
+  "anvil_cost": 2,
+  "slots": ["mainhand"],
+  "effects": {}
+}

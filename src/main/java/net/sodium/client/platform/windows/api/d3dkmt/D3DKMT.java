@@ -101,11 +101,7 @@ public class D3DKMT {
         }
 
         // Adapter uses software rendering
-        if ((adapterType & 0x4) != 0) {
-            return false;
-        }
-
-        return true;
+        return (adapterType & 0x4) == 0;
     }
 
     private static @Nullable String queryDriverFileName(int adapter) {
@@ -194,7 +190,7 @@ public class D3DKMT {
         }
 
         @Override
-        public String toString() {
+        public @NotNull String toString() {
             return "AdapterInfo{vendor=%s, description='%s', adapterType=0x%08X, openglIcdFilePath='%s', openglIcdVersion=%s}"
                     .formatted(this.vendor, this.name, this.adapterType, this.openglIcdFilePath, this.openglIcdVersion);
         }

@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "A  ",
+    "AA ",
+    "AAA"
+  ],
+  "key": {
+    "A": {
+      "item": "alexscaves:coprolith"
+    }
+  },
+  "result": {
+    "count": 4,
+    "id": "alexscaves:coprolith_stairs"
+  }
+}

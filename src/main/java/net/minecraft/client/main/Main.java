@@ -37,7 +37,6 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.User;
 import net.minecraft.client.server.IntegratedServer;
 import net.minecraft.core.UUIDUtil;
-import net.minecraft.obfuscate.DontObfuscate;
 import net.minecraft.server.Bootstrap;
 import net.minecraft.util.NativeModuleLister;
 import net.minecraft.util.datafix.DataFixTypes;
@@ -92,7 +91,6 @@ public class Main {
 	 * 
 	 * @param strings Command-line arguments passed to the application
 	 */
-	@DontObfuscate
 	public static void main(String[] strings) {
 		OptionParser optionParser = new OptionParser();
 		optionParser.allowsUnrecognizedOptions();

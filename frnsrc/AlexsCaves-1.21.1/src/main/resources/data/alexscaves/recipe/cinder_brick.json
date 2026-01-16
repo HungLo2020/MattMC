@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "CCC",
+    "C C",
+    "CCC"
+  ],
+  "key": {
+    "C": {
+      "tag": "c:concrete"
+    }
+  },
+  "result": {
+    "count": 16,
+    "id": "alexscaves:cinder_brick"
+  }
+}

@@ -1,6 +1,5 @@
 package com.mojang.blaze3d.systems;
 
-import com.mojang.blaze3d.DontObfuscate;
 import com.mojang.blaze3d.ProjectionType;
 import com.mojang.blaze3d.TracyFrameCapture;
 import com.mojang.blaze3d.buffers.GpuBuffer;
@@ -41,7 +40,6 @@ import org.lwjgl.system.MemoryUtil;
 import org.slf4j.Logger;
 
 @Environment(EnvType.CLIENT)
-@DontObfuscate
 public class RenderSystem {
 	static final Logger LOGGER = LogUtils.getLogger();
 	public static final int MINIMUM_ATLAS_TEXTURE_SIZE = 1024;

@@ -1,0 +1,16 @@
+{
+	"parent": "minecraft:block/pewen_branch_base_ne",
+	"textures": {
+		"branch": "minecraft:block/pewen/pewen_branch",
+		"branch_top": "minecraft:block/pewen/pewen_branch_top",
+		"pines1": "minecraft:block/pewen/no_pines",
+		"pines2": "minecraft:block/pewen/no_pines",
+		"pines3": "minecraft:block/pewen/no_pines",
+		"pines4": "minecraft:block/pewen/no_pines",
+		"pines5": "minecraft:block/pewen/no_pines",
+		"pines6": "minecraft:block/pewen/no_pines",
+		"pines7": "minecraft:block/pewen/no_pines",
+		"pines8": "minecraft:block/pewen/no_pines",
+		"particle": "minecraft:block/pewen/pewen_branch"
+	}
+}

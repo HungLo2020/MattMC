@@ -1,0 +1,12 @@
+{
+  "ingredients": [
+    {
+      "tag": "c:music_discs"
+    }
+  ],
+  "result": {
+    "id": "alexsmobs:music_disc_daze",
+    "count": 1
+  },
+  "time": 120
+}

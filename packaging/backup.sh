@@ -3,9 +3,26 @@ set -Eeuo pipefail
 
 DEST_DIR="/home/matt/OneDrive/Apps/Games/Storage/MattMC"
 
-# ---- Locate app root (works from app root or packaging/) ----
+# ---- Locate app root (detects based on current and parent directory) ----
 SCRIPT_DIR="$(cd -- "$(dirname -- "$0")" && pwd)"
-APP_DIR="$(dirname "$SCRIPT_DIR")"
+SCRIPT_DIR_NAME="$(basename "$SCRIPT_DIR")"
+PARENT_DIR_NAME="$(basename "$(dirname "$SCRIPT_DIR")")"
+
+# Fail early if script is in 'packaging' directory (dev environment)
+if [[ "$SCRIPT_DIR_NAME" == "packaging" ]]; then
+	echo "❌ This script should not be run from the packaging/ directory."
+	echo "   It is meant to run from the exported build."
+	echo "   Current location: $SCRIPT_DIR"
+	exit 1
+fi
+
+# If parent directory is 'MattMC', that's the app root to back up
+if [[ "$PARENT_DIR_NAME" == "MattMC" ]]; then
+	APP_DIR="$(dirname "$SCRIPT_DIR")"
+else
+	# Otherwise assume script is in app root itself
+	APP_DIR="$SCRIPT_DIR"
+fi
 
 APP_NAME="$(basename "$APP_DIR")"
 TS="$(date +%Y%m%d-%H%M%S)"

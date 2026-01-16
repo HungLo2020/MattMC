@@ -3,7 +3,6 @@ package net.sodium.api.vertex.format.common;
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.VertexFormat;
 import net.sodium.api.vertex.attributes.common.*;
-import net.sodium.api.vertex.attributes.common.*;
 
 public final class EntityVertex {
     public static final VertexFormat FORMAT = DefaultVertexFormat.NEW_ENTITY;

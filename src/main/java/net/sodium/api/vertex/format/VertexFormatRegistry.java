@@ -7,6 +7,7 @@ public interface VertexFormatRegistry {
     VertexFormatRegistry INSTANCE = DependencyInjection.load(VertexFormatRegistry.class,
             "net.caffeinemc.mods.sodium.client.render.vertex.VertexFormatRegistryImpl");
 
+    @SuppressWarnings("SameReturnValue")
     static VertexFormatRegistry instance() {
         return INSTANCE;
     }

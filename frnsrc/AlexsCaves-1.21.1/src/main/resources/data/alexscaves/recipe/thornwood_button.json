@@ -1,0 +1,13 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "group": "wooden_button",
+  "ingredients": [
+    {
+      "item": "alexscaves:thornwood_planks"
+    }
+  ],
+  "result": {
+    "id": "alexscaves:thornwood_button",
+    "count": 1
+  }
+}

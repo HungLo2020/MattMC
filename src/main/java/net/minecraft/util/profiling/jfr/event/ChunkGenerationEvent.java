@@ -7,7 +7,6 @@ import jdk.jfr.EventType;
 import jdk.jfr.Label;
 import jdk.jfr.Name;
 import jdk.jfr.StackTrace;
-import net.minecraft.obfuscate.DontObfuscate;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
@@ -17,7 +16,6 @@ import net.minecraft.world.level.Level;
 @Category({"Minecraft", "World Generation"})
 @StackTrace(false)
 @Enabled(false)
-@DontObfuscate
 public class ChunkGenerationEvent extends Event {
 	public static final String EVENT_NAME = "minecraft.ChunkGeneration";
 	public static final EventType TYPE = EventType.getEventType(ChunkGenerationEvent.class);

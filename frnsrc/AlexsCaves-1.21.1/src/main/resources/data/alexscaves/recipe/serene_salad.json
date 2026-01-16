@@ -1,0 +1,21 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "ingredients": [
+    {
+      "item": "alexscaves:fiddlehead"
+    },
+    {
+      "item": "alexscaves:tree_star"
+    },
+    {
+      "item": "alexscaves:pine_nuts"
+    },
+    {
+      "item": "minecraft:bowl"
+    }
+  ],
+  "result": {
+    "id": "alexscaves:serene_salad",
+    "count": 1
+  }
+}

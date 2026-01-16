@@ -41,6 +41,22 @@ import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.block.state.properties.NoteBlockInstrument;
 import net.minecraft.world.level.block.state.properties.SculkSensorPhase;
 import net.minecraft.world.level.block.state.properties.WoodType;
+import net.minecraft.world.level.block.custom.DirectionalFacingBlock;
+import net.minecraft.world.level.block.custom.SmoothLimestoneBlock;
+import net.minecraft.world.level.block.custom.FlytrapBlock;
+import net.minecraft.world.level.block.custom.FiddleheadBlock;
+import net.minecraft.world.level.block.custom.TreeStarBlock;
+import net.minecraft.world.level.block.custom.CycadBlock;
+import com.github.alexmodguy.alexscaves.server.block.DinosaurEggBlock;
+import com.github.alexmodguy.alexscaves.server.block.MultipleDinosaurEggsBlock;
+import com.github.alexmodguy.alexscaves.server.block.SubterranodonEggBlock;
+import com.github.alexmodguy.alexscaves.server.block.VallumraptorEggBlock;
+import com.github.alexmodguy.alexscaves.server.block.GrottoceratopsEggBlock;
+import com.github.alexmodguy.alexscaves.server.block.TremorsaurusEggBlock;
+import com.github.alexmodguy.alexscaves.server.block.RelicheirusEggBlock;
+import com.github.alexmodguy.alexscaves.server.block.DinosaurChopBlock;
+import com.github.alexmodguy.alexscaves.server.block.AmbersolBlock;
+import com.github.alexmodguy.alexscaves.server.block.AmbersolLightBlock;
 import net.minecraft.world.level.material.Fluids;
 import net.minecraft.world.level.material.MapColor;
 import net.minecraft.world.level.material.PushReaction;
@@ -79,6 +95,34 @@ public class Blocks {
 		"polished_andesite",
 		BlockBehaviour.Properties.of().mapColor(MapColor.STONE).instrument(NoteBlockInstrument.BASEDRUM).requiresCorrectToolForDrops().strength(1.5F, 6.0F)
 	);
+	
+	// Alex's Caves Limestone blocks
+	public static final Block LIMESTONE = register(
+		"limestone",
+		BlockBehaviour.Properties.of().mapColor(MapColor.TERRACOTTA_YELLOW).instrument(NoteBlockInstrument.BASEDRUM).requiresCorrectToolForDrops().strength(1.2F, 4.5F).sound(SoundType.DRIPSTONE_BLOCK)
+	);
+	public static final Block LIMESTONE_STAIRS = registerLegacyStair("limestone_stairs", LIMESTONE);
+	public static final Block LIMESTONE_SLAB = register("limestone_slab", SlabBlock::new, BlockBehaviour.Properties.ofLegacyCopy(LIMESTONE));
+	public static final Block LIMESTONE_WALL = register("limestone_wall", WallBlock::new, BlockBehaviour.Properties.ofLegacyCopy(LIMESTONE).forceSolidOn());
+	public static final Block LIMESTONE_PILLAR = register(
+		"limestone_pillar",
+		RotatedPillarBlock::new,
+		BlockBehaviour.Properties.ofLegacyCopy(LIMESTONE)
+	);
+	public static final Block LIMESTONE_CHISELED = register(
+		"limestone_chiseled",
+		properties -> new DirectionalFacingBlock(properties, true),
+		BlockBehaviour.Properties.ofLegacyCopy(LIMESTONE)
+	);
+	public static final Block SMOOTH_LIMESTONE = register(
+		"smooth_limestone",
+		SmoothLimestoneBlock::new,
+		BlockBehaviour.Properties.ofLegacyCopy(LIMESTONE)
+	);
+	public static final Block SMOOTH_LIMESTONE_STAIRS = registerLegacyStair("smooth_limestone_stairs", SMOOTH_LIMESTONE);
+	public static final Block SMOOTH_LIMESTONE_SLAB = register("smooth_limestone_slab", SlabBlock::new, BlockBehaviour.Properties.ofLegacyCopy(SMOOTH_LIMESTONE));
+	public static final Block SMOOTH_LIMESTONE_WALL = register("smooth_limestone_wall", WallBlock::new, BlockBehaviour.Properties.ofLegacyCopy(SMOOTH_LIMESTONE).forceSolidOn());
+	
 	public static final Block GRASS_BLOCK = register(
 		"grass_block", GrassBlock::new, BlockBehaviour.Properties.of().mapColor(MapColor.GRASS).randomTicks().strength(0.6F).sound(SoundType.GRASS)
 	);
@@ -169,6 +213,16 @@ public class Blocks {
 		"spruce_sapling",
 		properties -> new SaplingBlock(TreeGrower.SPRUCE, properties),
 		BlockBehaviour.Properties.of().mapColor(MapColor.PLANT).noCollision().randomTicks().instabreak().sound(SoundType.GRASS).pushReaction(PushReaction.DESTROY)
+	);
+	public static final Block PEWEN_SAPLING = register(
+		"pewen_sapling",
+		properties -> new SaplingBlock(com.github.alexmodguy.alexscaves.server.block.grower.PewenGrower.GROWER, properties),
+		BlockBehaviour.Properties.of().mapColor(MapColor.GRASS).noCollision().randomTicks().instabreak().sound(SoundType.GRASS).pushReaction(PushReaction.DESTROY)
+	);
+	public static final Block ANCIENT_SAPLING = register(
+		"ancient_sapling",
+		properties -> new SaplingBlock(com.github.alexmodguy.alexscaves.server.block.grower.AncientTreeGrower.GROWER, properties),
+		BlockBehaviour.Properties.of().mapColor(MapColor.GRASS).noCollision().randomTicks().instabreak().sound(SoundType.GRASS).pushReaction(PushReaction.DESTROY)
 	);
 	public static final Block BIRCH_SAPLING = register(
 		"birch_sapling",
@@ -681,6 +735,13 @@ public class Blocks {
 			.ignitedByLava()
 			.pushReaction(PushReaction.DESTROY)
 	);
+	
+	// Alex's Caves primordial blocks - plants
+	public static final Block FIDDLEHEAD = register("fiddlehead", FiddleheadBlock::new, BlockBehaviour.Properties.of().mapColor(MapColor.GRASS).noCollision().instabreak().sound(SoundType.GRASS).offsetType(BlockBehaviour.OffsetType.XZ));
+	public static final Block FLYTRAP = register("flytrap", FlytrapBlock::new, BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_RED).instabreak().sound(SoundType.ROOTS).randomTicks().offsetType(BlockBehaviour.OffsetType.XZ).noOcclusion().noCollision());
+	public static final Block TREE_STAR = register("tree_star", TreeStarBlock::new, BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_GREEN).instabreak().sound(SoundType.GRASS).noOcclusion().noCollision());
+	public static final Block CYCAD = register("cycad", CycadBlock::new, BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_LIGHT_GREEN).dynamicShape().strength(1F, 2.0F).sound(SoundType.WOOD).offsetType(BlockBehaviour.OffsetType.XZ));
+	
 	public static final Block BUSH = register(
 		"bush",
 		BushBlock::new,
@@ -2044,6 +2105,16 @@ public class Blocks {
 	public static final Block CAKE = register(
 		"cake", CakeBlock::new, BlockBehaviour.Properties.of().forceSolidOn().strength(0.5F).sound(SoundType.WOOL).pushReaction(PushReaction.DESTROY)
 	);
+	public static final Block DINOSAUR_CHOP = register(
+		"dinosaur_chop",
+		properties -> new DinosaurChopBlock(properties, 3, 0.2F, false),
+		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_RED).strength(1F, 1.0F).sound(SoundType.CANDLE).noOcclusion().dynamicShape().randomTicks()
+	);
+	public static final Block COOKED_DINOSAUR_CHOP = register(
+		"cooked_dinosaur_chop",
+		properties -> new DinosaurChopBlock(properties, 7, 0.35F, true),
+		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_BROWN).strength(1F, 1.0F).sound(SoundType.CANDLE).noOcclusion().dynamicShape()
+	);
 	public static final Block REPEATER = register(
 		"repeater", RepeaterBlock::new, BlockBehaviour.Properties.of().instabreak().sound(SoundType.STONE).pushReaction(PushReaction.DESTROY)
 	);
@@ -2573,6 +2644,12 @@ public class Blocks {
 	public static final Block POTTED_OAK_SAPLING = register("potted_oak_sapling", properties -> new FlowerPotBlock(OAK_SAPLING, properties), flowerPotProperties());
 	public static final Block POTTED_SPRUCE_SAPLING = register(
 		"potted_spruce_sapling", properties -> new FlowerPotBlock(SPRUCE_SAPLING, properties), flowerPotProperties()
+	);
+	public static final Block POTTED_PEWEN_SAPLING = register(
+		"potted_pewen_sapling", properties -> new FlowerPotBlock(PEWEN_SAPLING, properties), flowerPotProperties()
+	);
+	public static final Block POTTED_ANCIENT_SAPLING = register(
+		"potted_ancient_sapling", properties -> new FlowerPotBlock(ANCIENT_SAPLING, properties), flowerPotProperties()
 	);
 	public static final Block POTTED_BIRCH_SAPLING = register(
 		"potted_birch_sapling", properties -> new FlowerPotBlock(BIRCH_SAPLING, properties), flowerPotProperties()
@@ -4258,6 +4335,16 @@ public class Blocks {
 			.strength(2.0F)
 			.sound(SoundType.BONE_BLOCK)
 	);
+	public static final Block THIN_BONE = register(
+		"thin_bone",
+		RotatedPillarBlock::new,
+		BlockBehaviour.Properties.of()
+			.mapColor(MapColor.SAND)
+			.instrument(NoteBlockInstrument.XYLOPHONE)
+			.requiresCorrectToolForDrops()
+			.strength(0.4F)
+			.sound(SoundType.BONE_BLOCK)
+	);
 	public static final Block STRUCTURE_VOID = register(
 		"structure_void",
 		StructureVoidBlock::new,
@@ -4622,6 +4709,11 @@ public class Blocks {
 		properties -> new ConcretePowderBlock(BLACK_CONCRETE, properties),
 		BlockBehaviour.Properties.of().mapColor(DyeColor.BLACK).instrument(NoteBlockInstrument.SNARE).strength(0.5F).sound(SoundType.SAND)
 	);
+	public static final Block ELEVATOR = register(
+		"elevator",
+		ElevatorBlock::new,
+		BlockBehaviour.Properties.of().mapColor(DyeColor.WHITE).instrument(NoteBlockInstrument.BASEDRUM).requiresCorrectToolForDrops().strength(1.8F)
+	);
 	public static final Block KELP = register(
 		"kelp",
 		KelpBlock::new,
@@ -4655,6 +4747,31 @@ public class Blocks {
 	);
 	public static final Block SNIFFER_EGG = register(
 		"sniffer_egg", SnifferEggBlock::new, BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_RED).strength(0.5F).sound(SoundType.METAL).noOcclusion()
+	);
+	public static final Block SUBTERRANODON_EGG = register(
+		"subterranodon_egg",
+		SubterranodonEggBlock::new,
+		BlockBehaviour.Properties.of().mapColor(MapColor.TERRACOTTA_WHITE).strength(0.5F).sound(SoundType.METAL).randomTicks().noOcclusion()
+	);
+	public static final Block VALLUMRAPTOR_EGG = register(
+		"vallumraptor_egg",
+		VallumraptorEggBlock::new,
+		BlockBehaviour.Properties.of().mapColor(MapColor.TERRACOTTA_WHITE).strength(0.5F).sound(SoundType.METAL).randomTicks().noOcclusion()
+	);
+	public static final Block GROTTOCERATOPS_EGG = register(
+		"grottoceratops_egg",
+		GrottoceratopsEggBlock::new,
+		BlockBehaviour.Properties.of().mapColor(MapColor.TERRACOTTA_WHITE).strength(0.5F).sound(SoundType.METAL).randomTicks().noOcclusion()
+	);
+	public static final Block TREMORSAURUS_EGG = register(
+		"tremorsaurus_egg",
+		TremorsaurusEggBlock::new,
+		BlockBehaviour.Properties.of().mapColor(MapColor.TERRACOTTA_WHITE).strength(0.5F).sound(SoundType.METAL).randomTicks().noOcclusion()
+	);
+	public static final Block RELICHEIRUS_EGG = register(
+		"relicheirus_egg",
+		RelicheirusEggBlock::new,
+		BlockBehaviour.Properties.of().mapColor(MapColor.TERRACOTTA_WHITE).strength(0.5F).sound(SoundType.METAL).randomTicks().noOcclusion()
 	);
 	public static final Block DRIED_GHAST = register(
 		"dried_ghast",
@@ -5778,6 +5895,12 @@ public class Blocks {
 		AmethystBlock::new,
 		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_PURPLE).strength(1.5F).sound(SoundType.AMETHYST).requiresCorrectToolForDrops()
 	);
+	
+	// Alex's Caves primordial blocks - decorative
+	public static final Block AMBER = register("amber", props -> new TransparentBlock(props), BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_ORANGE).noOcclusion().requiresCorrectToolForDrops().strength(0.3F, 2.0F).sound(SoundType.GLASS));
+	public static final Block AMBERSOL = register("ambersol", AmbersolBlock::new, BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_YELLOW).requiresCorrectToolForDrops().strength(3F, 10.0F).randomTicks().sound(SoundType.GLASS).lightLevel((state) -> 15).emissiveRendering((state, getter, pos) -> true));
+	public static final Block AMBERSOL_LIGHT = register("ambersol_light", AmbersolLightBlock::new, BlockBehaviour.Properties.of().replaceable().noCollision().noLootTable().lightLevel((state) -> 15).air());
+	
 	public static final Block BUDDING_AMETHYST = register(
 		"budding_amethyst",
 		BuddingAmethystBlock::new,
@@ -6564,6 +6687,11 @@ public class Blocks {
 		RotatedPillarBlock::new,
 		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_PINK).strength(0.3F).lightLevel(blockStatex -> 15).sound(SoundType.FROGLIGHT)
 	);
+	public static final Block CARMINE_FROGLIGHT = register(
+		"carmine_froglight",
+		RotatedPillarBlock::new,
+		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_YELLOW).strength(0.3F).lightLevel(blockStatex -> 15).sound(SoundType.FROGLIGHT)
+	);
 	public static final Block FROGSPAWN = register(
 		"frogspawn",
 		FrogspawnBlock::new,
@@ -6686,6 +6814,241 @@ public class Blocks {
 			.instabreak()
 			.sound(SoundType.SWEET_BERRY_BUSH)
 			.pushReaction(PushReaction.DESTROY)
+	);
+
+	// Alex's Caves Blocks
+	public static final Block PRIMAL_MAGMA = register(
+		"primal_magma",
+		com.github.alexmodguy.alexscaves.server.block.PrimalMagmaBlock::new,
+		BlockBehaviour.Properties.of()
+			.mapColor(MapColor.NETHER)
+			.instrument(NoteBlockInstrument.BASEDRUM)
+			.requiresCorrectToolForDrops()
+			.lightLevel(state -> 5)
+			.strength(0.5F)
+			.isValidSpawn((state, getter, pos, entityType) -> entityType.fireImmune())
+			.hasPostProcess((state, getter, pos) -> true)
+			.emissiveRendering((state, getter, pos) -> true)
+			.sound(com.github.alexmodguy.alexscaves.server.block.ACSoundTypes.FLOOD_BASALT)
+			.randomTicks()
+	);
+	public static final Block FISSURE_PRIMAL_MAGMA = register(
+		"fissure_primal_magma",
+		com.github.alexmodguy.alexscaves.server.block.FissurePrimalMagmaBlock::new,
+		BlockBehaviour.Properties.of()
+			.mapColor(MapColor.NETHER)
+			.instrument(NoteBlockInstrument.BASEDRUM)
+			.requiresCorrectToolForDrops()
+			.lightLevel(state -> 5)
+			.strength(0.5F)
+			.isValidSpawn((state, getter, pos, entityType) -> entityType.fireImmune())
+			.hasPostProcess((state, getter, pos) -> true)
+			.emissiveRendering((state, getter, pos) -> true)
+			.sound(com.github.alexmodguy.alexscaves.server.block.ACSoundTypes.FLOOD_BASALT)
+			.randomTicks()
+	);
+	public static final Block FLOOD_BASALT = register(
+		"flood_basalt",
+		RotatedPillarBlock::new,
+		BlockBehaviour.Properties.of()
+			.mapColor(MapColor.TERRACOTTA_RED)
+			.strength(3.0F, 100.0F)
+			.sound(com.github.alexmodguy.alexscaves.server.block.ACSoundTypes.FLOOD_BASALT)
+			.requiresCorrectToolForDrops()
+	);
+	public static final Block ANCIENT_LEAVES = register(
+		"ancient_leaves",
+		properties -> new TintedParticleLeavesBlock(0.01F, properties),
+		BlockBehaviour.Properties.of()
+			.mapColor(MapColor.GRASS)
+			.strength(0.2F)
+			.randomTicks()
+			.sound(SoundType.GRASS)
+			.noOcclusion()
+			.isSuffocating((blockState, getter, pos) -> false)
+	);
+	public static final Block ARCHAIC_VINE = register(
+		"archaic_vine",
+		properties -> new com.github.alexmodguy.alexscaves.server.block.ArchaicVineBlock(properties),
+		BlockBehaviour.Properties.of()
+			.mapColor(MapColor.COLOR_GREEN)
+			.randomTicks()
+			.noCollision()
+			.instabreak()
+			.sound(SoundType.VINE)
+	);
+	public static final Block ARCHAIC_VINE_PLANT = register(
+		"archaic_vine_plant",
+		properties -> new com.github.alexmodguy.alexscaves.server.block.ArchaicVinePlantBlock(properties),
+		BlockBehaviour.Properties.of()
+			.mapColor(MapColor.COLOR_GREEN)
+			.randomTicks()
+			.noCollision()
+			.instabreak()
+			.sound(SoundType.VINE)
+	);
+	public static final Block FERN_THATCH = register(
+		"fern_thatch",
+		Block::new,
+		BlockBehaviour.Properties.of()
+			.mapColor(MapColor.COLOR_GREEN)
+			.strength(0.5F)
+			.sound(SoundType.GRASS)
+			.noOcclusion()
+	);
+	// Pewen Wood Set
+	public static final Block PEWEN_LOG = register(
+		"pewen_log",
+		RotatedPillarBlock::new,
+		BlockBehaviour.Properties.of()
+			.mapColor(MapColor.WOOD)
+			.strength(2.0F)
+			.sound(SoundType.CHERRY_WOOD)
+			.instrument(NoteBlockInstrument.BASS)
+	);
+	public static final Block PEWEN_WOOD = register(
+		"pewen_wood",
+		RotatedPillarBlock::new,
+		BlockBehaviour.Properties.of()
+			.mapColor(MapColor.WOOD)
+			.strength(2.0F)
+			.sound(SoundType.CHERRY_WOOD)
+			.instrument(NoteBlockInstrument.BASS)
+	);
+	public static final Block STRIPPED_PEWEN_LOG = register(
+		"stripped_pewen_log",
+		RotatedPillarBlock::new,
+		BlockBehaviour.Properties.of()
+			.mapColor(MapColor.WOOD)
+			.strength(2.0F)
+			.sound(SoundType.CHERRY_WOOD)
+			.instrument(NoteBlockInstrument.BASS)
+	);
+	public static final Block STRIPPED_PEWEN_WOOD = register(
+		"stripped_pewen_wood",
+		RotatedPillarBlock::new,
+		BlockBehaviour.Properties.of()
+			.mapColor(MapColor.WOOD)
+			.strength(2.0F)
+			.sound(SoundType.CHERRY_WOOD)
+			.instrument(NoteBlockInstrument.BASS)
+	);
+	public static final Block PEWEN_PLANKS = register(
+		"pewen_planks",
+		BlockBehaviour.Properties.of()
+			.mapColor(MapColor.WOOD)
+			.strength(2.0F, 3.0F)
+			.sound(SoundType.CHERRY_WOOD)
+			.instrument(NoteBlockInstrument.BASS)
+	);
+	public static final Block PEWEN_STAIRS = registerLegacyStair("pewen_stairs", PEWEN_PLANKS);
+	public static final Block PEWEN_SLAB = register(
+		"pewen_slab",
+		SlabBlock::new,
+		BlockBehaviour.Properties.ofLegacyCopy(PEWEN_PLANKS)
+	);
+	public static final Block PEWEN_FENCE = register(
+		"pewen_fence",
+		FenceBlock::new,
+		BlockBehaviour.Properties.ofLegacyCopy(PEWEN_PLANKS)
+	);
+	public static final Block PEWEN_FENCE_GATE = register(
+		"pewen_fence_gate",
+		properties -> new FenceGateBlock(WoodType.OAK, properties),
+		BlockBehaviour.Properties.ofLegacyCopy(PEWEN_PLANKS).strength(2.0F, 3.0F).sound(SoundType.CHERRY_WOOD).forceSolidOn()
+	);
+	public static final Block PEWEN_DOOR = register(
+		"pewen_door",
+		properties -> new DoorBlock(BlockSetType.CHERRY, properties),
+		BlockBehaviour.Properties.ofLegacyCopy(PEWEN_PLANKS).strength(3.0F).sound(SoundType.CHERRY_WOOD).noOcclusion()
+	);
+	public static final Block PEWEN_TRAPDOOR = register(
+		"pewen_trapdoor",
+		properties -> new TrapDoorBlock(BlockSetType.CHERRY, properties),
+		BlockBehaviour.Properties.of()
+			.mapColor(MapColor.WOOD)
+			.strength(3.0F)
+			.sound(SoundType.CHERRY_WOOD)
+			.noOcclusion()
+	);
+	public static final Block PEWEN_BUTTON = register(
+		"pewen_button",
+		properties -> new ButtonBlock(BlockSetType.CHERRY, 30, properties),
+		BlockBehaviour.Properties.of()
+			.mapColor(MapColor.WOOD)
+			.noCollision()
+			.strength(0.5F)
+			.sound(SoundType.CHERRY_WOOD)
+	);
+	public static final Block PEWEN_PRESSURE_PLATE = register(
+		"pewen_pressure_plate",
+		properties -> new PressurePlateBlock(BlockSetType.CHERRY, properties),
+		BlockBehaviour.Properties.ofLegacyCopy(PEWEN_PLANKS).noCollision().strength(0.5F).sound(SoundType.CHERRY_WOOD)
+	);
+	public static final Block PEWEN_SIGN = register(
+		"pewen_sign",
+		properties -> new StandingSignBlock(WoodType.OAK, properties),
+		BlockBehaviour.Properties.of()
+			.mapColor(MapColor.WOOD)
+			.noCollision()
+			.strength(1.0F)
+			.sound(SoundType.CHERRY_WOOD)
+	);
+	public static final Block PEWEN_WALL_SIGN = register(
+		"pewen_wall_sign",
+		properties -> new WallSignBlock(WoodType.OAK, properties),
+		BlockBehaviour.Properties.of()
+			.mapColor(MapColor.WOOD)
+			.noCollision()
+			.strength(1.0F)
+			.sound(SoundType.CHERRY_WOOD)
+	);
+	public static final Block PEWEN_HANGING_SIGN = register(
+		"pewen_hanging_sign",
+		properties -> new CeilingHangingSignBlock(WoodType.OAK, properties),
+		BlockBehaviour.Properties.of()
+			.mapColor(MapColor.WOOD)
+			.forceSolidOn()
+			.instrument(NoteBlockInstrument.BASS)
+			.noCollision()
+			.strength(1.0F)
+	);
+	public static final Block PEWEN_WALL_HANGING_SIGN = register(
+		"pewen_wall_hanging_sign",
+		properties -> new WallHangingSignBlock(WoodType.OAK, properties),
+		BlockBehaviour.Properties.of()
+			.mapColor(MapColor.WOOD)
+			.forceSolidOn()
+			.instrument(NoteBlockInstrument.BASS)
+			.noCollision()
+			.strength(1.0F)
+	);
+	public static final Block PEWEN_BRANCH = register(
+		"pewen_branch",
+		com.github.alexmodguy.alexscaves.server.block.PewenBranchBlock::new,
+		BlockBehaviour.Properties.of()
+			.mapColor(DyeColor.GREEN)
+			.strength(1.0F)
+			.sound(com.github.alexmodguy.alexscaves.server.block.ACSoundTypes.PEWEN_BRANCH)
+			.randomTicks()
+	);
+	public static final Block PEWEN_PINES = register(
+		"pewen_pines",
+		com.github.alexmodguy.alexscaves.server.block.PewenPinesBlock::new,
+		BlockBehaviour.Properties.of()
+			.mapColor(DyeColor.GREEN)
+			.instabreak()
+			.sound(SoundType.ROOTS)
+			.randomTicks()
+			.offsetType(BlockBehaviour.OffsetType.XZ)
+			.noOcclusion()
+			.replaceable()
+			.noCollision()
+	);
+	public static final Block POTTED_PEWEN_PINES = register(
+		"potted_pewen_pines",
+		properties -> new FlowerPotBlock(PEWEN_PINES, properties),
+		flowerPotProperties()
 	);
 
 	public static ToIntFunction<BlockState> litBlockEmission(int i) {
@@ -6862,5 +7225,8 @@ public class Blocks {
 				blockState.initCache();
 			}
 		}
+		
+		// Initialize Alex's Caves tree features AFTER all blocks are registered
+		net.minecraft.world.level.levelgen.feature.ACFeatures.init();
 	}
 }

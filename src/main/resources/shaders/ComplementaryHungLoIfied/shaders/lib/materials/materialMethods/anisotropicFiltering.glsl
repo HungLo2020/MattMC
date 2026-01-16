@@ -1,7 +1,4 @@
-/*
-    This file is specifically licensed with Mozilla Public License Version 2.0.
-    You can get a copy from https://www.mozilla.org/MPL/2.0/
-*/
+
 
 float manualDeterminant(mat2 matrix) {
     return matrix[0].x * matrix[1].y - matrix[0].y * matrix[1].x;

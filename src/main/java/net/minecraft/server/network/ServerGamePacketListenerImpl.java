@@ -100,6 +100,7 @@ import net.minecraft.network.protocol.game.ServerboundContainerClosePacket;
 import net.minecraft.network.protocol.game.ServerboundContainerSlotStateChangedPacket;
 import net.minecraft.network.protocol.game.ServerboundDebugSubscriptionRequestPacket;
 import net.minecraft.network.protocol.game.ServerboundEditBookPacket;
+import net.minecraft.network.protocol.game.ServerboundElevatorTeleportPacket;
 import net.minecraft.network.protocol.game.ServerboundEntityTagQueryPacket;
 import net.minecraft.network.protocol.game.ServerboundInteractPacket;
 import net.minecraft.network.protocol.game.ServerboundJigsawGeneratePacket;
@@ -2192,6 +2193,38 @@ public class ServerGamePacketListenerImpl
 		}
 
 		this.receivedMovementThisTick = false;
+	}
+
+	@Override
+	public void handleElevatorTeleport(ServerboundElevatorTeleportPacket packet) {
+		PacketUtils.ensureRunningOnSameThread(packet, this, this.player.level());
+		
+		// Validate the packet
+		BlockPos from = packet.getFrom();
+		BlockPos to = packet.getTo();
+		
+		// Basic validation
+		if (!this.player.level().isLoaded(from) || !this.player.level().isLoaded(to)) {
+			return;
+		}
+		
+		// Check player is near the from elevator
+		if (this.player.blockPosition().distManhattan(from) > 6) {  // activationRange
+			return;
+		}
+		
+		// Verify both are elevator blocks
+		if (!(this.player.level().getBlockState(from).getBlock() instanceof net.minecraft.world.level.block.ElevatorBlock)) {
+			return;
+		}
+		if (!(this.player.level().getBlockState(to).getBlock() instanceof net.minecraft.world.level.block.ElevatorBlock)) {
+			return;
+		}
+		
+		// Teleport the player
+		net.minecraft.world.level.block.ElevatorBlock elevatorBlock =
+			(net.minecraft.world.level.block.ElevatorBlock) this.player.level().getBlockState(to).getBlock();
+		elevatorBlock.teleportPlayerToElevator(this.player, to);
 	}
 
 	private void handlePlayerKnownMovement(Vec3 vec3) {

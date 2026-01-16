@@ -1,6 +1,5 @@
 package com.mojang.blaze3d.systems;
 
-import com.mojang.blaze3d.DontObfuscate;
 import com.mojang.blaze3d.buffers.GpuBuffer;
 import com.mojang.blaze3d.buffers.GpuBufferSlice;
 import com.mojang.blaze3d.pipeline.RenderPipeline;
@@ -14,7 +13,6 @@ import net.minecraft.api.Environment;
 import org.jetbrains.annotations.Nullable;
 
 @Environment(EnvType.CLIENT)
-@DontObfuscate
 public interface RenderPass extends AutoCloseable, net.irisshaders.iris.mixinterface.RenderPassInterface {
 	void pushDebugGroup(Supplier<String> supplier);
 

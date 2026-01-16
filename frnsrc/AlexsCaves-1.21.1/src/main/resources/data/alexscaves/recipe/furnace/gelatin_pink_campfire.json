@@ -1,0 +1,12 @@
+{
+  "type": "minecraft:campfire_cooking",
+  "ingredient": {
+    "item": "alexscaves:sweetish_fish_pink"
+  },
+  "result": {
+    "id": "alexscaves:gelatin_pink",
+    "count": 1
+  },
+  "experience": 0.15,
+  "cookingtime": 600
+}

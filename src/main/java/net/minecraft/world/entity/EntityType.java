@@ -73,6 +73,11 @@ import net.minecraft.world.entity.animal.horse.ZombieHorse;
 import net.minecraft.world.entity.animal.sheep.Sheep;
 import net.minecraft.world.entity.animal.sniffer.Sniffer;
 import net.minecraft.world.entity.animal.wolf.Wolf;
+import com.github.alexmodguy.alexscaves.server.entity.living.GrottoceratopsEntity;
+import com.github.alexmodguy.alexscaves.server.entity.living.RelicheirusEntity;
+import com.github.alexmodguy.alexscaves.server.entity.living.SubterranodonEntity;
+import com.github.alexmodguy.alexscaves.server.entity.living.TrilocarisEntity;
+import com.github.alexmodguy.alexscaves.server.entity.living.VallumraptorEntity;
 import net.minecraft.world.entity.boss.enderdragon.EndCrystal;
 import net.minecraft.world.entity.boss.enderdragon.EnderDragon;
 import net.minecraft.world.entity.boss.wither.WitherBoss;
@@ -215,6 +220,13 @@ public class EntityType<T extends Entity> implements FeatureElement, EntityTypeT
 			.sized(6.0F, 0.5F)
 			.clientTrackingRange(10)
 			.updateInterval(Integer.MAX_VALUE)
+	);
+	public static final EntityType<com.github.alexmodguy.alexscaves.server.entity.living.AtlatitanEntity> ATLATITAN = register(
+		"atlatitan",
+		EntityType.Builder.of(com.github.alexmodguy.alexscaves.server.entity.living.AtlatitanEntity::new, MobCategory.CREATURE)
+			.sized(5.0F, 8.0F)
+			.eyeHeight(7.0F)
+			.clientTrackingRange(11)
 	);
 	public static final EntityType<Armadillo> ARMADILLO = register(
 		"armadillo", EntityType.Builder.of(Armadillo::new, MobCategory.CREATURE).sized(0.7F, 0.65F).eyeHeight(0.26F).clientTrackingRange(10)
@@ -454,6 +466,7 @@ public class EntityType<T extends Entity> implements FeatureElement, EntityTypeT
 			.clientTrackingRange(10)
 			.updateInterval(20)
 	);
+	// CRUSHED_BLOCK and FALLING_TREE_BLOCK removed - falling trees functionality not needed
 	public static final EntityType<LargeFireball> FIREBALL = register(
 		"fireball",
 		EntityType.Builder.<LargeFireball>of(LargeFireball::new, MobCategory.MISC).noLootTable().sized(1.0F, 1.0F).clientTrackingRange(4).updateInterval(10)
@@ -520,6 +533,13 @@ public class EntityType<T extends Entity> implements FeatureElement, EntityTypeT
 	);
 	public static final EntityType<Goat> GOAT = register(
 		"goat", EntityType.Builder.of(Goat::new, MobCategory.CREATURE).sized(0.9F, 1.3F).passengerAttachments(1.1125F).clientTrackingRange(10)
+	);
+	public static final EntityType<GrottoceratopsEntity> GROTTOCERATOPS = register(
+		"grottoceratops",
+		EntityType.Builder.of(GrottoceratopsEntity::new, MobCategory.CREATURE)
+			.sized(2.5F, 2.0F)
+			.eyeHeight(1.5F)
+			.clientTrackingRange(10)
 	);
 	public static final EntityType<Guardian> GUARDIAN = register(
 		"guardian",
@@ -715,6 +735,22 @@ public class EntityType<T extends Entity> implements FeatureElement, EntityTypeT
 			.eyeHeight(0.5625F)
 			.clientTrackingRange(10)
 	);
+	public static final EntityType<Boat> PEWEN_BOAT = register(
+		"pewen_boat",
+		EntityType.Builder.of(boatFactory(() -> Items.PEWEN_BOAT), MobCategory.MISC)
+			.noLootTable()
+			.sized(1.375F, 0.5625F)
+			.eyeHeight(0.5625F)
+			.clientTrackingRange(10)
+	);
+	public static final EntityType<ChestBoat> PEWEN_CHEST_BOAT = register(
+		"pewen_chest_boat",
+		EntityType.Builder.of(chestBoatFactory(() -> Items.PEWEN_CHEST_BOAT), MobCategory.MISC)
+			.noLootTable()
+			.sized(1.375F, 0.5625F)
+			.eyeHeight(0.5625F)
+			.clientTrackingRange(10)
+	);
 	public static final EntityType<Panda> PANDA = register(
 		"panda", EntityType.Builder.of(Panda::new, MobCategory.CREATURE).sized(1.3F, 1.25F).clientTrackingRange(10)
 	);
@@ -796,6 +832,13 @@ public class EntityType<T extends Entity> implements FeatureElement, EntityTypeT
 			.clientTrackingRange(10)
 			.notInPeaceful()
 	);
+	public static final EntityType<RelicheirusEntity> RELICHEIRUS = register(
+		"relicheirus",
+		EntityType.Builder.of(RelicheirusEntity::new, MobCategory.CREATURE)
+			.sized(3.5F, 3.5F)
+			.eyeHeight(3.0F)
+			.clientTrackingRange(10)
+	);
 	public static final EntityType<Salmon> SALMON = register(
 		"salmon", EntityType.Builder.of(Salmon::new, MobCategory.WATER_AMBIENT).sized(0.7F, 0.4F).eyeHeight(0.26F).clientTrackingRange(4)
 	);
@@ -850,6 +893,20 @@ public class EntityType<T extends Entity> implements FeatureElement, EntityTypeT
 			.eyeHeight(1.05F)
 			.passengerAttachments(2.09375F)
 			.nameTagOffset(2.05F)
+			.clientTrackingRange(10)
+	);
+	public static final EntityType<SubterranodonEntity> SUBTERRANODON = register(
+		"subterranodon",
+		EntityType.Builder.of(SubterranodonEntity::new, MobCategory.CREATURE)
+			.sized(1.75F, 1.2F)
+			.eyeHeight(0.8F)
+			.clientTrackingRange(12)
+	);
+	public static final EntityType<VallumraptorEntity> VALLUMRAPTOR = register(
+		"vallumraptor",
+		EntityType.Builder.of(VallumraptorEntity::new, MobCategory.CREATURE)
+			.sized(0.8F, 1.5F)
+			.eyeHeight(1.2F)
 			.clientTrackingRange(10)
 	);
 	public static final EntityType<Snowball> SNOWBALL = register(
@@ -944,6 +1001,20 @@ public class EntityType<T extends Entity> implements FeatureElement, EntityTypeT
 			.eyeHeight(0.13F)
 			.clientTrackingRange(4)
 			.updateInterval(20)
+	);
+	public static final EntityType<com.github.alexmodguy.alexscaves.server.entity.living.TremorsaurusEntity> TREMORSAURUS = register(
+		"tremorsaurus",
+		EntityType.Builder.of(com.github.alexmodguy.alexscaves.server.entity.living.TremorsaurusEntity::new, MobCategory.CREATURE)
+			.sized(3.5F, 4.5F)
+			.eyeHeight(4.0F)
+			.clientTrackingRange(10)
+	);
+	public static final EntityType<TrilocarisEntity> TRILOCARIS = register(
+		"trilocaris",
+		EntityType.Builder.of(TrilocarisEntity::new, MobCategory.WATER_CREATURE)
+			.sized(0.8F, 0.4F)
+			.eyeHeight(0.2F)
+			.clientTrackingRange(8)
 	);
 	public static final EntityType<TropicalFish> TROPICAL_FISH = register(
 		"tropical_fish", EntityType.Builder.of(TropicalFish::new, MobCategory.WATER_AMBIENT).sized(0.5F, 0.4F).eyeHeight(0.26F).clientTrackingRange(4)

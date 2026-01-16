@@ -1,0 +1,11 @@
+{
+  "type": "minecraft:stonecutting",
+  "count": 1,
+  "ingredient": {
+    "item": "alexscaves:smooth_coprolith"
+  },
+  "result": {
+    "id": "alexscaves:smooth_coprolith_stairs",
+    "count": 1
+  }
+}

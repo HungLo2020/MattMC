@@ -1,11 +1,9 @@
 package com.mojang.blaze3d.textures;
 
-import com.mojang.blaze3d.DontObfuscate;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 
 @Environment(EnvType.CLIENT)
-@DontObfuscate
 public abstract class GpuTexture implements AutoCloseable, net.irisshaders.iris.mixinterface.GpuTextureInterface {
 	public static final int USAGE_COPY_DST = 1;
 	public static final int USAGE_COPY_SRC = 2;

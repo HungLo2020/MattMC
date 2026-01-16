@@ -1,0 +1,11 @@
+{
+  "type": "minecraft:stonecutting",
+  "count": 1,
+  "ingredient": {
+    "item": "alexscaves:galena_bricks"
+  },
+  "result": {
+    "id": "alexscaves:galena_brick_stairs",
+    "count": 1
+  }
+}

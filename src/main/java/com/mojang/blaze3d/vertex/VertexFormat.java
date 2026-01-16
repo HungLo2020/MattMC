@@ -2,7 +2,6 @@ package com.mojang.blaze3d.vertex;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import com.mojang.blaze3d.DontObfuscate;
 import com.mojang.blaze3d.GraphicsWorkarounds;
 import com.mojang.blaze3d.buffers.GpuBuffer;
 import com.mojang.blaze3d.systems.CommandEncoder;
@@ -19,7 +18,6 @@ import net.minecraft.api.Environment;
 import org.jetbrains.annotations.Nullable;
 
 @Environment(EnvType.CLIENT)
-@DontObfuscate
 public class VertexFormat implements net.irisshaders.iris.pipeline.programs.VertexFormatExtension {
 	public static final int UNKNOWN_ELEMENT = -1;
 	private final List<VertexFormatElement> elements;
@@ -155,7 +153,6 @@ public class VertexFormat implements net.irisshaders.iris.pipeline.programs.Vert
 	}
 
 	@Environment(EnvType.CLIENT)
-	@DontObfuscate
 	public static class Builder {
 		private final ImmutableMap.Builder<String, VertexFormatElement> elements = ImmutableMap.builder();
 		private final IntList offsets = new IntArrayList();

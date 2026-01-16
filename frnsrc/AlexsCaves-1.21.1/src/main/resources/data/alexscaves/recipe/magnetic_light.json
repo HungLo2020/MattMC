@@ -1,0 +1,19 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "R",
+    "I"
+  ],
+  "key": {
+    "R": {
+      "item": "alexscaves:notor_gizmo"
+    },
+    "I": {
+      "tag": "c:ingots/iron"
+    }
+  },
+  "result": {
+    "count": 4,
+    "id": "alexscaves:magnetic_light"
+  }
+}

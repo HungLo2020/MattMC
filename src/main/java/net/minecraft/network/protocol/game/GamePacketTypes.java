@@ -199,6 +199,7 @@ public class GamePacketTypes {
 	public static final PacketType<ClientboundPlayerSkinPacket> CLIENTBOUND_PLAYER_SKIN = createClientbound("player_skin");
 	public static final PacketType<ClientboundRemovePlayerSkinPacket> CLIENTBOUND_REMOVE_PLAYER_SKIN = createClientbound("remove_player_skin");
 	public static final PacketType<ServerboundPlayerSkinPacket> SERVERBOUND_PLAYER_SKIN = createServerbound("player_skin");
+	public static final PacketType<ServerboundElevatorTeleportPacket> SERVERBOUND_ELEVATOR_TELEPORT = createServerbound("elevator_teleport");
 
 	private static <T extends Packet<ClientGamePacketListener>> PacketType<T> createClientbound(String string) {
 		return new PacketType<>(PacketFlow.CLIENTBOUND, ResourceLocation.withDefaultNamespace(string));

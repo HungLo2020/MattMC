@@ -55,13 +55,10 @@ public class Version {
             if (versionInfoLength == 0) {
                 int error = Kernel32.getLastError();
 
-                switch (error) {
-                    case 0x714 /* ERROR_RESOURCE_DATA_NOT_FOUND */:
-                    case 0x715 /* ERROR_RESOURCE_TYPE_NOT_FOUND */:
-                        return null;
-                    default:
-                        throw new RuntimeException("GetFileVersionInfoSizeW failed, error=" + error);
-                }
+                return switch (error) { /* ERROR_RESOURCE_DATA_NOT_FOUND */
+                    case 0x714, 0x715 /* ERROR_RESOURCE_TYPE_NOT_FOUND */ -> null;
+                    default -> throw new RuntimeException("GetFileVersionInfoSizeW failed, error=" + error);
+                };
             }
 
             VersionInfo versionInfo = VersionInfo.allocate(versionInfoLength);

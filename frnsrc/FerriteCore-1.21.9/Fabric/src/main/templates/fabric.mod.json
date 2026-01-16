@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "id": "ferritecore",
+  "version": "${version}",
+  "name": "FerriteCore",
+  "description": "Reduces memory usage",
+  "icon": "logo.png",
+  "authors": [
+    "malte0811"
+  ],
+  "contact": {
+    "issues": "https://github.com/malte0811/FerriteCore/issues",
+    "source": "https://github.com/malte0811/FerriteCore",
+    "homepage": "https://www.curseforge.com/minecraft/mc-mods/ferritecore-fabric"
+  },
+  "license": "MIT",
+  "environment": "*",
+  "depends": {
+    "fabricloader": ">=0.14.21",
+    "minecraft": ">=${mc_version} <${next_major_mc}"
+  },
+  "breaks": {
+    "hydrogen": "<=0.3"
+  },
+  "mixins": [
+    "ferritecore.accessors.mixin.json",
+    "ferritecore.blockstatecache.mixin.json",
+    "ferritecore.fastmap.mixin.json",
+    "ferritecore.threaddetec.mixin.json"
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "group": "wooden_button",
+  "ingredients": [
+    {
+      "item": "minecraft:pewen_planks"
+    }
+  ],
+  "result": {
+    "id": "minecraft:pewen_button",
+    "count": 1
+  }
+}
