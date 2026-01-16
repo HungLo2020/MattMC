@@ -9,7 +9,7 @@ version = '1.21.10'
 // LWJGL version and natives configuration
 def lwjglVersion = '3.3.3'
 def lwjglNatives = System.getProperty('os.name').toLowerCase().contains('mac') 
-    ? (System.getProperty('os.arch').contains('aarch64') ? 'natives-macos-arm64' : 'natives-macos')
+    ? (System.getProperty('os.arch').contains('aarch64') || System.getProperty('os.arch').contains('arm64') ? 'natives-macos-arm64' : 'natives-macos')
     : System.getProperty('os.name').toLowerCase().contains('win') 
         ? (System.getProperty('os.arch').contains('64') ? 'natives-windows' : 'natives-windows-x86')
         : (System.getProperty('os.arch').contains('arm') || System.getProperty('os.arch').contains('aarch64')) 
