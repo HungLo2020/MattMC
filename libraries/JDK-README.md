@@ -2,6 +2,13 @@
 
 This project uses Temurin OpenJDK 25 bundled with the application to ensure consistent Java runtime across all environments.
 
+## Supported Platforms
+
+The automatic JDK download script supports:
+- **Linux**: x64 (Intel/AMD) and ARM64 (aarch64)
+- **macOS**: x64 (Intel) and ARM64 (Apple Silicon)
+- **Windows**: x64 (Intel/AMD) and ARM64
+
 ## Automatic Download (Windows/Linux/macOS)
 
 The JDK is automatically downloaded when needed on all major platforms:
@@ -39,11 +46,19 @@ If automatic download doesn't work, download manually:
 
 3. Download and extract to `libraries/jdk-25/`
 
-### Linux/macOS:
+### Linux:
 ```bash
 cd libraries
 tar -xzf /path/to/OpenJDK25U-jdk_*.tar.gz
 mv jdk-25.0.1+8 jdk-25
+```
+
+### macOS:
+```bash
+cd libraries
+tar -xzf /path/to/OpenJDK25U-jdk_*.tar.gz
+# On macOS, the JDK is in Contents/Home subdirectory
+mv jdk-25.0.1+8/Contents/Home jdk-25
 ```
 
 ### Windows:
