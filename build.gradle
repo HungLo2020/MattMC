@@ -392,6 +392,11 @@ def clientJvmArgs = [
     '-Dorg.lwjgl.util.Debug=true'
 ]
 
+// Add macOS-specific JVM arguments for LWJGL/GLFW
+if (System.getProperty('os.name').toLowerCase().contains('mac')) {
+    clientJvmArgs += '-XstartOnFirstThread'
+}
+
 // Helper method to configure JavaExec tasks to use bundled JDK (if available) or toolchain
 def configureBundledJdk(JavaExec task) {
     def bundledJdkDir = file("run/jdk-${targetJavaVersion}")
