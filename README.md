@@ -357,6 +357,16 @@ Make sure you have:
 - A graphics driver that supports OpenGL 4.4+
 - Game assets in `run/assets` directory
 
+### macOS SIGBUS crash (Fixed in current version)
+
+If you're running an older version and experiencing SIGBUS crashes on macOS (especially Apple Silicon/ARM64), this was caused by an incompatibility between ZGC and UseCompactObjectHeaders in Java 25.
+
+**Solution:** Update to the latest version. The build system now automatically disables UseCompactObjectHeaders on macOS while keeping ZGC enabled.
+
+If you need to manually fix this in an older version:
+- Remove `-XX:+UseCompactObjectHeaders` from JVM arguments
+- Keep `-XX:+UseZGC` (it works fine without compact object headers)
+
 ## Use Cases
 
 ### Research & Education
