@@ -375,6 +375,10 @@ application {
     mainClass = 'net.fabricmc.loader.impl.launch.knot.KnotClient'
 }
 
+// Detect macOS platform for JVM argument adjustments
+// Check for both "Mac OS X" and "macOS" (case-insensitive)
+def isMacOS = System.getProperty('os.name').toLowerCase().with { it.startsWith('mac') || it.contains('darwin') }
+
 // Common JVM arguments for server tasks
 def serverJvmArgs = [
     '-Xmx2G',
@@ -384,7 +388,7 @@ def serverJvmArgs = [
 
 // Add UseCompactObjectHeaders only on non-macOS platforms
 // macOS has known stability issues with ZGC + UseCompactObjectHeaders combination
-if (!System.getProperty('os.name').toLowerCase().contains('mac')) {
+if (!isMacOS) {
     serverJvmArgs += '-XX:+UseCompactObjectHeaders'
 }
 
@@ -398,12 +402,12 @@ def clientJvmArgs = [
 
 // Add UseCompactObjectHeaders only on non-macOS platforms
 // macOS has known stability issues with ZGC + UseCompactObjectHeaders combination
-if (!System.getProperty('os.name').toLowerCase().contains('mac')) {
+if (!isMacOS) {
     clientJvmArgs += '-XX:+UseCompactObjectHeaders'
 }
 
 // Add macOS-specific JVM arguments for LWJGL/GLFW
-if (System.getProperty('os.name').toLowerCase().contains('mac')) {
+if (isMacOS) {
     clientJvmArgs += '-XstartOnFirstThread'
 }
 
