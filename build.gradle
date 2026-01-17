@@ -379,18 +379,28 @@ application {
 def serverJvmArgs = [
     '-Xmx2G',
     '-Xms1G',
-    '-XX:+UseZGC',
-    '-XX:+UseCompactObjectHeaders'
+    '-XX:+UseZGC'
 ]
+
+// Add UseCompactObjectHeaders only on non-macOS platforms
+// macOS has known stability issues with ZGC + UseCompactObjectHeaders combination
+if (!System.getProperty('os.name').toLowerCase().contains('mac')) {
+    serverJvmArgs += '-XX:+UseCompactObjectHeaders'
+}
 
 // Common JVM arguments for client tasks
 def clientJvmArgs = [
     '-Xmx8G',
     '-Xms4G',
     '-XX:+UseZGC',
-    '-XX:+UseCompactObjectHeaders',
     '-Dorg.lwjgl.util.Debug=true'
 ]
+
+// Add UseCompactObjectHeaders only on non-macOS platforms
+// macOS has known stability issues with ZGC + UseCompactObjectHeaders combination
+if (!System.getProperty('os.name').toLowerCase().contains('mac')) {
+    clientJvmArgs += '-XX:+UseCompactObjectHeaders'
+}
 
 // Add macOS-specific JVM arguments for LWJGL/GLFW
 if (System.getProperty('os.name').toLowerCase().contains('mac')) {

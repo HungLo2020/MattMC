@@ -31,9 +31,15 @@ echo "Using bundled JDK ${JAVA_VERSION}"
 # Launch the dedicated server
 # Note: Server runs in headless mode by default (--nogui)
 # Remove --nogui to run with GUI
-$JAVA_CMD -Xmx2G -Xms1G \
-    -XX:+UseZGC \
-    -XX:+UseCompactObjectHeaders \
+
+# Build JVM arguments - UseCompactObjectHeaders is disabled on macOS due to stability issues
+JVM_ARGS="-Xmx2G -Xms1G -XX:+UseZGC"
+if [[ "$(uname -s)" != "Darwin" ]]; then
+    # Not macOS - safe to use UseCompactObjectHeaders
+    JVM_ARGS="$JVM_ARGS -XX:+UseCompactObjectHeaders"
+fi
+
+$JAVA_CMD $JVM_ARGS \
     -cp "@CLASSPATH_LINUX@" \
     net.minecraft.server.Main \
     --nogui
