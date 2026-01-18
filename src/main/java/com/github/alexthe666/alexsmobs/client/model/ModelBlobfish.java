@@ -1,13 +1,13 @@
 package com.github.alexthe666.alexsmobs.client.model;
 
-import com.github.alexthe666.alexsmobs.entity.EntityBlobfish;
 import com.github.alexthe666.citadel.client.model.AdvancedEntityModel;
 import com.github.alexthe666.citadel.client.model.AdvancedModelBox;
 import com.github.alexthe666.citadel.client.model.basic.BasicModelPart;
 import com.google.common.collect.ImmutableList;
+import net.minecraft.client.renderer.entity.state.LivingEntityRenderState;
 import net.minecraft.util.Mth;
 
-public class ModelBlobfish extends AdvancedEntityModel<EntityBlobfish> {
+public class ModelBlobfish extends AdvancedEntityModel<LivingEntityRenderState> {
     private final AdvancedModelBox root;
     private final AdvancedModelBox body;
     private final AdvancedModelBox nose;
@@ -69,16 +69,19 @@ public class ModelBlobfish extends AdvancedEntityModel<EntityBlobfish> {
     }
 
     @Override
-    public void setupAnim(EntityBlobfish entity, float limbSwing, float limbSwingAmount, float ageInTicks, float netHeadYaw, float headPitch){
+    public void setupAnim(LivingEntityRenderState renderState) {
         this.resetToDefaultPose();
-        this.body.rotateAngleX = headPitch * Mth.DEG_TO_RAD;
+        // Use basic animation based on render state
         float swimSpeed = 1.5F;
         float swimDegree = 0.85F;
+        float ageInTicks = renderState.ageInTicks;
+        float limbSwing = renderState.walkAnimationPos;
+        float limbSwingAmount = renderState.walkAnimationSpeed;
+        
         this.swing(tail, swimSpeed, swimDegree, false, 0, 0, limbSwing, limbSwingAmount);
         this.swing(tail_fin, swimSpeed, swimDegree * 0.3F, false, 0, 0, limbSwing, limbSwingAmount);
         this.swing(fin_left, swimSpeed, swimDegree, false, 3F, -0.3F, limbSwing, limbSwingAmount);
         this.swing(fin_right, swimSpeed, swimDegree, true, 3F, -0.3F, limbSwing, limbSwingAmount);
-
     }
 
     public void setRotationAngle(AdvancedModelBox AdvancedModelBox, float x, float y, float z) {

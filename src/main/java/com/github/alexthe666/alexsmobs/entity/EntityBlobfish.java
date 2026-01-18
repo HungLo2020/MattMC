@@ -38,6 +38,8 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LevelAccessor;
 import net.minecraft.world.level.ServerLevelAccessor;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
 import net.minecraft.world.phys.Vec3;
 
 import javax.annotation.Nonnull;
@@ -54,7 +56,7 @@ public class EntityBlobfish extends WaterAnimal implements FlyingAnimal, Bucketa
     public float squishAmount;
     private boolean wasOnGround;
 
-    protected EntityBlobfish(EntityType type, Level world) {
+    public EntityBlobfish(EntityType type, Level world) {
         super(type, world);
         this.moveControl = new AquaticMoveController(this, 1.0F);
     }
@@ -64,7 +66,7 @@ public class EntityBlobfish extends WaterAnimal implements FlyingAnimal, Bucketa
     }
 
 
-    public boolean checkSpawnRules(LevelAccessor worldIn, MobSpawnType spawnReasonIn) {
+    public boolean checkSpawnRules(LevelAccessor worldIn, EntitySpawnReason spawnReasonIn) {
         return true;  // Simplified spawn rules
     }
 
@@ -73,7 +75,7 @@ public class EntityBlobfish extends WaterAnimal implements FlyingAnimal, Bucketa
     }
 
     protected void handleAirSupply(int p_209207_1_) {
-        if (this.isAlive() && !this.isInWaterOrBubble() && !isSlimed()) {
+        if (this.isAlive() && !this.isInWater() && !isSlimed()) {
             this.setAirSupply(p_209207_1_ - 1);
             if (this.getAirSupply() == -20) {
                 this.setAirSupply(0);
@@ -129,20 +131,22 @@ public class EntityBlobfish extends WaterAnimal implements FlyingAnimal, Bucketa
         return SoundEvents.BUCKET_FILL_FISH;
     }
 
-    public void addAdditionalSaveData(CompoundTag compound) {
-        super.addAdditionalSaveData(compound);
-        compound.putBoolean("FromBucket", this.fromBucket());
-        compound.putBoolean("Depressurized", this.isDepressurized());
-        compound.putBoolean("Slimed", this.isSlimed());
-        compound.putFloat("BlobfishScale", this.getBlobfishScale());
+    @Override
+    protected void addAdditionalSaveData(ValueOutput valueOutput) {
+        super.addAdditionalSaveData(valueOutput);
+        valueOutput.putBoolean("FromBucket", this.fromBucket());
+        valueOutput.putBoolean("Depressurized", this.isDepressurized());
+        valueOutput.putBoolean("Slimed", this.isSlimed());
+        valueOutput.putFloat("BlobfishScale", this.getBlobfishScale());
     }
 
-    public void readAdditionalSaveData(CompoundTag compound) {
-        super.readAdditionalSaveData(compound);
-        this.setFromBucket(compound.getBoolean("FromBucket"));
-        this.setDepressurized(compound.getBoolean("Depressurized"));
-        this.setSlimed(compound.getBoolean("Slimed"));
-        this.setBlobfishScale(compound.getFloat("BlobfishScale"));
+    @Override
+    protected void readAdditionalSaveData(ValueInput valueInput) {
+        super.readAdditionalSaveData(valueInput);
+        this.setFromBucket(valueInput.getBooleanOr("FromBucket", false));
+        this.setDepressurized(valueInput.getBooleanOr("Depressurized", false));
+        this.setSlimed(valueInput.getBooleanOr("Slimed", false));
+        this.setBlobfishScale(valueInput.getFloatOr("BlobfishScale", 1.0F));
     }
 
     private boolean hasClearance() {
@@ -216,7 +220,7 @@ public class EntityBlobfish extends WaterAnimal implements FlyingAnimal, Bucketa
                 this.level().addParticle(new ItemParticleOption(ParticleTypes.ITEM, lvt_3_1_), this.getX() + (double) (this.random.nextFloat() * this.getBbWidth()) - (double) this.getBbWidth() * 0.5F, this.getY() + this.getBbHeight() * 0.5F + (double) (this.random.nextFloat() * this.getBbHeight() * 0.5F), this.getZ() + (double) (this.random.nextFloat() * this.getBbWidth()) - (double) this.getBbWidth() * 0.5F, d0, d1, d2);
             }
             lvt_3_1_.shrink(1);
-            return InteractionResult.sidedSuccess(this.level().isClientSide);
+            return this.level().isClientSide() ? InteractionResult.SUCCESS : InteractionResult.CONSUME;
         }
         return Bucketable.bucketMobPickup(player, hand, this).orElse(super.mobInteract(player, hand));
     }
@@ -257,15 +261,15 @@ public class EntityBlobfish extends WaterAnimal implements FlyingAnimal, Bucketa
     public void loadFromBucketTag(@Nonnull CompoundTag compound) {
         Bucketable.loadDefaultDataFromBucketTag(this, compound);
         if (compound.contains("BucketScale")){
-            this.setBlobfishScale(compound.getFloat("BucketScale"));
+            this.setBlobfishScale(compound.getFloatOr("BucketScale", 1.0F));
         }
         if (compound.contains("Slimed")){
-            this.setSlimed(compound.getBoolean("Slimed"));
+            this.setSlimed(compound.getBooleanOr("Slimed", false));
         }
     }
 
     @Nullable
-    public SpawnGroupData finalizeSpawn(ServerLevelAccessor worldIn, DifficultyInstance difficultyIn, MobSpawnType reason, @Nullable SpawnGroupData spawnDataIn) {
+    public SpawnGroupData finalizeSpawn(ServerLevelAccessor worldIn, DifficultyInstance difficultyIn, EntitySpawnReason reason, @Nullable SpawnGroupData spawnDataIn) {
         this.setBlobfishScale(0.75F + random.nextFloat() * 0.5F);
         return super.finalizeSpawn(worldIn, difficultyIn, reason, spawnDataIn);
     }
@@ -311,8 +315,8 @@ public class EntityBlobfish extends WaterAnimal implements FlyingAnimal, Bucketa
         return SoundEvents.COD_HURT;
     }
 
-    public static boolean canBlobfishSpawn(EntityType<EntityBlobfish> entityType, ServerLevelAccessor iServerWorld, MobSpawnType reason, BlockPos pos, RandomSource random) {
-        return reason == MobSpawnType.SPAWNER || pos.getY() <= 50 && iServerWorld.getFluidState(pos).is(FluidTags.WATER) && iServerWorld.getFluidState(pos.above()).is(FluidTags.WATER);
+    public static boolean canBlobfishSpawn(EntityType<EntityBlobfish> entityType, ServerLevelAccessor iServerWorld, EntitySpawnReason reason, BlockPos pos, RandomSource random) {
+        return EntitySpawnReason.isSpawner(reason) || pos.getY() <= 50 && iServerWorld.getFluidState(pos).is(FluidTags.WATER) && iServerWorld.getFluidState(pos.above()).is(FluidTags.WATER);
     }
 
     @Override

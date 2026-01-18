@@ -1,14 +1,13 @@
 package com.github.alexthe666.alexsmobs.client.model;
 
-import com.github.alexthe666.alexsmobs.entity.EntityBlobfish;
 import com.github.alexthe666.citadel.client.model.AdvancedEntityModel;
 import com.github.alexthe666.citadel.client.model.AdvancedModelBox;
 import com.github.alexthe666.citadel.client.model.basic.BasicModelPart;
 import com.google.common.collect.ImmutableList;
-import net.minecraft.client.Minecraft;
+import net.minecraft.client.renderer.entity.state.LivingEntityRenderState;
 import net.minecraft.util.Mth;
 
-public class ModelBlobfishDepressurized extends AdvancedEntityModel<EntityBlobfish> {
+public class ModelBlobfishDepressurized extends AdvancedEntityModel<LivingEntityRenderState> {
     private final AdvancedModelBox root;
     private final AdvancedModelBox body;
     private final AdvancedModelBox nose;
@@ -70,22 +69,20 @@ public class ModelBlobfishDepressurized extends AdvancedEntityModel<EntityBlobfi
     }
 
     @Override
-    public void setupAnim(EntityBlobfish entity, float limbSwing, float limbSwingAmount, float ageInTicks, float netHeadYaw, float headPitch){
+    public void setupAnim(LivingEntityRenderState renderState) {
         this.resetToDefaultPose();
-        if(!entity.onGround()){
-            this.body.rotateAngleX = headPitch * Mth.DEG_TO_RAD;
-        }
         float swimSpeed = 1.5F;
         float swimDegree = 0.85F;
+        float limbSwing = renderState.walkAnimationPos;
+        float limbSwingAmount = renderState.walkAnimationSpeed;
+        
         this.swing(tail, swimSpeed, swimDegree * 0.5F, false, 0, 0, limbSwing, limbSwingAmount);
         this.swing(tail_fin, swimSpeed, swimDegree * 0.5F, false, 0, 0, limbSwing, limbSwingAmount);
         this.flap(fin_left, swimSpeed, swimDegree, false, 3F, -0.3F, limbSwing, limbSwingAmount);
         this.flap(fin_right, swimSpeed, swimDegree, true, 3F, -0.3F, limbSwing, limbSwingAmount);
-        float lvt_6_1_ = Mth.lerp(Minecraft.getInstance().getTimer().getGameTimeDeltaPartialTick(false), entity.prevSquishFactor, entity.squishFactor);
-        float lvt_7_1_ = 1.0F / (lvt_6_1_ + 1.0F);
-        float squishScale = 1.0F / lvt_7_1_;
-        this.body.setScale(1F, squishScale, 1F);
-        this.body.rotationPointY += lvt_6_1_ * -5F;
+        // Simplified squish animation - removed Minecraft.getInstance() call
+        this.body.setScale(1F, 1F, 1F);
+        this.body.rotationPointY = 0F;
         this.body.setShouldScaleChildren(true);
     }
 

@@ -1,7 +1,5 @@
 package com.github.alexthe666.alexsmobs.entity.ai;
 
-import com.github.alexthe666.alexsmobs.entity.EntityGiantSquid;
-import com.github.alexthe666.alexsmobs.entity.EntityWarpedToad;
 import com.github.alexthe666.alexsmobs.entity.ISemiAquatic;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.PathfinderMob;
@@ -27,7 +25,7 @@ public class AquaticMoveController extends MoveControl {
     }
 
     public void tick() {
-        if (this.entity.isInWater() || entity instanceof EntityWarpedToad && entity.isInLava()) {
+        if (this.entity.isInWater()) {
             this.entity.setDeltaMovement(this.entity.getDeltaMovement().add(0.0D, 0.005D, 0.0D));
         }
         if (entity instanceof ISemiAquatic && ((ISemiAquatic) entity).shouldStopMoving()) {
@@ -41,13 +39,8 @@ public class AquaticMoveController extends MoveControl {
             double d3 = Mth.sqrt((float) (d0 * d0 + d1 * d1 + d2 * d2));
             d1 /= d3;
             float f = (float) (Mth.atan2(d2, d0) * 57.2957763671875D) - 90.0F;
-            if (entity instanceof EntityGiantSquid) {
-                ((EntityGiantSquid) entity).directPitch(d0, d1, d2, d3);
-            } else {
-                this.entity.setYRot(this.rotlerp(this.entity.getYRot(), f, yawLimit));
-                this.entity.yBodyRot = this.entity.getYRot();
-
-            }
+            this.entity.setYRot(this.rotlerp(this.entity.getYRot(), f, yawLimit));
+            this.entity.yBodyRot = this.entity.getYRot();
             float f1 = (float) (this.speedModifier * this.entity.getAttributeValue(Attributes.MOVEMENT_SPEED) * speedMulti);
             this.entity.setSpeed(f1 * 0.4F);
             this.entity.setDeltaMovement(this.entity.getDeltaMovement().add(0.0D, (double) this.entity.getSpeed() * d1 * 0.6D, 0.0D));
