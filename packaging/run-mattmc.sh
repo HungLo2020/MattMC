@@ -33,9 +33,15 @@ echo "Using bundled JDK ${JAVA_VERSION}"
 # Note: Minecraft classes are included in the main JAR, no separate game JAR needed
 # Note: Assets are loaded directly from JAR classpath - no --assetsDir needed
 # Note: JVM_ARGS is intentionally not quoted to allow word splitting
-$JAVA_CMD -Xmx8G -Xms4G \
-    -XX:+UseZGC \
-    -XX:+UseCompactObjectHeaders \
+
+# Build JVM arguments - UseCompactObjectHeaders is disabled on macOS due to stability issues
+JVM_ARGS="-Xmx8G -Xms4G -XX:+UseZGC"
+if [[ "$(uname -s)" != "Darwin" ]]; then
+    # Not macOS - safe to use UseCompactObjectHeaders
+    JVM_ARGS="$JVM_ARGS -XX:+UseCompactObjectHeaders"
+fi
+
+$JAVA_CMD $JVM_ARGS \
     -Dfabric.development=true \
     -cp "@CLASSPATH_LINUX@" \
     net.fabricmc.loader.impl.launch.knot.KnotClient \
