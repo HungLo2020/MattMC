@@ -19,6 +19,8 @@ public class ModelBlobfishDepressurized extends AdvancedEntityModel<LivingEntity
     public ModelBlobfishDepressurized() {
         texWidth = 64;
         texHeight = 64;
+        textureWidth = 64;
+        textureHeight = 64;
 
         root = new AdvancedModelBox(this, "root");
         root.setPos(0.0F, 24.0F, 0.0F);

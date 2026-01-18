@@ -19,6 +19,8 @@ public class ModelBlobfish extends AdvancedEntityModel<LivingEntityRenderState> 
     public ModelBlobfish() {
         texWidth = 32;
         texHeight = 32;
+        textureWidth = 32;
+        textureHeight = 32;
 
         root = new AdvancedModelBox(this, "root");
         root.setPos(0.0F, 24.0F, 0.0F);
