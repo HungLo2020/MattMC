@@ -1422,7 +1422,6 @@ public class CreativeModeTabs {
 						output.accept(Items.NETHERITE_HOE);
 						output.accept(Items.BUCKET);
 						output.accept(Items.WATER_BUCKET);
-						output.accept(Items.AXOLOTL_BUCKET);
 						output.accept(Items.BLOBFISH_BUCKET);
 						output.accept(Items.COD_BUCKET);
 						output.accept(Items.SALMON_BUCKET);
