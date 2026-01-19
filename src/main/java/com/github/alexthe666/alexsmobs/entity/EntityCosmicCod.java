@@ -140,7 +140,7 @@ public class EntityCosmicCod extends Mob implements Bucketable {
     public void loadFromBucketTag(@Nonnull CompoundTag compound) {
         Bucketable.loadDefaultDataFromBucketTag(this, compound);
         if (compound.contains("CosmicCodData")) {
-            CompoundTag codData = compound.getCompound("CosmicCodData").orElse(new CompoundTag());
+            CompoundTag codData = compound.getCompoundOrEmpty("CosmicCodData");
             this.setFromBucket(codData.getBooleanOr("FromBucket", false));
         }
     }
