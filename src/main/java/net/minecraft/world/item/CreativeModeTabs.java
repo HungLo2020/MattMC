@@ -1919,6 +1919,7 @@ public class CreativeModeTabs {
 					output.accept(Items.COD_SPAWN_EGG);
 					output.accept(Items.COPPER_GOLEM_SPAWN_EGG);
 					output.accept(Items.COW_SPAWN_EGG);
+					output.accept(Items.CROW_SPAWN_EGG);
 					output.accept(Items.CREAKING_SPAWN_EGG);
 					output.accept(Items.CREEPER_SPAWN_EGG);
 					output.accept(Items.DOLPHIN_SPAWN_EGG);

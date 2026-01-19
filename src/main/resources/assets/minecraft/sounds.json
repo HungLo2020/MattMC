@@ -14111,6 +14111,22 @@
     ],
     "subtitle": "subtitles.block.generic.footsteps"
   },
+  "entity.crow.hurt": {
+    "sounds": [
+      "crow_hurt_0",
+      "crow_hurt_1"
+    ],
+    "subtitle": "subtitles.entity.crow.hurt"
+  },
+  "entity.crow.idle": {
+    "sounds": [
+      "crow_idle_0",
+      "crow_idle_1",
+      "crow_idle_2",
+      "crow_idle_3"
+    ],
+    "subtitle": "subtitles.entity.crow.ambient"
+  },
   "entity.creaking.activate": {
     "sounds": [
       "mob/creaking/creaking_activate"

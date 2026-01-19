@@ -427,6 +427,8 @@ public class SoundEvents {
 	public static final SoundEvent COW_STEP = register("entity.cow.step");
 	public static final SoundEvent CRAFTER_CRAFT = register("block.crafter.craft");
 	public static final SoundEvent CRAFTER_FAIL = register("block.crafter.fail");
+	public static final SoundEvent CROW_IDLE = register("entity.crow.idle");
+	public static final SoundEvent CROW_HURT = register("entity.crow.hurt");
 	public static final SoundEvent CREAKING_AMBIENT = register("entity.creaking.ambient");
 	public static final SoundEvent CREAKING_ACTIVATE = register("entity.creaking.activate");
 	public static final SoundEvent CREAKING_DEACTIVATE = register("entity.creaking.deactivate");

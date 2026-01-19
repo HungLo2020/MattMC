@@ -102,6 +102,7 @@ public class EntityRenderers {
 		register(EntityType.COMMAND_BLOCK_MINECART, context -> new MinecartRenderer(context, ModelLayers.COMMAND_BLOCK_MINECART));
 		register(EntityType.COPPER_GOLEM, CopperGolemRenderer::new);
 		register(EntityType.COW, CowRenderer::new);
+		register(EntityType.CROW, com.github.alexthe666.alexsmobs.client.render.RenderCrow::new);
 		register(EntityType.CREAKING, CreakingRenderer::new);
 		register(EntityType.CREEPER, CreeperRenderer::new);
 		register(EntityType.DARK_OAK_BOAT, context -> new BoatRenderer(context, ModelLayers.DARK_OAK_BOAT));
