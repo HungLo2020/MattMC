@@ -21,11 +21,11 @@ public class EntityCockroachEgg extends ThrowableItemProjectile {
     }
 
     public EntityCockroachEgg(Level worldIn, LivingEntity throwerIn) {
-        super(EntityType.COCKROACH_EGG, throwerIn, worldIn);
+        super(EntityType.COCKROACH_EGG, throwerIn, worldIn, new ItemStack(Items.COCKROACH_OOTHECA));
     }
 
     public EntityCockroachEgg(Level worldIn, double x, double y, double z) {
-        super(EntityType.COCKROACH_EGG, x, y, z, worldIn);
+        super(EntityType.COCKROACH_EGG, x, y, z, worldIn, new ItemStack(Items.COCKROACH_OOTHECA));
     }
 
     public void handleEntityEvent(byte id) {
@@ -39,20 +39,20 @@ public class EntityCockroachEgg extends ThrowableItemProjectile {
 
     protected void onHit(HitResult result) {
         super.onHit(result);
-        if (!this.level().isClientSide) {
-            this.level().broadcastEntityEvent(this, (byte)3);
+        if (this.level() instanceof ServerLevel serverLevel) {
+            serverLevel.broadcastEntityEvent(this, (byte)3);
             int i = random.nextInt(3);
             for (int j = 0; j < i; ++j) {
-                final EntityCockroach croc = EntityType.COCKROACH.create(this.level(), EntitySpawnReason.TRIGGERED);
+                final EntityCockroach croc = EntityType.COCKROACH.create(serverLevel, EntitySpawnReason.TRIGGERED);
                 if (croc != null) {
                     croc.setAge(-24000);
                     croc.setPos(this.getX(), this.getY(), this.getZ());
                     croc.setYRot(this.getYRot());
-                    croc.finalizeSpawn((ServerLevel)level(), level().getCurrentDifficultyAt(this.blockPosition()), EntitySpawnReason.TRIGGERED, (SpawnGroupData)null);
-                    this.level().addFreshEntity(croc);
+                    croc.finalizeSpawn(serverLevel, serverLevel.getCurrentDifficultyAt(this.blockPosition()), EntitySpawnReason.TRIGGERED, (SpawnGroupData)null);
+                    serverLevel.addFreshEntity(croc);
                 }
             }
-            this.level().broadcastEntityEvent(this, (byte)3);
+            serverLevel.broadcastEntityEvent(this, (byte)3);
             this.remove(RemovalReason.DISCARDED);
         }
 

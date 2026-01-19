@@ -169,9 +169,9 @@ public class EntityCockroach extends Animal implements Shearable, ITargetsDroppe
 
     public void readAdditionalSaveData(ValueInput valueInput) {
         super.readAdditionalSaveData(valueInput);
-        this.setMaracas(valueInput.getBoolean("Maracas"));
-        this.setDancing(valueInput.getBoolean("Dancing"));
-        this.setBreaded(valueInput.getBoolean("Breaded"));
+        this.setMaracas(valueInput.getBooleanOr("Maracas", false));
+        this.setDancing(valueInput.getBooleanOr("Dancing", false));
+        this.setBreaded(valueInput.getBooleanOr("Breaded", false));
         this.timeUntilNextEgg = valueInput.getIntOr("EggTime", this.random.nextInt(24000) + 24000);
     }
 
@@ -380,6 +380,7 @@ public class EntityCockroach extends Animal implements Shearable, ITargetsDroppe
         return roach;
     }
 
+    @Override
     public boolean readyForShearing() {
         return this.isAlive() && !this.isBaby() && !isHeadless();
     }
@@ -389,29 +390,12 @@ public class EntityCockroach extends Animal implements Shearable, ITargetsDroppe
         serverLevel.explicitDamage(this, damageSources().generic(), 0F);
         serverLevel.playSound(null, this, SoundEvents.SHEEP_SHEAR, category, 1.0F, 1.0F);
         this.gameEvent(GameEvent.ENTITY_INTERACT);
-        this.setHeadless(true);
-    }
-
-    @Override
-    public boolean isShearable(@javax.annotation.Nullable Player player, ItemStack item, Level level, BlockPos pos) {
-        return readyForShearing();
-    }
-
-    @javax.annotation.Nonnull
-    @Override
-    public java.util.List<ItemStack> onSheared(@javax.annotation.Nullable Player player, ItemStack item, Level level, BlockPos pos) {
-        if (player != null) {
-            level.playSound(null, this, SoundEvents.SHEEP_SHEAR, SoundSource.PLAYERS, 1.0F, 1.0F);
-        }
-        this.gameEvent(GameEvent.ENTITY_INTERACT);
-        if (level instanceof ServerLevel serverLevel) {
-            serverLevel.explicitDamage(this, damageSources().generic(), 0F);
+        if (!serverLevel.isClientSide()) {
             for (int i = 0; i < 3; i++) {
                 serverLevel.sendParticles(ParticleTypes.SNEEZE, this.getRandomX(0.52F), this.getY(1D), this.getRandomZ(0.52F), 1, 0.0D, 0.0D, 0.0D, 0.0D);
             }
         }
         this.setHeadless(true);
-        return java.util.Collections.emptyList();
     }
 
     @Override
