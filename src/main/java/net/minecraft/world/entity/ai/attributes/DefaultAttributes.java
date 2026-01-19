@@ -108,6 +108,7 @@ public class DefaultAttributes {
 		.put(EntityType.BLUE_JAY, com.github.alexthe666.alexsmobs.entity.EntityBlueJay.bakeAttributes().build())
 		.put(EntityType.BOGGED, Bogged.createAttributes().build())
 		.put(EntityType.CAT, Cat.createAttributes().build())
+		.put(EntityType.CATFISH, com.github.alexthe666.alexsmobs.entity.EntityCatfish.bakeAttributes().build())
 		.put(EntityType.CAMEL, Camel.createAttributes().build())
 		.put(EntityType.CAVE_SPIDER, CaveSpider.createCaveSpider().build())
 		.put(EntityType.CHICKEN, Chicken.createAttributes().build())

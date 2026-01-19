@@ -1530,6 +1530,21 @@ public class Items {
 		properties -> new MobBucketItem(EntityType.COD, Fluids.WATER, SoundEvents.BUCKET_EMPTY_FISH, properties),
 		new Item.Properties().stacksTo(1).component(DataComponents.BUCKET_ENTITY_DATA, CustomData.EMPTY)
 	);
+	public static final Item SMALL_CATFISH_BUCKET = registerItem(
+		"small_catfish_bucket",
+		properties -> new com.github.alexthe666.alexsmobs.item.ItemModFishBucket(() -> EntityType.CATFISH, Fluids.WATER, properties),
+		new Item.Properties().stacksTo(1).component(DataComponents.BUCKET_ENTITY_DATA, CustomData.EMPTY)
+	);
+	public static final Item MEDIUM_CATFISH_BUCKET = registerItem(
+		"medium_catfish_bucket",
+		properties -> new com.github.alexthe666.alexsmobs.item.ItemModFishBucket(() -> EntityType.CATFISH, Fluids.WATER, properties),
+		new Item.Properties().stacksTo(1).component(DataComponents.BUCKET_ENTITY_DATA, CustomData.EMPTY)
+	);
+	public static final Item LARGE_CATFISH_BUCKET = registerItem(
+		"large_catfish_bucket",
+		properties -> new com.github.alexthe666.alexsmobs.item.ItemModFishBucket(() -> EntityType.CATFISH, Fluids.WATER, properties),
+		new Item.Properties().stacksTo(1).component(DataComponents.BUCKET_ENTITY_DATA, CustomData.EMPTY)
+	);
 	public static final Item TRILOCARIS_BUCKET = registerItem(
 		"trilocaris_bucket",
 		properties -> new MobBucketItem(EntityType.TRILOCARIS, Fluids.WATER, SoundEvents.BUCKET_EMPTY_FISH, properties),
@@ -1629,10 +1644,12 @@ public class Items {
 	public static final Item GLOWSTONE_DUST = registerItem("glowstone_dust");
 	public static final Item BLOBFISH = registerItem("blobfish", new Item.Properties().food(Foods.BLOBFISH, Consumables.BLOBFISH));
 	public static final Item COD = registerItem("cod", new Item.Properties().food(Foods.COD));
+	public static final Item RAW_CATFISH = registerItem("raw_catfish", new Item.Properties().food(Foods.RAW_CATFISH));
 	public static final Item SALMON = registerItem("salmon", new Item.Properties().food(Foods.SALMON));
 	public static final Item TROPICAL_FISH = registerItem("tropical_fish", new Item.Properties().food(Foods.TROPICAL_FISH));
 	public static final Item PUFFERFISH = registerItem("pufferfish", new Item.Properties().food(Foods.PUFFERFISH, Consumables.PUFFERFISH));
 	public static final Item COOKED_COD = registerItem("cooked_cod", new Item.Properties().food(Foods.COOKED_COD));
+	public static final Item COOKED_CATFISH = registerItem("cooked_catfish", new Item.Properties().food(Foods.COOKED_CATFISH));
 	public static final Item COOKED_SALMON = registerItem("cooked_salmon", new Item.Properties().food(Foods.COOKED_SALMON));
 	
 	// Alex's Caves Primordial items
@@ -1747,6 +1764,7 @@ public class Items {
 	public static final Item BOGGED_SPAWN_EGG = registerItem("bogged_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.BOGGED));
 	public static final Item BREEZE_SPAWN_EGG = registerItem("breeze_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.BREEZE));
 	public static final Item CAT_SPAWN_EGG = registerItem("cat_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.CAT));
+	public static final Item CATFISH_SPAWN_EGG = registerItem("catfish_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.CATFISH));
 	public static final Item CAMEL_SPAWN_EGG = registerItem("camel_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.CAMEL));
 	public static final Item CAVE_SPIDER_SPAWN_EGG = registerItem(
 		"cave_spider_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.CAVE_SPIDER)

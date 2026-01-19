@@ -1,11 +1,10 @@
 package com.github.alexthe666.alexsmobs.item;
 
 import net.minecraft.world.item.Item;
-import net.minecraft.world.item.Items;
 
 /**
  * Stub registry class for AlexsMobs items
- * Actual items are registered in vanilla Items.java
+ * Points to actual vanilla-registered items in Items.java
  */
 public class AMItemRegistry {
     
@@ -13,21 +12,21 @@ public class AMItemRegistry {
      * Deferred holder stub that returns the actual vanilla-registered item
      */
     public static class DeferredHolder {
-        private final Item item;
+        private final java.util.function.Supplier<Item> itemSupplier;
         
-        public DeferredHolder(Item item) {
-            this.item = item;
+        public DeferredHolder(java.util.function.Supplier<Item> itemSupplier) {
+            this.itemSupplier = itemSupplier;
         }
         
         public Item get() {
-            return item;
+            return itemSupplier.get();
         }
     }
     
-    // Catfish bucket items - these will reference vanilla Items after registration
-    public static final DeferredHolder SMALL_CATFISH_BUCKET = new DeferredHolder(Items.AIR); // Will be updated after Items.java registration
-    public static final DeferredHolder MEDIUM_CATFISH_BUCKET = new DeferredHolder(Items.AIR); // Will be updated after Items.java registration
-    public static final DeferredHolder LARGE_CATFISH_BUCKET = new DeferredHolder(Items.AIR); // Will be updated after Items.java registration
-    public static final DeferredHolder RAW_CATFISH = new DeferredHolder(Items.AIR); // Will be updated after Items.java registration
-    public static final DeferredHolder COOKED_CATFISH = new DeferredHolder(Items.AIR); // Will be updated after Items.java registration
+    // Catfish bucket items - reference vanilla Items
+    public static final DeferredHolder SMALL_CATFISH_BUCKET = new DeferredHolder(() -> net.minecraft.world.item.Items.SMALL_CATFISH_BUCKET);
+    public static final DeferredHolder MEDIUM_CATFISH_BUCKET = new DeferredHolder(() -> net.minecraft.world.item.Items.MEDIUM_CATFISH_BUCKET);
+    public static final DeferredHolder LARGE_CATFISH_BUCKET = new DeferredHolder(() -> net.minecraft.world.item.Items.LARGE_CATFISH_BUCKET);
+    public static final DeferredHolder RAW_CATFISH = new DeferredHolder(() -> net.minecraft.world.item.Items.RAW_CATFISH);
+    public static final DeferredHolder COOKED_CATFISH = new DeferredHolder(() -> net.minecraft.world.item.Items.COOKED_CATFISH);
 }

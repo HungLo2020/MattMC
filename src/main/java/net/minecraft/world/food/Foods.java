@@ -48,6 +48,10 @@ public class Foods {
 	public static final FoodProperties COOKED_TRILOCARIS_TAIL = new FoodProperties.Builder().nutrition(5).saturationModifier(0.5F).build();
 	public static final FoodProperties PINE_NUTS = new FoodProperties.Builder().nutrition(2).saturationModifier(0.175F).build();
 	public static final FoodProperties DINOSAUR_NUGGET = new FoodProperties.Builder().nutrition(3).saturationModifier(0.3F).build();
+	
+	// Alex's Mobs items
+	public static final FoodProperties RAW_CATFISH = new FoodProperties.Builder().nutrition(2).saturationModifier(0.3F).build();
+	public static final FoodProperties COOKED_CATFISH = new FoodProperties.Builder().nutrition(5).saturationModifier(0.5F).build();
 	public static final FoodProperties SERENE_SALAD = stew(5).saturationModifier(0.35F).build();
 	public static final FoodProperties SEETHING_STEW = stew(6).build();
 	public static final FoodProperties PRIMORDIAL_SOUP = stew(6).build();

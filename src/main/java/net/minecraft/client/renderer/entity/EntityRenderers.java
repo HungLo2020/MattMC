@@ -85,6 +85,7 @@ public class EntityRenderers {
 		register(EntityType.BREEZE, BreezeRenderer::new);
 		register(EntityType.BREEZE_WIND_CHARGE, WindChargeRenderer::new);
 		register(EntityType.CAMEL, CamelRenderer::new);
+		register(EntityType.CATFISH, com.github.alexthe666.alexsmobs.client.render.RenderCatfish::new);
 		register(EntityType.CAT, CatRenderer::new);
 		register(EntityType.CAVE_SPIDER, CaveSpiderRenderer::new);
 		register(EntityType.CHERRY_BOAT, context -> new BoatRenderer(context, ModelLayers.CHERRY_BOAT));
