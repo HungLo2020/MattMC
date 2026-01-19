@@ -92,6 +92,8 @@ public class EntityRenderers {
 		register(EntityType.CHERRY_CHEST_BOAT, context -> new BoatRenderer(context, ModelLayers.CHERRY_CHEST_BOAT));
 		register(EntityType.CHEST_MINECART, context -> new MinecartRenderer(context, ModelLayers.CHEST_MINECART));
 		register(EntityType.CHICKEN, ChickenRenderer::new);
+		register(EntityType.COCKROACH, com.github.alexthe666.alexsmobs.client.render.RenderCockroach::new);
+		register(EntityType.COCKROACH_EGG, ThrownItemRenderer::new);
 		register(EntityType.COD, CodRenderer::new);
 		register(EntityType.COMMAND_BLOCK_MINECART, context -> new MinecartRenderer(context, ModelLayers.COMMAND_BLOCK_MINECART));
 		register(EntityType.COPPER_GOLEM, CopperGolemRenderer::new);

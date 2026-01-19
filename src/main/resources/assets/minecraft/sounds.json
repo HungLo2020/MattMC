@@ -24920,5 +24920,21 @@
       "minecraft:entity/vallumraptor/vallumraptor_sleep_2"
     ],
     "subtitle": "subtitles.entity.vallumraptor.sleep"
+  },
+  "entity.cockroach.hurt": {
+    "sounds": [
+      "minecraft:cockroach_hurt_0",
+      "minecraft:cockroach_hurt_1",
+      "minecraft:cockroach_hurt_2"
+    ],
+    "subtitle": "subtitles.entity.cockroach.hurt"
+  },
+  "music.la_cucaracha": {
+    "sounds": [
+      {
+        "name": "minecraft:la_cucaracha",
+        "stream": true
+      }
+    ]
   }
 }

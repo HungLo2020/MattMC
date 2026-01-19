@@ -329,6 +329,8 @@ public class SoundEvents {
 	public static final SoundEvent CHICKEN_EGG = register("entity.chicken.egg");
 	public static final SoundEvent CHICKEN_HURT = register("entity.chicken.hurt");
 	public static final SoundEvent CHICKEN_STEP = register("entity.chicken.step");
+	public static final SoundEvent COCKROACH_HURT = register("entity.cockroach.hurt");
+	public static final SoundEvent LA_CUCARACHA = register("music.la_cucaracha");
 	public static final SoundEvent CHISELED_BOOKSHELF_BREAK = register("block.chiseled_bookshelf.break");
 	public static final SoundEvent CHISELED_BOOKSHELF_FALL = register("block.chiseled_bookshelf.fall");
 	public static final SoundEvent CHISELED_BOOKSHELF_HIT = register("block.chiseled_bookshelf.hit");
