@@ -93,7 +93,10 @@ public class EntityCatfish extends WaterAnimal implements FlyingAnimal, Bucketab
     }
 
     public static AttributeSupplier.Builder bakeAttributes() {
-        return Monster.createMonsterAttributes().add(Attributes.MAX_HEALTH, 10.0D).add(Attributes.MOVEMENT_SPEED, 0.25F);
+        return Monster.createMonsterAttributes()
+            .add(Attributes.MAX_HEALTH, 10.0D)
+            .add(Attributes.MOVEMENT_SPEED, 0.25F)
+            .add(Attributes.TEMPT_RANGE, 10.0D);
     }
 
     public int getMaxSpawnClusterSize() {
