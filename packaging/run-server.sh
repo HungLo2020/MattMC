@@ -32,11 +32,13 @@ echo "Using bundled JDK ${JAVA_VERSION}"
 # Note: Server runs in headless mode by default (--nogui)
 # Remove --nogui to run with GUI
 
-# Build JVM arguments - UseCompactObjectHeaders is disabled on macOS due to stability issues
-JVM_ARGS="-Xmx2G -Xms1G -XX:+UseZGC"
-if [[ "$(uname -s)" != "Darwin" ]]; then
-    # Not macOS - safe to use UseCompactObjectHeaders
-    JVM_ARGS="$JVM_ARGS -XX:+UseCompactObjectHeaders"
+# Build JVM arguments - Use G1GC on macOS due to ZGC stability issues (SIGBUS crashes)
+if [[ "$(uname -s)" == "Darwin" ]]; then
+    # macOS - use G1GC to avoid SIGBUS crashes in Arena::destruct_contents
+    JVM_ARGS="-Xmx2G -Xms1G -XX:+UseG1GC"
+else
+    # Linux/Unix - use ZGC with UseCompactObjectHeaders for better performance
+    JVM_ARGS="-Xmx2G -Xms1G -XX:+UseZGC -XX:+UseCompactObjectHeaders"
 fi
 
 $JAVA_CMD $JVM_ARGS \
