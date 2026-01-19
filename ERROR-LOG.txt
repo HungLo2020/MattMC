@@ -28,58 +28,59 @@ Note: Recompile with -Xlint:unchecked for details.
 
 > Task :runClient
 Using bundled JDK from: /Users/mattsherfey/Documents/Repos/MattMC/run/jdk-25
-[20:40:16] [main/INFO]: Detected integrated source mode - using Fabric Loader code source as game jar: /Users/mattsherfey/Documents/Repos/MattMC/build/libs/MattMC-1.21.10.jar
-[20:40:16] [main/INFO]: Loading Minecraft 1.21.10 with Fabric Loader 0.18.2
-[20:40:16] [main/INFO]: Mappings not present!
-[20:40:17] [main/INFO]: Loading 3 mods:
+[08:02:04] [main/INFO]: Detected integrated source mode - using Fabric Loader code source as game jar: /Users/mattsherfey/Documents/Repos/MattMC/build/libs/MattMC-1.21.10.jar
+[08:02:04] [main/INFO]: Loading Minecraft 1.21.10 with Fabric Loader 0.18.2
+[08:02:04] [main/INFO]: Mappings not present!
+[08:02:04] [main/INFO]: Loading 3 mods:
 	- java 25
 	- mattmc 1.21.10
 	- minecraft 1.21.10
-[20:40:17] [main/INFO]: Mixin system bypassed - all mixins converted to hook-based architecture
-[20:40:17] [main/INFO]: Mixin transformation disabled - using hook-based architecture
-[20:40:17] [main/INFO]: Searching for graphics cards...
+[08:02:04] [main/INFO]: Mixin system bypassed - all mixins converted to hook-based architecture
+[08:02:04] [main/INFO]: Mixin transformation disabled - using hook-based architecture
+[08:02:04] [main/INFO]: Searching for graphics cards...
 WARNING: A restricted method in java.lang.System has been called
 WARNING: java.lang.System::load has been called by com.sun.jna.Native in an unnamed module (file:/Users/mattsherfey/.gradle/caches/modules-2/files-2.1/net.java.dev.jna/jna/5.14.0/67bf3eaea4f0718cb376a181a629e5f88fa1c9dd/jna-5.14.0.jar)
 WARNING: Use --enable-native-access=ALL-UNNAMED to avoid a warning for callers in this module
 WARNING: Restricted methods will be blocked in a future release unless native access is enabled
 
-[20:40:17] [Datafixer Bootstrap/INFO]: 279 Datafixer optimizations took 166 milliseconds
+[08:02:05] [Datafixer Bootstrap/INFO]: 279 Datafixer optimizations took 161 milliseconds
 WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
 WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.joml.MemUtil$MemUtilUnsafe (file:/Users/mattsherfey/.gradle/caches/modules-2/files-2.1/org.joml/joml/1.10.5/22566d58af70ad3d72308bab63b8339906deb649/joml-1.10.5.jar)
 WARNING: Please consider reporting this to the maintainers of class org.joml.MemUtil$MemUtilUnsafe
 WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
-[20:40:19] [main/ERROR]: No data fixer registered for minecraft:atlatitan
-[20:40:19] [main/ERROR]: No data fixer registered for minecraft:blobfish
-[20:40:19] [main/ERROR]: No data fixer registered for minecraft:blue_jay
-[20:40:19] [main/ERROR]: No data fixer registered for minecraft:grottoceratops
-[20:40:19] [main/ERROR]: No data fixer registered for minecraft:pewen_boat
-[20:40:19] [main/ERROR]: No data fixer registered for minecraft:pewen_chest_boat
-[20:40:19] [main/ERROR]: No data fixer registered for minecraft:relicheirus
-[20:40:19] [main/ERROR]: No data fixer registered for minecraft:subterranodon
-[20:40:19] [main/ERROR]: No data fixer registered for minecraft:vallumraptor
-[20:40:19] [main/ERROR]: No data fixer registered for minecraft:tremorsaurus
-[20:40:19] [main/ERROR]: No data fixer registered for minecraft:trilocaris
-[20:40:19] [Render thread/INFO]: Setting user: steve
-[20:40:19] [Render thread/INFO]: Initializing Distant Horizons client, firing DhApiBeforeDhInitEvent...
-[20:40:19] [Render thread/INFO]: Running library validation...
-[20:40:20] [Render thread/INFO]: Garbage collectors: [G1 Young Generation, G1 Concurrent GC, G1 Old Generation]
-[20:40:20] [Render thread/WARN]: Distant Horizons: G1 Garbage collector detected. 
+[08:02:06] [main/ERROR]: No data fixer registered for minecraft:atlatitan
+[08:02:06] [main/ERROR]: No data fixer registered for minecraft:blobfish
+[08:02:06] [main/ERROR]: No data fixer registered for minecraft:blue_jay
+[08:02:06] [main/ERROR]: No data fixer registered for minecraft:catfish
+[08:02:06] [main/ERROR]: No data fixer registered for minecraft:grottoceratops
+[08:02:06] [main/ERROR]: No data fixer registered for minecraft:pewen_boat
+[08:02:06] [main/ERROR]: No data fixer registered for minecraft:pewen_chest_boat
+[08:02:06] [main/ERROR]: No data fixer registered for minecraft:relicheirus
+[08:02:06] [main/ERROR]: No data fixer registered for minecraft:subterranodon
+[08:02:06] [main/ERROR]: No data fixer registered for minecraft:vallumraptor
+[08:02:06] [main/ERROR]: No data fixer registered for minecraft:tremorsaurus
+[08:02:06] [main/ERROR]: No data fixer registered for minecraft:trilocaris
+[08:02:07] [Render thread/INFO]: Setting user: steve
+[08:02:07] [Render thread/INFO]: Initializing Distant Horizons client, firing DhApiBeforeDhInitEvent...
+[08:02:07] [Render thread/INFO]: Running library validation...
+[08:02:07] [Render thread/INFO]: Garbage collectors: [G1 Young Generation, G1 Concurrent GC, G1 Old Generation]
+[08:02:07] [Render thread/WARN]: Distant Horizons: G1 Garbage collector detected. 
 This garbage collector can cause FPS stuttering. 
 It's recommended to use a concurrent garbage collector 
 like ZGC (Java 21+) or Shenandoah (Java 8 through 17) for a smoother experience. 
 
-[20:40:20] [Render thread/INFO]: Distant Horizons, Version: 2.4.4-b
-[20:40:20] [Render thread/INFO]: Registering Fabric Client Events
-[20:40:20] [Render thread/INFO]: Registering Distant Horizons hooks
-[20:40:20] [Render thread/INFO]: Registered mod compatibility accessor for: [Sodium-Fabric].
-[20:40:20] [Render thread/INFO]: Skipping mod compatibility accessor for: [starlight]
-[20:40:20] [Render thread/INFO]: Skipping mod compatibility accessor for: [bclib]
-[20:40:20] [Render thread/INFO]: Skipping mod compatibility accessor for: [c2me]
-[20:40:20] [Render thread/INFO]: Registered mod compatibility accessor for: [iris].
-[20:40:20] [Render thread/INFO]: Initialising config for [DistantHorizons]
-[20:40:20] [Render thread/INFO]: [DistantHorizons] Config initialised
-[20:40:20] [Render thread/INFO]: Applying config to loggers
-[20:40:20] [Render thread/INFO]: Distant Horizons client Initialized.
+[08:02:07] [Render thread/INFO]: Distant Horizons, Version: 2.4.4-b
+[08:02:07] [Render thread/INFO]: Registering Fabric Client Events
+[08:02:07] [Render thread/INFO]: Registering Distant Horizons hooks
+[08:02:07] [Render thread/INFO]: Registered mod compatibility accessor for: [Sodium-Fabric].
+[08:02:07] [Render thread/INFO]: Skipping mod compatibility accessor for: [starlight]
+[08:02:07] [Render thread/INFO]: Skipping mod compatibility accessor for: [bclib]
+[08:02:07] [Render thread/INFO]: Skipping mod compatibility accessor for: [c2me]
+[08:02:07] [Render thread/INFO]: Registered mod compatibility accessor for: [iris].
+[08:02:07] [Render thread/INFO]: Initialising config for [DistantHorizons]
+[08:02:07] [Render thread/INFO]: [DistantHorizons] Config initialised
+[08:02:07] [Render thread/INFO]: Applying config to loggers
+[08:02:07] [Render thread/INFO]: Distant Horizons client Initialized.
 [LWJGL] Version: 3.3.3-snapshot
 	 OS: Mac OS X v26.2
 	JRE: macOS aarch64 25.0.1
@@ -90,8 +91,8 @@ like ZGC (Java 21+) or Shenandoah (Java 8 through 17) for a smoother experience.
 [LWJGL] Loading library: glfw
 	Module: org.lwjgl.glfw
 	Loaded from org.lwjgl.librarypath: /var/folders/_c/nnxhjxwn1491cd34x4g1dr5h0000gp/T/lwjgl_mattsherfey/3.3.3-snapshot/arm64/libglfw.dylib
-[20:40:20] [Render thread/INFO]: Queuing DH event binding...
-[20:40:20] [Render thread/INFO]: Backend library: LWJGL version 3.3.3-snapshot
+[08:02:07] [Render thread/INFO]: Queuing DH event binding...
+[08:02:07] [Render thread/INFO]: Backend library: LWJGL version 3.3.3-snapshot
 [LWJGL] Loading library: jemalloc
 	Module: org.lwjgl.jemalloc
 	Loaded from org.lwjgl.librarypath: /var/folders/_c/nnxhjxwn1491cd34x4g1dr5h0000gp/T/lwjgl_mattsherfey/3.3.3-snapshot/arm64/libjemalloc.dylib
@@ -103,359 +104,355 @@ like ZGC (Java 21+) or Shenandoah (Java 8 through 17) for a smoother experience.
 	libobjc.dylib not found in org.lwjgl.librarypath=/var/folders/_c/nnxhjxwn1491cd34x4g1dr5h0000gp/T/lwjgl_mattsherfey/3.3.3-snapshot/arm64
 [LWJGL] Java 9 text decoding enabled
 	Loaded from system paths: /usr/lib/libobjc.A.dylib
-[20:40:20] [DH-Manual-Event-Trigger/INFO]: DH Ready, binding Iris event handlers...
-[20:40:20] [DH-Manual-Event-Trigger/INFO]: DH Iris events bound.
+[08:02:07] [DH-Manual-Event-Trigger/INFO]: DH Ready, binding Iris event handlers...
+[08:02:07] [DH-Manual-Event-Trigger/INFO]: DH Iris events bound.
 [LWJGL] Loading JNI library: lwjgl_opengl
 	Module: org.lwjgl.opengl
 	Loaded from org.lwjgl.librarypath: /var/folders/_c/nnxhjxwn1491cd34x4g1dr5h0000gp/T/lwjgl_mattsherfey/3.3.3-snapshot/arm64/liblwjgl_opengl.dylib
 [LWJGL] Loading library: /System/Library/Frameworks/OpenGL.framework/Versions/Current/OpenGL
 	Module: org.lwjgl.opengl
 	Success
-[20:40:20] [Render thread/INFO]: [STDERR]: [LWJGL] [ThreadLocalUtil] Unsupported JNI version detected, this may result in a crash. Please inform LWJGL developers.
+[08:02:08] [Render thread/INFO]: [STDERR]: [LWJGL] [ThreadLocalUtil] Unsupported JNI version detected, this may result in a crash. Please inform LWJGL developers.
 [LWJGL] Java 10 multiplyHigh enabled
-[20:40:20] [Render thread/INFO]: OpenGL Vendor: Apple
-[20:40:20] [Render thread/INFO]: OpenGL Renderer: Apple M3
-[20:40:20] [Render thread/INFO]: OpenGL Version: 4.1 Metal - 90.5
-[20:40:21] [Render thread/INFO]: Debug functionality is disabled.
-[20:40:21] [Render thread/INFO]: DSA support not detected.
-[20:40:21] [Render thread/INFO]: Using optional rendering extensions: 
-[20:40:21] [Render thread/INFO]: Can't open pack archive at /assets/minecraft/resourcepacks/programmer_art.zip
-[20:40:21] [Render thread/INFO]: Found non-pack entry '/assets/minecraft/resourcepacks/programmer_art.zip', ignoring
-[20:40:21] [Render thread/INFO]: Can't open pack archive at /assets/minecraft/resourcepacks/high_contrast.zip
-[20:40:21] [Render thread/INFO]: Found non-pack entry '/assets/minecraft/resourcepacks/high_contrast.zip', ignoring
-[20:40:21] [Render thread/INFO]: Loaded 20 skins (0 custom)
+[08:02:08] [Render thread/INFO]: OpenGL Vendor: Apple
+[08:02:08] [Render thread/INFO]: OpenGL Renderer: Apple M3
+[08:02:08] [Render thread/INFO]: OpenGL Version: 4.1 Metal - 90.5
+[08:02:08] [Render thread/INFO]: Debug functionality is disabled.
+[08:02:08] [Render thread/INFO]: DSA support not detected.
+[08:02:08] [Render thread/INFO]: Using optional rendering extensions: 
+[08:02:08] [Render thread/INFO]: Can't open pack archive at /assets/minecraft/resourcepacks/programmer_art.zip
+[08:02:08] [Render thread/INFO]: Found non-pack entry '/assets/minecraft/resourcepacks/programmer_art.zip', ignoring
+[08:02:08] [Render thread/INFO]: Can't open pack archive at /assets/minecraft/resourcepacks/high_contrast.zip
+[08:02:08] [Render thread/INFO]: Found non-pack entry '/assets/minecraft/resourcepacks/high_contrast.zip', ignoring
+[08:02:08] [Render thread/INFO]: Loaded 20 skins (0 custom)
 [LWJGL] Loading library: openal
 	Module: org.lwjgl.openal
 	Loaded from org.lwjgl.librarypath: /var/folders/_c/nnxhjxwn1491cd34x4g1dr5h0000gp/T/lwjgl_mattsherfey/3.3.3-snapshot/arm64/libopenal.dylib
-[20:40:21] [Render thread/INFO]: Hardware information:
-[20:40:21] [Render thread/INFO]: CPU: 8x Apple M3
-[20:40:21] [Render thread/INFO]: GPU: Apple M3 (Supports OpenGL 4.1 Metal - 90.5)
-[20:40:21] [Render thread/INFO]: OS: Mac OS X (26.2)
+[08:02:08] [Render thread/INFO]: Hardware information:
+[08:02:08] [Render thread/INFO]: CPU: 8x Apple M3
+[08:02:08] [Render thread/INFO]: GPU: Apple M3 (Supports OpenGL 4.1 Metal - 90.5)
+[08:02:08] [Render thread/INFO]: OS: Mac OS X (26.2)
 [LWJGL] Java 16 memcpy enabled
 [LWJGL] Loading JNI library: lwjgl_stb
 	Module: org.lwjgl.stb
 	Loaded from org.lwjgl.librarypath: /var/folders/_c/nnxhjxwn1491cd34x4g1dr5h0000gp/T/lwjgl_mattsherfey/3.3.3-snapshot/arm64/liblwjgl_stb.dylib
-[20:40:21] [Render thread/INFO]: Reloading ResourceManager: vanilla
-[20:40:21] [Render thread/INFO]: Initializing VoxelMap...
-[20:40:21] [Render thread/INFO]: VoxelMap initialization complete
-[20:40:21] [Render thread/INFO]: Shaders are disabled because enableShaders is set to false in iris.properties
-[20:40:21] [Render thread/INFO]: Created: 256x256 waypoints-atlas
-[20:40:21] [Render thread/INFO]: Resized to: 32x32 chooser-atlas
-[20:40:21] [Render thread/INFO]: Resized to: 64x32 chooser-atlas
-[20:40:21] [Render thread/INFO]: Resized to: 64x64 chooser-atlas
-[20:40:21] [Render thread/INFO]: Resized to: 128x64 chooser-atlas
-[20:40:21] [Render thread/INFO]: Resized to: 128x128 chooser-atlas
-[20:40:21] [Render thread/INFO]: Resized to: 256x128 chooser-atlas
-[20:40:22] [Worker-Main-3/INFO]: Found unifont_all_no_pua-16.0.03.hex, loading
-[20:40:22] [Worker-Main-1/INFO]: Found unifont_pua-16.0.03.hex, loading
-[20:40:22] [Worker-Main-3/INFO]: Found unifont_jp_patch-16.0.03.hex, loading
-[20:40:22] [Worker-Main-7/WARN]: Exception loading blockstate definition: 'minecraft:thin_bone/vanilla' for variant: 'axis=x,offset=0': Unknown blockstate property: 'offset'
-[20:40:22] [Worker-Main-7/WARN]: Exception loading blockstate definition: 'minecraft:thin_bone/vanilla' for variant: 'axis=y,offset=0': Unknown blockstate property: 'offset'
-[20:40:22] [Worker-Main-7/WARN]: Exception loading blockstate definition: 'minecraft:thin_bone/vanilla' for variant: 'axis=z,offset=0': Unknown blockstate property: 'offset'
-[20:40:22] [Worker-Main-7/WARN]: Exception loading blockstate definition: 'minecraft:thin_bone/vanilla' for variant: 'axis=x,offset=1': Unknown blockstate property: 'offset'
-[20:40:22] [Worker-Main-7/WARN]: Exception loading blockstate definition: 'minecraft:thin_bone/vanilla' for variant: 'axis=y,offset=1': Unknown blockstate property: 'offset'
-[20:40:22] [Worker-Main-7/WARN]: Exception loading blockstate definition: 'minecraft:thin_bone/vanilla' for variant: 'axis=z,offset=1': Unknown blockstate property: 'offset'
-[20:40:22] [Worker-Main-7/WARN]: Exception loading blockstate definition: 'minecraft:thin_bone/vanilla' for variant: 'axis=x,offset=2': Unknown blockstate property: 'offset'
-[20:40:22] [Worker-Main-7/WARN]: Exception loading blockstate definition: 'minecraft:thin_bone/vanilla' for variant: 'axis=y,offset=2': Unknown blockstate property: 'offset'
-[20:40:22] [Worker-Main-7/WARN]: Exception loading blockstate definition: 'minecraft:thin_bone/vanilla' for variant: 'axis=z,offset=2': Unknown blockstate property: 'offset'
-[20:40:22] [Worker-Main-7/WARN]: Missing block model: minecraft:item/fissure_primal_magma
-[20:40:22] [Worker-Main-7/WARN]: Missing block model: minecraft:block/small_dinosaur_egg_1_template
-[20:40:22] [Worker-Main-7/WARN]: Missing block model: minecraft:block/small_dinosaur_egg_3_template
-[20:40:22] [Worker-Main-7/WARN]: Missing block model: minecraft:block/small_dinosaur_egg_2_template
-[20:40:22] [Worker-Main-7/WARN]: Missing block model: minecraft:block/small_dinosaur_egg_4_template
-[20:40:22] [Worker-Main-2/WARN]: Missing textures in model minecraft:block/tree_star:
+[08:02:08] [Render thread/INFO]: Reloading ResourceManager: vanilla
+[08:02:08] [Render thread/INFO]: Initializing VoxelMap...
+[08:02:08] [Render thread/INFO]: VoxelMap initialization complete
+[08:02:08] [Render thread/INFO]: Shaders are disabled because enableShaders is set to false in iris.properties
+[08:02:08] [Render thread/INFO]: Created: 256x256 waypoints-atlas
+[08:02:08] [Render thread/INFO]: Resized to: 32x32 chooser-atlas
+[08:02:08] [Render thread/INFO]: Resized to: 64x32 chooser-atlas
+[08:02:08] [Render thread/INFO]: Resized to: 64x64 chooser-atlas
+[08:02:08] [Render thread/INFO]: Resized to: 128x64 chooser-atlas
+[08:02:08] [Render thread/INFO]: Resized to: 128x128 chooser-atlas
+[08:02:08] [Render thread/INFO]: Resized to: 256x128 chooser-atlas
+[08:02:08] [Worker-Main-5/INFO]: Found unifont_all_no_pua-16.0.03.hex, loading
+[08:02:09] [Worker-Main-7/INFO]: Found unifont_pua-16.0.03.hex, loading
+[08:02:09] [Worker-Main-2/WARN]: Exception loading blockstate definition: 'minecraft:thin_bone/vanilla' for variant: 'axis=x,offset=0': Unknown blockstate property: 'offset'
+[08:02:09] [Worker-Main-2/WARN]: Exception loading blockstate definition: 'minecraft:thin_bone/vanilla' for variant: 'axis=y,offset=0': Unknown blockstate property: 'offset'
+[08:02:09] [Worker-Main-2/WARN]: Exception loading blockstate definition: 'minecraft:thin_bone/vanilla' for variant: 'axis=z,offset=0': Unknown blockstate property: 'offset'
+[08:02:09] [Worker-Main-2/WARN]: Exception loading blockstate definition: 'minecraft:thin_bone/vanilla' for variant: 'axis=x,offset=1': Unknown blockstate property: 'offset'
+[08:02:09] [Worker-Main-2/WARN]: Exception loading blockstate definition: 'minecraft:thin_bone/vanilla' for variant: 'axis=y,offset=1': Unknown blockstate property: 'offset'
+[08:02:09] [Worker-Main-2/WARN]: Exception loading blockstate definition: 'minecraft:thin_bone/vanilla' for variant: 'axis=z,offset=1': Unknown blockstate property: 'offset'
+[08:02:09] [Worker-Main-2/WARN]: Exception loading blockstate definition: 'minecraft:thin_bone/vanilla' for variant: 'axis=x,offset=2': Unknown blockstate property: 'offset'
+[08:02:09] [Worker-Main-2/WARN]: Exception loading blockstate definition: 'minecraft:thin_bone/vanilla' for variant: 'axis=y,offset=2': Unknown blockstate property: 'offset'
+[08:02:09] [Worker-Main-2/WARN]: Exception loading blockstate definition: 'minecraft:thin_bone/vanilla' for variant: 'axis=z,offset=2': Unknown blockstate property: 'offset'
+[08:02:09] [Worker-Main-3/INFO]: Found unifont_jp_patch-16.0.03.hex, loading
+[08:02:09] [Worker-Main-2/WARN]: Missing block model: minecraft:item/fissure_primal_magma
+[08:02:09] [Worker-Main-2/WARN]: Missing block model: minecraft:block/small_dinosaur_egg_1_template
+[08:02:09] [Worker-Main-2/WARN]: Missing block model: minecraft:block/small_dinosaur_egg_4_template
+[08:02:09] [Worker-Main-2/WARN]: Missing block model: minecraft:block/small_dinosaur_egg_2_template
+[08:02:09] [Worker-Main-2/WARN]: Missing block model: minecraft:block/small_dinosaur_egg_3_template
+[08:02:10] [Worker-Main-2/WARN]: Missing textures in model minecraft:block/tree_star:
     minecraft:textures/atlas/blocks.png:minecraft:block/tree_star_stem
-[20:40:22] [Worker-Main-2/WARN]: Missing textures in model minecraft:block/tree_star_flipped:
+[08:02:10] [Worker-Main-2/WARN]: Missing textures in model minecraft:block/tree_star_flipped:
     minecraft:textures/atlas/blocks.png:minecraft:block/tree_star_stem
-[20:40:22] [Worker-Main-2/WARN]: Missing texture references in model minecraft:block/fern_thatch:
+[08:02:10] [Worker-Main-2/WARN]: Missing texture references in model minecraft:block/fern_thatch:
     #missing
-[20:40:22] [Worker-Main-2/WARN]: Missing model for variant: 'Block{minecraft:thin_bone}[axis=x]'
-[20:40:22] [Worker-Main-2/WARN]: Missing model for variant: 'Block{minecraft:thin_bone}[axis=y]'
-[20:40:22] [Worker-Main-2/WARN]: Missing model for variant: 'Block{minecraft:thin_bone}[axis=z]'
-[20:40:22] [Render thread/INFO]: Info log when linking program containing VS minecraft:core/rendertype_text_intensity_see_through and FS minecraft:core/rendertype_text_intensity_see_through. Log output: WARNING: Could not find vertex shader attribute 'UV2' to match BindAttributeLocation request.
+[08:02:10] [Worker-Main-2/WARN]: Missing model for variant: 'Block{minecraft:thin_bone}[axis=x]'
+[08:02:10] [Worker-Main-2/WARN]: Missing model for variant: 'Block{minecraft:thin_bone}[axis=y]'
+[08:02:10] [Worker-Main-2/WARN]: Missing model for variant: 'Block{minecraft:thin_bone}[axis=z]'
+[08:02:10] [Render thread/INFO]: Info log when linking program containing VS minecraft:core/terrain and FS minecraft:core/terrain. Log output: WARNING: Could not find vertex shader attribute 'Normal' to match BindAttributeLocation request.
 
-[20:40:22] [Render thread/INFO]: Info log when linking program containing VS minecraft:core/rendertype_entity_alpha and FS minecraft:core/rendertype_entity_alpha. Log output: WARNING: Could not find vertex shader attribute 'Normal' to match BindAttributeLocation request.
+[08:02:10] [Render thread/INFO]: Info log when linking program containing VS minecraft:core/entity and FS minecraft:core/entity. Log output: WARNING: Output of vertex shader 'overlayColor' not read by fragment shader
+
+[08:02:10] [Render thread/INFO]: Info log when linking program containing VS minecraft:core/entity and FS minecraft:core/entity. Log output: WARNING: Could not find vertex shader attribute 'UV2' to match BindAttributeLocation request.
+
+[08:02:10] [Render thread/INFO]: Info log when linking program containing VS minecraft:core/rendertype_entity_alpha and FS minecraft:core/rendertype_entity_alpha. Log output: WARNING: Could not find vertex shader attribute 'Normal' to match BindAttributeLocation request.
 WARNING: Output of vertex shader 'texCoord1' not read by fragment shader
 WARNING: Output of vertex shader 'texCoord2' not read by fragment shader
 
-[20:40:22] [Render thread/INFO]: Info log when linking program containing VS minecraft:core/rendertype_translucent_moving_block and FS minecraft:core/rendertype_translucent_moving_block. Log output: WARNING: Could not find vertex shader attribute 'Normal' to match BindAttributeLocation request.
-
-[20:40:22] [Render thread/INFO]: Info log when linking program containing VS minecraft:core/rendertype_item_entity_translucent_cull and FS minecraft:core/rendertype_item_entity_translucent_cull. Log output: WARNING: Output of vertex shader 'texCoord1' not read by fragment shader
-WARNING: Output of vertex shader 'texCoord2' not read by fragment shader
-
-[20:40:22] [Render thread/INFO]: Info log when linking program containing VS minecraft:core/terrain and FS minecraft:core/terrain. Log output: WARNING: Could not find vertex shader attribute 'Normal' to match BindAttributeLocation request.
-
-[20:40:22] [Render thread/INFO]: Info log when linking program containing VS minecraft:core/entity and FS minecraft:core/entity. Log output: WARNING: Could not find vertex shader attribute 'Normal' to match BindAttributeLocation request.
-WARNING: Output of vertex shader 'overlayColor' not read by fragment shader
-
-[20:40:23] [Render thread/INFO]: Info log when linking program containing VS minecraft:core/rendertype_text_background_see_through and FS minecraft:core/rendertype_text_background_see_through. Log output: WARNING: Could not find vertex shader attribute 'UV2' to match BindAttributeLocation request.
-
-[20:40:23] [Render thread/INFO]: Info log when linking program containing VS minecraft:core/rendertype_text_see_through and FS minecraft:core/rendertype_text_see_through. Log output: WARNING: Could not find vertex shader attribute 'UV2' to match BindAttributeLocation request.
-
-[20:40:23] [Render thread/INFO]: Info log when linking program containing VS minecraft:core/entity and FS minecraft:core/entity. Log output: WARNING: Could not find vertex shader attribute 'Normal' to match BindAttributeLocation request.
+[08:02:10] [Render thread/INFO]: Info log when linking program containing VS minecraft:core/entity and FS minecraft:core/entity. Log output: WARNING: Could not find vertex shader attribute 'Normal' to match BindAttributeLocation request.
 WARNING: Could not find vertex shader attribute 'UV2' to match BindAttributeLocation request.
 WARNING: Output of vertex shader 'overlayColor' not read by fragment shader
 
-[20:40:23] [Render thread/INFO]: Info log when linking program containing VS minecraft:core/entity and FS minecraft:core/entity. Log output: WARNING: Output of vertex shader 'overlayColor' not read by fragment shader
+[08:02:10] [Render thread/INFO]: Info log when linking program containing VS minecraft:core/rendertype_translucent_moving_block and FS minecraft:core/rendertype_translucent_moving_block. Log output: WARNING: Could not find vertex shader attribute 'Normal' to match BindAttributeLocation request.
 
-[20:40:23] [Render thread/INFO]: Info log when linking program containing VS minecraft:core/terrain and FS minecraft:core/terrain. Log output: WARNING: Could not find vertex shader attribute 'Normal' to match BindAttributeLocation request.
+[08:02:10] [Render thread/INFO]: Info log when linking program containing VS minecraft:core/terrain and FS minecraft:core/terrain. Log output: WARNING: Could not find vertex shader attribute 'Normal' to match BindAttributeLocation request.
 
-[20:40:23] [Render thread/INFO]: Info log when linking program containing VS minecraft:core/entity and FS minecraft:core/entity. Log output: WARNING: Output of vertex shader 'overlayColor' not read by fragment shader
-
-[20:40:23] [Render thread/INFO]: Info log when linking program containing VS minecraft:core/rendertype_crumbling and FS minecraft:core/rendertype_crumbling. Log output: WARNING: Could not find vertex shader attribute 'Normal' to match BindAttributeLocation request.
-WARNING: Output of vertex shader 'texCoord2' not read by fragment shader
-
-[20:40:23] [Render thread/INFO]: Info log when linking program containing VS minecraft:core/rendertype_beacon_beam and FS minecraft:core/rendertype_beacon_beam. Log output: WARNING: Could not find vertex shader attribute 'Normal' to match BindAttributeLocation request.
-WARNING: Could not find vertex shader attribute 'UV2' to match BindAttributeLocation request.
-
-[20:40:23] [Render thread/INFO]: Info log when linking program containing VS minecraft:core/terrain and FS minecraft:core/terrain. Log output: WARNING: Could not find vertex shader attribute 'Normal' to match BindAttributeLocation request.
-
-[20:40:23] [Render thread/INFO]: Info log when linking program containing VS minecraft:core/rendertype_beacon_beam and FS minecraft:core/rendertype_beacon_beam. Log output: WARNING: Could not find vertex shader attribute 'Normal' to match BindAttributeLocation request.
-WARNING: Could not find vertex shader attribute 'UV2' to match BindAttributeLocation request.
-
-[20:40:23] [Render thread/INFO]: Info log when linking program containing VS minecraft:core/entity and FS minecraft:core/entity. Log output: WARNING: Output of vertex shader 'overlayColor' not read by fragment shader
-
-[20:40:23] [Render thread/INFO]: Info log when linking program containing VS minecraft:core/terrain and FS minecraft:core/terrain. Log output: WARNING: Could not find vertex shader attribute 'Normal' to match BindAttributeLocation request.
-
-[20:40:23] [Render thread/INFO]: Info log when linking program containing VS minecraft:core/entity and FS minecraft:core/entity. Log output: WARNING: Output of vertex shader 'overlayColor' not read by fragment shader
-
-[20:40:23] [Render thread/INFO]: Info log when linking program containing VS minecraft:core/entity and FS minecraft:core/entity. Log output: WARNING: Could not find vertex shader attribute 'Normal' to match BindAttributeLocation request.
-WARNING: Could not find vertex shader attribute 'UV2' to match BindAttributeLocation request.
-WARNING: Output of vertex shader 'overlayColor' not read by fragment shader
-
-[20:40:23] [Render thread/INFO]: Info log when linking program containing VS minecraft:core/entity and FS minecraft:core/entity. Log output: WARNING: Could not find vertex shader attribute 'UV2' to match BindAttributeLocation request.
-
-[20:40:23] [Render thread/INFO]: Info log when linking program containing VS minecraft:core/terrain and FS minecraft:core/terrain. Log output: WARNING: Could not find vertex shader attribute 'Normal' to match BindAttributeLocation request.
-
-[20:40:23] [Render thread/INFO]: Info log when linking program containing VS minecraft:core/terrain and FS minecraft:core/terrain. Log output: WARNING: Could not find vertex shader attribute 'Normal' to match BindAttributeLocation request.
-
-[20:40:23] [Render thread/INFO]: Info log when linking program containing VS minecraft:core/rendertype_entity_shadow and FS minecraft:core/rendertype_entity_shadow. Log output: WARNING: Could not find vertex shader attribute 'UV1' to match BindAttributeLocation request.
+[08:02:10] [Render thread/INFO]: Info log when linking program containing VS minecraft:core/rendertype_entity_shadow and FS minecraft:core/rendertype_entity_shadow. Log output: WARNING: Could not find vertex shader attribute 'UV1' to match BindAttributeLocation request.
 WARNING: Could not find vertex shader attribute 'Normal' to match BindAttributeLocation request.
 WARNING: Could not find vertex shader attribute 'UV2' to match BindAttributeLocation request.
 
-[20:40:23] [Render thread/INFO]: OpenAL initialized on device MacBook Air Speakers
-[20:40:23] [Render thread/INFO]: Sound engine started
-[20:40:23] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/particles.png-atlas
-[20:40:23] [Render thread/INFO]: Created: 128x64x0 minecraft:textures/atlas/decorated_pot.png-atlas
-[20:40:23] [Render thread/INFO]: Created: 2048x1024x0 minecraft:textures/atlas/armor_trims.png-atlas
-[20:40:23] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/paintings.png-atlas
-[20:40:23] [Render thread/INFO]: Created: 512x512x0 minecraft:textures/atlas/shield_patterns.png-atlas
-[20:40:23] [Render thread/INFO]: Created: 1024x1024x4 minecraft:textures/atlas/blocks.png-atlas
-[20:40:23] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/chest.png-atlas
-[20:40:23] [Render thread/INFO]: Created: 512x512x0 minecraft:textures/atlas/banner_patterns.png-atlas
-[20:40:23] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/beds.png-atlas
-[20:40:23] [Render thread/INFO]: Created: 1024x512x0 minecraft:textures/atlas/gui.png-atlas
-[20:40:23] [Render thread/INFO]: Created: 64x64x0 minecraft:textures/atlas/map_decorations.png-atlas
-[20:40:23] [Render thread/INFO]: Created: 256x256x0 minecraft:textures/atlas/signs.png-atlas
-[20:40:23] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/shulker_boxes.png-atlas
-[20:40:23] [Render thread/INFO]: Auto-updater has been disabled - no update checks will be performed
-[20:40:23] [Render thread/INFO]: Creating pipeline for dimension minecraft:overworld
-[20:40:30] [Worker-Main-7/ERROR]: Couldn't parse data file 'minecraft:blocks/cave_painting_pewen' from 'minecraft:loot_table/blocks/cave_painting_pewen.json': DataResult.Error['Unknown registry key in ResourceKey[minecraft:root / minecraft:item]: minecraft:cave_painting_pewen': net.minecraft.world.level.storage.loot.LootTable@40d0789c]
-[20:40:30] [Worker-Main-1/ERROR]: Couldn't parse data file 'minecraft:cooked_trilocaris_tail_campfire' from 'minecraft:recipe/cooked_trilocaris_tail_campfire.json': DataResult.Error['Failed to parse either. First: Not a string: {"item":"minecraft:trilocaris_tail"}; Second: Failed to parse either. First: Not a json array: {"item":"minecraft:trilocaris_tail"}; Second: Not a string: {"item":"minecraft:trilocaris_tail"}']
-[20:40:30] [Worker-Main-1/ERROR]: Couldn't parse data file 'minecraft:cooked_trilocaris_tail_smelting' from 'minecraft:recipe/cooked_trilocaris_tail_smelting.json': DataResult.Error['Failed to parse either. First: Not a string: {"item":"minecraft:trilocaris_tail"}; Second: Failed to parse either. First: Not a json array: {"item":"minecraft:trilocaris_tail"}; Second: Not a string: {"item":"minecraft:trilocaris_tail"}']
-[20:40:30] [Worker-Main-1/ERROR]: Couldn't parse data file 'minecraft:cooked_trilocaris_tail_smoking' from 'minecraft:recipe/cooked_trilocaris_tail_smoking.json': DataResult.Error['Failed to parse either. First: Not a string: {"item":"minecraft:trilocaris_tail"}; Second: Failed to parse either. First: Not a json array: {"item":"minecraft:trilocaris_tail"}; Second: Not a string: {"item":"minecraft:trilocaris_tail"}']
-[20:40:30] [Worker-Main-1/ERROR]: Couldn't parse data file 'minecraft:fern_thatch' from 'minecraft:recipe/fern_thatch.json': DataResult.Error['Map entry 'F' : Failed to parse either. First: Not a string: {"tag":"minecraft:ferns"}; Second: Failed to parse either. First: Not a json array: {"tag":"minecraft:ferns"}; Second: Not a string: {"tag":"minecraft:ferns"}']
-[20:40:30] [Worker-Main-1/ERROR]: Couldn't parse data file 'minecraft:furnace/cooked_dinosaur_chop_campfire' from 'minecraft:recipe/furnace/cooked_dinosaur_chop_campfire.json': DataResult.Error['Failed to parse either. First: Not a string: {"item":"minecraft:dinosaur_chop"}; Second: Failed to parse either. First: Not a json array: {"item":"minecraft:dinosaur_chop"}; Second: Not a string: {"item":"minecraft:dinosaur_chop"}']
-[20:40:30] [Worker-Main-1/ERROR]: Couldn't parse data file 'minecraft:furnace/cooked_dinosaur_chop_smelting' from 'minecraft:recipe/furnace/cooked_dinosaur_chop_smelting.json': DataResult.Error['Failed to parse either. First: Not a string: {"item":"minecraft:dinosaur_chop"}; Second: Failed to parse either. First: Not a json array: {"item":"minecraft:dinosaur_chop"}; Second: Not a string: {"item":"minecraft:dinosaur_chop"}']
-[20:40:30] [Worker-Main-1/ERROR]: Couldn't parse data file 'minecraft:furnace/cooked_dinosaur_chop_smoking' from 'minecraft:recipe/furnace/cooked_dinosaur_chop_smoking.json': DataResult.Error['Failed to parse either. First: Not a string: {"item":"minecraft:dinosaur_chop"}; Second: Failed to parse either. First: Not a json array: {"item":"minecraft:dinosaur_chop"}; Second: Not a string: {"item":"minecraft:dinosaur_chop"}']
-[20:40:30] [Worker-Main-1/ERROR]: Couldn't parse data file 'minecraft:pewen_boat' from 'minecraft:recipe/pewen_boat.json': DataResult.Error['Map entry '#' : Failed to parse either. First: Not a string: {"item":"minecraft:pewen_planks"}; Second: Failed to parse either. First: Not a json array: {"item":"minecraft:pewen_planks"}; Second: Not a string: {"item":"minecraft:pewen_planks"}']
-[20:40:30] [Worker-Main-1/ERROR]: Couldn't parse data file 'minecraft:pewen_button' from 'minecraft:recipe/pewen_button.json': DataResult.Error['List is too short: 0, expected range [1-9]']
-[20:40:30] [Worker-Main-1/ERROR]: Couldn't parse data file 'minecraft:pewen_chest_boat' from 'minecraft:recipe/pewen_chest_boat.json': DataResult.Error['List is too short: 0, expected range [1-9]']
-[20:40:30] [Worker-Main-1/ERROR]: Couldn't parse data file 'minecraft:pewen_door' from 'minecraft:recipe/pewen_door.json': DataResult.Error['Map entry '#' : Failed to parse either. First: Not a string: {"item":"minecraft:pewen_planks"}; Second: Failed to parse either. First: Not a json array: {"item":"minecraft:pewen_planks"}; Second: Not a string: {"item":"minecraft:pewen_planks"}']
-[20:40:30] [Worker-Main-1/ERROR]: Couldn't parse data file 'minecraft:pewen_fence' from 'minecraft:recipe/pewen_fence.json': DataResult.Error['Map entry '#' : Failed to parse either. First: Not a string: {"item":"minecraft:stick"}; Second: Failed to parse either. First: Not a json array: {"item":"minecraft:stick"}; Second: Not a string: {"item":"minecraft:stick"}']
-[20:40:30] [Worker-Main-1/ERROR]: Couldn't parse data file 'minecraft:pewen_fence_gate' from 'minecraft:recipe/pewen_fence_gate.json': DataResult.Error['Map entry '#' : Failed to parse either. First: Not a string: {"item":"minecraft:stick"}; Second: Failed to parse either. First: Not a json array: {"item":"minecraft:stick"}; Second: Not a string: {"item":"minecraft:stick"}']
-[20:40:30] [Worker-Main-1/ERROR]: Couldn't parse data file 'minecraft:pewen_hanging_sign' from 'minecraft:recipe/pewen_hanging_sign.json': DataResult.Error['Map entry 'C' : Failed to parse either. First: Not a string: {"item":"minecraft:chain"}; Second: Failed to parse either. First: Not a json array: {"item":"minecraft:chain"}; Second: Not a string: {"item":"minecraft:chain"}']
-[20:40:30] [Worker-Main-1/ERROR]: Couldn't parse data file 'minecraft:pewen_planks' from 'minecraft:recipe/pewen_planks.json': DataResult.Error['List is too short: 0, expected range [1-9]']
-[20:40:30] [Worker-Main-1/ERROR]: Couldn't parse data file 'minecraft:pewen_pressure_plate' from 'minecraft:recipe/pewen_pressure_plate.json': DataResult.Error['Map entry '#' : Failed to parse either. First: Not a string: {"item":"minecraft:pewen_planks"}; Second: Failed to parse either. First: Not a json array: {"item":"minecraft:pewen_planks"}; Second: Not a string: {"item":"minecraft:pewen_planks"}']
-[20:40:30] [Worker-Main-1/ERROR]: Couldn't parse data file 'minecraft:pewen_sign' from 'minecraft:recipe/pewen_sign.json': DataResult.Error['Map entry '#' : Failed to parse either. First: Not a string: {"item":"minecraft:pewen_planks"}; Second: Failed to parse either. First: Not a json array: {"item":"minecraft:pewen_planks"}; Second: Not a string: {"item":"minecraft:pewen_planks"}']
-[20:40:30] [Worker-Main-1/ERROR]: Couldn't parse data file 'minecraft:pewen_slab' from 'minecraft:recipe/pewen_slab.json': DataResult.Error['Map entry '#' : Failed to parse either. First: Not a string: {"item":"minecraft:pewen_planks"}; Second: Failed to parse either. First: Not a json array: {"item":"minecraft:pewen_planks"}; Second: Not a string: {"item":"minecraft:pewen_planks"}']
-[20:40:30] [Worker-Main-1/ERROR]: Couldn't parse data file 'minecraft:pewen_stairs' from 'minecraft:recipe/pewen_stairs.json': DataResult.Error['Map entry '#' : Failed to parse either. First: Not a string: {"item":"minecraft:pewen_planks"}; Second: Failed to parse either. First: Not a json array: {"item":"minecraft:pewen_planks"}; Second: Not a string: {"item":"minecraft:pewen_planks"}']
-[20:40:30] [Worker-Main-1/ERROR]: Couldn't parse data file 'minecraft:pewen_trapdoor' from 'minecraft:recipe/pewen_trapdoor.json': DataResult.Error['Map entry '#' : Failed to parse either. First: Not a string: {"item":"minecraft:pewen_planks"}; Second: Failed to parse either. First: Not a json array: {"item":"minecraft:pewen_planks"}; Second: Not a string: {"item":"minecraft:pewen_planks"}']
-[20:40:30] [Worker-Main-1/ERROR]: Couldn't parse data file 'minecraft:pewen_wood' from 'minecraft:recipe/pewen_wood.json': DataResult.Error['Map entry '#' : Failed to parse either. First: Not a string: {"item":"minecraft:pewen_log"}; Second: Failed to parse either. First: Not a json array: {"item":"minecraft:pewen_log"}; Second: Not a string: {"item":"minecraft:pewen_log"}']
-[20:40:30] [Worker-Main-1/ERROR]: Couldn't parse data file 'minecraft:stripped_pewen_wood' from 'minecraft:recipe/stripped_pewen_wood.json': DataResult.Error['Map entry '#' : Failed to parse either. First: Not a string: {"item":"minecraft:stripped_pewen_log"}; Second: Failed to parse either. First: Not a json array: {"item":"minecraft:stripped_pewen_log"}; Second: Not a string: {"item":"minecraft:stripped_pewen_log"}']
-[20:40:30] [Render thread/INFO]: Loaded 1461 recipes
-[20:40:30] [Render thread/INFO]: Loaded 1574 advancements
-[20:40:30] [Server thread/INFO]: Started DhWorld of type CLIENT_SERVER
-[20:40:30] [Server thread/INFO]: Starting integrated minecraft server version 1.21.10
-[20:40:30] [Server thread/INFO]: Generating keypair
-[20:40:30] [DH-Full Data Migration Thread[0]/INFO]: No migration necessary.
-[20:40:30] [Server thread/INFO]: Started DhClientServerLevel for [Wrapped{ServerLevel[New World]@minecraft:overworld}] at [[LocalSaveStructure@(/Users/mattsherfey/Documents/Repos/MattMC/run/saves/New World/data)]].
-[20:40:31] [DH-Full Data Migration Thread[0]/INFO]: No migration necessary.
-[20:40:31] [Server thread/INFO]: Started DhClientServerLevel for [Wrapped{ServerLevel[New World]@minecraft:the_nether}] at [[LocalSaveStructure@(/Users/mattsherfey/Documents/Repos/MattMC/run/saves/New World/DIM-1/data;/Users/mattsherfey/Documents/Repos/MattMC/run/saves/New World/data)]].
-[20:40:31] [DH-Full Data Migration Thread[0]/INFO]: No migration necessary.
-[20:40:31] [Server thread/INFO]: Started DhClientServerLevel for [Wrapped{ServerLevel[New World]@minecraft:the_end}] at [[LocalSaveStructure@(/Users/mattsherfey/Documents/Repos/MattMC/run/saves/New World/DIM-1/data;/Users/mattsherfey/Documents/Repos/MattMC/run/saves/New World/data;/Users/mattsherfey/Documents/Repos/MattMC/run/saves/New World/DIM1/data)]].
-[20:40:31] [DH-Full Data Migration Thread[0]/INFO]: No migration necessary.
-[20:40:31] [Server thread/INFO]: Started DhClientServerLevel for [Wrapped{ServerLevel[New World]@minecraft:primordial_caves}] at [[LocalSaveStructure@(/Users/mattsherfey/Documents/Repos/MattMC/run/saves/New World/DIM-1/data;/Users/mattsherfey/Documents/Repos/MattMC/run/saves/New World/data;/Users/mattsherfey/Documents/Repos/MattMC/run/saves/New World/DIM1/data;/Users/mattsherfey/Documents/Repos/MattMC/run/saves/New World/dimensions/minecraft/primordial_caves/data)]].
-[20:40:31] [Server thread/INFO]: Loading 0 persistent chunks...
-[20:40:31] [Server thread/INFO]: WorldEdit initialized
-[20:40:31] [Server thread/INFO]: WorldEdit commands registered
-[20:40:31] [Server thread/INFO]: Loading 49 chunks for player spawn...
-[20:40:31] [Server thread/INFO]: Preparing spawn area: 16%
-[20:40:31] [Server thread/INFO]: Preparing spawn area: 100%
-[20:40:31] [Server thread/INFO]: Time elapsed: 515 ms
-[20:40:31] [Server thread/INFO]: steve[local:E:7db25518] logged in with entity id 102 at (-26.01528076455052, 132.0, -8.98453389284139)
-[20:40:31] [Server thread/INFO]: Player [steve] joined.
-[20:40:31] [Render thread/INFO]: Reloading pipeline on dimension change: minecraft:overworld => minecraft:overworld
-[20:40:31] [Render thread/INFO]: Destroying pipeline minecraft:overworld
-[20:40:31] [Render thread/INFO]: Creating pipeline for dimension minecraft:overworld
-[20:40:31] [Render thread/INFO]: Loaded [0] waiting chunk wrappers.
-[20:40:31] [Server thread/INFO]: steve joined the game
-[20:40:31] [Render thread/INFO]: Started 2 worker threads
-[20:40:31] [DH-Request Module Ticker [minecraft:overworld] Thread[0]/INFO]: Batch Chunk Generator initialized
-[20:40:31] [DH-Request Module Ticker [minecraft:overworld] Thread[0]/INFO]: Set world gen queue for level [minecraft:overworld].
-[20:40:31] [Render thread/INFO]: Sent player skin to server: steve (Wide)
-[20:40:31] [Render thread/INFO]: [DH-CLIENT-CONNECT] ========== CLIENT ONLY CONNECTED ==========
-[20:40:31] [Render thread/INFO]: [DH-CLIENT-CONNECT] Thread: Render thread (ID: 3)
-[20:40:31] [Render thread/INFO]: [DH-CLIENT-CONNECT] Connected to dedicated server: false
-[20:40:31] [Render thread/INFO]: [DH-CLIENT-CONNECT] Connected to replay: false
-[20:40:31] [Render thread/INFO]: [DH-CLIENT-CONNECT] Not connected to dedicated server or replay - skipping DhClientWorld creation
-[20:40:31] [Render thread/INFO]: [DH-CLIENT-CONNECT] This is expected for integrated/singleplayer - world should be created by ServerApi
-[20:40:31] [Render thread/INFO]: Loaded [0] waiting chunk wrappers.
-[20:40:31] [Render thread/WARN]: Ignoring chat session from steve due to missing Services public key
-[20:40:31] [Render thread/INFO]: Stopping worker threads
-[20:40:31] [Render thread/INFO]: Started 2 worker threads
-[20:40:31] [Render thread/INFO]: Resizing Dynamic Transforms UBO, capacity limit of 2 reached during a single frame. New capacity will be 4.
-[20:40:31] [Render thread/INFO]: Creating GLProxy... If this is the last message you see there must have been an OpenGL error.
-[20:40:31] [Render thread/INFO]: Lod Render OpenGL version [4.1 Metal - 90.5].
-[20:40:31] [Render thread/INFO]: minecraftGlCapabilities:
+[08:02:10] [Render thread/INFO]: Info log when linking program containing VS minecraft:core/terrain and FS minecraft:core/terrain. Log output: WARNING: Could not find vertex shader attribute 'Normal' to match BindAttributeLocation request.
+
+[08:02:10] [Render thread/INFO]: Info log when linking program containing VS minecraft:core/entity and FS minecraft:core/entity. Log output: WARNING: Could not find vertex shader attribute 'Normal' to match BindAttributeLocation request.
+WARNING: Output of vertex shader 'overlayColor' not read by fragment shader
+
+[08:02:10] [Render thread/INFO]: Info log when linking program containing VS minecraft:core/entity and FS minecraft:core/entity. Log output: WARNING: Could not find vertex shader attribute 'Normal' to match BindAttributeLocation request.
+WARNING: Could not find vertex shader attribute 'UV2' to match BindAttributeLocation request.
+WARNING: Output of vertex shader 'overlayColor' not read by fragment shader
+
+[08:02:10] [Render thread/INFO]: Info log when linking program containing VS minecraft:core/rendertype_beacon_beam and FS minecraft:core/rendertype_beacon_beam. Log output: WARNING: Could not find vertex shader attribute 'Normal' to match BindAttributeLocation request.
+WARNING: Could not find vertex shader attribute 'UV2' to match BindAttributeLocation request.
+
+[08:02:10] [Render thread/INFO]: Info log when linking program containing VS minecraft:core/terrain and FS minecraft:core/terrain. Log output: WARNING: Could not find vertex shader attribute 'Normal' to match BindAttributeLocation request.
+
+[08:02:10] [Render thread/INFO]: Info log when linking program containing VS minecraft:core/entity and FS minecraft:core/entity. Log output: WARNING: Output of vertex shader 'overlayColor' not read by fragment shader
+
+[08:02:10] [Render thread/INFO]: Info log when linking program containing VS minecraft:core/rendertype_text_background_see_through and FS minecraft:core/rendertype_text_background_see_through. Log output: WARNING: Could not find vertex shader attribute 'UV2' to match BindAttributeLocation request.
+
+[08:02:10] [Render thread/INFO]: Info log when linking program containing VS minecraft:core/rendertype_crumbling and FS minecraft:core/rendertype_crumbling. Log output: WARNING: Could not find vertex shader attribute 'Normal' to match BindAttributeLocation request.
+WARNING: Output of vertex shader 'texCoord2' not read by fragment shader
+
+[08:02:10] [Render thread/INFO]: Info log when linking program containing VS minecraft:core/rendertype_text_see_through and FS minecraft:core/rendertype_text_see_through. Log output: WARNING: Could not find vertex shader attribute 'UV2' to match BindAttributeLocation request.
+
+[08:02:10] [Render thread/INFO]: Info log when linking program containing VS minecraft:core/terrain and FS minecraft:core/terrain. Log output: WARNING: Could not find vertex shader attribute 'Normal' to match BindAttributeLocation request.
+
+[08:02:10] [Render thread/INFO]: Info log when linking program containing VS minecraft:core/entity and FS minecraft:core/entity. Log output: WARNING: Output of vertex shader 'overlayColor' not read by fragment shader
+
+[08:02:10] [Render thread/INFO]: Info log when linking program containing VS minecraft:core/terrain and FS minecraft:core/terrain. Log output: WARNING: Could not find vertex shader attribute 'Normal' to match BindAttributeLocation request.
+
+[08:02:10] [Render thread/INFO]: Info log when linking program containing VS minecraft:core/rendertype_text_intensity_see_through and FS minecraft:core/rendertype_text_intensity_see_through. Log output: WARNING: Could not find vertex shader attribute 'UV2' to match BindAttributeLocation request.
+
+[08:02:10] [Render thread/INFO]: Info log when linking program containing VS minecraft:core/rendertype_beacon_beam and FS minecraft:core/rendertype_beacon_beam. Log output: WARNING: Could not find vertex shader attribute 'Normal' to match BindAttributeLocation request.
+WARNING: Could not find vertex shader attribute 'UV2' to match BindAttributeLocation request.
+
+[08:02:10] [Render thread/INFO]: Info log when linking program containing VS minecraft:core/entity and FS minecraft:core/entity. Log output: WARNING: Output of vertex shader 'overlayColor' not read by fragment shader
+
+[08:02:10] [Render thread/INFO]: Info log when linking program containing VS minecraft:core/rendertype_item_entity_translucent_cull and FS minecraft:core/rendertype_item_entity_translucent_cull. Log output: WARNING: Output of vertex shader 'texCoord1' not read by fragment shader
+WARNING: Output of vertex shader 'texCoord2' not read by fragment shader
+
+[08:02:10] [Render thread/INFO]: OpenAL initialized on device MacBook Air Speakers
+[08:02:10] [Render thread/INFO]: Sound engine started
+[08:02:10] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/particles.png-atlas
+[08:02:10] [Render thread/INFO]: Created: 128x64x0 minecraft:textures/atlas/decorated_pot.png-atlas
+[08:02:10] [Render thread/INFO]: Created: 2048x1024x0 minecraft:textures/atlas/armor_trims.png-atlas
+[08:02:10] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/paintings.png-atlas
+[08:02:10] [Render thread/INFO]: Created: 512x512x0 minecraft:textures/atlas/shield_patterns.png-atlas
+[08:02:10] [Render thread/INFO]: Created: 1024x1024x4 minecraft:textures/atlas/blocks.png-atlas
+[08:02:10] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/chest.png-atlas
+[08:02:10] [Render thread/INFO]: Created: 512x512x0 minecraft:textures/atlas/banner_patterns.png-atlas
+[08:02:10] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/beds.png-atlas
+[08:02:10] [Render thread/INFO]: Created: 1024x512x0 minecraft:textures/atlas/gui.png-atlas
+[08:02:10] [Render thread/INFO]: Created: 64x64x0 minecraft:textures/atlas/map_decorations.png-atlas
+[08:02:10] [Render thread/INFO]: Created: 256x256x0 minecraft:textures/atlas/signs.png-atlas
+[08:02:10] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/shulker_boxes.png-atlas
+[08:02:10] [Render thread/INFO]: Auto-updater has been disabled - no update checks will be performed
+[08:02:10] [Render thread/INFO]: Creating pipeline for dimension minecraft:overworld
+[08:02:15] [Worker-Main-6/ERROR]: Couldn't parse data file 'minecraft:blocks/cave_painting_pewen' from 'minecraft:loot_table/blocks/cave_painting_pewen.json': DataResult.Error['Unknown registry key in ResourceKey[minecraft:root / minecraft:item]: minecraft:cave_painting_pewen': net.minecraft.world.level.storage.loot.LootTable@4ddc3763]
+[08:02:15] [Worker-Main-4/ERROR]: Couldn't parse data file 'minecraft:cooked_trilocaris_tail_campfire' from 'minecraft:recipe/cooked_trilocaris_tail_campfire.json': DataResult.Error['Failed to parse either. First: Not a string: {"item":"minecraft:trilocaris_tail"}; Second: Failed to parse either. First: Not a json array: {"item":"minecraft:trilocaris_tail"}; Second: Not a string: {"item":"minecraft:trilocaris_tail"}']
+[08:02:15] [Worker-Main-4/ERROR]: Couldn't parse data file 'minecraft:cooked_trilocaris_tail_smelting' from 'minecraft:recipe/cooked_trilocaris_tail_smelting.json': DataResult.Error['Failed to parse either. First: Not a string: {"item":"minecraft:trilocaris_tail"}; Second: Failed to parse either. First: Not a json array: {"item":"minecraft:trilocaris_tail"}; Second: Not a string: {"item":"minecraft:trilocaris_tail"}']
+[08:02:15] [Worker-Main-4/ERROR]: Couldn't parse data file 'minecraft:cooked_trilocaris_tail_smoking' from 'minecraft:recipe/cooked_trilocaris_tail_smoking.json': DataResult.Error['Failed to parse either. First: Not a string: {"item":"minecraft:trilocaris_tail"}; Second: Failed to parse either. First: Not a json array: {"item":"minecraft:trilocaris_tail"}; Second: Not a string: {"item":"minecraft:trilocaris_tail"}']
+[08:02:15] [Worker-Main-4/ERROR]: Couldn't parse data file 'minecraft:fern_thatch' from 'minecraft:recipe/fern_thatch.json': DataResult.Error['Map entry 'F' : Failed to parse either. First: Not a string: {"tag":"minecraft:ferns"}; Second: Failed to parse either. First: Not a json array: {"tag":"minecraft:ferns"}; Second: Not a string: {"tag":"minecraft:ferns"}']
+[08:02:15] [Worker-Main-4/ERROR]: Couldn't parse data file 'minecraft:furnace/cooked_dinosaur_chop_campfire' from 'minecraft:recipe/furnace/cooked_dinosaur_chop_campfire.json': DataResult.Error['Failed to parse either. First: Not a string: {"item":"minecraft:dinosaur_chop"}; Second: Failed to parse either. First: Not a json array: {"item":"minecraft:dinosaur_chop"}; Second: Not a string: {"item":"minecraft:dinosaur_chop"}']
+[08:02:15] [Worker-Main-4/ERROR]: Couldn't parse data file 'minecraft:furnace/cooked_dinosaur_chop_smelting' from 'minecraft:recipe/furnace/cooked_dinosaur_chop_smelting.json': DataResult.Error['Failed to parse either. First: Not a string: {"item":"minecraft:dinosaur_chop"}; Second: Failed to parse either. First: Not a json array: {"item":"minecraft:dinosaur_chop"}; Second: Not a string: {"item":"minecraft:dinosaur_chop"}']
+[08:02:15] [Worker-Main-4/ERROR]: Couldn't parse data file 'minecraft:furnace/cooked_dinosaur_chop_smoking' from 'minecraft:recipe/furnace/cooked_dinosaur_chop_smoking.json': DataResult.Error['Failed to parse either. First: Not a string: {"item":"minecraft:dinosaur_chop"}; Second: Failed to parse either. First: Not a json array: {"item":"minecraft:dinosaur_chop"}; Second: Not a string: {"item":"minecraft:dinosaur_chop"}']
+[08:02:15] [Worker-Main-4/ERROR]: Couldn't parse data file 'minecraft:pewen_boat' from 'minecraft:recipe/pewen_boat.json': DataResult.Error['Map entry '#' : Failed to parse either. First: Not a string: {"item":"minecraft:pewen_planks"}; Second: Failed to parse either. First: Not a json array: {"item":"minecraft:pewen_planks"}; Second: Not a string: {"item":"minecraft:pewen_planks"}']
+[08:02:15] [Worker-Main-4/ERROR]: Couldn't parse data file 'minecraft:pewen_button' from 'minecraft:recipe/pewen_button.json': DataResult.Error['List is too short: 0, expected range [1-9]']
+[08:02:15] [Worker-Main-4/ERROR]: Couldn't parse data file 'minecraft:pewen_chest_boat' from 'minecraft:recipe/pewen_chest_boat.json': DataResult.Error['List is too short: 0, expected range [1-9]']
+[08:02:15] [Worker-Main-4/ERROR]: Couldn't parse data file 'minecraft:pewen_door' from 'minecraft:recipe/pewen_door.json': DataResult.Error['Map entry '#' : Failed to parse either. First: Not a string: {"item":"minecraft:pewen_planks"}; Second: Failed to parse either. First: Not a json array: {"item":"minecraft:pewen_planks"}; Second: Not a string: {"item":"minecraft:pewen_planks"}']
+[08:02:15] [Worker-Main-4/ERROR]: Couldn't parse data file 'minecraft:pewen_fence' from 'minecraft:recipe/pewen_fence.json': DataResult.Error['Map entry '#' : Failed to parse either. First: Not a string: {"item":"minecraft:stick"}; Second: Failed to parse either. First: Not a json array: {"item":"minecraft:stick"}; Second: Not a string: {"item":"minecraft:stick"}']
+[08:02:15] [Worker-Main-4/ERROR]: Couldn't parse data file 'minecraft:pewen_fence_gate' from 'minecraft:recipe/pewen_fence_gate.json': DataResult.Error['Map entry '#' : Failed to parse either. First: Not a string: {"item":"minecraft:stick"}; Second: Failed to parse either. First: Not a json array: {"item":"minecraft:stick"}; Second: Not a string: {"item":"minecraft:stick"}']
+[08:02:15] [Worker-Main-4/ERROR]: Couldn't parse data file 'minecraft:pewen_hanging_sign' from 'minecraft:recipe/pewen_hanging_sign.json': DataResult.Error['Map entry 'C' : Failed to parse either. First: Not a string: {"item":"minecraft:chain"}; Second: Failed to parse either. First: Not a json array: {"item":"minecraft:chain"}; Second: Not a string: {"item":"minecraft:chain"}']
+[08:02:15] [Worker-Main-4/ERROR]: Couldn't parse data file 'minecraft:pewen_planks' from 'minecraft:recipe/pewen_planks.json': DataResult.Error['List is too short: 0, expected range [1-9]']
+[08:02:15] [Worker-Main-4/ERROR]: Couldn't parse data file 'minecraft:pewen_pressure_plate' from 'minecraft:recipe/pewen_pressure_plate.json': DataResult.Error['Map entry '#' : Failed to parse either. First: Not a string: {"item":"minecraft:pewen_planks"}; Second: Failed to parse either. First: Not a json array: {"item":"minecraft:pewen_planks"}; Second: Not a string: {"item":"minecraft:pewen_planks"}']
+[08:02:15] [Worker-Main-4/ERROR]: Couldn't parse data file 'minecraft:pewen_sign' from 'minecraft:recipe/pewen_sign.json': DataResult.Error['Map entry '#' : Failed to parse either. First: Not a string: {"item":"minecraft:pewen_planks"}; Second: Failed to parse either. First: Not a json array: {"item":"minecraft:pewen_planks"}; Second: Not a string: {"item":"minecraft:pewen_planks"}']
+[08:02:15] [Worker-Main-4/ERROR]: Couldn't parse data file 'minecraft:pewen_slab' from 'minecraft:recipe/pewen_slab.json': DataResult.Error['Map entry '#' : Failed to parse either. First: Not a string: {"item":"minecraft:pewen_planks"}; Second: Failed to parse either. First: Not a json array: {"item":"minecraft:pewen_planks"}; Second: Not a string: {"item":"minecraft:pewen_planks"}']
+[08:02:15] [Worker-Main-4/ERROR]: Couldn't parse data file 'minecraft:pewen_stairs' from 'minecraft:recipe/pewen_stairs.json': DataResult.Error['Map entry '#' : Failed to parse either. First: Not a string: {"item":"minecraft:pewen_planks"}; Second: Failed to parse either. First: Not a json array: {"item":"minecraft:pewen_planks"}; Second: Not a string: {"item":"minecraft:pewen_planks"}']
+[08:02:15] [Worker-Main-4/ERROR]: Couldn't parse data file 'minecraft:pewen_trapdoor' from 'minecraft:recipe/pewen_trapdoor.json': DataResult.Error['Map entry '#' : Failed to parse either. First: Not a string: {"item":"minecraft:pewen_planks"}; Second: Failed to parse either. First: Not a json array: {"item":"minecraft:pewen_planks"}; Second: Not a string: {"item":"minecraft:pewen_planks"}']
+[08:02:15] [Worker-Main-4/ERROR]: Couldn't parse data file 'minecraft:pewen_wood' from 'minecraft:recipe/pewen_wood.json': DataResult.Error['Map entry '#' : Failed to parse either. First: Not a string: {"item":"minecraft:pewen_log"}; Second: Failed to parse either. First: Not a json array: {"item":"minecraft:pewen_log"}; Second: Not a string: {"item":"minecraft:pewen_log"}']
+[08:02:15] [Worker-Main-4/ERROR]: Couldn't parse data file 'minecraft:stripped_pewen_wood' from 'minecraft:recipe/stripped_pewen_wood.json': DataResult.Error['Map entry '#' : Failed to parse either. First: Not a string: {"item":"minecraft:stripped_pewen_log"}; Second: Failed to parse either. First: Not a json array: {"item":"minecraft:stripped_pewen_log"}; Second: Not a string: {"item":"minecraft:stripped_pewen_log"}']
+[08:02:15] [Render thread/INFO]: Loaded 1461 recipes
+[08:02:15] [Render thread/INFO]: Loaded 1574 advancements
+[08:02:15] [Server thread/INFO]: Started DhWorld of type CLIENT_SERVER
+[08:02:15] [Server thread/INFO]: Starting integrated minecraft server version 1.21.10
+[08:02:15] [Server thread/INFO]: Generating keypair
+[08:02:15] [DH-Full Data Migration Thread[0]/INFO]: No migration necessary.
+[08:02:15] [Server thread/INFO]: Started DhClientServerLevel for [Wrapped{ServerLevel[New World]@minecraft:overworld}] at [[LocalSaveStructure@(/Users/mattsherfey/Documents/Repos/MattMC/run/saves/New World/data)]].
+[08:02:15] [DH-Full Data Migration Thread[0]/INFO]: No migration necessary.
+[08:02:15] [Server thread/INFO]: Started DhClientServerLevel for [Wrapped{ServerLevel[New World]@minecraft:primordial_caves}] at [[LocalSaveStructure@(/Users/mattsherfey/Documents/Repos/MattMC/run/saves/New World/data;/Users/mattsherfey/Documents/Repos/MattMC/run/saves/New World/dimensions/minecraft/primordial_caves/data)]].
+[08:02:15] [DH-Full Data Migration Thread[0]/INFO]: No migration necessary.
+[08:02:15] [Server thread/INFO]: Started DhClientServerLevel for [Wrapped{ServerLevel[New World]@minecraft:the_end}] at [[LocalSaveStructure@(/Users/mattsherfey/Documents/Repos/MattMC/run/saves/New World/data;/Users/mattsherfey/Documents/Repos/MattMC/run/saves/New World/dimensions/minecraft/primordial_caves/data;/Users/mattsherfey/Documents/Repos/MattMC/run/saves/New World/DIM1/data)]].
+[08:02:15] [DH-Full Data Migration Thread[0]/INFO]: No migration necessary.
+[08:02:15] [Server thread/INFO]: Started DhClientServerLevel for [Wrapped{ServerLevel[New World]@minecraft:the_nether}] at [[LocalSaveStructure@(/Users/mattsherfey/Documents/Repos/MattMC/run/saves/New World/data;/Users/mattsherfey/Documents/Repos/MattMC/run/saves/New World/dimensions/minecraft/primordial_caves/data;/Users/mattsherfey/Documents/Repos/MattMC/run/saves/New World/DIM-1/data;/Users/mattsherfey/Documents/Repos/MattMC/run/saves/New World/DIM1/data)]].
+[08:02:15] [Server thread/INFO]: Loading 0 persistent chunks...
+[08:02:15] [Server thread/INFO]: WorldEdit initialized
+[08:02:15] [Server thread/INFO]: WorldEdit commands registered
+[08:02:16] [Server thread/INFO]: Loading 49 chunks for player spawn...
+[08:02:16] [Server thread/INFO]: Preparing spawn area: 16%
+[08:02:16] [Server thread/INFO]: Preparing spawn area: 16%
+[08:02:16] [Server thread/INFO]: Time elapsed: 915 ms
+[08:02:16] [Server thread/INFO]: steve[local:E:0289db8f] logged in with entity id 81 at (-38.09948505722924, 133.0, 1.5030440646780534)
+[08:02:16] [Server thread/INFO]: Player [steve] joined.
+[08:02:16] [Render thread/INFO]: Reloading pipeline on dimension change: minecraft:overworld => minecraft:overworld
+[08:02:16] [Render thread/INFO]: Destroying pipeline minecraft:overworld
+[08:02:16] [Render thread/INFO]: Creating pipeline for dimension minecraft:overworld
+[08:02:16] [Server thread/INFO]: steve joined the game
+[08:02:16] [Render thread/INFO]: Loaded [0] waiting chunk wrappers.
+[08:02:16] [DH-Request Module Ticker [minecraft:overworld] Thread[0]/INFO]: Batch Chunk Generator initialized
+[08:02:17] [DH-Request Module Ticker [minecraft:overworld] Thread[0]/INFO]: Set world gen queue for level [minecraft:overworld].
+[08:02:17] [Render thread/INFO]: Started 2 worker threads
+[08:02:17] [Render thread/INFO]: Sent player skin to server: steve (Wide)
+[08:02:17] [Render thread/INFO]: [DH-CLIENT-CONNECT] ========== CLIENT ONLY CONNECTED ==========
+[08:02:17] [Render thread/INFO]: [DH-CLIENT-CONNECT] Thread: Render thread (ID: 3)
+[08:02:17] [Render thread/INFO]: [DH-CLIENT-CONNECT] Connected to dedicated server: false
+[08:02:17] [Render thread/INFO]: [DH-CLIENT-CONNECT] Connected to replay: false
+[08:02:17] [Render thread/INFO]: [DH-CLIENT-CONNECT] Not connected to dedicated server or replay - skipping DhClientWorld creation
+[08:02:17] [Render thread/INFO]: [DH-CLIENT-CONNECT] This is expected for integrated/singleplayer - world should be created by ServerApi
+[08:02:17] [Render thread/INFO]: Loaded [0] waiting chunk wrappers.
+[08:02:17] [Render thread/WARN]: Ignoring chat session from steve due to missing Services public key
+[08:02:17] [Render thread/INFO]: Stopping worker threads
+[08:02:17] [Render thread/INFO]: Started 2 worker threads
+[08:02:17] [Render thread/INFO]: Resizing Dynamic Transforms UBO, capacity limit of 2 reached during a single frame. New capacity will be 4.
+[08:02:17] [Render thread/INFO]: Creating GLProxy... If this is the last message you see there must have been an OpenGL error.
+[08:02:17] [Render thread/INFO]: Lod Render OpenGL version [4.1 Metal - 90.5].
+[08:02:17] [Render thread/INFO]: minecraftGlCapabilities:
 Your OpenGL support:
 openGL version 3.2+: [true] <- REQUIRED
 Vertex Attribute Buffer Binding: [false] <- optional improvement
 Buffer Storage: [false] <- optional improvement
 
+[08:02:17] [Render thread/INFO]: This GPU doesn't support Buffer Storage (OpenGL 4.4), falling back to using other methods.
 [LWJGL] [GL] No debug output implementation is available.
-[20:40:31] [Render thread/INFO]: This GPU doesn't support Buffer Storage (OpenGL 4.4), falling back to using other methods.
-[20:40:31] [Render thread/INFO]: GPU Vendor [APPLE] with OS [macOS], Preferred upload method is [DATA].
-[20:40:31] [Render thread/INFO]: GLProxy creation successful. OpenGL smiles upon you this day.
-[20:40:31] [Render thread/INFO]: Setting up renderer
-[20:40:31] [Render thread/INFO]: Loading shader with type: [35633]
-[20:40:31] [Render thread/INFO]: Shader loaded sucessfully.
-[20:40:31] [Render thread/INFO]: Loading shader with type: [35632]
-[20:40:31] [Render thread/INFO]: Shader loaded sucessfully.
-[20:40:31] [Render thread/INFO]: Vertex Attribute (pre GL43) completed.
-[20:40:31] [Server thread/INFO]: Changing view distance to 12, from 10
-[20:40:31] [Server thread/INFO]: Changing simulation distance to 12, from 0
-[20:40:31] [Render thread/INFO]: Renderer setup complete
-[20:40:31] [Render thread/WARN]: There have been reports of instanced rendering causing crashes on macOS when Sodium is present. Instanced rendering can be disabled via the DH config.
-[20:40:31] [Render thread/INFO]: Loading shader with type: [35633]
-[20:40:31] [Render thread/INFO]: Shader loaded sucessfully.
-[20:40:31] [Render thread/INFO]: Loading shader with type: [35632]
-[20:40:31] [Render thread/INFO]: Shader loaded sucessfully.
-[20:40:31] [Render thread/INFO]: Vertex Attribute (pre GL43) completed.
-[20:40:31] [Render thread/INFO]: Loading shader with type: [35633]
-[20:40:31] [Render thread/INFO]: Shader loaded sucessfully.
-[20:40:31] [Render thread/INFO]: Loading shader with type: [35632]
-[20:40:31] [Render thread/INFO]: Shader loaded sucessfully.
-[20:40:31] [Render thread/INFO]: Vertex Attribute (pre GL43) completed.
-[20:40:31] [Render thread/INFO]: Loading shader with type: [35633]
-[20:40:31] [Render thread/INFO]: Shader loaded sucessfully.
-[20:40:31] [Render thread/INFO]: Loading shader with type: [35632]
-[20:40:31] [Render thread/INFO]: Shader loaded sucessfully.
-[20:40:31] [Render thread/INFO]: Loading shader with type: [35633]
-[20:40:31] [Render thread/INFO]: Shader loaded sucessfully.
-[20:40:31] [Render thread/INFO]: Loading shader with type: [35632]
-[20:40:31] [Render thread/INFO]: Shader loaded sucessfully.
-[20:40:31] [Render thread/INFO]: Vertex Attribute (pre GL43) completed.
-[20:40:31] [Render thread/INFO]: Loading shader with type: [35633]
-[20:40:31] [Render thread/INFO]: Shader loaded sucessfully.
-[20:40:31] [Render thread/INFO]: Loading shader with type: [35632]
-[20:40:31] [Render thread/INFO]: Shader loaded sucessfully.
-[20:40:31] [Render thread/INFO]: Loading shader with type: [35633]
-[20:40:31] [Render thread/INFO]: Shader loaded sucessfully.
-[20:40:31] [Render thread/INFO]: Loading shader with type: [35632]
-[20:40:31] [Render thread/INFO]: Shader loaded sucessfully.
-[20:40:31] [Render thread/INFO]: Loading shader with type: [35633]
-[20:40:31] [Render thread/INFO]: Shader loaded sucessfully.
-[20:40:31] [Render thread/INFO]: Loading shader with type: [35632]
-[20:40:31] [Render thread/INFO]: Shader loaded sucessfully.
-[20:40:31] [Render thread/INFO]: Loading shader with type: [35633]
-[20:40:31] [Render thread/INFO]: Shader loaded sucessfully.
-[20:40:31] [Render thread/INFO]: Loading shader with type: [35632]
-[20:40:31] [Render thread/INFO]: Shader loaded sucessfully.
-[20:40:31] [Render thread/INFO]: Loading shader with type: [35633]
-[20:40:31] [Render thread/INFO]: Shader loaded sucessfully.
-[20:40:31] [Render thread/INFO]: Loading shader with type: [35632]
-[20:40:31] [Render thread/INFO]: Shader loaded sucessfully.
-[20:40:31] [Render thread/INFO]: Loading shader with type: [35633]
-[20:40:31] [Render thread/INFO]: Shader loaded sucessfully.
-[20:40:31] [Render thread/INFO]: Loading shader with type: [35632]
-[20:40:31] [Render thread/INFO]: Shader loaded sucessfully.
-[20:40:32] [Render thread/INFO]: [System] [CHAT] §ENo waypoints exist for this world/server.
-[20:40:32] [Render thread/INFO]: Resizing Dynamic Transforms UBO, capacity limit of 4 reached during a single frame. New capacity will be 8.
-2026-01-18 20:40:32.323 java[15292:450211] [JRSAppKitAWT markAppIsDaemon]: Process manager already initialized: can't fully enable headless mode.
-[20:40:32] [Render thread/INFO]: Loaded 127 advancements
-[20:40:32] [Render thread/INFO]: Stopping worker threads
-[20:40:32] [Render thread/INFO]: Started 2 worker threads
+[08:02:17] [Render thread/INFO]: GPU Vendor [APPLE] with OS [macOS], Preferred upload method is [DATA].
+[08:02:17] [Render thread/INFO]: GLProxy creation successful. OpenGL smiles upon you this day.
+[08:02:17] [Server thread/INFO]: Changing view distance to 12, from 10
+[08:02:17] [Server thread/INFO]: Changing simulation distance to 12, from 0
+[08:02:17] [Render thread/INFO]: Setting up renderer
+[08:02:17] [Render thread/INFO]: Loading shader with type: [35633]
+[08:02:17] [Render thread/INFO]: Shader loaded sucessfully.
+[08:02:17] [Render thread/INFO]: Loading shader with type: [35632]
+[08:02:17] [Render thread/INFO]: Shader loaded sucessfully.
+[08:02:17] [Render thread/INFO]: Vertex Attribute (pre GL43) completed.
+[08:02:17] [Render thread/INFO]: Renderer setup complete
+[08:02:17] [Render thread/WARN]: There have been reports of instanced rendering causing crashes on macOS when Sodium is present. Instanced rendering can be disabled via the DH config.
+[08:02:17] [Render thread/INFO]: Loading shader with type: [35633]
+[08:02:17] [Render thread/INFO]: Shader loaded sucessfully.
+[08:02:17] [Render thread/INFO]: Loading shader with type: [35632]
+[08:02:17] [Render thread/INFO]: Shader loaded sucessfully.
+[08:02:17] [Render thread/INFO]: Vertex Attribute (pre GL43) completed.
+[08:02:17] [Render thread/INFO]: Loading shader with type: [35633]
+[08:02:17] [Render thread/INFO]: Shader loaded sucessfully.
+[08:02:17] [Render thread/INFO]: Loading shader with type: [35632]
+[08:02:17] [Render thread/INFO]: Shader loaded sucessfully.
+[08:02:17] [Render thread/INFO]: Vertex Attribute (pre GL43) completed.
+[08:02:17] [Render thread/INFO]: Loading shader with type: [35633]
+[08:02:17] [Render thread/INFO]: Shader loaded sucessfully.
+[08:02:17] [Render thread/INFO]: Loading shader with type: [35632]
+[08:02:17] [Render thread/INFO]: Shader loaded sucessfully.
+[08:02:17] [Render thread/INFO]: Loading shader with type: [35633]
+[08:02:17] [Render thread/INFO]: Shader loaded sucessfully.
+[08:02:17] [Render thread/INFO]: Loading shader with type: [35632]
+[08:02:17] [Render thread/INFO]: Shader loaded sucessfully.
+[08:02:17] [Render thread/INFO]: Vertex Attribute (pre GL43) completed.
+[08:02:17] [Render thread/INFO]: Loading shader with type: [35633]
+[08:02:17] [Render thread/INFO]: Shader loaded sucessfully.
+[08:02:17] [Render thread/INFO]: Loading shader with type: [35632]
+[08:02:17] [Render thread/INFO]: Shader loaded sucessfully.
+[08:02:17] [Render thread/INFO]: Loading shader with type: [35633]
+[08:02:17] [Render thread/INFO]: Shader loaded sucessfully.
+[08:02:17] [Render thread/INFO]: Loading shader with type: [35632]
+[08:02:17] [Render thread/INFO]: Shader loaded sucessfully.
+[08:02:17] [Render thread/INFO]: Loading shader with type: [35633]
+[08:02:17] [Render thread/INFO]: Shader loaded sucessfully.
+[08:02:17] [Render thread/INFO]: Loading shader with type: [35632]
+[08:02:17] [Render thread/INFO]: Shader loaded sucessfully.
+[08:02:17] [Render thread/INFO]: Loading shader with type: [35633]
+[08:02:17] [Render thread/INFO]: Shader loaded sucessfully.
+[08:02:17] [Render thread/INFO]: Loading shader with type: [35632]
+[08:02:17] [Render thread/INFO]: Shader loaded sucessfully.
+[08:02:17] [Render thread/INFO]: Loading shader with type: [35633]
+[08:02:17] [Render thread/INFO]: Shader loaded sucessfully.
+[08:02:17] [Render thread/INFO]: Loading shader with type: [35632]
+[08:02:17] [Render thread/INFO]: Shader loaded sucessfully.
+[08:02:17] [Render thread/INFO]: Loading shader with type: [35633]
+[08:02:17] [Render thread/INFO]: Shader loaded sucessfully.
+[08:02:17] [Render thread/INFO]: Loading shader with type: [35632]
+[08:02:17] [Render thread/INFO]: Shader loaded sucessfully.
+[08:02:17] [Render thread/INFO]: [System] [CHAT] §ENo waypoints exist for this world/server.
+[08:02:17] [Render thread/INFO]: Resizing Dynamic Transforms UBO, capacity limit of 4 reached during a single frame. New capacity will be 8.
+2026-01-19 08:02:17.463 java[22710:838725] [JRSAppKitAWT markAppIsDaemon]: Process manager already initialized: can't fully enable headless mode.
+[08:02:17] [Render thread/INFO]: Loaded 127 advancements
+[08:02:17] [Render thread/INFO]: Stopping worker threads
+[08:02:17] [Render thread/INFO]: Started 2 worker threads
+[08:02:17] [Render thread/INFO]: Resizing Dynamic Transforms UBO, capacity limit of 8 reached during a single frame. New capacity will be 16.
 UNSUPPORTED (log once): gldCopyBufferSubData: NEEDS IMPLEMENTATION
-[20:40:32] [Render thread/INFO]: Loaded 127 advancements
-[20:40:33] [Render thread/INFO]: Resizing Dynamic Transforms UBO, capacity limit of 8 reached during a single frame. New capacity will be 16.
-[20:40:34] [DH-World Gen Thread[2]/INFO]: WorldGen requiring [minecraft:structure_starts] is outside the expected range. Returning EMPTY chunk.
-[20:40:49] [Server thread/INFO]: Saving and pausing game...
-[20:40:50] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:overworld
-[20:40:50] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:the_nether
-[20:40:50] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:the_end
-[20:40:50] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:primordial_caves
-[20:41:10] [Server thread/INFO]: Saving and pausing game...
-[20:41:10] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:overworld
-[20:41:10] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:the_nether
-[20:41:10] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:the_end
-[20:41:10] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:primordial_caves
-[20:41:11] [Render thread/INFO]: Client on ClientOnly mode disconnecting.
-[20:41:11] [level shutdown/INFO]: Shutting down ClientRenderState
-[20:41:11] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[New World]@minecraft:the_end}].
-[20:41:11] [level shutdown/INFO]: Shutting down LodQuadTree...
-[20:41:11] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[New World]@minecraft:primordial_caves}].
-[20:41:11] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[New World]@minecraft:the_nether}].
-[20:41:11] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[New World]@minecraft:the_end}
-[20:41:11] [level shutdown/INFO]: Finished shutting down LodQuadTree
-[20:41:11] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[New World]@minecraft:primordial_caves}
-[20:41:11] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[New World]@minecraft:the_nether}
-[20:41:11] [level shutdown/INFO]: Closing world gen queue
-[20:41:11] [level shutdown/INFO]: Closing WorldGenerationQueue...
-[20:41:11] [level shutdown/INFO]: Shutting down world generator thread pool...
-[20:41:11] [level shutdown/INFO]: World generator thread pool shutdown with [1] incomplete tasks.
-[20:41:11] [level shutdown/INFO]: [BatchGenerator] shutting down...
-[20:41:11] [level shutdown/INFO]: Closing [BatchGenerationEnvironment]
-[20:41:11] [level shutdown/INFO]: Finished closing WorldGenerationQueue
-[20:41:11] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[New World]@minecraft:overworld}].
-[20:41:11] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[New World]@minecraft:overworld}
-[20:41:11] [Render thread/INFO]: Closed DhWorld of type [CLIENT_SERVER].
-[20:41:11] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[New World]@minecraft:the_end}].
-[20:41:11] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[New World]@minecraft:the_end}
-[20:41:11] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[New World]@minecraft:overworld}].
-[20:41:11] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[New World]@minecraft:primordial_caves}].
-[20:41:11] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[New World]@minecraft:the_nether}].
-[20:41:11] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[New World]@minecraft:primordial_caves}
-[20:41:11] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[New World]@minecraft:overworld}
-[20:41:11] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[New World]@minecraft:the_nether}
-[20:41:11] [Render thread/INFO]: Closed DhWorld of type [CLIENT_SERVER].
-[20:41:11] [Render thread/INFO]: Shutting down PriorityTaskPicker thread pool...
-[20:41:11] [Server thread/INFO]: steve lost connection: Disconnected
-[20:41:11] [Server thread/INFO]: steve left the game
-[20:41:11] [Server thread/INFO]: Stopping singleplayer server as player logged out
-[20:41:11] [Server thread/INFO]: WorldEdit shutdown
-[20:41:11] [Server thread/INFO]: Stopping server
-[20:41:11] [Server thread/INFO]: Saving players
-[20:41:11] [Server thread/INFO]: Saving worlds
-[20:41:11] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:overworld
-[20:41:11] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:the_nether
-[20:41:11] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:the_end
-[20:41:11] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:primordial_caves
-[20:41:11] [Server thread/INFO]: ThreadedAnvilChunkStorage (New World): All chunks are saved
-[20:41:11] [Server thread/INFO]: ThreadedAnvilChunkStorage (DIM-1): All chunks are saved
-[20:41:11] [Server thread/INFO]: ThreadedAnvilChunkStorage (DIM1): All chunks are saved
-[20:41:11] [Server thread/INFO]: ThreadedAnvilChunkStorage (primordial_caves): All chunks are saved
-[20:41:11] [Server thread/INFO]: ThreadedAnvilChunkStorage: All dimensions are saved
-[20:41:16] [Render thread/INFO]: Closing all [4] database connections...
-[20:41:16] [Render thread/INFO]: Closing database connection: [jdbc:sqlite:/Users/mattsherfey/Documents/Repos/MattMC/run/saves/New World/DIM1/data/DistantHorizons.sqlite]
-[20:41:16] [Render thread/INFO]: Closing database connection: [jdbc:sqlite:/Users/mattsherfey/Documents/Repos/MattMC/run/saves/New World/data/DistantHorizons.sqlite]
-[20:41:16] [Render thread/INFO]: Closing database connection: [jdbc:sqlite:/Users/mattsherfey/Documents/Repos/MattMC/run/saves/New World/dimensions/minecraft/primordial_caves/data/DistantHorizons.sqlite]
-[20:41:16] [Render thread/INFO]: Closing database connection: [jdbc:sqlite:/Users/mattsherfey/Documents/Repos/MattMC/run/saves/New World/DIM-1/data/DistantHorizons.sqlite]
-[20:41:16] [Render thread/INFO]: Unloading client level [ClientLevelWrapper]-[73p3ag8t287ne@minecraft:overworld].
-[20:41:16] [Render thread/INFO]: Stopping worker threads
-[20:41:17] [Render thread/INFO]: Stopping!
-[20:41:17] [Render thread/INFO]: Saving all world maps
-[20:41:17] [Render thread/INFO]: Save queue flushed!
+[08:02:17] [Render thread/INFO]: Loaded 127 advancements
+[08:02:39] [Render thread/INFO]: Loaded 127 advancements
+[08:02:43] [DH-World Gen Thread[1]/INFO]: WorldGen requiring [minecraft:structure_starts] is outside the expected range. Returning EMPTY chunk.
+[08:03:11] [Server thread/INFO]: Saving and pausing game...
+[08:03:11] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:overworld
+[08:03:12] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:primordial_caves
+[08:03:12] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:the_end
+[08:03:12] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:the_nether
+[08:03:12] [Render thread/INFO]: Client on ClientOnly mode disconnecting.
+[08:03:12] [level shutdown/INFO]: Shutting down ClientRenderState
+[08:03:12] [level shutdown/INFO]: Shutting down LodQuadTree...
+[08:03:12] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[New World]@minecraft:the_end}].
+[08:03:12] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[New World]@minecraft:the_nether}].
+[08:03:12] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[New World]@minecraft:primordial_caves}].
+[08:03:12] [level shutdown/INFO]: Finished shutting down LodQuadTree
+[08:03:12] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[New World]@minecraft:the_end}
+[08:03:12] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[New World]@minecraft:the_nether}
+[08:03:12] [level shutdown/INFO]: Closing world gen queue
+[08:03:12] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[New World]@minecraft:primordial_caves}
+[08:03:12] [level shutdown/INFO]: Closing WorldGenerationQueue...
+[08:03:12] [level shutdown/INFO]: Shutting down world generator thread pool...
+[08:03:12] [level shutdown/INFO]: World generator thread pool shutdown with [4] incomplete tasks.
+[08:03:12] [level shutdown/INFO]: [BatchGenerator] shutting down...
+[08:03:12] [level shutdown/INFO]: Closing [BatchGenerationEnvironment]
+[08:03:12] [level shutdown/INFO]: Finished closing WorldGenerationQueue
+[08:03:12] [Server thread/INFO]: steve lost connection: Disconnected
+[08:03:12] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[New World]@minecraft:overworld}].
+[08:03:12] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[New World]@minecraft:overworld}
+[08:03:12] [Render thread/INFO]: Closed DhWorld of type [CLIENT_SERVER].
+[08:03:12] [Server thread/INFO]: steve left the game
+[08:03:12] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[New World]@minecraft:primordial_caves}].
+[08:03:12] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[New World]@minecraft:primordial_caves}
+[08:03:12] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[New World]@minecraft:overworld}].
+[08:03:12] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[New World]@minecraft:overworld}
+[08:03:12] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[New World]@minecraft:the_end}].
+[08:03:12] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[New World]@minecraft:the_end}
+[08:03:12] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[New World]@minecraft:the_nether}].
+[08:03:12] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[New World]@minecraft:the_nether}
+[08:03:12] [Render thread/INFO]: Closed DhWorld of type [CLIENT_SERVER].
+[08:03:12] [Render thread/INFO]: Shutting down PriorityTaskPicker thread pool...
+[08:03:12] [Server thread/INFO]: Stopping singleplayer server as player logged out
+[08:03:12] [Server thread/INFO]: WorldEdit shutdown
+[08:03:12] [Server thread/INFO]: Stopping server
+[08:03:12] [Server thread/INFO]: Saving players
+[08:03:12] [Server thread/INFO]: Saving worlds
+[08:03:12] [Render thread/INFO]: Closing all [4] database connections...
+[08:03:12] [Render thread/INFO]: Closing database connection: [jdbc:sqlite:/Users/mattsherfey/Documents/Repos/MattMC/run/saves/New World/data/DistantHorizons.sqlite]
+[08:03:12] [Render thread/INFO]: Closing database connection: [jdbc:sqlite:/Users/mattsherfey/Documents/Repos/MattMC/run/saves/New World/dimensions/minecraft/primordial_caves/data/DistantHorizons.sqlite]
+[08:03:12] [Render thread/INFO]: Closing database connection: [jdbc:sqlite:/Users/mattsherfey/Documents/Repos/MattMC/run/saves/New World/DIM-1/data/DistantHorizons.sqlite]
+[08:03:12] [Render thread/INFO]: Closing database connection: [jdbc:sqlite:/Users/mattsherfey/Documents/Repos/MattMC/run/saves/New World/DIM1/data/DistantHorizons.sqlite]
+[08:03:12] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:overworld
+[08:03:13] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:primordial_caves
+[08:03:13] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:the_end
+[08:03:13] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:the_nether
+[08:03:13] [Server thread/INFO]: ThreadedAnvilChunkStorage (New World): All chunks are saved
+[08:03:13] [Server thread/INFO]: ThreadedAnvilChunkStorage (primordial_caves): All chunks are saved
+[08:03:13] [Server thread/INFO]: ThreadedAnvilChunkStorage (DIM1): All chunks are saved
+[08:03:13] [Server thread/INFO]: ThreadedAnvilChunkStorage (DIM-1): All chunks are saved
+[08:03:13] [Server thread/INFO]: ThreadedAnvilChunkStorage: All dimensions are saved
+[08:03:13] [Render thread/INFO]: Unloading client level [ClientLevelWrapper]-[73p3ag8t287ne@minecraft:overworld].
+[08:03:13] [Render thread/INFO]: Stopping worker threads
+[08:03:13] [Render thread/INFO]: Stopping!
+[08:03:13] [Render thread/INFO]: Saving all world maps
+[08:03:13] [Render thread/INFO]: Save queue flushed!
 
 [Incubating] Problems report is available at: file:///Users/mattsherfey/Documents/Repos/MattMC/build/reports/problems/problems-report.html
 
@@ -465,6 +462,6 @@ You can use '--warning-mode all' to show the individual deprecation warnings and
 
 For more on this, please refer to https://docs.gradle.org/9.1.0/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
 
-BUILD SUCCESSFUL in 1m 46s
+BUILD SUCCESSFUL in 1m 52s
 7 actionable tasks: 7 executed
 Consider enabling configuration cache to speed up this build: https://docs.gradle.org/9.1.0/userguide/configuration_cache_enabling.html
