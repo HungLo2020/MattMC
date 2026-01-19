@@ -77,7 +77,10 @@ public class EntityCockroach extends Animal implements Shearable, ITargetsDroppe
     }
 
     public static AttributeSupplier.Builder bakeAttributes() {
-        return Monster.createMonsterAttributes().add(Attributes.MAX_HEALTH, 6.0D).add(Attributes.MOVEMENT_SPEED, 0.35F);
+        return Monster.createMonsterAttributes()
+            .add(Attributes.MAX_HEALTH, 6.0D)
+            .add(Attributes.MOVEMENT_SPEED, 0.35F)
+            .add(Attributes.TEMPT_RANGE, 10.0D);
     }
 
     public static boolean isValidLightLevel(ServerLevelAccessor p_223323_0_, BlockPos p_223323_1_, RandomSource p_223323_2_) {
