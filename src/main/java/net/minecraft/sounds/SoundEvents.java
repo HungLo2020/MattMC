@@ -352,6 +352,7 @@ public class SoundEvents {
 	public static final SoundEvent COD_DEATH = register("entity.cod.death");
 	public static final SoundEvent COD_FLOP = register("entity.cod.flop");
 	public static final SoundEvent COD_HURT = register("entity.cod.hurt");
+	public static final SoundEvent COMB_JELLY_HURT = register("entity.comb_jelly.hurt");
 	public static final SoundEvent COMPARATOR_CLICK = register("block.comparator.click");
 	public static final SoundEvent COMPOSTER_EMPTY = register("block.composter.empty");
 	public static final SoundEvent COMPOSTER_FILL = register("block.composter.fill");

@@ -29,4 +29,7 @@ public class AMItemRegistry {
     public static final DeferredHolder LARGE_CATFISH_BUCKET = new DeferredHolder(() -> net.minecraft.world.item.Items.LARGE_CATFISH_BUCKET);
     public static final DeferredHolder RAW_CATFISH = new DeferredHolder(() -> net.minecraft.world.item.Items.RAW_CATFISH);
     public static final DeferredHolder COOKED_CATFISH = new DeferredHolder(() -> net.minecraft.world.item.Items.COOKED_CATFISH);
+    
+    // Comb Jelly bucket items - reference vanilla Items
+    public static final DeferredHolder COMB_JELLY_BUCKET = new DeferredHolder(() -> net.minecraft.world.item.Items.COMB_JELLY_BUCKET);
 }

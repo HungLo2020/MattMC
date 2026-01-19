@@ -334,6 +334,13 @@ public class EntityType<T extends Entity> implements FeatureElement, EntityTypeT
 			.clientTrackingRange(4)
 			.updateInterval(10)
 	);
+	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntityCombJelly> COMB_JELLY = register(
+		"comb_jelly",
+		EntityType.Builder.of(com.github.alexthe666.alexsmobs.entity.EntityCombJelly::new, MobCategory.WATER_AMBIENT)
+			.sized(0.75F, 0.75F)
+			.eyeHeight(0.375F)
+			.clientTrackingRange(5)
+	);
 	public static final EntityType<Boat> CHERRY_BOAT = register(
 		"cherry_boat",
 		EntityType.Builder.of(boatFactory(() -> Items.CHERRY_BOAT), MobCategory.MISC).noLootTable().sized(1.375F, 0.5625F).eyeHeight(0.5625F).clientTrackingRange(10)
