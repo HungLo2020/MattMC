@@ -406,11 +406,17 @@ def clientJvmArgs = [
 if (isMacOS) {
     // Use G1GC on macOS - ZGC has known stability issues causing SIGBUS crashes
     clientJvmArgs += '-XX:+UseG1GC'
-    // Additional macOS stability flags to prevent Arena crashes
+    // Additional macOS stability flags to prevent Arena/Chunk crashes
     clientJvmArgs += '-XX:ReservedCodeCacheSize=512m'
     clientJvmArgs += '-XX:+DisableExplicitGC'
     clientJvmArgs += '-XX:MaxMetaspaceSize=512m'
     clientJvmArgs += '-Djava.awt.headless=false'
+    // Prevent chunk allocation crashes during shader loading
+    clientJvmArgs += '-XX:+UnlockExperimentalVMOptions'
+    clientJvmArgs += '-XX:G1NewSizePercent=20'
+    clientJvmArgs += '-XX:G1MaxNewSizePercent=80'
+    clientJvmArgs += '-XX:+UseStringDeduplication'
+    clientJvmArgs += '-XX:MaxGCPauseMillis=200'
 } else {
     // Use ZGC on Linux/Windows for better performance
     clientJvmArgs += '-XX:+UseZGC'
