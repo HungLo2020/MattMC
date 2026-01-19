@@ -1781,6 +1781,12 @@ public class Items {
 		properties -> new com.github.alexthe666.alexsmobs.item.ItemModFishBucket(() -> EntityType.COMB_JELLY, Fluids.WATER, properties),
 		new Item.Properties().stacksTo(1).component(DataComponents.BUCKET_ENTITY_DATA, CustomData.EMPTY)
 	);
+	public static final Item COSMIC_COD_SPAWN_EGG = registerItem("cosmic_cod_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.COSMIC_COD));
+	public static final Item COSMIC_COD_BUCKET = registerItem(
+		"cosmic_cod_bucket",
+		properties -> new MobBucketItem(EntityType.COSMIC_COD, Fluids.WATER, SoundEvents.BUCKET_EMPTY_FISH, properties),
+		new Item.Properties().stacksTo(1).component(DataComponents.BUCKET_ENTITY_DATA, CustomData.EMPTY)
+	);
 	public static final Item COD_SPAWN_EGG = registerItem("cod_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.COD));
 	public static final Item COPPER_GOLEM_SPAWN_EGG = registerItem(
 		"copper_golem_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.COPPER_GOLEM)

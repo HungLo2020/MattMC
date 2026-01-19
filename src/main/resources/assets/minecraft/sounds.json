@@ -24936,6 +24936,14 @@
     ],
     "subtitle": "subtitles.entity.cockroach.hurt"
   },
+  "entity.cosmic_cod.hurt": {
+    "sounds": [
+      "minecraft:cosmic_cod_hurt_0",
+      "minecraft:cosmic_cod_hurt_1",
+      "minecraft:cosmic_cod_hurt_2"
+    ],
+    "subtitle": "subtitles.entity.cosmic_cod.hurt"
+  },
   "music.la_cucaracha": {
     "sounds": [
       {

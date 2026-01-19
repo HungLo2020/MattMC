@@ -79,6 +79,7 @@ import com.github.alexmodguy.alexscaves.server.entity.living.SubterranodonEntity
 import com.github.alexmodguy.alexscaves.server.entity.living.TrilocarisEntity;
 import com.github.alexmodguy.alexscaves.server.entity.living.VallumraptorEntity;
 import com.github.alexthe666.alexsmobs.entity.EntityBlobfish;
+import com.github.alexthe666.alexsmobs.entity.EntityCosmicCod;
 import net.minecraft.world.entity.boss.enderdragon.EndCrystal;
 import net.minecraft.world.entity.boss.enderdragon.EnderDragon;
 import net.minecraft.world.entity.boss.wither.WitherBoss;
@@ -340,6 +341,13 @@ public class EntityType<T extends Entity> implements FeatureElement, EntityTypeT
 			.sized(0.75F, 0.75F)
 			.eyeHeight(0.375F)
 			.clientTrackingRange(5)
+	);
+	public static final EntityType<EntityCosmicCod> COSMIC_COD = register(
+		"cosmic_cod",
+		EntityType.Builder.of(EntityCosmicCod::new, MobCategory.WATER_AMBIENT)
+			.sized(0.5F, 0.3F)
+			.eyeHeight(0.2F)
+			.clientTrackingRange(4)
 	);
 	public static final EntityType<Boat> CHERRY_BOAT = register(
 		"cherry_boat",
