@@ -1,0 +1,33 @@
+package com.github.alexthe666.alexsmobs.misc;
+
+import net.minecraft.core.registries.Registries;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.tags.TagKey;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.level.biome.Biome;
+import net.minecraft.world.level.block.Block;
+
+public class AMTagRegistry {
+    // Catfish-specific tags
+    public static final TagKey<EntityType<?>> CATFISH_IGNORE_EATING = registerEntityTag("catfish_ignore_eating");
+    public static final TagKey<Item> CATFISH_ITEM_FASCINATIONS = registerItemTag("catfish_item_fascinations");
+    public static final TagKey<Block> CATFISH_BLOCK_FASCINATIONS = registerBlockTag("catfish_block_fascinations");
+    public static final TagKey<Biome> SPAWNS_HUGE_CATFISH = registerBiomeTag("spawns_huge_catfish");
+
+    private static TagKey<Item> registerItemTag(String name) {
+        return TagKey.create(Registries.ITEM, ResourceLocation.withDefaultNamespace(name));
+    }
+
+    private static TagKey<Block> registerBlockTag(String name) {
+        return TagKey.create(Registries.BLOCK, ResourceLocation.withDefaultNamespace(name));
+    }
+
+    private static TagKey<EntityType<?>> registerEntityTag(String name) {
+        return TagKey.create(Registries.ENTITY_TYPE, ResourceLocation.withDefaultNamespace(name));
+    }
+
+    private static TagKey<Biome> registerBiomeTag(String name) {
+        return TagKey.create(Registries.BIOME, ResourceLocation.withDefaultNamespace(name));
+    }
+}

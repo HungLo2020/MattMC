@@ -307,6 +307,13 @@ public class EntityType<T extends Entity> implements FeatureElement, EntityTypeT
 	public static final EntityType<Camel> CAMEL = register(
 		"camel", EntityType.Builder.of(Camel::new, MobCategory.CREATURE).sized(1.7F, 2.375F).eyeHeight(2.275F).clientTrackingRange(10)
 	);
+	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntityCatfish> CATFISH = register(
+		"catfish",
+		EntityType.Builder.of(com.github.alexthe666.alexsmobs.entity.EntityCatfish::new, MobCategory.WATER_AMBIENT)
+			.sized(0.9F, 0.6F)
+			.eyeHeight(0.3F)
+			.clientTrackingRange(5)
+	);
 	public static final EntityType<Cat> CAT = register(
 		"cat", EntityType.Builder.of(Cat::new, MobCategory.CREATURE).sized(0.6F, 0.7F).eyeHeight(0.35F).passengerAttachments(0.5125F).clientTrackingRange(8)
 	);
