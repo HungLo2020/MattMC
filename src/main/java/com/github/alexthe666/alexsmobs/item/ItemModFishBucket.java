@@ -13,6 +13,8 @@ import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.EntitySpawnReason;
+import net.minecraft.world.entity.Mob;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.animal.Bucketable;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
@@ -30,22 +32,22 @@ import java.util.function.Supplier;
 
 public class ItemModFishBucket extends MobBucketItem {
 
-    private final Supplier<? extends EntityType<?>> fishTypeSupplier;
+    private final Supplier<? extends EntityType<? extends Mob>> fishTypeSupplier;
 
-    public ItemModFishBucket(Supplier<? extends EntityType<?>> fishTypeIn, Fluid fluid, Item.Properties builder) {
+    public ItemModFishBucket(Supplier<? extends EntityType<? extends Mob>> fishTypeIn, Fluid fluid, Item.Properties builder) {
         super(fishTypeIn.get(), fluid, SoundEvents.BUCKET_EMPTY_FISH, builder.stacksTo(1));
         this.fishTypeSupplier = fishTypeIn;
     }
 
-    public EntityType<?> getFishType() {
+    public EntityType<? extends Mob> getFishType() {
         return this.fishTypeSupplier.get();
     }
 
     @Override
-    public void checkExtraContent(@Nullable Player player, Level level, ItemStack stack, BlockPos pos) {
+    public void checkExtraContent(@Nullable LivingEntity livingEntity, Level level, ItemStack stack, BlockPos pos) {
         if (level instanceof ServerLevel) {
             this.spawnFish((ServerLevel) level, stack, pos);
-            level.gameEvent(player, GameEvent.ENTITY_PLACE, pos);
+            level.gameEvent(livingEntity, GameEvent.ENTITY_PLACE, pos);
         }
     }
 

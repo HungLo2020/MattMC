@@ -13,7 +13,7 @@ public class AMEntityRegistry {
      * @return true if spawn should succeed
      */
     public static boolean rollSpawn(int rolls, RandomSource random, EntitySpawnReason spawnReason) {
-        if (spawnReason == EntitySpawnReason.SPAWNER || spawnReason == EntitySpawnReason.SPAWN_EGG) {
+        if (spawnReason == EntitySpawnReason.SPAWNER || spawnReason == EntitySpawnReason.BUCKET || spawnReason == EntitySpawnReason.COMMAND) {
             return true;
         }
         for (int i = 0; i < rolls; i++) {

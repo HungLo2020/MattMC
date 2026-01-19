@@ -45,9 +45,15 @@ import net.minecraft.core.component.DataComponents;
 import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.world.level.ClipContext;
 import net.minecraft.world.level.Level;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.LevelAccessor;
 import net.minecraft.world.level.ServerLevelAccessor;
 import net.minecraft.world.level.biome.Biome;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
+import net.minecraft.world.level.storage.TagValueInput;
+import net.minecraft.world.level.storage.TagValueOutput;
+import net.minecraft.util.ProblemReporter;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.gameevent.GameEvent;
@@ -61,6 +67,7 @@ import javax.annotation.Nullable;
 import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Optional;
 
 public class EntityCatfish extends WaterAnimal implements FlyingAnimal, Bucketable, ContainerListener {
 
@@ -79,7 +86,7 @@ public class EntityCatfish extends WaterAnimal implements FlyingAnimal, Bucketab
     public SimpleContainer catfishInventory;
     private int eatCooldown = 0;
 
-    protected EntityCatfish(EntityType<? extends WaterAnimal> type, Level level) {
+    public EntityCatfish(EntityType<EntityCatfish> type, Level level) {
         super(type, level);
         initCatfishInventory();
         this.moveControl = new AquaticMoveController(this, 1.0F, 15F);
@@ -174,7 +181,7 @@ public class EntityCatfish extends WaterAnimal implements FlyingAnimal, Bucketab
 
     public void tick() {
         super.tick();
-        if (!this.level().isClientSide) {
+        if (!this.level().isClientSide()) {
             if(this.getSpitTime() > 0){
                 this.setSpitTime(this.getSpitTime() - 1);
             }
@@ -220,14 +227,6 @@ public class EntityCatfish extends WaterAnimal implements FlyingAnimal, Bucketab
         }
     }
 
-    @Nullable
-    protected ResourceKey<LootTable> getDefaultLootTable() {
-        if (this.getCatfishSize() == 2) {
-            return LARGE_LOOT;
-        }
-        return this.getCatfishSize() == 1 ? MEDIUM_LOOT : super.getDefaultLootTable();
-    }
-
     public void onSyncedDataUpdated(EntityDataAccessor<?> accessor) {
         if (CATFISH_SIZE.equals(accessor)) {
             this.refreshDimensions();
@@ -267,8 +266,11 @@ public class EntityCatfish extends WaterAnimal implements FlyingAnimal, Bucketab
                     if (!itemstack.isEmpty()) {
                         CompoundTag slotTag = new CompoundTag();
                         slotTag.putByte("Slot", (byte) i);
-                        net.minecraft.nbt.Tag saved = itemstack.saveOptional(this.level().registryAccess());
-                        nbttaglist.add(saved);
+                        // Encode ItemStack using codec
+                        ItemStack.CODEC.encodeStart(level().registryAccess().createSerializationContext(net.minecraft.nbt.NbtOps.INSTANCE), itemstack)
+                                .resultOrPartial(error -> {})
+                                .ifPresent(itemTag -> slotTag.put("Item", itemTag));
+                        nbttaglist.add(slotTag);
                     }
                 }
                 tag.put("Items", nbttaglist);
@@ -279,7 +281,11 @@ public class EntityCatfish extends WaterAnimal implements FlyingAnimal, Bucketab
     @Override
     public void loadFromBucketTag(@Nonnull CompoundTag compound) {
         Bucketable.loadDefaultDataFromBucketTag(this, compound);
-        readAdditionalSaveData(compound);
+        // Create ValueInput from CompoundTag
+        if (level() instanceof ServerLevel serverLevel) {
+            ValueInput valueInput = TagValueInput.create(ProblemReporter.DISCARDING, serverLevel.registryAccess(), compound);
+            this.load(valueInput);
+        }
     }
 
     @Override
@@ -348,13 +354,12 @@ public class EntityCatfish extends WaterAnimal implements FlyingAnimal, Bucketab
     }
 
     @Override
-    public boolean hurt(DamageSource source, float f) {
-        if(super.hurt(source, f)){
+    public boolean hurtServer(ServerLevel serverLevel, DamageSource source, float f) {
+        boolean result = super.hurtServer(serverLevel, source, f);
+        if(result){
             this.spit();
-            return true;
-        }else{
-            return false;
         }
+        return result;
     }
 
     @Override
@@ -363,51 +368,62 @@ public class EntityCatfish extends WaterAnimal implements FlyingAnimal, Bucketab
         ItemStack stack = player.getItemInHand(hand);
         if (stack.getItem() == Items.SEA_PICKLE) {
             this.spit();
-            return InteractionResult.sidedSuccess(this.level().isClientSide);
+            return this.level().isClientSide() ? InteractionResult.SUCCESS : InteractionResult.CONSUME;
         }
         return Bucketable.bucketMobPickup(player, hand, this).orElse(super.mobInteract(player, hand));
     }
 
-    public void addAdditionalSaveData(CompoundTag compound) {
-        super.addAdditionalSaveData(compound);
-        compound.putBoolean("FromBucket", this.fromBucket());
-        compound.putFloat("CatfishSize", this.getCatfishSize());
+    @Override
+    protected void addAdditionalSaveData(ValueOutput output) {
+        super.addAdditionalSaveData(output);
+        // Set the loot table based on size
+        ResourceKey<LootTable> lootTableKey = switch (this.getCatfishSize()) {
+            case 2 -> LARGE_LOOT;
+            case 1 -> MEDIUM_LOOT;
+            default -> null;
+        };
+        if (lootTableKey != null) {
+            output.store("DeathLootTable", LootTable.KEY_CODEC, lootTableKey);
+        }
+        output.putBoolean("FromBucket", this.fromBucket());
+        output.putInt("CatfishSize", this.getCatfishSize());
         if (catfishInventory != null) {
-            final ListTag nbttaglist = new ListTag();
+            ValueOutput.ValueOutputList itemsList = output.childrenList("Items");
             for (int i = 0; i < this.catfishInventory.getContainerSize(); ++i) {
                 final ItemStack itemstack = this.catfishInventory.getItem(i);
                 if (!itemstack.isEmpty()) {
-                    CompoundTag CompoundNBT = new CompoundTag();
-                    CompoundNBT.putByte("Slot", (byte) i);
-                    net.minecraft.nbt.Tag saved = (net.minecraft.nbt.Tag) itemstack.saveOptional(this.level().registryAccess());
-                    nbttaglist.add(saved);
+                    ValueOutput itemOutput = itemsList.addChild();
+                    itemOutput.putInt("Slot", i);
+                    itemOutput.store("Item", ItemStack.OPTIONAL_CODEC, itemstack);
                 }
             }
-            compound.put("Items", nbttaglist);
         }
-        compound.putString("ContainedEntityType", this.getSwallowedEntityType());
-        compound.put("ContainedData", this.getSwallowedData());
-        compound.putBoolean("HasSwallowedEntity", this.hasSwallowedEntity());
+        output.putString("ContainedEntityType", this.getSwallowedEntityType());
+        output.store("ContainedData", CompoundTag.CODEC, this.getSwallowedData());
+        output.putBoolean("HasSwallowedEntity", this.hasSwallowedEntity());
     }
 
-    public void readAdditionalSaveData(CompoundTag compound) {
-        super.readAdditionalSaveData(compound);
-        this.setFromBucket(compound.getBoolean("FromBucket"));
-        this.setCatfishSize(compound.getInt("CatfishSize"));
+    @Override
+    protected void readAdditionalSaveData(ValueInput input) {
+        super.readAdditionalSaveData(input);
+        this.setFromBucket(input.getBooleanOr("FromBucket", false));
+        this.setCatfishSize(input.getIntOr("CatfishSize", 0));
         if (catfishInventory != null) {
-            final ListTag nbttaglist = compound.getList("Items", 10);
             this.initCatfishInventory();
-            for (int i = 0; i < nbttaglist.size(); ++i) {
-                final CompoundTag CompoundNBT = nbttaglist.getCompound(i);
-                final int j = CompoundNBT.getByte("Slot") & 255;
-                this.catfishInventory.setItem(j, ItemStack.parseOptional(this.registryAccess(), CompoundNBT));
-            }
+            input.childrenList("Items").ifPresent(itemsList -> {
+                for (ValueInput itemInput : itemsList) {
+                    int slot = itemInput.getIntOr("Slot", 0);
+                    itemInput.read("Item", ItemStack.OPTIONAL_CODEC).ifPresent(itemStack -> {
+                        if (slot >= 0 && slot < this.catfishInventory.getContainerSize()) {
+                            this.catfishInventory.setItem(slot, itemStack);
+                        }
+                    });
+                }
+            });
         }
-        this.setSwallowedEntityType(compound.getString("ContainedEntityType"));
-        if (!compound.getCompound("ContainedData").isEmpty()) {
-            this.setSwallowedData(compound.getCompound("ContainedData"));
-        }
-        this.setHasSwallowedEntity(compound.getBoolean("HasSwallowedEntity"));
+        this.setSwallowedEntityType(input.getStringOr("ContainedEntityType", "minecraft:pig"));
+        input.read("ContainedData", CompoundTag.CODEC).ifPresent(this::setSwallowedData);
+        this.setHasSwallowedEntity(input.getBooleanOr("HasSwallowedEntity", false));
     }
 
     private EntityDimensions getDimsForCatfish() {
@@ -423,7 +439,7 @@ public class EntityCatfish extends WaterAnimal implements FlyingAnimal, Bucketab
         this.setCatfishSize(random.nextFloat() < 0.35F ? 1 : 0);
         if (random.nextFloat() < 0.1F) {
             final Holder<Biome> holder = worldIn.getBiome(this.blockPosition());
-            if (holder.is(AMTagRegistry.SPAWNS_HUGE_CATFISH) || reason == EntitySpawnReason.SPAWN_EGG) {
+            if (holder.is(AMTagRegistry.SPAWNS_HUGE_CATFISH) || reason == EntitySpawnReason.BUCKET || reason == EntitySpawnReason.COMMAND) {
                 this.setCatfishSize(2);
             }
         }
@@ -452,14 +468,14 @@ public class EntityCatfish extends WaterAnimal implements FlyingAnimal, Bucketab
     }
 
     @Override
-    protected void pickUpItem(ItemEntity itemEntity) {
+    protected void pickUpItem(ServerLevel serverLevel, ItemEntity itemEntity) {
         final ItemStack itemstack = itemEntity.getItem();
         if (this.getCatfishSize() != 2 && !isFull() && this.catfishInventory != null && this.catfishInventory.addItem(itemstack).isEmpty()) {
             this.onItemPickup(itemEntity);
             this.take(itemEntity, itemstack.getCount());
             itemEntity.discard();
             this.gameEvent(GameEvent.EAT);
-            this.playSound(SoundEvents.GENERIC_EAT, this.getSoundVolume(), this.getVoicePitch());
+            this.playSound(SoundEvents.GENERIC_EAT.value(), this.getSoundVolume(), this.getVoicePitch());
         }
     }
 
@@ -488,15 +504,21 @@ public class EntityCatfish extends WaterAnimal implements FlyingAnimal, Bucketab
             if (mobtype != null) {
                 this.setSwallowedEntityType(mobtype.toString());
             }
-            final CompoundTag tag = new CompoundTag();
-            mob.addAdditionalSaveData(tag);
-            this.setSwallowedData(tag);
+            // Save mob data to CompoundTag
+            CompoundTag tag = new CompoundTag();
+            if (level() instanceof ServerLevel serverLevel) {
+                TagValueOutput valueOutput = TagValueOutput.createWithContext(ProblemReporter.DISCARDING, serverLevel.registryAccess());
+                mob.save(valueOutput);
+                this.setSwallowedData(valueOutput.buildResult());
+            }
             this.gameEvent(GameEvent.EAT);
-            this.playSound(SoundEvents.GENERIC_EAT, this.getSoundVolume(), this.getVoicePitch());
+            this.playSound(SoundEvents.GENERIC_EAT.value(), this.getSoundVolume(), this.getVoicePitch());
             return true;
         }
         if (this.getCatfishSize() < 2 && entity instanceof final ItemEntity item) {
-            this.pickUpItem(item);
+            if (level() instanceof ServerLevel serverLevel) {
+                this.pickUpItem(serverLevel, item);
+            }
         }
         return false;
     }
@@ -510,11 +532,14 @@ public class EntityCatfish extends WaterAnimal implements FlyingAnimal, Bucketab
         this.eatCooldown = 60 + random.nextInt(60);
         if (this.getCatfishSize() == 2) {
             if (this.hasSwallowedEntity()) {
-                EntityType type = BuiltInRegistries.ENTITY_TYPE.get(ResourceLocation.parse(this.getSwallowedEntityType()));
-                if (type != null) {
-                    Entity entity = type.create(level());
+                EntityType<?> type = BuiltInRegistries.ENTITY_TYPE.getValue(ResourceLocation.parse(this.getSwallowedEntityType()));
+                if (type != null && level() instanceof ServerLevel serverLevel) {
+                    Entity entity = type.create(level(), EntitySpawnReason.LOAD);
                     if (entity instanceof final LivingEntity alive) {
-                        alive.readAdditionalSaveData(this.getSwallowedData());
+                        // Load mob data from CompoundTag
+                        CompoundTag swallowedTag = this.getSwallowedData();
+                        ValueInput valueInput = TagValueInput.create(ProblemReporter.DISCARDING, serverLevel.registryAccess(), swallowedTag);
+                        alive.load(valueInput);
                         alive.setHealth(Math.max(2, alive.getMaxHealth() * 0.25F));
                         alive.setYRot(random.nextFloat() * 360 - 180);
                         alive.setPos(this.getMouthVec());
@@ -571,10 +596,12 @@ public class EntityCatfish extends WaterAnimal implements FlyingAnimal, Bucketab
         return result.getBlockPos().equals(destinationBlock);
     }
 
+    @Override
     protected SoundEvent getDeathSound() {
         return SoundEvents.COD_DEATH;
     }
 
+    @Override
     protected SoundEvent getHurtSound(DamageSource damageSourceIn) {
         return SoundEvents.COD_HURT;
     }
@@ -596,7 +623,7 @@ public class EntityCatfish extends WaterAnimal implements FlyingAnimal, Bucketab
 
         @Override
         public boolean canUse() {
-            if (!catfish.isInWaterOrBubble() || catfish.eatCooldown > 0) {
+            if (!catfish.isInWater() || catfish.eatCooldown > 0) {
                 return false;
             }
             if (executionCooldown > 0) {
@@ -636,7 +663,7 @@ public class EntityCatfish extends WaterAnimal implements FlyingAnimal, Bucketab
                         food.hurt(catfish.damageSources().mobAttack(catfish), 12000);
                     } else if (catfish.swallowEntity(food)) {
                         catfish.gameEvent(GameEvent.EAT);
-                        catfish.playSound(SoundEvents.GENERIC_EAT, catfish.getSoundVolume(), catfish.getVoicePitch());
+                        catfish.playSound(SoundEvents.GENERIC_EAT.value(), catfish.getSoundVolume(), catfish.getVoicePitch());
                         food.discard();
                     }
                 }
@@ -670,7 +697,7 @@ public class EntityCatfish extends WaterAnimal implements FlyingAnimal, Bucketab
 
         @Override
         public boolean canUse() {
-            if (!fish.isInWaterOrBubble()) {
+            if (!fish.isInWater()) {
                 return false;
             }
             if (this.runDelay > 0) {
