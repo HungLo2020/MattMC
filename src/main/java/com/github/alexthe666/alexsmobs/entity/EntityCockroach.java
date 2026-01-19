@@ -175,9 +175,12 @@ public class EntityCockroach extends Animal implements Shearable, ITargetsDroppe
         this.timeUntilNextEgg = valueInput.getIntOr("EggTime", this.random.nextInt(24000) + 24000);
     }
 
-    @Nullable
-    protected ResourceKey<LootTable> getDefaultLootTable() {
-        return this.hasMaracas() ? this.isHeadless() ? MARACA_HEADLESS_LOOT : MARACA_LOOT : super.getDefaultLootTable();
+    @Override
+    protected void dropFromLootTable(ServerLevel serverLevel, DamageSource damageSource, boolean bl) {
+        ResourceKey<LootTable> lootTable = this.hasMaracas() ? this.isHeadless() ? MARACA_HEADLESS_LOOT : MARACA_LOOT : this.getType().getDefaultLootTable().orElse(null);
+        if (lootTable != null) {
+            this.dropFromLootTable(serverLevel, damageSource, bl, lootTable);
+        }
     }
 
     public float getWalkTargetValue(BlockPos pos, LevelReader worldIn) {
@@ -198,7 +201,7 @@ public class EntityCockroach extends Animal implements Shearable, ITargetsDroppe
        if (lvt_3_1_.getItem() == Items.MARACA && this.isAlive() && !this.hasMaracas()) {
             this.setMaracas(true);
             lvt_3_1_.shrink(1);
-            return InteractionResult.sidedSuccess(this.level().isClientSide());
+            return this.level().isClientSide() ? InteractionResult.SUCCESS : InteractionResult.CONSUME;
         } else if (lvt_3_1_.getItem() != Items.MARACA && this.isAlive() && this.hasMaracas()) {
             this.setMaracas(false);
             this.setDancing(false);
@@ -387,7 +390,7 @@ public class EntityCockroach extends Animal implements Shearable, ITargetsDroppe
 
     @Override
     public void shear(ServerLevel serverLevel, SoundSource category, ItemStack stack) {
-        serverLevel.explicitDamage(this, damageSources().generic(), 0F);
+        this.hurtServer(serverLevel, damageSources().generic(), 0F);
         serverLevel.playSound(null, this, SoundEvents.SHEEP_SHEAR, category, 1.0F, 1.0F);
         this.gameEvent(GameEvent.ENTITY_INTERACT);
         if (!serverLevel.isClientSide()) {
@@ -419,9 +422,7 @@ public class EntityCockroach extends Animal implements Shearable, ITargetsDroppe
         if (e.getItem().getItem() == Items.MARACA) {
             this.setMaracas(true);
         } else {
-            if (e.getItem().hasCraftingRemainingItem()) {
-                this.spawnAtLocation(e.getItem().getCraftingRemainingItem().copy());
-            }
+            // Crafting remainder logic removed in 1.21 - skipping
             this.heal(5);
             if (e.getItem().is(COCKROACH_FOODSTUFFS)) {
                 this.setBreaded(true);
