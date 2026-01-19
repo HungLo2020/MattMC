@@ -6,7 +6,7 @@ import com.github.alexthe666.citadel.client.model.AdvancedModelBox;
 import com.github.alexthe666.citadel.client.model.basic.BasicModelPart;
 import com.google.common.collect.ImmutableList;
 
-public class ModelCatfishMedium extends AdvancedEntityModel<EntityCatfish> {
+public class ModelCatfishMedium extends AdvancedEntityModel<CatfishRenderState> {
     private final AdvancedModelBox root;
     private final AdvancedModelBox body;
     private final AdvancedModelBox dorsal_fin;

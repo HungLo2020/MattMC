@@ -1,7 +1,7 @@
 package com.github.alexthe666.alexsmobs.entity;
 
 import net.minecraft.util.RandomSource;
-import net.minecraft.world.entity.MobSpawnType;
+import net.minecraft.world.entity.EntitySpawnReason;
 
 public class AMEntityRegistry {
     
@@ -12,8 +12,8 @@ public class AMEntityRegistry {
      * @param spawnReason Spawn reason
      * @return true if spawn should succeed
      */
-    public static boolean rollSpawn(int rolls, RandomSource random, MobSpawnType spawnReason) {
-        if (spawnReason == MobSpawnType.SPAWNER || spawnReason == MobSpawnType.SPAWN_EGG) {
+    public static boolean rollSpawn(int rolls, RandomSource random, EntitySpawnReason spawnReason) {
+        if (spawnReason == EntitySpawnReason.SPAWNER || spawnReason == EntitySpawnReason.SPAWN_EGG) {
             return true;
         }
         for (int i = 0; i < rolls; i++) {
