@@ -52,6 +52,7 @@ import com.github.alexmodguy.alexscaves.server.entity.living.TremorsaurusEntity;
 import com.github.alexmodguy.alexscaves.server.entity.living.TrilocarisEntity;
 import com.github.alexmodguy.alexscaves.server.entity.living.VallumraptorEntity;
 import com.github.alexthe666.alexsmobs.entity.EntityBlobfish;
+import com.github.alexthe666.alexsmobs.entity.EntityCosmicCod;
 import net.minecraft.world.entity.boss.enderdragon.EnderDragon;
 import net.minecraft.world.entity.boss.wither.WitherBoss;
 import net.minecraft.world.entity.decoration.ArmorStand;
@@ -114,6 +115,7 @@ public class DefaultAttributes {
 		.put(EntityType.CHICKEN, Chicken.createAttributes().build())
 		.put(EntityType.COCKROACH, com.github.alexthe666.alexsmobs.entity.EntityCockroach.bakeAttributes().build())
 		.put(EntityType.COMB_JELLY, com.github.alexthe666.alexsmobs.entity.EntityCombJelly.bakeAttributes().build())
+		.put(EntityType.COSMIC_COD, EntityCosmicCod.createAttributes().build())
 		.put(EntityType.COD, AbstractFish.createAttributes().build())
 		.put(EntityType.COPPER_GOLEM, CopperGolem.createAttributes().build())
 		.put(EntityType.COW, Cow.createAttributes().build())

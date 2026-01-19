@@ -19,6 +19,7 @@ import net.minecraft.world.entity.player.PlayerModelType;
 import org.slf4j.Logger;
 import com.github.alexthe666.alexsmobs.client.render.RenderBlobfish;
 import com.github.alexthe666.alexsmobs.client.render.RenderCombJelly;
+import com.github.alexthe666.alexsmobs.client.render.RenderCosmicCod;
 
 @Environment(EnvType.CLIENT)
 public class EntityRenderers {
@@ -96,6 +97,7 @@ public class EntityRenderers {
 		register(EntityType.COCKROACH, com.github.alexthe666.alexsmobs.client.render.RenderCockroach::new);
 		register(EntityType.COCKROACH_EGG, ThrownItemRenderer::new);
 		register(EntityType.COMB_JELLY, RenderCombJelly::new);
+		register(EntityType.COSMIC_COD, RenderCosmicCod::new);
 		register(EntityType.COD, CodRenderer::new);
 		register(EntityType.COMMAND_BLOCK_MINECART, context -> new MinecartRenderer(context, ModelLayers.COMMAND_BLOCK_MINECART));
 		register(EntityType.COPPER_GOLEM, CopperGolemRenderer::new);
