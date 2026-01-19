@@ -78,6 +78,7 @@ import com.github.alexmodguy.alexscaves.server.entity.living.RelicheirusEntity;
 import com.github.alexmodguy.alexscaves.server.entity.living.SubterranodonEntity;
 import com.github.alexmodguy.alexscaves.server.entity.living.TrilocarisEntity;
 import com.github.alexmodguy.alexscaves.server.entity.living.VallumraptorEntity;
+import com.github.alexthe666.alexsmobs.entity.EntityBlobfish;
 import net.minecraft.world.entity.boss.enderdragon.EndCrystal;
 import net.minecraft.world.entity.boss.enderdragon.EnderDragon;
 import net.minecraft.world.entity.boss.wither.WitherBoss;
@@ -273,6 +274,13 @@ public class EntityType<T extends Entity> implements FeatureElement, EntityTypeT
 	);
 	public static final EntityType<Blaze> BLAZE = register(
 		"blaze", EntityType.Builder.of(Blaze::new, MobCategory.MONSTER).fireImmune().sized(0.6F, 1.8F).clientTrackingRange(8).notInPeaceful()
+	);
+	public static final EntityType<EntityBlobfish> BLOBFISH = register(
+		"blobfish",
+		EntityType.Builder.of(EntityBlobfish::new, MobCategory.WATER_AMBIENT)
+			.sized(0.7F, 0.45F)
+			.eyeHeight(0.3F)
+			.clientTrackingRange(5)
 	);
 	public static final EntityType<Display.BlockDisplay> BLOCK_DISPLAY = register(
 		"block_display", EntityType.Builder.of(Display.BlockDisplay::new, MobCategory.MISC).noLootTable().sized(0.0F, 0.0F).clientTrackingRange(10).updateInterval(1)

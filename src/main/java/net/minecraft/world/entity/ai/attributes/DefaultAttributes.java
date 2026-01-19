@@ -51,6 +51,7 @@ import com.github.alexmodguy.alexscaves.server.entity.living.SubterranodonEntity
 import com.github.alexmodguy.alexscaves.server.entity.living.TremorsaurusEntity;
 import com.github.alexmodguy.alexscaves.server.entity.living.TrilocarisEntity;
 import com.github.alexmodguy.alexscaves.server.entity.living.VallumraptorEntity;
+import com.github.alexthe666.alexsmobs.entity.EntityBlobfish;
 import net.minecraft.world.entity.boss.enderdragon.EnderDragon;
 import net.minecraft.world.entity.boss.wither.WitherBoss;
 import net.minecraft.world.entity.decoration.ArmorStand;
@@ -103,6 +104,7 @@ public class DefaultAttributes {
 		.put(EntityType.BAT, Bat.createAttributes().build())
 		.put(EntityType.BEE, Bee.createAttributes().build())
 		.put(EntityType.BLAZE, Blaze.createAttributes().build())
+		.put(EntityType.BLOBFISH, EntityBlobfish.createAttributes().build())
 		.put(EntityType.BOGGED, Bogged.createAttributes().build())
 		.put(EntityType.CAT, Cat.createAttributes().build())
 		.put(EntityType.CAMEL, Camel.createAttributes().build())

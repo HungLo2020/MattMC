@@ -380,29 +380,46 @@ application {
 def isMacOS = System.getProperty('os.name').toLowerCase().with { it.startsWith('mac') || it.contains('darwin') }
 
 // Common JVM arguments for server tasks
+// Use G1GC on macOS due to ZGC stability issues (SIGBUS crashes in Arena::destruct_contents)
 def serverJvmArgs = [
     '-Xmx2G',
-    '-Xms1G',
-    '-XX:+UseZGC'
+    '-Xms1G'
 ]
 
-// Add UseCompactObjectHeaders only on non-macOS platforms
-// macOS has known stability issues with ZGC + UseCompactObjectHeaders combination
-if (!isMacOS) {
+if (isMacOS) {
+    // Use G1GC on macOS - ZGC has known stability issues causing SIGBUS crashes
+    serverJvmArgs += '-XX:+UseG1GC'
+} else {
+    // Use ZGC on Linux/Windows for better performance
+    serverJvmArgs += '-XX:+UseZGC'
     serverJvmArgs += '-XX:+UseCompactObjectHeaders'
 }
 
 // Common JVM arguments for client tasks
+// Use G1GC on macOS due to ZGC stability issues (SIGBUS crashes in Arena::destruct_contents)
 def clientJvmArgs = [
     '-Xmx8G',
     '-Xms4G',
-    '-XX:+UseZGC',
     '-Dorg.lwjgl.util.Debug=true'
 ]
 
-// Add UseCompactObjectHeaders only on non-macOS platforms
-// macOS has known stability issues with ZGC + UseCompactObjectHeaders combination
-if (!isMacOS) {
+if (isMacOS) {
+    // Use G1GC on macOS - ZGC has known stability issues causing SIGBUS crashes
+    clientJvmArgs += '-XX:+UseG1GC'
+    // Additional macOS stability flags to prevent Arena/Chunk crashes
+    clientJvmArgs += '-XX:ReservedCodeCacheSize=512m'
+    clientJvmArgs += '-XX:+DisableExplicitGC'
+    clientJvmArgs += '-XX:MaxMetaspaceSize=512m'
+    clientJvmArgs += '-Djava.awt.headless=false'
+    // Prevent chunk allocation crashes during shader loading
+    clientJvmArgs += '-XX:+UnlockExperimentalVMOptions'
+    clientJvmArgs += '-XX:G1NewSizePercent=20'
+    clientJvmArgs += '-XX:G1MaxNewSizePercent=80'
+    clientJvmArgs += '-XX:+UseStringDeduplication'
+    clientJvmArgs += '-XX:MaxGCPauseMillis=200'
+} else {
+    // Use ZGC on Linux/Windows for better performance
+    clientJvmArgs += '-XX:+UseZGC'
     clientJvmArgs += '-XX:+UseCompactObjectHeaders'
 }
 

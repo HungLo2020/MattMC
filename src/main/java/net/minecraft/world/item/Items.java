@@ -1545,6 +1545,11 @@ public class Items {
 		properties -> new MobBucketItem(EntityType.AXOLOTL, Fluids.WATER, SoundEvents.BUCKET_EMPTY_AXOLOTL, properties),
 		new Item.Properties().stacksTo(1).component(DataComponents.BUCKET_ENTITY_DATA, CustomData.EMPTY)
 	);
+	public static final Item BLOBFISH_BUCKET = registerItem(
+		"blobfish_bucket",
+		properties -> new MobBucketItem(EntityType.BLOBFISH, Fluids.WATER, SoundEvents.BUCKET_EMPTY_FISH, properties),
+		new Item.Properties().stacksTo(1).component(DataComponents.BUCKET_ENTITY_DATA, CustomData.EMPTY)
+	);
 	public static final Item TADPOLE_BUCKET = registerItem(
 		"tadpole_bucket",
 		properties -> new MobBucketItem(EntityType.TADPOLE, Fluids.WATER, SoundEvents.BUCKET_EMPTY_TADPOLE, properties),
@@ -1622,6 +1627,7 @@ public class Items {
 	public static final Item CLOCK = registerItem("clock");
 	public static final Item SPYGLASS = registerItem("spyglass", SpyglassItem::new, new Item.Properties().stacksTo(1));
 	public static final Item GLOWSTONE_DUST = registerItem("glowstone_dust");
+	public static final Item BLOBFISH = registerItem("blobfish", new Item.Properties().food(Foods.BLOBFISH, Consumables.BLOBFISH));
 	public static final Item COD = registerItem("cod", new Item.Properties().food(Foods.COD));
 	public static final Item SALMON = registerItem("salmon", new Item.Properties().food(Foods.SALMON));
 	public static final Item TROPICAL_FISH = registerItem("tropical_fish", new Item.Properties().food(Foods.TROPICAL_FISH));
@@ -1736,6 +1742,7 @@ public class Items {
 	public static final Item BAT_SPAWN_EGG = registerItem("bat_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.BAT));
 	public static final Item BEE_SPAWN_EGG = registerItem("bee_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.BEE));
 	public static final Item BLAZE_SPAWN_EGG = registerItem("blaze_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.BLAZE));
+	public static final Item BLOBFISH_SPAWN_EGG = registerItem("blobfish_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.BLOBFISH));
 	public static final Item BOGGED_SPAWN_EGG = registerItem("bogged_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.BOGGED));
 	public static final Item BREEZE_SPAWN_EGG = registerItem("breeze_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.BREEZE));
 	public static final Item CAT_SPAWN_EGG = registerItem("cat_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.CAT));

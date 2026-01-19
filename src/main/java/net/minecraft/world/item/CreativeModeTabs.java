@@ -1422,6 +1422,7 @@ public class CreativeModeTabs {
 						output.accept(Items.NETHERITE_HOE);
 						output.accept(Items.BUCKET);
 						output.accept(Items.WATER_BUCKET);
+						output.accept(Items.BLOBFISH_BUCKET);
 						output.accept(Items.COD_BUCKET);
 						output.accept(Items.SALMON_BUCKET);
 						output.accept(Items.TROPICAL_FISH_BUCKET);
@@ -1664,6 +1665,7 @@ public class CreativeModeTabs {
 						output.accept(Items.COOKED_MUTTON);
 						output.accept(Items.CHICKEN);
 						output.accept(Items.COOKED_CHICKEN);
+						output.accept(Items.BLOBFISH);
 						output.accept(Items.RABBIT);
 						output.accept(Items.COOKED_RABBIT);
 						output.accept(Items.COD);
@@ -1902,6 +1904,7 @@ public class CreativeModeTabs {
 					output.accept(Items.BAT_SPAWN_EGG);
 					output.accept(Items.BEE_SPAWN_EGG);
 					output.accept(Items.BLAZE_SPAWN_EGG);
+					output.accept(Items.BLOBFISH_SPAWN_EGG);
 					output.accept(Items.BOGGED_SPAWN_EGG);
 					output.accept(Items.BREEZE_SPAWN_EGG);
 					output.accept(Items.CAMEL_SPAWN_EGG);

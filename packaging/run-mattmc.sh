@@ -34,11 +34,14 @@ echo "Using bundled JDK ${JAVA_VERSION}"
 # Note: Assets are loaded directly from JAR classpath - no --assetsDir needed
 # Note: JVM_ARGS is intentionally not quoted to allow word splitting
 
-# Build JVM arguments - UseCompactObjectHeaders is disabled on macOS due to stability issues
-JVM_ARGS="-Xmx8G -Xms4G -XX:+UseZGC"
-if [[ "$(uname -s)" != "Darwin" ]]; then
-    # Not macOS - safe to use UseCompactObjectHeaders
-    JVM_ARGS="$JVM_ARGS -XX:+UseCompactObjectHeaders"
+# Build JVM arguments - Use G1GC on macOS due to ZGC stability issues (SIGBUS crashes)
+if [[ "$(uname -s)" == "Darwin" ]]; then
+    # macOS - use G1GC to avoid SIGBUS crashes in Arena/Chunk allocation
+    # Additional stability flags for macOS to prevent crashes during shader loading
+    JVM_ARGS="-Xmx8G -Xms4G -XX:+UseG1GC -XX:ReservedCodeCacheSize=512m -XX:+DisableExplicitGC -XX:MaxMetaspaceSize=512m -Djava.awt.headless=false -XX:+UnlockExperimentalVMOptions -XX:G1NewSizePercent=20 -XX:G1MaxNewSizePercent=80 -XX:+UseStringDeduplication -XX:MaxGCPauseMillis=200"
+else
+    # Linux/Unix - use ZGC with UseCompactObjectHeaders for better performance
+    JVM_ARGS="-Xmx8G -Xms4G -XX:+UseZGC -XX:+UseCompactObjectHeaders"
 fi
 
 $JAVA_CMD $JVM_ARGS \

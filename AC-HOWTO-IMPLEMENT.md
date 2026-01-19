@@ -106,6 +106,7 @@ Quick reference for implementing Alex's Caves mobs into MattMC's direct Minecraf
 9. **No Spawn Egg**: Ensure spawn egg item is registered in Items.java and added to CreativeModeTabs. copy zombie spawn egg texture for the egg texture for whatever mob is being added. copy an existing mob spawn egg for the 3 json locations such as Subteranodon.
 10. **No translations**: If adding new items or entities, ensure to add translation keys to the main en_us json language file.
 11. **Must use original sounds**: add the original sounds to the project, register them in the vanilla registery, and add them to the sounds.json and ensure the mob being added correctly references them and calls them.
+12. **NO ITEM TEXTURES**: MUST create ALL THREE jsons for items in the proper locations or the texture WILL BE NULL. You must ALSO use the minecraft namespace, and SOME jsons use a "generated" parent or something. compare with a known good item such as "vallumraptor spawn egg". for the item texture to work one of the jsons that must be create is in assets/minecraft/items/ it seems like this one is frequently forgotten. the ones in models/items/ are ALSO needed.
 
 ## Validation
 
