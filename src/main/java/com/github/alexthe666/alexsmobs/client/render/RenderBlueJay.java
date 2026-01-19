@@ -53,7 +53,7 @@ public class RenderBlueJay extends MobRenderer<EntityBlueJay, BlueJayRenderState
             super(RenderBlueJay.this);
         }
 
-        public void submit(PoseStack matrixStackIn, com.mojang.blaze3d.vertex.SubmitNodeCollector submitNodeCollector, int packedLightIn,
+        public void submit(PoseStack matrixStackIn, net.minecraft.client.renderer.SubmitNodeCollector submitNodeCollector, int packedLightIn,
                 BlueJayRenderState renderState, float limbSwing, float limbSwingAmount) {
             if (renderState.feedTime > 0) {
                 float alpha = (float) (1F + Math.sin(renderState.ageInTicks * 0.3F)) * 0.1F + 0.8F;
@@ -65,7 +65,7 @@ public class RenderBlueJay extends MobRenderer<EntityBlueJay, BlueJayRenderState
                     packedLightIn,
                     renderState,
                     AMColorUtil.packColor(1.0F, 1.0F, 1.0F, alpha),
-                    alpha
+                    AMColorUtil.packColor(1.0F, 1.0F, 1.0F, alpha)
                 );
             }
         }

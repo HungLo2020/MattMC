@@ -422,7 +422,7 @@ public class EntityBlueJay extends Animal implements ITargetsDroppedItems{
         this.entityData.set(FLYING, flying);
     }
 
-    public void readAdditionalSaveData(CompoundTag compound) {
+    public void readAdditionalSaveData(net.minecraft.world.level.storage.ValueInput compound) {
         super.readAdditionalSaveData(compound);
         this.setFlying(compound.getBooleanOr("Flying", false));
         this.blueTime = compound.getIntOr("BlueTime", 0);
@@ -446,7 +446,7 @@ public class EntityBlueJay extends Animal implements ITargetsDroppedItems{
         });
     }
 
-    public void addAdditionalSaveData(CompoundTag compound) {
+    public void addAdditionalSaveData(net.minecraft.world.level.storage.ValueOutput compound) {
         super.addAdditionalSaveData(compound);
         compound.putBoolean("Flying", this.isFlying());
         compound.putInt("BlueTime", this.blueTime);
@@ -582,7 +582,9 @@ public class EntityBlueJay extends Animal implements ITargetsDroppedItems{
         if (!this.getItemInHand(InteractionHand.MAIN_HAND).isEmpty() && !this.level().isClientSide()) {
             ItemStack stack = this.getItemInHand(InteractionHand.MAIN_HAND);
             this.setItemInHand(InteractionHand.MAIN_HAND, ItemStack.EMPTY);
-            this.spawnAtLocation(stack);
+            if (this.level() instanceof ServerLevel serverLevel) {
+                this.spawnAtLocation(serverLevel, stack);
+            }
         }
         this.heal(3);
         Entity itemThrower = e.getOwner();
