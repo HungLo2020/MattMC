@@ -14,6 +14,15 @@ public class AMTagRegistry {
     public static final TagKey<Item> CATFISH_ITEM_FASCINATIONS = registerItemTag("catfish_item_fascinations");
     public static final TagKey<Block> CATFISH_BLOCK_FASCINATIONS = registerBlockTag("catfish_block_fascinations");
     public static final TagKey<Biome> SPAWNS_HUGE_CATFISH = registerBiomeTag("spawns_huge_catfish");
+    
+    // Crow-specific tags
+    public static final TagKey<Item> CROW_BREEDABLES = registerItemTag("crow_breedables");
+    public static final TagKey<Item> CROW_TAMEABLES = registerItemTag("crow_tameables");
+    public static final TagKey<Item> CROW_FOODSTUFFS = registerItemTag("crow_foodstuffs");
+    public static final TagKey<Block> CROW_HOME_BLOCKS = registerBlockTag("crow_home_blocks");
+    public static final TagKey<Block> CROW_FEARS = registerBlockTag("crow_fears");
+    public static final TagKey<Block> CROW_FOODBLOCKS = registerBlockTag("crow_foodblocks");
+    public static final TagKey<EntityType<?>> SCATTERS_CROWS = registerEntityTag("scatters_crows");
 
     private static TagKey<Item> registerItemTag(String name) {
         return TagKey.create(Registries.ITEM, ResourceLocation.withDefaultNamespace(name));
