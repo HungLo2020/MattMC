@@ -4,6 +4,8 @@
 
 This repository contains a complete, decompiled source code port of Minecraft Java Edition 1.21.10 (both client and server), with a focus on performance optimization and modular architecture.
 
+Wiki for this project is available at [Wiki](docs/HOME.md)
+
 ## What Makes MattMC Different
 
 ### 🚀 Performance First
