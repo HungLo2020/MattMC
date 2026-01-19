@@ -37,7 +37,8 @@ echo "Using bundled JDK ${JAVA_VERSION}"
 # Build JVM arguments - Use G1GC on macOS due to ZGC stability issues (SIGBUS crashes)
 if [[ "$(uname -s)" == "Darwin" ]]; then
     # macOS - use G1GC to avoid SIGBUS crashes in Arena::destruct_contents
-    JVM_ARGS="-Xmx8G -Xms4G -XX:+UseG1GC"
+    # Additional stability flags for macOS
+    JVM_ARGS="-Xmx8G -Xms4G -XX:+UseG1GC -XX:ReservedCodeCacheSize=512m -XX:+DisableExplicitGC -XX:MaxMetaspaceSize=512m -Djava.awt.headless=false"
 else
     # Linux/Unix - use ZGC with UseCompactObjectHeaders for better performance
     JVM_ARGS="-Xmx8G -Xms4G -XX:+UseZGC -XX:+UseCompactObjectHeaders"
