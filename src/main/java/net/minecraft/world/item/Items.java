@@ -1775,6 +1775,11 @@ public class Items {
 	public static final Item COCKROACH_OOTHECA = registerItem("cockroach_ootheca", com.github.alexthe666.alexsmobs.item.CockroachOothecaItem::new, new Item.Properties().stacksTo(16));
 	public static final Item COCKROACH_WING = registerItem("cockroach_wing");
 	public static final Item COCKROACH_WING_FRAGMENT = registerItem("cockroach_wing_fragment");
+	public static final Item COMB_JELLY_SPAWN_EGG = registerItem("comb_jelly_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.COMB_JELLY));
+	public static final Item COMB_JELLY_BUCKET = registerItem(
+		"comb_jelly_bucket",
+		properties -> new BucketItem(EntityType.COMB_JELLY, properties.craftRemainder(BUCKET).stacksTo(1))
+	);
 	public static final Item COD_SPAWN_EGG = registerItem("cod_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.COD));
 	public static final Item COPPER_GOLEM_SPAWN_EGG = registerItem(
 		"copper_golem_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.COPPER_GOLEM)

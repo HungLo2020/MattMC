@@ -13738,6 +13738,13 @@
     ],
     "subtitle": "subtitles.entity.cod.hurt"
   },
+  "entity.comb_jelly.hurt": {
+    "sounds": [
+      "comb_jelly_hurt_0",
+      "comb_jelly_hurt_1"
+    ],
+    "subtitle": "subtitles.entity.comb_jelly.hurt"
+  },
   "entity.copper_golem.death": {
     "sounds": [
       "mob/coppergolem/regular/death"
