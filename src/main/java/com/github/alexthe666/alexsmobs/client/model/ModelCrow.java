@@ -86,6 +86,16 @@ public class ModelCrow extends AdvancedEntityModel<CrowRenderState> {
 	@Override
 	public void setupAnim(CrowRenderState renderState){
 		this.resetToDefaultPose();
+		
+		// Handle baby scaling
+		if (renderState.isBaby) {
+			float f = 1.45F;
+			head.setScale(f, f, f);
+			head.setShouldScaleChildren(true);
+		} else {
+			this.head.setScale(0.9F, 0.9F, 0.9F);
+		}
+		
 		float flapSpeed = 0.8F;
 		float flapDegree = 0.2F;
 		float walkSpeed = 1.2F;
@@ -140,30 +150,6 @@ public class ModelCrow extends AdvancedEntityModel<CrowRenderState> {
 		head.rotateAngleY += netHeadYaw / 57.295776F;
 		head.rotateAngleZ += headPitch / 57.295776F;
 
-	}
-
-	@Override
-	public void renderToBuffer(PoseStack matrixStackIn, VertexConsumer buffer, int packedLight, int packedOverlay, int color){
-		if (this.young) {
-			float f = 1.45F;
-			head.setScale(f, f, f);
-			head.setShouldScaleChildren(true);
-			matrixStackIn.pushPose();
-			matrixStackIn.scale(0.5F, 0.5F, 0.5F);
-			matrixStackIn.translate(0.0D, 1.5D, 0D);
-			parts().forEach((p_228292_8_) -> {
-				p_228292_8_.render(matrixStackIn, buffer, packedLight, packedOverlay, -1);
-			});
-			matrixStackIn.popPose();
-			this.head.setScale(0.9F, 0.9F, 0.9F);
-		} else {
-			this.head.setScale(0.9F, 0.9F, 0.9F);
-			matrixStackIn.pushPose();
-			parts().forEach((p_228290_8_) -> {
-				p_228290_8_.render(matrixStackIn, buffer, packedLight, packedOverlay, -1);
-			});
-			matrixStackIn.popPose();
-		}
 	}
 
 	@Override

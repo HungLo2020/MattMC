@@ -110,7 +110,7 @@ public class CrowAIFollowOwner extends Goal {
                 if(circlingTime > maxCircleTime && crow.getRidingCrows(owner) < 2){
                     crow.getMoveControl().setWantedPosition(owner.getX(), owner.getY() + owner.getEyeHeight() + 0.2F, owner.getZ(), 0.7F);
                     if(crow.distanceTo(owner) < 2){
-                        crow.startRiding(owner, true);
+                        crow.startRiding(owner, true, false);
                         // Network message removed - not needed for single-player
                     }
                 }else{
@@ -120,9 +120,7 @@ public class CrowAIFollowOwner extends Goal {
                     }
                     crow.setFlying(true);
                     crow.getMoveControl().setWantedPosition(circlePos.x(), circlePos.y() + owner.getEyeHeight() + 0.2F, circlePos.z(), 0.7F);
-
                 }
-
             }
         }
     }
@@ -160,7 +158,7 @@ public class CrowAIFollowOwner extends Goal {
         } else if (!this.isTeleportFriendlyBlock(new BlockPos(p_226328_1_, p_226328_2_, p_226328_3_))) {
             return false;
         } else {
-            this.crow.moveTo((double) p_226328_1_ + 0.5D, p_226328_2_, (double) p_226328_3_ + 0.5D, this.crow.getYRot(), this.crow.getXRot());
+            this.crow.setPos((double) p_226328_1_ + 0.5D, p_226328_2_, (double) p_226328_3_ + 0.5D);
             this.navigator.stop();
             return true;
         }

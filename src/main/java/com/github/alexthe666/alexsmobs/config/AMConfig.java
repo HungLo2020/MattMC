@@ -10,4 +10,5 @@ public class AMConfig {
     
     // Crow spawn configuration
     public static int crowSpawnRolls = 2;
+    public static boolean crowsStealCrops = true;
 }
