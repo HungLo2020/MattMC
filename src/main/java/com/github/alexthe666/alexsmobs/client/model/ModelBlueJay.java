@@ -85,7 +85,6 @@ public class ModelBlueJay extends AdvancedEntityModel<BlueJayRenderState> {
 
     @Override
     public void setupAnim(BlueJayRenderState renderState) {
-        super.setupAnim(renderState);
         this.resetToDefaultPose();
         float flapSpeed = 0.6F;
         float flapDegree = 0.2F;
@@ -148,30 +147,6 @@ public class ModelBlueJay extends AdvancedEntityModel<BlueJayRenderState> {
             this.walk(crest, 0.4F, 0.3F, false, 1F, 0.1F, ageInTicks, 1);
             this.swing(head, 0.4F, 0.4F, false, 2F, 0F, ageInTicks, 1);
             head.rotationPointZ +=  (float) (Math.sin(ageInTicks * -0.4 - 1F));
-        }
-    }
-
-    @Override
-    public void renderToBuffer(PoseStack matrixStackIn, VertexConsumer buffer, int packedLight, int packedOverlay, int color){
-        if (this.young) {
-            float f = 1.35F;
-            head.setScale(f, f, f);
-            head.setShouldScaleChildren(true);
-            matrixStackIn.pushPose();
-            matrixStackIn.scale(0.5F, 0.5F, 0.5F);
-            matrixStackIn.translate(0.0D, 1.5D, 0D);
-            parts().forEach((p_228292_8_) -> {
-                p_228292_8_.render(matrixStackIn, buffer, packedLight, packedOverlay, -1);
-            });
-            matrixStackIn.popPose();
-            this.head.setScale(1F, 1F, 1F);
-        } else {
-            this.head.setScale(1F, 1F, 1F);
-            matrixStackIn.pushPose();
-            parts().forEach((p_228290_8_) -> {
-                p_228290_8_.render(matrixStackIn, buffer, packedLight, packedOverlay, -1);
-            });
-            matrixStackIn.popPose();
         }
     }
 

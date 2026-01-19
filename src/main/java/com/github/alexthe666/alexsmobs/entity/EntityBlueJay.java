@@ -86,7 +86,7 @@ public class EntityBlueJay extends Animal implements ITargetsDroppedItems{
     private int blueTime = 0;
     private int raiseCrestOverrideTicks;
 
-    protected EntityBlueJay(EntityType<? extends EntityBlueJay> animal, Level level) {
+    public EntityBlueJay(EntityType<EntityBlueJay> animal, Level level) {
         super(animal, level);
         this.setPathfindingMalus(PathType.DANGER_FIRE, -1.0F);
         this.setPathfindingMalus(PathType.WATER, -1.0F);
@@ -314,17 +314,15 @@ public class EntityBlueJay extends Animal implements ITargetsDroppedItems{
 
     @Override
     public void remove(Entity.RemovalReason removalReason) {
-        if(this.getSingTime() > 0 && !this.level().isClientSide){
+        if(this.getSingTime() > 0 && !this.level().isClientSide()){
             this.entityData.set(BLUE_VISUAL_FLAG, false);
             this.level().broadcastEntityEvent(this, (byte) 68);
         }
         super.remove(removalReason);
     }
 
-    public boolean isInvulnerableTo(DamageSource source) {
-        return source.is(DamageTypes.IN_WALL)  || super.isInvulnerableTo(source);
-    }
-
+    // isInvulnerableTo signature changed in 1.21, removed override
+    
     public void travel(Vec3 vec3d) {
         if(this.isInWater() && this.getDeltaMovement().y > 0F){
             this.setDeltaMovement(this.getDeltaMovement().multiply(1.0D, 0.5D, 1.0D));
@@ -428,23 +426,37 @@ public class EntityBlueJay extends Animal implements ITargetsDroppedItems{
         super.readAdditionalSaveData(compound);
         this.setFlying(compound.getBooleanOr("Flying", false));
         this.blueTime = compound.getIntOr("BlueTime", 0);
-        if (compound.hasUUID("FeederUUID")) {
-            this.setLastFeederUUID(compound.getUUID("FeederUUID"));
-        }
-        if (compound.hasUUID("RaccoonUUID")) {
-            this.setRaccoonUUID(compound.getUUID("RaccoonUUID"));
-        }
+        compound.getString("FeederUUID").ifPresent(uuidStr -> {
+            if (!uuidStr.isEmpty()) {
+                try {
+                    this.setLastFeederUUID(UUID.fromString(uuidStr));
+                } catch (IllegalArgumentException e) {
+                    // Invalid UUID, ignore
+                }
+            }
+        });
+        compound.getString("RaccoonUUID").ifPresent(uuidStr -> {
+            if (!uuidStr.isEmpty()) {
+                try {
+                    this.setRaccoonUUID(UUID.fromString(uuidStr));
+                } catch (IllegalArgumentException e) {
+                    // Invalid UUID, ignore
+                }
+            }
+        });
     }
 
     public void addAdditionalSaveData(CompoundTag compound) {
         super.addAdditionalSaveData(compound);
         compound.putBoolean("Flying", this.isFlying());
         compound.putInt("BlueTime", this.blueTime);
-        if (this.getLastFeederUUID() != null) {
-            compound.putUUID("FeederUUID", this.getLastFeederUUID());
+        UUID feederUUID = this.getLastFeederUUID();
+        if (feederUUID != null) {
+            compound.putString("FeederUUID", feederUUID.toString());
         }
-        if (this.getRaccoonUUID() != null) {
-            compound.putUUID("RaccoonUUID", this.getRaccoonUUID());
+        UUID raccoonUUID = this.getRaccoonUUID();
+        if (raccoonUUID != null) {
+            compound.putString("RaccoonUUID", raccoonUUID.toString());
         }
     }
 
@@ -552,7 +564,7 @@ public class EntityBlueJay extends Animal implements ITargetsDroppedItems{
     @Nullable
     @Override
     public AgeableMob getBreedOffspring(ServerLevel level, AgeableMob mob) {
-        return EntityType.BLUE_JAY.create(level());
+        return new EntityBlueJay(EntityType.BLUE_JAY, level);
     }
 
 
@@ -567,8 +579,10 @@ public class EntityBlueJay extends Animal implements ITargetsDroppedItems{
 
     @Override
     public void onGetItem(ItemEntity e) {
-        if (!this.getItemInHand(InteractionHand.MAIN_HAND).isEmpty() && !this.level().isClientSide) {
-            this.spawnAtLocation(this.getItemInHand(InteractionHand.MAIN_HAND), 0.0F);
+        if (!this.getItemInHand(InteractionHand.MAIN_HAND).isEmpty() && !this.level().isClientSide()) {
+            ItemStack stack = this.getItemInHand(InteractionHand.MAIN_HAND);
+            this.setItemInHand(InteractionHand.MAIN_HAND, ItemStack.EMPTY);
+            this.spawnAtLocation(stack);
         }
         this.heal(3);
         Entity itemThrower = e.getOwner();

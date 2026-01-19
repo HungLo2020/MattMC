@@ -53,14 +53,20 @@ public class RenderBlueJay extends MobRenderer<EntityBlueJay, BlueJayRenderState
             super(RenderBlueJay.this);
         }
 
-        public void render(PoseStack matrixStackIn, MultiBufferSource bufferIn, int packedLightIn,
+        public void submit(PoseStack matrixStackIn, com.mojang.blaze3d.vertex.SubmitNodeCollector submitNodeCollector, int packedLightIn,
                 BlueJayRenderState renderState, float limbSwing, float limbSwingAmount) {
             if (renderState.feedTime > 0) {
-                VertexConsumer ivertexbuilder = bufferIn.getBuffer(RenderType.entityTranslucent(TEXTURE_SHINY));
                 float alpha = (float) (1F + Math.sin(renderState.ageInTicks * 0.3F)) * 0.1F + 0.8F;
-                this.getParentModel().renderToBuffer(matrixStackIn, ivertexbuilder, packedLightIn,
-                        getOverlayCoords(renderState, 0.0F),
-                        AMColorUtil.packColor(1.0F, 1.0F, 1.0F, alpha));
+                coloredCutoutModelCopyLayerRender(
+                    this.getParentModel(),
+                    TEXTURE_SHINY,
+                    matrixStackIn,
+                    submitNodeCollector,
+                    packedLightIn,
+                    renderState,
+                    AMColorUtil.packColor(1.0F, 1.0F, 1.0F, alpha),
+                    alpha
+                );
             }
         }
     }
