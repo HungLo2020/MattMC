@@ -9,7 +9,7 @@ import net.minecraft.client.renderer.entity.EntityRendererProvider;
 import net.minecraft.client.renderer.entity.MobRenderer;
 import net.minecraft.resources.ResourceLocation;
 
-public class RenderCombJelly extends MobRenderer<EntityCombJelly, CombJellyRenderState, EntityModel<CombJellyRenderState>> {
+public class RenderCombJelly extends MobRenderer<EntityCombJelly, CombJellyRenderState, ModelCombJelly> {
     private static final ResourceLocation TEXTURE_0 = ResourceLocation.withDefaultNamespace("textures/entity/comb_jelly_blue.png");
     private static final ResourceLocation TEXTURE_1 = ResourceLocation.withDefaultNamespace("textures/entity/comb_jelly_green.png");
     private static final ResourceLocation TEXTURE_2 = ResourceLocation.withDefaultNamespace("textures/entity/comb_jelly_red.png");
