@@ -1,0 +1,9 @@
+site_name: Project Wiki
+
+docs_dir: docs
+site_dir: mkdocs_site
+
+use_directory_urls: true
+
+nav:
+  - Home: index.md
