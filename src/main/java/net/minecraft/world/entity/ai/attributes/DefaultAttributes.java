@@ -112,6 +112,7 @@ public class DefaultAttributes {
 		.put(EntityType.CAMEL, Camel.createAttributes().build())
 		.put(EntityType.CAVE_SPIDER, CaveSpider.createCaveSpider().build())
 		.put(EntityType.CHICKEN, Chicken.createAttributes().build())
+		.put(EntityType.COCKROACH, com.github.alexthe666.alexsmobs.entity.EntityCockroach.bakeAttributes().build())
 		.put(EntityType.COD, AbstractFish.createAttributes().build())
 		.put(EntityType.COPPER_GOLEM, CopperGolem.createAttributes().build())
 		.put(EntityType.COW, Cow.createAttributes().build())

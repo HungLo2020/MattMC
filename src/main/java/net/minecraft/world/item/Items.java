@@ -1511,6 +1511,7 @@ public class Items {
 		new Item.Properties().stacksTo(1).useItemDescriptionPrefix()
 	);
 	public static final Item SNOWBALL = registerItem("snowball", SnowballItem::new, new Item.Properties().stacksTo(16));
+	public static final Item SOMBRERO = registerItem("sombrero", new Item.Properties().stacksTo(1).equippableUnswappable(EquipmentSlot.HEAD));
 	public static final Item LEATHER = registerItem("leather");
 	public static final Item MILK_BUCKET = registerItem(
 		"milk_bucket", new Item.Properties().craftRemainder(BUCKET).component(DataComponents.CONSUMABLE, Consumables.MILK_BUCKET).usingConvertsTo(BUCKET).stacksTo(1)
@@ -1770,6 +1771,10 @@ public class Items {
 		"cave_spider_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.CAVE_SPIDER)
 	);
 	public static final Item CHICKEN_SPAWN_EGG = registerItem("chicken_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.CHICKEN));
+	public static final Item COCKROACH_SPAWN_EGG = registerItem("cockroach_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.COCKROACH));
+	public static final Item COCKROACH_OOTHECA = registerItem("cockroach_ootheca", ProjectileItem::new, new Item.Properties(), EntityType.COCKROACH_EGG);
+	public static final Item COCKROACH_WING = registerItem("cockroach_wing");
+	public static final Item COCKROACH_WING_FRAGMENT = registerItem("cockroach_wing_fragment");
 	public static final Item COD_SPAWN_EGG = registerItem("cod_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.COD));
 	public static final Item COPPER_GOLEM_SPAWN_EGG = registerItem(
 		"copper_golem_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.COPPER_GOLEM)
@@ -1905,6 +1910,7 @@ public class Items {
 	public static final Item BAKED_POTATO = registerItem("baked_potato", new Item.Properties().food(Foods.BAKED_POTATO));
 	public static final Item POISONOUS_POTATO = registerItem("poisonous_potato", new Item.Properties().food(Foods.POISONOUS_POTATO, Consumables.POISONOUS_POTATO));
 	public static final Item MAP = registerItem("map", EmptyMapItem::new);
+	public static final Item MARACA = registerItem("maraca");
 	public static final Item GOLDEN_CARROT = registerItem("golden_carrot", new Item.Properties().food(Foods.GOLDEN_CARROT));
 	public static final Item SKELETON_SKULL = registerBlock(
 		Blocks.SKELETON_SKULL,

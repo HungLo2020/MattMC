@@ -320,6 +320,20 @@ public class EntityType<T extends Entity> implements FeatureElement, EntityTypeT
 	public static final EntityType<CaveSpider> CAVE_SPIDER = register(
 		"cave_spider", EntityType.Builder.of(CaveSpider::new, MobCategory.MONSTER).sized(0.7F, 0.5F).eyeHeight(0.45F).clientTrackingRange(8).notInPeaceful()
 	);
+	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntityCockroach> COCKROACH = register(
+		"cockroach",
+		EntityType.Builder.of(com.github.alexthe666.alexsmobs.entity.EntityCockroach::new, MobCategory.CREATURE)
+			.sized(0.7F, 0.4F)
+			.eyeHeight(0.25F)
+			.clientTrackingRange(8)
+	);
+	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntityCockroachEgg> COCKROACH_EGG = register(
+		"cockroach_egg",
+		EntityType.Builder.<com.github.alexthe666.alexsmobs.entity.EntityCockroachEgg>of(com.github.alexthe666.alexsmobs.entity.EntityCockroachEgg::new, MobCategory.MISC)
+			.sized(0.25F, 0.25F)
+			.clientTrackingRange(4)
+			.updateInterval(10)
+	);
 	public static final EntityType<Boat> CHERRY_BOAT = register(
 		"cherry_boat",
 		EntityType.Builder.of(boatFactory(() -> Items.CHERRY_BOAT), MobCategory.MISC).noLootTable().sized(1.375F, 0.5625F).eyeHeight(0.5625F).clientTrackingRange(10)
