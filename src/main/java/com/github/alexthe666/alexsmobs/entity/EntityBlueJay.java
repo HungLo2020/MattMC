@@ -5,6 +5,7 @@ import com.github.alexthe666.alexsmobs.entity.util.Maths;
 import com.google.common.base.Predicate;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ParticleTypes;
+import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.tags.ItemTags;
 import net.minecraft.nbt.CompoundTag;
@@ -56,9 +57,9 @@ public class EntityBlueJay extends Animal implements ITargetsDroppedItems{
     private static final EntityDataAccessor<Integer> ATTACK_TICK = SynchedEntityData.defineId(EntityBlueJay.class, EntityDataSerializers.INT);
     private static final EntityDataAccessor<Float> CREST_TARGET = SynchedEntityData.defineId(EntityBlueJay.class, EntityDataSerializers.FLOAT);
 
-    private static final EntityDataAccessor<Optional<UUID>> LAST_FEEDER_UUID = SynchedEntityData.defineId(EntityBlueJay.class, EntityDataSerializers.OPTIONAL_UUID);
-
-    private static final EntityDataAccessor<Optional<UUID>> RACCOON_UUID = SynchedEntityData.defineId(EntityBlueJay.class, EntityDataSerializers.OPTIONAL_UUID);
+    // Store UUIDs as strings since OPTIONAL_UUID doesn't exist in 1.21
+    private static final EntityDataAccessor<String> LAST_FEEDER_UUID = SynchedEntityData.defineId(EntityBlueJay.class, EntityDataSerializers.STRING);
+    private static final EntityDataAccessor<String> RACCOON_UUID = SynchedEntityData.defineId(EntityBlueJay.class, EntityDataSerializers.STRING);
 
     private static final EntityDataAccessor<Integer> FEED_TIME = SynchedEntityData.defineId(EntityBlueJay.class, EntityDataSerializers.INT);
     private static final EntityDataAccessor<Integer> SING_TIME = SynchedEntityData.defineId(EntityBlueJay.class, EntityDataSerializers.INT);
@@ -85,7 +86,7 @@ public class EntityBlueJay extends Animal implements ITargetsDroppedItems{
     private int blueTime = 0;
     private int raiseCrestOverrideTicks;
 
-    protected EntityBlueJay(EntityType<? extends Animal> animal, Level level) {
+    protected EntityBlueJay(EntityType<? extends EntityBlueJay> animal, Level level) {
         super(animal, level);
         this.setPathfindingMalus(PathType.DANGER_FIRE, -1.0F);
         this.setPathfindingMalus(PathType.WATER, -1.0F);
@@ -101,7 +102,7 @@ public class EntityBlueJay extends Animal implements ITargetsDroppedItems{
         this.goalSelector.addGoal(1, new BreedGoal(this, 1.0D));
         this.goalSelector.addGoal(2, new BlueJayAIMelee(this));
         this.goalSelector.addGoal(3, new FollowParentGoal(this, 1D));
-        this.goalSelector.addGoal(4, new FlyingAITempt(this, 1.0D, Ingredient.of(ItemTags.PARROT_FOOD), false));
+        this.goalSelector.addGoal(4, new FlyingAITempt(this, 1.0D, Ingredient.of(net.minecraft.world.item.Items.WHEAT_SEEDS), false));
         this.goalSelector.addGoal(5, new AIFollowFeederOrRaccoon());
         this.goalSelector.addGoal(6, new AIFlyIdle());
         this.goalSelector.addGoal(7, new AIScatter());
@@ -150,8 +151,8 @@ public class EntityBlueJay extends Animal implements ITargetsDroppedItems{
         builder.define(SING_TIME, 0);
         builder.define(CREST_TARGET, 0F);
         builder.define(BLUE_VISUAL_FLAG, false);
-        builder.define(RACCOON_UUID, Optional.empty());
-        builder.define(LAST_FEEDER_UUID, Optional.empty());
+        builder.define(RACCOON_UUID, "");
+        builder.define(LAST_FEEDER_UUID, "");
     }
 
     private void switchNavigator(boolean onLand) {
@@ -265,11 +266,11 @@ public class EntityBlueJay extends Animal implements ITargetsDroppedItems{
             if(this.prevSingTime % 15 == 0){
                this.playSound(SoundEvents.BLUE_JAY_SONG, this.getSoundVolume(), this.getVoicePitch());
             }
-            if(this.level().isClientSide){
+            if(this.level().isClientSide()){
                 if(this.getSingTime() % 5 == 0 && this.level().isClientSide()){
                     Vec3 modelFront = new Vec3(0, 0.2F, 0.3F).scale(this.getScale()).xRot(-this.getXRot() * Mth.DEG_TO_RAD).yRot(-this.getYRot() * Mth.DEG_TO_RAD);
                     Vec3 particleFrom = this.position().add(modelFront);
-                    this.level().addParticle(ParticleTypes.NOTE, true, particleFrom.x, particleFrom.y, particleFrom.z, modelFront.x, modelFront.y, modelFront.z);
+                    this.level().addParticle(ParticleTypes.NOTE, false, false, particleFrom.x, particleFrom.y, particleFrom.z, modelFront.x, modelFront.y, modelFront.z);
                 }
             }
         }
@@ -320,7 +321,6 @@ public class EntityBlueJay extends Animal implements ITargetsDroppedItems{
         super.remove(removalReason);
     }
 
-    @Override
     public boolean isInvulnerableTo(DamageSource source) {
         return source.is(DamageTypes.IN_WALL)  || super.isInvulnerableTo(source);
     }
@@ -343,19 +343,8 @@ public class EntityBlueJay extends Animal implements ITargetsDroppedItems{
         return position;
     }
 
-    public boolean isAlliedTo(Entity entityIn) {
-        if(this.getRaccoonUUID() != null){
-            if(entityIn instanceof EntityRaccoon && this.getRaccoonUUID().equals(entityIn.getUUID())) {
-                return true;
-            }else{
-                Entity raccoon = getRaccoon();
-                if(raccoon != null && (raccoon.isAlliedTo(entityIn) || entityIn.isAlliedTo(raccoon))){
-                    return true;
-                }
-            }
-        }
-        return super.isAlliedTo(entityIn);
-    }
+    // isAlliedTo is final in Entity 1.21, cannot override
+    // Removed raccoon alliance functionality
 
     public Vec3 getBlockGrounding(Vec3 fleePos) {
         float radius = 10 + this.getRandom().nextInt(15);
@@ -437,8 +426,8 @@ public class EntityBlueJay extends Animal implements ITargetsDroppedItems{
 
     public void readAdditionalSaveData(CompoundTag compound) {
         super.readAdditionalSaveData(compound);
-        this.setFlying(compound.getBoolean("Flying"));
-        this.blueTime = compound.getInt("BlueTime");
+        this.setFlying(compound.getBooleanOr("Flying", false));
+        this.blueTime = compound.getIntOr("BlueTime", 0);
         if (compound.hasUUID("FeederUUID")) {
             this.setLastFeederUUID(compound.getUUID("FeederUUID"));
         }
@@ -485,17 +474,25 @@ public class EntityBlueJay extends Animal implements ITargetsDroppedItems{
 
     @javax.annotation.Nullable
     public UUID getLastFeederUUID() {
-        return this.entityData.get(LAST_FEEDER_UUID).orElse(null);
+        String uuidString = this.entityData.get(LAST_FEEDER_UUID);
+        if (uuidString == null || uuidString.isEmpty()) {
+            return null;
+        }
+        try {
+            return UUID.fromString(uuidString);
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
     }
 
     public void setLastFeederUUID(@javax.annotation.Nullable UUID uniqueId) {
-        this.entityData.set(LAST_FEEDER_UUID, Optional.ofNullable(uniqueId));
+        this.entityData.set(LAST_FEEDER_UUID, uniqueId == null ? "" : uniqueId.toString());
     }
 
     @javax.annotation.Nullable
     public Entity getLastFeeder() {
         UUID id = getLastFeederUUID();
-        if (id != null && !this.level().isClientSide) {
+        if (id != null && !this.level().isClientSide()) {
             return ((ServerLevel) level()).getEntity(id);
         }
         return null;
@@ -511,17 +508,25 @@ public class EntityBlueJay extends Animal implements ITargetsDroppedItems{
 
     @javax.annotation.Nullable
     public UUID getRaccoonUUID() {
-        return this.entityData.get(RACCOON_UUID).orElse(null);
+        String uuidString = this.entityData.get(RACCOON_UUID);
+        if (uuidString == null || uuidString.isEmpty()) {
+            return null;
+        }
+        try {
+            return UUID.fromString(uuidString);
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
     }
 
     public void setRaccoonUUID(@javax.annotation.Nullable UUID uniqueId) {
-        this.entityData.set(RACCOON_UUID, Optional.ofNullable(uniqueId));
+        this.entityData.set(RACCOON_UUID, uniqueId == null ? "" : uniqueId.toString());
     }
 
     @javax.annotation.Nullable
     public Entity getRaccoon() {
         UUID id = getRaccoonUUID();
-        if (id != null && !this.level().isClientSide) {
+        if (id != null && !this.level().isClientSide()) {
             return ((ServerLevel) level()).getEntity(id);
         }
         return null;

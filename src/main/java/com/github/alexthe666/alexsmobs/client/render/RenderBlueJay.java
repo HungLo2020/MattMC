@@ -1,23 +1,18 @@
 package com.github.alexthe666.alexsmobs.client.render;
 
 import com.github.alexthe666.alexsmobs.client.model.ModelBlueJay;
-import com.github.alexthe666.alexsmobs.client.model.ModelRaccoon;
+import com.github.alexthe666.alexsmobs.client.render.state.BlueJayRenderState;
 import com.github.alexthe666.alexsmobs.entity.EntityBlueJay;
-import com.github.alexthe666.alexsmobs.entity.EntityRaccoon;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
-import net.minecraft.client.renderer.entity.EntityRenderer;
 import net.minecraft.client.renderer.entity.EntityRendererProvider;
-import net.minecraft.client.renderer.entity.LivingEntityRenderer;
 import net.minecraft.client.renderer.entity.MobRenderer;
 import net.minecraft.client.renderer.entity.layers.RenderLayer;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.world.phys.Vec3;
 
-public class RenderBlueJay extends MobRenderer<EntityBlueJay, ModelBlueJay> {
+public class RenderBlueJay extends MobRenderer<EntityBlueJay, BlueJayRenderState, ModelBlueJay> {
     private static final ResourceLocation TEXTURE = ResourceLocation.withDefaultNamespace("textures/entity/blue_jay.png");
     private static final ResourceLocation TEXTURE_SHINY = ResourceLocation.withDefaultNamespace("textures/entity/blue_jay_shiny.png");
 
@@ -26,47 +21,45 @@ public class RenderBlueJay extends MobRenderer<EntityBlueJay, ModelBlueJay> {
         this.addLayer(new LayerShiny());
     }
 
-    protected void scale(EntityBlueJay mob, PoseStack matrixStackIn, float partialTicks) {
-        matrixStackIn.scale(0.9F, 0.9F, 0.9F);
-        if (mob.isPassenger() && mob.getVehicle() != null) {
-            if (mob.getVehicle() instanceof EntityRaccoon entityRaccoon) {
-                EntityRenderer raccoonRenderer = Minecraft.getInstance().getEntityRenderDispatcher()
-                        .getRenderer(entityRaccoon);
-                if (raccoonRenderer instanceof LivingEntityRenderer
-                        && ((LivingEntityRenderer) raccoonRenderer).getModel() instanceof ModelRaccoon raccoonModel) {
-                    float begProgress = entityRaccoon.prevBegProgress
-                            + (entityRaccoon.begProgress - entityRaccoon.prevBegProgress) * partialTicks;
-                    float standProgress0 = entityRaccoon.prevStandProgress
-                            + (entityRaccoon.standProgress - entityRaccoon.prevStandProgress) * partialTicks;
-                    float sitProgress = entityRaccoon.prevSitProgress
-                            + (entityRaccoon.sitProgress - entityRaccoon.prevSitProgress) * partialTicks;
-                    float standProgress = Math.max(Math.max(begProgress, standProgress0) - sitProgress, 0);
-                    matrixStackIn.translate(0F, -1.03F - sitProgress * 0.01F, 0F);
-                    Vec3 vec = raccoonModel.getRidingPosition(new Vec3(0, 0, -0.1F + standProgress * 0.1F));
-                    matrixStackIn.translate(vec.x, vec.y, vec.z);
-                }
-            }
-        }
+    @Override
+    public BlueJayRenderState createRenderState() {
+        return new BlueJayRenderState();
     }
 
-    public ResourceLocation getTextureLocation(EntityBlueJay entity) {
+    @Override
+    public void extractRenderState(EntityBlueJay entity, BlueJayRenderState renderState, float partialTick) {
+        super.extractRenderState(entity, renderState, partialTick);
+        renderState.flyProgress = entity.prevFlyProgress + (entity.flyProgress - entity.prevFlyProgress) * partialTick;
+        renderState.flapAmount = entity.prevFlapAmount + (entity.flapAmount - entity.prevFlapAmount) * partialTick;
+        renderState.attackProgress = entity.prevAttackProgress + (entity.attackProgress - entity.prevAttackProgress) * partialTick;
+        renderState.crestAmount = entity.prevCrestAmount + (entity.crestAmount - entity.prevCrestAmount) * partialTick;
+        renderState.birdPitch = entity.prevBirdPitch + (entity.birdPitch - entity.prevBirdPitch) * partialTick;
+        renderState.feedTime = entity.getFeedTime();
+        renderState.singTime = entity.getSingTime();
+        renderState.isYoung = entity.isBaby();
+    }
+
+    protected void scale(BlueJayRenderState renderState, PoseStack matrixStackIn) {
+        matrixStackIn.scale(0.9F, 0.9F, 0.9F);
+    }
+
+    public ResourceLocation getTextureLocation(BlueJayRenderState renderState) {
         return TEXTURE;
     }
 
-    class LayerShiny extends RenderLayer<EntityBlueJay, ModelBlueJay> {
+    class LayerShiny extends RenderLayer<BlueJayRenderState, ModelBlueJay> {
 
         public LayerShiny() {
             super(RenderBlueJay.this);
         }
 
         public void render(PoseStack matrixStackIn, MultiBufferSource bufferIn, int packedLightIn,
-                EntityBlueJay entitylivingbaseIn, float limbSwing, float limbSwingAmount, float partialTicks,
-                float ageInTicks, float netHeadYaw, float headPitch) {
-            if (entitylivingbaseIn.getFeedTime() > 0) {
+                BlueJayRenderState renderState, float limbSwing, float limbSwingAmount) {
+            if (renderState.feedTime > 0) {
                 VertexConsumer ivertexbuilder = bufferIn.getBuffer(RenderType.entityTranslucent(TEXTURE_SHINY));
-                float alpha = (float) (1F + Math.sin(ageInTicks * 0.3F)) * 0.1F + 0.8F;
+                float alpha = (float) (1F + Math.sin(renderState.ageInTicks * 0.3F)) * 0.1F + 0.8F;
                 this.getParentModel().renderToBuffer(matrixStackIn, ivertexbuilder, packedLightIn,
-                        LivingEntityRenderer.getOverlayCoords(entitylivingbaseIn, 0.0F),
+                        getOverlayCoords(renderState, 0.0F),
                         AMColorUtil.packColor(1.0F, 1.0F, 1.0F, alpha));
             }
         }

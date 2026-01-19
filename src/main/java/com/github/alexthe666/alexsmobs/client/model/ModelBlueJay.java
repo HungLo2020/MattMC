@@ -1,6 +1,6 @@
 package com.github.alexthe666.alexsmobs.client.model;
 
-import com.github.alexthe666.alexsmobs.entity.EntityBlueJay;
+import com.github.alexthe666.alexsmobs.client.render.state.BlueJayRenderState;
 import com.github.alexthe666.alexsmobs.entity.util.Maths;
 import com.github.alexthe666.citadel.client.model.AdvancedEntityModel;
 import com.github.alexthe666.citadel.client.model.AdvancedModelBox;
@@ -10,7 +10,7 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.minecraft.util.Mth;
 
-public class ModelBlueJay extends AdvancedEntityModel<EntityBlueJay> {
+public class ModelBlueJay extends AdvancedEntityModel<BlueJayRenderState> {
 
     private final AdvancedModelBox root;
     private final AdvancedModelBox body;
@@ -84,7 +84,8 @@ public class ModelBlueJay extends AdvancedEntityModel<EntityBlueJay> {
     }
 
     @Override
-    public void setupAnim(EntityBlueJay entity, float limbSwing, float limbSwingAmount, float ageInTicks, float netHeadYaw, float headPitch) {
+    public void setupAnim(BlueJayRenderState renderState) {
+        super.setupAnim(renderState);
         this.resetToDefaultPose();
         float flapSpeed = 0.6F;
         float flapDegree = 0.2F;
@@ -92,12 +93,15 @@ public class ModelBlueJay extends AdvancedEntityModel<EntityBlueJay> {
         float walkDegree = 0.6F;
         float idleSpeed = 0.1F;
         float idleDegree = 0.1F;
-        float partialTick = ageInTicks - entity.tickCount;
-        float flyProgress = entity.prevFlyProgress + (entity.flyProgress - entity.prevFlyProgress) * partialTick;
-        float flapAmount = flyProgress * 0.2F * (entity.prevFlapAmount + (entity.flapAmount - entity.prevFlapAmount) * partialTick);
-        float crestAmount = entity.prevCrestAmount + (entity.crestAmount - entity.prevCrestAmount) * partialTick;
-        float biteProgress = entity.prevAttackProgress + (entity.attackProgress - entity.prevAttackProgress) * partialTick;
-        float birdPitch = entity.prevBirdPitch + (entity.birdPitch - entity.prevBirdPitch) * partialTick;
+        float flyProgress = renderState.flyProgress;
+        float flapAmount = flyProgress * 0.2F * renderState.flapAmount;
+        float crestAmount = renderState.crestAmount;
+        float biteProgress = renderState.attackProgress;
+        float birdPitch = renderState.birdPitch;
+        float ageInTicks = renderState.ageInTicks;
+        float limbSwing = renderState.walkAnimationPos;
+        float limbSwingAmount = renderState.walkAnimationSpeed;
+        
         progressRotationPrev(rightWing, flyProgress,  Maths.rad(-20),  0,  Maths.rad(20), 5F);
         progressRotationPrev(leftWing, flyProgress,  Maths.rad(-20),  0,  Maths.rad(-20), 5F);
         progressRotationPrev(body, flyProgress,  Maths.rad(10),  0,  0, 5F);
@@ -134,12 +138,12 @@ public class ModelBlueJay extends AdvancedEntityModel<EntityBlueJay> {
         this.walk(tail, idleSpeed, idleDegree, false, 1F, 0F, ageInTicks, 1);
         this.walk(crest, idleSpeed, idleDegree, false, 2F, 0F, ageInTicks, 1);
         this.bob(head, idleSpeed, idleDegree * 1.5F, true, ageInTicks, 1);
-        this.faceTarget(netHeadYaw, headPitch, 1.3F, head);
+        this.faceTarget(renderState.yRot, renderState.xRot, 1.3F, head);
         this.body.rotateAngleX += birdPitch * flyProgress * 0.2F * Mth.DEG_TO_RAD;
-        if(entity.getFeedTime() > 0){
+        if(renderState.feedTime > 0){
             this.flap(head, 0.4F, 0.4F, false, 1F, 0F, ageInTicks, 1);
         }
-        if(entity.getSingTime() > 0){
+        if(renderState.singTime > 0){
             this.flap(head, 0.4F, 0.4F, false, 1F, 0F, ageInTicks, 1);
             this.walk(crest, 0.4F, 0.3F, false, 1F, 0.1F, ageInTicks, 1);
             this.swing(head, 0.4F, 0.4F, false, 2F, 0F, ageInTicks, 1);
