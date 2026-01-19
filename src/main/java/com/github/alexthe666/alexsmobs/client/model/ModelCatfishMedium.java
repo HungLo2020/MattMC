@@ -1,6 +1,6 @@
 package com.github.alexthe666.alexsmobs.client.model;
 
-import com.github.alexthe666.alexsmobs.entity.EntityCatfish;
+import com.github.alexthe666.alexsmobs.client.render.state.CatfishRenderState;
 import com.github.alexthe666.citadel.client.model.AdvancedEntityModel;
 import com.github.alexthe666.citadel.client.model.AdvancedModelBox;
 import com.github.alexthe666.citadel.client.model.basic.BasicModelPart;
@@ -94,8 +94,11 @@ public class ModelCatfishMedium extends AdvancedEntityModel<EntityCatfish> {
     }
 
     @Override
-    public void setupAnim(EntityCatfish entity, float limbSwing, float limbSwingAmount, float ageInTicks, float netHeadYaw, float headPitch) {
+    public void setupAnim(CatfishRenderState renderState) {
         this.resetToDefaultPose();
+        float limbSwing = renderState.walkAnimationPos;
+        float limbSwingAmount = renderState.walkAnimationSpeed;
+        float ageInTicks = renderState.ageInTicks;
         float idleSpeed = 0.2F;
         float idleDegree = 0.25F;
         float swimSpeed = 0.55F;
