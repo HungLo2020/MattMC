@@ -51,7 +51,7 @@ public class EntityCombJelly extends WaterAnimal implements Bucketable {
     public float spin;
     public float prevSpin;
 
-    protected EntityCombJelly(EntityType<? extends WaterAnimal> animal, Level level) {
+    public EntityCombJelly(EntityType<? extends WaterAnimal> animal, Level level) {
         super(animal, level);
     }
 
@@ -164,7 +164,7 @@ public class EntityCombJelly extends WaterAnimal implements Bucketable {
             onLandProgress--;
         }
 
-        if (!this.level().isClientSide) {
+        if (!this.level().isClientSide()) {
             if (this.isInWater()) {
                 this.setNoGravity(true);
                 if(moveTarget == null || this.random.nextInt(120) == 0 || this.distanceToSqr(moveTarget.getX() + 0.5F, moveTarget.getY() + 0.5F, moveTarget.getZ() + 0.5F) < 5 || tickCount % 10 == 0 && !canBlockPosBeSeen(moveTarget)){
@@ -208,18 +208,18 @@ public class EntityCombJelly extends WaterAnimal implements Bucketable {
         }
     }
 
-    public void addAdditionalSaveData(CompoundTag compound) {
-        super.addAdditionalSaveData(compound);
-        compound.putBoolean("FromBucket", this.fromBucket());
-        compound.putFloat("JellyScale", this.getJellyScale());
-        compound.putInt("Variant", this.getVariant());
+    protected void addAdditionalSaveData(net.minecraft.world.level.storage.ValueOutput valueOutput) {
+        super.addAdditionalSaveData(valueOutput);
+        valueOutput.putBoolean("FromBucket", this.fromBucket());
+        valueOutput.putFloat("JellyScale", this.getJellyScale());
+        valueOutput.putInt("Variant", this.getVariant());
     }
 
-    public void readAdditionalSaveData(CompoundTag compound) {
-        super.readAdditionalSaveData(compound);
-        this.setFromBucket(compound.getBoolean("FromBucket"));
-        this.setJellyScale(compound.getFloat("JellyScale"));
-        this.setVariant(compound.getInt("Variant"));
+    protected void readAdditionalSaveData(net.minecraft.world.level.storage.ValueInput valueInput) {
+        super.readAdditionalSaveData(valueInput);
+        this.setFromBucket(valueInput.getBooleanOr("FromBucket", false));
+        this.setJellyScale(valueInput.getFloatOr("JellyScale", 1.0F));
+        this.setVariant(valueInput.getIntOr("Variant", 0));
     }
 
     public boolean canBlockPosBeSeen(BlockPos pos) {
@@ -267,15 +267,15 @@ public class EntityCombJelly extends WaterAnimal implements Bucketable {
     public void loadFromBucketTag(@Nonnull CompoundTag compound) {
         Bucketable.loadDefaultDataFromBucketTag(this, compound);
         if (compound.contains("BucketScale")){
-            this.setJellyScale(compound.getFloat("BucketScale"));
+            this.setJellyScale(compound.getFloatOr("BucketScale", 1.0F));
         }
         if (compound.contains("BucketVariantTag")){
-            this.setVariant(compound.getInt("BucketVariantTag"));
+            this.setVariant(compound.getIntOr("BucketVariantTag", 0));
         }
     }
 
     @Nullable
-    public SpawnGroupData finalizeSpawn(ServerLevelAccessor worldIn, DifficultyInstance difficultyIn, MobSpawnType reason, @Nullable SpawnGroupData spawnDataIn) {
+    public SpawnGroupData finalizeSpawn(ServerLevelAccessor worldIn, DifficultyInstance difficultyIn, EntitySpawnReason reason, @Nullable SpawnGroupData spawnDataIn) {
         this.setVariant(random.nextInt(3));
         this.setJellyScale(0.8F + random.nextFloat() * 0.4F);
         return super.finalizeSpawn(worldIn, difficultyIn, reason, spawnDataIn);

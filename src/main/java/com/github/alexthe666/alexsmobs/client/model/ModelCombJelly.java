@@ -44,9 +44,8 @@ public class ModelCombJelly extends AdvancedEntityModel<CombJellyRenderState> {
     @Override
     public void setupAnim(CombJellyRenderState renderState) {
         this.resetToDefaultPose();
-        float partialTick = Minecraft.getInstance().getTimer().getGameTimeDeltaPartialTick(false);
-        float birdPitch = renderState.prevJellyPitch + (renderState.jellyPitch - renderState.prevJellyPitch) * partialTick;
-        float landProgress = renderState.prevOnLandProgress + (renderState.onLandProgress - renderState.prevOnLandProgress) * partialTick;
+        float birdPitch = renderState.prevJellyPitch + (renderState.jellyPitch - renderState.prevJellyPitch) * renderState.partialTick;
+        float landProgress = renderState.prevOnLandProgress + (renderState.onLandProgress - renderState.prevOnLandProgress) * renderState.partialTick;
         float ageInTicks = renderState.ageInTicks;
         float girateSpeed = 0.1F * ageInTicks * (1F - landProgress * 0.2F);
         float widthScale = 0.95F + (float)Math.sin(girateSpeed) * 0.1F;

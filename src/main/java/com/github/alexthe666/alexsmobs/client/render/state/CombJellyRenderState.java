@@ -9,4 +9,5 @@ public class CombJellyRenderState extends LivingEntityRenderState {
     public float prevJellyPitch;
     public float onLandProgress;
     public float prevOnLandProgress;
+    public float partialTick;
 }
