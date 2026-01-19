@@ -39,21 +39,21 @@ import net.minecraft.world.level.*;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.gameevent.GameEvent;
 import net.minecraft.world.level.storage.loot.LootTable;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
-import net.neoforged.api.distmarker.Dist;
-import net.neoforged.api.distmarker.OnlyIn;
 
 import javax.annotation.Nullable;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-public class EntityCockroach extends Animal implements Shearable, net.neoforged.neoforge.common.IShearable, ITargetsDroppedItems {
+public class EntityCockroach extends Animal implements Shearable, ITargetsDroppedItems {
 
     // Tag keys for cockroach foods
-    public static final TagKey<Item> COCKROACH_BREEDABLES = ItemTags.create(ResourceLocation.withDefaultNamespace("cockroach_breedables"));
-    public static final TagKey<Item> COCKROACH_FOODSTUFFS = ItemTags.create(ResourceLocation.withDefaultNamespace("cockroach_foodstuffs"));
+    public static final TagKey<Item> COCKROACH_BREEDABLES = TagKey.create(Registries.ITEM, ResourceLocation.withDefaultNamespace("cockroach_breedables"));
+    public static final TagKey<Item> COCKROACH_FOODSTUFFS = TagKey.create(Registries.ITEM, ResourceLocation.withDefaultNamespace("cockroach_foodstuffs"));
 
     public static final ResourceKey<LootTable> MARACA_LOOT = ResourceKey.create(Registries.LOOT_TABLE, ResourceLocation.withDefaultNamespace("entities/cockroach_maracas"));
     public static final ResourceKey<LootTable> MARACA_HEADLESS_LOOT = ResourceKey.create(Registries.LOOT_TABLE, ResourceLocation.withDefaultNamespace("entities/cockroach_maracas_headless"));
@@ -61,7 +61,7 @@ public class EntityCockroach extends Animal implements Shearable, net.neoforged.
     private static final EntityDataAccessor<Boolean> DANCING = SynchedEntityData.defineId(EntityCockroach.class, EntityDataSerializers.BOOLEAN);
     private static final EntityDataAccessor<Boolean> HEADLESS = SynchedEntityData.defineId(EntityCockroach.class, EntityDataSerializers.BOOLEAN);
     private static final EntityDataAccessor<Boolean> MARACAS = SynchedEntityData.defineId(EntityCockroach.class, EntityDataSerializers.BOOLEAN);
-    private static final EntityDataAccessor<Optional<UUID>> NEAREST_MUSICIAN = SynchedEntityData.defineId(EntityCockroach.class, EntityDataSerializers.OPTIONAL_UUID);
+    private static final EntityDataAccessor<String> NEAREST_MUSICIAN = SynchedEntityData.defineId(EntityCockroach.class, EntityDataSerializers.STRING);
     private static final EntityDataAccessor<Boolean> BREADED = SynchedEntityData.defineId(EntityCockroach.class, EntityDataSerializers.BOOLEAN);
     public int randomWingFlapTick = 0;
     public float prevDanceProgress;
@@ -121,7 +121,7 @@ public class EntityCockroach extends Animal implements Shearable, net.neoforged.
         this.goalSelector.addGoal(0, new FloatGoal(this));
         this.goalSelector.addGoal(1, new PanicGoal(this, 1.1D));
         this.goalSelector.addGoal(2, new BreedGoal(this, 1.0D));
-        this.goalSelector.addGoal(3, new TemptGoal(this, 1.0D, Ingredient.of(COCKROACH_FOODSTUFFS), false));
+        this.goalSelector.addGoal(3, new TemptGoal(this, 1.0D, itemStack -> itemStack.is(COCKROACH_FOODSTUFFS), false));
         // EntityCentipedeHead not implemented - removed this avoidance goal
         this.goalSelector.addGoal(4, new AvoidEntityGoal(this, Player.class, 8, 1.3D, 1.0D) {
             public boolean canUse() {
@@ -139,14 +139,13 @@ public class EntityCockroach extends Animal implements Shearable, net.neoforged.
         this.targetSelector.addGoal(1, new CreatureAITargetItems(this, false));
     }
 
-    public boolean hurt(DamageSource source, float amount) {
-        boolean prev = super.hurt(source, amount);
+    public boolean hurtServer(ServerLevel serverLevel, DamageSource source, float amount) {
+        boolean prev = super.hurtServer(serverLevel, source, amount);
         if(prev){
             randomWingFlapTick = 5 + random.nextInt(15);
             if (this.getHealth() <= 1.0F && amount > 0 && !this.isHeadless() && this.getRandom().nextInt(3) == 0) {
                 this.setHeadless(true);
-                if (!this.level().isClientSide) {
-                    final ServerLevel serverLevel = (ServerLevel) this.level();
+                if (!this.level().isClientSide()) {
                     for (int i = 0; i < 3; i++) {
                         serverLevel.sendParticles(ParticleTypes.SNEEZE, this.getRandomX(0.52F), this.getY(1D), this.getRandomZ(0.52F), 1, 0.0D, 0.0D, 0.0D, 0.0D);
                     }
@@ -160,22 +159,20 @@ public class EntityCockroach extends Animal implements Shearable, net.neoforged.
         return stack.is(COCKROACH_BREEDABLES);
     }
 
-    public void addAdditionalSaveData(CompoundTag compound) {
-        super.addAdditionalSaveData(compound);
-        compound.putBoolean("Maracas", this.hasMaracas());
-        compound.putBoolean("Dancing", this.isDancing());
-        compound.putBoolean("Breaded", this.isBreaded());
-        compound.putInt("EggTime", this.timeUntilNextEgg);
+    public void addAdditionalSaveData(ValueOutput valueOutput) {
+        super.addAdditionalSaveData(valueOutput);
+        valueOutput.putBoolean("Maracas", this.hasMaracas());
+        valueOutput.putBoolean("Dancing", this.isDancing());
+        valueOutput.putBoolean("Breaded", this.isBreaded());
+        valueOutput.putInt("EggTime", this.timeUntilNextEgg);
     }
 
-    public void readAdditionalSaveData(CompoundTag compound) {
-        super.readAdditionalSaveData(compound);
-        this.setMaracas(compound.getBoolean("Maracas"));
-        this.setDancing(compound.getBoolean("Dancing"));
-        this.setBreaded(compound.getBoolean("Breaded"));
-        if (compound.contains("EggTime")) {
-            this.timeUntilNextEgg = compound.getInt("EggTime");
-        }
+    public void readAdditionalSaveData(ValueInput valueInput) {
+        super.readAdditionalSaveData(valueInput);
+        this.setMaracas(valueInput.getBoolean("Maracas"));
+        this.setDancing(valueInput.getBoolean("Dancing"));
+        this.setBreaded(valueInput.getBoolean("Breaded"));
+        this.timeUntilNextEgg = valueInput.getIntOr("EggTime", this.random.nextInt(24000) + 24000);
     }
 
     @Nullable
@@ -192,8 +189,8 @@ public class EntityCockroach extends Animal implements Shearable, net.neoforged.
     }
 
     @Override
-    public boolean isInvulnerableTo(DamageSource source) {
-        return source.is(DamageTypes.FALL) || source.is(DamageTypes.DROWN) || source.is(DamageTypes.IN_WALL)  || source.is(DamageTypeTags.IS_EXPLOSION) || source.getMsgId().equals("anvil") || super.isInvulnerableTo(source);
+    public boolean isInvulnerableTo(ServerLevel serverLevel, DamageSource source) {
+        return source.is(DamageTypes.FALL) || source.is(DamageTypes.DROWN) || source.is(DamageTypes.IN_WALL)  || source.is(DamageTypeTags.IS_EXPLOSION) || source.getMsgId().equals("anvil") || super.isInvulnerableTo(serverLevel, source);
     }
 
     public InteractionResult mobInteract(Player p_230254_1_, InteractionHand p_230254_2_) {
@@ -201,11 +198,13 @@ public class EntityCockroach extends Animal implements Shearable, net.neoforged.
        if (lvt_3_1_.getItem() == Items.MARACA && this.isAlive() && !this.hasMaracas()) {
             this.setMaracas(true);
             lvt_3_1_.shrink(1);
-            return InteractionResult.sidedSuccess(this.level().isClientSide);
+            return InteractionResult.sidedSuccess(this.level().isClientSide());
         } else if (lvt_3_1_.getItem() != Items.MARACA && this.isAlive() && this.hasMaracas()) {
             this.setMaracas(false);
             this.setDancing(false);
-            this.spawnAtLocation(new ItemStack(Items.MARACA));
+            if (this.level() instanceof ServerLevel serverLevel) {
+                this.spawnAtLocation(serverLevel, Items.MARACA);
+            }
             return InteractionResult.SUCCESS;
         } else {
             return super.mobInteract(p_230254_1_, p_230254_2_);
@@ -218,7 +217,7 @@ public class EntityCockroach extends Animal implements Shearable, net.neoforged.
         builder.define(DANCING, false);
         builder.define(HEADLESS, false);
         builder.define(MARACAS, false);
-        builder.define(NEAREST_MUSICIAN, Optional.empty());
+        builder.define(NEAREST_MUSICIAN, "");
         builder.define(BREADED, false);
     }
 
@@ -256,7 +255,15 @@ public class EntityCockroach extends Animal implements Shearable, net.neoforged.
 
     @Nullable
     public UUID getNearestMusicianId() {
-        return this.entityData.get(NEAREST_MUSICIAN).orElse(null);
+        String uuid = this.entityData.get(NEAREST_MUSICIAN);
+        if (uuid == null || uuid.isEmpty()) {
+            return null;
+        }
+        try {
+            return UUID.fromString(uuid);
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
     }
 
     public void tick() {
@@ -314,8 +321,8 @@ public class EntityCockroach extends Animal implements Shearable, net.neoforged.
         } else {
             laCucarachaTimer = 0;
         }
-        if (!this.level().isClientSide && this.isAlive() && !this.isBaby() && --this.timeUntilNextEgg <= 0) {
-           ItemEntity dropped = this.spawnAtLocation(Items.COCKROACH_OOTHECA);
+        if (this.level() instanceof ServerLevel serverLevel && this.isAlive() && !this.isBaby() && --this.timeUntilNextEgg <= 0) {
+           ItemEntity dropped = this.spawnAtLocation(serverLevel, Items.COCKROACH_OOTHECA);
            if(dropped != null){
                dropped.setDefaultPickUpDelay();
            }
@@ -338,7 +345,6 @@ public class EntityCockroach extends Animal implements Shearable, net.neoforged.
         return this.getBoundingBox().inflate(10, 10, 10);
     }
 
-    @OnlyIn(Dist.CLIENT)
     public void handleEntityEvent(byte id) {
         if (id == 67) {
             // AlexsMobs.PROXY.onEntityStatus call removed - inline if needed
@@ -349,17 +355,16 @@ public class EntityCockroach extends Animal implements Shearable, net.neoforged.
 
     public Entity getNearestMusician() {
         final UUID id = getNearestMusicianId();
-        if (id != null && !this.level().isClientSide) {
-            return ((ServerLevel) level()).getEntity(id);
+        if (id != null && this.level() instanceof ServerLevel serverLevel) {
+            return serverLevel.getEntity(id);
         }
         return null;
     }
 
     public void setNearestMusician(@Nullable UUID uniqueId) {
-        this.entityData.set(NEAREST_MUSICIAN, Optional.ofNullable(uniqueId));
+        this.entityData.set(NEAREST_MUSICIAN, uniqueId == null ? "" : uniqueId.toString());
     }
 
-    @OnlyIn(Dist.CLIENT)
     public void setRecordPlayingNearby(BlockPos pos, boolean isPartying) {
         this.jukeboxPosition = pos;
         this.isJukeboxing = isPartying;
@@ -380,29 +385,29 @@ public class EntityCockroach extends Animal implements Shearable, net.neoforged.
     }
 
     @Override
-    public boolean isShearable(@javax.annotation.Nullable Player player, ItemStack item, Level level, BlockPos pos) {
-        return readyForShearing();
+    public void shear(ServerLevel serverLevel, SoundSource category, ItemStack stack) {
+        serverLevel.explicitDamage(this, damageSources().generic(), 0F);
+        serverLevel.playSound(null, this, SoundEvents.SHEEP_SHEAR, category, 1.0F, 1.0F);
+        this.gameEvent(GameEvent.ENTITY_INTERACT);
+        this.setHeadless(true);
     }
 
     @Override
-    public void shear(SoundSource category) {
-        this.hurt(damageSources().generic(), 0F);
-        level().playSound(null, this, SoundEvents.SHEEP_SHEAR, category, 1.0F, 1.0F);
-        this.gameEvent(GameEvent.ENTITY_INTERACT);
-        this.setHeadless(true);
+    public boolean isShearable(@javax.annotation.Nullable Player player, ItemStack item, Level level, BlockPos pos) {
+        return readyForShearing();
     }
 
     @javax.annotation.Nonnull
     @Override
     public java.util.List<ItemStack> onSheared(@javax.annotation.Nullable Player player, ItemStack item, Level level, BlockPos pos) {
         if (player != null) {
-            level().playSound(null, this, SoundEvents.SHEEP_SHEAR, SoundSource.PLAYERS, 1.0F, 1.0F);
+            level.playSound(null, this, SoundEvents.SHEEP_SHEAR, SoundSource.PLAYERS, 1.0F, 1.0F);
         }
         this.gameEvent(GameEvent.ENTITY_INTERACT);
-        this.hurt(damageSources().generic(), 0F);
-        if (!level().isClientSide) {
+        if (level instanceof ServerLevel serverLevel) {
+            serverLevel.explicitDamage(this, damageSources().generic(), 0F);
             for (int i = 0; i < 3; i++) {
-                ((ServerLevel) this.level()).sendParticles(ParticleTypes.SNEEZE, this.getRandomX(0.52F), this.getY(1D), this.getRandomZ(0.52F), 1, 0.0D, 0.0D, 0.0D, 0.0D);
+                serverLevel.sendParticles(ParticleTypes.SNEEZE, this.getRandomX(0.52F), this.getY(1D), this.getRandomZ(0.52F), 1, 0.0D, 0.0D, 0.0D, 0.0D);
             }
         }
         this.setHeadless(true);

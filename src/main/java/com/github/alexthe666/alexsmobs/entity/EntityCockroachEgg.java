@@ -13,8 +13,7 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.HitResult;
-import net.neoforged.api.distmarker.Dist;
-import net.neoforged.api.distmarker.OnlyIn;
+
 public class EntityCockroachEgg extends ThrowableItemProjectile {
 
     public EntityCockroachEgg(EntityType p_i50154_1_, Level p_i50154_2_) {
@@ -29,7 +28,6 @@ public class EntityCockroachEgg extends ThrowableItemProjectile {
         super(EntityType.COCKROACH_EGG, x, y, z, worldIn);
     }
 
-    @OnlyIn(Dist.CLIENT)
     public void handleEntityEvent(byte id) {
         if (id == 3) {
             for (int i = 0; i < 8; ++i) {
@@ -48,9 +46,9 @@ public class EntityCockroachEgg extends ThrowableItemProjectile {
                 final EntityCockroach croc = EntityType.COCKROACH.create(this.level(), EntitySpawnReason.TRIGGERED);
                 if (croc != null) {
                     croc.setAge(-24000);
-                    croc.moveTo(this.getX(), this.getY(), this.getZ(), this.getYRot(), 0.0F);
+                    croc.setPos(this.getX(), this.getY(), this.getZ());
+                    croc.setYRot(this.getYRot());
                     croc.finalizeSpawn((ServerLevel)level(), level().getCurrentDifficultyAt(this.blockPosition()), EntitySpawnReason.TRIGGERED, (SpawnGroupData)null);
-                    croc.restrictTo(this.blockPosition(), 20);
                     this.level().addFreshEntity(croc);
                 }
             }

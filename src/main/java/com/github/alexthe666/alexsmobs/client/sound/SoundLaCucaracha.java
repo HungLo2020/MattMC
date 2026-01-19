@@ -1,16 +1,15 @@
 package com.github.alexthe666.alexsmobs.client.sound;
 
-import com.github.alexthe666.alexsmobs.ClientProxy;
 import com.github.alexthe666.alexsmobs.entity.EntityCockroach;
-import com.github.alexthe666.alexsmobs.misc.AMSoundRegistry;
 import net.minecraft.client.resources.sounds.AbstractTickableSoundInstance;
+import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 
 public class SoundLaCucaracha extends AbstractTickableSoundInstance {
     private final EntityCockroach cockroach;
 
     public SoundLaCucaracha(EntityCockroach cockroach) {
-        super(AMSoundRegistry.LA_CUCARACHA.get(), SoundSource.RECORDS, cockroach.getRandom());
+        super(SoundEvents.LA_CUCARACHA, SoundSource.RECORDS, cockroach.getRandom());
         this.cockroach = cockroach;
         this.attenuation = Attenuation.LINEAR;
         this.looping = true;
@@ -21,18 +20,8 @@ public class SoundLaCucaracha extends AbstractTickableSoundInstance {
     }
 
     public boolean canPlaySound() {
-        return !this.cockroach.isSilent() && this.cockroach.hasMaracas() && this.cockroach.isDancing() && ClientProxy.COCKROACH_SOUND_MAP.get(this.cockroach.getId()) == this;
+        return !this.cockroach.isSilent() && this.cockroach.hasMaracas() && this.cockroach.isDancing();
     }
-
-    public boolean isOnlyCockroach() {
-        for(SoundLaCucaracha cucaracha : ClientProxy.COCKROACH_SOUND_MAP.values()){
-            if(cucaracha != this && distanceSq(cucaracha.x, cucaracha.y, cucaracha.z) < 16 && cucaracha.canPlaySound()){
-                return false;
-            }
-        }
-        return true;
-    }
-
 
     public double distanceSq(double p_218140_1_, double p_218140_3_, double p_218140_5_) {
         double lvt_10_1_ = (double)this.getX() - p_218140_1_;
@@ -50,7 +39,6 @@ public class SoundLaCucaracha extends AbstractTickableSoundInstance {
             this.z = this.cockroach.getZ();
         } else {
             this.stop();
-            ClientProxy.COCKROACH_SOUND_MAP.remove(cockroach.getId());
         }
     }
 

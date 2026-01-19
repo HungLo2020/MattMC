@@ -1772,7 +1772,7 @@ public class Items {
 	);
 	public static final Item CHICKEN_SPAWN_EGG = registerItem("chicken_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.CHICKEN));
 	public static final Item COCKROACH_SPAWN_EGG = registerItem("cockroach_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.COCKROACH));
-	public static final Item COCKROACH_OOTHECA = registerItem("cockroach_ootheca", ProjectileItem::new, new Item.Properties(), EntityType.COCKROACH_EGG);
+	public static final Item COCKROACH_OOTHECA = registerItem("cockroach_ootheca", com.github.alexthe666.alexsmobs.item.CockroachOothecaItem::new, new Item.Properties().stacksTo(16));
 	public static final Item COCKROACH_WING = registerItem("cockroach_wing");
 	public static final Item COCKROACH_WING_FRAGMENT = registerItem("cockroach_wing_fragment");
 	public static final Item COD_SPAWN_EGG = registerItem("cod_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.COD));

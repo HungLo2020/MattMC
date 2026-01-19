@@ -129,8 +129,7 @@ public class ModelCockroach extends AdvancedEntityModel<CockroachRenderState> {
         float flyDegree = 0.5F;
         float walkSpeed = 1.25F;
         float walkDegree = 0.5F;
-        float partialTick = Minecraft.getInstance().getTimer().getGameTimeDeltaPartialTick(false);
-        float danceProgress = renderState.prevDanceProgress + (renderState.danceProgress - renderState.prevDanceProgress) * partialTick;
+        float danceProgress = renderState.danceProgress;
         float ageInTicks = renderState.ageInTicks;
         float limbSwing = renderState.walkAnimationPos;
         float limbSwingAmount = renderState.walkAnimationSpeed;
@@ -193,27 +192,13 @@ public class ModelCockroach extends AdvancedEntityModel<CockroachRenderState> {
             left_wing.showModel = true;
             right_wing.showModel = true;
         }
-    }
-
-    public void renderToBuffer(PoseStack matrixStackIn, VertexConsumer bufferIn, int packedLightIn, int packedOverlayIn, int color) {
-        if (this.young) {
-            this.head.setScale(1.5F, 1.5F, 1.5F);
-            matrixStackIn.pushPose();
-            matrixStackIn.scale(0.65F, 0.65F, 0.65F);
-            matrixStackIn.translate(0.0D, 0.815D, 0.125D);
-            parts().forEach((p_228292_8_) -> {
-                p_228292_8_.render(matrixStackIn, bufferIn, packedLightIn, packedOverlayIn, -1);
-            });
-            matrixStackIn.popPose();
+        
+        // Handle baby scaling - in 1.21 this is in setupAnim instead of renderToBuffer
+        if (renderState.isBaby) {
+            head.setScale(1.5F, 1.5F, 1.5F);
         } else {
-            this.head.setScale(1F, 1F, 1F);
-            matrixStackIn.pushPose();
-            parts().forEach((p_228290_8_) -> {
-                p_228290_8_.render(matrixStackIn, bufferIn, packedLightIn, packedOverlayIn, -1);
-            });
-            matrixStackIn.popPose();
+            head.setScale(1F, 1F, 1F);
         }
-
     }
 
     public void setRotationAngle(AdvancedModelBox advancedModelBox, float x, float y, float z) {
