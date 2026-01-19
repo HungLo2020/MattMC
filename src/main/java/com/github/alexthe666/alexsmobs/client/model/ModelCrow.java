@@ -1,6 +1,6 @@
 package com.github.alexthe666.alexsmobs.client.model;
 
-import com.github.alexthe666.alexsmobs.entity.EntityCrow;
+import com.github.alexthe666.alexsmobs.client.render.state.CrowRenderState;
 import com.github.alexthe666.alexsmobs.entity.util.Maths;
 import com.github.alexthe666.citadel.client.model.AdvancedEntityModel;
 import com.github.alexthe666.citadel.client.model.AdvancedModelBox;
@@ -10,7 +10,7 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.minecraft.client.Minecraft;
 
-public class ModelCrow extends AdvancedEntityModel<EntityCrow> {
+public class ModelCrow extends AdvancedEntityModel<CrowRenderState> {
 	public final AdvancedModelBox root;
 	public final AdvancedModelBox body;
 	public final AdvancedModelBox leg_left;
@@ -84,7 +84,7 @@ public class ModelCrow extends AdvancedEntityModel<EntityCrow> {
 	}
 
 	@Override
-	public void setupAnim(EntityCrow entity, float limbSwing, float limbSwingAmount, float ageInTicks, float netHeadYaw, float headPitch){
+	public void setupAnim(CrowRenderState renderState){
 		this.resetToDefaultPose();
 		float flapSpeed = 0.8F;
 		float flapDegree = 0.2F;
@@ -92,11 +92,15 @@ public class ModelCrow extends AdvancedEntityModel<EntityCrow> {
 		float walkDegree = 0.78F;
 		float idleSpeed = 0.1F;
 		float idleDegree = 0.1F;
-		float partialTick = Minecraft.getInstance().getTimer().getGameTimeDeltaPartialTick(false);
-		float flyProgress = entity.prevFlyProgress + (entity.flyProgress - entity.prevFlyProgress) * partialTick;
-		float sitProgress = entity.prevSitProgress + (entity.sitProgress - entity.prevSitProgress) * partialTick;
+		float flyProgress = renderState.flyProgress;
+		float sitProgress = renderState.sitProgress;
+		float limbSwing = renderState.walkAnimationPos;
+		float limbSwingAmount = renderState.walkAnimationSpeed;
+		float ageInTicks = renderState.ageInTicks;
+		float netHeadYaw = renderState.yRot;
+		float headPitch = renderState.xRot;
 		float runProgress = Math.max(0, (limbSwingAmount * 5F) - flyProgress);
-		float biteProgress = entity.prevAttackProgress + (entity.attackProgress - entity.prevAttackProgress) * partialTick;
+		float biteProgress = renderState.attackProgress;
 		progressRotationPrev(head, biteProgress, Maths.rad(60), 0, 0, 5F);
 		progressRotationPrev(body, biteProgress, Maths.rad(25), 0, 0, 5F);
 		progressRotationPrev(leg_left, biteProgress, Maths.rad(-25), 0, 0, 5F);

@@ -1101,7 +1101,6 @@ public class EntityCrow extends TamableAnimal implements ITargetsDroppedItems {
                             }
                         }else{
                             cooldown = 20;
-                            }
                         }
                     }catch (Exception e){
                     }

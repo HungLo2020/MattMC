@@ -140,7 +140,7 @@ public class CrowAICircleCrops extends MoveToBlockGoal {
                 }
             }
         }else{
-            if(crow.level().getGameRules().getBoolean(GameRules.RULE_MOBGRIEFING)) {
+            if(getServerLevel(crow.level()).getGameRules().getBoolean(GameRules.RULE_MOBGRIEFING)) {
                 crow.level().destroyBlock(blockPos, true);
             }
         }
