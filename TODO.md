@@ -1,4 +1,4 @@
-BlueJay
+
 Catfish
 Cockroach
 Comb jelly

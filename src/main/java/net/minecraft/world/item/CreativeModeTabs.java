@@ -1905,6 +1905,7 @@ public class CreativeModeTabs {
 					output.accept(Items.BEE_SPAWN_EGG);
 					output.accept(Items.BLAZE_SPAWN_EGG);
 					output.accept(Items.BLOBFISH_SPAWN_EGG);
+					output.accept(Items.BLUE_JAY_SPAWN_EGG);
 					output.accept(Items.BOGGED_SPAWN_EGG);
 					output.accept(Items.BREEZE_SPAWN_EGG);
 					output.accept(Items.CAMEL_SPAWN_EGG);

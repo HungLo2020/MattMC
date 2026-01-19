@@ -13064,6 +13064,29 @@
     ],
     "subtitle": "subtitles.entity.blaze.shoot"
   },
+  "entity.blue_jay.hurt": {
+    "sounds": [
+      "blue_jay_hurt_0",
+      "blue_jay_hurt_1"
+    ],
+    "subtitle": "subtitles.entity.blue_jay.hurt"
+  },
+  "entity.blue_jay.idle": {
+    "sounds": [
+      "blue_jay_idle_0",
+      "blue_jay_idle_1",
+      "blue_jay_idle_2"
+    ],
+    "subtitle": "subtitles.entity.blue_jay.ambient"
+  },
+  "entity.blue_jay.song": {
+    "sounds": [
+      "blue_jay_song_0",
+      "blue_jay_song_1",
+      "blue_jay_song_2"
+    ],
+    "subtitle": "subtitles.entity.blue_jay.song"
+  },
   "entity.boat.paddle_land": {
     "sounds": [
       "entity/boat/paddle_land1",

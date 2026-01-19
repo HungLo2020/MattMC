@@ -105,6 +105,7 @@ public class DefaultAttributes {
 		.put(EntityType.BEE, Bee.createAttributes().build())
 		.put(EntityType.BLAZE, Blaze.createAttributes().build())
 		.put(EntityType.BLOBFISH, EntityBlobfish.createAttributes().build())
+		.put(EntityType.BLUE_JAY, com.github.alexthe666.alexsmobs.entity.EntityBlueJay.bakeAttributes().build())
 		.put(EntityType.BOGGED, Bogged.createAttributes().build())
 		.put(EntityType.CAT, Cat.createAttributes().build())
 		.put(EntityType.CAMEL, Camel.createAttributes().build())

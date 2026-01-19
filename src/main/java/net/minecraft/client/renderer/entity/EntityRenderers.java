@@ -79,6 +79,7 @@ public class EntityRenderers {
 		register(EntityType.BIRCH_CHEST_BOAT, context -> new BoatRenderer(context, ModelLayers.BIRCH_CHEST_BOAT));
 		register(EntityType.BLAZE, BlazeRenderer::new);
 		register(EntityType.BLOBFISH, RenderBlobfish::new);
+		register(EntityType.BLUE_JAY, com.github.alexthe666.alexsmobs.client.render.RenderBlueJay::new);
 		register(EntityType.BLOCK_DISPLAY, DisplayRenderer.BlockDisplayRenderer::new);
 		register(EntityType.BOGGED, BoggedRenderer::new);
 		register(EntityType.BREEZE, BreezeRenderer::new);

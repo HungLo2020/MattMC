@@ -282,6 +282,9 @@ public class EntityType<T extends Entity> implements FeatureElement, EntityTypeT
 			.eyeHeight(0.3F)
 			.clientTrackingRange(5)
 	);
+	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntityBlueJay> BLUE_JAY = register(
+		"blue_jay", EntityType.Builder.of(com.github.alexthe666.alexsmobs.entity.EntityBlueJay::new, MobCategory.CREATURE).sized(0.5F, 0.5F).eyeHeight(0.3F).clientTrackingRange(8)
+	);
 	public static final EntityType<Display.BlockDisplay> BLOCK_DISPLAY = register(
 		"block_display", EntityType.Builder.of(Display.BlockDisplay::new, MobCategory.MISC).noLootTable().sized(0.0F, 0.0F).clientTrackingRange(10).updateInterval(1)
 	);
