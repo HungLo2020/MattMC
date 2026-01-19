@@ -181,6 +181,9 @@ public class SoundEvents {
 	public static final SoundEvent BLAZE_DEATH = register("entity.blaze.death");
 	public static final SoundEvent BLAZE_HURT = register("entity.blaze.hurt");
 	public static final SoundEvent BLAZE_SHOOT = register("entity.blaze.shoot");
+	public static final SoundEvent BLUE_JAY_IDLE = register("entity.blue_jay.idle");
+	public static final SoundEvent BLUE_JAY_HURT = register("entity.blue_jay.hurt");
+	public static final SoundEvent BLUE_JAY_SONG = register("entity.blue_jay.song");
 	public static final SoundEvent BOAT_PADDLE_LAND = register("entity.boat.paddle_land");
 	public static final SoundEvent BOAT_PADDLE_WATER = register("entity.boat.paddle_water");
 	public static final SoundEvent BOGGED_AMBIENT = register("entity.bogged.ambient");
