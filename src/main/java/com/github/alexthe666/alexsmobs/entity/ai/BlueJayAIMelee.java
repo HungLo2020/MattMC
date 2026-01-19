@@ -2,7 +2,7 @@ package com.github.alexthe666.alexsmobs.entity.ai;
 
 import com.github.alexthe666.alexsmobs.entity.EntityBlueJay;
 import com.github.alexthe666.alexsmobs.entity.util.Maths;
-import com.github.alexthe666.alexsmobs.misc.AMBlockPos;
+import net.minecraft.core.BlockPos;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
@@ -76,7 +76,7 @@ public class BlueJayAIMelee extends Goal {
         double extraX = circleDistance * Mth.sin((angle));
         double extraZ = circleDistance * Mth.cos(angle);
         Vec3 pos = new Vec3(target.x() + extraX, target.y() + yLevel, target.z() + extraZ);
-        if (blueJay.level().isEmptyBlock(AMBlockPos.fromVec3(pos))) {
+        if (blueJay.level().isEmptyBlock(BlockPos.containing(pos))) {
             return pos;
         }
         return null;
