@@ -53,6 +53,7 @@ import com.github.alexmodguy.alexscaves.server.entity.living.TrilocarisEntity;
 import com.github.alexmodguy.alexscaves.server.entity.living.VallumraptorEntity;
 import com.github.alexthe666.alexsmobs.entity.EntityBlobfish;
 import com.github.alexthe666.alexsmobs.entity.EntityCosmicCod;
+import com.github.alexthe666.alexsmobs.entity.EntityFlyingFish;
 import net.minecraft.world.entity.boss.enderdragon.EnderDragon;
 import net.minecraft.world.entity.boss.wither.WitherBoss;
 import net.minecraft.world.entity.decoration.ArmorStand;
@@ -132,6 +133,7 @@ public class DefaultAttributes {
 		.put(EntityType.ENDER_DRAGON, EnderDragon.createAttributes().build())
 		.put(EntityType.EVOKER, Evoker.createAttributes().build())
 		.put(EntityType.BREEZE, Breeze.createAttributes().build())
+		.put(EntityType.FLYING_FISH, EntityFlyingFish.createAttributes().build())
 		.put(EntityType.FOX, Fox.createAttributes().build())
 		.put(EntityType.FROG, Frog.createAttributes().build())
 		.put(EntityType.GHAST, Ghast.createAttributes().build())

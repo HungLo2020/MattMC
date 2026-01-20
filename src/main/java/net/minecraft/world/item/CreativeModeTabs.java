@@ -1423,7 +1423,12 @@ public class CreativeModeTabs {
 						output.accept(Items.BUCKET);
 						output.accept(Items.WATER_BUCKET);
 						output.accept(Items.BLOBFISH_BUCKET);
+						output.accept(Items.LARGE_CATFISH_BUCKET);
+						output.accept(Items.MEDIUM_CATFISH_BUCKET);
+						output.accept(Items.SMALL_CATFISH_BUCKET);
 						output.accept(Items.COD_BUCKET);
+						output.accept(Items.COSMIC_COD_BUCKET);
+						output.accept(Items.FLYING_FISH_BUCKET);
 						output.accept(Items.SALMON_BUCKET);
 						output.accept(Items.TROPICAL_FISH_BUCKET);
 						output.accept(Items.TRILOCARIS_BUCKET);
@@ -1930,6 +1935,7 @@ public class CreativeModeTabs {
 					output.accept(Items.ENDERMAN_SPAWN_EGG);
 					output.accept(Items.ENDERMITE_SPAWN_EGG);
 					output.accept(Items.EVOKER_SPAWN_EGG);
+					output.accept(Items.FLYING_FISH_SPAWN_EGG);
 					output.accept(Items.FOX_SPAWN_EGG);
 					output.accept(Items.FROG_SPAWN_EGG);
 					output.accept(Items.GHAST_SPAWN_EGG);
