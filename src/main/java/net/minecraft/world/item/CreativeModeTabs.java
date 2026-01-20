@@ -1949,6 +1949,7 @@ public class CreativeModeTabs {
 					output.accept(Items.HUMMINGBIRD_SPAWN_EGG);
 					output.accept(Items.HORSE_SPAWN_EGG);
 					output.accept(Items.HUSK_SPAWN_EGG);
+					output.accept(Items.JERBOA_SPAWN_EGG);
 					output.accept(Items.IRON_GOLEM_SPAWN_EGG);
 					output.accept(Items.LLAMA_SPAWN_EGG);
 					output.accept(Items.MAGMA_CUBE_SPAWN_EGG);

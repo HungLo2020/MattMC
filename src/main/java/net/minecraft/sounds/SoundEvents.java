@@ -828,6 +828,8 @@ public class SoundEvents {
 	public static final SoundEvent HUMMINGBIRD_IDLE = register("entity.hummingbird.idle");
 	public static final SoundEvent HUMMINGBIRD_HURT = register("entity.hummingbird.hurt");
 	public static final SoundEvent HUMMINGBIRD_LOOP = register("entity.hummingbird.loop");
+	public static final SoundEvent JERBOA_IDLE = register("entity.jerboa.idle");
+	public static final SoundEvent JERBOA_HURT = register("entity.jerboa.hurt");
 	public static final SoundEvent HONEY_BLOCK_BREAK = register("block.honey_block.break");
 	public static final SoundEvent HONEY_BLOCK_FALL = register("block.honey_block.fall");
 	public static final SoundEvent HONEY_BLOCK_HIT = register("block.honey_block.hit");

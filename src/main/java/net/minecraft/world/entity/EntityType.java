@@ -661,6 +661,12 @@ public class EntityType<T extends Entity> implements FeatureElement, EntityTypeT
 	public static final EntityType<Interaction> INTERACTION = register(
 		"interaction", EntityType.Builder.of(Interaction::new, MobCategory.MISC).noLootTable().sized(0.0F, 0.0F).clientTrackingRange(10)
 	);
+	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntityJerboa> JERBOA = register(
+		"jerboa",
+		EntityType.Builder.of(com.github.alexthe666.alexsmobs.entity.EntityJerboa::new, MobCategory.CREATURE)
+			.sized(0.5F, 0.5F)
+			.clientTrackingRange(8)
+	);
 	public static final EntityType<IronGolem> IRON_GOLEM = register(
 		"iron_golem", EntityType.Builder.of(IronGolem::new, MobCategory.MISC).sized(1.4F, 2.7F).clientTrackingRange(10)
 	);
