@@ -23,8 +23,11 @@ public class ModelHummingbird extends AdvancedEntityModel<HummingbirdRenderState
     private final AdvancedModelBox legR;
 
     public ModelHummingbird() {
+        // CRITICAL: Synchronize texture dimensions - set both before creating model boxes
         texWidth = 32;
         texHeight = 32;
+        textureWidth = 32;
+        textureHeight = 32;
 
         root = new AdvancedModelBox(this, "root");
         root.setPos(0.0F, 24.0F, 0.0F);
