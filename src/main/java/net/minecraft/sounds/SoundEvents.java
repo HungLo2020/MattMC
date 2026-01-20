@@ -563,6 +563,8 @@ public class SoundEvents {
 	public static final SoundEvent ENDER_DRAGON_SHOOT = register("entity.ender_dragon.shoot");
 	public static final SoundEvent ENDER_EYE_DEATH = register("entity.ender_eye.death");
 	public static final SoundEvent ENDER_EYE_LAUNCH = register("entity.ender_eye.launch");
+	public static final SoundEvent ENDERGRADE_IDLE = register("entity.endergrade.idle");
+	public static final SoundEvent ENDERGRADE_HURT = register("entity.endergrade.hurt");
 	public static final SoundEvent ENDERMAN_AMBIENT = register("entity.enderman.ambient");
 	public static final SoundEvent ENDERMAN_DEATH = register("entity.enderman.death");
 	public static final SoundEvent ENDERMAN_HURT = register("entity.enderman.hurt");

@@ -20,6 +20,7 @@ import org.slf4j.Logger;
 import com.github.alexthe666.alexsmobs.client.render.RenderBlobfish;
 import com.github.alexthe666.alexsmobs.client.render.RenderCombJelly;
 import com.github.alexthe666.alexsmobs.client.render.RenderCosmicCod;
+import com.github.alexthe666.alexsmobs.client.render.RenderEndergrade;
 
 @Environment(EnvType.CLIENT)
 public class EntityRenderers {
@@ -113,6 +114,7 @@ public class EntityRenderers {
 		register(EntityType.DROWNED, DrownedRenderer::new);
 		register(EntityType.EGG, ThrownItemRenderer::new);
 		register(EntityType.ELDER_GUARDIAN, ElderGuardianRenderer::new);
+		register(EntityType.ENDERGRADE, RenderEndergrade::new);
 		register(EntityType.ENDERMAN, EndermanRenderer::new);
 		register(EntityType.ENDERMITE, EndermiteRenderer::new);
 		register(EntityType.ENDER_DRAGON, EnderDragonRenderer::new);

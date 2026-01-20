@@ -470,6 +470,13 @@ public class EntityType<T extends Entity> implements FeatureElement, EntityTypeT
 		"ender_pearl",
 		EntityType.Builder.<ThrownEnderpearl>of(ThrownEnderpearl::new, MobCategory.MISC).noLootTable().sized(0.25F, 0.25F).clientTrackingRange(4).updateInterval(10)
 	);
+	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntityEndergrade> ENDERGRADE = register(
+		"endergrade",
+		EntityType.Builder.of(com.github.alexthe666.alexsmobs.entity.EntityEndergrade::new, MobCategory.CREATURE)
+			.sized(1.2F, 1.2F)
+			.eyeHeight(0.6F)
+			.clientTrackingRange(10)
+	);
 	public static final EntityType<EndCrystal> END_CRYSTAL = register(
 		"end_crystal",
 		EntityType.Builder.<EndCrystal>of(EndCrystal::new, MobCategory.MISC)
