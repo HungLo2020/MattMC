@@ -38,4 +38,8 @@ public class AMSoundRegistry {
     public static final DeferredHolder HUMMINGBIRD_IDLE = new DeferredHolder(() -> net.minecraft.sounds.SoundEvents.HUMMINGBIRD_IDLE);
     public static final DeferredHolder HUMMINGBIRD_HURT = new DeferredHolder(() -> net.minecraft.sounds.SoundEvents.HUMMINGBIRD_HURT);
     public static final DeferredHolder HUMMINGBIRD_LOOP = new DeferredHolder(() -> net.minecraft.sounds.SoundEvents.HUMMINGBIRD_LOOP);
+    
+    // Jerboa sounds - reference vanilla SoundEvents
+    public static final DeferredHolder JERBOA_IDLE = new DeferredHolder(() -> net.minecraft.sounds.SoundEvents.JERBOA_IDLE);
+    public static final DeferredHolder JERBOA_HURT = new DeferredHolder(() -> net.minecraft.sounds.SoundEvents.JERBOA_HURT);
 }

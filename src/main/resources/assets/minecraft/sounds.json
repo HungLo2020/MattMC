@@ -16419,6 +16419,21 @@
     ],
     "subtitle": "subtitles.entity.hummingbird.loop"
   },
+  "entity.jerboa.idle": {
+    "sounds": [
+      "jerboa_idle_0",
+      "jerboa_idle_1",
+      "jerboa_idle_2"
+    ],
+    "subtitle": "subtitles.entity.jerboa.idle"
+  },
+  "entity.jerboa.hurt": {
+    "sounds": [
+      "jerboa_hurt_0",
+      "jerboa_hurt_1"
+    ],
+    "subtitle": "subtitles.entity.jerboa.hurt"
+  },
   "entity.horse.ambient": {
     "sounds": [
       "mob/horse/idle1",

@@ -14,4 +14,9 @@ public class AMEffectRegistry {
      * In full implementation this would be a custom effect
      */
     public static final Holder<MobEffect> ENDER_FLU = MobEffects.POISON;
+    
+    /**
+     * Fleet Footed effect - points to vanilla speed effect
+     */
+    public static final Holder<MobEffect> FLEET_FOOTED = MobEffects.SPEED;
 }

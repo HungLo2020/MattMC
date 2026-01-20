@@ -38,6 +38,10 @@ public class AMTagRegistry {
     public static final TagKey<Block> HUMMINGBIRD_POLLINATES = registerBlockTag("hummingbird_pollinates");
     public static final TagKey<Block> HUMMINGBIRD_SPAWNS = registerBlockTag("hummingbird_spawns");
 
+    // Jerboa-specific tags
+    public static final TagKey<Item> JERBOA_BREEDABLES = registerItemTag("jerboa_breedables");
+    public static final TagKey<Item> JERBOA_BEGS_FOR = registerItemTag("jerboa_begs_for");
+
     private static TagKey<Item> registerItemTag(String name) {
         return TagKey.create(Registries.ITEM, ResourceLocation.withDefaultNamespace(name));
     }

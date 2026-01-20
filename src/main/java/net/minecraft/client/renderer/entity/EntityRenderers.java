@@ -156,6 +156,7 @@ public class EntityRenderers {
 		register(EntityType.HUSK, HuskRenderer::new);
 		register(EntityType.ILLUSIONER, IllusionerRenderer::new);
 		register(EntityType.INTERACTION, NoopRenderer::new);
+		register(EntityType.JERBOA, com.github.alexthe666.alexsmobs.client.render.RenderJerboa::new);
 		register(EntityType.IRON_GOLEM, IronGolemRenderer::new);
 		register(EntityType.ITEM, ItemEntityRenderer::new);
 		register(EntityType.ITEM_DISPLAY, DisplayRenderer.ItemDisplayRenderer::new);
