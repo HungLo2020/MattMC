@@ -1424,6 +1424,8 @@ public class CreativeModeTabs {
 						output.accept(Items.WATER_BUCKET);
 						output.accept(Items.BLOBFISH_BUCKET);
 						output.accept(Items.COD_BUCKET);
+						output.accept(Items.COSMIC_COD_BUCKET);
+						output.accept(Items.FLYING_FISH_BUCKET);
 						output.accept(Items.SALMON_BUCKET);
 						output.accept(Items.TROPICAL_FISH_BUCKET);
 						output.accept(Items.TRILOCARIS_BUCKET);
