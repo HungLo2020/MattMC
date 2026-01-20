@@ -3,8 +3,8 @@
     Catfish
     Cockroach
     Comb jelly
-cosmic cod
-crow
+    cosmic cod
+    crow
 endergrade
 fliying fish
 gazelle
