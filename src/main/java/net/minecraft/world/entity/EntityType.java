@@ -539,7 +539,7 @@ public class EntityType<T extends Entity> implements FeatureElement, EntityTypeT
 	);
 	public static final EntityType<EntityFlyingFish> FLYING_FISH = register(
 		"flying_fish",
-		EntityType.Builder.of(EntityFlyingFish::new, MobCategory.WATER_AMBIENT)
+		EntityType.Builder.<EntityFlyingFish>of(EntityFlyingFish::new, MobCategory.WATER_AMBIENT)
 			.sized(0.4F, 0.3F)
 			.eyeHeight(0.2F)
 			.clientTrackingRange(4)

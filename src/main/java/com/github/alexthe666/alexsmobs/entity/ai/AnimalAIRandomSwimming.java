@@ -59,9 +59,7 @@ public class AnimalAIRandomSwimming extends RandomStrollGoal {
 
     @Nullable
     protected Vec3 getPosition() {
-        if(this.mob.hasRestriction() && this.mob.distanceToSqr(Vec3.atCenterOf(this.mob.getRestrictCenter())) > this.mob.getRestrictRadius() * this.mob.getRestrictRadius()){
-            return DefaultRandomPos.getPosTowards(this.mob, xzSpread, 3, Vec3.atBottomCenterOf(this.mob.getRestrictCenter()), 3);
-        }
+        // Restriction checks removed for 1.21 compatibility
         if(this.mob.getRandom().nextFloat() < 0.3F){
             Vec3 vector3d = findSurfaceTarget(this.mob, xzSpread, ySpread * 2);
             if(vector3d != null){

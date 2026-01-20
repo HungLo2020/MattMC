@@ -1,6 +1,6 @@
 package com.github.alexthe666.alexsmobs.client.model;
 
-import com.github.alexthe666.alexsmobs.entity.EntityFlyingFish;
+import com.github.alexthe666.alexsmobs.client.render.state.FlyingFishRenderState;
 import com.github.alexthe666.alexsmobs.entity.util.Maths;
 import com.github.alexthe666.citadel.client.model.AdvancedEntityModel;
 import com.github.alexthe666.citadel.client.model.AdvancedModelBox;
@@ -8,7 +8,7 @@ import com.github.alexthe666.citadel.client.model.basic.BasicModelPart;
 import com.google.common.collect.ImmutableList;
 import net.minecraft.util.Mth;
 
-public class ModelFlyingFish extends AdvancedEntityModel<EntityFlyingFish> {
+public class ModelFlyingFish extends AdvancedEntityModel<FlyingFishRenderState> {
     private final AdvancedModelBox root;
     private final AdvancedModelBox body;
     private final AdvancedModelBox left_pectoralFin;
@@ -70,15 +70,18 @@ public class ModelFlyingFish extends AdvancedEntityModel<EntityFlyingFish> {
     }
 
     @Override
-    public void setupAnim(EntityFlyingFish entity, float limbSwing, float limbSwingAmount, float ageInTicks, float netHeadYaw, float headPitch) {
+    public void setupAnim(FlyingFishRenderState renderState) {
         this.resetToDefaultPose();
+        float limbSwing = renderState.walkAnimationPos;
+        float limbSwingAmount = renderState.walkAnimationSpeed;
+        float ageInTicks = renderState.ageInTicks;
+        float headPitch = renderState.xRot;
         float idleSpeed = 0.2F;
         float idleDegree = 0.3F;
         float swimSpeed = 0.55F;
         float swimDegree = 0.5F;
-        float partialTick = ageInTicks - entity.tickCount;
-        float flyProgress = entity.prevFlyProgress + (entity.flyProgress - entity.prevFlyProgress) * partialTick;
-        float landProgress = entity.prevOnLandProgress + (entity.onLandProgress - entity.prevOnLandProgress) * partialTick;
+        float flyProgress = Mth.lerp(1.0F, renderState.prevFlyProgress, renderState.flyProgress);
+        float landProgress = Mth.lerp(1.0F, renderState.prevOnLandProgress, renderState.onLandProgress);
         float swimProgress = Math.max(0, 5F - flyProgress) * 0.2F;
         AdvancedModelBox[] tailBoxes = new AdvancedModelBox[]{body, tail, tail_fin};
         progressRotationPrev(left_pectoralFin, flyProgress, Maths.rad(45), Maths.rad(80), Maths.rad(45), 5F);
