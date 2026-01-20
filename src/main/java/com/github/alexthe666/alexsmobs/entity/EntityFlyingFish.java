@@ -416,7 +416,7 @@ public class EntityFlyingFish extends WaterAnimal implements FlyingAnimal, Bucke
                 }else if(fish.isGliding() && fish.isInWater()){
                     stop();
                 }
-                Vec3 move = fish.getDeltaMovement().add(target.x, y, (double) (target.y));
+                Vec3 move = fish.getDeltaMovement().add(target.x, y, (double) (target.z));
                 fish.setDeltaMovement(move);
                 double d0 = move.horizontalDistance();
                 fish.setXRot((float)(-Mth.atan2(move.y, d0) * (double)Mth.RAD_TO_DEG));

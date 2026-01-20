@@ -36,7 +36,7 @@ public class AnimalAIRandomSwimming extends RandomStrollGoal {
     }
 
     public boolean canUse() {
-        if (this.mob.isVehicle()|| mob.getTarget() != null || !this.mob.isInWater() && !this.mob.isInLava()) {
+        if (this.mob.isVehicle() || mob.getTarget() != null || !this.mob.isInWater() && !this.mob.isInLava()) {
             return false;
         } else {
             if (!this.forceTrigger) {
