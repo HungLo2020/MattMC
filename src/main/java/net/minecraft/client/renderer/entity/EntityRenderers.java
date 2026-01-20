@@ -151,6 +151,7 @@ public class EntityRenderers {
 		register(EntityType.GUARDIAN, GuardianRenderer::new);
 		register(EntityType.HOGLIN, HoglinRenderer::new);
 		register(EntityType.HOPPER_MINECART, context -> new MinecartRenderer(context, ModelLayers.HOPPER_MINECART));
+		register(EntityType.HUMMINGBIRD, com.github.alexthe666.alexsmobs.client.render.RenderHummingbird::new);
 		register(EntityType.HORSE, HorseRenderer::new);
 		register(EntityType.HUSK, HuskRenderer::new);
 		register(EntityType.ILLUSIONER, IllusionerRenderer::new);

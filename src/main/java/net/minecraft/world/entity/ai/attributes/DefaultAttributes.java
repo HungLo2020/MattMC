@@ -145,6 +145,7 @@ public class DefaultAttributes {
 		.put(EntityType.GROTTOCERATOPS, GrottoceratopsEntity.createAttributes().build())
 		.put(EntityType.GUARDIAN, Guardian.createAttributes().build())
 		.put(EntityType.HOGLIN, Hoglin.createAttributes().build())
+		.put(EntityType.HUMMINGBIRD, com.github.alexthe666.alexsmobs.entity.EntityHummingbird.bakeAttributes().build())
 		.put(EntityType.HORSE, AbstractHorse.createBaseHorseAttributes().build())
 		.put(EntityType.HUSK, Zombie.createAttributes().build())
 		.put(EntityType.ILLUSIONER, Illusioner.createAttributes().build())
