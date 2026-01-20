@@ -29,4 +29,8 @@ public class AMSoundRegistry {
     // Crow sounds - reference vanilla SoundEvents
     public static final DeferredHolder CROW_IDLE = new DeferredHolder(() -> net.minecraft.sounds.SoundEvents.CROW_IDLE);
     public static final DeferredHolder CROW_HURT = new DeferredHolder(() -> net.minecraft.sounds.SoundEvents.CROW_HURT);
+    
+    // Endergrade sounds - reference vanilla SoundEvents
+    public static final DeferredHolder ENDERGRADE_IDLE = new DeferredHolder(() -> net.minecraft.sounds.SoundEvents.ENDERGRADE_IDLE);
+    public static final DeferredHolder ENDERGRADE_HURT = new DeferredHolder(() -> net.minecraft.sounds.SoundEvents.ENDERGRADE_HURT);
 }

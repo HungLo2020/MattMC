@@ -12783,6 +12783,47 @@
     ],
     "subtitle": "subtitles.entity.arrow.shoot"
   },
+  "entity.atlatitan.death": {
+    "sounds": [
+      "minecraft:mob/atlatitan/atlatitan_death_0",
+      "minecraft:mob/atlatitan/atlatitan_death_1"
+    ],
+    "subtitle": "subtitles.entity.atlatitan.death"
+  },
+  "entity.atlatitan.hurt": {
+    "sounds": [
+      "minecraft:mob/atlatitan/atlatitan_hurt_0",
+      "minecraft:mob/atlatitan/atlatitan_hurt_1",
+      "minecraft:mob/atlatitan/atlatitan_hurt_2"
+    ],
+    "subtitle": "subtitles.entity.atlatitan.hurt"
+  },
+  "entity.atlatitan.idle": {
+    "sounds": [
+      "minecraft:mob/atlatitan/atlatitan_idle_0",
+      "minecraft:mob/atlatitan/atlatitan_idle_1",
+      "minecraft:mob/atlatitan/atlatitan_idle_2"
+    ],
+    "subtitle": "subtitles.entity.atlatitan.ambient"
+  },
+  "entity.atlatitan.step": {
+    "sounds": [
+      "minecraft:mob/atlatitan/atlatitan_step_0",
+      "minecraft:mob/atlatitan/atlatitan_step_1",
+      "minecraft:mob/atlatitan/atlatitan_step_2",
+      "minecraft:mob/atlatitan/atlatitan_step_3",
+      "minecraft:mob/atlatitan/atlatitan_step_4",
+      "minecraft:mob/atlatitan/atlatitan_step_5"
+    ],
+    "subtitle": "subtitles.entity.atlatitan.step"
+  },
+  "entity.atlatitan.stomp": {
+    "sounds": [
+      "minecraft:mob/atlatitan/atlatitan_stomp_0",
+      "minecraft:mob/atlatitan/atlatitan_stomp_1"
+    ],
+    "subtitle": "subtitles.entity.atlatitan.stomp"
+  },
   "entity.axolotl.attack": {
     "sounds": [
       {
@@ -13696,6 +13737,14 @@
     ],
     "subtitle": "subtitles.block.generic.footsteps"
   },
+  "entity.cockroach.hurt": {
+    "sounds": [
+      "minecraft:cockroach_hurt_0",
+      "minecraft:cockroach_hurt_1",
+      "minecraft:cockroach_hurt_2"
+    ],
+    "subtitle": "subtitles.entity.cockroach.hurt"
+  },
   "entity.cod.ambient": {
     "sounds": []
   },
@@ -14069,6 +14118,14 @@
     ],
     "subtitle": "subtitles.block.generic.footsteps"
   },
+  "entity.cosmic_cod.hurt": {
+    "sounds": [
+      "minecraft:cosmic_cod_hurt_0",
+      "minecraft:cosmic_cod_hurt_1",
+      "minecraft:cosmic_cod_hurt_2"
+    ],
+    "subtitle": "subtitles.entity.cosmic_cod.hurt"
+  },
   "entity.cow.ambient": {
     "sounds": [
       "mob/cow/say1",
@@ -14110,22 +14167,6 @@
       "mob/cow/step4"
     ],
     "subtitle": "subtitles.block.generic.footsteps"
-  },
-  "entity.crow.hurt": {
-    "sounds": [
-      "crow_hurt_0",
-      "crow_hurt_1"
-    ],
-    "subtitle": "subtitles.entity.crow.hurt"
-  },
-  "entity.crow.idle": {
-    "sounds": [
-      "crow_idle_0",
-      "crow_idle_1",
-      "crow_idle_2",
-      "crow_idle_3"
-    ],
-    "subtitle": "subtitles.entity.crow.ambient"
   },
   "entity.creaking.activate": {
     "sounds": [
@@ -14233,6 +14274,22 @@
       "random/fuse"
     ],
     "subtitle": "subtitles.entity.creeper.primed"
+  },
+  "entity.crow.hurt": {
+    "sounds": [
+      "crow_hurt_0",
+      "crow_hurt_1"
+    ],
+    "subtitle": "subtitles.entity.crow.hurt"
+  },
+  "entity.crow.idle": {
+    "sounds": [
+      "crow_idle_0",
+      "crow_idle_1",
+      "crow_idle_2",
+      "crow_idle_3"
+    ],
+    "subtitle": "subtitles.entity.crow.ambient"
   },
   "entity.dolphin.ambient": {
     "sounds": [
@@ -14695,6 +14752,20 @@
       "random/bow"
     ],
     "subtitle": "subtitles.entity.ender_pearl.throw"
+  },
+  "entity.endergrade.hurt": {
+    "sounds": [
+      "endergrade_hurt_0"
+    ],
+    "subtitle": "subtitles.entity.endergrade.hurt"
+  },
+  "entity.endergrade.idle": {
+    "sounds": [
+      "endergrade_idle_0",
+      "endergrade_idle_1",
+      "endergrade_idle_2"
+    ],
+    "subtitle": "subtitles.entity.endergrade.ambient"
   },
   "entity.enderman.ambient": {
     "sounds": [
@@ -15953,69 +16024,13 @@
     ],
     "subtitle": "subtitles.block.generic.footsteps"
   },
-  "entity.atlatitan.idle": {
+  "entity.grottoceratops.attack": {
     "sounds": [
-      "minecraft:mob/atlatitan/atlatitan_idle_0",
-      "minecraft:mob/atlatitan/atlatitan_idle_1",
-      "minecraft:mob/atlatitan/atlatitan_idle_2"
+      "minecraft:entity/grottoceratops/grottoceratops_attack_0",
+      "minecraft:entity/grottoceratops/grottoceratops_attack_1",
+      "minecraft:entity/grottoceratops/grottoceratops_attack_2"
     ],
-    "subtitle": "subtitles.entity.atlatitan.ambient"
-  },
-  "entity.atlatitan.hurt": {
-    "sounds": [
-      "minecraft:mob/atlatitan/atlatitan_hurt_0",
-      "minecraft:mob/atlatitan/atlatitan_hurt_1",
-      "minecraft:mob/atlatitan/atlatitan_hurt_2"
-    ],
-    "subtitle": "subtitles.entity.atlatitan.hurt"
-  },
-  "entity.atlatitan.death": {
-    "sounds": [
-      "minecraft:mob/atlatitan/atlatitan_death_0",
-      "minecraft:mob/atlatitan/atlatitan_death_1"
-    ],
-    "subtitle": "subtitles.entity.atlatitan.death"
-  },
-  "entity.atlatitan.step": {
-    "sounds": [
-      "minecraft:mob/atlatitan/atlatitan_step_0",
-      "minecraft:mob/atlatitan/atlatitan_step_1",
-      "minecraft:mob/atlatitan/atlatitan_step_2",
-      "minecraft:mob/atlatitan/atlatitan_step_3",
-      "minecraft:mob/atlatitan/atlatitan_step_4",
-      "minecraft:mob/atlatitan/atlatitan_step_5"
-    ],
-    "subtitle": "subtitles.entity.atlatitan.step"
-  },
-  "entity.atlatitan.stomp": {
-    "sounds": [
-      "minecraft:mob/atlatitan/atlatitan_stomp_0",
-      "minecraft:mob/atlatitan/atlatitan_stomp_1"
-    ],
-    "subtitle": "subtitles.entity.atlatitan.stomp"
-  },
-  "entity.grottoceratops.idle": {
-    "sounds": [
-      "minecraft:entity/grottoceratops/grottoceratops_idle_0",
-      "minecraft:entity/grottoceratops/grottoceratops_idle_1",
-      "minecraft:entity/grottoceratops/grottoceratops_idle_2"
-    ],
-    "subtitle": "subtitles.entity.grottoceratops.ambient"
-  },
-  "entity.grottoceratops.hurt": {
-    "sounds": [
-      "minecraft:entity/grottoceratops/grottoceratops_hurt_0",
-      "minecraft:entity/grottoceratops/grottoceratops_hurt_1",
-      "minecraft:entity/grottoceratops/grottoceratops_hurt_2"
-    ],
-    "subtitle": "subtitles.entity.grottoceratops.hurt"
-  },
-  "entity.grottoceratops.death": {
-    "sounds": [
-      "minecraft:entity/grottoceratops/grottoceratops_death_0",
-      "minecraft:entity/grottoceratops/grottoceratops_death_1"
-    ],
-    "subtitle": "subtitles.entity.grottoceratops.death"
+    "subtitle": "subtitles.entity.grottoceratops.attack"
   },
   "entity.grottoceratops.call": {
     "sounds": [
@@ -16025,13 +16040,12 @@
     ],
     "subtitle": "subtitles.entity.grottoceratops.call"
   },
-  "entity.grottoceratops.attack": {
+  "entity.grottoceratops.death": {
     "sounds": [
-      "minecraft:entity/grottoceratops/grottoceratops_attack_0",
-      "minecraft:entity/grottoceratops/grottoceratops_attack_1",
-      "minecraft:entity/grottoceratops/grottoceratops_attack_2"
+      "minecraft:entity/grottoceratops/grottoceratops_death_0",
+      "minecraft:entity/grottoceratops/grottoceratops_death_1"
     ],
-    "subtitle": "subtitles.entity.grottoceratops.attack"
+    "subtitle": "subtitles.entity.grottoceratops.death"
   },
   "entity.grottoceratops.graze": {
     "sounds": [
@@ -16041,6 +16055,22 @@
     ],
     "subtitle": "subtitles.entity.grottoceratops.graze"
   },
+  "entity.grottoceratops.hurt": {
+    "sounds": [
+      "minecraft:entity/grottoceratops/grottoceratops_hurt_0",
+      "minecraft:entity/grottoceratops/grottoceratops_hurt_1",
+      "minecraft:entity/grottoceratops/grottoceratops_hurt_2"
+    ],
+    "subtitle": "subtitles.entity.grottoceratops.hurt"
+  },
+  "entity.grottoceratops.idle": {
+    "sounds": [
+      "minecraft:entity/grottoceratops/grottoceratops_idle_0",
+      "minecraft:entity/grottoceratops/grottoceratops_idle_1",
+      "minecraft:entity/grottoceratops/grottoceratops_idle_2"
+    ],
+    "subtitle": "subtitles.entity.grottoceratops.ambient"
+  },
   "entity.grottoceratops.step": {
     "sounds": [
       "minecraft:entity/grottoceratops/grottoceratops_step_0",
@@ -16048,81 +16078,6 @@
       "minecraft:entity/grottoceratops/grottoceratops_step_2"
     ],
     "subtitle": "subtitles.block.generic.footsteps"
-  },
-  "entity.tremorsaurus.idle": {
-    "sounds": [
-      "minecraft:entity/tremorsaurus/tremorsaurus_idle_0",
-      "minecraft:entity/tremorsaurus/tremorsaurus_idle_1",
-      "minecraft:entity/tremorsaurus/tremorsaurus_idle_2"
-    ],
-    "subtitle": "subtitles.entity.tremorsaurus.ambient"
-  },
-  "entity.tremorsaurus.hurt": {
-    "sounds": [
-      "minecraft:entity/tremorsaurus/tremorsaurus_hurt_0",
-      "minecraft:entity/tremorsaurus/tremorsaurus_hurt_1"
-    ],
-    "subtitle": "subtitles.entity.tremorsaurus.hurt"
-  },
-  "entity.tremorsaurus.death": {
-    "sounds": [
-      "minecraft:entity/tremorsaurus/tremorsaurus_death"
-    ],
-    "subtitle": "subtitles.entity.tremorsaurus.death"
-  },
-  "entity.tremorsaurus.roar": {
-    "sounds": [
-      "minecraft:entity/tremorsaurus/tremorsaurus_roar_0",
-      "minecraft:entity/tremorsaurus/tremorsaurus_roar_1",
-      "minecraft:entity/tremorsaurus/tremorsaurus_roar_2"
-    ],
-    "subtitle": "subtitles.entity.tremorsaurus.roar"
-  },
-  "entity.tremorsaurus.stomp": {
-    "sounds": [
-      "minecraft:entity/tremorsaurus/tremorsaurus_stomp_0",
-      "minecraft:entity/tremorsaurus/tremorsaurus_stomp_1",
-      "minecraft:entity/tremorsaurus/tremorsaurus_stomp_2",
-      "minecraft:entity/tremorsaurus/tremorsaurus_stomp_3"
-    ],
-    "subtitle": "subtitles.entity.tremorsaurus.stomp"
-  },
-  "entity.tremorsaurus.bite": {
-    "sounds": [
-      "minecraft:entity/tremorsaurus/tremorsaurus_bite"
-    ],
-    "subtitle": "subtitles.entity.tremorsaurus.bite"
-  },
-  "entity.tremorsaurus.throw": {
-    "sounds": [
-      "minecraft:entity/tremorsaurus/tremorsaurus_throw"
-    ],
-    "subtitle": "subtitles.entity.tremorsaurus.throw"
-  },
-  "entity.trilocaris.hurt": {
-    "sounds": [
-      "minecraft:entity/trilocaris/trilocaris_hurt_0",
-      "minecraft:entity/trilocaris/trilocaris_hurt_1",
-      "minecraft:entity/trilocaris/trilocaris_hurt_2"
-    ],
-    "subtitle": "subtitles.entity.trilocaris.hurt"
-  },
-  "entity.trilocaris.death": {
-    "sounds": [
-      "minecraft:entity/trilocaris/trilocaris_death_0",
-      "minecraft:entity/trilocaris/trilocaris_death_1",
-      "minecraft:entity/trilocaris/trilocaris_death_2"
-    ],
-    "subtitle": "subtitles.entity.trilocaris.death"
-  },
-  "entity.trilocaris.step": {
-    "sounds": [
-      "minecraft:entity/trilocaris/trilocaris_step_0",
-      "minecraft:entity/trilocaris/trilocaris_step_1",
-      "minecraft:entity/trilocaris/trilocaris_step_2",
-      "minecraft:entity/trilocaris/trilocaris_step_3"
-    ],
-    "subtitle": "subtitles.entity.trilocaris.step"
   },
   "entity.guardian.ambient": {
     "sounds": [
@@ -18936,13 +18891,13 @@
     ],
     "subtitle": "subtitles.entity.ravager.stunned"
   },
-  "entity.relicheirus.idle": {
+  "entity.relicheirus.death": {
     "sounds": [
-      "minecraft:entity/relicheirus/relicheirus_idle_0",
-      "minecraft:entity/relicheirus/relicheirus_idle_1",
-      "minecraft:entity/relicheirus/relicheirus_idle_2"
+      "minecraft:entity/relicheirus/relicheirus_death_0",
+      "minecraft:entity/relicheirus/relicheirus_death_1",
+      "minecraft:entity/relicheirus/relicheirus_death_2"
     ],
-    "subtitle": "subtitles.entity.relicheirus.ambient"
+    "subtitle": "subtitles.entity.relicheirus.death"
   },
   "entity.relicheirus.hurt": {
     "sounds": [
@@ -18952,13 +18907,21 @@
     ],
     "subtitle": "subtitles.entity.relicheirus.hurt"
   },
-  "entity.relicheirus.death": {
+  "entity.relicheirus.idle": {
     "sounds": [
-      "minecraft:entity/relicheirus/relicheirus_death_0",
-      "minecraft:entity/relicheirus/relicheirus_death_1",
-      "minecraft:entity/relicheirus/relicheirus_death_2"
+      "minecraft:entity/relicheirus/relicheirus_idle_0",
+      "minecraft:entity/relicheirus/relicheirus_idle_1",
+      "minecraft:entity/relicheirus/relicheirus_idle_2"
     ],
-    "subtitle": "subtitles.entity.relicheirus.death"
+    "subtitle": "subtitles.entity.relicheirus.ambient"
+  },
+  "entity.relicheirus.scratch": {
+    "sounds": [
+      "minecraft:entity/relicheirus/relicheirus_scratch_0",
+      "minecraft:entity/relicheirus/relicheirus_scratch_1",
+      "minecraft:entity/relicheirus/relicheirus_scratch_2"
+    ],
+    "subtitle": "subtitles.entity.relicheirus.scratch"
   },
   "entity.relicheirus.step": {
     "sounds": [
@@ -18968,14 +18931,6 @@
       "minecraft:entity/relicheirus/relicheirus_step_3"
     ],
     "subtitle": "subtitles.entity.relicheirus.step"
-  },
-  "entity.relicheirus.scratch": {
-    "sounds": [
-      "minecraft:entity/relicheirus/relicheirus_scratch_0",
-      "minecraft:entity/relicheirus/relicheirus_scratch_1",
-      "minecraft:entity/relicheirus/relicheirus_scratch_2"
-    ],
-    "subtitle": "subtitles.entity.relicheirus.scratch"
   },
   "entity.relicheirus.topple": {
     "sounds": [
@@ -19920,6 +19875,51 @@
     ],
     "subtitle": "subtitles.block.generic.footsteps"
   },
+  "entity.subterranodon.attack": {
+    "sounds": [
+      "minecraft:entity/subterranodon/subterranodon_attack_0",
+      "minecraft:entity/subterranodon/subterranodon_attack_1",
+      "minecraft:entity/subterranodon/subterranodon_attack_2",
+      "minecraft:entity/subterranodon/subterranodon_attack_3"
+    ],
+    "subtitle": "subtitles.entity.subterranodon.attack"
+  },
+  "entity.subterranodon.death": {
+    "sounds": [
+      "minecraft:entity/subterranodon/subterranodon_death_0",
+      "minecraft:entity/subterranodon/subterranodon_death_1",
+      "minecraft:entity/subterranodon/subterranodon_death_2"
+    ],
+    "subtitle": "subtitles.entity.subterranodon.death"
+  },
+  "entity.subterranodon.flap": {
+    "sounds": [
+      "minecraft:entity/subterranodon/subterranodon_flap_0",
+      "minecraft:entity/subterranodon/subterranodon_flap_1",
+      "minecraft:entity/subterranodon/subterranodon_flap_2",
+      "minecraft:entity/subterranodon/subterranodon_flap_3",
+      "minecraft:entity/subterranodon/subterranodon_flap_4",
+      "minecraft:entity/subterranodon/subterranodon_flap_5"
+    ],
+    "subtitle": "subtitles.entity.subterranodon.flap"
+  },
+  "entity.subterranodon.hurt": {
+    "sounds": [
+      "minecraft:entity/subterranodon/subterranodon_hurt_0",
+      "minecraft:entity/subterranodon/subterranodon_hurt_1",
+      "minecraft:entity/subterranodon/subterranodon_hurt_2"
+    ],
+    "subtitle": "subtitles.entity.subterranodon.hurt"
+  },
+  "entity.subterranodon.idle": {
+    "sounds": [
+      "minecraft:entity/subterranodon/subterranodon_idle_0",
+      "minecraft:entity/subterranodon/subterranodon_idle_1",
+      "minecraft:entity/subterranodon/subterranodon_idle_2",
+      "minecraft:entity/subterranodon/subterranodon_idle_3"
+    ],
+    "subtitle": "subtitles.entity.subterranodon.ambient"
+  },
   "entity.tadpole.death": {
     "sounds": [
       "mob/tadpole/death1",
@@ -19995,6 +19995,81 @@
       "random/fuse"
     ],
     "subtitle": "subtitles.entity.tnt.primed"
+  },
+  "entity.tremorsaurus.bite": {
+    "sounds": [
+      "minecraft:entity/tremorsaurus/tremorsaurus_bite"
+    ],
+    "subtitle": "subtitles.entity.tremorsaurus.bite"
+  },
+  "entity.tremorsaurus.death": {
+    "sounds": [
+      "minecraft:entity/tremorsaurus/tremorsaurus_death"
+    ],
+    "subtitle": "subtitles.entity.tremorsaurus.death"
+  },
+  "entity.tremorsaurus.hurt": {
+    "sounds": [
+      "minecraft:entity/tremorsaurus/tremorsaurus_hurt_0",
+      "minecraft:entity/tremorsaurus/tremorsaurus_hurt_1"
+    ],
+    "subtitle": "subtitles.entity.tremorsaurus.hurt"
+  },
+  "entity.tremorsaurus.idle": {
+    "sounds": [
+      "minecraft:entity/tremorsaurus/tremorsaurus_idle_0",
+      "minecraft:entity/tremorsaurus/tremorsaurus_idle_1",
+      "minecraft:entity/tremorsaurus/tremorsaurus_idle_2"
+    ],
+    "subtitle": "subtitles.entity.tremorsaurus.ambient"
+  },
+  "entity.tremorsaurus.roar": {
+    "sounds": [
+      "minecraft:entity/tremorsaurus/tremorsaurus_roar_0",
+      "minecraft:entity/tremorsaurus/tremorsaurus_roar_1",
+      "minecraft:entity/tremorsaurus/tremorsaurus_roar_2"
+    ],
+    "subtitle": "subtitles.entity.tremorsaurus.roar"
+  },
+  "entity.tremorsaurus.stomp": {
+    "sounds": [
+      "minecraft:entity/tremorsaurus/tremorsaurus_stomp_0",
+      "minecraft:entity/tremorsaurus/tremorsaurus_stomp_1",
+      "minecraft:entity/tremorsaurus/tremorsaurus_stomp_2",
+      "minecraft:entity/tremorsaurus/tremorsaurus_stomp_3"
+    ],
+    "subtitle": "subtitles.entity.tremorsaurus.stomp"
+  },
+  "entity.tremorsaurus.throw": {
+    "sounds": [
+      "minecraft:entity/tremorsaurus/tremorsaurus_throw"
+    ],
+    "subtitle": "subtitles.entity.tremorsaurus.throw"
+  },
+  "entity.trilocaris.death": {
+    "sounds": [
+      "minecraft:entity/trilocaris/trilocaris_death_0",
+      "minecraft:entity/trilocaris/trilocaris_death_1",
+      "minecraft:entity/trilocaris/trilocaris_death_2"
+    ],
+    "subtitle": "subtitles.entity.trilocaris.death"
+  },
+  "entity.trilocaris.hurt": {
+    "sounds": [
+      "minecraft:entity/trilocaris/trilocaris_hurt_0",
+      "minecraft:entity/trilocaris/trilocaris_hurt_1",
+      "minecraft:entity/trilocaris/trilocaris_hurt_2"
+    ],
+    "subtitle": "subtitles.entity.trilocaris.hurt"
+  },
+  "entity.trilocaris.step": {
+    "sounds": [
+      "minecraft:entity/trilocaris/trilocaris_step_0",
+      "minecraft:entity/trilocaris/trilocaris_step_1",
+      "minecraft:entity/trilocaris/trilocaris_step_2",
+      "minecraft:entity/trilocaris/trilocaris_step_3"
+    ],
+    "subtitle": "subtitles.entity.trilocaris.step"
   },
   "entity.tropical_fish.ambient": {
     "sounds": []
@@ -20174,6 +20249,61 @@
       }
     ],
     "subtitle": "subtitles.entity.turtle.swim"
+  },
+  "entity.vallumraptor.attack": {
+    "sounds": [
+      "minecraft:entity/vallumraptor/vallumraptor_attack_0",
+      "minecraft:entity/vallumraptor/vallumraptor_attack_1",
+      "minecraft:entity/vallumraptor/vallumraptor_attack_2"
+    ],
+    "subtitle": "subtitles.entity.vallumraptor.attack"
+  },
+  "entity.vallumraptor.call": {
+    "sounds": [
+      "minecraft:entity/vallumraptor/vallumraptor_call_0",
+      "minecraft:entity/vallumraptor/vallumraptor_call_1",
+      "minecraft:entity/vallumraptor/vallumraptor_call_2"
+    ],
+    "subtitle": "subtitles.entity.vallumraptor.call"
+  },
+  "entity.vallumraptor.death": {
+    "sounds": [
+      "minecraft:entity/vallumraptor/vallumraptor_death_0",
+      "minecraft:entity/vallumraptor/vallumraptor_death_1"
+    ],
+    "subtitle": "subtitles.entity.vallumraptor.death"
+  },
+  "entity.vallumraptor.hurt": {
+    "sounds": [
+      "minecraft:entity/vallumraptor/vallumraptor_hurt_0",
+      "minecraft:entity/vallumraptor/vallumraptor_hurt_1",
+      "minecraft:entity/vallumraptor/vallumraptor_hurt_2"
+    ],
+    "subtitle": "subtitles.entity.vallumraptor.hurt"
+  },
+  "entity.vallumraptor.idle": {
+    "sounds": [
+      "minecraft:entity/vallumraptor/vallumraptor_idle_0",
+      "minecraft:entity/vallumraptor/vallumraptor_idle_1",
+      "minecraft:entity/vallumraptor/vallumraptor_idle_2"
+    ],
+    "subtitle": "subtitles.entity.vallumraptor.ambient"
+  },
+  "entity.vallumraptor.scratch": {
+    "sounds": [
+      "minecraft:entity/vallumraptor/vallumraptor_scratch_0",
+      "minecraft:entity/vallumraptor/vallumraptor_scratch_1",
+      "minecraft:entity/vallumraptor/vallumraptor_scratch_2"
+    ],
+    "subtitle": "subtitles.entity.vallumraptor.scratch"
+  },
+  "entity.vallumraptor.sleep": {
+    "sounds": [
+      "minecraft:entity/vallumraptor/vallumraptor_sleep_0",
+      "minecraft:entity/vallumraptor/vallumraptor_sleep_1",
+      "minecraft:entity/vallumraptor/vallumraptor_sleep_2"
+    ],
+    "subtitle": "subtitles.entity.vallumraptor.sleep"
   },
   "entity.vex.ambient": {
     "sounds": [
@@ -23316,6 +23446,14 @@
       }
     ]
   },
+  "music.la_cucaracha": {
+    "sounds": [
+      {
+        "name": "minecraft:la_cucaracha",
+        "stream": true
+      }
+    ]
+  },
   "music.menu": {
     "sounds": [
       {
@@ -24843,129 +24981,5 @@
       "ambient/weather/rain4"
     ],
     "subtitle": "subtitles.weather.rain"
-  },
-  "entity.subterranodon.idle": {
-    "sounds": [
-      "minecraft:entity/subterranodon/subterranodon_idle_0",
-      "minecraft:entity/subterranodon/subterranodon_idle_1",
-      "minecraft:entity/subterranodon/subterranodon_idle_2",
-      "minecraft:entity/subterranodon/subterranodon_idle_3"
-    ],
-    "subtitle": "subtitles.entity.subterranodon.ambient"
-  },
-  "entity.subterranodon.hurt": {
-    "sounds": [
-      "minecraft:entity/subterranodon/subterranodon_hurt_0",
-      "minecraft:entity/subterranodon/subterranodon_hurt_1",
-      "minecraft:entity/subterranodon/subterranodon_hurt_2"
-    ],
-    "subtitle": "subtitles.entity.subterranodon.hurt"
-  },
-  "entity.subterranodon.death": {
-    "sounds": [
-      "minecraft:entity/subterranodon/subterranodon_death_0",
-      "minecraft:entity/subterranodon/subterranodon_death_1",
-      "minecraft:entity/subterranodon/subterranodon_death_2"
-    ],
-    "subtitle": "subtitles.entity.subterranodon.death"
-  },
-  "entity.subterranodon.flap": {
-    "sounds": [
-      "minecraft:entity/subterranodon/subterranodon_flap_0",
-      "minecraft:entity/subterranodon/subterranodon_flap_1",
-      "minecraft:entity/subterranodon/subterranodon_flap_2",
-      "minecraft:entity/subterranodon/subterranodon_flap_3",
-      "minecraft:entity/subterranodon/subterranodon_flap_4",
-      "minecraft:entity/subterranodon/subterranodon_flap_5"
-    ],
-    "subtitle": "subtitles.entity.subterranodon.flap"
-  },
-  "entity.subterranodon.attack": {
-    "sounds": [
-      "minecraft:entity/subterranodon/subterranodon_attack_0",
-      "minecraft:entity/subterranodon/subterranodon_attack_1",
-      "minecraft:entity/subterranodon/subterranodon_attack_2",
-      "minecraft:entity/subterranodon/subterranodon_attack_3"
-    ],
-    "subtitle": "subtitles.entity.subterranodon.attack"
-  },
-  "entity.vallumraptor.idle": {
-    "sounds": [
-      "minecraft:entity/vallumraptor/vallumraptor_idle_0",
-      "minecraft:entity/vallumraptor/vallumraptor_idle_1",
-      "minecraft:entity/vallumraptor/vallumraptor_idle_2"
-    ],
-    "subtitle": "subtitles.entity.vallumraptor.ambient"
-  },
-  "entity.vallumraptor.hurt": {
-    "sounds": [
-      "minecraft:entity/vallumraptor/vallumraptor_hurt_0",
-      "minecraft:entity/vallumraptor/vallumraptor_hurt_1",
-      "minecraft:entity/vallumraptor/vallumraptor_hurt_2"
-    ],
-    "subtitle": "subtitles.entity.vallumraptor.hurt"
-  },
-  "entity.vallumraptor.death": {
-    "sounds": [
-      "minecraft:entity/vallumraptor/vallumraptor_death_0",
-      "minecraft:entity/vallumraptor/vallumraptor_death_1"
-    ],
-    "subtitle": "subtitles.entity.vallumraptor.death"
-  },
-  "entity.vallumraptor.call": {
-    "sounds": [
-      "minecraft:entity/vallumraptor/vallumraptor_call_0",
-      "minecraft:entity/vallumraptor/vallumraptor_call_1",
-      "minecraft:entity/vallumraptor/vallumraptor_call_2"
-    ],
-    "subtitle": "subtitles.entity.vallumraptor.call"
-  },
-  "entity.vallumraptor.attack": {
-    "sounds": [
-      "minecraft:entity/vallumraptor/vallumraptor_attack_0",
-      "minecraft:entity/vallumraptor/vallumraptor_attack_1",
-      "minecraft:entity/vallumraptor/vallumraptor_attack_2"
-    ],
-    "subtitle": "subtitles.entity.vallumraptor.attack"
-  },
-  "entity.vallumraptor.scratch": {
-    "sounds": [
-      "minecraft:entity/vallumraptor/vallumraptor_scratch_0",
-      "minecraft:entity/vallumraptor/vallumraptor_scratch_1",
-      "minecraft:entity/vallumraptor/vallumraptor_scratch_2"
-    ],
-    "subtitle": "subtitles.entity.vallumraptor.scratch"
-  },
-  "entity.vallumraptor.sleep": {
-    "sounds": [
-      "minecraft:entity/vallumraptor/vallumraptor_sleep_0",
-      "minecraft:entity/vallumraptor/vallumraptor_sleep_1",
-      "minecraft:entity/vallumraptor/vallumraptor_sleep_2"
-    ],
-    "subtitle": "subtitles.entity.vallumraptor.sleep"
-  },
-  "entity.cockroach.hurt": {
-    "sounds": [
-      "minecraft:cockroach_hurt_0",
-      "minecraft:cockroach_hurt_1",
-      "minecraft:cockroach_hurt_2"
-    ],
-    "subtitle": "subtitles.entity.cockroach.hurt"
-  },
-  "entity.cosmic_cod.hurt": {
-    "sounds": [
-      "minecraft:cosmic_cod_hurt_0",
-      "minecraft:cosmic_cod_hurt_1",
-      "minecraft:cosmic_cod_hurt_2"
-    ],
-    "subtitle": "subtitles.entity.cosmic_cod.hurt"
-  },
-  "music.la_cucaracha": {
-    "sounds": [
-      {
-        "name": "minecraft:la_cucaracha",
-        "stream": true
-      }
-    ]
   }
 }

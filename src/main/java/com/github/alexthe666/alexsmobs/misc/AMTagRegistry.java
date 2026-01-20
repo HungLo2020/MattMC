@@ -24,6 +24,12 @@ public class AMTagRegistry {
     public static final TagKey<Block> CROW_FOODBLOCKS = registerBlockTag("crow_foodblocks");
     public static final TagKey<EntityType<?>> SCATTERS_CROWS = registerEntityTag("scatters_crows");
 
+    // Endergrade-specific tags
+    public static final TagKey<Item> ENDERGRADE_BREEDABLES = registerItemTag("endergrade_breedables");
+    public static final TagKey<Item> ENDERGRADE_FOLLOWS = registerItemTag("endergrade_follows");
+    public static final TagKey<Item> ENDERGRADE_FOODSTUFFS = registerItemTag("endergrade_foodstuffs");
+    public static final TagKey<Block> ENDERGRADE_BREAKABLES = registerBlockTag("endergrade_breakables");
+
     private static TagKey<Item> registerItemTag(String name) {
         return TagKey.create(Registries.ITEM, ResourceLocation.withDefaultNamespace(name));
     }

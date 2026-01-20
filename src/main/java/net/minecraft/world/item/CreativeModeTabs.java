@@ -1926,6 +1926,7 @@ public class CreativeModeTabs {
 					output.accept(Items.DONKEY_SPAWN_EGG);
 					output.accept(Items.DROWNED_SPAWN_EGG);
 					output.accept(Items.ELDER_GUARDIAN_SPAWN_EGG);
+					output.accept(Items.ENDERGRADE_SPAWN_EGG);
 					output.accept(Items.ENDERMAN_SPAWN_EGG);
 					output.accept(Items.ENDERMITE_SPAWN_EGG);
 					output.accept(Items.EVOKER_SPAWN_EGG);
