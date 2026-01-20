@@ -7,8 +7,8 @@
     crow
     endergrade
     fliying fish
-gazelle
-hummingbird
+    gazelle
+    hummingbird
 jerboa
 mimic octopus
 muskipper
