@@ -21,6 +21,7 @@ import com.github.alexthe666.alexsmobs.client.render.RenderBlobfish;
 import com.github.alexthe666.alexsmobs.client.render.RenderCombJelly;
 import com.github.alexthe666.alexsmobs.client.render.RenderCosmicCod;
 import com.github.alexthe666.alexsmobs.client.render.RenderEndergrade;
+import com.github.alexthe666.alexsmobs.client.render.RenderFlyingFish;
 
 @Environment(EnvType.CLIENT)
 public class EntityRenderers {
@@ -129,6 +130,7 @@ public class EntityRenderers {
 		register(EntityType.FIREBALL, context -> new ThrownItemRenderer(context, 3.0F, true));
 		register(EntityType.FIREWORK_ROCKET, FireworkEntityRenderer::new);
 		register(EntityType.FISHING_BOBBER, FishingHookRenderer::new);
+		register(EntityType.FLYING_FISH, RenderFlyingFish::new);
 		register(EntityType.FOX, FoxRenderer::new);
 		register(EntityType.FROG, FrogRenderer::new);
 		register(EntityType.FURNACE_MINECART, context -> new MinecartRenderer(context, ModelLayers.FURNACE_MINECART));

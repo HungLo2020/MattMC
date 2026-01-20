@@ -80,6 +80,7 @@ import com.github.alexmodguy.alexscaves.server.entity.living.TrilocarisEntity;
 import com.github.alexmodguy.alexscaves.server.entity.living.VallumraptorEntity;
 import com.github.alexthe666.alexsmobs.entity.EntityBlobfish;
 import com.github.alexthe666.alexsmobs.entity.EntityCosmicCod;
+import com.github.alexthe666.alexsmobs.entity.EntityFlyingFish;
 import net.minecraft.world.entity.boss.enderdragon.EndCrystal;
 import net.minecraft.world.entity.boss.enderdragon.EnderDragon;
 import net.minecraft.world.entity.boss.wither.WitherBoss;
@@ -535,6 +536,13 @@ public class EntityType<T extends Entity> implements FeatureElement, EntityTypeT
 			.sized(0.25F, 0.25F)
 			.clientTrackingRange(4)
 			.updateInterval(10)
+	);
+	public static final EntityType<EntityFlyingFish> FLYING_FISH = register(
+		"flying_fish",
+		EntityType.Builder.of(EntityFlyingFish::new, MobCategory.WATER_AMBIENT)
+			.sized(0.4F, 0.3F)
+			.eyeHeight(0.2F)
+			.clientTrackingRange(4)
 	);
 	public static final EntityType<Fox> FOX = register(
 		"fox",

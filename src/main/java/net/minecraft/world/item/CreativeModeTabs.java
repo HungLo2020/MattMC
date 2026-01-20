@@ -1930,6 +1930,7 @@ public class CreativeModeTabs {
 					output.accept(Items.ENDERMAN_SPAWN_EGG);
 					output.accept(Items.ENDERMITE_SPAWN_EGG);
 					output.accept(Items.EVOKER_SPAWN_EGG);
+					output.accept(Items.FLYING_FISH_SPAWN_EGG);
 					output.accept(Items.FOX_SPAWN_EGG);
 					output.accept(Items.FROG_SPAWN_EGG);
 					output.accept(Items.GHAST_SPAWN_EGG);

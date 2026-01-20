@@ -1807,6 +1807,12 @@ public class Items {
 	public static final Item ENDERMAN_SPAWN_EGG = registerItem("enderman_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.ENDERMAN));
 	public static final Item ENDERMITE_SPAWN_EGG = registerItem("endermite_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.ENDERMITE));
 	public static final Item EVOKER_SPAWN_EGG = registerItem("evoker_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.EVOKER));
+	public static final Item FLYING_FISH_SPAWN_EGG = registerItem("flying_fish_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.FLYING_FISH));
+	public static final Item FLYING_FISH_BUCKET = registerItem(
+		"flying_fish_bucket",
+		properties -> new MobBucketItem(EntityType.FLYING_FISH, Fluids.WATER, SoundEvents.BUCKET_EMPTY_FISH, properties),
+		new Item.Properties().stacksTo(1).component(DataComponents.BUCKET_ENTITY_DATA, CustomData.EMPTY)
+	);
 	public static final Item FOX_SPAWN_EGG = registerItem("fox_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.FOX));
 	public static final Item FROG_SPAWN_EGG = registerItem("frog_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.FROG));
 	public static final Item GHAST_SPAWN_EGG = registerItem("ghast_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.GHAST));
