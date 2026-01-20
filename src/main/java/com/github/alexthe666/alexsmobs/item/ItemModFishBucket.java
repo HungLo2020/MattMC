@@ -52,13 +52,16 @@ public class ItemModFishBucket extends MobBucketItem {
     }
 
     private void spawnFish(ServerLevel serverLevel, ItemStack stack, BlockPos pos) {
-        Entity entity = getFishType().spawn(serverLevel, stack, (Player) null, pos, EntitySpawnReason.BUCKET, true, false);
+        Mob entity = getFishType().create(serverLevel, EntityType.createDefaultStackConfig(serverLevel, stack, null), pos, EntitySpawnReason.BUCKET, true, false);
         if (entity instanceof Bucketable) {
             Bucketable bucketable = (Bucketable) entity;
-            bucketable.loadFromBucketTag(stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag());
+            CustomData customData = stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY);
+            bucketable.loadFromBucketTag(customData.copyTag());
             bucketable.setFromBucket(true);
         }
-        addExtraAttributes(entity, stack);
+        if (entity != null) {
+            addExtraAttributes(entity, stack);
+        }
     }
 
     private void addExtraAttributes(Entity entity, ItemStack stack) {
