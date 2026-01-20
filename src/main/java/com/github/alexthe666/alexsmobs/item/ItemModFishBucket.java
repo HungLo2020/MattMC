@@ -35,7 +35,7 @@ public class ItemModFishBucket extends MobBucketItem {
     private final Supplier<? extends EntityType<? extends Mob>> fishTypeSupplier;
 
     public ItemModFishBucket(Supplier<? extends EntityType<? extends Mob>> fishTypeIn, Fluid fluid, Item.Properties builder) {
-        super(fishTypeIn.get(), fluid, SoundEvents.BUCKET_EMPTY_FISH, builder.stacksTo(1));
+        super(fishTypeIn.get(), fluid, SoundEvents.BUCKET_EMPTY_FISH, builder);
         this.fishTypeSupplier = fishTypeIn;
     }
 

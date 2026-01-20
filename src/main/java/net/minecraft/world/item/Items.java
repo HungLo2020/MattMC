@@ -1533,15 +1533,18 @@ public class Items {
 	);
 	public static final Item SMALL_CATFISH_BUCKET = registerItem(
 		"small_catfish_bucket",
-		properties -> new com.github.alexthe666.alexsmobs.item.ItemModFishBucket(() -> EntityType.CATFISH, Fluids.WATER, properties)
+		properties -> new com.github.alexthe666.alexsmobs.item.ItemModFishBucket(() -> EntityType.CATFISH, Fluids.WATER, properties),
+		new Item.Properties().stacksTo(1).component(DataComponents.BUCKET_ENTITY_DATA, CustomData.EMPTY)
 	);
 	public static final Item MEDIUM_CATFISH_BUCKET = registerItem(
 		"medium_catfish_bucket",
-		properties -> new com.github.alexthe666.alexsmobs.item.ItemModFishBucket(() -> EntityType.CATFISH, Fluids.WATER, properties)
+		properties -> new com.github.alexthe666.alexsmobs.item.ItemModFishBucket(() -> EntityType.CATFISH, Fluids.WATER, properties),
+		new Item.Properties().stacksTo(1).component(DataComponents.BUCKET_ENTITY_DATA, CustomData.EMPTY)
 	);
 	public static final Item LARGE_CATFISH_BUCKET = registerItem(
 		"large_catfish_bucket",
-		properties -> new com.github.alexthe666.alexsmobs.item.ItemModFishBucket(() -> EntityType.CATFISH, Fluids.WATER, properties)
+		properties -> new com.github.alexthe666.alexsmobs.item.ItemModFishBucket(() -> EntityType.CATFISH, Fluids.WATER, properties),
+		new Item.Properties().stacksTo(1).component(DataComponents.BUCKET_ENTITY_DATA, CustomData.EMPTY)
 	);
 	public static final Item TRILOCARIS_BUCKET = registerItem(
 		"trilocaris_bucket",
