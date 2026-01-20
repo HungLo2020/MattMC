@@ -25,4 +25,8 @@ public class AMSoundRegistry {
     
     // Comb Jelly sounds - reference vanilla SoundEvents
     public static final DeferredHolder COMB_JELLY_HURT = new DeferredHolder(() -> net.minecraft.sounds.SoundEvents.COMB_JELLY_HURT);
+    
+    // Crow sounds - reference vanilla SoundEvents
+    public static final DeferredHolder CROW_IDLE = new DeferredHolder(() -> net.minecraft.sounds.SoundEvents.CROW_IDLE);
+    public static final DeferredHolder CROW_HURT = new DeferredHolder(() -> net.minecraft.sounds.SoundEvents.CROW_HURT);
 }

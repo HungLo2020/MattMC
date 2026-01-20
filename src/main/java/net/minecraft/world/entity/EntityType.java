@@ -386,6 +386,9 @@ public class EntityType<T extends Entity> implements FeatureElement, EntityTypeT
 	public static final EntityType<Cow> COW = register(
 		"cow", EntityType.Builder.of(Cow::new, MobCategory.CREATURE).sized(0.9F, 1.4F).eyeHeight(1.3F).passengerAttachments(1.36875F).clientTrackingRange(10)
 	);
+	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntityCrow> CROW = register(
+		"crow", EntityType.Builder.of(com.github.alexthe666.alexsmobs.entity.EntityCrow::new, MobCategory.CREATURE).sized(0.45F, 0.45F).eyeHeight(0.3F).clientTrackingRange(10)
+	);
 	public static final EntityType<Creaking> CREAKING = register(
 		"creaking", EntityType.Builder.of(Creaking::new, MobCategory.MONSTER).sized(0.9F, 2.7F).eyeHeight(2.3F).clientTrackingRange(8).notInPeaceful()
 	);

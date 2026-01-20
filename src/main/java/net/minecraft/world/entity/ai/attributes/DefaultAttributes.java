@@ -119,6 +119,7 @@ public class DefaultAttributes {
 		.put(EntityType.COD, AbstractFish.createAttributes().build())
 		.put(EntityType.COPPER_GOLEM, CopperGolem.createAttributes().build())
 		.put(EntityType.COW, Cow.createAttributes().build())
+		.put(EntityType.CROW, com.github.alexthe666.alexsmobs.entity.EntityCrow.bakeAttributes().build())
 		.put(EntityType.CREAKING, Creaking.createAttributes().build())
 		.put(EntityType.CREEPER, Creeper.createAttributes().build())
 		.put(EntityType.DOLPHIN, Dolphin.createAttributes().build())

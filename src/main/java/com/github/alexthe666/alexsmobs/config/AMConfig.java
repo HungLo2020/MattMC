@@ -7,4 +7,8 @@ public class AMConfig {
     
     // Comb Jelly spawn configuration
     public static int combJellySpawnRolls = 2;
+    
+    // Crow spawn configuration
+    public static int crowSpawnRolls = 2;
+    public static boolean crowsStealCrops = true;
 }

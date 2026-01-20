@@ -1792,6 +1792,7 @@ public class Items {
 		"copper_golem_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.COPPER_GOLEM)
 	);
 	public static final Item COW_SPAWN_EGG = registerItem("cow_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.COW));
+	public static final Item CROW_SPAWN_EGG = registerItem("crow_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.CROW));
 	public static final Item CREEPER_SPAWN_EGG = registerItem("creeper_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.CREEPER));
 	public static final Item DOLPHIN_SPAWN_EGG = registerItem("dolphin_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.DOLPHIN));
 	public static final Item DONKEY_SPAWN_EGG = registerItem("donkey_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.DONKEY));
