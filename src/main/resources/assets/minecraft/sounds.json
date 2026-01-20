@@ -16398,6 +16398,27 @@
     ],
     "subtitle": "subtitles.block.generic.footsteps"
   },
+  "entity.hummingbird.idle": {
+    "sounds": [
+      "hummingbird_idle_0",
+      "hummingbird_idle_1",
+      "hummingbird_idle_2"
+    ],
+    "subtitle": "subtitles.entity.hummingbird.idle"
+  },
+  "entity.hummingbird.hurt": {
+    "sounds": [
+      "hummingbird_hurt_0",
+      "hummingbird_hurt_1"
+    ],
+    "subtitle": "subtitles.entity.hummingbird.hurt"
+  },
+  "entity.hummingbird.loop": {
+    "sounds": [
+      "hummingbird_loop_0"
+    ],
+    "subtitle": "subtitles.entity.hummingbird.loop"
+  },
   "entity.horse.ambient": {
     "sounds": [
       "mob/horse/idle1",

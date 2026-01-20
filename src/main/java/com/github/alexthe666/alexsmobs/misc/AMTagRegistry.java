@@ -32,6 +32,11 @@ public class AMTagRegistry {
 
     // Gazelle-specific tags
     public static final TagKey<Item> GAZELLE_BREEDABLES = registerItemTag("gazelle_breedables");
+    
+    // Hummingbird-specific tags
+    public static final TagKey<Item> HUMMINGBIRD_BREEDABLES = registerItemTag("hummingbird_breedables");
+    public static final TagKey<Block> HUMMINGBIRD_POLLINATES = registerBlockTag("hummingbird_pollinates");
+    public static final TagKey<Block> HUMMINGBIRD_SPAWNS = registerBlockTag("hummingbird_spawns");
 
     private static TagKey<Item> registerItemTag(String name) {
         return TagKey.create(Registries.ITEM, ResourceLocation.withDefaultNamespace(name));

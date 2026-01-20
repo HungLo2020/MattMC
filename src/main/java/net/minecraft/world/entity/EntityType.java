@@ -629,6 +629,12 @@ public class EntityType<T extends Entity> implements FeatureElement, EntityTypeT
 		"hopper_minecart",
 		EntityType.Builder.of(MinecartHopper::new, MobCategory.MISC).noLootTable().sized(0.98F, 0.7F).passengerAttachments(0.1875F).clientTrackingRange(8)
 	);
+	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntityHummingbird> HUMMINGBIRD = register(
+		"hummingbird",
+		EntityType.Builder.of(com.github.alexthe666.alexsmobs.entity.EntityHummingbird::new, MobCategory.CREATURE)
+			.sized(0.4F, 0.4F)
+			.clientTrackingRange(8)
+	);
 	public static final EntityType<Horse> HORSE = register(
 		"horse",
 		EntityType.Builder.of(Horse::new, MobCategory.CREATURE).sized(1.3964844F, 1.6F).eyeHeight(1.52F).passengerAttachments(1.44375F).clientTrackingRange(10)

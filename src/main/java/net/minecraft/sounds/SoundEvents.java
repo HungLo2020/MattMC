@@ -825,6 +825,9 @@ public class SoundEvents {
 	public static final SoundEvent HOGLIN_HURT = register("entity.hoglin.hurt");
 	public static final SoundEvent HOGLIN_RETREAT = register("entity.hoglin.retreat");
 	public static final SoundEvent HOGLIN_STEP = register("entity.hoglin.step");
+	public static final SoundEvent HUMMINGBIRD_IDLE = register("entity.hummingbird.idle");
+	public static final SoundEvent HUMMINGBIRD_HURT = register("entity.hummingbird.hurt");
+	public static final SoundEvent HUMMINGBIRD_LOOP = register("entity.hummingbird.loop");
 	public static final SoundEvent HONEY_BLOCK_BREAK = register("block.honey_block.break");
 	public static final SoundEvent HONEY_BLOCK_FALL = register("block.honey_block.fall");
 	public static final SoundEvent HONEY_BLOCK_HIT = register("block.honey_block.hit");

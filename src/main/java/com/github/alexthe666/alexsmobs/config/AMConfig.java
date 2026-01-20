@@ -14,4 +14,7 @@ public class AMConfig {
     
     // Endergrade spawn configuration
     public static int endergradeSpawnRolls = 2;
+    
+    // Hummingbird spawn configuration
+    public static int hummingbirdSpawnRolls = 2;
 }
