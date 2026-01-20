@@ -1953,6 +1953,7 @@ public class CreativeModeTabs {
 					output.accept(Items.IRON_GOLEM_SPAWN_EGG);
 					output.accept(Items.LLAMA_SPAWN_EGG);
 					output.accept(Items.MAGMA_CUBE_SPAWN_EGG);
+					output.accept(Items.MIMIC_OCTOPUS_SPAWN_EGG);
 					output.accept(Items.MOOSHROOM_SPAWN_EGG);
 					output.accept(Items.MULE_SPAWN_EGG);
 					output.accept(Items.OCELOT_SPAWN_EGG);

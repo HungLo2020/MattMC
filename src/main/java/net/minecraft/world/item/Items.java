@@ -1832,6 +1832,7 @@ public class Items {
 	public static final Item IRON_GOLEM_SPAWN_EGG = registerItem("iron_golem_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.IRON_GOLEM));
 	public static final Item LLAMA_SPAWN_EGG = registerItem("llama_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.LLAMA));
 	public static final Item MAGMA_CUBE_SPAWN_EGG = registerItem("magma_cube_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.MAGMA_CUBE));
+	public static final Item MIMIC_OCTOPUS_SPAWN_EGG = registerItem("mimic_octopus_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.MIMIC_OCTOPUS));
 	public static final Item MOOSHROOM_SPAWN_EGG = registerItem("mooshroom_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.MOOSHROOM));
 	public static final Item MULE_SPAWN_EGG = registerItem("mule_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.MULE));
 	public static final Item OCELOT_SPAWN_EGG = registerItem("ocelot_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.OCELOT));

@@ -173,6 +173,7 @@ public class EntityRenderers {
 		register(EntityType.MANGROVE_CHEST_BOAT, context -> new BoatRenderer(context, ModelLayers.MANGROVE_CHEST_BOAT));
 		register(EntityType.MARKER, NoopRenderer::new);
 		register(EntityType.MINECART, context -> new MinecartRenderer(context, ModelLayers.MINECART));
+		register(EntityType.MIMIC_OCTOPUS, com.github.alexthe666.alexsmobs.client.render.RenderMimicOctopus::new);
 		register(EntityType.MOOSHROOM, MushroomCowRenderer::new);
 		register(EntityType.MULE, context -> new DonkeyRenderer(context, DonkeyRenderer.Type.MULE));
 		register(EntityType.OAK_BOAT, context -> new BoatRenderer(context, ModelLayers.OAK_BOAT));

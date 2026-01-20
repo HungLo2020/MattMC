@@ -774,6 +774,13 @@ public class EntityType<T extends Entity> implements FeatureElement, EntityTypeT
 	public static final EntityType<Minecart> MINECART = register(
 		"minecart", EntityType.Builder.of(Minecart::new, MobCategory.MISC).noLootTable().sized(0.98F, 0.7F).passengerAttachments(0.1875F).clientTrackingRange(8)
 	);
+	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntityMimicOctopus> MIMIC_OCTOPUS = register(
+		"mimic_octopus",
+		EntityType.Builder.<com.github.alexthe666.alexsmobs.entity.EntityMimicOctopus>of(com.github.alexthe666.alexsmobs.entity.EntityMimicOctopus::new, MobCategory.WATER_CREATURE)
+			.sized(0.9F, 0.5F)
+			.eyeHeight(0.3F)
+			.clientTrackingRange(8)
+	);
 	public static final EntityType<MushroomCow> MOOSHROOM = register(
 		"mooshroom",
 		EntityType.Builder.of(MushroomCow::new, MobCategory.CREATURE).sized(0.9F, 1.4F).eyeHeight(1.3F).passengerAttachments(1.36875F).clientTrackingRange(10)

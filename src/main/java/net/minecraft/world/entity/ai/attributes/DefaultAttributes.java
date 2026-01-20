@@ -154,6 +154,7 @@ public class DefaultAttributes {
 		.put(EntityType.LLAMA, Llama.createAttributes().build())
 		.put(EntityType.MAGMA_CUBE, MagmaCube.createAttributes().build())
 		.put(EntityType.MANNEQUIN, LivingEntity.createLivingAttributes().build())
+		.put(EntityType.MIMIC_OCTOPUS, com.github.alexthe666.alexsmobs.entity.EntityMimicOctopus.bakeAttributes().build())
 		.put(EntityType.MOOSHROOM, Cow.createAttributes().build())
 		.put(EntityType.MULE, AbstractChestedHorse.createBaseChestedHorseAttributes().build())
 		.put(EntityType.OCELOT, Ocelot.createAttributes().build())
