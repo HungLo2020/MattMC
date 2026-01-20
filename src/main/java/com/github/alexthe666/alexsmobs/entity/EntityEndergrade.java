@@ -69,7 +69,7 @@ public class EntityEndergrade extends Animal implements FlyingAnimal {
     }
 
     public static AttributeSupplier.Builder bakeAttributes() {
-        return Monster.createMonsterAttributes().add(Attributes.MAX_HEALTH, 20D).add(Attributes.ARMOR, 0.0D).add(Attributes.ATTACK_DAMAGE, 2.0D).add(Attributes.MOVEMENT_SPEED, 0.15F).add(Attributes.STEP_HEIGHT, 1.0D);
+        return Monster.createMonsterAttributes().add(Attributes.MAX_HEALTH, 20D).add(Attributes.ARMOR, 0.0D).add(Attributes.ATTACK_DAMAGE, 2.0D).add(Attributes.MOVEMENT_SPEED, 0.15F).add(Attributes.STEP_HEIGHT, 1.0D).add(Attributes.TEMPT_RANGE, 10.0D);
     }
 
     public static boolean canEndergradeSpawn(EntityType<? extends Animal> animal, LevelAccessor worldIn, EntitySpawnReason reason, BlockPos pos, RandomSource random) {
