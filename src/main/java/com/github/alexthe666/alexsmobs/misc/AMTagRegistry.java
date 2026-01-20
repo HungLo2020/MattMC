@@ -30,6 +30,9 @@ public class AMTagRegistry {
     public static final TagKey<Item> ENDERGRADE_FOODSTUFFS = registerItemTag("endergrade_foodstuffs");
     public static final TagKey<Block> ENDERGRADE_BREAKABLES = registerBlockTag("endergrade_breakables");
 
+    // Gazelle-specific tags
+    public static final TagKey<Item> GAZELLE_BREEDABLES = registerItemTag("gazelle_breedables");
+
     private static TagKey<Item> registerItemTag(String name) {
         return TagKey.create(Registries.ITEM, ResourceLocation.withDefaultNamespace(name));
     }

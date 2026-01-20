@@ -15484,6 +15484,13 @@
     ],
     "subtitle": "subtitles.entity.generic.swim"
   },
+  "entity.gazelle.hurt": {
+    "sounds": [
+      "gazelle_hurt_0",
+      "gazelle_hurt_1"
+    ],
+    "subtitle": "subtitles.entity.gazelle.hurt"
+  },
   "entity.ghast.ambient": {
     "sounds": [
       "mob/ghast/moan1",
