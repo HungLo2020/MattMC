@@ -136,6 +136,7 @@ public class DefaultAttributes {
 		.put(EntityType.FLYING_FISH, EntityFlyingFish.createAttributes().build())
 		.put(EntityType.FOX, Fox.createAttributes().build())
 		.put(EntityType.FROG, Frog.createAttributes().build())
+		.put(EntityType.GAZELLE, com.github.alexthe666.alexsmobs.entity.EntityGazelle.createAttributes().build())
 		.put(EntityType.GHAST, Ghast.createAttributes().build())
 		.put(EntityType.HAPPY_GHAST, HappyGhast.createAttributes().build())
 		.put(EntityType.GIANT, Giant.createAttributes().build())

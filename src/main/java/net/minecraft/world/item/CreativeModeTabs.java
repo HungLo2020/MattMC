@@ -1938,6 +1938,7 @@ public class CreativeModeTabs {
 					output.accept(Items.FLYING_FISH_SPAWN_EGG);
 					output.accept(Items.FOX_SPAWN_EGG);
 					output.accept(Items.FROG_SPAWN_EGG);
+					output.accept(Items.GAZELLE_SPAWN_EGG);
 					output.accept(Items.GHAST_SPAWN_EGG);
 					output.accept(Items.GLOW_SQUID_SPAWN_EGG);
 					output.accept(Items.GOAT_SPAWN_EGG);

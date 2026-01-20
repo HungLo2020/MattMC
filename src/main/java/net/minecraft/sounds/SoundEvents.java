@@ -676,6 +676,7 @@ public class SoundEvents {
 	public static final SoundEvent GENERIC_SMALL_FALL = register("entity.generic.small_fall");
 	public static final SoundEvent GENERIC_SPLASH = register("entity.generic.splash");
 	public static final SoundEvent GENERIC_SWIM = register("entity.generic.swim");
+	public static final SoundEvent GAZELLE_HURT = register("entity.gazelle.hurt");
 	public static final SoundEvent GHAST_AMBIENT = register("entity.ghast.ambient");
 	public static final SoundEvent GHAST_DEATH = register("entity.ghast.death");
 	public static final SoundEvent GHAST_HURT = register("entity.ghast.hurt");

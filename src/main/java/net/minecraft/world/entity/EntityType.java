@@ -560,6 +560,13 @@ public class EntityType<T extends Entity> implements FeatureElement, EntityTypeT
 		"furnace_minecart",
 		EntityType.Builder.of(MinecartFurnace::new, MobCategory.MISC).noLootTable().sized(0.98F, 0.7F).passengerAttachments(0.1875F).clientTrackingRange(8)
 	);
+	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntityGazelle> GAZELLE = register(
+		"gazelle",
+		EntityType.Builder.of(com.github.alexthe666.alexsmobs.entity.EntityGazelle::new, MobCategory.CREATURE)
+			.sized(0.9F, 1.3F)
+			.eyeHeight(1.1F)
+			.clientTrackingRange(10)
+	);
 	public static final EntityType<Ghast> GHAST = register(
 		"ghast",
 		EntityType.Builder.of(Ghast::new, MobCategory.MONSTER)
