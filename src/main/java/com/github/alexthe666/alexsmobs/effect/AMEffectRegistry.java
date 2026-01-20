@@ -18,5 +18,5 @@ public class AMEffectRegistry {
     /**
      * Fleet Footed effect - points to vanilla speed effect
      */
-    public static final Holder<MobEffect> FLEET_FOOTED = MobEffects.MOVEMENT_SPEED;
+    public static final Holder<MobEffect> FLEET_FOOTED = MobEffects.SPEED;
 }

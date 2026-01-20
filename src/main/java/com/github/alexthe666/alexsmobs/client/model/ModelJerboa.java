@@ -100,6 +100,14 @@ public class ModelJerboa extends AdvancedEntityModel<JerboaRenderState> {
         float reboundProgress = renderState.reboundProgress;
         float jumpProgress = Math.max(0, renderState.jumpProgress - reboundProgress);
         float begProgress = renderState.begProgress;
+        
+        // Handle baby scaling
+        if (renderState.isBaby) {
+            root.setScale(0.65F, 0.65F, 0.65F);
+        } else {
+            root.setScale(1.0F, 1.0F, 1.0F);
+        }
+        
         this.walk(leftArm, idleSpeed, idleDegree, true, 2F, 0.3F, ageInTicks, 1);
         this.walk(rightArm, idleSpeed, idleDegree, true, 2F, 0.3F, ageInTicks, 1);
         this.walk(tail, idleSpeed, idleDegree * 0.5F, true, 1F, -0.05F, ageInTicks, 1);
@@ -151,26 +159,6 @@ public class ModelJerboa extends AdvancedEntityModel<JerboaRenderState> {
                 this.legs.rotationPointY -= Math.abs(headPitch) * 0.0225F;
                 this.legs.rotationPointZ -= Math.abs(headPitch) * 0.015F;
             }
-        }
-
-    }
-
-    public void renderToBuffer(PoseStack matrixStackIn, VertexConsumer bufferIn, int packedLightIn, int packedOverlayIn, int color) {
-        if (this.young) {
-            float f = 1.75F;
-            matrixStackIn.pushPose();
-            matrixStackIn.scale(0.65F, 0.65F, 0.65F);
-            matrixStackIn.translate(0.0D, 0.815D, 0.125D);
-            parts().forEach((p_228292_8_) -> {
-                p_228292_8_.render(matrixStackIn, bufferIn, packedLightIn, packedOverlayIn, color);
-            });
-            matrixStackIn.popPose();
-        } else {
-            matrixStackIn.pushPose();
-            parts().forEach((p_228290_8_) -> {
-                p_228290_8_.render(matrixStackIn, bufferIn, packedLightIn, packedOverlayIn, color);
-            });
-            matrixStackIn.popPose();
         }
 
     }

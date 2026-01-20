@@ -32,7 +32,7 @@ public class JerboaAIBeg extends Goal {
             if(this.jerboa.isInLove()){
                 return false;
             }
-            this.closestPlayer = this.jerboa.level().getNearestPlayer(ENTITY_PREDICATE, this.jerboa);
+            this.closestPlayer = this.jerboa.level().getNearestPlayer(this.jerboa.getX(), this.jerboa.getY(), this.jerboa.getZ(), 32D, false);
             if (this.closestPlayer == null) {
                 return false;
             } else {
