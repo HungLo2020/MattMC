@@ -52,7 +52,7 @@ public class AnimalAIWanderRanged extends RandomStrollGoal {
 
     @Nullable
     protected Vec3 getPosition() {
-        if (this.mob.isInWaterOrBubble()) {
+        if (this.mob.isInWater()) {
             Vec3 vector3d = LandRandomPos.getPos(this.mob, xzRange, yRange);
             return vector3d == null ? super.getPosition() : vector3d;
         } else {

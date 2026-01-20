@@ -259,6 +259,19 @@ public class ModelGazelle extends AdvancedEntityModel<GazelleRenderState> {
     public void setupAnim(GazelleRenderState renderState) {
         this.resetToDefaultPose();
         
+        // Handle baby scaling
+        if (renderState.isBaby) {
+            float f = 1.75F;
+            head.setScale(f, f, f);
+            hornL.setScale(0.4F, 0.4F, 0.4F);
+            hornR.setScale(0.4F, 0.4F, 0.4F);
+            head.setShouldScaleChildren(true);
+        } else {
+            head.setScale(1, 1, 1);
+            hornL.setScale(1, 1, 1);
+            hornR.setScale(1, 1, 1);
+        }
+        
         // Extract render state data
         float limbSwing = renderState.walkAnimationPos;
         float limbSwingAmount = renderState.walkAnimationSpeed;
@@ -305,33 +318,6 @@ public class ModelGazelle extends AdvancedEntityModel<GazelleRenderState> {
             this.walk(backlegL, walkSpeed, walkDegree * 1.2F, true, 0F, 0F, limbSwing, limbSwingAmount);
 
         }
-    }
-
-    public void renderToBuffer(PoseStack matrixStackIn, VertexConsumer bufferIn, int packedLightIn, int packedOverlayIn, int color) {
-        if (this.young) {
-            float f = 1.75F;
-            head.setScale(f, f, f);
-            hornL.setScale(0.4F, 0.4F, 0.4F);
-            hornR.setScale(0.4F, 0.4F, 0.4F);
-            head.setShouldScaleChildren(true);
-            matrixStackIn.pushPose();
-            matrixStackIn.scale(0.5F, 0.5F, 0.5F);
-            matrixStackIn.translate(0.0D, 1.5D, 0.125D);
-            parts().forEach((p_228292_8_) -> {
-                p_228292_8_.render(matrixStackIn, bufferIn, packedLightIn, packedOverlayIn, -1);
-            });
-            matrixStackIn.popPose();
-            head.setScale(1, 1, 1);
-            hornL.setScale(1, 1, 1);
-            hornR.setScale(1, 1, 1);
-        } else {
-            matrixStackIn.pushPose();
-            parts().forEach((p_228290_8_) -> {
-                p_228290_8_.render(matrixStackIn, bufferIn, packedLightIn, packedOverlayIn, -1);
-            });
-            matrixStackIn.popPose();
-        }
-
     }
 
     @Override
