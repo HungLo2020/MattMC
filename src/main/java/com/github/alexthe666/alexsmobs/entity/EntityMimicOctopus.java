@@ -15,6 +15,9 @@ import net.minecraft.core.particles.ItemParticleOption;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.world.level.storage.ValueInput;
+import java.util.Optional;
+import net.minecraft.world.level.storage.ValueOutput;
 import net.minecraft.nbt.NbtUtils;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.syncher.EntityDataAccessor;
@@ -62,9 +65,6 @@ import net.minecraft.world.level.pathfinder.PathType;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
-import net.neoforged.api.distmarker.Dist;
-import net.neoforged.api.distmarker.OnlyIn;
-import net.neoforged.neoforge.fluids.FluidType;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -106,7 +106,7 @@ public class EntityMimicOctopus extends TamableAnimal implements ISemiAquatic, I
     private LivingEntity laserTargetEntity;
     private int guardianLaserTime;
 
-    protected EntityMimicOctopus(EntityType type, Level worldIn) {
+    public EntityMimicOctopus(EntityType type, Level worldIn) {
         super(type, worldIn);
         this.setPathfindingMalus(PathType.WATER, 0.0F);
         this.setPathfindingMalus(PathType.WATER_BORDER, 0.0F);
@@ -167,48 +167,53 @@ public class EntityMimicOctopus extends TamableAnimal implements ISemiAquatic, I
         return super.finalizeSpawn(worldIn, difficultyIn, reason, spawnDataIn);
     }
 
-    public void readAdditionalSaveData(CompoundTag compound) {
-        super.readAdditionalSaveData(compound);
-        this.entityData.set(MIMIC_ORDINAL, compound.getInt("MimicState"));
-        this.setUpgraded(compound.getBoolean("Upgraded"));
-        this.setOrderedToSit(compound.getBoolean("Sitting"));
-        this.setStopChange(compound.getBoolean("StopChange"));
-        this.setCommand(compound.getInt("OctoCommand"));
-        this.setMoistness(compound.getInt("Moistness"));
-        this.setFromBucket(compound.getBoolean("FromBucket"));
+    @Override
+    public void readAdditionalSaveData(ValueInput valueInput) {
+        super.readAdditionalSaveData(valueInput);
+        this.entityData.set(MIMIC_ORDINAL, valueInput.getIntOr("MimicState", 0));
+        this.setUpgraded(valueInput.getBooleanOr("Upgraded", false));
+        this.setOrderedToSit(valueInput.getBooleanOr("Sitting", false));
+        this.setStopChange(valueInput.getBooleanOr("StopChange", false));
+        this.setCommand(valueInput.getIntOr("OctoCommand", 0));
+        this.setMoistness(valueInput.getIntOr("Moistness", 2400));
+        this.setFromBucket(valueInput.getBooleanOr("FromBucket", false));
         BlockState blockstate = null;
-        if (compound.contains("MimickedBlockState", 10)) {
-            blockstate = NbtUtils.readBlockState(this.level().holderLookup(Registries.BLOCK), compound.getCompound("MimickedBlockState"));
-            if (blockstate.isAir()) {
-                blockstate = null;
+        if (valueInput.contains("MimickedBlockState")) {
+            Optional<CompoundTag> optTag = valueInput.getCompound("MimickedBlockState");
+            if (optTag.isPresent()) {
+                blockstate = NbtUtils.readBlockState(this.level().holderLookup(Registries.BLOCK), optTag.get());
+                if (blockstate.isAir()) {
+                    blockstate = null;
+                }
             }
         }
         this.setMimickedBlock(blockstate);
-        this.camoCooldown = compound.getInt("CamoCooldown");
-        this.mimicCooldown = compound.getInt("MimicCooldown");
-        this.stopMimicCooldown = compound.getInt("StopMimicCooldown");
-        this.fishFeedings = compound.getInt("FishFeedings");
-        this.mimicreamFeedings = compound.getInt("MimicreamFeedings");
+        this.camoCooldown = valueInput.getIntOr("CamoCooldown", 120);
+        this.mimicCooldown = valueInput.getIntOr("MimicCooldown", 0);
+        this.stopMimicCooldown = valueInput.getIntOr("StopMimicCooldown", -1);
+        this.fishFeedings = valueInput.getIntOr("FishFeedings", 0);
+        this.mimicreamFeedings = valueInput.getIntOr("MimicreamFeedings", 0);
     }
 
-    public void addAdditionalSaveData(CompoundTag compound) {
-        super.addAdditionalSaveData(compound);
-        compound.putInt("MimicState", this.getMimicState().ordinal());
-        compound.putBoolean("Upgraded", this.isUpgraded());
-        compound.putBoolean("Sitting", this.isSitting());
-        compound.putInt("OctoCommand", this.getCommand());
-        compound.putInt("Moistness", this.getMoistness());
-        compound.putBoolean("FromBucket", this.fromBucket());
-        compound.putBoolean("StopChange", this.isStopChange());
+    @Override
+    public void addAdditionalSaveData(ValueOutput valueOutput) {
+        super.addAdditionalSaveData(valueOutput);
+        valueOutput.putInt("MimicState", this.getMimicState().ordinal());
+        valueOutput.putBoolean("Upgraded", this.isUpgraded());
+        valueOutput.putBoolean("Sitting", this.isSitting());
+        valueOutput.putInt("OctoCommand", this.getCommand());
+        valueOutput.putInt("Moistness", this.getMoistness());
+        valueOutput.putBoolean("FromBucket", this.fromBucket());
+        valueOutput.putBoolean("StopChange", this.isStopChange());
         BlockState blockstate = this.getMimickedBlock();
         if (blockstate != null) {
-            compound.put("MimickedBlockState", NbtUtils.writeBlockState(blockstate));
+            valueOutput.putCompound("MimickedBlockState", NbtUtils.writeBlockState(blockstate));
         }
-        compound.putInt("CamoCooldown", this.camoCooldown);
-        compound.putInt("MimicCooldown", this.mimicCooldown);
-        compound.putInt("StopMimicCooldown", this.stopMimicCooldown);
-        compound.putInt("FishFeedings", this.fishFeedings);
-        compound.putInt("MimicreamFeedings", this.mimicreamFeedings);
+        valueOutput.putInt("CamoCooldown", this.camoCooldown);
+        valueOutput.putInt("MimicCooldown", this.mimicCooldown);
+        valueOutput.putInt("StopMimicCooldown", this.stopMimicCooldown);
+        valueOutput.putInt("FishFeedings", this.fishFeedings);
+        valueOutput.putInt("MimicreamFeedings", this.mimicreamFeedings);
     }
 
     @Override
@@ -461,9 +466,6 @@ public class EntityMimicOctopus extends TamableAnimal implements ISemiAquatic, I
     }
 
     @Override
-    public boolean canDrownInFluidType(FluidType type) {
-        return false; // Mimic octopus can breathe underwater
-    }
 
     private void switchNavigator(boolean onLand) {
         if (onLand) {
@@ -620,7 +622,6 @@ public class EntityMimicOctopus extends TamableAnimal implements ISemiAquatic, I
         return ((float) this.guardianLaserTime + p_175477_1_) / 30F;
     }
 
-    @OnlyIn(Dist.CLIENT)
     public void handleEntityEvent(byte id) {
         if (id == 68) {
             if (exclaimTime == 0) {
