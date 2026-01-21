@@ -166,7 +166,11 @@ public class EntityMudskipper extends TamableAnimal implements IFollower, ISemiA
     }
 
     public static AttributeSupplier.Builder createAttributes() {
-        return Monster.createMonsterAttributes().add(Attributes.MAX_HEALTH, 12.0D).add(Attributes.ATTACK_DAMAGE, 2.0D).add(Attributes.MOVEMENT_SPEED, 0.2F);
+        return Monster.createMonsterAttributes()
+            .add(Attributes.MAX_HEALTH, 12.0D)
+            .add(Attributes.ATTACK_DAMAGE, 2.0D)
+            .add(Attributes.MOVEMENT_SPEED, 0.2F)
+            .add(Attributes.TEMPT_RANGE);
     }
 
     @Override
