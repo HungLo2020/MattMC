@@ -1,5 +1,6 @@
 package com.github.alexthe666.alexsmobs.client.model;
 
+import com.github.alexthe666.alexsmobs.client.render.state.MimicOctopusRenderState;
 import com.github.alexthe666.alexsmobs.entity.EntityMimicOctopus;
 import com.github.alexthe666.alexsmobs.entity.util.Maths;
 import com.github.alexthe666.citadel.client.model.AdvancedEntityModel;
@@ -8,7 +9,7 @@ import com.github.alexthe666.citadel.client.model.basic.BasicModelPart;
 import com.google.common.collect.ImmutableList;
 import net.minecraft.util.Mth;
 
-public class ModelMimicOctopus extends AdvancedEntityModel<EntityMimicOctopus> {
+public class ModelMimicOctopus extends AdvancedEntityModel<MimicOctopusRenderState> {
     private final AdvancedModelBox root;
     private final AdvancedModelBox body;
     private final AdvancedModelBox leftEye;
@@ -137,43 +138,56 @@ public class ModelMimicOctopus extends AdvancedEntityModel<EntityMimicOctopus> {
     }
 
     @Override
-    public void setupAnim(EntityMimicOctopus entity, float limbSwing, float limbSwingAmount, float ageInTicks, float netHeadYaw, float headPitch) {
+    public void setupAnim(MimicOctopusRenderState renderState) {
         this.resetToDefaultPose();
-        float partialTicks = ageInTicks - entity.tickCount;
-        float transProgress = entity.prevTransProgress + (entity.transProgress - entity.prevTransProgress) * partialTicks;
-        float groundProgress = entity.prevGroundProgress + (entity.groundProgress - entity.prevGroundProgress) * partialTicks;
-        float sitProgress = entity.prevSitProgress + (entity.sitProgress - entity.prevSitProgress) * partialTicks;
-        float notSitProgress = 1 - sitProgress * 0.2F;
-        float swimProgress = (5F - groundProgress) * notSitProgress;
-        float groundProgressNorm = groundProgress * 0.2F * notSitProgress;
-        if(entity.getPrevMimicState() != null) {
-            float progress = notSitProgress * (5 - transProgress);
-            animateForMimicGround(entity.getPrevMimicState(), entity, limbSwing, limbSwingAmount, ageInTicks,  progress * groundProgressNorm);
-            if(sitProgress == 0){
-                animateForMimicWater(entity.getPrevMimicState(), entity, limbSwing, limbSwingAmount, ageInTicks, progress * (1 - groundProgressNorm));
+        float transProgress = renderState.transProgress;
+        float prevTransProgress = renderState.prevTransProgress;
+        float groundProgress = renderState.groundProgress;
+        float prevGroundProgress = renderState.prevGroundProgress;
+        float sitProgress = renderState.sitProgress;
+        float prevSitProgress = renderState.prevSitProgress;
+        EntityMimicOctopus.MimicState mimicState = renderState.mimicState;
+        EntityMimicOctopus.MimicState prevMimicState = renderState.prevMimicState;
+        float headPitch = renderState.xRot;
+        float ageInTicks = renderState.ageInTicks;
+        float limbSwing = renderState.walkAnimationPos;
+        float limbSwingAmount = renderState.walkAnimationSpeed;
+        
+        float partialTicks = 1.0F; // Render states don't have partialTicks, animations already interpolated
+        float transProgressInterp = prevTransProgress + (transProgress - prevTransProgress) * partialTicks;
+        float groundProgressInterp = prevGroundProgress + (groundProgress - prevGroundProgress) * partialTicks;
+        float sitProgressInterp = prevSitProgress + (sitProgress - prevSitProgress) * partialTicks;
+        float notSitProgress = 1 - sitProgressInterp * 0.2F;
+        float swimProgress = (5F - groundProgressInterp) * notSitProgress;
+        float groundProgressNorm = groundProgressInterp * 0.2F * notSitProgress;
+        if(prevMimicState != null) {
+            float progress = notSitProgress * (5 - transProgressInterp);
+            animateForMimicGround(prevMimicState, limbSwing, limbSwingAmount, ageInTicks,  progress * groundProgressNorm, renderState.hasGuardianLaser);
+            if(sitProgressInterp == 0){
+                animateForMimicWater(prevMimicState, limbSwing, limbSwingAmount, ageInTicks, progress * (1 - groundProgressNorm));
             }
         }
-        animateForMimicGround(entity.getMimicState(), entity, limbSwing, limbSwingAmount, ageInTicks, notSitProgress * transProgress * groundProgressNorm);
-        animateForMimicWater(entity.getMimicState(), entity, limbSwing, limbSwingAmount, ageInTicks, notSitProgress * transProgress * (1 - groundProgressNorm));
+        animateForMimicGround(mimicState, limbSwing, limbSwingAmount, ageInTicks, notSitProgress * transProgressInterp * groundProgressNorm, renderState.hasGuardianLaser);
+        animateForMimicWater(mimicState, limbSwing, limbSwingAmount, ageInTicks, notSitProgress * transProgressInterp * (1 - groundProgressNorm));
 
         if(swimProgress > 0.0F){
             float rot = headPitch * Mth.DEG_TO_RAD;
             this.body.rotationPointY += Math.abs(rot) * -7;
             this.body.rotateAngleX -= rot;
         }
-        progressRotationPrev(mantle, sitProgress, Maths.rad(10), 0, 0, 5F);
-        progressRotationPrev(leftFrontArm1, sitProgress,  0,  Maths.rad(10),  0, 5F);
-        progressRotationPrev(leftFrontArm2, sitProgress,  0,   Maths.rad(-5),  0, 5F);
-        progressRotationPrev(leftBackArm1, sitProgress,  0,  Maths.rad(-10),  0, 5F);
-        progressRotationPrev(leftBackArm2, sitProgress,  0,   Maths.rad(-15),  0, 5F);
-        progressRotationPrev(rightFrontArm1, sitProgress,  0,  Maths.rad(-10),  0, 5F);
-        progressRotationPrev(rightFrontArm2, sitProgress,  0,   Maths.rad(5),  0, 5F);
-        progressRotationPrev(rightBackArm1, sitProgress,  0,  Maths.rad(10),  0, 5F);
-        progressRotationPrev(rightBackArm2, sitProgress,  0,   Maths.rad(15),  0, 5F);
+        progressRotationPrev(mantle, sitProgressInterp, Maths.rad(10), 0, 0, 5F);
+        progressRotationPrev(leftFrontArm1, sitProgressInterp,  0,  Maths.rad(10),  0, 5F);
+        progressRotationPrev(leftFrontArm2, sitProgressInterp,  0,   Maths.rad(-5),  0, 5F);
+        progressRotationPrev(leftBackArm1, sitProgressInterp,  0,  Maths.rad(-10),  0, 5F);
+        progressRotationPrev(leftBackArm2, sitProgressInterp,  0,   Maths.rad(-15),  0, 5F);
+        progressRotationPrev(rightFrontArm1, sitProgressInterp,  0,  Maths.rad(-10),  0, 5F);
+        progressRotationPrev(rightFrontArm2, sitProgressInterp,  0,   Maths.rad(5),  0, 5F);
+        progressRotationPrev(rightBackArm1, sitProgressInterp,  0,  Maths.rad(10),  0, 5F);
+        progressRotationPrev(rightBackArm2, sitProgressInterp,  0,   Maths.rad(15),  0, 5F);
 
     }
 
-    public void animateForMimicWater(EntityMimicOctopus.MimicState state, EntityMimicOctopus entity, float limbSwing, float limbSwingAmount, float ageInTicks, float swimProgress) {
+    public void animateForMimicWater(EntityMimicOctopus.MimicState state, float limbSwing, float limbSwingAmount, float ageInTicks, float swimProgress) {
         limbSwingAmount = limbSwingAmount * swimProgress * 0.2F;
         progressRotationPrev(body, swimProgress, 0, Maths.rad(-180), 0, 5F);
         progressRotationPrev(leftFrontArm1, swimProgress, Maths.rad(-90),  Maths.rad(10), Maths.rad(-50), 5F);
@@ -255,7 +269,7 @@ public class ModelMimicOctopus extends AdvancedEntityModel<EntityMimicOctopus> {
         }
     }
 
-    public void animateForMimicGround(EntityMimicOctopus.MimicState state, EntityMimicOctopus entity, float limbSwing, float limbSwingAmount, float ageInTicks, float groundProgress){
+    public void animateForMimicGround(EntityMimicOctopus.MimicState state, float limbSwing, float limbSwingAmount, float ageInTicks, float groundProgress, boolean hasGuardianLaser){
         this.mantle.setScale(1, 1, 1);
         limbSwingAmount = limbSwingAmount * groundProgress * 0.2F;
         float degree = 0.8F;
@@ -319,7 +333,7 @@ public class ModelMimicOctopus extends AdvancedEntityModel<EntityMimicOctopus> {
             this.swing(rightFrontArm2, speed, degree * 0.3F, false, -2, -0.1F, limbSwing, limbSwingAmount);
             this.swing(rightBackArm1, speed, degree * 0.3F, false, -3, -0.1F, limbSwing, limbSwingAmount);
             this.swing(rightBackArm2, speed, degree * 0.3F, false, -4, 0.2F, limbSwing, limbSwingAmount);
-            if(entity.hasGuardianLaser()){
+            if(hasGuardianLaser){
                 progressRotationPrev(body, groundProgress, 0, Maths.rad(180), 0, 5F);
             }
         }

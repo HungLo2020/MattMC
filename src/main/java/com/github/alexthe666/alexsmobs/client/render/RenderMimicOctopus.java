@@ -1,6 +1,7 @@
 package com.github.alexthe666.alexsmobs.client.render;
 
 import com.github.alexthe666.alexsmobs.client.model.ModelMimicOctopus;
+import com.github.alexthe666.alexsmobs.client.render.state.MimicOctopusRenderState;
 import com.github.alexthe666.alexsmobs.entity.EntityMimicOctopus;
 import com.github.alexthe666.alexsmobs.entity.util.Maths;
 import com.mojang.blaze3d.vertex.PoseStack;
@@ -21,7 +22,7 @@ import net.minecraft.world.phys.Vec3;
 import org.joml.Matrix3f;
 import org.joml.Matrix4f;
 
-public class RenderMimicOctopus extends MobRenderer<EntityMimicOctopus, ModelMimicOctopus> {
+public class RenderMimicOctopus extends MobRenderer<EntityMimicOctopus, MimicOctopusRenderState, ModelMimicOctopus> {
     private static final ResourceLocation TEXTURE = ResourceLocation
             .withDefaultNamespace("textures/entity/mimic_octopus.png");
     private static final ResourceLocation TEXTURE_OVERLAY = ResourceLocation
@@ -45,6 +46,30 @@ public class RenderMimicOctopus extends MobRenderer<EntityMimicOctopus, ModelMim
         this.addLayer(new OverlayLayer(this));
     }
 
+    @Override
+    public MimicOctopusRenderState createRenderState() {
+        return new MimicOctopusRenderState();
+    }
+
+    @Override
+    public void extractRenderState(EntityMimicOctopus entity, MimicOctopusRenderState renderState, float partialTick) {
+        super.extractRenderState(entity, renderState, partialTick);
+        renderState.transProgress = entity.transProgress;
+        renderState.prevTransProgress = entity.prevTransProgress;
+        renderState.colorShiftProgress = entity.colorShiftProgress;
+        renderState.prevColorShiftProgress = entity.prevColorShiftProgress;
+        renderState.groundProgress = entity.groundProgress;
+        renderState.prevGroundProgress = entity.prevGroundProgress;
+        renderState.sitProgress = entity.sitProgress;
+        renderState.prevSitProgress = entity.prevSitProgress;
+        renderState.mimicState = entity.getMimicState();
+        renderState.prevMimicState = entity.getPrevMimicState();
+        renderState.mimickedBlock = entity.getMimickedBlock();
+        renderState.prevMimickedBlock = entity.getPrevMimickedBlock();
+        renderState.hasGuardianLaser = entity.hasGuardianLaser();
+        renderState.scale = entity.getScale();
+    }
+
     private static void vertex(VertexConsumer p_229108_0_, Matrix4f p_229108_1_, Matrix3f p_229108_2_,
             float p_229108_3_, float p_229108_4_, float p_229108_5_, int p_229108_6_, int p_229108_7_, int p_229108_8_,
             float p_229108_9_, float p_229108_10_) {
@@ -57,6 +82,9 @@ public class RenderMimicOctopus extends MobRenderer<EntityMimicOctopus, ModelMim
                 .setOverlay(OverlayTexture.NO_OVERLAY).setLight(15728880).setNormal(normal.x, normal.y, normal.z);
     }
 
+    // Guardian laser rendering is complex and needs entity access - commenting out for now
+    // Can be re-added later with proper render state handling
+    /*
     public void render(EntityMimicOctopus entityIn, float entityYaw, float partialTicks, PoseStack matrixStackIn,
             MultiBufferSource bufferIn, int packedLightIn) {
         LivingEntity livingentity = entityIn.getGuardianLaser();
@@ -130,12 +158,15 @@ public class RenderMimicOctopus extends MobRenderer<EntityMimicOctopus, ModelMim
         super.render(entityIn, entityYaw, partialTicks, matrixStackIn, bufferIn, packedLightIn);
 
     }
+    */
 
-    protected void scale(EntityMimicOctopus octo, PoseStack matrixStackIn, float partialTickTime) {
+    @Override
+    protected void scale(MimicOctopusRenderState renderState, PoseStack matrixStackIn) {
         matrixStackIn.translate(0, -0.02F, 0);
-        matrixStackIn.scale(0.9F * octo.getScale(), 0.9F * octo.getScale(), 0.9F * octo.getScale());
+        matrixStackIn.scale(0.9F * renderState.scale, 0.9F * renderState.scale, 0.9F * renderState.scale);
     }
 
+    /* Commenting out shouldRender override - needs entity access
     public boolean shouldRender(EntityMimicOctopus livingEntityIn, Frustum camera, double camX, double camY,
             double camZ) {
         if (super.shouldRender(livingEntityIn, camera, camX, camY, camZ)) {
@@ -161,25 +192,26 @@ public class RenderMimicOctopus extends MobRenderer<EntityMimicOctopus, ModelMim
         double d2 = Mth.lerp(p_177110_4_, entityLivingBaseIn.zOld, entityLivingBaseIn.getZ());
         return new Vec3(d0, d1, d2);
     }
+    */
 
-    public ResourceLocation getTextureLocation(EntityMimicOctopus entity) {
+    @Override
+    public ResourceLocation getTextureLocation(MimicOctopusRenderState renderState) {
         return TEXTURE;
     }
 
-    static class OverlayLayer extends RenderLayer<EntityMimicOctopus, ModelMimicOctopus> {
+    static class OverlayLayer extends RenderLayer<MimicOctopusRenderState, ModelMimicOctopus> {
 
         public OverlayLayer(RenderMimicOctopus render) {
             super(render);
         }
 
+        @Override
         public void render(PoseStack matrixStackIn, MultiBufferSource buffer, int packedLightIn,
-                EntityMimicOctopus entitylivingbaseIn, float limbSwing, float limbSwingAmount, float partialTicks,
-                float ageInTicks, float netHeadYaw, float headPitch) {
-            float transProgress = entitylivingbaseIn.prevTransProgress
-                    + (entitylivingbaseIn.transProgress - entitylivingbaseIn.prevTransProgress) * partialTicks;
-            float colorProgress = (entitylivingbaseIn.prevColorShiftProgress
-                    + (entitylivingbaseIn.colorShiftProgress - entitylivingbaseIn.prevColorShiftProgress)
-                            * partialTicks)
+                MimicOctopusRenderState renderState, float u, float v) {
+            float transProgress = renderState.transProgress;
+            float prevTransProgress = renderState.prevTransProgress;
+            float colorProgress = (renderState.prevColorShiftProgress
+                    + (renderState.colorShiftProgress - renderState.prevColorShiftProgress))
                     * 0.2F;
             float r = 1F;
             float g = 1F;
@@ -193,9 +225,9 @@ public class RenderMimicOctopus extends MobRenderer<EntityMimicOctopus, ModelMim
             float finG = 1.0F;
             float finB = 1.0F;
             float finA = 1.0F;
-            if (entitylivingbaseIn.getPrevMimicState() == EntityMimicOctopus.MimicState.OVERLAY) {
-                if (entitylivingbaseIn.getPrevMimickedBlock() != null) {
-                    int j = OctopusColorRegistry.getBlockColor(entitylivingbaseIn.getPrevMimickedBlock());
+            if (renderState.prevMimicState == EntityMimicOctopus.MimicState.OVERLAY) {
+                if (renderState.prevMimickedBlock != null) {
+                    int j = OctopusColorRegistry.getBlockColor(renderState.prevMimickedBlock);
                     startR = (float) (j >> 16 & 255) / 255.0F;
                     startG = (float) (j >> 8 & 255) / 255.0F;
                     startB = (float) (j & 255) / 255.0F;
@@ -203,9 +235,9 @@ public class RenderMimicOctopus extends MobRenderer<EntityMimicOctopus, ModelMim
                     startA = 0.0F;
                 }
             }
-            if ((entitylivingbaseIn.getMimicState() == EntityMimicOctopus.MimicState.OVERLAY)) {
-                if (entitylivingbaseIn.getMimickedBlock() != null) {
-                    int i = OctopusColorRegistry.getBlockColor(entitylivingbaseIn.getMimickedBlock());
+            if ((renderState.mimicState == EntityMimicOctopus.MimicState.OVERLAY)) {
+                if (renderState.mimickedBlock != null) {
+                    int i = OctopusColorRegistry.getBlockColor(renderState.mimickedBlock);
                     finR = (float) (i >> 16 & 255) / 255.0F;
                     finG = (float) (i >> 8 & 255) / 255.0F;
                     finB = (float) (i & 255) / 255.0F;
@@ -218,26 +250,26 @@ public class RenderMimicOctopus extends MobRenderer<EntityMimicOctopus, ModelMim
                 a = startA + (finA - startA) * colorProgress;
             }
             if (a == 1.0F) {
-                a *= 0.9F + 0.1F * (float) Math.sin(entitylivingbaseIn.tickCount * 0.1F);
+                a *= 0.9F + 0.1F * (float) Math.sin(renderState.ageInTicks * 0.1F);
             }
-            if (entitylivingbaseIn.getPrevMimicState() != null) {
+            if (renderState.prevMimicState != null) {
                 float alphaPrev = 1 - transProgress * 0.2F;
                 VertexConsumer prev = buffer
-                        .getBuffer(AMRenderTypes.entityTranslucent(getFor(entitylivingbaseIn.getPrevMimicState())));
-                if (entitylivingbaseIn.getPrevMimicState() == entitylivingbaseIn.getMimicState()) {
+                        .getBuffer(AMRenderTypes.entityTranslucent(getFor(renderState.prevMimicState)));
+                if (renderState.prevMimicState == renderState.mimicState) {
                     alphaPrev *= a;
                 }
                 this.getParentModel().renderToBuffer(matrixStackIn, prev, packedLightIn,
-                        getOverlayCoords(entitylivingbaseIn, 0), AMColorUtil.packColor(r, g, b, alphaPrev));
+                        OverlayTexture.NO_OVERLAY, AMColorUtil.packColor(r, g, b, alphaPrev));
             }
             float alphaCurrent = transProgress * 0.2F;
             VertexConsumer current = buffer
-                    .getBuffer(AMRenderTypes.entityTranslucent(getFor(entitylivingbaseIn.getMimicState())));
+                    .getBuffer(AMRenderTypes.entityTranslucent(getFor(renderState.mimicState)));
             this.getParentModel().renderToBuffer(matrixStackIn, current, packedLightIn,
-                    getOverlayCoords(entitylivingbaseIn, 0), AMColorUtil.packColor(r, g, b, a * alphaCurrent));
+                    OverlayTexture.NO_OVERLAY, AMColorUtil.packColor(r, g, b, a * alphaCurrent));
             VertexConsumer eyes = buffer.getBuffer(AMRenderTypes.entityTranslucent(TEXTURE_EYES));
             this.getParentModel().renderToBuffer(matrixStackIn, eyes, packedLightIn,
-                    getOverlayCoords(entitylivingbaseIn, 0), -1);
+                    OverlayTexture.NO_OVERLAY, -1);
         }
 
         public ResourceLocation getFor(EntityMimicOctopus.MimicState state) {
