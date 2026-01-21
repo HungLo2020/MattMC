@@ -142,29 +142,4 @@ public class ModelMudskipper extends AdvancedEntityModel<MudskipperRenderState> 
         this.swing(leftFin, walkSpeed, walkDegree, true, 2F, -0.3F, limbSwing, walkSwingAmount);
 
     }
-
-
-    @Override
-    public void renderToBuffer(PoseStack matrixStackIn, VertexConsumer buffer, int packedLight, int packedOverlay, int color){
-        if (this.young) {
-            float f = 1.45F;
-            head.setScale(f, f, f);
-            head.setShouldScaleChildren(true);
-            matrixStackIn.pushPose();
-            matrixStackIn.scale(0.5F, 0.5F, 0.5F);
-            matrixStackIn.translate(0.0D, 1.4D, 0D);
-            parts().forEach((p_228292_8_) -> {
-                p_228292_8_.render(matrixStackIn, buffer, packedLight, packedOverlay, -1);
-            });
-            matrixStackIn.popPose();
-            this.head.setScale(1F, 1F, 1F);
-        } else {
-            this.head.setScale(1F, 1F, 1F);
-            matrixStackIn.pushPose();
-            parts().forEach((p_228290_8_) -> {
-                p_228290_8_.render(matrixStackIn, buffer, packedLight, packedOverlay, -1);
-            });
-            matrixStackIn.popPose();
-        }
-    }
 }

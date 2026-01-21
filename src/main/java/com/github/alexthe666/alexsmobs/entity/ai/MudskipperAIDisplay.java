@@ -155,19 +155,19 @@ public class MudskipperAIDisplay extends Goal {
 
     @Nullable
     private EntityMudskipper getNearbyMudskipper() {
-        List<EntityMudskipper> skippers = this.world.getNearbyEntities(EntityMudskipper.class, JOSTLE_PREDICATE, this.mudskipper, this.mudskipper.getBoundingBox().inflate(16.0D));
-        double lvt_2_1_ = 1.7976931348623157E308D;
-        EntityMudskipper lvt_4_1_ = null;
-        Iterator var5 = skippers.iterator();
-
-        while (var5.hasNext()) {
-            EntityMudskipper lvt_6_1_ = (EntityMudskipper) var5.next();
-            if (this.mudskipper.canDisplayWith(lvt_6_1_) && this.mudskipper.distanceToSqr(lvt_6_1_) < lvt_2_1_) {
-                lvt_4_1_ = lvt_6_1_;
-                lvt_2_1_ = this.mudskipper.distanceToSqr(lvt_6_1_);
+        List<EntityMudskipper> skippers = this.world.getEntitiesOfClass(EntityMudskipper.class, this.mudskipper.getBoundingBox().inflate(16.0D), 
+            (EntityMudskipper skipper) -> skipper != null && this.mudskipper.canDisplayWith(skipper));
+        double minDist = Double.MAX_VALUE;
+        EntityMudskipper closest = null;
+        
+        for (EntityMudskipper skipper : skippers) {
+            double dist = this.mudskipper.distanceToSqr(skipper);
+            if (dist < minDist) {
+                closest = skipper;
+                minDist = dist;
             }
         }
 
-        return lvt_4_1_;
+        return closest;
     }
 }

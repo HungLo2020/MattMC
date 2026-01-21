@@ -8,21 +8,23 @@ import net.minecraft.world.entity.*;
 import net.minecraft.world.entity.projectile.ProjectileUtil;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.EntityHitResult;
 import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
 
 import javax.annotation.Nullable;
-import java.util.UUID;
 
 public abstract class EntityMobProjectile extends Entity {
-    private UUID ownerUUID;
+    private EntityReference<Entity> ownerRef;
     private int ownerNetworkId;
     private boolean leftOwner;
 
     public EntityMobProjectile(EntityType type, Level level) {
         super(type, level);
+        this.ownerRef = null;
     }
 
     public EntityMobProjectile(EntityType type, Level worldIn, Mob shooter) {
@@ -101,8 +103,8 @@ public abstract class EntityMobProjectile extends Entity {
 
     @Nullable
     public Entity getShooter() {
-        if (this.ownerUUID != null && this.level() instanceof ServerLevel) {
-            return ((ServerLevel) this.level()).getEntity(this.ownerUUID);
+        if (this.ownerRef != null && this.level() instanceof ServerLevel) {
+            return this.ownerRef.getEntity(this.level(), Entity.class);
         } else {
             return this.ownerNetworkId != 0 ? this.level().getEntity(this.ownerNetworkId) : null;
         }
@@ -110,33 +112,24 @@ public abstract class EntityMobProjectile extends Entity {
 
     public void setShooter(@Nullable Entity entityIn) {
         if (entityIn != null) {
-            this.ownerUUID = entityIn.getUUID();
+            this.ownerRef = EntityReference.of(entityIn);
             this.ownerNetworkId = entityIn.getId();
         }
 
     }
 
-    protected void addAdditionalSaveData(CompoundTag compound) {
-        if (this.ownerUUID != null) {
-            compound.putString("Owner", this.ownerUUID.toString());
-        }
-
+    @Override
+    protected void addAdditionalSaveData(ValueOutput valueOutput) {
+        EntityReference.store(this.ownerRef, valueOutput, "Owner");
         if (this.leftOwner) {
-            compound.putBoolean("LeftOwner", true);
+            valueOutput.putBoolean("LeftOwner", true);
         }
-
     }
 
-    protected void readAdditionalSaveData(CompoundTag compound) {
-        if (compound.contains("Owner")) {
-            try {
-                this.ownerUUID = java.util.UUID.fromString(compound.getString("Owner").orElse(""));
-            } catch (Exception e) {
-                this.ownerUUID = null;
-            }
-        }
-
-        this.leftOwner = compound.getBoolean("LeftOwner").orElse(false);
+    @Override
+    protected void readAdditionalSaveData(ValueInput valueInput) {
+        this.ownerRef = EntityReference.read(valueInput, "Owner");
+        this.leftOwner = valueInput.getBooleanOr("LeftOwner", false);
     }
 
     private boolean checkLeftOwner() {
@@ -211,14 +204,14 @@ public abstract class EntityMobProjectile extends Entity {
     public boolean isSameTeam(Entity shooter, Entity entity) {
         if(shooter instanceof TamableAnimal tamableAnimal && tamableAnimal.isTame()){
             if(entity instanceof TamableAnimal alsoTameable && alsoTameable.isTame()){
-                UUID ownerUUID1 = tamableAnimal.getOwner() != null ? tamableAnimal.getOwner().getUUID() : null;
-                UUID ownerUUID2 = alsoTameable.getOwner() != null ? alsoTameable.getOwner().getUUID() : null;
-                if(ownerUUID2 != null && ownerUUID1 != null && ownerUUID1.equals(ownerUUID2)){
+                LivingEntity owner1 = tamableAnimal.getOwner();
+                LivingEntity owner2 = alsoTameable.getOwner();
+                if(owner2 != null && owner1 != null && owner1.getUUID().equals(owner2.getUUID())){
                     return true;
                 }
             }
-            UUID ownerUUID = tamableAnimal.getOwner() != null ? tamableAnimal.getOwner().getUUID() : null;
-            return ownerUUID != null && ownerUUID.equals(entity.getUUID()) || shooter.isAlliedTo(entity);
+            LivingEntity owner = tamableAnimal.getOwner();
+            return owner != null && owner.getUUID().equals(entity.getUUID()) || shooter.isAlliedTo(entity);
         }
         return shooter.isAlliedTo(entity);
     }

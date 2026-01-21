@@ -3,16 +3,21 @@ package com.github.alexthe666.alexsmobs.entity;
 import net.minecraft.core.particles.BlockParticleOption;
 import net.minecraft.core.particles.ParticleOptions;
 import net.minecraft.core.particles.ParticleTypes;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.projectile.ItemSupplier;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.phys.EntityHitResult;
 import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
-public class EntityMudBall extends EntityMobProjectile {
+public class EntityMudBall extends EntityMobProjectile implements ItemSupplier {
 
     public EntityMudBall(EntityType type, Level level) {
         super(type, level);
@@ -22,6 +27,16 @@ public class EntityMudBall extends EntityMobProjectile {
         super(AMEntityRegistry.MUD_BALL.get(), worldIn, mudskipper);
         Vec3 vec3 = mudskipper.position().add(calcOffsetVec(new Vec3(0, 0, 0.2F * mudskipper.getScale()), 0F, mudskipper.getYRot()));
         this.setPos(vec3.x, vec3.y, vec3.z);
+    }
+    
+    @Override
+    public boolean hurtServer(ServerLevel serverLevel, DamageSource damageSource, float f) {
+        return false; // Projectiles cannot be hurt
+    }
+    
+    @Override
+    public ItemStack getItem() {
+        return new ItemStack(Items.MUD);  // Return mud item for rendering
     }
 
     public void doBehavior() {
@@ -46,7 +61,7 @@ public class EntityMudBall extends EntityMobProjectile {
     protected void onEntityHit(EntityHitResult result) {
         super.onEntityHit(result);
         if(result.getEntity() instanceof LivingEntity hurt){
-            hurt.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN, 60));
+            hurt.addEffect(new MobEffectInstance(MobEffects.SLOWNESS, 60));
         }
     }
 
@@ -66,7 +81,7 @@ public class EntityMudBall extends EntityMobProjectile {
 
     @Override
     protected void onImpact(HitResult result) {
-        if (!this.level().isClientSide) {
+        if (!this.level().isClientSide()) {
             this.level().broadcastEntityEvent(this, (byte)3);
         }
         super.onImpact(result);
