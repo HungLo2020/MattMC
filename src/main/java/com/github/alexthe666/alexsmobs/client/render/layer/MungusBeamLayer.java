@@ -18,8 +18,9 @@ import org.joml.Matrix3f;
 import org.joml.Matrix4f;
 
 public class MungusBeamLayer extends RenderLayer<MungusRenderState, ModelMungus> {
-    private static final ResourceLocation BEAM_TEXTURE = ResourceLocation.withDefaultNamespace("textures/entity/mungus_beam.png");
+    private static final ResourceLocation BEAM_TEXTURE = ResourceLocation.fromNamespaceAndPath("alexsmobs", "textures/entity/mungus_beam.png");
     private static final RenderType beamType = RenderType.eyes(BEAM_TEXTURE);
+    private static final int BEAM_ALPHA = 255;
 
     public MungusBeamLayer(RenderLayerParent<MungusRenderState, ModelMungus> parent) {
         super(parent);
@@ -120,6 +121,6 @@ public class MungusBeamLayer extends RenderLayer<MungusRenderState, ModelMungus>
         pos.mul(p_229108_1_);
         p_229108_0_.addVertex(pos.x, pos.y, pos.z)
                 .setUv(p_229108_9_, p_229108_10_)
-                .setColor(p_229108_6_, p_229108_7_, p_229108_8_, 255);
+                .setColor(p_229108_6_, p_229108_7_, p_229108_8_, BEAM_ALPHA);
     }
 }
