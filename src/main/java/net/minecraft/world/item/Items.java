@@ -1769,6 +1769,7 @@ public class Items {
 	public static final Item BLUE_JAY_SPAWN_EGG = registerItem("blue_jay_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.BLUE_JAY));
 	public static final Item BOGGED_SPAWN_EGG = registerItem("bogged_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.BOGGED));
 	public static final Item BREEZE_SPAWN_EGG = registerItem("breeze_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.BREEZE));
+	public static final Item BUNFUNGUS_SPAWN_EGG = registerItem("bunfungus_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.BUNFUNGUS));
 	public static final Item CAT_SPAWN_EGG = registerItem("cat_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.CAT));
 	public static final Item CATFISH_SPAWN_EGG = registerItem("catfish_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.CATFISH));
 	public static final Item CAMEL_SPAWN_EGG = registerItem("camel_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.CAMEL));
@@ -1841,6 +1842,7 @@ public class Items {
 	public static final Item MIMIC_OCTOPUS_BUCKET = registerItem("mimic_octopus_bucket", properties -> new MobBucketItem(EntityType.MIMIC_OCTOPUS, Fluids.WATER, SoundEvents.BUCKET_EMPTY_FISH, properties), new Item.Properties().stacksTo(1));
 	public static final Item MOOSHROOM_SPAWN_EGG = registerItem("mooshroom_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.MOOSHROOM));
 	public static final Item MULE_SPAWN_EGG = registerItem("mule_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.MULE));
+	public static final Item MUNGUS_SPAWN_EGG = registerItem("mungus_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.MUNGUS));
 	public static final Item MUDSKIPPER_SPAWN_EGG = registerItem("mudskipper_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.MUDSKIPPER));
 	public static final Item OCELOT_SPAWN_EGG = registerItem("ocelot_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.OCELOT));
 	public static final Item PANDA_SPAWN_EGG = registerItem("panda_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.PANDA));

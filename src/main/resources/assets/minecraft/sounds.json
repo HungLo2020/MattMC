@@ -13339,6 +13339,36 @@
     ],
     "subtitle": "subtitles.entity.breeze.wind_burst"
   },
+  "entity.bunfungus.attack": {
+    "sounds": [
+      "bunfungus_attack_0",
+      "bunfungus_attack_1",
+      "bunfungus_attack_2"
+    ],
+    "subtitle": "subtitles.entity.bunfungus.attack"
+  },
+  "entity.bunfungus.hurt": {
+    "sounds": [
+      "bunfungus_hurt_0",
+      "bunfungus_hurt_1"
+    ],
+    "subtitle": "subtitles.entity.bunfungus.hurt"
+  },
+  "entity.bunfungus.idle": {
+    "sounds": [
+      "bunfungus_idle_0",
+      "bunfungus_idle_1",
+      "bunfungus_idle_2"
+    ],
+    "subtitle": "subtitles.entity.bunfungus.idle"
+  },
+  "entity.bunfungus.jump": {
+    "sounds": [
+      "bunfungus_jump_0",
+      "bunfungus_jump_1"
+    ],
+    "subtitle": "subtitles.entity.bunfungus.jump"
+  },
   "entity.camel.ambient": {
     "sounds": [
       {
@@ -17077,6 +17107,39 @@
       "mob/sheep/shear"
     ],
     "subtitle": "subtitles.item.shears.shear"
+  },
+  "entity.mungus.hurt": {
+    "sounds": [
+      "mungus_hurt_0",
+      "mungus_hurt_1"
+    ],
+    "subtitle": "subtitles.entity.mungus.hurt"
+  },
+  "entity.mungus.idle": {
+    "sounds": [
+      "mungus_idle_0",
+      "mungus_idle_1",
+      "mungus_idle_2"
+    ],
+    "subtitle": "subtitles.entity.mungus.idle"
+  },
+  "entity.mungus.laser_end": {
+    "sounds": [
+      "mungus_laser_end"
+    ],
+    "subtitle": "subtitles.entity.mungus.laser_end"
+  },
+  "entity.mungus.laser_grow": {
+    "sounds": [
+      "mungus_laser_grow"
+    ],
+    "subtitle": "subtitles.entity.mungus.laser_grow"
+  },
+  "entity.mungus.laser_loop": {
+    "sounds": [
+      "mungus_laser_loop"
+    ],
+    "subtitle": "subtitles.entity.mungus.laser_loop"
   },
   "entity.mooshroom.suspicious_milk": {
     "sounds": [

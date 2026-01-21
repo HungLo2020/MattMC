@@ -89,6 +89,7 @@ public class EntityRenderers {
 		register(EntityType.BLOCK_DISPLAY, DisplayRenderer.BlockDisplayRenderer::new);
 		register(EntityType.BOGGED, BoggedRenderer::new);
 		register(EntityType.BREEZE, BreezeRenderer::new);
+		register(EntityType.BUNFUNGUS, com.github.alexthe666.alexsmobs.client.render.RenderBunfungus::new);
 		register(EntityType.BREEZE_WIND_CHARGE, WindChargeRenderer::new);
 		register(EntityType.CAMEL, CamelRenderer::new);
 		register(EntityType.CATFISH, com.github.alexthe666.alexsmobs.client.render.RenderCatfish::new);
@@ -179,6 +180,7 @@ public class EntityRenderers {
 		register(EntityType.MUD_BALL, ThrownItemRenderer::new);
 		register(EntityType.MUDSKIPPER, com.github.alexthe666.alexsmobs.client.render.RenderMudskipper::new);
 		register(EntityType.MULE, context -> new DonkeyRenderer(context, DonkeyRenderer.Type.MULE));
+		register(EntityType.MUNGUS, com.github.alexthe666.alexsmobs.client.render.RenderMungus::new);
 		register(EntityType.OAK_BOAT, context -> new BoatRenderer(context, ModelLayers.OAK_BOAT));
 		register(EntityType.OAK_CHEST_BOAT, context -> new BoatRenderer(context, ModelLayers.OAK_CHEST_BOAT));
 		register(EntityType.OCELOT, OcelotRenderer::new);
