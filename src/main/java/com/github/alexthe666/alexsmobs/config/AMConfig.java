@@ -17,4 +17,7 @@ public class AMConfig {
     
     // Hummingbird spawn configuration
     public static int hummingbirdSpawnRolls = 2;
+    
+    // Mimic Octopus spawn configuration
+    public static int mimicOctopusSpawnRolls = 2;
 }

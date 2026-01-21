@@ -54,6 +54,7 @@ import com.github.alexmodguy.alexscaves.server.entity.living.VallumraptorEntity;
 import com.github.alexthe666.alexsmobs.entity.EntityBlobfish;
 import com.github.alexthe666.alexsmobs.entity.EntityCosmicCod;
 import com.github.alexthe666.alexsmobs.entity.EntityFlyingFish;
+import com.github.alexthe666.alexsmobs.entity.EntityMimicOctopus;
 import net.minecraft.world.entity.boss.enderdragon.EnderDragon;
 import net.minecraft.world.entity.boss.wither.WitherBoss;
 import net.minecraft.world.entity.decoration.ArmorStand;
@@ -154,6 +155,7 @@ public class DefaultAttributes {
 		.put(EntityType.LLAMA, Llama.createAttributes().build())
 		.put(EntityType.MAGMA_CUBE, MagmaCube.createAttributes().build())
 		.put(EntityType.MANNEQUIN, LivingEntity.createLivingAttributes().build())
+		.put(EntityType.MIMIC_OCTOPUS, EntityMimicOctopus.createAttributes().build())
 		.put(EntityType.MOOSHROOM, Cow.createAttributes().build())
 		.put(EntityType.MULE, AbstractChestedHorse.createBaseChestedHorseAttributes().build())
 		.put(EntityType.OCELOT, Ocelot.createAttributes().build())

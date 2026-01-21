@@ -42,4 +42,8 @@ public class AMSoundRegistry {
     // Jerboa sounds - reference vanilla SoundEvents
     public static final DeferredHolder JERBOA_IDLE = new DeferredHolder(() -> net.minecraft.sounds.SoundEvents.JERBOA_IDLE);
     public static final DeferredHolder JERBOA_HURT = new DeferredHolder(() -> net.minecraft.sounds.SoundEvents.JERBOA_HURT);
+    
+    // Mimic Octopus sounds - reference vanilla SoundEvents
+    public static final DeferredHolder MIMIC_OCTOPUS_IDLE = new DeferredHolder(() -> net.minecraft.sounds.SoundEvents.MIMIC_OCTOPUS_IDLE);
+    public static final DeferredHolder MIMIC_OCTOPUS_HURT = new DeferredHolder(() -> net.minecraft.sounds.SoundEvents.MIMIC_OCTOPUS_HURT);
 }

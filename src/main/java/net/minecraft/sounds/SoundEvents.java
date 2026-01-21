@@ -962,6 +962,8 @@ public class SoundEvents {
 	public static final SoundEvent METAL_PRESSURE_PLATE_CLICK_OFF = register("block.metal_pressure_plate.click_off");
 	public static final SoundEvent METAL_PRESSURE_PLATE_CLICK_ON = register("block.metal_pressure_plate.click_on");
 	public static final SoundEvent METAL_STEP = register("block.metal.step");
+	public static final SoundEvent MIMIC_OCTOPUS_IDLE = register("entity.mimic_octopus.idle");
+	public static final SoundEvent MIMIC_OCTOPUS_HURT = register("entity.mimic_octopus.hurt");
 	public static final SoundEvent MINECART_INSIDE_UNDERWATER = register("entity.minecart.inside.underwater");
 	public static final SoundEvent MINECART_INSIDE = register("entity.minecart.inside");
 	public static final SoundEvent MINECART_RIDING = register("entity.minecart.riding");

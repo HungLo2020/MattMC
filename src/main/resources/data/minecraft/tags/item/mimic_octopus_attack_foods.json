@@ -1,0 +1,7 @@
+{
+  "__comment": "5-8 of these enables octopus to mimic combat abilities - using slime ball as a substitute for mimicream",
+  "replace": false,
+  "values": [
+    "minecraft:slime_ball"
+  ]
+}
