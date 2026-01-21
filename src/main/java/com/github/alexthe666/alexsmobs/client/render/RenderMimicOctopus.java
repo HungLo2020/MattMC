@@ -206,10 +206,9 @@ public class RenderMimicOctopus extends MobRenderer<EntityMimicOctopus, MimicOct
         }
 
         @Override
-        public void render(PoseStack matrixStackIn, MultiBufferSource buffer, int packedLightIn,
+        public void submit(PoseStack matrixStackIn, net.minecraft.client.renderer.SubmitNodeCollector collector, int packedLightIn,
                 MimicOctopusRenderState renderState, float u, float v) {
             float transProgress = renderState.transProgress;
-            float prevTransProgress = renderState.prevTransProgress;
             float colorProgress = (renderState.prevColorShiftProgress
                     + (renderState.colorShiftProgress - renderState.prevColorShiftProgress))
                     * 0.2F;
@@ -225,6 +224,7 @@ public class RenderMimicOctopus extends MobRenderer<EntityMimicOctopus, MimicOct
             float finG = 1.0F;
             float finB = 1.0F;
             float finA = 1.0F;
+            
             if (renderState.prevMimicState == EntityMimicOctopus.MimicState.OVERLAY) {
                 if (renderState.prevMimickedBlock != null) {
                     int j = OctopusColorRegistry.getBlockColor(renderState.prevMimickedBlock);
@@ -252,24 +252,31 @@ public class RenderMimicOctopus extends MobRenderer<EntityMimicOctopus, MimicOct
             if (a == 1.0F) {
                 a *= 0.9F + 0.1F * (float) Math.sin(renderState.ageInTicks * 0.1F);
             }
+            
             if (renderState.prevMimicState != null) {
                 float alphaPrev = 1 - transProgress * 0.2F;
-                VertexConsumer prev = buffer
-                        .getBuffer(AMRenderTypes.entityTranslucent(getFor(renderState.prevMimicState)));
+                RenderType prevRenderType = AMRenderTypes.entityTranslucent(getFor(renderState.prevMimicState));
                 if (renderState.prevMimicState == renderState.mimicState) {
                     alphaPrev *= a;
                 }
-                this.getParentModel().renderToBuffer(matrixStackIn, prev, packedLightIn,
-                        OverlayTexture.NO_OVERLAY, AMColorUtil.packColor(r, g, b, alphaPrev));
+                int prevColor = AMColorUtil.packColor(r, g, b, alphaPrev);
+                collector.order(1).submitModel(
+                    this.getParentModel(), renderState, matrixStackIn, prevRenderType, packedLightIn, OverlayTexture.NO_OVERLAY, prevColor, null, renderState.outlineColor, null
+                );
             }
+            
             float alphaCurrent = transProgress * 0.2F;
-            VertexConsumer current = buffer
-                    .getBuffer(AMRenderTypes.entityTranslucent(getFor(renderState.mimicState)));
-            this.getParentModel().renderToBuffer(matrixStackIn, current, packedLightIn,
-                    OverlayTexture.NO_OVERLAY, AMColorUtil.packColor(r, g, b, a * alphaCurrent));
-            VertexConsumer eyes = buffer.getBuffer(AMRenderTypes.entityTranslucent(TEXTURE_EYES));
-            this.getParentModel().renderToBuffer(matrixStackIn, eyes, packedLightIn,
-                    OverlayTexture.NO_OVERLAY, -1);
+            RenderType currentRenderType = AMRenderTypes.entityTranslucent(getFor(renderState.mimicState));
+            int currentColor = AMColorUtil.packColor(r, g, b, a * alphaCurrent);
+            collector.order(1).submitModel(
+                this.getParentModel(), renderState, matrixStackIn, currentRenderType, packedLightIn, OverlayTexture.NO_OVERLAY, currentColor, null, renderState.outlineColor, null
+            );
+            
+            // Render eyes
+            RenderType eyesRenderType = AMRenderTypes.entityTranslucent(TEXTURE_EYES);
+            collector.order(1).submitModel(
+                this.getParentModel(), renderState, matrixStackIn, eyesRenderType, packedLightIn, OverlayTexture.NO_OVERLAY, -1, null, renderState.outlineColor, null
+            );
         }
 
         public ResourceLocation getFor(EntityMimicOctopus.MimicState state) {

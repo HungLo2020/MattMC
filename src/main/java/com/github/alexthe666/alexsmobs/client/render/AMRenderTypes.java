@@ -4,12 +4,14 @@ import net.minecraft.client.renderer.RenderType;
 import net.minecraft.resources.ResourceLocation;
 
 /**
- * Simplified render types for AlexsMobs entities
+ * Minimal AMRenderTypes implementation for Mimic Octopus
+ * Only includes methods actually needed, delegates to vanilla RenderType
  */
 public class AMRenderTypes {
     
     /**
-     * Creates an entity translucent render type for the given texture
+     * Creates a translucent entity render type
+     * Delegates to vanilla RenderType.entityTranslucent()
      */
     public static RenderType entityTranslucent(ResourceLocation texture) {
         return RenderType.entityTranslucent(texture);

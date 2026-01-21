@@ -43,9 +43,6 @@ public class SemiAquaticAIRandomSwimming extends RandomStrollGoal {
 
     @Nullable
     protected Vec3 getPosition() {
-        if(this.mob.hasRestriction() && this.mob.distanceToSqr(Vec3.atCenterOf(this.mob.getRestrictCenter())) > this.mob.getRestrictRadius() * this.mob.getRestrictRadius()){
-            return DefaultRandomPos.getPosTowards(this.mob, 7, 3, Vec3.atBottomCenterOf(this.mob.getRestrictCenter()), 1);
-        }
         if(this.mob.getRandom().nextFloat() < 0.3F){
             Vec3 vector3d = findSurfaceTarget(this.mob, 15, 7);
             if(vector3d != null){
