@@ -12,4 +12,7 @@ public class MungusRenderState extends LivingEntityRenderState {
     public boolean isReverting;
     public float swellProgress;
     public float prevSwellProgress;
+    public double x;
+    public double y;
+    public double z;
 }

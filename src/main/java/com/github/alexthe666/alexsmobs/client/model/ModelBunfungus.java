@@ -133,9 +133,7 @@ public class ModelBunfungus extends AdvancedEntityModel<BunfungusRenderState> {
     }
 
     public void animate(BunfungusRenderState renderState) {
-        // TODO: ModelAnimator.update() signature changed in 1.21
-        // Commenting out animation updates temporarily - needs re-implementation with new API
-        // animator.update(renderState.currentAnimation, renderState.animationTick);
+        animator.update(renderState);
         animator.setAnimation(EntityBunfungus.ANIMATION_EAT);
         animator.startKeyframe(4);
         animator.rotate(head, Maths.rad(30), 0, 0);

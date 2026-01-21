@@ -484,8 +484,7 @@ public class EntityMungus extends Animal implements ITargetsDroppedItems, Sheara
                 double d5 = 1.0F;
                 double eyeHeight = this.getY() + 1.0F;
                 if (beamCounter % 20 == 0) {
-                    // TODO: Add MUNGUS_LASER_LOOP sound to AMSoundRegistry
-                    // this.playSound(AMSoundRegistry.MUNGUS_LASER_LOOP.get(), this.getVoicePitch(), this.getSoundVolume());
+                    this.playSound(SoundEvents.MUNGUS_LASER_LOOP, this.getSoundVolume(), this.getVoicePitch());
                 }
                 beamCounter++;
 
@@ -538,11 +537,9 @@ public class EntityMungus extends Animal implements ITargetsDroppedItems, Sheara
                                 }
                             }
                         }
-                        // TODO: Add MUNGUS_LASER_END sound to AMSoundRegistry
-                        // this.playSound(AMSoundRegistry.MUNGUS_LASER_END.get(), this.getVoicePitch(), this.getSoundVolume());
+                        this.playSound(SoundEvents.MUNGUS_LASER_END, this.getSoundVolume(), this.getVoicePitch());
                         if (flag) {
-                            // TODO: Add MUNGUS_LASER_GROW sound to AMSoundRegistry
-                            // this.playSound(AMSoundRegistry.MUNGUS_LASER_GROW.get(), this.getVoicePitch(), this.getSoundVolume());
+                            this.playSound(SoundEvents.MUNGUS_LASER_GROW, this.getSoundVolume(), this.getVoicePitch());
                         }
                         this.setBeamTarget(null);
                         beamCounter = -1200;
@@ -561,8 +558,7 @@ public class EntityMungus extends Animal implements ITargetsDroppedItems, Sheara
     }
 
     public boolean isFood(ItemStack stack) {
-        // TODO: Add MUNGUS_BREEDABLES tag to AMTagRegistry
-        return stack.is(ItemTags.FLOWERS); // Temporary fallback
+        return stack.is(MUNGUS_BREEDABLES);
     }
 
     @Nullable
@@ -614,8 +610,7 @@ public class EntityMungus extends Animal implements ITargetsDroppedItems, Sheara
     @Nullable
     @Override
     public AgeableMob getBreedOffspring(ServerLevel p_241840_1_, AgeableMob p_241840_2_) {
-        // TODO: Add MUNGUS to AMEntityRegistry
-        return null; // Temporary - needs registry entry
+        return EntityType.MUNGUS.create(p_241840_1_, EntitySpawnReason.BREEDING);
     }
 
     public boolean isMushroomTarget(BlockPos pos) {

@@ -1,6 +1,7 @@
 package com.github.alexthe666.alexsmobs.client.render;
 
 import com.github.alexthe666.alexsmobs.client.model.ModelMungus;
+import com.github.alexthe666.alexsmobs.client.render.layer.MungusBeamLayer;
 import com.github.alexthe666.alexsmobs.entity.EntityMungus;
 import com.github.alexthe666.alexsmobs.entity.util.Maths;
 import com.mojang.blaze3d.vertex.PoseStack;
@@ -39,6 +40,7 @@ public class RenderMungus extends MobRenderer<EntityMungus, MungusRenderState, M
         super(renderManagerIn, new ModelMungus(0), 0.5F);
         this.addLayer(new MungusSackLayer(this));
         this.addLayer(new MungusMushroomLayer(this));
+        this.addLayer(new MungusBeamLayer(this));
     }
 
     @Override
@@ -56,6 +58,9 @@ public class RenderMungus extends MobRenderer<EntityMungus, MungusRenderState, M
         renderState.isReverting = entity.isReverting();
         renderState.swellProgress = entity.swellProgress;
         renderState.prevSwellProgress = entity.prevSwellProgress;
+        renderState.x = entity.getX();
+        renderState.y = entity.getY();
+        renderState.z = entity.getZ();
     }
 
     protected boolean isShaking(MungusRenderState renderState) {

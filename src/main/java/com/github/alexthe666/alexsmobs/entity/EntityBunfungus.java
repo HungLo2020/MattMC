@@ -58,6 +58,7 @@ public class EntityBunfungus extends PathfinderMob implements IAnimatedEntity {
     public static final Animation ANIMATION_SLAM = Animation.create(20);
     public static final Animation ANIMATION_BELLY = Animation.create(10);
     public static final Animation ANIMATION_EAT = Animation.create(20);
+    public static final Animation[] ANIMATIONS = {ANIMATION_EAT, ANIMATION_BELLY, ANIMATION_SLAM};
     private static final EntityDataAccessor<Boolean> JUMP_ACTIVE = SynchedEntityData.defineId(EntityBunfungus.class, EntityDataSerializers.BOOLEAN);
     private static final EntityDataAccessor<Boolean> SLEEPING = SynchedEntityData.defineId(EntityBunfungus.class, EntityDataSerializers.BOOLEAN);
     private static final EntityDataAccessor<Boolean> BEGGING = SynchedEntityData.defineId(EntityBunfungus.class, EntityDataSerializers.BOOLEAN);

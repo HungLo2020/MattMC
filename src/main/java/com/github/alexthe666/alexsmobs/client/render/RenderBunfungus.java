@@ -39,9 +39,9 @@ public class RenderBunfungus extends MobRenderer<EntityBunfungus, BunfungusRende
         renderState.transformsIn = entity.transformsIn();
         renderState.prevTransformTime = entity.prevTransformTime;
         renderState.isSleeping = entity.isSleeping();
-        renderState.mainHandItem = entity.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.MAINHAND).copy();
         renderState.currentAnimation = entity.getAnimation();
         renderState.animationTick = entity.getAnimationTick();
+        this.itemModelResolver.updateForLiving(renderState.mainHandItem, entity.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.MAINHAND), net.minecraft.world.item.ItemDisplayContext.THIRD_PERSON_RIGHT_HAND, entity);
     }
 
 
@@ -64,10 +64,14 @@ public class RenderBunfungus extends MobRenderer<EntityBunfungus, BunfungusRende
 
         @Override
         public void submit(PoseStack poseStack, net.minecraft.client.renderer.SubmitNodeCollector submitNodeCollector, int packedLight, BunfungusRenderState renderState, float limbSwing, float limbSwingAmount) {
-            // TODO: Item rendering in layers needs re-implementation with the new 1.21 API
-            // The ItemInHandRenderer API may have changed. Commenting out for now.
-            // ItemStack itemstack = renderState.mainHandItem;
-            // This would need to use submitItem or similar method if available
+            if (!renderState.mainHandItem.isEmpty()) {
+                poseStack.pushPose();
+                translateToHand(poseStack);
+                poseStack.scale(0.75F, 0.75F, 0.75F);
+                poseStack.translate(0.0F, 0.35F, -0.15F);
+                renderState.mainHandItem.submit(poseStack, submitNodeCollector, packedLight, net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY, renderState.outlineColor);
+                poseStack.popPose();
+            }
         }
 
         protected void translateToHand(PoseStack matrixStack) {
