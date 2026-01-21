@@ -80,8 +80,6 @@ public class ModelMungus extends AdvancedEntityModel<MungusRenderState> {
 		float walkDegree = 0.6F;
 		float idleSpeed = 0.1F;
 		float idleDegree = 0.1F;
-		// TODO: In 1.21, partial tick is no longer accessible from Minecraft.getTimer()
-		// Using a simplified calculation - may need adjustment for smooth animation
 		float swell = Math.min(renderState.swellProgress, 10F);
 		float glowyBob = (swell * 0.22F) + 0.95F + (Mth.cos(ageInTicks * (0.1F + swell * 0.2F)) + 1F) * (0.05F + swell * 0.02F);
 		BlockPos targetPos = renderState.beamTarget;

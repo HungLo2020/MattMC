@@ -105,9 +105,6 @@ public class RenderMungus extends MobRenderer<EntityMungus, MungusRenderState, M
         }
     }
 
-    // TODO: shouldRender and render methods for beam need to be adapted to 1.21 RenderState system
-    // The beam rendering should be moved to a custom RenderLayer or handled differently
-
     public ResourceLocation getTextureLocation(MungusRenderState renderState) {
         return TEXTURE;
     }
