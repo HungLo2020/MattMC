@@ -19,6 +19,7 @@ import net.minecraft.sounds.SoundEvents;
 import net.minecraft.tags.EntityTypeTags;
 import net.minecraft.tags.ItemTags;
 import net.minecraft.tags.TagKey;
+import net.minecraft.world.item.Item;
 import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.InteractionHand;
@@ -75,7 +76,7 @@ public class EntityBunfungus extends PathfinderMob implements IAnimatedEntity {
     public int prevTransformTime;
     public static final int MAX_TRANSFORM_TIME = 50;
 
-    protected EntityBunfungus(EntityType t, Level lvl) {
+    public EntityBunfungus(EntityType t, Level lvl) {
         super(t, lvl);
     }
 
@@ -110,7 +111,7 @@ public class EntityBunfungus extends PathfinderMob implements IAnimatedEntity {
     }
 
     public boolean checkSpawnRules(LevelAccessor worldIn, EntitySpawnReason spawnReasonIn) {
-        return this.getRandom().nextInt(10) == 0 || spawnReasonIn == EntitySpawnReason.SPAWNER || spawnReasonIn == EntitySpawnReason.SPAWN_EGG;
+        return this.getRandom().nextInt(10) == 0 || spawnReasonIn == EntitySpawnReason.SPAWNER || spawnReasonIn == EntitySpawnReason.COMMAND;
     }
 
     protected PathNavigation createNavigation(Level worldIn) {

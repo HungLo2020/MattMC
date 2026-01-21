@@ -140,19 +140,19 @@ public class EntityMungus extends Animal implements ITargetsDroppedItems, Sheara
     }
 
     protected SoundEvent getAmbientSound() {
-        return SoundEvents.MOOSHROOM_AMBIENT;
+        return SoundEvents.MUNGUS_IDLE;
     }
 
     protected SoundEvent getHurtSound(DamageSource damageSourceIn) {
-        return SoundEvents.MOOSHROOM_HURT;
+        return SoundEvents.MUNGUS_HURT;
     }
 
     protected SoundEvent getDeathSound() {
-        return SoundEvents.MOOSHROOM_DEATH;
+        return SoundEvents.MUNGUS_HURT;
     }
 
     public boolean checkSpawnRules(LevelAccessor worldIn, EntitySpawnReason spawnReasonIn) {
-        return this.getRandom().nextInt(DEFAULT_MUNGUS_SPAWN_ROLLS) == 0 || spawnReasonIn == EntitySpawnReason.SPAWNER || spawnReasonIn == EntitySpawnReason.SPAWN_EGG;
+        return this.getRandom().nextInt(DEFAULT_MUNGUS_SPAWN_ROLLS) == 0 || spawnReasonIn == EntitySpawnReason.SPAWNER || spawnReasonIn == EntitySpawnReason.COMMAND;
     }
 
     protected void registerGoals() {
@@ -172,7 +172,7 @@ public class EntityMungus extends Animal implements ITargetsDroppedItems, Sheara
     public void tick(){
         super.tick();
         if (!this.level().isClientSide() && this.isAlive() && !this.isBaby() && --this.timeUntilNextEgg <= 0) {
-            ItemEntity dropped = this.spawnAtLocation(Items.BROWN_MUSHROOM);
+            ItemEntity dropped = this.spawnAtLocation((ServerLevel)this.level(), new ItemStack(Items.BROWN_MUSHROOM));
             if (dropped != null) {
                 dropped.setDefaultPickUpDelay();
             }
@@ -242,14 +242,14 @@ public class EntityMungus extends Animal implements ITargetsDroppedItems, Sheara
             final double ffDouble = ff;
             BlockPos center = this.blockPosition();
             BlockState transformState = Blocks.MYCELIUM.defaultBlockState();
-            Registry<Biome> registry = serverLevel.getServer().registryAccess().registryOrThrow(Registries.BIOME);
-            Holder<Biome> biome = registry.getHolder(Biomes.MUSHROOM_FIELDS).get();
+            Registry<Biome> registry = serverLevel.getServer().registryAccess().lookup(Registries.BIOME).orElseThrow();
+            Holder<Biome> biome = registry.get(Biomes.MUSHROOM_FIELDS);
             TagKey<Block> transformMatches = MUNGUS_REPLACE_MUSHROOM;
             if (this.getMushroomState() != null) {
                 String mushroomKey = BuiltInRegistries.BLOCK.getKey(this.getMushroomState().getBlock()).toString();
                 if (MUSHROOM_TO_BLOCK.containsKey(mushroomKey)) {
-                    Block block = BuiltInRegistries.BLOCK.get(ResourceLocation.parse(MUSHROOM_TO_BLOCK.get(mushroomKey)));
-                    if (block != null) {
+                    Block block = BuiltInRegistries.BLOCK.get(ResourceLocation.parse(MUSHROOM_TO_BLOCK.get(mushroomKey))).orElse(Blocks.AIR);
+                    if (block != null && block != Blocks.AIR) {
                         transformState = block.defaultBlockState();
                         if (block == Blocks.WARPED_NYLIUM) {
                             transformMatches = MUNGUS_REPLACE_NETHER;
@@ -294,7 +294,7 @@ public class EntityMungus extends Animal implements ITargetsDroppedItems, Sheara
     }
 
     private Holder<Biome> getBiomeKeyFromShroom() {
-        Registry<Biome> registry = this.level().registryAccess().registryOrThrow(Registries.BIOME);
+        Registry<Biome> registry = this.level().registryAccess().lookup(Registries.BIOME).orElseThrow();
         BlockState state = this.getMushroomState();
         if (state == null) {
             return null;
@@ -304,7 +304,7 @@ public class EntityMungus extends Animal implements ITargetsDroppedItems, Sheara
             String str = MUSHROOM_TO_BIOME.get(blockRegName.toString());
             Biome biome = registry.getOptional(ResourceLocation.parse(str)).orElse(null);
             ResourceKey<Biome> resourceKey = registry.getResourceKey(biome).orElse(null);
-            return registry.getHolder(resourceKey).orElse(null);
+            return registry.get(resourceKey);
         }
         return null;
     }
@@ -553,7 +553,7 @@ public class EntityMungus extends Animal implements ITargetsDroppedItems, Sheara
     }
 
     @Nullable
-    public SpawnGroupData finalizeSpawn(ServerLevelAccessor worldIn, DifficultyInstance difficultyIn, MobSpawnType reason, @Nullable SpawnGroupData spawnDataIn) {
+    public SpawnGroupData finalizeSpawn(ServerLevelAccessor worldIn, DifficultyInstance difficultyIn, EntitySpawnReason reason, @Nullable SpawnGroupData spawnDataIn) {
         this.entityData.set(ALT_ORDER_MUSHROOMS, random.nextBoolean());
         this.setMushroomCount(random.nextInt(2));
         setMushroomState(random.nextBoolean() ? Blocks.BROWN_MUSHROOM.defaultBlockState() : Blocks.RED_MUSHROOM.defaultBlockState());
@@ -648,10 +648,10 @@ public class EntityMungus extends Animal implements ITargetsDroppedItems, Sheara
     }
 
     @Override
-    public void shear(SoundSource category) {
+    public void shear(ServerLevel level, SoundSource soundSource, ItemStack tool) {
         this.gameEvent(GameEvent.ENTITY_INTERACT);
-        level().playSound(null, this, SoundEvents.SHEEP_SHEAR, category, 1.0F, 1.0F);
-        if (!this.level().isClientSide() && this.getMushroomState() != null && this.getMushroomCount() > 0) {
+        level.playSound(null, this, SoundEvents.SHEEP_SHEAR, soundSource, 1.0F, 1.0F);
+        if (!level.isClientSide() && this.getMushroomState() != null && this.getMushroomCount() > 0) {
             this.setMushroomCount(this.getMushroomCount() - 1);
             if (this.getMushroomCount() <= 0) {
                 this.setMushroomState(null);

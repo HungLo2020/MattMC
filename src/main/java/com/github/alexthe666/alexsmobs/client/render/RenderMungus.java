@@ -27,7 +27,7 @@ import net.minecraft.world.phys.Vec3;
 import org.joml.Matrix3f;
 import org.joml.Matrix4f;
 
-public class RenderMungus extends MobRenderer<EntityMungus, ModelMungus> {
+public class RenderMungus extends MobRenderer<EntityMungus, MungusRenderState, ModelMungus> {
     private static final ResourceLocation TEXTURE = ResourceLocation.withDefaultNamespace("textures/entity/mungus.png");
     private static final ResourceLocation BEAM_TEXTURE = ResourceLocation.withDefaultNamespace("textures/entity/mungus_beam.png");
     private static final ResourceLocation TEXTURE_BEAM_OVERLAY = ResourceLocation.withDefaultNamespace("textures/entity/mungus_beam_overlay.png");
@@ -41,8 +41,23 @@ public class RenderMungus extends MobRenderer<EntityMungus, ModelMungus> {
         this.addLayer(new MungusMushroomLayer(this));
     }
 
-    protected boolean isShaking(EntityMungus mungus) {
-        return mungus.isReverting();
+    @Override
+    public MungusRenderState createRenderState() {
+        return new MungusRenderState();
+    }
+
+    @Override
+    public void extractRenderState(EntityMungus entity, MungusRenderState renderState, float partialTick) {
+        super.extractRenderState(entity, renderState, partialTick);
+        renderState.beamTarget = entity.getBeamTarget();
+        renderState.mushroomState = entity.getMushroomState();
+        renderState.mushroomCount = entity.getMushroomCount();
+        renderState.altOrderMushroom = entity.isAltOrderMushroom();
+        renderState.isReverting = entity.isReverting();
+    }
+
+    protected boolean isShaking(MungusRenderState renderState) {
+        return renderState.isReverting;
     }
 
     private static void vertex(VertexConsumer p_229108_0_, Matrix4f p_229108_1_, Matrix3f p_229108_2_,
@@ -56,162 +71,59 @@ public class RenderMungus extends MobRenderer<EntityMungus, ModelMungus> {
                 .setColor(p_229108_6_, p_229108_7_, p_229108_8_, 255);
     }
 
-    protected void setupRotations(EntityMungus entityLiving, PoseStack matrixStackIn, float ageInTicks,
-            float rotationYaw, float partialTicks, float tickDelta) {
-        if (entityLiving.deathTime > 0) {
+    protected void setupRotations(MungusRenderState renderState, PoseStack matrixStackIn, float ageInTicks,
+            float rotationYaw, float partialTicks) {
+        if (renderState.deathTime > 0) {
             matrixStackIn.mulPose(Axis.YP.rotationDegrees(180.0F - rotationYaw));
-            float f = ((float) entityLiving.deathTime + partialTicks - 1.0F) / 20.0F * 1.6F;
+            float f = ((float) renderState.deathTime + partialTicks - 1.0F) / 20.0F * 1.6F;
             f = Mth.sqrt(f);
             if (f > 1.0F) {
                 f = 1.0F;
             }
             matrixStackIn.mulPose(Axis.XP.rotationDegrees(f * -90));
         } else {
-            super.setupRotations(entityLiving, matrixStackIn, ageInTicks, rotationYaw, partialTicks, tickDelta);
+            super.setupRotations(renderState, matrixStackIn, ageInTicks, rotationYaw, partialTicks);
         }
     }
 
-    protected float getFlipDegrees(EntityMungus p_77037_1_) {
+    protected float getFlipDegrees(MungusRenderState renderState) {
         return 0F;
     }
 
-    protected void scale(EntityMungus entitylivingbaseIn, PoseStack matrixStackIn, float partialTickTime) {
-        String s = ChatFormatting.stripFormatting(entitylivingbaseIn.getName().getString());
+    protected void scale(MungusRenderState renderState, PoseStack matrixStackIn, float partialTickTime) {
+        String s = ChatFormatting.stripFormatting(renderState.nameTag != null ? renderState.nameTag.getString() : "");
         if (s != null && s.toLowerCase().contains("drip")) {
-            matrixStackIn.translate(0F, entitylivingbaseIn.isBaby() ? -0.075F : -0.15F, 0F);
+            matrixStackIn.translate(0F, renderState.isBaby ? -0.075F : -0.15F, 0F);
         }
     }
 
-    public boolean shouldRender(EntityMungus livingEntityIn, Frustum camera, double camX, double camY, double camZ) {
-        if (super.shouldRender(livingEntityIn, camera, camX, camY, camZ)) {
-            return true;
-        } else {
-            if (livingEntityIn.getBeamTarget() != null) {
-                BlockPos pos = livingEntityIn.getBeamTarget();
-                if (pos != null) {
-                    Vec3 vector3d = Vec3.atLowerCornerOf(pos);
-                    Vec3 vector3dCorner = Vec3.atLowerCornerOf(pos).add(1, 1, 1);
-                    Vec3 vector3d1 = this.getPosition(livingEntityIn, livingEntityIn.getEyeHeight(), 1.0F);
-                    return camera.isVisible(
-                            new AABB(vector3d1.x, vector3d1.y, vector3d1.z, vector3d.x, vector3d.y, vector3d.z))
-                            || camera.isVisible(new AABB(vector3d1.x, vector3d1.y, vector3d1.z, vector3dCorner.x,
-                                    vector3dCorner.y, vector3dCorner.z));
-                }
-            }
+    // TODO: shouldRender and render methods for beam need to be adapted to 1.21 RenderState system
+    // The beam rendering should be moved to a custom RenderLayer or handled differently
 
-            return false;
-        }
-    }
-
-    private Vec3 getPosition(LivingEntity entityLivingBaseIn, double p_177110_2_, float p_177110_4_) {
-        double d0 = Mth.lerp(p_177110_4_, entityLivingBaseIn.xOld, entityLivingBaseIn.getX());
-        double d1 = Mth.lerp(p_177110_4_, entityLivingBaseIn.yOld, entityLivingBaseIn.getY()) + p_177110_2_;
-        double d2 = Mth.lerp(p_177110_4_, entityLivingBaseIn.zOld, entityLivingBaseIn.getZ());
-        return new Vec3(d0, d1, d2);
-    }
-
-    public void render(EntityMungus entityIn, float entityYaw, float partialTicks, PoseStack matrixStackIn,
-            MultiBufferSource bufferIn, int packedLightIn) {
-        super.render(entityIn, entityYaw, partialTicks, matrixStackIn, bufferIn, packedLightIn);
-        BlockPos target = entityIn.getBeamTarget();
-        if (target != null) {
-            float f = 1.0F;
-            float f1 = (float) entityIn.level().getGameTime() + partialTicks;
-            float f2 = -1.0F * (f1 * 0.15F % 1.0F);
-            float f3 = 1.13F;
-            if (entityIn.isBaby()) {
-                f3 = 0.555F;
-            }
-            matrixStackIn.pushPose();
-            matrixStackIn.translate(0.0D, f3, 0.0D);
-            Vec3 vector3d = Vec3.upFromBottomCenterOf(target, 0.15F);
-            Vec3 vector3d1 = this.getPosition(entityIn, f3, partialTicks);
-            Vec3 vector3d2 = vector3d.subtract(vector3d1);
-            float f4 = (float) (vector3d2.length());
-            vector3d2 = vector3d2.normalize();
-            float f5 = (float) Math.acos(vector3d2.y);
-            float f6 = (float) Math.atan2(vector3d2.z, vector3d2.x);
-            matrixStackIn.mulPose(Axis.YP.rotationDegrees(((Mth.PI / 2F) - f6) * Mth.RAD_TO_DEG));
-            matrixStackIn.mulPose(Axis.XP.rotationDegrees(f5 * Mth.RAD_TO_DEG));
-            int i = 1;
-            float f7 = f1 * 0.05F * 1.5F;
-            float f8 = 1F;
-            int j = (int) (f8 * 255.0F);
-            int k = (int) (f8 * 255.0F);
-            int l = (int) (f8 * 255.0F);
-            float f9 = 0.2F;
-            float f10 = 0.282F;
-            float f11 = Mth.cos(0 + 2.3561945F) * 0.8F;
-            float f12 = Mth.sin(0 + 2.3561945F) * 0.8F;
-            float f13 = Mth.cos(0 + Maths.QUARTER_PI) * 0.8F;
-            float f14 = Mth.sin(0 + Maths.QUARTER_PI) * 0.8F;
-            float f15 = Mth.cos(0 + 3.926991F) * 0.8F;
-            float f16 = Mth.sin(0 + 3.926991F) * 0.8F;
-            float f17 = Mth.cos(0 + 5.4977875F) * 0.8F;
-            float f18 = Mth.sin(0 + 5.4977875F) * 0.8F;
-            float f19 = Mth.cos(0 + Mth.PI) * 0.4F;
-            float f20 = Mth.sin(0 + Mth.PI) * 0.4F;
-            float f21 = Mth.cos(0 + 0.0F) * 0.4F;
-            float f22 = Mth.sin(0 + 0.0F) * 0.4F;
-            float f23 = Mth.cos(0 + (Mth.PI / 2F)) * 0.4F;
-            float f24 = Mth.sin(0 + (Mth.PI / 2F)) * 0.4F;
-            float f25 = Mth.cos(0 + (Mth.PI * 1.5F)) * 0.4F;
-            float f26 = Mth.sin(0 + (Mth.PI * 1.5F)) * 0.4F;
-            float f27 = 0.0F;
-            float f28 = 0.4999F;
-            float f29 = -1.0F + f2;
-            float f30 = f4 * 0.5F + f29;
-            VertexConsumer ivertexbuilder = bufferIn.getBuffer(beamType);
-            PoseStack.Pose matrixstack$entry = matrixStackIn.last();
-            Matrix4f matrix4f = matrixstack$entry.pose();
-            Matrix3f matrix3f = matrixstack$entry.normal();
-            vertex(ivertexbuilder, matrix4f, matrix3f, f19, f4, f20, j, k, l, 0.4999F, f30);
-            vertex(ivertexbuilder, matrix4f, matrix3f, f19, 0.0F, f20, j, k, l, 0.4999F, f29);
-            vertex(ivertexbuilder, matrix4f, matrix3f, f21, 0.0F, f22, j, k, l, 0.0F, f29);
-            vertex(ivertexbuilder, matrix4f, matrix3f, f21, f4, f22, j, k, l, 0.0F, f30);
-            vertex(ivertexbuilder, matrix4f, matrix3f, f23, f4, f24, j, k, l, 0.4999F, f30);
-            vertex(ivertexbuilder, matrix4f, matrix3f, f23, 0.0F, f24, j, k, l, 0.4999F, f29);
-            vertex(ivertexbuilder, matrix4f, matrix3f, f25, 0.0F, f26, j, k, l, 0.0F, f29);
-            vertex(ivertexbuilder, matrix4f, matrix3f, f25, f4, f26, j, k, l, 0.0F, f30);
-            float f31 = 0.0F;
-            if (entityIn.tickCount % 4 > 1) {
-                f31 = 0.5F;
-            }
-
-            vertex(ivertexbuilder, matrix4f, matrix3f, f11, f4, f12, j, k, l, 0.5F, f31 + 0.5F);
-            vertex(ivertexbuilder, matrix4f, matrix3f, f13, f4, f14, j, k, l, 1.0F, f31 + 0.5F);
-            vertex(ivertexbuilder, matrix4f, matrix3f, f17, f4, f18, j, k, l, 1.0F, f31);
-            vertex(ivertexbuilder, matrix4f, matrix3f, f15, f4, f16, j, k, l, 0.5F, f31);
-            matrixStackIn.popPose();
-        }
-
-    }
-
-    public ResourceLocation getTextureLocation(EntityMungus entity) {
+    public ResourceLocation getTextureLocation(MungusRenderState renderState) {
         return TEXTURE;
     }
 
-    static class MungusSackLayer extends RenderLayer<EntityMungus, ModelMungus> {
+    static class MungusSackLayer extends RenderLayer<MungusRenderState, ModelMungus> {
 
         public MungusSackLayer(RenderMungus p_i50928_1_) {
             super(p_i50928_1_);
         }
 
         public void render(PoseStack matrixStackIn, MultiBufferSource bufferIn, int packedLightIn,
-                EntityMungus entitylivingbaseIn, float limbSwing, float limbSwingAmount, float partialTicks,
-                float ageInTicks, float netHeadYaw, float headPitch) {
+                MungusRenderState renderState, float limbSwing, float limbSwingAmount) {
             VertexConsumer lead = bufferIn.getBuffer(RenderType.eyes(TEXTURE_SACK_OVERLAY));
-            float alpha = 0.75F + (Mth.cos(ageInTicks * 0.2F) + 1F) * 0.125F;
+            float alpha = 0.75F + (Mth.cos(renderState.ageInTicks * 0.2F) + 1F) * 0.125F;
             this.getParentModel().renderToBuffer(matrixStackIn, lead, 240, OverlayTexture.NO_OVERLAY,
                     packColor(1.0F, 1.0F, 1.0F, alpha));
-            if (entitylivingbaseIn.getBeamTarget() != null) {
+            if (renderState.beamTarget != null) {
                 VertexConsumer beam = bufferIn.getBuffer(RenderType.entityTranslucent(TEXTURE_BEAM_OVERLAY));
-                float beamAlpha = 0.75F + (Mth.cos(ageInTicks * 1) + 1F) * 0.125F;
+                float beamAlpha = 0.75F + (Mth.cos(renderState.ageInTicks * 1) + 1F) * 0.125F;
                 this.getParentModel().renderToBuffer(matrixStackIn, beam, 240,
-                        LivingEntityRenderer.getOverlayCoords(entitylivingbaseIn, 0),
+                        OverlayTexture.pack(OverlayTexture.u(0), OverlayTexture.v(false)),
                         packColor(1.0F, 1.0F, 1.0F, beamAlpha));
             }
-            String s = ChatFormatting.stripFormatting(entitylivingbaseIn.getName().getString());
+            String s = ChatFormatting.stripFormatting(renderState.nameTag != null ? renderState.nameTag.getString() : "");
             if (s != null && s.toLowerCase().contains("drip")) {
                 VertexConsumer shoeBuffer = bufferIn.getBuffer(RenderType.entityCutoutNoCull(TEXTURE_SHOES));
                 matrixStackIn.pushPose();
@@ -228,25 +140,24 @@ public class RenderMungus extends MobRenderer<EntityMungus, ModelMungus> {
         }
     }
 
-    static class MungusMushroomLayer extends RenderLayer<EntityMungus, ModelMungus> {
+    static class MungusMushroomLayer extends RenderLayer<MungusRenderState, ModelMungus> {
 
         public MungusMushroomLayer(RenderMungus p_i50928_1_) {
             super(p_i50928_1_);
         }
 
         public void render(PoseStack matrixStackIn, MultiBufferSource bufferIn, int packedLightIn,
-                EntityMungus entitylivingbaseIn, float limbSwing, float limbSwingAmount, float partialTicks,
-                float ageInTicks, float netHeadYaw, float headPitch) {
+                MungusRenderState renderState, float limbSwing, float limbSwingAmount) {
             BlockRenderDispatcher blockrendererdispatcher = Minecraft.getInstance().getBlockRenderer();
-            BlockState blockstate = entitylivingbaseIn.getMushroomState();
+            BlockState blockstate = renderState.mushroomState;
             if (blockstate == null) {
                 return;
             }
-            int i = LivingEntityRenderer.getOverlayCoords(entitylivingbaseIn, 0.0F);
-            boolean altOrder = entitylivingbaseIn.isAltOrderMushroom();
-            int mushroomCount = entitylivingbaseIn.getMushroomCount();
+            int i = OverlayTexture.pack(OverlayTexture.u(0), OverlayTexture.v(false));
+            boolean altOrder = renderState.altOrderMushroom;
+            int mushroomCount = renderState.mushroomCount;
             matrixStackIn.pushPose();
-            if (entitylivingbaseIn.isBaby()) {
+            if (renderState.isBaby) {
                 matrixStackIn.scale(0.5F, 0.5F, 0.5F);
                 matrixStackIn.translate(0.0D, 1.5D, 0D);
             }
