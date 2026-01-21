@@ -12,8 +12,6 @@ import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.EntityHitResult;
 import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
-import net.neoforged.api.distmarker.Dist;
-import net.neoforged.api.distmarker.OnlyIn;
 
 import javax.annotation.Nullable;
 import java.util.UUID;
@@ -70,7 +68,7 @@ public abstract class EntityMobProjectile extends Entity {
         this.updateRotation();
         if (this.isInWall() && (!isInWater() || removeInWater())) {
             this.remove(RemovalReason.DISCARDED);
-        } else if (this.isInWaterOrBubble() && this.removeInWater()) {
+        } else if (this.isInWater() && this.removeInWater()) {
             this.remove(RemovalReason.DISCARDED);
         } else {
             this.setDeltaMovement(vector3d.scale(0.99F));
@@ -87,8 +85,7 @@ public abstract class EntityMobProjectile extends Entity {
     protected void onEntityHit(EntityHitResult result) {
         Entity entity = this.getShooter();
         if (entity instanceof LivingEntity) {
-            boolean b = result.getEntity().hurt(damageSources().mobProjectile(this, (LivingEntity) entity), this.getDamage());
-
+            result.getEntity().hurt(damageSources().mobProjectile(this, (LivingEntity) entity), this.getDamage());
         }
         this.remove(RemovalReason.DISCARDED);
     }
@@ -97,7 +94,7 @@ public abstract class EntityMobProjectile extends Entity {
 
     protected void onHitBlock(BlockHitResult p_230299_1_) {
         BlockState blockstate = this.level().getBlockState(p_230299_1_.getBlockPos());
-        if (!this.level().isClientSide) {
+        if (!this.level().isClientSide()) {
             this.remove(RemovalReason.DISCARDED);
         }
     }
@@ -121,7 +118,7 @@ public abstract class EntityMobProjectile extends Entity {
 
     protected void addAdditionalSaveData(CompoundTag compound) {
         if (this.ownerUUID != null) {
-            compound.putUUID("Owner", this.ownerUUID);
+            compound.putString("Owner", this.ownerUUID.toString());
         }
 
         if (this.leftOwner) {
@@ -131,11 +128,15 @@ public abstract class EntityMobProjectile extends Entity {
     }
 
     protected void readAdditionalSaveData(CompoundTag compound) {
-        if (compound.hasUUID("Owner")) {
-            this.ownerUUID = compound.getUUID("Owner");
+        if (compound.contains("Owner")) {
+            try {
+                this.ownerUUID = java.util.UUID.fromString(compound.getString("Owner").orElse(""));
+            } catch (Exception e) {
+                this.ownerUUID = null;
+            }
         }
 
-        this.leftOwner = compound.getBoolean("LeftOwner");
+        this.leftOwner = compound.getBoolean("LeftOwner").orElse(false);
     }
 
     private boolean checkLeftOwner() {
@@ -184,7 +185,6 @@ public abstract class EntityMobProjectile extends Entity {
         }
     }
 
-    @OnlyIn(Dist.CLIENT)
     public void lerpMotion(double x, double y, double z) {
         this.setDeltaMovement(x, y, z);
         if (this.xRotO == 0.0F && this.yRotO == 0.0F) {
@@ -193,7 +193,8 @@ public abstract class EntityMobProjectile extends Entity {
             this.setYRot((float) (Mth.atan2(x, z) * (double) Mth.RAD_TO_DEG));
             this.xRotO = this.getXRot();
             this.yRotO = this.getYRot();
-            this.moveTo(this.getX(), this.getY(), this.getZ(), this.getYRot(), this.getXRot());
+            this.setPos(this.getX(), this.getY(), this.getZ());
+            this.setRot(this.getYRot(), this.getXRot());
         }
 
     }
@@ -210,11 +211,14 @@ public abstract class EntityMobProjectile extends Entity {
     public boolean isSameTeam(Entity shooter, Entity entity) {
         if(shooter instanceof TamableAnimal tamableAnimal && tamableAnimal.isTame()){
             if(entity instanceof TamableAnimal alsoTameable && alsoTameable.isTame()){
-                if(alsoTameable.getOwnerUUID() != null && tamableAnimal.getOwnerUUID() != null && tamableAnimal.getOwnerUUID().equals(alsoTameable.getOwnerUUID())){
+                UUID ownerUUID1 = tamableAnimal.getOwner() != null ? tamableAnimal.getOwner().getUUID() : null;
+                UUID ownerUUID2 = alsoTameable.getOwner() != null ? alsoTameable.getOwner().getUUID() : null;
+                if(ownerUUID2 != null && ownerUUID1 != null && ownerUUID1.equals(ownerUUID2)){
                     return true;
                 }
             }
-            return tamableAnimal.getOwnerUUID() != null && tamableAnimal.getOwnerUUID().equals(entity.getUUID()) || shooter.isAlliedTo(entity);
+            UUID ownerUUID = tamableAnimal.getOwner() != null ? tamableAnimal.getOwner().getUUID() : null;
+            return ownerUUID != null && ownerUUID.equals(entity.getUUID()) || shooter.isAlliedTo(entity);
         }
         return shooter.isAlliedTo(entity);
     }
