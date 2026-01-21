@@ -20,4 +20,7 @@ public class AMConfig {
     
     // Mimic Octopus spawn configuration
     public static int mimicOctopusSpawnRolls = 2;
+    
+    // Mudskipper spawn configuration
+    public static int mudskipperSpawnRolls = 2;
 }

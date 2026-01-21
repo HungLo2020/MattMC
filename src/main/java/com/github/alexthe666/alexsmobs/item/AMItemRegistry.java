@@ -35,4 +35,7 @@ public class AMItemRegistry {
     
     // Mimic Octopus bucket items - reference vanilla Items
     public static final DeferredHolder MIMIC_OCTOPUS_BUCKET = new DeferredHolder(() -> net.minecraft.world.item.Items.MIMIC_OCTOPUS_BUCKET);
+    
+    // Mudskipper bucket items - reference vanilla Items
+    public static final DeferredHolder MUDSKIPPER_BUCKET = new DeferredHolder(() -> net.minecraft.world.item.Items.MUDSKIPPER_BUCKET);
 }

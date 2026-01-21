@@ -17161,6 +17161,30 @@
     ],
     "subtitle": "subtitles.entity.mule.jump"
   },
+  "entity.mudskipper.hurt": {
+    "sounds": [
+      "mudskipper_hurt_0",
+      "mudskipper_hurt_1",
+      "mudskipper_hurt_2"
+    ],
+    "subtitle": "subtitles.entity.mudskipper.hurt"
+  },
+  "entity.mudskipper.walk": {
+    "sounds": [
+      "mudskipper_walk_0",
+      "mudskipper_walk_1",
+      "mudskipper_walk_2",
+      "mudskipper_walk_3"
+    ],
+    "subtitle": "subtitles.entity.mudskipper.walk"
+  },
+  "entity.mudskipper.spit": {
+    "sounds": [
+      "mudskipper_spit_0",
+      "mudskipper_spit_1"
+    ],
+    "subtitle": "subtitles.entity.mudskipper.spit"
+  },
   "entity.ocelot.ambient": {
     "sounds": [
       {

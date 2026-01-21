@@ -54,6 +54,11 @@ public class AMTagRegistry {
     public static final TagKey<Item> MIMIC_OCTOPUS_MOISTURIZES = registerItemTag("mimic_octopus_moisturizes");
     public static final TagKey<Block> MIMIC_OCTOPUS_SPAWNS = registerBlockTag("mimic_octopus_spawns");
 
+    // Mudskipper-specific tags
+    public static final TagKey<Item> MUDSKIPPER_BREEDABLES = registerItemTag("mudskipper_breedables");
+    public static final TagKey<Item> MUDSKIPPER_TAMEABLES = registerItemTag("mudskipper_tameables");
+    public static final TagKey<Item> MUDSKIPPER_FOODSTUFFS = registerItemTag("mudskipper_foodstuffs");
+
     private static TagKey<Item> registerItemTag(String name) {
         return TagKey.create(Registries.ITEM, ResourceLocation.withDefaultNamespace(name));
     }
