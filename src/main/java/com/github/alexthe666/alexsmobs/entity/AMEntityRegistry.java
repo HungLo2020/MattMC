@@ -23,6 +23,8 @@ public class AMEntityRegistry {
     
     // Mimic Octopus entity type - reference vanilla EntityType
     public static final DeferredEntityHolder MIMIC_OCTOPUS = new DeferredEntityHolder(() -> EntityType.MIMIC_OCTOPUS);
+    public static final DeferredEntityHolder MUDSKIPPER = new DeferredEntityHolder(() -> EntityType.MUDSKIPPER);
+    public static final DeferredEntityHolder MUD_BALL = new DeferredEntityHolder(() -> EntityType.MUD_BALL);
     
     /**
      * Helper method for spawn roll logic

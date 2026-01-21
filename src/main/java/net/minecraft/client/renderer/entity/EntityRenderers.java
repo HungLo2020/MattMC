@@ -176,6 +176,8 @@ public class EntityRenderers {
 		register(EntityType.MIMIC_OCTOPUS, RenderMimicOctopus::new);
 		register(EntityType.MINECART, context -> new MinecartRenderer(context, ModelLayers.MINECART));
 		register(EntityType.MOOSHROOM, MushroomCowRenderer::new);
+		register(EntityType.MUD_BALL, ThrownItemRenderer::new);
+		register(EntityType.MUDSKIPPER, com.github.alexthe666.alexsmobs.client.render.RenderMudskipper::new);
 		register(EntityType.MULE, context -> new DonkeyRenderer(context, DonkeyRenderer.Type.MULE));
 		register(EntityType.OAK_BOAT, context -> new BoatRenderer(context, ModelLayers.OAK_BOAT));
 		register(EntityType.OAK_CHEST_BOAT, context -> new BoatRenderer(context, ModelLayers.OAK_CHEST_BOAT));

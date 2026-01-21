@@ -1566,6 +1566,11 @@ public class Items {
 		properties -> new MobBucketItem(EntityType.BLOBFISH, Fluids.WATER, SoundEvents.BUCKET_EMPTY_FISH, properties),
 		new Item.Properties().stacksTo(1).component(DataComponents.BUCKET_ENTITY_DATA, CustomData.EMPTY)
 	);
+	public static final Item MUDSKIPPER_BUCKET = registerItem(
+		"mudskipper_bucket",
+		properties -> new MobBucketItem(EntityType.MUDSKIPPER, Fluids.WATER, SoundEvents.BUCKET_EMPTY_FISH, properties),
+		new Item.Properties().stacksTo(1).component(DataComponents.BUCKET_ENTITY_DATA, CustomData.EMPTY)
+	);
 	public static final Item TADPOLE_BUCKET = registerItem(
 		"tadpole_bucket",
 		properties -> new MobBucketItem(EntityType.TADPOLE, Fluids.WATER, SoundEvents.BUCKET_EMPTY_TADPOLE, properties),
@@ -1836,6 +1841,7 @@ public class Items {
 	public static final Item MIMIC_OCTOPUS_BUCKET = registerItem("mimic_octopus_bucket", properties -> new MobBucketItem(EntityType.MIMIC_OCTOPUS, Fluids.WATER, SoundEvents.BUCKET_EMPTY_FISH, properties), new Item.Properties().stacksTo(1));
 	public static final Item MOOSHROOM_SPAWN_EGG = registerItem("mooshroom_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.MOOSHROOM));
 	public static final Item MULE_SPAWN_EGG = registerItem("mule_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.MULE));
+	public static final Item MUDSKIPPER_SPAWN_EGG = registerItem("mudskipper_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.MUDSKIPPER));
 	public static final Item OCELOT_SPAWN_EGG = registerItem("ocelot_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.OCELOT));
 	public static final Item PANDA_SPAWN_EGG = registerItem("panda_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.PANDA));
 	public static final Item PARROT_SPAWN_EGG = registerItem("parrot_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.PARROT));

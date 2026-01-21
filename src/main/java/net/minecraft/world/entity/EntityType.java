@@ -788,6 +788,21 @@ public class EntityType<T extends Entity> implements FeatureElement, EntityTypeT
 	public static final EntityType<Mule> MULE = register(
 		"mule", EntityType.Builder.of(Mule::new, MobCategory.CREATURE).sized(1.3964844F, 1.6F).eyeHeight(1.52F).passengerAttachments(1.2125F).clientTrackingRange(8)
 	);
+	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntityMudBall> MUD_BALL = register(
+		"mud_ball",
+		EntityType.Builder.<com.github.alexthe666.alexsmobs.entity.EntityMudBall>of(com.github.alexthe666.alexsmobs.entity.EntityMudBall::new, MobCategory.MISC)
+			.noLootTable()
+			.sized(0.25F, 0.25F)
+			.clientTrackingRange(4)
+			.updateInterval(10)
+	);
+	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntityMudskipper> MUDSKIPPER = register(
+		"mudskipper",
+		EntityType.Builder.of(com.github.alexthe666.alexsmobs.entity.EntityMudskipper::new, MobCategory.CREATURE)
+			.sized(0.6F, 0.5F)
+			.eyeHeight(0.3F)
+			.clientTrackingRange(8)
+	);
 	public static final EntityType<Boat> OAK_BOAT = register(
 		"oak_boat",
 		EntityType.Builder.of(boatFactory(() -> Items.OAK_BOAT), MobCategory.MISC).noLootTable().sized(1.375F, 0.5625F).eyeHeight(0.5625F).clientTrackingRange(10)

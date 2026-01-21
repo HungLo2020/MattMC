@@ -1009,6 +1009,9 @@ public class SoundEvents {
 	public static final SoundEvent MULE_EAT = register("entity.mule.eat");
 	public static final SoundEvent MULE_HURT = register("entity.mule.hurt");
 	public static final SoundEvent MULE_JUMP = register("entity.mule.jump");
+	public static final SoundEvent MUDSKIPPER_HURT = register("entity.mudskipper.hurt");
+	public static final SoundEvent MUDSKIPPER_WALK = register("entity.mudskipper.walk");
+	public static final SoundEvent MUDSKIPPER_SPIT = register("entity.mudskipper.spit");
 	public static final Holder.Reference<SoundEvent> MUSIC_CREATIVE = registerForHolder("music.creative");
 	public static final Holder.Reference<SoundEvent> MUSIC_CREDITS = registerForHolder("music.credits");
 	public static final Holder.Reference<SoundEvent> MUSIC_DISC_5 = registerForHolder("music_disc.5");

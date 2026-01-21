@@ -157,6 +157,7 @@ public class DefaultAttributes {
 		.put(EntityType.MANNEQUIN, LivingEntity.createLivingAttributes().build())
 		.put(EntityType.MIMIC_OCTOPUS, EntityMimicOctopus.createAttributes().build())
 		.put(EntityType.MOOSHROOM, Cow.createAttributes().build())
+		.put(EntityType.MUDSKIPPER, com.github.alexthe666.alexsmobs.entity.EntityMudskipper.createAttributes().build())
 		.put(EntityType.MULE, AbstractChestedHorse.createBaseChestedHorseAttributes().build())
 		.put(EntityType.OCELOT, Ocelot.createAttributes().build())
 		.put(EntityType.PANDA, Panda.createAttributes().build())
