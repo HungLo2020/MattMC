@@ -16953,6 +16953,21 @@
     ],
     "subtitle": "subtitles.entity.magma_cube.squish"
   },
+  "entity.mimic_octopus.idle": {
+    "sounds": [
+      "mimic_octopus_idle_0",
+      "mimic_octopus_idle_1",
+      "mimic_octopus_idle_2"
+    ],
+    "subtitle": "subtitles.entity.mimic_octopus.idle"
+  },
+  "entity.mimic_octopus.hurt": {
+    "sounds": [
+      "mimic_octopus_hurt_0",
+      "mimic_octopus_hurt_1"
+    ],
+    "subtitle": "subtitles.entity.mimic_octopus.hurt"
+  },
   "entity.minecart.inside": {
     "sounds": [
       "minecart/inside"
