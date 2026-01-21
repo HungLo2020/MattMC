@@ -4064,6 +4064,7 @@
   "entity.minecraft.mimic_octopus": "Mimic Octopus",
   "entity.minecraft.minecart": "Minecart",
   "entity.minecraft.mooshroom": "Mooshroom",
+  "entity.minecraft.mudskipper": "Mudskipper",
   "entity.minecraft.mule": "Mule",
   "entity.minecraft.oak_boat": "Oak Boat",
   "entity.minecraft.oak_chest_boat": "Oak Boat with Chest",
@@ -4898,6 +4899,8 @@
   "item.minecraft.mooshroom_spawn_egg": "Mooshroom Spawn Egg",
   "item.minecraft.mourner_pottery_shard": "Mourner Pottery Shard",
   "item.minecraft.mourner_pottery_sherd": "Mourner Pottery Sherd",
+  "item.minecraft.mudskipper_bucket": "Bucket of Mudskipper",
+  "item.minecraft.mudskipper_spawn_egg": "Mudskipper Spawn Egg",
   "item.minecraft.mule_spawn_egg": "Mule Spawn Egg",
   "item.minecraft.mushroom_stew": "Mushroom Stew",
   "item.minecraft.music_disc_11": "Music Disc",
@@ -7910,5 +7913,8 @@
   "voxelmap.worldmap.subworld.deleteConfirm": "Confirm Delete Multiworld",
   "voxelmap.worldmap.subworld.edit": "Edit Multiworld Name",
   "voxelmap.worldmap.subworld.name": "Multiworld Name",
-  "voxelmap.worldmap.title": "VoxelMap"
+  "voxelmap.worldmap.title": "VoxelMap",
+  "entity.alexsmobs.all.command_0": "%s is now wandering",
+  "entity.alexsmobs.all.command_1": "%s is now following",
+  "entity.alexsmobs.all.command_2": "%s is now sitting"
 }
