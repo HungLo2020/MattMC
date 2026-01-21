@@ -40,6 +40,8 @@ public class RenderBunfungus extends MobRenderer<EntityBunfungus, BunfungusRende
         renderState.prevTransformTime = entity.prevTransformTime;
         renderState.isSleeping = entity.isSleeping();
         renderState.mainHandItem = entity.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.MAINHAND).copy();
+        renderState.currentAnimation = entity.getAnimation();
+        renderState.animationTick = entity.getAnimationTick();
     }
 
 
@@ -60,24 +62,12 @@ public class RenderBunfungus extends MobRenderer<EntityBunfungus, BunfungusRende
             super(render);
         }
 
-        public void render(PoseStack matrixStackIn, MultiBufferSource bufferIn, int packedLightIn, BunfungusRenderState renderState, float limbSwing, float limbSwingAmount) {
-            ItemStack itemstack = renderState.mainHandItem;
-            matrixStackIn.pushPose();
-            if (renderState.isBaby) {
-                matrixStackIn.scale(0.5F, 0.5F, 0.5F);
-                matrixStackIn.translate(0.0D, 1.5D, 0D);
-            }
-            matrixStackIn.pushPose();
-            translateToHand(matrixStackIn);
-            matrixStackIn.translate(0.3F, 0.45F, -0.15F);
-            matrixStackIn.mulPose(Axis.YP.rotationDegrees(90F));
-            matrixStackIn.mulPose(Axis.XP.rotationDegrees(-90F));
-            matrixStackIn.scale(1.15F, 1.15F, 1.15F);
-            ItemInHandRenderer renderer = Minecraft.getInstance().getEntityRenderDispatcher().getItemInHandRenderer();
-            // Note: renderItem signature may have changed in 1.21 - using available fields from renderState
-            // This may need further adjustment based on actual ItemInHandRenderer API
-            matrixStackIn.popPose();
-            matrixStackIn.popPose();
+        @Override
+        public void submit(PoseStack poseStack, net.minecraft.client.renderer.SubmitNodeCollector submitNodeCollector, int packedLight, BunfungusRenderState renderState, float limbSwing, float limbSwingAmount) {
+            // TODO: Item rendering in layers needs re-implementation with the new 1.21 API
+            // The ItemInHandRenderer API may have changed. Commenting out for now.
+            // ItemStack itemstack = renderState.mainHandItem;
+            // This would need to use submitItem or similar method if available
         }
 
         protected void translateToHand(PoseStack matrixStack) {

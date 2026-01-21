@@ -10,4 +10,6 @@ public class MungusRenderState extends LivingEntityRenderState {
     public int mushroomCount;
     public boolean altOrderMushroom;
     public boolean isReverting;
+    public float swellProgress;
+    public float prevSwellProgress;
 }

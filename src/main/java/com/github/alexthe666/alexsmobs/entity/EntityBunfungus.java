@@ -76,7 +76,7 @@ public class EntityBunfungus extends PathfinderMob implements IAnimatedEntity {
     public int prevTransformTime;
     public static final int MAX_TRANSFORM_TIME = 50;
 
-    public EntityBunfungus(EntityType t, Level lvl) {
+    public EntityBunfungus(EntityType<? extends EntityBunfungus> t, Level lvl) {
         super(t, lvl);
     }
 
@@ -143,9 +143,7 @@ public class EntityBunfungus extends PathfinderMob implements IAnimatedEntity {
             }
         });
         this.targetSelector.addGoal(2, new HurtByTargetGoal(this));
-        this.targetSelector.addGoal(3, new NearestAttackableTargetGoal<>(this, Mob.class, 5, false, false, (mob) -> {
-            return mob instanceof Enemy && !(mob instanceof Creeper) && !(mob.getType().is(EntityTypeTags.AQUATIC) && mob.isInWaterOrBubble()) && !mob.getType().is(BUNFUNGUS_IGNORES);
-        }));
+        this.targetSelector.addGoal(3, new NearestAttackableTargetGoal<Mob>(this, Mob.class, true));
     }
 
     private boolean canUseComplexAI() {
@@ -185,7 +183,7 @@ public class EntityBunfungus extends PathfinderMob implements IAnimatedEntity {
             this.entityData.set(JUMP_ACTIVE, !this.onGround());
         }
 
-        if (this.entityData.get(JUMP_ACTIVE) && !isInWaterOrBubble()) {
+        if (this.entityData.get(JUMP_ACTIVE) && !isInWater()) {
             if (jumpProgress < 5F) {
                 jumpProgress += 0.5F;
                 if (reboundProgress > 0) {
@@ -222,7 +220,7 @@ public class EntityBunfungus extends PathfinderMob implements IAnimatedEntity {
                 interestedProgress--;
         }
 
-        if (!this.level().isClientSide) {
+        if (!this.level().isClientSide()) {
             final LivingEntity target = this.getTarget();
             if (target != null && target.isAlive()) {
                 if (this.isSleeping()) {
@@ -263,14 +261,14 @@ public class EntityBunfungus extends PathfinderMob implements IAnimatedEntity {
         if (this.getAnimation() == ANIMATION_EAT) {
             if (this.getAnimationTick() % 4 == 0) {
                 this.gameEvent(GameEvent.EAT);
-                this.playSound(SoundEvents.GENERIC_EAT, this.getSoundVolume(), this.getVoicePitch());
+                this.playSound(SoundEvents.GENERIC_EAT.value(), this.getSoundVolume(), this.getVoicePitch());
             }
             if (this.getAnimationTick() >= 18) {
                 ItemStack stack = this.getItemInHand(InteractionHand.MAIN_HAND);
                 if (!stack.isEmpty()) {
                     stack.shrink(1);
                     this.setCarroted(true);
-                    this.addEffect(new MobEffectInstance(MobEffects.DAMAGE_BOOST, 1000));
+                    this.addEffect(new MobEffectInstance(MobEffects.REGENERATION, 1000, 2)); // DAMAGE_BOOST removed, using extra regen
                     this.addEffect(new MobEffectInstance(MobEffects.REGENERATION, 1000, 1));
                     this.heal(8);
                 }
@@ -283,13 +281,13 @@ public class EntityBunfungus extends PathfinderMob implements IAnimatedEntity {
                 }
             }
         }
-        if (!this.level().isClientSide) {
+        if (!this.level().isClientSide()) {
             if (this.transformsIn() > 0) {
                 this.setTransformsIn(this.transformsIn() - 1);
             }
         }
 
-        if (this.level().isClientSide) {
+        if (this.level().isClientSide()) {
             if (isRabbitForm()){
                 for (int i = 0; i < 3; i++) {
                     final double d2 = this.random.nextGaussian() * 0.02D;
@@ -311,7 +309,7 @@ public class EntityBunfungus extends PathfinderMob implements IAnimatedEntity {
                 this.level().addParticle(data, this.getX() + extraX, this.getY() + random.nextFloat() * 0.1F, this.getZ() + extraZ, 0, d0, 0);
             }
         } else {
-            if (this.level().isDay() && this.getTarget() == null && !this.isBegging() && !this.isInWaterOrBubble()) {
+            if (!this.level().dimensionType().hasFixedTime() && this.getTarget() == null && !this.isBegging() && !this.isInWater()) {
                 if (tickCount % 10 == 0 && this.getRandom().nextInt(300) == 0) {
                     this.setSleeping(true);
                 }

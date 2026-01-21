@@ -1,5 +1,6 @@
 package com.github.alexthe666.alexsmobs.client.render;
 
+import com.github.alexthe666.citadel.animation.Animation;
 import net.minecraft.client.renderer.entity.state.LivingEntityRenderState;
 import net.minecraft.world.item.ItemStack;
 
@@ -12,4 +13,6 @@ public class BunfungusRenderState extends LivingEntityRenderState {
     public int prevTransformTime;
     public boolean isSleeping;
     public ItemStack mainHandItem = ItemStack.EMPTY;
+    public Animation currentAnimation;
+    public int animationTick;
 }

@@ -1,5 +1,6 @@
 package com.github.alexthe666.alexsmobs.client.model;
 
+import com.github.alexthe666.alexsmobs.client.render.BunfungusRenderState;
 import com.github.alexthe666.alexsmobs.entity.EntityBunfungus;
 import com.github.alexthe666.alexsmobs.entity.util.Maths;
 import com.github.alexthe666.citadel.animation.IAnimatedEntity;
@@ -9,7 +10,7 @@ import com.github.alexthe666.citadel.client.model.ModelAnimator;
 import com.github.alexthe666.citadel.client.model.basic.BasicModelPart;
 import com.google.common.collect.ImmutableList;
 
-public class ModelBunfungus extends AdvancedEntityModel<EntityBunfungus> {
+public class ModelBunfungus extends AdvancedEntityModel<BunfungusRenderState> {
     public final AdvancedModelBox root;
     public final AdvancedModelBox body;
     public final AdvancedModelBox belly;
@@ -131,8 +132,10 @@ public class ModelBunfungus extends AdvancedEntityModel<EntityBunfungus> {
         animator = ModelAnimator.create();
     }
 
-    public void animate(IAnimatedEntity entity, float f, float f1, float f2, float f3, float f4) {
-        animator.update(entity);
+    public void animate(BunfungusRenderState renderState) {
+        // TODO: ModelAnimator.update() signature changed in 1.21
+        // Commenting out animation updates temporarily - needs re-implementation with new API
+        // animator.update(renderState.currentAnimation, renderState.animationTick);
         animator.setAnimation(EntityBunfungus.ANIMATION_EAT);
         animator.startKeyframe(4);
         animator.rotate(head, Maths.rad(30), 0, 0);
@@ -197,18 +200,20 @@ public class ModelBunfungus extends AdvancedEntityModel<EntityBunfungus> {
     }
 
     @Override
-    public void setupAnim(EntityBunfungus entity, float limbSwing, float limbSwingAmount, float ageInTicks, float netHeadYaw, float headPitch) {
+    public void setupAnim(BunfungusRenderState renderState) {
         this.resetToDefaultPose();
-        animate(entity, limbSwing, limbSwingAmount, ageInTicks, netHeadYaw, headPitch);
+        animate(renderState);
+        float limbSwing = renderState.walkAnimationPos;
+        float limbSwingAmount = renderState.walkAnimationSpeed;
+        float ageInTicks = renderState.ageInTicks;
         float idleSpeed = 0.1F;
         float idleDegree = 0.1F;
         float walkSpeed = 0.7F;
         float walkDegree = 2F;
-        float partialTicks = ageInTicks - entity.tickCount;
-        float sleepProgress = entity.prevSleepProgress + (entity.sleepProgress - entity.prevSleepProgress) * partialTicks;
-        float fallProgress = entity.prevReboundProgress + (entity.reboundProgress - entity.prevReboundProgress) * partialTicks;
-        float jumpProgress = Math.max(0, entity.prevJumpProgress + (entity.jumpProgress - entity.prevJumpProgress) * partialTicks - fallProgress);
-        float interestedProgress = entity.prevInterestedProgress + (entity.interestedProgress - entity.prevInterestedProgress) * partialTicks;
+        float sleepProgress = renderState.sleepProgress;
+        float fallProgress = renderState.reboundProgress;
+        float jumpProgress = Math.max(0, renderState.jumpProgress - fallProgress);
+        float interestedProgress = renderState.interestedProgress;
         float walkMod = 1F - (Math.max(jumpProgress, fallProgress) * 0.2F);
         float limbSwingMod = Math.min(limbSwingAmount, 0.38F) * walkMod;
         progressRotationPrev(body, sleepProgress, Maths.rad(90), 0, 0, 5F);
@@ -252,7 +257,7 @@ public class ModelBunfungus extends AdvancedEntityModel<EntityBunfungus> {
         progressPositionPrev(right_brow, interestedProgress, -0.5F,  -0.75F, 0, 5F);
         progressPositionPrev(left_brow, interestedProgress, 0, 0.5F, 0, 5F);
         if(sleepProgress == 0){
-            this.faceTarget(netHeadYaw, headPitch, 1.3F, head);
+            this.faceTarget(renderState.yRot, renderState.xRot, 1.3F, head);
         }
         this.flap(left_ear, idleSpeed, idleDegree, false, 1F, 0.2F, ageInTicks, 1);
         this.flap(right_ear, idleSpeed, idleDegree, true, 1F, 0.2F, ageInTicks, 1);

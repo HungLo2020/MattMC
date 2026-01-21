@@ -1019,14 +1019,14 @@ public class EntityType<T extends Entity> implements FeatureElement, EntityTypeT
 	);
 	public static final EntityType<EntityMungus> MUNGUS = register(
 		"mungus",
-		EntityType.Builder.of(EntityMungus::new, MobCategory.CREATURE)
+		EntityType.Builder.of((EntityType<EntityMungus> type, Level level) -> new EntityMungus(type, level), MobCategory.CREATURE)
 			.sized(0.75F, 1.45F)
 			.eyeHeight(1.1F)
 			.clientTrackingRange(10)
 	);
 	public static final EntityType<EntityBunfungus> BUNFUNGUS = register(
 		"bunfungus",
-		EntityType.Builder.of(EntityBunfungus::new, MobCategory.CREATURE)
+		EntityType.Builder.of((EntityType<EntityBunfungus> type, Level level) -> new EntityBunfungus(type, level), MobCategory.CREATURE)
 			.sized(1.85F, 2.1F)
 			.eyeHeight(1.6F)
 			.clientTrackingRange(10)

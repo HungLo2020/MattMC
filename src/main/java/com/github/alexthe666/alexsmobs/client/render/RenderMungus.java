@@ -54,6 +54,8 @@ public class RenderMungus extends MobRenderer<EntityMungus, MungusRenderState, M
         renderState.mushroomCount = entity.getMushroomCount();
         renderState.altOrderMushroom = entity.isAltOrderMushroom();
         renderState.isReverting = entity.isReverting();
+        renderState.swellProgress = entity.swellProgress;
+        renderState.prevSwellProgress = entity.prevSwellProgress;
     }
 
     protected boolean isShaking(MungusRenderState renderState) {
@@ -72,17 +74,18 @@ public class RenderMungus extends MobRenderer<EntityMungus, MungusRenderState, M
     }
 
     protected void setupRotations(MungusRenderState renderState, PoseStack matrixStackIn, float ageInTicks,
-            float rotationYaw, float partialTicks) {
+            float rotationYaw) {
         if (renderState.deathTime > 0) {
-            matrixStackIn.mulPose(Axis.YP.rotationDegrees(180.0F - rotationYaw));
-            float f = ((float) renderState.deathTime + partialTicks - 1.0F) / 20.0F * 1.6F;
+            // Note: partialTicks is now in renderState.ageInTicks
+            float f = ((float) renderState.deathTime - 1.0F) / 20.0F * 1.6F;
             f = Mth.sqrt(f);
             if (f > 1.0F) {
                 f = 1.0F;
             }
+            matrixStackIn.mulPose(Axis.YP.rotationDegrees(180.0F - rotationYaw));
             matrixStackIn.mulPose(Axis.XP.rotationDegrees(f * -90));
         } else {
-            super.setupRotations(renderState, matrixStackIn, ageInTicks, rotationYaw, partialTicks);
+            super.setupRotations(renderState, matrixStackIn, ageInTicks, rotationYaw);
         }
     }
 
@@ -110,28 +113,61 @@ public class RenderMungus extends MobRenderer<EntityMungus, MungusRenderState, M
             super(p_i50928_1_);
         }
 
-        public void render(PoseStack matrixStackIn, MultiBufferSource bufferIn, int packedLightIn,
-                MungusRenderState renderState, float limbSwing, float limbSwingAmount) {
-            VertexConsumer lead = bufferIn.getBuffer(RenderType.eyes(TEXTURE_SACK_OVERLAY));
+        @Override
+        public void submit(PoseStack poseStack, net.minecraft.client.renderer.SubmitNodeCollector submitNodeCollector, int packedLight, MungusRenderState renderState, float limbSwing, float limbSwingAmount) {
+            // Render glowing sack overlay
             float alpha = 0.75F + (Mth.cos(renderState.ageInTicks * 0.2F) + 1F) * 0.125F;
-            this.getParentModel().renderToBuffer(matrixStackIn, lead, 240, OverlayTexture.NO_OVERLAY,
-                    packColor(1.0F, 1.0F, 1.0F, alpha));
+            int color = packColor(1.0F, 1.0F, 1.0F, alpha);
+            submitNodeCollector.submitModel(
+                this.getParentModel(),
+                renderState,
+                poseStack,
+                RenderType.eyes(TEXTURE_SACK_OVERLAY),
+                240,
+                OverlayTexture.NO_OVERLAY,
+                color,
+                null,
+                0,
+                null
+            );
+            
+            // Render beam overlay if target exists
             if (renderState.beamTarget != null) {
-                VertexConsumer beam = bufferIn.getBuffer(RenderType.entityTranslucent(TEXTURE_BEAM_OVERLAY));
                 float beamAlpha = 0.75F + (Mth.cos(renderState.ageInTicks * 1) + 1F) * 0.125F;
-                this.getParentModel().renderToBuffer(matrixStackIn, beam, 240,
-                        OverlayTexture.pack(OverlayTexture.u(0), OverlayTexture.v(false)),
-                        packColor(1.0F, 1.0F, 1.0F, beamAlpha));
+                int beamColor = packColor(1.0F, 1.0F, 1.0F, beamAlpha);
+                submitNodeCollector.submitModel(
+                    this.getParentModel(),
+                    renderState,
+                    poseStack,
+                    RenderType.entityTranslucent(TEXTURE_BEAM_OVERLAY),
+                    240,
+                    OverlayTexture.pack(OverlayTexture.u(0), OverlayTexture.v(false)),
+                    beamColor,
+                    null,
+                    0,
+                    null
+                );
             }
+            
+            // Render shoes for "drip" named mungus
             String s = ChatFormatting.stripFormatting(renderState.nameTag != null ? renderState.nameTag.getString() : "");
             if (s != null && s.toLowerCase().contains("drip")) {
-                VertexConsumer shoeBuffer = bufferIn.getBuffer(RenderType.entityCutoutNoCull(TEXTURE_SHOES));
-                matrixStackIn.pushPose();
+                poseStack.pushPose();
                 this.getParentModel().renderShoes();
-                this.getParentModel().renderToBuffer(matrixStackIn, shoeBuffer, packedLightIn,
-                        OverlayTexture.NO_OVERLAY, -1);
+                submitNodeCollector.submitModel(
+                    this.getParentModel(),
+                    renderState,
+                    poseStack,
+                    RenderType.entityCutoutNoCull(TEXTURE_SHOES),
+                    packedLight,
+                    OverlayTexture.NO_OVERLAY,
+                    -1,
+                    null,
+                    0,
+                    null
+                );
                 this.getParentModel().postRenderShoes();
-                matrixStackIn.popPose();
+                poseStack.popPose();
             }
         }
         
@@ -146,69 +182,67 @@ public class RenderMungus extends MobRenderer<EntityMungus, MungusRenderState, M
             super(p_i50928_1_);
         }
 
-        public void render(PoseStack matrixStackIn, MultiBufferSource bufferIn, int packedLightIn,
-                MungusRenderState renderState, float limbSwing, float limbSwingAmount) {
-            BlockRenderDispatcher blockrendererdispatcher = Minecraft.getInstance().getBlockRenderer();
+        @Override
+        public void submit(PoseStack poseStack, net.minecraft.client.renderer.SubmitNodeCollector submitNodeCollector, int packedLight, MungusRenderState renderState, float limbSwing, float limbSwingAmount) {
             BlockState blockstate = renderState.mushroomState;
             if (blockstate == null) {
                 return;
             }
-            int i = OverlayTexture.pack(OverlayTexture.u(0), OverlayTexture.v(false));
+            int overlay = OverlayTexture.pack(OverlayTexture.u(0), OverlayTexture.v(false));
             boolean altOrder = renderState.altOrderMushroom;
             int mushroomCount = renderState.mushroomCount;
-            matrixStackIn.pushPose();
+            poseStack.pushPose();
             if (renderState.isBaby) {
-                matrixStackIn.scale(0.5F, 0.5F, 0.5F);
-                matrixStackIn.translate(0.0D, 1.5D, 0D);
+                poseStack.scale(0.5F, 0.5F, 0.5F);
+                poseStack.translate(0.0D, 1.5D, 0D);
             }
-            matrixStackIn.pushPose();
-            translateToBody(matrixStackIn);
+            poseStack.pushPose();
+            translateToBody(poseStack);
             if (mushroomCount == 1 && !altOrder || mushroomCount >= 2) {
-                matrixStackIn.pushPose();
-                matrixStackIn.translate(0.2F, -1.4F, 0.15D);
-                matrixStackIn.scale(-1.0F, -1.0F, 1.0F);
-                matrixStackIn.translate(-0.5D, -0.5D, -0.5D);
-                blockrendererdispatcher.renderSingleBlock(blockstate, matrixStackIn, bufferIn, packedLightIn, i);
-                matrixStackIn.popPose();
+                poseStack.pushPose();
+                poseStack.translate(0.2F, -1.4F, 0.15D);
+                poseStack.scale(-1.0F, -1.0F, 1.0F);
+                poseStack.translate(-0.5D, -0.5D, -0.5D);
+                submitNodeCollector.submitBlock(poseStack, blockstate, packedLight, overlay, renderState.outlineColor);
+                poseStack.popPose();
             }
             if (mushroomCount == 1 && altOrder || mushroomCount >= 2) {
-                matrixStackIn.pushPose();
-                matrixStackIn.translate(-0.2F, -1.5F, -0.2D);
-                matrixStackIn.scale(-1.0F, -1.0F, 1.0F);
-                matrixStackIn.translate(-0.5D, -0.5D, -0.5D);
-                blockrendererdispatcher.renderSingleBlock(blockstate, matrixStackIn, bufferIn, packedLightIn, i);
-                matrixStackIn.popPose();
+                poseStack.pushPose();
+                poseStack.translate(-0.2F, -1.5F, -0.2D);
+                poseStack.scale(-1.0F, -1.0F, 1.0F);
+                poseStack.translate(-0.5D, -0.5D, -0.5D);
+                submitNodeCollector.submitBlock(poseStack, blockstate, packedLight, overlay, renderState.outlineColor);
+                poseStack.popPose();
             }
             if (mushroomCount >= 3) {
-                matrixStackIn.pushPose();
-                matrixStackIn.translate(0.76F, -0.4F, 0.1D);
-                matrixStackIn.mulPose(Axis.ZP.rotationDegrees(90F));
-                matrixStackIn.scale(-1.0F, -1.0F, 1.0F);
-                matrixStackIn.translate(-0.5D, -0.5D, -0.5D);
-                blockrendererdispatcher.renderSingleBlock(blockstate, matrixStackIn, bufferIn, packedLightIn, i);
-                matrixStackIn.popPose();
+                poseStack.pushPose();
+                poseStack.translate(0.76F, -0.4F, 0.1D);
+                poseStack.mulPose(Axis.ZP.rotationDegrees(90F));
+                poseStack.scale(-1.0F, -1.0F, 1.0F);
+                poseStack.translate(-0.5D, -0.5D, -0.5D);
+                submitNodeCollector.submitBlock(poseStack, blockstate, packedLight, overlay, renderState.outlineColor);
+                poseStack.popPose();
             }
             if (mushroomCount >= 4) {
-                matrixStackIn.pushPose();
-                matrixStackIn.translate(-0.76F, -1.0F, 0.1D);
-                matrixStackIn.mulPose(Axis.ZP.rotationDegrees(-60F));
-                matrixStackIn.scale(-1.0F, -1.0F, 1.0F);
-                matrixStackIn.translate(-0.5D, -0.5D, -0.5D);
-                blockrendererdispatcher.renderSingleBlock(blockstate, matrixStackIn, bufferIn, packedLightIn, i);
-                matrixStackIn.popPose();
+                poseStack.pushPose();
+                poseStack.translate(-0.76F, -1.0F, 0.1D);
+                poseStack.mulPose(Axis.ZP.rotationDegrees(-60F));
+                poseStack.scale(-1.0F, -1.0F, 1.0F);
+                poseStack.translate(-0.5D, -0.5D, -0.5D);
+                submitNodeCollector.submitBlock(poseStack, blockstate, packedLight, overlay, renderState.outlineColor);
+                poseStack.popPose();
             }
             if (mushroomCount >= 5) {
-                matrixStackIn.pushPose();
-                matrixStackIn.translate(-0.76F, -0.1F, 0.1D);
-                matrixStackIn.mulPose(Axis.ZP.rotationDegrees(-100F));
-                matrixStackIn.scale(-1.0F, -1.0F, 1.0F);
-                matrixStackIn.translate(-0.5D, -0.5D, -0.5D);
-                blockrendererdispatcher.renderSingleBlock(blockstate, matrixStackIn, bufferIn, packedLightIn, i);
-                matrixStackIn.popPose();
+                poseStack.pushPose();
+                poseStack.translate(-0.76F, -0.1F, 0.1D);
+                poseStack.mulPose(Axis.ZP.rotationDegrees(-100F));
+                poseStack.scale(-1.0F, -1.0F, 1.0F);
+                poseStack.translate(-0.5D, -0.5D, -0.5D);
+                submitNodeCollector.submitBlock(poseStack, blockstate, packedLight, overlay, renderState.outlineColor);
+                poseStack.popPose();
             }
-            matrixStackIn.popPose();
-            matrixStackIn.popPose();
-
+            poseStack.popPose();
+            poseStack.popPose();
         }
 
         protected void translateToBody(PoseStack matrixStack) {
