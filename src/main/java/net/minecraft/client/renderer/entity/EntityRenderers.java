@@ -23,6 +23,7 @@ import com.github.alexthe666.alexsmobs.client.render.RenderCosmicCod;
 import com.github.alexthe666.alexsmobs.client.render.RenderEndergrade;
 import com.github.alexthe666.alexsmobs.client.render.RenderFlyingFish;
 import com.github.alexthe666.alexsmobs.client.render.RenderGazelle;
+import com.github.alexthe666.alexsmobs.client.render.RenderMimicOctopus;
 
 @Environment(EnvType.CLIENT)
 public class EntityRenderers {
@@ -172,6 +173,7 @@ public class EntityRenderers {
 		register(EntityType.MANGROVE_BOAT, context -> new BoatRenderer(context, ModelLayers.MANGROVE_BOAT));
 		register(EntityType.MANGROVE_CHEST_BOAT, context -> new BoatRenderer(context, ModelLayers.MANGROVE_CHEST_BOAT));
 		register(EntityType.MARKER, NoopRenderer::new);
+		register(EntityType.MIMIC_OCTOPUS, RenderMimicOctopus::new);
 		register(EntityType.MINECART, context -> new MinecartRenderer(context, ModelLayers.MINECART));
 		register(EntityType.MOOSHROOM, MushroomCowRenderer::new);
 		register(EntityType.MULE, context -> new DonkeyRenderer(context, DonkeyRenderer.Type.MULE));

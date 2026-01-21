@@ -23,19 +23,19 @@ import org.joml.Matrix4f;
 
 public class RenderMimicOctopus extends MobRenderer<EntityMimicOctopus, ModelMimicOctopus> {
     private static final ResourceLocation TEXTURE = ResourceLocation
-            .parse("alexsmobs:textures/entity/mimic_octopus.png");
+            .withDefaultNamespace("textures/entity/mimic_octopus.png");
     private static final ResourceLocation TEXTURE_OVERLAY = ResourceLocation
-            .parse("alexsmobs:textures/entity/mimic_octopus_overlay.png");
+            .withDefaultNamespace("textures/entity/mimic_octopus_overlay.png");
     private static final ResourceLocation TEXTURE_CREEPER = ResourceLocation
-            .parse("alexsmobs:textures/entity/mimic_octopus_creeper.png");
+            .withDefaultNamespace("textures/entity/mimic_octopus_creeper.png");
     private static final ResourceLocation TEXTURE_GUARDIAN = ResourceLocation
-            .parse("alexsmobs:textures/entity/mimic_octopus_guardian.png");
+            .withDefaultNamespace("textures/entity/mimic_octopus_guardian.png");
     private static final ResourceLocation TEXTURE_PUFFERFISH = ResourceLocation
-            .parse("alexsmobs:textures/entity/mimic_octopus_pufferfish.png");
+            .withDefaultNamespace("textures/entity/mimic_octopus_pufferfish.png");
     private static final ResourceLocation TEXTURE_MIMICUBE = ResourceLocation
-            .parse("alexsmobs:textures/entity/mimic_octopus_mimicube.png");
+            .withDefaultNamespace("textures/entity/mimic_octopus_mimicube.png");
     private static final ResourceLocation TEXTURE_EYES = ResourceLocation
-            .parse("alexsmobs:textures/entity/mimic_octopus_eyes.png");
+            .withDefaultNamespace("textures/entity/mimic_octopus_eyes.png");
     private static final ResourceLocation GUARDIAN_BEAM_TEXTURE = ResourceLocation
             .withDefaultNamespace("textures/entity/guardian_beam.png");
     private static final RenderType BEAM_RENDER_TYPE = RenderType.entityCutoutNoCull(GUARDIAN_BEAM_TEXTURE);

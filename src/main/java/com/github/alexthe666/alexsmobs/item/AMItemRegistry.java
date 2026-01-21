@@ -32,4 +32,7 @@ public class AMItemRegistry {
     
     // Comb Jelly bucket items - reference vanilla Items
     public static final DeferredHolder COMB_JELLY_BUCKET = new DeferredHolder(() -> net.minecraft.world.item.Items.COMB_JELLY_BUCKET);
+    
+    // Mimic Octopus bucket items - reference vanilla Items
+    public static final DeferredHolder MIMIC_OCTOPUS_BUCKET = new DeferredHolder(() -> net.minecraft.world.item.Items.MIMIC_OCTOPUS_BUCKET);
 }
