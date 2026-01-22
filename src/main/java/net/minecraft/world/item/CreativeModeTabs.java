@@ -1968,6 +1968,7 @@ public class CreativeModeTabs {
 					output.accept(Items.PIGLIN_BRUTE_SPAWN_EGG);
 					output.accept(Items.PILLAGER_SPAWN_EGG);
 					output.accept(Items.POLAR_BEAR_SPAWN_EGG);
+					output.accept(Items.POTOO_SPAWN_EGG);
 					output.accept(Items.PUFFERFISH_SPAWN_EGG);
 					output.accept(Items.RABBIT_SPAWN_EGG);
 					output.accept(Items.RAIN_FROG_SPAWN_EGG);

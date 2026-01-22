@@ -202,6 +202,7 @@ public class EntityRenderers {
 		);
 		register(EntityType.PILLAGER, PillagerRenderer::new);
 		register(EntityType.POLAR_BEAR, PolarBearRenderer::new);
+		register(EntityType.POTOO, com.github.alexthe666.alexsmobs.client.render.RenderPotoo::new);
 		register(EntityType.PUFFERFISH, PufferfishRenderer::new);
 		register(EntityType.RABBIT, RabbitRenderer::new);
 		register(EntityType.RAIN_FROG, com.github.alexthe666.alexsmobs.client.render.RenderRainFrog::new);

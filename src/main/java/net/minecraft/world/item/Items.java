@@ -1855,6 +1855,7 @@ public class Items {
 	);
 	public static final Item PILLAGER_SPAWN_EGG = registerItem("pillager_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.PILLAGER));
 	public static final Item POLAR_BEAR_SPAWN_EGG = registerItem("polar_bear_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.POLAR_BEAR));
+	public static final Item POTOO_SPAWN_EGG = registerItem("potoo_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.POTOO));
 	public static final Item PUFFERFISH_SPAWN_EGG = registerItem("pufferfish_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.PUFFERFISH));
 	public static final Item RABBIT_SPAWN_EGG = registerItem("rabbit_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.RABBIT));
 	public static final Item RAIN_FROG_SPAWN_EGG = registerItem("rain_frog_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.RAIN_FROG));
