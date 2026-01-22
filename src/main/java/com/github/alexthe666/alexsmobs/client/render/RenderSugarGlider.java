@@ -86,7 +86,7 @@ public class RenderSugarGlider extends MobRenderer<EntitySugarGlider, SugarGlide
             }
 
             matrixStackIn.mulPose(Axis.ZP.rotationDegrees(f * this.getFlipDegrees()));
-        } else if (ChatFormatting.stripFormatting(state.nameTag.getString()).equals("Dinnerbone") || ChatFormatting.stripFormatting(state.nameTag.getString()).equals("Grumm")) {
+        } else if (state.nameTag != null && (ChatFormatting.stripFormatting(state.nameTag.getString()).equals("Dinnerbone") || ChatFormatting.stripFormatting(state.nameTag.getString()).equals("Grumm"))) {
             matrixStackIn.translate(0.0D, (double)(state.boundingBoxHeight + 0.1F), 0.0D);
             matrixStackIn.mulPose(Axis.ZP.rotationDegrees(180.0F));
         }
