@@ -225,6 +225,7 @@
                         if (mat == 10680) return   7; // Ochre Froglight
                         if (mat == 10684) return   8; // Verdant Froglight
                         if (mat == 10688) return   9; // Pearlescent Froglight
+                        if (mat == 10689) return  59; // Carmine Froglight
                     }
                 }
             } else {

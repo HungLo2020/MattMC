@@ -115,7 +115,7 @@ vec4 GetSpecialBlocklightColor(int mat) {
 					if (mat == 56) return vec4(vec3(1.7, 0.9, 0.4) * 2.0, 0.0); // Copper Bulb:DimmerOnes:Lit
 					if (mat == 57) return vec4(vec3(0.1, 0.3, 0.4) * 0.5, 0.0005); // Sculk++
 					if (mat == 58) return vec4(vec3(0.0, 1.4, 1.4) * 4.0, 0.15); // End Portal Frame:Active
-					if (mat == 59) return vec4(0.0); // Bedrock
+					if (mat == 59) return vec4(vec3(1.3, 0.3, 0.3) * 4.5, 0.0); // Carmine Froglight
 					if (mat == 60) return vec4(vec3(3.1, 1.1, 0.3) * 0.125, 0.0125); // Command Block
 					if (mat == 61) return vec4(vec3(3.0, 0.9, 0.2) * 0.125, 0.0125); // Warped Fungus, Crimson Fungus
 				}
