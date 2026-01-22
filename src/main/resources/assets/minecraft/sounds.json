@@ -18970,6 +18970,26 @@
     ],
     "subtitle": "subtitles.entity.rabbit.jump"
   },
+  "entity.rain_frog.idle": {
+    "sounds": [
+      "rain_frog_idle_0",
+      "rain_frog_idle_1",
+      "rain_frog_idle_2",
+      "rain_frog_idle_3",
+      "rain_frog_idle_4",
+      "rain_frog_idle_5"
+    ],
+    "subtitle": "subtitles.entity.rain_frog.idle"
+  },
+  "entity.rain_frog.hurt": {
+    "sounds": [
+      "rain_frog_hurt_0",
+      "rain_frog_hurt_1",
+      "rain_frog_hurt_2",
+      "rain_frog_hurt_3"
+    ],
+    "subtitle": "subtitles.entity.rain_frog.hurt"
+  },
   "entity.ravager.ambient": {
     "sounds": [
       "mob/ravager/idle1",

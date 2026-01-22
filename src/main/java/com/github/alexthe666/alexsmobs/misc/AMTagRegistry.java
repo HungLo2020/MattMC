@@ -59,6 +59,10 @@ public class AMTagRegistry {
     public static final TagKey<Item> MUDSKIPPER_TAMEABLES = registerItemTag("mudskipper_tameables");
     public static final TagKey<Item> MUDSKIPPER_FOODSTUFFS = registerItemTag("mudskipper_foodstuffs");
 
+    // Rain Frog-specific tags
+    public static final TagKey<Item> RAIN_FROG_BREEDABLES = registerItemTag("rain_frog_breedables");
+    public static final TagKey<Block> RAIN_FROG_SPAWNS = registerBlockTag("rain_frog_spawns");
+    public static final TagKey<Item> INSECT_ITEMS = registerItemTag("insect_items");
     // Fly-specific tags
     public static final TagKey<Item> FLY_BREEDABLES = registerItemTag("fly_breedables");
 
