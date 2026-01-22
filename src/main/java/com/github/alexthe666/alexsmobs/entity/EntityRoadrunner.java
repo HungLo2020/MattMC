@@ -7,7 +7,8 @@ import com.github.alexthe666.alexsmobs.misc.AMTagRegistry;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ParticleTypes;
-import net.minecraft.nbt.CompoundTag;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
@@ -51,7 +52,7 @@ public class EntityRoadrunner extends Animal {
     public int timeUntilNextFeather = this.random.nextInt(24000) + 24000;
     private boolean hasMeepSpeed = false;
 
-    protected EntityRoadrunner(EntityType type, Level worldIn) {
+    public EntityRoadrunner(EntityType<? extends EntityRoadrunner> type, Level worldIn) {
         super(type, worldIn);
     }
 
@@ -61,27 +62,24 @@ public class EntityRoadrunner extends Animal {
         this.goalSelector.addGoal(1, new MeleeAttackGoal(this, 1.0D, false));
         this.goalSelector.addGoal(2, new BreedGoal(this, 1.0D));
         this.goalSelector.addGoal(4, new FollowParentGoal(this, 1.1D));
-        this.goalSelector.addGoal(4, new TemptGoal(this, 1.1D, Ingredient.of(AMTagRegistry.ROADRUNNER_BREEDABLES), false));
+        this.goalSelector.addGoal(4, new TemptGoal(this, 1.1D, itemStack -> itemStack.is(AMTagRegistry.ROADRUNNER_BREEDABLES), false));
         this.goalSelector.addGoal(5, new AnimalAIWanderRanged(this, 50, 1.0D, 25, 7));
         this.goalSelector.addGoal(6, new LookAtPlayerGoal(this, Player.class, 6.0F));
         this.goalSelector.addGoal(7, new RandomLookAroundGoal(this));
         this.targetSelector.addGoal(2, (new HurtByTargetGoal(this)).setAlertOthers());
     }
-    public void readAdditionalSaveData(CompoundTag compound) {
-        super.readAdditionalSaveData(compound);
-        if (compound.contains("FeatherTime")) {
-            this.timeUntilNextFeather = compound.getInt("FeatherTime");
-        }
-
+    public void readAdditionalSaveData(ValueInput valueInput) {
+        super.readAdditionalSaveData(valueInput);
+        this.timeUntilNextFeather = valueInput.getIntOr("FeatherTime", this.random.nextInt(24000) + 24000);
     }
 
     public boolean checkSpawnRules(LevelAccessor worldIn, EntitySpawnReason spawnReasonIn) {
         return true; // Simple spawn rule - can be customized later
     }
 
-    public void addAdditionalSaveData(CompoundTag compound) {
-        super.addAdditionalSaveData(compound);
-        compound.putInt("FeatherTime", this.timeUntilNextFeather);
+    public void addAdditionalSaveData(ValueOutput valueOutput) {
+        super.addAdditionalSaveData(valueOutput);
+        valueOutput.putInt("FeatherTime", this.timeUntilNextFeather);
     }
 
     protected SoundEvent getAmbientSound() {
@@ -109,9 +107,8 @@ public class EntityRoadrunner extends Animal {
         return true;
     }
 
-    @Override
-    public boolean isInvulnerableTo(DamageSource source) {
-        return source.is(DamageTypes.CACTUS) || source.getMsgId().equals("anvil") || super.isInvulnerableTo(source);
+    public boolean isInvulnerableTo(ServerLevel serverLevel, DamageSource source) {
+        return source.is(DamageTypes.CACTUS) || source.getMsgId().equals("anvil") || super.isInvulnerableTo(serverLevel, source);
     }
 
     public static AttributeSupplier.Builder bakeAttributes() {
@@ -128,8 +125,8 @@ public class EntityRoadrunner extends Animal {
         if (!this.onGround() && this.wingRotDelta < 1.0F) {
             this.wingRotDelta = 1.0F;
         }
-        if (!this.level().isClientSide && this.isAlive() && !this.isBaby() && --this.timeUntilNextFeather <= 0) {
-            this.spawnAtLocation(AMItemRegistry.ROADRUNNER_FEATHER.get());
+        if (this.level() instanceof ServerLevel serverLevel && this.isAlive() && !this.isBaby() && --this.timeUntilNextFeather <= 0) {
+            this.spawnAtLocation(serverLevel, AMItemRegistry.ROADRUNNER_FEATHER.get());
             this.timeUntilNextFeather = this.random.nextInt(24000) + 24000;
         }
         this.wingRotDelta = (float) ((double) this.wingRotDelta * 0.9D);
@@ -169,7 +166,7 @@ public class EntityRoadrunner extends Animal {
             }
         }
 
-        if (this.level().isClientSide && this.isMeep() && this.onGround() && !this.isInWaterOrBubble() && this.getDeltaMovement().lengthSqr() > 0.03D) {
+        if (this.level().isClientSide() && this.isMeep() && this.onGround() && !this.isInWater() && this.getDeltaMovement().lengthSqr() > 0.03D) {
             Vec3 vector3d = this.getViewVector(0.0F);
             final float yRotRad = this.getYRot() * Mth.DEG_TO_RAD;
             float f = Mth.cos(yRotRad) * 0.2F;

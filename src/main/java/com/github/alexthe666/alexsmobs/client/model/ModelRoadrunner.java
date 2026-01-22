@@ -189,29 +189,6 @@ public class ModelRoadrunner extends AdvancedEntityModel<RoadrunnerRenderState> 
         }
     }
 
-    public void renderToBuffer(PoseStack matrixStackIn, VertexConsumer bufferIn, int packedLightIn, int packedOverlayIn) {
-        if (this.young) {
-            float f = 1.75F;
-            neck.setScale(f, f, f);
-            neck.setShouldScaleChildren(true);
-            matrixStackIn.pushPose();
-            matrixStackIn.scale(0.5F, 0.5F, 0.5F);
-            matrixStackIn.translate(0.0D, 1.5D, 0.125D);
-            parts().forEach((p_228292_8_) -> {
-                p_228292_8_.render(matrixStackIn, bufferIn, packedLightIn, packedOverlayIn);
-            });
-            matrixStackIn.popPose();
-            neck.setScale(1, 1, 1);
-        } else {
-            matrixStackIn.pushPose();
-            parts().forEach((p_228290_8_) -> {
-                p_228290_8_.render(matrixStackIn, bufferIn, packedLightIn, packedOverlayIn);
-            });
-            matrixStackIn.popPose();
-        }
-
-    }
-
     @Override
     public Iterable<BasicModelPart> parts() {
         return ImmutableList.of(root);
