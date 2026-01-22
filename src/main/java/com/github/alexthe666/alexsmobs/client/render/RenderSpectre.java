@@ -4,11 +4,8 @@ import com.github.alexthe666.alexsmobs.client.model.ModelSpectre;
 import com.github.alexthe666.alexsmobs.client.render.state.SpectreRenderState;
 import com.github.alexthe666.alexsmobs.entity.EntitySpectre;
 import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.blaze3d.vertex.VertexConsumer;
-import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.entity.EntityRendererProvider;
-import net.minecraft.client.renderer.entity.LivingEntityRenderer;
 import net.minecraft.client.renderer.entity.MobRenderer;
 import net.minecraft.client.renderer.entity.layers.EyesLayer;
 import net.minecraft.client.renderer.entity.layers.RenderLayer;
@@ -35,6 +32,7 @@ public class RenderSpectre extends MobRenderer<EntitySpectre, SpectreRenderState
         super.extractRenderState(entity, renderState, partialTick);
         renderState.birdPitch = entity.birdPitch;
         renderState.prevBirdPitch = entity.prevBirdPitch;
+        renderState.isLeashed = entity.isLeashed();
     }
 
     protected void scale(SpectreRenderState renderState, PoseStack matrixStackIn) {
@@ -75,16 +73,22 @@ public class RenderSpectre extends MobRenderer<EntitySpectre, SpectreRenderState
             super(p_i50928_1_);
         }
 
-        public void render(PoseStack matrixStackIn, MultiBufferSource bufferIn, int packedLightIn,
-                SpectreRenderState renderState, float limbSwing, float limbSwingAmount) {
-            VertexConsumer lvt_11_1_ = bufferIn.getBuffer(this.getRenderType());
-            this.getParentModel().renderToBuffer(matrixStackIn, lvt_11_1_, 15728640,
-                    LivingEntityRenderer.getOverlayCoords(renderState, 0),
-                    AMColorUtil.packColor(1.0F, 1.0F, 1.0F, getAlphaForRender(renderState)));
+        @Override
+        public void submit(PoseStack poseStack, net.minecraft.client.renderer.SubmitNodeCollector submitNodeCollector, int packedLight,
+                SpectreRenderState renderState, float f, float g) {
+            float alpha = getAlphaForRender(renderState);
+            int color = AMColorUtil.packColor(1.0F, 1.0F, 1.0F, alpha);
+            
+            submitNodeCollector.order(1).submitModel(
+                this.getParentModel(), renderState, poseStack, this.getRenderType(), 15728640,
+                net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY, color, null, renderState.outlineColor, null
+            );
+            
             if (renderState.isLeashed) {
-                VertexConsumer lead = bufferIn.getBuffer(AMRenderTypes.entityCutoutNoCull(TEXTURE_LEAD));
-                this.getParentModel().renderToBuffer(matrixStackIn, lead, 15728640,
-                        LivingEntityRenderer.getOverlayCoords(renderState, 0), -1);
+                submitNodeCollector.order(1).submitModel(
+                    this.getParentModel(), renderState, poseStack, AMRenderTypes.entityCutoutNoCull(TEXTURE_LEAD), 15728640,
+                    net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY, -1, null, renderState.outlineColor, null
+                );
             }
         }
 

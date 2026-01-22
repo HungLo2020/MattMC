@@ -86,8 +86,8 @@ public class ModelSpectre extends AdvancedEntityModel<SpectreRenderState> {
         this.flap(wing_left, flySpeed, flyDegree * 0.85F, true, 7F, 0, ageInTicks, 1);
         this.flap(wing_right, flySpeed, flyDegree * 0.85F, false, 7F, 0, ageInTicks, 1);
         this.walk(root, flySpeed, flyDegree * 0.15F, true, 7.3F, 0, ageInTicks, 1);
-        float birdPitch = renderState.prevBirdPitch + (renderState.birdPitch - renderState.prevBirdPitch) * Minecraft.getInstance().getTimer().getGameTimeDeltaPartialTick(false);
-        this.root.rotateAngleX += birdPitch * Mth.DEG_TO_RAD;
+        // Bird pitch is already interpolated in render state
+        this.root.rotateAngleX += renderState.birdPitch * Mth.DEG_TO_RAD;
 
     }
 

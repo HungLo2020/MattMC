@@ -48,7 +48,7 @@ public class EntitySpectre extends Animal implements FlyingAnimal {
     public float prevBirdPitch = 0;
     public Vec3 lurePos = null;
 
-    protected EntitySpectre(EntityType type, Level world) {
+    public EntitySpectre(EntityType type, Level world) {
         super(type, world);
         this.moveControl = new MoveHelperController(this);
     }
@@ -112,8 +112,8 @@ public class EntitySpectre extends Animal implements FlyingAnimal {
     }
 
     @Override
-    public boolean isInvulnerableTo(DamageSource source) {
-        return !source.is(DamageTypes.MAGIC) && !source.is(DamageTypes.FELL_OUT_OF_WORLD) && !source.isCreativePlayer() && !source.is(DamageTypeTags.BYPASSES_INVULNERABILITY) || super.isInvulnerableTo(source);
+    public boolean isInvulnerableTo(ServerLevel serverLevel, DamageSource source) {
+        return !source.is(DamageTypes.MAGIC) && !source.is(DamageTypes.FELL_OUT_OF_WORLD) && !source.isCreativePlayer() && !source.is(DamageTypeTags.BYPASSES_INVULNERABILITY) || super.isInvulnerableTo(serverLevel, source);
     }
 
     @Nullable
@@ -162,10 +162,10 @@ public class EntitySpectre extends Animal implements FlyingAnimal {
                 entity.setDeltaMovement(entity.getDeltaMovement().multiply(1, 0.7F, 1));
             }
             if (entity.isShiftKeyDown()) {
-                this.dropLeash(true, true);
+                this.dropLeash();
             }
             // Custom leash handling for spectre (from tickLeash replacement)
-            if (!this.level().isClientSide) {
+            if (!this.level().isClientSide()) {
                 if (f > 30) {
                     double dx = (this.getLeashHolder().getX() - this.getX()) / (double) f;
                     double dy = (this.getLeashHolder().getY() - this.getY()) / (double) f;
@@ -173,7 +173,7 @@ public class EntitySpectre extends Animal implements FlyingAnimal {
                     this.setDeltaMovement(this.getDeltaMovement().add(Math.copySign(dx * dx * 0.4D, dx), Math.copySign(dy * dy * 0.4D, dy), Math.copySign(dz * dz * 0.4D, dz)));
                 }
                 if (!this.isAlive() || !this.getLeashHolder().isAlive()) {
-                    this.dropLeash(true, true);
+                    this.dropLeash();
                 }
             }
         }
@@ -364,7 +364,7 @@ public class EntitySpectre extends Animal implements FlyingAnimal {
                 --this.delayTemptCounter;
                 return false;
             } else {
-                this.closestPlayer = this.creature.level().getNearestPlayer(ENTITY_PREDICATE, this.creature);
+                this.closestPlayer = this.creature.level().getNearestPlayer(this.creature, 64D);
                 if (this.closestPlayer == null || this.creature.getLeashHolder() == closestPlayer) {
                     return false;
                 } else {
