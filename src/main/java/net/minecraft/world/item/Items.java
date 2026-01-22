@@ -1895,6 +1895,8 @@ public class Items {
 		"tropical_fish_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.TROPICAL_FISH)
 	);
 	public static final Item TURTLE_SPAWN_EGG = registerItem("turtle_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.TURTLE));
+	public static final Item TERRAPIN_SPAWN_EGG = registerItem("terrapin_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.TERRAPIN));
+	public static final Item TERRAPIN_BUCKET = registerItem("terrapin_bucket", properties -> new MobBucketItem(EntityType.TERRAPIN, Fluids.WATER, SoundEvents.BUCKET_EMPTY_FISH, properties), new Item.Properties().stacksTo(1));
 	public static final Item VEX_SPAWN_EGG = registerItem("vex_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.VEX));
 	public static final Item VILLAGER_SPAWN_EGG = registerItem("villager_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.VILLAGER));
 	public static final Item VINDICATOR_SPAWN_EGG = registerItem("vindicator_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.VINDICATOR));

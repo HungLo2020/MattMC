@@ -83,6 +83,7 @@ import com.github.alexthe666.alexsmobs.entity.EntityMungus;
 import com.github.alexthe666.alexsmobs.entity.EntityBlobfish;
 import com.github.alexthe666.alexsmobs.entity.EntityCosmicCod;
 import com.github.alexthe666.alexsmobs.entity.EntityFlyingFish;
+import com.github.alexthe666.alexsmobs.entity.EntityTerrapin;
 import net.minecraft.world.entity.boss.enderdragon.EndCrystal;
 import net.minecraft.world.entity.boss.enderdragon.EnderDragon;
 import net.minecraft.world.entity.boss.wither.WitherBoss;
@@ -1172,6 +1173,10 @@ public class EntityType<T extends Entity> implements FeatureElement, EntityTypeT
 	public static final EntityType<Turtle> TURTLE = register(
 		"turtle",
 		EntityType.Builder.of(Turtle::new, MobCategory.CREATURE).sized(1.2F, 0.4F).passengerAttachments(new Vec3(0.0, 0.55625, -0.25)).clientTrackingRange(10)
+	);
+	public static final EntityType<EntityTerrapin> TERRAPIN = register(
+		"terrapin",
+		EntityType.Builder.of(EntityTerrapin::new, MobCategory.CREATURE).sized(0.6F, 0.4F).clientTrackingRange(10)
 	);
 	public static final EntityType<Vex> VEX = register(
 		"vex",

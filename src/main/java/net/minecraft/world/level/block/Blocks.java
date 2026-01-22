@@ -4745,6 +4745,18 @@ public class Blocks {
 			.noOcclusion()
 			.pushReaction(PushReaction.DESTROY)
 	);
+	public static final Block TERRAPIN_EGG = register(
+		"terrapin_egg",
+		com.github.alexthe666.alexsmobs.block.BlockTerrapinEgg::new,
+		BlockBehaviour.Properties.of()
+			.mapColor(MapColor.SAND)
+			.forceSolidOn()
+			.strength(0.5F)
+			.sound(SoundType.METAL)
+			.randomTicks()
+			.noOcclusion()
+			.pushReaction(PushReaction.DESTROY)
+	);
 	public static final Block SNIFFER_EGG = register(
 		"sniffer_egg", SnifferEggBlock::new, BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_RED).strength(0.5F).sound(SoundType.METAL).noOcclusion()
 	);

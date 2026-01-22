@@ -266,6 +266,11 @@ public class BlockEntityType<T extends BlockEntity> {
 		Blocks.WAXED_WEATHERED_COPPER_GOLEM_STATUE,
 		Blocks.WAXED_OXIDIZED_COPPER_GOLEM_STATUE
 	);
+	public static final BlockEntityType<com.github.alexthe666.alexsmobs.tileentity.TileEntityTerrapinEgg> TERRAPIN_EGG = register(
+		"terrapin_egg",
+		com.github.alexthe666.alexsmobs.tileentity.TileEntityTerrapinEgg::new,
+		Blocks.TERRAPIN_EGG
+	);
 	private static final Set<BlockEntityType<?>> OP_ONLY_CUSTOM_DATA = Set.of(COMMAND_BLOCK, LECTERN, SIGN, HANGING_SIGN, MOB_SPAWNER, TRIAL_SPAWNER);
 	private final BlockEntityType.BlockEntitySupplier<? extends T> factory;
 	private final Set<Block> validBlocks;
