@@ -19239,6 +19239,24 @@
     ],
     "subtitle": "subtitles.entity.shoebill.hurt"
   },
+  "entity.spectre.idle": {
+    "sounds": [
+      "spectre_idle_0",
+      "spectre_idle_1",
+      "spectre_idle_2",
+      "spectre_idle_3",
+      "spectre_idle_4"
+    ],
+    "subtitle": "subtitles.entity.spectre.idle"
+  },
+  "entity.spectre.hurt": {
+    "sounds": [
+      "spectre_hurt_0",
+      "spectre_hurt_1",
+      "spectre_hurt_2"
+    ],
+    "subtitle": "subtitles.entity.spectre.hurt"
+  },
   "entity.sheep.ambient": {
     "sounds": [
       "mob/sheep/say1",

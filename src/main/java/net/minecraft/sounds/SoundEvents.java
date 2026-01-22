@@ -1424,6 +1424,8 @@ public class SoundEvents {
 	public static final SoundEvent SHROOMLIGHT_FALL = register("block.shroomlight.fall");
 	public static final SoundEvent SHOVEL_FLATTEN = register("item.shovel.flatten");
 	public static final SoundEvent SHOEBILL_HURT = register("entity.shoebill.hurt");
+	public static final SoundEvent SPECTRE_IDLE = register("entity.spectre.idle");
+	public static final SoundEvent SPECTRE_HURT = register("entity.spectre.hurt");
 	public static final SoundEvent SHULKER_AMBIENT = register("entity.shulker.ambient");
 	public static final SoundEvent SHULKER_BOX_CLOSE = register("block.shulker_box.close");
 	public static final SoundEvent SHULKER_BOX_OPEN = register("block.shulker_box.open");

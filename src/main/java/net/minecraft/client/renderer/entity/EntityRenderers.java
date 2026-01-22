@@ -213,6 +213,7 @@ public class EntityRenderers {
 		register(EntityType.SEAGULL, com.github.alexthe666.alexsmobs.client.render.RenderSeagull::new);
 		register(EntityType.SHEEP, SheepRenderer::new);
 		register(EntityType.SHOEBILL, com.github.alexthe666.alexsmobs.client.render.RenderShoebill::new);
+		register(EntityType.SPECTRE, com.github.alexthe666.alexsmobs.client.render.RenderSpectre::new);
 		register(EntityType.SHULKER, ShulkerRenderer::new);
 		register(EntityType.SHULKER_BULLET, ShulkerBulletRenderer::new);
 		register(EntityType.SILVERFISH, SilverfishRenderer::new);
