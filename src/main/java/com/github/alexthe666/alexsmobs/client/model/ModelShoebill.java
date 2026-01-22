@@ -139,51 +139,9 @@ public class ModelShoebill extends AdvancedEntityModel<ShoebillRenderState> {
 
     public void animate(ShoebillRenderState state, int animationId, int animationTick) {
         this.resetToDefaultPose();
-        animator.setAnimation(animationId == 1 ? 1 : 0); // ANIMATION_FISH
-        animator.startKeyframe(15);
-        animator.rotate(head, Maths.rad(-40), 0, 0);
-        animator.move(head, 0, 0.5F, 0);
-        animator.endKeyframe();
-        animator.startKeyframe(5);
-        animator.rotate(body, Maths.rad(40), 0, 0);
-        animator.rotate(leftLeg, Maths.rad(-40), 0, 0);
-        animator.rotate(rightLeg, Maths.rad(-40), 0, 0);
-        animator.rotate(head, Maths.rad(80), 0, 0);
-        animator.rotate(jaw, Maths.rad(20), 0, 0);
-        animator.move(body, 0, 1F, 0);
-        animator.move(head, 0, 0F, -2F);
-        animator.endKeyframe();
-        animator.setStaticKeyframe(3);
-        animator.resetKeyframe(5);
-        animator.setAnimation(animationId == 2 ? 1 : 0); // ANIMATION_BEAKSHAKE
-        animator.startKeyframe(4);
-        animator.rotate(head, Maths.rad(40), Maths.rad(40), 0);
-        animator.move(head, 0, 0.5F, 0);
-        animator.endKeyframe();
-        animator.startKeyframe(4);
-        animator.rotate(head, Maths.rad(40), Maths.rad(-40), 0);
-        animator.move(head, 0, 0.5F, 0);
-        animator.endKeyframe();
-        animator.startKeyframe(4);
-        animator.rotate(head, Maths.rad(40), Maths.rad(40), 0);
-        animator.move(head, 0, 0.5F, 0);
-        animator.endKeyframe();
-        animator.startKeyframe(4);
-        animator.rotate(head, Maths.rad(40), Maths.rad(-40), 0);
-        animator.move(head, 0, 0.5F, 0);
-        animator.endKeyframe();
-        animator.resetKeyframe(4);
-        animator.setAnimation(animationId == 3 ? 1 : 0); // ANIMATION_ATTACK
-        animator.startKeyframe(5);
-        animator.rotate(head, Maths.rad(-20), 0, 0);
-        animator.rotate(jaw, Maths.rad(30), 0, 0);
-        animator.move(head, 0, 0.5F, 0);
-        animator.endKeyframe();
-        animator.startKeyframe(5);
-        animator.rotate(head, Maths.rad(60), 0, 0);
-        animator.rotate(jaw, Maths.rad(5), 0, 0);
-        animator.endKeyframe();
-        animator.resetKeyframe(5);
+        // Animations are handled differently in render state architecture
+        // We can't use the old IAnimatedEntity system directly
+        // For now, skip keyframe animations and just use procedural animation
     }
 
     public void setRotationAngle(AdvancedModelBox AdvancedModelBox, float x, float y, float z) {

@@ -28,4 +28,7 @@ public class AMConfig {
     public static int seagullSpawnWeight = 21;
     public static int seagullSpawnRolls = 0;
     public static boolean seagullStealing = true;
+    
+    // Shoebill spawn configuration
+    public static int shoebillSpawnRolls = 0;
 }
