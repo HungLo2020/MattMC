@@ -70,7 +70,7 @@ public class EntityPotoo extends Animal implements IFalconry {
     private boolean isLandNavigator;
     private int timeFlying;
 
-    protected EntityPotoo(EntityType type, Level level) {
+    public EntityPotoo(EntityType type, Level level) {
         super(type, level);
         switchNavigator(true);
     }
@@ -81,13 +81,14 @@ public class EntityPotoo extends Animal implements IFalconry {
 
     protected void registerGoals() {
         this.goalSelector.addGoal(0, new FloatGoal(this));
-        this.goalSelector.addGoal(1, new TemptGoal(this, 1.0D, Ingredient.of(AMTagRegistry.POTOO_BREEDABLES), false));
+        this.goalSelector.addGoal(1, new TemptGoal(this, 1.0D, Ingredient.of(net.minecraft.world.item.Items.BEETROOT_SEEDS), false));
         this.goalSelector.addGoal(2, new BreedGoal(this, 1.0D));
         this.goalSelector.addGoal(3, new PanicGoal(this, 1D));
         this.goalSelector.addGoal(4, new AIPerch());
         this.goalSelector.addGoal(5, new AIMelee());
         this.goalSelector.addGoal(6, new AIFlyIdle());
-        this.targetSelector.addGoal(1, new NearestAttackableTargetGoal<>(this, EntityFly.class, 100, true, true, null));
+        // EntityFly targeting removed - EntityFly is stubbed
+        // this.targetSelector.addGoal(1, new NearestAttackableTargetGoal<>(this, EntityFly.class, 100, true, true, null));
     }
 
     private void switchNavigator(boolean onLand) {
@@ -127,7 +128,7 @@ public class EntityPotoo extends Animal implements IFalconry {
         this.entityData.set(SLEEPING, Boolean.valueOf(sleeping));
     }
 
-    public static boolean canPotooSpawn(EntityType type, LevelAccessor worldIn, MobSpawnType reason, BlockPos pos, RandomSource randomIn) {
+    public static boolean canPotooSpawn(EntityType type, LevelAccessor worldIn, EntitySpawnReason reason, BlockPos pos, RandomSource randomIn) {
         return isBrightEnoughToSpawn(worldIn, pos);
     }
 
@@ -140,7 +141,7 @@ public class EntityPotoo extends Animal implements IFalconry {
         return false;
     }
 
-    public boolean checkSpawnRules(LevelAccessor worldIn, MobSpawnType spawnReasonIn) {
+    public boolean checkSpawnRules(LevelAccessor worldIn, EntitySpawnReason spawnReasonIn) {
         return true; // Simplified spawn rules
     }
 
@@ -179,7 +180,7 @@ public class EntityPotoo extends Animal implements IFalconry {
         if (perchCooldown > 0) {
             perchCooldown--;
         }
-        if (!this.level().isClientSide) {
+        if (!this.level().isClientSide()) {
             this.entityData.set(TEMP_BRIGHTNESS, level().getMaxLocalRawBrightness(this.blockPosition()));
             if (isFlying()) {
                 if (this.isLandNavigator)
@@ -191,7 +192,7 @@ public class EntityPotoo extends Animal implements IFalconry {
 
             if (this.isFlying()) {
                 if (!this.onGround()) {
-                    if (!this.isInWaterOrBubble()) {
+                    if (!this.isInWater()) {
                         this.setDeltaMovement(this.getDeltaMovement().multiply(1F, 0.6F, 1F));
                     }
                 } else if (timeFlying > 20) {
@@ -202,7 +203,9 @@ public class EntityPotoo extends Animal implements IFalconry {
                 this.timeFlying = 0;
             }
             if (this.isPerching() && !this.isVehicle()) {
-                this.setSleeping(this.level().isDay() && (this.getTarget() == null || !this.getTarget().isAlive()));
+                // Check if it's day time (simplified - always false for now)
+                boolean isDay = this.level().dimensionType().hasFixedTime() ? false : (this.level().getDayTime() % 24000L) < 12000L;
+                this.setSleeping(isDay && (this.getTarget() == null || !this.getTarget().isAlive()));
             } else if (isSleeping()) {
                 this.setSleeping(false);
             }
@@ -254,17 +257,9 @@ public class EntityPotoo extends Animal implements IFalconry {
         return net.minecraft.sounds.SoundEvents.POTOO_HURT;
     }
 
-    public boolean hurt(DamageSource source, float amount) {
-        boolean prev = super.hurt(source, amount);
-        if (prev && source.getDirectEntity() instanceof LivingEntity) {
-            this.setPerching(false);
-        }
-        return prev;
-    }
-
     @Override
-    public boolean isInvulnerableTo(DamageSource source) {
-        return source.is(DamageTypes.IN_WALL)  || super.isInvulnerableTo(source);
+    public boolean isInvulnerableTo(ServerLevel level, DamageSource source) {
+        return source.is(DamageTypes.IN_WALL)  || super.isInvulnerableTo(level, source);
     }
 
     public void rideTick() {
@@ -333,7 +328,7 @@ public class EntityPotoo extends Animal implements IFalconry {
         this.entityData.set(PERCHING, perching);
     }
 
-    public void addAdditionalSaveData(CompoundTag compound) {
+    public void addAdditionalSaveData(net.minecraft.world.level.storage.ValueOutput compound) {
         super.addAdditionalSaveData(compound);
         compound.putBoolean("Flying", this.isFlying());
         compound.putBoolean("Perching", this.isPerching());
@@ -345,13 +340,17 @@ public class EntityPotoo extends Animal implements IFalconry {
         }
     }
 
-    public void readAdditionalSaveData(CompoundTag compound) {
+    public void readAdditionalSaveData(net.minecraft.world.level.storage.ValueInput compound) {
         super.readAdditionalSaveData(compound);
-        this.setFlying(compound.getBoolean("Flying"));
-        this.setPerching(compound.getBoolean("Perching"));
-        this.setPerchDirection(Direction.from3DDataValue(compound.getInt("PerchDir")));
-        if (compound.contains("PerchX") && compound.contains("PerchY") && compound.contains("PerchZ")) {
-            this.setPerchPos(new BlockPos(compound.getInt("PerchX"), compound.getInt("PerchY"), compound.getInt("PerchZ")));
+        this.setFlying(compound.getBooleanOr("Flying", false));
+        this.setPerching(compound.getBooleanOr("Perching", false));
+        this.setPerchDirection(Direction.from3DDataValue(compound.getIntOr("PerchDir", 0)));
+        // Read perch position - getIntOr returns 0 if not present
+        int perchX = compound.getIntOr("PerchX", 0);
+        int perchY = compound.getIntOr("PerchY", 0);
+        int perchZ = compound.getIntOr("PerchZ", 0);
+        if (perchX != 0 || perchY != 0 || perchZ != 0) {
+            this.setPerchPos(new BlockPos(perchX, perchY, perchZ));
         }
     }
 
@@ -626,7 +625,8 @@ public class EntityPotoo extends Animal implements IFalconry {
 
         @Override
         public boolean canContinueToUse() {
-            return (perchingTime < 300 || EntityPotoo.this.level().isDay()) && (EntityPotoo.this.getTarget() == null || !EntityPotoo.this.getTarget().isAlive()) && !EntityPotoo.this.isPassenger();
+            boolean isDay = EntityPotoo.this.level().dimensionType().hasFixedTime() ? false : (EntityPotoo.this.level().getDayTime() % 24000L) < 12000L;
+            return (perchingTime < 300 || isDay) && (EntityPotoo.this.getTarget() == null || !EntityPotoo.this.getTarget().isAlive()) && !EntityPotoo.this.isPassenger();
         }
 
         public void tick() {

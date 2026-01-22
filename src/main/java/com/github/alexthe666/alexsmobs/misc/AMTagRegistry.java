@@ -59,6 +59,13 @@ public class AMTagRegistry {
     public static final TagKey<Item> MUDSKIPPER_TAMEABLES = registerItemTag("mudskipper_tameables");
     public static final TagKey<Item> MUDSKIPPER_FOODSTUFFS = registerItemTag("mudskipper_foodstuffs");
 
+    // Fly-specific tags
+    public static final TagKey<Item> FLY_BREEDABLES = registerItemTag("fly_breedables");
+
+    // Potoo-specific tags
+    public static final TagKey<Item> POTOO_BREEDABLES = registerItemTag("potoo_breedables");
+    public static final TagKey<Block> POTOO_PERCHES = registerBlockTag("potoo_perches");
+
     private static TagKey<Item> registerItemTag(String name) {
         return TagKey.create(Registries.ITEM, ResourceLocation.withDefaultNamespace(name));
     }
