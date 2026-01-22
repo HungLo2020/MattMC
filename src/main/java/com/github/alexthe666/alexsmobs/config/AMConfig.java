@@ -23,4 +23,9 @@ public class AMConfig {
     
     // Mudskipper spawn configuration
     public static int mudskipperSpawnRolls = 2;
+    
+    // Seagull spawn configuration
+    public static int seagullSpawnWeight = 21;
+    public static int seagullSpawnRolls = 0;
+    public static boolean seagullStealing = true;
 }

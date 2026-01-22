@@ -19214,6 +19214,23 @@
     ],
     "subtitle": "subtitles.entity.salmon.hurt"
   },
+  "entity.seagull.hurt": {
+    "sounds": [
+      "seagull_hurt_0",
+      "seagull_hurt_1"
+    ],
+    "subtitle": "subtitles.entity.seagull.hurt"
+  },
+  "entity.seagull.idle": {
+    "sounds": [
+      "seagull_idle_0",
+      "seagull_idle_1",
+      "seagull_idle_2",
+      "seagull_idle_3",
+      "seagull_idle_4"
+    ],
+    "subtitle": "subtitles.entity.seagull.ambient"
+  },
   "entity.sheep.ambient": {
     "sounds": [
       "mob/sheep/say1",

@@ -16,7 +16,7 @@
     potoo
     rain frog
     roadrunner
-seagull
+    seagull
 seal
 shoebill
 spectre
