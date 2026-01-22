@@ -60,10 +60,12 @@ public class TileEntityTerrapinEgg extends BlockEntity {
     protected void saveAdditional(ValueOutput output) {
         super.saveAdditional(output);
         if(this.parent1 != null){
-            output.putChild("Parent1Data", child -> parent1.writeToNBT(child));
+            ValueOutput child1 = output.child("Parent1Data");
+            parent1.writeToNBT(child1);
         }
         if(this.parent2 != null){
-            output.putChild("Parent2Data", child -> parent2.writeToNBT(child));
+            ValueOutput child2 = output.child("Parent2Data");
+            parent2.writeToNBT(child2);
         }
     }
 
