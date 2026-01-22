@@ -71,4 +71,8 @@ public class AMSoundRegistry {
     // Spectre sounds - reference vanilla SoundEvents
     public static final DeferredHolder SPECTRE_IDLE = new DeferredHolder(() -> net.minecraft.sounds.SoundEvents.SPECTRE_IDLE);
     public static final DeferredHolder SPECTRE_HURT = new DeferredHolder(() -> net.minecraft.sounds.SoundEvents.SPECTRE_HURT);
+    
+    // Toucan sounds - reference vanilla SoundEvents
+    public static final DeferredHolder TOUCAN_IDLE = new DeferredHolder(() -> net.minecraft.sounds.SoundEvents.TOUCAN_IDLE);
+    public static final DeferredHolder TOUCAN_HURT = new DeferredHolder(() -> net.minecraft.sounds.SoundEvents.TOUCAN_HURT);
 }
