@@ -1316,6 +1316,8 @@ public class SoundEvents {
 	public static final SoundEvent ROADRUNNER_IDLE = register("entity.roadrunner.idle");
 	public static final SoundEvent ROADRUNNER_HURT = register("entity.roadrunner.hurt");
 	public static final SoundEvent ROADRUNNER_MEEP = register("entity.roadrunner.meep");
+	public static final SoundEvent SEAL_IDLE = register("entity.seal.idle");
+	public static final SoundEvent SEAL_HURT = register("entity.seal.hurt");
 	public static final SoundEvent RAVAGER_AMBIENT = register("entity.ravager.ambient");
 	public static final SoundEvent RAVAGER_ATTACK = register("entity.ravager.attack");
 	public static final SoundEvent RAVAGER_CELEBRATE = register("entity.ravager.celebrate");

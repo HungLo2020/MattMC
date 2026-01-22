@@ -178,6 +178,7 @@ public class DefaultAttributes {
 		.put(EntityType.RABBIT, Rabbit.createAttributes().build())
 		.put(EntityType.RAIN_FROG, com.github.alexthe666.alexsmobs.entity.EntityRainFrog.bakeAttributes().build())
 		.put(EntityType.ROADRUNNER, com.github.alexthe666.alexsmobs.entity.EntityRoadrunner.bakeAttributes().build())
+		.put(EntityType.SEAL, com.github.alexthe666.alexsmobs.entity.EntitySeal.createAttributes().build())
 		.put(EntityType.RAVAGER, Ravager.createAttributes().build())
 		.put(EntityType.RELICHEIRUS, RelicheirusEntity.createAttributes().build())
 		.put(EntityType.SALMON, AbstractFish.createAttributes().build())

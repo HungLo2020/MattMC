@@ -74,6 +74,13 @@ public class AMTagRegistry {
     public static final TagKey<Item> ROADRUNNER_BREEDABLES = registerItemTag("roadrunner_breedables");
     public static final TagKey<Block> ROADRUNNER_SPAWNS = registerBlockTag("roadrunner_spawns");
 
+    // Seal-specific tags
+    public static final TagKey<Block> SEAL_DIGABLES = registerBlockTag("seal_digables");
+    public static final TagKey<Item> SEAL_BREEDABLES = registerItemTag("seal_breedables");
+    public static final TagKey<Item> SEAL_OFFERINGS = registerItemTag("seal_offerings");
+    public static final TagKey<Block> SEAL_SPAWNS = registerBlockTag("seal_spawns");
+    public static final TagKey<Biome> SPAWNS_WHITE_SEALS = registerBiomeTag("spawns_white_seals");
+
     private static TagKey<Item> registerItemTag(String name) {
         return TagKey.create(Registries.ITEM, ResourceLocation.withDefaultNamespace(name));
     }
