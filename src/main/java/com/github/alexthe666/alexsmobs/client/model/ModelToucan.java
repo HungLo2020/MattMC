@@ -96,34 +96,16 @@ public class ModelToucan extends AdvancedEntityModel<ToucanRenderState> {
         return ImmutableList.of(root, body, tail, left_wing, left_wingtip, right_wing, right_wingtip, right_leg, left_leg, head, beak);
     }
 
-    @Override
-    public void renderToBuffer(PoseStack matrixStackIn, VertexConsumer buffer, int packedLight, int packedOverlay){
-        if (this.young) {
-            float f = 1.24F;
-            head.setScale(f, f, f);
-            head.setShouldScaleChildren(true);
-            matrixStackIn.pushPose();
-            matrixStackIn.scale(0.5F, 0.5F, 0.5F);
-            matrixStackIn.translate(0.0D, 1.5D, 0D);
-            parts().forEach((p_228292_8_) -> {
-                p_228292_8_.render(matrixStackIn, buffer, packedLight, packedOverlay);
-            });
-            matrixStackIn.popPose();
-            this.head.setScale(0.9F, 0.9F, 0.9F);
-        } else {
-            this.head.setScale(0.9F, 0.9F, 0.9F);
-            matrixStackIn.pushPose();
-            parts().forEach((p_228290_8_) -> {
-                p_228290_8_.render(matrixStackIn, buffer, packedLight, packedOverlay);
-            });
-            matrixStackIn.popPose();
-        }
-    }
-
 
     @Override
     public void setupAnim(ToucanRenderState state) {
         this.resetToDefaultPose();
+        float f = 1.24F;
+        if (state.isBaby) {
+            head.setScale(f, f, f);
+        } else {
+            head.setScale(0.9F, 0.9F, 0.9F);
+        }
         float flapSpeed = 1.0F;
         float flapDegree = 0.2F;
         float walkSpeed = 1.2F;

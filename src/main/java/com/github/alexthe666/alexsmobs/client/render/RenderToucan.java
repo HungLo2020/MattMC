@@ -30,7 +30,6 @@ public class RenderToucan extends MobRenderer<EntityToucan, ToucanRenderState, M
     public RenderToucan(EntityRendererProvider.Context renderManagerIn) {
         super(renderManagerIn, new ModelToucan(), 0.2F);
         this.addLayer(new LayerGlint(this));
-        this.addLayer(new LayerHeldItem(this));
     }
 
     @Override
@@ -79,44 +78,16 @@ public class RenderToucan extends MobRenderer<EntityToucan, ToucanRenderState, M
             super(render);
         }
 
-        public void render(PoseStack matrixStackIn, MultiBufferSource bufferIn, int packedLightIn, ToucanRenderState state, float limbSwing, float limbSwingAmount) {
+        @Override
+        public void submit(PoseStack poseStack, net.minecraft.client.renderer.SubmitNodeCollector submitNodeCollector, int packedLight,
+                ToucanRenderState state, float f, float g) {
             if(state.isEnchanted){
-                VertexConsumer vertexconsumer = ItemRenderer.getArmorFoilBuffer(bufferIn, RenderType.armorCutoutNoCull(TEXTURE_GOLDEN), true);
-                this.getParentModel().renderToBuffer(matrixStackIn, vertexconsumer, packedLightIn, LivingEntityRenderer.getOverlayCoords(state, 0.0F));
+                int color = -1;
+                submitNodeCollector.order(1).submitModel(
+                    this.getParentModel(), state, poseStack, RenderType.armorCutoutNoCull(TEXTURE_GOLDEN), packedLight,
+                    LivingEntityRenderer.getOverlayCoords(state, 0.0F), color, null, state.outlineColor, null
+                );
             }
-        }
-    }
-
-    static class LayerHeldItem extends RenderLayer<ToucanRenderState, ModelToucan> {
-
-        public LayerHeldItem(RenderToucan render) {
-            super(render);
-        }
-
-        public void render(PoseStack matrixStackIn, MultiBufferSource bufferIn, int packedLightIn, ToucanRenderState state, float limbSwing, float limbSwingAmount) {
-            ItemStack itemstack = state.heldItem;
-            matrixStackIn.pushPose();
-            if (state.isBaby) {
-                matrixStackIn.scale(0.5F, 0.5F, 0.5F);
-                matrixStackIn.translate(0.0D, 1.5D, 0D);
-            }
-            matrixStackIn.pushPose();
-            translateToHand(matrixStackIn);
-            matrixStackIn.translate(-0.07F, -0.1F, -0.25F);
-            matrixStackIn.mulPose(Axis.YP.rotationDegrees(-45F));
-            matrixStackIn.mulPose(Axis.XP.rotationDegrees(-90F));
-            ItemInHandRenderer renderer = Minecraft.getInstance().getEntityRenderDispatcher().getItemInHandRenderer();
-            // Pass null for entity since we're rendering from state
-            renderer.renderItem(null, itemstack, ItemDisplayContext.GROUND, false, matrixStackIn, bufferIn, packedLightIn);
-            matrixStackIn.popPose();
-            matrixStackIn.popPose();
-        }
-
-        protected void translateToHand(PoseStack matrixStack) {
-            this.getParentModel().root.translateAndRotate(matrixStack);
-            this.getParentModel().body.translateAndRotate(matrixStack);
-            this.getParentModel().head.translateAndRotate(matrixStack);
-
         }
     }
 }
