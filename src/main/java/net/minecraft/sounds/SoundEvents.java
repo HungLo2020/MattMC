@@ -1635,6 +1635,7 @@ public class SoundEvents {
 	public static final SoundEvent TURTLE_SHAMBLE = register("entity.turtle.shamble");
 	public static final SoundEvent TURTLE_SHAMBLE_BABY = register("entity.turtle.shamble_baby");
 	public static final SoundEvent TURTLE_SWIM = register("entity.turtle.swim");
+	public static final SoundEvent TERRAPIN_HURT = register("entity.terrapin.hurt");
 	public static final Holder.Reference<SoundEvent> UI_BUTTON_CLICK = registerForHolder("ui.button.click");
 	public static final SoundEvent UI_LOOM_SELECT_PATTERN = register("ui.loom.select_pattern");
 	public static final SoundEvent UI_LOOM_TAKE_RESULT = register("ui.loom.take_result");

@@ -24,6 +24,7 @@ import com.github.alexthe666.alexsmobs.client.render.RenderEndergrade;
 import com.github.alexthe666.alexsmobs.client.render.RenderFlyingFish;
 import com.github.alexthe666.alexsmobs.client.render.RenderGazelle;
 import com.github.alexthe666.alexsmobs.client.render.RenderMimicOctopus;
+import com.github.alexthe666.alexsmobs.client.render.RenderTerrapin;
 
 @Environment(EnvType.CLIENT)
 public class EntityRenderers {
@@ -249,6 +250,7 @@ public class EntityRenderers {
 		register(EntityType.TRIDENT, ThrownTridentRenderer::new);
 		register(EntityType.TROPICAL_FISH, TropicalFishRenderer::new);
 		register(EntityType.TURTLE, TurtleRenderer::new);
+		register(EntityType.TERRAPIN, RenderTerrapin::new);
 		register(EntityType.VEX, VexRenderer::new);
 		register(EntityType.VILLAGER, VillagerRenderer::new);
 		register(EntityType.VINDICATOR, VindicatorRenderer::new);

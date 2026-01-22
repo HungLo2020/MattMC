@@ -25244,5 +25244,13 @@
       "ambient/weather/rain4"
     ],
     "subtitle": "subtitles.weather.rain"
+  },
+  "entity.terrapin.hurt": {
+    "sounds": [
+      "entity/terrapin/terrapin_hurt_0",
+      "entity/terrapin/terrapin_hurt_1",
+      "entity/terrapin/terrapin_hurt_2"
+    ],
+    "subtitle": "subtitles.entity.terrapin.hurt"
   }
 }

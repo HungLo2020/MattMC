@@ -57,6 +57,7 @@ import com.github.alexthe666.alexsmobs.entity.EntityCosmicCod;
 import com.github.alexthe666.alexsmobs.entity.EntityFlyingFish;
 import com.github.alexthe666.alexsmobs.entity.EntityMimicOctopus;
 import com.github.alexthe666.alexsmobs.entity.EntityMungus;
+import com.github.alexthe666.alexsmobs.entity.EntityTerrapin;
 import net.minecraft.world.entity.boss.enderdragon.EnderDragon;
 import net.minecraft.world.entity.boss.wither.WitherBoss;
 import net.minecraft.world.entity.decoration.ArmorStand;
@@ -205,6 +206,7 @@ public class DefaultAttributes {
 		.put(EntityType.TRADER_LLAMA, Llama.createAttributes().build())
 		.put(EntityType.TROPICAL_FISH, AbstractFish.createAttributes().build())
 		.put(EntityType.TURTLE, Turtle.createAttributes().build())
+		.put(EntityType.TERRAPIN, EntityTerrapin.bakeAttributes().build())
 		.put(EntityType.VEX, Vex.createAttributes().build())
 		.put(EntityType.VILLAGER, Villager.createAttributes().build())
 		.put(EntityType.VINDICATOR, Vindicator.createAttributes().build())
