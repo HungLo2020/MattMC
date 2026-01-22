@@ -29,7 +29,7 @@ public class TileEntityTerrapinEgg extends BlockEntity {
             baby.setSkinColor((parent1.skinColor + parent2.skinColor) / 2);
             if(random.nextFloat() < 0.15F){
                 baby.setTurtleType(TerrapinTypes.OVERLAY);
-                switch (random.nextInt(2)){
+                switch (random.nextInt(3)){
                     case 0:
                         baby.setTurtleColor((int) (0xFFFFFF * random.nextFloat()));
                         break;
