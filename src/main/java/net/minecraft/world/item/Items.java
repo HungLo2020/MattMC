@@ -1891,6 +1891,7 @@ public class Items {
 	);
 	public static final Item TREMORSAURUS_SPAWN_EGG = registerItem("tremorsaurus_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.TREMORSAURUS));
 	public static final Item TRILOCARIS_SPAWN_EGG = registerItem("trilocaris_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.TRILOCARIS));
+	public static final Item TOUCAN_SPAWN_EGG = registerItem("toucan_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.TOUCAN));
 	public static final Item TROPICAL_FISH_SPAWN_EGG = registerItem(
 		"tropical_fish_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.TROPICAL_FISH)
 	);

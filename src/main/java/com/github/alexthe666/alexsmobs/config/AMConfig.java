@@ -1,5 +1,8 @@
 package com.github.alexthe666.alexsmobs.config;
 
+import com.google.common.collect.Lists;
+import java.util.List;
+
 public class AMConfig {
     // Catfish spawn configuration
     public static int catfishSpawnWeight = 4;
@@ -34,4 +37,13 @@ public class AMConfig {
     
     // Spectre spawn configuration
     public static int spectreSpawnRolls = 2;
+    
+    // Toucan spawn configuration
+    public static int toucanSpawnWeight = 23;
+    public static int toucanSpawnRolls = 0;
+    public static List<? extends String> toucanFruitMatches = Lists.newArrayList(
+            "minecraft:apple|minecraft:oak_sapling",
+            "minecraft:golden_apple|minecraft:oak_sapling",
+            "minecraft:enchanted_golden_apple|minecraft:oak_sapling"
+    );
 }

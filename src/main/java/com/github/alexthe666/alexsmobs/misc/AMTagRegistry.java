@@ -82,6 +82,11 @@ public class AMTagRegistry {
     public static final TagKey<Item> SHOEBILL_FOODSTUFFS = registerItemTag("shoebill_foodstuffs");
     public static final TagKey<Item> SHOEBILL_LUCK_FOODS = registerItemTag("shoebill_luck_foods");
     public static final TagKey<Item> SHOEBILL_LURE_FOODS = registerItemTag("shoebill_lure_foods");
+    
+    // Toucan-specific tags
+    public static final TagKey<Item> TOUCAN_BREEDABLES = registerItemTag("toucan_breedables");
+    public static final TagKey<Item> TOUCAN_GOLDEN_FOODS = registerItemTag("toucan_golden_foods");
+    public static final TagKey<Item> TOUCAN_ENCHANTED_GOLDEN_FOODS = registerItemTag("toucan_enchanted_golden_foods");
 
     private static TagKey<Item> registerItemTag(String name) {
         return TagKey.create(Registries.ITEM, ResourceLocation.withDefaultNamespace(name));

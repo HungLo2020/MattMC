@@ -27,6 +27,7 @@ public class AMEntityRegistry {
     public static final DeferredEntityHolder MUD_BALL = new DeferredEntityHolder(() -> EntityType.MUD_BALL);
     public static final DeferredEntityHolder SEAGULL = new DeferredEntityHolder(() -> EntityType.SEAGULL);
     public static final DeferredEntityHolder SHOEBILL = new DeferredEntityHolder(() -> EntityType.SHOEBILL);
+    public static final DeferredEntityHolder TOUCAN = new DeferredEntityHolder(() -> EntityType.TOUCAN);
     
     /**
      * Helper method for spawn roll logic
