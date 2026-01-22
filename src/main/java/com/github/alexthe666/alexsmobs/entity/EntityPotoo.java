@@ -87,8 +87,6 @@ public class EntityPotoo extends Animal implements IFalconry {
         this.goalSelector.addGoal(4, new AIPerch());
         this.goalSelector.addGoal(5, new AIMelee());
         this.goalSelector.addGoal(6, new AIFlyIdle());
-        // EntityFly targeting removed - EntityFly is stubbed
-        // this.targetSelector.addGoal(1, new NearestAttackableTargetGoal<>(this, EntityFly.class, 100, true, true, null));
     }
 
     private void switchNavigator(boolean onLand) {
@@ -275,7 +273,6 @@ public class EntityPotoo extends Animal implements IFalconry {
             if (this.isPassenger()) {
                 Entity mount = this.getVehicle();
                 if (mount instanceof Player) {
-                    // Falconry glove positioning removed - requires custom item
                     this.removeVehicle();
                     this.copyPosition(mount);
                 }
@@ -328,28 +325,31 @@ public class EntityPotoo extends Animal implements IFalconry {
         this.entityData.set(PERCHING, perching);
     }
 
-    public void addAdditionalSaveData(net.minecraft.world.level.storage.ValueOutput compound) {
-        super.addAdditionalSaveData(compound);
-        compound.putBoolean("Flying", this.isFlying());
-        compound.putBoolean("Perching", this.isPerching());
-        compound.putInt("PerchDir", this.getPerchDirection().ordinal());
+    public void addAdditionalSaveData(net.minecraft.world.level.storage.ValueOutput valueOutput) {
+        super.addAdditionalSaveData(valueOutput);
+        valueOutput.putBoolean("Flying", this.isFlying());
+        valueOutput.putBoolean("Perching", this.isPerching());
+        valueOutput.putInt("PerchDir", this.getPerchDirection().ordinal());
         if (this.getPerchPos() != null) {
-            compound.putInt("PerchX", this.getPerchPos().getX());
-            compound.putInt("PerchY", this.getPerchPos().getY());
-            compound.putInt("PerchZ", this.getPerchPos().getZ());
+            valueOutput.putBoolean("HasPerchPos", true);
+            valueOutput.putInt("PerchX", this.getPerchPos().getX());
+            valueOutput.putInt("PerchY", this.getPerchPos().getY());
+            valueOutput.putInt("PerchZ", this.getPerchPos().getZ());
+        } else {
+            valueOutput.putBoolean("HasPerchPos", false);
         }
     }
 
-    public void readAdditionalSaveData(net.minecraft.world.level.storage.ValueInput compound) {
-        super.readAdditionalSaveData(compound);
-        this.setFlying(compound.getBooleanOr("Flying", false));
-        this.setPerching(compound.getBooleanOr("Perching", false));
-        this.setPerchDirection(Direction.from3DDataValue(compound.getIntOr("PerchDir", 0)));
-        // Read perch position - getIntOr returns 0 if not present
-        int perchX = compound.getIntOr("PerchX", 0);
-        int perchY = compound.getIntOr("PerchY", 0);
-        int perchZ = compound.getIntOr("PerchZ", 0);
-        if (perchX != 0 || perchY != 0 || perchZ != 0) {
+    public void readAdditionalSaveData(net.minecraft.world.level.storage.ValueInput valueInput) {
+        super.readAdditionalSaveData(valueInput);
+        this.setFlying(valueInput.getBooleanOr("Flying", false));
+        this.setPerching(valueInput.getBooleanOr("Perching", false));
+        this.setPerchDirection(Direction.from3DDataValue(valueInput.getIntOr("PerchDir", 0)));
+        // Read perch position using HasPerchPos flag to handle (0,0,0) case
+        if (valueInput.getBooleanOr("HasPerchPos", false)) {
+            int perchX = valueInput.getIntOr("PerchX", 0);
+            int perchY = valueInput.getIntOr("PerchY", 0);
+            int perchZ = valueInput.getIntOr("PerchZ", 0);
             this.setPerchPos(new BlockPos(perchX, perchY, perchZ));
         }
     }
@@ -428,9 +428,7 @@ public class EntityPotoo extends Animal implements IFalconry {
     public InteractionResult mobInteract(Player player, InteractionHand hand) {
         ItemStack itemstack = player.getItemInHand(hand);
         Item item = itemstack.getItem();
-        InteractionResult type = super.mobInteract(player, hand);
-        // Falconry glove functionality removed - requires custom item
-        return type;
+        return super.mobInteract(player, hand);
     }
 
     public boolean isTargetBlocked(Vec3 target) {
