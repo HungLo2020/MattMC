@@ -1781,6 +1781,7 @@ public class CreativeModeTabs {
 					output.accept(Items.PRISMARINE_CRYSTALS);
 					output.accept(Items.NAUTILUS_SHELL);
 					output.accept(Items.HEART_OF_THE_SEA);
+					output.accept(Items.SOUL_HEART);
 					output.accept(Items.FIRE_CHARGE);
 					output.accept(Items.BLAZE_ROD);
 					output.accept(Items.BREEZE_ROD);
