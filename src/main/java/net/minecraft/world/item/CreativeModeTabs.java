@@ -1913,6 +1913,7 @@ public class CreativeModeTabs {
 					output.accept(Items.BLUE_JAY_SPAWN_EGG);
 					output.accept(Items.BOGGED_SPAWN_EGG);
 					output.accept(Items.BREEZE_SPAWN_EGG);
+					output.accept(Items.BUNFUNGUS_SPAWN_EGG);
 					output.accept(Items.CAMEL_SPAWN_EGG);
 					output.accept(Items.CAT_SPAWN_EGG);
 					output.accept(Items.CATFISH_SPAWN_EGG);
@@ -1957,6 +1958,7 @@ public class CreativeModeTabs {
 					output.accept(Items.MOOSHROOM_SPAWN_EGG);
 					output.accept(Items.MUDSKIPPER_SPAWN_EGG);
 					output.accept(Items.MULE_SPAWN_EGG);
+					output.accept(Items.MUNGUS_SPAWN_EGG);
 					output.accept(Items.OCELOT_SPAWN_EGG);
 					output.accept(Items.PANDA_SPAWN_EGG);
 					output.accept(Items.PARROT_SPAWN_EGG);

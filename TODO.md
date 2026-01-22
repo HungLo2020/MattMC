@@ -9,10 +9,10 @@
     fliying fish
     gazelle
     hummingbird
-jerboa
-mimic octopus
-muskipper
-mungus
+    jerboa
+    mimic octopus
+    muskipper
+    mungus
 potoo
 rain frog
 roadrunner
@@ -25,7 +25,7 @@ terrapin
 toucan
 anteater
 bald eahle
-bunfungus
+    bunfungus
 bison
 cachalot whale
 caiman

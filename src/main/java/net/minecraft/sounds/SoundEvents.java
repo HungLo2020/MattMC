@@ -244,6 +244,10 @@ public class SoundEvents {
 	public static final SoundEvent BUNDLE_INSERT = register("item.bundle.insert");
 	public static final SoundEvent BUNDLE_INSERT_FAIL = register("item.bundle.insert_fail");
 	public static final SoundEvent BUNDLE_REMOVE_ONE = register("item.bundle.remove_one");
+	public static final SoundEvent BUNFUNGUS_ATTACK = register("entity.bunfungus.attack");
+	public static final SoundEvent BUNFUNGUS_HURT = register("entity.bunfungus.hurt");
+	public static final SoundEvent BUNFUNGUS_IDLE = register("entity.bunfungus.idle");
+	public static final SoundEvent BUNFUNGUS_JUMP = register("entity.bunfungus.jump");
 	public static final SoundEvent CACTUS_FLOWER_BREAK = register("block.cactus_flower.break");
 	public static final SoundEvent CACTUS_FLOWER_PLACE = register("block.cactus_flower.place");
 	public static final SoundEvent CAKE_ADD_CANDLE = register("block.cake.add_candle");
@@ -972,6 +976,11 @@ public class SoundEvents {
 	public static final SoundEvent MOOSHROOM_MILK = register("entity.mooshroom.milk");
 	public static final SoundEvent MOOSHROOM_MILK_SUSPICIOUSLY = register("entity.mooshroom.suspicious_milk");
 	public static final SoundEvent MOOSHROOM_SHEAR = register("entity.mooshroom.shear");
+	public static final SoundEvent MUNGUS_HURT = register("entity.mungus.hurt");
+	public static final SoundEvent MUNGUS_IDLE = register("entity.mungus.idle");
+	public static final SoundEvent MUNGUS_LASER_END = register("entity.mungus.laser_end");
+	public static final SoundEvent MUNGUS_LASER_GROW = register("entity.mungus.laser_grow");
+	public static final SoundEvent MUNGUS_LASER_LOOP = register("entity.mungus.laser_loop");
 	public static final SoundEvent MOSS_CARPET_BREAK = register("block.moss_carpet.break");
 	public static final SoundEvent MOSS_CARPET_FALL = register("block.moss_carpet.fall");
 	public static final SoundEvent MOSS_CARPET_HIT = register("block.moss_carpet.hit");

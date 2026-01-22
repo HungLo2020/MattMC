@@ -52,9 +52,11 @@ import com.github.alexmodguy.alexscaves.server.entity.living.TremorsaurusEntity;
 import com.github.alexmodguy.alexscaves.server.entity.living.TrilocarisEntity;
 import com.github.alexmodguy.alexscaves.server.entity.living.VallumraptorEntity;
 import com.github.alexthe666.alexsmobs.entity.EntityBlobfish;
+import com.github.alexthe666.alexsmobs.entity.EntityBunfungus;
 import com.github.alexthe666.alexsmobs.entity.EntityCosmicCod;
 import com.github.alexthe666.alexsmobs.entity.EntityFlyingFish;
 import com.github.alexthe666.alexsmobs.entity.EntityMimicOctopus;
+import com.github.alexthe666.alexsmobs.entity.EntityMungus;
 import net.minecraft.world.entity.boss.enderdragon.EnderDragon;
 import net.minecraft.world.entity.boss.wither.WitherBoss;
 import net.minecraft.world.entity.decoration.ArmorStand;
@@ -110,6 +112,7 @@ public class DefaultAttributes {
 		.put(EntityType.BLOBFISH, EntityBlobfish.createAttributes().build())
 		.put(EntityType.BLUE_JAY, com.github.alexthe666.alexsmobs.entity.EntityBlueJay.bakeAttributes().build())
 		.put(EntityType.BOGGED, Bogged.createAttributes().build())
+		.put(EntityType.BUNFUNGUS, EntityBunfungus.bakeAttributes().build())
 		.put(EntityType.CAT, Cat.createAttributes().build())
 		.put(EntityType.CATFISH, com.github.alexthe666.alexsmobs.entity.EntityCatfish.bakeAttributes().build())
 		.put(EntityType.CAMEL, Camel.createAttributes().build())
@@ -159,6 +162,7 @@ public class DefaultAttributes {
 		.put(EntityType.MOOSHROOM, Cow.createAttributes().build())
 		.put(EntityType.MUDSKIPPER, com.github.alexthe666.alexsmobs.entity.EntityMudskipper.createAttributes().build())
 		.put(EntityType.MULE, AbstractChestedHorse.createBaseChestedHorseAttributes().build())
+		.put(EntityType.MUNGUS, EntityMungus.bakeAttributes().build())
 		.put(EntityType.OCELOT, Ocelot.createAttributes().build())
 		.put(EntityType.PANDA, Panda.createAttributes().build())
 		.put(EntityType.PARROT, Parrot.createAttributes().build())

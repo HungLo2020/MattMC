@@ -78,6 +78,8 @@ import com.github.alexmodguy.alexscaves.server.entity.living.RelicheirusEntity;
 import com.github.alexmodguy.alexscaves.server.entity.living.SubterranodonEntity;
 import com.github.alexmodguy.alexscaves.server.entity.living.TrilocarisEntity;
 import com.github.alexmodguy.alexscaves.server.entity.living.VallumraptorEntity;
+import com.github.alexthe666.alexsmobs.entity.EntityBunfungus;
+import com.github.alexthe666.alexsmobs.entity.EntityMungus;
 import com.github.alexthe666.alexsmobs.entity.EntityBlobfish;
 import com.github.alexthe666.alexsmobs.entity.EntityCosmicCod;
 import com.github.alexthe666.alexsmobs.entity.EntityFlyingFish;
@@ -1013,6 +1015,20 @@ public class EntityType<T extends Entity> implements FeatureElement, EntityTypeT
 		EntityType.Builder.of(VallumraptorEntity::new, MobCategory.CREATURE)
 			.sized(0.8F, 1.5F)
 			.eyeHeight(1.2F)
+			.clientTrackingRange(10)
+	);
+	public static final EntityType<EntityMungus> MUNGUS = register(
+		"mungus",
+		EntityType.Builder.of((EntityType<EntityMungus> type, Level level) -> new EntityMungus(type, level), MobCategory.CREATURE)
+			.sized(0.75F, 1.45F)
+			.eyeHeight(1.1F)
+			.clientTrackingRange(10)
+	);
+	public static final EntityType<EntityBunfungus> BUNFUNGUS = register(
+		"bunfungus",
+		EntityType.Builder.of((EntityType<EntityBunfungus> type, Level level) -> new EntityBunfungus(type, level), MobCategory.CREATURE)
+			.sized(1.85F, 2.1F)
+			.eyeHeight(1.6F)
 			.clientTrackingRange(10)
 	);
 	public static final EntityType<Snowball> SNOWBALL = register(
