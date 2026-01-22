@@ -70,7 +70,7 @@ public class EntityRainFrog extends Animal implements ITargetsDroppedItems,IDanc
     }
 
     public static AttributeSupplier.Builder bakeAttributes() {
-        return Monster.createMonsterAttributes().add(Attributes.MAX_HEALTH, 6.0D).add(Attributes.MOVEMENT_SPEED, 0.2F);
+        return Monster.createMonsterAttributes().add(Attributes.MAX_HEALTH, 6.0D).add(Attributes.MOVEMENT_SPEED, 0.2F).add(Attributes.TEMPT_RANGE, 10.0D);
     }
 
     protected void registerGoals() {
