@@ -46,6 +46,8 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.gameevent.GameEvent;
 import net.minecraft.world.level.material.Fluids;
 import net.minecraft.world.level.pathfinder.PathType;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
@@ -106,7 +108,7 @@ public class EntityTerrapin extends Animal implements ISemiAquatic, Bucketable {
     protected void registerGoals() {
         this.goalSelector.addGoal(0, new BreathAirGoal(this));
         this.goalSelector.addGoal(1, new MateGoal(this, 1.0D));
-        this.goalSelector.addGoal(2, new TemptGoal(this, 1.1D, Ingredient.of(ItemTags.FISHES), false));
+        this.goalSelector.addGoal(2, new TemptGoal(this, 1.1D, itemStack -> itemStack.is(ItemTags.FISHES), false));
         this.goalSelector.addGoal(3, new AnimalAIFindWater(this));
         this.goalSelector.addGoal(3, new AnimalAILeaveWater(this));
         this.goalSelector.addGoal(4, new SemiAquaticAIRandomSwimming(this, 1.0D, 30));
@@ -122,7 +124,7 @@ public class EntityTerrapin extends Animal implements ISemiAquatic, Bucketable {
         prevRetreatProgress = retreatProgress;
         prevSpinProgress = spinProgress;
 
-        final boolean inWaterOrBubble = this.isInWaterOrBubble();
+        final boolean inWaterOrBubble = this.isInWater();
         final boolean spinning = this.isSpinning();
         final boolean retreated = this.hasRetreated();
 
@@ -179,10 +181,10 @@ public class EntityTerrapin extends Animal implements ISemiAquatic, Bucketable {
             }
         }
         if (!this.level().isClientSide()) {
-            if (this.isInWaterOrBubble() && this.isLandNavigator) {
+            if (this.isInWater() && this.isLandNavigator) {
                 switchNavigator(false);
             }
-            if (!this.isInWaterOrBubble() && !this.isLandNavigator) {
+            if (!this.isInWater() && !this.isLandNavigator) {
                 switchNavigator(true);
             }
             if (isInWater()) {
@@ -254,28 +256,28 @@ public class EntityTerrapin extends Animal implements ISemiAquatic, Bucketable {
         builder.define(FROM_BUCKET, false);
     }
 
-    public void addAdditionalSaveData(CompoundTag compound) {
-        super.addAdditionalSaveData(compound);
-        compound.putInt("TurtleType", this.getTurtleTypeOrdinal());
-        compound.putInt("ShellType", this.getShellType());
-        compound.putInt("SkinType", this.getSkinType());
-        compound.putInt("TurtleColor", this.getTurtleColor());
-        compound.putInt("ShellColor", this.getShellColor());
-        compound.putInt("SkinColor", this.getSkinColor());
-        compound.putBoolean("HasEgg", this.hasEgg());
-        compound.putBoolean("Bucketed", this.fromBucket());
+    public void addAdditionalSaveData(ValueOutput output) {
+        super.addAdditionalSaveData(output);
+        output.putInt("TurtleType", this.getTurtleTypeOrdinal());
+        output.putInt("ShellType", this.getShellType());
+        output.putInt("SkinType", this.getSkinType());
+        output.putInt("TurtleColor", this.getTurtleColor());
+        output.putInt("ShellColor", this.getShellColor());
+        output.putInt("SkinColor", this.getSkinColor());
+        output.putBoolean("HasEgg", this.hasEgg());
+        output.putBoolean("Bucketed", this.fromBucket());
     }
 
-    public void readAdditionalSaveData(CompoundTag compound) {
-        super.readAdditionalSaveData(compound);
-        this.setTurtleTypeOrdinal(compound.getInt("TurtleType"));
-        this.setShellType(compound.getInt("ShellType"));
-        this.setSkinType(compound.getInt("SkinType"));
-        this.setTurtleColor(compound.getInt("TurtleColor"));
-        this.setShellColor(compound.getInt("ShellColor"));
-        this.setSkinColor(compound.getInt("SkinColor"));
-        this.setHasEgg(compound.getBoolean("HasEgg"));
-        this.setFromBucket(compound.getBoolean("Bucketed"));
+    public void readAdditionalSaveData(ValueInput input) {
+        super.readAdditionalSaveData(input);
+        this.setTurtleTypeOrdinal(input.getIntOr("TurtleType", 0));
+        this.setShellType(input.getIntOr("ShellType", 0));
+        this.setSkinType(input.getIntOr("SkinType", 0));
+        this.setTurtleColor(input.getIntOr("TurtleColor", 0));
+        this.setShellColor(input.getIntOr("ShellColor", 0));
+        this.setSkinColor(input.getIntOr("SkinColor", 0));
+        this.setHasEgg(input.getBooleanOr("HasEgg", false));
+        this.setFromBucket(input.getBooleanOr("Bucketed", false));
     }
 
     protected void playStepSound(BlockPos pos, BlockState state) {
@@ -401,15 +403,15 @@ public class EntityTerrapin extends Animal implements ISemiAquatic, Bucketable {
     }
 
     public void push(Entity entity) {
-        if (this.isInWaterOrBubble() || entity instanceof EntityTerrapin) {
+        if (this.isInWater() || entity instanceof EntityTerrapin) {
             super.push(entity);
         } else {
             entity.setDeltaMovement(entity.getDeltaMovement().add(this.getDeltaMovement()));
         }
     }
 
-    public boolean canBeCollidedWith() {
-        return this.isInWaterOrBubble() ? super.canBeCollidedWith() : this.isAlive();
+    public boolean canBeCollidedWith(@Nullable Entity entity) {
+        return this.isInWater() ? super.canBeCollidedWith(entity) : this.isAlive();
     }
 
     private void spinFor(int time) {
@@ -463,7 +465,7 @@ public class EntityTerrapin extends Animal implements ISemiAquatic, Bucketable {
 
     @Override
     public Animal getBreedOffspring(ServerLevel p_146743_, AgeableMob p_146744_) {
-        return EntityType.TERRAPIN.create(p_146743_);
+        return EntityType.TERRAPIN.create(p_146743_, EntitySpawnReason.BREEDING);
     }
 
     @Override
@@ -525,23 +527,15 @@ public class EntityTerrapin extends Animal implements ISemiAquatic, Bucketable {
 
     @Override
     public void saveToBucketTag(@Nonnull ItemStack bucket) {
-        Bucketable.saveDefaultDataToBucketTag(this, bucket);
+        super.saveToBucketTag(bucket);
         if (this.hasCustomName()) {
             bucket.set(net.minecraft.core.component.DataComponents.CUSTOM_NAME, this.getCustomName());
         }
-        CompoundTag platTag = new CompoundTag();
-        this.addAdditionalSaveData(platTag);
-        bucket.update(DataComponents.CUSTOM_DATA, CustomData.EMPTY, data -> data.update(tag -> {
-            tag.put("TerrapinData", platTag);
-        }));
     }
 
     @Override
-    public void loadFromBucketTag(@Nonnull CompoundTag compound) {
+    public void loadFromBucketTag(@Nonnull ValueInput compound) {
         Bucketable.loadDefaultDataFromBucketTag(this, compound);
-        if (compound.contains("TerrapinData")) {
-            this.readAdditionalSaveData(compound.getCompound("TerrapinData"));
-        }
     }
 
     @Override
@@ -557,7 +551,7 @@ public class EntityTerrapin extends Animal implements ISemiAquatic, Bucketable {
     public void calculateEntityAnimation(boolean flying) {
         final float f1 = (float) Mth.length(this.getX() - this.xo, 0, this.getZ() - this.zo);
         final float f2 = Math.min(f1 * (isSpinning() ? 4.0F : 32.0F), 1.0F);
-        this.walkAnimation.update(f2, 0.4F);
+        this.walkAnimation.update(f2, 0.4F, 1.0F);
     }
 
 

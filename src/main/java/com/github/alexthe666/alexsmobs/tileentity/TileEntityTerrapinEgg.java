@@ -3,13 +3,13 @@ package com.github.alexthe666.alexsmobs.tileentity;
 import com.github.alexthe666.alexsmobs.entity.EntityTerrapin;
 import com.github.alexthe666.alexsmobs.entity.util.TerrapinTypes;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.HolderLookup;
-import net.minecraft.nbt.CompoundTag;
 import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
 
 public class TileEntityTerrapinEgg extends BlockEntity {
     public ParentData parent1;
@@ -46,28 +46,24 @@ public class TileEntityTerrapinEgg extends BlockEntity {
 
 
     @Override
-    protected void loadAdditional(CompoundTag compound, HolderLookup.Provider registries) {
-        super.loadAdditional(compound, registries);
-        if(compound.contains("Parent1Data")){
-            this.parent1 = new ParentData(compound.getCompound("Parent1Data"));
-        }
-        if(compound.contains("Parent2Data")){
-            this.parent2 = new ParentData(compound.getCompound("Parent2Data"));
-        }
+    protected void loadAdditional(ValueInput input) {
+        super.loadAdditional(input);
+        input.child("Parent1Data").ifPresent(child -> {
+            this.parent1 = new ParentData(child);
+        });
+        input.child("Parent2Data").ifPresent(child -> {
+            this.parent2 = new ParentData(child);
+        });
     }
 
     @Override
-    protected void saveAdditional(CompoundTag compound, HolderLookup.Provider registries) {
-        super.saveAdditional(compound, registries);
+    protected void saveAdditional(ValueOutput output) {
+        super.saveAdditional(output);
         if(this.parent1 != null){
-            CompoundTag tag = new CompoundTag();
-            parent1.writeToNBT(tag);
-            compound.put("Parent1Data", tag);
+            output.putChild("Parent1Data", child -> parent1.writeToNBT(child));
         }
         if(this.parent2 != null){
-            CompoundTag tag = new CompoundTag();
-            parent2.writeToNBT(tag);
-            compound.put("Parent2Data", tag);
+            output.putChild("Parent2Data", child -> parent2.writeToNBT(child));
         }
     }
 
@@ -88,13 +84,13 @@ public class TileEntityTerrapinEgg extends BlockEntity {
             this.skinColor = skinColor;
         }
 
-        public ParentData(CompoundTag tag){
-            this(TerrapinTypes.values()[Mth.clamp(tag.getInt("TerrapinType"), 0, TerrapinTypes.values().length - 1)],
-                    tag.getInt("ShellType"),
-                    tag.getInt("SkinType"),
-                    tag.getInt("TurtleColor"),
-                    tag.getInt("ShellColor"),
-                    tag.getInt("SkinColor")
+        public ParentData(ValueInput input){
+            this(TerrapinTypes.values()[Mth.clamp(input.getIntOr("TerrapinType", 0), 0, TerrapinTypes.values().length - 1)],
+                    input.getIntOr("ShellType", 0),
+                    input.getIntOr("SkinType", 0),
+                    input.getIntOr("TurtleColor", 0),
+                    input.getIntOr("ShellColor", 0),
+                    input.getIntOr("SkinColor", 0)
                     );
         }
 
@@ -105,13 +101,13 @@ public class TileEntityTerrapinEgg extends BlockEntity {
             return other.type == this.type;
         }
 
-        public void writeToNBT(CompoundTag tag){
-            tag.putInt("TerrapinType", type.ordinal());
-            tag.putInt("ShellType", shellType);
-            tag.putInt("SkinType", skinType);
-            tag.putInt("TurtleColor", turtleColor);
-            tag.putInt("ShellColor", shellColor);
-            tag.putInt("SkinColor", skinColor);
+        public void writeToNBT(ValueOutput output){
+            output.putInt("TerrapinType", type.ordinal());
+            output.putInt("ShellType", shellType);
+            output.putInt("SkinType", skinType);
+            output.putInt("TurtleColor", turtleColor);
+            output.putInt("ShellColor", shellColor);
+            output.putInt("SkinColor", skinColor);
 
         }
     }
