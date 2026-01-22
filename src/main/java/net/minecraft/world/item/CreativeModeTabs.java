@@ -1671,6 +1671,8 @@ public class CreativeModeTabs {
 						output.accept(Items.CHICKEN);
 						output.accept(Items.COOKED_CHICKEN);
 						output.accept(Items.BLOBFISH);
+						output.accept(Items.RAW_CATFISH);
+						output.accept(Items.COOKED_CATFISH);
 						output.accept(Items.RABBIT);
 						output.accept(Items.COOKED_RABBIT);
 						output.accept(Items.COD);
@@ -1754,10 +1756,14 @@ public class CreativeModeTabs {
 					output.accept(Items.HEAVY_BONE);
 					output.accept(Items.STRING);
 					output.accept(Items.FEATHER);
+					output.accept(Items.ROADRUNNER_FEATHER);
+					output.accept(Items.COCKROACH_WING);
+					output.accept(Items.COCKROACH_WING_FRAGMENT);
 					output.accept(Items.SNOWBALL);
 					output.accept(Items.EGG);
 					output.accept(Items.BROWN_EGG);
 					output.accept(Items.BLUE_EGG);
+					output.accept(Items.COCKROACH_OOTHECA);
 					output.accept(Items.LEATHER);
 					output.accept(Items.RABBIT_HIDE);
 					output.accept(Items.TOUGH_HIDE);
@@ -1972,6 +1978,7 @@ public class CreativeModeTabs {
 					output.accept(Items.PUFFERFISH_SPAWN_EGG);
 					output.accept(Items.RABBIT_SPAWN_EGG);
 					output.accept(Items.RAIN_FROG_SPAWN_EGG);
+					output.accept(Items.ROADRUNNER_SPAWN_EGG);
 					output.accept(Items.RAVAGER_SPAWN_EGG);
 					output.accept(Items.RELICHEIRUS_SPAWN_EGG);
 					output.accept(Items.SALMON_SPAWN_EGG);

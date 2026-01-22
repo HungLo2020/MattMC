@@ -941,6 +941,12 @@ public class EntityType<T extends Entity> implements FeatureElement, EntityTypeT
 			.sized(0.4F, 0.4F)
 			.clientTrackingRange(8)
 	);
+	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntityRoadrunner> ROADRUNNER = register(
+		"roadrunner",
+		EntityType.Builder.of(com.github.alexthe666.alexsmobs.entity.EntityRoadrunner::new, MobCategory.CREATURE)
+			.sized(0.7F, 0.9F)
+			.clientTrackingRange(8)
+	);
 	public static final EntityType<Ravager> RAVAGER = register(
 		"ravager",
 		EntityType.Builder.of(Ravager::new, MobCategory.MONSTER)
