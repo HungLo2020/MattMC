@@ -75,4 +75,7 @@ public class AMSoundRegistry {
     // Toucan sounds - reference vanilla SoundEvents
     public static final DeferredHolder TOUCAN_IDLE = new DeferredHolder(() -> net.minecraft.sounds.SoundEvents.TOUCAN_IDLE);
     public static final DeferredHolder TOUCAN_HURT = new DeferredHolder(() -> net.minecraft.sounds.SoundEvents.TOUCAN_HURT);
+    
+    // Anteater sounds - reference vanilla SoundEvents
+    public static final SoundEvent ANTEATER_HURT = net.minecraft.sounds.SoundEvents.ANTEATER_HURT;
 }
