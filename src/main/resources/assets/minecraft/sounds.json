@@ -19257,6 +19257,22 @@
     ],
     "subtitle": "subtitles.entity.spectre.hurt"
   },
+  "entity.sugar_glider.idle": {
+    "sounds": [
+      "sugar_glider_idle_0",
+      "sugar_glider_idle_1",
+      "sugar_glider_idle_2",
+      "sugar_glider_idle_3"
+    ],
+    "subtitle": "subtitles.entity.sugar_glider.idle"
+  },
+  "entity.sugar_glider.hurt": {
+    "sounds": [
+      "sugar_glider_hurt_0",
+      "sugar_glider_hurt_1"
+    ],
+    "subtitle": "subtitles.entity.sugar_glider.hurt"
+  },
   "entity.sheep.ambient": {
     "sounds": [
       "mob/sheep/say1",
