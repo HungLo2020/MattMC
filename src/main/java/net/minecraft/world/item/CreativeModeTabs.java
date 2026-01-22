@@ -1984,6 +1984,7 @@ public class CreativeModeTabs {
 					output.accept(Items.SALMON_SPAWN_EGG);
 					output.accept(Items.SEAGULL_SPAWN_EGG);
 					output.accept(Items.SHEEP_SPAWN_EGG);
+					output.accept(Items.SHOEBILL_SPAWN_EGG);
 					output.accept(Items.SHULKER_SPAWN_EGG);
 					output.accept(Items.SILVERFISH_SPAWN_EGG);
 					output.accept(Items.SKELETON_SPAWN_EGG);

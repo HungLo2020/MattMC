@@ -1866,6 +1866,7 @@ public class Items {
 	public static final Item SALMON_SPAWN_EGG = registerItem("salmon_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.SALMON));
 	public static final Item SEAGULL_SPAWN_EGG = registerItem("seagull_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.SEAGULL));
 	public static final Item SHEEP_SPAWN_EGG = registerItem("sheep_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.SHEEP));
+	public static final Item SHOEBILL_SPAWN_EGG = registerItem("shoebill_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.SHOEBILL));
 	public static final Item SHULKER_SPAWN_EGG = registerItem("shulker_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.SHULKER));
 	public static final Item SILVERFISH_SPAWN_EGG = registerItem("silverfish_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.SILVERFISH));
 	public static final Item SKELETON_SPAWN_EGG = registerItem("skeleton_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.SKELETON));

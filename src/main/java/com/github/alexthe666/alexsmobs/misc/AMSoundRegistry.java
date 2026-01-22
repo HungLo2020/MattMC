@@ -64,4 +64,7 @@ public class AMSoundRegistry {
     // Seagull sounds - reference vanilla SoundEvents
     public static final DeferredHolder SEAGULL_IDLE = new DeferredHolder(() -> net.minecraft.sounds.SoundEvents.SEAGULL_IDLE);
     public static final DeferredHolder SEAGULL_HURT = new DeferredHolder(() -> net.minecraft.sounds.SoundEvents.SEAGULL_HURT);
+    
+    // Shoebill sounds - reference vanilla SoundEvents
+    public static final DeferredHolder SHOEBILL_HURT = new DeferredHolder(() -> net.minecraft.sounds.SoundEvents.SHOEBILL_HURT);
 }
