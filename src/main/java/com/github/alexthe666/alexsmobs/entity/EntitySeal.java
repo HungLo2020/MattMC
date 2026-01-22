@@ -8,7 +8,8 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
 import net.minecraft.core.particles.BlockParticleOption;
 import net.minecraft.core.particles.ParticleTypes;
-import net.minecraft.nbt.CompoundTag;
+import net.minecraft.world.level.storage.ValueOutput;
+import net.minecraft.world.level.storage.ValueInput;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
@@ -20,6 +21,7 @@ import net.minecraft.util.RandomSource;
 import net.minecraft.world.DifficultyInstance;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.*;
+import net.minecraft.world.entity.EntitySpawnReason;
 import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.ai.control.MoveControl;
@@ -70,7 +72,7 @@ public class EntitySeal extends Animal implements ISemiAquatic, IHerdPanic, ITar
     private boolean isLandNavigator;
     public int fishFeedings = 0;
 
-    protected EntitySeal(EntityType type, Level worldIn) {
+    public EntitySeal(EntityType type, Level worldIn) {
         super(type, worldIn);
         this.setPathfindingMalus(PathType.WATER, 0.0F);
         this.setPathfindingMalus(PathType.WATER_BORDER, 0.0F);
@@ -94,7 +96,7 @@ public class EntitySeal extends Animal implements ISemiAquatic, IHerdPanic, ITar
         return Monster.createMonsterAttributes().add(Attributes.MAX_HEALTH, 10.0D).add(Attributes.ATTACK_DAMAGE, 2.0D).add(Attributes.MOVEMENT_SPEED, 0.18F);
     }
 
-    public static boolean canSealSpawn(EntityType<? extends Animal> animal, LevelAccessor worldIn, MobSpawnType reason, BlockPos pos, RandomSource random) {
+    public static boolean canSealSpawn(EntityType<? extends Animal> animal, LevelAccessor worldIn, EntitySpawnReason reason, BlockPos pos, RandomSource random) {
         Holder<Biome> holder = worldIn.getBiome(pos);
         if (!holder.is(Biomes.FROZEN_OCEAN) && !holder.is(Biomes.DEEP_FROZEN_OCEAN)) {
             boolean spawnBlock = worldIn.getBlockState(pos.below()).is(AMTagRegistry.SEAL_SPAWNS);
@@ -117,7 +119,7 @@ public class EntitySeal extends Animal implements ISemiAquatic, IHerdPanic, ITar
         this.goalSelector.addGoal(8, new RandomLookAroundGoal(this));
         this.goalSelector.addGoal(8, new LookAtPlayerGoal(this, Player.class, 6.0F));
         // this.goalSelector.addGoal(9, new AvoidEntityGoal(this, EntityOrca.class, 20F, 1.3D, 1.0D)); // EntityOrca not implemented yet
-        this.goalSelector.addGoal(10, new TemptGoal(this, 1.1D, Ingredient.fromValues(Stream.of(new Ingredient.TagValue(AMTagRegistry.SEAL_BREEDABLES), new Ingredient.TagValue(AMTagRegistry.SEAL_OFFERINGS))), false));
+        this.goalSelector.addGoal(10, new TemptGoal(this, 1.1D, Ingredient.of(this.level().registryAccess().lookupOrThrow(net.minecraft.core.registries.Registries.ITEM).getOrThrow(AMTagRegistry.SEAL_BREEDABLES)), false));
         this.targetSelector.addGoal(1, new NearestAttackableTargetGoal<>(this, EntityFlyingFish.class, 55, true, true, null));
         this.targetSelector.addGoal(2, new CreatureAITargetItems(this, false));
     }
@@ -132,22 +134,6 @@ public class EntitySeal extends Animal implements ISemiAquatic, IHerdPanic, ITar
             this.navigation = new SemiAquaticPathNavigator(this, level());
             this.isLandNavigator = false;
         }
-    }
-
-    public boolean hurt(DamageSource source, float amount) {
-        final boolean prev = super.hurt(source, amount);
-        if (prev) {
-            final double range = 15;
-            final int fleeTime = 100 + getRandom().nextInt(150);
-            this.revengeCooldown = fleeTime;
-            List<? extends EntitySeal> list = this.level().getEntitiesOfClass(this.getClass(), this.getBoundingBox().inflate(range, range / 2, range));
-            for (EntitySeal gaz : list) {
-                gaz.revengeCooldown = fleeTime;
-                gaz.setBasking(false);
-            }
-            this.setBasking(false);
-        }
-        return prev;
     }
 
     @Override
@@ -169,7 +155,7 @@ public class EntitySeal extends Animal implements ISemiAquatic, IHerdPanic, ITar
     public void calculateEntityAnimation(boolean flying) {
         float f1 = (float) Mth.length(this.getX() - this.xo, 0, this.getZ() - this.zo);
         float f2 = Math.min(f1 * (isInWater() ? 4.0F : 48.0F), 1.0F);
-        this.walkAnimation.update(f2, 0.4F);
+        this.walkAnimation.update(f2, 0.4F, 2.5F);
     }
 
     public float getSwimAngle() {
@@ -186,7 +172,7 @@ public class EntitySeal extends Animal implements ISemiAquatic, IHerdPanic, ITar
         prevDigProgress = digProgress;
         prevBobbingProgress = bobbingProgress;
         prevSwimAngle = this.getSwimAngle();
-        boolean dig = isDigging() && isInWaterOrBubble();
+        boolean dig = isDigging() && isInWater();
         float f2 = (float) -((float) this.getDeltaMovement().y * (double) Mth.RAD_TO_DEG);
         if (isInWater()) {
             this.setXRot(f2 * 2.5F);
@@ -227,14 +213,14 @@ public class EntitySeal extends Animal implements ISemiAquatic, IHerdPanic, ITar
                 level().addParticle(new BlockParticleOption(ParticleTypes.BLOCK, understate), particleX, particleY, particleZ, motX, motY, motZ);
             }
         }
-        if (!this.level().isClientSide) {
+        if (!this.level().isClientSide()) {
             if (isBasking()) {
-                if (this.getLastHurtByMob() != null || isInLove() || revengeCooldown > 0 || this.isInWaterOrBubble() || this.getTarget() != null || baskingTimer > 1000 && this.getRandom().nextInt(100) == 0) {
+                if (this.getLastHurtByMob() != null || isInLove() || revengeCooldown > 0 || this.isInWater() || this.getTarget() != null || baskingTimer > 1000 && this.getRandom().nextInt(100) == 0) {
                     this.setBasking(false);
                 }
             } else {
                 if (this.getTarget() == null && !isInLove() && this.getLastHurtByMob() == null && revengeCooldown == 0 && !isBasking() && baskingTimer == 0 && this.getRandom().nextInt(15) == 0) {
-                    if (!isInWaterOrBubble()) {
+                    if (!isInWater()) {
                         this.setBasking(true);
                     }
                 }
@@ -280,7 +266,7 @@ public class EntitySeal extends Animal implements ISemiAquatic, IHerdPanic, ITar
             if(this.bobbingProgress > 0F){
                 this.bobbingProgress--;
             }
-            if(!this.level().isClientSide && random.nextInt(300) == 0 && !this.isInWater() && this.revengeCooldown == 0){
+            if(!this.level().isClientSide() && random.nextInt(300) == 0 && !this.isInWater() && this.revengeCooldown == 0){
                 bob = 20 + random.nextInt(20);
                 this.entityData.set(BOB_TICKS, bob);
             }
@@ -336,8 +322,8 @@ public class EntitySeal extends Animal implements ISemiAquatic, IHerdPanic, ITar
     }
 
     @Nullable
-    public SpawnGroupData finalizeSpawn(ServerLevelAccessor worldIn, DifficultyInstance difficultyIn, MobSpawnType
-            reason, @Nullable SpawnGroupData data, @Nullable CompoundTag dataTag) {
+    public SpawnGroupData finalizeSpawn(ServerLevelAccessor worldIn, DifficultyInstance difficultyIn, EntitySpawnReason
+            reason, @Nullable SpawnGroupData data) {
         this.setArctic(this.isBiomeArctic(worldIn, this.blockPosition()));
         int i;
         if (data instanceof SealGroupData) {
@@ -352,30 +338,24 @@ public class EntitySeal extends Animal implements ISemiAquatic, IHerdPanic, ITar
         return super.finalizeSpawn(worldIn, difficultyIn, reason, data);
     }
 
-    public void addAdditionalSaveData(CompoundTag compound) {
-        super.addAdditionalSaveData(compound);
-        compound.putBoolean("Arctic", this.isArctic());
-        compound.putBoolean("Basking", this.isBasking());
-        compound.putInt("BaskingTimer", this.baskingTimer);
-        compound.putInt("SwimTimer", this.swimTimer);
-        compound.putInt("FishFeedings", this.fishFeedings);
-        compound.putInt("Variant", this.getVariant());
-        if(feederUUID != null){
-            compound.putUUID("FeederUUID", feederUUID);
-        }
+    public void addAdditionalSaveData(ValueOutput valueOutput) {
+        super.addAdditionalSaveData(valueOutput);
+        valueOutput.putBoolean("Arctic", this.isArctic());
+        valueOutput.putBoolean("Basking", this.isBasking());
+        valueOutput.putInt("BaskingTimer", this.baskingTimer);
+        valueOutput.putInt("SwimTimer", this.swimTimer);
+        valueOutput.putInt("FishFeedings", this.fishFeedings);
+        valueOutput.putInt("Variant", this.getVariant());
     }
 
-    public void readAdditionalSaveData(CompoundTag compound) {
-        super.readAdditionalSaveData(compound);
-        this.setArctic(compound.getBoolean("Arctic"));
-        this.setBasking(compound.getBoolean("Basking"));
-        this.baskingTimer = compound.getInt("BaskingTimer");
-        this.swimTimer = compound.getInt("SwimTimer");
-        this.fishFeedings = compound.getInt("FishFeedings");
-        if(compound.hasUUID("FeederUUID")){
-            this.feederUUID = compound.getUUID("FeederUUID");
-        }
-        this.setVariant(compound.getInt("Variant"));
+    public void readAdditionalSaveData(ValueInput valueInput) {
+        super.readAdditionalSaveData(valueInput);
+        this.setArctic(valueInput.getBooleanOr("Arctic", false));
+        this.setBasking(valueInput.getBooleanOr("Basking", false));
+        this.baskingTimer = valueInput.getIntOr("BaskingTimer", 0);
+        this.swimTimer = valueInput.getIntOr("SwimTimer", 0);
+        this.fishFeedings = valueInput.getIntOr("FishFeedings", 0);
+        this.setVariant(valueInput.getIntOr("Variant", 0));
     }
 
     private boolean isBiomeArctic(LevelAccessor worldIn, BlockPos position) {
@@ -407,8 +387,10 @@ public class EntitySeal extends Animal implements ISemiAquatic, IHerdPanic, ITar
     @Nullable
     @Override
     public AgeableMob getBreedOffspring(ServerLevel serverWorld, AgeableMob ageableEntity) {
-        EntitySeal seal = EntityType.SEAL.create(serverWorld);
-        seal.setArctic(this.isBiomeArctic(serverWorld, this.blockPosition()));
+        EntitySeal seal = EntityType.SEAL.create(serverWorld, EntitySpawnReason.BREEDING);
+        if (seal != null) {
+            seal.setArctic(this.isBiomeArctic(serverWorld, this.blockPosition()));
+        }
         return seal;
     }
 

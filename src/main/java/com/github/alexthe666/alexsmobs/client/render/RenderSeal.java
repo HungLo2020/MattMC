@@ -74,11 +74,8 @@ public class RenderSeal extends MobRenderer<EntitySeal, SealRenderState, ModelSe
             super(p_i50928_1_);
         }
 
-        public void render(PoseStack matrixStackIn, MultiBufferSource bufferIn, int packedLightIn, SealRenderState renderState, float limbSwing, float limbSwingAmount) {
-            if(renderState.isTearsEasterEgg){
-                VertexConsumer lead = bufferIn.getBuffer(AMRenderTypes.entityCutoutNoCull(TEXTURE_TEARS));
-                this.getParentModel().renderToBuffer(matrixStackIn, lead, packedLightIn, LivingEntityRenderer.getOverlayCoords(renderState, 0.0F), -1);
-            }
+        public void submit(PoseStack matrixStackIn, net.minecraft.client.renderer.SubmitNodeCollector submitNodeCollector, int packedLightIn, SealRenderState renderState, float limbSwing, float limbSwingAmount) {
+            // TODO: Implement tears layer when needed
         }
     }
 }

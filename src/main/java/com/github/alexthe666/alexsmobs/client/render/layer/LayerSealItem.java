@@ -18,7 +18,8 @@ public class LayerSealItem extends RenderLayer<SealRenderState, ModelSeal> {
         super(render);
     }
 
-    public void render(PoseStack matrixStackIn, MultiBufferSource bufferIn, int packedLightIn, SealRenderState renderState, float limbSwing, float limbSwingAmount) {
+    public void submit(PoseStack matrixStackIn, net.minecraft.client.renderer.SubmitNodeCollector submitNodeCollector, int packedLightIn,
+            SealRenderState renderState, float limbSwing, float limbSwingAmount) {
         // TODO: Implement item rendering when render state has item data
         // For now, this is a stub
     }

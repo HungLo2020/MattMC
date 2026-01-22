@@ -65,7 +65,7 @@ public class SealAIDiveForItems extends Goal {
             if (seal.distanceTo(thrower) < 2D) {
                 ItemStack stack = seal.getMainHandItem().copy();
                 seal.setItemInHand(InteractionHand.MAIN_HAND, ItemStack.EMPTY);
-                ItemEntity item = seal.spawnAtLocation(stack);
+                ItemEntity item = seal.spawnAtLocation((ServerLevel) seal.level(), stack, 0.0F);
                 if (item != null) {
                     double d0 = thrower.getX() - this.seal.getX();
                     double d1 = thrower.getEyeY() - this.seal.getEyeY();
@@ -105,7 +105,7 @@ public class SealAIDiveForItems extends Goal {
                         copy = copy.copy();
                         this.seal.setItemInHand(InteractionHand.MAIN_HAND, copy);
                         for (ItemStack stack : lootList) {
-                            this.seal.spawnAtLocation(stack.copy());
+                            this.seal.spawnAtLocation((ServerLevel) this.seal.level(), stack.copy(), 0.0F);
                         }
                         this.returnToPlayer = true;
                     }
@@ -130,7 +130,7 @@ public class SealAIDiveForItems extends Goal {
         returnToPlayer = false;
         seal.fishFeedings = 0;
         if(!seal.getMainHandItem().isEmpty()){
-            seal.spawnAtLocation(seal.getMainHandItem().copy());
+            seal.spawnAtLocation((ServerLevel) seal.level(), seal.getMainHandItem().copy(), 0.0F);
             seal.setItemInHand(InteractionHand.MAIN_HAND, ItemStack.EMPTY);
         }
     }
