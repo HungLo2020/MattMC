@@ -57,10 +57,6 @@ public class RenderSeal extends MobRenderer<EntitySeal, SealRenderState, ModelSe
         renderState.variant = entity.getVariant();
     }
 
-    protected boolean shouldShowName(EntitySeal seal) {
-        return super.shouldShowName(seal) || seal.isTearsEasterEgg();
-    }
-
     public ResourceLocation getTextureLocation(SealRenderState renderState) {
         if(renderState.isArctic){
             return renderState.isBaby ? TEXTURE_ARCTIC_BABY : renderState.variant == 1 ? TEXTURE_ARCTIC_1 : TEXTURE_ARCTIC_0;

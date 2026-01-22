@@ -101,11 +101,11 @@ public class ModelSeal extends AdvancedEntityModel<SealRenderState> {
         float walkDegree = 1F;
         float swimSpeed = 0.5F;
         float swimDegree = 0.5F;
-        float partialTick = Minecraft.getInstance().getTimer().getGameTimeDeltaPartialTick(false);
-        float baskProgress = renderState.prevBaskProgress + (renderState.baskProgress - renderState.prevBaskProgress) * partialTick;
-        float swimAngle = renderState.prevSwimAngle + (renderState.swimAngle - renderState.prevSwimAngle) * partialTick;
-        float diggingProgress = renderState.prevDigProgress + (renderState.digProgress - renderState.prevDigProgress) * partialTick;
-        float bobbingProgress = renderState.prevBobbingProgress + (renderState.bobbingProgress - renderState.prevBobbingProgress) * partialTick;
+        // Render state already contains interpolated values
+        float baskProgress = renderState.baskProgress;
+        float swimAngle = renderState.swimAngle;
+        float diggingProgress = renderState.digProgress;
+        float bobbingProgress = renderState.bobbingProgress;
         int baskType = renderState.isTearsEasterEgg ? -1 : renderState.entityId % 5;
         progressRotationPrev(body, diggingProgress,  Maths.rad(70), 0, 0, 5F);
         progressRotationPrev(head, diggingProgress,  Maths.rad(10), 0, 0, 5F);
@@ -218,29 +218,6 @@ public class ModelSeal extends AdvancedEntityModel<SealRenderState> {
         this.faceTarget(renderState.yRot, renderState.xRot, 1, head);
         float yawAmount = swimAngle / 57.295776F * 0.5F;
         body.rotateAngleZ += yawAmount;
-
-    }
-
-    public void renderToBuffer(PoseStack matrixStackIn, VertexConsumer bufferIn, int packedLightIn, int packedOverlayIn, int color) {
-        if (this.young) {
-            float f = 1.65F;
-            head.setScale(f, f, f);
-            head.setShouldScaleChildren(true);
-            matrixStackIn.pushPose();
-            matrixStackIn.scale(0.5F, 0.5F, 0.5F);
-            matrixStackIn.translate(0.0D, 1.5D, 0D);
-            parts().forEach((p_228292_8_) -> {
-                p_228292_8_.render(matrixStackIn, bufferIn, packedLightIn, packedOverlayIn, -1);
-            });
-            matrixStackIn.popPose();
-            head.setScale(1, 1, 1);
-        } else {
-            matrixStackIn.pushPose();
-            parts().forEach((p_228290_8_) -> {
-                p_228290_8_.render(matrixStackIn, bufferIn, packedLightIn, packedOverlayIn, -1);
-            });
-            matrixStackIn.popPose();
-        }
 
     }
 

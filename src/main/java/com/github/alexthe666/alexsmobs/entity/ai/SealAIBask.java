@@ -14,11 +14,11 @@ public class SealAIBask extends Goal {
     }
 
     public boolean canContinueToUse() {
-        return this.seal.isBasking() && !this.seal.isInWaterOrBubble();
+        return this.seal.isBasking() && !this.seal.isInWater();
     }
 
     public boolean canUse() {
-        if (this.seal.isInWaterOrBubble()) {
+        if (this.seal.isInWater()) {
             return false;
         } else {
             return seal.getLastHurtByMob() == null && seal.getTarget() == null && seal.isBasking();
