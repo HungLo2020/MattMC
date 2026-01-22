@@ -1291,6 +1291,8 @@ public class SoundEvents {
 	public static final SoundEvent PORTAL_AMBIENT = register("block.portal.ambient");
 	public static final SoundEvent PORTAL_TRAVEL = register("block.portal.travel");
 	public static final SoundEvent PORTAL_TRIGGER = register("block.portal.trigger");
+	public static final SoundEvent POTOO_CALL = register("entity.potoo.call");
+	public static final SoundEvent POTOO_HURT = register("entity.potoo.hurt");
 	public static final SoundEvent POWDER_SNOW_BREAK = register("block.powder_snow.break");
 	public static final SoundEvent POWDER_SNOW_FALL = register("block.powder_snow.fall");
 	public static final SoundEvent POWDER_SNOW_HIT = register("block.powder_snow.hit");

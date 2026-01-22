@@ -910,6 +910,9 @@ public class EntityType<T extends Entity> implements FeatureElement, EntityTypeT
 	public static final EntityType<PolarBear> POLAR_BEAR = register(
 		"polar_bear", EntityType.Builder.of(PolarBear::new, MobCategory.CREATURE).immuneTo(Blocks.POWDER_SNOW).sized(1.4F, 1.4F).clientTrackingRange(10)
 	);
+	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntityPotoo> POTOO = register(
+		"potoo", EntityType.Builder.of(com.github.alexthe666.alexsmobs.entity.EntityPotoo::new, MobCategory.CREATURE).sized(0.4F, 0.7F).eyeHeight(0.45F).clientTrackingRange(8)
+	);
 	public static final EntityType<ThrownSplashPotion> SPLASH_POTION = register(
 		"splash_potion",
 		EntityType.Builder.<ThrownSplashPotion>of(ThrownSplashPotion::new, MobCategory.MISC)
