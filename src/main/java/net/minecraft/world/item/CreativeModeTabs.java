@@ -1972,6 +1972,7 @@ public class CreativeModeTabs {
 					output.accept(Items.PUFFERFISH_SPAWN_EGG);
 					output.accept(Items.RABBIT_SPAWN_EGG);
 					output.accept(Items.RAIN_FROG_SPAWN_EGG);
+					output.accept(Items.ROADRUNNER_SPAWN_EGG);
 					output.accept(Items.RAVAGER_SPAWN_EGG);
 					output.accept(Items.RELICHEIRUS_SPAWN_EGG);
 					output.accept(Items.SALMON_SPAWN_EGG);

@@ -70,6 +70,10 @@ public class AMTagRegistry {
     public static final TagKey<Item> POTOO_BREEDABLES = registerItemTag("potoo_breedables");
     public static final TagKey<Block> POTOO_PERCHES = registerBlockTag("potoo_perches");
 
+    // Roadrunner-specific tags
+    public static final TagKey<Item> ROADRUNNER_BREEDABLES = registerItemTag("roadrunner_breedables");
+    public static final TagKey<Block> ROADRUNNER_SPAWNS = registerBlockTag("roadrunner_spawns");
+
     private static TagKey<Item> registerItemTag(String name) {
         return TagKey.create(Registries.ITEM, ResourceLocation.withDefaultNamespace(name));
     }

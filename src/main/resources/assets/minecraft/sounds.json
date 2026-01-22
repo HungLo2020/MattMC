@@ -18990,6 +18990,27 @@
     ],
     "subtitle": "subtitles.entity.rain_frog.hurt"
   },
+  "entity.roadrunner.idle": {
+    "sounds": [
+      "roadrunner_idle_0",
+      "roadrunner_idle_1",
+      "roadrunner_idle_2"
+    ],
+    "subtitle": "subtitles.entity.roadrunner.idle"
+  },
+  "entity.roadrunner.hurt": {
+    "sounds": [
+      "roadrunner_hurt_0",
+      "roadrunner_hurt_1"
+    ],
+    "subtitle": "subtitles.entity.roadrunner.hurt"
+  },
+  "entity.roadrunner.meep": {
+    "sounds": [
+      "roadrunner_meep"
+    ],
+    "subtitle": "subtitles.entity.roadrunner.meep"
+  },
   "entity.ravager.ambient": {
     "sounds": [
       "mob/ravager/idle1",

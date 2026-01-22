@@ -38,4 +38,7 @@ public class AMItemRegistry {
     
     // Mudskipper bucket items - reference vanilla Items
     public static final DeferredHolder MUDSKIPPER_BUCKET = new DeferredHolder(() -> net.minecraft.world.item.Items.MUDSKIPPER_BUCKET);
+    
+    // Roadrunner items - reference vanilla Items
+    public static final DeferredHolder ROADRUNNER_FEATHER = new DeferredHolder(() -> net.minecraft.world.item.Items.ROADRUNNER_FEATHER);
 }

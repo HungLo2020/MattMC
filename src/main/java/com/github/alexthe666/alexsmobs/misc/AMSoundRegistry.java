@@ -55,4 +55,9 @@ public class AMSoundRegistry {
     // Rain Frog sounds - reference vanilla SoundEvents
     public static final DeferredHolder RAIN_FROG_IDLE = new DeferredHolder(() -> net.minecraft.sounds.SoundEvents.RAIN_FROG_IDLE);
     public static final DeferredHolder RAIN_FROG_HURT = new DeferredHolder(() -> net.minecraft.sounds.SoundEvents.RAIN_FROG_HURT);
+    
+    // Roadrunner sounds - reference vanilla SoundEvents
+    public static final DeferredHolder ROADRUNNER_IDLE = new DeferredHolder(() -> net.minecraft.sounds.SoundEvents.ROADRUNNER_IDLE);
+    public static final DeferredHolder ROADRUNNER_HURT = new DeferredHolder(() -> net.minecraft.sounds.SoundEvents.ROADRUNNER_HURT);
+    public static final DeferredHolder ROADRUNNER_MEEP = new DeferredHolder(() -> net.minecraft.sounds.SoundEvents.ROADRUNNER_MEEP);
 }

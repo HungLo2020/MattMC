@@ -1313,6 +1313,9 @@ public class SoundEvents {
 	public static final SoundEvent RAIN_FROG_IDLE = register("entity.rain_frog.idle");
 	public static final SoundEvent RAIN_FROG_HURT = register("entity.rain_frog.hurt");
 	public static final Holder.Reference<SoundEvent> RAID_HORN = registerForHolder("event.raid.horn");
+	public static final SoundEvent ROADRUNNER_IDLE = register("entity.roadrunner.idle");
+	public static final SoundEvent ROADRUNNER_HURT = register("entity.roadrunner.hurt");
+	public static final SoundEvent ROADRUNNER_MEEP = register("entity.roadrunner.meep");
 	public static final SoundEvent RAVAGER_AMBIENT = register("entity.ravager.ambient");
 	public static final SoundEvent RAVAGER_ATTACK = register("entity.ravager.attack");
 	public static final SoundEvent RAVAGER_CELEBRATE = register("entity.ravager.celebrate");

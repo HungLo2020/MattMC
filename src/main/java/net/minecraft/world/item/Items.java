@@ -1593,6 +1593,7 @@ public class Items {
 	);
 	public static final Item COMPASS = registerItem("compass", CompassItem::new);
 	public static final Item RECOVERY_COMPASS = registerItem("recovery_compass", new Item.Properties().rarity(Rarity.UNCOMMON));
+	public static final Item ROADRUNNER_FEATHER = registerItem("roadrunner_feather");
 	public static final Item BUNDLE = registerItem(
 		"bundle", BundleItem::new, new Item.Properties().stacksTo(1).component(DataComponents.BUNDLE_CONTENTS, BundleContents.EMPTY)
 	);
@@ -1859,6 +1860,7 @@ public class Items {
 	public static final Item PUFFERFISH_SPAWN_EGG = registerItem("pufferfish_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.PUFFERFISH));
 	public static final Item RABBIT_SPAWN_EGG = registerItem("rabbit_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.RABBIT));
 	public static final Item RAIN_FROG_SPAWN_EGG = registerItem("rain_frog_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.RAIN_FROG));
+	public static final Item ROADRUNNER_SPAWN_EGG = registerItem("roadrunner_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.ROADRUNNER));
 	public static final Item RAVAGER_SPAWN_EGG = registerItem("ravager_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.RAVAGER));
 	public static final Item RELICHEIRUS_SPAWN_EGG = registerItem("relicheirus_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.RELICHEIRUS));
 	public static final Item SALMON_SPAWN_EGG = registerItem("salmon_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.SALMON));
