@@ -1,0 +1,6 @@
+{
+  "parent": "minecraft:block/template_three_terrapin_eggs",
+  "textures": {
+    "0": "minecraft:block/terrapin_egg_very_cracked"
+  }
+}

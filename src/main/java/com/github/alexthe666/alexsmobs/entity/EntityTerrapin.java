@@ -2,6 +2,7 @@ package com.github.alexthe666.alexsmobs.entity;
 
 import com.github.alexthe666.alexsmobs.entity.ai.*;
 import com.github.alexthe666.alexsmobs.entity.util.TerrapinTypes;
+import com.github.alexthe666.alexsmobs.tileentity.TileEntityTerrapinEgg;
 import net.minecraft.ChatFormatting;
 import net.minecraft.advancements.CriteriaTriggers;
 import net.minecraft.core.BlockPos;
@@ -81,6 +82,7 @@ public class EntityTerrapin extends Animal implements ISemiAquatic, Bucketable {
     private float spinYRot;
     private int changeSpinAngleCooldown = 0;
     private LivingEntity lastLauncher = null;
+    private TileEntityTerrapinEgg.ParentData partnerData;
 
     public EntityTerrapin(EntityType<? extends Animal> animal, Level level) {
         super(animal, level);
@@ -590,6 +592,9 @@ public class EntityTerrapin extends Animal implements ISemiAquatic, Bucketable {
                 serverplayerentity.awardStat(Stats.ANIMALS_BRED);
                 CriteriaTriggers.BRED_ANIMALS.trigger(serverplayerentity, this.animal, this.partner, this.animal);
             }
+            if(partner instanceof EntityTerrapin terrapin){
+                this.turtle.partnerData = new TileEntityTerrapinEgg.ParentData(terrapin.getTurtleType(), terrapin.getShellType(), terrapin.getSkinType(), terrapin.getTurtleColor(), terrapin.getShellColor(), terrapin.getSkinColor());
+            }
             this.turtle.setHasEgg(true);
             this.animal.resetLove();
             this.partner.resetLove();
@@ -600,6 +605,55 @@ public class EntityTerrapin extends Animal implements ISemiAquatic, Bucketable {
                 this.level.addFreshEntity(new ExperienceOrb(this.level, this.animal.getX(), this.animal.getY(), this.animal.getZ(), random.nextInt(7) + 1));
             }
 
+        }
+    }
+    
+    static class LayEggGoal extends MoveToBlockGoal {
+        private final EntityTerrapin turtle;
+        private int digTime;
+
+        LayEggGoal(EntityTerrapin turtle, double speedIn) {
+            super(turtle, speedIn, 16);
+            this.turtle = turtle;
+        }
+
+        public void stop() {
+            digTime = 0;
+        }
+
+        public boolean canUse() {
+            return this.turtle.hasEgg() && super.canUse();
+        }
+
+        public boolean canContinueToUse() {
+            return super.canContinueToUse() && this.turtle.hasEgg();
+        }
+
+        public double acceptedDistance() {
+            return turtle.getBbWidth() + 0.5D;
+        }
+
+        public void tick() {
+            super.tick();
+            BlockPos blockpos = this.turtle.blockPosition();
+            turtle.swimTimer = 1000;
+            if (!this.turtle.isInWater() && this.isReachedTarget()) {
+                Level world = this.turtle.level();
+                turtle.gameEvent(GameEvent.BLOCK_PLACE);
+                world.playSound(null, blockpos, SoundEvents.TURTLE_LAY_EGG, SoundSource.BLOCKS, 0.3F, 0.9F + world.random.nextFloat() * 0.2F);
+                world.setBlock(this.blockPos.above(), Blocks.TERRAPIN_EGG.defaultBlockState().setValue(com.github.alexthe666.alexsmobs.block.BlockTerrapinEgg.EGGS, Integer.valueOf(this.turtle.random.nextInt(1) + 3)), 3);
+                if(world.getBlockEntity(this.blockPos.above()) instanceof TileEntityTerrapinEgg eggTe){
+                    eggTe.parent1 = new TileEntityTerrapinEgg.ParentData(turtle.getTurtleType(), turtle.getShellType(), turtle.getSkinType(), turtle.getTurtleColor(), turtle.getShellColor(), turtle.getSkinColor());
+                    eggTe.parent2 = turtle.partnerData == null ? eggTe.parent1 : turtle.partnerData;
+                }
+                this.turtle.setHasEgg(false);
+                this.turtle.setInLoveTime(600);
+            }
+
+        }
+
+        protected boolean isValidTarget(LevelReader worldIn, BlockPos pos) {
+            return worldIn.isEmptyBlock(pos.above()) && com.github.alexthe666.alexsmobs.block.BlockTerrapinEgg.isProperHabitat(worldIn, pos);
         }
     }
 }
