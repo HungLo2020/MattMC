@@ -77,6 +77,11 @@ public class AMTagRegistry {
     // Seagull-specific tags
     public static final TagKey<Item> SEAGULL_BREEDABLES = registerItemTag("seagull_breedables");
     public static final TagKey<Item> SEAGULL_OFFERINGS = registerItemTag("seagull_offerings");
+    
+    // Shoebill-specific tags
+    public static final TagKey<Item> SHOEBILL_FOODSTUFFS = registerItemTag("shoebill_foodstuffs");
+    public static final TagKey<Item> SHOEBILL_LUCK_FOODS = registerItemTag("shoebill_luck_foods");
+    public static final TagKey<Item> SHOEBILL_LURE_FOODS = registerItemTag("shoebill_lure_foods");
 
     private static TagKey<Item> registerItemTag(String name) {
         return TagKey.create(Registries.ITEM, ResourceLocation.withDefaultNamespace(name));

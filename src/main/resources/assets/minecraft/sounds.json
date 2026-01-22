@@ -19231,6 +19231,14 @@
     ],
     "subtitle": "subtitles.entity.seagull.ambient"
   },
+  "entity.shoebill.hurt": {
+    "sounds": [
+      "shoebill_hurt_0",
+      "shoebill_hurt_1",
+      "shoebill_hurt_2"
+    ],
+    "subtitle": "subtitles.entity.shoebill.hurt"
+  },
   "entity.sheep.ambient": {
     "sounds": [
       "mob/sheep/say1",
