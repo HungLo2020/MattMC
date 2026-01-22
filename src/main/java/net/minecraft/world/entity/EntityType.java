@@ -1167,6 +1167,13 @@ public class EntityType<T extends Entity> implements FeatureElement, EntityTypeT
 			.eyeHeight(0.2F)
 			.clientTrackingRange(8)
 	);
+	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntityToucan> TOUCAN = register(
+		"toucan",
+		EntityType.Builder.of(com.github.alexthe666.alexsmobs.entity.EntityToucan::new, MobCategory.CREATURE)
+			.sized(0.5F, 0.6F)
+			.eyeHeight(0.5F)
+			.clientTrackingRange(8)
+	);
 	public static final EntityType<TropicalFish> TROPICAL_FISH = register(
 		"tropical_fish", EntityType.Builder.of(TropicalFish::new, MobCategory.WATER_AMBIENT).sized(0.5F, 0.4F).eyeHeight(0.26F).clientTrackingRange(4)
 	);

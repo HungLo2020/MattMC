@@ -751,6 +751,8 @@ public class SoundEvents {
 	public static final SoundEvent TRILOCARIS_HURT = register("entity.trilocaris.hurt");
 	public static final SoundEvent TRILOCARIS_DEATH = register("entity.trilocaris.death");
 	public static final SoundEvent TRILOCARIS_STEP = register("entity.trilocaris.step");
+	public static final SoundEvent TOUCAN_IDLE = register("entity.toucan.idle");
+	public static final SoundEvent TOUCAN_HURT = register("entity.toucan.hurt");
 	public static final SoundEvent GRASS_BREAK = register("block.grass.break");
 	public static final SoundEvent GRASS_FALL = register("block.grass.fall");
 	public static final SoundEvent GRASS_HIT = register("block.grass.hit");
