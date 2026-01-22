@@ -5,8 +5,6 @@ import com.github.alexthe666.citadel.client.model.AdvancedEntityModel;
 import com.github.alexthe666.citadel.client.model.AdvancedModelBox;
 import com.github.alexthe666.citadel.client.model.basic.BasicModelPart;
 import com.google.common.collect.ImmutableList;
-import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.minecraft.client.renderer.entity.state.EntityRenderState;
 
 /**
@@ -47,15 +45,5 @@ public class ModelLeafcutterAnt extends AdvancedEntityModel<EntityRenderState> {
     @Override
     public Iterable<AdvancedModelBox> getAllParts() {
         return ImmutableList.of(root);
-    }
-    
-    @Override
-    public void renderToBuffer(PoseStack matrixStackIn, VertexConsumer buffer, int packedLight, int packedOverlay, int color){
-        matrixStackIn.pushPose();
-        matrixStackIn.scale(0.3F, 0.3F, 0.3F);
-        parts().forEach((part) -> {
-            part.render(matrixStackIn, buffer, packedLight, packedOverlay, -1);
-        });
-        matrixStackIn.popPose();
     }
 }

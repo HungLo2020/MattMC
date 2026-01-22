@@ -1,5 +1,7 @@
 package com.github.alexthe666.alexsmobs.entity;
 
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.AgeableMob;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.NeutralMob;
 import net.minecraft.world.entity.animal.Animal;
@@ -32,7 +34,7 @@ public class EntityLeafcutterAnt extends Animal implements NeutralMob {
     
     @Nullable
     @Override
-    public AgeableMob getBreedOffspring(net.minecraft.server.level.ServerLevel level, AgeableMob parent) {
+    public AgeableMob getBreedOffspring(ServerLevel level, AgeableMob parent) {
         return null;
     }
     

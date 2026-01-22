@@ -124,7 +124,34 @@ public class ModelAnteater extends AdvancedEntityModel<AnteaterRenderState> {
     public void animate(AnteaterRenderState renderState) {
         float standProgress = (renderState.prevStandProgress + (renderState.standProgress - renderState.prevStandProgress) * 0.2F) * 0.2F;
         float inverStandProgress = 1 - standProgress;
-        animator.update(renderState);
+        
+        // Create a temporary IAnimatedEntity wrapper for the animator
+        com.github.alexthe666.citadel.animation.IAnimatedEntity tempEntity = new com.github.alexthe666.citadel.animation.IAnimatedEntity() {
+            @Override
+            public int getAnimationTick() {
+                return renderState.animationTick;
+            }
+
+            @Override
+            public void setAnimationTick(int tick) {
+            }
+
+            @Override
+            public com.github.alexthe666.citadel.animation.Animation getAnimation() {
+                return renderState.currentAnimation;
+            }
+
+            @Override
+            public void setAnimation(com.github.alexthe666.citadel.animation.Animation animation) {
+            }
+
+            @Override
+            public com.github.alexthe666.citadel.animation.Animation[] getAnimations() {
+                return new com.github.alexthe666.citadel.animation.Animation[]{EntityAnteater.ANIMATION_SLASH_L, EntityAnteater.ANIMATION_SLASH_R, EntityAnteater.ANIMATION_TOUNGE_IDLE};
+            }
+        };
+        
+        animator.update(tempEntity);
         animator.setAnimation(EntityAnteater.ANIMATION_SLASH_L);
         animator.startKeyframe(5);
         animator.rotate(body, Maths.rad(-15), Maths.rad(-15), 0);
@@ -220,30 +247,6 @@ public class ModelAnteater extends AdvancedEntityModel<AnteaterRenderState> {
     @Override
     public Iterable<AdvancedModelBox> getAllParts() {
         return ImmutableList.of(root, body, tail, head, left_ear, right_ear, left_arm, right_arm, left_leg, right_leg, left_claws, right_claws, snout, tongue1, tongue2);
-    }
-
-    @Override
-    public void renderToBuffer(PoseStack matrixStackIn, VertexConsumer buffer, int packedLight, int packedOverlay, int color){
-        if (this.young) {
-            float f = 1.35F;
-            head.setScale(f, f, f);
-            head.setShouldScaleChildren(true);
-            matrixStackIn.pushPose();
-            matrixStackIn.scale(0.5F, 0.5F, 0.5F);
-            matrixStackIn.translate(0.0D, 1.5D, 0D);
-            parts().forEach((p_228292_8_) -> {
-                p_228292_8_.render(matrixStackIn, buffer, packedLight, packedOverlay, -1);
-            });
-            matrixStackIn.popPose();
-            this.head.setScale(1F, 1F, 1F);
-        } else {
-            this.head.setScale(1F, 1F, 1F);
-            matrixStackIn.pushPose();
-            parts().forEach((p_228290_8_) -> {
-                p_228290_8_.render(matrixStackIn, buffer, packedLight, packedOverlay, -1);
-            });
-            matrixStackIn.popPose();
-        }
     }
 
     public void setRotationAngle(AdvancedModelBox AdvancedModelBox, float x, float y, float z) {

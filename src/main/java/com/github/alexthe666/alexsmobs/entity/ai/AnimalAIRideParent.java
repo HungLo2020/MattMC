@@ -82,7 +82,7 @@ public class AnimalAIRideParent extends Goal {
             this.childAnimal.getNavigation().moveTo(this.parentAnimal, this.moveSpeed);
         }
         if(this.childAnimal.distanceTo(this.parentAnimal) < 2.0D){
-            this.childAnimal.startRiding(this.parentAnimal, false);
+            this.childAnimal.startRiding(this.parentAnimal, false, false);
             this.stop();
         }
     }
