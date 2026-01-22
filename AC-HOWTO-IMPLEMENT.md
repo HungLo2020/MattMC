@@ -107,6 +107,8 @@ Quick reference for implementing Alex's Caves mobs into MattMC's direct Minecraf
 10. **No translations**: If adding new items or entities, ensure to add translation keys to the main en_us json language file.
 11. **Must use original sounds**: add the original sounds to the project, register them in the vanilla registery, and add them to the sounds.json and ensure the mob being added correctly references them and calls them.
 12. **NO ITEM TEXTURES**: MUST create ALL THREE jsons for items in the proper locations or the texture WILL BE NULL. You must ALSO use the minecraft namespace, and SOME jsons use a "generated" parent or something. compare with a known good item such as "vallumraptor spawn egg". for the item texture to work one of the jsons that must be create is in assets/minecraft/items/ it seems like this one is frequently forgotten. the ones in models/items/ are ALSO needed.
+13. **TEMP goal crash**: The createAttributes() method in EntitySeagull.java was incorrectly using Monster.createMonsterAttributes() instead of Animal.createAnimalAttributes(). Since EntitySeagull extends Animal (not Monster), it should use the Animal base attributes which include TEMPT_RANGE. (this is an example from implementing the seagull mob, but similar issues almost assuredly will exist for other mobs)
+14. ** ENSURE ALL ADDED ITEMS ARE ADDED TO CREATIVE MODE TABS**: Any new items added MUST be added to the creative mode tabs in CreativeModeTabs.java or they will not appear in creative mode.
 
 ## Validation
 
