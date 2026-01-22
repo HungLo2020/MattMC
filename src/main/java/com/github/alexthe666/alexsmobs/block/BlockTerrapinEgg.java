@@ -1,6 +1,7 @@
 package com.github.alexthe666.alexsmobs.block;
 
 import com.github.alexthe666.alexsmobs.entity.EntityTerrapin;
+import com.github.alexthe666.alexsmobs.tileentity.TileEntityTerrapinEgg;
 import com.mojang.serialization.MapCodec;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.Registries;
@@ -10,6 +11,7 @@ import net.minecraft.sounds.SoundSource;
 import net.minecraft.tags.BlockTags;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntitySpawnReason;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ambient.Bat;
@@ -29,6 +31,7 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.RenderShape;
 import net.minecraft.world.level.block.SoundType;
 import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.StateDefinition;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
@@ -45,7 +48,7 @@ import javax.annotation.Nullable;
 import java.util.List;
 
 public class BlockTerrapinEgg extends BaseEntityBlock {
-    public static final MapCodec<BlockTerrapinEgg> CODEC = simpleCodec(p -> new BlockTerrapinEgg());
+    public static final MapCodec<BlockTerrapinEgg> CODEC = simpleCodec(BlockTerrapinEgg::new);
 
     @Override
     protected MapCodec<? extends BaseEntityBlock> codec() {
@@ -57,8 +60,8 @@ public class BlockTerrapinEgg extends BaseEntityBlock {
     private static final VoxelShape ONE_EGG_SHAPE = Block.box(3.0D, 0.0D, 3.0D, 12.0D, 7.0D, 12.0D);
     private static final VoxelShape MULTI_EGG_SHAPE = Block.box(1.0D, 0.0D, 1.0D, 15.0D, 7.0D, 15.0D);
 
-    public BlockTerrapinEgg() {
-        super(Properties.of().mapColor(MapColor.SAND).strength(0.5F).sound(SoundType.METAL).randomTicks().noOcclusion());
+    public BlockTerrapinEgg(BlockBehaviour.Properties properties) {
+        super(properties);
         this.registerDefaultState(this.stateDefinition.any().setValue(HATCH, Integer.valueOf(0)).setValue(EGGS, Integer.valueOf(1)));
     }
 
@@ -198,7 +201,7 @@ public class BlockTerrapinEgg extends BaseEntityBlock {
         if(pickaxe != null){
             Level level = builder.getLevel();
             var silkTouchEnchantment = level.holderLookup(Registries.ENCHANTMENT).getOrThrow(Enchantments.SILK_TOUCH);
-            silkTouch = pickaxe.getEnchantmentLevel(silkTouchEnchantment) > 0;
+            silkTouch = pickaxe.getEnchantments().getLevel(silkTouchEnchantment) > 0;
         }
         if (silkTouch && blockentity instanceof TileEntityTerrapinEgg) {
             ItemStack stack = new ItemStack(Blocks.TERRAPIN_EGG);
@@ -210,7 +213,7 @@ public class BlockTerrapinEgg extends BaseEntityBlock {
 
     public void onRemove(BlockState state, Level level, BlockPos pos, BlockState state2, boolean b) {
         if (state.is(Blocks.TERRAPIN_EGG) && state.getValue(EGGS) <= 1) {
-            super.onRemove(state, level, pos, state2, b);
+            // BaseEntityBlock handles block entity removal automatically
         }
     }
     @Nullable

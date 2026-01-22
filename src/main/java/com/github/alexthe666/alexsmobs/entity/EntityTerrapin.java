@@ -527,16 +527,31 @@ public class EntityTerrapin extends Animal implements ISemiAquatic, Bucketable {
 
     @Override
     public void saveToBucketTag(@Nonnull ItemStack bucket) {
-        super.saveToBucketTag(bucket);
+        Bucketable.saveDefaultDataToBucketTag(this, bucket);
         if (this.hasCustomName()) {
             bucket.set(net.minecraft.core.component.DataComponents.CUSTOM_NAME, this.getCustomName());
         }
+        CustomData.update(DataComponents.BUCKET_ENTITY_DATA, bucket, compoundTag -> {
+            compoundTag.putInt("TurtleType", this.getTurtleTypeOrdinal());
+            compoundTag.putInt("ShellType", this.getShellType());
+            compoundTag.putInt("SkinType", this.getSkinType());
+            compoundTag.putInt("TurtleColor", this.getTurtleColor());
+            compoundTag.putInt("ShellColor", this.getShellColor());
+            compoundTag.putInt("SkinColor", this.getSkinColor());
+            compoundTag.putBoolean("HasEgg", this.hasEgg());
+        });
     }
 
     @Override
     public void loadFromBucketTag(@Nonnull CompoundTag compound) {
-        // Bucketable interface requires CompoundTag parameter
-        // Note: Simplified for now due to API complexity
+        Bucketable.loadDefaultDataFromBucketTag(this, compound);
+        compound.getInt("TurtleType").ifPresent(this::setTurtleTypeOrdinal);
+        compound.getInt("ShellType").ifPresent(this::setShellType);
+        compound.getInt("SkinType").ifPresent(this::setSkinType);
+        compound.getInt("TurtleColor").ifPresent(this::setTurtleColor);
+        compound.getInt("ShellColor").ifPresent(this::setShellColor);
+        compound.getInt("SkinColor").ifPresent(this::setSkinColor);
+        compound.getBoolean("HasEgg").ifPresent(this::setHasEgg);
     }
 
     @Override

@@ -126,6 +126,16 @@ public class ModelTerrapin extends AdvancedEntityModel<TerrapinRenderState> {
         float swimProgress = (renderState.prevSwimProgress + (renderState.swimProgress - renderState.prevSwimProgress) * partialTick) * (5F - retreatProgress) * 0.2F;
         float standUnderwaterProgress = Math.max(0, (1F - Math.min(limbSwingAmount * 3F, 1F)) * swimProgress - retreatProgress);
         float spinDegree = 0.6F;
+        
+        // Handle baby scaling
+        if (renderState.isBaby) {
+            float f = 1.35F;
+            head.setScale(f, f, f);
+            head.setShouldScaleChildren(true);
+        } else {
+            head.setScale(0.9F, 0.9F, 0.9F);
+        }
+        
         progressRotationPrev(left_arm, swimProgress, Maths.rad(-20), 0,  Maths.rad(-70), 5F);
         progressRotationPrev(left_hand, swimProgress, 0, 0,  Maths.rad(70), 5F);
         progressRotationPrev(right_arm, swimProgress, Maths.rad(-20), 0,  Maths.rad(70), 5F);
@@ -200,29 +210,4 @@ public class ModelTerrapin extends AdvancedEntityModel<TerrapinRenderState> {
             }
         }
     }
-
-    @Override
-    public void renderToBuffer(PoseStack matrixStackIn, VertexConsumer buffer, int packedLight, int packedOverlay, int color){
-        if (this.young) {
-            float f = 1.35F;
-            head.setScale(f, f, f);
-            head.setShouldScaleChildren(true);
-            matrixStackIn.pushPose();
-            matrixStackIn.scale(0.5F, 0.5F, 0.5F);
-            matrixStackIn.translate(0.0D, 1.5D, 0D);
-            parts().forEach((p_228292_8_) -> {
-                p_228292_8_.render(matrixStackIn, buffer, packedLight, packedOverlay, -1);
-            });
-            matrixStackIn.popPose();
-            this.head.setScale(0.9F, 0.9F, 0.9F);
-        } else {
-            this.head.setScale(0.9F, 0.9F, 0.9F);
-            matrixStackIn.pushPose();
-            parts().forEach((p_228290_8_) -> {
-                p_228290_8_.render(matrixStackIn, buffer, packedLight, packedOverlay, -1);
-            });
-            matrixStackIn.popPose();
-        }
-    }
-
 }
