@@ -19011,6 +19011,23 @@
     ],
     "subtitle": "subtitles.entity.roadrunner.meep"
   },
+  "entity.seal.idle": {
+    "sounds": [
+      "seal_idle_0",
+      "seal_idle_1",
+      "seal_idle_2",
+      "seal_idle_3"
+    ],
+    "subtitle": "subtitles.entity.seal.idle"
+  },
+  "entity.seal.hurt": {
+    "sounds": [
+      "seal_hurt_0",
+      "seal_hurt_1",
+      "seal_hurt_2"
+    ],
+    "subtitle": "subtitles.entity.seal.hurt"
+  },
   "entity.ravager.ambient": {
     "sounds": [
       "mob/ravager/idle1",
