@@ -13,7 +13,7 @@
     mimic octopus
     muskipper
     mungus
-potoo
+    potoo
 rain frog
 roadrunner
 seagull
