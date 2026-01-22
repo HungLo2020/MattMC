@@ -41,4 +41,7 @@ public class AMItemRegistry {
     
     // Roadrunner items - reference vanilla Items
     public static final DeferredHolder ROADRUNNER_FEATHER = new DeferredHolder(() -> net.minecraft.world.item.Items.ROADRUNNER_FEATHER);
+    
+    // Spectre items - reference vanilla Items
+    public static final DeferredHolder SOUL_HEART = new DeferredHolder(() -> net.minecraft.world.item.Items.SOUL_HEART);
 }

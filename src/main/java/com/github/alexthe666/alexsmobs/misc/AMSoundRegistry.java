@@ -67,4 +67,8 @@ public class AMSoundRegistry {
     
     // Shoebill sounds - reference vanilla SoundEvents
     public static final DeferredHolder SHOEBILL_HURT = new DeferredHolder(() -> net.minecraft.sounds.SoundEvents.SHOEBILL_HURT);
+    
+    // Spectre sounds - reference vanilla SoundEvents
+    public static final DeferredHolder SPECTRE_IDLE = new DeferredHolder(() -> net.minecraft.sounds.SoundEvents.SPECTRE_IDLE);
+    public static final DeferredHolder SPECTRE_HURT = new DeferredHolder(() -> net.minecraft.sounds.SoundEvents.SPECTRE_HURT);
 }

@@ -31,4 +31,7 @@ public class AMConfig {
     
     // Shoebill spawn configuration
     public static int shoebillSpawnRolls = 0;
+    
+    // Spectre spawn configuration
+    public static int spectreSpawnRolls = 2;
 }

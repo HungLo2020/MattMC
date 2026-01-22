@@ -1781,6 +1781,7 @@ public class CreativeModeTabs {
 					output.accept(Items.PRISMARINE_CRYSTALS);
 					output.accept(Items.NAUTILUS_SHELL);
 					output.accept(Items.HEART_OF_THE_SEA);
+					output.accept(Items.SOUL_HEART);
 					output.accept(Items.FIRE_CHARGE);
 					output.accept(Items.BLAZE_ROD);
 					output.accept(Items.BREEZE_ROD);
@@ -1985,6 +1986,7 @@ public class CreativeModeTabs {
 					output.accept(Items.SEAGULL_SPAWN_EGG);
 					output.accept(Items.SHEEP_SPAWN_EGG);
 					output.accept(Items.SHOEBILL_SPAWN_EGG);
+					output.accept(Items.SPECTRE_SPAWN_EGG);
 					output.accept(Items.SHULKER_SPAWN_EGG);
 					output.accept(Items.SILVERFISH_SPAWN_EGG);
 					output.accept(Items.SKELETON_SPAWN_EGG);
