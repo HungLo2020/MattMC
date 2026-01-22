@@ -173,6 +173,7 @@ public class DefaultAttributes {
 		.put(EntityType.PILLAGER, Pillager.createAttributes().build())
 		.put(EntityType.PLAYER, Player.createAttributes().build())
 		.put(EntityType.POLAR_BEAR, PolarBear.createAttributes().build())
+		.put(EntityType.POTOO, com.github.alexthe666.alexsmobs.entity.EntityPotoo.bakeAttributes().build())
 		.put(EntityType.PUFFERFISH, AbstractFish.createAttributes().build())
 		.put(EntityType.RABBIT, Rabbit.createAttributes().build())
 		.put(EntityType.RAVAGER, Ravager.createAttributes().build())

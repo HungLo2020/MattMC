@@ -18803,6 +18803,24 @@
     ],
     "subtitle": "subtitles.entity.polar_bear.warning"
   },
+  "entity.potoo.call": {
+    "sounds": [
+      "potoo_call_0",
+      "potoo_call_1",
+      "potoo_call_2",
+      "potoo_call_3",
+      "potoo_call_4"
+    ],
+    "subtitle": "subtitles.entity.potoo.call"
+  },
+  "entity.potoo.hurt": {
+    "sounds": [
+      "potoo_hurt_0",
+      "potoo_hurt_1",
+      "potoo_hurt_2"
+    ],
+    "subtitle": "subtitles.entity.potoo.hurt"
+  },
   "entity.puffer_fish.blow_out": {
     "sounds": [
       {
