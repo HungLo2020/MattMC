@@ -1354,6 +1354,8 @@ public class SoundEvents {
 	public static final SoundEvent SALMON_DEATH = register("entity.salmon.death");
 	public static final SoundEvent SALMON_FLOP = register("entity.salmon.flop");
 	public static final SoundEvent SALMON_HURT = register("entity.salmon.hurt");
+	public static final SoundEvent SEAGULL_IDLE = register("entity.seagull.idle");
+	public static final SoundEvent SEAGULL_HURT = register("entity.seagull.hurt");
 	public static final SoundEvent SAND_BREAK = register("block.sand.break");
 	public static final SoundEvent SAND_FALL = register("block.sand.fall");
 	public static final SoundEvent SAND_HIT = register("block.sand.hit");

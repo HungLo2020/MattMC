@@ -73,6 +73,10 @@ public class AMTagRegistry {
     // Roadrunner-specific tags
     public static final TagKey<Item> ROADRUNNER_BREEDABLES = registerItemTag("roadrunner_breedables");
     public static final TagKey<Block> ROADRUNNER_SPAWNS = registerBlockTag("roadrunner_spawns");
+    
+    // Seagull-specific tags
+    public static final TagKey<Item> SEAGULL_BREEDABLES = registerItemTag("seagull_breedables");
+    public static final TagKey<Item> SEAGULL_OFFERINGS = registerItemTag("seagull_offerings");
 
     private static TagKey<Item> registerItemTag(String name) {
         return TagKey.create(Registries.ITEM, ResourceLocation.withDefaultNamespace(name));
