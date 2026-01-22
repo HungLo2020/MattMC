@@ -1,6 +1,6 @@
 package com.github.alexthe666.alexsmobs.client.model;
 
-import com.github.alexthe666.alexsmobs.entity.EntitySeal;
+import com.github.alexthe666.alexsmobs.client.render.state.SealRenderState;
 import com.github.alexthe666.alexsmobs.entity.util.Maths;
 import com.github.alexthe666.citadel.client.model.AdvancedEntityModel;
 import com.github.alexthe666.citadel.client.model.AdvancedModelBox;
@@ -11,7 +11,7 @@ import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.minecraft.client.Minecraft;
 import net.minecraft.util.Mth;
 
-public class ModelSeal extends AdvancedEntityModel<EntitySeal> {
+public class ModelSeal extends AdvancedEntityModel<SealRenderState> {
     public final AdvancedModelBox root;
     public final AdvancedModelBox body;
     public final AdvancedModelBox tail;
@@ -95,18 +95,18 @@ public class ModelSeal extends AdvancedEntityModel<EntitySeal> {
     }
 
     @Override
-    public void setupAnim(EntitySeal entity, float limbSwing, float limbSwingAmount, float ageInTicks, float netHeadYaw, float headPitch) {
+    public void setupAnim(SealRenderState renderState) {
         this.resetToDefaultPose();
-        float walkSpeed = young ? 0.25F : 0.5F;
+        float walkSpeed = renderState.isBaby ? 0.25F : 0.5F;
         float walkDegree = 1F;
         float swimSpeed = 0.5F;
         float swimDegree = 0.5F;
         float partialTick = Minecraft.getInstance().getTimer().getGameTimeDeltaPartialTick(false);
-        float baskProgress = entity.prevBaskProgress + (entity.baskProgress - entity.prevBaskProgress) * partialTick;
-        float swimAngle = entity.prevSwimAngle + (entity.getSwimAngle() - entity.prevSwimAngle) * partialTick;
-        float diggingProgress = entity.prevDigProgress + (entity.digProgress - entity.prevDigProgress) * partialTick;
-        float bobbingProgress = entity.prevBobbingProgress + (entity.bobbingProgress - entity.prevBobbingProgress) * partialTick;
-        int baskType = entity.isTearsEasterEgg() ? -1 : entity.getId() % 5;
+        float baskProgress = renderState.prevBaskProgress + (renderState.baskProgress - renderState.prevBaskProgress) * partialTick;
+        float swimAngle = renderState.prevSwimAngle + (renderState.swimAngle - renderState.prevSwimAngle) * partialTick;
+        float diggingProgress = renderState.prevDigProgress + (renderState.digProgress - renderState.prevDigProgress) * partialTick;
+        float bobbingProgress = renderState.prevBobbingProgress + (renderState.bobbingProgress - renderState.prevBobbingProgress) * partialTick;
+        int baskType = renderState.isTearsEasterEgg ? -1 : renderState.entityId % 5;
         progressRotationPrev(body, diggingProgress,  Maths.rad(70), 0, 0, 5F);
         progressRotationPrev(head, diggingProgress,  Maths.rad(10), 0, 0, 5F);
         progressRotationPrev(tail, diggingProgress,  Maths.rad(-10), 0, 0, 5F);
@@ -115,16 +115,16 @@ public class ModelSeal extends AdvancedEntityModel<EntitySeal> {
         progressPositionPrev(body, diggingProgress, 0, -12F, 2, 5F);
         progressPositionPrev(leftArm, diggingProgress, -1, 0, -2, 5F);
         progressPositionPrev(rightArm, diggingProgress, 1, 0, -2, 5F);
-        this.head.rotationPointZ += (float) (Math.sin(ageInTicks * 0.7F) * (double) 0.5F * bobbingProgress);
+        this.head.rotationPointZ += (float) (Math.sin(renderState.ageInTicks * 0.7F) * (double) 0.5F * bobbingProgress);
         if(diggingProgress > 0){
             float amount = diggingProgress * 0.2F;
-            this.swing(rightArm, 0.6F, 0.85F, true, 1F, -0.1F, ageInTicks, amount);
-            this.swing(leftArm, 0.6F, 0.85F, false, 1F, -0.1F, ageInTicks, amount);
-            this.walk(tail, 0.6F, 0.1F, false, 3F, -0.1F, ageInTicks, amount);
-            this.bob(body, 0.3F, 3F, true, ageInTicks, amount);
+            this.swing(rightArm, 0.6F, 0.85F, true, 1F, -0.1F, renderState.ageInTicks, amount);
+            this.swing(leftArm, 0.6F, 0.85F, false, 1F, -0.1F, renderState.ageInTicks, amount);
+            this.walk(tail, 0.6F, 0.1F, false, 3F, -0.1F, renderState.ageInTicks, amount);
+            this.bob(body, 0.3F, 3F, true, renderState.ageInTicks, amount);
         }
-        if (baskProgress > 0 && !entity.isTearsEasterEgg()) {
-            this.walk(head, 0.05F, 0.2F, true, 1F, -0.1F, ageInTicks, 1);
+        if (baskProgress > 0 && !renderState.isTearsEasterEgg) {
+            this.walk(head, 0.05F, 0.2F, true, 1F, -0.1F, renderState.ageInTicks, 1);
             if (baskType == 0) {
                 progressRotationPrev(body, baskProgress, 0, 0, Maths.rad(70), 5F);
                 progressRotationPrev(head, baskProgress, 0, Maths.rad(-20), Maths.rad(20), 5F);
@@ -137,8 +137,8 @@ public class ModelSeal extends AdvancedEntityModel<EntitySeal> {
                 progressPositionPrev(rightArm, baskProgress, 1, 0, 0, 5F);
                 progressPositionPrev(head, baskProgress, 0, 0, 1, 5F);
                 progressPositionPrev(body, baskProgress, 0, -4, 1, 5F);
-                this.flap(rightArm, 0.05F, 0.2F, true, 3F, -0.1F, ageInTicks, 1);
-                this.flap(leftArm, 0.05F, 0.2F, true, 3F, -0.1F, ageInTicks, 1);
+                this.flap(rightArm, 0.05F, 0.2F, true, 3F, -0.1F, renderState.ageInTicks, 1);
+                this.flap(leftArm, 0.05F, 0.2F, true, 3F, -0.1F, renderState.ageInTicks, 1);
             } else if (baskType == 1) {
                 progressRotationPrev(body, baskProgress, 0, 0, Maths.rad(-70), 5F);
                 progressRotationPrev(head, baskProgress, 0, Maths.rad(20), Maths.rad(-20), 5F);
@@ -151,8 +151,8 @@ public class ModelSeal extends AdvancedEntityModel<EntitySeal> {
                 progressPositionPrev(leftArm, baskProgress, -1, 0, 0, 5F);
                 progressPositionPrev(head, baskProgress, 0, 0, 1, 5F);
                 progressPositionPrev(body, baskProgress, 0, -4, 0, 5F);
-                this.flap(rightArm, 0.05F, 0.2F, false, 3F, -0.1F, ageInTicks, 1);
-                this.flap(leftArm, 0.05F, 0.2F, false, 3F, -0.1F, ageInTicks, 1);
+                this.flap(rightArm, 0.05F, 0.2F, false, 3F, -0.1F, renderState.ageInTicks, 1);
+                this.flap(leftArm, 0.05F, 0.2F, false, 3F, -0.1F, renderState.ageInTicks, 1);
             } else if (baskType == 2) {
                 progressRotationPrev(rightArm, baskProgress, 0, 0, Maths.rad(30), 5F);
                 progressRotationPrev(leftArm, baskProgress, 0, 0, Maths.rad(-40), 5F);
@@ -162,8 +162,8 @@ public class ModelSeal extends AdvancedEntityModel<EntitySeal> {
                 progressPositionPrev(body, baskProgress, 0, -4, 0, 5F);
                 progressPositionPrev(rightArm, baskProgress, 1, 0, 0, 5F);
                 progressPositionPrev(leftArm, baskProgress, -1, 0, 0, 5F);
-                this.flap(rightArm, 0.05F, 0.2F, true, 3F, -0.1F, ageInTicks, 1);
-                this.flap(leftArm, 0.05F, 0.2F, false, 3F, -0.1F, ageInTicks, 1);
+                this.flap(rightArm, 0.05F, 0.2F, true, 3F, -0.1F, renderState.ageInTicks, 1);
+                this.flap(leftArm, 0.05F, 0.2F, false, 3F, -0.1F, renderState.ageInTicks, 1);
             } else if (baskType == 3) {
                 progressRotationPrev(body, baskProgress, 0, Maths.rad(20), 0, 5F);
                 progressRotationPrev(tail, baskProgress, 0, Maths.rad(25), 0, 5F);
@@ -173,8 +173,8 @@ public class ModelSeal extends AdvancedEntityModel<EntitySeal> {
                 progressRotationPrev(leftLeg, baskProgress, 0, Maths.rad(30), 0, 5F);
                 progressRotationPrev(rightLeg, baskProgress, 0, Maths.rad(30), 0, 5F);
                 progressPositionPrev(head, baskProgress, 0, -1, 0, 5F);
-                this.flap(rightArm, 0.05F, 0.2F, true, 3F, -0.1F, ageInTicks, 1);
-                this.flap(leftArm, 0.05F, 0.2F, false, 3F, -0.1F, ageInTicks, 1);
+                this.flap(rightArm, 0.05F, 0.2F, true, 3F, -0.1F, renderState.ageInTicks, 1);
+                this.flap(leftArm, 0.05F, 0.2F, false, 3F, -0.1F, renderState.ageInTicks, 1);
             } else if (baskType == 4) {
                 progressRotationPrev(body, baskProgress, 0, Maths.rad(-20), 0, 5F);
                 progressRotationPrev(tail, baskProgress, 0, Maths.rad(-25), 0, 5F);
@@ -184,38 +184,38 @@ public class ModelSeal extends AdvancedEntityModel<EntitySeal> {
                 progressPositionPrev(head, baskProgress, 0, -1, 0, 5F);
                 progressRotationPrev(leftLeg, baskProgress, 0, Maths.rad(-30), 0, 5F);
                 progressRotationPrev(rightLeg, baskProgress, 0, Maths.rad(-30), 0, 5F);
-                this.flap(rightArm, 0.05F, 0.2F, true, 3F, -0.1F, ageInTicks, 1);
-                this.flap(leftArm, 0.05F, 0.2F, false, 3F, -0.1F, ageInTicks, 1);
+                this.flap(rightArm, 0.05F, 0.2F, true, 3F, -0.1F, renderState.ageInTicks, 1);
+                this.flap(leftArm, 0.05F, 0.2F, false, 3F, -0.1F, renderState.ageInTicks, 1);
             }
         }
         AdvancedModelBox[] bodyParts = new AdvancedModelBox[]{head, body, tail};
-        if (!entity.isInWater()) {
+        if (!renderState.isInWater) {
             float f = walkSpeed;
             float f1 = walkDegree * 0.3F;
-            this.body.rotationPointY += 1.4F * Math.min(0, (float) (Math.sin(limbSwing * f) * (double) limbSwingAmount * (double) f1 * 9D - (limbSwingAmount * f1 * 9D)));
-            this.body.rotationPointZ += (float) (Math.sin(limbSwing * f - 1.5F) * (double) limbSwingAmount * (double) f1 * 9D - (limbSwingAmount * f1 * 9D));
-            this.head.rotationPointZ += (float) (Math.sin(limbSwing * f - 2F) * (double) limbSwingAmount * (double) f1 * 2F - (limbSwingAmount * f1 * 2F));
-            this.walk(body, walkSpeed, walkDegree * 0.1F, false, 1F, 0.04F, limbSwing, limbSwingAmount);
-            this.walk(head, walkSpeed, walkDegree * 0.1F, true, 1F, 0.04F, limbSwing, limbSwingAmount);
-            this.walk(tail, walkSpeed, walkDegree * 0.15F, true, 1F, 0.06F, limbSwing, limbSwingAmount);
-            this.flap(rightArm, walkSpeed, walkDegree, true, 3F, 0, limbSwing, limbSwingAmount);
-            this.flap(leftArm, walkSpeed, walkDegree, false, 3F, 0, limbSwing, limbSwingAmount);
-            this.swing(rightArm, walkSpeed, walkDegree, false, 2F, -0.2F, limbSwing, limbSwingAmount);
-            this.swing(leftArm, walkSpeed, walkDegree, true, 2F, -0.2F, limbSwing, limbSwingAmount);
+            this.body.rotationPointY += 1.4F * Math.min(0, (float) (Math.sin(renderState.walkAnimationPos * f) * (double) renderState.walkAnimationSpeed * (double) f1 * 9D - (renderState.walkAnimationSpeed * f1 * 9D)));
+            this.body.rotationPointZ += (float) (Math.sin(renderState.walkAnimationPos * f - 1.5F) * (double) renderState.walkAnimationSpeed * (double) f1 * 9D - (renderState.walkAnimationSpeed * f1 * 9D));
+            this.head.rotationPointZ += (float) (Math.sin(renderState.walkAnimationPos * f - 2F) * (double) renderState.walkAnimationSpeed * (double) f1 * 2F - (renderState.walkAnimationSpeed * f1 * 2F));
+            this.walk(body, walkSpeed, walkDegree * 0.1F, false, 1F, 0.04F, renderState.walkAnimationPos, renderState.walkAnimationSpeed);
+            this.walk(head, walkSpeed, walkDegree * 0.1F, true, 1F, 0.04F, renderState.walkAnimationPos, renderState.walkAnimationSpeed);
+            this.walk(tail, walkSpeed, walkDegree * 0.15F, true, 1F, 0.06F, renderState.walkAnimationPos, renderState.walkAnimationSpeed);
+            this.flap(rightArm, walkSpeed, walkDegree, true, 3F, 0, renderState.walkAnimationPos, renderState.walkAnimationSpeed);
+            this.flap(leftArm, walkSpeed, walkDegree, false, 3F, 0, renderState.walkAnimationPos, renderState.walkAnimationSpeed);
+            this.swing(rightArm, walkSpeed, walkDegree, false, 2F, -0.2F, renderState.walkAnimationPos, renderState.walkAnimationSpeed);
+            this.swing(leftArm, walkSpeed, walkDegree, true, 2F, -0.2F, renderState.walkAnimationPos, renderState.walkAnimationSpeed);
         } else {
-            this.body.rotateAngleX += headPitch * Mth.DEG_TO_RAD;
-            this.body.rotationPointY += (float) (Math.sin(limbSwing * swimSpeed) * (double) limbSwingAmount * (double) swimDegree * 9D - (limbSwingAmount * swimDegree * 9D));
-            this.chainWave(bodyParts, swimSpeed, swimDegree, -3F, limbSwing, limbSwingAmount);
-            this.flap(rightArm, swimSpeed, swimDegree * 2.5F, true, 3F, 0, limbSwing, limbSwingAmount);
-            this.flap(leftArm, swimSpeed, swimDegree * 2.5F, false, 3F, 0, limbSwing, limbSwingAmount);
-            this.walk(leftLeg, swimSpeed, swimDegree, false, -4F, 0, limbSwing, limbSwingAmount);
-            this.walk(rightLeg, swimSpeed, swimDegree, false, -4F, 0, limbSwing, limbSwingAmount);
+            this.body.rotateAngleX += renderState.xRot * Mth.DEG_TO_RAD;
+            this.body.rotationPointY += (float) (Math.sin(renderState.walkAnimationPos * swimSpeed) * (double) renderState.walkAnimationSpeed * (double) swimDegree * 9D - (renderState.walkAnimationSpeed * swimDegree * 9D));
+            this.chainWave(bodyParts, swimSpeed, swimDegree, -3F, renderState.walkAnimationPos, renderState.walkAnimationSpeed);
+            this.flap(rightArm, swimSpeed, swimDegree * 2.5F, true, 3F, 0, renderState.walkAnimationPos, renderState.walkAnimationSpeed);
+            this.flap(leftArm, swimSpeed, swimDegree * 2.5F, false, 3F, 0, renderState.walkAnimationPos, renderState.walkAnimationSpeed);
+            this.walk(leftLeg, swimSpeed, swimDegree, false, -4F, 0, renderState.walkAnimationPos, renderState.walkAnimationSpeed);
+            this.walk(rightLeg, swimSpeed, swimDegree, false, -4F, 0, renderState.walkAnimationPos, renderState.walkAnimationSpeed);
         }
-        if(entity.isTearsEasterEgg() && !entity.isInWater()){
-            this.swing(head, 0.1F, 0.6F, true, 3F, 0.0F, ageInTicks, 1);
-            this.walk(head, 0.1F, 0.1F, true, 2F, 0.3F, ageInTicks, 1);
+        if(renderState.isTearsEasterEgg && !renderState.isInWater){
+            this.swing(head, 0.1F, 0.6F, true, 3F, 0.0F, renderState.ageInTicks, 1);
+            this.walk(head, 0.1F, 0.1F, true, 2F, 0.3F, renderState.ageInTicks, 1);
         }
-        this.faceTarget(netHeadYaw, headPitch, 1, head);
+        this.faceTarget(renderState.yRot, renderState.xRot, 1, head);
         float yawAmount = swimAngle / 57.295776F * 0.5F;
         body.rotateAngleZ += yawAmount;
 
