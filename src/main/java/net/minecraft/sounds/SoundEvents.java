@@ -1308,6 +1308,8 @@ public class SoundEvents {
 	public static final SoundEvent RABBIT_DEATH = register("entity.rabbit.death");
 	public static final SoundEvent RABBIT_HURT = register("entity.rabbit.hurt");
 	public static final SoundEvent RABBIT_JUMP = register("entity.rabbit.jump");
+	public static final SoundEvent RAIN_FROG_IDLE = register("entity.rain_frog.idle");
+	public static final SoundEvent RAIN_FROG_HURT = register("entity.rain_frog.hurt");
 	public static final Holder.Reference<SoundEvent> RAID_HORN = registerForHolder("event.raid.horn");
 	public static final SoundEvent RAVAGER_AMBIENT = register("entity.ravager.ambient");
 	public static final SoundEvent RAVAGER_ATTACK = register("entity.ravager.attack");

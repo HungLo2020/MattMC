@@ -51,4 +51,8 @@ public class AMSoundRegistry {
     public static final DeferredHolder MUDSKIPPER_HURT = new DeferredHolder(() -> net.minecraft.sounds.SoundEvents.MUDSKIPPER_HURT);
     public static final DeferredHolder MUDSKIPPER_WALK = new DeferredHolder(() -> net.minecraft.sounds.SoundEvents.MUDSKIPPER_WALK);
     public static final DeferredHolder MUDSKIPPER_SPIT = new DeferredHolder(() -> net.minecraft.sounds.SoundEvents.MUDSKIPPER_SPIT);
+    
+    // Rain Frog sounds - reference vanilla SoundEvents
+    public static final DeferredHolder RAIN_FROG_IDLE = new DeferredHolder(() -> net.minecraft.sounds.SoundEvents.RAIN_FROG_IDLE);
+    public static final DeferredHolder RAIN_FROG_HURT = new DeferredHolder(() -> net.minecraft.sounds.SoundEvents.RAIN_FROG_HURT);
 }

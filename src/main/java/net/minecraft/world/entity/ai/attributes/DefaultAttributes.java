@@ -175,6 +175,7 @@ public class DefaultAttributes {
 		.put(EntityType.POLAR_BEAR, PolarBear.createAttributes().build())
 		.put(EntityType.PUFFERFISH, AbstractFish.createAttributes().build())
 		.put(EntityType.RABBIT, Rabbit.createAttributes().build())
+		.put(EntityType.RAIN_FROG, com.github.alexthe666.alexsmobs.entity.EntityRainFrog.bakeAttributes().build())
 		.put(EntityType.RAVAGER, Ravager.createAttributes().build())
 		.put(EntityType.RELICHEIRUS, RelicheirusEntity.createAttributes().build())
 		.put(EntityType.SALMON, AbstractFish.createAttributes().build())

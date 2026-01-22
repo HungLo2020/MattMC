@@ -932,6 +932,12 @@ public class EntityType<T extends Entity> implements FeatureElement, EntityTypeT
 	public static final EntityType<Rabbit> RABBIT = register(
 		"rabbit", EntityType.Builder.of(Rabbit::new, MobCategory.CREATURE).sized(0.4F, 0.5F).clientTrackingRange(8)
 	);
+	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntityRainFrog> RAIN_FROG = register(
+		"rain_frog",
+		EntityType.Builder.of(com.github.alexthe666.alexsmobs.entity.EntityRainFrog::new, MobCategory.CREATURE)
+			.sized(0.4F, 0.4F)
+			.clientTrackingRange(8)
+	);
 	public static final EntityType<Ravager> RAVAGER = register(
 		"ravager",
 		EntityType.Builder.of(Ravager::new, MobCategory.MONSTER)
