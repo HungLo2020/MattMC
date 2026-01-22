@@ -382,14 +382,14 @@ public class EntitySugarGlider extends TamableAnimal implements IFollower {
         super.travel(travelVector);
     }
 
-    public void readAdditionalSaveData(net.minecraft.world.level.storage.ValueInput valueInput) {
+    protected void readAdditionalSaveData(net.minecraft.world.level.storage.ValueInput valueInput) {
         super.readAdditionalSaveData(valueInput);
         this.entityData.set(ATTACHED_FACE, Direction.from3DDataValue((int) valueInput.getByteOr("AttachFace", (byte) 0)));
         this.setCommand(valueInput.getIntOr("SugarGliderCommand", 0));
         this.setOrderedToSit(valueInput.getBooleanOr("SugarGliderSitting", false));
     }
 
-    public void addAdditionalSaveData(net.minecraft.world.level.storage.ValueOutput valueOutput) {
+    protected void addAdditionalSaveData(net.minecraft.world.level.storage.ValueOutput valueOutput) {
         super.addAdditionalSaveData(valueOutput);
         valueOutput.putByte("AttachFace", (byte) this.entityData.get(ATTACHED_FACE).get3DDataValue());
         valueOutput.putInt("SugarGliderCommand", this.getCommand());
