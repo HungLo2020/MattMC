@@ -1,0 +1,107 @@
+package com.github.alexthe666.alexsmobs.entity;
+
+// Removed: import com.github.alexthe666.alexsmobs.AlexsMobs;
+// Removed: import com.github.alexthe666.alexsmobs.message.MessageHurtMultipart;
+// Removed: import com.github.alexthe666.alexsmobs.message.MessageInteractMultipart;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.game.ClientGamePacketListener;
+import net.minecraft.network.syncher.SynchedEntityData;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityDimensions;
+import net.minecraft.world.entity.Pose;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
+import net.neoforged.neoforge.entity.PartEntity;
+
+import javax.annotation.Nullable;
+import java.util.List;
+
+public class EntityCachalotPart extends PartEntity<EntityCachalotWhale> {
+
+    private final EntityDimensions size;
+    public float scale = 1;
+
+    public EntityCachalotPart(EntityCachalotWhale parent, float sizeX, float sizeY) {
+        super(parent);
+        this.size = EntityDimensions.scalable(sizeX, sizeY);
+        this.refreshDimensions();
+    }
+
+    public EntityCachalotPart(EntityCachalotWhale entityCachalotWhale, float sizeX, float sizeY, EntityDimensions size) {
+        super(entityCachalotWhale);
+        this.size = size;
+    }
+
+    protected void collideWithNearbyEntities() {
+        final List<Entity> entities = this.level().getEntities(this, this.getBoundingBox().expandTowards(0.2D, 0.0D, 0.2D));
+        Entity parent = this.getParent();
+        if (parent != null) {
+            entities.stream().filter(entity -> entity != parent && !(entity instanceof EntityCachalotPart && ((EntityCachalotPart) entity).getParent() == parent) && entity.isPushable()).forEach(entity -> entity.push(parent));
+        }
+    }
+
+    @Override
+    public InteractionResult interact(Player player, InteractionHand hand) {
+        // STUB: Client-server messaging removed (AlexsMobs.sendMSGToServer not available)
+        // Direct interaction on server side only
+        return this.getParent() == null ? InteractionResult.PASS : this.getParent().mobInteract(player, hand);
+    }
+
+
+    protected void collideWithEntity(Entity entityIn) {
+        entityIn.push(this);
+    }
+
+    public boolean isPickable() {
+        return true;
+    }
+
+    @Nullable
+    public ItemStack getPickResult() {
+        Entity parent = this.getParent();
+        return parent != null ? parent.getPickResult() : ItemStack.EMPTY;
+    }
+
+    public boolean hurt(DamageSource source, float amount) {
+        // STUB: Client-server messaging removed (AlexsMobs.sendMSGToServer not available)
+        // Direct damage handling on server side only
+        return !this.isInvulnerableTo(source) && this.getParent() != null && this.getParent().attackEntityPartFrom(this, source, amount);
+    }
+
+    public boolean is(Entity entityIn) {
+        return this == entityIn || this.getParent() == entityIn;
+    }
+
+    public Packet<ClientGamePacketListener> getAddEntityPacket() {
+        throw new UnsupportedOperationException();
+    }
+
+    public EntityDimensions getDefaultDimensions(Pose poseIn) {
+        return this.size == null ? EntityDimensions.scalable(0, 0) : this.size.scale(scale);
+    }
+
+    @Override
+    protected void defineSynchedData(SynchedEntityData.Builder builder) {
+
+    }
+
+    public void tick(){
+        super.tick();
+    }
+
+    @Override
+    protected void readAdditionalSaveData(CompoundTag compound) {
+
+    }
+
+    @Override
+    protected void addAdditionalSaveData(CompoundTag compound) {
+
+    }
+}
