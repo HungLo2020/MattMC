@@ -65,6 +65,12 @@ public class AMSoundRegistry {
     public static final DeferredHolder SEAGULL_IDLE = new DeferredHolder(() -> net.minecraft.sounds.SoundEvents.SEAGULL_IDLE);
     public static final DeferredHolder SEAGULL_HURT = new DeferredHolder(() -> net.minecraft.sounds.SoundEvents.SEAGULL_HURT);
     
+    // Caiman sounds - reference vanilla SoundEvents
+    public static final DeferredHolder CAIMAN_IDLE = new DeferredHolder(() -> net.minecraft.sounds.SoundEvents.CAIMAN_IDLE);
+    public static final DeferredHolder CAIMAN_HURT = new DeferredHolder(() -> net.minecraft.sounds.SoundEvents.CAIMAN_HURT);
+    public static final DeferredHolder CAIMAN_SPLASH = new DeferredHolder(() -> net.minecraft.sounds.SoundEvents.CAIMAN_SPLASH);
+    public static final DeferredHolder CROCODILE_BABY = new DeferredHolder(() -> net.minecraft.sounds.SoundEvents.CROCODILE_BABY);
+    
     // Shoebill sounds - reference vanilla SoundEvents
     public static final DeferredHolder SHOEBILL_HURT = new DeferredHolder(() -> net.minecraft.sounds.SoundEvents.SHOEBILL_HURT);
     

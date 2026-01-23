@@ -4757,6 +4757,16 @@ public class Blocks {
 			.noOcclusion()
 			.pushReaction(PushReaction.DESTROY)
 	);
+	public static final Block CAIMAN_EGG = register(
+		"caiman_egg",
+		com.github.alexthe666.alexsmobs.block.BlockCaimanEgg::new,
+		BlockBehaviour.Properties.of()
+			.mapColor(MapColor.SAND)
+			.strength(0.5F)
+			.sound(SoundType.METAL)
+			.randomTicks()
+			.noOcclusion()
+	);
 	public static final Block SNIFFER_EGG = register(
 		"sniffer_egg", SnifferEggBlock::new, BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_RED).strength(0.5F).sound(SoundType.METAL).noOcclusion()
 	);

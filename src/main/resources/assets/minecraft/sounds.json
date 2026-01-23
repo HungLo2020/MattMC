@@ -25328,5 +25328,36 @@
       "minecraft:entity/cachalot_whale/cachalot_whale_click_2"
     ],
     "subtitle": "subtitles.entity.cachalot_whale.click"
+  },
+  "entity.caiman.idle": {
+    "sounds": [
+      "caiman_idle_0",
+      "caiman_idle_1",
+      "caiman_idle_2",
+      "caiman_idle_3"
+    ],
+    "subtitle": "subtitles.entity.caiman.idle"
+  },
+  "entity.caiman.hurt": {
+    "sounds": [
+      "caiman_hurt_0",
+      "caiman_hurt_1"
+    ],
+    "subtitle": "subtitles.entity.caiman.hurt"
+  },
+  "entity.caiman.splash": {
+    "sounds": [
+      "caiman_splash_0",
+      "caiman_splash_1",
+      "caiman_splash_2"
+    ],
+    "subtitle": "subtitles.entity.caiman.splash"
+  },
+  "entity.crocodile.baby": {
+    "sounds": [
+      "crocodile_baby_0",
+      "crocodile_baby_1"
+    ],
+    "subtitle": "subtitles.entity.caiman.idle"
   }
 }

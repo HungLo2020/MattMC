@@ -9,13 +9,14 @@ public class AMEntityRegistry {
     /**
      * Deferred holder stub for entity types
      */
-    public static class DeferredEntityHolder {
+    public static class DeferredEntityHolder implements java.util.function.Supplier<EntityType<?>> {
         private final java.util.function.Supplier<EntityType<?>> entitySupplier;
         
         public DeferredEntityHolder(java.util.function.Supplier<EntityType<?>> entitySupplier) {
             this.entitySupplier = entitySupplier;
         }
         
+        @Override
         public EntityType<?> get() {
             return entitySupplier.get();
         }
@@ -29,6 +30,7 @@ public class AMEntityRegistry {
     public static final DeferredEntityHolder SHOEBILL = new DeferredEntityHolder(() -> EntityType.SHOEBILL);
     public static final DeferredEntityHolder TOUCAN = new DeferredEntityHolder(() -> EntityType.TOUCAN);
     public static final DeferredEntityHolder ANTEATER = new DeferredEntityHolder(() -> EntityType.ANTEATER);
+    public static final DeferredEntityHolder CAIMAN = new DeferredEntityHolder(() -> EntityType.CAIMAN);
     
     /**
      * Helper method for spawn roll logic
@@ -47,5 +49,14 @@ public class AMEntityRegistry {
             }
         }
         return false;
+    }
+    
+    /**
+     * Build predicate from tag
+     * @param tag The entity tag to check
+     * @return Selector for targeting
+     */
+    public static net.minecraft.world.entity.ai.targeting.TargetingConditions.Selector buildPredicateFromTag(net.minecraft.tags.TagKey<EntityType<?>> tag) {
+        return (living, serverLevel) -> living != null && living.getType().is(tag);
     }
 }
