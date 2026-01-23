@@ -164,6 +164,7 @@ public class EntityRenderers {
 		);
 		register(EntityType.GIANT_SQUID, com.github.alexthe666.alexsmobs.client.render.RenderGiantSquid::new);
 		register(EntityType.GOAT, GoatRenderer::new);
+		register(EntityType.GORILLA, com.github.alexthe666.alexsmobs.client.render.RenderGorilla::new);
 		register(EntityType.GROTTOCERATOPS, com.github.alexmodguy.alexscaves.client.render.entity.GrottoceratopsRenderer::new);
 		register(EntityType.GUARDIAN, GuardianRenderer::new);
 		register(EntityType.HOGLIN, HoglinRenderer::new);

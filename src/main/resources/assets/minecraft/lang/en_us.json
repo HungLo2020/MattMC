@@ -8038,5 +8038,9 @@
   "subtitles.entity.capuchin_monkey.hurt": "Capuchin Monkey winces",
   "entity.minecraft.all.command_0": "%s is wandering",
   "entity.minecraft.all.command_1": "%s is following",
-  "entity.minecraft.all.command_2": "%s is sitting"
+  "entity.minecraft.all.command_2": "%s is sitting",
+  "entity.minecraft.gorilla": "Gorilla",
+  "item.minecraft.gorilla_spawn_egg": "Gorilla Spawn Egg",
+  "subtitles.entity.gorilla.ambient": "Gorilla grunts",
+  "subtitles.entity.gorilla.hurt": "Gorilla hurts"
 }

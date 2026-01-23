@@ -749,6 +749,8 @@ public class SoundEvents {
 	public static final SoundEvent GOAT_SCREAMING_PREPARE_RAM = register("entity.goat.screaming.prepare_ram");
 	public static final SoundEvent GOAT_SCREAMING_RAM_IMPACT = register("entity.goat.screaming.ram_impact");
 	public static final SoundEvent GOAT_STEP = register("entity.goat.step");
+	public static final SoundEvent GORILLA_IDLE = register("entity.gorilla.idle");
+	public static final SoundEvent GORILLA_HURT = register("entity.gorilla.hurt");
 	public static final SoundEvent ATLATITAN_IDLE = register("entity.atlatitan.idle");
 	public static final SoundEvent ATLATITAN_HURT = register("entity.atlatitan.hurt");
 	public static final SoundEvent ATLATITAN_DEATH = register("entity.atlatitan.death");
