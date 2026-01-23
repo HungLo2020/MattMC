@@ -1,0 +1,6 @@
+{
+  "parent": "minecraft:block/template_four_caiman_eggs",
+  "textures": {
+    "0": "minecraft:block/caiman_eggs"
+  }
+}

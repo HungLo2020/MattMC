@@ -946,6 +946,7 @@ public class CreativeModeTabs {
 					output.accept(Items.GLOW_LICHEN);
 					output.accept(Items.HANGING_ROOTS);
 					output.accept(Items.FROGSPAWN);
+					output.accept(Items.CAIMAN_EGG);
 					output.accept(Items.TURTLE_EGG);
 					output.accept(Items.SNIFFER_EGG);
 					output.accept(Items.SUBTERRANODON_EGG);
@@ -1919,6 +1920,7 @@ public class CreativeModeTabs {
 					output.accept(Items.BAT_SPAWN_EGG);
 					output.accept(Items.BEE_SPAWN_EGG);
 					output.accept(Items.BISON_SPAWN_EGG);
+					output.accept(Items.CAIMAN_SPAWN_EGG);
 					output.accept(Items.BLAZE_SPAWN_EGG);
 					output.accept(Items.BLOBFISH_SPAWN_EGG);
 					output.accept(Items.BLUE_JAY_SPAWN_EGG);

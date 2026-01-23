@@ -92,6 +92,13 @@ public class AMTagRegistry {
     public static final TagKey<Item> ANTEATER_BREEDABLES = registerItemTag("anteater_breedables");
     public static final TagKey<Item> ANTEATER_FOODSTUFFS = registerItemTag("anteater_foodstuffs");
 
+    // Caiman-specific tags
+    public static final TagKey<Item> CAIMAN_BREEDABLES = registerItemTag("caiman_breedables");
+    public static final TagKey<Item> CAIMAN_FOODSTUFFS = registerItemTag("caiman_foodstuffs");
+    public static final TagKey<EntityType<?>> CAIMAN_TARGETS = registerEntityTag("caiman_targets");
+    public static final TagKey<Block> CAIMAN_SPAWNS = registerBlockTag("caiman_spawns");
+    public static final TagKey<Block> CROCODILE_SPAWNS = registerBlockTag("crocodile_spawns");
+
     private static TagKey<Item> registerItemTag(String name) {
         return TagKey.create(Registries.ITEM, ResourceLocation.withDefaultNamespace(name));
     }
