@@ -14186,6 +14186,21 @@
     ],
     "subtitle": "subtitles.entity.cosmic_cod.hurt"
   },
+  "entity.cosmaw.idle": {
+    "sounds": [
+      "minecraft:entity/cosmaw_idle_0",
+      "minecraft:entity/cosmaw_idle_1",
+      "minecraft:entity/cosmaw_idle_2"
+    ],
+    "subtitle": "subtitles.entity.cosmaw.idle"
+  },
+  "entity.cosmaw.hurt": {
+    "sounds": [
+      "minecraft:entity/cosmaw_hurt_0",
+      "minecraft:entity/cosmaw_hurt_1"
+    ],
+    "subtitle": "subtitles.entity.cosmaw.hurt"
+  },
   "entity.cow.ambient": {
     "sounds": [
       "mob/cow/say1",

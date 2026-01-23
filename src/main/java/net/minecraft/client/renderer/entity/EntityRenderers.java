@@ -110,6 +110,7 @@ public class EntityRenderers {
 		register(EntityType.COCKROACH_EGG, ThrownItemRenderer::new);
 		register(EntityType.COMB_JELLY, RenderCombJelly::new);
 		register(EntityType.COSMIC_COD, RenderCosmicCod::new);
+		register(EntityType.COSMAW, com.github.alexthe666.alexsmobs.client.render.RenderCosmaw::new);
 		register(EntityType.COD, CodRenderer::new);
 		register(EntityType.COMMAND_BLOCK_MINECART, context -> new MinecartRenderer(context, ModelLayers.COMMAND_BLOCK_MINECART));
 		register(EntityType.COPPER_GOLEM, CopperGolemRenderer::new);
