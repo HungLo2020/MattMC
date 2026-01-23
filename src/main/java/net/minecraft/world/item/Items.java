@@ -1813,6 +1813,7 @@ public class Items {
 	public static final Item DOLPHIN_SPAWN_EGG = registerItem("dolphin_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.DOLPHIN));
 	public static final Item DONKEY_SPAWN_EGG = registerItem("donkey_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.DONKEY));
 	public static final Item DROWNED_SPAWN_EGG = registerItem("drowned_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.DROWNED));
+	public static final Item ELEPHANT_SPAWN_EGG = registerItem("elephant_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.ELEPHANT));
 	public static final Item ELDER_GUARDIAN_SPAWN_EGG = registerItem(
 		"elder_guardian_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.ELDER_GUARDIAN)
 	);

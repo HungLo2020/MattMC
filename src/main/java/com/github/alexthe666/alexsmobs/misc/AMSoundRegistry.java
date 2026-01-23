@@ -88,4 +88,11 @@ public class AMSoundRegistry {
     // Cosmaw sounds - reference vanilla SoundEvents
     public static final DeferredHolder COSMAW_IDLE = new DeferredHolder(() -> net.minecraft.sounds.SoundEvents.COSMAW_IDLE);
     public static final DeferredHolder COSMAW_HURT = new DeferredHolder(() -> net.minecraft.sounds.SoundEvents.COSMAW_HURT);
+    
+    // Elephant sounds - reference vanilla SoundEvents
+    public static final DeferredHolder ELEPHANT_IDLE = new DeferredHolder(() -> net.minecraft.sounds.SoundEvents.ELEPHANT_IDLE);
+    public static final DeferredHolder ELEPHANT_HURT = new DeferredHolder(() -> net.minecraft.sounds.SoundEvents.ELEPHANT_HURT);
+    public static final DeferredHolder ELEPHANT_DIE = new DeferredHolder(() -> net.minecraft.sounds.SoundEvents.ELEPHANT_DIE);
+    public static final DeferredHolder ELEPHANT_WALK = new DeferredHolder(() -> net.minecraft.sounds.SoundEvents.ELEPHANT_WALK);
+    public static final DeferredHolder ELEPHANT_TRUMPET = new DeferredHolder(() -> net.minecraft.sounds.SoundEvents.ELEPHANT_TRUMPET);
 }

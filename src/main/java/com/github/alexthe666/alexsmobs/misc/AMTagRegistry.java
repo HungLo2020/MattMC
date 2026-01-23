@@ -111,6 +111,12 @@ public class AMTagRegistry {
     public static final TagKey<Item> COSMAW_FOODSTUFFS = registerItemTag("cosmaw_foodstuffs");
     public static final TagKey<Item> COSMAW_BREEDABLES = registerItemTag("cosmaw_breedables");
     public static final TagKey<Item> COSMAW_TAMEABLES = registerItemTag("cosmaw_tameables");
+    
+    // Elephant-specific tags
+    public static final TagKey<Block> ELEPHANT_FOODBLOCKS = registerBlockTag("elephant_foodblocks");
+    public static final TagKey<Item> ELEPHANT_FOODSTUFFS = registerItemTag("elephant_foodstuffs");
+    public static final TagKey<Item> ELEPHANT_TAMEABLES = registerItemTag("elephant_tameables");
+    public static final TagKey<Item> ELEPHANT_BREEDABLES = registerItemTag("elephant_breedables");
 
     private static TagKey<Item> registerItemTag(String name) {
         return TagKey.create(Registries.ITEM, ResourceLocation.withDefaultNamespace(name));
