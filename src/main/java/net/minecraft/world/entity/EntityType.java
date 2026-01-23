@@ -805,6 +805,14 @@ public class EntityType<T extends Entity> implements FeatureElement, EntityTypeT
 			.clientTrackingRange(4)
 			.updateInterval(10)
 	);
+	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntityTossedItem> TOSSED_ITEM = register(
+		"tossed_item",
+		EntityType.Builder.<com.github.alexthe666.alexsmobs.entity.EntityTossedItem>of(com.github.alexthe666.alexsmobs.entity.EntityTossedItem::new, MobCategory.MISC)
+			.noLootTable()
+			.sized(0.25F, 0.25F)
+			.clientTrackingRange(4)
+			.updateInterval(10)
+	);
 	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntityMudskipper> MUDSKIPPER = register(
 		"mudskipper",
 		EntityType.Builder.of(com.github.alexthe666.alexsmobs.entity.EntityMudskipper::new, MobCategory.CREATURE)
@@ -986,6 +994,9 @@ public class EntityType<T extends Entity> implements FeatureElement, EntityTypeT
 	);
 	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntityCaiman> CAIMAN = register(
 		"caiman", EntityType.Builder.of(com.github.alexthe666.alexsmobs.entity.EntityCaiman::new, MobCategory.CREATURE).sized(1.2F, 0.5F).eyeHeight(0.4F).clientTrackingRange(10)
+	);
+	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntityCapuchinMonkey> CAPUCHIN_MONKEY = register(
+		"capuchin_monkey", EntityType.Builder.of(com.github.alexthe666.alexsmobs.entity.EntityCapuchinMonkey::new, MobCategory.CREATURE).sized(0.45F, 0.7F).eyeHeight(0.5F).clientTrackingRange(8)
 	);
 	public static final EntityType<Sheep> SHEEP = register(
 		"sheep", EntityType.Builder.of(Sheep::new, MobCategory.CREATURE).sized(0.9F, 1.3F).eyeHeight(1.235F).passengerAttachments(1.2375F).clientTrackingRange(10)

@@ -8002,5 +8002,12 @@
   "block.minecraft.caiman_egg": "Caiman Egg",
   "subtitles.entity.caiman.idle": "Caiman hisses",
   "subtitles.entity.caiman.hurt": "Caiman hurts",
-  "subtitles.entity.caiman.splash": "Caiman splashes"
+  "subtitles.entity.caiman.splash": "Caiman splashes",
+  "entity.minecraft.capuchin_monkey": "Capuchin Monkey",
+  "item.minecraft.capuchin_monkey_spawn_egg": "Capuchin Monkey Spawn Egg",
+  "subtitles.entity.capuchin_monkey.idle": "Capuchin Monkey squeaks",
+  "subtitles.entity.capuchin_monkey.hurt": "Capuchin Monkey winces",
+  "entity.minecraft.all.command_0": "%s is wandering",
+  "entity.minecraft.all.command_1": "%s is following",
+  "entity.minecraft.all.command_2": "%s is sitting"
 }

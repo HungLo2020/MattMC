@@ -99,6 +99,14 @@ public class AMTagRegistry {
     public static final TagKey<Block> CAIMAN_SPAWNS = registerBlockTag("caiman_spawns");
     public static final TagKey<Block> CROCODILE_SPAWNS = registerBlockTag("crocodile_spawns");
 
+    // Capuchin Monkey-specific tags
+    public static final TagKey<Item> CAPUCHIN_MONKEY_TAMEABLES = registerItemTag("capuchin_monkey_tameables");
+    public static final TagKey<Item> CAPUCHIN_MONKEY_BREEDABLES = registerItemTag("capuchin_monkey_breedables");
+    public static final TagKey<Item> CAPUCHIN_MONKEY_FOODSTUFFS = registerItemTag("capuchin_monkey_foodstuffs");
+    public static final TagKey<Block> CAPUCHIN_MONKEY_SPAWNS = registerBlockTag("capuchin_monkey_spawns");
+    public static final TagKey<Item> BANANAS = registerItemTag("bananas");
+    public static final TagKey<EntityType<?>> MONKEY_TARGET_WITH_DART = registerEntityTag("monkey_target_with_dart");
+
     private static TagKey<Item> registerItemTag(String name) {
         return TagKey.create(Registries.ITEM, ResourceLocation.withDefaultNamespace(name));
     }
