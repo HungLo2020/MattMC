@@ -18,6 +18,7 @@ import net.minecraft.client.renderer.entity.LivingEntityRenderer;
 import net.minecraft.client.renderer.entity.MobRenderer;
 import net.minecraft.client.renderer.entity.layers.RenderLayer;
 import net.minecraft.client.renderer.entity.state.LivingEntityRenderState;
+import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.HumanoidArm;
@@ -99,7 +100,7 @@ public class RenderBaldEagle extends MobRenderer<EntityBaldEagle, BaldEagleRende
         public void submit(PoseStack poseStack, SubmitNodeCollector collector, int packedLight, BaldEagleRenderState state, float limbSwing, float limbSwingAmount) {
             if (state.hasCap) {
                 RenderType renderType = RenderType.entityTranslucent(TEXTURE_CAP);
-                this.getParentModel().renderToBuffer(poseStack, collector.node(packedLight, renderType), packedLight, -1);
+                collector.order(1).submitModel(this.getParentModel(), state, poseStack, renderType, packedLight, OverlayTexture.NO_OVERLAY, -1, null, state.outlineColor, null);
             }
         }
     }

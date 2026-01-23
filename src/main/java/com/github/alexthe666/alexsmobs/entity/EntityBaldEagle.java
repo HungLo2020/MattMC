@@ -91,7 +91,7 @@ public class EntityBaldEagle extends TamableAnimal implements IFollower, IFalcon
     private int chunkLoadCooldown;
     private int stillTicksCounter = 0;
 
-    protected EntityBaldEagle(EntityType<? extends TamableAnimal> type, Level worldIn) {
+    public EntityBaldEagle(EntityType type, Level worldIn) {
         super(type, worldIn);
         switchNavigator(true);
     }
@@ -116,7 +116,7 @@ public class EntityBaldEagle extends TamableAnimal implements IFollower, IFalcon
         this.goalSelector.addGoal(3, new AITackle());
         this.goalSelector.addGoal(4, new AILandOnGlove());
         this.goalSelector.addGoal(5, new BreedGoal(this, 1.0D));
-        this.goalSelector.addGoal(6, new TemptGoal(this, 1.1D, Ingredient.fromValues(Stream.of(new Ingredient.TagValue(AMTagRegistry.BALD_EAGLE_TAMEABLES), new Ingredient.TagValue(AMTagRegistry.BALD_EAGLE_FOODSTUFFS))), false));
+        this.goalSelector.addGoal(6, new TemptGoal(this, 1.1D, Ingredient.of(Items.COD, Items.SALMON, Items.TROPICAL_FISH, Items.ROTTEN_FLESH), false));
         this.goalSelector.addGoal(7, new AIWanderIdle());
         this.goalSelector.addGoal(8, new LookAtPlayerGoal(this, Player.class, 6.0F) {
             @Override
@@ -133,7 +133,7 @@ public class EntityBaldEagle extends TamableAnimal implements IFollower, IFalcon
         this.targetSelector.addGoal(1, new OwnerHurtByTargetGoal(this));
         this.targetSelector.addGoal(2, new OwnerHurtTargetGoal(this));
         this.targetSelector.addGoal(3, (new AnimalAIHurtByTargetNotBaby(this)));
-        this.targetSelector.addGoal(4, new EntityAINearestTarget3D(this, LivingEntity.class, 55, true, true, AMEntityRegistry.buildPredicateFromTag(AMTagRegistry.BALD_EAGLE_TARGETS)) {
+        this.targetSelector.addGoal(4, new EntityAINearestTarget3D(this, LivingEntity.class, 55, true, true, (entity, level) -> (entity instanceof AbstractFish || entity instanceof Monster)) {
             public boolean canUse() {
                 return super.canUse() && !EntityBaldEagle.this.isLaunched() && EntityBaldEagle.this.getCommand() == 0;
             }
@@ -157,25 +157,10 @@ public class EntityBaldEagle extends TamableAnimal implements IFollower, IFalcon
         return true;
     }
 
-    public boolean isAlliedTo(Entity entityIn) {
-        if (this.isTame()) {
-            LivingEntity livingentity = this.getOwner();
-            if (entityIn == livingentity) {
-                return true;
-            }
-            if (entityIn instanceof TamableAnimal) {
-                return ((TamableAnimal) entityIn).isOwnedBy(livingentity);
-            }
-            if (livingentity != null) {
-                return livingentity.isAlliedTo(entityIn);
-            }
-        }
 
-        return super.isAlliedTo(entityIn);
-    }
 
     public boolean isFood(ItemStack stack) {
-        return stack.is(AMTagRegistry.BALD_EAGLE_BREEDABLES);
+        return stack.is(Items.COD) || stack.is(Items.SALMON) || stack.is(Items.TROPICAL_FISH);
     }
 
     private void switchNavigator(boolean onLand) {
@@ -190,40 +175,24 @@ public class EntityBaldEagle extends TamableAnimal implements IFollower, IFalcon
         }
     }
 
-    public boolean save(CompoundTag compound) {
-        String s = this.getEncodeId();
-        compound.putString("id", s);
-        super.save(compound);
-        return true;
+
+
+    public void addAdditionalSaveData(net.minecraft.world.level.storage.ValueOutput valueOutput) {
+        super.addAdditionalSaveData(valueOutput);
+        valueOutput.putBoolean("BirdSitting", this.isSitting());
+        valueOutput.putBoolean("Launched", this.isLaunched());
+        valueOutput.putBoolean("HasCap", this.hasCap());
+        valueOutput.putInt("EagleCommand", this.getCommand());
+        valueOutput.putInt("LaunchTime", this.launchTime);
     }
 
-    public boolean saveAsPassenger(CompoundTag compound) {
-        if (!this.isTame()) {
-            return super.saveAsPassenger(compound);
-        } else {
-            String s = this.getEncodeId();
-            compound.putString("id", s);
-            this.saveWithoutId(compound);
-            return true;
-        }
-    }
-
-    public void addAdditionalSaveData(CompoundTag compound) {
-        super.addAdditionalSaveData(compound);
-        compound.putBoolean("BirdSitting", this.isSitting());
-        compound.putBoolean("Launched", this.isLaunched());
-        compound.putBoolean("HasCap", this.hasCap());
-        compound.putInt("EagleCommand", this.getCommand());
-        compound.putInt("LaunchTime", this.launchTime);
-    }
-
-    public void readAdditionalSaveData(CompoundTag compound) {
-        super.readAdditionalSaveData(compound);
-        this.setOrderedToSit(compound.getBoolean("BirdSitting"));
-        this.setLaunched(compound.getBoolean("Launched"));
-        this.setCap(compound.getBoolean("HasCap"));
-        this.setCommand(compound.getInt("EagleCommand"));
-        this.launchTime = compound.getInt("LaunchTime");
+    public void readAdditionalSaveData(net.minecraft.world.level.storage.ValueInput valueInput) {
+        super.readAdditionalSaveData(valueInput);
+        this.setOrderedToSit(valueInput.getBooleanOr("BirdSitting", false));
+        this.setLaunched(valueInput.getBooleanOr("Launched", false));
+        this.setCap(valueInput.getBooleanOr("HasCap", false));
+        this.setCommand(valueInput.getIntOr("EagleCommand", 0));
+        this.launchTime = valueInput.getIntOr("LaunchTime", 0);
     }
 
     public void travel(Vec3 vec3d) {
@@ -327,26 +296,25 @@ public class EntityBaldEagle extends TamableAnimal implements IFollower, IFalcon
     }
 
     @Override
-    public boolean isInvulnerableTo(DamageSource source) {
-        return source.is(DamageTypes.IN_WALL) || super.isInvulnerableTo(source);
+    public boolean isInvulnerableTo(ServerLevel level, DamageSource source) {
+        return source.is(DamageTypes.IN_WALL) || super.isInvulnerableTo(level, source);
     }
 
     public InteractionResult mobInteract(Player player, InteractionHand hand) {
         ItemStack itemstack = player.getItemInHand(hand);
         Item item = itemstack.getItem();
         InteractionResult type = super.mobInteract(player, hand);
-        if (itemstack.is(AMTagRegistry.BALD_EAGLE_FOODSTUFFS) && this.getHealth() < this.getMaxHealth()) {
-            this.heal(10);
-            if (!player.isCreative()) {
-                itemstack.shrink(1);
+        if (itemstack.is(Items.COD) || itemstack.is(Items.SALMON) || itemstack.is(Items.ROTTEN_FLESH)) {
+            if (this.getHealth() < this.getMaxHealth()) {
+                this.heal(10);
+                if (!player.isCreative()) {
+                    itemstack.shrink(1);
+                }
+                this.level().broadcastEntityEvent(this, (byte) 7);
+                return InteractionResult.CONSUME;
             }
-            this.level().broadcastEntityEvent(this, (byte) 7);
-            return InteractionResult.CONSUME;
-        } else if (itemstack.is(AMTagRegistry.BALD_EAGLE_TAMEABLES)) {
-            if (itemstack.hasCraftingRemainingItem() && !player.getAbilities().instabuild) {
-                ItemEntity itemEntity = new ItemEntity(this.level(), this.getX(), this.getY(), this.getZ(), itemstack.getCraftingRemainingItem());
-                this.level().addFreshEntity(itemEntity);
-            }
+        }
+        if (itemstack.is(Items.COD) || itemstack.is(Items.SALMON) || itemstack.is(Items.TROPICAL_FISH)) {
             if (!player.isCreative()) {
                 itemstack.shrink(1);
             }
@@ -829,8 +797,8 @@ public class EntityBaldEagle extends TamableAnimal implements IFollower, IFalcon
     }
 
 
-    protected boolean hurtServer(ServerLevel level, DamageSource source, float amount) {
-        if (this.isInvulnerableTo(source)) {
+    public boolean hurtServer(ServerLevel level, DamageSource source, float amount) {
+        if (this.isInvulnerableTo(level, source)) {
             return false;
         } else {
             final Entity entity = source.getEntity();
