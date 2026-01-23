@@ -25304,5 +25304,29 @@
       "anteater_hurt_1"
     ],
     "subtitle": "subtitles.entity.anteater.hurt"
+  },
+  "entity.cachalot_whale.idle": {
+    "sounds": [
+      "minecraft:entity/cachalot_whale/cachalot_whale_idle_0",
+      "minecraft:entity/cachalot_whale/cachalot_whale_idle_1",
+      "minecraft:entity/cachalot_whale/cachalot_whale_idle_2"
+    ],
+    "subtitle": "subtitles.entity.cachalot_whale.ambient"
+  },
+  "entity.cachalot_whale.hurt": {
+    "sounds": [
+      "minecraft:entity/cachalot_whale/cachalot_whale_hurt_0",
+      "minecraft:entity/cachalot_whale/cachalot_whale_hurt_1",
+      "minecraft:entity/cachalot_whale/cachalot_whale_hurt_2"
+    ],
+    "subtitle": "subtitles.entity.cachalot_whale.hurt"
+  },
+  "entity.cachalot_whale.click": {
+    "sounds": [
+      "minecraft:entity/cachalot_whale/cachalot_whale_click_0",
+      "minecraft:entity/cachalot_whale/cachalot_whale_click_1",
+      "minecraft:entity/cachalot_whale/cachalot_whale_click_2"
+    ],
+    "subtitle": "subtitles.entity.cachalot_whale.click"
   }
 }

@@ -93,6 +93,8 @@ public class EntityRenderers {
 		register(EntityType.BOGGED, BoggedRenderer::new);
 		register(EntityType.BREEZE, BreezeRenderer::new);
 		register(EntityType.BUNFUNGUS, com.github.alexthe666.alexsmobs.client.render.RenderBunfungus::new);
+		register(EntityType.CACHALOT_WHALE, com.github.alexthe666.alexsmobs.client.render.RenderCachalotWhale::new);
+		register(EntityType.CACHALOT_ECHO, com.github.alexthe666.alexsmobs.client.render.RenderCachalotEcho::new);
 		register(EntityType.BREEZE_WIND_CHARGE, WindChargeRenderer::new);
 		register(EntityType.CAMEL, CamelRenderer::new);
 		register(EntityType.CATFISH, com.github.alexthe666.alexsmobs.client.render.RenderCatfish::new);

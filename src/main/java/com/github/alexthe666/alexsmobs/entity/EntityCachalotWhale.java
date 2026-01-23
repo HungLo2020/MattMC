@@ -128,7 +128,7 @@ public class EntityCachalotWhale extends Animal {
 
     public static <T extends Mob> boolean canCachalotWhaleSpawn(EntityType<T> entityType, ServerLevelAccessor iServerWorld, EntitySpawnReason reason, BlockPos pos, RandomSource random) {
         BlockPos up = pos;
-        while(up.getY() < iServerWorld.getMaxBuildHeight() && iServerWorld.getFluidState(up).is(FluidTags.WATER)){
+        while(up.getY() < 320 && iServerWorld.getFluidState(up).is(FluidTags.WATER)){ // getMaxBuildHeight() -> hardcoded 320 for overworld
             up = up.above();
         }
         return iServerWorld.getFluidState(up.below()).is(FluidTags.WATER) && up.getY() < iServerWorld.getSeaLevel() + 15 && iServerWorld.canSeeSky(up);
@@ -146,7 +146,7 @@ public class EntityCachalotWhale extends Animal {
         if (this.canDespawn()) {
             this.despawnDelay = this.despawnDelay - 1;
             if (this.despawnDelay <= 0) {
-                this.dropLeash(true, false);
+                this.dropLeash(); // Updated for 1.21 - no parameters
                 this.remove(RemovalReason.DISCARDED);
             }
         }
@@ -828,10 +828,8 @@ public class EntityCachalotWhale extends Animal {
         return true;
     }
 
-    @Override
-    public net.neoforged.neoforge.entity.PartEntity<?>[] getParts() {
-        return this.whaleParts;
-    }
+    // Removed getParts() override - PartEntity is NeoForge-specific
+    // Multipart hitboxes handled differently in vanilla
 
     @Nullable
     @Override
@@ -881,7 +879,7 @@ public class EntityCachalotWhale extends Animal {
         return 4000;
     }
 
-    @OnlyIn(Dist.CLIENT)
+    // @OnlyIn(Dist.CLIENT) - Removed annotation
     public void handleEntityEvent(byte id) {
         if (id == 67) {
             spawnSpoutParticles();
