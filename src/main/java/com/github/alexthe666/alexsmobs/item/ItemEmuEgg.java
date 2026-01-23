@@ -30,7 +30,9 @@ public class ItemEmuEgg extends Item implements ProjectileItem {
             null, player.getX(), player.getY(), player.getZ(), SoundEvents.EGG_THROW, SoundSource.PLAYERS, 0.5F, 0.4F / (level.getRandom().nextFloat() * 0.4F + 0.8F)
         );
         if (level instanceof ServerLevel serverLevel) {
-            Projectile.spawnProjectileFromRotation(EntityEmuEgg::new, serverLevel, itemStack, player, 0.0F, 1.5F, 1.0F);
+            EntityEmuEgg egg = new EntityEmuEgg(level, player);
+            egg.shootFromRotation(player, player.getXRot(), player.getYRot(), 0.0F, 1.5F, 1.0F);
+            level.addFreshEntity(egg);
         }
 
         player.awardStat(Stats.ITEM_USED.get(this));

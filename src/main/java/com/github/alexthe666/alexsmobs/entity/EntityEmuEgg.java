@@ -7,6 +7,7 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.EntitySpawnReason;
 import net.minecraft.world.entity.projectile.ThrowableItemProjectile;
 import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.HitResult;
@@ -18,11 +19,11 @@ public class EntityEmuEgg extends ThrowableItemProjectile {
     }
 
     public EntityEmuEgg(Level worldIn, LivingEntity throwerIn) {
-        super(EntityType.EMU_EGG, throwerIn, worldIn);
+        super(EntityType.EMU_EGG, throwerIn, worldIn, new ItemStack(Items.EMU_EGG));
     }
 
     public EntityEmuEgg(Level worldIn, double x, double y, double z) {
-        super(EntityType.EMU_EGG, x, y, z, worldIn);
+        super(EntityType.EMU_EGG, x, y, z, worldIn, new ItemStack(Items.EMU_EGG));
     }
 
     @Override
@@ -53,7 +54,7 @@ public class EntityEmuEgg extends ThrowableItemProjectile {
                             lvt_4_1_.setVariant(1);
                         }
                         lvt_4_1_.setAge(-24000);
-                        lvt_4_1_.moveTo(this.getX(), this.getY(), this.getZ(), this.getYRot(), 0.0F);
+                        lvt_4_1_.setPos(this.getX(), this.getY(), this.getZ());
                         this.level().addFreshEntity(lvt_4_1_);
                     }
                 }

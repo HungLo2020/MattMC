@@ -6,6 +6,8 @@ import com.github.alexthe666.citadel.animation.Animation;
 import com.github.alexthe666.citadel.animation.AnimationHandler;
 import com.github.alexthe666.citadel.animation.IAnimatedEntity;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
@@ -34,6 +36,8 @@ import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LevelAccessor;
 import net.minecraft.world.level.ServerLevelAccessor;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
 import net.minecraft.world.phys.Vec3;
 
 import javax.annotation.Nullable;
@@ -103,17 +107,14 @@ public class EntityEmu extends Animal implements IAnimatedEntity, IHerdPanic {
     protected void registerGoals() {
         this.goalSelector.addGoal(0, new FloatGoal(this));
         this.goalSelector.addGoal(1, new MeleeAttackGoal(this, 1.3D, true){
-            @Override
             protected double getAttackReachSqr(LivingEntity attackTarget) {
                 return EntityEmu.this.getBbWidth() * 2.0F * EntityEmu.this.getBbWidth() * 2.0F + attackTarget.getBbWidth() + 2.5;
             }
 
-            @Override
             public boolean canUse() {
                 return super.canUse() && EntityEmu.this.revengeCooldown <= 0;
             }
 
-            @Override
             public boolean canContinueToUse() {
                 return super.canContinueToUse() && EntityEmu.this.revengeCooldown <= 0;
             }
@@ -121,7 +122,7 @@ public class EntityEmu extends Animal implements IAnimatedEntity, IHerdPanic {
         this.goalSelector.addGoal(2, new AnimalAIHerdPanic(this, 1.5D));
         this.goalSelector.addGoal(3, new BreedGoal(this, 1.0D));
         this.goalSelector.addGoal(4, new FollowParentGoal(this, 1.1D));
-        this.goalSelector.addGoal(4, new TemptGoal(this, 1.1D, Ingredient.of(ItemTags.CHICKEN_FOOD), false));
+        this.goalSelector.addGoal(4, new TemptGoal(this, 1.1D, itemStack -> itemStack.is(ItemTags.CHICKEN_FOOD), false));
         this.goalSelector.addGoal(5, new AnimalAIWanderRanged(this, 110, 1.0D, 10, 7));
         this.goalSelector.addGoal(6, new LookAtPlayerGoal(this, Player.class, 15.0F));
         this.goalSelector.addGoal(7, new RandomLookAroundGoal(this));
@@ -142,24 +143,21 @@ public class EntityEmu extends Animal implements IAnimatedEntity, IHerdPanic {
     }
 
     @Override
-    public boolean hurt(DamageSource source, float amount) {
-        boolean prev = super.hurt(source, amount);
-        if (prev) {
-            double range = 15;
-            int fleeTime = 100 + getRandom().nextInt(5);
-            this.revengeCooldown = fleeTime;
-            List<? extends EntityEmu> list = this.level().getEntitiesOfClass(this.getClass(), this.getBoundingBox().inflate(range, range / 2, range));
-            for (EntityEmu emu : list) {
-                emu.revengeCooldown = fleeTime;
-                if(emu.isBaby() && random.nextInt(2) == 0){
-                    emu.emuAttackedDirectly = this.getLastHurtByMob() != null;
-                    emu.revengeCooldown = emu.emuAttackedDirectly ? 10 + getRandom().nextInt(30) : fleeTime;
-                }
+    protected void actuallyHurt(ServerLevel serverLevel, DamageSource source, float amount) {
+        super.actuallyHurt(serverLevel, source, amount);
+        double range = 15;
+        int fleeTime = 100 + getRandom().nextInt(5);
+        this.revengeCooldown = fleeTime;
+        List<? extends EntityEmu> list = this.level().getEntitiesOfClass(this.getClass(), this.getBoundingBox().inflate(range, range / 2, range));
+        for (EntityEmu emu : list) {
+            emu.revengeCooldown = fleeTime;
+            if(emu.isBaby() && random.nextInt(2) == 0){
+                emu.emuAttackedDirectly = this.getLastHurtByMob() != null;
+                emu.revengeCooldown = emu.emuAttackedDirectly ? 10 + getRandom().nextInt(30) : fleeTime;
             }
-            emuAttackedDirectly = this.getLastHurtByMob() != null;
-            this.revengeCooldown = emuAttackedDirectly ? 10 + getRandom().nextInt(30) : revengeCooldown;
         }
-        return prev;
+        emuAttackedDirectly = this.getLastHurtByMob() != null;
+        this.revengeCooldown = emuAttackedDirectly ? 10 + getRandom().nextInt(30) : revengeCooldown;
     }
 
     @Override
@@ -198,7 +196,9 @@ public class EntityEmu extends Animal implements IAnimatedEntity, IHerdPanic {
         }
         if (!this.level().isClientSide() && this.isAlive() && !this.isBaby() && --this.timeUntilNextEgg <= 0) {
             this.playSound(SoundEvents.CHICKEN_EGG, 1.0F, (this.random.nextFloat() - this.random.nextFloat()) * 0.2F + 1.0F);
-            this.spawnAtLocation(Items.EMU_EGG);
+            if (this.level() instanceof ServerLevel serverLevel) {
+                this.spawnAtLocation(serverLevel, Items.EMU_EGG);
+            }
             this.timeUntilNextEgg = this.random.nextInt(6000) + 6000;
         }
         AnimationHandler.INSTANCE.updateAnimations(this);
@@ -239,7 +239,6 @@ public class EntityEmu extends Animal implements IAnimatedEntity, IHerdPanic {
         return emu;
     }
 
-    @Override
     public boolean doHurtTarget(Entity entityIn) {
         if (this.getAnimation() == NO_ANIMATION) {
             this.setAnimation(ANIMATION_SCRATCH);
@@ -248,19 +247,17 @@ public class EntityEmu extends Animal implements IAnimatedEntity, IHerdPanic {
     }
 
     @Override
-    public void readAdditionalSaveData(CompoundTag compound) {
-        super.readAdditionalSaveData(compound);
-        this.setVariant(compound.getInt("Variant"));
-        if (compound.contains("EggLayTime")) {
-            this.timeUntilNextEgg = compound.getInt("EggLayTime");
-        }
+    protected void readAdditionalSaveData(ValueInput valueInput) {
+        super.readAdditionalSaveData(valueInput);
+        this.setVariant(valueInput.getIntOr("Variant", 0));
+        valueInput.getInt("EggLayTime").ifPresent(integer -> this.timeUntilNextEgg = integer);
     }
 
     @Override
-    public void addAdditionalSaveData(CompoundTag compound) {
-        super.addAdditionalSaveData(compound);
-        compound.putInt("Variant", this.getVariant());
-        compound.putInt("EggLayTime", this.timeUntilNextEgg);
+    protected void addAdditionalSaveData(ValueOutput valueOutput) {
+        super.addAdditionalSaveData(valueOutput);
+        valueOutput.putInt("Variant", this.getVariant());
+        valueOutput.putInt("EggLayTime", this.timeUntilNextEgg);
     }
 
     @Nullable

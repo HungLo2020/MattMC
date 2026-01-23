@@ -108,7 +108,33 @@ public class ModelEmu extends AdvancedEntityModel<EmuRenderState> {
 
     public void animate(EmuRenderState state) {
         this.resetToDefaultPose();
-        animator.update(state);
+        // Create a wrapper to adapt EmuRenderState to IAnimatedEntity interface for animator
+        IAnimatedEntity animatedEntity = new IAnimatedEntity() {
+            @Override
+            public int getAnimationTick() {
+                return state.animationTick;
+            }
+
+            @Override
+            public void setAnimationTick(int tick) {
+            }
+
+            @Override
+            public Animation getAnimation() {
+                return state.currentAnimation;
+            }
+
+            @Override
+            public void setAnimation(Animation animation) {
+            }
+
+            @Override
+            public Animation[] getAnimations() {
+                return new Animation[]{EntityEmu.ANIMATION_DODGE_LEFT, EntityEmu.ANIMATION_DODGE_RIGHT, EntityEmu.ANIMATION_PECK_GROUND, EntityEmu.ANIMATION_SCRATCH, EntityEmu.ANIMATION_PUZZLED};
+            }
+        };
+        
+        animator.update(animatedEntity);
         animator.setAnimation(EntityEmu.ANIMATION_DODGE_RIGHT);
         animator.startKeyframe(4);
         animator.move(body, 0, -5, 0);
@@ -250,7 +276,7 @@ public class ModelEmu extends AdvancedEntityModel<EmuRenderState> {
 
     @Override
     public void setupAnim(EmuRenderState state) {
-        super.setupAnim(state);
+        // Don't call super.setupAnim as it's abstract
         animate(state);
         float limbSwing = state.walkAnimationPos;
         float limbSwingAmount = state.walkAnimationSpeed;
@@ -306,30 +332,6 @@ public class ModelEmu extends AdvancedEntityModel<EmuRenderState> {
         progressRotationPrev(neck1, runProgress, Maths.rad(120), 0, 0, 5F);
         progressRotationPrev(neck2, runProgress, Maths.rad(-60), 0, 0, 5F);
         progressRotationPrev(headPivot, runProgress, Maths.rad(-50), 0, 0, 5F);
-    }
-
-    @Override
-    public void renderToBuffer(PoseStack matrixStackIn, VertexConsumer bufferIn, int packedLightIn, int packedOverlayIn, int color) {
-        if (this.young) {
-            float f = 1.5F;
-            head.setScale(f, f, f);
-            head.setShouldScaleChildren(true);
-            matrixStackIn.pushPose();
-            matrixStackIn.scale(0.35F, 0.35F, 0.35F);
-            matrixStackIn.translate(0.0D, 2.8D, 0D);
-            parts().forEach((p_228292_8_) -> {
-                p_228292_8_.render(matrixStackIn, bufferIn, packedLightIn, packedOverlayIn, color);
-            });
-            matrixStackIn.popPose();
-            head.setScale(1, 1, 1);
-        } else {
-            matrixStackIn.pushPose();
-            parts().forEach((p_228290_8_) -> {
-                p_228290_8_.render(matrixStackIn, bufferIn, packedLightIn, packedOverlayIn, color);
-            });
-            matrixStackIn.popPose();
-        }
-
     }
 
     @Override
