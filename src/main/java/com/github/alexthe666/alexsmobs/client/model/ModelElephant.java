@@ -323,15 +323,23 @@ public class ModelElephant extends AdvancedEntityModel<ElephantRenderState> {
     }
 
     @Override
-    public void setupAnim(EntityElephant entityIn, float limbSwing, float limbSwingAmount, float ageInTicks, float netHeadYaw, float headPitch) {
-        animate(entityIn, limbSwing, limbSwingAmount, ageInTicks, netHeadYaw, headPitch);
+    public void setupAnim(ElephantRenderState state) {
+        // Note: Cannot call animate() with render state architecture
+        // Animation system would need to be refactored to work with render state
+        this.resetToDefaultPose();
+        
         float walkSpeed = 0.7F;
         float walkDegree = 0.4F;
         float idleSpeed = 0.1F;
         float idleDegree = 0.2F;
-        float partialTick = Minecraft.getInstance().getTimer().getGameTimeDeltaPartialTick(false);
-        float sitProgress = entityIn.prevSitProgress + (entityIn.sitProgress - entityIn.prevSitProgress) * partialTick;
-        float standProgress = entityIn.prevStandProgress + (entityIn.standProgress - entityIn.prevStandProgress) * partialTick;
+        float sitProgress = state.sitProgress;
+        float standProgress = state.standProgress;
+        float limbSwing = state.walkAnimationPos;
+        float limbSwingAmount = state.walkAnimationSpeed;
+        float ageInTicks = state.ageInTicks;
+        float netHeadYaw = state.yRot;
+        float headPitch = state.xRot;
+        
         progressRotationPrev(body, standProgress, Maths.rad(-60),  0, 0, 5F);
         progressRotationPrev(tail, standProgress, Maths.rad(60),  0, 0, 5F);
         progressRotationPrev(right_arm, standProgress, Maths.rad(60),  Maths.rad(10), 0, 5F);

@@ -1,33 +1,37 @@
 package com.github.alexthe666.alexsmobs.client.render.layer;
 
 import com.github.alexthe666.alexsmobs.client.model.ModelElephant;
+import com.github.alexthe666.alexsmobs.client.render.ElephantRenderState;
 import com.github.alexthe666.alexsmobs.client.render.RenderElephant;
-import com.github.alexthe666.alexsmobs.entity.EntityElephant;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.math.Axis;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.ItemInHandRenderer;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.entity.layers.RenderLayer;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.ItemDisplayContext;
 import net.minecraft.world.item.ItemStack;
 
-public class LayerElephantItem extends RenderLayer<EntityElephant, ModelElephant> {
+public class LayerElephantItem extends RenderLayer<ElephantRenderState, ModelElephant> {
 
     public LayerElephantItem(RenderElephant render) {
         super(render);
     }
 
-    public void render(PoseStack matrixStackIn, MultiBufferSource bufferIn, int packedLightIn, EntityElephant entitylivingbaseIn, float limbSwing, float limbSwingAmount, float partialTicks, float ageInTicks, float netHeadYaw, float headPitch) {
-        ItemStack itemstack = entitylivingbaseIn.getMainHandItem();
+    public void render(PoseStack matrixStackIn, MultiBufferSource bufferIn, int packedLightIn, ElephantRenderState state, float limbSwing, float limbSwingAmount) {
+        ItemStack itemstack = state.mainHandItem;
+        if (itemstack.isEmpty()) {
+            return;
+        }
         matrixStackIn.pushPose();
-        if(entitylivingbaseIn.isBaby()){
+        if(state.isBaby){
             matrixStackIn.scale(0.35F, 0.35F, 0.35F);
             matrixStackIn.translate(0.0D, 2.8D, 0D);
         }
         matrixStackIn.pushPose();
         translateToHand(matrixStackIn);
-        if(entitylivingbaseIn.isBaby()){
+        if(state.isBaby){
             matrixStackIn.translate(0.0D, 0.2F, -0.22D);
         }
         matrixStackIn.translate(-0.0, 1.0F, 0.15F);
@@ -38,7 +42,8 @@ public class LayerElephantItem extends RenderLayer<EntityElephant, ModelElephant
             matrixStackIn.scale(2, 2, 2);
         }
         ItemInHandRenderer renderer = Minecraft.getInstance().getEntityRenderDispatcher().getItemInHandRenderer();
-        renderer.renderItem(entitylivingbaseIn, itemstack, ItemDisplayContext.GROUND, false, matrixStackIn, bufferIn, packedLightIn);
+        // Note: renderItem needs a LivingEntity, but we only have render state. Using null as fallback.
+        renderer.renderItem(null, itemstack, ItemDisplayContext.GROUND, false, matrixStackIn, bufferIn, packedLightIn);
         matrixStackIn.popPose();
         matrixStackIn.popPose();
     }

@@ -34,6 +34,7 @@ public class RenderElephant extends MobRenderer<EntityElephant, ElephantRenderSt
         state.standing = entity.isStanding();
         state.chested = entity.hasChest();
         state.carpetColor = entity.getCarpetColor();
+        state.mainHandItem = entity.getMainHandItem().copy();
     }
 
     protected void scale(ElephantRenderState state, PoseStack matrixStackIn) {

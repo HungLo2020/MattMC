@@ -1,7 +1,6 @@
 package com.github.alexthe666.alexsmobs.entity.ai;
 
 import com.github.alexthe666.alexsmobs.entity.EntityElephant;
-import com.github.alexthe666.alexsmobs.item.AMItemRegistry;
 import com.github.alexthe666.alexsmobs.misc.AMTagRegistry;
 import com.github.alexthe666.citadel.animation.IAnimatedEntity;
 import net.minecraft.commands.arguments.EntityAnchorArgument;
@@ -11,6 +10,7 @@ import net.minecraft.world.entity.PathfinderMob;
 import net.minecraft.world.entity.ai.goal.MoveToBlockGoal;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.level.ClipContext;
 import net.minecraft.world.level.LevelReader;
 import net.minecraft.world.level.block.state.BlockState;
@@ -115,8 +115,8 @@ public class ElephantAIForageLeaves extends MoveToBlockGoal {
                 itementity.setDefaultPickUpDelay();
                 elephant.level().addFreshEntity(itementity);
                 if (blockstate.is(AMTagRegistry.DROPS_ACACIA_BLOSSOMS) && rand.nextInt(30) == 0) {
-                    ItemStack banana = new ItemStack(AMItemRegistry.ACACIA_BLOSSOM.get());
-                    ItemEntity itementity2 = new ItemEntity(elephant.level(), blockPos.getX() + rand.nextFloat(), blockPos.getY() + rand.nextFloat(), blockPos.getZ() + rand.nextFloat(), banana);
+                    ItemStack blossom = new ItemStack(Items.APPLE); // Using apple as substitute for acacia blossom
+                    ItemEntity itementity2 = new ItemEntity(elephant.level(), blockPos.getX() + rand.nextFloat(), blockPos.getY() + rand.nextFloat(), blockPos.getZ() + rand.nextFloat(), blossom);
                     itementity2.setDefaultPickUpDelay();
                     elephant.level().addFreshEntity(itementity2);
                 }

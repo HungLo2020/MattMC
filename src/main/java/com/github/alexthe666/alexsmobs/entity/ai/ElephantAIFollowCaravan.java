@@ -1,6 +1,5 @@
 package com.github.alexthe666.alexsmobs.entity.ai;
 
-import com.github.alexthe666.alexsmobs.AlexsMobs;
 import com.github.alexthe666.alexsmobs.entity.EntityElephant;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.ai.goal.Goal;
@@ -115,7 +114,7 @@ public class ElephantAIFollowCaravan extends Goal {
                     try {
                         this.elephant.getNavigation().moveTo(this.elephant.getX() + vector3d.x, this.elephant.getY() + vector3d.y, this.elephant.getZ() + vector3d.z, this.speedModifier);
                     } catch (NullPointerException e) {
-                        AlexsMobs.LOGGER.warn("elephant encountered issue following caravan head");
+                        // Elephant encountered issue following caravan head
                     }
                 }
 

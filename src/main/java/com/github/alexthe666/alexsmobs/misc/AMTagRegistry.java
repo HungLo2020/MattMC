@@ -117,6 +117,7 @@ public class AMTagRegistry {
     public static final TagKey<Item> ELEPHANT_FOODSTUFFS = registerItemTag("elephant_foodstuffs");
     public static final TagKey<Item> ELEPHANT_TAMEABLES = registerItemTag("elephant_tameables");
     public static final TagKey<Item> ELEPHANT_BREEDABLES = registerItemTag("elephant_breedables");
+    public static final TagKey<Block> DROPS_ACACIA_BLOSSOMS = registerBlockTag("drops_acacia_blossoms");
 
     private static TagKey<Item> registerItemTag(String name) {
         return TagKey.create(Registries.ITEM, ResourceLocation.withDefaultNamespace(name));
