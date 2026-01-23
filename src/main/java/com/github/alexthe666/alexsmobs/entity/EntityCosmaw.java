@@ -326,9 +326,9 @@ public class EntityCosmaw extends TamableAnimal implements ITargetsDroppedItems,
                     }
                 } else {
                     if (this.getY() < 0F) {
-                        this.getDeltaMovement().add(0, 0.75F, 0);
+                        this.setDeltaMovement(this.getDeltaMovement().add(0, 0.75F, 0));
                     } else if (this.getY() < 80F) {
-                        this.getDeltaMovement().add(0, 0.1F, 0);
+                        this.setDeltaMovement(this.getDeltaMovement().add(0, 0.1F, 0));
                     }
                 }
 
@@ -390,7 +390,11 @@ public class EntityCosmaw extends TamableAnimal implements ITargetsDroppedItems,
     @Nullable
     @Override
     public AgeableMob getBreedOffspring(ServerLevel level, AgeableMob parent) {
-        return (EntityCosmaw) AMEntityRegistry.COSMAW.get().create(level, EntitySpawnReason.BREEDING);
+        Entity entity = AMEntityRegistry.COSMAW.get().create(level, EntitySpawnReason.BREEDING);
+        if (entity instanceof EntityCosmaw cosmaw) {
+            return cosmaw;
+        }
+        return null;
     }
 
     private BlockPos getCosmawGround(BlockPos in) {
@@ -413,8 +417,8 @@ public class EntityCosmaw extends TamableAnimal implements ITargetsDroppedItems,
     public void onGetItem(ItemEntity e) {
         ItemStack duplicate = e.getItem().copy();
         duplicate.setCount(1);
-        if (!this.getItemInHand(InteractionHand.MAIN_HAND).isEmpty() && !this.level().isClientSide()) {
-            this.spawnAtLocation((ServerLevel)level(), this.getItemInHand(InteractionHand.MAIN_HAND));
+        if (!this.getItemInHand(InteractionHand.MAIN_HAND).isEmpty() && level() instanceof ServerLevel serverLevel) {
+            this.spawnAtLocation(serverLevel, this.getItemInHand(InteractionHand.MAIN_HAND));
         }
         this.setItemInHand(InteractionHand.MAIN_HAND, duplicate);
         Entity itemThrower = e.getOwner();
