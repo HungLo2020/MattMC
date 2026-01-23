@@ -34,7 +34,7 @@ public class CapuchinAITargetBalloons extends Goal {
     public static final Predicate<Entity> TARGET_BLOON = (balloon) -> {
         // Use BuiltInRegistries to get entity ID instead of protected getEncodeId()
         String entityId = BuiltInRegistries.ENTITY_TYPE.getKey(balloon.getType()).toString();
-        return entityId != null && (balloon.getType().is(AMTagRegistry.MONKEY_TARGET_WITH_DART) || entityId.contains("balloom"));
+        return entityId != null && (balloon.getType().is(AMTagRegistry.MONKEY_TARGET_WITH_DART) || entityId.contains("balloon"));
     };
 
     public CapuchinAITargetBalloons(EntityCapuchinMonkey mobIn, boolean checkSight) {
