@@ -110,6 +110,7 @@ public class DefaultAttributes {
 		.put(EntityType.BALD_EAGLE, com.github.alexthe666.alexsmobs.entity.EntityBaldEagle.bakeAttributes().build())
 		.put(EntityType.BAT, Bat.createAttributes().build())
 		.put(EntityType.BEE, Bee.createAttributes().build())
+		.put(EntityType.BISON, com.github.alexthe666.alexsmobs.entity.EntityBison.bakeAttributes().build())
 		.put(EntityType.BLAZE, Blaze.createAttributes().build())
 		.put(EntityType.BLOBFISH, EntityBlobfish.createAttributes().build())
 		.put(EntityType.BLUE_JAY, com.github.alexthe666.alexsmobs.entity.EntityBlueJay.bakeAttributes().build())

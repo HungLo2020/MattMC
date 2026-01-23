@@ -13084,6 +13084,21 @@
     ],
     "subtitle": "subtitles.entity.bee.sting"
   },
+  "entity.bison.idle": {
+    "sounds": [
+      "bison_idle_0",
+      "bison_idle_1",
+      "bison_idle_2"
+    ],
+    "subtitle": "subtitles.entity.bison.ambient"
+  },
+  "entity.bison.hurt": {
+    "sounds": [
+      "bison_hurt_0",
+      "bison_hurt_1"
+    ],
+    "subtitle": "subtitles.entity.bison.hurt"
+  },
   "entity.blaze.ambient": {
     "sounds": [
       "mob/blaze/breathe1",

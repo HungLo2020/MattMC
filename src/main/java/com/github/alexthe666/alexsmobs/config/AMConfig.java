@@ -49,4 +49,7 @@ public class AMConfig {
     
     // Anteater spawn configuration
     public static int anteaterSpawnRolls = 2;
+    
+    // Bison spawn configuration
+    public static int bisonSpawnWeight = 15;
 }

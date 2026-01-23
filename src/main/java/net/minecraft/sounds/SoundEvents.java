@@ -178,6 +178,8 @@ public class SoundEvents {
 	public static final SoundEvent BIG_DRIPLEAF_HIT = register("block.big_dripleaf.hit");
 	public static final SoundEvent BIG_DRIPLEAF_PLACE = register("block.big_dripleaf.place");
 	public static final SoundEvent BIG_DRIPLEAF_STEP = register("block.big_dripleaf.step");
+	public static final SoundEvent BISON_IDLE = register("entity.bison.idle");
+	public static final SoundEvent BISON_HURT = register("entity.bison.hurt");
 	public static final SoundEvent BLAZE_AMBIENT = register("entity.blaze.ambient");
 	public static final SoundEvent BLAZE_BURN = register("entity.blaze.burn");
 	public static final SoundEvent BLAZE_DEATH = register("entity.blaze.death");
