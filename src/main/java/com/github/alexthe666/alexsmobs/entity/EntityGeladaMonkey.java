@@ -65,7 +65,7 @@ public class EntityGeladaMonkey extends Animal implements IAnimatedEntity, IHerd
     private int revengeCooldown = 0;
     private boolean hasSpedUp = false;
 
-    protected EntityGeladaMonkey(EntityType type, Level lvl) {
+    public EntityGeladaMonkey(EntityType type, Level lvl) {
         super(type, lvl);
         this.setPathfindingMalus(PathType.WATER, -1.0F);
     }
@@ -116,31 +116,29 @@ public class EntityGeladaMonkey extends Animal implements IAnimatedEntity, IHerd
         this.goalSelector.addGoal(3, new AnimalAIHerdPanic(this, 1.5D));
         this.goalSelector.addGoal(4, new FollowParentGoal(this, 1.1D));
         this.goalSelector.addGoal(5, new BreedGoal(this, 1.0D));
-        this.goalSelector.addGoal(6, new TemptGoal(this, 1.0D, Ingredient.fromValues(Stream.of(new Ingredient.TagValue(AMTagRegistry.GELADA_MONKEY_BREEDABLES), new Ingredient.TagValue(AMTagRegistry.GELADA_MONKEY_LAND_CLEARING_FOODS))), false));
+        this.goalSelector.addGoal(6, new TemptGoal(this, 1.0D, itemStack -> itemStack.is(AMTagRegistry.GELADA_MONKEY_BREEDABLES) || itemStack.is(AMTagRegistry.GELADA_MONKEY_LAND_CLEARING_FOODS), false));
         this.goalSelector.addGoal(7, new GeladaAIGroom(this));
         this.goalSelector.addGoal(8, new RandomStrollGoal(this, 1D, 120));
         this.goalSelector.addGoal(9, new LookAtPlayerGoal(this, Player.class, 6.0F));
         this.goalSelector.addGoal(10, new RandomLookAroundGoal(this));
         this.targetSelector.addGoal(1, hurtByTargetGoal = (new HurtByTargetGoal(this, EntityGeladaMonkey.class).setAlertOthers()));
-        this.targetSelector.addGoal(2, leaderFightGoal = new NearestAttackableTargetGoal<EntityGeladaMonkey>(this, EntityGeladaMonkey.class, 70, false, false, (monkey) -> {
-            return EntityGeladaMonkey.this.isLeader() && EntityGeladaMonkey.this.leaderFightTime == 0 && ((EntityGeladaMonkey) monkey).isLeader() && ((EntityGeladaMonkey) monkey).leaderFightTime == 0;
-        }));
+        this.targetSelector.addGoal(2, leaderFightGoal = new NearestAttackableTargetGoal<EntityGeladaMonkey>(this, EntityGeladaMonkey.class, false));
     }
 
-    public void addAdditionalSaveData(CompoundTag compound) {
-        super.addAdditionalSaveData(compound);
-        compound.putBoolean("Leader", this.isLeader());
-        compound.putInt("GrassTime", this.getClearGrassTime());
-        compound.putInt("FightTime", this.leaderFightTime);
-        compound.putBoolean("MonkeySitting", this.isSitting());
+    public void addAdditionalSaveData(net.minecraft.world.level.storage.ValueOutput valueOutput) {
+        super.addAdditionalSaveData(valueOutput);
+        valueOutput.putBoolean("Leader", this.isLeader());
+        valueOutput.putInt("GrassTime", this.getClearGrassTime());
+        valueOutput.putInt("FightTime", this.leaderFightTime);
+        valueOutput.putBoolean("MonkeySitting", this.isSitting());
     }
 
-    public void readAdditionalSaveData(CompoundTag compound) {
-        super.readAdditionalSaveData(compound);
-        this.setLeader(compound.getBoolean("Leader"));
-        this.setClearGrassTime(compound.getInt("GrassTime"));
-        this.setSitting(compound.getBoolean("MonkeySitting"));
-        this.leaderFightTime = compound.getInt("FightTime");
+    public void readAdditionalSaveData(net.minecraft.world.level.storage.ValueInput valueInput) {
+        super.readAdditionalSaveData(valueInput);
+        this.setLeader(valueInput.getBooleanOr("Leader", false));
+        this.setClearGrassTime(valueInput.getIntOr("GrassTime", 0));
+        this.setSitting(valueInput.getBooleanOr("MonkeySitting", false));
+        this.leaderFightTime = valueInput.getIntOr("FightTime", 0);
     }
 
     public boolean isFood(ItemStack stack) {
@@ -200,7 +198,7 @@ public class EntityGeladaMonkey extends Animal implements IAnimatedEntity, IHerd
                 sitProgress--;
         }
 
-        if (!this.level().isClientSide) {
+        if (!this.level().isClientSide()) {
             if (isSitting() && ++sittingTime > maxSitTime) {
                 this.setSitting(false);
                 sittingTime = 0;
@@ -320,17 +318,13 @@ public class EntityGeladaMonkey extends Animal implements IAnimatedEntity, IHerd
         return new Animation[]{ANIMATION_SWIPE_R, ANIMATION_SWIPE_L, ANIMATION_GROOM, ANIMATION_CHEST};
     }
 
-    public boolean hurt(DamageSource source, float amount) {
-        boolean prev = super.hurt(source, amount);
-        if (prev) {
-            Entity direct = source.getEntity();
-            if (direct instanceof EntityGeladaMonkey) {
-                int fleeTime = 100 + getRandom().nextInt(5);
-                this.revengeCooldown = fleeTime;
-                this.revengeCooldown = 10 + getRandom().nextInt(30);
-            }
+    @Override
+    protected void actuallyHurt(net.minecraft.server.level.ServerLevel serverLevel, DamageSource source, float amount) {
+        super.actuallyHurt(serverLevel, source, amount);
+        Entity direct = source.getEntity();
+        if (direct instanceof EntityGeladaMonkey) {
+            this.revengeCooldown = 10 + getRandom().nextInt(30);
         }
-        return prev;
     }
 
     public InteractionResult mobInteract(Player player, InteractionHand hand) {
@@ -347,7 +341,7 @@ public class EntityGeladaMonkey extends Animal implements IAnimatedEntity, IHerd
     @Nullable
     @Override
     public AgeableMob getBreedOffspring(ServerLevel lvl, AgeableMob mob) {
-        EntityGeladaMonkey baby = AMEntityRegistry.GELADA_MONKEY.get().create(lvl);
+        EntityGeladaMonkey baby = new EntityGeladaMonkey(EntityType.GELADA_MONKEY, lvl);
         baby.setLeader(random.nextInt(2) == 0);
         return baby;
     }

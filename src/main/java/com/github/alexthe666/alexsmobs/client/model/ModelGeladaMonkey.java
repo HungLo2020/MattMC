@@ -1,5 +1,6 @@
 package com.github.alexthe666.alexsmobs.client.model;
 
+import com.github.alexthe666.alexsmobs.client.render.GeladaMonkeyRenderState;
 import com.github.alexthe666.alexsmobs.entity.EntityGeladaMonkey;
 import com.github.alexthe666.alexsmobs.entity.util.Maths;
 import com.github.alexthe666.citadel.animation.IAnimatedEntity;
@@ -9,7 +10,7 @@ import com.github.alexthe666.citadel.client.model.ModelAnimator;
 import com.github.alexthe666.citadel.client.model.basic.BasicModelPart;
 import com.google.common.collect.ImmutableList;
 
-public class ModelGeladaMonkey extends AdvancedEntityModel<EntityGeladaMonkey> {
+public class ModelGeladaMonkey extends AdvancedEntityModel<GeladaMonkeyRenderState> {
 	private final AdvancedModelBox root;
 	private final AdvancedModelBox body;
 	private final AdvancedModelBox tail;
@@ -203,9 +204,17 @@ public class ModelGeladaMonkey extends AdvancedEntityModel<EntityGeladaMonkey> {
 		animator.move(left_arm, 1, 1, -1);
 	}
 	@Override
-	public void setupAnim(EntityGeladaMonkey entity, float limbSwing, float limbSwingAmount, float ageInTicks, float netHeadYaw, float headPitch){
-		animate(entity, limbSwing, limbSwingAmount, ageInTicks, netHeadYaw, headPitch);
-		boolean running = entity.isAggro();
+	public void setupAnim(GeladaMonkeyRenderState renderState){
+		this.resetToDefaultPose();
+		
+		// Extract values from render state
+		float limbSwing = renderState.walkAnimationPos;
+		float limbSwingAmount = renderState.walkAnimationSpeed;
+		float ageInTicks = renderState.ageInTicks;
+		float netHeadYaw = renderState.yRot;
+		float headPitch = renderState.xRot;
+		
+		boolean running = renderState.isAggro;
 		float runSpeed = 0.7F;
 		float runDegree = 0.7F;
 		float walkSpeed = 0.9F;
@@ -213,10 +222,12 @@ public class ModelGeladaMonkey extends AdvancedEntityModel<EntityGeladaMonkey> {
 		float idleSpeed = 0.15F;
 		float idleDegree = 0.5F;
 		float stillProgress = (1F - limbSwingAmount) * 5F;
-		float sitProgress = entity.prevSitProgress + (entity.sitProgress - entity.prevSitProgress) * (ageInTicks - entity.tickCount);
+		float sitProgress = renderState.sitProgress;
+		
 		progressRotationPrev(tail, stillProgress, Maths.rad(-40), 0, 0, 5F);
 		this.swing(tail, idleSpeed, idleDegree, true, 0, 0F, ageInTicks, 1);
 		this.bob(neck, idleSpeed * 0.5F, idleDegree * 0.25F, false, ageInTicks, 1);
+		
 		if(running){
 			this.walk(body, runSpeed, runDegree * 0.2F, true, 0F, 0F, limbSwing, limbSwingAmount);
 			this.walk(tail, runSpeed, runDegree * 0.5F, true, 0F, 0.3F, limbSwing, limbSwingAmount);
@@ -252,9 +263,11 @@ public class ModelGeladaMonkey extends AdvancedEntityModel<EntityGeladaMonkey> {
 		progressPositionPrev(right_leg, sitProgress, 0, -2.5F, 0, 5F);
 		progressPositionPrev(left_arm, sitProgress, 0, 2, 2, 5F);
 		progressPositionPrev(right_arm, sitProgress, 0, 2, 2, 5F);
+		
 		neck.rotateAngleY += netHeadYaw / 57.295776F * 0.5F;
 		neck.rotateAngleX += headPitch / 57.295776F;
-		if(entity.isBaby()){
+		
+		if(renderState.isBaby){
 			head.setScale(1.3F, 1.3F, 1.3F);
 			neck.setScale(1.25F, 1.25F, 1.25F);
 		}else{
