@@ -90,7 +90,7 @@ public class EntityGiantSquid extends WaterAnimal {
     private int holdTime;
     private int resetCapturedStateIn;
 
-    protected EntityGiantSquid(EntityType type, Level level) {
+    public EntityGiantSquid(EntityType type, Level level) {
         super(type, level);
         this.setPathfindingMalus(PathType.WATER, 0.0F);
         this.mantlePart1 = new EntityGiantSquidPart(this, 0.9F, 0.9F);
@@ -150,6 +150,10 @@ public class EntityGiantSquid extends WaterAnimal {
 
     public static AttributeSupplier.Builder bakeAttributes() {
         return Monster.createMonsterAttributes().add(Attributes.MAX_HEALTH, 38.0D).add(Attributes.ATTACK_DAMAGE, 8.0D).add(Attributes.MOVEMENT_SPEED, 0.25F);
+    }
+
+    public static AttributeSupplier.Builder createAttributes() {
+        return bakeAttributes();
     }
 
     @Override
