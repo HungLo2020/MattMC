@@ -37,6 +37,7 @@ public class AMEntityRegistry {
     public static final DeferredEntityHolder ELEPHANT = new DeferredEntityHolder(() -> EntityType.ELEPHANT);
     public static final DeferredEntityHolder EMU = new DeferredEntityHolder(() -> EntityType.EMU);
     public static final DeferredEntityHolder EMU_EGG = new DeferredEntityHolder(() -> EntityType.EMU_EGG);
+    public static final DeferredEntityHolder SPECTRE = new DeferredEntityHolder(() -> EntityType.SPECTRE);
     
     /**
      * Helper method for spawn roll logic

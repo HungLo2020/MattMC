@@ -48,7 +48,7 @@ public class EntitySpectre extends Animal implements FlyingAnimal {
     public float prevBirdPitch = 0;
     public Vec3 lurePos = null;
 
-    public EntitySpectre(EntityType type, Level world) {
+    public EntitySpectre(EntityType<? extends Animal> type, Level world) {
         super(type, world);
         this.moveControl = new MoveHelperController(this);
     }
