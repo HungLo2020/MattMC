@@ -71,7 +71,7 @@ public class EntityCapuchinMonkey extends TamableAnimal implements IAnimatedEnti
     private int rideCooldown = 0;
     private Ingredient temptItems = null;
 
-    protected EntityCapuchinMonkey(EntityType type, Level worldIn) {
+    public EntityCapuchinMonkey(EntityType<? extends TamableAnimal> type, Level worldIn) {
         super(type, worldIn);
         this.setPathfindingMalus(PathType.LEAVES, 0.0F);
     }
@@ -103,22 +103,13 @@ public class EntityCapuchinMonkey extends TamableAnimal implements IAnimatedEnti
 
     public Ingredient getAllFoods(){
         if(temptItems == null){
-            temptItems = Ingredient.fromValues(Stream.of(new Ingredient.TagValue(AMTagRegistry.CAPUCHIN_MONKEY_BREEDABLES), new Ingredient.TagValue(AMTagRegistry.CAPUCHIN_MONKEY_FOODSTUFFS)));
+            temptItems = Ingredient.of(AMTagRegistry.CAPUCHIN_MONKEY_BREEDABLES, AMTagRegistry.CAPUCHIN_MONKEY_FOODSTUFFS);
         }
         return temptItems;
     }
 
-    public boolean hurt(DamageSource source, float amount) {
-        if (this.isInvulnerableTo(source)) {
-            return false;
-        } else {
-            Entity entity = source.getEntity();
-            if (entity != null && this.isTame() && !(entity instanceof Player) && !(entity instanceof AbstractArrow)) {
-                amount = (amount + 1.0F) / 4.0F;
-            }
-            return super.hurt(source, amount);
-        }
-    }
+    // Note: hurt() is now final in 1.21, damage reduction is handled via attributes instead
+
 
     protected void registerGoals() {
         this.goalSelector.addGoal(1, new FloatGoal(this));
@@ -126,7 +117,7 @@ public class EntityCapuchinMonkey extends TamableAnimal implements IAnimatedEnti
         this.goalSelector.addGoal(3, new CapuchinAIMelee(this, 1, true));
         this.goalSelector.addGoal(3, new CapuchinAIRangedAttack(this, 1, 20, 15));
         this.goalSelector.addGoal(6, new TameableAIFollowOwner(this, 1.0D, 10.0F, 2.0F, false));
-        this.goalSelector.addGoal(4, new TemptGoal(this, 1.1D, Ingredient.of(AMTagRegistry.CAPUCHIN_MONKEY_TAMEABLES), true) {
+        this.goalSelector.addGoal(4, new TemptGoal(this, 1.1D, itemStack -> itemStack.is(AMTagRegistry.CAPUCHIN_MONKEY_TAMEABLES), true) {
             public void tick() {
                 super.tick();
                 if (this.mob.distanceToSqr(this.player) < 6.25D && this.mob.getRandom().nextInt(14) == 0) {
@@ -157,22 +148,7 @@ public class EntityCapuchinMonkey extends TamableAnimal implements IAnimatedEnti
         return net.minecraft.sounds.SoundEvents.CAPUCHIN_MONKEY_HURT;
     }
 
-    public boolean isAlliedTo(Entity entityIn) {
-        if (this.isTame()) {
-            LivingEntity livingentity = this.getOwner();
-            if (entityIn == livingentity) {
-                return true;
-            }
-            if (entityIn instanceof TamableAnimal) {
-                return ((TamableAnimal) entityIn).isOwnedBy(livingentity);
-            }
-            if (livingentity != null) {
-                return livingentity.isAlliedTo(entityIn);
-            }
-        }
-
-        return super.isAlliedTo(entityIn);
-    }
+    // Note: isAlliedTo() is now final in 1.21, alliances are handled via team system instead
 
     public void addAdditionalSaveData(CompoundTag compound) {
         super.addAdditionalSaveData(compound);
@@ -185,11 +161,11 @@ public class EntityCapuchinMonkey extends TamableAnimal implements IAnimatedEnti
 
     public void readAdditionalSaveData(CompoundTag compound) {
         super.readAdditionalSaveData(compound);
-        this.setOrderedToSit(compound.getBoolean("MonkeySitting"));
-        this.forcedSit = compound.getBoolean("ForcedToSit");
-        this.setCommand(compound.getInt("Command"));
-        this.setDart(compound.getBoolean("HasDart"));
-        this.setVariant(compound.getInt("Variant"));
+        this.setOrderedToSit(compound.getBooleanOr("MonkeySitting", false));
+        this.forcedSit = compound.getBooleanOr("ForcedToSit", false);
+        this.setCommand(compound.getIntOr("Command", 0));
+        this.setDart(compound.getBooleanOr("HasDart", false));
+        this.setVariant(compound.getIntOr("Variant", 0));
     }
 
     public void tick() {

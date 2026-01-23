@@ -27,11 +27,14 @@ public class EntityTossedItem extends ThrowableItemProjectile {
     }
 
     public EntityTossedItem(Level worldIn, LivingEntity throwerIn) {
-        super(EntityType.TOSSED_ITEM, throwerIn, worldIn);
+        super(EntityType.TOSSED_ITEM, worldIn);
+        this.setOwner(throwerIn);
+        this.setPos(throwerIn.getX(), throwerIn.getEyeY() - 0.1, throwerIn.getZ());
     }
 
     public EntityTossedItem(Level worldIn, double x, double y, double z) {
-        super(EntityType.TOSSED_ITEM, x, y, z, worldIn);
+        super(EntityType.TOSSED_ITEM, worldIn);
+        this.setPos(x, y, z);
     }
 
     @Override
@@ -103,12 +106,12 @@ public class EntityTossedItem extends ThrowableItemProjectile {
 
     public void addAdditionalSaveData(CompoundTag compound) {
         super.addAdditionalSaveData(compound);
-        compound.putBoolean("Dart", this.isDart());
+        compound.put("Dart", this.isDart());
     }
 
     public void readAdditionalSaveData(CompoundTag compound) {
         super.readAdditionalSaveData(compound);
-        this.setDart(compound.getBoolean("Dart"));
+        this.setDart(compound.getBooleanOr("Dart", false));
     }
 
     protected void onHit(HitResult result) {
