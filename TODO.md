@@ -26,16 +26,16 @@
     anteater (NEEDS ANT AND ANT BLOCKS ADN BLOCK ENTITYIES)
     bald eagle
     bunfungus
-bison
-cachalot whale
-caiman
-capuchin monkey
-cosmaw
-elephant
-emu
-frilled shark
-gelada monkey
-giant squid
+    bison
+    cachalot whale
+    caiman
+    capuchin monkey
+    cosmaw
+    elephant
+    emu
+    frilled shark
+    gelada monkey
+    giant squid
 gorilla
 kangaroo
 leafcutter ant
