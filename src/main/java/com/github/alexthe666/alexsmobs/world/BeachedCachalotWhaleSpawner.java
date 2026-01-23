@@ -90,7 +90,7 @@ public class BeachedCachalotWhaleSpawner {
                     whale.setBeached(true);
                     AMWorldData worldinfo = AMWorldData.get(world);
                     worldinfo.setBeachedCachalotID(whale.getUUID());
-                    whale.restrictTo(upPos, 16);
+                    whale.setHomeTo(upPos, 16);
                     whale.setDespawnBeach(true);
                     world.addFreshEntity(whale);
                 }

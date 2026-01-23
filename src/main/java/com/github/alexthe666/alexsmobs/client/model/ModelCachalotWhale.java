@@ -106,6 +106,15 @@ public class ModelCachalotWhale extends AdvancedEntityModel<CachalotWhaleRenderS
 		float grabProgress = renderState.grabProgress;
 		int grabTime = renderState.grabTime;
 		
+		// Handle baby scaling
+		if (renderState.isBaby) {
+			float f = 1.25F;
+			head.setScale(f, f, f);
+			head.setShouldScaleChildren(true);
+		} else {
+			head.setScale(1, 1, 1);
+		}
+		
 		// Get movement offsets from render state
 		float renderYaw = (float)renderState.movementOffsets[0][0];
 		float properPitch = renderState.xRot;
@@ -156,30 +165,6 @@ public class ModelCachalotWhale extends AdvancedEntityModel<CachalotWhaleRenderS
 			this.tail1.rotationPointZ -= 4 * limbSwingAmount;
 			this.tail2.rotationPointZ -= 2 * limbSwingAmount;
 		}
-	}
-
-	@Override
-	public void renderToBuffer(PoseStack matrixStackIn, VertexConsumer bufferIn, int packedLightIn, int packedOverlayIn, int color) {
-		if (this.young) {
-			float f = 1.25F;
-			head.setScale(f, f, f);
-			head.setShouldScaleChildren(true);
-			matrixStackIn.pushPose();
-			matrixStackIn.scale(0.5F, 0.5F, 0.5F);
-			matrixStackIn.translate(0.0D, 1.5D, 0.125D);
-			parts().forEach((p_228292_8_) -> {
-				p_228292_8_.render(matrixStackIn, bufferIn, packedLightIn, packedOverlayIn, -1);
-			});
-			matrixStackIn.popPose();
-			head.setScale(1, 1, 1);
-		} else {
-			matrixStackIn.pushPose();
-			parts().forEach((p_228290_8_) -> {
-				p_228290_8_.render(matrixStackIn, bufferIn, packedLightIn, packedOverlayIn, -1);
-			});
-			matrixStackIn.popPose();
-		}
-
 	}
 	public void setRotationAngle(AdvancedModelBox AdvancedModelBox, float x, float y, float z) {
 		AdvancedModelBox.rotateAngleX = x;

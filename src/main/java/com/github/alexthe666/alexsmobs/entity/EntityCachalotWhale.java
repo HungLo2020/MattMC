@@ -826,7 +826,6 @@ public class EntityCachalotWhale extends Animal {
         part.setPos(this.getX() + offsetX * part.scale, this.getY() + offsetY * part.scale, this.getZ() + offsetZ * part.scale);
     }
 
-    @Override
     public boolean isMultipartEntity() {
         return true;
     }
@@ -845,7 +844,8 @@ public class EntityCachalotWhale extends Animal {
     }
 
     public boolean attackEntityPartFrom(EntityCachalotPart entityCachalotPart, DamageSource source, float amount) {
-        return this.hurt(source, amount);
+        this.hurt(source, amount);
+        return true;
     }
 
     @Nullable
@@ -917,7 +917,7 @@ public class EntityCachalotWhale extends Animal {
     public Vec3 getDismountLocationForPassenger(LivingEntity dismount) {
         Vec3 mouth = this.getMouthVec();
         BlockPos pos = AMBlockPos.fromVec3(mouth);
-        while(!level().isEmptyBlock(pos) && !level().isWaterAt(pos) && pos.getY() < level().getMaxBuildHeight()){
+        while(!level().isEmptyBlock(pos) && !level().isWaterAt(pos) && pos.getY() < 320){
             pos = pos.above();
         }
         return new Vec3(mouth.x, pos.getY() + 0.5F, mouth.z);

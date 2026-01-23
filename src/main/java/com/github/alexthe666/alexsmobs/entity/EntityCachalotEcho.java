@@ -1,11 +1,14 @@
 package com.github.alexthe666.alexsmobs.entity;
 
-import net.minecraft.nbt.CompoundTag;
+import net.minecraft.world.level.storage.ValueOutput;
+import net.minecraft.world.level.storage.ValueInput;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.Mth;
+import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
@@ -103,7 +106,7 @@ public class EntityCachalotEcho extends Entity {
                 whale.recieveEcho();
             }
         }
-        if (!playerLaunched && !this.level().isClientSide && !this.isInWaterOrBubble()) {
+        if (!playerLaunched && !this.level().isClientSide() && !this.isInWater()) {
             remove(RemovalReason.DISCARDED);
         }
         if (this.tickCount > 100) {
@@ -148,7 +151,7 @@ public class EntityCachalotEcho extends Entity {
                 this.remove(RemovalReason.DISCARDED);
                 echo.setReturning(true);
                 echo.shoot(d0, d1, d2, 1, 0);
-                if (!this.level().isClientSide) {
+                if (!this.level().isClientSide()) {
                     level().addFreshEntity(echo);
                 }
             }
@@ -156,7 +159,7 @@ public class EntityCachalotEcho extends Entity {
     }
 
     protected void onHitBlock(BlockHitResult p_230299_1_) {
-        if (!this.level().isClientSide && !playerLaunched) {
+        if (!this.level().isClientSide() && !playerLaunched) {
             this.remove(RemovalReason.DISCARDED);
         }
     }
@@ -185,26 +188,35 @@ public class EntityCachalotEcho extends Entity {
         }
     }
 
-    protected void addAdditionalSaveData(CompoundTag compound) {
+    @Override
+    public boolean hurtServer(ServerLevel level, DamageSource source, float amount) {
+        // Echo entities don't take damage
+        return false;
+    }
+
+    protected void addAdditionalSaveData(ValueOutput valueOutput) {
         if (this.ownerUUID != null) {
-            compound.putUUID("Owner", this.ownerUUID);
+            valueOutput.putLong("OwnerMost", this.ownerUUID.getMostSignificantBits());
+            valueOutput.putLong("OwnerLeast", this.ownerUUID.getLeastSignificantBits());
         }
 
         if (this.leftOwner) {
-            compound.putBoolean("LeftOwner", true);
+            valueOutput.putBoolean("LeftOwner", true);
         }
-        compound.putBoolean("Green", isGreen());
+        valueOutput.putBoolean("Green", isGreen());
     }
 
     /**
      * (abstract) Protected helper method to read subclass entity data from NBT.
      */
-    protected void readAdditionalSaveData(CompoundTag compound) {
-        if (compound.hasUUID("Owner")) {
-            this.ownerUUID = compound.getUUID("Owner");
+    protected void readAdditionalSaveData(ValueInput valueInput) {
+        if (valueInput.getLong("OwnerMost").isPresent() && valueInput.getLong("OwnerLeast").isPresent()) {
+            long most = valueInput.getLongOr("OwnerMost", 0L);
+            long least = valueInput.getLongOr("OwnerLeast", 0L);
+            this.ownerUUID = new UUID(most, least);
         }
-        this.setGreen(compound.getBoolean("Green"));
-        this.leftOwner = compound.getBoolean("LeftOwner");
+        this.setGreen(valueInput.getBooleanOr("Green", false));
+        this.leftOwner = valueInput.getBooleanOr("LeftOwner", false);
     }
 
     private boolean checkLeftOwner() {

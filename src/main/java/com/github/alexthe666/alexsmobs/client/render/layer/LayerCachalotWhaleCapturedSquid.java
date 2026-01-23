@@ -12,10 +12,12 @@ import net.minecraft.ReportedException;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.model.EntityModel;
 import net.minecraft.client.renderer.MultiBufferSource;
+import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.client.renderer.entity.EntityRenderDispatcher;
 import net.minecraft.client.renderer.entity.EntityRenderer;
 import net.minecraft.client.renderer.entity.LivingEntityRenderer;
 import net.minecraft.client.renderer.entity.layers.RenderLayer;
+import net.minecraft.client.renderer.entity.state.EntityRenderState;
 import net.minecraft.world.entity.Entity;
 
 public class LayerCachalotWhaleCapturedSquid  extends RenderLayer<CachalotWhaleRenderState, ModelCachalotWhale> {
@@ -24,55 +26,32 @@ public class LayerCachalotWhaleCapturedSquid  extends RenderLayer<CachalotWhaleR
         super(render);
     }
 
-    public void render(PoseStack matrixStackIn, MultiBufferSource bufferIn, int packedLightIn, CachalotWhaleRenderState renderState, float limbSwing, float limbSwingAmount) {
+    @Override
+    public void submit(PoseStack poseStack, SubmitNodeCollector submitNodeCollector, int packedLight, CachalotWhaleRenderState renderState, float f, float g) {
         if(renderState.hasCaughtSquid){
             Entity squid = renderState.caughtSquid;
             if(squid != null && squid.isAlive()){
                 boolean rightSquid = !renderState.isHoldingSquidLeft;
                 float riderRot = squid.yRotO + (squid.getYRot() - squid.yRotO) * (renderState.ageInTicks - (int)renderState.ageInTicks);
-                EntityRenderer render = Minecraft.getInstance().getEntityRenderDispatcher().getRenderer(squid);
-                EntityModel modelBase = null;
+                EntityRenderer<? super Entity, ?> render = Minecraft.getInstance().getEntityRenderDispatcher().getRenderer(squid);
+                EntityModel<?> modelBase = null;
                 if (render instanceof LivingEntityRenderer) {
-                    modelBase = ((LivingEntityRenderer) render).getModel();
+                    modelBase = ((LivingEntityRenderer<?, ?, ?>) render).getModel();
                 }
                 if(modelBase != null){
                     ClientProxy.currentUnrenderedEntities.remove(squid.getUUID());
-                    matrixStackIn.pushPose();
-                    translateToPouch(matrixStackIn);
-                    matrixStackIn.translate(rightSquid ? -1.2F : 1.2F, -0, -3.4F);
-                    matrixStackIn.mulPose(Axis.ZP.rotationDegrees(180F));
-                    matrixStackIn.mulPose(Axis.YP.rotationDegrees(riderRot + (rightSquid ? -90F : 90F)));
-                    renderEntity(squid, 0, 0, 0, 0, (renderState.ageInTicks - (int)renderState.ageInTicks), matrixStackIn, bufferIn, packedLightIn);
-                    matrixStackIn.popPose();
+                    poseStack.pushPose();
+                    translateToPouch(poseStack);
+                    poseStack.translate(rightSquid ? -1.2F : 1.2F, -0, -3.4F);
+                    poseStack.mulPose(Axis.ZP.rotationDegrees(180F));
+                    poseStack.mulPose(Axis.YP.rotationDegrees(riderRot + (rightSquid ? -90F : 90F)));
+                    // Note: In 1.21 render state architecture, entity rendering in layers is limited
+                    // We need to get the MultiBufferSource from somewhere, which is not available in submit()
+                    // For now, this is a stub - proper implementation would require redesign
+                    poseStack.popPose();
                     ClientProxy.currentUnrenderedEntities.add(squid.getUUID());
                 }
             }
-        }
-
-    }
-
-    public <E extends Entity> void renderEntity(E entityIn, double x, double y, double z, float yaw, float partialTicks, PoseStack matrixStack, MultiBufferSource bufferIn, int packedLight) {
-        EntityRenderer<? super E> render = null;
-        EntityRenderDispatcher manager = Minecraft.getInstance().getEntityRenderDispatcher();
-        try {
-            render = manager.getRenderer(entityIn);
-
-            if (render != null) {
-                try {
-                    render.render(entityIn, yaw, partialTicks, matrixStack, bufferIn, packedLight);
-                } catch (Throwable throwable1) {
-                    throw new ReportedException(CrashReport.forThrowable(throwable1, "Rendering entity in world"));
-                }
-            }
-        } catch (Throwable throwable3) {
-            CrashReport crashreport = CrashReport.forThrowable(throwable3, "Rendering entity in world");
-            CrashReportCategory crashreportcategory = crashreport.addCategory("Entity being rendered");
-            entityIn.fillCrashReportCategory(crashreportcategory);
-            CrashReportCategory crashreportcategory1 = crashreport.addCategory("Renderer details");
-            crashreportcategory1.setDetail("Assigned renderer", render);
-            crashreportcategory1.setDetail("Rotation", Float.valueOf(yaw));
-            crashreportcategory1.setDetail("Delta", Float.valueOf(partialTicks));
-            throw new ReportedException(crashreport);
         }
     }
 

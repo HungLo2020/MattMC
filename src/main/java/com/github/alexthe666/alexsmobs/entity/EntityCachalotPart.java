@@ -9,6 +9,7 @@ import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.ClientGamePacketListener;
 import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.damagesource.DamageSource;
@@ -73,10 +74,10 @@ public class EntityCachalotPart extends Entity {
         return parent != null ? parent.getPickResult() : ItemStack.EMPTY;
     }
 
-    public boolean hurt(DamageSource source, float amount) {
-        // STUB: Client-server messaging removed (AlexsMobs.sendMSGToServer not available)
+    @Override
+    public boolean hurtServer(ServerLevel level, DamageSource source, float amount) {
         // Direct damage handling on server side only
-        return !this.isInvulnerableTo(source) && parentMob != null && parentMob.attackEntityPartFrom(this, source, amount);
+        return parentMob != null && parentMob.attackEntityPartFrom(this, source, amount);
     }
 
     public boolean is(Entity entityIn) {
