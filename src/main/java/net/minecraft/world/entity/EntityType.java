@@ -294,7 +294,7 @@ public class EntityType<T extends Entity> implements FeatureElement, EntityTypeT
 		"cachalot_whale", EntityType.Builder.of(com.github.alexthe666.alexsmobs.entity.EntityCachalotWhale::new, MobCategory.WATER_CREATURE).sized(5.0F, 4.5F).eyeHeight(2.25F).clientTrackingRange(10)
 	);
 	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntityCachalotEcho> CACHALOT_ECHO = register(
-		"cachalot_echo", EntityType.Builder.of(com.github.alexthe666.alexsmobs.entity.EntityCachalotEcho::new, MobCategory.MISC).noLootTable().sized(0.5F, 0.5F).clientTrackingRange(4).updateInterval(20)
+		"cachalot_echo", EntityType.Builder.<com.github.alexthe666.alexsmobs.entity.EntityCachalotEcho>of(com.github.alexthe666.alexsmobs.entity.EntityCachalotEcho::new, MobCategory.MISC).noLootTable().sized(0.5F, 0.5F).clientTrackingRange(4).updateInterval(20)
 	);
 	public static final EntityType<Display.BlockDisplay> BLOCK_DISPLAY = register(
 		"block_display", EntityType.Builder.of(Display.BlockDisplay::new, MobCategory.MISC).noLootTable().sized(0.0F, 0.0F).clientTrackingRange(10).updateInterval(1)
