@@ -137,6 +137,7 @@ public class DefaultAttributes {
 		.put(EntityType.DOLPHIN, Dolphin.createAttributes().build())
 		.put(EntityType.DONKEY, AbstractChestedHorse.createBaseChestedHorseAttributes().build())
 		.put(EntityType.DROWNED, Drowned.createAttributes().build())
+		.put(EntityType.ELEPHANT, com.github.alexthe666.alexsmobs.entity.EntityElephant.bakeAttributes().build())
 		.put(EntityType.ELDER_GUARDIAN, ElderGuardian.createAttributes().build())
 		.put(EntityType.ENDERGRADE, com.github.alexthe666.alexsmobs.entity.EntityEndergrade.bakeAttributes().build())
 		.put(EntityType.ENDERMAN, EnderMan.createAttributes().build())

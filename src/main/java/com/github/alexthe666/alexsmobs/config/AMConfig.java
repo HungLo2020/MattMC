@@ -55,4 +55,7 @@ public class AMConfig {
     
     // Cosmaw spawn configuration
     public static int cosmawSpawnRolls = 2;
+    
+    // Elephant spawn configuration
+    public static int elephantSpawnRolls = 2;
 }

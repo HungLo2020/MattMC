@@ -14683,6 +14683,47 @@
     ],
     "subtitle": "subtitles.entity.drowned.swim"
   },
+  "entity.elephant.die": {
+    "sounds": [
+      "elephant_die_0",
+      "elephant_die_1"
+    ],
+    "subtitle": "subtitles.entity.elephant.death"
+  },
+  "entity.elephant.hurt": {
+    "sounds": [
+      "elephant_hurt_0",
+      "elephant_hurt_1",
+      "elephant_hurt_2"
+    ],
+    "subtitle": "subtitles.entity.elephant.hurt"
+  },
+  "entity.elephant.idle": {
+    "sounds": [
+      "elephant_idle_0",
+      "elephant_idle_1",
+      "elephant_idle_2",
+      "elephant_idle_4"
+    ],
+    "subtitle": "subtitles.entity.elephant.ambient"
+  },
+  "entity.elephant.trumpet": {
+    "sounds": [
+      "elephant_trumpet_0",
+      "elephant_trumpet_1",
+      "elephant_trumpet_2"
+    ],
+    "subtitle": "subtitles.entity.elephant.trumpet"
+  },
+  "entity.elephant.walk": {
+    "sounds": [
+      "elephant_walk_0",
+      "elephant_walk_1",
+      "elephant_walk_2",
+      "elephant_walk_3"
+    ],
+    "subtitle": "subtitles.block.generic.footsteps"
+  },
   "entity.egg.throw": {
     "sounds": [
       "random/bow"
