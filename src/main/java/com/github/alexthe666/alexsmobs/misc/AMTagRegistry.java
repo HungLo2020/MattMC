@@ -119,6 +119,11 @@ public class AMTagRegistry {
     public static final TagKey<Item> ELEPHANT_BREEDABLES = registerItemTag("elephant_breedables");
     public static final TagKey<Block> DROPS_ACACIA_BLOSSOMS = registerBlockTag("drops_acacia_blossoms");
 
+    // Gelada Monkey-specific tags
+    public static final TagKey<Item> GELADA_MONKEY_BREEDABLES = registerItemTag("gelada_monkey_breedables");
+    public static final TagKey<Item> GELADA_MONKEY_LAND_CLEARING_FOODS = registerItemTag("gelada_monkey_land_clearing_foods");
+    public static final TagKey<Block> GELADA_MONKEY_GRASS = registerBlockTag("gelada_monkey_grass");
+
     private static TagKey<Item> registerItemTag(String name) {
         return TagKey.create(Registries.ITEM, ResourceLocation.withDefaultNamespace(name));
     }

@@ -15352,6 +15352,22 @@
     ],
     "subtitle": "subtitles.entity.fox.teleport"
   },
+  "entity.gelada_monkey.idle": {
+    "sounds": [
+      "gelada_monkey_idle_0",
+      "gelada_monkey_idle_1",
+      "gelada_monkey_idle_2"
+    ],
+    "subtitle": "subtitles.entity.gelada_monkey.ambient"
+  },
+  "entity.gelada_monkey.hurt": {
+    "sounds": [
+      "gelada_monkey_hurt_0",
+      "gelada_monkey_hurt_1",
+      "gelada_monkey_hurt_2"
+    ],
+    "subtitle": "subtitles.entity.gelada_monkey.hurt"
+  },
   "entity.frog.ambient": {
     "sounds": [
       {
