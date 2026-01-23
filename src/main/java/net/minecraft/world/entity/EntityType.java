@@ -452,6 +452,16 @@ public class EntityType<T extends Entity> implements FeatureElement, EntityTypeT
 	public static final EntityType<ThrownEgg> EGG = register(
 		"egg", EntityType.Builder.<ThrownEgg>of(ThrownEgg::new, MobCategory.MISC).noLootTable().sized(0.25F, 0.25F).clientTrackingRange(4).updateInterval(10)
 	);
+	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntityEmu> EMU = register(
+		"emu",
+		EntityType.Builder.of(com.github.alexthe666.alexsmobs.entity.EntityEmu::new, MobCategory.CREATURE)
+			.sized(0.9F, 2.0F)
+			.eyeHeight(1.8F)
+			.clientTrackingRange(10)
+	);
+	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntityEmuEgg> EMU_EGG = register(
+		"emu_egg", EntityType.Builder.<com.github.alexthe666.alexsmobs.entity.EntityEmuEgg>of(com.github.alexthe666.alexsmobs.entity.EntityEmuEgg::new, MobCategory.MISC).noLootTable().sized(0.25F, 0.25F).clientTrackingRange(4).updateInterval(10)
+	);
 	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntityElephant> ELEPHANT = register(
 		"elephant",
 		EntityType.Builder.of(com.github.alexthe666.alexsmobs.entity.EntityElephant::new, MobCategory.CREATURE)

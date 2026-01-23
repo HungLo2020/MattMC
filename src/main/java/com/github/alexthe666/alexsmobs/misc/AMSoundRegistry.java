@@ -95,4 +95,8 @@ public class AMSoundRegistry {
     public static final DeferredHolder ELEPHANT_DIE = new DeferredHolder(() -> net.minecraft.sounds.SoundEvents.ELEPHANT_DIE);
     public static final DeferredHolder ELEPHANT_WALK = new DeferredHolder(() -> net.minecraft.sounds.SoundEvents.ELEPHANT_WALK);
     public static final DeferredHolder ELEPHANT_TRUMPET = new DeferredHolder(() -> net.minecraft.sounds.SoundEvents.ELEPHANT_TRUMPET);
+    
+    // Emu sounds - reference vanilla SoundEvents
+    public static final DeferredHolder EMU_IDLE = new DeferredHolder(() -> net.minecraft.sounds.SoundEvents.EMU_IDLE);
+    public static final DeferredHolder EMU_HURT = new DeferredHolder(() -> net.minecraft.sounds.SoundEvents.EMU_HURT);
 }

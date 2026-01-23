@@ -1623,6 +1623,7 @@ public class CreativeModeTabs {
 						output.accept(Items.END_CRYSTAL);
 						output.accept(Items.SNOWBALL);
 						output.accept(Items.EGG);
+						output.accept(Items.EMU_EGG);
 						output.accept(Items.BROWN_EGG);
 						output.accept(Items.BLUE_EGG);
 						output.accept(Items.WIND_CHARGE);
@@ -1693,6 +1694,8 @@ public class CreativeModeTabs {
 						output.accept(Items.DINOSAUR_CHOP);
 						output.accept(Items.COOKED_DINOSAUR_CHOP);
 						output.accept(Items.PUMPKIN_PIE);
+						output.accept(Items.EMU_EGG);
+						output.accept(Items.BOILED_EMU_EGG);
 						output.accept(Items.ROTTEN_FLESH);
 						output.accept(Items.SPIDER_EYE);
 						output.accept(Items.MUSHROOM_STEW);
@@ -1759,6 +1762,7 @@ public class CreativeModeTabs {
 					output.accept(Items.STRING);
 					output.accept(Items.FEATHER);
 					output.accept(Items.ROADRUNNER_FEATHER);
+					output.accept(Items.EMU_FEATHER);
 					output.accept(Items.COCKROACH_WING);
 					output.accept(Items.COCKROACH_WING_FRAGMENT);
 					output.accept(Items.SNOWBALL);
@@ -1949,6 +1953,7 @@ public class CreativeModeTabs {
 					output.accept(Items.DROWNED_SPAWN_EGG);
 					output.accept(Items.ELEPHANT_SPAWN_EGG);
 					output.accept(Items.ELDER_GUARDIAN_SPAWN_EGG);
+					output.accept(Items.EMU_SPAWN_EGG);
 					output.accept(Items.ENDERGRADE_SPAWN_EGG);
 					output.accept(Items.ENDERMAN_SPAWN_EGG);
 					output.accept(Items.ENDERMITE_SPAWN_EGG);

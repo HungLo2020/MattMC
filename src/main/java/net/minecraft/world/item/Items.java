@@ -1814,6 +1814,10 @@ public class Items {
 	public static final Item DONKEY_SPAWN_EGG = registerItem("donkey_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.DONKEY));
 	public static final Item DROWNED_SPAWN_EGG = registerItem("drowned_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.DROWNED));
 	public static final Item ELEPHANT_SPAWN_EGG = registerItem("elephant_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.ELEPHANT));
+	public static final Item EMU_SPAWN_EGG = registerItem("emu_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.EMU));
+	public static final Item EMU_EGG = registerItem("emu_egg", properties -> new com.github.alexthe666.alexsmobs.item.ItemEmuEgg(properties), new Item.Properties().stacksTo(16));
+	public static final Item BOILED_EMU_EGG = registerItem("boiled_emu_egg", Item::new, new Item.Properties().food(Foods.COOKED_CHICKEN));
+	public static final Item EMU_FEATHER = registerItem("emu_feather", Item::new, new Item.Properties());
 	public static final Item ELDER_GUARDIAN_SPAWN_EGG = registerItem(
 		"elder_guardian_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.ELDER_GUARDIAN)
 	);
