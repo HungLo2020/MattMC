@@ -124,6 +124,9 @@ public class AMTagRegistry {
     public static final TagKey<Item> GELADA_MONKEY_LAND_CLEARING_FOODS = registerItemTag("gelada_monkey_land_clearing_foods");
     public static final TagKey<Block> GELADA_MONKEY_GRASS = registerBlockTag("gelada_monkey_grass");
 
+    // Giant Squid-specific tags
+    public static final TagKey<EntityType<?>> GIANT_SQUID_TARGETS = registerEntityTag("giant_squid_targets");
+
     private static TagKey<Item> registerItemTag(String name) {
         return TagKey.create(Registries.ITEM, ResourceLocation.withDefaultNamespace(name));
     }

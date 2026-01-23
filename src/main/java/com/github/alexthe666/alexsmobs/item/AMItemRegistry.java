@@ -49,4 +49,7 @@ public class AMItemRegistry {
     public static final DeferredHolder EMU_EGG = new DeferredHolder(() -> net.minecraft.world.item.Items.EMU_EGG);
     public static final DeferredHolder BOILED_EMU_EGG = new DeferredHolder(() -> net.minecraft.world.item.Items.BOILED_EMU_EGG);
     public static final DeferredHolder EMU_FEATHER = new DeferredHolder(() -> net.minecraft.world.item.Items.EMU_FEATHER);
+    
+    // Giant Squid items - reference vanilla Items
+    public static final DeferredHolder LOST_TENTACLE = new DeferredHolder(() -> net.minecraft.world.item.Items.LOST_TENTACLE);
 }

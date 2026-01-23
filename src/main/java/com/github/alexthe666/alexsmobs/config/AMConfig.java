@@ -61,4 +61,7 @@ public class AMConfig {
     
     // Gelada Monkey spawn configuration
     public static int geladaMonkeySpawnRolls = 2;
+    
+    // Giant Squid spawn configuration
+    public static int giantSquidSpawnRolls = 2;
 }
