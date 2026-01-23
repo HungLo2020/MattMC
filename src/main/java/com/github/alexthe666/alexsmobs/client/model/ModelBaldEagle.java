@@ -159,13 +159,13 @@ public class ModelBaldEagle extends AdvancedEntityModel<BaldEagleRenderState> {
         float idleDegree = 0.1F;
         
         // Extract animation values from state
-        float flyProgress = 0;
-        float perchProgress = 0;
-        float tackleProgress = 0;
-        float swoopProgress = 0;
-        float biteProgress = 0;
-        float flapAmount = 0;
-        float birdPitch = 0;
+        float flyProgress = state.flyProgress;
+        float perchProgress = state.sitProgress;
+        float tackleProgress = state.tackleProgress;
+        float swoopProgress = state.swoopProgress;
+        float biteProgress = state.attackProgress;
+        float flapAmount = state.flapAmount;
+        float birdPitch = state.birdPitch;
         float netHeadYaw = state.yRot;
         float headPitch = state.xRot;
         float ageInTicks = state.ageInTicks;

@@ -44,6 +44,13 @@ public class RenderBaldEagle extends MobRenderer<EntityBaldEagle, BaldEagleRende
         state.hasCap = entity.hasCap();
         state.isPassenger = entity.isPassenger();
         state.vehicle = entity.getVehicle();
+        state.flyProgress = entity.prevFlyProgress + (entity.flyProgress - entity.prevFlyProgress) * partialTicks;
+        state.attackProgress = entity.prevAttackProgress + (entity.attackProgress - entity.prevAttackProgress) * partialTicks;
+        state.tackleProgress = entity.prevTackleProgress + (entity.tackleProgress - entity.prevTackleProgress) * partialTicks;
+        state.swoopProgress = entity.prevSwoopProgress + (entity.swoopProgress - entity.prevSwoopProgress) * partialTicks;
+        state.flapAmount = entity.prevFlapAmount + (entity.flapAmount - entity.prevFlapAmount) * partialTicks;
+        state.birdPitch = entity.prevBirdPitch + (entity.birdPitch - entity.prevBirdPitch) * partialTicks;
+        state.sitProgress = entity.prevSitProgress + (entity.sitProgress - entity.prevSitProgress) * partialTicks;
     }
 
     public boolean shouldRender(EntityBaldEagle baldEagle, Frustum p_225626_2_, double p_225626_3_, double p_225626_5_, double p_225626_7_) {
