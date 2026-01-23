@@ -1765,6 +1765,7 @@ public class CreativeModeTabs {
 					output.accept(Items.BROWN_EGG);
 					output.accept(Items.BLUE_EGG);
 					output.accept(Items.COCKROACH_OOTHECA);
+					output.accept(Items.BISON_FUR);
 					output.accept(Items.LEATHER);
 					output.accept(Items.RABBIT_HIDE);
 					output.accept(Items.TOUGH_HIDE);
@@ -1917,6 +1918,7 @@ public class CreativeModeTabs {
 					output.accept(Items.BALD_EAGLE_SPAWN_EGG);
 					output.accept(Items.BAT_SPAWN_EGG);
 					output.accept(Items.BEE_SPAWN_EGG);
+					output.accept(Items.BISON_SPAWN_EGG);
 					output.accept(Items.BLAZE_SPAWN_EGG);
 					output.accept(Items.BLOBFISH_SPAWN_EGG);
 					output.accept(Items.BLUE_JAY_SPAWN_EGG);

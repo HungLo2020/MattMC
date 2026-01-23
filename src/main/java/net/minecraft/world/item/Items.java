@@ -1752,6 +1752,7 @@ public class Items {
 	);
 	public static final Item SPIDER_EYE = registerItem("spider_eye", new Item.Properties().food(Foods.SPIDER_EYE, Consumables.SPIDER_EYE));
 	public static final Item FERMENTED_SPIDER_EYE = registerItem("fermented_spider_eye");
+	public static final Item BISON_FUR = registerItem("bison_fur");
 	public static final Item BLAZE_POWDER = registerItem("blaze_powder");
 	public static final Item MAGMA_CREAM = registerItem("magma_cream");
 	public static final Item BREWING_STAND = registerBlock(
@@ -1767,6 +1768,7 @@ public class Items {
 	public static final Item BALD_EAGLE_SPAWN_EGG = registerItem("bald_eagle_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.BALD_EAGLE));
 	public static final Item BAT_SPAWN_EGG = registerItem("bat_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.BAT));
 	public static final Item BEE_SPAWN_EGG = registerItem("bee_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.BEE));
+	public static final Item BISON_SPAWN_EGG = registerItem("bison_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.BISON));
 	public static final Item BLAZE_SPAWN_EGG = registerItem("blaze_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.BLAZE));
 	public static final Item BLOBFISH_SPAWN_EGG = registerItem("blobfish_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.BLOBFISH));
 	public static final Item BLUE_JAY_SPAWN_EGG = registerItem("blue_jay_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.BLUE_JAY));
