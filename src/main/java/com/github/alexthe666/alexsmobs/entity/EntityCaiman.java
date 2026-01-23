@@ -44,6 +44,8 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.gameevent.GameEvent;
 import net.minecraft.world.level.pathfinder.PathType;
 import net.minecraft.world.level.storage.loot.BuiltInLootTables;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
 import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.Nullable;
 
@@ -400,7 +402,8 @@ public class EntityCaiman extends TamableAnimal implements ISemiAquatic,IFollowe
         }
     }
 
-    public void addAdditionalSaveData(CompoundTag compound) {
+    @Override
+    protected void addAdditionalSaveData(ValueOutput compound) {
         super.addAdditionalSaveData(compound);
         compound.putBoolean("HasEgg", this.hasEgg());
         compound.putBoolean("Bellowing", this.isBellowing());
@@ -409,13 +412,14 @@ public class EntityCaiman extends TamableAnimal implements ISemiAquatic,IFollowe
         compound.putInt("BellowCooldown", this.bellowCooldown);
     }
 
-    public void readAdditionalSaveData(CompoundTag compound) {
+    @Override
+    protected void readAdditionalSaveData(ValueInput compound) {
         super.readAdditionalSaveData(compound);
-        this.setHasEgg(compound.getBoolean("HasEgg"));
-        this.setBellowing(compound.getBoolean("Bellowing"));
-        this.bellowCooldown = compound.getInt("BellowCooldown");
-        this.setCommand(compound.getInt("CaimanCommand"));
-        this.setOrderedToSit(compound.getBoolean("CaimanSitting"));
+        this.setHasEgg(compound.getBooleanOr("HasEgg", false));
+        this.setBellowing(compound.getBooleanOr("Bellowing", false));
+        this.bellowCooldown = compound.getIntOr("BellowCooldown", 0);
+        this.setCommand(compound.getIntOr("CaimanCommand", 0));
+        this.setOrderedToSit(compound.getBooleanOr("CaimanSitting", false));
     }
 
     @Override
