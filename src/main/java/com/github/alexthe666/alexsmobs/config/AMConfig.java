@@ -52,4 +52,7 @@ public class AMConfig {
     
     // Bison spawn configuration
     public static int bisonSpawnWeight = 15;
+    
+    // Cosmaw spawn configuration
+    public static int cosmawSpawnRolls = 2;
 }

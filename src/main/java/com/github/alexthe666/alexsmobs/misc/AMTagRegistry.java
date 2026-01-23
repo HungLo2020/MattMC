@@ -107,6 +107,11 @@ public class AMTagRegistry {
     public static final TagKey<Item> BANANAS = registerItemTag("bananas");
     public static final TagKey<EntityType<?>> MONKEY_TARGET_WITH_DART = registerEntityTag("monkey_target_with_dart");
 
+    // Cosmaw-specific tags
+    public static final TagKey<Item> COSMAW_FOODSTUFFS = registerItemTag("cosmaw_foodstuffs");
+    public static final TagKey<Item> COSMAW_BREEDABLES = registerItemTag("cosmaw_breedables");
+    public static final TagKey<Item> COSMAW_TAMEABLES = registerItemTag("cosmaw_tameables");
+
     private static TagKey<Item> registerItemTag(String name) {
         return TagKey.create(Registries.ITEM, ResourceLocation.withDefaultNamespace(name));
     }

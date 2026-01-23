@@ -84,4 +84,8 @@ public class AMSoundRegistry {
     
     // Anteater sounds - reference vanilla SoundEvents
     public static final SoundEvent ANTEATER_HURT = net.minecraft.sounds.SoundEvents.ANTEATER_HURT;
+    
+    // Cosmaw sounds - reference vanilla SoundEvents
+    public static final DeferredHolder COSMAW_IDLE = new DeferredHolder(() -> net.minecraft.sounds.SoundEvents.COSMAW_IDLE);
+    public static final DeferredHolder COSMAW_HURT = new DeferredHolder(() -> net.minecraft.sounds.SoundEvents.COSMAW_HURT);
 }
