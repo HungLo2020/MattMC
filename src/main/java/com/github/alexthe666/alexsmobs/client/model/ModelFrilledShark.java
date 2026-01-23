@@ -87,21 +87,27 @@ public class ModelFrilledShark extends AdvancedEntityModel<FrilledSharkRenderSta
 	}
 
 	public void animate(FrilledSharkRenderState renderState) {
-		animator.update(renderState);
-		animator.setAnimation(EntityFrilledShark.ANIMATION_ATTACK);
-		animator.startKeyframe(5);
-		animator.rotate(jaw, Maths.rad(-20), 0, 0);
-		animator.move(head, 0, 0.5F, 3);
-		animator.endKeyframe();
-		animator.startKeyframe(5);
-		animator.rotate(head, Maths.rad(-10), 0, 0);
-		animator.rotate(jaw, Maths.rad(40), 0, 0);
-		animator.endKeyframe();
-		animator.startKeyframe(5);
-		animator.rotate(head, Maths.rad(5), 0, 0);
-		animator.rotate(jaw, Maths.rad(-20), 0, 0);
-		animator.endKeyframe();
-		animator.resetKeyframe(2);
+		// Animation handling for render states
+		if (renderState.currentAnimation == EntityFrilledShark.ANIMATION_ATTACK) {
+			int tick = renderState.animationTick;
+			float partialTick = renderState.ageInTicks - (int)renderState.ageInTicks;
+			
+			// Manual keyframe animation for attack
+			if (tick >= 0 && tick < 5) {
+				float progress = (tick + partialTick) / 5.0F;
+				jaw.rotateAngleX = Maths.rad(-20) * progress;
+				head.setPos(0, 0.5F * progress + -2.0F, -15.0F + 3 * progress);
+			} else if (tick >= 5 && tick < 10) {
+				float progress = (tick - 5 + partialTick) / 5.0F;
+				head.rotateAngleX = Maths.rad(-10) * progress;
+				jaw.rotateAngleX = Maths.rad(-20) + (Maths.rad(40) - Maths.rad(-20)) * progress;
+				head.setPos(0, 0.5F + -2.0F, -15.0F + 3);
+			} else if (tick >= 10 && tick < 15) {
+				float progress = (tick - 10 + partialTick) / 5.0F;
+				head.rotateAngleX = Maths.rad(-10) + (Maths.rad(5) - Maths.rad(-10)) * progress;
+				jaw.rotateAngleX = Maths.rad(40) + (Maths.rad(-20) - Maths.rad(40)) * progress;
+			}
+		}
 	}
 
 	@Override

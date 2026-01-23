@@ -4,15 +4,12 @@ import com.github.alexthe666.alexsmobs.client.model.ModelFrilledShark;
 import com.github.alexthe666.alexsmobs.client.render.state.FrilledSharkRenderState;
 import com.github.alexthe666.alexsmobs.entity.EntityFrilledShark;
 import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.minecraft.client.model.EntityModel;
-import net.minecraft.client.renderer.MultiBufferSource;
+import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.client.renderer.entity.EntityRendererProvider;
 import net.minecraft.client.renderer.entity.MobRenderer;
 import net.minecraft.client.renderer.entity.layers.RenderLayer;
 import net.minecraft.resources.ResourceLocation;
-
-import static net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY;
 
 public class RenderFrilledShark extends MobRenderer<EntityFrilledShark, FrilledSharkRenderState, EntityModel<FrilledSharkRenderState>> {
     private static final ResourceLocation TEXTURE = ResourceLocation.withDefaultNamespace("textures/entity/frilled_shark.png");
@@ -56,9 +53,11 @@ public class RenderFrilledShark extends MobRenderer<EntityFrilledShark, FrilledS
             super(render);
         }
 
-        public void render(PoseStack matrixStackIn, MultiBufferSource buffer, int packedLightIn, FrilledSharkRenderState renderState, float limbSwing, float limbSwingAmount) {
-            VertexConsumer glintBuilder = buffer.getBuffer(AMRenderTypes.getEyesFlickering(TEXTURE_TEETH, 240));
-            this.getParentModel().renderToBuffer(matrixStackIn, glintBuilder, 240, NO_OVERLAY);
+        @Override
+        public void submit(PoseStack poseStack, SubmitNodeCollector submitNodeCollector, int packedLightIn, FrilledSharkRenderState renderState, float limbSwing, float limbSwingAmount) {
+            submitNodeCollector.order(1).submitModel(
+                this.getParentModel(), renderState, poseStack, AMRenderTypes.getEyesFlickering(TEXTURE_TEETH, 240), 240, net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY, -1, null, renderState.outlineColor, null
+            );
         }
     }
 }

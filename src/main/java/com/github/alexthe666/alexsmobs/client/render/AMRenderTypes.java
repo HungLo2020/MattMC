@@ -32,4 +32,12 @@ public class AMRenderTypes {
     public static RenderType getSpectreBones(ResourceLocation texture) {
         return RenderType.entityTranslucent(texture);
     }
+    
+    /**
+     * Creates an eyes render type with flickering effect
+     * Delegates to vanilla RenderType.eyes()
+     */
+    public static RenderType getEyesFlickering(ResourceLocation texture, int light) {
+        return RenderType.eyes(texture);
+    }
 }

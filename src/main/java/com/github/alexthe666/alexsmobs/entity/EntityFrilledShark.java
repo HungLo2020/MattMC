@@ -45,9 +45,9 @@ import net.minecraft.world.level.LevelAccessor;
 import net.minecraft.world.level.LevelReader;
 import net.minecraft.world.level.ServerLevelAccessor;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
 import net.minecraft.world.phys.Vec3;
-import net.neoforged.api.distmarker.Dist;
-import net.neoforged.api.distmarker.OnlyIn;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -118,10 +118,10 @@ public class EntityFrilledShark extends WaterAnimal implements IAnimatedEntity, 
         return SoundEvents.BUCKET_FILL_FISH;
     }
 
-    public void addAdditionalSaveData(CompoundTag compound) {
-        super.addAdditionalSaveData(compound);
-        compound.putBoolean("FromBucket", this.fromBucket());
-        compound.putBoolean("Depressurized", this.isDepressurized());
+    public void addAdditionalSaveData(ValueOutput valueOutput) {
+        super.addAdditionalSaveData(valueOutput);
+        valueOutput.putBoolean("FromBucket", this.fromBucket());
+        valueOutput.putBoolean("Depressurized", this.isDepressurized());
     }
 
     public boolean requiresCustomPersistence() {
@@ -132,10 +132,10 @@ public class EntityFrilledShark extends WaterAnimal implements IAnimatedEntity, 
         return !this.fromBucket() && !this.hasCustomName();
     }
 
-    public void readAdditionalSaveData(CompoundTag compound) {
-        super.readAdditionalSaveData(compound);
-        this.setFromBucket(compound.getBoolean("FromBucket"));
-        this.setDepressurized(compound.getBoolean("Depressurized"));
+    public void readAdditionalSaveData(ValueInput valueInput) {
+        super.readAdditionalSaveData(valueInput);
+        this.setFromBucket(valueInput.getBooleanOr("FromBucket", false));
+        this.setDepressurized(valueInput.getBooleanOr("Depressurized", false));
     }
 
     private void doInitialPosing(LevelAccessor world) {
@@ -194,19 +194,21 @@ public class EntityFrilledShark extends WaterAnimal implements IAnimatedEntity, 
             bucket.set(net.minecraft.core.component.DataComponents.CUSTOM_NAME, this.getCustomName());
         }
         Bucketable.saveDefaultDataToBucketTag(this, bucket);
-        CompoundTag platTag = new CompoundTag();
-        this.addAdditionalSaveData(platTag);
         bucket.update(DataComponents.CUSTOM_DATA, CustomData.EMPTY, data -> data.update(tag -> {
-            tag.put("FrilledSharkData", platTag);
+            CompoundTag sharkData = new CompoundTag();
+            sharkData.putBoolean("FromBucket", this.fromBucket());
+            sharkData.putBoolean("Depressurized", this.isDepressurized());
+            tag.put("FrilledSharkData", sharkData);
         }));
     }
 
     @Override
     public void loadFromBucketTag(@Nonnull CompoundTag compound) {
         Bucketable.loadDefaultDataFromBucketTag(this, compound);
-        if (compound.contains("FrilledSharkData")) {
-            this.readAdditionalSaveData(compound.getCompound("FrilledSharkData"));
-        }
+        compound.getCompound("FrilledSharkData").ifPresent(sharkData -> {
+            this.setFromBucket(sharkData.getBooleanOr("FromBucket", false));
+            this.setDepressurized(sharkData.getBooleanOr("Depressurized", false));
+        });
     }
 
     @Override
@@ -233,7 +235,7 @@ public class EntityFrilledShark extends WaterAnimal implements IAnimatedEntity, 
     public void calculateEntityAnimation(boolean flying) {
         float f1 = (float)Mth.length(this.getX() - this.xo, this.getY() - this.yo, this.getZ() - this.zo);
         float f2 = Math.min(f1 * 8.0F, 1.0F);
-        this.walkAnimation.update(f2, 0.4F);
+        this.walkAnimation.update(f2, 0.4F, 10.0F);
     }
 
     public void tick() {
@@ -255,22 +257,30 @@ public class EntityFrilledShark extends WaterAnimal implements IAnimatedEntity, 
         if (!isDepressurized() && !clear) {
             this.setDepressurized(true);
         }
-        if (!this.level().isClientSide && this.getTarget() != null && this.getAnimation() == ANIMATION_ATTACK && this.getAnimationTick() == 12) {
+        if (!this.level().isClientSide() && this.getTarget() != null && this.getAnimation() == ANIMATION_ATTACK && this.getAnimationTick() == 12) {
             float f1 = this.getYRot() * Mth.DEG_TO_RAD;
             this.setDeltaMovement(this.getDeltaMovement().add(-Mth.sin(f1) * 0.06F, 0.0D, Mth.cos(f1) * 0.06F));
-            if (this.getTarget().hurt(this.damageSources().mobAttack(this), (float) this.getAttribute(Attributes.ATTACK_DAMAGE).getBaseValue())){
-                // Removed Exsanguination effect and shark tooth drops - vanilla only
+            if (this.level() instanceof net.minecraft.server.level.ServerLevel serverLevel) {
+                this.getTarget().hurtServer(serverLevel, this.damageSources().mobAttack(this), (float) this.getAttribute(Attributes.ATTACK_DAMAGE).getBaseValue());
             }
-
+            // Removed Exsanguination effect and shark tooth drops - vanilla only
         }
         AnimationHandler.INSTANCE.updateAnimations(this);
     }
 
-    public boolean hurt(DamageSource source, float amount) {
-        if (source.getEntity() instanceof Drowned) {
-            amount *= 0.5F;
+    public boolean doHurtTarget(Entity entityIn) {
+        if (this.getAnimation() == NO_ANIMATION) {
+            this.setAnimation(ANIMATION_ATTACK);
         }
-        return super.hurt(source, amount);
+        return true;
+    }
+
+    public void handleEntityEvent(byte id) {
+        if (id == 68) {
+            // Removed particle effects - vanilla only
+        } else {
+            super.handleEntityEvent(id);
+        }
     }
 
     private boolean hasClearance() {
@@ -315,22 +325,6 @@ public class EntityFrilledShark extends WaterAnimal implements IAnimatedEntity, 
         animationTick = tick;
     }
 
-    public boolean doHurtTarget(Entity entityIn) {
-        if (this.getAnimation() == NO_ANIMATION) {
-            this.setAnimation(ANIMATION_ATTACK);
-        }
-        return true;
-    }
-
-    @OnlyIn(Dist.CLIENT)
-    public void handleEntityEvent(byte id) {
-        if (id == 68) {
-            // Removed particle effects - vanilla only
-        } else {
-            super.handleEntityEvent(id);
-        }
-    }
-
     private class AIMelee extends Goal {
 
         public AIMelee() {
@@ -352,10 +346,11 @@ public class EntityFrilledShark extends WaterAnimal implements IAnimatedEntity, 
                 } else {
                     speed = 0.6F;
                     EntityFrilledShark.this.lookAt(target, 70, 70);
-                    if (target instanceof Squid) {
+                    if (target instanceof Squid squid) {
                         Vec3 mouth = EntityFrilledShark.this.position();
                         float squidSpeed = 0.07F;
-                        ((Squid) target).setMovementVector((float) (mouth.x - target.getX()) * squidSpeed, (float) (mouth.y - target.getEyeY()) * squidSpeed, (float) (mouth.z - target.getZ()) * squidSpeed);
+                        Vec3 pullVec = new Vec3((mouth.x - target.getX()) * squidSpeed, (mouth.y - target.getEyeY()) * squidSpeed, (mouth.z - target.getZ()) * squidSpeed);
+                        squid.setDeltaMovement(squid.getDeltaMovement().add(pullVec));
                         EntityFrilledShark.this.level().broadcastEntityEvent(EntityFrilledShark.this, (byte) 68);
                     }
                 }
