@@ -54,6 +54,7 @@ import com.github.alexmodguy.alexscaves.server.entity.living.VallumraptorEntity;
 import com.github.alexthe666.alexsmobs.entity.EntityBlobfish;
 import com.github.alexthe666.alexsmobs.entity.EntityBunfungus;
 import com.github.alexthe666.alexsmobs.entity.EntityCosmicCod;
+import com.github.alexthe666.alexsmobs.entity.EntityFrilledShark;
 import com.github.alexthe666.alexsmobs.entity.EntityFlyingFish;
 import com.github.alexthe666.alexsmobs.entity.EntityMimicOctopus;
 import com.github.alexthe666.alexsmobs.entity.EntityMungus;
@@ -127,6 +128,7 @@ public class DefaultAttributes {
 		.put(EntityType.COCKROACH, com.github.alexthe666.alexsmobs.entity.EntityCockroach.bakeAttributes().build())
 		.put(EntityType.COMB_JELLY, com.github.alexthe666.alexsmobs.entity.EntityCombJelly.bakeAttributes().build())
 		.put(EntityType.COSMIC_COD, EntityCosmicCod.createAttributes().build())
+		.put(EntityType.FRILLED_SHARK, EntityFrilledShark.createAttributes().build())
 		.put(EntityType.COSMAW, com.github.alexthe666.alexsmobs.entity.EntityCosmaw.bakeAttributes().build())
 		.put(EntityType.COD, AbstractFish.createAttributes().build())
 		.put(EntityType.COPPER_GOLEM, CopperGolem.createAttributes().build())
