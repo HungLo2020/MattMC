@@ -27,6 +27,7 @@ public class RenderGorilla extends MobRenderer<EntityGorilla, GorillaRenderState
     @Override
     public void extractRenderState(EntityGorilla entity, GorillaRenderState state, float partialTick) {
         super.extractRenderState(entity, state, partialTick);
+        net.minecraft.client.renderer.entity.state.HoldingEntityRenderState.extractHoldingEntityRenderState(entity, state, this.itemModelResolver);
         state.standProgress = entity.prevStandProgress + (entity.standProgress - entity.prevStandProgress) * partialTick;
         state.sitProgress = entity.prevSitProgress + (entity.sitProgress - entity.prevSitProgress) * partialTick;
         state.gorillaScale = entity.getGorillaScale();
@@ -35,7 +36,6 @@ public class RenderGorilla extends MobRenderer<EntityGorilla, GorillaRenderState
         state.isFunkyKong = entity.isFunkyKong();
         state.isBaby = entity.isBaby();
         state.animationTick = entity.getAnimationTick();
-        state.mainHandItem = entity.getMainHandItem().copy();
         state.name = entity.getName().getString();
     }
 

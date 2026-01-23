@@ -170,26 +170,6 @@ public class ModelGorilla extends AdvancedEntityModel<GorillaRenderState> {
 		animator.resetKeyframe(6);
 	}
 
-	public void renderToBuffer(PoseStack matrixStackIn, VertexConsumer bufferIn, int packedLightIn, int packedOverlayIn, int color) {
-		if (this.young) {
-			float f = 1.35F;
-			head.setScale(f, f, f);
-			head.setShouldScaleChildren(true);
-			matrixStackIn.pushPose();
-			parts().forEach((p_228292_8_) -> {
-				p_228292_8_.render(matrixStackIn, bufferIn, packedLightIn, packedOverlayIn, -1);
-			});
-			matrixStackIn.popPose();
-			head.setScale(1, 1, 1);
-		} else {
-			matrixStackIn.pushPose();
-			parts().forEach((p_228290_8_) -> {
-				p_228290_8_.render(matrixStackIn, bufferIn, packedLightIn, packedOverlayIn, -1);
-			});
-			matrixStackIn.popPose();
-		}
-	}
-
 	@Override
 	public void setupAnim(GorillaRenderState state) {
 		this.resetToDefaultPose();

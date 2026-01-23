@@ -1,9 +1,8 @@
 package com.github.alexthe666.alexsmobs.client.render;
 
-import net.minecraft.client.renderer.entity.state.LivingEntityRenderState;
-import net.minecraft.world.item.ItemStack;
+import net.minecraft.client.renderer.entity.state.HoldingEntityRenderState;
 
-public class GorillaRenderState extends LivingEntityRenderState {
+public class GorillaRenderState extends HoldingEntityRenderState {
     public float standProgress;
     public float sitProgress;
     public float gorillaScale;
@@ -12,6 +11,5 @@ public class GorillaRenderState extends LivingEntityRenderState {
     public boolean isFunkyKong;
     public boolean isBaby;
     public int animationTick;
-    public ItemStack mainHandItem = ItemStack.EMPTY;
     public String name = "";
 }

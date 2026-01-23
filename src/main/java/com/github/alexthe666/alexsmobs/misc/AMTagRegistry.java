@@ -127,6 +127,14 @@ public class AMTagRegistry {
     // Giant Squid-specific tags
     public static final TagKey<EntityType<?>> GIANT_SQUID_TARGETS = registerEntityTag("giant_squid_targets");
 
+    // Gorilla-specific tags
+    public static final TagKey<Block> GORILLA_SPAWNS = registerBlockTag("gorilla_spawns");
+    public static final TagKey<Item> GORILLA_TAMEABLES = registerItemTag("gorilla_tameables");
+    public static final TagKey<Item> GORILLA_BREEDABLES = registerItemTag("gorilla_breedables");
+    public static final TagKey<Item> GORILLA_FOODSTUFFS = registerItemTag("gorilla_foodstuffs");
+    public static final TagKey<Block> GORILLA_BREAKABLES = registerBlockTag("gorilla_breakables");
+    public static final TagKey<Block> DROPS_BANANAS = registerBlockTag("drops_bananas");
+
     private static TagKey<Item> registerItemTag(String name) {
         return TagKey.create(Registries.ITEM, ResourceLocation.withDefaultNamespace(name));
     }

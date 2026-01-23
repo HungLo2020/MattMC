@@ -89,7 +89,7 @@ public class EntityGorilla extends TamableAnimal implements IAnimatedEntity, ITa
     private boolean hasSilverbackAttributes = false;
     public int poundChestCooldown = 0;
 
-    protected EntityGorilla(EntityType type, Level worldIn) {
+    public EntityGorilla(EntityType type, Level worldIn) {
         super(type, worldIn);
         this.setPathfindingMalus(PathType.WATER, -1.0F);
         this.setPathfindingMalus(PathType.LEAVES, 0.0F);
@@ -99,8 +99,8 @@ public class EntityGorilla extends TamableAnimal implements IAnimatedEntity, ITa
         return new AdvancedPathNavigateNoTeleport(this, worldIn, false);
     }
 
-    public static AttributeSupplier.Builder bakeAttributes() {
-        return Animal.createAnimalAttributes().add(Attributes.MAX_HEALTH, 30.0D).add(Attributes.FOLLOW_RANGE, 32.0D).add(Attributes.ARMOR, 0.0D).add(Attributes.ATTACK_DAMAGE, 7.0D).add(Attributes.KNOCKBACK_RESISTANCE, 0.5F).add(Attributes.MOVEMENT_SPEED, 0.25F).add(Attributes.STEP_HEIGHT, 1.0D).add(Attributes.TEMPT_RANGE, 10.0D);
+    public static AttributeSupplier.Builder createAttributes() {
+        return net.minecraft.world.entity.animal.Animal.createAnimalAttributes().add(Attributes.MAX_HEALTH, 30.0D).add(Attributes.FOLLOW_RANGE, 32.0D).add(Attributes.ARMOR, 0.0D).add(Attributes.ATTACK_DAMAGE, 7.0D).add(Attributes.KNOCKBACK_RESISTANCE, 0.5F).add(Attributes.MOVEMENT_SPEED, 0.25F).add(Attributes.STEP_HEIGHT, 1.0D).add(Attributes.TEMPT_RANGE, 10.0D);
     }
 
     public static boolean isTameableFood(ItemStack stack) {
@@ -402,8 +402,8 @@ public class EntityGorilla extends TamableAnimal implements IAnimatedEntity, ITa
                             this.level().broadcastEntityEvent(this, (byte) 6);
                         }
                     }
-                    if (stack.hasCraftingRemainingItem()) {
-                        this.spawnAtLocation(stack.getCraftingRemainingItem());
+                    if (stack.has(net.minecraft.core.component.DataComponents.CRAFTING_REMAINING_ITEM)) {
+                        this.spawnAtLocation((ServerLevel)this.level(), stack.get(net.minecraft.core.component.DataComponents.CRAFTING_REMAINING_ITEM).copy());
                     }
                     stack.shrink(1);
                 }
@@ -520,8 +520,8 @@ public class EntityGorilla extends TamableAnimal implements IAnimatedEntity, ITa
     public void onGetItem(ItemEntity targetEntity) {
         ItemStack duplicate = targetEntity.getItem().copy();
         duplicate.setCount(1);
-        if (!this.getItemInHand(InteractionHand.MAIN_HAND).isEmpty() && !this.level().isClientSide) {
-            this.spawnAtLocation(this.getItemInHand(InteractionHand.MAIN_HAND), 0.0F);
+        if (!this.getItemInHand(InteractionHand.MAIN_HAND).isEmpty() && !this.level().isClientSide()) {
+            this.spawnAtLocation((ServerLevel)this.level(), this.getItemInHand(InteractionHand.MAIN_HAND));
         }
         this.setItemInHand(InteractionHand.MAIN_HAND, duplicate);
         Entity thrower = targetEntity.getOwner();
