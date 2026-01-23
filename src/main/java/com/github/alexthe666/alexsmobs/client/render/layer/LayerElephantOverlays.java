@@ -4,9 +4,8 @@ import com.github.alexthe666.alexsmobs.client.model.ModelElephant;
 import com.github.alexthe666.alexsmobs.client.render.ElephantRenderState;
 import com.github.alexthe666.alexsmobs.client.render.RenderElephant;
 import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.blaze3d.vertex.VertexConsumer;
-import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
+import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.client.renderer.entity.layers.RenderLayer;
 import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.resources.ResourceLocation;
@@ -41,20 +40,40 @@ public class LayerElephantOverlays extends RenderLayer<ElephantRenderState, Mode
         super(renderElephant);
     }
 
-    public void render(PoseStack matrixStackIn, MultiBufferSource bufferIn, int packedLightIn, ElephantRenderState state, float limbSwing, float limbSwingAmount) {
+    @Override
+    public void submit(PoseStack poseStack, SubmitNodeCollector submitNodeCollector, int i, ElephantRenderState state, float f, float g) {
         if(state.chested){
-            VertexConsumer ivertexbuilder = bufferIn.getBuffer(RenderType.entityCutout(TEXTURE_CHEST));
-            this.getParentModel().renderToBuffer(matrixStackIn, ivertexbuilder, packedLightIn, state.getOverlayCoords(), -1);
+            submitNodeCollector.order(1)
+                .submitModel(
+                    this.getParentModel(),
+                    state,
+                    poseStack,
+                    RenderType.entityCutout(TEXTURE_CHEST),
+                    i,
+                    OverlayTexture.NO_OVERLAY,
+                    -1,
+                    null,
+                    state.outlineColor,
+                    null
+                );
         }
         DyeColor color = state.carpetColor >= 0 && state.carpetColor < 16 ? DyeColor.byId(state.carpetColor) : null;
-        // Note: Trader status is not in render state, would need to add if needed
         if(color != null) {
             ResourceLocation texture = ELEPHANT_DECOR_TEXTURES[color.getId()];
-
-            this.getParentModel().copyPropertiesTo(this.model);
             this.model.setupAnim(state);
-            VertexConsumer vertexConsumer = bufferIn.getBuffer(RenderType.entityCutoutNoCull(texture));
-            this.model.renderToBuffer(matrixStackIn, vertexConsumer, packedLightIn, OverlayTexture.NO_OVERLAY, -1);
+            submitNodeCollector.order(1)
+                .submitModel(
+                    this.model,
+                    state,
+                    poseStack,
+                    RenderType.entityCutoutNoCull(texture),
+                    i,
+                    OverlayTexture.NO_OVERLAY,
+                    -1,
+                    null,
+                    state.outlineColor,
+                    null
+                );
         }
     }
 }

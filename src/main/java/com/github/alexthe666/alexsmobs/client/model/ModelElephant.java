@@ -291,8 +291,14 @@ public class ModelElephant extends AdvancedEntityModel<ElephantRenderState> {
         animator.resetKeyframe(5);
     }
 
-    public void renderToBuffer(PoseStack matrixStackIn, VertexConsumer bufferIn, int packedLightIn, int packedOverlayIn, int color) {
-        if (this.young) {
+    @Override
+    public void setupAnim(ElephantRenderState state) {
+        // Note: Cannot call animate() with render state architecture
+        // Animation system would need to be refactored to work with render state
+        this.resetToDefaultPose();
+        
+        // Handle baby scaling
+        if (state.isBaby) {
             float f = 1.5F;
             float f2 = 0.75F;
             head.rotationPointY = -10;
@@ -301,32 +307,12 @@ public class ModelElephant extends AdvancedEntityModel<ElephantRenderState> {
             head.setShouldScaleChildren(true);
             trunk1.setScale(f2, f2, f2);
             trunk1.setShouldScaleChildren(true);
-            matrixStackIn.pushPose();
-            matrixStackIn.scale(0.35F, 0.35F, 0.35F);
-            matrixStackIn.translate(0.0D, 2.8D, 0D);
-            parts().forEach((p_228292_8_) -> {
-                p_228292_8_.render(matrixStackIn, bufferIn, packedLightIn, packedOverlayIn, -1);
-            });
-            matrixStackIn.popPose();
+        } else {
+            head.rotationPointY = -2.0F;
             head.setScale(1, 1, 1);
             tail.setScale(1, 1, 1);
             trunk1.setScale(1, 1, 1);
-        } else {
-            head.rotationPointY = -2.0F;
-            matrixStackIn.pushPose();
-            parts().forEach((p_228290_8_) -> {
-                p_228290_8_.render(matrixStackIn, bufferIn, packedLightIn, packedOverlayIn, -1);
-            });
-            matrixStackIn.popPose();
         }
-
-    }
-
-    @Override
-    public void setupAnim(ElephantRenderState state) {
-        // Note: Cannot call animate() with render state architecture
-        // Animation system would need to be refactored to work with render state
-        this.resetToDefaultPose();
         
         float walkSpeed = 0.7F;
         float walkDegree = 0.4F;

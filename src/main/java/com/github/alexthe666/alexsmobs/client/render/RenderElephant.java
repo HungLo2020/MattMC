@@ -32,9 +32,9 @@ public class RenderElephant extends MobRenderer<EntityElephant, ElephantRenderSt
         state.tusked = entity.isTusked();
         state.sitting = entity.isSitting();
         state.standing = entity.isStanding();
-        state.chested = entity.hasChest();
-        state.carpetColor = entity.getCarpetColor();
-        state.mainHandItem = entity.getMainHandItem().copy();
+        state.chested = entity.isChested();
+        state.carpetColor = entity.getColor() != null ? entity.getColor().getId() : -1;
+        this.itemModelResolver.updateForLiving(state.mainHandItem, entity.getMainHandItem(), net.minecraft.world.item.ItemDisplayContext.GROUND, entity);
     }
 
     protected void scale(ElephantRenderState state, PoseStack matrixStackIn) {

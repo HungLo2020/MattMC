@@ -105,23 +105,21 @@ public class ElephantAIForageLeaves extends MoveToBlockGoal {
     }
 
     private void breakLeaves() {
-        if (net.neoforged.neoforge.event.EventHooks.canEntityGrief(elephant.level(), elephant)) {
-            BlockState blockstate = elephant.level().getBlockState(this.blockPos);
-            if (blockstate.is(AMTagRegistry.ELEPHANT_FOODBLOCKS)) {
-                elephant.level().destroyBlock(blockPos, false);
-                final RandomSource rand = this.elephant.getRandom();
-                ItemStack stack = new ItemStack(blockstate.getBlock().asItem());
-                ItemEntity itementity = new ItemEntity(elephant.level(), blockPos.getX() + rand.nextFloat(), blockPos.getY() + rand.nextFloat(), blockPos.getZ() + rand.nextFloat(), stack);
-                itementity.setDefaultPickUpDelay();
-                elephant.level().addFreshEntity(itementity);
-                if (blockstate.is(AMTagRegistry.DROPS_ACACIA_BLOSSOMS) && rand.nextInt(30) == 0) {
-                    ItemStack blossom = new ItemStack(Items.APPLE); // Using apple as substitute for acacia blossom
-                    ItemEntity itementity2 = new ItemEntity(elephant.level(), blockPos.getX() + rand.nextFloat(), blockPos.getY() + rand.nextFloat(), blockPos.getZ() + rand.nextFloat(), blossom);
-                    itementity2.setDefaultPickUpDelay();
-                    elephant.level().addFreshEntity(itementity2);
-                }
-                stop();
+        BlockState blockstate = elephant.level().getBlockState(this.blockPos);
+        if (blockstate.is(AMTagRegistry.ELEPHANT_FOODBLOCKS)) {
+            elephant.level().destroyBlock(blockPos, false);
+            final RandomSource rand = this.elephant.getRandom();
+            ItemStack stack = new ItemStack(blockstate.getBlock().asItem());
+            ItemEntity itementity = new ItemEntity(elephant.level(), blockPos.getX() + rand.nextFloat(), blockPos.getY() + rand.nextFloat(), blockPos.getZ() + rand.nextFloat(), stack);
+            itementity.setDefaultPickUpDelay();
+            elephant.level().addFreshEntity(itementity);
+            if (blockstate.is(AMTagRegistry.DROPS_ACACIA_BLOSSOMS) && rand.nextInt(30) == 0) {
+                ItemStack blossom = new ItemStack(Items.APPLE); // Using apple as substitute for acacia blossom
+                ItemEntity itementity2 = new ItemEntity(elephant.level(), blockPos.getX() + rand.nextFloat(), blockPos.getY() + rand.nextFloat(), blockPos.getZ() + rand.nextFloat(), blossom);
+                itementity2.setDefaultPickUpDelay();
+                elephant.level().addFreshEntity(itementity2);
             }
+            stop();
         }
     }
 
