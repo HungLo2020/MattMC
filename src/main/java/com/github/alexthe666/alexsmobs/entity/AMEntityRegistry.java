@@ -35,6 +35,8 @@ public class AMEntityRegistry {
     public static final DeferredEntityHolder TOSSED_ITEM = new DeferredEntityHolder(() -> EntityType.TOSSED_ITEM);
     public static final DeferredEntityHolder COSMAW = new DeferredEntityHolder(() -> EntityType.COSMAW);
     public static final DeferredEntityHolder ELEPHANT = new DeferredEntityHolder(() -> EntityType.ELEPHANT);
+    public static final DeferredEntityHolder EMU = new DeferredEntityHolder(() -> EntityType.EMU);
+    public static final DeferredEntityHolder EMU_EGG = new DeferredEntityHolder(() -> EntityType.EMU_EGG);
     
     /**
      * Helper method for spawn roll logic

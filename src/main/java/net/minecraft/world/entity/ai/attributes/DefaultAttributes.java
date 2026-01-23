@@ -138,6 +138,7 @@ public class DefaultAttributes {
 		.put(EntityType.DONKEY, AbstractChestedHorse.createBaseChestedHorseAttributes().build())
 		.put(EntityType.DROWNED, Drowned.createAttributes().build())
 		.put(EntityType.ELEPHANT, com.github.alexthe666.alexsmobs.entity.EntityElephant.bakeAttributes().build())
+		.put(EntityType.EMU, com.github.alexthe666.alexsmobs.entity.EntityEmu.createAttributes().build())
 		.put(EntityType.ELDER_GUARDIAN, ElderGuardian.createAttributes().build())
 		.put(EntityType.ENDERGRADE, com.github.alexthe666.alexsmobs.entity.EntityEndergrade.bakeAttributes().build())
 		.put(EntityType.ENDERMAN, EnderMan.createAttributes().build())

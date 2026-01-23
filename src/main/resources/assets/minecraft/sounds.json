@@ -14724,6 +14724,23 @@
     ],
     "subtitle": "subtitles.block.generic.footsteps"
   },
+  "entity.emu.idle": {
+    "sounds": [
+      "emu_idle_0",
+      "emu_idle_1",
+      "emu_idle_2"
+    ],
+    "subtitle": "subtitles.entity.emu.ambient"
+  },
+  "entity.emu.hurt": {
+    "sounds": [
+      "emu_hurt_0",
+      "emu_hurt_1",
+      "emu_hurt_2"
+    ],
+    "subtitle": "subtitles.entity.emu.hurt"
+  },
+  "entity.egg.throw": {
   "entity.egg.throw": {
     "sounds": [
       "random/bow"

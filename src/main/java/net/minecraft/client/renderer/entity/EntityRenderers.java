@@ -126,6 +126,8 @@ public class EntityRenderers {
 		register(EntityType.DROWNED, DrownedRenderer::new);
 		register(EntityType.EGG, ThrownItemRenderer::new);
 		register(EntityType.ELEPHANT, com.github.alexthe666.alexsmobs.client.render.RenderElephant::new);
+		register(EntityType.EMU, com.github.alexthe666.alexsmobs.client.render.RenderEmu::new);
+		register(EntityType.EMU_EGG, ThrownItemRenderer::new);
 		register(EntityType.ELDER_GUARDIAN, ElderGuardianRenderer::new);
 		register(EntityType.ENDERGRADE, RenderEndergrade::new);
 		register(EntityType.ENDERMAN, EndermanRenderer::new);
