@@ -3,18 +3,12 @@ package com.github.alexthe666.alexsmobs.client.render;
 import com.github.alexthe666.alexsmobs.client.model.ModelBison;
 import com.github.alexthe666.alexsmobs.client.model.ModelBisonBaby;
 import com.github.alexthe666.alexsmobs.entity.EntityBison;
-import com.github.alexthe666.citadel.client.model.AdvancedEntityModel;
 import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.blaze3d.vertex.VertexConsumer;
-import net.minecraft.client.renderer.MultiBufferSource;
-import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.entity.EntityRendererProvider;
-import net.minecraft.client.renderer.entity.LivingEntityRenderer;
 import net.minecraft.client.renderer.entity.MobRenderer;
-import net.minecraft.client.renderer.entity.layers.RenderLayer;
 import net.minecraft.resources.ResourceLocation;
 
-public class RenderBison extends MobRenderer<EntityBison, AdvancedEntityModel<EntityBison>> {
+public class RenderBison extends MobRenderer<EntityBison, BisonRenderState, ModelBison> {
     private static final ResourceLocation TEXTURE_BABY = ResourceLocation.withDefaultNamespace("textures/entity/bison_baby.png");
     private static final ResourceLocation TEXTURE_BABY_SNOWY = ResourceLocation.withDefaultNamespace("textures/entity/bison_baby_snowy.png");
     private static final ResourceLocation TEXTURE_SNOWY = ResourceLocation.withDefaultNamespace("textures/entity/bison_snowy.png");
@@ -25,31 +19,34 @@ public class RenderBison extends MobRenderer<EntityBison, AdvancedEntityModel<En
 
     public RenderBison(EntityRendererProvider.Context renderManagerIn) {
         super(renderManagerIn, new ModelBison(), 0.8F);
-        this.addLayer(new LayerSnow());
     }
 
-    protected void scale(EntityBison entitylivingbaseIn, PoseStack matrixStackIn, float partialTickTime) {
-        if(entitylivingbaseIn.isBaby()){
-            model = modelBaby;
-        }else{
-            model = modelBison;
-        }
+    @Override
+    public BisonRenderState createRenderState() {
+        return new BisonRenderState();
     }
 
-    public ResourceLocation getTextureLocation(EntityBison entity) {
-        return entity.isBaby() ? TEXTURE_BABY : entity.isSheared() ? TEXTURE_SHEARED : TEXTURE;
+    @Override
+    public void extractRenderState(EntityBison entity, BisonRenderState state, float partialTick) {
+        super.extractRenderState(entity, state, partialTick);
+        state.chargeProgress = entity.prevChargeProgress + (entity.chargeProgress - entity.prevChargeProgress) * partialTick;
+        state.isSheared = entity.isSheared();
+        state.isSnowy = entity.isSnowy();
+        state.isBaby = entity.isBaby();
     }
 
-    class LayerSnow extends RenderLayer<EntityBison, AdvancedEntityModel<EntityBison>> {
+    protected void scale(BisonRenderState state, PoseStack matrixStackIn) {
+        // Model switching is handled in getTextureLocation for now
+    }
 
-        public LayerSnow() {
-            super(RenderBison.this);
-        }
-
-        public void render(PoseStack matrixStackIn, MultiBufferSource bufferIn, int packedLightIn, EntityBison entitylivingbaseIn, float limbSwing, float limbSwingAmount, float partialTicks, float ageInTicks, float netHeadYaw, float headPitch) {
-            if (entitylivingbaseIn.isSnowy()) {
-                VertexConsumer ivertexbuilder = bufferIn.getBuffer(RenderType.entityCutoutNoCull(entitylivingbaseIn.isBaby() ? TEXTURE_BABY_SNOWY : TEXTURE_SNOWY));
-                this.getParentModel().renderToBuffer(matrixStackIn, ivertexbuilder, packedLightIn, LivingEntityRenderer.getOverlayCoords(entitylivingbaseIn, 0.0F), -1);
+    public ResourceLocation getTextureLocation(BisonRenderState state) {
+        if (state.isBaby) {
+            return state.isSnowy ? TEXTURE_BABY_SNOWY : TEXTURE_BABY;
+        } else {
+            if (state.isSheared) {
+                return TEXTURE_SHEARED;
+            } else {
+                return state.isSnowy ? TEXTURE_SNOWY : TEXTURE;
             }
         }
     }

@@ -30,7 +30,7 @@ import net.minecraft.world.entity.ai.goal.*;
 import net.minecraft.world.entity.ai.goal.target.NearestAttackableTargetGoal;
 import net.minecraft.world.entity.ai.navigation.PathNavigation;
 import net.minecraft.world.entity.animal.Animal;
-import net.minecraft.world.entity.animal.Wolf;
+import net.minecraft.world.entity.animal.wolf.Wolf;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
@@ -51,7 +51,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.EnumSet;
 
-public class EntityBison extends Animal implements IAnimatedEntity, Shearable, net.neoforged.neoforge.common.IShearable {
+public class EntityBison extends Animal implements IAnimatedEntity, Shearable {
 
     public static final Animation ANIMATION_PREPARE_CHARGE = Animation.create(40);
     public static final Animation ANIMATION_EAT = Animation.create(35);
@@ -71,7 +71,7 @@ public class EntityBison extends Animal implements IAnimatedEntity, Shearable, n
     private boolean hasChargedSpeed = false;
     private int feedingsSinceLastShear = 0;
 
-    protected EntityBison(EntityType<? extends Animal> animal, Level lvl) {
+    public EntityBison(EntityType<? extends Animal> animal, Level lvl) {
         super(animal, lvl);
     }
 
@@ -147,16 +147,16 @@ public class EntityBison extends Animal implements IAnimatedEntity, Shearable, n
     @Nullable
     @Override
     public AgeableMob getBreedOffspring(ServerLevel level, AgeableMob mob) {
-        return EntityType.BISON.create(level());
+        return new EntityBison(EntityType.BISON, level);
     }
 
     public void readAdditionalSaveData(CompoundTag compound) {
         super.readAdditionalSaveData(compound);
-        this.setSnowy(compound.getBoolean("Snowy"));
-        this.setSheared(compound.getBoolean("Sheared"));
-        this.permSnow = compound.getBoolean("SnowPerm");
-        this.chargeCooldown = compound.getInt("ChargeCooldown");
-        this.feedingsSinceLastShear = compound.getInt("Feedings");
+        this.setSnowy(compound.getBooleanOr("Snowy", false));
+        this.setSheared(compound.getBooleanOr("Sheared", false));
+        this.permSnow = compound.getBooleanOr("SnowPerm", false);
+        this.chargeCooldown = compound.getIntOr("ChargeCooldown", 0);
+        this.feedingsSinceLastShear = compound.getIntOr("Feedings", 0);
     }
 
     public void addAdditionalSaveData(CompoundTag compound) {
@@ -276,7 +276,7 @@ public class EntityBison extends Animal implements IAnimatedEntity, Shearable, n
         } else if (world.getHeightmapPos(Heightmap.Types.MOTION_BLOCKING, position).getY() > position.getY()) {
             return false;
         } else {
-            return world.getBiome(position).value().getPrecipitationAt(position) == Biome.Precipitation.SNOW;
+            return world.getBiome(position).value().getPrecipitationAt(position, world.getSeaLevel()) == Biome.Precipitation.SNOW;
         }
     }
 
@@ -345,7 +345,7 @@ public class EntityBison extends Animal implements IAnimatedEntity, Shearable, n
         return type;
     }
 
-    public void customServerAiStep() {
+    protected void customServerAiStep() {
         super.customServerAiStep();
         breakBlock();
     }
@@ -356,7 +356,7 @@ public class EntityBison extends Animal implements IAnimatedEntity, Shearable, n
             return;
         }
         boolean flag = false;
-        if (!this.level().isClientSide && this.blockBreakCounter == 0 && net.neoforged.neoforge.event.EventHooks.canEntityGrief(level(), this)) {
+        if (!this.level().isClientSide() && this.blockBreakCounter == 0) {
             for (int a = (int) Math.round(this.getBoundingBox().minX); a <= (int) Math.round(this.getBoundingBox().maxX); a++) {
                 for (int b = (int) Math.round(this.getBoundingBox().minY) - 1; (b <= (int) Math.round(this.getBoundingBox().maxY) + 1) && (b <= 127); b++) {
                     for (int c = (int) Math.round(this.getBoundingBox().minZ); c <= (int) Math.round(this.getBoundingBox().maxZ); c++) {
@@ -403,35 +403,19 @@ public class EntityBison extends Animal implements IAnimatedEntity, Shearable, n
     }
 
     @Override
-    public boolean isShearable(@javax.annotation.Nullable Player player, ItemStack item, Level level, BlockPos pos) {
-        return this.readyForShearing();
-    }
-
-    @javax.annotation.Nonnull
-    @Override
-    public java.util.List<ItemStack> onSheared(@javax.annotation.Nullable net.minecraft.world.entity.player.Player player, ItemStack item, Level level, BlockPos pos) {
-        if (player != null) {
-            level().playSound(null, this, SoundEvents.SHEEP_SHEAR, SoundSource.PLAYERS, 1.0F, 1.0F);
-        }
-        this.gameEvent(GameEvent.ENTITY_INTERACT);
-        this.setSheared(true);
-        this.feedingsSinceLastShear = 0;
-        java.util.List<ItemStack> drops = new java.util.ArrayList<>();
-        for (int i = 0; i < 2 + random.nextInt(2); i++) {
-            drops.add(new ItemStack(Items.BISON_FUR));
-        }
-        return drops;
-    }
-
-    @Override
-    public void shear(SoundSource category) {
-        level().playSound(null, this, SoundEvents.SHEEP_SHEAR, category, 1.0F, 1.0F);
+    public void shear(ServerLevel serverLevel, SoundSource category, ItemStack itemStack) {
+        serverLevel.playSound(null, this, SoundEvents.SHEEP_SHEAR, category, 1.0F, 1.0F);
         this.gameEvent(GameEvent.ENTITY_INTERACT);
         this.setSheared(true);
         this.feedingsSinceLastShear = 0;
         for (int i = 0; i < 2 + random.nextInt(2); i++) {
-            this.spawnAtLocation(Items.BISON_FUR);
+            this.spawnAtLocation(new ItemStack(Items.BISON_FUR));
         }
+    }
+
+    @Override
+    public boolean readyForShearing() {
+        return !isSheared() && !isBaby();
     }
 
     public boolean isCharging() {
@@ -440,11 +424,6 @@ public class EntityBison extends Animal implements IAnimatedEntity, Shearable, n
 
     public void setCharging(boolean charging) {
         this.entityData.set(CHARGING, charging);
-    }
-
-    @Override
-    public boolean readyForShearing() {
-        return !isSheared() && !isBaby();
     }
 
     public boolean isValidCharging() {

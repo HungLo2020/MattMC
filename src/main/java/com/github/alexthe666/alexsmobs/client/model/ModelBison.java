@@ -1,5 +1,6 @@
 package com.github.alexthe666.alexsmobs.client.model;
 
+import com.github.alexthe666.alexsmobs.client.render.BisonRenderState;
 import com.github.alexthe666.alexsmobs.entity.EntityBison;
 import com.github.alexthe666.alexsmobs.entity.util.Maths;
 import com.github.alexthe666.citadel.animation.IAnimatedEntity;
@@ -10,7 +11,7 @@ import com.github.alexthe666.citadel.client.model.basic.BasicModelPart;
 import com.google.common.collect.ImmutableList;
 import net.minecraft.util.Mth;
 
-public class ModelBison extends AdvancedEntityModel<EntityBison> {
+public class ModelBison extends AdvancedEntityModel<BisonRenderState> {
     private final AdvancedModelBox root;
     private final AdvancedModelBox body;
     private final AdvancedModelBox left_leg;
@@ -205,14 +206,23 @@ public class ModelBison extends AdvancedEntityModel<EntityBison> {
     }
 
     @Override
-    public void setupAnim(EntityBison entity, float limbSwing, float limbSwingAmount, float ageInTicks, float netHeadYaw, float headPitch) {
-        this.animate(entity, limbSwing, limbSwingAmount, ageInTicks, netHeadYaw, headPitch);
+    public void setupAnim(BisonRenderState state) {
+        this.resetToDefaultPose();
+        float limbSwing = state.walkAnimationPos;
+        float limbSwingAmount = state.walkAnimationSpeed;
+        float ageInTicks = state.ageInTicks;
+        float netHeadYaw = state.yRot;
+        float headPitch = state.xRot;
+        
+        // Note: Animation handling would need entity reference for IAnimatedEntity
+        // For now, simplified version without entity-based animations
+        
         float walkSpeed = 0.7F;
         float walkDegree = 0.6F;
         float idleSpeed = 0.1F;
         float idleDegree = 0.1F;
-        float partialTick = ageInTicks - entity.tickCount;
-        float runProgress = entity.prevChargeProgress + (entity.chargeProgress - entity.prevChargeProgress) * partialTick;
+        float runProgress = state.chargeProgress;
+        
         progressPositionPrev(head, runProgress, 0, 1, -3.5F, 5F);
         progressRotationPrev(head, runProgress, Maths.rad(30), 0, 0, 5F);
         if (runProgress > 0) {

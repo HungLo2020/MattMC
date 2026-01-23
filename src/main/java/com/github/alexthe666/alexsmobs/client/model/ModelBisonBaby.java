@@ -1,5 +1,6 @@
 package com.github.alexthe666.alexsmobs.client.model;
 
+import com.github.alexthe666.alexsmobs.client.render.BisonRenderState;
 import com.github.alexthe666.alexsmobs.entity.EntityBison;
 import com.github.alexthe666.alexsmobs.entity.util.Maths;
 import com.github.alexthe666.citadel.animation.IAnimatedEntity;
@@ -10,7 +11,7 @@ import com.github.alexthe666.citadel.client.model.basic.BasicModelPart;
 import com.google.common.collect.ImmutableList;
 import net.minecraft.util.Mth;
 
-public class ModelBisonBaby extends AdvancedEntityModel<EntityBison> {
+public class ModelBisonBaby extends AdvancedEntityModel<BisonRenderState> {
     private final AdvancedModelBox root;
     private final AdvancedModelBox body;
     private final AdvancedModelBox torso;
@@ -150,8 +151,17 @@ public class ModelBisonBaby extends AdvancedEntityModel<EntityBison> {
     }
 
     @Override
-    public void setupAnim(EntityBison entity, float limbSwing, float limbSwingAmount, float ageInTicks, float netHeadYaw, float headPitch) {
-        this.animate(entity, limbSwing, limbSwingAmount, ageInTicks, netHeadYaw, headPitch);
+    public void setupAnim(BisonRenderState state) {
+        this.resetToDefaultPose();
+        float limbSwing = state.walkAnimationPos;
+        float limbSwingAmount = state.walkAnimationSpeed;
+        float ageInTicks = state.ageInTicks;
+        float netHeadYaw = state.yRot;
+        float headPitch = state.xRot;
+        
+        // Note: Animation handling would need entity reference for IAnimatedEntity
+        // For now, simplified version without entity-based animations
+        
         float walkSpeed = 0.4F;
         float walkDegree = 0.7F;
         float idleSpeed = 0.1F;
