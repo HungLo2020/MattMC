@@ -1775,6 +1775,7 @@ public class Items {
 	public static final Item BOGGED_SPAWN_EGG = registerItem("bogged_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.BOGGED));
 	public static final Item BREEZE_SPAWN_EGG = registerItem("breeze_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.BREEZE));
 	public static final Item BUNFUNGUS_SPAWN_EGG = registerItem("bunfungus_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.BUNFUNGUS));
+	public static final Item CACHALOT_WHALE_SPAWN_EGG = registerItem("cachalot_whale_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.CACHALOT_WHALE));
 	public static final Item CAT_SPAWN_EGG = registerItem("cat_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.CAT));
 	public static final Item CATFISH_SPAWN_EGG = registerItem("catfish_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.CATFISH));
 	public static final Item CAMEL_SPAWN_EGG = registerItem("camel_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.CAMEL));

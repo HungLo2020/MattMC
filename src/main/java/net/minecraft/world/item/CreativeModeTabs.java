@@ -1925,6 +1925,7 @@ public class CreativeModeTabs {
 					output.accept(Items.BOGGED_SPAWN_EGG);
 					output.accept(Items.BREEZE_SPAWN_EGG);
 					output.accept(Items.BUNFUNGUS_SPAWN_EGG);
+					output.accept(Items.CACHALOT_WHALE_SPAWN_EGG);
 					output.accept(Items.CAMEL_SPAWN_EGG);
 					output.accept(Items.CAT_SPAWN_EGG);
 					output.accept(Items.CATFISH_SPAWN_EGG);
