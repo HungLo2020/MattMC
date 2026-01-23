@@ -201,7 +201,7 @@ public class EntityShoebill extends Animal implements IAnimatedEntity, ITargetsD
                     switchNavigator(true);
             }
 
-            if (this.revengeCooldown > 0 && !this.isFlying()) {
+            if (this.revengeCooldown == 0 && this.isFlying()) {
                 if (this.onGround() || this.isInWater()) {
                     this.setFlying(false);
                 }

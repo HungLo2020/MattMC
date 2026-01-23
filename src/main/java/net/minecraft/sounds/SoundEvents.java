@@ -144,6 +144,8 @@ public class SoundEvents {
 	public static final SoundEvent BAMBOO_WOOD_FENCE_GATE_OPEN = register("block.bamboo_wood_fence_gate.open");
 	public static final SoundEvent BARREL_CLOSE = register("block.barrel.close");
 	public static final SoundEvent BARREL_OPEN = register("block.barrel.open");
+	public static final SoundEvent BALD_EAGLE_IDLE = register("entity.bald_eagle.idle");
+	public static final SoundEvent BALD_EAGLE_HURT = register("entity.bald_eagle.hurt");
 	public static final SoundEvent BASALT_BREAK = register("block.basalt.break");
 	public static final SoundEvent BASALT_STEP = register("block.basalt.step");
 	public static final SoundEvent BASALT_PLACE = register("block.basalt.place");

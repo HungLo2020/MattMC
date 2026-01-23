@@ -80,6 +80,7 @@ public class EntityRenderers {
 		register(EntityType.AXOLOTL, AxolotlRenderer::new);
 		register(EntityType.BAMBOO_CHEST_RAFT, context -> new RaftRenderer(context, ModelLayers.BAMBOO_CHEST_RAFT));
 		register(EntityType.BAMBOO_RAFT, context -> new RaftRenderer(context, ModelLayers.BAMBOO_RAFT));
+		register(EntityType.BALD_EAGLE, com.github.alexthe666.alexsmobs.client.render.RenderBaldEagle::new);
 		register(EntityType.BAT, BatRenderer::new);
 		register(EntityType.BEE, BeeRenderer::new);
 		register(EntityType.BIRCH_BOAT, context -> new BoatRenderer(context, ModelLayers.BIRCH_BOAT));

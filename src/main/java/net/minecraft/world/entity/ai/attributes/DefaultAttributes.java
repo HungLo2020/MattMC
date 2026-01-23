@@ -107,6 +107,7 @@ public class DefaultAttributes {
 		.put(EntityType.ARMADILLO, Armadillo.createAttributes().build())
 		.put(EntityType.ARMOR_STAND, ArmorStand.createAttributes().build())
 		.put(EntityType.AXOLOTL, Axolotl.createAttributes().build())
+		.put(EntityType.BALD_EAGLE, com.github.alexthe666.alexsmobs.entity.EntityBaldEagle.bakeAttributes().build())
 		.put(EntityType.BAT, Bat.createAttributes().build())
 		.put(EntityType.BEE, Bee.createAttributes().build())
 		.put(EntityType.BLAZE, Blaze.createAttributes().build())

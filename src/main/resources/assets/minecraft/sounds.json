@@ -12917,6 +12917,21 @@
     ],
     "subtitle": "subtitles.entity.axolotl.swim"
   },
+  "entity.bald_eagle.idle": {
+    "sounds": [
+      "bald_eagle_idle_0",
+      "bald_eagle_idle_1",
+      "bald_eagle_idle_2"
+    ],
+    "subtitle": "subtitles.entity.bald_eagle.idle"
+  },
+  "entity.bald_eagle.hurt": {
+    "sounds": [
+      "bald_eagle_hurt_0",
+      "bald_eagle_hurt_1"
+    ],
+    "subtitle": "subtitles.entity.bald_eagle.hurt"
+  },
   "entity.bat.ambient": {
     "sounds": [
       "mob/bat/idle1",
