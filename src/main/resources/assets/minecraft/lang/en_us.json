@@ -7990,5 +7990,10 @@
   "entity.minecraft.sugar_glider.command_2": "%s is now sitting",
   "entity.minecraft.anteater": "Anteater",
   "item.minecraft.anteater_spawn_egg": "Anteater Spawn Egg",
-  "subtitles.entity.anteater.hurt": "Anteater hurts"
+  "subtitles.entity.anteater.hurt": "Anteater hurts",
+  "entity.minecraft.cachalot_whale": "Cachalot Whale",
+  "item.minecraft.cachalot_whale_spawn_egg": "Cachalot Whale Spawn Egg",
+  "subtitles.entity.cachalot_whale.click": "Cachalot Whale clicks",
+  "subtitles.entity.cachalot_whale.hurt": "Cachalot Whale hurts",
+  "subtitles.entity.cachalot_whale.idle": "Cachalot Whale calls"
 }
