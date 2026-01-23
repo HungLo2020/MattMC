@@ -131,7 +131,6 @@ public class ModelCaiman extends AdvancedEntityModel<CaimanRenderState> {
 
     @Override
     public void setupAnim(CaimanRenderState state) {
-        super.setupAnim(state);
         this.resetToDefaultPose();
         float idleSpeed = 0.05F;
         float idleDegree = 0.1F;
@@ -153,7 +152,7 @@ public class ModelCaiman extends AdvancedEntityModel<CaimanRenderState> {
         progressRotationPrev(rightLeg, swimProgress, Maths.rad(75), 0, Maths.rad(60), 1F);
         progressRotationPrev(leftLeg, swimProgress, Maths.rad(75), 0, Maths.rad(-60), 1F);
         progressPositionPrev(head, swimAmount, 0, 2, 0, 1F);
-        progressPositionPrev(head, entity.holdProgress, 0, 0, 2, 5F);
+        progressPositionPrev(head, grabProgress, 0, 0, 2, 5F);
         progressPositionPrev(bottomJaw, grabProgress, 0, 1, 0, 5F);
         progressRotationPrev(topJaw, grabProgress, Maths.rad(-15), 0, 0, 5F);
         progressRotationPrev(bottomJaw, grabProgress, Maths.rad(25), 0, 0, 5F);
@@ -221,28 +220,6 @@ public class ModelCaiman extends AdvancedEntityModel<CaimanRenderState> {
         AdvancedModelBox.rotateAngleX = x;
         AdvancedModelBox.rotateAngleY = y;
         AdvancedModelBox.rotateAngleZ = z;
-    }
-
-    public void renderToBuffer(PoseStack matrixStackIn, VertexConsumer bufferIn, int packedLightIn, int packedOverlayIn, int color) {
-        if (this.young) {
-            float f = 1.25F;
-            head.setScale(f, f, f);
-            head.setShouldScaleChildren(true);
-            matrixStackIn.pushPose();
-            matrixStackIn.scale(0.25F, 0.25F, 0.25F);
-            matrixStackIn.translate(0.0D, 4.5D, 0.125D);
-            parts().forEach((p_228292_8_) -> {
-                p_228292_8_.render(matrixStackIn, bufferIn, packedLightIn, packedOverlayIn, color);
-            });
-            matrixStackIn.popPose();
-            head.setScale(1, 1, 1);
-        } else {
-            matrixStackIn.pushPose();
-            parts().forEach((p_228290_8_) -> {
-                p_228290_8_.render(matrixStackIn, bufferIn, packedLightIn, packedOverlayIn, color);
-            });
-            matrixStackIn.popPose();
-        }
     }
 
     private float walkValue(float limbSwing, float limbSwingAmount, float speed, float offset, float degree, boolean inverse) {
