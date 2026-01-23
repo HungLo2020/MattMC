@@ -1,6 +1,6 @@
 package com.github.alexthe666.alexsmobs.client.model;
 
-import com.github.alexthe666.alexsmobs.entity.EntityGiantSquid;
+import com.github.alexthe666.alexsmobs.client.render.state.GiantSquidRenderState;
 import com.github.alexthe666.alexsmobs.entity.util.Maths;
 import com.github.alexthe666.citadel.client.model.AdvancedEntityModel;
 import com.github.alexthe666.citadel.client.model.AdvancedModelBox;
@@ -11,7 +11,7 @@ import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.phys.Vec3;
 
-public class ModelGiantSquid extends AdvancedEntityModel<EntityGiantSquid> {
+public class ModelGiantSquid extends AdvancedEntityModel<GiantSquidRenderState> {
     private final AdvancedModelBox root;
     private final AdvancedModelBox head;
     private final AdvancedModelBox beak;
@@ -262,7 +262,7 @@ public class ModelGiantSquid extends AdvancedEntityModel<EntityGiantSquid> {
     }
 
     @Override
-    public void setupAnim(EntityGiantSquid entity, float limbSwing, float limbSwingAmount, float ageInTicks, float netHeadYaw, float headPitch) {
+    public void setupAnim(GiantSquidRenderState renderState) {
         this.resetToDefaultPose();
         float swimSpeed = 0.2F;
         float swimDegree = 0.4F;
@@ -270,11 +270,13 @@ public class ModelGiantSquid extends AdvancedEntityModel<EntityGiantSquid> {
         float idleDegree = 0.02F;
         float flailSpeed = 0.3F;
         float flailDegree = 0.4F;
-        float partialTick = ageInTicks - entity.tickCount;
-        float dryProgress = entity.prevDryProgress + (entity.dryProgress - entity.prevDryProgress) * partialTick;
-        float capturedProgress = entity.prevCapturedProgress + (entity.capturedProgress - entity.prevCapturedProgress) * partialTick;
-        float grabProgress = entity.prevGrabProgress + (entity.grabProgress - entity.prevGrabProgress) * partialTick;
-        float pitch = entity.prevSquidPitch + (entity.getSquidPitch() - entity.prevSquidPitch) * partialTick;
+        float ageInTicks = renderState.ageInTicks;
+        float limbSwing = renderState.walkAnimationPos;
+        float limbSwingAmount = renderState.walkAnimationSpeed;
+        float dryProgress = renderState.dryProgress;
+        float capturedProgress = renderState.capturedProgress;
+        float grabProgress = renderState.grabProgress;
+        float pitch = renderState.squidPitch;
         float f = (pitch - 90) * Mth.DEG_TO_RAD;
         float f1 = (float) Math.sin(swimSpeed * limbSwing) * swimDegree * limbSwingAmount;
         float stretchy = 0.9F + 0.2F * f1;
@@ -286,23 +288,23 @@ public class ModelGiantSquid extends AdvancedEntityModel<EntityGiantSquid> {
         this.mantle.setScale(stretchyXZ, stretchy, stretchyXZ - (dryProgress * 0.05F));
         this.mantle.setShouldScaleChildren(true);
         float contractFromGrab = 1F - (0.2F * grabProgress);
-        this.right_arm2.rotateAngleX -= contractFromGrab * getArmRot(entity, 2, partialTick, false);
-        this.left_arm2.rotateAngleX += contractFromGrab * getArmRot(entity, 2, partialTick, false);
-        this.right_arm2.rotateAngleX -= contractFromGrab * getArmRot(entity, 4, partialTick, false);
-        this.left_arm2.rotateAngleX += contractFromGrab * getArmRot(entity, 4, partialTick, false);
-        this.right_arm3.rotateAngleX -= contractFromGrab * getArmRot(entity, 8, partialTick, false);
-        this.left_arm3.rotateAngleX += contractFromGrab * getArmRot(entity, 8, partialTick, false);
-        this.right_arm4.rotateAngleX -= contractFromGrab * getArmRot(entity, 12, partialTick, false);
-        this.left_arm4.rotateAngleX += contractFromGrab * getArmRot(entity, 12, partialTick, false);
+        this.right_arm2.rotateAngleX -= contractFromGrab * getArmRot(renderState, 2, false);
+        this.left_arm2.rotateAngleX += contractFromGrab * getArmRot(renderState, 2, false);
+        this.right_arm2.rotateAngleX -= contractFromGrab * getArmRot(renderState, 4, false);
+        this.left_arm2.rotateAngleX += contractFromGrab * getArmRot(renderState, 4, false);
+        this.right_arm3.rotateAngleX -= contractFromGrab * getArmRot(renderState, 8, false);
+        this.left_arm3.rotateAngleX += contractFromGrab * getArmRot(renderState, 8, false);
+        this.right_arm4.rotateAngleX -= contractFromGrab * getArmRot(renderState, 12, false);
+        this.left_arm4.rotateAngleX += contractFromGrab * getArmRot(renderState, 12, false);
 
-        this.right_arm2.rotateAngleZ += contractFromGrab * getArmRot(entity, 2, partialTick, true);
-        this.left_arm2.rotateAngleZ -= contractFromGrab * getArmRot(entity, 2, partialTick, true);
-        this.right_arm2.rotateAngleZ += contractFromGrab * getArmRot(entity, 4, partialTick, true);
-        this.left_arm2.rotateAngleZ -= contractFromGrab * getArmRot(entity, 4, partialTick, true);
-        this.right_arm3.rotateAngleZ += contractFromGrab * getArmRot(entity, 6, partialTick, true);
-        this.left_arm3.rotateAngleZ -= contractFromGrab * getArmRot(entity, 6, partialTick, true);
-        this.right_arm4.rotateAngleZ += contractFromGrab * getArmRot(entity, 8, partialTick, true);
-        this.left_arm4.rotateAngleZ -= contractFromGrab * getArmRot(entity, 8, partialTick, true);
+        this.right_arm2.rotateAngleZ += contractFromGrab * getArmRot(renderState, 2, true);
+        this.left_arm2.rotateAngleZ -= contractFromGrab * getArmRot(renderState, 2, true);
+        this.right_arm2.rotateAngleZ += contractFromGrab * getArmRot(renderState, 4, true);
+        this.left_arm2.rotateAngleZ -= contractFromGrab * getArmRot(renderState, 4, true);
+        this.right_arm3.rotateAngleZ += contractFromGrab * getArmRot(renderState, 6, true);
+        this.left_arm3.rotateAngleZ -= contractFromGrab * getArmRot(renderState, 6, true);
+        this.right_arm4.rotateAngleZ += contractFromGrab * getArmRot(renderState, 8, true);
+        this.left_arm4.rotateAngleZ -= contractFromGrab * getArmRot(renderState, 8, true);
 
         progressRotationPrev(mantle_end, dryProgress, Maths.rad(-10), 0, 0, 5F);
         progressRotationPrev(right_membrane, dryProgress, 0, Maths.rad(20), 0, 5F);
@@ -478,30 +480,20 @@ public class ModelGiantSquid extends AdvancedEntityModel<EntityGiantSquid> {
             this.walk(beak, 0.7F, 0.35F, true, 0F, 0F, ageInTicks, 1);
             this.bob(beak, 0.7F, 0.35F, true, ageInTicks, 1);
         }
-        Entity look = Minecraft.getInstance().getCameraEntity();
-        if (look != null) {
-            Vec3 vector3d = look.getEyePosition(partialTick);
-            Vec3 vector3d1 = entity.getEyePosition(partialTick);
-            float dist = Mth.clamp((float) vector3d.subtract(vector3d1).length() * 0.2F, 0.4F, 1.0F);
-            float eyeScale = 1.4F - dist;
-            float maxEyeDist = 0.7F;
-            double d0 = (vector3d.y - vector3d1.y);
-            Vec3 vector3d2 = entity.getViewVector(0.0F);
-            vector3d2 = new Vec3(vector3d2.x, 0.0D, vector3d2.z);
-            Vec3 vector3d3 = (new Vec3(vector3d.x - vector3d1.x, 0.0D, vector3d.z - vector3d1.z)).normalize();
-            double d1 = vector3d2.dot(vector3d3);
-            double eyeXz = Mth.sqrt((float) Math.abs(d1)) * -2F * (float) Math.signum(d1);
-            this.left_pupil.setScale(eyeScale, eyeScale, eyeScale);
-            this.left_pupil.rotationPointZ -= (float) Mth.clamp(-eyeXz, -maxEyeDist / eyeScale, maxEyeDist / eyeScale);
-            this.left_pupil.rotationPointY += (float) Mth.clamp(-d0, -maxEyeDist / eyeScale, maxEyeDist / eyeScale);
-            this.right_pupil.setScale(eyeScale, eyeScale, eyeScale);
-            this.right_pupil.rotationPointZ += (float) Mth.clamp(eyeXz, -maxEyeDist / eyeScale, maxEyeDist / eyeScale);
-            this.right_pupil.rotationPointY += (float) Mth.clamp(-d0, -maxEyeDist / eyeScale, maxEyeDist / eyeScale);
-        }
+        // Eye tracking removed - requires entity reference which is not available in render state
     }
 
-    private float getArmRot(EntityGiantSquid entity, int offset, float partialTick, boolean pitch) {
-        float rotWrap = Mth.wrapDegrees(entity.getRingBuffer(offset, partialTick, pitch) - entity.getRingBuffer(0, partialTick, pitch));
+    private float getRingBufferFromRenderState(GiantSquidRenderState renderState, int bufferOffset, boolean pitch) {
+        if (renderState.ringBufferIndex < 0) {
+            return 0;
+        }
+        int i = (renderState.ringBufferIndex - bufferOffset) & 63;
+        int k = pitch ? 1 : 0;
+        return renderState.ringBuffer[i][k];
+    }
+
+    private float getArmRot(GiantSquidRenderState renderState, int offset, boolean pitch) {
+        float rotWrap = Mth.wrapDegrees(getRingBufferFromRenderState(renderState, offset, pitch) - getRingBufferFromRenderState(renderState, 0, pitch));
         return (Mth.clamp(rotWrap, -50, 50) * 0.4F) * Mth.DEG_TO_RAD;
     }
 

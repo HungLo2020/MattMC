@@ -162,6 +162,7 @@ public class EntityRenderers {
 				context, new SquidModel(context.bakeLayer(ModelLayers.GLOW_SQUID)), new SquidModel(context.bakeLayer(ModelLayers.GLOW_SQUID_BABY))
 			)
 		);
+		register(EntityType.GIANT_SQUID, com.github.alexthe666.alexsmobs.client.render.RenderGiantSquid::new);
 		register(EntityType.GOAT, GoatRenderer::new);
 		register(EntityType.GROTTOCERATOPS, com.github.alexmodguy.alexscaves.client.render.entity.GrottoceratopsRenderer::new);
 		register(EntityType.GUARDIAN, GuardianRenderer::new);

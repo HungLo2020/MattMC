@@ -1849,6 +1849,7 @@ public class Items {
 		"happy_ghast_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.HAPPY_GHAST)
 	);
 	public static final Item GLOW_SQUID_SPAWN_EGG = registerItem("glow_squid_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.GLOW_SQUID));
+	public static final Item GIANT_SQUID_SPAWN_EGG = registerItem("giant_squid_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.GIANT_SQUID));
 	public static final Item GOAT_SPAWN_EGG = registerItem("goat_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.GOAT));
 	public static final Item GROTTOCERATOPS_SPAWN_EGG = registerItem("grottoceratops_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.GROTTOCERATOPS));
 	public static final Item GUARDIAN_SPAWN_EGG = registerItem("guardian_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.GUARDIAN));
@@ -2389,6 +2390,7 @@ public class Items {
 	);
 	public static final Item HONEYCOMB_BLOCK = registerBlock(Blocks.HONEYCOMB_BLOCK);
 	public static final Item LODESTONE = registerBlock(Blocks.LODESTONE);
+	public static final Item LOST_TENTACLE = registerItem("lost_tentacle");
 	public static final Item CRYING_OBSIDIAN = registerBlock(Blocks.CRYING_OBSIDIAN);
 	public static final Item BLACKSTONE = registerBlock(Blocks.BLACKSTONE);
 	public static final Item BLACKSTONE_SLAB = registerBlock(Blocks.BLACKSTONE_SLAB);

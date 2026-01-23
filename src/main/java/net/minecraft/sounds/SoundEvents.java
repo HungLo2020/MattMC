@@ -729,6 +729,8 @@ public class SoundEvents {
 	public static final SoundEvent GLOW_SQUID_DEATH = register("entity.glow_squid.death");
 	public static final SoundEvent GLOW_SQUID_HURT = register("entity.glow_squid.hurt");
 	public static final SoundEvent GLOW_SQUID_SQUIRT = register("entity.glow_squid.squirt");
+	public static final SoundEvent GIANT_SQUID_HURT = register("entity.giant_squid.hurt");
+	public static final SoundEvent GIANT_SQUID_GAMES = register("entity.giant_squid.games");
 	public static final SoundEvent GOAT_AMBIENT = register("entity.goat.ambient");
 	public static final SoundEvent GOAT_DEATH = register("entity.goat.death");
 	public static final SoundEvent GOAT_EAT = register("entity.goat.eat");

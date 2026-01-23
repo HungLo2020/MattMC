@@ -157,6 +157,7 @@ public class DefaultAttributes {
 		.put(EntityType.HAPPY_GHAST, HappyGhast.createAttributes().build())
 		.put(EntityType.GIANT, Giant.createAttributes().build())
 		.put(EntityType.GLOW_SQUID, GlowSquid.createAttributes().build())
+		.put(EntityType.GIANT_SQUID, com.github.alexthe666.alexsmobs.entity.EntityGiantSquid.createAttributes().build())
 		.put(EntityType.GOAT, Goat.createAttributes().build())
 		.put(EntityType.GROTTOCERATOPS, GrottoceratopsEntity.createAttributes().build())
 		.put(EntityType.GUARDIAN, Guardian.createAttributes().build())

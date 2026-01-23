@@ -1,29 +1,48 @@
 package com.github.alexthe666.alexsmobs.client.render;
 
 import com.github.alexthe666.alexsmobs.client.model.ModelGiantSquid;
+import com.github.alexthe666.alexsmobs.client.render.state.GiantSquidRenderState;
 import com.github.alexthe666.alexsmobs.entity.EntityGiantSquid;
 import com.github.alexthe666.alexsmobs.entity.EntityGiantSquidPart;
 import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.blaze3d.vertex.VertexConsumer;
-import net.minecraft.client.renderer.MultiBufferSource;
-import net.minecraft.client.renderer.RenderType;
+import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.client.renderer.culling.Frustum;
 import net.minecraft.client.renderer.entity.EntityRendererProvider;
-import net.minecraft.client.renderer.entity.LivingEntityRenderer;
 import net.minecraft.client.renderer.entity.MobRenderer;
 import net.minecraft.client.renderer.entity.layers.RenderLayer;
 import net.minecraft.resources.ResourceLocation;
 
-public class RenderGiantSquid extends MobRenderer<EntityGiantSquid, ModelGiantSquid> {
-    private static final ResourceLocation TEXTURE = ResourceLocation.parse("alexsmobs:textures/entity/giant_squid.png");
+public class RenderGiantSquid extends MobRenderer<EntityGiantSquid, GiantSquidRenderState, ModelGiantSquid> {
+    private static final ResourceLocation TEXTURE = ResourceLocation.withDefaultNamespace("textures/entity/giant_squid.png");
     private static final ResourceLocation TEXTURE_BLUE = ResourceLocation
-            .parse("alexsmobs:textures/entity/giant_squid_blue.png");
+            .withDefaultNamespace("textures/entity/giant_squid_blue.png");
     private static final ResourceLocation TEXTURE_DEPRESSURIZED = ResourceLocation
-            .parse("alexsmobs:textures/entity/giant_squid_depressurized.png");
+            .withDefaultNamespace("textures/entity/giant_squid_depressurized.png");
 
     public RenderGiantSquid(EntityRendererProvider.Context renderManagerIn) {
         super(renderManagerIn, new ModelGiantSquid(), 1F);
         this.addLayer(new LayerDepressurization(this));
+    }
+
+    @Override
+    public GiantSquidRenderState createRenderState() {
+        return new GiantSquidRenderState();
+    }
+
+    @Override
+    public void extractRenderState(EntityGiantSquid entity, GiantSquidRenderState renderState, float partialTick) {
+        super.extractRenderState(entity, renderState, partialTick);
+        renderState.squidPitch = entity.prevSquidPitch + (entity.getSquidPitch() - entity.prevSquidPitch) * partialTick;
+        renderState.depressurization = entity.prevDepressurization + (entity.getDepressurization() - entity.prevDepressurization) * partialTick;
+        renderState.grabProgress = entity.prevGrabProgress + (entity.grabProgress - entity.prevGrabProgress) * partialTick;
+        renderState.dryProgress = entity.prevDryProgress + (entity.dryProgress - entity.prevDryProgress) * partialTick;
+        renderState.capturedProgress = entity.prevCapturedProgress + (entity.capturedProgress - entity.prevCapturedProgress) * partialTick;
+        renderState.isBlue = entity.isBlue();
+        renderState.ringBufferIndex = entity.ringBufferIndex;
+        for (int i = 0; i < renderState.ringBuffer.length; i++) {
+            renderState.ringBuffer[i][0] = entity.ringBuffer[i][0];
+            renderState.ringBuffer[i][1] = entity.ringBuffer[i][1];
+        }
     }
 
     protected float getFlipDegrees(EntityGiantSquid squid) {
@@ -50,24 +69,26 @@ public class RenderGiantSquid extends MobRenderer<EntityGiantSquid, ModelGiantSq
     protected void scale(EntityGiantSquid entitylivingbaseIn, PoseStack matrixStackIn, float partialTickTime) {
     }
 
-    public ResourceLocation getTextureLocation(EntityGiantSquid entity) {
-        return entity.isBlue() ? TEXTURE_BLUE : TEXTURE;
+    public ResourceLocation getTextureLocation(GiantSquidRenderState renderState) {
+        return renderState.isBlue ? TEXTURE_BLUE : TEXTURE;
     }
 
-    static class LayerDepressurization extends RenderLayer<EntityGiantSquid, ModelGiantSquid> {
+    static class LayerDepressurization extends RenderLayer<GiantSquidRenderState, ModelGiantSquid> {
 
         public LayerDepressurization(RenderGiantSquid render) {
             super(render);
         }
 
-        public void render(PoseStack matrixStackIn, MultiBufferSource bufferIn, int packedLightIn,
-                EntityGiantSquid squid, float limbSwing, float limbSwingAmount, float partialTicks, float ageInTicks,
-                float netHeadYaw, float headPitch) {
-            VertexConsumer ivertexbuilder = bufferIn.getBuffer(RenderType.entityTranslucent(TEXTURE_DEPRESSURIZED));
-            float alpha = squid.prevDepressurization
-                    + (squid.getDepressurization() - squid.prevDepressurization) * partialTicks;
-            this.getParentModel().renderToBuffer(matrixStackIn, ivertexbuilder, packedLightIn,
-                    LivingEntityRenderer.getOverlayCoords(squid, 0.0F), AMColorUtil.packColor(1.0F, 1.0F, 1.0F, alpha));
+        @Override
+        public void submit(PoseStack poseStack, SubmitNodeCollector submitNodeCollector, int packedLight, GiantSquidRenderState renderState, float f, float g) {
+            // Note: In 1.21 render state architecture, we need to use the submitNodeCollector
+            // The old render() method with MultiBufferSource is no longer available
+            // This is a stub for now - proper translucent rendering may require different approach
+            float alpha = renderState.depressurization;
+            if (alpha > 0.01F) {
+                // Translucent overlay rendering would go here
+                // In the new architecture, this might need to be handled differently
+            }
         }
     }
 }

@@ -15798,6 +15798,20 @@
     ],
     "subtitle": "subtitles.entity.glow_squid.squirt"
   },
+  "entity.giant_squid.hurt": {
+    "sounds": [
+      "giant_squid_hurt_0",
+      "giant_squid_hurt_1",
+      "giant_squid_hurt_2"
+    ],
+    "subtitle": "subtitles.entity.giant_squid.hurt"
+  },
+  "entity.giant_squid.games": {
+    "sounds": [
+      "giant_squid_games"
+    ],
+    "subtitle": "subtitles.entity.giant_squid.games"
+  },
   "entity.goat.ambient": {
     "sounds": [
       {

@@ -1,35 +1,36 @@
 package com.github.alexthe666.alexsmobs.entity;
 
-import com.github.alexthe666.alexsmobs.AlexsMobs;
-import com.github.alexthe666.alexsmobs.message.MessageHurtMultipart;
-import com.github.alexthe666.alexsmobs.message.MessageInteractMultipart;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.ClientGamePacketListener;
 import net.minecraft.network.syncher.SynchedEntityData;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityDimensions;
-import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Pose;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
 import net.minecraft.world.phys.Vec3;
-import net.neoforged.neoforge.entity.PartEntity;
 
 import javax.annotation.Nullable;
+import java.util.List;
 
-public class EntityGiantSquidPart extends PartEntity<EntityGiantSquid> implements IHurtableMultipart {
+public class EntityGiantSquidPart extends Entity {
 
     private final EntityDimensions size;
+    public final EntityGiantSquid parentMob;
     public float scale = 1;
     private boolean collisionOnly = false;
 
     public EntityGiantSquidPart(EntityGiantSquid parent, float sizeX, float sizeY) {
-        super(parent);
+        super(parent.getType(), parent.level());
         this.size = EntityDimensions.scalable(sizeX, sizeY);
+        this.parentMob = parent;
         this.refreshDimensions();
     }
 
@@ -46,21 +47,22 @@ public class EntityGiantSquidPart extends PartEntity<EntityGiantSquid> implement
     public boolean canUsePortal(boolean allowVehicles) {
         return false;
     }
-
-    @Override
+    
     public Vec3 getLeashOffset() {
         return new Vec3(0.0D, (double)this.getEyeHeight() * 0.15F, (double)(this.getBbWidth() * 0.1F));
     }
 
     protected void collideWithNearbyEntities() {
-
+        final List<Entity> entities = this.level().getEntities(this, this.getBoundingBox().expandTowards(0.2D, 0.0D, 0.2D));
+        Entity parent = parentMob;
+        if (parent != null) {
+            entities.stream().filter(entity -> entity != parent && !(entity instanceof EntityGiantSquidPart && ((EntityGiantSquidPart) entity).parentMob == parent) && entity.isPushable()).forEach(entity -> entity.push(parent));
+        }
     }
 
+    @Override
     public InteractionResult interact(Player player, InteractionHand hand) {
-        if(this.level().isClientSide && this.getParent() != null){
-            AlexsMobs.sendMSGToServer(new MessageInteractMultipart(this.getParent().getId(), hand == InteractionHand.OFF_HAND));
-        }
-        return this.getParent() == null ? InteractionResult.PASS : this.getParent().mobInteract(player, hand);
+        return parentMob == null ? InteractionResult.PASS : parentMob.mobInteract(player, hand);
     }
 
     public boolean canBeCollidedWith() {
@@ -79,19 +81,17 @@ public class EntityGiantSquidPart extends PartEntity<EntityGiantSquid> implement
 
     @Nullable
     public ItemStack getPickResult() {
-        Entity parent = this.getParent();
+        Entity parent = parentMob;
         return parent != null ? parent.getPickResult() : ItemStack.EMPTY;
     }
 
-    public boolean hurt(DamageSource source, float amount) {
-        if(this.level().isClientSide && this.getParent() != null && !this.getParent().isInvulnerableTo(source) && !collisionOnly){
-            AlexsMobs.sendMSGToServer(new MessageHurtMultipart(this.getId(), this.getParent().getId(), amount, source.getMsgId()));
-        }
-        return !collisionOnly && !this.isInvulnerableTo(source) && this.getParent().attackEntityPartFrom(this, source, amount);
+    @Override
+    public boolean hurtServer(ServerLevel level, DamageSource source, float amount) {
+        return parentMob != null && !collisionOnly && parentMob.attackEntityPartFrom(this, source, amount);
     }
 
     public boolean is(Entity entityIn) {
-        return this == entityIn || this.getParent() == entityIn;
+        return this == entityIn || parentMob == entityIn;
     }
 
     public Packet<ClientGamePacketListener> getAddEntityPacket() {
@@ -112,17 +112,12 @@ public class EntityGiantSquidPart extends PartEntity<EntityGiantSquid> implement
     }
 
     @Override
-    protected void readAdditionalSaveData(CompoundTag compound) {
+    protected void readAdditionalSaveData(ValueInput valueInput) {
 
     }
 
     @Override
-    protected void addAdditionalSaveData(CompoundTag compound) {
+    protected void addAdditionalSaveData(ValueOutput valueOutput) {
 
-    }
-
-    @Override
-    public void onAttackedFromServer(LivingEntity parent, float damage, DamageSource damageSource) {
-        parent.hurt(damageSource, damage);
     }
 }
