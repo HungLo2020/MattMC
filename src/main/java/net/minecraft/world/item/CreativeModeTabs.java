@@ -1914,6 +1914,7 @@ public class CreativeModeTabs {
 					output.accept(Items.ATLATITAN_SPAWN_EGG);
 					output.accept(Items.ARMADILLO_SPAWN_EGG);
 					output.accept(Items.AXOLOTL_SPAWN_EGG);
+					output.accept(Items.BALD_EAGLE_SPAWN_EGG);
 					output.accept(Items.BAT_SPAWN_EGG);
 					output.accept(Items.BEE_SPAWN_EGG);
 					output.accept(Items.BLAZE_SPAWN_EGG);

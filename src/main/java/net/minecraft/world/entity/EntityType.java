@@ -972,6 +972,9 @@ public class EntityType<T extends Entity> implements FeatureElement, EntityTypeT
 	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntitySeagull> SEAGULL = register(
 		"seagull", EntityType.Builder.of(com.github.alexthe666.alexsmobs.entity.EntitySeagull::new, MobCategory.CREATURE).sized(0.5F, 0.6F).eyeHeight(0.5F).clientTrackingRange(10)
 	);
+	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntityBaldEagle> BALD_EAGLE = register(
+		"bald_eagle", EntityType.Builder.of(com.github.alexthe666.alexsmobs.entity.EntityBaldEagle::new, MobCategory.CREATURE).sized(0.6F, 0.8F).eyeHeight(0.6F).clientTrackingRange(10)
+	);
 	public static final EntityType<Sheep> SHEEP = register(
 		"sheep", EntityType.Builder.of(Sheep::new, MobCategory.CREATURE).sized(0.9F, 1.3F).eyeHeight(1.235F).passengerAttachments(1.2375F).clientTrackingRange(10)
 	);
