@@ -58,4 +58,7 @@ public class AMConfig {
     
     // Elephant spawn configuration
     public static int elephantSpawnRolls = 2;
+    
+    // Gelada Monkey spawn configuration
+    public static int geladaMonkeySpawnRolls = 2;
 }

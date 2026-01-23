@@ -99,4 +99,8 @@ public class AMSoundRegistry {
     // Emu sounds - reference vanilla SoundEvents
     public static final DeferredHolder EMU_IDLE = new DeferredHolder(() -> net.minecraft.sounds.SoundEvents.EMU_IDLE);
     public static final DeferredHolder EMU_HURT = new DeferredHolder(() -> net.minecraft.sounds.SoundEvents.EMU_HURT);
+    
+    // Gelada Monkey sounds - reference vanilla SoundEvents
+    public static final DeferredHolder GELADA_MONKEY_IDLE = new DeferredHolder(() -> net.minecraft.sounds.SoundEvents.GELADA_MONKEY_IDLE);
+    public static final DeferredHolder GELADA_MONKEY_HURT = new DeferredHolder(() -> net.minecraft.sounds.SoundEvents.GELADA_MONKEY_HURT);
 }
