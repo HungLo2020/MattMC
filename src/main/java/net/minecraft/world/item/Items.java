@@ -1802,6 +1802,7 @@ public class Items {
 		properties -> new MobBucketItem(EntityType.COSMIC_COD, Fluids.WATER, SoundEvents.BUCKET_EMPTY_FISH, properties),
 		new Item.Properties().stacksTo(1).component(DataComponents.BUCKET_ENTITY_DATA, CustomData.EMPTY)
 	);
+	public static final Item COSMAW_SPAWN_EGG = registerItem("cosmaw_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.COSMAW));
 	public static final Item COD_SPAWN_EGG = registerItem("cod_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.COD));
 	public static final Item COPPER_GOLEM_SPAWN_EGG = registerItem(
 		"copper_golem_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.COPPER_GOLEM)

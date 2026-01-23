@@ -359,6 +359,13 @@ public class EntityType<T extends Entity> implements FeatureElement, EntityTypeT
 			.eyeHeight(0.2F)
 			.clientTrackingRange(4)
 	);
+	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntityCosmaw> COSMAW = register(
+		"cosmaw", 
+		EntityType.Builder.of(com.github.alexthe666.alexsmobs.entity.EntityCosmaw::new, MobCategory.CREATURE)
+			.sized(1.5F, 1.5F)
+			.eyeHeight(1.0F)
+			.clientTrackingRange(10)
+	);
 	public static final EntityType<Boat> CHERRY_BOAT = register(
 		"cherry_boat",
 		EntityType.Builder.of(boatFactory(() -> Items.CHERRY_BOAT), MobCategory.MISC).noLootTable().sized(1.375F, 0.5625F).eyeHeight(0.5625F).clientTrackingRange(10)

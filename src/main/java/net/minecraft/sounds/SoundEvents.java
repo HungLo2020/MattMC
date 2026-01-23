@@ -339,6 +339,8 @@ public class SoundEvents {
 	public static final SoundEvent CHICKEN_STEP = register("entity.chicken.step");
 	public static final SoundEvent COCKROACH_HURT = register("entity.cockroach.hurt");
 	public static final SoundEvent COSMIC_COD_HURT = register("entity.cosmic_cod.hurt");
+	public static final SoundEvent COSMAW_IDLE = register("entity.cosmaw.idle");
+	public static final SoundEvent COSMAW_HURT = register("entity.cosmaw.hurt");
 	public static final SoundEvent CACHALOT_WHALE_IDLE = register("entity.cachalot_whale.idle");
 	public static final SoundEvent CACHALOT_WHALE_HURT = register("entity.cachalot_whale.hurt");
 	public static final SoundEvent CACHALOT_WHALE_CLICK = register("entity.cachalot_whale.click");
