@@ -35,9 +35,7 @@ public class RenderBison extends MobRenderer<EntityBison, BisonRenderState, Mode
         state.isBaby = entity.isBaby();
     }
 
-    protected void scale(BisonRenderState state, PoseStack matrixStackIn) {
-        // Model switching is handled in getTextureLocation for now
-    }
+
 
     public ResourceLocation getTextureLocation(BisonRenderState state) {
         if (state.isBaby) {
