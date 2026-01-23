@@ -4759,7 +4759,7 @@ public class Blocks {
 	);
 	public static final Block CAIMAN_EGG = register(
 		"caiman_egg",
-		properties -> new com.github.alexthe666.alexsmobs.block.BlockReptileEgg(com.github.alexthe666.alexsmobs.entity.AMEntityRegistry.CAIMAN),
+		com.github.alexthe666.alexsmobs.block.BlockCaimanEgg::new,
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.SAND)
 			.strength(0.5F)
