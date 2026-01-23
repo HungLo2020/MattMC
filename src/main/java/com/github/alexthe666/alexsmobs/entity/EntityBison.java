@@ -150,7 +150,7 @@ public class EntityBison extends Animal implements IAnimatedEntity, Shearable {
         return new EntityBison(EntityType.BISON, level);
     }
 
-    public void readAdditionalSaveData(CompoundTag compound) {
+    public void readAdditionalSaveData(net.minecraft.world.level.storage.ValueInput compound) {
         super.readAdditionalSaveData(compound);
         this.setSnowy(compound.getBooleanOr("Snowy", false));
         this.setSheared(compound.getBooleanOr("Sheared", false));
@@ -159,7 +159,7 @@ public class EntityBison extends Animal implements IAnimatedEntity, Shearable {
         this.feedingsSinceLastShear = compound.getIntOr("Feedings", 0);
     }
 
-    public void addAdditionalSaveData(CompoundTag compound) {
+    public void addAdditionalSaveData(net.minecraft.world.level.storage.ValueOutput compound) {
         super.addAdditionalSaveData(compound);
         compound.putBoolean("Snowy", this.isSnowy());
         compound.putBoolean("Sheared", this.isSheared());
@@ -186,7 +186,7 @@ public class EntityBison extends Animal implements IAnimatedEntity, Shearable {
                 snowTimer = 200 + random.nextInt(400);
                 if (this.isSnowy()) {
                     if (!permSnow) {
-                        if (this.getRemainingFireTicks() > 0 || this.isInWaterOrBubble() || !isSnowingAt(level(), this.blockPosition().above())) {
+                        if (this.getRemainingFireTicks() > 0 || this.isInWater() || !isSnowingAt(level(), this.blockPosition().above())) {
                             this.setSnowy(false);
                         }
                     }
@@ -262,7 +262,7 @@ public class EntityBison extends Animal implements IAnimatedEntity, Shearable {
             feedingsSinceLastShear = 0;
             this.setSheared(false);
         }
-        if (!this.level().isClientSide() && this.isCharging() && (this.getTarget() == null && this.chargePartner == null || this.isInWaterOrBubble())) {
+        if (!this.level().isClientSide() && this.isCharging() && (this.getTarget() == null && this.chargePartner == null || this.isInWater())) {
             this.setCharging(false);
         }
         AnimationHandler.INSTANCE.updateAnimations(this);
@@ -345,8 +345,8 @@ public class EntityBison extends Animal implements IAnimatedEntity, Shearable {
         return type;
     }
 
-    protected void customServerAiStep() {
-        super.customServerAiStep();
+    protected void customServerAiStep(ServerLevel serverLevel) {
+        super.customServerAiStep(serverLevel);
         breakBlock();
     }
 
@@ -409,7 +409,7 @@ public class EntityBison extends Animal implements IAnimatedEntity, Shearable {
         this.setSheared(true);
         this.feedingsSinceLastShear = 0;
         for (int i = 0; i < 2 + random.nextInt(2); i++) {
-            this.spawnAtLocation(new ItemStack(Items.BISON_FUR));
+            this.spawnAtLocation(serverLevel, new ItemStack(Items.BISON_FUR));
         }
     }
 
@@ -427,7 +427,7 @@ public class EntityBison extends Animal implements IAnimatedEntity, Shearable {
     }
 
     public boolean isValidCharging() {
-        return !this.isBaby() && this.isAlive() && chargeCooldown == 0 && !this.isInWaterOrBubble();
+        return !this.isBaby() && this.isAlive() && chargeCooldown == 0 && !this.isInWater();
     }
 
 
