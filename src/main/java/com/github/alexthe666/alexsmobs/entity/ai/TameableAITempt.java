@@ -4,17 +4,18 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.TamableAnimal;
 import net.minecraft.world.entity.ai.goal.TemptGoal;
-import net.minecraft.world.entity.ai.targeting.TargetingConditions;
 import net.minecraft.world.entity.animal.Animal;
-import net.minecraft.world.item.crafting.Ingredient;
+import net.minecraft.world.item.ItemStack;
+
+import java.util.function.Predicate;
 
 public class TameableAITempt extends TemptGoal {
 
     private final Animal tameable;
     private int calmDown;
-    private final Ingredient items;
+    private final Predicate<ItemStack> items;
 
-    public TameableAITempt(Animal tameable, double speedIn, Ingredient temptItemsIn, boolean scaredByPlayerMovementIn) {
+    public TameableAITempt(Animal tameable, double speedIn, Predicate<ItemStack> temptItemsIn, boolean scaredByPlayerMovementIn) {
         super(tameable, speedIn, temptItemsIn, scaredByPlayerMovementIn);
         this.tameable = tameable;
         this.items = temptItemsIn;

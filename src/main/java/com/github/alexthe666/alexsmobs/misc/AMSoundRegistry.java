@@ -104,6 +104,10 @@ public class AMSoundRegistry {
     public static final DeferredHolder GELADA_MONKEY_IDLE = new DeferredHolder(() -> net.minecraft.sounds.SoundEvents.GELADA_MONKEY_IDLE);
     public static final DeferredHolder GELADA_MONKEY_HURT = new DeferredHolder(() -> net.minecraft.sounds.SoundEvents.GELADA_MONKEY_HURT);
     
+    // Gorilla sounds - reference vanilla SoundEvents
+    public static final DeferredHolder GORILLA_IDLE = new DeferredHolder(() -> net.minecraft.sounds.SoundEvents.GORILLA_IDLE);
+    public static final DeferredHolder GORILLA_HURT = new DeferredHolder(() -> net.minecraft.sounds.SoundEvents.GORILLA_HURT);
+    
     // Giant Squid sounds - reference vanilla SoundEvents
     public static final DeferredHolder GIANT_SQUID_HURT = new DeferredHolder(() -> net.minecraft.sounds.SoundEvents.GIANT_SQUID_HURT);
     public static final DeferredHolder GIANT_SQUID_GAMES = new DeferredHolder(() -> net.minecraft.sounds.SoundEvents.GIANT_SQUID_GAMES);
