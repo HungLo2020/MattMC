@@ -282,7 +282,12 @@ public class EntityCaiman extends TamableAnimal implements ISemiAquatic,IFollowe
     }
 
     public static AttributeSupplier.Builder bakeAttributes() {
-        return Monster.createMonsterAttributes().add(Attributes.MAX_HEALTH, 20.0D).add(Attributes.ATTACK_DAMAGE, 3.0D).add(Attributes.ARMOR, 8.0D).add(Attributes.MOVEMENT_SPEED, 0.2F);
+        return Monster.createMonsterAttributes()
+            .add(Attributes.MAX_HEALTH, 20.0D)
+            .add(Attributes.ATTACK_DAMAGE, 3.0D)
+            .add(Attributes.ARMOR, 8.0D)
+            .add(Attributes.MOVEMENT_SPEED, 0.2F)
+            .add(Attributes.TEMPT_RANGE, 10.0D);
     }
 
     public boolean isPushedByFluid() {
