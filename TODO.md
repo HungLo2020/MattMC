@@ -17,14 +17,14 @@
     rain frog
     roadrunner
     seagull
-seal
-shoebill
-spectre
-sugar glider
-terrapin
-toucan
-anteater
-bald eahle
+    seal
+    shoebill
+    spectre
+    sugar glider
+    terrapin
+    toucan
+    anteater (NEEDS ANT AND ANT BLOCKS ADN BLOCK ENTITYIES)
+    bald eagle
     bunfungus
 bison
 cachalot whale
