@@ -7978,5 +7978,8 @@
   "entity.alexsmobs.all.command_2": "%s is now sitting",
   "entity.minecraft.sugar_glider.command_0": "%s is now wandering",
   "entity.minecraft.sugar_glider.command_1": "%s is now following",
-  "entity.minecraft.sugar_glider.command_2": "%s is now sitting"
+  "entity.minecraft.sugar_glider.command_2": "%s is now sitting",
+  "entity.minecraft.anteater": "Anteater",
+  "item.minecraft.anteater_spawn_egg": "Anteater Spawn Egg",
+  "subtitles.entity.anteater.hurt": "Anteater hurts"
 }

@@ -211,6 +211,7 @@ public class EntityRenderers {
 		register(EntityType.RAVAGER, RavagerRenderer::new);
 		register(EntityType.RELICHEIRUS, com.github.alexmodguy.alexscaves.client.render.entity.RelicheirusRenderer::new);
 		register(EntityType.SALMON, SalmonRenderer::new);
+		register(EntityType.ANTEATER, com.github.alexthe666.alexsmobs.client.render.RenderAnteater::new);
 		register(EntityType.SEAGULL, com.github.alexthe666.alexsmobs.client.render.RenderSeagull::new);
 		register(EntityType.SHEEP, SheepRenderer::new);
 		register(EntityType.SHOEBILL, com.github.alexthe666.alexsmobs.client.render.RenderShoebill::new);

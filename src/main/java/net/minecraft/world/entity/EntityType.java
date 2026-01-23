@@ -966,6 +966,9 @@ public class EntityType<T extends Entity> implements FeatureElement, EntityTypeT
 	public static final EntityType<Salmon> SALMON = register(
 		"salmon", EntityType.Builder.of(Salmon::new, MobCategory.WATER_AMBIENT).sized(0.7F, 0.4F).eyeHeight(0.26F).clientTrackingRange(4)
 	);
+	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntityAnteater> ANTEATER = register(
+		"anteater", EntityType.Builder.of(com.github.alexthe666.alexsmobs.entity.EntityAnteater::new, MobCategory.CREATURE).sized(1.2F, 0.9F).eyeHeight(0.7F).clientTrackingRange(10)
+	);
 	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntitySeagull> SEAGULL = register(
 		"seagull", EntityType.Builder.of(com.github.alexthe666.alexsmobs.entity.EntitySeagull::new, MobCategory.CREATURE).sized(0.5F, 0.6F).eyeHeight(0.5F).clientTrackingRange(10)
 	);

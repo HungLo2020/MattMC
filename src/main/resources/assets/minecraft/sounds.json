@@ -25267,5 +25267,12 @@
       "entity/terrapin/terrapin_hurt_2"
     ],
     "subtitle": "subtitles.entity.terrapin.hurt"
+  },
+  "entity.anteater.hurt": {
+    "sounds": [
+      "anteater_hurt_0",
+      "anteater_hurt_1"
+    ],
+    "subtitle": "subtitles.entity.anteater.hurt"
   }
 }
