@@ -27,7 +27,9 @@ public class CapuchinAIMelee extends MeleeAttackGoal {
         if (distToEnemySqr <= d0) {
             this.resetAttackCooldown();
             this.mob.swing(InteractionHand.MAIN_HAND);
-            this.mob.doHurtTarget(enemy);
+            if (this.mob.level() instanceof net.minecraft.server.level.ServerLevel serverLevel) {
+                this.mob.doHurtTarget(serverLevel, enemy);
+            }
         }
 
     }

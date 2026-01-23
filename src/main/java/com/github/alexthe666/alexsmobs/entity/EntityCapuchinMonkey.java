@@ -7,7 +7,6 @@ import com.github.alexthe666.citadel.animation.Animation;
 import com.github.alexthe666.citadel.animation.AnimationHandler;
 import com.github.alexthe666.citadel.animation.IAnimatedEntity;
 import net.minecraft.core.BlockPos;
-import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
@@ -43,6 +42,8 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.gameevent.GameEvent;
 import net.minecraft.world.level.pathfinder.PathType;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
 import net.minecraft.world.phys.Vec3;
 
 import javax.annotation.Nullable;
@@ -102,10 +103,9 @@ public class EntityCapuchinMonkey extends TamableAnimal implements IAnimatedEnti
     }
 
     public Ingredient getAllFoods(){
-        if(temptItems == null){
-            temptItems = Ingredient.of(AMTagRegistry.CAPUCHIN_MONKEY_BREEDABLES, AMTagRegistry.CAPUCHIN_MONKEY_FOODSTUFFS);
-        }
-        return temptItems;
+        // This method is not used anymore, but kept for compatibility
+        // Direct tag checks are used instead
+        return Ingredient.of();
     }
 
     // Note: hurt() is now final in 1.21, damage reduction is handled via attributes instead
@@ -150,22 +150,22 @@ public class EntityCapuchinMonkey extends TamableAnimal implements IAnimatedEnti
 
     // Note: isAlliedTo() is now final in 1.21, alliances are handled via team system instead
 
-    public void addAdditionalSaveData(CompoundTag compound) {
-        super.addAdditionalSaveData(compound);
-        compound.putBoolean("MonkeySitting", this.isSitting());
-        compound.putBoolean("HasDart", this.hasDart());
-        compound.putBoolean("ForcedToSit", this.forcedSit);
-        compound.putInt("Command", this.getCommand());
-        compound.putInt("Variant", this.getVariant());
+    public void addAdditionalSaveData(ValueOutput valueOutput) {
+        super.addAdditionalSaveData(valueOutput);
+        valueOutput.putBoolean("MonkeySitting", this.isSitting());
+        valueOutput.putBoolean("HasDart", this.hasDart());
+        valueOutput.putBoolean("ForcedToSit", this.forcedSit);
+        valueOutput.putInt("Command", this.getCommand());
+        valueOutput.putInt("Variant", this.getVariant());
     }
 
-    public void readAdditionalSaveData(CompoundTag compound) {
-        super.readAdditionalSaveData(compound);
-        this.setOrderedToSit(compound.getBooleanOr("MonkeySitting", false));
-        this.forcedSit = compound.getBooleanOr("ForcedToSit", false);
-        this.setCommand(compound.getIntOr("Command", 0));
-        this.setDart(compound.getBooleanOr("HasDart", false));
-        this.setVariant(compound.getIntOr("Variant", 0));
+    public void readAdditionalSaveData(ValueInput valueInput) {
+        super.readAdditionalSaveData(valueInput);
+        this.setOrderedToSit(valueInput.getBooleanOr("MonkeySitting", false));
+        this.forcedSit = valueInput.getBooleanOr("ForcedToSit", false);
+        this.setCommand(valueInput.getIntOr("Command", 0));
+        this.setDart(valueInput.getBooleanOr("HasDart", false));
+        this.setVariant(valueInput.getIntOr("Variant", 0));
     }
 
     public void tick() {
@@ -184,7 +184,7 @@ public class EntityCapuchinMonkey extends TamableAnimal implements IAnimatedEnti
             sittingTime = 0;
             maxSitTime = 75 + random.nextInt(50);
         }
-        if (!this.level().isClientSide && this.getAnimation() == NO_ANIMATION && !this.isSitting() && this.getCommand() != 1 && random.nextInt(1500) == 0) {
+        if (!this.level().isClientSide() && this.getAnimation() == NO_ANIMATION && !this.isSitting() && this.getCommand() != 1 && random.nextInt(1500) == 0) {
             maxSitTime = 300 + random.nextInt(250);
             this.setOrderedToSit(true);
         }
@@ -192,7 +192,7 @@ public class EntityCapuchinMonkey extends TamableAnimal implements IAnimatedEnti
             this.setOrderedToSit(false);
         }
 
-        if (!this.level().isClientSide) {
+        if (!this.level().isClientSide()) {
             if (this.getTarget() != null && this.getAnimation() == ANIMATION_SCRATCH && this.getAnimationTick() == 10) {
                 float f1 = this.getYRot() * Mth.DEG_TO_RAD;
                 this.setDeltaMovement(this.getDeltaMovement().add(-Mth.sin(f1) * 0.3F, 0.0D, Mth.cos(f1) * 0.3F));
@@ -221,10 +221,10 @@ public class EntityCapuchinMonkey extends TamableAnimal implements IAnimatedEnti
         if (rideCooldown > 0) {
             rideCooldown--;
         }
-        if (!this.level().isClientSide && getAnimation() == NO_ANIMATION && this.getRandom().nextInt(300) == 0) {
+        if (!this.level().isClientSide() && getAnimation() == NO_ANIMATION && this.getRandom().nextInt(300) == 0) {
             setAnimation(ANIMATION_HEADTILT);
         }
-        if (!this.level().isClientSide && this.isSitting()) {
+        if (!this.level().isClientSide() && this.isSitting()) {
             this.getNavigation().stop();
         }
         AnimationHandler.INSTANCE.updateAnimations(this);
@@ -254,8 +254,8 @@ public class EntityCapuchinMonkey extends TamableAnimal implements IAnimatedEnti
         super.travel(vec3d);
     }
 
-    protected void dropEquipment() {
-        super.dropEquipment();
+    protected void dropEquipment(ServerLevel serverLevel) {
+        super.dropEquipment(serverLevel);
         if (hasDart()) {
             // TODO: Add ancient dart item
             // this.spawnAtLocation(Items.ANCIENT_DART);
@@ -399,9 +399,8 @@ public class EntityCapuchinMonkey extends TamableAnimal implements IAnimatedEnti
         animationTick = tick;
     }
 
-    @Override
-    public boolean isInvulnerableTo(DamageSource source) {
-        return source.is(DamageTypes.IN_WALL)  || super.isInvulnerableTo(source);
+    public boolean isInvulnerableTo(ServerLevel serverLevel, DamageSource source) {
+        return source.is(DamageTypes.IN_WALL) || super.isInvulnerableTo(serverLevel, source);
     }
 
     public InteractionResult mobInteract(Player player, InteractionHand hand) {
@@ -417,7 +416,7 @@ public class EntityCapuchinMonkey extends TamableAnimal implements IAnimatedEnti
                 }
                 return InteractionResult.SUCCESS;
             }
-            if (isTame() && (getAllFoods().test(itemstack) && !isFood(itemstack)) && this.getHealth() < this.getMaxHealth()) {
+            if (isTame() && (itemstack.is(AMTagRegistry.CAPUCHIN_MONKEY_BREEDABLES) || itemstack.is(AMTagRegistry.CAPUCHIN_MONKEY_FOODSTUFFS)) && !isFood(itemstack) && this.getHealth() < this.getMaxHealth()) {
                 this.usePlayerItem(player, hand, itemstack);
                 this.gameEvent(GameEvent.EAT);
                 this.playSound(SoundEvents.CAT_EAT, this.getSoundVolume(), this.getVoicePitch());
@@ -428,7 +427,8 @@ public class EntityCapuchinMonkey extends TamableAnimal implements IAnimatedEnti
 
         final InteractionResult interactionresult = itemstack.interactLivingEntity(player, this, hand);
         final InteractionResult type = super.mobInteract(player, hand);
-        if (interactionresult != InteractionResult.SUCCESS && type != InteractionResult.SUCCESS && isTame() && isOwnedBy(player) && !isFood(itemstack) && !isTameableFood(itemstack) && !getAllFoods().test(itemstack)) {
+        boolean isAllFoods = itemstack.is(AMTagRegistry.CAPUCHIN_MONKEY_BREEDABLES) || itemstack.is(AMTagRegistry.CAPUCHIN_MONKEY_FOODSTUFFS);
+        if (interactionresult != InteractionResult.SUCCESS && type != InteractionResult.SUCCESS && isTame() && isOwnedBy(player) && !isFood(itemstack) && !isTameableFood(itemstack) && !isAllFoods) {
             // TODO: Add ancient dart item support
             // if (!this.hasDart() && itemstack.getItem() == Items.ANCIENT_DART) {
             //     this.setDart(true);
@@ -441,7 +441,7 @@ public class EntityCapuchinMonkey extends TamableAnimal implements IAnimatedEnti
                 return InteractionResult.SUCCESS;
             }
             if (player.isShiftKeyDown() && player.getPassengers().isEmpty()) {
-                this.startRiding(player, false);
+                this.startRiding(player, false, false);
                 rideCooldown = 20;
                 return InteractionResult.SUCCESS;
             } else {
@@ -476,7 +476,9 @@ public class EntityCapuchinMonkey extends TamableAnimal implements IAnimatedEnti
 
     @Override
     public boolean canTargetItem(ItemStack stack) {
-        return getAllFoods().test(stack) || isTameableFood(stack);
+        return stack.is(AMTagRegistry.CAPUCHIN_MONKEY_BREEDABLES) || 
+               stack.is(AMTagRegistry.CAPUCHIN_MONKEY_FOODSTUFFS) || 
+               isTameableFood(stack);
     }
 
     public boolean isFood(ItemStack stack) {
@@ -500,7 +502,9 @@ public class EntityCapuchinMonkey extends TamableAnimal implements IAnimatedEnti
         if (e.getItem().is(AMTagRegistry.CAPUCHIN_MONKEY_TAMEABLES) && itemThrower != null && !this.isTame()) {
             if (getRandom().nextInt(5) == 0) {
                 this.setTame(true, true);
-                this.setOwnerUUID(itemThrower.getUUID());
+                if (itemThrower instanceof LivingEntity living) {
+                    this.setOwner(living);
+                }
                 this.level().broadcastEntityEvent(this, (byte) 7);
             } else {
                 this.level().broadcastEntityEvent(this, (byte) 6);

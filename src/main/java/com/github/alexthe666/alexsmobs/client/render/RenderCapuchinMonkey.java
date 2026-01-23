@@ -33,6 +33,8 @@ public class RenderCapuchinMonkey extends MobRenderer<EntityCapuchinMonkey, Capu
         state.currentAnimation = entity.getAnimation();
         state.animationTick = entity.getAnimationTick();
         state.isBaby = entity.isBaby();
+        state.vehicle = entity.getVehicle();
+        state.isPassenger = entity.isPassenger();
     }
 
     protected void scale(CapuchinMonkeyRenderState state, PoseStack matrixStackIn) {

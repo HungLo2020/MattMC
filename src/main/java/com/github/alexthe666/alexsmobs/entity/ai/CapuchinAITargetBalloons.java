@@ -2,8 +2,10 @@ package com.github.alexthe666.alexsmobs.entity.ai;
 
 import com.github.alexthe666.alexsmobs.entity.EntityCapuchinMonkey;
 import com.github.alexthe666.alexsmobs.misc.AMTagRegistry;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.ai.goal.Goal;
@@ -30,7 +32,9 @@ public class CapuchinAITargetBalloons extends Goal {
     protected int unseenMemoryTicks = 60;
     protected final int targetChance;
     public static final Predicate<Entity> TARGET_BLOON = (balloon) -> {
-        return balloon.getEncodeId() != null && (balloon.getType().is(AMTagRegistry.MONKEY_TARGET_WITH_DART) || balloon.getEncodeId().contains("balloom"));
+        // Use BuiltInRegistries to get entity ID instead of protected getEncodeId()
+        String entityId = BuiltInRegistries.ENTITY_TYPE.getKey(balloon.getType()).toString();
+        return entityId != null && (balloon.getType().is(AMTagRegistry.MONKEY_TARGET_WITH_DART) || entityId.contains("balloom"));
     };
 
     public CapuchinAITargetBalloons(EntityCapuchinMonkey mobIn, boolean checkSight) {
@@ -134,9 +138,7 @@ public class CapuchinAITargetBalloons extends Goal {
     protected boolean isSuitableTarget(@Nullable LivingEntity potentialTarget, TargetingConditions targetPredicate) {
         if (potentialTarget == null) {
             return false;
-        } else if (!targetPredicate.test(this.monkey, potentialTarget)) {
-            return false;
-        } else if (!this.monkey.isWithinRestriction(potentialTarget.blockPosition())) {
+        } else if (!targetPredicate.test(this.monkey.level() instanceof net.minecraft.server.level.ServerLevel sl ? sl : null, this.monkey, potentialTarget)) {
             return false;
         } else {
             if (this.nearbyOnly) {

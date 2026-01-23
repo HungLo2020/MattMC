@@ -4,9 +4,9 @@ import com.github.alexthe666.citadel.client.model.AdvancedEntityModel;
 import com.github.alexthe666.citadel.client.model.AdvancedModelBox;
 import com.github.alexthe666.citadel.client.model.basic.BasicModelPart;
 import com.google.common.collect.ImmutableList;
-import net.minecraft.world.entity.Entity;
+import net.minecraft.client.renderer.entity.state.EntityRenderState;
 
-public class ModelAncientDart extends AdvancedEntityModel<Entity> {
+public class ModelAncientDart extends AdvancedEntityModel<EntityRenderState> {
 	private final AdvancedModelBox root;
 	private final AdvancedModelBox main;
 	private final AdvancedModelBox feathers;
@@ -56,8 +56,8 @@ public class ModelAncientDart extends AdvancedEntityModel<Entity> {
 	}
 
 	@Override
-	public void setupAnim(Entity entity, float v, float v1, float v2, float v3, float v4) {
-
+	public void setupAnim(EntityRenderState renderState) {
+		// No animation needed for dart model
 	}
 
 	public void setRotationAngle(AdvancedModelBox modelRenderer, float x, float y, float z) {

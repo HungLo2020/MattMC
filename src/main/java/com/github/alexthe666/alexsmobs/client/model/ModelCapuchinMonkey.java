@@ -1,7 +1,9 @@
 package com.github.alexthe666.alexsmobs.client.model;
 
+import com.github.alexthe666.alexsmobs.client.render.CapuchinMonkeyRenderState;
 import com.github.alexthe666.alexsmobs.entity.EntityCapuchinMonkey;
 import com.github.alexthe666.alexsmobs.entity.util.Maths;
+import com.github.alexthe666.citadel.animation.Animation;
 import com.github.alexthe666.citadel.animation.IAnimatedEntity;
 import com.github.alexthe666.citadel.client.model.AdvancedEntityModel;
 import com.github.alexthe666.citadel.client.model.AdvancedModelBox;
@@ -13,7 +15,7 @@ import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.minecraft.client.Minecraft;
 import net.minecraft.world.entity.LivingEntity;
 
-public class ModelCapuchinMonkey extends AdvancedEntityModel<EntityCapuchinMonkey> {
+public class ModelCapuchinMonkey extends AdvancedEntityModel<CapuchinMonkeyRenderState> {
 	public final AdvancedModelBox root;
 	public final AdvancedModelBox body;
 	public final AdvancedModelBox arm_left;
@@ -204,16 +206,62 @@ public class ModelCapuchinMonkey extends AdvancedEntityModel<EntityCapuchinMonke
 	}
 
 	@Override
-	public void setupAnim(EntityCapuchinMonkey entity, float limbSwing, float limbSwingAmount, float ageInTicks, float netHeadYaw, float headPitch){
-		this.animate(entity, limbSwing, limbSwingAmount, ageInTicks, netHeadYaw, headPitch);
+	public void setupAnim(CapuchinMonkeyRenderState renderState){
+		// Store render state
+		this.renderState = renderState;
+		
+		// Handle baby scaling
+		if (renderState.isBaby) {
+			float f = 1.75F;
+			head.setScale(f, f, f);
+			head.setShouldScaleChildren(true);
+		} else {
+			head.setScale(1, 1, 1);
+			head.setShouldScaleChildren(false);
+		}
+		
+		// Extract values from render state
+		float limbSwing = renderState.walkAnimationPos;
+		float limbSwingAmount = renderState.walkAnimationSpeed;
+		float ageInTicks = renderState.ageInTicks;
+		float netHeadYaw = renderState.yRot;
+		float headPitch = renderState.xRot;
+		
+		// Create a temporary entity-like object for animation system
+		// Note: This is a workaround for the animation system that expects IAnimatedEntity
+		IAnimatedEntity animEntity = new IAnimatedEntity() {
+			@Override
+			public int getAnimationTick() {
+				return renderState.animationTick;
+			}
+
+			@Override
+			public void setAnimationTick(int tick) {
+			}
+
+			@Override
+			public Animation getAnimation() {
+				return renderState.currentAnimation != null ? renderState.currentAnimation : IAnimatedEntity.NO_ANIMATION;
+			}
+
+			@Override
+			public void setAnimation(Animation animation) {
+			}
+			
+			@Override
+			public Animation[] getAnimations() {
+				return new Animation[]{EntityCapuchinMonkey.ANIMATION_THROW, EntityCapuchinMonkey.ANIMATION_SCRATCH, EntityCapuchinMonkey.ANIMATION_HEADTILT};
+			}
+		};
+		
+		this.animate(animEntity, limbSwing, limbSwingAmount, ageInTicks, netHeadYaw, headPitch);
 		float idleSpeed = 0.2F;
 		float idleDegree = 0.4F;
 		float walkSpeed = 0.8F;
 		float walkDegree = 0.7F;
 		float stillProgress = 5F * (1F - limbSwingAmount);
-		float partialTick = Minecraft.getInstance().getTimer().getGameTimeDeltaPartialTick(false);
-		float sitProgress = entity.isPassenger() ? 0 :entity.prevSitProgress + (entity.sitProgress - entity.prevSitProgress) * partialTick;
-		float rideProgress = entity.isPassenger() && entity.getVehicle() instanceof LivingEntity && entity.isOwnedBy((LivingEntity) entity.getVehicle()) ? 10 : 0;
+		float sitProgress = renderState.sitProgress;
+		float rideProgress = renderState.isPassenger && renderState.vehicle instanceof LivingEntity ? 10 : 0;
 		progressPositionPrev(body, rideProgress, 3, 12F, 0, 10F);
 		progressRotationPrev(body, rideProgress, 0,  Maths.rad(90), 0, 10F);
 		progressRotationPrev(head, rideProgress, 0,  Maths.rad(-90), 0, 10F);
@@ -244,32 +292,13 @@ public class ModelCapuchinMonkey extends AdvancedEntityModel<EntityCapuchinMonke
 
 	}
 
-	public void renderToBuffer(PoseStack matrixStackIn, VertexConsumer bufferIn, int packedLightIn, int packedOverlayIn, int color) {
-		if (this.young) {
-			float f = 1.75F;
-			head.setScale(f, f, f);
-			head.setShouldScaleChildren(true);
-			matrixStackIn.pushPose();
-			matrixStackIn.scale(0.5F, 0.5F, 0.5F);
-			matrixStackIn.translate(0.0D, 1.5D, 0.125D);
-			parts().forEach((p_228292_8_) -> {
-				p_228292_8_.render(matrixStackIn, bufferIn, packedLightIn, packedOverlayIn, -1);
-			});
-			matrixStackIn.popPose();
-			head.setScale(1, 1, 1);
-		} else {
-			matrixStackIn.pushPose();
-			parts().forEach((p_228290_8_) -> {
-				p_228290_8_.render(matrixStackIn, bufferIn, packedLightIn, packedOverlayIn, -1);
-			});
-			matrixStackIn.popPose();
-		}
-
-	}
 
 	public void setRotationAngle(AdvancedModelBox AdvancedModelBox, float x, float y, float z) {
 		AdvancedModelBox.rotateAngleX = x;
 		AdvancedModelBox.rotateAngleY = y;
 		AdvancedModelBox.rotateAngleZ = z;
 	}
+	
+	// Store render state for use in baby scaling
+	private CapuchinMonkeyRenderState renderState;
 }
