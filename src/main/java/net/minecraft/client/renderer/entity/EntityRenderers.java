@@ -151,6 +151,7 @@ public class EntityRenderers {
 		register(EntityType.FROG, FrogRenderer::new);
 		register(EntityType.FURNACE_MINECART, context -> new MinecartRenderer(context, ModelLayers.FURNACE_MINECART));
 		register(EntityType.GAZELLE, RenderGazelle::new);
+		register(EntityType.GELADA_MONKEY, com.github.alexthe666.alexsmobs.client.render.RenderGeladaMonkey::new);
 		register(EntityType.GHAST, GhastRenderer::new);
 		register(EntityType.HAPPY_GHAST, HappyGhastRenderer::new);
 		register(EntityType.GIANT, context -> new GiantMobRenderer(context, 6.0F));

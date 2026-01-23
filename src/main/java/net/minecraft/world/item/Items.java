@@ -1843,6 +1843,7 @@ public class Items {
 	public static final Item FOX_SPAWN_EGG = registerItem("fox_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.FOX));
 	public static final Item FROG_SPAWN_EGG = registerItem("frog_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.FROG));
 	public static final Item GAZELLE_SPAWN_EGG = registerItem("gazelle_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.GAZELLE));
+	public static final Item GELADA_MONKEY_SPAWN_EGG = registerItem("gelada_monkey_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.GELADA_MONKEY));
 	public static final Item GHAST_SPAWN_EGG = registerItem("ghast_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.GHAST));
 	public static final Item HAPPY_GHAST_SPAWN_EGG = registerItem(
 		"happy_ghast_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.HAPPY_GHAST)

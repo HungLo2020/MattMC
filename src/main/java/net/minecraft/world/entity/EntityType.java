@@ -595,6 +595,9 @@ public class EntityType<T extends Entity> implements FeatureElement, EntityTypeT
 	public static final EntityType<Frog> FROG = register(
 		"frog", EntityType.Builder.of(Frog::new, MobCategory.CREATURE).sized(0.5F, 0.5F).passengerAttachments(new Vec3(0.0, 0.375, -0.25)).clientTrackingRange(10)
 	);
+	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntityGeladaMonkey> GELADA_MONKEY = register(
+		"gelada_monkey", EntityType.Builder.of(com.github.alexthe666.alexsmobs.entity.EntityGeladaMonkey::new, MobCategory.CREATURE).sized(0.6F, 0.9F).eyeHeight(0.7F).clientTrackingRange(8)
+	);
 	public static final EntityType<MinecartFurnace> FURNACE_MINECART = register(
 		"furnace_minecart",
 		EntityType.Builder.of(MinecartFurnace::new, MobCategory.MISC).noLootTable().sized(0.98F, 0.7F).passengerAttachments(0.1875F).clientTrackingRange(8)

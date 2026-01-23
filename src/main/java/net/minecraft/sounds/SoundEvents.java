@@ -650,6 +650,8 @@ public class SoundEvents {
 	public static final SoundEvent FOX_SNIFF = register("entity.fox.sniff");
 	public static final SoundEvent FOX_SPIT = register("entity.fox.spit");
 	public static final SoundEvent FOX_TELEPORT = register("entity.fox.teleport");
+	public static final SoundEvent GELADA_MONKEY_IDLE = register("entity.gelada_monkey.idle");
+	public static final SoundEvent GELADA_MONKEY_HURT = register("entity.gelada_monkey.hurt");
 	public static final SoundEvent SUSPICIOUS_SAND_BREAK = register("block.suspicious_sand.break");
 	public static final SoundEvent SUSPICIOUS_SAND_STEP = register("block.suspicious_sand.step");
 	public static final SoundEvent SUSPICIOUS_SAND_PLACE = register("block.suspicious_sand.place");

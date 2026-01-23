@@ -152,6 +152,7 @@ public class DefaultAttributes {
 		.put(EntityType.FOX, Fox.createAttributes().build())
 		.put(EntityType.FROG, Frog.createAttributes().build())
 		.put(EntityType.GAZELLE, com.github.alexthe666.alexsmobs.entity.EntityGazelle.createAttributes().build())
+		.put(EntityType.GELADA_MONKEY, com.github.alexthe666.alexsmobs.entity.EntityGeladaMonkey.bakeAttributes().build())
 		.put(EntityType.GHAST, Ghast.createAttributes().build())
 		.put(EntityType.HAPPY_GHAST, HappyGhast.createAttributes().build())
 		.put(EntityType.GIANT, Giant.createAttributes().build())
