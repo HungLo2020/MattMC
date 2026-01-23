@@ -82,7 +82,7 @@ public class EntityCapuchinMonkey extends TamableAnimal implements IAnimatedEnti
     }
 
     public static AttributeSupplier.Builder bakeAttributes() {
-        return TamableAnimal.createMobAttributes().add(Attributes.MAX_HEALTH, 10.0D).add(Attributes.ATTACK_DAMAGE, 2.0D).add(Attributes.MOVEMENT_SPEED, 0.4F).add(Attributes.STEP_HEIGHT, 1.0D).add(Attributes.FOLLOW_RANGE, 16.0D);
+        return TamableAnimal.createMobAttributes().add(Attributes.MAX_HEALTH, 10.0D).add(Attributes.ATTACK_DAMAGE, 2.0D).add(Attributes.MOVEMENT_SPEED, 0.4F).add(Attributes.STEP_HEIGHT, 1.0D).add(Attributes.FOLLOW_RANGE, 16.0D).add(Attributes.TEMPT_RANGE, 10.0D);
     }
 
     public static <T extends Mob> boolean canCapuchinSpawn(EntityType<EntityCapuchinMonkey> entityType, LevelAccessor worldIn, EntitySpawnReason reason, BlockPos pos, RandomSource random) {
