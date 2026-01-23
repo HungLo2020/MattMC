@@ -20,6 +20,7 @@ import org.slf4j.Logger;
 import com.github.alexthe666.alexsmobs.client.render.RenderBlobfish;
 import com.github.alexthe666.alexsmobs.client.render.RenderCombJelly;
 import com.github.alexthe666.alexsmobs.client.render.RenderCosmicCod;
+import com.github.alexthe666.alexsmobs.client.render.RenderFrilledShark;
 import com.github.alexthe666.alexsmobs.client.render.RenderEndergrade;
 import com.github.alexthe666.alexsmobs.client.render.RenderFlyingFish;
 import com.github.alexthe666.alexsmobs.client.render.RenderGazelle;
@@ -110,6 +111,7 @@ public class EntityRenderers {
 		register(EntityType.COCKROACH_EGG, ThrownItemRenderer::new);
 		register(EntityType.COMB_JELLY, RenderCombJelly::new);
 		register(EntityType.COSMIC_COD, RenderCosmicCod::new);
+		register(EntityType.FRILLED_SHARK, RenderFrilledShark::new);
 		register(EntityType.COSMAW, com.github.alexthe666.alexsmobs.client.render.RenderCosmaw::new);
 		register(EntityType.COD, CodRenderer::new);
 		register(EntityType.COMMAND_BLOCK_MINECART, context -> new MinecartRenderer(context, ModelLayers.COMMAND_BLOCK_MINECART));

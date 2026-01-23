@@ -1429,6 +1429,7 @@ public class CreativeModeTabs {
 						output.accept(Items.SMALL_CATFISH_BUCKET);
 						output.accept(Items.COD_BUCKET);
 						output.accept(Items.COSMIC_COD_BUCKET);
+						output.accept(Items.FRILLED_SHARK_BUCKET);
 						output.accept(Items.FLYING_FISH_BUCKET);
 						output.accept(Items.SALMON_BUCKET);
 						output.accept(Items.TROPICAL_FISH_BUCKET);
@@ -1941,6 +1942,7 @@ public class CreativeModeTabs {
 					output.accept(Items.COCKROACH_SPAWN_EGG);
 					output.accept(Items.COMB_JELLY_SPAWN_EGG);
 					output.accept(Items.COSMIC_COD_SPAWN_EGG);
+					output.accept(Items.FRILLED_SHARK_SPAWN_EGG);
 					output.accept(Items.COSMAW_SPAWN_EGG);
 					output.accept(Items.COD_SPAWN_EGG);
 					output.accept(Items.COPPER_GOLEM_SPAWN_EGG);
