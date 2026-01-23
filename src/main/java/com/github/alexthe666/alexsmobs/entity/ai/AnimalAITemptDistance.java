@@ -5,7 +5,6 @@ import net.minecraft.world.entity.PathfinderMob;
 import net.minecraft.world.entity.ai.goal.Goal;
 import net.minecraft.world.entity.ai.targeting.TargetingConditions;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.crafting.Ingredient;
 
 import java.util.EnumSet;
 
@@ -21,10 +20,10 @@ public class AnimalAITemptDistance extends Goal {
     protected Player player;
     private int calmDown;
     private boolean isRunning;
-    private final Ingredient items;
+    private final java.util.function.Predicate<net.minecraft.world.item.ItemStack> items;
     private final boolean canScare;
 
-    public AnimalAITemptDistance(PathfinderMob p_25939_, double p_25940_, Ingredient p_25941_, boolean p_25942_, double distance) {
+    public AnimalAITemptDistance(PathfinderMob p_25939_, double p_25940_, java.util.function.Predicate<net.minecraft.world.item.ItemStack> p_25941_, boolean p_25942_, double distance) {
         this.mob = p_25939_;
         this.speedModifier = p_25940_;
         this.items = p_25941_;
@@ -38,12 +37,12 @@ public class AnimalAITemptDistance extends Goal {
             --this.calmDown;
             return false;
         } else {
-            this.player = this.mob.level().getNearestPlayer(this.targetingConditions, this.mob);
+            this.player = getServerLevel(this.mob).getNearestPlayer(this.targetingConditions, this.mob);
             return this.player != null;
         }
     }
 
-    private boolean shouldFollow(LivingEntity p_148139_) {
+    private boolean shouldFollow(LivingEntity p_148139_, net.minecraft.server.level.ServerLevel serverLevel) {
         return this.items.test(p_148139_.getMainHandItem()) || this.items.test(p_148139_.getOffhandItem());
     }
 

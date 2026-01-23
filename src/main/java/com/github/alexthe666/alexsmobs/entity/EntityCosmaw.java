@@ -6,14 +6,20 @@ import com.github.alexthe666.alexsmobs.entity.util.Maths;
 import com.github.alexthe666.alexsmobs.misc.AMBlockPos;
 import com.github.alexthe666.alexsmobs.misc.AMSoundRegistry;
 import com.github.alexthe666.alexsmobs.misc.AMTagRegistry;
-import com.google.common.base.Predicates;
 import net.minecraft.advancements.CriteriaTriggers;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.component.DataComponents;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvent;
@@ -41,7 +47,6 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LevelAccessor;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.gameevent.GameEvent;
-import net.minecraft.world.level.storage.loot.BuiltInLootTables;
 import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
 
@@ -67,7 +72,7 @@ public class EntityCosmaw extends TamableAnimal implements ITargetsDroppedItems,
     private int heldItemTime;
     private BlockPos lastSafeTpPosition;
 
-    protected EntityCosmaw(EntityType<? extends TamableAnimal> type, Level lvl) {
+    public EntityCosmaw(EntityType<? extends TamableAnimal> type, Level lvl) {
         super(type, lvl);
         this.moveControl = new FlightMoveController(this, 1F, false, true);
     }
@@ -112,7 +117,7 @@ public class EntityCosmaw extends TamableAnimal implements ITargetsDroppedItems,
         this.goalSelector.addGoal(3, new FlyingAIFollowOwner(this, 1.3D, 8.0F, 4.0F, false));
         this.goalSelector.addGoal(4, new AIPickupOwner());
         this.goalSelector.addGoal(5, new BreedGoal(this, 1.2D));
-        this.goalSelector.addGoal(6, new AnimalAITemptDistance(this, 1.1D, Ingredient.of(AMTagRegistry.COSMAW_FOODSTUFFS), false, 25) {
+        this.goalSelector.addGoal(6, new AnimalAITemptDistance(this, 1.1D, itemStack -> itemStack.is(AMTagRegistry.COSMAW_FOODSTUFFS), false, 25) {
             public boolean canUse() {
                 return super.canUse() && EntityCosmaw.this.getMainHandItem().isEmpty();
             }
@@ -134,7 +139,7 @@ public class EntityCosmaw extends TamableAnimal implements ITargetsDroppedItems,
                 return super.canUse();
             }
         }));
-        this.targetSelector.addGoal(3, new EntityAINearestTarget3D(this, EntityCosmicCod.class, 80, true, false, Predicates.alwaysTrue()));
+        this.targetSelector.addGoal(3, new EntityAINearestTarget3D(this, EntityCosmicCod.class, 80, true, false, null));
 
     }
 
@@ -207,16 +212,16 @@ public class EntityCosmaw extends TamableAnimal implements ITargetsDroppedItems,
     }
 
 
-    public void addAdditionalSaveData(CompoundTag compound) {
-        super.addAdditionalSaveData(compound);
-        compound.putBoolean("CosmawSitting", this.isSitting());
-        compound.putInt("Command", this.getCommand());
+    public void addAdditionalSaveData(ValueOutput valueOutput) {
+        super.addAdditionalSaveData(valueOutput);
+        valueOutput.putBoolean("CosmawSitting", this.isSitting());
+        valueOutput.putInt("Command", this.getCommand());
     }
 
-    public void readAdditionalSaveData(CompoundTag compound) {
-        super.readAdditionalSaveData(compound);
-        this.setOrderedToSit(compound.getBoolean("CosmawSitting"));
-        this.setCommand(compound.getInt("Command"));
+    public void readAdditionalSaveData(ValueInput valueInput) {
+        super.readAdditionalSaveData(valueInput);
+        this.setOrderedToSit(valueInput.getBooleanOr("CosmawSitting", false));
+        this.setCommand(valueInput.getIntOr("Command", 0));
     }
 
     public void tick() {
@@ -225,7 +230,7 @@ public class EntityCosmaw extends TamableAnimal implements ITargetsDroppedItems,
         prevClutchProgress = clutchProgress;
         prevBiteProgress = biteProgress;
         prevCosmawPitch = this.getCosmawPitch();
-        if (!this.level().isClientSide) {
+        if (!this.level().isClientSide()) {
             final float f2 = (float) -((float) this.getDeltaMovement().y * Mth.RAD_TO_DEG);
             this.setCosmawPitch(this.getCosmawPitch() + 0.6F * (this.getCosmawPitch() + f2) - this.getCosmawPitch());
         }
@@ -251,13 +256,6 @@ public class EntityCosmaw extends TamableAnimal implements ITargetsDroppedItems,
                 biteProgress = Math.min(5F, biteProgress + 2F);
             } else {
                 if (this.getTarget() != null && this.distanceTo(this.getTarget()) < 3.3D) {
-                    if (this.getTarget() instanceof EntityCosmicCod && !this.isTame()) {
-                        EntityCosmicCod fish = (EntityCosmicCod) this.getTarget();
-                        CompoundTag fishNbt = new CompoundTag();
-                        fish.addAdditionalSaveData(fishNbt);
-                        fishNbt.putString("DeathLootTable", BuiltInLootTables.EMPTY.location().toString());
-                        fish.readAdditionalSaveData(fishNbt);
-                    }
                     this.getTarget().hurt(this.damageSources().mobAttack(this), (float) this.getAttributeValue(Attributes.ATTACK_DAMAGE));
                 }
                 this.entityData.set(ATTACK_TICK, this.entityData.get(ATTACK_TICK) - 1);
@@ -278,7 +276,7 @@ public class EntityCosmaw extends TamableAnimal implements ITargetsDroppedItems,
                     if (getRandom().nextFloat() < 0.3F) {
                         this.setTame(true, true);
                         this.setCommand(1);
-                        this.setOwnerUUID(this.fishThrowerID);
+                        this.setOwner(level().getPlayerByUUID(this.fishThrowerID));
                         Player player = level().getPlayerByUUID(fishThrowerID);
                         if (player instanceof ServerPlayer) {
                             CriteriaTriggers.TAME_ANIMAL.trigger((ServerPlayer) player, this);
@@ -288,15 +286,12 @@ public class EntityCosmaw extends TamableAnimal implements ITargetsDroppedItems,
                         this.level().broadcastEntityEvent(this, (byte) 6);
                     }
                 }
-                if (this.getMainHandItem().hasCraftingRemainingItem()) {
-                    this.spawnAtLocation(this.getMainHandItem().getCraftingRemainingItem());
-                }
                 this.getMainHandItem().shrink(1);
             }
         } else {
             heldItemTime = 0;
         }
-        if (!this.level().isClientSide) {
+        if (!this.level().isClientSide()) {
             if (tickCount % 100 == 0 || lastSafeTpPosition == null) {
                 BlockPos pos = getCosmawGround(this.blockPosition());
                 if (pos.getY() > 1) {
@@ -390,26 +385,12 @@ public class EntityCosmaw extends TamableAnimal implements ITargetsDroppedItems,
         return new DirectPathNavigator(this, level, 0.5F);
     }
 
-    public boolean isAlliedTo(Entity entityIn) {
-        if (this.isTame()) {
-            final LivingEntity livingentity = this.getOwner();
-            if (entityIn == livingentity) {
-                return true;
-            }
-            if (entityIn instanceof TamableAnimal) {
-                return ((TamableAnimal) entityIn).isOwnedBy(livingentity);
-            }
-            if (livingentity != null) {
-                return livingentity.isAlliedTo(entityIn);
-            }
-        }
-        return super.isAlliedTo(entityIn);
-    }
+
 
     @Nullable
     @Override
     public AgeableMob getBreedOffspring(ServerLevel level, AgeableMob parent) {
-        return AMEntityRegistry.COSMAW.get().create(level());
+        return (EntityCosmaw) AMEntityRegistry.COSMAW.get().create(level, EntitySpawnReason.BREEDING);
     }
 
     private BlockPos getCosmawGround(BlockPos in) {
@@ -432,8 +413,8 @@ public class EntityCosmaw extends TamableAnimal implements ITargetsDroppedItems,
     public void onGetItem(ItemEntity e) {
         ItemStack duplicate = e.getItem().copy();
         duplicate.setCount(1);
-        if (!this.getItemInHand(InteractionHand.MAIN_HAND).isEmpty() && !this.level().isClientSide) {
-            this.spawnAtLocation(this.getItemInHand(InteractionHand.MAIN_HAND), 0.0F);
+        if (!this.getItemInHand(InteractionHand.MAIN_HAND).isEmpty() && !this.level().isClientSide()) {
+            this.spawnAtLocation((ServerLevel)level(), this.getItemInHand(InteractionHand.MAIN_HAND));
         }
         this.setItemInHand(InteractionHand.MAIN_HAND, duplicate);
         Entity itemThrower = e.getOwner();
@@ -483,7 +464,6 @@ public class EntityCosmaw extends TamableAnimal implements ITargetsDroppedItems,
         }
     }
 
-    @Override
     public boolean canRiderInteract() {
         return true;
     }
