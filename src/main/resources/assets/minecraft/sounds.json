@@ -25359,5 +25359,24 @@
       "crocodile_baby_1"
     ],
     "subtitle": "subtitles.entity.caiman.idle"
+  },
+  "entity.capuchin_monkey.idle": {
+    "sounds": [
+      "capuchin_monkey_idle_0",
+      "capuchin_monkey_idle_1",
+      "capuchin_monkey_idle_2",
+      "capuchin_monkey_idle_3",
+      "capuchin_monkey_idle_4"
+    ],
+    "subtitle": "subtitles.entity.capuchin_monkey.idle"
+  },
+  "entity.capuchin_monkey.hurt": {
+    "sounds": [
+      "capuchin_monkey_hurt_0",
+      "capuchin_monkey_hurt_1",
+      "capuchin_monkey_hurt_2",
+      "capuchin_monkey_hurt_3"
+    ],
+    "subtitle": "subtitles.entity.capuchin_monkey.hurt"
   }
 }

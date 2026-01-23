@@ -1369,6 +1369,8 @@ public class SoundEvents {
 	public static final SoundEvent CAIMAN_IDLE = register("entity.caiman.idle");
 	public static final SoundEvent CAIMAN_HURT = register("entity.caiman.hurt");
 	public static final SoundEvent CAIMAN_SPLASH = register("entity.caiman.splash");
+	public static final SoundEvent CAPUCHIN_MONKEY_IDLE = register("entity.capuchin_monkey.idle");
+	public static final SoundEvent CAPUCHIN_MONKEY_HURT = register("entity.capuchin_monkey.hurt");
 	public static final SoundEvent CROCODILE_BABY = register("entity.crocodile.baby");
 	public static final SoundEvent SAND_BREAK = register("block.sand.break");
 	public static final SoundEvent SAND_FALL = register("block.sand.fall");

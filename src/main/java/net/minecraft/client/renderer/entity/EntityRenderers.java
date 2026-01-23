@@ -87,6 +87,7 @@ public class EntityRenderers {
 		register(EntityType.BIRCH_CHEST_BOAT, context -> new BoatRenderer(context, ModelLayers.BIRCH_CHEST_BOAT));
 		register(EntityType.BISON, com.github.alexthe666.alexsmobs.client.render.RenderBison::new);
 		register(EntityType.CAIMAN, com.github.alexthe666.alexsmobs.client.render.RenderCaiman::new);
+		register(EntityType.CAPUCHIN_MONKEY, com.github.alexthe666.alexsmobs.client.render.RenderCapuchinMonkey::new);
 		register(EntityType.BLAZE, BlazeRenderer::new);
 		register(EntityType.BLOBFISH, RenderBlobfish::new);
 		register(EntityType.BLUE_JAY, com.github.alexthe666.alexsmobs.client.render.RenderBlueJay::new);
