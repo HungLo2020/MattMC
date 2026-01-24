@@ -16,7 +16,7 @@ public class EffectDebilitatingSting extends MobEffect {
     }
 
     @Override
-    public boolean applyEffectTick(LivingEntity entity, int amplifier) {
+    public boolean applyEffectTick(net.minecraft.server.level.ServerLevel serverLevel, LivingEntity entity, int amplifier) {
         // Debilitating effect - prevents movement and attack
         entity.setDeltaMovement(entity.getDeltaMovement().multiply(0.1D, 1.0D, 0.1D));
         return true;

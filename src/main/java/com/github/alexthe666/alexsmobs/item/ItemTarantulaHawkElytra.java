@@ -9,7 +9,6 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.equipment.ArmorType;
-import net.minecraft.world.item.equipment.EquipmentModel;
 import net.minecraft.world.level.Level;
 
 import javax.annotation.Nullable;
@@ -40,7 +39,6 @@ public class ItemTarantulaHawkElytra extends Item {
         return true;
     }
 
-    @Override
     public boolean isValidRepairItem(ItemStack toRepair, ItemStack repair) {
         return repair.getItem() == net.minecraft.world.item.Items.TARANTULA_HAWK_WING_FRAGMENT;
     }

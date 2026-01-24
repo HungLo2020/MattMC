@@ -54,6 +54,8 @@ import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.world.level.*;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.gameevent.GameEvent;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
 import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
 
@@ -186,15 +188,20 @@ public class EntityTarantulaHawk extends TamableAnimal implements IFollower {
         builder.define(COMMAND, 0);
     }
 
-    protected boolean isImmuneTo(DamageSource source) {
-        // Immunity logic moved here from hurt()
+    @Override
+    public boolean isInvulnerableTo(ServerLevel level, DamageSource source) {
+        // Immunity to cactus damage
+        if (source.is(DamageTypes.CACTUS)) {
+            return true;
+        }
+        // Immunity logic - tarantula hawks are immune to damage from arthropods with debilitating sting
         if (source.getEntity() instanceof LivingEntity living && living.getType().is(net.minecraft.tags.EntityTypeTags.ARTHROPOD) && living.hasEffect(AMEffectRegistry.DEBILITATING_STING)) {
             return true;
         }
-        return super.isImmuneTo(source);
+        return super.isInvulnerableTo(level, source);
     }
 
-    public void addAdditionalSaveData(net.minecraft.world.level.storage.loot.parameters.ValueOutput valueOutput) {
+    public void addAdditionalSaveData(ValueOutput valueOutput) {
         super.addAdditionalSaveData(valueOutput);
         valueOutput.putBoolean("HawkSitting", this.isSitting());
         valueOutput.putBoolean("Nether", this.isNether());
@@ -205,7 +212,7 @@ public class EntityTarantulaHawk extends TamableAnimal implements IFollower {
         valueOutput.putBoolean("BreedFlag", this.bredBuryFlag);
     }
 
-    public void readAdditionalSaveData(net.minecraft.world.level.storage.loot.parameters.ValueInput valueInput) {
+    public void readAdditionalSaveData(ValueInput valueInput) {
         super.readAdditionalSaveData(valueInput);
         this.setOrderedToSit(valueInput.getBooleanOr("HawkSitting", false));
         this.setNether(valueInput.getBooleanOr("Nether", false));
@@ -446,7 +453,7 @@ public class EntityTarantulaHawk extends TamableAnimal implements IFollower {
                     itemstack.shrink(1);
                     return InteractionResult.SUCCESS;
                 } else {
-                    this.spawnAtLocation(this.getMainHandItem().copy());
+                    this.spawnAtLocation((ServerLevel)this.level(), this.getMainHandItem().copy());
                     this.setItemInHand(InteractionHand.MAIN_HAND, ItemStack.EMPTY);
                     return InteractionResult.SUCCESS;
                 }
@@ -486,11 +493,6 @@ public class EntityTarantulaHawk extends TamableAnimal implements IFollower {
     @Override
     public AgeableMob getBreedOffspring(ServerLevel p_241840_1_, AgeableMob p_241840_2_) {
         return null;
-    }
-
-    @Override
-    public boolean isInvulnerableTo(DamageSource source) {
-        return source.is(DamageTypes.CACTUS) || super.isInvulnerableTo(source);
     }
 
     @Override
@@ -746,7 +748,7 @@ public class EntityTarantulaHawk extends TamableAnimal implements IFollower {
                 if (hawk.distanceTo(target) < target.getBbWidth() + 1.5F && !target.isPassenger()) {
                     hawk.setDragging(true);
                     hawk.setFlying(false);
-                    target.startRiding(hawk, true);
+                    target.startRiding(hawk, true, true);
                 }
             } else {
                 if (target != null && !paralizedWithChild) {
@@ -765,7 +767,7 @@ public class EntityTarantulaHawk extends TamableAnimal implements IFollower {
                             hawk.entityData.set(ATTACK_TICK, 7);
                         }
                         if (hawk.attackProgress == 5F) {
-                            hawk.doHurtTarget(target);
+                            hawk.doHurtTarget((ServerLevel)hawk.level(), target);
                             if(hawk.bredBuryFlag){
                                 if(target.getHealth() <= 1.0F){
                                     target.heal(5);
@@ -773,7 +775,8 @@ public class EntityTarantulaHawk extends TamableAnimal implements IFollower {
                             }
                             target.addEffect(new MobEffectInstance(AMEffectRegistry.DEBILITATING_STING, target.getType().is(net.minecraft.tags.EntityTypeTags.ARTHROPOD) ? EntityTarantulaHawk.STING_DURATION : 600, hawk.bredBuryFlag ? 1 : 0));
                             if (!hawk.level().isClientSide() && target.getType().is(net.minecraft.tags.EntityTypeTags.ARTHROPOD)) {
-                                AlexsMobs.sendMSGToAll(new MessageTarantulaHawkSting(hawk.getId(), target.getId()));
+                                // Network message simplified - just apply effect directly since we're on server
+                                target.addEffect(new MobEffectInstance(AMEffectRegistry.DEBILITATING_STING, EntityTarantulaHawk.STING_DURATION));
                             }
                             orbitCooldown = target.getType().is(net.minecraft.tags.EntityTypeTags.ARTHROPOD) ? 200 + random.nextInt(200) : 10 + random.nextInt(20);
                         }

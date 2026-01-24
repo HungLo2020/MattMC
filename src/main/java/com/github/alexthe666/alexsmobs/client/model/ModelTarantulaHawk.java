@@ -135,26 +135,31 @@ public class ModelTarantulaHawk extends AdvancedEntityModel<com.github.alexthe66
     }
 
     @Override
-    public void setupAnim(EntityTarantulaHawk entity, float limbSwing, float limbSwingAmount, float ageInTicks, float netHeadYaw, float headPitch) {
+    public void setupAnim(com.github.alexthe666.alexsmobs.client.render.TarantulaHawkRenderState renderState) {
         this.resetToDefaultPose();
         float idleSpeed = 0.25F;
         float idleDegree = 0.25F;
-        float walkSpeed = entity.isDragging() ? 2F : 0.8F;
+        float walkSpeed = renderState.isDragging ? 2F : 0.8F;
         float walkDegree = 0.4F;
         float flySpeed = 0.25F;
         float flyDegree = 0.6F;
         float digSpeed = 0.85F;
         float digDegree = 0.6F;
-        float partialTick = ageInTicks - entity.tickCount;
-        float flyProgress = entity.prevFlyProgress + (entity.flyProgress - entity.prevFlyProgress) * partialTick;
-        float dragProgress = entity.prevDragProgress + (entity.dragProgress - entity.prevDragProgress) * partialTick;
-        float sitProgress = entity.prevSitProgress + (entity.sitProgress - entity.prevSitProgress) * partialTick;
-        float digProgress = entity.prevDigProgress + (entity.digProgress - entity.prevDigProgress) * partialTick;
-        float stingProgress = entity.prevAttackProgress + (entity.attackProgress - entity.prevAttackProgress) * partialTick;
+        float flyProgress = renderState.flyProgress;
+        float dragProgress = renderState.dragProgress;
+        float sitProgress = renderState.sitProgress;
+        float digProgress = renderState.digProgress;
+        float stingProgress = renderState.attackProgress;
         float walkProgress = 5F - flyProgress;
         float stingFlyProgress = stingProgress * flyProgress * 0.2F;
         float stingGroundProgress = stingProgress * walkProgress * 0.2F;
-        float flyAngle = entity.prevFlyAngle + (entity.getFlyAngle() - entity.prevFlyAngle) * partialTick;
+        float flyAngle = renderState.flyAngle;
+        float ageInTicks = renderState.ageInTicks;
+        float limbSwing = renderState.walkAnimationPos;
+        float limbSwingAmount = renderState.walkAnimationSpeed;
+        float netHeadYaw = renderState.yRot;
+        float headPitch = renderState.xRot;
+        
         this.flap(antenna_left, idleSpeed, idleDegree * 1, false, 1, 0, ageInTicks, 1);
         this.flap(antenna_right, idleSpeed, idleDegree * 1, true, 1, 0, ageInTicks, 1);
         this.walk(antenna_right, idleSpeed, idleDegree * 2F, true, -1, 0, ageInTicks, 1);
@@ -258,11 +263,6 @@ public class ModelTarantulaHawk extends AdvancedEntityModel<com.github.alexthe66
         if(dragProgress == 0){
             this.faceTarget(netHeadYaw, headPitch, 1.2F, head);
         }
-    }
-
-    @Override
-    public void renderToBuffer(PoseStack matrixStack, VertexConsumer buffer, int packedLight, int packedOverlay, int color) {
-        root.render(matrixStack, buffer, packedLight, packedOverlay);
     }
 
     @Override

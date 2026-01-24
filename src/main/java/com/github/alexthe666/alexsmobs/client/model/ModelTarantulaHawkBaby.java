@@ -34,10 +34,13 @@ public class ModelTarantulaHawkBaby extends AdvancedEntityModel<com.github.alext
     }
 
     @Override
-    public void setupAnim(EntityTarantulaHawk entityIn, float limbSwing, float limbSwingAmount, float ageInTicks, float netHeadYaw, float headPitch) {
+    public void setupAnim(com.github.alexthe666.alexsmobs.client.render.TarantulaHawkRenderState renderState) {
         this.resetToDefaultPose();
         float walkSpeed = 1;
         float walkDegree = 0.75F;
+        float limbSwing = renderState.walkAnimationPos;
+        float limbSwingAmount = renderState.walkAnimationSpeed;
+        float ageInTicks = renderState.ageInTicks;
         float stretch = (float) (Math.sin(limbSwing * 0.25F) * limbSwingAmount) + limbSwingAmount;
         body.setScale(1, (1 - stretch * 0.05F), (1 + stretch * 0.5F));
         body.rotationPointZ -= stretch * 4;
@@ -54,11 +57,6 @@ public class ModelTarantulaHawkBaby extends AdvancedEntityModel<com.github.alext
     @Override
     public Iterable<AdvancedModelBox> getAllParts() {
         return ImmutableList.of(root, body, head);
-    }
-
-    @Override
-    public void renderToBuffer(PoseStack matrixStack, VertexConsumer buffer, int packedLight, int packedOverlay, int color){
-        root.render(matrixStack, buffer, packedLight, packedOverlay);
     }
 
     public void setRotationAngle(AdvancedModelBox advancedModelBox, float x, float y, float z) {
