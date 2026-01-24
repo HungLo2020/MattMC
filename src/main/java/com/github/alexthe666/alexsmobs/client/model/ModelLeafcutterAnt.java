@@ -3,6 +3,7 @@ package com.github.alexthe666.alexsmobs.client.model;// Made with Blockbench 3.8
 // Paste this class into your mod and generate all required imports
 
 
+import com.github.alexthe666.alexsmobs.client.render.LeafcutterAntRenderState;
 import com.github.alexthe666.alexsmobs.entity.EntityAnteater;
 import com.github.alexthe666.alexsmobs.entity.EntityLeafcutterAnt;
 import com.github.alexthe666.alexsmobs.entity.util.Maths;
@@ -15,7 +16,7 @@ import com.google.common.collect.ImmutableList;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 
-public class ModelLeafcutterAnt extends AdvancedEntityModel<EntityLeafcutterAnt> {
+public class ModelLeafcutterAnt extends AdvancedEntityModel<LeafcutterAntRenderState> {
 	private final AdvancedModelBox root;
 	private final AdvancedModelBox body;
 	private final AdvancedModelBox legfront_left;
@@ -123,27 +124,13 @@ public class ModelLeafcutterAnt extends AdvancedEntityModel<EntityLeafcutterAnt>
 		animator = ModelAnimator.create();
 	}
 
-	public void renderToBuffer(PoseStack matrixStackIn, VertexConsumer bufferIn, int packedLightIn, int packedOverlayIn, int color) {
-		if (this.young) {
-			float f = 1.5F;
-			head.setScale(f, f, f);
-			head.setShouldScaleChildren(true);
-			matrixStackIn.pushPose();
-			matrixStackIn.scale(0.5F, 0.5F, 0.5F);
-			matrixStackIn.translate(0.0D, 1.5D, 0.125D);
-			parts().forEach((p_228292_8_) -> {
-				p_228292_8_.render(matrixStackIn, bufferIn, packedLightIn, packedOverlayIn, -1);
-			});
-			matrixStackIn.popPose();
-			head.setScale(1, 1, 1);
-		} else {
-			matrixStackIn.pushPose();
-			parts().forEach((p_228290_8_) -> {
-				p_228290_8_.render(matrixStackIn, bufferIn, packedLightIn, packedOverlayIn, -1);
-			});
-			matrixStackIn.popPose();
-		}
-
+	// Custom render method for BasicModelPart children
+	public void renderChildren(PoseStack matrixStackIn, VertexConsumer bufferIn, int packedLightIn, int packedOverlayIn, int color) {
+		matrixStackIn.pushPose();
+		parts().forEach((p_228290_8_) -> {
+			p_228290_8_.render(matrixStackIn, bufferIn, packedLightIn, packedOverlayIn, -1);
+		});
+		matrixStackIn.popPose();
 	}
 
 	@Override
@@ -176,12 +163,33 @@ public class ModelLeafcutterAnt extends AdvancedEntityModel<EntityLeafcutterAnt>
 	}
 
 	@Override
-	public void setupAnim(EntityLeafcutterAnt entity, float limbSwing, float limbSwingAmount, float ageInTicks, float netHeadYaw, float headPitch){
-		animate(entity, limbSwing, limbSwingAmount, ageInTicks, netHeadYaw, headPitch);
+	public void setupAnim(LeafcutterAntRenderState state){
+		this.resetToDefaultPose();
+		// Animate based on state
+		if (state.animationTick > 0) {
+			// animator.update needs IAnimatedEntity, skip for now
+			float ageInTicks = state.ageInTicks;
+			float tickProgress = (state.animationTick % 13) / 13.0F;
+			if (tickProgress < 5.0F / 13.0F) {
+				animator.move(body, 0, 0, -5);
+				animator.rotate(head, Maths.rad(-25), 0, 0);
+				animator.rotate(abdomen, Maths.rad(25), 0, 0);
+				animator.rotate(antenna_left, Maths.rad(-25), Maths.rad(-25), 0);
+				animator.rotate(antenna_right, Maths.rad(-25), Maths.rad(25), 0);
+			} else if (tickProgress < 10.0F / 13.0F) {
+				animator.move(body, 0, 0, 2);
+				animator.rotate(head, Maths.rad(25), 0, 0);
+			}
+		}
 		float idleSpeed = 0.25F;
 		float idleDegree = 0.25F;
 		float walkSpeed = 1F;
 		float walkDegree = 1F;
+		float ageInTicks = state.ageInTicks;
+		float limbSwing = state.walkAnimationPos;
+		float limbSwingAmount = state.walkAnimationSpeed;
+		float netHeadYaw = state.yRot;
+		float headPitch = state.xRot;
 		this.swing(antenna_left, idleSpeed, idleDegree, true, 1, 0.1F, ageInTicks, 1);
 		this.swing(antenna_right, idleSpeed, idleDegree, false, 1, 0.1F, ageInTicks, 1);
 		this.walk(antenna_left, idleSpeed, idleDegree * 0.25F, false, -1, -0.05F, ageInTicks, 1);

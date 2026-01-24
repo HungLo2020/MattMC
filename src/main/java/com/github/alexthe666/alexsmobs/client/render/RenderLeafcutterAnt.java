@@ -46,6 +46,7 @@ public class RenderLeafcutterAnt extends MobRenderer<EntityLeafcutterAnt, Leafcu
         state.leafHarvestedState = entity.getLeafHarvestedState().orElse(null);
         state.leafHarvestedPos = entity.getLeafHarvestedPos().orElse(null);
         state.animationTick = entity.getAnimationTick();
+        state.id = entity.getId();
     }
 
 
@@ -53,9 +54,6 @@ public class RenderLeafcutterAnt extends MobRenderer<EntityLeafcutterAnt, Leafcu
     protected void setupRotations(LeafcutterAntRenderState state, PoseStack matrixStackIn, float ageInTicks, float scaleFactor) {
         super.setupRotations(state, matrixStackIn, ageInTicks, scaleFactor);
         
-        if (state.isShaking) {
-            ageInTicks += (float)(Math.cos((double)state.ageInTicks * 3.25D) * Math.PI * (double)0.4F);
-        }
         float trans = state.isBaby ? 0.25F : 0.5F;
         Pose pose = state.pose;
         if (pose != Pose.SLEEPING) {

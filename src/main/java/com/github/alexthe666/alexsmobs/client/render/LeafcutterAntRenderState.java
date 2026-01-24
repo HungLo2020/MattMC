@@ -16,4 +16,5 @@ public class LeafcutterAntRenderState extends LivingEntityRenderState {
     public BlockState leafHarvestedState;
     public BlockPos leafHarvestedPos;
     public int animationTick;
+    public int id;
 }

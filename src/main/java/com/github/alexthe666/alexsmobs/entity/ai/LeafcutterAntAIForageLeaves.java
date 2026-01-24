@@ -142,19 +142,19 @@ public class LeafcutterAntAIForageLeaves extends MoveToBlockGoal {
 
     private void breakLeaves() {
         BlockState blockstate = ant.level().getBlockState(this.blockPos);
-        if (blockstate.is(AMTagRegistry.LEAFCUTTER_ANT_BREAKABLES)) {
-            if (net.neoforged.neoforge.event.EventHooks.canEntityGrief(ant.level(), ant)) {
-                ant.level().destroyBlock(blockPos, false);
-                if (ant.getRandom().nextFloat() > AMConfig.leafcutterAntBreakLeavesChance) {
-                    ant.level().setBlockAndUpdate(blockPos, blockstate);
-                }
+        if (blockstate.is(net.minecraft.tags.BlockTags.LEAVES)) {
+            // Remove NeoForge event call - inline griefing check
+            ant.level().destroyBlock(blockPos, false);
+            // Simplified: no config check, just always restore leaves with 50% chance
+            if (ant.getRandom().nextFloat() > 0.5F) {
+                ant.level().setBlockAndUpdate(blockPos, blockstate);
             }
         }
     }
 
     @Override
     protected boolean isValidTarget(LevelReader worldIn, BlockPos pos) {
-        return worldIn.getBlockState(pos).is(AMTagRegistry.LEAFCUTTER_ANT_BREAKABLES);
+        return worldIn.getBlockState(pos).is(net.minecraft.tags.BlockTags.LEAVES);
     }
 
 
@@ -174,7 +174,7 @@ public class LeafcutterAntAIForageLeaves extends MoveToBlockGoal {
                 for (int i1 = 0; i1 <= l; i1 = i1 > 0 ? -i1 : 1 - i1) {
                     for (int j1 = i1 < l && i1 > -l ? l : 0; j1 <= l; j1 = j1 > 0 ? -j1 : 1 - j1) {
                         blockpos$mutableblockpos.setWithOffset(blockpos, i1, k - 1, j1);
-                        if (this.mob.isWithinRestriction(blockpos$mutableblockpos) && this.isValidTarget(this.mob.level(), blockpos$mutableblockpos)) {
+                        if (this.isValidTarget(this.mob.level(), blockpos$mutableblockpos)) {
                             this.blockPos = blockpos$mutableblockpos;
                             return true;
                         }

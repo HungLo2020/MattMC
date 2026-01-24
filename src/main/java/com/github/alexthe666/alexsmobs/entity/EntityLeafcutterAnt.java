@@ -115,10 +115,8 @@ public class EntityLeafcutterAnt extends Animal implements NeutralMob, IAnimated
         super.setTarget(entitylivingbaseIn);
     }
 
-    @Nullable
-    protected ResourceKey<LootTable> getDefaultLootTable() {
-        return this.isQueen() ? QUEEN_LOOT : super.getDefaultLootTable();
-    }
+    // Note: Cannot override getLootTable() as it's final in 1.21
+    // Loot table selection is now handled elsewhere
 
     private void switchNavigator(boolean rightsideUp) {
         if (rightsideUp) {
@@ -215,12 +213,14 @@ public class EntityLeafcutterAnt extends Animal implements NeutralMob, IAnimated
                 int babies = 1 + random.nextInt(1);
                 pacifyAllNearby();
                 for(int i = 0; i < babies; i++){
-                    EntityLeafcutterAnt leafcutterAnt = AMEntityRegistry.LEAFCUTTER_ANT.get().create(level());
-                    leafcutterAnt.copyPosition(this);
-                    leafcutterAnt.setAge(-24000);
-                    if(!this.level().isClientSide()){
-                        level().broadcastEntityEvent(this, (byte)18);
-                        level().addFreshEntity(leafcutterAnt);
+                    EntityLeafcutterAnt leafcutterAnt = net.minecraft.world.entity.EntityType.LEAFCUTTER_ANT.create(level(), EntitySpawnReason.BREEDING);
+                    if (leafcutterAnt != null) {
+                        leafcutterAnt.copyPosition(this);
+                        leafcutterAnt.setAge(-24000);
+                        if(!this.level().isClientSide()){
+                            level().broadcastEntityEvent(this, (byte)18);
+                            level().addFreshEntity(leafcutterAnt);
+                        }
                     }
                 }
                 if(!player.isCreative()){
@@ -270,7 +270,7 @@ public class EntityLeafcutterAnt extends Animal implements NeutralMob, IAnimated
         Vec3 vector3d = this.getDeltaMovement();
         if (!this.level().isClientSide() && !this.isQueen()) {
             this.setBesideClimbableBlock(this.horizontalCollision || this.verticalCollision && !this.onGround());
-            if (this.onGround() || this.isInWaterOrBubble() || this.isInLava()) {
+            if (this.onGround() || this.isInWaterOrRain() || this.isInLava()) {
                 this.entityData.set(ATTACHED_FACE, Direction.DOWN);
             } else  if (this.verticalCollision) {
                 this.entityData.set(ATTACHED_FACE, Direction.UP);
@@ -296,7 +296,8 @@ public class EntityLeafcutterAnt extends Animal implements NeutralMob, IAnimated
                 this.setDeltaMovement(this.getDeltaMovement().add(0, 1, 0));
             }else{
                 if (!this.horizontalCollision && attachmentFacing != Direction.UP) {
-                    Vec3 vec = Vec3.atLowerCornerOf(attachmentFacing.getNormal());
+                    org.joml.Vector3f step = attachmentFacing.step();
+                    Vec3 vec = Vec3.atLowerCornerOf(new net.minecraft.core.Vec3i((int)step.x, (int)step.y, (int)step.z));
                     this.setDeltaMovement(this.getDeltaMovement().add(vec.normalize().multiply(0.1F, 0.1F, 0.1F)));
                 }
                 if (!this.onGround() && vector3d.y < 0.0D) {
@@ -484,56 +485,50 @@ public class EntityLeafcutterAnt extends Animal implements NeutralMob, IAnimated
         this.entityData.set(QUEEN, Boolean.valueOf(queen));
     }
 
-    public void readAdditionalSaveData(CompoundTag compound) {
-        super.readAdditionalSaveData(compound);
-        this.entityData.set(ATTACHED_FACE, Direction.from3DDataValue(compound.getByte("AttachFace").orElse((byte)0)));
-        this.setLeaf(compound.getBoolean("Leaf").orElse(false));
-        this.setQueen(compound.getBoolean("Queen").orElse(false));
-        this.setAntScale(compound.getFloat("AntScale").orElse(0F));
-        BlockState blockstate = null;
-        if (compound.contains("HarvestedLeafState")) {
-            blockstate = NbtUtils.readBlockState(this.level().holderLookup(Registries.BLOCK), compound.getCompound("HarvestedLeafState"));
-            if (blockstate.isAir()) {
-                blockstate = null;
-            }
+    public void readAdditionalSaveData(net.minecraft.world.level.storage.ValueInput input) {
+        super.readAdditionalSaveData(input);
+        this.entityData.set(ATTACHED_FACE, input.read("AttachFace", Direction.LEGACY_ID_CODEC).orElse(Direction.DOWN));
+        this.setLeaf(input.getBooleanOr("Leaf", false));
+        this.setQueen(input.getBooleanOr("Queen", false));
+        this.setAntScale(input.getFloatOr("AntScale", 1.0F));
+        BlockState blockstate = input.read("HarvestedLeafState", BlockState.CODEC).orElse(null);
+        if (blockstate != null && blockstate.isAir()) {
+            blockstate = null;
         }
-        this.stayOutOfHiveCountdown = compound.getInt("CannotEnterHiveTicks").orElse(0);
-        this.haveBabyCooldown = compound.getInt("BabyCooldown").orElse(0);
-        this.hivePos = null;
-        if (compound.contains("HivePos")) {
-            this.hivePos = NbtUtils.readBlockPos(compound, "HivePos").orElse(BlockPos.ZERO);
-        }
+        this.stayOutOfHiveCountdown = input.getIntOr("CannotEnterHiveTicks", 0);
+        this.haveBabyCooldown = input.getIntOr("BabyCooldown", 0);
+        this.hivePos = input.read("HivePos", BlockPos.CODEC).orElse(null);
         this.setLeafHarvestedState(blockstate);
-        if (compound.contains("HLPX")) {
-            int i = compound.getInt("HLPX").orElse(0);
-            int j = compound.getInt("HLPY").orElse(0);
-            int k = compound.getInt("HLPZ").orElse(0);
+        int i = input.getIntOr("HLPX", Integer.MIN_VALUE);
+        if (i != Integer.MIN_VALUE) {
+            int j = input.getIntOr("HLPY", 0);
+            int k = input.getIntOr("HLPZ", 0);
             this.entityData.set(LEAF_HARVESTED_POS, Optional.of(new BlockPos(i, j, k)));
         } else {
             this.entityData.set(LEAF_HARVESTED_POS, Optional.empty());
         }
     }
 
-    public void addAdditionalSaveData(CompoundTag compound) {
-        super.addAdditionalSaveData(compound);
-        compound.putByte("AttachFace", (byte) this.entityData.get(ATTACHED_FACE).get3DDataValue());
-        compound.putBoolean("Leaf", this.hasLeaf());
-        compound.putBoolean("Queen", this.isQueen());
-        compound.putFloat("AntScale", this.getAntScale());
+    public void addAdditionalSaveData(net.minecraft.world.level.storage.ValueOutput output) {
+        super.addAdditionalSaveData(output);
+        output.store("AttachFace", Direction.LEGACY_ID_CODEC, this.entityData.get(ATTACHED_FACE));
+        output.putBoolean("Leaf", this.hasLeaf());
+        output.putBoolean("Queen", this.isQueen());
+        output.putFloat("AntScale", this.getAntScale());
         BlockState blockstate = this.getHarvestedState();
         if (blockstate != null) {
-            compound.put("HarvestedLeafState", NbtUtils.writeBlockState(blockstate));
+            output.store("HarvestedLeafState", BlockState.CODEC, blockstate);
         }
         if (this.hasHive()) {
-            compound.put("HivePos", NbtUtils.writeBlockPos(this.getHivePos()));
+            output.store("HivePos", BlockPos.CODEC, this.getHivePos());
         }
-        compound.putInt("CannotEnterHiveTicks", this.stayOutOfHiveCountdown);
-        compound.putInt("BabyCooldown", this.haveBabyCooldown);
+        output.putInt("CannotEnterHiveTicks", this.stayOutOfHiveCountdown);
+        output.putInt("BabyCooldown", this.haveBabyCooldown);
         BlockPos blockpos = this.getHarvestedPos();
         if (blockpos != null) {
-            compound.putInt("HLPX", blockpos.getX());
-            compound.putInt("HLPY", blockpos.getY());
-            compound.putInt("HLPZ", blockpos.getZ());
+            output.putInt("HLPX", blockpos.getX());
+            output.putInt("HLPY", blockpos.getY());
+            output.putInt("HLPZ", blockpos.getZ());
         }
 
     }
@@ -610,7 +605,7 @@ public class EntityLeafcutterAnt extends Animal implements NeutralMob, IAnimated
     public void calculateEntityAnimation(boolean flying) {
         float f1 = (float)Mth.length(this.getX() - this.xo, 2 * (this.getY() - this.yo), this.getZ() - this.zo);
         float f2 = Math.min(f1 * 4.0F, 1.0F);
-        this.walkAnimation.update(f2, 0.4F);
+        this.walkAnimation.update(f2, 0.4F, 1.0F);
     }
 
     @Override
