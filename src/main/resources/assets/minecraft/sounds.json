@@ -16194,6 +16194,23 @@
     ],
     "subtitle": "subtitles.block.generic.footsteps"
   },
+  "entity.gorilla.idle": {
+    "sounds": [
+      "gorilla_idle_0",
+      "gorilla_idle_1",
+      "gorilla_idle_2",
+      "gorilla_idle_3"
+    ],
+    "subtitle": "subtitles.entity.gorilla.ambient"
+  },
+  "entity.gorilla.hurt": {
+    "sounds": [
+      "gorilla_hurt_0",
+      "gorilla_hurt_1",
+      "gorilla_hurt_2"
+    ],
+    "subtitle": "subtitles.entity.gorilla.hurt"
+  },
   "entity.grottoceratops.attack": {
     "sounds": [
       "minecraft:entity/grottoceratops/grottoceratops_attack_0",

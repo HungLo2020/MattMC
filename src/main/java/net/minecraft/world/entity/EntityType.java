@@ -655,6 +655,13 @@ public class EntityType<T extends Entity> implements FeatureElement, EntityTypeT
 	public static final EntityType<Goat> GOAT = register(
 		"goat", EntityType.Builder.of(Goat::new, MobCategory.CREATURE).sized(0.9F, 1.3F).passengerAttachments(1.1125F).clientTrackingRange(10)
 	);
+	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntityGorilla> GORILLA = register(
+		"gorilla",
+		EntityType.Builder.of(com.github.alexthe666.alexsmobs.entity.EntityGorilla::new, MobCategory.CREATURE)
+			.sized(1.0F, 1.5F)
+			.eyeHeight(1.2F)
+			.clientTrackingRange(10)
+	);
 	public static final EntityType<GrottoceratopsEntity> GROTTOCERATOPS = register(
 		"grottoceratops",
 		EntityType.Builder.of(GrottoceratopsEntity::new, MobCategory.CREATURE)

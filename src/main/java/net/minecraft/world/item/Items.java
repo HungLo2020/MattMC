@@ -1851,6 +1851,7 @@ public class Items {
 	public static final Item GLOW_SQUID_SPAWN_EGG = registerItem("glow_squid_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.GLOW_SQUID));
 	public static final Item GIANT_SQUID_SPAWN_EGG = registerItem("giant_squid_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.GIANT_SQUID));
 	public static final Item GOAT_SPAWN_EGG = registerItem("goat_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.GOAT));
+	public static final Item GORILLA_SPAWN_EGG = registerItem("gorilla_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.GORILLA));
 	public static final Item GROTTOCERATOPS_SPAWN_EGG = registerItem("grottoceratops_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.GROTTOCERATOPS));
 	public static final Item GUARDIAN_SPAWN_EGG = registerItem("guardian_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.GUARDIAN));
 	public static final Item HOGLIN_SPAWN_EGG = registerItem("hoglin_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.HOGLIN));
