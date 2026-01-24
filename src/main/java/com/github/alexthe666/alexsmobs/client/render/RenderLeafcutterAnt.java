@@ -54,6 +54,9 @@ public class RenderLeafcutterAnt extends MobRenderer<EntityLeafcutterAnt, Leafcu
     protected void setupRotations(LeafcutterAntRenderState state, PoseStack matrixStackIn, float ageInTicks, float scaleFactor) {
         super.setupRotations(state, matrixStackIn, ageInTicks, scaleFactor);
         
+        // Rotate model 180 degrees to face the correct direction
+        matrixStackIn.mulPose(Axis.YP.rotationDegrees(180.0F));
+        
         float trans = state.isBaby ? 0.25F : 0.5F;
         Pose pose = state.pose;
         if (pose != Pose.SLEEPING) {
