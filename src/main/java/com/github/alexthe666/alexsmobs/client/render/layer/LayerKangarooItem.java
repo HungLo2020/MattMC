@@ -2,42 +2,22 @@ package com.github.alexthe666.alexsmobs.client.render.layer;
 
 import com.github.alexthe666.alexsmobs.client.model.KangarooModel;
 import com.github.alexthe666.alexsmobs.client.render.KangarooRenderer;
-import com.github.alexthe666.alexsmobs.entity.EntityKangaroo;
+import com.github.alexthe666.alexsmobs.client.render.KangarooRenderState;
 import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.math.Axis;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.renderer.ItemInHandRenderer;
 import net.minecraft.client.renderer.MultiBufferSource;
+import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.client.renderer.entity.layers.RenderLayer;
-import net.minecraft.world.entity.EquipmentSlot;
-import net.minecraft.world.item.ItemDisplayContext;
-import net.minecraft.world.item.ItemStack;
 
-public class LayerKangarooItem extends RenderLayer<EntityKangaroo, KangarooModel> {
+public class LayerKangarooItem extends RenderLayer<KangarooRenderState, KangarooModel> {
 
     public LayerKangarooItem(KangarooRenderer render) {
         super(render);
     }
 
-    public void render(PoseStack matrixStackIn, MultiBufferSource bufferIn, int packedLightIn, EntityKangaroo entitylivingbaseIn, float limbSwing, float limbSwingAmount, float partialTicks, float ageInTicks, float netHeadYaw, float headPitch) {
-        ItemStack itemstack = entitylivingbaseIn.getItemBySlot(EquipmentSlot.MAINHAND);
-        matrixStackIn.pushPose();
-        boolean left = entitylivingbaseIn.isLeftHanded();
-        if(entitylivingbaseIn.isBaby()){
-            matrixStackIn.scale(0.5F, 0.5F, 0.5F);
-            matrixStackIn.translate(0.0D, 1.5D, 0D);
-        }
-        matrixStackIn.pushPose();
-        translateToHand(matrixStackIn, left);
-        matrixStackIn.translate(0F, 0.75F, -0.125F);
-
-        matrixStackIn.mulPose(Axis.XP.rotationDegrees(-110F));
-        matrixStackIn.mulPose(Axis.YP.rotationDegrees(180F));
-        matrixStackIn.scale(0.8F, 0.8F, 0.8F);
-        ItemInHandRenderer renderer = Minecraft.getInstance().getEntityRenderDispatcher().getItemInHandRenderer();
-        renderer.renderItem(entitylivingbaseIn, itemstack, left ? ItemDisplayContext.THIRD_PERSON_LEFT_HAND : ItemDisplayContext.THIRD_PERSON_RIGHT_HAND, false, matrixStackIn, bufferIn, packedLightIn);
-        matrixStackIn.popPose();
-        matrixStackIn.popPose();
+    @Override
+    public void submit(PoseStack poseStack, SubmitNodeCollector submitNodeCollector, int packedLight, KangarooRenderState renderState, float bob, float yRot) {
+        // This layer would need access to entity inventory which is not in RenderState
+        // TODO: Add inventory items to KangarooRenderState if needed
     }
 
     protected void translateToHand(PoseStack matrixStack, boolean left) {

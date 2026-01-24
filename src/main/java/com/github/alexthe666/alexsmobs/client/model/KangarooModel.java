@@ -36,6 +36,7 @@ public class KangarooModel extends AdvancedEntityModel<KangarooRenderState> {
 	public final AdvancedModelBox snout;
 	public static boolean renderOnlyHead = false;
 	private ModelAnimator animator;
+	private KangarooRenderState renderState;
 
 	public KangarooModel() {
 		texWidth = 128;
@@ -163,6 +164,11 @@ public class KangarooModel extends AdvancedEntityModel<KangarooRenderState> {
 				@Override
 				public void setAnimation(com.github.alexthe666.citadel.animation.Animation animation) {
 				}
+				
+				@Override
+				public com.github.alexthe666.citadel.animation.Animation[] getAnimations() {
+					return new com.github.alexthe666.citadel.animation.Animation[]{EntityKangaroo.ANIMATION_EAT_GRASS, EntityKangaroo.ANIMATION_KICK, EntityKangaroo.ANIMATION_PUNCH_L, EntityKangaroo.ANIMATION_PUNCH_R};
+				}
 			};
 			animator.update(animatedEntity);
 		}
@@ -257,8 +263,12 @@ public class KangarooModel extends AdvancedEntityModel<KangarooRenderState> {
 	}
 
 
-	@Override
+	public void setupAnim(KangarooRenderState renderState) {
+		this.setupAnim(renderState, renderState.walkAnimationPos, renderState.walkAnimationSpeed, renderState.ageInTicks, renderState.yRot, renderState.xRot);
+	}
+
 	public void setupAnim(KangarooRenderState renderState, float limbSwing, float limbSwingAmount, float ageInTicks, float netHeadYaw, float headPitch){
+		this.renderState = renderState;
 		animate(renderState, limbSwing, limbSwingAmount, ageInTicks, netHeadYaw, headPitch);
 		float jumpRotation = Mth.sin(renderState.jumpCompletion * 3.1415927F);
 		float walkSpeed = 1F;
@@ -347,34 +357,15 @@ public class KangarooModel extends AdvancedEntityModel<KangarooRenderState> {
 			this.neck.rotateAngleX += 120 * 0.017453292F;
 			progressPositionPrev(head, 1F, 0, 0F, -2F, 1F);
 		}
-	}
-
-	@Override
-	public void renderToBuffer(PoseStack matrixStackIn, VertexConsumer bufferIn, int packedLightIn, int packedOverlayIn, int color) {
-		if (this.young) {
+		
+		// Handle baby scaling and rendering
+		if (renderState != null && renderState.isBaby) {
 			float f = 1.65F;
 			head.setScale(f, f, f);
 			head.setShouldScaleChildren(true);
-			matrixStackIn.pushPose();
-			matrixStackIn.scale(0.5F, 0.5F, 0.5F);
-			matrixStackIn.translate(0.0D, 1.5D, 0D);
-			if(renderOnlyHead){
-				neck.setPos(0.0F, 0F, 0.0F);
-				this.neck.render(matrixStackIn, bufferIn, packedLightIn, packedOverlayIn, -1);
-			}else{
-				neck.setPos(0.0F, 2.0F, -8.0F);
-				parts().forEach((p_228292_8_) -> {
-					p_228292_8_.render(matrixStackIn, bufferIn, packedLightIn, packedOverlayIn, -1);
-				});
-			}
-			matrixStackIn.popPose();
-			head.setScale(1, 1, 1);
+			// Note: Actual rendering transformation should be in custom render layers if needed
 		} else {
-			matrixStackIn.pushPose();
-			parts().forEach((p_228290_8_) -> {
-				p_228290_8_.render(matrixStackIn, bufferIn, packedLightIn, packedOverlayIn, -1);
-			});
-			matrixStackIn.popPose();
+			head.setScale(1, 1, 1);
 		}
 	}
 
