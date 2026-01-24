@@ -832,12 +832,6 @@ public class EntityType<T extends Entity> implements FeatureElement, EntityTypeT
 			.clientTrackingRange(32)
 			.updateInterval(2)
 	);
-	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntityMantisShrimp> MANTIS_SHRIMP = register(
-		"mantis_shrimp",
-		EntityType.Builder.of(com.github.alexthe666.alexsmobs.entity.EntityMantisShrimp::new, MobCategory.WATER_CREATURE)
-			.sized(1.25F, 1.2F)
-			.clientTrackingRange(10)
-	);
 	public static final EntityType<Marker> MARKER = register(
 		"marker", EntityType.Builder.of(Marker::new, MobCategory.MISC).noLootTable().sized(0.0F, 0.0F).clientTrackingRange(0)
 	);

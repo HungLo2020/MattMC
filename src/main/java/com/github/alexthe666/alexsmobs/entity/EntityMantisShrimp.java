@@ -379,10 +379,10 @@ public class EntityMantisShrimp extends TamableAnimal implements ISemiAquatic, I
 
     protected void readAdditionalSaveData(TagValueInput valueInput) {
         super.readAdditionalSaveData(valueInput);
-        this.setOrderedToSit(valueInput.getBoolean("MantisShrimpSitting").orElse(false));
-        this.setCommand(valueInput.getInt("Command").orElse(0));
-        this.setVariant(valueInput.getInt("Variant").orElse(0));
-        this.setMoistness(valueInput.getInt("Moisture").orElse(60000));
+        this.setOrderedToSit(valueInput.getBooleanOr("MantisShrimpSitting", false));
+        this.setCommand(valueInput.getIntOr("Command", 0));
+        this.setVariant(valueInput.getIntOr("Variant", 0));
+        this.setMoistness(valueInput.getIntOr("Moisture", 60000));
     }
 
     public void aiStep() {
