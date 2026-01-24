@@ -1596,6 +1596,8 @@ public class SoundEvents {
 	public static final SoundEvent SNOW_GOLEM_HURT = register("entity.snow_golem.hurt");
 	public static final SoundEvent SNOW_GOLEM_SHOOT = register("entity.snow_golem.shoot");
 	public static final SoundEvent SNOW_GOLEM_SHEAR = register("entity.snow_golem.shear");
+	public static final SoundEvent SNOW_LEOPARD_IDLE = register("entity.snow_leopard.idle");
+	public static final SoundEvent SNOW_LEOPARD_HURT = register("entity.snow_leopard.hurt");
 	public static final SoundEvent SNOW_HIT = register("block.snow.hit");
 	public static final SoundEvent SNOW_PLACE = register("block.snow.place");
 	public static final SoundEvent SNOW_STEP = register("block.snow.step");

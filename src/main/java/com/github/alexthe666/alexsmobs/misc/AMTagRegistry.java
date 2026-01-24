@@ -149,6 +149,11 @@ public class AMTagRegistry {
     public static final TagKey<EntityType<?>> ORCA_TARGETS = registerEntityTag("orca_targets");
     public static final TagKey<Block> ORCA_BREAKABLES = registerBlockTag("orca_breakables");
 
+    // Snow Leopard-specific tags
+    public static final TagKey<EntityType<?>> SNOW_LEOPARD_TARGETS = registerEntityTag("snow_leopard_targets");
+    public static final TagKey<Item> SNOW_LEOPARD_BREEDABLES = registerItemTag("snow_leopard_breedables");
+    public static final TagKey<Block> SNOW_LEOPARD_SPAWNS = registerBlockTag("snow_leopard_spawns");
+
     // Tag helper method for entity checks
     public static class TagHelper {
         public static boolean isEntityIn(TagKey<EntityType<?>> tag, net.minecraft.world.entity.Entity entity) {
