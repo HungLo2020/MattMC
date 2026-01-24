@@ -1788,6 +1788,7 @@ public class CreativeModeTabs {
 					output.accept(Items.LEATHER);
 					output.accept(Items.KANGAROO_HIDE);
 					output.accept(Items.RABBIT_HIDE);
+					output.accept(Items.RACCOON_TAIL);
 					output.accept(Items.TOUGH_HIDE);
 					output.accept(Items.HONEYCOMB);
 					output.accept(Items.RESIN_CLUMP);
@@ -2017,6 +2018,7 @@ public class CreativeModeTabs {
 					output.accept(Items.POTOO_SPAWN_EGG);
 					output.accept(Items.PUFFERFISH_SPAWN_EGG);
 					output.accept(Items.RABBIT_SPAWN_EGG);
+					output.accept(Items.RACCOON_SPAWN_EGG);
 					output.accept(Items.RAIN_FROG_SPAWN_EGG);
 					output.accept(Items.ROADRUNNER_SPAWN_EGG);
 					output.accept(Items.RAVAGER_SPAWN_EGG);

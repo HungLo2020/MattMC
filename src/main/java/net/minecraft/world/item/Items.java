@@ -1903,6 +1903,7 @@ public class Items {
 	public static final Item POTOO_SPAWN_EGG = registerItem("potoo_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.POTOO));
 	public static final Item PUFFERFISH_SPAWN_EGG = registerItem("pufferfish_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.PUFFERFISH));
 	public static final Item RABBIT_SPAWN_EGG = registerItem("rabbit_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.RABBIT));
+	public static final Item RACCOON_SPAWN_EGG = registerItem("raccoon_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.RACCOON));
 	public static final Item RAIN_FROG_SPAWN_EGG = registerItem("rain_frog_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.RAIN_FROG));
 	public static final Item ROADRUNNER_SPAWN_EGG = registerItem("roadrunner_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.ROADRUNNER));
 	public static final Item RAVAGER_SPAWN_EGG = registerItem("ravager_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.RAVAGER));
@@ -2065,6 +2066,7 @@ public class Items {
 	public static final Item RABBIT_STEW = registerItem("rabbit_stew", new Item.Properties().stacksTo(1).food(Foods.RABBIT_STEW).usingConvertsTo(BOWL));
 	public static final Item RABBIT_FOOT = registerItem("rabbit_foot");
 	public static final Item RABBIT_HIDE = registerItem("rabbit_hide");
+	public static final Item RACCOON_TAIL = registerItem("raccoon_tail");
 	public static final Item ARMOR_STAND = registerItem("armor_stand", ArmorStandItem::new, new Item.Properties().stacksTo(16));
 	public static final Item COPPER_HORSE_ARMOR = registerItem("copper_horse_armor", new Item.Properties().horseArmor(ArmorMaterials.COPPER));
 	public static final Item IRON_HORSE_ARMOR = registerItem("iron_horse_armor", new Item.Properties().horseArmor(ArmorMaterials.IRON));
