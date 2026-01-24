@@ -2392,6 +2392,8 @@ public class Items {
 			.component(DataComponents.BEES, Bees.EMPTY)
 			.component(DataComponents.BLOCK_STATE, BlockItemStateProperties.EMPTY.with(BeehiveBlock.HONEY_LEVEL, 0))
 	);
+	public static final Item LEAFCUTTER_ANTHILL = registerBlock(Blocks.LEAFCUTTER_ANTHILL);
+	public static final Item LEAFCUTTER_ANT_CHAMBER = registerBlock(Blocks.LEAFCUTTER_ANT_CHAMBER);
 	public static final Item HONEY_BOTTLE = registerItem(
 		"honey_bottle",
 		new Item.Properties().craftRemainder(GLASS_BOTTLE).food(Foods.HONEY_BOTTLE, Consumables.HONEY_BOTTLE).usingConvertsTo(GLASS_BOTTLE).stacksTo(16)
