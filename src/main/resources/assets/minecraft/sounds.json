@@ -20129,6 +20129,22 @@
     ],
     "subtitle": "subtitles.entity.snowball.throw"
   },
+  "entity.snow_leopard.hurt": {
+    "sounds": [
+      "snow_leopard_hurt_0",
+      "snow_leopard_hurt_1",
+      "snow_leopard_hurt_2"
+    ],
+    "subtitle": "subtitles.entity.snow_leopard.hurt"
+  },
+  "entity.snow_leopard.idle": {
+    "sounds": [
+      "snow_leopard_idle_0",
+      "snow_leopard_idle_1",
+      "snow_leopard_idle_2"
+    ],
+    "subtitle": "subtitles.entity.snow_leopard.ambient"
+  },
   "entity.snowball.throw": {
     "sounds": [
       "random/bow"
