@@ -188,6 +188,7 @@ public class EntityRenderers {
 		register(EntityType.LINGERING_POTION, ThrownItemRenderer::new);
 		register(EntityType.LLAMA, context -> new LlamaRenderer(context, ModelLayers.LLAMA, ModelLayers.LLAMA_BABY));
 		register(EntityType.LLAMA_SPIT, LlamaSpitRenderer::new);
+		register(EntityType.LOBSTER, net.minecraft.client.renderer.entity.RenderLobster::new);
 		register(EntityType.MAGMA_CUBE, MagmaCubeRenderer::new);
 		register(EntityType.MANGROVE_BOAT, context -> new BoatRenderer(context, ModelLayers.MANGROVE_BOAT));
 		register(EntityType.MANGROVE_CHEST_BOAT, context -> new BoatRenderer(context, ModelLayers.MANGROVE_CHEST_BOAT));

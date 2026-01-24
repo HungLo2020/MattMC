@@ -1664,6 +1664,8 @@ public class Items {
 	// Alex's Caves Primordial items
 	public static final Item TRILOCARIS_TAIL = registerItem("trilocaris_tail", new Item.Properties().food(Foods.TRILOCARIS_TAIL));
 	public static final Item COOKED_TRILOCARIS_TAIL = registerItem("cooked_trilocaris_tail", new Item.Properties().food(Foods.COOKED_TRILOCARIS_TAIL));
+	public static final Item LOBSTER_TAIL = registerItem("lobster_tail", new Item.Properties().food(Foods.RAW_CATFISH));
+	public static final Item COOKED_LOBSTER_TAIL = registerItem("cooked_lobster_tail", new Item.Properties().food(Foods.COOKED_CATFISH));
 	public static final Item PINE_NUTS = registerItem("pine_nuts", new Item.Properties().food(Foods.PINE_NUTS));
 	public static final Item PEWEN_SAP = registerItem("pewen_sap");
 	public static final Item AMBER_CURIOSITY = registerItem("amber_curiosity");
@@ -1868,6 +1870,12 @@ public class Items {
 	public static final Item LEAFCUTTER_ANT_PUPA = registerItem("leafcutter_ant_pupa", com.github.alexthe666.alexsmobs.item.ItemLeafcutterPupa::new, new Item.Properties());
 	public static final Item IRON_GOLEM_SPAWN_EGG = registerItem("iron_golem_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.IRON_GOLEM));
 	public static final Item LLAMA_SPAWN_EGG = registerItem("llama_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.LLAMA));
+	public static final Item LOBSTER_SPAWN_EGG = registerItem("lobster_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.LOBSTER));
+	public static final Item LOBSTER_BUCKET = registerItem(
+		"lobster_bucket",
+		properties -> new MobBucketItem(EntityType.LOBSTER, Fluids.WATER, SoundEvents.BUCKET_EMPTY_FISH, properties),
+		new Item.Properties().stacksTo(1)
+	);
 	public static final Item MAGMA_CUBE_SPAWN_EGG = registerItem("magma_cube_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.MAGMA_CUBE));
 	public static final Item MIMIC_OCTOPUS_SPAWN_EGG = registerItem("mimic_octopus_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.MIMIC_OCTOPUS));
 	public static final Item MIMIC_OCTOPUS_BUCKET = registerItem("mimic_octopus_bucket", properties -> new MobBucketItem(EntityType.MIMIC_OCTOPUS, Fluids.WATER, SoundEvents.BUCKET_EMPTY_FISH, properties), new Item.Properties().stacksTo(1));

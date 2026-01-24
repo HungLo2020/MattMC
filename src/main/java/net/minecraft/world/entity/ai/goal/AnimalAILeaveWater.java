@@ -1,7 +1,6 @@
-package com.github.alexthe666.alexsmobs.entity.ai;
+package net.minecraft.world.entity.ai.goal;
 
-import com.github.alexthe666.alexsmobs.entity.ISemiAquatic;
-import com.github.alexthe666.alexsmobs.misc.AMBlockPos;
+import net.minecraft.world.entity.animal.ISemiAquatic;
 import net.minecraft.core.BlockPos;
 import net.minecraft.tags.FluidTags;
 import net.minecraft.util.Mth;
@@ -71,7 +70,7 @@ public class AnimalAILeaveWater extends Goal {
             if (waterDetected) {
                 vector3d = LandRandomPos.getPos(this.creature, 23, 7);
             } else {
-                return AMBlockPos.fromVec3(vector3d);
+                return BlockPos.containing(vector3d.x, vector3d.y, vector3d.z);
             }
             tries++;
         }

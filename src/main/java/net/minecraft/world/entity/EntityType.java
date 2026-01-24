@@ -790,6 +790,13 @@ public class EntityType<T extends Entity> implements FeatureElement, EntityTypeT
 	public static final EntityType<LlamaSpit> LLAMA_SPIT = register(
 		"llama_spit", EntityType.Builder.<LlamaSpit>of(LlamaSpit::new, MobCategory.MISC).noLootTable().sized(0.25F, 0.25F).clientTrackingRange(4).updateInterval(10)
 	);
+	public static final EntityType<net.minecraft.world.entity.animal.EntityLobster> LOBSTER = register(
+		"lobster",
+		EntityType.Builder.<net.minecraft.world.entity.animal.EntityLobster>of((type, level) -> new net.minecraft.world.entity.animal.EntityLobster(level), MobCategory.WATER_AMBIENT)
+			.sized(0.9F, 0.5F)
+			.eyeHeight(0.3F)
+			.clientTrackingRange(4)
+	);
 	public static final EntityType<MagmaCube> MAGMA_CUBE = register(
 		"magma_cube",
 		EntityType.Builder.of(MagmaCube::new, MobCategory.MONSTER)
