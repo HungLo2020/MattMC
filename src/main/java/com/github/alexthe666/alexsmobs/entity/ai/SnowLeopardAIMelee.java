@@ -4,6 +4,7 @@ import com.github.alexthe666.alexsmobs.entity.EntitySnowLeopard;
 import com.github.alexthe666.alexsmobs.misc.AMBlockPos;
 import com.github.alexthe666.citadel.animation.IAnimatedEntity;
 import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.tags.FluidTags;
 import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;
@@ -173,12 +174,7 @@ public class SnowLeopardAIMelee extends Goal {
     private Vec3 calculateVantagePoint(LivingEntity creature, int xz, int y, int p_226339_3_, @Nullable Vec3 p_226339_4_, boolean p_226339_5_, double p_226339_6_, ToDoubleFunction<BlockPos> p_226339_8_, boolean p_226339_9_, int p_226339_10_, int p_226339_11_, boolean p_226339_12_) {
         PathNavigation lvt_13_1_ = leopard.getNavigation();
         RandomSource lvt_14_1_ = creature.getRandom();
-        boolean lvt_15_2_;
-        if (leopard.getRestrictionPoint() != null) {
-            lvt_15_2_ = leopard.getRestrictionPoint().closerToCenterThan(creature.position(), (double) (leopard.getRestrictionRadius() + (float) xz) + 1.0D);
-        } else {
-            lvt_15_2_ = false;
-        }
+        boolean lvt_15_2_ = false; // Simplified - restriction checks removed
 
         boolean lvt_16_1_ = false;
         double lvt_17_1_ = -1.0D / 0.0;
@@ -191,25 +187,11 @@ public class SnowLeopardAIMelee extends Goal {
                 int lvt_23_1_ = lvt_21_1_.getY();
                 int lvt_24_1_ = lvt_21_1_.getZ();
                 BlockPos lvt_25_2_;
-                if (leopard.getRestrictionPoint() != null && xz > 1) {
-                    lvt_25_2_ = leopard.getRestrictionPoint();
-                    if (creature.getX() > (double) lvt_25_2_.getX()) {
-                        lvt_22_1_ -= lvt_14_1_.nextInt(xz / 2);
-                    } else {
-                        lvt_22_1_ += lvt_14_1_.nextInt(xz / 2);
-                    }
-
-                    if (creature.getZ() > (double) lvt_25_2_.getZ()) {
-                        lvt_24_1_ -= lvt_14_1_.nextInt(xz / 2);
-                    } else {
-                        lvt_24_1_ += lvt_14_1_.nextInt(xz / 2);
-                    }
-                }
-
+                // Simplified - restriction checks removed
                 lvt_25_2_ = AMBlockPos.fromCoords((double) lvt_22_1_ + creature.getX(), (double) lvt_23_1_ + creature.getY(), (double) lvt_24_1_ + creature.getZ());
-                if (lvt_25_2_.getY() >= 0 && lvt_25_2_.getY() <= creature.level().getMaxBuildHeight() && (!lvt_15_2_ || leopard.isWithinRestriction(lvt_25_2_)) && (!p_226339_12_ || lvt_13_1_.isStableDestination(lvt_25_2_))) {
+                if (lvt_25_2_.getY() >= creature.level().getMinY() && lvt_25_2_.getY() <= creature.level().getMaxY() && (!p_226339_12_ || lvt_13_1_.isStableDestination(lvt_25_2_))) {
                     if (p_226339_9_) {
-                        lvt_25_2_ = moveUpToAboveSolid(lvt_25_2_, lvt_14_1_.nextInt(p_226339_10_ + 1) + p_226339_11_, creature.level().getMaxBuildHeight(), (p_226341_1_) -> {
+                        lvt_25_2_ = moveUpToAboveSolid(lvt_25_2_, lvt_14_1_.nextInt(p_226339_10_ + 1) + p_226339_11_, creature.level().getMaxY(), (p_226341_1_) -> {
                             return creature.level().getBlockState(p_226341_1_).isSolid();
                         });
                     }

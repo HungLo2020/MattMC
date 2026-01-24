@@ -122,7 +122,34 @@ public class ModelSnowLeopard extends AdvancedEntityModel<SnowLeopardRenderState
 
     public void animate(SnowLeopardRenderState renderState) {
         this.resetToDefaultPose();
-        animator.update(renderState);
+        
+        // Create a temporary IAnimatedEntity wrapper for the animator
+        com.github.alexthe666.citadel.animation.IAnimatedEntity tempEntity = new com.github.alexthe666.citadel.animation.IAnimatedEntity() {
+            @Override
+            public int getAnimationTick() {
+                return renderState.animationTick;
+            }
+
+            @Override
+            public void setAnimationTick(int tick) {
+            }
+
+            @Override
+            public com.github.alexthe666.citadel.animation.Animation getAnimation() {
+                return renderState.currentAnimation;
+            }
+
+            @Override
+            public void setAnimation(com.github.alexthe666.citadel.animation.Animation animation) {
+            }
+
+            @Override
+            public com.github.alexthe666.citadel.animation.Animation[] getAnimations() {
+                return new com.github.alexthe666.citadel.animation.Animation[]{EntitySnowLeopard.ANIMATION_ATTACK_L, EntitySnowLeopard.ANIMATION_ATTACK_R};
+            }
+        };
+        
+        animator.update(tempEntity);
         animator.setAnimation(EntitySnowLeopard.ANIMATION_ATTACK_R);
         animator.startKeyframe(3);
         animator.rotate(body, 0, Maths.rad(-10F), 0);

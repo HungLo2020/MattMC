@@ -54,7 +54,7 @@ public class EntitySnowLeopard extends Animal implements IAnimatedEntity, ITarge
     public float prevSleepProgress;
     public float sleepProgress;
 
-    protected EntitySnowLeopard(EntityType<? extends Animal> type, Level worldIn) {
+    public EntitySnowLeopard(EntityType<? extends Animal> type, Level worldIn) {
         super(type, worldIn);
     }
 
