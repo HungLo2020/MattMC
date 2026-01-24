@@ -386,16 +386,18 @@ public class EntityOrca extends TamableAnimal implements IAnimatedEntity {
     protected void updateAir(int p_209207_1_) {
     }
 
-    public void addAdditionalSaveData(CompoundTag compound) {
-        super.addAdditionalSaveData(compound);
-        compound.putInt("Moistness", this.getMoistness());
-        compound.putInt("Variant", this.getVariant());
+    @Override
+    protected void addAdditionalSaveData(net.minecraft.world.level.storage.ValueOutput valueOutput) {
+        super.addAdditionalSaveData(valueOutput);
+        valueOutput.putInt("Moistness", this.getMoistness());
+        valueOutput.putInt("Variant", this.getVariant());
     }
 
-    public void readAdditionalSaveData(CompoundTag compound) {
-        super.readAdditionalSaveData(compound);
-        this.setMoistness(compound.getIntOr("Moistness", 2400));
-        this.setVariant(compound.getIntOr("Variant", 0));
+    @Override
+    protected void readAdditionalSaveData(net.minecraft.world.level.storage.ValueInput valueInput) {
+        super.readAdditionalSaveData(valueInput);
+        this.setMoistness(valueInput.getIntOr("Moistness", 2400));
+        this.setVariant(valueInput.getIntOr("Variant", 0));
     }
 
     public void onJumpHit(LivingEntity entityIn) {
