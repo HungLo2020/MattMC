@@ -14741,7 +14741,6 @@
     "subtitle": "subtitles.entity.emu.hurt"
   },
   "entity.egg.throw": {
-  "entity.egg.throw": {
     "sounds": [
       "random/bow"
     ],
@@ -25552,5 +25551,4 @@
     ],
     "subtitle": "subtitles.entity.leafcutter_ant_queen.idle"
   }
-}
 }
