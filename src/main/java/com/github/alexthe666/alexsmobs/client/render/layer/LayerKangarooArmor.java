@@ -24,7 +24,8 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.item.ArmorItem;
+// Armor handling disabled - needs 1.21 equipment API refactor
+// import net.minecraft.world.item.ArmorItem;
 import net.minecraft.world.item.ItemDisplayContext;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.component.DyedItemColor;
@@ -44,6 +45,8 @@ public class LayerKangarooArmor extends RenderLayer<EntityKangaroo, KangarooMode
         this.renderer = render;
     }
 
+    // Disabled for 1.21 - needs equipment API refactor
+    /*
     public static ResourceLocation getArmorResource(net.minecraft.world.entity.Entity entity, ItemStack stack,
             EquipmentSlot slot, @javax.annotation.Nullable String type) {
         ArmorItem item = (ArmorItem) stack.getItem();
@@ -62,6 +65,7 @@ public class LayerKangarooArmor extends RenderLayer<EntityKangaroo, KangarooMode
 
         return resourcelocation;
     }
+    */
 
     public void render(PoseStack matrixStackIn, MultiBufferSource bufferIn, int packedLightIn, EntityKangaroo roo,
             float limbSwing, float limbSwingAmount, float partialTicks, float ageInTicks, float netHeadYaw,

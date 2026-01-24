@@ -1735,6 +1735,10 @@ public class Items {
 	public static final Item COOKED_BEEF = registerItem("cooked_beef", new Item.Properties().food(Foods.COOKED_BEEF));
 	public static final Item CHICKEN = registerItem("chicken", new Item.Properties().food(Foods.CHICKEN, Consumables.CHICKEN));
 	public static final Item COOKED_CHICKEN = registerItem("cooked_chicken", new Item.Properties().food(Foods.COOKED_CHICKEN));
+	public static final Item KANGAROO_HIDE = registerItem("kangaroo_hide");
+	public static final Item KANGAROO_MEAT = registerItem("kangaroo_meat", new Item.Properties().food(Foods.CHICKEN, Consumables.CHICKEN));
+	public static final Item COOKED_KANGAROO_MEAT = registerItem("cooked_kangaroo_meat", new Item.Properties().food(Foods.COOKED_CHICKEN));
+	public static final Item KANGAROO_BURGER = registerItem("kangaroo_burger", new Item.Properties().food(Foods.COOKED_BEEF));
 	public static final Item ROTTEN_FLESH = registerItem("rotten_flesh", new Item.Properties().food(Foods.ROTTEN_FLESH, Consumables.ROTTEN_FLESH));
 	public static final Item ENDER_PEARL = registerItem("ender_pearl", EnderpearlItem::new, new Item.Properties().stacksTo(16).useCooldown(1.0F));
 	public static final Item BLAZE_ROD = registerItem("blaze_rod");
@@ -1859,6 +1863,7 @@ public class Items {
 	public static final Item HORSE_SPAWN_EGG = registerItem("horse_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.HORSE));
 	public static final Item HUSK_SPAWN_EGG = registerItem("husk_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.HUSK));
 	public static final Item JERBOA_SPAWN_EGG = registerItem("jerboa_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.JERBOA));
+	public static final Item KANGAROO_SPAWN_EGG = registerItem("kangaroo_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.KANGAROO));
 	public static final Item IRON_GOLEM_SPAWN_EGG = registerItem("iron_golem_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.IRON_GOLEM));
 	public static final Item LLAMA_SPAWN_EGG = registerItem("llama_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.LLAMA));
 	public static final Item MAGMA_CUBE_SPAWN_EGG = registerItem("magma_cube_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.MAGMA_CUBE));

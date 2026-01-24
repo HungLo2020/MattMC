@@ -16932,6 +16932,31 @@
     ],
     "subtitle": "subtitles.entity.item.pickup"
   },
+  "entity.kangaroo.idle_0": {
+    "sounds": [
+      "kangaroo_idle_0"
+    ]
+  },
+  "entity.kangaroo.idle_1": {
+    "sounds": [
+      "kangaroo_idle_1"
+    ]
+  },
+  "entity.kangaroo.idle_2": {
+    "sounds": [
+      "kangaroo_idle_2"
+    ]
+  },
+  "entity.kangaroo.hurt_0": {
+    "sounds": [
+      "kangaroo_hurt_0"
+    ]
+  },
+  "entity.kangaroo.hurt_1": {
+    "sounds": [
+      "kangaroo_hurt_1"
+    ]
+  },
   "entity.item_frame.add_item": {
     "sounds": [
       "entity/itemframe/add_item1",

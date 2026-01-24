@@ -78,6 +78,7 @@ import com.github.alexmodguy.alexscaves.server.entity.living.RelicheirusEntity;
 import com.github.alexmodguy.alexscaves.server.entity.living.SubterranodonEntity;
 import com.github.alexmodguy.alexscaves.server.entity.living.TrilocarisEntity;
 import com.github.alexmodguy.alexscaves.server.entity.living.VallumraptorEntity;
+import com.github.alexthe666.alexsmobs.entity.EntityKangaroo;
 import com.github.alexthe666.alexsmobs.entity.EntityBunfungus;
 import com.github.alexthe666.alexsmobs.entity.EntityMungus;
 import com.github.alexthe666.alexsmobs.entity.EntityBlobfish;
@@ -1120,6 +1121,13 @@ public class EntityType<T extends Entity> implements FeatureElement, EntityTypeT
 		EntityType.Builder.of(VallumraptorEntity::new, MobCategory.CREATURE)
 			.sized(0.8F, 1.5F)
 			.eyeHeight(1.2F)
+			.clientTrackingRange(10)
+	);
+	public static final EntityType<EntityKangaroo> KANGAROO = register(
+		"kangaroo",
+		EntityType.Builder.of(EntityKangaroo::new, MobCategory.CREATURE)
+			.sized(0.8F, 1.8F)
+			.eyeHeight(1.4F)
 			.clientTrackingRange(10)
 	);
 	public static final EntityType<EntityMungus> MUNGUS = register(

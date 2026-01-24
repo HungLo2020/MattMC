@@ -923,6 +923,11 @@ public class SoundEvents {
 	public static final SoundEvent ITEM_FRAME_ROTATE_ITEM = register("entity.item_frame.rotate_item");
 	public static final Holder.Reference<SoundEvent> ITEM_BREAK = registerForHolder("entity.item.break");
 	public static final SoundEvent ITEM_PICKUP = register("entity.item.pickup");
+	public static final SoundEvent KANGAROO_IDLE_0 = register("entity.kangaroo.idle_0");
+	public static final SoundEvent KANGAROO_IDLE_1 = register("entity.kangaroo.idle_1");
+	public static final SoundEvent KANGAROO_IDLE_2 = register("entity.kangaroo.idle_2");
+	public static final SoundEvent KANGAROO_HURT_0 = register("entity.kangaroo.hurt_0");
+	public static final SoundEvent KANGAROO_HURT_1 = register("entity.kangaroo.hurt_1");
 	public static final SoundEvent LADDER_BREAK = register("block.ladder.break");
 	public static final SoundEvent LADDER_FALL = register("block.ladder.fall");
 	public static final SoundEvent LADDER_HIT = register("block.ladder.hit");

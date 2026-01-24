@@ -43,7 +43,6 @@ import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.DispenserMenu;
-import net.minecraft.world.item.ArmorItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.Ingredient;
@@ -827,21 +826,19 @@ public class EntityKangaroo extends TamableAnimal implements ContainerListener, 
                     if (stack.getItem().canEquip(stack, EquipmentSlot.HEAD, this)  && !this.isBaby() && helmetIndex == -1) {
                         helmetIndex = i;
                     }
-                    if (stack.getItem() instanceof ArmorItem && !this.isBaby()) {
-                        ArmorItem armorItem = (ArmorItem) stack.getItem();
-                        if (armorItem.getEquipmentSlot() == EquipmentSlot.HEAD) {
-                            double prot = getProtectionForItem(stack, EquipmentSlot.HEAD);
-                            if (prot > 0 && prot > helmetArmor) {
-                                helmetArmor = prot;
-                                helmetIndex = i;
-                            }
+                    // Armor item handling simplified for 1.21
+                    if (stack.getItem().canEquip(stack, EquipmentSlot.HEAD, this) && !this.isBaby()) {
+                        double prot = getProtectionForItem(stack, EquipmentSlot.HEAD);
+                        if (prot > 0 && prot > helmetArmor) {
+                            helmetArmor = prot;
+                            helmetIndex = i;
                         }
-                        if (armorItem.getEquipmentSlot() == EquipmentSlot.CHEST) {
-                            double prot = getProtectionForItem(stack, EquipmentSlot.CHEST);
-                            if (prot > 0 && prot > chestplateArmor) {
-                                chestplateArmor = prot;
-                                chestplateIndex = i;
-                            }
+                    }
+                    if (stack.getItem().canEquip(stack, EquipmentSlot.CHEST, this) && !this.isBaby()) {
+                        double prot = getProtectionForItem(stack, EquipmentSlot.CHEST);
+                        if (prot > 0 && prot > chestplateArmor) {
+                            chestplateArmor = prot;
+                            chestplateIndex = i;
                         }
                     }
                 }

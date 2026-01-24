@@ -1674,6 +1674,9 @@ public class CreativeModeTabs {
 						output.accept(Items.COOKED_MUTTON);
 						output.accept(Items.CHICKEN);
 						output.accept(Items.COOKED_CHICKEN);
+						output.accept(Items.KANGAROO_MEAT);
+						output.accept(Items.COOKED_KANGAROO_MEAT);
+						output.accept(Items.KANGAROO_BURGER);
 						output.accept(Items.BLOBFISH);
 						output.accept(Items.RAW_CATFISH);
 						output.accept(Items.COOKED_CATFISH);
@@ -1773,6 +1776,7 @@ public class CreativeModeTabs {
 					output.accept(Items.COCKROACH_OOTHECA);
 					output.accept(Items.BISON_FUR);
 					output.accept(Items.LEATHER);
+					output.accept(Items.KANGAROO_HIDE);
 					output.accept(Items.RABBIT_HIDE);
 					output.accept(Items.TOUGH_HIDE);
 					output.accept(Items.HONEYCOMB);
@@ -1978,6 +1982,7 @@ public class CreativeModeTabs {
 					output.accept(Items.HORSE_SPAWN_EGG);
 					output.accept(Items.HUSK_SPAWN_EGG);
 					output.accept(Items.JERBOA_SPAWN_EGG);
+					output.accept(Items.KANGAROO_SPAWN_EGG);
 					output.accept(Items.IRON_GOLEM_SPAWN_EGG);
 					output.accept(Items.LLAMA_SPAWN_EGG);
 					output.accept(Items.MAGMA_CUBE_SPAWN_EGG);
