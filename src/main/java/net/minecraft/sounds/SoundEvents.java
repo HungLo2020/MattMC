@@ -1009,6 +1009,9 @@ public class SoundEvents {
 	public static final SoundEvent MOOSHROOM_MILK = register("entity.mooshroom.milk");
 	public static final SoundEvent MOOSHROOM_MILK_SUSPICIOUSLY = register("entity.mooshroom.suspicious_milk");
 	public static final SoundEvent MOOSHROOM_SHEAR = register("entity.mooshroom.shear");
+	public static final SoundEvent MOOSE_IDLE = register("entity.moose.idle");
+	public static final SoundEvent MOOSE_HURT = register("entity.moose.hurt");
+	public static final SoundEvent MOOSE_JOSTLE = register("entity.moose.jostle");
 	public static final SoundEvent MUNGUS_HURT = register("entity.mungus.hurt");
 	public static final SoundEvent MUNGUS_IDLE = register("entity.mungus.idle");
 	public static final SoundEvent MUNGUS_LASER_END = register("entity.mungus.laser_end");

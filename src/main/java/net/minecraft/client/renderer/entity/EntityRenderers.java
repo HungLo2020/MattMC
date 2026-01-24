@@ -199,6 +199,7 @@ public class EntityRenderers {
 		register(EntityType.MOOSHROOM, MushroomCowRenderer::new);
 		register(EntityType.MUD_BALL, ThrownItemRenderer::new);
 		register(EntityType.MUDSKIPPER, com.github.alexthe666.alexsmobs.client.render.RenderMudskipper::new);
+		register(EntityType.MOOSE, com.github.alexthe666.alexsmobs.client.render.RenderMoose::new);
 		register(EntityType.MULE, context -> new DonkeyRenderer(context, DonkeyRenderer.Type.MULE));
 		register(EntityType.MUNGUS, com.github.alexthe666.alexsmobs.client.render.RenderMungus::new);
 		register(EntityType.OAK_BOAT, context -> new BoatRenderer(context, ModelLayers.OAK_BOAT));
