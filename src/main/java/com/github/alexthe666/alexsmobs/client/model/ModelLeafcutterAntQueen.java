@@ -176,7 +176,7 @@ public class ModelLeafcutterAntQueen extends AdvancedEntityModel<LeafcutterAntRe
 		this.swing(legmid_left, walkSpeed, walkDegree, false, 0, 0F, limbSwing, limbSwingAmount);
 		this.flap(legmid_left, walkSpeed, walkDegree * 0.8F, false, -1.5F, -0.4F, limbSwing, limbSwingAmount);
 		this.bob(body, walkSpeed * 2F, walkDegree * -0.6F, false, limbSwing, limbSwingAmount);
-		float offsetleft = 2F;
+		float offsetleft = -2F;
 		this.swing(legback_left, walkSpeed, -walkDegree * 1.2F, false, offsetleft, -0.2F, limbSwing, limbSwingAmount);
 		this.flap(legback_left, walkSpeed, walkDegree * 0.8F, false, offsetleft-1.5F, -0.4F, limbSwing, limbSwingAmount);
 		this.swing(legront_left, walkSpeed, -walkDegree, false, offsetleft, 0.3F, limbSwing, limbSwingAmount);
