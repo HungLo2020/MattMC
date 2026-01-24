@@ -1760,6 +1760,10 @@ public class Items {
 	public static final Item SPIDER_EYE = registerItem("spider_eye", new Item.Properties().food(Foods.SPIDER_EYE, Consumables.SPIDER_EYE));
 	public static final Item FERMENTED_SPIDER_EYE = registerItem("fermented_spider_eye");
 	public static final Item BISON_FUR = registerItem("bison_fur");
+	public static final Item MOOSE_ANTLER = registerItem("moose_antler");
+	public static final Item MOOSE_RIBS = registerItem("moose_ribs", new Item.Properties().food(Foods.PORKCHOP));
+	public static final Item COOKED_MOOSE_RIBS = registerItem("cooked_moose_ribs", new Item.Properties().food(Foods.COOKED_PORKCHOP));
+	public static final Item MOOSE_HEADGEAR = registerItem("moose_headgear", new Item.Properties().durability(300).humanoidArmor(ArmorMaterials.LEATHER, ArmorType.HELMET));
 	public static final Item BLAZE_POWDER = registerItem("blaze_powder");
 	public static final Item MAGMA_CREAM = registerItem("magma_cream");
 	public static final Item BREWING_STAND = registerBlock(
@@ -1881,6 +1885,7 @@ public class Items {
 	public static final Item MIMIC_OCTOPUS_SPAWN_EGG = registerItem("mimic_octopus_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.MIMIC_OCTOPUS));
 	public static final Item MIMIC_OCTOPUS_BUCKET = registerItem("mimic_octopus_bucket", properties -> new MobBucketItem(EntityType.MIMIC_OCTOPUS, Fluids.WATER, SoundEvents.BUCKET_EMPTY_FISH, properties), new Item.Properties().stacksTo(1));
 	public static final Item MOOSHROOM_SPAWN_EGG = registerItem("mooshroom_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.MOOSHROOM));
+	public static final Item MOOSE_SPAWN_EGG = registerItem("moose_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.MOOSE));
 	public static final Item MULE_SPAWN_EGG = registerItem("mule_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.MULE));
 	public static final Item MUNGUS_SPAWN_EGG = registerItem("mungus_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.MUNGUS));
 	public static final Item MUDSKIPPER_SPAWN_EGG = registerItem("mudskipper_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.MUDSKIPPER));

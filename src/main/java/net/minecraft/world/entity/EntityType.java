@@ -852,6 +852,9 @@ public class EntityType<T extends Entity> implements FeatureElement, EntityTypeT
 		"mooshroom",
 		EntityType.Builder.of(MushroomCow::new, MobCategory.CREATURE).sized(0.9F, 1.4F).eyeHeight(1.3F).passengerAttachments(1.36875F).clientTrackingRange(10)
 	);
+	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntityMoose> MOOSE = register(
+		"moose", EntityType.Builder.of(com.github.alexthe666.alexsmobs.entity.EntityMoose::new, MobCategory.CREATURE).sized(1.5F, 2.3F).eyeHeight(2.0F).clientTrackingRange(10)
+	);
 	public static final EntityType<Mule> MULE = register(
 		"mule", EntityType.Builder.of(Mule::new, MobCategory.CREATURE).sized(1.3964844F, 1.6F).eyeHeight(1.52F).passengerAttachments(1.2125F).clientTrackingRange(8)
 	);

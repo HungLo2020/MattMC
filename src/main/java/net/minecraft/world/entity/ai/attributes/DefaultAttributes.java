@@ -179,6 +179,7 @@ public class DefaultAttributes {
 		.put(EntityType.MANTIS_SHRIMP, com.github.alexthe666.alexsmobs.entity.EntityMantisShrimp.bakeAttributes().build())
 		.put(EntityType.MIMIC_OCTOPUS, EntityMimicOctopus.createAttributes().build())
 		.put(EntityType.MOOSHROOM, Cow.createAttributes().build())
+		.put(EntityType.MOOSE, com.github.alexthe666.alexsmobs.entity.EntityMoose.bakeAttributes().build())
 		.put(EntityType.MUDSKIPPER, com.github.alexthe666.alexsmobs.entity.EntityMudskipper.createAttributes().build())
 		.put(EntityType.MULE, AbstractChestedHorse.createBaseChestedHorseAttributes().build())
 		.put(EntityType.MUNGUS, EntityMungus.bakeAttributes().build())

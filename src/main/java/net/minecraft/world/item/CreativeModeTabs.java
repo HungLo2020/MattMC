@@ -1617,6 +1617,7 @@ public class CreativeModeTabs {
 						output.accept(Items.NETHERITE_LEGGINGS);
 						output.accept(Items.NETHERITE_BOOTS);
 						output.accept(Items.TURTLE_HELMET);
+						output.accept(Items.MOOSE_HEADGEAR);
 						output.accept(Items.LEATHER_HORSE_ARMOR);
 						output.accept(Items.COPPER_HORSE_ARMOR);
 						output.accept(Items.IRON_HORSE_ARMOR);
@@ -1680,6 +1681,8 @@ public class CreativeModeTabs {
 						output.accept(Items.COOKED_CHICKEN);
 						output.accept(Items.KANGAROO_MEAT);
 						output.accept(Items.COOKED_KANGAROO_MEAT);
+						output.accept(Items.MOOSE_RIBS);
+						output.accept(Items.COOKED_MOOSE_RIBS);
 						output.accept(Items.KANGAROO_BURGER);
 						output.accept(Items.BLOBFISH);
 						output.accept(Items.RAW_CATFISH);
@@ -1781,6 +1784,7 @@ public class CreativeModeTabs {
 					output.accept(Items.BLUE_EGG);
 					output.accept(Items.COCKROACH_OOTHECA);
 					output.accept(Items.BISON_FUR);
+					output.accept(Items.MOOSE_ANTLER);
 					output.accept(Items.LEATHER);
 					output.accept(Items.KANGAROO_HIDE);
 					output.accept(Items.RABBIT_HIDE);
@@ -1997,6 +2001,7 @@ public class CreativeModeTabs {
 					output.accept(Items.MANTIS_SHRIMP_SPAWN_EGG);
 					output.accept(Items.MIMIC_OCTOPUS_SPAWN_EGG);
 					output.accept(Items.MOOSHROOM_SPAWN_EGG);
+					output.accept(Items.MOOSE_SPAWN_EGG);
 					output.accept(Items.MUDSKIPPER_SPAWN_EGG);
 					output.accept(Items.MULE_SPAWN_EGG);
 					output.accept(Items.MUNGUS_SPAWN_EGG);

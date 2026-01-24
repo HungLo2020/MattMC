@@ -17360,6 +17360,29 @@
     ],
     "subtitle": "subtitles.entity.mooshroom.suspicious_milk"
   },
+  "entity.moose.idle": {
+    "sounds": [
+      "moose_idle_0",
+      "moose_idle_1",
+      "moose_idle_2"
+    ],
+    "subtitle": "subtitles.entity.moose.ambient"
+  },
+  "entity.moose.hurt": {
+    "sounds": [
+      "moose_hurt_0",
+      "moose_hurt_1"
+    ],
+    "subtitle": "subtitles.entity.moose.hurt"
+  },
+  "entity.moose.jostle": {
+    "sounds": [
+      "moose_jostle_0",
+      "moose_jostle_1",
+      "moose_jostle_2"
+    ],
+    "subtitle": "subtitles.entity.moose.jostle"
+  },
   "entity.mule.ambient": {
     "sounds": [
       "mob/horse/donkey/idle1",
