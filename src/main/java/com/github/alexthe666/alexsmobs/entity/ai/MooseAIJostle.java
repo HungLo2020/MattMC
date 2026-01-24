@@ -143,14 +143,18 @@ public class MooseAIJostle extends Goal {
 
     @Nullable
     private EntityMoose getNearbyMoose() {
-        List<EntityMoose> listOfMeese = this.world.getNearbyEntities(EntityMoose.class, JOSTLE_PREDICATE, this.moose, this.moose.getBoundingBox().inflate(16.0D));
+        List<EntityMoose> listOfMeese = this.world.getEntities(
+            net.minecraft.world.entity.EntityType.MOOSE,
+            this.moose.getBoundingBox().inflate(16.0D),
+            (moose) -> this.moose.canJostleWith(moose)
+        );
         double lvt_2_1_ = 1.7976931348623157E308D;
         EntityMoose lvt_4_1_ = null;
         Iterator var5 = listOfMeese.iterator();
 
         while (var5.hasNext()) {
             EntityMoose lvt_6_1_ = (EntityMoose) var5.next();
-            if (this.moose.canJostleWith(lvt_6_1_) && this.moose.distanceToSqr(lvt_6_1_) < lvt_2_1_) {
+            if (this.moose.distanceToSqr(lvt_6_1_) < lvt_2_1_) {
                 lvt_4_1_ = lvt_6_1_;
                 lvt_2_1_ = this.moose.distanceToSqr(lvt_6_1_);
             }

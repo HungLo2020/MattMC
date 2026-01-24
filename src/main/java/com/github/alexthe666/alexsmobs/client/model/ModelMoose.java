@@ -216,38 +216,6 @@ public class ModelMoose extends AdvancedEntityModel<MooseRenderState> {
         }
     }
 
-    public void renderToBuffer(PoseStack matrixStackIn, VertexConsumer bufferIn, int packedLightIn, int packedOverlayIn, int color) {
-        if (this.young) {
-            float f = 1.35F;
-            float feet = 1.45F;
-            head.setScale(f, f, f);
-            head.setShouldScaleChildren(true);
-            right_arm.setScale(1, feet, 1);
-            left_arm.setScale(1, feet, 1);
-            right_leg.setScale(1, feet, 1);
-            left_leg.setScale(1, feet, 1);
-            matrixStackIn.pushPose();
-            matrixStackIn.scale(0.35F, 0.35F, 0.35F);
-            matrixStackIn.translate(0.0D, 2.25D, 0.125D);
-            parts().forEach((p_228292_8_) -> {
-                p_228292_8_.render(matrixStackIn, bufferIn, packedLightIn, packedOverlayIn, -1);
-            });
-            matrixStackIn.popPose();
-            head.setScale(1, 1, 1);
-            right_arm.setScale(1, 1, 1);
-            left_arm.setScale(1, 1, 1);
-            right_leg.setScale(1, 1, 1);
-            left_leg.setScale(1, 1, 1);
-        } else {
-            matrixStackIn.pushPose();
-            parts().forEach((p_228290_8_) -> {
-                p_228290_8_.render(matrixStackIn, bufferIn, packedLightIn, packedOverlayIn, -1);
-            });
-            matrixStackIn.popPose();
-        }
-
-    }
-
     @Override
     public Iterable<BasicModelPart> parts() {
         return ImmutableList.of(root);
