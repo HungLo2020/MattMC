@@ -1093,8 +1093,8 @@ public class CreativeModeTabs {
 						output.accept(Items.SCAFFOLDING);
 						output.accept(Items.BEE_NEST);
 						output.accept(Items.BEEHIVE);
-						output.accept(Items.LEAFCUTTER_ANTHILL);
-						output.accept(Items.LEAFCUTTER_ANT_CHAMBER);
+						output.accept(Blocks.LEAFCUTTER_ANTHILL);
+						output.accept(Blocks.LEAFCUTTER_ANT_CHAMBER);
 						output.accept(Items.LEAFCUTTER_ANT_PUPA);
 						output.accept(Items.SUSPICIOUS_SAND);
 						output.accept(Items.SUSPICIOUS_GRAVEL);
