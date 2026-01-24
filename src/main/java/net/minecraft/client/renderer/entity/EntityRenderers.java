@@ -205,6 +205,7 @@ public class EntityRenderers {
 		register(EntityType.OAK_BOAT, context -> new BoatRenderer(context, ModelLayers.OAK_BOAT));
 		register(EntityType.OAK_CHEST_BOAT, context -> new BoatRenderer(context, ModelLayers.OAK_CHEST_BOAT));
 		register(EntityType.OCELOT, OcelotRenderer::new);
+		register(EntityType.ORCA, com.github.alexthe666.alexsmobs.client.render.RenderOrca::new);
 		register(EntityType.OMINOUS_ITEM_SPAWNER, OminousItemSpawnerRenderer::new);
 		register(EntityType.PAINTING, PaintingRenderer::new);
 		register(EntityType.PALE_OAK_BOAT, context -> new BoatRenderer(context, ModelLayers.PALE_OAK_BOAT));

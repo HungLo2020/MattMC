@@ -899,6 +899,9 @@ public class EntityType<T extends Entity> implements FeatureElement, EntityTypeT
 	public static final EntityType<OminousItemSpawner> OMINOUS_ITEM_SPAWNER = register(
 		"ominous_item_spawner", EntityType.Builder.of(OminousItemSpawner::new, MobCategory.MISC).noLootTable().sized(0.25F, 0.25F).clientTrackingRange(8)
 	);
+	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntityOrca> ORCA = register(
+		"orca", EntityType.Builder.of(com.github.alexthe666.alexsmobs.entity.EntityOrca::new, MobCategory.WATER_CREATURE).sized(1.6F, 1.2F).eyeHeight(0.8F).clientTrackingRange(10)
+	);
 	public static final EntityType<Painting> PAINTING = register(
 		"painting",
 		EntityType.Builder.<Painting>of(Painting::new, MobCategory.MISC).noLootTable().sized(0.5F, 0.5F).clientTrackingRange(10).updateInterval(Integer.MAX_VALUE)

@@ -184,6 +184,7 @@ public class DefaultAttributes {
 		.put(EntityType.MULE, AbstractChestedHorse.createBaseChestedHorseAttributes().build())
 		.put(EntityType.MUNGUS, EntityMungus.bakeAttributes().build())
 		.put(EntityType.OCELOT, Ocelot.createAttributes().build())
+		.put(EntityType.ORCA, com.github.alexthe666.alexsmobs.entity.EntityOrca.createAttributes().build())
 		.put(EntityType.PANDA, Panda.createAttributes().build())
 		.put(EntityType.PARROT, Parrot.createAttributes().build())
 		.put(EntityType.PHANTOM, Monster.createMonsterAttributes().build())

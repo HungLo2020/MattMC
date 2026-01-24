@@ -17513,6 +17513,28 @@
     ],
     "subtitle": "subtitles.entity.cat.hurt"
   },
+  "entity.orca.die": {
+    "sounds": [
+      "orca_die_0",
+      "orca_die_1"
+    ],
+    "subtitle": "subtitles.entity.orca.death"
+  },
+  "entity.orca.hurt": {
+    "sounds": [
+      "orca_hurt_0",
+      "orca_hurt_1"
+    ],
+    "subtitle": "subtitles.entity.orca.hurt"
+  },
+  "entity.orca.idle": {
+    "sounds": [
+      "orca_idle_0",
+      "orca_idle_1",
+      "orca_idle_2"
+    ],
+    "subtitle": "subtitles.entity.orca.ambient"
+  },
   "entity.painting.break": {
     "sounds": [
       "entity/painting/break1",

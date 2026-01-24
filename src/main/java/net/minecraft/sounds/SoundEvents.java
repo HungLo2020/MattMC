@@ -1202,6 +1202,9 @@ public class SoundEvents {
 	public static final SoundEvent OCELOT_HURT = register("entity.ocelot.hurt");
 	public static final SoundEvent OCELOT_AMBIENT = register("entity.ocelot.ambient");
 	public static final SoundEvent OCELOT_DEATH = register("entity.ocelot.death");
+	public static final SoundEvent ORCA_IDLE = register("entity.orca.idle");
+	public static final SoundEvent ORCA_HURT = register("entity.orca.hurt");
+	public static final SoundEvent ORCA_DIE = register("entity.orca.die");
 	public static final Holder.Reference<SoundEvent> OMINOUS_BOTTLE_DISPOSE = registerForHolder("item.ominous_bottle.dispose");
 	public static final SoundEvent PAINTING_BREAK = register("entity.painting.break");
 	public static final SoundEvent PAINTING_PLACE = register("entity.painting.place");
