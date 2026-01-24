@@ -102,23 +102,56 @@ public class ModelRaccoon extends AdvancedEntityModel<RaccoonRenderState> {
 
     public void animate(RaccoonRenderState state) {
         this.resetToDefaultPose();
-        animator.setAnimation(EntityRaccoon.ANIMATION_ATTACK);
-        animator.startKeyframe(3);
-        animator.rotate(head, Maths.rad(-20), 0, 0);
-        animator.rotate(arm_right, Maths.rad(-120), 0, Maths.rad(30));
-        animator.rotate(arm_left, Maths.rad(-40), 0, Maths.rad(-20));
-        animator.endKeyframe();
-        animator.startKeyframe(3);
-        animator.rotate(head, Maths.rad(-20), 0, 0);
-        animator.rotate(arm_right, Maths.rad(-40), 0, Maths.rad(20));
-        animator.rotate(arm_left, Maths.rad(-120), 0, Maths.rad(-30));
-        animator.endKeyframe();
-        animator.startKeyframe(3);
-        animator.rotate(head, Maths.rad(-20), 0, 0);
-        animator.rotate(arm_right, Maths.rad(-120), 0, Maths.rad(30));
-        animator.rotate(arm_left, Maths.rad(-40), 0, Maths.rad(-20));
-        animator.endKeyframe();
-        animator.resetKeyframe(3);
+        // Create a simple wrapper to provide animation data to the animator
+        // This allows the ModelAnimator to work without direct entity access
+        IAnimatedEntity animatedWrapper = new IAnimatedEntity() {
+            @Override
+            public int getAnimationTick() {
+                return state.animationTick;
+            }
+
+            @Override
+            public void setAnimationTick(int tick) {
+                // No-op in render state
+            }
+
+            @Override
+            public com.github.alexthe666.citadel.animation.Animation getAnimation() {
+                return state.currentAnimation;
+            }
+
+            @Override
+            public void setAnimation(com.github.alexthe666.citadel.animation.Animation animation) {
+                // No-op in render state
+            }
+
+            @Override
+            public com.github.alexthe666.citadel.animation.Animation[] getAnimations() {
+                return new com.github.alexthe666.citadel.animation.Animation[]{EntityRaccoon.ANIMATION_ATTACK};
+            }
+        };
+        
+        // Update animator with wrapper and use animation data from render state
+        if (state.currentAnimation != null && state.currentAnimation == EntityRaccoon.ANIMATION_ATTACK) {
+            animator.update(animatedWrapper);
+            animator.setAnimation(state.currentAnimation);
+            animator.startKeyframe(3);
+            animator.rotate(head, Maths.rad(-20), 0, 0);
+            animator.rotate(arm_right, Maths.rad(-120), 0, Maths.rad(30));
+            animator.rotate(arm_left, Maths.rad(-40), 0, Maths.rad(-20));
+            animator.endKeyframe();
+            animator.startKeyframe(3);
+            animator.rotate(head, Maths.rad(-20), 0, 0);
+            animator.rotate(arm_right, Maths.rad(-40), 0, Maths.rad(20));
+            animator.rotate(arm_left, Maths.rad(-120), 0, Maths.rad(-30));
+            animator.endKeyframe();
+            animator.startKeyframe(3);
+            animator.rotate(head, Maths.rad(-20), 0, 0);
+            animator.rotate(arm_right, Maths.rad(-120), 0, Maths.rad(30));
+            animator.rotate(arm_left, Maths.rad(-40), 0, Maths.rad(-20));
+            animator.endKeyframe();
+            animator.resetKeyframe(3);
+        }
     }
 
     @Override
