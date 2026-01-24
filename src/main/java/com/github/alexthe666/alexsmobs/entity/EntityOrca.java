@@ -72,7 +72,7 @@ public class EntityOrca extends TamableAnimal implements IAnimatedEntity {
         return animal.isBaby();
     };
 
-    protected EntityOrca(EntityType type, Level worldIn) {
+    public EntityOrca(EntityType type, Level worldIn) {
         super(type, worldIn);
         this.setPathfindingMalus(PathType.WATER, 0.0F);
         this.moveControl = new MoveHelperController(this);
@@ -155,8 +155,8 @@ public class EntityOrca extends TamableAnimal implements IAnimatedEntity {
         this.goalSelector.addGoal(6, new OrcaAIMelee(this, 1.2F, true));
         this.goalSelector.addGoal(8, new FollowBoatGoal(this));
         this.targetSelector.addGoal(1, (new HurtByTargetGoal(this)).setAlertOthers());
-        this.targetSelector.addGoal(2, new EntityAINearestTarget3D(this, EntityCachalotWhale.class, 25, false, false, TARGET_BABY));
-        this.targetSelector.addGoal(3, new EntityAINearestTarget3D(this, LivingEntity.class, 200, false, true, (entity) -> entity != null && AMTagRegistry.TagHelper.isEntityIn(AMTagRegistry.ORCA_TARGETS, entity)));
+        this.targetSelector.addGoal(2, new EntityAINearestTarget3D(this, EntityCachalotWhale.class, 25, false, false, (entity, level) -> entity != null && entity.isBaby()));
+        this.targetSelector.addGoal(3, new EntityAINearestTarget3D(this, LivingEntity.class, 200, false, true, (entity, level) -> entity != null && AMTagRegistry.TagHelper.isEntityIn(AMTagRegistry.ORCA_TARGETS, entity)));
     }
 
     @Override
@@ -188,8 +188,8 @@ public class EntityOrca extends TamableAnimal implements IAnimatedEntity {
 
     }
 
-    public void customServerAiStep() {
-        super.customServerAiStep();
+    public void customServerAiStep(ServerLevel serverLevel) {
+        super.customServerAiStep(serverLevel);
         breakBlock();
     }
 
@@ -199,7 +199,7 @@ public class EntityOrca extends TamableAnimal implements IAnimatedEntity {
             return;
         }
         boolean flag = false;
-        if (!this.level().isClientSide && this.blockBreakCounter == 0) {
+        if (!this.level().isClientSide() && this.blockBreakCounter == 0) {
             for (int a = (int) Math.round(this.getBoundingBox().minX); a <= (int) Math.round(this.getBoundingBox().maxX); a++) {
                 for (int b = (int) Math.round(this.getBoundingBox().minY) - 1; (b <= (int) Math.round(this.getBoundingBox().maxY) + 1) && (b <= 127); b++) {
                     for (int c = (int) Math.round(this.getBoundingBox().minZ); c <= (int) Math.round(this.getBoundingBox().maxZ); c++) {
@@ -239,7 +239,7 @@ public class EntityOrca extends TamableAnimal implements IAnimatedEntity {
             this.setAirSupply(this.getMaxAirSupply());
         } else {
 
-            if (this.isInWaterRainOrBubble()) {
+            if (this.isInWaterOrRain()) {
                 this.setMoistness(2400);
             } else {
                 this.setMoistness(this.getMoistness() - 1);
@@ -255,7 +255,7 @@ public class EntityOrca extends TamableAnimal implements IAnimatedEntity {
                 }
             }
 
-            if (this.level().isClientSide && this.isInWater() && this.getDeltaMovement().lengthSqr() > 0.03D) {
+            if (this.level().isClientSide() && this.isInWater() && this.getDeltaMovement().lengthSqr() > 0.03D) {
                 Vec3 vector3d = this.getViewVector(0.0F);
                 final float yRotRad = this.getYRot() * Mth.DEG_TO_RAD;
                 final float f = Mth.cos(yRotRad) * 0.9F;
@@ -276,22 +276,16 @@ public class EntityOrca extends TamableAnimal implements IAnimatedEntity {
                 if(attackTarget instanceof Drowned || attackTarget instanceof Guardian){
                     damage *= 2F;
                 }
-                boolean flag = attackTarget.hurt(this.damageSources().mobAttack(this), damage);
-                if (flag) {
-                    // doEnchantDamageEffects removed in 1.21
-                    this.playSound(SoundEvents.DOLPHIN_ATTACK, 1.0F, 1.0F);
-                }
+                attackTarget.hurt(this.damageSources().mobAttack(this), damage);
+                this.playSound(SoundEvents.DOLPHIN_ATTACK, 1.0F, 1.0F);
             }
             if (this.getAnimation() == ANIMATION_TAILSWING && this.getAnimationTick() == 6) {
                 float damage =(float) ((int) this.getAttributeValue(Attributes.ATTACK_DAMAGE));
                 if(attackTarget instanceof Drowned || attackTarget instanceof Guardian){
                     damage *= 2F;
                 }
-                boolean flag = attackTarget.hurt(this.damageSources().mobAttack(this), damage);
-                if (flag) {
-                    // doEnchantDamageEffects removed in 1.21
-                    this.playSound(SoundEvents.DOLPHIN_ATTACK, 1.0F, 1.0F);
-                }
+                attackTarget.hurt(this.damageSources().mobAttack(this), damage);
+                this.playSound(SoundEvents.DOLPHIN_ATTACK, 1.0F, 1.0F);
                 final float yRotRad = this.getYRot() * Mth.DEG_TO_RAD;
                 attackTarget.knockback(1F, Mth.sin(yRotRad), -Mth.cos(yRotRad));
                 float knockbackResist = (float) Mth.clamp((1.0D - this.getAttributeValue(Attributes.KNOCKBACK_RESISTANCE)), 0, 1);
@@ -299,8 +293,8 @@ public class EntityOrca extends TamableAnimal implements IAnimatedEntity {
 
             }
         }
-        if (attackTarget != null && attackTarget instanceof Player && attackTarget.hasEffect(AMEffectRegistry.ORCAS_MIGHT.getDelegate())) {
-            attackTarget.removeEffect(AMEffectRegistry.ORCAS_MIGHT.getDelegate());
+        if (attackTarget != null && attackTarget instanceof Player && attackTarget.hasEffect(AMEffectRegistry.ORCAS_MIGHT)) {
+            attackTarget.removeEffect(AMEffectRegistry.ORCAS_MIGHT);
         }
         AnimationHandler.INSTANCE.updateAnimations(this);
     }
@@ -316,7 +310,7 @@ public class EntityOrca extends TamableAnimal implements IAnimatedEntity {
     }
 
     public boolean doHurtTarget(Entity entityIn) {
-        if(this.isInWaterOrBubble() && random.nextBoolean()){
+        if(this.isInWater() && random.nextBoolean()){
             this.setAnimation(ANIMATION_TAILSWING);
         }else{
             this.setAnimation(ANIMATION_BITE);
@@ -400,16 +394,13 @@ public class EntityOrca extends TamableAnimal implements IAnimatedEntity {
 
     public void readAdditionalSaveData(CompoundTag compound) {
         super.readAdditionalSaveData(compound);
-        this.setMoistness(compound.getInt("Moistness"));
-        this.setVariant(compound.getInt("Variant"));
+        this.setMoistness(compound.getIntOr("Moistness", 2400));
+        this.setVariant(compound.getIntOr("Variant", 0));
     }
 
     public void onJumpHit(LivingEntity entityIn) {
-        boolean flag = entityIn.hurt(this.damageSources().mobAttack(this), (float) ((int) this.getAttributeValue(Attributes.ATTACK_DAMAGE)));
-        if (flag) {
-            // doEnchantDamageEffects removed in 1.21
-            this.playSound(SoundEvents.DOLPHIN_ATTACK, 1.0F, 1.0F);
-        }
+        entityIn.hurt(this.damageSources().mobAttack(this), (float) ((int) this.getAttributeValue(Attributes.ATTACK_DAMAGE)));
+        this.playSound(SoundEvents.DOLPHIN_ATTACK, 1.0F, 1.0F);
     }
 
     public static boolean canOrcaSpawn(EntityType<EntityOrca> p_223364_0_, LevelAccessor p_223364_1_, EntitySpawnReason reason, BlockPos p_223364_3_, RandomSource p_223364_4_) {
@@ -432,7 +423,7 @@ public class EntityOrca extends TamableAnimal implements IAnimatedEntity {
         }
 
         public boolean canUse() {
-            this.targetPlayer = this.dolphin.level().getNearestPlayer(EntityOrca.PLAYER_PREDICATE, this.dolphin);
+            this.targetPlayer = this.dolphin.level().getNearestPlayer(this.dolphin, 24.0D);
             if (this.targetPlayer == null) {
                 return false;
             } else {
@@ -461,7 +452,7 @@ public class EntityOrca extends TamableAnimal implements IAnimatedEntity {
             }
 
             if (this.targetPlayer.isSwimming() && this.targetPlayer.level().random.nextInt(6) == 0) {
-                this.targetPlayer.addEffect(new MobEffectInstance(AMEffectRegistry.ORCAS_MIGHT.getDelegate(), 1000));
+                this.targetPlayer.addEffect(new MobEffectInstance(AMEffectRegistry.ORCAS_MIGHT, 1000));
             }
         }
     }

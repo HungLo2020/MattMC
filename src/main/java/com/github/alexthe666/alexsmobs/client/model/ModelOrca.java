@@ -95,48 +95,50 @@ public class ModelOrca extends AdvancedEntityModel<OrcaRenderState> {
 
     public void animate(Animation currentAnimation, int animationTick) {
         this.resetToDefaultPose();
-        if (currentAnimation != null) {
-            animator.setAnimation(currentAnimation);
-            animator.setAnimationTick(animationTick);
+        if (currentAnimation != null && animationTick > 0) {
+            // Manually calculate progress through animation
             if (currentAnimation == EntityOrca.ANIMATION_BITE) {
-                animator.startKeyframe(5);
-                animator.move(body, 0, 0, -5);
-                animator.rotate(head, Maths.rad(-25), 0, 0);
-                animator.rotate(jaw, Maths.rad(60), 0, 0);
-                animator.endKeyframe();
-                animator.resetKeyframe(3);
+                float progress = Math.min(1.0F, animationTick / 5.0F);
+                if (animationTick <= 5) {
+                    this.body.defaultPositionZ += -5 * progress;
+                    this.head.rotateAngleX += Maths.rad(-25) * progress;
+                    this.jaw.rotateAngleX += Maths.rad(60) * progress;
+                } else if (animationTick <= 8) {
+                    float resetProgress = (animationTick - 5) / 3.0F;
+                    this.body.defaultPositionZ += -5 * (1 - resetProgress);
+                    this.head.rotateAngleX += Maths.rad(-25) * (1 - resetProgress);
+                    this.jaw.rotateAngleX += Maths.rad(60) * (1 - resetProgress);
+                }
             } else if (currentAnimation == EntityOrca.ANIMATION_TAILSWING) {
-                animator.startKeyframe(5);
-                animator.move(body, 0, -6, 15);
-                animator.rotate(body, Maths.rad(-140), 0, 0);
-                animator.rotate(tail1, Maths.rad(-35), 0, 0);
-                animator.rotate(tail2, Maths.rad(-35), 0, 0);
-                animator.rotate(tailend, Maths.rad(-25), 0, 0);
-                animator.endKeyframe();
-                animator.setStaticKeyframe(3);
-                animator.resetKeyframe(12);
+                float progress = Math.min(1.0F, animationTick / 5.0F);
+                if (animationTick <= 5) {
+                    this.body.defaultPositionY += -6 * progress;
+                    this.body.defaultPositionZ += 15 * progress;
+                    this.body.rotateAngleX += Maths.rad(-140) * progress;
+                    this.tail1.rotateAngleX += Maths.rad(-35) * progress;
+                    this.tail2.rotateAngleX += Maths.rad(-35) * progress;
+                    this.tailend.rotateAngleX += Maths.rad(-25) * progress;
+                } else if (animationTick <= 8) {
+                    // Hold static
+                    this.body.defaultPositionY += -6;
+                    this.body.defaultPositionZ += 15;
+                    this.body.rotateAngleX += Maths.rad(-140);
+                    this.tail1.rotateAngleX += Maths.rad(-35);
+                    this.tail2.rotateAngleX += Maths.rad(-35);
+                    this.tailend.rotateAngleX += Maths.rad(-25);
+                } else if (animationTick <= 20) {
+                    float resetProgress = (animationTick - 8) / 12.0F;
+                    this.body.defaultPositionY += -6 * (1 - resetProgress);
+                    this.body.defaultPositionZ += 15 * (1 - resetProgress);
+                    this.body.rotateAngleX += Maths.rad(-140) * (1 - resetProgress);
+                    this.tail1.rotateAngleX += Maths.rad(-35) * (1 - resetProgress);
+                    this.tail2.rotateAngleX += Maths.rad(-35) * (1 - resetProgress);
+                    this.tailend.rotateAngleX += Maths.rad(-25) * (1 - resetProgress);
+                }
             }
         }
     }
 
-    public void renderToBuffer(PoseStack matrixStackIn, VertexConsumer bufferIn, int packedLightIn, int packedOverlayIn, int color) {
-        if (this.young) {
-            matrixStackIn.pushPose();
-            matrixStackIn.scale(0.35F, 0.35F, 0.35F);
-            matrixStackIn.translate(0.0D, 2.75D, 0.125D);
-            parts().forEach((p_228292_8_) -> {
-                p_228292_8_.render(matrixStackIn, bufferIn, packedLightIn, packedOverlayIn, -1);
-            });
-            matrixStackIn.popPose();
-        } else {
-            matrixStackIn.pushPose();
-            parts().forEach((p_228290_8_) -> {
-                p_228290_8_.render(matrixStackIn, bufferIn, packedLightIn, packedOverlayIn, -1);
-            });
-            matrixStackIn.popPose();
-        }
-
-    }
 
     @Override
     public void setupAnim(OrcaRenderState state) {
