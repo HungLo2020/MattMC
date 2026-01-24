@@ -10,6 +10,7 @@ import com.github.alexthe666.citadel.animation.IAnimatedEntity;
 import com.google.common.collect.Maps;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
@@ -278,30 +279,26 @@ public class EntityKangaroo extends TamableAnimal implements ContainerListener, 
         return type;
     }
 
-    public void addAdditionalSaveData(CompoundTag compound) {
-        super.addAdditionalSaveData(compound);
-        compound.putBoolean("KangarooSitting", this.isSitting());
-        compound.putBoolean("KangarooSittingForced", this.forcedSit());
-        compound.putBoolean("Standing", this.isStanding());
-        compound.putInt("Command", this.getCommand());
-        compound.putInt("HelmetInvIndex", this.entityData.get(HELMET_INDEX));
-        compound.putInt("SwordInvIndex", this.entityData.get(SWORD_INDEX));
-        compound.putInt("ChestInvIndex", this.entityData.get(CHEST_INDEX));
-        // TODO: Implement proper inventory saving with 1.21 API
-        // Inventory saving API changed in 1.21 - need to use ValueOutput/ValueInput pattern
+    public void addAdditionalSaveData(net.minecraft.world.level.storage.ValueOutput valueOutput) {
+        super.addAdditionalSaveData(valueOutput);
+        valueOutput.putBoolean("KangarooSitting", this.isSitting());
+        valueOutput.putBoolean("KangarooSittingForced", this.forcedSit());
+        valueOutput.putBoolean("Standing", this.isStanding());
+        valueOutput.putInt("Command", this.getCommand());
+        valueOutput.putInt("HelmetInvIndex", this.entityData.get(HELMET_INDEX));
+        valueOutput.putInt("SwordInvIndex", this.entityData.get(SWORD_INDEX));
+        valueOutput.putInt("ChestInvIndex", this.entityData.get(CHEST_INDEX));
     }
 
-    public void readAdditionalSaveData(CompoundTag compound) {
-        super.readAdditionalSaveData(compound);
-        this.setOrderedToSit(compound.getBoolean("KangarooSitting"));
-        this.entityData.set(FORCED_SIT, compound.getBoolean("KangarooSittingForced"));
-        this.setStanding(compound.getBoolean("Standing"));
-        this.setCommand(compound.getInt("Command"));
-        this.entityData.set(HELMET_INDEX, compound.getInt("HelmetInvIndex"));
-        this.entityData.set(SWORD_INDEX, compound.getInt("SwordInvIndex"));
-        this.entityData.set(CHEST_INDEX, compound.getInt("ChestInvIndex"));
-        // TODO: Implement proper inventory loading with 1.21 API
-        // Inventory loading API changed in 1.21 - need to use ValueOutput/ValueInput pattern
+    public void readAdditionalSaveData(net.minecraft.world.level.storage.ValueInput valueInput) {
+        super.readAdditionalSaveData(valueInput);
+        this.setOrderedToSit(valueInput.getBooleanOr("KangarooSitting", false));
+        this.entityData.set(FORCED_SIT, valueInput.getBooleanOr("KangarooSittingForced", false));
+        this.setStanding(valueInput.getBooleanOr("Standing", false));
+        this.setCommand(valueInput.getIntOr("Command", 0));
+        this.entityData.set(HELMET_INDEX, valueInput.getIntOr("HelmetInvIndex", 0));
+        this.entityData.set(SWORD_INDEX, valueInput.getIntOr("SwordInvIndex", 0));
+        this.entityData.set(CHEST_INDEX, valueInput.getIntOr("ChestInvIndex", 0));
         this.initKangarooInventory();
         resetKangarooSlots();
     }
@@ -399,12 +396,6 @@ public class EntityKangaroo extends TamableAnimal implements ContainerListener, 
         return (double) this.getBbHeight() * 0.35F;
     }
 
-    public void onAddedToLevel(ServerLevel level) {
-        super.onAddedToLevel(level);
-        // onAddedToWorld removed in 1.21;
-        updateClientInventory();
-    }
-
     public void tick() {
         super.tick();
         boolean moving = this.getDeltaMovement().lengthSqr() > 0.03D;
@@ -498,16 +489,19 @@ public class EntityKangaroo extends TamableAnimal implements ContainerListener, 
                     ItemStack foodStack = ItemStack.EMPTY;
                     for (int i = 0; i < this.kangarooInventory.getContainerSize(); i++) {
                         ItemStack stack = this.kangarooInventory.getItem(i);
-                        if (stack.has(net.minecraft.core.component.DataComponents.FOOD) && stack.getFoodProperties(this) != null && !true /* isMeat removed */) {
+                        if (stack.has(net.minecraft.core.component.DataComponents.FOOD)) {
                             foodStack = stack;
                         }
                     }
-                    if (!foodStack.isEmpty() && foodStack.getFoodProperties(this) != null) {
-                        MessageKangarooEat.spawnEatParticles(this, foodStack);
-                        this.heal(foodStack.getFoodProperties(this).nutrition() * 2);
-                        foodStack.shrink(1);
-                        this.gameEvent(GameEvent.EAT);
-                        this.playSound(SoundEvents.GENERIC_EAT, this.getSoundVolume(), this.getVoicePitch());
+                    if (!foodStack.isEmpty()) {
+                        var foodComponent = foodStack.get(net.minecraft.core.component.DataComponents.FOOD);
+                        if (foodComponent != null) {
+                            MessageKangarooEat.spawnEatParticles(this, foodStack);
+                            this.heal(foodComponent.nutrition() * 2);
+                            foodStack.shrink(1);
+                            this.gameEvent(GameEvent.EAT);
+                            this.playSound(SoundEvents.GENERIC_EAT.value(), this.getSoundVolume(), this.getVoicePitch());
+                        }
                     }
                 }
             }
@@ -575,24 +569,21 @@ public class EntityKangaroo extends TamableAnimal implements ContainerListener, 
         AnimationHandler.INSTANCE.updateAnimations(this);
     }
 
-    public void doHurtTarget(ServerLevel serverLevel, Entity entityIn) {
-        super.doHurtTarget(serverLevel, entityIn);
+    public boolean doHurtTarget(Entity entityIn) {
         if (!this.getMainHandItem().isEmpty()) {
             damageItem(this.getMainHandItem());
         }
+        return true;
     }
 
-    public boolean hurt(DamageSource src, float amount) {
-        boolean prev = super.hurt(src, amount);
-        if (prev) {
-            if (!this.getItemBySlot(EquipmentSlot.HEAD).isEmpty()) {
-                damageItem(this.getItemBySlot(EquipmentSlot.HEAD));
-            }
-            if (!this.getItemBySlot(EquipmentSlot.CHEST).isEmpty()) {
-                damageItem(this.getItemBySlot(EquipmentSlot.CHEST));
-            }
+    protected void actuallyHurt(ServerLevel serverLevel, DamageSource src, float amount) {
+        super.actuallyHurt(serverLevel, src, amount);
+        if (!this.getItemBySlot(EquipmentSlot.HEAD).isEmpty()) {
+            damageItem(this.getItemBySlot(EquipmentSlot.HEAD));
         }
-        return prev;
+        if (!this.getItemBySlot(EquipmentSlot.CHEST).isEmpty()) {
+            damageItem(this.getItemBySlot(EquipmentSlot.CHEST));
+        }
     }
 
     private void damageItem(ItemStack stack) {
@@ -604,25 +595,8 @@ public class EntityKangaroo extends TamableAnimal implements ContainerListener, 
         }
     }
 
-    public boolean isInvulnerableTo(DamageSource source) {
-        return super.isInvulnerableTo(source) || source.is(DamageTypes.IN_WALL);
-    }
-
-    public boolean isAlliedTo(Entity entityIn) {
-        if (this.isTame()) {
-            LivingEntity livingentity = this.getOwner();
-            if (entityIn == livingentity) {
-                return true;
-            }
-            if (entityIn instanceof TamableAnimal) {
-                return ((TamableAnimal) entityIn).isOwnedBy(livingentity);
-            }
-            if (livingentity != null) {
-                return livingentity.isAlliedTo(entityIn);
-            }
-        }
-
-        return super.isAlliedTo(entityIn);
+    public boolean isInvulnerableTo(ServerLevel serverLevel, DamageSource source) {
+        return super.isInvulnerableTo(serverLevel, source) || source.is(DamageTypes.IN_WALL);
     }
 
     public MoveControl getMoveControl() {
@@ -878,34 +852,30 @@ public class EntityKangaroo extends TamableAnimal implements ContainerListener, 
     }
 
     public double getDamageForItem(ItemStack itemStack) {
-        // getAttributeModifiers changed in 1.21 - needs EquipmentSlot parameter
-        var modifiers = itemStack.getAttributeModifiers(EquipmentSlot.MAINHAND);
-        if (!modifiers.modifiers().isEmpty()) {
-            double d = 0;
-            for (var entry : modifiers.modifiers()) {
-                if (entry.attribute().equals(Attributes.ATTACK_DAMAGE)) {
-                    d += entry.modifier().amount();
-                }
-            }
-            return d;
+        if (itemStack.isEmpty()) {
+            return 0;
         }
-        return 0;
+        final double[] d = {0};
+        itemStack.forEachModifier(EquipmentSlot.MAINHAND, (attribute, modifier) -> {
+            if (attribute.is(Attributes.ATTACK_DAMAGE)) {
+                d[0] += modifier.amount();
+            }
+        });
+        return d[0];
     }
 
 
     public double getProtectionForItem(ItemStack itemStack, EquipmentSlot type) {
-        // getAttributeModifiers changed in 1.21 - needs EquipmentSlot parameter
-        var modifiers = itemStack.getAttributeModifiers(type);
-        if (!modifiers.modifiers().isEmpty()) {
-            double d = 0;
-            for (var entry : modifiers.modifiers()) {
-                if (entry.attribute().equals(Attributes.ARMOR)) {
-                    d += entry.modifier().amount();
-                }
-            }
-            return d;
+        if (itemStack.isEmpty()) {
+            return 0;
         }
-        return 0;
+        final double[] d = {0};
+        itemStack.forEachModifier(type, (attribute, modifier) -> {
+            if (attribute.is(Attributes.ARMOR)) {
+                d[0] += modifier.amount();
+            }
+        });
+        return d[0];
     }
 
     public void jumpFromGround() {

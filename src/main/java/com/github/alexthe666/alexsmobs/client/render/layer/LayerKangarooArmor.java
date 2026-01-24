@@ -26,7 +26,7 @@ public class LayerKangarooArmor extends RenderLayer<KangarooRenderState, Kangaro
 
     public LayerKangarooArmor(KangarooRenderer render, EntityRendererProvider.Context context) {
         super(render);
-        defaultBipedModel = new HumanoidModel(context.bakeLayer(ModelLayers.PLAYER_OUTER_ARMOR));
+        defaultBipedModel = new HumanoidModel(context.bakeLayer(ModelLayers.PLAYER_ARMOR.chest()));
         this.renderer = render;
     }
 
