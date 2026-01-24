@@ -1864,6 +1864,8 @@ public class Items {
 	public static final Item HUSK_SPAWN_EGG = registerItem("husk_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.HUSK));
 	public static final Item JERBOA_SPAWN_EGG = registerItem("jerboa_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.JERBOA));
 	public static final Item KANGAROO_SPAWN_EGG = registerItem("kangaroo_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.KANGAROO));
+	public static final Item LEAFCUTTER_ANT_SPAWN_EGG = registerItem("leafcutter_ant_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.LEAFCUTTER_ANT));
+	public static final Item LEAFCUTTER_ANT_PUPA = registerItem("leafcutter_ant_pupa", com.github.alexthe666.alexsmobs.item.ItemLeafcutterPupa::new, new Item.Properties());
 	public static final Item IRON_GOLEM_SPAWN_EGG = registerItem("iron_golem_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.IRON_GOLEM));
 	public static final Item LLAMA_SPAWN_EGG = registerItem("llama_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.LLAMA));
 	public static final Item MAGMA_CUBE_SPAWN_EGG = registerItem("magma_cube_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.MAGMA_CUBE));
@@ -2390,6 +2392,8 @@ public class Items {
 			.component(DataComponents.BEES, Bees.EMPTY)
 			.component(DataComponents.BLOCK_STATE, BlockItemStateProperties.EMPTY.with(BeehiveBlock.HONEY_LEVEL, 0))
 	);
+	public static final Item LEAFCUTTER_ANTHILL = registerBlock(Blocks.LEAFCUTTER_ANTHILL);
+	public static final Item LEAFCUTTER_ANT_CHAMBER = registerBlock(Blocks.LEAFCUTTER_ANT_CHAMBER);
 	public static final Item HONEY_BOTTLE = registerItem(
 		"honey_bottle",
 		new Item.Properties().craftRemainder(GLASS_BOTTLE).food(Foods.HONEY_BOTTLE, Consumables.HONEY_BOTTLE).usingConvertsTo(GLASS_BOTTLE).stacksTo(16)

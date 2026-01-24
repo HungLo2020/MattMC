@@ -1093,6 +1093,9 @@ public class CreativeModeTabs {
 						output.accept(Items.SCAFFOLDING);
 						output.accept(Items.BEE_NEST);
 						output.accept(Items.BEEHIVE);
+						output.accept(Items.LEAFCUTTER_ANTHILL);
+						output.accept(Items.LEAFCUTTER_ANT_CHAMBER);
+						output.accept(Items.LEAFCUTTER_ANT_PUPA);
 						output.accept(Items.SUSPICIOUS_SAND);
 						output.accept(Items.SUSPICIOUS_GRAVEL);
 						output.accept(Items.LIGHTNING_ROD);
@@ -1983,6 +1986,7 @@ public class CreativeModeTabs {
 					output.accept(Items.HUSK_SPAWN_EGG);
 					output.accept(Items.JERBOA_SPAWN_EGG);
 					output.accept(Items.KANGAROO_SPAWN_EGG);
+					output.accept(Items.LEAFCUTTER_ANT_SPAWN_EGG);
 					output.accept(Items.IRON_GOLEM_SPAWN_EGG);
 					output.accept(Items.LLAMA_SPAWN_EGG);
 					output.accept(Items.MAGMA_CUBE_SPAWN_EGG);

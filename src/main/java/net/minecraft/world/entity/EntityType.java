@@ -1130,6 +1130,13 @@ public class EntityType<T extends Entity> implements FeatureElement, EntityTypeT
 			.eyeHeight(1.4F)
 			.clientTrackingRange(10)
 	);
+	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntityLeafcutterAnt> LEAFCUTTER_ANT = register(
+		"leafcutter_ant",
+		EntityType.Builder.of(com.github.alexthe666.alexsmobs.entity.EntityLeafcutterAnt::new, MobCategory.CREATURE)
+			.sized(0.7F, 0.5F)
+			.eyeHeight(0.3F)
+			.clientTrackingRange(8)
+	);
 	public static final EntityType<EntityMungus> MUNGUS = register(
 		"mungus",
 		EntityType.Builder.of((EntityType<EntityMungus> type, Level level) -> new EntityMungus(type, level), MobCategory.CREATURE)

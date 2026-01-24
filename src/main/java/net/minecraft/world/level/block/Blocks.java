@@ -5330,6 +5330,16 @@ public class Blocks {
 		LecternBlock::new,
 		BlockBehaviour.Properties.of().mapColor(MapColor.WOOD).instrument(NoteBlockInstrument.BASS).strength(2.5F).sound(SoundType.WOOD).ignitedByLava()
 	);
+	public static final Block LEAFCUTTER_ANTHILL = register(
+		"leafcutter_anthill",
+		com.github.alexthe666.alexsmobs.block.BlockLeafcutterAnthill::new,
+		BlockBehaviour.Properties.of().mapColor(MapColor.DIRT).strength(0.5F).sound(SoundType.GRAVEL)
+	);
+	public static final Block LEAFCUTTER_ANT_CHAMBER = register(
+		"leafcutter_ant_chamber",
+		com.github.alexthe666.alexsmobs.block.BlockLeafcutterAntChamber::new,
+		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_GREEN).strength(0.3F).sound(SoundType.SLIME_BLOCK)
+	);
 	public static final Block SMITHING_TABLE = register(
 		"smithing_table",
 		SmithingTableBlock::new,

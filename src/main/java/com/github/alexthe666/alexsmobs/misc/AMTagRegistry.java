@@ -134,6 +134,9 @@ public class AMTagRegistry {
     public static final TagKey<Item> GORILLA_FOODSTUFFS = registerItemTag("gorilla_foodstuffs");
     public static final TagKey<Block> GORILLA_BREAKABLES = registerBlockTag("gorilla_breakables");
     public static final TagKey<Block> DROPS_BANANAS = registerBlockTag("drops_bananas");
+    
+    // Leafcutter Ant-specific tags
+    public static final TagKey<Item> LEAFCUTTER_ANT_FOODSTUFFS = registerItemTag("leafcutter_ant_foodstuffs");
 
     private static TagKey<Item> registerItemTag(String name) {
         return TagKey.create(Registries.ITEM, ResourceLocation.withDefaultNamespace(name));
