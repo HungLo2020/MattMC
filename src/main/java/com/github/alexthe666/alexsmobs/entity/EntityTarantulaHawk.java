@@ -133,7 +133,7 @@ public class EntityTarantulaHawk extends TamableAnimal implements IFollower {
         this.goalSelector.addGoal(4, new AIMelee());
         this.goalSelector.addGoal(5, new AIBury());
         this.goalSelector.addGoal(6, new BreedGoal(this, 1.0D));
-        this.goalSelector.addGoal(7, new TemptGoal(this, 1.1D, Ingredient.fromValues(Stream.of(new Ingredient.TagValue(AMTagRegistry.TARANTULA_HAWK_BREEDABLES), new Ingredient.TagValue(AMTagRegistry.TARANTULA_HAWK_TAMEABLES), new Ingredient.TagValue(AMTagRegistry.TARANTULA_HAWK_FOODSTUFFS))), false));
+        this.goalSelector.addGoal(7, new TemptGoal(this, 1.1D, itemStack -> itemStack.is(AMTagRegistry.TARANTULA_HAWK_BREEDABLES) || itemStack.is(AMTagRegistry.TARANTULA_HAWK_TAMEABLES) || itemStack.is(AMTagRegistry.TARANTULA_HAWK_FOODSTUFFS), false));
         this.goalSelector.addGoal(8, new AIWalkIdle());
         this.goalSelector.addGoal(9, new LookAtPlayerGoal(this, Player.class, 6.0F));
         this.goalSelector.addGoal(10, new RandomLookAroundGoal(this));
@@ -186,51 +186,34 @@ public class EntityTarantulaHawk extends TamableAnimal implements IFollower {
         builder.define(COMMAND, 0);
     }
 
-    public boolean hurt(DamageSource source, float amount) {
-        // getMobType() removed in 1.21 - use EntityType tags instead
+    protected boolean isImmuneTo(DamageSource source) {
+        // Immunity logic moved here from hurt()
         if (source.getEntity() instanceof LivingEntity living && living.getType().is(net.minecraft.tags.EntityTypeTags.ARTHROPOD) && living.hasEffect(AMEffectRegistry.DEBILITATING_STING)) {
-            return false;
+            return true;
         }
-        return super.hurt(source, amount);
+        return super.isImmuneTo(source);
     }
 
-    public void addAdditionalSaveData(CompoundTag compound) {
-        super.addAdditionalSaveData(compound);
-        compound.putBoolean("HawkSitting", this.isSitting());
-        compound.putBoolean("Nether", this.isNether());
-        compound.putBoolean("Digging", this.isDigging());
-        compound.putBoolean("Flying", this.isFlying());
-        compound.putInt("Command", this.getCommand());
-        compound.putInt("SpiderFeedings", this.spiderFeedings);
-        compound.putBoolean("BreedFlag", this.bredBuryFlag);
+    public void addAdditionalSaveData(net.minecraft.world.level.storage.loot.parameters.ValueOutput valueOutput) {
+        super.addAdditionalSaveData(valueOutput);
+        valueOutput.putBoolean("HawkSitting", this.isSitting());
+        valueOutput.putBoolean("Nether", this.isNether());
+        valueOutput.putBoolean("Digging", this.isDigging());
+        valueOutput.putBoolean("Flying", this.isFlying());
+        valueOutput.putInt("Command", this.getCommand());
+        valueOutput.putInt("SpiderFeedings", this.spiderFeedings);
+        valueOutput.putBoolean("BreedFlag", this.bredBuryFlag);
     }
 
-    public void readAdditionalSaveData(CompoundTag compound) {
-        super.readAdditionalSaveData(compound);
-        this.setOrderedToSit(compound.getBoolean("HawkSitting"));
-        this.setNether(compound.getBoolean("Nether"));
-        this.setDigging(compound.getBoolean("Digging"));
-        this.setFlying(compound.getBoolean("Flying"));
-        this.setCommand(compound.getInt("Command"));
-        this.spiderFeedings = compound.getInt("SpiderFeedings");
-        this.bredBuryFlag = compound.getBoolean("BreedFlag");
-    }
-
-    public boolean isAlliedTo(Entity entityIn) {
-        if (this.isTame()) {
-            LivingEntity livingentity = this.getOwner();
-            if (entityIn == livingentity) {
-                return true;
-            }
-            if (entityIn instanceof TamableAnimal) {
-                return ((TamableAnimal) entityIn).isOwnedBy(livingentity);
-            }
-            if (livingentity != null) {
-                return livingentity.isAlliedTo(entityIn);
-            }
-        }
-
-        return super.isAlliedTo(entityIn);
+    public void readAdditionalSaveData(net.minecraft.world.level.storage.loot.parameters.ValueInput valueInput) {
+        super.readAdditionalSaveData(valueInput);
+        this.setOrderedToSit(valueInput.getBooleanOr("HawkSitting", false));
+        this.setNether(valueInput.getBooleanOr("Nether", false));
+        this.setDigging(valueInput.getBooleanOr("Digging", false));
+        this.setFlying(valueInput.getBooleanOr("Flying", false));
+        this.setCommand(valueInput.getIntOr("Command", 0));
+        this.spiderFeedings = valueInput.getIntOr("SpiderFeedings", 0);
+        this.bredBuryFlag = valueInput.getBooleanOr("BreedFlag", false);
     }
 
     public float getFlyAngle() {
@@ -361,7 +344,7 @@ public class EntityTarantulaHawk extends TamableAnimal implements IFollower {
             this.setFlyAngle(Math.min(this.getFlyAngle() + 4, 0));
         }
         this.setFlyAngle(Mth.clamp(this.getFlyAngle(), -30, 30));
-        if (!this.level().isClientSide) {
+        if (!this.level().isClientSide()) {
             if (isFlying() && this.isLandNavigator) {
                 switchNavigator(false);
             }
@@ -413,7 +396,7 @@ public class EntityTarantulaHawk extends TamableAnimal implements IFollower {
         if(this.tickCount > 0 && tickCount % 300 == 0 && this.getHealth() < this.getMaxHealth()){
             this.heal(1);
         }
-        if(!this.level().isClientSide && this.isDragging() && this.getPassengers().isEmpty() && !this.isDigging()){
+        if(!this.level().isClientSide() && this.isDragging() && this.getPassengers().isEmpty() && !this.isDigging()){
             dragTime++;
             if(dragTime > 5000){
                 dragTime = 0;
@@ -789,7 +772,7 @@ public class EntityTarantulaHawk extends TamableAnimal implements IFollower {
                                 }
                             }
                             target.addEffect(new MobEffectInstance(AMEffectRegistry.DEBILITATING_STING, target.getType().is(net.minecraft.tags.EntityTypeTags.ARTHROPOD) ? EntityTarantulaHawk.STING_DURATION : 600, hawk.bredBuryFlag ? 1 : 0));
-                            if (!hawk.level().isClientSide && target.getType().is(net.minecraft.tags.EntityTypeTags.ARTHROPOD)) {
+                            if (!hawk.level().isClientSide() && target.getType().is(net.minecraft.tags.EntityTypeTags.ARTHROPOD)) {
                                 AlexsMobs.sendMSGToAll(new MessageTarantulaHawkSting(hawk.getId(), target.getId()));
                             }
                             orbitCooldown = target.getType().is(net.minecraft.tags.EntityTypeTags.ARTHROPOD) ? 200 + random.nextInt(200) : 10 + random.nextInt(20);

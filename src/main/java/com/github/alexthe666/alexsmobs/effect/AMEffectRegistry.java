@@ -28,6 +28,11 @@ public class AMEffectRegistry {
      */
     public static final Holder<MobEffect> ORCAS_MIGHT;
     
+    /**
+     * Debilitating Sting effect - from Tarantula Hawk sting
+     */
+    public static final Holder<MobEffect> DEBILITATING_STING;
+    
     static {
         // Register Orca's Might effect
         MobEffect orcasMightEffect = new EffectOrcaMight();
@@ -35,6 +40,14 @@ public class AMEffectRegistry {
             BuiltInRegistries.MOB_EFFECT,
             ResourceLocation.withDefaultNamespace("orcas_might"),
             orcasMightEffect
+        );
+        
+        // Register Debilitating Sting effect
+        MobEffect debilitatingStingEffect = new EffectDebilitatingSting();
+        DEBILITATING_STING = Registry.registerForHolder(
+            BuiltInRegistries.MOB_EFFECT,
+            ResourceLocation.withDefaultNamespace("debilitating_sting"),
+            debilitatingStingEffect
         );
     }
 }
