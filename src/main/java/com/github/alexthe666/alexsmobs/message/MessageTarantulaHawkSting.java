@@ -12,10 +12,9 @@ import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
-import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 public class MessageTarantulaHawkSting implements CustomPacketPayload {
-    public static final CustomPacketPayload.Type<MessageTarantulaHawkSting> TYPE = new CustomPacketPayload.Type<>(ResourceLocation.fromNamespaceAndPath(AlexsMobs.MODID, "tarantula_hawk_sting"));
+    public static final CustomPacketPayload.Type<MessageTarantulaHawkSting> TYPE = new CustomPacketPayload.Type<>(ResourceLocation.withDefaultNamespace("tarantula_hawk_sting"));
     public static final StreamCodec<FriendlyByteBuf, MessageTarantulaHawkSting> CODEC = StreamCodec.ofMember(MessageTarantulaHawkSting::write, MessageTarantulaHawkSting::read);
 
     public int hawk;
@@ -40,16 +39,14 @@ public class MessageTarantulaHawkSting implements CustomPacketPayload {
     @Override
     public Type<? extends CustomPacketPayload> type() { return TYPE; }
 
-    public static void handle(MessageTarantulaHawkSting message, IPayloadContext context) {
-        context.enqueueWork(() -> {
-            Player player = context.player();
-            if (player != null && player.level() != null) {
-                Entity entity = player.level().getEntity(message.hawk);
-                Entity spider = player.level().getEntity(message.spider);
-                if (entity instanceof EntityTarantulaHawk && spider instanceof LivingEntity livingSpider && livingSpider.getType().is(EntityTypeTags.ARTHROPOD)) {
-                    livingSpider.addEffect(new MobEffectInstance(AMEffectRegistry.DEBILITATING_STING, EntityTarantulaHawk.STING_DURATION));
-                }
+    // Simplified handle - inline the event processing directly
+    public void applyEffect(Player player) {
+        if (player != null && player.level() != null) {
+            Entity entity = player.level().getEntity(this.hawk);
+            Entity spider = player.level().getEntity(this.spider);
+            if (entity instanceof EntityTarantulaHawk && spider instanceof LivingEntity livingSpider && livingSpider.getType().is(EntityTypeTags.ARTHROPOD)) {
+                livingSpider.addEffect(new MobEffectInstance(AMEffectRegistry.DEBILITATING_STING, EntityTarantulaHawk.STING_DURATION));
             }
-        });
+        }
     }
 }

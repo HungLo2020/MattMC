@@ -1937,7 +1937,7 @@ public class Items {
 	public static final Item TARANTULA_HAWK_WING = registerItem("tarantula_hawk_wing", Item::new, new Item.Properties());
 	public static final Item TARANTULA_HAWK_WING_FRAGMENT = registerItem("tarantula_hawk_wing_fragment", Item::new, new Item.Properties());
 	public static final Item TARANTULA_HAWK_ELYTRA = registerItem("tarantula_hawk_elytra", 
-		properties -> new com.github.alexthe666.alexsmobs.item.ItemTarantulaHawkElytra(properties, net.minecraft.world.item.ArmorMaterials.LEATHER),
+		com.github.alexthe666.alexsmobs.item.ItemTarantulaHawkElytra::new,
 		new Item.Properties().durability(432));
 	public static final Item TARANTULA_HAWK_ELYTRA_BROKEN = registerItem("tarantula_hawk_elytra_broken", Item::new, new Item.Properties());
 	public static final Item TRADER_LLAMA_SPAWN_EGG = registerItem(

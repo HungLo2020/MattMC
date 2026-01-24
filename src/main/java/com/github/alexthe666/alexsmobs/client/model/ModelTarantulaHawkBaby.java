@@ -8,7 +8,7 @@ import com.google.common.collect.ImmutableList;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 
-public class ModelTarantulaHawkBaby extends AdvancedEntityModel<EntityTarantulaHawk> {
+public class ModelTarantulaHawkBaby extends AdvancedEntityModel<com.github.alexthe666.alexsmobs.client.render.TarantulaHawkRenderState> {
     private final AdvancedModelBox root;
     private final AdvancedModelBox body;
     private final AdvancedModelBox head;
