@@ -1858,6 +1858,10 @@ public class SoundEvents {
 	public static final SoundEvent APPLY_EFFECT_BAD_OMEN = register("event.mob_effect.bad_omen");
 	public static final SoundEvent APPLY_EFFECT_TRIAL_OMEN = register("event.mob_effect.trial_omen");
 	public static final SoundEvent APPLY_EFFECT_RAID_OMEN = register("event.mob_effect.raid_omen");
+	public static final SoundEvent LEAFCUTTER_ANT_HURT = register("entity.leafcutter_ant.hurt");
+	public static final SoundEvent LEAFCUTTER_ANT_IDLE = register("entity.leafcutter_ant.idle");
+	public static final SoundEvent LEAFCUTTER_ANT_QUEEN_HURT = register("entity.leafcutter_ant_queen.hurt");
+	public static final SoundEvent LEAFCUTTER_ANT_QUEEN_IDLE = register("entity.leafcutter_ant_queen.idle");
 	public static final Holder.Reference<SoundEvent> SADDLE_UNEQUIP = registerForHolder("item.saddle.unequip");
 
 	private static Holder<SoundEvent> register(ResourceLocation resourceLocation, ResourceLocation resourceLocation2, float f) {

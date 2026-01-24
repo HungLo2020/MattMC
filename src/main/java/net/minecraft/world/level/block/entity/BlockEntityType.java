@@ -214,6 +214,7 @@ public class BlockEntityType<T extends BlockEntity> {
 	public static final BlockEntityType<SmokerBlockEntity> SMOKER = register("smoker", SmokerBlockEntity::new, Blocks.SMOKER);
 	public static final BlockEntityType<BlastFurnaceBlockEntity> BLAST_FURNACE = register("blast_furnace", BlastFurnaceBlockEntity::new, Blocks.BLAST_FURNACE);
 	public static final BlockEntityType<LecternBlockEntity> LECTERN = register("lectern", LecternBlockEntity::new, Blocks.LECTERN);
+	public static final BlockEntityType<com.github.alexthe666.alexsmobs.tileentity.TileEntityLeafcutterAnthill> LEAFCUTTER_ANTHILL = register("leafcutter_anthill", com.github.alexthe666.alexsmobs.tileentity.TileEntityLeafcutterAnthill::new, Blocks.LEAFCUTTER_ANTHILL);
 	public static final BlockEntityType<BellBlockEntity> BELL = register("bell", BellBlockEntity::new, Blocks.BELL);
 	public static final BlockEntityType<JigsawBlockEntity> JIGSAW = register("jigsaw", JigsawBlockEntity::new, Blocks.JIGSAW);
 	public static final BlockEntityType<CampfireBlockEntity> CAMPFIRE = register("campfire", CampfireBlockEntity::new, Blocks.CAMPFIRE, Blocks.SOUL_CAMPFIRE);

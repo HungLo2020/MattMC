@@ -30,4 +30,10 @@ public class AMPointOfInterestRegistry {
         ResourceKey.create(Registries.POINT_OF_INTEREST_TYPE, 
             ResourceLocation.withDefaultNamespace("hummingbird_feeder"))
     );
+    
+    // Leafcutter ant hill POI
+    public static final DeferredHolder LEAFCUTTER_ANT_HILL = new DeferredHolder(
+        ResourceKey.create(Registries.POINT_OF_INTEREST_TYPE, 
+            ResourceLocation.withDefaultNamespace("leafcutter_ant_hill"))
+    );
 }

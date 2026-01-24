@@ -111,4 +111,8 @@ public class AMSoundRegistry {
     // Giant Squid sounds - reference vanilla SoundEvents
     public static final DeferredHolder GIANT_SQUID_HURT = new DeferredHolder(() -> net.minecraft.sounds.SoundEvents.GIANT_SQUID_HURT);
     public static final DeferredHolder GIANT_SQUID_GAMES = new DeferredHolder(() -> net.minecraft.sounds.SoundEvents.GIANT_SQUID_GAMES);
+    
+    // Leafcutter Ant sounds - reference vanilla SoundEvents
+    public static final DeferredHolder LEAFCUTTER_ANT_HURT = new DeferredHolder(() -> net.minecraft.sounds.SoundEvents.LEAFCUTTER_ANT_HURT);
+    public static final DeferredHolder LEAFCUTTER_ANT_QUEEN_HURT = new DeferredHolder(() -> net.minecraft.sounds.SoundEvents.LEAFCUTTER_ANT_QUEEN_HURT);
 }

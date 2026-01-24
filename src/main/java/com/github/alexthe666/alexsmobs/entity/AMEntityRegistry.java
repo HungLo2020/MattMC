@@ -38,6 +38,7 @@ public class AMEntityRegistry {
     public static final DeferredEntityHolder EMU = new DeferredEntityHolder(() -> EntityType.EMU);
     public static final DeferredEntityHolder EMU_EGG = new DeferredEntityHolder(() -> EntityType.EMU_EGG);
     public static final DeferredEntityHolder GELADA_MONKEY = new DeferredEntityHolder(() -> EntityType.GELADA_MONKEY);
+    public static final DeferredEntityHolder LEAFCUTTER_ANT = new DeferredEntityHolder(() -> EntityType.LEAFCUTTER_ANT);
     
     /**
      * Helper method for spawn roll logic

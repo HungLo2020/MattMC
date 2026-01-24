@@ -56,6 +56,7 @@ import com.github.alexthe666.alexsmobs.entity.EntityBunfungus;
 import com.github.alexthe666.alexsmobs.entity.EntityCosmicCod;
 import com.github.alexthe666.alexsmobs.entity.EntityFrilledShark;
 import com.github.alexthe666.alexsmobs.entity.EntityFlyingFish;
+import com.github.alexthe666.alexsmobs.entity.EntityLeafcutterAnt;
 import com.github.alexthe666.alexsmobs.entity.EntityMimicOctopus;
 import com.github.alexthe666.alexsmobs.entity.EntityMungus;
 import com.github.alexthe666.alexsmobs.entity.EntityTerrapin;
@@ -169,6 +170,7 @@ public class DefaultAttributes {
 		.put(EntityType.ILLUSIONER, Illusioner.createAttributes().build())
 		.put(EntityType.JERBOA, com.github.alexthe666.alexsmobs.entity.EntityJerboa.bakeAttributes().build())
 		.put(EntityType.KANGAROO, com.github.alexthe666.alexsmobs.entity.EntityKangaroo.bakeAttributes().build())
+		.put(EntityType.LEAFCUTTER_ANT, com.github.alexthe666.alexsmobs.entity.EntityLeafcutterAnt.bakeAttributes().build())
 		.put(EntityType.IRON_GOLEM, IronGolem.createAttributes().build())
 		.put(EntityType.LLAMA, Llama.createAttributes().build())
 		.put(EntityType.MAGMA_CUBE, MagmaCube.createAttributes().build())

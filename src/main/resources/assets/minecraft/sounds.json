@@ -25523,5 +25523,33 @@
       "capuchin_monkey_hurt_3"
     ],
     "subtitle": "subtitles.entity.capuchin_monkey.hurt"
+  },
+  "entity.leafcutter_ant.hurt": {
+    "sounds": [
+      "leafcutter_ant_hurt_0",
+      "leafcutter_ant_hurt_1"
+    ],
+    "subtitle": "subtitles.entity.leafcutter_ant.hurt"
+  },
+  "entity.leafcutter_ant.idle": {
+    "sounds": [
+      "leafcutter_ant_hurt_0",
+      "leafcutter_ant_hurt_1"
+    ],
+    "subtitle": "subtitles.entity.leafcutter_ant.idle"
+  },
+  "entity.leafcutter_ant_queen.hurt": {
+    "sounds": [
+      "leafcutter_ant_queen_hurt_0",
+      "leafcutter_ant_queen_hurt_1"
+    ],
+    "subtitle": "subtitles.entity.leafcutter_ant_queen.hurt"
+  },
+  "entity.leafcutter_ant_queen.idle": {
+    "sounds": [
+      "leafcutter_ant_queen_hurt_0",
+      "leafcutter_ant_queen_hurt_1"
+    ],
+    "subtitle": "subtitles.entity.leafcutter_ant_queen.idle"
   }
 }
