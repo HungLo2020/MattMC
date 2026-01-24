@@ -138,6 +138,13 @@ public class AMTagRegistry {
     // Leafcutter Ant-specific tags
     public static final TagKey<Item> LEAFCUTTER_ANT_FOODSTUFFS = registerItemTag("leafcutter_ant_foodstuffs");
 
+    // Raccoon-specific tags
+    public static final TagKey<Item> RACCOON_BREEDABLES = registerItemTag("raccoon_breedables");
+    public static final TagKey<Item> RACCOON_TEAMING_FOODS = registerItemTag("raccoon_teaming_foods");
+    public static final TagKey<Item> RACCOON_FOODSTUFFS = registerItemTag("raccoon_foodstuffs");
+    public static final TagKey<Item> RACCOON_TAMEABLES = registerItemTag("raccoon_tameables");
+    public static final TagKey<Item> RACOON_DISSOLVES = registerItemTag("racoon_dissolves");
+
     private static TagKey<Item> registerItemTag(String name) {
         return TagKey.create(Registries.ITEM, ResourceLocation.withDefaultNamespace(name));
     }

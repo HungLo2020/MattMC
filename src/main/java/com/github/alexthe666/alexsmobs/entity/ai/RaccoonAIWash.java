@@ -8,6 +8,7 @@ import net.minecraft.tags.FluidTags;
 import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.entity.ai.goal.Goal;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.gameevent.GameEvent;
 import net.minecraft.world.phys.Vec3;
 
@@ -82,8 +83,9 @@ public class RaccoonAIWash extends Goal {
                         raccoon.onEatItem();
                     }
                     this.raccoon.postWashItem(raccoon.getMainHandItem());
-                    if(this.raccoon.getMainHandItem().hasCraftingRemainingItem()){
-                        this.raccoon.spawnAtLocation(this.raccoon.getMainHandItem().getCraftingRemainingItem());
+                    ItemStack remainder = this.raccoon.getMainHandItem().getItem().getCraftingRemainder();
+                    if(!remainder.isEmpty()){
+                        this.raccoon.spawnAtLocation((net.minecraft.server.level.ServerLevel)this.raccoon.level(), remainder);
                     }
                     this.raccoon.getMainHandItem().shrink(1);
                 }
@@ -107,7 +109,7 @@ public class RaccoonAIWash extends Goal {
         int range = 32;
         for (int i = 0; i < 15; i++) {
             BlockPos blockpos1 = this.raccoon.blockPosition().offset(random.nextInt(range) - range / 2, 3, random.nextInt(range) - range / 2);
-            while (this.raccoon.level().isEmptyBlock(blockpos1) && blockpos1.getY() > raccoon.level().getMinBuildHeight()) {
+            while (this.raccoon.level().isEmptyBlock(blockpos1) && blockpos1.getY() > ((net.minecraft.world.level.LevelHeightAccessor)raccoon.level()).getMinY()) {
                 blockpos1 = blockpos1.below();
             }
             if (isConnectedToLand(blockpos1)) {

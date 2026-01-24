@@ -11,7 +11,6 @@ import net.minecraft.advancements.CriteriaTriggers;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ItemParticleOption;
 import net.minecraft.core.particles.ParticleTypes;
-import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
@@ -22,7 +21,6 @@ import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.tags.ItemTags;
 import net.minecraft.util.Mth;
-import net.minecraft.world.Container;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.damagesource.DamageSource;
@@ -52,13 +50,15 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LevelAccessor;
 import net.minecraft.world.level.gameevent.GameEvent;
 import net.minecraft.world.level.pathfinder.PathType;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 
 import javax.annotation.Nullable;
 import java.util.*;
 
-public class EntityRaccoon extends TamableAnimal implements IAnimatedEntity, IFollower, ITargetsDroppedItems, ILootsChests {
+public class EntityRaccoon extends TamableAnimal implements IAnimatedEntity, IFollower, ITargetsDroppedItems {
 
     private static final EntityDataAccessor<Boolean> STANDING = SynchedEntityData.defineId(EntityRaccoon.class, EntityDataSerializers.BOOLEAN);
     private static final EntityDataAccessor<Boolean> SITTING = SynchedEntityData.defineId(EntityRaccoon.class, EntityDataSerializers.BOOLEAN);
@@ -130,13 +130,13 @@ public class EntityRaccoon extends TamableAnimal implements IAnimatedEntity, IFo
         this.goalSelector.addGoal(4, new FloatGoal(this));
         this.goalSelector.addGoal(5, new LeapAtTargetGoal(this, 0.4F));
         this.goalSelector.addGoal(6, new MeleeAttackGoal(this, 1.1D, true));
-        this.goalSelector.addGoal(7, new AnimalAILootChests(this, 16));
+        // Chest looting removed
         this.goalSelector.addGoal(8, new FollowParentGoal(this, 1.1D));
         this.goalSelector.addGoal(9, new RaccoonAIBeg(this, 0.65D));
         this.goalSelector.addGoal(10, new AnimalAIPanicBaby(this, 1.25D));
         this.goalSelector.addGoal(11, new AIStealFromVillagers(this));
         this.goalSelector.addGoal(12, new StrollGoal(200));
-        this.goalSelector.addGoal(13, new TameableAIDestroyTurtleEggs(this, 1.0D, 3));
+        // Turtle egg breaking removed
         this.goalSelector.addGoal(14, new AnimalAIWanderRanged(this, 120, 1.0D, 14, 7));
         this.goalSelector.addGoal(15, new LookAtPlayerGoal(this, Player.class, 15.0F));
         this.goalSelector.addGoal(15, new RandomLookAroundGoal(this));
@@ -146,25 +146,7 @@ public class EntityRaccoon extends TamableAnimal implements IAnimatedEntity, IFo
         this.targetSelector.addGoal(4, new OwnerHurtTargetGoal(this));
     }
 
-    public boolean isAlliedTo(Entity entityIn) {
-        if (entityIn instanceof EntityBlueJay jay) {
-            return jay.getRaccoonUUID() != null && jay.getRaccoonUUID().equals(this.getUUID());
-        }
-        if (this.isTame()) {
-            LivingEntity livingentity = this.getOwner();
-            if (entityIn == livingentity) {
-                return true;
-            }
-            if (entityIn instanceof TamableAnimal) {
-                return ((TamableAnimal) entityIn).isOwnedBy(livingentity);
-            }
-            if (livingentity != null) {
-                return livingentity.isAlliedTo(entityIn);
-            }
-        }
 
-        return super.isAlliedTo(entityIn);
-    }
 
 
     public boolean doHurtTarget(Entity entityIn) {
@@ -174,11 +156,11 @@ public class EntityRaccoon extends TamableAnimal implements IAnimatedEntity, IFo
         return true;
     }
 
-    protected void dropEquipment() {
-        super.dropEquipment();
+    protected void dropEquipment(ServerLevel level) {
+        super.dropEquipment(level);
         if (this.getColor() != null) {
-            if (!this.level().isClientSide) {
-                this.spawnAtLocation(this.getCarpetItemBeingWorn());
+            if (!this.level().isClientSide()) {
+                this.spawnAtLocation(level, this.getCarpetItemBeingWorn());
             }
             this.setColor(null);
         }
@@ -215,8 +197,8 @@ public class EntityRaccoon extends TamableAnimal implements IAnimatedEntity, IFo
             this.level().broadcastEntityEvent(this, (byte) 93);
             return InteractionResult.SUCCESS;
         } else if (this.isTame() && !this.getMainHandItem().isEmpty()) {
-            if (!this.level().isClientSide) {
-                this.spawnAtLocation(this.getMainHandItem().copy());
+            if (!this.level().isClientSide()) {
+                this.spawnAtLocation((ServerLevel)this.level(), this.getMainHandItem().copy());
             }
             this.setItemInHand(InteractionHand.MAIN_HAND, ItemStack.EMPTY);
             pickupItemCooldown = 60;
@@ -225,7 +207,7 @@ public class EntityRaccoon extends TamableAnimal implements IAnimatedEntity, IFo
             DyeColor color = EntityElephant.getCarpetColor(itemstack);
             if (color != this.getColor()) {
                 if (this.getColor() != null) {
-                    this.spawnAtLocation(this.getCarpetItemBeingWorn());
+                    this.spawnAtLocation((ServerLevel)this.level(), this.getCarpetItemBeingWorn());
                 }
                 this.gameEvent(GameEvent.ENTITY_INTERACT);
                 this.playSound(SoundEvents.LLAMA_SWAG.value(), 1.0F, (this.random.nextFloat() - this.random.nextFloat()) * 0.2F + 1.0F);
@@ -238,7 +220,7 @@ public class EntityRaccoon extends TamableAnimal implements IAnimatedEntity, IFo
             this.gameEvent(GameEvent.ENTITY_INTERACT);
             this.playSound(SoundEvents.SHEEP_SHEAR, 1.0F, (this.random.nextFloat() - this.random.nextFloat()) * 0.2F + 1.0F);
             if (this.getColor() != null) {
-                this.spawnAtLocation(this.getCarpetItemBeingWorn());
+                this.spawnAtLocation((ServerLevel)this.level(), this.getCarpetItemBeingWorn());
             }
             this.setColor(null);
             return InteractionResult.SUCCESS;
@@ -248,8 +230,9 @@ public class EntityRaccoon extends TamableAnimal implements IAnimatedEntity, IFo
                 copy.setCount(1);
                 this.setItemInHand(InteractionHand.MAIN_HAND, copy);
                 this.onEatItem();
-                if (itemstack.hasCraftingRemainingItem()) {
-                    this.spawnAtLocation(itemstack.getCraftingRemainingItem());
+                ItemStack remainder = itemstack.getItem().getCraftingRemainder();
+                if (!remainder.isEmpty()) {
+                    this.spawnAtLocation((ServerLevel)this.level(), remainder);
                 }
                 if (!player.isCreative()) {
                     itemstack.shrink(1);
@@ -257,7 +240,7 @@ public class EntityRaccoon extends TamableAnimal implements IAnimatedEntity, IFo
                 this.setItemInHand(InteractionHand.MAIN_HAND, ItemStack.EMPTY);
             } else {
                 this.gameEvent(GameEvent.EAT);
-                this.playSound(SoundEvents.GENERIC_EAT, this.getSoundVolume(), this.getVoicePitch());
+                this.playSound(SoundEvents.GENERIC_EAT.value(), this.getSoundVolume(), this.getVoicePitch());
                 this.heal(5);
             }
             this.usePlayerItem(player, hand, itemstack);
@@ -287,22 +270,24 @@ public class EntityRaccoon extends TamableAnimal implements IAnimatedEntity, IFo
     }
 
 
-    public void addAdditionalSaveData(CompoundTag compound) {
-        super.addAdditionalSaveData(compound);
-        compound.putBoolean("RacSitting", this.isSitting());
-        compound.putBoolean("ForcedToSit", this.forcedSit);
-        compound.putInt("RacCommand", this.getCommand());
-        compound.putInt("Carpet", this.entityData.get(CARPET_COLOR));
-        compound.putInt("StealCooldown", stealCooldown);
+    @Override
+    protected void addAdditionalSaveData(ValueOutput valueOutput) {
+        super.addAdditionalSaveData(valueOutput);
+        valueOutput.putBoolean("RacSitting", this.isSitting());
+        valueOutput.putBoolean("ForcedToSit", this.forcedSit);
+        valueOutput.putInt("RacCommand", this.getCommand());
+        valueOutput.putInt("Carpet", this.entityData.get(CARPET_COLOR));
+        valueOutput.putInt("StealCooldown", stealCooldown);
     }
 
-    public void readAdditionalSaveData(CompoundTag compound) {
-        super.readAdditionalSaveData(compound);
-        this.setOrderedToSit(compound.getBoolean("RacSitting"));
-        this.forcedSit = compound.getBoolean("ForcedToSit");
-        this.setCommand(compound.getInt("RacCommand"));
-        this.entityData.set(CARPET_COLOR, compound.getInt("Carpet"));
-        this.stealCooldown = compound.getInt("StealCooldown");
+    @Override
+    protected void readAdditionalSaveData(ValueInput valueInput) {
+        super.readAdditionalSaveData(valueInput);
+        this.setOrderedToSit(valueInput.getBooleanOr("RacSitting", false));
+        this.forcedSit = valueInput.getBooleanOr("ForcedToSit", false);
+        this.setCommand(valueInput.getIntOr("RacCommand", 0));
+        this.entityData.set(CARPET_COLOR, valueInput.getIntOr("Carpet", -1));
+        this.stealCooldown = valueInput.getIntOr("StealCooldown", 0);
 
     }
 
@@ -330,8 +315,8 @@ public class EntityRaccoon extends TamableAnimal implements IAnimatedEntity, IFo
         return Monster.createMonsterAttributes().add(Attributes.MAX_HEALTH, 9D).add(Attributes.ATTACK_DAMAGE, 2.0D).add(Attributes.MOVEMENT_SPEED, 0.25F);
     }
 
-    public boolean hurt(DamageSource source, float amount) {
-        if (this.isInvulnerableTo(source)) {
+    public boolean hurtServer(ServerLevel level, DamageSource source, float amount) {
+        if (this.isInvulnerableTo(level, source)) {
             return false;
         } else {
             Entity entity = source.getEntity();
@@ -339,7 +324,7 @@ public class EntityRaccoon extends TamableAnimal implements IAnimatedEntity, IFo
             if (entity != null && this.isTame() && !(entity instanceof Player) && !(entity instanceof AbstractArrow)) {
                 amount = (amount + 1.0F) / 4.0F;
             }
-            return super.hurt(source, amount);
+            return super.hurtServer(level, source, amount);
         }
     }
 
@@ -410,13 +395,14 @@ public class EntityRaccoon extends TamableAnimal implements IAnimatedEntity, IFo
             standingTime = 0;
             maxStandTime = 75 + random.nextInt(50);
         }
-        if (!this.level().isClientSide) {
+        if (!this.level().isClientSide()) {
             if (lookForWaterBeforeEatingTimer > 0) {
                 lookForWaterBeforeEatingTimer--;
             } else if (!isWashing() && canTargetItem(this.getMainHandItem())) {
                 onEatItem();
-                if (this.getMainHandItem().hasCraftingRemainingItem()) {
-                    this.spawnAtLocation(this.getMainHandItem().getCraftingRemainingItem());
+                ItemStack remainder = this.getMainHandItem().getItem().getCraftingRemainder();
+                if (!remainder.isEmpty()) {
+                    this.spawnAtLocation((ServerLevel)this.level(), remainder);
                 }
                 this.getMainHandItem().shrink(1);
             }
@@ -437,7 +423,7 @@ public class EntityRaccoon extends TamableAnimal implements IAnimatedEntity, IFo
                 }
             }
         }
-        if (!this.level().isClientSide && this.getTarget() != null && this.hasLineOfSight(this.getTarget()) && this.distanceTo(this.getTarget()) < 4 && this.getAnimation() == ANIMATION_ATTACK && this.getAnimationTick() == 5) {
+        if (!this.level().isClientSide() && this.getTarget() != null && this.hasLineOfSight(this.getTarget()) && this.distanceTo(this.getTarget()) < 4 && this.getAnimation() == ANIMATION_ATTACK && this.getAnimationTick() == 5) {
             float f1 = this.getYRot() * Mth.DEG_TO_RAD;
             this.setDeltaMovement(this.getDeltaMovement().add((double) (-Mth.sin(f1) * -0.06F), 0.0D, (double) (Mth.cos(f1) * -0.06F)));
             this.getTarget().knockback(0.35F, getTarget().getX() - this.getX(), getTarget().getZ() - this.getZ());
@@ -456,15 +442,17 @@ public class EntityRaccoon extends TamableAnimal implements IAnimatedEntity, IFo
         this.heal(10);
         this.level().broadcastEntityEvent(this, (byte) 92);
         this.gameEvent(GameEvent.EAT);
-        this.playSound(SoundEvents.GENERIC_EAT, this.getSoundVolume(), this.getVoicePitch());
+        this.playSound(SoundEvents.GENERIC_EAT.value(), this.getSoundVolume(), this.getVoicePitch());
     }
 
     public void postWashItem(ItemStack stack) {
         if (stack.is(AMTagRegistry.RACCOON_TAMEABLES) && eggThrowerUUID != null && !this.isTame()) {
             if (getRandom().nextFloat() < 0.3F) {
                 this.setTame(true, true);
-                this.setOwnerUUID(eggThrowerUUID);
                 Player player = level().getPlayerByUUID(eggThrowerUUID);
+                if (player != null) {
+                    this.setOwner(player);
+                }
                 if (player instanceof ServerPlayer) {
                     CriteriaTriggers.TAME_ANIMAL.trigger((ServerPlayer) player, this);
                 }
@@ -493,10 +481,6 @@ public class EntityRaccoon extends TamableAnimal implements IAnimatedEntity, IFo
         } else {
             super.handleEntityEvent(id);
         }
-    }
-
-    public boolean canBeRiddenUnderFluidType(FluidType type, Entity rider) {
-        return true;
     }
 
     public boolean isStanding() {
@@ -605,8 +589,8 @@ public class EntityRaccoon extends TamableAnimal implements IAnimatedEntity, IFo
         lookForWaterBeforeEatingTimer = 100;
         ItemStack duplicate = e.getItem().copy();
         duplicate.setCount(1);
-        if (!this.getItemInHand(InteractionHand.MAIN_HAND).isEmpty() && !this.level().isClientSide) {
-            this.spawnAtLocation(this.getItemInHand(InteractionHand.MAIN_HAND), 0.0F);
+        if (!this.getItemInHand(InteractionHand.MAIN_HAND).isEmpty() && !this.level().isClientSide()) {
+            this.spawnAtLocation((ServerLevel)this.level(), this.getItemInHand(InteractionHand.MAIN_HAND), 0.0F);
         }
         Entity thrower = e.getOwner();
         if (e.getItem().is(AMTagRegistry.RACCOON_TEAMING_FOODS) && thrower != null && bondWithBlueJays(thrower.getUUID())) {
@@ -662,21 +646,6 @@ public class EntityRaccoon extends TamableAnimal implements IAnimatedEntity, IFo
             }
         }
         return any;
-    }
-
-    @Override
-    public boolean isLootable(Container inventory) {
-        for (int i = 0; i < inventory.getContainerSize(); i++) {
-            if (shouldLootItem(inventory.getItem(i))) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    @Override
-    public boolean shouldLootItem(ItemStack stack) {
-        return isRaccoonFood(stack);
     }
 
     public boolean isHoldingSugar() {
@@ -814,26 +783,32 @@ public class EntityRaccoon extends TamableAnimal implements IAnimatedEntity, IFo
 
         @Nullable
         private boolean isGolemNearby() {
-            List<IronGolem> lvt_1_1_ = raccoon.level().getNearbyEntities(IronGolem.class, IRON_GOLEM_PREDICATE, raccoon, raccoon.getBoundingBox().inflate(25.0D));
-            return !lvt_1_1_.isEmpty();
+            if (raccoon.level() instanceof ServerLevel serverLevel) {
+                List<IronGolem> lvt_1_1_ = serverLevel.getNearbyEntities(IronGolem.class, IRON_GOLEM_PREDICATE, raccoon, raccoon.getBoundingBox().inflate(25.0D));
+                return !lvt_1_1_.isEmpty();
+            }
+            return false;
         }
 
         @Nullable
         private AbstractVillager getNearbyVillagers() {
-            List<AbstractVillager> lvt_1_1_ = raccoon.level().getNearbyEntities(AbstractVillager.class, VILLAGER_STEAL_PREDICATE, raccoon, raccoon.getBoundingBox().inflate(20.0D));
-            double lvt_2_1_ = 10000;
-            AbstractVillager lvt_4_1_ = null;
-            Iterator var5 = lvt_1_1_.iterator();
+            if (raccoon.level() instanceof ServerLevel serverLevel) {
+                List<AbstractVillager> lvt_1_1_ = serverLevel.getNearbyEntities(AbstractVillager.class, VILLAGER_STEAL_PREDICATE, raccoon, raccoon.getBoundingBox().inflate(20.0D));
+                double lvt_2_1_ = 10000;
+                AbstractVillager lvt_4_1_ = null;
+                Iterator var5 = lvt_1_1_.iterator();
 
-            while (var5.hasNext()) {
-                AbstractVillager lvt_6_1_ = (AbstractVillager) var5.next();
-                if (lvt_6_1_.getHealth() > 2.0F && !lvt_6_1_.getOffers().isEmpty() && raccoon.distanceToSqr(lvt_6_1_) < lvt_2_1_) {
-                    lvt_4_1_ = lvt_6_1_;
-                    lvt_2_1_ = raccoon.distanceToSqr(lvt_6_1_);
+                while (var5.hasNext()) {
+                    AbstractVillager lvt_6_1_ = (AbstractVillager) var5.next();
+                    if (lvt_6_1_.getHealth() > 2.0F && !lvt_6_1_.getOffers().isEmpty() && raccoon.distanceToSqr(lvt_6_1_) < lvt_2_1_) {
+                        lvt_4_1_ = lvt_6_1_;
+                        lvt_2_1_ = raccoon.distanceToSqr(lvt_6_1_);
+                    }
                 }
-            }
 
-            return lvt_4_1_;
+                return lvt_4_1_;
+            }
+            return null;
         }
 
     }
