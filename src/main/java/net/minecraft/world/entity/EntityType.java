@@ -1235,6 +1235,13 @@ public class EntityType<T extends Entity> implements FeatureElement, EntityTypeT
 	public static final EntityType<Tadpole> TADPOLE = register(
 		"tadpole", EntityType.Builder.of(Tadpole::new, MobCategory.CREATURE).sized(0.4F, 0.3F).eyeHeight(0.19500001F).clientTrackingRange(10)
 	);
+	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntityTarantulaHawk> TARANTULA_HAWK = register(
+		"tarantula_hawk",
+		EntityType.Builder.of(com.github.alexthe666.alexsmobs.entity.EntityTarantulaHawk::new, MobCategory.CREATURE)
+			.sized(1.2F, 0.9F)
+			.eyeHeight(0.7F)
+			.clientTrackingRange(10)
+	);
 	public static final EntityType<Display.TextDisplay> TEXT_DISPLAY = register(
 		"text_display", EntityType.Builder.of(Display.TextDisplay::new, MobCategory.MISC).noLootTable().sized(0.0F, 0.0F).clientTrackingRange(10).updateInterval(1)
 	);

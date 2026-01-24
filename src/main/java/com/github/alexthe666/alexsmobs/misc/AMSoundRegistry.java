@@ -124,4 +124,8 @@ public class AMSoundRegistry {
     // Leafcutter Ant sounds - reference vanilla SoundEvents
     public static final DeferredHolder LEAFCUTTER_ANT_HURT = new DeferredHolder(() -> net.minecraft.sounds.SoundEvents.LEAFCUTTER_ANT_HURT);
     public static final DeferredHolder LEAFCUTTER_ANT_QUEEN_HURT = new DeferredHolder(() -> net.minecraft.sounds.SoundEvents.LEAFCUTTER_ANT_QUEEN_HURT);
+    
+    // Tarantula Hawk sounds - reference vanilla SoundEvents
+    public static final DeferredHolder TARANTULA_HAWK_HURT = new DeferredHolder(() -> net.minecraft.sounds.SoundEvents.TARANTULA_HAWK_HURT);
+    public static final DeferredHolder TARANTULA_HAWK_WING = new DeferredHolder(() -> net.minecraft.sounds.SoundEvents.TARANTULA_HAWK_WING);
 }

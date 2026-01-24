@@ -1480,6 +1480,8 @@ public class CreativeModeTabs {
 						output.accept(Items.ENDER_PEARL);
 						output.accept(Items.ENDER_EYE);
 						output.accept(Items.ELYTRA);
+						output.accept(Items.TARANTULA_HAWK_ELYTRA);
+						output.accept(Items.TARANTULA_HAWK_ELYTRA_BROKEN);
 						generateFireworksAllDurations(output, CreativeModeTab.TabVisibility.PARENT_AND_SEARCH_TABS);
 						output.accept(Items.SADDLE);
 						output.accept(Items.WHITE_HARNESS);
@@ -1778,6 +1780,8 @@ public class CreativeModeTabs {
 					output.accept(Items.EMU_FEATHER);
 					output.accept(Items.COCKROACH_WING);
 					output.accept(Items.COCKROACH_WING_FRAGMENT);
+					output.accept(Items.TARANTULA_HAWK_WING);
+					output.accept(Items.TARANTULA_HAWK_WING_FRAGMENT);
 					output.accept(Items.SNOWBALL);
 					output.accept(Items.EGG);
 					output.accept(Items.BROWN_EGG);
@@ -2046,6 +2050,7 @@ public class CreativeModeTabs {
 					output.accept(Items.STRAY_SPAWN_EGG);
 					output.accept(Items.STRIDER_SPAWN_EGG);
 					output.accept(Items.TADPOLE_SPAWN_EGG);
+					output.accept(Items.TARANTULA_HAWK_SPAWN_EGG);
 					output.accept(Items.TRADER_LLAMA_SPAWN_EGG);
 					output.accept(Items.TREMORSAURUS_SPAWN_EGG);
 					output.accept(Items.TRILOCARIS_SPAWN_EGG);

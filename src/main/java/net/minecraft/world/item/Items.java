@@ -1933,6 +1933,13 @@ public class Items {
 	public static final Item STRAY_SPAWN_EGG = registerItem("stray_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.STRAY));
 	public static final Item STRIDER_SPAWN_EGG = registerItem("strider_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.STRIDER));
 	public static final Item TADPOLE_SPAWN_EGG = registerItem("tadpole_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.TADPOLE));
+	public static final Item TARANTULA_HAWK_SPAWN_EGG = registerItem("tarantula_hawk_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.TARANTULA_HAWK));
+	public static final Item TARANTULA_HAWK_WING = registerItem("tarantula_hawk_wing", Item::new, new Item.Properties());
+	public static final Item TARANTULA_HAWK_WING_FRAGMENT = registerItem("tarantula_hawk_wing_fragment", Item::new, new Item.Properties());
+	public static final Item TARANTULA_HAWK_ELYTRA = registerItem("tarantula_hawk_elytra", 
+		properties -> new com.github.alexthe666.alexsmobs.item.ItemTarantulaHawkElytra(properties, net.minecraft.world.item.ArmorMaterials.LEATHER),
+		new Item.Properties().durability(432));
+	public static final Item TARANTULA_HAWK_ELYTRA_BROKEN = registerItem("tarantula_hawk_elytra_broken", Item::new, new Item.Properties());
 	public static final Item TRADER_LLAMA_SPAWN_EGG = registerItem(
 		"trader_llama_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.TRADER_LLAMA)
 	);
