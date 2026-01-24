@@ -145,6 +145,17 @@ public class AMTagRegistry {
     public static final TagKey<Item> RACCOON_TAMEABLES = registerItemTag("raccoon_tameables");
     public static final TagKey<Item> RACCOON_DISSOLVES = registerItemTag("raccoon_dissolves");
 
+    // Orca-specific tags
+    public static final TagKey<EntityType<?>> ORCA_TARGETS = registerEntityTag("orca_targets");
+    public static final TagKey<Block> ORCA_BREAKABLES = registerBlockTag("orca_breakables");
+
+    // Tag helper method for entity checks
+    public static class TagHelper {
+        public static boolean isEntityIn(TagKey<EntityType<?>> tag, net.minecraft.world.entity.Entity entity) {
+            return entity != null && entity.getType().is(tag);
+        }
+    }
+
     private static TagKey<Item> registerItemTag(String name) {
         return TagKey.create(Registries.ITEM, ResourceLocation.withDefaultNamespace(name));
     }

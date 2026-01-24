@@ -2007,6 +2007,7 @@ public class CreativeModeTabs {
 					output.accept(Items.MULE_SPAWN_EGG);
 					output.accept(Items.MUNGUS_SPAWN_EGG);
 					output.accept(Items.OCELOT_SPAWN_EGG);
+					output.accept(Items.ORCA_SPAWN_EGG);
 					output.accept(Items.PANDA_SPAWN_EGG);
 					output.accept(Items.PARROT_SPAWN_EGG);
 					output.accept(Items.PHANTOM_SPAWN_EGG);
