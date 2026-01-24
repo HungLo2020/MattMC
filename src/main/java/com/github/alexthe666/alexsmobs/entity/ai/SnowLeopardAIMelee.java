@@ -153,7 +153,7 @@ public class SnowLeopardAIMelee extends Goal {
                 if(leopard.getAnimation() == IAnimatedEntity.NO_ANIMATION){
                     leopard.setAnimation(leopard.getRandom().nextBoolean() ? EntitySnowLeopard.ANIMATION_ATTACK_R : EntitySnowLeopard.ANIMATION_ATTACK_L);
                 }else if(this.leopard.getAnimationTick() == 5){
-                    leopard.doHurtTarget(target);
+                    leopard.doHurtTarget((ServerLevel)leopard.level(), target);
                 }
             }
         }
@@ -174,8 +174,8 @@ public class SnowLeopardAIMelee extends Goal {
         PathNavigation lvt_13_1_ = leopard.getNavigation();
         RandomSource lvt_14_1_ = creature.getRandom();
         boolean lvt_15_2_;
-        if (leopard.hasRestriction()) {
-            lvt_15_2_ = leopard.getRestrictCenter().closerToCenterThan(creature.position(), (double) (leopard.getRestrictRadius() + (float) xz) + 1.0D);
+        if (leopard.getRestrictionPoint() != null) {
+            lvt_15_2_ = leopard.getRestrictionPoint().closerToCenterThan(creature.position(), (double) (leopard.getRestrictionRadius() + (float) xz) + 1.0D);
         } else {
             lvt_15_2_ = false;
         }
@@ -191,8 +191,8 @@ public class SnowLeopardAIMelee extends Goal {
                 int lvt_23_1_ = lvt_21_1_.getY();
                 int lvt_24_1_ = lvt_21_1_.getZ();
                 BlockPos lvt_25_2_;
-                if (leopard.hasRestriction() && xz > 1) {
-                    lvt_25_2_ = leopard.getRestrictCenter();
+                if (leopard.getRestrictionPoint() != null && xz > 1) {
+                    lvt_25_2_ = leopard.getRestrictionPoint();
                     if (creature.getX() > (double) lvt_25_2_.getX()) {
                         lvt_22_1_ -= lvt_14_1_.nextInt(xz / 2);
                     } else {

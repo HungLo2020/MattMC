@@ -1,5 +1,6 @@
 package com.github.alexthe666.alexsmobs.client.model;
 
+import com.github.alexthe666.alexsmobs.client.render.SnowLeopardRenderState;
 import com.github.alexthe666.alexsmobs.entity.EntitySnowLeopard;
 import com.github.alexthe666.alexsmobs.entity.util.Maths;
 import com.github.alexthe666.citadel.animation.IAnimatedEntity;
@@ -10,9 +11,8 @@ import com.github.alexthe666.citadel.client.model.basic.BasicModelPart;
 import com.google.common.collect.ImmutableList;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
-import net.minecraft.client.Minecraft;
 
-public class ModelSnowLeopard extends AdvancedEntityModel<EntitySnowLeopard> {
+public class ModelSnowLeopard extends AdvancedEntityModel<SnowLeopardRenderState> {
     private final AdvancedModelBox root;
     private final AdvancedModelBox body;
     private final AdvancedModelBox tail1;
@@ -31,6 +31,8 @@ public class ModelSnowLeopard extends AdvancedEntityModel<EntitySnowLeopard> {
     public ModelSnowLeopard() {
         texWidth = 64;
         texHeight = 64;
+        textureWidth = 64;
+        textureHeight = 64;
 
         root = new AdvancedModelBox(this);
         root.setRotationPoint(0.0F, 24.0F, 0.0F);
@@ -118,10 +120,9 @@ public class ModelSnowLeopard extends AdvancedEntityModel<EntitySnowLeopard> {
         return ImmutableList.of(root, body, head, bubble, whiskersLeft, whiskersRight, armLeft, armRight, legLeft, legRight, tail1, tail2, tail3);
     }
 
-    public void animate(IAnimatedEntity entity, float f, float f1, float f2, float f3, float f4) {
+    public void animate(SnowLeopardRenderState renderState) {
         this.resetToDefaultPose();
-        animator.update(entity);
-        animator.update(entity);
+        animator.update(renderState);
         animator.setAnimation(EntitySnowLeopard.ANIMATION_ATTACK_R);
         animator.startKeyframe(3);
         animator.rotate(body, 0, Maths.rad(-10F), 0);
@@ -146,19 +147,22 @@ public class ModelSnowLeopard extends AdvancedEntityModel<EntitySnowLeopard> {
         animator.resetKeyframe(5);
     }
 
-    @Override
-    public void setupAnim(EntitySnowLeopard entity, float limbSwing, float limbSwingAmount, float ageInTicks, float netHeadYaw, float headPitch) {
-        animate(entity, limbSwing, limbSwingAmount, ageInTicks, netHeadYaw, headPitch);
+    public void setupAnim(SnowLeopardRenderState renderState) {
+        animate(renderState);
+        float limbSwing = renderState.walkAnimationPos;
+        float limbSwingAmount = renderState.walkAnimationSpeed;
+        float ageInTicks = renderState.ageInTicks;
+        float netHeadYaw = renderState.yRot;
+        float headPitch = renderState.xRot;
         float walkSpeed = 0.7F;
         float walkDegree = 0.6F;
         float idleSpeed = 0.1F;
         float idleDegree = 0.1F;
         float runProgress = 5F * limbSwingAmount;
-        float partialTick = Minecraft.getInstance().getTimer().getGameTimeDeltaPartialTick(false);
-        float stalkProgress = entity.prevSneakProgress + (entity.sneakProgress - entity.prevSneakProgress) * partialTick;
-        float tackleProgress = entity.prevTackleProgress + (entity.tackleProgress - entity.prevTackleProgress) * partialTick;
-        float sitProgress = entity.prevSitProgress + (entity.sitProgress - entity.prevSitProgress) * partialTick;
-        float sleepProgress = entity.prevSleepProgress + (entity.sleepProgress - entity.prevSleepProgress) * partialTick;
+        float stalkProgress = renderState.prevSneakProgress + (renderState.sneakProgress - renderState.prevSneakProgress);
+        float tackleProgress = renderState.prevTackleProgress + (renderState.tackleProgress - renderState.prevTackleProgress);
+        float sitProgress = renderState.prevSitProgress + (renderState.sitProgress - renderState.prevSitProgress);
+        float sleepProgress = renderState.prevSleepProgress + (renderState.sleepProgress - renderState.prevSleepProgress);
         float sitSleepProgress = Math.max(sitProgress, sleepProgress);
         this.swing(tail1, idleSpeed, idleDegree * 2F, false, 2F, 0F, ageInTicks, 1 - limbSwingAmount);
         this.swing(tail2, idleSpeed, idleDegree * 1.5F, false, 2F, 0F, ageInTicks, 1 - limbSwingAmount);
@@ -205,7 +209,7 @@ public class ModelSnowLeopard extends AdvancedEntityModel<EntitySnowLeopard> {
         progressPositionPrev(armLeft, tackleProgress, 1F, 2F, 0, 3F);
         progressPositionPrev(armRight, tackleProgress, -1F, 2F, 0, 3F);
         progressPositionPrev(tail1, tackleProgress, 0, 0F, -1F, 3F);
-        float tailAngle = entity.getId() % 2 == 0 ? 1 : -1;
+        float tailAngle = renderState.entityId % 2 == 0 ? 1 : -1;
         progressRotationPrev(legLeft, sitSleepProgress, Maths.rad(-90), Maths.rad(-20), 0, 5F);
         progressRotationPrev(legRight, sitSleepProgress, Maths.rad(-90), Maths.rad(20), 0, 5F);
         progressRotationPrev(armLeft, sitSleepProgress, Maths.rad(-90), 0, 0, 5F);
@@ -239,29 +243,6 @@ public class ModelSnowLeopard extends AdvancedEntityModel<EntitySnowLeopard> {
         if (sleepProgress <= 0.0F) {
             this.faceTarget(netHeadYaw, headPitch, 1, head);
         }
-    }
-
-    public void renderToBuffer(PoseStack matrixStackIn, VertexConsumer bufferIn, int packedLightIn, int packedOverlayIn, int color) {
-        if (this.young) {
-            float f = 1.45F;
-            head.setScale(f, f, f);
-            head.setShouldScaleChildren(true);
-            matrixStackIn.pushPose();
-            matrixStackIn.scale(0.5F, 0.5F, 0.5F);
-            matrixStackIn.translate(0.0D, 1.5D, 0D);
-            parts().forEach((p_228292_8_) -> {
-                p_228292_8_.render(matrixStackIn, bufferIn, packedLightIn, packedOverlayIn, -1);
-            });
-            matrixStackIn.popPose();
-            head.setScale(1, 1, 1);
-        } else {
-            matrixStackIn.pushPose();
-            parts().forEach((p_228290_8_) -> {
-                p_228290_8_.render(matrixStackIn, bufferIn, packedLightIn, packedOverlayIn, -1);
-            });
-            matrixStackIn.popPose();
-        }
-
     }
 
     public void setRotationAngle(AdvancedModelBox AdvancedModelBox, float x, float y, float z) {

@@ -214,13 +214,13 @@ public class EntitySnowLeopard extends Animal implements IAnimatedEntity, ITarge
                 this.setSitting(false);
                 this.setSleeping(false);
             }
-            if ((isSitting() || isSleeping()) && (++sittingTime > maxSitTime || this.getTarget() != null || this.isInLove() || this.isInWaterOrBubble())) {
+            if ((isSitting() || isSleeping()) && (++sittingTime > maxSitTime || this.getTarget() != null || this.isInLove() || this.isInWater())) {
                 this.setSitting(false);
                 this.setSleeping(false);
                 sittingTime = 0;
                 maxSitTime = 100 + random.nextInt(50);
             }
-            if (this.getTarget() == null && this.getDeltaMovement().lengthSqr() < 0.03D && this.getAnimation() == NO_ANIMATION && !this.isSleeping() && !this.isSitting() && !this.isInWaterOrBubble() && random.nextInt(340) == 0) {
+            if (this.getTarget() == null && this.getDeltaMovement().lengthSqr() < 0.03D && this.getAnimation() == NO_ANIMATION && !this.isSleeping() && !this.isSitting() && !this.isInWater() && random.nextInt(340) == 0) {
                 sittingTime = 0;
                 if (this.getRandom().nextInt(2) != 0) {
                     maxSitTime = 200 + random.nextInt(800);
@@ -237,12 +237,12 @@ public class EntitySnowLeopard extends Animal implements IAnimatedEntity, ITarge
         if (attackTarget != null) {
             if (distanceTo(attackTarget) < attackTarget.getBbWidth() + this.getBbWidth() + 0.6D && this.hasLineOfSight(attackTarget)) {
                 if (this.getAnimation() == ANIMATION_ATTACK_L && this.getAnimationTick() == 7) {
-                    doHurtTarget(attackTarget);
+                    this.doHurtTarget((ServerLevel)this.level(), attackTarget);
                     float rot = getYRot() + 90;
                     attackTarget.knockback(0.5F, Mth.sin(rot * Mth.DEG_TO_RAD), -Mth.cos(rot * Mth.DEG_TO_RAD));
                 }
                 if (this.getAnimation() == ANIMATION_ATTACK_R && this.getAnimationTick() == 7) {
-                    doHurtTarget(attackTarget);
+                    this.doHurtTarget((ServerLevel)this.level(), attackTarget);
                     float rot = getYRot() - 90;
                     attackTarget.knockback(0.5F, Mth.sin(rot * Mth.DEG_TO_RAD), -Mth.cos(rot * Mth.DEG_TO_RAD));
                 }
@@ -250,16 +250,6 @@ public class EntitySnowLeopard extends Animal implements IAnimatedEntity, ITarge
             }
         }
         AnimationHandler.INSTANCE.updateAnimations(this);
-    }
-
-    public boolean hurt(DamageSource source, float amount) {
-        final boolean prev = super.hurt(source, amount);
-        if (prev) {
-            sittingTime = 0;
-            this.setSleeping(false);
-            this.setSitting(false);
-        }
-        return prev;
     }
 
     public void travel(Vec3 vec3d) {
@@ -311,7 +301,7 @@ public class EntitySnowLeopard extends Animal implements IAnimatedEntity, ITarge
 
     @Override
     public boolean canTargetItem(ItemStack stack) {
-        return stack.has(net.minecraft.core.component.DataComponents.FOOD) && stack.getFoodProperties(this) != null;
+        return stack.has(net.minecraft.core.component.DataComponents.FOOD);
     }
 
     @Override
