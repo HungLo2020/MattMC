@@ -835,6 +835,9 @@ public class EntityType<T extends Entity> implements FeatureElement, EntityTypeT
 	public static final EntityType<Marker> MARKER = register(
 		"marker", EntityType.Builder.of(Marker::new, MobCategory.MISC).noLootTable().sized(0.0F, 0.0F).clientTrackingRange(0)
 	);
+	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntityMantisShrimp> MANTIS_SHRIMP = register(
+		"mantis_shrimp", EntityType.Builder.of(com.github.alexthe666.alexsmobs.entity.EntityMantisShrimp::new, MobCategory.WATER_CREATURE).sized(0.8F, 0.5F).eyeHeight(0.4F).clientTrackingRange(10)
+	);
 	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntityMimicOctopus> MIMIC_OCTOPUS = register(
 		"mimic_octopus",
 		EntityType.Builder.of(com.github.alexthe666.alexsmobs.entity.EntityMimicOctopus::new, MobCategory.WATER_CREATURE)
