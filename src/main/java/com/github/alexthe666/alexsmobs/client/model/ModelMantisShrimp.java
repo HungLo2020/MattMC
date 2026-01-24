@@ -1,6 +1,6 @@
 package com.github.alexthe666.alexsmobs.client.model;
 
-import com.github.alexthe666.alexsmobs.entity.EntityMantisShrimp;
+import com.github.alexthe666.alexsmobs.client.render.MantisShrimpRenderState;
 import com.github.alexthe666.alexsmobs.entity.util.Maths;
 import com.github.alexthe666.citadel.client.model.AdvancedEntityModel;
 import com.github.alexthe666.citadel.client.model.AdvancedModelBox;
@@ -8,10 +8,9 @@ import com.github.alexthe666.citadel.client.model.basic.BasicModelPart;
 import com.google.common.collect.ImmutableList;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
-import net.minecraft.client.Minecraft;
 import net.minecraft.util.Mth;
 
-public class ModelMantisShrimp extends AdvancedEntityModel<EntityMantisShrimp> {
+public class ModelMantisShrimp extends AdvancedEntityModel<MantisShrimpRenderState> {
 	public final AdvancedModelBox root;
 	public final AdvancedModelBox body;
 	public final AdvancedModelBox tail;
@@ -130,50 +129,28 @@ public class ModelMantisShrimp extends AdvancedEntityModel<EntityMantisShrimp> {
 		return ImmutableList.of(root, body, head, eye_left, eye_right, fist_left, fist_right, arm_left, arm_right, whisker_left, whisker_right, flapper_left, flapper_right, tail, legs_back, legs_front);
 	}
 
-	public void renderToBuffer(PoseStack matrixStackIn, VertexConsumer bufferIn, int packedLightIn, int packedOverlayIn, int color) {
-		if (this.young) {
-			this.eye_left.setScale(1.15F, 1.15F, 1.15F);
-			this.eye_right.setScale(1.15F, 1.15F, 1.15F);
-			matrixStackIn.pushPose();
-			matrixStackIn.scale(0.5F, 0.5F, 0.5F);
-			matrixStackIn.translate(0.0D, 1.5D, 0.125D);
-			parts().forEach((p_228292_8_) -> {
-				p_228292_8_.render(matrixStackIn, bufferIn, packedLightIn, packedOverlayIn, -1);
-			});
-			matrixStackIn.popPose();
-		} else {
-			this.eye_left.setScale(1F, 1F, 1F);
-			this.eye_right.setScale(1F, 1F, 1F);
-			matrixStackIn.pushPose();
-			parts().forEach((p_228290_8_) -> {
-				p_228290_8_.render(matrixStackIn, bufferIn, packedLightIn, packedOverlayIn, -1);
-			});
-			matrixStackIn.popPose();
-		}
-
-	}
-
-
 	@Override
-	public void setupAnim(EntityMantisShrimp entity, float limbSwing, float limbSwingAmount, float ageInTicks, float netHeadYaw, float headPitch){
+	public void setupAnim(MantisShrimpRenderState renderState){
 		this.resetToDefaultPose();
 		float idleSpeed = 0.1f;
 		float idleDegree = 0.3f;
 		float walkSpeed = 0.9f;
 		float walkDegree = 0.6F;
-		float partialTick = Minecraft.getInstance().getTimer().getGameTimeDeltaPartialTick(false);
-		float swimProgress = (Math.min(limbSwingAmount, 0.25F) * 4F) * (entity.prevInWaterProgress + (entity.inWaterProgress - entity.prevInWaterProgress) * partialTick);
-		float punchProgress = entity.prevPunchProgress + (entity.punchProgress - entity.prevPunchProgress) * partialTick;
-		float leftEyePitch = entity.prevLeftPitch + (entity.getEyePitch(true) - entity.prevLeftPitch) * partialTick;
-		float rightEyePitch = entity.prevRightPitch + (entity.getEyePitch(false) - entity.prevRightPitch) * partialTick;
-		float leftEyeYaw = entity.prevLeftYaw + (entity.getEyeYaw(true) - entity.prevLeftYaw) * partialTick;
-		float rightEyeYaw = entity.prevRightYaw + (entity.getEyeYaw(false) - entity.prevRightYaw) * partialTick;
+		float swimProgress = (Math.min(renderState.walkAnimationSpeed, 0.25F) * 4F) * renderState.inWaterProgress;
+		float punchProgress = renderState.punchProgress;
+		float leftEyePitch = renderState.leftEyePitch;
+		float rightEyePitch = renderState.rightEyePitch;
+		float leftEyeYaw = renderState.leftEyeYaw;
+		float rightEyeYaw = renderState.rightEyeYaw;
+		float ageInTicks = renderState.ageInTicks;
+		float limbSwing = renderState.walkAnimationPos;
+		float limbSwingAmount = renderState.walkAnimationSpeed;
 		this.eye_left.rotateAngleX += leftEyePitch * Mth.DEG_TO_RAD;
 		this.eye_left.rotateAngleY += leftEyeYaw * Mth.DEG_TO_RAD;
 		this.eye_right.rotateAngleX += rightEyePitch * Mth.DEG_TO_RAD;
 		this.eye_right.rotateAngleY += rightEyeYaw * Mth.DEG_TO_RAD;
-		this.head.rotateAngleY += netHeadYaw * 0.5F * Mth.DEG_TO_RAD;
-		this.head.rotateAngleX += headPitch * 0.8F * Mth.DEG_TO_RAD;
+		this.head.rotateAngleY += renderState.yRot / 57.295776F * 0.5F;
+		this.head.rotateAngleX += renderState.xRot / 57.295776F * 0.8F;
 		this.walk(whisker_left, idleSpeed * 1.5F, idleDegree, false, 0F, -0.25F, ageInTicks, 1);
 		this.walk(whisker_right, idleSpeed * 1.5F, idleDegree, true, 0F, 0.25F, ageInTicks, 1);
 		this.swing(whisker_left, idleSpeed * 1F, idleDegree * 0.75F, false, 1F, 0F, ageInTicks, 1);
@@ -211,6 +188,15 @@ public class ModelMantisShrimp extends AdvancedEntityModel<EntityMantisShrimp> {
 		progressRotationPrev(fist_left, punchProgress, Maths.rad(-240), 0,  Maths.rad(-10), 2F);
 		progressRotationPrev(flapper_right, punchProgress, 0, Maths.rad(50), 0, 2F);
 		progressRotationPrev(flapper_left, punchProgress, 0, Maths.rad(-50), 0, 2F);
+
+		// Handle baby scaling
+		if (renderState.isBaby) {
+			this.eye_left.setScale(1.15F, 1.15F, 1.15F);
+			this.eye_right.setScale(1.15F, 1.15F, 1.15F);
+		} else {
+			this.eye_left.setScale(1F, 1F, 1F);
+			this.eye_right.setScale(1F, 1F, 1F);
+		}
 
 	}
 
