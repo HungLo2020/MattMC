@@ -17091,6 +17091,19 @@
     ],
     "subtitle": "subtitles.entity.llama.swag"
   },
+  "entity.lobster.hurt": {
+    "sounds": [
+      "lobster_hurt_0",
+      "lobster_hurt_1"
+    ],
+    "subtitle": "subtitles.entity.lobster.hurt"
+  },
+  "entity.lobster.attack": {
+    "sounds": [
+      "lobster_attack"
+    ],
+    "subtitle": "subtitles.entity.lobster.attack"
+  },
   "entity.magma_cube.death": {
     "sounds": [
       "mob/slime/big1",

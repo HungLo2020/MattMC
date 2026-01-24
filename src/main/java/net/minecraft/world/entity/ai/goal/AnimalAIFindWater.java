@@ -1,6 +1,6 @@
-package com.github.alexthe666.alexsmobs.entity.ai;
+package net.minecraft.world.entity.ai.goal;
 
-import com.github.alexthe666.alexsmobs.entity.ISemiAquatic;
+import net.minecraft.world.entity.animal.ISemiAquatic;
 import net.minecraft.core.BlockPos;
 import net.minecraft.tags.FluidTags;
 import net.minecraft.util.RandomSource;

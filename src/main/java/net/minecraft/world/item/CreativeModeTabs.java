@@ -1441,6 +1441,7 @@ public class CreativeModeTabs {
 						output.accept(Items.PUFFERFISH_BUCKET);
 						output.accept(Items.AXOLOTL_BUCKET);
 						output.accept(Items.TADPOLE_BUCKET);
+						output.accept(Items.LOBSTER_BUCKET);
 						output.accept(Items.LAVA_BUCKET);
 						output.accept(Items.POWDER_SNOW_BUCKET);
 						output.accept(Items.MILK_BUCKET);
@@ -1693,6 +1694,8 @@ public class CreativeModeTabs {
 						output.accept(Items.PUFFERFISH);
 						output.accept(Items.TRILOCARIS_TAIL);
 						output.accept(Items.COOKED_TRILOCARIS_TAIL);
+						output.accept(Items.LOBSTER_TAIL);
+						output.accept(Items.COOKED_LOBSTER_TAIL);
 						output.accept(Items.PINE_NUTS);
 						output.accept(Items.DINOSAUR_NUGGET);
 						output.accept(Items.BREAD);
@@ -1989,6 +1992,7 @@ public class CreativeModeTabs {
 					output.accept(Items.LEAFCUTTER_ANT_SPAWN_EGG);
 					output.accept(Items.IRON_GOLEM_SPAWN_EGG);
 					output.accept(Items.LLAMA_SPAWN_EGG);
+					output.accept(Items.LOBSTER_SPAWN_EGG);
 					output.accept(Items.MAGMA_CUBE_SPAWN_EGG);
 					output.accept(Items.MIMIC_OCTOPUS_SPAWN_EGG);
 					output.accept(Items.MOOSHROOM_SPAWN_EGG);
