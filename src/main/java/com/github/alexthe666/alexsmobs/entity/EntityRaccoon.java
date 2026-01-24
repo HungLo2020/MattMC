@@ -649,7 +649,7 @@ public class EntityRaccoon extends TamableAnimal implements IAnimatedEntity, IFo
     }
 
     public boolean isHoldingSugar() {
-        return this.getMainHandItem().is(AMTagRegistry.RACOON_DISSOLVES);
+        return this.getMainHandItem().is(AMTagRegistry.RACCOON_DISSOLVES);
     }
 
     class StrollGoal extends MoveThroughVillageGoal {
