@@ -1179,6 +1179,9 @@ public class EntityType<T extends Entity> implements FeatureElement, EntityTypeT
 	public static final EntityType<SnowGolem> SNOW_GOLEM = register(
 		"snow_golem", EntityType.Builder.of(SnowGolem::new, MobCategory.MISC).immuneTo(Blocks.POWDER_SNOW).sized(0.7F, 1.9F).eyeHeight(1.7F).clientTrackingRange(8)
 	);
+	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntitySnowLeopard> SNOW_LEOPARD = register(
+		"snow_leopard", EntityType.Builder.of(com.github.alexthe666.alexsmobs.entity.EntitySnowLeopard::new, MobCategory.CREATURE).sized(0.9F, 0.9F).eyeHeight(0.7F).clientTrackingRange(10)
+	);
 	public static final EntityType<MinecartSpawner> SPAWNER_MINECART = register(
 		"spawner_minecart",
 		EntityType.Builder.of(MinecartSpawner::new, MobCategory.MISC).noLootTable().sized(0.98F, 0.7F).passengerAttachments(0.1875F).clientTrackingRange(8)

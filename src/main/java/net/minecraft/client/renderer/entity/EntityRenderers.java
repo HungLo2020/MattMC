@@ -249,6 +249,7 @@ public class EntityRenderers {
 		register(EntityType.SNIFFER, SnifferRenderer::new);
 		register(EntityType.SNOWBALL, ThrownItemRenderer::new);
 		register(EntityType.SNOW_GOLEM, SnowGolemRenderer::new);
+		register(EntityType.SNOW_LEOPARD, com.github.alexthe666.alexsmobs.client.render.RenderSnowLeopard::new);
 		register(EntityType.SUBTERRANODON, com.github.alexmodguy.alexscaves.client.render.entity.SubterranodonRenderer::new);
 		register(EntityType.TREMORSAURUS, com.github.alexmodguy.alexscaves.client.render.entity.TremorsaurusRenderer::new);
 		register(EntityType.TRILOCARIS, com.github.alexmodguy.alexscaves.client.render.entity.TrilocarisRenderer::new);

@@ -221,6 +221,7 @@ public class DefaultAttributes {
 		.put(EntityType.TOUCAN, com.github.alexthe666.alexsmobs.entity.EntityToucan.bakeAttributes().build())
 		.put(EntityType.VALLUMRAPTOR, VallumraptorEntity.createAttributes().build())
 		.put(EntityType.SNOW_GOLEM, SnowGolem.createAttributes().build())
+		.put(EntityType.SNOW_LEOPARD, com.github.alexthe666.alexsmobs.entity.EntitySnowLeopard.createAttributes().build())
 		.put(EntityType.SPIDER, Spider.createAttributes().build())
 		.put(EntityType.SQUID, Squid.createAttributes().build())
 		.put(EntityType.STRAY, AbstractSkeleton.createAttributes().build())
