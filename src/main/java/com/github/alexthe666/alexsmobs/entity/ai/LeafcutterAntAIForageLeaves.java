@@ -140,13 +140,15 @@ public class LeafcutterAntAIForageLeaves extends MoveToBlockGoal {
 
     }
 
+    private static final float LEAF_RESTORE_CHANCE = 0.5F;
+    
     private void breakLeaves() {
         BlockState blockstate = ant.level().getBlockState(this.blockPos);
         if (blockstate.is(net.minecraft.tags.BlockTags.LEAVES)) {
             // Remove NeoForge event call - inline griefing check
             ant.level().destroyBlock(blockPos, false);
-            // Simplified: no config check, just always restore leaves with 50% chance
-            if (ant.getRandom().nextFloat() > 0.5F) {
+            // Simplified: no config check, restore leaves based on chance constant
+            if (ant.getRandom().nextFloat() > LEAF_RESTORE_CHANCE) {
                 ant.level().setBlockAndUpdate(blockPos, blockstate);
             }
         }

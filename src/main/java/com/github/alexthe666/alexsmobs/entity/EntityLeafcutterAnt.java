@@ -54,6 +54,8 @@ import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.pathfinder.PathType;
 import net.minecraft.world.level.storage.loot.LootTable;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
 import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.phys.shapes.CollisionContext;
 
@@ -297,7 +299,7 @@ public class EntityLeafcutterAnt extends Animal implements NeutralMob, IAnimated
             }else{
                 if (!this.horizontalCollision && attachmentFacing != Direction.UP) {
                     org.joml.Vector3f step = attachmentFacing.step();
-                    Vec3 vec = Vec3.atLowerCornerOf(new net.minecraft.core.Vec3i((int)step.x, (int)step.y, (int)step.z));
+                    Vec3 vec = new Vec3(step.x, step.y, step.z);
                     this.setDeltaMovement(this.getDeltaMovement().add(vec.normalize().multiply(0.1F, 0.1F, 0.1F)));
                 }
                 if (!this.onGround() && vector3d.y < 0.0D) {
@@ -485,7 +487,7 @@ public class EntityLeafcutterAnt extends Animal implements NeutralMob, IAnimated
         this.entityData.set(QUEEN, Boolean.valueOf(queen));
     }
 
-    public void readAdditionalSaveData(net.minecraft.world.level.storage.ValueInput input) {
+    public void readAdditionalSaveData(ValueInput input) {
         super.readAdditionalSaveData(input);
         this.entityData.set(ATTACHED_FACE, input.read("AttachFace", Direction.LEGACY_ID_CODEC).orElse(Direction.DOWN));
         this.setLeaf(input.getBooleanOr("Leaf", false));

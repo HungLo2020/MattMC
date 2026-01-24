@@ -21,11 +21,11 @@ import net.minecraft.world.item.Items;
 public class LayerLeafcutterAntLeaf extends RenderLayer<LeafcutterAntRenderState, AdvancedEntityModel<LeafcutterAntRenderState>> {
 
     private static final ResourceLocation TEXTURE_0 = ResourceLocation
-            .parse("alexsmobs:textures/entity/leafcutter_ant_leaf_0.png");
+            .withDefaultNamespace("textures/entity/leafcutter_ant_leaf_0.png");
     private static final ResourceLocation TEXTURE_1 = ResourceLocation
-            .parse("alexsmobs:textures/entity/leafcutter_ant_leaf_1.png");
+            .withDefaultNamespace("textures/entity/leafcutter_ant_leaf_1.png");
     private static final ResourceLocation TEXTURE_2 = ResourceLocation
-            .parse("alexsmobs:textures/entity/leafcutter_ant_leaf_2.png");
+            .withDefaultNamespace("textures/entity/leafcutter_ant_leaf_2.png");
 
     public LayerLeafcutterAntLeaf(RenderLeafcutterAnt render) {
         super(render);
