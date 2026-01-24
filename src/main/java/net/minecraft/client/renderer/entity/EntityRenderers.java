@@ -181,6 +181,7 @@ public class EntityRenderers {
 		register(EntityType.ITEM_FRAME, ItemFrameRenderer::new);
 		register(EntityType.JUNGLE_BOAT, context -> new BoatRenderer(context, ModelLayers.JUNGLE_BOAT));
 		register(EntityType.JUNGLE_CHEST_BOAT, context -> new BoatRenderer(context, ModelLayers.JUNGLE_CHEST_BOAT));
+		register(EntityType.KANGAROO, com.github.alexthe666.alexsmobs.client.render.KangarooRenderer::new);
 		register(EntityType.LEASH_KNOT, LeashKnotRenderer::new);
 		register(EntityType.LIGHTNING_BOLT, LightningBoltRenderer::new);
 		register(EntityType.LINGERING_POTION, ThrownItemRenderer::new);
