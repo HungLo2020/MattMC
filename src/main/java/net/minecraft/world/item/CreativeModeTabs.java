@@ -1994,6 +1994,7 @@ public class CreativeModeTabs {
 					output.accept(Items.LLAMA_SPAWN_EGG);
 					output.accept(Items.LOBSTER_SPAWN_EGG);
 					output.accept(Items.MAGMA_CUBE_SPAWN_EGG);
+					output.accept(Items.MANTIS_SHRIMP_SPAWN_EGG);
 					output.accept(Items.MIMIC_OCTOPUS_SPAWN_EGG);
 					output.accept(Items.MOOSHROOM_SPAWN_EGG);
 					output.accept(Items.MUDSKIPPER_SPAWN_EGG);

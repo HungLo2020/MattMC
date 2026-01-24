@@ -192,6 +192,7 @@ public class EntityRenderers {
 		register(EntityType.MAGMA_CUBE, MagmaCubeRenderer::new);
 		register(EntityType.MANGROVE_BOAT, context -> new BoatRenderer(context, ModelLayers.MANGROVE_BOAT));
 		register(EntityType.MANGROVE_CHEST_BOAT, context -> new BoatRenderer(context, ModelLayers.MANGROVE_CHEST_BOAT));
+		register(EntityType.MANTIS_SHRIMP, com.github.alexthe666.alexsmobs.client.render.RenderMantisShrimp::new);
 		register(EntityType.MARKER, NoopRenderer::new);
 		register(EntityType.MIMIC_OCTOPUS, RenderMimicOctopus::new);
 		register(EntityType.MINECART, context -> new MinecartRenderer(context, ModelLayers.MINECART));

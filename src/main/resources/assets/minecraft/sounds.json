@@ -25563,5 +25563,20 @@
       "leafcutter_ant_queen_hurt_1"
     ],
     "subtitle": "subtitles.entity.leafcutter_ant_queen.idle"
+  },
+  "entity.mantis_shrimp.hurt": {
+    "sounds": [
+      "mantis_shrimp_hurt_0",
+      "mantis_shrimp_hurt_1"
+    ],
+    "subtitle": "subtitles.entity.mantis_shrimp.hurt"
+  },
+  "entity.mantis_shrimp.snap": {
+    "sounds": [
+      "mantis_shrimp_snap_0",
+      "mantis_shrimp_snap_1",
+      "mantis_shrimp_snap_2"
+    ],
+    "subtitle": "subtitles.entity.mantis_shrimp.snap"
   }
 }

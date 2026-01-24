@@ -176,6 +176,7 @@ public class DefaultAttributes {
 		.put(EntityType.LOBSTER, net.minecraft.world.entity.animal.EntityLobster.bakeAttributes().build())
 		.put(EntityType.MAGMA_CUBE, MagmaCube.createAttributes().build())
 		.put(EntityType.MANNEQUIN, LivingEntity.createLivingAttributes().build())
+		.put(EntityType.MANTIS_SHRIMP, com.github.alexthe666.alexsmobs.entity.EntityMantisShrimp.bakeAttributes().build())
 		.put(EntityType.MIMIC_OCTOPUS, EntityMimicOctopus.createAttributes().build())
 		.put(EntityType.MOOSHROOM, Cow.createAttributes().build())
 		.put(EntityType.MUDSKIPPER, com.github.alexthe666.alexsmobs.entity.EntityMudskipper.createAttributes().build())

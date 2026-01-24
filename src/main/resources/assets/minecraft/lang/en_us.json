@@ -8064,5 +8064,10 @@
   "subtitles.entity.leafcutter_ant.hurt": "Leafcutter Ant hurts",
   "subtitles.entity.leafcutter_ant.idle": "Leafcutter Ant chittering",
   "subtitles.entity.leafcutter_ant_queen.hurt": "Leafcutter Ant Queen hurts",
-  "subtitles.entity.leafcutter_ant_queen.idle": "Leafcutter Ant Queen chittering"
+  "subtitles.entity.leafcutter_ant_queen.idle": "Leafcutter Ant Queen chittering",
+  "entity.minecraft.mantis_shrimp": "Mantis Shrimp",
+  "item.minecraft.mantis_shrimp_spawn_egg": "Mantis Shrimp Spawn Egg",
+  "subtitles.entity.mantis_shrimp.hurt": "Mantis Shrimp hurts",
+  "subtitles.entity.mantis_shrimp.snap": "Mantis Shrimp snaps",
+  "entity.alexsmobs.mantis_shrimp.command_3": "%s will now break blocks"
 }
