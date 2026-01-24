@@ -1,8 +1,8 @@
 package com.github.alexthe666.alexsmobs.client.render.layer;
 
-import com.github.alexthe666.alexsmobs.client.model.ModelKangaroo;
+import com.github.alexthe666.alexsmobs.client.model.KangarooModel;
 import com.github.alexthe666.alexsmobs.client.render.AMColorUtil;
-import com.github.alexthe666.alexsmobs.client.render.RenderKangaroo;
+import com.github.alexthe666.alexsmobs.client.render.KangarooRenderer;
 import com.github.alexthe666.alexsmobs.entity.EntityKangaroo;
 import com.github.alexthe666.alexsmobs.item.AMItemRegistry;
 import com.google.common.collect.Maps;
@@ -32,13 +32,13 @@ import org.joml.Quaternionf;
 
 import java.util.Map;
 
-public class LayerKangarooArmor extends RenderLayer<EntityKangaroo, ModelKangaroo> {
+public class LayerKangarooArmor extends RenderLayer<EntityKangaroo, KangarooModel> {
 
     private static final Map<String, ResourceLocation> ARMOR_TEXTURE_RES_MAP = Maps.newHashMap();
     private final HumanoidModel defaultBipedModel;
-    private final RenderKangaroo renderer;
+    private final KangarooRenderer renderer;
 
-    public LayerKangarooArmor(RenderKangaroo render, EntityRendererProvider.Context context) {
+    public LayerKangarooArmor(KangarooRenderer render, EntityRendererProvider.Context context) {
         super(render);
         defaultBipedModel = new HumanoidModel(context.bakeLayer(ModelLayers.ARMOR_STAND_OUTER_ARMOR));
         this.renderer = render;

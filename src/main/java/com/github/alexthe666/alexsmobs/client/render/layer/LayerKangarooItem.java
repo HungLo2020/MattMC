@@ -1,7 +1,7 @@
 package com.github.alexthe666.alexsmobs.client.render.layer;
 
-import com.github.alexthe666.alexsmobs.client.model.ModelKangaroo;
-import com.github.alexthe666.alexsmobs.client.render.RenderKangaroo;
+import com.github.alexthe666.alexsmobs.client.model.KangarooModel;
+import com.github.alexthe666.alexsmobs.client.render.KangarooRenderer;
 import com.github.alexthe666.alexsmobs.entity.EntityKangaroo;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.math.Axis;
@@ -13,9 +13,9 @@ import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.item.ItemDisplayContext;
 import net.minecraft.world.item.ItemStack;
 
-public class LayerKangarooItem extends RenderLayer<EntityKangaroo, ModelKangaroo> {
+public class LayerKangarooItem extends RenderLayer<EntityKangaroo, KangarooModel> {
 
-    public LayerKangarooItem(RenderKangaroo render) {
+    public LayerKangarooItem(KangarooRenderer render) {
         super(render);
     }
 

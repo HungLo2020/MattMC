@@ -1,8 +1,8 @@
 package com.github.alexthe666.alexsmobs.client.render.layer;
 
 import com.github.alexthe666.alexsmobs.ClientProxy;
-import com.github.alexthe666.alexsmobs.client.model.ModelKangaroo;
-import com.github.alexthe666.alexsmobs.client.render.RenderKangaroo;
+import com.github.alexthe666.alexsmobs.client.model.KangarooModel;
+import com.github.alexthe666.alexsmobs.client.render.KangarooRenderer;
 import com.github.alexthe666.alexsmobs.entity.EntityKangaroo;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.math.Axis;
@@ -18,9 +18,9 @@ import net.minecraft.client.renderer.entity.LivingEntityRenderer;
 import net.minecraft.client.renderer.entity.layers.RenderLayer;
 import net.minecraft.world.entity.Entity;
 
-public class LayerKangarooBaby extends RenderLayer<EntityKangaroo, ModelKangaroo> {
+public class LayerKangarooBaby extends RenderLayer<EntityKangaroo, KangarooModel> {
 
-    public LayerKangarooBaby(RenderKangaroo render) {
+    public LayerKangarooBaby(KangarooRenderer render) {
         super(render);
     }
 
@@ -38,11 +38,11 @@ public class LayerKangarooBaby extends RenderLayer<EntityKangaroo, ModelKangaroo
                     matrixStackIn.pushPose();
                     translateToPouch(matrixStackIn);
                     matrixStackIn.translate(0, 1.12F, -0.3F);
-                    ModelKangaroo.renderOnlyHead = true;
+                    KangarooModel.renderOnlyHead = true;
                     matrixStackIn.mulPose(Axis.ZP.rotationDegrees(180F));
                     matrixStackIn.mulPose(Axis.YP.rotationDegrees(riderRot + 180F));
                     renderEntity(passenger, 0, 0, 0, 0, partialTicks, matrixStackIn, bufferIn, packedLightIn);
-                    ModelKangaroo.renderOnlyHead = false;
+                    KangarooModel.renderOnlyHead = false;
                     matrixStackIn.popPose();
                     ClientProxy.currentUnrenderedEntities.add(passenger.getUUID());
                 }

@@ -1,5 +1,6 @@
 package com.github.alexthe666.alexsmobs.client.model;
 
+import com.github.alexthe666.alexsmobs.client.render.KangarooRenderState;
 import com.github.alexthe666.alexsmobs.entity.EntityKangaroo;
 import com.github.alexthe666.alexsmobs.entity.util.Maths;
 import com.github.alexthe666.citadel.animation.IAnimatedEntity;
@@ -12,10 +13,8 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.minecraft.client.Minecraft;
 import net.minecraft.util.Mth;
-import net.minecraft.world.entity.EquipmentSlot;
-import net.minecraft.world.item.ItemStack;
 
-public class ModelKangaroo extends AdvancedEntityModel<EntityKangaroo> {
+public class KangarooModel extends AdvancedEntityModel<KangarooRenderState> {
 	public final AdvancedModelBox root;
 	public final AdvancedModelBox body;
 	public final AdvancedModelBox pouch;
@@ -38,7 +37,7 @@ public class ModelKangaroo extends AdvancedEntityModel<EntityKangaroo> {
 	public static boolean renderOnlyHead = false;
 	private ModelAnimator animator;
 
-	public ModelKangaroo() {
+	public KangarooModel() {
 		texWidth = 128;
 		texHeight = 128;
 
@@ -142,9 +141,31 @@ public class ModelKangaroo extends AdvancedEntityModel<EntityKangaroo> {
 		animator = ModelAnimator.create();
 	}
 
-	public void animate(IAnimatedEntity entity, float f, float f1, float f2, float f3, float f4) {
+	public void animate(KangarooRenderState renderState, float f, float f1, float f2, float f3, float f4) {
 		this.resetToDefaultPose();
-		animator.update(entity);
+		if (renderState.animation != null && renderState.animationTick >= 0) {
+			// Create a simple IAnimatedEntity wrapper for the animator
+			IAnimatedEntity animatedEntity = new IAnimatedEntity() {
+				@Override
+				public int getAnimationTick() {
+					return renderState.animationTick;
+				}
+				
+				@Override
+				public void setAnimationTick(int tick) {
+				}
+				
+				@Override
+				public com.github.alexthe666.citadel.animation.Animation getAnimation() {
+					return renderState.animation;
+				}
+				
+				@Override
+				public void setAnimation(com.github.alexthe666.citadel.animation.Animation animation) {
+				}
+			};
+			animator.update(animatedEntity);
+		}
 		animator.setAnimation(EntityKangaroo.ANIMATION_EAT_GRASS);
 		animator.startKeyframe(5);
 		animator.move(neck, 0, 3, -2);
@@ -237,19 +258,18 @@ public class ModelKangaroo extends AdvancedEntityModel<EntityKangaroo> {
 
 
 	@Override
-	public void setupAnim(EntityKangaroo entity, float limbSwing, float limbSwingAmount, float ageInTicks, float netHeadYaw, float headPitch){
-		animate(entity, limbSwing, limbSwingAmount, ageInTicks, netHeadYaw, headPitch);
-		float partialTick = Minecraft.getInstance().getTimer().getGameTimeDeltaPartialTick(false);
-		float jumpRotation = Mth.sin(entity.getJumpCompletion(partialTick) * 3.1415927F);
+	public void setupAnim(KangarooRenderState renderState, float limbSwing, float limbSwingAmount, float ageInTicks, float netHeadYaw, float headPitch){
+		animate(renderState, limbSwing, limbSwingAmount, ageInTicks, netHeadYaw, headPitch);
+		float jumpRotation = Mth.sin(renderState.jumpCompletion * 3.1415927F);
 		float walkSpeed = 1F;
 		float walkDegree = 0.5F;
 		float idleSpeed = 0.05F;
 		float idleDegree = 0.1F;
-		float sitProgress = entity.prevSitProgress + (entity.sitProgress - entity.prevSitProgress) * partialTick;
-		float pouchOpenProgress = entity.prevPouchProgress + (entity.pouchProgress - entity.prevPouchProgress) * partialTick;
-		float moveProgress = entity.prevTotalMovingProgress + (entity.totalMovingProgress - entity.prevTotalMovingProgress) * partialTick;
-		float stillProgress = Math.max(0, (entity.prevStandProgress + (entity.standProgress - entity.prevStandProgress) * partialTick) - moveProgress);
-		if(entity.getVisualFlag() == 1){
+		float sitProgress = renderState.sitProgress;
+		float pouchOpenProgress = renderState.pouchProgress;
+		float moveProgress = renderState.totalMovingProgress;
+		float stillProgress = Math.max(0, renderState.standProgress - moveProgress);
+		if(renderState.visualFlag == 1){
 			progressRotationPrev(arm_left, 1, Maths.rad(-65), 0, Maths.rad(-45), 1F);
 			progressRotationPrev(arm_right, 1, Maths.rad(-65), 0, Maths.rad(45), 1F);
 		}
@@ -308,14 +328,12 @@ public class ModelKangaroo extends AdvancedEntityModel<EntityKangaroo> {
 
 		this.foot_left.rotateAngleX += (Math.max(0, jumpRotation - 0.5F) * 25.0F) * 0.017453292F;
 		this.foot_right.rotateAngleX += (Math.max(0, jumpRotation - 0.5F) * 25.0F) * 0.017453292F;
-		ItemStack helmet = entity.getItemBySlot(EquipmentSlot.HEAD);
-		ItemStack hand = entity.getItemBySlot(EquipmentSlot.MAINHAND);
-		if(!helmet.isEmpty()){
+		if(renderState.helmetIndex != 0){
 			this.ear_left.rotateAngleZ += 75 * 0.017453292F;
 			this.ear_right.rotateAngleZ += -75 * 0.017453292F;
 		}
-		if(!hand.isEmpty()){
-			if(entity.isLeftHanded()){
+		if(renderState.swordIndex != 0){
+			if(renderState.isLeftHanded){
 				this.arm_left.rotateAngleX -= 25 * 0.017453292F;
 			}else{
 				this.arm_right.rotateAngleX -= 25 * 0.017453292F;
@@ -324,7 +342,7 @@ public class ModelKangaroo extends AdvancedEntityModel<EntityKangaroo> {
 		this.head.rotateAngleY += netHeadYaw * 0.35F * Mth.DEG_TO_RAD;
 		this.head.rotateAngleX += headPitch * 0.65F * Mth.DEG_TO_RAD;
 		this.neck.rotateAngleY += netHeadYaw * 0.15F * Mth.DEG_TO_RAD;
-		if(entity.isBaby() && entity.isPassenger() && entity.getVehicle() instanceof EntityKangaroo) {
+		if(renderState.isBaby && renderState.isPassenger && renderState.vehicleIsKangaroo) {
 			this.head.rotateAngleX -= 50 * 0.017453292F;
 			this.neck.rotateAngleX += 120 * 0.017453292F;
 			progressPositionPrev(head, 1F, 0, 0F, -2F, 1F);
