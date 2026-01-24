@@ -107,7 +107,13 @@ public class EntityTarantulaHawk extends TamableAnimal implements IFollower {
     }
 
     public static AttributeSupplier.Builder bakeAttributes() {
-        return Monster.createMonsterAttributes().add(Attributes.MAX_HEALTH, 18.0D).add(Attributes.ARMOR, 4.0D).add(Attributes.FOLLOW_RANGE, 32.0D).add(Attributes.MOVEMENT_SPEED, 0.3F).add(Attributes.ATTACK_DAMAGE, 5);
+        return Monster.createMonsterAttributes()
+            .add(Attributes.MAX_HEALTH, 18.0D)
+            .add(Attributes.ARMOR, 4.0D)
+            .add(Attributes.FOLLOW_RANGE, 32.0D)
+            .add(Attributes.MOVEMENT_SPEED, 0.3F)
+            .add(Attributes.ATTACK_DAMAGE, 5)
+            .add(Attributes.TEMPT_RANGE, 10.0D);
     }
 
     public boolean checkSpawnRules(LevelAccessor worldIn, EntitySpawnReason spawnReasonIn) {
