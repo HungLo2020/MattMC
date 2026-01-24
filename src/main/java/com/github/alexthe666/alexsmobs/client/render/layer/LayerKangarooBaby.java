@@ -1,9 +1,9 @@
 package com.github.alexthe666.alexsmobs.client.render.layer;
 
 import com.github.alexthe666.alexsmobs.ClientProxy;
-import com.github.alexthe666.alexsmobs.client.model.ModelCachalotWhale;
-import com.github.alexthe666.alexsmobs.client.render.RenderCachalotWhale;
-import com.github.alexthe666.alexsmobs.entity.EntityCachalotWhale;
+import com.github.alexthe666.alexsmobs.client.model.ModelKangaroo;
+import com.github.alexthe666.alexsmobs.client.render.RenderKangaroo;
+import com.github.alexthe666.alexsmobs.entity.EntityKangaroo;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.math.Axis;
 import net.minecraft.CrashReport;
@@ -18,34 +18,35 @@ import net.minecraft.client.renderer.entity.LivingEntityRenderer;
 import net.minecraft.client.renderer.entity.layers.RenderLayer;
 import net.minecraft.world.entity.Entity;
 
-public class LayerCachalotWhaleCapturedSquid  extends RenderLayer<EntityCachalotWhale, ModelCachalotWhale> {
+public class LayerKangarooBaby extends RenderLayer<EntityKangaroo, ModelKangaroo> {
 
-    public LayerCachalotWhaleCapturedSquid(RenderCachalotWhale render) {
+    public LayerKangarooBaby(RenderKangaroo render) {
         super(render);
     }
 
-    public void render(PoseStack matrixStackIn, MultiBufferSource bufferIn, int packedLightIn, EntityCachalotWhale whale, float limbSwing, float limbSwingAmount, float partialTicks, float ageInTicks, float netHeadYaw, float headPitch) {
-        if(whale.hasCaughtSquid() && whale.isAlive()){
-            Entity squid = whale.getCaughtSquid();
-            if(squid != null && squid.isAlive()){
-                boolean rightSquid = !whale.isHoldingSquidLeft();
-                float riderRot = squid.yRotO + (squid.getYRot() - squid.yRotO) * partialTicks;
-                EntityRenderer render = Minecraft.getInstance().getEntityRenderDispatcher().getRenderer(squid);
+    public void render(PoseStack matrixStackIn, MultiBufferSource bufferIn, int packedLightIn, EntityKangaroo roo, float limbSwing, float limbSwingAmount, float partialTicks, float ageInTicks, float netHeadYaw, float headPitch) {
+        if(roo.isVehicle() && !roo.isBaby()){
+            for(Entity passenger : roo.getPassengers()){
+                float riderRot = passenger.yRotO + (passenger.getYRot() - passenger.yRotO) * partialTicks;
+                EntityRenderer render = Minecraft.getInstance().getEntityRenderDispatcher().getRenderer(passenger);
                 EntityModel modelBase = null;
                 if (render instanceof LivingEntityRenderer) {
                     modelBase = ((LivingEntityRenderer) render).getModel();
                 }
                 if(modelBase != null){
-                    ClientProxy.currentUnrenderedEntities.remove(squid.getUUID());
+                    ClientProxy.currentUnrenderedEntities.remove(passenger.getUUID());
                     matrixStackIn.pushPose();
                     translateToPouch(matrixStackIn);
-                    matrixStackIn.translate(rightSquid ? -1.2F : 1.2F, -0, -3.4F);
+                    matrixStackIn.translate(0, 1.12F, -0.3F);
+                    ModelKangaroo.renderOnlyHead = true;
                     matrixStackIn.mulPose(Axis.ZP.rotationDegrees(180F));
-                    matrixStackIn.mulPose(Axis.YP.rotationDegrees(riderRot + (rightSquid ? -90F : 90F)));
-                    renderEntity(squid, 0, 0, 0, 0, partialTicks, matrixStackIn, bufferIn, packedLightIn);
+                    matrixStackIn.mulPose(Axis.YP.rotationDegrees(riderRot + 180F));
+                    renderEntity(passenger, 0, 0, 0, 0, partialTicks, matrixStackIn, bufferIn, packedLightIn);
+                    ModelKangaroo.renderOnlyHead = false;
                     matrixStackIn.popPose();
-                    ClientProxy.currentUnrenderedEntities.add(squid.getUUID());
+                    ClientProxy.currentUnrenderedEntities.add(passenger.getUUID());
                 }
+
             }
         }
 
@@ -79,8 +80,5 @@ public class LayerCachalotWhaleCapturedSquid  extends RenderLayer<EntityCachalot
     protected void translateToPouch(PoseStack matrixStack) {
         this.getParentModel().root.translateAndRotate(matrixStack);
         this.getParentModel().body.translateAndRotate(matrixStack);
-        this.getParentModel().head.translateAndRotate(matrixStack);
-        this.getParentModel().jaw.translateAndRotate(matrixStack);
     }
 }
-

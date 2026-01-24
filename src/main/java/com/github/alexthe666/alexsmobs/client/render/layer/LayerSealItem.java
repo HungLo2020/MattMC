@@ -1,26 +1,25 @@
 package com.github.alexthe666.alexsmobs.client.render.layer;
 
-import com.github.alexthe666.alexsmobs.client.model.ModelCrow;
-import com.github.alexthe666.alexsmobs.client.render.RenderCrow;
-import com.github.alexthe666.alexsmobs.entity.EntityCrow;
+import com.github.alexthe666.alexsmobs.client.model.ModelSeal;
+import com.github.alexthe666.alexsmobs.client.render.RenderSeal;
+import com.github.alexthe666.alexsmobs.entity.EntitySeal;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.math.Axis;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.ItemInHandRenderer;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.entity.layers.RenderLayer;
-import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.item.ItemDisplayContext;
 import net.minecraft.world.item.ItemStack;
 
-public class LayerCrowItem extends RenderLayer<EntityCrow, ModelCrow> {
+public class LayerSealItem extends RenderLayer<EntitySeal, ModelSeal> {
 
-    public LayerCrowItem(RenderCrow render) {
+    public LayerSealItem(RenderSeal render) {
         super(render);
     }
 
-    public void render(PoseStack matrixStackIn, MultiBufferSource bufferIn, int packedLightIn, EntityCrow entitylivingbaseIn, float limbSwing, float limbSwingAmount, float partialTicks, float ageInTicks, float netHeadYaw, float headPitch) {
-        ItemStack itemstack = entitylivingbaseIn.getItemBySlot(EquipmentSlot.MAINHAND);
+    public void render(PoseStack matrixStackIn, MultiBufferSource bufferIn, int packedLightIn, EntitySeal entitylivingbaseIn, float limbSwing, float limbSwingAmount, float partialTicks, float ageInTicks, float netHeadYaw, float headPitch) {
+        ItemStack itemstack = entitylivingbaseIn.getMainHandItem();
         matrixStackIn.pushPose();
         if(entitylivingbaseIn.isBaby()){
             matrixStackIn.scale(0.5F, 0.5F, 0.5F);
@@ -28,10 +27,12 @@ public class LayerCrowItem extends RenderLayer<EntityCrow, ModelCrow> {
         }
         matrixStackIn.pushPose();
         translateToHand(matrixStackIn);
-        matrixStackIn.translate(0, -0.09F, -0.125F);
-        matrixStackIn.mulPose(Axis.YP.rotationDegrees(-2.5F));
+        if(entitylivingbaseIn.isBaby()){
+            matrixStackIn.translate(0.0D, 0.1F, -0.6D);
+        }
+        matrixStackIn.translate(-0.1F, 0.15F, -0.6F);
+        matrixStackIn.mulPose(Axis.YP.rotationDegrees(-45F));
         matrixStackIn.mulPose(Axis.XP.rotationDegrees(-90F));
-        matrixStackIn.scale(0.75F, 0.75F, 0.75F);
         ItemInHandRenderer renderer = Minecraft.getInstance().getEntityRenderDispatcher().getItemInHandRenderer();
         renderer.renderItem(entitylivingbaseIn, itemstack, ItemDisplayContext.GROUND, false, matrixStackIn, bufferIn, packedLightIn);
         matrixStackIn.popPose();
