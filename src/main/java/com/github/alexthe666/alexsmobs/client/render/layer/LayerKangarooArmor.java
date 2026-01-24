@@ -88,6 +88,8 @@ public class LayerKangarooArmor extends RenderLayer<EntityKangaroo, KangarooMode
             {
                 matrixStackIn.pushPose();
                 ItemStack itemstack = roo.getItemBySlot(EquipmentSlot.HEAD);
+                // Armor rendering disabled - 1.21 equipment API needs refactor
+                /*
                 if (itemstack.getItem() instanceof ArmorItem) {
                     ArmorItem armoritem = (ArmorItem) itemstack.getItem();
                     if (itemstack.canEquip(EquipmentSlot.HEAD, roo)) {
@@ -119,7 +121,9 @@ public class LayerKangarooArmor extends RenderLayer<EntityKangaroo, KangarooMode
                                     getArmorResource(roo, itemstack, EquipmentSlot.HEAD, null), notAVanillaModel);
                         }
                     }
-                } else {
+                } else
+                */
+                {
                     translateToHead(matrixStackIn);
                     matrixStackIn.translate(0, -0.2, -0.1F);
                     matrixStackIn.mulPose((new Quaternionf()).rotateX(Mth.PI));
@@ -133,6 +137,8 @@ public class LayerKangarooArmor extends RenderLayer<EntityKangaroo, KangarooMode
             {
                 matrixStackIn.pushPose();
                 ItemStack itemstack = roo.getItemBySlot(EquipmentSlot.CHEST);
+                // Armor rendering disabled - 1.21 equipment API needs refactor
+                /*
                 if (itemstack.getItem() instanceof ArmorItem) {
                     ArmorItem armoritem = (ArmorItem) itemstack.getItem();
                     if (armoritem.getEquipmentSlot() == EquipmentSlot.CHEST) {
@@ -162,6 +168,7 @@ public class LayerKangarooArmor extends RenderLayer<EntityKangaroo, KangarooMode
 
                     }
                 }
+                */
                 matrixStackIn.popPose();
             }
         }
