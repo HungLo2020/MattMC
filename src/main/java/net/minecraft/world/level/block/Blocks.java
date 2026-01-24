@@ -5332,12 +5332,12 @@ public class Blocks {
 	);
 	public static final Block LEAFCUTTER_ANTHILL = register(
 		"leafcutter_anthill",
-		p -> new com.github.alexthe666.alexsmobs.block.BlockLeafcutterAnthill(),
+		com.github.alexthe666.alexsmobs.block.BlockLeafcutterAnthill::new,
 		BlockBehaviour.Properties.of().mapColor(MapColor.DIRT).strength(0.5F).sound(SoundType.GRAVEL)
 	);
 	public static final Block LEAFCUTTER_ANT_CHAMBER = register(
 		"leafcutter_ant_chamber",
-		p -> new com.github.alexthe666.alexsmobs.block.BlockLeafcutterAntChamber(p),
+		com.github.alexthe666.alexsmobs.block.BlockLeafcutterAntChamber::new,
 		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_GREEN).strength(0.3F).sound(SoundType.SLIME_BLOCK)
 	);
 	public static final Block SMITHING_TABLE = register(

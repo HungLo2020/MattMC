@@ -17,15 +17,15 @@ import net.minecraft.world.phys.BlockHitResult;
 import javax.annotation.Nullable;
 
 public class BlockLeafcutterAnthill extends BaseEntityBlock {
-    public static final MapCodec<BlockLeafcutterAnthill> CODEC = simpleCodec(p -> new BlockLeafcutterAnthill());
+    public static final MapCodec<BlockLeafcutterAnthill> CODEC = simpleCodec(BlockLeafcutterAnthill::new);
 
     @Override
     protected MapCodec<? extends BaseEntityBlock> codec() {
         return CODEC;
     }
 
-    public BlockLeafcutterAnthill() {
-        super(BlockBehaviour.Properties.of().sound(SoundType.GRAVEL).strength(0.75F));
+    public BlockLeafcutterAnthill(BlockBehaviour.Properties properties) {
+        super(properties);
     }
 
     @Override

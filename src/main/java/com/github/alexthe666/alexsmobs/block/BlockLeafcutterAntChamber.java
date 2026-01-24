@@ -19,12 +19,8 @@ public class BlockLeafcutterAntChamber extends Block {
         return CODEC;
     }
 
-    public BlockLeafcutterAntChamber() {
-        super(BlockBehaviour.Properties.of().sound(SoundType.SLIME_BLOCK).strength(0.3F));
-    }
-
-    public BlockLeafcutterAntChamber(BlockBehaviour.Properties props) {
-        super(props);
+    public BlockLeafcutterAntChamber(BlockBehaviour.Properties properties) {
+        super(properties);
     }
 
     @Override
