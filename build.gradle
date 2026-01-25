@@ -376,6 +376,10 @@ application {
     mainClass = 'net.fabricmc.loader.impl.launch.knot.KnotClient'
 }
 
+// Detect macOS platform for JVM argument adjustments
+// Check for both "Mac OS X" and "macOS" (case-insensitive)
+def isMacOS = System.getProperty('os.name').toLowerCase().with { it.startsWith('mac') || it.contains('darwin') }
+
 // ============================================================================
 // GRAALVM NATIVE IMAGE CONFIGURATION
 // ============================================================================
@@ -432,14 +436,12 @@ graalvmNative {
                 '--enable-url-protocols=http,https,jar',
                 
                 // Enable HTTPS
-                '--enable-https',
-                
-                // Platform-specific options
-                isMacOS ? '-H:+UseCGSymbolDirectives' : ''
+                '--enable-https'
             )
             
             // Platform-specific build arguments
             if (isMacOS) {
+                buildArgs.add('-H:+UseCGSymbolDirectives')
                 buildArgs.add('-march=compatibility')
             }
             
@@ -490,10 +492,6 @@ graalvmNative {
     }
 }
 
-
-// Detect macOS platform for JVM argument adjustments
-// Check for both "Mac OS X" and "macOS" (case-insensitive)
-def isMacOS = System.getProperty('os.name').toLowerCase().with { it.startsWith('mac') || it.contains('darwin') }
 
 // Common JVM arguments for server tasks
 // Use G1GC on macOS due to ZGC stability issues (SIGBUS crashes in Arena::destruct_contents)
@@ -1038,33 +1036,8 @@ tasks.register('clientDistZip', Zip) {
 // GRAALVM NATIVE IMAGE TASKS
 // ============================================================================
 // Tasks for building native executables using GraalVM Native Image
+// Note: The GraalVM plugin automatically creates 'nativeCompile' task
 // ============================================================================
-
-// Task to build native client executable
-tasks.register('nativeClientCompile') {
-    group = 'native'
-    description = 'Builds native client executable using GraalVM Native Image'
-    
-    dependsOn 'nativeCompile'
-    
-    doLast {
-        println "✅ Native client executable built successfully!"
-        println "   Location: ${buildDir}/native/nativeCompile/"
-    }
-}
-
-// Task to build native server executable
-tasks.register('nativeServerCompile') {
-    group = 'native'
-    description = 'Builds native server executable using GraalVM Native Image'
-    
-    dependsOn 'nativeCompile'
-    
-    doLast {
-        println "✅ Native server executable built successfully!"
-        println "   Location: ${buildDir}/native/nativeCompile/"
-    }
-}
 
 // Task to create a native client distribution
 tasks.register('nativeClientDist') {
