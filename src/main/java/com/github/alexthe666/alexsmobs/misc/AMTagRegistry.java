@@ -163,6 +163,9 @@ public class AMTagRegistry {
     public static final TagKey<Item> TARANTULA_HAWK_FOODSTUFFS = registerItemTag("tarantula_hawk_foodstuffs");
     public static final TagKey<Block> TARANTULA_HAWK_SPAWNS = registerBlockTag("tarantula_hawk_spawns");
     public static final TagKey<Biome> SPAWNS_NETHER_TARANTULA_HAWKS = registerBiomeTag("spawns_nether_tarantula_hawks");
+    
+    // Underminer-specific tags
+    public static final TagKey<Item> UNDERMINER_ORES = registerItemTag("underminer_ores");
 
     // Tag helper method for entity checks
     public static class TagHelper {

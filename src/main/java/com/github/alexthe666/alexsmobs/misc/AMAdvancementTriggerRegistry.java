@@ -17,6 +17,7 @@ public class AMAdvancementTriggerRegistry {
     
     // Stub triggers
     public static final DeferredTriggerHolder ELEPHANT_SWAG = new DeferredTriggerHolder();
+    public static final DeferredTriggerHolder UNDERMINE_UNDERMINER = new DeferredTriggerHolder();
     
     // Legacy method for compatibility
     public static void triggerSeagullSteal(Object player) {

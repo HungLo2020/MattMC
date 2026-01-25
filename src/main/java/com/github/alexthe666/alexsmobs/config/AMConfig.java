@@ -68,4 +68,9 @@ public class AMConfig {
     // Tarantula Hawk spawn configuration
     public static int tarantulaHawkSpawnRolls = 2;
     public static boolean fireproofTarantulaHawk = false;
+    
+    // Underminer spawn configuration
+    public static int underminerSpawnWeight = 50;
+    public static int underminerSpawnRolls = 1;
+    public static double underminerDisappearDistance = 8.0;
 }

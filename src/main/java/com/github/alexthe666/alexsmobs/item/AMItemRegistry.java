@@ -52,4 +52,7 @@ public class AMItemRegistry {
     
     // Giant Squid items - reference vanilla Items
     public static final DeferredHolder LOST_TENTACLE = new DeferredHolder(() -> net.minecraft.world.item.Items.LOST_TENTACLE);
+    
+    // Underminer items - stub, points to diamond pickaxe for now
+    public static final DeferredHolder GHOSTLY_PICKAXE = new DeferredHolder(() -> net.minecraft.world.item.Items.DIAMOND_PICKAXE);
 }
