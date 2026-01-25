@@ -21456,6 +21456,22 @@
     ],
     "subtitle": "subtitles.entity.warden.tendril_clicks"
   },
+  "entity.warped_toad.hurt": {
+    "sounds": [
+      "warped_toad_hurt_0",
+      "warped_toad_hurt_1",
+      "warped_toad_hurt_2"
+    ],
+    "subtitle": "subtitles.entity.warped_toad.hurt"
+  },
+  "entity.warped_toad.idle": {
+    "sounds": [
+      "warped_toad_idle_0",
+      "warped_toad_idle_1",
+      "warped_toad_idle_2"
+    ],
+    "subtitle": "subtitles.entity.warped_toad.ambient"
+  },
   "entity.wind_charge.throw": {
     "sounds": [
       "random/bow"

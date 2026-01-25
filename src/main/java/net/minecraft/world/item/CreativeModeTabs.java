@@ -2065,6 +2065,7 @@ public class CreativeModeTabs {
 					output.accept(Items.VINDICATOR_SPAWN_EGG);
 					output.accept(Items.WANDERING_TRADER_SPAWN_EGG);
 					output.accept(Items.WARDEN_SPAWN_EGG);
+					output.accept(Items.WARPED_TOAD_SPAWN_EGG);
 					output.accept(Items.WITCH_SPAWN_EGG);
 					output.accept(Items.WITHER_SKELETON_SPAWN_EGG);
 					output.accept(Items.WOLF_SPAWN_EGG);
