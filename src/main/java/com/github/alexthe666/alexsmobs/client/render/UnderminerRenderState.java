@@ -11,6 +11,7 @@ public class UnderminerRenderState extends HumanoidRenderState {
     public float hidingProgress;
     public float prevHidingProgress;
     public boolean isFullyHidden;
+    public float alpha = 1.0F;
     @Nullable
     public BlockPos miningPos;
     public float miningProgress;

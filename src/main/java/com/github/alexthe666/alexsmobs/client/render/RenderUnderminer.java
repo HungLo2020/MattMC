@@ -4,8 +4,6 @@ import com.github.alexthe666.alexsmobs.client.model.ModelUnderminerDwarf;
 import com.github.alexthe666.alexsmobs.client.render.layer.LayerUnderminerItem;
 import com.github.alexthe666.alexsmobs.entity.EntityUnderminer;
 import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.blaze3d.vertex.SheetedDecalTextureGenerator;
-import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.culling.Frustum;
@@ -13,7 +11,6 @@ import net.minecraft.client.renderer.entity.EntityRendererProvider;
 import net.minecraft.client.renderer.entity.MobRenderer;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.util.Mth;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 
@@ -35,6 +32,7 @@ public class RenderUnderminer extends MobRenderer<EntityUnderminer, UnderminerRe
             .collect(Collectors.toList());
     private static final List<RenderType> DESTROY_TYPES = BREAKING_LOCATIONS.stream()
             .map(AMRenderTypes::getGhostCrumbling).collect(Collectors.toList());
+    
     public static boolean renderWithPickaxe = false;
 
     public RenderUnderminer(EntityRendererProvider.Context renderManagerIn) {
@@ -58,18 +56,25 @@ public class RenderUnderminer extends MobRenderer<EntityUnderminer, UnderminerRe
         state.miningPos = entity.getMiningPos();
         state.miningProgress = entity.getMiningProgress();
         
+        // Calculate alpha for transparency based on hiding
+        float hide = (state.prevHidingProgress + (state.hidingProgress - state.prevHidingProgress) * partialTick) * 0.1F;
+        state.alpha = (1F - hide) * 0.6F;
+        
         // Adjust shadow radius based on hiding progress
         if (!state.isFullyHidden) {
-            float hide = (state.prevHidingProgress + (state.hidingProgress - state.prevHidingProgress) * partialTick) * 0.1F;
-            float alpha = (1F - hide) * 0.6F;
-            this.shadowRadius = 0.9F * alpha;
+            this.shadowRadius = 0.9F * state.alpha;
         } else {
             this.shadowRadius = 0;
         }
     }
 
     protected void scale(UnderminerRenderState state, PoseStack matrixStackIn) {
-        matrixStackIn.scale(0.925F, 0.925F, 0.925F);
+        if (state.isDwarf) {
+            matrixStackIn.scale(0.925F, 0.925F, 0.925F);
+        } else {
+            // Tall variants are taller
+            matrixStackIn.scale(1.1F, 1.1F, 1.1F);
+        }
     }
 
     public boolean shouldRender(EntityUnderminer livingEntityIn, Frustum camera, double camX, double camY,
@@ -93,11 +98,19 @@ public class RenderUnderminer extends MobRenderer<EntityUnderminer, UnderminerRe
     @Nullable
     protected RenderType getRenderType(UnderminerRenderState state, boolean normal, boolean invis, boolean outline) {
         ResourceLocation resourcelocation = this.getTextureLocation(state);
-        return outline ? RenderType.outline(resourcelocation) : AMRenderTypes.getUnderminer(resourcelocation);
+        if (outline) {
+            return RenderType.outline(resourcelocation);
+        }
+        // Use the underminer render type which supports transparency
+        return AMRenderTypes.getUnderminer(resourcelocation);
     }
 
     public ResourceLocation getTextureLocation(UnderminerRenderState state) {
         return state.isDwarf ? TEXTURE_DWARF : state.variant == 0 ? TEXTURE_0 : TEXTURE_1;
     }
-
+    
+    public float getAlphaForRender(UnderminerRenderState state) {
+        // Return the calculated alpha based on hiding progress
+        return Math.max(0.0F, Math.min(1.0F, state.alpha));
+    }
 }
