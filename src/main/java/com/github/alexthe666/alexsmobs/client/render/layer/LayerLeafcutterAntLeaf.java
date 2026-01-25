@@ -52,7 +52,7 @@ public class LayerLeafcutterAntLeaf extends RenderLayer<LeafcutterAntRenderState
                 this.getParentModel(),
                 state,
                 matrixStackIn,
-                RenderType.entityCutoutNoCull(res),
+                RenderType.entityCutout(res),
                 packedLightIn,
                 LivingEntityRenderer.getOverlayCoords(state, 0.0F),
                 AMColorUtil.packColor(f, f1, f2, 1.0F),
