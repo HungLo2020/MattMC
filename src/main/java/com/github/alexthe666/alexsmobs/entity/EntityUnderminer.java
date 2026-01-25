@@ -480,7 +480,7 @@ public class EntityUnderminer extends PathfinderMob {
 
         @Override
         public boolean canUse() {
-            if (EntityUnderminer.this.mineCooldown == 0 && EntityUnderminer.this.hasPick() && !EntityUnderminer.this.isHiding() && !EntityUnderminer.this.isActuallyInAWall() && EntityUnderminer.this.getRandom().nextInt(30) == 0) {
+            if (canStartMining()) {
                 List<BlockPos> obscuredOres = EntityUnderminer.this.getNearbyObscuredOres(16, 8);
                 BlockPos nearest = null;
                 double nearestDist = Double.MAX_VALUE;
@@ -498,6 +498,14 @@ public class EntityUnderminer extends PathfinderMob {
                 return minePretendPos != null;
             }
             return false;
+        }
+        
+        private boolean canStartMining() {
+            return EntityUnderminer.this.mineCooldown == 0 
+                && EntityUnderminer.this.hasPick() 
+                && !EntityUnderminer.this.isHiding() 
+                && !EntityUnderminer.this.isActuallyInAWall() 
+                && EntityUnderminer.this.getRandom().nextInt(30) == 0;
         }
 
         @Override

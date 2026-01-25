@@ -28,7 +28,7 @@ public class MonsterAIWalkThroughHallsOfStructure extends RandomStrollGoal {
     public MonsterAIWalkThroughHallsOfStructure(PathfinderMob mob, double speed, int chance, TagKey<Structure> structureTagKey, double maximumDistance) {
         super(mob, speed, chance, false);
         this.structureTagKey = structureTagKey;
-        this.maximumDistance = 32;
+        this.maximumDistance = maximumDistance;
     }
 
     public boolean canUse() {
@@ -61,7 +61,7 @@ public class MonsterAIWalkThroughHallsOfStructure extends RandomStrollGoal {
                     }
                 }
                 if(!validPieceCenters.isEmpty()){
-                    BlockPos randomCenter = validPieceCenters.size() > 1 ? validPieceCenters.get(mob.getRandom().nextInt(validPieceCenters.size() - 1)) : validPieceCenters.get(0);
+                    BlockPos randomCenter = validPieceCenters.size() > 1 ? validPieceCenters.get(mob.getRandom().nextInt(validPieceCenters.size())) : validPieceCenters.get(0);
                     return Vec3.atCenterOf(randomCenter.offset(mob.getRandom().nextInt(2) - 1, 0, mob.getRandom().nextInt(2) - 1));
 
                 }
