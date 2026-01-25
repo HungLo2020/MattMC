@@ -51,10 +51,6 @@ import java.util.EnumSet;
 
 public class EntityEnderiophage extends Animal implements Enemy, FlyingAnimal {
 
-    private static final TargetingConditions.Selector ENDERGRADE_OR_INFECTED = (entity, level) -> {
-        return entity instanceof EntityEndergrade || entity.hasEffect(AMEffectRegistry.ENDER_FLU);
-    };
-    
     private static final EntityDataAccessor<Float> PHAGE_PITCH = SynchedEntityData.defineId(EntityEnderiophage.class, EntityDataSerializers.FLOAT);
     private static final EntityDataAccessor<Boolean> FLYING = SynchedEntityData.defineId(EntityEnderiophage.class, EntityDataSerializers.BOOLEAN);
     private static final EntityDataAccessor<Boolean> MISSING_EYE = SynchedEntityData.defineId(EntityEnderiophage.class, EntityDataSerializers.BOOLEAN);
@@ -151,7 +147,9 @@ public class EntityEnderiophage extends Animal implements Enemy, FlyingAnimal {
                 return EntityEnderiophage.this.isMissingEye() && super.canContinueToUse();
             }
         });
-        this.targetSelector.addGoal(1, new EntityAINearestTarget3D(this, LivingEntity.class, 15, true, true, ENDERGRADE_OR_INFECTED) {
+        this.targetSelector.addGoal(1, new EntityAINearestTarget3D(this, LivingEntity.class, 15, true, true, (entity, level) -> {
+            return entity instanceof EntityEndergrade || entity.hasEffect(AMEffectRegistry.ENDER_FLU);
+        }) {
             public boolean canUse() {
                 return !EntityEnderiophage.this.isMissingEye() && EntityEnderiophage.this.fleeAfterStealTime == 0 && super.canUse();
             }
