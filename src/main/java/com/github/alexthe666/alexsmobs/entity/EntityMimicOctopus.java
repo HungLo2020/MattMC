@@ -255,8 +255,8 @@ public class EntityMimicOctopus extends TamableAnimal implements ISemiAquatic, I
         this.goalSelector.addGoal(0, new AIAttack());
         this.goalSelector.addGoal(1, new SitWhenOrderedToGoal(this));
         this.goalSelector.addGoal(2, new TameableAIFollowOwnerWater(this, 1.3D, 4.0F, 2.0F, false));
-        this.goalSelector.addGoal(3, new AnimalAIFindWater(this));
-        this.goalSelector.addGoal(3, new AnimalAILeaveWater(this));
+        this.goalSelector.addGoal(3, new com.github.alexthe666.alexsmobs.entity.ai.AnimalAIFindWater(this));
+        this.goalSelector.addGoal(3, new com.github.alexthe666.alexsmobs.entity.ai.AnimalAILeaveWater(this));
         this.goalSelector.addGoal(4, new TemptGoal(this, 1.0D, Ingredient.of(this.level().registryAccess().lookupOrThrow(Registries.ITEM).getOrThrow(AMTagRegistry.MIMIC_OCTOPUS_BREEDABLES)), false) {
             @Override
             public void tick() {

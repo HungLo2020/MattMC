@@ -1936,6 +1936,7 @@ public class Items {
 	public static final Item TARANTULA_HAWK_SPAWN_EGG = registerItem("tarantula_hawk_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.TARANTULA_HAWK));
 	public static final Item TASMANIAN_DEVIL_SPAWN_EGG = registerItem("tasmanian_devil_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.TASMANIAN_DEVIL));
 	public static final Item UNDERMINER_SPAWN_EGG = registerItem("underminer_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.UNDERMINER));
+	public static final Item WARPED_TOAD_SPAWN_EGG = registerItem("warped_toad_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.WARPED_TOAD));
 	public static final Item TARANTULA_HAWK_WING = registerItem("tarantula_hawk_wing", Item::new, new Item.Properties());
 	public static final Item TARANTULA_HAWK_WING_FRAGMENT = registerItem("tarantula_hawk_wing_fragment", Item::new, new Item.Properties());
 	public static final Item TARANTULA_HAWK_ELYTRA = registerItem("tarantula_hawk_elytra", 

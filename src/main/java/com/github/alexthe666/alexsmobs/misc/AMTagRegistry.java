@@ -166,6 +166,12 @@ public class AMTagRegistry {
     
     // Underminer-specific tags
     public static final TagKey<Item> UNDERMINER_ORES = registerItemTag("underminer_ores");
+    
+    // Warped Toad-specific tags
+    public static final TagKey<Item> WARPED_TOAD_BREEDABLES = registerItemTag("warped_toad_breedables");
+    public static final TagKey<Item> WARPED_TOAD_TAMEABLES = registerItemTag("warped_toad_tameables");
+    public static final TagKey<Item> WARPED_TOAD_FOODSTUFFS = registerItemTag("warped_toad_foodstuffs");
+    public static final TagKey<EntityType<?>> WARPED_TOAD_TARGETS = registerEntityTag("warped_toad_targets");
 
     // Tag helper method for entity checks
     public static class TagHelper {

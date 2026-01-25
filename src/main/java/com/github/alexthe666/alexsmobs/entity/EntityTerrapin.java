@@ -109,8 +109,8 @@ public class EntityTerrapin extends Animal implements ISemiAquatic, Bucketable {
         this.goalSelector.addGoal(0, new BreathAirGoal(this));
         this.goalSelector.addGoal(1, new MateGoal(this, 1.0D));
         this.goalSelector.addGoal(2, new TemptGoal(this, 1.1D, itemStack -> itemStack.is(ItemTags.FISHES), false));
-        this.goalSelector.addGoal(3, new AnimalAIFindWater(this));
-        this.goalSelector.addGoal(3, new AnimalAILeaveWater(this));
+        this.goalSelector.addGoal(3, new com.github.alexthe666.alexsmobs.entity.ai.AnimalAIFindWater(this));
+        this.goalSelector.addGoal(3, new com.github.alexthe666.alexsmobs.entity.ai.AnimalAILeaveWater(this));
         this.goalSelector.addGoal(4, new SemiAquaticAIRandomSwimming(this, 1.0D, 30));
         this.goalSelector.addGoal(6, new PanicGoal(this, 1.1D));
         this.goalSelector.addGoal(7, new RandomStrollGoal(this, 1.0D, 60));

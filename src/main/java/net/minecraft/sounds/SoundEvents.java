@@ -1412,6 +1412,8 @@ public class SoundEvents {
 	public static final SoundEvent UNDERMINER_IDLE = register("entity.underminer.idle");
 	public static final SoundEvent UNDERMINER_HURT = register("entity.underminer.hurt");
 	public static final SoundEvent UNDERMINER_STEP = register("entity.underminer.step");
+	public static final SoundEvent WARPED_TOAD_IDLE = register("entity.warped_toad.idle");
+	public static final SoundEvent WARPED_TOAD_HURT = register("entity.warped_toad.hurt");
 	public static final SoundEvent SAND_BREAK = register("block.sand.break");
 	public static final SoundEvent SAND_FALL = register("block.sand.fall");
 	public static final SoundEvent SAND_HIT = register("block.sand.hit");

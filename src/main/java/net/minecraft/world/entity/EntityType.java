@@ -1256,6 +1256,13 @@ public class EntityType<T extends Entity> implements FeatureElement, EntityTypeT
 			.eyeHeight(1.0F)
 			.clientTrackingRange(8)
 	);
+	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntityWarpedToad> WARPED_TOAD = register(
+		"warped_toad",
+		EntityType.Builder.of(com.github.alexthe666.alexsmobs.entity.EntityWarpedToad::new, MobCategory.CREATURE)
+			.sized(1.0F, 0.8F)
+			.eyeHeight(0.6F)
+			.clientTrackingRange(10)
+	);
 	public static final EntityType<Display.TextDisplay> TEXT_DISPLAY = register(
 		"text_display", EntityType.Builder.of(Display.TextDisplay::new, MobCategory.MISC).noLootTable().sized(0.0F, 0.0F).clientTrackingRange(10).updateInterval(1)
 	);
