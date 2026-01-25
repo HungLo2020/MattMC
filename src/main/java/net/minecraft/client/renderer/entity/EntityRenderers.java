@@ -25,6 +25,7 @@ import com.github.alexthe666.alexsmobs.client.render.RenderEndergrade;
 import com.github.alexthe666.alexsmobs.client.render.RenderFlyingFish;
 import com.github.alexthe666.alexsmobs.client.render.RenderGazelle;
 import com.github.alexthe666.alexsmobs.client.render.RenderMimicOctopus;
+import com.github.alexthe666.alexsmobs.client.render.RenderPlatypus;
 import com.github.alexthe666.alexsmobs.client.render.RenderTerrapin;
 
 @Environment(EnvType.CLIENT)
