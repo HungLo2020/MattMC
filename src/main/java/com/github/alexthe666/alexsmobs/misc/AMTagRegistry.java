@@ -137,6 +137,9 @@ public class AMTagRegistry {
     
     // Leafcutter Ant-specific tags
     public static final TagKey<Item> LEAFCUTTER_ANT_FOODSTUFFS = registerItemTag("leafcutter_ant_foodstuffs");
+    
+    // Tasmanian Devil-specific tags
+    public static final TagKey<Item> TASMANIAN_DEVIL_HOWLING_FOODS = registerItemTag("tasmanian_devil_howling_foods");
 
     // Raccoon-specific tags
     public static final TagKey<Item> RACCOON_BREEDABLES = registerItemTag("raccoon_breedables");

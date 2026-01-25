@@ -1242,6 +1242,13 @@ public class EntityType<T extends Entity> implements FeatureElement, EntityTypeT
 			.eyeHeight(0.7F)
 			.clientTrackingRange(10)
 	);
+	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntityTasmanianDevil> TASMANIAN_DEVIL = register(
+		"tasmanian_devil",
+		EntityType.Builder.of(com.github.alexthe666.alexsmobs.entity.EntityTasmanianDevil::new, MobCategory.CREATURE)
+			.sized(0.7F, 0.6F)
+			.eyeHeight(0.4F)
+			.clientTrackingRange(8)
+	);
 	public static final EntityType<Display.TextDisplay> TEXT_DISPLAY = register(
 		"text_display", EntityType.Builder.of(Display.TextDisplay::new, MobCategory.MISC).noLootTable().sized(0.0F, 0.0F).clientTrackingRange(10).updateInterval(1)
 	);

@@ -20627,6 +20627,28 @@
     ],
     "subtitle": "subtitles.entity.tarantula_hawk.wing"
   },
+  "entity.tasmanian_devil.idle": {
+    "sounds": [
+      "tasmanian_devil_idle_0",
+      "tasmanian_devil_idle_1",
+      "tasmanian_devil_idle_2"
+    ],
+    "subtitle": "subtitles.entity.tasmanian_devil.idle"
+  },
+  "entity.tasmanian_devil.hurt": {
+    "sounds": [
+      "tasmanian_devil_hurt_0",
+      "tasmanian_devil_hurt_1"
+    ],
+    "subtitle": "subtitles.entity.tasmanian_devil.hurt"
+  },
+  "entity.tasmanian_devil.roar": {
+    "sounds": [
+      "tasmanian_devil_roar_0",
+      "tasmanian_devil_roar_1"
+    ],
+    "subtitle": "subtitles.entity.tasmanian_devil.roar"
+  },
   "entity.tropical_fish.ambient": {
     "sounds": []
   },
