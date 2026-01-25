@@ -1,20 +1,15 @@
 package com.github.alexthe666.alexsmobs.client.render;
 
 import com.github.alexthe666.alexsmobs.client.model.ModelUnderminerDwarf;
-import com.github.alexthe666.alexsmobs.client.model.layered.AMModelLayers;
 import com.github.alexthe666.alexsmobs.client.render.layer.LayerUnderminerItem;
 import com.github.alexthe666.alexsmobs.entity.EntityUnderminer;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.SheetedDecalTextureGenerator;
 import com.mojang.blaze3d.vertex.VertexConsumer;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.model.EntityModel;
-import net.minecraft.client.model.HumanoidModel;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.culling.Frustum;
 import net.minecraft.client.renderer.entity.EntityRendererProvider;
-import net.minecraft.client.renderer.entity.LivingEntityRenderer;
 import net.minecraft.client.renderer.entity.MobRenderer;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
@@ -27,7 +22,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
-public class RenderUnderminer extends MobRenderer<EntityUnderminer, UnderminerRenderState, EntityModel<UnderminerRenderState>> {
+public class RenderUnderminer extends MobRenderer<EntityUnderminer, UnderminerRenderState, ModelUnderminerDwarf> {
     private static final ResourceLocation TEXTURE_DWARF = ResourceLocation
             .withDefaultNamespace("textures/entity/underminer_dwarf.png");
     private static final ResourceLocation TEXTURE_0 = ResourceLocation
@@ -38,17 +33,12 @@ public class RenderUnderminer extends MobRenderer<EntityUnderminer, UnderminerRe
             .mapToObj((destroyStage) -> ResourceLocation
                     .withDefaultNamespace("textures/block/ghostly_pickaxe/destroy_stage_" + destroyStage + ".png"))
             .collect(Collectors.toList());
-    private final ModelUnderminerDwarf DWARF_MODEL;
-    private final HumanoidModel<UnderminerRenderState> NORMAL_MODEL;
     private static final List<RenderType> DESTROY_TYPES = BREAKING_LOCATIONS.stream()
             .map(AMRenderTypes::getGhostCrumbling).collect(Collectors.toList());
     public static boolean renderWithPickaxe = false;
 
     public RenderUnderminer(EntityRendererProvider.Context renderManagerIn) {
         super(renderManagerIn, new ModelUnderminerDwarf(), 0.4F);
-        DWARF_MODEL = (ModelUnderminerDwarf) this.model;
-        NORMAL_MODEL = new HumanoidModel<>(
-                Minecraft.getInstance().getEntityModels().bakeLayer(AMModelLayers.UNDERMINER));
         this.addLayer(new LayerUnderminerItem(this));
     }
 
@@ -67,6 +57,15 @@ public class RenderUnderminer extends MobRenderer<EntityUnderminer, UnderminerRe
         state.isFullyHidden = entity.isFullyHidden();
         state.miningPos = entity.getMiningPos();
         state.miningProgress = entity.getMiningProgress();
+        
+        // Adjust shadow radius based on hiding progress
+        if (!state.isFullyHidden) {
+            float hide = (state.prevHidingProgress + (state.hidingProgress - state.prevHidingProgress) * partialTick) * 0.1F;
+            float alpha = (1F - hide) * 0.6F;
+            this.shadowRadius = 0.9F * alpha;
+        } else {
+            this.shadowRadius = 0;
+        }
     }
 
     protected void scale(UnderminerRenderState state, PoseStack matrixStackIn) {
@@ -88,44 +87,6 @@ public class RenderUnderminer extends MobRenderer<EntityUnderminer, UnderminerRe
                 }
             }
             return false;
-        }
-    }
-
-    @Override
-    public void render(UnderminerRenderState state, PoseStack matrixStackIn, MultiBufferSource bufferIn, int packedLightIn) {
-        if (state.isDwarf) {
-            this.model = DWARF_MODEL;
-        } else {
-            this.model = NORMAL_MODEL;
-        }
-        
-        if (!state.isFullyHidden) {
-            float hide = (state.prevHidingProgress + (state.hidingProgress - state.prevHidingProgress) * 1.0F) * 0.1F;
-            float alpha = (1F - hide) * 0.6F;
-            this.shadowRadius = 0.9F * alpha;
-        } else {
-            this.shadowRadius = 0;
-        }
-        
-        super.render(state, matrixStackIn, bufferIn, packedLightIn);
-        
-        // Render mining breaking texture
-        BlockPos miningPos = state.miningPos;
-        if (miningPos != null) {
-            matrixStackIn.pushPose();
-            double d0 = state.x;
-            double d1 = state.y;
-            double d2 = state.z;
-
-            matrixStackIn.translate((double) miningPos.getX() - d0, (double) miningPos.getY() - d1,
-                    (double) miningPos.getZ() - d2);
-            int progress = (int) Math
-                    .round((DESTROY_TYPES.size() - 1) * (float) Mth.clamp(state.miningProgress, 0F, 1.0F));
-            PoseStack.Pose posestack$pose = matrixStackIn.last();
-            VertexConsumer vertexconsumer1 = new SheetedDecalTextureGenerator(
-                    bufferIn.getBuffer(DESTROY_TYPES.get(progress)), posestack$pose,
-                    1.0F);
-            matrixStackIn.popPose();
         }
     }
 

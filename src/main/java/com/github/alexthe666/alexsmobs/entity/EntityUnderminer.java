@@ -26,8 +26,8 @@ import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.DifficultyInstance;
 import net.minecraft.world.InteractionHand;
-import net.minecraft.world.ValueInput;
-import net.minecraft.world.ValueOutput;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.damagesource.DamageTypes;
 import net.minecraft.world.entity.*;
@@ -243,11 +243,11 @@ public class EntityUnderminer extends PathfinderMob {
         this.setItemSlot(EquipmentSlot.MAINHAND, new ItemStack(AMItemRegistry.GHOSTLY_PICKAXE.get()));
     }
 
-    protected float getEquipmentDropChance(ServerLevel serverLevel, EquipmentSlot slot) {
+    protected float getEquipmentDropChance(EquipmentSlot slot) {
         if(slot == EquipmentSlot.MAINHAND){
             return 0.5F;
         }
-        return super.getEquipmentDropChance(serverLevel, slot);
+        return 0.085F; // default mob equipment drop chance
     }
 
     @Nullable
@@ -419,7 +419,7 @@ public class EntityUnderminer extends PathfinderMob {
         if(lastGivenStack != null){
             return lastGivenStack.getItem() == state.getBlock().asItem();
         }
-        return state.is(AMTagRegistry.UNDERMINER_ORES);
+        return state.getBlock().asItem().builtInRegistryHolder().is(AMTagRegistry.UNDERMINER_ORES);
     }
 
     public void aiStep() {

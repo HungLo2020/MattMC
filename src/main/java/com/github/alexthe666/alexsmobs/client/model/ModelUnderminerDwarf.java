@@ -21,10 +21,6 @@ public class ModelUnderminerDwarf extends AdvancedEntityModel<UnderminerRenderSt
     private final AdvancedModelBox rightArm;
     private final AdvancedModelBox leftLeg;
     private final AdvancedModelBox rightLeg;
-    public HumanoidModel.ArmPose leftArmPose = HumanoidModel.ArmPose.EMPTY;
-    public HumanoidModel.ArmPose rightArmPose = HumanoidModel.ArmPose.EMPTY;
-    public boolean crouching;
-    public float swimAmount;
 
     public ModelUnderminerDwarf() {
         texWidth = 128;
@@ -85,7 +81,30 @@ public class ModelUnderminerDwarf extends AdvancedEntityModel<UnderminerRenderSt
         float ageInTicks = state.ageInTicks;
         float netHeadYaw = state.yRot;
         float headPitch = state.xRot;
-        setupHumanoidAnims(state, limbSwing, limbSwingAmount, ageInTicks, netHeadYaw, headPitch);
+        
+        // Basic head rotation
+        this.head.rotateAngleY = netHeadYaw * Mth.DEG_TO_RAD * 0.2F;
+        this.head.rotateAngleX = headPitch * Mth.DEG_TO_RAD * 0.2F;
+        
+        // Basic arm swing
+        this.rightArm.rotateAngleX = Mth.cos(limbSwing * 0.6662F + Mth.PI) * 2.0F * limbSwingAmount * 0.5F;
+        this.leftArm.rotateAngleX = Mth.cos(limbSwing * 0.6662F) * 2.0F * limbSwingAmount * 0.5F;
+        this.rightArm.rotateAngleZ = 0.0F;
+        this.leftArm.rotateAngleZ = 0.0F;
+        
+        // Basic leg swing
+        this.rightLeg.rotateAngleX = Mth.cos(limbSwing * 0.6662F) * 1.4F * limbSwingAmount;
+        this.leftLeg.rotateAngleX = Mth.cos(limbSwing * 0.6662F + Mth.PI) * 1.4F * limbSwingAmount;
+        this.rightLeg.rotateAngleY = 0.0F;
+        this.leftLeg.rotateAngleY = 0.0F;
+        this.rightLeg.rotateAngleZ = 0.0F;
+        this.leftLeg.rotateAngleZ = 0.0F;
+        
+        // Idle animations
+        this.rightArm.rotateAngleZ += 1.0F * (Mth.cos(ageInTicks * 0.09F) * 0.05F + 0.05F);
+        this.rightArm.rotateAngleX += 1.0F * Mth.sin(ageInTicks * 0.067F) * 0.05F;
+        this.leftArm.rotateAngleZ += -1.0F * (Mth.cos(ageInTicks * 0.09F) * 0.05F + 0.05F);
+        this.leftArm.rotateAngleX += -1.0F * Mth.sin(ageInTicks * 0.067F) * 0.05F;
     }
 
     @Override
@@ -93,263 +112,13 @@ public class ModelUnderminerDwarf extends AdvancedEntityModel<UnderminerRenderSt
         return ImmutableList.of(body, head, beard, helmet, rightLeg, leftLeg, rightArm, leftArm);
     }
 
-    /*
-        From here on out copied from HumanoidModel
-     */
-    public void setupHumanoidAnims(UnderminerRenderState state, float p_102867_, float p_102868_, float p_102869_, float p_102870_, float p_102871_) {
-        boolean flag = state.isFallFlying;
-        boolean flag1 = state.isVisuallySwimming;
-        this.head.rotateAngleY = p_102870_ * Mth.DEG_TO_RAD;
-        if (flag) {
-            this.head.rotateAngleX = (-Maths.QUARTER_PI);
-        } else if (this.swimAmount > 0.0F) {
-            if (flag1) {
-                this.head.rotateAngleX = this.rotlerpRad(this.swimAmount, this.head.rotateAngleX, -Maths.QUARTER_PI);
-            } else {
-                this.head.rotateAngleX = this.rotlerpRad(this.swimAmount, this.head.rotateAngleX, p_102871_ * Mth.DEG_TO_RAD);
-            }
-        } else {
-            this.head.rotateAngleX = p_102871_ * Mth.DEG_TO_RAD;
-        }
-        float f = 1.0F;
-        if (flag) {
-            f = (float) (state.movementSpeedSqr);
-            f /= 0.2F;
-            f *= f * f;
-        }
-
-        if (f < 1.0F) {
-            f = 1.0F;
-        }
-
-        this.rightArm.rotateAngleX = Mth.cos(p_102867_ * 0.6662F + Mth.PI) * 2.0F * p_102868_ * 0.5F / f;
-        this.leftArm.rotateAngleX = Mth.cos(p_102867_ * 0.6662F) * 2.0F * p_102868_ * 0.5F / f;
-        this.rightArm.rotateAngleZ = 0.0F;
-        this.leftArm.rotateAngleZ = 0.0F;
-        this.rightLeg.rotateAngleX = Mth.cos(p_102867_ * 0.6662F) * 1.4F * p_102868_ / f;
-        this.leftLeg.rotateAngleX = Mth.cos(p_102867_ * 0.6662F + Mth.PI) * 1.4F * p_102868_ / f;
-        this.rightLeg.rotateAngleY = 0.0F;
-        this.leftLeg.rotateAngleY = 0.0F;
-        this.rightLeg.rotateAngleZ = 0.0F;
-        this.leftLeg.rotateAngleZ = 0.0F;
-        if (this.riding) {
-            this.rightArm.rotateAngleX += (-(float)Math.PI / 5F);
-            this.leftArm.rotateAngleX += (-(float)Math.PI / 5F);
-            this.rightLeg.rotateAngleX = -1.4137167F;
-            this.rightLeg.rotateAngleY = ((float)Math.PI / 10F);
-            this.rightLeg.rotateAngleZ = 0.07853982F;
-            this.leftLeg.rotateAngleX = -1.4137167F;
-            this.leftLeg.rotateAngleY = (-(float)Math.PI / 10F);
-            this.leftLeg.rotateAngleZ = -0.07853982F;
-        }
-
-        this.rightArm.rotateAngleY = 0.0F;
-        this.leftArm.rotateAngleY = 0.0F;
-        boolean flag2 = state.mainArm == HumanoidArm.RIGHT;
-        if (state.isUsingItem) {
-            boolean flag3 = state.useItemHand == InteractionHand.MAIN_HAND;
-            if (flag3 == flag2) {
-                this.poseRightArm(state);
-            } else {
-                this.poseLeftArm(state);
-            }
-        } else {
-            boolean flag4 = flag2 ? this.leftArmPose.isTwoHanded() : this.rightArmPose.isTwoHanded();
-            if (flag2 != flag4) {
-                this.poseLeftArm(state);
-                this.poseRightArm(state);
-            } else {
-                this.poseRightArm(state);
-                this.poseLeftArm(state);
-            }
-        }
-
-        this.setupAttackAnimation(state, p_102869_);
-        if (this.crouching) {
-            this.body.rotateAngleX = 0.5F;
-            this.rightArm.rotateAngleX += 0.4F;
-            this.leftArm.rotateAngleX += 0.4F;
-        }
-
-        if (this.rightArmPose != HumanoidModel.ArmPose.SPYGLASS) {
-            this.rightArm.rotateAngleZ += 1.0F * (Mth.cos(p_102869_ * 0.09F) * 0.05F + 0.05F);
-            this.rightArm.rotateAngleX += 1.0F * Mth.sin(p_102869_ * 0.067F) * 0.05F;
-        }
-
-        if (this.leftArmPose != HumanoidModel.ArmPose.SPYGLASS) {
-            this.leftArm.rotateAngleZ += -1.0F * (Mth.cos(p_102869_ * 0.09F) * 0.05F + 0.05F);
-            this.leftArm.rotateAngleX += -1.0F * Mth.sin(p_102869_ * 0.067F) * 0.05F;
-        }
-
-        if (this.swimAmount > 0.0F) {
-            final float f5 = p_102867_ % 26.0F;
-            HumanoidArm humanoidarm = this.getAttackArm(state);
-            final float f1 = humanoidarm == HumanoidArm.RIGHT && this.attackTime > 0.0F ? 0.0F : this.swimAmount;
-            final float f2 = humanoidarm == HumanoidArm.LEFT && this.attackTime > 0.0F ? 0.0F : this.swimAmount;
-            if (!state.isUsingItem) {
-                if (f5 < 14.0F) {
-                    this.leftArm.rotateAngleX = this.rotlerpRad(f2, this.leftArm.rotateAngleX, 0.0F);
-                    this.rightArm.rotateAngleX = Mth.lerp(f1, this.rightArm.rotateAngleX, 0.0F);
-                    this.leftArm.rotateAngleY = this.rotlerpRad(f2, this.leftArm.rotateAngleY, Mth.PI);
-                    this.rightArm.rotateAngleY = Mth.lerp(f1, this.rightArm.rotateAngleY, Mth.PI);
-                    this.leftArm.rotateAngleZ = this.rotlerpRad(f2, this.leftArm.rotateAngleZ, Mth.PI + 1.8707964F * this.quadraticArmUpdate(f5) / this.quadraticArmUpdate(14.0F));
-                    this.rightArm.rotateAngleZ = Mth.lerp(f1, this.rightArm.rotateAngleZ, Mth.PI - 1.8707964F * this.quadraticArmUpdate(f5) / this.quadraticArmUpdate(14.0F));
-                } else if (f5 >= 14.0F && f5 < 22.0F) {
-                    float f6 = (f5 - 14.0F) / 8.0F;
-                    this.leftArm.rotateAngleX = this.rotlerpRad(f2, this.leftArm.rotateAngleX, Mth.HALF_PI * f6);
-                    this.rightArm.rotateAngleX = Mth.lerp(f1, this.rightArm.rotateAngleX, Mth.HALF_PI * f6);
-                    this.leftArm.rotateAngleY = this.rotlerpRad(f2, this.leftArm.rotateAngleY, Mth.PI);
-                    this.rightArm.rotateAngleY = Mth.lerp(f1, this.rightArm.rotateAngleY, Mth.PI);
-                    this.leftArm.rotateAngleZ = this.rotlerpRad(f2, this.leftArm.rotateAngleZ, 5.012389F - 1.8707964F * f6);
-                    this.rightArm.rotateAngleZ = Mth.lerp(f1, this.rightArm.rotateAngleZ, 1.2707963F + 1.8707964F * f6);
-                } else if (f5 >= 22.0F && f5 < 26.0F) {
-                    float f3 = (f5 - 22.0F) / 4.0F;
-                    this.leftArm.rotateAngleX = this.rotlerpRad(f2, this.leftArm.rotateAngleX, Mth.HALF_PI - Mth.HALF_PI * f3);
-                    this.rightArm.rotateAngleX = Mth.lerp(f1, this.rightArm.rotateAngleX, Mth.HALF_PI - Mth.HALF_PI * f3);
-                    this.leftArm.rotateAngleY = this.rotlerpRad(f2, this.leftArm.rotateAngleY, Mth.PI);
-                    this.rightArm.rotateAngleY = Mth.lerp(f1, this.rightArm.rotateAngleY, Mth.PI);
-                    this.leftArm.rotateAngleZ = this.rotlerpRad(f2, this.leftArm.rotateAngleZ, Mth.PI);
-                    this.rightArm.rotateAngleZ = Mth.lerp(f1, this.rightArm.rotateAngleZ, Mth.PI);
-                }
-            }
-
-            this.leftLeg.rotateAngleX = Mth.lerp(this.swimAmount, this.leftLeg.rotateAngleX, 0.3F * Mth.cos(p_102867_ * 0.33333334F + Mth.PI));
-            this.rightLeg.rotateAngleX = Mth.lerp(this.swimAmount, this.rightLeg.rotateAngleX, 0.3F * Mth.cos(p_102867_ * 0.33333334F));
-        }
-    }
-
-    private void poseRightArm(UnderminerRenderState p_102876_) {
-        switch (this.rightArmPose) {
-            case EMPTY:
-                this.rightArm.rotateAngleY = 0.0F;
-                break;
-            case BLOCK:
-                this.rightArm.rotateAngleX = this.rightArm.rotateAngleX * 0.5F - 0.9424779F;
-                this.rightArm.rotateAngleY = (-(float)Math.PI / 6F);
-                break;
-            case ITEM:
-                this.rightArm.rotateAngleX = this.rightArm.rotateAngleX * 0.5F - ((float)Math.PI / 10F);
-                this.rightArm.rotateAngleY = 0.0F;
-                break;
-            case THROW_SPEAR:
-                this.rightArm.rotateAngleX = this.rightArm.rotateAngleX * 0.5F - Mth.PI;
-                this.rightArm.rotateAngleY = 0.0F;
-                break;
-            case BOW_AND_ARROW:
-                this.rightArm.rotateAngleY = -0.1F + this.head.rotateAngleY;
-                this.leftArm.rotateAngleY = 0.1F + this.head.rotateAngleY + 0.4F;
-                this.rightArm.rotateAngleX = (-Mth.HALF_PI) + this.head.rotateAngleX;
-                this.leftArm.rotateAngleX = (-Mth.HALF_PI) + this.head.rotateAngleX;
-                break;
-            case CROSSBOW_CHARGE: // fallthrough
-            case CROSSBOW_HOLD:
-                break;
-            case SPYGLASS:
-                this.rightArm.rotateAngleX = Mth.clamp(this.head.rotateAngleX - 1.9198622F - (p_102876_.isCrouching ? 0.2617994F : 0.0F), -2.4F, 3.3F);
-                this.rightArm.rotateAngleY = this.head.rotateAngleY - 0.2617994F;
-                break;
-            case TOOT_HORN:
-                this.rightArm.rotateAngleX = Mth.clamp(this.head.rotateAngleX, -1.2F, 1.2F) - 1.4835298F;
-                this.rightArm.rotateAngleY = this.head.rotateAngleY - ((float)Math.PI / 6F);
-        }
-
-    }
-
-    private void poseLeftArm(UnderminerRenderState p_102879_) {
-        switch (this.leftArmPose) {
-            case EMPTY:
-                this.leftArm.rotateAngleY = 0.0F;
-                break;
-            case BLOCK:
-                this.leftArm.rotateAngleX = this.leftArm.rotateAngleX * 0.5F - 0.9424779F;
-                this.leftArm.rotateAngleY = ((float)Math.PI / 6F);
-                break;
-            case ITEM:
-                this.leftArm.rotateAngleX = this.leftArm.rotateAngleX * 0.5F - ((float)Math.PI / 10F);
-                this.leftArm.rotateAngleY = 0.0F;
-                break;
-            case THROW_SPEAR:
-                this.leftArm.rotateAngleX = this.leftArm.rotateAngleX * 0.5F - Mth.PI;
-                this.leftArm.rotateAngleY = 0.0F;
-                break;
-            case BOW_AND_ARROW:
-                this.rightArm.rotateAngleY = -0.1F + this.head.rotateAngleY - 0.4F;
-                this.leftArm.rotateAngleY = 0.1F + this.head.rotateAngleY;
-                this.rightArm.rotateAngleX = (-Mth.HALF_PI) + this.head.rotateAngleX;
-                this.leftArm.rotateAngleX = (-Mth.HALF_PI) + this.head.rotateAngleX;
-                break;
-            case CROSSBOW_CHARGE:
-                break;
-            case CROSSBOW_HOLD:
-                break;
-            case SPYGLASS:
-                this.leftArm.rotateAngleX = Mth.clamp(this.head.rotateAngleX - 1.9198622F - (p_102879_.isCrouching ? 0.2617994F : 0.0F), -2.4F, 3.3F);
-                this.leftArm.rotateAngleY = this.head.rotateAngleY + 0.2617994F;
-                break;
-            case TOOT_HORN:
-                this.leftArm.rotateAngleX = Mth.clamp(this.head.rotateAngleX, -1.2F, 1.2F) - 1.4835298F;
-                this.leftArm.rotateAngleY = this.head.rotateAngleY + ((float)Math.PI / 6F);
-        }
-
-    }
-
-    protected void setupAttackAnimation(UnderminerRenderState p_102858_, float p_102859_) {
-        if (!(this.attackTime <= 0.0F)) {
-            HumanoidArm humanoidarm = this.getAttackArm(p_102858_);
-            AdvancedModelBox modelpart = this.getArm(humanoidarm);
-            float f = this.attackTime;
-            this.body.rotateAngleY = Mth.sin(Mth.sqrt(f) * Mth.TWO_PI) * 0.2F;
-            if (humanoidarm == HumanoidArm.LEFT) {
-                this.body.rotateAngleY *= -1.0F;
-            }
-            this.head.rotateAngleY -= this.body.rotateAngleY;
-            this.leftLeg.rotateAngleY -= this.body.rotateAngleY;
-            this.rightLeg.rotateAngleY -= this.body.rotateAngleY;
-            this.leftArm.rotateAngleX += this.body.rotateAngleY;
-            f = 1.0F - this.attackTime;
-            f *= f;
-            f *= f;
-            f = 1.0F - f;
-            final float f1 = Mth.sin(f * Mth.PI);
-            final float f2 = Mth.sin(this.attackTime * Mth.PI) * -(this.head.rotateAngleX - 0.7F) * 0.75F;
-            modelpart.rotateAngleX -= f1 * 1.2F + f2;
-            modelpart.rotateAngleY += this.body.rotateAngleY * 2.0F;
-            modelpart.rotateAngleZ += Mth.sin(this.attackTime * Mth.PI) * -0.4F;
-        }
-    }
-
-    protected float rotlerpRad(float p_102836_, float p_102837_, float p_102838_) {
-        float f = (p_102838_ - p_102837_) % Mth.TWO_PI;
-        if (f < -Mth.PI) {
-            f += Mth.TWO_PI;
-        }
-
-        if (f >= Mth.PI) {
-            f -= Mth.TWO_PI;
-        }
-
-        return p_102837_ + p_102836_ * f;
-    }
-
-    private float quadraticArmUpdate(float p_102834_) {
-        return -65.0F * p_102834_ + p_102834_ * p_102834_;
-    }
-
-
-    public void translateToHand(HumanoidArm p_102854_, PoseStack p_102855_) {
-        this.getArm(p_102854_).translateAndRotate(p_102855_);
-    }
-
-    protected AdvancedModelBox getArm(HumanoidArm p_102852_) {
-        return p_102852_ == HumanoidArm.LEFT ? this.leftArm : this.rightArm;
-    }
-
     public AdvancedModelBox getHead() {
         return this.head;
     }
 
-    private HumanoidArm getAttackArm(UnderminerRenderState p_102857_) {
-        HumanoidArm humanoidarm = p_102857_.mainArm;
-        return p_102857_.attackingArm == InteractionHand.MAIN_HAND ? humanoidarm : humanoidarm.getOpposite();
+    public void setRotationAngle(AdvancedModelBox AdvancedModelBox, float x, float y, float z) {
+        AdvancedModelBox.rotateAngleX = x;
+        AdvancedModelBox.rotateAngleY = y;
+        AdvancedModelBox.rotateAngleZ = z;
     }
 }
