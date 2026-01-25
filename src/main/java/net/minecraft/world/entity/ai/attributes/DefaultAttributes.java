@@ -219,6 +219,7 @@ public class DefaultAttributes {
 		.put(EntityType.TREMORSAURUS, TremorsaurusEntity.createAttributes().build())
 		.put(EntityType.TRILOCARIS, TrilocarisEntity.createAttributes().build())
 		.put(EntityType.TOUCAN, com.github.alexthe666.alexsmobs.entity.EntityToucan.bakeAttributes().build())
+		.put(EntityType.TARANTULA_HAWK, com.github.alexthe666.alexsmobs.entity.EntityTarantulaHawk.bakeAttributes().build())
 		.put(EntityType.VALLUMRAPTOR, VallumraptorEntity.createAttributes().build())
 		.put(EntityType.SNOW_GOLEM, SnowGolem.createAttributes().build())
 		.put(EntityType.SNOW_LEOPARD, com.github.alexthe666.alexsmobs.entity.EntitySnowLeopard.createAttributes().build())

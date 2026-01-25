@@ -154,6 +154,13 @@ public class AMTagRegistry {
     public static final TagKey<Item> SNOW_LEOPARD_BREEDABLES = registerItemTag("snow_leopard_breedables");
     public static final TagKey<Block> SNOW_LEOPARD_SPAWNS = registerBlockTag("snow_leopard_spawns");
 
+    // Tarantula Hawk-specific tags
+    public static final TagKey<Item> TARANTULA_HAWK_BREEDABLES = registerItemTag("tarantula_hawk_breedables");
+    public static final TagKey<Item> TARANTULA_HAWK_TAMEABLES = registerItemTag("tarantula_hawk_tameables");
+    public static final TagKey<Item> TARANTULA_HAWK_FOODSTUFFS = registerItemTag("tarantula_hawk_foodstuffs");
+    public static final TagKey<Block> TARANTULA_HAWK_SPAWNS = registerBlockTag("tarantula_hawk_spawns");
+    public static final TagKey<Biome> SPAWNS_NETHER_TARANTULA_HAWKS = registerBiomeTag("spawns_nether_tarantula_hawks");
+
     // Tag helper method for entity checks
     public static class TagHelper {
         public static boolean isEntityIn(TagKey<EntityType<?>> tag, net.minecraft.world.entity.Entity entity) {
