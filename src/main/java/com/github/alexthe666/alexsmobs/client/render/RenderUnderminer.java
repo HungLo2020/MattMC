@@ -1,9 +1,11 @@
 package com.github.alexthe666.alexsmobs.client.render;
 
-import com.github.alexthe666.alexsmobs.client.model.ModelUnderminerDwarf;
+import com.github.alexthe666.alexsmobs.client.model.ModelUnderminerWrapper;
 import com.github.alexthe666.alexsmobs.client.render.layer.LayerUnderminerItem;
+import com.github.alexthe666.alexsmobs.client.render.layer.LayerUnderminerTransparency;
 import com.github.alexthe666.alexsmobs.entity.EntityUnderminer;
 import com.mojang.blaze3d.vertex.PoseStack;
+import net.minecraft.client.model.geom.ModelLayers;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.culling.Frustum;
@@ -19,7 +21,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
-public class RenderUnderminer extends MobRenderer<EntityUnderminer, UnderminerRenderState, ModelUnderminerDwarf> {
+public class RenderUnderminer extends MobRenderer<EntityUnderminer, UnderminerRenderState, ModelUnderminerWrapper> {
     private static final ResourceLocation TEXTURE_DWARF = ResourceLocation
             .withDefaultNamespace("textures/entity/underminer_dwarf.png");
     private static final ResourceLocation TEXTURE_0 = ResourceLocation
@@ -36,7 +38,9 @@ public class RenderUnderminer extends MobRenderer<EntityUnderminer, UnderminerRe
     public static boolean renderWithPickaxe = false;
 
     public RenderUnderminer(EntityRendererProvider.Context renderManagerIn) {
-        super(renderManagerIn, new ModelUnderminerDwarf(), 0.4F);
+        super(renderManagerIn, new ModelUnderminerWrapper(renderManagerIn.bakeLayer(ModelLayers.UNDERMINER)), 0.4F);
+        // Add transparency layer first so it renders the base model with alpha
+        this.addLayer(new LayerUnderminerTransparency(this));
         this.addLayer(new LayerUnderminerItem(this));
     }
 
@@ -97,12 +101,9 @@ public class RenderUnderminer extends MobRenderer<EntityUnderminer, UnderminerRe
 
     @Nullable
     protected RenderType getRenderType(UnderminerRenderState state, boolean normal, boolean invis, boolean outline) {
-        ResourceLocation resourcelocation = this.getTextureLocation(state);
-        if (outline) {
-            return RenderType.outline(resourcelocation);
-        }
-        // Use the underminer render type which supports transparency
-        return AMRenderTypes.getUnderminer(resourcelocation);
+        // Return null to skip base model rendering
+        // The transparency layer will handle all rendering with proper alpha
+        return null;
     }
 
     public ResourceLocation getTextureLocation(UnderminerRenderState state) {

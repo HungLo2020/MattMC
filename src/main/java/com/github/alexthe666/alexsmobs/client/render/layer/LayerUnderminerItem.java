@@ -1,6 +1,6 @@
 package com.github.alexthe666.alexsmobs.client.render.layer;
 
-import com.github.alexthe666.alexsmobs.client.model.ModelUnderminerDwarf;
+import com.github.alexthe666.alexsmobs.client.model.ModelUnderminerWrapper;
 import com.github.alexthe666.alexsmobs.client.render.RenderUnderminer;
 import com.github.alexthe666.alexsmobs.client.render.UnderminerRenderState;
 import com.mojang.blaze3d.vertex.PoseStack;
@@ -12,7 +12,7 @@ import net.minecraft.client.renderer.entity.layers.RenderLayer;
  * Note: In the render state architecture, this would require extending the render state
  * Simplified for now as a stub for compatibility
  */
-public class LayerUnderminerItem extends RenderLayer<UnderminerRenderState, ModelUnderminerDwarf> {
+public class LayerUnderminerItem extends RenderLayer<UnderminerRenderState, ModelUnderminerWrapper> {
 
     public LayerUnderminerItem(RenderUnderminer render) {
         super(render);
