@@ -14,7 +14,7 @@ import net.minecraft.resources.ResourceLocation;
 
 import javax.annotation.Nullable;
 
-public class RenderEnderiophage extends MobRenderer<EntityEnderiophage, ModelEnderiophage> {
+public class RenderEnderiophage extends MobRenderer<EntityEnderiophage, EnderiophageRenderState, ModelEnderiophage> {
     private static final ResourceLocation TEXTURE = ResourceLocation.withDefaultNamespace("textures/entity/enderiophage.png");
     private static final ResourceLocation TEXTURE_GLOW = ResourceLocation.withDefaultNamespace("textures/entity/enderiophage_glow.png");
     private static final ResourceLocation TEXTURE_OVERWORLD = ResourceLocation.withDefaultNamespace("textures/entity/enderiophage_overworld.png");
@@ -27,48 +27,75 @@ public class RenderEnderiophage extends MobRenderer<EntityEnderiophage, ModelEnd
         this.addLayer(new EnderiophageEyesLayer(this));
     }
 
+    @Override
+    public EnderiophageRenderState createRenderState() {
+        return new EnderiophageRenderState();
+    }
+
+    @Override
+    public void extractRenderState(EntityEnderiophage entity, EnderiophageRenderState state, float partialTick) {
+        super.extractRenderState(entity, state, partialTick);
+        state.phageScale = entity.getPhageScale();
+        state.prevPhageScale = entity.prevEnderiophageScale;
+        state.phagePitch = entity.getPhagePitch();
+        state.prevPhagePitch = entity.prevPhagePitch;
+        state.tentacleAngle = entity.tentacleAngle;
+        state.lastTentacleAngle = entity.lastTentacleAngle;
+        state.phageRotation = entity.phageRotation;
+        state.flyProgress = entity.flyProgress;
+        state.prevFlyProgress = entity.prevFlyProgress;
+        state.passengerIndex = entity.passengerIndex;
+        state.isPassenger = entity.isPassenger();
+        state.isMissingEye = entity.isMissingEye();
+        state.variant = entity.getVariant();
+        state.yHeadRot = entity.getYHeadRot();
+        state.xHeadRot = entity.getXRot();
+        state.yBodyRot = entity.yBodyRot;
+    }
+
     @Nullable
     @Override
-    protected RenderType getRenderType(EntityEnderiophage p_230496_1_, boolean p_230496_2_, boolean p_230496_3_, boolean p_230496_4_) {
-        ResourceLocation resourcelocation = this.getTextureLocation(p_230496_1_);
-        if (p_230496_3_) {
+    protected RenderType getRenderType(EnderiophageRenderState state, boolean visible, boolean visibleToPlayer, boolean bodyVisible) {
+        ResourceLocation resourcelocation = this.getTextureLocation(state);
+        if (visibleToPlayer) {
             return RenderType.itemEntityTranslucentCull(resourcelocation);
-        } else if (p_230496_2_) {
+        } else if (visible) {
             return RenderType.entityTranslucent(resourcelocation);
         } else {
-            return p_230496_4_ ? RenderType.outline(resourcelocation) : null;
+            return bodyVisible ? RenderType.outline(resourcelocation) : null;
         }
     }
 
-    protected void scale(EntityEnderiophage entitylivingbaseIn, PoseStack matrixStackIn, float partialTickTime) {
-        float scale = entitylivingbaseIn.prevEnderiophageScale + (entitylivingbaseIn.getPhageScale() - entitylivingbaseIn.prevEnderiophageScale) * partialTickTime;
+    protected void scale(EnderiophageRenderState state, PoseStack matrixStackIn) {
+        float scale = state.prevPhageScale + (state.phageScale - state.prevPhageScale);
         matrixStackIn.scale(0.8F * scale, 0.8F * scale, 0.8F * scale);
     }
 
 
-    public ResourceLocation getTextureLocation(EntityEnderiophage entity) {
-        return entity.getVariant() == 2 ? TEXTURE_NETHER : entity.getVariant() == 1 ? TEXTURE_OVERWORLD : TEXTURE;
+    public ResourceLocation getTextureLocation(EnderiophageRenderState state) {
+        return state.variant == 2 ? TEXTURE_NETHER : state.variant == 1 ? TEXTURE_OVERWORLD : TEXTURE;
     }
 
-    static class EnderiophageEyesLayer extends EyesLayer<EntityEnderiophage, ModelEnderiophage> {
+    class EnderiophageEyesLayer extends EyesLayer<EnderiophageRenderState, ModelEnderiophage> {
 
         public EnderiophageEyesLayer(RenderEnderiophage p_i50928_1_) {
             super(p_i50928_1_);
         }
 
 
-        public void render(PoseStack matrixStackIn, MultiBufferSource bufferIn, int packedLightIn, EntityEnderiophage entitylivingbaseIn, float limbSwing, float limbSwingAmount, float partialTicks, float ageInTicks, float netHeadYaw, float headPitch) {
-            VertexConsumer ivertexbuilder = bufferIn.getBuffer(this.getRenderType(entitylivingbaseIn));
-            this.getParentModel().renderToBuffer(matrixStackIn, ivertexbuilder, 15728640, OverlayTexture.NO_OVERLAY, -1);
+        public void render(PoseStack matrixStackIn, MultiBufferSource bufferIn, int packedLightIn, EnderiophageRenderState state, float limbSwing, float limbSwingAmount) {
+            VertexConsumer ivertexbuilder = bufferIn.getBuffer(this.getRenderType(state));
+            this.getParentModel().renderToBuffer(matrixStackIn, ivertexbuilder, 15728640, OverlayTexture.NO_OVERLAY);
         }
 
         @Override
         public RenderType renderType() {
-            return AMRenderTypes.getGhost(TEXTURE_GLOW);
+            return AMRenderTypes.getEyesFlickering(TEXTURE_GLOW, 15728640);
         }
 
-        public RenderType getRenderType(EntityEnderiophage entity) {
-            return AMRenderTypes.getGhost(entity.getVariant() == 2 ? TEXTURE_NETHER_GLOW : entity.getVariant() == 1 ? TEXTURE_OVERWORLD_GLOW : TEXTURE_GLOW);
+        public RenderType getRenderType(EnderiophageRenderState state) {
+            ResourceLocation tex = state.variant == 2 ? TEXTURE_NETHER_GLOW : state.variant == 1 ? TEXTURE_OVERWORLD_GLOW : TEXTURE_GLOW;
+            return AMRenderTypes.getEyesFlickering(tex, 15728640);
         }
     }
 

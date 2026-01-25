@@ -1,6 +1,6 @@
 package com.github.alexthe666.alexsmobs.client.model;
 
-import com.github.alexthe666.alexsmobs.entity.EntityEnderiophage;
+import com.github.alexthe666.alexsmobs.client.render.EnderiophageRenderState;
 import com.github.alexthe666.alexsmobs.entity.util.Maths;
 import com.github.alexthe666.citadel.client.model.AdvancedEntityModel;
 import com.github.alexthe666.citadel.client.model.AdvancedModelBox;
@@ -13,7 +13,7 @@ import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.phys.Vec3;
 
-public class ModelEnderiophage extends AdvancedEntityModel<EntityEnderiophage> {
+public class ModelEnderiophage extends AdvancedEntityModel<EnderiophageRenderState> {
     private final AdvancedModelBox root;
     private final AdvancedModelBox body;
     private final AdvancedModelBox mouth;
@@ -133,17 +133,20 @@ public class ModelEnderiophage extends AdvancedEntityModel<EntityEnderiophage> {
     }
 
     @Override
-    public void setupAnim(EntityEnderiophage entity, float limbSwing, float limbSwingAmount, float ageInTicks, float netHeadYaw, float headPitch) {
+    public void setupAnim(EnderiophageRenderState state) {
         this.resetToDefaultPose();
         Entity look = Minecraft.getInstance().getCameraEntity();
-        float partialTicks = ageInTicks - entity.tickCount;
+        float partialTicks = state.ageInTicks - (int)state.ageInTicks;
         float idleSpeed = 0.25F;
         float idleDegree = 0.1F;
         float walkSpeed = 2F;
         float walkDegree = 0.6F;
-        float flyProgress = entity.prevFlyProgress + (entity.flyProgress - entity.prevFlyProgress) * partialTicks;
-        float phagePitch = Maths.rad(Mth.rotLerp(partialTicks, entity.prevPhagePitch, entity.getPhagePitch()));
-        float totalYaw = Maths.rad(Mth.rotLerp(partialTicks, entity.yBodyRotO, entity.yBodyRot));
+        float flyProgress = state.prevFlyProgress + (state.flyProgress - state.prevFlyProgress) * partialTicks;
+        float phagePitch = Maths.rad(Mth.rotLerp(partialTicks, state.prevPhagePitch, state.phagePitch));
+        float totalYaw = Maths.rad(Mth.rotLerp(partialTicks, state.yBodyRot, state.yBodyRot));
+        float limbSwing = state.walkAnimationPos;
+        float limbSwingAmount = state.walkAnimationSpeed;
+        float ageInTicks = state.ageInTicks;
         float tentacleProgress = (5F - limbSwingAmount * 10F) * flyProgress * 0.2F;
 
         this.bob(eye, idleSpeed, idleDegree * -8, false, ageInTicks, 1);
@@ -190,20 +193,20 @@ public class ModelEnderiophage extends AdvancedEntityModel<EntityEnderiophage> {
             progressRotationPrev(tailfront_right, limbSwingAmount, Maths.rad(15), 0, 0, 1F);
         }
 
-        if(entity.isMissingEye()){
+        if(state.isMissingEye){
             this.eye.showModel = false;
         }else{
             this.eye.showModel = true;
         }
-        if(entity.isPassenger()){
+        if(state.isPassenger){
             this.body.rotateAngleX += Mth.HALF_PI;
-            this.body.rotateAngleY += Mth.HALF_PI * entity.passengerIndex;
+            this.body.rotateAngleY += Mth.HALF_PI * state.passengerIndex;
             this.sheath.setScale(1F, (float) (0.85F + Math.sin(ageInTicks) * 0.15F), 1F);
             this.collar.rotationPointY -= (float) (Math.sin(ageInTicks) * 0.15F - 0.15F) * 12F;
             this.capsid.setScale((float) (0.85F + Math.sin(ageInTicks + 2F) * 0.15F), (float) (1F + Math.sin(ageInTicks) * 0.15F), (float) (0.85F + Math.sin(ageInTicks + 2F) * 0.15F));
             this.mouth.rotationPointY += (Math.sin(ageInTicks) + 1F) * 2F;
             tentacleProgress = -2F;
-        }else{
+        } else {
             this.sheath.setScale(1F,1F, 1F);
             this.capsid.setScale(1F,1F, 1F);
             this.body.rotateAngleX -= phagePitch * flyProgress * 0.2F;
@@ -216,19 +219,9 @@ public class ModelEnderiophage extends AdvancedEntityModel<EntityEnderiophage> {
         progressRotationPrev(tailmid_right, tentacleProgress, 0, 0, Maths.rad(45), 5F);
         progressRotationPrev(tailback_right, tentacleProgress, 0, 0, Maths.rad(45), 5F);
 
-        if (look != null) {
-            Vec3 vector3d = look.getEyePosition(partialTicks);
-            Vec3 vector3d1 = entity.getEyePosition(partialTicks);
-            Vec3 vector3d2 = vector3d.subtract(vector3d1);
-            float f = Mth.sqrt((float)(vector3d2.x * vector3d2.x + vector3d2.z * vector3d2.z)) - totalYaw;
-            this.eye.rotateAngleY += -(float) (Mth.atan2(vector3d2.x, vector3d2.z)) - totalYaw;
-            this.eye.rotateAngleX += -Mth.clamp(vector3d2.y * 0.5F, Math.PI * -0.5F, Math.PI * 0.5F) + phagePitch * flyProgress * 0.2F;
-        }
-    }
-
-    @Override
-    public void renderToBuffer(PoseStack matrixStack, VertexConsumer buffer, int packedLight, int packedOverlay, int color) {
-        root.render(matrixStack, buffer, packedLight, packedOverlay);
+        // Look-at logic simplified - using state head rotation
+        this.eye.rotateAngleY += Maths.rad(state.yHeadRot - state.yBodyRot);
+        this.eye.rotateAngleX += Maths.rad(state.xHeadRot) + phagePitch * flyProgress * 0.2F;
     }
 
     @Override
