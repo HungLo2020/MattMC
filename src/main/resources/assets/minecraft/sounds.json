@@ -14911,6 +14911,29 @@
     ],
     "subtitle": "subtitles.entity.endergrade.ambient"
   },
+  "entity.enderiophage.hurt": {
+    "sounds": [
+      "enderiophage_hurt_0",
+      "enderiophage_hurt_1"
+    ],
+    "subtitle": "subtitles.entity.enderiophage.hurt"
+  },
+  "entity.enderiophage.walk": {
+    "sounds": [
+      "enderiophage_walk_0",
+      "enderiophage_walk_1",
+      "enderiophage_walk_2"
+    ],
+    "subtitle": "subtitles.entity.enderiophage.step"
+  },
+  "entity.enderiophage.squish": {
+    "sounds": [
+      "enderiophage_squish_0",
+      "enderiophage_squish_1",
+      "enderiophage_squish_2"
+    ],
+    "subtitle": "subtitles.entity.enderiophage.squish"
+  },
   "entity.enderman.ambient": {
     "sounds": [
       "mob/endermen/idle1",

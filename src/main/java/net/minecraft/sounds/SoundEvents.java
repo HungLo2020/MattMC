@@ -587,6 +587,9 @@ public class SoundEvents {
 	public static final SoundEvent EMU_HURT = register("entity.emu.hurt");
 	public static final SoundEvent ENDERGRADE_IDLE = register("entity.endergrade.idle");
 	public static final SoundEvent ENDERGRADE_HURT = register("entity.endergrade.hurt");
+	public static final SoundEvent ENDERIOPHAGE_HURT = register("entity.enderiophage.hurt");
+	public static final SoundEvent ENDERIOPHAGE_WALK = register("entity.enderiophage.walk");
+	public static final SoundEvent ENDERIOPHAGE_SQUISH = register("entity.enderiophage.squish");
 	public static final SoundEvent ENDERMAN_AMBIENT = register("entity.enderman.ambient");
 	public static final SoundEvent ENDERMAN_DEATH = register("entity.enderman.death");
 	public static final SoundEvent ENDERMAN_HURT = register("entity.enderman.hurt");

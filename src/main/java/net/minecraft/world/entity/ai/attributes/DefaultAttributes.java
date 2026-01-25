@@ -146,6 +146,7 @@ public class DefaultAttributes {
 		.put(EntityType.EMU, com.github.alexthe666.alexsmobs.entity.EntityEmu.createAttributes().build())
 		.put(EntityType.ELDER_GUARDIAN, ElderGuardian.createAttributes().build())
 		.put(EntityType.ENDERGRADE, com.github.alexthe666.alexsmobs.entity.EntityEndergrade.bakeAttributes().build())
+		.put(EntityType.ENDERIOPHAGE, com.github.alexthe666.alexsmobs.entity.EntityEnderiophage.createAttributes().build())
 		.put(EntityType.ENDERMAN, EnderMan.createAttributes().build())
 		.put(EntityType.ENDERMITE, Endermite.createAttributes().build())
 		.put(EntityType.ENDER_DRAGON, EnderDragon.createAttributes().build())

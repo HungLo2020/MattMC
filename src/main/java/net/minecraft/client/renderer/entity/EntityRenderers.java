@@ -133,6 +133,7 @@ public class EntityRenderers {
 		register(EntityType.EMU_EGG, ThrownItemRenderer::new);
 		register(EntityType.ELDER_GUARDIAN, ElderGuardianRenderer::new);
 		register(EntityType.ENDERGRADE, RenderEndergrade::new);
+		register(EntityType.ENDERIOPHAGE, com.github.alexthe666.alexsmobs.client.render.RenderEnderiophage::new);
 		register(EntityType.ENDERMAN, EndermanRenderer::new);
 		register(EntityType.ENDERMITE, EndermiteRenderer::new);
 		register(EntityType.ENDER_DRAGON, EnderDragonRenderer::new);

@@ -526,6 +526,13 @@ public class EntityType<T extends Entity> implements FeatureElement, EntityTypeT
 			.eyeHeight(0.6F)
 			.clientTrackingRange(10)
 	);
+	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntityEnderiophage> ENDERIOPHAGE = register(
+		"enderiophage",
+		EntityType.Builder.of(com.github.alexthe666.alexsmobs.entity.EntityEnderiophage::new, MobCategory.MONSTER)
+			.sized(0.9F, 0.9F)
+			.eyeHeight(0.6F)
+			.clientTrackingRange(10)
+	);
 	public static final EntityType<EndCrystal> END_CRYSTAL = register(
 		"end_crystal",
 		EntityType.Builder.<EndCrystal>of(EndCrystal::new, MobCategory.MISC)
