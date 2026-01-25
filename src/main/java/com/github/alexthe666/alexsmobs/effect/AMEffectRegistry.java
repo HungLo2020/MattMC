@@ -5,8 +5,8 @@ import net.minecraft.world.effect.MobEffect;
 import net.minecraft.world.effect.MobEffects;
 
 /**
- * Stub registry for AlexsMobs effects
- * Uses vanilla effects as placeholders to avoid registry freeze issues
+ * Registry for AlexsMobs effects
+ * References effects registered in vanilla MobEffects.java
  */
 public class AMEffectRegistry {
     
@@ -22,14 +22,14 @@ public class AMEffectRegistry {
     public static final Holder<MobEffect> FLEET_FOOTED = MobEffects.SPEED;
     
     /**
-     * Orca's Might effect - stub using vanilla strength effect
-     * In full implementation this would be a custom effect
+     * Orca's Might effect - provides attack speed boost when swimming with orcas
+     * Registered in MobEffects.java
      */
-    public static final Holder<MobEffect> ORCAS_MIGHT = MobEffects.STRENGTH;
+    public static final Holder<MobEffect> ORCAS_MIGHT = MobEffects.ORCAS_MIGHT;
     
     /**
-     * Debilitating Sting effect - stub using vanilla weakness effect  
-     * In full implementation this would be a custom effect
+     * Debilitating Sting effect - from Tarantula Hawk sting
+     * Registered in MobEffects.java
      */
-    public static final Holder<MobEffect> DEBILITATING_STING = MobEffects.WEAKNESS;
+    public static final Holder<MobEffect> DEBILITATING_STING = MobEffects.DEBILITATING_STING;
 }

@@ -120,6 +120,14 @@ public class MobEffects {
 	public static final Holder<MobEffect> INFESTED = register(
 		"infested", new InfestedMobEffect(MobEffectCategory.HARMFUL, 9214860, 0.1F, randomSource -> Mth.randomBetweenInclusive(randomSource, 1, 2))
 	);
+	
+	// AlexsMobs custom effects
+	public static final Holder<MobEffect> ORCAS_MIGHT = register(
+		"orcas_might", new com.github.alexthe666.alexsmobs.effect.EffectOrcaMight()
+	);
+	public static final Holder<MobEffect> DEBILITATING_STING = register(
+		"debilitating_sting", new com.github.alexthe666.alexsmobs.effect.EffectDebilitatingSting()
+	);
 
 	private static Holder<MobEffect> register(String string, MobEffect mobEffect) {
 		return Registry.registerForHolder(BuiltInRegistries.MOB_EFFECT, ResourceLocation.withDefaultNamespace(string), mobEffect);
