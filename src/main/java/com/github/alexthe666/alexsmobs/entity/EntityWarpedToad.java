@@ -74,7 +74,7 @@ public class EntityWarpedToad extends TamableAnimal implements ITargetsDroppedIt
     private int currentMoveTypeDuration;
     private int swimTimer = -100;
 
-    protected EntityWarpedToad(EntityType<EntityWarpedToad> entityType, Level world) {
+    public EntityWarpedToad(EntityType<EntityWarpedToad> entityType, Level world) {
         super(entityType, world);
         this.setPathfindingMalus(PathType.WATER, 0.0F);
         this.setPathfindingMalus(PathType.LAVA, 0.0F);
@@ -480,7 +480,7 @@ public class EntityWarpedToad extends TamableAnimal implements ITargetsDroppedIt
     @Nullable
     @Override
     public AgeableMob getBreedOffspring(ServerLevel serverWorld, AgeableMob ageableEntity) {
-        return AMEntityRegistry.WARPED_TOAD.get().create(serverWorld);
+        return (AgeableMob) AMEntityRegistry.WARPED_TOAD.get().create(serverWorld, EntitySpawnReason.BREEDING);
     }
 
     public float getTongueLength() {
@@ -671,7 +671,9 @@ public class EntityWarpedToad extends TamableAnimal implements ITargetsDroppedIt
             } else if (!this.isTeleportFriendlyBlock(new BlockPos(p_226328_1_, p_226328_2_, p_226328_3_))) {
                 return false;
             } else {
-                this.tameable.moveTo((double) p_226328_1_ + 0.5D, p_226328_2_, (double) p_226328_3_ + 0.5D, this.tameable.getYRot(), this.tameable.getXRot());
+                this.tameable.teleportTo((double) p_226328_1_ + 0.5D, (double) p_226328_2_, (double) p_226328_3_ + 0.5D);
+                this.tameable.setYRot(this.tameable.getYRot());
+                this.tameable.setXRot(this.tameable.getXRot());
                 this.tameable.getNavigation().stop();
                 return true;
             }

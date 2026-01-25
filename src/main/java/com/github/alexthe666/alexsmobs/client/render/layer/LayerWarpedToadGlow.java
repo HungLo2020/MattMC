@@ -6,10 +6,10 @@ import com.github.alexthe666.alexsmobs.client.render.AMRenderTypes;
 import com.github.alexthe666.alexsmobs.client.render.RenderWarpedToad;
 import com.github.alexthe666.alexsmobs.client.render.WarpedToadRenderState;
 import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.blaze3d.vertex.VertexConsumer;
-import net.minecraft.client.renderer.MultiBufferSource;
-import net.minecraft.client.renderer.entity.LivingEntityRenderer;
+import net.minecraft.client.renderer.RenderType;
+import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.client.renderer.entity.layers.RenderLayer;
+import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
 
@@ -24,15 +24,15 @@ public class LayerWarpedToadGlow extends RenderLayer<WarpedToadRenderState, Mode
     }
 
     @Override
-    public void render(PoseStack matrixStackIn, MultiBufferSource bufferIn, int packedLightIn,
-            WarpedToadRenderState state, float limbSwing, float limbSwingAmount) {
+    public void submit(PoseStack poseStack, SubmitNodeCollector submitNodeCollector, int i, WarpedToadRenderState state, float f, float g) {
         if (!state.isBased) {
-            VertexConsumer ivertexbuilder = bufferIn.getBuffer(
-                    AMRenderTypes.getEyesFlickering(state.isBlinking ? TEXTURE_BLINKING : TEXTURE, 0));
+            ResourceLocation texture = state.isBlinking ? TEXTURE_BLINKING : TEXTURE;
+            RenderType renderType = AMRenderTypes.getEyesFlickering(texture, 0);
             final float alpha = 0.75F + (Mth.cos(state.ageInTicks * 0.2F) + 1F) * 0.125F;
-            this.getParentModel().renderToBuffer(matrixStackIn, ivertexbuilder, 240,
-                    LivingEntityRenderer.getOverlayCoords(state, 0.0F),
-                    AMColorUtil.packColor(1.0F, 1.0F, 1.0F, alpha));
+            int color = AMColorUtil.packColor(1.0F, 1.0F, 1.0F, alpha);
+            submitNodeCollector.order(1).submitModel(
+                this.getParentModel(), state, poseStack, renderType, 240, OverlayTexture.NO_OVERLAY, color, null, state.outlineColor, null
+            );
         }
     }
 }
