@@ -4,6 +4,9 @@ pluginManagement {
         maven { url 'https://maven.minecraftforge.net/' }
         maven { url 'https://repo.maven.apache.org/maven2' }
     }
+    plugins {
+        id 'org.graalvm.buildtools.native' version '0.10.3'
+    }
 }
 
 // Enable automatic JDK provisioning for toolchains

@@ -1,6 +1,7 @@
 plugins {
     id 'java'
     id 'application'
+    id 'org.graalvm.buildtools.native' version '0.10.3'
 }
 
 group = 'net.minecraft'
@@ -374,6 +375,121 @@ jar {
 application {
     mainClass = 'net.fabricmc.loader.impl.launch.knot.KnotClient'
 }
+
+// ============================================================================
+// GRAALVM NATIVE IMAGE CONFIGURATION
+// ============================================================================
+// Configure GraalVM Native Image for cross-platform native compilation
+// ============================================================================
+
+graalvmNative {
+    binaries {
+        main {
+            // Main class for client executable
+            mainClass = 'net.fabricmc.loader.impl.launch.knot.KnotClient'
+            
+            // Enable verbose output during native image build
+            verbose = true
+            
+            // Build options for native image
+            buildArgs.addAll(
+                // Memory settings for native image build process
+                '-J-Xmx16g',
+                
+                // Enable all security features
+                '--no-fallback',
+                
+                // Initialize at build time (reduces startup time)
+                '--initialize-at-build-time=org.slf4j,org.apache.logging.log4j',
+                
+                // Report unsupported elements
+                '--report-unsupported-elements-at-runtime',
+                
+                // Allow incomplete classpath (for dynamic loading)
+                '--allow-incomplete-classpath',
+                
+                // Enable JNI
+                '--enable-all-security-services',
+                
+                // Add debugging information
+                '-H:+ReportExceptionStackTraces',
+                
+                // Enable monitoring/debugging features
+                '-H:+AddAllCharsets',
+                
+                // Enable resource configuration
+                '-H:IncludeResources=.*\\.json',
+                '-H:IncludeResources=.*\\.properties',
+                '-H:IncludeResources=.*\\.png',
+                '-H:IncludeResources=.*\\.jpg',
+                '-H:IncludeResources=.*\\.mcmeta',
+                '-H:IncludeResources=.*\\.nbt',
+                '-H:IncludeResources=.*\\.dat',
+                '-H:IncludeResources=assets/.*',
+                '-H:IncludeResources=data/.*',
+                
+                // Dynamic proxy configuration for reflection
+                '--enable-url-protocols=http,https,jar',
+                
+                // Enable HTTPS
+                '--enable-https',
+                
+                // Platform-specific options
+                isMacOS ? '-H:+UseCGSymbolDirectives' : ''
+            )
+            
+            // Platform-specific build arguments
+            if (isMacOS) {
+                buildArgs.add('-march=compatibility')
+            }
+            
+            // JVM options for the build process
+            jvmArgs.addAll(
+                '-Djava.awt.headless=false'
+            )
+        }
+        
+        // Server executable configuration
+        server {
+            mainClass = 'net.minecraft.server.Main'
+            
+            verbose = true
+            
+            buildArgs.addAll(
+                '-J-Xmx16g',
+                '--no-fallback',
+                '--initialize-at-build-time=org.slf4j,org.apache.logging.log4j',
+                '--report-unsupported-elements-at-runtime',
+                '--allow-incomplete-classpath',
+                '--enable-all-security-services',
+                '-H:+ReportExceptionStackTraces',
+                '-H:+AddAllCharsets',
+                '-H:IncludeResources=.*\\.json',
+                '-H:IncludeResources=.*\\.properties',
+                '-H:IncludeResources=data/.*',
+                '--enable-url-protocols=http,https,jar',
+                '--enable-https'
+            )
+        }
+    }
+    
+    // Agent options for generating native image configuration
+    agent {
+        defaultMode = "standard"
+        modes {
+            standard {
+                // Generate configuration files during agent run
+            }
+        }
+        
+        metadataCopy {
+            inputTaskNames.add("run")
+            outputDirectories.add("src/main/resources/META-INF/native-image")
+            mergeWithExisting = true
+        }
+    }
+}
+
 
 // Detect macOS platform for JVM argument adjustments
 // Check for both "Mac OS X" and "macOS" (case-insensitive)
@@ -917,6 +1033,138 @@ tasks.register('clientDistZip', Zip) {
     
     destinationDirectory = file("${buildDir}/distributions")
 }
+
+// ============================================================================
+// GRAALVM NATIVE IMAGE TASKS
+// ============================================================================
+// Tasks for building native executables using GraalVM Native Image
+// ============================================================================
+
+// Task to build native client executable
+tasks.register('nativeClientCompile') {
+    group = 'native'
+    description = 'Builds native client executable using GraalVM Native Image'
+    
+    dependsOn 'nativeCompile'
+    
+    doLast {
+        println "✅ Native client executable built successfully!"
+        println "   Location: ${buildDir}/native/nativeCompile/"
+    }
+}
+
+// Task to build native server executable
+tasks.register('nativeServerCompile') {
+    group = 'native'
+    description = 'Builds native server executable using GraalVM Native Image'
+    
+    dependsOn 'nativeCompile'
+    
+    doLast {
+        println "✅ Native server executable built successfully!"
+        println "   Location: ${buildDir}/native/nativeCompile/"
+    }
+}
+
+// Task to create a native client distribution
+tasks.register('nativeClientDist') {
+    group = 'native'
+    description = 'Creates a runnable native client distribution'
+    
+    dependsOn 'nativeCompile', 'shaderPackZip'
+    
+    def distDir = "${buildDir}/native-client-dist/MattMC"
+    def osName = System.getProperty('os.name').toLowerCase()
+    def isWindows = osName.contains('windows') || osName.contains('win')
+    
+    outputs.dir distDir
+    
+    doLast {
+        // Create directory structure
+        file("${distDir}").mkdirs()
+        file("${distDir}/run").mkdirs()
+        file("${distDir}/run/resourcepacks").mkdirs()
+        file("${distDir}/run/shaderpacks").mkdirs()
+        
+        // Copy native executable
+        def executableName = isWindows ? 'MattMC.exe' : 'MattMC'
+        def nativeExecutable = file("${buildDir}/native/nativeCompile/${executableName}")
+        
+        if (nativeExecutable.exists()) {
+            copy {
+                from nativeExecutable
+                into distDir
+            }
+            
+            // Make executable on Unix-like systems
+            if (!isWindows) {
+                def destExecutable = file("${distDir}/${executableName}")
+                destExecutable.setExecutable(true)
+            }
+            
+            println "✅ Copied native executable to ${distDir}"
+        } else {
+            println "⚠️  Native executable not found at: ${nativeExecutable}"
+            println "   Run './gradlew nativeCompile' first to build the native executable"
+        }
+        
+        // Copy shader pack
+        copy {
+            from file("${buildDir}/shaderpacks")
+            into "${distDir}/run/shaderpacks"
+            include '*.zip'
+        }
+        
+        // Create a simple launch script for native executable
+        if (isWindows) {
+            def launchScript = file("${distDir}/run-mattmc.bat")
+            launchScript.text = """@echo off
+:: MattMC Native Client Launcher
+cd /d "%~dp0"
+
+:: Launch the native executable
+MattMC.exe --version 1.21.10 --accessToken 0 --gameDir run
+
+pause
+"""
+        } else {
+            def launchScript = file("${distDir}/run-mattmc.sh")
+            launchScript.text = """#!/bin/bash
+# MattMC Native Client Launcher
+
+# Get script directory
+SCRIPT_DIR="\$(cd "\$(dirname "\$0")" && pwd)"
+cd "\$SCRIPT_DIR"
+
+# Launch the native executable
+./MattMC --version 1.21.10 --accessToken 0 --gameDir run
+"""
+            launchScript.setExecutable(true)
+        }
+        
+        println "✅ Native client distribution created at: ${distDir}"
+    }
+}
+
+// Task to create a zip of the native client distribution
+tasks.register('nativeClientDistZip', Zip) {
+    group = 'native'
+    description = 'Creates a zip of the native client distribution'
+    
+    dependsOn 'nativeClientDist'
+    
+    archiveBaseName = 'MattMC-Native-Client'
+    
+    from "${buildDir}/native-client-dist"
+    
+    destinationDirectory = file("${buildDir}/distributions")
+    
+    doLast {
+        println "✅ Native client distribution zip created!"
+        println "   Location: ${destinationDirectory.get()}/MattMC-Native-Client.zip"
+    }
+}
+
 
 // ===== TESTING CONFIGURATION =====
 

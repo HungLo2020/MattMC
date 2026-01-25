@@ -1,4 +1,4 @@
-# PowerShell script to download Temurin OpenJDK for Windows
+# PowerShell script to download GraalVM for Windows
 # This script checks if the JDK is already present and downloads it if needed
 
 $ErrorActionPreference = "Stop"
@@ -19,23 +19,23 @@ if (Test-Path $GradlePropertiesPath) {
 
 $JdkDir = Join-Path $ScriptDir "jdk-$JavaVersion"
 
-# JDK version configuration - Update these when a new Java version is released
-# This is the specific build version to download (e.g., 25.0.1+8)
-$JdkVersion = "25.0.1+8"
-$JdkBuild = "25.0.1_8"
+# GraalVM version configuration
+# Using GraalVM for JDK 21 as JDK 25 is not yet available for GraalVM
+$GraalVMVersion = "21.0.5"
+$GraalVMBuild = "21.0.5+9.1"
 
 # Detect architecture
 $Arch = $env:PROCESSOR_ARCHITECTURE
 if ($Arch -eq "AMD64") {
     $Platform = "windows-x64"
-    $JdkUrl = "https://github.com/adoptium/temurin$JavaVersion-binaries/releases/download/jdk-$JdkVersion/OpenJDK$($JavaVersion)U-jdk_x64_windows_hotspot_$JdkBuild.zip"
-    $JdkArchive = "OpenJDK$($JavaVersion)U-jdk_x64_windows_hotspot_$JdkBuild.zip"
-    $JdkExtractedDir = "jdk-$JdkVersion"
+    $JdkUrl = "https://download.oracle.com/graalvm/21/latest/graalvm-jdk-21_windows-x64_bin.zip"
+    $JdkArchive = "graalvm-jdk-21_windows-x64_bin.zip"
+    $JdkExtractedDir = "graalvm-jdk-$GraalVMBuild"
 } elseif ($Arch -eq "ARM64") {
-    $Platform = "windows-aarch64"
-    $JdkUrl = "https://github.com/adoptium/temurin$JavaVersion-binaries/releases/download/jdk-$JdkVersion/OpenJDK$($JavaVersion)U-jdk_aarch64_windows_hotspot_$JdkBuild.zip"
-    $JdkArchive = "OpenJDK$($JavaVersion)U-jdk_aarch64_windows_hotspot_$JdkBuild.zip"
-    $JdkExtractedDir = "jdk-$JdkVersion"
+    Write-Host "[ERROR] GraalVM for Windows ARM64 is not officially available yet" -ForegroundColor Red
+    Write-Host "   Please use x64 emulation or download manually from:" -ForegroundColor Yellow
+    Write-Host "   https://www.graalvm.org/downloads/" -ForegroundColor Yellow
+    exit 1
 } else {
     Write-Host "[ERROR] Unsupported architecture: $Arch" -ForegroundColor Red
     exit 1
@@ -43,12 +43,13 @@ if ($Arch -eq "AMD64") {
 
 # Check if JDK already exists
 $JavaExe = Join-Path $JdkDir "bin\java.exe"
-if ((Test-Path $JdkDir) -and (Test-Path $JavaExe)) {
-    Write-Host "[OK] JDK already exists at: $JdkDir" -ForegroundColor Green
+$NativeImageExe = Join-Path $JdkDir "bin\native-image.cmd"
+if ((Test-Path $JdkDir) -and (Test-Path $JavaExe) -and (Test-Path $NativeImageExe)) {
+    Write-Host "[OK] GraalVM already exists at: $JdkDir" -ForegroundColor Green
     exit 0
 }
 
-Write-Host "[DOWNLOAD] Downloading Temurin OpenJDK $JavaVersion for $Platform..." -ForegroundColor Cyan
+Write-Host "[DOWNLOAD] Downloading GraalVM $GraalVMVersion for $Platform..." -ForegroundColor Cyan
 Write-Host "   URL: $JdkUrl"
 
 # Create temporary directory
@@ -62,14 +63,14 @@ try {
     Write-Host "[INFO] Downloading..." -ForegroundColor Yellow
     Invoke-WebRequest -Uri $JdkUrl -OutFile $ArchivePath -UseBasicParsing
     
-    Write-Host "[INFO] Extracting JDK..." -ForegroundColor Yellow
+    Write-Host "[INFO] Extracting GraalVM..." -ForegroundColor Yellow
     
     # Extract using built-in PowerShell
     $ExtractPath = Join-Path $TempDir "extracted"
     Expand-Archive -Path $ArchivePath -DestinationPath $ExtractPath -Force
     
     # Move to final location
-    Write-Host "[INFO] Installing JDK to: $JdkDir" -ForegroundColor Yellow
+    Write-Host "[INFO] Installing GraalVM to: $JdkDir" -ForegroundColor Yellow
     
     # Remove old JDK if exists
     if (Test-Path $JdkDir) {
@@ -80,14 +81,24 @@ try {
     $ExtractedJdkPath = Join-Path $ExtractPath $JdkExtractedDir
     Move-Item -Path $ExtractedJdkPath -Destination $JdkDir -Force
     
-    Write-Host "[SUCCESS] JDK installed successfully!" -ForegroundColor Green
+    Write-Host "[SUCCESS] GraalVM installed successfully!" -ForegroundColor Green
     
     # Verify installation
     $JavaExe = Join-Path $JdkDir "bin\java.exe"
     & $JavaExe -version
     
     Write-Host ""
-    Write-Host "[SUCCESS] Temurin OpenJDK $JavaVersion is ready to use at: $JdkDir" -ForegroundColor Green
+    Write-Host "[INFO] Verifying native-image tool..." -ForegroundColor Yellow
+    $NativeImageExe = Join-Path $JdkDir "bin\native-image.cmd"
+    if (Test-Path $NativeImageExe) {
+        Write-Host "[SUCCESS] native-image tool is available" -ForegroundColor Green
+    } else {
+        Write-Host "[WARNING] native-image tool not found, it should be included in GraalVM" -ForegroundColor Yellow
+    }
+    
+    Write-Host ""
+    Write-Host "[SUCCESS] GraalVM $GraalVMVersion is ready to use at: $JdkDir" -ForegroundColor Green
+    Write-Host "   Native Image compilation is now available!" -ForegroundColor Green
     
 } finally {
     # Clean up temporary directory
