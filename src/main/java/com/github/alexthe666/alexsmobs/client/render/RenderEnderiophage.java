@@ -21,6 +21,7 @@ public class RenderEnderiophage extends MobRenderer<EntityEnderiophage, Enderiop
     private static final ResourceLocation TEXTURE_OVERWORLD_GLOW = ResourceLocation.withDefaultNamespace("textures/entity/enderiophage_overworld_glow.png");
     private static final ResourceLocation TEXTURE_NETHER = ResourceLocation.withDefaultNamespace("textures/entity/enderiophage_nether.png");
     private static final ResourceLocation TEXTURE_NETHER_GLOW = ResourceLocation.withDefaultNamespace("textures/entity/enderiophage_nether_glow.png");
+    private static final int FULL_BRIGHT = 15728640;
 
     public RenderEnderiophage(EntityRendererProvider.Context renderManagerIn) {
         super(renderManagerIn, new ModelEnderiophage(), 0.5F);
@@ -85,17 +86,17 @@ public class RenderEnderiophage extends MobRenderer<EntityEnderiophage, Enderiop
 
         public void render(PoseStack matrixStackIn, MultiBufferSource bufferIn, int packedLightIn, EnderiophageRenderState state, float limbSwing, float limbSwingAmount) {
             VertexConsumer ivertexbuilder = bufferIn.getBuffer(this.getRenderType(state));
-            this.getParentModel().renderToBuffer(matrixStackIn, ivertexbuilder, 15728640, OverlayTexture.NO_OVERLAY);
+            this.getParentModel().renderToBuffer(matrixStackIn, ivertexbuilder, FULL_BRIGHT, OverlayTexture.NO_OVERLAY);
         }
 
         @Override
         public RenderType renderType() {
-            return AMRenderTypes.getEyesFlickering(TEXTURE_GLOW, 15728640);
+            return AMRenderTypes.getEyesFlickering(TEXTURE_GLOW, FULL_BRIGHT);
         }
 
         public RenderType getRenderType(EnderiophageRenderState state) {
             ResourceLocation tex = state.variant == 2 ? TEXTURE_NETHER_GLOW : state.variant == 1 ? TEXTURE_OVERWORLD_GLOW : TEXTURE_GLOW;
-            return AMRenderTypes.getEyesFlickering(tex, 15728640);
+            return AMRenderTypes.getEyesFlickering(tex, FULL_BRIGHT);
         }
     }
 

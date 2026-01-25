@@ -51,20 +51,15 @@ import java.util.EnumSet;
 
 public class EntityEnderiophage extends Animal implements Enemy, FlyingAnimal {
 
-    @Override
-    public boolean isFood(ItemStack stack) {
-        return false;
-    }
-
-
+    private static final TargetingConditions.Selector ENDERGRADE_OR_INFECTED = (entity, level) -> {
+        return entity instanceof EntityEndergrade || entity.hasEffect(AMEffectRegistry.ENDER_FLU);
+    };
+    
     private static final EntityDataAccessor<Float> PHAGE_PITCH = SynchedEntityData.defineId(EntityEnderiophage.class, EntityDataSerializers.FLOAT);
     private static final EntityDataAccessor<Boolean> FLYING = SynchedEntityData.defineId(EntityEnderiophage.class, EntityDataSerializers.BOOLEAN);
     private static final EntityDataAccessor<Boolean> MISSING_EYE = SynchedEntityData.defineId(EntityEnderiophage.class, EntityDataSerializers.BOOLEAN);
     private static final EntityDataAccessor<Float> PHAGE_SCALE = SynchedEntityData.defineId(EntityEnderiophage.class, EntityDataSerializers.FLOAT);
     private static final EntityDataAccessor<Integer> VARIANT = SynchedEntityData.defineId(EntityEnderiophage.class, EntityDataSerializers.INT);
-    private static final TargetingConditions.Selector ENDERGRADE_OR_INFECTED = (entity, level) -> {
-        return entity instanceof EntityEndergrade || entity.hasEffect(AMEffectRegistry.ENDER_FLU);
-    };
     public float prevPhagePitch;
     public float tentacleAngle;
     public float lastTentacleAngle;
@@ -89,6 +84,11 @@ public class EntityEnderiophage extends Animal implements Enemy, FlyingAnimal {
         this.rotationVelocity = 1.0F / (this.random.nextFloat() + 1.0F) * 0.2F;
         switchNavigator(false);
         this.xpReward = 5;
+    }
+
+    @Override
+    public boolean isFood(ItemStack stack) {
+        return false;
     }
 
     public static AttributeSupplier.Builder createAttributes() {

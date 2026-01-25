@@ -14,6 +14,8 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.phys.Vec3;
 
 public class ModelEnderiophage extends AdvancedEntityModel<EnderiophageRenderState> {
+    private static final float MAX_FLY_PROGRESS = 5.0F;
+    
     private final AdvancedModelBox root;
     private final AdvancedModelBox body;
     private final AdvancedModelBox mouth;
@@ -163,7 +165,7 @@ public class ModelEnderiophage extends AdvancedEntityModel<EnderiophageRenderSta
         this.bob(body, idleSpeed, idleDegree * 8, false, ageInTicks, 1);
         this.body.rotationPointY += 8F;
 
-        if (flyProgress != 5) {
+        if (flyProgress != MAX_FLY_PROGRESS) {
             limbSwingAmount = limbSwingAmount * (1 - (flyProgress * 0.2F));
             this.walk(sheath, walkSpeed, walkDegree * 0.2F, true, 1, 0.05F, limbSwing, limbSwingAmount);
             this.swing(tailfront_right, walkSpeed, walkDegree * -1.2F, false, 0, -0.3F, limbSwing, limbSwingAmount);
