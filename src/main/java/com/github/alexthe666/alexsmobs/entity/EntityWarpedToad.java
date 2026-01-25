@@ -124,8 +124,8 @@ public class EntityWarpedToad extends TamableAnimal implements ITargetsDroppedIt
         return worldIn.isUnobstructed(this);
     }
 
-    public boolean hurt(DamageSource source, float amount) {
-        if (this.isInvulnerableTo(source)) {
+    public boolean hurtServer(ServerLevel serverLevel, DamageSource source, float amount) {
+        if (this.isInvulnerableTo(serverLevel, source)) {
             return false;
         } else {
             Entity entity = source.getEntity();
@@ -133,20 +133,20 @@ public class EntityWarpedToad extends TamableAnimal implements ITargetsDroppedIt
             if (entity != null && this.isTame() && !(entity instanceof Player) && !(entity instanceof AbstractArrow)) {
                 amount = (amount + 1.0F) / 3.0F;
             }
-            return super.hurt(source, amount);
+            return super.hurtServer(serverLevel, source, amount);
         }
     }
 
-    public void addAdditionalSaveData(CompoundTag compound) {
-        super.addAdditionalSaveData(compound);
-        compound.putBoolean("ToadSitting", this.isOrderedToSit());
-        compound.putInt("Command", this.getCommand());
+    protected void addAdditionalSaveData(net.minecraft.world.level.storage.ValueOutput valueOutput) {
+        super.addAdditionalSaveData(valueOutput);
+        valueOutput.putBoolean("ToadSitting", this.isOrderedToSit());
+        valueOutput.putInt("Command", this.getCommand());
     }
 
-    public void readAdditionalSaveData(CompoundTag compound) {
-        super.readAdditionalSaveData(compound);
-        this.setOrderedToSit(compound.getBoolean("ToadSitting"));
-        this.setCommand(compound.getInt("Command"));
+    protected void readAdditionalSaveData(net.minecraft.world.level.storage.ValueInput valueInput) {
+        super.readAdditionalSaveData(valueInput);
+        this.setOrderedToSit(valueInput.getBooleanOr("ToadSitting", false));
+        this.setCommand(valueInput.getIntOr("Command", 0));
     }
 
     protected void registerGoals() {
@@ -156,7 +156,7 @@ public class EntityWarpedToad extends TamableAnimal implements ITargetsDroppedIt
         this.goalSelector.addGoal(3, new com.github.alexthe666.alexsmobs.entity.ai.AnimalAIFindWater(this));
         this.goalSelector.addGoal(3, new com.github.alexthe666.alexsmobs.entity.ai.AnimalAILeaveWater(this));
         this.goalSelector.addGoal(3, new BreedGoal(this, 0.8D));
-        this.goalSelector.addGoal(4, new TemptGoal(this, 1.0D, Ingredient.of(AMTagRegistry.WARPED_TOAD_FOODSTUFFS), false));
+        this.goalSelector.addGoal(4, new TemptGoal(this, 1.0D, (stack) -> stack.is(AMTagRegistry.WARPED_TOAD_FOODSTUFFS), false));
         this.goalSelector.addGoal(5, new WarpedToadAIRandomSwimming(this, 1.0D, 7));
         this.goalSelector.addGoal(6, new AnimalAILeapRandomly(this, 50, 7){
             public boolean canUse(){
@@ -204,8 +204,8 @@ public class EntityWarpedToad extends TamableAnimal implements ITargetsDroppedIt
     protected void checkFallDamage(double y, boolean onGroundIn, BlockState state, BlockPos pos) {
     }
 
-    public void customServerAiStep() {
-        super.customServerAiStep();
+    public void customServerAiStep(ServerLevel serverLevel) {
+        super.customServerAiStep(serverLevel);
     }
 
     public boolean isFood(ItemStack stack) {
@@ -259,7 +259,8 @@ public class EntityWarpedToad extends TamableAnimal implements ITargetsDroppedIt
     }
 
 
-    public boolean isAlliedTo(Entity entityIn) {
+    @Override
+    public boolean isAlliedTo(@Nullable Entity entityIn) {
         if (this.isTame()) {
             LivingEntity livingentity = this.getOwner();
             if (entityIn == livingentity) {
@@ -289,7 +290,7 @@ public class EntityWarpedToad extends TamableAnimal implements ITargetsDroppedIt
         if(this.isBaby() && this.getEyeHeight() > this.getBbHeight()){
             this.refreshDimensions();
         }
-        if (!this.level().isClientSide) {
+        if (!this.level().isClientSide()) {
             if (isInWater() || isInLava()) {
                 if (swimTimer < 0) {
                     swimTimer = 0;
@@ -366,10 +367,10 @@ public class EntityWarpedToad extends TamableAnimal implements ITargetsDroppedIt
         if (isTongueOut && attackProgress < 5F) {
             attackProgress++;
         }
-        if (!this.level().isClientSide) {
+        if (!level().isClientSide()) {
             this.entityData.set(JUMP_ACTIVE, !this.onGround());
         }
-        if (this.entityData.get(JUMP_ACTIVE) && !isInWaterOrBubble()) {
+        if (this.entityData.get(JUMP_ACTIVE) && !isInWater()) {
             this.yBodyRot = this.getYRot();
             this.yHeadRot = this.getYRot();
             if (jumpProgress < 5F) {
@@ -405,9 +406,7 @@ public class EntityWarpedToad extends TamableAnimal implements ITargetsDroppedIt
                 this.yBodyRot = this.getYRot();
                 this.yHeadRot = this.getYRot();
             } else {
-                if (entityIn instanceof EntityCrimsonMosquito) {
-                    ((EntityCrimsonMosquito) entityIn).setShrink(true);
-                }
+                // CrimsonMosquito logic removed (not part of this port)
                 this.setXRot(0);
                 final float radius = attackProgress * 0.2F * 1.2F * (getTongueLength() - getTongueLength() * 0.4F);
                 final float angle = (Maths.STARTING_ANGLE * this.yBodyRot);
@@ -418,17 +417,14 @@ public class EntityWarpedToad extends TamableAnimal implements ITargetsDroppedIt
                 this.getTarget().setDeltaMovement(minus);
                 if (attackProgress == 0.5F) {
                     float damage = (float) this.getAttribute(Attributes.ATTACK_DAMAGE).getValue();
-                    if (entityIn instanceof EntityCrimsonMosquito) {
-                        damage = Float.MAX_VALUE;
-                    }
                     entityIn.hurt(this.damageSources().mobAttack(this), damage);
                 }
             }
 
-//            if (attackProgress == 5 && (entityIn.getBbHeight() < 0.89D || entityIn instanceof EntityCrimsonMosquito) && !entityIn.hasPassenger(this)) {
+//            if (attackProgress == 5 && (entityIn.getBbHeight() < 0.89D) && !entityIn.hasPassenger(this)) {
 //            }
         }
-        if (!this.level().isClientSide && attackProgress == 5F && isTongueOut) {
+        if (!level().isClientSide() && attackProgress == 5F && isTongueOut) {
             setTongueOut(false);
             attackProgress = 4F;
         }
