@@ -258,25 +258,6 @@ public class EntityWarpedToad extends TamableAnimal implements ITargetsDroppedIt
         return type;
     }
 
-
-    @Override
-    public boolean isAlliedTo(@Nullable Entity entityIn) {
-        if (this.isTame()) {
-            LivingEntity livingentity = this.getOwner();
-            if (entityIn == livingentity) {
-                return true;
-            }
-            if (entityIn instanceof TamableAnimal) {
-                return ((TamableAnimal) entityIn).isOwnedBy(livingentity);
-            }
-            if (livingentity != null) {
-                return livingentity.isAlliedTo(entityIn);
-            }
-        }
-
-        return super.isAlliedTo(entityIn);
-    }
-
     public boolean canSpawnSprintParticle() {
         return false;
     }

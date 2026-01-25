@@ -95,8 +95,8 @@ public class EntityCaiman extends TamableAnimal implements ISemiAquatic,IFollowe
         this.goalSelector.addGoal(4, new TameableAIFollowOwnerWater(this, 1.1D, 4.0F, 2.0F, false));
         this.goalSelector.addGoal(5, new MeleeAttackGoal(this, 1.2F, false));
         this.goalSelector.addGoal(6, new TemptGoal(this, 1.1D, itemStack -> itemStack.is(AMTagRegistry.CAIMAN_BREEDABLES), false));
-        this.goalSelector.addGoal(7, new AnimalAIFindWater(this));
-        this.goalSelector.addGoal(7, new AnimalAILeaveWater(this));
+        this.goalSelector.addGoal(7, new com.github.alexthe666.alexsmobs.entity.ai.AnimalAIFindWater(this));
+        this.goalSelector.addGoal(7, new com.github.alexthe666.alexsmobs.entity.ai.AnimalAILeaveWater(this));
         this.goalSelector.addGoal(8, new CaimanAIBellow(this));
         this.goalSelector.addGoal(9, new SemiAquaticAIRandomSwimming(this, 1.0D, 30));
         this.goalSelector.addGoal(10, new RandomStrollGoal(this, 1.0D, 60));

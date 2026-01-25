@@ -153,8 +153,8 @@ public class EntityMantisShrimp extends TamableAnimal implements ISemiAquatic, I
         this.goalSelector.addGoal(1, new SitWhenOrderedToGoal(this));
         this.goalSelector.addGoal(2, new FollowOwner(this, 1.3D, 4.0F, 2.0F, false));
         this.goalSelector.addGoal(3, new MeleeAttackGoal(this, 1.2F, false));
-        this.goalSelector.addGoal(4, new AnimalAIFindWater(this));
-        this.goalSelector.addGoal(4, new AnimalAILeaveWater(this));
+        this.goalSelector.addGoal(4, new com.github.alexthe666.alexsmobs.entity.ai.AnimalAIFindWater(this));
+        this.goalSelector.addGoal(4, new com.github.alexthe666.alexsmobs.entity.ai.AnimalAILeaveWater(this));
         this.goalSelector.addGoal(5, new BreedGoal(this, 0.8D));
         this.goalSelector.addGoal(6, new TemptGoal(this, 1.0D, itemStack -> itemStack.is(ItemTags.FISHES), false));
         this.goalSelector.addGoal(7, new SemiAquaticAIRandomSwimming(this, 1.0D, 30));
