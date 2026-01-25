@@ -1249,6 +1249,13 @@ public class EntityType<T extends Entity> implements FeatureElement, EntityTypeT
 			.eyeHeight(0.4F)
 			.clientTrackingRange(8)
 	);
+	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntityUnderminer> UNDERMINER = register(
+		"underminer",
+		EntityType.Builder.of(com.github.alexthe666.alexsmobs.entity.EntityUnderminer::new, MobCategory.MONSTER)
+			.sized(0.6F, 1.2F)
+			.eyeHeight(1.0F)
+			.clientTrackingRange(8)
+	);
 	public static final EntityType<Display.TextDisplay> TEXT_DISPLAY = register(
 		"text_display", EntityType.Builder.of(Display.TextDisplay::new, MobCategory.MISC).noLootTable().sized(0.0F, 0.0F).clientTrackingRange(10).updateInterval(1)
 	);

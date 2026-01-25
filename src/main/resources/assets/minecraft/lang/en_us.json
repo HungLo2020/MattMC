@@ -8106,5 +8106,10 @@
   "item.minecraft.mantis_shrimp_spawn_egg": "Mantis Shrimp Spawn Egg",
   "subtitles.entity.mantis_shrimp.hurt": "Mantis Shrimp hurts",
   "subtitles.entity.mantis_shrimp.snap": "Mantis Shrimp snaps",
-  "entity.alexsmobs.mantis_shrimp.command_3": "%s will now break blocks"
+  "entity.alexsmobs.mantis_shrimp.command_3": "%s will now break blocks",
+  "entity.minecraft.underminer": "Underminer",
+  "item.minecraft.underminer_spawn_egg": "Underminer Spawn Egg",
+  "subtitles.entity.underminer.idle": "Underminer grumbles",
+  "subtitles.entity.underminer.hurt": "Underminer hurts",
+  "subtitles.entity.underminer.step": "Underminer steps"
 }
