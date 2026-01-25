@@ -948,7 +948,8 @@ public class CreativeModeTabs {
 					output.accept(Items.FROGSPAWN);
 					output.accept(Items.TURTLE_EGG);
 					output.accept(Items.CAIMAN_EGG);
-					output.accept(Items.PLATYPUS_EGG);
+					// TODO: Re-enable when platypus egg item is registered
+					// output.accept(Items.PLATYPUS_EGG);
 					output.accept(Items.SNIFFER_EGG);
 					output.accept(Items.SUBTERRANODON_EGG);
 					output.accept(Items.VALLUMRAPTOR_EGG);

@@ -46,14 +46,18 @@ public class RenderPlatypus extends MobRenderer<EntityPlatypus, PlatypusRenderSt
     static class FedoraLayer extends RenderLayer<PlatypusRenderState, ModelPlatypus> {
         private final ResourceLocation TEXTURE = ResourceLocation.withDefaultNamespace("textures/entity/platypus_fedora.png");
 
-        public FedoraLayer(RenderPlatypus renderGrizzlyBear) {
-            super(renderGrizzlyBear);
+        public FedoraLayer(RenderPlatypus renderer) {
+            super(renderer);
         }
 
-        public void render(PoseStack matrixStackIn, MultiBufferSource bufferIn, int packedLightIn, PlatypusRenderState state, float limbSwing, float limbSwingAmount) {
+        @Override
+        public void submit(PoseStack matrixStackIn, net.minecraft.client.renderer.SubmitNodeCollector submitNodeCollector, int packedLightIn,
+                PlatypusRenderState state, float limbSwing, float limbSwingAmount) {
             if(state.hasFedora){
-                VertexConsumer ivertexbuilder = bufferIn.getBuffer(RenderType.entityCutout(TEXTURE));
-                this.getParentModel().renderToBuffer(matrixStackIn, ivertexbuilder, packedLightIn, LivingEntityRenderer.getOverlayCoords(state, 0.0F));
+                submitNodeCollector.order(1).submitModel(
+                    this.getParentModel(), state, matrixStackIn, net.minecraft.client.renderer.RenderType.entityCutout(TEXTURE), 
+                    packedLightIn, net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY, -1, null, state.outlineColor, null
+                );
             }
         }
     }

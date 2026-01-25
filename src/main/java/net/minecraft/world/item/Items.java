@@ -866,7 +866,8 @@ public class Items {
 	public static final Item ELEVATOR = registerBlock(Blocks.ELEVATOR);
 	public static final Item TURTLE_EGG = registerBlock(Blocks.TURTLE_EGG);
 	public static final Item CAIMAN_EGG = registerBlock(Blocks.CAIMAN_EGG);
-	public static final Item PLATYPUS_EGG = registerBlock(Blocks.PLATYPUS_EGG);
+	// TODO: Platypus egg item - needs block registration first
+	// public static final Item PLATYPUS_EGG = registerBlock(Blocks.PLATYPUS_EGG);
 	public static final Item SNIFFER_EGG = registerBlock(Blocks.SNIFFER_EGG, (UnaryOperator<Item.Properties>)(properties -> properties.rarity(Rarity.UNCOMMON)));
 	public static final Item SUBTERRANODON_EGG = registerBlock(Blocks.SUBTERRANODON_EGG);
 	public static final Item VALLUMRAPTOR_EGG = registerBlock(Blocks.VALLUMRAPTOR_EGG);

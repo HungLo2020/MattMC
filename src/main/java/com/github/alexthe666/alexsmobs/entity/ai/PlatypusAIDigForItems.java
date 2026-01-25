@@ -85,9 +85,13 @@ public class PlatypusAIDigForItems extends Goal {
                 List<ItemStack> lootList = getItemStacks(platypus);
                 if (lootList.size() > 0) {
                     for (ItemStack stack : lootList) {
-                        ItemEntity e = this.platypus.spawnAtLocation(stack.copy());
-                        e.hasImpulse = true;
-                        e.setDeltaMovement(e.getDeltaMovement().multiply(0.2, 0.2, 0.2));
+                        if(platypus.level() instanceof net.minecraft.server.level.ServerLevel serverLevel) {
+                            ItemEntity e = this.platypus.spawnAtLocation(serverLevel, stack.copy(), 0.0F);
+                            if(e != null) {
+                                e.hasImpulse = true;
+                                e.setDeltaMovement(e.getDeltaMovement().multiply(0.2, 0.2, 0.2));
+                            }
+                        }
                     }
                 }
             }

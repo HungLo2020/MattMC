@@ -44,7 +44,7 @@ public class ParticlePlatypus extends SimpleAnimatedParticle {
             this.spriteSet = spriteSet;
         }
 
-        public Particle createParticle(SimpleParticleType typeIn, ClientLevel worldIn, double x, double y, double z, double xSpeed, double ySpeed, double zSpeed) {
+        public Particle createParticle(SimpleParticleType typeIn, ClientLevel worldIn, double x, double y, double z, double xSpeed, double ySpeed, double zSpeed, net.minecraft.util.RandomSource randomSource) {
             ParticlePlatypus p = new ParticlePlatypus(worldIn, x, y, z, xSpeed, ySpeed, zSpeed, spriteSet);
             return p;
         }

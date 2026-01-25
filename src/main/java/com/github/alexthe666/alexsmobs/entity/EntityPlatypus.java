@@ -559,7 +559,8 @@ public class EntityPlatypus extends Animal implements ISemiAquatic, ITargetsDrop
                 final Level world = this.turtle.level();
                 turtle.gameEvent(GameEvent.BLOCK_PLACE);
                 world.playSound(null, blockpos, SoundEvents.TURTLE_LAY_EGG, SoundSource.BLOCKS, 0.3F, 0.9F + world.random.nextFloat() * 0.2F);
-                world.setBlock(this.blockPos.above(), Blocks.PLATYPUS_EGG.defaultBlockState().setValue(BlockReptileEgg.EGGS, this.turtle.random.nextInt(3) + 1), 3);
+                // TODO: Re-enable when platypus egg block is registered
+                // world.setBlock(this.blockPos.above(), Blocks.PLATYPUS_EGG.defaultBlockState().setValue(BlockReptileEgg.EGGS, this.turtle.random.nextInt(3) + 1), 3);
                 this.turtle.setHasEgg(false);
                 this.turtle.setDigging(false);
                 this.turtle.setInLoveTime(600);
