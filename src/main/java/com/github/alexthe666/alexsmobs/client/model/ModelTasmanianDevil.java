@@ -150,10 +150,9 @@ public class ModelTasmanianDevil extends AdvancedEntityModel<TasmanianDevilRende
 		float walkDegree = 0.5F;
 		float idleSpeed = 0.1F;
 		float idleDegree = 0.1F;
-		float partialTick = Minecraft.getInstance().getTimer().getGameTimeDeltaPartialTick(false);
-		float baskProgress0 = renderState.prevBaskProgress + (renderState.baskProgress - renderState.prevBaskProgress) * partialTick;
-		float sitProgress = renderState.prevSitProgress + (renderState.sitProgress - renderState.prevSitProgress) * partialTick;
-		float baskProgress = Math.max(0, baskProgress0 - sitProgress);
+		// Use the progress values directly from renderState
+		float baskProgress = renderState.baskProgress;
+		float sitProgress = renderState.sitProgress;
 		float limbSwing = renderState.walkAnimationPos;
 		float limbSwingAmount = renderState.walkAnimationSpeed;
 		float ageInTicks = renderState.ageInTicks;
@@ -208,29 +207,6 @@ public class ModelTasmanianDevil extends AdvancedEntityModel<TasmanianDevilRende
 		this.swing(tail, idleSpeed, idleDegree * 0.9F, false, 1F, 0F, ageInTicks, 1);
 		this.faceTarget(netHeadYaw, headPitch, 1, head);
 
-	}
-
-	@Override
-	public void renderToBuffer(PoseStack matrixStackIn, VertexConsumer bufferIn, int packedLightIn, int packedOverlayIn, int color) {
-		if (this.young) {
-			float f = 1.65F;
-			head.setScale(f, f, f);
-			head.setShouldScaleChildren(true);
-			matrixStackIn.pushPose();
-			matrixStackIn.scale(0.5F, 0.5F, 0.5F);
-			matrixStackIn.translate(0.0D, 1.5D, 0D);
-			parts().forEach((p_228292_8_) -> {
-				p_228292_8_.render(matrixStackIn, bufferIn, packedLightIn, packedOverlayIn, color);
-			});
-			matrixStackIn.popPose();
-			head.setScale(1, 1, 1);
-		} else {
-			matrixStackIn.pushPose();
-			parts().forEach((p_228290_8_) -> {
-				p_228290_8_.render(matrixStackIn, bufferIn, packedLightIn, packedOverlayIn, color);
-			});
-			matrixStackIn.popPose();
-		}
 	}
 
 	@Override
