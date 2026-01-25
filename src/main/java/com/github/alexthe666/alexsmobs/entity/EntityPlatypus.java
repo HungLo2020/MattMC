@@ -70,7 +70,7 @@ public class EntityPlatypus extends Animal implements ISemiAquatic, ITargetsDrop
     private boolean isLandNavigator;
     private int swimTimer = -1000;
 
-    protected EntityPlatypus(EntityType type, Level world) {
+    public EntityPlatypus(EntityType type, Level world) {
         super(type, world);
         this.setPathfindingMalus(PathType.WATER, 0.0F);
         this.setPathfindingMalus(PathType.WATER_BORDER, 0.0F);
@@ -122,19 +122,23 @@ public class EntityPlatypus extends Animal implements ISemiAquatic, ITargetsDrop
         if (this.hasCustomName()) {
             bucket.set(net.minecraft.core.component.DataComponents.CUSTOM_NAME, this.getCustomName());
         }
-        CompoundTag platTag = new CompoundTag();
-        this.addAdditionalSaveData(platTag);
         bucket.update(DataComponents.CUSTOM_DATA, CustomData.EMPTY, data -> data.update(tag -> {
-            tag.put("PlatypusData", platTag);
+            tag.putBoolean("Fedora", this.hasFedora());
+            tag.putBoolean("Sensing", this.isSensing());
+            tag.putBoolean("FromBucket", this.fromBucket());
+            tag.putBoolean("HasEgg", this.hasEgg());
+            tag.putBoolean("SuperCharged", this.superCharged);
         }));
     }
 
     @Override
     public void loadFromBucketTag(@Nonnull CompoundTag compound) {
         Bucketable.loadDefaultDataFromBucketTag(this, compound);
-        if (compound.contains("PlatypusData")) {
-            this.readAdditionalSaveData(compound.getCompound("PlatypusData"));
-        }
+        this.setFedora(compound.getBooleanOr("Fedora", false));
+        this.setSensing(compound.getBooleanOr("Sensing", false));
+        this.setFromBucket(compound.getBooleanOr("FromBucket", false));
+        this.setHasEgg(compound.getBooleanOr("HasEgg", false));
+        this.superCharged = compound.getBooleanOr("SuperCharged", false);
     }
 
     @Override
@@ -147,7 +151,7 @@ public class EntityPlatypus extends Animal implements ISemiAquatic, ITargetsDrop
                 itemstack.shrink(1);
             }
             this.setFedora(true);
-            return InteractionResult.sidedSuccess(this.level().isClientSide);
+            return InteractionResult.SUCCESS;
         }*/
         // Allow charging with certain items (redstone, etc)
         if (itemstack.is(net.minecraft.world.item.Items.REDSTONE) && !this.isSensing()) {
@@ -156,20 +160,20 @@ public class EntityPlatypus extends Animal implements ISemiAquatic, ITargetsDrop
                 itemstack.shrink(1);
             }
             this.setSensing(true);
-            return InteractionResult.sidedSuccess(this.level().isClientSide);
+            return InteractionResult.SUCCESS;
         }
         return Bucketable.bucketMobPickup(player, hand, this).orElse(super.mobInteract(player, hand));
     }
 
     protected void registerGoals() {
-        this.goalSelector.addGoal(0, new BreathAirGoal(this));
-        this.goalSelector.addGoal(1, new AnimalAIFindWater(this));
-        this.goalSelector.addGoal(1, new AnimalAILeaveWater(this));
+        this.goalSelector.addGoal(0, new net.minecraft.world.entity.ai.goal.BreathAirGoal(this));
+        this.goalSelector.addGoal(1, new com.github.alexthe666.alexsmobs.entity.ai.AnimalAIFindWater(this));
+        this.goalSelector.addGoal(1, new com.github.alexthe666.alexsmobs.entity.ai.AnimalAILeaveWater(this));
         this.goalSelector.addGoal(2, new MateGoal(this, 1.0D));
         this.goalSelector.addGoal(2, new LayEggGoal(this, 1.0D));
-        this.goalSelector.addGoal(2, new BreedGoal(this, 0.8D));
-        this.goalSelector.addGoal(3, new PanicGoal(this, 1.1D));
-        this.goalSelector.addGoal(3, new TemptGoal(this, 1.0D, Ingredient.of(net.minecraft.world.item.Items.REDSTONE), false){
+        this.goalSelector.addGoal(2, new net.minecraft.world.entity.ai.goal.BreedGoal(this, 0.8D));
+        this.goalSelector.addGoal(3, new net.minecraft.world.entity.ai.goal.PanicGoal(this, 1.1D));
+        this.goalSelector.addGoal(3, new net.minecraft.world.entity.ai.goal.TemptGoal(this, 1.0D, Ingredient.of(net.minecraft.world.item.Items.REDSTONE), false){
             public void start() {
                 super.start();
                 EntityPlatypus.this.setSensingVisual(true);
@@ -184,16 +188,16 @@ public class EntityPlatypus extends Animal implements ISemiAquatic, ITargetsDrop
                 EntityPlatypus.this.setSensingVisual(false);
             }
         });
-        this.goalSelector.addGoal(5, new TemptGoal(this, 1.1D, Ingredient.of(ItemTags.FISHES), false){
+        this.goalSelector.addGoal(5, new net.minecraft.world.entity.ai.goal.TemptGoal(this, 1.1D, itemStack -> itemStack.is(ItemTags.FISHES), false){
             public boolean canUse(){
                 return super.canUse() && !EntityPlatypus.this.isSensing();
             }
         });
         this.goalSelector.addGoal(5, new PlatypusAIDigForItems(this));
         this.goalSelector.addGoal(6, new SemiAquaticAIRandomSwimming(this, 1.0D, 30));
-        this.goalSelector.addGoal(7, new RandomStrollGoal(this, 1.0D, 60));
-        this.goalSelector.addGoal(8, new RandomLookAroundGoal(this));
-        this.goalSelector.addGoal(9, new LookAtPlayerGoal(this, Player.class, 6.0F));
+        this.goalSelector.addGoal(7, new net.minecraft.world.entity.ai.goal.RandomStrollGoal(this, 1.0D, 60));
+        this.goalSelector.addGoal(8, new net.minecraft.world.entity.ai.goal.RandomLookAroundGoal(this));
+        this.goalSelector.addGoal(9, new net.minecraft.world.entity.ai.goal.LookAtPlayerGoal(this, Player.class, 6.0F));
         this.targetSelector.addGoal(1, new CreatureAITargetItems(this, false, false, 40, 15){
             public boolean canUse(){
                 return super.canUse() && !EntityPlatypus.this.isSensing();
@@ -205,13 +209,18 @@ public class EntityPlatypus extends Animal implements ISemiAquatic, ITargetsDrop
         });
     }
 
-    public boolean hurt(DamageSource source, float amount) {
-        boolean prev = super.hurt(source, amount);
-        if(prev && source.getDirectEntity() instanceof LivingEntity){
-            LivingEntity entity = (LivingEntity)source.getDirectEntity();
-            entity.addEffect(new MobEffectInstance(MobEffects.POISON, 100));
+    @Override
+    public boolean hurtServer(ServerLevel serverLevel, DamageSource source, float amount) {
+        if (this.isInvulnerableTo(serverLevel, source)) {
+            return false;
+        } else {
+            boolean prev = super.hurtServer(serverLevel, source, amount);
+            if(prev && source.getDirectEntity() instanceof LivingEntity){
+                LivingEntity entity = (LivingEntity)source.getDirectEntity();
+                entity.addEffect(new MobEffectInstance(MobEffects.POISON, 100));
+            }
+            return prev;
         }
-        return prev;
     }
 
     public boolean isPerry() {
@@ -241,8 +250,8 @@ public class EntityPlatypus extends Animal implements ISemiAquatic, ITargetsDrop
             BlockPos ground = this.getBlockPosBelowThatAffectsMyMovement();
             BlockState state = this.level().getBlockState(ground);
             if (state.isSolid()) {
-                if (this.level().isClientSide) {
-                    level().addParticle(new BlockParticleOption(ParticleTypes.BLOCK, state), true, this.getX() + extraX, ground.getY() + extraY, this.getZ() + extraZ, motionX, motionY, motionZ);
+                if (this.level().isClientSide()) {
+                    level().addParticle(new BlockParticleOption(ParticleTypes.BLOCK, state), true, false, this.getX() + extraX, ground.getY() + extraY, this.getZ() + extraZ, motionX, motionY, motionZ);
                 }
             }
         }
@@ -280,11 +289,11 @@ public class EntityPlatypus extends Animal implements ISemiAquatic, ITargetsDrop
         builder.define(HAS_EGG, false);
     }
 
-    protected void dropEquipment() {
-        super.dropEquipment();
+    protected void dropEquipment(ServerLevel serverLevel) {
+        super.dropEquipment(serverLevel);
         // Fedora drop commented out until fedora item is implemented
         /*if (this.hasFedora()) {
-            this.spawnAtLocation(Items.FEDORA);
+            this.spawnAtLocation(serverLevel, Items.FEDORA);
         }*/
 
     }
@@ -313,22 +322,22 @@ public class EntityPlatypus extends Animal implements ISemiAquatic, ITargetsDrop
         this.entityData.set(FEDORA, Boolean.valueOf(sensing));
     }
 
-    public void addAdditionalSaveData(CompoundTag compound) {
-        super.addAdditionalSaveData(compound);
-        compound.putBoolean("Fedora", this.hasFedora());
-        compound.putBoolean("Sensing", this.isSensing());
-        compound.putBoolean("FromBucket", this.fromBucket());
-        compound.putBoolean("HasEgg", this.hasEgg());
-        compound.putBoolean("SuperCharged", this.superCharged);
+    public void addAdditionalSaveData(net.minecraft.world.level.storage.ValueOutput valueOutput) {
+        super.addAdditionalSaveData(valueOutput);
+        valueOutput.putBoolean("Fedora", this.hasFedora());
+        valueOutput.putBoolean("Sensing", this.isSensing());
+        valueOutput.putBoolean("FromBucket", this.fromBucket());
+        valueOutput.putBoolean("HasEgg", this.hasEgg());
+        valueOutput.putBoolean("SuperCharged", this.superCharged);
     }
 
-    public void readAdditionalSaveData(CompoundTag compound) {
-        super.readAdditionalSaveData(compound);
-        this.setFedora(compound.getBoolean("Fedora"));
-        this.setSensing(compound.getBoolean("Sensing"));
-        this.setFromBucket(compound.getBoolean("FromBucket"));
-        this.setHasEgg(compound.getBoolean("HasEgg"));
-        this.superCharged = compound.getBoolean("SuperCharged");
+    public void readAdditionalSaveData(net.minecraft.world.level.storage.ValueInput valueInput) {
+        super.readAdditionalSaveData(valueInput);
+        this.setFedora(valueInput.getBooleanOr("Fedora", false));
+        this.setSensing(valueInput.getBooleanOr("Sensing", false));
+        this.setFromBucket(valueInput.getBooleanOr("FromBucket", false));
+        this.setHasEgg(valueInput.getBooleanOr("HasEgg", false));
+        this.superCharged = valueInput.getBooleanOr("SuperCharged", false);
     }
 
     @Override
@@ -361,7 +370,7 @@ public class EntityPlatypus extends Animal implements ISemiAquatic, ITargetsDrop
         super.tick();
         prevInWaterProgress = inWaterProgress;
         prevDigProgress = digProgress;
-        boolean dig = isDigging() && isInWaterOrBubble();
+        boolean dig = isDigging() && isInWater();
         if (dig && digProgress < 5F) {
             digProgress++;
         }
@@ -369,7 +378,7 @@ public class EntityPlatypus extends Animal implements ISemiAquatic, ITargetsDrop
             digProgress--;
         }
 
-        if (this.isInWaterOrBubble()) {
+        if (this.isInWater()) {
             if (inWaterProgress < 5F)
                 inWaterProgress++;
 
@@ -389,7 +398,7 @@ public class EntityPlatypus extends Animal implements ISemiAquatic, ITargetsDrop
         if (inWaterProgress > 0) {
         } else {
         }
-        if (!this.level().isClientSide) {
+        if (!this.level().isClientSide()) {
             if (isInWater()) {
                 swimTimer++;
             } else {

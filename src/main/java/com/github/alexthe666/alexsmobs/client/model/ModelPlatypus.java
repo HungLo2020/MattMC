@@ -1,6 +1,6 @@
 package com.github.alexthe666.alexsmobs.client.model;
 
-import com.github.alexthe666.alexsmobs.entity.EntityPlatypus;
+import com.github.alexthe666.alexsmobs.client.render.PlatypusRenderState;
 import com.github.alexthe666.alexsmobs.entity.util.Maths;
 import com.github.alexthe666.citadel.client.model.AdvancedEntityModel;
 import com.github.alexthe666.citadel.client.model.AdvancedModelBox;
@@ -8,9 +8,8 @@ import com.github.alexthe666.citadel.client.model.basic.BasicModelPart;
 import com.google.common.collect.ImmutableList;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
-import net.minecraft.client.Minecraft;
 
-public class ModelPlatypus extends AdvancedEntityModel<EntityPlatypus> {
+public class ModelPlatypus extends AdvancedEntityModel<PlatypusRenderState> {
     private final AdvancedModelBox root;
     private final AdvancedModelBox body;
     private final AdvancedModelBox head;
@@ -79,12 +78,17 @@ public class ModelPlatypus extends AdvancedEntityModel<EntityPlatypus> {
     }
 
     @Override
+    public Iterable<BasicModelPart> parts() {
+        return ImmutableList.of(root);
+    }
+
+    @Override
     public Iterable<AdvancedModelBox> getAllParts() {
         return ImmutableList.of(root, body, tail, head, beak, fedora, arm_left, arm_right, leg_left, leg_right);
     }
 
     @Override
-    public void setupAnim(EntityPlatypus entity, float limbSwing, float limbSwingAmount, float ageInTicks, float netHeadYaw, float headPitch){
+    public void setupAnim(PlatypusRenderState state){
         this.resetToDefaultPose();
         float walkSpeed = 1F;
         float walkDegree = 1.3F;
@@ -92,9 +96,10 @@ public class ModelPlatypus extends AdvancedEntityModel<EntityPlatypus> {
         float idleDegree = 0.2F;
         float swimSpeed = 1.3F;
         float swimDegree = 1.3F;
-        float partialTick = Minecraft.getInstance().getTimer().getGameTimeDeltaPartialTick(false);
-        float digProgress = entity.prevDigProgress + (entity.digProgress - entity.prevDigProgress) * partialTick;
-        float swimProgress = entity.prevInWaterProgress + (entity.inWaterProgress - entity.prevInWaterProgress) * partialTick;
+        float digProgress = state.digProgress;
+        float swimProgress = state.inWaterProgress;
+        float ageInTicks = state.ageInTicks;
+        
         progressPositionPrev(body, swimProgress, 0, -3.5F, 0, 5f);
         progressRotationPrev(arm_left, swimProgress, Maths.rad(-5), 0, Maths.rad(75), 5f);
         progressRotationPrev(arm_right, swimProgress, Maths.rad(-5), 0, Maths.rad(-75), 5f);
@@ -116,68 +121,37 @@ public class ModelPlatypus extends AdvancedEntityModel<EntityPlatypus> {
             this.swing(head, 0.8F, idleDegree * 0.7F, false, 3F, 0F, ageInTicks, 1);
             this.swing(arm_right, 0.8F, idleDegree * 2.6F, false, 1F, -0.25F, ageInTicks, 1);
             this.swing(arm_left, 0.8F, idleDegree * 2.6F, true, 1F, -0.25F, ageInTicks, 1);
-        }else if(entity.isSensing() || entity.isSensingVisual()){
-            this.swing(head, swimSpeed, swimDegree * 0.25F, false, 2F, 0F, ageInTicks, 1);
-            this.walk(head, swimSpeed, swimDegree * 0.25F, false, 1F, 0F, ageInTicks, 1);
         }else{
-            this.faceTarget(netHeadYaw, headPitch, 1.2F, head);
+            head.rotateAngleY += state.yRot / 57.295776F * 0.2F;
+            head.rotateAngleX += state.xRot / 57.295776F * 0.2F;
         }
         if(swimProgress > 0F){
             this.bob(body, idleSpeed, idleDegree * 2F, false, ageInTicks, 1);
-            this.walk(tail, swimSpeed, swimDegree * 0.1F, false, 3F, 0.25F, limbSwing, limbSwingAmount);
-            this.swing(tail, swimSpeed, swimDegree * 0.5F, false, 2F, 0F, limbSwing, limbSwingAmount);
-            this.swing(body, swimSpeed, swimDegree * 0.3F, false, 3F, 0F, limbSwing, limbSwingAmount);
-            this.swing(head, swimSpeed, swimDegree * 0.5F, true, 3F, 0F, limbSwing, limbSwingAmount);
-            this.flap(arm_right, swimSpeed, swimDegree * 0.9F, false, 1F, 0.85F, limbSwing, limbSwingAmount);
-            this.flap(arm_left, swimSpeed, swimDegree * 0.9F, true, 1F, 0.85F, limbSwing, limbSwingAmount);
-            this.flap(leg_right, swimSpeed, swimDegree * 0.9F, false, 3F, 0.85F, limbSwing, limbSwingAmount);
-            this.flap(leg_left, swimSpeed, swimDegree * 0.9F, true, 3F, 0.85F, limbSwing, limbSwingAmount);
-            this.walk(body, swimSpeed, swimDegree * 0.2F, false, 0F, 0F, limbSwing, limbSwingAmount);
+            this.walk(tail, swimSpeed, swimDegree * 0.1F, false, 3F, 0.25F, state.walkAnimationPos, state.walkAnimationSpeed);
+            this.swing(tail, swimSpeed, swimDegree * 0.5F, false, 2F, 0F, state.walkAnimationPos, state.walkAnimationSpeed);
+            this.swing(body, swimSpeed, swimDegree * 0.3F, false, 3F, 0F, state.walkAnimationPos, state.walkAnimationSpeed);
+            this.swing(head, swimSpeed, swimDegree * 0.5F, true, 3F, 0F, state.walkAnimationPos, state.walkAnimationSpeed);
+            this.flap(arm_right, swimSpeed, swimDegree * 0.9F, false, 1F, 0.85F, state.walkAnimationPos, state.walkAnimationSpeed);
+            this.flap(arm_left, swimSpeed, swimDegree * 0.9F, true, 1F, 0.85F, state.walkAnimationPos, state.walkAnimationSpeed);
+            this.flap(leg_right, swimSpeed, swimDegree * 0.9F, false, 3F, 0.85F, state.walkAnimationPos, state.walkAnimationSpeed);
+            this.flap(leg_left, swimSpeed, swimDegree * 0.9F, true, 3F, 0.85F, state.walkAnimationPos, state.walkAnimationSpeed);
+            this.walk(body, swimSpeed, swimDegree * 0.2F, false, 0F, 0F, state.walkAnimationPos, state.walkAnimationSpeed);
 
         }else{
             this.swing(tail, idleSpeed * 0.5F, idleDegree, false, 0F, 0F, ageInTicks, 1);
-            this.bob(body, walkSpeed * 1.75F, walkDegree * 1F, false, limbSwing, limbSwingAmount);
-            this.swing(body, walkSpeed, walkDegree * 0.3F, false, 3F, 0F, limbSwing, limbSwingAmount);
-            this.swing(head, walkSpeed, walkDegree * 0.2F, true, 3F, 0F, limbSwing, limbSwingAmount);
-            this.walk(tail, walkSpeed, walkDegree * 0.3F, false, 3F, 0.1F, limbSwing, limbSwingAmount);
-            this.swing(arm_left, walkSpeed, walkDegree * 0.5F, true, 1F, 0.15F, limbSwing, limbSwingAmount);
-            this.flap(arm_left, walkSpeed, walkDegree * 0.5F, true, 0F, 0.25F, limbSwing, limbSwingAmount);
-            this.swing(arm_right, walkSpeed, walkDegree * 0.5F, true, 1F, -0.15F, limbSwing, limbSwingAmount);
-            this.flap(arm_right, walkSpeed, walkDegree * 0.5F, true, 0F, -0.25F, limbSwing, limbSwingAmount);
-            this.swing(leg_left, walkSpeed, walkDegree * 0.5F, false, 1F, -0.15F, limbSwing, limbSwingAmount);
-            this.flap(leg_left, walkSpeed, walkDegree * 0.5F, false, 0F, -0.15F, limbSwing, limbSwingAmount);
-            this.swing(leg_right, walkSpeed, walkDegree * 0.5F, false, 1F, 0.15F, limbSwing, limbSwingAmount);
-            this.flap(leg_right, walkSpeed, walkDegree * 0.5F, false, 0F, 0.15F, limbSwing, limbSwingAmount);
+            this.bob(body, walkSpeed * 1.75F, walkDegree * 1F, false, state.walkAnimationPos, state.walkAnimationSpeed);
+            this.swing(body, walkSpeed, walkDegree * 0.3F, false, 3F, 0F, state.walkAnimationPos, state.walkAnimationSpeed);
+            this.swing(head, walkSpeed, walkDegree * 0.2F, true, 3F, 0F, state.walkAnimationPos, state.walkAnimationSpeed);
+            this.walk(tail, walkSpeed, walkDegree * 0.3F, false, 3F, 0.1F, state.walkAnimationPos, state.walkAnimationSpeed);
+            this.swing(arm_left, walkSpeed, walkDegree * 0.5F, true, 1F, 0.15F, state.walkAnimationPos, state.walkAnimationSpeed);
+            this.flap(arm_left, walkSpeed, walkDegree * 0.5F, true, 0F, 0.25F, state.walkAnimationPos, state.walkAnimationSpeed);
+            this.swing(arm_right, walkSpeed, walkDegree * 0.5F, true, 1F, -0.15F, state.walkAnimationPos, state.walkAnimationSpeed);
+            this.flap(arm_right, walkSpeed, walkDegree * 0.5F, true, 0F, -0.25F, state.walkAnimationPos, state.walkAnimationSpeed);
+            this.swing(leg_left, walkSpeed, walkDegree * 0.5F, false, 1F, -0.15F, state.walkAnimationPos, state.walkAnimationSpeed);
+            this.flap(leg_left, walkSpeed, walkDegree * 0.5F, false, 0F, -0.15F, state.walkAnimationPos, state.walkAnimationSpeed);
+            this.swing(leg_right, walkSpeed, walkDegree * 0.5F, false, 1F, 0.15F, state.walkAnimationPos, state.walkAnimationSpeed);
+            this.flap(leg_right, walkSpeed, walkDegree * 0.5F, false, 0F, 0.15F, state.walkAnimationPos, state.walkAnimationSpeed);
         }
-    }
-
-    @Override
-    public void renderToBuffer(PoseStack matrixStackIn, VertexConsumer bufferIn, int packedLightIn, int packedOverlayIn, int color) {
-        if (this.young) {
-            float f = 1.65F;
-            head.setScale(f, f, f);
-            head.setShouldScaleChildren(true);
-            matrixStackIn.pushPose();
-            matrixStackIn.scale(0.5F, 0.5F, 0.5F);
-            matrixStackIn.translate(0.0D, 1.5D, 0D);
-            parts().forEach((p_228292_8_) -> {
-                p_228292_8_.render(matrixStackIn, bufferIn, packedLightIn, packedOverlayIn, -1);
-            });
-            matrixStackIn.popPose();
-            head.setScale(1, 1, 1);
-        } else {
-            matrixStackIn.pushPose();
-            parts().forEach((p_228290_8_) -> {
-                p_228290_8_.render(matrixStackIn, bufferIn, packedLightIn, packedOverlayIn, -1);
-            });
-            matrixStackIn.popPose();
-        }
-    }
-
-
-    @Override
-    public Iterable<BasicModelPart> parts() {
-        return ImmutableList.of(root);
     }
 
     public void setRotationAngle(AdvancedModelBox AdvancedModelBox, float x, float y, float z) {
