@@ -16245,6 +16245,30 @@
     ],
     "subtitle": "subtitles.entity.gorilla.hurt"
   },
+  "entity.grizzly_bear.idle": {
+    "sounds": [
+      "grizzly_bear_idle_0",
+      "grizzly_bear_idle_1",
+      "grizzly_bear_idle_2",
+      "grizzly_bear_idle_3"
+    ],
+    "subtitle": "subtitles.entity.grizzly_bear.ambient"
+  },
+  "entity.grizzly_bear.hurt": {
+    "sounds": [
+      "grizzly_bear_hurt_0",
+      "grizzly_bear_hurt_1",
+      "grizzly_bear_hurt_2"
+    ],
+    "subtitle": "subtitles.entity.grizzly_bear.hurt"
+  },
+  "entity.grizzly_bear.die": {
+    "sounds": [
+      "grizzly_bear_die_0",
+      "grizzly_bear_die_1"
+    ],
+    "subtitle": "subtitles.entity.grizzly_bear.death"
+  },
   "entity.grottoceratops.attack": {
     "sounds": [
       "minecraft:entity/grottoceratops/grottoceratops_attack_0",

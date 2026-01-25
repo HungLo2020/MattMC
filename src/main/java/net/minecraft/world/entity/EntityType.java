@@ -678,6 +678,13 @@ public class EntityType<T extends Entity> implements FeatureElement, EntityTypeT
 			.eyeHeight(1.2F)
 			.clientTrackingRange(10)
 	);
+	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntityGrizzlyBear> GRIZZLY_BEAR = register(
+		"grizzly_bear",
+		EntityType.Builder.of(com.github.alexthe666.alexsmobs.entity.EntityGrizzlyBear::new, MobCategory.CREATURE)
+			.sized(1.7F, 1.95F)
+			.eyeHeight(1.5F)
+			.clientTrackingRange(10)
+	);
 	public static final EntityType<GrottoceratopsEntity> GROTTOCERATOPS = register(
 		"grottoceratops",
 		EntityType.Builder.of(GrottoceratopsEntity::new, MobCategory.CREATURE)

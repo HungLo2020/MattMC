@@ -164,6 +164,7 @@ public class DefaultAttributes {
 		.put(EntityType.GIANT_SQUID, com.github.alexthe666.alexsmobs.entity.EntityGiantSquid.createAttributes().build())
 		.put(EntityType.GOAT, Goat.createAttributes().build())
 		.put(EntityType.GORILLA, com.github.alexthe666.alexsmobs.entity.EntityGorilla.createAttributes().build())
+		.put(EntityType.GRIZZLY_BEAR, com.github.alexthe666.alexsmobs.entity.EntityGrizzlyBear.bakeAttributes().build())
 		.put(EntityType.GROTTOCERATOPS, GrottoceratopsEntity.createAttributes().build())
 		.put(EntityType.GUARDIAN, Guardian.createAttributes().build())
 		.put(EntityType.HOGLIN, Hoglin.createAttributes().build())
