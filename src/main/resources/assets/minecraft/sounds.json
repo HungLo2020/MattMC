@@ -12582,6 +12582,18 @@
     ],
     "subtitle": "subtitles.entity.allay.item_thrown"
   },
+  "entity.alligator_snapping_turtle.idle": {
+    "sounds": [
+      "alligator_snapping_turtle_idle_1"
+    ],
+    "subtitle": "subtitles.entity.alligator_snapping_turtle.idle"
+  },
+  "entity.alligator_snapping_turtle.hurt": {
+    "sounds": [
+      "alligator_snapping_turtle_hurt_1"
+    ],
+    "subtitle": "subtitles.entity.alligator_snapping_turtle.hurt"
+  },
   "entity.armadillo.ambient": {
     "sounds": [
       "mob/armadillo/ambient1",
