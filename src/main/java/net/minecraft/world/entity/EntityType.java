@@ -85,6 +85,7 @@ import com.github.alexthe666.alexsmobs.entity.EntityBlobfish;
 import com.github.alexthe666.alexsmobs.entity.EntityCosmicCod;
 import com.github.alexthe666.alexsmobs.entity.EntityFlyingFish;
 import com.github.alexthe666.alexsmobs.entity.EntityTerrapin;
+import com.github.alexthe666.alexsmobs.entity.EntityAlligatorSnappingTurtle;
 import net.minecraft.world.entity.boss.enderdragon.EndCrystal;
 import net.minecraft.world.entity.boss.enderdragon.EnderDragon;
 import net.minecraft.world.entity.boss.wither.WitherBoss;
@@ -218,6 +219,13 @@ public class EntityType<T extends Entity> implements FeatureElement, EntityTypeT
 	public static final EntityType<Allay> ALLAY = register(
 		"allay",
 		EntityType.Builder.of(Allay::new, MobCategory.CREATURE).sized(0.35F, 0.6F).eyeHeight(0.36F).ridingOffset(0.04F).clientTrackingRange(8).updateInterval(2)
+	);
+	public static final EntityType<EntityAlligatorSnappingTurtle> ALLIGATOR_SNAPPING_TURTLE = register(
+		"alligator_snapping_turtle",
+		EntityType.Builder.of(EntityAlligatorSnappingTurtle::new, MobCategory.CREATURE)
+			.sized(1.5F, 0.7F)
+			.eyeHeight(0.45F)
+			.clientTrackingRange(10)
 	);
 	public static final EntityType<AreaEffectCloud> AREA_EFFECT_CLOUD = register(
 		"area_effect_cloud",

@@ -60,6 +60,7 @@ import com.github.alexthe666.alexsmobs.entity.EntityLeafcutterAnt;
 import com.github.alexthe666.alexsmobs.entity.EntityMimicOctopus;
 import com.github.alexthe666.alexsmobs.entity.EntityMungus;
 import com.github.alexthe666.alexsmobs.entity.EntityTerrapin;
+import com.github.alexthe666.alexsmobs.entity.EntityAlligatorSnappingTurtle;
 import net.minecraft.world.entity.boss.enderdragon.EnderDragon;
 import net.minecraft.world.entity.boss.wither.WitherBoss;
 import net.minecraft.world.entity.decoration.ArmorStand;
@@ -105,6 +106,7 @@ public class DefaultAttributes {
 	private static final Logger LOGGER = LogUtils.getLogger();
 	private static final Map<EntityType<? extends LivingEntity>, AttributeSupplier> SUPPLIERS = ImmutableMap.<EntityType<? extends LivingEntity>, AttributeSupplier>builder()
 		.put(EntityType.ALLAY, Allay.createAttributes().build())
+		.put(EntityType.ALLIGATOR_SNAPPING_TURTLE, EntityAlligatorSnappingTurtle.createAttributes().build())
 		.put(EntityType.ATLATITAN, com.github.alexmodguy.alexscaves.server.entity.living.AtlatitanEntity.createAttributes().build())
 		.put(EntityType.ARMADILLO, Armadillo.createAttributes().build())
 		.put(EntityType.ARMOR_STAND, ArmorStand.createAttributes().build())

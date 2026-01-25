@@ -20,6 +20,8 @@ public class SoundEvents {
 	public static final SoundEvent ALLAY_ITEM_GIVEN = register("entity.allay.item_given");
 	public static final SoundEvent ALLAY_ITEM_TAKEN = register("entity.allay.item_taken");
 	public static final SoundEvent ALLAY_THROW = register("entity.allay.item_thrown");
+	public static final SoundEvent ALLIGATOR_SNAPPING_TURTLE_IDLE = register("entity.alligator_snapping_turtle.idle");
+	public static final SoundEvent ALLIGATOR_SNAPPING_TURTLE_HURT = register("entity.alligator_snapping_turtle.hurt");
 	public static final Holder.Reference<SoundEvent> AMBIENT_CAVE = registerForHolder("ambient.cave");
 	public static final Holder.Reference<SoundEvent> AMBIENT_BASALT_DELTAS_ADDITIONS = registerForHolder("ambient.basalt_deltas.additions");
 	public static final Holder.Reference<SoundEvent> AMBIENT_BASALT_DELTAS_LOOP = registerForHolder("ambient.basalt_deltas.loop");
