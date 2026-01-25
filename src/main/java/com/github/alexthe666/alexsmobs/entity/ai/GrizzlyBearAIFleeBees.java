@@ -83,7 +83,7 @@ public class GrizzlyBearAIFleeBees extends Goal {
     }
 
     public double getRunSpeed() {
-        return 0.7F;
+        return 0.7;
     }
 }
 
