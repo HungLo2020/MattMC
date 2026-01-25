@@ -133,4 +133,9 @@ public class AMSoundRegistry {
     // Tarantula Hawk sounds - reference vanilla SoundEvents
     public static final DeferredHolder TARANTULA_HAWK_HURT = new DeferredHolder(() -> net.minecraft.sounds.SoundEvents.TARANTULA_HAWK_HURT);
     public static final DeferredHolder TARANTULA_HAWK_WING = new DeferredHolder(() -> net.minecraft.sounds.SoundEvents.TARANTULA_HAWK_WING);
+    
+    // Underminer sounds - reference vanilla SoundEvents
+    public static final DeferredHolder UNDERMINER_IDLE = new DeferredHolder(() -> net.minecraft.sounds.SoundEvents.UNDERMINER_IDLE);
+    public static final DeferredHolder UNDERMINER_HURT = new DeferredHolder(() -> net.minecraft.sounds.SoundEvents.UNDERMINER_HURT);
+    public static final DeferredHolder UNDERMINER_STEP = new DeferredHolder(() -> net.minecraft.sounds.SoundEvents.UNDERMINER_STEP);
 }

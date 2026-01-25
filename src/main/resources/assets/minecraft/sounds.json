@@ -25691,5 +25691,30 @@
       "mantis_shrimp_snap_2"
     ],
     "subtitle": "subtitles.entity.mantis_shrimp.snap"
+  },
+  "entity.underminer.idle": {
+    "sounds": [
+      "underminer_idle_0",
+      "underminer_idle_1",
+      "underminer_idle_2",
+      "underminer_idle_3"
+    ],
+    "subtitle": "subtitles.entity.underminer.idle"
+  },
+  "entity.underminer.hurt": {
+    "sounds": [
+      "underminer_hurt_0",
+      "underminer_hurt_1"
+    ],
+    "subtitle": "subtitles.entity.underminer.hurt"
+  },
+  "entity.underminer.step": {
+    "sounds": [
+      "underminer_step_0",
+      "underminer_step_1",
+      "underminer_step_2",
+      "underminer_step_3"
+    ],
+    "subtitle": "subtitles.entity.underminer.step"
   }
 }

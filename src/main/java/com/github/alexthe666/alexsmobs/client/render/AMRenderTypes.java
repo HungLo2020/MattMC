@@ -40,4 +40,26 @@ public class AMRenderTypes {
     public static RenderType getEyesFlickering(ResourceLocation texture, int light) {
         return RenderType.eyes(texture);
     }
+    
+    /**
+     * Creates a translucent render type for Underminer entity
+     * Uses energy swirl shader for ghostly effect
+     */
+    public static RenderType getUnderminer(ResourceLocation texture) {
+        return RenderType.entityTranslucent(texture);
+    }
+    
+    /**
+     * Creates a render type for ghostly pickaxe item
+     */
+    public static RenderType getGhostPickaxe(ResourceLocation texture) {
+        return RenderType.entityTranslucent(texture);
+    }
+    
+    /**
+     * Creates a render type for ghostly crumbling/breaking effect
+     */
+    public static RenderType getGhostCrumbling(ResourceLocation texture) {
+        return RenderType.entityTranslucent(texture);
+    }
 }

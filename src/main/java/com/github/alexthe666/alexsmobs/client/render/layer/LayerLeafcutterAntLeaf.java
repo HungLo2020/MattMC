@@ -48,14 +48,17 @@ public class LayerLeafcutterAntLeaf extends RenderLayer<LeafcutterAntRenderState
             final float f = (float) (leafColor >> 16 & 255) / 255.0F;
             final float f1 = (float) (leafColor >> 8 & 255) / 255.0F;
             final float f2 = (float) (leafColor & 255) / 255.0F;
-            bufferSource.submitModel(
+            // Use order(1) to ensure proper rendering order with depth testing
+            bufferSource.order(1).submitModel(
                 this.getParentModel(),
                 state,
                 matrixStackIn,
-                RenderType.entityCutoutNoCull(res),
+                RenderType.entityCutout(res),
                 packedLightIn,
                 LivingEntityRenderer.getOverlayCoords(state, 0.0F),
                 AMColorUtil.packColor(f, f1, f2, 1.0F),
+                null,
+                state.outlineColor,
                 null
             );
         }

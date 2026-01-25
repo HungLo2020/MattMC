@@ -421,6 +421,7 @@ public class LayerDefinitions {
 		builder.put(ModelLayers.TROPICAL_FISH_SMALL_PATTERN, TropicalFishModelA.createBodyLayer(FISH_PATTERN_DEFORMATION));
 		builder.put(ModelLayers.TURTLE, layerDefinition42);
 		builder.put(ModelLayers.TURTLE_BABY, layerDefinition42.apply(TurtleModel.BABY_TRANSFORMER));
+		builder.put(ModelLayers.UNDERMINER, LayerDefinition.create(HumanoidModel.createMesh(CubeDeformation.NONE, 0.05F), 64, 64));
 		builder.put(ModelLayers.VEX, VexModel.createBodyLayer());
 		builder.put(ModelLayers.VILLAGER, layerDefinition28);
 		builder.put(ModelLayers.VILLAGER_NO_HAT, layerDefinition29);
