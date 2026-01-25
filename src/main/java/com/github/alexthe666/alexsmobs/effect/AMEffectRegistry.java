@@ -1,14 +1,12 @@
 package com.github.alexthe666.alexsmobs.effect;
 
 import net.minecraft.core.Holder;
-import net.minecraft.core.Registry;
-import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.effect.MobEffect;
 import net.minecraft.world.effect.MobEffects;
 
 /**
- * Stub registry for AlexsMobs effects
+ * Registry for AlexsMobs effects
+ * References effects registered in vanilla MobEffects.java
  */
 public class AMEffectRegistry {
     
@@ -25,29 +23,13 @@ public class AMEffectRegistry {
     
     /**
      * Orca's Might effect - provides attack speed boost when swimming with orcas
+     * Registered in MobEffects.java
      */
-    public static final Holder<MobEffect> ORCAS_MIGHT;
+    public static final Holder<MobEffect> ORCAS_MIGHT = MobEffects.ORCAS_MIGHT;
     
     /**
      * Debilitating Sting effect - from Tarantula Hawk sting
+     * Registered in MobEffects.java
      */
-    public static final Holder<MobEffect> DEBILITATING_STING;
-    
-    static {
-        // Register Orca's Might effect
-        MobEffect orcasMightEffect = new EffectOrcaMight();
-        ORCAS_MIGHT = Registry.registerForHolder(
-            BuiltInRegistries.MOB_EFFECT,
-            ResourceLocation.withDefaultNamespace("orcas_might"),
-            orcasMightEffect
-        );
-        
-        // Register Debilitating Sting effect
-        MobEffect debilitatingStingEffect = new EffectDebilitatingSting();
-        DEBILITATING_STING = Registry.registerForHolder(
-            BuiltInRegistries.MOB_EFFECT,
-            ResourceLocation.withDefaultNamespace("debilitating_sting"),
-            debilitatingStingEffect
-        );
-    }
+    public static final Holder<MobEffect> DEBILITATING_STING = MobEffects.DEBILITATING_STING;
 }

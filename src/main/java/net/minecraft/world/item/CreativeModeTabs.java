@@ -1977,6 +1977,7 @@ public class CreativeModeTabs {
 					output.accept(Items.ELDER_GUARDIAN_SPAWN_EGG);
 					output.accept(Items.EMU_SPAWN_EGG);
 					output.accept(Items.ENDERGRADE_SPAWN_EGG);
+					output.accept(Items.ENDERIOPHAGE_SPAWN_EGG);
 					output.accept(Items.ENDERMAN_SPAWN_EGG);
 					output.accept(Items.ENDERMITE_SPAWN_EGG);
 					output.accept(Items.EVOKER_SPAWN_EGG);

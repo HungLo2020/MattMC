@@ -1842,6 +1842,7 @@ public class Items {
 		"ender_dragon_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.ENDER_DRAGON)
 	);
 	public static final Item ENDERGRADE_SPAWN_EGG = registerItem("endergrade_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.ENDERGRADE));
+	public static final Item ENDERIOPHAGE_SPAWN_EGG = registerItem("enderiophage_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.ENDERIOPHAGE));
 	public static final Item ENDERMAN_SPAWN_EGG = registerItem("enderman_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.ENDERMAN));
 	public static final Item ENDERMITE_SPAWN_EGG = registerItem("endermite_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.ENDERMITE));
 	public static final Item EVOKER_SPAWN_EGG = registerItem("evoker_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.EVOKER));

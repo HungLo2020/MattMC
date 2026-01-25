@@ -34,6 +34,11 @@ public class AMSoundRegistry {
     public static final DeferredHolder ENDERGRADE_IDLE = new DeferredHolder(() -> net.minecraft.sounds.SoundEvents.ENDERGRADE_IDLE);
     public static final DeferredHolder ENDERGRADE_HURT = new DeferredHolder(() -> net.minecraft.sounds.SoundEvents.ENDERGRADE_HURT);
     
+    // Enderiophage sounds - reference vanilla SoundEvents
+    public static final DeferredHolder ENDERIOPHAGE_HURT = new DeferredHolder(() -> net.minecraft.sounds.SoundEvents.ENDERIOPHAGE_HURT);
+    public static final DeferredHolder ENDERIOPHAGE_WALK = new DeferredHolder(() -> net.minecraft.sounds.SoundEvents.ENDERIOPHAGE_WALK);
+    public static final DeferredHolder ENDERIOPHAGE_SQUISH = new DeferredHolder(() -> net.minecraft.sounds.SoundEvents.ENDERIOPHAGE_SQUISH);
+    
     // Hummingbird sounds - reference vanilla SoundEvents
     public static final DeferredHolder HUMMINGBIRD_IDLE = new DeferredHolder(() -> net.minecraft.sounds.SoundEvents.HUMMINGBIRD_IDLE);
     public static final DeferredHolder HUMMINGBIRD_HURT = new DeferredHolder(() -> net.minecraft.sounds.SoundEvents.HUMMINGBIRD_HURT);
