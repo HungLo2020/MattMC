@@ -16,6 +16,7 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundEvents;
@@ -25,6 +26,8 @@ import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.DifficultyInstance;
 import net.minecraft.world.InteractionHand;
+import net.minecraft.world.ValueInput;
+import net.minecraft.world.ValueOutput;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.damagesource.DamageTypes;
 import net.minecraft.world.entity.*;
@@ -129,28 +132,26 @@ public class EntityUnderminer extends PathfinderMob {
         builder.define(VARIANT, 0);
     }
 
-    public void addAdditionalSaveData(CompoundTag compound) {
-        super.addAdditionalSaveData(compound);
-        compound.putBoolean("Dwarf", this.isDwarf());
-        compound.putBoolean("Hiding", this.isHiding());
-        compound.putInt("Variant", this.getVariant());
-        compound.putInt("ResetItemTime", resetStackTime);
-        compound.putInt("MineCooldown", mineCooldown);
+    protected void addAdditionalSaveData(ValueOutput output) {
+        super.addAdditionalSaveData(output);
+        output.putBoolean("Dwarf", this.isDwarf());
+        output.putBoolean("Hiding", this.isHiding());
+        output.putInt("Variant", this.getVariant());
+        output.putInt("ResetItemTime", resetStackTime);
+        output.putInt("MineCooldown", mineCooldown);
         if(lastGivenStack != null && !lastGivenStack.isEmpty()){
-            compound.put("MineStack", lastGivenStack.save(this.registryAccess()));
+            output.store("MineStack", ItemStack.OPTIONAL_CODEC, lastGivenStack);
         }
     }
 
-    public void readAdditionalSaveData(CompoundTag compound) {
-        super.readAdditionalSaveData(compound);
-        this.setDwarf(compound.getBoolean("Dwarf"));
-        this.setHiding(compound.getBoolean("Hiding"));
-        this.setVariant(compound.getInt("Variant"));
-        this.resetStackTime = compound.getInt("ResetItemTime");
-        this.mineCooldown = compound.getInt("MineCooldown");
-        if(compound.contains("MineStack")){
-            this.lastGivenStack = ItemStack.parseOptional(this.registryAccess(), compound.getCompound("MineStack"));
-        }
+    protected void readAdditionalSaveData(ValueInput input) {
+        super.readAdditionalSaveData(input);
+        this.setDwarf(input.getBooleanOr("Dwarf", false));
+        this.setHiding(input.getBooleanOr("Hiding", false));
+        this.setVariant(input.getIntOr("Variant", 0));
+        this.resetStackTime = input.getIntOr("ResetItemTime", 0);
+        this.mineCooldown = input.getIntOr("MineCooldown", 0);
+        input.read("MineStack", ItemStack.OPTIONAL_CODEC).ifPresent(stack -> this.lastGivenStack = stack);
     }
 
     protected SoundEvent getAmbientSound() {
@@ -213,13 +214,13 @@ public class EntityUnderminer extends PathfinderMob {
     }
 
     @Override
-    public boolean isInvulnerableTo(DamageSource source) {
-        return !source.is(DamageTypes.MAGIC) && source.is(DamageTypes.FELL_OUT_OF_WORLD) && !source.isCreativePlayer() || super.isInvulnerableTo(source);
+    public boolean isInvulnerableTo(ServerLevel level, DamageSource source) {
+        return !source.is(DamageTypes.MAGIC) && source.is(DamageTypes.FELL_OUT_OF_WORLD) && !source.isCreativePlayer() || super.isInvulnerableTo(level, source);
     }
 
     private float calculateDistanceToFloor() {
         BlockPos floor = AMBlockPos.fromCoords(this.getX(), this.getBoundingBox().maxY, this.getZ());
-        while (!level().getBlockState(floor).isFaceSturdy(level(), floor, Direction.UP) && floor.getY() > level().getMinBuildHeight()) {
+        while (!level().getBlockState(floor).isFaceSturdy(level(), floor, Direction.UP) && floor.getY() > level().getMinY()) {
             floor = floor.below();
         }
         return (float) (this.getBoundingBox().minY - (floor.getY() + 1));
@@ -242,11 +243,11 @@ public class EntityUnderminer extends PathfinderMob {
         this.setItemSlot(EquipmentSlot.MAINHAND, new ItemStack(AMItemRegistry.GHOSTLY_PICKAXE.get()));
     }
 
-    protected float getEquipmentDropChance(EquipmentSlot slot) {
+    protected float getEquipmentDropChance(ServerLevel serverLevel, EquipmentSlot slot) {
         if(slot == EquipmentSlot.MAINHAND){
             return 0.5F;
         }
-        return super.getEquipmentDropChance(slot);
+        return super.getEquipmentDropChance(serverLevel, slot);
     }
 
     @Nullable
@@ -279,7 +280,7 @@ public class EntityUnderminer extends PathfinderMob {
         if(!this.isHiding() && hidingProgress > 0F){
             hidingProgress--;
         }
-        if (!this.level().isClientSide) {
+        if (!this.level().isClientSide()) {
             final double xzSpeed = this.getDeltaMovement().horizontalDistance();
             final double distToFloor = Mth.clamp(calculateDistanceToFloor(), -1F, 1F);
             if (Math.abs(distToFloor) > 0.01 && xzSpeed < 0.05 && !this.isActuallyInAWall()) {
@@ -332,7 +333,7 @@ public class EntityUnderminer extends PathfinderMob {
         return stack.is(AMTagRegistry.UNDERMINER_ORES);
     }
 
-    protected void pickUpItem(ItemEntity itemEntity) {
+    protected void pickUpItem(ServerLevel serverLevel, ItemEntity itemEntity) {
         ItemStack itemstack = itemEntity.getItem();
         if (itemstack.is(AMTagRegistry.UNDERMINER_ORES)) {
             this.onItemPickup(itemEntity);
@@ -343,7 +344,7 @@ public class EntityUnderminer extends PathfinderMob {
             this.resetStackTime = 2000 + random.nextInt(1200);
             this.mineCooldown = 0;
         }else{
-            super.pickUpItem(itemEntity);
+            super.pickUpItem(serverLevel, itemEntity);
         }
 
     }
@@ -546,7 +547,7 @@ public class EntityUnderminer extends PathfinderMob {
                         EntityUnderminer.this.setXRot((float) (Mth.atan2(d3, f) * (double) Mth.RAD_TO_DEG) + (float) Math.sin(EntityUnderminer.this.tickCount * 0.1F));
                         EntityUnderminer.this.entityData.set(VISUALLY_MINING, true);
                         if (mineTime % 10 == 0) {
-                            SoundType soundType = minePretendStartState.getBlock().getSoundType(minePretendStartState, EntityUnderminer.this.level(), minePretendPos, EntityUnderminer.this);
+                            SoundType soundType = minePretendStartState.getSoundType();
                             EntityUnderminer.this.playSound(soundType.getHitSound());
                         }
                     }

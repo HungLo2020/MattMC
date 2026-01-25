@@ -1,6 +1,6 @@
 package com.github.alexthe666.alexsmobs.client.model;
 
-import com.github.alexthe666.alexsmobs.entity.EntityUnderminer;
+import com.github.alexthe666.alexsmobs.client.render.UnderminerRenderState;
 import com.github.alexthe666.alexsmobs.entity.util.Maths;
 import com.github.alexthe666.citadel.client.model.AdvancedEntityModel;
 import com.github.alexthe666.citadel.client.model.AdvancedModelBox;
@@ -12,7 +12,7 @@ import net.minecraft.util.Mth;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.HumanoidArm;
 
-public class ModelUnderminerDwarf extends AdvancedEntityModel<EntityUnderminer> {
+public class ModelUnderminerDwarf extends AdvancedEntityModel<UnderminerRenderState> {
     private final AdvancedModelBox body;
     private final AdvancedModelBox head;
     private final AdvancedModelBox helmet;
@@ -78,9 +78,14 @@ public class ModelUnderminerDwarf extends AdvancedEntityModel<EntityUnderminer> 
     }
 
     @Override
-    public void setupAnim(EntityUnderminer entityIn, float limbSwing, float limbSwingAmount, float ageInTicks, float netHeadYaw, float headPitch) {
+    public void setupAnim(UnderminerRenderState state) {
         this.resetToDefaultPose();
-        setupHumanoidAnims(entityIn, limbSwing, limbSwingAmount, ageInTicks, netHeadYaw, headPitch);
+        float limbSwing = state.walkAnimationPos;
+        float limbSwingAmount = state.walkAnimationSpeed;
+        float ageInTicks = state.ageInTicks;
+        float netHeadYaw = state.yRot;
+        float headPitch = state.xRot;
+        setupHumanoidAnims(state, limbSwing, limbSwingAmount, ageInTicks, netHeadYaw, headPitch);
     }
 
     @Override
@@ -91,9 +96,9 @@ public class ModelUnderminerDwarf extends AdvancedEntityModel<EntityUnderminer> 
     /*
         From here on out copied from HumanoidModel
      */
-    public void setupHumanoidAnims(EntityUnderminer entityIn, float p_102867_, float p_102868_, float p_102869_, float p_102870_, float p_102871_) {
-        boolean flag = entityIn.getFallFlyingTicks() > 4;
-        boolean flag1 = entityIn.isVisuallySwimming();
+    public void setupHumanoidAnims(UnderminerRenderState state, float p_102867_, float p_102868_, float p_102869_, float p_102870_, float p_102871_) {
+        boolean flag = state.isFallFlying;
+        boolean flag1 = state.isVisuallySwimming;
         this.head.rotateAngleY = p_102870_ * Mth.DEG_TO_RAD;
         if (flag) {
             this.head.rotateAngleX = (-Maths.QUARTER_PI);
@@ -108,7 +113,7 @@ public class ModelUnderminerDwarf extends AdvancedEntityModel<EntityUnderminer> 
         }
         float f = 1.0F;
         if (flag) {
-            f = (float)entityIn.getDeltaMovement().lengthSqr();
+            f = (float) (state.movementSpeedSqr);
             f /= 0.2F;
             f *= f * f;
         }
@@ -140,26 +145,26 @@ public class ModelUnderminerDwarf extends AdvancedEntityModel<EntityUnderminer> 
 
         this.rightArm.rotateAngleY = 0.0F;
         this.leftArm.rotateAngleY = 0.0F;
-        boolean flag2 = entityIn.getMainArm() == HumanoidArm.RIGHT;
-        if (entityIn.isUsingItem()) {
-            boolean flag3 = entityIn.getUsedItemHand() == InteractionHand.MAIN_HAND;
+        boolean flag2 = state.mainArm == HumanoidArm.RIGHT;
+        if (state.isUsingItem) {
+            boolean flag3 = state.useItemHand == InteractionHand.MAIN_HAND;
             if (flag3 == flag2) {
-                this.poseRightArm(entityIn);
+                this.poseRightArm(state);
             } else {
-                this.poseLeftArm(entityIn);
+                this.poseLeftArm(state);
             }
         } else {
             boolean flag4 = flag2 ? this.leftArmPose.isTwoHanded() : this.rightArmPose.isTwoHanded();
             if (flag2 != flag4) {
-                this.poseLeftArm(entityIn);
-                this.poseRightArm(entityIn);
+                this.poseLeftArm(state);
+                this.poseRightArm(state);
             } else {
-                this.poseRightArm(entityIn);
-                this.poseLeftArm(entityIn);
+                this.poseRightArm(state);
+                this.poseLeftArm(state);
             }
         }
 
-        this.setupAttackAnimation(entityIn, p_102869_);
+        this.setupAttackAnimation(state, p_102869_);
         if (this.crouching) {
             this.body.rotateAngleX = 0.5F;
             this.rightArm.rotateAngleX += 0.4F;
@@ -178,10 +183,10 @@ public class ModelUnderminerDwarf extends AdvancedEntityModel<EntityUnderminer> 
 
         if (this.swimAmount > 0.0F) {
             final float f5 = p_102867_ % 26.0F;
-            HumanoidArm humanoidarm = this.getAttackArm(entityIn);
+            HumanoidArm humanoidarm = this.getAttackArm(state);
             final float f1 = humanoidarm == HumanoidArm.RIGHT && this.attackTime > 0.0F ? 0.0F : this.swimAmount;
             final float f2 = humanoidarm == HumanoidArm.LEFT && this.attackTime > 0.0F ? 0.0F : this.swimAmount;
-            if (!entityIn.isUsingItem()) {
+            if (!state.isUsingItem) {
                 if (f5 < 14.0F) {
                     this.leftArm.rotateAngleX = this.rotlerpRad(f2, this.leftArm.rotateAngleX, 0.0F);
                     this.rightArm.rotateAngleX = Mth.lerp(f1, this.rightArm.rotateAngleX, 0.0F);
@@ -213,7 +218,7 @@ public class ModelUnderminerDwarf extends AdvancedEntityModel<EntityUnderminer> 
         }
     }
 
-    private void poseRightArm(EntityUnderminer p_102876_) {
+    private void poseRightArm(UnderminerRenderState p_102876_) {
         switch (this.rightArmPose) {
             case EMPTY:
                 this.rightArm.rotateAngleY = 0.0F;
@@ -240,7 +245,7 @@ public class ModelUnderminerDwarf extends AdvancedEntityModel<EntityUnderminer> 
             case CROSSBOW_HOLD:
                 break;
             case SPYGLASS:
-                this.rightArm.rotateAngleX = Mth.clamp(this.head.rotateAngleX - 1.9198622F - (p_102876_.isCrouching() ? 0.2617994F : 0.0F), -2.4F, 3.3F);
+                this.rightArm.rotateAngleX = Mth.clamp(this.head.rotateAngleX - 1.9198622F - (p_102876_.isCrouching ? 0.2617994F : 0.0F), -2.4F, 3.3F);
                 this.rightArm.rotateAngleY = this.head.rotateAngleY - 0.2617994F;
                 break;
             case TOOT_HORN:
@@ -250,7 +255,7 @@ public class ModelUnderminerDwarf extends AdvancedEntityModel<EntityUnderminer> 
 
     }
 
-    private void poseLeftArm(EntityUnderminer p_102879_) {
+    private void poseLeftArm(UnderminerRenderState p_102879_) {
         switch (this.leftArmPose) {
             case EMPTY:
                 this.leftArm.rotateAngleY = 0.0F;
@@ -278,7 +283,7 @@ public class ModelUnderminerDwarf extends AdvancedEntityModel<EntityUnderminer> 
             case CROSSBOW_HOLD:
                 break;
             case SPYGLASS:
-                this.leftArm.rotateAngleX = Mth.clamp(this.head.rotateAngleX - 1.9198622F - (p_102879_.isCrouching() ? 0.2617994F : 0.0F), -2.4F, 3.3F);
+                this.leftArm.rotateAngleX = Mth.clamp(this.head.rotateAngleX - 1.9198622F - (p_102879_.isCrouching ? 0.2617994F : 0.0F), -2.4F, 3.3F);
                 this.leftArm.rotateAngleY = this.head.rotateAngleY + 0.2617994F;
                 break;
             case TOOT_HORN:
@@ -288,7 +293,7 @@ public class ModelUnderminerDwarf extends AdvancedEntityModel<EntityUnderminer> 
 
     }
 
-    protected void setupAttackAnimation(EntityUnderminer p_102858_, float p_102859_) {
+    protected void setupAttackAnimation(UnderminerRenderState p_102858_, float p_102859_) {
         if (!(this.attackTime <= 0.0F)) {
             HumanoidArm humanoidarm = this.getAttackArm(p_102858_);
             AdvancedModelBox modelpart = this.getArm(humanoidarm);
@@ -343,8 +348,8 @@ public class ModelUnderminerDwarf extends AdvancedEntityModel<EntityUnderminer> 
         return this.head;
     }
 
-    private HumanoidArm getAttackArm(EntityUnderminer p_102857_) {
-        HumanoidArm humanoidarm = p_102857_.getMainArm();
-        return p_102857_.swingingArm == InteractionHand.MAIN_HAND ? humanoidarm : humanoidarm.getOpposite();
+    private HumanoidArm getAttackArm(UnderminerRenderState p_102857_) {
+        HumanoidArm humanoidarm = p_102857_.mainArm;
+        return p_102857_.attackingArm == InteractionHand.MAIN_HAND ? humanoidarm : humanoidarm.getOpposite();
     }
 }
