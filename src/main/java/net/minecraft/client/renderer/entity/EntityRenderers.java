@@ -226,6 +226,7 @@ public class EntityRenderers {
 			context -> new PiglinRenderer(context, ModelLayers.PIGLIN_BRUTE, ModelLayers.PIGLIN_BRUTE, ModelLayers.PIGLIN_BRUTE_ARMOR, ModelLayers.PIGLIN_BRUTE_ARMOR)
 		);
 		register(EntityType.PILLAGER, PillagerRenderer::new);
+		register(EntityType.PLATYPUS, com.github.alexthe666.alexsmobs.client.render.RenderPlatypus::new);
 		register(EntityType.POLAR_BEAR, PolarBearRenderer::new);
 		register(EntityType.POTOO, com.github.alexthe666.alexsmobs.client.render.RenderPotoo::new);
 		register(EntityType.PUFFERFISH, PufferfishRenderer::new);

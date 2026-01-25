@@ -196,6 +196,7 @@ public class DefaultAttributes {
 		.put(EntityType.PIGLIN, Piglin.createAttributes().build())
 		.put(EntityType.PIGLIN_BRUTE, PiglinBrute.createAttributes().build())
 		.put(EntityType.PILLAGER, Pillager.createAttributes().build())
+		.put(EntityType.PLATYPUS, com.github.alexthe666.alexsmobs.entity.EntityPlatypus.bakeAttributes().build())
 		.put(EntityType.PLAYER, Player.createAttributes().build())
 		.put(EntityType.POLAR_BEAR, PolarBear.createAttributes().build())
 		.put(EntityType.POTOO, com.github.alexthe666.alexsmobs.entity.EntityPotoo.bakeAttributes().build())

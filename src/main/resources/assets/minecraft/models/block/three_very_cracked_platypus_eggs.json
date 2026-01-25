@@ -1,0 +1,6 @@
+{
+  "parent": "minecraft:block/template_three_platypus_eggs",
+  "textures": {
+    "0": "minecraft:block/platypus_eggs_very_cracked"
+  }
+}

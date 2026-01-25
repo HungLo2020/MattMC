@@ -1301,6 +1301,8 @@ public class SoundEvents {
 	public static final SoundEvent PILLAGER_CELEBRATE = register("entity.pillager.celebrate");
 	public static final SoundEvent PILLAGER_DEATH = register("entity.pillager.death");
 	public static final SoundEvent PILLAGER_HURT = register("entity.pillager.hurt");
+	public static final SoundEvent PLATYPUS_IDLE = register("entity.platypus.idle");
+	public static final SoundEvent PLATYPUS_HURT = register("entity.platypus.hurt");
 	public static final SoundEvent PISTON_CONTRACT = register("block.piston.contract");
 	public static final SoundEvent PISTON_EXTEND = register("block.piston.extend");
 	public static final SoundEvent PLAYER_ATTACK_CRIT = register("entity.player.attack.crit");

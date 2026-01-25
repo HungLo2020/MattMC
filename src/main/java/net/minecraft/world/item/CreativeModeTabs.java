@@ -948,6 +948,7 @@ public class CreativeModeTabs {
 					output.accept(Items.FROGSPAWN);
 					output.accept(Items.TURTLE_EGG);
 					output.accept(Items.CAIMAN_EGG);
+					output.accept(Items.PLATYPUS_EGG);
 					output.accept(Items.SNIFFER_EGG);
 					output.accept(Items.SUBTERRANODON_EGG);
 					output.accept(Items.VALLUMRAPTOR_EGG);
@@ -1444,6 +1445,7 @@ public class CreativeModeTabs {
 						output.accept(Items.LOBSTER_BUCKET);
 						output.accept(Items.LAVA_BUCKET);
 						output.accept(Items.POWDER_SNOW_BUCKET);
+						output.accept(Items.PLATYPUS_BUCKET);
 						output.accept(Items.MILK_BUCKET);
 						output.accept(Items.FISHING_ROD);
 						output.accept(Items.FLINT_AND_STEEL);
@@ -2022,6 +2024,7 @@ public class CreativeModeTabs {
 					output.accept(Items.PIGLIN_SPAWN_EGG);
 					output.accept(Items.PIGLIN_BRUTE_SPAWN_EGG);
 					output.accept(Items.PILLAGER_SPAWN_EGG);
+					output.accept(Items.PLATYPUS_SPAWN_EGG);
 					output.accept(Items.POLAR_BEAR_SPAWN_EGG);
 					output.accept(Items.POTOO_SPAWN_EGG);
 					output.accept(Items.PUFFERFISH_SPAWN_EGG);

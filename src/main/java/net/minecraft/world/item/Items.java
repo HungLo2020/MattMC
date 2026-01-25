@@ -866,6 +866,7 @@ public class Items {
 	public static final Item ELEVATOR = registerBlock(Blocks.ELEVATOR);
 	public static final Item TURTLE_EGG = registerBlock(Blocks.TURTLE_EGG);
 	public static final Item CAIMAN_EGG = registerBlock(Blocks.CAIMAN_EGG);
+	public static final Item PLATYPUS_EGG = registerBlock(Blocks.PLATYPUS_EGG);
 	public static final Item SNIFFER_EGG = registerBlock(Blocks.SNIFFER_EGG, (UnaryOperator<Item.Properties>)(properties -> properties.rarity(Rarity.UNCOMMON)));
 	public static final Item SUBTERRANODON_EGG = registerBlock(Blocks.SUBTERRANODON_EGG);
 	public static final Item VALLUMRAPTOR_EGG = registerBlock(Blocks.VALLUMRAPTOR_EGG);
@@ -1512,6 +1513,11 @@ public class Items {
 		properties -> new SolidBucketItem(Blocks.POWDER_SNOW, SoundEvents.BUCKET_EMPTY_POWDER_SNOW, properties),
 		new Item.Properties().stacksTo(1).useItemDescriptionPrefix()
 	);
+	public static final Item PLATYPUS_BUCKET = registerItem(
+		"platypus_bucket",
+		properties -> new MobBucketItem(EntityType.PLATYPUS, Fluids.WATER, SoundEvents.BUCKET_EMPTY_FISH, properties),
+		new Item.Properties().stacksTo(1).component(DataComponents.BUCKET_ENTITY_DATA, CustomData.EMPTY)
+	);
 	public static final Item SNOWBALL = registerItem("snowball", SnowballItem::new, new Item.Properties().stacksTo(16));
 	public static final Item SOMBRERO = registerItem("sombrero", new Item.Properties().stacksTo(1).equippableUnswappable(EquipmentSlot.HEAD));
 	public static final Item LEATHER = registerItem("leather");
@@ -1903,6 +1909,7 @@ public class Items {
 		"piglin_brute_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.PIGLIN_BRUTE)
 	);
 	public static final Item PILLAGER_SPAWN_EGG = registerItem("pillager_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.PILLAGER));
+	public static final Item PLATYPUS_SPAWN_EGG = registerItem("platypus_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.PLATYPUS));
 	public static final Item POLAR_BEAR_SPAWN_EGG = registerItem("polar_bear_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.POLAR_BEAR));
 	public static final Item POTOO_SPAWN_EGG = registerItem("potoo_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.POTOO));
 	public static final Item PUFFERFISH_SPAWN_EGG = registerItem("pufferfish_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.PUFFERFISH));

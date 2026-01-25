@@ -4767,6 +4767,17 @@ public class Blocks {
 			.randomTicks()
 			.noOcclusion()
 	);
+	public static final Block PLATYPUS_EGG = register(
+		"platypus_egg",
+		com.github.alexthe666.alexsmobs.block.BlockReptileEgg::new,
+		BlockBehaviour.Properties.of()
+			.mapColor(MapColor.SAND)
+			.strength(0.5F)
+			.sound(SoundType.METAL)
+			.randomTicks()
+			.noOcclusion()
+			.pushReaction(PushReaction.DESTROY)
+	);
 	public static final Block SNIFFER_EGG = register(
 		"sniffer_egg", SnifferEggBlock::new, BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_RED).strength(0.5F).sound(SoundType.METAL).noOcclusion()
 	);
