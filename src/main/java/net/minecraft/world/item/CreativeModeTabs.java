@@ -2051,6 +2051,7 @@ public class CreativeModeTabs {
 					output.accept(Items.STRIDER_SPAWN_EGG);
 					output.accept(Items.TADPOLE_SPAWN_EGG);
 					output.accept(Items.TARANTULA_HAWK_SPAWN_EGG);
+					output.accept(Items.TASMANIAN_DEVIL_SPAWN_EGG);
 					output.accept(Items.TRADER_LLAMA_SPAWN_EGG);
 					output.accept(Items.TREMORSAURUS_SPAWN_EGG);
 					output.accept(Items.TRILOCARIS_SPAWN_EGG);
