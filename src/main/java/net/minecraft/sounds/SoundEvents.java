@@ -756,6 +756,9 @@ public class SoundEvents {
 	public static final SoundEvent GOAT_STEP = register("entity.goat.step");
 	public static final SoundEvent GORILLA_IDLE = register("entity.gorilla.idle");
 	public static final SoundEvent GORILLA_HURT = register("entity.gorilla.hurt");
+	public static final SoundEvent GRIZZLY_BEAR_IDLE = register("entity.grizzly_bear.idle");
+	public static final SoundEvent GRIZZLY_BEAR_HURT = register("entity.grizzly_bear.hurt");
+	public static final SoundEvent GRIZZLY_BEAR_DIE = register("entity.grizzly_bear.die");
 	public static final SoundEvent ATLATITAN_IDLE = register("entity.atlatitan.idle");
 	public static final SoundEvent ATLATITAN_HURT = register("entity.atlatitan.hurt");
 	public static final SoundEvent ATLATITAN_DEATH = register("entity.atlatitan.death");

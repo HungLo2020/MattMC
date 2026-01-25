@@ -1,0 +1,810 @@
+package com.github.alexthe666.alexsmobs.entity;
+
+import com.github.alexthe666.alexsmobs.entity.ai.*;
+import com.github.alexthe666.alexsmobs.entity.util.Maths;
+import com.github.alexthe666.citadel.animation.Animation;
+import com.github.alexthe666.citadel.animation.AnimationHandler;
+import com.github.alexthe666.citadel.animation.IAnimatedEntity;
+import net.minecraft.advancements.CriteriaTriggers;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.particles.ItemParticleOption;
+import net.minecraft.core.particles.ParticleTypes;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.syncher.EntityDataAccessor;
+import net.minecraft.network.syncher.EntityDataSerializers;
+import net.minecraft.network.syncher.SynchedEntityData;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.sounds.SoundEvent;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.util.Mth;
+import net.minecraft.util.TimeUtil;
+import net.minecraft.util.valueproviders.UniformInt;
+import net.minecraft.world.DifficultyInstance;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.damagesource.DamageTypes;
+import net.minecraft.world.entity.*;
+import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
+import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.entity.ai.goal.*;
+import net.minecraft.world.entity.ai.goal.target.*;
+import net.minecraft.world.entity.animal.Animal;
+import net.minecraft.world.entity.animal.Fox;
+import net.minecraft.world.entity.animal.wolf.Wolf;
+import net.minecraft.world.entity.item.ItemEntity;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.entity.projectile.AbstractArrow;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.item.ShovelItem;
+import net.minecraft.world.item.crafting.Ingredient;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.LevelAccessor;
+import net.minecraft.world.level.ServerLevelAccessor;
+import net.minecraft.world.level.biome.Biome;
+import net.minecraft.world.level.gameevent.GameEvent;
+import net.minecraft.world.level.levelgen.Heightmap;
+import net.minecraft.world.phys.Vec3;
+import net.minecraft.tags.ItemTags;
+
+import javax.annotation.Nullable;
+import java.util.UUID;
+import java.util.function.Predicate;
+
+public class EntityGrizzlyBear extends TamableAnimal implements NeutralMob, IAnimatedEntity, ITargetsDroppedItems, IFollower {
+
+    public static final Animation ANIMATION_MAUL = Animation.create(20);
+    public static final Animation ANIMATION_SNIFF = Animation.create(12);
+    public static final Animation ANIMATION_SWIPE_R = Animation.create(15);
+    public static final Animation ANIMATION_SWIPE_L = Animation.create(20);
+    private static final EntityDataAccessor<Boolean> STANDING = SynchedEntityData.defineId(EntityGrizzlyBear.class, EntityDataSerializers.BOOLEAN);
+    private static final EntityDataAccessor<Boolean> SITTING = SynchedEntityData.defineId(EntityGrizzlyBear.class, EntityDataSerializers.BOOLEAN);
+    private static final EntityDataAccessor<Boolean> HONEYED = SynchedEntityData.defineId(EntityGrizzlyBear.class, EntityDataSerializers.BOOLEAN);
+    private static final EntityDataAccessor<Boolean> EATING = SynchedEntityData.defineId(EntityGrizzlyBear.class, EntityDataSerializers.BOOLEAN);
+    private static final EntityDataAccessor<Boolean> SNOWY = SynchedEntityData.defineId(EntityGrizzlyBear.class, EntityDataSerializers.BOOLEAN);
+    private static final EntityDataAccessor<Integer> APRIL_FOOLS_MODE = SynchedEntityData.defineId(EntityGrizzlyBear.class, EntityDataSerializers.INT);
+    private static final EntityDataAccessor<Integer> COMMAND = SynchedEntityData.defineId(EntityGrizzlyBear.class, EntityDataSerializers.INT);
+    private static final UniformInt angerLogic = TimeUtil.rangeOfSeconds(20, 39);
+    public float prevStandProgress;
+    public float prevSitProgress;
+    public float standProgress;
+    public float sitProgress;
+    public int maxStandTime = 75;
+    public boolean forcedSit = false;
+    private int animationTick;
+    private Animation currentAnimation;
+    private int standingTime = 0;
+    private int sittingTime = 0;
+    private int maxSitTime = 75;
+    private int eatingTime = 0;
+    private int angerTime;
+    private UUID angerTarget;
+    private int honeyedTime;
+    @Nullable
+    private UUID salmonThrowerID = null;
+    // Removed TEMPTATION_ITEMS - use direct item tag in TameableAITempt instead
+    public int timeUntilNextFur = this.random.nextInt(24000) + 24000;
+    protected static final EntityDimensions STANDING_SIZE = EntityDimensions.scalable(1.7F,  2.75F);
+    private boolean recalcSize = false;
+    private int snowTimer = 0;
+    private boolean permSnow = false;
+
+    public EntityGrizzlyBear(EntityType type, Level worldIn) {
+        super(type, worldIn);
+    }
+
+    public static AttributeSupplier.Builder bakeAttributes() {
+        return Animal.createAnimalAttributes().add(Attributes.MAX_HEALTH, 55.0D).add(Attributes.ATTACK_DAMAGE, 8.0D).add(Attributes.KNOCKBACK_RESISTANCE, 0.6F).add(Attributes.MOVEMENT_SPEED, 0.25F).add(Attributes.STEP_HEIGHT, 1.0D).add(Attributes.TEMPT_RANGE, 10.0D);
+    }
+
+    public EntityDimensions getDefaultDimensions(Pose poseIn) {
+        return isStanding() ? STANDING_SIZE.scale(this.getScale()) : super.getDefaultDimensions(poseIn);
+    }
+
+    public boolean hurtServer(ServerLevel serverLevel, DamageSource source, float amount) {
+        if (this.isInvulnerableTo(serverLevel, source)) {
+            return false;
+        } else {
+            Entity entity = source.getEntity();
+            this.setOrderedToSit(false);
+            if (entity != null && this.isTame() && !(entity instanceof Player) && !(entity instanceof AbstractArrow)) {
+                amount = (amount + 1.0F) / 3.0F;
+            }
+            return super.hurtServer(serverLevel, source, amount);
+        }
+    }
+
+    protected SoundEvent getAmbientSound() {
+        return SoundEvents.GRIZZLY_BEAR_IDLE;
+    }
+
+    protected SoundEvent getHurtSound(DamageSource damageSourceIn) {
+        return SoundEvents.GRIZZLY_BEAR_HURT;
+    }
+
+    protected SoundEvent getDeathSound() {
+        return SoundEvents.GRIZZLY_BEAR_DIE;
+    }
+
+    public void positionRider(Entity passenger, Entity.MoveFunction moveFunc) {
+        if (this.hasPassenger(passenger)) {
+            float sitAdd = -0.065F * this.sitProgress;
+            float standAdd = -0.07F * this.standProgress;
+            float radius = standAdd + sitAdd;
+            float angle = (Maths.STARTING_ANGLE * this.yBodyRot);
+            double extraX = radius * Mth.sin(Mth.PI + angle);
+            double extraZ = radius * Mth.cos(angle);
+            double passengerYOffset = passenger instanceof Player ? -0.35D : 0.0D;
+            passenger.setPos(this.getX() + extraX, this.getY() + this.getPassengersRidingOffset() + passengerYOffset, this.getZ() + extraZ);
+        }
+    }
+
+    public double getPassengersRidingOffset() {
+        float f = Math.min(0.25F, this.walkAnimation.speed());
+        float f1 = this.walkAnimation.position();
+        float sitAdd = 0.01F * this.sitProgress;
+        float standAdd = 0.07F * this.standProgress;
+        return (double)this.getBbHeight() - 0.3D + (double)(0.12F * Mth.cos(f1 * 0.7F) * 0.7F * f) + sitAdd + standAdd;
+    }
+
+    public void playAmbientSound() {
+        if(!isFreddy()){
+            super.playAmbientSound();
+        }
+    }
+
+    protected float getWaterSlowDown() {
+        return isVehicle() ? 0.9F : 0.98F;
+    }
+
+    public void startPersistentAngerTimer() {
+        this.setRemainingPersistentAngerTime(angerLogic.sample(this.random));
+    }
+
+    public int getRemainingPersistentAngerTime() {
+        return this.angerTime;
+    }
+
+    public void setRemainingPersistentAngerTime(int time) {
+        this.angerTime = time;
+    }
+
+    public UUID getPersistentAngerTarget() {
+        return this.angerTarget;
+    }
+
+    public void setPersistentAngerTarget(@Nullable UUID target) {
+        this.angerTarget = target;
+    }
+
+    public boolean isInvulnerableTo(ServerLevel serverLevel, DamageSource source) {
+        return source.getMsgId() != null && source.getMsgId().equals("sting") || source.is(DamageTypes.IN_WALL) || super.isInvulnerableTo(serverLevel, source);
+    }
+
+    protected void registerGoals() {
+        super.registerGoals();
+        this.goalSelector.addGoal(0, new FloatGoal(this));
+        this.goalSelector.addGoal(1, new SitWhenOrderedToGoal(this));
+        this.goalSelector.addGoal(2, new TameableAIFollowOwner(this, 1.2D, 5.0F, 2.0F, false));
+        this.goalSelector.addGoal(3, new GrizzlyBearAIAprilFools(this));
+        this.goalSelector.addGoal(4, new EntityGrizzlyBear.MeleeAttackGoal());
+        this.goalSelector.addGoal(4, new EntityGrizzlyBear.PanicGoal());
+        this.goalSelector.addGoal(5, new TameableAITempt(this, 1.1D, itemStack -> itemStack.is(ItemTags.FISHES), false));
+        this.goalSelector.addGoal(5, new FollowParentGoal(this, 1.25D));
+        this.goalSelector.addGoal(5, new GrizzlyBearAIBeehive(this));
+        this.goalSelector.addGoal(6, new GrizzlyBearAIFleeBees(this, 14, 1D, 1D));
+        this.goalSelector.addGoal(6, new BreedGoal(this, 1.0D));
+        this.goalSelector.addGoal(7, new RandomStrollGoal(this, 0.75D));
+        this.goalSelector.addGoal(8, new LookAtPlayerGoal(this, Player.class, 6.0F));
+        this.goalSelector.addGoal(8, new RandomLookAroundGoal(this));
+        this.targetSelector.addGoal(1, new OwnerHurtByTargetGoal(this));
+        this.targetSelector.addGoal(2, new OwnerHurtTargetGoal(this));
+        this.targetSelector.addGoal(3, new EntityGrizzlyBear.HurtByTargetGoal());
+        this.targetSelector.addGoal(4, new CreatureAITargetItems(this, false));
+        this.targetSelector.addGoal(5, new EntityGrizzlyBear.AttackPlayerGoal());
+        this.targetSelector.addGoal(6, new NearestAttackableTargetGoal<>(this, Player.class, 10, true, false, this::isAngryAt));
+        this.targetSelector.addGoal(7, new NonTameRandomTargetGoal<>(this, Fox.class, false, null));
+        this.targetSelector.addGoal(8, new NonTameRandomTargetGoal<>(this, Wolf.class, false, null));
+        this.targetSelector.addGoal(7, new ResetUniversalAngerTargetGoal<>(this, false));
+    }
+
+    public void addAdditionalSaveData(net.minecraft.world.level.storage.ValueOutput valueOutput) {
+        super.addAdditionalSaveData(valueOutput);
+        valueOutput.putBoolean("Honeyed", this.isHoneyed());
+        valueOutput.putBoolean("Snowy", this.isSnowy());
+        valueOutput.putBoolean("Standing", this.isStanding());
+        valueOutput.putBoolean("BearSitting", this.isSitting());
+        valueOutput.putBoolean("ForcedToSit", this.forcedSit);
+        valueOutput.putBoolean("SnowPerm", this.permSnow);
+        valueOutput.putInt("FurTime", this.timeUntilNextFur);
+        valueOutput.putInt("BearCommand", this.getCommand());
+    }
+
+    public void readAdditionalSaveData(net.minecraft.world.level.storage.ValueInput valueInput) {
+        super.readAdditionalSaveData(valueInput);
+        this.setHoneyed(valueInput.getBooleanOr("Honeyed", false));
+        this.setSnowy(valueInput.getBooleanOr("Snowy", false));
+        this.setStanding(valueInput.getBooleanOr("Standing", false));
+        this.setOrderedToSit(valueInput.getBooleanOr("BearSitting", false));
+        this.setCommand(valueInput.getIntOr("BearCommand", 0));
+        this.forcedSit = valueInput.getBooleanOr("ForcedToSit", false);
+        this.permSnow = valueInput.getBooleanOr("SnowPerm", false);
+        this.timeUntilNextFur = valueInput.getIntOr("FurTime", this.random.nextInt(24000) + 24000);
+    }
+
+    public boolean isFood(ItemStack stack) {
+        Item item = stack.getItem();
+        return isTame() && stack.is(ItemTags.FISHES);
+    }
+
+
+    public void handleEntityEvent(byte id) {
+        if (id == 67) {
+            // Stub: particle effects for eating
+            for(int i = 0; i < 7; i++){
+                double d0 = this.random.nextGaussian() * 0.02D;
+                double d1 = this.random.nextGaussian() * 0.02D;
+                double d2 = this.random.nextGaussian() * 0.02D;
+                this.level().addParticle(ParticleTypes.HAPPY_VILLAGER, this.getRandomX(1.0D), this.getRandomY() + 0.5D, this.getRandomZ(1.0D), d0, d1, d2);
+            }
+        } else  if (id == 68) {
+            // Stub: special particle effect (April Fools)
+            for(int i = 0; i < 15; i++){
+                double d0 = this.random.nextGaussian() * 0.02D;
+                double d1 = this.random.nextGaussian() * 0.02D;
+                double d2 = this.random.nextGaussian() * 0.02D;
+                this.level().addParticle(ParticleTypes.HEART, this.getRandomX(1.0D), this.getRandomY() + 0.5D, this.getRandomZ(1.0D), d0, d1, d2);
+            }
+        } else{
+            super.handleEntityEvent(id);
+        }
+    }
+
+    @Nullable
+    @Override
+    public LivingEntity getControllingPassenger() {
+        for (Entity passenger : this.getPassengers()) {
+            if (passenger instanceof Player) {
+                Player player = (Player) passenger;
+                return player;
+            }
+        }
+        return null;
+    }
+
+    public InteractionResult mobInteract(Player player, InteractionHand hand) {
+        ItemStack itemstack = player.getItemInHand(hand);
+        Item item = itemstack.getItem();
+        if(item == Items.SNOW && !this.isSnowy() && !this.level().isClientSide()){
+            this.usePlayerItem(player, hand, itemstack);
+            this.permSnow = true;
+            this.setSnowy(true);
+            this.gameEvent(GameEvent.ENTITY_INTERACT);
+            this.playSound(SoundEvents.SNOW_PLACE, this.getSoundVolume(), this.getVoicePitch());
+            return InteractionResult.SUCCESS;
+        }
+        if(item instanceof ShovelItem && this.isSnowy() && !this.level().isClientSide()){
+            this.permSnow = false;
+            if(!player.isCreative()){
+                if (itemstack.isDamageableItem()) itemstack.setDamageValue(itemstack.getDamageValue() + 1);
+            }
+            this.setSnowy(false);
+            this.gameEvent(GameEvent.ENTITY_INTERACT);
+            this.playSound(SoundEvents.SNOW_BREAK, this.getSoundVolume(), this.getVoicePitch());
+            return InteractionResult.SUCCESS;
+        }
+        InteractionResult interactionresult = itemstack.interactLivingEntity(player, this, hand);
+        if (interactionresult != InteractionResult.SUCCESS && isTame() && isOwnedBy(player) && !isFood(itemstack)){
+            if(!player.isShiftKeyDown() && !this.isBaby()){
+                player.startRiding(this);
+                return InteractionResult.SUCCESS;
+            }else{
+                this.setCommand((this.getCommand() + 1) % 3);
+
+                if (this.getCommand() == 3) {
+                    this.setCommand(0);
+                }
+                player.displayClientMessage(Component.translatable("entity.alexsmobs.all.command_" + this.getCommand(), this.getName()), true);
+                boolean sit = this.getCommand() == 2;
+                if (sit) {
+                    this.forcedSit = true;
+                    this.setOrderedToSit(true);
+                    return InteractionResult.SUCCESS;
+                } else {
+                    this.forcedSit = false;
+                    this.setOrderedToSit(false);
+                    return InteractionResult.SUCCESS;
+                }
+            }
+        }
+        InteractionResult type = super.mobInteract(player, hand);
+        return type;
+    }
+
+    protected Vec3 getRiddenInput(Player player, Vec3 deltaIn) {
+        if (player.zza != 0) {
+            float f = player.zza < 0.0F ? 0.5F : 1.0F;
+            return new Vec3(player.xxa * 0.25F, 0.0D, player.zza * 0.5F * f);
+        } else {
+            this.setSprinting(false);
+        }
+        return Vec3.ZERO;
+    }
+    protected void tickRidden(Player player, Vec3 vec3) {
+        super.tickRidden(player, vec3);
+        if(player.zza != 0 || player.xxa != 0){
+            this.setRot(player.getYRot(), player.getXRot() * 0.25F);
+            this.yRotO = this.yBodyRot = this.yHeadRot = this.getYRot();
+            this.getNavigation().stop();
+            this.setTarget(null);
+            this.setSprinting(true);
+        }
+    }
+
+    protected float getRiddenSpeed(Player rider) {
+        return (float)(this.getAttributeValue(Attributes.MOVEMENT_SPEED));
+    }
+
+    public void travel(Vec3 vec3d) {
+        if (!this.shouldMove()) {
+            if (this.getNavigation().getPath() != null) {
+                this.getNavigation().stop();
+            }
+            vec3d = Vec3.ZERO;
+        }
+        super.travel(vec3d);
+    }
+
+    public void tick() {
+        super.tick();
+        if (this.isBaby() || this.getEyeHeight() > this.getBbHeight()) {
+            this.refreshDimensions();
+        }
+        if(!isStanding() && this.getBbHeight() >= 2.75F){
+            this.refreshDimensions();
+        }
+        this.prevStandProgress = this.standProgress;
+        this.prevSitProgress = this.sitProgress;
+
+        if (this.isSitting()) {
+            if (sitProgress < 10F)
+                sitProgress++;
+        } else {
+            if (sitProgress > 0F)
+                sitProgress--;
+        }
+
+        if (this.isStanding()) {
+            if (standProgress < 10F)
+                standProgress++;
+        } else {
+            if (standProgress > 0F)
+                standProgress--;
+        }
+
+        if(!this.getItemInHand(InteractionHand.MAIN_HAND).isEmpty() && this.canTargetItem(this.getItemInHand(InteractionHand.MAIN_HAND))){
+            this.setEating(true);
+            this.setOrderedToSit(true);
+            this.setStanding(false);
+        }
+        if(recalcSize){
+            recalcSize = false;
+            this.refreshDimensions();
+        }
+
+        if(isEating() && !this.canTargetItem(this.getItemInHand(InteractionHand.MAIN_HAND))){
+            this.setEating(false);
+            eatingTime = 0;
+            if(!forcedSit){
+                this.setOrderedToSit(true);
+            }
+        }
+        if(isEating()){
+            eatingTime++;
+            for(int i = 0; i < 3; i++){
+                double d2 = this.random.nextGaussian() * 0.02D;
+                double d0 = this.random.nextGaussian() * 0.02D;
+                double d1 = this.random.nextGaussian() * 0.02D;
+                this.level().addParticle(new ItemParticleOption(ParticleTypes.ITEM, this.getItemInHand(InteractionHand.MAIN_HAND)), this.getX() + (double) (this.random.nextFloat() * this.getBbWidth()) - (double) this.getBbWidth() * 0.5F, this.getY() + this.getBbHeight() * 0.5F + (double) (this.random.nextFloat() * this.getBbHeight() * 0.5F), this.getZ() + (double) (this.random.nextFloat() * this.getBbWidth()) - (double) this.getBbWidth() * 0.5F, d0, d1, d2);
+            }
+            if(eatingTime % 5 == 0){
+                this.gameEvent(GameEvent.EAT);
+                this.playSound(SoundEvents.GENERIC_EAT.value(), this.getSoundVolume(), this.getVoicePitch());
+            }
+            if(eatingTime > 100){
+                ItemStack stack = this.getItemInHand(InteractionHand.MAIN_HAND);
+                if(!stack.isEmpty()){
+                    if(stack.is(ItemTags.FISHES)){
+                        this.setHoneyed(true);
+                        this.heal(10);
+                        this.honeyedTime = 700;
+                    }else{
+                        this.heal(4);
+                    }
+                    if(stack.is(ItemTags.FISHES) && !this.isTame() && this.salmonThrowerID != null){
+                       if(getRandom().nextFloat() < 0.3F){
+                           this.setTame(true, true);
+                           if (this.level() instanceof ServerLevel serverLevel) {
+                               Player player = serverLevel.getServer().getPlayerList().getPlayer(this.salmonThrowerID);
+                               if (player != null) {
+                                   this.setOwner(player);
+                                   if (player instanceof ServerPlayer serverPlayer) {
+                                       CriteriaTriggers.TAME_ANIMAL.trigger(serverPlayer, this);
+                                   }
+                               }
+                           }
+                           this.level().broadcastEntityEvent(this, (byte)7);
+                       }else{
+                           this.level().broadcastEntityEvent(this, (byte)6);
+                       }
+                    }
+                    // Crafting remaining item handling removed - simplified for 1.21
+                    stack.shrink(1);
+                }
+                eatingTime = 0;
+            }
+        }
+        if (isStanding() && ++standingTime > maxStandTime) {
+            this.setStanding(false);
+            standingTime = 0;
+            maxStandTime = 75 + random.nextInt(50);
+        }
+        if (isSitting() && !forcedSit && ++sittingTime > maxSitTime) {
+            this.setOrderedToSit(false);
+            sittingTime = 0;
+            maxSitTime = 75 + random.nextInt(50);
+        }
+        if (!this.level().isClientSide() && this.getAnimation() == NO_ANIMATION && !this.isStanding() && !this.isSitting() && random.nextInt(1500) == 0) {
+            maxSitTime = 300 + random.nextInt(250);
+            this.setOrderedToSit(true);
+        }
+        /*
+        if(this.getAnimation() == NO_ANIMATION && !this.isStanding() && !this.isSitting() && rand.nextInt(1500) == 0){
+            maxStandTime = 75 + rand.nextInt(50);
+            this.setStanding(true);
+        }
+         */
+        if (!forcedSit && this.isSitting() && (this.getTarget() != null || this.isStanding()) && !this.isEating()) {
+            this.setOrderedToSit(false);
+        }
+        if (this.getAnimation() == NO_ANIMATION && this.getAprilFoolsFlag() < 1 && random.nextInt(isStanding() ? 350 : 2500) == 0) {
+            this.setAnimation(ANIMATION_SNIFF);
+        }
+        if (this.isSitting()) {
+            this.getNavigation().stop();
+        }
+        LivingEntity attackTarget = this.getTarget();
+        if(this.getControllingPassenger() != null && this.getControllingPassenger() instanceof Player){
+            Player rider = (Player)this.getControllingPassenger();
+            if(rider.getLastHurtMob() != null && this.distanceTo(rider.getLastHurtMob()) < this.getBbWidth() + 3F && !this.isAlliedTo(rider.getLastHurtMob())){
+                UUID preyUUID = rider.getLastHurtMob().getUUID();
+                if (!this.getUUID().equals(preyUUID)) {
+                    attackTarget = rider.getLastHurtMob();
+                    if (getAnimation() == NO_ANIMATION || getAnimation() == ANIMATION_SNIFF) {
+                        EntityGrizzlyBear.this.setAnimation(random.nextBoolean() ? ANIMATION_MAUL : random.nextBoolean() ? ANIMATION_SWIPE_L : ANIMATION_SWIPE_R);
+                    }
+                }
+            }
+        }
+        if (attackTarget != null) {
+            if(!this.level().isClientSide()){
+                this.setSprinting(true);
+            }
+            if (distanceTo(attackTarget) < attackTarget.getBbWidth() + this.getBbWidth() + 2.5F) {
+                if (this.getAnimation() == ANIMATION_MAUL && this.getAnimationTick() % 5 == 0 && this.getAnimationTick() > 3 && this.level() instanceof ServerLevel serverLevel) {
+                    doHurtTarget(serverLevel, attackTarget);
+                }
+                if ((this.getAnimation() == ANIMATION_SWIPE_L) && this.getAnimationTick() == 7 && this.level() instanceof ServerLevel serverLevel) {
+                    doHurtTarget(serverLevel, attackTarget);
+                    float rot = getYRot() + 90;
+                    attackTarget.knockback(0.5F, Mth.sin(rot * Mth.DEG_TO_RAD), -Mth.cos(rot * Mth.DEG_TO_RAD));
+                }
+                if ((this.getAnimation() == ANIMATION_SWIPE_R) && this.getAnimationTick() == 7 && this.level() instanceof ServerLevel serverLevel) {
+                    doHurtTarget(serverLevel, attackTarget);
+                    float rot = getYRot() - 90;
+                    attackTarget.knockback(0.5F, Mth.sin(rot * Mth.DEG_TO_RAD), -Mth.cos(rot * Mth.DEG_TO_RAD));
+                }
+
+            }
+        }else{
+            if(!this.level().isClientSide() && this.getControllingPassenger() == null){
+                this.setSprinting(false);
+            }
+        }
+        if(!this.level().isClientSide() && isHoneyed() && --honeyedTime <= 0){
+            this.setHoneyed(false);
+            honeyedTime = 0;
+        }
+        if(this.forcedSit && !this.isVehicle() && this.isTame()){
+            this.setOrderedToSit(true);
+        }
+        if(this.isVehicle() && this.isSitting()){
+            this.setOrderedToSit(false);
+        }
+        if (!this.level().isClientSide() && this.isAlive() && isTame() && !this.isBaby() && --this.timeUntilNextFur <= 0 && this.level() instanceof ServerLevel serverLevel) {
+            this.spawnAtLocation(serverLevel, Items.RABBIT_HIDE);
+            this.timeUntilNextFur = this.random.nextInt(24000) + 24000;
+        }
+        if(snowTimer > 0){
+            snowTimer--;
+        }
+        if (snowTimer == 0 && !this.level().isClientSide()) {
+            snowTimer = 200 + random.nextInt(400);
+            if(this.isSnowy()){
+               if(!permSnow){
+                   if (!this.level().isClientSide() || this.getRemainingFireTicks() > 0 || this.isInWater() || !isSnowingAt(level(), this.blockPosition().above())) {
+                       this.setSnowy(false);
+                   }
+               }
+            }else{
+                if (!this.level().isClientSide() &&  isSnowingAt(level(), this.blockPosition())) {
+                    this.setSnowy(true);
+                }
+            }
+        }
+        if(this.isFreddy()){
+            this.setStanding(true);
+            this.standingTime = 0;
+            this.maxStandTime = 40;
+        }
+        AnimationHandler.INSTANCE.updateAnimations(this);
+    }
+
+    public static boolean isSnowingAt(Level world, BlockPos position) {
+        if (!world.isRaining()) {
+            return false;
+        } else if (!world.canSeeSky(position)) {
+            return false;
+        } else if (world.getHeightmapPos(Heightmap.Types.MOTION_BLOCKING, position).getY() > position.getY()) {
+            return false;
+        } else {
+            return world.getBiome(position).value().getPrecipitationAt(position, world.getSeaLevel()) == Biome.Precipitation.SNOW;
+        }
+    }
+
+    // isAlliedTo method removed - it's final in 1.21 and cannot be overridden
+    // The logic is now handled through the taming system
+
+    public void setOrderedToSit(boolean sit) {
+        this.entityData.set(SITTING, Boolean.valueOf(sit));
+    }
+
+    public boolean isSitting() {
+        return this.entityData.get(SITTING);
+    }
+
+    @Override
+    protected void defineSynchedData(SynchedEntityData.Builder builder) {
+        super.defineSynchedData(builder);
+        builder.define(STANDING, false);
+        builder.define(SITTING, false);
+        builder.define(HONEYED, false);
+        builder.define(SNOWY, false);
+        builder.define(EATING, false);
+        builder.define(APRIL_FOOLS_MODE, 0);
+        builder.define(COMMAND, 0);
+    }
+
+    public boolean isEating() {
+        return this.entityData.get(EATING);
+    }
+
+    public void setEating(boolean eating) {
+        this.entityData.set(EATING, Boolean.valueOf(eating));
+    }
+
+    public boolean isHoneyed() {
+        return this.entityData.get(HONEYED);
+    }
+
+    public void setHoneyed(boolean honeyed) {
+        this.entityData.set(HONEYED, Boolean.valueOf(honeyed));
+    }
+
+    public boolean isSnowy() {
+        return this.entityData.get(SNOWY);
+    }
+
+    public void setSnowy(boolean honeyed) {
+        this.entityData.set(SNOWY, Boolean.valueOf(honeyed));
+    }
+
+    public boolean isStanding() {
+        return this.entityData.get(STANDING);
+    }
+
+    public void setStanding(boolean standing) {
+        this.entityData.set(STANDING, Boolean.valueOf(standing));
+        this.recalcSize = true;
+    }
+
+    public int getAprilFoolsFlag() {
+        return this.entityData.get(APRIL_FOOLS_MODE);
+    }
+
+    /*
+        0 - default bear mode
+        1 - stalking player, normal bear texture
+        2 - freddy texture
+        3 - freddy texture, blind player
+        4 - freddy texture, music box
+        5 - freddy texture, attack
+     */
+    public void setAprilFoolsFlag(int i) {
+        this.entityData.set(APRIL_FOOLS_MODE, i);
+    }
+
+    public int getCommand() {
+        return this.entityData.get(COMMAND);
+    }
+
+    public void setCommand(int command) {
+        this.entityData.set(COMMAND, Integer.valueOf(command));
+    }
+
+    @Nullable
+    @Override
+    public AgeableMob getBreedOffspring(ServerLevel world, AgeableMob p_241840_2_) {
+        return EntityType.POLAR_BEAR.create(world, EntitySpawnReason.BREEDING);
+    }
+
+    @Override
+    public int getAnimationTick() {
+        return animationTick;
+    }
+
+    @Override
+    public void setAnimationTick(int tick) {
+        animationTick = tick;
+    }
+
+    @Override
+    public Animation getAnimation() {
+        return currentAnimation;
+    }
+
+    @Override
+    public void setAnimation(Animation animation) {
+        currentAnimation = animation;
+        if (animation == ANIMATION_MAUL) {
+            maxStandTime = 21;
+            this.setStanding(true);
+        }
+        if (animation == ANIMATION_SWIPE_R || animation == ANIMATION_SWIPE_L) {
+            maxStandTime = 2 + random.nextInt(5);
+            this.setStanding(true);
+        }
+    }
+
+    @Override
+    public Animation[] getAnimations() {
+        return new Animation[]{ANIMATION_MAUL, ANIMATION_SNIFF, ANIMATION_SWIPE_R, ANIMATION_SWIPE_L};
+    }
+
+    public boolean shouldMove() {
+        return !isSitting();
+    }
+
+    public SpawnGroupData finalizeSpawn(ServerLevelAccessor worldIn, DifficultyInstance difficultyIn, EntitySpawnReason reason, @Nullable SpawnGroupData spawnDataIn) {
+        if (spawnDataIn == null) {
+            spawnDataIn = new AgeableMob.AgeableMobGroupData(1.0F);
+        }
+
+        return super.finalizeSpawn(worldIn, difficultyIn, reason, spawnDataIn);
+    }
+
+    public boolean canTargetItem(ItemStack stack) {
+        return stack.is(ItemTags.FISHES);
+    }
+
+    public void onGetItem(ItemEntity targetEntity) {
+        ItemStack duplicate = targetEntity.getItem().copy();
+        duplicate.setCount(1);
+        if (!this.getItemInHand(InteractionHand.MAIN_HAND).isEmpty() && !this.level().isClientSide() && this.level() instanceof ServerLevel serverLevel) {
+            this.spawnAtLocation(serverLevel, this.getItemInHand(InteractionHand.MAIN_HAND));
+        }
+        this.setItemInHand(InteractionHand.MAIN_HAND, duplicate);
+        Entity thrower = targetEntity.getOwner();
+        if(targetEntity.getItem().is(ItemTags.FISHES) && thrower != null && this.isHoneyed()){
+            salmonThrowerID = thrower.getUUID();
+        }else{
+            salmonThrowerID = null;
+        }
+    }
+
+    public boolean isEatingHeldItem() {
+        return false;
+    }
+
+    public boolean isFreddy() {
+        return getAprilFoolsFlag() > 1;
+    }
+
+    @Override
+    public boolean shouldFollow() {
+        return this.getAprilFoolsFlag() == 0 && this.getCommand() == 1;
+    }
+
+
+    class HurtByTargetGoal extends net.minecraft.world.entity.ai.goal.target.HurtByTargetGoal {
+        public HurtByTargetGoal() {
+            super(EntityGrizzlyBear.this);
+        }
+
+        /**
+         * Execute a one shot task or start executing a continuous task
+         */
+        public void start() {
+            super.start();
+            if (EntityGrizzlyBear.this.isBaby()) {
+                this.alertOthers();
+                this.stop();
+            }
+
+        }
+
+        protected void alertOther(Mob mobIn, LivingEntity targetIn) {
+            if (mobIn instanceof EntityGrizzlyBear && !mobIn.isBaby()) {
+                super.alertOther(mobIn, targetIn);
+            }
+
+        }
+    }
+
+    class MeleeAttackGoal extends net.minecraft.world.entity.ai.goal.MeleeAttackGoal {
+        public MeleeAttackGoal() {
+            super(EntityGrizzlyBear.this, 1.25D, true);
+        }
+
+        protected void checkAndPerformAttack(LivingEntity enemy, double distToEnemySqr) {
+            double d0 = this.getAttackReachSqr(enemy);
+            if (distToEnemySqr <= d0) {
+                if (getAnimation() == NO_ANIMATION || getAnimation() == ANIMATION_SNIFF) {
+                    EntityGrizzlyBear.this.setAnimation(random.nextBoolean() ? ANIMATION_MAUL : random.nextBoolean() ? ANIMATION_SWIPE_L : ANIMATION_SWIPE_R);
+                }
+            }
+        }
+
+        public void stop() {
+            EntityGrizzlyBear.this.setStanding(false);
+            super.stop();
+        }
+
+        protected double getAttackReachSqr(LivingEntity attackTarget) {
+            return 3.0F + attackTarget.getBbWidth();
+        }
+    }
+
+    class AttackPlayerGoal extends NearestAttackableTargetGoal<Player> {
+        public AttackPlayerGoal() {
+            super(EntityGrizzlyBear.this, Player.class, 3, true, true, null);
+        }
+
+        public boolean canUse() {
+            if (EntityGrizzlyBear.this.isBaby() || EntityGrizzlyBear.this.getAprilFoolsFlag() >= 1 || EntityGrizzlyBear.this.isHoneyed()) {
+                return false;
+            } else {
+                return super.canUse();
+            }
+        }
+
+        protected double getFollowDistance() {
+            return 5.0D;
+        }
+    }
+
+    class PanicGoal extends net.minecraft.world.entity.ai.goal.PanicGoal {
+        public PanicGoal() {
+            super(EntityGrizzlyBear.this, 2.0D);
+        }
+
+        public boolean canUse() {
+            return (EntityGrizzlyBear.this.isBaby() || EntityGrizzlyBear.this.isOnFire()) && super.canUse();
+        }
+    }
+
+}

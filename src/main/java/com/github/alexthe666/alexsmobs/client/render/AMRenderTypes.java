@@ -62,4 +62,12 @@ public class AMRenderTypes {
     public static RenderType getGhostCrumbling(ResourceLocation texture) {
         return RenderType.entityTranslucent(texture);
     }
+    
+    /**
+     * Creates an eyes render type without fog
+     * Delegates to vanilla RenderType.eyes()
+     */
+    public static RenderType getEyesNoFog(ResourceLocation texture) {
+        return RenderType.eyes(texture);
+    }
 }
