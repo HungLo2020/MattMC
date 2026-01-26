@@ -6,8 +6,6 @@ import com.github.alexthe666.citadel.client.model.AdvancedEntityModel;
 import com.github.alexthe666.citadel.client.model.AdvancedModelBox;
 import com.github.alexthe666.citadel.client.model.basic.BasicModelPart;
 import com.google.common.collect.ImmutableList;
-import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.blaze3d.vertex.VertexConsumer;
 
 public class ModelRattlesnake extends AdvancedEntityModel<RattlesnakeRenderState> {
     private final AdvancedModelBox body;
@@ -58,29 +56,6 @@ public class ModelRattlesnake extends AdvancedEntityModel<RattlesnakeRenderState
         this.updateDefaultPose();
     }
 
-    public void renderToBuffer(PoseStack matrixStackIn, VertexConsumer bufferIn, int packedLightIn, int packedOverlayIn, int color) {
-        if (this.young) {
-            float f = 1.75F;
-            head.setScale(f, f, f);
-            head.setShouldScaleChildren(true);
-            matrixStackIn.pushPose();
-            matrixStackIn.scale(0.35F, 0.35F, 0.35F);
-            matrixStackIn.translate(0.0D, 2.75D, 0.125D);
-            parts().forEach((p_228292_8_) -> {
-                p_228292_8_.render(matrixStackIn, bufferIn, packedLightIn, packedOverlayIn, -1);
-            });
-            matrixStackIn.popPose();
-            head.setScale(1, 1, 1);
-        } else {
-            matrixStackIn.pushPose();
-            parts().forEach((p_228290_8_) -> {
-                p_228290_8_.render(matrixStackIn, bufferIn, packedLightIn, packedOverlayIn, -1);
-            });
-            matrixStackIn.popPose();
-        }
-
-    }
-
     @Override
     public void setupAnim(RattlesnakeRenderState state) {
         this.resetToDefaultPose();
@@ -88,6 +63,17 @@ public class ModelRattlesnake extends AdvancedEntityModel<RattlesnakeRenderState
         float walkDegree = 0.4F;
         AdvancedModelBox[] bodyParts = new AdvancedModelBox[]{neck1, neck2, body, tail1, tail2};
         float curlProgress = state.prevCurlProgress + (state.curlProgress - state.prevCurlProgress) * state.ageInTicks;
+        
+        // Handle baby scaling
+        if (state.isBaby) {
+            float f = 1.75F;
+            head.setScale(f, f, f);
+            head.setShouldScaleChildren(true);
+        } else {
+            head.setScale(1, 1, 1);
+            head.setShouldScaleChildren(false);
+        }
+        
         progressPositionPrev(body, curlProgress, 0, 0, 3, 5F);
         progressRotationPrev(body, curlProgress, 0, Maths.rad(-90), 0, 5F);
         progressRotationPrev(tail1, curlProgress, Maths.rad(-10), Maths.rad(-70), 0, 5F);

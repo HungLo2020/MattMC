@@ -49,14 +49,14 @@ public class EntityRattlesnake extends Animal implements IAnimatedEntity {
     private static final Predicate<LivingEntity> WARNABLE_PREDICATE = (mob) -> {
         return mob instanceof Player && !((Player) mob).isCreative() && !mob.isSpectator() || mob instanceof EntityRoadrunner;
     };
-    private static final Predicate<LivingEntity> TARGETABLE_PREDICATE = (mob) -> {
-        return mob instanceof Player && !((Player) mob).isCreative() && !mob.isSpectator() || mob instanceof EntityRoadrunner;
+    private static final net.minecraft.world.entity.ai.targeting.TargetingConditions.Selector TARGETABLE_SELECTOR = (living, serverLevel) -> {
+        return living instanceof Player && !((Player) living).isCreative() && !living.isSpectator() || living instanceof EntityRoadrunner;
     };
     private int animationTick;
     private Animation currentAnimation;
     public static final Animation ANIMATION_BITE = Animation.create(20);
     private int loopSoundTick = 0;
-    protected EntityRattlesnake(EntityType type, Level worldIn) {
+    public EntityRattlesnake(EntityType type, Level worldIn) {
         super(type, worldIn);
     }
 
@@ -147,7 +147,7 @@ public class EntityRattlesnake extends Animal implements IAnimatedEntity {
         }
 
         LivingEntity target = this.getTarget();
-        if (!this.level().isClientSide) {
+        if (!this.level().isClientSide()) {
             if (this.isCurled() && (target != null && target.isAlive())) {
                 this.setCurled(false);
             }
@@ -201,13 +201,13 @@ public class EntityRattlesnake extends Animal implements IAnimatedEntity {
     }
 
     public boolean isFood(ItemStack stack) {
-        return stack.has(net.minecraft.core.component.DataComponents.FOOD) && stack.getFoodProperties(this) != null;
+        return stack.has(net.minecraft.core.component.DataComponents.FOOD);
     }
 
     @Nullable
     @Override
     public AgeableMob getBreedOffspring(ServerLevel p_241840_1_, AgeableMob p_241840_2_) {
-        return AMEntityRegistry.RATTLESNAKE.get().create(p_241840_1_);
+        return (EntityRattlesnake) AMEntityRegistry.RATTLESNAKE.get().create(p_241840_1_, EntitySpawnReason.BREEDING);
     }
 
     @Override
@@ -286,7 +286,7 @@ public class EntityRattlesnake extends Animal implements IAnimatedEntity {
 
     class ShortDistanceTarget extends NearestAttackableTargetGoal<Player> {
         public ShortDistanceTarget() {
-            super(EntityRattlesnake.this, Player.class, 3, true, true, TARGETABLE_PREDICATE);
+            super(EntityRattlesnake.this, Player.class, 3, true, true, TARGETABLE_SELECTOR);
         }
 
         public boolean canUse() {
