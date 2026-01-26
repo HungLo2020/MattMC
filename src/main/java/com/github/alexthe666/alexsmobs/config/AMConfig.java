@@ -65,6 +65,9 @@ public class AMConfig {
     // Giant Squid spawn configuration
     public static int giantSquidSpawnRolls = 2;
     
+    // Rattlesnake spawn configuration
+    public static int rattlesnakeSpawnRolls = 2;
+    
     // Tarantula Hawk spawn configuration
     public static int tarantulaHawkSpawnRolls = 2;
     public static boolean fireproofTarantulaHawk = false;

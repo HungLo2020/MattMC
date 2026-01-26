@@ -19296,6 +19296,25 @@
     ],
     "subtitle": "subtitles.entity.rain_frog.hurt"
   },
+  "entity.rattlesnake.hurt": {
+    "sounds": [
+      "rattlesnake_hurt_0",
+      "rattlesnake_hurt_1"
+    ],
+    "subtitle": "subtitles.entity.rattlesnake.hurt"
+  },
+  "entity.rattlesnake.loop": {
+    "sounds": [
+      "rattlesnake_loop"
+    ],
+    "subtitle": "subtitles.entity.rattlesnake.loop"
+  },
+  "entity.rattlesnake.attack": {
+    "sounds": [
+      "rattlesnake_attack"
+    ],
+    "subtitle": "subtitles.entity.rattlesnake.attack"
+  },
   "entity.roadrunner.idle": {
     "sounds": [
       "roadrunner_idle_0",
