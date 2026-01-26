@@ -4769,7 +4769,7 @@ public class Blocks {
 	);
 	public static final Block PLATYPUS_EGG = register(
 		"platypus_egg",
-		properties -> new com.github.alexthe666.alexsmobs.block.BlockReptileEgg(() -> EntityType.PLATYPUS),
+		com.github.alexthe666.alexsmobs.block.BlockPlatypusEgg::new,
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.SAND)
 			.strength(0.5F)
