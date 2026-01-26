@@ -10,7 +10,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.InteractionHand;
-import net.minecraft.world.ItemInteractionResult;
+import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
@@ -18,6 +18,8 @@ import net.minecraft.world.item.context.BlockPlaceContext;
 import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LevelAccessor;
+import net.minecraft.world.level.LevelReader;
+import net.minecraft.world.level.ScheduledTickAccess;
 import net.minecraft.world.level.block.*;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.block.state.BlockState;
@@ -44,16 +46,26 @@ public class BlockSkunkSpray extends MultifaceBlock implements SimpleWaterlogged
     private static final BooleanProperty WATERLOGGED = BlockStateProperties.WATERLOGGED;
 
     public BlockSkunkSpray() {
-        super(BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_LIGHT_GREEN).noOcclusion().randomTicks().noCollission().instabreak().sound(SoundType.FROGSPAWN));
+        super(BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_LIGHT_GREEN).noOcclusion().randomTicks().noCollision().instabreak().sound(SoundType.FROGSPAWN));
         this.registerDefaultState(this.defaultBlockState().setValue(WATERLOGGED, Boolean.valueOf(false)).setValue(AGE, 0));
     }
 
-    public BlockState updateShape(BlockState state, Direction direction, BlockState state2, LevelAccessor levelAccessor, BlockPos pos, BlockPos pos2) {
-        if (state.getValue(WATERLOGGED)) {
-            levelAccessor.scheduleTick(pos, Fluids.WATER, Fluids.WATER.getTickDelay(levelAccessor));
+    @Override
+    protected BlockState updateShape(
+        BlockState blockState,
+        LevelReader levelReader,
+        ScheduledTickAccess scheduledTickAccess,
+        BlockPos blockPos,
+        Direction direction,
+        BlockPos blockPos2,
+        BlockState blockState2,
+        RandomSource randomSource
+    ) {
+        if (blockState.getValue(WATERLOGGED)) {
+            scheduledTickAccess.scheduleTick(blockPos, Fluids.WATER, Fluids.WATER.getTickDelay(levelReader));
         }
 
-        return super.updateShape(state, direction, state2, levelAccessor, pos, pos2);
+        return super.updateShape(blockState, levelReader, scheduledTickAccess, blockPos, direction, blockPos2, blockState2, randomSource);
     }
 
     public void randomTick(BlockState state, ServerLevel level, BlockPos pos, RandomSource randomSource) {
@@ -81,7 +93,8 @@ public class BlockSkunkSpray extends MultifaceBlock implements SimpleWaterlogged
         definition.add(WATERLOGGED, AGE);
     }
 
-    public ItemInteractionResult useItemOn(ItemStack itemStack, BlockState state, Level worldIn, BlockPos pos, Player player, InteractionHand handIn, BlockHitResult hit) {
+    @Override
+    protected InteractionResult useItemOn(ItemStack itemStack, BlockState state, Level worldIn, BlockPos pos, Player player, InteractionHand handIn, net.minecraft.world.phys.BlockHitResult hit) {
         int setContent = -1;
         if(itemStack.is(Items.GLASS_BOTTLE)) {
            Direction dir = hit.getDirection().getOpposite();
@@ -94,7 +107,7 @@ public class BlockSkunkSpray extends MultifaceBlock implements SimpleWaterlogged
                if(!player.isCreative()){
                    itemStack.shrink(1);
                }
-               return ItemInteractionResult.SUCCESS;
+               return InteractionResult.SUCCESS;
            }
         }
         return super.useItemOn(itemStack, state, worldIn, pos, player, handIn, hit);
@@ -122,11 +135,6 @@ public class BlockSkunkSpray extends MultifaceBlock implements SimpleWaterlogged
 
     public FluidState getFluidState(BlockState state) {
         return state.getValue(WATERLOGGED) ? Fluids.WATER.getSource(false) : super.getFluidState(state);
-    }
-
-    @Override
-    public MultifaceSpreader getSpreader() {
-        return null;
     }
 
     public boolean propagatesSkylightDown(BlockState state, BlockGetter level, BlockPos pos) {

@@ -511,7 +511,6 @@ public class Items {
 	public static final Item SOUL_SAND = registerBlock(Blocks.SOUL_SAND);
 	public static final Item SOUL_SOIL = registerBlock(Blocks.SOUL_SOIL);
 	public static final Item SOUL_HEART = registerItem("soul_heart", Item::new, new Item.Properties());
-	public static final Item STINK_BOTTLE = registerItem("stink_bottle", Item::new, new Item.Properties().craftRemainder(GLASS_BOTTLE).stacksTo(1));
 	public static final Item BASALT = registerBlock(Blocks.BASALT);
 	public static final Item POLISHED_BASALT = registerBlock(Blocks.POLISHED_BASALT);
 	public static final Item SMOOTH_BASALT = registerBlock(Blocks.SMOOTH_BASALT);
@@ -1755,6 +1754,7 @@ public class Items {
 	public static final Item GOLD_NUGGET = registerItem("gold_nugget");
 	public static final Item NETHER_WART = registerItem("nether_wart", createBlockItemWithCustomItemName(Blocks.NETHER_WART));
 	public static final Item GLASS_BOTTLE = registerItem("glass_bottle", BottleItem::new);
+	public static final Item STINK_BOTTLE = registerItem("stink_bottle", Item::new, new Item.Properties().craftRemainder(GLASS_BOTTLE).stacksTo(1));
 	public static final Item POTION = registerItem(
 		"potion",
 		PotionItem::new,

@@ -53,7 +53,7 @@ public class EntitySkunk extends Animal {
     private static final EntityDataAccessor<Integer> SPRAY_TIME = SynchedEntityData.defineId(EntitySkunk.class, EntityDataSerializers.INT);
     private static final EntityDataAccessor<Float> SPRAY_YAW = SynchedEntityData.defineId(EntitySkunk.class, EntityDataSerializers.FLOAT);
 
-    protected EntitySkunk(EntityType<? extends Animal> type, Level level) {
+    public EntitySkunk(EntityType type, Level level) {
         super(type, level);
     }
 
@@ -78,13 +78,13 @@ public class EntitySkunk extends Animal {
                 EntitySkunk.this.harassedTime += 10;
             }
         });
-        this.goalSelector.addGoal(3, new TemptGoal(this, 1.1D, Ingredient.of(AMTagRegistry.SKUNK_BREEDABLES), false));
+        this.goalSelector.addGoal(3, new TemptGoal(this, 1.1D, itemStack -> itemStack.is(AMTagRegistry.SKUNK_BREEDABLES), false));
         this.goalSelector.addGoal(2, new BreedGoal(this, 1.0D));
         this.goalSelector.addGoal(4, new RandomStrollGoal(this, 1D, 60));
         this.goalSelector.addGoal(5, new FollowParentGoal(this, 1D));
         this.goalSelector.addGoal(6, new LookAtPlayerGoal(this, Player.class, 6.0F));
         this.goalSelector.addGoal(7, new RandomLookAroundGoal(this));
-        this.goalSelector.addGoal(3, new AvoidEntityGoal(this, LivingEntity.class, AMEntityRegistry.buildPredicateFromTag(AMTagRegistry.SKUNK_FEARS), 10,  1.3D, 1.1D, EntitySelector.NO_CREATIVE_OR_SPECTATOR) {
+        this.goalSelector.addGoal(3, new AvoidEntityGoal<>(this, LivingEntity.class, (living) -> living.getType().is(AMTagRegistry.SKUNK_FEARS), 10.0F,  1.3D, 1.1D, EntitySelector.NO_CREATIVE_OR_SPECTATOR::test) {
             public boolean canUse() {
                 return super.canUse() && EntitySkunk.this.getSprayTime() <= 0;
             }
@@ -102,7 +102,7 @@ public class EntitySkunk extends Animal {
         });
     }
 
-    public boolean checkSpawnRules(LevelAccessor worldIn, MobSpawnType spawnReasonIn) {
+    public boolean checkSpawnRules(LevelAccessor worldIn, EntitySpawnReason spawnReasonIn) {
         return AMEntityRegistry.rollSpawn(AMConfig.skunkSpawnRolls, this.getRandom(), spawnReasonIn) && super.checkSpawnRules(worldIn, spawnReasonIn);
     }
 
@@ -159,7 +159,7 @@ public class EntitySkunk extends Animal {
         if(this.getSprayTime() <= 0 && this.sprayProgress > 0F){
             this.sprayProgress--;
         }
-        if(!this.level().isClientSide){
+        if(!this.level().isClientSide()){
             if(harassedTime > 200 && sprayCooldown == 0 && !this.isBaby()){
                 harassedTime = 0;
                 sprayCooldown = 200 + random.nextInt(200);
@@ -234,7 +234,7 @@ public class EntitySkunk extends Animal {
     @Nullable
     @Override
     public AgeableMob getBreedOffspring(ServerLevel level, AgeableMob mob) {
-        return AMEntityRegistry.SKUNK.get().create(level());
+        return (AgeableMob) AMEntityRegistry.SKUNK.get().create(level, EntitySpawnReason.BREEDING);
     }
 
     private class SprayGoal extends Goal {
@@ -291,7 +291,7 @@ public class EntitySkunk extends Animal {
                         Collection<MobEffectInstance> collection = EntitySkunk.this.getActiveEffects();
                         for (LivingEntity entity : EntitySkunk.this.level().getEntitiesOfClass(LivingEntity.class, poisonBox)) {
                             if (!(entity instanceof EntitySkunk)) {
-                                entity.addEffect(new MobEffectInstance(MobEffects.CONFUSION, 300));
+                                entity.addEffect(new MobEffectInstance(MobEffects.NAUSEA, 300));
                                 if(entity instanceof ServerPlayer serverPlayer){
                                     AMAdvancementTriggerRegistry.SKUNK_SPRAY.get().trigger(serverPlayer);
                                 }
