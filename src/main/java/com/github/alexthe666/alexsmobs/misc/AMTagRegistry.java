@@ -147,6 +147,9 @@ public class AMTagRegistry {
     public static final TagKey<Item> RACCOON_FOODSTUFFS = registerItemTag("raccoon_foodstuffs");
     public static final TagKey<Item> RACCOON_TAMEABLES = registerItemTag("raccoon_tameables");
     public static final TagKey<Item> RACCOON_DISSOLVES = registerItemTag("raccoon_dissolves");
+    
+    // Rattlesnake-specific tags
+    public static final TagKey<Block> RATTLESNAKE_SPAWNS = registerBlockTag("rattlesnake_spawns");
 
     // Orca-specific tags
     public static final TagKey<EntityType<?>> ORCA_TARGETS = registerEntityTag("orca_targets");
