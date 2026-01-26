@@ -1370,6 +1370,9 @@ public class SoundEvents {
 	public static final SoundEvent RATTLESNAKE_HURT = register("entity.rattlesnake.hurt");
 	public static final SoundEvent RATTLESNAKE_LOOP = register("entity.rattlesnake.loop");
 	public static final SoundEvent RATTLESNAKE_ATTACK = register("entity.rattlesnake.attack");
+	
+	public static final SoundEvent RHINOCEROS_IDLE = register("entity.rhinoceros.idle");
+	public static final SoundEvent RHINOCEROS_HURT = register("entity.rhinoceros.hurt");
 	public static final SoundEvent RAVAGER_AMBIENT = register("entity.ravager.ambient");
 	public static final SoundEvent RAVAGER_ATTACK = register("entity.ravager.attack");
 	public static final SoundEvent RAVAGER_CELEBRATE = register("entity.ravager.celebrate");

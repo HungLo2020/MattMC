@@ -2032,6 +2032,7 @@ public class CreativeModeTabs {
 					output.accept(Items.RACCOON_SPAWN_EGG);
 					output.accept(Items.RAIN_FROG_SPAWN_EGG);
 					output.accept(Items.RATTLESNAKE_SPAWN_EGG);
+					output.accept(Items.RHINOCEROS_SPAWN_EGG);
 					output.accept(Items.ROADRUNNER_SPAWN_EGG);
 					output.accept(Items.RAVAGER_SPAWN_EGG);
 					output.accept(Items.RELICHEIRUS_SPAWN_EGG);

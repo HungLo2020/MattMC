@@ -1061,6 +1061,13 @@ public class EntityType<T extends Entity> implements FeatureElement, EntityTypeT
 			.sized(0.6F, 0.3F)
 			.clientTrackingRange(8)
 	);
+	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntityRhinoceros> RHINOCEROS = register(
+		"rhinoceros",
+		EntityType.Builder.of(com.github.alexthe666.alexsmobs.entity.EntityRhinoceros::new, MobCategory.CREATURE)
+			.sized(1.8F, 2.0F)
+			.eyeHeight(1.8F)
+			.clientTrackingRange(10)
+	);
 	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntityRoadrunner> ROADRUNNER = register(
 		"roadrunner",
 		EntityType.Builder.of(com.github.alexthe666.alexsmobs.entity.EntityRoadrunner::new, MobCategory.CREATURE)
