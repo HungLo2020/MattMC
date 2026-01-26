@@ -75,6 +75,10 @@ public class AMSoundRegistry {
     public static final DeferredHolder RATTLESNAKE_LOOP = new DeferredHolder(() -> net.minecraft.sounds.SoundEvents.RATTLESNAKE_LOOP);
     public static final DeferredHolder RATTLESNAKE_ATTACK = new DeferredHolder(() -> net.minecraft.sounds.SoundEvents.RATTLESNAKE_ATTACK);
     
+    // Rhinoceros sounds - reference vanilla SoundEvents
+    public static final DeferredHolder RHINOCEROS_IDLE = new DeferredHolder(() -> net.minecraft.sounds.SoundEvents.RHINOCEROS_IDLE);
+    public static final DeferredHolder RHINOCEROS_HURT = new DeferredHolder(() -> net.minecraft.sounds.SoundEvents.RHINOCEROS_HURT);
+    
     // Seagull sounds - reference vanilla SoundEvents
     public static final DeferredHolder SEAGULL_IDLE = new DeferredHolder(() -> net.minecraft.sounds.SoundEvents.SEAGULL_IDLE);
     public static final DeferredHolder SEAGULL_HURT = new DeferredHolder(() -> net.minecraft.sounds.SoundEvents.SEAGULL_HURT);

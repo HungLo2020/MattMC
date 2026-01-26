@@ -76,4 +76,7 @@ public class AMConfig {
     public static int underminerSpawnWeight = 50;
     public static int underminerSpawnRolls = 1;
     public static double underminerDisappearDistance = 8.0;
+    
+    // Rhinoceros spawn configuration
+    public static int rhinocerosSpawnRolls = 2;
 }

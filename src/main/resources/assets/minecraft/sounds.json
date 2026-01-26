@@ -19315,6 +19315,21 @@
     ],
     "subtitle": "subtitles.entity.rattlesnake.attack"
   },
+  "entity.rhinoceros.idle": {
+    "sounds": [
+      "rhinoceros_idle_0",
+      "rhinoceros_idle_1",
+      "rhinoceros_idle_2"
+    ],
+    "subtitle": "subtitles.entity.rhinoceros.idle"
+  },
+  "entity.rhinoceros.hurt": {
+    "sounds": [
+      "rhinoceros_hurt_0",
+      "rhinoceros_hurt_1"
+    ],
+    "subtitle": "subtitles.entity.rhinoceros.hurt"
+  },
   "entity.roadrunner.idle": {
     "sounds": [
       "roadrunner_idle_0",
