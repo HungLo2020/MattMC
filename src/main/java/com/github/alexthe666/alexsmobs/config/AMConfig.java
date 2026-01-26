@@ -32,6 +32,9 @@ public class AMConfig {
     public static int seagullSpawnRolls = 0;
     public static boolean seagullStealing = true;
     
+    // Skunk spawn configuration
+    public static int skunkSpawnRolls = 2;
+    
     // Shoebill spawn configuration
     public static int shoebillSpawnRolls = 0;
     

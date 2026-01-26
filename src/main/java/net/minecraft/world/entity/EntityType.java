@@ -1116,6 +1116,13 @@ public class EntityType<T extends Entity> implements FeatureElement, EntityTypeT
 	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntityShoebill> SHOEBILL = register(
 		"shoebill", EntityType.Builder.of(com.github.alexthe666.alexsmobs.entity.EntityShoebill::new, MobCategory.CREATURE).sized(0.7F, 1.0F).eyeHeight(0.9F).clientTrackingRange(10)
 	);
+	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntitySkunk> SKUNK = register(
+		"skunk",
+		EntityType.Builder.of(com.github.alexthe666.alexsmobs.entity.EntitySkunk::new, MobCategory.CREATURE)
+			.sized(0.6F, 0.5F)
+			.eyeHeight(0.3F)
+			.clientTrackingRange(8)
+	);
 	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntitySpectre> SPECTRE = register(
 		"spectre", EntityType.Builder.of(com.github.alexthe666.alexsmobs.entity.EntitySpectre::new, MobCategory.MONSTER).sized(1.0F, 1.5F).eyeHeight(1.35F).clientTrackingRange(10)
 	);

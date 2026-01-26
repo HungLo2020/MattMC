@@ -78,6 +78,10 @@ public class AMTagRegistry {
     public static final TagKey<Item> SEAGULL_BREEDABLES = registerItemTag("seagull_breedables");
     public static final TagKey<Item> SEAGULL_OFFERINGS = registerItemTag("seagull_offerings");
     
+    // Skunk-specific tags
+    public static final TagKey<Item> SKUNK_BREEDABLES = registerItemTag("skunk_breedables");
+    public static final TagKey<EntityType<?>> SKUNK_FEARS = registerEntityTag("skunk_fears");
+    
     // Shoebill-specific tags
     public static final TagKey<Item> SHOEBILL_FOODSTUFFS = registerItemTag("shoebill_foodstuffs");
     public static final TagKey<Item> SHOEBILL_LUCK_FOODS = registerItemTag("shoebill_luck_foods");

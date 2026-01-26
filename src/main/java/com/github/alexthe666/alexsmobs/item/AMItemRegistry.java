@@ -55,4 +55,7 @@ public class AMItemRegistry {
     
     // Underminer items - stub, points to diamond pickaxe for now
     public static final DeferredHolder GHOSTLY_PICKAXE = new DeferredHolder(() -> net.minecraft.world.item.Items.DIAMOND_PICKAXE);
+    
+    // Skunk items - stub, points to glass bottle as fallback
+    public static final DeferredHolder STINK_BOTTLE = new DeferredHolder(() -> net.minecraft.world.item.Items.GLASS_BOTTLE);
 }
