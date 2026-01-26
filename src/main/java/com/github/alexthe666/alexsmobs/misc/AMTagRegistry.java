@@ -173,6 +173,9 @@ public class AMTagRegistry {
     public static final TagKey<Item> WARPED_TOAD_FOODSTUFFS = registerItemTag("warped_toad_foodstuffs");
     public static final TagKey<EntityType<?>> WARPED_TOAD_TARGETS = registerEntityTag("warped_toad_targets");
 
+    // Platypus-specific tags
+    public static final TagKey<Block> PLATYPUS_DIGABLES = registerBlockTag("platypus_digables");
+
     // Tag helper method for entity checks
     public static class TagHelper {
         public static boolean isEntityIn(TagKey<EntityType<?>> tag, net.minecraft.world.entity.Entity entity) {

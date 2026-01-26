@@ -18778,6 +18778,21 @@
     ],
     "subtitle": "subtitles.entity.pillager.hurt"
   },
+  "entity.platypus.idle": {
+    "sounds": [
+      "platypus_idle_0",
+      "platypus_idle_1",
+      "platypus_idle_2"
+    ],
+    "subtitle": "subtitles.entity.platypus.idle"
+  },
+  "entity.platypus.hurt": {
+    "sounds": [
+      "platypus_hurt_0",
+      "platypus_hurt_1"
+    ],
+    "subtitle": "subtitles.entity.platypus.hurt"
+  },
   "entity.player.attack.crit": {
     "sounds": [
       {

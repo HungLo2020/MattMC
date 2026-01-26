@@ -3903,7 +3903,6 @@
   "effect.minecraft.weaving": "Weaving",
   "effect.minecraft.wind_charged": "Wind Charged",
   "effect.minecraft.wither": "Wither",
-  "effect.minecraft.orcas_might": "Orca's Might",
   "effect.minecraft.debilitating_sting": "Debilitating Sting",
   "effect.none": "No Effects",
   "enchantment.level.1": "I",
@@ -4102,6 +4101,7 @@
   "entity.minecraft.piglin": "Piglin",
   "entity.minecraft.piglin_brute": "Piglin Brute",
   "entity.minecraft.pillager": "Pillager",
+  "entity.minecraft.platypus": "Platypus",
   "entity.minecraft.player": "Player",
   "entity.minecraft.polar_bear": "Polar Bear",
   "entity.minecraft.potoo": "Potoo",
@@ -5064,6 +5064,7 @@
   "item.minecraft.piglin_brute_spawn_egg": "Piglin Brute Spawn Egg",
   "item.minecraft.piglin_spawn_egg": "Piglin Spawn Egg",
   "item.minecraft.pillager_spawn_egg": "Pillager Spawn Egg",
+  "item.minecraft.platypus_spawn_egg": "Platypus Spawn Egg",
   "item.minecraft.pine_nuts": "Pine Nuts",
   "item.minecraft.pink_bundle": "Pink Bundle",
   "item.minecraft.pink_dye": "Pink Dye",
@@ -5110,6 +5111,7 @@
   "item.minecraft.pottery_shard_prize": "Prize Pottery Shard",
   "item.minecraft.pottery_shard_skull": "Skull Pottery Shard",
   "item.minecraft.powder_snow_bucket": "Powder Snow Bucket",
+  "item.minecraft.platypus_bucket": "Bucket of Platypus",
   "item.minecraft.primordial_soup": "Primordial Soup",
   "item.minecraft.prismarine_crystals": "Prismarine Crystals",
   "item.minecraft.prismarine_shard": "Prismarine Shard",
@@ -8131,5 +8133,9 @@
   "item.minecraft.underminer_spawn_egg": "Underminer Spawn Egg",
   "subtitles.entity.underminer.idle": "Underminer grumbles",
   "subtitles.entity.underminer.hurt": "Underminer hurts",
-  "subtitles.entity.underminer.step": "Underminer steps"
+  "subtitles.entity.underminer.step": "Underminer steps",
+  "item.minecraft.platypus_egg": "Platypus Egg",
+  "block.minecraft.platypus_egg": "Platypus Egg",
+  "subtitles.entity.platypus.idle": "Platypus chittering",
+  "subtitles.entity.platypus.hurt": "Platypus hurts"
 }

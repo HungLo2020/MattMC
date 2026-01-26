@@ -1008,6 +1008,13 @@ public class EntityType<T extends Entity> implements FeatureElement, EntityTypeT
 			.clientTrackingRange(8)
 			.notInPeaceful()
 	);
+	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntityPlatypus> PLATYPUS = register(
+		"platypus",
+		EntityType.Builder.of(com.github.alexthe666.alexsmobs.entity.EntityPlatypus::new, MobCategory.CREATURE)
+			.sized(0.8F, 0.5F)
+			.eyeHeight(0.25F)
+			.clientTrackingRange(10)
+	);
 	public static final EntityType<PolarBear> POLAR_BEAR = register(
 		"polar_bear", EntityType.Builder.of(PolarBear::new, MobCategory.CREATURE).immuneTo(Blocks.POWDER_SNOW).sized(1.4F, 1.4F).clientTrackingRange(10)
 	);
