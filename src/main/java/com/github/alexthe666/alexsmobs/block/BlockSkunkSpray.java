@@ -8,7 +8,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.InteractionHand;
-import net.minecraft.world.ItemInteractionResult;
+import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
@@ -71,7 +71,7 @@ public class BlockSkunkSpray extends MultifaceBlock implements SimpleWaterlogged
         definition.add(WATERLOGGED, AGE);
     }
 
-    public ItemInteractionResult useItemOn(ItemStack itemStack, BlockState state, Level worldIn, BlockPos pos, Player player, InteractionHand handIn, BlockHitResult hit) {
+    protected InteractionResult useItemOn(ItemStack itemStack, BlockState state, Level worldIn, BlockPos pos, Player player, InteractionHand handIn, BlockHitResult hit) {
         int setContent = -1;
         if(itemStack.is(Items.GLASS_BOTTLE)) {
            Direction dir = hit.getDirection().getOpposite();
@@ -85,7 +85,7 @@ public class BlockSkunkSpray extends MultifaceBlock implements SimpleWaterlogged
                if(!player.isCreative()){
                    itemStack.shrink(1);
                }
-               return ItemInteractionResult.SUCCESS;
+               return InteractionResult.SUCCESS;
            }
         }
         return super.useItemOn(itemStack, state, worldIn, pos, player, handIn, hit);
@@ -115,7 +115,6 @@ public class BlockSkunkSpray extends MultifaceBlock implements SimpleWaterlogged
         return state.getValue(WATERLOGGED) ? Fluids.WATER.getSource(false) : super.getFluidState(state);
     }
 
-    @Override
     public MultifaceSpreader getSpreader() {
         return null;
     }

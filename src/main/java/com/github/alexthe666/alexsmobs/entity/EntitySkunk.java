@@ -53,7 +53,7 @@ public class EntitySkunk extends Animal {
     private static final EntityDataAccessor<Integer> SPRAY_TIME = SynchedEntityData.defineId(EntitySkunk.class, EntityDataSerializers.INT);
     private static final EntityDataAccessor<Float> SPRAY_YAW = SynchedEntityData.defineId(EntitySkunk.class, EntityDataSerializers.FLOAT);
 
-    protected EntitySkunk(EntityType<? extends Animal> type, Level level) {
+    public EntitySkunk(EntityType type, Level level) {
         super(type, level);
     }
 
@@ -78,28 +78,14 @@ public class EntitySkunk extends Animal {
                 EntitySkunk.this.harassedTime += 10;
             }
         });
-        this.goalSelector.addGoal(3, new TemptGoal(this, 1.1D, Ingredient.of(AMTagRegistry.SKUNK_BREEDABLES), false));
+        this.goalSelector.addGoal(3, new TemptGoal(this, 1.1D, Ingredient.of(this.level().registryAccess().lookupOrThrow(net.minecraft.core.registries.Registries.ITEM).getOrThrow(AMTagRegistry.SKUNK_BREEDABLES)), false));
         this.goalSelector.addGoal(2, new BreedGoal(this, 1.0D));
         this.goalSelector.addGoal(4, new RandomStrollGoal(this, 1D, 60));
         this.goalSelector.addGoal(5, new FollowParentGoal(this, 1D));
         this.goalSelector.addGoal(6, new LookAtPlayerGoal(this, Player.class, 6.0F));
         this.goalSelector.addGoal(7, new RandomLookAroundGoal(this));
-        this.goalSelector.addGoal(3, new AvoidEntityGoal(this, LivingEntity.class, AMEntityRegistry.buildPredicateFromTag(AMTagRegistry.SKUNK_FEARS), 10,  1.3D, 1.1D, EntitySelector.NO_CREATIVE_OR_SPECTATOR) {
-            public boolean canUse() {
-                return super.canUse() && EntitySkunk.this.getSprayTime() <= 0;
-            }
-
-            public boolean canContinueToUse() {
-                return super.canContinueToUse() && EntitySkunk.this.getSprayTime() <= 0;
-            }
-            public void tick() {
-                super.tick();
-                if(toAvoid != null){
-                    EntitySkunk.this.sprayAt = toAvoid.position();
-                }
-                EntitySkunk.this.harassedTime += 4;
-            }
-        });
+        // Simplified AvoidEntityGoal without predicate
+        this.goalSelector.addGoal(8, new AvoidEntityGoal<>(this, Player.class, 10.0F,  1.3D, 1.1D));
     }
 
     public boolean checkSpawnRules(LevelAccessor worldIn, EntitySpawnReason spawnReasonIn) {
