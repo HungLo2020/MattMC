@@ -58,16 +58,18 @@ public class RenderRhinoceros extends MobRenderer<EntityRhinoceros, RhinocerosRe
             super(parent);
         }
 
-        public void render(PoseStack p_225628_1_, MultiBufferSource p_225628_2_, int p_225628_3_,
-                RhinocerosRenderState state, float p_225628_5_, float p_225628_6_) {
+        @Override
+        public void submit(PoseStack poseStack, net.minecraft.client.renderer.SubmitNodeCollector submitNodeCollector, int i, 
+                           RhinocerosRenderState state, float f, float g) {
             int color = state.potionColor;
             if (color != -1 && !state.isInvisible) {
                 float r = (float) (color >> 16 & 255) / 255.0F;
-                float g = (float) (color >> 8 & 255) / 255.0F;
+                float gb = (float) (color >> 8 & 255) / 255.0F;
                 float b = (float) (color & 255) / 255.0F;
-                this.getParentModel().renderToBuffer(p_225628_1_,
-                        p_225628_2_.getBuffer(AMRenderTypes.entityCutoutNoCull(TEXTURE_POTION)), p_225628_3_,
-                        OverlayTexture.NO_OVERLAY, AMColorUtil.packColor(r, g, b, 1.0F));
+                submitNodeCollector.order(1)
+                    .submitModel(this.getParentModel(), state, poseStack,
+                        AMRenderTypes.entityCutoutNoCull(TEXTURE_POTION), i,
+                        OverlayTexture.NO_OVERLAY, AMColorUtil.packColor(r, gb, b, 1.0F), null, state.outlineColor, null);
             }
         }
     }
