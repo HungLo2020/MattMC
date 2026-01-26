@@ -33,7 +33,6 @@ import net.minecraft.world.phys.shapes.VoxelShape;
 
 import javax.annotation.Nullable;
 import java.util.List;
-import java.util.function.Supplier;
 
 public class BlockPlatypusEgg extends Block {
     public static final IntegerProperty HATCH = BlockStateProperties.HATCH;
@@ -44,11 +43,6 @@ public class BlockPlatypusEgg extends Block {
     public BlockPlatypusEgg(BlockBehaviour.Properties properties) {
         super(properties);
         this.registerDefaultState(this.stateDefinition.any().setValue(HATCH, Integer.valueOf(0)).setValue(EGGS, Integer.valueOf(1)));
-    }
-    
-    // Use EntityType.PLATYPUS directly instead of a supplier
-    private static Supplier<EntityType<?>> getBirths() {
-        return () -> EntityType.PLATYPUS;
     }
     
     public static boolean hasProperHabitat(BlockGetter reader, BlockPos blockReader) {
@@ -102,11 +96,7 @@ public class BlockPlatypusEgg extends Block {
     }
 
     private boolean canTrample(Level world, Entity trampler) {
-        if (!(trampler instanceof EntityPlatypus)) {
-            return true;
-        } else {
-            return false;
-        }
+        return !(trampler instanceof EntityPlatypus);
     }
 
     public void randomTick(BlockState state, ServerLevel worldIn, BlockPos pos, RandomSource random) {
