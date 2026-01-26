@@ -511,6 +511,7 @@ public class Items {
 	public static final Item SOUL_SAND = registerBlock(Blocks.SOUL_SAND);
 	public static final Item SOUL_SOIL = registerBlock(Blocks.SOUL_SOIL);
 	public static final Item SOUL_HEART = registerItem("soul_heart", Item::new, new Item.Properties());
+	public static final Item STINK_BOTTLE = registerItem("stink_bottle", Item::new, new Item.Properties().craftRemainder(GLASS_BOTTLE).stacksTo(1));
 	public static final Item BASALT = registerBlock(Blocks.BASALT);
 	public static final Item POLISHED_BASALT = registerBlock(Blocks.POLISHED_BASALT);
 	public static final Item SMOOTH_BASALT = registerBlock(Blocks.SMOOTH_BASALT);
@@ -1926,6 +1927,7 @@ public class Items {
 	public static final Item SEAGULL_SPAWN_EGG = registerItem("seagull_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.SEAGULL));
 	public static final Item SHEEP_SPAWN_EGG = registerItem("sheep_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.SHEEP));
 	public static final Item SHOEBILL_SPAWN_EGG = registerItem("shoebill_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.SHOEBILL));
+	public static final Item SKUNK_SPAWN_EGG = registerItem("skunk_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.SKUNK));
 	public static final Item SPECTRE_SPAWN_EGG = registerItem("spectre_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.SPECTRE));
 	public static final Item SUGAR_GLIDER_SPAWN_EGG = registerItem("sugar_glider_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.SUGAR_GLIDER));
 	public static final Item SHULKER_SPAWN_EGG = registerItem("shulker_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.SHULKER));

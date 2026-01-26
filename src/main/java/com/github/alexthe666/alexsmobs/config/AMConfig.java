@@ -79,4 +79,7 @@ public class AMConfig {
     
     // Rhinoceros spawn configuration
     public static int rhinocerosSpawnRolls = 2;
+    
+    // Skunk spawn configuration
+    public static int skunkSpawnRolls = 2;
 }

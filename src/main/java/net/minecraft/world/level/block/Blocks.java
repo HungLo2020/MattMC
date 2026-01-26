@@ -2400,6 +2400,18 @@ public class Blocks {
 			.ignitedByLava()
 			.pushReaction(PushReaction.DESTROY)
 	);
+	public static final Block SKUNK_SPRAY = register(
+		"skunk_spray",
+		properties -> new com.github.alexthe666.alexsmobs.block.BlockSkunkSpray(),
+		BlockBehaviour.Properties.of()
+			.mapColor(MapColor.COLOR_LIGHT_GREEN)
+			.noOcclusion()
+			.randomTicks()
+			.noCollision()
+			.instabreak()
+			.sound(SoundType.FROGSPAWN)
+			.pushReaction(PushReaction.DESTROY)
+	);
 	public static final Block RESIN_CLUMP = register(
 		"resin_clump",
 		MultifaceBlock::new,
