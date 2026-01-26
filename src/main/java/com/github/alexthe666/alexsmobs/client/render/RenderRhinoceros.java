@@ -1,0 +1,74 @@
+package com.github.alexthe666.alexsmobs.client.render;
+
+import com.github.alexthe666.alexsmobs.client.model.ModelRhinoceros;
+import com.github.alexthe666.alexsmobs.entity.EntityRhinoceros;
+import com.mojang.blaze3d.vertex.PoseStack;
+import net.minecraft.client.renderer.MultiBufferSource;
+import net.minecraft.client.renderer.entity.EntityRendererProvider;
+import net.minecraft.client.renderer.entity.MobRenderer;
+import net.minecraft.client.renderer.entity.layers.RenderLayer;
+import net.minecraft.client.renderer.texture.OverlayTexture;
+import net.minecraft.resources.ResourceLocation;
+
+public class RenderRhinoceros extends MobRenderer<EntityRhinoceros, RhinocerosRenderState, ModelRhinoceros> {
+    private static final ResourceLocation TEXTURE = ResourceLocation.withDefaultNamespace("textures/entity/rhinoceros.png");
+    private static final ResourceLocation TEXTURE_ANGRY = ResourceLocation.withDefaultNamespace("textures/entity/rhinoceros_angry.png");
+    private static final ResourceLocation TEXTURE_POTION = ResourceLocation.withDefaultNamespace("textures/entity/rhinoceros_potion.png");
+
+    public RenderRhinoceros(EntityRendererProvider.Context renderManagerIn) {
+        super(renderManagerIn, new ModelRhinoceros(), 0.9F);
+        this.addLayer(new PotionLayer(this));
+    }
+
+    @Override
+    public RhinocerosRenderState createRenderState() {
+        return new RhinocerosRenderState();
+    }
+
+    @Override
+    public void extractRenderState(EntityRhinoceros entity, RhinocerosRenderState state, float partialTick) {
+        super.extractRenderState(entity, state, partialTick);
+        state.animationTick = entity.getAnimationTick();
+        // Map Animation objects to IDs for the render state
+        if (entity.getAnimation() == EntityRhinoceros.ANIMATION_FLICK_EARS) {
+            state.currentAnimationId = 0;
+        } else if (entity.getAnimation() == EntityRhinoceros.ANIMATION_EAT_GRASS) {
+            state.currentAnimationId = 1;
+        } else if (entity.getAnimation() == EntityRhinoceros.ANIMATION_FLING) {
+            state.currentAnimationId = 2;
+        } else if (entity.getAnimation() == EntityRhinoceros.ANIMATION_SLASH) {
+            state.currentAnimationId = 3;
+        } else {
+            state.currentAnimationId = -1;
+        }
+        state.isAngry = entity.isAngry();
+        state.potionColor = entity.getPotionColor();
+    }
+
+    protected void scale(RhinocerosRenderState state, PoseStack matrixStackIn) {
+        matrixStackIn.scale(1.1F, 1.1F, 1.1F);
+    }
+
+    public ResourceLocation getTextureLocation(RhinocerosRenderState state) {
+        return state.isAngry ? TEXTURE_ANGRY : TEXTURE;
+    }
+
+    private static class PotionLayer extends RenderLayer<RhinocerosRenderState, ModelRhinoceros> {
+        public PotionLayer(RenderRhinoceros parent) {
+            super(parent);
+        }
+
+        public void render(PoseStack p_225628_1_, MultiBufferSource p_225628_2_, int p_225628_3_,
+                RhinocerosRenderState state, float p_225628_5_, float p_225628_6_) {
+            int color = state.potionColor;
+            if (color != -1 && !state.isInvisible) {
+                float r = (float) (color >> 16 & 255) / 255.0F;
+                float g = (float) (color >> 8 & 255) / 255.0F;
+                float b = (float) (color & 255) / 255.0F;
+                this.getParentModel().renderToBuffer(p_225628_1_,
+                        p_225628_2_.getBuffer(AMRenderTypes.entityCutoutNoCull(TEXTURE_POTION)), p_225628_3_,
+                        OverlayTexture.NO_OVERLAY, AMColorUtil.packColor(r, g, b, 1.0F));
+            }
+        }
+    }
+}
