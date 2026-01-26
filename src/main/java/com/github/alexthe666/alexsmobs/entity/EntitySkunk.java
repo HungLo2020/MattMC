@@ -268,8 +268,8 @@ public class EntitySkunk extends Animal {
                             dir = Direction.UP;
                         }
                         BlockState currentState = level().getBlockState(pos);
-                        BlockState sprayState = ((MultifaceBlock) net.minecraft.world.level.block.Blocks.SKUNK_SPRAY).getStateForPlacement(level().getBlockState(pos), level(), pos, dir);
-                        if ((currentState.isAir() || currentState.canBeReplaced()) && sprayState != null && sprayState.is(net.minecraft.world.level.block.Blocks.SKUNK_SPRAY)) {
+                        BlockState sprayState = ((MultifaceBlock) AMBlockRegistry.SKUNK_SPRAY.get()).getStateForPlacement(level().getBlockState(pos), level(), pos, dir);
+                        if ((currentState.isAir() || currentState.canBeReplaced()) && sprayState != null && sprayState.is(AMBlockRegistry.SKUNK_SPRAY.get())) {
                             level().setBlockAndUpdate(pos, sprayState);
                         }
                         double sprayDist = hitResult.getLocation().subtract(skunkPos).length() / maxSprayDist;

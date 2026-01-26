@@ -108,7 +108,7 @@ public class BlockSkunkSpray extends MultifaceBlock implements SimpleWaterlogged
 
 
     public boolean canBeReplaced(BlockState state, BlockPlaceContext context) {
-        return !context.getItemInHand().is(net.minecraft.world.level.block.Blocks.SKUNK_SPRAY.asItem()) || super.canBeReplaced(state, context);
+        return !context.getItemInHand().is(AMBlockRegistry.SKUNK_SPRAY.get().asItem()) || super.canBeReplaced(state, context);
     }
 
     public FluidState getFluidState(BlockState state) {
