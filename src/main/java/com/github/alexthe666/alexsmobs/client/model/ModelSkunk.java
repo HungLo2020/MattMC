@@ -1,6 +1,6 @@
 package com.github.alexthe666.alexsmobs.client.model;
 
-import com.github.alexthe666.alexsmobs.entity.EntitySkunk;
+import com.github.alexthe666.alexsmobs.client.render.SkunkRenderState;
 import com.github.alexthe666.alexsmobs.entity.util.Maths;
 import com.github.alexthe666.citadel.client.model.AdvancedEntityModel;
 import com.github.alexthe666.citadel.client.model.AdvancedModelBox;
@@ -9,7 +9,7 @@ import com.google.common.collect.ImmutableList;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 
-public class ModelSkunk extends AdvancedEntityModel<EntitySkunk> {
+public class ModelSkunk extends AdvancedEntityModel<SkunkRenderState> {
     private final AdvancedModelBox root;
     private final AdvancedModelBox body;
     private final AdvancedModelBox leftLeg;
@@ -75,15 +75,19 @@ public class ModelSkunk extends AdvancedEntityModel<EntitySkunk> {
     }
 
     @Override
-    public void setupAnim(EntitySkunk entity, float limbSwing, float limbSwingAmount, float ageInTicks, float netHeadYaw, float headPitch){
+    public void setupAnim(SkunkRenderState state){
         this.resetToDefaultPose();
         float idleSpeed =  0.1F;
         float idleDegree = 0.15f;
         float walkSpeed =  1.25F;
         float walkDegree = 0.5f;
-        float partialTicks = ageInTicks - entity.tickCount;
-        float sprayProgress = entity.prevSprayProgress + (entity.sprayProgress - entity.prevSprayProgress) * partialTicks;
-        float legsStill = Math.max(sprayProgress * 0.2F, limbSwingAmount);
+        float partialTicks = state.ageInTicks - state.tickCount;
+        float sprayProgress = state.prevSprayProgress + (state.sprayProgress - state.prevSprayProgress) * partialTicks;
+        float legsStill = Math.max(sprayProgress * 0.2F, state.walkAnimationSpeed);
+        float ageInTicks = state.ageInTicks;
+        float limbSwing = state.walkAnimationPos;
+        float limbSwingAmount = state.walkAnimationSpeed;
+        
         progressRotationPrev(leftArm, sprayProgress, Maths.rad(80F), 0, 0, 5F);
         progressRotationPrev(rightArm, sprayProgress, Maths.rad(80F), 0, 0, 5F);
         progressRotationPrev(leftLeg, sprayProgress, Maths.rad(100F), 0, 0, 5F);
@@ -125,7 +129,7 @@ public class ModelSkunk extends AdvancedEntityModel<EntitySkunk> {
         this.flap(leftArm, walkSpeed, walkSpeed * 0.3F, true, -1, 0, limbSwing, limbSwingAmount);
         this.flap(head, walkSpeed, walkSpeed * 0.3F, true, -1, 0, limbSwing, limbSwingAmount);
         this.flap(tail, walkSpeed, walkSpeed * 0.2F, true, -1, 0, limbSwing, limbSwingAmount);
-        this.faceTarget(netHeadYaw, headPitch, 1.2F, head);
+        this.faceTarget(state.yRot, state.xRot, 1.2F, head);
         float leftLegS = (float) (Math.sin((double) (limbSwing * walkSpeed) - 2.5F) * (double) limbSwingAmount * (double) walkDegree - (double) (limbSwingAmount * walkDegree));
         float rightLegS = (float) (Math.sin(-(double) (limbSwing * walkSpeed) + 2.5F) * (double) limbSwingAmount * (double) walkDegree - (double) (limbSwingAmount * walkDegree));
         this.rightArm.rotationPointY += 3 * leftLegS;

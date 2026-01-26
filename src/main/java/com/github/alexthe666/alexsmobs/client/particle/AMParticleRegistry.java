@@ -26,4 +26,5 @@ public class AMParticleRegistry {
     
     // Use vanilla particles as fallback
     public static final DeferredHolder SHOCKED = new DeferredHolder(() -> ParticleTypes.ELECTRIC_SPARK);
+    public static final DeferredHolder SMELLY = new DeferredHolder(() -> ParticleTypes.SNEEZE); // Use sneeze particle as fallback for smelly
 }

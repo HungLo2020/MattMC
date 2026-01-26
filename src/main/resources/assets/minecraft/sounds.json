@@ -19594,6 +19594,29 @@
     ],
     "subtitle": "subtitles.entity.shoebill.hurt"
   },
+  "entity.skunk.idle": {
+    "sounds": [
+      "skunk_idle_0",
+      "skunk_idle_1",
+      "skunk_idle_2"
+    ],
+    "subtitle": "subtitles.entity.skunk.ambient"
+  },
+  "entity.skunk.hurt": {
+    "sounds": [
+      "skunk_hurt_0",
+      "skunk_hurt_1",
+      "skunk_hurt_2"
+    ],
+    "subtitle": "subtitles.entity.skunk.hurt"
+  },
+  "entity.skunk.spray": {
+    "sounds": [
+      "skunk_spray_0",
+      "skunk_spray_1"
+    ],
+    "subtitle": "subtitles.entity.skunk.spray"
+  },
   "entity.spectre.idle": {
     "sounds": [
       "spectre_idle_0",

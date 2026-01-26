@@ -182,6 +182,10 @@ public class AMTagRegistry {
 
     // Platypus-specific tags
     public static final TagKey<Block> PLATYPUS_DIGABLES = registerBlockTag("platypus_digables");
+    
+    // Skunk-specific tags
+    public static final TagKey<Item> SKUNK_BREEDABLES = registerItemTag("skunk_breedables");
+    public static final TagKey<EntityType<?>> SKUNK_FEARS = registerEntityTag("skunk_fears");
 
     // Tag helper method for entity checks
     public static class TagHelper {
