@@ -248,6 +248,7 @@ public class EntityRenderers {
 		register(EntityType.SUGAR_GLIDER, com.github.alexthe666.alexsmobs.client.render.RenderSugarGlider::new);
 		register(EntityType.SHULKER, ShulkerRenderer::new);
 		register(EntityType.SHULKER_BULLET, ShulkerBulletRenderer::new);
+		register(EntityType.SKUNK, com.github.alexthe666.alexsmobs.client.render.RenderSkunk::new);
 		register(EntityType.SILVERFISH, SilverfishRenderer::new);
 		register(EntityType.SKELETON, SkeletonRenderer::new);
 		register(EntityType.SKELETON_HORSE, context -> new UndeadHorseRenderer(context, UndeadHorseRenderer.Type.SKELETON));

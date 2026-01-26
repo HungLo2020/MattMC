@@ -1503,6 +1503,9 @@ public class SoundEvents {
 	public static final SoundEvent SUGAR_GLIDER_IDLE = register("entity.sugar_glider.idle");
 	public static final SoundEvent SUGAR_GLIDER_HURT = register("entity.sugar_glider.hurt");
 	public static final SoundEvent SHULKER_AMBIENT = register("entity.shulker.ambient");
+	public static final SoundEvent SKUNK_IDLE = register("entity.skunk.idle");
+	public static final SoundEvent SKUNK_HURT = register("entity.skunk.hurt");
+	public static final SoundEvent SKUNK_SPRAY = register("entity.skunk.spray");
 	public static final SoundEvent SHULKER_BOX_CLOSE = register("block.shulker_box.close");
 	public static final SoundEvent SHULKER_BOX_OPEN = register("block.shulker_box.open");
 	public static final SoundEvent SHULKER_BULLET_HIT = register("entity.shulker_bullet.hit");
