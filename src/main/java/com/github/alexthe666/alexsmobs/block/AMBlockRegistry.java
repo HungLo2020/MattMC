@@ -26,9 +26,6 @@ public class AMBlockRegistry {
     // Skunk Spray block - reference vanilla Blocks
     public static final DeferredHolder SKUNK_SPRAY = new DeferredHolder(() -> net.minecraft.world.level.block.Blocks.SKUNK_SPRAY);
     
-    // Hummingbird Feeder block - reference vanilla Blocks
-    public static final DeferredHolder HUMMINGBIRD_FEEDER = new DeferredHolder(() -> net.minecraft.world.level.block.Blocks.HUMMINGBIRD_FEEDER);
-    
     // Leafcutter Ant Hill blocks - reference vanilla Blocks
     public static final DeferredHolder LEAFCUTTER_ANTHILL = new DeferredHolder(() -> net.minecraft.world.level.block.Blocks.LEAFCUTTER_ANTHILL);
     public static final DeferredHolder LEAFCUTTER_ANT_CHAMBER = new DeferredHolder(() -> net.minecraft.world.level.block.Blocks.LEAFCUTTER_ANT_CHAMBER);

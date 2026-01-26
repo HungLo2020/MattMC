@@ -5354,7 +5354,7 @@ public class Blocks {
 	public static final Block SKUNK_SPRAY = register(
 		"skunk_spray",
 		com.github.alexthe666.alexsmobs.block.BlockSkunkSpray::new,
-		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_LIGHT_GREEN).noOcclusion().randomTicks().noCollission().instabreak().sound(SoundType.FROGSPAWN)
+		BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_LIGHT_GREEN).noOcclusion().randomTicks().noCollision().instabreak().sound(SoundType.FROGSPAWN)
 	);
 	public static final Block SMITHING_TABLE = register(
 		"smithing_table",

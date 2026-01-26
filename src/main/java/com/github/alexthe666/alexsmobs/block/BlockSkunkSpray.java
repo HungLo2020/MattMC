@@ -42,16 +42,8 @@ public class BlockSkunkSpray extends MultifaceBlock implements SimpleWaterlogged
     private static final BooleanProperty WATERLOGGED = BlockStateProperties.WATERLOGGED;
 
     public BlockSkunkSpray() {
-        super(BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_LIGHT_GREEN).noOcclusion().randomTicks().noCollission().instabreak().sound(SoundType.FROGSPAWN));
+        super(BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_LIGHT_GREEN).noOcclusion().randomTicks().noCollision().instabreak().sound(SoundType.FROGSPAWN));
         this.registerDefaultState(this.defaultBlockState().setValue(WATERLOGGED, Boolean.valueOf(false)).setValue(AGE, 0));
-    }
-
-    public BlockState updateShape(BlockState state, Direction direction, BlockState state2, LevelAccessor levelAccessor, BlockPos pos, BlockPos pos2) {
-        if (state.getValue(WATERLOGGED)) {
-            levelAccessor.scheduleTick(pos, Fluids.WATER, Fluids.WATER.getTickDelay(levelAccessor));
-        }
-
-        return super.updateShape(state, direction, state2, levelAccessor, pos, pos2);
     }
 
     public void randomTick(BlockState state, ServerLevel level, BlockPos pos, RandomSource randomSource) {
