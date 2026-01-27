@@ -238,7 +238,7 @@ public class EntityType<T extends Entity> implements FeatureElement, EntityTypeT
 	);
 	public static final EntityType<EntityAnacondaPart> ANACONDA_PART = register(
 		"anaconda_part",
-		EntityType.Builder.of(EntityAnacondaPart::new, MobCategory.CREATURE)
+		EntityType.Builder.<EntityAnacondaPart>of(EntityAnacondaPart::new, MobCategory.CREATURE)
 			.sized(0.8F, 0.6F)
 			.eyeHeight(0.3F)
 			.clientTrackingRange(10)

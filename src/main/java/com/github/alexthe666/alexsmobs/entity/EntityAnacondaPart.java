@@ -24,6 +24,8 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockBehaviour;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.phys.shapes.BooleanOp;
@@ -39,8 +41,8 @@ public class EntityAnacondaPart extends LivingEntity implements IHurtableMultipa
     private static final EntityDataAccessor<Integer> BODYINDEX = SynchedEntityData.defineId(EntityAnacondaPart.class, EntityDataSerializers.INT);
     private static final EntityDataAccessor<Integer> BODY_TYPE = SynchedEntityData.defineId(EntityAnacondaPart.class, EntityDataSerializers.INT);
     private static final EntityDataAccessor<Float> TARGET_YAW = SynchedEntityData.defineId(EntityAnacondaPart.class, EntityDataSerializers.FLOAT);
-    private static final EntityDataAccessor<Optional<UUID>> CHILD_UUID = SynchedEntityData.defineId(EntityAnacondaPart.class, EntityDataSerializers.OPTIONAL_UUID);
-    private static final EntityDataAccessor<Optional<UUID>> PARENT_UUID = SynchedEntityData.defineId(EntityAnacondaPart.class, EntityDataSerializers.OPTIONAL_UUID);
+    private static final EntityDataAccessor<String> CHILD_UUID = SynchedEntityData.defineId(EntityAnacondaPart.class, EntityDataSerializers.STRING);
+    private static final EntityDataAccessor<String> PARENT_UUID = SynchedEntityData.defineId(EntityAnacondaPart.class, EntityDataSerializers.STRING);
     private static final EntityDataAccessor<Float> SWELL = SynchedEntityData.defineId(EntityAnacondaPart.class, EntityDataSerializers.FLOAT);
     public EntityDimensions multipartSize;
     private float strangleProgess;
@@ -81,8 +83,8 @@ public class EntityAnacondaPart extends LivingEntity implements IHurtableMultipa
     }
 
     @Override
-    public boolean isInvulnerableTo(DamageSource source) {
-        return source.is(DamageTypes.IN_WALL)  || super.isInvulnerableTo(source);
+    public boolean isInvulnerableTo(ServerLevel level, DamageSource source) {
+        return source.is(DamageTypes.IN_WALL)  || super.isInvulnerableTo(level, source);
     }
 
     @Override
@@ -105,7 +107,7 @@ public class EntityAnacondaPart extends LivingEntity implements IHurtableMultipa
         if (this.tickCount > 1) {
             final Entity parent = getParent();
             refreshDimensions();
-            if (!this.level().isClientSide) {
+            if (!this.level().isClientSide()) {
                 if (parent == null) {
                     this.remove(RemovalReason.DISCARDED);
                 }
@@ -172,7 +174,8 @@ public class EntityAnacondaPart extends LivingEntity implements IHurtableMultipa
         this.setXRot(f2);
         this.setYRot(f);
         this.yHeadRot = f;
-        this.moveTo(avg.x, avg.y, avg.z, f, f2);
+        this.setPos(avg.x, avg.y, avg.z);
+        this.setRot(f, f2);
         headEntityId = headId;
         return avg;
     }
@@ -235,23 +238,23 @@ public class EntityAnacondaPart extends LivingEntity implements IHurtableMultipa
     public boolean hurtHeadId(DamageSource source, float f) {
         if (headEntityId != -1) {
             Entity e = level().getEntity(headEntityId);
-            if (e instanceof EntityAnaconda) {
-               return e.hurt(source, f);
+            if (e instanceof EntityAnaconda && e instanceof LivingEntity living) {
+                return living.hurtServer((ServerLevel) level(), source, f);
             }
         }
         return false;
     }
 
     @Override
-    public boolean hurt(DamageSource source, float damage) {
+    public boolean hurtServer(ServerLevel level, DamageSource source, float damage) {
         return hurtHeadId(source, damage);
     }
 
     @Override
     protected void defineSynchedData(SynchedEntityData.Builder builder) {
         super.defineSynchedData(builder);
-        builder.define(CHILD_UUID, Optional.empty());
-        builder.define(PARENT_UUID, Optional.empty());
+        builder.define(CHILD_UUID, "");
+        builder.define(PARENT_UUID, "");
         builder.define(BODYINDEX, 0);
         builder.define(BODY_TYPE, AnacondaPartIndex.NECK.ordinal());
         builder.define(TARGET_YAW, 0F);
@@ -270,7 +273,6 @@ public class EntityAnacondaPart extends LivingEntity implements IHurtableMultipa
         }
     }
 
-    @Override
     public Iterable<ItemStack> getArmorSlots() {
         return ImmutableList.of();
     }
@@ -300,7 +302,7 @@ public class EntityAnacondaPart extends LivingEntity implements IHurtableMultipa
     }
 
     public Entity getParent() {
-        if (!this.level().isClientSide) {
+        if (!this.level().isClientSide()) {
             final UUID id = getParentId();
             if (id != null) {
                 return ((ServerLevel) level()).getEntity(id);
@@ -316,15 +318,23 @@ public class EntityAnacondaPart extends LivingEntity implements IHurtableMultipa
 
     @Nullable
     public UUID getParentId() {
-        return this.entityData.get(PARENT_UUID).orElse(null);
+        String uuidStr = this.entityData.get(PARENT_UUID);
+        if (uuidStr.isEmpty()) {
+            return null;
+        }
+        try {
+            return UUID.fromString(uuidStr);
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
     }
 
     public void setParentId(@Nullable UUID uniqueId) {
-        this.entityData.set(PARENT_UUID, Optional.ofNullable(uniqueId));
+        this.entityData.set(PARENT_UUID, uniqueId == null ? "" : uniqueId.toString());
     }
 
     public Entity getChild() {
-        if (!this.level().isClientSide) {
+        if (!this.level().isClientSide()) {
             final UUID id = getChildId();
             if (id != null) {
                 return ((ServerLevel) level()).getEntity(id);
@@ -336,35 +346,57 @@ public class EntityAnacondaPart extends LivingEntity implements IHurtableMultipa
 
     @Nullable
     public UUID getChildId() {
-        return this.entityData.get(CHILD_UUID).orElse(null);
+        String uuidStr = this.entityData.get(CHILD_UUID);
+        if (uuidStr.isEmpty()) {
+            return null;
+        }
+        try {
+            return UUID.fromString(uuidStr);
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
     }
 
     public void setChildId(@Nullable UUID uniqueId) {
-        this.entityData.set(CHILD_UUID, Optional.ofNullable(uniqueId));
+        this.entityData.set(CHILD_UUID, uniqueId == null ? "" : uniqueId.toString());
     }
 
-    public void addAdditionalSaveData(CompoundTag compound) {
-        super.addAdditionalSaveData(compound);
-        if (this.getParentId() != null) {
-            compound.putUUID("ParentUUID", this.getParentId());
+    public void addAdditionalSaveData(ValueOutput valueOutput) {
+        super.addAdditionalSaveData(valueOutput);
+        UUID parentUUID = this.getParentId();
+        if (parentUUID != null) {
+            valueOutput.putString("ParentUUID", parentUUID.toString());
         }
-        if (this.getChildId() != null) {
-            compound.putUUID("ChildUUID", this.getChildId());
+        UUID childUUID = this.getChildId();
+        if (childUUID != null) {
+            valueOutput.putString("ChildUUID", childUUID.toString());
         }
-        compound.putInt("BodyModel", getPartType().ordinal());
-        compound.putInt("BodyIndex", getBodyIndex());
+        valueOutput.putInt("BodyModel", getPartType().ordinal());
+        valueOutput.putInt("BodyIndex", getBodyIndex());
     }
 
-    public void readAdditionalSaveData(CompoundTag compound) {
-        super.readAdditionalSaveData(compound);
-        if (compound.hasUUID("ParentUUID")) {
-            this.setParentId(compound.getUUID("ParentUUID"));
-        }
-        if (compound.hasUUID("ChildUUID")) {
-            this.setChildId(compound.getUUID("ChildUUID"));
-        }
-        this.setPartType(AnacondaPartIndex.fromOrdinal(compound.getInt("BodyModel")));
-        this.setBodyIndex(compound.getInt("BodyIndex"));
+    public void readAdditionalSaveData(ValueInput valueInput) {
+        super.readAdditionalSaveData(valueInput);
+        valueInput.getString("ParentUUID").ifPresent(uuidStr -> {
+            if (!uuidStr.isEmpty()) {
+                try {
+                    this.setParentId(UUID.fromString(uuidStr));
+                } catch (IllegalArgumentException e) {
+                    // Invalid UUID, ignore
+                }
+            }
+        });
+        valueInput.getString("ChildUUID").ifPresent(uuidStr -> {
+            if (!uuidStr.isEmpty()) {
+                try {
+                    this.setChildId(UUID.fromString(uuidStr));
+                } catch (IllegalArgumentException e) {
+                    // Invalid UUID, ignore
+                }
+            }
+        });
+        this.setPartType(AnacondaPartIndex.fromOrdinal(valueInput.getIntOr("BodyModel", 0)));
+        this.setBodyIndex(valueInput.getIntOr("BodyIndex", 0));
     }
 
     @Override
