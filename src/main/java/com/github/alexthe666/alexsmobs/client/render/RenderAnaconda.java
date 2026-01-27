@@ -8,25 +8,41 @@ import net.minecraft.client.renderer.entity.EntityRendererProvider;
 import net.minecraft.client.renderer.entity.MobRenderer;
 import net.minecraft.resources.ResourceLocation;
 
-public class RenderAnaconda extends MobRenderer<EntityAnaconda, ModelAnaconda<EntityAnaconda>> {
-    private static final ResourceLocation TEXTURE = ResourceLocation.parse("alexsmobs:textures/entity/anaconda.png");
-    private static final ResourceLocation TEXTURE_SHEDDING = ResourceLocation.parse("alexsmobs:textures/entity/anaconda_shedding.png");
-    private static final ResourceLocation TEXTURE_YELLOW = ResourceLocation.parse("alexsmobs:textures/entity/anaconda_yellow.png");
-    private static final ResourceLocation TEXTURE_YELLOW_SHEDDING = ResourceLocation.parse("alexsmobs:textures/entity/anaconda_yellow_shedding.png");
+public class RenderAnaconda extends MobRenderer<EntityAnaconda, AnacondaRenderState, ModelAnaconda> {
+    private static final ResourceLocation TEXTURE = ResourceLocation.withDefaultNamespace("textures/entity/anaconda.png");
+    private static final ResourceLocation TEXTURE_SHEDDING = ResourceLocation.withDefaultNamespace("textures/entity/anaconda_shedding.png");
+    private static final ResourceLocation TEXTURE_YELLOW = ResourceLocation.withDefaultNamespace("textures/entity/anaconda_yellow.png");
+    private static final ResourceLocation TEXTURE_YELLOW_SHEDDING = ResourceLocation.withDefaultNamespace("textures/entity/anaconda_yellow_shedding.png");
 
     public RenderAnaconda(EntityRendererProvider.Context renderManagerIn) {
         super(renderManagerIn, new ModelAnaconda(AnacondaPartIndex.HEAD), 0.3F);
     }
 
-    protected void scale(EntityAnaconda entitylivingbaseIn, PoseStack matrixStackIn, float partialTickTime) {
-        matrixStackIn.scale(entitylivingbaseIn.getScale(), entitylivingbaseIn.getScale(), entitylivingbaseIn.getScale());
+    @Override
+    public AnacondaRenderState createRenderState() {
+        return new AnacondaRenderState();
+    }
+
+    @Override
+    public void extractRenderState(EntityAnaconda entity, AnacondaRenderState renderState, float partialTick) {
+        super.extractRenderState(entity, renderState, partialTick);
+        renderState.strangleProgress = entity.getStrangleProgress(partialTick);
+        renderState.isYellow = entity.isYellow();
+        renderState.isShedding = entity.isShedding();
+        renderState.scale = entity.getScale();
+    }
+
+    @Override
+    protected void scale(AnacondaRenderState renderState, PoseStack matrixStackIn) {
+        matrixStackIn.scale(renderState.scale, renderState.scale, renderState.scale);
     }
 
     public static ResourceLocation getAnacondaTexture(boolean yellow, boolean shedding) {
         return yellow ? shedding ? TEXTURE_YELLOW_SHEDDING : TEXTURE_YELLOW : shedding ? TEXTURE_SHEDDING : TEXTURE;
     }
 
-    public ResourceLocation getTextureLocation(EntityAnaconda entity) {
-        return getAnacondaTexture(entity.isYellow(), entity.isShedding());
+    @Override
+    public ResourceLocation getTextureLocation(AnacondaRenderState renderState) {
+        return getAnacondaTexture(renderState.isYellow, renderState.isShedding);
     }
 }
