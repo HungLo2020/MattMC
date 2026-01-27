@@ -101,6 +101,11 @@ public class EntityAnacondaPart extends LivingEntity implements IHurtableMultipa
         return false;
     }
 
+    @Override
+    protected void serverAiStep() {
+        // Do nothing - parts are positioned manually by parent entity
+    }
+
 
     @Override
     public void tick() {
@@ -109,7 +114,6 @@ public class EntityAnacondaPart extends LivingEntity implements IHurtableMultipa
         prevStrangleProgess = strangleProgess;
         prevSwell = this.getSwell();
         this.setDeltaMovement(Vec3.ZERO);
-        this.setOnGround(true);
         if (this.tickCount > 1) {
             final Entity parent = getParent();
             refreshDimensions();
