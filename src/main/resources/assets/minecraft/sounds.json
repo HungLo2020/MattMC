@@ -12594,6 +12594,29 @@
     ],
     "subtitle": "subtitles.entity.alligator_snapping_turtle.hurt"
   },
+  "entity.anaconda.slither": {
+    "sounds": [
+      "anaconda_slither_0",
+      "anaconda_slither_1",
+      "anaconda_slither_2",
+      "anaconda_slither_3"
+    ],
+    "subtitle": "subtitles.entity.anaconda.slither"
+  },
+  "entity.anaconda.attack": {
+    "sounds": [
+      "anaconda_attack_0",
+      "anaconda_attack_1"
+    ],
+    "subtitle": "subtitles.entity.anaconda.attack"
+  },
+  "entity.anaconda.hurt": {
+    "sounds": [
+      "anaconda_hurt_0",
+      "anaconda_hurt_1"
+    ],
+    "subtitle": "subtitles.entity.anaconda.hurt"
+  },
   "entity.armadillo.ambient": {
     "sounds": [
       "mob/armadillo/ambient1",

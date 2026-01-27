@@ -85,19 +85,16 @@ public class EntityAnaconda extends Animal implements ISemiAquatic {
     }
 
     protected SoundEvent getHurtSound(DamageSource damageSourceIn) {
-        // TODO: Add ANACONDA_HURT sound event
-        return SoundEvents.GENERIC_HURT;
+        return SoundEvents.ANACONDA_HURT;
     }
 
     protected SoundEvent getDeathSound() {
-        // TODO: Add ANACONDA_HURT sound event
-        return SoundEvents.GENERIC_HURT;
+        return SoundEvents.ANACONDA_HURT;
     }
 
     protected void playStepSound(BlockPos pos, BlockState state) {
         if (!isBaby()) {
-            // TODO: Add ANACONDA_SLITHER sound event
-            this.playSound(SoundEvents.SPIDER_STEP, 0.5F, 1.0F);
+            this.playSound(SoundEvents.ANACONDA_SLITHER, 0.5F, 1.0F);
         } else {
             super.playStepSound(pos, state);
         }

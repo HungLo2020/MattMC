@@ -75,6 +75,8 @@ public class EntityRenderers {
 		register(EntityType.ACACIA_CHEST_BOAT, context -> new BoatRenderer(context, ModelLayers.ACACIA_CHEST_BOAT));
 		register(EntityType.ALLAY, AllayRenderer::new);
 		register(EntityType.ALLIGATOR_SNAPPING_TURTLE, com.github.alexthe666.alexsmobs.client.render.RenderAlligatorSnappingTurtle::new);
+		register(EntityType.ANACONDA, com.github.alexthe666.alexsmobs.client.render.RenderAnaconda::new);
+		register(EntityType.ANACONDA_PART, com.github.alexthe666.alexsmobs.client.render.RenderAnacondaPart::new);
 		register(EntityType.AREA_EFFECT_CLOUD, NoopRenderer::new);
 		register(EntityType.ATLATITAN, com.github.alexmodguy.alexscaves.client.render.entity.AtlatitanRenderer::new);
 		register(EntityType.ARMADILLO, ArmadilloRenderer::new);
