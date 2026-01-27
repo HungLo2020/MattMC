@@ -88,6 +88,11 @@ public class RenderAnacondaPart extends LivingEntityRenderer<EntityAnacondaPart,
 
 
     @Override
+    protected boolean shouldShowName(EntityAnacondaPart entity, double distance) {
+        return false;
+    }
+
+    @Override
     public ResourceLocation getTextureLocation(AnacondaPartRenderState renderState) {
         return RenderAnaconda.getAnacondaTexture(renderState.isYellow, renderState.isShedding);
     }

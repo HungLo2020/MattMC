@@ -66,11 +66,15 @@ public class EntityAnacondaPart extends LivingEntity implements IHurtableMultipa
     public EntityAnacondaPart(EntityType t, Level world) {
         super(t, world);
         multipartSize = t.getDimensions();
+        this.noPhysics = true;
+        this.setNoGravity(true);
     }
 
     public EntityAnacondaPart(EntityType t, LivingEntity parent) {
         super(t, parent.level());
         this.setParent(parent);
+        this.noPhysics = true;
+        this.setNoGravity(true);
     }
 
     @Override
