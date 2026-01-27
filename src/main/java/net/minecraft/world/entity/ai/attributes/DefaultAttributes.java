@@ -214,6 +214,7 @@ public class DefaultAttributes {
 		.put(EntityType.SEAGULL, com.github.alexthe666.alexsmobs.entity.EntitySeagull.createAttributes().build())
 		.put(EntityType.SHEEP, Sheep.createAttributes().build())
 		.put(EntityType.SHOEBILL, com.github.alexthe666.alexsmobs.entity.EntityShoebill.bakeAttributes().build())
+		.put(EntityType.SKUNK, com.github.alexthe666.alexsmobs.entity.EntitySkunk.bakeAttributes().build())
 		.put(EntityType.SPECTRE, com.github.alexthe666.alexsmobs.entity.EntitySpectre.createAttributes().build())
 		.put(EntityType.SUGAR_GLIDER, com.github.alexthe666.alexsmobs.entity.EntitySugarGlider.bakeAttributes().build())
 		.put(EntityType.SHULKER, Shulker.createAttributes().build())
