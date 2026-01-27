@@ -1,7 +1,6 @@
 package com.github.alexthe666.alexsmobs.client.model;
 
-import com.github.alexthe666.alexsmobs.entity.EntityAnaconda;
-import com.github.alexthe666.alexsmobs.entity.EntityAnacondaPart;
+import com.github.alexthe666.alexsmobs.client.render.AnacondaRenderState;
 import com.github.alexthe666.alexsmobs.entity.util.AnacondaPartIndex;
 import com.github.alexthe666.alexsmobs.entity.util.Maths;
 import com.github.alexthe666.citadel.client.model.AdvancedEntityModel;
@@ -9,14 +8,15 @@ import com.github.alexthe666.citadel.client.model.AdvancedModelBox;
 import com.github.alexthe666.citadel.client.model.basic.BasicModelPart;
 import com.google.common.collect.ImmutableList;
 import net.minecraft.util.Mth;
-import net.minecraft.world.entity.LivingEntity;
 
-public class ModelAnaconda<T extends LivingEntity> extends AdvancedEntityModel<T> {
+public class ModelAnaconda extends AdvancedEntityModel<AnacondaRenderState> {
     private final AdvancedModelBox root;
     private final AdvancedModelBox part;
     private AdvancedModelBox jaw;
+    private final AnacondaPartIndex partIndex;
 
     public ModelAnaconda(AnacondaPartIndex index) {
+        this.partIndex = index;
         texWidth = 128;
         texHeight = 128;
         part = new AdvancedModelBox(this, "part");
@@ -57,32 +57,27 @@ public class ModelAnaconda<T extends LivingEntity> extends AdvancedEntityModel<T
     }
 
     @Override
-    public void setupAnim(LivingEntity entity, float limbSwing, float limbSwingAmount, float ageInTicks, float netHeadYaw, float headPitch) {
+    public void setupAnim(AnacondaRenderState renderState) {
         this.resetToDefaultPose();
-        float partialTick = ageInTicks - entity.tickCount;
-        float strangle = 0F;
-        if(jaw != null && entity instanceof EntityAnaconda anaconda){ //head
-            strangle = anaconda.getStrangleProgress(partialTick);
+        float idleSpeed = 0.05F;
+        float strangle = renderState.strangleProgress;
+        
+        if(jaw != null && partIndex == AnacondaPartIndex.HEAD){ // head
             progressPositionPrev(part, strangle, 0, 4, 0, 5F);
             progressPositionPrev(jaw, strangle, 0, 0, 1F, 5F);
             progressRotationPrev(part, strangle, Maths.rad(10), 0, 0, 5F);
             progressRotationPrev(jaw, strangle, Maths.rad(160), 0, 0, 5F);
-            this.part.rotateAngleY += netHeadYaw / 57.295776F;
-            this.part.rotateAngleX += Math.min(0, headPitch / 57.295776F);
-            this.part.rotationPointX += Mth.sin(limbSwing) * 2.0F * limbSwingAmount;
-            this.walk(part, 0.7F, 0.2F, false, 1F, 0.05F, ageInTicks, strangle * 0.2F);
-            this.walk(jaw, 0.7F, 0.4F, true, 1F, -0.05F, ageInTicks, strangle * 0.2F);
-        }else if(entity instanceof EntityAnacondaPart){ //body
-            EntityAnacondaPart partEntity = (EntityAnacondaPart)entity;
-            //int i = Mth.clamp(partEntity.getBodyIndex(), 0 , 6);
+            this.part.rotateAngleY += renderState.yRot / 57.295776F;
+            this.part.rotateAngleX += Math.min(0, renderState.xRot / 57.295776F);
+            this.part.rotationPointX += Mth.sin(renderState.walkAnimationPos) * 2.0F * renderState.walkAnimationSpeed;
+            this.walk(part, 0.7F, 0.2F, false, 1F, 0.05F, renderState.ageInTicks, strangle * 0.2F);
+            this.walk(jaw, 0.7F, 0.4F, true, 1F, -0.05F, renderState.ageInTicks, strangle * 0.2F);
+        } else { // body parts
+            // Body part animation - scale based on swellLerp if needed
             float f = 1.01F;
-            if(partEntity.getBodyIndex() % 2 == 1){
-                f = 1.0F;
-            }
-            float swell = partEntity.getSwellLerp(partialTick) * 0.15F;
+            float swell = 0.0F; // We don't have swellLerp in render state yet, could add if needed
             part.setScale(f + swell, f + swell, f);
         }
-
     }
 
     @Override
