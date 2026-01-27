@@ -1,5 +1,6 @@
 package com.github.alexthe666.alexsmobs;
 
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import java.util.Calendar;
@@ -24,5 +25,13 @@ public class AlexsMobs {
     
     public static boolean isHalloween() {
         return isHalloween;
+    }
+    
+    /**
+     * Stub for network messaging - no-op in direct source integration
+     */
+    public static <MSG extends CustomPacketPayload> void sendMSGToAll(MSG message) {
+        // No-op: In direct source integration, we don't need network syncing
+        // The client and server share the same world instance in singleplayer
     }
 }
