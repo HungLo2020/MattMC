@@ -22,7 +22,6 @@ import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.phys.shapes.BooleanOp;
 import net.minecraft.world.phys.shapes.Shapes;
-import net.neoforged.neoforge.fluids.FluidType;
 
 import javax.annotation.Nullable;
 import java.util.List;
@@ -34,14 +33,14 @@ public class EntityCentipedeBody extends Mob implements IHurtableMultipart {
 
     private static final EntityDataAccessor<Integer> BODYINDEX = SynchedEntityData.defineId(EntityCentipedeBody.class, EntityDataSerializers.INT);
     private static final EntityDataAccessor<Float> BODY_XROT = SynchedEntityData.defineId(EntityCentipedeBody.class, EntityDataSerializers.FLOAT);
-    private static final EntityDataAccessor<Optional<UUID>> PARENT_UUID = SynchedEntityData.defineId(EntityCentipedeBody.class, EntityDataSerializers.OPTIONAL_UUID);
-    private static final EntityDataAccessor<Optional<UUID>> CHILD_UUID = SynchedEntityData.defineId(EntityCentipedeBody.class, EntityDataSerializers.OPTIONAL_UUID);
+    private static final EntityDataAccessor<String> PARENT_UUID = SynchedEntityData.defineId(EntityCentipedeBody.class, EntityDataSerializers.STRING);
+    private static final EntityDataAccessor<String> CHILD_UUID = SynchedEntityData.defineId(EntityCentipedeBody.class, EntityDataSerializers.STRING);
     public EntityDimensions multipartSize;
     protected float radius;
     protected float angleYaw;
     protected float damageMultiplier = 1;
     private double prevHeight = 0;
-    protected EntityCentipedeBody(EntityType type, Level worldIn) {
+    public EntityCentipedeBody(EntityType type, Level worldIn) {
         super(type, worldIn);
         multipartSize = type.getDimensions();
     }
@@ -56,9 +55,8 @@ public class EntityCentipedeBody extends Mob implements IHurtableMultipart {
     }
 
 
-    @Override
-    public boolean isInvulnerableTo(DamageSource source) {
-        return  source.is(DamageTypes.IN_WALL)  || super.isInvulnerableTo(source);
+    public boolean isInvulnerableTo(ServerLevel level, DamageSource source) {
+        return  source.is(DamageTypes.IN_WALL)  || super.isInvulnerableTo(level, source);
     }
 
     public boolean isNoGravity() {
@@ -98,10 +96,10 @@ public class EntityCentipedeBody extends Mob implements IHurtableMultipart {
     public void addAdditionalSaveData(CompoundTag compound) {
         super.addAdditionalSaveData(compound);
         if (this.getParentId() != null) {
-            compound.putUUID("ParentUUID", this.getParentId());
+            compound.putString("ParentUUID", this.getParentId().toString());
         }
         if (this.getChildId() != null) {
-            compound.putUUID("ChildUUID", this.getChildId());
+            compound.putString("ChildUUID", this.getChildId().toString());
         }
         compound.putInt("BodyIndex", getBodyIndex());
         compound.putFloat("PartAngle", angleYaw);
@@ -110,11 +108,19 @@ public class EntityCentipedeBody extends Mob implements IHurtableMultipart {
 
     public void readAdditionalSaveData(CompoundTag compound) {
         super.readAdditionalSaveData(compound);
-        if (compound.hasUUID("ParentUUID")) {
-            this.setParentId(compound.getUUID("ParentUUID"));
+        if (compound.contains("ParentUUID")) {
+            try {
+                this.setParentId(UUID.fromString(compound.getString("ParentUUID")));
+            } catch (IllegalArgumentException e) {
+                // Invalid UUID string
+            }
         }
-        if (compound.hasUUID("ChildUUID")) {
-            this.setChildId(compound.getUUID("ChildUUID"));
+        if (compound.contains("ChildUUID")) {
+            try {
+                this.setChildId(UUID.fromString(compound.getString("ChildUUID")));
+            } catch (IllegalArgumentException e) {
+                // Invalid UUID string
+            }
         }
         this.setBodyIndex(compound.getInt("BodyIndex"));
         this.angleYaw = compound.getFloat("PartAngle");
@@ -123,15 +129,15 @@ public class EntityCentipedeBody extends Mob implements IHurtableMultipart {
     @Override
     protected void defineSynchedData(SynchedEntityData.Builder builder) {
         super.defineSynchedData(builder);
-        builder.define(PARENT_UUID, Optional.empty());
-        builder.define(CHILD_UUID, Optional.empty());
+        builder.define(PARENT_UUID, "");
+        builder.define(CHILD_UUID, "");
         builder.define(BODYINDEX, 0);
         builder.define(BODY_XROT, 0F);
     }
 
     public Entity getParent() {
         final UUID id = getParentId();
-        if (id != null && !this.level().isClientSide) {
+        if (id != null && !this.level().isClientSide()) {
             return ((ServerLevel) level()).getEntity(id);
         }
         return null;
@@ -143,7 +149,7 @@ public class EntityCentipedeBody extends Mob implements IHurtableMultipart {
 
     public Entity getChild() {
         final UUID id = getChildId();
-        if (id != null && !this.level().isClientSide) {
+        if (id != null && !this.level().isClientSide()) {
             return ((ServerLevel) level()).getEntity(id);
         }
         return null;
@@ -151,11 +157,19 @@ public class EntityCentipedeBody extends Mob implements IHurtableMultipart {
 
     @Nullable
     public UUID getChildId() {
-        return this.entityData.get(CHILD_UUID).orElse(null);
+        String uuidStr = this.entityData.get(CHILD_UUID);
+        if (uuidStr == null || uuidStr.isEmpty()) {
+            return null;
+        }
+        try {
+            return UUID.fromString(uuidStr);
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
     }
 
     public void setChildId(@Nullable UUID uniqueId) {
-        this.entityData.set(CHILD_UUID, Optional.ofNullable(uniqueId));
+        this.entityData.set(CHILD_UUID, uniqueId == null ? "" : uniqueId.toString());
     }
 
     @Override
@@ -183,9 +197,9 @@ public class EntityCentipedeBody extends Mob implements IHurtableMultipart {
         }
     }
 
-    public boolean startRiding(Entity entityIn) {
+    public boolean startRiding(Entity entityIn, boolean force) {
         if(!(entityIn instanceof AbstractMinecart || entityIn instanceof Boat)){
-            return super.startRiding(entityIn);
+            return super.startRiding(entityIn, force);
         }
         return false;
     }
@@ -200,11 +214,19 @@ public class EntityCentipedeBody extends Mob implements IHurtableMultipart {
 
     @Nullable
     public UUID getParentId() {
-        return this.entityData.get(PARENT_UUID).orElse(null);
+        String uuidStr = this.entityData.get(PARENT_UUID);
+        if (uuidStr == null || uuidStr.isEmpty()) {
+            return null;
+        }
+        try {
+            return UUID.fromString(uuidStr);
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
     }
 
     public void setParentId(@Nullable UUID uniqueId) {
-        this.entityData.set(PARENT_UUID, Optional.ofNullable(uniqueId));
+        this.entityData.set(PARENT_UUID, uniqueId == null ? "" : uniqueId.toString());
     }
 
     public static AttributeSupplier.Builder bakeAttributes() {
@@ -289,11 +311,6 @@ public class EntityCentipedeBody extends Mob implements IHurtableMultipart {
                 return p_185969_.isSuffocating(this.level(), blockpos) && Shapes.joinIsNotEmpty(p_185969_.getCollisionShape(this.level(), blockpos).move(vec3.x, vec3.y, vec3.z), Shapes.create(axisalignedbb), BooleanOp.AND);
             });
         }
-    }
-
-    @Override
-    public boolean canDrownInFluidType(FluidType type) {
-        return false; // Centipede body part can breathe in all fluids
     }
 
     public float getBackOffset() {

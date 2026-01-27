@@ -1,13 +1,17 @@
 package com.github.alexthe666.alexsmobs.client.model;
 
+import com.github.alexthe666.alexsmobs.client.render.CentipedeBodyRenderState;
+import com.github.alexthe666.alexsmobs.client.render.CentipedeHeadRenderState;
+import com.github.alexthe666.alexsmobs.client.render.CentipedeTailRenderState;
 import com.github.alexthe666.alexsmobs.entity.EntityCentipedeBody;
 import com.github.alexthe666.citadel.client.model.AdvancedEntityModel;
 import com.github.alexthe666.citadel.client.model.AdvancedModelBox;
 import com.github.alexthe666.citadel.client.model.basic.BasicModelPart;
 import com.google.common.collect.ImmutableList;
+import net.minecraft.client.renderer.entity.state.EntityRenderState;
 import net.minecraft.world.entity.LivingEntity;
 
-public class ModelCaveCentipede<T extends LivingEntity> extends AdvancedEntityModel<T> {
+public class ModelCaveCentipede extends AdvancedEntityModel<EntityRenderState> {
     private final int type;//0 = head, 1 = body, 2 = tail
     private final AdvancedModelBox root;
     private AdvancedModelBox body;
@@ -236,14 +240,17 @@ public class ModelCaveCentipede<T extends LivingEntity> extends AdvancedEntityMo
     }
 
     @Override
-    public void setupAnim(LivingEntity entity, float limbSwing, float limbSwingAmount, float ageInTicks, float netHeadYaw, float headPitch) {
+    public void setupAnim(EntityRenderState state) {
         this.resetToDefaultPose();
-        float partialTick = ageInTicks - entity.tickCount;
+        float limbSwing = state.walkAnimationPos;
+        float limbSwingAmount = state.walkAnimationSpeed;
+        float ageInTicks = state.ageInTicks;
+        float partialTick = 0;
         float walkSpeed = 1.5F;
         float walkDegree = 0.85F;
         float idleSpeed = 0.25F;
         float idleDegree = 0.35F;
-        if(entity.deathTime > 0){
+        if(state.isDeadOrDying){
             limbSwing = ageInTicks;
             limbSwingAmount = 1;
         }
@@ -253,42 +260,45 @@ public class ModelCaveCentipede<T extends LivingEntity> extends AdvancedEntityMo
             this.swing(fangs, idleSpeed, idleDegree * 0.1F, false, 0, 0, ageInTicks, 1);
             this.fangs.rotationPointZ = -6.2F;
         }else if(type == 1){
-            if(entity instanceof EntityCentipedeBody){
-                float offset = (float) ((((EntityCentipedeBody)entity).getBodyIndex() + 1 ) * Math.PI * 0.5F);
-                double walkOffset = (offset ) * Math.PI * 0.5F;
-                this.swing(leftLegBodyF, walkSpeed, walkDegree, true, offset, 0F, limbSwing, limbSwingAmount);
-                this.flap(leftLeg2BodyF, walkSpeed, walkDegree * 0.5F, true, offset, 0.1F, limbSwing, limbSwingAmount);
-                this.swing(leftLegBodyB, walkSpeed, walkDegree, true, offset + 0.5F, 0F, limbSwing, limbSwingAmount);
-                this.flap(leftLeg2BodyB, walkSpeed, walkDegree * 0.5F, true, offset + 0.5F, 0.1F, limbSwing, limbSwingAmount);
-                this.swing(rightLegBodyF, walkSpeed, walkDegree, false, offset, 0F, limbSwing, limbSwingAmount);
-                this.flap(rightLegBodyF2, walkSpeed, walkDegree * 0.5F, false, offset, 0.1F, limbSwing, limbSwingAmount);
-                this.swing(rightLegBodyB, walkSpeed, walkDegree, false, offset + 0.5F, 0F, limbSwing, limbSwingAmount);
-                this.flap(rightLegBodyB2, walkSpeed, walkDegree * 0.5F, false, offset + 0.5F, 0.1F, limbSwing, limbSwingAmount);
-                this.body.rotationPointY += (float)(Math.sin( (double)(limbSwing * walkSpeed) - walkOffset) * (double)limbSwingAmount * (double)walkDegree - (double)(limbSwingAmount * walkDegree) );
-                this.body.rotationPointY += (float)(Math.sin( (double)(ageInTicks * 0.1) - walkOffset) * (double)0.01 );
-
+            int bodyIndex = 0;
+            if(state instanceof CentipedeBodyRenderState){
+                bodyIndex = ((CentipedeBodyRenderState)state).bodyIndex;
             }
+            float offset = (float) ((bodyIndex + 1 ) * Math.PI * 0.5F);
+            double walkOffset = (offset ) * Math.PI * 0.5F;
+            this.swing(leftLegBodyF, walkSpeed, walkDegree, true, offset, 0F, limbSwing, limbSwingAmount);
+            this.flap(leftLeg2BodyF, walkSpeed, walkDegree * 0.5F, true, offset, 0.1F, limbSwing, limbSwingAmount);
+            this.swing(leftLegBodyB, walkSpeed, walkDegree, true, offset + 0.5F, 0F, limbSwing, limbSwingAmount);
+            this.flap(leftLeg2BodyB, walkSpeed, walkDegree * 0.5F, true, offset + 0.5F, 0.1F, limbSwing, limbSwingAmount);
+            this.swing(rightLegBodyF, walkSpeed, walkDegree, false, offset, 0F, limbSwing, limbSwingAmount);
+            this.flap(rightLegBodyF2, walkSpeed, walkDegree * 0.5F, false, offset, 0.1F, limbSwing, limbSwingAmount);
+            this.swing(rightLegBodyB, walkSpeed, walkDegree, false, offset + 0.5F, 0F, limbSwing, limbSwingAmount);
+            this.flap(rightLegBodyB2, walkSpeed, walkDegree * 0.5F, false, offset + 0.5F, 0.1F, limbSwing, limbSwingAmount);
+            this.body.rotationPointY += (float)(Math.sin( (double)(limbSwing * walkSpeed) - walkOffset) * (double)limbSwingAmount * (double)walkDegree - (double)(limbSwingAmount * walkDegree) );
+            this.body.rotationPointY += (float)(Math.sin( (double)(ageInTicks * 0.1) - walkOffset) * (double)0.01 );
 
         }else{
-            if(entity instanceof EntityCentipedeBody) {
-                float offset = (float) ((((EntityCentipedeBody) entity).getBodyIndex() + 1) * Math.PI * 0.5F);
-                double walkOffset = (offset ) * Math.PI * 0.5F;
-                this.swing(leftLegTailF, walkSpeed, walkDegree, true, offset, 0F, limbSwing, limbSwingAmount);
-                this.flap(leftLeg2TailF, walkSpeed, walkDegree * 0.5F, true, offset, 0.1F, limbSwing, limbSwingAmount);
-                this.swing(leftLegTailB, walkSpeed, walkDegree, true, offset + 0.5F, 0F, limbSwing, limbSwingAmount);
-                this.flap(leftLegTailB2, walkSpeed, walkDegree * 0.5F, true, offset + 0.5F, 0.1F, limbSwing, limbSwingAmount);
-
-                this.swing(rightLegTailF, walkSpeed, walkDegree, false, offset, 0F, limbSwing, limbSwingAmount);
-                this.flap(rightLeg2TailF, walkSpeed, walkDegree * 0.5F, false, offset, 0.1F, limbSwing, limbSwingAmount);
-                this.swing(rightLegTailB, walkSpeed, walkDegree, false, offset + 0.5F, 0F, limbSwing, limbSwingAmount);
-                this.flap(rightLegTailB2, walkSpeed, walkDegree * 0.5F, false, offset + 0.5F, 0.1F, limbSwing, limbSwingAmount);
-                this.tail.rotationPointY += (float)(Math.sin( (double)(limbSwing * walkSpeed) - walkOffset) * (double)limbSwingAmount * (double)walkDegree - (double)(limbSwingAmount * walkDegree) );
-                this.tail.rotationPointY += (float)(Math.sin( (double)(ageInTicks * 0.1) - walkOffset) * (double)0.01 );
-                this.swing(leftTail, walkSpeed, walkDegree * 0.2F, true, offset + 1F, 0F, limbSwing, limbSwingAmount);
-                this.swing(rightTail, walkSpeed, walkDegree * 0.2F, false, offset + 1F, 0F, limbSwing, limbSwingAmount);
-                this.walk(leftTail, idleSpeed, idleDegree, true, offset + 1.5F, -0.5F, ageInTicks, 1);
-                this.walk(rightTail, idleSpeed, idleDegree, false, offset + 1.5F, 0.5F, ageInTicks, 1);
+            int bodyIndex = 0;
+            if(state instanceof CentipedeBodyRenderState){
+                bodyIndex = ((CentipedeBodyRenderState)state).bodyIndex;
             }
+            float offset = (float) ((bodyIndex + 1) * Math.PI * 0.5F);
+            double walkOffset = (offset ) * Math.PI * 0.5F;
+            this.swing(leftLegTailF, walkSpeed, walkDegree, true, offset, 0F, limbSwing, limbSwingAmount);
+            this.flap(leftLeg2TailF, walkSpeed, walkDegree * 0.5F, true, offset, 0.1F, limbSwing, limbSwingAmount);
+            this.swing(leftLegTailB, walkSpeed, walkDegree, true, offset + 0.5F, 0F, limbSwing, limbSwingAmount);
+            this.flap(leftLegTailB2, walkSpeed, walkDegree * 0.5F, true, offset + 0.5F, 0.1F, limbSwing, limbSwingAmount);
+
+            this.swing(rightLegTailF, walkSpeed, walkDegree, false, offset, 0F, limbSwing, limbSwingAmount);
+            this.flap(rightLeg2TailF, walkSpeed, walkDegree * 0.5F, false, offset, 0.1F, limbSwing, limbSwingAmount);
+            this.swing(rightLegTailB, walkSpeed, walkDegree, false, offset + 0.5F, 0F, limbSwing, limbSwingAmount);
+            this.flap(rightLegTailB2, walkSpeed, walkDegree * 0.5F, false, offset + 0.5F, 0.1F, limbSwing, limbSwingAmount);
+            this.tail.rotationPointY += (float)(Math.sin( (double)(limbSwing * walkSpeed) - walkOffset) * (double)limbSwingAmount * (double)walkDegree - (double)(limbSwingAmount * walkDegree) );
+            this.tail.rotationPointY += (float)(Math.sin( (double)(ageInTicks * 0.1) - walkOffset) * (double)0.01 );
+            this.swing(leftTail, walkSpeed, walkDegree * 0.2F, true, offset + 1F, 0F, limbSwing, limbSwingAmount);
+            this.swing(rightTail, walkSpeed, walkDegree * 0.2F, false, offset + 1F, 0F, limbSwing, limbSwingAmount);
+            this.walk(leftTail, idleSpeed, idleDegree, true, offset + 1.5F, -0.5F, ageInTicks, 1);
+            this.walk(rightTail, idleSpeed, idleDegree, false, offset + 1.5F, 0.5F, ageInTicks, 1);
         }
     }
 

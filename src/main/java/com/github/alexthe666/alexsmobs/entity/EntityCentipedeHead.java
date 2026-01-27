@@ -41,14 +41,14 @@ import java.util.UUID;
 
 public class EntityCentipedeHead extends Monster {
 
-    private static final EntityDataAccessor<Optional<UUID>> CHILD_UUID = SynchedEntityData.defineId(EntityCentipedeHead.class, EntityDataSerializers.OPTIONAL_UUID);
+    private static final EntityDataAccessor<String> CHILD_UUID = SynchedEntityData.defineId(EntityCentipedeHead.class, EntityDataSerializers.STRING);
     private static final EntityDataAccessor<Integer> CHILD_ID = SynchedEntityData.defineId(EntityCentipedeHead.class, EntityDataSerializers.INT);
     private static final EntityDataAccessor<Integer> SEGMENT_COUNT = SynchedEntityData.defineId(EntityCentipedeHead.class, EntityDataSerializers.INT);
     public final float[] ringBuffer = new float[64];
     public int ringBufferIndex = -1;
     private EntityCentipedeBody[] parts;
 
-    protected EntityCentipedeHead(EntityType type, Level worldIn) {
+    public EntityCentipedeHead(EntityType type, Level worldIn) {
         super(type, worldIn);
         this.xpReward = 13;
     }
@@ -106,13 +106,13 @@ public class EntityCentipedeHead extends Monster {
     @Override
     protected void defineSynchedData(SynchedEntityData.Builder builder) {
         super.defineSynchedData(builder);
-        builder.define(CHILD_UUID, Optional.empty());
+        builder.define(CHILD_UUID, "");
         builder.define(CHILD_ID, -1);
         builder.define(SEGMENT_COUNT, 5);
     }
 
-    public boolean doHurtTarget(Entity entityIn) {
-        if (super.doHurtTarget(entityIn)) {
+    public boolean doHurtTarget(ServerLevel level, Entity entityIn) {
+        if (super.doHurtTarget(level, entityIn)) {
             if (entityIn instanceof LivingEntity) {
                 final int i;
                 final Difficulty difficulty = this.level().getDifficulty();
@@ -143,16 +143,24 @@ public class EntityCentipedeHead extends Monster {
 
     @Nullable
     public UUID getChildId() {
-        return this.entityData.get(CHILD_UUID).orElse(null);
+        String uuidStr = this.entityData.get(CHILD_UUID);
+        if (uuidStr == null || uuidStr.isEmpty()) {
+            return null;
+        }
+        try {
+            return UUID.fromString(uuidStr);
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
     }
 
     public void setChildId(@Nullable UUID uniqueId) {
-        this.entityData.set(CHILD_UUID, Optional.ofNullable(uniqueId));
+        this.entityData.set(CHILD_UUID, uniqueId == null ? "" : uniqueId.toString());
     }
 
     public Entity getChild() {
         final UUID id = getChildId();
-        if (id != null && !this.level().isClientSide) {
+        if (id != null && !this.level().isClientSide()) {
             return ((ServerLevel) level()).getEntity(id);
         }
         return null;
@@ -164,7 +172,7 @@ public class EntityCentipedeHead extends Monster {
     }
 
     @Nullable
-    public SpawnGroupData finalizeSpawn(ServerLevelAccessor worldIn, DifficultyInstance difficultyIn, MobSpawnType reason, @Nullable SpawnGroupData spawnDataIn) {
+    public SpawnGroupData finalizeSpawn(ServerLevelAccessor worldIn, DifficultyInstance difficultyIn, EntitySpawnReason reason, @Nullable SpawnGroupData spawnDataIn) {
         this.setSegmentCount(random.nextInt(4) + 5);
         return super.finalizeSpawn(worldIn, difficultyIn, reason, spawnDataIn);
     }
@@ -172,7 +180,7 @@ public class EntityCentipedeHead extends Monster {
     public void addAdditionalSaveData(CompoundTag compound) {
         super.addAdditionalSaveData(compound);
         if (this.getChildId() != null) {
-            compound.putUUID("ChildUUID", this.getChildId());
+            compound.putString("ChildUUID", this.getChildId().toString());
         }
         compound.putInt("SegCount", getSegmentCount());
 
@@ -180,8 +188,12 @@ public class EntityCentipedeHead extends Monster {
 
     public void readAdditionalSaveData(CompoundTag compound) {
         super.readAdditionalSaveData(compound);
-        if (compound.hasUUID("ChildUUID")) {
-            this.setChildId(compound.getUUID("ChildUUID"));
+        if (compound.contains("ChildUUID")) {
+            try {
+                this.setChildId(UUID.fromString(compound.getString("ChildUUID")));
+            } catch (IllegalArgumentException e) {
+                // Invalid UUID string
+            }
         }
         this.setSegmentCount(compound.getInt("SegCount"));
     }
@@ -198,9 +210,8 @@ public class EntityCentipedeHead extends Monster {
         return false;
     }
 
-    @Override
-    public boolean isInvulnerableTo(DamageSource source) {
-        return source.is(DamageTypes.IN_WALL)  || super.isInvulnerableTo(source);
+    public boolean isInvulnerableTo(ServerLevel level, DamageSource source) {
+        return source.is(DamageTypes.IN_WALL)  || super.isInvulnerableTo(level, source);
     }
 
 
@@ -219,7 +230,7 @@ public class EntityCentipedeHead extends Monster {
         }
         this.ringBuffer[this.ringBufferIndex] = this.getYRot();
 
-        if (!this.level().isClientSide) {
+        if (!this.level().isClientSide()) {
             final Entity child = getChild();
             if (child == null) {
                 LivingEntity partParent = this;
