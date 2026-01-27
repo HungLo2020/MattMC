@@ -1,12 +1,9 @@
 package com.github.alexthe666.alexsmobs.entity;
 
-import com.github.alexthe666.alexsmobs.AlexsMobs;
 import com.github.alexthe666.alexsmobs.entity.util.AnacondaPartIndex;
-import com.github.alexthe666.alexsmobs.message.MessageHurtMultipart;
 import com.github.alexthe666.alexsmobs.misc.AMBlockPos;
 import com.google.common.collect.ImmutableList;
 import net.minecraft.core.BlockPos;
-import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
@@ -28,11 +25,11 @@ import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.phys.shapes.BooleanOp;
 import net.minecraft.world.phys.shapes.Shapes;
-import net.neoforged.neoforge.fluids.FluidType;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
 
 import javax.annotation.Nullable;
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Predicate;
 
@@ -40,8 +37,8 @@ public class EntityAnacondaPart extends LivingEntity implements IHurtableMultipa
     private static final EntityDataAccessor<Integer> BODYINDEX = SynchedEntityData.defineId(EntityAnacondaPart.class, EntityDataSerializers.INT);
     private static final EntityDataAccessor<Integer> BODY_TYPE = SynchedEntityData.defineId(EntityAnacondaPart.class, EntityDataSerializers.INT);
     private static final EntityDataAccessor<Float> TARGET_YAW = SynchedEntityData.defineId(EntityAnacondaPart.class, EntityDataSerializers.FLOAT);
-    private static final EntityDataAccessor<Optional<UUID>> CHILD_UUID = SynchedEntityData.defineId(EntityAnacondaPart.class, EntityDataSerializers.OPTIONAL_UUID);
-    private static final EntityDataAccessor<Optional<UUID>> PARENT_UUID = SynchedEntityData.defineId(EntityAnacondaPart.class, EntityDataSerializers.OPTIONAL_UUID);
+    private UUID childUUID = null;
+    private UUID parentUUID = null;
     private static final EntityDataAccessor<Float> SWELL = SynchedEntityData.defineId(EntityAnacondaPart.class, EntityDataSerializers.FLOAT);
     public EntityDimensions multipartSize;
     private float strangleProgess;
@@ -82,8 +79,8 @@ public class EntityAnacondaPart extends LivingEntity implements IHurtableMultipa
     }
 
     @Override
-    public boolean isInvulnerableTo(DamageSource source) {
-        return source.is(DamageTypes.IN_WALL)  || super.isInvulnerableTo(source);
+    public boolean isInvulnerableTo(ServerLevel serverLevel, DamageSource source) {
+        return source.is(DamageTypes.IN_WALL)  || super.isInvulnerableTo(serverLevel, source);
     }
 
     @Override
@@ -106,14 +103,14 @@ public class EntityAnacondaPart extends LivingEntity implements IHurtableMultipa
         if (this.tickCount > 1) {
             final Entity parent = getParent();
             refreshDimensions();
-            if (!this.level().isClientSide) {
+            if (!this.level().isClientSide()) {
                 if (parent == null) {
                     this.remove(RemovalReason.DISCARDED);
                 }
                 if (parent != null) {
                     if (parent instanceof final LivingEntity livingEntityParent) {
                         if (livingEntityParent.hurtTime > 0 || livingEntityParent.deathTime > 0) {
-                            AlexsMobs.sendMSGToAll(new MessageHurtMultipart(this.getId(), parent.getId(), 0));
+                            // STUB: AlexsMobs messaging removed (sendMSGToAll not available)
                             this.hurtTime = livingEntityParent.hurtTime;
                             this.deathTime = livingEntityParent.deathTime;
                         }
@@ -173,7 +170,8 @@ public class EntityAnacondaPart extends LivingEntity implements IHurtableMultipa
         this.setXRot(f2);
         this.setYRot(f);
         this.yHeadRot = f;
-        this.moveTo(avg.x, avg.y, avg.z, f, f2);
+        this.setPos(avg.x, avg.y, avg.z);
+        this.setRot(f, f2);
         headEntityId = headId;
         return avg;
     }
@@ -221,11 +219,6 @@ public class EntityAnacondaPart extends LivingEntity implements IHurtableMultipa
         }
     }
 
-    @Override
-    public boolean canDrownInFluidType(FluidType type) {
-        return false; // Anaconda part can breathe underwater
-    }
-
     public boolean isPushedByFluid() {
         return false;
     }
@@ -238,26 +231,26 @@ public class EntityAnacondaPart extends LivingEntity implements IHurtableMultipa
         }
     }
 
-    public boolean hurtHeadId(DamageSource source, float f) {
+    public boolean hurtHeadId(ServerLevel level, DamageSource source, float f) {
         if (headEntityId != -1) {
-            Entity e = level().getEntity(headEntityId);
+            Entity e = level.getEntity(headEntityId);
             if (e instanceof EntityAnaconda) {
-               return e.hurt(source, f);
+               return e.hurtServer(level, source, f);
             }
         }
         return false;
     }
 
     @Override
-    public boolean hurt(DamageSource source, float damage) {
-        return hurtHeadId(source, damage);
+    public boolean hurtServer(ServerLevel level, DamageSource source, float damage) {
+        return hurtHeadId(level, source, damage);
     }
 
     @Override
     protected void defineSynchedData(SynchedEntityData.Builder builder) {
         super.defineSynchedData(builder);
-        builder.define(CHILD_UUID, Optional.empty());
-        builder.define(PARENT_UUID, Optional.empty());
+        // TODO: Implement UUID storage with proper codec
+        // TODO: Implement UUID storage with proper codec
         builder.define(BODYINDEX, 0);
         builder.define(BODY_TYPE, AnacondaPartIndex.NECK.ordinal());
         builder.define(TARGET_YAW, 0F);
@@ -276,22 +269,18 @@ public class EntityAnacondaPart extends LivingEntity implements IHurtableMultipa
         }
     }
 
-    @Override
     public Iterable<ItemStack> getArmorSlots() {
         return ImmutableList.of();
     }
 
-    @Override
     public ItemStack getItemBySlot(EquipmentSlot slotIn) {
         return ItemStack.EMPTY;
     }
 
-    @Override
     public void setItemSlot(EquipmentSlot p_21036_, ItemStack p_21037_) {
 
     }
 
-    @Override
     public HumanoidArm getMainArm() {
         return HumanoidArm.RIGHT;
     }
@@ -306,7 +295,7 @@ public class EntityAnacondaPart extends LivingEntity implements IHurtableMultipa
     }
 
     public Entity getParent() {
-        if (!this.level().isClientSide) {
+        if (!this.level().isClientSide()) {
             final UUID id = getParentId();
             if (id != null) {
                 return ((ServerLevel) level()).getEntity(id);
@@ -322,15 +311,15 @@ public class EntityAnacondaPart extends LivingEntity implements IHurtableMultipa
 
     @Nullable
     public UUID getParentId() {
-        return this.entityData.get(PARENT_UUID).orElse(null);
+        return this.parentUUID;
     }
 
     public void setParentId(@Nullable UUID uniqueId) {
-        this.entityData.set(PARENT_UUID, Optional.ofNullable(uniqueId));
+        this.parentUUID = uniqueId;
     }
 
     public Entity getChild() {
-        if (!this.level().isClientSide) {
+        if (!this.level().isClientSide()) {
             final UUID id = getChildId();
             if (id != null) {
                 return ((ServerLevel) level()).getEntity(id);
@@ -342,35 +331,27 @@ public class EntityAnacondaPart extends LivingEntity implements IHurtableMultipa
 
     @Nullable
     public UUID getChildId() {
-        return this.entityData.get(CHILD_UUID).orElse(null);
+        return this.childUUID;
     }
 
     public void setChildId(@Nullable UUID uniqueId) {
-        this.entityData.set(CHILD_UUID, Optional.ofNullable(uniqueId));
+        this.childUUID = uniqueId;
     }
 
-    public void addAdditionalSaveData(CompoundTag compound) {
-        super.addAdditionalSaveData(compound);
-        if (this.getParentId() != null) {
-            compound.putUUID("ParentUUID", this.getParentId());
-        }
-        if (this.getChildId() != null) {
-            compound.putUUID("ChildUUID", this.getChildId());
-        }
-        compound.putInt("BodyModel", getPartType().ordinal());
-        compound.putInt("BodyIndex", getBodyIndex());
+    @Override
+    protected void addAdditionalSaveData(ValueOutput valueOutput) {
+        super.addAdditionalSaveData(valueOutput);
+        // TODO: Implement UUID storage with proper codec
+        valueOutput.putInt("BodyModel", getPartType().ordinal());
+        valueOutput.putInt("BodyIndex", getBodyIndex());
     }
 
-    public void readAdditionalSaveData(CompoundTag compound) {
-        super.readAdditionalSaveData(compound);
-        if (compound.hasUUID("ParentUUID")) {
-            this.setParentId(compound.getUUID("ParentUUID"));
-        }
-        if (compound.hasUUID("ChildUUID")) {
-            this.setChildId(compound.getUUID("ChildUUID"));
-        }
-        this.setPartType(AnacondaPartIndex.fromOrdinal(compound.getInt("BodyModel")));
-        this.setBodyIndex(compound.getInt("BodyIndex"));
+    @Override
+    protected void readAdditionalSaveData(ValueInput valueInput) {
+        super.readAdditionalSaveData(valueInput);
+        // TODO: Implement UUID storage with proper codec
+        this.setPartType(AnacondaPartIndex.fromOrdinal(valueInput.getIntOr("BodyModel", 0)));
+        this.setBodyIndex(valueInput.getIntOr("BodyIndex", 0));
     }
 
     @Override
