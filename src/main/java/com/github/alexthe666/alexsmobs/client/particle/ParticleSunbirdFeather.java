@@ -3,24 +3,22 @@ package com.github.alexthe666.alexsmobs.client.particle;
 import com.github.alexthe666.alexsmobs.entity.util.Maths;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.particle.*;
+import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.core.particles.SimpleParticleType;
 import net.minecraft.util.Mth;
+import net.minecraft.util.RandomSource;
 
-public class ParticleSunbirdFeather extends SimpleAnimatedParticle {
+public class ParticleSunbirdFeather extends SingleQuadParticle {
 
     private float initialRoll = 0;
 
-    private ParticleSunbirdFeather(ClientLevel world, double x, double y, double z, double xd, double yd, double zd, SpriteSet sprites) {
-        super(world, x, y, z, sprites, 0.0F);
+    private ParticleSunbirdFeather(ClientLevel world, double x, double y, double z, double xd, double yd, double zd, TextureAtlasSprite sprite) {
+        super(world, x, y, z, xd, yd, zd, sprite);
         this.friction = 0.96F;
         this.speedUpWhenYMotionIsBlocked = true;
-        this.xd = xd;
-        this.yd = yd;
-        this.zd = zd;
         this.quadSize = 0.15F + this.random.nextFloat() * 0.2F;
         this.lifetime = 20 + this.random.nextInt(20);
         this.gravity = 0.02F;
-        this.pickSprite(sprites);
         float f = Mth.sqrt((float) (xd * xd + zd * zd));
         float f1 = -(float) Mth.atan2(yd, f) + Maths.rad(135);
         this.roll = f1 * 2F;
@@ -53,8 +51,8 @@ public class ParticleSunbirdFeather extends SimpleAnimatedParticle {
     }
 
     @Override
-    public ParticleRenderType getRenderType() {
-        return ParticleRenderType.PARTICLE_SHEET_TRANSLUCENT;
+    public SingleQuadParticle.Layer getLayer() {
+        return SingleQuadParticle.Layer.TRANSLUCENT;
     }
 
     public static class Factory implements ParticleProvider<SimpleParticleType> {
@@ -64,8 +62,8 @@ public class ParticleSunbirdFeather extends SimpleAnimatedParticle {
             this.spriteSet = spriteSet;
         }
 
-        public Particle createParticle(SimpleParticleType typeIn, ClientLevel worldIn, double x, double y, double z, double xSpeed, double ySpeed, double zSpeed) {
-            return new ParticleSunbirdFeather(worldIn, x, y, z, xSpeed, ySpeed, zSpeed, spriteSet);
+        public Particle createParticle(SimpleParticleType typeIn, ClientLevel worldIn, double x, double y, double z, double xSpeed, double ySpeed, double zSpeed, RandomSource randomSource) {
+            return new ParticleSunbirdFeather(worldIn, x, y, z, xSpeed, ySpeed, zSpeed, spriteSet.get(randomSource));
         }
     }
 }

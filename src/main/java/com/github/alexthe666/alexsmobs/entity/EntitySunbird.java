@@ -72,7 +72,7 @@ public class EntitySunbird extends Animal implements FlyingAnimal {
     private int fullScorchTime;
 
 
-    protected EntitySunbird(EntityType type, Level worldIn) {
+    public EntitySunbird(EntityType type, Level worldIn) {
         super(type, worldIn);
         this.moveControl = new MoveHelperController(this);
         orbitClockwise = new Random().nextBoolean();
@@ -134,21 +134,19 @@ public class EntitySunbird extends Animal implements FlyingAnimal {
     protected void checkFallDamage(double y, boolean onGroundIn, BlockState state, BlockPos pos) {
     }
 
-    public boolean hurt(DamageSource source, float amount) {
-        boolean prev = super.hurt(source, amount);
-        if (prev) {
-            if (source.getEntity() != null) {
-                if (source.getEntity() instanceof LivingEntity) {
-                    LivingEntity hurter = (LivingEntity) source.getEntity();
-                    if (hurter.hasEffect(AMEffectRegistry.SUNBIRD_BLESSING)) {
-                        hurter.removeEffect(AMEffectRegistry.SUNBIRD_BLESSING);
-                    }
-                    hurter.addEffect(new MobEffectInstance(AMEffectRegistry.SUNBIRD_CURSE, 600, 0));
+    @Override
+    public boolean hurtServer(ServerLevel level, DamageSource source, float amount) {
+        boolean result = super.hurtServer(level, source, amount);
+        if (result && source.getEntity() != null) {
+            if (source.getEntity() instanceof LivingEntity) {
+                LivingEntity hurter = (LivingEntity) source.getEntity();
+                if (hurter.hasEffect(AMEffectRegistry.SUNBIRD_BLESSING)) {
+                    hurter.removeEffect(AMEffectRegistry.SUNBIRD_BLESSING);
                 }
+                hurter.addEffect(new MobEffectInstance(AMEffectRegistry.SUNBIRD_CURSE, 600, 0));
             }
-            return prev;
         }
-        return prev;
+        return result;
     }
 
     public void travel(Vec3 travelVector) {
@@ -164,13 +162,13 @@ public class EntitySunbird extends Animal implements FlyingAnimal {
             BlockPos ground = AMBlockPos.fromCoords(this.getX(), this.getY() - 1.0D, this.getZ());
             float f = 0.91F;
             if (this.onGround()) {
-                f = this.level().getBlockState(ground).getFriction(this.level(), ground, this) * 0.91F;
+                f = this.level().getBlockState(ground).getBlock().getFriction() * 0.91F;
             }
 
             //float f1 = 0.16277137F / (f * f * f);
             f = 0.91F;
             if (this.onGround()) {
-                f = this.level().getBlockState(ground).getFriction(this.level(), ground, this) * 0.91F;
+                f = this.level().getBlockState(ground).getBlock().getFriction() * 0.91F;
             }
             this.calculateEntityAnimation(true);
 
@@ -247,7 +245,7 @@ public class EntitySunbird extends Animal implements FlyingAnimal {
                 scorchProgress--;
         }
 
-        if (scorching && scorchProgress == 20F && !this.level().isClientSide) {
+        if (scorching && scorchProgress == 20F && !this.level().isClientSide()) {
             if(fullScorchTime > 30){
                 this.setScorching(false);
             }else if(fullScorchTime % 5 == 0){
@@ -277,27 +275,26 @@ public class EntitySunbird extends Animal implements FlyingAnimal {
     }
 
 
-    public void readAdditionalSaveData(CompoundTag compound) {
-        super.readAdditionalSaveData(compound);
-        if (compound.contains("BeaconPosX")) {
-            int i = compound.getInt("BeaconPosX");
-            int j = compound.getInt("BeaconPosY");
-            int k = compound.getInt("BeaconPosZ");
+    public void readAdditionalSaveData(net.minecraft.world.level.storage.ValueInput valueInput) {
+        super.readAdditionalSaveData(valueInput);
+        int i = valueInput.getIntOr("BeaconPosX", Integer.MIN_VALUE);
+        if (i != Integer.MIN_VALUE) {
+            int j = valueInput.getIntOr("BeaconPosY", 0);
+            int k = valueInput.getIntOr("BeaconPosZ", 0);
             this.beaconPos = new BlockPos(i, j, k);
         } else {
             this.beaconPos = null;
         }
     }
 
-    public void addAdditionalSaveData(CompoundTag compound) {
-        super.addAdditionalSaveData(compound);
+    public void addAdditionalSaveData(net.minecraft.world.level.storage.ValueOutput valueOutput) {
+        super.addAdditionalSaveData(valueOutput);
         BlockPos blockpos = this.beaconPos;
         if (blockpos != null) {
-            compound.putInt("BeaconPosX", blockpos.getX());
-            compound.putInt("BeaconPosY", blockpos.getY());
-            compound.putInt("BeaconPosZ", blockpos.getZ());
+            valueOutput.putInt("BeaconPosX", blockpos.getX());
+            valueOutput.putInt("BeaconPosY", blockpos.getY());
+            valueOutput.putInt("BeaconPosZ", blockpos.getZ());
         }
-
     }
 
 
