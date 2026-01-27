@@ -66,15 +66,11 @@ public class EntityAnacondaPart extends LivingEntity implements IHurtableMultipa
     public EntityAnacondaPart(EntityType t, Level world) {
         super(t, world);
         multipartSize = t.getDimensions();
-        this.noPhysics = true;
-        this.setNoGravity(true);
     }
 
     public EntityAnacondaPart(EntityType t, LivingEntity parent) {
         super(t, parent.level());
         this.setParent(parent);
-        this.noPhysics = true;
-        this.setNoGravity(true);
     }
 
     @Override
@@ -97,18 +93,12 @@ public class EntityAnacondaPart extends LivingEntity implements IHurtableMultipa
     }
 
     public boolean isNoGravity() {
-        return true;
+        return false;
     }
 
     @Override
     public boolean shouldShowName() {
         return false;
-    }
-
-    @Override
-    public void travel(Vec3 travelVector) {
-        // Do nothing - parts are positioned manually by parent entity via tickMultipartPosition()
-        // Overriding this prevents LivingEntity's travel() from applying movement/gravity
     }
 
 
@@ -119,6 +109,7 @@ public class EntityAnacondaPart extends LivingEntity implements IHurtableMultipa
         prevStrangleProgess = strangleProgess;
         prevSwell = this.getSwell();
         this.setDeltaMovement(Vec3.ZERO);
+        this.setOnGround(true);
         if (this.tickCount > 1) {
             final Entity parent = getParent();
             refreshDimensions();
