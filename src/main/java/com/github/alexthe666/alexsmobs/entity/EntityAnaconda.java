@@ -77,8 +77,8 @@ public class EntityAnaconda extends Animal implements ISemiAquatic {
     private int passiveFor = 0;
     private UUID childUUID = null;
 
-    public EntityAnaconda(EntityType t, Level world) {
-        super(t, world);
+    public EntityAnaconda(EntityType<? extends EntityAnaconda> entityType, Level level) {
+        super(entityType, level);
         this.setPathfindingMalus(PathType.WATER, 0.0F);
         this.setPathfindingMalus(PathType.WATER_BORDER, 0.0F);
         switchNavigator(true);
