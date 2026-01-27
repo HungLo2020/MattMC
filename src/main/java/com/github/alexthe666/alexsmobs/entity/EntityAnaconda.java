@@ -77,7 +77,7 @@ public class EntityAnaconda extends Animal implements ISemiAquatic {
     private int passiveFor = 0;
     private UUID childUUID = null;
 
-    protected EntityAnaconda(EntityType t, Level world) {
+    public EntityAnaconda(EntityType t, Level world) {
         super(t, world);
         this.setPathfindingMalus(PathType.WATER, 0.0F);
         this.setPathfindingMalus(PathType.WATER_BORDER, 0.0F);
@@ -326,7 +326,7 @@ public class EntityAnaconda extends Animal implements ISemiAquatic {
             final int segments = 7;
             final Entity child = getChild();
             if (child == null) {
-                LivingEntity partParent = this;
+                Entity partParent = this;
                 parts = new EntityAnacondaPart[segments];
                 AnacondaPartIndex partIndex = AnacondaPartIndex.HEAD;
                 Vec3 prevPos = this.position();
@@ -334,7 +334,7 @@ public class EntityAnaconda extends Animal implements ISemiAquatic {
                     final float prevReqRot = calcPartRotation(i) + getYawForPart(i);
                     final float reqRot = calcPartRotation(i + 1) + getYawForPart(i);
                     // TODO: EntityType.ANACONDA_PART needs to be registered in vanilla EntityType
-                    EntityAnacondaPart part = new EntityAnacondaPart(this.getType(), this);
+                    EntityAnacondaPart part = new EntityAnacondaPart(this);
                     part.setParent(partParent);
                     part.copyDataFrom(this);
                     part.setBodyIndex(i);
