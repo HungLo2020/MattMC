@@ -32,4 +32,16 @@ public class AMEffectRegistry {
      * Registered in MobEffects.java
      */
     public static final Holder<MobEffect> DEBILITATING_STING = MobEffects.DEBILITATING_STING;
+    
+    /**
+     * Sunbird Blessing effect - grants slow falling and elytra boost
+     * Registered in MobEffects.java
+     */
+    public static final Holder<MobEffect> SUNBIRD_BLESSING = MobEffects.SUNBIRD_BLESSING;
+    
+    /**
+     * Sunbird Curse effect - increased gravity and no elytra
+     * Registered in MobEffects.java
+     */
+    public static final Holder<MobEffect> SUNBIRD_CURSE = MobEffects.SUNBIRD_CURSE;
 }

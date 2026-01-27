@@ -36,4 +36,10 @@ public class AMPointOfInterestRegistry {
         ResourceKey.create(Registries.POINT_OF_INTEREST_TYPE, 
             ResourceLocation.withDefaultNamespace("leafcutter_ant_hill"))
     );
+    
+    // Beacon POI - reference vanilla beacon
+    public static final DeferredHolder BEACON = new DeferredHolder(
+        ResourceKey.create(Registries.POINT_OF_INTEREST_TYPE, 
+            ResourceLocation.withDefaultNamespace("beacon"))
+    );
 }

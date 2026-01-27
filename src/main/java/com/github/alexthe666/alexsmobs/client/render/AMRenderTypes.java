@@ -70,4 +70,20 @@ public class AMRenderTypes {
     public static RenderType getEyesNoFog(ResourceLocation texture) {
         return RenderType.eyes(texture);
     }
+    
+    /**
+     * Creates an eyes render type with alpha blending enabled
+     * Used for Sunbird glow effect
+     */
+    public static RenderType getEyesAlphaEnabled(ResourceLocation texture) {
+        return RenderType.eyes(texture);
+    }
+    
+    /**
+     * Creates a render type for Sunbird shine effect
+     * Uses additive blending for bright glow
+     */
+    public static RenderType getSunbirdShine() {
+        return RenderType.endPortal();  // Use end portal render type for bright additive effect
+    }
 }

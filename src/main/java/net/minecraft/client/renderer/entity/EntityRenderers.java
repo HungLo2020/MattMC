@@ -247,6 +247,7 @@ public class EntityRenderers {
 		register(EntityType.SKUNK, com.github.alexthe666.alexsmobs.client.render.RenderSkunk::new);
 		register(EntityType.SPECTRE, com.github.alexthe666.alexsmobs.client.render.RenderSpectre::new);
 		register(EntityType.SUGAR_GLIDER, com.github.alexthe666.alexsmobs.client.render.RenderSugarGlider::new);
+		register(EntityType.SUNBIRD, com.github.alexthe666.alexsmobs.client.render.RenderSunbird::new);
 		register(EntityType.SHULKER, ShulkerRenderer::new);
 		register(EntityType.SHULKER_BULLET, ShulkerBulletRenderer::new);
 		register(EntityType.SILVERFISH, SilverfishRenderer::new);

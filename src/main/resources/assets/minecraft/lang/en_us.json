@@ -8153,5 +8153,11 @@
   "item.minecraft.platypus_egg": "Platypus Egg",
   "block.minecraft.platypus_egg": "Platypus Egg",
   "subtitles.entity.platypus.idle": "Platypus chittering",
-  "subtitles.entity.platypus.hurt": "Platypus hurts"
+  "subtitles.entity.platypus.hurt": "Platypus hurts",
+  "entity.minecraft.sunbird": "Sunbird",
+  "item.minecraft.sunbird_spawn_egg": "Sunbird Spawn Egg",
+  "effect.minecraft.sunbird_blessing": "Sunbird's Blessing",
+  "effect.minecraft.sunbird_curse": "Sunbird's Curse",
+  "subtitles.entity.sunbird.ambient": "Sunbird chirps",
+  "subtitles.entity.sunbird.hurt": "Sunbird hurts"
 }
