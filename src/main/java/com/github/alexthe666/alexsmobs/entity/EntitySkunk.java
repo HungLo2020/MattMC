@@ -58,7 +58,11 @@ public class EntitySkunk extends Animal {
     }
 
     public static AttributeSupplier.Builder bakeAttributes() {
-        return Monster.createMonsterAttributes().add(Attributes.MAX_HEALTH, 8.0D).add(Attributes.ATTACK_DAMAGE, 1.0D).add(Attributes.MOVEMENT_SPEED, 0.25F);
+        return Animal.createAnimalAttributes()
+            .add(Attributes.MAX_HEALTH, 8.0D)
+            .add(Attributes.ATTACK_DAMAGE, 1.0D)
+            .add(Attributes.MOVEMENT_SPEED, 0.25F)
+            .add(Attributes.TEMPT_RANGE);
     }
 
     @Override
