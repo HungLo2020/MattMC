@@ -83,6 +83,10 @@ public class AMSoundRegistry {
     public static final DeferredHolder SEAGULL_IDLE = new DeferredHolder(() -> net.minecraft.sounds.SoundEvents.SEAGULL_IDLE);
     public static final DeferredHolder SEAGULL_HURT = new DeferredHolder(() -> net.minecraft.sounds.SoundEvents.SEAGULL_HURT);
     
+    // Sunbird sounds - reference vanilla SoundEvents
+    public static final DeferredHolder SUNBIRD_IDLE = new DeferredHolder(() -> net.minecraft.sounds.SoundEvents.SUNBIRD_IDLE);
+    public static final DeferredHolder SUNBIRD_HURT = new DeferredHolder(() -> net.minecraft.sounds.SoundEvents.SUNBIRD_HURT);
+    
     // Orca sounds - reference vanilla SoundEvents
     public static final SoundEvent ORCA_IDLE = net.minecraft.sounds.SoundEvents.ORCA_IDLE;
     public static final SoundEvent ORCA_HURT = net.minecraft.sounds.SoundEvents.ORCA_HURT;

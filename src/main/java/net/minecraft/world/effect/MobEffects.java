@@ -128,6 +128,12 @@ public class MobEffects {
 	public static final Holder<MobEffect> DEBILITATING_STING = register(
 		"debilitating_sting", new com.github.alexthe666.alexsmobs.effect.EffectDebilitatingSting()
 	);
+	public static final Holder<MobEffect> SUNBIRD_BLESSING = register(
+		"sunbird_blessing", new com.github.alexthe666.alexsmobs.effect.EffectSunbird(false)
+	);
+	public static final Holder<MobEffect> SUNBIRD_CURSE = register(
+		"sunbird_curse", new com.github.alexthe666.alexsmobs.effect.EffectSunbird(true)
+	);
 
 	private static Holder<MobEffect> register(String string, MobEffect mobEffect) {
 		return Registry.registerForHolder(BuiltInRegistries.MOB_EFFECT, ResourceLocation.withDefaultNamespace(string), mobEffect);

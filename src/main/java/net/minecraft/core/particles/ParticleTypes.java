@@ -156,6 +156,8 @@ public class ParticleTypes {
 	public static final SimpleParticleType FIREFLY = register("firefly", false);
 	// Alex's Caves primordial particles
 	public static final SimpleParticleType FLY = register("fly", false);
+	// Alex's Mobs particles
+	public static final SimpleParticleType SUNBIRD_FEATHER = register("sunbird_feather", false);
 	
 	public static final Codec<ParticleOptions> CODEC = BuiltInRegistries.PARTICLE_TYPE
 		.byNameCodec()

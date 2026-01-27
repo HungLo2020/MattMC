@@ -1414,6 +1414,8 @@ public class SoundEvents {
 	public static final SoundEvent ANTEATER_HURT = register("entity.anteater.hurt");
 	public static final SoundEvent SEAGULL_IDLE = register("entity.seagull.idle");
 	public static final SoundEvent SEAGULL_HURT = register("entity.seagull.hurt");
+	public static final SoundEvent SUNBIRD_IDLE = register("entity.sunbird.idle");
+	public static final SoundEvent SUNBIRD_HURT = register("entity.sunbird.hurt");
 	public static final SoundEvent SKUNK_IDLE = register("entity.skunk.idle");
 	public static final SoundEvent SKUNK_HURT = register("entity.skunk.hurt");
 	public static final SoundEvent SKUNK_SPRAY = register("entity.skunk.spray");

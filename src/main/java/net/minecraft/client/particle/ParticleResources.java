@@ -175,6 +175,7 @@ public class ParticleResources implements PreparableReloadListener {
 		this.register(ParticleTypes.BLOCK_CRUMBLE, new TerrainParticle.CrumblingProvider());
 		this.register(ParticleTypes.FIREFLY, FireflyParticle.FireflyProvider::new);
 		this.register(ParticleTypes.FLY, FlyParticle.Provider::new);
+		this.register(ParticleTypes.SUNBIRD_FEATHER, com.github.alexthe666.alexsmobs.client.particle.ParticleSunbirdFeather.Factory::new);
 	}
 
 	private <T extends ParticleOptions> void register(ParticleType<T> particleType, ParticleProvider<T> particleProvider) {

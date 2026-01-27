@@ -186,6 +186,9 @@ public class AMTagRegistry {
     // Skunk-specific tags
     public static final TagKey<Item> SKUNK_BREEDABLES = registerItemTag("skunk_breedables");
     public static final TagKey<EntityType<?>> SKUNK_FEARS = registerEntityTag("skunk_fears");
+    
+    // Sunbird-specific tags
+    public static final TagKey<EntityType<?>> SUNBIRD_SCORCH_TARGETS = registerEntityTag("sunbird_scorch_targets");
 
     // Tag helper method for entity checks
     public static class TagHelper {

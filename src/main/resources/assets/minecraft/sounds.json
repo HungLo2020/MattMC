@@ -25863,5 +25863,19 @@
       "underminer_step_3"
     ],
     "subtitle": "subtitles.entity.underminer.step"
+  },
+  "entity.sunbird.idle": {
+    "sounds": [
+      "entity/sunbird/sunbird_idle_0",
+      "entity/sunbird/sunbird_idle_1"
+    ],
+    "subtitle": "subtitles.entity.sunbird.ambient"
+  },
+  "entity.sunbird.hurt": {
+    "sounds": [
+      "entity/sunbird/sunbird_hurt_0",
+      "entity/sunbird/sunbird_hurt_1"
+    ],
+    "subtitle": "subtitles.entity.sunbird.hurt"
   }
 }
