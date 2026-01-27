@@ -60,9 +60,6 @@ import java.util.UUID;
 
 public class EntityAnaconda extends Animal implements ISemiAquatic {
 
-    // Dummy field to maintain field index compatibility (was OPTIONAL_UUID in original, not available in 1.21)
-    // Using OPTIONAL_LIVING_ENTITY_REFERENCE as placeholder to match serialization behavior
-    private static final EntityDataAccessor<Optional<EntityReference<LivingEntity>>> CHILD_UUID_DUMMY = SynchedEntityData.defineId(EntityAnaconda.class, EntityDataSerializers.OPTIONAL_LIVING_ENTITY_REFERENCE);
     private static final EntityDataAccessor<Integer> CHILD_ID = SynchedEntityData.defineId(EntityAnaconda.class, EntityDataSerializers.INT);
     private static final EntityDataAccessor<Boolean> STRANGLING = SynchedEntityData.defineId(EntityAnaconda.class, EntityDataSerializers.BOOLEAN);
     private static final EntityDataAccessor<Boolean> YELLOW = SynchedEntityData.defineId(EntityAnaconda.class, EntityDataSerializers.BOOLEAN);
@@ -195,7 +192,6 @@ public class EntityAnaconda extends Animal implements ISemiAquatic {
     @Override
     protected void defineSynchedData(SynchedEntityData.Builder builder) {
         super.defineSynchedData(builder);
-        builder.define(CHILD_UUID_DUMMY, Optional.empty()); // Dummy field for compatibility (was OPTIONAL_UUID)
         builder.define(CHILD_ID, -1);
         builder.define(STRANGLING, false);
         builder.define(YELLOW, false);
