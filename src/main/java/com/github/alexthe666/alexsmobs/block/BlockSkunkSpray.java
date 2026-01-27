@@ -90,7 +90,7 @@ public class BlockSkunkSpray extends MultifaceBlock implements SimpleWaterlogged
 
     protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> definition) {
         super.createBlockStateDefinition(definition);
-        definition.add(WATERLOGGED, AGE);
+        definition.add(AGE);
     }
 
     @Override
