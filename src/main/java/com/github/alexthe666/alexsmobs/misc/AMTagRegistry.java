@@ -99,6 +99,11 @@ public class AMTagRegistry {
     public static final TagKey<Block> CAIMAN_SPAWNS = registerBlockTag("caiman_spawns");
     public static final TagKey<Block> CROCODILE_SPAWNS = registerBlockTag("crocodile_spawns");
 
+    // Anaconda-specific tags
+    public static final TagKey<Block> ANACONDA_SPAWNS = registerBlockTag("anaconda_spawns");
+    public static final TagKey<Item> ANACONDA_FOODSTUFFS = registerItemTag("anaconda_foodstuffs");
+    public static final TagKey<EntityType<?>> ANACONDA_TARGETS = registerEntityTag("anaconda_targets");
+
     // Capuchin Monkey-specific tags
     public static final TagKey<Item> CAPUCHIN_MONKEY_TAMEABLES = registerItemTag("capuchin_monkey_tameables");
     public static final TagKey<Item> CAPUCHIN_MONKEY_BREEDABLES = registerItemTag("capuchin_monkey_breedables");

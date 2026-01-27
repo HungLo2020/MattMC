@@ -1940,6 +1940,7 @@ public class CreativeModeTabs {
 					output.accept(Items.CREAKING_HEART);
 					output.accept(Items.ALLAY_SPAWN_EGG);
 					output.accept(Items.ALLIGATOR_SNAPPING_TURTLE_SPAWN_EGG);
+					output.accept(Items.ANACONDA_SPAWN_EGG);
 					output.accept(Items.ATLATITAN_SPAWN_EGG);
 					output.accept(Items.ARMADILLO_SPAWN_EGG);
 					output.accept(Items.AXOLOTL_SPAWN_EGG);

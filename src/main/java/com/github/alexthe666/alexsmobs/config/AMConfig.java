@@ -47,6 +47,9 @@ public class AMConfig {
             "minecraft:enchanted_golden_apple|minecraft:oak_sapling"
     );
     
+    // Anaconda spawn configuration
+    public static int anacondaSpawnRolls = 2;
+    
     // Anteater spawn configuration
     public static int anteaterSpawnRolls = 2;
     

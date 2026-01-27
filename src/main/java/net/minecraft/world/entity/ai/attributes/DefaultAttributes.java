@@ -107,6 +107,8 @@ public class DefaultAttributes {
 	private static final Map<EntityType<? extends LivingEntity>, AttributeSupplier> SUPPLIERS = ImmutableMap.<EntityType<? extends LivingEntity>, AttributeSupplier>builder()
 		.put(EntityType.ALLAY, Allay.createAttributes().build())
 		.put(EntityType.ALLIGATOR_SNAPPING_TURTLE, EntityAlligatorSnappingTurtle.createAttributes().build())
+		.put(EntityType.ANACONDA, com.github.alexthe666.alexsmobs.entity.EntityAnaconda.bakeAttributes().build())
+		.put(EntityType.ANACONDA_PART, com.github.alexthe666.alexsmobs.entity.EntityAnacondaPart.bakeAttributes().build())
 		.put(EntityType.ATLATITAN, com.github.alexmodguy.alexscaves.server.entity.living.AtlatitanEntity.createAttributes().build())
 		.put(EntityType.ARMADILLO, Armadillo.createAttributes().build())
 		.put(EntityType.ARMOR_STAND, ArmorStand.createAttributes().build())

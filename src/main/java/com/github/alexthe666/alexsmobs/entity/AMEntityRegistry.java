@@ -22,7 +22,9 @@ public class AMEntityRegistry {
         }
     }
     
-    // Mimic Octopus entity type - reference vanilla EntityType
+    // Entity type references
+    public static final DeferredEntityHolder ANACONDA = new DeferredEntityHolder(() -> EntityType.ANACONDA);
+    public static final DeferredEntityHolder ANACONDA_PART = new DeferredEntityHolder(() -> EntityType.ANACONDA_PART);
     public static final DeferredEntityHolder MIMIC_OCTOPUS = new DeferredEntityHolder(() -> EntityType.MIMIC_OCTOPUS);
     public static final DeferredEntityHolder MUDSKIPPER = new DeferredEntityHolder(() -> EntityType.MUDSKIPPER);
     public static final DeferredEntityHolder MUD_BALL = new DeferredEntityHolder(() -> EntityType.MUD_BALL);
