@@ -12582,17 +12582,47 @@
     ],
     "subtitle": "subtitles.entity.allay.item_thrown"
   },
+  "entity.alligator_snapping_turtle.hurt": {
+    "sounds": [
+      "alligator_snapping_turtle_hurt_1"
+    ],
+    "subtitle": "subtitles.entity.alligator_snapping_turtle.hurt"
+  },
   "entity.alligator_snapping_turtle.idle": {
     "sounds": [
       "alligator_snapping_turtle_idle_1"
     ],
     "subtitle": "subtitles.entity.alligator_snapping_turtle.idle"
   },
-  "entity.alligator_snapping_turtle.hurt": {
+  "entity.anaconda.attack": {
     "sounds": [
-      "alligator_snapping_turtle_hurt_1"
+      "anaconda_attack_0",
+      "anaconda_attack_1"
     ],
-    "subtitle": "subtitles.entity.alligator_snapping_turtle.hurt"
+    "subtitle": "subtitles.entity.anaconda.attack"
+  },
+  "entity.anaconda.hurt": {
+    "sounds": [
+      "anaconda_hurt_0",
+      "anaconda_hurt_1"
+    ],
+    "subtitle": "subtitles.entity.anaconda.hurt"
+  },
+  "entity.anaconda.slither": {
+    "sounds": [
+      "anaconda_slither_0",
+      "anaconda_slither_1",
+      "anaconda_slither_2",
+      "anaconda_slither_3"
+    ],
+    "subtitle": "subtitles.entity.anaconda.slither"
+  },
+  "entity.anteater.hurt": {
+    "sounds": [
+      "anteater_hurt_0",
+      "anteater_hurt_1"
+    ],
+    "subtitle": "subtitles.entity.anteater.hurt"
   },
   "entity.armadillo.ambient": {
     "sounds": [
@@ -12929,6 +12959,13 @@
     ],
     "subtitle": "subtitles.entity.axolotl.swim"
   },
+  "entity.bald_eagle.hurt": {
+    "sounds": [
+      "bald_eagle_hurt_0",
+      "bald_eagle_hurt_1"
+    ],
+    "subtitle": "subtitles.entity.bald_eagle.hurt"
+  },
   "entity.bald_eagle.idle": {
     "sounds": [
       "bald_eagle_idle_0",
@@ -12936,13 +12973,6 @@
       "bald_eagle_idle_2"
     ],
     "subtitle": "subtitles.entity.bald_eagle.idle"
-  },
-  "entity.bald_eagle.hurt": {
-    "sounds": [
-      "bald_eagle_hurt_0",
-      "bald_eagle_hurt_1"
-    ],
-    "subtitle": "subtitles.entity.bald_eagle.hurt"
   },
   "entity.bat.ambient": {
     "sounds": [
@@ -13096,6 +13126,13 @@
     ],
     "subtitle": "subtitles.entity.bee.sting"
   },
+  "entity.bison.hurt": {
+    "sounds": [
+      "bison_hurt_0",
+      "bison_hurt_1"
+    ],
+    "subtitle": "subtitles.entity.bison.hurt"
+  },
   "entity.bison.idle": {
     "sounds": [
       "bison_idle_0",
@@ -13103,13 +13140,6 @@
       "bison_idle_2"
     ],
     "subtitle": "subtitles.entity.bison.ambient"
-  },
-  "entity.bison.hurt": {
-    "sounds": [
-      "bison_hurt_0",
-      "bison_hurt_1"
-    ],
-    "subtitle": "subtitles.entity.bison.hurt"
   },
   "entity.blaze.ambient": {
     "sounds": [
@@ -13411,6 +13441,54 @@
     ],
     "subtitle": "subtitles.entity.bunfungus.jump"
   },
+  "entity.cachalot_whale.click": {
+    "sounds": [
+      "minecraft:entity/cachalot_whale/cachalot_whale_click_0",
+      "minecraft:entity/cachalot_whale/cachalot_whale_click_1",
+      "minecraft:entity/cachalot_whale/cachalot_whale_click_2"
+    ],
+    "subtitle": "subtitles.entity.cachalot_whale.click"
+  },
+  "entity.cachalot_whale.hurt": {
+    "sounds": [
+      "minecraft:entity/cachalot_whale/cachalot_whale_hurt_0",
+      "minecraft:entity/cachalot_whale/cachalot_whale_hurt_1",
+      "minecraft:entity/cachalot_whale/cachalot_whale_hurt_2"
+    ],
+    "subtitle": "subtitles.entity.cachalot_whale.hurt"
+  },
+  "entity.cachalot_whale.idle": {
+    "sounds": [
+      "minecraft:entity/cachalot_whale/cachalot_whale_idle_0",
+      "minecraft:entity/cachalot_whale/cachalot_whale_idle_1",
+      "minecraft:entity/cachalot_whale/cachalot_whale_idle_2"
+    ],
+    "subtitle": "subtitles.entity.cachalot_whale.ambient"
+  },
+  "entity.caiman.hurt": {
+    "sounds": [
+      "caiman_hurt_0",
+      "caiman_hurt_1"
+    ],
+    "subtitle": "subtitles.entity.caiman.hurt"
+  },
+  "entity.caiman.idle": {
+    "sounds": [
+      "caiman_idle_0",
+      "caiman_idle_1",
+      "caiman_idle_2",
+      "caiman_idle_3"
+    ],
+    "subtitle": "subtitles.entity.caiman.idle"
+  },
+  "entity.caiman.splash": {
+    "sounds": [
+      "caiman_splash_0",
+      "caiman_splash_1",
+      "caiman_splash_2"
+    ],
+    "subtitle": "subtitles.entity.caiman.splash"
+  },
   "entity.camel.ambient": {
     "sounds": [
       {
@@ -13623,6 +13701,25 @@
       }
     ],
     "subtitle": "subtitles.block.generic.footsteps"
+  },
+  "entity.capuchin_monkey.hurt": {
+    "sounds": [
+      "capuchin_monkey_hurt_0",
+      "capuchin_monkey_hurt_1",
+      "capuchin_monkey_hurt_2",
+      "capuchin_monkey_hurt_3"
+    ],
+    "subtitle": "subtitles.entity.capuchin_monkey.hurt"
+  },
+  "entity.capuchin_monkey.idle": {
+    "sounds": [
+      "capuchin_monkey_idle_0",
+      "capuchin_monkey_idle_1",
+      "capuchin_monkey_idle_2",
+      "capuchin_monkey_idle_3",
+      "capuchin_monkey_idle_4"
+    ],
+    "subtitle": "subtitles.entity.capuchin_monkey.idle"
   },
   "entity.cat.ambient": {
     "sounds": [
@@ -14190,13 +14287,12 @@
     ],
     "subtitle": "subtitles.block.generic.footsteps"
   },
-  "entity.cosmic_cod.hurt": {
+  "entity.cosmaw.hurt": {
     "sounds": [
-      "minecraft:cosmic_cod_hurt_0",
-      "minecraft:cosmic_cod_hurt_1",
-      "minecraft:cosmic_cod_hurt_2"
+      "minecraft:entity/cosmaw_hurt_0",
+      "minecraft:entity/cosmaw_hurt_1"
     ],
-    "subtitle": "subtitles.entity.cosmic_cod.hurt"
+    "subtitle": "subtitles.entity.cosmaw.hurt"
   },
   "entity.cosmaw.idle": {
     "sounds": [
@@ -14206,12 +14302,13 @@
     ],
     "subtitle": "subtitles.entity.cosmaw.idle"
   },
-  "entity.cosmaw.hurt": {
+  "entity.cosmic_cod.hurt": {
     "sounds": [
-      "minecraft:entity/cosmaw_hurt_0",
-      "minecraft:entity/cosmaw_hurt_1"
+      "minecraft:cosmic_cod_hurt_0",
+      "minecraft:cosmic_cod_hurt_1",
+      "minecraft:cosmic_cod_hurt_2"
     ],
-    "subtitle": "subtitles.entity.cosmaw.hurt"
+    "subtitle": "subtitles.entity.cosmic_cod.hurt"
   },
   "entity.cow.ambient": {
     "sounds": [
@@ -14361,6 +14458,13 @@
       "random/fuse"
     ],
     "subtitle": "subtitles.entity.creeper.primed"
+  },
+  "entity.crocodile.baby": {
+    "sounds": [
+      "crocodile_baby_0",
+      "crocodile_baby_1"
+    ],
+    "subtitle": "subtitles.entity.caiman.idle"
   },
   "entity.crow.hurt": {
     "sounds": [
@@ -14695,63 +14799,6 @@
     ],
     "subtitle": "subtitles.entity.drowned.swim"
   },
-  "entity.elephant.die": {
-    "sounds": [
-      "elephant_die_0",
-      "elephant_die_1"
-    ],
-    "subtitle": "subtitles.entity.elephant.death"
-  },
-  "entity.elephant.hurt": {
-    "sounds": [
-      "elephant_hurt_0",
-      "elephant_hurt_1",
-      "elephant_hurt_2"
-    ],
-    "subtitle": "subtitles.entity.elephant.hurt"
-  },
-  "entity.elephant.idle": {
-    "sounds": [
-      "elephant_idle_0",
-      "elephant_idle_1",
-      "elephant_idle_2",
-      "elephant_idle_4"
-    ],
-    "subtitle": "subtitles.entity.elephant.ambient"
-  },
-  "entity.elephant.trumpet": {
-    "sounds": [
-      "elephant_trumpet_0",
-      "elephant_trumpet_1",
-      "elephant_trumpet_2"
-    ],
-    "subtitle": "subtitles.entity.elephant.trumpet"
-  },
-  "entity.elephant.walk": {
-    "sounds": [
-      "elephant_walk_0",
-      "elephant_walk_1",
-      "elephant_walk_2",
-      "elephant_walk_3"
-    ],
-    "subtitle": "subtitles.block.generic.footsteps"
-  },
-  "entity.emu.idle": {
-    "sounds": [
-      "emu_idle_0",
-      "emu_idle_1",
-      "emu_idle_2"
-    ],
-    "subtitle": "subtitles.entity.emu.ambient"
-  },
-  "entity.emu.hurt": {
-    "sounds": [
-      "emu_hurt_0",
-      "emu_hurt_1",
-      "emu_hurt_2"
-    ],
-    "subtitle": "subtitles.entity.emu.hurt"
-  },
   "entity.egg.throw": {
     "sounds": [
       "random/bow"
@@ -14820,6 +14867,63 @@
       "mob/guardian/land_hit4"
     ],
     "subtitle": "subtitles.entity.elder_guardian.hurt"
+  },
+  "entity.elephant.die": {
+    "sounds": [
+      "elephant_die_0",
+      "elephant_die_1"
+    ],
+    "subtitle": "subtitles.entity.elephant.death"
+  },
+  "entity.elephant.hurt": {
+    "sounds": [
+      "elephant_hurt_0",
+      "elephant_hurt_1",
+      "elephant_hurt_2"
+    ],
+    "subtitle": "subtitles.entity.elephant.hurt"
+  },
+  "entity.elephant.idle": {
+    "sounds": [
+      "elephant_idle_0",
+      "elephant_idle_1",
+      "elephant_idle_2",
+      "elephant_idle_4"
+    ],
+    "subtitle": "subtitles.entity.elephant.ambient"
+  },
+  "entity.elephant.trumpet": {
+    "sounds": [
+      "elephant_trumpet_0",
+      "elephant_trumpet_1",
+      "elephant_trumpet_2"
+    ],
+    "subtitle": "subtitles.entity.elephant.trumpet"
+  },
+  "entity.elephant.walk": {
+    "sounds": [
+      "elephant_walk_0",
+      "elephant_walk_1",
+      "elephant_walk_2",
+      "elephant_walk_3"
+    ],
+    "subtitle": "subtitles.block.generic.footsteps"
+  },
+  "entity.emu.hurt": {
+    "sounds": [
+      "emu_hurt_0",
+      "emu_hurt_1",
+      "emu_hurt_2"
+    ],
+    "subtitle": "subtitles.entity.emu.hurt"
+  },
+  "entity.emu.idle": {
+    "sounds": [
+      "emu_idle_0",
+      "emu_idle_1",
+      "emu_idle_2"
+    ],
+    "subtitle": "subtitles.entity.emu.ambient"
   },
   "entity.ender_dragon.ambient": {
     "sounds": [
@@ -14918,14 +15022,6 @@
     ],
     "subtitle": "subtitles.entity.enderiophage.hurt"
   },
-  "entity.enderiophage.walk": {
-    "sounds": [
-      "enderiophage_walk_0",
-      "enderiophage_walk_1",
-      "enderiophage_walk_2"
-    ],
-    "subtitle": "subtitles.entity.enderiophage.step"
-  },
   "entity.enderiophage.squish": {
     "sounds": [
       "enderiophage_squish_0",
@@ -14933,6 +15029,14 @@
       "enderiophage_squish_2"
     ],
     "subtitle": "subtitles.entity.enderiophage.squish"
+  },
+  "entity.enderiophage.walk": {
+    "sounds": [
+      "enderiophage_walk_0",
+      "enderiophage_walk_1",
+      "enderiophage_walk_2"
+    ],
+    "subtitle": "subtitles.entity.enderiophage.step"
   },
   "entity.enderman.ambient": {
     "sounds": [
@@ -15386,22 +15490,6 @@
     ],
     "subtitle": "subtitles.entity.fox.teleport"
   },
-  "entity.gelada_monkey.idle": {
-    "sounds": [
-      "gelada_monkey_idle_0",
-      "gelada_monkey_idle_1",
-      "gelada_monkey_idle_2"
-    ],
-    "subtitle": "subtitles.entity.gelada_monkey.ambient"
-  },
-  "entity.gelada_monkey.hurt": {
-    "sounds": [
-      "gelada_monkey_hurt_0",
-      "gelada_monkey_hurt_1",
-      "gelada_monkey_hurt_2"
-    ],
-    "subtitle": "subtitles.entity.gelada_monkey.hurt"
-  },
   "entity.frog.ambient": {
     "sounds": [
       {
@@ -15588,6 +15676,29 @@
       }
     ]
   },
+  "entity.gazelle.hurt": {
+    "sounds": [
+      "gazelle_hurt_0",
+      "gazelle_hurt_1"
+    ],
+    "subtitle": "subtitles.entity.gazelle.hurt"
+  },
+  "entity.gelada_monkey.hurt": {
+    "sounds": [
+      "gelada_monkey_hurt_0",
+      "gelada_monkey_hurt_1",
+      "gelada_monkey_hurt_2"
+    ],
+    "subtitle": "subtitles.entity.gelada_monkey.hurt"
+  },
+  "entity.gelada_monkey.idle": {
+    "sounds": [
+      "gelada_monkey_idle_0",
+      "gelada_monkey_idle_1",
+      "gelada_monkey_idle_2"
+    ],
+    "subtitle": "subtitles.entity.gelada_monkey.ambient"
+  },
   "entity.generic.big_fall": {
     "sounds": [
       "damage/fallbig"
@@ -15666,13 +15777,6 @@
       "liquid/swim4"
     ],
     "subtitle": "subtitles.entity.generic.swim"
-  },
-  "entity.gazelle.hurt": {
-    "sounds": [
-      "gazelle_hurt_0",
-      "gazelle_hurt_1"
-    ],
-    "subtitle": "subtitles.entity.gazelle.hurt"
   },
   "entity.ghast.ambient": {
     "sounds": [
@@ -15753,6 +15857,20 @@
     ],
     "subtitle": "subtitles.entity.ghastling.spawn"
   },
+  "entity.giant_squid.games": {
+    "sounds": [
+      "giant_squid_games"
+    ],
+    "subtitle": "subtitles.entity.giant_squid.games"
+  },
+  "entity.giant_squid.hurt": {
+    "sounds": [
+      "giant_squid_hurt_0",
+      "giant_squid_hurt_1",
+      "giant_squid_hurt_2"
+    ],
+    "subtitle": "subtitles.entity.giant_squid.hurt"
+  },
   "entity.glow_item_frame.add_item": {
     "sounds": [
       "entity/itemframe/add_item1",
@@ -15831,20 +15949,6 @@
       "mob/glow_squid/squirt3"
     ],
     "subtitle": "subtitles.entity.glow_squid.squirt"
-  },
-  "entity.giant_squid.hurt": {
-    "sounds": [
-      "giant_squid_hurt_0",
-      "giant_squid_hurt_1",
-      "giant_squid_hurt_2"
-    ],
-    "subtitle": "subtitles.entity.giant_squid.hurt"
-  },
-  "entity.giant_squid.games": {
-    "sounds": [
-      "giant_squid_games"
-    ],
-    "subtitle": "subtitles.entity.giant_squid.games"
   },
   "entity.goat.ambient": {
     "sounds": [
@@ -16228,6 +16332,14 @@
     ],
     "subtitle": "subtitles.block.generic.footsteps"
   },
+  "entity.gorilla.hurt": {
+    "sounds": [
+      "gorilla_hurt_0",
+      "gorilla_hurt_1",
+      "gorilla_hurt_2"
+    ],
+    "subtitle": "subtitles.entity.gorilla.hurt"
+  },
   "entity.gorilla.idle": {
     "sounds": [
       "gorilla_idle_0",
@@ -16237,22 +16349,12 @@
     ],
     "subtitle": "subtitles.entity.gorilla.ambient"
   },
-  "entity.gorilla.hurt": {
+  "entity.grizzly_bear.die": {
     "sounds": [
-      "gorilla_hurt_0",
-      "gorilla_hurt_1",
-      "gorilla_hurt_2"
+      "grizzly_bear_die_0",
+      "grizzly_bear_die_1"
     ],
-    "subtitle": "subtitles.entity.gorilla.hurt"
-  },
-  "entity.grizzly_bear.idle": {
-    "sounds": [
-      "grizzly_bear_idle_0",
-      "grizzly_bear_idle_1",
-      "grizzly_bear_idle_2",
-      "grizzly_bear_idle_3"
-    ],
-    "subtitle": "subtitles.entity.grizzly_bear.ambient"
+    "subtitle": "subtitles.entity.grizzly_bear.death"
   },
   "entity.grizzly_bear.hurt": {
     "sounds": [
@@ -16262,12 +16364,14 @@
     ],
     "subtitle": "subtitles.entity.grizzly_bear.hurt"
   },
-  "entity.grizzly_bear.die": {
+  "entity.grizzly_bear.idle": {
     "sounds": [
-      "grizzly_bear_die_0",
-      "grizzly_bear_die_1"
+      "grizzly_bear_idle_0",
+      "grizzly_bear_idle_1",
+      "grizzly_bear_idle_2",
+      "grizzly_bear_idle_3"
     ],
-    "subtitle": "subtitles.entity.grizzly_bear.death"
+    "subtitle": "subtitles.entity.grizzly_bear.ambient"
   },
   "entity.grottoceratops.attack": {
     "sounds": [
@@ -16636,42 +16740,6 @@
     ],
     "subtitle": "subtitles.block.generic.footsteps"
   },
-  "entity.hummingbird.idle": {
-    "sounds": [
-      "hummingbird_idle_0",
-      "hummingbird_idle_1",
-      "hummingbird_idle_2"
-    ],
-    "subtitle": "subtitles.entity.hummingbird.idle"
-  },
-  "entity.hummingbird.hurt": {
-    "sounds": [
-      "hummingbird_hurt_0",
-      "hummingbird_hurt_1"
-    ],
-    "subtitle": "subtitles.entity.hummingbird.hurt"
-  },
-  "entity.hummingbird.loop": {
-    "sounds": [
-      "hummingbird_loop_0"
-    ],
-    "subtitle": "subtitles.entity.hummingbird.loop"
-  },
-  "entity.jerboa.idle": {
-    "sounds": [
-      "jerboa_idle_0",
-      "jerboa_idle_1",
-      "jerboa_idle_2"
-    ],
-    "subtitle": "subtitles.entity.jerboa.idle"
-  },
-  "entity.jerboa.hurt": {
-    "sounds": [
-      "jerboa_hurt_0",
-      "jerboa_hurt_1"
-    ],
-    "subtitle": "subtitles.entity.jerboa.hurt"
-  },
   "entity.horse.ambient": {
     "sounds": [
       "mob/horse/idle1",
@@ -16823,6 +16891,27 @@
       "liquid/swim4"
     ],
     "subtitle": "subtitles.entity.generic.swim"
+  },
+  "entity.hummingbird.hurt": {
+    "sounds": [
+      "hummingbird_hurt_0",
+      "hummingbird_hurt_1"
+    ],
+    "subtitle": "subtitles.entity.hummingbird.hurt"
+  },
+  "entity.hummingbird.idle": {
+    "sounds": [
+      "hummingbird_idle_0",
+      "hummingbird_idle_1",
+      "hummingbird_idle_2"
+    ],
+    "subtitle": "subtitles.entity.hummingbird.idle"
+  },
+  "entity.hummingbird.loop": {
+    "sounds": [
+      "hummingbird_loop_0"
+    ],
+    "subtitle": "subtitles.entity.hummingbird.loop"
   },
   "entity.husk.ambient": {
     "sounds": [
@@ -16990,31 +17079,6 @@
     ],
     "subtitle": "subtitles.entity.item.pickup"
   },
-  "entity.kangaroo.idle_0": {
-    "sounds": [
-      "kangaroo_idle_0"
-    ]
-  },
-  "entity.kangaroo.idle_1": {
-    "sounds": [
-      "kangaroo_idle_1"
-    ]
-  },
-  "entity.kangaroo.idle_2": {
-    "sounds": [
-      "kangaroo_idle_2"
-    ]
-  },
-  "entity.kangaroo.hurt_0": {
-    "sounds": [
-      "kangaroo_hurt_0"
-    ]
-  },
-  "entity.kangaroo.hurt_1": {
-    "sounds": [
-      "kangaroo_hurt_1"
-    ]
-  },
   "entity.item_frame.add_item": {
     "sounds": [
       "entity/itemframe/add_item1",
@@ -17058,6 +17122,74 @@
       "entity/itemframe/rotate_item4"
     ],
     "subtitle": "subtitles.entity.item_frame.rotate_item"
+  },
+  "entity.jerboa.hurt": {
+    "sounds": [
+      "jerboa_hurt_0",
+      "jerboa_hurt_1"
+    ],
+    "subtitle": "subtitles.entity.jerboa.hurt"
+  },
+  "entity.jerboa.idle": {
+    "sounds": [
+      "jerboa_idle_0",
+      "jerboa_idle_1",
+      "jerboa_idle_2"
+    ],
+    "subtitle": "subtitles.entity.jerboa.idle"
+  },
+  "entity.kangaroo.hurt_0": {
+    "sounds": [
+      "kangaroo_hurt_0"
+    ]
+  },
+  "entity.kangaroo.hurt_1": {
+    "sounds": [
+      "kangaroo_hurt_1"
+    ]
+  },
+  "entity.kangaroo.idle_0": {
+    "sounds": [
+      "kangaroo_idle_0"
+    ]
+  },
+  "entity.kangaroo.idle_1": {
+    "sounds": [
+      "kangaroo_idle_1"
+    ]
+  },
+  "entity.kangaroo.idle_2": {
+    "sounds": [
+      "kangaroo_idle_2"
+    ]
+  },
+  "entity.leafcutter_ant.hurt": {
+    "sounds": [
+      "leafcutter_ant_hurt_0",
+      "leafcutter_ant_hurt_1"
+    ],
+    "subtitle": "subtitles.entity.leafcutter_ant.hurt"
+  },
+  "entity.leafcutter_ant.idle": {
+    "sounds": [
+      "leafcutter_ant_hurt_0",
+      "leafcutter_ant_hurt_1"
+    ],
+    "subtitle": "subtitles.entity.leafcutter_ant.idle"
+  },
+  "entity.leafcutter_ant_queen.hurt": {
+    "sounds": [
+      "leafcutter_ant_queen_hurt_0",
+      "leafcutter_ant_queen_hurt_1"
+    ],
+    "subtitle": "subtitles.entity.leafcutter_ant_queen.hurt"
+  },
+  "entity.leafcutter_ant_queen.idle": {
+    "sounds": [
+      "leafcutter_ant_queen_hurt_0",
+      "leafcutter_ant_queen_hurt_1"
+    ],
+    "subtitle": "subtitles.entity.leafcutter_ant_queen.idle"
   },
   "entity.lightning_bolt.impact": {
     "sounds": [
@@ -17150,18 +17282,18 @@
     ],
     "subtitle": "subtitles.entity.llama.swag"
   },
+  "entity.lobster.attack": {
+    "sounds": [
+      "lobster_attack"
+    ],
+    "subtitle": "subtitles.entity.lobster.attack"
+  },
   "entity.lobster.hurt": {
     "sounds": [
       "lobster_hurt_0",
       "lobster_hurt_1"
     ],
     "subtitle": "subtitles.entity.lobster.hurt"
-  },
-  "entity.lobster.attack": {
-    "sounds": [
-      "lobster_attack"
-    ],
-    "subtitle": "subtitles.entity.lobster.attack"
   },
   "entity.magma_cube.death": {
     "sounds": [
@@ -17229,13 +17361,20 @@
     ],
     "subtitle": "subtitles.entity.magma_cube.squish"
   },
-  "entity.mimic_octopus.idle": {
+  "entity.mantis_shrimp.hurt": {
     "sounds": [
-      "mimic_octopus_idle_0",
-      "mimic_octopus_idle_1",
-      "mimic_octopus_idle_2"
+      "mantis_shrimp_hurt_0",
+      "mantis_shrimp_hurt_1"
     ],
-    "subtitle": "subtitles.entity.mimic_octopus.idle"
+    "subtitle": "subtitles.entity.mantis_shrimp.hurt"
+  },
+  "entity.mantis_shrimp.snap": {
+    "sounds": [
+      "mantis_shrimp_snap_0",
+      "mantis_shrimp_snap_1",
+      "mantis_shrimp_snap_2"
+    ],
+    "subtitle": "subtitles.entity.mantis_shrimp.snap"
   },
   "entity.mimic_octopus.hurt": {
     "sounds": [
@@ -17243,6 +17382,14 @@
       "mimic_octopus_hurt_1"
     ],
     "subtitle": "subtitles.entity.mimic_octopus.hurt"
+  },
+  "entity.mimic_octopus.idle": {
+    "sounds": [
+      "mimic_octopus_idle_0",
+      "mimic_octopus_idle_1",
+      "mimic_octopus_idle_2"
+    ],
+    "subtitle": "subtitles.entity.mimic_octopus.idle"
   },
   "entity.minecart.inside": {
     "sounds": [
@@ -17261,6 +17408,29 @@
       "minecart/base"
     ],
     "subtitle": "subtitles.entity.minecart.riding"
+  },
+  "entity.moose.hurt": {
+    "sounds": [
+      "moose_hurt_0",
+      "moose_hurt_1"
+    ],
+    "subtitle": "subtitles.entity.moose.hurt"
+  },
+  "entity.moose.idle": {
+    "sounds": [
+      "moose_idle_0",
+      "moose_idle_1",
+      "moose_idle_2"
+    ],
+    "subtitle": "subtitles.entity.moose.ambient"
+  },
+  "entity.moose.jostle": {
+    "sounds": [
+      "moose_jostle_0",
+      "moose_jostle_1",
+      "moose_jostle_2"
+    ],
+    "subtitle": "subtitles.entity.moose.jostle"
   },
   "entity.mooshroom.convert": {
     "sounds": [
@@ -17354,39 +17524,6 @@
     ],
     "subtitle": "subtitles.item.shears.shear"
   },
-  "entity.mungus.hurt": {
-    "sounds": [
-      "mungus_hurt_0",
-      "mungus_hurt_1"
-    ],
-    "subtitle": "subtitles.entity.mungus.hurt"
-  },
-  "entity.mungus.idle": {
-    "sounds": [
-      "mungus_idle_0",
-      "mungus_idle_1",
-      "mungus_idle_2"
-    ],
-    "subtitle": "subtitles.entity.mungus.idle"
-  },
-  "entity.mungus.laser_end": {
-    "sounds": [
-      "mungus_laser_end"
-    ],
-    "subtitle": "subtitles.entity.mungus.laser_end"
-  },
-  "entity.mungus.laser_grow": {
-    "sounds": [
-      "mungus_laser_grow"
-    ],
-    "subtitle": "subtitles.entity.mungus.laser_grow"
-  },
-  "entity.mungus.laser_loop": {
-    "sounds": [
-      "mungus_laser_loop"
-    ],
-    "subtitle": "subtitles.entity.mungus.laser_loop"
-  },
   "entity.mooshroom.suspicious_milk": {
     "sounds": [
       "mob/mooshroom/milk1",
@@ -17419,28 +17556,29 @@
     ],
     "subtitle": "subtitles.entity.mooshroom.suspicious_milk"
   },
-  "entity.moose.idle": {
+  "entity.mudskipper.hurt": {
     "sounds": [
-      "moose_idle_0",
-      "moose_idle_1",
-      "moose_idle_2"
+      "mudskipper_hurt_0",
+      "mudskipper_hurt_1",
+      "mudskipper_hurt_2"
     ],
-    "subtitle": "subtitles.entity.moose.ambient"
+    "subtitle": "subtitles.entity.mudskipper.hurt"
   },
-  "entity.moose.hurt": {
+  "entity.mudskipper.spit": {
     "sounds": [
-      "moose_hurt_0",
-      "moose_hurt_1"
+      "mudskipper_spit_0",
+      "mudskipper_spit_1"
     ],
-    "subtitle": "subtitles.entity.moose.hurt"
+    "subtitle": "subtitles.entity.mudskipper.spit"
   },
-  "entity.moose.jostle": {
+  "entity.mudskipper.walk": {
     "sounds": [
-      "moose_jostle_0",
-      "moose_jostle_1",
-      "moose_jostle_2"
+      "mudskipper_walk_0",
+      "mudskipper_walk_1",
+      "mudskipper_walk_2",
+      "mudskipper_walk_3"
     ],
-    "subtitle": "subtitles.entity.moose.jostle"
+    "subtitle": "subtitles.entity.mudskipper.walk"
   },
   "entity.mule.ambient": {
     "sounds": [
@@ -17493,29 +17631,38 @@
     ],
     "subtitle": "subtitles.entity.mule.jump"
   },
-  "entity.mudskipper.hurt": {
+  "entity.mungus.hurt": {
     "sounds": [
-      "mudskipper_hurt_0",
-      "mudskipper_hurt_1",
-      "mudskipper_hurt_2"
+      "mungus_hurt_0",
+      "mungus_hurt_1"
     ],
-    "subtitle": "subtitles.entity.mudskipper.hurt"
+    "subtitle": "subtitles.entity.mungus.hurt"
   },
-  "entity.mudskipper.walk": {
+  "entity.mungus.idle": {
     "sounds": [
-      "mudskipper_walk_0",
-      "mudskipper_walk_1",
-      "mudskipper_walk_2",
-      "mudskipper_walk_3"
+      "mungus_idle_0",
+      "mungus_idle_1",
+      "mungus_idle_2"
     ],
-    "subtitle": "subtitles.entity.mudskipper.walk"
+    "subtitle": "subtitles.entity.mungus.idle"
   },
-  "entity.mudskipper.spit": {
+  "entity.mungus.laser_end": {
     "sounds": [
-      "mudskipper_spit_0",
-      "mudskipper_spit_1"
+      "mungus_laser_end"
     ],
-    "subtitle": "subtitles.entity.mudskipper.spit"
+    "subtitle": "subtitles.entity.mungus.laser_end"
+  },
+  "entity.mungus.laser_grow": {
+    "sounds": [
+      "mungus_laser_grow"
+    ],
+    "subtitle": "subtitles.entity.mungus.laser_grow"
+  },
+  "entity.mungus.laser_loop": {
+    "sounds": [
+      "mungus_laser_loop"
+    ],
+    "subtitle": "subtitles.entity.mungus.laser_loop"
   },
   "entity.ocelot.ambient": {
     "sounds": [
@@ -18778,6 +18925,13 @@
     ],
     "subtitle": "subtitles.entity.pillager.hurt"
   },
+  "entity.platypus.hurt": {
+    "sounds": [
+      "platypus_hurt_0",
+      "platypus_hurt_1"
+    ],
+    "subtitle": "subtitles.entity.platypus.hurt"
+  },
   "entity.platypus.idle": {
     "sounds": [
       "platypus_idle_0",
@@ -18785,13 +18939,6 @@
       "platypus_idle_2"
     ],
     "subtitle": "subtitles.entity.platypus.idle"
-  },
-  "entity.platypus.hurt": {
-    "sounds": [
-      "platypus_hurt_0",
-      "platypus_hurt_1"
-    ],
-    "subtitle": "subtitles.entity.platypus.hurt"
   },
   "entity.player.attack.crit": {
     "sounds": [
@@ -19276,6 +19423,30 @@
     ],
     "subtitle": "subtitles.entity.rabbit.jump"
   },
+  "entity.raccoon.hurt": {
+    "sounds": [
+      "entity/raccoon/raccoon_hurt_0",
+      "entity/raccoon/raccoon_hurt_1"
+    ],
+    "subtitle": "subtitles.entity.raccoon.hurt"
+  },
+  "entity.raccoon.idle": {
+    "sounds": [
+      "entity/raccoon/raccoon_idle_0",
+      "entity/raccoon/raccoon_idle_1",
+      "entity/raccoon/raccoon_idle_2"
+    ],
+    "subtitle": "subtitles.entity.raccoon.idle"
+  },
+  "entity.rain_frog.hurt": {
+    "sounds": [
+      "rain_frog_hurt_0",
+      "rain_frog_hurt_1",
+      "rain_frog_hurt_2",
+      "rain_frog_hurt_3"
+    ],
+    "subtitle": "subtitles.entity.rain_frog.hurt"
+  },
   "entity.rain_frog.idle": {
     "sounds": [
       "rain_frog_idle_0",
@@ -19287,14 +19458,11 @@
     ],
     "subtitle": "subtitles.entity.rain_frog.idle"
   },
-  "entity.rain_frog.hurt": {
+  "entity.rattlesnake.attack": {
     "sounds": [
-      "rain_frog_hurt_0",
-      "rain_frog_hurt_1",
-      "rain_frog_hurt_2",
-      "rain_frog_hurt_3"
+      "rattlesnake_attack"
     ],
-    "subtitle": "subtitles.entity.rain_frog.hurt"
+    "subtitle": "subtitles.entity.rattlesnake.attack"
   },
   "entity.rattlesnake.hurt": {
     "sounds": [
@@ -19308,63 +19476,6 @@
       "rattlesnake_loop"
     ],
     "subtitle": "subtitles.entity.rattlesnake.loop"
-  },
-  "entity.rattlesnake.attack": {
-    "sounds": [
-      "rattlesnake_attack"
-    ],
-    "subtitle": "subtitles.entity.rattlesnake.attack"
-  },
-  "entity.rhinoceros.idle": {
-    "sounds": [
-      "rhinoceros_idle_0",
-      "rhinoceros_idle_1",
-      "rhinoceros_idle_2"
-    ],
-    "subtitle": "subtitles.entity.rhinoceros.idle"
-  },
-  "entity.rhinoceros.hurt": {
-    "sounds": [
-      "rhinoceros_hurt_0",
-      "rhinoceros_hurt_1"
-    ],
-    "subtitle": "subtitles.entity.rhinoceros.hurt"
-  },
-  "entity.roadrunner.idle": {
-    "sounds": [
-      "roadrunner_idle_0",
-      "roadrunner_idle_1",
-      "roadrunner_idle_2"
-    ],
-    "subtitle": "subtitles.entity.roadrunner.idle"
-  },
-  "entity.roadrunner.hurt": {
-    "sounds": [
-      "roadrunner_hurt_0",
-      "roadrunner_hurt_1"
-    ],
-    "subtitle": "subtitles.entity.roadrunner.hurt"
-  },
-  "entity.roadrunner.meep": {
-    "sounds": [
-      "roadrunner_meep"
-    ],
-    "subtitle": "subtitles.entity.roadrunner.meep"
-  },
-  "entity.raccoon.idle": {
-    "sounds": [
-      "entity/raccoon/raccoon_idle_0",
-      "entity/raccoon/raccoon_idle_1",
-      "entity/raccoon/raccoon_idle_2"
-    ],
-    "subtitle": "subtitles.entity.raccoon.idle"
-  },
-  "entity.raccoon.hurt": {
-    "sounds": [
-      "entity/raccoon/raccoon_hurt_0",
-      "entity/raccoon/raccoon_hurt_1"
-    ],
-    "subtitle": "subtitles.entity.raccoon.hurt"
   },
   "entity.ravager.ambient": {
     "sounds": [
@@ -19499,6 +19610,42 @@
     ],
     "subtitle": "subtitles.entity.relicheirus.topple"
   },
+  "entity.rhinoceros.hurt": {
+    "sounds": [
+      "rhinoceros_hurt_0",
+      "rhinoceros_hurt_1"
+    ],
+    "subtitle": "subtitles.entity.rhinoceros.hurt"
+  },
+  "entity.rhinoceros.idle": {
+    "sounds": [
+      "rhinoceros_idle_0",
+      "rhinoceros_idle_1",
+      "rhinoceros_idle_2"
+    ],
+    "subtitle": "subtitles.entity.rhinoceros.idle"
+  },
+  "entity.roadrunner.hurt": {
+    "sounds": [
+      "roadrunner_hurt_0",
+      "roadrunner_hurt_1"
+    ],
+    "subtitle": "subtitles.entity.roadrunner.hurt"
+  },
+  "entity.roadrunner.idle": {
+    "sounds": [
+      "roadrunner_idle_0",
+      "roadrunner_idle_1",
+      "roadrunner_idle_2"
+    ],
+    "subtitle": "subtitles.entity.roadrunner.idle"
+  },
+  "entity.roadrunner.meep": {
+    "sounds": [
+      "roadrunner_meep"
+    ],
+    "subtitle": "subtitles.entity.roadrunner.meep"
+  },
   "entity.salmon.ambient": {
     "sounds": []
   },
@@ -19586,71 +19733,6 @@
     ],
     "subtitle": "subtitles.entity.seagull.ambient"
   },
-  "entity.shoebill.hurt": {
-    "sounds": [
-      "shoebill_hurt_0",
-      "shoebill_hurt_1",
-      "shoebill_hurt_2"
-    ],
-    "subtitle": "subtitles.entity.shoebill.hurt"
-  },
-  "entity.skunk.idle": {
-    "sounds": [
-      "skunk_idle_0",
-      "skunk_idle_1",
-      "skunk_idle_2"
-    ],
-    "subtitle": "subtitles.entity.skunk.ambient"
-  },
-  "entity.skunk.hurt": {
-    "sounds": [
-      "skunk_hurt_0",
-      "skunk_hurt_1",
-      "skunk_hurt_2"
-    ],
-    "subtitle": "subtitles.entity.skunk.hurt"
-  },
-  "entity.skunk.spray": {
-    "sounds": [
-      "skunk_spray_0",
-      "skunk_spray_1"
-    ],
-    "subtitle": "subtitles.entity.skunk.spray"
-  },
-  "entity.spectre.idle": {
-    "sounds": [
-      "spectre_idle_0",
-      "spectre_idle_1",
-      "spectre_idle_2",
-      "spectre_idle_3",
-      "spectre_idle_4"
-    ],
-    "subtitle": "subtitles.entity.spectre.idle"
-  },
-  "entity.spectre.hurt": {
-    "sounds": [
-      "spectre_hurt_0",
-      "spectre_hurt_1",
-      "spectre_hurt_2"
-    ],
-    "subtitle": "subtitles.entity.spectre.hurt"
-  },
-  "entity.sugar_glider.idle": {
-    "sounds": [
-      "sugar_glider_idle_0",
-      "sugar_glider_idle_1",
-      "sugar_glider_idle_2",
-      "sugar_glider_idle_3"
-    ],
-    "subtitle": "subtitles.entity.sugar_glider.idle"
-  },
-  "entity.sugar_glider.hurt": {
-    "sounds": [
-      "sugar_glider_hurt_0",
-      "sugar_glider_hurt_1"
-    ],
-    "subtitle": "subtitles.entity.sugar_glider.hurt"
-  },
   "entity.sheep.ambient": {
     "sounds": [
       "mob/sheep/say1",
@@ -19690,6 +19772,14 @@
       "mob/sheep/step5"
     ],
     "subtitle": "subtitles.block.generic.footsteps"
+  },
+  "entity.shoebill.hurt": {
+    "sounds": [
+      "shoebill_hurt_0",
+      "shoebill_hurt_1",
+      "shoebill_hurt_2"
+    ],
+    "subtitle": "subtitles.entity.shoebill.hurt"
   },
   "entity.shulker.ambient": {
     "sounds": [
@@ -19992,6 +20082,29 @@
     ],
     "subtitle": "subtitles.entity.skeleton_horse.swim"
   },
+  "entity.skunk.hurt": {
+    "sounds": [
+      "skunk_hurt_0",
+      "skunk_hurt_1",
+      "skunk_hurt_2"
+    ],
+    "subtitle": "subtitles.entity.skunk.hurt"
+  },
+  "entity.skunk.idle": {
+    "sounds": [
+      "skunk_idle_0",
+      "skunk_idle_1",
+      "skunk_idle_2"
+    ],
+    "subtitle": "subtitles.entity.skunk.ambient"
+  },
+  "entity.skunk.spray": {
+    "sounds": [
+      "skunk_spray_0",
+      "skunk_spray_1"
+    ],
+    "subtitle": "subtitles.entity.skunk.spray"
+  },
   "entity.slime.attack": {
     "sounds": [
       "mob/slime/attack1",
@@ -20281,6 +20394,24 @@
       "random/bow"
     ],
     "subtitle": "subtitles.entity.snowball.throw"
+  },
+  "entity.spectre.hurt": {
+    "sounds": [
+      "spectre_hurt_0",
+      "spectre_hurt_1",
+      "spectre_hurt_2"
+    ],
+    "subtitle": "subtitles.entity.spectre.hurt"
+  },
+  "entity.spectre.idle": {
+    "sounds": [
+      "spectre_idle_0",
+      "spectre_idle_1",
+      "spectre_idle_2",
+      "spectre_idle_3",
+      "spectre_idle_4"
+    ],
+    "subtitle": "subtitles.entity.spectre.idle"
   },
   "entity.spider.ambient": {
     "sounds": [
@@ -20577,6 +20708,36 @@
     ],
     "subtitle": "subtitles.entity.subterranodon.ambient"
   },
+  "entity.sugar_glider.hurt": {
+    "sounds": [
+      "sugar_glider_hurt_0",
+      "sugar_glider_hurt_1"
+    ],
+    "subtitle": "subtitles.entity.sugar_glider.hurt"
+  },
+  "entity.sugar_glider.idle": {
+    "sounds": [
+      "sugar_glider_idle_0",
+      "sugar_glider_idle_1",
+      "sugar_glider_idle_2",
+      "sugar_glider_idle_3"
+    ],
+    "subtitle": "subtitles.entity.sugar_glider.idle"
+  },
+  "entity.sunbird.hurt": {
+    "sounds": [
+      "entity/sunbird/sunbird_hurt_0",
+      "entity/sunbird/sunbird_hurt_1"
+    ],
+    "subtitle": "subtitles.entity.sunbird.hurt"
+  },
+  "entity.sunbird.idle": {
+    "sounds": [
+      "entity/sunbird/sunbird_idle_0",
+      "entity/sunbird/sunbird_idle_1"
+    ],
+    "subtitle": "subtitles.entity.sunbird.ambient"
+  },
   "entity.tadpole.death": {
     "sounds": [
       "mob/tadpole/death1",
@@ -20647,11 +20808,71 @@
     ],
     "subtitle": "subtitles.entity.tadpole.hurt"
   },
+  "entity.tarantula_hawk.hurt": {
+    "sounds": [
+      "tarantula_hawk_hurt_0",
+      "tarantula_hawk_hurt_1"
+    ],
+    "subtitle": "subtitles.entity.tarantula_hawk.hurt"
+  },
+  "entity.tarantula_hawk.wing": {
+    "sounds": [
+      "tarantula_hawk_wing_0",
+      "tarantula_hawk_wing_1",
+      "tarantula_hawk_wing_2"
+    ],
+    "subtitle": "subtitles.entity.tarantula_hawk.wing"
+  },
+  "entity.tasmanian_devil.hurt": {
+    "sounds": [
+      "tasmanian_devil_hurt_0",
+      "tasmanian_devil_hurt_1"
+    ],
+    "subtitle": "subtitles.entity.tasmanian_devil.hurt"
+  },
+  "entity.tasmanian_devil.idle": {
+    "sounds": [
+      "tasmanian_devil_idle_0",
+      "tasmanian_devil_idle_1",
+      "tasmanian_devil_idle_2"
+    ],
+    "subtitle": "subtitles.entity.tasmanian_devil.idle"
+  },
+  "entity.tasmanian_devil.roar": {
+    "sounds": [
+      "tasmanian_devil_roar_0",
+      "tasmanian_devil_roar_1"
+    ],
+    "subtitle": "subtitles.entity.tasmanian_devil.roar"
+  },
+  "entity.terrapin.hurt": {
+    "sounds": [
+      "entity/terrapin/terrapin_hurt_0",
+      "entity/terrapin/terrapin_hurt_1",
+      "entity/terrapin/terrapin_hurt_2"
+    ],
+    "subtitle": "subtitles.entity.terrapin.hurt"
+  },
   "entity.tnt.primed": {
     "sounds": [
       "random/fuse"
     ],
     "subtitle": "subtitles.entity.tnt.primed"
+  },
+  "entity.toucan.hurt": {
+    "sounds": [
+      "toucan_hurt_0",
+      "toucan_hurt_1"
+    ],
+    "subtitle": "subtitles.entity.toucan.hurt"
+  },
+  "entity.toucan.idle": {
+    "sounds": [
+      "toucan_idle_0",
+      "toucan_idle_1",
+      "toucan_idle_2"
+    ],
+    "subtitle": "subtitles.entity.toucan.idle"
   },
   "entity.tremorsaurus.bite": {
     "sounds": [
@@ -20727,58 +20948,6 @@
       "minecraft:entity/trilocaris/trilocaris_step_3"
     ],
     "subtitle": "subtitles.entity.trilocaris.step"
-  },
-  "entity.toucan.hurt": {
-    "sounds": [
-      "toucan_hurt_0",
-      "toucan_hurt_1"
-    ],
-    "subtitle": "subtitles.entity.toucan.hurt"
-  },
-  "entity.toucan.idle": {
-    "sounds": [
-      "toucan_idle_0",
-      "toucan_idle_1",
-      "toucan_idle_2"
-    ],
-    "subtitle": "subtitles.entity.toucan.idle"
-  },
-  "entity.tarantula_hawk.hurt": {
-    "sounds": [
-      "tarantula_hawk_hurt_0",
-      "tarantula_hawk_hurt_1"
-    ],
-    "subtitle": "subtitles.entity.tarantula_hawk.hurt"
-  },
-  "entity.tarantula_hawk.wing": {
-    "sounds": [
-      "tarantula_hawk_wing_0",
-      "tarantula_hawk_wing_1",
-      "tarantula_hawk_wing_2"
-    ],
-    "subtitle": "subtitles.entity.tarantula_hawk.wing"
-  },
-  "entity.tasmanian_devil.idle": {
-    "sounds": [
-      "tasmanian_devil_idle_0",
-      "tasmanian_devil_idle_1",
-      "tasmanian_devil_idle_2"
-    ],
-    "subtitle": "subtitles.entity.tasmanian_devil.idle"
-  },
-  "entity.tasmanian_devil.hurt": {
-    "sounds": [
-      "tasmanian_devil_hurt_0",
-      "tasmanian_devil_hurt_1"
-    ],
-    "subtitle": "subtitles.entity.tasmanian_devil.hurt"
-  },
-  "entity.tasmanian_devil.roar": {
-    "sounds": [
-      "tasmanian_devil_roar_0",
-      "tasmanian_devil_roar_1"
-    ],
-    "subtitle": "subtitles.entity.tasmanian_devil.roar"
   },
   "entity.tropical_fish.ambient": {
     "sounds": []
@@ -20958,6 +21127,31 @@
       }
     ],
     "subtitle": "subtitles.entity.turtle.swim"
+  },
+  "entity.underminer.hurt": {
+    "sounds": [
+      "underminer_hurt_0",
+      "underminer_hurt_1"
+    ],
+    "subtitle": "subtitles.entity.underminer.hurt"
+  },
+  "entity.underminer.idle": {
+    "sounds": [
+      "underminer_idle_0",
+      "underminer_idle_1",
+      "underminer_idle_2",
+      "underminer_idle_3"
+    ],
+    "subtitle": "subtitles.entity.underminer.idle"
+  },
+  "entity.underminer.step": {
+    "sounds": [
+      "underminer_step_0",
+      "underminer_step_1",
+      "underminer_step_2",
+      "underminer_step_3"
+    ],
+    "subtitle": "subtitles.entity.underminer.step"
   },
   "entity.vallumraptor.attack": {
     "sounds": [
@@ -25706,176 +25900,5 @@
       "ambient/weather/rain4"
     ],
     "subtitle": "subtitles.weather.rain"
-  },
-  "entity.terrapin.hurt": {
-    "sounds": [
-      "entity/terrapin/terrapin_hurt_0",
-      "entity/terrapin/terrapin_hurt_1",
-      "entity/terrapin/terrapin_hurt_2"
-    ],
-    "subtitle": "subtitles.entity.terrapin.hurt"
-  },
-  "entity.anteater.hurt": {
-    "sounds": [
-      "anteater_hurt_0",
-      "anteater_hurt_1"
-    ],
-    "subtitle": "subtitles.entity.anteater.hurt"
-  },
-  "entity.cachalot_whale.idle": {
-    "sounds": [
-      "minecraft:entity/cachalot_whale/cachalot_whale_idle_0",
-      "minecraft:entity/cachalot_whale/cachalot_whale_idle_1",
-      "minecraft:entity/cachalot_whale/cachalot_whale_idle_2"
-    ],
-    "subtitle": "subtitles.entity.cachalot_whale.ambient"
-  },
-  "entity.cachalot_whale.hurt": {
-    "sounds": [
-      "minecraft:entity/cachalot_whale/cachalot_whale_hurt_0",
-      "minecraft:entity/cachalot_whale/cachalot_whale_hurt_1",
-      "minecraft:entity/cachalot_whale/cachalot_whale_hurt_2"
-    ],
-    "subtitle": "subtitles.entity.cachalot_whale.hurt"
-  },
-  "entity.cachalot_whale.click": {
-    "sounds": [
-      "minecraft:entity/cachalot_whale/cachalot_whale_click_0",
-      "minecraft:entity/cachalot_whale/cachalot_whale_click_1",
-      "minecraft:entity/cachalot_whale/cachalot_whale_click_2"
-    ],
-    "subtitle": "subtitles.entity.cachalot_whale.click"
-  },
-  "entity.caiman.idle": {
-    "sounds": [
-      "caiman_idle_0",
-      "caiman_idle_1",
-      "caiman_idle_2",
-      "caiman_idle_3"
-    ],
-    "subtitle": "subtitles.entity.caiman.idle"
-  },
-  "entity.caiman.hurt": {
-    "sounds": [
-      "caiman_hurt_0",
-      "caiman_hurt_1"
-    ],
-    "subtitle": "subtitles.entity.caiman.hurt"
-  },
-  "entity.caiman.splash": {
-    "sounds": [
-      "caiman_splash_0",
-      "caiman_splash_1",
-      "caiman_splash_2"
-    ],
-    "subtitle": "subtitles.entity.caiman.splash"
-  },
-  "entity.crocodile.baby": {
-    "sounds": [
-      "crocodile_baby_0",
-      "crocodile_baby_1"
-    ],
-    "subtitle": "subtitles.entity.caiman.idle"
-  },
-  "entity.capuchin_monkey.idle": {
-    "sounds": [
-      "capuchin_monkey_idle_0",
-      "capuchin_monkey_idle_1",
-      "capuchin_monkey_idle_2",
-      "capuchin_monkey_idle_3",
-      "capuchin_monkey_idle_4"
-    ],
-    "subtitle": "subtitles.entity.capuchin_monkey.idle"
-  },
-  "entity.capuchin_monkey.hurt": {
-    "sounds": [
-      "capuchin_monkey_hurt_0",
-      "capuchin_monkey_hurt_1",
-      "capuchin_monkey_hurt_2",
-      "capuchin_monkey_hurt_3"
-    ],
-    "subtitle": "subtitles.entity.capuchin_monkey.hurt"
-  },
-  "entity.leafcutter_ant.hurt": {
-    "sounds": [
-      "leafcutter_ant_hurt_0",
-      "leafcutter_ant_hurt_1"
-    ],
-    "subtitle": "subtitles.entity.leafcutter_ant.hurt"
-  },
-  "entity.leafcutter_ant.idle": {
-    "sounds": [
-      "leafcutter_ant_hurt_0",
-      "leafcutter_ant_hurt_1"
-    ],
-    "subtitle": "subtitles.entity.leafcutter_ant.idle"
-  },
-  "entity.leafcutter_ant_queen.hurt": {
-    "sounds": [
-      "leafcutter_ant_queen_hurt_0",
-      "leafcutter_ant_queen_hurt_1"
-    ],
-    "subtitle": "subtitles.entity.leafcutter_ant_queen.hurt"
-  },
-  "entity.leafcutter_ant_queen.idle": {
-    "sounds": [
-      "leafcutter_ant_queen_hurt_0",
-      "leafcutter_ant_queen_hurt_1"
-    ],
-    "subtitle": "subtitles.entity.leafcutter_ant_queen.idle"
-  },
-  "entity.mantis_shrimp.hurt": {
-    "sounds": [
-      "mantis_shrimp_hurt_0",
-      "mantis_shrimp_hurt_1"
-    ],
-    "subtitle": "subtitles.entity.mantis_shrimp.hurt"
-  },
-  "entity.mantis_shrimp.snap": {
-    "sounds": [
-      "mantis_shrimp_snap_0",
-      "mantis_shrimp_snap_1",
-      "mantis_shrimp_snap_2"
-    ],
-    "subtitle": "subtitles.entity.mantis_shrimp.snap"
-  },
-  "entity.underminer.idle": {
-    "sounds": [
-      "underminer_idle_0",
-      "underminer_idle_1",
-      "underminer_idle_2",
-      "underminer_idle_3"
-    ],
-    "subtitle": "subtitles.entity.underminer.idle"
-  },
-  "entity.underminer.hurt": {
-    "sounds": [
-      "underminer_hurt_0",
-      "underminer_hurt_1"
-    ],
-    "subtitle": "subtitles.entity.underminer.hurt"
-  },
-  "entity.underminer.step": {
-    "sounds": [
-      "underminer_step_0",
-      "underminer_step_1",
-      "underminer_step_2",
-      "underminer_step_3"
-    ],
-    "subtitle": "subtitles.entity.underminer.step"
-  },
-  "entity.sunbird.idle": {
-    "sounds": [
-      "entity/sunbird/sunbird_idle_0",
-      "entity/sunbird/sunbird_idle_1"
-    ],
-    "subtitle": "subtitles.entity.sunbird.ambient"
-  },
-  "entity.sunbird.hurt": {
-    "sounds": [
-      "entity/sunbird/sunbird_hurt_0",
-      "entity/sunbird/sunbird_hurt_1"
-    ],
-    "subtitle": "subtitles.entity.sunbird.hurt"
   }
 }

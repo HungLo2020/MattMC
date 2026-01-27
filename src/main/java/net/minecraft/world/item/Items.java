@@ -1735,6 +1735,7 @@ public class Items {
 	public static final Item SHEARS = registerItem(
 		"shears", ShearsItem::new, new Item.Properties().durability(238).component(DataComponents.TOOL, ShearsItem.createToolProperties())
 	);
+	public static final Item SHED_SNAKE_SKIN = registerItem("shed_snake_skin", new Item.Properties());
 	public static final Item MELON_SLICE = registerItem("melon_slice", new Item.Properties().food(Foods.MELON_SLICE));
 	public static final Item DRIED_KELP = registerItem("dried_kelp", new Item.Properties().food(Foods.DRIED_KELP, Consumables.DRIED_KELP));
 	public static final Item PUMPKIN_SEEDS = registerItem(net.minecraft.references.Items.PUMPKIN_SEEDS, createBlockItemWithCustomItemName(Blocks.PUMPKIN_STEM));
@@ -1783,6 +1784,7 @@ public class Items {
 	public static final Item ARMADILLO_SPAWN_EGG = registerItem("armadillo_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.ARMADILLO));
 	public static final Item ALLAY_SPAWN_EGG = registerItem("allay_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.ALLAY));
 	public static final Item ALLIGATOR_SNAPPING_TURTLE_SPAWN_EGG = registerItem("alligator_snapping_turtle_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.ALLIGATOR_SNAPPING_TURTLE));
+	public static final Item ANACONDA_SPAWN_EGG = registerItem("anaconda_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.ANACONDA));
 	public static final Item AXOLOTL_SPAWN_EGG = registerItem("axolotl_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.AXOLOTL));
 	public static final Item BALD_EAGLE_SPAWN_EGG = registerItem("bald_eagle_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.BALD_EAGLE));
 	public static final Item BAT_SPAWN_EGG = registerItem("bat_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.BAT));
