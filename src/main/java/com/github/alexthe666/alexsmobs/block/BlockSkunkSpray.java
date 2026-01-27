@@ -35,7 +35,7 @@ import net.minecraft.world.phys.BlockHitResult;
 import java.util.ArrayList;
 
 public class BlockSkunkSpray extends MultifaceBlock implements SimpleWaterloggedBlock {
-    public static final MapCodec<BlockSkunkSpray> CODEC = simpleCodec(p -> new BlockSkunkSpray());
+    public static final MapCodec<BlockSkunkSpray> CODEC = simpleCodec(BlockSkunkSpray::new);
 
     @Override
     public MapCodec<BlockSkunkSpray> codec() {
@@ -45,8 +45,8 @@ public class BlockSkunkSpray extends MultifaceBlock implements SimpleWaterlogged
     public static final IntegerProperty AGE = BlockStateProperties.AGE_3;
     private static final BooleanProperty WATERLOGGED = BlockStateProperties.WATERLOGGED;
 
-    public BlockSkunkSpray() {
-        super(BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_LIGHT_GREEN).noOcclusion().randomTicks().noCollision().instabreak().sound(SoundType.FROGSPAWN));
+    public BlockSkunkSpray(BlockBehaviour.Properties properties) {
+        super(properties);
         this.registerDefaultState(this.defaultBlockState().setValue(WATERLOGGED, Boolean.valueOf(false)).setValue(AGE, 0));
     }
 

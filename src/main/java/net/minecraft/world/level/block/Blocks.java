@@ -2402,7 +2402,7 @@ public class Blocks {
 	);
 	public static final Block SKUNK_SPRAY = register(
 		"skunk_spray",
-		properties -> new com.github.alexthe666.alexsmobs.block.BlockSkunkSpray(),
+		com.github.alexthe666.alexsmobs.block.BlockSkunkSpray::new,
 		BlockBehaviour.Properties.of()
 			.mapColor(MapColor.COLOR_LIGHT_GREEN)
 			.noOcclusion()
