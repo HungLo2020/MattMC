@@ -4,8 +4,6 @@ import com.github.alexthe666.alexsmobs.config.AMConfig;
 import com.github.alexthe666.alexsmobs.entity.ai.*;
 import com.github.alexthe666.alexsmobs.entity.util.AnacondaPartIndex;
 import com.github.alexthe666.alexsmobs.entity.util.Maths;
-import com.github.alexthe666.alexsmobs.item.AMItemRegistry;
-import com.github.alexthe666.alexsmobs.misc.AMSoundRegistry;
 import com.github.alexthe666.alexsmobs.misc.AMTagRegistry;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
@@ -14,6 +12,7 @@ import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundEvent;
+import net.minecraft.sounds.SoundEvents;
 import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.Difficulty;
@@ -34,6 +33,7 @@ import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.monster.Monster;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LevelAccessor;
@@ -43,7 +43,6 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.pathfinder.PathType;
 import net.minecraft.world.level.storage.loot.BuiltInLootTables;
 import net.minecraft.world.phys.Vec3;
-import net.neoforged.neoforge.fluids.FluidType;
 
 import javax.annotation.Nullable;
 import java.util.List;
@@ -77,16 +76,16 @@ public class EntityAnaconda extends Animal implements ISemiAquatic {
     }
 
     protected SoundEvent getHurtSound(DamageSource damageSourceIn) {
-        return AMSoundRegistry.ANACONDA_HURT.get();
+        return SoundEvents.ANACONDA_HURT;
     }
 
     protected SoundEvent getDeathSound() {
-        return AMSoundRegistry.ANACONDA_HURT.get();
+        return SoundEvents.ANACONDA_HURT;
     }
 
     protected void playStepSound(BlockPos pos, BlockState state) {
         if (!isBaby()) {
-            this.playSound(AMSoundRegistry.ANACONDA_SLITHER.get(), 1.0F, 1.0F);
+            this.playSound(SoundEvents.ANACONDA_SLITHER, 1.0F, 1.0F);
         } else {
             super.playStepSound(pos, state);
         }
@@ -97,12 +96,12 @@ public class EntityAnaconda extends Animal implements ISemiAquatic {
         return Monster.createMonsterAttributes().add(Attributes.MAX_HEALTH, 40.0D).add(Attributes.MOVEMENT_SPEED, 0.15F);
     }
 
-    public static boolean canAnacondaSpawn(EntityType type, LevelAccessor worldIn, MobSpawnType reason, BlockPos pos, RandomSource randomIn) {
+    public static boolean canAnacondaSpawn(EntityType type, LevelAccessor worldIn, EntitySpawnReason reason, BlockPos pos, RandomSource randomIn) {
         final boolean spawnBlock = worldIn.getBlockState(pos.below()).is(AMTagRegistry.ANACONDA_SPAWNS);
         return spawnBlock && pos.getY() < worldIn.getSeaLevel() + 4;
     }
 
-    public boolean checkSpawnRules(LevelAccessor worldIn, MobSpawnType spawnReasonIn) {
+    public boolean checkSpawnRules(LevelAccessor worldIn, EntitySpawnReason spawnReasonIn) {
         return AMEntityRegistry.rollSpawn(AMConfig.anacondaSpawnRolls, this.getRandom(), spawnReasonIn);
     }
 
@@ -241,11 +240,6 @@ public class EntityAnaconda extends Animal implements ISemiAquatic {
         return null;
     }
 
-    @Override
-    public boolean canDrownInFluidType(FluidType type) {
-        return false; // Anaconda can breathe underwater
-    }
-
     public boolean isPushedByFluid() {
         return false;
     }
@@ -332,7 +326,7 @@ public class EntityAnaconda extends Animal implements ISemiAquatic {
                 for (int i = 0; i < segments; i++) {
                     final float prevReqRot = calcPartRotation(i) + getYawForPart(i);
                     final float reqRot = calcPartRotation(i + 1) + getYawForPart(i);
-                    EntityAnacondaPart part = new EntityAnacondaPart(AMEntityRegistry.ANACONDA_PART.get(), this);
+                    EntityAnacondaPart part = new EntityAnacondaPart(EntityType.ANACONDA_PART, this);
                     part.setParent(partParent);
                     part.copyDataFrom(this);
                     part.setBodyIndex(i);
@@ -388,7 +382,7 @@ public class EntityAnaconda extends Animal implements ISemiAquatic {
         if (this.getSheddingTime() > 0) {
             this.setSheddingTime(this.getSheddingTime() - 1);
             if (this.getSheddingTime() == 0) {
-                this.spawnItemAtOffset(new ItemStack(AMItemRegistry.SHED_SNAKE_SKIN.get()), 1 + random.nextFloat(), 0.2F);
+                this.spawnItemAtOffset(new ItemStack(Items.SHED_SNAKE_SKIN), 1 + random.nextFloat(), 0.2F);
                 shedCooldown = 1000 + random.nextInt(2000);
             }
         }
@@ -517,7 +511,7 @@ public class EntityAnaconda extends Animal implements ISemiAquatic {
     @Nullable
     @Override
     public AgeableMob getBreedOffspring(ServerLevel serverWorld, AgeableMob mob) {
-        EntityAnaconda anaconda = AMEntityRegistry.ANACONDA.get().create(serverWorld);
+        EntityAnaconda anaconda = EntityType.ANACONDA.create(serverWorld);
         anaconda.setYellow(this.isYellow());
         return anaconda;
     }
@@ -564,7 +558,7 @@ public class EntityAnaconda extends Animal implements ISemiAquatic {
     }
 
     @Nullable
-    public SpawnGroupData finalizeSpawn(ServerLevelAccessor worldIn, DifficultyInstance difficultyIn, MobSpawnType reason, @Nullable SpawnGroupData spawnDataIn) {
+    public SpawnGroupData finalizeSpawn(ServerLevelAccessor worldIn, DifficultyInstance difficultyIn, EntitySpawnReason reason, @Nullable SpawnGroupData spawnDataIn) {
         this.setYellow(random.nextBoolean());
         return super.finalizeSpawn(worldIn, difficultyIn, reason, spawnDataIn);
     }
@@ -591,7 +585,7 @@ public class EntityAnaconda extends Animal implements ISemiAquatic {
                 if (jumpAttemptCooldown == 0 && snake.distanceTo(target) < 1 + target.getBbWidth() && !snake.isStrangling()) {
                     target.hurt(snake.damageSources().mobAttack(snake), 4);
                     snake.setStrangling(target.getBbWidth() <= 2.0F && !(target instanceof EntityAnaconda));
-                    snake.playSound(AMSoundRegistry.ANACONDA_ATTACK.get(), snake.getSoundVolume(), snake.getVoicePitch());
+                    snake.playSound(SoundEvents.ANACONDA_ATTACK, snake.getSoundVolume(), snake.getVoicePitch());
                     jumpAttemptCooldown = 5 + random.nextInt(5);
                 }
                 if (snake.isStrangling()) {
