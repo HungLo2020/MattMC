@@ -60,6 +60,12 @@ import java.util.UUID;
 
 public class EntityAnaconda extends Animal implements ISemiAquatic {
 
+    // Deprecated dummy field for backward compatibility with old world saves (do not use)
+    // This field existed in earlier versions (commits 995f4791, 0507c489) and must remain to prevent
+    // "Invalid entity data item type" errors when loading worlds with existing anaconda entities
+    @Deprecated
+    private static final EntityDataAccessor<Integer> LEGACY_CHILD_UUID_DUMMY = SynchedEntityData.defineId(EntityAnaconda.class, EntityDataSerializers.INT);
+    
     private static final EntityDataAccessor<Integer> CHILD_ID = SynchedEntityData.defineId(EntityAnaconda.class, EntityDataSerializers.INT);
     private static final EntityDataAccessor<Boolean> STRANGLING = SynchedEntityData.defineId(EntityAnaconda.class, EntityDataSerializers.BOOLEAN);
     private static final EntityDataAccessor<Boolean> YELLOW = SynchedEntityData.defineId(EntityAnaconda.class, EntityDataSerializers.BOOLEAN);
@@ -192,6 +198,7 @@ public class EntityAnaconda extends Animal implements ISemiAquatic {
     @Override
     protected void defineSynchedData(SynchedEntityData.Builder builder) {
         super.defineSynchedData(builder);
+        builder.define(LEGACY_CHILD_UUID_DUMMY, -1); // Deprecated legacy field for backward compatibility
         builder.define(CHILD_ID, -1);
         builder.define(STRANGLING, false);
         builder.define(YELLOW, false);
