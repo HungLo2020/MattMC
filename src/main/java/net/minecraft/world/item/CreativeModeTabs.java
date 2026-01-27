@@ -1604,6 +1604,7 @@ public class CreativeModeTabs {
 						output.accept(Items.CHAINMAIL_CHESTPLATE);
 						output.accept(Items.CHAINMAIL_LEGGINGS);
 						output.accept(Items.CHAINMAIL_BOOTS);
+						output.accept(Items.CENTIPEDE_LEGGINGS);
 						output.accept(Items.IRON_HELMET);
 						output.accept(Items.IRON_CHESTPLATE);
 						output.accept(Items.IRON_LEGGINGS);
@@ -1683,6 +1684,7 @@ public class CreativeModeTabs {
 						output.accept(Items.COOKED_MUTTON);
 						output.accept(Items.CHICKEN);
 						output.accept(Items.COOKED_CHICKEN);
+						output.accept(Items.CENTIPEDE_LEG);
 						output.accept(Items.KANGAROO_MEAT);
 						output.accept(Items.COOKED_KANGAROO_MEAT);
 						output.accept(Items.MOOSE_RIBS);
@@ -1950,6 +1952,7 @@ public class CreativeModeTabs {
 					output.accept(Items.BISON_SPAWN_EGG);
 					output.accept(Items.CAIMAN_SPAWN_EGG);
 					output.accept(Items.CAPUCHIN_MONKEY_SPAWN_EGG);
+					output.accept(Items.CAVE_CENTIPEDE_SPAWN_EGG);
 					output.accept(Items.BLAZE_SPAWN_EGG);
 					output.accept(Items.BLOBFISH_SPAWN_EGG);
 					output.accept(Items.BLUE_JAY_SPAWN_EGG);

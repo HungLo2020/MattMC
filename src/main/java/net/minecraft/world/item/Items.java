@@ -1744,6 +1744,8 @@ public class Items {
 	public static final Item COOKED_BEEF = registerItem("cooked_beef", new Item.Properties().food(Foods.COOKED_BEEF));
 	public static final Item CHICKEN = registerItem("chicken", new Item.Properties().food(Foods.CHICKEN, Consumables.CHICKEN));
 	public static final Item COOKED_CHICKEN = registerItem("cooked_chicken", new Item.Properties().food(Foods.COOKED_CHICKEN));
+	public static final Item CENTIPEDE_LEG = registerItem("centipede_leg", new Item.Properties().food(Foods.CHICKEN, Consumables.CHICKEN));
+	public static final Item CENTIPEDE_LEGGINGS = registerItem("centipede_leggings", new Item.Properties().humanoidArmor(ArmorMaterials.CHAINMAIL, ArmorType.LEGGINGS));
 	public static final Item KANGAROO_HIDE = registerItem("kangaroo_hide");
 	public static final Item KANGAROO_MEAT = registerItem("kangaroo_meat", new Item.Properties().food(Foods.CHICKEN, Consumables.CHICKEN));
 	public static final Item COOKED_KANGAROO_MEAT = registerItem("cooked_kangaroo_meat", new Item.Properties().food(Foods.COOKED_CHICKEN));
@@ -1792,6 +1794,7 @@ public class Items {
 	public static final Item BISON_SPAWN_EGG = registerItem("bison_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.BISON));
 	public static final Item CAIMAN_SPAWN_EGG = registerItem("caiman_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.CAIMAN));
 	public static final Item CAPUCHIN_MONKEY_SPAWN_EGG = registerItem("capuchin_monkey_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.CAPUCHIN_MONKEY));
+	public static final Item CAVE_CENTIPEDE_SPAWN_EGG = registerItem("cave_centipede_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.CAVE_CENTIPEDE_HEAD));
 	public static final Item BLAZE_SPAWN_EGG = registerItem("blaze_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.BLAZE));
 	public static final Item BLOBFISH_SPAWN_EGG = registerItem("blobfish_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.BLOBFISH));
 	public static final Item BLUE_JAY_SPAWN_EGG = registerItem("blue_jay_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.BLUE_JAY));

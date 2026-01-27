@@ -93,6 +93,9 @@ public class EntityRenderers {
 		register(EntityType.BISON, com.github.alexthe666.alexsmobs.client.render.RenderBison::new);
 		register(EntityType.CAIMAN, com.github.alexthe666.alexsmobs.client.render.RenderCaiman::new);
 		register(EntityType.CAPUCHIN_MONKEY, com.github.alexthe666.alexsmobs.client.render.RenderCapuchinMonkey::new);
+		register(EntityType.CAVE_CENTIPEDE_HEAD, com.github.alexthe666.alexsmobs.client.render.RenderCentipedeHead::new);
+		register(EntityType.CAVE_CENTIPEDE_BODY, com.github.alexthe666.alexsmobs.client.render.RenderCentipedeBody::new);
+		register(EntityType.CAVE_CENTIPEDE_TAIL, com.github.alexthe666.alexsmobs.client.render.RenderCentipedeTail::new);
 		register(EntityType.BLAZE, BlazeRenderer::new);
 		register(EntityType.BLOBFISH, RenderBlobfish::new);
 		register(EntityType.BLUE_JAY, com.github.alexthe666.alexsmobs.client.render.RenderBlueJay::new);

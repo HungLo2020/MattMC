@@ -14352,6 +14352,31 @@
     ],
     "subtitle": "subtitles.block.generic.footsteps"
   },
+  "entity.cave_centipede.walk": {
+    "sounds": [
+      "centipede_walk_0",
+      "centipede_walk_1",
+      "centipede_walk_2",
+      "centipede_walk_3",
+      "centipede_walk_4"
+    ],
+    "subtitle": "subtitles.entity.cave_centipede.walk"
+  },
+  "entity.cave_centipede.hurt": {
+    "sounds": [
+      "centipede_hurt_0",
+      "centipede_hurt_1",
+      "centipede_hurt_2"
+    ],
+    "subtitle": "subtitles.entity.cave_centipede.hurt"
+  },
+  "entity.cave_centipede.attack": {
+    "sounds": [
+      "centipede_attack_0",
+      "centipede_attack_1"
+    ],
+    "subtitle": "subtitles.entity.cave_centipede.attack"
+  },
   "entity.creaking.activate": {
     "sounds": [
       "mob/creaking/creaking_activate"

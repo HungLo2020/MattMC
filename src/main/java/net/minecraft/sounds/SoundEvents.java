@@ -443,6 +443,9 @@ public class SoundEvents {
 	public static final SoundEvent COW_HURT = register("entity.cow.hurt");
 	public static final SoundEvent COW_MILK = register("entity.cow.milk");
 	public static final SoundEvent COW_STEP = register("entity.cow.step");
+	public static final SoundEvent CENTIPEDE_WALK = register("entity.cave_centipede.walk");
+	public static final SoundEvent CENTIPEDE_HURT = register("entity.cave_centipede.hurt");
+	public static final SoundEvent CENTIPEDE_ATTACK = register("entity.cave_centipede.attack");
 	public static final SoundEvent CRAFTER_CRAFT = register("block.crafter.craft");
 	public static final SoundEvent CRAFTER_FAIL = register("block.crafter.fail");
 	public static final SoundEvent CROW_IDLE = register("entity.crow.idle");
