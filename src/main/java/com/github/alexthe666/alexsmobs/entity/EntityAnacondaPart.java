@@ -93,6 +93,11 @@ public class EntityAnacondaPart extends LivingEntity implements IHurtableMultipa
     }
 
     public boolean isNoGravity() {
+        return true;
+    }
+
+    @Override
+    public boolean shouldShowName() {
         return false;
     }
 
