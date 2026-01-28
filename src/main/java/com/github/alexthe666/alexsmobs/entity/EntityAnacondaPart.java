@@ -93,23 +93,7 @@ public class EntityAnacondaPart extends LivingEntity implements IHurtableMultipa
     }
 
     public boolean isNoGravity() {
-        return true;
-    }
-
-    @Override
-    public boolean shouldShowName() {
         return false;
-    }
-
-    @Override
-    protected void serverAiStep() {
-        // Do nothing - parts are positioned manually by parent entity
-    }
-
-    @Override
-    public void travel(Vec3 vec3) {
-        // Do nothing - parts are positioned manually by parent entity
-        // Prevent any movement from being applied
     }
 
 
@@ -192,8 +176,6 @@ public class EntityAnacondaPart extends LivingEntity implements IHurtableMultipa
         this.yHeadRot = f;
         this.setPos(avg.x, avg.y, avg.z);
         this.setRot(f, f2);
-        // Mark as on ground to prevent fall physics and movement calculations
-        this.setOnGround(true);
         headEntityId = headId;
         return avg;
     }
