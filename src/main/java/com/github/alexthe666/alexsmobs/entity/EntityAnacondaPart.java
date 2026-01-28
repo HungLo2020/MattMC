@@ -107,13 +107,6 @@ public class EntityAnacondaPart extends LivingEntity implements IHurtableMultipa
     }
 
     @Override
-    public void aiStep() {
-        // Completely override aiStep to prevent ALL AI and physics processing
-        // (velocity dampening, jump logic, movement calculations, etc.)
-        // Parts are positioned manually by parent entity
-    }
-
-    @Override
     public void travel(Vec3 vec3) {
         // Do nothing - parts are positioned manually by parent entity
         // Prevent any movement from being applied
