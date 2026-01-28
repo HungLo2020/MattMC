@@ -1945,6 +1945,7 @@ public class Items {
 	public static final Item SHULKER_SPAWN_EGG = registerItem("shulker_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.SHULKER));
 	public static final Item SILVERFISH_SPAWN_EGG = registerItem("silverfish_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.SILVERFISH));
 	public static final Item SKELETON_SPAWN_EGG = registerItem("skeleton_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.SKELETON));
+	public static final Item SKELEWAG_SPAWN_EGG = registerItem("skelewag_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.SKELEWAG));
 	public static final Item SKELETON_HORSE_SPAWN_EGG = registerItem(
 		"skeleton_horse_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.SKELETON_HORSE)
 	);
@@ -2671,6 +2672,11 @@ public class Items {
 	private static ResourceKey<Item> blockIdToItemId(ResourceKey<Block> resourceKey) {
 		return ResourceKey.create(Registries.ITEM, resourceKey.location());
 	}
+	
+	// Skelewag items
+	public static final Item SKELEWAG_SWORD = registerItem("skelewag_sword", properties -> new com.github.alexthe666.alexsmobs.item.ItemSkelewagSword(properties), new Item.Properties().stacksTo(1).durability(430));
+	public static final Item SKELEWAG_SWORD_HAND = registerItem("skelewag_sword_hand", Item::new, new Item.Properties());
+	public static final Item SKELEWAG_SWORD_INVENTORY = registerItem("skelewag_sword_inventory", Item::new, new Item.Properties());
 
 	public static Item registerBlock(Block block) {
 		return registerBlock(block, BlockItem::new);

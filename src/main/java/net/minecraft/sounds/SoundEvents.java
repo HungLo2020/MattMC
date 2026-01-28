@@ -1537,6 +1537,8 @@ public class SoundEvents {
 	public static final SoundEvent SKELETON_AMBIENT = register("entity.skeleton.ambient");
 	public static final SoundEvent SKELETON_CONVERTED_TO_STRAY = register("entity.skeleton.converted_to_stray");
 	public static final SoundEvent SKELETON_DEATH = register("entity.skeleton.death");
+	public static final SoundEvent SKELEWAG_IDLE = register("entity.skelewag.idle");
+	public static final SoundEvent SKELEWAG_HURT = register("entity.skelewag.hurt");
 	public static final SoundEvent SKELETON_HORSE_AMBIENT = register("entity.skeleton_horse.ambient");
 	public static final SoundEvent SKELETON_HORSE_DEATH = register("entity.skeleton_horse.death");
 	public static final SoundEvent SKELETON_HORSE_HURT = register("entity.skeleton_horse.hurt");
