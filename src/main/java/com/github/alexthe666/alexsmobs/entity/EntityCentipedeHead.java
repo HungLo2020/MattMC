@@ -177,25 +177,26 @@ public class EntityCentipedeHead extends Monster {
         return super.finalizeSpawn(worldIn, difficultyIn, reason, spawnDataIn);
     }
 
-    public void addAdditionalSaveData(CompoundTag compound) {
-        super.addAdditionalSaveData(compound);
+    public void addAdditionalSaveData(net.minecraft.world.level.storage.ValueOutput valueOutput) {
+        super.addAdditionalSaveData(valueOutput);
         if (this.getChildId() != null) {
-            compound.putString("ChildUUID", this.getChildId().toString());
+            valueOutput.putString("ChildUUID", this.getChildId().toString());
         }
-        compound.putInt("SegCount", getSegmentCount());
+        valueOutput.putInt("SegCount", getSegmentCount());
 
     }
 
-    public void readAdditionalSaveData(CompoundTag compound) {
-        super.readAdditionalSaveData(compound);
-        if (compound.contains("ChildUUID")) {
+    public void readAdditionalSaveData(net.minecraft.world.level.storage.ValueInput valueInput) {
+        super.readAdditionalSaveData(valueInput);
+        Optional<String> childUUID = valueInput.getString("ChildUUID");
+        if (childUUID.isPresent()) {
             try {
-                this.setChildId(UUID.fromString(compound.getString("ChildUUID")));
+                this.setChildId(UUID.fromString(childUUID.get()));
             } catch (IllegalArgumentException e) {
                 // Invalid UUID string
             }
         }
-        this.setSegmentCount(compound.getInt("SegCount"));
+        this.setSegmentCount(valueInput.getIntOr("SegCount", 3));
     }
 
     private boolean shouldReplaceParts() {

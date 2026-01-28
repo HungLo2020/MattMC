@@ -242,15 +242,30 @@ public class ModelCaveCentipede extends AdvancedEntityModel<EntityRenderState> {
     @Override
     public void setupAnim(EntityRenderState state) {
         this.resetToDefaultPose();
-        float limbSwing = state.walkAnimationPos;
-        float limbSwingAmount = state.walkAnimationSpeed;
+        float limbSwing = 0;
+        float limbSwingAmount = 0;
+        boolean isDeadOrDying = false;
+        
+        // Extract animation data from the appropriate render state
+        if (state instanceof CentipedeHeadRenderState) {
+            CentipedeHeadRenderState headState = (CentipedeHeadRenderState) state;
+            limbSwing = headState.walkAnimationPos;
+            limbSwingAmount = headState.walkAnimationSpeed;
+            isDeadOrDying = headState.isDeadOrDying;
+        } else if (state instanceof CentipedeBodyRenderState) {
+            CentipedeBodyRenderState bodyState = (CentipedeBodyRenderState) state;
+            limbSwing = bodyState.walkAnimationPos;
+            limbSwingAmount = bodyState.walkAnimationSpeed;
+            isDeadOrDying = bodyState.isDeadOrDying;
+        }
+        
         float ageInTicks = state.ageInTicks;
         float partialTick = 0;
         float walkSpeed = 1.5F;
         float walkDegree = 0.85F;
         float idleSpeed = 0.25F;
         float idleDegree = 0.35F;
-        if(state.isDeadOrDying){
+        if(isDeadOrDying){
             limbSwing = ageInTicks;
             limbSwingAmount = 1;
         }

@@ -6,4 +6,6 @@ public class CentipedeBodyRenderState extends LivingEntityRenderState {
     public int bodyIndex;
     public boolean isDeadOrDying;
     public int deathTime;
+    public float walkAnimationPos;
+    public float walkAnimationSpeed;
 }

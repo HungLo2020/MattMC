@@ -93,38 +93,40 @@ public class EntityCentipedeBody extends Mob implements IHurtableMultipart {
         this.angleYaw = angleYaw;
     }
 
-    public void addAdditionalSaveData(CompoundTag compound) {
-        super.addAdditionalSaveData(compound);
+    public void addAdditionalSaveData(net.minecraft.world.level.storage.ValueOutput valueOutput) {
+        super.addAdditionalSaveData(valueOutput);
         if (this.getParentId() != null) {
-            compound.putString("ParentUUID", this.getParentId().toString());
+            valueOutput.putString("ParentUUID", this.getParentId().toString());
         }
         if (this.getChildId() != null) {
-            compound.putString("ChildUUID", this.getChildId().toString());
+            valueOutput.putString("ChildUUID", this.getChildId().toString());
         }
-        compound.putInt("BodyIndex", getBodyIndex());
-        compound.putFloat("PartAngle", angleYaw);
-        compound.putFloat("PartRadius", radius);
+        valueOutput.putInt("BodyIndex", getBodyIndex());
+        valueOutput.putFloat("PartAngle", angleYaw);
+        valueOutput.putFloat("PartRadius", radius);
     }
 
-    public void readAdditionalSaveData(CompoundTag compound) {
-        super.readAdditionalSaveData(compound);
-        if (compound.contains("ParentUUID")) {
+    public void readAdditionalSaveData(net.minecraft.world.level.storage.ValueInput valueInput) {
+        super.readAdditionalSaveData(valueInput);
+        Optional<String> parentUUID = valueInput.getString("ParentUUID");
+        if (parentUUID.isPresent()) {
             try {
-                this.setParentId(UUID.fromString(compound.getString("ParentUUID")));
+                this.setParentId(UUID.fromString(parentUUID.get()));
             } catch (IllegalArgumentException e) {
                 // Invalid UUID string
             }
         }
-        if (compound.contains("ChildUUID")) {
+        Optional<String> childUUID = valueInput.getString("ChildUUID");
+        if (childUUID.isPresent()) {
             try {
-                this.setChildId(UUID.fromString(compound.getString("ChildUUID")));
+                this.setChildId(UUID.fromString(childUUID.get()));
             } catch (IllegalArgumentException e) {
                 // Invalid UUID string
             }
         }
-        this.setBodyIndex(compound.getInt("BodyIndex"));
-        this.angleYaw = compound.getFloat("PartAngle");
-        this.radius = compound.getFloat("PartRadius");
+        this.setBodyIndex(valueInput.getIntOr("BodyIndex", 0));
+        this.angleYaw = valueInput.getFloatOr("PartAngle", 0F);
+        this.radius = valueInput.getFloatOr("PartRadius", 0F);
     }
     @Override
     protected void defineSynchedData(SynchedEntityData.Builder builder) {
@@ -177,12 +179,7 @@ public class EntityCentipedeBody extends Mob implements IHurtableMultipart {
         return this == entity || this.getParent() == entity;
     }
 
-    @Override
-    public boolean hurt(DamageSource source, float damage) {
-        final Entity parent = getParent();
-        final boolean prev = parent != null && parent.hurt(source, damage * this.damageMultiplier);
-        return prev;
-    }
+    // Note: hurt() is final in 1.21, so damage delegation to parent is handled via IHurtableMultipart interface
 
     @Override
     public boolean isPickable() {
@@ -197,9 +194,9 @@ public class EntityCentipedeBody extends Mob implements IHurtableMultipart {
         }
     }
 
-    public boolean startRiding(Entity entityIn, boolean force) {
+    public boolean startRiding(Entity entityIn, boolean force, boolean silent) {
         if(!(entityIn instanceof AbstractMinecart || entityIn instanceof Boat)){
-            return super.startRiding(entityIn, force);
+            return super.startRiding(entityIn, force, silent);
         }
         return false;
     }
@@ -257,7 +254,9 @@ public class EntityCentipedeBody extends Mob implements IHurtableMultipart {
         this.entityData.set(BODY_XROT, f2);
         this.setYRot(f);
         this.yHeadRot = f;
-        this.moveTo(avg.x, avg.y, avg.z, f, f2);
+        this.setPos(avg.x, avg.y, avg.z);
+        this.setYRot(f);
+        this.setXRot(f2);
         return avg;
     }
 

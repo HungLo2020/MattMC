@@ -1134,7 +1134,7 @@ public class EntityType<T extends Entity> implements FeatureElement, EntityTypeT
 		"cave_centipede_head", EntityType.Builder.of(com.github.alexthe666.alexsmobs.entity.EntityCentipedeHead::new, MobCategory.MONSTER).sized(0.9F, 0.9F).clientTrackingRange(8)
 	);
 	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntityCentipedeBody> CAVE_CENTIPEDE_BODY = register(
-		"cave_centipede_body", EntityType.Builder.of(com.github.alexthe666.alexsmobs.entity.EntityCentipedeBody::new, MobCategory.MISC).sized(0.9F, 0.9F).fireImmune().updateInterval(1).clientTrackingRange(8)
+		"cave_centipede_body", EntityType.Builder.<com.github.alexthe666.alexsmobs.entity.EntityCentipedeBody>of((type, level) -> new com.github.alexthe666.alexsmobs.entity.EntityCentipedeBody(type, level), MobCategory.MISC).sized(0.9F, 0.9F).fireImmune().updateInterval(1).clientTrackingRange(8)
 	);
 	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntityCentipedeTail> CAVE_CENTIPEDE_TAIL = register(
 		"cave_centipede_tail", EntityType.Builder.of(com.github.alexthe666.alexsmobs.entity.EntityCentipedeTail::new, MobCategory.MISC).sized(0.9F, 0.9F).fireImmune().updateInterval(1).clientTrackingRange(8)
