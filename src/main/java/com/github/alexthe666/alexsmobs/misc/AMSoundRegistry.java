@@ -165,4 +165,8 @@ public class AMSoundRegistry {
     // Warped Toad sounds - reference vanilla SoundEvents
     public static final DeferredHolder WARPED_TOAD_IDLE = new DeferredHolder(() -> net.minecraft.sounds.SoundEvents.WARPED_TOAD_IDLE);
     public static final DeferredHolder WARPED_TOAD_HURT = new DeferredHolder(() -> net.minecraft.sounds.SoundEvents.WARPED_TOAD_HURT);
+    
+    // Komodo Dragon sounds - reference vanilla SoundEvents
+    public static final DeferredHolder KOMODO_DRAGON_IDLE = new DeferredHolder(() -> net.minecraft.sounds.SoundEvents.KOMODO_DRAGON_IDLE);
+    public static final DeferredHolder KOMODO_DRAGON_HURT = new DeferredHolder(() -> net.minecraft.sounds.SoundEvents.KOMODO_DRAGON_HURT);
 }

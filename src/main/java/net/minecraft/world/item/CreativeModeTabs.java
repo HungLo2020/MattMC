@@ -2010,6 +2010,7 @@ public class CreativeModeTabs {
 					output.accept(Items.HUSK_SPAWN_EGG);
 					output.accept(Items.JERBOA_SPAWN_EGG);
 					output.accept(Items.KANGAROO_SPAWN_EGG);
+					output.accept(Items.KOMODO_DRAGON_SPAWN_EGG);
 					output.accept(Items.LEAFCUTTER_ANT_SPAWN_EGG);
 					output.accept(Items.IRON_GOLEM_SPAWN_EGG);
 					output.accept(Items.LLAMA_SPAWN_EGG);

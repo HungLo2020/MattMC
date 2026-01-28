@@ -49,6 +49,7 @@ public class AMEntityRegistry {
     public static final DeferredEntityHolder TASMANIAN_DEVIL = new DeferredEntityHolder(() -> EntityType.TASMANIAN_DEVIL);
     public static final DeferredEntityHolder UNDERMINER = new DeferredEntityHolder(() -> EntityType.UNDERMINER);
     public static final DeferredEntityHolder WARPED_TOAD = new DeferredEntityHolder(() -> EntityType.WARPED_TOAD);
+    public static final DeferredEntityHolder KOMODO_DRAGON = new DeferredEntityHolder(() -> EntityType.KOMODO_DRAGON);
     
     /**
      * Helper method for spawn roll logic
