@@ -58,4 +58,8 @@ public class AMItemRegistry {
     
     // Skunk items - reference vanilla Items
     public static final DeferredHolder STINK_BOTTLE = new DeferredHolder(() -> net.minecraft.world.item.Items.STINK_BOTTLE);
+    
+    // Komodo Dragon items - reference vanilla Items
+    public static final DeferredHolder KOMODO_SPIT = new DeferredHolder(() -> net.minecraft.world.item.Items.KOMODO_SPIT);
+    public static final DeferredHolder KOMODO_SPIT_BOTTLE = new DeferredHolder(() -> net.minecraft.world.item.Items.KOMODO_SPIT_BOTTLE);
 }

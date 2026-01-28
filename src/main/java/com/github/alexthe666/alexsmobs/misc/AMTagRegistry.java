@@ -195,6 +195,12 @@ public class AMTagRegistry {
     // Sunbird-specific tags
     public static final TagKey<EntityType<?>> SUNBIRD_SCORCH_TARGETS = registerEntityTag("sunbird_scorch_targets");
 
+    // Komodo Dragon-specific tags
+    public static final TagKey<Item> KOMODO_DRAGON_TAMEABLES = registerItemTag("komodo_dragon_tameables");
+    public static final TagKey<Item> KOMODO_DRAGON_BREEDABLES = registerItemTag("komodo_dragon_breedables");
+    public static final TagKey<Block> KOMODO_DRAGON_SPAWNS = registerBlockTag("komodo_dragon_spawns");
+    public static final TagKey<EntityType<?>> KOMODO_DRAGON_TARGETS = registerEntityTag("komodo_dragon_targets");
+
     // Tag helper method for entity checks
     public static class TagHelper {
         public static boolean isEntityIn(TagKey<EntityType<?>> tag, net.minecraft.world.entity.Entity entity) {

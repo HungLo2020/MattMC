@@ -1758,6 +1758,8 @@ public class Items {
 	public static final Item GOLD_NUGGET = registerItem("gold_nugget");
 	public static final Item NETHER_WART = registerItem("nether_wart", createBlockItemWithCustomItemName(Blocks.NETHER_WART));
 	public static final Item GLASS_BOTTLE = registerItem("glass_bottle", BottleItem::new);
+	public static final Item KOMODO_SPIT = registerItem("komodo_spit", Item::new, new Item.Properties());
+	public static final Item KOMODO_SPIT_BOTTLE = registerItem("komodo_spit_bottle", Item::new, new Item.Properties().craftRemainder(GLASS_BOTTLE).stacksTo(1));
 	public static final Item STINK_BOTTLE = registerItem("stink_bottle", Item::new, new Item.Properties().craftRemainder(GLASS_BOTTLE).stacksTo(1));
 	public static final Item POTION = registerItem(
 		"potion",
@@ -1888,6 +1890,7 @@ public class Items {
 	public static final Item HUSK_SPAWN_EGG = registerItem("husk_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.HUSK));
 	public static final Item JERBOA_SPAWN_EGG = registerItem("jerboa_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.JERBOA));
 	public static final Item KANGAROO_SPAWN_EGG = registerItem("kangaroo_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.KANGAROO));
+	public static final Item KOMODO_DRAGON_SPAWN_EGG = registerItem("komodo_dragon_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.KOMODO_DRAGON));
 	public static final Item LEAFCUTTER_ANT_SPAWN_EGG = registerItem("leafcutter_ant_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.LEAFCUTTER_ANT));
 	public static final Item LEAFCUTTER_ANT_PUPA = registerItem("leafcutter_ant_pupa", com.github.alexthe666.alexsmobs.item.ItemLeafcutterPupa::new, new Item.Properties());
 	public static final Item IRON_GOLEM_SPAWN_EGG = registerItem("iron_golem_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.IRON_GOLEM));

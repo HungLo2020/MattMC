@@ -181,6 +181,7 @@ public class DefaultAttributes {
 		.put(EntityType.ILLUSIONER, Illusioner.createAttributes().build())
 		.put(EntityType.JERBOA, com.github.alexthe666.alexsmobs.entity.EntityJerboa.bakeAttributes().build())
 		.put(EntityType.KANGAROO, com.github.alexthe666.alexsmobs.entity.EntityKangaroo.bakeAttributes().build())
+		.put(EntityType.KOMODO_DRAGON, com.github.alexthe666.alexsmobs.entity.EntityKomodoDragon.bakeAttributes().build())
 		.put(EntityType.LEAFCUTTER_ANT, com.github.alexthe666.alexsmobs.entity.EntityLeafcutterAnt.bakeAttributes().build())
 		.put(EntityType.IRON_GOLEM, IronGolem.createAttributes().build())
 		.put(EntityType.LLAMA, Llama.createAttributes().build())

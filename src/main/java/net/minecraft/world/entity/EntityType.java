@@ -1237,6 +1237,13 @@ public class EntityType<T extends Entity> implements FeatureElement, EntityTypeT
 			.eyeHeight(1.4F)
 			.clientTrackingRange(10)
 	);
+	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntityKomodoDragon> KOMODO_DRAGON = register(
+		"komodo_dragon",
+		EntityType.Builder.of(com.github.alexthe666.alexsmobs.entity.EntityKomodoDragon::new, MobCategory.CREATURE)
+			.sized(1.35F, 0.85F)
+			.eyeHeight(0.6F)
+			.clientTrackingRange(10)
+	);
 	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntityLeafcutterAnt> LEAFCUTTER_ANT = register(
 		"leafcutter_ant",
 		EntityType.Builder.of(com.github.alexthe666.alexsmobs.entity.EntityLeafcutterAnt::new, MobCategory.CREATURE)

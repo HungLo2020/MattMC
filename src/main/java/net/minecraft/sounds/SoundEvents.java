@@ -942,6 +942,8 @@ public class SoundEvents {
 	public static final SoundEvent KANGAROO_IDLE_2 = register("entity.kangaroo.idle_2");
 	public static final SoundEvent KANGAROO_HURT_0 = register("entity.kangaroo.hurt_0");
 	public static final SoundEvent KANGAROO_HURT_1 = register("entity.kangaroo.hurt_1");
+	public static final SoundEvent KOMODO_DRAGON_IDLE = register("entity.komodo_dragon.idle");
+	public static final SoundEvent KOMODO_DRAGON_HURT = register("entity.komodo_dragon.hurt");
 	public static final SoundEvent LADDER_BREAK = register("block.ladder.break");
 	public static final SoundEvent LADDER_FALL = register("block.ladder.fall");
 	public static final SoundEvent LADDER_HIT = register("block.ladder.hit");

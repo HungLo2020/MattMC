@@ -17212,6 +17212,18 @@
       "kangaroo_idle_2"
     ]
   },
+  "entity.komodo_dragon.idle": {
+    "sounds": [
+      "komodo_dragon_idle_0",
+      "komodo_dragon_idle_1"
+    ]
+  },
+  "entity.komodo_dragon.hurt": {
+    "sounds": [
+      "komodo_dragon_hurt_0",
+      "komodo_dragon_hurt_1"
+    ]
+  },
   "entity.leafcutter_ant.hurt": {
     "sounds": [
       "leafcutter_ant_hurt_0",
