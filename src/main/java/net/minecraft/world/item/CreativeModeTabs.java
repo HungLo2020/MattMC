@@ -1806,6 +1806,7 @@ public class CreativeModeTabs {
 					output.accept(Items.GLOW_INK_SAC);
 					output.accept(Items.TURTLE_SCUTE);
 					output.accept(Items.ARMADILLO_SCUTE);
+					output.accept(Items.CROCODILE_SCUTE);
 					output.accept(Items.SLIME_BALL);
 					output.accept(Items.CLAY_BALL);
 					output.accept(Items.PRISMARINE_SHARD);
@@ -1971,6 +1972,7 @@ public class CreativeModeTabs {
 					output.accept(Items.FRILLED_SHARK_SPAWN_EGG);
 					output.accept(Items.COSMAW_SPAWN_EGG);
 					output.accept(Items.COD_SPAWN_EGG);
+					output.accept(Items.CROCODILE_SPAWN_EGG);
 					output.accept(Items.COPPER_GOLEM_SPAWN_EGG);
 					output.accept(Items.COW_SPAWN_EGG);
 					output.accept(Items.CROW_SPAWN_EGG);
