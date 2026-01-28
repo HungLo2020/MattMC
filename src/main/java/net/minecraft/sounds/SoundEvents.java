@@ -1431,6 +1431,9 @@ public class SoundEvents {
 	public static final SoundEvent CAPUCHIN_MONKEY_IDLE = register("entity.capuchin_monkey.idle");
 	public static final SoundEvent CAPUCHIN_MONKEY_HURT = register("entity.capuchin_monkey.hurt");
 	public static final SoundEvent CROCODILE_BABY = register("entity.crocodile.baby");
+	public static final SoundEvent CROCODILE_IDLE = register("entity.crocodile.idle");
+	public static final SoundEvent CROCODILE_HURT = register("entity.crocodile.hurt");
+	public static final SoundEvent CROCODILE_BITE = register("entity.crocodile.bite");
 	public static final SoundEvent TARANTULA_HAWK_HURT = register("entity.tarantula_hawk.hurt");
 	public static final SoundEvent TARANTULA_HAWK_WING = register("entity.tarantula_hawk.wing");
 	public static final SoundEvent TASMANIAN_DEVIL_IDLE = register("entity.tasmanian_devil.idle");

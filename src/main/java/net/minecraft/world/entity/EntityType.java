@@ -83,6 +83,7 @@ import com.github.alexthe666.alexsmobs.entity.EntityBunfungus;
 import com.github.alexthe666.alexsmobs.entity.EntityMungus;
 import com.github.alexthe666.alexsmobs.entity.EntityBlobfish;
 import com.github.alexthe666.alexsmobs.entity.EntityCosmicCod;
+import com.github.alexthe666.alexsmobs.entity.EntityCrocodile;
 import com.github.alexthe666.alexsmobs.entity.EntityFlyingFish;
 import com.github.alexthe666.alexsmobs.entity.EntityTerrapin;
 import com.github.alexthe666.alexsmobs.entity.EntityAlligatorSnappingTurtle;
@@ -425,6 +426,9 @@ public class EntityType<T extends Entity> implements FeatureElement, EntityTypeT
 	);
 	public static final EntityType<Cod> COD = register(
 		"cod", EntityType.Builder.of(Cod::new, MobCategory.WATER_AMBIENT).sized(0.5F, 0.3F).eyeHeight(0.195F).clientTrackingRange(4)
+	);
+	public static final EntityType<EntityCrocodile> CROCODILE = register(
+		"crocodile", EntityType.Builder.of(EntityCrocodile::new, MobCategory.CREATURE).sized(1.5F, 0.8F).eyeHeight(0.6F).clientTrackingRange(10)
 	);
 	public static final EntityType<CopperGolem> COPPER_GOLEM = register(
 		"copper_golem", EntityType.Builder.of(CopperGolem::new, MobCategory.MISC).sized(0.49F, 0.98F).eyeHeight(0.8125F).clientTrackingRange(10)

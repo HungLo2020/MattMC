@@ -14491,6 +14491,30 @@
     ],
     "subtitle": "subtitles.entity.caiman.idle"
   },
+  "entity.crocodile.bite": {
+    "sounds": [
+      "crocodile_bite_0",
+      "crocodile_bite_1"
+    ],
+    "subtitle": "subtitles.entity.crocodile.bite"
+  },
+  "entity.crocodile.hurt": {
+    "sounds": [
+      "crocodile_hurt_0",
+      "crocodile_hurt_1",
+      "crocodile_hurt_2"
+    ],
+    "subtitle": "subtitles.entity.crocodile.hurt"
+  },
+  "entity.crocodile.idle": {
+    "sounds": [
+      "crocodile_idle_0",
+      "crocodile_idle_1",
+      "crocodile_idle_2",
+      "crocodile_idle_3"
+    ],
+    "subtitle": "subtitles.entity.crocodile.idle"
+  },
   "entity.crow.hurt": {
     "sounds": [
       "crow_hurt_0",

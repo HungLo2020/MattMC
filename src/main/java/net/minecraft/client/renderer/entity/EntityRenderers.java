@@ -121,6 +121,7 @@ public class EntityRenderers {
 		register(EntityType.FRILLED_SHARK, RenderFrilledShark::new);
 		register(EntityType.COSMAW, com.github.alexthe666.alexsmobs.client.render.RenderCosmaw::new);
 		register(EntityType.COD, CodRenderer::new);
+		register(EntityType.CROCODILE, com.github.alexthe666.alexsmobs.client.render.RenderCrocodile::new);
 		register(EntityType.COMMAND_BLOCK_MINECART, context -> new MinecartRenderer(context, ModelLayers.COMMAND_BLOCK_MINECART));
 		register(EntityType.COPPER_GOLEM, CopperGolemRenderer::new);
 		register(EntityType.COW, CowRenderer::new);

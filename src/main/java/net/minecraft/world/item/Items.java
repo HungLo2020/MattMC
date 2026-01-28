@@ -1275,6 +1275,7 @@ public class Items {
 	public static final Item TURTLE_HELMET = registerItem("turtle_helmet", new Item.Properties().humanoidArmor(ArmorMaterials.TURTLE_SCUTE, ArmorType.HELMET));
 	public static final Item TURTLE_SCUTE = registerItem("turtle_scute");
 	public static final Item ARMADILLO_SCUTE = registerItem("armadillo_scute");
+	public static final Item CROCODILE_SCUTE = registerItem("crocodile_scute");
 	public static final Item WOLF_ARMOR = registerItem("wolf_armor", new Item.Properties().wolfArmor(ArmorMaterials.ARMADILLO_SCUTE));
 	public static final Item FLINT_AND_STEEL = registerItem("flint_and_steel", FlintAndSteelItem::new, new Item.Properties().durability(64));
 	public static final Item BOWL = registerItem("bowl");
@@ -1833,6 +1834,7 @@ public class Items {
 	);
 	public static final Item COSMAW_SPAWN_EGG = registerItem("cosmaw_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.COSMAW));
 	public static final Item COD_SPAWN_EGG = registerItem("cod_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.COD));
+	public static final Item CROCODILE_SPAWN_EGG = registerItem("crocodile_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.CROCODILE));
 	public static final Item COPPER_GOLEM_SPAWN_EGG = registerItem(
 		"copper_golem_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.COPPER_GOLEM)
 	);

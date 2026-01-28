@@ -139,6 +139,7 @@ public class DefaultAttributes {
 		.put(EntityType.FRILLED_SHARK, EntityFrilledShark.createAttributes().build())
 		.put(EntityType.COSMAW, com.github.alexthe666.alexsmobs.entity.EntityCosmaw.bakeAttributes().build())
 		.put(EntityType.COD, AbstractFish.createAttributes().build())
+		.put(EntityType.CROCODILE, com.github.alexthe666.alexsmobs.entity.EntityCrocodile.bakeAttributes().build())
 		.put(EntityType.COPPER_GOLEM, CopperGolem.createAttributes().build())
 		.put(EntityType.COW, Cow.createAttributes().build())
 		.put(EntityType.CROW, com.github.alexthe666.alexsmobs.entity.EntityCrow.bakeAttributes().build())
