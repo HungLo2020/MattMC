@@ -88,4 +88,7 @@ public class AMConfig {
     
     // Komodo Dragon spawn configuration
     public static int komodoDragonSpawnRolls = 2;
+    
+    // Tiger spawn configuration
+    public static int tigerSpawnRolls = 2;
 }

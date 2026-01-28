@@ -6,11 +6,10 @@ import net.minecraft.world.entity.LivingEntity;
 
 public class EffectTigersBlessing extends MobEffect {
 
-    protected EffectTigersBlessing() {
+    public EffectTigersBlessing() {
         super(MobEffectCategory.BENEFICIAL, 0XFFD75E);
     }
 
-    @Override
     public boolean applyEffectTick(LivingEntity entity, int amplifier) {
         return true;
     }

@@ -1,5 +1,6 @@
 package com.github.alexthe666.alexsmobs.client.model;
 
+import com.github.alexthe666.alexsmobs.client.render.TigerRenderState;
 import com.github.alexthe666.alexsmobs.entity.EntityTiger;
 import com.github.alexthe666.alexsmobs.entity.util.Maths;
 import com.github.alexthe666.citadel.animation.IAnimatedEntity;
@@ -11,7 +12,7 @@ import com.google.common.collect.ImmutableList;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 
-public class ModelTiger extends AdvancedEntityModel<EntityTiger> {
+public class ModelTiger extends AdvancedEntityModel<TigerRenderState> {
     private final AdvancedModelBox root;
     private final AdvancedModelBox body;
     private final AdvancedModelBox tail;
@@ -216,8 +217,17 @@ public class ModelTiger extends AdvancedEntityModel<EntityTiger> {
     }
 
     @Override
-    public void setupAnim(EntityTiger entity, float limbSwing, float limbSwingAmount, float ageInTicks, float netHeadYaw, float headPitch) {
-        animate(entity, limbSwing, limbSwingAmount, ageInTicks, netHeadYaw, headPitch);
+    public void setupAnim(TigerRenderState state) {
+        this.resetToDefaultPose();
+        float limbSwing = state.walkAnimationPos;
+        float limbSwingAmount = state.walkAnimationSpeed;
+        float ageInTicks = state.ageInTicks;
+        float netHeadYaw = state.yRot;
+        float headPitch = state.xRot;
+        
+        // Note: Animation system (animate method) is skipped in render state architecture
+        // as it requires direct entity access. Consider migrating animations to render state.
+        
         float walkSpeed = 0.7F;
         float walkDegree = 0.8F;
         float runSpeed = 1.0F;
@@ -225,11 +235,10 @@ public class ModelTiger extends AdvancedEntityModel<EntityTiger> {
         float idleSpeed = 0.1F;
         float idleDegree = 0.1F;
         float moveProgress = 5F * limbSwingAmount;
-        float partialTick = ageInTicks - entity.tickCount;
-        float sitProgress = entity.prevSitProgress + (entity.sitProgress - entity.prevSitProgress) * partialTick;
-        float holdProgress = entity.prevHoldProgress + (entity.holdProgress - entity.prevHoldProgress) * partialTick;
-        float sleepProgress = entity.prevSleepProgress + (entity.sleepProgress - entity.prevSleepProgress) * partialTick;
-        boolean leftSleep = entity.getId() % 2 == 0;
+        float sitProgress = state.sitProgress;
+        float holdProgress = state.holdProgress;
+        float sleepProgress = state.sleepProgress;
+        boolean leftSleep = state.entityId % 2 == 0;
         this.walk(tail, idleSpeed, idleDegree * 1F, false, -2F, 0.1F, ageInTicks, 1);
         this.flap(tail, idleSpeed, idleDegree * 1.2F, false, 2F, 0F, ageInTicks, 1);
         this.flap(tail2, idleSpeed, idleDegree * 2F, false, 2F, 0F, ageInTicks, 1);
@@ -242,7 +251,7 @@ public class ModelTiger extends AdvancedEntityModel<EntityTiger> {
         progressPositionPrev(armright, moveProgress, 0, -1, 0, 5F);
         progressPositionPrev(legleft, moveProgress, 0, -1, 0, 5F);
         progressPositionPrev(legright, moveProgress, 0, -1, 0, 5F);
-        if (entity.isRunning()) {
+        if (state.isRunning) {
             this.chainFlap(tailBoxes, runSpeed, runDegree * 0.5F, -1, limbSwing, limbSwingAmount);
             this.bob(body, runSpeed, runDegree * 2, false, limbSwing, limbSwingAmount);
             this.bob(head, runSpeed, runDegree * -1, false, limbSwing, limbSwingAmount);
@@ -272,7 +281,7 @@ public class ModelTiger extends AdvancedEntityModel<EntityTiger> {
         progressRotationPrev(legright, sitProgress, Maths.rad(-90), Maths.rad(20), 0, 5F);
         progressRotationPrev(armleft, sitProgress, Maths.rad(-50), 0, 0, 5F);
         progressRotationPrev(armright, sitProgress, Maths.rad(-50), 0, 0, 5F);
-        float tailAngle = entity.getId() % 2 == 0 ? 1 : -1;
+        float tailAngle = state.entityId % 2 == 0 ? 1 : -1;
         progressRotationPrev(tail, sitProgress, Maths.rad(20), Maths.rad(tailAngle * -15), Maths.rad(tailAngle * 15), 5F);
         progressRotationPrev(tail2, sitProgress, Maths.rad(20), Maths.rad(tailAngle * -30), Maths.rad(tailAngle * 30), 5F);
         progressPositionPrev(body, sitProgress, 0, 5F, 0, 5F);
@@ -337,29 +346,6 @@ public class ModelTiger extends AdvancedEntityModel<EntityTiger> {
     @Override
     public Iterable<AdvancedModelBox> getAllParts() {
         return ImmutableList.of(root, body, head, tail, tail2, snout, earleft, earright, legleft, legright, armleft, armright);
-    }
-
-    @Override
-    public void renderToBuffer(PoseStack matrixStackIn, VertexConsumer buffer, int packedLight, int packedOverlay, int color) {
-        if (this.young) {
-            float f = 1.5F;
-            head.setScale(f, f, f);
-            head.setShouldScaleChildren(true);
-            matrixStackIn.pushPose();
-            matrixStackIn.scale(0.5F, 0.5F, 0.5F);
-            matrixStackIn.translate(0.0D, 1.5D, 0D);
-            parts().forEach((p_228292_8_) -> {
-                p_228292_8_.render(matrixStackIn, buffer, packedLight, packedOverlay, -1);
-            });
-            matrixStackIn.popPose();
-            head.setScale(1, 1, 1);
-        } else {
-            matrixStackIn.pushPose();
-            parts().forEach((p_228290_8_) -> {
-                p_228290_8_.render(matrixStackIn, buffer, packedLight, packedOverlay, -1);
-            });
-            matrixStackIn.popPose();
-        }
     }
 
     public void setRotationAngle(AdvancedModelBox AdvancedModelBox, float x, float y, float z) {

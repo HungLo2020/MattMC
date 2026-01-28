@@ -80,6 +80,14 @@ public class AMRenderTypes {
     }
     
     /**
+     * Creates an eyes render type
+     * Delegates to vanilla RenderType.eyes()
+     */
+    public static RenderType eyes(ResourceLocation texture) {
+        return RenderType.eyes(texture);
+    }
+    
+    /**
      * Creates a render type for Sunbird shine effect
      * Uses additive blending for bright glow
      */
