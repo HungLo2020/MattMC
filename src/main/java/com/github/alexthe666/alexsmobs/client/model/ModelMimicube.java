@@ -64,7 +64,6 @@ public class ModelMimicube extends AdvancedEntityModel<MimicubeRenderState> {
 
 	@Override
 	public void setupAnim(MimicubeRenderState renderState) {
-		super.setupAnim(renderState);
 		this.resetToDefaultPose();
 		float idleSpeed = 0.1F;
 		float idleDegree = 1F;

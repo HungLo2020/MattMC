@@ -33,11 +33,11 @@ import net.minecraft.world.entity.projectile.ThrownTrident;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.ProjectileWeaponItem;
+import net.minecraft.world.item.ShieldItem;
 import net.minecraft.world.item.TridentItem;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.gameevent.GameEvent;
 import net.minecraft.world.phys.Vec3;
-import net.neoforged.neoforge.common.ItemAbilities;
 
 public class EntityMimicube extends Monster implements RangedAttackMob {
 
@@ -91,7 +91,7 @@ public class EntityMimicube extends Monster implements RangedAttackMob {
     }
 
     public void setCombatTask() {
-        if (this.level() != null && !this.level().isClientSide) {
+        if (this.level() != null && !this.level().isClientSide()) {
             this.goalSelector.removeGoal(this.aiAttackOnCollide);
             this.goalSelector.removeGoal(this.aiArrowAttack);
             ItemStack itemstack = this.getMainHandItem();
@@ -171,7 +171,7 @@ public class EntityMimicube extends Monster implements RangedAttackMob {
             }
         }
         super.setItemSlot(slotIn, stack);
-        if (!this.level().isClientSide) {
+        if (!this.level().isClientSide()) {
             this.setCombatTask();
         }
     }
@@ -187,11 +187,14 @@ public class EntityMimicube extends Monster implements RangedAttackMob {
     }
 
     public boolean isBlocking() {
-        return this.getMainHandItem().canPerformAction(ItemAbilities.SHIELD_BLOCK) || this.getOffhandItem().canPerformAction(ItemAbilities.SHIELD_BLOCK);
+        ItemStack mainHand = this.getMainHandItem();
+        ItemStack offHand = this.getOffhandItem();
+        return (mainHand.getItem() instanceof ShieldItem) || (offHand.getItem() instanceof ShieldItem);
     }
 
-    public boolean hurt(DamageSource source, float amount) {
-        Entity trueSource = source.getEntity();
+    protected void customServerAiStep(net.minecraft.server.level.ServerLevel serverLevel) {
+        super.customServerAiStep(serverLevel);
+        Entity trueSource = this.getLastHurtByMob();
         if (trueSource != null && trueSource instanceof LivingEntity attacker) {
             if (!attacker.getItemBySlot(EquipmentSlot.HEAD).isEmpty()) {
                 this.setItemSlot(EquipmentSlot.HEAD, mimicStack(attacker.getItemBySlot(EquipmentSlot.HEAD)));
@@ -203,7 +206,6 @@ public class EntityMimicube extends Monster implements RangedAttackMob {
                 this.setItemSlot(EquipmentSlot.MAINHAND, mimicStack(attacker.getItemBySlot(EquipmentSlot.MAINHAND)));
             }
         }
-        return super.hurt(source, amount);
     }
 
     private ItemStack mimicStack(ItemStack stack){
@@ -259,7 +261,7 @@ public class EntityMimicube extends Monster implements RangedAttackMob {
                 }
                 if (eatingTicks % 6 == 0) {
                     this.gameEvent(GameEvent.EAT);
-                    this.playSound(SoundEvents.GENERIC_EAT, this.getSoundVolume(), this.getVoicePitch());
+                    this.playSound(SoundEvents.GENERIC_EAT.value(), this.getSoundVolume(), this.getVoicePitch());
                 }
                 eatingTicks++;
             }
@@ -279,10 +281,10 @@ public class EntityMimicube extends Monster implements RangedAttackMob {
                     this.level().addParticle(new ItemParticleOption(ParticleTypes.ITEM, this.getItemInHand(InteractionHand.MAIN_HAND)), this.getX() + (double) (this.random.nextFloat() * this.getBbWidth()) - (double) this.getBbWidth() * 0.5F, this.getY() + this.getBbHeight() * 0.5F + (double) (this.random.nextFloat() * this.getBbHeight() * 0.5F), this.getZ() + (double) (this.random.nextFloat() * this.getBbWidth()) - (double) this.getBbWidth() * 0.5F, d0, d1, d2);
                 }
                 this.gameEvent(GameEvent.EAT);
-                this.playSound(SoundEvents.GENERIC_EAT, this.getSoundVolume(), this.getVoicePitch());
+                this.playSound(SoundEvents.GENERIC_EAT.value(), this.getSoundVolume(), this.getVoicePitch());
                 if (eatingTicks % 6 == 0) {
                     this.gameEvent(GameEvent.EAT);
-                    this.playSound(SoundEvents.GENERIC_EAT, this.getSoundVolume(), this.getVoicePitch());
+                    this.playSound(SoundEvents.GENERIC_EAT.value(), this.getSoundVolume(), this.getVoicePitch());
                 }
                 eatingTicks++;
             }
@@ -303,8 +305,8 @@ public class EntityMimicube extends Monster implements RangedAttackMob {
             this.wasOnGround = true;
         }
         if (this.entityData.get(ATTACK_TICK) > 0) {
-            if (this.entityData.get(ATTACK_TICK) == 2 && this.getTarget() != null && this.distanceTo(this.getTarget()) < 2.3D) {
-                super.doHurtTarget(this.getTarget());
+            if (this.entityData.get(ATTACK_TICK) == 2 && this.getTarget() != null && this.distanceTo(this.getTarget()) < 2.3D && this.level() instanceof net.minecraft.server.level.ServerLevel serverLevel) {
+                super.doHurtTarget(serverLevel, this.getTarget());
             }
             this.entityData.set(ATTACK_TICK, this.entityData.get(ATTACK_TICK) - 1);
             if (attackProgress < 3F) {
