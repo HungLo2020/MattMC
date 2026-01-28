@@ -1124,6 +1124,9 @@ public class EntityType<T extends Entity> implements FeatureElement, EntityTypeT
 	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntityAnteater> ANTEATER = register(
 		"anteater", EntityType.Builder.of(com.github.alexthe666.alexsmobs.entity.EntityAnteater::new, MobCategory.CREATURE).sized(1.2F, 0.9F).eyeHeight(0.7F).clientTrackingRange(10)
 	);
+	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntityMimicube> MIMICUBE = register(
+		"mimicube", EntityType.Builder.of(com.github.alexthe666.alexsmobs.entity.EntityMimicube::new, MobCategory.MONSTER).sized(1.02F, 1.02F).eyeHeight(0.51F).clientTrackingRange(10)
+	);
 	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntitySeagull> SEAGULL = register(
 		"seagull", EntityType.Builder.of(com.github.alexthe666.alexsmobs.entity.EntitySeagull::new, MobCategory.CREATURE).sized(0.5F, 0.6F).eyeHeight(0.5F).clientTrackingRange(10)
 	);
