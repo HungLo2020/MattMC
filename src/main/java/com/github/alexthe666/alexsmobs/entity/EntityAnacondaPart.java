@@ -97,8 +97,10 @@ public class EntityAnacondaPart extends LivingEntity implements IHurtableMultipa
     }
 
     @Override
-    public boolean canBeCollidedWith(@Nullable Entity entity) {
-        return true;
+    public void travel(Vec3 travelVector) {
+        // Override travel to prevent any movement from physics
+        // Parts are positioned manually by the head entity
+        this.setDeltaMovement(Vec3.ZERO);
     }
 
 
