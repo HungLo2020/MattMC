@@ -10,10 +10,5 @@ public class ItemSkelewagSword extends Item {
         super(props);
     }
 
-    @Override
-    public boolean isValidRepairItem(ItemStack stack, ItemStack repairStack) {
-        return repairStack.is(Items.BONE);
-    }
-
 }
 
