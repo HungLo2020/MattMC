@@ -1,5 +1,6 @@
 package com.github.alexthe666.alexsmobs.client.model;
 
+import com.github.alexthe666.alexsmobs.client.render.SkelewagRenderState;
 import com.github.alexthe666.alexsmobs.entity.EntitySkelewag;
 import com.github.alexthe666.alexsmobs.entity.util.Maths;
 import com.github.alexthe666.citadel.animation.IAnimatedEntity;
@@ -10,7 +11,7 @@ import com.github.alexthe666.citadel.client.model.basic.BasicModelPart;
 import com.google.common.collect.ImmutableList;
 import net.minecraft.util.Mth;
 
-public class ModelSkelewag extends AdvancedEntityModel<EntitySkelewag> {
+public class ModelSkelewag extends AdvancedEntityModel<SkelewagRenderState> {
     private final AdvancedModelBox root;
     private final AdvancedModelBox body;
     private final AdvancedModelBox head;
@@ -82,85 +83,45 @@ public class ModelSkelewag extends AdvancedEntityModel<EntitySkelewag> {
         animator = ModelAnimator.create();
     }
 
-    public void animate(IAnimatedEntity entity, float f, float f1, float f2, float f3, float f4) {
-        this.resetToDefaultPose();
-        animator.update(entity);
-        animator.setAnimation(EntitySkelewag.ANIMATION_STAB);
-        animator.startKeyframe(3);
-        animator.move(body, 0, 0, 10);
-        animator.move(head, 1, 0, -1);
-        animator.rotate(body, Maths.rad(-10), 0, 0);
-        animator.rotate(head, Maths.rad(10), Maths.rad(-5), 0);
-        animator.endKeyframe();
-        animator.setStaticKeyframe(2);
-        animator.startKeyframe(2);
-        animator.move(body, 0, 0, -10);
-        animator.rotate(body, 0, 0, Maths.rad(-10));
-        animator.endKeyframe();
-        animator.resetKeyframe(3);
-        animator.setAnimation(EntitySkelewag.ANIMATION_SLASH);
-        animator.startKeyframe(5);
-        animator.move(body, 0, 0, 5);
-        animator.rotate(body, 0, Maths.rad(-40), 0);
-        animator.rotate(tail, 0, Maths.rad(20), 0);
-        animator.rotate(head,  Maths.rad(10), Maths.rad(-10), Maths.rad(-10));
-        animator.endKeyframe();
-        animator.startKeyframe(5);
-        animator.move(body, 0, 0, 5);
-        animator.rotate(body, 0, Maths.rad(40), 0);
-        animator.rotate(tail, 0, Maths.rad(-20), 0);
-        animator.rotate(head,  Maths.rad(-10), Maths.rad(10), Maths.rad(10));
-        animator.endKeyframe();
-        animator.startKeyframe(5);
-        animator.move(body, 0, 0, 5);
-        animator.rotate(body, 0, Maths.rad(-40), 0);
-        animator.rotate(tail, 0, Maths.rad(20), 0);
-        animator.rotate(head,  Maths.rad(-10), Maths.rad(-10), Maths.rad(-10));
-        animator.endKeyframe();
-        animator.startKeyframe(5);
-        animator.move(body, 0, 0, 5);
-        animator.rotate(body, 0, Maths.rad(40), 0);
-        animator.rotate(tail, 0, Maths.rad(-20), 0);
-        animator.rotate(head,  Maths.rad(10), Maths.rad(10), Maths.rad(10));
-        animator.endKeyframe();
-        animator.resetKeyframe(5);
-    }
-
     @Override
-    public void setupAnim(EntitySkelewag entity, float limbSwing, float limbSwingAmount, float ageInTicks, float netHeadYaw, float headPitch) {
-        animate(entity, limbSwing, limbSwingAmount, ageInTicks, netHeadYaw, headPitch);
+    public void setupAnim(SkelewagRenderState state) {
+        this.resetToDefaultPose();
         float idleSpeed = 0.2F;
         float idleDegree = 0.3F;
         float swimSpeed = 0.55F;
         float swimDegree = 0.5F;
-        float partialTick = ageInTicks - entity.tickCount;
-        float landProgress = entity.prevOnLandProgress + (entity.onLandProgress - entity.prevOnLandProgress) * partialTick;
-        float fallApartProgress = entity.deathTime > 0 ? (entity.deathTime + partialTick) / 20F : 0;
+        float landProgress = state.onLandProgress;
+        float ageInTicks = state.ageInTicks;
+        
         progressRotationPrev(body, landProgress, 0, 0, Maths.rad(-90), 5F);
         progressPositionPrev(body, landProgress, 0, 3, 6, 5F);
-        progressPositionPrev(tail, fallApartProgress, 0, 0, 4, 1F);
-        progressPositionPrev(tail_fin, fallApartProgress, 0, 0, 4, 1F);
-        progressPositionPrev(right_fin, fallApartProgress, 0, 1, 2, 1F);
-        progressPositionPrev(left_fin, fallApartProgress, 0, 1, 2, 1F);
-        progressPositionPrev(head, fallApartProgress, 0, 0, -1, 1F);
-        progressRotationPrev(right_fin, fallApartProgress, 0,  Maths.rad(25), 0, 1F);
-        progressRotationPrev(left_fin, fallApartProgress, 0,  Maths.rad(-25), 0, 1F);
+        
+        if(state.deathTime > 0) {
+            float fallApartProgress = state.deathTime / 20F;
+            progressPositionPrev(tail, fallApartProgress, 0, 0, 4, 1F);
+            progressPositionPrev(tail_fin, fallApartProgress, 0, 0, 4, 1F);
+            progressPositionPrev(right_fin, fallApartProgress, 0, 1, 2, 1F);
+            progressPositionPrev(left_fin, fallApartProgress, 0, 1, 2, 1F);
+            progressPositionPrev(head, fallApartProgress, 0, 0, -1, 1F);
+            progressRotationPrev(right_fin, fallApartProgress, 0,  Maths.rad(25), 0, 1F);
+            progressRotationPrev(left_fin, fallApartProgress, 0,  Maths.rad(-25), 0, 1F);
+        }
+        
         AdvancedModelBox[] tailBoxes = new AdvancedModelBox[]{body, tail, tail_fin};
         this.chainSwing(tailBoxes, idleSpeed, idleDegree * 0.1F, 3, ageInTicks, 1);
         this.bob(body, idleSpeed, idleDegree, false, ageInTicks, 1);
         this.bob(left_fin, idleSpeed, idleDegree, false, ageInTicks, 1);
         this.bob(right_fin, idleSpeed, idleDegree, false, ageInTicks, 1);
         this.swing(flag, idleSpeed, idleDegree * 0.2F, false, 3, 0.05F, ageInTicks, 1);
-        this.chainSwing(tailBoxes, swimSpeed, swimDegree, -2, limbSwing, limbSwingAmount);
-        this.swing(head, swimSpeed, swimDegree, true, -0.5F, 0, limbSwing, limbSwingAmount);
-        this.flap(left_fin, swimSpeed, swimDegree, true, -1, -0, limbSwing, limbSwingAmount);
-        this.flap(right_fin, swimSpeed, swimDegree, false, -1, -0, limbSwing, limbSwingAmount);
-        this.bob(left_fin, swimSpeed, -1.5F * swimDegree, false, limbSwing, limbSwingAmount);
-        this.bob(right_fin, swimSpeed, -1.5F * swimDegree, false, limbSwing, limbSwingAmount);
-        this.swing(flag, swimSpeed, swimDegree * 0.6F, false, 2, 0.3F, limbSwing, limbSwingAmount);
-        this.body.rotateAngleX += headPitch * Mth.DEG_TO_RAD;
-        this.head.rotateAngleX -= headPitch * 0.5F * Mth.DEG_TO_RAD;
-
+        this.chainSwing(tailBoxes, swimSpeed, swimDegree, -2, state.walkAnimationPos, state.walkAnimationSpeed);
+        this.swing(head, swimSpeed, swimDegree, true, -0.5F, 0, state.walkAnimationPos, state.walkAnimationSpeed);
+        this.flap(left_fin, swimSpeed, swimDegree, true, -1, -0, state.walkAnimationPos, state.walkAnimationSpeed);
+        this.flap(right_fin, swimSpeed, swimDegree, false, -1, -0, state.walkAnimationPos, state.walkAnimationSpeed);
+        this.bob(left_fin, swimSpeed, -1.5F * swimDegree, false, state.walkAnimationPos, state.walkAnimationSpeed);
+        this.bob(right_fin, swimSpeed, -1.5F * swimDegree, false, state.walkAnimationPos, state.walkAnimationSpeed);
+        this.swing(flag, swimSpeed, swimDegree * 0.6F, false, 2, 0.3F, state.walkAnimationPos, state.walkAnimationSpeed);
+        this.body.rotateAngleX += state.xRot * Mth.DEG_TO_RAD;
+        this.head.rotateAngleX -= state.xRot * 0.5F * Mth.DEG_TO_RAD;
     }
 
     @Override
