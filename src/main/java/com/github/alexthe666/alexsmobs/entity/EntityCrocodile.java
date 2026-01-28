@@ -89,7 +89,7 @@ public class EntityCrocodile extends TamableAnimal implements IAnimatedEntity, I
     private int animationTick;
     private Animation currentAnimation;
 
-    protected EntityCrocodile(EntityType type, Level worldIn) {
+    public EntityCrocodile(EntityType type, Level worldIn) {
         super(type, worldIn);
         this.setPathfindingMalus(PathType.WATER, 0.0F);
         this.setPathfindingMalus(PathType.WATER_BORDER, 0.0F);
