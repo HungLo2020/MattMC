@@ -713,6 +713,13 @@ public class EntityType<T extends Entity> implements FeatureElement, EntityTypeT
 			.eyeHeight(1.5F)
 			.clientTrackingRange(10)
 	);
+	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntityHammerheadShark> HAMMERHEAD_SHARK = register(
+		"hammerhead_shark",
+		EntityType.Builder.of(com.github.alexthe666.alexsmobs.entity.EntityHammerheadShark::new, MobCategory.WATER_CREATURE)
+			.sized(1.4F, 0.8F)
+			.eyeHeight(0.4F)
+			.clientTrackingRange(10)
+	);
 	public static final EntityType<Guardian> GUARDIAN = register(
 		"guardian",
 		EntityType.Builder.of(Guardian::new, MobCategory.MONSTER)

@@ -2002,6 +2002,7 @@ public class CreativeModeTabs {
 					output.accept(Items.GRIZZLY_BEAR_SPAWN_EGG);
 					output.accept(Items.GROTTOCERATOPS_SPAWN_EGG);
 					output.accept(Items.GUARDIAN_SPAWN_EGG);
+					output.accept(Items.HAMMERHEAD_SHARK_SPAWN_EGG);
 					output.accept(Items.HAPPY_GHAST_SPAWN_EGG);
 					output.accept(Items.HOGLIN_SPAWN_EGG);
 					output.accept(Items.HUMMINGBIRD_SPAWN_EGG);
