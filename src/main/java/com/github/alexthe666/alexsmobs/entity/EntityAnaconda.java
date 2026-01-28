@@ -344,6 +344,7 @@ public class EntityAnaconda extends Animal implements ISemiAquatic {
                     final float prevReqRot = calcPartRotation(i) + getYawForPart(i);
                     final float reqRot = calcPartRotation(i + 1) + getYawForPart(i);
                     EntityAnacondaPart part = new EntityAnacondaPart(EntityType.ANACONDA_PART, this);
+                    part.noPhysics = true;
                     part.setParent(partParent);
                     part.copyDataFrom(this);
                     part.setBodyIndex(i);
