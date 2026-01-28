@@ -177,6 +177,7 @@ public class EntityRenderers {
 		register(EntityType.GRIZZLY_BEAR, com.github.alexthe666.alexsmobs.client.render.RenderGrizzlyBear::new);
 		register(EntityType.GROTTOCERATOPS, com.github.alexmodguy.alexscaves.client.render.entity.GrottoceratopsRenderer::new);
 		register(EntityType.GUARDIAN, GuardianRenderer::new);
+		register(EntityType.HAMMERHEAD_SHARK, com.github.alexthe666.alexsmobs.client.render.RenderHammerheadShark::new);
 		register(EntityType.HOGLIN, HoglinRenderer::new);
 		register(EntityType.HOPPER_MINECART, context -> new MinecartRenderer(context, ModelLayers.HOPPER_MINECART));
 		register(EntityType.HUMMINGBIRD, com.github.alexthe666.alexsmobs.client.render.RenderHummingbird::new);
