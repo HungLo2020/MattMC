@@ -108,7 +108,8 @@ public class EntityAnacondaPart extends LivingEntity implements IHurtableMultipa
 
     @Override
     public void aiStep() {
-        // Completely override aiStep to prevent any AI processing
+        // Completely override aiStep to prevent ALL AI and physics processing
+        // (velocity dampening, jump logic, movement calculations, etc.)
         // Parts are positioned manually by parent entity
     }
 
@@ -198,6 +199,7 @@ public class EntityAnacondaPart extends LivingEntity implements IHurtableMultipa
         this.yHeadRot = f;
         this.setPos(avg.x, avg.y, avg.z);
         this.setRot(f, f2);
+        // Mark as on ground to prevent fall physics and movement calculations
         this.setOnGround(true);
         headEntityId = headId;
         return avg;
