@@ -24,9 +24,6 @@ public class RenderHammerheadShark extends MobRenderer<EntityHammerheadShark, Ha
         super.extractRenderState(entity, state, partialTick);
     }
 
-    protected void scale(HammerheadSharkRenderState state, PoseStack matrixStackIn) {
-    }
-
     public ResourceLocation getTextureLocation(HammerheadSharkRenderState state) {
         return TEXTURE;
     }

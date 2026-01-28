@@ -93,8 +93,8 @@ public class EntityHammerheadShark extends WaterAnimal {
 
 
     public boolean isTargetBlocked(Vec3 target) {
-        Vec3 Vector3d = new Vec3(this.getX(), this.getEyeY(), this.getZ());
-        return this.level().clip(new ClipContext(Vector3d, target, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, this)).getType() == HitResult.Type.BLOCK;
+        Vec3 startVector = new Vec3(this.getX(), this.getEyeY(), this.getZ());
+        return this.level().clip(new ClipContext(startVector, target, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, this)).getType() == HitResult.Type.BLOCK;
     }
 
     public static AttributeSupplier.Builder bakeAttributes() {
@@ -133,29 +133,29 @@ public class EntityHammerheadShark extends WaterAnimal {
             return this.shark.getTarget() != null;
         }
 
-        public void start(){
+        public void start() {
             circlingTime = 0;
             maxCirclingTime = 360 + this.shark.random.nextInt(80);
             circleDistance = 5 + this.shark.random.nextFloat() * 5;
             clockwise = this.shark.random.nextBoolean();
         }
 
-        public void stop(){
+        public void stop() {
             circlingTime = 0;
             maxCirclingTime = 360 + this.shark.random.nextInt(80);
             circleDistance = 5 + this.shark.random.nextFloat() * 5;
             clockwise = this.shark.random.nextBoolean();
         }
 
-        public void tick(){
+        public void tick() {
             LivingEntity prey = this.shark.getTarget();
-            if(prey != null){
+            if (prey != null) {
                 double dist = this.shark.distanceTo(prey);
-                if(circlingTime >= maxCirclingTime){
+                if (circlingTime >= maxCirclingTime) {
                     shark.lookAt(prey, 30.0F, 30.0F);
                     shark.getNavigation().moveTo(prey, 1.5D);
-                    if(dist < 2D){
-                        if(!shark.level().isClientSide() && shark.level() instanceof ServerLevel serverLevel) {
+                    if (dist < 2D) {
+                        if (!shark.level().isClientSide() && shark.level() instanceof ServerLevel serverLevel) {
                             shark.doHurtTarget(serverLevel, prey);
                         }
                         // Shark tooth drop removed (item not implemented yet)
@@ -164,14 +164,14 @@ public class EntityHammerheadShark extends WaterAnimal {
                         // }
                         stop();
                     }
-                }else{
-                    if(dist <= 25){
+                } else {
+                    if (dist <= 25) {
                         circlingTime++;
                         BlockPos circlePos = getSharkCirclePos(prey);
-                        if(circlePos != null){
+                        if (circlePos != null) {
                             shark.getNavigation().moveTo(circlePos.getX() + 0.5D, circlePos.getY() + 0.5D, circlePos.getZ() + 0.5D, 0.6D);
                         }
-                    }else{
+                    } else {
                         shark.lookAt(prey, 30.0F, 30.0F);
                         shark.getNavigation().moveTo(prey, 0.8D);
                     }
@@ -184,11 +184,11 @@ public class EntityHammerheadShark extends WaterAnimal {
             double extraX = circleDistance * Mth.sin((angle));
             double extraZ = circleDistance * Mth.cos(angle);
             BlockPos ground = AMBlockPos.fromCoords(target.getX() + 0.5F + extraX, shark.getY(), target.getZ() + 0.5F + extraZ);
-            if(shark.level().getFluidState(ground).is(FluidTags.WATER)){
+            if (shark.level().getFluidState(ground).is(FluidTags.WATER)) {
                 return ground;
 
             }
             return null;
-    }
+        }
     }
 }

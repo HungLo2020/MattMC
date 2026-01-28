@@ -1,5 +1,7 @@
-package com.github.alexthe666.alexsmobs.client.model;// Made with Blockbench 3.7.4
-// Exported for Minecraft version 1.15
+package com.github.alexthe666.alexsmobs.client.model;
+
+// Made with Blockbench 3.7.4
+// Exported for Minecraft version 1.21
 // Paste this class into your mod and generate all required imports
 
 
@@ -143,7 +145,7 @@ public class ModelHammerheadShark extends AdvancedEntityModel<HammerheadSharkRen
 
 	@Override
 	public Iterable<AdvancedModelBox> getAllParts() {
-		return ImmutableList.of(root, main_body, head, head_hammer, finL, finR, tail1, tail2,tail3, tail_finL, tail_finR, tailbottomend, tailtopend, topfintail, topfin);
+		return ImmutableList.of(root, main_body, head, head_hammer, finL, finR, tail1, tail2, tail3, tail_finL, tail_finR, tailbottomend, tailtopend, topfintail, topfin);
 	}
 
 
