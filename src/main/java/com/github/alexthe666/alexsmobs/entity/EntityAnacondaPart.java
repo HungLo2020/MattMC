@@ -106,6 +106,12 @@ public class EntityAnacondaPart extends LivingEntity implements IHurtableMultipa
         // Do nothing - parts are positioned manually by parent entity
     }
 
+    @Override
+    public void travel(Vec3 vec3) {
+        // Do nothing - parts are positioned manually by parent entity
+        // Prevent any movement from being applied
+    }
+
 
     @Override
     public void tick() {
