@@ -19,10 +19,10 @@ public class KomodoDragonAIJostle  extends Goal {
     private final Level world;
     private float angle;
 
-    public KomodoDragonAIJostle(EntityKomodoDragon moose) {
+    public KomodoDragonAIJostle(EntityKomodoDragon komodoDragon) {
         this.setFlags(EnumSet.of(Flag.MOVE, Flag.LOOK, Flag.TARGET));
-        this.komodo = moose;
-        this.world = moose.level();
+        this.komodo = komodoDragon;
+        this.world = komodoDragon.level();
     }
 
     @Override

@@ -7,15 +7,12 @@ import com.github.alexthe666.alexsmobs.item.AMItemRegistry;
 import com.github.alexthe666.alexsmobs.misc.AMSoundRegistry;
 import com.github.alexthe666.alexsmobs.misc.AMTagRegistry;
 import net.minecraft.ChatFormatting;
-import net.minecraft.advancements.CriteriaTriggers;
 import net.minecraft.core.BlockPos;
-import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;
@@ -36,9 +33,18 @@ import net.minecraft.world.entity.ai.goal.target.OwnerHurtTargetGoal;
 import net.minecraft.world.entity.ai.targeting.TargetingConditions;
 import net.minecraft.world.entity.animal.Animal;
 import net.minecraft.world.entity.item.ItemEntity;
-import net.minecraft.world.entity.monster.Monster;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.projectile.AbstractArrow;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.item.crafting.Ingredient;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.LevelAccessor;
+import net.minecraft.world.phys.Vec3;
+
+import javax.annotation.Nullable;
+import java.util.UUID;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
@@ -488,11 +494,11 @@ public class EntityKomodoDragon extends TamableAnimal implements ITargetsDropped
         }
     }
 
-    public void pushBackJostling(EntityKomodoDragon entityMoose, float strength) {
-        applyKnockbackFromMoose(strength, entityMoose.getX() - this.getX(), entityMoose.getZ() - this.getZ());
+    public void pushBackJostling(EntityKomodoDragon otherDragon, float strength) {
+        applyJostleKnockback(strength, otherDragon.getX() - this.getX(), otherDragon.getZ() - this.getZ());
     }
 
-    private void applyKnockbackFromMoose(float strength, double ratioX, double ratioZ) {
+    private void applyJostleKnockback(float strength, double ratioX, double ratioZ) {
         if (!(strength <= 0.0F)) {
             this.hasImpulse = true;
             Vec3 vector3d = this.getDeltaMovement();
@@ -501,8 +507,8 @@ public class EntityKomodoDragon extends TamableAnimal implements ITargetsDropped
         }
     }
 
-    public boolean canJostleWith(EntityKomodoDragon moose) {
-        return !moose.isOrderedToSit() && !moose.isVehicle() && !moose.isBaby() && moose.getJostlingPartnerUUID() == null && moose.jostleCooldown == 0;
+    public boolean canJostleWith(EntityKomodoDragon other) {
+        return !other.isOrderedToSit() && !other.isVehicle() && !other.isBaby() && other.getJostlingPartnerUUID() == null && other.jostleCooldown == 0;
     }
 
     public void playJostleSound() {
