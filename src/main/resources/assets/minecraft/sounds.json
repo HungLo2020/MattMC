@@ -19794,6 +19794,21 @@
     ],
     "subtitle": "subtitles.entity.seagull.ambient"
   },
+  "entity.mimicube.hurt": {
+    "sounds": [
+      "mimicube_hurt_0",
+      "mimicube_hurt_1"
+    ],
+    "subtitle": "subtitles.entity.mimicube.hurt"
+  },
+  "entity.mimicube.jump": {
+    "sounds": [
+      "mimicube_jump_0",
+      "mimicube_jump_1",
+      "mimicube_jump_2"
+    ],
+    "subtitle": "subtitles.entity.mimicube.jump"
+  },
   "entity.sheep.ambient": {
     "sounds": [
       "mob/sheep/say1",
