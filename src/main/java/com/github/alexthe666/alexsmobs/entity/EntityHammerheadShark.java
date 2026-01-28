@@ -6,6 +6,7 @@ import com.github.alexthe666.alexsmobs.entity.ai.SemiAquaticPathNavigator;
 import com.github.alexthe666.alexsmobs.entity.util.Maths;
 import com.github.alexthe666.alexsmobs.misc.AMBlockPos;
 import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.tags.FluidTags;
@@ -18,6 +19,7 @@ import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.ai.goal.*;
 import net.minecraft.world.entity.ai.goal.target.HurtByTargetGoal;
 import net.minecraft.world.entity.ai.navigation.PathNavigation;
+import net.minecraft.world.entity.ai.targeting.TargetingConditions;
 import net.minecraft.world.entity.animal.AbstractSchoolingFish;
 import net.minecraft.world.entity.animal.Squid;
 import net.minecraft.world.entity.animal.WaterAnimal;
@@ -31,15 +33,14 @@ import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
 
 import java.util.EnumSet;
-import java.util.function.Predicate;
 
 public class EntityHammerheadShark extends WaterAnimal {
 
-    private static final Predicate<LivingEntity> INJURED_PREDICATE = (mob) -> {
+    private static final TargetingConditions.Selector INJURED_SELECTOR = (mob, level) -> {
         return mob.getHealth() <= mob.getMaxHealth() / 2D;
     };
 
-    protected EntityHammerheadShark(EntityType type, Level worldIn) {
+    public EntityHammerheadShark(EntityType type, Level worldIn) {
         super(type, worldIn);
         this.moveControl = new AquaticMoveController(this, 1F);
     }
@@ -83,7 +84,7 @@ public class EntityHammerheadShark extends WaterAnimal {
         this.goalSelector.addGoal(8, new FollowBoatGoal(this));
         this.goalSelector.addGoal(9, new AvoidEntityGoal<>(this, Guardian.class, 8.0F, 1.0D, 1.0D));
         this.targetSelector.addGoal(1, (new HurtByTargetGoal(this)));
-        this.targetSelector.addGoal(2, new EntityAINearestTarget3D(this, LivingEntity.class, 50, false, true, INJURED_PREDICATE));
+        this.targetSelector.addGoal(2, new EntityAINearestTarget3D(this, LivingEntity.class, 50, false, true, INJURED_SELECTOR));
         this.targetSelector.addGoal(2, new EntityAINearestTarget3D(this, Squid.class, 50, false, true, null));
         // Removed mimic octopus targeting (not implemented yet)
         // this.targetSelector.addGoal(2, new EntityAINearestTarget3D(this, EntityMimicOctopus.class, 80, false, true, null));
@@ -154,7 +155,9 @@ public class EntityHammerheadShark extends WaterAnimal {
                     shark.lookAt(prey, 30.0F, 30.0F);
                     shark.getNavigation().moveTo(prey, 1.5D);
                     if(dist < 2D){
-                        shark.doHurtTarget(prey);
+                        if(!shark.level().isClientSide() && shark.level() instanceof ServerLevel serverLevel) {
+                            shark.doHurtTarget(serverLevel, prey);
+                        }
                         // Shark tooth drop removed (item not implemented yet)
                         // if(shark.random.nextFloat() < 0.3F){
                         //     shark.spawnAtLocation(new ItemStack(Items.BONE));
