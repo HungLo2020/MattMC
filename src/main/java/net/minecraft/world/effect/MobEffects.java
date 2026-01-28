@@ -128,6 +128,9 @@ public class MobEffects {
 	public static final Holder<MobEffect> DEBILITATING_STING = register(
 		"debilitating_sting", new com.github.alexthe666.alexsmobs.effect.EffectDebilitatingSting()
 	);
+	public static final Holder<MobEffect> TIGERS_BLESSING = register(
+		"tigers_blessing", new com.github.alexthe666.alexsmobs.effect.EffectTigersBlessing()
+	);
 	public static final Holder<MobEffect> SUNBIRD_BLESSING = register(
 		"sunbird_blessing", new com.github.alexthe666.alexsmobs.effect.EffectSunbird(false)
 	);

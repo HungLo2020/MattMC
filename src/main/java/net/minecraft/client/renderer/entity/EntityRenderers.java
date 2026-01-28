@@ -274,6 +274,7 @@ public class EntityRenderers {
 		register(EntityType.TOUCAN, com.github.alexthe666.alexsmobs.client.render.RenderToucan::new);
 		register(EntityType.TARANTULA_HAWK, com.github.alexthe666.alexsmobs.client.render.RenderTarantulaHawk::new);
 		register(EntityType.TASMANIAN_DEVIL, com.github.alexthe666.alexsmobs.client.render.RenderTasmanianDevil::new);
+		register(EntityType.TIGER, com.github.alexthe666.alexsmobs.client.render.RenderTiger::new);
 		register(EntityType.UNDERMINER, com.github.alexthe666.alexsmobs.client.render.RenderUnderminer::new);
 		register(EntityType.WARPED_TOAD, com.github.alexthe666.alexsmobs.client.render.RenderWarpedToad::new);
 		register(EntityType.VALLUMRAPTOR, com.github.alexmodguy.alexscaves.client.render.entity.VallumraptorRenderer::new);

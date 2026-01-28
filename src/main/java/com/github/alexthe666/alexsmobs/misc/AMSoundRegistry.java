@@ -119,6 +119,11 @@ public class AMSoundRegistry {
     public static final DeferredHolder TASMANIAN_DEVIL_HURT = new DeferredHolder(() -> net.minecraft.sounds.SoundEvents.TASMANIAN_DEVIL_HURT);
     public static final DeferredHolder TASMANIAN_DEVIL_ROAR = new DeferredHolder(() -> net.minecraft.sounds.SoundEvents.TASMANIAN_DEVIL_ROAR);
     
+    // Tiger sounds - reference vanilla SoundEvents
+    public static final DeferredHolder TIGER_IDLE = new DeferredHolder(() -> net.minecraft.sounds.SoundEvents.TIGER_IDLE);
+    public static final DeferredHolder TIGER_HURT = new DeferredHolder(() -> net.minecraft.sounds.SoundEvents.TIGER_HURT);
+    public static final DeferredHolder TIGER_ANGRY = new DeferredHolder(() -> net.minecraft.sounds.SoundEvents.TIGER_ANGRY);
+    
     // Anteater sounds - reference vanilla SoundEvents
     public static final SoundEvent ANTEATER_HURT = net.minecraft.sounds.SoundEvents.ANTEATER_HURT;
     
