@@ -1441,6 +1441,9 @@ public class SoundEvents {
 	public static final SoundEvent TASMANIAN_DEVIL_IDLE = register("entity.tasmanian_devil.idle");
 	public static final SoundEvent TASMANIAN_DEVIL_HURT = register("entity.tasmanian_devil.hurt");
 	public static final SoundEvent TASMANIAN_DEVIL_ROAR = register("entity.tasmanian_devil.roar");
+	public static final SoundEvent TIGER_IDLE = register("entity.tiger.idle");
+	public static final SoundEvent TIGER_HURT = register("entity.tiger.hurt");
+	public static final SoundEvent TIGER_ANGRY = register("entity.tiger.angry");
 	public static final SoundEvent UNDERMINER_IDLE = register("entity.underminer.idle");
 	public static final SoundEvent UNDERMINER_HURT = register("entity.underminer.hurt");
 	public static final SoundEvent UNDERMINER_STEP = register("entity.underminer.step");

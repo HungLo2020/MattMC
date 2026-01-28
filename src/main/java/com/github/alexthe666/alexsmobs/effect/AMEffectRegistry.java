@@ -34,6 +34,17 @@ public class AMEffectRegistry {
     public static final Holder<MobEffect> DEBILITATING_STING = MobEffects.DEBILITATING_STING;
     
     /**
+     * Tiger's Blessing effect - protection from tigers after feeding them
+     * Registered in MobEffects.java
+     */
+    public static final Holder<MobEffect> TIGERS_BLESSING = MobEffects.TIGERS_BLESSING;
+    
+    /**
+     * Fear effect - placeholder using weakness
+     */
+    public static final Holder<MobEffect> FEAR = MobEffects.WEAKNESS;
+    
+    /**
      * Sunbird Blessing effect - grants slow falling and elytra boost
      * Registered in MobEffects.java
      */

@@ -89,6 +89,7 @@ import com.github.alexthe666.alexsmobs.entity.EntityTerrapin;
 import com.github.alexthe666.alexsmobs.entity.EntityAlligatorSnappingTurtle;
 import com.github.alexthe666.alexsmobs.entity.EntityAnaconda;
 import com.github.alexthe666.alexsmobs.entity.EntityAnacondaPart;
+import com.github.alexthe666.alexsmobs.entity.EntityTiger;
 import net.minecraft.world.entity.boss.enderdragon.EndCrystal;
 import net.minecraft.world.entity.boss.enderdragon.EnderDragon;
 import net.minecraft.world.entity.boss.wither.WitherBoss;
@@ -1343,6 +1344,13 @@ public class EntityType<T extends Entity> implements FeatureElement, EntityTypeT
 			.sized(0.7F, 0.6F)
 			.eyeHeight(0.4F)
 			.clientTrackingRange(8)
+	);
+	public static final EntityType<EntityTiger> TIGER = register(
+		"tiger",
+		EntityType.Builder.of(EntityTiger::new, MobCategory.CREATURE)
+			.sized(1.5F, 1.3F)
+			.eyeHeight(1.0F)
+			.clientTrackingRange(10)
 	);
 	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntityUnderminer> UNDERMINER = register(
 		"underminer",

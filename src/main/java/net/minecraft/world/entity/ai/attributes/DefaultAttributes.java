@@ -239,6 +239,7 @@ public class DefaultAttributes {
 		.put(EntityType.TOUCAN, com.github.alexthe666.alexsmobs.entity.EntityToucan.bakeAttributes().build())
 		.put(EntityType.TARANTULA_HAWK, com.github.alexthe666.alexsmobs.entity.EntityTarantulaHawk.bakeAttributes().build())
 		.put(EntityType.TASMANIAN_DEVIL, com.github.alexthe666.alexsmobs.entity.EntityTasmanianDevil.bakeAttributes().build())
+		.put(EntityType.TIGER, com.github.alexthe666.alexsmobs.entity.EntityTiger.bakeAttributes().build())
 		.put(EntityType.UNDERMINER, com.github.alexthe666.alexsmobs.entity.EntityUnderminer.bakeAttributes().build())
 		.put(EntityType.WARPED_TOAD, com.github.alexthe666.alexsmobs.entity.EntityWarpedToad.bakeAttributes().build())
 		.put(EntityType.VALLUMRAPTOR, VallumraptorEntity.createAttributes().build())

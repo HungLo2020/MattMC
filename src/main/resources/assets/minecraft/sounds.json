@@ -25975,5 +25975,30 @@
       "ambient/weather/rain4"
     ],
     "subtitle": "subtitles.weather.rain"
+  },
+  "entity.tiger.idle": {
+    "sounds": [
+      "tiger_idle_0",
+      "tiger_idle_1",
+      "tiger_idle_2",
+      "tiger_idle_3"
+    ],
+    "subtitle": "subtitles.entity.tiger.idle"
+  },
+  "entity.tiger.hurt": {
+    "sounds": [
+      "tiger_hurt_0",
+      "tiger_hurt_1",
+      "tiger_hurt_2"
+    ],
+    "subtitle": "subtitles.entity.tiger.hurt"
+  },
+  "entity.tiger.angry": {
+    "sounds": [
+      "tiger_angry_0",
+      "tiger_angry_1",
+      "tiger_angry_2"
+    ],
+    "subtitle": "subtitles.entity.tiger.angry"
   }
 }

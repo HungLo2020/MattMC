@@ -146,6 +146,10 @@ public class AMTagRegistry {
     // Tasmanian Devil-specific tags
     public static final TagKey<Item> TASMANIAN_DEVIL_HOWLING_FOODS = registerItemTag("tasmanian_devil_howling_foods");
 
+    // Tiger-specific tags
+    public static final TagKey<Item> TIGER_BREEDABLES = registerItemTag("tiger_breedables");
+    public static final TagKey<EntityType<?>> TIGER_TARGETS = registerEntityTag("tiger_targets");
+
     // Raccoon-specific tags
     public static final TagKey<Item> RACCOON_BREEDABLES = registerItemTag("raccoon_breedables");
     public static final TagKey<Item> RACCOON_TEAMING_FOODS = registerItemTag("raccoon_teaming_foods");
