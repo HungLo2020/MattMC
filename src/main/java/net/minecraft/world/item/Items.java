@@ -2675,8 +2675,6 @@ public class Items {
 	
 	// Skelewag items
 	public static final Item SKELEWAG_SWORD = registerItem("skelewag_sword", properties -> new com.github.alexthe666.alexsmobs.item.ItemSkelewagSword(properties), new Item.Properties().stacksTo(1).durability(430));
-	public static final Item SKELEWAG_SWORD_HAND = registerItem("skelewag_sword_hand", Item::new, new Item.Properties());
-	public static final Item SKELEWAG_SWORD_INVENTORY = registerItem("skelewag_sword_inventory", Item::new, new Item.Properties());
 
 	public static Item registerBlock(Block block) {
 		return registerBlock(block, BlockItem::new);

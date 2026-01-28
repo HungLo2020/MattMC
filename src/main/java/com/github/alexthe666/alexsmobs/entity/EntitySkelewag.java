@@ -102,7 +102,7 @@ public class EntitySkelewag extends Monster implements IAnimatedEntity {
     @Override
     protected void defineSynchedData(SynchedEntityData.Builder builder) {
         super.defineSynchedData(builder);
-        builder.define(VARIANT, Integer.valueOf(0));
+        builder.define(VARIANT, 0);
     }
 
     public static AttributeSupplier.Builder createAttributes() {
@@ -168,7 +168,7 @@ public class EntitySkelewag extends Monster implements IAnimatedEntity {
     }
 
     public void setVariant(int command) {
-        this.entityData.set(VARIANT, Integer.valueOf(command));
+        this.entityData.set(VARIANT, command);
     }
 
     protected void addAdditionalSaveData(net.minecraft.world.level.storage.ValueOutput valueOutput) {
@@ -207,7 +207,7 @@ public class EntitySkelewag extends Monster implements IAnimatedEntity {
             passenger.setYBodyRot(this.yBodyRot);
             Vec3 vec = new Vec3(0, this.getBbHeight() * 0.4F, this.getBbWidth() * -0.2F).xRot(-this.getXRot() * Mth.DEG_TO_RAD).yRot(-this.getYRot() * Mth.DEG_TO_RAD);
             double passengerYOffset = passenger instanceof Player ? -0.35D : -0.5D;
-            passenger.setPos(this.getX() + vec.x, this.getY() + vec.y + passengerYOffset, this.getZ() + vec.z);
+            moveFunc.accept(passenger, this.getX() + vec.x, this.getY() + vec.y + passengerYOffset, this.getZ() + vec.z);
         }
     }
 
@@ -222,9 +222,8 @@ public class EntitySkelewag extends Monster implements IAnimatedEntity {
             Drowned drowned = EntityType.DROWNED.create(level(), reason);
             if (drowned != null) {
                 drowned.finalizeSpawn(worldIn, difficultyIn, reason, spawnDataIn);
-                drowned.copyPosition(this);
+                drowned.setPos(this.getX(), this.getY(), this.getZ());
                 drowned.startRiding(this, false, false);
-                worldIn.addFreshEntityWithPassengers(drowned);
             }
         }
         if(reason == EntitySpawnReason.STRUCTURE){

@@ -6,7 +6,6 @@ import com.github.alexthe666.alexsmobs.entity.util.Maths;
 import com.github.alexthe666.citadel.animation.IAnimatedEntity;
 import com.github.alexthe666.citadel.client.model.AdvancedEntityModel;
 import com.github.alexthe666.citadel.client.model.AdvancedModelBox;
-import com.github.alexthe666.citadel.client.model.ModelAnimator;
 import com.github.alexthe666.citadel.client.model.basic.BasicModelPart;
 import com.google.common.collect.ImmutableList;
 import net.minecraft.util.Mth;
@@ -20,7 +19,6 @@ public class ModelSkelewag extends AdvancedEntityModel<SkelewagRenderState> {
     private final AdvancedModelBox right_fin;
     private final AdvancedModelBox tail;
     private final AdvancedModelBox tail_fin;
-    private ModelAnimator animator;
 
     public ModelSkelewag() {
         texWidth = 128;
@@ -80,7 +78,6 @@ public class ModelSkelewag extends AdvancedEntityModel<SkelewagRenderState> {
         tail.addChild(tail_fin);
         tail_fin.setTextureOffset(0, 31).addBox(0.0F, -12.0F, 0.0F, 0.0F, 25.0F, 11.0F, 0.0F, false);
         this.updateDefaultPose();
-        animator = ModelAnimator.create();
     }
 
     @Override
