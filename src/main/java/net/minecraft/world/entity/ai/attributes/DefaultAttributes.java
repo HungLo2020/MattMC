@@ -229,6 +229,7 @@ public class DefaultAttributes {
 		.put(EntityType.SHULKER, Shulker.createAttributes().build())
 		.put(EntityType.SILVERFISH, Silverfish.createAttributes().build())
 		.put(EntityType.SKELETON, AbstractSkeleton.createAttributes().build())
+		.put(EntityType.SKELEWAG, com.github.alexthe666.alexsmobs.entity.EntitySkelewag.createAttributes().build())
 		.put(EntityType.SKELETON_HORSE, SkeletonHorse.createAttributes().build())
 		.put(EntityType.SLIME, Monster.createMonsterAttributes().build())
 		.put(EntityType.SNIFFER, Sniffer.createAttributes().build())

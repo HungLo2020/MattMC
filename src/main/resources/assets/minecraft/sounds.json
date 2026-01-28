@@ -20014,6 +20014,20 @@
     ],
     "subtitle": "subtitles.block.generic.footsteps"
   },
+  "entity.skelewag.idle": {
+    "sounds": [
+      "skelewag_idle_0",
+      "skelewag_idle_1"
+    ],
+    "subtitle": "subtitles.entity.skelewag.idle"
+  },
+  "entity.skelewag.hurt": {
+    "sounds": [
+      "skelewag_hurt_0",
+      "skelewag_hurt_1"
+    ],
+    "subtitle": "subtitles.entity.skelewag.hurt"
+  },
   "entity.skeleton_horse.ambient": {
     "sounds": [
       "mob/horse/skeleton/idle1",

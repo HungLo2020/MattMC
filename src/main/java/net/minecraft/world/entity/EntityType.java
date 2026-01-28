@@ -1186,6 +1186,9 @@ public class EntityType<T extends Entity> implements FeatureElement, EntityTypeT
 		"skeleton",
 		EntityType.Builder.of(Skeleton::new, MobCategory.MONSTER).sized(0.6F, 1.99F).eyeHeight(1.74F).ridingOffset(-0.7F).clientTrackingRange(8).notInPeaceful()
 	);
+	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntitySkelewag> SKELEWAG = register(
+		"skelewag", EntityType.Builder.of(com.github.alexthe666.alexsmobs.entity.EntitySkelewag::new, MobCategory.MONSTER).sized(2F, 1.2F).eyeHeight(0.9F).clientTrackingRange(8).notInPeaceful()
+	);
 	public static final EntityType<SkeletonHorse> SKELETON_HORSE = register(
 		"skeleton_horse",
 		EntityType.Builder.of(SkeletonHorse::new, MobCategory.CREATURE)

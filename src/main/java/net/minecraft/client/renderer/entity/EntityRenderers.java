@@ -260,6 +260,7 @@ public class EntityRenderers {
 		register(EntityType.SHULKER_BULLET, ShulkerBulletRenderer::new);
 		register(EntityType.SILVERFISH, SilverfishRenderer::new);
 		register(EntityType.SKELETON, SkeletonRenderer::new);
+		register(EntityType.SKELEWAG, com.github.alexthe666.alexsmobs.client.render.RenderSkelewag::new);
 		register(EntityType.SKELETON_HORSE, context -> new UndeadHorseRenderer(context, UndeadHorseRenderer.Type.SKELETON));
 		register(EntityType.SLIME, SlimeRenderer::new);
 		register(EntityType.SMALL_FIREBALL, context -> new ThrownItemRenderer(context, 0.75F, true));

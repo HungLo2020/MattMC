@@ -1580,6 +1580,7 @@ public class CreativeModeTabs {
 						output.accept(Items.COPPER_SWORD);
 						output.accept(Items.IRON_SWORD);
 						output.accept(Items.GOLDEN_SWORD);
+						output.accept(Items.SKELEWAG_SWORD);
 						output.accept(Items.DIAMOND_SWORD);
 						output.accept(Items.NETHERITE_SWORD);
 						output.accept(Items.WOODEN_AXE);
@@ -2056,6 +2057,7 @@ public class CreativeModeTabs {
 					output.accept(Items.SHULKER_SPAWN_EGG);
 					output.accept(Items.SILVERFISH_SPAWN_EGG);
 					output.accept(Items.SKELETON_SPAWN_EGG);
+					output.accept(Items.SKELEWAG_SPAWN_EGG);
 					output.accept(Items.SKELETON_HORSE_SPAWN_EGG);
 					output.accept(Items.SLIME_SPAWN_EGG);
 					output.accept(Items.SNIFFER_SPAWN_EGG);
