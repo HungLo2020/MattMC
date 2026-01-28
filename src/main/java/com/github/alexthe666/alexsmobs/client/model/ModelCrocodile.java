@@ -1,5 +1,6 @@
 package com.github.alexthe666.alexsmobs.client.model;
 
+import com.github.alexthe666.alexsmobs.client.render.CrocodileRenderState;
 import com.github.alexthe666.alexsmobs.entity.EntityCrocodile;
 import com.github.alexthe666.alexsmobs.entity.util.Maths;
 import com.github.alexthe666.citadel.animation.IAnimatedEntity;
@@ -10,9 +11,8 @@ import com.github.alexthe666.citadel.client.model.basic.BasicModelPart;
 import com.google.common.collect.ImmutableList;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
-import net.minecraft.client.Minecraft;
 
-public class ModelCrocodile extends AdvancedEntityModel<EntityCrocodile> {
+public class ModelCrocodile extends AdvancedEntityModel<CrocodileRenderState> {
     private final AdvancedModelBox root;
     private final AdvancedModelBox body;
     private final AdvancedModelBox left_leg;
@@ -39,6 +39,8 @@ public class ModelCrocodile extends AdvancedEntityModel<EntityCrocodile> {
     public ModelCrocodile() {
         texWidth = 256;
         texHeight = 256;
+        textureWidth = 256;
+        textureHeight = 256;
 
         root = new AdvancedModelBox(this, "root");
         root.setRotationPoint(0.0F, 24.0F, 0.0F);
@@ -191,24 +193,28 @@ public class ModelCrocodile extends AdvancedEntityModel<EntityCrocodile> {
     }
 
     @Override
-    public void setupAnim(EntityCrocodile entityIn, float limbSwing, float limbSwingAmount, float ageInTicks, float netHeadYaw, float headPitch) {
+    public void setupAnim(CrocodileRenderState state) {
         this.resetToDefaultPose();
-        animate(entityIn, limbSwing, limbSwingAmount, ageInTicks, netHeadYaw, headPitch);
-        boolean swimAnimate = entityIn.isInWater();
+        float limbSwing = state.walkAnimationPos;
+        float limbSwingAmount = state.walkAnimationSpeed;
+        float ageInTicks = state.ageInTicks;
+        float netHeadYaw = state.yRot;
+        float headPitch = state.xRot;
+        
+        boolean swimAnimate = state.isInWater;
         float walkSpeed = 0.7F;
         float walkDegree = 0.7F;
         float swimSpeed = 1.0F;
         float swimDegree = 0.2F;
-        float partialTick = Minecraft.getInstance().getTimer().getGameTimeDeltaPartialTick(false);
-        float swimProgress = entityIn.prevSwimProgress + (entityIn.swimProgress - entityIn.prevSwimProgress) * partialTick;
-        float baskProgress = entityIn.prevBaskingProgress + (entityIn.baskingProgress - entityIn.prevBaskingProgress) * partialTick;
-        float grabProgress = entityIn.prevGrabProgress + (entityIn.grabProgress - entityIn.prevGrabProgress) * partialTick;
+        float swimProgress = state.swimProgress;
+        float baskProgress = state.baskingProgress;
+        float grabProgress = state.grabProgress;
         if (!swimAnimate && grabProgress <= 0) {
             this.faceTarget(netHeadYaw, headPitch, 2, neck, head);
         }
         progressRotationPrev(jaw, grabProgress, Maths.rad(30), 0, 0, 10F);
         progressRotationPrev(head, grabProgress, Maths.rad(-10), 0, 0, 10F);
-        if (entityIn.baskingType == 0) {
+        if (state.baskingType == 0) {
             progressRotationPrev(body, baskProgress, 0, Maths.rad(-7), 0, 10F);
             progressRotationPrev(tail1, baskProgress, 0, Maths.rad(30), 0, 10F);
             progressRotationPrev(tail2, baskProgress, 0, Maths.rad(20), 0, 10F);
@@ -216,7 +222,7 @@ public class ModelCrocodile extends AdvancedEntityModel<EntityCrocodile> {
             progressRotationPrev(neck, baskProgress, 0, Maths.rad(-10), 0, 10F);
             progressRotationPrev(head, baskProgress, Maths.rad(-60), Maths.rad(-10), 0, 10F);
             progressRotationPrev(jaw, baskProgress, Maths.rad(60), 0, 0, 10F);
-        } else if (entityIn.baskingType == 1) {
+        } else if (state.baskingType == 1) {
             progressRotationPrev(body, baskProgress, 0, Maths.rad(7), 0, 10F);
             progressRotationPrev(tail1, baskProgress, 0, Maths.rad(-30), 0, 10F);
             progressRotationPrev(tail2, baskProgress, 0, Maths.rad(-20), 0, 10F);
@@ -290,29 +296,6 @@ public class ModelCrocodile extends AdvancedEntityModel<EntityCrocodile> {
     @Override
     public Iterable<AdvancedModelBox> getAllParts() {
         return ImmutableList.of(root, body, neck, head, jaw, left_arm, right_arm, left_leg, right_leg, tail1, tail2, tail3, crown, left_foot, right_foot, left_hand, right_hand, left_upperteeth, right_upperteeth, left_lowerteeth, right_lowerteeth);
-    }
-
-    public void renderToBuffer(PoseStack matrixStackIn, VertexConsumer bufferIn, int packedLightIn, int packedOverlayIn, int color) {
-        if (this.young) {
-            float f = 1.5F;
-            head.setScale(f, f, f);
-            head.setShouldScaleChildren(true);
-            matrixStackIn.pushPose();
-            matrixStackIn.scale(0.15F, 0.15F, 0.15F);
-            matrixStackIn.translate(0.0D, 8.5D, 0.125D);
-            parts().forEach((p_228292_8_) -> {
-                p_228292_8_.render(matrixStackIn, bufferIn, packedLightIn, packedOverlayIn, -1);
-            });
-            matrixStackIn.popPose();
-            head.setScale(1, 1, 1);
-        } else {
-            matrixStackIn.pushPose();
-            parts().forEach((p_228290_8_) -> {
-                p_228290_8_.render(matrixStackIn, bufferIn, packedLightIn, packedOverlayIn, -1);
-            });
-            matrixStackIn.popPose();
-        }
-
     }
 
     public void setRotationAngle(AdvancedModelBox advancedModelBox, float x, float y, float z) {
