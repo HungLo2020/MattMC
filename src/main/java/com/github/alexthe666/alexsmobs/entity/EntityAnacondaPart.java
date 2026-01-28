@@ -96,6 +96,11 @@ public class EntityAnacondaPart extends LivingEntity implements IHurtableMultipa
         return false;
     }
 
+    @Override
+    public boolean canBeCollidedWith(@Nullable Entity entity) {
+        return true;
+    }
+
 
     @Override
     public void tick() {
