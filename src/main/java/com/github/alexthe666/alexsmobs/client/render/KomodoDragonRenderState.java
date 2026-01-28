@@ -16,4 +16,7 @@ public class KomodoDragonRenderState extends LivingEntityRenderState {
     public boolean isSaddled;
     public boolean isMaid;
     public boolean isBaby;
+    public int hurtTime;
+    public int deathTime;
+    public float partialTick;
 }

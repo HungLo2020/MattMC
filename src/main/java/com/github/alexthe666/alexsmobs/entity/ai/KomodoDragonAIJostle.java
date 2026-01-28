@@ -1,6 +1,7 @@
 package com.github.alexthe666.alexsmobs.entity.ai;
 
 import com.github.alexthe666.alexsmobs.entity.EntityKomodoDragon;
+import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.ai.goal.Goal;
 import net.minecraft.world.entity.ai.targeting.TargetingConditions;
 import net.minecraft.world.level.Level;
@@ -142,14 +143,18 @@ public class KomodoDragonAIJostle  extends Goal {
 
     @Nullable
     private EntityKomodoDragon getNearbyKomodoDragon() {
-        List<EntityKomodoDragon> komodoDragons = this.world.getNearbyEntities(EntityKomodoDragon.class, JOSTLE_PREDICATE, this.komodo, this.komodo.getBoundingBox().inflate(16.0D));
+        List<EntityKomodoDragon> komodoDragons = this.world.getEntities(
+            EntityType.KOMODO_DRAGON,
+            this.komodo.getBoundingBox().inflate(16.0D),
+            (komodo) -> this.komodo.canJostleWith(komodo)
+        );
         double lvt_2_1_ = 1.7976931348623157E308D;
         EntityKomodoDragon lvt_4_1_ = null;
         Iterator var5 = komodoDragons.iterator();
 
         while (var5.hasNext()) {
             EntityKomodoDragon lvt_6_1_ = (EntityKomodoDragon) var5.next();
-            if (this.komodo.canJostleWith(lvt_6_1_) && this.komodo.distanceToSqr(lvt_6_1_) < lvt_2_1_) {
+            if (this.komodo.distanceToSqr(lvt_6_1_) < lvt_2_1_) {
                 lvt_4_1_ = lvt_6_1_;
                 lvt_2_1_ = this.komodo.distanceToSqr(lvt_6_1_);
             }

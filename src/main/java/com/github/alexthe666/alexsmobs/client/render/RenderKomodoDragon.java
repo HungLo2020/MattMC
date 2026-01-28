@@ -38,6 +38,9 @@ public class RenderKomodoDragon extends MobRenderer<EntityKomodoDragon, KomodoDr
         renderState.isSaddled = komodo.isSaddled();
         renderState.isMaid = komodo.isMaid();
         renderState.isBaby = komodo.isBaby();
+        renderState.hurtTime = komodo.hurtTime;
+        renderState.deathTime = komodo.deathTime;
+        renderState.partialTick = partialTick;
     }
 
     protected void scale(KomodoDragonRenderState renderState, PoseStack matrixStackIn) {
@@ -56,18 +59,22 @@ public class RenderKomodoDragon extends MobRenderer<EntityKomodoDragon, KomodoDr
             super(render);
         }
 
-        public void render(PoseStack matrixStackIn, MultiBufferSource bufferIn, int packedLightIn, KomodoDragonRenderState renderState, float netHeadYaw, float headPitch) {
+        @Override
+        public void submit(PoseStack poseStack, net.minecraft.client.renderer.SubmitNodeCollector submitNodeCollector, int packedLight, 
+                           KomodoDragonRenderState renderState, float netHeadYaw, float headPitch) {
             if(renderState.isMaid){
-                VertexConsumer maid = bufferIn.getBuffer(AMRenderTypes.entityCutoutNoCull(TEXTURE_MAID));
-                this.getParentModel().copyPropertiesTo(MAID_MODEL);
+                submitNodeCollector.order(1)
+                    .submitModel(MAID_MODEL, renderState, poseStack,
+                        AMRenderTypes.entityCutoutNoCull(TEXTURE_MAID), packedLight,
+                        net.minecraft.client.renderer.texture.OverlayTexture.pack(0, renderState.hurtTime > 0), -1, null, renderState.outlineColor, null);
                 MAID_MODEL.setupAnim(renderState);
-                MAID_MODEL.renderToBuffer(matrixStackIn, maid, packedLightIn, LivingEntityRenderer.getWhiteOverlayProgress(renderState.hurtTime, renderState.deathTime), -1);
             }
             if(renderState.isSaddled){
-                VertexConsumer saddle = bufferIn.getBuffer(AMRenderTypes.entityCutoutNoCull(TEXTURE_SADDLE));
-                this.getParentModel().copyPropertiesTo(SADDLE_MODEL);
+                submitNodeCollector.order(1)
+                    .submitModel(SADDLE_MODEL, renderState, poseStack,
+                        AMRenderTypes.entityCutoutNoCull(TEXTURE_SADDLE), packedLight,
+                        net.minecraft.client.renderer.texture.OverlayTexture.pack(0, renderState.hurtTime > 0), -1, null, renderState.outlineColor, null);
                 SADDLE_MODEL.setupAnim(renderState);
-                SADDLE_MODEL.renderToBuffer(matrixStackIn, saddle, packedLightIn, LivingEntityRenderer.getWhiteOverlayProgress(renderState.hurtTime, renderState.deathTime), -1);
             }
         }
     }

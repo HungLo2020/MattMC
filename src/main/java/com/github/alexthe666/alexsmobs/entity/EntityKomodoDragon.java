@@ -33,6 +33,7 @@ import net.minecraft.world.entity.ai.goal.target.HurtByTargetGoal;
 import net.minecraft.world.entity.ai.goal.target.NearestAttackableTargetGoal;
 import net.minecraft.world.entity.ai.goal.target.OwnerHurtByTargetGoal;
 import net.minecraft.world.entity.ai.goal.target.OwnerHurtTargetGoal;
+import net.minecraft.world.entity.ai.targeting.TargetingConditions;
 import net.minecraft.world.entity.animal.Animal;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.monster.Monster;
@@ -58,14 +59,14 @@ public class EntityKomodoDragon extends TamableAnimal implements ITargetsDropped
     public int timeUntilSpit = this.random.nextInt(12000) + 24000;
     public float nextJostleAngleFromServer;
     private int riderAttackCooldown = 0;
-    public static final Predicate<EntityKomodoDragon> HURT_OR_BABY = (p_213616_0_) -> {
-        return p_213616_0_.isBaby() || p_213616_0_.getHealth() <= 0.7F * p_213616_0_.getMaxHealth();
+    public static final TargetingConditions.Selector HURT_OR_BABY = (LivingEntity entity, ServerLevel level) -> {
+        return entity instanceof EntityKomodoDragon && (((EntityKomodoDragon)entity).isBaby() || entity.getHealth() <= 0.7F * entity.getMaxHealth());
     };
     protected static final EntityDimensions JOSTLING_SIZE = EntityDimensions.scalable(1.35F, 1.85F);
     private static final EntityDataAccessor<Integer> COMMAND = SynchedEntityData.defineId(EntityKomodoDragon.class, EntityDataSerializers.INT);
     private static final EntityDataAccessor<Boolean> JOSTLING = SynchedEntityData.defineId(EntityKomodoDragon.class, EntityDataSerializers.BOOLEAN);
     private static final EntityDataAccessor<Float> JOSTLE_ANGLE = SynchedEntityData.defineId(EntityKomodoDragon.class, EntityDataSerializers.FLOAT);
-    private static final EntityDataAccessor<Optional<UUID>> JOSTLER_UUID = SynchedEntityData.defineId(EntityKomodoDragon.class, EntityDataSerializers.OPTIONAL_UNIQUE_ID);
+    private static final EntityDataAccessor<String> JOSTLER_UUID = SynchedEntityData.defineId(EntityKomodoDragon.class, EntityDataSerializers.STRING);
     private static final EntityDataAccessor<Boolean> SADDLED = SynchedEntityData.defineId(EntityKomodoDragon.class, EntityDataSerializers.BOOLEAN);
     public float prevJostleAngle;
     public float prevJostleProgress;
@@ -85,7 +86,7 @@ public class EntityKomodoDragon extends TamableAnimal implements ITargetsDropped
         builder.define(JOSTLING, false);
         builder.define(SADDLED, false);
         builder.define(JOSTLE_ANGLE, 0F);
-        builder.define(JOSTLER_UUID, Optional.empty());
+        builder.define(JOSTLER_UUID, "");
     }
 
     public int getCommand() {
@@ -122,9 +123,7 @@ public class EntityKomodoDragon extends TamableAnimal implements ITargetsDropped
         this.targetSelector.addGoal(2, new OwnerHurtTargetGoal(this));
         this.targetSelector.addGoal(3, new HurtByTargetGoal(this));
         this.targetSelector.addGoal(4, new CreatureAITargetItems(this, false));
-        this.targetSelector.addGoal(6, new NearestAttackableTargetGoal<>(this, EntityKomodoDragon.class, 50, true, false, (komodo) -> {
-            return komodo.isBaby() || komodo.getHealth() <= 0.7F * komodo.getMaxHealth();
-        }));
+        this.targetSelector.addGoal(6, new NearestAttackableTargetGoal<EntityKomodoDragon>(this, EntityKomodoDragon.class, 50, true, false, HURT_OR_BABY));
         this.targetSelector.addGoal(7, new NearestAttackableTargetGoal(this, Player.class, 150, true, true, null));
         this.targetSelector.addGoal(8, new EntityAINearestTarget3D(this, LivingEntity.class, 180, false, true, AMEntityRegistry.buildPredicateFromTag(AMTagRegistry.KOMODO_DRAGON_TARGETS)));
     }
@@ -179,8 +178,7 @@ public class EntityKomodoDragon extends TamableAnimal implements ITargetsDropped
         return AMSoundRegistry.KOMODO_DRAGON_HURT.get();
     }
 
-    @Override
-    protected void readAdditionalSaveData(net.minecraft.nbt.ValueInput valueInput) {
+    protected void readAdditionalSaveData(net.minecraft.world.level.storage.ValueInput valueInput) {
         super.readAdditionalSaveData(valueInput);
         if (valueInput.getIntOr("SpitTime", -1) >= 0) {
             this.timeUntilSpit = valueInput.getIntOr("SpitTime", this.random.nextInt(12000) + 24000);
@@ -190,8 +188,7 @@ public class EntityKomodoDragon extends TamableAnimal implements ITargetsDropped
         this.setSaddled(valueInput.getBooleanOr("Saddle", false));
     }
 
-    @Override
-    protected void addAdditionalSaveData(net.minecraft.nbt.ValueOutput valueOutput) {
+    protected void addAdditionalSaveData(net.minecraft.world.level.storage.ValueOutput valueOutput) {
         super.addAdditionalSaveData(valueOutput);
         valueOutput.putInt("SpitTime", this.timeUntilSpit);
         valueOutput.putInt("KomodoCommand", this.getCommand());
@@ -378,7 +375,7 @@ public class EntityKomodoDragon extends TamableAnimal implements ITargetsDropped
                 return InteractionResult.SUCCESS;
             }else if(itemstack.is(net.minecraft.world.item.Items.SHEARS) && this.isSaddled()){
                 this.setSaddled(false);
-                this.spawnAtLocation(Items.SADDLE);
+                this.spawnAtLocation((ServerLevel)this.level(), Items.SADDLE);
                 return InteractionResult.SUCCESS;
             }else{
                 if(!player.isShiftKeyDown() && !this.isBaby() && this.isSaddled()){
@@ -405,12 +402,8 @@ public class EntityKomodoDragon extends TamableAnimal implements ITargetsDropped
         return type;
     }
 
-    protected EntityKomodoDragon(EntityType<? extends TamableAnimal> type, Level worldIn) {
+    public EntityKomodoDragon(EntityType<EntityKomodoDragon> type, Level worldIn) {
         super(type, worldIn);
-    }
-
-    public EntityKomodoDragon(Level worldIn) {
-        this(EntityType.KOMODO_DRAGON, worldIn);
     }
 
     protected float getWaterSlowDown() {
@@ -428,9 +421,8 @@ public class EntityKomodoDragon extends TamableAnimal implements ITargetsDropped
 
     @Nullable
     @Override
-    public AgeableMob getBreedOffspring(ServerLevel p_241840_1_, AgeableMob p_241840_2_) {
-        EntityKomodoDragon baby = AMEntityRegistry.KOMODO_DRAGON.get().create(p_241840_1_, EntitySpawnReason.BREEDING);
-        return baby;
+    public AgeableMob getBreedOffspring(ServerLevel serverLevel, AgeableMob ageable) {
+        return EntityType.KOMODO_DRAGON.create(serverLevel, EntitySpawnReason.BREEDING);
     }
 
     @Override
@@ -464,18 +456,26 @@ public class EntityKomodoDragon extends TamableAnimal implements ITargetsDropped
 
     @Nullable
     public UUID getJostlingPartnerUUID() {
-        return this.entityData.get(JOSTLER_UUID).orElse(null);
+        String uuidStr = this.entityData.get(JOSTLER_UUID);
+        if (uuidStr == null || uuidStr.isEmpty()) {
+            return null;
+        }
+        try {
+            return UUID.fromString(uuidStr);
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
     }
 
     public void setJostlingPartnerUUID(@Nullable UUID uniqueId) {
-        this.entityData.set(JOSTLER_UUID, Optional.ofNullable(uniqueId));
+        this.entityData.set(JOSTLER_UUID, uniqueId == null ? "" : uniqueId.toString());
     }
 
     @Nullable
     public Entity getJostlingPartner() {
         UUID id = getJostlingPartnerUUID();
-        if (id != null && !this.level().isClientSide) {
-            return ((ServerLevel) level()).getEntity(id);
+        if (id != null && this.level() instanceof ServerLevel serverLevel) {
+            return serverLevel.getEntity(id);
         }
         return null;
     }

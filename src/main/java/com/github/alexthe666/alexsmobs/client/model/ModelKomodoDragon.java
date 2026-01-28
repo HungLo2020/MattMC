@@ -114,11 +114,21 @@ public class ModelKomodoDragon extends AdvancedEntityModel<KomodoDragonRenderSta
 	@Override
 	public void setupAnim(KomodoDragonRenderState renderState) {
 		this.resetToDefaultPose();
+		
+		// Handle baby scaling
+		if (renderState.isBaby) {
+			float f = 1.75F;
+			head.setScale(f, f, f);
+			head.setShouldScaleChildren(true);
+		} else {
+			head.setScale(1, 1, 1);
+		}
+		
 		float idleSpeed = 0.7F;
 		float idleDegree = 0.7F;
 		float walkSpeed = 0.5F;
 		float walkDegree = 0.7F;
-		float partialTick = Minecraft.getInstance().getTimer().getGameTimeDeltaPartialTick(false);
+		float partialTick = renderState.partialTick;
 		float sitProgress = renderState.prevSitProgress + (renderState.sitProgress - renderState.prevSitProgress) * partialTick;
 		float jostleProgress = renderState.prevJostleProgress + (renderState.jostleProgress - renderState.prevJostleProgress) * partialTick;
 		float jostleAngle = renderState.prevJostleAngle + (renderState.jostleAngle - renderState.prevJostleAngle) * partialTick;
@@ -198,29 +208,6 @@ public class ModelKomodoDragon extends AdvancedEntityModel<KomodoDragonRenderSta
 			this.head.rotateAngleX -= inv;
 		} else {
 			this.faceTarget(netHeadYaw, headPitch, 1, neck, head);
-		}
-
-	}
-
-	public void renderToBuffer(PoseStack matrixStackIn, VertexConsumer bufferIn, int packedLightIn, int packedOverlayIn, int color) {
-		if (this.young) {
-			float f = 1.75F;
-			head.setScale(f, f, f);
-			head.setShouldScaleChildren(true);
-			matrixStackIn.pushPose();
-			matrixStackIn.scale(0.35F, 0.35F, 0.35F);
-			matrixStackIn.translate(0.0D, 2.75D, 0.125D);
-			parts().forEach((p_228292_8_) -> {
-				p_228292_8_.render(matrixStackIn, bufferIn, packedLightIn, packedOverlayIn, -1);
-			});
-			matrixStackIn.popPose();
-			head.setScale(1, 1, 1);
-		} else {
-			matrixStackIn.pushPose();
-			parts().forEach((p_228290_8_) -> {
-				p_228290_8_.render(matrixStackIn, bufferIn, packedLightIn, packedOverlayIn, -1);
-			});
-			matrixStackIn.popPose();
 		}
 
 	}
