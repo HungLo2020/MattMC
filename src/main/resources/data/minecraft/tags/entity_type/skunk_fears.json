@@ -1,5 +1,5 @@
 {
-  "__comment": "All mobs that mimic octopus flees, players included separately.",
+  "__comment": "All mobs that skunks fear.",
   "replace": false,
   "values": [
     "minecraft:player",

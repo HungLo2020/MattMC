@@ -1,5 +1,5 @@
 {
-  "__comment": "all land animal (non villager, non player) mobs that passive.",
+  "__comment": "all land animal (non-villager, non-player) mobs that are passive.",
   "replace": false,
   "values": [
     "minecraft:cat",
