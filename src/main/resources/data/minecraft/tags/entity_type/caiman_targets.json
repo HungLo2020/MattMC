@@ -1,0 +1,24 @@
+{
+  "__comment": "all non-player targets of the caiman mob.",
+  "replace": false,
+  "values": [
+    "minecraft:chicken",
+    "minecraft:tropical_fish",
+    "minecraft:cod",
+    "minecraft:salmon",
+    "minecraft:parrot",
+    "minecraft:rabbit",
+    "minecraft:crow",
+    "minecraft:toucan",
+    "minecraft:jerboa",
+    "minecraft:frog",
+    "minecraft:blue_jay",
+    "minecraft:terrapin",
+    "minecraft:catfish",
+    "minecraft:flying_fish",
+    "minecraft:rain_frog",
+    "minecraft:sugar_glider",
+    "minecraft:banana_slug",
+    "minecraft:triops"
+  ]
+}

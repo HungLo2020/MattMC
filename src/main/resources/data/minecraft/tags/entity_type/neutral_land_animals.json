@@ -1,0 +1,21 @@
+{
+  "__comment": "all land animal (non villager, non player) mobs that neutral AND somewhat strong. For big predators to target.",
+  "replace": false,
+  "values": [
+    "minecraft:polar_bear",
+    "minecraft:bald_eagle",
+    "minecraft:elephant",
+    "minecraft:endergrade",
+    "minecraft:grizzly_bear",
+    "minecraft:gorilla",
+    "minecraft:kangaroo",
+    "minecraft:moose",
+    "minecraft:raccoon",
+    "minecraft:rattlesnake",
+    "minecraft:snow_leopard",
+    "minecraft:tiger",
+    "minecraft:anteater",
+    "minecraft:gelada_monkey",
+    "minecraft:caiman"
+  ]
+}

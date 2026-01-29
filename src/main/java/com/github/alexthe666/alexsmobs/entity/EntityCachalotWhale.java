@@ -248,8 +248,7 @@ public class EntityCachalotWhale extends Animal {
         this.goalSelector.addGoal(6, new LookAtPlayerGoal(this, Player.class, 20.0F));
         this.goalSelector.addGoal(7, new FollowBoatGoal(this));
         this.targetSelector.addGoal(1, (new AnimalAIHurtByTargetNotBaby(this).setAlertOthers()));
-        // STUB: Target goal simplified - AMEntityRegistry.buildPredicateFromTag not available
-        this.targetSelector.addGoal(2, new EntityAINearestTarget3D(this, LivingEntity.class, 30, false, true, (living, serverLevel) -> living instanceof net.minecraft.world.entity.animal.Squid || living instanceof net.minecraft.world.entity.monster.Guardian) {
+        this.targetSelector.addGoal(2, new EntityAINearestTarget3D(this, LivingEntity.class, 30, false, true, AMEntityRegistry.buildPredicateFromTag(AMTagRegistry.CACHALOT_WHALE_TARGETS)) {
             public boolean canUse() {
                 return !EntityCachalotWhale.this.isSleeping() && !EntityCachalotWhale.this.isBeached() && super.canUse();
             }

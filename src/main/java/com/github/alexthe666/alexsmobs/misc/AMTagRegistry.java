@@ -132,6 +132,41 @@ public class AMTagRegistry {
     // Giant Squid-specific tags
     public static final TagKey<EntityType<?>> GIANT_SQUID_TARGETS = registerEntityTag("giant_squid_targets");
 
+    // Cachalot Whale-specific tags
+    public static final TagKey<EntityType<?>> CACHALOT_WHALE_TARGETS = registerEntityTag("cachalot_whale_targets");
+
+    // Bald Eagle-specific tags
+    public static final TagKey<EntityType<?>> BALD_EAGLE_TARGETS = registerEntityTag("bald_eagle_targets");
+
+    // Crocodile-specific tags
+    public static final TagKey<EntityType<?>> CROCODILE_TARGETS = registerEntityTag("crocodile_targets");
+
+    // Mantis Shrimp-specific tags
+    public static final TagKey<EntityType<?>> MANTIS_SHRIMP_TARGETS = registerEntityTag("mantis_shrimp_targets");
+
+    // Fly-specific tags (additional)
+    public static final TagKey<EntityType<?>> FLY_ANNOY_TARGETS = registerEntityTag("fly_annoy_targets");
+    public static final TagKey<EntityType<?>> FLY_HURT_TARGETS = registerEntityTag("fly_hurt_targets");
+
+    // Froststalker-specific tags
+    public static final TagKey<EntityType<?>> FROSTSTALKER_TARGETS = registerEntityTag("froststalker_targets");
+
+    // Crimson Mosquito-specific tags
+    public static final TagKey<EntityType<?>> CRIMSON_MOSQUITO_TARGETS = registerEntityTag("crimson_mosquito_targets");
+
+    // Bunfungus-specific tags
+    public static final TagKey<EntityType<?>> BUNFUNGUS_IGNORES = registerEntityTag("bunfungus_ignores");
+    public static final TagKey<EntityType<?>> BUNFUNGUS_IGNORE_AOE_ATTACKS = registerEntityTag("bunfungus_ignore_aoe_attacks");
+
+    // Generic entity classification tags
+    public static final TagKey<EntityType<?>> NEUTRAL_LAND_ANIMALS = registerEntityTag("neutral_land_animals");
+    public static final TagKey<EntityType<?>> PASSIVE_LAND_ANIMALS = registerEntityTag("passive_land_animals");
+    public static final TagKey<EntityType<?>> VILLAGERS = registerEntityTag("villagers");
+
+    // Special behavior tags
+    public static final TagKey<EntityType<?>> VOID_PORTAL_IGNORES = registerEntityTag("void_portal_ignores");
+    public static final TagKey<EntityType<?>> IGNORES_KIMONO = registerEntityTag("ignores_kimono");
+
     // Gorilla-specific tags
     public static final TagKey<Block> GORILLA_SPAWNS = registerBlockTag("gorilla_spawns");
     public static final TagKey<Item> GORILLA_TAMEABLES = registerItemTag("gorilla_tameables");

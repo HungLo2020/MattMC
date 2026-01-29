@@ -1,0 +1,11 @@
+{
+  "__comment": "all mobs that are immune to the effects of the irradiated effect.",
+  "values": [
+    "minecraft:nucleeper",
+    "minecraft:radgill",
+    "minecraft:brainiac",
+    "minecraft:gammaroach",
+    "minecraft:raycat",
+    "minecraft:tremorzilla"
+  ]
+}

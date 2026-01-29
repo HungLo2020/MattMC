@@ -4,6 +4,7 @@ import com.github.alexmodguy.alexscaves.server.entity.ai.*;
 import com.github.alexmodguy.alexscaves.server.entity.util.KeybindUsingMount;
 import com.github.alexmodguy.alexscaves.server.entity.util.ShakesScreen;
 import com.github.alexmodguy.alexscaves.server.misc.ACMath;
+import com.github.alexmodguy.alexscaves.server.misc.ACTagRegistry;
 import com.github.alexthe666.citadel.animation.Animation;
 import com.github.alexthe666.citadel.animation.AnimationHandler;
 import com.github.alexthe666.citadel.animation.IAnimatedEntity;
@@ -249,8 +250,9 @@ public class TremorsaurusEntity extends DinosaurEntity implements KeybindUsingMo
         }
         List<LivingEntity> list = this.level().getEntitiesOfClass(LivingEntity.class, this.getBoundingBox().inflate(30, 10, 30));
         for (LivingEntity e : list) {
-            // Removed AC tag check - all non-allied mobs can be scared
-            if (!isAlliedTo(e)) {
+            // Check if entity resists tremorsaurus roar
+            boolean resistsRoar = e.getType().is(ACTagRegistry.RESISTS_TREMORSAURUS_ROAR);
+            if (!isAlliedTo(e) && !resistsRoar) {
                 if (e instanceof PathfinderMob mob && (!(mob instanceof TamableAnimal) || !((TamableAnimal) mob).isInSittingPose())) {
                     mob.setTarget(null);
                     mob.setLastHurtByMob(null);

@@ -1,0 +1,13 @@
+{
+  "__comment": "all mobs that do not break dinosaur eggs by walking on them.",
+  "values": [
+    "minecraft:subterranodon",
+    "minecraft:vallumraptor",
+    "minecraft:grottoceratops",
+    "minecraft:tremorsaurus",
+    "minecraft:relicheirus",
+    "minecraft:luxtructosaurus",
+    "minecraft:atlatitan",
+    "minecraft:tremorzilla"
+  ]
+}
