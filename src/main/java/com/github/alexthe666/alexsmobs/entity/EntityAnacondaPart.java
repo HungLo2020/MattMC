@@ -102,11 +102,11 @@ public class EntityAnacondaPart extends LivingEntity implements IHurtableMultipa
 
     @Override
     public void tick() {
+        this.setDeltaMovement(Vec3.ZERO);
         super.tick();
 
         prevStrangleProgess = strangleProgess;
         prevSwell = this.getSwell();
-        this.setDeltaMovement(Vec3.ZERO);
         if (this.tickCount > 1) {
             final Entity parent = getParent();
             refreshDimensions();
