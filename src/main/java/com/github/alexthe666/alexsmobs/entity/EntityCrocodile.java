@@ -569,12 +569,7 @@ public class EntityCrocodile extends TamableAnimal implements IAnimatedEntity, I
                 return !isBaby() && !isTame() && level().getDifficulty() != Difficulty.PEACEFUL && super.canUse();
             }
         });
-        // Placeholder - CROCODILE_TARGETS tag should be defined
-        this.targetSelector.addGoal(5, new EntityAINearestTarget3D(this, LivingEntity.class, 180, false, true, (living, serverLevel) -> {
-            if (living == null) return false;
-            // Target hostile mobs and fish
-            return living instanceof Monster || living.getType().is(EntityTypeTags.AXOLOTL_HUNT_TARGETS);
-        }) {
+        this.targetSelector.addGoal(5, new EntityAINearestTarget3D(this, LivingEntity.class, 180, false, true, AMEntityRegistry.buildPredicateFromTag(AMTagRegistry.CROCODILE_TARGETS)) {
             public boolean canUse() {
                 return !isBaby() && !isTame() && super.canUse();
             }

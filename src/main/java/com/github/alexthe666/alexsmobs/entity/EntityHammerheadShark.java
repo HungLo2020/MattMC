@@ -86,8 +86,7 @@ public class EntityHammerheadShark extends WaterAnimal {
         this.targetSelector.addGoal(1, (new HurtByTargetGoal(this)));
         this.targetSelector.addGoal(2, new EntityAINearestTarget3D(this, LivingEntity.class, 50, false, true, INJURED_SELECTOR));
         this.targetSelector.addGoal(2, new EntityAINearestTarget3D(this, Squid.class, 50, false, true, null));
-        // Removed mimic octopus targeting (not implemented yet)
-        // this.targetSelector.addGoal(2, new EntityAINearestTarget3D(this, EntityMimicOctopus.class, 80, false, true, null));
+        this.targetSelector.addGoal(2, new EntityAINearestTarget3D(this, EntityMimicOctopus.class, 80, false, true, null));
         this.targetSelector.addGoal(3, new EntityAINearestTarget3D(this, AbstractSchoolingFish.class, 70, false, true, null));
     }
 
