@@ -243,6 +243,7 @@ public class EntityType<T extends Entity> implements FeatureElement, EntityTypeT
 			.sized(0.8F, 0.6F)
 			.eyeHeight(0.3F)
 			.clientTrackingRange(10)
+			.updateInterval(1)
 			.noLootTable()
 	);
 	public static final EntityType<AreaEffectCloud> AREA_EFFECT_CLOUD = register(

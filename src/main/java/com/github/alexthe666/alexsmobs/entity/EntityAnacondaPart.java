@@ -96,13 +96,6 @@ public class EntityAnacondaPart extends LivingEntity implements IHurtableMultipa
         return false;
     }
 
-    @Override
-    public void travel(Vec3 travelVector) {
-        // Override travel to prevent any movement from physics
-        // Parts are positioned manually by the head entity
-        this.setDeltaMovement(Vec3.ZERO);
-    }
-
 
     @Override
     public void tick() {
