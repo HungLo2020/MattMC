@@ -7,7 +7,7 @@ import com.github.alexthe666.alexsmobs.entity.util.Maths;
 // Removed: import com.github.alexthe666.alexsmobs.item.AMItemRegistry;
 import com.github.alexthe666.alexsmobs.misc.AMBlockPos;
 // Removed: import com.github.alexthe666.alexsmobs.misc.AMSoundRegistry;
-// Removed: import com.github.alexthe666.alexsmobs.misc.AMTagRegistry;
+import com.github.alexthe666.alexsmobs.misc.AMTagRegistry;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.syncher.EntityDataAccessor;
