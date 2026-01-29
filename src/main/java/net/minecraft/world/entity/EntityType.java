@@ -240,11 +240,9 @@ public class EntityType<T extends Entity> implements FeatureElement, EntityTypeT
 	public static final EntityType<EntityAnacondaPart> ANACONDA_PART = register(
 		"anaconda_part",
 		EntityType.Builder.<EntityAnacondaPart>of(EntityAnacondaPart::new, MobCategory.MISC)
-			.sized(0.8F, 0.6F)
-			.eyeHeight(0.3F)
+			.sized(0.8F, 0.8F)
 			.clientTrackingRange(10)
 			.updateInterval(1)
-			.noLootTable()
 	);
 	public static final EntityType<AreaEffectCloud> AREA_EFFECT_CLOUD = register(
 		"area_effect_cloud",
