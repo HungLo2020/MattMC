@@ -179,7 +179,6 @@ public class EntityAnacondaPart extends LivingEntity implements IHurtableMultipa
         this.yHeadRot = f;
         this.setPos(avg.x, avg.y, avg.z);
         this.setRot(f, f2);
-        this.reapplyPosition();  // Ensure bounding box updates
         headEntityId = headId;
         return avg;
     }
