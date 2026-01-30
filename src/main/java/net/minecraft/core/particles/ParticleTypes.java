@@ -156,6 +156,7 @@ public class ParticleTypes {
 	public static final SimpleParticleType FIREFLY = register("firefly", false);
 	// Alex's Caves primordial particles
 	public static final SimpleParticleType FLY = register("fly", false);
+	public static final SimpleParticleType WATER_TREMOR = register("water_tremor", false);
 	// Alex's Mobs particles
 	public static final SimpleParticleType SUNBIRD_FEATHER = register("sunbird_feather", false);
 	

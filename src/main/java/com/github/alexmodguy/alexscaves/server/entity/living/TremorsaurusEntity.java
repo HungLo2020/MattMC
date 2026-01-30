@@ -291,7 +291,7 @@ public class TremorsaurusEntity extends DinosaurEntity implements KeybindUsingMo
                         }
                         float water = getWaterLevelForBlock(level(), mutableBlockPos);
                         if (water > 0.0F) {
-                            level().addParticle(ParticleTypes.SPLASH, mutableBlockPos.getX() + 0.5F, mutableBlockPos.getY() + water + 0.01, mutableBlockPos.getZ() + 0.5F, 0, 0, 0);
+                            level().addParticle(ParticleTypes.WATER_TREMOR, mutableBlockPos.getX() + 0.5F, mutableBlockPos.getY() + water + 0.01, mutableBlockPos.getZ() + 0.5F, 0, 0, 0);
                         }
 
                     }
