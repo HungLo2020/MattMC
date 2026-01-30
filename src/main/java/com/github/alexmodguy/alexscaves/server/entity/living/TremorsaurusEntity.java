@@ -72,6 +72,8 @@ public class TremorsaurusEntity extends DinosaurEntity implements KeybindUsingMo
     private int lastScareTimestamp = 0;
     private boolean hasRunningAttributes = false;
     private int roarCooldown = 0;
+    // Throttle water particle spawning
+    private int lastWaterShakeTick = 0;
     public static final Animation ANIMATION_SNIFF = Animation.create(30);
     public static final Animation ANIMATION_SPEAK = Animation.create(15);
     public static final Animation ANIMATION_ROAR = Animation.create(55);
@@ -141,8 +143,12 @@ public class TremorsaurusEntity extends DinosaurEntity implements KeybindUsingMo
         if (this.onGround() && !this.isInWater() && this.walkAnimation.speed() > 0.1F && !this.isBaby()) {
             float f = (float) Math.cos(this.walkAnimation.position() * 0.8F - 1.5F);
             if (Math.abs(f) < 0.2) {
-                // Water shake effect for walking
-                this.shakeWater();
+                // Throttle water particle spawning to avoid performance issues
+                // Only spawn particles if enough ticks have passed since last spawn
+                if (this.tickCount - lastWaterShakeTick > 10) {
+                    this.shakeWater();
+                    lastWaterShakeTick = this.tickCount;
+                }
                 // Screen shake disabled - screenShakeAmount = 1F;
             }
         }
