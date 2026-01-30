@@ -141,9 +141,7 @@ public class TremorsaurusEntity extends DinosaurEntity implements KeybindUsingMo
             if (Math.abs(f) < 0.2) {
                 if (screenShakeAmount <= 0.3) {
                     // Water shake effect for walking
-                    if (this.level().isClientSide()) {
-                        this.shakeWater();
-                    }
+                    this.shakeWater();
                 }
                 screenShakeAmount = 1F;
             }
