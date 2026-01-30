@@ -1,0 +1,12 @@
+{
+  "__comment": "all non-player targets of the tiger mob.",
+  "replace": false,
+  "values": [
+    "#minecraft:passive_land_animals",
+    "#minecraft:villagers",
+    "minecraft:kangaroo",
+    "minecraft:moose",
+    "minecraft:gelada_monkey",
+    "minecraft:caiman"
+  ]
+}

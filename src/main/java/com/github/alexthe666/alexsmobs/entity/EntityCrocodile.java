@@ -3,6 +3,7 @@ package com.github.alexthe666.alexsmobs.entity;
 import com.github.alexthe666.alexsmobs.block.BlockReptileEgg;
 import com.github.alexthe666.alexsmobs.entity.ai.*;
 import com.github.alexthe666.alexsmobs.entity.util.Maths;
+import com.github.alexthe666.alexsmobs.misc.AMTagRegistry;
 import com.github.alexthe666.citadel.animation.Animation;
 import com.github.alexthe666.citadel.animation.AnimationHandler;
 import com.github.alexthe666.citadel.animation.IAnimatedEntity;
@@ -569,12 +570,7 @@ public class EntityCrocodile extends TamableAnimal implements IAnimatedEntity, I
                 return !isBaby() && !isTame() && level().getDifficulty() != Difficulty.PEACEFUL && super.canUse();
             }
         });
-        // Placeholder - CROCODILE_TARGETS tag should be defined
-        this.targetSelector.addGoal(5, new EntityAINearestTarget3D(this, LivingEntity.class, 180, false, true, (living, serverLevel) -> {
-            if (living == null) return false;
-            // Target hostile mobs and fish
-            return living instanceof Monster || living.getType().is(EntityTypeTags.AXOLOTL_HUNT_TARGETS);
-        }) {
+        this.targetSelector.addGoal(5, new EntityAINearestTarget3D(this, LivingEntity.class, 180, false, true, AMEntityRegistry.buildPredicateFromTag(AMTagRegistry.CROCODILE_TARGETS)) {
             public boolean canUse() {
                 return !isBaby() && !isTame() && super.canUse();
             }

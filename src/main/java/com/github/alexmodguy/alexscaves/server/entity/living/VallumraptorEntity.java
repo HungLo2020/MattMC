@@ -154,10 +154,9 @@ public class VallumraptorEntity extends DinosaurEntity implements IAnimatedEntit
         this.targetSelector.addGoal(2, new OwnerHurtByTargetGoal(this));
         this.targetSelector.addGoal(3, new OwnerHurtTargetGoal(this));
         this.targetSelector.addGoal(4, (new HurtByTargetGoal(this, VallumraptorEntity.class)).setAlertOthers());
-        // TODO: Missing goals - AnimalPackTargetGoal, MobTargetUntamedGoal, MobTargetClosePlayers
-        // this.targetSelector.addGoal(5, new AnimalPackTargetGoal(this, GrottoceratopsEntity.class, 30, false, 5));
-        // this.targetSelector.addGoal(6, new MobTargetUntamedGoal<>(this, Mob.class, 100, true, false, VALLUMRAPTOR_TARGETS));
-        // this.targetSelector.addGoal(8, new MobTargetClosePlayers(this,  120,12));
+        this.targetSelector.addGoal(5, new AnimalPackTargetGoal(this, GrottoceratopsEntity.class, 30, false, 5));
+        this.targetSelector.addGoal(6, new MobTargetUntamedGoal<>(this, Mob.class, 100, true, false, (living, level) -> living.getType().is(VALLUMRAPTOR_TARGETS_TAG)));
+        this.targetSelector.addGoal(8, new MobTargetClosePlayers(this, 120, 12));
     }
 
     @Nullable
