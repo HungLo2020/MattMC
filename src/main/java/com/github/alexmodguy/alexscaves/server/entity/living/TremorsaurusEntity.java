@@ -140,8 +140,10 @@ public class TremorsaurusEntity extends DinosaurEntity implements KeybindUsingMo
             float f = (float) Math.cos(this.walkAnimation.position() * 0.8F - 1.5F);
             if (Math.abs(f) < 0.2) {
                 if (screenShakeAmount <= 0.3) {
-                    this.playSound(SoundEvents.TREMORSAURUS_STOMP, 2, 1.0F);
-                    this.shakeWater();
+                    // Water shake effect for walking
+                    if (this.level().isClientSide()) {
+                        this.shakeWater();
+                    }
                 }
                 screenShakeAmount = 1F;
             }
@@ -334,6 +336,10 @@ public class TremorsaurusEntity extends DinosaurEntity implements KeybindUsingMo
     }
 
     protected void playStepSound(BlockPos pos, BlockState state) {
+        // Play stomp sound for Tremorsaurus walking
+        if (!this.isBaby()) {
+            this.playSound(SoundEvents.TREMORSAURUS_STOMP, 2.0F, 1.0F);
+        }
     }
 
     public float getScreenShakeAmount(float partialTicks) {
