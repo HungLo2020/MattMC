@@ -188,13 +188,8 @@ public abstract class SauropodBaseModel<T extends LivingEntityRenderState> exten
         float legBack = renderState.legBackAmount;
         float danceAmount = renderState.danceAmount;
         
-        // Neck and tail positioning from pre-calculated render state
-        if (!straighten) {
-            neck.rotateAngleY += (float) Math.toRadians(renderState.neckYRot);
-            neck.rotateAngleX += (float) Math.toRadians(renderState.neckXRot);
-            tail.rotateAngleY += (float) Math.toRadians(renderState.tailYRot);
-            tail.rotateAngleX += (float) Math.toRadians(renderState.tailXRot);
-        }
+        // Position neck and tail using pre-calculated part angles from render state
+        positionNeckAndTailFromRenderState(renderState);
         
         // Idle animations
         this.walk(neck, idleSpeed, 0.03F, true, 0F, 0F, ageInTicks, 1);
@@ -222,6 +217,39 @@ public abstract class SauropodBaseModel<T extends LivingEntityRenderState> exten
             float ageSine = Mth.clamp((float) Math.sin(ageInTicks * 0.08F) * 2F, 0, 1);
             float gangnam1 = danceAmount * ageSine;
             this.body.swing(0.65F, 0.05F, false, 0F, 0F, ageInTicks, danceAmount);
+        }
+    }
+
+    // Replicate the original positionNeckAndTail logic using render state data
+    private void positionNeckAndTailFromRenderState(com.github.alexmodguy.alexscaves.client.render.entity.AtlatitanRenderState renderState) {
+        if (!straighten && !renderState.isFakeEntity) {
+            float neckPart1Pitch = (float) Math.toRadians(renderState.neckPart1PitchAngle) * 0.5F;
+            float neckPart2Pitch = (float) Math.toRadians(renderState.neckPart2PitchAngle) * 0.5F;
+            float neckPart3Pitch = (float) Math.toRadians(renderState.neckPart3PitchAngle) * 0.5F;
+            float tailPart1Pitch = (float) Math.toRadians(renderState.tailPart1PitchAngle) + 0.141F;
+            float tailPart2Pitch = (float) Math.toRadians(renderState.tailPart2PitchAngle) + 0.076F;
+            float tailPart3Pitch = (float) Math.toRadians(renderState.tailPart3PitchAngle) * 0.5F;
+            float neckPart2Yaw = renderState.neckPart2YawAngle;
+            float pitchAmount = renderState.animation == com.github.alexmodguy.alexscaves.server.entity.living.SauropodBaseEntity.ANIMATION_SPEW_FLAMES ? 0.0F : Mth.clamp(renderState.headPitch, -30, 30) / 57.295776F;
+            float headApproach = Mth.approachDegrees(neckPart2Yaw, renderState.headPartYawAngle, 45F) - neckPart2Yaw;
+            
+            neck.rotateAngleX -= neckPart1Pitch + neckPart2Pitch;
+            neck.rotateAngleY += Math.toRadians(180F + renderState.neckPart1YawAngle) - this.chest.rotateAngleY - this.body.rotateAngleY - this.root.rotateAngleY;
+            neck2.rotateAngleX -= neckPart2Pitch;
+            neck2.rotateAngleY += Math.toRadians(180F + neckPart2Yaw);
+            head.rotateAngleX += pitchAmount + neckPart1Pitch + neckPart2Pitch + neckPart3Pitch - (float) Math.toRadians(renderState.headPartPitchAngle) * 0.2F;
+            head.rotateAngleY += Math.toRadians(headApproach);
+            
+            if (neckPart2Pitch > 0F) {
+                neck2.rotationPointZ += Math.min(neckPart2Pitch * 50F, 50F);
+            }
+            
+            tail.rotateAngleY += Math.toRadians(renderState.tailPart1YawAngle);
+            tail2.rotateAngleY += Math.toRadians(renderState.tailPart2YawAngle);
+            tail3.rotateAngleY += Math.toRadians(renderState.tailPart3YawAngle - renderState.tailPart2YawAngle);
+            tail.rotateAngleX += tailPart1Pitch;
+            tail2.rotateAngleX += tailPart2Pitch;
+            tail3.rotateAngleX += tailPart3Pitch;
         }
     }
 
