@@ -1,7 +1,6 @@
 {
   "__comment": "all mobs that scare subterranodons.",
   "values": [
-    "minecraft:tremorsaurus",
-    "minecraft:tremorzilla"
+    "minecraft:tremorsaurus"
   ]
 }

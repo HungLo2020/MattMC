@@ -2,9 +2,7 @@
   "type": "minecraft:crafting_shaped",
   "group": "wooden_trapdoor",
   "key": {
-    "#": {
-      "item": "minecraft:pewen_planks"
-    }
+    "#": "minecraft:pewen_planks"
   },
   "pattern": [
     "###",

@@ -4,7 +4,6 @@
   "values": [
     "#minecraft:villagers",
     "#minecraft:passive_land_animals",
-    "minecraft:goat",
-    "minecraft:tusklin"
+    "minecraft:goat"
   ]
 }

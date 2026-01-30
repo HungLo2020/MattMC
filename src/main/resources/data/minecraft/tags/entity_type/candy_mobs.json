@@ -1,18 +1,4 @@
 {
   "__comment": "all mobs that do not break sugar glass by walking on it.",
-  "values": [
-    "minecraft:sweetish_fish",
-    "minecraft:caniac",
-    "minecraft:gumbeeper",
-    "minecraft:candicorn",
-    "minecraft:gum_worm",
-    "minecraft:gum_worm_segment",
-    "minecraft:caramel_cube",
-    "minecraft:melted_caramel",
-    "minecraft:gummy_bear",
-    "minecraft:licowitch",
-    "minecraft:spinning_peppermint",
-    "minecraft:sugar_staff_hex",
-    "minecraft:gingerbread_man"
-  ]
+  "values": []
 }
