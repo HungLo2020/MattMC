@@ -27,10 +27,6 @@ public class SauropodPartEntity extends Entity {
     private final Entity connectedTo;
     private final EntityDimensions size;
     public float scale = 1;
-    public float yBodyRot;
-    public float yBodyRotO;
-    public float pitchAngle;
-    public float prevPitchAngle;
 
     public SauropodPartEntity(SauropodBaseEntity parent, Entity connectedTo, float sizeXZ, float sizeY) {
         super(parent.getType(), parent.level());
@@ -138,9 +134,33 @@ public class SauropodPartEntity extends Entity {
         return new Vec3(this.getX(), this.getY() + this.getBbHeight() / 2.0, this.getZ());
     }
 
-    public float calculateAnimationAngle(float partialTick, boolean pitch) {
-        float bodyRotInterp = Mth.rotLerp(partialTick, this.yBodyRotO, this.yBodyRot);
-        float pitchInterp = Mth.rotLerp(partialTick, this.prevPitchAngle, this.pitchAngle);
-        return pitch ? pitchInterp : bodyRotInterp;
+    public float calculateAnimationAngle(float partialTicks, boolean pitch) {
+        float parentRot = 0;
+        Vec3 connection = connectedTo.getPosition(partialTicks).add(0, connectedTo.getBbHeight() * 0.5F, 0);
+        if (connectedTo == parentMob && parentMob != null) {
+            connection = connection.add(0, -parentMob.getLegSolverBodyOffset(), 0);
+        }
+        if (parentMob != null && this == parentMob.neckPart1) {
+            connection = connection.add(0, 2F * parentMob.getScale(), 0);
+        }
+        if(parentMob != null){
+            parentRot = -(parentMob.yBodyRotO + (parentMob.yBodyRot - parentMob.yBodyRotO) * partialTicks) - 90F;
+        }
+        Vec3 center = centeredPosition(partialTicks);
+        Vec3 offset = connection.subtract(center).normalize();
+        Vec3 back = center.add(offset.scale(-1 * this.getBbWidth()));
+        double d0 = connection.x - back.x;
+        double d1 = connection.y - back.y;
+        double d2 = connection.z - back.z;
+        if (pitch) {
+            double d3 = Mth.sqrt((float) (d0 * d0 + d2 * d2));
+            return Mth.wrapDegrees((float) (-(Mth.atan2(d1, d3) * 180.0F / (float) Math.PI)));
+        } else {
+            return (float) (Mth.atan2(d2, d0) * 57.2957763671875D) + parentRot;
+        }
+    }
+
+    public Vec3 centeredPosition(float partialTicks) {
+        return this.getPosition(partialTicks).add(0, this.getBbHeight() * 0.5F, 0);
     }
 }

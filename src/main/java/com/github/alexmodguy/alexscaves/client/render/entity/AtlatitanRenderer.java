@@ -39,6 +39,23 @@ public class AtlatitanRenderer extends MobRenderer<AtlatitanEntity, AtlatitanRen
         renderState.raiseArmsAmount = entity.getRaiseArmsAmount(partialTick);
         renderState.animation = entity.getAnimation();
         renderState.animationTick = entity.getAnimationTick();
+        
+        // Calculate neck and tail part angles for proper multi-segment articulation
+        renderState.neckPart1YawAngle = entity.neckPart1.calculateAnimationAngle(partialTick, false);
+        renderState.neckPart1PitchAngle = entity.neckPart1.calculateAnimationAngle(partialTick, true);
+        renderState.neckPart2YawAngle = entity.neckPart2.calculateAnimationAngle(partialTick, false);
+        renderState.neckPart2PitchAngle = entity.neckPart2.calculateAnimationAngle(partialTick, true);
+        renderState.neckPart3PitchAngle = entity.neckPart3.calculateAnimationAngle(partialTick, true);
+        renderState.headPartYawAngle = entity.headPart.calculateAnimationAngle(partialTick, false);
+        renderState.headPartPitchAngle = entity.headPart.calculateAnimationAngle(partialTick, true);
+        renderState.tailPart1YawAngle = entity.tailPart1.calculateAnimationAngle(partialTick, false);
+        renderState.tailPart1PitchAngle = entity.tailPart1.calculateAnimationAngle(partialTick, true);
+        renderState.tailPart2YawAngle = entity.tailPart2.calculateAnimationAngle(partialTick, false);
+        renderState.tailPart2PitchAngle = entity.tailPart2.calculateAnimationAngle(partialTick, true);
+        renderState.tailPart3YawAngle = entity.tailPart3.calculateAnimationAngle(partialTick, false);
+        renderState.tailPart3PitchAngle = entity.tailPart3.calculateAnimationAngle(partialTick, true);
+        renderState.headPitch = renderState.xRot; // from LivingEntityRenderState
+        renderState.isFakeEntity = entity.isFakeEntity();
     }
 
     @Override
