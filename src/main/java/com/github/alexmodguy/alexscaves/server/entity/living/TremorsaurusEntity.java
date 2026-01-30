@@ -66,11 +66,14 @@ public class TremorsaurusEntity extends DinosaurEntity implements KeybindUsingMo
     public final LegSolver legSolver = new LegSolver(new LegSolver.Leg(-0.45F, 0.75F, 1.0F, false), new LegSolver.Leg(-0.45F, -0.75F, 1.0F, false));
     private Animation currentAnimation;
     private int animationTick;
-    private float prevScreenShakeAmount;
-    private float screenShakeAmount;
+    // Screen shake disabled due to lighting bugs
+    // private float prevScreenShakeAmount;
+    // private float screenShakeAmount;
     private int lastScareTimestamp = 0;
     private boolean hasRunningAttributes = false;
     private int roarCooldown = 0;
+    // Throttle water particle spawning
+    private int lastWaterShakeTick = 0;
     public static final Animation ANIMATION_SNIFF = Animation.create(30);
     public static final Animation ANIMATION_SPEAK = Animation.create(15);
     public static final Animation ANIMATION_ROAR = Animation.create(55);
@@ -129,21 +132,24 @@ public class TremorsaurusEntity extends DinosaurEntity implements KeybindUsingMo
 
     public void tick() {
         super.tick();
-        prevScreenShakeAmount = screenShakeAmount;
+        // Screen shake disabled - prevScreenShakeAmount = screenShakeAmount;
         this.yBodyRot = Mth.approachDegrees(this.yBodyRotO, yBodyRot, getHeadRotSpeed());
         this.legSolver.update(this, this.yBodyRot, this.getEntityScale());
         AnimationHandler.INSTANCE.updateAnimations(this);
-        if (screenShakeAmount > 0) {
-            screenShakeAmount = Math.max(0, screenShakeAmount - 0.34F);
-        }
+        // Screen shake disabled
+        // if (screenShakeAmount > 0) {
+        //     screenShakeAmount = Math.max(0, screenShakeAmount - 0.34F);
+        // }
         if (this.onGround() && !this.isInWater() && this.walkAnimation.speed() > 0.1F && !this.isBaby()) {
             float f = (float) Math.cos(this.walkAnimation.position() * 0.8F - 1.5F);
             if (Math.abs(f) < 0.2) {
-                if (screenShakeAmount <= 0.3) {
-                    this.playSound(SoundEvents.TREMORSAURUS_STOMP, 2, 1.0F);
+                // Throttle water particle spawning to avoid performance issues
+                // Only spawn particles if enough ticks have passed since last spawn
+                if (this.tickCount - lastWaterShakeTick > 10) {
                     this.shakeWater();
+                    lastWaterShakeTick = this.tickCount;
                 }
-                screenShakeAmount = 1F;
+                // Screen shake disabled - screenShakeAmount = 1F;
             }
         }
         if (this.tickCount % 100 == 0 && this.getHealth() < this.getMaxHealth()) {
@@ -161,7 +167,7 @@ public class TremorsaurusEntity extends DinosaurEntity implements KeybindUsingMo
             this.playRoarSound();
         }
         if (this.getAnimation() == ANIMATION_ROAR && this.getAnimationTick() >= 5 && this.getAnimationTick() <= 40 && !this.isBaby()) {
-            screenShakeAmount = 1F;
+            // Screen shake disabled - screenShakeAmount = 1F;
             roarScatterTime = 30;
             if (this.getAnimationTick() % 5 == 0 && level().isClientSide()) {
                 this.shakeWater();
@@ -291,6 +297,8 @@ public class TremorsaurusEntity extends DinosaurEntity implements KeybindUsingMo
                         }
                         float water = getWaterLevelForBlock(level(), mutableBlockPos);
                         if (water > 0.0F) {
+                            // Use SPLASH particles instead of WATER_TREMOR to avoid billboard orientation issues
+                            // WATER_TREMOR particles in 1.21 don't support the horizontal orientation from the original mod
                             level().addParticle(ParticleTypes.SPLASH, mutableBlockPos.getX() + 0.5F, mutableBlockPos.getY() + water + 0.01, mutableBlockPos.getZ() + 0.5F, 0, 0, 0);
                         }
 
@@ -334,10 +342,16 @@ public class TremorsaurusEntity extends DinosaurEntity implements KeybindUsingMo
     }
 
     protected void playStepSound(BlockPos pos, BlockState state) {
+        // Play stomp sound for Tremorsaurus walking
+        if (!this.isBaby()) {
+            this.playSound(SoundEvents.TREMORSAURUS_STOMP, 2.0F, 1.0F);
+        }
     }
 
     public float getScreenShakeAmount(float partialTicks) {
-        return prevScreenShakeAmount + (screenShakeAmount - prevScreenShakeAmount) * partialTicks;
+        // Screen shake disabled due to lighting bugs
+        return 0F;
+        // return prevScreenShakeAmount + (screenShakeAmount - prevScreenShakeAmount) * partialTicks;
     }
 
     public Vec3 getShakePreyPos() {

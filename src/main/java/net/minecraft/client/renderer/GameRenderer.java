@@ -147,6 +147,13 @@ public class GameRenderer implements Projector, AutoCloseable, net.caffeinemc.mo
 	private final GlobalSettingsUniform globalSettingsUniform = new GlobalSettingsUniform();
 	private final PerspectiveProjectionMatrixBuffer levelProjectionMatrixBuffer = new PerspectiveProjectionMatrixBuffer("level");
 	private final CachedPerspectiveProjectionMatrixBuffer hud3dProjectionMatrixBuffer = new CachedPerspectiveProjectionMatrixBuffer("3d hud", 0.05F, 100.0F);
+	// Screen shake support for ShakesScreen entities
+	private static final double SCREEN_SHAKE_SEARCH_RADIUS = 64.0;
+	private static final float MAX_SCREEN_SHAKE_AMOUNT = 2.0F;
+	private static final float SCREEN_SHAKE_INTENSITY_XY = 0.2F;
+	private static final float SCREEN_SHAKE_INTENSITY_Z = 0.5F;
+	private int lastTremorTick = -1;
+	private final float[] randomTremorOffsets = new float[3];
 
 	public GameRenderer(Minecraft minecraft, ItemInHandRenderer itemInHandRenderer, RenderBuffers renderBuffers, BlockRenderDispatcher blockRenderDispatcher) {
 		this.minecraft = minecraft;
@@ -509,6 +516,55 @@ public class GameRenderer implements Projector, AutoCloseable, net.caffeinemc.mo
 		}
 	}
 
+	/**
+	 * Applies screen shake effect from nearby ShakesScreen entities (e.g., Tremorsaurus).
+	 * This creates a camera shake effect by translating the view matrix based on proximity
+	 * to entities that implement the ShakesScreen interface.
+	 * 
+	 * @param poseStack The pose stack to apply translations to
+	 * @param partialTick The partial tick time for smooth interpolation
+	 */
+	public void applyScreenShake(PoseStack poseStack, float partialTick) {
+		Entity cameraEntity = this.minecraft.getCameraEntity();
+		if (cameraEntity == null || this.minecraft.level == null) {
+			return;
+		}
+
+		float tremorAmount = 0F;
+		double distance = Double.MAX_VALUE;
+		AABB aabb = cameraEntity.getBoundingBox().inflate(SCREEN_SHAKE_SEARCH_RADIUS);
+		
+		// Find nearby entities that implement ShakesScreen
+		for (Entity entity : this.minecraft.level.getEntities(cameraEntity, aabb)) {
+			if (entity instanceof com.github.alexmodguy.alexscaves.server.entity.util.ShakesScreen shakesScreen) {
+				double entityDistance = entity.distanceTo(cameraEntity);
+				if (shakesScreen.canFeelShake(cameraEntity) && entityDistance < distance) {
+					distance = entityDistance;
+					tremorAmount = Math.min((1F - (float) Math.min(1, distance / shakesScreen.getShakeDistance()))
+							* Math.max(shakesScreen.getScreenShakeAmount(partialTick), 0F), MAX_SCREEN_SHAKE_AMOUNT);
+				}
+			}
+		}
+
+		if (tremorAmount > 0) {
+			// Update random offsets once per tick for consistent shake within a frame
+			if (this.lastTremorTick != cameraEntity.tickCount) {
+				RandomSource randomSource = this.minecraft.level.random;
+				this.randomTremorOffsets[0] = randomSource.nextFloat();
+				this.randomTremorOffsets[1] = randomSource.nextFloat();
+				this.randomTremorOffsets[2] = randomSource.nextFloat();
+				this.lastTremorTick = cameraEntity.tickCount;
+			}
+			
+			float intensity = (float)(tremorAmount * this.minecraft.options.screenEffectScale().get());
+			poseStack.translate(
+				this.randomTremorOffsets[0] * SCREEN_SHAKE_INTENSITY_XY * intensity,
+				this.randomTremorOffsets[1] * SCREEN_SHAKE_INTENSITY_XY * intensity,
+				this.randomTremorOffsets[2] * SCREEN_SHAKE_INTENSITY_Z * intensity
+			);
+		}
+	}
+
 	private void renderItemInHand(float f, boolean bl, Matrix4f matrix4f) {
 		if (!this.panoramicMode) {
 			this.featureRenderDispatcher.renderAllFeatures();
@@ -827,6 +883,8 @@ public class GameRenderer implements Projector, AutoCloseable, net.caffeinemc.mo
 				this.bobView(poseStack, this.mainCamera.getPartialTickTime());
 			}
 		}
+		// Apply screen shake from ShakesScreen entities
+		this.applyScreenShake(poseStack, this.mainCamera.getPartialTickTime());
 
 		matrix4f.mul(poseStack.last().pose());
 		// Iris: Disable screen effect scale when shaders are on (merged from MixinModelViewBobbing)
@@ -859,6 +917,8 @@ public class GameRenderer implements Projector, AutoCloseable, net.caffeinemc.mo
 			if (this.minecraft.options.bobView().get()) {
 				this.bobView(stack, tickDelta);
 			}
+			// Apply screen shake from ShakesScreen entities
+			this.applyScreenShake(stack, tickDelta);
 
 			matrix4f2.set(stack.last().pose());
 
