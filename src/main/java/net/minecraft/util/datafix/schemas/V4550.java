@@ -1,6 +1,5 @@
 package net.minecraft.util.datafix.schemas;
 
-import com.google.common.collect.Maps;
 import com.mojang.datafixers.schemas.Schema;
 import com.mojang.datafixers.types.templates.TypeTemplate;
 import java.util.Map;

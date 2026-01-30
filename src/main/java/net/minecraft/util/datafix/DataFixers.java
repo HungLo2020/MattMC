@@ -1572,9 +1572,8 @@ public class DataFixers {
 			)
 		);
 		Schema schema280 = dataFixerBuilder.addSchema(4550, V4550::new);
-		dataFixerBuilder.addFixer(new AddNewChoices(schema280, "Added Alex's Mobs entities", References.ENTITY));
-		dataFixerBuilder.addFixer(new AddNewChoices(schema280, "Added Alex's Caves entities", References.ENTITY));
-		dataFixerBuilder.addFixer(new AddNewChoices(schema280, "Added modded block entities", References.BLOCK_ENTITY));
+		dataFixerBuilder.addFixer(new AddNewChoices(schema280, "Added mod entities and block entities", References.ENTITY));
+		dataFixerBuilder.addFixer(new AddNewChoices(schema280, "Added mod block entities", References.BLOCK_ENTITY));
 	}
 
 	private static UnaryOperator<String> createRenamerNoNamespace(Map<String, String> map) {
