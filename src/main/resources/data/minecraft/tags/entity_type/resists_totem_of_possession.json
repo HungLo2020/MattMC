@@ -4,9 +4,6 @@
     "#c:bosses",
     "minecraft:warden",
     "minecraft:armor_stand",
-    "minecraft:hullbreaker",
-    "minecraft:forsaken",
-    "minecraft:atlatitan",
-    "minecraft:tremorzilla"
+    "minecraft:atlatitan"
   ]
 }

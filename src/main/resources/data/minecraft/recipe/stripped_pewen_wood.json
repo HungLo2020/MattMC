@@ -2,9 +2,7 @@
   "type": "minecraft:crafting_shaped",
   "group": "bark",
   "key": {
-    "#": {
-      "item": "minecraft:stripped_pewen_log"
-    }
+    "#": "minecraft:stripped_pewen_log"
   },
   "pattern": [
     "##",

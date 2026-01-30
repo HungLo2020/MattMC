@@ -7,9 +7,7 @@
     "S S"
   ],
   "key": {
-    "S": {
-      "item": "minecraft:centipede_leg"
-    }
+    "S": "minecraft:centipede_leg"
   },
   "result": {
     "id": "minecraft:centipede_leggings",

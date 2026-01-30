@@ -1,0 +1,8 @@
+{
+  "replace": false,
+  "values": [
+    "minecraft:maggot",
+    "minecraft:mosquito_larva",
+    "minecraft:leafcutter_ant_pupa"
+  ]
+}

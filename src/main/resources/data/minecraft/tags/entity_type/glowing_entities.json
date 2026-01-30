@@ -7,15 +7,6 @@
     "minecraft:allay",
     "minecraft:magma_cube",
     "minecraft:phantom",
-    "minecraft:warden",
-    "minecraft:teletor",
-    "minecraft:magnetron",
-    "minecraft:boundroid",
-    "minecraft:notor",
-    "minecraft:nucleeper",
-    "minecraft:radgill",
-    "minecraft:raycat",
-    "minecraft:gossamer_worm",
-    "minecraft:tremorzilla"
+    "minecraft:warden"
   ]
 }
