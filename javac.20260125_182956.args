@@ -1,8 +1,0 @@
--cp
-"✓ Using bundled dependencies from libraries/deps/
-  Run './libraries/download-dependencies.sh' to update bundled dependencies"
--sourcepath
-src/main/java
-src/main/java/com/github/alexthe666/alexsmobs/client/model/ModelGrizzlyBear.java
--d
-/tmp/test-compile

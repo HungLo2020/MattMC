@@ -23,76 +23,45 @@ Note: Recompile with -Xlint:unchecked for details.
 
 > Task :runClient
 Using bundled JDK from: /home/matt/Documents/Repos/MattMC/run/jdk-25
-[19:28:18] [main/INFO]: Detected integrated source mode - using Fabric Loader code source as game jar: /home/matt/Documents/Repos/MattMC/build/libs/MattMC-1.21.10.jar
-[19:28:18] [main/INFO]: Loading Minecraft 1.21.10 with Fabric Loader 0.18.2
-[19:28:18] [main/INFO]: Mappings not present!
-[19:28:18] [main/INFO]: Loading 3 mods:
+[18:17:39] [main/INFO]: Detected integrated source mode - using Fabric Loader code source as game jar: /home/matt/Documents/Repos/MattMC/build/libs/MattMC-1.21.10.jar
+[18:17:39] [main/INFO]: Loading Minecraft 1.21.10 with Fabric Loader 0.18.2
+[18:17:39] [main/INFO]: Mappings not present!
+[18:17:39] [main/INFO]: Loading 3 mods:
 	- java 25
 	- mattmc 1.21.10
 	- minecraft 1.21.10
-[19:28:18] [main/INFO]: Mixin system bypassed - all mixins converted to hook-based architecture
-[19:28:18] [main/INFO]: Mixin transformation disabled - using hook-based architecture
-[19:28:18] [main/INFO]: Searching for graphics cards...
-[19:28:18] [main/INFO]: Found graphics adapter: LinuxPciAdapterInfo[vendor=NVIDIA, name=GA102 [GeForce RTX 3080 Ti], pciVendorId=0x10de, pciDeviceId=0x2208]
-[19:28:18] [main/WARN]: Sodium has applied one or more workarounds to prevent crashes or other issues on your system: [NVIDIA_THREADED_OPTIMIZATIONS_BROKEN]
-[19:28:18] [main/WARN]: This is not necessarily an issue, but it may result in certain features or optimizations being disabled. You can sometimes fix these issues by upgrading your graphics driver.
+[18:17:39] [main/INFO]: Mixin system bypassed - all mixins converted to hook-based architecture
+[18:17:39] [main/INFO]: Mixin transformation disabled - using hook-based architecture
+[18:17:39] [main/INFO]: Searching for graphics cards...
+[18:17:39] [main/INFO]: Found graphics adapter: LinuxPciAdapterInfo[vendor=NVIDIA, name=GA102 [GeForce RTX 3080 Ti], pciVendorId=0x10de, pciDeviceId=0x2208]
+[18:17:39] [main/WARN]: Sodium has applied one or more workarounds to prevent crashes or other issues on your system: [NVIDIA_THREADED_OPTIMIZATIONS_BROKEN]
+[18:17:39] [main/WARN]: This is not necessarily an issue, but it may result in certain features or optimizations being disabled. You can sometimes fix these issues by upgrading your graphics driver.
 WARNING: A restricted method in java.lang.System has been called
 WARNING: java.lang.System::load has been called by com.sun.jna.Native in an unnamed module (file:/home/matt/.gradle/caches/modules-2/files-2.1/net.java.dev.jna/jna/5.14.0/67bf3eaea4f0718cb376a181a629e5f88fa1c9dd/jna-5.14.0.jar)
 WARNING: Use --enable-native-access=ALL-UNNAMED to avoid a warning for callers in this module
 WARNING: Restricted methods will be blocked in a future release unless native access is enabled
 
-[19:28:18] [Datafixer Bootstrap/INFO]: 279 Datafixer optimizations took 171 milliseconds
+[18:17:40] [Datafixer Bootstrap/INFO]: 280 Datafixer optimizations took 179 milliseconds
 WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
 WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.joml.MemUtil$MemUtilUnsafe (file:/home/matt/.gradle/caches/modules-2/files-2.1/org.joml/joml/1.10.5/22566d58af70ad3d72308bab63b8339906deb649/joml-1.10.5.jar)
 WARNING: Please consider reporting this to the maintainers of class org.joml.MemUtil$MemUtilUnsafe
 WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
-[19:28:19] [main/ERROR]: No data fixer registered for minecraft:atlatitan
-[19:28:19] [main/ERROR]: No data fixer registered for minecraft:blobfish
-[19:28:19] [main/ERROR]: No data fixer registered for minecraft:blue_jay
-[19:28:19] [main/ERROR]: No data fixer registered for minecraft:catfish
-[19:28:19] [main/ERROR]: No data fixer registered for minecraft:cockroach
-[19:28:19] [main/ERROR]: No data fixer registered for minecraft:cockroach_egg
-[19:28:19] [main/ERROR]: No data fixer registered for minecraft:comb_jelly
-[19:28:19] [main/ERROR]: No data fixer registered for minecraft:cosmic_cod
-[19:28:19] [main/ERROR]: No data fixer registered for minecraft:crow
-[19:28:19] [main/ERROR]: No data fixer registered for minecraft:endergrade
-[19:28:19] [main/ERROR]: No data fixer registered for minecraft:flying_fish
-[19:28:19] [main/ERROR]: No data fixer registered for minecraft:gazelle
-[19:28:19] [main/ERROR]: No data fixer registered for minecraft:grottoceratops
-[19:28:19] [main/ERROR]: No data fixer registered for minecraft:hummingbird
-[19:28:19] [main/ERROR]: No data fixer registered for minecraft:jerboa
-[19:28:19] [main/ERROR]: No data fixer registered for minecraft:mimic_octopus
-[19:28:19] [main/ERROR]: No data fixer registered for minecraft:mud_ball
-[19:28:19] [main/ERROR]: No data fixer registered for minecraft:mudskipper
-[19:28:19] [main/ERROR]: No data fixer registered for minecraft:pewen_boat
-[19:28:19] [main/ERROR]: No data fixer registered for minecraft:pewen_chest_boat
-[19:28:19] [main/ERROR]: No data fixer registered for minecraft:potoo
-[19:28:19] [main/ERROR]: No data fixer registered for minecraft:rain_frog
-[19:28:19] [main/ERROR]: No data fixer registered for minecraft:roadrunner
-[19:28:19] [main/ERROR]: No data fixer registered for minecraft:relicheirus
-[19:28:19] [main/ERROR]: No data fixer registered for minecraft:seagull
-[19:28:19] [main/ERROR]: No data fixer registered for minecraft:subterranodon
-[19:28:19] [main/ERROR]: No data fixer registered for minecraft:vallumraptor
-[19:28:19] [main/ERROR]: No data fixer registered for minecraft:mungus
-[19:28:19] [main/ERROR]: No data fixer registered for minecraft:bunfungus
-[19:28:19] [main/ERROR]: No data fixer registered for minecraft:tremorsaurus
-[19:28:19] [main/ERROR]: No data fixer registered for minecraft:trilocaris
-[19:28:20] [Render thread/INFO]: Setting user: HungLo
-[19:28:20] [Render thread/INFO]: Initializing Distant Horizons client, firing DhApiBeforeDhInitEvent...
-[19:28:20] [Render thread/INFO]: Running library validation...
-[19:28:20] [Render thread/INFO]: Garbage collectors: [ZGC Minor Cycles, ZGC Minor Pauses, ZGC Major Cycles, ZGC Major Pauses]
-[19:28:20] [Render thread/INFO]: Distant Horizons, Version: 2.4.4-b
-[19:28:20] [Render thread/INFO]: Registering Fabric Client Events
-[19:28:20] [Render thread/INFO]: Registering Distant Horizons hooks
-[19:28:20] [Render thread/INFO]: Registered mod compatibility accessor for: [Sodium-Fabric].
-[19:28:20] [Render thread/INFO]: Skipping mod compatibility accessor for: [starlight]
-[19:28:20] [Render thread/INFO]: Skipping mod compatibility accessor for: [bclib]
-[19:28:20] [Render thread/INFO]: Skipping mod compatibility accessor for: [c2me]
-[19:28:20] [Render thread/INFO]: Registered mod compatibility accessor for: [iris].
-[19:28:20] [Render thread/INFO]: Initialising config for [DistantHorizons]
-[19:28:20] [Render thread/INFO]: [DistantHorizons] Config initialised
-[19:28:20] [Render thread/INFO]: Applying config to loggers
-[19:28:20] [Render thread/INFO]: Distant Horizons client Initialized.
+[18:17:42] [Render thread/INFO]: Setting user: HungLo
+[18:17:42] [Render thread/INFO]: Initializing Distant Horizons client, firing DhApiBeforeDhInitEvent...
+[18:17:42] [Render thread/INFO]: Running library validation...
+[18:17:42] [Render thread/INFO]: Garbage collectors: [ZGC Minor Cycles, ZGC Minor Pauses, ZGC Major Cycles, ZGC Major Pauses]
+[18:17:42] [Render thread/INFO]: Distant Horizons, Version: 2.4.4-b
+[18:17:42] [Render thread/INFO]: Registering Fabric Client Events
+[18:17:42] [Render thread/INFO]: Registering Distant Horizons hooks
+[18:17:42] [Render thread/INFO]: Registered mod compatibility accessor for: [Sodium-Fabric].
+[18:17:42] [Render thread/INFO]: Skipping mod compatibility accessor for: [starlight]
+[18:17:42] [Render thread/INFO]: Skipping mod compatibility accessor for: [bclib]
+[18:17:42] [Render thread/INFO]: Skipping mod compatibility accessor for: [c2me]
+[18:17:42] [Render thread/INFO]: Registered mod compatibility accessor for: [iris].
+[18:17:42] [Render thread/INFO]: Initialising config for [DistantHorizons]
+[18:17:42] [Render thread/INFO]: [DistantHorizons] Config initialised
+[18:17:42] [Render thread/INFO]: Applying config to loggers
+[18:17:42] [Render thread/INFO]: Distant Horizons client Initialized.
 [LWJGL] Version: 3.3.3-snapshot
 	 OS: Linux v6.14.0-37-generic
 	JRE: Linux amd64 25.0.1
@@ -103,17 +72,17 @@ WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
 [LWJGL] Loading library: glfw
 	Module: org.lwjgl.glfw
 	Loaded from org.lwjgl.librarypath: /tmp/lwjgl_matt/3.3.3-snapshot/x64/libglfw.so
-[19:28:20] [Render thread/INFO]: Queuing DH event binding...
-[19:28:20] [Render thread/INFO]: Backend library: LWJGL version 3.3.3-snapshot
+[18:17:42] [Render thread/INFO]: Queuing DH event binding...
+[18:17:42] [Render thread/INFO]: Backend library: LWJGL version 3.3.3-snapshot
 [LWJGL] Loading library: jemalloc
 	Module: org.lwjgl.jemalloc
 	Loaded from org.lwjgl.librarypath: /tmp/lwjgl_matt/3.3.3-snapshot/x64/libjemalloc.so
 [LWJGL] MemoryUtil allocator: JEmallocAllocator
 [LWJGL] Java 9 check intrinsics enabled
 [LWJGL] Closure Registry: ConcurrentHashMap
-[19:28:20] [Render thread/INFO]: Modifying process environment to apply workarounds for the NVIDIA graphics driver...
-[19:28:20] [DH-Manual-Event-Trigger/INFO]: DH Ready, binding Iris event handlers...
-[19:28:20] [DH-Manual-Event-Trigger/INFO]: DH Iris events bound.
+[18:17:42] [DH-Manual-Event-Trigger/INFO]: DH Ready, binding Iris event handlers...
+[18:17:42] [Render thread/INFO]: Modifying process environment to apply workarounds for the NVIDIA graphics driver...
+[18:17:42] [DH-Manual-Event-Trigger/INFO]: DH Iris events bound.
 [LWJGL] Loading JNI library: lwjgl_stb
 	Module: org.lwjgl.stb
 	Loaded from org.lwjgl.librarypath: /tmp/lwjgl_matt/3.3.3-snapshot/x64/liblwjgl_stb.so
@@ -125,168 +94,187 @@ WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
 	libGLX.so.0 not found in org.lwjgl.librarypath=/tmp/lwjgl_matt/3.3.3-snapshot/x64
 [LWJGL] Java 9 text decoding enabled
 	Loaded from system paths: /lib/x86_64-linux-gnu/libGLX.so.0
-[19:28:21] [Render thread/INFO]: [STDERR]: [LWJGL] [ThreadLocalUtil] Unsupported JNI version detected, this may result in a crash. Please inform LWJGL developers.
+[18:17:42] [Render thread/INFO]: [STDERR]: [LWJGL] [ThreadLocalUtil] Unsupported JNI version detected, this may result in a crash. Please inform LWJGL developers.
 [LWJGL] Java 10 multiplyHigh enabled
-[19:28:21] [Render thread/INFO]: OpenGL Vendor: NVIDIA Corporation
-[19:28:21] [Render thread/INFO]: OpenGL Renderer: NVIDIA GeForce RTX 3080 Ti/PCIe/SSE2
-[19:28:21] [Render thread/INFO]: OpenGL Version: 3.3.0 NVIDIA 580.95.05
-[19:28:21] [Render thread/INFO]: Modifying OpenGL context to apply workarounds for the NVIDIA graphics driver...
-[19:28:21] [Render thread/INFO]: Debug functionality is disabled.
-[19:28:21] [Render thread/INFO]: ARB_direct_state_access detected, enabling DSA.
-[19:28:21] [Render thread/INFO]: Using optional rendering extensions: GL_ARB_buffer_storage, GL_KHR_debug, GL_ARB_vertex_attrib_binding, GL_ARB_direct_state_access
-[19:28:21] [Render thread/INFO]: Can't open pack archive at /assets/minecraft/resourcepacks/programmer_art.zip
-[19:28:21] [Render thread/INFO]: Found non-pack entry '/assets/minecraft/resourcepacks/programmer_art.zip', ignoring
-[19:28:21] [Render thread/INFO]: Can't open pack archive at /assets/minecraft/resourcepacks/high_contrast.zip
-[19:28:21] [Render thread/INFO]: Found non-pack entry '/assets/minecraft/resourcepacks/high_contrast.zip', ignoring
-[19:28:21] [Render thread/INFO]: Loaded 20 skins (0 custom)
+[18:17:42] [Render thread/INFO]: OpenGL Vendor: NVIDIA Corporation
+[18:17:42] [Render thread/INFO]: OpenGL Renderer: NVIDIA GeForce RTX 3080 Ti/PCIe/SSE2
+[18:17:42] [Render thread/INFO]: OpenGL Version: 3.3.0 NVIDIA 580.95.05
+[18:17:42] [Render thread/INFO]: Modifying OpenGL context to apply workarounds for the NVIDIA graphics driver...
+[18:17:42] [Render thread/INFO]: Debug functionality is disabled.
+[18:17:42] [Render thread/INFO]: ARB_direct_state_access detected, enabling DSA.
+[18:17:42] [Render thread/INFO]: Using optional rendering extensions: GL_ARB_buffer_storage, GL_KHR_debug, GL_ARB_vertex_attrib_binding, GL_ARB_direct_state_access
+[18:17:42] [Render thread/INFO]: Can't open pack archive at /assets/minecraft/resourcepacks/programmer_art.zip
+[18:17:42] [Render thread/INFO]: Found non-pack entry '/assets/minecraft/resourcepacks/programmer_art.zip', ignoring
+[18:17:42] [Render thread/INFO]: Can't open pack archive at /assets/minecraft/resourcepacks/high_contrast.zip
+[18:17:42] [Render thread/INFO]: Found non-pack entry '/assets/minecraft/resourcepacks/high_contrast.zip', ignoring
+[18:17:42] [Render thread/INFO]: Loaded 20 skins (0 custom)
 [LWJGL] Loading library: openal
 	Module: org.lwjgl.openal
 	Loaded from org.lwjgl.librarypath: /tmp/lwjgl_matt/3.3.3-snapshot/x64/libopenal.so
 [LWJGL] [ALC] ALC_SOFT_reopen_device was reported as available but an entry point is missing.
-[19:28:21] [Render thread/INFO]: Hardware information:
-[19:28:21] [Render thread/INFO]: CPU: 20x 12th Gen Intel(R) Core(TM) i7-12700K
-[19:28:21] [Render thread/INFO]: GPU: NVIDIA GeForce RTX 3080 Ti/PCIe/SSE2 (Supports OpenGL 3.3.0 NVIDIA 580.95.05)
-[19:28:21] [Render thread/INFO]: OS: Linux (6.14.0-37-generic)
+[18:17:42] [Render thread/INFO]: Hardware information:
+[18:17:42] [Render thread/INFO]: CPU: 20x 12th Gen Intel(R) Core(TM) i7-12700K
+[18:17:42] [Render thread/INFO]: GPU: NVIDIA GeForce RTX 3080 Ti/PCIe/SSE2 (Supports OpenGL 3.3.0 NVIDIA 580.95.05)
+[18:17:42] [Render thread/INFO]: OS: Linux (6.14.0-37-generic)
 [LWJGL] Java 16 memcpy enabled
-[19:28:21] [Render thread/INFO]: Reloading ResourceManager: vanilla
-[19:28:21] [Worker-Main-19/INFO]: Found unifont_all_no_pua-16.0.03.hex, loading
-[19:28:21] [Worker-Main-16/INFO]: Found unifont_pua-16.0.03.hex, loading
-[19:28:21] [Render thread/INFO]: Initializing VoxelMap...
-[19:28:21] [Render thread/INFO]: VoxelMap initialization complete
-[19:28:21] [Worker-Main-18/INFO]: Found unifont_jp_patch-16.0.03.hex, loading
-[19:28:21] [Worker-Main-17/WARN]: Exception loading blockstate definition: 'minecraft:thin_bone/vanilla' for variant: 'axis=x,offset=0': Unknown blockstate property: 'offset'
-[19:28:21] [Worker-Main-17/WARN]: Exception loading blockstate definition: 'minecraft:thin_bone/vanilla' for variant: 'axis=y,offset=0': Unknown blockstate property: 'offset'
-[19:28:21] [Worker-Main-17/WARN]: Exception loading blockstate definition: 'minecraft:thin_bone/vanilla' for variant: 'axis=z,offset=0': Unknown blockstate property: 'offset'
-[19:28:21] [Worker-Main-17/WARN]: Exception loading blockstate definition: 'minecraft:thin_bone/vanilla' for variant: 'axis=x,offset=1': Unknown blockstate property: 'offset'
-[19:28:21] [Worker-Main-17/WARN]: Exception loading blockstate definition: 'minecraft:thin_bone/vanilla' for variant: 'axis=y,offset=1': Unknown blockstate property: 'offset'
-[19:28:21] [Worker-Main-17/WARN]: Exception loading blockstate definition: 'minecraft:thin_bone/vanilla' for variant: 'axis=z,offset=1': Unknown blockstate property: 'offset'
-[19:28:21] [Worker-Main-17/WARN]: Exception loading blockstate definition: 'minecraft:thin_bone/vanilla' for variant: 'axis=x,offset=2': Unknown blockstate property: 'offset'
-[19:28:21] [Worker-Main-17/WARN]: Exception loading blockstate definition: 'minecraft:thin_bone/vanilla' for variant: 'axis=y,offset=2': Unknown blockstate property: 'offset'
-[19:28:21] [Worker-Main-17/WARN]: Exception loading blockstate definition: 'minecraft:thin_bone/vanilla' for variant: 'axis=z,offset=2': Unknown blockstate property: 'offset'
-[19:28:21] [Worker-Main-13/WARN]: Missing block model: minecraft:item/fissure_primal_magma
-[19:28:21] [Worker-Main-13/WARN]: Missing block model: minecraft:block/small_dinosaur_egg_1_template
-[19:28:21] [Worker-Main-13/WARN]: Missing block model: minecraft:block/small_dinosaur_egg_4_template
-[19:28:21] [Worker-Main-13/WARN]: Missing block model: minecraft:block/small_dinosaur_egg_3_template
-[19:28:21] [Worker-Main-13/WARN]: Missing block model: minecraft:block/small_dinosaur_egg_2_template
-[19:28:21] [Render thread/INFO]: Profile: MATTMC (+0 options changed by user)
-[19:28:21] [Worker-Main-7/WARN]: Missing textures in model minecraft:block/tree_star:
+[18:17:43] [Render thread/INFO]: Reloading ResourceManager: vanilla
+[18:17:43] [Render thread/INFO]: Initializing VoxelMap...
+[18:17:43] [Render thread/INFO]: VoxelMap initialization complete
+[18:17:43] [Worker-Main-5/INFO]: Found unifont_pua-16.0.03.hex, loading
+[18:17:43] [Worker-Main-18/INFO]: Found unifont_all_no_pua-16.0.03.hex, loading
+[18:17:43] [Worker-Main-5/INFO]: Found unifont_jp_patch-16.0.03.hex, loading
+[18:17:43] [Render thread/INFO]: Profile: MATTMC (+0 options changed by user)
+[18:17:43] [Worker-Main-5/WARN]: Missing textures in model minecraft:block/tree_star:
     minecraft:textures/atlas/blocks.png:minecraft:block/tree_star_stem
-[19:28:21] [Worker-Main-7/WARN]: Missing textures in model minecraft:block/tree_star_flipped:
+[18:17:43] [Worker-Main-5/WARN]: Missing textures in model minecraft:block/tree_star_flipped:
     minecraft:textures/atlas/blocks.png:minecraft:block/tree_star_stem
-[19:28:21] [Worker-Main-7/WARN]: Missing texture references in model minecraft:block/fern_thatch:
+[18:17:43] [Worker-Main-5/WARN]: Missing texture references in model minecraft:block/fern_thatch:
     #missing
-[19:28:22] [Worker-Main-7/WARN]: Missing model for variant: 'Block{minecraft:thin_bone}[axis=x]'
-[19:28:22] [Worker-Main-7/WARN]: Missing model for variant: 'Block{minecraft:thin_bone}[axis=y]'
-[19:28:22] [Worker-Main-7/WARN]: Missing model for variant: 'Block{minecraft:thin_bone}[axis=z]'
-[19:28:22] [Render thread/INFO]: Using shaderpack: ComplementaryHungLoIfied.zip
-[19:28:22] [Render thread/INFO]: Created: 256x256 waypoints-atlas
-[19:28:22] [Render thread/INFO]: Resized to: 32x32 chooser-atlas
-[19:28:22] [Render thread/INFO]: Resized to: 64x32 chooser-atlas
-[19:28:22] [Render thread/INFO]: Resized to: 64x64 chooser-atlas
-[19:28:22] [Render thread/INFO]: Resized to: 128x64 chooser-atlas
-[19:28:22] [Render thread/INFO]: Resized to: 128x128 chooser-atlas
-[19:28:22] [Render thread/INFO]: Resized to: 256x128 chooser-atlas
-[19:28:22] [Render thread/INFO]: OpenAL initialized on device HT-S350
-[19:28:22] [Render thread/INFO]: Sound engine started
-[19:28:22] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/particles.png-atlas
-[19:28:22] [Render thread/INFO]: Created: 128x64x0 minecraft:textures/atlas/decorated_pot.png-atlas
-[19:28:22] [Render thread/INFO]: Created: 2048x1024x0 minecraft:textures/atlas/armor_trims.png-atlas
-[19:28:22] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/paintings.png-atlas
-[19:28:22] [Render thread/INFO]: Created: 512x512x0 minecraft:textures/atlas/shield_patterns.png-atlas
-[19:28:22] [Render thread/INFO]: Created: 1024x1024x4 minecraft:textures/atlas/blocks.png-atlas
-[19:28:22] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/chest.png-atlas
-[19:28:22] [Render thread/INFO]: Created: 512x512x0 minecraft:textures/atlas/banner_patterns.png-atlas
-[19:28:22] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/beds.png-atlas
-[19:28:22] [Render thread/INFO]: Created: 1024x512x0 minecraft:textures/atlas/gui.png-atlas
-[19:28:22] [Render thread/INFO]: Created: 64x64x0 minecraft:textures/atlas/map_decorations.png-atlas
-[19:28:22] [Render thread/INFO]: Created: 256x256x0 minecraft:textures/atlas/signs.png-atlas
-[19:28:22] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/shulker_boxes.png-atlas
-[19:28:22] [Render thread/INFO]: Auto-updater has been disabled - no update checks will be performed
-[19:28:22] [Render thread/INFO]: Creating pipeline for dimension minecraft:overworld
-[19:28:22] [Render thread/WARN]: Type is VERTEX
-[19:28:22] [Render thread/WARN]: Type is FRAGMENT
-[19:28:22] [Render thread/WARN]: Type is VERTEX
-[19:28:22] [Render thread/WARN]: Type is FRAGMENT
-[19:28:22] [Render thread/WARN]: Type is VERTEX
-[19:28:22] [Render thread/WARN]: Type is FRAGMENT
-[19:28:30] [Render thread/ERROR]: Couldn't load tag minecraft:jerboa_breedables as it is missing following references: minecraft:seeds (from vanilla)
-[19:28:30] [Render thread/ERROR]: Couldn't load tag minecraft:jerboa_begs_for as it is missing following references: #minecraft:seeds (from vanilla)
-[19:28:30] [Worker-Main-19/ERROR]: Couldn't parse data file 'minecraft:blocks/cave_painting_pewen' from 'minecraft:loot_table/blocks/cave_painting_pewen.json': DataResult.Error['Unknown registry key in ResourceKey[minecraft:root / minecraft:item]: minecraft:cave_painting_pewen': net.minecraft.world.level.storage.loot.LootTable@6e6532f7]
-[19:28:30] [Worker-Main-7/ERROR]: Couldn't parse data file 'minecraft:cooked_trilocaris_tail_campfire' from 'minecraft:recipe/cooked_trilocaris_tail_campfire.json': DataResult.Error['Failed to parse either. First: Not a string: {"item":"minecraft:trilocaris_tail"}; Second: Failed to parse either. First: Not a json array: {"item":"minecraft:trilocaris_tail"}; Second: Not a string: {"item":"minecraft:trilocaris_tail"}']
-[19:28:30] [Worker-Main-7/ERROR]: Couldn't parse data file 'minecraft:cooked_trilocaris_tail_smelting' from 'minecraft:recipe/cooked_trilocaris_tail_smelting.json': DataResult.Error['Failed to parse either. First: Not a string: {"item":"minecraft:trilocaris_tail"}; Second: Failed to parse either. First: Not a json array: {"item":"minecraft:trilocaris_tail"}; Second: Not a string: {"item":"minecraft:trilocaris_tail"}']
-[19:28:30] [Worker-Main-7/ERROR]: Couldn't parse data file 'minecraft:cooked_trilocaris_tail_smoking' from 'minecraft:recipe/cooked_trilocaris_tail_smoking.json': DataResult.Error['Failed to parse either. First: Not a string: {"item":"minecraft:trilocaris_tail"}; Second: Failed to parse either. First: Not a json array: {"item":"minecraft:trilocaris_tail"}; Second: Not a string: {"item":"minecraft:trilocaris_tail"}']
-[19:28:30] [Worker-Main-7/ERROR]: Couldn't parse data file 'minecraft:fern_thatch' from 'minecraft:recipe/fern_thatch.json': DataResult.Error['Map entry 'F' : Failed to parse either. First: Not a string: {"tag":"minecraft:ferns"}; Second: Failed to parse either. First: Not a json array: {"tag":"minecraft:ferns"}; Second: Not a string: {"tag":"minecraft:ferns"}']
-[19:28:30] [Worker-Main-7/ERROR]: Couldn't parse data file 'minecraft:furnace/cooked_dinosaur_chop_campfire' from 'minecraft:recipe/furnace/cooked_dinosaur_chop_campfire.json': DataResult.Error['Failed to parse either. First: Not a string: {"item":"minecraft:dinosaur_chop"}; Second: Failed to parse either. First: Not a json array: {"item":"minecraft:dinosaur_chop"}; Second: Not a string: {"item":"minecraft:dinosaur_chop"}']
-[19:28:30] [Worker-Main-7/ERROR]: Couldn't parse data file 'minecraft:furnace/cooked_dinosaur_chop_smelting' from 'minecraft:recipe/furnace/cooked_dinosaur_chop_smelting.json': DataResult.Error['Failed to parse either. First: Not a string: {"item":"minecraft:dinosaur_chop"}; Second: Failed to parse either. First: Not a json array: {"item":"minecraft:dinosaur_chop"}; Second: Not a string: {"item":"minecraft:dinosaur_chop"}']
-[19:28:30] [Worker-Main-7/ERROR]: Couldn't parse data file 'minecraft:furnace/cooked_dinosaur_chop_smoking' from 'minecraft:recipe/furnace/cooked_dinosaur_chop_smoking.json': DataResult.Error['Failed to parse either. First: Not a string: {"item":"minecraft:dinosaur_chop"}; Second: Failed to parse either. First: Not a json array: {"item":"minecraft:dinosaur_chop"}; Second: Not a string: {"item":"minecraft:dinosaur_chop"}']
-[19:28:30] [Worker-Main-7/ERROR]: Couldn't parse data file 'minecraft:pewen_boat' from 'minecraft:recipe/pewen_boat.json': DataResult.Error['Map entry '#' : Failed to parse either. First: Not a string: {"item":"minecraft:pewen_planks"}; Second: Failed to parse either. First: Not a json array: {"item":"minecraft:pewen_planks"}; Second: Not a string: {"item":"minecraft:pewen_planks"}']
-[19:28:30] [Worker-Main-7/ERROR]: Couldn't parse data file 'minecraft:pewen_button' from 'minecraft:recipe/pewen_button.json': DataResult.Error['List is too short: 0, expected range [1-9]']
-[19:28:30] [Worker-Main-7/ERROR]: Couldn't parse data file 'minecraft:pewen_chest_boat' from 'minecraft:recipe/pewen_chest_boat.json': DataResult.Error['List is too short: 0, expected range [1-9]']
-[19:28:30] [Worker-Main-7/ERROR]: Couldn't parse data file 'minecraft:pewen_door' from 'minecraft:recipe/pewen_door.json': DataResult.Error['Map entry '#' : Failed to parse either. First: Not a string: {"item":"minecraft:pewen_planks"}; Second: Failed to parse either. First: Not a json array: {"item":"minecraft:pewen_planks"}; Second: Not a string: {"item":"minecraft:pewen_planks"}']
-[19:28:30] [Worker-Main-7/ERROR]: Couldn't parse data file 'minecraft:pewen_fence' from 'minecraft:recipe/pewen_fence.json': DataResult.Error['Map entry '#' : Failed to parse either. First: Not a string: {"item":"minecraft:stick"}; Second: Failed to parse either. First: Not a json array: {"item":"minecraft:stick"}; Second: Not a string: {"item":"minecraft:stick"}']
-[19:28:30] [Worker-Main-7/ERROR]: Couldn't parse data file 'minecraft:pewen_fence_gate' from 'minecraft:recipe/pewen_fence_gate.json': DataResult.Error['Map entry '#' : Failed to parse either. First: Not a string: {"item":"minecraft:stick"}; Second: Failed to parse either. First: Not a json array: {"item":"minecraft:stick"}; Second: Not a string: {"item":"minecraft:stick"}']
-[19:28:30] [Worker-Main-7/ERROR]: Couldn't parse data file 'minecraft:pewen_hanging_sign' from 'minecraft:recipe/pewen_hanging_sign.json': DataResult.Error['Map entry 'C' : Failed to parse either. First: Not a string: {"item":"minecraft:chain"}; Second: Failed to parse either. First: Not a json array: {"item":"minecraft:chain"}; Second: Not a string: {"item":"minecraft:chain"}']
-[19:28:30] [Worker-Main-7/ERROR]: Couldn't parse data file 'minecraft:pewen_planks' from 'minecraft:recipe/pewen_planks.json': DataResult.Error['List is too short: 0, expected range [1-9]']
-[19:28:30] [Worker-Main-7/ERROR]: Couldn't parse data file 'minecraft:pewen_pressure_plate' from 'minecraft:recipe/pewen_pressure_plate.json': DataResult.Error['Map entry '#' : Failed to parse either. First: Not a string: {"item":"minecraft:pewen_planks"}; Second: Failed to parse either. First: Not a json array: {"item":"minecraft:pewen_planks"}; Second: Not a string: {"item":"minecraft:pewen_planks"}']
-[19:28:30] [Worker-Main-7/ERROR]: Couldn't parse data file 'minecraft:pewen_sign' from 'minecraft:recipe/pewen_sign.json': DataResult.Error['Map entry '#' : Failed to parse either. First: Not a string: {"item":"minecraft:pewen_planks"}; Second: Failed to parse either. First: Not a json array: {"item":"minecraft:pewen_planks"}; Second: Not a string: {"item":"minecraft:pewen_planks"}']
-[19:28:30] [Worker-Main-7/ERROR]: Couldn't parse data file 'minecraft:pewen_slab' from 'minecraft:recipe/pewen_slab.json': DataResult.Error['Map entry '#' : Failed to parse either. First: Not a string: {"item":"minecraft:pewen_planks"}; Second: Failed to parse either. First: Not a json array: {"item":"minecraft:pewen_planks"}; Second: Not a string: {"item":"minecraft:pewen_planks"}']
-[19:28:30] [Worker-Main-7/ERROR]: Couldn't parse data file 'minecraft:pewen_stairs' from 'minecraft:recipe/pewen_stairs.json': DataResult.Error['Map entry '#' : Failed to parse either. First: Not a string: {"item":"minecraft:pewen_planks"}; Second: Failed to parse either. First: Not a json array: {"item":"minecraft:pewen_planks"}; Second: Not a string: {"item":"minecraft:pewen_planks"}']
-[19:28:30] [Worker-Main-7/ERROR]: Couldn't parse data file 'minecraft:pewen_trapdoor' from 'minecraft:recipe/pewen_trapdoor.json': DataResult.Error['Map entry '#' : Failed to parse either. First: Not a string: {"item":"minecraft:pewen_planks"}; Second: Failed to parse either. First: Not a json array: {"item":"minecraft:pewen_planks"}; Second: Not a string: {"item":"minecraft:pewen_planks"}']
-[19:28:30] [Worker-Main-7/ERROR]: Couldn't parse data file 'minecraft:pewen_wood' from 'minecraft:recipe/pewen_wood.json': DataResult.Error['Map entry '#' : Failed to parse either. First: Not a string: {"item":"minecraft:pewen_log"}; Second: Failed to parse either. First: Not a json array: {"item":"minecraft:pewen_log"}; Second: Not a string: {"item":"minecraft:pewen_log"}']
-[19:28:30] [Worker-Main-7/ERROR]: Couldn't parse data file 'minecraft:stripped_pewen_wood' from 'minecraft:recipe/stripped_pewen_wood.json': DataResult.Error['Map entry '#' : Failed to parse either. First: Not a string: {"item":"minecraft:stripped_pewen_log"}; Second: Failed to parse either. First: Not a json array: {"item":"minecraft:stripped_pewen_log"}; Second: Not a string: {"item":"minecraft:stripped_pewen_log"}']
-[19:28:30] [Render thread/INFO]: Loaded 1461 recipes
-[19:28:30] [Render thread/INFO]: Loaded 1574 advancements
-[19:28:30] [Server thread/INFO]: Started DhWorld of type CLIENT_SERVER
-[19:28:30] [Server thread/INFO]: Starting integrated minecraft server version 1.21.10
-[19:28:30] [Server thread/INFO]: Generating keypair
-[19:28:31] [Server thread/INFO]: Started DhClientServerLevel for [Wrapped{ServerLevel[Origin Prime City 3]@minecraft:overworld}] at [[LocalSaveStructure@(/home/matt/Documents/Repos/MattMC/run/saves/Origin Prime City 3/data)]].
-[19:28:31] [DH-Full Data Migration Thread[0]/INFO]: No migration necessary.
-[19:28:31] [DH-Full Data Migration Thread[0]/INFO]: No migration necessary.
-[19:28:31] [Server thread/INFO]: Started DhClientServerLevel for [Wrapped{ServerLevel[Origin Prime City 3]@minecraft:the_nether}] at [[LocalSaveStructure@(/home/matt/Documents/Repos/MattMC/run/saves/Origin Prime City 3/DIM-1/data;/home/matt/Documents/Repos/MattMC/run/saves/Origin Prime City 3/data)]].
-[19:28:31] [DH-Full Data Migration Thread[0]/INFO]: No migration necessary.
-[19:28:31] [Server thread/INFO]: Started DhClientServerLevel for [Wrapped{ServerLevel[Origin Prime City 3]@minecraft:the_end}] at [[LocalSaveStructure@(/home/matt/Documents/Repos/MattMC/run/saves/Origin Prime City 3/DIM-1/data;/home/matt/Documents/Repos/MattMC/run/saves/Origin Prime City 3/data;/home/matt/Documents/Repos/MattMC/run/saves/Origin Prime City 3/DIM1/data)]].
-[19:28:31] [DH-Full Data Migration Thread[0]/INFO]: No migration necessary.
-[19:28:31] [Server thread/INFO]: Started DhClientServerLevel for [Wrapped{ServerLevel[Origin Prime City 3]@minecraft:primordial_caves}] at [[LocalSaveStructure@(/home/matt/Documents/Repos/MattMC/run/saves/Origin Prime City 3/DIM-1/data;/home/matt/Documents/Repos/MattMC/run/saves/Origin Prime City 3/data;/home/matt/Documents/Repos/MattMC/run/saves/Origin Prime City 3/DIM1/data;/home/matt/Documents/Repos/MattMC/run/saves/Origin Prime City 3/dimensions/minecraft/primordial_caves/data)]].
-[19:28:31] [Server thread/INFO]: Loading 0 persistent chunks...
-[19:28:31] [Server thread/INFO]: Preparing spawn area: 16%
-[19:28:31] [Server thread/INFO]: WorldEdit initialized
-[19:28:31] [Server thread/INFO]: WorldEdit commands registered
-[19:28:31] [Server thread/INFO]: Loading 49 chunks for player spawn...
-[19:28:31] [Server thread/INFO]: Preparing spawn area: 100%
-[19:28:31] [Server thread/INFO]: Time elapsed: 511 ms
-[19:28:32] [Server thread/INFO]: HungLo[local:E:1f01b117] logged in with entity id 60 at (181.5069805045084, 67.00063554902955, -72.15825598150094)
-[19:28:32] [Render thread/INFO]: Reloading pipeline on dimension change: minecraft:overworld => minecraft:overworld
-[19:28:32] [Render thread/INFO]: Destroying pipeline minecraft:overworld
-[19:28:32] [Server thread/INFO]: Player [HungLo] joined.
-[19:28:32] [Render thread/INFO]: Creating pipeline for dimension minecraft:overworld
-[19:28:32] [Server thread/INFO]: HungLo joined the game
-[19:28:32] [DH-Request Module Ticker [minecraft:overworld] Thread[0]/INFO]: Batch Chunk Generator initialized
-[19:28:32] [DH-Request Module Ticker [minecraft:overworld] Thread[0]/INFO]: Set world gen queue for level [minecraft:overworld].
-[19:28:32] [Server thread/INFO]: Changing simulation distance to 12, from 0
-[19:28:32] [Render thread/INFO]: Loaded [0] waiting chunk wrappers.
-[19:28:32] [Render thread/INFO]: Started 10 worker threads
-[19:28:32] [Render thread/INFO]: Sent player skin to server: hunglo (Wide)
-[19:28:32] [Render thread/INFO]: [DH-CLIENT-CONNECT] ========== CLIENT ONLY CONNECTED ==========
-[19:28:32] [Render thread/INFO]: [DH-CLIENT-CONNECT] Thread: Render thread (ID: 3)
-[19:28:32] [Render thread/INFO]: [DH-CLIENT-CONNECT] Connected to dedicated server: false
-[19:28:32] [Render thread/INFO]: [DH-CLIENT-CONNECT] Connected to replay: false
-[19:28:32] [Render thread/INFO]: [DH-CLIENT-CONNECT] Not connected to dedicated server or replay - skipping DhClientWorld creation
-[19:28:32] [Render thread/INFO]: [DH-CLIENT-CONNECT] This is expected for integrated/singleplayer - world should be created by ServerApi
-[19:28:32] [Render thread/INFO]: Loaded [0] waiting chunk wrappers.
-[19:28:32] [Render thread/WARN]: Ignoring chat session from HungLo due to missing Services public key
-[19:28:32] [Render thread/INFO]: Loaded 126 advancements
-[19:28:32] [Render thread/WARN]: Error while parsing the block ID map entry for "block.10104":
-[19:28:32] [Render thread/WARN]: - The block minecraft:stone_slab has no property with the name variant, ignoring!
-[19:28:32] [Render thread/WARN]: Error while parsing the block ID map entry for "block.10944":
-[19:28:32] [Render thread/WARN]: - The block minecraft:creaking_heart has no property with the name active, ignoring!
-[19:28:32] [Render thread/WARN]: Error while parsing the block ID map entry for "block.10948":
-[19:28:32] [Render thread/WARN]: - The block minecraft:creaking_heart has no property with the name active, ignoring!
-[19:28:32] [Render thread/INFO]: Stopping worker threads
-[19:28:32] [Render thread/INFO]: Started 10 worker threads
-[19:28:32] [Render thread/INFO]: Resizing Dynamic Transforms UBO, capacity limit of 2 reached during a single frame. New capacity will be 4.
-[19:28:32] [Render thread/INFO]: Creating GLProxy... If this is the last message you see there must have been an OpenGL error.
-[19:28:32] [Render thread/INFO]: Lod Render OpenGL version [3.3.0 NVIDIA 580.95.05].
-[19:28:32] [Render thread/INFO]: minecraftGlCapabilities:
+[18:17:43] [Render thread/INFO]: Using shaderpack: ComplementaryHungLoIfied.zip
+[18:17:43] [Render thread/INFO]: Created: 256x256 waypoints-atlas
+[18:17:43] [Render thread/INFO]: Resized to: 32x32 chooser-atlas
+[18:17:43] [Render thread/INFO]: Resized to: 64x32 chooser-atlas
+[18:17:43] [Render thread/INFO]: Resized to: 64x64 chooser-atlas
+[18:17:43] [Render thread/INFO]: Resized to: 128x64 chooser-atlas
+[18:17:43] [Render thread/INFO]: Resized to: 128x128 chooser-atlas
+[18:17:43] [Render thread/INFO]: Resized to: 256x128 chooser-atlas
+[18:17:43] [IO-Worker-1/INFO]: Preferred audio device has become available!
+[18:17:43] [Render thread/INFO]: OpenAL initialized on device HT-S350
+[18:17:43] [Render thread/INFO]: Sound engine started
+[18:17:43] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/particles.png-atlas
+[18:17:43] [Render thread/INFO]: Created: 128x64x0 minecraft:textures/atlas/decorated_pot.png-atlas
+[18:17:43] [Render thread/INFO]: Created: 2048x1024x0 minecraft:textures/atlas/armor_trims.png-atlas
+[18:17:43] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/paintings.png-atlas
+[18:17:43] [Render thread/INFO]: Created: 512x512x0 minecraft:textures/atlas/shield_patterns.png-atlas
+[18:17:43] [Render thread/INFO]: Created: 1024x1024x4 minecraft:textures/atlas/blocks.png-atlas
+[18:17:43] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/chest.png-atlas
+[18:17:43] [Render thread/INFO]: Created: 512x512x0 minecraft:textures/atlas/banner_patterns.png-atlas
+[18:17:43] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/beds.png-atlas
+[18:17:43] [Render thread/INFO]: Created: 1024x512x0 minecraft:textures/atlas/gui.png-atlas
+[18:17:43] [Render thread/INFO]: Created: 64x64x0 minecraft:textures/atlas/map_decorations.png-atlas
+[18:17:43] [Render thread/INFO]: Created: 256x256x0 minecraft:textures/atlas/signs.png-atlas
+[18:17:43] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/shulker_boxes.png-atlas
+[18:17:44] [Render thread/INFO]: Auto-updater has been disabled - no update checks will be performed
+[18:17:44] [Render thread/INFO]: Creating pipeline for dimension minecraft:overworld
+[18:17:44] [Render thread/WARN]: Type is VERTEX
+[18:17:44] [Render thread/WARN]: Type is FRAGMENT
+[18:17:44] [Render thread/WARN]: Type is VERTEX
+[18:17:44] [Render thread/WARN]: Type is FRAGMENT
+[18:17:44] [Render thread/WARN]: Type is VERTEX
+[18:17:44] [Render thread/WARN]: Type is FRAGMENT
+[18:17:45] [Render thread/INFO]: OpenAL initialized on device HT-S350
+[18:17:45] [Render thread/INFO]: Sound engine started
+[18:17:49] [Render thread/ERROR]: Couldn't load tag minecraft:jerboa_breedables as it is missing following references: minecraft:seeds (from vanilla)
+[18:17:49] [Render thread/ERROR]: Couldn't load tag minecraft:cosmaw_breedables as it is missing following references: minecraft:cosmic_cod (from vanilla)
+[18:17:49] [Render thread/ERROR]: Couldn't load tag minecraft:jerboa_begs_for as it is missing following references: #minecraft:seeds (from vanilla)
+[18:17:49] [Render thread/ERROR]: Couldn't load tag minecraft:anteater_foodstuffs as it is missing following references: #minecraft:insect_items (from vanilla)
+[18:17:49] [Render thread/ERROR]: Couldn't load tag minecraft:cosmaw_tameables as it is missing following references: minecraft:cosmic_cod (from vanilla)
+[18:17:49] [Render thread/ERROR]: Couldn't load tag minecraft:cosmaw_foodstuffs as it is missing following references: #minecraft:cosmaw_breedables (from vanilla), #minecraft:cosmaw_tameables (from vanilla)
+[18:17:49] [Render thread/ERROR]: Couldn't load tag minecraft:bald_eagle_targets as it is missing following references: minecraft:triops (from vanilla)
+[18:17:49] [Render thread/ERROR]: Couldn't load tag minecraft:ignores_kimono as it is missing following references: minecraft:murmur (from vanilla), minecraft:murmur_head (from vanilla)
+[18:17:49] [Render thread/ERROR]: Couldn't load tag minecraft:giant_squid_targets as it is missing following references: minecraft:devils_hole_pupfish (from vanilla), minecraft:triops (from vanilla)
+[18:17:49] [Render thread/ERROR]: Couldn't load tag minecraft:notor_ignores as it is missing following references: minecraft:teletor (from vanilla), minecraft:magnetron (from vanilla), minecraft:boundroid (from vanilla), minecraft:ferrouslime (from vanilla), minecraft:notor (from vanilla)
+[18:17:49] [Render thread/ERROR]: Couldn't load tag minecraft:glowing_entities as it is missing following references: minecraft:teletor (from vanilla), minecraft:magnetron (from vanilla), minecraft:boundroid (from vanilla), minecraft:notor (from vanilla), minecraft:nucleeper (from vanilla), minecraft:radgill (from vanilla), minecraft:raycat (from vanilla), minecraft:gossamer_worm (from vanilla), minecraft:tremorzilla (from vanilla)
+[18:17:49] [Render thread/ERROR]: Couldn't load tag minecraft:passive_land_animals as it is missing following references: minecraft:seal (from vanilla), minecraft:maned_wolf (from vanilla)
+[18:17:49] [Render thread/ERROR]: Couldn't load tag minecraft:tiger_targets as it is missing following references: #minecraft:passive_land_animals (from vanilla)
+[18:17:49] [Render thread/ERROR]: Couldn't load tag minecraft:komodo_dragon_targets as it is missing following references: #minecraft:passive_land_animals (from vanilla)
+[18:17:49] [Render thread/ERROR]: Couldn't load tag minecraft:froststalker_targets as it is missing following references: #minecraft:passive_land_animals (from vanilla), minecraft:tusklin (from vanilla)
+[18:17:49] [Render thread/ERROR]: Couldn't load tag minecraft:resists_tremorsaurus_roar as it is missing following references: minecraft:luxtructosaurus (from vanilla), minecraft:tremorzilla (from vanilla)
+[18:17:49] [Render thread/ERROR]: Couldn't load tag minecraft:resists_radiation as it is missing following references: minecraft:nucleeper (from vanilla), minecraft:radgill (from vanilla), minecraft:brainiac (from vanilla), minecraft:gammaroach (from vanilla), minecraft:raycat (from vanilla), minecraft:tremorzilla (from vanilla)
+[18:17:49] [Render thread/ERROR]: Couldn't load tag minecraft:subterranodon_flees as it is missing following references: minecraft:tremorzilla (from vanilla)
+[18:17:49] [Render thread/ERROR]: Couldn't load tag minecraft:moth_dust_enrages as it is missing following references: minecraft:vesper (from vanilla), minecraft:corrodent (from vanilla), minecraft:underzealot (from vanilla), minecraft:forsaken (from vanilla), minecraft:watcher (from vanilla)
+[18:17:49] [Render thread/ERROR]: Couldn't load tag minecraft:resists_acid as it is missing following references: minecraft:nucleeper (from vanilla), minecraft:radgill (from vanilla), minecraft:brainiac (from vanilla), minecraft:raycat (from vanilla), minecraft:tremorzilla (from vanilla)
+[18:17:49] [Render thread/ERROR]: Couldn't load tag minecraft:ferromagnetic_entities as it is missing following references: minecraft:nucleeper (from vanilla)
+[18:17:49] [Render thread/ERROR]: Couldn't load tag minecraft:resists_bubbled as it is missing following references: minecraft:deep_one_mage (from vanilla)
+[18:17:49] [Render thread/ERROR]: Couldn't load tag minecraft:resists_totem_of_possession as it is missing following references: #c:bosses (from vanilla), minecraft:hullbreaker (from vanilla), minecraft:forsaken (from vanilla), minecraft:tremorzilla (from vanilla)
+[18:17:49] [Render thread/ERROR]: Couldn't load tag minecraft:resists_magnets as it is missing following references: minecraft:teletor (from vanilla), minecraft:notor (from vanilla)
+[18:17:49] [Render thread/ERROR]: Couldn't load tag minecraft:seafloor_denizens as it is missing following references: minecraft:lanternfish (from vanilla), minecraft:sea_pig (from vanilla), minecraft:hullbreaker (from vanilla), minecraft:gossamer_worm (from vanilla), minecraft:tripodfish (from vanilla), minecraft:deep_one (from vanilla), minecraft:deep_one_knight (from vanilla), minecraft:deep_one_mage (from vanilla)
+[18:17:49] [Render thread/ERROR]: Couldn't load tag minecraft:candy_mobs as it is missing following references: minecraft:sweetish_fish (from vanilla), minecraft:caniac (from vanilla), minecraft:gumbeeper (from vanilla), minecraft:candicorn (from vanilla), minecraft:gum_worm (from vanilla), minecraft:gum_worm_segment (from vanilla), minecraft:caramel_cube (from vanilla), minecraft:melted_caramel (from vanilla), minecraft:gummy_bear (from vanilla), minecraft:licowitch (from vanilla), minecraft:spinning_peppermint (from vanilla), minecraft:sugar_staff_hex (from vanilla), minecraft:gingerbread_man (from vanilla)
+[18:17:49] [Render thread/ERROR]: Couldn't load tag minecraft:mantis_shrimp_targets as it is missing following references: minecraft:triops (from vanilla)
+[18:17:49] [Render thread/ERROR]: Couldn't load tag minecraft:forsaken_ignores as it is missing following references: minecraft:vesper (from vanilla), minecraft:corrodent (from vanilla), minecraft:underzealot (from vanilla), minecraft:forsaken (from vanilla), minecraft:watcher (from vanilla)
+[18:17:49] [Render thread/ERROR]: Couldn't load tag minecraft:orca_targets as it is missing following references: minecraft:seal (from vanilla)
+[18:17:49] [Render thread/ERROR]: Couldn't load tag minecraft:dinosaurs as it is missing following references: minecraft:luxtructosaurus (from vanilla), minecraft:tremorzilla (from vanilla)
+[18:17:49] [Render thread/ERROR]: Couldn't load tag minecraft:crimson_mosquito_targets as it is missing following references: #minecraft:passive_land_animals (from vanilla)
+[18:17:49] [Render thread/ERROR]: Couldn't load tag minecraft:void_portal_ignores as it is missing following references: minecraft:void_portal (from vanilla)
+[18:17:49] [Render thread/ERROR]: Couldn't load tag minecraft:caiman_targets as it is missing following references: minecraft:banana_slug (from vanilla), minecraft:triops (from vanilla)
+[18:17:49] [Render thread/ERROR]: Couldn't load tag minecraft:crocodile_targets as it is missing following references: #minecraft:passive_land_animals (from vanilla), minecraft:triops (from vanilla)
+[18:17:50] [Worker-Main-3/ERROR]: Couldn't parse data file 'minecraft:blocks/cave_painting_pewen' from 'minecraft:loot_table/blocks/cave_painting_pewen.json': DataResult.Error['Unknown registry key in ResourceKey[minecraft:root / minecraft:item]: minecraft:cave_painting_pewen': net.minecraft.world.level.storage.loot.LootTable@30f41b68]
+[18:17:50] [Worker-Main-5/ERROR]: Couldn't parse data file 'minecraft:centipede_leggings' from 'minecraft:recipe/centipede_leggings.json': DataResult.Error['Map entry 'S' : Failed to parse either. First: Not a string: {"item":"minecraft:centipede_leg"}; Second: Failed to parse either. First: Not a json array: {"item":"minecraft:centipede_leg"}; Second: Not a string: {"item":"minecraft:centipede_leg"}']
+[18:17:50] [Worker-Main-5/ERROR]: Couldn't parse data file 'minecraft:cooked_trilocaris_tail_campfire' from 'minecraft:recipe/cooked_trilocaris_tail_campfire.json': DataResult.Error['Failed to parse either. First: Not a string: {"item":"minecraft:trilocaris_tail"}; Second: Failed to parse either. First: Not a json array: {"item":"minecraft:trilocaris_tail"}; Second: Not a string: {"item":"minecraft:trilocaris_tail"}']
+[18:17:50] [Worker-Main-5/ERROR]: Couldn't parse data file 'minecraft:cooked_trilocaris_tail_smelting' from 'minecraft:recipe/cooked_trilocaris_tail_smelting.json': DataResult.Error['Failed to parse either. First: Not a string: {"item":"minecraft:trilocaris_tail"}; Second: Failed to parse either. First: Not a json array: {"item":"minecraft:trilocaris_tail"}; Second: Not a string: {"item":"minecraft:trilocaris_tail"}']
+[18:17:50] [Worker-Main-5/ERROR]: Couldn't parse data file 'minecraft:cooked_trilocaris_tail_smoking' from 'minecraft:recipe/cooked_trilocaris_tail_smoking.json': DataResult.Error['Failed to parse either. First: Not a string: {"item":"minecraft:trilocaris_tail"}; Second: Failed to parse either. First: Not a json array: {"item":"minecraft:trilocaris_tail"}; Second: Not a string: {"item":"minecraft:trilocaris_tail"}']
+[18:17:50] [Worker-Main-5/ERROR]: Couldn't parse data file 'minecraft:fern_thatch' from 'minecraft:recipe/fern_thatch.json': DataResult.Error['Map entry 'F' : Failed to parse either. First: Not a string: {"tag":"minecraft:ferns"}; Second: Failed to parse either. First: Not a json array: {"tag":"minecraft:ferns"}; Second: Not a string: {"tag":"minecraft:ferns"}']
+[18:17:50] [Worker-Main-5/ERROR]: Couldn't parse data file 'minecraft:furnace/cooked_dinosaur_chop_campfire' from 'minecraft:recipe/furnace/cooked_dinosaur_chop_campfire.json': DataResult.Error['Failed to parse either. First: Not a string: {"item":"minecraft:dinosaur_chop"}; Second: Failed to parse either. First: Not a json array: {"item":"minecraft:dinosaur_chop"}; Second: Not a string: {"item":"minecraft:dinosaur_chop"}']
+[18:17:50] [Worker-Main-5/ERROR]: Couldn't parse data file 'minecraft:furnace/cooked_dinosaur_chop_smelting' from 'minecraft:recipe/furnace/cooked_dinosaur_chop_smelting.json': DataResult.Error['Failed to parse either. First: Not a string: {"item":"minecraft:dinosaur_chop"}; Second: Failed to parse either. First: Not a json array: {"item":"minecraft:dinosaur_chop"}; Second: Not a string: {"item":"minecraft:dinosaur_chop"}']
+[18:17:50] [Worker-Main-5/ERROR]: Couldn't parse data file 'minecraft:furnace/cooked_dinosaur_chop_smoking' from 'minecraft:recipe/furnace/cooked_dinosaur_chop_smoking.json': DataResult.Error['Failed to parse either. First: Not a string: {"item":"minecraft:dinosaur_chop"}; Second: Failed to parse either. First: Not a json array: {"item":"minecraft:dinosaur_chop"}; Second: Not a string: {"item":"minecraft:dinosaur_chop"}']
+[18:17:50] [Worker-Main-5/ERROR]: Couldn't parse data file 'minecraft:pewen_boat' from 'minecraft:recipe/pewen_boat.json': DataResult.Error['Map entry '#' : Failed to parse either. First: Not a string: {"item":"minecraft:pewen_planks"}; Second: Failed to parse either. First: Not a json array: {"item":"minecraft:pewen_planks"}; Second: Not a string: {"item":"minecraft:pewen_planks"}']
+[18:17:50] [Worker-Main-5/ERROR]: Couldn't parse data file 'minecraft:pewen_button' from 'minecraft:recipe/pewen_button.json': DataResult.Error['List is too short: 0, expected range [1-9]']
+[18:17:50] [Worker-Main-5/ERROR]: Couldn't parse data file 'minecraft:pewen_chest_boat' from 'minecraft:recipe/pewen_chest_boat.json': DataResult.Error['List is too short: 0, expected range [1-9]']
+[18:17:50] [Worker-Main-5/ERROR]: Couldn't parse data file 'minecraft:pewen_door' from 'minecraft:recipe/pewen_door.json': DataResult.Error['Map entry '#' : Failed to parse either. First: Not a string: {"item":"minecraft:pewen_planks"}; Second: Failed to parse either. First: Not a json array: {"item":"minecraft:pewen_planks"}; Second: Not a string: {"item":"minecraft:pewen_planks"}']
+[18:17:50] [Worker-Main-5/ERROR]: Couldn't parse data file 'minecraft:pewen_fence' from 'minecraft:recipe/pewen_fence.json': DataResult.Error['Map entry '#' : Failed to parse either. First: Not a string: {"item":"minecraft:stick"}; Second: Failed to parse either. First: Not a json array: {"item":"minecraft:stick"}; Second: Not a string: {"item":"minecraft:stick"}']
+[18:17:50] [Worker-Main-5/ERROR]: Couldn't parse data file 'minecraft:pewen_fence_gate' from 'minecraft:recipe/pewen_fence_gate.json': DataResult.Error['Map entry '#' : Failed to parse either. First: Not a string: {"item":"minecraft:stick"}; Second: Failed to parse either. First: Not a json array: {"item":"minecraft:stick"}; Second: Not a string: {"item":"minecraft:stick"}']
+[18:17:50] [Worker-Main-5/ERROR]: Couldn't parse data file 'minecraft:pewen_hanging_sign' from 'minecraft:recipe/pewen_hanging_sign.json': DataResult.Error['Map entry 'C' : Failed to parse either. First: Not a string: {"item":"minecraft:chain"}; Second: Failed to parse either. First: Not a json array: {"item":"minecraft:chain"}; Second: Not a string: {"item":"minecraft:chain"}']
+[18:17:50] [Worker-Main-5/ERROR]: Couldn't parse data file 'minecraft:pewen_planks' from 'minecraft:recipe/pewen_planks.json': DataResult.Error['List is too short: 0, expected range [1-9]']
+[18:17:50] [Worker-Main-5/ERROR]: Couldn't parse data file 'minecraft:pewen_pressure_plate' from 'minecraft:recipe/pewen_pressure_plate.json': DataResult.Error['Map entry '#' : Failed to parse either. First: Not a string: {"item":"minecraft:pewen_planks"}; Second: Failed to parse either. First: Not a json array: {"item":"minecraft:pewen_planks"}; Second: Not a string: {"item":"minecraft:pewen_planks"}']
+[18:17:50] [Worker-Main-5/ERROR]: Couldn't parse data file 'minecraft:pewen_sign' from 'minecraft:recipe/pewen_sign.json': DataResult.Error['Map entry '#' : Failed to parse either. First: Not a string: {"item":"minecraft:pewen_planks"}; Second: Failed to parse either. First: Not a json array: {"item":"minecraft:pewen_planks"}; Second: Not a string: {"item":"minecraft:pewen_planks"}']
+[18:17:50] [Worker-Main-5/ERROR]: Couldn't parse data file 'minecraft:pewen_slab' from 'minecraft:recipe/pewen_slab.json': DataResult.Error['Map entry '#' : Failed to parse either. First: Not a string: {"item":"minecraft:pewen_planks"}; Second: Failed to parse either. First: Not a json array: {"item":"minecraft:pewen_planks"}; Second: Not a string: {"item":"minecraft:pewen_planks"}']
+[18:17:50] [Worker-Main-5/ERROR]: Couldn't parse data file 'minecraft:pewen_stairs' from 'minecraft:recipe/pewen_stairs.json': DataResult.Error['Map entry '#' : Failed to parse either. First: Not a string: {"item":"minecraft:pewen_planks"}; Second: Failed to parse either. First: Not a json array: {"item":"minecraft:pewen_planks"}; Second: Not a string: {"item":"minecraft:pewen_planks"}']
+[18:17:50] [Worker-Main-5/ERROR]: Couldn't parse data file 'minecraft:pewen_trapdoor' from 'minecraft:recipe/pewen_trapdoor.json': DataResult.Error['Map entry '#' : Failed to parse either. First: Not a string: {"item":"minecraft:pewen_planks"}; Second: Failed to parse either. First: Not a json array: {"item":"minecraft:pewen_planks"}; Second: Not a string: {"item":"minecraft:pewen_planks"}']
+[18:17:50] [Worker-Main-5/ERROR]: Couldn't parse data file 'minecraft:pewen_wood' from 'minecraft:recipe/pewen_wood.json': DataResult.Error['Map entry '#' : Failed to parse either. First: Not a string: {"item":"minecraft:pewen_log"}; Second: Failed to parse either. First: Not a json array: {"item":"minecraft:pewen_log"}; Second: Not a string: {"item":"minecraft:pewen_log"}']
+[18:17:50] [Worker-Main-5/ERROR]: Couldn't parse data file 'minecraft:stripped_pewen_wood' from 'minecraft:recipe/stripped_pewen_wood.json': DataResult.Error['Map entry '#' : Failed to parse either. First: Not a string: {"item":"minecraft:stripped_pewen_log"}; Second: Failed to parse either. First: Not a json array: {"item":"minecraft:stripped_pewen_log"}; Second: Not a string: {"item":"minecraft:stripped_pewen_log"}']
+[18:17:50] [Render thread/INFO]: Loaded 1464 recipes
+[18:17:50] [Render thread/INFO]: Loaded 1574 advancements
+[18:17:50] [Server thread/INFO]: Started DhWorld of type CLIENT_SERVER
+[18:17:50] [Server thread/INFO]: Starting integrated minecraft server version 1.21.10
+[18:17:50] [Server thread/INFO]: Generating keypair
+[18:17:50] [DH-Full Data Migration Thread[0]/INFO]: No migration necessary.
+[18:17:50] [Server thread/INFO]: Started DhClientServerLevel for [Wrapped{ServerLevel[Origin Prime City 3]@minecraft:overworld}] at [[LocalSaveStructure@(/home/matt/Documents/Repos/MattMC/run/saves/Origin Prime City 3/data)]].
+[18:17:51] [DH-Full Data Migration Thread[0]/INFO]: No migration necessary.
+[18:17:51] [Server thread/INFO]: Started DhClientServerLevel for [Wrapped{ServerLevel[Origin Prime City 3]@minecraft:the_end}] at [[LocalSaveStructure@(/home/matt/Documents/Repos/MattMC/run/saves/Origin Prime City 3/data;/home/matt/Documents/Repos/MattMC/run/saves/Origin Prime City 3/DIM1/data)]].
+[18:17:51] [DH-Full Data Migration Thread[0]/INFO]: No migration necessary.
+[18:17:51] [Server thread/INFO]: Started DhClientServerLevel for [Wrapped{ServerLevel[Origin Prime City 3]@minecraft:primordial_caves}] at [[LocalSaveStructure@(/home/matt/Documents/Repos/MattMC/run/saves/Origin Prime City 3/dimensions/minecraft/primordial_caves/data;/home/matt/Documents/Repos/MattMC/run/saves/Origin Prime City 3/data;/home/matt/Documents/Repos/MattMC/run/saves/Origin Prime City 3/DIM1/data)]].
+[18:17:51] [DH-Full Data Migration Thread[0]/INFO]: No migration necessary.
+[18:17:51] [Server thread/INFO]: Started DhClientServerLevel for [Wrapped{ServerLevel[Origin Prime City 3]@minecraft:the_nether}] at [[LocalSaveStructure@(/home/matt/Documents/Repos/MattMC/run/saves/Origin Prime City 3/dimensions/minecraft/primordial_caves/data;/home/matt/Documents/Repos/MattMC/run/saves/Origin Prime City 3/data;/home/matt/Documents/Repos/MattMC/run/saves/Origin Prime City 3/DIM1/data;/home/matt/Documents/Repos/MattMC/run/saves/Origin Prime City 3/DIM-1/data)]].
+[18:17:51] [Server thread/INFO]: Loading 0 persistent chunks...
+[18:17:51] [Server thread/INFO]: WorldEdit initialized
+[18:17:51] [Server thread/INFO]: WorldEdit commands registered
+[18:17:51] [Server thread/INFO]: Loading 49 chunks for player spawn...
+[18:17:51] [Server thread/INFO]: Preparing spawn area: 16%
+[18:17:51] [Server thread/INFO]: Preparing spawn area: 100%
+[18:17:51] [Server thread/INFO]: Time elapsed: 511 ms
+[18:17:51] [Server thread/INFO]: HungLo[local:E:1a0c91fd] logged in with entity id 200 at (352.60191148509034, 73.1875, -31.580148142582466)
+[18:17:51] [Server thread/INFO]: Player [HungLo] joined.
+[18:17:51] [Server thread/INFO]: HungLo joined the game
+[18:17:51] [Render thread/INFO]: Reloading pipeline on dimension change: minecraft:overworld => minecraft:overworld
+[18:17:51] [Render thread/INFO]: Destroying pipeline minecraft:overworld
+[18:17:51] [DH-Request Module Ticker [minecraft:overworld] Thread[0]/INFO]: Batch Chunk Generator initialized
+[18:17:51] [Render thread/INFO]: Creating pipeline for dimension minecraft:overworld
+[18:17:51] [DH-Request Module Ticker [minecraft:overworld] Thread[0]/INFO]: Set world gen queue for level [minecraft:overworld].
+[18:17:52] [Server thread/INFO]: Changing simulation distance to 12, from 0
+[18:17:52] [Render thread/INFO]: Loaded [0] waiting chunk wrappers.
+[18:17:52] [Render thread/INFO]: Started 10 worker threads
+[18:17:52] [Render thread/INFO]: Sent player skin to server: hunglo (Wide)
+[18:17:52] [Render thread/INFO]: [DH-CLIENT-CONNECT] ========== CLIENT ONLY CONNECTED ==========
+[18:17:52] [Render thread/INFO]: [DH-CLIENT-CONNECT] Thread: Render thread (ID: 3)
+[18:17:52] [Render thread/INFO]: [DH-CLIENT-CONNECT] Connected to dedicated server: false
+[18:17:52] [Render thread/INFO]: [DH-CLIENT-CONNECT] Connected to replay: false
+[18:17:52] [Render thread/INFO]: [DH-CLIENT-CONNECT] Not connected to dedicated server or replay - skipping DhClientWorld creation
+[18:17:52] [Render thread/INFO]: [DH-CLIENT-CONNECT] This is expected for integrated/singleplayer - world should be created by ServerApi
+[18:17:52] [Render thread/INFO]: Loaded [0] waiting chunk wrappers.
+[18:17:52] [Render thread/WARN]: Ignoring chat session from HungLo due to missing Services public key
+[18:17:52] [Render thread/INFO]: Loaded 129 advancements
+[18:17:52] [Render thread/WARN]: Error while parsing the block ID map entry for "block.10104":
+[18:17:52] [Render thread/WARN]: - The block minecraft:stone_slab has no property with the name variant, ignoring!
+[18:17:52] [Render thread/WARN]: Error while parsing the block ID map entry for "block.10944":
+[18:17:52] [Render thread/WARN]: - The block minecraft:creaking_heart has no property with the name active, ignoring!
+[18:17:52] [Render thread/WARN]: Error while parsing the block ID map entry for "block.10948":
+[18:17:52] [Render thread/WARN]: - The block minecraft:creaking_heart has no property with the name active, ignoring!
+[18:17:52] [Render thread/INFO]: Stopping worker threads
+[18:17:52] [Render thread/INFO]: Started 10 worker threads
+[18:17:52] [Render thread/INFO]: Resizing Dynamic Transforms UBO, capacity limit of 2 reached during a single frame. New capacity will be 4.
+[18:17:52] [Render thread/INFO]: Creating GLProxy... If this is the last message you see there must have been an OpenGL error.
+[18:17:52] [Render thread/INFO]: Lod Render OpenGL version [3.3.0 NVIDIA 580.95.05].
+[18:17:52] [Render thread/INFO]: minecraftGlCapabilities:
 Your OpenGL support:
 openGL version 3.2+: [true] <- REQUIRED
 Vertex Attribute Buffer Binding: [true] <- optional improvement
@@ -294,99 +282,91 @@ Buffer Storage: [true] <- optional improvement
 
 [LWJGL] [GL] Using KHR_debug for error logging.
 [LWJGL] [GL] Warning: A non-debug context may not produce any debug output.
-[19:28:32] [Render thread/INFO]: GPU Vendor [NVIDIA CORPORATION] with OS [Linux], Preferred upload method is [BUFFER_STORAGE].
-[19:28:32] [Render thread/INFO]: GLProxy creation successful. OpenGL smiles upon you this day.
-[19:28:32] [Render thread/INFO]: Resizing Dynamic Transforms UBO, capacity limit of 4 reached during a single frame. New capacity will be 8.
-[19:28:32] [Render thread/WARN]: Skipping DH render to prevent GL_INVALID_OPERATION during shader transition (shouldOverride=true but renderPass=OPAQUE_AND_TRANSPARENT)
-[19:28:32] [Render thread/INFO]: Setting up renderer
-[19:28:32] [Render thread/INFO]: Loading shader with type: [35633]
-[19:28:32] [Render thread/INFO]: Shader loaded sucessfully.
-[19:28:32] [Render thread/INFO]: Loading shader with type: [35632]
-[19:28:32] [Render thread/INFO]: Shader loaded sucessfully.
-[19:28:32] [Render thread/INFO]: Vertex Attribute (GL43+) completed. It contains 1 binding points and a stride size of 16
-[19:28:32] [Render thread/INFO]: Renderer setup complete
-[19:28:32] [Render thread/INFO]: Resizing Dynamic Transforms UBO, capacity limit of 8 reached during a single frame. New capacity will be 16.
-[19:28:33] [Render thread/INFO]: Loading shader with type: [35633]
-[19:28:33] [Render thread/INFO]: Shader loaded sucessfully.
-[19:28:33] [Render thread/INFO]: Loading shader with type: [35632]
-[19:28:33] [Render thread/INFO]: Shader loaded sucessfully.
-[19:28:33] [Render thread/INFO]: Vertex Attribute (GL43+) completed. It contains 1 binding points and a stride size of 12
-[19:28:33] [Render thread/INFO]: Loading shader with type: [35633]
-[19:28:33] [Render thread/INFO]: Shader loaded sucessfully.
-[19:28:33] [Render thread/INFO]: Loading shader with type: [35632]
-[19:28:33] [Render thread/INFO]: Shader loaded sucessfully.
-[19:28:33] [Render thread/INFO]: Vertex Attribute (GL43+) completed. It contains 1 binding points and a stride size of 12
-[19:28:33] [Render thread/INFO]: Loaded 126 advancements
-[19:28:33] [Voxelmap LiveMap Calculation Thread/WARN]: Block texture for block minecraft:subterranodon_egg is missing!
-[19:28:33] [Voxelmap LiveMap Calculation Thread/WARN]: Block texture for block minecraft:vallumraptor_egg is missing!
-[19:28:33] [Voxelmap LiveMap Calculation Thread/WARN]: Block texture for block minecraft:subterranodon_egg is missing!
-[19:28:33] [Voxelmap LiveMap Calculation Thread/WARN]: Block texture for block minecraft:vallumraptor_egg is missing!
-[19:28:33] [Voxelmap LiveMap Calculation Thread/WARN]: Block texture for block minecraft:subterranodon_egg is missing!
-[19:28:33] [Voxelmap LiveMap Calculation Thread/WARN]: Block texture for block minecraft:vallumraptor_egg is missing!
-[19:28:33] [Voxelmap LiveMap Calculation Thread/WARN]: Block texture for block minecraft:subterranodon_egg is missing!
-[19:28:33] [Voxelmap LiveMap Calculation Thread/WARN]: Block texture for block minecraft:vallumraptor_egg is missing!
-[19:28:34] [DH-Render Loader Thread[3]/WARN]: [EMPTY] biome string deserialized. This may mean the level was null when a save was attempted, a file saving error, or a biome saving error. Future errors will not be logged.
-[19:28:39] [Server thread/INFO]: Saving and pausing game...
-[19:28:39] [Server thread/INFO]: Saving chunks for level 'ServerLevel[Origin Prime City 3]'/minecraft:overworld
-[19:28:39] [Server thread/INFO]: Saving chunks for level 'ServerLevel[Origin Prime City 3]'/minecraft:the_nether
-[19:28:39] [Server thread/INFO]: Saving chunks for level 'ServerLevel[Origin Prime City 3]'/minecraft:the_end
-[19:28:39] [Server thread/INFO]: Saving chunks for level 'ServerLevel[Origin Prime City 3]'/minecraft:primordial_caves
-[19:28:40] [Render thread/INFO]: Client on ClientOnly mode disconnecting.
-[19:28:40] [level shutdown/INFO]: Shutting down ClientRenderState
-[19:28:40] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[Origin Prime City 3]@minecraft:primordial_caves}].
-[19:28:40] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[Origin Prime City 3]@minecraft:the_nether}].
-[19:28:40] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[Origin Prime City 3]@minecraft:the_end}].
-[19:28:40] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[Origin Prime City 3]@minecraft:the_end}
-[19:28:40] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[Origin Prime City 3]@minecraft:primordial_caves}
-[19:28:40] [level shutdown/INFO]: Shutting down LodQuadTree...
-[19:28:40] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[Origin Prime City 3]@minecraft:the_nether}
-[19:28:40] [level shutdown/INFO]: Finished shutting down LodQuadTree
-[19:28:40] [level shutdown/INFO]: Closing world gen queue
-[19:28:40] [level shutdown/INFO]: Closing WorldGenerationQueue...
-[19:28:40] [level shutdown/INFO]: Shutting down world generator thread pool...
-[19:28:40] [level shutdown/INFO]: World generator thread pool shutdown with [0] incomplete tasks.
-[19:28:40] [level shutdown/INFO]: [BatchGenerator] shutting down...
-[19:28:40] [level shutdown/INFO]: Closing [BatchGenerationEnvironment]
-[19:28:40] [level shutdown/INFO]: Finished closing WorldGenerationQueue
-[19:28:40] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[Origin Prime City 3]@minecraft:overworld}].
-[19:28:40] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[Origin Prime City 3]@minecraft:overworld}
-[19:28:40] [Render thread/INFO]: Closed DhWorld of type [CLIENT_SERVER].
-[19:28:40] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[Origin Prime City 3]@minecraft:overworld}].
-[19:28:40] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[Origin Prime City 3]@minecraft:the_nether}].
-[19:28:40] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[Origin Prime City 3]@minecraft:the_end}].
-[19:28:40] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[Origin Prime City 3]@minecraft:overworld}
-[19:28:40] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[Origin Prime City 3]@minecraft:the_nether}
-[19:28:40] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[Origin Prime City 3]@minecraft:the_end}
-[19:28:40] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[Origin Prime City 3]@minecraft:primordial_caves}].
-[19:28:40] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[Origin Prime City 3]@minecraft:primordial_caves}
-[19:28:40] [Render thread/INFO]: Closed DhWorld of type [CLIENT_SERVER].
-[19:28:40] [Render thread/INFO]: Shutting down PriorityTaskPicker thread pool...
-[19:28:40] [Server thread/INFO]: HungLo lost connection: Disconnected
-[19:28:40] [Server thread/INFO]: HungLo left the game
-[19:28:40] [Server thread/INFO]: Stopping singleplayer server as player logged out
-[19:28:40] [Render thread/INFO]: Closing all [4] database connections...
-[19:28:40] [Render thread/INFO]: Closing database connection: [jdbc:sqlite:/home/matt/Documents/Repos/MattMC/run/saves/Origin Prime City 3/DIM-1/data/DistantHorizons.sqlite]
-[19:28:40] [Render thread/INFO]: Closing database connection: [jdbc:sqlite:/home/matt/Documents/Repos/MattMC/run/saves/Origin Prime City 3/DIM1/data/DistantHorizons.sqlite]
-[19:28:40] [Render thread/INFO]: Closing database connection: [jdbc:sqlite:/home/matt/Documents/Repos/MattMC/run/saves/Origin Prime City 3/data/DistantHorizons.sqlite]
-[19:28:40] [Render thread/INFO]: Closing database connection: [jdbc:sqlite:/home/matt/Documents/Repos/MattMC/run/saves/Origin Prime City 3/dimensions/minecraft/primordial_caves/data/DistantHorizons.sqlite]
-[19:28:40] [Server thread/INFO]: WorldEdit shutdown
-[19:28:40] [Server thread/INFO]: Stopping server
-[19:28:40] [Server thread/INFO]: Saving players
-[19:28:40] [Server thread/INFO]: Saving worlds
-[19:28:40] [Server thread/INFO]: Saving chunks for level 'ServerLevel[Origin Prime City 3]'/minecraft:overworld
-[19:28:40] [Server thread/INFO]: Saving chunks for level 'ServerLevel[Origin Prime City 3]'/minecraft:the_nether
-[19:28:40] [Server thread/INFO]: Saving chunks for level 'ServerLevel[Origin Prime City 3]'/minecraft:the_end
-[19:28:40] [Server thread/INFO]: Saving chunks for level 'ServerLevel[Origin Prime City 3]'/minecraft:primordial_caves
-[19:28:40] [Server thread/INFO]: ThreadedAnvilChunkStorage (Origin Prime City 3): All chunks are saved
-[19:28:40] [Server thread/INFO]: ThreadedAnvilChunkStorage (DIM-1): All chunks are saved
-[19:28:40] [Server thread/INFO]: ThreadedAnvilChunkStorage (DIM1): All chunks are saved
-[19:28:40] [Server thread/INFO]: ThreadedAnvilChunkStorage (primordial_caves): All chunks are saved
-[19:28:40] [Server thread/INFO]: ThreadedAnvilChunkStorage: All dimensions are saved
-[19:28:40] [Render thread/INFO]: Unloading client level [ClientLevelWrapper]-[3ls0d68vul1ou@minecraft:overworld].
-[19:28:40] [Render thread/INFO]: Stopping worker threads
-[19:28:40] [Render thread/INFO]: Stopping!
-[19:28:40] [Render thread/INFO]: Saving all world maps
-[19:28:40] [Render thread/INFO]: Save queue flushed!
+[18:17:52] [Render thread/INFO]: GPU Vendor [NVIDIA CORPORATION] with OS [Linux], Preferred upload method is [BUFFER_STORAGE].
+[18:17:52] [Render thread/INFO]: GLProxy creation successful. OpenGL smiles upon you this day.
+[18:17:52] [Render thread/WARN]: Skipping DH render to prevent GL_INVALID_OPERATION during shader transition (shouldOverride=true but renderPass=OPAQUE_AND_TRANSPARENT)
+[18:17:52] [Render thread/INFO]: Setting up renderer
+[18:17:52] [Render thread/INFO]: Loading shader with type: [35633]
+[18:17:52] [Render thread/INFO]: Shader loaded sucessfully.
+[18:17:52] [Render thread/INFO]: Loading shader with type: [35632]
+[18:17:52] [Render thread/INFO]: Shader loaded sucessfully.
+[18:17:52] [Render thread/INFO]: Vertex Attribute (GL43+) completed. It contains 1 binding points and a stride size of 16
+[18:17:52] [Render thread/INFO]: Renderer setup complete
+[18:17:52] [Render thread/INFO]: Resizing Dynamic Transforms UBO, capacity limit of 4 reached during a single frame. New capacity will be 8.
+[18:17:52] [Render thread/INFO]: Loading shader with type: [35633]
+[18:17:52] [Render thread/INFO]: Shader loaded sucessfully.
+[18:17:52] [Render thread/INFO]: Loading shader with type: [35632]
+[18:17:52] [Render thread/INFO]: Shader loaded sucessfully.
+[18:17:52] [Render thread/INFO]: Vertex Attribute (GL43+) completed. It contains 1 binding points and a stride size of 12
+[18:17:52] [Render thread/INFO]: Loading shader with type: [35633]
+[18:17:52] [Render thread/INFO]: Shader loaded sucessfully.
+[18:17:52] [Render thread/INFO]: Loading shader with type: [35632]
+[18:17:52] [Render thread/INFO]: Shader loaded sucessfully.
+[18:17:52] [Render thread/INFO]: Vertex Attribute (GL43+) completed. It contains 1 binding points and a stride size of 12
+[18:17:52] [Render thread/INFO]: Resizing Dynamic Transforms UBO, capacity limit of 8 reached during a single frame. New capacity will be 16.
+[18:17:52] [Render thread/INFO]: Loaded 129 advancements
+[18:17:53] [Render thread/INFO]: Resizing Dynamic Transforms UBO, capacity limit of 16 reached during a single frame. New capacity will be 32.
+[18:17:55] [Server thread/INFO]: Saving and pausing game...
+[18:17:55] [Server thread/INFO]: Saving chunks for level 'ServerLevel[Origin Prime City 3]'/minecraft:overworld
+[18:17:55] [Server thread/INFO]: Saving chunks for level 'ServerLevel[Origin Prime City 3]'/minecraft:the_end
+[18:17:55] [Server thread/INFO]: Saving chunks for level 'ServerLevel[Origin Prime City 3]'/minecraft:primordial_caves
+[18:17:55] [Server thread/INFO]: Saving chunks for level 'ServerLevel[Origin Prime City 3]'/minecraft:the_nether
+[18:17:56] [Render thread/INFO]: Client on ClientOnly mode disconnecting.
+[18:17:56] [level shutdown/INFO]: Shutting down ClientRenderState
+[18:17:56] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[Origin Prime City 3]@minecraft:the_end}].
+[18:17:56] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[Origin Prime City 3]@minecraft:primordial_caves}].
+[18:17:56] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[Origin Prime City 3]@minecraft:the_nether}].
+[18:17:56] [level shutdown/INFO]: Shutting down LodQuadTree...
+[18:17:56] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[Origin Prime City 3]@minecraft:primordial_caves}
+[18:17:56] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[Origin Prime City 3]@minecraft:the_nether}
+[18:17:56] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[Origin Prime City 3]@minecraft:the_end}
+[18:17:56] [level shutdown/INFO]: Finished shutting down LodQuadTree
+[18:17:56] [level shutdown/INFO]: Closing world gen queue
+[18:17:56] [level shutdown/INFO]: Closing WorldGenerationQueue...
+[18:17:56] [level shutdown/INFO]: Shutting down world generator thread pool...
+[18:17:56] [level shutdown/INFO]: World generator thread pool shutdown with [0] incomplete tasks.
+[18:17:56] [level shutdown/INFO]: [BatchGenerator] shutting down...
+[18:17:56] [level shutdown/INFO]: Closing [BatchGenerationEnvironment]
+[18:17:56] [level shutdown/INFO]: Finished closing WorldGenerationQueue
+[18:17:56] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[Origin Prime City 3]@minecraft:overworld}].
+[18:17:56] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[Origin Prime City 3]@minecraft:overworld}
+[18:17:56] [Render thread/INFO]: Closed DhWorld of type [CLIENT_SERVER].
+[18:17:56] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[Origin Prime City 3]@minecraft:primordial_caves}].
+[18:17:56] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[Origin Prime City 3]@minecraft:the_end}].
+[18:17:56] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[Origin Prime City 3]@minecraft:primordial_caves}
+[18:17:56] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[Origin Prime City 3]@minecraft:the_nether}].
+[18:17:56] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[Origin Prime City 3]@minecraft:the_end}
+[18:17:56] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[Origin Prime City 3]@minecraft:the_nether}
+[18:17:56] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[Origin Prime City 3]@minecraft:overworld}].
+[18:17:56] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[Origin Prime City 3]@minecraft:overworld}
+[18:17:56] [Render thread/INFO]: Closed DhWorld of type [CLIENT_SERVER].
+[18:17:56] [Render thread/INFO]: Shutting down PriorityTaskPicker thread pool...
+[18:17:56] [Server thread/INFO]: HungLo lost connection: Disconnected
+[18:17:56] [Server thread/INFO]: HungLo left the game
+[18:17:56] [Server thread/INFO]: Stopping singleplayer server as player logged out
+[18:17:56] [Server thread/INFO]: WorldEdit shutdown
+[18:17:56] [Server thread/INFO]: Stopping server
+[18:17:56] [Server thread/INFO]: Saving players
+[18:17:56] [Server thread/INFO]: Saving worlds
+[18:17:56] [Server thread/INFO]: Saving chunks for level 'ServerLevel[Origin Prime City 3]'/minecraft:overworld
+[18:17:56] [Render thread/INFO]: Closing all [4] database connections...
+[18:17:56] [Render thread/INFO]: Closing database connection: [jdbc:sqlite:/home/matt/Documents/Repos/MattMC/run/saves/Origin Prime City 3/data/DistantHorizons.sqlite]
+[18:17:56] [Render thread/INFO]: Closing database connection: [jdbc:sqlite:/home/matt/Documents/Repos/MattMC/run/saves/Origin Prime City 3/DIM1/data/DistantHorizons.sqlite]
+[18:17:56] [Render thread/INFO]: Closing database connection: [jdbc:sqlite:/home/matt/Documents/Repos/MattMC/run/saves/Origin Prime City 3/DIM-1/data/DistantHorizons.sqlite]
+[18:17:56] [Render thread/INFO]: Closing database connection: [jdbc:sqlite:/home/matt/Documents/Repos/MattMC/run/saves/Origin Prime City 3/dimensions/minecraft/primordial_caves/data/DistantHorizons.sqlite]
+[18:17:56] [Server thread/INFO]: Saving chunks for level 'ServerLevel[Origin Prime City 3]'/minecraft:the_end
+[18:17:56] [Server thread/INFO]: Saving chunks for level 'ServerLevel[Origin Prime City 3]'/minecraft:primordial_caves
+[18:17:56] [Server thread/INFO]: Saving chunks for level 'ServerLevel[Origin Prime City 3]'/minecraft:the_nether
+[18:17:56] [Server thread/INFO]: ThreadedAnvilChunkStorage (Origin Prime City 3): All chunks are saved
+[18:17:56] [Server thread/INFO]: ThreadedAnvilChunkStorage (DIM1): All chunks are saved
+[18:17:56] [Server thread/INFO]: ThreadedAnvilChunkStorage (primordial_caves): All chunks are saved
+[18:17:56] [Server thread/INFO]: ThreadedAnvilChunkStorage (DIM-1): All chunks are saved
+[18:17:56] [Server thread/INFO]: ThreadedAnvilChunkStorage: All dimensions are saved
+[18:17:56] [Render thread/INFO]: Unloading client level [ClientLevelWrapper]-[3ls0d68vul1ou@minecraft:overworld].
+[18:17:56] [Render thread/INFO]: Stopping worker threads
+[18:17:57] [Render thread/INFO]: Stopping!
+[18:17:57] [Render thread/INFO]: Saving all world maps
+[18:17:57] [Render thread/INFO]: Save queue flushed!
 
 [Incubating] Problems report is available at: file:///home/matt/Documents/Repos/MattMC/build/reports/problems/problems-report.html
 
@@ -396,6 +376,6 @@ You can use '--warning-mode all' to show the individual deprecation warnings and
 
 For more on this, please refer to https://docs.gradle.org/9.1.0/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
 
-BUILD SUCCESSFUL in 52s
+BUILD SUCCESSFUL in 49s
 7 actionable tasks: 7 executed
 Consider enabling configuration cache to speed up this build: https://docs.gradle.org/9.1.0/userguide/configuration_cache_enabling.html
