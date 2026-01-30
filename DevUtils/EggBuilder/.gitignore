@@ -1,5 +1,7 @@
 # Generated spawn egg textures
 *.png
+alexsmobs_eggs/
+alexscaves_eggs/
 
 # Python cache
 __pycache__/

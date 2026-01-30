@@ -52,7 +52,7 @@ Colors can be entered with or without the `#` prefix:
 
 ### Examples
 
-Some vanilla Minecraft spawn egg colors for reference:
+#### Vanilla Minecraft spawn egg colors:
 
 | Mob | Base Color | Overlay Color |
 |-----|------------|---------------|
@@ -63,11 +63,57 @@ Some vanilla Minecraft spawn egg colors for reference:
 | Skeleton | `#C1C1C1` | `#494949` |
 | Enderman | `#161616` | `#000000` |
 
+#### AlexsMobs spawn egg colors (first 10):
+
+| Mob | Base Color | Overlay Color |
+|-----|------------|---------------|
+| Grizzly Bear | `#693A2C` | `#976144` |
+| Roadrunner | `#3A2E26` | `#FBE9CE` |
+| Bone Serpent | `#E5D9C4` | `#FF6038` |
+| Gazelle | `#DDA675` | `#2C2925` |
+| Crocodile | `#738940` | `#A6A15E` |
+| Fly | `#464241` | `#892E2E` |
+| Hummingbird | `#325E7F` | `#44A75F` |
+| Orca | `#2C2C2C` | `#D6D8E4` |
+| Sunbird | `#F6694F` | `#FFDDA0` |
+| Gorilla | `#595B5D` | `#1C1C21` |
+
+See `generate_alexsmobs_eggs.py` for the complete list of 30+ AlexsMobs spawn eggs.
+
 ### Output
 
 The script generates a file named `spawn_egg.png` in the current directory (DevUtils/EggBuilder/).
 
 The output is a 16x16 pixel PNG texture that can be used directly in your Minecraft resource pack or mod.
+
+## Batch Generation Scripts
+
+Two batch generation scripts are provided for convenience:
+
+### generate_examples.py
+Generates a few common vanilla Minecraft spawn eggs as examples.
+
+```bash
+python generate_examples.py
+```
+
+### generate_alexsmobs_eggs.py
+Generates all 30 AlexsMobs spawn egg textures using the exact color codes from the mod's source code.
+
+```bash
+python generate_alexsmobs_eggs.py
+```
+
+This will create an `alexsmobs_eggs/` directory with all the textures.
+
+### generate_alexscaves_eggs.py
+Generates all 43 AlexsCaves spawn egg textures using the exact color codes from the mod's source code.
+
+```bash
+python generate_alexscaves_eggs.py
+```
+
+This will create an `alexscaves_eggs/` directory with all the textures.
 
 ## Using the Generated Textures
 
