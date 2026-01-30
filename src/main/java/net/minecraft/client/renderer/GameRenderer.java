@@ -147,6 +147,9 @@ public class GameRenderer implements Projector, AutoCloseable, net.caffeinemc.mo
 	private final GlobalSettingsUniform globalSettingsUniform = new GlobalSettingsUniform();
 	private final PerspectiveProjectionMatrixBuffer levelProjectionMatrixBuffer = new PerspectiveProjectionMatrixBuffer("level");
 	private final CachedPerspectiveProjectionMatrixBuffer hud3dProjectionMatrixBuffer = new CachedPerspectiveProjectionMatrixBuffer("3d hud", 0.05F, 100.0F);
+	// Screen shake support for ShakesScreen entities
+	private int lastTremorTick = -1;
+	private final float[] randomTremorOffsets = new float[3];
 
 	public GameRenderer(Minecraft minecraft, ItemInHandRenderer itemInHandRenderer, RenderBuffers renderBuffers, BlockRenderDispatcher blockRenderDispatcher) {
 		this.minecraft = minecraft;
@@ -509,6 +512,47 @@ public class GameRenderer implements Projector, AutoCloseable, net.caffeinemc.mo
 		}
 	}
 
+	public void applyScreenShake(PoseStack poseStack, float partialTick) {
+		Entity cameraEntity = this.minecraft.getCameraEntity();
+		if (cameraEntity == null) {
+			return;
+		}
+
+		float tremorAmount = 0F;
+		double shakeDistanceScale = 64;
+		double distance = Double.MAX_VALUE;
+		AABB aabb = cameraEntity.getBoundingBox().inflate(shakeDistanceScale);
+		
+		// Find nearby entities that implement ShakesScreen
+		for (Entity entity : this.minecraft.level.getEntities(cameraEntity, aabb)) {
+			if (entity instanceof com.github.alexmodguy.alexscaves.server.entity.util.ShakesScreen shakesScreen) {
+				if (shakesScreen.canFeelShake(cameraEntity) && entity.distanceTo(cameraEntity) < distance) {
+					distance = entity.distanceTo(cameraEntity);
+					tremorAmount = Math.min((1F - (float) Math.min(1, distance / shakesScreen.getShakeDistance()))
+							* Math.max(shakesScreen.getScreenShakeAmount(partialTick), 0F), 2.0F);
+				}
+			}
+		}
+
+		if (tremorAmount > 0) {
+			// Update random offsets once per tick
+			if (this.lastTremorTick != cameraEntity.tickCount) {
+				RandomSource rng = this.minecraft.level.random;
+				this.randomTremorOffsets[0] = rng.nextFloat();
+				this.randomTremorOffsets[1] = rng.nextFloat();
+				this.randomTremorOffsets[2] = rng.nextFloat();
+				this.lastTremorTick = cameraEntity.tickCount;
+			}
+			
+			float intensity = (float)(tremorAmount * this.minecraft.options.screenEffectScale().get());
+			poseStack.translate(
+				this.randomTremorOffsets[0] * 0.2F * intensity,
+				this.randomTremorOffsets[1] * 0.2F * intensity,
+				this.randomTremorOffsets[2] * 0.5F * intensity
+			);
+		}
+	}
+
 	private void renderItemInHand(float f, boolean bl, Matrix4f matrix4f) {
 		if (!this.panoramicMode) {
 			this.featureRenderDispatcher.renderAllFeatures();
@@ -827,6 +871,8 @@ public class GameRenderer implements Projector, AutoCloseable, net.caffeinemc.mo
 				this.bobView(poseStack, this.mainCamera.getPartialTickTime());
 			}
 		}
+		// Apply screen shake from ShakesScreen entities
+		this.applyScreenShake(poseStack, this.mainCamera.getPartialTickTime());
 
 		matrix4f.mul(poseStack.last().pose());
 		// Iris: Disable screen effect scale when shaders are on (merged from MixinModelViewBobbing)
@@ -859,6 +905,8 @@ public class GameRenderer implements Projector, AutoCloseable, net.caffeinemc.mo
 			if (this.minecraft.options.bobView().get()) {
 				this.bobView(stack, tickDelta);
 			}
+			// Apply screen shake from ShakesScreen entities
+			this.applyScreenShake(stack, tickDelta);
 
 			matrix4f2.set(stack.last().pose());
 
