@@ -2,7 +2,7 @@ package net.irisshaders.iris.uniforms.custom;
 
 import com.google.common.collect.ImmutableMap;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
-import kroppeb.stareval.function.Type;
+import net.stareval.function.Type;
 import net.irisshaders.iris.Iris;
 import net.irisshaders.iris.gl.uniform.FloatSupplier;
 import net.irisshaders.iris.gl.uniform.UniformHolder;

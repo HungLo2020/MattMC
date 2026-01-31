@@ -1,10 +1,10 @@
 package net.irisshaders.iris.uniforms.custom.cached;
 
-import kroppeb.stareval.expression.Expression;
-import kroppeb.stareval.expression.VariableExpression;
-import kroppeb.stareval.function.FunctionContext;
-import kroppeb.stareval.function.FunctionReturn;
-import kroppeb.stareval.function.Type;
+import net.stareval.expression.Expression;
+import net.stareval.expression.VariableExpression;
+import net.stareval.function.FunctionContext;
+import net.stareval.function.FunctionReturn;
+import net.stareval.function.Type;
 import net.irisshaders.iris.gl.uniform.UniformUpdateFrequency;
 import net.irisshaders.iris.parsing.VectorType;
 import org.joml.Vector2f;
