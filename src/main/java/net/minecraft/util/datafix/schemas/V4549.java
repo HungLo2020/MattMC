@@ -13,10 +13,8 @@ public class V4549 extends NamespacedSchema {
 	@Override
 	public Map<String, Supplier<TypeTemplate>> registerEntities(Schema schema) {
 		Map<String, Supplier<TypeTemplate>> map = super.registerEntities(schema);
-		
 		// Register quantize:tremorsaurus entity before renaming
 		schema.registerSimple(map, "quantize:tremorsaurus");
-		
 		return map;
 	}
 }
