@@ -128,6 +128,7 @@ import net.minecraft.util.datafix.fixes.EntitySpawnerItemVariantComponentFix;
 import net.minecraft.util.datafix.fixes.EntityStringUuidFix;
 import net.minecraft.util.datafix.fixes.EntityTheRenameningFix;
 import net.minecraft.util.datafix.fixes.EntityTippedArrowFix;
+import net.minecraft.util.datafix.fixes.EntityTremorsaurusRenameFix;
 import net.minecraft.util.datafix.fixes.EntityUUIDFix;
 import net.minecraft.util.datafix.fixes.EntityVariantFix;
 import net.minecraft.util.datafix.fixes.EntityWolfColorFix;
@@ -1575,6 +1576,7 @@ public class DataFixers {
 				)
 			)
 		);
+		dataFixerBuilder.addFixer(new EntityTremorsaurusRenameFix(schema279, true));
 		Schema schema280 = dataFixerBuilder.addSchema(4550, V4550::new);
 		dataFixerBuilder.addFixer(new AddNewChoices(schema280, "Added mod entities and block entities", References.ENTITY));
 		dataFixerBuilder.addFixer(new AddNewChoices(schema280, "Added mod block entities", References.BLOCK_ENTITY));
