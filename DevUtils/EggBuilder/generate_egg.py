@@ -20,7 +20,11 @@ import os
 
 def hex_to_rgb(hex_color):
     """Convert hex color string to RGB tuple."""
+    # Strip common prefixes
     hex_color = hex_color.lstrip('#')
+    if hex_color.lower().startswith('0x'):
+        hex_color = hex_color[2:]
+    
     if len(hex_color) != 6:
         raise ValueError(f"Invalid hex color: {hex_color}")
     return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
