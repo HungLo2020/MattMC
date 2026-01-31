@@ -3,7 +3,7 @@ package net.minecraft.client.renderer.debug;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
-import com.mojang.blaze3d.vertex.PoseStack;
+import net.blaze3d.vertex.PoseStack;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;

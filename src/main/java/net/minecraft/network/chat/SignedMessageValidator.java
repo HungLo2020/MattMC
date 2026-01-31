@@ -1,6 +1,6 @@
 package net.minecraft.network.chat;
 
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import java.util.function.BooleanSupplier;
 import net.minecraft.util.SignatureValidator;
 import org.jetbrains.annotations.Nullable;

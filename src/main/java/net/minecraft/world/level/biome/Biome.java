@@ -31,6 +31,7 @@ import net.minecraft.world.level.levelgen.WorldgenRandom;
 import net.minecraft.world.level.levelgen.synth.PerlinSimplexNoise;
 import net.minecraft.world.level.material.FluidState;
 import net.minecraft.world.level.material.Fluids;
+import net.sodium.client.world.biome.BiomeColorMaps;
 import org.jetbrains.annotations.Nullable;
 
 public final class Biome implements net.irisshaders.iris.mixinterface.ExtendedBiome {
@@ -223,7 +224,7 @@ public final class Biome implements net.irisshaders.iris.mixinterface.ExtendedBi
 		if (this.hasCustomGrassColor) {
 			color = this.customGrassColor;
 		} else {
-			color = net.caffeinemc.mods.sodium.client.world.biome.BiomeColorMaps.getGrassColor(this.defaultColorIndex);
+			color = BiomeColorMaps.getGrassColor(this.defaultColorIndex);
 		}
 
 		var modifier = this.cachedSpecialEffects.getGrassColorModifier();
@@ -257,7 +258,7 @@ public final class Biome implements net.irisshaders.iris.mixinterface.ExtendedBi
 		if (this.hasCustomFoliageColor) {
 			color = this.customFoliageColor;
 		} else {
-			color = net.caffeinemc.mods.sodium.client.world.biome.BiomeColorMaps.getFoliageColor(this.defaultColorIndex);
+			color = BiomeColorMaps.getFoliageColor(this.defaultColorIndex);
 		}
 
 		return color;
@@ -520,6 +521,6 @@ public final class Biome implements net.irisshaders.iris.mixinterface.ExtendedBi
 		double temperature = Mth.clamp(this.climateSettings.temperature(), 0.0F, 1.0F);
 		double humidity = Mth.clamp(this.climateSettings.downfall(), 0.0F, 1.0F);
 
-		return net.caffeinemc.mods.sodium.client.world.biome.BiomeColorMaps.getIndex(temperature, humidity);
+		return BiomeColorMaps.getIndex(temperature, humidity);
 	}
 }

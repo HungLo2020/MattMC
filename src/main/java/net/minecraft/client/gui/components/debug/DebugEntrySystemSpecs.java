@@ -1,8 +1,8 @@
 package net.minecraft.client.gui.components.debug;
 
-import com.mojang.blaze3d.platform.GLX;
-import com.mojang.blaze3d.systems.GpuDevice;
-import com.mojang.blaze3d.systems.RenderSystem;
+import net.blaze3d.platform.GLX;
+import net.blaze3d.systems.GpuDevice;
+import net.blaze3d.systems.RenderSystem;
 import java.util.List;
 import java.util.Locale;
 import net.minecraft.api.EnvType;

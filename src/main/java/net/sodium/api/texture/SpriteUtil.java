@@ -11,7 +11,7 @@ import org.jetbrains.annotations.NotNull;
 @ApiStatus.Experimental
 public interface SpriteUtil {
     SpriteUtil INSTANCE = DependencyInjection.load(SpriteUtil.class,
-            "net.caffeinemc.mods.sodium.client.render.texture.SpriteUtilImpl");
+            "net.sodium.client.render.texture.SpriteUtilImpl");
     
     /**
      * Marks the sprite as "active", meaning that it is visible during this frame and should have the animation

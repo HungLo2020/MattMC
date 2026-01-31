@@ -1,7 +1,7 @@
 package net.minecraft.world.waypoints;
 
 import com.mojang.datafixers.util.Either;
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import io.netty.buffer.ByteBuf;
 import java.util.UUID;
 import net.minecraft.core.UUIDUtil;

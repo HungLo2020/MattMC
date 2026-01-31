@@ -4,7 +4,6 @@ package com.github.alexthe666.citadel.server.entity.pathfinding.raycoms.pathjobs
  */
 
 import com.github.alexthe666.citadel.Citadel;
-import com.github.alexthe666.citadel.server.entity.pathfinding.raycoms.*;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.util.RandomSource;

@@ -1,6 +1,6 @@
 package net.minecraft.client.server;
 
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import java.net.SocketAddress;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;

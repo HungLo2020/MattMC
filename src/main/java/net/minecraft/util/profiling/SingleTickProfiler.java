@@ -1,6 +1,6 @@
 package net.minecraft.util.profiling;
 
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import java.io.File;
 import java.util.function.LongSupplier;
 import net.minecraft.SharedConstants;

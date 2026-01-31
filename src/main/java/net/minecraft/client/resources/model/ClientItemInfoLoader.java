@@ -1,7 +1,7 @@
 package net.minecraft.client.resources.model;
 
 import com.google.gson.JsonElement;
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import com.mojang.serialization.DynamicOps;
 import com.mojang.serialization.JsonOps;
 import java.io.Reader;

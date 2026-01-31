@@ -5,7 +5,7 @@ import com.google.common.collect.Maps;
 import com.google.common.collect.ImmutableMap.Builder;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.datafixers.util.Pair;
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.util.List;

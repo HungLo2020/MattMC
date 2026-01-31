@@ -22,7 +22,7 @@ public class SodiumAccessor implements ISodiumAccessor
 	
 	
 	static {
-		isSodiumV5OrLess = !classPresent("net.caffeinemc.mods.sodium.client.render.SodiumWorldRenderer");
+		isSodiumV5OrLess = !classPresent("net.sodium.client.render.SodiumWorldRenderer");
 	}
 	
 	

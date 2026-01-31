@@ -1,6 +1,6 @@
 package net.fabricmc.fabric.api.renderer.v1.render;
 
-import com.mojang.blaze3d.vertex.VertexConsumer;
+import net.blaze3d.vertex.VertexConsumer;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.chunk.ChunkSectionLayer;
 import org.jetbrains.annotations.Nullable;

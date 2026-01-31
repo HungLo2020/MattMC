@@ -1,7 +1,7 @@
 package net.minecraft.core;
 
 import com.google.common.collect.ImmutableMap;
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;

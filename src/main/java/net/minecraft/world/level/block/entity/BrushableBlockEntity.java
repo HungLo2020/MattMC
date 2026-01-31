@@ -1,6 +1,6 @@
 package net.minecraft.world.level.block.entity;
 
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import java.util.Objects;
 import net.minecraft.advancements.CriteriaTriggers;

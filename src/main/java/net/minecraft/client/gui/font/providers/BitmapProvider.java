@@ -1,14 +1,14 @@
 package net.minecraft.client.gui.font.providers;
 
-import com.mojang.blaze3d.font.GlyphBitmap;
-import com.mojang.blaze3d.font.GlyphInfo;
-import com.mojang.blaze3d.font.GlyphProvider;
-import com.mojang.blaze3d.font.UnbakedGlyph;
-import com.mojang.blaze3d.platform.NativeImage;
-import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.textures.GpuTexture;
+import net.blaze3d.font.GlyphBitmap;
+import net.blaze3d.font.GlyphInfo;
+import net.blaze3d.font.GlyphProvider;
+import net.blaze3d.font.UnbakedGlyph;
+import net.blaze3d.platform.NativeImage;
+import net.blaze3d.systems.RenderSystem;
+import net.blaze3d.textures.GpuTexture;
 import com.mojang.datafixers.util.Either;
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.DataResult;
 import com.mojang.serialization.MapCodec;

@@ -1,14 +1,12 @@
 package net.irisshaders.iris.pathways;
 
-import com.mojang.blaze3d.buffers.GpuBuffer;
-import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.vertex.BufferBuilder;
-import com.mojang.blaze3d.vertex.DefaultVertexFormat;
-import com.mojang.blaze3d.vertex.MeshData;
-import com.mojang.blaze3d.vertex.Tesselator;
-import com.mojang.blaze3d.vertex.VertexFormat;
-import net.irisshaders.iris.gl.IrisRenderSystem;
-import net.irisshaders.iris.helpers.VertexBufferHelper;
+import net.blaze3d.buffers.GpuBuffer;
+import net.blaze3d.systems.RenderSystem;
+import net.blaze3d.vertex.BufferBuilder;
+import net.blaze3d.vertex.DefaultVertexFormat;
+import net.blaze3d.vertex.MeshData;
+import net.blaze3d.vertex.Tesselator;
+import net.blaze3d.vertex.VertexFormat;
 
 /**
  * Renders a full-screen textured quad to the screen. Used in composite / deferred rendering.

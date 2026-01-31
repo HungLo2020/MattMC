@@ -1,9 +1,9 @@
 package net.minecraft.client.renderer;
 
-import com.mojang.blaze3d.vertex.ByteBufferBuilder;
-import com.mojang.blaze3d.vertex.VertexConsumer;
-import com.mojang.blaze3d.vertex.VertexFormat;
-import com.mojang.blaze3d.vertex.VertexFormatElement;
+import net.blaze3d.vertex.ByteBufferBuilder;
+import net.blaze3d.vertex.VertexConsumer;
+import net.blaze3d.vertex.VertexFormat;
+import net.blaze3d.vertex.VertexFormatElement;
 import java.util.Optional;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;

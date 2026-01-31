@@ -1,6 +1,6 @@
 package net.minecraft.util.profiling.metrics.storage;
 
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.io.Writer;

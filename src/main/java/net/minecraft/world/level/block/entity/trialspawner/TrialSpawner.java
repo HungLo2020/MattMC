@@ -1,7 +1,7 @@
 package net.minecraft.world.level.block.entity.trialspawner;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;

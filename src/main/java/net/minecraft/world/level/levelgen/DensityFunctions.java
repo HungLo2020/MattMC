@@ -1,7 +1,7 @@
 package net.minecraft.world.level.levelgen;
 
 import com.mojang.datafixers.util.Either;
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;

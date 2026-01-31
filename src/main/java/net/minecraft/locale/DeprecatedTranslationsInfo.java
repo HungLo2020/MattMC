@@ -1,7 +1,7 @@
 package net.minecraft.locale;
 
 import com.google.gson.JsonElement;
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.JsonOps;
 import com.mojang.serialization.codecs.RecordCodecBuilder;

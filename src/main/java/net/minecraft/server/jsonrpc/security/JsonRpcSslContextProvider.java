@@ -1,6 +1,6 @@
 package net.minecraft.server.jsonrpc.security;
 
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
 import java.io.File;

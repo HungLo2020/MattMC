@@ -1,6 +1,6 @@
 package net.minecraft.network.syncher;
 
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import io.netty.handler.codec.DecoderException;
 import io.netty.handler.codec.EncoderException;
 import java.util.ArrayList;

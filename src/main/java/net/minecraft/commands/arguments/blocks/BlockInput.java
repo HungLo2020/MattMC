@@ -1,6 +1,6 @@
 package net.minecraft.commands.arguments.blocks;
 
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import java.util.Set;
 import java.util.function.Predicate;
 import net.minecraft.core.BlockPos;

@@ -1,7 +1,7 @@
 package net.minecraft.client.gui.components;
 
 import com.google.common.collect.Lists;
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.ListIterator;
@@ -14,7 +14,6 @@ import net.minecraft.client.GuiMessageTag;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.ChatScreen;
-import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.multiplayer.chat.ChatListener;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MessageSignature;
@@ -26,6 +25,7 @@ import net.minecraft.util.Mth;
 import net.minecraft.util.profiling.Profiler;
 import net.minecraft.util.profiling.ProfilerFiller;
 import net.minecraft.world.entity.player.ChatVisiblity;
+import net.voxelmap.VoxelMap;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 
@@ -188,7 +188,7 @@ public class ChatComponent {
 	public void addMessage(Component component) {
 		// VoxelMap: Check for permission messages
 		try {
-			com.mamiyaotaru.voxelmap.VoxelMap.checkPermissionMessages(component);
+			VoxelMap.checkPermissionMessages(component);
 		} catch (Exception e) {
 			// Silently catch to avoid crashes
 		}

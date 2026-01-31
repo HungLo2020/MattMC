@@ -1,8 +1,7 @@
 package net.minecraft.util.profiling.custom;
 
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import net.minecraft.SystemReport;
-import net.minecraft.Util;
 import net.minecraft.util.profiling.metrics.storage.MetricsPersister;
 import org.slf4j.Logger;
 

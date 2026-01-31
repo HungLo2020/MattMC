@@ -1,6 +1,6 @@
 package net.minecraft.world.level.block;
 
-import com.mojang.math.OctahedralGroup;
+import net.math.OctahedralGroup;
 import com.mojang.serialization.Codec;
 import net.minecraft.core.Direction;
 import net.minecraft.network.chat.Component;

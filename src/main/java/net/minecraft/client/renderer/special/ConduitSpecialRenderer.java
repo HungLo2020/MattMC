@@ -1,6 +1,6 @@
 package net.minecraft.client.renderer.special;
 
-import com.mojang.blaze3d.vertex.PoseStack;
+import net.blaze3d.vertex.PoseStack;
 import com.mojang.serialization.MapCodec;
 import java.util.Set;
 import net.minecraft.api.EnvType;

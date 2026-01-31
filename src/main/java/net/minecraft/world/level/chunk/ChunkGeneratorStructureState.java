@@ -2,7 +2,7 @@ package net.minecraft.world.level.chunk;
 
 import com.google.common.base.Stopwatch;
 import com.mojang.datafixers.util.Pair;
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import it.unimi.dsi.fastutil.objects.Object2ObjectArrayMap;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import java.util.ArrayList;

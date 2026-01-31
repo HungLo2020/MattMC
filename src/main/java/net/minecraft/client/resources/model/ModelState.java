@@ -1,6 +1,6 @@
 package net.minecraft.client.resources.model;
 
-import com.mojang.math.Transformation;
+import net.math.Transformation;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.core.Direction;

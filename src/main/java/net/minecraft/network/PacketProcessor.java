@@ -1,7 +1,7 @@
 package net.minecraft.network;
 
 import com.google.common.collect.Queues;
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import java.util.Queue;
 import java.util.concurrent.RejectedExecutionException;
 import net.minecraft.ReportedException;

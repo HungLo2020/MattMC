@@ -1,6 +1,6 @@
 package net.irisshaders.iris.pipeline;
 
-import com.mojang.blaze3d.textures.GpuTextureView;
+import net.blaze3d.textures.GpuTextureView;
 import it.unimi.dsi.fastutil.objects.Object2ObjectMap;
 import net.irisshaders.iris.compat.dh.DHCompat;
 import net.irisshaders.iris.features.FeatureFlags;
@@ -16,7 +16,6 @@ import net.minecraft.client.gui.components.debug.DebugScreenDisplayer;
 import net.minecraft.client.renderer.LevelRenderer;
 import net.minecraft.client.renderer.state.CameraRenderState;
 
-import java.util.List;
 import java.util.OptionalInt;
 
 public interface WorldRenderingPipeline {

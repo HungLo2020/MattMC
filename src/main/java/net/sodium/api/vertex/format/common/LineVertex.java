@@ -1,7 +1,7 @@
 package net.sodium.api.vertex.format.common;
 
-import com.mojang.blaze3d.vertex.DefaultVertexFormat;
-import com.mojang.blaze3d.vertex.VertexFormat;
+import net.blaze3d.vertex.DefaultVertexFormat;
+import net.blaze3d.vertex.VertexFormat;
 import net.sodium.api.vertex.attributes.common.ColorAttribute;
 import net.sodium.api.vertex.attributes.common.NormalAttribute;
 import net.sodium.api.vertex.attributes.common.PositionAttribute;

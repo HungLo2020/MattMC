@@ -1,6 +1,6 @@
 package net.irisshaders.iris.uniforms.custom.cached;
 
-import com.mojang.blaze3d.opengl.GlStateManager;
+import net.blaze3d.opengl.GlStateManager;
 import net.stareval.function.FunctionReturn;
 import net.stareval.function.Type;
 import net.irisshaders.iris.gl.uniform.UniformUpdateFrequency;

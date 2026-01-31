@@ -2,7 +2,7 @@ package net.minecraft.server.commands;
 
 import com.google.common.collect.Lists;
 import com.mojang.brigadier.CommandDispatcher;
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import java.util.Collection;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;

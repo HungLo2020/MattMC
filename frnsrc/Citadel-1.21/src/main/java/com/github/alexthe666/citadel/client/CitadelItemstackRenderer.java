@@ -3,7 +3,6 @@ package com.github.alexthe666.citadel.client;
 import com.github.alexthe666.citadel.Citadel;
 import com.github.alexthe666.citadel.item.component.CustomRenderDisplay;
 import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.vertex.*;
 import com.mojang.math.Axis;
 import net.minecraft.Util;
 import net.minecraft.client.Minecraft;

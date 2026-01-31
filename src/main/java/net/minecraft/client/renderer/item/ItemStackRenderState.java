@@ -1,6 +1,6 @@
 package net.minecraft.client.renderer.item;
 
-import com.mojang.blaze3d.vertex.PoseStack;
+import net.blaze3d.vertex.PoseStack;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -18,6 +18,10 @@ import net.minecraft.util.RandomSource;
 import net.minecraft.world.item.ItemDisplayContext;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.AABB.Builder;
+import net.sodium.client.render.frapi.mesh.MutableMeshImpl;
+import net.sodium.client.render.frapi.render.AccessLayerRenderState;
+import net.sodium.client.render.frapi.render.OrderedSubmitNodeCollectorExtension;
+import net.sodium.client.render.frapi.render.QuadToPosPipe;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
@@ -101,7 +105,7 @@ public class ItemStackRenderState implements net.irisshaders.iris.mixinterface.I
 		Vector3f vector3f = new Vector3f();
 		PoseStack.Pose pose = new PoseStack.Pose();
 		// Sodium FRAPI: QuadToPosPipe for mesh processing (merged from ItemRenderStateMixin)
-		net.caffeinemc.mods.sodium.client.render.frapi.render.QuadToPosPipe pipe = null;
+		QuadToPosPipe pipe = null;
 
 		for (int i = 0; i < this.activeLayerCount; i++) {
 			ItemStackRenderState.LayerRenderState layerRenderState = this.layers[i];
@@ -114,11 +118,11 @@ public class ItemStackRenderState implements net.irisshaders.iris.mixinterface.I
 			}
 
 			// Sodium FRAPI: Process mutable mesh before resetting pose (merged from ItemRenderStateMixin)
-			net.caffeinemc.mods.sodium.client.render.frapi.mesh.MutableMeshImpl mutableMesh = ((net.caffeinemc.mods.sodium.client.render.frapi.render.AccessLayerRenderState) layerRenderState).fabric_getMutableMesh();
+			MutableMeshImpl mutableMesh = ((AccessLayerRenderState) layerRenderState).fabric_getMutableMesh();
 
 			if (mutableMesh.size() > 0) {
 				if (pipe == null) {
-					pipe = new net.caffeinemc.mods.sodium.client.render.frapi.render.QuadToPosPipe(consumer, vector3f);
+					pipe = new QuadToPosPipe(consumer, vector3f);
 				}
 				pipe.matrix = matrix4f;
 				// Use the mutable version here as it does not use a ThreadLocal or cursor stack
@@ -163,7 +167,7 @@ public class ItemStackRenderState implements net.irisshaders.iris.mixinterface.I
 	}
 
 	@Environment(EnvType.CLIENT)
-	public class LayerRenderState implements net.fabricmc.fabric.api.renderer.v1.render.FabricLayerRenderState, net.caffeinemc.mods.sodium.client.render.frapi.render.AccessLayerRenderState {
+	public class LayerRenderState implements net.fabricmc.fabric.api.renderer.v1.render.FabricLayerRenderState, AccessLayerRenderState {
 		private static final Vector3f[] NO_EXTENTS = new Vector3f[0];
 		public static final Supplier<Vector3f[]> NO_EXTENTS_SUPPLIER = () -> NO_EXTENTS;
 		private final List<BakedQuad> quads = new ArrayList();
@@ -181,7 +185,7 @@ public class ItemStackRenderState implements net.irisshaders.iris.mixinterface.I
 		private Object argumentForSpecialRendering;
 		Supplier<Vector3f[]> extents = NO_EXTENTS_SUPPLIER;
 		// Fabric Rendering API support (from ItemLayerRenderStateMixin)
-		private final net.caffeinemc.mods.sodium.client.render.frapi.mesh.MutableMeshImpl mutableMesh = new net.caffeinemc.mods.sodium.client.render.frapi.mesh.MutableMeshImpl();
+		private final MutableMeshImpl mutableMesh = new MutableMeshImpl();
 
 		public void clear() {
 			this.quads.clear();
@@ -265,7 +269,7 @@ public class ItemStackRenderState implements net.irisshaders.iris.mixinterface.I
 					);
 			} else if (this.renderType != null) {
 				// Fabric Rendering API support (from ItemLayerRenderStateMixin redirect)
-				if (this.mutableMesh.size() > 0 && submitNodeCollector instanceof net.caffeinemc.mods.sodium.client.render.frapi.render.OrderedSubmitNodeCollectorExtension access) {
+				if (this.mutableMesh.size() > 0 && submitNodeCollector instanceof OrderedSubmitNodeCollectorExtension access) {
 					// We don't have to copy the mesh here because vanilla doesn't copy the tint array or quad list either.
 					access.fabric_submitItem(poseStack, ItemStackRenderState.this.displayContext, i, j, k, this.tintLayers, this.quads, this.renderType, this.foilType, this.mutableMesh);
 				} else {
@@ -297,7 +301,7 @@ public class ItemStackRenderState implements net.irisshaders.iris.mixinterface.I
 		
 		// Fabric Rendering API support (from ItemLayerRenderStateMixin)
 		@Override
-		public net.caffeinemc.mods.sodium.client.render.frapi.mesh.MutableMeshImpl fabric_getMutableMesh() {
+		public MutableMeshImpl fabric_getMutableMesh() {
 			return this.mutableMesh;
 		}
 	}

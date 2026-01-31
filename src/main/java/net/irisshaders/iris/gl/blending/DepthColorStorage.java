@@ -1,6 +1,6 @@
 package net.irisshaders.iris.gl.blending;
 
-import com.mojang.blaze3d.opengl.GlStateManager;
+import net.blaze3d.opengl.GlStateManager;
 
 public class DepthColorStorage {
 	private static boolean originalDepthEnable;

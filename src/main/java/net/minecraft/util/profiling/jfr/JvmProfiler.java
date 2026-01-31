@@ -1,6 +1,6 @@
 package net.minecraft.util.profiling.jfr;
 
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import java.net.SocketAddress;
 import java.nio.file.Path;
 import net.minecraft.core.Holder;

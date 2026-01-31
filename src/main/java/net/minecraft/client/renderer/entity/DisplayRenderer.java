@@ -1,8 +1,8 @@
 package net.minecraft.client.renderer.entity;
 
-import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.math.Axis;
-import com.mojang.math.Transformation;
+import net.blaze3d.vertex.PoseStack;
+import net.math.Axis;
+import net.math.Transformation;
 import java.util.ArrayList;
 import java.util.List;
 import net.minecraft.api.EnvType;

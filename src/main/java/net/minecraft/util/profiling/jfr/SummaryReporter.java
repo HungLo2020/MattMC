@@ -1,6 +1,6 @@
 package net.minecraft.util.profiling.jfr;
 
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;

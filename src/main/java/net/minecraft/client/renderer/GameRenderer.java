@@ -1,18 +1,19 @@
 package net.minecraft.client.renderer;
 
-import com.mojang.blaze3d.ProjectionType;
-import com.mojang.blaze3d.buffers.GpuBufferSlice;
-import com.mojang.blaze3d.pipeline.RenderTarget;
-import com.mojang.blaze3d.platform.Lighting;
-import com.mojang.blaze3d.platform.NativeImage;
-import com.mojang.blaze3d.resource.CrossFrameResourcePool;
-import com.mojang.blaze3d.shaders.ShaderType;
-import com.mojang.blaze3d.systems.GpuDevice;
-import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.vertex.PoseStack;
+import net.blaze3d.ProjectionType;
+import net.blaze3d.buffers.GpuBufferSlice;
+import net.blaze3d.pipeline.RenderTarget;
+import net.blaze3d.platform.GLX;
+import net.blaze3d.platform.Lighting;
+import net.blaze3d.platform.NativeImage;
+import net.blaze3d.resource.CrossFrameResourcePool;
+import net.blaze3d.shaders.ShaderType;
+import net.blaze3d.systems.GpuDevice;
+import net.blaze3d.systems.RenderSystem;
+import net.blaze3d.vertex.PoseStack;
 import com.mojang.jtracy.TracyClient;
-import com.mojang.logging.LogUtils;
-import com.mojang.math.Axis;
+import net.logging.LogUtils;
+import net.math.Axis;
 import java.io.IOException;
 import java.io.Reader;
 import java.nio.file.Files;
@@ -20,6 +21,8 @@ import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.function.BiFunction;
+
+import net.alexscaves.server.entity.util.ShakesScreen;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.CrashReport;
@@ -90,6 +93,9 @@ import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.phys.HitResult.Type;
 import net.minecraft.world.waypoints.TrackedWaypoint.Projector;
+import net.sodium.client.util.FogParameters;
+import net.sodium.client.util.FogStorage;
+import net.sodium.fabric.SodiumFogRenderHook;
 import org.apache.commons.io.IOUtils;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix4f;
@@ -100,7 +106,7 @@ import org.joml.Vector4f;
 import org.slf4j.Logger;
 
 @Environment(EnvType.CLIENT)
-public class GameRenderer implements Projector, AutoCloseable, net.caffeinemc.mods.sodium.client.util.FogStorage {
+public class GameRenderer implements Projector, AutoCloseable, FogStorage {
 	private static final ResourceLocation BLUR_POST_CHAIN_ID = ResourceLocation.withDefaultNamespace("blur");
 	public static final int MAX_BLUR_RADIUS = 10;
 	private static final Logger LOGGER = LogUtils.getLogger();
@@ -190,8 +196,8 @@ public class GameRenderer implements Projector, AutoCloseable, net.caffeinemc.mo
 		
 		// Iris: From MixinGameRenderer - log hardware information
 		net.irisshaders.iris.Iris.logger.info("Hardware information:");
-		net.irisshaders.iris.Iris.logger.info("CPU: " + com.mojang.blaze3d.platform.GLX._getCpuInfo());
-		net.irisshaders.iris.Iris.logger.info("GPU: " + com.mojang.blaze3d.systems.RenderSystem.getDevice().getRenderer() + " (Supports OpenGL " + com.mojang.blaze3d.systems.RenderSystem.getDevice().getVersion() + ")");
+		net.irisshaders.iris.Iris.logger.info("CPU: " + GLX._getCpuInfo());
+		net.irisshaders.iris.Iris.logger.info("GPU: " + RenderSystem.getDevice().getRenderer() + " (Supports OpenGL " + RenderSystem.getDevice().getVersion() + ")");
 		net.irisshaders.iris.Iris.logger.info("OS: " + System.getProperty("os.name") + " (" + System.getProperty("os.version") + ")");
 		this.screenEffectRenderer = new ScreenEffectRenderer(minecraft, atlasManager, bufferSource);
 		this.cubeMap = this.createCubeMap(minecraft.options.panoramaTheme().get());
@@ -536,7 +542,7 @@ public class GameRenderer implements Projector, AutoCloseable, net.caffeinemc.mo
 		
 		// Find nearby entities that implement ShakesScreen
 		for (Entity entity : this.minecraft.level.getEntities(cameraEntity, aabb)) {
-			if (entity instanceof com.github.alexmodguy.alexscaves.server.entity.util.ShakesScreen shakesScreen) {
+			if (entity instanceof ShakesScreen shakesScreen) {
 				double entityDistance = entity.distanceTo(cameraEntity);
 				if (shakesScreen.canFeelShake(cameraEntity) && entityDistance < distance) {
 					distance = entityDistance;
@@ -1069,8 +1075,8 @@ public class GameRenderer implements Projector, AutoCloseable, net.caffeinemc.mo
 	}
 
 	@Override
-	public net.caffeinemc.mods.sodium.client.util.FogParameters sodium$getFogParameters() {
+	public FogParameters sodium$getFogParameters() {
 		// Use the hook-based fog parameter storage instead of mixin
-		return net.caffeinemc.mods.sodium.fabric.SodiumFogRenderHook.getFogParameters();
+		return SodiumFogRenderHook.getFogParameters();
 	}
 }

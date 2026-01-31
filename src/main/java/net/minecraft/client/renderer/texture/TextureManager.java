@@ -1,7 +1,7 @@
 package net.minecraft.client.renderer.texture;
 
-import com.mojang.blaze3d.platform.NativeImage;
-import com.mojang.logging.LogUtils;
+import net.blaze3d.platform.NativeImage;
+import net.logging.LogUtils;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -23,8 +23,6 @@ import net.minecraft.ReportedException;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.packs.resources.PreparableReloadListener;
 import net.minecraft.server.packs.resources.ResourceManager;
-import net.minecraft.server.packs.resources.PreparableReloadListener.PreparationBarrier;
-import net.minecraft.server.packs.resources.PreparableReloadListener.SharedState;
 import org.slf4j.Logger;
 
 @Environment(EnvType.CLIENT)

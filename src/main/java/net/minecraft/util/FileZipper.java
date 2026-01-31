@@ -1,7 +1,7 @@
 package net.minecraft.util;
 
 import com.google.common.collect.ImmutableMap;
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;

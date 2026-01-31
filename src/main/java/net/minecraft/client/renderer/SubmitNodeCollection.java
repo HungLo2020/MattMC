@@ -1,6 +1,6 @@
 package net.minecraft.client.renderer;
 
-import com.mojang.blaze3d.vertex.PoseStack;
+import net.blaze3d.vertex.PoseStack;
 import java.util.ArrayList;
 import java.util.List;
 import net.minecraft.api.EnvType;
@@ -30,9 +30,9 @@ import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix4f;
 import org.joml.Quaternionf;
 // Sodium FRAPI imports
-import net.caffeinemc.mods.sodium.client.render.frapi.render.MeshItemCommand;
-import net.caffeinemc.mods.sodium.client.render.frapi.render.OrderedSubmitNodeCollectorExtension;
-import net.caffeinemc.mods.sodium.client.render.frapi.render.SubmitNodeCollectionExtension;
+import net.sodium.client.render.frapi.render.MeshItemCommand;
+import net.sodium.client.render.frapi.render.OrderedSubmitNodeCollectorExtension;
+import net.sodium.client.render.frapi.render.SubmitNodeCollectionExtension;
 import net.fabricmc.fabric.api.renderer.v1.mesh.MeshView;
 
 @Environment(EnvType.CLIENT)

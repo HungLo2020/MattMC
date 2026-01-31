@@ -1,6 +1,6 @@
 package net.minecraft.client.multiplayer.resolver;
 
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import java.util.Hashtable;
 import java.util.Optional;
 import javax.naming.directory.Attribute;

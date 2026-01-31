@@ -1,8 +1,8 @@
 package net.minecraft.world.level.levelgen.feature;
 
-import com.github.alexmodguy.alexscaves.server.level.feature.PewenTreeFeature;
-import com.github.alexmodguy.alexscaves.server.level.feature.AncientTreeFeature;
-import com.github.alexmodguy.alexscaves.server.level.feature.GiantAncientTreeFeature;
+import net.alexscaves.server.level.feature.PewenTreeFeature;
+import net.alexscaves.server.level.feature.AncientTreeFeature;
+import net.alexscaves.server.level.feature.GiantAncientTreeFeature;
 import net.minecraft.core.Registry;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;

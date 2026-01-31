@@ -1,6 +1,6 @@
 package net.minecraft.world.entity.boss.enderdragon.phases;
 
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import net.minecraft.world.entity.boss.enderdragon.EnderDragon;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;

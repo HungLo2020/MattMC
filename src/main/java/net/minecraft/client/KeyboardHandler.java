@@ -1,12 +1,12 @@
 package net.minecraft.client;
 
 import com.google.common.base.MoreObjects;
-import com.mojang.blaze3d.Blaze3D;
-import com.mojang.blaze3d.platform.ClipboardManager;
-import com.mojang.blaze3d.platform.InputConstants;
-import com.mojang.blaze3d.platform.TextureUtil;
-import com.mojang.blaze3d.platform.Window;
-import com.mojang.logging.LogUtils;
+import net.blaze3d.Blaze3D;
+import net.blaze3d.platform.ClipboardManager;
+import net.blaze3d.platform.InputConstants;
+import net.blaze3d.platform.TextureUtil;
+import net.blaze3d.platform.Window;
+import net.logging.LogUtils;
 import java.nio.file.Path;
 import java.text.MessageFormat;
 import java.util.Locale;

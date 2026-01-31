@@ -1,6 +1,6 @@
 package net.minecraft.client.renderer;
 
-import com.mojang.blaze3d.vertex.ByteBufferBuilder;
+import net.blaze3d.vertex.ByteBufferBuilder;
 import java.util.Arrays;
 import java.util.Map;
 import net.minecraft.api.EnvType;

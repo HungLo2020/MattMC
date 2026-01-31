@@ -1,6 +1,6 @@
 package net.minecraft.util.profiling.custom;
 
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import net.minecraft.util.profiling.metrics.storage.MetricsPersister;
 import org.slf4j.Logger;
 
@@ -12,7 +12,6 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
-import java.util.stream.Collectors;
 
 /**
  * Generates interactive HTML profiling reports with expandable/collapsible sections.

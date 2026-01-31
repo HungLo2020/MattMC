@@ -1,6 +1,6 @@
 package net.irisshaders.iris.gui.screen;
 
-import com.mojang.blaze3d.platform.InputConstants;
+import net.blaze3d.platform.InputConstants;
 import net.irisshaders.iris.Iris;
 import net.iris.api.v0.IrisApi;
 import net.irisshaders.iris.gui.GuiUtil;

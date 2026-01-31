@@ -1,7 +1,7 @@
 package net.minecraft.world.level.block;
 
-import com.mojang.math.OctahedralGroup;
-import com.mojang.math.Quadrant;
+import net.math.OctahedralGroup;
+import net.math.Quadrant;
 import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import java.util.Map;

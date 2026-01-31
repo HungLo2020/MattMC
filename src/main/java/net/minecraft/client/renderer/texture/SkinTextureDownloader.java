@@ -1,7 +1,7 @@
 package net.minecraft.client.renderer.texture;
 
-import com.mojang.blaze3d.platform.NativeImage;
-import com.mojang.logging.LogUtils;
+import net.blaze3d.platform.NativeImage;
+import net.logging.LogUtils;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;

@@ -1,6 +1,6 @@
 package net.minecraft.client.gui.screens.options.controls;
 
-import com.mojang.blaze3d.platform.InputConstants;
+import net.blaze3d.platform.InputConstants;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.Util;

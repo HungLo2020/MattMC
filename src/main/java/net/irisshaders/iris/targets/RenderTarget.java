@@ -1,6 +1,6 @@
 package net.irisshaders.iris.targets;
 
-import com.mojang.blaze3d.opengl.GlStateManager;
+import net.blaze3d.opengl.GlStateManager;
 import net.irisshaders.iris.gl.GLDebug;
 import net.irisshaders.iris.gl.IrisRenderSystem;
 import net.irisshaders.iris.gl.texture.InternalTextureFormat;

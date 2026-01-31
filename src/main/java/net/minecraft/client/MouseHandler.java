@@ -1,9 +1,9 @@
 package net.minecraft.client;
 
-import com.mojang.blaze3d.Blaze3D;
-import com.mojang.blaze3d.platform.InputConstants;
-import com.mojang.blaze3d.platform.Window;
-import com.mojang.logging.LogUtils;
+import net.blaze3d.Blaze3D;
+import net.blaze3d.platform.InputConstants;
+import net.blaze3d.platform.Window;
+import net.logging.LogUtils;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.nio.file.Paths;

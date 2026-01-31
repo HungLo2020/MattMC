@@ -4,7 +4,7 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import net.minecraft.server.profile.PlayerProfile;
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import java.io.File;
 import java.net.SocketAddress;
 import java.nio.file.Path;

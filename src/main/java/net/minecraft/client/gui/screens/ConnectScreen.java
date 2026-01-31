@@ -1,6 +1,6 @@
 package net.minecraft.client.gui.screens;
 
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import io.netty.channel.ChannelFuture;
 import java.net.InetSocketAddress;
 import java.util.Optional;

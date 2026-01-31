@@ -1,7 +1,7 @@
 package net.minecraft.client;
 
 import com.google.common.collect.ImmutableList;
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.util.List;

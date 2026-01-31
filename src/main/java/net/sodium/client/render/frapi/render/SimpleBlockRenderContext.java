@@ -1,0 +1,119 @@
+package net.sodium.client.render.frapi.render;
+
+import net.blaze3d.vertex.PoseStack;
+import net.blaze3d.vertex.VertexConsumer;
+import net.sodium.api.texture.SpriteUtil;
+import net.sodium.client.render.frapi.helper.ColorHelper;
+import net.sodium.client.render.frapi.mesh.MutableQuadViewImpl;
+import net.sodium.client.render.texture.SpriteFinderCache;
+import net.fabricmc.fabric.api.renderer.v1.model.FabricBlockStateModel;
+import net.fabricmc.fabric.api.renderer.v1.render.BlockVertexConsumerProvider;
+import net.minecraft.client.renderer.ItemBlockRenderTypes;
+import net.minecraft.client.renderer.LightTexture;
+import net.minecraft.client.renderer.RenderType;
+import net.minecraft.client.renderer.block.model.BlockStateModel;
+import net.minecraft.client.renderer.chunk.ChunkSectionLayer;
+import net.minecraft.core.BlockPos;
+import net.minecraft.util.ARGB;
+import net.minecraft.util.Mth;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.BlockAndTintGetter;
+import net.minecraft.world.level.block.state.BlockState;
+import org.jetbrains.annotations.Nullable;
+
+public class SimpleBlockRenderContext extends AbstractBlockRenderContext {
+    public static final ThreadLocal<SimpleBlockRenderContext> POOL = ThreadLocal.withInitial(SimpleBlockRenderContext::new);
+
+    private final RandomSource random = RandomSource.createNewThreadLocalInstance();
+
+    private BlockVertexConsumerProvider vertexConsumers;
+    private float red;
+    private float green;
+    private float blue;
+    private int light;
+
+    @Nullable
+    private ChunkSectionLayer lastRenderLayer;
+    @Nullable
+    private VertexConsumer lastVertexConsumer;
+    private PoseStack.Pose matrices;
+    private int overlay;
+
+    @Override
+    protected void processQuad(MutableQuadViewImpl quad) {
+        final ChunkSectionLayer quadRenderLayer = quad.renderLayer();
+        final ChunkSectionLayer renderLayer = quadRenderLayer == null ? defaultRenderType : quadRenderLayer;
+        final VertexConsumer vertexConsumer;
+
+        if (renderLayer == lastRenderLayer) {
+            vertexConsumer = lastVertexConsumer;
+        } else {
+            lastVertexConsumer = vertexConsumer = vertexConsumers.getBuffer(renderLayer);
+            lastRenderLayer = renderLayer;
+        }
+
+        if (quad.tintIndex() != -1) {
+            final float red = this.red;
+            final float green = this.green;
+            final float blue = this.blue;
+
+            for (int i = 0; i < 4; i++) {
+                quad.color(i, ARGB.scaleRGB(quad.color(i), red, green, blue));
+            }
+        }
+
+        if (quad.emissive()) {
+            for (int i = 0; i < 4; i++) {
+                quad.lightmap(i, LightTexture.FULL_BRIGHT);
+            }
+        } else {
+            final int light = this.light;
+
+            for (int i = 0; i < 4; i++) {
+                quad.lightmap(i, ColorHelper.maxBrightness(quad.lightmap(i), light));
+            }
+        }
+
+        QuadEncoder.writeQuadVertices(quad, vertexConsumer, overlay, matrices.pose(), matrices.trustedNormals, matrices.normal());
+
+        SpriteUtil.INSTANCE.markSpriteActive(quad.sprite(SpriteFinderCache.forBlockAtlas()));
+    }
+
+    private RenderType toRenderLayer(ChunkSectionLayer defaultRenderType) {
+        return switch (defaultRenderType) {
+            case SOLID -> RenderType.solid();
+            case CUTOUT_MIPPED -> RenderType.cutoutMipped();
+            case CUTOUT -> RenderType.cutout();
+            case TRANSLUCENT -> RenderType.translucentMovingBlock();
+            case TRIPWIRE -> RenderType.tripwire();
+        };
+    }
+
+    public void bufferModel(PoseStack.Pose entry, BlockVertexConsumerProvider vertexConsumers, BlockStateModel model, float red, float green, float blue, int light, int overlay, BlockAndTintGetter blockView, BlockPos pos, BlockState state) {
+        matrices = entry;
+        this.overlay = overlay;
+
+        this.prepareAoInfo(true);
+
+        this.vertexConsumers = vertexConsumers;
+        this.defaultRenderType = ItemBlockRenderTypes.getChunkRenderType(state);
+        this.red = Mth.clamp(red, 0, 1);
+        this.green = Mth.clamp(green, 0, 1);
+        this.blue = Mth.clamp(blue, 0, 1);
+        this.light = light;
+        this.level = blockView;
+        this.state = state;
+        this.pos = pos;
+
+        random.setSeed(42L);
+
+        ((FabricBlockStateModel) model).emitQuads(getEmitter(), blockView, pos, state, random, cullFace -> false);
+
+        this.level = null;
+        this.state = null;
+        this.pos = null;
+        this.vertexConsumers = null;
+        lastRenderLayer = null;
+        lastVertexConsumer = null;
+    }
+}

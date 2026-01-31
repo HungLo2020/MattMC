@@ -1,6 +1,6 @@
 package net.minecraft.client.renderer.chunk;
 
-import com.mojang.blaze3d.pipeline.RenderTarget;
+import net.blaze3d.pipeline.RenderTarget;
 import java.util.Locale;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;

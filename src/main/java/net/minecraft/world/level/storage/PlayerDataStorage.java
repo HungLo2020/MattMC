@@ -1,7 +1,7 @@
 package net.minecraft.world.level.storage;
 
 import com.mojang.datafixers.DataFixer;
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;

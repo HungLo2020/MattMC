@@ -1,7 +1,7 @@
 package net.minecraft.world.entity;
 
 import com.google.common.collect.ImmutableSet;
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import com.mojang.serialization.Codec;
 import java.util.Optional;
 import java.util.Set;
@@ -9,6 +9,9 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
+
+import net.alexscaves.server.entity.living.*;
+import net.alexsmobs.entity.*;
 import net.minecraft.Util;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -73,23 +76,18 @@ import net.minecraft.world.entity.animal.horse.ZombieHorse;
 import net.minecraft.world.entity.animal.sheep.Sheep;
 import net.minecraft.world.entity.animal.sniffer.Sniffer;
 import net.minecraft.world.entity.animal.wolf.Wolf;
-import com.github.alexmodguy.alexscaves.server.entity.living.GrottoceratopsEntity;
-import com.github.alexmodguy.alexscaves.server.entity.living.RelicheirusEntity;
-import com.github.alexmodguy.alexscaves.server.entity.living.SubterranodonEntity;
-import com.github.alexmodguy.alexscaves.server.entity.living.TrilocarisEntity;
-import com.github.alexmodguy.alexscaves.server.entity.living.VallumraptorEntity;
-import com.github.alexthe666.alexsmobs.entity.EntityKangaroo;
-import com.github.alexthe666.alexsmobs.entity.EntityBunfungus;
-import com.github.alexthe666.alexsmobs.entity.EntityMungus;
-import com.github.alexthe666.alexsmobs.entity.EntityBlobfish;
-import com.github.alexthe666.alexsmobs.entity.EntityCosmicCod;
-import com.github.alexthe666.alexsmobs.entity.EntityCrocodile;
-import com.github.alexthe666.alexsmobs.entity.EntityFlyingFish;
-import com.github.alexthe666.alexsmobs.entity.EntityTerrapin;
-import com.github.alexthe666.alexsmobs.entity.EntityAlligatorSnappingTurtle;
-import com.github.alexthe666.alexsmobs.entity.EntityAnaconda;
-import com.github.alexthe666.alexsmobs.entity.EntityAnacondaPart;
-import com.github.alexthe666.alexsmobs.entity.EntityTiger;
+import net.alexscaves.server.entity.living.RelicheirusEntity;
+import net.alexsmobs.entity.EntityKangaroo;
+import net.alexsmobs.entity.EntityBunfungus;
+import net.alexsmobs.entity.EntityMungus;
+import net.alexsmobs.entity.EntityBlobfish;
+import net.alexsmobs.entity.EntityCosmicCod;
+import net.alexsmobs.entity.EntityCrocodile;
+import net.alexsmobs.entity.EntityFlyingFish;
+import net.alexsmobs.entity.EntityAlligatorSnappingTurtle;
+import net.alexsmobs.entity.EntityAnaconda;
+import net.alexsmobs.entity.EntityAnacondaPart;
+import net.alexsmobs.entity.EntityTiger;
 import net.minecraft.world.entity.boss.enderdragon.EndCrystal;
 import net.minecraft.world.entity.boss.enderdragon.EnderDragon;
 import net.minecraft.world.entity.boss.wither.WitherBoss;
@@ -255,9 +253,9 @@ public class EntityType<T extends Entity> implements FeatureElement, EntityTypeT
 			.clientTrackingRange(10)
 			.updateInterval(Integer.MAX_VALUE)
 	);
-	public static final EntityType<com.github.alexmodguy.alexscaves.server.entity.living.AtlatitanEntity> ATLATITAN = register(
+	public static final EntityType<AtlatitanEntity> ATLATITAN = register(
 		"atlatitan",
-		EntityType.Builder.of(com.github.alexmodguy.alexscaves.server.entity.living.AtlatitanEntity::new, MobCategory.CREATURE)
+		EntityType.Builder.of(AtlatitanEntity::new, MobCategory.CREATURE)
 			.sized(5.0F, 8.0F)
 			.eyeHeight(7.0F)
 			.clientTrackingRange(11)
@@ -315,14 +313,14 @@ public class EntityType<T extends Entity> implements FeatureElement, EntityTypeT
 			.eyeHeight(0.3F)
 			.clientTrackingRange(5)
 	);
-	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntityBlueJay> BLUE_JAY = register(
-		"blue_jay", EntityType.Builder.of(com.github.alexthe666.alexsmobs.entity.EntityBlueJay::new, MobCategory.CREATURE).sized(0.5F, 0.5F).eyeHeight(0.3F).clientTrackingRange(8)
+	public static final EntityType<EntityBlueJay> BLUE_JAY = register(
+		"blue_jay", EntityType.Builder.of(EntityBlueJay::new, MobCategory.CREATURE).sized(0.5F, 0.5F).eyeHeight(0.3F).clientTrackingRange(8)
 	);
-	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntityCachalotWhale> CACHALOT_WHALE = register(
-		"cachalot_whale", EntityType.Builder.of(com.github.alexthe666.alexsmobs.entity.EntityCachalotWhale::new, MobCategory.WATER_CREATURE).sized(5.0F, 4.5F).eyeHeight(2.25F).clientTrackingRange(10)
+	public static final EntityType<EntityCachalotWhale> CACHALOT_WHALE = register(
+		"cachalot_whale", EntityType.Builder.of(EntityCachalotWhale::new, MobCategory.WATER_CREATURE).sized(5.0F, 4.5F).eyeHeight(2.25F).clientTrackingRange(10)
 	);
-	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntityCachalotEcho> CACHALOT_ECHO = register(
-		"cachalot_echo", EntityType.Builder.<com.github.alexthe666.alexsmobs.entity.EntityCachalotEcho>of(com.github.alexthe666.alexsmobs.entity.EntityCachalotEcho::new, MobCategory.MISC).noLootTable().sized(0.5F, 0.5F).clientTrackingRange(4).updateInterval(20)
+	public static final EntityType<EntityCachalotEcho> CACHALOT_ECHO = register(
+		"cachalot_echo", EntityType.Builder.<EntityCachalotEcho>of(EntityCachalotEcho::new, MobCategory.MISC).noLootTable().sized(0.5F, 0.5F).clientTrackingRange(4).updateInterval(20)
 	);
 	public static final EntityType<Display.BlockDisplay> BLOCK_DISPLAY = register(
 		"block_display", EntityType.Builder.of(Display.BlockDisplay::new, MobCategory.MISC).noLootTable().sized(0.0F, 0.0F).clientTrackingRange(10).updateInterval(1)
@@ -346,9 +344,9 @@ public class EntityType<T extends Entity> implements FeatureElement, EntityTypeT
 	public static final EntityType<Camel> CAMEL = register(
 		"camel", EntityType.Builder.of(Camel::new, MobCategory.CREATURE).sized(1.7F, 2.375F).eyeHeight(2.275F).clientTrackingRange(10)
 	);
-	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntityCatfish> CATFISH = register(
+	public static final EntityType<EntityCatfish> CATFISH = register(
 		"catfish",
-		EntityType.Builder.of(com.github.alexthe666.alexsmobs.entity.EntityCatfish::new, MobCategory.WATER_AMBIENT)
+		EntityType.Builder.of(EntityCatfish::new, MobCategory.WATER_AMBIENT)
 			.sized(0.9F, 0.6F)
 			.eyeHeight(0.3F)
 			.clientTrackingRange(5)
@@ -359,23 +357,23 @@ public class EntityType<T extends Entity> implements FeatureElement, EntityTypeT
 	public static final EntityType<CaveSpider> CAVE_SPIDER = register(
 		"cave_spider", EntityType.Builder.of(CaveSpider::new, MobCategory.MONSTER).sized(0.7F, 0.5F).eyeHeight(0.45F).clientTrackingRange(8).notInPeaceful()
 	);
-	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntityCockroach> COCKROACH = register(
+	public static final EntityType<EntityCockroach> COCKROACH = register(
 		"cockroach",
-		EntityType.Builder.of(com.github.alexthe666.alexsmobs.entity.EntityCockroach::new, MobCategory.CREATURE)
+		EntityType.Builder.of(EntityCockroach::new, MobCategory.CREATURE)
 			.sized(0.7F, 0.4F)
 			.eyeHeight(0.25F)
 			.clientTrackingRange(8)
 	);
-	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntityCockroachEgg> COCKROACH_EGG = register(
+	public static final EntityType<EntityCockroachEgg> COCKROACH_EGG = register(
 		"cockroach_egg",
-		EntityType.Builder.<com.github.alexthe666.alexsmobs.entity.EntityCockroachEgg>of(com.github.alexthe666.alexsmobs.entity.EntityCockroachEgg::new, MobCategory.MISC)
+		EntityType.Builder.<EntityCockroachEgg>of(EntityCockroachEgg::new, MobCategory.MISC)
 			.sized(0.25F, 0.25F)
 			.clientTrackingRange(4)
 			.updateInterval(10)
 	);
-	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntityCombJelly> COMB_JELLY = register(
+	public static final EntityType<EntityCombJelly> COMB_JELLY = register(
 		"comb_jelly",
-		EntityType.Builder.of(com.github.alexthe666.alexsmobs.entity.EntityCombJelly::new, MobCategory.WATER_AMBIENT)
+		EntityType.Builder.of(EntityCombJelly::new, MobCategory.WATER_AMBIENT)
 			.sized(0.75F, 0.75F)
 			.eyeHeight(0.375F)
 			.clientTrackingRange(5)
@@ -387,16 +385,16 @@ public class EntityType<T extends Entity> implements FeatureElement, EntityTypeT
 			.eyeHeight(0.2F)
 			.clientTrackingRange(4)
 	);
-	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntityFrilledShark> FRILLED_SHARK = register(
+	public static final EntityType<EntityFrilledShark> FRILLED_SHARK = register(
 		"frilled_shark",
-		EntityType.Builder.of(com.github.alexthe666.alexsmobs.entity.EntityFrilledShark::new, MobCategory.WATER_CREATURE)
+		EntityType.Builder.of(EntityFrilledShark::new, MobCategory.WATER_CREATURE)
 			.sized(0.6F, 0.6F)
 			.eyeHeight(0.3F)
 			.clientTrackingRange(8)
 	);
-	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntityCosmaw> COSMAW = register(
+	public static final EntityType<EntityCosmaw> COSMAW = register(
 		"cosmaw", 
-		EntityType.Builder.of(com.github.alexthe666.alexsmobs.entity.EntityCosmaw::new, MobCategory.CREATURE)
+		EntityType.Builder.of(EntityCosmaw::new, MobCategory.CREATURE)
 			.sized(1.5F, 1.5F)
 			.eyeHeight(1.0F)
 			.clientTrackingRange(10)
@@ -441,8 +439,8 @@ public class EntityType<T extends Entity> implements FeatureElement, EntityTypeT
 	public static final EntityType<Cow> COW = register(
 		"cow", EntityType.Builder.of(Cow::new, MobCategory.CREATURE).sized(0.9F, 1.4F).eyeHeight(1.3F).passengerAttachments(1.36875F).clientTrackingRange(10)
 	);
-	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntityCrow> CROW = register(
-		"crow", EntityType.Builder.of(com.github.alexthe666.alexsmobs.entity.EntityCrow::new, MobCategory.CREATURE).sized(0.45F, 0.45F).eyeHeight(0.3F).clientTrackingRange(10)
+	public static final EntityType<EntityCrow> CROW = register(
+		"crow", EntityType.Builder.of(EntityCrow::new, MobCategory.CREATURE).sized(0.45F, 0.45F).eyeHeight(0.3F).clientTrackingRange(10)
 	);
 	public static final EntityType<Creaking> CREAKING = register(
 		"creaking", EntityType.Builder.of(Creaking::new, MobCategory.MONSTER).sized(0.9F, 2.7F).eyeHeight(2.3F).clientTrackingRange(8).notInPeaceful()
@@ -490,19 +488,19 @@ public class EntityType<T extends Entity> implements FeatureElement, EntityTypeT
 	public static final EntityType<ThrownEgg> EGG = register(
 		"egg", EntityType.Builder.<ThrownEgg>of(ThrownEgg::new, MobCategory.MISC).noLootTable().sized(0.25F, 0.25F).clientTrackingRange(4).updateInterval(10)
 	);
-	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntityEmu> EMU = register(
+	public static final EntityType<EntityEmu> EMU = register(
 		"emu",
-		EntityType.Builder.of(com.github.alexthe666.alexsmobs.entity.EntityEmu::new, MobCategory.CREATURE)
+		EntityType.Builder.of(EntityEmu::new, MobCategory.CREATURE)
 			.sized(0.9F, 2.0F)
 			.eyeHeight(1.8F)
 			.clientTrackingRange(10)
 	);
-	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntityEmuEgg> EMU_EGG = register(
-		"emu_egg", EntityType.Builder.<com.github.alexthe666.alexsmobs.entity.EntityEmuEgg>of(com.github.alexthe666.alexsmobs.entity.EntityEmuEgg::new, MobCategory.MISC).noLootTable().sized(0.25F, 0.25F).clientTrackingRange(4).updateInterval(10)
+	public static final EntityType<EntityEmuEgg> EMU_EGG = register(
+		"emu_egg", EntityType.Builder.<EntityEmuEgg>of(EntityEmuEgg::new, MobCategory.MISC).noLootTable().sized(0.25F, 0.25F).clientTrackingRange(4).updateInterval(10)
 	);
-	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntityElephant> ELEPHANT = register(
+	public static final EntityType<EntityElephant> ELEPHANT = register(
 		"elephant",
-		EntityType.Builder.of(com.github.alexthe666.alexsmobs.entity.EntityElephant::new, MobCategory.CREATURE)
+		EntityType.Builder.of(EntityElephant::new, MobCategory.CREATURE)
 			.sized(3.0F, 3.5F)
 			.clientTrackingRange(10)
 	);
@@ -541,16 +539,16 @@ public class EntityType<T extends Entity> implements FeatureElement, EntityTypeT
 		"ender_pearl",
 		EntityType.Builder.<ThrownEnderpearl>of(ThrownEnderpearl::new, MobCategory.MISC).noLootTable().sized(0.25F, 0.25F).clientTrackingRange(4).updateInterval(10)
 	);
-	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntityEndergrade> ENDERGRADE = register(
+	public static final EntityType<EntityEndergrade> ENDERGRADE = register(
 		"endergrade",
-		EntityType.Builder.of(com.github.alexthe666.alexsmobs.entity.EntityEndergrade::new, MobCategory.CREATURE)
+		EntityType.Builder.of(EntityEndergrade::new, MobCategory.CREATURE)
 			.sized(1.2F, 1.2F)
 			.eyeHeight(0.6F)
 			.clientTrackingRange(10)
 	);
-	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntityEnderiophage> ENDERIOPHAGE = register(
+	public static final EntityType<EntityEnderiophage> ENDERIOPHAGE = register(
 		"enderiophage",
-		EntityType.Builder.of(com.github.alexthe666.alexsmobs.entity.EntityEnderiophage::new, MobCategory.MONSTER)
+		EntityType.Builder.of(EntityEnderiophage::new, MobCategory.MONSTER)
 			.sized(0.9F, 0.9F)
 			.eyeHeight(0.6F)
 			.clientTrackingRange(10)
@@ -633,16 +631,16 @@ public class EntityType<T extends Entity> implements FeatureElement, EntityTypeT
 	public static final EntityType<Frog> FROG = register(
 		"frog", EntityType.Builder.of(Frog::new, MobCategory.CREATURE).sized(0.5F, 0.5F).passengerAttachments(new Vec3(0.0, 0.375, -0.25)).clientTrackingRange(10)
 	);
-	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntityGeladaMonkey> GELADA_MONKEY = register(
-		"gelada_monkey", EntityType.Builder.of(com.github.alexthe666.alexsmobs.entity.EntityGeladaMonkey::new, MobCategory.CREATURE).sized(0.6F, 0.9F).eyeHeight(0.7F).clientTrackingRange(8)
+	public static final EntityType<EntityGeladaMonkey> GELADA_MONKEY = register(
+		"gelada_monkey", EntityType.Builder.of(EntityGeladaMonkey::new, MobCategory.CREATURE).sized(0.6F, 0.9F).eyeHeight(0.7F).clientTrackingRange(8)
 	);
 	public static final EntityType<MinecartFurnace> FURNACE_MINECART = register(
 		"furnace_minecart",
 		EntityType.Builder.of(MinecartFurnace::new, MobCategory.MISC).noLootTable().sized(0.98F, 0.7F).passengerAttachments(0.1875F).clientTrackingRange(8)
 	);
-	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntityGazelle> GAZELLE = register(
+	public static final EntityType<EntityGazelle> GAZELLE = register(
 		"gazelle",
-		EntityType.Builder.of(com.github.alexthe666.alexsmobs.entity.EntityGazelle::new, MobCategory.CREATURE)
+		EntityType.Builder.of(EntityGazelle::new, MobCategory.CREATURE)
 			.sized(0.9F, 1.3F)
 			.eyeHeight(1.1F)
 			.clientTrackingRange(10)
@@ -683,9 +681,9 @@ public class EntityType<T extends Entity> implements FeatureElement, EntityTypeT
 	public static final EntityType<GlowSquid> GLOW_SQUID = register(
 		"glow_squid", EntityType.Builder.of(GlowSquid::new, MobCategory.UNDERGROUND_WATER_CREATURE).sized(0.8F, 0.8F).eyeHeight(0.4F).clientTrackingRange(10)
 	);
-	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntityGiantSquid> GIANT_SQUID = register(
+	public static final EntityType<EntityGiantSquid> GIANT_SQUID = register(
 		"giant_squid",
-		EntityType.Builder.of(com.github.alexthe666.alexsmobs.entity.EntityGiantSquid::new, MobCategory.WATER_CREATURE)
+		EntityType.Builder.of(EntityGiantSquid::new, MobCategory.WATER_CREATURE)
 			.sized(2.5F, 1.5F)
 			.eyeHeight(0.75F)
 			.clientTrackingRange(10)
@@ -693,16 +691,16 @@ public class EntityType<T extends Entity> implements FeatureElement, EntityTypeT
 	public static final EntityType<Goat> GOAT = register(
 		"goat", EntityType.Builder.of(Goat::new, MobCategory.CREATURE).sized(0.9F, 1.3F).passengerAttachments(1.1125F).clientTrackingRange(10)
 	);
-	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntityGorilla> GORILLA = register(
+	public static final EntityType<EntityGorilla> GORILLA = register(
 		"gorilla",
-		EntityType.Builder.of(com.github.alexthe666.alexsmobs.entity.EntityGorilla::new, MobCategory.CREATURE)
+		EntityType.Builder.of(EntityGorilla::new, MobCategory.CREATURE)
 			.sized(1.0F, 1.5F)
 			.eyeHeight(1.2F)
 			.clientTrackingRange(10)
 	);
-	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntityGrizzlyBear> GRIZZLY_BEAR = register(
+	public static final EntityType<EntityGrizzlyBear> GRIZZLY_BEAR = register(
 		"grizzly_bear",
-		EntityType.Builder.of(com.github.alexthe666.alexsmobs.entity.EntityGrizzlyBear::new, MobCategory.CREATURE)
+		EntityType.Builder.of(EntityGrizzlyBear::new, MobCategory.CREATURE)
 			.sized(1.7F, 1.95F)
 			.eyeHeight(1.5F)
 			.clientTrackingRange(10)
@@ -714,9 +712,9 @@ public class EntityType<T extends Entity> implements FeatureElement, EntityTypeT
 			.eyeHeight(1.5F)
 			.clientTrackingRange(10)
 	);
-	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntityHammerheadShark> HAMMERHEAD_SHARK = register(
+	public static final EntityType<EntityHammerheadShark> HAMMERHEAD_SHARK = register(
 		"hammerhead_shark",
-		EntityType.Builder.of(com.github.alexthe666.alexsmobs.entity.EntityHammerheadShark::new, MobCategory.WATER_CREATURE)
+		EntityType.Builder.of(EntityHammerheadShark::new, MobCategory.WATER_CREATURE)
 			.sized(1.4F, 0.8F)
 			.eyeHeight(0.4F)
 			.clientTrackingRange(10)
@@ -737,9 +735,9 @@ public class EntityType<T extends Entity> implements FeatureElement, EntityTypeT
 		"hopper_minecart",
 		EntityType.Builder.of(MinecartHopper::new, MobCategory.MISC).noLootTable().sized(0.98F, 0.7F).passengerAttachments(0.1875F).clientTrackingRange(8)
 	);
-	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntityHummingbird> HUMMINGBIRD = register(
+	public static final EntityType<EntityHummingbird> HUMMINGBIRD = register(
 		"hummingbird",
-		EntityType.Builder.of(com.github.alexthe666.alexsmobs.entity.EntityHummingbird::new, MobCategory.CREATURE)
+		EntityType.Builder.of(EntityHummingbird::new, MobCategory.CREATURE)
 			.sized(0.4F, 0.4F)
 			.clientTrackingRange(8)
 	);
@@ -769,9 +767,9 @@ public class EntityType<T extends Entity> implements FeatureElement, EntityTypeT
 	public static final EntityType<Interaction> INTERACTION = register(
 		"interaction", EntityType.Builder.of(Interaction::new, MobCategory.MISC).noLootTable().sized(0.0F, 0.0F).clientTrackingRange(10)
 	);
-	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntityJerboa> JERBOA = register(
+	public static final EntityType<EntityJerboa> JERBOA = register(
 		"jerboa",
-		EntityType.Builder.of(com.github.alexthe666.alexsmobs.entity.EntityJerboa::new, MobCategory.CREATURE)
+		EntityType.Builder.of(EntityJerboa::new, MobCategory.CREATURE)
 			.sized(0.5F, 0.5F)
 			.clientTrackingRange(8)
 	);
@@ -886,12 +884,12 @@ public class EntityType<T extends Entity> implements FeatureElement, EntityTypeT
 	public static final EntityType<Marker> MARKER = register(
 		"marker", EntityType.Builder.of(Marker::new, MobCategory.MISC).noLootTable().sized(0.0F, 0.0F).clientTrackingRange(0)
 	);
-	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntityMantisShrimp> MANTIS_SHRIMP = register(
-		"mantis_shrimp", EntityType.Builder.of(com.github.alexthe666.alexsmobs.entity.EntityMantisShrimp::new, MobCategory.WATER_CREATURE).sized(0.8F, 0.5F).eyeHeight(0.4F).clientTrackingRange(10)
+	public static final EntityType<EntityMantisShrimp> MANTIS_SHRIMP = register(
+		"mantis_shrimp", EntityType.Builder.of(EntityMantisShrimp::new, MobCategory.WATER_CREATURE).sized(0.8F, 0.5F).eyeHeight(0.4F).clientTrackingRange(10)
 	);
-	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntityMimicOctopus> MIMIC_OCTOPUS = register(
+	public static final EntityType<EntityMimicOctopus> MIMIC_OCTOPUS = register(
 		"mimic_octopus",
-		EntityType.Builder.of(com.github.alexthe666.alexsmobs.entity.EntityMimicOctopus::new, MobCategory.WATER_CREATURE)
+		EntityType.Builder.of(EntityMimicOctopus::new, MobCategory.WATER_CREATURE)
 			.sized(0.8F, 0.6F)
 			.eyeHeight(0.3F)
 			.clientTrackingRange(8)
@@ -903,31 +901,31 @@ public class EntityType<T extends Entity> implements FeatureElement, EntityTypeT
 		"mooshroom",
 		EntityType.Builder.of(MushroomCow::new, MobCategory.CREATURE).sized(0.9F, 1.4F).eyeHeight(1.3F).passengerAttachments(1.36875F).clientTrackingRange(10)
 	);
-	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntityMoose> MOOSE = register(
-		"moose", EntityType.Builder.of(com.github.alexthe666.alexsmobs.entity.EntityMoose::new, MobCategory.CREATURE).sized(1.5F, 2.3F).eyeHeight(2.0F).clientTrackingRange(10)
+	public static final EntityType<EntityMoose> MOOSE = register(
+		"moose", EntityType.Builder.of(EntityMoose::new, MobCategory.CREATURE).sized(1.5F, 2.3F).eyeHeight(2.0F).clientTrackingRange(10)
 	);
 	public static final EntityType<Mule> MULE = register(
 		"mule", EntityType.Builder.of(Mule::new, MobCategory.CREATURE).sized(1.3964844F, 1.6F).eyeHeight(1.52F).passengerAttachments(1.2125F).clientTrackingRange(8)
 	);
-	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntityMudBall> MUD_BALL = register(
+	public static final EntityType<EntityMudBall> MUD_BALL = register(
 		"mud_ball",
-		EntityType.Builder.<com.github.alexthe666.alexsmobs.entity.EntityMudBall>of(com.github.alexthe666.alexsmobs.entity.EntityMudBall::new, MobCategory.MISC)
+		EntityType.Builder.<EntityMudBall>of(EntityMudBall::new, MobCategory.MISC)
 			.noLootTable()
 			.sized(0.25F, 0.25F)
 			.clientTrackingRange(4)
 			.updateInterval(10)
 	);
-	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntityTossedItem> TOSSED_ITEM = register(
+	public static final EntityType<EntityTossedItem> TOSSED_ITEM = register(
 		"tossed_item",
-		EntityType.Builder.<com.github.alexthe666.alexsmobs.entity.EntityTossedItem>of(com.github.alexthe666.alexsmobs.entity.EntityTossedItem::new, MobCategory.MISC)
+		EntityType.Builder.<EntityTossedItem>of(EntityTossedItem::new, MobCategory.MISC)
 			.noLootTable()
 			.sized(0.25F, 0.25F)
 			.clientTrackingRange(4)
 			.updateInterval(10)
 	);
-	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntityMudskipper> MUDSKIPPER = register(
+	public static final EntityType<EntityMudskipper> MUDSKIPPER = register(
 		"mudskipper",
-		EntityType.Builder.of(com.github.alexthe666.alexsmobs.entity.EntityMudskipper::new, MobCategory.CREATURE)
+		EntityType.Builder.of(EntityMudskipper::new, MobCategory.CREATURE)
 			.sized(0.6F, 0.5F)
 			.eyeHeight(0.3F)
 			.clientTrackingRange(8)
@@ -950,8 +948,8 @@ public class EntityType<T extends Entity> implements FeatureElement, EntityTypeT
 	public static final EntityType<OminousItemSpawner> OMINOUS_ITEM_SPAWNER = register(
 		"ominous_item_spawner", EntityType.Builder.of(OminousItemSpawner::new, MobCategory.MISC).noLootTable().sized(0.25F, 0.25F).clientTrackingRange(8)
 	);
-	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntityOrca> ORCA = register(
-		"orca", EntityType.Builder.of(com.github.alexthe666.alexsmobs.entity.EntityOrca::new, MobCategory.WATER_CREATURE).sized(1.6F, 1.2F).eyeHeight(0.8F).clientTrackingRange(10)
+	public static final EntityType<EntityOrca> ORCA = register(
+		"orca", EntityType.Builder.of(EntityOrca::new, MobCategory.WATER_CREATURE).sized(1.6F, 1.2F).eyeHeight(0.8F).clientTrackingRange(10)
 	);
 	public static final EntityType<Painting> PAINTING = register(
 		"painting",
@@ -1037,9 +1035,9 @@ public class EntityType<T extends Entity> implements FeatureElement, EntityTypeT
 			.clientTrackingRange(8)
 			.notInPeaceful()
 	);
-	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntityPlatypus> PLATYPUS = register(
+	public static final EntityType<EntityPlatypus> PLATYPUS = register(
 		"platypus",
-		EntityType.Builder.of(com.github.alexthe666.alexsmobs.entity.EntityPlatypus::new, MobCategory.CREATURE)
+		EntityType.Builder.of(EntityPlatypus::new, MobCategory.CREATURE)
 			.sized(0.8F, 0.5F)
 			.eyeHeight(0.25F)
 			.clientTrackingRange(10)
@@ -1047,8 +1045,8 @@ public class EntityType<T extends Entity> implements FeatureElement, EntityTypeT
 	public static final EntityType<PolarBear> POLAR_BEAR = register(
 		"polar_bear", EntityType.Builder.of(PolarBear::new, MobCategory.CREATURE).immuneTo(Blocks.POWDER_SNOW).sized(1.4F, 1.4F).clientTrackingRange(10)
 	);
-	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntityPotoo> POTOO = register(
-		"potoo", EntityType.Builder.of(com.github.alexthe666.alexsmobs.entity.EntityPotoo::new, MobCategory.CREATURE).sized(0.4F, 0.7F).eyeHeight(0.45F).clientTrackingRange(8)
+	public static final EntityType<EntityPotoo> POTOO = register(
+		"potoo", EntityType.Builder.of(EntityPotoo::new, MobCategory.CREATURE).sized(0.4F, 0.7F).eyeHeight(0.45F).clientTrackingRange(8)
 	);
 	public static final EntityType<ThrownSplashPotion> SPLASH_POTION = register(
 		"splash_potion",
@@ -1072,34 +1070,34 @@ public class EntityType<T extends Entity> implements FeatureElement, EntityTypeT
 	public static final EntityType<Rabbit> RABBIT = register(
 		"rabbit", EntityType.Builder.of(Rabbit::new, MobCategory.CREATURE).sized(0.4F, 0.5F).clientTrackingRange(8)
 	);
-	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntityRaccoon> RACCOON = register(
+	public static final EntityType<EntityRaccoon> RACCOON = register(
 		"raccoon",
-		EntityType.Builder.of(com.github.alexthe666.alexsmobs.entity.EntityRaccoon::new, MobCategory.CREATURE)
+		EntityType.Builder.of(EntityRaccoon::new, MobCategory.CREATURE)
 			.sized(0.75F, 0.5F)
 			.clientTrackingRange(8)
 	);
-	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntityRainFrog> RAIN_FROG = register(
+	public static final EntityType<EntityRainFrog> RAIN_FROG = register(
 		"rain_frog",
-		EntityType.Builder.of(com.github.alexthe666.alexsmobs.entity.EntityRainFrog::new, MobCategory.CREATURE)
+		EntityType.Builder.of(EntityRainFrog::new, MobCategory.CREATURE)
 			.sized(0.4F, 0.4F)
 			.clientTrackingRange(8)
 	);
-	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntityRattlesnake> RATTLESNAKE = register(
+	public static final EntityType<EntityRattlesnake> RATTLESNAKE = register(
 		"rattlesnake",
-		EntityType.Builder.of(com.github.alexthe666.alexsmobs.entity.EntityRattlesnake::new, MobCategory.CREATURE)
+		EntityType.Builder.of(EntityRattlesnake::new, MobCategory.CREATURE)
 			.sized(0.6F, 0.3F)
 			.clientTrackingRange(8)
 	);
-	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntityRhinoceros> RHINOCEROS = register(
+	public static final EntityType<EntityRhinoceros> RHINOCEROS = register(
 		"rhinoceros",
-		EntityType.Builder.of(com.github.alexthe666.alexsmobs.entity.EntityRhinoceros::new, MobCategory.CREATURE)
+		EntityType.Builder.of(EntityRhinoceros::new, MobCategory.CREATURE)
 			.sized(1.8F, 2.0F)
 			.eyeHeight(1.8F)
 			.clientTrackingRange(10)
 	);
-	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntityRoadrunner> ROADRUNNER = register(
+	public static final EntityType<EntityRoadrunner> ROADRUNNER = register(
 		"roadrunner",
-		EntityType.Builder.of(com.github.alexthe666.alexsmobs.entity.EntityRoadrunner::new, MobCategory.CREATURE)
+		EntityType.Builder.of(EntityRoadrunner::new, MobCategory.CREATURE)
 			.sized(0.7F, 0.9F)
 			.clientTrackingRange(8)
 	);
@@ -1121,54 +1119,54 @@ public class EntityType<T extends Entity> implements FeatureElement, EntityTypeT
 	public static final EntityType<Salmon> SALMON = register(
 		"salmon", EntityType.Builder.of(Salmon::new, MobCategory.WATER_AMBIENT).sized(0.7F, 0.4F).eyeHeight(0.26F).clientTrackingRange(4)
 	);
-	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntityAnteater> ANTEATER = register(
-		"anteater", EntityType.Builder.of(com.github.alexthe666.alexsmobs.entity.EntityAnteater::new, MobCategory.CREATURE).sized(1.2F, 0.9F).eyeHeight(0.7F).clientTrackingRange(10)
+	public static final EntityType<EntityAnteater> ANTEATER = register(
+		"anteater", EntityType.Builder.of(EntityAnteater::new, MobCategory.CREATURE).sized(1.2F, 0.9F).eyeHeight(0.7F).clientTrackingRange(10)
 	);
-	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntityMimicube> MIMICUBE = register(
-		"mimicube", EntityType.Builder.of(com.github.alexthe666.alexsmobs.entity.EntityMimicube::new, MobCategory.MONSTER).sized(1.02F, 1.02F).eyeHeight(0.51F).clientTrackingRange(10)
+	public static final EntityType<EntityMimicube> MIMICUBE = register(
+		"mimicube", EntityType.Builder.of(EntityMimicube::new, MobCategory.MONSTER).sized(1.02F, 1.02F).eyeHeight(0.51F).clientTrackingRange(10)
 	);
-	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntitySeagull> SEAGULL = register(
-		"seagull", EntityType.Builder.of(com.github.alexthe666.alexsmobs.entity.EntitySeagull::new, MobCategory.CREATURE).sized(0.5F, 0.6F).eyeHeight(0.5F).clientTrackingRange(10)
+	public static final EntityType<EntitySeagull> SEAGULL = register(
+		"seagull", EntityType.Builder.of(EntitySeagull::new, MobCategory.CREATURE).sized(0.5F, 0.6F).eyeHeight(0.5F).clientTrackingRange(10)
 	);
-	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntitySunbird> SUNBIRD = register(
-		"sunbird", EntityType.Builder.of(com.github.alexthe666.alexsmobs.entity.EntitySunbird::new, MobCategory.CREATURE).sized(0.8F, 1.2F).eyeHeight(1.0F).clientTrackingRange(10)
+	public static final EntityType<EntitySunbird> SUNBIRD = register(
+		"sunbird", EntityType.Builder.of(EntitySunbird::new, MobCategory.CREATURE).sized(0.8F, 1.2F).eyeHeight(1.0F).clientTrackingRange(10)
 	);
-	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntityBaldEagle> BALD_EAGLE = register(
-		"bald_eagle", EntityType.Builder.of(com.github.alexthe666.alexsmobs.entity.EntityBaldEagle::new, MobCategory.CREATURE).sized(0.6F, 0.8F).eyeHeight(0.6F).clientTrackingRange(10)
+	public static final EntityType<EntityBaldEagle> BALD_EAGLE = register(
+		"bald_eagle", EntityType.Builder.of(EntityBaldEagle::new, MobCategory.CREATURE).sized(0.6F, 0.8F).eyeHeight(0.6F).clientTrackingRange(10)
 	);
-	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntityBison> BISON = register(
-		"bison", EntityType.Builder.of(com.github.alexthe666.alexsmobs.entity.EntityBison::new, MobCategory.CREATURE).sized(1.7F, 2.0F).eyeHeight(1.7F).clientTrackingRange(10)
+	public static final EntityType<EntityBison> BISON = register(
+		"bison", EntityType.Builder.of(EntityBison::new, MobCategory.CREATURE).sized(1.7F, 2.0F).eyeHeight(1.7F).clientTrackingRange(10)
 	);
-	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntityCaiman> CAIMAN = register(
-		"caiman", EntityType.Builder.of(com.github.alexthe666.alexsmobs.entity.EntityCaiman::new, MobCategory.CREATURE).sized(1.2F, 0.5F).eyeHeight(0.4F).clientTrackingRange(10)
+	public static final EntityType<EntityCaiman> CAIMAN = register(
+		"caiman", EntityType.Builder.of(EntityCaiman::new, MobCategory.CREATURE).sized(1.2F, 0.5F).eyeHeight(0.4F).clientTrackingRange(10)
 	);
-	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntityCapuchinMonkey> CAPUCHIN_MONKEY = register(
-		"capuchin_monkey", EntityType.Builder.of(com.github.alexthe666.alexsmobs.entity.EntityCapuchinMonkey::new, MobCategory.CREATURE).sized(0.45F, 0.7F).eyeHeight(0.5F).clientTrackingRange(8)
+	public static final EntityType<EntityCapuchinMonkey> CAPUCHIN_MONKEY = register(
+		"capuchin_monkey", EntityType.Builder.of(EntityCapuchinMonkey::new, MobCategory.CREATURE).sized(0.45F, 0.7F).eyeHeight(0.5F).clientTrackingRange(8)
 	);
-	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntityCentipedeHead> CAVE_CENTIPEDE_HEAD = register(
-		"cave_centipede_head", EntityType.Builder.of(com.github.alexthe666.alexsmobs.entity.EntityCentipedeHead::new, MobCategory.MONSTER).sized(0.9F, 0.9F).clientTrackingRange(8)
+	public static final EntityType<EntityCentipedeHead> CAVE_CENTIPEDE_HEAD = register(
+		"cave_centipede_head", EntityType.Builder.of(EntityCentipedeHead::new, MobCategory.MONSTER).sized(0.9F, 0.9F).clientTrackingRange(8)
 	);
-	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntityCentipedeBody> CAVE_CENTIPEDE_BODY = register(
-		"cave_centipede_body", EntityType.Builder.<com.github.alexthe666.alexsmobs.entity.EntityCentipedeBody>of((type, level) -> new com.github.alexthe666.alexsmobs.entity.EntityCentipedeBody(type, level), MobCategory.MISC).sized(0.9F, 0.9F).fireImmune().updateInterval(1).clientTrackingRange(8)
+	public static final EntityType<EntityCentipedeBody> CAVE_CENTIPEDE_BODY = register(
+		"cave_centipede_body", EntityType.Builder.<EntityCentipedeBody>of((type, level) -> new EntityCentipedeBody(type, level), MobCategory.MISC).sized(0.9F, 0.9F).fireImmune().updateInterval(1).clientTrackingRange(8)
 	);
-	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntityCentipedeTail> CAVE_CENTIPEDE_TAIL = register(
-		"cave_centipede_tail", EntityType.Builder.of(com.github.alexthe666.alexsmobs.entity.EntityCentipedeTail::new, MobCategory.MISC).sized(0.9F, 0.9F).fireImmune().updateInterval(1).clientTrackingRange(8)
+	public static final EntityType<EntityCentipedeTail> CAVE_CENTIPEDE_TAIL = register(
+		"cave_centipede_tail", EntityType.Builder.of(EntityCentipedeTail::new, MobCategory.MISC).sized(0.9F, 0.9F).fireImmune().updateInterval(1).clientTrackingRange(8)
 	);
 	public static final EntityType<Sheep> SHEEP = register(
 		"sheep", EntityType.Builder.of(Sheep::new, MobCategory.CREATURE).sized(0.9F, 1.3F).eyeHeight(1.235F).passengerAttachments(1.2375F).clientTrackingRange(10)
 	);
-	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntityShoebill> SHOEBILL = register(
-		"shoebill", EntityType.Builder.of(com.github.alexthe666.alexsmobs.entity.EntityShoebill::new, MobCategory.CREATURE).sized(0.7F, 1.0F).eyeHeight(0.9F).clientTrackingRange(10)
+	public static final EntityType<EntityShoebill> SHOEBILL = register(
+		"shoebill", EntityType.Builder.of(EntityShoebill::new, MobCategory.CREATURE).sized(0.7F, 1.0F).eyeHeight(0.9F).clientTrackingRange(10)
 	);
-	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntitySkunk> SKUNK = register(
-		"skunk", EntityType.Builder.of(com.github.alexthe666.alexsmobs.entity.EntitySkunk::new, MobCategory.CREATURE).sized(0.5F, 0.5F).eyeHeight(0.4F).clientTrackingRange(10)
+	public static final EntityType<EntitySkunk> SKUNK = register(
+		"skunk", EntityType.Builder.of(EntitySkunk::new, MobCategory.CREATURE).sized(0.5F, 0.5F).eyeHeight(0.4F).clientTrackingRange(10)
 	);
-	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntitySpectre> SPECTRE = register(
-		"spectre", EntityType.Builder.of(com.github.alexthe666.alexsmobs.entity.EntitySpectre::new, MobCategory.MONSTER).sized(1.0F, 1.5F).eyeHeight(1.35F).clientTrackingRange(10)
+	public static final EntityType<EntitySpectre> SPECTRE = register(
+		"spectre", EntityType.Builder.of(EntitySpectre::new, MobCategory.MONSTER).sized(1.0F, 1.5F).eyeHeight(1.35F).clientTrackingRange(10)
 	);
-	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntitySugarGlider> SUGAR_GLIDER = register(
+	public static final EntityType<EntitySugarGlider> SUGAR_GLIDER = register(
 		"sugar_glider",
-		EntityType.Builder.of(com.github.alexthe666.alexsmobs.entity.EntitySugarGlider::new, MobCategory.CREATURE).sized(0.6F, 0.5F).eyeHeight(0.3F).clientTrackingRange(8)
+		EntityType.Builder.of(EntitySugarGlider::new, MobCategory.CREATURE).sized(0.6F, 0.5F).eyeHeight(0.3F).clientTrackingRange(8)
 	);
 	public static final EntityType<Shulker> SHULKER = register(
 		"shulker",
@@ -1190,8 +1188,8 @@ public class EntityType<T extends Entity> implements FeatureElement, EntityTypeT
 		"skeleton",
 		EntityType.Builder.of(Skeleton::new, MobCategory.MONSTER).sized(0.6F, 1.99F).eyeHeight(1.74F).ridingOffset(-0.7F).clientTrackingRange(8).notInPeaceful()
 	);
-	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntitySkelewag> SKELEWAG = register(
-		"skelewag", EntityType.Builder.of(com.github.alexthe666.alexsmobs.entity.EntitySkelewag::new, MobCategory.MONSTER).sized(2F, 1.2F).eyeHeight(0.9F).clientTrackingRange(8).notInPeaceful()
+	public static final EntityType<EntitySkelewag> SKELEWAG = register(
+		"skelewag", EntityType.Builder.of(EntitySkelewag::new, MobCategory.MONSTER).sized(2F, 1.2F).eyeHeight(0.9F).clientTrackingRange(8).notInPeaceful()
 	);
 	public static final EntityType<SkeletonHorse> SKELETON_HORSE = register(
 		"skeleton_horse",
@@ -1244,16 +1242,16 @@ public class EntityType<T extends Entity> implements FeatureElement, EntityTypeT
 			.eyeHeight(1.4F)
 			.clientTrackingRange(10)
 	);
-	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntityKomodoDragon> KOMODO_DRAGON = register(
+	public static final EntityType<EntityKomodoDragon> KOMODO_DRAGON = register(
 		"komodo_dragon",
-		EntityType.Builder.of(com.github.alexthe666.alexsmobs.entity.EntityKomodoDragon::new, MobCategory.CREATURE)
+		EntityType.Builder.of(EntityKomodoDragon::new, MobCategory.CREATURE)
 			.sized(1.35F, 0.85F)
 			.eyeHeight(0.6F)
 			.clientTrackingRange(10)
 	);
-	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntityLeafcutterAnt> LEAFCUTTER_ANT = register(
+	public static final EntityType<EntityLeafcutterAnt> LEAFCUTTER_ANT = register(
 		"leafcutter_ant",
-		EntityType.Builder.of(com.github.alexthe666.alexsmobs.entity.EntityLeafcutterAnt::new, MobCategory.CREATURE)
+		EntityType.Builder.of(EntityLeafcutterAnt::new, MobCategory.CREATURE)
 			.sized(0.7F, 0.5F)
 			.eyeHeight(0.3F)
 			.clientTrackingRange(8)
@@ -1278,8 +1276,8 @@ public class EntityType<T extends Entity> implements FeatureElement, EntityTypeT
 	public static final EntityType<SnowGolem> SNOW_GOLEM = register(
 		"snow_golem", EntityType.Builder.of(SnowGolem::new, MobCategory.MISC).immuneTo(Blocks.POWDER_SNOW).sized(0.7F, 1.9F).eyeHeight(1.7F).clientTrackingRange(8)
 	);
-	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntitySnowLeopard> SNOW_LEOPARD = register(
-		"snow_leopard", EntityType.Builder.of(com.github.alexthe666.alexsmobs.entity.EntitySnowLeopard::new, MobCategory.CREATURE).sized(0.9F, 0.9F).eyeHeight(0.7F).clientTrackingRange(10)
+	public static final EntityType<EntitySnowLeopard> SNOW_LEOPARD = register(
+		"snow_leopard", EntityType.Builder.of(EntitySnowLeopard::new, MobCategory.CREATURE).sized(0.9F, 0.9F).eyeHeight(0.7F).clientTrackingRange(10)
 	);
 	public static final EntityType<MinecartSpawner> SPAWNER_MINECART = register(
 		"spawner_minecart",
@@ -1334,16 +1332,16 @@ public class EntityType<T extends Entity> implements FeatureElement, EntityTypeT
 	public static final EntityType<Tadpole> TADPOLE = register(
 		"tadpole", EntityType.Builder.of(Tadpole::new, MobCategory.CREATURE).sized(0.4F, 0.3F).eyeHeight(0.19500001F).clientTrackingRange(10)
 	);
-	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntityTarantulaHawk> TARANTULA_HAWK = register(
+	public static final EntityType<EntityTarantulaHawk> TARANTULA_HAWK = register(
 		"tarantula_hawk",
-		EntityType.Builder.of(com.github.alexthe666.alexsmobs.entity.EntityTarantulaHawk::new, MobCategory.CREATURE)
+		EntityType.Builder.of(EntityTarantulaHawk::new, MobCategory.CREATURE)
 			.sized(1.2F, 0.9F)
 			.eyeHeight(0.7F)
 			.clientTrackingRange(10)
 	);
-	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntityTasmanianDevil> TASMANIAN_DEVIL = register(
+	public static final EntityType<EntityTasmanianDevil> TASMANIAN_DEVIL = register(
 		"tasmanian_devil",
-		EntityType.Builder.of(com.github.alexthe666.alexsmobs.entity.EntityTasmanianDevil::new, MobCategory.CREATURE)
+		EntityType.Builder.of(EntityTasmanianDevil::new, MobCategory.CREATURE)
 			.sized(0.7F, 0.6F)
 			.eyeHeight(0.4F)
 			.clientTrackingRange(8)
@@ -1355,16 +1353,16 @@ public class EntityType<T extends Entity> implements FeatureElement, EntityTypeT
 			.eyeHeight(1.0F)
 			.clientTrackingRange(10)
 	);
-	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntityUnderminer> UNDERMINER = register(
+	public static final EntityType<EntityUnderminer> UNDERMINER = register(
 		"underminer",
-		EntityType.Builder.of(com.github.alexthe666.alexsmobs.entity.EntityUnderminer::new, MobCategory.MONSTER)
+		EntityType.Builder.of(EntityUnderminer::new, MobCategory.MONSTER)
 			.sized(0.6F, 1.2F)
 			.eyeHeight(1.0F)
 			.clientTrackingRange(8)
 	);
-	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntityWarpedToad> WARPED_TOAD = register(
+	public static final EntityType<EntityWarpedToad> WARPED_TOAD = register(
 		"warped_toad",
-		EntityType.Builder.of(com.github.alexthe666.alexsmobs.entity.EntityWarpedToad::new, MobCategory.CREATURE)
+		EntityType.Builder.of(EntityWarpedToad::new, MobCategory.CREATURE)
 			.sized(1.0F, 0.8F)
 			.eyeHeight(0.6F)
 			.clientTrackingRange(10)
@@ -1403,9 +1401,9 @@ public class EntityType<T extends Entity> implements FeatureElement, EntityTypeT
 			.clientTrackingRange(4)
 			.updateInterval(20)
 	);
-	public static final EntityType<com.github.alexmodguy.alexscaves.server.entity.living.TremorsaurusEntity> TREMORSAURUS = register(
+	public static final EntityType<TremorsaurusEntity> TREMORSAURUS = register(
 		"tremorsaurus",
-		EntityType.Builder.of(com.github.alexmodguy.alexscaves.server.entity.living.TremorsaurusEntity::new, MobCategory.CREATURE)
+		EntityType.Builder.of(TremorsaurusEntity::new, MobCategory.CREATURE)
 			.sized(3.5F, 4.5F)
 			.eyeHeight(4.0F)
 			.clientTrackingRange(10)
@@ -1417,9 +1415,9 @@ public class EntityType<T extends Entity> implements FeatureElement, EntityTypeT
 			.eyeHeight(0.2F)
 			.clientTrackingRange(8)
 	);
-	public static final EntityType<com.github.alexthe666.alexsmobs.entity.EntityToucan> TOUCAN = register(
+	public static final EntityType<EntityToucan> TOUCAN = register(
 		"toucan",
-		EntityType.Builder.of(com.github.alexthe666.alexsmobs.entity.EntityToucan::new, MobCategory.CREATURE)
+		EntityType.Builder.of(EntityToucan::new, MobCategory.CREATURE)
 			.sized(0.5F, 0.6F)
 			.eyeHeight(0.5F)
 			.clientTrackingRange(8)

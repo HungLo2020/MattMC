@@ -1,21 +1,23 @@
 package net.minecraft.client.renderer;
 
-import com.mojang.blaze3d.pipeline.BlendFunction;
-import com.mojang.blaze3d.pipeline.RenderPipeline;
-import com.mojang.blaze3d.platform.DepthTestFunction;
-import com.mojang.blaze3d.platform.DestFactor;
-import com.mojang.blaze3d.platform.PolygonMode;
-import com.mojang.blaze3d.platform.SourceFactor;
-import com.mojang.blaze3d.shaders.UniformType;
-import com.mojang.blaze3d.textures.TextureFormat;
-import com.mojang.blaze3d.vertex.DefaultVertexFormat;
-import com.mojang.blaze3d.vertex.VertexFormat;
+import net.blaze3d.pipeline.BlendFunction;
+import net.blaze3d.pipeline.RenderPipeline;
+import net.blaze3d.platform.DepthTestFunction;
+import net.blaze3d.platform.DestFactor;
+import net.blaze3d.platform.PolygonMode;
+import net.blaze3d.platform.SourceFactor;
+import net.blaze3d.shaders.UniformType;
+import net.blaze3d.textures.TextureFormat;
+import net.blaze3d.vertex.DefaultVertexFormat;
+import net.blaze3d.vertex.VertexFormat;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.resources.ResourceLocation;
+import net.voxelmap.VoxelConstants;
+import net.voxelmap.fabric.FabricModApiBridge;
 
 @Environment(EnvType.CLIENT)
 public class RenderPipelines {
@@ -24,7 +26,7 @@ public class RenderPipelines {
 	// VoxelMap: Initialize ModApiBridge when RenderPipelines is loaded
 	static {
 		try {
-			com.mamiyaotaru.voxelmap.VoxelConstants.setModApiBride(new com.mamiyaotaru.voxelmap.fabric.FabricModApiBridge());
+			VoxelConstants.setModApiBride(new FabricModApiBridge());
 		} catch (Exception e) {
 			// Silently catch to avoid crashes
 		}

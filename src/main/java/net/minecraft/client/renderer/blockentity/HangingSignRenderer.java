@@ -1,8 +1,8 @@
 package net.minecraft.client.renderer.blockentity;
 
 import com.google.common.collect.ImmutableMap;
-import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.math.Axis;
+import net.blaze3d.vertex.PoseStack;
+import net.math.Axis;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.stream.Stream;

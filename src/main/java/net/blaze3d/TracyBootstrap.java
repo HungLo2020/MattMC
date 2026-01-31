@@ -1,0 +1,31 @@
+package net.blaze3d;
+
+import com.mojang.jtracy.TracyClient;
+import net.logging.LogListeners;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
+import org.slf4j.event.Level;
+
+@Environment(EnvType.CLIENT)
+public class TracyBootstrap {
+	private static boolean setup;
+
+	public static void setup() {
+		if (!setup) {
+			TracyClient.load();
+			if (TracyClient.isAvailable()) {
+				LogListeners.addListener("Tracy", (string, level) -> TracyClient.message(string, messageColor(level)));
+				setup = true;
+			}
+		}
+	}
+
+	private static int messageColor(Level level) {
+		return switch (level) {
+			case DEBUG -> 11184810;
+			case WARN -> 16777130;
+			case ERROR -> 16755370;
+			default -> 16777215;
+		};
+	}
+}

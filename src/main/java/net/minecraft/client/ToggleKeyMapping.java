@@ -1,6 +1,6 @@
 package net.minecraft.client;
 
-import com.mojang.blaze3d.platform.InputConstants;
+import net.blaze3d.platform.InputConstants;
 import java.util.function.BooleanSupplier;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;

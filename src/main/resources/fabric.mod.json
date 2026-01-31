@@ -20,14 +20,14 @@
   ],
   "entrypoints": {
     "client": [
-      "net.caffeinemc.mods.sodium.fabric.SodiumFabricMod",
+      "net.sodium.fabric.SodiumFabricMod",
       "com.seibel.distanthorizons.fabric.FabricMain"
     ],
     "server": [
       "com.seibel.distanthorizons.fabric.FabricMain"
     ],
     "preLaunch": [
-      "net.caffeinemc.mods.sodium.fabric.SodiumPreLaunch"
+      "net.sodium.fabric.SodiumPreLaunch"
     ]
   },
   "provides": [

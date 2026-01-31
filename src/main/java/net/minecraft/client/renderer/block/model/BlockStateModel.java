@@ -20,8 +20,8 @@ import net.minecraft.util.random.Weighted;
 import net.minecraft.util.random.WeightedList;
 import net.minecraft.world.level.block.state.BlockState;
 // Sodium FRAPI imports
-import net.caffeinemc.mods.sodium.client.render.frapi.render.AbstractBlockRenderContext;
-import net.caffeinemc.mods.sodium.client.services.PlatformModelAccess;
+import net.sodium.client.render.frapi.render.AbstractBlockRenderContext;
+import net.sodium.client.services.PlatformModelAccess;
 import net.fabricmc.fabric.api.renderer.v1.mesh.QuadEmitter;
 import net.fabricmc.fabric.api.renderer.v1.model.FabricBlockModelPart;
 import net.fabricmc.fabric.api.renderer.v1.model.FabricBlockStateModel;

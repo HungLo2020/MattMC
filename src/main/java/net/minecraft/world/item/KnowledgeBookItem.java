@@ -1,6 +1,6 @@
 package net.minecraft.world.item;
 
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;

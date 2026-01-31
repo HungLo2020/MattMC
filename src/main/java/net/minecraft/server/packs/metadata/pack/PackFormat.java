@@ -1,7 +1,7 @@
 package net.minecraft.server.packs.metadata.pack;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.DataResult;
 import com.mojang.serialization.MapCodec;

@@ -1,6 +1,6 @@
 package net.minecraft.client.multiplayer.resolver;
 
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;

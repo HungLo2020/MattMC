@@ -1,6 +1,6 @@
 package net.irisshaders.iris.apiimpl;
 
-import com.mojang.blaze3d.pipeline.RenderPipeline;
+import net.blaze3d.pipeline.RenderPipeline;
 import net.irisshaders.iris.Iris;
 import net.iris.api.v0.IrisApi;
 import net.iris.api.v0.IrisApiConfig;

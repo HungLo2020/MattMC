@@ -1,6 +1,6 @@
 package net.minecraft.server.level;
 
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import java.util.List;
 import java.util.Objects;
 import net.minecraft.SharedConstants;

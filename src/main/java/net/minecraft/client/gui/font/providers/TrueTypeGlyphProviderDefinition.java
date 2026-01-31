@@ -1,8 +1,8 @@
 package net.minecraft.client.gui.font.providers;
 
-import com.mojang.blaze3d.font.GlyphProvider;
-import com.mojang.blaze3d.font.TrueTypeGlyphProvider;
-import com.mojang.blaze3d.platform.TextureUtil;
+import net.blaze3d.font.GlyphProvider;
+import net.blaze3d.font.TrueTypeGlyphProvider;
+import net.blaze3d.platform.TextureUtil;
 import com.mojang.datafixers.util.Either;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.MapCodec;

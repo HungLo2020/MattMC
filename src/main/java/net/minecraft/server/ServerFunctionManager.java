@@ -2,7 +2,7 @@ package net.minecraft.server;
 
 import com.google.common.collect.ImmutableList;
 import com.mojang.brigadier.CommandDispatcher;
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;

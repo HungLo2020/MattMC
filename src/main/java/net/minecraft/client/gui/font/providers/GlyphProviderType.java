@@ -1,6 +1,6 @@
 package net.minecraft.client.gui.font.providers;
 
-import com.mojang.blaze3d.font.SpaceProvider;
+import net.blaze3d.font.SpaceProvider;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.MapCodec;
 import net.minecraft.api.EnvType;

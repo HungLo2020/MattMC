@@ -2,11 +2,8 @@ package net.minecraft.server.network;
 
 import com.google.common.primitives.Ints;
 import net.minecraft.server.profile.PlayerProfile;
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import java.math.BigInteger;
-import java.net.InetAddress;
-import java.net.InetSocketAddress;
-import java.net.SocketAddress;
 import java.security.PrivateKey;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;

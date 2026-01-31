@@ -1,7 +1,7 @@
 package net.minecraft.server.dedicated;
 
 import com.google.common.collect.Streams;
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import java.lang.management.ManagementFactory;
 import java.lang.management.ThreadInfo;
 import java.lang.management.ThreadMXBean;

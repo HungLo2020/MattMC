@@ -2,7 +2,7 @@ package net.minecraft.client.resources.language;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;

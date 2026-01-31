@@ -2,7 +2,7 @@ package net.minecraft.client.gui;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Ordering;
-import com.mojang.blaze3d.platform.Window;
+import net.blaze3d.platform.Window;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.Map;
@@ -79,6 +79,7 @@ import net.minecraft.world.scores.Objective;
 import net.minecraft.world.scores.PlayerScoreEntry;
 import net.minecraft.world.scores.PlayerTeam;
 import net.minecraft.world.scores.Scoreboard;
+import net.voxelmap.VoxelConstants;
 import org.apache.commons.lang3.tuple.Pair;
 import org.jetbrains.annotations.Nullable;
 
@@ -729,7 +730,7 @@ public class Gui {
 		int o = guiGraphics.guiHeight() / 2 + n / 3;
 		
 		// VoxelMap: Move scoreboard to make room for minimap
-		o = com.mamiyaotaru.voxelmap.VoxelConstants.moveScoreboard(o, n);
+		o = VoxelConstants.moveScoreboard(o, n);
 		
 		int p = 3;
 		int q = guiGraphics.guiWidth() - j - 3;

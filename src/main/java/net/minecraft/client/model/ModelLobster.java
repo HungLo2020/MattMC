@@ -2,9 +2,9 @@ package net.minecraft.client.model;
 
 import net.minecraft.client.renderer.entity.state.LobsterRenderState;
 import net.minecraft.world.entity.util.Maths;
-import com.github.alexthe666.citadel.client.model.AdvancedEntityModel;
-import com.github.alexthe666.citadel.client.model.AdvancedModelBox;
-import com.github.alexthe666.citadel.client.model.basic.BasicModelPart;
+import net.citadel.client.model.AdvancedEntityModel;
+import net.citadel.client.model.AdvancedModelBox;
+import net.citadel.client.model.basic.BasicModelPart;
 import com.google.common.collect.ImmutableList;
 
 public class ModelLobster extends AdvancedEntityModel<LobsterRenderState> {

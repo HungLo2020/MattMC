@@ -1,6 +1,6 @@
 package net.minecraft.server.rcon.thread;
 
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import java.io.BufferedInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;

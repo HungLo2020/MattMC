@@ -1,6 +1,6 @@
 package net.minecraft.client.main;
 
-import com.mojang.blaze3d.platform.DisplayData;
+import net.blaze3d.platform.DisplayData;
 import java.io.File;
 import java.net.Proxy;
 import java.nio.file.Path;

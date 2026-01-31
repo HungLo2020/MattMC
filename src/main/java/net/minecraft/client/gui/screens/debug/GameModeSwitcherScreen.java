@@ -1,7 +1,7 @@
 package net.minecraft.client.gui.screens.debug;
 
 import com.google.common.collect.Lists;
-import com.mojang.blaze3d.platform.InputConstants;
+import net.blaze3d.platform.InputConstants;
 import java.util.List;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;

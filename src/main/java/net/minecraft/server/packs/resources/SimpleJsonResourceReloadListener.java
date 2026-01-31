@@ -2,7 +2,7 @@ package net.minecraft.server.packs.resources;
 
 import com.google.gson.JsonElement;
 import com.google.gson.JsonParseException;
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.DynamicOps;
 import com.mojang.serialization.JsonOps;

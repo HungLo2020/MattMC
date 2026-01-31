@@ -1,6 +1,6 @@
 package net.irisshaders.iris.pbr.util;
 
-import com.mojang.blaze3d.platform.NativeImage;
+import net.blaze3d.platform.NativeImage;
 import net.sodium.api.util.ColorABGR;
 
 public class ImageManipulationUtil {

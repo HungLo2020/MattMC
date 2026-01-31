@@ -1,5 +1,9 @@
 package net.minecraft.world.effect;
 
+import net.alexsmobs.effect.EffectDebilitatingSting;
+import net.alexsmobs.effect.EffectOrcaMight;
+import net.alexsmobs.effect.EffectSunbird;
+import net.alexsmobs.effect.EffectTigersBlessing;
 import net.minecraft.core.Holder;
 import net.minecraft.core.Registry;
 import net.minecraft.core.particles.ParticleTypes;
@@ -123,19 +127,19 @@ public class MobEffects {
 	
 	// AlexsMobs custom effects
 	public static final Holder<MobEffect> ORCAS_MIGHT = register(
-		"orcas_might", new com.github.alexthe666.alexsmobs.effect.EffectOrcaMight()
+		"orcas_might", new EffectOrcaMight()
 	);
 	public static final Holder<MobEffect> DEBILITATING_STING = register(
-		"debilitating_sting", new com.github.alexthe666.alexsmobs.effect.EffectDebilitatingSting()
+		"debilitating_sting", new EffectDebilitatingSting()
 	);
 	public static final Holder<MobEffect> TIGERS_BLESSING = register(
-		"tigers_blessing", new com.github.alexthe666.alexsmobs.effect.EffectTigersBlessing()
+		"tigers_blessing", new EffectTigersBlessing()
 	);
 	public static final Holder<MobEffect> SUNBIRD_BLESSING = register(
-		"sunbird_blessing", new com.github.alexthe666.alexsmobs.effect.EffectSunbird(false)
+		"sunbird_blessing", new EffectSunbird(false)
 	);
 	public static final Holder<MobEffect> SUNBIRD_CURSE = register(
-		"sunbird_curse", new com.github.alexthe666.alexsmobs.effect.EffectSunbird(true)
+		"sunbird_curse", new EffectSunbird(true)
 	);
 
 	private static Holder<MobEffect> register(String string, MobEffect mobEffect) {

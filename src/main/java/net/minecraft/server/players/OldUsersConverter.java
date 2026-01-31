@@ -6,7 +6,7 @@ import com.google.common.io.Files;
 import net.minecraft.server.profile.PlayerProfile;
 import net.minecraft.server.profile.ProfileLookupCallback;
 import net.minecraft.server.profile.ProfileNotFoundException;
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;

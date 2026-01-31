@@ -1,12 +1,12 @@
 package net.minecraft.client.renderer.fog;
 
 import com.google.common.collect.Lists;
-import com.mojang.blaze3d.buffers.GpuBuffer;
-import com.mojang.blaze3d.buffers.GpuBufferSlice;
-import com.mojang.blaze3d.buffers.Std140Builder;
-import com.mojang.blaze3d.buffers.Std140SizeCalculator;
-import com.mojang.blaze3d.systems.GpuDevice;
-import com.mojang.blaze3d.systems.RenderSystem;
+import net.blaze3d.buffers.GpuBuffer;
+import net.blaze3d.buffers.GpuBufferSlice;
+import net.blaze3d.buffers.Std140Builder;
+import net.blaze3d.buffers.Std140SizeCalculator;
+import net.blaze3d.systems.GpuDevice;
+import net.blaze3d.systems.RenderSystem;
 import java.nio.ByteBuffer;
 import java.util.List;
 import net.minecraft.api.EnvType;
@@ -31,11 +31,13 @@ import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.level.material.FogType;
+import net.sodium.client.util.FogParameters;
+import net.sodium.client.util.FogStorage;
 import org.joml.Vector4f;
 import org.lwjgl.system.MemoryStack;
 
 @Environment(EnvType.CLIENT)
-public class FogRenderer implements AutoCloseable, net.caffeinemc.mods.sodium.client.util.FogStorage {
+public class FogRenderer implements AutoCloseable, FogStorage {
 	public static final int FOG_UBO_SIZE = new Std140SizeCalculator().putVec4().putFloat().putFloat().putFloat().putFloat().putFloat().putFloat().get();
 	private static final List<FogEnvironment> FOG_ENVIRONMENTS = Lists.<FogEnvironment>newArrayList(
 		new LavaFogEnvironment(),
@@ -50,7 +52,7 @@ public class FogRenderer implements AutoCloseable, net.caffeinemc.mods.sodium.cl
 	private final GpuBuffer emptyBuffer;
 	private final MappableRingBuffer regularBuffer;
 	// Sodium: FogStorage interface implementation (from FogRendererMixin)
-	private net.caffeinemc.mods.sodium.client.util.FogParameters parameters = net.caffeinemc.mods.sodium.client.util.FogParameters.NONE;
+	private FogParameters parameters = FogParameters.NONE;
 
 	public FogRenderer() {
 		GpuDevice gpuDevice = RenderSystem.getDevice();
@@ -231,7 +233,7 @@ public class FogRenderer implements AutoCloseable, net.caffeinemc.mods.sodium.cl
 				fogData.cloudEnd
 			);
 			// Sodium: Store fog parameters (from FogRendererMixin)
-			parameters = new net.caffeinemc.mods.sodium.client.util.FogParameters(vector4f.x, vector4f.y, vector4f.z, vector4f.w, fogData.environmentalStart, fogData.environmentalEnd, fogData.renderDistanceStart, fogData.renderDistanceEnd);
+			parameters = new FogParameters(vector4f.x, vector4f.y, vector4f.z, vector4f.w, fogData.environmentalStart, fogData.environmentalEnd, fogData.renderDistanceStart, fogData.renderDistanceEnd);
 		}
 		
 		// Iris: Capture fog color
@@ -273,7 +275,7 @@ public class FogRenderer implements AutoCloseable, net.caffeinemc.mods.sodium.cl
 	
 	// Sodium: FogStorage interface method (from FogRendererMixin)
 	@Override
-	public net.caffeinemc.mods.sodium.client.util.FogParameters sodium$getFogParameters() {
+	public FogParameters sodium$getFogParameters() {
 		return parameters;
 	}
 

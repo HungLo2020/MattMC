@@ -1,7 +1,10 @@
 package net.minecraft.world.level.block.entity;
 
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import java.util.Set;
+
+import net.alexsmobs.tileentity.TileEntityLeafcutterAnthill;
+import net.alexsmobs.tileentity.TileEntityTerrapinEgg;
 import net.minecraft.Util;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
@@ -214,7 +217,7 @@ public class BlockEntityType<T extends BlockEntity> {
 	public static final BlockEntityType<SmokerBlockEntity> SMOKER = register("smoker", SmokerBlockEntity::new, Blocks.SMOKER);
 	public static final BlockEntityType<BlastFurnaceBlockEntity> BLAST_FURNACE = register("blast_furnace", BlastFurnaceBlockEntity::new, Blocks.BLAST_FURNACE);
 	public static final BlockEntityType<LecternBlockEntity> LECTERN = register("lectern", LecternBlockEntity::new, Blocks.LECTERN);
-	public static final BlockEntityType<com.github.alexthe666.alexsmobs.tileentity.TileEntityLeafcutterAnthill> LEAFCUTTER_ANTHILL = register("leafcutter_anthill", com.github.alexthe666.alexsmobs.tileentity.TileEntityLeafcutterAnthill::new, Blocks.LEAFCUTTER_ANTHILL);
+	public static final BlockEntityType<TileEntityLeafcutterAnthill> LEAFCUTTER_ANTHILL = register("leafcutter_anthill", TileEntityLeafcutterAnthill::new, Blocks.LEAFCUTTER_ANTHILL);
 	public static final BlockEntityType<BellBlockEntity> BELL = register("bell", BellBlockEntity::new, Blocks.BELL);
 	public static final BlockEntityType<JigsawBlockEntity> JIGSAW = register("jigsaw", JigsawBlockEntity::new, Blocks.JIGSAW);
 	public static final BlockEntityType<CampfireBlockEntity> CAMPFIRE = register("campfire", CampfireBlockEntity::new, Blocks.CAMPFIRE, Blocks.SOUL_CAMPFIRE);
@@ -267,9 +270,9 @@ public class BlockEntityType<T extends BlockEntity> {
 		Blocks.WAXED_WEATHERED_COPPER_GOLEM_STATUE,
 		Blocks.WAXED_OXIDIZED_COPPER_GOLEM_STATUE
 	);
-	public static final BlockEntityType<com.github.alexthe666.alexsmobs.tileentity.TileEntityTerrapinEgg> TERRAPIN_EGG = register(
+	public static final BlockEntityType<TileEntityTerrapinEgg> TERRAPIN_EGG = register(
 		"terrapin_egg",
-		com.github.alexthe666.alexsmobs.tileentity.TileEntityTerrapinEgg::new,
+		TileEntityTerrapinEgg::new,
 		Blocks.TERRAPIN_EGG
 	);
 	private static final Set<BlockEntityType<?>> OP_ONLY_CUSTOM_DATA = Set.of(COMMAND_BLOCK, LECTERN, SIGN, HANGING_SIGN, MOB_SPAWNER, TRIAL_SPAWNER);

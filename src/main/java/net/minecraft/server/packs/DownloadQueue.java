@@ -3,7 +3,7 @@ package net.minecraft.server.packs;
 import com.google.common.hash.HashCode;
 import com.google.common.hash.HashFunction;
 import com.mojang.datafixers.util.Either;
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import java.io.IOException;

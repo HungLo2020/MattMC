@@ -1,10 +1,10 @@
 package net.minecraft.client.renderer.entity;
 
-import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.blaze3d.vertex.SheetedDecalTextureGenerator;
-import com.mojang.blaze3d.vertex.VertexConsumer;
-import com.mojang.blaze3d.vertex.VertexMultiConsumer;
-import com.mojang.math.MatrixUtil;
+import net.blaze3d.vertex.PoseStack;
+import net.blaze3d.vertex.SheetedDecalTextureGenerator;
+import net.blaze3d.vertex.VertexConsumer;
+import net.blaze3d.vertex.VertexMultiConsumer;
+import net.math.MatrixUtil;
 import java.util.List;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
@@ -17,6 +17,9 @@ import net.minecraft.client.renderer.item.ItemStackRenderState;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.ARGB;
 import net.minecraft.world.item.ItemDisplayContext;
+import net.sodium.client.model.quad.BakedQuadView;
+import net.sodium.client.render.immediate.model.BakedModelEncoder;
+import net.sodium.client.render.vertex.VertexConsumerUtils;
 
 @Environment(EnvType.CLIENT)
 public class ItemRenderer {
@@ -96,7 +99,7 @@ public class ItemRenderer {
 
 	private static void renderQuadList(PoseStack poseStack, VertexConsumer vertexConsumer, List<BakedQuad> list, int[] is, int i, int j) {
 		// Sodium: Use fast rendering path if available (merged from ItemRendererMixin)
-		var writer = net.caffeinemc.mods.sodium.client.render.vertex.VertexConsumerUtils.convertOrLog(vertexConsumer);
+		var writer = VertexConsumerUtils.convertOrLog(vertexConsumer);
 
 		if (writer != null && !list.isEmpty()) {
 			sodium$renderBakedItemQuads(poseStack.last(), writer, list, is, i, j);
@@ -138,7 +141,7 @@ public class ItemRenderer {
 				continue; // ignore bad quads
 			}
 
-			net.caffeinemc.mods.sodium.client.model.quad.BakedQuadView quad = (net.caffeinemc.mods.sodium.client.model.quad.BakedQuadView) (Object) bakedQuad;
+			BakedQuadView quad = (BakedQuadView) (Object) bakedQuad;
 
 			int color = 0xFFFFFFFF;
 
@@ -146,7 +149,7 @@ public class ItemRenderer {
 				color = net.sodium.api.util.ColorARGB.toABGR(getLayerColorSafe(colors, bakedQuad.tintIndex()));
 			}
 
-			net.caffeinemc.mods.sodium.client.render.immediate.model.BakedModelEncoder.writeQuadVertices(writer, matrices, quad, color, light, overlay, net.caffeinemc.mods.sodium.client.render.immediate.model.BakedModelEncoder.shouldMultiplyAlpha());
+			BakedModelEncoder.writeQuadVertices(writer, matrices, quad, color, light, overlay, BakedModelEncoder.shouldMultiplyAlpha());
 
 			if (quad.getSprite() != null) {
 				net.sodium.api.texture.SpriteUtil.INSTANCE.markSpriteActive(quad.getSprite());

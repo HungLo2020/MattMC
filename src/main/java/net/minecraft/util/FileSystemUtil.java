@@ -1,6 +1,6 @@
 package net.minecraft.util;
 
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.file.FileSystemAlreadyExistsException;

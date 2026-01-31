@@ -10,7 +10,7 @@ import net.minecraft.network.protocol.common.custom.BrandPayload;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.network.protocol.common.custom.DiscardedPayload;
 // VoxelMap: Import VoxelMap packet types
-import com.mamiyaotaru.voxelmap.packets.WorldIdC2S;
+import net.voxelmap.packets.WorldIdC2S;
 // Distant Horizons: Import Distant Horizons packet type
 import com.seibel.distanthorizons.common.CommonPacketPayload;
 

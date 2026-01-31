@@ -1,10 +1,8 @@
 package net.irisshaders.iris.targets;
 
-import com.mojang.blaze3d.opengl.GlStateManager;
-import com.mojang.blaze3d.systems.RenderSystem;
+import net.blaze3d.opengl.GlStateManager;
 import net.irisshaders.iris.gl.IrisRenderSystem;
 import net.irisshaders.iris.gl.framebuffer.GlFramebuffer;
-import net.minecraft.client.Minecraft;
 import org.joml.Vector4f;
 
 import java.util.Objects;

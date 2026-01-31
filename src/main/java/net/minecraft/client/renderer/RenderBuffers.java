@@ -1,6 +1,6 @@
 package net.minecraft.client.renderer;
 
-import com.mojang.blaze3d.vertex.ByteBufferBuilder;
+import net.blaze3d.vertex.ByteBufferBuilder;
 import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
 import java.util.SequencedMap;
 import net.minecraft.api.EnvType;

@@ -1,6 +1,6 @@
 package net.minecraft.client.renderer.texture;
 
-import com.mojang.blaze3d.platform.NativeImage;
+import net.blaze3d.platform.NativeImage;
 import java.io.Closeable;
 import java.io.IOException;
 import java.io.InputStream;

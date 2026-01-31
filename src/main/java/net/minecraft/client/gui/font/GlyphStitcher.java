@@ -1,7 +1,7 @@
 package net.minecraft.client.gui.font;
 
-import com.mojang.blaze3d.font.GlyphBitmap;
-import com.mojang.blaze3d.font.GlyphInfo;
+import net.blaze3d.font.GlyphBitmap;
+import net.blaze3d.font.GlyphInfo;
 import java.util.ArrayList;
 import java.util.List;
 import net.minecraft.api.EnvType;

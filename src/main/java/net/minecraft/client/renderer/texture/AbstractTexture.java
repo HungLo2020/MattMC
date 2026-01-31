@@ -1,9 +1,9 @@
 package net.minecraft.client.renderer.texture;
 
-import com.mojang.blaze3d.textures.AddressMode;
-import com.mojang.blaze3d.textures.FilterMode;
-import com.mojang.blaze3d.textures.GpuTexture;
-import com.mojang.blaze3d.textures.GpuTextureView;
+import net.blaze3d.textures.AddressMode;
+import net.blaze3d.textures.FilterMode;
+import net.blaze3d.textures.GpuTexture;
+import net.blaze3d.textures.GpuTextureView;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import org.jetbrains.annotations.Nullable;

@@ -1,6 +1,6 @@
 package net.minecraft.client.resources.model;
 
-import com.mojang.math.Quadrant;
+import net.math.Quadrant;
 import java.util.List;
 import java.util.Map;
 import net.minecraft.api.EnvType;

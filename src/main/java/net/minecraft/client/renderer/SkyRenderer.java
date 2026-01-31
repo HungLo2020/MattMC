@@ -1,19 +1,19 @@
 package net.minecraft.client.renderer;
 
-import com.mojang.blaze3d.buffers.GpuBuffer;
-import com.mojang.blaze3d.buffers.GpuBufferSlice;
-import com.mojang.blaze3d.pipeline.RenderPipeline;
-import com.mojang.blaze3d.systems.RenderPass;
-import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.textures.GpuTextureView;
-import com.mojang.blaze3d.vertex.BufferBuilder;
-import com.mojang.blaze3d.vertex.ByteBufferBuilder;
-import com.mojang.blaze3d.vertex.DefaultVertexFormat;
-import com.mojang.blaze3d.vertex.MeshData;
-import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.blaze3d.vertex.VertexConsumer;
-import com.mojang.blaze3d.vertex.VertexFormat;
-import com.mojang.math.Axis;
+import net.blaze3d.buffers.GpuBuffer;
+import net.blaze3d.buffers.GpuBufferSlice;
+import net.blaze3d.pipeline.RenderPipeline;
+import net.blaze3d.systems.RenderPass;
+import net.blaze3d.systems.RenderSystem;
+import net.blaze3d.textures.GpuTextureView;
+import net.blaze3d.vertex.BufferBuilder;
+import net.blaze3d.vertex.ByteBufferBuilder;
+import net.blaze3d.vertex.DefaultVertexFormat;
+import net.blaze3d.vertex.MeshData;
+import net.blaze3d.vertex.PoseStack;
+import net.blaze3d.vertex.VertexConsumer;
+import net.blaze3d.vertex.VertexFormat;
+import net.math.Axis;
 import java.util.OptionalDouble;
 import java.util.OptionalInt;
 import net.minecraft.api.EnvType;
@@ -363,7 +363,7 @@ public class SkyRenderer implements AutoCloseable {
 		poseStack.mulPose(Axis.YP.rotationDegrees(-90.0F));
 		poseStack.mulPose(Axis.XP.rotationDegrees(f * 360.0F));
 		// Iris: Apply sun path rotation (from MixinSkyRenderer)
-		poseStack.mulPose(com.mojang.math.Axis.ZP.rotationDegrees(iris$getSunPathRotation()));
+		poseStack.mulPose(Axis.ZP.rotationDegrees(iris$getSunPathRotation()));
 		this.renderSun(g, poseStack);
 		this.renderMoon(i, g, poseStack);
 		if (h > 0.0F) {

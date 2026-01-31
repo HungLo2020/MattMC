@@ -1,6 +1,6 @@
 package net.irisshaders.iris;
 
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

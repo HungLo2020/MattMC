@@ -7,7 +7,7 @@ import com.google.common.hash.HashCode;
 import com.google.common.net.InetAddresses;
 import net.minecraft.server.profile.PlayerProfile;
 import com.mojang.datafixers.util.Either;
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.DynamicOps;
 import com.mojang.serialization.MapCodec;

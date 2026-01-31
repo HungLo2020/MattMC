@@ -1,7 +1,7 @@
 package net.minecraft.client.renderer;
 
 import com.google.common.collect.Queues;
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Queue;

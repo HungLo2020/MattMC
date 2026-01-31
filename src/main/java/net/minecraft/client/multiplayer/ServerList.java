@@ -1,7 +1,7 @@
 package net.minecraft.client.multiplayer;
 
 import com.google.common.collect.Lists;
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;

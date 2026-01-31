@@ -1,7 +1,6 @@
 package com.github.alexthe666.alexsmobs.client.render.item;
 
 import com.github.alexthe666.alexsmobs.AlexsMobs;
-import com.github.alexthe666.alexsmobs.client.model.layered.*;
 import com.github.alexthe666.alexsmobs.item.AMItemRegistry;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.model.HumanoidModel;

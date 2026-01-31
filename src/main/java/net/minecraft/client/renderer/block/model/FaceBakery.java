@@ -1,9 +1,9 @@
 package net.minecraft.client.renderer.block.model;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.mojang.math.MatrixUtil;
-import com.mojang.math.Quadrant;
-import com.mojang.math.Transformation;
+import net.math.MatrixUtil;
+import net.math.Quadrant;
+import net.math.Transformation;
 import java.util.function.Consumer;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;

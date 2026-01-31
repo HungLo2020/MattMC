@@ -1,6 +1,6 @@
 package net.minecraft.network.chat;
 
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import java.time.Instant;
 import java.util.UUID;
 import java.util.function.BooleanSupplier;

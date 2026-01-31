@@ -1,14 +1,14 @@
 package net.minecraft.client.renderer.state;
 
-import com.mojang.blaze3d.buffers.GpuBufferSlice;
-import com.mojang.blaze3d.systems.RenderPass;
-import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.vertex.BufferBuilder;
-import com.mojang.blaze3d.vertex.ByteBufferBuilder;
-import com.mojang.blaze3d.vertex.DefaultVertexFormat;
-import com.mojang.blaze3d.vertex.MeshData;
-import com.mojang.blaze3d.vertex.VertexConsumer;
-import com.mojang.blaze3d.vertex.VertexFormat;
+import net.blaze3d.buffers.GpuBufferSlice;
+import net.blaze3d.systems.RenderPass;
+import net.blaze3d.systems.RenderSystem;
+import net.blaze3d.vertex.BufferBuilder;
+import net.blaze3d.vertex.ByteBufferBuilder;
+import net.blaze3d.vertex.DefaultVertexFormat;
+import net.blaze3d.vertex.MeshData;
+import net.blaze3d.vertex.VertexConsumer;
+import net.blaze3d.vertex.VertexFormat;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
@@ -19,6 +19,7 @@ import net.minecraft.client.particle.SingleQuadParticle;
 import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.client.renderer.feature.ParticleFeatureRenderer;
 import net.minecraft.client.renderer.texture.TextureManager;
+import net.sodium.client.render.vertex.VertexConsumerUtils;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
@@ -122,7 +123,7 @@ public class QuadParticleRenderState implements SubmitNodeCollector.ParticleGrou
 		VertexConsumer vertexConsumer, float f, float g, float h, float i, float j, float k, float l, float m, float n, float o, float p, float q, int r, int s
 	) {
 		// Sodium: Use optimized rendering if available (merged from QuadParticleRenderStateMixin)
-		final var writer = net.caffeinemc.mods.sodium.client.render.vertex.VertexConsumerUtils.convertOrLog(vertexConsumer);
+		final var writer = VertexConsumerUtils.convertOrLog(vertexConsumer);
 
 		if (writer != null) {
 			TEMP_QUAT.set(i, j, k, l);

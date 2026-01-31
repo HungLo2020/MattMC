@@ -1,6 +1,6 @@
 package net.minecraft.world.level.block.entity;
 
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import java.util.Objects;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.NonNullList;

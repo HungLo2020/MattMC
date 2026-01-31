@@ -1,7 +1,7 @@
 package net.minecraft.client.server;
 
 import com.google.common.collect.Lists;
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.InetAddress;

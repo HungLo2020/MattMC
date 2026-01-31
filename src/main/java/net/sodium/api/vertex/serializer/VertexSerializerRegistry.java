@@ -1,11 +1,11 @@
 package net.sodium.api.vertex.serializer;
 
-import com.mojang.blaze3d.vertex.VertexFormat;
+import net.blaze3d.vertex.VertexFormat;
 import net.sodium.api.internal.DependencyInjection;
 
 public interface VertexSerializerRegistry {
     VertexSerializerRegistry INSTANCE = DependencyInjection.load(VertexSerializerRegistry.class,
-            "net.caffeinemc.mods.sodium.client.render.vertex.serializers.VertexSerializerRegistryImpl");
+            "net.sodium.client.render.vertex.serializers.VertexSerializerRegistryImpl");
 
     @SuppressWarnings("SameReturnValue")
     static VertexSerializerRegistry instance() {

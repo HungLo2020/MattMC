@@ -1,6 +1,6 @@
 package net.minecraft.client.gui.screens.dialog.body;
 
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import com.mojang.serialization.MapCodec;
 import java.util.HashMap;
 import java.util.Map;

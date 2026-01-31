@@ -1,6 +1,6 @@
 package net.minecraft.server.chase;
 
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetAddress;

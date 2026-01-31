@@ -1,7 +1,7 @@
 package net.minecraft.client.sounds;
 
 import com.google.common.collect.Maps;
-import com.mojang.blaze3d.audio.SoundBuffer;
+import net.blaze3d.audio.SoundBuffer;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;

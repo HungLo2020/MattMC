@@ -1,6 +1,6 @@
 package net.minecraft.client.renderer.block.model;
 
-import com.mojang.math.Quadrant;
+import net.math.Quadrant;
 import java.util.function.UnaryOperator;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;

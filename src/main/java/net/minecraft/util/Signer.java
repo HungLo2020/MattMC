@@ -1,6 +1,6 @@
 package net.minecraft.util;
 
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import java.security.PrivateKey;
 import java.security.Signature;
 import org.slf4j.Logger;

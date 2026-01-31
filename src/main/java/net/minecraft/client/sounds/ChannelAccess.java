@@ -1,8 +1,8 @@
 package net.minecraft.client.sounds;
 
 import com.google.common.collect.Sets;
-import com.mojang.blaze3d.audio.Channel;
-import com.mojang.blaze3d.audio.Library;
+import net.blaze3d.audio.Channel;
+import net.blaze3d.audio.Library;
 import java.util.Iterator;
 import java.util.Objects;
 import java.util.Set;

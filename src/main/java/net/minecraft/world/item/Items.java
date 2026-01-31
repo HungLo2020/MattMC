@@ -5,6 +5,8 @@ import java.util.Optional;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.UnaryOperator;
+
+import net.alexsmobs.item.*;
 import net.minecraft.core.Direction;
 import net.minecraft.core.Registry;
 import net.minecraft.core.component.DataComponents;
@@ -1542,17 +1544,17 @@ public class Items {
 	);
 	public static final Item SMALL_CATFISH_BUCKET = registerItem(
 		"small_catfish_bucket",
-		properties -> new com.github.alexthe666.alexsmobs.item.ItemModFishBucket(() -> EntityType.CATFISH, Fluids.WATER, properties),
+		properties -> new ItemModFishBucket(() -> EntityType.CATFISH, Fluids.WATER, properties),
 		new Item.Properties().stacksTo(1).component(DataComponents.BUCKET_ENTITY_DATA, CustomData.EMPTY)
 	);
 	public static final Item MEDIUM_CATFISH_BUCKET = registerItem(
 		"medium_catfish_bucket",
-		properties -> new com.github.alexthe666.alexsmobs.item.ItemModFishBucket(() -> EntityType.CATFISH, Fluids.WATER, properties),
+		properties -> new ItemModFishBucket(() -> EntityType.CATFISH, Fluids.WATER, properties),
 		new Item.Properties().stacksTo(1).component(DataComponents.BUCKET_ENTITY_DATA, CustomData.EMPTY)
 	);
 	public static final Item LARGE_CATFISH_BUCKET = registerItem(
 		"large_catfish_bucket",
-		properties -> new com.github.alexthe666.alexsmobs.item.ItemModFishBucket(() -> EntityType.CATFISH, Fluids.WATER, properties),
+		properties -> new ItemModFishBucket(() -> EntityType.CATFISH, Fluids.WATER, properties),
 		new Item.Properties().stacksTo(1).component(DataComponents.BUCKET_ENTITY_DATA, CustomData.EMPTY)
 	);
 	public static final Item TRILOCARIS_BUCKET = registerItem(
@@ -1813,13 +1815,13 @@ public class Items {
 	);
 	public static final Item CHICKEN_SPAWN_EGG = registerItem("chicken_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.CHICKEN));
 	public static final Item COCKROACH_SPAWN_EGG = registerItem("cockroach_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.COCKROACH));
-	public static final Item COCKROACH_OOTHECA = registerItem("cockroach_ootheca", com.github.alexthe666.alexsmobs.item.CockroachOothecaItem::new, new Item.Properties().stacksTo(16));
+	public static final Item COCKROACH_OOTHECA = registerItem("cockroach_ootheca", CockroachOothecaItem::new, new Item.Properties().stacksTo(16));
 	public static final Item COCKROACH_WING = registerItem("cockroach_wing");
 	public static final Item COCKROACH_WING_FRAGMENT = registerItem("cockroach_wing_fragment");
 	public static final Item COMB_JELLY_SPAWN_EGG = registerItem("comb_jelly_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.COMB_JELLY));
 	public static final Item COMB_JELLY_BUCKET = registerItem(
 		"comb_jelly_bucket",
-		properties -> new com.github.alexthe666.alexsmobs.item.ItemModFishBucket(() -> EntityType.COMB_JELLY, Fluids.WATER, properties),
+		properties -> new ItemModFishBucket(() -> EntityType.COMB_JELLY, Fluids.WATER, properties),
 		new Item.Properties().stacksTo(1).component(DataComponents.BUCKET_ENTITY_DATA, CustomData.EMPTY)
 	);
 	public static final Item COSMIC_COD_SPAWN_EGG = registerItem("cosmic_cod_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.COSMIC_COD));
@@ -1848,7 +1850,7 @@ public class Items {
 	public static final Item DROWNED_SPAWN_EGG = registerItem("drowned_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.DROWNED));
 	public static final Item ELEPHANT_SPAWN_EGG = registerItem("elephant_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.ELEPHANT));
 	public static final Item EMU_SPAWN_EGG = registerItem("emu_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.EMU));
-	public static final Item EMU_EGG = registerItem("emu_egg", properties -> new com.github.alexthe666.alexsmobs.item.ItemEmuEgg(properties), new Item.Properties().stacksTo(16));
+	public static final Item EMU_EGG = registerItem("emu_egg", properties -> new ItemEmuEgg(properties), new Item.Properties().stacksTo(16));
 	public static final Item BOILED_EMU_EGG = registerItem("boiled_emu_egg", Item::new, new Item.Properties().food(Foods.COOKED_CHICKEN));
 	public static final Item EMU_FEATHER = registerItem("emu_feather", Item::new, new Item.Properties());
 	public static final Item ELDER_GUARDIAN_SPAWN_EGG = registerItem(
@@ -1892,7 +1894,7 @@ public class Items {
 	public static final Item KANGAROO_SPAWN_EGG = registerItem("kangaroo_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.KANGAROO));
 	public static final Item KOMODO_DRAGON_SPAWN_EGG = registerItem("komodo_dragon_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.KOMODO_DRAGON));
 	public static final Item LEAFCUTTER_ANT_SPAWN_EGG = registerItem("leafcutter_ant_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.LEAFCUTTER_ANT));
-	public static final Item LEAFCUTTER_ANT_PUPA = registerItem("leafcutter_ant_pupa", com.github.alexthe666.alexsmobs.item.ItemLeafcutterPupa::new, new Item.Properties());
+	public static final Item LEAFCUTTER_ANT_PUPA = registerItem("leafcutter_ant_pupa", ItemLeafcutterPupa::new, new Item.Properties());
 	public static final Item IRON_GOLEM_SPAWN_EGG = registerItem("iron_golem_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.IRON_GOLEM));
 	public static final Item LLAMA_SPAWN_EGG = registerItem("llama_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.LLAMA));
 	public static final Item LOBSTER_SPAWN_EGG = registerItem("lobster_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.LOBSTER));
@@ -1969,7 +1971,7 @@ public class Items {
 	public static final Item TARANTULA_HAWK_WING = registerItem("tarantula_hawk_wing", Item::new, new Item.Properties());
 	public static final Item TARANTULA_HAWK_WING_FRAGMENT = registerItem("tarantula_hawk_wing_fragment", Item::new, new Item.Properties());
 	public static final Item TARANTULA_HAWK_ELYTRA = registerItem("tarantula_hawk_elytra", 
-		com.github.alexthe666.alexsmobs.item.ItemTarantulaHawkElytra::new,
+		ItemTarantulaHawkElytra::new,
 		new Item.Properties().durability(432));
 	public static final Item TARANTULA_HAWK_ELYTRA_BROKEN = registerItem("tarantula_hawk_elytra_broken", Item::new, new Item.Properties());
 	public static final Item TRADER_LLAMA_SPAWN_EGG = registerItem(
@@ -2676,7 +2678,7 @@ public class Items {
 	}
 	
 	// Skelewag items
-	public static final Item SKELEWAG_SWORD = registerItem("skelewag_sword", properties -> new com.github.alexthe666.alexsmobs.item.ItemSkelewagSword(properties), new Item.Properties().stacksTo(1).durability(430));
+	public static final Item SKELEWAG_SWORD = registerItem("skelewag_sword", properties -> new ItemSkelewagSword(properties), new Item.Properties().stacksTo(1).durability(430));
 
 	public static Item registerBlock(Block block) {
 		return registerBlock(block, BlockItem::new);

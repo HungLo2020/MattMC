@@ -2,7 +2,7 @@ package net.minecraft.tags;
 
 import com.google.gson.JsonElement;
 import com.mojang.datafixers.util.Either;
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import com.mojang.serialization.Dynamic;
 import com.mojang.serialization.JsonOps;
 import java.io.Reader;
