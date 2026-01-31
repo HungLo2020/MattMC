@@ -1,0 +1,23 @@
+# Generated spawn egg textures
+*.png
+alexsmobs_eggs/
+alexscaves_eggs/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Virtual environments
+venv/
+env/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
