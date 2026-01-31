@@ -1529,7 +1529,7 @@ public class DataFixers {
 		Schema schema278 = dataFixerBuilder.addSchema(4548, SAME_NAMESPACED);
 		dataFixerBuilder.addFixer(new WorldSpawnDataFix(schema278));
 		dataFixerBuilder.addFixer(new PlayerRespawnDataFix(schema278));
-		Schema schema279 = dataFixerBuilder.addSchema(4549, SAME_NAMESPACED);
+		Schema schema279 = dataFixerBuilder.addSchema(4549, V4549::new);
 		dataFixerBuilder.addFixer(
 			BlockRenameFix.create(
 				schema279,
