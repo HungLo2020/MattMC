@@ -5,6 +5,7 @@
 - [Directory Structure](#directory-structure)
 - [Writing Tests](#writing-tests)
 - [Running Tests](#running-tests)
+- [List of all Tests](#list-of-all-tests)
 - [Test Isolation from Production Builds](#test-isolation-from-production-builds)
 - [IDE Integration](#ide-integration)
 - [Best Practices](#best-practices)
@@ -361,6 +362,10 @@ When tests fail, you'll see:
 - The assertion that failed
 - The expected vs actual values
 - Full stack trace
+
+## List of All Tests
+- Chunk Performance Test: `./gradlew performancetest --tests net.minecraft.world.level.chunk.ChunkGenerationPerformanceTest`
+- Chunk Performance Test: `./gradlew performancetest --tests net.minecraft.world.level.chunk.ChunkGenerationBatcgPerformanceTest`
 
 ## Test Isolation from Production Builds
 
