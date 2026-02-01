@@ -57,6 +57,12 @@ public class ProfilerCollectorWrapperTest {
         
         Map<String, OperationRecord> ops = wrapper.getOperations();
         
+        // Debug: print all operations
+        System.out.println("Operations collected: " + ops.size());
+        for (String key : ops.keySet()) {
+            System.out.println("  - " + key);
+        }
+        
         // Should have all paths
         assertEquals(6, ops.size(), "Should have 6 operations");
         assertTrue(ops.containsKey("root.tick.entities"));
