@@ -42,6 +42,8 @@ public class ProfilerCollectorWrapperTest {
         // Simulate tick with multiple operations
         wrapper.push("root");
         wrapper.push("tick");
+        wrapper.push("world");
+        wrapper.pop();
         
         wrapper.push("entities");
         wrapper.pop();
@@ -57,14 +59,9 @@ public class ProfilerCollectorWrapperTest {
         
         Map<String, OperationRecord> ops = wrapper.getOperations();
         
-        // Debug: print all operations
-        System.out.println("Operations collected: " + ops.size());
-        for (String key : ops.keySet()) {
-            System.out.println("  - " + key);
-        }
-        
         // Should have all paths
         assertEquals(6, ops.size(), "Should have 6 operations");
+        assertTrue(ops.containsKey("root.tick.world"));
         assertTrue(ops.containsKey("root.tick.entities"));
         assertTrue(ops.containsKey("root.tick.blocks"));
         assertTrue(ops.containsKey("root.tick.tileEntities"));
