@@ -24,8 +24,8 @@ The workflow builds the Rust project for three platforms:
 When the workflow completes successfully, it will:
 
 1. **Extract the version** from `Cargo.toml` (e.g., `0.1.0`)
-2. **Generate a timestamp** in the format `YYYY-MM-DD-HHMM` (e.g., `2024-02-02-1430`)
-3. **Create a release tag** combining both: `v{VERSION}-{TIMESTAMP}` (e.g., `v0.1.0-2024-02-02-1430`)
+2. **Generate a timestamp** in the format `YYYY-MM-DD-HHMM` (e.g., `2026-02-02-1430`)
+3. **Create a release tag** combining both: `v{VERSION}-{TIMESTAMP}` (e.g., `v0.1.0-2026-02-02-1430`)
 4. **Upload binaries** for all three platforms as release assets
 
 This naming scheme ensures that:
