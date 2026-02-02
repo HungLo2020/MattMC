@@ -1,0 +1,170 @@
+name: Build and Release Rust Project
+
+on:
+  workflow_dispatch:
+    inputs:
+      create_release:
+        description: 'Create a GitHub release'
+        required: false
+        default: 'true'
+        type: boolean
+
+jobs:
+  build:
+    name: Build for ${{ matrix.platform.name }}
+    runs-on: ${{ matrix.platform.os }}
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - name: Linux x86_64
+            os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            artifact_name: mattmc-rust-linux-x86_64
+            binary_extension: ''
+          - name: Windows x86_64
+            os: windows-latest
+            target: x86_64-pc-windows-msvc
+            artifact_name: mattmc-rust-windows-x86_64
+            binary_extension: '.exe'
+          - name: macOS Apple Silicon
+            os: macos-latest
+            target: aarch64-apple-darwin
+            artifact_name: mattmc-rust-macos-aarch64
+            binary_extension: ''
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.platform.target }}
+
+      - name: Install Linux dependencies (Vulkan)
+        if: matrix.platform.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libvulkan-dev vulkan-tools libxkbcommon-dev libwayland-dev
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/registry
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-registry-
+
+      - name: Cache cargo index
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/git
+          key: ${{ runner.os }}-cargo-git-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-git-
+
+      - name: Cache target directory
+        uses: actions/cache@v4
+        with:
+          path: target
+          key: ${{ runner.os }}-${{ matrix.platform.target }}-target-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ matrix.platform.target }}-target-
+
+      - name: Build release binary
+        run: cargo build --release --target ${{ matrix.platform.target }}
+
+      - name: Prepare binary for upload
+        shell: bash
+        run: |
+          cd target/${{ matrix.platform.target }}/release
+          if [ -f "mattmc-rust${{ matrix.platform.binary_extension }}" ]; then
+            cp mattmc-rust${{ matrix.platform.binary_extension }} ../../../${{ matrix.platform.artifact_name }}${{ matrix.platform.binary_extension }}
+          else
+            echo "Error: Binary not found!"
+            exit 1
+          fi
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.platform.artifact_name }}
+          path: ${{ matrix.platform.artifact_name }}${{ matrix.platform.binary_extension }}
+          if-no-files-found: error
+
+  create-release:
+    name: Create GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    if: ${{ inputs.create_release == true }}
+    
+    permissions:
+      contents: write
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Extract version and generate release info
+        id: release_info
+        run: |
+          # Extract version from Cargo.toml
+          VERSION=$(grep '^version = ' Cargo.toml | head -n 1 | sed 's/version = "\(.*\)"/\1/')
+          
+          # Generate timestamp (YYYY-MM-DD-HHMM format)
+          TIMESTAMP=$(date -u +"%Y-%m-%d-%H%M")
+          
+          # Create release tag
+          RELEASE_TAG="v${VERSION}-${TIMESTAMP}"
+          
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "timestamp=${TIMESTAMP}" >> $GITHUB_OUTPUT
+          echo "release_tag=${RELEASE_TAG}" >> $GITHUB_OUTPUT
+          echo "release_name=MattMC Rust ${VERSION} (${TIMESTAMP})" >> $GITHUB_OUTPUT
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Create release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ steps.release_info.outputs.release_tag }}
+          name: ${{ steps.release_info.outputs.release_name }}
+          draft: false
+          prerelease: false
+          body: |
+            ## MattMC Rust/Vulkan Build
+            
+            **Version:** ${{ steps.release_info.outputs.version }}
+            **Build Date:** ${{ steps.release_info.outputs.timestamp }}
+            
+            This is an automated build of the MattMC Rust/Vulkan project.
+            
+            ### Platforms
+            - ✅ Linux x86_64
+            - ✅ Windows x86_64
+            - ✅ macOS Apple Silicon (aarch64)
+            
+            ### Installation
+            1. Download the binary for your platform
+            2. Make it executable (Linux/macOS): `chmod +x mattmc-rust-*`
+            3. Run the binary
+            
+            ### Requirements
+            - Vulkan-compatible GPU and drivers
+            - For Linux: libvulkan1, libxkbcommon, libwayland-client
+            - For Windows: Latest GPU drivers with Vulkan support
+            - For macOS: MoltenVK (usually included with macOS)
+            
+            ---
+            *Built with GitHub Actions*
+          files: |
+            artifacts/mattmc-rust-linux-x86_64/mattmc-rust-linux-x86_64
+            artifacts/mattmc-rust-windows-x86_64/mattmc-rust-windows-x86_64.exe
+            artifacts/mattmc-rust-macos-aarch64/mattmc-rust-macos-aarch64
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
