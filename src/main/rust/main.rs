@@ -442,7 +442,7 @@ fn main() {
             p.queue_family_properties()
                 .iter()
                 .enumerate()
-                .position(|(_i, q)| {
+                .position(|(_, q)| {
                     q.queue_flags.intersects(QueueFlags::GRAPHICS)
                 })
                 .map(|i| (p, i as u32))

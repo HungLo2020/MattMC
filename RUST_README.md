@@ -5,6 +5,8 @@ This directory contains the Rust/Vulkan reimplementation of MattMC.
 ## Requirements
 
 - Rust 1.70 or later (install via [rustup](https://rustup.rs/))
+  - The project uses features from Rust 2021 edition
+  - Vulkano 0.34 and winit 0.28 compatibility tested with Rust 1.70+
 - Vulkan SDK installed on your system
   - Windows: Download from [LunarG](https://vulkan.lunarg.com/)
   - Linux: Install via package manager (e.g., `sudo apt install vulkan-tools libvulkan-dev` on Ubuntu)
