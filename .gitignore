@@ -18,6 +18,7 @@ crash-reports/
 # Rust
 rusttarget/
 rustrun/
+rust-core/
 Cargo.lock
 
 

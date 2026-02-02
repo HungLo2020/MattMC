@@ -56,8 +56,11 @@ The demo will:
 ├── src/main/rust/
 │   └── main.rs                  # Main Rust application
 ├── rusttarget/                  # Build artifacts (gitignored)
-└── rustrun/                     # Runtime directory (gitignored, for future use)
+├── rustrun/                     # Runtime directory (gitignored, for future use)
+└── rust-core/                   # Core dump directory (gitignored)
 ```
+
+**Note about rust-core directory**: If the Rust application crashes, it may create a `rust-core/` directory containing core dump files for debugging. This directory is automatically gitignored. If you see this directory and want to investigate crashes, the core dump files inside can be analyzed with debuggers like `gdb` or `lldb`. You can safely delete this directory if you don't need to debug crashes.
 
 ## Shared Resources
 
@@ -113,3 +116,23 @@ cargo build --release
 The optimized binary will be located at:
 - `rusttarget/release/mattmc-rust` (Linux/macOS)
 - `rusttarget\release\mattmc-rust.exe` (Windows)
+
+## Troubleshooting
+
+### rust-core Directory Appears
+
+If you see a `rust-core/` directory in the project root, this indicates the application crashed and created core dump files. This directory is gitignored automatically.
+
+**What is it?** 
+- Core dump files from Rust program crashes
+- Contains memory dumps for debugging
+
+**What to do?**
+- The directory is safe to delete if you don't need crash debugging
+- If the crashes persist, the core files can be analyzed with debuggers (`gdb`, `lldb`)
+- Report persistent crashes as issues with the core dump information
+
+**Why gitignored?**
+- Core dumps can be very large (hundreds of MB)
+- They contain system-specific information
+- Not useful for version control
