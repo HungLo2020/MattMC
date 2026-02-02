@@ -22,7 +22,7 @@ use vulkano::pipeline::graphics::viewport::{Viewport, ViewportState};
 use vulkano::pipeline::graphics::GraphicsPipelineCreateInfo;
 use vulkano::pipeline::layout::PipelineDescriptorSetLayoutCreateInfo;
 use vulkano::pipeline::{
-    GraphicsPipeline, PipelineLayout, PipelineShaderStageCreateInfo,
+    DynamicState, GraphicsPipeline, PipelineLayout, PipelineShaderStageCreateInfo,
 };
 use vulkano::render_pass::{Framebuffer, FramebufferCreateInfo, RenderPass, Subpass};
 use vulkano::swapchain::{
@@ -237,6 +237,7 @@ impl App {
                     subpass.num_color_attachments(),
                     ColorBlendAttachmentState::default(),
                 )),
+                dynamic_state: [DynamicState::Viewport].into_iter().collect(),
                 subpass: Some(subpass.into()),
                 ..GraphicsPipelineCreateInfo::layout(layout)
             },
