@@ -17,7 +17,9 @@ raw-window-handle = "0.5"
 
 [profile.dev]
 opt-level = 1
+debug = true
 
 [profile.release]
 opt-level = 3
+debug = true
 lto = true
