@@ -41,3 +41,7 @@ jmh-result.txt
 /Task
 *.inline_backup
 /libraries/jdk-25/
+
+# Rust build artifacts
+rust-core/target/
+rust-core/Cargo.lock

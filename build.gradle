@@ -6,6 +6,79 @@ plugins {
 group = 'net.minecraft'
 version = '1.21.10'
 
+// ============================================================================
+// RUST INTEGRATION - Compile Rust library before Java
+// ============================================================================
+
+// Task to compile the Rust library
+task compileRust(type: Exec) {
+    description = 'Compiles the Rust native library using Cargo'
+    group = 'build'
+    
+    workingDir = file('rust-core')
+    
+    // Use 'cargo.exe' on Windows, 'cargo' on Unix-like systems
+    def cargoCmd = System.getProperty('os.name').toLowerCase().contains('win') ? 'cargo.exe' : 'cargo'
+    commandLine cargoCmd, 'build', '--release'
+    
+    // Only run if Rust source files have changed
+    inputs.dir('rust-core/src')
+    inputs.file('rust-core/Cargo.toml')
+    outputs.dir('rust-core/target/release')
+    
+    doFirst {
+        println "Compiling Rust library..."
+    }
+    
+    doLast {
+        println "✓ Rust library compiled successfully"
+    }
+}
+
+// Task to copy the Rust library to the resources directory
+task copyRustLibrary(type: Copy, dependsOn: compileRust) {
+    description = 'Copies the compiled Rust library to Java resources'
+    group = 'build'
+    
+    from('rust-core/target/release') {
+        include 'libmattmc_rust.so'    // Linux
+        include 'libmattmc_rust.dylib' // macOS
+        include 'mattmc_rust.dll'       // Windows
+    }
+    into 'build/resources/main/natives'
+    
+    doLast {
+        println "✓ Rust library copied to build/resources/main/natives"
+    }
+}
+
+// Make Java compilation depend on Rust compilation
+tasks.named('compileJava') {
+    dependsOn copyRustLibrary
+}
+
+// Clean task for Rust artifacts
+task cleanRust(type: Exec) {
+    description = 'Cleans Rust build artifacts'
+    group = 'build'
+    
+    workingDir = file('rust-core')
+    
+    def cargoCmd = System.getProperty('os.name').toLowerCase().contains('win') ? 'cargo.exe' : 'cargo'
+    commandLine cargoCmd, 'clean'
+    
+    doLast {
+        println "✓ Rust build artifacts cleaned"
+    }
+}
+
+// Make clean task also clean Rust artifacts
+clean.dependsOn cleanRust
+
+// ============================================================================
+// END RUST INTEGRATION
+// ============================================================================
+
 // LWJGL version and natives configuration
 def lwjglVersion = '3.3.3'
 def lwjglNatives = System.getProperty('os.name').toLowerCase().contains('mac') 
