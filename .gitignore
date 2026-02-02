@@ -43,5 +43,5 @@ jmh-result.txt
 /libraries/jdk-25/
 
 # Rust build artifacts
-rust-core/target/
-rust-core/Cargo.lock
+src/main/rust/target/
+src/main/rust/Cargo.lock

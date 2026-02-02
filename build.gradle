@@ -15,16 +15,16 @@ task compileRust(type: Exec) {
     description = 'Compiles the Rust native library using Cargo'
     group = 'build'
     
-    workingDir = file('rust-core')
+    workingDir = file('src/main/rust')
     
     // Use 'cargo.exe' on Windows, 'cargo' on Unix-like systems
     def cargoCmd = System.getProperty('os.name').toLowerCase().contains('win') ? 'cargo.exe' : 'cargo'
     commandLine cargoCmd, 'build', '--release'
     
     // Only run if Rust source files have changed
-    inputs.dir('rust-core/src')
-    inputs.file('rust-core/Cargo.toml')
-    outputs.dir('rust-core/target/release')
+    inputs.dir('src/main/rust/src')
+    inputs.file('src/main/rust/Cargo.toml')
+    outputs.dir('src/main/rust/target/release')
     
     doFirst {
         println "Compiling Rust library..."
@@ -40,7 +40,7 @@ task copyRustLibrary(type: Copy, dependsOn: compileRust) {
     description = 'Copies the compiled Rust library to Java resources'
     group = 'build'
     
-    from('rust-core/target/release') {
+    from('src/main/rust/target/release') {
         include 'libmattmc_rust.so'    // Linux
         include 'libmattmc_rust.dylib' // macOS
         include 'mattmc_rust.dll'       // Windows
@@ -62,7 +62,7 @@ task cleanRust(type: Exec) {
     description = 'Cleans Rust build artifacts'
     group = 'build'
     
-    workingDir = file('rust-core')
+    workingDir = file('src/main/rust')
     
     def cargoCmd = System.getProperty('os.name').toLowerCase().contains('win') ? 'cargo.exe' : 'cargo'
     commandLine cargoCmd, 'clean'

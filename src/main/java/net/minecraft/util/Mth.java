@@ -1,5 +1,9 @@
 package net.minecraft.util;
 
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.util.Locale;
 import java.util.UUID;
 import java.util.function.IntPredicate;
@@ -14,6 +18,81 @@ import org.joml.Quaternionf;
 import org.joml.Vector3f;
 
 public class Mth {
+	// Rust library loading - migrated math functions to Rust for performance
+	private static boolean RUST_AVAILABLE = false;
+	
+	static {
+		try {
+			// Extract and load the native library from resources
+			String libraryName = getNativeLibraryName();
+			String resourcePath = "/natives/" + libraryName;
+			
+			// Try to load from resources
+			InputStream in = Mth.class.getResourceAsStream(resourcePath);
+			if (in != null) {
+				// Create a temporary file to extract the library
+				File tempLib = File.createTempFile("mattmc_rust", getNativeLibrarySuffix());
+				tempLib.deleteOnExit();
+				
+				try (OutputStream out = new FileOutputStream(tempLib)) {
+					byte[] buffer = new byte[8192];
+					int bytesRead;
+					while ((bytesRead = in.read(buffer)) != -1) {
+						out.write(buffer, 0, bytesRead);
+					}
+				}
+				in.close();
+				
+				// Load the extracted library
+				System.load(tempLib.getAbsolutePath());
+				RUST_AVAILABLE = true;
+			}
+		} catch (Exception e) {
+			// Fallback to Java implementations - this is fine
+			RUST_AVAILABLE = false;
+		}
+	}
+	
+	private static String getNativeLibraryName() {
+		String os = System.getProperty("os.name").toLowerCase();
+		if (os.contains("win")) {
+			return "mattmc_rust.dll";
+		} else if (os.contains("mac")) {
+			return "libmattmc_rust.dylib";
+		} else {
+			return "libmattmc_rust.so";
+		}
+	}
+	
+	private static String getNativeLibrarySuffix() {
+		String os = System.getProperty("os.name").toLowerCase();
+		if (os.contains("win")) {
+			return ".dll";
+		} else if (os.contains("mac")) {
+			return ".dylib";
+		} else {
+			return ".so";
+		}
+	}
+	
+	// Native Rust method declarations - these match the Rust function signatures
+	private static native int rustFloor(float value);
+	private static native int rustFloor(double value);
+	private static native long rustLfloor(double value);
+	private static native int rustCeil(float value);
+	private static native int rustCeil(double value);
+	private static native long rustCeilLong(double value);
+	private static native int rustClamp(int value, int min, int max);
+	private static native long rustClamp(long value, long min, long max);
+	private static native float rustClamp(float value, float min, float max);
+	private static native double rustClamp(double value, double min, double max);
+	private static native float rustAbs(float value);
+	private static native int rustAbs(int value);
+	private static native float rustSquare(float value);
+	private static native double rustSquare(double value);
+	private static native int rustSquare(int value);
+	private static native long rustSquare(long value);
+	
 	private static final long UUID_VERSION = 61440L;
 	private static final long UUID_VERSION_TYPE_4 = 16384L;
 	private static final long UUID_VARIANT = -4611686018427387904L;
@@ -58,56 +137,104 @@ public class Mth {
 	}
 
 	public static int floor(float f) {
+		if (RUST_AVAILABLE) {
+			return rustFloor(f);
+		}
+		// Fallback to Java implementation
 		int i = (int)f;
 		return f < i ? i - 1 : i;
 	}
 
 	public static int floor(double d) {
+		if (RUST_AVAILABLE) {
+			return rustFloor(d);
+		}
+		// Fallback to Java implementation
 		int i = (int)d;
 		return d < i ? i - 1 : i;
 	}
 
 	public static long lfloor(double d) {
+		if (RUST_AVAILABLE) {
+			return rustLfloor(d);
+		}
+		// Fallback to Java implementation
 		long l = (long)d;
 		return d < l ? l - 1L : l;
 	}
 
 	public static float abs(float f) {
+		if (RUST_AVAILABLE) {
+			return rustAbs(f);
+		}
+		// Fallback to Java implementation
 		return Math.abs(f);
 	}
 
 	public static int abs(int i) {
+		if (RUST_AVAILABLE) {
+			return rustAbs(i);
+		}
+		// Fallback to Java implementation
 		return Math.abs(i);
 	}
 
 	public static int ceil(float f) {
+		if (RUST_AVAILABLE) {
+			return rustCeil(f);
+		}
+		// Fallback to Java implementation
 		int i = (int)f;
 		return f > i ? i + 1 : i;
 	}
 
 	public static int ceil(double d) {
+		if (RUST_AVAILABLE) {
+			return rustCeil(d);
+		}
+		// Fallback to Java implementation
 		int i = (int)d;
 		return d > i ? i + 1 : i;
 	}
 
 	public static long ceilLong(double d) {
+		if (RUST_AVAILABLE) {
+			return rustCeilLong(d);
+		}
+		// Fallback to Java implementation
 		long l = (long)d;
 		return d > l ? l + 1L : l;
 	}
 
 	public static int clamp(int i, int j, int k) {
+		if (RUST_AVAILABLE) {
+			return rustClamp(i, j, k);
+		}
+		// Fallback to Java implementation
 		return Math.min(Math.max(i, j), k);
 	}
 
 	public static long clamp(long l, long m, long n) {
+		if (RUST_AVAILABLE) {
+			return rustClamp(l, m, n);
+		}
+		// Fallback to Java implementation
 		return Math.min(Math.max(l, m), n);
 	}
 
 	public static float clamp(float f, float g, float h) {
+		if (RUST_AVAILABLE) {
+			return rustClamp(f, g, h);
+		}
+		// Fallback to Java implementation
 		return f < g ? g : Math.min(f, h);
 	}
 
 	public static double clamp(double d, double e, double f) {
+		if (RUST_AVAILABLE) {
+			return rustClamp(d, e, f);
+		}
+		// Fallback to Java implementation
 		return d < e ? e : Math.min(d, f);
 	}
 
@@ -593,18 +720,34 @@ public class Mth {
 	}
 
 	public static float square(float f) {
+		if (RUST_AVAILABLE) {
+			return rustSquare(f);
+		}
+		// Fallback to Java implementation
 		return f * f;
 	}
 
 	public static double square(double d) {
+		if (RUST_AVAILABLE) {
+			return rustSquare(d);
+		}
+		// Fallback to Java implementation
 		return d * d;
 	}
 
 	public static int square(int i) {
+		if (RUST_AVAILABLE) {
+			return rustSquare(i);
+		}
+		// Fallback to Java implementation
 		return i * i;
 	}
 
 	public static long square(long l) {
+		if (RUST_AVAILABLE) {
+			return rustSquare(l);
+		}
+		// Fallback to Java implementation
 		return l * l;
 	}
 

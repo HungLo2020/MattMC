@@ -18,21 +18,21 @@ Rust offers several advantages over Java for performance-critical game code:
 
 ### Phase 1: Setup and Proof of Concept ✓
 
-1. Set up Rust build integration with Gradle
+1. Set up Rust build integration with Gradle in `src/main/rust/`
 2. Create JNI bindings infrastructure
-3. Convert a simple, heavily-used utility class as proof of concept
+3. Migrate existing Mth.java methods to Rust implementations
 4. Verify the integration works end-to-end
 
 ### Phase 2: Incremental Migration (Recommended Approach)
 
-The key to successful migration is to proceed incrementally, one class at a time:
+The key to successful migration is to proceed incrementally, one class or set of methods at a time:
 
-#### Selection Criteria for Classes to Migrate
+#### Selection Criteria for Code to Migrate
 
-Convert classes in this priority order:
+Migrate code in this priority order:
 
 1. **Pure utility functions** (no dependencies, heavily used)
-   - Math utilities (floor, ceil, clamp, etc.)
+   - Math utilities (floor, ceil, clamp, etc.) ✓ DONE
    - String processing
    - Data structure utilities
    
@@ -52,34 +52,34 @@ Convert classes in this priority order:
    - Spatial data structures (octrees, etc.)
    - Cache implementations
 
-#### Migration Process (Per Class)
+#### Migration Process (Per Method or Class)
 
-For each class you want to migrate:
+For each method or class you want to migrate:
 
-1. **Identify the class**
+1. **Identify the target**
    - Should have no or minimal dependencies on other Java classes
    - Should be called from Java, not call back into Java
    - Should have clear, simple method signatures
 
 2. **Create Rust implementation**
-   - Create a new Rust module in `rust-core/src/`
+   - Add implementation in `src/main/rust/src/lib.rs`
    - Implement the functionality in pure Rust
-   - Add unit tests in Rust
+   - Add JNI export functions
 
 3. **Add JNI bindings**
    - Create JNI wrapper functions using the `jni` crate
-   - Follow naming convention: `Java_<package_path>_<class>_<method>`
+   - Follow naming convention: `Java_<package_path>_<class>_rust<Method>`
    - For overloaded methods, include type signature (e.g., `__I` for int, `__F` for float)
 
-4. **Create Java wrapper class**
-   - Create a Java class with the same API as the original
-   - Add `native` method declarations
+4. **Update existing Java class**
+   - Add native method declarations (e.g., `private static native int rustFloor(float value);`)
+   - Update existing methods to call Rust when available
    - Implement fallback logic to pure Java if Rust library fails to load
-   - Load the native library in a static initializer
+   - Add library loading in a static initializer
 
-5. **Update existing code**
-   - Replace calls to old class with calls to new Rust-backed class
+5. **Test thoroughly**
    - Run existing tests to verify behavior is unchanged
+   - All existing code should continue to work
 
 6. **Performance testing**
    - Run benchmarks to verify performance improvement
@@ -90,9 +90,10 @@ For each class you want to migrate:
 The Gradle build is configured to:
 
 1. Compile Rust code BEFORE Java compilation (`compileJava` depends on `copyRustLibrary`)
-2. Copy compiled native libraries to `build/resources/main/natives/`
-3. Include native libraries in the JAR file
-4. Clean Rust artifacts when running `gradle clean`
+2. Rust source location: `src/main/rust/src/lib.rs`
+3. Copy compiled native libraries to `build/resources/main/natives/`
+4. Include native libraries in the JAR file
+5. Clean Rust artifacts when running `gradle clean`
 
 ### JNI Method Naming Convention
 
@@ -102,10 +103,16 @@ JNI methods must follow this naming pattern:
 Java_<package_path>_<class>_<method>[__<signature>]
 ```
 
+For methods with Rust implementations that are wrapped by Java methods, use the `rust` prefix:
+
+```
+Java_<package_path>_<class>_rust<Method>[__<signature>]
+```
+
 Examples:
-- `Java_net_minecraft_util_MthRust_floor__F` - floor(float)
-- `Java_net_minecraft_util_MthRust_floor__D` - floor(double)
-- `Java_net_minecraft_util_MthRust_clamp__III` - clamp(int, int, int)
+- `Java_net_minecraft_util_Mth_rustFloor__F` - rustFloor(float)
+- `Java_net_minecraft_util_Mth_rustFloor__D` - rustFloor(double)
+- `Java_net_minecraft_util_Mth_rustClamp__III` - rustClamp(int, int, int)
 
 Type signatures:
 - `I` = int
@@ -119,24 +126,24 @@ Type signatures:
 
 ```
 MattMC/
-├── rust-core/                  # Rust library root
+├── src/main/rust/              # Rust library root
 │   ├── Cargo.toml              # Rust dependencies and build config
 │   └── src/
-│       └── lib.rs              # Main Rust library file
+│       └── lib.rs              # Rust implementations with JNI exports
 ├── src/main/java/
 │   └── net/minecraft/util/
-│       └── MthRust.java        # Java wrapper for Rust functions
+│       └── Mth.java            # Migrated class with Rust integration
 └── build.gradle                # Gradle build with Rust integration
 ```
 
 ### Error Handling and Fallbacks
 
-Every Rust-backed Java class should:
+Every migrated Java class should:
 
 1. Gracefully handle library loading failures
 2. Provide pure Java fallback implementations
 3. Not crash if the native library is unavailable
-4. Log warnings when falling back to Java
+4. Silently fall back to Java (no error messages for normal operation)
 
 This ensures the game can still run even if:
 - The Rust library fails to compile
@@ -145,12 +152,11 @@ This ensures the game can still run even if:
 
 ### Testing Strategy
 
-For each migrated class:
+For each migrated method:
 
-1. **Unit tests in Rust** - Test core logic in isolation
-2. **Integration tests in Java** - Verify JNI bindings work correctly
-3. **Compatibility tests** - Verify behavior matches original Java implementation
-4. **Performance benchmarks** - Measure actual performance improvement
+1. **Existing tests should pass** - Verify behavior matches original Java implementation
+2. **Integration tests** - Verify JNI bindings work correctly
+3. **Performance benchmarks** - Measure actual performance improvement
 
 ### Platform Support
 
@@ -177,22 +183,71 @@ The Rust project uses:
 
 - `jni = "0.21"` - JNI bindings for Rust
 
-Additional dependencies should be added to `rust-core/Cargo.toml` as needed.
+Additional dependencies should be added to `src/main/rust/Cargo.toml` as needed.
 
 ### Common Pitfalls to Avoid
 
-1. **Don't migrate too much at once** - One class at a time
+1. **Don't migrate too much at once** - One method/class at a time
 2. **Don't create circular dependencies** - Keep calls one-directional (Java → Rust)
 3. **Don't ignore precision differences** - Floating-point math may differ slightly
 4. **Don't forget about platforms** - Test on all supported OS/architectures
 5. **Don't remove Java fallbacks** - Always keep pure Java implementations
+
+## Example: Migrated Mth.java Methods
+
+Here's how the migration looks for the `Mth` class:
+
+### Rust Implementation (`src/main/rust/src/lib.rs`)
+
+```rust
+#[no_mangle]
+pub extern "system" fn Java_net_minecraft_util_Mth_rustFloor__F(
+    _env: JNIEnv,
+    _class: JClass,
+    value: jfloat,
+) -> jint {
+    let i = value as jint;
+    if value < i as jfloat { i - 1 } else { i }
+}
+```
+
+### Java Integration (`src/main/java/net/minecraft/util/Mth.java`)
+
+```java
+public class Mth {
+    private static boolean RUST_AVAILABLE = false;
+    
+    static {
+        try {
+            // Load native library
+            ...
+            RUST_AVAILABLE = true;
+        } catch (Exception e) {
+            RUST_AVAILABLE = false;
+        }
+    }
+    
+    // Native method declaration
+    private static native int rustFloor(float value);
+    
+    // Public method with Rust integration
+    public static int floor(float f) {
+        if (RUST_AVAILABLE) {
+            return rustFloor(f);  // Call Rust
+        }
+        // Fallback to Java
+        int i = (int)f;
+        return f < i ? i - 1 : i;
+    }
+}
+```
 
 ## Next Steps
 
 After the proof of concept:
 
 1. Profile the game to identify performance bottlenecks
-2. Select the next class to migrate based on:
+2. Select the next methods to migrate based on:
    - Performance impact
    - Simplicity (few dependencies)
    - Frequency of use

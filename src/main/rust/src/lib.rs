@@ -2,9 +2,9 @@ use jni::JNIEnv;
 use jni::objects::JClass;
 use jni::sys::{jint, jlong, jfloat, jdouble};
 
-/// Fast floor function for floats
+/// Fast floor function for floats - migrated from Mth.java
 #[no_mangle]
-pub extern "system" fn Java_net_minecraft_util_MthRust_floor__F(
+pub extern "system" fn Java_net_minecraft_util_Mth_rustFloor__F(
     _env: JNIEnv,
     _class: JClass,
     value: jfloat,
@@ -17,9 +17,9 @@ pub extern "system" fn Java_net_minecraft_util_MthRust_floor__F(
     }
 }
 
-/// Fast floor function for doubles
+/// Fast floor function for doubles - migrated from Mth.java
 #[no_mangle]
-pub extern "system" fn Java_net_minecraft_util_MthRust_floor__D(
+pub extern "system" fn Java_net_minecraft_util_Mth_rustFloor__D(
     _env: JNIEnv,
     _class: JClass,
     value: jdouble,
@@ -32,9 +32,9 @@ pub extern "system" fn Java_net_minecraft_util_MthRust_floor__D(
     }
 }
 
-/// Fast lfloor function (long floor) for doubles
+/// Fast lfloor function (long floor) for doubles - migrated from Mth.java
 #[no_mangle]
-pub extern "system" fn Java_net_minecraft_util_MthRust_lfloor(
+pub extern "system" fn Java_net_minecraft_util_Mth_rustLfloor(
     _env: JNIEnv,
     _class: JClass,
     value: jdouble,
@@ -47,9 +47,9 @@ pub extern "system" fn Java_net_minecraft_util_MthRust_lfloor(
     }
 }
 
-/// Fast ceil function for floats
+/// Fast ceil function for floats - migrated from Mth.java
 #[no_mangle]
-pub extern "system" fn Java_net_minecraft_util_MthRust_ceil__F(
+pub extern "system" fn Java_net_minecraft_util_Mth_rustCeil__F(
     _env: JNIEnv,
     _class: JClass,
     value: jfloat,
@@ -62,9 +62,9 @@ pub extern "system" fn Java_net_minecraft_util_MthRust_ceil__F(
     }
 }
 
-/// Fast ceil function for doubles
+/// Fast ceil function for doubles - migrated from Mth.java
 #[no_mangle]
-pub extern "system" fn Java_net_minecraft_util_MthRust_ceil__D(
+pub extern "system" fn Java_net_minecraft_util_Mth_rustCeil__D(
     _env: JNIEnv,
     _class: JClass,
     value: jdouble,
@@ -77,9 +77,9 @@ pub extern "system" fn Java_net_minecraft_util_MthRust_ceil__D(
     }
 }
 
-/// Fast ceilLong function for doubles
+/// Fast ceilLong function for doubles - migrated from Mth.java
 #[no_mangle]
-pub extern "system" fn Java_net_minecraft_util_MthRust_ceilLong(
+pub extern "system" fn Java_net_minecraft_util_Mth_rustCeilLong(
     _env: JNIEnv,
     _class: JClass,
     value: jdouble,
@@ -92,9 +92,9 @@ pub extern "system" fn Java_net_minecraft_util_MthRust_ceilLong(
     }
 }
 
-/// Clamp int value between min and max
+/// Clamp int value between min and max - migrated from Mth.java
 #[no_mangle]
-pub extern "system" fn Java_net_minecraft_util_MthRust_clamp__III(
+pub extern "system" fn Java_net_minecraft_util_Mth_rustClamp__III(
     _env: JNIEnv,
     _class: JClass,
     value: jint,
@@ -104,9 +104,9 @@ pub extern "system" fn Java_net_minecraft_util_MthRust_clamp__III(
     value.max(min).min(max)
 }
 
-/// Clamp long value between min and max
+/// Clamp long value between min and max - migrated from Mth.java
 #[no_mangle]
-pub extern "system" fn Java_net_minecraft_util_MthRust_clamp__JJJ(
+pub extern "system" fn Java_net_minecraft_util_Mth_rustClamp__JJJ(
     _env: JNIEnv,
     _class: JClass,
     value: jlong,
@@ -116,9 +116,9 @@ pub extern "system" fn Java_net_minecraft_util_MthRust_clamp__JJJ(
     value.max(min).min(max)
 }
 
-/// Clamp float value between min and max
+/// Clamp float value between min and max - migrated from Mth.java
 #[no_mangle]
-pub extern "system" fn Java_net_minecraft_util_MthRust_clamp__FFF(
+pub extern "system" fn Java_net_minecraft_util_Mth_rustClamp__FFF(
     _env: JNIEnv,
     _class: JClass,
     value: jfloat,
@@ -132,9 +132,9 @@ pub extern "system" fn Java_net_minecraft_util_MthRust_clamp__FFF(
     }
 }
 
-/// Clamp double value between min and max
+/// Clamp double value between min and max - migrated from Mth.java
 #[no_mangle]
-pub extern "system" fn Java_net_minecraft_util_MthRust_clamp__DDD(
+pub extern "system" fn Java_net_minecraft_util_Mth_rustClamp__DDD(
     _env: JNIEnv,
     _class: JClass,
     value: jdouble,
@@ -148,9 +148,9 @@ pub extern "system" fn Java_net_minecraft_util_MthRust_clamp__DDD(
     }
 }
 
-/// Absolute value for floats
+/// Absolute value for floats - migrated from Mth.java
 #[no_mangle]
-pub extern "system" fn Java_net_minecraft_util_MthRust_abs__F(
+pub extern "system" fn Java_net_minecraft_util_Mth_rustAbs__F(
     _env: JNIEnv,
     _class: JClass,
     value: jfloat,
@@ -158,9 +158,9 @@ pub extern "system" fn Java_net_minecraft_util_MthRust_abs__F(
     value.abs()
 }
 
-/// Absolute value for ints
+/// Absolute value for ints - migrated from Mth.java
 #[no_mangle]
-pub extern "system" fn Java_net_minecraft_util_MthRust_abs__I(
+pub extern "system" fn Java_net_minecraft_util_Mth_rustAbs__I(
     _env: JNIEnv,
     _class: JClass,
     value: jint,
@@ -168,9 +168,9 @@ pub extern "system" fn Java_net_minecraft_util_MthRust_abs__I(
     value.abs()
 }
 
-/// Square a float
+/// Square a float - migrated from Mth.java
 #[no_mangle]
-pub extern "system" fn Java_net_minecraft_util_MthRust_square__F(
+pub extern "system" fn Java_net_minecraft_util_Mth_rustSquare__F(
     _env: JNIEnv,
     _class: JClass,
     value: jfloat,
@@ -178,9 +178,9 @@ pub extern "system" fn Java_net_minecraft_util_MthRust_square__F(
     value * value
 }
 
-/// Square a double
+/// Square a double - migrated from Mth.java
 #[no_mangle]
-pub extern "system" fn Java_net_minecraft_util_MthRust_square__D(
+pub extern "system" fn Java_net_minecraft_util_Mth_rustSquare__D(
     _env: JNIEnv,
     _class: JClass,
     value: jdouble,
@@ -188,9 +188,9 @@ pub extern "system" fn Java_net_minecraft_util_MthRust_square__D(
     value * value
 }
 
-/// Square an int
+/// Square an int - migrated from Mth.java
 #[no_mangle]
-pub extern "system" fn Java_net_minecraft_util_MthRust_square__I(
+pub extern "system" fn Java_net_minecraft_util_Mth_rustSquare__I(
     _env: JNIEnv,
     _class: JClass,
     value: jint,
@@ -198,9 +198,9 @@ pub extern "system" fn Java_net_minecraft_util_MthRust_square__I(
     value * value
 }
 
-/// Square a long
+/// Square a long - migrated from Mth.java
 #[no_mangle]
-pub extern "system" fn Java_net_minecraft_util_MthRust_square__J(
+pub extern "system" fn Java_net_minecraft_util_Mth_rustSquare__J(
     _env: JNIEnv,
     _class: JClass,
     value: jlong,
