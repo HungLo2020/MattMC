@@ -30,24 +30,28 @@ mkdir -p "$MATTMCR_DIR"
 # Copy release binary to MattMCr folder
 echo "Copying binary to MattMCr folder..."
 cp "$BINARY_PATH" "$MATTMCR_DIR/"
+if [ $? -ne 0 ]; then
+    echo "Failed to copy binary to MattMCr folder"
+    exit 1
+fi
 
 # Copy release binary directly to buildrust directory
 echo "Copying binary to buildrust directory..."
 cp "$BINARY_PATH" "$BUILDRUST_DIR/"
+if [ $? -ne 0 ]; then
+    echo "Failed to copy binary to buildrust directory"
+    exit 1
+fi
 
 # Zip the MattMCr directory
 echo "Zipping MattMCr directory..."
-cd "$BUILDRUST_DIR"
-zip -r MattMCr.zip MattMCr
-cd ..
-
-# Check if copy was successful
-if [ $? -eq 0 ]; then
-    echo "Successfully exported mattmc-rust!"
-    echo "  - Binary in: $BUILDRUST_DIR/mattmc-rust"
-    echo "  - MattMCr folder in: $MATTMCR_DIR"
-    echo "  - Zip file: $BUILDRUST_DIR/MattMCr.zip"
-else
-    echo "Failed to create export"
+(cd "$BUILDRUST_DIR" && zip -r MattMCr.zip MattMCr)
+if [ $? -ne 0 ]; then
+    echo "Failed to create zip file"
     exit 1
 fi
+
+echo "Successfully exported mattmc-rust!"
+echo "  - Binary in: $BUILDRUST_DIR/mattmc-rust"
+echo "  - MattMCr folder in: $MATTMCR_DIR"
+echo "  - Zip file: $BUILDRUST_DIR/MattMCr.zip"
