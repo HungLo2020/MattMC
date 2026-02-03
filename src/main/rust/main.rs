@@ -1,6 +1,7 @@
 mod client;
 
 use std::sync::Arc;
+use std::time::Instant;
 use vulkano::buffer::{Buffer, BufferCreateInfo, BufferUsage};
 use vulkano::command_buffer::allocator::{
     StandardCommandBufferAllocator, StandardCommandBufferAllocatorCreateInfo,
@@ -32,13 +33,14 @@ use vulkano::swapchain::{
 };
 use vulkano::sync::{self, GpuFuture};
 use vulkano::{Validated, VulkanError, VulkanLibrary};
-use winit::event::{Event, WindowEvent};
+use winit::event::{Event, WindowEvent, ElementState, VirtualKeyCode, DeviceEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
 use winit::window::{Window, WindowBuilder};
 
-use client::renderer::cube::{CubeVertex, create_cube_vertices};
+use client::renderer::cube::CubeVertex;
 use client::renderer::camera::Camera;
 use client::renderer::shaders::{vertex_shader, fragment_shader};
+use client::renderer::chunk::Chunk;
 
 struct App {
     instance: Arc<Instance>,
@@ -57,6 +59,10 @@ struct App {
     recreate_swapchain: bool,
     previous_frame_end: Option<Box<dyn GpuFuture>>,
     camera: Camera,
+    // Input state
+    keys_pressed: std::collections::HashSet<VirtualKeyCode>,
+    last_frame_time: Instant,
+    cursor_locked: bool,
 }
 
 impl App {
@@ -68,11 +74,15 @@ impl App {
     ) -> (Self, Arc<Window>) {
         let window = Arc::new(
             WindowBuilder::new()
-                .with_title("MattMC Rust/Vulkan - Rotating Cube")
-                .with_inner_size(winit::dpi::LogicalSize::new(800, 600))
+                .with_title("MattMC Rust/Vulkan - Chunk Renderer")
+                .with_inner_size(winit::dpi::LogicalSize::new(1280, 720))
                 .build(event_loop)
                 .unwrap(),
         );
+
+        // Lock cursor for FPS-style controls
+        window.set_cursor_visible(false);
+        let _ = window.set_cursor_grab(winit::window::CursorGrabMode::Confined);
 
         let surface = Surface::from_window(instance.clone(), window.clone()).unwrap();
 
@@ -129,8 +139,11 @@ impl App {
         )
         .unwrap();
 
-        // Create cube vertices
-        let vertices = create_cube_vertices();
+        // Create chunk and generate vertices
+        println!("Generating chunk...");
+        let chunk = Chunk::new();
+        let vertices = chunk.generate_vertices();
+        println!("Generated {} vertices for chunk", vertices.len());
 
         let vertex_buffer = Buffer::from_iter(
             memory_allocator.clone(),
@@ -226,6 +239,9 @@ impl App {
             recreate_swapchain: false,
             previous_frame_end: Some(sync::now(device.clone()).boxed()),
             camera,
+            keys_pressed: std::collections::HashSet::new(),
+            last_frame_time: Instant::now(),
+            cursor_locked: true,
         };
 
         (app, window)
@@ -238,8 +254,73 @@ impl App {
                 self.recreate_swapchain = true;
                 false
             }
+            WindowEvent::KeyboardInput { input, .. } => {
+                if let Some(keycode) = input.virtual_keycode {
+                    match input.state {
+                        ElementState::Pressed => {
+                            self.keys_pressed.insert(keycode);
+                            // ESC to exit
+                            if keycode == VirtualKeyCode::Escape {
+                                return true;
+                            }
+                        }
+                        ElementState::Released => {
+                            self.keys_pressed.remove(&keycode);
+                        }
+                    }
+                }
+                false
+            }
             _ => false,
         }
+    }
+
+    fn handle_device_event(&mut self, event: DeviceEvent) {
+        match event {
+            DeviceEvent::MouseMotion { delta } => {
+                if self.cursor_locked {
+                    self.camera.update_rotation(delta.0 as f32, delta.1 as f32);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    fn update(&mut self) {
+        let current_time = Instant::now();
+        let delta_time = (current_time - self.last_frame_time).as_secs_f32();
+        self.last_frame_time = current_time;
+
+        // Calculate movement based on keys pressed
+        let mut forward = 0.0;
+        let mut right = 0.0;
+        let mut up = 0.0;
+
+        if self.keys_pressed.contains(&VirtualKeyCode::W) {
+            forward += 1.0;
+        }
+        if self.keys_pressed.contains(&VirtualKeyCode::S) {
+            forward -= 1.0;
+        }
+        if self.keys_pressed.contains(&VirtualKeyCode::D) {
+            right += 1.0;
+        }
+        if self.keys_pressed.contains(&VirtualKeyCode::A) {
+            right -= 1.0;
+        }
+        if self.keys_pressed.contains(&VirtualKeyCode::Space) {
+            up += 1.0;
+        }
+        if self.is_control_pressed() {
+            up -= 1.0;
+        }
+
+        self.camera.update_position(delta_time, forward, right, up);
+    }
+
+    fn is_control_pressed(&self) -> bool {
+        self.keys_pressed.contains(&VirtualKeyCode::LControl) ||
+        self.keys_pressed.contains(&VirtualKeyCode::RControl)
     }
 
     fn render(&mut self, window: &Window) {
@@ -302,7 +383,7 @@ impl App {
         builder
             .begin_render_pass(
                 RenderPassBeginInfo {
-                    clear_values: vec![Some([0.1, 0.1, 0.15, 1.0].into())],
+                    clear_values: vec![Some([0.53, 0.81, 0.92, 1.0].into())], // Sky blue
                     ..RenderPassBeginInfo::framebuffer(
                         self.framebuffers[image_index as usize].clone(),
                     )
@@ -457,7 +538,11 @@ fn main() {
                     *control_flow = ControlFlow::Poll;
                 }
             }
+            Event::DeviceEvent { event, .. } => {
+                app.handle_device_event(event);
+            }
             Event::RedrawRequested(_) => {
+                app.update();
                 app.render(&window);
             }
             Event::MainEventsCleared => {
