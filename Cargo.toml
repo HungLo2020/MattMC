@@ -16,6 +16,9 @@ bytemuck = { version = "1.14", features = ["derive"] }
 raw-window-handle = "0.5"
 glam = "0.24"
 
+[build-dependencies]
+# No build dependencies needed - vulkano-shaders handles shader compilation
+
 [profile.dev]
 opt-level = 1
 debug = true

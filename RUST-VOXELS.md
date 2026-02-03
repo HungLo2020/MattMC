@@ -229,8 +229,11 @@ src/main/rust/
 
 **Prerequisites**:
 - Rust 1.70+ (`rustup install stable`)
-- Vulkan SDK installed
-- C++ compiler (for building dependencies)
+- Vulkan-capable GPU with drivers installed
+- C++ compiler (required for building shaderc-sys on first build)
+  - Linux: `gcc` or `clang`
+  - macOS: Xcode Command Line Tools
+  - Windows: MSVC (Visual Studio) or MinGW
 
 **Build Commands**:
 ```bash
@@ -276,12 +279,14 @@ MattMC/
 Current dependencies:
 - **winit**: Cross-platform window creation and input
 - **vulkano**: Safe Vulkan bindings
-- **vulkano-shaders**: Compile GLSL to SPIR-V at build time
-- **bytemuck**: Safe casting between types
+- **vulkano-shaders**: Compile-time GLSL to SPIR-V shader compilation
+- **bytemuck**: Safe casting between types (used for push constants and vertex data)
 - **raw-window-handle**: Platform window handles for Vulkan
+- **glam**: Fast vector/matrix math
+
+**Note on shaders**: Shaders are embedded inline in `src/main/rust/client/renderer/shaders.rs` and compiled to SPIR-V at build time using the `vulkano_shaders::shader!` macro. This requires shaderc to be built on first compile.
 
 Future dependencies to add:
-- **glam**: Fast vector/matrix math
 - **noise**: Noise generation (Perlin, Simplex)
 - **image**: Texture loading
 - **fastnbt**: NBT serialization
