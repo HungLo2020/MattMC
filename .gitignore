@@ -15,6 +15,12 @@ run/
 logs/
 crash-reports/
 
+# Rust
+rusttarget/
+rustrun/
+rust-core/
+Cargo.lock
+
 
 # OS
 .DS_Store
