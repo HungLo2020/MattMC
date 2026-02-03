@@ -415,7 +415,7 @@ Java uses GLSL shaders for OpenGL. These need conversion for Vulkan:
 
 ### Voxel Engine Development  
 - [0fps: Meshing in a Minecraft Game](https://0fps.net/2012/06/30/meshing-in-a-minecraft-game/)
-- [Greedy Meshing Article](https://0fps.net/2012/06/30/meshing-in-a-minecraft-game/)
+- [Voxel Engine Development Guide](https://sites.google.com/site/letsmakeavoxelengine/)
 
 ### Minecraft Internals
 - [Minecraft Wiki - Java Edition Data Values](https://minecraft.wiki/)
