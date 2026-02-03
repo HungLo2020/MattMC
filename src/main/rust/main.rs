@@ -1,5 +1,7 @@
+mod client;
+
 use std::sync::Arc;
-use vulkano::buffer::{Buffer, BufferContents, BufferCreateInfo, BufferUsage};
+use vulkano::buffer::{Buffer, BufferCreateInfo, BufferUsage};
 use vulkano::command_buffer::allocator::{
     StandardCommandBufferAllocator, StandardCommandBufferAllocatorCreateInfo,
 };
@@ -16,13 +18,13 @@ use vulkano::memory::allocator::{AllocationCreateInfo, MemoryTypeFilter, Standar
 use vulkano::pipeline::graphics::color_blend::{ColorBlendAttachmentState, ColorBlendState};
 use vulkano::pipeline::graphics::input_assembly::InputAssemblyState;
 use vulkano::pipeline::graphics::multisample::MultisampleState;
-use vulkano::pipeline::graphics::rasterization::RasterizationState;
+use vulkano::pipeline::graphics::rasterization::{RasterizationState, CullMode};
 use vulkano::pipeline::graphics::vertex_input::{Vertex, VertexDefinition};
 use vulkano::pipeline::graphics::viewport::{Viewport, ViewportState};
 use vulkano::pipeline::graphics::GraphicsPipelineCreateInfo;
 use vulkano::pipeline::layout::PipelineDescriptorSetLayoutCreateInfo;
 use vulkano::pipeline::{
-    DynamicState, GraphicsPipeline, PipelineLayout, PipelineShaderStageCreateInfo,
+    DynamicState, GraphicsPipeline, PipelineLayout, PipelineShaderStageCreateInfo, Pipeline,
 };
 use vulkano::render_pass::{Framebuffer, FramebufferCreateInfo, RenderPass, Subpass};
 use vulkano::swapchain::{
@@ -34,42 +36,9 @@ use winit::event::{Event, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
 use winit::window::{Window, WindowBuilder};
 
-#[derive(BufferContents, Vertex)]
-#[repr(C)]
-struct MyVertex {
-    #[format(R32G32_SFLOAT)]
-    position: [f32; 2],
-}
-
-mod vs {
-    vulkano_shaders::shader! {
-        ty: "vertex",
-        src: r"
-            #version 460
-
-            layout(location = 0) in vec2 position;
-
-            void main() {
-                gl_Position = vec4(position, 0.0, 1.0);
-            }
-        ",
-    }
-}
-
-mod fs {
-    vulkano_shaders::shader! {
-        ty: "fragment",
-        src: r"
-            #version 460
-
-            layout(location = 0) out vec4 f_color;
-
-            void main() {
-                f_color = vec4(1.0, 0.5, 0.2, 1.0);
-            }
-        ",
-    }
-}
+use client::renderer::cube::{CubeVertex, create_cube_vertices};
+use client::renderer::camera::Camera;
+use client::renderer::shaders::{vertex_shader, fragment_shader};
 
 struct App {
     instance: Arc<Instance>,
@@ -81,12 +50,13 @@ struct App {
     render_pass: Arc<RenderPass>,
     framebuffers: Vec<Arc<Framebuffer>>,
     pipeline: Arc<GraphicsPipeline>,
-    vertex_buffer: vulkano::buffer::Subbuffer<[MyVertex]>,
+    vertex_buffer: vulkano::buffer::Subbuffer<[CubeVertex]>,
     viewport: Viewport,
     command_buffer_allocator: Arc<StandardCommandBufferAllocator>,
     memory_allocator: Arc<StandardMemoryAllocator>,
     recreate_swapchain: bool,
     previous_frame_end: Option<Box<dyn GpuFuture>>,
+    camera: Camera,
 }
 
 impl App {
@@ -98,7 +68,7 @@ impl App {
     ) -> (Self, Arc<Window>) {
         let window = Arc::new(
             WindowBuilder::new()
-                .with_title("MattMC Rust/Vulkan - Square Demo")
+                .with_title("MattMC Rust/Vulkan - Rotating Cube")
                 .with_inner_size(winit::dpi::LogicalSize::new(800, 600))
                 .build(event_loop)
                 .unwrap(),
@@ -159,26 +129,8 @@ impl App {
         )
         .unwrap();
 
-        let vertices = [
-            MyVertex {
-                position: [-0.5, -0.5],
-            },
-            MyVertex {
-                position: [0.5, -0.5],
-            },
-            MyVertex {
-                position: [0.5, 0.5],
-            },
-            MyVertex {
-                position: [-0.5, -0.5],
-            },
-            MyVertex {
-                position: [0.5, 0.5],
-            },
-            MyVertex {
-                position: [-0.5, 0.5],
-            },
-        ];
+        // Create cube vertices
+        let vertices = create_cube_vertices();
 
         let vertex_buffer = Buffer::from_iter(
             memory_allocator.clone(),
@@ -195,16 +147,16 @@ impl App {
         )
         .unwrap();
 
-        let vs = vs::load(device.clone())
+        let vs = vertex_shader::load(device.clone())
             .unwrap()
             .entry_point("main")
             .unwrap();
-        let fs = fs::load(device.clone())
+        let fs = fragment_shader::load(device.clone())
             .unwrap()
             .entry_point("main")
             .unwrap();
 
-        let vertex_input_state = MyVertex::per_vertex()
+        let vertex_input_state = CubeVertex::per_vertex()
             .definition(&vs.info().input_interface)
             .unwrap();
 
@@ -223,6 +175,9 @@ impl App {
 
         let subpass = Subpass::from(render_pass.clone(), 0).unwrap();
 
+        let mut rasterization_state = RasterizationState::default();
+        rasterization_state.cull_mode = CullMode::Back;
+
         let pipeline = GraphicsPipeline::new(
             device.clone(),
             None,
@@ -231,7 +186,7 @@ impl App {
                 vertex_input_state: Some(vertex_input_state),
                 input_assembly_state: Some(InputAssemblyState::default()),
                 viewport_state: Some(ViewportState::default()),
-                rasterization_state: Some(RasterizationState::default()),
+                rasterization_state: Some(rasterization_state),
                 multisample_state: Some(MultisampleState::default()),
                 color_blend_state: Some(ColorBlendState::with_attachment_states(
                     subpass.num_color_attachments(),
@@ -252,6 +207,8 @@ impl App {
 
         let framebuffers = window_size_dependent_setup(&images, render_pass.clone(), &mut viewport);
 
+        let camera = Camera::new();
+
         let app = App {
             instance,
             device: device.clone(),
@@ -268,6 +225,7 @@ impl App {
             memory_allocator,
             recreate_swapchain: false,
             previous_frame_end: Some(sync::now(device.clone()).boxed()),
+            camera,
         };
 
         (app, window)
@@ -327,6 +285,13 @@ impl App {
             self.recreate_swapchain = true;
         }
 
+        // Calculate MVP matrix
+        let aspect_ratio = self.viewport.extent[0] / self.viewport.extent[1];
+        let mvp = self.camera.get_mvp_matrix(aspect_ratio);
+        let push_constants = vertex_shader::PushConstants {
+            mvp: mvp.to_cols_array_2d(),
+        };
+
         let mut builder = AutoCommandBufferBuilder::primary(
             &self.command_buffer_allocator,
             self.queue.queue_family_index(),
@@ -337,7 +302,7 @@ impl App {
         builder
             .begin_render_pass(
                 RenderPassBeginInfo {
-                    clear_values: vec![Some([0.0, 0.0, 0.1, 1.0].into())],
+                    clear_values: vec![Some([0.1, 0.1, 0.15, 1.0].into())],
                     ..RenderPassBeginInfo::framebuffer(
                         self.framebuffers[image_index as usize].clone(),
                     )
@@ -351,6 +316,8 @@ impl App {
             .set_viewport(0, [self.viewport.clone()].into_iter().collect())
             .unwrap()
             .bind_pipeline_graphics(self.pipeline.clone())
+            .unwrap()
+            .push_constants(self.pipeline.layout().clone(), 0, push_constants)
             .unwrap()
             .bind_vertex_buffers(0, self.vertex_buffer.clone())
             .unwrap()
