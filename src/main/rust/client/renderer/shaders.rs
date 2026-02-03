@@ -17,7 +17,8 @@ pub mod vertex_shader {
     pub fn load(device: Arc<Device>) -> Result<Arc<ShaderModule>, vulkano::Validated<vulkano::VulkanError>> {
         // Load pre-compiled SPIR-V shader
         let spirv_bytes = include_bytes!("../../../../../shaders/compiled/vertex.spv");
-        let spirv_words = spirv::bytes_to_words(spirv_bytes).unwrap();
+        let spirv_words = spirv::bytes_to_words(spirv_bytes)
+            .expect("Failed to convert vertex shader SPIR-V bytes to words");
         let create_info = ShaderModuleCreateInfo::new(&spirv_words);
         unsafe { ShaderModule::new(device, create_info) }
     }
@@ -30,7 +31,8 @@ pub mod fragment_shader {
     pub fn load(device: Arc<Device>) -> Result<Arc<ShaderModule>, vulkano::Validated<vulkano::VulkanError>> {
         // Load pre-compiled SPIR-V shader
         let spirv_bytes = include_bytes!("../../../../../shaders/compiled/fragment.spv");
-        let spirv_words = spirv::bytes_to_words(spirv_bytes).unwrap();
+        let spirv_words = spirv::bytes_to_words(spirv_bytes)
+            .expect("Failed to convert fragment shader SPIR-V bytes to words");
         let create_info = ShaderModuleCreateInfo::new(&spirv_words);
         unsafe { ShaderModule::new(device, create_info) }
     }
