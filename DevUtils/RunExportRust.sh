@@ -9,27 +9,45 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-# Define target directory
-TARGET_DIR="/home/matt/Downloads/MattMCr"
+# Define buildrust directory in project root
+BUILDRUST_DIR="buildrust"
+MATTMCR_DIR="$BUILDRUST_DIR/MattMCr"
+BINARY_PATH="rusttarget/release/mattmc-rust"
 
-# Remove existing directory if it exists (wipe completely)
-if [ -d "$TARGET_DIR" ]; then
-    echo "Removing existing directory: $TARGET_DIR"
-    rm -rf "$TARGET_DIR"
+# Clean buildrust directory if it exists
+if [ -d "$BUILDRUST_DIR" ]; then
+    echo "Cleaning existing buildrust directory..."
+    rm -rf "$BUILDRUST_DIR"/*
+else
+    echo "Creating buildrust directory..."
+    mkdir -p "$BUILDRUST_DIR"
 fi
 
-# Create the target directory
-echo "Creating directory: $TARGET_DIR"
-mkdir -p "$TARGET_DIR"
+# Create MattMCr subdirectory
+echo "Creating MattMCr directory in buildrust..."
+mkdir -p "$MATTMCR_DIR"
 
-# Copy the executable to the target directory
-echo "Copying executable to $TARGET_DIR"
-cp rusttarget/release/mattmc-rust "$TARGET_DIR/"
+# Copy release binary to MattMCr folder
+echo "Copying binary to MattMCr folder..."
+cp "$BINARY_PATH" "$MATTMCR_DIR/"
+
+# Copy release binary directly to buildrust directory
+echo "Copying binary to buildrust directory..."
+cp "$BINARY_PATH" "$BUILDRUST_DIR/"
+
+# Zip the MattMCr directory
+echo "Zipping MattMCr directory..."
+cd "$BUILDRUST_DIR"
+zip -r MattMCr.zip MattMCr
+cd ..
 
 # Check if copy was successful
 if [ $? -eq 0 ]; then
-    echo "Successfully exported mattmc-rust to $TARGET_DIR"
+    echo "Successfully exported mattmc-rust!"
+    echo "  - Binary in: $BUILDRUST_DIR/mattmc-rust"
+    echo "  - MattMCr folder in: $MATTMCR_DIR"
+    echo "  - Zip file: $BUILDRUST_DIR/MattMCr.zip"
 else
-    echo "Failed to copy executable"
+    echo "Failed to create export"
     exit 1
 fi

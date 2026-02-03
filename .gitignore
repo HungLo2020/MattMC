@@ -20,6 +20,7 @@ rusttarget/
 rustrun/
 rust-core/
 Cargo.lock
+buildrust/
 
 
 # OS
