@@ -11,7 +11,8 @@ pub struct CubeVertex {
 }
 
 pub fn create_cube_vertices() -> Vec<CubeVertex> {
-    // Define 8 vertices of a cube centered at origin
+    // Create 36 vertices for 6 cube faces (each face = 2 triangles = 6 vertices)
+    // Cube is centered at origin with size 1.0
     let vertices = vec![
         // Front face (red-ish)
         CubeVertex { position: [-0.5, -0.5,  0.5], color: [1.0, 0.0, 0.0] },  // 0
