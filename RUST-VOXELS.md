@@ -229,8 +229,8 @@ src/main/rust/
 
 **Prerequisites**:
 - Rust 1.70+ (`rustup install stable`)
-- Vulkan SDK installed
-- C++ compiler (for building dependencies)
+- Vulkan-capable GPU with drivers installed
+- **Note**: No cmake or C++ compiler required for building the project!
 
 **Build Commands**:
 ```bash
@@ -276,12 +276,13 @@ MattMC/
 Current dependencies:
 - **winit**: Cross-platform window creation and input
 - **vulkano**: Safe Vulkan bindings
-- **vulkano-shaders**: Compile GLSL to SPIR-V at build time
-- **bytemuck**: Safe casting between types
+- **bytemuck**: Safe casting between types (used for push constants and vertex data)
 - **raw-window-handle**: Platform window handles for Vulkan
+- **glam**: Fast vector/matrix math (currently used)
+
+**Note on shaders**: The project uses pre-compiled SPIR-V shaders instead of `vulkano-shaders` to avoid cmake dependency. See `shaders/README.md` for details.
 
 Future dependencies to add:
-- **glam**: Fast vector/matrix math
 - **noise**: Noise generation (Perlin, Simplex)
 - **image**: Texture loading
 - **fastnbt**: NBT serialization
