@@ -85,7 +85,8 @@ impl Camera {
     }
     
     pub fn get_projection_matrix(&self, aspect_ratio: f32) -> Mat4 {
-        // Perspective projection, 45° FOV
+        // Vulkan-compatible perspective projection
+        // Uses proper Y-axis flip and depth range [0, 1]
     }
     
     pub fn get_mvp_matrix(&self, aspect_ratio: f32) -> Mat4 {
@@ -93,6 +94,12 @@ impl Camera {
     }
 }
 ```
+
+**Important**: The projection matrix is specifically tailored for Vulkan's coordinate system:
+- Y-axis is flipped in clip space (uses `-f` instead of `f`)
+- Depth range is [0, 1] instead of OpenGL's [-1, 1]
+
+This prevents the fisheye/warping effect that would occur with a standard OpenGL projection matrix.
 
 ### 3. Shaders (`client/renderer/shaders.rs`)
 

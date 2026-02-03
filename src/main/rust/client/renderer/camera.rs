@@ -22,13 +22,21 @@ impl Camera {
     }
 
     pub fn get_projection_matrix(&self, aspect_ratio: f32) -> Mat4 {
-        // Perspective projection
-        Mat4::perspective_rh(
-            45.0_f32.to_radians(),  // Field of view
-            aspect_ratio,            // Aspect ratio
-            0.1,                     // Near plane
-            100.0,                   // Far plane
-        )
+        // Vulkan-compatible perspective projection
+        // Vulkan has Y-axis inverted and depth range [0, 1] (not [-1, 1] like OpenGL)
+        let fov_y = 45.0_f32.to_radians();
+        let near = 0.1;
+        let far = 100.0;
+        
+        // Create perspective matrix for Vulkan
+        let f = 1.0 / (fov_y / 2.0).tan();
+        
+        Mat4::from_cols_array(&[
+            f / aspect_ratio, 0.0,  0.0,                           0.0,
+            0.0,             -f,    0.0,                           0.0,  // Note: -f for Vulkan Y-flip
+            0.0,              0.0,  far / (near - far),           -1.0,
+            0.0,              0.0,  (near * far) / (near - far),   0.0,
+        ])
     }
 
     pub fn get_model_matrix(&self) -> Mat4 {

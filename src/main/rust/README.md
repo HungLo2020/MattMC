@@ -58,6 +58,7 @@ cargo run --release
 2. MVP matrix calculated each frame:
    - Model: Rotation based on elapsed time
    - View: Camera at (0, 0, 3) looking at origin
+   - Projection: Vulkan-compatible perspective (Y-flipped, depth [0,1])
    - Projection: Perspective with 45° FOV
 3. Push constants send MVP matrix to vertex shader
 4. Vertex shader transforms positions, passes colors to fragment shader
