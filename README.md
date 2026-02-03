@@ -65,18 +65,43 @@ MattMC/
 
 MattMC is being rebuilt from scratch using Rust and Vulkan for improved performance and modern graphics. The Rust code is located in `src/main/rust/`.
 
-**Building the Rust project:**
-- **Prerequisites**: Rust 1.70+ (`rustup install stable`) and a Vulkan-capable GPU with drivers
-- **Windows users**: See [WINDOWS_BUILD.md](WINDOWS_BUILD.md) for detailed build instructions
-- **Build dependencies**: The build process will automatically compile shaders using shaderc
-  - **Recommended**: Install the [Vulkan SDK](https://vulkan.lunarg.com/sdk/home) (includes shaderc)
-  - **Alternative**: Install cmake - the build will compile shaderc from source
-  - On Linux: `sudo apt install libshaderc-dev` or `sudo apt install cmake`
-  - On macOS: `brew install cmake` or install Vulkan SDK
-- See [Rust Build Workflow Documentation](docs/RUST_BUILD_WORKFLOW.md) for automated builds
-- Manual build: `cargo build --release`
-- Run: `cargo run --release`
+### ⚠️ IMPORTANT: Before Building
 
-**Shaders**: GLSL shaders are embedded inline in `src/main/rust/client/renderer/shaders.rs` and compiled to SPIR-V at build time using the `vulkano_shaders::shader!` macro.
+**The Rust build WILL FAIL without these dependencies installed:**
+
+**Windows users:**
+1. Install [Vulkan SDK](https://vulkan.lunarg.com/sdk/home) (recommended) OR [cmake](https://cmake.org/download/)
+2. Restart your terminal/IDE after installation
+3. See [WINDOWS_BUILD.md](WINDOWS_BUILD.md) for detailed instructions
+
+**macOS users:**
+```bash
+brew install cmake
+# OR install Vulkan SDK from https://vulkan.lunarg.com/sdk/home
+```
+
+**Linux users:**
+```bash
+sudo apt install cmake
+# OR
+sudo apt install libshaderc-dev
+```
+
+### Building the Rust Project
+
+Once you have the dependencies installed:
+
+```bash
+cargo build --release  # Build optimized binary
+cargo run --release    # Build and run
+```
+
+**Why these dependencies?** The build compiles GLSL shaders to SPIR-V at build time using `vulkano_shaders::shader!` macro, which requires either:
+- Pre-built shaderc libraries (from Vulkan SDK), OR
+- cmake to build shaderc from source
+
+**Shaders**: GLSL shaders are embedded inline in `src/main/rust/client/renderer/shaders.rs` and compiled to SPIR-V at build time.
+
+For more details, see [Rust Build Workflow Documentation](docs/RUST_BUILD_WORKFLOW.md).
 
 The project includes a GitHub Actions workflow for building releases for Linux, Windows, and macOS. See the documentation for details on how to trigger builds and create releases.
