@@ -11,9 +11,13 @@ path = "src/main/rust/main.rs"
 [dependencies]
 winit = "0.28"
 vulkano = "0.34"
+vulkano-shaders = "0.34"
 bytemuck = { version = "1.14", features = ["derive"] }
 raw-window-handle = "0.5"
 glam = "0.24"
+
+[build-dependencies]
+# No build dependencies needed - vulkano-shaders handles shader compilation
 
 [profile.dev]
 opt-level = 1

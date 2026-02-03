@@ -67,11 +67,13 @@ MattMC is being rebuilt from scratch using Rust and Vulkan for improved performa
 
 **Building the Rust project:**
 - **Prerequisites**: Rust 1.70+ (`rustup install stable`) and a Vulkan-capable GPU with drivers
-- **No cmake required!** The project uses pre-compiled shaders to avoid build-time dependencies
+- **Build dependencies**: The build process will automatically compile shaders using shaderc
+  - On first build, shaderc-sys will be built from source (requires a C++ compiler)
+  - Alternatively, set `VULKAN_SDK` environment variable if you have the Vulkan SDK installed
 - See [Rust Build Workflow Documentation](docs/RUST_BUILD_WORKFLOW.md) for automated builds
 - Manual build: `cargo build --release`
 - Run: `cargo run --release`
 
-**Note**: The shaders are pre-compiled to SPIR-V and included in the repository. If you need to modify shaders, see `shaders/README.md` for instructions.
+**Shaders**: GLSL shaders are embedded inline in `src/main/rust/client/renderer/shaders.rs` and compiled to SPIR-V at build time using the `vulkano_shaders::shader!` macro.
 
 The project includes a GitHub Actions workflow for building releases for Linux, Windows, and macOS. See the documentation for details on how to trigger builds and create releases.

@@ -1,39 +1,38 @@
-use std::sync::Arc;
-use vulkano::device::Device;
-use vulkano::shader::{ShaderModule, ShaderModuleCreateInfo};
-use vulkano::shader::spirv;
-
 pub mod vertex_shader {
-    use super::*;
+    vulkano_shaders::shader! {
+        ty: "vertex",
+        src: r"
+            #version 460
 
-    /// Push constants for the vertex shader
-    #[repr(C)]
-    #[derive(Clone, Copy, Debug, bytemuck::Pod, bytemuck::Zeroable)]
-    pub struct PushConstants {
-        pub mvp: [[f32; 4]; 4],
-    }
+            layout(location = 0) in vec3 position;
+            layout(location = 1) in vec3 color;
 
-    /// Load the pre-compiled vertex shader
-    pub fn load(device: Arc<Device>) -> Result<Arc<ShaderModule>, vulkano::Validated<vulkano::VulkanError>> {
-        // Load pre-compiled SPIR-V shader
-        let spirv_bytes = include_bytes!("../../../../../shaders/compiled/vertex.spv");
-        let spirv_words = spirv::bytes_to_words(spirv_bytes)
-            .expect("Failed to convert vertex shader SPIR-V bytes to words");
-        let create_info = ShaderModuleCreateInfo::new(&spirv_words);
-        unsafe { ShaderModule::new(device, create_info) }
+            layout(push_constant) uniform PushConstants {
+                mat4 mvp;
+            } push_constants;
+
+            layout(location = 0) out vec3 frag_color;
+
+            void main() {
+                gl_Position = push_constants.mvp * vec4(position, 1.0);
+                frag_color = color;
+            }
+        ",
     }
 }
 
 pub mod fragment_shader {
-    use super::*;
+    vulkano_shaders::shader! {
+        ty: "fragment",
+        src: r"
+            #version 460
 
-    /// Load the pre-compiled fragment shader
-    pub fn load(device: Arc<Device>) -> Result<Arc<ShaderModule>, vulkano::Validated<vulkano::VulkanError>> {
-        // Load pre-compiled SPIR-V shader
-        let spirv_bytes = include_bytes!("../../../../../shaders/compiled/fragment.spv");
-        let spirv_words = spirv::bytes_to_words(spirv_bytes)
-            .expect("Failed to convert fragment shader SPIR-V bytes to words");
-        let create_info = ShaderModuleCreateInfo::new(&spirv_words);
-        unsafe { ShaderModule::new(device, create_info) }
+            layout(location = 0) in vec3 frag_color;
+            layout(location = 0) out vec4 out_color;
+
+            void main() {
+                out_color = vec4(frag_color, 1.0);
+            }
+        ",
     }
 }
