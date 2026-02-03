@@ -67,9 +67,12 @@ MattMC is being rebuilt from scratch using Rust and Vulkan for improved performa
 
 **Building the Rust project:**
 - **Prerequisites**: Rust 1.70+ (`rustup install stable`) and a Vulkan-capable GPU with drivers
+- **Windows users**: See [WINDOWS_BUILD.md](WINDOWS_BUILD.md) for detailed build instructions
 - **Build dependencies**: The build process will automatically compile shaders using shaderc
-  - On first build, shaderc-sys will be built from source (requires a C++ compiler)
-  - Alternatively, set `VULKAN_SDK` environment variable if you have the Vulkan SDK installed
+  - **Recommended**: Install the [Vulkan SDK](https://vulkan.lunarg.com/sdk/home) (includes shaderc)
+  - **Alternative**: Install cmake - the build will compile shaderc from source
+  - On Linux: `sudo apt install libshaderc-dev` or `sudo apt install cmake`
+  - On macOS: `brew install cmake` or install Vulkan SDK
 - See [Rust Build Workflow Documentation](docs/RUST_BUILD_WORKFLOW.md) for automated builds
 - Manual build: `cargo build --release`
 - Run: `cargo run --release`
