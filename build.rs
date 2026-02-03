@@ -6,6 +6,8 @@ fn main() {
     // However, it provides helpful messages when the build succeeds.
     
     println!("cargo:rerun-if-changed=src/main/rust/client/renderer/shaders.rs");
+    println!("cargo:rerun-if-changed=src/main/rust/shaders/vertex.glsl");
+    println!("cargo:rerun-if-changed=src/main/rust/shaders/fragment.glsl");
     
     // Check for cmake availability (required by shaderc-sys if building from source)
     let cmake_available = Command::new("cmake")

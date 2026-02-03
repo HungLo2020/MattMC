@@ -70,7 +70,7 @@ MattMC is being rebuilt from scratch using Rust and Vulkan for improved performa
 - **Build**: `cargo build --release`
 - **Run**: `cargo run --release`
 
-**Shaders**: GLSL shaders are embedded inline in `src/main/rust/client/renderer/shaders.rs` and compiled to SPIR-V at build time.
+**Shaders**: GLSL shaders are located in `src/main/rust/shaders/` and compiled to SPIR-V at build time.
 
 See [Rust Build Workflow Documentation](docs/RUST_BUILD_WORKFLOW.md) for automated builds.
 
