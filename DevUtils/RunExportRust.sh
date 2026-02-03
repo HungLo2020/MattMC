@@ -37,10 +37,14 @@ fi
 
 # Copy packaging/rust/ contents to MattMCr folder
 echo "Copying packaging/rust/ contents to MattMCr folder..."
-cp -r packaging/rust/* "$MATTMCR_DIR/"
-if [ $? -ne 0 ]; then
-    echo "Failed to copy packaging/rust/ contents"
-    exit 1
+if [ -d "packaging/rust" ] && [ "$(ls -A packaging/rust)" ]; then
+    cp -r packaging/rust/. "$MATTMCR_DIR/"
+    if [ $? -ne 0 ]; then
+        echo "Failed to copy packaging/rust/ contents"
+        exit 1
+    fi
+else
+    echo "Warning: packaging/rust/ is empty or does not exist, skipping..."
 fi
 
 # Copy release binary directly to buildrust directory
