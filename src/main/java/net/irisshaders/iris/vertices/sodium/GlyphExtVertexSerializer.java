@@ -1,7 +1,7 @@
 package net.irisshaders.iris.vertices.sodium;
 
-import com.mojang.blaze3d.vertex.DefaultVertexFormat;
-import com.mojang.blaze3d.vertex.VertexFormatElement;
+import net.blaze3d.vertex.DefaultVertexFormat;
+import net.blaze3d.vertex.VertexFormatElement;
 import net.sodium.api.memory.MemoryIntrinsics;
 import net.sodium.api.vertex.serializer.VertexSerializer;
 import net.irisshaders.iris.uniforms.CapturedRenderingState;

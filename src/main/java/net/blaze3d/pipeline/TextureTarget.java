@@ -1,0 +1,15 @@
+package net.blaze3d.pipeline;
+
+import net.blaze3d.systems.RenderSystem;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
+import org.jetbrains.annotations.Nullable;
+
+@Environment(EnvType.CLIENT)
+public class TextureTarget extends RenderTarget {
+	public TextureTarget(@Nullable String string, int i, int j, boolean bl) {
+		super(string, bl);
+		RenderSystem.assertOnRenderThread();
+		this.resize(i, j);
+	}
+}

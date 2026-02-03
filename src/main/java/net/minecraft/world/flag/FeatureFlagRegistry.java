@@ -1,7 +1,7 @@
 package net.minecraft.world.flag;
 
 import com.google.common.collect.Sets;
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.DataResult;
 import java.util.Arrays;

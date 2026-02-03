@@ -1,8 +1,8 @@
 package net.minecraft.client.renderer;
 
 import com.google.common.collect.ImmutableList;
-import com.mojang.blaze3d.pipeline.RenderTarget;
-import com.mojang.blaze3d.systems.RenderSystem;
+import net.blaze3d.pipeline.RenderTarget;
+import net.blaze3d.systems.RenderSystem;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;

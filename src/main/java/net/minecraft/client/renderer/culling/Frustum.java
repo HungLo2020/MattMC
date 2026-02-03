@@ -1,8 +1,8 @@
 package net.minecraft.client.renderer.culling;
 
-import net.caffeinemc.mods.sodium.client.render.viewport.Viewport;
-import net.caffeinemc.mods.sodium.client.render.viewport.ViewportProvider;
-import net.caffeinemc.mods.sodium.client.render.viewport.frustum.SimpleFrustum;
+import net.sodium.client.render.viewport.Viewport;
+import net.sodium.client.render.viewport.ViewportProvider;
+import net.sodium.client.render.viewport.frustum.SimpleFrustum;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.world.level.levelgen.structure.BoundingBox;

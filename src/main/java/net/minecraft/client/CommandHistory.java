@@ -1,7 +1,7 @@
 package net.minecraft.client;
 
 import com.google.common.base.Charsets;
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.IOException;

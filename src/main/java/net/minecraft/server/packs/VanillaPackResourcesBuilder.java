@@ -2,7 +2,7 @@ package net.minecraft.server.packs;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableMap.Builder;
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URL;

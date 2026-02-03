@@ -1,7 +1,7 @@
 package net.minecraft.server.network;
 
 import net.minecraft.server.profile.PlayerProfile;
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;

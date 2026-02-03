@@ -1,6 +1,6 @@
 package net.minecraft.util;
 
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.function.Consumer;

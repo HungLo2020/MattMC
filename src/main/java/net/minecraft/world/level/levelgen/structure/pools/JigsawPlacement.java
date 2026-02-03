@@ -1,7 +1,7 @@
 package net.minecraft.world.level.levelgen.structure.pools;
 
 import com.google.common.collect.Lists;
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import java.util.List;
 import java.util.Optional;
 import net.minecraft.core.BlockPos;

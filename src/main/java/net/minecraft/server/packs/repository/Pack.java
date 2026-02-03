@@ -1,6 +1,6 @@
 package net.minecraft.server.packs.repository;
 
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import java.util.List;
 import java.util.function.Function;
 import net.minecraft.SharedConstants;

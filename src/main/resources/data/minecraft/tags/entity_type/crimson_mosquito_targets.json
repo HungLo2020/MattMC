@@ -1,0 +1,9 @@
+{
+  "__comment": "all non-player targets of the crimson mosquito mob.",
+  "replace": false,
+  "values": [
+    "#minecraft:passive_land_animals",
+    "#minecraft:neutral_land_animals",
+    "#minecraft:villagers"
+  ]
+}

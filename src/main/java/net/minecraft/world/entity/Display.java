@@ -1,7 +1,7 @@
 package net.minecraft.world.entity;
 
-import com.mojang.logging.LogUtils;
-import com.mojang.math.Transformation;
+import net.logging.LogUtils;
+import net.math.Transformation;
 import com.mojang.serialization.Codec;
 import it.unimi.dsi.fastutil.ints.IntSet;
 import java.util.List;

@@ -1,10 +1,10 @@
 package net.minecraft.client.gui.font;
 
 import com.google.common.collect.Sets;
-import com.mojang.blaze3d.font.GlyphBitmap;
-import com.mojang.blaze3d.font.GlyphInfo;
-import com.mojang.blaze3d.font.GlyphProvider;
-import com.mojang.blaze3d.font.UnbakedGlyph;
+import net.blaze3d.font.GlyphBitmap;
+import net.blaze3d.font.GlyphInfo;
+import net.blaze3d.font.GlyphProvider;
+import net.blaze3d.font.UnbakedGlyph;
 import it.unimi.dsi.fastutil.ints.Int2ObjectFunction;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;

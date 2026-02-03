@@ -20,9 +20,11 @@ import net.minecraft.util.ExtraCodecs;
 import net.minecraft.util.SimpleBitStorage;
 import net.minecraft.util.ThreadingDetector;
 import net.minecraft.util.ZeroBitStorage;
+import net.sodium.client.world.BitStorageExtension;
+import net.sodium.client.world.PalettedContainerROExtension;
 import org.jetbrains.annotations.Nullable;
 
-public class PalettedContainer<T> implements PaletteResize<T>, PalettedContainerRO<T>, net.caffeinemc.mods.sodium.client.world.PalettedContainerROExtension<T> {
+public class PalettedContainer<T> implements PaletteResize<T>, PalettedContainerRO<T>, PalettedContainerROExtension<T> {
 	private static final int MIN_PALETTE_BITS = 0;
 	private volatile PalettedContainer.Data<T> data;
 	private final Strategy<T> strategy;
@@ -349,7 +351,7 @@ public class PalettedContainer<T> implements PaletteResize<T>, PalettedContainer
 
 		PalettedContainer.Data<T> data = java.util.Objects.requireNonNull(this.data, "PalettedContainer must have data");
 
-		net.caffeinemc.mods.sodium.client.world.BitStorageExtension storage = (net.caffeinemc.mods.sodium.client.world.BitStorageExtension) data.storage();
+		BitStorageExtension storage = (BitStorageExtension) data.storage();
 		storage.sodium$unpack(values, data.palette());
 	}
 

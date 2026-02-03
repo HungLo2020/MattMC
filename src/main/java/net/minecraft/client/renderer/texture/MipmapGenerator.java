@@ -1,10 +1,10 @@
 package net.minecraft.client.renderer.texture;
 
-import com.mojang.blaze3d.platform.NativeImage;
+import net.blaze3d.platform.NativeImage;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
-import net.minecraft.Util;
 import net.minecraft.util.ARGB;
+import net.sodium.client.util.color.ColorSRGB;
 
 @Environment(EnvType.CLIENT)
 public class MipmapGenerator {
@@ -101,13 +101,13 @@ public class MipmapGenerator {
 		float relativeWeightTwo = alphaTwo * scale;
 
 		// Convert the color components into linear space, then multiply the corresponding weight.
-		float oneR = net.caffeinemc.mods.sodium.client.util.color.ColorSRGB.srgbToLinear(net.sodium.api.util.ColorABGR.unpackRed(one)) * relativeWeightOne;
-		float oneG = net.caffeinemc.mods.sodium.client.util.color.ColorSRGB.srgbToLinear(net.sodium.api.util.ColorABGR.unpackGreen(one)) * relativeWeightOne;
-		float oneB = net.caffeinemc.mods.sodium.client.util.color.ColorSRGB.srgbToLinear(net.sodium.api.util.ColorABGR.unpackBlue(one)) * relativeWeightOne;
+		float oneR = ColorSRGB.srgbToLinear(net.sodium.api.util.ColorABGR.unpackRed(one)) * relativeWeightOne;
+		float oneG = ColorSRGB.srgbToLinear(net.sodium.api.util.ColorABGR.unpackGreen(one)) * relativeWeightOne;
+		float oneB = ColorSRGB.srgbToLinear(net.sodium.api.util.ColorABGR.unpackBlue(one)) * relativeWeightOne;
 
-		float twoR = net.caffeinemc.mods.sodium.client.util.color.ColorSRGB.srgbToLinear(net.sodium.api.util.ColorABGR.unpackRed(two)) * relativeWeightTwo;
-		float twoG = net.caffeinemc.mods.sodium.client.util.color.ColorSRGB.srgbToLinear(net.sodium.api.util.ColorABGR.unpackGreen(two)) * relativeWeightTwo;
-		float twoB = net.caffeinemc.mods.sodium.client.util.color.ColorSRGB.srgbToLinear(net.sodium.api.util.ColorABGR.unpackBlue(two)) * relativeWeightTwo;
+		float twoR = ColorSRGB.srgbToLinear(net.sodium.api.util.ColorABGR.unpackRed(two)) * relativeWeightTwo;
+		float twoG = ColorSRGB.srgbToLinear(net.sodium.api.util.ColorABGR.unpackGreen(two)) * relativeWeightTwo;
+		float twoB = ColorSRGB.srgbToLinear(net.sodium.api.util.ColorABGR.unpackBlue(two)) * relativeWeightTwo;
 
 		// Combine the color components of each color
 		float linearR = oneR + twoR;
@@ -118,19 +118,19 @@ public class MipmapGenerator {
 		int averageAlpha = (alphaOne + alphaTwo) >> 1;
 
 		// Convert to sRGB and pack the colors back into an integer.
-		return net.caffeinemc.mods.sodium.client.util.color.ColorSRGB.linearToSrgb(linearR, linearG, linearB, averageAlpha);
+		return ColorSRGB.linearToSrgb(linearR, linearG, linearB, averageAlpha);
 	}
 
 	// Computes a non-weighted average of the two sRGB colors in linear space, avoiding brightness losses.
 	private static int averageRgb(int a, int b, int alpha) {
-		float ar = net.caffeinemc.mods.sodium.client.util.color.ColorSRGB.srgbToLinear(net.sodium.api.util.ColorABGR.unpackRed(a));
-		float ag = net.caffeinemc.mods.sodium.client.util.color.ColorSRGB.srgbToLinear(net.sodium.api.util.ColorABGR.unpackGreen(a));
-		float ab = net.caffeinemc.mods.sodium.client.util.color.ColorSRGB.srgbToLinear(net.sodium.api.util.ColorABGR.unpackBlue(a));
+		float ar = ColorSRGB.srgbToLinear(net.sodium.api.util.ColorABGR.unpackRed(a));
+		float ag = ColorSRGB.srgbToLinear(net.sodium.api.util.ColorABGR.unpackGreen(a));
+		float ab = ColorSRGB.srgbToLinear(net.sodium.api.util.ColorABGR.unpackBlue(a));
 
-		float br = net.caffeinemc.mods.sodium.client.util.color.ColorSRGB.srgbToLinear(net.sodium.api.util.ColorABGR.unpackRed(b));
-		float bg = net.caffeinemc.mods.sodium.client.util.color.ColorSRGB.srgbToLinear(net.sodium.api.util.ColorABGR.unpackGreen(b));
-		float bb = net.caffeinemc.mods.sodium.client.util.color.ColorSRGB.srgbToLinear(net.sodium.api.util.ColorABGR.unpackBlue(b));
+		float br = ColorSRGB.srgbToLinear(net.sodium.api.util.ColorABGR.unpackRed(b));
+		float bg = ColorSRGB.srgbToLinear(net.sodium.api.util.ColorABGR.unpackGreen(b));
+		float bb = ColorSRGB.srgbToLinear(net.sodium.api.util.ColorABGR.unpackBlue(b));
 
-		return net.caffeinemc.mods.sodium.client.util.color.ColorSRGB.linearToSrgb((ar + br) * 0.5f, (ag + bg) * 0.5f, (ab + bb) * 0.5f, alpha);
+		return ColorSRGB.linearToSrgb((ar + br) * 0.5f, (ag + bg) * 0.5f, (ab + bb) * 0.5f, alpha);
 	}
 }

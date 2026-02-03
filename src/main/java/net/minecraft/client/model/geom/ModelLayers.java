@@ -299,6 +299,7 @@ public class ModelLayers {
 	public static final ModelLayerLocation ZOMBIE_VILLAGER_BABY_NO_HAT = register("zombie_villager_baby_no_hat");
 	public static final ArmorModelSet<ModelLayerLocation> ZOMBIE_VILLAGER_BABY_ARMOR = registerArmorSet("zombie_villager_baby");
 	public static final ArmorModelSet<ModelLayerLocation> ZOMBIE_VILLAGER_ARMOR = registerArmorSet("zombie_villager");
+	public static final ModelLayerLocation UNDERMINER = register("underminer");
 	public static final ModelLayerLocation ZOMBIFIED_PIGLIN = register("zombified_piglin");
 	public static final ModelLayerLocation ZOMBIFIED_PIGLIN_BABY = register("zombified_piglin_baby");
 	public static final ArmorModelSet<ModelLayerLocation> ZOMBIFIED_PIGLIN_BABY_ARMOR = registerArmorSet("zombified_piglin_baby");

@@ -12,8 +12,6 @@ import com.github.alexthe666.alexsmobs.event.ServerEvents;
 import com.github.alexthe666.alexsmobs.inventory.AMMenuRegistry;
 import com.github.alexthe666.alexsmobs.item.AMArmorMaterial;
 import com.github.alexthe666.alexsmobs.item.AMItemRegistry;
-import com.github.alexthe666.alexsmobs.message.*;
-import com.github.alexthe666.alexsmobs.misc.*;
 import com.github.alexthe666.alexsmobs.tileentity.AMTileEntityRegistry;
 import com.github.alexthe666.alexsmobs.world.AMFeatureRegistry;
 import com.github.alexthe666.alexsmobs.world.AMLeafcutterAntBiomeModifier;

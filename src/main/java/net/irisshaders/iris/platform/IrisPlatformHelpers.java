@@ -1,6 +1,6 @@
 package net.irisshaders.iris.platform;
 
-import com.mojang.blaze3d.textures.TextureFormat;
+import net.blaze3d.textures.TextureFormat;
 import net.irisshaders.iris.gl.texture.DepthBufferFormat;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.core.BlockPos;

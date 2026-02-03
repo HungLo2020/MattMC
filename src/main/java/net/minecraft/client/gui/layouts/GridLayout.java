@@ -1,6 +1,6 @@
 package net.minecraft.client.gui.layouts;
 
-import com.mojang.math.Divisor;
+import net.math.Divisor;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;

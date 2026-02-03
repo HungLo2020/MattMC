@@ -14,7 +14,7 @@ import com.mojang.datafixers.types.Type;
 import com.mojang.datafixers.util.Pair;
 import com.mojang.jtracy.TracyClient;
 import com.mojang.jtracy.Zone;
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import com.mojang.serialization.DataResult;
 import com.mojang.serialization.Dynamic;
 import it.unimi.dsi.fastutil.ints.IntArrayList;

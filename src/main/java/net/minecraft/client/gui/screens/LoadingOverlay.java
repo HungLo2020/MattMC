@@ -1,8 +1,8 @@
 package net.minecraft.client.gui.screens;
 
-import com.mojang.blaze3d.platform.NativeImage;
-import com.mojang.blaze3d.platform.Window;
-import com.mojang.blaze3d.systems.RenderSystem;
+import net.blaze3d.platform.NativeImage;
+import net.blaze3d.platform.Window;
+import net.blaze3d.systems.RenderSystem;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Optional;

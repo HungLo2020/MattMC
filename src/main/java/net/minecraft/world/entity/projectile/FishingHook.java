@@ -1,6 +1,6 @@
 package net.minecraft.world.entity.projectile;
 
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import java.util.Collections;
 import java.util.List;
 import net.minecraft.advancements.CriteriaTriggers;

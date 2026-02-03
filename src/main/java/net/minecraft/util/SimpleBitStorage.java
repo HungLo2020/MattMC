@@ -1,7 +1,7 @@
 package net.minecraft.util;
 
 import java.util.function.IntConsumer;
-import net.caffeinemc.mods.sodium.client.world.BitStorageExtension;
+import net.sodium.client.world.BitStorageExtension;
 import net.minecraft.world.level.chunk.Palette;
 import org.apache.commons.lang3.Validate;
 import org.jetbrains.annotations.Nullable;

@@ -1,16 +1,16 @@
 package net.minecraft.client.renderer;
 
-import com.mojang.blaze3d.buffers.GpuBuffer;
-import com.mojang.blaze3d.buffers.Std140Builder;
-import com.mojang.blaze3d.buffers.Std140SizeCalculator;
-import com.mojang.blaze3d.systems.CommandEncoder;
-import com.mojang.blaze3d.systems.GpuDevice;
-import com.mojang.blaze3d.systems.RenderPass;
-import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.textures.FilterMode;
-import com.mojang.blaze3d.textures.GpuTexture;
-import com.mojang.blaze3d.textures.GpuTextureView;
-import com.mojang.blaze3d.textures.TextureFormat;
+import net.blaze3d.buffers.GpuBuffer;
+import net.blaze3d.buffers.Std140Builder;
+import net.blaze3d.buffers.Std140SizeCalculator;
+import net.blaze3d.systems.CommandEncoder;
+import net.blaze3d.systems.GpuDevice;
+import net.blaze3d.systems.RenderPass;
+import net.blaze3d.systems.RenderSystem;
+import net.blaze3d.textures.FilterMode;
+import net.blaze3d.textures.GpuTexture;
+import net.blaze3d.textures.GpuTextureView;
+import net.blaze3d.textures.TextureFormat;
 import java.util.OptionalInt;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;

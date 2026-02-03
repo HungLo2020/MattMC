@@ -3,11 +3,11 @@ package net.irisshaders.iris.shadows;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
-import com.mojang.blaze3d.buffers.GpuBuffer;
-import com.mojang.blaze3d.opengl.GlStateManager;
-import com.mojang.blaze3d.systems.RenderPass;
-import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.vertex.VertexFormat;
+import net.blaze3d.buffers.GpuBuffer;
+import net.blaze3d.opengl.GlStateManager;
+import net.blaze3d.systems.RenderPass;
+import net.blaze3d.systems.RenderSystem;
+import net.blaze3d.vertex.VertexFormat;
 import it.unimi.dsi.fastutil.objects.Object2ObjectMap;
 import net.irisshaders.iris.features.FeatureFlags;
 import net.irisshaders.iris.gl.IrisRenderSystem;
@@ -208,7 +208,7 @@ public class ShadowCompositeRenderer {
 						ranCompute = true;
 						computeProgram.use();
 						this.customUniforms.push(computeProgram);
-						com.mojang.blaze3d.pipeline.RenderTarget main = Minecraft.getInstance().getMainRenderTarget();
+						net.blaze3d.pipeline.RenderTarget main = Minecraft.getInstance().getMainRenderTarget();
 						computeProgram.dispatch(main.width, main.height);
 					}
 				}

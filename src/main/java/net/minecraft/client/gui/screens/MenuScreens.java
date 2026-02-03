@@ -1,7 +1,7 @@
 package net.minecraft.client.gui.screens;
 
 import com.google.common.collect.Maps;
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import java.util.Map;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;

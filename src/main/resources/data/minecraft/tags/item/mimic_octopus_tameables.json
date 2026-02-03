@@ -1,0 +1,10 @@
+{
+  "__comment": "Tames and heals when given - using fish items since lobster tail is not in vanilla",
+  "replace": false,
+  "values": [
+    "minecraft:cod",
+    "minecraft:salmon",
+    "minecraft:tropical_fish",
+    "minecraft:pufferfish"
+  ]
+}

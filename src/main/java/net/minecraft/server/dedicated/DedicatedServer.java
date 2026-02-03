@@ -5,7 +5,7 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.ImmutableMap.Builder;
 import com.google.common.net.HostAndPort;
 import com.mojang.datafixers.DataFixer;
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import io.netty.handler.ssl.SslContext;
 import java.io.BufferedReader;
 import java.io.IOException;

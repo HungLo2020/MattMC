@@ -1,10 +1,10 @@
 package net.minecraft.client.renderer.feature;
 
-import com.mojang.blaze3d.buffers.GpuBuffer;
-import com.mojang.blaze3d.pipeline.RenderTarget;
-import com.mojang.blaze3d.systems.GpuDevice;
-import com.mojang.blaze3d.systems.RenderPass;
-import com.mojang.blaze3d.systems.RenderSystem;
+import net.blaze3d.buffers.GpuBuffer;
+import net.blaze3d.pipeline.RenderTarget;
+import net.blaze3d.systems.GpuDevice;
+import net.blaze3d.systems.RenderPass;
+import net.blaze3d.systems.RenderSystem;
 import java.nio.ByteBuffer;
 import java.util.ArrayDeque;
 import java.util.ArrayList;

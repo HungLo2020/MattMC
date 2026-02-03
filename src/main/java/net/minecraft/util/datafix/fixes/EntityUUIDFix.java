@@ -5,7 +5,7 @@ import com.mojang.datafixers.DSL;
 import com.mojang.datafixers.DataFixUtils;
 import com.mojang.datafixers.TypeRewriteRule;
 import com.mojang.datafixers.schemas.Schema;
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import com.mojang.serialization.Dynamic;
 import java.util.Optional;
 import java.util.Set;

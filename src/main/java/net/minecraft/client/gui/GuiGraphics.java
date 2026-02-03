@@ -1,10 +1,10 @@
 package net.minecraft.client.gui;
 
-import com.mojang.blaze3d.pipeline.RenderPipeline;
-import com.mojang.blaze3d.platform.Window;
-import com.mojang.blaze3d.platform.cursor.CursorType;
-import com.mojang.blaze3d.platform.cursor.CursorTypes;
-import com.mojang.blaze3d.textures.GpuTextureView;
+import net.blaze3d.pipeline.RenderPipeline;
+import net.blaze3d.platform.Window;
+import net.blaze3d.platform.cursor.CursorType;
+import net.blaze3d.platform.cursor.CursorTypes;
+import net.blaze3d.textures.GpuTextureView;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;

@@ -1,7 +1,7 @@
 package net.minecraft.client.renderer.block;
 
-import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.blaze3d.vertex.VertexConsumer;
+import net.blaze3d.vertex.PoseStack;
+import net.blaze3d.vertex.VertexConsumer;
 import it.unimi.dsi.fastutil.longs.Long2FloatLinkedOpenHashMap;
 import it.unimi.dsi.fastutil.longs.Long2IntLinkedOpenHashMap;
 import java.util.List;
@@ -22,12 +22,15 @@ import net.minecraft.core.Direction;
 import net.minecraft.core.BlockPos.MutableBlockPos;
 import net.minecraft.util.ARGB;
 import net.minecraft.util.Mth;
-import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.BlockAndTintGetter;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.hooks.HookRegistry;
 import net.minecraft.hooks.ModelBlockRendererHooks;
+import net.sodium.client.model.quad.BakedQuadView;
+import net.sodium.client.render.frapi.render.SimpleBlockRenderContext;
+import net.sodium.client.render.immediate.model.BakedModelEncoder;
+import net.sodium.client.render.vertex.VertexConsumerUtils;
 
 @Environment(EnvType.CLIENT)
 public class ModelBlockRenderer implements net.fabricmc.fabric.api.renderer.v1.render.FabricBlockModelRenderer {
@@ -43,7 +46,7 @@ public class ModelBlockRenderer implements net.fabricmc.fabric.api.renderer.v1.r
 	@Override
 	public void render(net.minecraft.world.level.BlockAndTintGetter blockView, net.minecraft.client.renderer.block.model.BlockStateModel model, 
 	                   net.minecraft.world.level.block.state.BlockState state, net.minecraft.core.BlockPos pos, 
-	                   com.mojang.blaze3d.vertex.PoseStack matrices, 
+	                   PoseStack matrices,
 	                   net.fabricmc.fabric.api.renderer.v1.render.BlockVertexConsumerProvider vertexConsumers, 
 	                   boolean cull, long seed, int overlay) {
 		// Override the default implementation to pass 'this' instead of null
@@ -337,14 +340,14 @@ public class ModelBlockRenderer implements net.fabricmc.fabric.api.renderer.v1.r
 
 	public static void renderModel(PoseStack.Pose pose, VertexConsumer vertexConsumer, BlockStateModel blockStateModel, float f, float g, float h, int i, int j) {
 		// Sodium: Use optimized vertex writer intrinsics if available (merged from ModelBlockRendererMixin model.block)
-		var writer = net.caffeinemc.mods.sodium.client.render.vertex.VertexConsumerUtils.convertOrLog(vertexConsumer);
+		var writer = VertexConsumerUtils.convertOrLog(vertexConsumer);
 		if (writer != null) {
 			sodium$renderFast(pose, writer, blockStateModel, f, g, h, i, j);
 			return;
 		}
 
 		// FRAPI: Use Sodium fast path for FRAPI rendering (merged from ModelBlockRendererMixin frapi)
-		net.caffeinemc.mods.sodium.client.render.frapi.render.SimpleBlockRenderContext.POOL.get().bufferModel(pose, layer -> vertexConsumer, blockStateModel, f, g, h, i, j, net.minecraft.world.level.EmptyBlockAndTintGetter.INSTANCE, net.minecraft.core.BlockPos.ZERO, net.minecraft.world.level.block.Blocks.AIR.defaultBlockState());
+		SimpleBlockRenderContext.POOL.get().bufferModel(pose, layer -> vertexConsumer, blockStateModel, f, g, h, i, j, net.minecraft.world.level.EmptyBlockAndTintGetter.INSTANCE, net.minecraft.core.BlockPos.ZERO, net.minecraft.world.level.block.Blocks.AIR.defaultBlockState());
 	}
 
 	private static void renderQuadList(PoseStack.Pose pose, VertexConsumer vertexConsumer, float f, float g, float h, List<BakedQuad> list, int i, int j) {
@@ -1020,11 +1023,11 @@ public class ModelBlockRenderer implements net.fabricmc.fabric.api.renderer.v1.r
 				continue; // ignore bad quads
 			}
 
-			net.caffeinemc.mods.sodium.client.model.quad.BakedQuadView quad = (net.caffeinemc.mods.sodium.client.model.quad.BakedQuadView) (Object) bakedQuad;
+			BakedQuadView quad = (BakedQuadView) (Object) bakedQuad;
 
 			int color = quad.hasColor() ? defaultColor : 0xFFFFFFFF;
 
-			net.caffeinemc.mods.sodium.client.render.immediate.model.BakedModelEncoder.writeQuadVertices(writer, matrices, quad, color, light, overlay, false);
+			BakedModelEncoder.writeQuadVertices(writer, matrices, quad, color, light, overlay, false);
 
 			if (quad.getSprite() != null) {
 				net.sodium.api.texture.SpriteUtil.INSTANCE.markSpriteActive(quad.getSprite());

@@ -1,8 +1,8 @@
 package net.minecraft.client.resources.model;
 
-import com.mojang.math.OctahedralGroup;
-import com.mojang.math.Quadrant;
-import com.mojang.math.Transformation;
+import net.math.OctahedralGroup;
+import net.math.Quadrant;
+import net.math.Transformation;
 import java.util.EnumMap;
 import java.util.Map;
 import net.minecraft.api.EnvType;

@@ -1,6 +1,6 @@
 package net.minecraft.util.thread;
 
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.slf4j.Logger;

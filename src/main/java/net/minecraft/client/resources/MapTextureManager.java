@@ -1,6 +1,6 @@
 package net.minecraft.client.resources;
 
-import com.mojang.blaze3d.platform.NativeImage;
+import net.blaze3d.platform.NativeImage;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import net.minecraft.api.EnvType;

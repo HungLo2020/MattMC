@@ -1,6 +1,6 @@
 package net.minecraft.client.model;
 
-import com.mojang.blaze3d.vertex.PoseStack;
+import net.blaze3d.vertex.PoseStack;
 import java.util.Set;
 import java.util.function.Function;
 import net.minecraft.api.EnvType;

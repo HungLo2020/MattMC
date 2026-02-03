@@ -4,7 +4,7 @@ import com.google.common.base.Splitter;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParseException;
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;

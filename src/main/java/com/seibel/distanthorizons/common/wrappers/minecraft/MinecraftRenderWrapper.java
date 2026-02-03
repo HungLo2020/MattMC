@@ -1,20 +1,17 @@
 package com.seibel.distanthorizons.common.wrappers.minecraft;
 
 import java.awt.Color;
-import java.lang.invoke.MethodHandles;
 import java.util.concurrent.ConcurrentHashMap;
 
-import com.mojang.blaze3d.pipeline.RenderTarget;
-import com.mojang.blaze3d.platform.NativeImage;
+import net.blaze3d.pipeline.RenderTarget;
+import net.blaze3d.platform.NativeImage;
 import com.seibel.distanthorizons.api.enums.config.EDhApiLodShading;
 import com.seibel.distanthorizons.common.wrappers.McObjectConverter;
 import com.seibel.distanthorizons.common.wrappers.misc.LightMapWrapper;
 import com.seibel.distanthorizons.core.config.Config;
-import com.seibel.distanthorizons.core.dependencyInjection.ModAccessorInjector;
 
 import com.seibel.distanthorizons.core.enums.EDhDirection;
 import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
-import com.seibel.distanthorizons.core.util.ColorUtil;
 import com.seibel.distanthorizons.core.wrapperInterfaces.misc.ILightMapWrapper;
 
 import net.minecraft.client.renderer.fog.FogRenderer;
@@ -30,7 +27,6 @@ import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftRen
 
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
-import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.world.effect.MobEffects;
 
@@ -41,7 +37,7 @@ import org.joml.Vector4f;
 
 import net.minecraft.world.level.material.FogType;
 
-import com.mojang.blaze3d.opengl.GlTexture;
+import net.blaze3d.opengl.GlTexture;
 
 
 /**

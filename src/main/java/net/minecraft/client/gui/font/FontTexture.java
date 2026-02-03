@@ -1,12 +1,12 @@
 package net.minecraft.client.gui.font;
 
-import com.mojang.blaze3d.font.GlyphBitmap;
-import com.mojang.blaze3d.font.GlyphInfo;
-import com.mojang.blaze3d.platform.TextureUtil;
-import com.mojang.blaze3d.systems.GpuDevice;
-import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.textures.FilterMode;
-import com.mojang.blaze3d.textures.TextureFormat;
+import net.blaze3d.font.GlyphBitmap;
+import net.blaze3d.font.GlyphInfo;
+import net.blaze3d.platform.TextureUtil;
+import net.blaze3d.systems.GpuDevice;
+import net.blaze3d.systems.RenderSystem;
+import net.blaze3d.textures.FilterMode;
+import net.blaze3d.textures.TextureFormat;
 import java.nio.file.Path;
 import java.util.function.Supplier;
 import net.minecraft.api.EnvType;

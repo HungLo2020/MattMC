@@ -2,7 +2,7 @@ package net.minecraft.world.level.chunk;
 
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import com.mojang.serialization.Codec;
 import it.unimi.dsi.fastutil.ints.IntArrays;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;

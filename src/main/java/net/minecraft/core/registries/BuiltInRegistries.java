@@ -1,7 +1,7 @@
 package net.minecraft.core.registries;
 
 import com.google.common.collect.Maps;
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import com.mojang.serialization.Lifecycle;
 import com.mojang.serialization.MapCodec;
 import java.util.Map;

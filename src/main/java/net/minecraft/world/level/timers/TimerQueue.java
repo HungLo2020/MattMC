@@ -3,7 +3,7 @@ package net.minecraft.world.level.timers;
 import com.google.common.collect.HashBasedTable;
 import com.google.common.collect.Table;
 import com.google.common.primitives.UnsignedLong;
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import com.mojang.serialization.Dynamic;
 import java.util.Collection;
 import java.util.Collections;

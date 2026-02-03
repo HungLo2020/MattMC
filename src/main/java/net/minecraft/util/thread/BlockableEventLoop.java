@@ -4,7 +4,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Queues;
 import com.mojang.jtracy.TracyClient;
 import com.mojang.jtracy.Zone;
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import java.util.List;
 import java.util.Queue;
 import java.util.concurrent.CompletableFuture;

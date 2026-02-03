@@ -2,11 +2,11 @@ package net.irisshaders.iris.pipeline;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
-import com.mojang.blaze3d.buffers.GpuBuffer;
-import com.mojang.blaze3d.opengl.GlStateManager;
-import com.mojang.blaze3d.systems.RenderPass;
-import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.vertex.VertexFormat;
+import net.blaze3d.buffers.GpuBuffer;
+import net.blaze3d.opengl.GlStateManager;
+import net.blaze3d.systems.RenderPass;
+import net.blaze3d.systems.RenderSystem;
+import net.blaze3d.vertex.VertexFormat;
 import it.unimi.dsi.fastutil.ints.IntList;
 import it.unimi.dsi.fastutil.objects.Object2ObjectMap;
 import net.irisshaders.iris.features.FeatureFlags;
@@ -204,7 +204,7 @@ public class FinalPassRenderer {
 	}
 
 	public void renderFinalPass() {
-		final com.mojang.blaze3d.pipeline.RenderTarget main = Minecraft.getInstance().getMainRenderTarget();
+		final net.blaze3d.pipeline.RenderTarget main = Minecraft.getInstance().getMainRenderTarget();
 		final int baseWidth = main.width;
 		final int baseHeight = main.height;
 

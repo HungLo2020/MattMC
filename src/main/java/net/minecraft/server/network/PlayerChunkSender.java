@@ -1,7 +1,7 @@
 package net.minecraft.server.network;
 
 import com.google.common.collect.Comparators;
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import it.unimi.dsi.fastutil.longs.LongSet;
 import java.util.Comparator;

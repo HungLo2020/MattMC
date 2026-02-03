@@ -1,8 +1,8 @@
 package net.minecraft.client.gui.font;
 
-import com.mojang.blaze3d.font.GlyphInfo;
-import com.mojang.blaze3d.font.GlyphProvider;
-import com.mojang.blaze3d.font.UnbakedGlyph;
+import net.blaze3d.font.GlyphInfo;
+import net.blaze3d.font.GlyphProvider;
+import net.blaze3d.font.UnbakedGlyph;
 import it.unimi.dsi.fastutil.ints.IntSet;
 import it.unimi.dsi.fastutil.ints.IntSets;
 import net.minecraft.api.EnvType;

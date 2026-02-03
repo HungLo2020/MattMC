@@ -1,6 +1,6 @@
 package net.minecraft.client.gui.font;
 
-import com.mojang.blaze3d.vertex.VertexConsumer;
+import net.blaze3d.vertex.VertexConsumer;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import org.joml.Matrix4f;

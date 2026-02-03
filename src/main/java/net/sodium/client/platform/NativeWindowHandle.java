@@ -1,6 +1,6 @@
 package net.sodium.client.platform;
 
-import com.mojang.blaze3d.platform.Window;
+import net.blaze3d.platform.Window;
 import org.lwjgl.glfw.GLFWNativeWin32;
 
 public interface NativeWindowHandle {

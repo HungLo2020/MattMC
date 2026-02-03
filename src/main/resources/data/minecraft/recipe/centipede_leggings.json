@@ -1,0 +1,16 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "equipment",
+  "pattern": [
+    "SSS",
+    "S S",
+    "S S"
+  ],
+  "key": {
+    "S": "minecraft:centipede_leg"
+  },
+  "result": {
+    "id": "minecraft:centipede_leggings",
+    "count": 1
+  }
+}

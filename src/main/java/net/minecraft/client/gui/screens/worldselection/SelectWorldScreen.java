@@ -1,6 +1,6 @@
 package net.minecraft.client.gui.screens.worldselection;
 
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import java.io.IOException;
 import java.util.function.Consumer;
 import net.minecraft.api.EnvType;

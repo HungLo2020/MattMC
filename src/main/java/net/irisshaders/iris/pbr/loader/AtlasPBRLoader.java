@@ -1,6 +1,6 @@
 package net.irisshaders.iris.pbr.loader;
 
-import com.mojang.blaze3d.platform.NativeImage;
+import net.blaze3d.platform.NativeImage;
 import net.irisshaders.iris.Iris;
 import net.irisshaders.iris.pbr.format.TextureFormat;
 import net.irisshaders.iris.pbr.format.TextureFormatLoader;

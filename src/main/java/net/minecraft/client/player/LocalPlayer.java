@@ -1,7 +1,7 @@
 package net.minecraft.client.player;
 
 import com.google.common.collect.Lists;
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
@@ -69,7 +69,6 @@ import net.minecraft.world.entity.HumanoidArm;
 import net.minecraft.world.entity.MoverType;
 import net.minecraft.world.entity.PlayerRideableJumping;
 import net.minecraft.world.entity.Pose;
-import net.minecraft.world.entity.Entity.RemovalReason;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.animal.HappyGhast;
 import net.minecraft.world.entity.player.Abilities;
@@ -79,7 +78,6 @@ import net.minecraft.world.entity.vehicle.AbstractMinecart;
 import net.minecraft.world.inventory.ClickAction;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.component.WritableBookContent;
-import net.minecraft.world.item.crafting.display.RecipeDisplayId;
 import net.minecraft.world.level.BaseCommandBlock;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.block.Portal.Transition;

@@ -1,13 +1,13 @@
 package net.minecraft.client.gui.render.pip;
 
-import com.mojang.blaze3d.ProjectionType;
-import com.mojang.blaze3d.systems.GpuDevice;
-import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.textures.FilterMode;
-import com.mojang.blaze3d.textures.GpuTexture;
-import com.mojang.blaze3d.textures.GpuTextureView;
-import com.mojang.blaze3d.textures.TextureFormat;
-import com.mojang.blaze3d.vertex.PoseStack;
+import net.blaze3d.ProjectionType;
+import net.blaze3d.systems.GpuDevice;
+import net.blaze3d.systems.RenderSystem;
+import net.blaze3d.textures.FilterMode;
+import net.blaze3d.textures.GpuTexture;
+import net.blaze3d.textures.GpuTextureView;
+import net.blaze3d.textures.TextureFormat;
+import net.blaze3d.vertex.PoseStack;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.client.gui.render.TextureSetup;

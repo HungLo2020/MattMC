@@ -1,0 +1,6 @@
+{
+  "__comment": "all mobs that forsaken will not be aggressive towards.",
+  "values": [
+    "minecraft:bat"
+  ]
+}

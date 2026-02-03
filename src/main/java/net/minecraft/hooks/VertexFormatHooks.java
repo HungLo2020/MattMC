@@ -1,6 +1,6 @@
 package net.minecraft.hooks;
 
-import com.mojang.blaze3d.vertex.VertexFormat;
+import net.blaze3d.vertex.VertexFormat;
 
 /**
  * Hook interface for vertex format lifecycle events.

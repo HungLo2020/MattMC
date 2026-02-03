@@ -2,7 +2,7 @@ package net.minecraft.client.renderer;
 
 import com.google.common.collect.Lists;
 import com.google.common.collect.Queues;
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import it.unimi.dsi.fastutil.longs.Long2ObjectFunction;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;

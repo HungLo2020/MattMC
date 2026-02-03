@@ -20,6 +20,9 @@ public class Consumables {
 		.build();
 	public static final Consumable OMINOUS_BOTTLE = defaultDrink().soundAfterConsume(SoundEvents.OMINOUS_BOTTLE_DISPOSE).build();
 	public static final Consumable DRIED_KELP = defaultFood().consumeSeconds(0.8F).build();
+	public static final Consumable BLOBFISH = defaultFood()
+		.onConsume(new ApplyStatusEffectsConsumeEffect(new MobEffectInstance(MobEffects.POISON, 120, 0)))
+		.build();
 	public static final Consumable CHICKEN = defaultFood()
 		.onConsume(new ApplyStatusEffectsConsumeEffect(new MobEffectInstance(MobEffects.HUNGER, 600, 0), 0.3F))
 		.build();

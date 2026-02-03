@@ -1,6 +1,6 @@
 package net.minecraft.world.level;
 
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import java.util.Optional;
 import java.util.function.Function;
 import net.minecraft.core.BlockPos;

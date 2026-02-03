@@ -1,6 +1,6 @@
 package net.minecraft.world.level.block;
 
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import com.mojang.serialization.MapCodec;
 import java.util.IdentityHashMap;
 import java.util.Map;

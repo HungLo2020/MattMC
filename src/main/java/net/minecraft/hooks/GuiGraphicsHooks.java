@@ -1,6 +1,6 @@
 package net.minecraft.hooks;
 
-import com.mojang.blaze3d.pipeline.RenderPipeline;
+import net.blaze3d.pipeline.RenderPipeline;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 
 /**

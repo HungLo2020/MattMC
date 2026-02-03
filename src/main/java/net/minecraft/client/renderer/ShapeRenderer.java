@@ -1,13 +1,15 @@
 package net.minecraft.client.renderer;
 
-import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.blaze3d.vertex.VertexConsumer;
+import net.blaze3d.vertex.PoseStack;
+import net.blaze3d.vertex.VertexConsumer;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.core.Direction;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.phys.shapes.VoxelShape;
+import net.sodium.client.render.vertex.VertexConsumerUtils;
+import net.sodium.client.render.vertex.buffer.BufferBuilderExtension;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
 
@@ -50,7 +52,7 @@ public class ShapeRenderer {
 		float p
 	) {
 		// Sodium: Use fast intrinsics path if available (merged from LevelRendererMixin outlines)
-		var writer = net.caffeinemc.mods.sodium.client.render.vertex.VertexConsumerUtils.convertOrLog(vertexConsumer);
+		var writer = VertexConsumerUtils.convertOrLog(vertexConsumer);
 
 		if (writer != null) {
 			sodium$renderLineBoxFast(pose, vertexConsumer, writer, d, e, f, g, h, i, j, k, l, m, n, o, p);
@@ -242,7 +244,7 @@ public class ShapeRenderer {
 		float v8y = org.joml.Math.fma(position.m01(), x2f, org.joml.Math.fma(position.m11(), y2f, org.joml.Math.fma(position.m21(), z2f, position.m31())));
 		float v8z = org.joml.Math.fma(position.m02(), x2f, org.joml.Math.fma(position.m12(), y2f, org.joml.Math.fma(position.m22(), z2f, position.m32())));
 
-		if (vertexConsumer instanceof net.caffeinemc.mods.sodium.client.render.vertex.buffer.BufferBuilderExtension ext) {
+		if (vertexConsumer instanceof BufferBuilderExtension ext) {
 			ext.sodium$duplicateVertex();
 		}
 

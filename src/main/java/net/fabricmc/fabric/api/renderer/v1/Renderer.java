@@ -1,6 +1,6 @@
 package net.fabricmc.fabric.api.renderer.v1;
 
-import com.mojang.blaze3d.vertex.PoseStack;
+import net.blaze3d.vertex.PoseStack;
 
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.block.BlockRenderDispatcher;

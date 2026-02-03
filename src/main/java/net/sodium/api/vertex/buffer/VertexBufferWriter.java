@@ -1,7 +1,7 @@
 package net.sodium.api.vertex.buffer;
 
-import com.mojang.blaze3d.vertex.VertexConsumer;
-import com.mojang.blaze3d.vertex.VertexFormat;
+import net.blaze3d.vertex.VertexConsumer;
+import net.blaze3d.vertex.VertexFormat;
 import net.sodium.api.memory.MemoryIntrinsics;
 import org.jetbrains.annotations.Nullable;
 import org.lwjgl.system.MemoryStack;

@@ -1,6 +1,5 @@
 package com.github.alexmodguy.alexscaves.server.level.feature;
 
-import com.github.alexmodguy.alexscaves.server.block.*;
 import com.github.alexmodguy.alexscaves.server.misc.ACMath;
 import com.mojang.serialization.Codec;
 import net.minecraft.Util;

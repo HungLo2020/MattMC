@@ -1,0 +1,8 @@
+{
+  "__comment": "all non-worm entities that void portals ignore.",
+  "replace": false,
+  "values": [
+    "minecraft:end_crystal",
+    "minecraft:ender_dragon"
+  ]
+}

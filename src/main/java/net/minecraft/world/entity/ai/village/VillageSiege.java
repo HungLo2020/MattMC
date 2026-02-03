@@ -1,6 +1,6 @@
 package net.minecraft.world.entity.ai.village;
 
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.tags.BiomeTags;

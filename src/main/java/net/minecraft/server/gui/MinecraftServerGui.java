@@ -1,8 +1,8 @@
 package net.minecraft.server.gui;
 
 import com.google.common.collect.Lists;
-import com.mojang.logging.LogQueues;
-import com.mojang.logging.LogUtils;
+import net.logging.LogQueues;
+import net.logging.LogUtils;
 import java.awt.BorderLayout;
 import java.awt.Dimension;
 import java.awt.Font;

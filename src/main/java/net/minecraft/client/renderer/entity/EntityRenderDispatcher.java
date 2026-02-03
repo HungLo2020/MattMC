@@ -1,7 +1,7 @@
 package net.minecraft.client.renderer.entity;
 
 import com.google.common.collect.ImmutableMap;
-import com.mojang.blaze3d.vertex.PoseStack;
+import net.blaze3d.vertex.PoseStack;
 import java.util.Map;
 import java.util.function.Supplier;
 import net.minecraft.api.EnvType;

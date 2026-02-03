@@ -1,0 +1,10 @@
+{
+  "__comment": "All mobs that mimic octopus flees - using only vanilla mobs",
+  "replace": false,
+  "values": [
+    "minecraft:drowned",
+    "minecraft:dolphin",
+    "minecraft:guardian",
+    "minecraft:elder_guardian"
+  ]
+}

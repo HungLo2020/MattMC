@@ -1,6 +1,6 @@
 package net.irisshaders.iris.vertices;
 
-import com.mojang.blaze3d.vertex.VertexFormat;
+import net.blaze3d.vertex.VertexFormat;
 
 public interface IrisExtendedBufferBuilder {
 	VertexFormat iris$format();

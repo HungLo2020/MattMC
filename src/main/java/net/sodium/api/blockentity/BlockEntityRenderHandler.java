@@ -9,7 +9,7 @@ import org.jetbrains.annotations.ApiStatus;
 @ApiStatus.AvailableSince("0.6.0")
 public interface BlockEntityRenderHandler {
     BlockEntityRenderHandler INSTANCE = DependencyInjection.load(BlockEntityRenderHandler.class,
-            "net.caffeinemc.mods.sodium.client.render.chunk.BlockEntityRenderHandlerImpl");
+            "net.sodium.client.render.chunk.BlockEntityRenderHandlerImpl");
 
     @SuppressWarnings("SameReturnValue")
     static BlockEntityRenderHandler instance() {

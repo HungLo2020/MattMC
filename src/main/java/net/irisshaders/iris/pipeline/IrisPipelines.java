@@ -1,13 +1,11 @@
 package net.irisshaders.iris.pipeline;
 
-import com.mojang.blaze3d.pipeline.RenderPipeline;
-import com.mojang.datafixers.types.Func;
+import net.blaze3d.pipeline.RenderPipeline;
 import it.unimi.dsi.fastutil.Function;
 import it.unimi.dsi.fastutil.objects.Object2ObjectArrayMap;
 import net.irisshaders.iris.Iris;
 import net.irisshaders.iris.pathways.HandRenderer;
 import net.irisshaders.iris.pipeline.programs.ShaderKey;
-import net.irisshaders.iris.shaderpack.loading.ProgramId;
 import net.irisshaders.iris.shadows.ShadowRenderingState;
 import net.minecraft.client.renderer.RenderPipelines;
 import org.jetbrains.annotations.Nullable;

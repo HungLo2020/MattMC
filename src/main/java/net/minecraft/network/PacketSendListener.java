@@ -1,6 +1,6 @@
 package net.minecraft.network;
 
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import io.netty.channel.ChannelFutureListener;
 import java.util.function.Supplier;
 import net.minecraft.network.protocol.Packet;

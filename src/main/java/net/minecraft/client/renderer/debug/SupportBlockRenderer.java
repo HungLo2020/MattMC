@@ -1,7 +1,7 @@
 package net.minecraft.client.renderer.debug;
 
 import com.google.common.collect.ImmutableList;
-import com.mojang.blaze3d.vertex.PoseStack;
+import net.blaze3d.vertex.PoseStack;
 import java.util.Collections;
 import java.util.List;
 import java.util.function.DoubleSupplier;

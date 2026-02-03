@@ -2,7 +2,7 @@ package net.minecraft.commands.execution;
 
 import com.google.common.collect.Queues;
 import com.mojang.brigadier.context.ContextChain;
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import java.util.Deque;
 import java.util.List;

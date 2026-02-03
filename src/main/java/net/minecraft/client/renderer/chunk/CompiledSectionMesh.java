@@ -1,10 +1,10 @@
 package net.minecraft.client.renderer.chunk;
 
-import com.mojang.blaze3d.buffers.GpuBuffer;
-import com.mojang.blaze3d.systems.CommandEncoder;
-import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.vertex.ByteBufferBuilder;
-import com.mojang.blaze3d.vertex.MeshData;
+import net.blaze3d.buffers.GpuBuffer;
+import net.blaze3d.systems.CommandEncoder;
+import net.blaze3d.systems.RenderSystem;
+import net.blaze3d.vertex.ByteBufferBuilder;
+import net.blaze3d.vertex.MeshData;
 import java.nio.ByteBuffer;
 import java.util.EnumMap;
 import java.util.List;

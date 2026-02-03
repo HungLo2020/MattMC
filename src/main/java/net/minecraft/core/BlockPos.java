@@ -1,7 +1,7 @@
 package net.minecraft.core;
 
 import com.google.common.collect.AbstractIterator;
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import com.mojang.serialization.Codec;
 import io.netty.buffer.ByteBuf;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;

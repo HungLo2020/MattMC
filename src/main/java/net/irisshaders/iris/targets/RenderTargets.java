@@ -1,12 +1,12 @@
 package net.irisshaders.iris.targets;
 
 import com.google.common.collect.ImmutableSet;
-import com.mojang.blaze3d.opengl.GlStateManager;
-import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.textures.AddressMode;
-import com.mojang.blaze3d.textures.FilterMode;
-import com.mojang.blaze3d.textures.GpuTexture;
-import com.mojang.blaze3d.textures.TextureFormat;
+import net.blaze3d.opengl.GlStateManager;
+import net.blaze3d.systems.RenderSystem;
+import net.blaze3d.textures.AddressMode;
+import net.blaze3d.textures.FilterMode;
+import net.blaze3d.textures.GpuTexture;
+import net.blaze3d.textures.TextureFormat;
 import net.irisshaders.iris.gl.IrisRenderSystem;
 import net.irisshaders.iris.gl.framebuffer.GlFramebuffer;
 import net.irisshaders.iris.gl.texture.DepthBufferFormat;

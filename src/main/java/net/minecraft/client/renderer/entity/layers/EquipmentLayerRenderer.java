@@ -1,6 +1,6 @@
 package net.minecraft.client.renderer.entity.layers;
 
-import com.mojang.blaze3d.vertex.PoseStack;
+import net.blaze3d.vertex.PoseStack;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Function;

@@ -1,9 +1,9 @@
 package net.minecraft.client.gui.font.glyphs;
 
-import com.mojang.blaze3d.font.GlyphInfo;
-import com.mojang.blaze3d.pipeline.RenderPipeline;
-import com.mojang.blaze3d.textures.GpuTextureView;
-import com.mojang.blaze3d.vertex.VertexConsumer;
+import net.blaze3d.font.GlyphInfo;
+import net.blaze3d.pipeline.RenderPipeline;
+import net.blaze3d.textures.GpuTextureView;
+import net.blaze3d.vertex.VertexConsumer;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.client.gui.Font;
@@ -11,6 +11,7 @@ import net.minecraft.client.gui.font.GlyphRenderTypes;
 import net.minecraft.client.gui.font.TextRenderable;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.network.chat.Style;
+import net.sodium.client.render.vertex.VertexConsumerUtils;
 import org.joml.Matrix4f;
 
 @Environment(EnvType.CLIENT)
@@ -96,7 +97,7 @@ public class BakedSheetGlyph implements BakedGlyph, EffectGlyph {
 
 	private void render(boolean bl, float f, float g, float h, Matrix4f matrix4f, VertexConsumer vertexConsumer, int i, boolean bl2, int j) {
 		// Sodium: Use fast intrinsics path if available (merged from BakedGlyphMixin)
-		var writer = net.caffeinemc.mods.sodium.client.render.vertex.VertexConsumerUtils.convertOrLog(vertexConsumer);
+		var writer = VertexConsumerUtils.convertOrLog(vertexConsumer);
 
 		if (writer != null) {
 			float x1 = f + this.left;
@@ -168,7 +169,7 @@ public class BakedSheetGlyph implements BakedGlyph, EffectGlyph {
 
 	private void buildEffect(BakedSheetGlyph.EffectInstance effectInstance, float f, float g, int i, VertexConsumer vertexConsumer, int j, Matrix4f matrix4f) {
 		// Sodium: Use fast intrinsics path if available (merged from BakedGlyphMixin)
-		var writer = net.caffeinemc.mods.sodium.client.render.vertex.VertexConsumerUtils.convertOrLog(vertexConsumer);
+		var writer = VertexConsumerUtils.convertOrLog(vertexConsumer);
 
 		if (writer != null) {
 			float x1 = effectInstance.x0;

@@ -1,0 +1,531 @@
+package net.alexsmobs.entity;
+
+import net.alexsmobs.config.AMConfig;
+import net.alexsmobs.entity.ai.*;
+import net.alexsmobs.entity.ai.*;
+import net.alexsmobs.entity.util.Maths;
+import net.alexsmobs.item.AMItemRegistry;
+import net.alexsmobs.misc.AMSoundRegistry;
+import net.alexsmobs.misc.AMTagRegistry;
+import net.minecraft.ChatFormatting;
+import net.minecraft.core.BlockPos;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.syncher.EntityDataAccessor;
+import net.minecraft.network.syncher.EntityDataSerializers;
+import net.minecraft.network.syncher.SynchedEntityData;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.sounds.SoundEvent;
+import net.minecraft.util.Mth;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.Difficulty;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.effect.MobEffectInstance;
+import net.minecraft.world.effect.MobEffects;
+import net.minecraft.world.entity.*;
+import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
+import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.entity.ai.goal.*;
+import net.minecraft.world.entity.ai.goal.target.HurtByTargetGoal;
+import net.minecraft.world.entity.ai.goal.target.NearestAttackableTargetGoal;
+import net.minecraft.world.entity.ai.goal.target.OwnerHurtByTargetGoal;
+import net.minecraft.world.entity.ai.goal.target.OwnerHurtTargetGoal;
+import net.minecraft.world.entity.ai.targeting.TargetingConditions;
+import net.minecraft.world.entity.animal.Animal;
+import net.minecraft.world.entity.item.ItemEntity;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.entity.projectile.AbstractArrow;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.item.crafting.Ingredient;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.LevelAccessor;
+import net.minecraft.world.phys.Vec3;
+
+import javax.annotation.Nullable;
+import java.util.UUID;
+
+public class EntityKomodoDragon extends TamableAnimal implements ITargetsDroppedItems, IFollower {
+
+    private static final Ingredient TEMPTATION_ITEMS = Ingredient.of(net.minecraft.world.item.Items.ROTTEN_FLESH);
+    public int slaughterCooldown = 0;
+    public int timeUntilSpit = this.random.nextInt(12000) + 24000;
+    public float nextJostleAngleFromServer;
+    private int riderAttackCooldown = 0;
+    public static final TargetingConditions.Selector HURT_OR_BABY = (LivingEntity entity, ServerLevel level) -> {
+        return entity instanceof EntityKomodoDragon && (((EntityKomodoDragon)entity).isBaby() || entity.getHealth() <= 0.7F * entity.getMaxHealth());
+    };
+    protected static final EntityDimensions JOSTLING_SIZE = EntityDimensions.scalable(1.35F, 1.85F);
+    private static final EntityDataAccessor<Integer> COMMAND = SynchedEntityData.defineId(EntityKomodoDragon.class, EntityDataSerializers.INT);
+    private static final EntityDataAccessor<Boolean> JOSTLING = SynchedEntityData.defineId(EntityKomodoDragon.class, EntityDataSerializers.BOOLEAN);
+    private static final EntityDataAccessor<Float> JOSTLE_ANGLE = SynchedEntityData.defineId(EntityKomodoDragon.class, EntityDataSerializers.FLOAT);
+    private static final EntityDataAccessor<String> JOSTLER_UUID = SynchedEntityData.defineId(EntityKomodoDragon.class, EntityDataSerializers.STRING);
+    private static final EntityDataAccessor<Boolean> SADDLED = SynchedEntityData.defineId(EntityKomodoDragon.class, EntityDataSerializers.BOOLEAN);
+    public float prevJostleAngle;
+    public float prevJostleProgress;
+    public float jostleProgress;
+    public float prevSitProgress;
+    public float sitProgress;
+    public boolean jostleDirection;
+    public int jostleTimer = 0;
+    public boolean instantlyTriggerJostleAI = false;
+    public int jostleCooldown = 100 + random.nextInt(40);
+    private boolean hasJostlingSize;
+
+    @Override
+    protected void defineSynchedData(SynchedEntityData.Builder builder) {
+        super.defineSynchedData(builder);
+        builder.define(COMMAND, 0);
+        builder.define(JOSTLING, false);
+        builder.define(SADDLED, false);
+        builder.define(JOSTLE_ANGLE, 0F);
+        builder.define(JOSTLER_UUID, "");
+    }
+
+    public int getCommand() {
+        return this.entityData.get(COMMAND);
+    }
+
+    public void setCommand(int command) {
+        this.entityData.set(COMMAND, Integer.valueOf(command));
+    }
+
+    public static <T extends Mob> boolean canKomodoDragonSpawn(EntityType<? extends Animal> animal, LevelAccessor worldIn, EntitySpawnReason reason, BlockPos pos, RandomSource random) {
+        boolean spawnBlock = worldIn.getBlockState(pos.below()).is(AMTagRegistry.KOMODO_DRAGON_SPAWNS);
+        return spawnBlock && worldIn.getRawBrightness(pos, 0) > 8;
+    }
+
+    public boolean checkSpawnRules(LevelAccessor worldIn, EntitySpawnReason spawnReasonIn) {
+        return AMEntityRegistry.rollSpawn(AMConfig.komodoDragonSpawnRolls, this.getRandom(), spawnReasonIn);
+    }
+
+    protected void registerGoals() {
+        super.registerGoals();
+        this.goalSelector.addGoal(0, new FloatGoal(this));
+        this.goalSelector.addGoal(1, new SitWhenOrderedToGoal(this));
+        this.goalSelector.addGoal(2, new MeleeAttackGoal(this, 2D, false));
+        this.goalSelector.addGoal(3, new TameableAIFollowOwner(this, 1.2D, 6.0F, 3.0F, false));
+        this.goalSelector.addGoal(4, new KomodoDragonAIJostle(this));
+        this.goalSelector.addGoal(5, new TameableAITempt(this, 1.1D, TEMPTATION_ITEMS, false));
+        this.goalSelector.addGoal(5, new AnimalAIFleeAdult(this, 1.25D, 32));
+        this.goalSelector.addGoal(6, new KomodoDragonAIBreed(this, 1.0D));
+        this.goalSelector.addGoal(6, new RandomStrollGoal(this, 1D, 50));
+        this.goalSelector.addGoal(7, new LookAtPlayerGoal(this, Player.class, 6.0F));
+        this.goalSelector.addGoal(8, new RandomLookAroundGoal(this));
+        this.targetSelector.addGoal(1, new OwnerHurtByTargetGoal(this));
+        this.targetSelector.addGoal(2, new OwnerHurtTargetGoal(this));
+        this.targetSelector.addGoal(3, new HurtByTargetGoal(this));
+        this.targetSelector.addGoal(4, new CreatureAITargetItems(this, false));
+        this.targetSelector.addGoal(6, new NearestAttackableTargetGoal<EntityKomodoDragon>(this, EntityKomodoDragon.class, 50, true, false, HURT_OR_BABY));
+        this.targetSelector.addGoal(7, new NearestAttackableTargetGoal(this, Player.class, 150, true, true, null));
+        this.targetSelector.addGoal(8, new EntityAINearestTarget3D(this, LivingEntity.class, 180, false, true, AMEntityRegistry.buildPredicateFromTag(AMTagRegistry.KOMODO_DRAGON_TARGETS)));
+    }
+
+    protected Vec3 getRiddenInput(Player player, Vec3 deltaIn) {
+        if (player.zza != 0) {
+            float f = player.zza < 0.0F ? 0.5F : 1.0F;
+            return new Vec3(player.xxa * 0.25F, 0.0D, player.zza * 0.5F * f);
+        } else {
+            this.setSprinting(false);
+        }
+        return Vec3.ZERO;
+    }
+
+    protected void tickRidden(Player player, Vec3 vec3) {
+        super.tickRidden(player, vec3);
+        if(player.zza != 0 || player.xxa != 0){
+            this.setRot(player.getYRot(), player.getXRot() * 0.25F);
+            this.yRotO = this.yBodyRot = this.yHeadRot = this.getYRot();
+            this.getNavigation().stop();
+            this.setTarget(null);
+            this.setSprinting(true);
+        }
+    }
+
+    protected float getRiddenSpeed(Player rider) {
+        return (float)(this.getAttributeValue(Attributes.MOVEMENT_SPEED) * 2);
+    }
+
+    protected void actuallyHurt(ServerLevel serverLevel, DamageSource source, float amount) {
+        if (this.isInvulnerableTo(serverLevel, source)) {
+            return;
+        } else {
+            Entity entity = source.getEntity();
+            this.setOrderedToSit(false);
+            if (entity != null && this.isTame() && !(entity instanceof Player) && !(entity instanceof AbstractArrow)) {
+                amount = (amount + 1.0F) / 3.0F;
+            }
+            super.actuallyHurt(serverLevel, source, amount);
+        }
+    }
+
+    protected SoundEvent getAmbientSound() {
+        return AMSoundRegistry.KOMODO_DRAGON_IDLE.get();
+    }
+
+    protected SoundEvent getHurtSound(DamageSource damageSourceIn) {
+        return AMSoundRegistry.KOMODO_DRAGON_HURT.get();
+    }
+
+    protected SoundEvent getDeathSound() {
+        return AMSoundRegistry.KOMODO_DRAGON_HURT.get();
+    }
+
+    protected void readAdditionalSaveData(net.minecraft.world.level.storage.ValueInput valueInput) {
+        super.readAdditionalSaveData(valueInput);
+        if (valueInput.getIntOr("SpitTime", -1) >= 0) {
+            this.timeUntilSpit = valueInput.getIntOr("SpitTime", this.random.nextInt(12000) + 24000);
+        }
+        this.setCommand(valueInput.getIntOr("KomodoCommand", 0));
+        this.jostleCooldown = valueInput.getIntOr("JostlingCooldown", 100);
+        this.setSaddled(valueInput.getBooleanOr("Saddle", false));
+    }
+
+    protected void addAdditionalSaveData(net.minecraft.world.level.storage.ValueOutput valueOutput) {
+        super.addAdditionalSaveData(valueOutput);
+        valueOutput.putInt("SpitTime", this.timeUntilSpit);
+        valueOutput.putInt("KomodoCommand", this.getCommand());
+        valueOutput.putBoolean("Saddle", this.isSaddled());
+        valueOutput.putInt("JostlingCooldown", this.jostleCooldown);
+    }
+
+    public boolean isFood(ItemStack stack) {
+        Item item = stack.getItem();
+        return isTame() && stack.is(AMTagRegistry.KOMODO_DRAGON_BREEDABLES);
+    }
+
+    public void tick() {
+        prevJostleAngle = this.getJostleAngle();
+        super.tick();
+        prevJostleProgress = jostleProgress;
+        prevSitProgress = sitProgress;
+
+        if(slaughterCooldown > 0){
+            slaughterCooldown--;
+        }
+        if (!this.level().isClientSide() && this.isAlive() && !this.isBaby() && --this.timeUntilSpit <= 0) {
+            this.spawnAtLocation((ServerLevel)this.level(), AMItemRegistry.KOMODO_SPIT.get());
+            this.timeUntilSpit = this.random.nextInt(12000) + 24000;
+        }
+        if(riderAttackCooldown > 0){
+            riderAttackCooldown--;
+        }
+        if(this.getControllingPassenger() != null && this.getControllingPassenger() instanceof Player){
+            Player rider = (Player)this.getControllingPassenger();
+            if(rider.getLastHurtMob() != null && this.distanceTo(rider.getLastHurtMob()) < this.getBbWidth() + 3F && !this.isAlliedTo(rider.getLastHurtMob())){
+                UUID preyUUID = rider.getLastHurtMob().getUUID();
+                if (!this.getUUID().equals(preyUUID) && riderAttackCooldown == 0) {
+                    doHurtTarget((ServerLevel)this.level(), rider.getLastHurtMob());
+                    riderAttackCooldown = 20;
+                }
+            }
+        }
+        if (!hasJostlingSize && isJostling()){
+            refreshDimensions();
+            hasJostlingSize = true;
+        }
+        if (hasJostlingSize && !isJostling()){
+            refreshDimensions();
+            hasJostlingSize = false;
+        }
+
+        if (this.isJostling()) {
+            if (jostleProgress < 5F)
+                jostleProgress++;
+        } else {
+            if (jostleProgress > 0F)
+                jostleProgress--;
+        }
+
+        if (this.isOrderedToSit()) {
+            if (sitProgress < 5F)
+                sitProgress++;
+        } else {
+            if (sitProgress > 0F)
+                sitProgress--;
+        }
+
+        if(this.getCommand() == 2 && !this.isVehicle()){
+            this.setOrderedToSit(true);
+        }else{
+            this.setOrderedToSit(false);
+        }
+
+        if (jostleCooldown > 0) {
+            jostleCooldown--;
+        }
+
+        if(!this.level().isClientSide()){
+            if(this.getJostleAngle() < nextJostleAngleFromServer){
+                this.setJostleAngle(this.getJostleAngle() + 1);
+
+            }
+            if(this.getJostleAngle() > nextJostleAngleFromServer) {
+                this.setJostleAngle(this.getJostleAngle() - 1);
+            }
+        }
+    }
+
+    public EntityDimensions getDefaultDimensions(Pose poseIn) {
+        return isJostling() && !isBaby() ? JOSTLING_SIZE.scale(this.getScale()) : super.getDefaultDimensions(poseIn);
+    }
+
+    protected boolean isAlliedToInternal(Entity entityIn) {
+        if (this.isTame()) {
+            LivingEntity livingentity = this.getOwner();
+            if (entityIn == livingentity) {
+                return true;
+            }
+            if (entityIn instanceof TamableAnimal) {
+                return ((TamableAnimal) entityIn).isOwnedBy(livingentity);
+            }
+            if (livingentity != null) {
+                return livingentity.isAlliedTo(entityIn);
+            }
+        }
+
+        return false;
+    }
+
+    public boolean doHurtTarget(ServerLevel serverLevel, Entity entityIn) {
+        if (super.doHurtTarget(serverLevel, entityIn)) {
+            if (entityIn instanceof LivingEntity) {
+                int i = 5;
+                if (this.level().getDifficulty() == Difficulty.NORMAL) {
+                    i = 10;
+                } else if (this.level().getDifficulty() == Difficulty.HARD) {
+                    i = 20;
+                }
+                ((LivingEntity)entityIn).addEffect(new MobEffectInstance(MobEffects.POISON, i * 20, 0));
+            }
+
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    public boolean canBeAffected(MobEffectInstance potioneffectIn) {
+        if (potioneffectIn.is(MobEffects.POISON)) {
+            return false;
+        }
+        return super.canBeAffected(potioneffectIn);
+    }
+
+    @Nullable
+    public LivingEntity getControllingPassenger() {
+        for (Entity passenger : this.getPassengers()) {
+            if (passenger instanceof Player) {
+                Player player = (Player) passenger;
+                return player;
+            }
+        }
+        return null;
+    }
+
+    public void positionRider(Entity passenger, Entity.MoveFunction moveFunc) {
+        if (this.hasPassenger(passenger)) {
+            float radius = 0;
+            float angle = (Maths.STARTING_ANGLE * this.yBodyRot);
+            double extraX = radius * Mth.sin(Mth.PI + angle);
+            double extraZ = radius * Mth.cos(angle);
+            double passengerYOffset = passenger instanceof Player ? -0.35D : 0.0D;
+            passenger.setPos(this.getX() + extraX, this.getY() + this.getPassengersRidingOffset() + passengerYOffset, this.getZ() + extraZ);
+        }
+    }
+
+    public double getPassengersRidingOffset() {
+        float f = Math.min(0.25F, this.walkAnimation.speed());
+        float f1 = this.walkAnimation.position();
+        return (double)this.getBbHeight() - 0.2D + (double)(0.12F * Mth.cos(f1 * 0.7F) * 0.7F * f);
+    }
+
+
+
+    public InteractionResult mobInteract(Player player, InteractionHand hand) {
+        ItemStack itemstack = player.getItemInHand(hand);
+        InteractionResult type = super.mobInteract(player, hand);
+        InteractionResult interactionresult = itemstack.interactLivingEntity(player, this, hand);
+        if(itemstack.is(AMTagRegistry.KOMODO_DRAGON_TAMEABLES) && !isTame()){
+            int tameAmount = 58 + this.random.nextInt(15);
+            if(itemstack.getCount() > tameAmount){
+                this.tame(player);
+                this.level().broadcastEntityEvent(this, (byte) 7);
+            }else{
+                this.level().broadcastEntityEvent(this, (byte) 6);
+            }
+            itemstack.shrink(itemstack.getCount());
+            return InteractionResult.SUCCESS;
+        }
+        if (interactionresult != InteractionResult.SUCCESS && type != InteractionResult.SUCCESS && isTame() && isOwnedBy(player)){
+            if(isFood(itemstack)){
+                this.setInLoveTime(600);
+                this.usePlayerItem(player, hand, itemstack);
+                return InteractionResult.SUCCESS;
+            }else if(itemstack.getItem() == Items.SADDLE && !this.isSaddled()){
+                this.usePlayerItem(player, hand, itemstack);
+                this.setSaddled(true);
+                return InteractionResult.SUCCESS;
+            }else if(itemstack.is(net.minecraft.world.item.Items.SHEARS) && this.isSaddled()){
+                this.setSaddled(false);
+                this.spawnAtLocation((ServerLevel)this.level(), Items.SADDLE);
+                return InteractionResult.SUCCESS;
+            }else{
+                if(!player.isShiftKeyDown() && !this.isBaby() && this.isSaddled()){
+                    player.startRiding(this);
+                    return InteractionResult.SUCCESS;
+                }else{
+                    this.setCommand((this.getCommand() + 1) % 3);
+
+                    if (this.getCommand() == 3) {
+                        this.setCommand(0);
+                    }
+                    player.displayClientMessage(Component.translatable("entity.minecraft.all.command_" + this.getCommand(), this.getName()), true);
+                    boolean sit = this.getCommand() == 2;
+                    if (sit) {
+                        this.setOrderedToSit(true);
+                        return InteractionResult.SUCCESS;
+                    } else {
+                        this.setOrderedToSit(false);
+                        return InteractionResult.SUCCESS;
+                    }
+                }
+            }
+        }
+        return type;
+    }
+
+    public EntityKomodoDragon(EntityType<EntityKomodoDragon> type, Level worldIn) {
+        super(type, worldIn);
+    }
+
+    protected float getWaterSlowDown() {
+        return 0.98F;
+    }
+
+    public void setTarget(@Nullable LivingEntity entitylivingbaseIn) {
+        if(!this.isBaby() || slaughterCooldown > 0){
+            super.setTarget(entitylivingbaseIn);
+        }
+    }
+    public static AttributeSupplier.Builder bakeAttributes() {
+        return Animal.createAnimalAttributes().add(Attributes.MAX_HEALTH, 30D).add(Attributes.ARMOR, 0.0D).add(Attributes.ATTACK_DAMAGE, 4.0D).add(Attributes.MOVEMENT_SPEED, 0.23F).add(Attributes.STEP_HEIGHT, 1.0D);
+    }
+
+    @Nullable
+    @Override
+    public AgeableMob getBreedOffspring(ServerLevel serverLevel, AgeableMob ageable) {
+        return EntityType.KOMODO_DRAGON.create(serverLevel, EntitySpawnReason.BREEDING);
+    }
+
+    @Override
+    public boolean canTargetItem(ItemStack stack) {
+        return stack.is(AMTagRegistry.KOMODO_DRAGON_TAMEABLES) || (stack.has(net.minecraft.core.component.DataComponents.FOOD) && true);
+    }
+
+    public boolean isSaddled() {
+        return this.entityData.get(SADDLED);
+    }
+
+    public void setSaddled(boolean saddled) {
+        this.entityData.set(SADDLED, Boolean.valueOf(saddled));
+    }
+
+    public boolean isJostling() {
+        return this.entityData.get(JOSTLING);
+    }
+
+    public void setJostling(boolean jostle) {
+        this.entityData.set(JOSTLING, jostle);
+    }
+
+    public float getJostleAngle() {
+        return this.entityData.get(JOSTLE_ANGLE);
+    }
+
+    public void setJostleAngle(float scale) {
+        this.entityData.set(JOSTLE_ANGLE, scale);
+    }
+
+    @Nullable
+    public UUID getJostlingPartnerUUID() {
+        String uuidStr = this.entityData.get(JOSTLER_UUID);
+        if (uuidStr == null || uuidStr.isEmpty()) {
+            return null;
+        }
+        try {
+            return UUID.fromString(uuidStr);
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
+    }
+
+    public void setJostlingPartnerUUID(@Nullable UUID uniqueId) {
+        this.entityData.set(JOSTLER_UUID, uniqueId == null ? "" : uniqueId.toString());
+    }
+
+    @Nullable
+    public Entity getJostlingPartner() {
+        UUID id = getJostlingPartnerUUID();
+        if (id != null && this.level() instanceof ServerLevel serverLevel) {
+            return serverLevel.getEntity(id);
+        }
+        return null;
+    }
+
+    public void setJostlingPartner(@Nullable Entity jostlingPartner) {
+        if (jostlingPartner == null) {
+            this.setJostlingPartnerUUID(null);
+        } else {
+            this.setJostlingPartnerUUID(jostlingPartner.getUUID());
+        }
+    }
+
+    public void pushBackJostling(EntityKomodoDragon otherDragon, float strength) {
+        applyJostleKnockback(strength, otherDragon.getX() - this.getX(), otherDragon.getZ() - this.getZ());
+    }
+
+    private void applyJostleKnockback(float strength, double ratioX, double ratioZ) {
+        if (!(strength <= 0.0F)) {
+            this.hasImpulse = true;
+            Vec3 vector3d = this.getDeltaMovement();
+            Vec3 vector3d1 = (new Vec3(ratioX, 0.0D, ratioZ)).normalize().scale(strength);
+            this.setDeltaMovement(vector3d.x / 2.0D - vector3d1.x, 0.3F, vector3d.z / 2.0D - vector3d1.z);
+        }
+    }
+
+    public boolean canJostleWith(EntityKomodoDragon other) {
+        return !other.isOrderedToSit() && !other.isVehicle() && !other.isBaby() && other.getJostlingPartnerUUID() == null && other.jostleCooldown == 0;
+    }
+
+    public void playJostleSound() {
+    }
+
+    protected void dropEquipment(ServerLevel serverLevel) {
+        super.dropEquipment(serverLevel);
+        if (this.isSaddled()) {
+            if (!this.level().isClientSide()) {
+                this.spawnAtLocation(serverLevel, Items.SADDLE);
+            }
+        }
+        this.setSaddled(false);
+    }
+
+    @Override
+    public void onGetItem(ItemEntity e) {
+        this.heal(10);
+    }
+
+    @Override
+    public boolean shouldFollow() {
+        return this.getCommand() == 1;
+    }
+
+    public boolean isMaid() {
+        String s = ChatFormatting.stripFormatting(this.getName().getString());
+        return s != null && (s.toLowerCase().contains("maid") || s.toLowerCase().contains("coda"));
+
+    }
+}

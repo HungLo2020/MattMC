@@ -1,6 +1,6 @@
 package net.sodium.api.math;
 
-import com.mojang.blaze3d.vertex.PoseStack;
+import net.blaze3d.vertex.PoseStack;
 import net.sodium.api.util.NormI8;
 import net.minecraft.core.Direction;
 import org.joml.*;

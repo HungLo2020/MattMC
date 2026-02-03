@@ -1,6 +1,6 @@
 package net.minecraft.client.renderer.block.model;
 
-import com.mojang.math.Quadrant;
+import net.math.Quadrant;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;

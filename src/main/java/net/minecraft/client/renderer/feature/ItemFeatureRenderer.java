@@ -1,6 +1,6 @@
 package net.minecraft.client.renderer.feature;
 
-import com.mojang.blaze3d.vertex.PoseStack;
+import net.blaze3d.vertex.PoseStack;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.client.renderer.MultiBufferSource;
@@ -9,12 +9,15 @@ import net.minecraft.client.renderer.SubmitNodeCollection;
 import net.minecraft.client.renderer.SubmitNodeStorage;
 import net.minecraft.client.renderer.entity.ItemRenderer;
 import net.minecraft.client.renderer.item.ItemStackRenderState;
+import net.sodium.client.render.frapi.render.ItemRenderContext;
+import net.sodium.client.render.frapi.render.MeshItemCommand;
+import net.sodium.client.render.frapi.render.SubmitNodeCollectionExtension;
 
 @Environment(EnvType.CLIENT)
 public class ItemFeatureRenderer {
 	private final PoseStack poseStack = new PoseStack();
 	// Sodium FRAPI: Item render context (merged from ItemFeatureRendererMixin)
-	private final net.caffeinemc.mods.sodium.client.render.frapi.render.ItemRenderContext itemRenderContext = new net.caffeinemc.mods.sodium.client.render.frapi.render.ItemRenderContext();
+	private final ItemRenderContext itemRenderContext = new ItemRenderContext();
 
 	public void render(SubmitNodeCollection submitNodeCollection, MultiBufferSource.BufferSource bufferSource, OutlineBufferSource outlineBufferSource) {
 		for (SubmitNodeStorage.ItemSubmit itemSubmit : submitNodeCollection.getItemSubmits()) {
@@ -53,7 +56,7 @@ public class ItemFeatureRenderer {
 		}
 		
 		// Sodium FRAPI: Render mesh item commands (merged from ItemFeatureRendererMixin)
-		for (net.caffeinemc.mods.sodium.client.render.frapi.render.MeshItemCommand itemCommand : ((net.caffeinemc.mods.sodium.client.render.frapi.render.SubmitNodeCollectionExtension) submitNodeCollection).sodium_getMeshItemCommands()) {
+		for (MeshItemCommand itemCommand : ((SubmitNodeCollectionExtension) submitNodeCollection).sodium_getMeshItemCommands()) {
 			poseStack.pushPose();
 			poseStack.last().set(itemCommand.positionMatrix());
 

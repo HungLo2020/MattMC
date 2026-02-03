@@ -1,14 +1,12 @@
 package com.seibel.distanthorizons.common.wrappers.misc;
 
-import com.mojang.blaze3d.platform.NativeImage;
+import net.blaze3d.platform.NativeImage;
 import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
 import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftGLWrapper;
 import com.seibel.distanthorizons.core.wrapperInterfaces.misc.ILightMapWrapper;
 import com.seibel.distanthorizons.core.logging.DhLogger;
 import org.lwjgl.opengl.GL32;
-
-import java.nio.ByteBuffer;
 
 public class LightMapWrapper implements ILightMapWrapper
 {

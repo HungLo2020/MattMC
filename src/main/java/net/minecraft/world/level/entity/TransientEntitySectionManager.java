@@ -1,6 +1,6 @@
 package net.minecraft.world.level.entity;
 
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import it.unimi.dsi.fastutil.longs.LongSet;
 import net.minecraft.core.BlockPos;

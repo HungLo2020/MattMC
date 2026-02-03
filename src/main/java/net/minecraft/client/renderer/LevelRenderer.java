@@ -2,23 +2,21 @@ package net.minecraft.client.renderer;
 
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
-import com.mojang.blaze3d.buffers.GpuBuffer;
-import com.mojang.blaze3d.buffers.GpuBufferSlice;
-import com.mojang.blaze3d.framegraph.FrameGraphBuilder;
-import com.mojang.blaze3d.framegraph.FramePass;
-import com.mojang.blaze3d.pipeline.RenderTarget;
-import com.mojang.blaze3d.pipeline.TextureTarget;
-import com.mojang.blaze3d.platform.Lighting;
-import com.mojang.blaze3d.resource.GraphicsResourceAllocator;
-import com.mojang.blaze3d.resource.RenderTargetDescriptor;
-import com.mojang.blaze3d.resource.ResourceHandle;
-import com.mojang.blaze3d.systems.RenderPass;
-import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.blaze3d.vertex.SheetedDecalTextureGenerator;
-import com.mojang.blaze3d.vertex.VertexConsumer;
-import com.mojang.blaze3d.vertex.VertexFormat;
-import com.mojang.logging.LogUtils;
+import net.blaze3d.buffers.GpuBufferSlice;
+import net.blaze3d.framegraph.FrameGraphBuilder;
+import net.blaze3d.framegraph.FramePass;
+import net.blaze3d.pipeline.RenderTarget;
+import net.blaze3d.pipeline.TextureTarget;
+import net.blaze3d.platform.Lighting;
+import net.blaze3d.resource.GraphicsResourceAllocator;
+import net.blaze3d.resource.RenderTargetDescriptor;
+import net.blaze3d.resource.ResourceHandle;
+import net.blaze3d.systems.RenderPass;
+import net.blaze3d.systems.RenderSystem;
+import net.blaze3d.vertex.PoseStack;
+import net.blaze3d.vertex.SheetedDecalTextureGenerator;
+import net.blaze3d.vertex.VertexConsumer;
+import net.logging.LogUtils;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectFunction;
@@ -26,12 +24,10 @@ import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap.Entry;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
-import it.unimi.dsi.fastutil.objects.ObjectListIterator;
-import java.util.ArrayList;
+
 import java.util.EnumMap;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Locale;
 import java.util.Optional;
 import java.util.Set;
 import java.util.SortedSet;
@@ -54,8 +50,6 @@ import net.minecraft.client.renderer.chunk.ChunkSectionLayerGroup;
 import net.minecraft.client.renderer.chunk.ChunkSectionsToRender;
 import net.minecraft.client.renderer.chunk.CompiledSectionMesh;
 import net.minecraft.client.renderer.chunk.RenderRegionCache;
-import net.minecraft.client.renderer.chunk.SectionBuffers;
-import net.minecraft.client.renderer.chunk.SectionMesh;
 import net.minecraft.client.renderer.chunk.SectionRenderDispatcher;
 import net.minecraft.client.renderer.chunk.TranslucencyPointOfView;
 import net.minecraft.client.renderer.culling.Frustum;
@@ -64,7 +58,6 @@ import net.minecraft.client.renderer.debug.GameTestBlockHighlightRenderer;
 import net.minecraft.client.renderer.entity.EntityRenderDispatcher;
 import net.minecraft.client.renderer.entity.state.EntityRenderState;
 import net.minecraft.client.renderer.feature.FeatureRenderDispatcher;
-import net.minecraft.client.renderer.feature.ModelFeatureRenderer;
 import net.minecraft.client.renderer.state.BlockBreakingRenderState;
 import net.minecraft.client.renderer.state.BlockOutlineRenderState;
 import net.minecraft.client.renderer.state.LevelRenderState;
@@ -91,7 +84,6 @@ import net.minecraft.world.level.BlockAndTintGetter;
 import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.LightLayer;
-import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.material.FogType;
 import net.minecraft.world.phys.BlockHitResult;
@@ -99,16 +91,24 @@ import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.phys.HitResult.Type;
 import net.minecraft.world.phys.shapes.CollisionContext;
 import net.minecraft.world.phys.shapes.VoxelShape;
+import net.sodium.client.gl.device.RenderDevice;
+import net.sodium.client.render.SodiumWorldRenderer;
+import net.sodium.client.render.chunk.ChunkRenderMatrices;
+import net.sodium.client.render.viewport.ViewportProvider;
+import net.sodium.client.util.FlawlessFrames;
+import net.sodium.client.util.SodiumChunkSection;
+import net.sodium.client.world.LevelRendererExtension;
+import net.sodium.fabric.SodiumFogRenderHook;
+import net.voxelmap.VoxelConstants;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix4f;
 import org.joml.Matrix4fStack;
 import org.joml.Matrix4fc;
-import org.joml.Vector3f;
 import org.joml.Vector4f;
 import org.slf4j.Logger;
 
 @Environment(EnvType.CLIENT)
-public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseable, net.irisshaders.iris.shadows.CullingDataCache, net.caffeinemc.mods.sodium.client.world.LevelRendererExtension {
+public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseable, net.irisshaders.iris.shadows.CullingDataCache, LevelRendererExtension {
 	private static final Logger LOGGER = LogUtils.getLogger();
 	private static final ResourceLocation TRANSPARENCY_POST_CHAIN_ID = ResourceLocation.withDefaultNamespace("transparency");
 	private static final ResourceLocation ENTITY_OUTLINE_POST_CHAIN_ID = ResourceLocation.withDefaultNamespace("entity_outline");
@@ -173,8 +173,8 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 	
 	// Sodium: From LevelRendererMixin - fields for Sodium world renderer integration
 	private static final EnumMap<ChunkSectionLayer, List<RenderPass.Draw<GpuBufferSlice[]>>> SODIUM_STATIC_MAP = new EnumMap<>(ChunkSectionLayer.class);
-	private net.caffeinemc.mods.sodium.client.render.SodiumWorldRenderer renderer;
-	private net.caffeinemc.mods.sodium.client.render.chunk.ChunkRenderMatrices matrices;
+	private SodiumWorldRenderer renderer;
+	private ChunkRenderMatrices matrices;
 
 	public LevelRenderer(
 		Minecraft minecraft,
@@ -193,7 +193,7 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 		this.featureRenderDispatcher = featureRenderDispatcher;
 		
 		// Sodium: Initialize SodiumWorldRenderer
-		this.renderer = new net.caffeinemc.mods.sodium.client.render.SodiumWorldRenderer(minecraft);
+		this.renderer = new SodiumWorldRenderer(minecraft);
 	}
 
 	public void close() {
@@ -287,11 +287,11 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 		this.gameTestBlockHighlightRenderer.clear();
 		
 		// Sodium: Update renderer when world changes
-		net.caffeinemc.mods.sodium.client.gl.device.RenderDevice.enterManagedCode();
+		RenderDevice.enterManagedCode();
 		try {
 			this.renderer.setLevel(clientLevel);
 		} finally {
-			net.caffeinemc.mods.sodium.client.gl.device.RenderDevice.exitManagedCode();
+			RenderDevice.exitManagedCode();
 		}
 	}
 
@@ -331,11 +331,11 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 		}
 		
 		// Sodium: Reload renderer
-		net.caffeinemc.mods.sodium.client.gl.device.RenderDevice.enterManagedCode();
+		RenderDevice.enterManagedCode();
 		try {
 			this.renderer.reload();
 		} finally {
-			net.caffeinemc.mods.sodium.client.gl.device.RenderDevice.exitManagedCode();
+			RenderDevice.exitManagedCode();
 		}
 	}
 
@@ -379,8 +379,8 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 
 public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // Made public for Iris shadow rendering
 // Sodium: Redirect terrain setup to our renderer
-	var viewport = ((net.caffeinemc.mods.sodium.client.render.viewport.ViewportProvider) frustum).sodium$createViewport();
-	var updateChunksImmediately = net.caffeinemc.mods.sodium.client.util.FlawlessFrames.isActive();
+	var viewport = ((ViewportProvider) frustum).sodium$createViewport();
+	var updateChunksImmediately = FlawlessFrames.isActive();
 
 	int sectionX = SectionPos.posToSectionCoord(camera.getPosition().x());
 	int sectionY = SectionPos.posToSectionCoord(camera.getPosition().y());
@@ -393,11 +393,11 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 	this.worldBorderRenderer.invalidate();
 	}
 
-	net.caffeinemc.mods.sodium.client.gl.device.RenderDevice.enterManagedCode();
+	RenderDevice.enterManagedCode();
 	try {
-	this.renderer.setupTerrain(camera, viewport, net.caffeinemc.mods.sodium.fabric.SodiumFogRenderHook.getFogParameters(), spectator, updateChunksImmediately, matrices);
+	this.renderer.setupTerrain(camera, viewport, SodiumFogRenderHook.getFogParameters(), spectator, updateChunksImmediately, matrices);
 	} finally {
-	net.caffeinemc.mods.sodium.client.gl.device.RenderDevice.exitManagedCode();
+	RenderDevice.exitManagedCode();
 	}
 	}
 
@@ -496,7 +496,7 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 		Frustum frustum = this.prepareCullFrustum(matrix4f, matrix4f3, vec3);
 		
 		// Sodium: Store matrices for setupTerrain (from LevelRendererMixin @Inject at="INVOKE cullTerrain")
-		this.matrices = new net.caffeinemc.mods.sodium.client.render.chunk.ChunkRenderMatrices(matrix4f2, matrix4f);
+		this.matrices = new ChunkRenderMatrices(matrix4f2, matrix4f);
 		
 		// Iris: From MixinLevelRenderer - Render shadow terrain after frustum preparation
 		this.pipeline.renderShadows(this, camera, this.levelRenderState.cameraRenderState);
@@ -653,11 +653,11 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 		
 		// VoxelMap: Render waypoint beacons after level rendering
 		try {
-			com.mojang.blaze3d.vertex.PoseStack voxelmap_poseStack = new com.mojang.blaze3d.vertex.PoseStack();
+			PoseStack voxelmap_poseStack = new PoseStack();
 			voxelmap_poseStack.pushPose();
 			voxelmap_poseStack.last().pose().set(matrix4f);
 			net.minecraft.client.renderer.MultiBufferSource.BufferSource bufferSource = this.minecraft.renderBuffers().bufferSource();
-			com.mamiyaotaru.voxelmap.VoxelConstants.onRenderWaypoints(deltaTracker.getGameTimeDeltaPartialTick(false), voxelmap_poseStack, bufferSource, camera);
+			VoxelConstants.onRenderWaypoints(deltaTracker.getGameTimeDeltaPartialTick(false), voxelmap_poseStack, bufferSource, camera);
 			voxelmap_poseStack.popPose();
 		} catch (Exception e) {
 			// Silently catch to avoid crashes
@@ -1122,7 +1122,7 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 		}
 		
 		ChunkSectionsToRender chunkSectionsToRender = new ChunkSectionsToRender(SODIUM_STATIC_MAP, -1, new GpuBufferSlice[0]);
-		((net.caffeinemc.mods.sodium.client.util.SodiumChunkSection) (Object) chunkSectionsToRender).sodium$setRendering(renderer, matrices, x, y, z);
+		((SodiumChunkSection) (Object) chunkSectionsToRender).sodium$setRendering(renderer, matrices, x, y, z);
 		return chunkSectionsToRender;
 	}
 
@@ -1368,8 +1368,8 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 		
 		// VoxelMap: Notify world update listener for chunk changes
 		try {
-			if (com.mamiyaotaru.voxelmap.VoxelConstants.getVoxelMapInstance().getWorldUpdateListener() != null) {
-				com.mamiyaotaru.voxelmap.VoxelConstants.getVoxelMapInstance().getWorldUpdateListener().notifyObservers(x, z);
+			if (VoxelConstants.getVoxelMapInstance().getWorldUpdateListener() != null) {
+				VoxelConstants.getVoxelMapInstance().getWorldUpdateListener().notifyObservers(x, z);
 			}
 		} catch (Exception e) {
 			// Silently catch to avoid crashes
@@ -1747,17 +1747,17 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 
 	// Sodium: LevelRendererExtension interface implementation
 	@Override
-	public net.caffeinemc.mods.sodium.client.render.SodiumWorldRenderer sodium$getWorldRenderer() {
+	public SodiumWorldRenderer sodium$getWorldRenderer() {
 		return this.renderer;
 	}
 
 	@Override
-	public void sodium$setMatrices(net.caffeinemc.mods.sodium.client.render.chunk.ChunkRenderMatrices matrices) {
+	public void sodium$setMatrices(ChunkRenderMatrices matrices) {
 		this.matrices = matrices;
 	}
 
 	@Override
-	public net.caffeinemc.mods.sodium.client.render.chunk.ChunkRenderMatrices sodium$getMatrices() {
+	public ChunkRenderMatrices sodium$getMatrices() {
 		return this.matrices;
 	}
 }

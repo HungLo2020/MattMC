@@ -1,6 +1,6 @@
 package net.minecraft.data.structures;
 
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtUtils;

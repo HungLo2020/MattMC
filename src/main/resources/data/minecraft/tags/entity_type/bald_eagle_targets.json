@@ -1,0 +1,12 @@
+{
+  "__comment": "all non-player targets of the bald eagle mob.",
+  "replace": false,
+  "values": [
+    "minecraft:rabbit",
+    "minecraft:salmon",
+    "minecraft:raccoon",
+    "minecraft:jerboa",
+    "minecraft:catfish",
+    "minecraft:flying_fish"
+  ]
+}

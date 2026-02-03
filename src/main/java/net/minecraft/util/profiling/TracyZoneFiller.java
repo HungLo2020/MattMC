@@ -2,7 +2,7 @@ package net.minecraft.util.profiling;
 
 import com.mojang.jtracy.Plot;
 import com.mojang.jtracy.TracyClient;
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import java.lang.StackWalker.Option;
 import java.lang.StackWalker.StackFrame;
 import java.util.ArrayList;

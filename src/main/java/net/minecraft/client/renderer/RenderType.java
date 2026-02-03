@@ -1,16 +1,16 @@
 package net.minecraft.client.renderer;
 
 import com.google.common.collect.ImmutableList;
-import com.mojang.blaze3d.buffers.GpuBuffer;
-import com.mojang.blaze3d.buffers.GpuBufferSlice;
-import com.mojang.blaze3d.pipeline.RenderPipeline;
-import com.mojang.blaze3d.pipeline.RenderTarget;
-import com.mojang.blaze3d.systems.RenderPass;
-import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.systems.ScissorState;
-import com.mojang.blaze3d.textures.GpuTextureView;
-import com.mojang.blaze3d.vertex.MeshData;
-import com.mojang.blaze3d.vertex.VertexFormat;
+import net.blaze3d.buffers.GpuBuffer;
+import net.blaze3d.buffers.GpuBufferSlice;
+import net.blaze3d.pipeline.RenderPipeline;
+import net.blaze3d.pipeline.RenderTarget;
+import net.blaze3d.systems.RenderPass;
+import net.blaze3d.systems.RenderSystem;
+import net.blaze3d.systems.ScissorState;
+import net.blaze3d.textures.GpuTextureView;
+import net.blaze3d.vertex.MeshData;
+import net.blaze3d.vertex.VertexFormat;
 import java.util.Optional;
 import java.util.OptionalDouble;
 import java.util.OptionalInt;
@@ -1014,12 +1014,12 @@ public abstract class RenderType extends RenderStateShard implements net.irissha
 		
 		// Iris: Override to provide actual implementation
 		@Override
-		public com.mojang.blaze3d.pipeline.RenderTarget iris$getRenderTarget() {
+		public RenderTarget iris$getRenderTarget() {
 			return this.state.outputState.getRenderTarget();
 		}
 		
 		@Override
-		public com.mojang.blaze3d.pipeline.RenderPipeline iris$getPipeline() {
+		public RenderPipeline iris$getPipeline() {
 			return this.renderPipeline;
 		}
 	}

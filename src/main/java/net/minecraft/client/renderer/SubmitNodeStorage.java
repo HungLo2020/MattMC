@@ -1,6 +1,6 @@
 package net.minecraft.client.renderer;
 
-import com.mojang.blaze3d.vertex.PoseStack;
+import net.blaze3d.vertex.PoseStack;
 import it.unimi.dsi.fastutil.ints.Int2ObjectAVLTreeMap;
 import java.util.List;
 import net.minecraft.api.EnvType;
@@ -22,13 +22,14 @@ import net.minecraft.util.FormattedCharSequence;
 import net.minecraft.world.item.ItemDisplayContext;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.Vec3;
+import net.sodium.client.render.frapi.render.OrderedSubmitNodeCollectorExtension;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix4f;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
 
 @Environment(EnvType.CLIENT)
-public class SubmitNodeStorage implements SubmitNodeCollector, net.caffeinemc.mods.sodium.client.render.frapi.render.OrderedSubmitNodeCollectorExtension {
+public class SubmitNodeStorage implements SubmitNodeCollector, OrderedSubmitNodeCollectorExtension {
 	private final Int2ObjectAVLTreeMap<SubmitNodeCollection> submitsPerOrder = new Int2ObjectAVLTreeMap<>();
 
 	public SubmitNodeCollection order(int i) {
@@ -40,7 +41,7 @@ public class SubmitNodeStorage implements SubmitNodeCollector, net.caffeinemc.mo
 	public void fabric_submitItem(PoseStack matrices, ItemDisplayContext displayContext, int light, int overlay, int outlineColors, int[] tintLayers, List<BakedQuad> quads, RenderType renderLayer, ItemStackRenderState.FoilType foilType, net.fabricmc.fabric.api.renderer.v1.mesh.MeshView mesh) {
 		SubmitNodeCollection queue = order(0);
 
-		if (queue instanceof net.caffeinemc.mods.sodium.client.render.frapi.render.OrderedSubmitNodeCollectorExtension access) {
+		if (queue instanceof OrderedSubmitNodeCollectorExtension access) {
 			access.fabric_submitItem(matrices, displayContext, light, overlay, outlineColors, tintLayers, quads, renderLayer, foilType, mesh);
 		} else {
 			queue.submitItem(matrices, displayContext, light, overlay, outlineColors, tintLayers, quads, renderLayer, foilType);

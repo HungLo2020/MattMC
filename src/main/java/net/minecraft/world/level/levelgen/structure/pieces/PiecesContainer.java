@@ -2,7 +2,7 @@ package net.minecraft.world.level.levelgen.structure.pieces;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;

@@ -1,6 +1,6 @@
 package net.minecraft.world.level.redstone;
 
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;

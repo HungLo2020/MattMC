@@ -1,11 +1,11 @@
 package net.minecraft.client.renderer.chunk;
 
-import com.mojang.blaze3d.buffers.GpuBuffer;
-import com.mojang.blaze3d.buffers.GpuBufferSlice;
-import com.mojang.blaze3d.pipeline.RenderTarget;
-import com.mojang.blaze3d.systems.RenderPass;
-import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.vertex.VertexFormat;
+import net.blaze3d.buffers.GpuBuffer;
+import net.blaze3d.buffers.GpuBufferSlice;
+import net.blaze3d.pipeline.RenderTarget;
+import net.blaze3d.systems.RenderPass;
+import net.blaze3d.systems.RenderSystem;
+import net.blaze3d.vertex.VertexFormat;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.OptionalDouble;
@@ -17,14 +17,18 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.hooks.ChunkRenderLayerHooks;
 import net.minecraft.hooks.HookRegistry;
+import net.sodium.client.gl.device.RenderDevice;
+import net.sodium.client.render.SodiumWorldRenderer;
+import net.sodium.client.render.chunk.ChunkRenderMatrices;
+import net.sodium.client.util.SodiumChunkSection;
 
 @Environment(EnvType.CLIENT)
 public record ChunkSectionsToRender(
 	EnumMap<ChunkSectionLayer, List<RenderPass.Draw<GpuBufferSlice[]>>> drawsPerLayer, int maxIndicesRequired, GpuBufferSlice[] dynamicTransforms
-) implements net.caffeinemc.mods.sodium.client.util.SodiumChunkSection {
+) implements SodiumChunkSection {
 	// Sodium: SodiumChunkSection interface implementation (from ChunkSectionsToRenderMixin)
-	private static net.caffeinemc.mods.sodium.client.render.SodiumWorldRenderer renderer;
-	private static net.caffeinemc.mods.sodium.client.render.chunk.ChunkRenderMatrices matrices;
+	private static SodiumWorldRenderer renderer;
+	private static ChunkRenderMatrices matrices;
 	private static double x;
 	private static double y;
 	private static double z;
@@ -37,11 +41,11 @@ public record ChunkSectionsToRender(
 		
 		// Sodium: Let Sodium renderer handle if active (from ChunkSectionsToRenderMixin)
 		if (renderer != null) {
-			net.caffeinemc.mods.sodium.client.gl.device.RenderDevice.enterManagedCode();
+			RenderDevice.enterManagedCode();
 			try {
 				renderer.drawChunkLayer(chunkSectionLayerGroup, matrices, x, y, z);
 			} finally {
-				net.caffeinemc.mods.sodium.client.gl.device.RenderDevice.exitManagedCode();
+				RenderDevice.exitManagedCode();
 			}
 			return;
 		}
@@ -86,7 +90,7 @@ public record ChunkSectionsToRender(
 	
 	// Sodium: SodiumChunkSection interface method (from ChunkSectionsToRenderMixin)
 	@Override
-	public void sodium$setRendering(net.caffeinemc.mods.sodium.client.render.SodiumWorldRenderer renderer, net.caffeinemc.mods.sodium.client.render.chunk.ChunkRenderMatrices matrices, double x, double y, double z) {
+	public void sodium$setRendering(SodiumWorldRenderer renderer, ChunkRenderMatrices matrices, double x, double y, double z) {
 		ChunkSectionsToRender.renderer = renderer;
 		ChunkSectionsToRender.matrices = matrices;
 		ChunkSectionsToRender.x = x;

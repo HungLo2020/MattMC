@@ -1,7 +1,7 @@
 package net.minecraft.client.renderer.debug;
 
 import com.google.common.collect.Lists;
-import com.mojang.blaze3d.vertex.PoseStack;
+import net.blaze3d.vertex.PoseStack;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;

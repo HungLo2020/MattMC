@@ -1,6 +1,6 @@
 package net.minecraft.client.gui.components;
 
-import com.mojang.blaze3d.platform.cursor.CursorTypes;
+import net.blaze3d.platform.cursor.CursorTypes;
 import java.util.function.Consumer;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;

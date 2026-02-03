@@ -1,7 +1,7 @@
 package net.minecraft.client;
 
 import com.mojang.datafixers.DataFixer;
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import com.mojang.serialization.DataResult;
 import java.nio.file.Path;
 import net.minecraft.api.EnvType;

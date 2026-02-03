@@ -1,6 +1,6 @@
 package net.minecraft.network.protocol;
 
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import net.minecraft.CrashReport;
 import net.minecraft.CrashReportCategory;
 import net.minecraft.CrashReportDetail;

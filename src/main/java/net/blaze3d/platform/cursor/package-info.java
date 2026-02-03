@@ -1,0 +1,11 @@
+@ParametersAreNonnullByDefault
+@MethodsReturnNonnullByDefault
+@FieldsAreNonnullByDefault
+@Environment(EnvType.CLIENT)
+package net.blaze3d.platform.cursor;
+
+import javax.annotation.ParametersAreNonnullByDefault;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
+import net.minecraft.FieldsAreNonnullByDefault;
+import net.minecraft.MethodsReturnNonnullByDefault;

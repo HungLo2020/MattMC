@@ -1,7 +1,7 @@
 package net.minecraft.server.packs;
 
 import com.google.gson.JsonObject;
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import com.mojang.serialization.JsonOps;
 import java.io.BufferedReader;
 import java.io.IOException;

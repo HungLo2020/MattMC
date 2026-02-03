@@ -14,7 +14,7 @@ import com.mojang.brigadier.suggestion.SuggestionProvider;
 import com.mojang.brigadier.tree.ArgumentCommandNode;
 import com.mojang.brigadier.tree.CommandNode;
 import com.mojang.brigadier.tree.RootCommandNode;
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;

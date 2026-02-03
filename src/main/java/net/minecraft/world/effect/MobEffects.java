@@ -1,5 +1,9 @@
 package net.minecraft.world.effect;
 
+import net.alexsmobs.effect.EffectDebilitatingSting;
+import net.alexsmobs.effect.EffectOrcaMight;
+import net.alexsmobs.effect.EffectSunbird;
+import net.alexsmobs.effect.EffectTigersBlessing;
 import net.minecraft.core.Holder;
 import net.minecraft.core.Registry;
 import net.minecraft.core.particles.ParticleTypes;
@@ -119,6 +123,23 @@ public class MobEffects {
 	public static final Holder<MobEffect> OOZING = register("oozing", new OozingMobEffect(MobEffectCategory.HARMFUL, 10092451, randomSource -> 2));
 	public static final Holder<MobEffect> INFESTED = register(
 		"infested", new InfestedMobEffect(MobEffectCategory.HARMFUL, 9214860, 0.1F, randomSource -> Mth.randomBetweenInclusive(randomSource, 1, 2))
+	);
+	
+	// AlexsMobs custom effects
+	public static final Holder<MobEffect> ORCAS_MIGHT = register(
+		"orcas_might", new EffectOrcaMight()
+	);
+	public static final Holder<MobEffect> DEBILITATING_STING = register(
+		"debilitating_sting", new EffectDebilitatingSting()
+	);
+	public static final Holder<MobEffect> TIGERS_BLESSING = register(
+		"tigers_blessing", new EffectTigersBlessing()
+	);
+	public static final Holder<MobEffect> SUNBIRD_BLESSING = register(
+		"sunbird_blessing", new EffectSunbird(false)
+	);
+	public static final Holder<MobEffect> SUNBIRD_CURSE = register(
+		"sunbird_curse", new EffectSunbird(true)
 	);
 
 	private static Holder<MobEffect> register(String string, MobEffect mobEffect) {

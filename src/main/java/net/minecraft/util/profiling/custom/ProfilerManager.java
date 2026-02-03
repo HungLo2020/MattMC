@@ -1,8 +1,7 @@
 package net.minecraft.util.profiling.custom;
 
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import net.minecraft.commands.CommandSourceStack;
-import net.minecraft.server.MinecraftServer;
 import net.minecraft.util.profiling.Profiler;
 import net.minecraft.util.profiling.ProfilerFiller;
 import org.slf4j.Logger;

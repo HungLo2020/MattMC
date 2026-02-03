@@ -1,7 +1,7 @@
 package net.minecraft.client.model.geom;
 
-import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.blaze3d.vertex.VertexConsumer;
+import net.blaze3d.vertex.PoseStack;
+import net.blaze3d.vertex.VertexConsumer;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -16,6 +16,9 @@ import net.minecraft.api.Environment;
 import net.minecraft.core.Direction;
 import net.minecraft.core.Direction.Axis;
 import net.minecraft.util.RandomSource;
+import net.sodium.client.render.immediate.model.EntityRenderer;
+import net.sodium.client.render.immediate.model.ModelCuboid;
+import net.sodium.client.render.vertex.VertexConsumerUtils;
 import org.joml.Matrix3f;
 import org.joml.Matrix4f;
 import org.joml.Quaternionf;
@@ -242,11 +245,11 @@ public class ModelPart {  // Changed from final to support Citadel's BasicEntity
 		public final float maxY;
 		public final float maxZ;
 		// Sodium: Cuboid for fast rendering (merged from CubeMixin)
-		private net.caffeinemc.mods.sodium.client.render.immediate.model.ModelCuboid sodium$cuboid;
+		private ModelCuboid sodium$cuboid;
 
 		public Cube(int i, int j, float f, float g, float h, float k, float l, float m, float n, float o, float p, boolean bl, float q, float r, Set<Direction> set) {
 			// Sodium: Create cuboid before setting minX (merged from CubeMixin)
-			this.sodium$cuboid = new net.caffeinemc.mods.sodium.client.render.immediate.model.ModelCuboid(i, j, f, g, h, k, l, m, n, o, p, bl, q, r, set);
+			this.sodium$cuboid = new ModelCuboid(i, j, f, g, h, k, l, m, n, o, p, bl, q, r, set);
 
 			this.minX = f;
 			this.minY = g;
@@ -315,10 +318,10 @@ public class ModelPart {  // Changed from final to support Citadel's BasicEntity
 
 		public void compile(PoseStack.Pose pose, VertexConsumer vertexConsumer, int i, int j, int k) {
 			// Sodium: Use fast cuboid rendering if available (merged from CubeMixin)
-			net.sodium.api.vertex.buffer.VertexBufferWriter writer = net.caffeinemc.mods.sodium.client.render.vertex.VertexConsumerUtils.convertOrLog(vertexConsumer);
+			net.sodium.api.vertex.buffer.VertexBufferWriter writer = VertexConsumerUtils.convertOrLog(vertexConsumer);
 
 			if (writer != null) {
-				net.caffeinemc.mods.sodium.client.render.immediate.model.EntityRenderer.renderCuboid(pose, writer, this.sodium$cuboid, i, j, net.sodium.api.util.ColorARGB.toABGR(k));
+				EntityRenderer.renderCuboid(pose, writer, this.sodium$cuboid, i, j, net.sodium.api.util.ColorARGB.toABGR(k));
 				return;
 			}
 

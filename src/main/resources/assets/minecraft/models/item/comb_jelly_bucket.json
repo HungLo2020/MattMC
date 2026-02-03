@@ -1,0 +1,7 @@
+{
+  "parent": "minecraft:item/generated",
+  "textures": {
+    "layer0": "minecraft:item/lower_bucket",
+    "layer1": "minecraft:item/bucket_content/comb_jelly"
+  }
+}

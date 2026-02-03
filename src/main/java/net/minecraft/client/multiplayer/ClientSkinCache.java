@@ -1,6 +1,7 @@
 package net.minecraft.client.multiplayer;
 
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
+import net.blaze3d.platform.NativeImage;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.client.Minecraft;
@@ -38,7 +39,7 @@ public class ClientSkinCache {
 		try {
 			// Load the skin image from byte array using NativeImage
 			ByteArrayInputStream inputStream = new ByteArrayInputStream(skinData);
-			com.mojang.blaze3d.platform.NativeImage nativeImage = com.mojang.blaze3d.platform.NativeImage.read(inputStream);
+			NativeImage nativeImage = NativeImage.read(inputStream);
 			
 			if (nativeImage == null) {
 				LOGGER.warn("Failed to read skin image for player {}", playerId);

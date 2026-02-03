@@ -2,9 +2,9 @@ package net.minecraft.client.gui.screens.options;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
-import com.mojang.blaze3d.platform.Monitor;
-import com.mojang.blaze3d.platform.VideoMode;
-import com.mojang.blaze3d.platform.Window;
+import net.blaze3d.platform.Monitor;
+import net.blaze3d.platform.VideoMode;
+import net.blaze3d.platform.Window;
 import java.util.List;
 import java.util.Optional;
 import net.minecraft.api.EnvType;

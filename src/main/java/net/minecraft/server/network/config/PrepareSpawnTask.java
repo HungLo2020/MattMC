@@ -1,6 +1,6 @@
 package net.minecraft.server.network.config;
 
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;

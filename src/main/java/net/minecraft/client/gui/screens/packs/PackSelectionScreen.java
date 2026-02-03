@@ -2,8 +2,8 @@ package net.minecraft.client.gui.screens.packs;
 
 import com.google.common.collect.Maps;
 import com.google.common.hash.Hashing;
-import com.mojang.blaze3d.platform.NativeImage;
-import com.mojang.logging.LogUtils;
+import net.blaze3d.platform.NativeImage;
+import net.logging.LogUtils;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.DirectoryStream;

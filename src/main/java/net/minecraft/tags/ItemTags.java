@@ -104,6 +104,7 @@ public final class ItemTags {
 	public static final TagKey<Item> HOGLIN_FOOD = bind("hoglin_food");
 	public static final TagKey<Item> LLAMA_FOOD = bind("llama_food");
 	public static final TagKey<Item> LLAMA_TEMPT_ITEMS = bind("llama_tempt_items");
+	public static final TagKey<Item> MOOSE_BREEDABLES = bind("moose_breedables");
 	public static final TagKey<Item> OCELOT_FOOD = bind("ocelot_food");
 	public static final TagKey<Item> PANDA_FOOD = bind("panda_food");
 	public static final TagKey<Item> PANDA_EATS_FROM_GROUND = bind("panda_eats_from_ground");

@@ -1,7 +1,7 @@
 package net.minecraft.client.renderer;
 
-import com.mojang.blaze3d.pipeline.RenderTarget;
-import com.mojang.blaze3d.resource.ResourceHandle;
+import net.blaze3d.pipeline.RenderTarget;
+import net.blaze3d.resource.ResourceHandle;
 import java.util.Set;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;

@@ -1,10 +1,10 @@
 package net.irisshaders.iris.shadows;
 
 import com.google.common.collect.ImmutableSet;
-import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.textures.FilterMode;
-import com.mojang.blaze3d.textures.GpuTexture;
-import com.mojang.blaze3d.textures.TextureFormat;
+import net.blaze3d.systems.RenderSystem;
+import net.blaze3d.textures.FilterMode;
+import net.blaze3d.textures.GpuTexture;
+import net.blaze3d.textures.TextureFormat;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntList;
 import net.irisshaders.iris.features.FeatureFlags;

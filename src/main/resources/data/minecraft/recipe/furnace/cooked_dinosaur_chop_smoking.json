@@ -1,8 +1,6 @@
 {
   "type": "minecraft:smoking",
-  "ingredient": {
-    "item": "minecraft:dinosaur_chop"
-  },
+  "ingredient": "minecraft:dinosaur_chop",
   "result": {
     "id": "minecraft:cooked_dinosaur_chop",
     "count": 1

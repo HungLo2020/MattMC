@@ -1,17 +1,18 @@
 package net.minecraft.client.renderer.texture;
 
-import com.mojang.blaze3d.textures.GpuTexture;
-import com.mojang.blaze3d.vertex.VertexConsumer;
+import net.blaze3d.textures.GpuTexture;
+import net.blaze3d.vertex.VertexConsumer;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.client.renderer.SpriteCoordinateExpander;
 import net.minecraft.hooks.HookRegistry;
 import net.minecraft.hooks.TextureAtlasSpriteHooks;
 import net.minecraft.resources.ResourceLocation;
+import net.sodium.client.render.chunk.compile.pipeline.TextureAtlasSpriteExtension;
 import org.jetbrains.annotations.Nullable;
 
 @Environment(EnvType.CLIENT)
-public class TextureAtlasSprite implements net.caffeinemc.mods.sodium.client.render.chunk.compile.pipeline.TextureAtlasSpriteExtension {
+public class TextureAtlasSprite implements TextureAtlasSpriteExtension {
 	private final ResourceLocation atlasLocation;
 	private final SpriteContents contents;
 	final int x;

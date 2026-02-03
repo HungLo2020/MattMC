@@ -1,14 +1,13 @@
 package net.minecraft.client.renderer.entity;
 
 import com.google.common.collect.Maps;
-import com.mojang.blaze3d.vertex.PoseStack;
+import net.blaze3d.vertex.PoseStack;
 import java.util.Map;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.client.model.AdultAndBabyModelPair;
 import net.minecraft.client.model.ChickenModel;
 import net.minecraft.client.model.ColdChickenModel;
-import net.minecraft.client.model.EntityModel;
 import net.minecraft.client.model.geom.ModelLayers;
 import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.client.renderer.entity.state.ChickenRenderState;

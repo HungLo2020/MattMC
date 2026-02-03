@@ -2,7 +2,7 @@ package net.minecraft.client.gui.components;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Lists;
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import java.util.List;
 import java.util.function.Consumer;
 import net.minecraft.api.EnvType;

@@ -1,6 +1,6 @@
 package net.minecraft.client.entity;
 
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import net.minecraft.api.EnvType;

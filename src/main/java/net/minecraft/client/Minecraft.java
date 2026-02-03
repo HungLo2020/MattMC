@@ -13,25 +13,25 @@ import net.minecraft.client.auth.ProfileResult;
 import net.minecraft.hooks.GameHooks;
 import net.minecraft.hooks.HookRegistry;
 
-import com.mojang.blaze3d.TracyFrameCapture;
-import com.mojang.blaze3d.pipeline.MainTarget;
-import com.mojang.blaze3d.pipeline.RenderTarget;
-import com.mojang.blaze3d.platform.ClientShutdownWatchdog;
-import com.mojang.blaze3d.platform.DisplayData;
-import com.mojang.blaze3d.platform.FramerateLimitTracker;
-import com.mojang.blaze3d.platform.GLX;
-import com.mojang.blaze3d.platform.IconSet;
-import com.mojang.blaze3d.platform.InputConstants;
-import com.mojang.blaze3d.platform.Window;
-import com.mojang.blaze3d.platform.WindowEventHandler;
-import com.mojang.blaze3d.systems.GpuDevice;
-import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.systems.TimerQuery;
-import com.mojang.blaze3d.vertex.Tesselator;
+import net.blaze3d.TracyFrameCapture;
+import net.blaze3d.pipeline.MainTarget;
+import net.blaze3d.pipeline.RenderTarget;
+import net.blaze3d.platform.ClientShutdownWatchdog;
+import net.blaze3d.platform.DisplayData;
+import net.blaze3d.platform.FramerateLimitTracker;
+import net.blaze3d.platform.GLX;
+import net.blaze3d.platform.IconSet;
+import net.blaze3d.platform.InputConstants;
+import net.blaze3d.platform.Window;
+import net.blaze3d.platform.WindowEventHandler;
+import net.blaze3d.systems.GpuDevice;
+import net.blaze3d.systems.RenderSystem;
+import net.blaze3d.systems.TimerQuery;
+import net.blaze3d.vertex.Tesselator;
 import com.mojang.datafixers.DataFixer;
 import com.mojang.jtracy.DiscontinuousFrame;
 import com.mojang.jtracy.TracyClient;
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -48,7 +48,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.MissingResourceException;
 import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
@@ -253,6 +252,8 @@ import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.EntityHitResult;
 import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.HitResult.Type;
+import net.voxelmap.VoxelConstants;
+import net.voxelmap.VoxelMapInitializer;
 import org.apache.commons.io.FileUtils;
 import org.jetbrains.annotations.Nullable;
 import org.lwjgl.util.tinyfd.TinyFileDialogs;
@@ -703,7 +704,7 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 		
 		// VoxelMap: Initialize early (similar to Iris pattern)
 		try {
-			com.mamiyaotaru.voxelmap.VoxelMapInitializer.initialize();
+			VoxelMapInitializer.initialize();
 		} catch (Exception e) {
 			LOGGER.error("Failed to initialize VoxelMap", e);
 		}
@@ -1963,7 +1964,7 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 		// VoxelMap: Client tick hook
 		profilerFiller.push("voxelmap_tick");
 		try {
-			com.mamiyaotaru.voxelmap.VoxelConstants.clientTick();
+			VoxelConstants.clientTick();
 		} catch (Exception e) {
 			// Silently catch to avoid crashes
 		}

@@ -1,6 +1,6 @@
 package net.minecraft.client.renderer.texture;
 
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;

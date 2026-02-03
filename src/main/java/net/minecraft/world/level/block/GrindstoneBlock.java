@@ -1,6 +1,6 @@
 package net.minecraft.world.level.block;
 
-import com.mojang.math.OctahedralGroup;
+import net.math.OctahedralGroup;
 import com.mojang.serialization.MapCodec;
 import java.util.Map;
 import java.util.function.Function;

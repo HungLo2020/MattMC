@@ -1,6 +1,6 @@
 package net.minecraft.hooks;
 
-import com.mojang.blaze3d.vertex.VertexConsumer;
+import net.blaze3d.vertex.VertexConsumer;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 
 /**

@@ -1,6 +1,6 @@
 package net.minecraft.advancements.critereon;
 
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import com.mojang.serialization.Codec;
 import io.netty.buffer.ByteBuf;
 import net.minecraft.core.component.DataComponentGetter;

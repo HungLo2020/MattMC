@@ -1,0 +1,65 @@
+package net.alexsmobs.item;
+
+import net.minecraft.world.item.Item;
+
+/**
+ * Stub registry class for AlexsMobs items
+ * Points to actual vanilla-registered items in Items.java
+ */
+public class AMItemRegistry {
+    
+    /**
+     * Deferred holder stub that returns the actual vanilla-registered item
+     */
+    public static class DeferredHolder {
+        private final java.util.function.Supplier<Item> itemSupplier;
+        
+        public DeferredHolder(java.util.function.Supplier<Item> itemSupplier) {
+            this.itemSupplier = itemSupplier;
+        }
+        
+        public Item get() {
+            return itemSupplier.get();
+        }
+    }
+    
+    // Catfish bucket items - reference vanilla Items
+    public static final DeferredHolder SMALL_CATFISH_BUCKET = new DeferredHolder(() -> net.minecraft.world.item.Items.SMALL_CATFISH_BUCKET);
+    public static final DeferredHolder MEDIUM_CATFISH_BUCKET = new DeferredHolder(() -> net.minecraft.world.item.Items.MEDIUM_CATFISH_BUCKET);
+    public static final DeferredHolder LARGE_CATFISH_BUCKET = new DeferredHolder(() -> net.minecraft.world.item.Items.LARGE_CATFISH_BUCKET);
+    public static final DeferredHolder RAW_CATFISH = new DeferredHolder(() -> net.minecraft.world.item.Items.RAW_CATFISH);
+    public static final DeferredHolder COOKED_CATFISH = new DeferredHolder(() -> net.minecraft.world.item.Items.COOKED_CATFISH);
+    
+    // Comb Jelly bucket items - reference vanilla Items
+    public static final DeferredHolder COMB_JELLY_BUCKET = new DeferredHolder(() -> net.minecraft.world.item.Items.COMB_JELLY_BUCKET);
+    
+    // Mimic Octopus bucket items - reference vanilla Items
+    public static final DeferredHolder MIMIC_OCTOPUS_BUCKET = new DeferredHolder(() -> net.minecraft.world.item.Items.MIMIC_OCTOPUS_BUCKET);
+    
+    // Mudskipper bucket items - reference vanilla Items
+    public static final DeferredHolder MUDSKIPPER_BUCKET = new DeferredHolder(() -> net.minecraft.world.item.Items.MUDSKIPPER_BUCKET);
+    
+    // Roadrunner items - reference vanilla Items
+    public static final DeferredHolder ROADRUNNER_FEATHER = new DeferredHolder(() -> net.minecraft.world.item.Items.ROADRUNNER_FEATHER);
+    
+    // Spectre items - reference vanilla Items
+    public static final DeferredHolder SOUL_HEART = new DeferredHolder(() -> net.minecraft.world.item.Items.SOUL_HEART);
+    
+    // Emu items - reference vanilla Items
+    public static final DeferredHolder EMU_EGG = new DeferredHolder(() -> net.minecraft.world.item.Items.EMU_EGG);
+    public static final DeferredHolder BOILED_EMU_EGG = new DeferredHolder(() -> net.minecraft.world.item.Items.BOILED_EMU_EGG);
+    public static final DeferredHolder EMU_FEATHER = new DeferredHolder(() -> net.minecraft.world.item.Items.EMU_FEATHER);
+    
+    // Giant Squid items - reference vanilla Items
+    public static final DeferredHolder LOST_TENTACLE = new DeferredHolder(() -> net.minecraft.world.item.Items.LOST_TENTACLE);
+    
+    // Underminer items - stub, points to diamond pickaxe for now
+    public static final DeferredHolder GHOSTLY_PICKAXE = new DeferredHolder(() -> net.minecraft.world.item.Items.DIAMOND_PICKAXE);
+    
+    // Skunk items - reference vanilla Items
+    public static final DeferredHolder STINK_BOTTLE = new DeferredHolder(() -> net.minecraft.world.item.Items.STINK_BOTTLE);
+    
+    // Komodo Dragon items - reference vanilla Items
+    public static final DeferredHolder KOMODO_SPIT = new DeferredHolder(() -> net.minecraft.world.item.Items.KOMODO_SPIT);
+    public static final DeferredHolder KOMODO_SPIT_BOTTLE = new DeferredHolder(() -> net.minecraft.world.item.Items.KOMODO_SPIT_BOTTLE);
+}

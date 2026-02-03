@@ -31,9 +31,17 @@ echo "Using bundled JDK ${JAVA_VERSION}"
 # Launch the dedicated server
 # Note: Server runs in headless mode by default (--nogui)
 # Remove --nogui to run with GUI
-$JAVA_CMD -Xmx2G -Xms1G \
-    -XX:+UseZGC \
-    -XX:+UseCompactObjectHeaders \
+
+# Build JVM arguments - Use G1GC on macOS due to ZGC stability issues (SIGBUS crashes)
+if [[ "$(uname -s)" == "Darwin" ]]; then
+    # macOS - use G1GC to avoid SIGBUS crashes in Arena::destruct_contents
+    JVM_ARGS="-Xmx2G -Xms1G -XX:+UseG1GC"
+else
+    # Linux/Unix - use ZGC with UseCompactObjectHeaders for better performance
+    JVM_ARGS="-Xmx2G -Xms1G -XX:+UseZGC -XX:+UseCompactObjectHeaders"
+fi
+
+$JAVA_CMD $JVM_ARGS \
     -cp "@CLASSPATH_LINUX@" \
     net.minecraft.server.Main \
     --nogui

@@ -1,6 +1,6 @@
 package net.minecraft.client.resources.model;
 
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;

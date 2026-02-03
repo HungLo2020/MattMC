@@ -1,9 +1,9 @@
 package net.minecraft.client.renderer;
 
-import com.mojang.blaze3d.platform.DisplayData;
-import com.mojang.blaze3d.platform.Monitor;
-import com.mojang.blaze3d.platform.ScreenManager;
-import com.mojang.blaze3d.platform.Window;
+import net.blaze3d.platform.DisplayData;
+import net.blaze3d.platform.Monitor;
+import net.blaze3d.platform.ScreenManager;
+import net.blaze3d.platform.Window;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.client.Minecraft;

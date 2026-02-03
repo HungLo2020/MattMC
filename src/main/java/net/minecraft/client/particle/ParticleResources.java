@@ -2,7 +2,7 @@ package net.minecraft.client.particle;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Maps;
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import java.io.IOException;
@@ -16,6 +16,8 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.stream.Collectors;
+
+import net.alexsmobs.client.particle.ParticleSunbirdFeather;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.Util;
@@ -32,8 +34,6 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.packs.resources.PreparableReloadListener;
 import net.minecraft.server.packs.resources.Resource;
 import net.minecraft.server.packs.resources.ResourceManager;
-import net.minecraft.server.packs.resources.PreparableReloadListener.PreparationBarrier;
-import net.minecraft.server.packs.resources.PreparableReloadListener.SharedState;
 import net.minecraft.util.GsonHelper;
 import net.minecraft.util.RandomSource;
 import net.minecraft.util.profiling.Profiler;
@@ -175,6 +175,8 @@ public class ParticleResources implements PreparableReloadListener {
 		this.register(ParticleTypes.BLOCK_CRUMBLE, new TerrainParticle.CrumblingProvider());
 		this.register(ParticleTypes.FIREFLY, FireflyParticle.FireflyProvider::new);
 		this.register(ParticleTypes.FLY, FlyParticle.Provider::new);
+		this.register(ParticleTypes.WATER_TREMOR, WaterTremorParticle.Provider::new);
+		this.register(ParticleTypes.SUNBIRD_FEATHER, ParticleSunbirdFeather.Factory::new);
 	}
 
 	private <T extends ParticleOptions> void register(ParticleType<T> particleType, ParticleProvider<T> particleProvider) {

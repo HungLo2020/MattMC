@@ -1,7 +1,7 @@
 package net.irisshaders.iris.uniforms.custom.cached;
 
-import kroppeb.stareval.function.FunctionReturn;
-import kroppeb.stareval.function.Type;
+import net.stareval.function.FunctionReturn;
+import net.stareval.function.Type;
 import net.irisshaders.iris.Iris;
 import net.irisshaders.iris.gl.uniform.UniformUpdateFrequency;
 import org.jetbrains.annotations.NotNull;

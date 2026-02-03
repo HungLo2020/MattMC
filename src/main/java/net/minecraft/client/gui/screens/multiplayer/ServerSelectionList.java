@@ -2,8 +2,8 @@ package net.minecraft.client.gui.screens.multiplayer;
 
 import com.google.common.collect.Lists;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import com.mojang.blaze3d.platform.NativeImage;
-import com.mojang.logging.LogUtils;
+import net.blaze3d.platform.NativeImage;
+import net.logging.LogUtils;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.Arrays;

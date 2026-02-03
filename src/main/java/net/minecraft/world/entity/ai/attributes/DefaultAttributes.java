@@ -1,8 +1,11 @@
 package net.minecraft.world.entity.ai.attributes;
 
 import com.google.common.collect.ImmutableMap;
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import java.util.Map;
+
+import net.alexscaves.server.entity.living.AtlatitanEntity;
+import net.alexsmobs.entity.*;
 import net.minecraft.Util;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.world.entity.EntityType;
@@ -45,12 +48,20 @@ import net.minecraft.world.entity.animal.horse.ZombieHorse;
 import net.minecraft.world.entity.animal.sheep.Sheep;
 import net.minecraft.world.entity.animal.sniffer.Sniffer;
 import net.minecraft.world.entity.animal.wolf.Wolf;
-import com.github.alexmodguy.alexscaves.server.entity.living.GrottoceratopsEntity;
-import com.github.alexmodguy.alexscaves.server.entity.living.RelicheirusEntity;
-import com.github.alexmodguy.alexscaves.server.entity.living.SubterranodonEntity;
-import com.github.alexmodguy.alexscaves.server.entity.living.TremorsaurusEntity;
-import com.github.alexmodguy.alexscaves.server.entity.living.TrilocarisEntity;
-import com.github.alexmodguy.alexscaves.server.entity.living.VallumraptorEntity;
+import net.alexscaves.server.entity.living.GrottoceratopsEntity;
+import net.alexscaves.server.entity.living.RelicheirusEntity;
+import net.alexscaves.server.entity.living.SubterranodonEntity;
+import net.alexscaves.server.entity.living.TremorsaurusEntity;
+import net.alexscaves.server.entity.living.TrilocarisEntity;
+import net.alexscaves.server.entity.living.VallumraptorEntity;
+import net.alexsmobs.entity.EntityBlobfish;
+import net.alexsmobs.entity.EntityBunfungus;
+import net.alexsmobs.entity.EntityCosmicCod;
+import net.alexsmobs.entity.EntityFrilledShark;
+import net.alexsmobs.entity.EntityFlyingFish;
+import net.alexsmobs.entity.EntityMimicOctopus;
+import net.alexsmobs.entity.EntityMungus;
+import net.alexsmobs.entity.EntityAlligatorSnappingTurtle;
 import net.minecraft.world.entity.boss.enderdragon.EnderDragon;
 import net.minecraft.world.entity.boss.wither.WitherBoss;
 import net.minecraft.world.entity.decoration.ArmorStand;
@@ -96,52 +107,97 @@ public class DefaultAttributes {
 	private static final Logger LOGGER = LogUtils.getLogger();
 	private static final Map<EntityType<? extends LivingEntity>, AttributeSupplier> SUPPLIERS = ImmutableMap.<EntityType<? extends LivingEntity>, AttributeSupplier>builder()
 		.put(EntityType.ALLAY, Allay.createAttributes().build())
-		.put(EntityType.ATLATITAN, com.github.alexmodguy.alexscaves.server.entity.living.AtlatitanEntity.createAttributes().build())
+		.put(EntityType.ALLIGATOR_SNAPPING_TURTLE, EntityAlligatorSnappingTurtle.createAttributes().build())
+		.put(EntityType.ANACONDA, EntityAnaconda.bakeAttributes().build())
+		.put(EntityType.ANACONDA_PART, EntityAnacondaPart.bakeAttributes().build())
+		.put(EntityType.ATLATITAN, AtlatitanEntity.createAttributes().build())
 		.put(EntityType.ARMADILLO, Armadillo.createAttributes().build())
 		.put(EntityType.ARMOR_STAND, ArmorStand.createAttributes().build())
 		.put(EntityType.AXOLOTL, Axolotl.createAttributes().build())
+		.put(EntityType.BALD_EAGLE, EntityBaldEagle.bakeAttributes().build())
 		.put(EntityType.BAT, Bat.createAttributes().build())
 		.put(EntityType.BEE, Bee.createAttributes().build())
+		.put(EntityType.BISON, EntityBison.bakeAttributes().build())
+		.put(EntityType.CAIMAN, EntityCaiman.bakeAttributes().build())
+		.put(EntityType.CAPUCHIN_MONKEY, EntityCapuchinMonkey.bakeAttributes().build())
+		.put(EntityType.CAVE_CENTIPEDE_HEAD, EntityCentipedeHead.bakeAttributes().build())
+		.put(EntityType.CAVE_CENTIPEDE_BODY, EntityCentipedeBody.bakeAttributes().build())
+		.put(EntityType.CAVE_CENTIPEDE_TAIL, EntityCentipedeTail.bakeAttributes().build())
 		.put(EntityType.BLAZE, Blaze.createAttributes().build())
+		.put(EntityType.BLOBFISH, EntityBlobfish.createAttributes().build())
+		.put(EntityType.BLUE_JAY, EntityBlueJay.bakeAttributes().build())
 		.put(EntityType.BOGGED, Bogged.createAttributes().build())
+		.put(EntityType.BUNFUNGUS, EntityBunfungus.bakeAttributes().build())
+		.put(EntityType.CACHALOT_WHALE, EntityCachalotWhale.bakeAttributes().build())
 		.put(EntityType.CAT, Cat.createAttributes().build())
+		.put(EntityType.CATFISH, EntityCatfish.bakeAttributes().build())
 		.put(EntityType.CAMEL, Camel.createAttributes().build())
 		.put(EntityType.CAVE_SPIDER, CaveSpider.createCaveSpider().build())
 		.put(EntityType.CHICKEN, Chicken.createAttributes().build())
+		.put(EntityType.COCKROACH, EntityCockroach.bakeAttributes().build())
+		.put(EntityType.COMB_JELLY, EntityCombJelly.bakeAttributes().build())
+		.put(EntityType.COSMIC_COD, EntityCosmicCod.createAttributes().build())
+		.put(EntityType.FRILLED_SHARK, EntityFrilledShark.createAttributes().build())
+		.put(EntityType.COSMAW, EntityCosmaw.bakeAttributes().build())
 		.put(EntityType.COD, AbstractFish.createAttributes().build())
+		.put(EntityType.CROCODILE, EntityCrocodile.bakeAttributes().build())
 		.put(EntityType.COPPER_GOLEM, CopperGolem.createAttributes().build())
 		.put(EntityType.COW, Cow.createAttributes().build())
+		.put(EntityType.CROW, EntityCrow.bakeAttributes().build())
 		.put(EntityType.CREAKING, Creaking.createAttributes().build())
 		.put(EntityType.CREEPER, Creeper.createAttributes().build())
 		.put(EntityType.DOLPHIN, Dolphin.createAttributes().build())
 		.put(EntityType.DONKEY, AbstractChestedHorse.createBaseChestedHorseAttributes().build())
 		.put(EntityType.DROWNED, Drowned.createAttributes().build())
+		.put(EntityType.ELEPHANT, EntityElephant.bakeAttributes().build())
+		.put(EntityType.EMU, EntityEmu.createAttributes().build())
 		.put(EntityType.ELDER_GUARDIAN, ElderGuardian.createAttributes().build())
+		.put(EntityType.ENDERGRADE, EntityEndergrade.bakeAttributes().build())
+		.put(EntityType.ENDERIOPHAGE, EntityEnderiophage.createAttributes().build())
 		.put(EntityType.ENDERMAN, EnderMan.createAttributes().build())
 		.put(EntityType.ENDERMITE, Endermite.createAttributes().build())
 		.put(EntityType.ENDER_DRAGON, EnderDragon.createAttributes().build())
 		.put(EntityType.EVOKER, Evoker.createAttributes().build())
 		.put(EntityType.BREEZE, Breeze.createAttributes().build())
+		.put(EntityType.FLYING_FISH, EntityFlyingFish.createAttributes().build())
 		.put(EntityType.FOX, Fox.createAttributes().build())
 		.put(EntityType.FROG, Frog.createAttributes().build())
+		.put(EntityType.GAZELLE, EntityGazelle.createAttributes().build())
+		.put(EntityType.GELADA_MONKEY, EntityGeladaMonkey.bakeAttributes().build())
 		.put(EntityType.GHAST, Ghast.createAttributes().build())
 		.put(EntityType.HAPPY_GHAST, HappyGhast.createAttributes().build())
 		.put(EntityType.GIANT, Giant.createAttributes().build())
 		.put(EntityType.GLOW_SQUID, GlowSquid.createAttributes().build())
+		.put(EntityType.GIANT_SQUID, EntityGiantSquid.createAttributes().build())
 		.put(EntityType.GOAT, Goat.createAttributes().build())
+		.put(EntityType.GORILLA, EntityGorilla.createAttributes().build())
+		.put(EntityType.GRIZZLY_BEAR, EntityGrizzlyBear.bakeAttributes().build())
 		.put(EntityType.GROTTOCERATOPS, GrottoceratopsEntity.createAttributes().build())
 		.put(EntityType.GUARDIAN, Guardian.createAttributes().build())
+		.put(EntityType.HAMMERHEAD_SHARK, EntityHammerheadShark.bakeAttributes().build())
 		.put(EntityType.HOGLIN, Hoglin.createAttributes().build())
+		.put(EntityType.HUMMINGBIRD, EntityHummingbird.bakeAttributes().build())
 		.put(EntityType.HORSE, AbstractHorse.createBaseHorseAttributes().build())
 		.put(EntityType.HUSK, Zombie.createAttributes().build())
 		.put(EntityType.ILLUSIONER, Illusioner.createAttributes().build())
+		.put(EntityType.JERBOA, EntityJerboa.bakeAttributes().build())
+		.put(EntityType.KANGAROO, EntityKangaroo.bakeAttributes().build())
+		.put(EntityType.KOMODO_DRAGON, EntityKomodoDragon.bakeAttributes().build())
+		.put(EntityType.LEAFCUTTER_ANT, EntityLeafcutterAnt.bakeAttributes().build())
 		.put(EntityType.IRON_GOLEM, IronGolem.createAttributes().build())
 		.put(EntityType.LLAMA, Llama.createAttributes().build())
+		.put(EntityType.LOBSTER, net.minecraft.world.entity.animal.EntityLobster.bakeAttributes().build())
 		.put(EntityType.MAGMA_CUBE, MagmaCube.createAttributes().build())
 		.put(EntityType.MANNEQUIN, LivingEntity.createLivingAttributes().build())
+		.put(EntityType.MANTIS_SHRIMP, EntityMantisShrimp.bakeAttributes().build())
+		.put(EntityType.MIMIC_OCTOPUS, EntityMimicOctopus.createAttributes().build())
 		.put(EntityType.MOOSHROOM, Cow.createAttributes().build())
+		.put(EntityType.MOOSE, EntityMoose.bakeAttributes().build())
+		.put(EntityType.MUDSKIPPER, EntityMudskipper.createAttributes().build())
 		.put(EntityType.MULE, AbstractChestedHorse.createBaseChestedHorseAttributes().build())
+		.put(EntityType.MUNGUS, EntityMungus.bakeAttributes().build())
 		.put(EntityType.OCELOT, Ocelot.createAttributes().build())
+		.put(EntityType.ORCA, EntityOrca.createAttributes().build())
 		.put(EntityType.PANDA, Panda.createAttributes().build())
 		.put(EntityType.PARROT, Parrot.createAttributes().build())
 		.put(EntityType.PHANTOM, Monster.createMonsterAttributes().build())
@@ -149,25 +205,48 @@ public class DefaultAttributes {
 		.put(EntityType.PIGLIN, Piglin.createAttributes().build())
 		.put(EntityType.PIGLIN_BRUTE, PiglinBrute.createAttributes().build())
 		.put(EntityType.PILLAGER, Pillager.createAttributes().build())
+		.put(EntityType.PLATYPUS, EntityPlatypus.bakeAttributes().build())
 		.put(EntityType.PLAYER, Player.createAttributes().build())
 		.put(EntityType.POLAR_BEAR, PolarBear.createAttributes().build())
+		.put(EntityType.POTOO, EntityPotoo.bakeAttributes().build())
 		.put(EntityType.PUFFERFISH, AbstractFish.createAttributes().build())
 		.put(EntityType.RABBIT, Rabbit.createAttributes().build())
+		.put(EntityType.RACCOON, EntityRaccoon.createAttributes().build())
+		.put(EntityType.RAIN_FROG, EntityRainFrog.bakeAttributes().build())
+		.put(EntityType.RATTLESNAKE, EntityRattlesnake.bakeAttributes().build())
+		.put(EntityType.RHINOCEROS, EntityRhinoceros.createAttributes().build())
+		.put(EntityType.ROADRUNNER, EntityRoadrunner.bakeAttributes().build())
 		.put(EntityType.RAVAGER, Ravager.createAttributes().build())
 		.put(EntityType.RELICHEIRUS, RelicheirusEntity.createAttributes().build())
 		.put(EntityType.SALMON, AbstractFish.createAttributes().build())
+		.put(EntityType.ANTEATER, EntityAnteater.createAttributes().build())
+		.put(EntityType.MIMICUBE, EntityMimicube.createAttributes().build())
+		.put(EntityType.SEAGULL, EntitySeagull.createAttributes().build())
 		.put(EntityType.SHEEP, Sheep.createAttributes().build())
+		.put(EntityType.SHOEBILL, EntityShoebill.bakeAttributes().build())
+		.put(EntityType.SKUNK, EntitySkunk.bakeAttributes().build())
+		.put(EntityType.SPECTRE, EntitySpectre.createAttributes().build())
+		.put(EntityType.SUGAR_GLIDER, EntitySugarGlider.bakeAttributes().build())
+		.put(EntityType.SUNBIRD, EntitySunbird.createAttributes().build())
 		.put(EntityType.SHULKER, Shulker.createAttributes().build())
 		.put(EntityType.SILVERFISH, Silverfish.createAttributes().build())
 		.put(EntityType.SKELETON, AbstractSkeleton.createAttributes().build())
+		.put(EntityType.SKELEWAG, EntitySkelewag.createAttributes().build())
 		.put(EntityType.SKELETON_HORSE, SkeletonHorse.createAttributes().build())
 		.put(EntityType.SLIME, Monster.createMonsterAttributes().build())
 		.put(EntityType.SNIFFER, Sniffer.createAttributes().build())
 		.put(EntityType.SUBTERRANODON, SubterranodonEntity.createAttributes().build())
 		.put(EntityType.TREMORSAURUS, TremorsaurusEntity.createAttributes().build())
 		.put(EntityType.TRILOCARIS, TrilocarisEntity.createAttributes().build())
+		.put(EntityType.TOUCAN, EntityToucan.bakeAttributes().build())
+		.put(EntityType.TARANTULA_HAWK, EntityTarantulaHawk.bakeAttributes().build())
+		.put(EntityType.TASMANIAN_DEVIL, EntityTasmanianDevil.bakeAttributes().build())
+		.put(EntityType.TIGER, EntityTiger.bakeAttributes().build())
+		.put(EntityType.UNDERMINER, EntityUnderminer.bakeAttributes().build())
+		.put(EntityType.WARPED_TOAD, EntityWarpedToad.bakeAttributes().build())
 		.put(EntityType.VALLUMRAPTOR, VallumraptorEntity.createAttributes().build())
 		.put(EntityType.SNOW_GOLEM, SnowGolem.createAttributes().build())
+		.put(EntityType.SNOW_LEOPARD, EntitySnowLeopard.createAttributes().build())
 		.put(EntityType.SPIDER, Spider.createAttributes().build())
 		.put(EntityType.SQUID, Squid.createAttributes().build())
 		.put(EntityType.STRAY, AbstractSkeleton.createAttributes().build())
@@ -176,6 +255,7 @@ public class DefaultAttributes {
 		.put(EntityType.TRADER_LLAMA, Llama.createAttributes().build())
 		.put(EntityType.TROPICAL_FISH, AbstractFish.createAttributes().build())
 		.put(EntityType.TURTLE, Turtle.createAttributes().build())
+		.put(EntityType.TERRAPIN, EntityTerrapin.bakeAttributes().build())
 		.put(EntityType.VEX, Vex.createAttributes().build())
 		.put(EntityType.VILLAGER, Villager.createAttributes().build())
 		.put(EntityType.VINDICATOR, Vindicator.createAttributes().build())

@@ -3,7 +3,7 @@ package net.minecraft.server.commands;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.brigadier.exceptions.SimpleCommandExceptionType;
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;

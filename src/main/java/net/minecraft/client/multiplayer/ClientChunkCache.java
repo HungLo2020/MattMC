@@ -1,6 +1,6 @@
 package net.minecraft.client.multiplayer;
 
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import java.io.FileOutputStream;
 import java.io.IOException;

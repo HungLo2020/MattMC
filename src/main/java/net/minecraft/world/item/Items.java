@@ -5,6 +5,8 @@ import java.util.Optional;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.UnaryOperator;
+
+import net.alexsmobs.item.*;
 import net.minecraft.core.Direction;
 import net.minecraft.core.Registry;
 import net.minecraft.core.component.DataComponents;
@@ -510,6 +512,7 @@ public class Items {
 	public static final Item NETHERRACK = registerBlock(Blocks.NETHERRACK);
 	public static final Item SOUL_SAND = registerBlock(Blocks.SOUL_SAND);
 	public static final Item SOUL_SOIL = registerBlock(Blocks.SOUL_SOIL);
+	public static final Item SOUL_HEART = registerItem("soul_heart", Item::new, new Item.Properties());
 	public static final Item BASALT = registerBlock(Blocks.BASALT);
 	public static final Item POLISHED_BASALT = registerBlock(Blocks.POLISHED_BASALT);
 	public static final Item SMOOTH_BASALT = registerBlock(Blocks.SMOOTH_BASALT);
@@ -864,6 +867,8 @@ public class Items {
 	public static final Item BLACK_CONCRETE_POWDER = registerBlock(Blocks.BLACK_CONCRETE_POWDER);
 	public static final Item ELEVATOR = registerBlock(Blocks.ELEVATOR);
 	public static final Item TURTLE_EGG = registerBlock(Blocks.TURTLE_EGG);
+	public static final Item CAIMAN_EGG = registerBlock(Blocks.CAIMAN_EGG);
+	public static final Item PLATYPUS_EGG = registerBlock(Blocks.PLATYPUS_EGG);
 	public static final Item SNIFFER_EGG = registerBlock(Blocks.SNIFFER_EGG, (UnaryOperator<Item.Properties>)(properties -> properties.rarity(Rarity.UNCOMMON)));
 	public static final Item SUBTERRANODON_EGG = registerBlock(Blocks.SUBTERRANODON_EGG);
 	public static final Item VALLUMRAPTOR_EGG = registerBlock(Blocks.VALLUMRAPTOR_EGG);
@@ -1272,6 +1277,7 @@ public class Items {
 	public static final Item TURTLE_HELMET = registerItem("turtle_helmet", new Item.Properties().humanoidArmor(ArmorMaterials.TURTLE_SCUTE, ArmorType.HELMET));
 	public static final Item TURTLE_SCUTE = registerItem("turtle_scute");
 	public static final Item ARMADILLO_SCUTE = registerItem("armadillo_scute");
+	public static final Item CROCODILE_SCUTE = registerItem("crocodile_scute");
 	public static final Item WOLF_ARMOR = registerItem("wolf_armor", new Item.Properties().wolfArmor(ArmorMaterials.ARMADILLO_SCUTE));
 	public static final Item FLINT_AND_STEEL = registerItem("flint_and_steel", FlintAndSteelItem::new, new Item.Properties().durability(64));
 	public static final Item BOWL = registerItem("bowl");
@@ -1510,7 +1516,13 @@ public class Items {
 		properties -> new SolidBucketItem(Blocks.POWDER_SNOW, SoundEvents.BUCKET_EMPTY_POWDER_SNOW, properties),
 		new Item.Properties().stacksTo(1).useItemDescriptionPrefix()
 	);
+	public static final Item PLATYPUS_BUCKET = registerItem(
+		"platypus_bucket",
+		properties -> new MobBucketItem(EntityType.PLATYPUS, Fluids.WATER, SoundEvents.BUCKET_EMPTY_FISH, properties),
+		new Item.Properties().stacksTo(1).component(DataComponents.BUCKET_ENTITY_DATA, CustomData.EMPTY)
+	);
 	public static final Item SNOWBALL = registerItem("snowball", SnowballItem::new, new Item.Properties().stacksTo(16));
+	public static final Item SOMBRERO = registerItem("sombrero", new Item.Properties().stacksTo(1).equippableUnswappable(EquipmentSlot.HEAD));
 	public static final Item LEATHER = registerItem("leather");
 	public static final Item MILK_BUCKET = registerItem(
 		"milk_bucket", new Item.Properties().craftRemainder(BUCKET).component(DataComponents.CONSUMABLE, Consumables.MILK_BUCKET).usingConvertsTo(BUCKET).stacksTo(1)
@@ -1530,6 +1542,21 @@ public class Items {
 		properties -> new MobBucketItem(EntityType.COD, Fluids.WATER, SoundEvents.BUCKET_EMPTY_FISH, properties),
 		new Item.Properties().stacksTo(1).component(DataComponents.BUCKET_ENTITY_DATA, CustomData.EMPTY)
 	);
+	public static final Item SMALL_CATFISH_BUCKET = registerItem(
+		"small_catfish_bucket",
+		properties -> new ItemModFishBucket(() -> EntityType.CATFISH, Fluids.WATER, properties),
+		new Item.Properties().stacksTo(1).component(DataComponents.BUCKET_ENTITY_DATA, CustomData.EMPTY)
+	);
+	public static final Item MEDIUM_CATFISH_BUCKET = registerItem(
+		"medium_catfish_bucket",
+		properties -> new ItemModFishBucket(() -> EntityType.CATFISH, Fluids.WATER, properties),
+		new Item.Properties().stacksTo(1).component(DataComponents.BUCKET_ENTITY_DATA, CustomData.EMPTY)
+	);
+	public static final Item LARGE_CATFISH_BUCKET = registerItem(
+		"large_catfish_bucket",
+		properties -> new ItemModFishBucket(() -> EntityType.CATFISH, Fluids.WATER, properties),
+		new Item.Properties().stacksTo(1).component(DataComponents.BUCKET_ENTITY_DATA, CustomData.EMPTY)
+	);
 	public static final Item TRILOCARIS_BUCKET = registerItem(
 		"trilocaris_bucket",
 		properties -> new MobBucketItem(EntityType.TRILOCARIS, Fluids.WATER, SoundEvents.BUCKET_EMPTY_FISH, properties),
@@ -1543,6 +1570,16 @@ public class Items {
 	public static final Item AXOLOTL_BUCKET = registerItem(
 		"axolotl_bucket",
 		properties -> new MobBucketItem(EntityType.AXOLOTL, Fluids.WATER, SoundEvents.BUCKET_EMPTY_AXOLOTL, properties),
+		new Item.Properties().stacksTo(1).component(DataComponents.BUCKET_ENTITY_DATA, CustomData.EMPTY)
+	);
+	public static final Item BLOBFISH_BUCKET = registerItem(
+		"blobfish_bucket",
+		properties -> new MobBucketItem(EntityType.BLOBFISH, Fluids.WATER, SoundEvents.BUCKET_EMPTY_FISH, properties),
+		new Item.Properties().stacksTo(1).component(DataComponents.BUCKET_ENTITY_DATA, CustomData.EMPTY)
+	);
+	public static final Item MUDSKIPPER_BUCKET = registerItem(
+		"mudskipper_bucket",
+		properties -> new MobBucketItem(EntityType.MUDSKIPPER, Fluids.WATER, SoundEvents.BUCKET_EMPTY_FISH, properties),
 		new Item.Properties().stacksTo(1).component(DataComponents.BUCKET_ENTITY_DATA, CustomData.EMPTY)
 	);
 	public static final Item TADPOLE_BUCKET = registerItem(
@@ -1567,6 +1604,7 @@ public class Items {
 	);
 	public static final Item COMPASS = registerItem("compass", CompassItem::new);
 	public static final Item RECOVERY_COMPASS = registerItem("recovery_compass", new Item.Properties().rarity(Rarity.UNCOMMON));
+	public static final Item ROADRUNNER_FEATHER = registerItem("roadrunner_feather");
 	public static final Item BUNDLE = registerItem(
 		"bundle", BundleItem::new, new Item.Properties().stacksTo(1).component(DataComponents.BUNDLE_CONTENTS, BundleContents.EMPTY)
 	);
@@ -1622,16 +1660,21 @@ public class Items {
 	public static final Item CLOCK = registerItem("clock");
 	public static final Item SPYGLASS = registerItem("spyglass", SpyglassItem::new, new Item.Properties().stacksTo(1));
 	public static final Item GLOWSTONE_DUST = registerItem("glowstone_dust");
+	public static final Item BLOBFISH = registerItem("blobfish", new Item.Properties().food(Foods.BLOBFISH, Consumables.BLOBFISH));
 	public static final Item COD = registerItem("cod", new Item.Properties().food(Foods.COD));
+	public static final Item RAW_CATFISH = registerItem("raw_catfish", new Item.Properties().food(Foods.RAW_CATFISH));
 	public static final Item SALMON = registerItem("salmon", new Item.Properties().food(Foods.SALMON));
 	public static final Item TROPICAL_FISH = registerItem("tropical_fish", new Item.Properties().food(Foods.TROPICAL_FISH));
 	public static final Item PUFFERFISH = registerItem("pufferfish", new Item.Properties().food(Foods.PUFFERFISH, Consumables.PUFFERFISH));
 	public static final Item COOKED_COD = registerItem("cooked_cod", new Item.Properties().food(Foods.COOKED_COD));
+	public static final Item COOKED_CATFISH = registerItem("cooked_catfish", new Item.Properties().food(Foods.COOKED_CATFISH));
 	public static final Item COOKED_SALMON = registerItem("cooked_salmon", new Item.Properties().food(Foods.COOKED_SALMON));
 	
 	// Alex's Caves Primordial items
 	public static final Item TRILOCARIS_TAIL = registerItem("trilocaris_tail", new Item.Properties().food(Foods.TRILOCARIS_TAIL));
 	public static final Item COOKED_TRILOCARIS_TAIL = registerItem("cooked_trilocaris_tail", new Item.Properties().food(Foods.COOKED_TRILOCARIS_TAIL));
+	public static final Item LOBSTER_TAIL = registerItem("lobster_tail", new Item.Properties().food(Foods.RAW_CATFISH));
+	public static final Item COOKED_LOBSTER_TAIL = registerItem("cooked_lobster_tail", new Item.Properties().food(Foods.COOKED_CATFISH));
 	public static final Item PINE_NUTS = registerItem("pine_nuts", new Item.Properties().food(Foods.PINE_NUTS));
 	public static final Item PEWEN_SAP = registerItem("pewen_sap");
 	public static final Item AMBER_CURIOSITY = registerItem("amber_curiosity");
@@ -1695,6 +1738,7 @@ public class Items {
 	public static final Item SHEARS = registerItem(
 		"shears", ShearsItem::new, new Item.Properties().durability(238).component(DataComponents.TOOL, ShearsItem.createToolProperties())
 	);
+	public static final Item SHED_SNAKE_SKIN = registerItem("shed_snake_skin", new Item.Properties());
 	public static final Item MELON_SLICE = registerItem("melon_slice", new Item.Properties().food(Foods.MELON_SLICE));
 	public static final Item DRIED_KELP = registerItem("dried_kelp", new Item.Properties().food(Foods.DRIED_KELP, Consumables.DRIED_KELP));
 	public static final Item PUMPKIN_SEEDS = registerItem(net.minecraft.references.Items.PUMPKIN_SEEDS, createBlockItemWithCustomItemName(Blocks.PUMPKIN_STEM));
@@ -1703,6 +1747,12 @@ public class Items {
 	public static final Item COOKED_BEEF = registerItem("cooked_beef", new Item.Properties().food(Foods.COOKED_BEEF));
 	public static final Item CHICKEN = registerItem("chicken", new Item.Properties().food(Foods.CHICKEN, Consumables.CHICKEN));
 	public static final Item COOKED_CHICKEN = registerItem("cooked_chicken", new Item.Properties().food(Foods.COOKED_CHICKEN));
+	public static final Item CENTIPEDE_LEG = registerItem("centipede_leg", new Item.Properties().food(Foods.CHICKEN, Consumables.CHICKEN));
+	public static final Item CENTIPEDE_LEGGINGS = registerItem("centipede_leggings", new Item.Properties().humanoidArmor(ArmorMaterials.CHAINMAIL, ArmorType.LEGGINGS));
+	public static final Item KANGAROO_HIDE = registerItem("kangaroo_hide");
+	public static final Item KANGAROO_MEAT = registerItem("kangaroo_meat", new Item.Properties().food(Foods.CHICKEN, Consumables.CHICKEN));
+	public static final Item COOKED_KANGAROO_MEAT = registerItem("cooked_kangaroo_meat", new Item.Properties().food(Foods.COOKED_CHICKEN));
+	public static final Item KANGAROO_BURGER = registerItem("kangaroo_burger", new Item.Properties().food(Foods.COOKED_BEEF));
 	public static final Item ROTTEN_FLESH = registerItem("rotten_flesh", new Item.Properties().food(Foods.ROTTEN_FLESH, Consumables.ROTTEN_FLESH));
 	public static final Item ENDER_PEARL = registerItem("ender_pearl", EnderpearlItem::new, new Item.Properties().stacksTo(16).useCooldown(1.0F));
 	public static final Item BLAZE_ROD = registerItem("blaze_rod");
@@ -1710,6 +1760,9 @@ public class Items {
 	public static final Item GOLD_NUGGET = registerItem("gold_nugget");
 	public static final Item NETHER_WART = registerItem("nether_wart", createBlockItemWithCustomItemName(Blocks.NETHER_WART));
 	public static final Item GLASS_BOTTLE = registerItem("glass_bottle", BottleItem::new);
+	public static final Item KOMODO_SPIT = registerItem("komodo_spit", Item::new, new Item.Properties());
+	public static final Item KOMODO_SPIT_BOTTLE = registerItem("komodo_spit_bottle", Item::new, new Item.Properties().craftRemainder(GLASS_BOTTLE).stacksTo(1));
+	public static final Item STINK_BOTTLE = registerItem("stink_bottle", Item::new, new Item.Properties().craftRemainder(GLASS_BOTTLE).stacksTo(1));
 	public static final Item POTION = registerItem(
 		"potion",
 		PotionItem::new,
@@ -1721,6 +1774,11 @@ public class Items {
 	);
 	public static final Item SPIDER_EYE = registerItem("spider_eye", new Item.Properties().food(Foods.SPIDER_EYE, Consumables.SPIDER_EYE));
 	public static final Item FERMENTED_SPIDER_EYE = registerItem("fermented_spider_eye");
+	public static final Item BISON_FUR = registerItem("bison_fur");
+	public static final Item MOOSE_ANTLER = registerItem("moose_antler");
+	public static final Item MOOSE_RIBS = registerItem("moose_ribs", new Item.Properties().food(Foods.PORKCHOP));
+	public static final Item COOKED_MOOSE_RIBS = registerItem("cooked_moose_ribs", new Item.Properties().food(Foods.COOKED_PORKCHOP));
+	public static final Item MOOSE_HEADGEAR = registerItem("moose_headgear", new Item.Properties().durability(300).humanoidArmor(ArmorMaterials.LEATHER, ArmorType.HELMET));
 	public static final Item BLAZE_POWDER = registerItem("blaze_powder");
 	public static final Item MAGMA_CREAM = registerItem("magma_cream");
 	public static final Item BREWING_STAND = registerBlock(
@@ -1732,55 +1790,130 @@ public class Items {
 	public static final Item ATLATITAN_SPAWN_EGG = registerItem("atlatitan_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.ATLATITAN));
 	public static final Item ARMADILLO_SPAWN_EGG = registerItem("armadillo_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.ARMADILLO));
 	public static final Item ALLAY_SPAWN_EGG = registerItem("allay_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.ALLAY));
+	public static final Item ALLIGATOR_SNAPPING_TURTLE_SPAWN_EGG = registerItem("alligator_snapping_turtle_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.ALLIGATOR_SNAPPING_TURTLE));
+	public static final Item ANACONDA_SPAWN_EGG = registerItem("anaconda_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.ANACONDA));
 	public static final Item AXOLOTL_SPAWN_EGG = registerItem("axolotl_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.AXOLOTL));
+	public static final Item BALD_EAGLE_SPAWN_EGG = registerItem("bald_eagle_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.BALD_EAGLE));
 	public static final Item BAT_SPAWN_EGG = registerItem("bat_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.BAT));
 	public static final Item BEE_SPAWN_EGG = registerItem("bee_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.BEE));
+	public static final Item BISON_SPAWN_EGG = registerItem("bison_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.BISON));
+	public static final Item CAIMAN_SPAWN_EGG = registerItem("caiman_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.CAIMAN));
+	public static final Item CAPUCHIN_MONKEY_SPAWN_EGG = registerItem("capuchin_monkey_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.CAPUCHIN_MONKEY));
+	public static final Item CAVE_CENTIPEDE_SPAWN_EGG = registerItem("cave_centipede_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.CAVE_CENTIPEDE_HEAD));
 	public static final Item BLAZE_SPAWN_EGG = registerItem("blaze_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.BLAZE));
+	public static final Item BLOBFISH_SPAWN_EGG = registerItem("blobfish_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.BLOBFISH));
+	public static final Item BLUE_JAY_SPAWN_EGG = registerItem("blue_jay_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.BLUE_JAY));
 	public static final Item BOGGED_SPAWN_EGG = registerItem("bogged_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.BOGGED));
 	public static final Item BREEZE_SPAWN_EGG = registerItem("breeze_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.BREEZE));
+	public static final Item BUNFUNGUS_SPAWN_EGG = registerItem("bunfungus_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.BUNFUNGUS));
+	public static final Item CACHALOT_WHALE_SPAWN_EGG = registerItem("cachalot_whale_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.CACHALOT_WHALE));
 	public static final Item CAT_SPAWN_EGG = registerItem("cat_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.CAT));
+	public static final Item CATFISH_SPAWN_EGG = registerItem("catfish_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.CATFISH));
 	public static final Item CAMEL_SPAWN_EGG = registerItem("camel_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.CAMEL));
 	public static final Item CAVE_SPIDER_SPAWN_EGG = registerItem(
 		"cave_spider_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.CAVE_SPIDER)
 	);
 	public static final Item CHICKEN_SPAWN_EGG = registerItem("chicken_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.CHICKEN));
+	public static final Item COCKROACH_SPAWN_EGG = registerItem("cockroach_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.COCKROACH));
+	public static final Item COCKROACH_OOTHECA = registerItem("cockroach_ootheca", CockroachOothecaItem::new, new Item.Properties().stacksTo(16));
+	public static final Item COCKROACH_WING = registerItem("cockroach_wing");
+	public static final Item COCKROACH_WING_FRAGMENT = registerItem("cockroach_wing_fragment");
+	public static final Item COMB_JELLY_SPAWN_EGG = registerItem("comb_jelly_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.COMB_JELLY));
+	public static final Item COMB_JELLY_BUCKET = registerItem(
+		"comb_jelly_bucket",
+		properties -> new ItemModFishBucket(() -> EntityType.COMB_JELLY, Fluids.WATER, properties),
+		new Item.Properties().stacksTo(1).component(DataComponents.BUCKET_ENTITY_DATA, CustomData.EMPTY)
+	);
+	public static final Item COSMIC_COD_SPAWN_EGG = registerItem("cosmic_cod_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.COSMIC_COD));
+	public static final Item COSMIC_COD_BUCKET = registerItem(
+		"cosmic_cod_bucket",
+		properties -> new MobBucketItem(EntityType.COSMIC_COD, Fluids.WATER, SoundEvents.BUCKET_EMPTY_FISH, properties),
+		new Item.Properties().stacksTo(1).component(DataComponents.BUCKET_ENTITY_DATA, CustomData.EMPTY)
+	);
+	public static final Item FRILLED_SHARK_SPAWN_EGG = registerItem("frilled_shark_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.FRILLED_SHARK));
+	public static final Item FRILLED_SHARK_BUCKET = registerItem(
+		"frilled_shark_bucket",
+		properties -> new MobBucketItem(EntityType.FRILLED_SHARK, Fluids.WATER, SoundEvents.BUCKET_EMPTY_FISH, properties),
+		new Item.Properties().stacksTo(1).component(DataComponents.BUCKET_ENTITY_DATA, CustomData.EMPTY)
+	);
+	public static final Item COSMAW_SPAWN_EGG = registerItem("cosmaw_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.COSMAW));
 	public static final Item COD_SPAWN_EGG = registerItem("cod_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.COD));
+	public static final Item CROCODILE_SPAWN_EGG = registerItem("crocodile_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.CROCODILE));
 	public static final Item COPPER_GOLEM_SPAWN_EGG = registerItem(
 		"copper_golem_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.COPPER_GOLEM)
 	);
 	public static final Item COW_SPAWN_EGG = registerItem("cow_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.COW));
+	public static final Item CROW_SPAWN_EGG = registerItem("crow_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.CROW));
 	public static final Item CREEPER_SPAWN_EGG = registerItem("creeper_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.CREEPER));
 	public static final Item DOLPHIN_SPAWN_EGG = registerItem("dolphin_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.DOLPHIN));
 	public static final Item DONKEY_SPAWN_EGG = registerItem("donkey_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.DONKEY));
 	public static final Item DROWNED_SPAWN_EGG = registerItem("drowned_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.DROWNED));
+	public static final Item ELEPHANT_SPAWN_EGG = registerItem("elephant_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.ELEPHANT));
+	public static final Item EMU_SPAWN_EGG = registerItem("emu_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.EMU));
+	public static final Item EMU_EGG = registerItem("emu_egg", properties -> new ItemEmuEgg(properties), new Item.Properties().stacksTo(16));
+	public static final Item BOILED_EMU_EGG = registerItem("boiled_emu_egg", Item::new, new Item.Properties().food(Foods.COOKED_CHICKEN));
+	public static final Item EMU_FEATHER = registerItem("emu_feather", Item::new, new Item.Properties());
 	public static final Item ELDER_GUARDIAN_SPAWN_EGG = registerItem(
 		"elder_guardian_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.ELDER_GUARDIAN)
 	);
 	public static final Item ENDER_DRAGON_SPAWN_EGG = registerItem(
 		"ender_dragon_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.ENDER_DRAGON)
 	);
+	public static final Item ENDERGRADE_SPAWN_EGG = registerItem("endergrade_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.ENDERGRADE));
+	public static final Item ENDERIOPHAGE_SPAWN_EGG = registerItem("enderiophage_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.ENDERIOPHAGE));
 	public static final Item ENDERMAN_SPAWN_EGG = registerItem("enderman_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.ENDERMAN));
 	public static final Item ENDERMITE_SPAWN_EGG = registerItem("endermite_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.ENDERMITE));
 	public static final Item EVOKER_SPAWN_EGG = registerItem("evoker_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.EVOKER));
+	public static final Item FLYING_FISH_SPAWN_EGG = registerItem("flying_fish_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.FLYING_FISH));
+	public static final Item FLYING_FISH_BUCKET = registerItem(
+		"flying_fish_bucket",
+		properties -> new MobBucketItem(EntityType.FLYING_FISH, Fluids.WATER, SoundEvents.BUCKET_EMPTY_FISH, properties),
+		new Item.Properties().stacksTo(1).component(DataComponents.BUCKET_ENTITY_DATA, CustomData.EMPTY)
+	);
 	public static final Item FOX_SPAWN_EGG = registerItem("fox_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.FOX));
 	public static final Item FROG_SPAWN_EGG = registerItem("frog_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.FROG));
+	public static final Item GAZELLE_SPAWN_EGG = registerItem("gazelle_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.GAZELLE));
+	public static final Item GELADA_MONKEY_SPAWN_EGG = registerItem("gelada_monkey_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.GELADA_MONKEY));
 	public static final Item GHAST_SPAWN_EGG = registerItem("ghast_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.GHAST));
 	public static final Item HAPPY_GHAST_SPAWN_EGG = registerItem(
 		"happy_ghast_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.HAPPY_GHAST)
 	);
 	public static final Item GLOW_SQUID_SPAWN_EGG = registerItem("glow_squid_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.GLOW_SQUID));
+	public static final Item GIANT_SQUID_SPAWN_EGG = registerItem("giant_squid_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.GIANT_SQUID));
 	public static final Item GOAT_SPAWN_EGG = registerItem("goat_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.GOAT));
+	public static final Item GORILLA_SPAWN_EGG = registerItem("gorilla_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.GORILLA));
+	public static final Item GRIZZLY_BEAR_SPAWN_EGG = registerItem("grizzly_bear_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.GRIZZLY_BEAR));
 	public static final Item GROTTOCERATOPS_SPAWN_EGG = registerItem("grottoceratops_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.GROTTOCERATOPS));
 	public static final Item GUARDIAN_SPAWN_EGG = registerItem("guardian_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.GUARDIAN));
+	public static final Item HAMMERHEAD_SHARK_SPAWN_EGG = registerItem("hammerhead_shark_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.HAMMERHEAD_SHARK));
 	public static final Item HOGLIN_SPAWN_EGG = registerItem("hoglin_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.HOGLIN));
+	public static final Item HUMMINGBIRD_SPAWN_EGG = registerItem("hummingbird_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.HUMMINGBIRD));
 	public static final Item HORSE_SPAWN_EGG = registerItem("horse_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.HORSE));
 	public static final Item HUSK_SPAWN_EGG = registerItem("husk_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.HUSK));
+	public static final Item JERBOA_SPAWN_EGG = registerItem("jerboa_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.JERBOA));
+	public static final Item KANGAROO_SPAWN_EGG = registerItem("kangaroo_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.KANGAROO));
+	public static final Item KOMODO_DRAGON_SPAWN_EGG = registerItem("komodo_dragon_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.KOMODO_DRAGON));
+	public static final Item LEAFCUTTER_ANT_SPAWN_EGG = registerItem("leafcutter_ant_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.LEAFCUTTER_ANT));
+	public static final Item LEAFCUTTER_ANT_PUPA = registerItem("leafcutter_ant_pupa", ItemLeafcutterPupa::new, new Item.Properties());
 	public static final Item IRON_GOLEM_SPAWN_EGG = registerItem("iron_golem_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.IRON_GOLEM));
 	public static final Item LLAMA_SPAWN_EGG = registerItem("llama_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.LLAMA));
+	public static final Item LOBSTER_SPAWN_EGG = registerItem("lobster_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.LOBSTER));
+	public static final Item LOBSTER_BUCKET = registerItem(
+		"lobster_bucket",
+		properties -> new MobBucketItem(EntityType.LOBSTER, Fluids.WATER, SoundEvents.BUCKET_EMPTY_FISH, properties),
+		new Item.Properties().stacksTo(1)
+	);
 	public static final Item MAGMA_CUBE_SPAWN_EGG = registerItem("magma_cube_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.MAGMA_CUBE));
+	public static final Item MANTIS_SHRIMP_SPAWN_EGG = registerItem("mantis_shrimp_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.MANTIS_SHRIMP));
+	public static final Item MIMIC_OCTOPUS_SPAWN_EGG = registerItem("mimic_octopus_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.MIMIC_OCTOPUS));
+	public static final Item MIMIC_OCTOPUS_BUCKET = registerItem("mimic_octopus_bucket", properties -> new MobBucketItem(EntityType.MIMIC_OCTOPUS, Fluids.WATER, SoundEvents.BUCKET_EMPTY_FISH, properties), new Item.Properties().stacksTo(1));
 	public static final Item MOOSHROOM_SPAWN_EGG = registerItem("mooshroom_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.MOOSHROOM));
+	public static final Item MOOSE_SPAWN_EGG = registerItem("moose_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.MOOSE));
 	public static final Item MULE_SPAWN_EGG = registerItem("mule_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.MULE));
+	public static final Item MUNGUS_SPAWN_EGG = registerItem("mungus_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.MUNGUS));
+	public static final Item MUDSKIPPER_SPAWN_EGG = registerItem("mudskipper_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.MUDSKIPPER));
 	public static final Item OCELOT_SPAWN_EGG = registerItem("ocelot_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.OCELOT));
+	public static final Item ORCA_SPAWN_EGG = registerItem("orca_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.ORCA));
 	public static final Item PANDA_SPAWN_EGG = registerItem("panda_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.PANDA));
 	public static final Item PARROT_SPAWN_EGG = registerItem("parrot_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.PARROT));
 	public static final Item PHANTOM_SPAWN_EGG = registerItem("phantom_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.PHANTOM));
@@ -1790,16 +1923,32 @@ public class Items {
 		"piglin_brute_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.PIGLIN_BRUTE)
 	);
 	public static final Item PILLAGER_SPAWN_EGG = registerItem("pillager_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.PILLAGER));
+	public static final Item PLATYPUS_SPAWN_EGG = registerItem("platypus_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.PLATYPUS));
 	public static final Item POLAR_BEAR_SPAWN_EGG = registerItem("polar_bear_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.POLAR_BEAR));
+	public static final Item POTOO_SPAWN_EGG = registerItem("potoo_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.POTOO));
 	public static final Item PUFFERFISH_SPAWN_EGG = registerItem("pufferfish_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.PUFFERFISH));
 	public static final Item RABBIT_SPAWN_EGG = registerItem("rabbit_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.RABBIT));
+	public static final Item RACCOON_SPAWN_EGG = registerItem("raccoon_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.RACCOON));
+	public static final Item RAIN_FROG_SPAWN_EGG = registerItem("rain_frog_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.RAIN_FROG));
+	public static final Item RATTLESNAKE_SPAWN_EGG = registerItem("rattlesnake_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.RATTLESNAKE));
+	public static final Item RHINOCEROS_SPAWN_EGG = registerItem("rhinoceros_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.RHINOCEROS));
+	public static final Item ROADRUNNER_SPAWN_EGG = registerItem("roadrunner_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.ROADRUNNER));
 	public static final Item RAVAGER_SPAWN_EGG = registerItem("ravager_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.RAVAGER));
 	public static final Item RELICHEIRUS_SPAWN_EGG = registerItem("relicheirus_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.RELICHEIRUS));
 	public static final Item SALMON_SPAWN_EGG = registerItem("salmon_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.SALMON));
+	public static final Item ANTEATER_SPAWN_EGG = registerItem("anteater_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.ANTEATER));
+	public static final Item MIMICUBE_SPAWN_EGG = registerItem("mimicube_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.MIMICUBE));
+	public static final Item SEAGULL_SPAWN_EGG = registerItem("seagull_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.SEAGULL));
 	public static final Item SHEEP_SPAWN_EGG = registerItem("sheep_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.SHEEP));
+	public static final Item SHOEBILL_SPAWN_EGG = registerItem("shoebill_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.SHOEBILL));
+	public static final Item SKUNK_SPAWN_EGG = registerItem("skunk_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.SKUNK));
+	public static final Item SPECTRE_SPAWN_EGG = registerItem("spectre_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.SPECTRE));
+	public static final Item SUGAR_GLIDER_SPAWN_EGG = registerItem("sugar_glider_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.SUGAR_GLIDER));
+	public static final Item SUNBIRD_SPAWN_EGG = registerItem("sunbird_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.SUNBIRD));
 	public static final Item SHULKER_SPAWN_EGG = registerItem("shulker_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.SHULKER));
 	public static final Item SILVERFISH_SPAWN_EGG = registerItem("silverfish_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.SILVERFISH));
 	public static final Item SKELETON_SPAWN_EGG = registerItem("skeleton_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.SKELETON));
+	public static final Item SKELEWAG_SPAWN_EGG = registerItem("skelewag_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.SKELEWAG));
 	public static final Item SKELETON_HORSE_SPAWN_EGG = registerItem(
 		"skeleton_horse_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.SKELETON_HORSE)
 	);
@@ -1808,20 +1957,35 @@ public class Items {
 	public static final Item SUBTERRANODON_SPAWN_EGG = registerItem("subterranodon_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.SUBTERRANODON));
 	public static final Item VALLUMRAPTOR_SPAWN_EGG = registerItem("vallumraptor_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.VALLUMRAPTOR));
 	public static final Item SNOW_GOLEM_SPAWN_EGG = registerItem("snow_golem_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.SNOW_GOLEM));
+	public static final Item SNOW_LEOPARD_SPAWN_EGG = registerItem("snow_leopard_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.SNOW_LEOPARD));
 	public static final Item SPIDER_SPAWN_EGG = registerItem("spider_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.SPIDER));
 	public static final Item SQUID_SPAWN_EGG = registerItem("squid_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.SQUID));
 	public static final Item STRAY_SPAWN_EGG = registerItem("stray_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.STRAY));
 	public static final Item STRIDER_SPAWN_EGG = registerItem("strider_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.STRIDER));
 	public static final Item TADPOLE_SPAWN_EGG = registerItem("tadpole_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.TADPOLE));
+	public static final Item TARANTULA_HAWK_SPAWN_EGG = registerItem("tarantula_hawk_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.TARANTULA_HAWK));
+	public static final Item TASMANIAN_DEVIL_SPAWN_EGG = registerItem("tasmanian_devil_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.TASMANIAN_DEVIL));
+	public static final Item TIGER_SPAWN_EGG = registerItem("tiger_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.TIGER));
+	public static final Item UNDERMINER_SPAWN_EGG = registerItem("underminer_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.UNDERMINER));
+	public static final Item WARPED_TOAD_SPAWN_EGG = registerItem("warped_toad_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.WARPED_TOAD));
+	public static final Item TARANTULA_HAWK_WING = registerItem("tarantula_hawk_wing", Item::new, new Item.Properties());
+	public static final Item TARANTULA_HAWK_WING_FRAGMENT = registerItem("tarantula_hawk_wing_fragment", Item::new, new Item.Properties());
+	public static final Item TARANTULA_HAWK_ELYTRA = registerItem("tarantula_hawk_elytra", 
+		ItemTarantulaHawkElytra::new,
+		new Item.Properties().durability(432));
+	public static final Item TARANTULA_HAWK_ELYTRA_BROKEN = registerItem("tarantula_hawk_elytra_broken", Item::new, new Item.Properties());
 	public static final Item TRADER_LLAMA_SPAWN_EGG = registerItem(
 		"trader_llama_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.TRADER_LLAMA)
 	);
 	public static final Item TREMORSAURUS_SPAWN_EGG = registerItem("tremorsaurus_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.TREMORSAURUS));
 	public static final Item TRILOCARIS_SPAWN_EGG = registerItem("trilocaris_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.TRILOCARIS));
+	public static final Item TOUCAN_SPAWN_EGG = registerItem("toucan_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.TOUCAN));
 	public static final Item TROPICAL_FISH_SPAWN_EGG = registerItem(
 		"tropical_fish_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.TROPICAL_FISH)
 	);
 	public static final Item TURTLE_SPAWN_EGG = registerItem("turtle_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.TURTLE));
+	public static final Item TERRAPIN_SPAWN_EGG = registerItem("terrapin_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.TERRAPIN));
+	public static final Item TERRAPIN_BUCKET = registerItem("terrapin_bucket", properties -> new MobBucketItem(EntityType.TERRAPIN, Fluids.WATER, SoundEvents.BUCKET_EMPTY_FISH, properties), new Item.Properties().stacksTo(1));
 	public static final Item VEX_SPAWN_EGG = registerItem("vex_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.VEX));
 	public static final Item VILLAGER_SPAWN_EGG = registerItem("villager_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.VILLAGER));
 	public static final Item VINDICATOR_SPAWN_EGG = registerItem("vindicator_spawn_egg", SpawnEggItem::new, new Item.Properties().spawnEgg(EntityType.VINDICATOR));
@@ -1879,6 +2043,7 @@ public class Items {
 	public static final Item BAKED_POTATO = registerItem("baked_potato", new Item.Properties().food(Foods.BAKED_POTATO));
 	public static final Item POISONOUS_POTATO = registerItem("poisonous_potato", new Item.Properties().food(Foods.POISONOUS_POTATO, Consumables.POISONOUS_POTATO));
 	public static final Item MAP = registerItem("map", EmptyMapItem::new);
+	public static final Item MARACA = registerItem("maraca");
 	public static final Item GOLDEN_CARROT = registerItem("golden_carrot", new Item.Properties().food(Foods.GOLDEN_CARROT));
 	public static final Item SKELETON_SKULL = registerBlock(
 		Blocks.SKELETON_SKULL,
@@ -1944,6 +2109,7 @@ public class Items {
 	public static final Item RABBIT_STEW = registerItem("rabbit_stew", new Item.Properties().stacksTo(1).food(Foods.RABBIT_STEW).usingConvertsTo(BOWL));
 	public static final Item RABBIT_FOOT = registerItem("rabbit_foot");
 	public static final Item RABBIT_HIDE = registerItem("rabbit_hide");
+	public static final Item RACCOON_TAIL = registerItem("raccoon_tail");
 	public static final Item ARMOR_STAND = registerItem("armor_stand", ArmorStandItem::new, new Item.Properties().stacksTo(16));
 	public static final Item COPPER_HORSE_ARMOR = registerItem("copper_horse_armor", new Item.Properties().horseArmor(ArmorMaterials.COPPER));
 	public static final Item IRON_HORSE_ARMOR = registerItem("iron_horse_armor", new Item.Properties().horseArmor(ArmorMaterials.IRON));
@@ -2285,12 +2451,15 @@ public class Items {
 			.component(DataComponents.BEES, Bees.EMPTY)
 			.component(DataComponents.BLOCK_STATE, BlockItemStateProperties.EMPTY.with(BeehiveBlock.HONEY_LEVEL, 0))
 	);
+	public static final Item LEAFCUTTER_ANTHILL = registerBlock(Blocks.LEAFCUTTER_ANTHILL);
+	public static final Item LEAFCUTTER_ANT_CHAMBER = registerBlock(Blocks.LEAFCUTTER_ANT_CHAMBER);
 	public static final Item HONEY_BOTTLE = registerItem(
 		"honey_bottle",
 		new Item.Properties().craftRemainder(GLASS_BOTTLE).food(Foods.HONEY_BOTTLE, Consumables.HONEY_BOTTLE).usingConvertsTo(GLASS_BOTTLE).stacksTo(16)
 	);
 	public static final Item HONEYCOMB_BLOCK = registerBlock(Blocks.HONEYCOMB_BLOCK);
 	public static final Item LODESTONE = registerBlock(Blocks.LODESTONE);
+	public static final Item LOST_TENTACLE = registerItem("lost_tentacle");
 	public static final Item CRYING_OBSIDIAN = registerBlock(Blocks.CRYING_OBSIDIAN);
 	public static final Item BLACKSTONE = registerBlock(Blocks.BLACKSTONE);
 	public static final Item BLACKSTONE_SLAB = registerBlock(Blocks.BLACKSTONE_SLAB);
@@ -2507,6 +2676,9 @@ public class Items {
 	private static ResourceKey<Item> blockIdToItemId(ResourceKey<Block> resourceKey) {
 		return ResourceKey.create(Registries.ITEM, resourceKey.location());
 	}
+	
+	// Skelewag items
+	public static final Item SKELEWAG_SWORD = registerItem("skelewag_sword", properties -> new ItemSkelewagSword(properties), new Item.Properties().stacksTo(1).durability(430));
 
 	public static Item registerBlock(Block block) {
 		return registerBlock(block, BlockItem::new);

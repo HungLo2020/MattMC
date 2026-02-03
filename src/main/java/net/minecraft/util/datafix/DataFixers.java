@@ -374,6 +374,7 @@ import net.minecraft.util.datafix.schemas.V4532;
 import net.minecraft.util.datafix.schemas.V4533;
 import net.minecraft.util.datafix.schemas.V4543;
 import net.minecraft.util.datafix.schemas.V4549;
+import net.minecraft.util.datafix.schemas.V4550;
 import net.minecraft.util.datafix.schemas.V501;
 import net.minecraft.util.datafix.schemas.V700;
 import net.minecraft.util.datafix.schemas.V701;
@@ -1547,6 +1548,10 @@ public class DataFixers {
 						.put("quantize:cycad", "minecraft:cycad")
 						.put("quantize:ambersol", "minecraft:ambersol")
 						.put("quantize:fiddlehead", "minecraft:fiddlehead")
+						.put("quantize:pewen_pines", "minecraft:pewen_pines")
+						.put("quantize:pewen_wood", "minecraft:pewen_wood")
+						.put("quantize:pewen_log", "minecraft:pewen_log")
+						.put("quantize:pewen_branch", "minecraft:pewen_branch")
 						.build()
 				)
 			)
@@ -1570,6 +1575,9 @@ public class DataFixers {
 				)
 			)
 		);
+		Schema schema280 = dataFixerBuilder.addSchema(4550, V4550::new);
+		dataFixerBuilder.addFixer(new AddNewChoices(schema280, "Added mod entities and block entities", References.ENTITY));
+		dataFixerBuilder.addFixer(new AddNewChoices(schema280, "Added mod block entities", References.BLOCK_ENTITY));
 	}
 
 	private static UnaryOperator<String> createRenamerNoNamespace(Map<String, String> map) {

@@ -2,8 +2,8 @@ package net.minecraft.client.multiplayer;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableList.Builder;
-import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.logging.LogUtils;
+import net.blaze3d.systems.RenderSystem;
+import net.logging.LogUtils;
 import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URL;
@@ -42,7 +42,6 @@ import net.minecraft.core.Holder;
 import net.minecraft.nbt.Tag;
 import net.minecraft.network.Connection;
 import net.minecraft.network.DisconnectionDetails;
-import net.minecraft.network.PacketListener;
 import net.minecraft.network.ServerboundPacketListener;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;

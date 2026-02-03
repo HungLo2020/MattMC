@@ -1,7 +1,7 @@
 package net.minecraft.server.rcon.thread;
 
 import com.google.common.collect.Lists;
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.ServerSocket;

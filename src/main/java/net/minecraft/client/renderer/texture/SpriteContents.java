@@ -1,15 +1,12 @@
 package net.minecraft.client.renderer.texture;
 
-import com.mojang.blaze3d.platform.NativeImage;
-import com.mojang.blaze3d.platform.TextureUtil;
-import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.textures.GpuTexture;
-import com.mojang.logging.LogUtils;
+import net.blaze3d.platform.NativeImage;
+import net.blaze3d.systems.RenderSystem;
+import net.blaze3d.textures.GpuTexture;
+import net.logging.LogUtils;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntSet;
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
@@ -21,7 +18,6 @@ import net.minecraft.api.Environment;
 import net.minecraft.CrashReport;
 import net.minecraft.CrashReportCategory;
 import net.minecraft.ReportedException;
-import net.minecraft.SharedConstants;
 import net.minecraft.client.resources.metadata.animation.AnimationFrame;
 import net.minecraft.client.resources.metadata.animation.AnimationMetadataSection;
 import net.minecraft.client.resources.metadata.animation.FrameSize;
@@ -29,11 +25,15 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.packs.metadata.MetadataSectionType;
 import net.minecraft.server.packs.metadata.MetadataSectionType.WithValue;
 import net.minecraft.util.ARGB;
+import net.sodium.client.SodiumClientMod;
+import net.sodium.client.render.chunk.compile.pipeline.SpriteContentsExtension;
+import net.sodium.client.util.NativeImageHelper;
+import net.sodium.client.util.color.ColorSRGB;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 
 @Environment(EnvType.CLIENT)
-public class SpriteContents implements Stitcher.Entry, AutoCloseable, net.caffeinemc.mods.sodium.client.render.chunk.compile.pipeline.SpriteContentsExtension, net.irisshaders.iris.pbr.SpriteContentsExtension, net.irisshaders.iris.pbr.texture.SpriteContentsExtension {
+public class SpriteContents implements Stitcher.Entry, AutoCloseable, SpriteContentsExtension, net.irisshaders.iris.pbr.SpriteContentsExtension, net.irisshaders.iris.pbr.texture.SpriteContentsExtension {
 	private static final Logger LOGGER = LogUtils.getLogger();
 	final ResourceLocation name;
 	final int width;
@@ -347,8 +347,8 @@ public class SpriteContents implements Stitcher.Entry, AutoCloseable, net.caffei
 				NativeImage src = this.parent.byMipLevel[layer];
 				NativeImage dst = this.activeFrame[layer];
 
-				long ppSrcPixel = net.caffeinemc.mods.sodium.client.util.NativeImageHelper.getPointerRGBA(src);
-				long ppDstPixel = net.caffeinemc.mods.sodium.client.util.NativeImageHelper.getPointerRGBA(dst);
+				long ppSrcPixel = NativeImageHelper.getPointerRGBA(src);
+				long ppDstPixel = NativeImageHelper.getPointerRGBA(dst);
 
 				for (int layerY = 0; layerY < height; layerY++) {
 					// Pointers to the pixel array for the current and next frame
@@ -412,9 +412,9 @@ public class SpriteContents implements Stitcher.Entry, AutoCloseable, net.caffei
 		@Override
 		public void tickAndUpload(int i, int j, GpuTexture gpuTexture) {
 			// Sodium: From SpriteContentsTickerMixin - on-demand animation check
-			boolean onDemand = net.caffeinemc.mods.sodium.client.SodiumClientMod.options().performance.animateOnlyVisibleTextures;
+			boolean onDemand = SodiumClientMod.options().performance.animateOnlyVisibleTextures;
 			
-			if (onDemand && !net.caffeinemc.mods.sodium.client.render.texture.SpriteContentsExtension.isActive(this.parent)) {
+			if (onDemand && !net.sodium.client.render.texture.SpriteContentsExtension.isActive(this.parent)) {
 				this.subFrame++;
 				if (this.subFrame >= ((SpriteContents.FrameInfo)this.animationInfo.frames.get(this.frame)).time()) {
 					this.frame = (this.frame + 1) % this.animationInfo.frames.size();
@@ -438,7 +438,7 @@ public class SpriteContents implements Stitcher.Entry, AutoCloseable, net.caffei
 			}
 			
 			// Sodium: From SpriteContentsTickerMixin - reset active flag after upload
-			net.caffeinemc.mods.sodium.client.render.texture.SpriteContentsExtension.setActive(this.parent, false);
+			net.sodium.client.render.texture.SpriteContentsExtension.setActive(this.parent, false);
 		}
 
 		@Override
@@ -451,7 +451,7 @@ public class SpriteContents implements Stitcher.Entry, AutoCloseable, net.caffei
 	
 	// Sodium: Scan sprite contents for transparency (from SpriteContentsMixin scan package)
 	private void sodium$scanSpriteContents(NativeImage nativeImage) {
-		final long ppPixel = net.caffeinemc.mods.sodium.client.util.NativeImageHelper.getPointerRGBA(nativeImage);
+		final long ppPixel = NativeImageHelper.getPointerRGBA(nativeImage);
 		final int pixelCount = nativeImage.getHeight() * nativeImage.getWidth();
 
 		for (int pixelIndex = 0; pixelIndex < pixelCount; pixelIndex++) {
@@ -491,7 +491,7 @@ public class SpriteContents implements Stitcher.Entry, AutoCloseable, net.caffei
 	 * black color does not leak over into sampling.
 	 */
 	private static void sodium$fillInTransparentPixelColors(NativeImage nativeImage) {
-		final long ppPixel = net.caffeinemc.mods.sodium.client.util.NativeImageHelper.getPointerRGBA(nativeImage);
+		final long ppPixel = NativeImageHelper.getPointerRGBA(nativeImage);
 		final int pixelCount = nativeImage.getHeight() * nativeImage.getWidth();
 
 		// Calculate an average color from all pixels that are not completely transparent.
@@ -513,9 +513,9 @@ public class SpriteContents implements Stitcher.Entry, AutoCloseable, net.caffei
 				float weight = (float) alpha;
 
 				// Make sure to convert to linear space so that we don't lose brightness.
-				r += net.caffeinemc.mods.sodium.client.util.color.ColorSRGB.srgbToLinear(net.sodium.api.util.ColorABGR.unpackRed(color)) * weight;
-				g += net.caffeinemc.mods.sodium.client.util.color.ColorSRGB.srgbToLinear(net.sodium.api.util.ColorABGR.unpackGreen(color)) * weight;
-				b += net.caffeinemc.mods.sodium.client.util.color.ColorSRGB.srgbToLinear(net.sodium.api.util.ColorABGR.unpackBlue(color)) * weight;
+				r += ColorSRGB.srgbToLinear(net.sodium.api.util.ColorABGR.unpackRed(color)) * weight;
+				g += ColorSRGB.srgbToLinear(net.sodium.api.util.ColorABGR.unpackGreen(color)) * weight;
+				b += ColorSRGB.srgbToLinear(net.sodium.api.util.ColorABGR.unpackBlue(color)) * weight;
 
 				totalWeight += weight;
 			}
@@ -532,7 +532,7 @@ public class SpriteContents implements Stitcher.Entry, AutoCloseable, net.caffei
 
 		// Convert that color in linear space back to sRGB.
 		// Use an alpha value of zero - this works since we only replace pixels with an alpha value of 0.
-		int averageColor = net.caffeinemc.mods.sodium.client.util.color.ColorSRGB.linearToSrgb(r, g, b, 0);
+		int averageColor = ColorSRGB.linearToSrgb(r, g, b, 0);
 
 		for (int pixelIndex = 0; pixelIndex < pixelCount; pixelIndex++) {
 			long pPixel = ppPixel + (pixelIndex * 4);

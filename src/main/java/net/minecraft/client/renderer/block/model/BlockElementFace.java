@@ -6,7 +6,7 @@ import com.google.gson.JsonDeserializer;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParseException;
-import com.mojang.math.Quadrant;
+import net.math.Quadrant;
 import java.lang.reflect.Type;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;

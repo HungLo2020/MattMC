@@ -1,7 +1,7 @@
 package net.minecraft.server.dedicated;
 
 import com.google.common.base.MoreObjects;
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;

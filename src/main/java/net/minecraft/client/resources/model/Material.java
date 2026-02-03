@@ -1,6 +1,6 @@
 package net.minecraft.client.resources.model;
 
-import com.mojang.blaze3d.vertex.VertexConsumer;
+import net.blaze3d.vertex.VertexConsumer;
 import java.util.Comparator;
 import java.util.Objects;
 import java.util.function.Function;

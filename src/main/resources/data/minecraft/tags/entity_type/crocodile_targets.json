@@ -1,0 +1,12 @@
+{
+  "__comment": "all non-player targets of the crocodile mob.",
+  "replace": false,
+  "values": [
+    "#minecraft:passive_land_animals",
+    "#minecraft:villagers",
+    "minecraft:kangaroo",
+    "minecraft:gelada_monkey",
+    "minecraft:catfish",
+    "minecraft:caiman"
+  ]
+}

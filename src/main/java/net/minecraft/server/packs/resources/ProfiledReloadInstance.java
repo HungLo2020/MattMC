@@ -1,7 +1,7 @@
 package net.minecraft.server.packs.resources;
 
 import com.google.common.base.Stopwatch;
-import com.mojang.logging.LogUtils;
+import net.logging.LogUtils;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
