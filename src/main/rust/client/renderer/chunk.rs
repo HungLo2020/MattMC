@@ -30,7 +30,7 @@ impl Block {
     }
 }
 
-/// A chunk represents a 16x16x384 block section of the world
+/// A chunk represents a 16x16x384 block section of the world (X×Z×Y)
 pub struct Chunk {
     blocks: [[[Block; CHUNK_WIDTH]; CHUNK_HEIGHT]; CHUNK_WIDTH],
 }

@@ -11,6 +11,9 @@ pub struct Camera {
     pub look_sensitivity: f32,
 }
 
+// Epsilon value to prevent camera from flipping at vertical extremes
+const PITCH_LIMIT_EPSILON: f32 = 0.01;
+
 impl Camera {
     pub fn new() -> Self {
         Self {
@@ -67,7 +70,10 @@ impl Camera {
         self.pitch += delta_y * self.look_sensitivity;
         
         // Clamp pitch to prevent camera flipping
-        self.pitch = self.pitch.clamp(-std::f32::consts::FRAC_PI_2 + 0.01, std::f32::consts::FRAC_PI_2 - 0.01);
+        self.pitch = self.pitch.clamp(
+            -std::f32::consts::FRAC_PI_2 + PITCH_LIMIT_EPSILON,
+            std::f32::consts::FRAC_PI_2 - PITCH_LIMIT_EPSILON
+        );
     }
 
     pub fn get_view_matrix(&self) -> Mat4 {

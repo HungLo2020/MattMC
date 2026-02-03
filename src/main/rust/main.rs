@@ -311,12 +311,16 @@ impl App {
         if self.keys_pressed.contains(&VirtualKeyCode::Space) {
             up += 1.0;
         }
-        if self.keys_pressed.contains(&VirtualKeyCode::LControl) || 
-           self.keys_pressed.contains(&VirtualKeyCode::RControl) {
+        if self.is_control_pressed() {
             up -= 1.0;
         }
 
         self.camera.update_position(delta_time, forward, right, up);
+    }
+
+    fn is_control_pressed(&self) -> bool {
+        self.keys_pressed.contains(&VirtualKeyCode::LControl) ||
+        self.keys_pressed.contains(&VirtualKeyCode::RControl)
     }
 
     fn render(&mut self, window: &Window) {
