@@ -1,33 +1,27 @@
 package net.vulkanic.backends.opengl;
 
-import net.blaze3d.opengl.GlStateManager;
-import net.blaze3d.systems.CommandEncoder;
-import net.blaze3d.systems.GpuDevice;
-import net.blaze3d.systems.RenderSystem;
 import net.vulkanic.VulkanicCommandBuffer;
 import net.vulkanic.VulkanicFramebuffer;
 import net.vulkanic.VulkanicShader;
 import net.vulkanic.VulkanicBuffer;
 import net.vulkanic.VulkanicTexture;
 import org.lwjgl.opengl.GL11;
+import org.lwjgl.opengl.GL13;
+import org.lwjgl.opengl.GL20;
 
 /**
  * OpenGL implementation of VulkanicCommandBuffer.
+ * This is the ONLY place in the codebase that should directly call OpenGL functions.
  */
 public class OpenGLCommandBuffer implements VulkanicCommandBuffer {
-    private final GpuDevice device;
-    private final CommandEncoder encoder;
     private OpenGLShader currentShader;
     
-    public OpenGLCommandBuffer(GpuDevice device) {
-        this.device = device;
-        this.encoder = device.createCommandEncoder();
+    public OpenGLCommandBuffer() {
         this.currentShader = null;
     }
     
     @Override
     public void beginRenderPass(VulkanicFramebuffer framebuffer) {
-        RenderSystem.assertOnRenderThread();
         if (framebuffer != null) {
             setViewport(0, 0, framebuffer.getWidth(), framebuffer.getHeight());
         }
@@ -35,15 +29,14 @@ public class OpenGLCommandBuffer implements VulkanicCommandBuffer {
     
     @Override
     public void endRenderPass() {
-        RenderSystem.assertOnRenderThread();
+        // No-op for OpenGL
     }
     
     @Override
     public void bindShader(VulkanicShader shader) {
-        RenderSystem.assertOnRenderThread();
         if (shader instanceof OpenGLShader openGLShader) {
             this.currentShader = openGLShader;
-            GlStateManager._glUseProgram(openGLShader.getProgramId());
+            GL20.glUseProgram(openGLShader.getProgramId());
         } else {
             throw new IllegalArgumentException("Shader must be an OpenGLShader");
         }
@@ -51,25 +44,25 @@ public class OpenGLCommandBuffer implements VulkanicCommandBuffer {
     
     @Override
     public void bindVertexBuffer(VulkanicBuffer buffer) {
-        RenderSystem.assertOnRenderThread();
         if (!(buffer instanceof OpenGLBuffer)) {
             throw new IllegalArgumentException("Buffer must be an OpenGLBuffer");
         }
+        // TODO: Implement vertex buffer binding with GL15.glBindBuffer
     }
     
     @Override
     public void bindIndexBuffer(VulkanicBuffer buffer) {
-        RenderSystem.assertOnRenderThread();
         if (!(buffer instanceof OpenGLBuffer)) {
             throw new IllegalArgumentException("Buffer must be an OpenGLBuffer");
         }
+        // TODO: Implement index buffer binding with GL15.glBindBuffer
     }
     
     @Override
     public void bindTexture(int unit, VulkanicTexture texture) {
-        RenderSystem.assertOnRenderThread();
-        if (texture instanceof OpenGLTexture) {
-            GlStateManager._activeTexture(33984 + unit);
+        if (texture instanceof OpenGLTexture openGLTexture) {
+            GL13.glActiveTexture(GL13.GL_TEXTURE0 + unit);
+            GL11.glBindTexture(GL11.GL_TEXTURE_2D, openGLTexture.getTextureId());
         } else {
             throw new IllegalArgumentException("Texture must be an OpenGLTexture");
         }
@@ -77,46 +70,40 @@ public class OpenGLCommandBuffer implements VulkanicCommandBuffer {
     
     @Override
     public void draw(int vertexCount) {
-        RenderSystem.assertOnRenderThread();
-        GlStateManager._drawArrays(4, 0, vertexCount);
+        GL11.glDrawArrays(GL11.GL_TRIANGLES, 0, vertexCount);
     }
     
     @Override
     public void drawIndexed(int indexCount) {
-        RenderSystem.assertOnRenderThread();
-        GlStateManager._drawElements(4, indexCount, 5123, 0);
+        GL11.glDrawElements(GL11.GL_TRIANGLES, indexCount, GL11.GL_UNSIGNED_SHORT, 0);
     }
     
     @Override
     public void clear(float r, float g, float b, float a) {
-        RenderSystem.assertOnRenderThread();
         GL11.glClearColor(r, g, b, a);
-        GlStateManager._clear(16384);
+        GL11.glClear(GL11.GL_COLOR_BUFFER_BIT);
     }
     
     @Override
     public void clearDepth(float depth) {
-        RenderSystem.assertOnRenderThread();
         GL11.glClearDepth(depth);
-        GlStateManager._clear(256);
+        GL11.glClear(GL11.GL_DEPTH_BUFFER_BIT);
     }
     
     @Override
     public void clearColorAndDepth(float r, float g, float b, float a, float depth) {
-        RenderSystem.assertOnRenderThread();
         GL11.glClearColor(r, g, b, a);
         GL11.glClearDepth(depth);
-        GlStateManager._clear(16384 | 256);
+        GL11.glClear(GL11.GL_COLOR_BUFFER_BIT | GL11.GL_DEPTH_BUFFER_BIT);
     }
     
     @Override
     public void setViewport(int x, int y, int width, int height) {
-        RenderSystem.assertOnRenderThread();
-        GlStateManager._viewport(x, y, width, height);
+        GL11.glViewport(x, y, width, height);
     }
     
     @Override
     public void submit() {
-        RenderSystem.assertOnRenderThread();
+        // No-op for OpenGL - commands are immediate
     }
 }

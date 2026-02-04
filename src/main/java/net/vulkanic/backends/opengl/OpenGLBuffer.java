@@ -1,19 +1,16 @@
 package net.vulkanic.backends.opengl;
 
-import net.blaze3d.buffers.GpuBuffer;
-import net.blaze3d.buffers.GpuBufferSlice;
-import net.blaze3d.systems.CommandEncoder;
-import net.blaze3d.systems.RenderSystem;
 import net.vulkanic.VulkanicBuffer;
+import org.lwjgl.opengl.GL15;
 import java.nio.ByteBuffer;
 
 /**
  * OpenGL implementation of VulkanicBuffer.
  * 
- * Wraps Blaze3D's GpuBuffer to provide the Vulkanic buffer interface.
+ * Uses direct OpenGL buffer objects (VBOs) for GPU buffer management.
  */
 public class OpenGLBuffer implements VulkanicBuffer {
-    private final GpuBuffer gpuBuffer;
+    private final int bufferId;
     private final int sizeInBytes;
     
     /**
@@ -23,15 +20,12 @@ public class OpenGLBuffer implements VulkanicBuffer {
      */
     public OpenGLBuffer(int sizeInBytes) {
         this.sizeInBytes = sizeInBytes;
+        this.bufferId = GL15.glGenBuffers();
         
-        // Create GPU buffer using Blaze3D device
-        // Usage flags: VERTEX | MAP_WRITE for general-purpose vertex/uniform data
-        int usage = GpuBuffer.USAGE_VERTEX | GpuBuffer.USAGE_MAP_WRITE | GpuBuffer.USAGE_COPY_DST;
-        this.gpuBuffer = RenderSystem.getDevice().createBuffer(
-            () -> "VulkanicBuffer", 
-            usage, 
-            sizeInBytes
-        );
+        // Allocate buffer storage
+        GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, bufferId);
+        GL15.glBufferData(GL15.GL_ARRAY_BUFFER, sizeInBytes, GL15.GL_DYNAMIC_DRAW);
+        GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, 0);
     }
     
     @Override
@@ -40,10 +34,9 @@ public class OpenGLBuffer implements VulkanicBuffer {
             throw new IllegalArgumentException("Data size (" + data.remaining() + ") exceeds buffer size (" + sizeInBytes + ")");
         }
         
-        // Use command encoder to write data to the buffer
-        CommandEncoder encoder = RenderSystem.getDevice().createCommandEncoder();
-        GpuBufferSlice slice = gpuBuffer.slice();
-        encoder.writeToBuffer(slice, data);
+        GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, bufferId);
+        GL15.glBufferSubData(GL15.GL_ARRAY_BUFFER, 0, data);
+        GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, 0);
     }
     
     @Override
@@ -55,10 +48,9 @@ public class OpenGLBuffer implements VulkanicBuffer {
             throw new IllegalArgumentException("Data at offset " + offset + " exceeds buffer size");
         }
         
-        // Use command encoder to write data to a slice of the buffer
-        CommandEncoder encoder = RenderSystem.getDevice().createCommandEncoder();
-        GpuBufferSlice slice = gpuBuffer.slice(offset, data.remaining());
-        encoder.writeToBuffer(slice, data);
+        GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, bufferId);
+        GL15.glBufferSubData(GL15.GL_ARRAY_BUFFER, offset, data);
+        GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, 0);
     }
     
     @Override
@@ -67,19 +59,19 @@ public class OpenGLBuffer implements VulkanicBuffer {
     }
     
     /**
-     * Gets the underlying Blaze3D GPU buffer.
+     * Gets the OpenGL buffer ID.
      * Package-private for use by other OpenGL backend classes.
      * 
-     * @return the GPU buffer
+     * @return the buffer ID
      */
-    GpuBuffer getGpuBuffer() {
-        return gpuBuffer;
+    int getBufferId() {
+        return bufferId;
     }
     
     @Override
     public void close() {
-        if (!gpuBuffer.isClosed()) {
-            gpuBuffer.close();
+        if (bufferId != 0) {
+            GL15.glDeleteBuffers(bufferId);
         }
     }
 }

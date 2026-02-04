@@ -1,9 +1,5 @@
 package net.vulkanic.backends.opengl;
 
-import net.blaze3d.opengl.GlStateManager;
-import net.blaze3d.shaders.ShaderType;
-import net.blaze3d.systems.RenderSystem;
-import net.minecraft.resources.ResourceLocation;
 import net.vulkanic.VulkanicShader;
 import org.lwjgl.opengl.GL20;
 import org.slf4j.Logger;
@@ -12,7 +8,8 @@ import org.slf4j.LoggerFactory;
 /**
  * OpenGL implementation of VulkanicShader.
  * 
- * Compiles and manages GLSL shaders using Blaze3D's shader infrastructure.
+ * Compiles and manages GLSL shaders using direct OpenGL calls.
+ * This is the ONLY place that should compile shaders using OpenGL.
  */
 public class OpenGLShader implements VulkanicShader {
     private static final Logger LOGGER = LoggerFactory.getLogger(OpenGLShader.class);
@@ -29,26 +26,24 @@ public class OpenGLShader implements VulkanicShader {
      * @throws IllegalStateException if shader compilation or linking fails
      */
     public OpenGLShader(String vertexShaderSource, String fragmentShaderSource) {
-        RenderSystem.assertOnRenderThread();
-        
         // Compile vertex shader
-        this.vertexShaderId = compileShader(ShaderType.VERTEX, vertexShaderSource);
+        this.vertexShaderId = compileShader(GL20.GL_VERTEX_SHADER, "vertex", vertexShaderSource);
         if (this.vertexShaderId == 0) {
             throw new IllegalStateException("Failed to compile vertex shader");
         }
         
         // Compile fragment shader
-        this.fragmentShaderId = compileShader(ShaderType.FRAGMENT, fragmentShaderSource);
+        this.fragmentShaderId = compileShader(GL20.GL_FRAGMENT_SHADER, "fragment", fragmentShaderSource);
         if (this.fragmentShaderId == 0) {
-            GlStateManager.glDeleteShader(this.vertexShaderId);
+            GL20.glDeleteShader(this.vertexShaderId);
             throw new IllegalStateException("Failed to compile fragment shader");
         }
         
         // Link program
         this.programId = linkProgram(this.vertexShaderId, this.fragmentShaderId);
         if (this.programId == 0) {
-            GlStateManager.glDeleteShader(this.vertexShaderId);
-            GlStateManager.glDeleteShader(this.fragmentShaderId);
+            GL20.glDeleteShader(this.vertexShaderId);
+            GL20.glDeleteShader(this.fragmentShaderId);
             throw new IllegalStateException("Failed to link shader program");
         }
     }
@@ -56,25 +51,26 @@ public class OpenGLShader implements VulkanicShader {
     /**
      * Compiles a shader from source.
      * 
-     * @param type the shader type
+     * @param type the shader type (GL_VERTEX_SHADER or GL_FRAGMENT_SHADER)
+     * @param typeName the shader type name for logging
      * @param source the shader source code
      * @return the shader ID, or 0 if compilation failed
      */
-    private int compileShader(ShaderType type, String source) {
-        int shaderId = GlStateManager.glCreateShader(type == ShaderType.VERTEX ? 35633 : 35632);
+    private int compileShader(int type, String typeName, String source) {
+        int shaderId = GL20.glCreateShader(type);
         if (shaderId == 0) {
-            LOGGER.error("Failed to create {} shader", type.getName());
+            LOGGER.error("Failed to create {} shader", typeName);
             return 0;
         }
         
-        GlStateManager.glShaderSource(shaderId, source);
-        GlStateManager.glCompileShader(shaderId);
+        GL20.glShaderSource(shaderId, source);
+        GL20.glCompileShader(shaderId);
         
-        int compileStatus = GlStateManager.glGetShaderi(shaderId, 35713);
+        int compileStatus = GL20.glGetShaderi(shaderId, GL20.GL_COMPILE_STATUS);
         if (compileStatus == 0) {
-            String log = GlStateManager.glGetShaderInfoLog(shaderId, 32768);
-            LOGGER.error("Failed to compile {} shader: {}", type.getName(), log);
-            GlStateManager.glDeleteShader(shaderId);
+            String log = GL20.glGetShaderInfoLog(shaderId, 32768);
+            LOGGER.error("Failed to compile {} shader: {}", typeName, log);
+            GL20.glDeleteShader(shaderId);
             return 0;
         }
         
@@ -89,21 +85,21 @@ public class OpenGLShader implements VulkanicShader {
      * @return the program ID, or 0 if linking failed
      */
     private int linkProgram(int vertexShaderId, int fragmentShaderId) {
-        int programId = GlStateManager.glCreateProgram();
+        int programId = GL20.glCreateProgram();
         if (programId == 0) {
             LOGGER.error("Failed to create shader program");
             return 0;
         }
         
-        GlStateManager.glAttachShader(programId, vertexShaderId);
-        GlStateManager.glAttachShader(programId, fragmentShaderId);
-        GlStateManager.glLinkProgram(programId);
+        GL20.glAttachShader(programId, vertexShaderId);
+        GL20.glAttachShader(programId, fragmentShaderId);
+        GL20.glLinkProgram(programId);
         
-        int linkStatus = GlStateManager.glGetProgrami(programId, 35714);
+        int linkStatus = GL20.glGetProgrami(programId, GL20.GL_LINK_STATUS);
         if (linkStatus == 0) {
-            String log = GlStateManager.glGetProgramInfoLog(programId, 32768);
+            String log = GL20.glGetProgramInfoLog(programId, 32768);
             LOGGER.error("Failed to link shader program: {}", log);
-            GlStateManager.glDeleteProgram(programId);
+            GL20.glDeleteProgram(programId);
             return 0;
         }
         
@@ -112,17 +108,15 @@ public class OpenGLShader implements VulkanicShader {
     
     @Override
     public void setUniform(String name, int value) {
-        RenderSystem.assertOnRenderThread();
-        int location = GlStateManager._glGetUniformLocation(programId, name);
+        int location = GL20.glGetUniformLocation(programId, name);
         if (location != -1) {
-            GlStateManager._glUniform1i(location, value);
+            GL20.glUniform1i(location, value);
         }
     }
     
     @Override
     public void setUniform(String name, float value) {
-        RenderSystem.assertOnRenderThread();
-        int location = GlStateManager._glGetUniformLocation(programId, name);
+        int location = GL20.glGetUniformLocation(programId, name);
         if (location != -1) {
             GL20.glUniform1f(location, value);
         }
@@ -130,8 +124,7 @@ public class OpenGLShader implements VulkanicShader {
     
     @Override
     public void setUniform(String name, float x, float y) {
-        RenderSystem.assertOnRenderThread();
-        int location = GlStateManager._glGetUniformLocation(programId, name);
+        int location = GL20.glGetUniformLocation(programId, name);
         if (location != -1) {
             GL20.glUniform2f(location, x, y);
         }
@@ -139,8 +132,7 @@ public class OpenGLShader implements VulkanicShader {
     
     @Override
     public void setUniform(String name, float x, float y, float z) {
-        RenderSystem.assertOnRenderThread();
-        int location = GlStateManager._glGetUniformLocation(programId, name);
+        int location = GL20.glGetUniformLocation(programId, name);
         if (location != -1) {
             GL20.glUniform3f(location, x, y, z);
         }
@@ -148,8 +140,7 @@ public class OpenGLShader implements VulkanicShader {
     
     @Override
     public void setUniform(String name, float x, float y, float z, float w) {
-        RenderSystem.assertOnRenderThread();
-        int location = GlStateManager._glGetUniformLocation(programId, name);
+        int location = GL20.glGetUniformLocation(programId, name);
         if (location != -1) {
             GL20.glUniform4f(location, x, y, z, w);
         }
@@ -160,8 +151,7 @@ public class OpenGLShader implements VulkanicShader {
         if (matrix.length != 16) {
             throw new IllegalArgumentException("Matrix must have 16 elements");
         }
-        RenderSystem.assertOnRenderThread();
-        int location = GlStateManager._glGetUniformLocation(programId, name);
+        int location = GL20.glGetUniformLocation(programId, name);
         if (location != -1) {
             GL20.glUniformMatrix4fv(location, false, matrix);
         }
@@ -179,15 +169,14 @@ public class OpenGLShader implements VulkanicShader {
     
     @Override
     public void close() {
-        RenderSystem.assertOnRenderThread();
         if (programId != 0) {
-            GlStateManager.glDeleteProgram(programId);
+            GL20.glDeleteProgram(programId);
         }
         if (vertexShaderId != 0) {
-            GlStateManager.glDeleteShader(vertexShaderId);
+            GL20.glDeleteShader(vertexShaderId);
         }
         if (fragmentShaderId != 0) {
-            GlStateManager.glDeleteShader(fragmentShaderId);
+            GL20.glDeleteShader(fragmentShaderId);
         }
     }
 }

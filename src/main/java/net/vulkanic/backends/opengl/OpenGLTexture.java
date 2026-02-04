@@ -1,20 +1,17 @@
 package net.vulkanic.backends.opengl;
 
-import net.blaze3d.platform.NativeImage;
-import net.blaze3d.systems.CommandEncoder;
-import net.blaze3d.systems.RenderSystem;
-import net.blaze3d.textures.GpuTexture;
-import net.blaze3d.textures.TextureFormat;
 import net.vulkanic.VulkanicTexture;
+import org.lwjgl.opengl.GL11;
+import org.lwjgl.opengl.GL12;
 import java.nio.ByteBuffer;
 
 /**
  * OpenGL implementation of VulkanicTexture.
  * 
- * Wraps Blaze3D's GpuTexture to provide the Vulkanic texture interface.
+ * Uses direct OpenGL texture objects for GPU texture management.
  */
 public class OpenGLTexture implements VulkanicTexture {
-    private GpuTexture gpuTexture;
+    private final int textureId;
     private final int width;
     private final int height;
     
@@ -26,33 +23,18 @@ public class OpenGLTexture implements VulkanicTexture {
      * @param height the texture height
      */
     public OpenGLTexture(int width, int height) {
-        this(width, height, TextureFormat.RGBA8);
-    }
-    
-    /**
-     * Creates a new OpenGL texture with the specified dimensions and format.
-     * Package-private for use by OpenGLFramebuffer.
-     * 
-     * @param width the texture width
-     * @param height the texture height
-     * @param format the texture format
-     */
-    OpenGLTexture(int width, int height, TextureFormat format) {
         this.width = width;
         this.height = height;
+        this.textureId = GL11.glGenTextures();
         
-        // Create GPU texture using Blaze3D device
-        // Usage flags: TEXTURE_BINDING for sampling, COPY_DST for uploading
-        int usage = GpuTexture.USAGE_TEXTURE_BINDING | GpuTexture.USAGE_COPY_DST;
-        this.gpuTexture = RenderSystem.getDevice().createTexture(
-            "VulkanicTexture",
-            usage,
-            format,
-            width,
-            height,
-            1,  // depthOrLayers
-            1   // mipLevels
-        );
+        // Set up texture
+        GL11.glBindTexture(GL11.GL_TEXTURE_2D, textureId);
+        GL11.glTexImage2D(GL11.GL_TEXTURE_2D, 0, GL11.GL_RGBA8, width, height, 0, GL11.GL_RGBA, GL11.GL_UNSIGNED_BYTE, (ByteBuffer)null);
+        GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MIN_FILTER, GL11.GL_LINEAR);
+        GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MAG_FILTER, GL11.GL_LINEAR);
+        GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_WRAP_S, GL12.GL_CLAMP_TO_EDGE);
+        GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_WRAP_T, GL12.GL_CLAMP_TO_EDGE);
+        GL11.glBindTexture(GL11.GL_TEXTURE_2D, 0);
     }
     
     @Override
@@ -68,17 +50,9 @@ public class OpenGLTexture implements VulkanicTexture {
             throw new IllegalArgumentException("Data buffer too small. Expected " + expectedSize + " bytes, got " + data.remaining());
         }
         
-        // Use command encoder to write data to the texture
-        CommandEncoder encoder = RenderSystem.getDevice().createCommandEncoder();
-        encoder.writeToTexture(
-            gpuTexture,
-            data,
-            NativeImage.Format.RGBA,
-            0,  // mipLevel
-            0, 0,  // x, y offset
-            width, height,  // width, height
-            1   // depthOrLayers
-        );
+        GL11.glBindTexture(GL11.GL_TEXTURE_2D, textureId);
+        GL11.glTexSubImage2D(GL11.GL_TEXTURE_2D, 0, 0, 0, width, height, GL11.GL_RGBA, GL11.GL_UNSIGNED_BYTE, data);
+        GL11.glBindTexture(GL11.GL_TEXTURE_2D, 0);
     }
     
     @Override
@@ -92,29 +66,19 @@ public class OpenGLTexture implements VulkanicTexture {
     }
     
     /**
-     * Gets the underlying Blaze3D GPU texture.
+     * Gets the OpenGL texture ID.
      * Package-private for use by other OpenGL backend classes.
      * 
-     * @return the GPU texture
+     * @return the texture ID
      */
-    GpuTexture getGpuTexture() {
-        return gpuTexture;
-    }
-    
-    /**
-     * Sets the underlying GPU texture.
-     * Package-private for use by OpenGLFramebuffer.
-     * 
-     * @param gpuTexture the new GPU texture
-     */
-    void setGpuTexture(GpuTexture gpuTexture) {
-        this.gpuTexture = gpuTexture;
+    int getTextureId() {
+        return textureId;
     }
     
     @Override
     public void close() {
-        if (gpuTexture != null) {
-            gpuTexture.close();
+        if (textureId != 0) {
+            GL11.glDeleteTextures(textureId);
         }
     }
 }

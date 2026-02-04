@@ -1,7 +1,5 @@
 package net.vulkanic.backends.opengl;
 
-import net.blaze3d.systems.GpuDevice;
-import net.blaze3d.systems.RenderSystem;
 import net.vulkanic.BackendType;
 import net.vulkanic.VulkanicBuffer;
 import net.vulkanic.VulkanicCommandBuffer;
@@ -9,33 +7,26 @@ import net.vulkanic.VulkanicDevice;
 import net.vulkanic.VulkanicFramebuffer;
 import net.vulkanic.VulkanicShader;
 import net.vulkanic.VulkanicTexture;
+import org.lwjgl.opengl.GL11;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  * OpenGL implementation of VulkanicDevice.
  * 
- * This implementation wraps the existing Blaze3D rendering infrastructure,
- * providing a clean API while maintaining compatibility with the current system.
+ * This is the ONLY place in the codebase (besides other backend classes) that should
+ * directly interact with OpenGL. All rendering operations go through this backend.
  */
 public class OpenGLDevice implements VulkanicDevice {
     private static final Logger LOGGER = LoggerFactory.getLogger(OpenGLDevice.class);
     
-    private final GpuDevice blaze3dDevice;
-    
     public OpenGLDevice() {
-        // Get the existing Blaze3D device from RenderSystem
-        this.blaze3dDevice = RenderSystem.getDevice();
-        if (this.blaze3dDevice == null) {
-            throw new IllegalStateException("Blaze3D device is not initialized. Ensure RenderSystem is set up first.");
-        }
-        
         LOGGER.info("OpenGL backend initialized");
     }
     
     @Override
     public VulkanicCommandBuffer createCommandBuffer() {
-        return new OpenGLCommandBuffer(this.blaze3dDevice);
+        return new OpenGLCommandBuffer();
     }
     
     @Override
@@ -65,27 +56,26 @@ public class OpenGLDevice implements VulkanicDevice {
     
     @Override
     public String getBackendName() {
-        return blaze3dDevice.getBackendName();
+        return "OpenGL";
     }
     
     @Override
     public String getVendor() {
-        return blaze3dDevice.getVendor();
+        return GL11.glGetString(GL11.GL_VENDOR);
     }
     
     @Override
     public String getRenderer() {
-        return blaze3dDevice.getRenderer();
+        return GL11.glGetString(GL11.GL_RENDERER);
     }
     
     @Override
     public int getMaxTextureSize() {
-        return blaze3dDevice.getMaxTextureSize();
+        return GL11.glGetInteger(GL11.GL_MAX_TEXTURE_SIZE);
     }
     
     @Override
     public void close() {
         LOGGER.info("OpenGL backend closed");
-        // Note: We don't close the Blaze3D device as it's managed by RenderSystem
     }
 }
