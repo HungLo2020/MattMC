@@ -20,3 +20,4 @@ pub mod util;
 // This maintains backward compatibility while organizing code into modules
 pub use util::math_util::*;
 pub use util::bit_shift_util::*;
+pub use util::color_util::*;
