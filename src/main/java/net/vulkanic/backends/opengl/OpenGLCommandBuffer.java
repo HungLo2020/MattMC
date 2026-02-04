@@ -7,6 +7,7 @@ import net.vulkanic.VulkanicBuffer;
 import net.vulkanic.VulkanicTexture;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL13;
+import org.lwjgl.opengl.GL14;
 import org.lwjgl.opengl.GL20;
 
 /**
@@ -122,6 +123,66 @@ public class OpenGLCommandBuffer implements VulkanicCommandBuffer {
     @Override
     public void disableScissorTest() {
         GL11.glDisable(GL11.GL_SCISSOR_TEST);
+    }
+    
+    // Depth state operations
+    @Override
+    public void enableDepthTest() {
+        GL11.glEnable(GL11.GL_DEPTH_TEST);
+    }
+    
+    @Override
+    public void disableDepthTest() {
+        GL11.glDisable(GL11.GL_DEPTH_TEST);
+    }
+    
+    @Override
+    public void setDepthFunc(int func) {
+        GL11.glDepthFunc(func);
+    }
+    
+    @Override
+    public void setDepthMask(boolean mask) {
+        GL11.glDepthMask(mask);
+    }
+    
+    // Blend state operations
+    @Override
+    public void enableBlend() {
+        GL11.glEnable(GL11.GL_BLEND);
+    }
+    
+    @Override
+    public void disableBlend() {
+        GL11.glDisable(GL11.GL_BLEND);
+    }
+    
+    @Override
+    public void setBlendFuncSeparate(int srcRgb, int dstRgb, int srcAlpha, int dstAlpha) {
+        GL14.glBlendFuncSeparate(srcRgb, dstRgb, srcAlpha, dstAlpha);
+    }
+    
+    // Cull state operations
+    @Override
+    public void enableCull() {
+        GL11.glEnable(GL11.GL_CULL_FACE);
+    }
+    
+    @Override
+    public void disableCull() {
+        GL11.glDisable(GL11.GL_CULL_FACE);
+    }
+    
+    // Color operations
+    @Override
+    public void setColorMask(boolean red, boolean green, boolean blue, boolean alpha) {
+        GL11.glColorMask(red, green, blue, alpha);
+    }
+    
+    // Texture operations
+    @Override
+    public void setActiveTexture(int textureUnit) {
+        GL13.glActiveTexture(textureUnit);
     }
     
     @Override

@@ -27,5 +27,27 @@ public interface VulkanicCommandBuffer {
     void setScissor(int x, int y, int width, int height);
     void enableScissorTest();
     void disableScissorTest();
+    
+    // Depth state operations
+    void enableDepthTest();
+    void disableDepthTest();
+    void setDepthFunc(int func);
+    void setDepthMask(boolean mask);
+    
+    // Blend state operations
+    void enableBlend();
+    void disableBlend();
+    void setBlendFuncSeparate(int srcRgb, int dstRgb, int srcAlpha, int dstAlpha);
+    
+    // Cull state operations
+    void enableCull();
+    void disableCull();
+    
+    // Color operations
+    void setColorMask(boolean red, boolean green, boolean blue, boolean alpha);
+    
+    // Texture operations
+    void setActiveTexture(int textureUnit);
+    
     void submit();
 }

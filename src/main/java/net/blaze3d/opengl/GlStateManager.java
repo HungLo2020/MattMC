@@ -96,19 +96,41 @@ public class GlStateManager {
 
 	public static void _disableDepthTest() {
 		RenderSystem.assertOnRenderThread();
-		DEPTH.mode.disable();
+		
+		// Route through Vulkanic abstraction layer
+		if (net.vulkanic.Vulkanic.isInitialized()) {
+			net.vulkanic.Vulkanic.getDevice().createCommandBuffer().disableDepthTest();
+			// Update state tracker to stay in sync
+			DEPTH.mode.enabled = false;
+		} else {
+			DEPTH.mode.disable();
+		}
 	}
 
 	public static void _enableDepthTest() {
 		RenderSystem.assertOnRenderThread();
-		DEPTH.mode.enable();
+		
+		// Route through Vulkanic abstraction layer
+		if (net.vulkanic.Vulkanic.isInitialized()) {
+			net.vulkanic.Vulkanic.getDevice().createCommandBuffer().enableDepthTest();
+			// Update state tracker to stay in sync
+			DEPTH.mode.enabled = true;
+		} else {
+			DEPTH.mode.enable();
+		}
 	}
 
 	public static void _depthFunc(int i) {
 		RenderSystem.assertOnRenderThread();
 		if (i != DEPTH.func) {
 			DEPTH.func = i;
-			GL11.glDepthFunc(i);
+			
+			// Route through Vulkanic abstraction layer
+			if (net.vulkanic.Vulkanic.isInitialized()) {
+				net.vulkanic.Vulkanic.getDevice().createCommandBuffer().setDepthFunc(i);
+			} else {
+				GL11.glDepthFunc(i);
+			}
 		}
 	}
 
@@ -122,7 +144,13 @@ public class GlStateManager {
 		
 		if (bl != DEPTH.mask) {
 			DEPTH.mask = bl;
-			GL11.glDepthMask(bl);
+			
+			// Route through Vulkanic abstraction layer
+			if (net.vulkanic.Vulkanic.isInitialized()) {
+				net.vulkanic.Vulkanic.getDevice().createCommandBuffer().setDepthMask(bl);
+			} else {
+				GL11.glDepthMask(bl);
+			}
 		}
 	}
 
@@ -133,7 +161,15 @@ public class GlStateManager {
 			net.irisshaders.iris.gl.blending.BlendModeStorage.deferBlendModeToggle(false);
 			return;
 		}
-		BLEND.mode.disable();
+		
+		// Route through Vulkanic abstraction layer
+		if (net.vulkanic.Vulkanic.isInitialized()) {
+			net.vulkanic.Vulkanic.getDevice().createCommandBuffer().disableBlend();
+			// Update state tracker to stay in sync
+			BLEND.mode.enabled = false;
+		} else {
+			BLEND.mode.disable();
+		}
 	}
 
 	public static void _enableBlend() {
@@ -143,7 +179,15 @@ public class GlStateManager {
 			net.irisshaders.iris.gl.blending.BlendModeStorage.deferBlendModeToggle(true);
 			return;
 		}
-		BLEND.mode.enable();
+		
+		// Route through Vulkanic abstraction layer
+		if (net.vulkanic.Vulkanic.isInitialized()) {
+			net.vulkanic.Vulkanic.getDevice().createCommandBuffer().enableBlend();
+			// Update state tracker to stay in sync
+			BLEND.mode.enabled = true;
+		} else {
+			BLEND.mode.enable();
+		}
 	}
 
 	public static void _blendFuncSeparate(int i, int j, int k, int l) {
@@ -158,7 +202,13 @@ public class GlStateManager {
 			BLEND.dstRgb = j;
 			BLEND.srcAlpha = k;
 			BLEND.dstAlpha = l;
-			glBlendFuncSeparate(i, j, k, l);
+			
+			// Route through Vulkanic abstraction layer
+			if (net.vulkanic.Vulkanic.isInitialized()) {
+				net.vulkanic.Vulkanic.getDevice().createCommandBuffer().setBlendFuncSeparate(i, j, k, l);
+			} else {
+				glBlendFuncSeparate(i, j, k, l);
+			}
 		}
 		
 		// Iris: Notify listener of blend function changes
@@ -406,12 +456,28 @@ public class GlStateManager {
 
 	public static void _enableCull() {
 		RenderSystem.assertOnRenderThread();
-		CULL.enable.enable();
+		
+		// Route through Vulkanic abstraction layer
+		if (net.vulkanic.Vulkanic.isInitialized()) {
+			net.vulkanic.Vulkanic.getDevice().createCommandBuffer().enableCull();
+			// Update state tracker to stay in sync
+			CULL.enable.enabled = true;
+		} else {
+			CULL.enable.enable();
+		}
 	}
 
 	public static void _disableCull() {
 		RenderSystem.assertOnRenderThread();
-		CULL.enable.disable();
+		
+		// Route through Vulkanic abstraction layer
+		if (net.vulkanic.Vulkanic.isInitialized()) {
+			net.vulkanic.Vulkanic.getDevice().createCommandBuffer().disableCull();
+			// Update state tracker to stay in sync
+			CULL.enable.enabled = false;
+		} else {
+			CULL.enable.disable();
+		}
 	}
 
 	public static void _polygonMode(int i, int j) {
@@ -466,7 +532,13 @@ public class GlStateManager {
 		
 		if (activeTexture != i - 33984) {
 			activeTexture = i - 33984;
-			GL13.glActiveTexture(i);
+			
+			// Route through Vulkanic abstraction layer
+			if (net.vulkanic.Vulkanic.isInitialized()) {
+				net.vulkanic.Vulkanic.getDevice().createCommandBuffer().setActiveTexture(i);
+			} else {
+				GL13.glActiveTexture(i);
+			}
 		}
 	}
 
@@ -564,7 +636,13 @@ public class GlStateManager {
 			COLOR_MASK.green = bl2;
 			COLOR_MASK.blue = bl3;
 			COLOR_MASK.alpha = bl4;
-			GL11.glColorMask(bl, bl2, bl3, bl4);
+			
+			// Route through Vulkanic abstraction layer
+			if (net.vulkanic.Vulkanic.isInitialized()) {
+				net.vulkanic.Vulkanic.getDevice().createCommandBuffer().setColorMask(bl, bl2, bl3, bl4);
+			} else {
+				GL11.glColorMask(bl, bl2, bl3, bl4);
+			}
 		}
 	}
 
