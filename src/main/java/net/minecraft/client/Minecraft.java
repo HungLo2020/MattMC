@@ -1383,8 +1383,8 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 
 		RenderTarget renderTarget = this.getMainRenderTarget();
 		
-		// Route clear operation through Vulkanic abstraction layer
-		net.vulkanic.integration.VulkanicGuiIntegration.clearColor(0.0f, 0.0f, 0.0f, 1.0f);
+		// Route combined color+depth clear through Vulkanic
+		net.vulkanic.integration.VulkanicGuiIntegration.clearColorAndDepth(0.0f, 0.0f, 0.0f, 1.0f, 1.0f);
 		
 		RenderSystem.getDevice().createCommandEncoder().clearColorAndDepthTextures(renderTarget.getColorTexture(), 0, renderTarget.getDepthTexture(), 1.0);
 		profilerFiller.push("gameRenderer");

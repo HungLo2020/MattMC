@@ -102,6 +102,14 @@ public class OpenGLCommandBuffer implements VulkanicCommandBuffer {
     }
     
     @Override
+    public void clearColorAndDepth(float r, float g, float b, float a, float depth) {
+        RenderSystem.assertOnRenderThread();
+        GL11.glClearColor(r, g, b, a);
+        GL11.glClearDepth(depth);
+        GlStateManager._clear(16384 | 256);
+    }
+    
+    @Override
     public void setViewport(int x, int y, int width, int height) {
         RenderSystem.assertOnRenderThread();
         GlStateManager._viewport(x, y, width, height);

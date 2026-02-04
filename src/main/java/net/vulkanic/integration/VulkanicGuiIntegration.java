@@ -56,6 +56,19 @@ public class VulkanicGuiIntegration {
         }
     }
     
+    public static void clearColorAndDepth(float r, float g, float b, float a, float depth) {
+        if (!enabled) return;
+        
+        try {
+            VulkanicDevice device = Vulkanic.getDevice();
+            VulkanicCommandBuffer cmd = device.createCommandBuffer();
+            cmd.clearColorAndDepth(r, g, b, a, depth);
+            cmd.submit();
+        } catch (Exception e) {
+            LOGGER.error("Vulkanic clearColorAndDepth failed", e);
+        }
+    }
+    
     public static void setViewport(int x, int y, int width, int height) {
         if (!enabled) return;
         

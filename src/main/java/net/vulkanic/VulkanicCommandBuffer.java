@@ -14,6 +14,7 @@ public interface VulkanicCommandBuffer {
     void drawIndexed(int indexCount);
     void clear(float r, float g, float b, float a);
     void clearDepth(float depth);
+    void clearColorAndDepth(float r, float g, float b, float a, float depth);
     void setViewport(int x, int y, int width, int height);
     void submit();
 }

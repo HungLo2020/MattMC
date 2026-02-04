@@ -723,6 +723,10 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 
 			if (this.shouldShowEntityOutlines() && resourceHandle4 != null) {
 				RenderTarget renderTarget = resourceHandle4.get();
+				
+				// Route clear through Vulkanic
+				net.vulkanic.integration.VulkanicGuiIntegration.clearColorAndDepth(0.0f, 0.0f, 0.0f, 0.0f, 1.0f);
+				
 				RenderSystem.getDevice().createCommandEncoder().clearColorAndDepthTextures(renderTarget.getColorTexture(), 0, renderTarget.getDepthTexture(), 1.0);
 			}
 
