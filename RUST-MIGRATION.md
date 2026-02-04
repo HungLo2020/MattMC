@@ -72,32 +72,70 @@ static {
 - Simple API - easy to verify correctness
 
 **Implementation approach**:
-1. Rust FFI library (`src/main/rust/src/lib.rs`) with C-compatible exports
+1. Rust FFI library (`src/main/rust/util/math_util.rs`) with C-compatible exports
 2. Java FFM interface loads native library from JAR
 3. Comprehensive tests verify behavioral equivalence (12 test methods)
 4. Platform-specific builds (Linux, macOS x64/ARM, Windows)
+
+#### 2. BitShiftUtil (`com.seibel.distanthorizons.coreapi.util.BitShiftUtil`)
+
+**Status**: ✅ Complete and tested
+
+**What it does**: Helper methods for bit shift operations (written to make code easier to read)
+
+**Migrated functions** (10 total):
+- `powerOfTwo(int/long)` - Calculates 2^value via bit shift
+- `half(int/long)` - Divides by 2 via right shift
+- `divideByPowerOfTwo(int/long, int/long)` - Divides by 2^power via right shift
+- `square(int/long)` - Multiplies by 2 via left shift
+- `pow(int/long, int/long)` - Multiplies by 2^power via left shift
+
+**Why this class?**
+- No external dependencies
+- Pure bit manipulation operations (perfect for Rust)
+- Frequently used throughout the codebase
+- Simple, stateless operations
+- Second migration validates the modular structure approach
+
+**Implementation approach**:
+1. Rust FFI library (`src/main/rust/util/bit_shift_util.rs`) with C-compatible exports
+2. Java FFM interface loads native library from JAR
+3. Comprehensive tests verify behavioral equivalence (10 test methods)
+4. Demonstrates successful modular Rust structure
 
 ## Technical Architecture
 
 ### Current Project Structure
 
-**Important Note**: As of now, the entire Rust implementation lives in a **single file** (`src/main/rust/src/lib.rs`). This is a temporary starting point for the proof-of-concept migration.
+**Migration Complete**: The Rust codebase now uses a **modular structure** as planned, with each Java class having its own Rust module.
 
-**Future Structure**: As more components are migrated, the Rust codebase will be **drastically expanded** with a clear organizational structure:
+**Current Structure**:
+```
+src/main/rust/
+├── Cargo.toml                      # Rust project configuration
+├── README.md                       # Rust documentation
+├── lib.rs                          # Main entry point, re-exports modules
+└── util/
+    ├── mod.rs                      # Module declaration
+    ├── math_util.rs                # MathUtil FFI functions
+    └── bit_shift_util.rs           # BitShiftUtil FFI functions
+```
 
-- **One Rust file per Java class** - Each migrated Java class should have a corresponding Rust module
-- **Mirror Java package structure** - Rust module hierarchy should reflect Java package hierarchy where practical
+**Design principles**:
+- **One Rust file per Java class** - Each migrated Java class has a corresponding Rust module
+- **Mirror Java package structure** - Rust module hierarchy reflects Java package hierarchy
 - **Single compiled library** - All Rust modules compile into one native library (`.so`/`.dylib`/`.dll`)
 - **Single JAR distribution** - The unified native library is packaged into the final JAR
 
-**Example future structure**:
+**Future expansion**:
 ```
-src/main/rust/src/
+src/main/rust/
+├── Cargo.toml                      # Rust project configuration
 ├── lib.rs                          # Main entry point, re-exports modules
 ├── util/
 │   ├── mod.rs                      # Module declaration
 │   ├── math_util.rs                # MathUtil FFI functions
-│   ├── bit_shift_util.rs           # BitShiftUtil FFI functions (future)
+│   ├── bit_shift_util.rs           # BitShiftUtil FFI functions
 │   └── string_util.rs              # StringUtil FFI functions (future)
 ├── core/
 │   ├── mod.rs
@@ -185,15 +223,16 @@ At runtime:
 
 1. **Identify candidate** - Use profiling data and dependency analysis
 2. **Create Rust module** - Add a new `.rs` file mirroring the Java class structure
-   - For `com.example.util.MyUtil.java` → create `src/main/rust/src/util/my_util.rs`
-   - Update `lib.rs` or parent `mod.rs` to include the new module
+   - For `com.example.util.MyUtil.java` → create `src/main/rust/util/my_util.rs`
+   - Update `util/mod.rs` to add `pub mod my_util;`
+   - Update `lib.rs` to re-export with `pub use util::my_util::*;`
 3. **Implement Rust** - Create FFI-compatible functions with `#[no_mangle]` and `extern "C"`
 4. **Create FFM interface** - Replace Java implementation with native calls
 5. **Write tests** - Verify behavioral equivalence with original
 6. **Update build** - Ensure library is built and packaged (usually automatic)
 7. **Document** - Update this file and add migration notes
 
-**Note**: Currently all Rust code is in `lib.rs`. As we migrate more classes, we'll refactor to the module-per-class structure described above.
+**Current modular structure**: The codebase now uses the module-per-class structure as designed.
 
 ### Testing Requirements
 
@@ -226,7 +265,7 @@ While performance varies by use case, typical improvements include:
 
 Based on profiling and architecture analysis, potential candidates:
 
-1. **BitShiftUtil** - Pure math, no dependencies (similar to MathUtil)
+1. **StringUtil** - String manipulation utilities (pure functions, no dependencies)
 2. **Data processing pipelines** - Heavy computation in LOD generation
 3. **Geometric calculations** - Vector math, collision detection
 4. **Compression/decompression** - CPU-intensive, well-defined APIs
@@ -359,18 +398,19 @@ When contributing to Rust migration efforts:
 
 ## Project Evolution
 
-### Current State (v0.1)
+### Current State (v0.2)
 
-- **Single Rust file** (`lib.rs`) containing all FFI exports
-- **One migrated class** (`MathUtil`)
-- **Proof of concept** for FFM integration
+- **Modular Rust structure** - Organized into `util/` module with separate files per class
+- **Two migrated classes** (`MathUtil` and `BitShiftUtil`)
+- **Production-ready** FFM integration with comprehensive testing
+- **22 passing tests** verifying behavioral equivalence
 
-### Near-Term Goals (v0.2-0.5)
+### Near-Term Goals (v0.3-0.5)
 
-- **Refactor to modular structure** - Split `lib.rs` into per-class modules
-- **Migrate 3-5 utility classes** - Focus on math/data processing
+- **Migrate 3-5 more utility classes** - Focus on math/data processing (e.g., StringUtil)
 - **Establish patterns** - Standard practices for FFI boundary design
 - **Performance benchmarks** - Quantify improvements
+- **Cross-platform CI** - Automated testing on Linux, macOS, and Windows
 
 ### Long-Term Vision (v1.0+)
 
@@ -381,6 +421,18 @@ When contributing to Rust migration efforts:
 
 ## Changelog
 
+### 2024-02-04: Modular Structure Migration (v0.2)
+- ✅ Migrated `BitShiftUtil` to Rust (10 functions)
+- ✅ Refactored Rust codebase to modular structure
+- ✅ Created `util/` module with separate files per class
+- ✅ Moved MathUtil functions to `util/math_util.rs`
+- ✅ Implemented BitShiftUtil in `util/bit_shift_util.rs`
+- ✅ Updated `lib.rs` to re-export modules
+- ✅ Added comprehensive testing for BitShiftUtil (10 tests)
+- ✅ All 22 tests passing (12 MathUtil + 10 BitShiftUtil)
+- ✅ Validated modular build and packaging
+- 📝 **Architecture**: Now using one Rust file per Java class as designed
+
 ### 2024-02-04: Initial Migration (v0.1)
 - ✅ Migrated `MathUtil` to Rust
 - ✅ Set up FFM integration infrastructure
@@ -389,7 +441,7 @@ When contributing to Rust migration efforts:
 - ✅ Added comprehensive testing (12 tests, all passing)
 - ✅ Fixed macOS cargo detection issue
 - ✅ Documented migration strategy
-- 📝 **Note**: All Rust code currently in single `lib.rs` file - will expand to modular structure
+- 📝 **Note**: All Rust code initially in single `lib.rs` file
 
 ---
 

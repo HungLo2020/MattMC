@@ -5,6 +5,7 @@ edition = "2021"
 
 [lib]
 name = "mattmc_native"
+path = "lib.rs"  # Specify lib.rs is in root of rust directory, not src/lib.rs
 crate-type = ["cdylib"]  # Creates a dynamic library for Java FFM
 
 [dependencies]
