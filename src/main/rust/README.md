@@ -80,12 +80,11 @@ Then build for specific platforms:
 ```
 src/main/rust/
 ├── Cargo.toml          # Rust project configuration
-└── src/
-    ├── lib.rs          # Main entry point, re-exports modules
-    └── util/
-        ├── mod.rs              # Module declarations
-        ├── math_util.rs        # MathUtil FFI functions
-        └── bit_shift_util.rs   # BitShiftUtil FFI functions
+├── lib.rs              # Main entry point, re-exports modules
+└── util/
+    ├── mod.rs              # Module declarations
+    ├── math_util.rs        # MathUtil FFI functions
+    └── bit_shift_util.rs   # BitShiftUtil FFI functions
 ```
 
 **Modular Design**: Each migrated Java class has its own Rust module file. The `lib.rs` file re-exports all modules to make their functions available via the C ABI.
@@ -128,7 +127,7 @@ All 22 test methods (12 for MathUtil, 10 for BitShiftUtil) verify that the Rust 
 
 ## Development Workflow
 
-1. Modify Rust code in `src/main/rust/src/util/` (e.g., `math_util.rs`, `bit_shift_util.rs`)
+1. Modify Rust code in `src/main/rust/util/` (e.g., `math_util.rs`, `bit_shift_util.rs`)
 2. If adding a new module, update `util/mod.rs` to declare it and `lib.rs` to re-export it
 3. Build: `./gradlew buildRustNative`
 4. Copy to resources: `./gradlew copyNativeLibs`
@@ -140,7 +139,7 @@ Or just run `./gradlew build` to do all steps.
 
 ### To an existing module (e.g., MathUtil):
 
-1. **Add Rust function** in `src/util/math_util.rs`:
+1. **Add Rust function** in `util/math_util.rs`:
    ```rust
    #[no_mangle]
    pub extern "C" fn mathutil_my_function(arg: i32) -> i32 {
@@ -172,9 +171,9 @@ Or just run `./gradlew build` to do all steps.
 
 ### To add a new module:
 
-1. Create a new `.rs` file in `src/util/` (e.g., `string_util.rs`)
-2. Add `pub mod string_util;` to `src/util/mod.rs`
-3. Add `pub use util::string_util::*;` to `src/lib.rs`
+1. Create a new `.rs` file in `util/` (e.g., `string_util.rs`)
+2. Add `pub mod string_util;` to `util/mod.rs`
+3. Add `pub use util::string_util::*;` to `lib.rs`
 4. Follow the same FFI function pattern as above
 5. Create corresponding Java FFM class and tests
 

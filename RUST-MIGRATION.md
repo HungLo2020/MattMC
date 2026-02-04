@@ -72,7 +72,7 @@ static {
 - Simple API - easy to verify correctness
 
 **Implementation approach**:
-1. Rust FFI library (`src/main/rust/src/util/math_util.rs`) with C-compatible exports
+1. Rust FFI library (`src/main/rust/util/math_util.rs`) with C-compatible exports
 2. Java FFM interface loads native library from JAR
 3. Comprehensive tests verify behavioral equivalence (12 test methods)
 4. Platform-specific builds (Linux, macOS x64/ARM, Windows)
@@ -98,7 +98,7 @@ static {
 - Second migration validates the modular structure approach
 
 **Implementation approach**:
-1. Rust FFI library (`src/main/rust/src/util/bit_shift_util.rs`) with C-compatible exports
+1. Rust FFI library (`src/main/rust/util/bit_shift_util.rs`) with C-compatible exports
 2. Java FFM interface loads native library from JAR
 3. Comprehensive tests verify behavioral equivalence (10 test methods)
 4. Demonstrates successful modular Rust structure
@@ -111,7 +111,9 @@ static {
 
 **Current Structure**:
 ```
-src/main/rust/src/
+src/main/rust/
+├── Cargo.toml                      # Rust project configuration
+├── README.md                       # Rust documentation
 ├── lib.rs                          # Main entry point, re-exports modules
 └── util/
     ├── mod.rs                      # Module declaration
@@ -127,13 +129,13 @@ src/main/rust/src/
 
 **Future expansion**:
 ```
-src/main/rust/src/
+src/main/rust/
+├── Cargo.toml                      # Rust project configuration
 ├── lib.rs                          # Main entry point, re-exports modules
 ├── util/
 │   ├── mod.rs                      # Module declaration
 │   ├── math_util.rs                # MathUtil FFI functions
 │   ├── bit_shift_util.rs           # BitShiftUtil FFI functions
-│   └── string_util.rs              # StringUtil FFI functions (future)
 │   └── string_util.rs              # StringUtil FFI functions (future)
 ├── core/
 │   ├── mod.rs
@@ -221,7 +223,7 @@ At runtime:
 
 1. **Identify candidate** - Use profiling data and dependency analysis
 2. **Create Rust module** - Add a new `.rs` file mirroring the Java class structure
-   - For `com.example.util.MyUtil.java` → create `src/main/rust/src/util/my_util.rs`
+   - For `com.example.util.MyUtil.java` → create `src/main/rust/util/my_util.rs`
    - Update `util/mod.rs` to add `pub mod my_util;`
    - Update `lib.rs` to re-export with `pub use util::my_util::*;`
 3. **Implement Rust** - Create FFI-compatible functions with `#[no_mangle]` and `extern "C"`

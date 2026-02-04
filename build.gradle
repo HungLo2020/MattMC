@@ -386,7 +386,8 @@ tasks.register('buildRustNative', Exec) {
     def cargoPath = findCargoExecutable()
     commandLine cargoPath, 'build', '--release'
     
-    inputs.dir('src/main/rust/src')
+    inputs.files('src/main/rust/lib.rs')
+    inputs.dir('src/main/rust/util')
     inputs.file('src/main/rust/Cargo.toml')
     outputs.dir('src/main/rust/target/release')
 }
@@ -401,7 +402,8 @@ tasks.register('buildRustLinux', Exec) {
     def cargoPath = findCargoExecutable()
     commandLine cargoPath, 'build', '--release', '--target', 'x86_64-unknown-linux-gnu'
     
-    inputs.dir('src/main/rust/src')
+    inputs.files('src/main/rust/lib.rs')
+    inputs.dir('src/main/rust/util')
     inputs.file('src/main/rust/Cargo.toml')
     outputs.dir('src/main/rust/target/x86_64-unknown-linux-gnu/release')
     
@@ -427,7 +429,8 @@ tasks.register('buildRustMacOSx64', Exec) {
     def cargoPath = findCargoExecutable()
     commandLine cargoPath, 'build', '--release', '--target', 'x86_64-apple-darwin'
     
-    inputs.dir('src/main/rust/src')
+    inputs.files('src/main/rust/lib.rs')
+    inputs.dir('src/main/rust/util')
     inputs.file('src/main/rust/Cargo.toml')
     outputs.dir('src/main/rust/target/x86_64-apple-darwin/release')
     
@@ -451,7 +454,8 @@ tasks.register('buildRustMacOSARM', Exec) {
     def cargoPath = findCargoExecutable()
     commandLine cargoPath, 'build', '--release', '--target', 'aarch64-apple-darwin'
     
-    inputs.dir('src/main/rust/src')
+    inputs.files('src/main/rust/lib.rs')
+    inputs.dir('src/main/rust/util')
     inputs.file('src/main/rust/Cargo.toml')
     outputs.dir('src/main/rust/target/aarch64-apple-darwin/release')
     
@@ -475,7 +479,8 @@ tasks.register('buildRustWindows', Exec) {
     def cargoPath = findCargoExecutable()
     commandLine cargoPath, 'build', '--release', '--target', 'x86_64-pc-windows-gnu'
     
-    inputs.dir('src/main/rust/src')
+    inputs.files('src/main/rust/lib.rs')
+    inputs.dir('src/main/rust/util')
     inputs.file('src/main/rust/Cargo.toml')
     outputs.dir('src/main/rust/target/x86_64-pc-windows-gnu/release')
     
