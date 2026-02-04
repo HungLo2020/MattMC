@@ -548,9 +548,14 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 		this.window.setErrorSection("Testing Vulkanic");
 		try {
 			net.vulkanic.test.VulkanicTestUtil.runAllTests();
+			
+			// Enable Vulkanic integration for actual game rendering
+			net.vulkanic.integration.VulkanicGuiIntegration.enable();
+			
 		} catch (Exception e) {
 			LOGGER.error("Vulkanic tests encountered an error", e);
-		}
+        }
+
 		
 		this.window.setErrorSection("Post startup");
 		this.blockColors = BlockColors.createDefault();
@@ -1382,6 +1387,10 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 		}
 
 		RenderTarget renderTarget = this.getMainRenderTarget();
+		
+		// Route clear operation through Vulkanic abstraction layer
+		net.vulkanic.integration.VulkanicGuiIntegration.clearColor(0.0f, 0.0f, 0.0f, 1.0f);
+		
 		RenderSystem.getDevice().createCommandEncoder().clearColorAndDepthTextures(renderTarget.getColorTexture(), 0, renderTarget.getDepthTexture(), 1.0);
 		profilerFiller.push("gameRenderer");
 		startTime = Util.getNanos();
@@ -1409,6 +1418,11 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 		}
 
 		this.window.updateDisplay(this.tracyFrameCapture);
+		
+		// Log Vulkanic stats periodically (every 5 seconds at 60fps = 300 frames)
+		if (this.frames % 300 == 0 && this.frames > 0) {
+			net.vulkanic.integration.VulkanicGuiIntegration.logStats();
+		}
 		int k = this.framerateLimitTracker.getFramerateLimit();
 		if (k < 260) {
 			RenderSystem.limitDisplayFPS(k);
