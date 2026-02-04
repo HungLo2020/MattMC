@@ -326,6 +326,146 @@ tasks.named('processResources') {
 // ============================================================================
 
 // ============================================================================
+// RUST NATIVE LIBRARY BUILD TASKS
+// ============================================================================
+// Build Rust native library for Linux, macOS, and Windows
+// ============================================================================
+
+// Task to build Rust library for the current platform
+tasks.register('buildRustNative', Exec) {
+    group = 'build'
+    description = 'Builds the Rust native library for the current platform'
+    
+    workingDir 'src/main/rust'
+    commandLine 'cargo', 'build', '--release'
+    
+    inputs.dir('src/main/rust/src')
+    inputs.file('src/main/rust/Cargo.toml')
+    outputs.dir('src/main/rust/target/release')
+}
+
+// Task to build Rust library for Linux x86_64
+tasks.register('buildRustLinux', Exec) {
+    group = 'build'
+    description = 'Builds the Rust native library for Linux x86_64'
+    
+    workingDir 'src/main/rust'
+    commandLine 'cargo', 'build', '--release', '--target', 'x86_64-unknown-linux-gnu'
+    
+    inputs.dir('src/main/rust/src')
+    inputs.file('src/main/rust/Cargo.toml')
+    outputs.dir('src/main/rust/target/x86_64-unknown-linux-gnu/release')
+    
+    // Only run if cross-compilation is set up
+    onlyIf {
+        // Check if the target is installed
+        def result = project.exec {
+            commandLine 'rustup', 'target', 'list', '--installed'
+            standardOutput = new ByteArrayOutputStream()
+            ignoreExitValue = true
+        }
+        return result.exitValue == 0
+    }
+}
+
+// Task to build Rust library for macOS x86_64
+tasks.register('buildRustMacOSx64', Exec) {
+    group = 'build'
+    description = 'Builds the Rust native library for macOS x86_64'
+    
+    workingDir 'src/main/rust'
+    commandLine 'cargo', 'build', '--release', '--target', 'x86_64-apple-darwin'
+    
+    inputs.dir('src/main/rust/src')
+    inputs.file('src/main/rust/Cargo.toml')
+    outputs.dir('src/main/rust/target/x86_64-apple-darwin/release')
+    
+    onlyIf {
+        def result = project.exec {
+            commandLine 'rustup', 'target', 'list', '--installed'
+            standardOutput = new ByteArrayOutputStream()
+            ignoreExitValue = true
+        }
+        return result.exitValue == 0
+    }
+}
+
+// Task to build Rust library for macOS ARM64 (Apple Silicon)
+tasks.register('buildRustMacOSARM', Exec) {
+    group = 'build'
+    description = 'Builds the Rust native library for macOS ARM64'
+    
+    workingDir 'src/main/rust'
+    commandLine 'cargo', 'build', '--release', '--target', 'aarch64-apple-darwin'
+    
+    inputs.dir('src/main/rust/src')
+    inputs.file('src/main/rust/Cargo.toml')
+    outputs.dir('src/main/rust/target/aarch64-apple-darwin/release')
+    
+    onlyIf {
+        def result = project.exec {
+            commandLine 'rustup', 'target', 'list', '--installed'
+            standardOutput = new ByteArrayOutputStream()
+            ignoreExitValue = true
+        }
+        return result.exitValue == 0
+    }
+}
+
+// Task to build Rust library for Windows x86_64
+tasks.register('buildRustWindows', Exec) {
+    group = 'build'
+    description = 'Builds the Rust native library for Windows x86_64'
+    
+    workingDir 'src/main/rust'
+    commandLine 'cargo', 'build', '--release', '--target', 'x86_64-pc-windows-gnu'
+    
+    inputs.dir('src/main/rust/src')
+    inputs.file('src/main/rust/Cargo.toml')
+    outputs.dir('src/main/rust/target/x86_64-pc-windows-gnu/release')
+    
+    onlyIf {
+        def result = project.exec {
+            commandLine 'rustup', 'target', 'list', '--installed'
+            standardOutput = new ByteArrayOutputStream()
+            ignoreExitValue = true
+        }
+        return result.exitValue == 0
+    }
+}
+
+// Task to copy native libraries to resources
+tasks.register('copyNativeLibs', Copy) {
+    group = 'build'
+    description = 'Copies built Rust native libraries to resources/native directory'
+    
+    dependsOn buildRustNative
+    
+    into 'src/main/resources/native'
+    
+    // Determine which library to copy based on the current platform
+    def osName = System.getProperty('os.name').toLowerCase()
+    def libExt
+    def libPrefix
+    def targetDir = 'src/main/rust/target/release'
+    
+    if (osName.contains('win')) {
+        libExt = 'dll'
+        libPrefix = ''
+    } else if (osName.contains('mac')) {
+        libExt = 'dylib'
+        libPrefix = 'lib'
+    } else {
+        libExt = 'so'
+        libPrefix = 'lib'
+    }
+    
+    from(targetDir) {
+        include "${libPrefix}mattmc_native.${libExt}"
+    }
+}
+
+// ============================================================================
 // SHADER PACK ZIP TASK
 // ============================================================================
 // Creates a zip of the shader pack from src/main/resources/shaders
@@ -355,6 +495,9 @@ tasks.register('shaderPackZip', Zip) {
 // ============================================================================
 
 jar {
+    // Build Rust native library before creating JAR
+    dependsOn copyNativeLibs
+    
     // ONE JAR with EVERYTHING - Fabric Loader + Minecraft + all mods
     from sourceSets.main.output
     
