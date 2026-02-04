@@ -21,6 +21,7 @@ rustrun/
 rust-core/
 Cargo.lock
 buildrust/
+src/main/rust/target/
 
 
 # OS

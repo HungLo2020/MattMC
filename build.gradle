@@ -310,6 +310,7 @@ sourceSets {
 // ============================================================================
 
 tasks.named('processResources') {
+    dependsOn copyNativeLibs
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }
 
@@ -526,7 +527,8 @@ def isMacOS = System.getProperty('os.name').toLowerCase().with { it.startsWith('
 // Use G1GC on macOS due to ZGC stability issues (SIGBUS crashes in Arena::destruct_contents)
 def serverJvmArgs = [
     '-Xmx2G',
-    '-Xms1G'
+    '-Xms1G',
+    '--enable-native-access=ALL-UNNAMED'  // Enable FFM native access
 ]
 
 if (isMacOS) {
@@ -543,7 +545,8 @@ if (isMacOS) {
 def clientJvmArgs = [
     '-Xmx8G',
     '-Xms4G',
-    '-Dorg.lwjgl.util.Debug=true'
+    '-Dorg.lwjgl.util.Debug=true',
+    '--enable-native-access=ALL-UNNAMED'  // Enable FFM native access
 ]
 
 if (isMacOS) {
@@ -1066,6 +1069,9 @@ tasks.register('clientDistZip', Zip) {
 // Configure JUnit 5 test platform for standard tests
 test {
     useJUnitPlatform()
+    
+    // Enable native access for FFM (Foreign Function & Memory API)
+    jvmArgs '--enable-native-access=ALL-UNNAMED'
     
     // Configure test output
     testLogging {
