@@ -59,23 +59,17 @@ public class GlStateManager {
 
 	public static void _disableScissorTest() {
 		RenderSystem.assertOnRenderThread();
-		
-		// Route through Vulkanic abstraction layer - NO FALLBACK
-		net.vulkanic.Vulkanic.getDevice().createCommandBuffer().disableScissorTest();
+		SCISSOR.mode.disable();
 	}
 
 	public static void _enableScissorTest() {
 		RenderSystem.assertOnRenderThread();
-		
-		// Route through Vulkanic abstraction layer - NO FALLBACK
-		net.vulkanic.Vulkanic.getDevice().createCommandBuffer().enableScissorTest();
+		SCISSOR.mode.enable();
 	}
 
 	public static void _scissorBox(int i, int j, int k, int l) {
 		RenderSystem.assertOnRenderThread();
-		
-		// Route through Vulkanic abstraction layer - NO FALLBACK
-		net.vulkanic.Vulkanic.getDevice().createCommandBuffer().setScissor(i, j, k, l);
+		GL11.glScissor(i, j, k, l);
 	}
 
 	public static void _disableDepthTest() {
@@ -526,8 +520,8 @@ public class GlStateManager {
 		iris$viewportWidth = k;
 		iris$viewportHeight = l;
 		
-		// Route through Vulkanic abstraction layer - NO FALLBACK
-		net.vulkanic.Vulkanic.getDevice().createCommandBuffer().setViewport(i, j, k, l);
+		RenderSystem.assertOnRenderThreadOrInit();
+		GL11.glViewport(i, j, k, l);
 	}
 
 	public static void _colorMask(boolean bl, boolean bl2, boolean bl3, boolean bl4) {
@@ -549,10 +543,7 @@ public class GlStateManager {
 
 	public static void _clear(int i) {
 		RenderSystem.assertOnRenderThread();
-		
-		// Route through Vulkanic abstraction layer - NO FALLBACK
-		// Just pass the buffer bits - the backend will use OpenGL's current clear color state
-		net.vulkanic.Vulkanic.getDevice().createCommandBuffer().clearBuffers(i);
+		GL11.glClear(i);
 		
 		if (MacosUtil.IS_MACOS) {
 			_getError();

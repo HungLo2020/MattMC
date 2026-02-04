@@ -153,24 +153,6 @@ public class GlCommandEncoder implements CommandEncoder {
 
 	@Override
 	public void clearColorAndDepthTextures(GpuTexture gpuTexture, int i, GpuTexture gpuTexture2, double d) {
-		// Route through Vulkanic abstraction layer
-		if (net.vulkanic.Vulkanic.isInitialized()) {
-			try {
-				net.vulkanic.VulkanicDevice device = net.vulkanic.Vulkanic.getDevice();
-				net.vulkanic.VulkanicCommandBuffer cmd = device.createCommandBuffer();
-				cmd.clearColorAndDepth(
-					ARGB.redFloat(i),
-					ARGB.greenFloat(i),
-					ARGB.blueFloat(i),
-					ARGB.alphaFloat(i),
-					(float)d
-				);
-				cmd.submit();
-			} catch (Exception e) {
-				// Fall through to direct OpenGL call
-			}
-		}
-		
 		if (this.inRenderPass) {
 			throw new IllegalStateException("Close the existing render pass before creating a new one!");
 		} else {
@@ -227,18 +209,6 @@ public class GlCommandEncoder implements CommandEncoder {
 
 	@Override
 	public void clearDepthTexture(GpuTexture gpuTexture, double d) {
-		// Route through Vulkanic abstraction layer
-		if (net.vulkanic.Vulkanic.isInitialized()) {
-			try {
-				net.vulkanic.VulkanicDevice device = net.vulkanic.Vulkanic.getDevice();
-				net.vulkanic.VulkanicCommandBuffer cmd = device.createCommandBuffer();
-				cmd.clearDepth((float)d);
-				cmd.submit();
-			} catch (Exception e) {
-				// Fall through to direct OpenGL call
-			}
-		}
-		
 		if (this.inRenderPass) {
 			throw new IllegalStateException("Close the existing render pass before creating a new one!");
 		} else {
