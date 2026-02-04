@@ -2,16 +2,81 @@ package com.seibel.distanthorizons.core.util.math;
 
 import com.seibel.distanthorizons.api.objects.math.DhApiVec3f;
 import com.seibel.distanthorizons.coreapi.util.MathUtil;
+import com.seibel.distanthorizons.coreapi.util.NativeLibraryLoader;
+
+import java.lang.foreign.*;
+import java.lang.invoke.MethodHandle;
+import java.nio.file.Path;
 
 /**
  * A (almost) exact copy of Minecraft's 1.16.5
  * implementation of a 3 element float vector.
  *
+ * Static distance calculation methods now use Rust FFM for performance.
+ *
  * @author James Seibel
- * @version 11-11-2021
+ * @version 2024-02-04 (Rust FFM migration for static distance methods)
  */
 public class Vec3f extends DhApiVec3f
 {
+	private static final Linker LINKER = Linker.nativeLinker();
+	private static final SymbolLookup LIBRARY;
+	
+	// Function handles for native calls
+	private static final MethodHandle getManhattanDistanceHandle;
+	private static final MethodHandle getDistanceHandle;
+	
+	static {
+		try {
+			// Determine the platform-specific library name
+			String osName = System.getProperty("os.name").toLowerCase();
+			String libraryName;
+			
+			if (osName.contains("win")) {
+				libraryName = "mattmc_native.dll";
+			} else if (osName.contains("mac")) {
+				libraryName = "libmattmc_native.dylib";
+			} else {
+				libraryName = "libmattmc_native.so";
+			}
+			
+			// Load library from the JAR's native resources
+			Path libraryPath = NativeLibraryLoader.loadLibraryFromJar(libraryName);
+			
+			// Load the library
+			SymbolLookup lib = SymbolLookup.libraryLookup(libraryPath, Arena.global());
+			LIBRARY = lib;
+			
+			// Initialize function handles
+			getManhattanDistanceHandle = LINKER.downcallHandle(
+				findFunction("vec3f_get_manhattan_distance"),
+				FunctionDescriptor.of(ValueLayout.JAVA_FLOAT, 
+					ValueLayout.JAVA_FLOAT, ValueLayout.JAVA_FLOAT, ValueLayout.JAVA_FLOAT,
+					ValueLayout.JAVA_FLOAT, ValueLayout.JAVA_FLOAT, ValueLayout.JAVA_FLOAT)
+			);
+			
+			getDistanceHandle = LINKER.downcallHandle(
+				findFunction("vec3f_get_distance"),
+				FunctionDescriptor.of(ValueLayout.JAVA_DOUBLE, 
+					ValueLayout.JAVA_FLOAT, ValueLayout.JAVA_FLOAT, ValueLayout.JAVA_FLOAT,
+					ValueLayout.JAVA_FLOAT, ValueLayout.JAVA_FLOAT, ValueLayout.JAVA_FLOAT)
+			);
+			
+			System.out.println("[MattMC] Successfully loaded Rust native library for Vec3f: " + libraryName);
+		} catch (Throwable e) {
+			// NO FALLBACK - fail hard as requested
+			System.err.println("FATAL: Failed to load Rust native library for Vec3f!");
+			System.err.println("This is a critical error. The game cannot continue without the native library.");
+			e.printStackTrace();
+			throw new ExceptionInInitializerError(e);
+		}
+	}
+	
+	private static MemorySegment findFunction(String name) {
+		return LIBRARY.find(name)
+			.orElseThrow(() -> new UnsatisfiedLinkError("Missing function: " + name));
+	}
+	
 	//==============//
 	// constructors //
 	//==============//
@@ -123,16 +188,20 @@ public class Vec3f extends DhApiVec3f
 	
 	public static float getManhattanDistance(DhApiVec3f a, DhApiVec3f b)
 	{
-		return Math.abs(a.x - b.x)
-				+ Math.abs(a.y - b.y)
-				+ Math.abs(a.z - b.z);
+		try {
+			return (float) getManhattanDistanceHandle.invokeExact(a.x, a.y, a.z, b.x, b.y, b.z);
+		} catch (Throwable e) {
+			throw new RuntimeException("Failed to call native getManhattanDistance", e);
+		}
 	}
 	
 	public static double getDistance(DhApiVec3f a, DhApiVec3f b)
 	{
-		return Math.sqrt(Math.pow(a.x - b.x, 2)
-				+ Math.pow(a.y - b.y, 2)
-				+ Math.pow(a.z - b.z, 2));
+		try {
+			return (double) getDistanceHandle.invokeExact(a.x, a.y, a.z, b.x, b.y, b.z);
+		} catch (Throwable e) {
+			throw new RuntimeException("Failed to call native getDistance", e);
+		}
 	}
 	
 	
