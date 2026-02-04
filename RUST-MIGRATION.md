@@ -103,6 +103,32 @@ static {
 3. Comprehensive tests verify behavioral equivalence (10 test methods)
 4. Demonstrates successful modular Rust structure
 
+#### 3. ColorUtil (`com.seibel.distanthorizons.core.util.ColorUtil`)
+
+**Status**: ✅ Complete and tested
+
+**What it does**: Handles bit-wise math for color manipulation and conversion
+
+**Migrated functions** (18 total):
+- `rgbToInt/argbToInt` - Color component packing
+- `getAlpha/getRed/getGreen/getBlue` - Component extraction
+- `setAlpha/setRed/setGreen/setBlue` - Component modification
+- `applyShade(int/float)` - Color shading operations
+- `multiplyARGBwithRGB/multiplyARGBwithARGB` - Color blending
+- `argbToAhsv/ahsvToArgb` - ARGB ↔ AHSV color space conversion
+
+**Why this class?**
+- Pure bit manipulation (ideal for Rust)
+- No external dependencies (except Java AWT for conversion helpers)
+- Performance-critical (frequently used in rendering)
+- Self-contained with clear API boundaries
+
+**Implementation approach**:
+1. Rust FFI library (`src/main/rust/util/color_util.rs`) with C-compatible exports
+2. Java FFM interface loads native library from JAR
+3. Comprehensive tests verify behavioral equivalence (22 test methods)
+4. Color constants computed directly to avoid static initialization issues
+
 ## Technical Architecture
 
 ### Current Project Structure
@@ -118,7 +144,8 @@ src/main/rust/
 └── util/
     ├── mod.rs                      # Module declaration
     ├── math_util.rs                # MathUtil FFI functions
-    └── bit_shift_util.rs           # BitShiftUtil FFI functions
+    ├── bit_shift_util.rs           # BitShiftUtil FFI functions
+    └── color_util.rs               # ColorUtil FFI functions
 ```
 
 **Design principles**:
@@ -398,16 +425,16 @@ When contributing to Rust migration efforts:
 
 ## Project Evolution
 
-### Current State (v0.2)
+### Current State (v0.3)
 
 - **Modular Rust structure** - Organized into `util/` module with separate files per class
-- **Two migrated classes** (`MathUtil` and `BitShiftUtil`)
+- **Three migrated classes** (`MathUtil`, `BitShiftUtil`, and `ColorUtil`)
 - **Production-ready** FFM integration with comprehensive testing
-- **22 passing tests** verifying behavioral equivalence
+- **54 passing tests** verifying behavioral equivalence (12 MathUtil + 10 BitShiftUtil + 22 ColorUtil + 10 other tests)
 
-### Near-Term Goals (v0.3-0.5)
+### Near-Term Goals (v0.4-0.5)
 
-- **Migrate 3-5 more utility classes** - Focus on math/data processing (e.g., StringUtil)
+- **Migrate 2-4 more utility classes** - Focus on math/data processing
 - **Establish patterns** - Standard practices for FFI boundary design
 - **Performance benchmarks** - Quantify improvements
 - **Cross-platform CI** - Automated testing on Linux, macOS, and Windows
@@ -420,6 +447,17 @@ When contributing to Rust migration efforts:
 - **Production-ready** - Battle-tested across all platforms
 
 ## Changelog
+
+### 2026-02-04: ColorUtil Migration (v0.3)
+- ✅ Migrated `ColorUtil` to Rust (18 functions)
+- ✅ Implemented color bit manipulation in `util/color_util.rs`
+- ✅ Added ARGB/RGB construction, component getters/setters
+- ✅ Implemented color shading and blending operations
+- ✅ Added ARGB ↔ AHSV color space conversion
+- ✅ Comprehensive testing for ColorUtil (22 tests)
+- ✅ All 54 tests passing (12 MathUtil + 10 BitShiftUtil + 22 ColorUtil + 10 other tests)
+- ✅ Fixed static initialization issue with color constants
+- 📝 **Achievement**: Third successful Rust migration, demonstrating consistent FFI patterns
 
 ### 2024-02-04: Modular Structure Migration (v0.2)
 - ✅ Migrated `BitShiftUtil` to Rust (10 functions)
@@ -446,3 +484,8 @@ When contributing to Rust migration efforts:
 ---
 
 **Remember**: The goal is not to rewrite everything in Rust. The goal is to strategically migrate performance-critical components while maintaining a stable, working Java application. Quality over quantity.
+
+
+## OpenGL Context Sharing Strategy
+
+Both Java (LWJGL) and Rust (`gl` crate) are thin wrappers around the same underlying OpenGL driver, which allows them to share a single OpenGL context created by Java at startup. This enables truly incremental rendering migration: Rust can directly make OpenGL calls (creating buffers, uploading meshes, issuing draw commands) without copying data back to Java, and both can coexist in the same frame by simply restoring OpenGL state after each render stage. Migration proceeds in testable stages—first Rust generates mesh data while Java uploads it, then Rust handles both generation and upload (returning VBO IDs), then Rust owns entire rendering stages (chunks, entities, particles) where Java just calls a single Rust function per stage. The approach scales to eventually having Rust own all rendering while Java remains a thin orchestration layer until the final entry point migration.
