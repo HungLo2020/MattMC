@@ -23,7 +23,6 @@ Cargo.lock
 buildrust/
 src/main/rust/target/
 
-
 # OS
 .DS_Store
 Thumbs.db
@@ -49,3 +48,4 @@ jmh-result.txt
 /Task
 *.inline_backup
 /libraries/jdk-25/
+/src/main/rust/target/
