@@ -98,6 +98,13 @@ public class OpenGLCommandBuffer implements VulkanicCommandBuffer {
     }
     
     @Override
+    public void clearBuffers(int bufferBits) {
+        // Use OpenGL's current clear color/depth state - don't override it
+        // This is the proper way to clear when glClearColor/glClearDepth have already been set
+        GL11.glClear(bufferBits);
+    }
+    
+    @Override
     public void setViewport(int x, int y, int width, int height) {
         GL11.glViewport(x, y, width, height);
     }

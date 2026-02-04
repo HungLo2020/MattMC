@@ -551,19 +551,8 @@ public class GlStateManager {
 		RenderSystem.assertOnRenderThread();
 		
 		// Route through Vulkanic abstraction layer - NO FALLBACK
-		net.vulkanic.VulkanicCommandBuffer cmd = net.vulkanic.Vulkanic.getDevice().createCommandBuffer();
-		
-		// Handle different clear buffer combinations
-		if ((i & GL11.GL_COLOR_BUFFER_BIT) != 0 && (i & GL11.GL_DEPTH_BUFFER_BIT) != 0) {
-			// Clear both color and depth - get current clear color
-			cmd.clearColorAndDepth(0.0f, 0.0f, 0.0f, 1.0f, 1.0f);
-		} else if ((i & GL11.GL_COLOR_BUFFER_BIT) != 0) {
-			// Clear only color
-			cmd.clear(0.0f, 0.0f, 0.0f, 1.0f);
-		} else if ((i & GL11.GL_DEPTH_BUFFER_BIT) != 0) {
-			// Clear only depth
-			cmd.clearDepth(1.0f);
-		}
+		// Just pass the buffer bits - the backend will use OpenGL's current clear color state
+		net.vulkanic.Vulkanic.getDevice().createCommandBuffer().clearBuffers(i);
 		
 		if (MacosUtil.IS_MACOS) {
 			_getError();
