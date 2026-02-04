@@ -21,7 +21,7 @@ rustrun/
 rust-core/
 Cargo.lock
 buildrust/
-
+src/main/rust/target/
 
 # OS
 .DS_Store
@@ -48,3 +48,4 @@ jmh-result.txt
 /Task
 *.inline_backup
 /libraries/jdk-25/
+/src/main/rust/target/
