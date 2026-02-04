@@ -219,7 +219,7 @@ pub extern "C" fn colorutil_argb_to_ahsv(color: c_int, output: *mut f32) {
 pub extern "C" fn colorutil_ahsv_to_argb(a: f32, h: f32, s: f32, v: f32) -> c_int {
     // Clamp inputs
     let a = a.min(1.0);
-    let h = if h > 360.0 { h - 350.0 } else { h };
+    let h = if h > 360.0 { h - 360.0 } else { h };
     let s = s.min(1.0);
     let v = v.min(1.0);
     
