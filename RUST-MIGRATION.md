@@ -484,3 +484,8 @@ When contributing to Rust migration efforts:
 ---
 
 **Remember**: The goal is not to rewrite everything in Rust. The goal is to strategically migrate performance-critical components while maintaining a stable, working Java application. Quality over quantity.
+
+
+## OpenGL Context Sharing Strategy
+
+Both Java (LWJGL) and Rust (`gl` crate) are thin wrappers around the same underlying OpenGL driver, which allows them to share a single OpenGL context created by Java at startup. This enables truly incremental rendering migration: Rust can directly make OpenGL calls (creating buffers, uploading meshes, issuing draw commands) without copying data back to Java, and both can coexist in the same frame by simply restoring OpenGL state after each render stage. Migration proceeds in testable stages—first Rust generates mesh data while Java uploads it, then Rust handles both generation and upload (returning VBO IDs), then Rust owns entire rendering stages (chunks, entities, particles) where Java just calls a single Rust function per stage. The approach scales to eventually having Rust own all rendering while Java remains a thin orchestration layer until the final entry point migration.
