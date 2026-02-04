@@ -326,6 +326,16 @@ public class GlDevice implements GpuDevice {
 
 	@Override
 	public void close() {
+		// Shutdown Vulkanic rendering abstraction layer
+		try {
+			if (net.vulkanic.Vulkanic.isInitialized()) {
+				net.vulkanic.Vulkanic.shutdown();
+				LOGGER.info("Vulkanic shutdown complete");
+			}
+		} catch (Exception e) {
+			LOGGER.error("Error shutting down Vulkanic", e);
+		}
+		
 		this.clearPipelineCache();
 	}
 

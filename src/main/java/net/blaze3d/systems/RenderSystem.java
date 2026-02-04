@@ -267,6 +267,14 @@ public class RenderSystem {
 		apiDescription = getDevice().getImplementationInformation();
 		dynamicUniforms = new DynamicUniforms();
 		
+		// Initialize Vulkanic rendering abstraction layer
+		try {
+			net.vulkanic.Vulkanic.initialize(net.vulkanic.BackendType.OPENGL);
+			LOGGER.info("Vulkanic rendering abstraction layer initialized");
+		} catch (Exception e) {
+			LOGGER.error("Failed to initialize Vulkanic", e);
+		}
+		
 		// Sodium: Post-context initialization (from RenderSystemMixin)
 		net.sodium.client.compatibility.environment.GlContextInfo context = net.sodium.client.compatibility.environment.GlContextInfo.create();
 		LOGGER.info("OpenGL Vendor: {}", context.vendor());

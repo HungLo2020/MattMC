@@ -544,14 +544,6 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 		this.window.setErrorSection("Startup");
 		RenderSystem.setupDefaultState();
 		
-		// Initialize Vulkanic integration
-		this.window.setErrorSection("Vulkanic");
-		try {
-			net.vulkanic.integration.VulkanicGuiIntegration.enable();
-		} catch (Exception e) {
-			LOGGER.error("Vulkanic integration failed", e);
-        }
-		
 		this.window.setErrorSection("Post startup");
 		this.blockColors = BlockColors.createDefault();
 		this.modelManager = new ModelManager(this.blockColors, this.atlasManager, this.playerSkinRenderCache);
@@ -1382,10 +1374,6 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 		}
 
 		RenderTarget renderTarget = this.getMainRenderTarget();
-		
-		// Route combined color+depth clear through Vulkanic
-		net.vulkanic.integration.VulkanicGuiIntegration.clearColorAndDepth(0.0f, 0.0f, 0.0f, 1.0f, 1.0f);
-		
 		RenderSystem.getDevice().createCommandEncoder().clearColorAndDepthTextures(renderTarget.getColorTexture(), 0, renderTarget.getDepthTexture(), 1.0);
 		profilerFiller.push("gameRenderer");
 		startTime = Util.getNanos();

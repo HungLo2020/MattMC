@@ -241,14 +241,6 @@ public class Main {
 			Thread.currentThread().setName("Render thread");
 			RenderSystem.initRenderThread();
 			
-			// Initialize Vulkanic rendering abstraction layer
-			try {
-				net.vulkanic.Vulkanic.initialize(net.vulkanic.BackendType.OPENGL);
-				logger.info("Vulkanic rendering abstraction layer initialized successfully");
-			} catch (Exception e) {
-				logger.error("Failed to initialize Vulkanic, continuing without it", e);
-			}
-			
 			minecraft = new Minecraft(gameConfig);
 		} catch (SilentInitException var72) {
 			Util.shutdownExecutors();
@@ -269,15 +261,6 @@ public class Main {
 		try {
 			minecraft2.stop();
 		} finally {
-			// Shutdown Vulkanic
-			try {
-				if (net.vulkanic.Vulkanic.isInitialized()) {
-					net.vulkanic.Vulkanic.shutdown();
-					logger.info("Vulkanic shutdown complete");
-				}
-			} catch (Exception e) {
-				logger.error("Error shutting down Vulkanic", e);
-			}
 			
 			minecraft.destroy();
 		}
