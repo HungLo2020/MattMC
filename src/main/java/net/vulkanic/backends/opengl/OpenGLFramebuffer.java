@@ -1,25 +1,36 @@
 package net.vulkanic.backends.opengl;
 
+import net.blaze3d.textures.TextureFormat;
 import net.vulkanic.VulkanicFramebuffer;
 import net.vulkanic.VulkanicTexture;
 
 /**
  * OpenGL implementation of VulkanicFramebuffer.
  * 
- * Placeholder implementation - will be filled in during Phase 2.
+ * Creates a framebuffer with color and depth attachments using Blaze3D.
  */
 public class OpenGLFramebuffer implements VulkanicFramebuffer {
     private final int width;
     private final int height;
-    private final VulkanicTexture colorTexture;
-    private final VulkanicTexture depthTexture;
+    private final OpenGLTexture colorTexture;
+    private final OpenGLTexture depthTexture;
     
+    /**
+     * Creates a new framebuffer with the specified dimensions.
+     * Creates both a color attachment (RGBA8) and a depth attachment (DEPTH32).
+     * 
+     * @param width the framebuffer width
+     * @param height the framebuffer height
+     */
     public OpenGLFramebuffer(int width, int height) {
         this.width = width;
         this.height = height;
-        // TODO: Create framebuffer and attachments using Blaze3D
-        this.colorTexture = null; // Placeholder
-        this.depthTexture = null; // Placeholder
+        
+        // Create color attachment texture (RGBA8) with RENDER_ATTACHMENT usage
+        this.colorTexture = new OpenGLTexture(width, height, TextureFormat.RGBA8);
+        
+        // Create depth attachment texture (DEPTH32) with RENDER_ATTACHMENT usage
+        this.depthTexture = new OpenGLTexture(width, height, TextureFormat.DEPTH32);
     }
     
     @Override
@@ -44,6 +55,11 @@ public class OpenGLFramebuffer implements VulkanicFramebuffer {
     
     @Override
     public void close() {
-        // TODO: Implement framebuffer cleanup
+        if (colorTexture != null) {
+            colorTexture.close();
+        }
+        if (depthTexture != null) {
+            depthTexture.close();
+        }
     }
 }
