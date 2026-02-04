@@ -23,6 +23,17 @@ The `MathUtil` class has been migrated from pure Java to Rust FFI. It provides:
 
 **IMPORTANT**: This implementation has NO Java fallback. If the native library fails to load, the game will fail with an `ExceptionInInitializerError`.
 
+### BitShiftUtil (com.seibel.distanthorizons.coreapi.util.BitShiftUtil)
+
+The `BitShiftUtil` class has been migrated from pure Java to Rust FFI. It provides:
+- `powerOfTwo()` - Calculate 2^value (int, long)
+- `half()` - Divide by 2 via right shift (int, long)
+- `divideByPowerOfTwo()` - Divide by 2^power (int, long)
+- `square()` - Multiply by 2 via left shift (int, long)
+- `pow()` - Multiply by 2^power (int, long)
+
+**IMPORTANT**: This implementation has NO Java fallback. If the native library fails to load, the game will fail with an `ExceptionInInitializerError`.
+
 ## Building
 
 The Rust library is automatically built when you run:
@@ -70,8 +81,14 @@ Then build for specific platforms:
 src/main/rust/
 ├── Cargo.toml          # Rust project configuration
 └── src/
-    └── lib.rs          # Rust FFI implementation
+    ├── lib.rs          # Main entry point, re-exports modules
+    └── util/
+        ├── mod.rs              # Module declarations
+        ├── math_util.rs        # MathUtil FFI functions
+        └── bit_shift_util.rs   # BitShiftUtil FFI functions
 ```
+
+**Modular Design**: Each migrated Java class has its own Rust module file. The `lib.rs` file re-exports all modules to make their functions available via the C ABI.
 
 ## Native Library Packaging
 
@@ -104,25 +121,29 @@ Run the Rust integration tests:
 
 ```bash
 ./gradlew test --tests "MathUtilTest"
+./gradlew test --tests "BitShiftUtilTest"
 ```
 
-All 12 test methods verify that the Rust implementation matches the original Java behavior.
+All 22 test methods (12 for MathUtil, 10 for BitShiftUtil) verify that the Rust implementation matches the original Java behavior.
 
 ## Development Workflow
 
-1. Modify Rust code in `src/main/rust/src/lib.rs`
-2. Build: `./gradlew buildRustNative`
-3. Copy to resources: `./gradlew copyNativeLibs`
-4. Test: `./gradlew test --tests "MathUtilTest"`
+1. Modify Rust code in `src/main/rust/src/util/` (e.g., `math_util.rs`, `bit_shift_util.rs`)
+2. If adding a new module, update `util/mod.rs` to declare it and `lib.rs` to re-export it
+3. Build: `./gradlew buildRustNative`
+4. Copy to resources: `./gradlew copyNativeLibs`
+5. Test: `./gradlew test --tests "MathUtilTest" --tests "BitShiftUtilTest"`
 
 Or just run `./gradlew build` to do all steps.
 
 ## Adding New Native Functions
 
-1. **Add Rust function** in `src/lib.rs`:
+### To an existing module (e.g., MathUtil):
+
+1. **Add Rust function** in `src/util/math_util.rs`:
    ```rust
    #[no_mangle]
-   pub extern "C" fn my_function(arg: i32) -> i32 {
+   pub extern "C" fn mathutil_my_function(arg: i32) -> i32 {
        // implementation
    }
    ```
@@ -133,7 +154,7 @@ Or just run `./gradlew build` to do all steps.
    
    static {
        myFunction = LINKER.downcallHandle(
-           findFunction("my_function"),
+           findFunction("mathutil_my_function"),
            FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_INT)
        );
    }
@@ -148,6 +169,14 @@ Or just run `./gradlew build` to do all steps.
    ```
 
 3. **Rebuild and test**
+
+### To add a new module:
+
+1. Create a new `.rs` file in `src/util/` (e.g., `string_util.rs`)
+2. Add `pub mod string_util;` to `src/util/mod.rs`
+3. Add `pub use util::string_util::*;` to `src/lib.rs`
+4. Follow the same FFI function pattern as above
+5. Create corresponding Java FFM class and tests
 
 ## Performance Considerations
 
