@@ -4,3 +4,4 @@
 pub mod math_util;
 pub mod bit_shift_util;
 pub mod color_util;
+pub mod bool_util;

@@ -16,8 +16,13 @@
 // Utility module containing mathematical and bitwise operations
 pub mod util;
 
+// SQL modules
+pub mod sql;
+
 // Re-export all utility functions so they remain accessible via the C ABI
 // This maintains backward compatibility while organizing code into modules
 pub use util::math_util::*;
 pub use util::bit_shift_util::*;
 pub use util::color_util::*;
+pub use util::bool_util::*;
+pub use sql::dto::util::varint_util::*;
