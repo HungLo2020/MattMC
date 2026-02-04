@@ -103,7 +103,133 @@ static {
 3. Comprehensive tests verify behavioral equivalence (10 test methods)
 4. Demonstrates successful modular Rust structure
 
+#### 4. BoolUtil (`com.seibel.distanthorizons.core.util.BoolUtil`)
+
+**Status**: ✅ Complete and tested
+
+**What it does**: Provides null-safe boolean conversion utilities
+
+**Migrated functions** (1 total):
+- `falseIfNull(Boolean)` - Returns false if value is null, otherwise returns the boolean value
+
+**Why this class?**
+- Simple, pure function with no dependencies
+- Useful for null-safety in conditional logic
+- Demonstrates minimal FFI overhead for simple operations
+
+**Implementation approach**:
+1. Rust FFI library (`src/main/rust/util/bool_util.rs`) with C-compatible export
+2. Java FFM interface loads native library from JAR
+3. Comprehensive tests verify behavioral equivalence (5 test methods)
+
+#### 5. VarintUtil (`com.seibel.distanthorizons.core.sql.dto.util.VarintUtil`)
+
+**Status**: ✅ Partial migration - zigzag encoding/decoding migrated, I/O operations remain in Java
+
+**What it does**: Provides variable-length integer encoding with zigzag encoding for efficient storage
+
+**Migrated functions** (2 total):
+- `zigzagEncode(int)` - Encodes signed integers to unsigned for efficient varint storage
+- `zigzagDecode(int)` - Decodes zigzag-encoded integers back to signed form
+
+**Why these functions?**
+- Pure mathematical operations (ideal for Rust)
+- Performance-critical for data serialization
+- No external dependencies
+
+**Implementation approach**:
+1. Rust FFI library (`src/main/rust/sql/dto/util/varint_util.rs`) with C-compatible exports
+2. Java FFM interface for zigzag functions, I/O methods remain in Java
+3. Comprehensive tests verify encoding/decoding correctness (8 test methods)
+4. Demonstrates modular structure extending to `sql/dto/util/` package hierarchy
+
+#### 6. RayCastUtil (`com.seibel.distanthorizons.core.util.RayCastUtil`)
+
+**Status**: ✅ Complete and tested
+
+**What it does**: Provides geometric ray-casting utilities for intersection testing
+
+**Migrated functions** (1 total):
+- `rayIntersectsSquare(...)` - Tests if a 2D ray intersects a square (used for LOD frustum culling)
+
+**Why this class?**
+- Pure mathematical operations with complex branching logic
+- Performance-critical in rendering pipeline
+- No external dependencies
+- Good candidate for Rust's optimization
+
+**Implementation approach**:
+1. Rust FFI library (`src/main/rust/util/raycast_util.rs`) with C-compatible export
+2. Java FFM interface loads native library from JAR
+3. Comprehensive tests verify geometric correctness (17 test methods)
+4. Tests cover edge cases: vertical rays, horizontal rays, diagonal rays, static rays
+
+#### 7. StringUtil (`com.seibel.distanthorizons.coreapi.util.StringUtil`)
+
+**Status**: ✅ Partial migration - byte-to-hex conversion migrated, higher-level string operations remain in Java
+
+**What it does**: Provides string manipulation utilities
+
+**Migrated functions** (1 total):
+- `byteArrayToHexString(byte[])` - Converts byte array to hexadecimal string representation
+
+**Why this function?**
+- Performance-critical for data serialization and debugging
+- Pure data transformation with no external dependencies
+- Frequently used in logging and network protocols
+
+**Implementation approach**:
+1. Rust FFI library (`src/main/rust/util/string_util.rs`) with C-compatible export
+2. Java FFM interface using MemorySegment for safe byte array passing
+3. Hybrid implementation - Rust for performance-critical conversions, Java for higher-level operations
+4. Comprehensive tests verify hex conversion correctness (8 test methods)
+
+#### 8. NumberUtil (`com.seibel.distanthorizons.core.util.NumberUtil`)
+
+**Status**: ✅ Partial migration - type-specific comparisons migrated, reflection-based operations remain in Java
+
+**What it does**: Provides generic number comparison utilities
+
+**Migrated functions** (12 total):
+- `greaterThan(int/long/float/double/short/byte)` - Type-specific greater-than comparisons
+- `lessThan(int/long/float/double/short/byte)` - Type-specific less-than comparisons
+
+**Why these functions?**
+- Type-specific operations avoid boxing overhead
+- Frequently used in hot paths
+- Simple comparisons benefit from Rust's zero-cost abstractions
+
+**Implementation approach**:
+1. Rust FFI library (`src/main/rust/util/number_util.rs`) with C-compatible exports
+2. Java FFM interface for type-specific methods, generic Number-based methods remain in Java
+3. Hybrid implementation preserves existing API while optimizing specific types
+4. Comprehensive tests verify comparison correctness (16 test methods)
+
 #### 3. ColorUtil (`com.seibel.distanthorizons.core.util.ColorUtil`)
+
+**Status**: ✅ Complete and tested
+
+**What it does**: Handles bit-wise math for color manipulation and conversion
+
+**Migrated functions** (18 total):
+- `rgbToInt/argbToInt` - Color component packing
+- `getAlpha/getRed/getGreen/getBlue` - Component extraction
+- `setAlpha/setRed/setGreen/setBlue` - Component modification
+- `applyShade(int/float)` - Color shading operations
+- `multiplyARGBwithRGB/multiplyARGBwithARGB` - Color blending
+- `argbToAhsv/ahsvToArgb` - ARGB ↔ AHSV color space conversion
+
+**Why this class?**
+- Pure bit manipulation (ideal for Rust)
+- No external dependencies (except Java AWT for conversion helpers)
+- Performance-critical (frequently used in rendering)
+- Self-contained with clear API boundaries
+
+**Implementation approach**:
+1. Rust FFI library (`src/main/rust/util/color_util.rs`) with C-compatible exports
+2. Java FFM interface loads native library from JAR
+3. Comprehensive tests verify behavioral equivalence (22 test methods)
+4. Color constants computed directly to avoid static initialization issues
 
 **Status**: ✅ Complete and tested
 
@@ -425,19 +551,19 @@ When contributing to Rust migration efforts:
 
 ## Project Evolution
 
-### Current State (v0.3)
+### Current State (v0.4)
 
-- **Modular Rust structure** - Organized into `util/` module with separate files per class
-- **Three migrated classes** (`MathUtil`, `BitShiftUtil`, and `ColorUtil`)
+- **Modular Rust structure** - Organized into `util/` and `sql/dto/util/` modules with separate files per class
+- **Eight migrated classes** (`MathUtil`, `BitShiftUtil`, `ColorUtil`, `BoolUtil`, `VarintUtil`, `RayCastUtil`, `StringUtil`, `NumberUtil`)
 - **Production-ready** FFM integration with comprehensive testing
-- **54 passing tests** verifying behavioral equivalence (12 MathUtil + 10 BitShiftUtil + 22 ColorUtil + 10 other tests)
+- **108 passing tests** verifying behavioral equivalence (12 MathUtil + 10 BitShiftUtil + 22 ColorUtil + 5 BoolUtil + 8 VarintUtil + 17 RayCastUtil + 8 StringUtil + 16 NumberUtil + 10 other tests)
 
-### Near-Term Goals (v0.4-0.5)
+### Near-Term Goals (v0.5-0.6)
 
-- **Migrate 2-4 more utility classes** - Focus on math/data processing
-- **Establish patterns** - Standard practices for FFI boundary design
-- **Performance benchmarks** - Quantify improvements
+- **Performance benchmarks** - Quantify improvements from Rust migrations
 - **Cross-platform CI** - Automated testing on Linux, macOS, and Windows
+- **Migrate additional hot-path utilities** - Profile-guided migration
+- **Refine FFI patterns** - Document best practices from migrations
 
 ### Long-Term Vision (v1.0+)
 
@@ -447,6 +573,22 @@ When contributing to Rust migration efforts:
 - **Production-ready** - Battle-tested across all platforms
 
 ## Changelog
+
+### 2026-02-04: Five Additional Utilities Migration (v0.4)
+- ✅ Migrated `BoolUtil` to Rust (1 function) - null-safe boolean handling
+- ✅ Migrated `VarintUtil` to Rust (2 functions) - zigzag encoding/decoding for variable-length integers
+- ✅ Migrated `RayCastUtil` to Rust (1 function) - ray-square intersection for geometric calculations
+- ✅ Migrated `StringUtil` to Rust (1 function) - byte array to hex string conversion (hybrid implementation)
+- ✅ Migrated `NumberUtil` to Rust (12 functions) - type-specific numeric comparisons (hybrid implementation)
+- ✅ Created modular structure in `sql/dto/util/` for VarintUtil
+- ✅ Comprehensive testing for all new migrations (54 new tests)
+- ✅ All 108 tests passing (12 MathUtil + 10 BitShiftUtil + 22 ColorUtil + 5 BoolUtil + 8 VarintUtil + 17 RayCastUtil + 8 StringUtil + 16 NumberUtil + 10 other tests)
+- 📝 **Achievement**: Eight utility classes now migrated, demonstrating successful patterns for:
+  - Pure mathematical functions (RayCastUtil)
+  - Data encoding/decoding (VarintUtil)
+  - Type-specific optimizations (NumberUtil)
+  - Memory-efficient conversions (StringUtil)
+  - Simple null-safe wrappers (BoolUtil)
 
 ### 2026-02-04: ColorUtil Migration (v0.3)
 - ✅ Migrated `ColorUtil` to Rust (18 functions)
