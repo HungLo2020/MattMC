@@ -611,12 +611,24 @@ public class GlStateManager {
 		RenderSystem.assertOnRenderThread();
 		numTextures++;
 		PLOT_TEXTURES.setValue(numTextures);
-		return GL11.glGenTextures();
+		
+		// Route through Vulkanic abstraction layer
+		if (net.vulkanic.Vulkanic.isInitialized()) {
+			return net.vulkanic.Vulkanic.getDevice().createCommandBuffer().genTexture();
+		} else {
+			return GL11.glGenTextures();
+		}
 	}
 
 	public static void _deleteTexture(int i) {
 		RenderSystem.assertOnRenderThread();
-		GL11.glDeleteTextures(i);
+		
+		// Route through Vulkanic abstraction layer
+		if (net.vulkanic.Vulkanic.isInitialized()) {
+			net.vulkanic.Vulkanic.getDevice().createCommandBuffer().deleteTexture(i);
+		} else {
+			GL11.glDeleteTextures(i);
+		}
 
 		for (GlStateManager.TextureState textureState : TEXTURES) {
 			if (textureState.binding == i) {
@@ -649,7 +661,13 @@ public class GlStateManager {
 
 	public static void _texImage2D(int i, int j, int k, int l, int m, int n, int o, int p, @Nullable ByteBuffer byteBuffer) {
 		RenderSystem.assertOnRenderThread();
-		GL11.glTexImage2D(i, j, k, l, m, n, o, p, byteBuffer);
+		
+		// Route through Vulkanic abstraction layer
+		if (net.vulkanic.Vulkanic.isInitialized()) {
+			net.vulkanic.Vulkanic.getDevice().createCommandBuffer().texImage2D(i, j, k, l, m, n, o, p, byteBuffer);
+		} else {
+			GL11.glTexImage2D(i, j, k, l, m, n, o, p, byteBuffer);
+		}
 		
 		// Iris: Track texture image data (from MixinGlStateManager texture)
 		net.irisshaders.iris.pbr.TextureInfoCache.INSTANCE.onTexImage2D(i, j, k, l, m, n, o, p, byteBuffer);
@@ -657,12 +675,24 @@ public class GlStateManager {
 
 	public static void _texSubImage2D(int i, int j, int k, int l, int m, int n, int o, int p, long q) {
 		RenderSystem.assertOnRenderThread();
-		GL11.glTexSubImage2D(i, j, k, l, m, n, o, p, q);
+		
+		// Route through Vulkanic abstraction layer
+		if (net.vulkanic.Vulkanic.isInitialized()) {
+			net.vulkanic.Vulkanic.getDevice().createCommandBuffer().texSubImage2D(i, j, k, l, m, n, o, p, q);
+		} else {
+			GL11.glTexSubImage2D(i, j, k, l, m, n, o, p, q);
+		}
 	}
 
 	public static void _texSubImage2D(int i, int j, int k, int l, int m, int n, int o, int p, ByteBuffer byteBuffer) {
 		RenderSystem.assertOnRenderThread();
-		GL11.glTexSubImage2D(i, j, k, l, m, n, o, p, byteBuffer);
+		
+		// Route through Vulkanic abstraction layer
+		if (net.vulkanic.Vulkanic.isInitialized()) {
+			net.vulkanic.Vulkanic.getDevice().createCommandBuffer().texSubImage2D(i, j, k, l, m, n, o, p, byteBuffer);
+		} else {
+			GL11.glTexSubImage2D(i, j, k, l, m, n, o, p, byteBuffer);
+		}
 	}
 
 	public static void _viewport(int i, int j, int k, int l) {
@@ -725,17 +755,35 @@ public class GlStateManager {
 
 	public static void _vertexAttribPointer(int i, int j, int k, boolean bl, int l, long m) {
 		RenderSystem.assertOnRenderThread();
-		GL20.glVertexAttribPointer(i, j, k, bl, l, m);
+		
+		// Route through Vulkanic abstraction layer
+		if (net.vulkanic.Vulkanic.isInitialized()) {
+			net.vulkanic.Vulkanic.getDevice().createCommandBuffer().vertexAttribPointer(i, j, k, bl, l, m);
+		} else {
+			GL20.glVertexAttribPointer(i, j, k, bl, l, m);
+		}
 	}
 
 	public static void _vertexAttribIPointer(int i, int j, int k, int l, long m) {
 		RenderSystem.assertOnRenderThread();
-		GL30.glVertexAttribIPointer(i, j, k, l, m);
+		
+		// Route through Vulkanic abstraction layer
+		if (net.vulkanic.Vulkanic.isInitialized()) {
+			net.vulkanic.Vulkanic.getDevice().createCommandBuffer().vertexAttribIPointer(i, j, k, l, m);
+		} else {
+			GL30.glVertexAttribIPointer(i, j, k, l, m);
+		}
 	}
 
 	public static void _enableVertexAttribArray(int i) {
 		RenderSystem.assertOnRenderThread();
-		GL20.glEnableVertexAttribArray(i);
+		
+		// Route through Vulkanic abstraction layer
+		if (net.vulkanic.Vulkanic.isInitialized()) {
+			net.vulkanic.Vulkanic.getDevice().createCommandBuffer().enableVertexAttribArray(i);
+		} else {
+			GL20.glEnableVertexAttribArray(i);
+		}
 	}
 
 	public static void _drawElements(int i, int j, int k, long l) {
@@ -746,12 +794,23 @@ public class GlStateManager {
 			mode = org.lwjgl.opengl.GL43C.GL_PATCHES;
 		}
 		
-		org.lwjgl.opengl.GL43C.glDrawElements(mode, j, k, l);
+		// Route through Vulkanic abstraction layer
+		if (net.vulkanic.Vulkanic.isInitialized()) {
+			net.vulkanic.Vulkanic.getDevice().createCommandBuffer().drawElements(mode, j, k, l);
+		} else {
+			org.lwjgl.opengl.GL43C.glDrawElements(mode, j, k, l);
+		}
 	}
 
 	public static void _drawArrays(int i, int j, int k) {
 		RenderSystem.assertOnRenderThread();
-		GL11.glDrawArrays(i, j, k);
+		
+		// Route through Vulkanic abstraction layer
+		if (net.vulkanic.Vulkanic.isInitialized()) {
+			net.vulkanic.Vulkanic.getDevice().createCommandBuffer().drawArrays(i, j, k);
+		} else {
+			GL11.glDrawArrays(i, j, k);
+		}
 	}
 
 	public static void _pixelStore(int i, int j) {
@@ -767,7 +826,13 @@ public class GlStateManager {
 
 	public static void _readPixels(int i, int j, int k, int l, int m, int n, long o) {
 		RenderSystem.assertOnRenderThread();
-		GL11.glReadPixels(i, j, k, l, m, n, o);
+		
+		// Route through Vulkanic abstraction layer
+		if (net.vulkanic.Vulkanic.isInitialized()) {
+			net.vulkanic.Vulkanic.getDevice().createCommandBuffer().readPixels(i, j, k, l, m, n, o);
+		} else {
+			GL11.glReadPixels(i, j, k, l, m, n, o);
+		}
 	}
 
 	public static int _getError() {

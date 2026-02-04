@@ -9,6 +9,8 @@ import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL13;
 import org.lwjgl.opengl.GL14;
 import org.lwjgl.opengl.GL20;
+import org.lwjgl.opengl.GL30;
+import org.lwjgl.opengl.GL43C;
 
 /**
  * OpenGL implementation of VulkanicCommandBuffer.
@@ -236,6 +238,70 @@ public class OpenGLCommandBuffer implements VulkanicCommandBuffer {
     @Override
     public void setPolygonMode(int face, int mode) {
         GL11.glPolygonMode(face, mode);
+    }
+    
+    // Draw operations
+    @Override
+    public void drawArrays(int mode, int first, int count) {
+        GL11.glDrawArrays(mode, first, count);
+    }
+    
+    @Override
+    public void drawElements(int mode, int count, int type, long indices) {
+        // Note: Iris tessellation hooks are preserved in GlStateManager
+        GL43C.glDrawElements(mode, count, type, indices);
+    }
+    
+    // Vertex attribute operations
+    @Override
+    public void vertexAttribPointer(int index, int size, int type, boolean normalized, int stride, long pointer) {
+        GL20.glVertexAttribPointer(index, size, type, normalized, stride, pointer);
+    }
+    
+    @Override
+    public void vertexAttribIPointer(int index, int size, int type, int stride, long pointer) {
+        GL30.glVertexAttribIPointer(index, size, type, stride, pointer);
+    }
+    
+    @Override
+    public void enableVertexAttribArray(int index) {
+        GL20.glEnableVertexAttribArray(index);
+    }
+    
+    // Texture gen/delete operations
+    @Override
+    public int genTexture() {
+        return GL11.glGenTextures();
+    }
+    
+    @Override
+    public void deleteTexture(int texture) {
+        GL11.glDeleteTextures(texture);
+    }
+    
+    // Texture image operations
+    @Override
+    public void texImage2D(int target, int level, int internalFormat, int width, int height, 
+                           int border, int format, int type, java.nio.ByteBuffer pixels) {
+        GL11.glTexImage2D(target, level, internalFormat, width, height, border, format, type, pixels);
+    }
+    
+    @Override
+    public void texSubImage2D(int target, int level, int xoffset, int yoffset, int width, int height,
+                              int format, int type, long pixels) {
+        GL11.glTexSubImage2D(target, level, xoffset, yoffset, width, height, format, type, pixels);
+    }
+    
+    @Override
+    public void texSubImage2D(int target, int level, int xoffset, int yoffset, int width, int height,
+                              int format, int type, java.nio.ByteBuffer pixels) {
+        GL11.glTexSubImage2D(target, level, xoffset, yoffset, width, height, format, type, pixels);
+    }
+    
+    // Read pixels operation
+    @Override
+    public void readPixels(int x, int y, int width, int height, int format, int type, long pixels) {
+        GL11.glReadPixels(x, y, width, height, format, type, pixels);
     }
     
     @Override
