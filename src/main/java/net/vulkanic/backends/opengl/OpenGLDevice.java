@@ -19,14 +19,18 @@ import org.slf4j.LoggerFactory;
  */
 public class OpenGLDevice implements VulkanicDevice {
     private static final Logger LOGGER = LoggerFactory.getLogger(OpenGLDevice.class);
+    private final OpenGLCommandBuffer sharedCommandBuffer;
     
     public OpenGLDevice() {
+        this.sharedCommandBuffer = new OpenGLCommandBuffer();
         LOGGER.info("OpenGL backend initialized");
     }
     
     @Override
     public VulkanicCommandBuffer createCommandBuffer() {
-        return new OpenGLCommandBuffer();
+        // Return the shared command buffer for immediate-mode rendering
+        // OpenGL backend executes commands immediately, so no buffering needed
+        return sharedCommandBuffer;
     }
     
     @Override

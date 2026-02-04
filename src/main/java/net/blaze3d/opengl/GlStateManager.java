@@ -59,17 +59,39 @@ public class GlStateManager {
 
 	public static void _disableScissorTest() {
 		RenderSystem.assertOnRenderThread();
-		SCISSOR.mode.disable();
+		
+		// Route through Vulkanic abstraction layer
+		if (net.vulkanic.Vulkanic.isInitialized()) {
+			net.vulkanic.Vulkanic.getDevice().createCommandBuffer().disableScissorTest();
+			// Update state tracker to stay in sync
+			SCISSOR.mode.enabled = false;
+		} else {
+			SCISSOR.mode.disable();
+		}
 	}
 
 	public static void _enableScissorTest() {
 		RenderSystem.assertOnRenderThread();
-		SCISSOR.mode.enable();
+		
+		// Route through Vulkanic abstraction layer
+		if (net.vulkanic.Vulkanic.isInitialized()) {
+			net.vulkanic.Vulkanic.getDevice().createCommandBuffer().enableScissorTest();
+			// Update state tracker to stay in sync
+			SCISSOR.mode.enabled = true;
+		} else {
+			SCISSOR.mode.enable();
+		}
 	}
 
 	public static void _scissorBox(int i, int j, int k, int l) {
 		RenderSystem.assertOnRenderThread();
-		GL11.glScissor(i, j, k, l);
+		
+		// Route through Vulkanic abstraction layer
+		if (net.vulkanic.Vulkanic.isInitialized()) {
+			net.vulkanic.Vulkanic.getDevice().createCommandBuffer().setScissor(i, j, k, l);
+		} else {
+			GL11.glScissor(i, j, k, l);
+		}
 	}
 
 	public static void _disableDepthTest() {
@@ -520,8 +542,13 @@ public class GlStateManager {
 		iris$viewportWidth = k;
 		iris$viewportHeight = l;
 		
-		RenderSystem.assertOnRenderThreadOrInit();
-		GL11.glViewport(i, j, k, l);
+		// Route through Vulkanic abstraction layer
+		if (net.vulkanic.Vulkanic.isInitialized()) {
+			net.vulkanic.Vulkanic.getDevice().createCommandBuffer().setViewport(i, j, k, l);
+		} else {
+			RenderSystem.assertOnRenderThreadOrInit();
+			GL11.glViewport(i, j, k, l);
+		}
 	}
 
 	public static void _colorMask(boolean bl, boolean bl2, boolean bl3, boolean bl4) {
@@ -543,7 +570,13 @@ public class GlStateManager {
 
 	public static void _clear(int i) {
 		RenderSystem.assertOnRenderThread();
-		GL11.glClear(i);
+		
+		// Route through Vulkanic abstraction layer
+		if (net.vulkanic.Vulkanic.isInitialized()) {
+			net.vulkanic.Vulkanic.getDevice().createCommandBuffer().clearBuffers(i);
+		} else {
+			GL11.glClear(i);
+		}
 		
 		if (MacosUtil.IS_MACOS) {
 			_getError();
