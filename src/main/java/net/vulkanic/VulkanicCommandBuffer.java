@@ -48,6 +48,22 @@ public interface VulkanicCommandBuffer {
     
     // Texture operations
     void setActiveTexture(int textureUnit);
+    void bindTexture(int texture);
+    void setTexParameter(int target, int pname, int param);
+    void setPixelStore(int pname, int param);
+    
+    // Polygon offset operations
+    void enablePolygonOffset();
+    void disablePolygonOffset();
+    void setPolygonOffset(float factor, float units);
+    
+    // Color logic operations
+    void enableColorLogicOp();
+    void disableColorLogicOp();
+    void setLogicOp(int op);
+    
+    // Polygon mode operation
+    void setPolygonMode(int face, int mode);
     
     void submit();
 }

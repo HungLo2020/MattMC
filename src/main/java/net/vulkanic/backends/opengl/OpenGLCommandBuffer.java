@@ -186,6 +186,59 @@ public class OpenGLCommandBuffer implements VulkanicCommandBuffer {
     }
     
     @Override
+    public void bindTexture(int texture) {
+        GL11.glBindTexture(GL11.GL_TEXTURE_2D, texture);
+    }
+    
+    @Override
+    public void setTexParameter(int target, int pname, int param) {
+        GL11.glTexParameteri(target, pname, param);
+    }
+    
+    @Override
+    public void setPixelStore(int pname, int param) {
+        GL11.glPixelStorei(pname, param);
+    }
+    
+    // Polygon offset operations
+    @Override
+    public void enablePolygonOffset() {
+        GL11.glEnable(GL11.GL_POLYGON_OFFSET_FILL);
+    }
+    
+    @Override
+    public void disablePolygonOffset() {
+        GL11.glDisable(GL11.GL_POLYGON_OFFSET_FILL);
+    }
+    
+    @Override
+    public void setPolygonOffset(float factor, float units) {
+        GL11.glPolygonOffset(factor, units);
+    }
+    
+    // Color logic operations
+    @Override
+    public void enableColorLogicOp() {
+        GL11.glEnable(GL11.GL_COLOR_LOGIC_OP);
+    }
+    
+    @Override
+    public void disableColorLogicOp() {
+        GL11.glDisable(GL11.GL_COLOR_LOGIC_OP);
+    }
+    
+    @Override
+    public void setLogicOp(int op) {
+        GL11.glLogicOp(op);
+    }
+    
+    // Polygon mode operation
+    @Override
+    public void setPolygonMode(int face, int mode) {
+        GL11.glPolygonMode(face, mode);
+    }
+    
+    @Override
     public void submit() {
         // No-op for OpenGL - commands are immediate
     }

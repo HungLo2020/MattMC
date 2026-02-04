@@ -482,17 +482,39 @@ public class GlStateManager {
 
 	public static void _polygonMode(int i, int j) {
 		RenderSystem.assertOnRenderThread();
-		GL11.glPolygonMode(i, j);
+		
+		// Route through Vulkanic abstraction layer
+		if (net.vulkanic.Vulkanic.isInitialized()) {
+			net.vulkanic.Vulkanic.getDevice().createCommandBuffer().setPolygonMode(i, j);
+		} else {
+			GL11.glPolygonMode(i, j);
+		}
 	}
 
 	public static void _enablePolygonOffset() {
 		RenderSystem.assertOnRenderThread();
-		POLY_OFFSET.fill.enable();
+		
+		// Route through Vulkanic abstraction layer
+		if (net.vulkanic.Vulkanic.isInitialized()) {
+			net.vulkanic.Vulkanic.getDevice().createCommandBuffer().enablePolygonOffset();
+			// Update state tracker to stay in sync
+			POLY_OFFSET.fill.enabled = true;
+		} else {
+			POLY_OFFSET.fill.enable();
+		}
 	}
 
 	public static void _disablePolygonOffset() {
 		RenderSystem.assertOnRenderThread();
-		POLY_OFFSET.fill.disable();
+		
+		// Route through Vulkanic abstraction layer
+		if (net.vulkanic.Vulkanic.isInitialized()) {
+			net.vulkanic.Vulkanic.getDevice().createCommandBuffer().disablePolygonOffset();
+			// Update state tracker to stay in sync
+			POLY_OFFSET.fill.enabled = false;
+		} else {
+			POLY_OFFSET.fill.disable();
+		}
 	}
 
 	public static void _polygonOffset(float f, float g) {
@@ -500,25 +522,53 @@ public class GlStateManager {
 		if (f != POLY_OFFSET.factor || g != POLY_OFFSET.units) {
 			POLY_OFFSET.factor = f;
 			POLY_OFFSET.units = g;
-			GL11.glPolygonOffset(f, g);
+			
+			// Route through Vulkanic abstraction layer
+			if (net.vulkanic.Vulkanic.isInitialized()) {
+				net.vulkanic.Vulkanic.getDevice().createCommandBuffer().setPolygonOffset(f, g);
+			} else {
+				GL11.glPolygonOffset(f, g);
+			}
 		}
 	}
 
 	public static void _enableColorLogicOp() {
 		RenderSystem.assertOnRenderThread();
-		COLOR_LOGIC.enable.enable();
+		
+		// Route through Vulkanic abstraction layer
+		if (net.vulkanic.Vulkanic.isInitialized()) {
+			net.vulkanic.Vulkanic.getDevice().createCommandBuffer().enableColorLogicOp();
+			// Update state tracker to stay in sync
+			COLOR_LOGIC.enable.enabled = true;
+		} else {
+			COLOR_LOGIC.enable.enable();
+		}
 	}
 
 	public static void _disableColorLogicOp() {
 		RenderSystem.assertOnRenderThread();
-		COLOR_LOGIC.enable.disable();
+		
+		// Route through Vulkanic abstraction layer
+		if (net.vulkanic.Vulkanic.isInitialized()) {
+			net.vulkanic.Vulkanic.getDevice().createCommandBuffer().disableColorLogicOp();
+			// Update state tracker to stay in sync
+			COLOR_LOGIC.enable.enabled = false;
+		} else {
+			COLOR_LOGIC.enable.disable();
+		}
 	}
 
 	public static void _logicOp(int i) {
 		RenderSystem.assertOnRenderThread();
 		if (i != COLOR_LOGIC.op) {
 			COLOR_LOGIC.op = i;
-			GL11.glLogicOp(i);
+			
+			// Route through Vulkanic abstraction layer
+			if (net.vulkanic.Vulkanic.isInitialized()) {
+				net.vulkanic.Vulkanic.getDevice().createCommandBuffer().setLogicOp(i);
+			} else {
+				GL11.glLogicOp(i);
+			}
 		}
 	}
 
@@ -544,7 +594,13 @@ public class GlStateManager {
 
 	public static void _texParameter(int i, int j, int k) {
 		RenderSystem.assertOnRenderThread();
-		GL11.glTexParameteri(i, j, k);
+		
+		// Route through Vulkanic abstraction layer
+		if (net.vulkanic.Vulkanic.isInitialized()) {
+			net.vulkanic.Vulkanic.getDevice().createCommandBuffer().setTexParameter(i, j, k);
+		} else {
+			GL11.glTexParameteri(i, j, k);
+		}
 	}
 
 	public static int _getTexLevelParameter(int i, int j, int k) {
@@ -581,7 +637,13 @@ public class GlStateManager {
 		RenderSystem.assertOnRenderThread();
 		if (i != TEXTURES[activeTexture].binding) {
 			TEXTURES[activeTexture].binding = i;
-			GL11.glBindTexture(3553, i);
+			
+			// Route through Vulkanic abstraction layer
+			if (net.vulkanic.Vulkanic.isInitialized()) {
+				net.vulkanic.Vulkanic.getDevice().createCommandBuffer().bindTexture(i);
+			} else {
+				GL11.glBindTexture(3553, i);
+			}
 		}
 	}
 
@@ -694,7 +756,13 @@ public class GlStateManager {
 
 	public static void _pixelStore(int i, int j) {
 		RenderSystem.assertOnRenderThread();
-		GL11.glPixelStorei(i, j);
+		
+		// Route through Vulkanic abstraction layer
+		if (net.vulkanic.Vulkanic.isInitialized()) {
+			net.vulkanic.Vulkanic.getDevice().createCommandBuffer().setPixelStore(i, j);
+		} else {
+			GL11.glPixelStorei(i, j);
+		}
 	}
 
 	public static void _readPixels(int i, int j, int k, int l, int m, int n, long o) {
