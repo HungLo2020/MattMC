@@ -543,6 +543,15 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 		this.resourceManager.registerReloadListener(new DryFoliageColorReloadListener());
 		this.window.setErrorSection("Startup");
 		RenderSystem.setupDefaultState();
+		
+		// Test Vulkanic integration
+		this.window.setErrorSection("Testing Vulkanic");
+		try {
+			net.vulkanic.test.VulkanicTestUtil.runAllTests();
+		} catch (Exception e) {
+			LOGGER.error("Vulkanic tests encountered an error", e);
+		}
+		
 		this.window.setErrorSection("Post startup");
 		this.blockColors = BlockColors.createDefault();
 		this.modelManager = new ModelManager(this.blockColors, this.atlasManager, this.playerSkinRenderCache);
