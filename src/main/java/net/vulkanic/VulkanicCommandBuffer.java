@@ -16,5 +16,8 @@ public interface VulkanicCommandBuffer {
     void clearDepth(float depth);
     void clearColorAndDepth(float r, float g, float b, float a, float depth);
     void setViewport(int x, int y, int width, int height);
+    void setScissor(int x, int y, int width, int height);
+    void enableScissorTest();
+    void disableScissorTest();
     void submit();
 }

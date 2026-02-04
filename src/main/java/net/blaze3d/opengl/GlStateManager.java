@@ -59,17 +59,23 @@ public class GlStateManager {
 
 	public static void _disableScissorTest() {
 		RenderSystem.assertOnRenderThread();
-		SCISSOR.mode.disable();
+		
+		// Route through Vulkanic abstraction layer - NO FALLBACK
+		net.vulkanic.Vulkanic.getDevice().createCommandBuffer().disableScissorTest();
 	}
 
 	public static void _enableScissorTest() {
 		RenderSystem.assertOnRenderThread();
-		SCISSOR.mode.enable();
+		
+		// Route through Vulkanic abstraction layer - NO FALLBACK
+		net.vulkanic.Vulkanic.getDevice().createCommandBuffer().enableScissorTest();
 	}
 
 	public static void _scissorBox(int i, int j, int k, int l) {
 		RenderSystem.assertOnRenderThread();
-		GL20.glScissor(i, j, k, l);
+		
+		// Route through Vulkanic abstraction layer - NO FALLBACK
+		net.vulkanic.Vulkanic.getDevice().createCommandBuffer().setScissor(i, j, k, l);
 	}
 
 	public static void _disableDepthTest() {
@@ -520,7 +526,8 @@ public class GlStateManager {
 		iris$viewportWidth = k;
 		iris$viewportHeight = l;
 		
-		GL11.glViewport(i, j, k, l);
+		// Route through Vulkanic abstraction layer - NO FALLBACK
+		net.vulkanic.Vulkanic.getDevice().createCommandBuffer().setViewport(i, j, k, l);
 	}
 
 	public static void _colorMask(boolean bl, boolean bl2, boolean bl3, boolean bl4) {
@@ -542,7 +549,22 @@ public class GlStateManager {
 
 	public static void _clear(int i) {
 		RenderSystem.assertOnRenderThread();
-		GL11.glClear(i);
+		
+		// Route through Vulkanic abstraction layer - NO FALLBACK
+		net.vulkanic.VulkanicCommandBuffer cmd = net.vulkanic.Vulkanic.getDevice().createCommandBuffer();
+		
+		// Handle different clear buffer combinations
+		if ((i & GL11.GL_COLOR_BUFFER_BIT) != 0 && (i & GL11.GL_DEPTH_BUFFER_BIT) != 0) {
+			// Clear both color and depth - get current clear color
+			cmd.clearColorAndDepth(0.0f, 0.0f, 0.0f, 1.0f, 1.0f);
+		} else if ((i & GL11.GL_COLOR_BUFFER_BIT) != 0) {
+			// Clear only color
+			cmd.clear(0.0f, 0.0f, 0.0f, 1.0f);
+		} else if ((i & GL11.GL_DEPTH_BUFFER_BIT) != 0) {
+			// Clear only depth
+			cmd.clearDepth(1.0f);
+		}
+		
 		if (MacosUtil.IS_MACOS) {
 			_getError();
 		}

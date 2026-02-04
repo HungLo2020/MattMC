@@ -103,6 +103,21 @@ public class OpenGLCommandBuffer implements VulkanicCommandBuffer {
     }
     
     @Override
+    public void setScissor(int x, int y, int width, int height) {
+        GL11.glScissor(x, y, width, height);
+    }
+    
+    @Override
+    public void enableScissorTest() {
+        GL11.glEnable(GL11.GL_SCISSOR_TEST);
+    }
+    
+    @Override
+    public void disableScissorTest() {
+        GL11.glDisable(GL11.GL_SCISSOR_TEST);
+    }
+    
+    @Override
     public void submit() {
         // No-op for OpenGL - commands are immediate
     }
