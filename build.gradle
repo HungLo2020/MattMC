@@ -332,13 +332,59 @@ tasks.named('processResources') {
 // Build Rust native library for Linux, macOS, and Windows
 // ============================================================================
 
+// Helper function to find cargo executable
+// Gradle doesn't inherit shell PATH on macOS, so we need to check common locations
+def findCargoExecutable() {
+    def cargoCmd = 'cargo'
+    
+    // First, try to find cargo in PATH (works on Linux and some macOS setups)
+    try {
+        def checkCargo = project.exec {
+            commandLine 'which', 'cargo'
+            standardOutput = new ByteArrayOutputStream()
+            ignoreExitValue = true
+        }
+        if (checkCargo.exitValue == 0) {
+            return 'cargo'
+        }
+    } catch (Exception e) {
+        // which command failed, continue to check other locations
+    }
+    
+    // Common cargo installation paths
+    def homePath = System.getProperty('user.home')
+    def possiblePaths = [
+        "${homePath}/.cargo/bin/cargo",           // rustup default (Linux/macOS)
+        '/opt/homebrew/bin/cargo',                 // Homebrew on Apple Silicon
+        '/usr/local/bin/cargo',                    // Homebrew on Intel Mac
+        "${homePath}/.local/bin/cargo",           // alternative Linux location
+    ]
+    
+    for (path in possiblePaths) {
+        def cargoFile = file(path)
+        if (cargoFile.exists() && cargoFile.canExecute()) {
+            println "✓ Found cargo at: ${path}"
+            return path
+        }
+    }
+    
+    // If we still can't find it, return 'cargo' and let it fail with a helpful message
+    println "⚠ Warning: Could not find cargo executable in common locations."
+    println "  Please ensure Rust is installed and cargo is in your PATH."
+    println "  Checked locations: ${possiblePaths.join(', ')}"
+    return 'cargo'
+}
+
 // Task to build Rust library for the current platform
 tasks.register('buildRustNative', Exec) {
     group = 'build'
     description = 'Builds the Rust native library for the current platform'
     
     workingDir 'src/main/rust'
-    commandLine 'cargo', 'build', '--release'
+    
+    // Use the cargo path finder
+    def cargoPath = findCargoExecutable()
+    commandLine cargoPath, 'build', '--release'
     
     inputs.dir('src/main/rust/src')
     inputs.file('src/main/rust/Cargo.toml')
@@ -351,7 +397,9 @@ tasks.register('buildRustLinux', Exec) {
     description = 'Builds the Rust native library for Linux x86_64'
     
     workingDir 'src/main/rust'
-    commandLine 'cargo', 'build', '--release', '--target', 'x86_64-unknown-linux-gnu'
+    
+    def cargoPath = findCargoExecutable()
+    commandLine cargoPath, 'build', '--release', '--target', 'x86_64-unknown-linux-gnu'
     
     inputs.dir('src/main/rust/src')
     inputs.file('src/main/rust/Cargo.toml')
@@ -361,7 +409,7 @@ tasks.register('buildRustLinux', Exec) {
     onlyIf {
         // Check if the target is installed
         def result = project.exec {
-            commandLine 'rustup', 'target', 'list', '--installed'
+            commandLine findCargoExecutable().replace('cargo', 'rustup'), 'target', 'list', '--installed'
             standardOutput = new ByteArrayOutputStream()
             ignoreExitValue = true
         }
@@ -375,7 +423,9 @@ tasks.register('buildRustMacOSx64', Exec) {
     description = 'Builds the Rust native library for macOS x86_64'
     
     workingDir 'src/main/rust'
-    commandLine 'cargo', 'build', '--release', '--target', 'x86_64-apple-darwin'
+    
+    def cargoPath = findCargoExecutable()
+    commandLine cargoPath, 'build', '--release', '--target', 'x86_64-apple-darwin'
     
     inputs.dir('src/main/rust/src')
     inputs.file('src/main/rust/Cargo.toml')
@@ -383,7 +433,7 @@ tasks.register('buildRustMacOSx64', Exec) {
     
     onlyIf {
         def result = project.exec {
-            commandLine 'rustup', 'target', 'list', '--installed'
+            commandLine findCargoExecutable().replace('cargo', 'rustup'), 'target', 'list', '--installed'
             standardOutput = new ByteArrayOutputStream()
             ignoreExitValue = true
         }
@@ -397,7 +447,9 @@ tasks.register('buildRustMacOSARM', Exec) {
     description = 'Builds the Rust native library for macOS ARM64'
     
     workingDir 'src/main/rust'
-    commandLine 'cargo', 'build', '--release', '--target', 'aarch64-apple-darwin'
+    
+    def cargoPath = findCargoExecutable()
+    commandLine cargoPath, 'build', '--release', '--target', 'aarch64-apple-darwin'
     
     inputs.dir('src/main/rust/src')
     inputs.file('src/main/rust/Cargo.toml')
@@ -405,7 +457,7 @@ tasks.register('buildRustMacOSARM', Exec) {
     
     onlyIf {
         def result = project.exec {
-            commandLine 'rustup', 'target', 'list', '--installed'
+            commandLine findCargoExecutable().replace('cargo', 'rustup'), 'target', 'list', '--installed'
             standardOutput = new ByteArrayOutputStream()
             ignoreExitValue = true
         }
@@ -419,7 +471,9 @@ tasks.register('buildRustWindows', Exec) {
     description = 'Builds the Rust native library for Windows x86_64'
     
     workingDir 'src/main/rust'
-    commandLine 'cargo', 'build', '--release', '--target', 'x86_64-pc-windows-gnu'
+    
+    def cargoPath = findCargoExecutable()
+    commandLine cargoPath, 'build', '--release', '--target', 'x86_64-pc-windows-gnu'
     
     inputs.dir('src/main/rust/src')
     inputs.file('src/main/rust/Cargo.toml')
@@ -427,7 +481,7 @@ tasks.register('buildRustWindows', Exec) {
     
     onlyIf {
         def result = project.exec {
-            commandLine 'rustup', 'target', 'list', '--installed'
+            commandLine findCargoExecutable().replace('cargo', 'rustup'), 'target', 'list', '--installed'
             standardOutput = new ByteArrayOutputStream()
             ignoreExitValue = true
         }

@@ -161,6 +161,33 @@ Or just run `./gradlew build` to do all steps.
 - **Java**: 22+ (FFM API is available since Java 22, project uses Java 25)
 - **Cargo**: 1.93.0 or later
 
+### Installing Rust
+
+If you haven't installed Rust yet:
+
+```bash
+# Install via rustup (recommended)
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+
+# After installation, ensure cargo is in your PATH
+source "$HOME/.cargo/env"
+```
+
+### macOS Build Issues
+
+On macOS, Gradle may not find `cargo` even if it's installed. The build script automatically checks these locations:
+- `~/.cargo/bin/cargo` (rustup default)
+- `/opt/homebrew/bin/cargo` (Homebrew on Apple Silicon)
+- `/usr/local/bin/cargo` (Homebrew on Intel)
+
+If you still get "cargo not found" errors:
+1. Verify cargo is installed: `which cargo`
+2. Add cargo to your PATH in `~/.zshrc` or `~/.bash_profile`:
+   ```bash
+   export PATH="$HOME/.cargo/bin:$PATH"
+   ```
+3. Restart your terminal or run: `source ~/.zshrc`
+
 ## Troubleshooting
 
 ### Library not found
