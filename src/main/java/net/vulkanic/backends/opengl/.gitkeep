@@ -1,0 +1,4 @@
+// OpenGL Backend Implementation
+// This directory contains the OpenGL-specific rendering backend for Vulkanic.
+// DO NOT call classes in this directory directly from game code.
+// All access should go through the Vulkanic API layer.
