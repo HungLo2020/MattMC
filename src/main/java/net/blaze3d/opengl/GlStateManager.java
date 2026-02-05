@@ -69,7 +69,7 @@ public class GlStateManager {
 
 	public static void _scissorBox(int i, int j, int k, int l) {
 		RenderSystem.assertOnRenderThread();
-		GL20.glScissor(i, j, k, l);
+		net.vulkanic.VulkanicAPI.setScissorBox(i, j, k, l);
 	}
 
 	public static void _disableDepthTest() {
@@ -86,7 +86,7 @@ public class GlStateManager {
 		RenderSystem.assertOnRenderThread();
 		if (i != DEPTH.func) {
 			DEPTH.func = i;
-			GL11.glDepthFunc(i);
+			net.vulkanic.VulkanicAPI.setDepthTestFunction(i);
 		}
 	}
 
@@ -100,7 +100,7 @@ public class GlStateManager {
 		
 		if (bl != DEPTH.mask) {
 			DEPTH.mask = bl;
-			GL11.glDepthMask(bl);
+			net.vulkanic.VulkanicAPI.setDepthWriteEnabled(bl);
 		}
 	}
 
@@ -279,7 +279,7 @@ public class GlStateManager {
 
 	public static void _glBindBuffer(int i, int j) {
 		RenderSystem.assertOnRenderThread();
-		GL15.glBindBuffer(i, j);
+		net.vulkanic.VulkanicAPI.attachBuffer(i, j);
 	}
 
 	public static void _glBindVertexArray(int i) {
@@ -322,12 +322,12 @@ public class GlStateManager {
 
 	public static void _glBindFramebuffer(int i, int j) {
 		if ((i == 36008 || i == 36160) && readFbo != j) {
-			GL30.glBindFramebuffer(36008, j);
+			net.vulkanic.VulkanicAPI.attachFramebuffer(36008, j);
 			readFbo = j;
 		}
 
 		if ((i == 36009 || i == 36160) && writeFbo != j) {
-			GL30.glBindFramebuffer(36009, j);
+			net.vulkanic.VulkanicAPI.attachFramebuffer(36009, j);
 			writeFbo = j;
 		}
 	}
@@ -364,7 +364,7 @@ public class GlStateManager {
 
 	public static void _glFramebufferTexture2D(int i, int j, int k, int l, int m) {
 		RenderSystem.assertOnRenderThread();
-		GL30.glFramebufferTexture2D(i, j, k, l, m);
+		net.vulkanic.VulkanicAPI.attachTextureToFramebuffer(i, j, k, l, m);
 	}
 
 	public static void glBlendFuncSeparate(int i, int j, int k, int l) {
@@ -533,7 +533,7 @@ public class GlStateManager {
 			COLOR_MASK.green = bl2;
 			COLOR_MASK.blue = bl3;
 			COLOR_MASK.alpha = bl4;
-			GL11.glColorMask(bl, bl2, bl3, bl4);
+			net.vulkanic.VulkanicAPI.setColorWriteMask(bl, bl2, bl3, bl4);
 		}
 	}
 
@@ -578,7 +578,7 @@ public class GlStateManager {
 
 	public static void _pixelStore(int i, int j) {
 		RenderSystem.assertOnRenderThread();
-		GL11.glPixelStorei(i, j);
+		net.vulkanic.VulkanicAPI.setPixelStoreMode(i, j);
 	}
 
 	public static void _readPixels(int i, int j, int k, int l, int m, int n, long o) {
