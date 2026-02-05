@@ -16,6 +16,7 @@ import net.blaze3d.textures.GpuTextureView;
 import net.blaze3d.textures.TextureFormat;
 import net.blaze3d.vertex.VertexFormat;
 import net.logging.LogUtils;
+import net.vulkanic.VulkanicAPI;
 import java.nio.ByteBuffer;
 import java.util.Collection;
 import java.util.Collections;
@@ -121,12 +122,12 @@ public class GlCommandEncoder implements CommandEncoder {
 					GlStateManager._disableScissorTest();
 					GlStateManager._depthMask(true);
 					GlStateManager._colorMask(true, true, true, true);
-					GlStateManager._clear(j);
+					VulkanicAPI.clear(j);
 				}
 
 				// Iris: From MixinGlCommandEncoder - Do not change viewport in shadow pass
 				if (!net.irisshaders.iris.shadows.ShadowRenderingState.areShadowsCurrentlyBeingRendered()) {
-					GlStateManager._viewport(0, 0, gpuTextureView.getWidth(0), gpuTextureView.getHeight(0));
+					VulkanicAPI.viewport(0, 0, gpuTextureView.getWidth(0), gpuTextureView.getHeight(0));
 				}
 				
 				this.lastPipeline = null;
@@ -483,7 +484,7 @@ public class GlCommandEncoder implements CommandEncoder {
 					GL11.glBindTexture(34067, ((GlTexture)gpuTexture).id);
 				} else {
 					o = 3553;
-					GlStateManager._bindTexture(((GlTexture)gpuTexture).id);
+					VulkanicAPI.bindTexture(((GlTexture)gpuTexture).id);
 				}
 
 				GlStateManager._pixelStore(3314, m);
@@ -649,7 +650,7 @@ public class GlCommandEncoder implements CommandEncoder {
 			throw new UnsupportedOperationException("Textures with multiple depths or layers are not yet supported for presentation");
 		} else {
 			GlStateManager._disableScissorTest();
-			GlStateManager._viewport(0, 0, gpuTextureView.getWidth(0), gpuTextureView.getHeight(0));
+			VulkanicAPI.viewport(0, 0, gpuTextureView.getWidth(0), gpuTextureView.getHeight(0));
 			GlStateManager._depthMask(true);
 			GlStateManager._colorMask(true, true, true, true);
 			this.device.directStateAccess().bindFrameBufferTextures(this.drawFbo, ((GlTexture)gpuTextureView.texture()).glId(), 0, 0, 0);
@@ -913,7 +914,7 @@ public class GlCommandEncoder implements CommandEncoder {
 		this.applyPipelineState(renderPipeline);
 		boolean bl = this.lastProgram != glProgram;
 		if (bl) {
-			GlStateManager._glUseProgram(glProgram.getProgramId());
+			VulkanicAPI.useProgram(glProgram.getProgramId());
 			this.lastProgram = glProgram;
 		}
 
@@ -960,7 +961,7 @@ public class GlCommandEncoder implements CommandEncoder {
 						GL11.glBindTexture(34067, glTexture.id);
 					} else {
 						o = 3553;
-						GlStateManager._bindTexture(glTexture.id);
+						VulkanicAPI.bindTexture(glTexture.id);
 					}
 
 					GlStateManager._texParameter(o, 33084, glTextureView2x.baseMipLevel());
@@ -1010,7 +1011,7 @@ public class GlCommandEncoder implements CommandEncoder {
 			}
 
 			if (renderPipeline.getBlendFunction().isPresent()) {
-				GlStateManager._enableBlend();
+				VulkanicAPI.enableBlend();
 				BlendFunction blendFunction = (BlendFunction)renderPipeline.getBlendFunction().get();
 				GlStateManager._blendFuncSeparate(
 					GlConst.toGl(blendFunction.sourceColor()),
