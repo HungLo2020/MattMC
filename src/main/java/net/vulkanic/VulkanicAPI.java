@@ -155,4 +155,36 @@ public class VulkanicAPI {
     public static int checkForErrors() {
         return getBackend().checkForErrors();
     }
+    
+    public static void transferTexture2DImage(int tgt, int lvl, int intfmt, int w, int h, int bdr, int fmt, int typ, java.nio.ByteBuffer pix) {
+        getBackend().transferTexture2DImage(tgt, lvl, intfmt, w, h, bdr, fmt, typ, pix);
+    }
+    
+    public static void transferTexture2DSubregion(int tgt, int lvl, int xoff, int yoff, int w, int h, int fmt, int typ, long pix) {
+        getBackend().transferTexture2DSubregion(tgt, lvl, xoff, yoff, w, h, fmt, typ, pix);
+    }
+    
+    public static void transferTexture2DSubregionBuf(int tgt, int lvl, int xoff, int yoff, int w, int h, int fmt, int typ, java.nio.ByteBuffer pix) {
+        getBackend().transferTexture2DSubregionBuf(tgt, lvl, xoff, yoff, w, h, fmt, typ, pix);
+    }
+    
+    public static int allocateBufferObject() {
+        return getBackend().allocateBufferObject();
+    }
+    
+    public static void releaseBufferObject(int buf) {
+        getBackend().releaseBufferObject(buf);
+    }
+    
+    public static void fillBufferWithData(int tgt, java.nio.ByteBuffer dat, int usg) {
+        getBackend().fillBufferWithData(tgt, dat, usg);
+    }
+    
+    public static void fillBufferWithSize(int tgt, long sz, int usg) {
+        getBackend().fillBufferWithSize(tgt, sz, usg);
+    }
+    
+    public static void fillBufferSubregion(int tgt, long off, java.nio.ByteBuffer dat) {
+        getBackend().fillBufferSubregion(tgt, off, dat);
+    }
 }

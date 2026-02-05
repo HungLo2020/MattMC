@@ -146,4 +146,44 @@ public class OpenGLBackend implements GraphicsBackend {
     public int checkForErrors() {
         return GL11.glGetError();
     }
+    
+    @Override
+    public void transferTexture2DImage(int tgt, int lvl, int intfmt, int w, int h, int bdr, int fmt, int typ, java.nio.ByteBuffer pix) {
+        GL11.glTexImage2D(tgt, lvl, intfmt, w, h, bdr, fmt, typ, pix);
+    }
+    
+    @Override
+    public void transferTexture2DSubregion(int tgt, int lvl, int xoff, int yoff, int w, int h, int fmt, int typ, long pix) {
+        GL11.glTexSubImage2D(tgt, lvl, xoff, yoff, w, h, fmt, typ, pix);
+    }
+    
+    @Override
+    public void transferTexture2DSubregionBuf(int tgt, int lvl, int xoff, int yoff, int w, int h, int fmt, int typ, java.nio.ByteBuffer pix) {
+        GL11.glTexSubImage2D(tgt, lvl, xoff, yoff, w, h, fmt, typ, pix);
+    }
+    
+    @Override
+    public int allocateBufferObject() {
+        return GL15.glGenBuffers();
+    }
+    
+    @Override
+    public void releaseBufferObject(int buf) {
+        GL15.glDeleteBuffers(buf);
+    }
+    
+    @Override
+    public void fillBufferWithData(int tgt, java.nio.ByteBuffer dat, int usg) {
+        GL15.glBufferData(tgt, dat, usg);
+    }
+    
+    @Override
+    public void fillBufferWithSize(int tgt, long sz, int usg) {
+        GL15.glBufferData(tgt, sz, usg);
+    }
+    
+    @Override
+    public void fillBufferSubregion(int tgt, long off, java.nio.ByteBuffer dat) {
+        GL15.glBufferSubData(tgt, off, dat);
+    }
 }

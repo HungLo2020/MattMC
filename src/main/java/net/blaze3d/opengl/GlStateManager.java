@@ -269,7 +269,7 @@ public class GlStateManager {
 	public static int _glGenBuffers() {
 		RenderSystem.assertOnRenderThread();
 		incrementTrackedBuffers();
-		return GL15.glGenBuffers();
+		return net.vulkanic.VulkanicAPI.allocateBufferObject();
 	}
 
 	public static int _glGenVertexArrays() {
@@ -289,17 +289,17 @@ public class GlStateManager {
 
 	public static void _glBufferData(int i, ByteBuffer byteBuffer, int j) {
 		RenderSystem.assertOnRenderThread();
-		GL15.glBufferData(i, byteBuffer, j);
+		net.vulkanic.VulkanicAPI.fillBufferWithData(i, byteBuffer, j);
 	}
 
 	public static void _glBufferSubData(int i, int j, ByteBuffer byteBuffer) {
 		RenderSystem.assertOnRenderThread();
-		GL15.glBufferSubData(i, (long)j, byteBuffer);
+		net.vulkanic.VulkanicAPI.fillBufferSubregion(i, (long)j, byteBuffer);
 	}
 
 	public static void _glBufferData(int i, long l, int j) {
 		RenderSystem.assertOnRenderThread();
-		GL15.glBufferData(i, l, j);
+		net.vulkanic.VulkanicAPI.fillBufferWithSize(i, l, j);
 	}
 
 	@Nullable
@@ -317,7 +317,7 @@ public class GlStateManager {
 		RenderSystem.assertOnRenderThread();
 		numBuffers--;
 		PLOT_BUFFERS.setValue(numBuffers);
-		GL15.glDeleteBuffers(i);
+		net.vulkanic.VulkanicAPI.releaseBufferObject(i);
 	}
 
 	public static void _glBindFramebuffer(int i, int j) {
@@ -490,7 +490,7 @@ public class GlStateManager {
 
 	public static void _texImage2D(int i, int j, int k, int l, int m, int n, int o, int p, @Nullable ByteBuffer byteBuffer) {
 		RenderSystem.assertOnRenderThread();
-		GL11.glTexImage2D(i, j, k, l, m, n, o, p, byteBuffer);
+		net.vulkanic.VulkanicAPI.transferTexture2DImage(i, j, k, l, m, n, o, p, byteBuffer);
 		
 		// Iris: Track texture image data (from MixinGlStateManager texture)
 		net.irisshaders.iris.pbr.TextureInfoCache.INSTANCE.onTexImage2D(i, j, k, l, m, n, o, p, byteBuffer);
@@ -498,12 +498,12 @@ public class GlStateManager {
 
 	public static void _texSubImage2D(int i, int j, int k, int l, int m, int n, int o, int p, long q) {
 		RenderSystem.assertOnRenderThread();
-		GL11.glTexSubImage2D(i, j, k, l, m, n, o, p, q);
+		net.vulkanic.VulkanicAPI.transferTexture2DSubregion(i, j, k, l, m, n, o, p, q);
 	}
 
 	public static void _texSubImage2D(int i, int j, int k, int l, int m, int n, int o, int p, ByteBuffer byteBuffer) {
 		RenderSystem.assertOnRenderThread();
-		GL11.glTexSubImage2D(i, j, k, l, m, n, o, p, byteBuffer);
+		net.vulkanic.VulkanicAPI.transferTexture2DSubregionBuf(i, j, k, l, m, n, o, p, byteBuffer);
 	}
 
 	public static void _viewport(int i, int j, int k, int l) {

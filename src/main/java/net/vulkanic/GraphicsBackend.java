@@ -52,4 +52,16 @@ public interface GraphicsBackend {
     
     // Error checking
     int checkForErrors();
+    
+    // Texture pixel data transfer
+    void transferTexture2DImage(int tgt, int lvl, int intfmt, int w, int h, int bdr, int fmt, int typ, java.nio.ByteBuffer pix);
+    void transferTexture2DSubregion(int tgt, int lvl, int xoff, int yoff, int w, int h, int fmt, int typ, long pix);
+    void transferTexture2DSubregionBuf(int tgt, int lvl, int xoff, int yoff, int w, int h, int fmt, int typ, java.nio.ByteBuffer pix);
+    
+    // GPU buffer lifecycle
+    int allocateBufferObject();
+    void releaseBufferObject(int buf);
+    void fillBufferWithData(int tgt, java.nio.ByteBuffer dat, int usg);
+    void fillBufferWithSize(int tgt, long sz, int usg);
+    void fillBufferSubregion(int tgt, long off, java.nio.ByteBuffer dat);
 }
