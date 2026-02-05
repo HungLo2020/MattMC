@@ -225,27 +225,27 @@ public class GlStateManager {
 
 	public static int _glGetUniformLocation(int programId, CharSequence name) {
 		RenderSystem.assertOnRenderThread();
-		int location = GL20.glGetUniformLocation(programId, name);
+		int location = net.vulkanic.VulkanicAPI.locateUniformVariable(programId, name);
 		
 		// Iris: Handle sampler name fallbacks for extended shaders
 		if (location == -1 && name.equals("Sampler0")) {
-			location = GL20.glGetUniformLocation(programId, "tex");
+			location = net.vulkanic.VulkanicAPI.locateUniformVariable(programId, "tex");
 			
 			if (location == -1) {
-				location = GL20.glGetUniformLocation(programId, "gtexture");
+				location = net.vulkanic.VulkanicAPI.locateUniformVariable(programId, "gtexture");
 				
 				if (location == -1) {
-					location = GL20.glGetUniformLocation(programId, "texture");
+					location = net.vulkanic.VulkanicAPI.locateUniformVariable(programId, "texture");
 				}
 			}
 		}
 		
 		if (location == -1 && name.equals("Sampler1")) {
-			location = GL20.glGetUniformLocation(programId, "iris_overlay");
+			location = net.vulkanic.VulkanicAPI.locateUniformVariable(programId, "iris_overlay");
 		}
 		
 		if (location == -1 && name.equals("Sampler2")) {
-			location = GL20.glGetUniformLocation(programId, "lightmap");
+			location = net.vulkanic.VulkanicAPI.locateUniformVariable(programId, "lightmap");
 		}
 		
 		return location;
@@ -253,12 +253,12 @@ public class GlStateManager {
 
 	public static void _glUniform1i(int i, int j) {
 		RenderSystem.assertOnRenderThread();
-		GL20.glUniform1i(i, j);
+		net.vulkanic.VulkanicAPI.assignUniformInteger(i, j);
 	}
 
 	public static void _glBindAttribLocation(int i, int j, CharSequence charSequence) {
 		RenderSystem.assertOnRenderThread();
-		GL20.glBindAttribLocation(i, j, charSequence);
+		net.vulkanic.VulkanicAPI.bindAttributeLocation(i, j, charSequence);
 	}
 
 	public static void incrementTrackedBuffers() {
@@ -374,12 +374,12 @@ public class GlStateManager {
 
 	public static String glGetShaderInfoLog(int i, int j) {
 		RenderSystem.assertOnRenderThread();
-		return GL20.glGetShaderInfoLog(i, j);
+		return net.vulkanic.VulkanicAPI.retrieveShaderInfoLog(i);
 	}
 
 	public static String glGetProgramInfoLog(int i, int j) {
 		RenderSystem.assertOnRenderThread();
-		return GL20.glGetProgramInfoLog(i, j);
+		return net.vulkanic.VulkanicAPI.retrieveProgramInfoLog(i);
 	}
 
 	public static void _enableCull() {
@@ -610,17 +610,17 @@ public class GlStateManager {
 
 	public static long _glFenceSync(int i, int j) {
 		RenderSystem.assertOnRenderThread();
-		return GL32.glFenceSync(i, j);
+		return net.vulkanic.VulkanicAPI.createFenceSync(i, j);
 	}
 
 	public static int _glClientWaitSync(long l, int i, long m) {
 		RenderSystem.assertOnRenderThread();
-		return GL32.glClientWaitSync(l, i, m);
+		return net.vulkanic.VulkanicAPI.waitForSync(l, i, m);
 	}
 
 	public static void _glDeleteSync(long l) {
 		RenderSystem.assertOnRenderThread();
-		GL32.glDeleteSync(l);
+		net.vulkanic.VulkanicAPI.destroySync(l);
 	}
 
 	@Environment(EnvType.CLIENT)

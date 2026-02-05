@@ -281,4 +281,44 @@ public class OpenGLBackend implements GraphicsBackend {
     public void activateVertexAttribute(int index) {
         GL20.glEnableVertexAttribArray(index);
     }
+    
+    @Override
+    public String retrieveProgramInfoLog(int program) {
+        return GL20.glGetProgramInfoLog(program);
+    }
+    
+    @Override
+    public String retrieveShaderInfoLog(int shader) {
+        return GL20.glGetShaderInfoLog(shader);
+    }
+    
+    @Override
+    public int locateUniformVariable(int program, CharSequence name) {
+        return GL20.glGetUniformLocation(program, name);
+    }
+    
+    @Override
+    public void assignUniformInteger(int location, int value) {
+        GL20.glUniform1i(location, value);
+    }
+    
+    @Override
+    public void bindAttributeLocation(int program, int index, CharSequence name) {
+        GL20.glBindAttribLocation(program, index, name);
+    }
+    
+    @Override
+    public long createFenceSync(int condition, int flags) {
+        return org.lwjgl.opengl.GL32.glFenceSync(condition, flags);
+    }
+    
+    @Override
+    public int waitForSync(long sync, int flags, long timeout) {
+        return org.lwjgl.opengl.GL32.glClientWaitSync(sync, flags, timeout);
+    }
+    
+    @Override
+    public void destroySync(long sync) {
+        org.lwjgl.opengl.GL32.glDeleteSync(sync);
+    }
 }

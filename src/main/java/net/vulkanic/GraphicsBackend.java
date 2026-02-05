@@ -88,9 +88,19 @@ public interface GraphicsBackend {
     void attachShaderToProgram(int program, int shader);
     int queryProgramParameter(int program, int pname);
     int queryShaderParameter(int shader, int pname);
+    String retrieveProgramInfoLog(int program);
+    String retrieveShaderInfoLog(int shader);
+    int locateUniformVariable(int program, CharSequence name);
+    void assignUniformInteger(int location, int value);
+    void bindAttributeLocation(int program, int index, CharSequence name);
     
     // Vertex attributes
     void configureVertexAttribute(int index, int size, int type, boolean normalized, int stride, long pointer);
     void configureVertexAttributeInteger(int index, int size, int type, int stride, long pointer);
     void activateVertexAttribute(int index);
+    
+    // Synchronization
+    long createFenceSync(int condition, int flags);
+    int waitForSync(long sync, int flags, long timeout);
+    void destroySync(long sync);
 }

@@ -263,4 +263,36 @@ public class VulkanicAPI {
     public static void activateVertexAttribute(int index) {
         getBackend().activateVertexAttribute(index);
     }
+    
+    public static String retrieveProgramInfoLog(int program) {
+        return getBackend().retrieveProgramInfoLog(program);
+    }
+    
+    public static String retrieveShaderInfoLog(int shader) {
+        return getBackend().retrieveShaderInfoLog(shader);
+    }
+    
+    public static int locateUniformVariable(int program, CharSequence name) {
+        return getBackend().locateUniformVariable(program, name);
+    }
+    
+    public static void assignUniformInteger(int location, int value) {
+        getBackend().assignUniformInteger(location, value);
+    }
+    
+    public static void bindAttributeLocation(int program, int index, CharSequence name) {
+        getBackend().bindAttributeLocation(program, index, name);
+    }
+    
+    public static long createFenceSync(int condition, int flags) {
+        return getBackend().createFenceSync(condition, flags);
+    }
+    
+    public static int waitForSync(long sync, int flags, long timeout) {
+        return getBackend().waitForSync(sync, flags, timeout);
+    }
+    
+    public static void destroySync(long sync) {
+        getBackend().destroySync(sync);
+    }
 }
