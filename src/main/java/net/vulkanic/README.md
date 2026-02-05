@@ -66,28 +66,63 @@ Once the abstraction layer is stable with OpenGL:
 
 ### Current Statistics
 
-**Total OpenGL References**: ~2,025 occurrences across the codebase
+**Vulkanic Abstraction Progress: 25%**
 
-**Breakdown by Component**:
-- **Blaze3D** (current abstraction layer): 37 direct OpenGL imports, 123 Java files
-- **Sodium**: 45 OpenGL imports (performance optimization mod)
-- **Iris Shaders**: 168 OpenGL imports, 445 Java files (shader support)
-- **Distant Horizons**: 1 Java file (minimal direct usage)
-- **Core Minecraft**: 0 direct OpenGL imports (uses Blaze3D)
+**Total OpenGL Methods in GlStateManager**: 55 unique methods
+**Methods Abstracted in Backend**: 14 methods  
+**Remaining Methods**: 41 methods
 
-**Unique OpenGL Methods**: ~161 distinct GL function calls identified
+**OpenGL Calls in GlStateManager**: 55 calls (down from 64 initially)
+**OpenGL Calls in Backend**: 16 calls (all abstracted methods)
 
-### Migration Progress
+### Abstracted Methods (14)
 
-| Component | Total Calls | Migrated | Percentage |
-|-----------|-------------|----------|------------|
-| Blaze3D | ~37 imports | 0 | 0% |
-| Sodium | ~45 imports | 0 | 0% |
-| Iris Shaders | ~168 imports | 0 | 0% |
-| Distant Horizons | ~1 file | 0 | 0% |
-| **TOTAL** | **~316 import sites** | **0** | **0%** |
+**State Management (4)**
+- enable/disable (generic) - GL11.glEnable/glDisable
+- setDepthTestFunction - GL11.glDepthFunc
+- setDepthWriteEnabled - GL11.glDepthMask
 
-*Note: Import sites represent files importing OpenGL APIs. Actual function call count is higher (~2,025 occurrences).*
+**Rendering (6)**
+- bindTexture - GL11.glBindTexture
+- viewport - GL11.glViewport
+- clear - GL11.glClear
+- setColorWriteMask - GL11.glColorMask
+- setScissorBox - GL20.glScissor
+- setPixelStoreMode - GL11.glPixelStorei
+
+**Shaders (1)**
+- useProgram - GL20.glUseProgram
+
+**Blending (2)**
+- enableBlend/disableBlend - GL11.glEnable/glDisable(GL_BLEND)
+
+**Framebuffers (2)**
+- attachFramebuffer - GL30.glBindFramebuffer
+- attachTextureToFramebuffer - GL30.glFramebufferTexture2D
+
+**Buffers (1)**
+- attachBuffer - GL15.glBindBuffer
+
+### Migration Progress by Component
+
+| Component | Status | Notes |
+|-----------|--------|-------|
+| **GlStateManager → Vulkanic** | 25% | 14/55 methods abstracted |
+| **Blaze3D** | ⏳ In Progress | State management complete |
+| **Sodium** | ⏳ Pending | Awaiting core abstraction |
+| **Iris Shaders** | ⏳ Pending | Awaiting core abstraction |
+| **Distant Horizons** | ⏳ Pending | Awaiting core abstraction |
+
+### Next Priority Methods
+
+Based on usage frequency in rendering pipeline:
+1. Shader operations (create, compile, link, uniforms) - ~12 methods
+2. Buffer operations (gen, delete, data, vertex arrays) - ~10 methods  
+3. Texture operations (gen, delete, image, parameters) - ~7 methods
+4. Drawing/sync operations - ~6 methods
+5. Misc (error, polygon, logic) - ~6 methods
+
+**Target**: 50% completion (27/55 methods) in next iteration
 
 ## Development Guidelines
 
