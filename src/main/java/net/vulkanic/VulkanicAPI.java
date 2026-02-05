@@ -10,12 +10,33 @@ public class VulkanicAPI {
     private static GraphicsBackend backend;
     
     /**
-     * Initialize the Vulkanic API with a specific backend.
-     * For now, only OpenGL backend is supported.
+     * Backend types supported by Vulkanic.
+     */
+    public enum BackendType {
+        OPENGL,
+        VULKAN  // Future implementation
+    }
+    
+    /**
+     * Initialize the Vulkanic API with the default backend (OpenGL).
      */
     public static void initialize() {
+        initialize(BackendType.OPENGL);
+    }
+    
+    /**
+     * Initialize the Vulkanic API with a specific backend.
+     * @param backendType The backend type to use
+     */
+    public static synchronized void initialize(BackendType backendType) {
         if (backend == null) {
-            backend = new OpenGLBackend();
+            switch (backendType) {
+                case OPENGL:
+                    backend = new OpenGLBackend();
+                    break;
+                case VULKAN:
+                    throw new UnsupportedOperationException("Vulkan backend not yet implemented");
+            }
         }
     }
     

@@ -8,7 +8,7 @@ public interface GraphicsBackend {
     
     /**
      * Bind a texture to the current texture unit.
-     * @param textureId The OpenGL texture ID
+     * @param textureId The texture ID (backend-specific)
      */
     void bindTexture(int textureId);
     
@@ -23,7 +23,7 @@ public interface GraphicsBackend {
     
     /**
      * Clear the specified buffers.
-     * @param mask Buffer mask (e.g., GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+     * @param mask Buffer mask (backend-specific, e.g., color, depth, or stencil buffers)
      */
     void clear(int mask);
     
