@@ -51,27 +51,10 @@ MattMC/
 │       │       ├── fabricmc/      # Fabric API stubs
 │       │       ├── iris/          # Iris API
 │       │       └── sodium/        # Sodium API
-│       ├── rust/         # Rust/Vulkan rewrite (early stages)
 │       └── resources/    # Resource files
 │           └── version.json       # Version information
-├── Cargo.toml            # Rust project configuration
 └── run/                  # Runtime directory (created on first run)
     ├── jdk-21/           # Bundled JDK (optional)
     ├── assets/           # Game assets
     └── server.properties # Server configuration
 ```
-
-## Rust/Vulkan Rewrite
-
-MattMC is being rebuilt from scratch using Rust and Vulkan for improved performance and modern graphics. The Rust code is located in `src/main/rust/`.
-
-**Building the Rust project:**
-- **Prerequisites**: Rust 1.70+ (`rustup install stable`) and a Vulkan-capable GPU with drivers
-- **Build**: `cargo build --release`
-- **Run**: `cargo run --release`
-
-**Shaders**: GLSL shaders are located in `src/main/rust/shaders/` and compiled to SPIR-V at build time.
-
-See [Rust Build Workflow Documentation](docs/RUST_BUILD_WORKFLOW.md) for automated builds.
-
-The project includes a GitHub Actions workflow for building releases for Linux, Windows, and macOS. See the documentation for details on how to trigger builds and create releases.
