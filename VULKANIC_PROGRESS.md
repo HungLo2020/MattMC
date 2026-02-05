@@ -6,35 +6,35 @@
 
 - **Total Files with OpenGL:** 152 files (across entire codebase)
 - **Files Migrated:** 0 complete, 1 in progress  
-- **Overall Progress:** ~10% (foundation phase)
-- **Current Focus:** GlStateManager.java (58% complete)
+- **Overall Progress:** ~13% (foundation phase)
+- **Current Focus:** GlStateManager.java (70% complete)
 
 ## Component Status
 
 | Component | Files | Status | Phase |
 |-----------|-------|--------|-------|
-| Blaze3D | 10 | 🔄 58% | 1 - Current |
+| Blaze3D | 10 | 🔄 70% | 1 - Current |
 | Sodium | 30 | ⏳ 0% | 3 - Future |
 | Iris | 68 | ⏳ 0% | 4 - Future |
 | Distant Horizons | 43 | ⏳ 0% | 5 - Future |
 | Minecraft Core | 0 | ✅ Clean | N/A |
 | Backend | 1 | ✅ Correct | N/A |
 
-## GlStateManager Progress (58%)
+## GlStateManager Progress (70%)
 
-**Abstracted:** 32/55 methods  
-**Remaining:** 23 methods  
-**GL calls removed:** 28 total (37 remaining)
+**Abstracted:** 39/55 methods  
+**Remaining:** 16 methods  
+**GL calls removed:** 35 total (30 remaining)
 
-### Completed Methods (32)
+### Completed Methods (39)
 
 **State Management (4):**
 - enable/disable (generic), setDepthTestFunction, setDepthWriteEnabled
 
-**Rendering (3):**
+**Rendering (5):**
 - viewport, clear, setPixelStoreMode, setColorWriteMask, setScissorBox
 
-**Texture Operations (10):**
+**Texture Operations (10) - ✅ COMPLETE:**
 - bindTexture (with state tracking)
 - activateTextureUnit, configureTextureParameter
 - createTexture, removeTexture
@@ -46,14 +46,19 @@
 **Blending (3):**
 - enableBlend/disableBlend, configureBlendFunc
 
-**Framebuffers (2):**
+**Framebuffers (5) - ✅ COMPLETE:**
 - attachFramebuffer, attachTextureToFramebuffer
+- generateFramebufferObject, destroyFramebufferObject, copyFramebufferRegion
 
-**Buffers (6):**
+**Buffers (8):**
 - attachBuffer, allocateBufferObject, releaseBufferObject
 - fillBufferWithData (2 variants), fillBufferSubregion
+- mapBufferRegion, unmapBufferData
 
-**Polygon Operations (3):**
+**Vertex Arrays (2):**
+- createVertexArrayObject, selectVertexArray
+
+**Polygon Operations (3) - ✅ COMPLETE:**
 - configurePolygonMode, configurePolygonOffset, configureLogicOp
 
 **Drawing (1):**
@@ -62,21 +67,20 @@
 **Error Checking (1):**
 - checkForErrors
 
-### Remaining Categories (23 methods)
+### Remaining Categories (16 methods)
 
-- **Shader ops:** 12 methods (create, compile, link, attach, uniforms, etc.)
-- **Buffer/vertex ops:** 5 methods (vertex arrays, attrib pointers)
-- **Framebuffer ops:** 3 methods (gen, delete, blit)
-- **Sync ops:** 3 methods (fence, wait, delete)
+- **Shader ops:** 11 methods (create, compile, link, attach, get program/shader info, uniforms, bind attribs)
+- **Vertex attribute ops:** 2 methods (vertex attrib pointer, enable attrib)
+- **Sync ops:** 3 methods (fence, client wait, delete sync)
 
 ## Architecture Compliance
 
 ✅ All OpenGL calls for abstracted methods ONLY in backends/opengl/OpenGLBackend.java  
 ✅ GlStateManager delegates to VulkanicAPI  
-✅ State tracking preserved (including Iris texture tracking)
+✅ State tracking preserved (Iris integration, FBO state)
 ✅ Build successful  
 
 ## Next Milestone
 
-**Target:** 70% GlStateManager completion (38/55 methods)  
-**Add:** 6 more methods (shader or vertex operations)
+**Target:** 80% GlStateManager completion (44/55 methods)  
+**Add:** 5 more methods (shader compilation/linking operations)
