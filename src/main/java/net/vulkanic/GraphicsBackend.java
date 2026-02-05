@@ -42,4 +42,16 @@ public interface GraphicsBackend {
      * @param programId The shader program ID
      */
     void useProgram(int programId);
+    
+    /**
+     * Enable a GL capability.
+     * @param cap The capability to enable (backend-specific constant)
+     */
+    void enable(int cap);
+    
+    /**
+     * Disable a GL capability.
+     * @param cap The capability to disable (backend-specific constant)
+     */
+    void disable(int cap);
 }

@@ -75,4 +75,12 @@ public class VulkanicAPI {
     public static void useProgram(int programId) {
         getBackend().useProgram(programId);
     }
+    
+    public static void enable(int cap) {
+        getBackend().enable(cap);
+    }
+    
+    public static void disable(int cap) {
+        getBackend().disable(cap);
+    }
 }

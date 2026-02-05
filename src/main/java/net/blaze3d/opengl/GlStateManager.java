@@ -663,37 +663,21 @@ public class GlStateManager {
 			if (stateUnknown) {
 				this.enabled = bl;
 				stateUnknown = false;
-				// Delegate to VulkanicAPI for GL_BLEND (3042)
-				if (this.state == 3042) {
-					if (bl) {
-						net.vulkanic.VulkanicAPI.enableBlend();
-					} else {
-						net.vulkanic.VulkanicAPI.disableBlend();
-					}
+				// Delegate ALL enable/disable to VulkanicAPI
+				if (bl) {
+					net.vulkanic.VulkanicAPI.enable(this.state);
 				} else {
-					if (bl) {
-						GL11.glEnable(this.state);
-					} else {
-						GL11.glDisable(this.state);
-					}
+					net.vulkanic.VulkanicAPI.disable(this.state);
 				}
 				return;
 			}
 			if (bl != this.enabled) {
 				this.enabled = bl;
-				// Delegate to VulkanicAPI for GL_BLEND (3042)
-				if (this.state == 3042) {
-					if (bl) {
-						net.vulkanic.VulkanicAPI.enableBlend();
-					} else {
-						net.vulkanic.VulkanicAPI.disableBlend();
-					}
+				// Delegate ALL enable/disable to VulkanicAPI
+				if (bl) {
+					net.vulkanic.VulkanicAPI.enable(this.state);
 				} else {
-					if (bl) {
-						GL11.glEnable(this.state);
-					} else {
-						GL11.glDisable(this.state);
-					}
+					net.vulkanic.VulkanicAPI.disable(this.state);
 				}
 			}
 		}

@@ -9,6 +9,7 @@ import org.lwjgl.opengl.GL20;
 /**
  * OpenGL implementation of the Vulkanic Graphics Backend.
  * Provides 1:1 mappings to OpenGL functions with proper state tracking.
+ * This is the ONLY place where direct OpenGL calls should be made.
  */
 public class OpenGLBackend implements GraphicsBackend {
     
@@ -46,5 +47,15 @@ public class OpenGLBackend implements GraphicsBackend {
     @Override
     public void useProgram(int programId) {
         GL20.glUseProgram(programId);
+    }
+    
+    @Override
+    public void enable(int cap) {
+        GL11.glEnable(cap);
+    }
+    
+    @Override
+    public void disable(int cap) {
+        GL11.glDisable(cap);
     }
 }
