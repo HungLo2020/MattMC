@@ -66,8 +66,12 @@ MattMC/
 MattMC is being rebuilt from scratch using Rust and Vulkan for improved performance and modern graphics. The Rust code is located in `src/main/rust/`.
 
 **Building the Rust project:**
-- See [Rust Build Workflow Documentation](docs/RUST_BUILD_WORKFLOW.md) for automated builds
-- Manual build: `cargo build --release`
-- Run: `cargo run --release`
+- **Prerequisites**: Rust 1.70+ (`rustup install stable`) and a Vulkan-capable GPU with drivers
+- **Build**: `cargo build --release`
+- **Run**: `cargo run --release`
+
+**Shaders**: GLSL shaders are located in `src/main/rust/shaders/` and compiled to SPIR-V at build time.
+
+See [Rust Build Workflow Documentation](docs/RUST_BUILD_WORKFLOW.md) for automated builds.
 
 The project includes a GitHub Actions workflow for building releases for Linux, Windows, and macOS. See the documentation for details on how to trigger builds and create releases.
