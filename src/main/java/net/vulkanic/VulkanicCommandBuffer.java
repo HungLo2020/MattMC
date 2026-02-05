@@ -139,6 +139,9 @@ public interface VulkanicCommandBuffer {
     // Generic state operations
     void glEnable(int cap);
     void glDisable(int cap);
+    void drawBuffer(int buffer);
+    void glClearColor(float r, float g, float b, float a);
+    void glClearDepth(double depth);
     
     void submit();
 }

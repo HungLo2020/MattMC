@@ -502,6 +502,21 @@ public class OpenGLCommandBuffer implements VulkanicCommandBuffer {
     }
     
     @Override
+    public void drawBuffer(int buffer) {
+        GL11.glDrawBuffer(buffer);
+    }
+    
+    @Override
+    public void glClearColor(float r, float g, float b, float a) {
+        GL11.glClearColor(r, g, b, a);
+    }
+    
+    @Override
+    public void glClearDepth(double depth) {
+        GL11.glClearDepth(depth);
+    }
+    
+    @Override
     public void submit() {
         // No-op for OpenGL - commands are immediate
     }

@@ -108,12 +108,20 @@ public class GlCommandEncoder implements CommandEncoder {
 				int j = 0;
 				if (optionalInt.isPresent()) {
 					int k = optionalInt.getAsInt();
-					GL11.glClearColor(ARGB.redFloat(k), ARGB.greenFloat(k), ARGB.blueFloat(k), ARGB.alphaFloat(k));
+					if (net.vulkanic.Vulkanic.isInitialized()) {
+						net.vulkanic.Vulkanic.getDevice().createCommandBuffer().glClearColor(ARGB.redFloat(k), ARGB.greenFloat(k), ARGB.blueFloat(k), ARGB.alphaFloat(k));
+					} else {
+						GL11.glClearColor(ARGB.redFloat(k), ARGB.greenFloat(k), ARGB.blueFloat(k), ARGB.alphaFloat(k));
+					}
 					j |= 16384;
 				}
 
 				if (gpuTextureView2 != null && optionalDouble.isPresent()) {
-					GL11.glClearDepth(optionalDouble.getAsDouble());
+					if (net.vulkanic.Vulkanic.isInitialized()) {
+						net.vulkanic.Vulkanic.getDevice().createCommandBuffer().glClearDepth(optionalDouble.getAsDouble());
+					} else {
+						GL11.glClearDepth(optionalDouble.getAsDouble());
+					}
 					j |= 256;
 				}
 
@@ -142,7 +150,11 @@ public class GlCommandEncoder implements CommandEncoder {
 		} else {
 			this.verifyColorTexture(gpuTexture);
 			this.device.directStateAccess().bindFrameBufferTextures(this.drawFbo, ((GlTexture)gpuTexture).id, 0, 0, 36160);
-			GL11.glClearColor(ARGB.redFloat(i), ARGB.greenFloat(i), ARGB.blueFloat(i), ARGB.alphaFloat(i));
+			if (net.vulkanic.Vulkanic.isInitialized()) {
+				net.vulkanic.Vulkanic.getDevice().createCommandBuffer().glClearColor(ARGB.redFloat(i), ARGB.greenFloat(i), ARGB.blueFloat(i), ARGB.alphaFloat(i));
+			} else {
+				GL11.glClearColor(ARGB.redFloat(i), ARGB.greenFloat(i), ARGB.blueFloat(i), ARGB.alphaFloat(i));
+			}
 			GlStateManager._disableScissorTest();
 			GlStateManager._colorMask(true, true, true, true);
 			GlStateManager._clear(16384);
