@@ -11,6 +11,7 @@ import org.lwjgl.opengl.GL14;
 import org.lwjgl.opengl.GL15;
 import org.lwjgl.opengl.GL20;
 import org.lwjgl.opengl.GL30;
+import org.lwjgl.opengl.GL32;
 import org.lwjgl.opengl.GL43C;
 
 /**
@@ -445,6 +446,59 @@ public class OpenGLCommandBuffer implements VulkanicCommandBuffer {
     @Override
     public void deleteFramebuffer(int framebuffer) {
         GL30.glDeleteFramebuffers(framebuffer);
+    }
+    
+    // === Phase 6: Query & State Operations ===
+    @Override
+    public int getError() {
+        return GL11.glGetError();
+    }
+    
+    @Override
+    public String getString(int name) {
+        return GL11.glGetString(name);
+    }
+    
+    @Override
+    public int getInteger(int pname) {
+        return GL11.glGetInteger(pname);
+    }
+    
+    @Override
+    public int getTexLevelParameteri(int target, int level, int pname) {
+        return GL11.glGetTexLevelParameteri(target, level, pname);
+    }
+    
+    @Override
+    public void blendFuncSeparate(int sfactorRGB, int dfactorRGB, int sfactorAlpha, int dfactorAlpha) {
+        GL14.glBlendFuncSeparate(sfactorRGB, dfactorRGB, sfactorAlpha, dfactorAlpha);
+    }
+    
+    // Sync operations
+    @Override
+    public long fenceSync(int condition, int flags) {
+        return GL32.glFenceSync(condition, flags);
+    }
+    
+    @Override
+    public int clientWaitSync(long sync, int flags, long timeout) {
+        return GL32.glClientWaitSync(sync, flags, timeout);
+    }
+    
+    @Override
+    public void deleteSync(long sync) {
+        GL32.glDeleteSync(sync);
+    }
+    
+    // Generic state operations
+    @Override
+    public void glEnable(int cap) {
+        GL11.glEnable(cap);
+    }
+    
+    @Override
+    public void glDisable(int cap) {
+        GL11.glDisable(cap);
     }
     
     @Override

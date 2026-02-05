@@ -573,7 +573,11 @@ public class GlStateManager {
 
 	public static void glBlendFuncSeparate(int i, int j, int k, int l) {
 		RenderSystem.assertOnRenderThread();
-		GL14.glBlendFuncSeparate(i, j, k, l);
+		if (net.vulkanic.Vulkanic.isInitialized()) {
+			net.vulkanic.Vulkanic.getDevice().createCommandBuffer().blendFuncSeparate(i, j, k, l);
+		} else {
+			GL14.glBlendFuncSeparate(i, j, k, l);
+		}
 	}
 
 	public static String glGetShaderInfoLog(int i, int j) {
@@ -742,7 +746,11 @@ public class GlStateManager {
 	}
 
 	public static int _getTexLevelParameter(int i, int j, int k) {
-		return GL11.glGetTexLevelParameteri(i, j, k);
+		if (net.vulkanic.Vulkanic.isInitialized()) {
+			return net.vulkanic.Vulkanic.getDevice().createCommandBuffer().getTexLevelParameteri(i, j, k);
+		} else {
+			return GL11.glGetTexLevelParameteri(i, j, k);
+		}
 	}
 
 	public static int _genTexture() {
@@ -975,39 +983,69 @@ public class GlStateManager {
 
 	public static int _getError() {
 		RenderSystem.assertOnRenderThread();
-		return GL11.glGetError();
+		if (net.vulkanic.Vulkanic.isInitialized()) {
+			return net.vulkanic.Vulkanic.getDevice().createCommandBuffer().getError();
+		} else {
+			return GL11.glGetError();
+		}
 	}
 
 	public static void clearGlErrors() {
 		RenderSystem.assertOnRenderThread();
 
-		while (GL11.glGetError() != 0) {
+		if (net.vulkanic.Vulkanic.isInitialized()) {
+			net.vulkanic.VulkanicCommandBuffer cmd = net.vulkanic.Vulkanic.getDevice().createCommandBuffer();
+			while (cmd.getError() != 0) {
+			}
+		} else {
+			while (GL11.glGetError() != 0) {
+			}
 		}
 	}
 
 	public static String _getString(int i) {
 		RenderSystem.assertOnRenderThread();
-		return GL11.glGetString(i);
+		if (net.vulkanic.Vulkanic.isInitialized()) {
+			return net.vulkanic.Vulkanic.getDevice().createCommandBuffer().getString(i);
+		} else {
+			return GL11.glGetString(i);
+		}
 	}
 
 	public static int _getInteger(int i) {
 		RenderSystem.assertOnRenderThread();
-		return GL11.glGetInteger(i);
+		if (net.vulkanic.Vulkanic.isInitialized()) {
+			return net.vulkanic.Vulkanic.getDevice().createCommandBuffer().getInteger(i);
+		} else {
+			return GL11.glGetInteger(i);
+		}
 	}
 
 	public static long _glFenceSync(int i, int j) {
 		RenderSystem.assertOnRenderThread();
-		return GL32.glFenceSync(i, j);
+		if (net.vulkanic.Vulkanic.isInitialized()) {
+			return net.vulkanic.Vulkanic.getDevice().createCommandBuffer().fenceSync(i, j);
+		} else {
+			return GL32.glFenceSync(i, j);
+		}
 	}
 
 	public static int _glClientWaitSync(long l, int i, long m) {
 		RenderSystem.assertOnRenderThread();
-		return GL32.glClientWaitSync(l, i, m);
+		if (net.vulkanic.Vulkanic.isInitialized()) {
+			return net.vulkanic.Vulkanic.getDevice().createCommandBuffer().clientWaitSync(l, i, m);
+		} else {
+			return GL32.glClientWaitSync(l, i, m);
+		}
 	}
 
 	public static void _glDeleteSync(long l) {
 		RenderSystem.assertOnRenderThread();
-		GL32.glDeleteSync(l);
+		if (net.vulkanic.Vulkanic.isInitialized()) {
+			net.vulkanic.Vulkanic.getDevice().createCommandBuffer().deleteSync(l);
+		} else {
+			GL32.glDeleteSync(l);
+		}
 	}
 
 	@Environment(EnvType.CLIENT)
@@ -1050,19 +1088,37 @@ public class GlStateManager {
 			if (stateUnknown) {
 				this.enabled = bl;
 				stateUnknown = false;
-				if (bl) {
-					GL11.glEnable(this.state);
+				if (net.vulkanic.Vulkanic.isInitialized()) {
+					net.vulkanic.VulkanicCommandBuffer cmd = net.vulkanic.Vulkanic.getDevice().createCommandBuffer();
+					if (bl) {
+						cmd.glEnable(this.state);
+					} else {
+						cmd.glDisable(this.state);
+					}
 				} else {
-					GL11.glDisable(this.state);
+					if (bl) {
+						GL11.glEnable(this.state);
+					} else {
+						GL11.glDisable(this.state);
+					}
 				}
 				return;
 			}
 			if (bl != this.enabled) {
 				this.enabled = bl;
-				if (bl) {
-					GL11.glEnable(this.state);
+				if (net.vulkanic.Vulkanic.isInitialized()) {
+					net.vulkanic.VulkanicCommandBuffer cmd = net.vulkanic.Vulkanic.getDevice().createCommandBuffer();
+					if (bl) {
+						cmd.glEnable(this.state);
+					} else {
+						cmd.glDisable(this.state);
+					}
 				} else {
-					GL11.glDisable(this.state);
+					if (bl) {
+						GL11.glEnable(this.state);
+					} else {
+						GL11.glDisable(this.state);
+					}
 				}
 			}
 		}

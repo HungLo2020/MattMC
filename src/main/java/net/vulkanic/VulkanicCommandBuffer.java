@@ -124,5 +124,21 @@ public interface VulkanicCommandBuffer {
     void blitFramebuffer(int srcX0, int srcY0, int srcX1, int srcY1, int dstX0, int dstY0, int dstX1, int dstY1, int mask, int filter);
     void deleteFramebuffer(int framebuffer);
     
+    // === Phase 6: Query & State Operations ===
+    int getError();
+    String getString(int name);
+    int getInteger(int pname);
+    int getTexLevelParameteri(int target, int level, int pname);
+    void blendFuncSeparate(int sfactorRGB, int dfactorRGB, int sfactorAlpha, int dfactorAlpha);
+    
+    // Sync operations
+    long fenceSync(int condition, int flags);
+    int clientWaitSync(long sync, int flags, long timeout);
+    void deleteSync(long sync);
+    
+    // Generic state operations
+    void glEnable(int cap);
+    void glDisable(int cap);
+    
     void submit();
 }
