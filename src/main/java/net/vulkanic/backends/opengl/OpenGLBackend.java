@@ -186,4 +186,39 @@ public class OpenGLBackend implements GraphicsBackend {
     public void fillBufferSubregion(int tgt, long off, java.nio.ByteBuffer dat) {
         GL15.glBufferSubData(tgt, off, dat);
     }
+    
+    @Override
+    public int createVertexArrayObject() {
+        return GL30.glGenVertexArrays();
+    }
+    
+    @Override
+    public void selectVertexArray(int vao) {
+        GL30.glBindVertexArray(vao);
+    }
+    
+    @Override
+    public java.nio.ByteBuffer mapBufferRegion(int tgt, int off, int len, int acc) {
+        return GL30.glMapBufferRange(tgt, off, len, acc);
+    }
+    
+    @Override
+    public void unmapBufferData(int tgt) {
+        GL15.glUnmapBuffer(tgt);
+    }
+    
+    @Override
+    public int generateFramebufferObject() {
+        return GL30.glGenFramebuffers();
+    }
+    
+    @Override
+    public void destroyFramebufferObject(int fbo) {
+        GL30.glDeleteFramebuffers(fbo);
+    }
+    
+    @Override
+    public void copyFramebufferRegion(int srcX0, int srcY0, int srcX1, int srcY1, int dstX0, int dstY0, int dstX1, int dstY1, int msk, int flt) {
+        GL30.glBlitFramebuffer(srcX0, srcY0, srcX1, srcY1, dstX0, dstY0, dstX1, dstY1, msk, flt);
+    }
 }

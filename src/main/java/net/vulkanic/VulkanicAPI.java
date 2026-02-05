@@ -187,4 +187,32 @@ public class VulkanicAPI {
     public static void fillBufferSubregion(int tgt, long off, java.nio.ByteBuffer dat) {
         getBackend().fillBufferSubregion(tgt, off, dat);
     }
+    
+    public static int createVertexArrayObject() {
+        return getBackend().createVertexArrayObject();
+    }
+    
+    public static void selectVertexArray(int vao) {
+        getBackend().selectVertexArray(vao);
+    }
+    
+    public static java.nio.ByteBuffer mapBufferRegion(int tgt, int off, int len, int acc) {
+        return getBackend().mapBufferRegion(tgt, off, len, acc);
+    }
+    
+    public static void unmapBufferData(int tgt) {
+        getBackend().unmapBufferData(tgt);
+    }
+    
+    public static int generateFramebufferObject() {
+        return getBackend().generateFramebufferObject();
+    }
+    
+    public static void destroyFramebufferObject(int fbo) {
+        getBackend().destroyFramebufferObject(fbo);
+    }
+    
+    public static void copyFramebufferRegion(int srcX0, int srcY0, int srcX1, int srcY1, int dstX0, int dstY0, int dstX1, int dstY1, int msk, int flt) {
+        getBackend().copyFramebufferRegion(srcX0, srcY0, srcX1, srcY1, dstX0, dstY0, dstX1, dstY1, msk, flt);
+    }
 }

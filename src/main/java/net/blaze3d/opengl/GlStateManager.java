@@ -274,7 +274,7 @@ public class GlStateManager {
 
 	public static int _glGenVertexArrays() {
 		RenderSystem.assertOnRenderThread();
-		return GL30.glGenVertexArrays();
+		return net.vulkanic.VulkanicAPI.createVertexArrayObject();
 	}
 
 	public static void _glBindBuffer(int i, int j) {
@@ -284,7 +284,7 @@ public class GlStateManager {
 
 	public static void _glBindVertexArray(int i) {
 		RenderSystem.assertOnRenderThread();
-		GL30.glBindVertexArray(i);
+		net.vulkanic.VulkanicAPI.selectVertexArray(i);
 	}
 
 	public static void _glBufferData(int i, ByteBuffer byteBuffer, int j) {
@@ -305,12 +305,12 @@ public class GlStateManager {
 	@Nullable
 	public static ByteBuffer _glMapBufferRange(int i, int j, int k, int l) {
 		RenderSystem.assertOnRenderThread();
-		return GL30.glMapBufferRange(i, j, k, l);
+		return net.vulkanic.VulkanicAPI.mapBufferRegion(i, j, k, l);
 	}
 
 	public static void _glUnmapBuffer(int i) {
 		RenderSystem.assertOnRenderThread();
-		GL15.glUnmapBuffer(i);
+		net.vulkanic.VulkanicAPI.unmapBufferData(i);
 	}
 
 	public static void _glDeleteBuffers(int i) {
@@ -342,12 +342,12 @@ public class GlStateManager {
 
 	public static void _glBlitFrameBuffer(int i, int j, int k, int l, int m, int n, int o, int p, int q, int r) {
 		RenderSystem.assertOnRenderThread();
-		GL30.glBlitFramebuffer(i, j, k, l, m, n, o, p, q, r);
+		net.vulkanic.VulkanicAPI.copyFramebufferRegion(i, j, k, l, m, n, o, p, q, r);
 	}
 
 	public static void _glDeleteFramebuffers(int i) {
 		RenderSystem.assertOnRenderThread();
-		GL30.glDeleteFramebuffers(i);
+		net.vulkanic.VulkanicAPI.destroyFramebufferObject(i);
 		if (readFbo == i) {
 			readFbo = 0;
 		}
@@ -359,7 +359,7 @@ public class GlStateManager {
 
 	public static int glGenFramebuffers() {
 		RenderSystem.assertOnRenderThread();
-		return GL30.glGenFramebuffers();
+		return net.vulkanic.VulkanicAPI.generateFramebufferObject();
 	}
 
 	public static void _glFramebufferTexture2D(int i, int j, int k, int l, int m) {

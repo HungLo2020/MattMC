@@ -64,4 +64,17 @@ public interface GraphicsBackend {
     void fillBufferWithData(int tgt, java.nio.ByteBuffer dat, int usg);
     void fillBufferWithSize(int tgt, long sz, int usg);
     void fillBufferSubregion(int tgt, long off, java.nio.ByteBuffer dat);
+    
+    // Vertex array objects
+    int createVertexArrayObject();
+    void selectVertexArray(int vao);
+    
+    // Buffer memory mapping
+    java.nio.ByteBuffer mapBufferRegion(int tgt, int off, int len, int acc);
+    void unmapBufferData(int tgt);
+    
+    // Framebuffer lifecycle
+    int generateFramebufferObject();
+    void destroyFramebufferObject(int fbo);
+    void copyFramebufferRegion(int srcX0, int srcY0, int srcX1, int srcY1, int dstX0, int dstY0, int dstX1, int dstY1, int msk, int flt);
 }
