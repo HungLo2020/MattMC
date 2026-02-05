@@ -517,6 +517,46 @@ public class OpenGLCommandBuffer implements VulkanicCommandBuffer {
     }
     
     @Override
+    public void getIntegerv(int pname, int[] params) {
+        GL11.glGetIntegerv(pname, params);
+    }
+    
+    @Override
+    public boolean isEnabled(int cap) {
+        return GL11.glIsEnabled(cap);
+    }
+    
+    @Override
+    public int getFramebufferAttachmentParameteri(int target, int attachment, int pname) {
+        return GL30.glGetFramebufferAttachmentParameteri(target, attachment, pname);
+    }
+    
+    @Override
+    public boolean isFramebuffer(int framebuffer) {
+        return GL30.glIsFramebuffer(framebuffer);
+    }
+    
+    @Override
+    public boolean isTexture(int texture) {
+        return GL11.glIsTexture(texture);
+    }
+    
+    @Override
+    public boolean isBuffer(int buffer) {
+        return GL15.glIsBuffer(buffer);
+    }
+    
+    @Override
+    public boolean isVertexArray(int array) {
+        return GL30.glIsVertexArray(array);
+    }
+    
+    @Override
+    public boolean isProgram(int program) {
+        return GL20.glIsProgram(program);
+    }
+    
+    @Override
     public void submit() {
         // No-op for OpenGL - commands are immediate
     }

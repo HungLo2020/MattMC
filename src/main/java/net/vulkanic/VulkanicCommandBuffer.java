@@ -128,7 +128,15 @@ public interface VulkanicCommandBuffer {
     int getError();
     String getString(int name);
     int getInteger(int pname);
+    void getIntegerv(int pname, int[] params);
     int getTexLevelParameteri(int target, int level, int pname);
+    boolean isEnabled(int cap);
+    int getFramebufferAttachmentParameteri(int target, int attachment, int pname);
+    boolean isFramebuffer(int framebuffer);
+    boolean isTexture(int texture);
+    boolean isBuffer(int buffer);
+    boolean isVertexArray(int array);
+    boolean isProgram(int program);
     void blendFuncSeparate(int sfactorRGB, int dfactorRGB, int sfactorAlpha, int dfactorAlpha);
     
     // Sync operations
