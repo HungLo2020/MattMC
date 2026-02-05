@@ -2,7 +2,6 @@ package com.seibel.distanthorizons.core.render.glObject;
 
 import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftGLWrapper;
-import net.blaze3d.opengl.GlStateManager;
 import net.vulkanic.Vulkanic;
 import net.vulkanic.VulkanicCommandBuffer;
 import org.lwjgl.opengl.GL32;
@@ -188,15 +187,15 @@ public class GLState
 		// attempting to set textures on the default frame buffer (ID 0) will throw errors
 		if (frameBufferSet)
 		{
-			GlStateManager._glFramebufferTexture2D(GL32.GL_FRAMEBUFFER, GL32.GL_COLOR_ATTACHMENT0, GL32.GL_TEXTURE_2D, this.frameBufferTexture0, 0);
-			GlStateManager._glFramebufferTexture2D(GL32.GL_FRAMEBUFFER, GL32.GL_COLOR_ATTACHMENT1, GL32.GL_TEXTURE_2D, this.frameBufferTexture1, 0);
-			GlStateManager._glFramebufferTexture2D(GL32.GL_FRAMEBUFFER, GL32.GL_DEPTH_ATTACHMENT, GL32.GL_TEXTURE_2D, this.frameBufferDepthTexture, 0);
+			GL32.glFramebufferTexture2D(GL32.GL_FRAMEBUFFER, GL32.GL_COLOR_ATTACHMENT0, GL32.GL_TEXTURE_2D, this.frameBufferTexture0, 0);
+			GL32.glFramebufferTexture2D(GL32.GL_FRAMEBUFFER, GL32.GL_COLOR_ATTACHMENT1, GL32.GL_TEXTURE_2D, this.frameBufferTexture1, 0);
+			GL32.glFramebufferTexture2D(GL32.GL_FRAMEBUFFER, GL32.GL_DEPTH_ATTACHMENT, GL32.GL_TEXTURE_2D, this.frameBufferDepthTexture, 0);
 		}
 		
-		GlStateManager._glBindVertexArray(cmd.isVertexArray(this.vao) ? this.vao : 0);
-		GlStateManager._glBindBuffer(GL32.GL_ARRAY_BUFFER, cmd.isBuffer(this.vbo) ? this.vbo : 0);
-		GlStateManager._glBindBuffer(GL32.GL_ELEMENT_ARRAY_BUFFER, cmd.isBuffer(this.ebo) ? this.ebo: 0);
-		GlStateManager._glUseProgram(cmd.isProgram(this.program) ? this.program : 0);
+		GL32.glBindVertexArray(cmd.isVertexArray(this.vao) ? this.vao : 0);
+		GL32.glBindBuffer(GL32.GL_ARRAY_BUFFER, cmd.isBuffer(this.vbo) ? this.vbo : 0);
+		GL32.glBindBuffer(GL32.GL_ELEMENT_ARRAY_BUFFER, cmd.isBuffer(this.ebo) ? this.ebo: 0);
+		GL32.glUseProgram(cmd.isProgram(this.program) ? this.program : 0);
 		
 		if (this.writeToDepthBuffer)
 		{
@@ -208,7 +207,7 @@ public class GLState
 		}
 		
 		GLMC.glBlendFunc(this.blendSrcColor, this.blendDstColor);
-		GlStateManager._blendEquationSeparate(this.blendEqRGB, this.blendEqAlpha);
+		GL32.glBlendEquationSeparate(this.blendEqRGB, this.blendEqAlpha);
 		GLMC.glBlendFuncSeparate(this.blendSrcColor, this.blendDstColor, this.blendSrcAlpha, this.blendDstAlpha);
 		
 		if (this.depth)
