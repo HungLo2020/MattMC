@@ -484,7 +484,7 @@ public class GlCommandEncoder implements CommandEncoder {
 					GL11.glBindTexture(34067, ((GlTexture)gpuTexture).id);
 				} else {
 					o = 3553;
-					GlStateManager._bindTexture(((GlTexture)gpuTexture).id);
+					VulkanicAPI.bindTexture(((GlTexture)gpuTexture).id);
 				}
 
 				GlStateManager._pixelStore(3314, m);
@@ -961,7 +961,7 @@ public class GlCommandEncoder implements CommandEncoder {
 						GL11.glBindTexture(34067, glTexture.id);
 					} else {
 						o = 3553;
-						GlStateManager._bindTexture(glTexture.id);
+						VulkanicAPI.bindTexture(glTexture.id);
 					}
 
 					GlStateManager._texParameter(o, 33084, glTextureView2x.baseMipLevel());

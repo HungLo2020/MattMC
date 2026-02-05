@@ -1,5 +1,6 @@
 package net.vulkanic.backends.opengl;
 
+import net.blaze3d.opengl.GlStateManager;
 import net.vulkanic.GraphicsBackend;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL13;
@@ -7,13 +8,19 @@ import org.lwjgl.opengl.GL20;
 
 /**
  * OpenGL implementation of the Vulkanic Graphics Backend.
- * Provides 1:1 mappings to OpenGL functions.
+ * Provides 1:1 mappings to OpenGL functions with proper state tracking.
  */
 public class OpenGLBackend implements GraphicsBackend {
     
     @Override
     public void bindTexture(int textureId) {
-        GL11.glBindTexture(GL11.GL_TEXTURE_2D, textureId);
+        // Use state tracking from GlStateManager to avoid redundant binds
+        // This is critical for proper texture unit management
+        int activeTexUnit = GlStateManager.activeTexture;
+        if (textureId != GlStateManager.TEXTURES[activeTexUnit].binding) {
+            GlStateManager.TEXTURES[activeTexUnit].binding = textureId;
+            GL11.glBindTexture(GL11.GL_TEXTURE_2D, textureId);
+        }
     }
     
     @Override
