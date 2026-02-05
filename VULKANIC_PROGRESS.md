@@ -6,27 +6,27 @@
 
 - **Total Files with OpenGL:** 152 files (across entire codebase)
 - **Files Migrated:** 0 complete, 1 in progress  
-- **Overall Progress:** ~13% (foundation phase)
-- **Current Focus:** GlStateManager.java (70% complete)
+- **Overall Progress:** ~15% (foundation phase)
+- **Current Focus:** GlStateManager.java (80% complete)
 
 ## Component Status
 
 | Component | Files | Status | Phase |
 |-----------|-------|--------|-------|
-| Blaze3D | 10 | 🔄 70% | 1 - Current |
+| Blaze3D | 10 | 🔄 80% | 1 - Current |
 | Sodium | 30 | ⏳ 0% | 3 - Future |
 | Iris | 68 | ⏳ 0% | 4 - Future |
 | Distant Horizons | 43 | ⏳ 0% | 5 - Future |
 | Minecraft Core | 0 | ✅ Clean | N/A |
 | Backend | 1 | ✅ Correct | N/A |
 
-## GlStateManager Progress (70%)
+## GlStateManager Progress (80%)
 
-**Abstracted:** 39/55 methods  
-**Remaining:** 16 methods  
-**GL calls removed:** 35 total (30 remaining)
+**Abstracted:** 44/55 methods  
+**Remaining:** 11 methods  
+**GL calls removed:** 40 total (25 remaining)
 
-### Completed Methods (39)
+### Completed Methods (44)
 
 **State Management (4):**
 - enable/disable (generic), setDepthTestFunction, setDepthWriteEnabled
@@ -40,8 +40,10 @@
 - createTexture, removeTexture
 - transferTexture2DImage, transferTexture2DSubregion (2 variants)
 
-**Shaders (1):**
+**Shaders (6):**
 - useProgram
+- constructShaderObject, disposeShaderObject, compileShaderSource
+- constructProgramObject, disposeProgramObject
 
 **Blending (3):**
 - enableBlend/disableBlend, configureBlendFunc
@@ -67,9 +69,9 @@
 **Error Checking (1):**
 - checkForErrors
 
-### Remaining Categories (16 methods)
+### Remaining Categories (11 methods)
 
-- **Shader ops:** 11 methods (create, compile, link, attach, get program/shader info, uniforms, bind attribs)
+- **Shader ops:** 6 methods (link, attach, get program/shader info, uniforms, bind attribs)
 - **Vertex attribute ops:** 2 methods (vertex attrib pointer, enable attrib)
 - **Sync ops:** 3 methods (fence, client wait, delete sync)
 
@@ -82,5 +84,5 @@
 
 ## Next Milestone
 
-**Target:** 80% GlStateManager completion (44/55 methods)  
-**Add:** 5 more methods (shader compilation/linking operations)
+**Target:** 90% GlStateManager completion (49/55 methods)  
+**Add:** 5 more methods (shader linking/info + vertex attribs)
