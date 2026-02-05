@@ -337,7 +337,8 @@ tasks.register('shaderPackZip', Zip) {
     description = 'Creates a zip of the ComplementaryHungLoIfied shader pack'
     
     // Always regenerate the zip to pick up any shader changes
-    outputs.upToDateWhen { false }
+    // I shouldnt need this though... if the shaders fail to pick up changes uncomment the line below
+    //outputs.upToDateWhen { false }
     
     archiveBaseName = 'ComplementaryHungLoIfied'
     archiveVersion = ''
