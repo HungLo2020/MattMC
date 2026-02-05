@@ -202,7 +202,7 @@ public class GlStateManager {
 		net.irisshaders.iris.gl.IrisRenderSystem.onProgramUse();
 		
 		iris$program = i;
-		GL20.glUseProgram(i);
+		net.vulkanic.VulkanicAPI.useProgram(i);
 		
 		// Iris: From MixinGlStateManager_DepthColorOverride - reset tessellation flag
 		net.irisshaders.iris.vertices.ImmediateState.usingTessellation = false;
@@ -517,7 +517,7 @@ public class GlStateManager {
 		iris$viewportWidth = k;
 		iris$viewportHeight = l;
 		
-		GL11.glViewport(i, j, k, l);
+		net.vulkanic.VulkanicAPI.viewport(i, j, k, l);
 	}
 
 	public static void _colorMask(boolean bl, boolean bl2, boolean bl3, boolean bl4) {
@@ -539,7 +539,7 @@ public class GlStateManager {
 
 	public static void _clear(int i) {
 		RenderSystem.assertOnRenderThread();
-		GL11.glClear(i);
+		net.vulkanic.VulkanicAPI.clear(i);
 		if (MacosUtil.IS_MACOS) {
 			_getError();
 		}
@@ -663,19 +663,37 @@ public class GlStateManager {
 			if (stateUnknown) {
 				this.enabled = bl;
 				stateUnknown = false;
-				if (bl) {
-					GL11.glEnable(this.state);
+				// Delegate to VulkanicAPI for GL_BLEND (3042)
+				if (this.state == 3042) {
+					if (bl) {
+						net.vulkanic.VulkanicAPI.enableBlend();
+					} else {
+						net.vulkanic.VulkanicAPI.disableBlend();
+					}
 				} else {
-					GL11.glDisable(this.state);
+					if (bl) {
+						GL11.glEnable(this.state);
+					} else {
+						GL11.glDisable(this.state);
+					}
 				}
 				return;
 			}
 			if (bl != this.enabled) {
 				this.enabled = bl;
-				if (bl) {
-					GL11.glEnable(this.state);
+				// Delegate to VulkanicAPI for GL_BLEND (3042)
+				if (this.state == 3042) {
+					if (bl) {
+						net.vulkanic.VulkanicAPI.enableBlend();
+					} else {
+						net.vulkanic.VulkanicAPI.disableBlend();
+					}
 				} else {
-					GL11.glDisable(this.state);
+					if (bl) {
+						GL11.glEnable(this.state);
+					} else {
+						GL11.glDisable(this.state);
+					}
 				}
 			}
 		}
