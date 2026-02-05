@@ -23,9 +23,9 @@ fi
 # Change to project root
 cd "$PROJECT_ROOT"
 
-# Downloads directory - defaults to matt's home on Kubuntu
+# Downloads directory - defaults to user's Downloads folder
 # Override with: DOWNLOADS_DIR=/path/to/dir ./RunExport.sh
-DOWNLOADS_DIR="${DOWNLOADS_DIR:-/home/matt/Downloads}"
+DOWNLOADS_DIR="${DOWNLOADS_DIR:-${HOME}/Downloads}"
 PROJECT_NAME="MattMC"
 
 echo "========================================="

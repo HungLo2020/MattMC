@@ -2,7 +2,8 @@
 set -euo pipefail
 
 # --- Config you can tweak ---
-ONEDRIVE_DIR="/home/matt/OneDrive/Apps/Programming/MattMC"
+# Default backup destination (can be overridden via environment variable)
+ONEDRIVE_DIR="${BACKUP_ONEDRIVE_DIR:-${HOME}/OneDrive/Apps/Programming/MattMC}"
 DOWNLOADS_DIR="${HOME}/Downloads"
 COPY_TO_DOWNLOADS=false   # set to true if you want a copy in Downloads as well
 

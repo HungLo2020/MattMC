@@ -7,7 +7,12 @@ build/
 .idea/workspace.xml
 .idea/shelf/
 .idea/mavenHomeManager.xml
+.idea/inspectionProfiles/
 *.iws
+*.iml
+.classpath
+.project
+.settings/
 out/
 
 # Runtime
@@ -26,10 +31,19 @@ buildrust/
 # OS
 .DS_Store
 Thumbs.db
+.Spotlight-V100
+.Trashes
+*~
+*.swp
+*.swo
 
 # Misc
 *.log
 *.tmp
+
+# Build artifacts and temporary files
+ERROR-LOG.txt
+build_output.txt
 
 # JDK (too large to commit)
 libraries/jdk-21/

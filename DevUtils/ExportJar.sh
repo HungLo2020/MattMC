@@ -1,9 +1,9 @@
 #!/bin/bash
 
 # ExportJar.sh - Build MattMC jar and copy it to external lib folder
-# Builds the project to ensure an up-to-date jar, then copies it to:
-#   /home/matt/Documents/MattMC/lib/
+# Builds the project to ensure an up-to-date jar, then copies it to a destination directory.
 # Overwrites the existing jar.
+# Usage: DEST_DIR=/path/to/lib ./ExportJar.sh
 
 set -e
 
@@ -25,7 +25,8 @@ fi
 cd "$PROJECT_ROOT"
 
 # Destination directory (override with: DEST_DIR=/path ./ExportJar.sh)
-DEST_DIR="${DEST_DIR:-/home/matt/Documents/MattMC/lib}"
+# Defaults to ${HOME}/Documents/MattMC/lib if not specified
+DEST_DIR="${DEST_DIR:-${HOME}/Documents/MattMC/lib}"
 
 echo "========================================="
 echo "  MattMC Jar Export Script"
