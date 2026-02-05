@@ -77,4 +77,11 @@ public interface GraphicsBackend {
     int generateFramebufferObject();
     void destroyFramebufferObject(int fbo);
     void copyFramebufferRegion(int srcX0, int srcY0, int srcX1, int srcY1, int dstX0, int dstY0, int dstX1, int dstY1, int msk, int flt);
+    
+    // Shader pipeline
+    int constructShaderObject(int shaderType);
+    void disposeShaderObject(int shader);
+    void compileShaderSource(int shader);
+    int constructProgramObject();
+    void disposeProgramObject(int program);
 }

@@ -221,4 +221,29 @@ public class OpenGLBackend implements GraphicsBackend {
     public void copyFramebufferRegion(int srcX0, int srcY0, int srcX1, int srcY1, int dstX0, int dstY0, int dstX1, int dstY1, int msk, int flt) {
         GL30.glBlitFramebuffer(srcX0, srcY0, srcX1, srcY1, dstX0, dstY0, dstX1, dstY1, msk, flt);
     }
+    
+    @Override
+    public int constructShaderObject(int shaderType) {
+        return GL20.glCreateShader(shaderType);
+    }
+    
+    @Override
+    public void disposeShaderObject(int shader) {
+        GL20.glDeleteShader(shader);
+    }
+    
+    @Override
+    public void compileShaderSource(int shader) {
+        GL20.glCompileShader(shader);
+    }
+    
+    @Override
+    public int constructProgramObject() {
+        return GL20.glCreateProgram();
+    }
+    
+    @Override
+    public void disposeProgramObject(int program) {
+        GL20.glDeleteProgram(program);
+    }
 }
