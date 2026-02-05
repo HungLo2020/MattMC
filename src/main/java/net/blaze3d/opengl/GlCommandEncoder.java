@@ -173,8 +173,13 @@ public class GlCommandEncoder implements CommandEncoder {
 			int j = ((GlTexture)gpuTexture).getFbo(this.device.directStateAccess(), gpuTexture2);
 			GlStateManager._glBindFramebuffer(36160, j);
 			GlStateManager._disableScissorTest();
-			GL11.glClearDepth(d);
-			GL11.glClearColor(ARGB.redFloat(i), ARGB.greenFloat(i), ARGB.blueFloat(i), ARGB.alphaFloat(i));
+			if (net.vulkanic.Vulkanic.isInitialized()) {
+				net.vulkanic.Vulkanic.getDevice().createCommandBuffer().glClearDepth(d);
+				net.vulkanic.Vulkanic.getDevice().createCommandBuffer().glClearColor(ARGB.redFloat(i), ARGB.greenFloat(i), ARGB.blueFloat(i), ARGB.alphaFloat(i));
+			} else {
+				GL11.glClearDepth(d);
+				GL11.glClearColor(ARGB.redFloat(i), ARGB.greenFloat(i), ARGB.blueFloat(i), ARGB.alphaFloat(i));
+			}
 			GlStateManager._depthMask(true);
 			GlStateManager._colorMask(true, true, true, true);
 			GlStateManager._clear(16640);
@@ -194,8 +199,13 @@ public class GlCommandEncoder implements CommandEncoder {
 			GlStateManager._glBindFramebuffer(36160, n);
 			GlStateManager._scissorBox(j, k, l, m);
 			GlStateManager._enableScissorTest();
-			GL11.glClearDepth(d);
-			GL11.glClearColor(ARGB.redFloat(i), ARGB.greenFloat(i), ARGB.blueFloat(i), ARGB.alphaFloat(i));
+			if (net.vulkanic.Vulkanic.isInitialized()) {
+				net.vulkanic.Vulkanic.getDevice().createCommandBuffer().glClearDepth(d);
+				net.vulkanic.Vulkanic.getDevice().createCommandBuffer().glClearColor(ARGB.redFloat(i), ARGB.greenFloat(i), ARGB.blueFloat(i), ARGB.alphaFloat(i));
+			} else {
+				GL11.glClearDepth(d);
+				GL11.glClearColor(ARGB.redFloat(i), ARGB.greenFloat(i), ARGB.blueFloat(i), ARGB.alphaFloat(i));
+			}
 			GlStateManager._depthMask(true);
 			GlStateManager._colorMask(true, true, true, true);
 			GlStateManager._clear(16640);
@@ -226,12 +236,21 @@ public class GlCommandEncoder implements CommandEncoder {
 		} else {
 			this.verifyDepthTexture(gpuTexture);
 			this.device.directStateAccess().bindFrameBufferTextures(this.drawFbo, 0, ((GlTexture)gpuTexture).id, 0, 36160);
-			GL11.glDrawBuffer(0);
-			GL11.glClearDepth(d);
+			if (net.vulkanic.Vulkanic.isInitialized()) {
+				net.vulkanic.Vulkanic.getDevice().createCommandBuffer().drawBuffer(0);
+				net.vulkanic.Vulkanic.getDevice().createCommandBuffer().glClearDepth(d);
+			} else {
+				GL11.glDrawBuffer(0);
+				GL11.glClearDepth(d);
+			}
 			GlStateManager._depthMask(true);
 			GlStateManager._disableScissorTest();
 			GlStateManager._clear(256);
-			GL11.glDrawBuffer(36064);
+			if (net.vulkanic.Vulkanic.isInitialized()) {
+				net.vulkanic.Vulkanic.getDevice().createCommandBuffer().drawBuffer(36064);
+			} else {
+				GL11.glDrawBuffer(36064);
+			}
 			GlStateManager._glFramebufferTexture2D(36160, 36096, 3553, 0, 0);
 			GlStateManager._glBindFramebuffer(36160, 0);
 		}
@@ -440,7 +459,11 @@ public class GlCommandEncoder implements CommandEncoder {
 				int q;
 				if ((gpuTexture.usage() & 16) != 0) {
 					q = GlConst.CUBEMAP_TARGETS[j % 6];
-					GL11.glBindTexture(34067, ((GlTexture)gpuTexture).id);
+					if (net.vulkanic.Vulkanic.isInitialized()) {
+						net.vulkanic.Vulkanic.getDevice().createCommandBuffer().bindTexture(((GlTexture)gpuTexture).id);
+					} else {
+						GL11.glBindTexture(34067, ((GlTexture)gpuTexture).id);
+					}
 				} else {
 					q = 3553;
 					GlStateManager._bindTexture(((GlTexture)gpuTexture).id);
@@ -492,7 +515,11 @@ public class GlCommandEncoder implements CommandEncoder {
 				int o;
 				if ((gpuTexture.usage() & 16) != 0) {
 					o = GlConst.CUBEMAP_TARGETS[j % 6];
-					GL11.glBindTexture(34067, ((GlTexture)gpuTexture).id);
+					if (net.vulkanic.Vulkanic.isInitialized()) {
+						net.vulkanic.Vulkanic.getDevice().createCommandBuffer().bindTexture(((GlTexture)gpuTexture).id);
+					} else {
+						GL11.glBindTexture(34067, ((GlTexture)gpuTexture).id);
+					}
 				} else {
 					o = 3553;
 					GlStateManager._bindTexture(((GlTexture)gpuTexture).id);
@@ -969,7 +996,11 @@ public class GlCommandEncoder implements CommandEncoder {
 					int o;
 					if ((glTexture.usage() & 16) != 0) {
 						o = 34067;
-						GL11.glBindTexture(34067, glTexture.id);
+						if (net.vulkanic.Vulkanic.isInitialized()) {
+							net.vulkanic.Vulkanic.getDevice().createCommandBuffer().bindTexture(glTexture.id);
+						} else {
+							GL11.glBindTexture(34067, glTexture.id);
+						}
 					} else {
 						o = 3553;
 						GlStateManager._bindTexture(glTexture.id);
