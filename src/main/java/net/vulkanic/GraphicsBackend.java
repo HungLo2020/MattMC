@@ -6,52 +6,32 @@ package net.vulkanic;
  */
 public interface GraphicsBackend {
     
-    /**
-     * Bind a texture to the current texture unit.
-     * @param textureId The texture ID (backend-specific)
-     */
     void bindTexture(int textureId);
-    
-    /**
-     * Set the viewport for rendering.
-     * @param x The x coordinate of the viewport
-     * @param y The y coordinate of the viewport
-     * @param width The width of the viewport
-     * @param height The height of the viewport
-     */
     void viewport(int x, int y, int width, int height);
-    
-    /**
-     * Clear the specified buffers.
-     * @param mask Buffer mask (backend-specific, e.g., color, depth, or stencil buffers)
-     */
     void clear(int mask);
-    
-    /**
-     * Enable blending.
-     */
     void enableBlend();
-    
-    /**
-     * Disable blending.
-     */
     void disableBlend();
-    
-    /**
-     * Set the active shader program.
-     * @param programId The shader program ID
-     */
     void useProgram(int programId);
-    
-    /**
-     * Enable a GL capability.
-     * @param cap The capability to enable (backend-specific constant)
-     */
     void enable(int cap);
-    
-    /**
-     * Disable a GL capability.
-     * @param cap The capability to disable (backend-specific constant)
-     */
     void disable(int cap);
+    
+    // Depth operations
+    void setDepthTestFunction(int func);
+    void setDepthWriteEnabled(boolean enabled);
+    
+    // Color operations
+    void setColorWriteMask(boolean r, boolean g, boolean b, boolean a);
+    
+    // Scissor operations
+    void setScissorBox(int x, int y, int w, int h);
+    
+    // Pixel operations
+    void setPixelStoreMode(int pname, int value);
+    
+    // Framebuffer operations
+    void attachFramebuffer(int target, int fbo);
+    void attachTextureToFramebuffer(int target, int attachment, int textarget, int texture, int level);
+    
+    // Buffer operations  
+    void attachBuffer(int target, int buffer);
 }

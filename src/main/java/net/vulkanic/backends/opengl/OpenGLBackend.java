@@ -3,20 +3,18 @@ package net.vulkanic.backends.opengl;
 import net.blaze3d.opengl.GlStateManager;
 import net.vulkanic.GraphicsBackend;
 import org.lwjgl.opengl.GL11;
-import org.lwjgl.opengl.GL13;
+import org.lwjgl.opengl.GL15;
 import org.lwjgl.opengl.GL20;
+import org.lwjgl.opengl.GL30;
 
 /**
  * OpenGL implementation of the Vulkanic Graphics Backend.
- * Provides 1:1 mappings to OpenGL functions with proper state tracking.
  * This is the ONLY place where direct OpenGL calls should be made.
  */
 public class OpenGLBackend implements GraphicsBackend {
     
     @Override
     public void bindTexture(int textureId) {
-        // Use state tracking from GlStateManager to avoid redundant binds
-        // This is critical for proper texture unit management
         int activeTexUnit = GlStateManager.activeTexture;
         if (textureId != GlStateManager.TEXTURES[activeTexUnit].binding) {
             GlStateManager.TEXTURES[activeTexUnit].binding = textureId;
@@ -57,5 +55,45 @@ public class OpenGLBackend implements GraphicsBackend {
     @Override
     public void disable(int cap) {
         GL11.glDisable(cap);
+    }
+    
+    @Override
+    public void setDepthTestFunction(int func) {
+        GL11.glDepthFunc(func);
+    }
+    
+    @Override
+    public void setDepthWriteEnabled(boolean enabled) {
+        GL11.glDepthMask(enabled);
+    }
+    
+    @Override
+    public void setColorWriteMask(boolean r, boolean g, boolean b, boolean a) {
+        GL11.glColorMask(r, g, b, a);
+    }
+    
+    @Override
+    public void setScissorBox(int x, int y, int w, int h) {
+        GL20.glScissor(x, y, w, h);
+    }
+    
+    @Override
+    public void setPixelStoreMode(int pname, int value) {
+        GL11.glPixelStorei(pname, value);
+    }
+    
+    @Override
+    public void attachFramebuffer(int target, int fbo) {
+        GL30.glBindFramebuffer(target, fbo);
+    }
+    
+    @Override
+    public void attachTextureToFramebuffer(int target, int attachment, int textarget, int texture, int level) {
+        GL30.glFramebufferTexture2D(target, attachment, textarget, texture, level);
+    }
+    
+    @Override
+    public void attachBuffer(int target, int buffer) {
+        GL15.glBindBuffer(target, buffer);
     }
 }

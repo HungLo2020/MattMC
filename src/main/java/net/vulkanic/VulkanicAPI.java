@@ -83,4 +83,36 @@ public class VulkanicAPI {
     public static void disable(int cap) {
         getBackend().disable(cap);
     }
+    
+    public static void setDepthTestFunction(int func) {
+        getBackend().setDepthTestFunction(func);
+    }
+    
+    public static void setDepthWriteEnabled(boolean enabled) {
+        getBackend().setDepthWriteEnabled(enabled);
+    }
+    
+    public static void setColorWriteMask(boolean r, boolean g, boolean b, boolean a) {
+        getBackend().setColorWriteMask(r, g, b, a);
+    }
+    
+    public static void setScissorBox(int x, int y, int w, int h) {
+        getBackend().setScissorBox(x, y, w, h);
+    }
+    
+    public static void setPixelStoreMode(int pname, int value) {
+        getBackend().setPixelStoreMode(pname, value);
+    }
+    
+    public static void attachFramebuffer(int target, int fbo) {
+        getBackend().attachFramebuffer(target, fbo);
+    }
+    
+    public static void attachTextureToFramebuffer(int target, int attachment, int textarget, int texture, int level) {
+        getBackend().attachTextureToFramebuffer(target, attachment, textarget, texture, level);
+    }
+    
+    public static void attachBuffer(int target, int buffer) {
+        getBackend().attachBuffer(target, buffer);
+    }
 }
