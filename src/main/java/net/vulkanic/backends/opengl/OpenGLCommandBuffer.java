@@ -474,6 +474,11 @@ public class OpenGLCommandBuffer implements VulkanicCommandBuffer {
         GL14.glBlendFuncSeparate(sfactorRGB, dfactorRGB, sfactorAlpha, dfactorAlpha);
     }
     
+    @Override
+    public void blendEquationSeparate(int modeRGB, int modeAlpha) {
+        GL20.glBlendEquationSeparate(modeRGB, modeAlpha);
+    }
+    
     // Sync operations
     @Override
     public long fenceSync(int condition, int flags) {

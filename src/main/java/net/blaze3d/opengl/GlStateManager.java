@@ -217,6 +217,17 @@ public class GlStateManager {
 		}
 	}
 
+	public static void _blendEquationSeparate(int modeRGB, int modeAlpha) {
+		RenderSystem.assertOnRenderThread();
+		
+		// Route through Vulkanic abstraction layer
+		if (net.vulkanic.Vulkanic.isInitialized()) {
+			net.vulkanic.Vulkanic.getDevice().createCommandBuffer().blendEquationSeparate(modeRGB, modeAlpha);
+		} else {
+			GL20.glBlendEquationSeparate(modeRGB, modeAlpha);
+		}
+	}
+
 	public static int glGetProgrami(int i, int j) {
 		RenderSystem.assertOnRenderThread();
 		if (net.vulkanic.Vulkanic.isInitialized()) {

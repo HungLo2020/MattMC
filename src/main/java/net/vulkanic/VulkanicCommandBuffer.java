@@ -138,6 +138,7 @@ public interface VulkanicCommandBuffer {
     boolean isVertexArray(int array);
     boolean isProgram(int program);
     void blendFuncSeparate(int sfactorRGB, int dfactorRGB, int sfactorAlpha, int dfactorAlpha);
+    void blendEquationSeparate(int modeRGB, int modeAlpha);
     
     // Sync operations
     long fenceSync(int condition, int flags);
