@@ -82,4 +82,31 @@ public class OpenGLDevice implements VulkanicDevice {
     public void close() {
         LOGGER.info("OpenGL backend closed");
     }
+    
+    // === Phase 5: Resource Creation Operations ===
+    
+    @Override
+    public int genBuffer() {
+        return org.lwjgl.opengl.GL15.glGenBuffers();
+    }
+    
+    @Override
+    public int genVertexArray() {
+        return org.lwjgl.opengl.GL30.glGenVertexArrays();
+    }
+    
+    @Override
+    public int genFramebuffer() {
+        return org.lwjgl.opengl.GL30.glGenFramebuffers();
+    }
+    
+    @Override
+    public int createShaderObject(int type) {
+        return org.lwjgl.opengl.GL20.glCreateShader(type);
+    }
+    
+    @Override
+    public int createProgramObject() {
+        return org.lwjgl.opengl.GL20.glCreateProgram();
+    }
 }

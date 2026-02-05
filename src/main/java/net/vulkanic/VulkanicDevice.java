@@ -90,4 +90,42 @@ public interface VulkanicDevice {
      * Releases all resources associated with this device.
      */
     void close();
+    
+    // === Phase 5: Resource Creation Operations ===
+    
+    /**
+     * Generates a new buffer object.
+     * 
+     * @return the buffer ID
+     */
+    int genBuffer();
+    
+    /**
+     * Generates a new vertex array object (VAO).
+     * 
+     * @return the VAO ID
+     */
+    int genVertexArray();
+    
+    /**
+     * Generates a new framebuffer object.
+     * 
+     * @return the framebuffer ID
+     */
+    int genFramebuffer();
+    
+    /**
+     * Creates a new shader object.
+     * 
+     * @param type the shader type (e.g., GL_VERTEX_SHADER, GL_FRAGMENT_SHADER)
+     * @return the shader ID
+     */
+    int createShaderObject(int type);
+    
+    /**
+     * Creates a new program object.
+     * 
+     * @return the program ID
+     */
+    int createProgramObject();
 }

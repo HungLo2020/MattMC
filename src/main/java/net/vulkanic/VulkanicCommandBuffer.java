@@ -86,5 +86,43 @@ public interface VulkanicCommandBuffer {
     // Read pixels operation
     void readPixels(int x, int y, int width, int height, int format, int type, long pixels);
     
+    // === Phase 5: Shader/Program Operations ===
+    void shaderSource(int shader, CharSequence[] source);
+    void compileShader(int shader);
+    int getShaderi(int shader, int pname);
+    String getShaderInfoLog(int shader, int maxLength);
+    void deleteShader(int shader);
+    void attachShader(int program, int shader);
+    void linkProgram(int program);
+    int getProgrami(int program, int pname);
+    String getProgramInfoLog(int program, int maxLength);
+    void deleteProgram(int program);
+    void useProgram(int program);
+    
+    // Uniform operations
+    int getUniformLocation(int program, CharSequence name);
+    void uniform1i(int location, int value);
+    
+    // Attribute operations
+    void bindAttribLocation(int program, int index, CharSequence name);
+    
+    // === Phase 5: Buffer Operations ===
+    void bindBuffer(int target, int buffer);
+    void bufferData(int target, java.nio.ByteBuffer data, int usage);
+    void bufferData(int target, long size, int usage);
+    void bufferSubData(int target, int offset, java.nio.ByteBuffer data);
+    java.nio.ByteBuffer mapBufferRange(int target, int offset, int length, int access);
+    void unmapBuffer(int target);
+    void deleteBuffer(int buffer);
+    
+    // === Phase 5: VAO Operations ===
+    void bindVertexArray(int array);
+    
+    // === Phase 5: Framebuffer Operations ===
+    void bindFramebuffer(int target, int framebuffer);
+    void framebufferTexture2D(int target, int attachment, int textarget, int texture, int level);
+    void blitFramebuffer(int srcX0, int srcY0, int srcX1, int srcY1, int dstX0, int dstY0, int dstX1, int dstY1, int mask, int filter);
+    void deleteFramebuffer(int framebuffer);
+    
     void submit();
 }

@@ -219,21 +219,35 @@ public class GlStateManager {
 
 	public static int glGetProgrami(int i, int j) {
 		RenderSystem.assertOnRenderThread();
+		if (net.vulkanic.Vulkanic.isInitialized()) {
+			return net.vulkanic.Vulkanic.getDevice().createCommandBuffer().getProgrami(i, j);
+		}
 		return GL20.glGetProgrami(i, j);
 	}
 
 	public static void glAttachShader(int i, int j) {
 		RenderSystem.assertOnRenderThread();
-		GL20.glAttachShader(i, j);
+		if (net.vulkanic.Vulkanic.isInitialized()) {
+			net.vulkanic.Vulkanic.getDevice().createCommandBuffer().attachShader(i, j);
+		} else {
+			GL20.glAttachShader(i, j);
+		}
 	}
 
 	public static void glDeleteShader(int i) {
 		RenderSystem.assertOnRenderThread();
-		GL20.glDeleteShader(i);
+		if (net.vulkanic.Vulkanic.isInitialized()) {
+			net.vulkanic.Vulkanic.getDevice().createCommandBuffer().deleteShader(i);
+		} else {
+			GL20.glDeleteShader(i);
+		}
 	}
 
 	public static int glCreateShader(int i) {
 		RenderSystem.assertOnRenderThread();
+		if (net.vulkanic.Vulkanic.isInitialized()) {
+			return net.vulkanic.Vulkanic.getDevice().createShaderObject(i);
+		}
 		return GL20.glCreateShader(i);
 	}
 
@@ -248,7 +262,12 @@ public class GlStateManager {
 		try (MemoryStack memoryStack = MemoryStack.stackPush()) {
 			PointerBuffer pointerBuffer = memoryStack.mallocPointer(1);
 			pointerBuffer.put(byteBuffer);
-			GL20C.nglShaderSource(i, 1, pointerBuffer.address0(), 0L);
+			if (net.vulkanic.Vulkanic.isInitialized()) {
+				// For Vulkanic, use the standard glShaderSource with CharSequence array
+				GL20C.nglShaderSource(i, 1, pointerBuffer.address0(), 0L);
+			} else {
+				GL20C.nglShaderSource(i, 1, pointerBuffer.address0(), 0L);
+			}
 		} finally {
 			MemoryUtil.memFree(byteBuffer);
 		}
@@ -256,11 +275,18 @@ public class GlStateManager {
 
 	public static void glCompileShader(int i) {
 		RenderSystem.assertOnRenderThread();
-		GL20.glCompileShader(i);
+		if (net.vulkanic.Vulkanic.isInitialized()) {
+			net.vulkanic.Vulkanic.getDevice().createCommandBuffer().compileShader(i);
+		} else {
+			GL20.glCompileShader(i);
+		}
 	}
 
 	public static int glGetShaderi(int i, int j) {
 		RenderSystem.assertOnRenderThread();
+		if (net.vulkanic.Vulkanic.isInitialized()) {
+			return net.vulkanic.Vulkanic.getDevice().createCommandBuffer().getShaderi(i, j);
+		}
 		return GL20.glGetShaderi(i, j);
 	}
 
@@ -274,7 +300,12 @@ public class GlStateManager {
 		net.irisshaders.iris.gl.IrisRenderSystem.onProgramUse();
 		
 		iris$program = i;
-		GL20.glUseProgram(i);
+		
+		if (net.vulkanic.Vulkanic.isInitialized()) {
+			net.vulkanic.Vulkanic.getDevice().createCommandBuffer().useProgram(i);
+		} else {
+			GL20.glUseProgram(i);
+		}
 		
 		// Iris: From MixinGlStateManager_DepthColorOverride - reset tessellation flag
 		net.irisshaders.iris.vertices.ImmediateState.usingTessellation = false;
@@ -282,42 +313,75 @@ public class GlStateManager {
 
 	public static int glCreateProgram() {
 		RenderSystem.assertOnRenderThread();
+		if (net.vulkanic.Vulkanic.isInitialized()) {
+			return net.vulkanic.Vulkanic.getDevice().createProgramObject();
+		}
 		return GL20.glCreateProgram();
 	}
 
 	public static void glDeleteProgram(int i) {
 		RenderSystem.assertOnRenderThread();
-		GL20.glDeleteProgram(i);
+		if (net.vulkanic.Vulkanic.isInitialized()) {
+			net.vulkanic.Vulkanic.getDevice().createCommandBuffer().deleteProgram(i);
+		} else {
+			GL20.glDeleteProgram(i);
+		}
 	}
 
 	public static void glLinkProgram(int i) {
 		RenderSystem.assertOnRenderThread();
-		GL20.glLinkProgram(i);
+		if (net.vulkanic.Vulkanic.isInitialized()) {
+			net.vulkanic.Vulkanic.getDevice().createCommandBuffer().linkProgram(i);
+		} else {
+			GL20.glLinkProgram(i);
+		}
 	}
 
 	public static int _glGetUniformLocation(int programId, CharSequence name) {
 		RenderSystem.assertOnRenderThread();
-		int location = GL20.glGetUniformLocation(programId, name);
+		int location;
+		
+		if (net.vulkanic.Vulkanic.isInitialized()) {
+			location = net.vulkanic.Vulkanic.getDevice().createCommandBuffer().getUniformLocation(programId, name);
+		} else {
+			location = GL20.glGetUniformLocation(programId, name);
+		}
 		
 		// Iris: Handle sampler name fallbacks for extended shaders
 		if (location == -1 && name.equals("Sampler0")) {
-			location = GL20.glGetUniformLocation(programId, "tex");
-			
-			if (location == -1) {
-				location = GL20.glGetUniformLocation(programId, "gtexture");
-				
+			if (net.vulkanic.Vulkanic.isInitialized()) {
+				location = net.vulkanic.Vulkanic.getDevice().createCommandBuffer().getUniformLocation(programId, "tex");
 				if (location == -1) {
-					location = GL20.glGetUniformLocation(programId, "texture");
+					location = net.vulkanic.Vulkanic.getDevice().createCommandBuffer().getUniformLocation(programId, "gtexture");
+					if (location == -1) {
+						location = net.vulkanic.Vulkanic.getDevice().createCommandBuffer().getUniformLocation(programId, "texture");
+					}
+				}
+			} else {
+				location = GL20.glGetUniformLocation(programId, "tex");
+				if (location == -1) {
+					location = GL20.glGetUniformLocation(programId, "gtexture");
+					if (location == -1) {
+						location = GL20.glGetUniformLocation(programId, "texture");
+					}
 				}
 			}
 		}
 		
 		if (location == -1 && name.equals("Sampler1")) {
-			location = GL20.glGetUniformLocation(programId, "iris_overlay");
+			if (net.vulkanic.Vulkanic.isInitialized()) {
+				location = net.vulkanic.Vulkanic.getDevice().createCommandBuffer().getUniformLocation(programId, "iris_overlay");
+			} else {
+				location = GL20.glGetUniformLocation(programId, "iris_overlay");
+			}
 		}
 		
 		if (location == -1 && name.equals("Sampler2")) {
-			location = GL20.glGetUniformLocation(programId, "lightmap");
+			if (net.vulkanic.Vulkanic.isInitialized()) {
+				location = net.vulkanic.Vulkanic.getDevice().createCommandBuffer().getUniformLocation(programId, "lightmap");
+			} else {
+				location = GL20.glGetUniformLocation(programId, "lightmap");
+			}
 		}
 		
 		return location;
@@ -325,12 +389,20 @@ public class GlStateManager {
 
 	public static void _glUniform1i(int i, int j) {
 		RenderSystem.assertOnRenderThread();
-		GL20.glUniform1i(i, j);
+		if (net.vulkanic.Vulkanic.isInitialized()) {
+			net.vulkanic.Vulkanic.getDevice().createCommandBuffer().uniform1i(i, j);
+		} else {
+			GL20.glUniform1i(i, j);
+		}
 	}
 
 	public static void _glBindAttribLocation(int i, int j, CharSequence charSequence) {
 		RenderSystem.assertOnRenderThread();
-		GL20.glBindAttribLocation(i, j, charSequence);
+		if (net.vulkanic.Vulkanic.isInitialized()) {
+			net.vulkanic.Vulkanic.getDevice().createCommandBuffer().bindAttribLocation(i, j, charSequence);
+		} else {
+			GL20.glBindAttribLocation(i, j, charSequence);
+		}
 	}
 
 	public static void incrementTrackedBuffers() {
@@ -341,65 +413,110 @@ public class GlStateManager {
 	public static int _glGenBuffers() {
 		RenderSystem.assertOnRenderThread();
 		incrementTrackedBuffers();
+		if (net.vulkanic.Vulkanic.isInitialized()) {
+			return net.vulkanic.Vulkanic.getDevice().genBuffer();
+		}
 		return GL15.glGenBuffers();
 	}
 
 	public static int _glGenVertexArrays() {
 		RenderSystem.assertOnRenderThread();
+		if (net.vulkanic.Vulkanic.isInitialized()) {
+			return net.vulkanic.Vulkanic.getDevice().genVertexArray();
+		}
 		return GL30.glGenVertexArrays();
 	}
 
 	public static void _glBindBuffer(int i, int j) {
 		RenderSystem.assertOnRenderThread();
-		GL15.glBindBuffer(i, j);
+		if (net.vulkanic.Vulkanic.isInitialized()) {
+			net.vulkanic.Vulkanic.getDevice().createCommandBuffer().bindBuffer(i, j);
+		} else {
+			GL15.glBindBuffer(i, j);
+		}
 	}
 
 	public static void _glBindVertexArray(int i) {
 		RenderSystem.assertOnRenderThread();
-		GL30.glBindVertexArray(i);
+		if (net.vulkanic.Vulkanic.isInitialized()) {
+			net.vulkanic.Vulkanic.getDevice().createCommandBuffer().bindVertexArray(i);
+		} else {
+			GL30.glBindVertexArray(i);
+		}
 	}
 
 	public static void _glBufferData(int i, ByteBuffer byteBuffer, int j) {
 		RenderSystem.assertOnRenderThread();
-		GL15.glBufferData(i, byteBuffer, j);
+		if (net.vulkanic.Vulkanic.isInitialized()) {
+			net.vulkanic.Vulkanic.getDevice().createCommandBuffer().bufferData(i, byteBuffer, j);
+		} else {
+			GL15.glBufferData(i, byteBuffer, j);
+		}
 	}
 
 	public static void _glBufferSubData(int i, int j, ByteBuffer byteBuffer) {
 		RenderSystem.assertOnRenderThread();
-		GL15.glBufferSubData(i, (long)j, byteBuffer);
+		if (net.vulkanic.Vulkanic.isInitialized()) {
+			net.vulkanic.Vulkanic.getDevice().createCommandBuffer().bufferSubData(i, j, byteBuffer);
+		} else {
+			GL15.glBufferSubData(i, (long)j, byteBuffer);
+		}
 	}
 
 	public static void _glBufferData(int i, long l, int j) {
 		RenderSystem.assertOnRenderThread();
-		GL15.glBufferData(i, l, j);
+		if (net.vulkanic.Vulkanic.isInitialized()) {
+			net.vulkanic.Vulkanic.getDevice().createCommandBuffer().bufferData(i, l, j);
+		} else {
+			GL15.glBufferData(i, l, j);
+		}
 	}
 
 	@Nullable
 	public static ByteBuffer _glMapBufferRange(int i, int j, int k, int l) {
 		RenderSystem.assertOnRenderThread();
+		if (net.vulkanic.Vulkanic.isInitialized()) {
+			return net.vulkanic.Vulkanic.getDevice().createCommandBuffer().mapBufferRange(i, j, k, l);
+		}
 		return GL30.glMapBufferRange(i, j, k, l);
 	}
 
 	public static void _glUnmapBuffer(int i) {
 		RenderSystem.assertOnRenderThread();
-		GL15.glUnmapBuffer(i);
+		if (net.vulkanic.Vulkanic.isInitialized()) {
+			net.vulkanic.Vulkanic.getDevice().createCommandBuffer().unmapBuffer(i);
+		} else {
+			GL15.glUnmapBuffer(i);
+		}
 	}
 
 	public static void _glDeleteBuffers(int i) {
 		RenderSystem.assertOnRenderThread();
 		numBuffers--;
 		PLOT_BUFFERS.setValue(numBuffers);
-		GL15.glDeleteBuffers(i);
+		if (net.vulkanic.Vulkanic.isInitialized()) {
+			net.vulkanic.Vulkanic.getDevice().createCommandBuffer().deleteBuffer(i);
+		} else {
+			GL15.glDeleteBuffers(i);
+		}
 	}
 
 	public static void _glBindFramebuffer(int i, int j) {
 		if ((i == 36008 || i == 36160) && readFbo != j) {
-			GL30.glBindFramebuffer(36008, j);
+			if (net.vulkanic.Vulkanic.isInitialized()) {
+				net.vulkanic.Vulkanic.getDevice().createCommandBuffer().bindFramebuffer(36008, j);
+			} else {
+				GL30.glBindFramebuffer(36008, j);
+			}
 			readFbo = j;
 		}
 
 		if ((i == 36009 || i == 36160) && writeFbo != j) {
-			GL30.glBindFramebuffer(36009, j);
+			if (net.vulkanic.Vulkanic.isInitialized()) {
+				net.vulkanic.Vulkanic.getDevice().createCommandBuffer().bindFramebuffer(36009, j);
+			} else {
+				GL30.glBindFramebuffer(36009, j);
+			}
 			writeFbo = j;
 		}
 	}
@@ -414,12 +531,20 @@ public class GlStateManager {
 
 	public static void _glBlitFrameBuffer(int i, int j, int k, int l, int m, int n, int o, int p, int q, int r) {
 		RenderSystem.assertOnRenderThread();
-		GL30.glBlitFramebuffer(i, j, k, l, m, n, o, p, q, r);
+		if (net.vulkanic.Vulkanic.isInitialized()) {
+			net.vulkanic.Vulkanic.getDevice().createCommandBuffer().blitFramebuffer(i, j, k, l, m, n, o, p, q, r);
+		} else {
+			GL30.glBlitFramebuffer(i, j, k, l, m, n, o, p, q, r);
+		}
 	}
 
 	public static void _glDeleteFramebuffers(int i) {
 		RenderSystem.assertOnRenderThread();
-		GL30.glDeleteFramebuffers(i);
+		if (net.vulkanic.Vulkanic.isInitialized()) {
+			net.vulkanic.Vulkanic.getDevice().createCommandBuffer().deleteFramebuffer(i);
+		} else {
+			GL30.glDeleteFramebuffers(i);
+		}
 		if (readFbo == i) {
 			readFbo = 0;
 		}
@@ -431,12 +556,19 @@ public class GlStateManager {
 
 	public static int glGenFramebuffers() {
 		RenderSystem.assertOnRenderThread();
+		if (net.vulkanic.Vulkanic.isInitialized()) {
+			return net.vulkanic.Vulkanic.getDevice().genFramebuffer();
+		}
 		return GL30.glGenFramebuffers();
 	}
 
 	public static void _glFramebufferTexture2D(int i, int j, int k, int l, int m) {
 		RenderSystem.assertOnRenderThread();
-		GL30.glFramebufferTexture2D(i, j, k, l, m);
+		if (net.vulkanic.Vulkanic.isInitialized()) {
+			net.vulkanic.Vulkanic.getDevice().createCommandBuffer().framebufferTexture2D(i, j, k, l, m);
+		} else {
+			GL30.glFramebufferTexture2D(i, j, k, l, m);
+		}
 	}
 
 	public static void glBlendFuncSeparate(int i, int j, int k, int l) {
@@ -446,11 +578,17 @@ public class GlStateManager {
 
 	public static String glGetShaderInfoLog(int i, int j) {
 		RenderSystem.assertOnRenderThread();
+		if (net.vulkanic.Vulkanic.isInitialized()) {
+			return net.vulkanic.Vulkanic.getDevice().createCommandBuffer().getShaderInfoLog(i, j);
+		}
 		return GL20.glGetShaderInfoLog(i, j);
 	}
 
 	public static String glGetProgramInfoLog(int i, int j) {
 		RenderSystem.assertOnRenderThread();
+		if (net.vulkanic.Vulkanic.isInitialized()) {
+			return net.vulkanic.Vulkanic.getDevice().createCommandBuffer().getProgramInfoLog(i, j);
+		}
 		return GL20.glGetProgramInfoLog(i, j);
 	}
 

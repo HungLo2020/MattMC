@@ -8,6 +8,7 @@ import net.vulkanic.VulkanicTexture;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL13;
 import org.lwjgl.opengl.GL14;
+import org.lwjgl.opengl.GL15;
 import org.lwjgl.opengl.GL20;
 import org.lwjgl.opengl.GL30;
 import org.lwjgl.opengl.GL43C;
@@ -302,6 +303,148 @@ public class OpenGLCommandBuffer implements VulkanicCommandBuffer {
     @Override
     public void readPixels(int x, int y, int width, int height, int format, int type, long pixels) {
         GL11.glReadPixels(x, y, width, height, format, type, pixels);
+    }
+    
+    // === Phase 5: Shader/Program Operations ===
+    
+    @Override
+    public void shaderSource(int shader, CharSequence[] source) {
+        GL20.glShaderSource(shader, source);
+    }
+    
+    @Override
+    public void compileShader(int shader) {
+        GL20.glCompileShader(shader);
+    }
+    
+    @Override
+    public int getShaderi(int shader, int pname) {
+        return GL20.glGetShaderi(shader, pname);
+    }
+    
+    @Override
+    public String getShaderInfoLog(int shader, int maxLength) {
+        return GL20.glGetShaderInfoLog(shader, maxLength);
+    }
+    
+    @Override
+    public void deleteShader(int shader) {
+        GL20.glDeleteShader(shader);
+    }
+    
+    @Override
+    public void attachShader(int program, int shader) {
+        GL20.glAttachShader(program, shader);
+    }
+    
+    @Override
+    public void linkProgram(int program) {
+        GL20.glLinkProgram(program);
+    }
+    
+    @Override
+    public int getProgrami(int program, int pname) {
+        return GL20.glGetProgrami(program, pname);
+    }
+    
+    @Override
+    public String getProgramInfoLog(int program, int maxLength) {
+        return GL20.glGetProgramInfoLog(program, maxLength);
+    }
+    
+    @Override
+    public void deleteProgram(int program) {
+        GL20.glDeleteProgram(program);
+    }
+    
+    @Override
+    public void useProgram(int program) {
+        GL20.glUseProgram(program);
+    }
+    
+    // Uniform operations
+    
+    @Override
+    public int getUniformLocation(int program, CharSequence name) {
+        return GL20.glGetUniformLocation(program, name);
+    }
+    
+    @Override
+    public void uniform1i(int location, int value) {
+        GL20.glUniform1i(location, value);
+    }
+    
+    // Attribute operations
+    
+    @Override
+    public void bindAttribLocation(int program, int index, CharSequence name) {
+        GL20.glBindAttribLocation(program, index, name);
+    }
+    
+    // === Phase 5: Buffer Operations ===
+    
+    @Override
+    public void bindBuffer(int target, int buffer) {
+        GL15.glBindBuffer(target, buffer);
+    }
+    
+    @Override
+    public void bufferData(int target, java.nio.ByteBuffer data, int usage) {
+        GL15.glBufferData(target, data, usage);
+    }
+    
+    @Override
+    public void bufferData(int target, long size, int usage) {
+        GL15.glBufferData(target, size, usage);
+    }
+    
+    @Override
+    public void bufferSubData(int target, int offset, java.nio.ByteBuffer data) {
+        GL15.glBufferSubData(target, (long)offset, data);
+    }
+    
+    @Override
+    public java.nio.ByteBuffer mapBufferRange(int target, int offset, int length, int access) {
+        return GL30.glMapBufferRange(target, offset, length, access);
+    }
+    
+    @Override
+    public void unmapBuffer(int target) {
+        GL15.glUnmapBuffer(target);
+    }
+    
+    @Override
+    public void deleteBuffer(int buffer) {
+        GL15.glDeleteBuffers(buffer);
+    }
+    
+    // === Phase 5: VAO Operations ===
+    
+    @Override
+    public void bindVertexArray(int array) {
+        GL30.glBindVertexArray(array);
+    }
+    
+    // === Phase 5: Framebuffer Operations ===
+    
+    @Override
+    public void bindFramebuffer(int target, int framebuffer) {
+        GL30.glBindFramebuffer(target, framebuffer);
+    }
+    
+    @Override
+    public void framebufferTexture2D(int target, int attachment, int textarget, int texture, int level) {
+        GL30.glFramebufferTexture2D(target, attachment, textarget, texture, level);
+    }
+    
+    @Override
+    public void blitFramebuffer(int srcX0, int srcY0, int srcX1, int srcY1, int dstX0, int dstY0, int dstX1, int dstY1, int mask, int filter) {
+        GL30.glBlitFramebuffer(srcX0, srcY0, srcX1, srcY1, dstX0, dstY0, dstX1, dstY1, mask, filter);
+    }
+    
+    @Override
+    public void deleteFramebuffer(int framebuffer) {
+        GL30.glDeleteFramebuffers(framebuffer);
     }
     
     @Override
