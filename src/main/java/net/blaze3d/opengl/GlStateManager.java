@@ -369,7 +369,7 @@ public class GlStateManager {
 
 	public static void glBlendFuncSeparate(int i, int j, int k, int l) {
 		RenderSystem.assertOnRenderThread();
-		GL14.glBlendFuncSeparate(i, j, k, l);
+		net.vulkanic.VulkanicAPI.configureBlendFunc(i, j, k, l);
 	}
 
 	public static String glGetShaderInfoLog(int i, int j) {
@@ -394,7 +394,7 @@ public class GlStateManager {
 
 	public static void _polygonMode(int i, int j) {
 		RenderSystem.assertOnRenderThread();
-		GL11.glPolygonMode(i, j);
+		net.vulkanic.VulkanicAPI.configurePolygonMode(i, j);
 	}
 
 	public static void _enablePolygonOffset() {
@@ -412,7 +412,7 @@ public class GlStateManager {
 		if (f != POLY_OFFSET.factor || g != POLY_OFFSET.units) {
 			POLY_OFFSET.factor = f;
 			POLY_OFFSET.units = g;
-			GL11.glPolygonOffset(f, g);
+			net.vulkanic.VulkanicAPI.configurePolygonOffset(f, g);
 		}
 	}
 
@@ -430,7 +430,7 @@ public class GlStateManager {
 		RenderSystem.assertOnRenderThread();
 		if (i != COLOR_LOGIC.op) {
 			COLOR_LOGIC.op = i;
-			GL11.glLogicOp(i);
+			net.vulkanic.VulkanicAPI.configureLogicOp(i);
 		}
 	}
 
@@ -444,13 +444,13 @@ public class GlStateManager {
 		
 		if (activeTexture != i - 33984) {
 			activeTexture = i - 33984;
-			GL13.glActiveTexture(i);
+			net.vulkanic.VulkanicAPI.activateTextureUnit(i);
 		}
 	}
 
 	public static void _texParameter(int i, int j, int k) {
 		RenderSystem.assertOnRenderThread();
-		GL11.glTexParameteri(i, j, k);
+		net.vulkanic.VulkanicAPI.configureTextureParameter(i, j, k);
 	}
 
 	public static int _getTexLevelParameter(int i, int j, int k) {
@@ -461,12 +461,12 @@ public class GlStateManager {
 		RenderSystem.assertOnRenderThread();
 		numTextures++;
 		PLOT_TEXTURES.setValue(numTextures);
-		return GL11.glGenTextures();
+		return net.vulkanic.VulkanicAPI.createTexture();
 	}
 
 	public static void _deleteTexture(int i) {
 		RenderSystem.assertOnRenderThread();
-		GL11.glDeleteTextures(i);
+		net.vulkanic.VulkanicAPI.removeTexture(i);
 
 		for (GlStateManager.TextureState textureState : TEXTURES) {
 			if (textureState.binding == i) {
@@ -573,7 +573,7 @@ public class GlStateManager {
 
 	public static void _drawArrays(int i, int j, int k) {
 		RenderSystem.assertOnRenderThread();
-		GL11.glDrawArrays(i, j, k);
+		net.vulkanic.VulkanicAPI.drawPrimitiveArrays(i, j, k);
 	}
 
 	public static void _pixelStore(int i, int j) {
@@ -588,7 +588,7 @@ public class GlStateManager {
 
 	public static int _getError() {
 		RenderSystem.assertOnRenderThread();
-		return GL11.glGetError();
+		return net.vulkanic.VulkanicAPI.checkForErrors();
 	}
 
 	public static void clearGlErrors() {

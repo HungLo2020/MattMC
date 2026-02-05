@@ -115,4 +115,44 @@ public class VulkanicAPI {
     public static void attachBuffer(int target, int buffer) {
         getBackend().attachBuffer(target, buffer);
     }
+    
+    public static void activateTextureUnit(int unit) {
+        getBackend().activateTextureUnit(unit);
+    }
+    
+    public static void configureTextureParameter(int target, int pname, int param) {
+        getBackend().configureTextureParameter(target, pname, param);
+    }
+    
+    public static int createTexture() {
+        return getBackend().createTexture();
+    }
+    
+    public static void removeTexture(int texture) {
+        getBackend().removeTexture(texture);
+    }
+    
+    public static void configurePolygonMode(int face, int mode) {
+        getBackend().configurePolygonMode(face, mode);
+    }
+    
+    public static void configurePolygonOffset(float factor, float units) {
+        getBackend().configurePolygonOffset(factor, units);
+    }
+    
+    public static void configureLogicOp(int opcode) {
+        getBackend().configureLogicOp(opcode);
+    }
+    
+    public static void drawPrimitiveArrays(int mode, int first, int count) {
+        getBackend().drawPrimitiveArrays(mode, first, count);
+    }
+    
+    public static void configureBlendFunc(int srcRgb, int dstRgb, int srcAlpha, int dstAlpha) {
+        getBackend().configureBlendFunc(srcRgb, dstRgb, srcAlpha, dstAlpha);
+    }
+    
+    public static int checkForErrors() {
+        return getBackend().checkForErrors();
+    }
 }

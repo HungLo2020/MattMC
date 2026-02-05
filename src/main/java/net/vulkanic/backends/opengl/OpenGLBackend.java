@@ -96,4 +96,54 @@ public class OpenGLBackend implements GraphicsBackend {
     public void attachBuffer(int target, int buffer) {
         GL15.glBindBuffer(target, buffer);
     }
+    
+    @Override
+    public void activateTextureUnit(int unit) {
+        org.lwjgl.opengl.GL13.glActiveTexture(unit);
+    }
+    
+    @Override
+    public void configureTextureParameter(int target, int pname, int param) {
+        GL11.glTexParameteri(target, pname, param);
+    }
+    
+    @Override
+    public int createTexture() {
+        return GL11.glGenTextures();
+    }
+    
+    @Override
+    public void removeTexture(int texture) {
+        GL11.glDeleteTextures(texture);
+    }
+    
+    @Override
+    public void configurePolygonMode(int face, int mode) {
+        GL11.glPolygonMode(face, mode);
+    }
+    
+    @Override
+    public void configurePolygonOffset(float factor, float units) {
+        GL11.glPolygonOffset(factor, units);
+    }
+    
+    @Override
+    public void configureLogicOp(int opcode) {
+        GL11.glLogicOp(opcode);
+    }
+    
+    @Override
+    public void drawPrimitiveArrays(int mode, int first, int count) {
+        GL11.glDrawArrays(mode, first, count);
+    }
+    
+    @Override
+    public void configureBlendFunc(int srcRgb, int dstRgb, int srcAlpha, int dstAlpha) {
+        org.lwjgl.opengl.GL14.glBlendFuncSeparate(srcRgb, dstRgb, srcAlpha, dstAlpha);
+    }
+    
+    @Override
+    public int checkForErrors() {
+        return GL11.glGetError();
+    }
 }

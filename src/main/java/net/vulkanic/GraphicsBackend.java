@@ -34,4 +34,22 @@ public interface GraphicsBackend {
     
     // Buffer operations  
     void attachBuffer(int target, int buffer);
+    
+    // Texture unit and parameter operations
+    void activateTextureUnit(int unit);
+    void configureTextureParameter(int target, int pname, int param);
+    int createTexture();
+    void removeTexture(int texture);
+    
+    // Polygon rendering operations
+    void configurePolygonMode(int face, int mode);
+    void configurePolygonOffset(float factor, float units);
+    void configureLogicOp(int opcode);
+    
+    // Drawing operations
+    void drawPrimitiveArrays(int mode, int first, int count);
+    void configureBlendFunc(int srcRgb, int dstRgb, int srcAlpha, int dstAlpha);
+    
+    // Error checking
+    int checkForErrors();
 }
