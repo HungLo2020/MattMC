@@ -461,7 +461,7 @@ public class OpenGLCommandBuffer implements VulkanicCommandBuffer {
     
     @Override
     public int getInteger(int pname) {
-        return GL11.glGetInteger(pname);
+        return GL32.glGetInteger(pname);
     }
     
     @Override
