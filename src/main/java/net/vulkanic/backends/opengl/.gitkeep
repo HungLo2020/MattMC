@@ -1,0 +1,11 @@
+# OpenGL Backend Implementation
+
+This directory will contain the OpenGL-specific implementation of the Vulkanic graphics abstraction layer.
+
+## Purpose
+
+The OpenGL backend provides compatibility with existing Minecraft rendering by implementing the Vulkanic frontend API using OpenGL/LWJGL calls.
+
+## Status
+
+⏳ Not yet implemented - awaiting frontend API design
