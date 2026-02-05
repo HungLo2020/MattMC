@@ -246,4 +246,39 @@ public class OpenGLBackend implements GraphicsBackend {
     public void disposeProgramObject(int program) {
         GL20.glDeleteProgram(program);
     }
+    
+    @Override
+    public void linkProgramBinary(int program) {
+        GL20.glLinkProgram(program);
+    }
+    
+    @Override
+    public void attachShaderToProgram(int program, int shader) {
+        GL20.glAttachShader(program, shader);
+    }
+    
+    @Override
+    public int queryProgramParameter(int program, int pname) {
+        return GL20.glGetProgrami(program, pname);
+    }
+    
+    @Override
+    public int queryShaderParameter(int shader, int pname) {
+        return GL20.glGetShaderi(shader, pname);
+    }
+    
+    @Override
+    public void configureVertexAttribute(int index, int size, int type, boolean normalized, int stride, long pointer) {
+        GL20.glVertexAttribPointer(index, size, type, normalized, stride, pointer);
+    }
+    
+    @Override
+    public void configureVertexAttributeInteger(int index, int size, int type, int stride, long pointer) {
+        org.lwjgl.opengl.GL30.glVertexAttribIPointer(index, size, type, stride, pointer);
+    }
+    
+    @Override
+    public void activateVertexAttribute(int index) {
+        GL20.glEnableVertexAttribArray(index);
+    }
 }

@@ -84,4 +84,13 @@ public interface GraphicsBackend {
     void compileShaderSource(int shader);
     int constructProgramObject();
     void disposeProgramObject(int program);
+    void linkProgramBinary(int program);
+    void attachShaderToProgram(int program, int shader);
+    int queryProgramParameter(int program, int pname);
+    int queryShaderParameter(int shader, int pname);
+    
+    // Vertex attributes
+    void configureVertexAttribute(int index, int size, int type, boolean normalized, int stride, long pointer);
+    void configureVertexAttributeInteger(int index, int size, int type, int stride, long pointer);
+    void activateVertexAttribute(int index);
 }

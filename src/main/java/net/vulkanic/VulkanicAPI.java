@@ -235,4 +235,32 @@ public class VulkanicAPI {
     public static void disposeProgramObject(int program) {
         getBackend().disposeProgramObject(program);
     }
+    
+    public static void linkProgramBinary(int program) {
+        getBackend().linkProgramBinary(program);
+    }
+    
+    public static void attachShaderToProgram(int program, int shader) {
+        getBackend().attachShaderToProgram(program, shader);
+    }
+    
+    public static int queryProgramParameter(int program, int pname) {
+        return getBackend().queryProgramParameter(program, pname);
+    }
+    
+    public static int queryShaderParameter(int shader, int pname) {
+        return getBackend().queryShaderParameter(shader, pname);
+    }
+    
+    public static void configureVertexAttribute(int index, int size, int type, boolean normalized, int stride, long pointer) {
+        getBackend().configureVertexAttribute(index, size, type, normalized, stride, pointer);
+    }
+    
+    public static void configureVertexAttributeInteger(int index, int size, int type, int stride, long pointer) {
+        getBackend().configureVertexAttributeInteger(index, size, type, stride, pointer);
+    }
+    
+    public static void activateVertexAttribute(int index) {
+        getBackend().activateVertexAttribute(index);
+    }
 }

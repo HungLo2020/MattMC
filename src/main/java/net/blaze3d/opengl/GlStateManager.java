@@ -147,12 +147,12 @@ public class GlStateManager {
 
 	public static int glGetProgrami(int i, int j) {
 		RenderSystem.assertOnRenderThread();
-		return GL20.glGetProgrami(i, j);
+		return net.vulkanic.VulkanicAPI.queryProgramParameter(i, j);
 	}
 
 	public static void glAttachShader(int i, int j) {
 		RenderSystem.assertOnRenderThread();
-		GL20.glAttachShader(i, j);
+		net.vulkanic.VulkanicAPI.attachShaderToProgram(i, j);
 	}
 
 	public static void glDeleteShader(int i) {
@@ -189,7 +189,7 @@ public class GlStateManager {
 
 	public static int glGetShaderi(int i, int j) {
 		RenderSystem.assertOnRenderThread();
-		return GL20.glGetShaderi(i, j);
+		return net.vulkanic.VulkanicAPI.queryShaderParameter(i, j);
 	}
 
 	public static void _glUseProgram(int i) {
@@ -220,7 +220,7 @@ public class GlStateManager {
 
 	public static void glLinkProgram(int i) {
 		RenderSystem.assertOnRenderThread();
-		GL20.glLinkProgram(i);
+		net.vulkanic.VulkanicAPI.linkProgramBinary(i);
 	}
 
 	public static int _glGetUniformLocation(int programId, CharSequence name) {
@@ -547,17 +547,17 @@ public class GlStateManager {
 
 	public static void _vertexAttribPointer(int i, int j, int k, boolean bl, int l, long m) {
 		RenderSystem.assertOnRenderThread();
-		GL20.glVertexAttribPointer(i, j, k, bl, l, m);
+		net.vulkanic.VulkanicAPI.configureVertexAttribute(i, j, k, bl, l, m);
 	}
 
 	public static void _vertexAttribIPointer(int i, int j, int k, int l, long m) {
 		RenderSystem.assertOnRenderThread();
-		GL30.glVertexAttribIPointer(i, j, k, l, m);
+		net.vulkanic.VulkanicAPI.configureVertexAttributeInteger(i, j, k, l, m);
 	}
 
 	public static void _enableVertexAttribArray(int i) {
 		RenderSystem.assertOnRenderThread();
-		GL20.glEnableVertexAttribArray(i);
+		net.vulkanic.VulkanicAPI.activateVertexAttribute(i);
 	}
 
 	public static void _drawElements(int i, int j, int k, long l) {
