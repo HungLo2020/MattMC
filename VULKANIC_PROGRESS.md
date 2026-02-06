@@ -1,15 +1,15 @@
 # Vulkanic OpenGL Abstraction - Progress Tracker
 
-**Last Updated:** 2026-02-06 19:20 UTC  
+**Last Updated:** 2026-02-06 19:30 UTC  
 **Status:** ✅ CORE ENGINE COMPLETE + IRIS MIGRATION IN PROGRESS
 
 ## 🎉 Executive Summary
 
 - **Sodium Client:** 484 files - **100% COMPLETE** ✅
 - **Blaze3D:** 123 files - **100% COMPLETE** ✅
-- **Iris Shaders:** 25/68 files - **36.8% COMPLETE** (in progress)
+- **Iris Shaders:** 30/68 files - **44.1% COMPLETE** (in progress)
 - **Total Core Engine:** 607 files - **ZERO OpenGL dependencies** 🎉
-- **Backend Methods:** 150+ GL calls abstracted
+- **Backend Methods:** 170+ GL calls abstracted
 
 ## 📊 Component Status
 
@@ -17,7 +17,7 @@
 |-----------|-------------|----------|-----------|----------|
 | **Sodium Client** | 484 | 484 | 0 | ✅ **100%** |
 | **Blaze3D** | 123 | 123 | 0 | ✅ **100%** |
-| **Iris Shaders** | 68 | 25 | 43 | 🔄 **36.8%** |
+| **Iris Shaders** | 68 | 30 | 38 | 🔄 **44.1%** |
 | **Core Total** | 607 | 607 | 0 | ✅ **100%** |
 | Distant Horizons | TBD | 0 | TBD | 0% (mod) |
 | Minecraft Core | N/A | N/A | N/A | ✅ Uses Blaze3D |
@@ -27,13 +27,13 @@
 
 ## 🆕 Iris Shaders - IN PROGRESS (68 files total)
 
-**Status:** Migration progressing - 25 files migrated, 43 remaining
+**Status:** Migration progressing - 30 files migrated, 38 remaining
 
 ### Files with OpenGL Dependencies
 - **Total Iris files**: 445
 - **Files with OpenGL imports**: 68
-- **Files migrated**: 25
-- **Remaining**: 43
+- **Files migrated**: 30
+- **Remaining**: 38
 
 ### Migration Session 1 (5 files - COMPLETE)
 
@@ -231,27 +231,83 @@ Added 4 new pixel store constants:
 - `GL_UNPACK_SKIP_PIXELS` = 0x0CF4
 - `GL_UNPACK_ALIGNMENT` = 0x0CF5
 
-**Location**: `net.irisshaders.iris.gl.texture.PixelFormat.java`
-- **Before**: 3 OpenGL imports (GL11C, GL12C, GL30C)
-- **After**: ZERO OpenGL imports, uses hex literals
-- **Changes**: All pixel format constants → hex literals (GL_RED, GL_RG, GL_RGB, etc.)
+### Migration Session 6 (5 files - COMPLETE)
 
-#### 10. **PixelType.java** ✅
-**Location**: `net.irisshaders.iris.gl.texture.PixelType.java`
-- **Before**: 3 OpenGL imports (GL11C, GL12C, GL30C)
-- **After**: ZERO OpenGL imports, uses hex literals
-- **Changes**: All pixel type constants → hex literals (GL_BYTE, GL_SHORT, GL_FLOAT, etc.)
+#### 26. **GlFramebuffer.java** ✅
+**Location**: `net.irisshaders.iris.gl.framebuffer.GlFramebuffer.java`
+- **Before**: 1 OpenGL import (GL30C), 12 GL constant usages
+- **After**: ZERO OpenGL imports, uses VulkanicAPI constants
+- **Changes**:
+  - `GL30C.GL_MAX_DRAW_BUFFERS` → `VulkanicAPI.GL_MAX_DRAW_BUFFERS`
+  - `GL30C.GL_MAX_COLOR_ATTACHMENTS` → `VulkanicAPI.GL_MAX_COLOR_ATTACHMENTS`
+  - `GL30C.GL_FRAMEBUFFER` → `VulkanicAPI.GL_FRAMEBUFFER`
+  - `GL30C.GL_READ_FRAMEBUFFER` → `VulkanicAPI.GL_READ_FRAMEBUFFER`
+  - `GL30C.GL_DRAW_FRAMEBUFFER` → `VulkanicAPI.GL_DRAW_FRAMEBUFFER`
+  - `GL30C.GL_DEPTH_ATTACHMENT` → `VulkanicAPI.GL_DEPTH_ATTACHMENT`
+  - `GL30C.GL_COLOR_ATTACHMENT0` → `VulkanicAPI.GL_COLOR_ATTACHMENT0`
+  - `GL30C.GL_NONE` → `VulkanicAPI.GL_NONE`
 
-### Remaining Files (43)
+#### 27. **GlImage.java** ✅
+**Location**: `net.irisshaders.iris.gl.image.GlImage.java`
+- **Before**: 5 OpenGL imports (GL11C, GL13C, GL20C, GL30C, GL43C), 10 GL constant usages
+- **After**: ZERO OpenGL imports (except ARBClearTexture for actual GL call), uses VulkanicAPI constants
+- **Changes**:
+  - `GL43C.GL_TEXTURE` → `VulkanicAPI.GL_TEXTURE`
+  - `GL11C.GL_TEXTURE_MIN_FILTER` → `VulkanicAPI.GL_TEXTURE_MIN_FILTER`
+  - `GL11C.GL_TEXTURE_MAG_FILTER` → `VulkanicAPI.GL_TEXTURE_MAG_FILTER`
+  - `GL11C.GL_TEXTURE_WRAP_S` → `VulkanicAPI.GL_TEXTURE_WRAP_S`
+  - `GL11C.GL_TEXTURE_WRAP_T` → `VulkanicAPI.GL_TEXTURE_WRAP_T`
+  - `GL30C.GL_TEXTURE_WRAP_R` → `VulkanicAPI.GL_TEXTURE_WRAP_R`
+  - `GL11C.GL_NEAREST/LINEAR` → `VulkanicAPI.GL_NEAREST/LINEAR`
+  - `GL13C.GL_CLAMP_TO_EDGE` → `VulkanicAPI.GL_CLAMP_TO_EDGE`
+  - `GL20C.GL_TEXTURE_MAX_LEVEL` → `VulkanicAPI.GL_TEXTURE_MAX_LEVEL`
+  - `GL20C.GL_TEXTURE_MIN/MAX_LOD` → `VulkanicAPI.GL_TEXTURE_MIN/MAX_LOD`
+  - `GL20C.GL_TEXTURE_LOD_BIAS` → `VulkanicAPI.GL_TEXTURE_LOD_BIAS`
+
+#### 28. **ShaderStorageBuffer.java** ✅
+**Location**: `net.irisshaders.iris.gl.buffer.ShaderStorageBuffer.java`
+- **Before**: 2 OpenGL imports (GL43C, GL46C), 8 GL constant usages
+- **After**: ZERO OpenGL imports, uses VulkanicAPI constants
+- **Changes**:
+  - `GL43C.GL_BUFFER` → `VulkanicAPI.GL_BUFFER`
+  - `GL43C.GL_SHADER_STORAGE_BUFFER` → `VulkanicAPI.GL_SHADER_STORAGE_BUFFER`
+  - `GL43C.GL_R8` → `VulkanicAPI.GL_R8`
+  - `GL43C.GL_RED` → `VulkanicAPI.GL_RED`
+  - `GL43C.GL_BYTE` → `VulkanicAPI.GL_BYTE`
+  - `GL46C.GL_DYNAMIC_STORAGE_BIT` → `VulkanicAPI.GL_DYNAMIC_STORAGE_BIT`
+
+#### 29. **ProgramSamplers.java** ✅
+**Location**: `net.irisshaders.iris.gl.program.ProgramSamplers.java`
+- **Before**: 1 OpenGL import (GL20C), 1 GL constant usage
+- **After**: ZERO OpenGL imports, uses VulkanicAPI constants
+- **Changes**:
+  - `GL20C.GL_TEXTURE0` → `VulkanicAPI.GL_TEXTURE0`
+
+#### 30. **ComputeProgram.java** ✅
+**Location**: `net.irisshaders.iris.gl.program.ComputeProgram.java`
+- **Before**: 2 OpenGL imports (GL43C, GL46C), 5 GL constant usages
+- **After**: ZERO OpenGL imports, uses VulkanicAPI constants
+- **Changes**:
+  - `GL43C.GL_COMPUTE_WORK_GROUP_SIZE` → `VulkanicAPI.GL_COMPUTE_WORK_GROUP_SIZE`
+  - `GL43C.GL_SHADER_IMAGE_ACCESS_BARRIER_BIT` → `VulkanicAPI.GL_SHADER_IMAGE_ACCESS_BARRIER_BIT`
+  - `GL43C.GL_TEXTURE_FETCH_BARRIER_BIT` → `VulkanicAPI.GL_TEXTURE_FETCH_BARRIER_BIT`
+  - `GL43C.GL_SHADER_STORAGE_BARRIER_BIT` → `VulkanicAPI.GL_SHADER_STORAGE_BARRIER_BIT`
+  - `GL46C.GL_DISPATCH_INDIRECT_BUFFER` → `VulkanicAPI.GL_DISPATCH_INDIRECT_BUFFER`
+
+### VulkanicAPI Extensions (Session 6)
+Added 40 new GL constants for framebuffer, texture, compute, and buffer operations:
+- **Framebuffer**: `GL_READ_FRAMEBUFFER`, `GL_DRAW_FRAMEBUFFER`, `GL_COLOR_ATTACHMENT0`, `GL_DEPTH_ATTACHMENT`, `GL_DEPTH_STENCIL_ATTACHMENT`, `GL_MAX_COLOR_ATTACHMENTS`, `GL_NONE`
+- **Texture Parameters**: `GL_TEXTURE_MIN_FILTER`, `GL_TEXTURE_MAG_FILTER`, `GL_TEXTURE_WRAP_S/T/R`, `GL_TEXTURE_MIN/MAX_LOD`, `GL_TEXTURE_LOD_BIAS`, `GL_LINEAR`, `GL_NEAREST`, `GL_CLAMP_TO_EDGE`
+- **Compute Shader**: `GL_COMPUTE_WORK_GROUP_SIZE`, `GL_SHADER_IMAGE_ACCESS_BARRIER_BIT`, `GL_TEXTURE_FETCH_BARRIER_BIT`, `GL_SHADER_STORAGE_BARRIER_BIT`, `GL_DISPATCH_INDIRECT_BUFFER`
+- **Image/Buffer**: `GL_RED`, `GL_BYTE`, `GL_R8`, `GL_BUFFER`, `GL_TEXTURE`, `GL_DYNAMIC_STORAGE_BIT`
+
+### Remaining Files (38)
 Key files still needing migration:
-- GlFramebuffer.java
 - Program.java
 - ProgramUniforms.java
-- ProgramSamplers.java
-- ComputeProgram.java
-- GlImage.java
+- GLDebug.java (large file with many GL calls)
 - IrisRenderSystem.java (large file with many GL calls)
-- Plus 56 more files
+- Plus 34 more files
 
 ---
 

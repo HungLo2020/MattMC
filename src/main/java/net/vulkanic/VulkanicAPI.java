@@ -98,6 +98,45 @@ public class VulkanicAPI {
     public static final int GL_CONTEXT_FLAGS = 0x821E;
     public static final int GL_DEBUG_OUTPUT = 0x92E0;
     
+    // OpenGL Constants - Framebuffer Targets and Attachments
+    public static final int GL_READ_FRAMEBUFFER = 0x8CA8;
+    public static final int GL_DRAW_FRAMEBUFFER = 0x8CA9;
+    public static final int GL_COLOR_ATTACHMENT0 = 0x8CE0;
+    public static final int GL_DEPTH_ATTACHMENT = 0x8D00;
+    public static final int GL_DEPTH_STENCIL_ATTACHMENT = 0x821A;
+    public static final int GL_MAX_COLOR_ATTACHMENTS = 0x8CDF;
+    public static final int GL_NONE = 0;
+    
+    // OpenGL Constants - Texture Parameters
+    public static final int GL_TEXTURE_MIN_FILTER = 0x2801;
+    public static final int GL_TEXTURE_MAG_FILTER = 0x2800;
+    public static final int GL_TEXTURE_WRAP_S = 0x2802;
+    public static final int GL_TEXTURE_WRAP_T = 0x2803;
+    public static final int GL_TEXTURE_WRAP_R = 0x8072;
+    public static final int GL_TEXTURE_MIN_LOD = 0x813A;
+    public static final int GL_TEXTURE_MAX_LOD = 0x813B;
+    public static final int GL_TEXTURE_LOD_BIAS = 0x8501;
+    public static final int GL_LINEAR = 0x2601;
+    public static final int GL_NEAREST = 0x2600;
+    public static final int GL_CLAMP_TO_EDGE = 0x812F;
+    
+    // OpenGL Constants - Compute Shader
+    public static final int GL_COMPUTE_WORK_GROUP_SIZE = 0x8267;
+    public static final int GL_SHADER_IMAGE_ACCESS_BARRIER_BIT = 0x00000020;
+    public static final int GL_TEXTURE_FETCH_BARRIER_BIT = 0x00000008;
+    public static final int GL_SHADER_STORAGE_BARRIER_BIT = 0x00002000;
+    public static final int GL_DISPATCH_INDIRECT_BUFFER = 0x90EE;
+    
+    // OpenGL Constants - Image/Texture Formats
+    public static final int GL_RED = 0x1903;
+    public static final int GL_BYTE = 0x1400;
+    public static final int GL_R8 = 0x8229;
+    
+    // OpenGL Constants - Other
+    public static final int GL_BUFFER = 0x82E0;
+    public static final int GL_TEXTURE = 0x1702;
+    public static final int GL_DYNAMIC_STORAGE_BIT = 0x0100;
+    
     // OpenGL Constants - Debug Severity Levels
     public static final int GL_DEBUG_SEVERITY_HIGH = 0x9146;
     public static final int GL_DEBUG_SEVERITY_MEDIUM = 0x9147;
