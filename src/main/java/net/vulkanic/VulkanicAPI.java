@@ -391,4 +391,24 @@ public class VulkanicAPI {
     public static boolean hasBufferStorageExtension() {
         return getBackend().hasBufferStorageExtension();
     }
+    
+    public static boolean hasVertexAttribBindingExtension() {
+        return getBackend().hasVertexAttribBindingExtension();
+    }
+    
+    public static void attachVertexBuffer(int bindingIndex, int buffer, long offset, int stride) {
+        getBackend().attachVertexBuffer(bindingIndex, buffer, offset, stride);
+    }
+    
+    public static void specifyVertexAttribFormat(int attribIndex, int size, int type, boolean normalized, int relativeOffset) {
+        getBackend().specifyVertexAttribFormat(attribIndex, size, type, normalized, relativeOffset);
+    }
+    
+    public static void specifyVertexAttribIFormat(int attribIndex, int size, int type, int relativeOffset) {
+        getBackend().specifyVertexAttribIFormat(attribIndex, size, type, relativeOffset);
+    }
+    
+    public static void associateVertexAttrib(int attribIndex, int bindingIndex) {
+        getBackend().associateVertexAttrib(attribIndex, bindingIndex);
+    }
 }

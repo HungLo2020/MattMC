@@ -484,4 +484,29 @@ public class OpenGLBackend implements GraphicsBackend {
     public boolean hasBufferStorageExtension() {
         return org.lwjgl.opengl.GL.getCapabilities().GL_ARB_buffer_storage;
     }
+    
+    @Override
+    public boolean hasVertexAttribBindingExtension() {
+        return org.lwjgl.opengl.GL.getCapabilities().GL_ARB_vertex_attrib_binding;
+    }
+    
+    @Override
+    public void attachVertexBuffer(int bindingIndex, int buffer, long offset, int stride) {
+        org.lwjgl.opengl.ARBVertexAttribBinding.glBindVertexBuffer(bindingIndex, buffer, offset, stride);
+    }
+    
+    @Override
+    public void specifyVertexAttribFormat(int attribIndex, int size, int type, boolean normalized, int relativeOffset) {
+        org.lwjgl.opengl.ARBVertexAttribBinding.glVertexAttribFormat(attribIndex, size, type, normalized, relativeOffset);
+    }
+    
+    @Override
+    public void specifyVertexAttribIFormat(int attribIndex, int size, int type, int relativeOffset) {
+        org.lwjgl.opengl.ARBVertexAttribBinding.glVertexAttribIFormat(attribIndex, size, type, relativeOffset);
+    }
+    
+    @Override
+    public void associateVertexAttrib(int attribIndex, int bindingIndex) {
+        org.lwjgl.opengl.ARBVertexAttribBinding.glVertexAttribBinding(attribIndex, bindingIndex);
+    }
 }

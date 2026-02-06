@@ -147,4 +147,11 @@ public interface GraphicsBackend {
     
     // Extension capability checking
     boolean hasBufferStorageExtension();
+    boolean hasVertexAttribBindingExtension();
+    
+    // ARB vertex attrib binding operations
+    void attachVertexBuffer(int bindingIndex, int buffer, long offset, int stride);
+    void specifyVertexAttribFormat(int attribIndex, int size, int type, boolean normalized, int relativeOffset);
+    void specifyVertexAttribIFormat(int attribIndex, int size, int type, int relativeOffset);
+    void associateVertexAttrib(int attribIndex, int bindingIndex);
 }

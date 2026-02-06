@@ -8,14 +8,13 @@ import java.util.Map;
 import java.util.Set;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
+import net.vulkanic.VulkanicAPI;
 import org.jetbrains.annotations.Nullable;
-import org.lwjgl.opengl.ARBVertexAttribBinding;
-import org.lwjgl.opengl.GLCapabilities;
 
 @Environment(EnvType.CLIENT)
 public abstract class VertexArrayCache {
-	public static VertexArrayCache create(GLCapabilities gLCapabilities, GlDebugLabel glDebugLabel, Set<String> set) {
-		if (gLCapabilities.GL_ARB_vertex_attrib_binding && GlDevice.USE_GL_ARB_vertex_attrib_binding) {
+	public static VertexArrayCache create(GlDebugLabel glDebugLabel, Set<String> set) {
+		if (VulkanicAPI.hasVertexAttribBindingExtension() && GlDevice.USE_GL_ARB_vertex_attrib_binding) {
 			set.add("GL_ARB_vertex_attrib_binding");
 			return new VertexArrayCache.Separate(glDebugLabel);
 		} else {
@@ -115,10 +114,10 @@ public abstract class VertexArrayCache {
 				GlStateManager._glBindVertexArray(vertexArray.id);
 				if (glBuffer != null && vertexArray.lastVertexBuffer != glBuffer) {
 					if (this.needsMesaWorkaround && vertexArray.lastVertexBuffer != null && vertexArray.lastVertexBuffer.handle == glBuffer.handle) {
-						ARBVertexAttribBinding.glBindVertexBuffer(0, 0, 0L, 0);
+						VulkanicAPI.attachVertexBuffer(0, 0, 0L, 0);
 					}
 
-					ARBVertexAttribBinding.glBindVertexBuffer(0, glBuffer.handle, 0L, vertexFormat.getVertexSize());
+					VulkanicAPI.attachVertexBuffer(0, glBuffer.handle, 0L, vertexFormat.getVertexSize());
 					vertexArray.lastVertexBuffer = glBuffer;
 				}
 			} else {
@@ -135,28 +134,28 @@ public abstract class VertexArrayCache {
 							case GENERIC:
 							case UV:
 								if (vertexFormatElement.type() == VertexFormatElement.Type.FLOAT) {
-									ARBVertexAttribBinding.glVertexAttribFormat(
+									VulkanicAPI.specifyVertexAttribFormat(
 										j, vertexFormatElement.count(), GlConst.toGl(vertexFormatElement.type()), false, vertexFormat.getOffset(vertexFormatElement)
 									);
 								} else {
-									ARBVertexAttribBinding.glVertexAttribIFormat(
+									VulkanicAPI.specifyVertexAttribIFormat(
 										j, vertexFormatElement.count(), GlConst.toGl(vertexFormatElement.type()), vertexFormat.getOffset(vertexFormatElement)
 									);
 								}
 								break;
 							case NORMAL:
 							case COLOR:
-								ARBVertexAttribBinding.glVertexAttribFormat(
+								VulkanicAPI.specifyVertexAttribFormat(
 									j, vertexFormatElement.count(), GlConst.toGl(vertexFormatElement.type()), true, vertexFormat.getOffset(vertexFormatElement)
 								);
 						}
 
-						ARBVertexAttribBinding.glVertexAttribBinding(j, 0);
+						VulkanicAPI.associateVertexAttrib(j, 0);
 					}
 				}
 
 				if (glBuffer != null) {
-					ARBVertexAttribBinding.glBindVertexBuffer(0, glBuffer.handle, 0L, vertexFormat.getVertexSize());
+					VulkanicAPI.attachVertexBuffer(0, glBuffer.handle, 0L, vertexFormat.getVertexSize());
 				}
 
 				VertexArrayCache.VertexArray vertexArray2 = new VertexArrayCache.VertexArray(i, vertexFormat, glBuffer);
