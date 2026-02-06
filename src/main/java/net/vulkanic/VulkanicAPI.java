@@ -319,4 +319,28 @@ public class VulkanicAPI {
     public static void uploadShaderSource(int shader, long pointerBufferAddress, int stringCount, long lengthsPointer) {
         getBackend().uploadShaderSource(shader, pointerBufferAddress, stringCount, lengthsPointer);
     }
+    
+    public static int generateQueryObject() {
+        return getBackend().generateQueryObject();
+    }
+    
+    public static void initiateQuery(int target, int id) {
+        getBackend().initiateQuery(target, id);
+    }
+    
+    public static void concludeQuery(int target) {
+        getBackend().concludeQuery(target);
+    }
+    
+    public static void disposeQueryObject(int id) {
+        getBackend().disposeQueryObject(id);
+    }
+    
+    public static int retrieveQueryObjectInt(int id, int pname) {
+        return getBackend().retrieveQueryObjectInt(id, pname);
+    }
+    
+    public static long retrieveQueryObjectInt64(int id, int pname) {
+        return getBackend().retrieveQueryObjectInt64(id, pname);
+    }
 }

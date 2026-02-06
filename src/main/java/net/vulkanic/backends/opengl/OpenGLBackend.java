@@ -351,4 +351,34 @@ public class OpenGLBackend implements GraphicsBackend {
     public void uploadShaderSource(int shader, long pointerBufferAddress, int stringCount, long lengthsPointer) {
         org.lwjgl.opengl.GL20C.nglShaderSource(shader, stringCount, pointerBufferAddress, lengthsPointer);
     }
+    
+    @Override
+    public int generateQueryObject() {
+        return org.lwjgl.opengl.GL32C.glGenQueries();
+    }
+    
+    @Override
+    public void initiateQuery(int target, int id) {
+        org.lwjgl.opengl.GL32C.glBeginQuery(target, id);
+    }
+    
+    @Override
+    public void concludeQuery(int target) {
+        org.lwjgl.opengl.GL32C.glEndQuery(target);
+    }
+    
+    @Override
+    public void disposeQueryObject(int id) {
+        org.lwjgl.opengl.GL32C.glDeleteQueries(id);
+    }
+    
+    @Override
+    public int retrieveQueryObjectInt(int id, int pname) {
+        return org.lwjgl.opengl.GL32C.glGetQueryObjecti(id, pname);
+    }
+    
+    @Override
+    public long retrieveQueryObjectInt64(int id, int pname) {
+        return org.lwjgl.opengl.ARBTimerQuery.glGetQueryObjecti64(id, pname);
+    }
 }

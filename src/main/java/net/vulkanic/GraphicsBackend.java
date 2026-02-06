@@ -117,4 +117,12 @@ public interface GraphicsBackend {
     
     // Shader source (native)
     void uploadShaderSource(int shader, long pointerBufferAddress, int stringCount, long lengthsPointer);
+    
+    // Timer query operations
+    int generateQueryObject();
+    void initiateQuery(int target, int id);
+    void concludeQuery(int target);
+    void disposeQueryObject(int id);
+    int retrieveQueryObjectInt(int id, int pname);
+    long retrieveQueryObjectInt64(int id, int pname);
 }
