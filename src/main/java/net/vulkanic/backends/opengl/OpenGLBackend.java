@@ -401,4 +401,67 @@ public class OpenGLBackend implements GraphicsBackend {
     public void labelObjectExt(int type, int object, String label) {
         org.lwjgl.opengl.EXTDebugLabel.glLabelObjectEXT(type, object, label);
     }
+    
+    @Override
+    public boolean supportsKhrDebug() {
+        return org.lwjgl.opengl.GL.getCapabilities().GL_KHR_debug;
+    }
+    
+    @Override
+    public boolean supportsArbDebugOutput() {
+        return org.lwjgl.opengl.GL.getCapabilities().GL_ARB_debug_output;
+    }
+    
+    @Override
+    public void setupKhrDebugSystem(int verbosityLevel, boolean synchronous, java.util.function.Consumer<String> messageHandler) {
+        org.lwjgl.opengl.GL11.glEnable(37600); // GL_DEBUG_OUTPUT
+        if (synchronous) {
+            org.lwjgl.opengl.GL11.glEnable(33346); // GL_DEBUG_OUTPUT_SYNCHRONOUS
+        }
+        
+        // Configure message filtering based on verbosity
+        java.util.List<Integer> levels = java.util.Arrays.asList(37190, 37191, 37192, 33387);
+        for (int i = 0; i < levels.size(); i++) {
+            boolean shouldEnable = i < verbosityLevel;
+            org.lwjgl.opengl.KHRDebug.glDebugMessageControl(4352, 4352, levels.get(i), (int[])null, shouldEnable);
+        }
+        
+        // Install callback
+        org.lwjgl.opengl.GLDebugMessageCallback callback = org.lwjgl.opengl.GLDebugMessageCallback.create(
+            (source, type, id, severity, length, message, userParam) -> {
+                String msg = org.lwjgl.opengl.GLDebugMessageCallback.getMessage(length, message);
+                messageHandler.accept(msg);
+            }
+        );
+        org.lwjgl.opengl.KHRDebug.glDebugMessageCallback(
+            net.blaze3d.platform.GLX.make(callback, net.blaze3d.platform.DebugMemoryUntracker::untrack), 
+            0L
+        );
+    }
+    
+    @Override
+    public void setupArbDebugSystem(int verbosityLevel, boolean synchronous, java.util.function.Consumer<String> messageHandler) {
+        if (synchronous) {
+            org.lwjgl.opengl.GL11.glEnable(33346); // GL_DEBUG_OUTPUT_SYNCHRONOUS
+        }
+        
+        // Configure message filtering based on verbosity  
+        java.util.List<Integer> levels = java.util.Arrays.asList(37190, 37191, 37192);
+        for (int i = 0; i < levels.size(); i++) {
+            boolean shouldEnable = i < verbosityLevel;
+            org.lwjgl.opengl.ARBDebugOutput.glDebugMessageControlARB(4352, 4352, levels.get(i), (int[])null, shouldEnable);
+        }
+        
+        // Install callback
+        org.lwjgl.opengl.GLDebugMessageARBCallback callback = org.lwjgl.opengl.GLDebugMessageARBCallback.create(
+            (source, type, id, severity, length, message, userParam) -> {
+                String msg = org.lwjgl.opengl.GLDebugMessageCallback.getMessage(length, message);
+                messageHandler.accept(msg);
+            }
+        );
+        org.lwjgl.opengl.ARBDebugOutput.glDebugMessageCallbackARB(
+            net.blaze3d.platform.GLX.make(callback, net.blaze3d.platform.DebugMemoryUntracker::untrack),
+            0L
+        );
+    }
 }

@@ -359,4 +359,20 @@ public class VulkanicAPI {
     public static void labelObjectExt(int type, int object, String label) {
         getBackend().labelObjectExt(type, object, label);
     }
+    
+    public static boolean supportsKhrDebug() {
+        return getBackend().supportsKhrDebug();
+    }
+    
+    public static boolean supportsArbDebugOutput() {
+        return getBackend().supportsArbDebugOutput();
+    }
+    
+    public static void setupKhrDebugSystem(int verbosityLevel, boolean synchronous, java.util.function.Consumer<String> messageHandler) {
+        getBackend().setupKhrDebugSystem(verbosityLevel, synchronous, messageHandler);
+    }
+    
+    public static void setupArbDebugSystem(int verbosityLevel, boolean synchronous, java.util.function.Consumer<String> messageHandler) {
+        getBackend().setupArbDebugSystem(verbosityLevel, synchronous, messageHandler);
+    }
 }

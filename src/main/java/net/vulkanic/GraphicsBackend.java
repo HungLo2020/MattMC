@@ -133,4 +133,10 @@ public interface GraphicsBackend {
     
     // Debug label operations (EXT_debug_label)
     void labelObjectExt(int type, int object, String label);
+    
+    // Debug system initialization (wraps entire debug setup)
+    boolean supportsKhrDebug();
+    boolean supportsArbDebugOutput();
+    void setupKhrDebugSystem(int verbosityLevel, boolean synchronous, java.util.function.Consumer<String> messageHandler);
+    void setupArbDebugSystem(int verbosityLevel, boolean synchronous, java.util.function.Consumer<String> messageHandler);
 }
