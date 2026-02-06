@@ -49,6 +49,7 @@ public interface GraphicsBackend {
     
     // Drawing operations
     void drawPrimitiveArrays(int mode, int first, int count);
+    void drawIndexedElements(int mode, int count, int type, long indices);
     void configureBlendFunc(int srcRgb, int dstRgb, int srcAlpha, int dstAlpha);
     
     // Error checking

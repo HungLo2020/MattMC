@@ -141,6 +141,11 @@ public class OpenGLBackend implements GraphicsBackend {
     public void drawPrimitiveArrays(int mode, int first, int count) {
         GL11.glDrawArrays(mode, first, count);
     }
+
+    @Override
+    public void drawIndexedElements(int mode, int count, int type, long indices) {
+        GL11.glDrawElements(mode, count, type, indices);
+    }
     
     @Override
     public void configureBlendFunc(int srcRgb, int dstRgb, int srcAlpha, int dstAlpha) {

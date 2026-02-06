@@ -569,7 +569,7 @@ public class GlStateManager {
 			mode = org.lwjgl.opengl.GL43C.GL_PATCHES;
 		}
 		
-		org.lwjgl.opengl.GL43C.glDrawElements(mode, j, k, l);
+		net.vulkanic.VulkanicAPI.drawIndexedElements(mode, j, k, l);
 	}
 
 	public static void _drawArrays(int i, int j, int k) {

@@ -151,6 +151,10 @@ public class VulkanicAPI {
     public static void drawPrimitiveArrays(int mode, int first, int count) {
         getBackend().drawPrimitiveArrays(mode, first, count);
     }
+
+    public static void drawIndexedElements(int mode, int count, int type, long indices) {
+        getBackend().drawIndexedElements(mode, count, type, indices);
+    }
     
     public static void configureBlendFunc(int srcRgb, int dstRgb, int srcAlpha, int dstAlpha) {
         getBackend().configureBlendFunc(srcRgb, dstRgb, srcAlpha, dstAlpha);
