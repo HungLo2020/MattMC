@@ -566,6 +566,36 @@ public class OpenGLBackend implements GraphicsBackend {
     }
     
     @Override
+    public void assignUniformFloat2(int location, float x, float y) {
+        org.lwjgl.opengl.GL30C.glUniform2f(location, x, y);
+    }
+    
+    @Override
+    public void assignUniformFloat2v(int location, float[] value) {
+        org.lwjgl.opengl.GL30C.glUniform2fv(location, value);
+    }
+    
+    @Override
+    public void assignUniformFloat3(int location, float x, float y, float z) {
+        org.lwjgl.opengl.GL30C.glUniform3f(location, x, y, z);
+    }
+    
+    @Override
+    public void assignUniformFloat3v(int location, float[] value) {
+        org.lwjgl.opengl.GL30C.glUniform3fv(location, value);
+    }
+    
+    @Override
+    public void assignUniformFloat4(int location, float x, float y, float z, float w) {
+        org.lwjgl.opengl.GL30C.glUniform4f(location, x, y, z, w);
+    }
+    
+    @Override
+    public void assignUniformFloat4v(int location, float[] value) {
+        org.lwjgl.opengl.GL30C.glUniform4fv(location, value);
+    }
+    
+    @Override
     public void assignUniformMatrix4f(int location, java.nio.FloatBuffer matrix) {
         org.lwjgl.opengl.GL30C.glUniformMatrix4fv(location, false, matrix);
     }
@@ -573,6 +603,16 @@ public class OpenGLBackend implements GraphicsBackend {
     @Override
     public void bindUniformBufferBase(int bindingPoint, int bufferId) {
         org.lwjgl.opengl.GL32C.glBindBufferBase(org.lwjgl.opengl.GL32C.GL_UNIFORM_BUFFER, bindingPoint, bufferId);
+    }
+    
+    @Override
+    public void bindFragmentDataLocation(int program, int colorNumber, CharSequence name) {
+        org.lwjgl.opengl.GL30C.glBindFragDataLocation(program, colorNumber, name);
+    }
+    
+    @Override
+    public int querySyncStatus(long sync, int pname, java.nio.IntBuffer values) {
+        return org.lwjgl.opengl.GL32C.glGetSynci(sync, pname, values);
     }
     
     @Override

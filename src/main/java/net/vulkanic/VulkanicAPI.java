@@ -456,12 +456,44 @@ public class VulkanicAPI {
         getBackend().assignUniformFloat(location, value);
     }
     
+    public static void assignUniformFloat2(int location, float x, float y) {
+        getBackend().assignUniformFloat2(location, x, y);
+    }
+    
+    public static void assignUniformFloat2v(int location, float[] value) {
+        getBackend().assignUniformFloat2v(location, value);
+    }
+    
+    public static void assignUniformFloat3(int location, float x, float y, float z) {
+        getBackend().assignUniformFloat3(location, x, y, z);
+    }
+    
+    public static void assignUniformFloat3v(int location, float[] value) {
+        getBackend().assignUniformFloat3v(location, value);
+    }
+    
+    public static void assignUniformFloat4(int location, float x, float y, float z, float w) {
+        getBackend().assignUniformFloat4(location, x, y, z, w);
+    }
+    
+    public static void assignUniformFloat4v(int location, float[] value) {
+        getBackend().assignUniformFloat4v(location, value);
+    }
+    
     public static void assignUniformMatrix4f(int location, java.nio.FloatBuffer matrix) {
         getBackend().assignUniformMatrix4f(location, matrix);
     }
     
     public static void bindUniformBufferBase(int bindingPoint, int bufferId) {
         getBackend().bindUniformBufferBase(bindingPoint, bufferId);
+    }
+    
+    public static void bindFragmentDataLocation(int program, int colorNumber, CharSequence name) {
+        getBackend().bindFragmentDataLocation(program, colorNumber, name);
+    }
+    
+    public static int querySyncStatus(long sync, int pname, java.nio.IntBuffer values) {
+        return getBackend().querySyncStatus(sync, pname, values);
     }
     
     public static org.lwjgl.opengl.GLCapabilities obtainGraphicsCapabilities() {

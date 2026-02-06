@@ -175,8 +175,20 @@ public interface GraphicsBackend {
     
     // Uniform operations (additional)
     void assignUniformFloat(int location, float value);
+    void assignUniformFloat2(int location, float x, float y);
+    void assignUniformFloat2v(int location, float[] value);
+    void assignUniformFloat3(int location, float x, float y, float z);
+    void assignUniformFloat3v(int location, float[] value);
+    void assignUniformFloat4(int location, float x, float y, float z, float w);
+    void assignUniformFloat4v(int location, float[] value);
     void assignUniformMatrix4f(int location, java.nio.FloatBuffer matrix);
     void bindUniformBufferBase(int bindingPoint, int bufferId);
+    
+    // Program fragment data binding
+    void bindFragmentDataLocation(int program, int colorNumber, CharSequence name);
+    
+    // Sync query operations
+    int querySyncStatus(long sync, int pname, java.nio.IntBuffer values);
     
     // GL Capabilities
     org.lwjgl.opengl.GLCapabilities obtainGraphicsCapabilities();
