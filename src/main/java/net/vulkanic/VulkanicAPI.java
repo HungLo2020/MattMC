@@ -451,4 +451,16 @@ public class VulkanicAPI {
     public static void attachBufferToTexture(int target, int internalFormat, int buffer) {
         getBackend().attachBufferToTexture(target, internalFormat, buffer);
     }
+    
+    public static void assignUniformFloat(int location, float value) {
+        getBackend().assignUniformFloat(location, value);
+    }
+    
+    public static void assignUniformMatrix4f(int location, java.nio.FloatBuffer matrix) {
+        getBackend().assignUniformMatrix4f(location, matrix);
+    }
+    
+    public static void bindUniformBufferBase(int bindingPoint, int bufferId) {
+        getBackend().bindUniformBufferBase(bindingPoint, bufferId);
+    }
 }

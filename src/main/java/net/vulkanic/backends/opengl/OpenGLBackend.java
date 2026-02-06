@@ -559,4 +559,19 @@ public class OpenGLBackend implements GraphicsBackend {
     public void attachBufferToTexture(int target, int internalFormat, int buffer) {
         org.lwjgl.opengl.GL31.glTexBuffer(target, internalFormat, buffer);
     }
+    
+    @Override
+    public void assignUniformFloat(int location, float value) {
+        org.lwjgl.opengl.GL30C.glUniform1f(location, value);
+    }
+    
+    @Override
+    public void assignUniformMatrix4f(int location, java.nio.FloatBuffer matrix) {
+        org.lwjgl.opengl.GL30C.glUniformMatrix4fv(location, false, matrix);
+    }
+    
+    @Override
+    public void bindUniformBufferBase(int bindingPoint, int bufferId) {
+        org.lwjgl.opengl.GL32C.glBindBufferBase(org.lwjgl.opengl.GL32C.GL_UNIFORM_BUFFER, bindingPoint, bufferId);
+    }
 }

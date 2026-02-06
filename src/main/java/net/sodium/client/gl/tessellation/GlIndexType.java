@@ -1,11 +1,9 @@
 package net.sodium.client.gl.tessellation;
 
-import org.lwjgl.opengl.GL32C;
-
 public enum GlIndexType {
-    UNSIGNED_BYTE(GL32C.GL_UNSIGNED_BYTE, 1),
-    UNSIGNED_SHORT(GL32C.GL_UNSIGNED_SHORT, 2),
-    UNSIGNED_INT(GL32C.GL_UNSIGNED_INT, 4);
+    UNSIGNED_BYTE(5121, 1),
+    UNSIGNED_SHORT(5123, 2),
+    UNSIGNED_INT(5125, 4);
 
     private final int id;
     private final int stride;

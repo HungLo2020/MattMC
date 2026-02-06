@@ -172,4 +172,9 @@ public interface GraphicsBackend {
     
     // Texture buffer operations
     void attachBufferToTexture(int target, int internalFormat, int buffer);
+    
+    // Uniform operations (additional)
+    void assignUniformFloat(int location, float value);
+    void assignUniformMatrix4f(int location, java.nio.FloatBuffer matrix);
+    void bindUniformBufferBase(int bindingPoint, int bufferId);
 }
