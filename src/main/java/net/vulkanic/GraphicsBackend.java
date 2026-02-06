@@ -250,4 +250,11 @@ public interface GraphicsBackend {
     
     // Capabilities
     GraphicsCapabilities getGraphicsCapabilities();
+    
+    // Debug object labeling
+    void labelObject(int identifier, int name, String label);
+    
+    // Debug group push/pop
+    void pushDebugGroup(int source, int id, String message);
+    void popDebugGroup();
 }

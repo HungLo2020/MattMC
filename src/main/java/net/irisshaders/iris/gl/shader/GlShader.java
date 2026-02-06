@@ -7,7 +7,6 @@ import net.irisshaders.iris.gl.IrisRenderSystem;
 import net.vulkanic.VulkanicAPI;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.lwjgl.opengl.KHRDebug;
 
 import java.util.Locale;
 
@@ -30,7 +29,7 @@ public class GlShader extends GlResource {
 		ShaderWorkarounds.safeShaderSource(handle, src);
 		GlStateManager.glCompileShader(handle);
 
-		GLDebug.nameObject(KHRDebug.GL_SHADER, handle, name + "(" + type.name().toLowerCase(Locale.ROOT) + ")");
+		GLDebug.nameObject(VulkanicAPI.GL_SHADER, handle, name + "(" + type.name().toLowerCase(Locale.ROOT) + ")");
 
 		String log = IrisRenderSystem.getShaderInfoLog(handle);
 

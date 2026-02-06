@@ -806,4 +806,19 @@ public class OpenGLBackend implements GraphicsBackend {
     public GraphicsCapabilities getGraphicsCapabilities() {
         return new GraphicsCapabilities(org.lwjgl.opengl.GL.getCapabilities());
     }
+    
+    @Override
+    public void labelObject(int identifier, int name, String label) {
+        org.lwjgl.opengl.KHRDebug.glObjectLabel(identifier, name, label);
+    }
+    
+    @Override
+    public void pushDebugGroup(int source, int id, String message) {
+        org.lwjgl.opengl.KHRDebug.glPushDebugGroup(source, id, message);
+    }
+    
+    @Override
+    public void popDebugGroup() {
+        org.lwjgl.opengl.KHRDebug.glPopDebugGroup();
+    }
 }

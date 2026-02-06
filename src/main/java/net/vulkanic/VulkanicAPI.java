@@ -151,6 +151,9 @@ public class VulkanicAPI {
     public static final int GL_DEBUG_SEVERITY_LOW = 0x9148;
     public static final int GL_DEBUG_SEVERITY_NOTIFICATION = 0x826B;
     
+    // OpenGL Constants - Debug Source
+    public static final int GL_DEBUG_SOURCE_APPLICATION = 0x824A;
+    
     // OpenGL Constants - Pixel Store Parameters
     public static final int GL_UNPACK_ROW_LENGTH = 0x0CF2;
     public static final int GL_UNPACK_SKIP_ROWS = 0x0CF3;
@@ -839,5 +842,19 @@ public class VulkanicAPI {
     
     public static void glCopyTexSubImage2D(int target, int level, int xoffset, int yoffset, int x, int y, int width, int height) {
         getBackend().glCopyTexSubImage2D(target, level, xoffset, yoffset, x, y, width, height);
+    }
+    
+    // Debug object labeling (KHRDebug/GL43)
+    public static void labelObject(int identifier, int name, String label) {
+        getBackend().labelObject(identifier, name, label);
+    }
+    
+    // Debug group push/pop (KHRDebug/GL43)
+    public static void pushDebugGroup(int source, int id, String message) {
+        getBackend().pushDebugGroup(source, id, message);
+    }
+    
+    public static void popDebugGroup() {
+        getBackend().popDebugGroup();
     }
 }
