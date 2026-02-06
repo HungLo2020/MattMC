@@ -10,6 +10,7 @@ import net.sodium.client.gl.sync.GlFence;
 import net.sodium.client.gl.tessellation.*;
 import net.sodium.client.gl.tessellation.*;
 import net.sodium.client.gl.util.EnumBitField;
+import net.vulkanic.VulkanicAPI;
 import org.lwjgl.opengl.*;
 import java.nio.ByteBuffer;
 
@@ -52,7 +53,7 @@ public class GLRenderDevice implements RenderDevice {
 
     @Override
     public GLCapabilities getCapabilities() {
-        return GL.getCapabilities();
+        return (GLCapabilities) VulkanicAPI.obtainGraphicsCapabilities();
     }
 
     @Override
@@ -75,7 +76,7 @@ public class GLRenderDevice implements RenderDevice {
 
     @Override
     public int getMaxTextureLodBias() {
-        return GL30C.glGetInteger(GL30C.GL_MAX_TEXTURE_LOD_BIAS);
+        return VulkanicAPI.queryIntegerState(33085); // GL_MAX_TEXTURE_LOD_BIAS
     }
 
     private void checkDeviceActive() {
