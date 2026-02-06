@@ -295,4 +295,28 @@ public class VulkanicAPI {
     public static void destroySync(long sync) {
         getBackend().destroySync(sync);
     }
+    
+    public static int queryIntegerState(int pname) {
+        return getBackend().queryIntegerState(pname);
+    }
+    
+    public static String queryStringInfo(int name) {
+        return getBackend().queryStringInfo(name);
+    }
+    
+    public static int pollErrorCode() {
+        return getBackend().pollErrorCode();
+    }
+    
+    public static void readFramebufferPixels(int x, int y, int width, int height, int format, int type, long pixels) {
+        getBackend().readFramebufferPixels(x, y, width, height, format, type, pixels);
+    }
+    
+    public static int queryTextureLevelParameter(int target, int level, int pname) {
+        return getBackend().queryTextureLevelParameter(target, level, pname);
+    }
+    
+    public static void uploadShaderSource(int shader, long pointerBufferAddress, int stringCount, long lengthsPointer) {
+        getBackend().uploadShaderSource(shader, pointerBufferAddress, stringCount, lengthsPointer);
+    }
 }

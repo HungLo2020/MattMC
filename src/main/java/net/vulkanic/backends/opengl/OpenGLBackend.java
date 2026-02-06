@@ -321,4 +321,34 @@ public class OpenGLBackend implements GraphicsBackend {
     public void destroySync(long sync) {
         org.lwjgl.opengl.GL32.glDeleteSync(sync);
     }
+    
+    @Override
+    public int queryIntegerState(int pname) {
+        return GL11.glGetInteger(pname);
+    }
+    
+    @Override
+    public String queryStringInfo(int name) {
+        return GL11.glGetString(name);
+    }
+    
+    @Override
+    public int pollErrorCode() {
+        return GL11.glGetError();
+    }
+    
+    @Override
+    public void readFramebufferPixels(int x, int y, int width, int height, int format, int type, long pixels) {
+        GL11.glReadPixels(x, y, width, height, format, type, pixels);
+    }
+    
+    @Override
+    public int queryTextureLevelParameter(int target, int level, int pname) {
+        return GL11.glGetTexLevelParameteri(target, level, pname);
+    }
+    
+    @Override
+    public void uploadShaderSource(int shader, long pointerBufferAddress, int stringCount, long lengthsPointer) {
+        org.lwjgl.opengl.GL20C.nglShaderSource(shader, stringCount, pointerBufferAddress, lengthsPointer);
+    }
 }

@@ -9,6 +9,7 @@ import java.nio.ByteBuffer;
 import java.util.stream.IntStream;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
+import net.vulkanic.VulkanicAPI;
 import org.jetbrains.annotations.Nullable;
 import org.lwjgl.PointerBuffer;
 import org.lwjgl.opengl.GL11;
@@ -176,7 +177,7 @@ public class GlStateManager {
 		try (MemoryStack memoryStack = MemoryStack.stackPush()) {
 			PointerBuffer pointerBuffer = memoryStack.mallocPointer(1);
 			pointerBuffer.put(byteBuffer);
-			GL20C.nglShaderSource(i, 1, pointerBuffer.address0(), 0L);
+			VulkanicAPI.uploadShaderSource(i, pointerBuffer.address0(), 1, 0L);
 		} finally {
 			MemoryUtil.memFree(byteBuffer);
 		}
@@ -454,7 +455,7 @@ public class GlStateManager {
 	}
 
 	public static int _getTexLevelParameter(int i, int j, int k) {
-		return GL11.glGetTexLevelParameteri(i, j, k);
+		return VulkanicAPI.queryTextureLevelParameter(i, j, k);
 	}
 
 	public static int _genTexture() {
@@ -583,7 +584,7 @@ public class GlStateManager {
 
 	public static void _readPixels(int i, int j, int k, int l, int m, int n, long o) {
 		RenderSystem.assertOnRenderThread();
-		GL11.glReadPixels(i, j, k, l, m, n, o);
+		VulkanicAPI.readFramebufferPixels(i, j, k, l, m, n, o);
 	}
 
 	public static int _getError() {
@@ -594,18 +595,18 @@ public class GlStateManager {
 	public static void clearGlErrors() {
 		RenderSystem.assertOnRenderThread();
 
-		while (GL11.glGetError() != 0) {
+		while (VulkanicAPI.pollErrorCode() != 0) {
 		}
 	}
 
 	public static String _getString(int i) {
 		RenderSystem.assertOnRenderThread();
-		return GL11.glGetString(i);
+		return VulkanicAPI.queryStringInfo(i);
 	}
 
 	public static int _getInteger(int i) {
 		RenderSystem.assertOnRenderThread();
-		return GL11.glGetInteger(i);
+		return VulkanicAPI.queryIntegerState(i);
 	}
 
 	public static long _glFenceSync(int i, int j) {

@@ -103,4 +103,18 @@ public interface GraphicsBackend {
     long createFenceSync(int condition, int flags);
     int waitForSync(long sync, int flags, long timeout);
     void destroySync(long sync);
+    
+    // Query operations
+    int queryIntegerState(int pname);
+    String queryStringInfo(int name);
+    int pollErrorCode();
+    
+    // Pixel readback
+    void readFramebufferPixels(int x, int y, int width, int height, int format, int type, long pixels);
+    
+    // Texture queries
+    int queryTextureLevelParameter(int target, int level, int pname);
+    
+    // Shader source (native)
+    void uploadShaderSource(int shader, long pointerBufferAddress, int stringCount, long lengthsPointer);
 }
