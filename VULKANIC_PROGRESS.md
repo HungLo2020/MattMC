@@ -1,13 +1,13 @@
 # Vulkanic OpenGL Abstraction - Progress Tracker
 
-**Last Updated:** 2026-02-06 19:40 UTC  
+**Last Updated:** 2026-02-06 19:57 UTC  
 **Status:** ✅ CORE ENGINE COMPLETE + IRIS MIGRATION IN PROGRESS
 
 ## 🎉 Executive Summary
 
 - **Sodium Client:** 484 files - **100% COMPLETE** ✅
 - **Blaze3D:** 123 files - **100% COMPLETE** ✅
-- **Iris Shaders:** 35/68 files - **51.5% COMPLETE** (in progress)
+- **Iris Shaders:** 40/68 files - **58.8% COMPLETE** (in progress)
 - **Total Core Engine:** 607 files - **ZERO OpenGL dependencies** 🎉
 - **Backend Methods:** 170+ GL calls abstracted
 
@@ -17,7 +17,7 @@
 |-----------|-------------|----------|-----------|----------|
 | **Sodium Client** | 484 | 484 | 0 | ✅ **100%** |
 | **Blaze3D** | 123 | 123 | 0 | ✅ **100%** |
-| **Iris Shaders** | 68 | 35 | 33 | 🔄 **51.5%** |
+| **Iris Shaders** | 68 | 40 | 28 | 🔄 **58.8%** |
 | **Core Total** | 607 | 607 | 0 | ✅ **100%** |
 | Distant Horizons | TBD | 0 | TBD | 0% (mod) |
 | Minecraft Core | N/A | N/A | N/A | ✅ Uses Blaze3D |
@@ -27,13 +27,13 @@
 
 ## 🆕 Iris Shaders - IN PROGRESS (68 files total)
 
-**Status:** Migration progressing - 35 files migrated, 33 remaining
+**Status:** Migration progressing - 40 files migrated, 28 remaining
 
 ### Files with OpenGL Dependencies
 - **Total Iris files**: 445
 - **Files with OpenGL imports**: 68
-- **Files migrated**: 35
-- **Remaining**: 33
+- **Files migrated**: 40
+- **Remaining**: 28
 
 ### Migration Session 1 (5 files - COMPLETE)
 
@@ -369,7 +369,86 @@ Added 6 new GL constants for texture operations, clear operations, and fog modes
 - **Texture Wrap Modes**: `GL_REPEAT` = 0x2901
 - **Fog Modes**: `GL_EXP2` = 0x0801
 
-### Remaining Files (33)
+### Migration Session 8 (5 files - COMPLETE)
+
+#### 36. **TextureInfoCache.java** ✅
+**Location**: `net.irisshaders.iris.pbr.TextureInfoCache.java`
+- **Before**: 1 OpenGL import (GL20C), 5 GL constant usages
+- **After**: ZERO OpenGL imports, uses VulkanicAPI constants
+- **Changes**:
+  - `GL20C.GL_TEXTURE_INTERNAL_FORMAT` → `VulkanicAPI.GL_TEXTURE_INTERNAL_FORMAT`
+  - `GL20C.GL_TEXTURE_WIDTH` → `VulkanicAPI.GL_TEXTURE_WIDTH`
+  - `GL20C.GL_TEXTURE_HEIGHT` → `VulkanicAPI.GL_TEXTURE_HEIGHT`
+  - `GL20C.GL_TEXTURE_BINDING_2D` → `VulkanicAPI.GL_TEXTURE_BINDING_2D`
+  - `GL20C.GL_TEXTURE_2D` → `VulkanicAPI.GL_TEXTURE_2D`
+
+#### 37. **TextureManipulationUtil.java** ✅
+**Location**: `net.irisshaders.iris.pbr.util.TextureManipulationUtil.java`
+- **Before**: 2 OpenGL imports (GL11, GL30), 9 GL constant usages
+- **After**: ZERO OpenGL imports, uses VulkanicAPI constants
+- **Changes**:
+  - `GL30.GL_FRAMEBUFFER_BINDING` → `VulkanicAPI.GL_FRAMEBUFFER_BINDING`
+  - `GL11.GL_COLOR_CLEAR_VALUE` → `VulkanicAPI.GL_COLOR_CLEAR_VALUE`
+  - `GL11.GL_TEXTURE_BINDING_2D` → `VulkanicAPI.GL_TEXTURE_BINDING_2D`
+  - `GL11.GL_VIEWPORT` → `VulkanicAPI.GL_VIEWPORT`
+  - `GL30.GL_FRAMEBUFFER` → `VulkanicAPI.GL_FRAMEBUFFER` (used 3 times)
+  - `GL30.GL_COLOR_ATTACHMENT0` → `VulkanicAPI.GL_COLOR_ATTACHMENT0` (used 2 times)
+  - `GL11.GL_TEXTURE_2D` → `VulkanicAPI.GL_TEXTURE_2D` (used 4 times)
+  - `GL11.GL_TEXTURE_WIDTH` → `VulkanicAPI.GL_TEXTURE_WIDTH`
+  - `GL11.GL_TEXTURE_HEIGHT` → `VulkanicAPI.GL_TEXTURE_HEIGHT`
+  - `GL11.GL_COLOR_BUFFER_BIT` → `VulkanicAPI.GL_COLOR_BUFFER_BIT`
+
+#### 38. **PipelineManager.java** ✅
+**Location**: `net.irisshaders.iris.pipeline.PipelineManager.java`
+- **Before**: 1 OpenGL import (GL20C), 2 GL constant usages
+- **After**: ZERO OpenGL imports, uses VulkanicAPI constants
+- **Changes**:
+  - `GL20C.GL_TEXTURE0` → `VulkanicAPI.GL_TEXTURE0` (used 2 times in resetTextureState method)
+
+#### 39. **NoiseTexture.java** ✅
+**Location**: `net.irisshaders.iris.targets.backed.NoiseTexture.java`
+- **Before**: 4 OpenGL imports (GL11C, GL13C, GL20C, GL43C), 13 GL constant usages
+- **After**: ZERO OpenGL imports, uses VulkanicAPI constants
+- **Changes**:
+  - `GL11C.GL_TEXTURE_2D` → `VulkanicAPI.GL_TEXTURE_2D` (used 11 times)
+  - `GL11C.GL_TEXTURE_MIN_FILTER` → `VulkanicAPI.GL_TEXTURE_MIN_FILTER`
+  - `GL11C.GL_TEXTURE_MAG_FILTER` → `VulkanicAPI.GL_TEXTURE_MAG_FILTER`
+  - `GL11C.GL_LINEAR` → `VulkanicAPI.GL_LINEAR` (used 2 times)
+  - `GL13C.GL_REPEAT` → `VulkanicAPI.GL_REPEAT` (used 2 times)
+  - `GL11C.GL_TEXTURE_WRAP_S` → `VulkanicAPI.GL_TEXTURE_WRAP_S`
+  - `GL11C.GL_TEXTURE_WRAP_T` → `VulkanicAPI.GL_TEXTURE_WRAP_T`
+  - `GL20C.GL_TEXTURE_MAX_LEVEL` → `VulkanicAPI.GL_TEXTURE_MAX_LEVEL`
+  - `GL20C.GL_TEXTURE_MIN_LOD` → `VulkanicAPI.GL_TEXTURE_MIN_LOD`
+  - `GL20C.GL_TEXTURE_MAX_LOD` → `VulkanicAPI.GL_TEXTURE_MAX_LOD`
+  - `GL20C.GL_TEXTURE_LOD_BIAS` → `VulkanicAPI.GL_TEXTURE_LOD_BIAS`
+  - `GL43C.GL_TEXTURE` → `VulkanicAPI.GL_TEXTURE`
+  - `GL11C.GL_RGB` → `VulkanicAPI.GL_RGB` (used 2 times)
+  - `GL11C.GL_UNSIGNED_BYTE` → `VulkanicAPI.GL_UNSIGNED_BYTE`
+  - `GL20C.GL_UNPACK_ALIGNMENT` → `VulkanicAPI.GL_UNPACK_ALIGNMENT`
+
+#### 40. **RenderTarget.java** ✅
+**Location**: `net.irisshaders.iris.targets.RenderTarget.java`
+- **Before**: 3 OpenGL imports (GL11C, GL13C, GL43C), 7 GL constant usages
+- **After**: ZERO OpenGL imports, uses VulkanicAPI constants
+- **Changes**:
+  - `GL11C.GL_TEXTURE_2D` → `VulkanicAPI.GL_TEXTURE_2D` (used 3 times)
+  - `GL11C.GL_TEXTURE_MIN_FILTER` → `VulkanicAPI.GL_TEXTURE_MIN_FILTER`
+  - `GL11C.GL_TEXTURE_MAG_FILTER` → `VulkanicAPI.GL_TEXTURE_MAG_FILTER`
+  - `GL11C.GL_LINEAR` → `VulkanicAPI.GL_LINEAR` (used 2 times)
+  - `GL11C.GL_NEAREST` → `VulkanicAPI.GL_NEAREST` (used 2 times)
+  - `GL13C.GL_CLAMP_TO_EDGE` → `VulkanicAPI.GL_CLAMP_TO_EDGE` (used 2 times)
+  - `GL11C.GL_TEXTURE_WRAP_S` → `VulkanicAPI.GL_TEXTURE_WRAP_S`
+  - `GL11C.GL_TEXTURE_WRAP_T` → `VulkanicAPI.GL_TEXTURE_WRAP_T`
+  - `GL43C.GL_TEXTURE` → `VulkanicAPI.GL_TEXTURE`
+
+### VulkanicAPI Extensions (Session 8)
+Added 9 new GL constants for texture level parameters, framebuffer binding, and queries:
+- **Texture Level Parameters**: `GL_TEXTURE_INTERNAL_FORMAT` = 0x1003, `GL_TEXTURE_WIDTH` = 0x1000, `GL_TEXTURE_HEIGHT` = 0x1001, `GL_TEXTURE_BINDING_2D` = 0x8069
+- **Framebuffer Binding**: `GL_FRAMEBUFFER_BINDING` = 0x8CA6
+- **Query Parameters**: `GL_COLOR_CLEAR_VALUE` = 0x0C22, `GL_VIEWPORT` = 0x0BA2
+- **Pixel Formats**: `GL_RGB` = 0x1907
+
+### Remaining Files (28)
 Key files still needing migration:
 - Program.java
 - ProgramUniforms.java

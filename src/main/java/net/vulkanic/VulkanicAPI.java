@@ -155,12 +155,26 @@ public class VulkanicAPI {
     // OpenGL Constants - Pixel Types and Formats
     public static final int GL_UNSIGNED_BYTE = 0x1401;
     public static final int GL_RGBA = 0x1908;
+    public static final int GL_RGB = 0x1907;
     
     // OpenGL Constants - Texture Wrap Modes
     public static final int GL_REPEAT = 0x2901;
     
     // OpenGL Constants - Fog Modes
     public static final int GL_EXP2 = 0x0801;
+    
+    // OpenGL Constants - Texture Level Parameters
+    public static final int GL_TEXTURE_INTERNAL_FORMAT = 0x1003;
+    public static final int GL_TEXTURE_WIDTH = 0x1000;
+    public static final int GL_TEXTURE_HEIGHT = 0x1001;
+    public static final int GL_TEXTURE_BINDING_2D = 0x8069;
+    
+    // OpenGL Constants - Framebuffer Binding
+    public static final int GL_FRAMEBUFFER_BINDING = 0x8CA6;
+    
+    // OpenGL Constants - Get Parameters
+    public static final int GL_COLOR_CLEAR_VALUE = 0x0C22;
+    public static final int GL_VIEWPORT = 0x0BA2;
     
     /**
      * Backend types supported by Vulkanic.
