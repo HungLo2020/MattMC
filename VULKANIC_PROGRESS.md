@@ -1,13 +1,13 @@
 # Vulkanic OpenGL Abstraction - Progress Tracker
 
-**Last Updated:** 2026-02-06 18:21 UTC  
+**Last Updated:** 2026-02-06 18:32 UTC  
 **Status:** ✅ CORE ENGINE COMPLETE + IRIS MIGRATION IN PROGRESS
 
 ## 🎉 Executive Summary
 
 - **Sodium Client:** 484 files - **100% COMPLETE** ✅
 - **Blaze3D:** 123 files - **100% COMPLETE** ✅
-- **Iris Shaders:** 5/68 files - **7.4% COMPLETE** (in progress)
+- **Iris Shaders:** 10/68 files - **14.7% COMPLETE** (in progress)
 - **Total Core Engine:** 607 files - **ZERO OpenGL dependencies** 🎉
 - **Backend Methods:** 140+ GL calls abstracted
 
@@ -17,7 +17,7 @@
 |-----------|-------------|----------|-----------|----------|
 | **Sodium Client** | 484 | 484 | 0 | ✅ **100%** |
 | **Blaze3D** | 123 | 123 | 0 | ✅ **100%** |
-| **Iris Shaders** | 68 | 5 | 63 | 🔄 **7.4%** |
+| **Iris Shaders** | 68 | 10 | 58 | 🔄 **14.7%** |
 | **Core Total** | 607 | 607 | 0 | ✅ **100%** |
 | Distant Horizons | TBD | 0 | TBD | 0% (mod) |
 | Minecraft Core | N/A | N/A | N/A | ✅ Uses Blaze3D |
@@ -27,13 +27,13 @@
 
 ## 🆕 Iris Shaders - IN PROGRESS (68 files total)
 
-**Status:** Migration started - 5 files migrated, 63 remaining
+**Status:** Migration progressing - 10 files migrated, 58 remaining
 
 ### Files with OpenGL Dependencies
 - **Total Iris files**: 445
 - **Files with OpenGL imports**: 68
-- **Files migrated**: 5
-- **Remaining**: 63
+- **Files migrated**: 10
+- **Remaining**: 58
 
 ### Migration Session 1 (5 files - COMPLETE)
 
@@ -75,7 +75,41 @@
 - **After**: ZERO OpenGL imports, uses private constants
 - **Changes**: Replaced all GL imports with private constants (GL constants defined locally)
 
-### Remaining Files (63)
+### Migration Session 2 (5 files - COMPLETE)
+
+#### 6. **DepthBufferFormat.java** ✅
+**Location**: `net.irisshaders.iris.gl.texture.DepthBufferFormat.java`
+- **Before**: 2 OpenGL imports (GL30C, GL43C)
+- **After**: ZERO OpenGL imports, uses private constants
+- **Changes**: All depth buffer format constants (GL_DEPTH_COMPONENT, GL_DEPTH_STENCIL, etc.) → private constants
+
+#### 7. **DepthCopyStrategy.java** ✅
+**Location**: `net.irisshaders.iris.gl.texture.DepthCopyStrategy.java`
+- **Before**: 4 OpenGL imports (GL, GL20C, GL30C, GL43C), direct GL capability check
+- **After**: ZERO OpenGL imports, uses VulkanicAPI
+- **Changes**:
+  - `GL.getCapabilities().glCopyImageSubData != MemoryUtil.NULL` → `VulkanicAPI.checkFunctionAvailable("glCopyImageSubData")`
+  - All GL constants → interface constants (GL_TEXTURE_2D, GL_DEPTH_BUFFER_BIT, etc.)
+
+#### 8. **InternalTextureFormat.java** ✅
+**Location**: `net.irisshaders.iris.gl.texture.InternalTextureFormat.java`
+- **Before**: 5 OpenGL imports (GL11C, GL30C, GL31C, GL33C, GL41C)
+- **After**: ZERO OpenGL imports, uses hex literals
+- **Changes**: Replaced 80+ GL texture format constants with hex literals (inline comments show original)
+
+#### 9. **PixelFormat.java** ✅
+**Location**: `net.irisshaders.iris.gl.texture.PixelFormat.java`
+- **Before**: 3 OpenGL imports (GL11C, GL12C, GL30C)
+- **After**: ZERO OpenGL imports, uses hex literals
+- **Changes**: All pixel format constants → hex literals (GL_RED, GL_RG, GL_RGB, etc.)
+
+#### 10. **PixelType.java** ✅
+**Location**: `net.irisshaders.iris.gl.texture.PixelType.java`
+- **Before**: 3 OpenGL imports (GL11C, GL12C, GL30C)
+- **After**: ZERO OpenGL imports, uses hex literals
+- **Changes**: All pixel type constants → hex literals (GL_BYTE, GL_SHORT, GL_FLOAT, etc.)
+
+### Remaining Files (58)
 Key files still needing migration:
 - GlFramebuffer.java
 - Program.java
@@ -175,7 +209,10 @@ Changes:
 
 **Total GL Methods Abstracted:** 140+ methods in OpenGLBackend
 
-### Recent Additions (Iris Migration)
+### Recent Additions (Iris Migration Session 2)
+- `checkFunctionAvailable(String functionName)` - Checks if a GL function is available at runtime
+
+### Previous Additions (Iris Migration Session 1)
 - `GL_VERTEX_SHADER`, `GL_FRAGMENT_SHADER`, `GL_GEOMETRY_SHADER`, `GL_COMPUTE_SHADER` - Shader type constants
 - `GL_TESS_CONTROL_SHADER`, `GL_TESS_EVALUATION_SHADER` - Tessellation shader constants
 - `GL_NEVER`, `GL_LESS`, `GL_EQUAL`, `GL_LEQUAL`, `GL_GREATER`, `GL_NOTEQUAL`, `GL_GEQUAL`, `GL_ALWAYS` - Alpha test functions
@@ -183,7 +220,7 @@ Changes:
 - `GL_DST_COLOR`, `GL_ONE_MINUS_DST_COLOR`, `GL_SRC_ALPHA`, `GL_ONE_MINUS_SRC_ALPHA` - More blend modes
 - `GL_DST_ALPHA`, `GL_ONE_MINUS_DST_ALPHA`, `GL_SRC_ALPHA_SATURATE` - Additional blend modes
 
-### Previous Additions
+### Previous Additions (Core Engine)
 - `initializeGraphicsCapabilities()` - OpenGL context initialization
 - `createBufferStorage(ByteBuffer)` - ByteBuffer overload for ARB compatibility
 - `copyBufferSubData()` - Buffer-to-buffer copying

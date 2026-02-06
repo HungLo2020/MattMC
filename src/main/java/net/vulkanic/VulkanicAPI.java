@@ -623,6 +623,10 @@ public class VulkanicAPI {
         return getBackend().initializeGraphicsCapabilities();
     }
     
+    public static boolean checkFunctionAvailable(String functionName) {
+        return getBackend().checkFunctionAvailable(functionName);
+    }
+    
     public static void copyBufferSubData(int readTarget, int writeTarget, long readOffset, long writeOffset, long size) {
         getBackend().copyBufferSubData(readTarget, writeTarget, readOffset, writeOffset, size);
     }

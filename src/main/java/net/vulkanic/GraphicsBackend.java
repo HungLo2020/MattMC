@@ -214,6 +214,7 @@ public interface GraphicsBackend {
     // Graphics Capabilities
     GraphicsCapabilities obtainGraphicsCapabilities();
     GraphicsCapabilities initializeGraphicsCapabilities();
+    boolean checkFunctionAvailable(String functionName);
     
     // Additional buffer operations for Sodium
     void copyBufferSubData(int readTarget, int writeTarget, long readOffset, long writeOffset, long size);

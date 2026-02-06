@@ -704,6 +704,18 @@ public class OpenGLBackend implements GraphicsBackend {
     }
     
     @Override
+    public boolean checkFunctionAvailable(String functionName) {
+        org.lwjgl.opengl.GLCapabilities caps = org.lwjgl.opengl.GL.getCapabilities();
+        try {
+            java.lang.reflect.Field field = caps.getClass().getField(functionName);
+            long address = field.getLong(caps);
+            return address != org.lwjgl.system.MemoryUtil.NULL;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+    
+    @Override
     public void copyBufferSubData(int readTarget, int writeTarget, long readOffset, long writeOffset, long size) {
         org.lwjgl.opengl.GL31.glCopyBufferSubData(readTarget, writeTarget, readOffset, writeOffset, size);
     }
