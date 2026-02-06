@@ -104,6 +104,12 @@ public class VulkanicAPI {
     public static final int GL_DEBUG_SEVERITY_LOW = 0x9148;
     public static final int GL_DEBUG_SEVERITY_NOTIFICATION = 0x826B;
     
+    // OpenGL Constants - Pixel Store Parameters
+    public static final int GL_UNPACK_ROW_LENGTH = 0x0CF2;
+    public static final int GL_UNPACK_SKIP_ROWS = 0x0CF3;
+    public static final int GL_UNPACK_SKIP_PIXELS = 0x0CF4;
+    public static final int GL_UNPACK_ALIGNMENT = 0x0CF5;
+    
     /**
      * Backend types supported by Vulkanic.
      */

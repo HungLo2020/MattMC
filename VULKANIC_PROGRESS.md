@@ -1,15 +1,15 @@
 # Vulkanic OpenGL Abstraction - Progress Tracker
 
-**Last Updated:** 2026-02-06 19:05 UTC  
+**Last Updated:** 2026-02-06 19:20 UTC  
 **Status:** ✅ CORE ENGINE COMPLETE + IRIS MIGRATION IN PROGRESS
 
 ## 🎉 Executive Summary
 
 - **Sodium Client:** 484 files - **100% COMPLETE** ✅
 - **Blaze3D:** 123 files - **100% COMPLETE** ✅
-- **Iris Shaders:** 20/68 files - **29.4% COMPLETE** (in progress)
+- **Iris Shaders:** 25/68 files - **36.8% COMPLETE** (in progress)
 - **Total Core Engine:** 607 files - **ZERO OpenGL dependencies** 🎉
-- **Backend Methods:** 145+ GL calls abstracted
+- **Backend Methods:** 150+ GL calls abstracted
 
 ## 📊 Component Status
 
@@ -17,7 +17,7 @@
 |-----------|-------------|----------|-----------|----------|
 | **Sodium Client** | 484 | 484 | 0 | ✅ **100%** |
 | **Blaze3D** | 123 | 123 | 0 | ✅ **100%** |
-| **Iris Shaders** | 68 | 20 | 48 | 🔄 **29.4%** |
+| **Iris Shaders** | 68 | 25 | 43 | 🔄 **36.8%** |
 | **Core Total** | 607 | 607 | 0 | ✅ **100%** |
 | Distant Horizons | TBD | 0 | TBD | 0% (mod) |
 | Minecraft Core | N/A | N/A | N/A | ✅ Uses Blaze3D |
@@ -27,13 +27,13 @@
 
 ## 🆕 Iris Shaders - IN PROGRESS (68 files total)
 
-**Status:** Migration progressing - 20 files migrated, 48 remaining
+**Status:** Migration progressing - 25 files migrated, 43 remaining
 
 ### Files with OpenGL Dependencies
 - **Total Iris files**: 445
 - **Files with OpenGL imports**: 68
-- **Files migrated**: 20
-- **Remaining**: 48
+- **Files migrated**: 25
+- **Remaining**: 43
 
 ### Migration Session 1 (5 files - COMPLETE)
 
@@ -187,6 +187,50 @@
 - **After**: ZERO OpenGL imports, ZERO GL calls
 - **Changes**:
   - `GL20C.nglShaderSource(glId, 1, pointers.address0(), 0)` → `VulkanicAPI.uploadShaderSourceNative(glId, 1, pointers.address0(), 0)`
+
+### Migration Session 5 (5 files - COMPLETE)
+
+#### 21. **TextureUploadHelper.java** ✅
+**Location**: `net.irisshaders.iris.gl.texture.TextureUploadHelper.java`
+- **Before**: 1 OpenGL import (GL20C), 4 GL constant usages
+- **After**: ZERO OpenGL imports, uses VulkanicAPI constants
+- **Changes**:
+  - `GL20C.GL_UNPACK_ROW_LENGTH` → `VulkanicAPI.GL_UNPACK_ROW_LENGTH`
+  - `GL20C.GL_UNPACK_SKIP_ROWS` → `VulkanicAPI.GL_UNPACK_SKIP_ROWS`
+  - `GL20C.GL_UNPACK_SKIP_PIXELS` → `VulkanicAPI.GL_UNPACK_SKIP_PIXELS`
+  - `GL20C.GL_UNPACK_ALIGNMENT` → `VulkanicAPI.GL_UNPACK_ALIGNMENT`
+
+#### 22. **Float2VectorCachedUniform.java** ✅
+**Location**: `net.irisshaders.iris.uniforms.custom.cached.Float2VectorCachedUniform.java`
+- **Before**: 1 OpenGL import (GL21 - unused)
+- **After**: ZERO OpenGL imports
+- **Changes**: Removed unused GL21 import
+
+#### 23. **Float3VectorCachedUniform.java** ✅
+**Location**: `net.irisshaders.iris.uniforms.custom.cached.Float3VectorCachedUniform.java`
+- **Before**: 1 OpenGL import (GL21 - unused)
+- **After**: ZERO OpenGL imports
+- **Changes**: Removed unused GL21 import
+
+#### 24. **Float4VectorCachedUniform.java** ✅
+**Location**: `net.irisshaders.iris.uniforms.custom.cached.Float4VectorCachedUniform.java`
+- **Before**: 1 OpenGL import (GL21 - unused)
+- **After**: ZERO OpenGL imports
+- **Changes**: Removed unused GL21 import
+
+#### 25. **Int3VectorCachedUniform.java** ✅
+**Location**: `net.irisshaders.iris.uniforms.custom.cached.Int3VectorCachedUniform.java`
+- **Before**: 1 OpenGL import (GL21 - unused)
+- **After**: ZERO OpenGL imports
+- **Changes**: Removed unused GL21 import
+
+### VulkanicAPI Extensions (Session 5)
+Added 4 new pixel store constants:
+- `GL_UNPACK_ROW_LENGTH` = 0x0CF2
+- `GL_UNPACK_SKIP_ROWS` = 0x0CF3
+- `GL_UNPACK_SKIP_PIXELS` = 0x0CF4
+- `GL_UNPACK_ALIGNMENT` = 0x0CF5
+
 **Location**: `net.irisshaders.iris.gl.texture.PixelFormat.java`
 - **Before**: 3 OpenGL imports (GL11C, GL12C, GL30C)
 - **After**: ZERO OpenGL imports, uses hex literals
@@ -198,7 +242,7 @@
 - **After**: ZERO OpenGL imports, uses hex literals
 - **Changes**: All pixel type constants → hex literals (GL_BYTE, GL_SHORT, GL_FLOAT, etc.)
 
-### Remaining Files (58)
+### Remaining Files (43)
 Key files still needing migration:
 - GlFramebuffer.java
 - Program.java
