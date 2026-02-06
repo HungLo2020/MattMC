@@ -12,6 +12,9 @@ public interface GraphicsBackend {
     void bindTexture(int textureId);
     void bindTexture(int target, int textureId);  // For explicit target binding
     void viewport(int x, int y, int width, int height);
+    void activeTexture(int texture);
+    void enableCull();
+    void disableCull();
     void clear(int mask);
     void enableBlend();
     void disableBlend();
@@ -62,6 +65,7 @@ public interface GraphicsBackend {
     void configureTextureParameter(int target, int pname, int param);
     int createTexture();
     void removeTexture(int texture);
+    void copyTexSubImage2D(int texture, int target, int level, int xoffset, int yoffset, int x, int y, int width, int height);
     
     // Polygon rendering operations
     void configurePolygonMode(int face, int mode);

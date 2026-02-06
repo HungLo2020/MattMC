@@ -3,10 +3,8 @@ package net.vulkanic.backends.opengl;
 import net.blaze3d.opengl.GlStateManager;
 import net.vulkanic.GraphicsBackend;
 import net.vulkanic.GraphicsCapabilities;
-import org.lwjgl.opengl.GL11;
-import org.lwjgl.opengl.GL15;
-import org.lwjgl.opengl.GL20;
-import org.lwjgl.opengl.GL30;
+import org.lwjgl.opengl.*;
+
 import java.nio.ByteBuffer;
 import java.nio.FloatBuffer;
 
@@ -33,6 +31,21 @@ public class OpenGLBackend implements GraphicsBackend {
     @Override
     public void viewport(int x, int y, int width, int height) {
         GL11.glViewport(x, y, width, height);
+    }
+    
+    @Override
+    public void activeTexture(int texture) {
+        GL13.glActiveTexture(texture);
+    }
+    
+    @Override
+    public void enableCull() {
+        GL11.glEnable(GL11.GL_CULL_FACE);
+    }
+    
+    @Override
+    public void disableCull() {
+        GL11.glDisable(GL11.GL_CULL_FACE);
     }
     
     @Override
@@ -187,6 +200,12 @@ public class OpenGLBackend implements GraphicsBackend {
     @Override
     public int createTexture() {
         return GL11.glGenTextures();
+    }
+    
+    @Override
+    public void copyTexSubImage2D(int texture, int target, int level, int xoffset, int yoffset, int x, int y, int width, int height) {
+        GL11.glBindTexture(target, texture);
+        GL11.glCopyTexSubImage2D(target, level, xoffset, yoffset, x, y, width, height);
     }
     
     @Override

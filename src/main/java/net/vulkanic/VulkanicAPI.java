@@ -37,8 +37,12 @@ public class VulkanicAPI {
     // OpenGL Constants - Texture Targets and Units
     public static final int GL_TEXTURE_2D = 0x0DE1;      // 3553
     public static final int GL_TEXTURE0 = 0x84C0;        // 33984
+    public static final int GL_TEXTURE2 = 0x84C2;        // 33986
+    public static final int GL_TEXTURE4 = 0x84C4;        // 33988
     public static final int GL_TEXTURE_BASE_LEVEL = 0x813C;  // 33084
     public static final int GL_TEXTURE_MAX_LEVEL = 0x813D;   // 33085
+    public static final int GL_TEXTURE_COMPARE_MODE = 0x884C;  // 34892
+    public static final int GL_COMPARE_REF_TO_TEXTURE = 0x884E;  // 34894
     
     // OpenGL Constants - Framebuffer/Buffer
     public static final int GL_FRAMEBUFFER = 0x8D40;     // 36160
@@ -119,7 +123,13 @@ public class VulkanicAPI {
     public static final int GL_TEXTURE_LOD_BIAS = 0x8501;
     public static final int GL_LINEAR = 0x2601;
     public static final int GL_NEAREST = 0x2600;
+    public static final int GL_NEAREST_MIPMAP_NEAREST = 0x2700;  // 9984
+    public static final int GL_LINEAR_MIPMAP_NEAREST = 0x2701;   // 9985
+    public static final int GL_NEAREST_MIPMAP_LINEAR = 0x2702;   // 9986
+    public static final int GL_LINEAR_MIPMAP_LINEAR = 0x2703;    // 9987
     public static final int GL_CLAMP_TO_EDGE = 0x812F;
+    public static final int GL_CLAMP = 0x2900;
+    public static final int GL_TEXTURE_SWIZZLE_RGBA = 0x8E46;   // 36422
     
     // OpenGL Constants - Compute Shader
     public static final int GL_COMPUTE_WORK_GROUP_SIZE = 0x8267;
@@ -274,6 +284,18 @@ public class VulkanicAPI {
         getBackend().viewport(x, y, width, height);
     }
     
+    public static void activeTexture(int texture) {
+        getBackend().activeTexture(texture);
+    }
+    
+    public static void enableCull() {
+        getBackend().enableCull();
+    }
+    
+    public static void disableCull() {
+        getBackend().disableCull();
+    }
+    
     public static void clear(int mask) {
         getBackend().clear(mask);
     }
@@ -288,6 +310,14 @@ public class VulkanicAPI {
     
     public static void useProgram(int programId) {
         getBackend().useProgram(programId);
+    }
+    
+    public static void bindFramebuffer(int target, int framebuffer) {
+        getBackend().attachFramebuffer(target, framebuffer);
+    }
+    
+    public static void copyTexSubImage2D(int texture, int target, int level, int xoffset, int yoffset, int x, int y, int width, int height) {
+        getBackend().copyTexSubImage2D(texture, target, level, xoffset, yoffset, x, y, width, height);
     }
     
     public static void enable(int cap) {
