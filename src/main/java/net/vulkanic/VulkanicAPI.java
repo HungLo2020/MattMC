@@ -12,6 +12,7 @@ public class VulkanicAPI {
     // OpenGL Constants - Buffer Targets
     public static final int GL_COPY_READ_BUFFER = 0x8F36;
     public static final int GL_COPY_WRITE_BUFFER = 0x8F37;
+    public static final int GL_SHADER_STORAGE_BUFFER = 0x90D2;
     
     // OpenGL Constants - String Names
     public static final int GL_VENDOR = 0x1F00;
@@ -24,9 +25,14 @@ public class VulkanicAPI {
     // OpenGL Constants - Primitive Types
     public static final int GL_PATCHES = 0x000E;
     
-    // OpenGL Constants - Shader Status
+    // OpenGL Constants - Shader/Program Status
     public static final int GL_COMPILE_STATUS = 0x8B81;  // 35713
     public static final int GL_LINK_STATUS = 0x8B82;     // 35714
+    public static final int GL_TRUE = 1;
+    
+    // OpenGL Constants - Debug Objects
+    public static final int GL_SHADER = 0x82E1;
+    public static final int GL_PROGRAM = 0x82E2;
     
     // OpenGL Constants - Texture Targets and Units
     public static final int GL_TEXTURE_2D = 0x0DE1;      // 3553
@@ -34,8 +40,17 @@ public class VulkanicAPI {
     public static final int GL_TEXTURE_BASE_LEVEL = 0x813C;  // 33084
     public static final int GL_TEXTURE_MAX_LEVEL = 0x813D;   // 33085
     
-    // OpenGL Constants - Framebuffer
+    // OpenGL Constants - Framebuffer/Buffer
     public static final int GL_FRAMEBUFFER = 0x8D40;     // 36160
+    public static final int GL_COLOR = 0x1800;
+    
+    // OpenGL Constants - Image Access
+    public static final int GL_READ_WRITE = 0x88BA;
+    
+    // OpenGL Constants - Query Limits
+    public static final int GL_MAX_TEXTURE_IMAGE_UNITS = 0x8872;
+    public static final int GL_MAX_DRAW_BUFFERS = 0x8824;
+    public static final int GL_MAX_SHADER_STORAGE_BUFFER_BINDINGS = 0x90DD;
     
     // OpenGL Constants - Shader Types
     public static final int GL_VERTEX_SHADER = 0x8B31;

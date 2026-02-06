@@ -1,13 +1,13 @@
 # Vulkanic OpenGL Abstraction - Progress Tracker
 
-**Last Updated:** 2026-02-06 18:32 UTC  
+**Last Updated:** 2026-02-06 18:42 UTC  
 **Status:** ✅ CORE ENGINE COMPLETE + IRIS MIGRATION IN PROGRESS
 
 ## 🎉 Executive Summary
 
 - **Sodium Client:** 484 files - **100% COMPLETE** ✅
 - **Blaze3D:** 123 files - **100% COMPLETE** ✅
-- **Iris Shaders:** 10/68 files - **14.7% COMPLETE** (in progress)
+- **Iris Shaders:** 15/68 files - **22.1% COMPLETE** (in progress)
 - **Total Core Engine:** 607 files - **ZERO OpenGL dependencies** 🎉
 - **Backend Methods:** 140+ GL calls abstracted
 
@@ -17,7 +17,7 @@
 |-----------|-------------|----------|-----------|----------|
 | **Sodium Client** | 484 | 484 | 0 | ✅ **100%** |
 | **Blaze3D** | 123 | 123 | 0 | ✅ **100%** |
-| **Iris Shaders** | 68 | 10 | 58 | 🔄 **14.7%** |
+| **Iris Shaders** | 68 | 15 | 53 | 🔄 **22.1%** |
 | **Core Total** | 607 | 607 | 0 | ✅ **100%** |
 | Distant Horizons | TBD | 0 | TBD | 0% (mod) |
 | Minecraft Core | N/A | N/A | N/A | ✅ Uses Blaze3D |
@@ -27,13 +27,13 @@
 
 ## 🆕 Iris Shaders - IN PROGRESS (68 files total)
 
-**Status:** Migration progressing - 10 files migrated, 58 remaining
+**Status:** Migration progressing - 15 files migrated, 53 remaining
 
 ### Files with OpenGL Dependencies
 - **Total Iris files**: 445
 - **Files with OpenGL imports**: 68
-- **Files migrated**: 10
-- **Remaining**: 58
+- **Files migrated**: 15
+- **Remaining**: 53
 
 ### Migration Session 1 (5 files - COMPLETE)
 
@@ -209,7 +209,17 @@ Changes:
 
 **Total GL Methods Abstracted:** 140+ methods in OpenGLBackend
 
-### Recent Additions (Iris Migration Session 2)
+### Recent Additions (Iris Migration Session 3)
+- `GL_SHADER_STORAGE_BUFFER` - Shader storage buffer target constant
+- `GL_TRUE` - Boolean true constant
+- `GL_SHADER`, `GL_PROGRAM` - Debug object type constants
+- `GL_COLOR` - Color buffer constant
+- `GL_READ_WRITE` - Image access mode constant
+- `GL_MAX_TEXTURE_IMAGE_UNITS` - Query limit for texture units
+- `GL_MAX_DRAW_BUFFERS` - Query limit for draw buffers
+- `GL_MAX_SHADER_STORAGE_BUFFER_BINDINGS` - Query limit for SSBO bindings
+
+### Previous Additions (Iris Migration Session 2)
 - `checkFunctionAvailable(String functionName)` - Checks if a GL function is available at runtime
 
 ### Previous Additions (Iris Migration Session 1)

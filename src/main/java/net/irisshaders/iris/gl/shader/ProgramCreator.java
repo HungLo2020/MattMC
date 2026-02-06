@@ -3,10 +3,9 @@ package net.irisshaders.iris.gl.shader;
 import net.blaze3d.opengl.GlStateManager;
 import net.irisshaders.iris.gl.GLDebug;
 import net.irisshaders.iris.gl.IrisRenderSystem;
+import net.vulkanic.VulkanicAPI;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.lwjgl.opengl.GL20C;
-import org.lwjgl.opengl.KHRDebug;
 
 public class ProgramCreator {
 	private static final Logger LOGGER = LogManager.getLogger(ProgramCreator.class);
@@ -24,14 +23,14 @@ public class ProgramCreator {
 		GlStateManager._glBindAttribLocation(program, 1, "UV0");
 
 		for (GlShader shader : shaders) {
-			GLDebug.nameObject(KHRDebug.GL_SHADER, shader.getHandle(), shader.getName());
+			GLDebug.nameObject(VulkanicAPI.GL_SHADER, shader.getHandle(), shader.getName());
 
 			GlStateManager.glAttachShader(program, shader.getHandle());
 		}
 
 		GlStateManager.glLinkProgram(program);
 
-		GLDebug.nameObject(KHRDebug.GL_PROGRAM, program, name);
+		GLDebug.nameObject(VulkanicAPI.GL_PROGRAM, program, name);
 
 		//Always detach shaders according to https://www.khronos.org/opengl/wiki/Shader_Compilation#Cleanup
 		for (GlShader shader : shaders) {
@@ -44,9 +43,9 @@ public class ProgramCreator {
 			LOGGER.warn("Program link log for " + name + ": " + log);
 		}
 
-		int result = GlStateManager.glGetProgrami(program, GL20C.GL_LINK_STATUS);
+		int result = GlStateManager.glGetProgrami(program, VulkanicAPI.GL_LINK_STATUS);
 
-		if (result != GL20C.GL_TRUE) {
+		if (result != VulkanicAPI.GL_TRUE) {
 			throw new ShaderCompileException(name, log);
 		}
 
