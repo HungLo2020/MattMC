@@ -45,7 +45,10 @@ import net.irisshaders.iris.uniforms.CommonUniforms;
 import net.irisshaders.iris.uniforms.FrameUpdateNotifier;
 import net.irisshaders.iris.uniforms.custom.CustomUniforms;
 import net.minecraft.client.Minecraft;
-import net.vulkanic.VulkanicAPI;
+import org.lwjgl.opengl.GL15C;
+import org.lwjgl.opengl.GL20C;
+import org.lwjgl.opengl.GL30C;
+import org.lwjgl.opengl.GL43C;
 
 import java.util.Map;
 import java.util.Objects;
@@ -151,7 +154,7 @@ public class ShadowCompositeRenderer {
 		this.passes = passes.build();
 		this.flippedAtLeastOnceFinal = flippedAtLeastOnce.build();
 
-		VulkanicAPI.bindFramebuffer(VulkanicAPI.GL_READ_FRAMEBUFFER, 0);
+		GlStateManager._glBindFramebuffer(GL30C.GL_READ_FRAMEBUFFER, 0);
 	}
 
 	private static void setupMipmapping(net.irisshaders.iris.targets.RenderTarget target, boolean readFromAlt) {
@@ -168,21 +171,21 @@ public class ShadowCompositeRenderer {
 		//
 		// Also note that this only applies to one of the two buffers in a render target buffer pair - making it
 		// unlikely that this issue occurs in practice with most shader packs.
-		IrisRenderSystem.generateMipmaps(texture, VulkanicAPI.GL_TEXTURE_2D);
-		IrisRenderSystem.texParameteri(texture, VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_MIN_FILTER, target.getInternalFormat().getPixelFormat().isInteger() ? VulkanicAPI.GL_NEAREST_MIPMAP_NEAREST : VulkanicAPI.GL_LINEAR_MIPMAP_LINEAR);
+		IrisRenderSystem.generateMipmaps(texture, GL20C.GL_TEXTURE_2D);
+		IrisRenderSystem.texParameteri(texture, GL20C.GL_TEXTURE_2D, GL20C.GL_TEXTURE_MIN_FILTER, target.getInternalFormat().getPixelFormat().isInteger() ? GL20C.GL_NEAREST_MIPMAP_NEAREST : GL20C.GL_LINEAR_MIPMAP_LINEAR);
 	}
 
 	private static void resetRenderTarget(RenderTarget target) {
 		// Resets the sampling mode of the given render target and then unbinds it to prevent accidental sampling of it
 		// elsewhere.
 
-		int filter = VulkanicAPI.GL_LINEAR;
+		int filter = GL20C.GL_LINEAR;
 		if (target.getInternalFormat().getPixelFormat().isInteger()) {
-			filter = VulkanicAPI.GL_NEAREST;
+			filter = GL20C.GL_NEAREST;
 		}
 
-		IrisRenderSystem.texParameteri(target.getMainTexture(), VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_MIN_FILTER, filter);
-		IrisRenderSystem.texParameteri(target.getAltTexture(), VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_MIN_FILTER, filter);
+		IrisRenderSystem.texParameteri(target.getMainTexture(), GL20C.GL_TEXTURE_2D, GL20C.GL_TEXTURE_MIN_FILTER, filter);
+		IrisRenderSystem.texParameteri(target.getAltTexture(), GL20C.GL_TEXTURE_2D, GL20C.GL_TEXTURE_MIN_FILTER, filter);
 	}
 
 	public ImmutableSet<Integer> getFlippedAtLeastOnceFinal() {
@@ -211,7 +214,7 @@ public class ShadowCompositeRenderer {
 				}
 
 				if (ranCompute) {
-					IrisRenderSystem.memoryBarrier(VulkanicAPI.GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | VulkanicAPI.GL_TEXTURE_FETCH_BARRIER_BIT | VulkanicAPI.GL_SHADER_STORAGE_BARRIER_BIT);
+					IrisRenderSystem.memoryBarrier(GL43C.GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL43C.GL_TEXTURE_FETCH_BARRIER_BIT | GL43C.GL_SHADER_STORAGE_BARRIER_BIT);
 				}
 
 				Program.unbind();
@@ -221,7 +224,7 @@ public class ShadowCompositeRenderer {
 				}
 
 				if (!renderPass.mipmappedBuffers.isEmpty()) {
-					VulkanicAPI.activeTexture(VulkanicAPI.GL_TEXTURE0);
+					GlStateManager._activeTexture(GL15C.GL_TEXTURE0);
 
 					for (int index : renderPass.mipmappedBuffers) {
 						setupMipmapping(renderTargets.get(index), renderPass.stageReadsFromAlt.contains(index));
@@ -234,7 +237,7 @@ public class ShadowCompositeRenderer {
 				float scaledHeight = renderTargets.getResolution() * renderPass.viewportScale.scale();
 				int beginWidth = (int) (renderTargets.getResolution() * renderPass.viewportScale.viewportX());
 				int beginHeight = (int) (renderTargets.getResolution() * renderPass.viewportScale.viewportY());
-				VulkanicAPI.viewport(beginWidth, beginHeight, (int) scaledWidth, (int) scaledHeight);
+				GlStateManager._viewport(beginWidth, beginHeight, (int) scaledWidth, (int) scaledHeight);
 
 				renderPass.framebuffer.bind();
 				renderPass.program.use();
@@ -247,7 +250,7 @@ public class ShadowCompositeRenderer {
 
 		// Make sure to reset the viewport to how it was before... Otherwise weird issues could occur.
 		ProgramUniforms.clearActiveUniforms();
-		VulkanicAPI.useProgram(0);
+		GlStateManager._glUseProgram(0);
 
 		// TODO IMS: Apparantly we are not supposed to do this for shadowcomp...
 		/*
@@ -259,7 +262,7 @@ public class ShadowCompositeRenderer {
 		}
 		 */
 
-		VulkanicAPI.activeTexture(VulkanicAPI.GL_TEXTURE0);
+		GlStateManager._activeTexture(GL15C.GL_TEXTURE0);
 	}
 
 	// TODO: Don't just copy this from DeferredWorldRenderingPipeline
@@ -383,7 +386,7 @@ public class ShadowCompositeRenderer {
 				blendModeOverride.apply();
 			} else {
 				BlendModeStorage.restoreBlend();
-				VulkanicAPI.disableBlend();
+				GlStateManager._disableBlend();
 			}
 		}
 	}

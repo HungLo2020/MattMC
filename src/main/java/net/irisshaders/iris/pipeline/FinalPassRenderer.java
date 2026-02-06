@@ -50,7 +50,12 @@ import net.irisshaders.iris.uniforms.FrameUpdateNotifier;
 import net.irisshaders.iris.uniforms.custom.CustomUniforms;
 import net.minecraft.client.Minecraft;
 import org.jetbrains.annotations.Nullable;
-import net.vulkanic.VulkanicAPI;
+import org.lwjgl.opengl.GL11C;
+import org.lwjgl.opengl.GL15C;
+import org.lwjgl.opengl.GL20C;
+import org.lwjgl.opengl.GL30C;
+import org.lwjgl.opengl.GL43C;
+import org.lwjgl.opengl.GL46C;
 
 import java.util.Map;
 import java.util.Objects;
@@ -154,7 +159,7 @@ public class FinalPassRenderer {
 
 		this.swapPasses = swapPasses.build();
 
-		VulkanicAPI.bindFramebuffer(VulkanicAPI.GL_READ_FRAMEBUFFER, 0);
+		GlStateManager._glBindFramebuffer(GL30C.GL_READ_FRAMEBUFFER, 0);
 	}
 
 	private static void setupMipmapping(RenderTarget target, boolean readFromAlt) {
@@ -173,29 +178,29 @@ public class FinalPassRenderer {
 		//
 		// Also note that this only applies to one of the two buffers in a render target buffer pair - making it
 		// unlikely that this issue occurs in practice with most shader packs.
-		IrisRenderSystem.generateMipmaps(texture, VulkanicAPI.GL_TEXTURE_2D);
+		IrisRenderSystem.generateMipmaps(texture, GL20C.GL_TEXTURE_2D);
 
-		int filter = VulkanicAPI.GL_LINEAR_MIPMAP_LINEAR;
+		int filter = GL20C.GL_LINEAR_MIPMAP_LINEAR;
 		if (target.getInternalFormat().getPixelFormat().isInteger()) {
-			filter = VulkanicAPI.GL_NEAREST_MIPMAP_NEAREST;
+			filter = GL20C.GL_NEAREST_MIPMAP_NEAREST;
 		}
 
-		IrisRenderSystem.texParameteri(texture, VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_MIN_FILTER, filter);
+		IrisRenderSystem.texParameteri(texture, GL20C.GL_TEXTURE_2D, GL20C.GL_TEXTURE_MIN_FILTER, filter);
 	}
 
 	private static void resetRenderTarget(RenderTarget target) {
 		if (target == null) return;
 		// Resets the sampling mode of the given render target and then unbinds it to prevent accidental sampling of it
 		// elsewhere.
-		int filter = VulkanicAPI.GL_LINEAR;
+		int filter = GL20C.GL_LINEAR;
 		if (target.getInternalFormat().getPixelFormat().isInteger()) {
-			filter = VulkanicAPI.GL_NEAREST;
+			filter = GL20C.GL_NEAREST;
 		}
 
-		IrisRenderSystem.texParameteri(target.getMainTexture(), VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_MIN_FILTER, filter);
-		IrisRenderSystem.texParameteri(target.getAltTexture(), VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_MIN_FILTER, filter);
+		IrisRenderSystem.texParameteri(target.getMainTexture(), GL20C.GL_TEXTURE_2D, GL20C.GL_TEXTURE_MIN_FILTER, filter);
+		IrisRenderSystem.texParameteri(target.getAltTexture(), GL20C.GL_TEXTURE_2D, GL20C.GL_TEXTURE_MIN_FILTER, filter);
 
-		VulkanicAPI.bindTexture(0);
+		GlStateManager._bindTexture(0);
 	}
 
 	public void renderFinalPass() {
@@ -235,10 +240,10 @@ public class FinalPassRenderer {
 				}
 			}
 
-			IrisRenderSystem.memoryBarrier(VulkanicAPI.GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | VulkanicAPI.GL_TEXTURE_FETCH_BARRIER_BIT | VulkanicAPI.GL_SHADER_STORAGE_BARRIER_BIT);
+			IrisRenderSystem.memoryBarrier(GL43C.GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL43C.GL_TEXTURE_FETCH_BARRIER_BIT | GL43C.GL_SHADER_STORAGE_BARRIER_BIT);
 
 			if (!finalPass.mipmappedBuffers.isEmpty()) {
-				VulkanicAPI.activeTexture(VulkanicAPI.GL_TEXTURE0);
+				GlStateManager._activeTexture(GL15C.GL_TEXTURE0);
 
 				for (int index : finalPass.mipmappedBuffers) {
 					setupMipmapping(renderTargets.get(index), finalPass.stageReadsFromAlt.contains(index));
@@ -258,7 +263,7 @@ public class FinalPassRenderer {
 				finalPass.program.use();
 
 				BlendModeOverride.restore();
-				VulkanicAPI.disableBlend();
+				GlStateManager._disableBlend();
 
 				// program is the identifier for final :shrug:
 				this.customUniforms.push(finalPass.program);
@@ -279,10 +284,10 @@ public class FinalPassRenderer {
 			// https://stackoverflow.com/a/23994979/18166885
 			this.baseline.bindAsReadBuffer();
 
-			IrisRenderSystem.copyTexSubImage2D(main.getColorTexture().iris$getGlId(), VulkanicAPI.GL_TEXTURE_2D, 0, 0, 0, 0, 0, baseWidth, baseHeight);
+			IrisRenderSystem.copyTexSubImage2D(main.getColorTexture().iris$getGlId(), GL11C.GL_TEXTURE_2D, 0, 0, 0, 0, 0, baseWidth, baseHeight);
 		}
 
-		VulkanicAPI.activeTexture(VulkanicAPI.GL_TEXTURE0);
+		GlStateManager._activeTexture(GL15C.GL_TEXTURE0);
 
 		for (int i = 0; i < renderTargets.getRenderTargetCount(); i++) {
 			// Reset mipmapping states at the end of the frame.
@@ -300,24 +305,26 @@ public class FinalPassRenderer {
 			// Also note that RenderTargets already calls readBuffer(0) for us.
 			swapPass.from.bind();
 
-			VulkanicAPI.bindTexture(swapPass.targetTexture);
-			VulkanicAPI.copyTexSubImage2D(swapPass.targetTexture, VulkanicAPI.GL_TEXTURE_2D, 0, 0, 0, 0, 0, swapPass.width, swapPass.height);
+			GlStateManager._bindTexture(swapPass.targetTexture);
+			GL46C.glCopyTexSubImage2D(GL20C.GL_TEXTURE_2D, 0, 0, 0, 0, 0, swapPass.width, swapPass.height);
 		}
 
 		// Make sure to reset the viewport to how it was before... Otherwise weird issues could occur.
 		// Also bind the "main" framebuffer if it isn't already bound.
 		ProgramUniforms.clearActiveUniforms();
 		ProgramSamplers.clearActiveSamplers();
-		VulkanicAPI.useProgram(0);
+		GlStateManager._glUseProgram(0);
 
 		for (int i = 0; i < SamplerLimits.get().getMaxTextureUnits(); i++) {
 			// Unbind all textures that we may have used.
 			// NB: This is necessary for shader pack reloading to work properly
-			VulkanicAPI.activeTexture(VulkanicAPI.GL_TEXTURE0 + i);
-			VulkanicAPI.bindTexture(0);
+			if (GlStateManager.TEXTURES[i].binding != 0) {
+				GlStateManager._activeTexture(GL15C.GL_TEXTURE0 + i);
+				GlStateManager._bindTexture(0);
+			}
 		}
 
-		VulkanicAPI.activeTexture(VulkanicAPI.GL_TEXTURE0);
+		GlStateManager._activeTexture(GL15C.GL_TEXTURE0);
 	}
 
 	public void recalculateSwapPassSize() {

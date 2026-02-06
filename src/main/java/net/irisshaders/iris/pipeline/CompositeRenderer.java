@@ -55,7 +55,10 @@ import net.irisshaders.iris.uniforms.custom.CustomUniforms;
 import net.irisshaders.iris.vertices.ImmediateState;
 import net.minecraft.client.Minecraft;
 import net.minecraft.resources.ResourceLocation;
-import net.vulkanic.VulkanicAPI;
+import org.lwjgl.opengl.GL15C;
+import org.lwjgl.opengl.GL20C;
+import org.lwjgl.opengl.GL30C;
+import org.lwjgl.opengl.GL43C;
 
 import java.util.Arrays;
 import java.util.Locale;
@@ -195,7 +198,7 @@ public class CompositeRenderer {
 		this.passes = passes.build();
 		this.flippedAtLeastOnceFinal = flippedAtLeastOnce.build();
 
-		VulkanicAPI.bindFramebuffer(VulkanicAPI.GL_READ_FRAMEBUFFER, 0);
+		GlStateManager._glBindFramebuffer(GL30C.GL_READ_FRAMEBUFFER, 0);
 	}
 
 	private boolean hasComputes(ComputeSource[][] computes) {
@@ -231,14 +234,14 @@ public class CompositeRenderer {
 		//
 		// Also note that this only applies to one of the two buffers in a render target buffer pair - making it
 		// unlikely that this issue occurs in practice with most shader packs.
-		IrisRenderSystem.generateMipmaps(texture, VulkanicAPI.GL_TEXTURE_2D);
+		IrisRenderSystem.generateMipmaps(texture, GL20C.GL_TEXTURE_2D);
 
-		int filter = VulkanicAPI.GL_LINEAR_MIPMAP_LINEAR;
+		int filter = GL20C.GL_LINEAR_MIPMAP_LINEAR;
 		if (target.getInternalFormat().getPixelFormat().isInteger()) {
-			filter = VulkanicAPI.GL_NEAREST_MIPMAP_NEAREST;
+			filter = GL20C.GL_NEAREST_MIPMAP_NEAREST;
 		}
 
-		IrisRenderSystem.texParameteri(texture, VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_MIN_FILTER, filter);
+		IrisRenderSystem.texParameteri(texture, GL20C.GL_TEXTURE_2D, GL20C.GL_TEXTURE_MIN_FILTER, filter);
 	}
 
 	public ImmutableSet<Integer> getFlippedAtLeastOnceFinal() {
@@ -295,7 +298,7 @@ public class CompositeRenderer {
 				}
 
 				if (ranCompute) {
-					IrisRenderSystem.memoryBarrier(VulkanicAPI.GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | VulkanicAPI.GL_TEXTURE_FETCH_BARRIER_BIT | VulkanicAPI.GL_SHADER_STORAGE_BARRIER_BIT);
+					IrisRenderSystem.memoryBarrier(GL43C.GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL43C.GL_TEXTURE_FETCH_BARRIER_BIT | GL43C.GL_SHADER_STORAGE_BARRIER_BIT);
 				}
 
 				Program.unbind();
@@ -306,7 +309,7 @@ public class CompositeRenderer {
 				}
 
 				if (!compositePass.mipmappedBuffers.isEmpty()) {
-					VulkanicAPI.activeTexture(VulkanicAPI.GL_TEXTURE0);
+					GlStateManager._activeTexture(GL15C.GL_TEXTURE0);
 
 					for (int index : compositePass.mipmappedBuffers) {
 						setupMipmapping(CompositeRenderer.this.renderTargets.get(index), compositePass.stageReadsFromAlt.contains(index));
@@ -319,7 +322,7 @@ public class CompositeRenderer {
 				float scaledHeight = compositePass.viewHeight * compositePass.viewportScale.scale();
 				int beginWidth = (int) (compositePass.viewWidth * compositePass.viewportScale.viewportX());
 				int beginHeight = (int) (compositePass.viewHeight * compositePass.viewportScale.viewportY());
-				VulkanicAPI.viewport(beginWidth, beginHeight, (int) scaledWidth, (int) scaledHeight);
+				GlStateManager._viewport(beginWidth, beginHeight, (int) scaledWidth, (int) scaledHeight);
 
 				compositePass.program.use();
 
@@ -338,19 +341,19 @@ public class CompositeRenderer {
 		// Also bind the "main" framebuffer if it isn't already bound.
 		ProgramUniforms.clearActiveUniforms();
 		ProgramSamplers.clearActiveSamplers();
-		VulkanicAPI.useProgram(0);
+		GlStateManager._glUseProgram(0);
 
 		// NB: Unbinding all of these textures is necessary for proper shaderpack reloading.
 		for (int i = 0; i < SamplerLimits.get().getMaxTextureUnits(); i++) {
 			// Unbind all textures that we may have used.
 			// NB: This is necessary for shader pack reloading to work propely
 			if (GlStateManager.TEXTURES[i].binding != 0) {
-				VulkanicAPI.activeTexture(VulkanicAPI.GL_TEXTURE0 + i);
+				GlStateManager._activeTexture(GL15C.GL_TEXTURE0 + i);
 				GlStateManager._bindTexture(0);
 			}
 		}
 
-		VulkanicAPI.activeTexture(VulkanicAPI.GL_TEXTURE0);
+		GlStateManager._activeTexture(GL15C.GL_TEXTURE0);
 
 		GLDebug.popGroup();
 
@@ -514,7 +517,7 @@ public class CompositeRenderer {
 				blendModeOverride.apply();
 			} else {
 				BlendModeStorage.restoreBlend();
-				VulkanicAPI.disableBlend();
+				GlStateManager._disableBlend();
 			}
 		}
 	}
