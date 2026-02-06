@@ -1,13 +1,13 @@
 # Vulkanic OpenGL Abstraction - Progress Tracker
 
-**Last Updated:** 2026-02-06 19:57 UTC  
+**Last Updated:** 2026-02-06 20:28 UTC  
 **Status:** ✅ CORE ENGINE COMPLETE + IRIS MIGRATION IN PROGRESS
 
 ## 🎉 Executive Summary
 
 - **Sodium Client:** 484 files - **100% COMPLETE** ✅
 - **Blaze3D:** 123 files - **100% COMPLETE** ✅
-- **Iris Shaders:** 40/68 files - **58.8% COMPLETE** (in progress)
+- **Iris Shaders:** 45/68 files - **66.2% COMPLETE** (in progress)
 - **Total Core Engine:** 607 files - **ZERO OpenGL dependencies** 🎉
 - **Backend Methods:** 170+ GL calls abstracted
 
@@ -17,7 +17,7 @@
 |-----------|-------------|----------|-----------|----------|
 | **Sodium Client** | 484 | 484 | 0 | ✅ **100%** |
 | **Blaze3D** | 123 | 123 | 0 | ✅ **100%** |
-| **Iris Shaders** | 68 | 40 | 28 | 🔄 **58.8%** |
+| **Iris Shaders** | 68 | 45 | 23 | 🔄 **66.2%** |
 | **Core Total** | 607 | 607 | 0 | ✅ **100%** |
 | Distant Horizons | TBD | 0 | TBD | 0% (mod) |
 | Minecraft Core | N/A | N/A | N/A | ✅ Uses Blaze3D |
@@ -27,13 +27,13 @@
 
 ## 🆕 Iris Shaders - IN PROGRESS (68 files total)
 
-**Status:** Migration progressing - 40 files migrated, 28 remaining
+**Status:** Migration progressing - 45 files migrated, 23 remaining
 
 ### Files with OpenGL Dependencies
 - **Total Iris files**: 445
 - **Files with OpenGL imports**: 68
-- **Files migrated**: 40
-- **Remaining**: 28
+- **Files migrated**: 45
+- **Remaining**: 23
 
 ### Migration Session 1 (5 files - COMPLETE)
 
@@ -695,6 +695,60 @@ Remaining OpenGL dependencies are in mod integrations:
 - **Other mods:** Various third-party integrations
 
 These can be migrated as needed, but the **core engine is 100% complete**.
+
+---
+
+### Migration Session 9 (5 files - COMPLETE)
+
+#### 1. **Program.java** ✅
+**Location**: `net.irisshaders.iris.gl.program.Program.java`
+- **Before**: 1 OpenGL import (GL43C)
+- **After**: ZERO OpenGL imports, uses VulkanicAPI constants
+- **Changes**:
+  - `GL43C.GL_SHADER_IMAGE_ACCESS_BARRIER_BIT` → `VulkanicAPI.GL_SHADER_IMAGE_ACCESS_BARRIER_BIT`
+  - `GL43C.GL_TEXTURE_FETCH_BARRIER_BIT` → `VulkanicAPI.GL_TEXTURE_FETCH_BARRIER_BIT`
+  - `GL43C.GL_SHADER_STORAGE_BARRIER_BIT` → `VulkanicAPI.GL_SHADER_STORAGE_BARRIER_BIT`
+
+#### 2. **DhFrameBufferWrapper.java** ✅
+**Location**: `net.irisshaders.iris.compat.dh.DhFrameBufferWrapper.java`
+- **Before**: 1 OpenGL import (GL32)
+- **After**: ZERO OpenGL imports, uses VulkanicAPI constant + IrisRenderSystem method
+- **Changes**:
+  - `GL32.glCheckFramebufferStatus(GL32.GL_FRAMEBUFFER)` → `IrisRenderSystem.checkFramebufferStatus(VulkanicAPI.GL_FRAMEBUFFER)`
+
+#### 3. **ShaderMap.java** ✅
+**Location**: `net.irisshaders.iris.pipeline.programs.ShaderMap.java`
+- **Before**: 1 OpenGL import (GL46C)
+- **After**: ZERO OpenGL imports, uses VulkanicAPI constant
+- **Changes**:
+  - `GL46C.GL_FALSE` → `VulkanicAPI.GL_FALSE`
+
+#### 4. **NativeImageBackedCustomTexture.java** ✅
+**Location**: `net.irisshaders.iris.targets.backed.NativeImageBackedCustomTexture.java`
+- **Before**: 2 OpenGL imports (GL11C, GL13C)
+- **After**: ZERO OpenGL imports, uses VulkanicAPI constants
+- **Changes**:
+  - `GL11C.GL_TEXTURE_2D` → `VulkanicAPI.GL_TEXTURE_2D` (4 occurrences)
+  - `GL11C.GL_TEXTURE_MIN_FILTER` → `VulkanicAPI.GL_TEXTURE_MIN_FILTER`
+  - `GL11C.GL_TEXTURE_MAG_FILTER` → `VulkanicAPI.GL_TEXTURE_MAG_FILTER`
+  - `GL11C.GL_LINEAR` → `VulkanicAPI.GL_LINEAR` (2 occurrences)
+  - `GL11C.GL_TEXTURE_WRAP_S` → `VulkanicAPI.GL_TEXTURE_WRAP_S`
+  - `GL11C.GL_TEXTURE_WRAP_T` → `VulkanicAPI.GL_TEXTURE_WRAP_T`
+  - `GL13C.GL_CLAMP_TO_EDGE` → `VulkanicAPI.GL_CLAMP_TO_EDGE` (2 occurrences)
+
+#### 5. **ColorSpaceComputeConverter.java** ✅
+**Location**: `net.irisshaders.iris.pathways.colorspace.ColorSpaceComputeConverter.java`
+- **Before**: 1 OpenGL import (GL43C)
+- **After**: ZERO OpenGL imports, uses VulkanicAPI constants
+- **Changes**:
+  - `GL43C.GL_SHADER_IMAGE_ACCESS_BARRIER_BIT` → `VulkanicAPI.GL_SHADER_IMAGE_ACCESS_BARRIER_BIT`
+  - `GL43C.GL_TEXTURE_FETCH_BARRIER_BIT` → `VulkanicAPI.GL_TEXTURE_FETCH_BARRIER_BIT`
+
+**Session 9 Stats:**
+- Files migrated: 5
+- OpenGL imports removed: 6
+- GL constant replacements: 20
+- New VulkanicAPI constants: 1 (GL_FALSE)
 
 ---
 

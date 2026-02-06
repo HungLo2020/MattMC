@@ -176,6 +176,9 @@ public class VulkanicAPI {
     public static final int GL_COLOR_CLEAR_VALUE = 0x0C22;
     public static final int GL_VIEWPORT = 0x0BA2;
     
+    // OpenGL Constants - Boolean values
+    public static final int GL_FALSE = 0;
+    
     /**
      * Backend types supported by Vulkanic.
      */
