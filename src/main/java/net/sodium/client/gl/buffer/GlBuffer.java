@@ -1,13 +1,13 @@
 package net.sodium.client.gl.buffer;
 
 import net.sodium.client.gl.GlObject;
-import org.lwjgl.opengl.GL20C;
+import net.vulkanic.VulkanicAPI;
 
 public abstract class GlBuffer extends GlObject {
     private GlBufferMapping activeMapping;
 
     protected GlBuffer() {
-        this.setHandle(GL20C.glGenBuffers());
+        this.setHandle(VulkanicAPI.allocateBufferObject());
     }
 
     public GlBufferMapping getActiveMapping() {
