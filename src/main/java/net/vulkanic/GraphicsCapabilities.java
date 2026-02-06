@@ -34,6 +34,8 @@ public class GraphicsCapabilities {
     public final boolean GL_KHR_no_error;
     public final boolean GL_EXT_debug_label;
     public final boolean GL_ARB_timer_query;
+    public final boolean GL_KHR_parallel_shader_compile;
+    public final boolean GL_ARB_parallel_shader_compile;
     
     /**
      * Creates a GraphicsCapabilities instance by wrapping the underlying OpenGL capabilities.
@@ -67,5 +69,7 @@ public class GraphicsCapabilities {
         this.GL_KHR_no_error = glCaps.GL_KHR_no_error;
         this.GL_EXT_debug_label = glCaps.GL_EXT_debug_label;
         this.GL_ARB_timer_query = glCaps.GL_ARB_timer_query;
+        this.GL_KHR_parallel_shader_compile = glCaps.GL_KHR_parallel_shader_compile;
+        this.GL_ARB_parallel_shader_compile = glCaps.GL_ARB_parallel_shader_compile;
     }
 }

@@ -241,4 +241,13 @@ public interface GraphicsBackend {
     
     // Texture operations
     void glCopyTexSubImage2D(int target, int level, int xoffset, int yoffset, int x, int y, int width, int height);
+    
+    // Clear texture image (ARB_clear_texture)
+    void clearTexImage(int texture, int level, int format, int type, int[] data);
+    
+    // Parallel shader compile (KHR/ARB)
+    void setMaxShaderCompilerThreads(int count);
+    
+    // Capabilities
+    GraphicsCapabilities getGraphicsCapabilities();
 }

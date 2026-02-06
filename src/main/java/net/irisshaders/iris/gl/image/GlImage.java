@@ -9,7 +9,6 @@ import net.irisshaders.iris.gl.texture.PixelFormat;
 import net.irisshaders.iris.gl.texture.PixelType;
 import net.irisshaders.iris.gl.texture.TextureType;
 import net.vulkanic.VulkanicAPI;
-import org.lwjgl.opengl.ARBClearTexture;
 
 public class GlImage extends GlResource {
 	protected final String name;
@@ -62,7 +61,7 @@ public class GlImage extends GlResource {
 		IrisRenderSystem.texParameteri(texture, target.getGlType(), VulkanicAPI.GL_TEXTURE_MAX_LOD, 0);
 		IrisRenderSystem.texParameterf(texture, target.getGlType(), VulkanicAPI.GL_TEXTURE_LOD_BIAS, 0.0F);
 
-		ARBClearTexture.glClearTexImage(texture, 0, format.getGlFormat(), pixelType.getGlFormat(), (int[]) null);
+		VulkanicAPI.clearTexImage(texture, 0, format.getGlFormat(), pixelType.getGlFormat(), (int[]) null);
 	}
 
 	public String getName() {

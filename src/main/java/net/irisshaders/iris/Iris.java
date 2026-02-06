@@ -47,11 +47,9 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.HoverEvent;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.Level;
+import net.vulkanic.VulkanicAPI;
 import org.jetbrains.annotations.NotNull;
 import org.lwjgl.glfw.GLFW;
-import org.lwjgl.opengl.ARBParallelShaderCompile;
-import org.lwjgl.opengl.GL;
-import org.lwjgl.opengl.KHRParallelShaderCompile;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -129,11 +127,7 @@ public class Iris {
 			return;
 		}
 
-		if (GL.getCapabilities().GL_KHR_parallel_shader_compile) {
-			KHRParallelShaderCompile.glMaxShaderCompilerThreadsKHR(10);
-		} else if (GL.getCapabilities().GL_ARB_parallel_shader_compile) {
-			ARBParallelShaderCompile.glMaxShaderCompilerThreadsARB(10);
-		}
+		VulkanicAPI.setMaxShaderCompilerThreads(10);
 
 		PBRTextureManager.INSTANCE.init();
 

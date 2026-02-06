@@ -786,4 +786,24 @@ public class OpenGLBackend implements GraphicsBackend {
     public void glCopyTexSubImage2D(int target, int level, int xoffset, int yoffset, int x, int y, int width, int height) {
         org.lwjgl.opengl.GL11.glCopyTexSubImage2D(target, level, xoffset, yoffset, x, y, width, height);
     }
+    
+    @Override
+    public void clearTexImage(int texture, int level, int format, int type, int[] data) {
+        org.lwjgl.opengl.ARBClearTexture.glClearTexImage(texture, level, format, type, data);
+    }
+    
+    @Override
+    public void setMaxShaderCompilerThreads(int count) {
+        org.lwjgl.opengl.GLCapabilities caps = org.lwjgl.opengl.GL.getCapabilities();
+        if (caps.GL_KHR_parallel_shader_compile) {
+            org.lwjgl.opengl.KHRParallelShaderCompile.glMaxShaderCompilerThreadsKHR(count);
+        } else if (caps.GL_ARB_parallel_shader_compile) {
+            org.lwjgl.opengl.ARBParallelShaderCompile.glMaxShaderCompilerThreadsARB(count);
+        }
+    }
+    
+    @Override
+    public GraphicsCapabilities getGraphicsCapabilities() {
+        return new GraphicsCapabilities(org.lwjgl.opengl.GL.getCapabilities());
+    }
 }

@@ -577,6 +577,18 @@ public class VulkanicAPI {
         getBackend().destroySync(sync);
     }
     
+    public static void clearTexImage(int texture, int level, int format, int type, int[] data) {
+        getBackend().clearTexImage(texture, level, format, type, data);
+    }
+    
+    public static void setMaxShaderCompilerThreads(int count) {
+        getBackend().setMaxShaderCompilerThreads(count);
+    }
+    
+    public static GraphicsCapabilities getGraphicsCapabilities() {
+        return getBackend().getGraphicsCapabilities();
+    }
+    
     public static int queryIntegerState(int pname) {
         return getBackend().queryIntegerState(pname);
     }
