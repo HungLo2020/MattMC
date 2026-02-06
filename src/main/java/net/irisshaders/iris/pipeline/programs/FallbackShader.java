@@ -12,8 +12,7 @@ import net.irisshaders.iris.gl.framebuffer.GlFramebuffer;
 import net.irisshaders.iris.mixinterface.ShaderInstanceInterface;
 import net.irisshaders.iris.pipeline.IrisRenderingPipeline;
 import net.irisshaders.iris.uniforms.CapturedRenderingState;
-import org.lwjgl.opengl.GL31C;
-import org.lwjgl.opengl.GL46C;
+import net.vulkanic.VulkanicAPI;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -67,7 +66,7 @@ public class FallbackShader extends GlProgram implements IrisProgram {
 		int ALPHA_TEST_VALUE = GlStateManager._glGetUniformLocation(programId, "AlphaTestValue");
 
 		if (ALPHA_TEST_VALUE > -1) {
-			GL46C.glUniform1f(ALPHA_TEST_VALUE, alphaValue);
+			VulkanicAPI.assignUniformFloat(ALPHA_TEST_VALUE, alphaValue);
 		}
 	}
 
@@ -82,7 +81,7 @@ public class FallbackShader extends GlProgram implements IrisProgram {
 
 	@Override
 	public int iris$getBlockIndex(int program, CharSequence uniformBlockName) {
-		return GL31C.glGetUniformBlockIndex(program, uniformBlockName);
+		return VulkanicAPI.locateUniformBlock(program, uniformBlockName.toString());
 	}
 
 	@Override
@@ -101,11 +100,11 @@ public class FallbackShader extends GlProgram implements IrisProgram {
 			float fogDensity = CapturedRenderingState.INSTANCE.getFogDensity();
 
 			if (fogDensity >= 0.0) {
-				GL46C.glUniform1f(FOG_DENSITY, fogDensity);
-				GL46C.glUniform1i(FOG_IS_EXP2, 1);
+				VulkanicAPI.assignUniformFloat(FOG_DENSITY, fogDensity);
+				VulkanicAPI.assignUniformInteger(FOG_IS_EXP2, 1);
 			} else {
-				GL46C.glUniform1f(FOG_DENSITY, 0.0f);
-				GL46C.glUniform1i(FOG_IS_EXP2, 0);
+				VulkanicAPI.assignUniformFloat(FOG_DENSITY, 0.0f);
+				VulkanicAPI.assignUniformInteger(FOG_IS_EXP2, 0);
 			}
 		}
 

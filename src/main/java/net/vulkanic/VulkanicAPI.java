@@ -42,6 +42,7 @@ public class VulkanicAPI {
     
     // OpenGL Constants - Framebuffer/Buffer
     public static final int GL_FRAMEBUFFER = 0x8D40;     // 36160
+    public static final int GL_FRAMEBUFFER_COMPLETE = 0x8CD5;  // 36053
     public static final int GL_COLOR = 0x1800;
     
     // OpenGL Constants - Image Access
@@ -151,6 +152,7 @@ public class VulkanicAPI {
     
     // OpenGL Constants - Clear Bits
     public static final int GL_COLOR_BUFFER_BIT = 0x00004000;
+    public static final int GL_DEPTH_BUFFER_BIT = 0x00000100;
     
     // OpenGL Constants - Pixel Types and Formats
     public static final int GL_UNSIGNED_BYTE = 0x1401;
