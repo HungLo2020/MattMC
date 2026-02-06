@@ -464,4 +464,9 @@ public class OpenGLBackend implements GraphicsBackend {
             0L
         );
     }
+    
+    @Override
+    public boolean hasBufferStorageExtension() {
+        return org.lwjgl.opengl.GL.getCapabilities().GL_ARB_buffer_storage;
+    }
 }

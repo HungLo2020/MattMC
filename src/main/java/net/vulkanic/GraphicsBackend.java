@@ -139,4 +139,7 @@ public interface GraphicsBackend {
     boolean supportsArbDebugOutput();
     void setupKhrDebugSystem(int verbosityLevel, boolean synchronous, java.util.function.Consumer<String> messageHandler);
     void setupArbDebugSystem(int verbosityLevel, boolean synchronous, java.util.function.Consumer<String> messageHandler);
+    
+    // Extension capability checking
+    boolean hasBufferStorageExtension();
 }

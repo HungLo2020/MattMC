@@ -375,4 +375,8 @@ public class VulkanicAPI {
     public static void setupArbDebugSystem(int verbosityLevel, boolean synchronous, java.util.function.Consumer<String> messageHandler) {
         getBackend().setupArbDebugSystem(verbosityLevel, synchronous, messageHandler);
     }
+    
+    public static boolean hasBufferStorageExtension() {
+        return getBackend().hasBufferStorageExtension();
+    }
 }

@@ -70,7 +70,7 @@ public class GlDevice implements GpuDevice {
 		this.debugLog = GlDebug.enableDebugCallback(i, bl, this.enabledExtensions);
 		this.debugLabels = GlDebugLabel.create(gLCapabilities, bl2, this.enabledExtensions);
 		this.vertexArrayCache = VertexArrayCache.create(gLCapabilities, this.debugLabels, this.enabledExtensions);
-		this.bufferStorage = BufferStorage.create(gLCapabilities, this.enabledExtensions);
+		this.bufferStorage = BufferStorage.create(this.enabledExtensions);
 		this.directStateAccess = DirectStateAccess.create(gLCapabilities, this.enabledExtensions, graphicsWorkarounds);
 		this.maxSupportedTextureSize = j;
 		this.defaultShaderSource = biFunction;

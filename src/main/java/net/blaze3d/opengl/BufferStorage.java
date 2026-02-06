@@ -5,14 +5,14 @@ import java.util.Set;
 import java.util.function.Supplier;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
+import net.vulkanic.VulkanicAPI;
 import org.jetbrains.annotations.Nullable;
-import org.lwjgl.opengl.GLCapabilities;
 import org.lwjgl.system.MemoryUtil;
 
 @Environment(EnvType.CLIENT)
 public abstract class BufferStorage {
-	public static BufferStorage create(GLCapabilities gLCapabilities, Set<String> set) {
-		if (gLCapabilities.GL_ARB_buffer_storage && GlDevice.USE_GL_ARB_buffer_storage) {
+	public static BufferStorage create(Set<String> set) {
+		if (VulkanicAPI.hasBufferStorageExtension() && GlDevice.USE_GL_ARB_buffer_storage) {
 			set.add("GL_ARB_buffer_storage");
 			return new BufferStorage.Immutable();
 		} else {
