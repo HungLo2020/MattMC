@@ -8,6 +8,7 @@ import org.lwjgl.opengl.GL15;
 import org.lwjgl.opengl.GL20;
 import org.lwjgl.opengl.GL30;
 import java.nio.ByteBuffer;
+import java.nio.FloatBuffer;
 
 /**
  * OpenGL implementation of the Vulkanic Graphics Backend.
@@ -759,5 +760,25 @@ public class OpenGLBackend implements GraphicsBackend {
     @Override
     public void multiDrawElementsBaseVertex(int mode, long pCount, int type, long pIndices, int drawCount, long pBaseVertex) {
         org.lwjgl.opengl.GL32C.nglMultiDrawElementsBaseVertex(mode, pCount, type, pIndices, drawCount, pBaseVertex);
+    }
+    
+    @Override
+    public void assignUniformMatrix4fv(int location, boolean transpose, FloatBuffer value) {
+        org.lwjgl.opengl.GL20C.glUniformMatrix4fv(location, transpose, value);
+    }
+    
+    @Override
+    public String queryString(int name) {
+        return org.lwjgl.opengl.GL11C.glGetString(name);
+    }
+    
+    @Override
+    public String queryStringIndexed(int name, int index) {
+        return org.lwjgl.opengl.GL30C.glGetStringi(name, index);
+    }
+    
+    @Override
+    public void uploadShaderSourceNative(int shader, int count, long strings, long length) {
+        org.lwjgl.opengl.GL20C.nglShaderSource(shader, count, strings, length);
     }
 }

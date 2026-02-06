@@ -1,15 +1,15 @@
 # Vulkanic OpenGL Abstraction - Progress Tracker
 
-**Last Updated:** 2026-02-06 18:42 UTC  
+**Last Updated:** 2026-02-06 19:05 UTC  
 **Status:** ✅ CORE ENGINE COMPLETE + IRIS MIGRATION IN PROGRESS
 
 ## 🎉 Executive Summary
 
 - **Sodium Client:** 484 files - **100% COMPLETE** ✅
 - **Blaze3D:** 123 files - **100% COMPLETE** ✅
-- **Iris Shaders:** 15/68 files - **22.1% COMPLETE** (in progress)
+- **Iris Shaders:** 20/68 files - **29.4% COMPLETE** (in progress)
 - **Total Core Engine:** 607 files - **ZERO OpenGL dependencies** 🎉
-- **Backend Methods:** 140+ GL calls abstracted
+- **Backend Methods:** 145+ GL calls abstracted
 
 ## 📊 Component Status
 
@@ -17,7 +17,7 @@
 |-----------|-------------|----------|-----------|----------|
 | **Sodium Client** | 484 | 484 | 0 | ✅ **100%** |
 | **Blaze3D** | 123 | 123 | 0 | ✅ **100%** |
-| **Iris Shaders** | 68 | 15 | 53 | 🔄 **22.1%** |
+| **Iris Shaders** | 68 | 20 | 48 | 🔄 **29.4%** |
 | **Core Total** | 607 | 607 | 0 | ✅ **100%** |
 | Distant Horizons | TBD | 0 | TBD | 0% (mod) |
 | Minecraft Core | N/A | N/A | N/A | ✅ Uses Blaze3D |
@@ -27,13 +27,13 @@
 
 ## 🆕 Iris Shaders - IN PROGRESS (68 files total)
 
-**Status:** Migration progressing - 15 files migrated, 53 remaining
+**Status:** Migration progressing - 20 files migrated, 48 remaining
 
 ### Files with OpenGL Dependencies
 - **Total Iris files**: 445
 - **Files with OpenGL imports**: 68
-- **Files migrated**: 15
-- **Remaining**: 53
+- **Files migrated**: 20
+- **Remaining**: 48
 
 ### Migration Session 1 (5 files - COMPLETE)
 
@@ -98,6 +98,95 @@
 - **Changes**: Replaced 80+ GL texture format constants with hex literals (inline comments show original)
 
 #### 9. **PixelFormat.java** ✅
+**Location**: `net.irisshaders.iris.gl.texture.PixelFormat.java`
+- **Before**: 2 OpenGL imports (GL11C, GL30C)
+- **After**: ZERO OpenGL imports, uses hex literals
+- **Changes**: All pixel format constants → hex literals
+
+#### 10. **PixelType.java** ✅
+**Location**: `net.irisshaders.iris.gl.texture.PixelType.java`
+- **Before**: 3 OpenGL imports (GL11C, GL12C, GL30C)
+- **After**: ZERO OpenGL imports, uses hex literals
+- **Changes**: All pixel type constants → hex literals
+
+### Migration Session 3 (5 files - COMPLETE)
+
+#### 11. **ImageBinding.java** ✅
+**Location**: `net.irisshaders.iris.gl.image.ImageBinding.java`
+- **Before**: 1 OpenGL import (GL42C)
+- **After**: ZERO OpenGL imports, uses VulkanicAPI constants
+- **Changes**: `GL42C.GL_READ_WRITE` → `VulkanicAPI.GL_READ_WRITE`
+
+#### 12. **ImageClearPass.java** ✅
+**Location**: `net.irisshaders.iris.gl.image.ImageClearPass.java`
+- **Before**: 1 OpenGL import (GL30C)
+- **After**: ZERO OpenGL imports, uses VulkanicAPI constants
+- **Changes**: `GL30C.GL_COLOR` → `VulkanicAPI.GL_COLOR`
+
+#### 13. **SamplerLimits.java** ✅
+**Location**: `net.irisshaders.iris.gl.sampler.SamplerLimits.java`
+- **Before**: 2 OpenGL imports (GL20C, GL45C)
+- **After**: ZERO OpenGL imports, uses VulkanicAPI constants
+- **Changes**:
+  - `GL20C.GL_MAX_TEXTURE_IMAGE_UNITS` → `VulkanicAPI.GL_MAX_TEXTURE_IMAGE_UNITS`
+  - `GL20C.GL_MAX_DRAW_BUFFERS` → `VulkanicAPI.GL_MAX_DRAW_BUFFERS`
+  - `GL45C.GL_MAX_SHADER_STORAGE_BUFFER_BINDINGS` → `VulkanicAPI.GL_MAX_SHADER_STORAGE_BUFFER_BINDINGS`
+
+#### 14. **ProgramCreator.java** ✅
+**Location**: `net.irisshaders.iris.gl.shader.ProgramCreator.java`
+- **Before**: 2 OpenGL imports (GL20C, KHRDebug)
+- **After**: ZERO OpenGL imports, uses VulkanicAPI constants
+- **Changes**:
+  - `GL20C.GL_TRUE` → `VulkanicAPI.GL_TRUE`
+  - `KHRDebug.GL_SHADER`, `KHRDebug.GL_PROGRAM` → `VulkanicAPI.GL_SHADER`, `VulkanicAPI.GL_PROGRAM`
+
+#### 15. **ShaderStorageBufferHolder.java** ✅
+**Location**: `net.irisshaders.iris.gl.buffer.ShaderStorageBufferHolder.java`
+- **Before**: 1 OpenGL import (GL43C)
+- **After**: ZERO OpenGL imports, uses VulkanicAPI constants
+- **Changes**: `GL43C.GL_SHADER_STORAGE_BUFFER` → `VulkanicAPI.GL_SHADER_STORAGE_BUFFER`
+
+### Migration Session 4 (5 files - COMPLETE)
+
+#### 16. **TextureType.java** ✅
+**Location**: `net.irisshaders.iris.gl.texture.TextureType.java`
+- **Before**: 1 OpenGL import (GL30C)
+- **After**: ZERO OpenGL imports, uses VulkanicAPI constants
+- **Changes**:
+  - `GL30C.GL_TEXTURE_1D` → `VulkanicAPI.GL_TEXTURE_1D`
+  - `GL30C.GL_TEXTURE_2D` → `VulkanicAPI.GL_TEXTURE_2D`
+  - `GL30C.GL_TEXTURE_3D` → `VulkanicAPI.GL_TEXTURE_3D`
+
+#### 17. **MatrixUniform.java** ✅
+**Location**: `net.irisshaders.iris.gl.uniform.MatrixUniform.java`
+- **Before**: 1 OpenGL import (GL46C), direct GL call
+- **After**: ZERO OpenGL imports, ZERO GL calls
+- **Changes**:
+  - `GL46C.glUniformMatrix4fv(location, false, buffer)` → `VulkanicAPI.assignUniformMatrix4fv(location, false, buffer)`
+
+#### 18. **MatrixFromFloatArrayUniform.java** ✅
+**Location**: `net.irisshaders.iris.gl.uniform.MatrixFromFloatArrayUniform.java`
+- **Before**: 1 OpenGL import (GL46C), direct GL call
+- **After**: ZERO OpenGL imports, ZERO GL calls
+- **Changes**:
+  - `GL46C.glUniformMatrix4fv(location, false, buffer)` → `VulkanicAPI.assignUniformMatrix4fv(location, false, buffer)`
+
+#### 19. **StandardMacros.java** ✅
+**Location**: `net.irisshaders.iris.gl.shader.StandardMacros.java`
+- **Before**: 3 OpenGL imports (GL11, GL20C, GL30C), 3 GL constant usages
+- **After**: ZERO OpenGL imports, uses VulkanicAPI constants
+- **Changes**:
+  - `GL20C.GL_VERSION` → `VulkanicAPI.GL_VERSION`
+  - `GL20C.GL_SHADING_LANGUAGE_VERSION` → `VulkanicAPI.GL_SHADING_LANGUAGE_VERSION`
+  - `GL30C.GL_NUM_EXTENSIONS` → `VulkanicAPI.GL_NUM_EXTENSIONS`
+  - `GL30C.GL_EXTENSIONS` → `VulkanicAPI.GL_EXTENSIONS`
+
+#### 20. **ShaderWorkarounds.java** ✅
+**Location**: `net.irisshaders.iris.gl.shader.ShaderWorkarounds.java`
+- **Before**: 1 OpenGL import (GL20C), native GL call
+- **After**: ZERO OpenGL imports, ZERO GL calls
+- **Changes**:
+  - `GL20C.nglShaderSource(glId, 1, pointers.address0(), 0)` → `VulkanicAPI.uploadShaderSourceNative(glId, 1, pointers.address0(), 0)`
 **Location**: `net.irisshaders.iris.gl.texture.PixelFormat.java`
 - **Before**: 3 OpenGL imports (GL11C, GL12C, GL30C)
 - **After**: ZERO OpenGL imports, uses hex literals
@@ -207,9 +296,20 @@ Changes:
 
 ## 🎯 Backend Abstraction Status
 
-**Total GL Methods Abstracted:** 140+ methods in OpenGLBackend
+**Total GL Methods Abstracted:** 145+ methods in OpenGLBackend
 
-### Recent Additions (Iris Migration Session 3)
+### Recent Additions (Iris Migration Session 4)
+- `GL_TEXTURE_1D`, `GL_TEXTURE_3D`, `GL_TEXTURE_RECTANGLE` - Texture type constants
+- `GL_VERSION`, `GL_SHADING_LANGUAGE_VERSION` - String query constants
+- `GL_EXTENSIONS`, `GL_NUM_EXTENSIONS` - Extension query constants
+- `GL_DEBUG_OUTPUT_SYNCHRONOUS`, `GL_CONTEXT_FLAGS`, `GL_DEBUG_OUTPUT` - Debug constants
+- `GL_DEBUG_SEVERITY_HIGH`, `GL_DEBUG_SEVERITY_MEDIUM`, `GL_DEBUG_SEVERITY_LOW`, `GL_DEBUG_SEVERITY_NOTIFICATION` - Debug severity levels
+- `assignUniformMatrix4fv(location, transpose, buffer)` - Upload 4x4 matrix uniform
+- `queryString(name)` - Query GL string values
+- `queryStringIndexed(name, index)` - Query indexed GL string values (e.g., extensions)
+- `uploadShaderSourceNative(shader, count, strings, length)` - Native shader source upload (workaround for AMD drivers)
+
+### Previous Additions (Iris Migration Session 3)
 - `GL_SHADER_STORAGE_BUFFER` - Shader storage buffer target constant
 - `GL_TRUE` - Boolean true constant
 - `GL_SHADER`, `GL_PROGRAM` - Debug object type constants

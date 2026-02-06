@@ -1,6 +1,7 @@
 package net.vulkanic;
 
 import java.nio.ByteBuffer;
+import java.nio.FloatBuffer;
 
 /**
  * Interface for graphics backend implementations.
@@ -227,4 +228,14 @@ public interface GraphicsBackend {
     
     // Multi-draw operations
     void multiDrawElementsBaseVertex(int mode, long pCount, int type, long pIndices, int drawCount, long pBaseVertex);
+    
+    // Uniform matrix operations
+    void assignUniformMatrix4fv(int location, boolean transpose, FloatBuffer value);
+    
+    // String queries
+    String queryString(int name);
+    String queryStringIndexed(int name, int index);
+    
+    // Native shader source upload
+    void uploadShaderSourceNative(int shader, int count, long strings, long length);
 }

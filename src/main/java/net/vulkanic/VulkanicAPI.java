@@ -83,6 +83,27 @@ public class VulkanicAPI {
     public static final int GL_ONE_MINUS_DST_ALPHA = 0x0305;
     public static final int GL_SRC_ALPHA_SATURATE = 0x0308;
     
+    // OpenGL Constants - Texture Types
+    public static final int GL_TEXTURE_1D = 0x0DE0;
+    public static final int GL_TEXTURE_3D = 0x806F;
+    public static final int GL_TEXTURE_RECTANGLE = 0x84F5;
+    
+    // OpenGL Constants - Query Names
+    public static final int GL_SHADING_LANGUAGE_VERSION = 0x8B8C;
+    public static final int GL_EXTENSIONS = 0x1F03;
+    public static final int GL_NUM_EXTENSIONS = 0x821D;
+    
+    // OpenGL Constants - Debug Capabilities
+    public static final int GL_DEBUG_OUTPUT_SYNCHRONOUS = 0x8242;
+    public static final int GL_CONTEXT_FLAGS = 0x821E;
+    public static final int GL_DEBUG_OUTPUT = 0x92E0;
+    
+    // OpenGL Constants - Debug Severity Levels
+    public static final int GL_DEBUG_SEVERITY_HIGH = 0x9146;
+    public static final int GL_DEBUG_SEVERITY_MEDIUM = 0x9147;
+    public static final int GL_DEBUG_SEVERITY_LOW = 0x9148;
+    public static final int GL_DEBUG_SEVERITY_NOTIFICATION = 0x826B;
+    
     /**
      * Backend types supported by Vulkanic.
      */
@@ -664,5 +685,21 @@ public class VulkanicAPI {
     
     public static void multiDrawElementsBaseVertex(int mode, long pCount, int type, long pIndices, int drawCount, long pBaseVertex) {
         getBackend().multiDrawElementsBaseVertex(mode, pCount, type, pIndices, drawCount, pBaseVertex);
+    }
+    
+    public static void assignUniformMatrix4fv(int location, boolean transpose, java.nio.FloatBuffer value) {
+        getBackend().assignUniformMatrix4fv(location, transpose, value);
+    }
+    
+    public static String queryString(int name) {
+        return getBackend().queryString(name);
+    }
+    
+    public static String queryStringIndexed(int name, int index) {
+        return getBackend().queryStringIndexed(name, index);
+    }
+    
+    public static void uploadShaderSourceNative(int shader, int count, long strings, long length) {
+        getBackend().uploadShaderSourceNative(shader, count, strings, length);
     }
 }
