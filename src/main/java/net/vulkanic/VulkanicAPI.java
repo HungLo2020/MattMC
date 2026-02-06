@@ -157,6 +157,7 @@ public class VulkanicAPI {
     // OpenGL Constants - Pixel Types and Formats
     public static final int GL_UNSIGNED_BYTE = 0x1401;
     public static final int GL_RGBA = 0x1908;
+    public static final int GL_RGBA8 = 0x8058;
     public static final int GL_RGB = 0x1907;
     
     // OpenGL Constants - Texture Wrap Modes
@@ -180,6 +181,43 @@ public class VulkanicAPI {
     
     // OpenGL Constants - Boolean values
     public static final int GL_FALSE = 0;
+    
+    // OpenGL Constants - Uniform/Active Types
+    public static final int GL_FLOAT = 0x1406;
+    public static final int GL_INT = 0x1404;
+    public static final int GL_BOOL = 0x8B56;
+    public static final int GL_FLOAT_VEC2 = 0x8B50;
+    public static final int GL_FLOAT_VEC3 = 0x8B51;
+    public static final int GL_FLOAT_VEC4 = 0x8B52;
+    public static final int GL_INT_VEC2 = 0x8B53;
+    public static final int GL_INT_VEC3 = 0x8B54;
+    public static final int GL_INT_VEC4 = 0x8B55;
+    public static final int GL_FLOAT_MAT2 = 0x8B5A;
+    public static final int GL_FLOAT_MAT3 = 0x8B5B;
+    public static final int GL_FLOAT_MAT4 = 0x8B5C;
+    public static final int GL_SAMPLER_1D = 0x8B5D;
+    public static final int GL_SAMPLER_2D = 0x8B5E;
+    public static final int GL_SAMPLER_3D = 0x8B5F;
+    public static final int GL_SAMPLER_1D_SHADOW = 0x8B61;
+    public static final int GL_SAMPLER_2D_SHADOW = 0x8B62;
+    public static final int GL_UNSIGNED_INT_SAMPLER_2D = 0x8DD2;
+    public static final int GL_UNSIGNED_INT_SAMPLER_3D = 0x8DD3;
+    
+    // OpenGL Constants - Image Types (ARB_shader_image_load_store)
+    public static final int GL_IMAGE_1D = 0x904C;
+    public static final int GL_IMAGE_2D = 0x904D;
+    public static final int GL_IMAGE_3D = 0x904E;
+    public static final int GL_IMAGE_1D_ARRAY = 0x9052;
+    public static final int GL_IMAGE_2D_ARRAY = 0x9053;
+    public static final int GL_INT_IMAGE_1D = 0x9057;
+    public static final int GL_INT_IMAGE_2D = 0x9058;
+    public static final int GL_INT_IMAGE_3D = 0x9059;
+    public static final int GL_UNSIGNED_INT_IMAGE_1D = 0x9062;
+    public static final int GL_UNSIGNED_INT_IMAGE_2D = 0x9063;
+    public static final int GL_UNSIGNED_INT_IMAGE_3D = 0x9064;
+    
+    // OpenGL Constants - Program Query
+    public static final int GL_ACTIVE_UNIFORMS = 0x8B86;
     
     /**
      * Backend types supported by Vulkanic.

@@ -12,10 +12,8 @@ import net.irisshaders.iris.gl.uniform.UniformType;
 import net.irisshaders.iris.gl.uniform.UniformUpdateFrequency;
 import net.irisshaders.iris.uniforms.SystemTimeUniforms;
 import net.minecraft.client.Minecraft;
+import net.vulkanic.VulkanicAPI;
 import org.lwjgl.BufferUtils;
-import org.lwjgl.opengl.ARBShaderImageLoadStore;
-import org.lwjgl.opengl.GL20C;
-import org.lwjgl.opengl.GL30C;
 
 import java.nio.IntBuffer;
 import java.util.ArrayList;
@@ -65,57 +63,57 @@ public class ProgramUniforms {
 	private static String getTypeName(int type) {
 		String typeName;
 
-		if (type == GL20C.GL_FLOAT) {
+		if (type == VulkanicAPI.GL_FLOAT) {
 			typeName = "float";
-		} else if (type == GL20C.GL_INT) {
+		} else if (type == VulkanicAPI.GL_INT) {
 			typeName = "int";
-		} else if (type == GL20C.GL_FLOAT_MAT4) {
+		} else if (type == VulkanicAPI.GL_FLOAT_MAT4) {
 			typeName = "mat4";
-		} else if (type == GL20C.GL_FLOAT_VEC4) {
+		} else if (type == VulkanicAPI.GL_FLOAT_VEC4) {
 			typeName = "vec4";
-		} else if (type == GL20C.GL_FLOAT_MAT3) {
+		} else if (type == VulkanicAPI.GL_FLOAT_MAT3) {
 			typeName = "mat3";
-		} else if (type == GL20C.GL_FLOAT_VEC3) {
+		} else if (type == VulkanicAPI.GL_FLOAT_VEC3) {
 			typeName = "vec3";
-		} else if (type == GL20C.GL_FLOAT_MAT2) {
+		} else if (type == VulkanicAPI.GL_FLOAT_MAT2) {
 			typeName = "mat2";
-		} else if (type == GL20C.GL_FLOAT_VEC2) {
+		} else if (type == VulkanicAPI.GL_FLOAT_VEC2) {
 			typeName = "vec2";
-		} else if (type == GL20C.GL_INT_VEC2) {
+		} else if (type == VulkanicAPI.GL_INT_VEC2) {
 			typeName = "ivec2";
-		} else if (type == GL20C.GL_INT_VEC4) {
+		} else if (type == VulkanicAPI.GL_INT_VEC4) {
 			typeName = "ivec4";
-		} else if (type == GL20C.GL_SAMPLER_3D) {
+		} else if (type == VulkanicAPI.GL_SAMPLER_3D) {
 			typeName = "sampler3D";
-		} else if (type == GL20C.GL_SAMPLER_2D) {
+		} else if (type == VulkanicAPI.GL_SAMPLER_2D) {
 			typeName = "sampler2D";
-		} else if (type == GL30C.GL_UNSIGNED_INT_SAMPLER_2D) {
+		} else if (type == VulkanicAPI.GL_UNSIGNED_INT_SAMPLER_2D) {
 			typeName = "usampler2D";
-		} else if (type == GL30C.GL_UNSIGNED_INT_SAMPLER_3D) {
+		} else if (type == VulkanicAPI.GL_UNSIGNED_INT_SAMPLER_3D) {
 			typeName = "usampler3D";
-		} else if (type == GL20C.GL_SAMPLER_1D) {
+		} else if (type == VulkanicAPI.GL_SAMPLER_1D) {
 			typeName = "sampler1D";
-		} else if (type == GL20C.GL_SAMPLER_2D_SHADOW) {
+		} else if (type == VulkanicAPI.GL_SAMPLER_2D_SHADOW) {
 			typeName = "sampler2DShadow";
-		} else if (type == GL20C.GL_SAMPLER_1D_SHADOW) {
+		} else if (type == VulkanicAPI.GL_SAMPLER_1D_SHADOW) {
 			typeName = "sampler1DShadow";
-		} else if (type == ARBShaderImageLoadStore.GL_IMAGE_1D) {
+		} else if (type == VulkanicAPI.GL_IMAGE_1D) {
 			typeName = "image1D";
-		} else if (type == ARBShaderImageLoadStore.GL_IMAGE_2D) {
+		} else if (type == VulkanicAPI.GL_IMAGE_2D) {
 			typeName = "image2D";
-		} else if (type == ARBShaderImageLoadStore.GL_IMAGE_3D) {
+		} else if (type == VulkanicAPI.GL_IMAGE_3D) {
 			typeName = "image3D";
-		} else if (type == ARBShaderImageLoadStore.GL_INT_IMAGE_1D) {
+		} else if (type == VulkanicAPI.GL_INT_IMAGE_1D) {
 			typeName = "iimage1D";
-		} else if (type == ARBShaderImageLoadStore.GL_INT_IMAGE_2D) {
+		} else if (type == VulkanicAPI.GL_INT_IMAGE_2D) {
 			typeName = "iimage2D";
-		} else if (type == ARBShaderImageLoadStore.GL_INT_IMAGE_3D) {
+		} else if (type == VulkanicAPI.GL_INT_IMAGE_3D) {
 			typeName = "iimage3D";
-		} else if (type == ARBShaderImageLoadStore.GL_UNSIGNED_INT_IMAGE_1D) {
+		} else if (type == VulkanicAPI.GL_UNSIGNED_INT_IMAGE_1D) {
 			typeName = "uimage1D";
-		} else if (type == ARBShaderImageLoadStore.GL_UNSIGNED_INT_IMAGE_2D) {
+		} else if (type == VulkanicAPI.GL_UNSIGNED_INT_IMAGE_2D) {
 			typeName = "uimage2D";
-		} else if (type == ARBShaderImageLoadStore.GL_UNSIGNED_INT_IMAGE_3D) {
+		} else if (type == VulkanicAPI.GL_UNSIGNED_INT_IMAGE_3D) {
 			typeName = "uimage3D";
 		} else {
 			typeName = "(unknown:" + type + ")";
@@ -125,43 +123,43 @@ public class ProgramUniforms {
 	}
 
 	private static UniformType getExpectedType(int type) {
-		if (type == GL20C.GL_FLOAT) {
+		if (type == VulkanicAPI.GL_FLOAT) {
 			return UniformType.FLOAT;
-		} else if (type == GL20C.GL_INT) {
+		} else if (type == VulkanicAPI.GL_INT) {
 			return UniformType.INT;
-		} else if (type == GL20C.GL_BOOL) {
+		} else if (type == VulkanicAPI.GL_BOOL) {
 			return UniformType.INT;
-		} else if (type == GL20C.GL_FLOAT_MAT4) {
+		} else if (type == VulkanicAPI.GL_FLOAT_MAT4) {
 			return UniformType.MAT4;
-		} else if (type == GL20C.GL_FLOAT_VEC4) {
+		} else if (type == VulkanicAPI.GL_FLOAT_VEC4) {
 			return UniformType.VEC4;
-		} else if (type == GL20C.GL_INT_VEC4) {
+		} else if (type == VulkanicAPI.GL_INT_VEC4) {
 			return UniformType.VEC4I;
-		} else if (type == GL20C.GL_FLOAT_MAT3) {
+		} else if (type == VulkanicAPI.GL_FLOAT_MAT3) {
 			return UniformType.MAT3;
-		} else if (type == GL20C.GL_FLOAT_VEC3) {
+		} else if (type == VulkanicAPI.GL_FLOAT_VEC3) {
 			return UniformType.VEC3;
-		} else if (type == GL20C.GL_INT_VEC3) {
+		} else if (type == VulkanicAPI.GL_INT_VEC3) {
 			return UniformType.VEC3I;
-		} else if (type == GL20C.GL_FLOAT_MAT2) {
+		} else if (type == VulkanicAPI.GL_FLOAT_MAT2) {
 			return null;
-		} else if (type == GL20C.GL_FLOAT_VEC2) {
+		} else if (type == VulkanicAPI.GL_FLOAT_VEC2) {
 			return UniformType.VEC2;
-		} else if (type == GL20C.GL_INT_VEC2) {
+		} else if (type == VulkanicAPI.GL_INT_VEC2) {
 			return UniformType.VEC2I;
-		} else if (type == GL20C.GL_SAMPLER_3D) {
+		} else if (type == VulkanicAPI.GL_SAMPLER_3D) {
 			return UniformType.INT;
-		} else if (type == GL20C.GL_SAMPLER_2D) {
+		} else if (type == VulkanicAPI.GL_SAMPLER_2D) {
 			return UniformType.INT;
-		} else if (type == GL30C.GL_UNSIGNED_INT_SAMPLER_2D) {
+		} else if (type == VulkanicAPI.GL_UNSIGNED_INT_SAMPLER_2D) {
 			return UniformType.INT;
-		} else if (type == GL30C.GL_UNSIGNED_INT_SAMPLER_3D) {
+		} else if (type == VulkanicAPI.GL_UNSIGNED_INT_SAMPLER_3D) {
 			return UniformType.INT;
-		} else if (type == GL20C.GL_SAMPLER_1D) {
+		} else if (type == VulkanicAPI.GL_SAMPLER_1D) {
 			return UniformType.INT;
-		} else if (type == GL20C.GL_SAMPLER_2D_SHADOW) {
+		} else if (type == VulkanicAPI.GL_SAMPLER_2D_SHADOW) {
 			return UniformType.INT;
-		} else if (type == GL20C.GL_SAMPLER_1D_SHADOW) {
+		} else if (type == VulkanicAPI.GL_SAMPLER_1D_SHADOW) {
 			return UniformType.INT;
 		} else {
 			return null;
@@ -169,27 +167,27 @@ public class ProgramUniforms {
 	}
 
 	private static boolean isSampler(int type) {
-		return type == GL20C.GL_SAMPLER_1D
-			|| type == GL20C.GL_SAMPLER_2D
-			|| type == GL30C.GL_UNSIGNED_INT_SAMPLER_2D
-			|| type == GL30C.GL_UNSIGNED_INT_SAMPLER_3D
-			|| type == GL20C.GL_SAMPLER_3D
-			|| type == GL20C.GL_SAMPLER_1D_SHADOW
-			|| type == GL20C.GL_SAMPLER_2D_SHADOW;
+		return type == VulkanicAPI.GL_SAMPLER_1D
+			|| type == VulkanicAPI.GL_SAMPLER_2D
+			|| type == VulkanicAPI.GL_UNSIGNED_INT_SAMPLER_2D
+			|| type == VulkanicAPI.GL_UNSIGNED_INT_SAMPLER_3D
+			|| type == VulkanicAPI.GL_SAMPLER_3D
+			|| type == VulkanicAPI.GL_SAMPLER_1D_SHADOW
+			|| type == VulkanicAPI.GL_SAMPLER_2D_SHADOW;
 	}
 
 	private static boolean isImage(int type) {
-		return type == ARBShaderImageLoadStore.GL_IMAGE_1D
-			|| type == ARBShaderImageLoadStore.GL_IMAGE_2D
-			|| type == ARBShaderImageLoadStore.GL_UNSIGNED_INT_IMAGE_1D
-			|| type == ARBShaderImageLoadStore.GL_UNSIGNED_INT_IMAGE_2D
-			|| type == ARBShaderImageLoadStore.GL_UNSIGNED_INT_IMAGE_3D
-			|| type == ARBShaderImageLoadStore.GL_INT_IMAGE_1D
-			|| type == ARBShaderImageLoadStore.GL_INT_IMAGE_2D
-			|| type == ARBShaderImageLoadStore.GL_INT_IMAGE_3D
-			|| type == ARBShaderImageLoadStore.GL_IMAGE_3D
-			|| type == ARBShaderImageLoadStore.GL_IMAGE_1D_ARRAY
-			|| type == ARBShaderImageLoadStore.GL_IMAGE_2D_ARRAY;
+		return type == VulkanicAPI.GL_IMAGE_1D
+			|| type == VulkanicAPI.GL_IMAGE_2D
+			|| type == VulkanicAPI.GL_UNSIGNED_INT_IMAGE_1D
+			|| type == VulkanicAPI.GL_UNSIGNED_INT_IMAGE_2D
+			|| type == VulkanicAPI.GL_UNSIGNED_INT_IMAGE_3D
+			|| type == VulkanicAPI.GL_INT_IMAGE_1D
+			|| type == VulkanicAPI.GL_INT_IMAGE_2D
+			|| type == VulkanicAPI.GL_INT_IMAGE_3D
+			|| type == VulkanicAPI.GL_IMAGE_3D
+			|| type == VulkanicAPI.GL_IMAGE_1D_ARRAY
+			|| type == VulkanicAPI.GL_IMAGE_2D_ARRAY;
 	}
 
 	private void updateStage(ImmutableList<Uniform> uniforms) {
@@ -312,7 +310,7 @@ public class ProgramUniforms {
 		public ProgramUniforms buildUniforms() {
 			// Check for any unsupported uniforms and warn about them so that we can easily figure out what uniforms we
 			// need to add.
-			int activeUniforms = GlStateManager.glGetProgrami(program, GL20C.GL_ACTIVE_UNIFORMS);
+			int activeUniforms = GlStateManager.glGetProgrami(program, VulkanicAPI.GL_ACTIVE_UNIFORMS);
 			IntBuffer sizeBuf = BufferUtils.createIntBuffer(1);
 			IntBuffer typeBuf = BufferUtils.createIntBuffer(1);
 
