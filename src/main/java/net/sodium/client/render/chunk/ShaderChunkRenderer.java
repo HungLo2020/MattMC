@@ -1,8 +1,6 @@
 package net.sodium.client.render.chunk;
 
-import net.blaze3d.opengl.GlConst;
 import net.blaze3d.opengl.GlDevice;
-import net.blaze3d.opengl.GlStateManager;
 import net.blaze3d.opengl.GlTexture;
 import net.blaze3d.pipeline.RenderTarget;
 import net.blaze3d.systems.RenderSystem;
@@ -19,6 +17,7 @@ import net.sodium.client.gl.shader.*;
 import net.sodium.client.util.FogParameters;
 import net.blaze3d.opengl.GlCommandEncoder;
 import net.minecraft.resources.ResourceLocation;
+import net.vulkanic.VulkanicAPI;
 import java.util.Map;
 
 public abstract class ShaderChunkRenderer implements ChunkRenderer {
@@ -94,7 +93,7 @@ public abstract class ShaderChunkRenderer implements ChunkRenderer {
 
         // Iris: From MixinShaderChunkRenderer - viewport redirect (skip if in shadow pass)
         if (!net.irisshaders.iris.shadows.ShadowRenderingState.areShadowsCurrentlyBeingRendered()) {
-            GlStateManager._viewport(0, 0, target.getColorTexture().getWidth(0), target.getColorTexture().getHeight(0));
+            VulkanicAPI.viewport(0, 0, target.getColorTexture().getWidth(0), target.getColorTexture().getHeight(0));
         }
         
         // Iris: From MixinShaderChunkRenderer - framebuffer binding is delayed/redirected
@@ -116,7 +115,7 @@ public abstract class ShaderChunkRenderer implements ChunkRenderer {
         }
 
         if (program == null) {
-            GlStateManager._glBindFramebuffer(GlConst.GL_FRAMEBUFFER, ((GlTexture) target.getColorTexture()).getFbo(((GlDevice) RenderSystem.getDevice()).directStateAccess(), target.getDepthTexture()));
+            VulkanicAPI.attachFramebuffer(VulkanicAPI.GL_FRAMEBUFFER, ((GlTexture) target.getColorTexture()).getFbo(((GlDevice) RenderSystem.getDevice()).directStateAccess(), target.getDepthTexture()));
             program = this.compileProgram(options);
         }
 

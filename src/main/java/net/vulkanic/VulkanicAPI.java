@@ -24,6 +24,19 @@ public class VulkanicAPI {
     // OpenGL Constants - Primitive Types
     public static final int GL_PATCHES = 0x000E;
     
+    // OpenGL Constants - Shader Status
+    public static final int GL_COMPILE_STATUS = 0x8B81;  // 35713
+    public static final int GL_LINK_STATUS = 0x8B82;     // 35714
+    
+    // OpenGL Constants - Texture Targets and Units
+    public static final int GL_TEXTURE_2D = 0x0DE1;      // 3553
+    public static final int GL_TEXTURE0 = 0x84C0;        // 33984
+    public static final int GL_TEXTURE_BASE_LEVEL = 0x813C;  // 33084
+    public static final int GL_TEXTURE_MAX_LEVEL = 0x813D;   // 33085
+    
+    // OpenGL Constants - Framebuffer
+    public static final int GL_FRAMEBUFFER = 0x8D40;     // 36160
+    
     /**
      * Backend types supported by Vulkanic.
      */

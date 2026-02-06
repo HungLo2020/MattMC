@@ -1,6 +1,5 @@
 package net.sodium.client.gl.shader;
 
-import net.blaze3d.opengl.GlStateManager;
 import net.sodium.client.gl.GlObject;
 import net.minecraft.resources.ResourceLocation;
 import net.vulkanic.VulkanicAPI;
@@ -31,7 +30,7 @@ public class GlShader extends GlObject {
             LOGGER.warn("Include table: {}", Arrays.toString(parsedShader.includeIds()));
         }
 
-        int result = GlStateManager.glGetShaderi(handle, 35713);  // GL_COMPILE_STATUS
+        int result = VulkanicAPI.queryShaderParameter(handle, VulkanicAPI.GL_COMPILE_STATUS);
 
         if (result != 1) {  // GL_TRUE
             throw new RuntimeException("Shader compilation failed, see log for details");

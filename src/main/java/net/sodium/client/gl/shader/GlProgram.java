@@ -1,6 +1,5 @@
 package net.sodium.client.gl.shader;
 
-import net.blaze3d.opengl.GlStateManager;
 import net.sodium.client.gl.GlObject;
 import net.sodium.client.gl.shader.uniform.GlUniform;
 import net.sodium.client.gl.shader.uniform.GlUniformBlock;
@@ -130,7 +129,7 @@ public class GlProgram<T> extends GlObject implements ShaderBindingContext {
                 LOGGER.warn("Program link log for " + this.name + ": " + log);
             }
 
-            int result = GlStateManager.glGetProgrami(this.program, 35714); // GL_LINK_STATUS
+            int result = VulkanicAPI.queryProgramParameter(this.program, VulkanicAPI.GL_LINK_STATUS);
 
             if (result != 1) { // GL_TRUE
                 throw new RuntimeException("Shader program linking failed, see log for details");

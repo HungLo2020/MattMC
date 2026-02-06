@@ -1,6 +1,5 @@
 package net.sodium.client.render.chunk.shader;
 
-import net.blaze3d.opengl.GlStateManager;
 import net.blaze3d.opengl.GlTexture;
 import net.blaze3d.textures.GpuTextureView;
 import net.sodium.client.gl.device.GLRenderDevice;
@@ -13,6 +12,7 @@ import net.sodium.client.render.chunk.vertex.format.impl.CompactChunkVertex;
 import net.sodium.client.util.FogParameters;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.texture.TextureAtlas;
+import net.vulkanic.VulkanicAPI;
 import org.joml.Matrix4fc;
 
 import java.util.EnumMap;
@@ -76,11 +76,11 @@ public class DefaultShaderInterface implements ChunkShaderInterface {
     @Deprecated(forRemoval = true) // should be handled properly in GFX instead.
     private void bindTexture(ChunkShaderTextureSlot slot, GpuTextureView textureView) {
         GlTexture tex = (GlTexture) textureView.texture();
-        GlStateManager._activeTexture(33984 + slot.ordinal()); // GL_TEXTURE0
-        GlStateManager._bindTexture(tex.glId());
-        GlStateManager._texParameter(3553, 33084, textureView.baseMipLevel()); // GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL
-        GlStateManager._texParameter(3553, 33085, textureView.baseMipLevel() + textureView.mipLevels() - 1); // GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL
-        tex.flushModeChanges(3553); // GL_TEXTURE_2D
+        VulkanicAPI.activateTextureUnit(VulkanicAPI.GL_TEXTURE0 + slot.ordinal());
+        VulkanicAPI.bindTexture(VulkanicAPI.GL_TEXTURE_2D, tex.glId());
+        VulkanicAPI.configureTextureParameter(VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_BASE_LEVEL, textureView.baseMipLevel());
+        VulkanicAPI.configureTextureParameter(VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_MAX_LEVEL, textureView.baseMipLevel() + textureView.mipLevels() - 1);
+        tex.flushModeChanges(VulkanicAPI.GL_TEXTURE_2D);
 
         var uniform = this.uniformTextures.get(slot);
         uniform.setInt(slot.ordinal());
