@@ -343,4 +343,20 @@ public class VulkanicAPI {
     public static long retrieveQueryObjectInt64(int id, int pname) {
         return getBackend().retrieveQueryObjectInt64(id, pname);
     }
+    
+    public static void labelDebugObject(int identifier, int name, String label) {
+        getBackend().labelDebugObject(identifier, name, label);
+    }
+    
+    public static void enterDebugGroup(int source, int id, CharSequence message) {
+        getBackend().enterDebugGroup(source, id, message);
+    }
+    
+    public static void exitDebugGroup() {
+        getBackend().exitDebugGroup();
+    }
+    
+    public static void labelObjectExt(int type, int object, String label) {
+        getBackend().labelObjectExt(type, object, label);
+    }
 }

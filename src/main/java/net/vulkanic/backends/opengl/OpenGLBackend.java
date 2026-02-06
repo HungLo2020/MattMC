@@ -381,4 +381,24 @@ public class OpenGLBackend implements GraphicsBackend {
     public long retrieveQueryObjectInt64(int id, int pname) {
         return org.lwjgl.opengl.ARBTimerQuery.glGetQueryObjecti64(id, pname);
     }
+    
+    @Override
+    public void labelDebugObject(int identifier, int name, String label) {
+        org.lwjgl.opengl.KHRDebug.glObjectLabel(identifier, name, label);
+    }
+    
+    @Override
+    public void enterDebugGroup(int source, int id, CharSequence message) {
+        org.lwjgl.opengl.KHRDebug.glPushDebugGroup(source, id, message);
+    }
+    
+    @Override
+    public void exitDebugGroup() {
+        org.lwjgl.opengl.KHRDebug.glPopDebugGroup();
+    }
+    
+    @Override
+    public void labelObjectExt(int type, int object, String label) {
+        org.lwjgl.opengl.EXTDebugLabel.glLabelObjectEXT(type, object, label);
+    }
 }

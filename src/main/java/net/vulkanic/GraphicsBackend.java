@@ -125,4 +125,12 @@ public interface GraphicsBackend {
     void disposeQueryObject(int id);
     int retrieveQueryObjectInt(int id, int pname);
     long retrieveQueryObjectInt64(int id, int pname);
+    
+    // Debug label operations (KHR_debug)
+    void labelDebugObject(int identifier, int name, String label);
+    void enterDebugGroup(int source, int id, CharSequence message);
+    void exitDebugGroup();
+    
+    // Debug label operations (EXT_debug_label)
+    void labelObjectExt(int type, int object, String label);
 }
