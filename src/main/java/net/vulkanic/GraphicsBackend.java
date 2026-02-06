@@ -238,4 +238,7 @@ public interface GraphicsBackend {
     
     // Native shader source upload
     void uploadShaderSourceNative(int shader, int count, long strings, long length);
+    
+    // Texture operations
+    void glCopyTexSubImage2D(int target, int level, int xoffset, int yoffset, int x, int y, int width, int height);
 }

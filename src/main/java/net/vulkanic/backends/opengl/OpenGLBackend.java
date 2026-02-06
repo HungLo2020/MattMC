@@ -781,4 +781,9 @@ public class OpenGLBackend implements GraphicsBackend {
     public void uploadShaderSourceNative(int shader, int count, long strings, long length) {
         org.lwjgl.opengl.GL20C.nglShaderSource(shader, count, strings, length);
     }
+    
+    @Override
+    public void glCopyTexSubImage2D(int target, int level, int xoffset, int yoffset, int x, int y, int width, int height) {
+        org.lwjgl.opengl.GL20C.glCopyTexSubImage2D(target, level, xoffset, yoffset, x, y, width, height);
+    }
 }

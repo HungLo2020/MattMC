@@ -37,6 +37,8 @@ public class VulkanicAPI {
     // OpenGL Constants - Texture Targets and Units
     public static final int GL_TEXTURE_2D = 0x0DE1;      // 3553
     public static final int GL_TEXTURE0 = 0x84C0;        // 33984
+    public static final int GL_TEXTURE2 = GL_TEXTURE0 + 2;  // 33986
+    public static final int GL_TEXTURE4 = GL_TEXTURE0 + 4;  // 33988
     public static final int GL_TEXTURE_BASE_LEVEL = 0x813C;  // 33084
     public static final int GL_TEXTURE_MAX_LEVEL = 0x813D;   // 33085
     
@@ -119,7 +121,12 @@ public class VulkanicAPI {
     public static final int GL_TEXTURE_LOD_BIAS = 0x8501;
     public static final int GL_LINEAR = 0x2601;
     public static final int GL_NEAREST = 0x2600;
+    public static final int GL_NEAREST_MIPMAP_NEAREST = 0x2700;
+    public static final int GL_LINEAR_MIPMAP_LINEAR = 0x2703;
     public static final int GL_CLAMP_TO_EDGE = 0x812F;
+    public static final int GL_TEXTURE_COMPARE_MODE = 0x884C;
+    public static final int GL_COMPARE_REF_TO_TEXTURE = 0x884E;
+    public static final int GL_TEXTURE_SWIZZLE_RGBA = 0x8E46;
     
     // OpenGL Constants - Compute Shader
     public static final int GL_COMPUTE_WORK_GROUP_SIZE = 0x8267;
@@ -816,5 +823,9 @@ public class VulkanicAPI {
     
     public static void uploadShaderSourceNative(int shader, int count, long strings, long length) {
         getBackend().uploadShaderSourceNative(shader, count, strings, length);
+    }
+    
+    public static void glCopyTexSubImage2D(int target, int level, int xoffset, int yoffset, int x, int y, int width, int height) {
+        getBackend().glCopyTexSubImage2D(target, level, xoffset, yoffset, x, y, width, height);
     }
 }
