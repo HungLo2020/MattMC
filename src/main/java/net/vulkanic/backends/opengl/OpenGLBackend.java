@@ -102,6 +102,75 @@ public class OpenGLBackend implements GraphicsBackend {
         GL15.glBindBuffer(target, buffer);
     }
     
+    // Direct State Access buffer operations
+    @Override
+    public int createBufferDSA() {
+        return org.lwjgl.opengl.ARBDirectStateAccess.glCreateBuffers();
+    }
+    
+    @Override
+    public void namedBufferDataDSA(int buffer, long size, int usage) {
+        org.lwjgl.opengl.ARBDirectStateAccess.glNamedBufferData(buffer, size, usage);
+    }
+    
+    @Override
+    public void namedBufferDataDSA(int buffer, java.nio.ByteBuffer data, int usage) {
+        org.lwjgl.opengl.ARBDirectStateAccess.glNamedBufferData(buffer, data, usage);
+    }
+    
+    @Override
+    public void namedBufferSubDataDSA(int buffer, long offset, java.nio.ByteBuffer data) {
+        org.lwjgl.opengl.ARBDirectStateAccess.glNamedBufferSubData(buffer, offset, data);
+    }
+    
+    @Override
+    public void namedBufferStorageDSA(int buffer, long size, int flags) {
+        org.lwjgl.opengl.ARBDirectStateAccess.glNamedBufferStorage(buffer, size, flags);
+    }
+    
+    @Override
+    public void namedBufferStorageDSA(int buffer, java.nio.ByteBuffer data, int flags) {
+        org.lwjgl.opengl.ARBDirectStateAccess.glNamedBufferStorage(buffer, data, flags);
+    }
+    
+    @Override
+    public java.nio.ByteBuffer mapNamedBufferRangeDSA(int buffer, long offset, long length, int access) {
+        return org.lwjgl.opengl.ARBDirectStateAccess.glMapNamedBufferRange(buffer, offset, length, access);
+    }
+    
+    @Override
+    public void unmapNamedBufferDSA(int buffer) {
+        org.lwjgl.opengl.ARBDirectStateAccess.glUnmapNamedBuffer(buffer);
+    }
+    
+    @Override
+    public void flushMappedNamedBufferRangeDSA(int buffer, long offset, long length) {
+        org.lwjgl.opengl.ARBDirectStateAccess.glFlushMappedNamedBufferRange(buffer, offset, length);
+    }
+    
+    @Override
+    public void copyNamedBufferSubDataDSA(int readBuffer, int writeBuffer, long readOffset, long writeOffset, long size) {
+        org.lwjgl.opengl.ARBDirectStateAccess.glCopyNamedBufferSubData(readBuffer, writeBuffer, readOffset, writeOffset, size);
+    }
+    
+    // Direct State Access framebuffer operations
+    @Override
+    public int createFramebufferDSA() {
+        return org.lwjgl.opengl.ARBDirectStateAccess.glCreateFramebuffers();
+    }
+    
+    @Override
+    public void namedFramebufferTextureDSA(int framebuffer, int attachment, int texture, int level) {
+        org.lwjgl.opengl.ARBDirectStateAccess.glNamedFramebufferTexture(framebuffer, attachment, texture, level);
+    }
+    
+    @Override
+    public void blitNamedFramebufferDSA(int readFramebuffer, int drawFramebuffer, int srcX0, int srcY0, int srcX1, int srcY1,
+                                        int dstX0, int dstY0, int dstX1, int dstY1, int mask, int filter) {
+        org.lwjgl.opengl.ARBDirectStateAccess.glBlitNamedFramebuffer(readFramebuffer, drawFramebuffer, srcX0, srcY0, srcX1, srcY1,
+                                                                      dstX0, dstY0, dstX1, dstY1, mask, filter);
+    }
+    
     @Override
     public void activateTextureUnit(int unit) {
         org.lwjgl.opengl.GL13.glActiveTexture(unit);

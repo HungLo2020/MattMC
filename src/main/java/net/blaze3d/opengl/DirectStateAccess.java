@@ -55,54 +55,54 @@ public abstract class DirectStateAccess {
 		@Override
 		int createBuffer() {
 			GlStateManager.incrementTrackedBuffers();
-			return ARBDirectStateAccess.glCreateBuffers();
+			return net.vulkanic.VulkanicAPI.createBufferDSA();
 		}
 
 		@Override
 		void bufferData(int i, long l, int j) {
-			ARBDirectStateAccess.glNamedBufferData(i, l, GlConst.bufferUsageToGlEnum(j));
+			net.vulkanic.VulkanicAPI.namedBufferDataDSA(i, l, GlConst.bufferUsageToGlEnum(j));
 		}
 
 		@Override
 		void bufferData(int i, ByteBuffer byteBuffer, int j) {
-			ARBDirectStateAccess.glNamedBufferData(i, byteBuffer, GlConst.bufferUsageToGlEnum(j));
+			net.vulkanic.VulkanicAPI.namedBufferDataDSA(i, byteBuffer, GlConst.bufferUsageToGlEnum(j));
 		}
 
 		@Override
 		void bufferSubData(int i, int j, ByteBuffer byteBuffer, int k) {
-			ARBDirectStateAccess.glNamedBufferSubData(i, (long)j, byteBuffer);
+			net.vulkanic.VulkanicAPI.namedBufferSubDataDSA(i, (long)j, byteBuffer);
 		}
 
 		@Override
 		void bufferStorage(int i, long l, int j) {
-			ARBDirectStateAccess.glNamedBufferStorage(i, l, GlConst.bufferUsageToGlFlag(j));
+			net.vulkanic.VulkanicAPI.namedBufferStorageDSA(i, l, GlConst.bufferUsageToGlFlag(j));
 		}
 
 		@Override
 		void bufferStorage(int i, ByteBuffer byteBuffer, int j) {
-			ARBDirectStateAccess.glNamedBufferStorage(i, byteBuffer, GlConst.bufferUsageToGlFlag(j));
+			net.vulkanic.VulkanicAPI.namedBufferStorageDSA(i, byteBuffer, GlConst.bufferUsageToGlFlag(j));
 		}
 
 		@Nullable
 		@Override
 		ByteBuffer mapBufferRange(int i, int j, int k, int l, int m) {
-			return ARBDirectStateAccess.glMapNamedBufferRange(i, j, k, l);
+			return net.vulkanic.VulkanicAPI.mapNamedBufferRangeDSA(i, j, k, l);
 		}
 
 		@Override
 		void unmapBuffer(int i, int j) {
-			ARBDirectStateAccess.glUnmapNamedBuffer(i);
+			net.vulkanic.VulkanicAPI.unmapNamedBufferDSA(i);
 		}
 
 		@Override
 		public int createFrameBufferObject() {
-			return ARBDirectStateAccess.glCreateFramebuffers();
+			return net.vulkanic.VulkanicAPI.createFramebufferDSA();
 		}
 
 		@Override
 		public void bindFrameBufferTextures(int i, int j, int k, int l, int m) {
-			ARBDirectStateAccess.glNamedFramebufferTexture(i, 36064, j, l);
-			ARBDirectStateAccess.glNamedFramebufferTexture(i, 36096, k, l);
+			net.vulkanic.VulkanicAPI.namedFramebufferTextureDSA(i, 36064, j, l); // GL_COLOR_ATTACHMENT0
+			net.vulkanic.VulkanicAPI.namedFramebufferTextureDSA(i, 36096, k, l); // GL_DEPTH_ATTACHMENT
 			if (m != 0) {
 				GlStateManager._glBindFramebuffer(m, i);
 			}
@@ -110,17 +110,17 @@ public abstract class DirectStateAccess {
 
 		@Override
 		public void blitFrameBuffers(int i, int j, int k, int l, int m, int n, int o, int p, int q, int r, int s, int t) {
-			ARBDirectStateAccess.glBlitNamedFramebuffer(i, j, k, l, m, n, o, p, q, r, s, t);
+			net.vulkanic.VulkanicAPI.blitNamedFramebufferDSA(i, j, k, l, m, n, o, p, q, r, s, t);
 		}
 
 		@Override
 		void flushMappedBufferRange(int i, int j, int k, int l) {
-			ARBDirectStateAccess.glFlushMappedNamedBufferRange(i, j, k);
+			net.vulkanic.VulkanicAPI.flushMappedNamedBufferRangeDSA(i, j, k);
 		}
 
 		@Override
 		void copyBufferSubData(int i, int j, int k, int l, int m) {
-			ARBDirectStateAccess.glCopyNamedBufferSubData(i, j, k, l, m);
+			net.vulkanic.VulkanicAPI.copyNamedBufferSubDataDSA(i, j, k, l, m);
 		}
 	}
 

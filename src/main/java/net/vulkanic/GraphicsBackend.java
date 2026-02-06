@@ -36,6 +36,24 @@ public interface GraphicsBackend {
     // Buffer operations  
     void attachBuffer(int target, int buffer);
     
+    // Direct State Access buffer operations
+    int createBufferDSA();
+    void namedBufferDataDSA(int buffer, long size, int usage);
+    void namedBufferDataDSA(int buffer, java.nio.ByteBuffer data, int usage);
+    void namedBufferSubDataDSA(int buffer, long offset, java.nio.ByteBuffer data);
+    void namedBufferStorageDSA(int buffer, long size, int flags);
+    void namedBufferStorageDSA(int buffer, java.nio.ByteBuffer data, int flags);
+    java.nio.ByteBuffer mapNamedBufferRangeDSA(int buffer, long offset, long length, int access);
+    void unmapNamedBufferDSA(int buffer);
+    void flushMappedNamedBufferRangeDSA(int buffer, long offset, long length);
+    void copyNamedBufferSubDataDSA(int readBuffer, int writeBuffer, long readOffset, long writeOffset, long size);
+    
+    // Direct State Access framebuffer operations
+    int createFramebufferDSA();
+    void namedFramebufferTextureDSA(int framebuffer, int attachment, int texture, int level);
+    void blitNamedFramebufferDSA(int readFramebuffer, int drawFramebuffer, int srcX0, int srcY0, int srcX1, int srcY1, 
+                                  int dstX0, int dstY0, int dstX1, int dstY1, int mask, int filter);
+    
     // Texture unit and parameter operations
     void activateTextureUnit(int unit);
     void configureTextureParameter(int target, int pname, int param);

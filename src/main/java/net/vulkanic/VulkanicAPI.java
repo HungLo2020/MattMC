@@ -120,6 +120,62 @@ public class VulkanicAPI {
         getBackend().attachBuffer(target, buffer);
     }
     
+    // Direct State Access buffer operations
+    public static int createBufferDSA() {
+        return getBackend().createBufferDSA();
+    }
+    
+    public static void namedBufferDataDSA(int buffer, long size, int usage) {
+        getBackend().namedBufferDataDSA(buffer, size, usage);
+    }
+    
+    public static void namedBufferDataDSA(int buffer, java.nio.ByteBuffer data, int usage) {
+        getBackend().namedBufferDataDSA(buffer, data, usage);
+    }
+    
+    public static void namedBufferSubDataDSA(int buffer, long offset, java.nio.ByteBuffer data) {
+        getBackend().namedBufferSubDataDSA(buffer, offset, data);
+    }
+    
+    public static void namedBufferStorageDSA(int buffer, long size, int flags) {
+        getBackend().namedBufferStorageDSA(buffer, size, flags);
+    }
+    
+    public static void namedBufferStorageDSA(int buffer, java.nio.ByteBuffer data, int flags) {
+        getBackend().namedBufferStorageDSA(buffer, data, flags);
+    }
+    
+    public static java.nio.ByteBuffer mapNamedBufferRangeDSA(int buffer, long offset, long length, int access) {
+        return getBackend().mapNamedBufferRangeDSA(buffer, offset, length, access);
+    }
+    
+    public static void unmapNamedBufferDSA(int buffer) {
+        getBackend().unmapNamedBufferDSA(buffer);
+    }
+    
+    public static void flushMappedNamedBufferRangeDSA(int buffer, long offset, long length) {
+        getBackend().flushMappedNamedBufferRangeDSA(buffer, offset, length);
+    }
+    
+    public static void copyNamedBufferSubDataDSA(int readBuffer, int writeBuffer, long readOffset, long writeOffset, long size) {
+        getBackend().copyNamedBufferSubDataDSA(readBuffer, writeBuffer, readOffset, writeOffset, size);
+    }
+    
+    // Direct State Access framebuffer operations
+    public static int createFramebufferDSA() {
+        return getBackend().createFramebufferDSA();
+    }
+    
+    public static void namedFramebufferTextureDSA(int framebuffer, int attachment, int texture, int level) {
+        getBackend().namedFramebufferTextureDSA(framebuffer, attachment, texture, level);
+    }
+    
+    public static void blitNamedFramebufferDSA(int readFramebuffer, int drawFramebuffer, int srcX0, int srcY0, int srcX1, int srcY1,
+                                                int dstX0, int dstY0, int dstX1, int dstY1, int mask, int filter) {
+        getBackend().blitNamedFramebufferDSA(readFramebuffer, drawFramebuffer, srcX0, srcY0, srcX1, srcY1,
+                                              dstX0, dstY0, dstX1, dstY1, mask, filter);
+    }
+    
     public static void activateTextureUnit(int unit) {
         getBackend().activateTextureUnit(unit);
     }
