@@ -75,8 +75,8 @@ public class GlDevice implements GpuDevice {
 		this.maxSupportedTextureSize = j;
 		this.defaultShaderSource = biFunction;
 		this.encoder = new GlCommandEncoder(this);
-		this.uniformOffsetAlignment = GL11.glGetInteger(35380);
-		GL11.glEnable(34895);
+		this.uniformOffsetAlignment = net.vulkanic.VulkanicAPI.queryIntegerState(35380); // GL_UNIFORM_BUFFER_OFFSET_ALIGNMENT
+		net.vulkanic.VulkanicAPI.enable(34895); // GL_PROGRAM_POINT_SIZE
 	}
 
 	public GlDebugLabel debugLabels() {
@@ -125,7 +125,7 @@ public class GlDevice implements GpuDevice {
 
 			int o;
 			if (bl) {
-				GL11.glBindTexture(34067, n);
+				net.vulkanic.VulkanicAPI.bindTexture(34067, n); // GL_TEXTURE_CUBE_MAP
 				o = 34067;
 			} else {
 				GlStateManager._bindTexture(n);
