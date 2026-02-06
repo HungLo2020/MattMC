@@ -2,6 +2,7 @@ package net.vulkanic.backends.opengl;
 
 import net.blaze3d.opengl.GlStateManager;
 import net.vulkanic.GraphicsBackend;
+import net.vulkanic.GraphicsCapabilities;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL15;
 import org.lwjgl.opengl.GL20;
@@ -692,7 +693,40 @@ public class OpenGLBackend implements GraphicsBackend {
     }
     
     @Override
-    public org.lwjgl.opengl.GLCapabilities obtainGraphicsCapabilities() {
-        return org.lwjgl.opengl.GL.getCapabilities();
+    public GraphicsCapabilities obtainGraphicsCapabilities() {
+        return new GraphicsCapabilities(org.lwjgl.opengl.GL.getCapabilities());
+    }
+    
+    @Override
+    public void copyBufferSubData(int readTarget, int writeTarget, long readOffset, long writeOffset, long size) {
+        org.lwjgl.opengl.GL31.glCopyBufferSubData(readTarget, writeTarget, readOffset, writeOffset, size);
+    }
+    
+    @Override
+    public void deleteVertexArray(int vertexArray) {
+        org.lwjgl.opengl.GL30.glDeleteVertexArrays(vertexArray);
+    }
+    
+    @Override
+    public void flushMappedBufferRange(int target, long offset, long length) {
+        org.lwjgl.opengl.GL30.glFlushMappedBufferRange(target, offset, length);
+    }
+    
+    @Override
+    public void createBufferStorage(int target, long size, int flags) {
+        org.lwjgl.opengl.GLCapabilities capabilities = org.lwjgl.opengl.GL.getCapabilities();
+        
+        if (capabilities.OpenGL44) {
+            org.lwjgl.opengl.GL44C.glBufferStorage(target, size, flags);
+        } else if (capabilities.GL_ARB_buffer_storage) {
+            org.lwjgl.opengl.ARBBufferStorage.glBufferStorage(target, size, flags);
+        } else {
+            throw new UnsupportedOperationException("Buffer storage is not supported");
+        }
+    }
+    
+    @Override
+    public void multiDrawElementsBaseVertex(int mode, long pCount, int type, long pIndices, int drawCount, long pBaseVertex) {
+        org.lwjgl.opengl.GL32C.nglMultiDrawElementsBaseVertex(mode, pCount, type, pIndices, drawCount, pBaseVertex);
     }
 }

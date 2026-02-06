@@ -1,7 +1,7 @@
 package net.sodium.client.gl.device;
 
 import net.sodium.client.gl.functions.DeviceFunctions;
-import org.lwjgl.opengl.GLCapabilities;
+import net.vulkanic.GraphicsCapabilities;
 
 public interface RenderDevice {
     RenderDevice INSTANCE = new GLRenderDevice();
@@ -19,7 +19,7 @@ public interface RenderDevice {
     void makeActive();
     void makeInactive();
 
-    GLCapabilities getCapabilities();
+    GraphicsCapabilities getCapabilities();
 
     DeviceFunctions getDeviceFunctions();
 

@@ -556,7 +556,27 @@ public class VulkanicAPI {
         return getBackend().querySyncStatus(sync, pname, length);
     }
     
-    public static org.lwjgl.opengl.GLCapabilities obtainGraphicsCapabilities() {
+    public static GraphicsCapabilities obtainGraphicsCapabilities() {
         return getBackend().obtainGraphicsCapabilities();
+    }
+    
+    public static void copyBufferSubData(int readTarget, int writeTarget, long readOffset, long writeOffset, long size) {
+        getBackend().copyBufferSubData(readTarget, writeTarget, readOffset, writeOffset, size);
+    }
+    
+    public static void deleteVertexArray(int vertexArray) {
+        getBackend().deleteVertexArray(vertexArray);
+    }
+    
+    public static void flushMappedBufferRange(int target, long offset, long length) {
+        getBackend().flushMappedBufferRange(target, offset, length);
+    }
+    
+    public static void createBufferStorage(int target, long size, int flags) {
+        getBackend().createBufferStorage(target, size, flags);
+    }
+    
+    public static void multiDrawElementsBaseVertex(int mode, long pCount, int type, long pIndices, int drawCount, long pBaseVertex) {
+        getBackend().multiDrawElementsBaseVertex(mode, pCount, type, pIndices, drawCount, pBaseVertex);
     }
 }

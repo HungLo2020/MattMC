@@ -209,6 +209,17 @@ public interface GraphicsBackend {
     // Sync query operations
     int querySyncStatus(long sync, int pname, java.nio.IntBuffer length);
     
-    // GL Capabilities
-    org.lwjgl.opengl.GLCapabilities obtainGraphicsCapabilities();
+    // Graphics Capabilities
+    GraphicsCapabilities obtainGraphicsCapabilities();
+    
+    // Additional buffer operations for Sodium
+    void copyBufferSubData(int readTarget, int writeTarget, long readOffset, long writeOffset, long size);
+    void deleteVertexArray(int vertexArray);
+    void flushMappedBufferRange(int target, long offset, long length);
+    
+    // Buffer storage operations
+    void createBufferStorage(int target, long size, int flags);
+    
+    // Multi-draw operations
+    void multiDrawElementsBaseVertex(int mode, long pCount, int type, long pIndices, int drawCount, long pBaseVertex);
 }

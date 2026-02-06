@@ -11,7 +11,6 @@ import net.sodium.client.gl.tessellation.*;
 import net.sodium.client.gl.tessellation.*;
 import net.sodium.client.gl.util.EnumBitField;
 import net.vulkanic.VulkanicAPI;
-import org.lwjgl.opengl.*;
 import java.nio.ByteBuffer;
 
 public class GLRenderDevice implements RenderDevice {
@@ -52,8 +51,8 @@ public class GLRenderDevice implements RenderDevice {
     }
 
     @Override
-    public GLCapabilities getCapabilities() {
-        return (GLCapabilities) VulkanicAPI.obtainGraphicsCapabilities();
+    public net.vulkanic.GraphicsCapabilities getCapabilities() {
+        return VulkanicAPI.obtainGraphicsCapabilities();
     }
 
     @Override
@@ -95,7 +94,7 @@ public class GLRenderDevice implements RenderDevice {
         @Override
         public void bindVertexArray(GlVertexArray array) {
             if (this.stateTracker.makeVertexArrayActive(array)) {
-                GL30C.glBindVertexArray(array.handle());
+                VulkanicAPI.selectVertexArray(array.handle());
             }
         }
 
@@ -103,7 +102,7 @@ public class GLRenderDevice implements RenderDevice {
         public void uploadData(GlMutableBuffer glBuffer, ByteBuffer byteBuffer, GlBufferUsage usage) {
             this.bindBuffer(GlBufferTarget.ARRAY_BUFFER, glBuffer);
 
-            GL20C.glBufferData(GlBufferTarget.ARRAY_BUFFER.getTargetParameter(), byteBuffer, usage.getId());
+            VulkanicAPI.fillBufferWithData(GlBufferTarget.ARRAY_BUFFER.getTargetParameter(), byteBuffer, usage.getId());
             glBuffer.setSize(byteBuffer.remaining());
         }
 
@@ -112,20 +111,20 @@ public class GLRenderDevice implements RenderDevice {
             this.bindBuffer(GlBufferTarget.COPY_READ_BUFFER, src);
             this.bindBuffer(GlBufferTarget.COPY_WRITE_BUFFER, dst);
 
-            GL31C.glCopyBufferSubData(GL31C.GL_COPY_READ_BUFFER, GL31C.GL_COPY_WRITE_BUFFER, readOffset, writeOffset, bytes);
+            VulkanicAPI.copyBufferSubData(0x8F36, 0x8F37, readOffset, writeOffset, bytes); // GL_COPY_READ_BUFFER, GL_COPY_WRITE_BUFFER
         }
 
         @Override
         public void bindBuffer(GlBufferTarget target, GlBuffer buffer) {
             if (this.stateTracker.makeBufferActive(target, buffer)) {
-                GL20C.glBindBuffer(target.getTargetParameter(), buffer.handle());
+                VulkanicAPI.attachBuffer(target.getTargetParameter(), buffer.handle());
             }
         }
 
         @Override
         public void unbindVertexArray() {
             if (this.stateTracker.makeVertexArrayActive(null)) {
-                GL30C.glBindVertexArray(GlVertexArray.NULL_ARRAY_ID);
+                VulkanicAPI.selectVertexArray(GlVertexArray.NULL_ARRAY_ID);
             }
         }
 
@@ -133,7 +132,7 @@ public class GLRenderDevice implements RenderDevice {
         public void allocateStorage(GlMutableBuffer buffer, long bufferSize, GlBufferUsage usage) {
             this.bindBuffer(GlBufferTarget.ARRAY_BUFFER, buffer);
 
-            GL20C.glBufferData(GlBufferTarget.ARRAY_BUFFER.getTargetParameter(), bufferSize, usage.getId());
+            VulkanicAPI.fillBufferWithSize(GlBufferTarget.ARRAY_BUFFER.getTargetParameter(), bufferSize, usage.getId());
             buffer.setSize(bufferSize);
         }
 
@@ -148,7 +147,7 @@ public class GLRenderDevice implements RenderDevice {
             int handle = buffer.handle();
             buffer.invalidateHandle();
 
-            GL20C.glDeleteBuffers(handle);
+            VulkanicAPI.releaseBufferObject(handle);
         }
 
         @Override
@@ -158,7 +157,7 @@ public class GLRenderDevice implements RenderDevice {
             int handle = vertexArray.handle();
             vertexArray.invalidateHandle();
 
-            GL30C.glDeleteVertexArrays(handle);
+            VulkanicAPI.deleteVertexArray(handle);
         }
 
         @Override
@@ -208,7 +207,7 @@ public class GLRenderDevice implements RenderDevice {
 
             this.bindBuffer(GlBufferTarget.ARRAY_BUFFER, buffer);
 
-            ByteBuffer buf = GL32C.glMapBufferRange(GlBufferTarget.ARRAY_BUFFER.getTargetParameter(), offset, length, flags.getBitField());
+            ByteBuffer buf = VulkanicAPI.mapBufferRegion(GlBufferTarget.ARRAY_BUFFER.getTargetParameter(), (int)offset, (int)length, flags.getBitField());
 
             if (buf == null) {
                 throw new RuntimeException("Failed to map buffer");
@@ -228,7 +227,7 @@ public class GLRenderDevice implements RenderDevice {
             GlBuffer buffer = map.getBufferObject();
 
             this.bindBuffer(GlBufferTarget.ARRAY_BUFFER, buffer);
-            GL32C.glUnmapBuffer(GlBufferTarget.ARRAY_BUFFER.getTargetParameter());
+            VulkanicAPI.unmapBufferData(GlBufferTarget.ARRAY_BUFFER.getTargetParameter());
 
             buffer.setActiveMapping(null);
             map.dispose();
@@ -241,12 +240,12 @@ public class GLRenderDevice implements RenderDevice {
             GlBuffer buffer = map.getBufferObject();
 
             this.bindBuffer(GlBufferTarget.COPY_READ_BUFFER, buffer);
-            GL32C.glFlushMappedBufferRange(GlBufferTarget.COPY_READ_BUFFER.getTargetParameter(), offset, length);
+            VulkanicAPI.flushMappedBufferRange(GlBufferTarget.COPY_READ_BUFFER.getTargetParameter(), offset, length);
         }
 
         @Override
         public GlFence createFence() {
-            return new GlFence(GL32C.glFenceSync(GL32C.GL_SYNC_GPU_COMMANDS_COMPLETE, 0));
+            return new GlFence(VulkanicAPI.createFenceSync(0x9117, 0)); // GL_SYNC_GPU_COMMANDS_COMPLETE
         }
 
         private void checkMapDisposed(GlBufferMapping map) {
@@ -291,10 +290,10 @@ public class GLRenderDevice implements RenderDevice {
             
             // Iris: Use GL_PATCHES when tessellation is active
             int primitiveId = net.irisshaders.iris.vertices.ImmediateState.usingTessellation 
-                ? org.lwjgl.opengl.GL43C.GL_PATCHES 
+                ? 0x000E // GL_PATCHES (GL43C.GL_PATCHES)
                 : primitiveType.getId();
 
-            GL32C.nglMultiDrawElementsBaseVertex(primitiveId,
+            VulkanicAPI.multiDrawElementsBaseVertex(primitiveId,
                     batch.pElementCount,
                     indexType.getFormatId(),
                     batch.pElementPointer,
