@@ -23,6 +23,11 @@ public class OpenGLBackend implements GraphicsBackend {
     }
     
     @Override
+    public void bindTexture(int target, int textureId) {
+        GL11.glBindTexture(target, textureId);
+    }
+    
+    @Override
     public void viewport(int x, int y, int width, int height) {
         GL11.glViewport(x, y, width, height);
     }
@@ -508,5 +513,50 @@ public class OpenGLBackend implements GraphicsBackend {
     @Override
     public void associateVertexAttrib(int attribIndex, int bindingIndex) {
         org.lwjgl.opengl.ARBVertexAttribBinding.glVertexAttribBinding(attribIndex, bindingIndex);
+    }
+    
+    @Override
+    public void setClearDepthValue(double depth) {
+        org.lwjgl.opengl.GL11.glClearDepth(depth);
+    }
+    
+    @Override
+    public void setClearColorValue(float red, float green, float blue, float alpha) {
+        org.lwjgl.opengl.GL11.glClearColor(red, green, blue, alpha);
+    }
+    
+    @Override
+    public void selectDrawBuffer(int mode) {
+        org.lwjgl.opengl.GL11.glDrawBuffer(mode);
+    }
+    
+    @Override
+    public void renderIndexedInstancedWithBase(int mode, int count, int type, long indices, int instanceCount, int baseVertex) {
+        org.lwjgl.opengl.GL32.glDrawElementsInstancedBaseVertex(mode, count, type, indices, instanceCount, baseVertex);
+    }
+    
+    @Override
+    public void renderIndexedWithBase(int mode, int count, int type, long indices, int baseVertex) {
+        org.lwjgl.opengl.GL32.glDrawElementsBaseVertex(mode, count, type, indices, baseVertex);
+    }
+    
+    @Override
+    public void renderIndexedInstanced(int mode, int count, int type, long indices, int instanceCount) {
+        org.lwjgl.opengl.GL31.glDrawElementsInstanced(mode, count, type, indices, instanceCount);
+    }
+    
+    @Override
+    public void renderArraysInstanced(int mode, int first, int count, int instanceCount) {
+        org.lwjgl.opengl.GL31.glDrawArraysInstanced(mode, first, count, instanceCount);
+    }
+    
+    @Override
+    public void attachUniformBufferRange(int target, int index, int buffer, long offset, long size) {
+        org.lwjgl.opengl.GL32.glBindBufferRange(target, index, buffer, offset, size);
+    }
+    
+    @Override
+    public void attachBufferToTexture(int target, int internalFormat, int buffer) {
+        org.lwjgl.opengl.GL31.glTexBuffer(target, internalFormat, buffer);
     }
 }

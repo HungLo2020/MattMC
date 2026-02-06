@@ -7,6 +7,7 @@ package net.vulkanic;
 public interface GraphicsBackend {
     
     void bindTexture(int textureId);
+    void bindTexture(int target, int textureId);  // For explicit target binding
     void viewport(int x, int y, int width, int height);
     void clear(int mask);
     void enableBlend();
@@ -154,4 +155,21 @@ public interface GraphicsBackend {
     void specifyVertexAttribFormat(int attribIndex, int size, int type, boolean normalized, int relativeOffset);
     void specifyVertexAttribIFormat(int attribIndex, int size, int type, int relativeOffset);
     void associateVertexAttrib(int attribIndex, int bindingIndex);
+    
+    // Clear operations
+    void setClearDepthValue(double depth);
+    void setClearColorValue(float red, float green, float blue, float alpha);
+    void selectDrawBuffer(int mode);
+    
+    // Advanced drawing operations
+    void renderIndexedInstancedWithBase(int mode, int count, int type, long indices, int instanceCount, int baseVertex);
+    void renderIndexedWithBase(int mode, int count, int type, long indices, int baseVertex);
+    void renderIndexedInstanced(int mode, int count, int type, long indices, int instanceCount);
+    void renderArraysInstanced(int mode, int first, int count, int instanceCount);
+    
+    // Uniform buffer operations
+    void attachUniformBufferRange(int target, int index, int buffer, long offset, long size);
+    
+    // Texture buffer operations
+    void attachBufferToTexture(int target, int internalFormat, int buffer);
 }

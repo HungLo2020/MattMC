@@ -56,6 +56,10 @@ public class VulkanicAPI {
         getBackend().bindTexture(textureId);
     }
     
+    public static void bindTexture(int target, int textureId) {
+        getBackend().bindTexture(target, textureId);
+    }
+    
     public static void viewport(int x, int y, int width, int height) {
         getBackend().viewport(x, y, width, height);
     }
@@ -410,5 +414,41 @@ public class VulkanicAPI {
     
     public static void associateVertexAttrib(int attribIndex, int bindingIndex) {
         getBackend().associateVertexAttrib(attribIndex, bindingIndex);
+    }
+    
+    public static void setClearDepthValue(double depth) {
+        getBackend().setClearDepthValue(depth);
+    }
+    
+    public static void setClearColorValue(float red, float green, float blue, float alpha) {
+        getBackend().setClearColorValue(red, green, blue, alpha);
+    }
+    
+    public static void selectDrawBuffer(int mode) {
+        getBackend().selectDrawBuffer(mode);
+    }
+    
+    public static void renderIndexedInstancedWithBase(int mode, int count, int type, long indices, int instanceCount, int baseVertex) {
+        getBackend().renderIndexedInstancedWithBase(mode, count, type, indices, instanceCount, baseVertex);
+    }
+    
+    public static void renderIndexedWithBase(int mode, int count, int type, long indices, int baseVertex) {
+        getBackend().renderIndexedWithBase(mode, count, type, indices, baseVertex);
+    }
+    
+    public static void renderIndexedInstanced(int mode, int count, int type, long indices, int instanceCount) {
+        getBackend().renderIndexedInstanced(mode, count, type, indices, instanceCount);
+    }
+    
+    public static void renderArraysInstanced(int mode, int first, int count, int instanceCount) {
+        getBackend().renderArraysInstanced(mode, first, count, instanceCount);
+    }
+    
+    public static void attachUniformBufferRange(int target, int index, int buffer, long offset, long size) {
+        getBackend().attachUniformBufferRange(target, index, buffer, offset, size);
+    }
+    
+    public static void attachBufferToTexture(int target, int internalFormat, int buffer) {
+        getBackend().attachBufferToTexture(target, internalFormat, buffer);
     }
 }
