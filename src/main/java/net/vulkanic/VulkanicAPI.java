@@ -9,6 +9,21 @@ import net.vulkanic.backends.opengl.OpenGLBackend;
 public class VulkanicAPI {
     private static GraphicsBackend backend;
     
+    // OpenGL Constants - Buffer Targets
+    public static final int GL_COPY_READ_BUFFER = 0x8F36;
+    public static final int GL_COPY_WRITE_BUFFER = 0x8F37;
+    
+    // OpenGL Constants - String Names
+    public static final int GL_VENDOR = 0x1F00;
+    public static final int GL_RENDERER = 0x1F01;
+    public static final int GL_VERSION = 0x1F02;
+    
+    // OpenGL Constants - Sync
+    public static final int GL_SYNC_GPU_COMMANDS_COMPLETE = 0x9117;
+    
+    // OpenGL Constants - Primitive Types
+    public static final int GL_PATCHES = 0x000E;
+    
     /**
      * Backend types supported by Vulkanic.
      */

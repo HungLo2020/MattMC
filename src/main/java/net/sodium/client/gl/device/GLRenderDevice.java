@@ -111,7 +111,7 @@ public class GLRenderDevice implements RenderDevice {
             this.bindBuffer(GlBufferTarget.COPY_READ_BUFFER, src);
             this.bindBuffer(GlBufferTarget.COPY_WRITE_BUFFER, dst);
 
-            VulkanicAPI.copyBufferSubData(0x8F36, 0x8F37, readOffset, writeOffset, bytes); // GL_COPY_READ_BUFFER, GL_COPY_WRITE_BUFFER
+            VulkanicAPI.copyBufferSubData(VulkanicAPI.GL_COPY_READ_BUFFER, VulkanicAPI.GL_COPY_WRITE_BUFFER, readOffset, writeOffset, bytes);
         }
 
         @Override
@@ -245,7 +245,7 @@ public class GLRenderDevice implements RenderDevice {
 
         @Override
         public GlFence createFence() {
-            return new GlFence(VulkanicAPI.createFenceSync(0x9117, 0)); // GL_SYNC_GPU_COMMANDS_COMPLETE
+            return new GlFence(VulkanicAPI.createFenceSync(VulkanicAPI.GL_SYNC_GPU_COMMANDS_COMPLETE, 0));
         }
 
         private void checkMapDisposed(GlBufferMapping map) {
@@ -290,7 +290,7 @@ public class GLRenderDevice implements RenderDevice {
             
             // Iris: Use GL_PATCHES when tessellation is active
             int primitiveId = net.irisshaders.iris.vertices.ImmediateState.usingTessellation 
-                ? 0x000E // GL_PATCHES (GL43C.GL_PATCHES)
+                ? VulkanicAPI.GL_PATCHES
                 : primitiveType.getId();
 
             VulkanicAPI.multiDrawElementsBaseVertex(primitiveId,
