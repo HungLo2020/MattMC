@@ -37,8 +37,8 @@ public class VulkanicAPI {
     // OpenGL Constants - Texture Targets and Units
     public static final int GL_TEXTURE_2D = 0x0DE1;      // 3553
     public static final int GL_TEXTURE0 = 0x84C0;        // 33984
-    public static final int GL_TEXTURE2 = GL_TEXTURE0 + 2;  // 33986
-    public static final int GL_TEXTURE4 = GL_TEXTURE0 + 4;  // 33988
+    public static final int GL_TEXTURE2 = 0x84C2;        // 33986
+    public static final int GL_TEXTURE4 = 0x84C4;        // 33988
     public static final int GL_TEXTURE_BASE_LEVEL = 0x813C;  // 33084
     public static final int GL_TEXTURE_MAX_LEVEL = 0x813D;   // 33085
     
