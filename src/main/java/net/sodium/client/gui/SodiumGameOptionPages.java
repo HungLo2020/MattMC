@@ -24,8 +24,7 @@ import net.minecraft.client.*;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ParticleStatus;
 import net.minecraft.client.PanoramaTheme;
-import org.lwjgl.opengl.GL;
-import org.lwjgl.opengl.GLCapabilities;
+import net.vulkanic.VulkanicAPI;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -440,7 +439,7 @@ public class SodiumGameOptionPages {
     }
 
     private static boolean supportsNoErrorContext() {
-        GLCapabilities capabilities = GL.getCapabilities();
+        var capabilities = VulkanicAPI.obtainGraphicsCapabilities();
         return (capabilities.OpenGL46 || capabilities.GL_KHR_no_error)
                 && !Workarounds.isWorkaroundEnabled(Workarounds.Reference.NO_ERROR_CONTEXT_UNSUPPORTED);
     }

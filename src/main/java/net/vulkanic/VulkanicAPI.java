@@ -463,4 +463,8 @@ public class VulkanicAPI {
     public static void bindUniformBufferBase(int bindingPoint, int bufferId) {
         getBackend().bindUniformBufferBase(bindingPoint, bufferId);
     }
+    
+    public static org.lwjgl.opengl.GLCapabilities obtainGraphicsCapabilities() {
+        return getBackend().obtainGraphicsCapabilities();
+    }
 }

@@ -574,4 +574,9 @@ public class OpenGLBackend implements GraphicsBackend {
     public void bindUniformBufferBase(int bindingPoint, int bufferId) {
         org.lwjgl.opengl.GL32C.glBindBufferBase(org.lwjgl.opengl.GL32C.GL_UNIFORM_BUFFER, bindingPoint, bufferId);
     }
+    
+    @Override
+    public org.lwjgl.opengl.GLCapabilities obtainGraphicsCapabilities() {
+        return org.lwjgl.opengl.GL.getCapabilities();
+    }
 }

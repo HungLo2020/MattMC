@@ -177,4 +177,7 @@ public interface GraphicsBackend {
     void assignUniformFloat(int location, float value);
     void assignUniformMatrix4f(int location, java.nio.FloatBuffer matrix);
     void bindUniformBufferBase(int bindingPoint, int bufferId);
+    
+    // GL Capabilities
+    org.lwjgl.opengl.GLCapabilities obtainGraphicsCapabilities();
 }
