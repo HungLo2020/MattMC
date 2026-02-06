@@ -37,6 +37,37 @@ public class VulkanicAPI {
     // OpenGL Constants - Framebuffer
     public static final int GL_FRAMEBUFFER = 0x8D40;     // 36160
     
+    // OpenGL Constants - Shader Types
+    public static final int GL_VERTEX_SHADER = 0x8B31;
+    public static final int GL_FRAGMENT_SHADER = 0x8B30;
+    public static final int GL_GEOMETRY_SHADER = 0x8DD9;
+    public static final int GL_COMPUTE_SHADER = 0x91B9;
+    public static final int GL_TESS_CONTROL_SHADER = 0x8E88;
+    public static final int GL_TESS_EVALUATION_SHADER = 0x8E87;
+    
+    // OpenGL Constants - Alpha Test Functions
+    public static final int GL_NEVER = 0x0200;
+    public static final int GL_LESS = 0x0201;
+    public static final int GL_EQUAL = 0x0202;
+    public static final int GL_LEQUAL = 0x0203;
+    public static final int GL_GREATER = 0x0204;
+    public static final int GL_NOTEQUAL = 0x0205;
+    public static final int GL_GEQUAL = 0x0206;
+    public static final int GL_ALWAYS = 0x0207;
+    
+    // OpenGL Constants - Blend Functions
+    public static final int GL_ZERO = 0;
+    public static final int GL_ONE = 1;
+    public static final int GL_SRC_COLOR = 0x0300;
+    public static final int GL_ONE_MINUS_SRC_COLOR = 0x0301;
+    public static final int GL_DST_COLOR = 0x0306;
+    public static final int GL_ONE_MINUS_DST_COLOR = 0x0307;
+    public static final int GL_SRC_ALPHA = 0x0302;
+    public static final int GL_ONE_MINUS_SRC_ALPHA = 0x0303;
+    public static final int GL_DST_ALPHA = 0x0304;
+    public static final int GL_ONE_MINUS_DST_ALPHA = 0x0305;
+    public static final int GL_SRC_ALPHA_SATURATE = 0x0308;
+    
     /**
      * Backend types supported by Vulkanic.
      */

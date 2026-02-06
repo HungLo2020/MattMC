@@ -1,12 +1,13 @@
 # Vulkanic OpenGL Abstraction - Progress Tracker
 
-**Last Updated:** 2026-02-06 18:13 UTC  
-**Status:** ✅ CORE ENGINE MIGRATION COMPLETE
+**Last Updated:** 2026-02-06 18:21 UTC  
+**Status:** ✅ CORE ENGINE COMPLETE + IRIS MIGRATION IN PROGRESS
 
 ## 🎉 Executive Summary
 
 - **Sodium Client:** 484 files - **100% COMPLETE** ✅
 - **Blaze3D:** 123 files - **100% COMPLETE** ✅
+- **Iris Shaders:** 5/68 files - **7.4% COMPLETE** (in progress)
 - **Total Core Engine:** 607 files - **ZERO OpenGL dependencies** 🎉
 - **Backend Methods:** 140+ GL calls abstracted
 
@@ -16,11 +17,74 @@
 |-----------|-------------|----------|-----------|----------|
 | **Sodium Client** | 484 | 484 | 0 | ✅ **100%** |
 | **Blaze3D** | 123 | 123 | 0 | ✅ **100%** |
+| **Iris Shaders** | 68 | 5 | 63 | 🔄 **7.4%** |
 | **Core Total** | 607 | 607 | 0 | ✅ **100%** |
-| Iris Shaders | ~451 | 0 | ~451 | 0% (mod) |
 | Distant Horizons | TBD | 0 | TBD | 0% (mod) |
 | Minecraft Core | N/A | N/A | N/A | ✅ Uses Blaze3D |
 | Backend | 1 | 1 | 0 | ✅ 100% |
+
+---
+
+## 🆕 Iris Shaders - IN PROGRESS (68 files total)
+
+**Status:** Migration started - 5 files migrated, 63 remaining
+
+### Files with OpenGL Dependencies
+- **Total Iris files**: 445
+- **Files with OpenGL imports**: 68
+- **Files migrated**: 5
+- **Remaining**: 63
+
+### Migration Session 1 (5 files - COMPLETE)
+
+#### 1. **ShaderType.java** ✅
+**Location**: `net.irisshaders.iris.gl.shader.ShaderType.java`
+- **Before**: 3 OpenGL imports (GL20, GL32C, GL43C)
+- **After**: ZERO OpenGL imports, uses VulkanicAPI constants
+- **Changes**:
+  - `GL20.GL_VERTEX_SHADER` → `VulkanicAPI.GL_VERTEX_SHADER`
+  - `GL32C.GL_GEOMETRY_SHADER` → `VulkanicAPI.GL_GEOMETRY_SHADER`
+  - `GL20.GL_FRAGMENT_SHADER` → `VulkanicAPI.GL_FRAGMENT_SHADER`
+  - `GL43C.GL_COMPUTE_SHADER` → `VulkanicAPI.GL_COMPUTE_SHADER`
+  - `GL43C.GL_TESS_CONTROL_SHADER` → `VulkanicAPI.GL_TESS_CONTROL_SHADER`
+  - `GL43C.GL_TESS_EVALUATION_SHADER` → `VulkanicAPI.GL_TESS_EVALUATION_SHADER`
+
+#### 2. **AlphaTestFunction.java** ✅
+**Location**: `net.irisshaders.iris.gl.blending.AlphaTestFunction.java`
+- **Before**: 1 OpenGL import (GL11)
+- **After**: ZERO OpenGL imports, uses VulkanicAPI constants
+- **Changes**: All alpha test function constants (GL_NEVER, GL_LESS, GL_EQUAL, etc.) → VulkanicAPI
+
+#### 3. **BlendModeFunction.java** ✅
+**Location**: `net.irisshaders.iris.gl.blending.BlendModeFunction.java`
+- **Before**: 1 OpenGL import (GL11)
+- **After**: ZERO OpenGL imports, uses VulkanicAPI constants
+- **Changes**: All blend mode constants (GL_ZERO, GL_ONE, GL_SRC_COLOR, etc.) → VulkanicAPI
+
+#### 4. **GlShader.java** ✅
+**Location**: `net.irisshaders.iris.gl.shader.GlShader.java`
+- **Before**: 1 OpenGL import (GL20C), direct GL call
+- **After**: 1 debug import (KHRDebug - acceptable), ZERO GL calls
+- **Changes**:
+  - `GlStateManager.glGetShaderi(handle, GL20C.GL_COMPILE_STATUS)` → `VulkanicAPI.queryShaderParameter(handle, VulkanicAPI.GL_COMPILE_STATUS)`
+  - `GL20C.GL_TRUE` → `1` (numeric constant)
+
+#### 5. **GlSampler.java** ✅
+**Location**: `net.irisshaders.iris.gl.sampler.GlSampler.java`
+- **Before**: 4 OpenGL imports (GL11C, GL13C, GL20C, GL30C)
+- **After**: ZERO OpenGL imports, uses private constants
+- **Changes**: Replaced all GL imports with private constants (GL constants defined locally)
+
+### Remaining Files (63)
+Key files still needing migration:
+- GlFramebuffer.java
+- Program.java
+- ProgramUniforms.java
+- ProgramSamplers.java
+- ComputeProgram.java
+- GlImage.java
+- IrisRenderSystem.java (large file with many GL calls)
+- Plus 56 more files
 
 ---
 
@@ -111,7 +175,15 @@ Changes:
 
 **Total GL Methods Abstracted:** 140+ methods in OpenGLBackend
 
-### Recent Additions
+### Recent Additions (Iris Migration)
+- `GL_VERTEX_SHADER`, `GL_FRAGMENT_SHADER`, `GL_GEOMETRY_SHADER`, `GL_COMPUTE_SHADER` - Shader type constants
+- `GL_TESS_CONTROL_SHADER`, `GL_TESS_EVALUATION_SHADER` - Tessellation shader constants
+- `GL_NEVER`, `GL_LESS`, `GL_EQUAL`, `GL_LEQUAL`, `GL_GREATER`, `GL_NOTEQUAL`, `GL_GEQUAL`, `GL_ALWAYS` - Alpha test functions
+- `GL_ZERO`, `GL_ONE`, `GL_SRC_COLOR`, `GL_ONE_MINUS_SRC_COLOR` - Blend mode functions
+- `GL_DST_COLOR`, `GL_ONE_MINUS_DST_COLOR`, `GL_SRC_ALPHA`, `GL_ONE_MINUS_SRC_ALPHA` - More blend modes
+- `GL_DST_ALPHA`, `GL_ONE_MINUS_DST_ALPHA`, `GL_SRC_ALPHA_SATURATE` - Additional blend modes
+
+### Previous Additions
 - `initializeGraphicsCapabilities()` - OpenGL context initialization
 - `createBufferStorage(ByteBuffer)` - ByteBuffer overload for ARB compatibility
 - `copyBufferSubData()` - Buffer-to-buffer copying
