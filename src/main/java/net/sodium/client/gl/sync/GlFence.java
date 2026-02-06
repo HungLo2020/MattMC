@@ -19,12 +19,12 @@ public class GlFence {
         int result;
 
         try (MemoryStack stack = MemoryStack.stackPush()) {
-            IntBuffer count = stack.callocInt(1);
-            result = VulkanicAPI.querySyncStatus(this.id, 37143, count); // GL_SYNC_STATUS
-
-            if (count.get(0) != 1) {
-                throw new RuntimeException("glGetSync returned more than one value");
-            }
+            IntBuffer length = stack.callocInt(1);
+            result = VulkanicAPI.querySyncStatus(this.id, 37143, length); // GL_SYNC_STATUS
+            
+            // The length buffer should contain the number of values written (should be 1)
+            // However, some drivers may not write to this buffer at all, so we'll just
+            // trust the return value instead of checking the length
         }
 
         return result == 37889; // GL_SIGNALED

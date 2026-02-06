@@ -492,8 +492,8 @@ public class VulkanicAPI {
         getBackend().bindFragmentDataLocation(program, colorNumber, name);
     }
     
-    public static int querySyncStatus(long sync, int pname, java.nio.IntBuffer values) {
-        return getBackend().querySyncStatus(sync, pname, values);
+    public static int querySyncStatus(long sync, int pname, java.nio.IntBuffer length) {
+        return getBackend().querySyncStatus(sync, pname, length);
     }
     
     public static org.lwjgl.opengl.GLCapabilities obtainGraphicsCapabilities() {

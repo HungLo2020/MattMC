@@ -611,8 +611,10 @@ public class OpenGLBackend implements GraphicsBackend {
     }
     
     @Override
-    public int querySyncStatus(long sync, int pname, java.nio.IntBuffer values) {
-        return org.lwjgl.opengl.GL32C.glGetSynci(sync, pname, values);
+    public int querySyncStatus(long sync, int pname, java.nio.IntBuffer length) {
+        // glGetSynci returns the sync value and writes to length buffer
+        // the number of values returned (should be 1 for single integer queries)
+        return org.lwjgl.opengl.GL32C.glGetSynci(sync, pname, length);
     }
     
     @Override

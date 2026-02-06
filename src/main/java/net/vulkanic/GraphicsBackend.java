@@ -188,7 +188,7 @@ public interface GraphicsBackend {
     void bindFragmentDataLocation(int program, int colorNumber, CharSequence name);
     
     // Sync query operations
-    int querySyncStatus(long sync, int pname, java.nio.IntBuffer values);
+    int querySyncStatus(long sync, int pname, java.nio.IntBuffer length);
     
     // GL Capabilities
     org.lwjgl.opengl.GLCapabilities obtainGraphicsCapabilities();
