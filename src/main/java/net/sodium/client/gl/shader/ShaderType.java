@@ -1,18 +1,14 @@
 package net.sodium.client.gl.shader;
 
-import org.lwjgl.opengl.GL20C;
-import org.lwjgl.opengl.GL32C;
-import org.lwjgl.opengl.GL40C;
-
 /**
  * An enumeration over the supported OpenGL shader types.
  */
 public enum ShaderType {
-    VERTEX(GL20C.GL_VERTEX_SHADER),
-    GEOMETRY(GL32C.GL_GEOMETRY_SHADER),
-    TESS_CONTROL(GL40C.GL_TESS_CONTROL_SHADER),
-    TESS_EVALUATION(GL40C.GL_TESS_EVALUATION_SHADER),
-    FRAGMENT(GL20C.GL_FRAGMENT_SHADER);
+    VERTEX(35633),  // GL_VERTEX_SHADER
+    GEOMETRY(36313),  // GL_GEOMETRY_SHADER
+    TESS_CONTROL(36488),  // GL_TESS_CONTROL_SHADER
+    TESS_EVALUATION(36487),  // GL_TESS_EVALUATION_SHADER
+    FRAGMENT(35632);  // GL_FRAGMENT_SHADER
 
     public final int id;
 
