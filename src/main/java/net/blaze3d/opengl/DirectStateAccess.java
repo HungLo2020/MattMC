@@ -5,16 +5,13 @@ import java.nio.ByteBuffer;
 import java.util.Set;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
+import net.vulkanic.GraphicsCapabilities;
+import net.vulkanic.VulkanicAPI;
 import org.jetbrains.annotations.Nullable;
-import org.lwjgl.opengl.ARBBufferStorage;
-import org.lwjgl.opengl.ARBDirectStateAccess;
-import org.lwjgl.opengl.GL30;
-import org.lwjgl.opengl.GL31;
-import org.lwjgl.opengl.GLCapabilities;
 
 @Environment(EnvType.CLIENT)
 public abstract class DirectStateAccess {
-	public static DirectStateAccess create(GLCapabilities gLCapabilities, Set<String> set, GraphicsWorkarounds graphicsWorkarounds) {
+	public static DirectStateAccess create(GraphicsCapabilities gLCapabilities, Set<String> set, GraphicsWorkarounds graphicsWorkarounds) {
 		if (gLCapabilities.GL_ARB_direct_state_access && GlDevice.USE_GL_ARB_direct_state_access && !graphicsWorkarounds.isGlOnDx12()) {
 			set.add("GL_ARB_direct_state_access");
 			return new DirectStateAccess.Core();
@@ -169,7 +166,7 @@ public abstract class DirectStateAccess {
 		void bufferStorage(int i, long l, int j) {
 			int k = this.selectBufferBindTarget(j);
 			GlStateManager._glBindBuffer(k, i);
-			ARBBufferStorage.glBufferStorage(k, l, GlConst.bufferUsageToGlFlag(j));
+			VulkanicAPI.createBufferStorage(k, l, GlConst.bufferUsageToGlFlag(j));
 			GlStateManager._glBindBuffer(k, 0);
 		}
 
@@ -177,7 +174,7 @@ public abstract class DirectStateAccess {
 		void bufferStorage(int i, ByteBuffer byteBuffer, int j) {
 			int k = this.selectBufferBindTarget(j);
 			GlStateManager._glBindBuffer(k, i);
-			ARBBufferStorage.glBufferStorage(k, byteBuffer, GlConst.bufferUsageToGlFlag(j));
+			VulkanicAPI.createBufferStorage(k, byteBuffer, GlConst.bufferUsageToGlFlag(j));
 			GlStateManager._glBindBuffer(k, 0);
 		}
 
@@ -203,7 +200,7 @@ public abstract class DirectStateAccess {
 		void flushMappedBufferRange(int i, int j, int k, int l) {
 			int m = this.selectBufferBindTarget(l);
 			GlStateManager._glBindBuffer(m, i);
-			GL30.glFlushMappedBufferRange(m, j, k);
+			VulkanicAPI.flushMappedBufferRange(m, j, k);
 			GlStateManager._glBindBuffer(m, 0);
 		}
 
@@ -211,7 +208,7 @@ public abstract class DirectStateAccess {
 		void copyBufferSubData(int i, int j, int k, int l, int m) {
 			GlStateManager._glBindBuffer(36662, i);
 			GlStateManager._glBindBuffer(36663, j);
-			GL31.glCopyBufferSubData(36662, 36663, k, l, m);
+			VulkanicAPI.copyBufferSubData(36662, 36663, k, l, m);
 			GlStateManager._glBindBuffer(36662, 0);
 			GlStateManager._glBindBuffer(36663, 0);
 		}

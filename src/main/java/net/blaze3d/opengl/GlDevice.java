@@ -31,9 +31,6 @@ import net.minecraft.resources.ResourceLocation;
 import org.apache.commons.lang3.StringUtils;
 import org.jetbrains.annotations.Nullable;
 import org.lwjgl.glfw.GLFW;
-import org.lwjgl.opengl.GL;
-import org.lwjgl.opengl.GL11;
-import org.lwjgl.opengl.GLCapabilities;
 import org.slf4j.Logger;
 
 @Environment(EnvType.CLIENT)
@@ -63,7 +60,7 @@ public class GlDevice implements GpuDevice {
 
 	public GlDevice(long l, int i, boolean bl, BiFunction<ResourceLocation, ShaderType, String> biFunction, boolean bl2) {
 		GLFW.glfwMakeContextCurrent(l);
-		GLCapabilities gLCapabilities = GL.createCapabilities();
+		net.vulkanic.GraphicsCapabilities gLCapabilities = net.vulkanic.VulkanicAPI.initializeGraphicsCapabilities();
 		int j = getMaxSupportedTextureSize();
 		GLFW.glfwSetWindowSizeLimits(l, -1, -1, j, j);
 		GraphicsWorkarounds graphicsWorkarounds = GraphicsWorkarounds.get(this);

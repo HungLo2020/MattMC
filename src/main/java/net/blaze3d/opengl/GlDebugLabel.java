@@ -6,8 +6,8 @@ import java.util.function.Supplier;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.util.StringUtil;
+import net.vulkanic.GraphicsCapabilities;
 import net.vulkanic.VulkanicAPI;
-import org.lwjgl.opengl.GLCapabilities;
 import org.slf4j.Logger;
 
 @Environment(EnvType.CLIENT)
@@ -35,7 +35,7 @@ public abstract class GlDebugLabel {
 	public void popDebugGroup() {
 	}
 
-	public static GlDebugLabel create(GLCapabilities gLCapabilities, boolean bl, Set<String> set) {
+	public static GlDebugLabel create(GraphicsCapabilities gLCapabilities, boolean bl, Set<String> set) {
 		if (bl) {
 			if (gLCapabilities.GL_KHR_debug && GlDevice.USE_GL_KHR_debug) {
 				set.add("GL_KHR_debug");

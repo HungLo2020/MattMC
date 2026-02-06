@@ -588,6 +588,10 @@ public class VulkanicAPI {
         return getBackend().obtainGraphicsCapabilities();
     }
     
+    public static GraphicsCapabilities initializeGraphicsCapabilities() {
+        return getBackend().initializeGraphicsCapabilities();
+    }
+    
     public static void copyBufferSubData(int readTarget, int writeTarget, long readOffset, long writeOffset, long size) {
         getBackend().copyBufferSubData(readTarget, writeTarget, readOffset, writeOffset, size);
     }
@@ -602,6 +606,10 @@ public class VulkanicAPI {
     
     public static void createBufferStorage(int target, long size, int flags) {
         getBackend().createBufferStorage(target, size, flags);
+    }
+    
+    public static void createBufferStorage(int target, java.nio.ByteBuffer data, int flags) {
+        getBackend().createBufferStorage(target, data, flags);
     }
     
     public static void multiDrawElementsBaseVertex(int mode, long pCount, int type, long pIndices, int drawCount, long pBaseVertex) {

@@ -7,6 +7,7 @@ import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL15;
 import org.lwjgl.opengl.GL20;
 import org.lwjgl.opengl.GL30;
+import java.nio.ByteBuffer;
 
 /**
  * OpenGL implementation of the Vulkanic Graphics Backend.
@@ -698,6 +699,11 @@ public class OpenGLBackend implements GraphicsBackend {
     }
     
     @Override
+    public GraphicsCapabilities initializeGraphicsCapabilities() {
+        return new GraphicsCapabilities(org.lwjgl.opengl.GL.createCapabilities());
+    }
+    
+    @Override
     public void copyBufferSubData(int readTarget, int writeTarget, long readOffset, long writeOffset, long size) {
         org.lwjgl.opengl.GL31.glCopyBufferSubData(readTarget, writeTarget, readOffset, writeOffset, size);
     }
@@ -720,6 +726,19 @@ public class OpenGLBackend implements GraphicsBackend {
             org.lwjgl.opengl.GL44C.glBufferStorage(target, size, flags);
         } else if (capabilities.GL_ARB_buffer_storage) {
             org.lwjgl.opengl.ARBBufferStorage.glBufferStorage(target, size, flags);
+        } else {
+            throw new UnsupportedOperationException("Buffer storage is not supported");
+        }
+    }
+    
+    @Override
+    public void createBufferStorage(int target, ByteBuffer data, int flags) {
+        org.lwjgl.opengl.GLCapabilities capabilities = org.lwjgl.opengl.GL.getCapabilities();
+        
+        if (capabilities.OpenGL44) {
+            org.lwjgl.opengl.GL44C.glBufferStorage(target, data, flags);
+        } else if (capabilities.GL_ARB_buffer_storage) {
+            org.lwjgl.opengl.ARBBufferStorage.glBufferStorage(target, data, flags);
         } else {
             throw new UnsupportedOperationException("Buffer storage is not supported");
         }

@@ -1,5 +1,7 @@
 package net.vulkanic;
 
+import java.nio.ByteBuffer;
+
 /**
  * Interface for graphics backend implementations.
  * This interface defines the contract that all backends (OpenGL, Vulkan) must implement.
@@ -211,6 +213,7 @@ public interface GraphicsBackend {
     
     // Graphics Capabilities
     GraphicsCapabilities obtainGraphicsCapabilities();
+    GraphicsCapabilities initializeGraphicsCapabilities();
     
     // Additional buffer operations for Sodium
     void copyBufferSubData(int readTarget, int writeTarget, long readOffset, long writeOffset, long size);
@@ -219,6 +222,7 @@ public interface GraphicsBackend {
     
     // Buffer storage operations
     void createBufferStorage(int target, long size, int flags);
+    void createBufferStorage(int target, ByteBuffer data, int flags);
     
     // Multi-draw operations
     void multiDrawElementsBaseVertex(int mode, long pCount, int type, long pIndices, int drawCount, long pBaseVertex);
