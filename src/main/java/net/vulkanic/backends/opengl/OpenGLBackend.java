@@ -353,6 +353,21 @@ public class OpenGLBackend implements GraphicsBackend {
     }
     
     @Override
+    public int locateUniformBlock(int program, String uniformBlockName) {
+        return org.lwjgl.opengl.GL31.glGetUniformBlockIndex(program, uniformBlockName);
+    }
+    
+    @Override
+    public void bindUniformBlock(int program, int uniformBlockIndex, int uniformBlockBinding) {
+        org.lwjgl.opengl.GL31.glUniformBlockBinding(program, uniformBlockIndex, uniformBlockBinding);
+    }
+    
+    @Override
+    public String retrieveActiveUniformBlockName(int program, int uniformBlockIndex) {
+        return org.lwjgl.opengl.GL31.glGetActiveUniformBlockName(program, uniformBlockIndex);
+    }
+    
+    @Override
     public int generateQueryObject() {
         return org.lwjgl.opengl.GL32C.glGenQueries();
     }

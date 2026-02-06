@@ -14,9 +14,9 @@ import java.util.Set;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.client.renderer.ShaderManager;
+import net.vulkanic.VulkanicAPI;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.VisibleForTesting;
-import org.lwjgl.opengl.GL31;
 import org.slf4j.Logger;
 
 @Environment(EnvType.CLIENT)
@@ -94,13 +94,13 @@ public class GlProgram implements AutoCloseable, net.irisshaders.iris.mixinterfa
 					if (this instanceof net.irisshaders.iris.pipeline.programs.IrisProgram is) {
 						k = is.iris$getBlockIndex(this.programId, string);
 					} else {
-						k = GL31.glGetUniformBlockIndex(this.programId, string);
+						k = VulkanicAPI.locateUniformBlock(this.programId, string);
 					}
 					if (k == -1) {
 						yield null;
 					} else {
 						int l = i++;
-						GL31.glUniformBlockBinding(this.programId, k, l);
+						VulkanicAPI.bindUniformBlock(this.programId, k, l);
 						yield new Uniform.Ubo(l);
 					}
 				}
@@ -140,11 +140,11 @@ public class GlProgram implements AutoCloseable, net.irisshaders.iris.mixinterfa
 		int o = GlStateManager.glGetProgrami(this.programId, 35382);
 
 		for (int p = 0; p < o; p++) {
-			String string = GL31.glGetActiveUniformBlockName(this.programId, p);
+			String string = VulkanicAPI.retrieveActiveUniformBlockName(this.programId, p);
 			if (!this.uniformsByName.containsKey(string)) {
 				if (!list2.contains(string) && BUILT_IN_UNIFORMS.contains(string)) {
 					int n = i++;
-					GL31.glUniformBlockBinding(this.programId, p, n);
+					VulkanicAPI.bindUniformBlock(this.programId, p, n);
 					this.uniformsByName.put(string, new Uniform.Ubo(n));
 				} else if (string.startsWith("iris_")) {
 					// Silently skip Iris-injected uniforms

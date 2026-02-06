@@ -320,6 +320,18 @@ public class VulkanicAPI {
         getBackend().uploadShaderSource(shader, pointerBufferAddress, stringCount, lengthsPointer);
     }
     
+    public static int locateUniformBlock(int program, String uniformBlockName) {
+        return getBackend().locateUniformBlock(program, uniformBlockName);
+    }
+    
+    public static void bindUniformBlock(int program, int uniformBlockIndex, int uniformBlockBinding) {
+        getBackend().bindUniformBlock(program, uniformBlockIndex, uniformBlockBinding);
+    }
+    
+    public static String retrieveActiveUniformBlockName(int program, int uniformBlockIndex) {
+        return getBackend().retrieveActiveUniformBlockName(program, uniformBlockIndex);
+    }
+    
     public static int generateQueryObject() {
         return getBackend().generateQueryObject();
     }

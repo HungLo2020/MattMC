@@ -118,6 +118,11 @@ public interface GraphicsBackend {
     // Shader source (native)
     void uploadShaderSource(int shader, long pointerBufferAddress, int stringCount, long lengthsPointer);
     
+    // Uniform block operations
+    int locateUniformBlock(int program, String uniformBlockName);
+    void bindUniformBlock(int program, int uniformBlockIndex, int uniformBlockBinding);
+    String retrieveActiveUniformBlockName(int program, int uniformBlockIndex);
+    
     // Timer query operations
     int generateQueryObject();
     void initiateQuery(int target, int id);
