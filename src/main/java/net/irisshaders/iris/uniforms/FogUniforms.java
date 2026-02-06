@@ -6,8 +6,8 @@ import net.irisshaders.iris.gl.state.StateUpdateNotifiers;
 import net.irisshaders.iris.gl.uniform.DynamicUniformHolder;
 import net.irisshaders.iris.gl.uniform.UniformUpdateFrequency;
 import net.minecraft.client.Minecraft;
+import net.vulkanic.VulkanicAPI;
 import org.joml.Vector3f;
-import org.lwjgl.opengl.GL11;
 
 import static net.irisshaders.iris.gl.uniform.UniformUpdateFrequency.PER_FRAME;
 
@@ -25,9 +25,9 @@ public class FogUniforms {
 				float fogDensity = CapturedRenderingState.INSTANCE.getFogDensity();
 
 				if (fogDensity < 0.0F) {
-					return GL11.GL_LINEAR;
+					return VulkanicAPI.GL_LINEAR;
 				} else {
-					return GL11.GL_EXP2;
+					return VulkanicAPI.GL_EXP2;
 				}
 			}, listener -> {
 			});

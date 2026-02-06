@@ -149,6 +149,19 @@ public class VulkanicAPI {
     public static final int GL_UNPACK_SKIP_PIXELS = 0x0CF4;
     public static final int GL_UNPACK_ALIGNMENT = 0x0CF5;
     
+    // OpenGL Constants - Clear Bits
+    public static final int GL_COLOR_BUFFER_BIT = 0x00004000;
+    
+    // OpenGL Constants - Pixel Types and Formats
+    public static final int GL_UNSIGNED_BYTE = 0x1401;
+    public static final int GL_RGBA = 0x1908;
+    
+    // OpenGL Constants - Texture Wrap Modes
+    public static final int GL_REPEAT = 0x2901;
+    
+    // OpenGL Constants - Fog Modes
+    public static final int GL_EXP2 = 0x0801;
+    
     /**
      * Backend types supported by Vulkanic.
      */
