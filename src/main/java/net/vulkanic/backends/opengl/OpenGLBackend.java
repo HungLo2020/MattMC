@@ -24,7 +24,8 @@ public class OpenGLBackend implements GraphicsBackend {
         try {
             return org.lwjgl.opengl.WGL.wglGetCurrentContext();
         } catch (UnsatisfiedLinkError e) {
-            // Not on Windows, or WGL not available
+            // WGL native library not available - occurs on non-Windows platforms
+            // or when the native library fails to load
             return 0L;
         }
     }
@@ -723,7 +724,7 @@ public class OpenGLBackend implements GraphicsBackend {
             glCaps.OpenGL20, glCaps.OpenGL21,
             glCaps.OpenGL30, glCaps.OpenGL31, glCaps.OpenGL32, glCaps.OpenGL33,
             glCaps.OpenGL40, glCaps.OpenGL41, glCaps.OpenGL42, glCaps.OpenGL43, glCaps.OpenGL44, glCaps.OpenGL45, glCaps.OpenGL46,
-            // Extension flags
+            // Extension flags - using camelCase for consistency
             glCaps.GL_ARB_buffer_storage, glCaps.GL_ARB_vertex_attrib_binding, glCaps.GL_ARB_direct_state_access,
             glCaps.GL_ARB_debug_output, glCaps.GL_KHR_debug, glCaps.GL_AMD_debug_output,
             glCaps.GL_KHR_no_error, glCaps.GL_EXT_debug_label, glCaps.GL_ARB_timer_query,

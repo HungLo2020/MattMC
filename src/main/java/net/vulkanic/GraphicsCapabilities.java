@@ -60,14 +60,14 @@ public class GraphicsCapabilities {
         boolean openGL30, boolean openGL31, boolean openGL32, boolean openGL33,
         boolean openGL40, boolean openGL41, boolean openGL42, boolean openGL43, boolean openGL44, boolean openGL45, boolean openGL46,
         // Extension flags
-        boolean gl_ARB_buffer_storage, boolean gl_ARB_vertex_attrib_binding, boolean gl_ARB_direct_state_access,
-        boolean gl_ARB_debug_output, boolean gl_KHR_debug, boolean gl_AMD_debug_output,
-        boolean gl_KHR_no_error, boolean gl_EXT_debug_label, boolean gl_ARB_timer_query,
-        boolean gl_KHR_parallel_shader_compile, boolean gl_ARB_parallel_shader_compile,
-        boolean gl_ARB_multi_bind, boolean gl_ARB_tessellation_shader,
-        boolean gl_ARB_shader_storage_buffer_object, boolean gl_ARB_shader_image_load_store,
-        boolean gl_EXT_shader_image_load_store, boolean gl_ARB_draw_buffers_blend,
-        boolean gl_NVX_gpu_memory_info
+        boolean glArbBufferStorage, boolean glArbVertexAttribBinding, boolean glArbDirectStateAccess,
+        boolean glArbDebugOutput, boolean glKhrDebug, boolean glAmdDebugOutput,
+        boolean glKhrNoError, boolean glExtDebugLabel, boolean glArbTimerQuery,
+        boolean glKhrParallelShaderCompile, boolean glArbParallelShaderCompile,
+        boolean glArbMultiBind, boolean glArbTessellationShader,
+        boolean glArbShaderStorageBufferObject, boolean glArbShaderImageLoadStore,
+        boolean glExtShaderImageLoadStore, boolean glArbDrawBuffersBlend,
+        boolean glNvxGpuMemoryInfo
     ) {
         this.OpenGL11 = openGL11;
         this.OpenGL12 = openGL12;
@@ -88,23 +88,23 @@ public class GraphicsCapabilities {
         this.OpenGL45 = openGL45;
         this.OpenGL46 = openGL46;
         
-        this.GL_ARB_buffer_storage = gl_ARB_buffer_storage;
-        this.GL_ARB_vertex_attrib_binding = gl_ARB_vertex_attrib_binding;
-        this.GL_ARB_direct_state_access = gl_ARB_direct_state_access;
-        this.GL_ARB_debug_output = gl_ARB_debug_output;
-        this.GL_KHR_debug = gl_KHR_debug;
-        this.GL_AMD_debug_output = gl_AMD_debug_output;
-        this.GL_KHR_no_error = gl_KHR_no_error;
-        this.GL_EXT_debug_label = gl_EXT_debug_label;
-        this.GL_ARB_timer_query = gl_ARB_timer_query;
-        this.GL_KHR_parallel_shader_compile = gl_KHR_parallel_shader_compile;
-        this.GL_ARB_parallel_shader_compile = gl_ARB_parallel_shader_compile;
-        this.GL_ARB_multi_bind = gl_ARB_multi_bind;
-        this.GL_ARB_tessellation_shader = gl_ARB_tessellation_shader;
-        this.GL_ARB_shader_storage_buffer_object = gl_ARB_shader_storage_buffer_object;
-        this.GL_ARB_shader_image_load_store = gl_ARB_shader_image_load_store;
-        this.GL_EXT_shader_image_load_store = gl_EXT_shader_image_load_store;
-        this.GL_ARB_draw_buffers_blend = gl_ARB_draw_buffers_blend;
-        this.GL_NVX_gpu_memory_info = gl_NVX_gpu_memory_info;
+        this.GL_ARB_buffer_storage = glArbBufferStorage;
+        this.GL_ARB_vertex_attrib_binding = glArbVertexAttribBinding;
+        this.GL_ARB_direct_state_access = glArbDirectStateAccess;
+        this.GL_ARB_debug_output = glArbDebugOutput;
+        this.GL_KHR_debug = glKhrDebug;
+        this.GL_AMD_debug_output = glAmdDebugOutput;
+        this.GL_KHR_no_error = glKhrNoError;
+        this.GL_EXT_debug_label = glExtDebugLabel;
+        this.GL_ARB_timer_query = glArbTimerQuery;
+        this.GL_KHR_parallel_shader_compile = glKhrParallelShaderCompile;
+        this.GL_ARB_parallel_shader_compile = glArbParallelShaderCompile;
+        this.GL_ARB_multi_bind = glArbMultiBind;
+        this.GL_ARB_tessellation_shader = glArbTessellationShader;
+        this.GL_ARB_shader_storage_buffer_object = glArbShaderStorageBufferObject;
+        this.GL_ARB_shader_image_load_store = glArbShaderImageLoadStore;
+        this.GL_EXT_shader_image_load_store = glExtShaderImageLoadStore;
+        this.GL_ARB_draw_buffers_blend = glArbDrawBuffersBlend;
+        this.GL_NVX_gpu_memory_info = glNvxGpuMemoryInfo;
     }
 }
