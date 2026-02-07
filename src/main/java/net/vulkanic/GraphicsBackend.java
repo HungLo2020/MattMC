@@ -304,6 +304,7 @@ public interface GraphicsBackend {
     void glVertexAttrib4f(int index, float v0, float v1, float v2, float v3);
     void glDetachShader(int program, int shader);
     void glFramebufferTexture2D(int target, int attachment, int textarget, int texture, int level);
+    void glFramebufferTexture(int target, int attachment, int texture, int level);
     int glGetTexParameteri(int target, int pname);
     void glBindImageTexture(int unit, int texture, int level, boolean layered, int layer, int access, int format);
     int glGetMaxImageUnits();

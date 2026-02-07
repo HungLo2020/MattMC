@@ -62,6 +62,7 @@ public class VulkanicAPI {
     public static final int GL_TEXTURE0 = 0x84C0;        // 33984
     public static final int GL_TEXTURE1 = 0x84C1;        // 33985
     public static final int GL_TEXTURE2 = 0x84C2;        // 33986
+    public static final int GL_TEXTURE3 = 0x84C3;        // 33987
     public static final int GL_TEXTURE4 = 0x84C4;        // 33988
     public static final int GL_TEXTURE_BASE_LEVEL = 0x813C;  // 33084
     public static final int GL_TEXTURE_MAX_LEVEL = 0x813D;   // 33085
@@ -1069,6 +1070,10 @@ public class VulkanicAPI {
     
     public static void glFramebufferTexture2D(int target, int attachment, int textarget, int texture, int level) {
         getBackend().glFramebufferTexture2D(target, attachment, textarget, texture, level);
+    }
+    
+    public static void glFramebufferTexture(int target, int attachment, int texture, int level) {
+        getBackend().glFramebufferTexture(target, attachment, texture, level);
     }
     
     public static int glGetTexParameteri(int target, int pname) {

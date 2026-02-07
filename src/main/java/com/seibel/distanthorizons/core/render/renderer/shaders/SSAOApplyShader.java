@@ -8,7 +8,7 @@ import com.seibel.distanthorizons.core.render.renderer.SSAORenderer;
 import com.seibel.distanthorizons.core.render.renderer.ScreenQuad;
 import com.seibel.distanthorizons.core.util.RenderUtil;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftGLWrapper;
-import org.lwjgl.opengl.GL32;
+import net.vulkanic.VulkanicAPI;
 
 /**
  * Draws the SSAO texture onto DH's FrameBuffer. <br><br>
@@ -67,33 +67,33 @@ public class SSAOApplyShader extends AbstractShaderRenderer
 	@Override
 	protected void onApplyUniforms(float partialTicks)
 	{
-		GLMC.glActiveTexture(GL32.GL_TEXTURE0);
+		GLMC.glActiveTexture(VulkanicAPI.GL_TEXTURE0);
 		GLMC.glBindTexture(LodRenderer.INSTANCE.getActiveDepthTextureId());
-		GL32.glUniform1i(this.gDepthMapUniform, 0);
+		VulkanicAPI.glUniform1i(this.gDepthMapUniform, 0);
 		
-		GLMC.glActiveTexture(GL32.GL_TEXTURE1);
+		GLMC.glActiveTexture(VulkanicAPI.GL_TEXTURE1);
 		GLMC.glBindTexture(this.ssaoTexture);
-		GL32.glUniform1i(this.gSSAOMapUniform, 1);
+		VulkanicAPI.glUniform1i(this.gSSAOMapUniform, 1);
 		
-		GL32.glUniform1i(this.gBlurRadiusUniform, Config.Client.Advanced.Graphics.Ssao.blurRadius.get());
+		VulkanicAPI.glUniform1i(this.gBlurRadiusUniform, Config.Client.Advanced.Graphics.Ssao.blurRadius.get());
 		
 		if (this.gViewSizeUniform >= 0)
 		{
-			GL32.glUniform2f(this.gViewSizeUniform,
+			VulkanicAPI.glUniform2f(this.gViewSizeUniform,
 					MC_RENDER.getTargetFramebufferViewportWidth(),
 					MC_RENDER.getTargetFramebufferViewportHeight());
 		}
 		
 		if (this.gNearUniform >= 0)
 		{
-			GL32.glUniform1f(this.gNearUniform,
+			VulkanicAPI.glUniform1f(this.gNearUniform,
 					RenderUtil.getNearClipPlaneDistanceInBlocks(partialTicks));
 		}
 		
 		if (this.gFarUniform >= 0)
 		{
 			float farClipPlane = RenderUtil.getFarClipPlaneDistanceInBlocks();
-			GL32.glUniform1f(this.gFarUniform, farClipPlane);
+			VulkanicAPI.glUniform1f(this.gFarUniform, farClipPlane);
 		}
 	}
 	
@@ -107,8 +107,8 @@ public class SSAOApplyShader extends AbstractShaderRenderer
 	protected void onRender()
 	{
 		GLMC.enableBlend();
-		GL32.glBlendEquation(GL32.GL_FUNC_ADD);
-		GLMC.glBlendFuncSeparate(GL32.GL_ZERO, GL32.GL_SRC_ALPHA, GL32.GL_ZERO, GL32.GL_ONE);
+		VulkanicAPI.glBlendEquation(VulkanicAPI.GL_FUNC_ADD);
+		GLMC.glBlendFuncSeparate(VulkanicAPI.GL_ZERO, VulkanicAPI.GL_SRC_ALPHA, VulkanicAPI.GL_ZERO, VulkanicAPI.GL_ONE);
 
 		// Depth testing must be disabled otherwise this application shader won't apply anything.
 		// setting this isn't necessary in vanilla, but some mods may change this, requiring it to be set manually, 
@@ -116,8 +116,8 @@ public class SSAOApplyShader extends AbstractShaderRenderer
 		GLMC.disableDepthTest();
 		
 		// apply the rendered SSAO to the LODs 
-		GLMC.glBindFramebuffer(GL32.GL_READ_FRAMEBUFFER, SSAOShader.INSTANCE.frameBuffer);
-		GLMC.glBindFramebuffer(GL32.GL_DRAW_FRAMEBUFFER, LodRenderer.INSTANCE.getActiveFramebufferId());
+		GLMC.glBindFramebuffer(VulkanicAPI.GL_READ_FRAMEBUFFER, SSAOShader.INSTANCE.frameBuffer);
+		GLMC.glBindFramebuffer(VulkanicAPI.GL_DRAW_FRAMEBUFFER, LodRenderer.INSTANCE.getActiveFramebufferId());
 		
 		
 		ScreenQuad.INSTANCE.render();

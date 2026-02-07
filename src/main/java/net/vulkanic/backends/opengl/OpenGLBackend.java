@@ -1047,6 +1047,11 @@ public class OpenGLBackend implements GraphicsBackend {
     }
     
     @Override
+    public void glFramebufferTexture(int target, int attachment, int texture, int level) {
+        org.lwjgl.opengl.GL32C.glFramebufferTexture(target, attachment, texture, level);
+    }
+    
+    @Override
     public int glGetTexParameteri(int target, int pname) {
         return org.lwjgl.opengl.GL32C.glGetTexParameteri(target, pname);
     }
