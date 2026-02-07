@@ -357,4 +357,14 @@ public interface GraphicsBackend {
     void glDebugMessageControlARB(int source, int type, int severity, int[] ids, boolean enabled);
     void glDebugMessageCallbackAMD(org.lwjgl.opengl.GLDebugMessageAMDCallback callback, long userParam);
     void glDebugMessageEnableAMD(int category, int severity, int[] ids, boolean enabled);
+    
+    // High-level debug callback wrapper methods
+    void setupDebugMessageCallback(VulkanicAPI.DebugMessageCallback callback);
+    void setupDebugMessageCallbackKHR(VulkanicAPI.DebugMessageCallback callback);
+    void setupDebugMessageCallbackARB(VulkanicAPI.DebugMessageCallbackARB callback);
+    void setupDebugMessageCallbackAMD(VulkanicAPI.DebugMessageCallbackAMD callback);
+    void clearDebugMessageCallback();
+    void clearDebugMessageCallbackKHR();
+    void clearDebugMessageCallbackARB();
+    void clearDebugMessageCallbackAMD();
 }

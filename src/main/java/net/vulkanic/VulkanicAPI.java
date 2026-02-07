@@ -9,6 +9,22 @@ import net.vulkanic.backends.opengl.OpenGLBackend;
 public class VulkanicAPI {
     private static GraphicsBackend backend;
     
+    // Functional interfaces for debug callbacks
+    @FunctionalInterface
+    public interface DebugMessageCallback {
+        void invoke(int source, int type, int id, int severity, String message);
+    }
+    
+    @FunctionalInterface
+    public interface DebugMessageCallbackARB {
+        void invoke(int source, int type, int id, int severity, String message);
+    }
+    
+    @FunctionalInterface
+    public interface DebugMessageCallbackAMD {
+        void invoke(int id, int category, int severity, String message);
+    }
+    
     // OpenGL Constants - Buffer Targets
     public static final int GL_COPY_READ_BUFFER = 0x8F36;
     public static final int GL_COPY_WRITE_BUFFER = 0x8F37;
@@ -1255,5 +1271,38 @@ public class VulkanicAPI {
     
     public static void glDebugMessageEnableAMD(int category, int severity, int[] ids, boolean enabled) {
         getBackend().glDebugMessageEnableAMD(category, severity, ids, enabled);
+    }
+    
+    // High-level debug callback wrapper methods that accept functional interfaces
+    public static void setupDebugMessageCallback(DebugMessageCallback callback) {
+        getBackend().setupDebugMessageCallback(callback);
+    }
+    
+    public static void setupDebugMessageCallbackKHR(DebugMessageCallback callback) {
+        getBackend().setupDebugMessageCallbackKHR(callback);
+    }
+    
+    public static void setupDebugMessageCallbackARB(DebugMessageCallbackARB callback) {
+        getBackend().setupDebugMessageCallbackARB(callback);
+    }
+    
+    public static void setupDebugMessageCallbackAMD(DebugMessageCallbackAMD callback) {
+        getBackend().setupDebugMessageCallbackAMD(callback);
+    }
+    
+    public static void clearDebugMessageCallback() {
+        getBackend().clearDebugMessageCallback();
+    }
+    
+    public static void clearDebugMessageCallbackKHR() {
+        getBackend().clearDebugMessageCallbackKHR();
+    }
+    
+    public static void clearDebugMessageCallbackARB() {
+        getBackend().clearDebugMessageCallbackARB();
+    }
+    
+    public static void clearDebugMessageCallbackAMD() {
+        getBackend().clearDebugMessageCallbackAMD();
     }
 }

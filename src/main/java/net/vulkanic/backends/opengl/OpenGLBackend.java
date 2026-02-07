@@ -3,6 +3,7 @@ package net.vulkanic.backends.opengl;
 import net.blaze3d.opengl.GlStateManager;
 import net.vulkanic.GraphicsBackend;
 import net.vulkanic.GraphicsCapabilities;
+import net.vulkanic.VulkanicAPI;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL15;
 import org.lwjgl.opengl.GL20;
@@ -1306,5 +1307,70 @@ public class OpenGLBackend implements GraphicsBackend {
     @Override
     public void glDebugMessageEnableAMD(int category, int severity, int[] ids, boolean enabled) {
         org.lwjgl.opengl.AMDDebugOutput.glDebugMessageEnableAMD(category, severity, ids, enabled);
+    }
+    
+    // High-level debug callback wrapper implementations
+    @Override
+    public void setupDebugMessageCallback(VulkanicAPI.DebugMessageCallback callback) {
+        org.lwjgl.opengl.GLDebugMessageCallback proc = org.lwjgl.opengl.GLDebugMessageCallback.create(
+            (source, type, id, severity, length, message, userParam) -> {
+                String messageStr = org.lwjgl.opengl.GLDebugMessageCallback.getMessage(length, message);
+                callback.invoke(source, type, id, severity, messageStr);
+            }
+        );
+        org.lwjgl.opengl.GL43C.glDebugMessageCallback(proc, 0L);
+    }
+    
+    @Override
+    public void setupDebugMessageCallbackKHR(VulkanicAPI.DebugMessageCallback callback) {
+        org.lwjgl.opengl.GLDebugMessageCallback proc = org.lwjgl.opengl.GLDebugMessageCallback.create(
+            (source, type, id, severity, length, message, userParam) -> {
+                String messageStr = org.lwjgl.opengl.GLDebugMessageCallback.getMessage(length, message);
+                callback.invoke(source, type, id, severity, messageStr);
+            }
+        );
+        org.lwjgl.opengl.KHRDebug.glDebugMessageCallback(proc, 0L);
+    }
+    
+    @Override
+    public void setupDebugMessageCallbackARB(VulkanicAPI.DebugMessageCallbackARB callback) {
+        org.lwjgl.opengl.GLDebugMessageARBCallback proc = org.lwjgl.opengl.GLDebugMessageARBCallback.create(
+            (source, type, id, severity, length, message, userParam) -> {
+                String messageStr = org.lwjgl.opengl.GLDebugMessageARBCallback.getMessage(length, message);
+                callback.invoke(source, type, id, severity, messageStr);
+            }
+        );
+        org.lwjgl.opengl.ARBDebugOutput.glDebugMessageCallbackARB(proc, 0L);
+    }
+    
+    @Override
+    public void setupDebugMessageCallbackAMD(VulkanicAPI.DebugMessageCallbackAMD callback) {
+        org.lwjgl.opengl.GLDebugMessageAMDCallback proc = org.lwjgl.opengl.GLDebugMessageAMDCallback.create(
+            (id, category, severity, length, message, userParam) -> {
+                String messageStr = org.lwjgl.opengl.GLDebugMessageAMDCallback.getMessage(length, message);
+                callback.invoke(id, category, severity, messageStr);
+            }
+        );
+        org.lwjgl.opengl.AMDDebugOutput.glDebugMessageCallbackAMD(proc, 0L);
+    }
+    
+    @Override
+    public void clearDebugMessageCallback() {
+        org.lwjgl.opengl.GL43C.glDebugMessageCallback(null, 0L);
+    }
+    
+    @Override
+    public void clearDebugMessageCallbackKHR() {
+        org.lwjgl.opengl.KHRDebug.glDebugMessageCallback(null, 0L);
+    }
+    
+    @Override
+    public void clearDebugMessageCallbackARB() {
+        org.lwjgl.opengl.ARBDebugOutput.glDebugMessageCallbackARB(null, 0L);
+    }
+    
+    @Override
+    public void clearDebugMessageCallbackAMD() {
+        org.lwjgl.opengl.AMDDebugOutput.glDebugMessageCallbackAMD(null, 0L);
     }
 }
