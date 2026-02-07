@@ -36,6 +36,11 @@ public class VulkanicAPI {
     public static final int GL_STATIC_DRAW = 0x88E4;
     public static final int GL_DYNAMIC_DRAW = 0x88E8;
     
+    // OpenGL Constants - Buffer Mapping
+    public static final int GL_MAP_WRITE_BIT = 0x0002;
+    public static final int GL_MAP_INVALIDATE_BUFFER_BIT = 0x0008;
+    public static final int GL_MAP_UNSYNCHRONIZED_BIT = 0x0020;
+    
     // OpenGL Constants - String Names
     public static final int GL_VENDOR = 0x1F00;
     public static final int GL_RENDERER = 0x1F01;
@@ -66,6 +71,33 @@ public class VulkanicAPI {
     public static final int GL_TEXTURE2 = 0x84C2;        // 33986
     public static final int GL_TEXTURE3 = 0x84C3;        // 33987
     public static final int GL_TEXTURE4 = 0x84C4;        // 33988
+    public static final int GL_TEXTURE5 = 0x84C5;        // 33989
+    public static final int GL_TEXTURE6 = 0x84C6;        // 33990
+    public static final int GL_TEXTURE7 = 0x84C7;        // 33991
+    public static final int GL_TEXTURE8 = 0x84C8;        // 33992
+    public static final int GL_TEXTURE9 = 0x84C9;        // 33993
+    public static final int GL_TEXTURE10 = 0x84CA;       // 33994
+    public static final int GL_TEXTURE11 = 0x84CB;       // 33995
+    public static final int GL_TEXTURE12 = 0x84CC;       // 33996
+    public static final int GL_TEXTURE13 = 0x84CD;       // 33997
+    public static final int GL_TEXTURE14 = 0x84CE;       // 33998
+    public static final int GL_TEXTURE15 = 0x84CF;       // 33999
+    public static final int GL_TEXTURE16 = 0x84D0;       // 34000
+    public static final int GL_TEXTURE17 = 0x84D1;       // 34001
+    public static final int GL_TEXTURE18 = 0x84D2;       // 34002
+    public static final int GL_TEXTURE19 = 0x84D3;       // 34003
+    public static final int GL_TEXTURE20 = 0x84D4;       // 34004
+    public static final int GL_TEXTURE21 = 0x84D5;       // 34005
+    public static final int GL_TEXTURE22 = 0x84D6;       // 34006
+    public static final int GL_TEXTURE23 = 0x84D7;       // 34007
+    public static final int GL_TEXTURE24 = 0x84D8;       // 34008
+    public static final int GL_TEXTURE25 = 0x84D9;       // 34009
+    public static final int GL_TEXTURE26 = 0x84DA;       // 34010
+    public static final int GL_TEXTURE27 = 0x84DB;       // 34011
+    public static final int GL_TEXTURE28 = 0x84DC;       // 34012
+    public static final int GL_TEXTURE29 = 0x84DD;       // 34013
+    public static final int GL_TEXTURE30 = 0x84DE;       // 34014
+    public static final int GL_TEXTURE31 = 0x84DF;       // 34015
     public static final int GL_TEXTURE_BASE_LEVEL = 0x813C;  // 33084
     public static final int GL_TEXTURE_MAX_LEVEL = 0x813D;   // 33085
     
@@ -100,6 +132,15 @@ public class VulkanicAPI {
     public static final int GL_GEQUAL = 0x0206;
     public static final int GL_ALWAYS = 0x0207;
     
+    // OpenGL Constants - Stencil Operations
+    public static final int GL_KEEP = 0x1E00;
+    public static final int GL_REPLACE = 0x1E01;
+    public static final int GL_INCR = 0x1E02;
+    public static final int GL_DECR = 0x1E03;
+    public static final int GL_INVERT = 0x150A;
+    public static final int GL_INCR_WRAP = 0x8507;
+    public static final int GL_DECR_WRAP = 0x8508;
+    
     // OpenGL Constants - Blend Functions
     public static final int GL_ZERO = 0;
     public static final int GL_ONE = 1;
@@ -112,6 +153,10 @@ public class VulkanicAPI {
     public static final int GL_DST_ALPHA = 0x0304;
     public static final int GL_ONE_MINUS_DST_ALPHA = 0x0305;
     public static final int GL_SRC_ALPHA_SATURATE = 0x0308;
+    public static final int GL_CONSTANT_COLOR = 0x8001;
+    public static final int GL_ONE_MINUS_CONSTANT_COLOR = 0x8002;
+    public static final int GL_CONSTANT_ALPHA = 0x8003;
+    public static final int GL_ONE_MINUS_CONSTANT_ALPHA = 0x8004;
     
     // OpenGL Constants - Texture Types
     public static final int GL_TEXTURE_1D = 0x0DE0;
@@ -180,6 +225,15 @@ public class VulkanicAPI {
     public static final int GL_GREEN = 0x1904;
     public static final int GL_BLUE = 0x1905;
     public static final int GL_ALPHA = 0x1906;
+    public static final int GL_RG = 0x8227;
+    public static final int GL_BGR = 0x80E0;
+    public static final int GL_BGRA = 0x80E1;
+    public static final int GL_RED_INTEGER = 0x8D94;
+    public static final int GL_RG_INTEGER = 0x8228;
+    public static final int GL_RGB_INTEGER = 0x8D98;
+    public static final int GL_BGR_INTEGER = 0x8D9A;
+    public static final int GL_RGBA_INTEGER = 0x8D99;
+    public static final int GL_BGRA_INTEGER = 0x8D9B;
     public static final int GL_BYTE = 0x1400;
     public static final int GL_UNSIGNED_SHORT_4_4_4_4 = 0x8033;
     public static final int GL_UNSIGNED_INT = 0x1405;
@@ -224,8 +278,13 @@ public class VulkanicAPI {
     public static final int GL_EXP2 = 0x0801;
     
     // OpenGL Constants - Polygon Mode
+    public static final int GL_POINT = 0x1B00;
     public static final int GL_LINE = 0x1B01;
     public static final int GL_FILL = 0x1B02;
+    
+    // OpenGL Constants - Face Culling
+    public static final int GL_FRONT = 0x0404;
+    public static final int GL_BACK = 0x0405;
     public static final int GL_FRONT_AND_BACK = 0x0408;
     
     // OpenGL Constants - GPU Memory Info (NVX)
@@ -249,6 +308,7 @@ public class VulkanicAPI {
     
     // OpenGL Constants - Uniform/Active Types
     public static final int GL_FLOAT = 0x1406;
+    public static final int GL_DOUBLE = 0x140A;
     public static final int GL_INT = 0x1404;
     public static final int GL_SHORT = 0x1402;
     public static final int GL_UNSIGNED_SHORT = 0x1403;
@@ -1316,6 +1376,14 @@ public class VulkanicAPI {
     
     public static int glCreateFramebuffers() {
         return getBackend().glCreateFramebuffers();
+    }
+    
+    public static int glGenFramebuffers() {
+        return getBackend().generateFramebufferObject();
+    }
+    
+    public static void glDeleteFramebuffers(int framebuffer) {
+        getBackend().destroyFramebufferObject(framebuffer);
     }
     
     public static int glCreateTextures(int target) {

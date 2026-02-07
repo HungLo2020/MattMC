@@ -2,7 +2,7 @@ package com.seibel.distanthorizons.core.render.glObject.buffer;
 
 import java.nio.ByteBuffer;
 
-import org.lwjgl.opengl.GL32;
+import net.vulkanic.VulkanicAPI;
 
 import com.seibel.distanthorizons.api.enums.config.EDhApiGpuUploadMethod;
 
@@ -40,7 +40,7 @@ public class GLVertexBuffer extends GLBuffer
 	}
 	
 	@Override
-	public int getBufferBindingTarget() { return GL32.GL_ARRAY_BUFFER; }
+	public int getBufferBindingTarget() { return VulkanicAPI.GL_ARRAY_BUFFER; }
 	
 	public void uploadBuffer(ByteBuffer byteBuffer, int vertCount, EDhApiGpuUploadMethod uploadMethod, int maxExpensionSize)
 	{
@@ -53,7 +53,7 @@ public class GLVertexBuffer extends GLBuffer
 		if (byteBuffer.limit() - byteBuffer.position() != 0)
 		{
 			boolean useBuffStorage = uploadMethod.useBufferStorage;
-			super.uploadBuffer(byteBuffer, uploadMethod, maxExpensionSize, useBuffStorage ? 0 : GL32.GL_STATIC_DRAW);
+			super.uploadBuffer(byteBuffer, uploadMethod, maxExpensionSize, useBuffStorage ? 0 : VulkanicAPI.GL_STATIC_DRAW);
 		}
 		this.vertexCount = vertCount;
 	}
@@ -61,9 +61,9 @@ public class GLVertexBuffer extends GLBuffer
 	public ByteBuffer mapBuffer(int targetSize, EDhApiGpuUploadMethod uploadMethod, int maxExpansionSize)
 	{
 		return super.mapBuffer(targetSize, uploadMethod, maxExpansionSize,
-				uploadMethod.useBufferStorage ? GL32.GL_MAP_WRITE_BIT :
-						uploadMethod.useEarlyMapping ? GL32.GL_DYNAMIC_DRAW : GL32.GL_STATIC_DRAW,
-				GL32.GL_MAP_WRITE_BIT | GL32.GL_MAP_UNSYNCHRONIZED_BIT | GL32.GL_MAP_INVALIDATE_BUFFER_BIT);
+				uploadMethod.useBufferStorage ? VulkanicAPI.GL_MAP_WRITE_BIT :
+						uploadMethod.useEarlyMapping ? VulkanicAPI.GL_DYNAMIC_DRAW : VulkanicAPI.GL_STATIC_DRAW,
+				VulkanicAPI.GL_MAP_WRITE_BIT | VulkanicAPI.GL_MAP_UNSYNCHRONIZED_BIT | VulkanicAPI.GL_MAP_INVALIDATE_BUFFER_BIT);
 	}
 	
 }
