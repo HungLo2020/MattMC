@@ -1305,6 +1305,27 @@ public class OpenGLBackend implements GraphicsBackend {
         return org.lwjgl.opengl.ARBDirectStateAccess.glCreateTextures(target);
     }
     
+    // Additional rendering operations
+    @Override
+    public void glDrawElements(int mode, int count, int type, long indices) {
+        org.lwjgl.opengl.GL32.glDrawElements(mode, count, type, indices);
+    }
+    
+    @Override
+    public void glBlendEquation(int mode) {
+        org.lwjgl.opengl.GL32.glBlendEquation(mode);
+    }
+    
+    @Override
+    public void glClearDepth(double depth) {
+        org.lwjgl.opengl.GL32.glClearDepth(depth);
+    }
+    
+    @Override
+    public int glGetFramebufferAttachmentParameteri(int target, int attachment, int pname) {
+        return org.lwjgl.opengl.GL32.glGetFramebufferAttachmentParameteri(target, attachment, pname);
+    }
+    
     @Override
     public void glDebugMessageControl(int source, int type, int severity, int[] ids, boolean enabled) {
         org.lwjgl.opengl.GL43C.glDebugMessageControl(source, type, severity, ids, enabled);

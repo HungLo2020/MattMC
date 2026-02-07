@@ -356,6 +356,12 @@ public interface GraphicsBackend {
     int glCreateFramebuffers();
     int glCreateTextures(int target);
     
+    // Additional rendering operations
+    void glDrawElements(int mode, int count, int type, long indices);
+    void glBlendEquation(int mode);
+    void glClearDepth(double depth);
+    int glGetFramebufferAttachmentParameteri(int target, int attachment, int pname);
+    
     // Debug callback methods (low-level control methods only)
     void glDebugMessageControl(int source, int type, int severity, int[] ids, boolean enabled);
     void glDebugMessageControlKHR(int source, int type, int severity, int[] ids, boolean enabled);

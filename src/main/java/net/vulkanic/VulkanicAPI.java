@@ -126,13 +126,16 @@ public class VulkanicAPI {
     public static final int GL_DEPTH_ATTACHMENT = 0x8D00;
     public static final int GL_DEPTH_STENCIL_ATTACHMENT = 0x821A;
     public static final int GL_MAX_COLOR_ATTACHMENTS = 0x8CDF;
+    public static final int GL_FRAMEBUFFER_ATTACHMENT_OBJECT_NAME = 0x8CD1;
     public static final int GL_NONE = 0;
     
     // OpenGL Constants - Blend State
     public static final int GL_BLEND = 0x0BE2;
+    public static final int GL_FUNC_ADD = 0x8006;
     
-    // OpenGL Constants - Culling
+    // OpenGL Constants - Culling and Tests
     public static final int GL_CULL_FACE = 0x0B44;
+    public static final int GL_SCISSOR_TEST = 0x0C11;
     
     // OpenGL Constants - Texture Parameters
     public static final int GL_TEXTURE_MIN_FILTER = 0x2801;
@@ -206,6 +209,7 @@ public class VulkanicAPI {
     public static final int GL_EXP2 = 0x0801;
     
     // OpenGL Constants - Polygon Mode
+    public static final int GL_LINE = 0x1B01;
     public static final int GL_FILL = 0x1B02;
     public static final int GL_FRONT_AND_BACK = 0x0408;
     
@@ -1250,6 +1254,23 @@ public class VulkanicAPI {
     
     public static int glCreateTextures(int target) {
         return getBackend().glCreateTextures(target);
+    }
+    
+    // Additional rendering operations
+    public static void glDrawElements(int mode, int count, int type, long indices) {
+        getBackend().glDrawElements(mode, count, type, indices);
+    }
+    
+    public static void glBlendEquation(int mode) {
+        getBackend().glBlendEquation(mode);
+    }
+    
+    public static void glClearDepth(double depth) {
+        getBackend().glClearDepth(depth);
+    }
+    
+    public static int glGetFramebufferAttachmentParameteri(int target, int attachment, int pname) {
+        return getBackend().glGetFramebufferAttachmentParameteri(target, attachment, pname);
     }
     
     // Debug callback control methods (low-level callback control methods only)
