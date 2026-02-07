@@ -18,6 +18,18 @@ import java.nio.FloatBuffer;
 public class OpenGLBackend implements GraphicsBackend {
     
     @Override
+    public long getGraphicsContext() {
+        // Platform-specific: On Windows, return the WGL context handle
+        // On other platforms, this would use different APIs (GLX on Linux, CGL on macOS)
+        try {
+            return org.lwjgl.opengl.WGL.wglGetCurrentContext();
+        } catch (UnsatisfiedLinkError e) {
+            // Not on Windows, or WGL not available
+            return 0L;
+        }
+    }
+    
+    @Override
     public void bindTexture(int textureId) {
         int activeTexUnit = GlStateManager.activeTexture;
         if (textureId != GlStateManager.TEXTURES[activeTexUnit].binding) {
@@ -700,14 +712,37 @@ public class OpenGLBackend implements GraphicsBackend {
         return org.lwjgl.opengl.GL32C.glGetSynci(sync, pname, length);
     }
     
+    /**
+     * Helper method to convert LWJGL GLCapabilities to Vulkanic GraphicsCapabilities.
+     * This extracts all capability flags from the OpenGL-specific object.
+     */
+    private GraphicsCapabilities convertCapabilities(org.lwjgl.opengl.GLCapabilities glCaps) {
+        return new GraphicsCapabilities(
+            // OpenGL version flags
+            glCaps.OpenGL11, glCaps.OpenGL12, glCaps.OpenGL13, glCaps.OpenGL14, glCaps.OpenGL15,
+            glCaps.OpenGL20, glCaps.OpenGL21,
+            glCaps.OpenGL30, glCaps.OpenGL31, glCaps.OpenGL32, glCaps.OpenGL33,
+            glCaps.OpenGL40, glCaps.OpenGL41, glCaps.OpenGL42, glCaps.OpenGL43, glCaps.OpenGL44, glCaps.OpenGL45, glCaps.OpenGL46,
+            // Extension flags
+            glCaps.GL_ARB_buffer_storage, glCaps.GL_ARB_vertex_attrib_binding, glCaps.GL_ARB_direct_state_access,
+            glCaps.GL_ARB_debug_output, glCaps.GL_KHR_debug, glCaps.GL_AMD_debug_output,
+            glCaps.GL_KHR_no_error, glCaps.GL_EXT_debug_label, glCaps.GL_ARB_timer_query,
+            glCaps.GL_KHR_parallel_shader_compile, glCaps.GL_ARB_parallel_shader_compile,
+            glCaps.GL_ARB_multi_bind, glCaps.GL_ARB_tessellation_shader,
+            glCaps.GL_ARB_shader_storage_buffer_object, glCaps.GL_ARB_shader_image_load_store,
+            glCaps.GL_EXT_shader_image_load_store, glCaps.GL_ARB_draw_buffers_blend,
+            glCaps.GL_NVX_gpu_memory_info
+        );
+    }
+    
     @Override
     public GraphicsCapabilities obtainGraphicsCapabilities() {
-        return new GraphicsCapabilities(org.lwjgl.opengl.GL.getCapabilities());
+        return convertCapabilities(org.lwjgl.opengl.GL.getCapabilities());
     }
     
     @Override
     public GraphicsCapabilities initializeGraphicsCapabilities() {
-        return new GraphicsCapabilities(org.lwjgl.opengl.GL.createCapabilities());
+        return convertCapabilities(org.lwjgl.opengl.GL.createCapabilities());
     }
     
     @Override
@@ -810,7 +845,7 @@ public class OpenGLBackend implements GraphicsBackend {
     
     @Override
     public GraphicsCapabilities getGraphicsCapabilities() {
-        return new GraphicsCapabilities(org.lwjgl.opengl.GL.getCapabilities());
+        return convertCapabilities(org.lwjgl.opengl.GL.getCapabilities());
     }
     
     @Override

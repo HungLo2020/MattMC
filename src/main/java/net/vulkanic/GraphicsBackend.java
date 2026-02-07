@@ -9,6 +9,14 @@ import java.nio.FloatBuffer;
  */
 public interface GraphicsBackend {
     
+    // Context operations
+    /**
+     * Gets the current graphics context (platform-specific).
+     * On Windows, this returns the WGL context handle.
+     * Returns 0 or NULL if no context is current.
+     */
+    long getGraphicsContext();
+    
     void bindTexture(int textureId);
     void bindTexture(int target, int textureId);  // For explicit target binding
     void generateMipmap(int target);

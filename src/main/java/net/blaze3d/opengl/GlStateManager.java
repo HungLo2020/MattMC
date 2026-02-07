@@ -430,7 +430,7 @@ public class GlStateManager {
 	public static void _activeTexture(int i) {
 		RenderSystem.assertOnRenderThread();
 		// Iris: From MixinGlStateManager_FramebufferBinding - validate texture unit range
-		int tex = i - org.lwjgl.opengl.GL46C.GL_TEXTURE0;
+		int tex = i - VulkanicAPI.GL_TEXTURE0;
 		if (tex < 0 || tex > 128) {
 			throw new IllegalArgumentException("Texture " + tex + " out of range");
 		}
@@ -557,8 +557,8 @@ public class GlStateManager {
 		RenderSystem.assertOnRenderThread();
 		// Iris: From MixinGlStateManager_DepthColorOverride - tessellation support
 		int mode = i;
-		if (mode == org.lwjgl.opengl.GL43C.GL_TRIANGLES && net.irisshaders.iris.vertices.ImmediateState.usingTessellation) {
-			mode = org.lwjgl.opengl.GL43C.GL_PATCHES;
+		if (mode == VulkanicAPI.GL_TRIANGLES && net.irisshaders.iris.vertices.ImmediateState.usingTessellation) {
+			mode = VulkanicAPI.GL_PATCHES;
 		}
 		
 		net.vulkanic.VulkanicAPI.drawIndexedElements(mode, j, k, l);

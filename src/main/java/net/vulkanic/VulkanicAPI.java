@@ -40,6 +40,7 @@ public class VulkanicAPI {
     public static final int GL_SYNC_GPU_COMMANDS_COMPLETE = 0x9117;
     
     // OpenGL Constants - Primitive Types
+    public static final int GL_TRIANGLES = 0x0004;
     public static final int GL_PATCHES = 0x000E;
     
     // OpenGL Constants - Shader/Program Status
@@ -303,6 +304,16 @@ public class VulkanicAPI {
             initialize();
         }
         return backend;
+    }
+    
+    // Context operations
+    /**
+     * Gets the current graphics context (platform-specific).
+     * On Windows, this returns the WGL context handle.
+     * Returns 0 or NULL if no context is current.
+     */
+    public static long getGraphicsContext() {
+        return getBackend().getGraphicsContext();
     }
     
     // Convenience methods that delegate to the backend
