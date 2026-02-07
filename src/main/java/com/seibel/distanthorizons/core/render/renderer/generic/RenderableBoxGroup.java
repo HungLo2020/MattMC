@@ -10,7 +10,7 @@ import com.seibel.distanthorizons.core.render.glObject.GLProxy;
 import com.seibel.distanthorizons.core.util.LodUtil;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftGLWrapper;
 import org.jetbrains.annotations.Nullable;
-import org.lwjgl.opengl.GL32;
+import net.vulkanic.VulkanicAPI;
 
 import java.awt.*;
 import java.io.Closeable;
@@ -309,20 +309,20 @@ public class RenderableBoxGroup
 			
 			
 			// Upload transformation matrices
-			GL32.glBindBuffer(GL32.GL_ARRAY_BUFFER, this.instanceChunkPosVbo);
-			GL32.glBufferData(GL32.GL_ARRAY_BUFFER, chunkPosData, GL32.GL_DYNAMIC_DRAW);
-			GL32.glBindBuffer(GL32.GL_ARRAY_BUFFER, this.instanceSubChunkPosVbo);
-			GL32.glBufferData(GL32.GL_ARRAY_BUFFER, subChunkPosData, GL32.GL_DYNAMIC_DRAW);
-			GL32.glBindBuffer(GL32.GL_ARRAY_BUFFER, this.instanceScaleVbo);
-			GL32.glBufferData(GL32.GL_ARRAY_BUFFER, scalingData, GL32.GL_DYNAMIC_DRAW);
+			VulkanicAPI.glBindBuffer(VulkanicAPI.GL_ARRAY_BUFFER, this.instanceChunkPosVbo);
+			VulkanicAPI.glBufferData(VulkanicAPI.GL_ARRAY_BUFFER, chunkPosData, VulkanicAPI.GL_DYNAMIC_DRAW);
+			VulkanicAPI.glBindBuffer(VulkanicAPI.GL_ARRAY_BUFFER, this.instanceSubChunkPosVbo);
+			VulkanicAPI.glBufferData(VulkanicAPI.GL_ARRAY_BUFFER, subChunkPosData, VulkanicAPI.GL_DYNAMIC_DRAW);
+			VulkanicAPI.glBindBuffer(VulkanicAPI.GL_ARRAY_BUFFER, this.instanceScaleVbo);
+			VulkanicAPI.glBufferData(VulkanicAPI.GL_ARRAY_BUFFER, scalingData, VulkanicAPI.GL_DYNAMIC_DRAW);
 			
 			// Upload colors
-			GL32.glBindBuffer(GL32.GL_ARRAY_BUFFER, this.instanceColorVbo);
-			GL32.glBufferData(GL32.GL_ARRAY_BUFFER, colorData, GL32.GL_DYNAMIC_DRAW);
+			VulkanicAPI.glBindBuffer(VulkanicAPI.GL_ARRAY_BUFFER, this.instanceColorVbo);
+			VulkanicAPI.glBufferData(VulkanicAPI.GL_ARRAY_BUFFER, colorData, VulkanicAPI.GL_DYNAMIC_DRAW);
 			
 			// Upload materials
-			GL32.glBindBuffer(GL32.GL_ARRAY_BUFFER, this.instanceMaterialVbo);
-			GL32.glBufferData(GL32.GL_ARRAY_BUFFER, materialData, GL32.GL_DYNAMIC_DRAW);
+			VulkanicAPI.glBindBuffer(VulkanicAPI.GL_ARRAY_BUFFER, this.instanceMaterialVbo);
+			VulkanicAPI.glBufferData(VulkanicAPI.GL_ARRAY_BUFFER, materialData, VulkanicAPI.GL_DYNAMIC_DRAW);
 		}
 		
 		

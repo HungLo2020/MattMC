@@ -298,6 +298,7 @@ public interface GraphicsBackend {
     String glGetActiveUniform(int program, int index, int size, java.nio.IntBuffer type, java.nio.IntBuffer name);
     void glReadPixels(int x, int y, int width, int height, int format, int type, float[] pixels);
     void glBufferData(int target, float[] data, int usage);
+    void glBufferData(int target, int[] data, int usage);
     void glBufferStorage(int target, long size, int flags);
     void glBindBufferBase(int target, int index, int buffer);
     void glVertexAttrib4f(int index, float v0, float v1, float v2, float v3);

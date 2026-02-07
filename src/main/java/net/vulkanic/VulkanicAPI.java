@@ -33,6 +33,7 @@ public class VulkanicAPI {
     
     // OpenGL Constants - Buffer Usage
     public static final int GL_STATIC_DRAW = 0x88E4;
+    public static final int GL_DYNAMIC_DRAW = 0x88E8;
     
     // OpenGL Constants - String Names
     public static final int GL_VENDOR = 0x1F00;
@@ -1040,6 +1041,10 @@ public class VulkanicAPI {
     }
     
     public static void glBufferData(int target, float[] data, int usage) {
+        getBackend().glBufferData(target, data, usage);
+    }
+    
+    public static void glBufferData(int target, int[] data, int usage) {
         getBackend().glBufferData(target, data, usage);
     }
     

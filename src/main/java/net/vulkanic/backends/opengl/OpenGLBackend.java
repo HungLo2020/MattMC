@@ -1017,6 +1017,11 @@ public class OpenGLBackend implements GraphicsBackend {
     }
     
     @Override
+    public void glBufferData(int target, int[] data, int usage) {
+        org.lwjgl.opengl.GL32C.glBufferData(target, data, usage);
+    }
+    
+    @Override
     public void glBufferStorage(int target, long size, int flags) {
         org.lwjgl.opengl.GL45C.glBufferStorage(target, size, flags);
     }
