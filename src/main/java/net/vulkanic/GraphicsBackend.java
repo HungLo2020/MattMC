@@ -347,4 +347,8 @@ public interface GraphicsBackend {
     void glNamedFramebufferTexture(int framebuffer, int attachment, int texture, int level);
     int glCreateFramebuffers();
     int glCreateTextures(int target);
+    
+    // Debug callback methods
+    void glDebugMessageControl(int source, int type, int severity, int[] ids, boolean enabled);
+    void glDebugMessageCallback(org.lwjgl.opengl.GLDebugMessageCallback callback, long userParam);
 }

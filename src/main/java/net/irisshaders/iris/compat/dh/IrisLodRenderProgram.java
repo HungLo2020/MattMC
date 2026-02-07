@@ -27,9 +27,7 @@ import net.minecraft.client.Minecraft;
 import org.joml.Matrix3f;
 import org.joml.Matrix4f;
 import org.joml.Matrix4fc;
-import org.lwjgl.opengl.GL32;
-import org.lwjgl.opengl.GL43C;
-import org.lwjgl.opengl.GL46C;
+import net.vulkanic.VulkanicAPI;
 import org.lwjgl.system.MemoryStack;
 
 import java.nio.FloatBuffer;
@@ -62,46 +60,46 @@ public class IrisLodRenderProgram {
 
 	// This will bind  AbstractVertexAttribute
 	private IrisLodRenderProgram(String name, boolean isShadowPass, boolean translucent, BlendModeOverride override, BufferBlendOverride[] bufferBlendOverrides, String vertex, String tessControl, String tessEval, String geometry, String fragment, CustomUniforms customUniforms, IrisRenderingPipeline pipeline) {
-		id = GL43C.glCreateProgram();
+		id = VulkanicAPI.constructProgramObject();
 
-		GL32.glBindAttribLocation(this.id, 0, "vPosition");
-		GL32.glBindAttribLocation(this.id, 1, "iris_color");
-		GL32.glBindAttribLocation(this.id, 2, "irisExtra");
+		VulkanicAPI.bindAttributeLocation(this.id, 0, "vPosition");
+		VulkanicAPI.bindAttributeLocation(this.id, 1, "iris_color");
+		VulkanicAPI.bindAttributeLocation(this.id, 2, "irisExtra");
 
 		this.bufferBlendOverrides = bufferBlendOverrides;
 
 		GlShader vert = new GlShader(ShaderType.VERTEX, name + ".vsh", vertex);
-		GL43C.glAttachShader(id, vert.getHandle());
+		VulkanicAPI.attachShaderToProgram(id, vert.getHandle());
 
 		GlShader tessCont = null;
 		if (tessControl != null) {
 			tessCont = new GlShader(ShaderType.TESSELATION_CONTROL, name + ".tcs", tessControl);
-			GL43C.glAttachShader(id, tessCont.getHandle());
+			VulkanicAPI.attachShaderToProgram(id, tessCont.getHandle());
 		}
 
 		GlShader tessE = null;
 		if (tessEval != null) {
 			tessE = new GlShader(ShaderType.TESSELATION_EVAL, name + ".tes", tessEval);
-			GL43C.glAttachShader(id, tessE.getHandle());
+			VulkanicAPI.attachShaderToProgram(id, tessE.getHandle());
 		}
 
 		GlShader geom = null;
 		if (geometry != null) {
 			geom = new GlShader(ShaderType.GEOMETRY, name + ".gsh", geometry);
-			GL43C.glAttachShader(id, geom.getHandle());
+			VulkanicAPI.attachShaderToProgram(id, geom.getHandle());
 		}
 
 		GlShader frag = new GlShader(ShaderType.FRAGMENT, name + ".fsh", fragment);
-		GL43C.glAttachShader(id, frag.getHandle());
+		VulkanicAPI.attachShaderToProgram(id, frag.getHandle());
 
-		GL32.glLinkProgram(this.id);
-		int status = GL32.glGetProgrami(this.id, 35714);
+		VulkanicAPI.linkProgramBinary(this.id);
+		int status = VulkanicAPI.queryProgramParameter(this.id, VulkanicAPI.GL_LINK_STATUS);
 		if (status != 1) {
-			String message = "Shader link error in Iris DH program! Details: " + GL32.glGetProgramInfoLog(this.id);
+			String message = "Shader link error in Iris DH program! Details: " + VulkanicAPI.retrieveProgramInfoLog(this.id);
 			this.free();
 			throw new RuntimeException(message);
 		} else {
-			GL32.glUseProgram(this.id);
+			VulkanicAPI.useProgram(this.id);
 		}
 
 		vert.destroy();
@@ -183,7 +181,7 @@ public class IrisLodRenderProgram {
 	// Noise Uniforms
 
 	public int tryGetUniformLocation2(CharSequence name) {
-		return GL32.glGetUniformLocation(this.id, name);
+		return VulkanicAPI.locateUniformVariable(this.id, name);
 	}
 
 	public void setUniform(int index, Matrix4fc matrix) {
@@ -194,7 +192,7 @@ public class IrisLodRenderProgram {
 			matrix.get(buffer);
 			buffer.rewind();
 
-			GL46C.glUniformMatrix4fv(index, false, buffer);
+			VulkanicAPI.glUniformMatrix4fv(index, false, buffer);
 		}
 	}
 
@@ -212,7 +210,7 @@ public class IrisLodRenderProgram {
 
 	// Override ShaderProgram.bind()
 	public void bind() {
-		GL43C.glUseProgram(id);
+		VulkanicAPI.useProgram(id);
 		if (blend != null) blend.apply();
 
 		for (BufferBlendOverride override : bufferBlendOverrides) {
@@ -221,18 +219,18 @@ public class IrisLodRenderProgram {
 	}
 
 	public void unbind() {
-		GL43C.glUseProgram(0);
+		VulkanicAPI.useProgram(0);
 		ProgramUniforms.clearActiveUniforms();
 		ProgramSamplers.clearActiveSamplers();
 		BlendModeOverride.restore();
 	}
 
 	public void free() {
-		GL43C.glDeleteProgram(id);
+		VulkanicAPI.disposeProgramObject(id);
 	}
 
 	public void fillUniformData(Matrix4fc projection, Matrix4fc modelView, int worldYOffset, float partialTicks) {
-		GL43C.glUseProgram(id);
+		VulkanicAPI.useProgram(id);
 
 		Minecraft.getInstance().gameRenderer.lightTexture().turnOnLightLayer();
 		IrisRenderSystem.bindTextureToUnit(TextureType.TEXTURE_2D.getGlType(), IrisSamplers.LIGHTMAP_TEXTURE_UNIT, RenderSystem.getShaderTexture(2).texture().iris$getGlId());
@@ -265,7 +263,7 @@ public class IrisLodRenderProgram {
 	}
 
 	private void setUniform(int index, float value) {
-		GL43C.glUniform1f(index, value);
+		VulkanicAPI.glUniform1f(index, value);
 	}
 
 	public void setModelPos(DhApiVec3f modelPos) {
@@ -273,7 +271,7 @@ public class IrisLodRenderProgram {
 	}
 
 	private void setUniform(int index, DhApiVec3f pos) {
-		GL43C.glUniform3f(index, pos.x, pos.y, pos.z);
+		VulkanicAPI.glUniform3f(index, pos.x, pos.y, pos.z);
 	}
 
 }

@@ -31,6 +31,7 @@ public class GraphicsCapabilities {
     public final boolean GL_ARB_direct_state_access;
     public final boolean GL_ARB_debug_output;
     public final boolean GL_KHR_debug;
+    public final boolean GL_AMD_debug_output;
     public final boolean GL_KHR_no_error;
     public final boolean GL_EXT_debug_label;
     public final boolean GL_ARB_timer_query;
@@ -73,6 +74,7 @@ public class GraphicsCapabilities {
         this.GL_ARB_direct_state_access = glCaps.GL_ARB_direct_state_access;
         this.GL_ARB_debug_output = glCaps.GL_ARB_debug_output;
         this.GL_KHR_debug = glCaps.GL_KHR_debug;
+        this.GL_AMD_debug_output = glCaps.GL_AMD_debug_output;
         this.GL_KHR_no_error = glCaps.GL_KHR_no_error;
         this.GL_EXT_debug_label = glCaps.GL_EXT_debug_label;
         this.GL_ARB_timer_query = glCaps.GL_ARB_timer_query;

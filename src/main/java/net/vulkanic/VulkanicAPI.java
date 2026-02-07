@@ -113,6 +113,9 @@ public class VulkanicAPI {
     // OpenGL Constants - Blend State
     public static final int GL_BLEND = 0x0BE2;
     
+    // OpenGL Constants - Culling
+    public static final int GL_CULL_FACE = 0x0B44;
+    
     // OpenGL Constants - Texture Parameters
     public static final int GL_TEXTURE_MIN_FILTER = 0x2801;
     public static final int GL_TEXTURE_MAG_FILTER = 0x2800;
@@ -1219,5 +1222,14 @@ public class VulkanicAPI {
     
     public static int glCreateTextures(int target) {
         return getBackend().glCreateTextures(target);
+    }
+    
+    // Debug callback wrapper methods
+    public static void glDebugMessageControl(int source, int type, int severity, int[] ids, boolean enabled) {
+        getBackend().glDebugMessageControl(source, type, severity, ids, enabled);
+    }
+    
+    public static void glDebugMessageCallback(org.lwjgl.opengl.GLDebugMessageCallback callback, long userParam) {
+        getBackend().glDebugMessageCallback(callback, userParam);
     }
 }

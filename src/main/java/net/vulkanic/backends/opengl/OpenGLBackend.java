@@ -1267,4 +1267,14 @@ public class OpenGLBackend implements GraphicsBackend {
     public int glCreateTextures(int target) {
         return org.lwjgl.opengl.ARBDirectStateAccess.glCreateTextures(target);
     }
+    
+    @Override
+    public void glDebugMessageControl(int source, int type, int severity, int[] ids, boolean enabled) {
+        org.lwjgl.opengl.GL43C.glDebugMessageControl(source, type, severity, ids, enabled);
+    }
+    
+    @Override
+    public void glDebugMessageCallback(org.lwjgl.opengl.GLDebugMessageCallback callback, long userParam) {
+        org.lwjgl.opengl.GL43C.glDebugMessageCallback(callback, userParam);
+    }
 }
