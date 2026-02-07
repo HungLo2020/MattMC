@@ -1179,6 +1179,11 @@ public class OpenGLBackend implements GraphicsBackend {
     }
     
     @Override
+    public void glViewport(int x, int y, int width, int height) {
+        org.lwjgl.opengl.GL11.glViewport(x, y, width, height);
+    }
+    
+    @Override
     public void glDispatchComputeIndirect(long offset) {
         org.lwjgl.opengl.GL43C.glDispatchComputeIndirect(offset);
     }

@@ -44,6 +44,7 @@ public class VulkanicAPI {
     public static final int GL_SYNC_GPU_COMMANDS_COMPLETE = 0x9117;
     
     // OpenGL Constants - Primitive Types
+    public static final int GL_LINES = 0x0001;
     public static final int GL_TRIANGLES = 0x0004;
     public static final int GL_TRIANGLE_FAN = 0x0006;
     public static final int GL_PATCHES = 0x000E;
@@ -1166,6 +1167,10 @@ public class VulkanicAPI {
     
     public static void glPolygonMode(int face, int mode) {
         getBackend().glPolygonMode(face, mode);
+    }
+    
+    public static void glViewport(int x, int y, int width, int height) {
+        getBackend().glViewport(x, y, width, height);
     }
     
     public static void glDispatchComputeIndirect(long offset) {

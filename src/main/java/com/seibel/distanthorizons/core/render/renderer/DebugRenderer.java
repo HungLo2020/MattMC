@@ -19,9 +19,9 @@ import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftRen
 import com.seibel.distanthorizons.core.util.math.Mat4f;
 import com.seibel.distanthorizons.core.util.math.Vec3d;
 import com.seibel.distanthorizons.core.util.math.Vec3f;
+import net.vulkanic.VulkanicAPI;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.lwjgl.opengl.GL32;
 
 import java.awt.*;
 import java.io.Closeable;
@@ -139,7 +139,7 @@ public class DebugRenderer
 		boxOutlineBuffer.asIntBuffer().put(BOX_OUTLINE_INDICES);
 		boxOutlineBuffer.rewind();
 		this.outlineIndexBuffer = new GLElementBuffer(false);
-		this.outlineIndexBuffer.uploadBuffer(boxOutlineBuffer, EDhApiGpuUploadMethod.DATA, BOX_OUTLINE_INDICES.length * Integer.BYTES, GL32.GL_STATIC_DRAW);
+		this.outlineIndexBuffer.uploadBuffer(boxOutlineBuffer, EDhApiGpuUploadMethod.DATA, BOX_OUTLINE_INDICES.length * Integer.BYTES, VulkanicAPI.GL_STATIC_DRAW);
 		
 	}
 	
@@ -179,7 +179,7 @@ public class DebugRenderer
 		
 		this.init();
 		
-		GL32.glPolygonMode(GL32.GL_FRONT_AND_BACK, GL32.GL_LINE);
+		VulkanicAPI.glPolygonMode(VulkanicAPI.GL_FRONT_AND_BACK, VulkanicAPI.GL_LINE);
 		GLMC.enableDepthTest();
 		
 		this.basicShader.bind();
@@ -203,7 +203,7 @@ public class DebugRenderer
 		
 		
 		// box rendering
-		GL32.glPolygonMode(GL32.GL_FRONT_AND_BACK, GL32.GL_FILL);
+		VulkanicAPI.glPolygonMode(VulkanicAPI.GL_FRONT_AND_BACK, VulkanicAPI.GL_FILL);
 		for (BoxParticle particle : this.particles)
 		{
 			this.renderBox(particle.getBox());
@@ -218,7 +218,7 @@ public class DebugRenderer
 		t.multiply(boxTransform);
 		this.basicShader.setUniform(this.basicShader.getUniformLocation("uTransform"), t);
 		this.basicShader.setUniform(this.basicShader.getUniformLocation("uColor"), box.color);
-		GL32.glDrawElements(GL32.GL_LINES, BOX_OUTLINE_INDICES.length, GL32.GL_UNSIGNED_INT, 0);
+		VulkanicAPI.glDrawElements(VulkanicAPI.GL_LINES, BOX_OUTLINE_INDICES.length, VulkanicAPI.GL_UNSIGNED_INT, 0);
 	}
 	
 	

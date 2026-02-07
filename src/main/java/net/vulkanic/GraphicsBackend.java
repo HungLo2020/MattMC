@@ -328,6 +328,7 @@ public interface GraphicsBackend {
     int glGetInteger(int pname);
     void glDeleteBuffers(int buffer);
     void glPolygonMode(int face, int mode);
+    void glViewport(int x, int y, int width, int height);
     void glDispatchComputeIndirect(long offset);
     void glBindBuffer(int target, int buffer);
     String glGetStringi(int name, int index);
