@@ -821,4 +821,445 @@ public class OpenGLBackend implements GraphicsBackend {
     public void popDebugGroup() {
         org.lwjgl.opengl.KHRDebug.glPopDebugGroup();
     }
+    
+    // Additional methods for IrisRenderSystem
+    
+    @Override
+    public void glGetIntegerv(int pname, int[] params) {
+        org.lwjgl.opengl.GL32C.glGetIntegerv(pname, params);
+    }
+    
+    @Override
+    public void glGetFloatv(int pname, float[] params) {
+        org.lwjgl.opengl.GL32C.glGetFloatv(pname, params);
+    }
+    
+    @Override
+    public void glTexImage1D(int target, int level, int internalformat, int width, int border, int format, int type, java.nio.ByteBuffer pixels) {
+        org.lwjgl.opengl.GL30C.glTexImage1D(target, level, internalformat, width, border, format, type, pixels);
+    }
+    
+    @Override
+    public void glTexImage2D(int target, int level, int internalformat, int width, int height, int border, int format, int type, java.nio.ByteBuffer pixels) {
+        org.lwjgl.opengl.GL32C.glTexImage2D(target, level, internalformat, width, height, border, format, type, pixels);
+    }
+    
+    @Override
+    public void glTexImage3D(int target, int level, int internalformat, int width, int height, int depth, int border, int format, int type, java.nio.ByteBuffer pixels) {
+        org.lwjgl.opengl.GL30C.glTexImage3D(target, level, internalformat, width, height, depth, border, format, type, pixels);
+    }
+    
+    @Override
+    public void glUniformMatrix4fv(int location, boolean transpose, java.nio.FloatBuffer matrix) {
+        org.lwjgl.opengl.GL32C.glUniformMatrix4fv(location, transpose, matrix);
+    }
+    
+    @Override
+    public void glUniformMatrix4fv(int location, boolean transpose, float[] matrix) {
+        org.lwjgl.opengl.GL32C.glUniformMatrix4fv(location, transpose, matrix);
+    }
+    
+    @Override
+    public void glCopyTexImage2D(int target, int level, int internalFormat, int x, int y, int width, int height, int border) {
+        org.lwjgl.opengl.GL32C.glCopyTexImage2D(target, level, internalFormat, x, y, width, height, border);
+    }
+    
+    @Override
+    public void glUniform1f(int location, float v0) {
+        org.lwjgl.opengl.GL32C.glUniform1f(location, v0);
+    }
+    
+    @Override
+    public void glUniform2f(int location, float v0, float v1) {
+        org.lwjgl.opengl.GL32C.glUniform2f(location, v0, v1);
+    }
+    
+    @Override
+    public void glUniform2i(int location, int v0, int v1) {
+        org.lwjgl.opengl.GL32C.glUniform2i(location, v0, v1);
+    }
+    
+    @Override
+    public void glUniform3f(int location, float v0, float v1, float v2) {
+        org.lwjgl.opengl.GL32C.glUniform3f(location, v0, v1, v2);
+    }
+    
+    @Override
+    public void glUniform3i(int location, int v0, int v1, int v2) {
+        org.lwjgl.opengl.GL32C.glUniform3i(location, v0, v1, v2);
+    }
+    
+    @Override
+    public void glUniform4f(int location, float v0, float v1, float v2, float v3) {
+        org.lwjgl.opengl.GL32C.glUniform4f(location, v0, v1, v2, v3);
+    }
+    
+    @Override
+    public void glUniform4i(int location, int v0, int v1, int v2, int v3) {
+        org.lwjgl.opengl.GL32C.glUniform4i(location, v0, v1, v2, v3);
+    }
+    
+    @Override
+    public void glTexParameteriv(int target, int pname, int[] params) {
+        org.lwjgl.opengl.GL32C.glTexParameteriv(target, pname, params);
+    }
+    
+    @Override
+    public void glTexParameteri(int target, int pname, int param) {
+        org.lwjgl.opengl.GL32C.glTexParameteri(target, pname, param);
+    }
+    
+    @Override
+    public void glTexParameterf(int target, int pname, float param) {
+        org.lwjgl.opengl.GL32C.glTexParameterf(target, pname, param);
+    }
+    
+    @Override
+    public String glGetProgramInfoLog(int program) {
+        return org.lwjgl.opengl.GL32C.glGetProgramInfoLog(program);
+    }
+    
+    @Override
+    public String glGetShaderInfoLog(int shader) {
+        return org.lwjgl.opengl.GL32C.glGetShaderInfoLog(shader);
+    }
+    
+    @Override
+    public void glDrawBuffers(int[] buffers) {
+        org.lwjgl.opengl.GL32C.glDrawBuffers(buffers);
+    }
+    
+    @Override
+    public void glReadBuffer(int buffer) {
+        org.lwjgl.opengl.GL32C.glReadBuffer(buffer);
+    }
+    
+    @Override
+    public void glClearBufferfv(int buffer, int drawbuffer, float[] values) {
+        org.lwjgl.opengl.GL32C.glClearBufferfv(buffer, drawbuffer, values);
+    }
+    
+    @Override
+    public void glClearBufferiv(int buffer, int drawbuffer, int[] values) {
+        org.lwjgl.opengl.GL32C.glClearBufferiv(buffer, drawbuffer, values);
+    }
+    
+    @Override
+    public void glClearBufferuiv(int buffer, int drawbuffer, int[] values) {
+        org.lwjgl.opengl.GL32C.glClearBufferuiv(buffer, drawbuffer, values);
+    }
+    
+    @Override
+    public String glGetActiveUniform(int program, int index, int size, java.nio.IntBuffer type, java.nio.IntBuffer name) {
+        return org.lwjgl.opengl.GL32C.glGetActiveUniform(program, index, size, type, name);
+    }
+    
+    @Override
+    public void glReadPixels(int x, int y, int width, int height, int format, int type, float[] pixels) {
+        org.lwjgl.opengl.GL32C.glReadPixels(x, y, width, height, format, type, pixels);
+    }
+    
+    @Override
+    public void glBufferData(int target, float[] data, int usage) {
+        org.lwjgl.opengl.GL32C.glBufferData(target, data, usage);
+    }
+    
+    @Override
+    public void glBufferStorage(int target, long size, int flags) {
+        org.lwjgl.opengl.GL45C.glBufferStorage(target, size, flags);
+    }
+    
+    @Override
+    public void glBindBufferBase(int target, int index, int buffer) {
+        org.lwjgl.opengl.GL43C.glBindBufferBase(target, index, buffer);
+    }
+    
+    @Override
+    public void glVertexAttrib4f(int index, float v0, float v1, float v2, float v3) {
+        org.lwjgl.opengl.GL32C.glVertexAttrib4f(index, v0, v1, v2, v3);
+    }
+    
+    @Override
+    public void glDetachShader(int program, int shader) {
+        org.lwjgl.opengl.GL32C.glDetachShader(program, shader);
+    }
+    
+    @Override
+    public void glFramebufferTexture2D(int target, int attachment, int textarget, int texture, int level) {
+        org.lwjgl.opengl.GL32C.glFramebufferTexture2D(target, attachment, textarget, texture, level);
+    }
+    
+    @Override
+    public int glGetTexParameteri(int target, int pname) {
+        return org.lwjgl.opengl.GL32C.glGetTexParameteri(target, pname);
+    }
+    
+    @Override
+    public void glBindImageTexture(int unit, int texture, int level, boolean layered, int layer, int access, int format) {
+        org.lwjgl.opengl.GLCapabilities caps = org.lwjgl.opengl.GL.getCapabilities();
+        if (caps.OpenGL42 || caps.GL_ARB_shader_image_load_store) {
+            org.lwjgl.opengl.GL42C.glBindImageTexture(unit, texture, level, layered, layer, access, format);
+        } else {
+            org.lwjgl.opengl.EXTShaderImageLoadStore.glBindImageTextureEXT(unit, texture, level, layered, layer, access, format);
+        }
+    }
+    
+    @Override
+    public int glGetMaxImageUnits() {
+        org.lwjgl.opengl.GLCapabilities caps = org.lwjgl.opengl.GL.getCapabilities();
+        if (caps.OpenGL42 || caps.GL_ARB_shader_image_load_store) {
+            return org.lwjgl.opengl.GL11.glGetInteger(org.lwjgl.opengl.GL42C.GL_MAX_IMAGE_UNITS);
+        } else if (caps.GL_EXT_shader_image_load_store) {
+            return org.lwjgl.opengl.GL11.glGetInteger(org.lwjgl.opengl.EXTShaderImageLoadStore.GL_MAX_IMAGE_UNITS_EXT);
+        } else {
+            return 0;
+        }
+    }
+    
+    @Override
+    public void glGenBuffers(int[] buffers) {
+        org.lwjgl.opengl.GL43C.glGenBuffers(buffers);
+    }
+    
+    @Override
+    public void glClearBufferSubData(int target, int internalformat, long offset, long size, int format, int type, int[] data) {
+        org.lwjgl.opengl.GL43C.glClearBufferSubData(target, internalformat, offset, size, format, type, data);
+    }
+    
+    @Override
+    public void glGetProgramiv(int program, int pname, int[] params) {
+        org.lwjgl.opengl.GL32C.glGetProgramiv(program, pname, params);
+    }
+    
+    @Override
+    public void glDispatchCompute(int workX, int workY, int workZ) {
+        org.lwjgl.opengl.GL45C.glDispatchCompute(workX, workY, workZ);
+    }
+    
+    @Override
+    public void glMemoryBarrier(int barriers) {
+        org.lwjgl.opengl.GL45C.glMemoryBarrier(barriers);
+    }
+    
+    @Override
+    public void glDisablei(int target, int index) {
+        org.lwjgl.opengl.GL32C.glDisablei(target, index);
+    }
+    
+    @Override
+    public void glEnablei(int target, int index) {
+        org.lwjgl.opengl.GL32C.glEnablei(target, index);
+    }
+    
+    @Override
+    public void glBlendFuncSeparatei(int buffer, int srcRGB, int dstRGB, int srcAlpha, int dstAlpha) {
+        org.lwjgl.opengl.ARBDrawBuffersBlend.glBlendFuncSeparateiARB(buffer, srcRGB, dstRGB, srcAlpha, dstAlpha);
+    }
+    
+    @Override
+    public int glGetUniformBlockIndex(int program, String uniformBlockName) {
+        return org.lwjgl.opengl.GL32C.glGetUniformBlockIndex(program, uniformBlockName);
+    }
+    
+    @Override
+    public void glUniformBlockBinding(int program, int uniformBlockIndex, int uniformBlockBinding) {
+        org.lwjgl.opengl.GL32C.glUniformBlockBinding(program, uniformBlockIndex, uniformBlockBinding);
+    }
+    
+    @Override
+    public int glGenSamplers() {
+        return org.lwjgl.opengl.GL33C.glGenSamplers();
+    }
+    
+    @Override
+    public void glDeleteSamplers(int sampler) {
+        org.lwjgl.opengl.GL33C.glDeleteSamplers(sampler);
+    }
+    
+    @Override
+    public void glBindSampler(int unit, int sampler) {
+        org.lwjgl.opengl.GL33C.glBindSampler(unit, sampler);
+    }
+    
+    @Override
+    public void glBindSamplers(int first, int[] samplers) {
+        org.lwjgl.opengl.GL45C.glBindSamplers(first, samplers);
+    }
+    
+    @Override
+    public void glSamplerParameteri(int sampler, int pname, int param) {
+        org.lwjgl.opengl.GL33C.glSamplerParameteri(sampler, pname, param);
+    }
+    
+    @Override
+    public void glSamplerParameterf(int sampler, int pname, float param) {
+        org.lwjgl.opengl.GL33C.glSamplerParameterf(sampler, pname, param);
+    }
+    
+    @Override
+    public void glSamplerParameteriv(int sampler, int pname, int[] params) {
+        org.lwjgl.opengl.GL33C.glSamplerParameteriv(sampler, pname, params);
+    }
+    
+    @Override
+    public int glGetInteger(int pname) {
+        return org.lwjgl.opengl.GL32C.glGetInteger(pname);
+    }
+    
+    @Override
+    public void glDeleteBuffers(int buffer) {
+        org.lwjgl.opengl.GL43C.glDeleteBuffers(buffer);
+    }
+    
+    @Override
+    public void glPolygonMode(int face, int mode) {
+        org.lwjgl.opengl.GL43C.glPolygonMode(face, mode);
+    }
+    
+    @Override
+    public void glDispatchComputeIndirect(long offset) {
+        org.lwjgl.opengl.GL43C.glDispatchComputeIndirect(offset);
+    }
+    
+    @Override
+    public void glBindBuffer(int target, int buffer) {
+        org.lwjgl.opengl.GL46C.glBindBuffer(target, buffer);
+    }
+    
+    @Override
+    public String glGetStringi(int name, int index) {
+        return org.lwjgl.opengl.GL46C.glGetStringi(name, index);
+    }
+    
+    @Override
+    public void glCopyImageSubData(int srcName, int srcTarget, int srcLevel, int srcX, int srcY, int srcZ, int dstName, int dstTarget, int dstLevel, int dstX, int dstY, int dstZ, int width, int height, int depth) {
+        org.lwjgl.opengl.GL46C.glCopyImageSubData(srcName, srcTarget, srcLevel, srcX, srcY, srcZ, dstName, dstTarget, dstLevel, dstX, dstY, dstZ, width, height, depth);
+    }
+    
+    @Override
+    public int glCheckFramebufferStatus(int target) {
+        return org.lwjgl.opengl.GL46C.glCheckFramebufferStatus(target);
+    }
+    
+    @Override
+    public void glUniformMatrix3fv(int location, boolean transpose, java.nio.FloatBuffer value) {
+        org.lwjgl.opengl.GL46C.glUniformMatrix3fv(location, transpose, value);
+    }
+    
+    @Override
+    public void glUniformMatrix3fv(int location, boolean transpose, float[] value) {
+        org.lwjgl.opengl.GL46C.glUniformMatrix3fv(location, transpose, value);
+    }
+    
+    @Override
+    public void glClearColor(float r, float g, float b, float a) {
+        org.lwjgl.opengl.GL46C.glClearColor(r, g, b, a);
+    }
+    
+    @Override
+    public int glGetAttribLocation(int program, String name) {
+        return org.lwjgl.opengl.GL46C.glGetAttribLocation(program, name);
+    }
+    
+    @Override
+    public void glGenerateMipmap(int target) {
+        org.lwjgl.opengl.GL32C.glGenerateMipmap(target);
+    }
+    
+    @Override
+    public void glBlitFramebuffer(int srcX0, int srcY0, int srcX1, int srcY1, int dstX0, int dstY0, int dstX1, int dstY1, int mask, int filter) {
+        org.lwjgl.opengl.GL32C.glBlitFramebuffer(srcX0, srcY0, srcX1, srcY1, dstX0, dstY0, dstX1, dstY1, mask, filter);
+    }
+    
+    // DSA methods
+    
+    @Override
+    public void glGenerateTextureMipmap(int texture) {
+        org.lwjgl.opengl.ARBDirectStateAccess.glGenerateTextureMipmap(texture);
+    }
+    
+    @Override
+    public void glTextureParameteri(int texture, int pname, int param) {
+        org.lwjgl.opengl.ARBDirectStateAccess.glTextureParameteri(texture, pname, param);
+    }
+    
+    @Override
+    public void glTextureParameterf(int texture, int pname, float param) {
+        org.lwjgl.opengl.ARBDirectStateAccess.glTextureParameterf(texture, pname, param);
+    }
+    
+    @Override
+    public void glTextureParameteriv(int texture, int pname, int[] params) {
+        org.lwjgl.opengl.ARBDirectStateAccess.glTextureParameteriv(texture, pname, params);
+    }
+    
+    @Override
+    public void glNamedFramebufferReadBuffer(int framebuffer, int mode) {
+        org.lwjgl.opengl.ARBDirectStateAccess.glNamedFramebufferReadBuffer(framebuffer, mode);
+    }
+    
+    @Override
+    public void glNamedFramebufferDrawBuffers(int framebuffer, int[] bufs) {
+        org.lwjgl.opengl.ARBDirectStateAccess.glNamedFramebufferDrawBuffers(framebuffer, bufs);
+    }
+    
+    @Override
+    public void glClearNamedFramebufferfv(int framebuffer, int buffer, int drawbuffer, float[] value) {
+        org.lwjgl.opengl.ARBDirectStateAccess.glClearNamedFramebufferfv(framebuffer, buffer, drawbuffer, value);
+    }
+    
+    @Override
+    public void glClearNamedFramebufferiv(int framebuffer, int buffer, int drawbuffer, int[] value) {
+        org.lwjgl.opengl.ARBDirectStateAccess.glClearNamedFramebufferiv(framebuffer, buffer, drawbuffer, value);
+    }
+    
+    @Override
+    public void glClearNamedFramebufferuiv(int framebuffer, int buffer, int drawbuffer, int[] value) {
+        org.lwjgl.opengl.ARBDirectStateAccess.glClearNamedFramebufferuiv(framebuffer, buffer, drawbuffer, value);
+    }
+    
+    @Override
+    public int glGetTextureParameteri(int texture, int pname) {
+        return org.lwjgl.opengl.ARBDirectStateAccess.glGetTextureParameteri(texture, pname);
+    }
+    
+    @Override
+    public void glCopyTextureSubImage2D(int texture, int level, int xoffset, int yoffset, int x, int y, int width, int height) {
+        org.lwjgl.opengl.ARBDirectStateAccess.glCopyTextureSubImage2D(texture, level, xoffset, yoffset, x, y, width, height);
+    }
+    
+    @Override
+    public void glBindTextureUnit(int unit, int texture) {
+        org.lwjgl.opengl.ARBDirectStateAccess.glBindTextureUnit(unit, texture);
+    }
+    
+    @Override
+    public int glCreateBuffers() {
+        return org.lwjgl.opengl.ARBDirectStateAccess.glCreateBuffers();
+    }
+    
+    @Override
+    public void glNamedBufferData(int buffer, float[] data, int usage) {
+        org.lwjgl.opengl.GL45C.glNamedBufferData(buffer, data, usage);
+    }
+    
+    @Override
+    public void glBlitNamedFramebuffer(int readFramebuffer, int drawFramebuffer, int srcX0, int srcY0, int srcX1, int srcY1, int dstX0, int dstY0, int dstX1, int dstY1, int mask, int filter) {
+        org.lwjgl.opengl.ARBDirectStateAccess.glBlitNamedFramebuffer(readFramebuffer, drawFramebuffer, srcX0, srcY0, srcX1, srcY1, dstX0, dstY0, dstX1, dstY1, mask, filter);
+    }
+    
+    @Override
+    public void glNamedFramebufferTexture(int framebuffer, int attachment, int texture, int level) {
+        org.lwjgl.opengl.ARBDirectStateAccess.glNamedFramebufferTexture(framebuffer, attachment, texture, level);
+    }
+    
+    @Override
+    public int glCreateFramebuffers() {
+        return org.lwjgl.opengl.ARBDirectStateAccess.glCreateFramebuffers();
+    }
+    
+    @Override
+    public int glCreateTextures(int target) {
+        return org.lwjgl.opengl.ARBDirectStateAccess.glCreateTextures(target);
+    }
 }

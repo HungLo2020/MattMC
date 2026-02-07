@@ -110,6 +110,9 @@ public class VulkanicAPI {
     public static final int GL_MAX_COLOR_ATTACHMENTS = 0x8CDF;
     public static final int GL_NONE = 0;
     
+    // OpenGL Constants - Blend State
+    public static final int GL_BLEND = 0x0BE2;
+    
     // OpenGL Constants - Texture Parameters
     public static final int GL_TEXTURE_MIN_FILTER = 0x2801;
     public static final int GL_TEXTURE_MAG_FILTER = 0x2800;
@@ -134,9 +137,14 @@ public class VulkanicAPI {
     public static final int GL_TEXTURE_FETCH_BARRIER_BIT = 0x00000008;
     public static final int GL_SHADER_STORAGE_BARRIER_BIT = 0x00002000;
     public static final int GL_DISPATCH_INDIRECT_BUFFER = 0x90EE;
+    public static final int GL_MAX_IMAGE_UNITS = 0x8F38;
+    public static final int GL_MAX_IMAGE_UNITS_EXT = 0x8F38;
     
     // OpenGL Constants - Image/Texture Formats
     public static final int GL_RED = 0x1903;
+    public static final int GL_GREEN = 0x1904;
+    public static final int GL_BLUE = 0x1905;
+    public static final int GL_ALPHA = 0x1906;
     public static final int GL_BYTE = 0x1400;
     public static final int GL_R8 = 0x8229;
     
@@ -175,6 +183,13 @@ public class VulkanicAPI {
     
     // OpenGL Constants - Fog Modes
     public static final int GL_EXP2 = 0x0801;
+    
+    // OpenGL Constants - Polygon Mode
+    public static final int GL_FILL = 0x1B02;
+    public static final int GL_FRONT_AND_BACK = 0x0408;
+    
+    // OpenGL Constants - GPU Memory Info (NVX)
+    public static final int GL_GPU_MEMORY_INFO_CURRENT_AVAILABLE_VIDMEM_NVX = 0x9049;
     
     // OpenGL Constants - Texture Level Parameters
     public static final int GL_TEXTURE_INTERNAL_FORMAT = 0x1003;
@@ -856,5 +871,349 @@ public class VulkanicAPI {
     
     public static void popDebugGroup() {
         getBackend().popDebugGroup();
+    }
+    
+    // Additional methods for IrisRenderSystem migration
+    
+    public static void glGetIntegerv(int pname, int[] params) {
+        getBackend().glGetIntegerv(pname, params);
+    }
+    
+    public static void glGetFloatv(int pname, float[] params) {
+        getBackend().glGetFloatv(pname, params);
+    }
+    
+    public static void glTexImage1D(int target, int level, int internalformat, int width, int border, int format, int type, java.nio.ByteBuffer pixels) {
+        getBackend().glTexImage1D(target, level, internalformat, width, border, format, type, pixels);
+    }
+    
+    public static void glTexImage2D(int target, int level, int internalformat, int width, int height, int border, int format, int type, java.nio.ByteBuffer pixels) {
+        getBackend().glTexImage2D(target, level, internalformat, width, height, border, format, type, pixels);
+    }
+    
+    public static void glTexImage3D(int target, int level, int internalformat, int width, int height, int depth, int border, int format, int type, java.nio.ByteBuffer pixels) {
+        getBackend().glTexImage3D(target, level, internalformat, width, height, depth, border, format, type, pixels);
+    }
+    
+    public static void glUniformMatrix4fv(int location, boolean transpose, java.nio.FloatBuffer matrix) {
+        getBackend().glUniformMatrix4fv(location, transpose, matrix);
+    }
+    
+    public static void glUniformMatrix4fv(int location, boolean transpose, float[] matrix) {
+        getBackend().glUniformMatrix4fv(location, transpose, matrix);
+    }
+    
+    public static void glCopyTexImage2D(int target, int level, int internalFormat, int x, int y, int width, int height, int border) {
+        getBackend().glCopyTexImage2D(target, level, internalFormat, x, y, width, height, border);
+    }
+    
+    public static void glUniform1f(int location, float v0) {
+        getBackend().glUniform1f(location, v0);
+    }
+    
+    public static void glUniform2f(int location, float v0, float v1) {
+        getBackend().glUniform2f(location, v0, v1);
+    }
+    
+    public static void glUniform2i(int location, int v0, int v1) {
+        getBackend().glUniform2i(location, v0, v1);
+    }
+    
+    public static void glUniform3f(int location, float v0, float v1, float v2) {
+        getBackend().glUniform3f(location, v0, v1, v2);
+    }
+    
+    public static void glUniform3i(int location, int v0, int v1, int v2) {
+        getBackend().glUniform3i(location, v0, v1, v2);
+    }
+    
+    public static void glUniform4f(int location, float v0, float v1, float v2, float v3) {
+        getBackend().glUniform4f(location, v0, v1, v2, v3);
+    }
+    
+    public static void glUniform4i(int location, int v0, int v1, int v2, int v3) {
+        getBackend().glUniform4i(location, v0, v1, v2, v3);
+    }
+    
+    public static void glTexParameteriv(int target, int pname, int[] params) {
+        getBackend().glTexParameteriv(target, pname, params);
+    }
+    
+    public static void glTexParameteri(int target, int pname, int param) {
+        getBackend().glTexParameteri(target, pname, param);
+    }
+    
+    public static void glTexParameterf(int target, int pname, float param) {
+        getBackend().glTexParameterf(target, pname, param);
+    }
+    
+    public static String glGetProgramInfoLog(int program) {
+        return getBackend().glGetProgramInfoLog(program);
+    }
+    
+    public static String glGetShaderInfoLog(int shader) {
+        return getBackend().glGetShaderInfoLog(shader);
+    }
+    
+    public static void glDrawBuffers(int[] buffers) {
+        getBackend().glDrawBuffers(buffers);
+    }
+    
+    public static void glReadBuffer(int buffer) {
+        getBackend().glReadBuffer(buffer);
+    }
+    
+    public static void glClearBufferfv(int buffer, int drawbuffer, float[] values) {
+        getBackend().glClearBufferfv(buffer, drawbuffer, values);
+    }
+    
+    public static void glClearBufferiv(int buffer, int drawbuffer, int[] values) {
+        getBackend().glClearBufferiv(buffer, drawbuffer, values);
+    }
+    
+    public static void glClearBufferuiv(int buffer, int drawbuffer, int[] values) {
+        getBackend().glClearBufferuiv(buffer, drawbuffer, values);
+    }
+    
+    public static String glGetActiveUniform(int program, int index, int size, java.nio.IntBuffer type, java.nio.IntBuffer name) {
+        return getBackend().glGetActiveUniform(program, index, size, type, name);
+    }
+    
+    public static void glReadPixels(int x, int y, int width, int height, int format, int type, float[] pixels) {
+        getBackend().glReadPixels(x, y, width, height, format, type, pixels);
+    }
+    
+    public static void glBufferData(int target, float[] data, int usage) {
+        getBackend().glBufferData(target, data, usage);
+    }
+    
+    public static void glBufferStorage(int target, long size, int flags) {
+        getBackend().glBufferStorage(target, size, flags);
+    }
+    
+    public static void glBindBufferBase(int target, int index, int buffer) {
+        getBackend().glBindBufferBase(target, index, buffer);
+    }
+    
+    public static void glVertexAttrib4f(int index, float v0, float v1, float v2, float v3) {
+        getBackend().glVertexAttrib4f(index, v0, v1, v2, v3);
+    }
+    
+    public static void glDetachShader(int program, int shader) {
+        getBackend().glDetachShader(program, shader);
+    }
+    
+    public static void glFramebufferTexture2D(int target, int attachment, int textarget, int texture, int level) {
+        getBackend().glFramebufferTexture2D(target, attachment, textarget, texture, level);
+    }
+    
+    public static int glGetTexParameteri(int target, int pname) {
+        return getBackend().glGetTexParameteri(target, pname);
+    }
+    
+    public static void glBindImageTexture(int unit, int texture, int level, boolean layered, int layer, int access, int format) {
+        getBackend().glBindImageTexture(unit, texture, level, layered, layer, access, format);
+    }
+    
+    public static int glGetMaxImageUnits() {
+        return getBackend().glGetMaxImageUnits();
+    }
+    
+    public static void glGenBuffers(int[] buffers) {
+        getBackend().glGenBuffers(buffers);
+    }
+    
+    public static void glClearBufferSubData(int target, int internalformat, long offset, long size, int format, int type, int[] data) {
+        getBackend().glClearBufferSubData(target, internalformat, offset, size, format, type, data);
+    }
+    
+    public static void glGetProgramiv(int program, int pname, int[] params) {
+        getBackend().glGetProgramiv(program, pname, params);
+    }
+    
+    public static void glDispatchCompute(int workX, int workY, int workZ) {
+        getBackend().glDispatchCompute(workX, workY, workZ);
+    }
+    
+    public static void glMemoryBarrier(int barriers) {
+        getBackend().glMemoryBarrier(barriers);
+    }
+    
+    public static void glDisablei(int target, int index) {
+        getBackend().glDisablei(target, index);
+    }
+    
+    public static void glEnablei(int target, int index) {
+        getBackend().glEnablei(target, index);
+    }
+    
+    public static void glBlendFuncSeparatei(int buffer, int srcRGB, int dstRGB, int srcAlpha, int dstAlpha) {
+        getBackend().glBlendFuncSeparatei(buffer, srcRGB, dstRGB, srcAlpha, dstAlpha);
+    }
+    
+    public static int glGetUniformBlockIndex(int program, String uniformBlockName) {
+        return getBackend().glGetUniformBlockIndex(program, uniformBlockName);
+    }
+    
+    public static void glUniformBlockBinding(int program, int uniformBlockIndex, int uniformBlockBinding) {
+        getBackend().glUniformBlockBinding(program, uniformBlockIndex, uniformBlockBinding);
+    }
+    
+    public static int glGenSamplers() {
+        return getBackend().glGenSamplers();
+    }
+    
+    public static void glDeleteSamplers(int sampler) {
+        getBackend().glDeleteSamplers(sampler);
+    }
+    
+    public static void glBindSampler(int unit, int sampler) {
+        getBackend().glBindSampler(unit, sampler);
+    }
+    
+    public static void glBindSamplers(int first, int[] samplers) {
+        getBackend().glBindSamplers(first, samplers);
+    }
+    
+    public static void glSamplerParameteri(int sampler, int pname, int param) {
+        getBackend().glSamplerParameteri(sampler, pname, param);
+    }
+    
+    public static void glSamplerParameterf(int sampler, int pname, float param) {
+        getBackend().glSamplerParameterf(sampler, pname, param);
+    }
+    
+    public static void glSamplerParameteriv(int sampler, int pname, int[] params) {
+        getBackend().glSamplerParameteriv(sampler, pname, params);
+    }
+    
+    public static int glGetInteger(int pname) {
+        return getBackend().glGetInteger(pname);
+    }
+    
+    public static void glDeleteBuffers(int buffer) {
+        getBackend().glDeleteBuffers(buffer);
+    }
+    
+    public static void glPolygonMode(int face, int mode) {
+        getBackend().glPolygonMode(face, mode);
+    }
+    
+    public static void glDispatchComputeIndirect(long offset) {
+        getBackend().glDispatchComputeIndirect(offset);
+    }
+    
+    public static void glBindBuffer(int target, int buffer) {
+        getBackend().glBindBuffer(target, buffer);
+    }
+    
+    public static String glGetStringi(int name, int index) {
+        return getBackend().glGetStringi(name, index);
+    }
+    
+    public static void glCopyImageSubData(int srcName, int srcTarget, int srcLevel, int srcX, int srcY, int srcZ, int dstName, int dstTarget, int dstLevel, int dstX, int dstY, int dstZ, int width, int height, int depth) {
+        getBackend().glCopyImageSubData(srcName, srcTarget, srcLevel, srcX, srcY, srcZ, dstName, dstTarget, dstLevel, dstX, dstY, dstZ, width, height, depth);
+    }
+    
+    public static int glCheckFramebufferStatus(int target) {
+        return getBackend().glCheckFramebufferStatus(target);
+    }
+    
+    public static void glUniformMatrix3fv(int location, boolean transpose, java.nio.FloatBuffer value) {
+        getBackend().glUniformMatrix3fv(location, transpose, value);
+    }
+    
+    public static void glUniformMatrix3fv(int location, boolean transpose, float[] value) {
+        getBackend().glUniformMatrix3fv(location, transpose, value);
+    }
+    
+    public static void glClearColor(float r, float g, float b, float a) {
+        getBackend().glClearColor(r, g, b, a);
+    }
+    
+    public static int glGetAttribLocation(int program, String name) {
+        return getBackend().glGetAttribLocation(program, name);
+    }
+    
+    public static void glGenerateMipmap(int target) {
+        getBackend().glGenerateMipmap(target);
+    }
+    
+    public static void glBlitFramebuffer(int srcX0, int srcY0, int srcX1, int srcY1, int dstX0, int dstY0, int dstX1, int dstY1, int mask, int filter) {
+        getBackend().glBlitFramebuffer(srcX0, srcY0, srcX1, srcY1, dstX0, dstY0, dstX1, dstY1, mask, filter);
+    }
+    
+    // DSA (Direct State Access) methods - ARB versions
+    
+    public static void glGenerateTextureMipmap(int texture) {
+        getBackend().glGenerateTextureMipmap(texture);
+    }
+    
+    public static void glTextureParameteri(int texture, int pname, int param) {
+        getBackend().glTextureParameteri(texture, pname, param);
+    }
+    
+    public static void glTextureParameterf(int texture, int pname, float param) {
+        getBackend().glTextureParameterf(texture, pname, param);
+    }
+    
+    public static void glTextureParameteriv(int texture, int pname, int[] params) {
+        getBackend().glTextureParameteriv(texture, pname, params);
+    }
+    
+    public static void glNamedFramebufferReadBuffer(int framebuffer, int mode) {
+        getBackend().glNamedFramebufferReadBuffer(framebuffer, mode);
+    }
+    
+    public static void glNamedFramebufferDrawBuffers(int framebuffer, int[] bufs) {
+        getBackend().glNamedFramebufferDrawBuffers(framebuffer, bufs);
+    }
+    
+    public static void glClearNamedFramebufferfv(int framebuffer, int buffer, int drawbuffer, float[] value) {
+        getBackend().glClearNamedFramebufferfv(framebuffer, buffer, drawbuffer, value);
+    }
+    
+    public static void glClearNamedFramebufferiv(int framebuffer, int buffer, int drawbuffer, int[] value) {
+        getBackend().glClearNamedFramebufferiv(framebuffer, buffer, drawbuffer, value);
+    }
+    
+    public static void glClearNamedFramebufferuiv(int framebuffer, int buffer, int drawbuffer, int[] value) {
+        getBackend().glClearNamedFramebufferuiv(framebuffer, buffer, drawbuffer, value);
+    }
+    
+    public static int glGetTextureParameteri(int texture, int pname) {
+        return getBackend().glGetTextureParameteri(texture, pname);
+    }
+    
+    public static void glCopyTextureSubImage2D(int texture, int level, int xoffset, int yoffset, int x, int y, int width, int height) {
+        getBackend().glCopyTextureSubImage2D(texture, level, xoffset, yoffset, x, y, width, height);
+    }
+    
+    public static void glBindTextureUnit(int unit, int texture) {
+        getBackend().glBindTextureUnit(unit, texture);
+    }
+    
+    public static int glCreateBuffers() {
+        return getBackend().glCreateBuffers();
+    }
+    
+    public static void glNamedBufferData(int buffer, float[] data, int usage) {
+        getBackend().glNamedBufferData(buffer, data, usage);
+    }
+    
+    public static void glBlitNamedFramebuffer(int readFramebuffer, int drawFramebuffer, int srcX0, int srcY0, int srcX1, int srcY1, int dstX0, int dstY0, int dstX1, int dstY1, int mask, int filter) {
+        getBackend().glBlitNamedFramebuffer(readFramebuffer, drawFramebuffer, srcX0, srcY0, srcX1, srcY1, dstX0, dstY0, dstX1, dstY1, mask, filter);
+    }
+    
+    public static void glNamedFramebufferTexture(int framebuffer, int attachment, int texture, int level) {
+        getBackend().glNamedFramebufferTexture(framebuffer, attachment, texture, level);
+    }
+    
+    public static int glCreateFramebuffers() {
+        return getBackend().glCreateFramebuffers();
+    }
+    
+    public static int glCreateTextures(int target) {
+        return getBackend().glCreateTextures(target);
     }
 }

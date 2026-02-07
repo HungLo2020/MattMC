@@ -36,6 +36,13 @@ public class GraphicsCapabilities {
     public final boolean GL_ARB_timer_query;
     public final boolean GL_KHR_parallel_shader_compile;
     public final boolean GL_ARB_parallel_shader_compile;
+    public final boolean GL_ARB_multi_bind;
+    public final boolean GL_ARB_tessellation_shader;
+    public final boolean GL_ARB_shader_storage_buffer_object;
+    public final boolean GL_ARB_shader_image_load_store;
+    public final boolean GL_EXT_shader_image_load_store;
+    public final boolean GL_ARB_draw_buffers_blend;
+    public final boolean GL_NVX_gpu_memory_info;
     
     /**
      * Creates a GraphicsCapabilities instance by wrapping the underlying OpenGL capabilities.
@@ -71,5 +78,12 @@ public class GraphicsCapabilities {
         this.GL_ARB_timer_query = glCaps.GL_ARB_timer_query;
         this.GL_KHR_parallel_shader_compile = glCaps.GL_KHR_parallel_shader_compile;
         this.GL_ARB_parallel_shader_compile = glCaps.GL_ARB_parallel_shader_compile;
+        this.GL_ARB_multi_bind = glCaps.GL_ARB_multi_bind;
+        this.GL_ARB_tessellation_shader = glCaps.GL_ARB_tessellation_shader;
+        this.GL_ARB_shader_storage_buffer_object = glCaps.GL_ARB_shader_storage_buffer_object;
+        this.GL_ARB_shader_image_load_store = glCaps.GL_ARB_shader_image_load_store;
+        this.GL_EXT_shader_image_load_store = glCaps.GL_EXT_shader_image_load_store;
+        this.GL_ARB_draw_buffers_blend = glCaps.GL_ARB_draw_buffers_blend;
+        this.GL_NVX_gpu_memory_info = glCaps.GL_NVX_gpu_memory_info;
     }
 }
