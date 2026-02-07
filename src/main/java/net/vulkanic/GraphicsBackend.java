@@ -351,4 +351,10 @@ public interface GraphicsBackend {
     // Debug callback methods
     void glDebugMessageControl(int source, int type, int severity, int[] ids, boolean enabled);
     void glDebugMessageCallback(org.lwjgl.opengl.GLDebugMessageCallback callback, long userParam);
+    void glDebugMessageCallbackKHR(org.lwjgl.opengl.GLDebugMessageCallback callback, long userParam);
+    void glDebugMessageControlKHR(int source, int type, int severity, int[] ids, boolean enabled);
+    void glDebugMessageCallbackARB(org.lwjgl.opengl.GLDebugMessageARBCallback callback, long userParam);
+    void glDebugMessageControlARB(int source, int type, int severity, int[] ids, boolean enabled);
+    void glDebugMessageCallbackAMD(org.lwjgl.opengl.GLDebugMessageAMDCallback callback, long userParam);
+    void glDebugMessageEnableAMD(int category, int severity, int[] ids, boolean enabled);
 }

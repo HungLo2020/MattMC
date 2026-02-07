@@ -1232,4 +1232,28 @@ public class VulkanicAPI {
     public static void glDebugMessageCallback(org.lwjgl.opengl.GLDebugMessageCallback callback, long userParam) {
         getBackend().glDebugMessageCallback(callback, userParam);
     }
+    
+    public static void glDebugMessageCallbackKHR(org.lwjgl.opengl.GLDebugMessageCallback callback, long userParam) {
+        getBackend().glDebugMessageCallbackKHR(callback, userParam);
+    }
+    
+    public static void glDebugMessageControlKHR(int source, int type, int severity, int[] ids, boolean enabled) {
+        getBackend().glDebugMessageControlKHR(source, type, severity, ids, enabled);
+    }
+    
+    public static void glDebugMessageCallbackARB(org.lwjgl.opengl.GLDebugMessageARBCallback callback, long userParam) {
+        getBackend().glDebugMessageCallbackARB(callback, userParam);
+    }
+    
+    public static void glDebugMessageControlARB(int source, int type, int severity, int[] ids, boolean enabled) {
+        getBackend().glDebugMessageControlARB(source, type, severity, ids, enabled);
+    }
+    
+    public static void glDebugMessageCallbackAMD(org.lwjgl.opengl.GLDebugMessageAMDCallback callback, long userParam) {
+        getBackend().glDebugMessageCallbackAMD(callback, userParam);
+    }
+    
+    public static void glDebugMessageEnableAMD(int category, int severity, int[] ids, boolean enabled) {
+        getBackend().glDebugMessageEnableAMD(category, severity, ids, enabled);
+    }
 }
