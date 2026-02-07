@@ -384,6 +384,16 @@ public class OpenGLBackend implements GraphicsBackend {
     }
     
     @Override
+    public void deactivateVertexAttribute(int index) {
+        GL20.glDisableVertexAttribArray(index);
+    }
+    
+    @Override
+    public void setVertexAttribDivisor(int index, int divisor) {
+        org.lwjgl.opengl.GL33.glVertexAttribDivisor(index, divisor);
+    }
+    
+    @Override
     public String retrieveProgramInfoLog(int program) {
         return GL20.glGetProgramInfoLog(program);
     }

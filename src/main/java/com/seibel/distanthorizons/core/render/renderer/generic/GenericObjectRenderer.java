@@ -31,9 +31,7 @@ import com.seibel.distanthorizons.coreapi.DependencyInjection.OverrideInjector;
 import com.seibel.distanthorizons.coreapi.ModInfo;
 import org.apache.logging.log4j.LogManager;
 import com.seibel.distanthorizons.core.logging.DhLogger;
-import org.lwjgl.opengl.ARBInstancedArrays;
-import org.lwjgl.opengl.GL32;
-import org.lwjgl.opengl.GL33;
+import net.vulkanic.VulkanicAPI;
 import org.lwjgl.system.MemoryUtil;
 
 import java.awt.*;
@@ -213,7 +211,7 @@ public class GenericObjectRenderer implements IDhApiCustomRenderRegister
 		solidIndexBuffer.asIntBuffer().put(BOX_INDICES);
 		solidIndexBuffer.rewind();
 		this.boxIndexBuffer = new GLElementBuffer(false);
-		this.boxIndexBuffer.uploadBuffer(solidIndexBuffer, EDhApiGpuUploadMethod.DATA, BOX_INDICES.length * Integer.BYTES, GL32.GL_STATIC_DRAW);
+		this.boxIndexBuffer.uploadBuffer(solidIndexBuffer, EDhApiGpuUploadMethod.DATA, BOX_INDICES.length * Integer.BYTES, VulkanicAPI.GL_STATIC_DRAW);
 		this.boxIndexBuffer.bind();
 		MemoryUtil.memFree(solidIndexBuffer);
 	}
@@ -381,18 +379,18 @@ public class GenericObjectRenderer implements IDhApiCustomRenderRegister
 		boolean renderWireframe = Config.Client.Advanced.Debugging.renderWireframe.get();
 		if (renderWireframe)
 		{
-			GL32.glPolygonMode(GL32.GL_FRONT_AND_BACK, GL32.GL_LINE);
+			VulkanicAPI.glPolygonMode(VulkanicAPI.GL_FRONT_AND_BACK, VulkanicAPI.GL_LINE);
 			GLMC.disableFaceCulling();
 		}
 		else
 		{
-			GL32.glPolygonMode(GL32.GL_FRONT_AND_BACK, GL32.GL_FILL);
+			VulkanicAPI.glPolygonMode(VulkanicAPI.GL_FRONT_AND_BACK, VulkanicAPI.GL_FILL);
 			GLMC.enableFaceCulling();
 		}
 		
 		GLMC.enableBlend();
-		GL32.glBlendEquation(GL32.GL_FUNC_ADD);
-		GLMC.glBlendFuncSeparate(GL32.GL_SRC_ALPHA, GL32.GL_ONE_MINUS_SRC_ALPHA, GL32.GL_ONE, GL32.GL_ONE_MINUS_SRC_ALPHA);
+		VulkanicAPI.glBlendEquation(VulkanicAPI.GL_FUNC_ADD);
+		GLMC.glBlendFuncSeparate(VulkanicAPI.GL_SRC_ALPHA, VulkanicAPI.GL_ONE_MINUS_SRC_ALPHA, VulkanicAPI.GL_ONE, VulkanicAPI.GL_ONE_MINUS_SRC_ALPHA);
 		
 		IDhApiGenericObjectShaderProgram shaderProgram = useInstancedRendering ? this.instancedShaderProgram : this.directShaderProgram;
 		IDhApiGenericObjectShaderProgram shaderProgramOverride = OverrideInjector.INSTANCE.get(IDhApiGenericObjectShaderProgram.class);
@@ -478,7 +476,7 @@ public class GenericObjectRenderer implements IDhApiCustomRenderRegister
 		if (renderWireframe)
 		{
 			// default back to GL_FILL since all other rendering uses it 
-			GL32.glPolygonMode(GL32.GL_FRONT_AND_BACK, GL32.GL_FILL);
+			VulkanicAPI.glPolygonMode(VulkanicAPI.GL_FRONT_AND_BACK, VulkanicAPI.GL_FILL);
 			GLMC.enableFaceCulling();
 		}
 		
@@ -519,48 +517,48 @@ public class GenericObjectRenderer implements IDhApiCustomRenderRegister
 		// Bind instance data //
 		profiler.popPush("binding");
 		
-		GL32.glBindBuffer(GL32.GL_ARRAY_BUFFER, boxGroup.instanceColorVbo);
-		GL32.glEnableVertexAttribArray(1);
-		GL32.glVertexAttribPointer(1, 4, GL32.GL_FLOAT, false, 4 * Float.BYTES, 0);
+		VulkanicAPI.glBindBuffer(VulkanicAPI.GL_ARRAY_BUFFER, boxGroup.instanceColorVbo);
+		VulkanicAPI.activateVertexAttribute(1);
+		VulkanicAPI.configureVertexAttribute(1, 4, VulkanicAPI.GL_FLOAT, false, 4 * Float.BYTES, 0);
 		this.vertexAttribDivisor(1, 1);
 		
-		GL32.glBindBuffer(GL32.GL_ARRAY_BUFFER, boxGroup.instanceScaleVbo);
-		GL32.glEnableVertexAttribArray(2);
+		VulkanicAPI.glBindBuffer(VulkanicAPI.GL_ARRAY_BUFFER, boxGroup.instanceScaleVbo);
+		VulkanicAPI.activateVertexAttribute(2);
 		this.vertexAttribDivisor(2, 1);
-		GL32.glVertexAttribPointer(2, 3, GL32.GL_FLOAT, false, 3 * Float.BYTES, 0);
+		VulkanicAPI.configureVertexAttribute(2, 3, VulkanicAPI.GL_FLOAT, false, 3 * Float.BYTES, 0);
 		
-		GL32.glBindBuffer(GL32.GL_ARRAY_BUFFER, boxGroup.instanceChunkPosVbo);
-		GL32.glEnableVertexAttribArray(3);
+		VulkanicAPI.glBindBuffer(VulkanicAPI.GL_ARRAY_BUFFER, boxGroup.instanceChunkPosVbo);
+		VulkanicAPI.activateVertexAttribute(3);
 		this.vertexAttribDivisor(3, 1);
-		GL32.glVertexAttribIPointer(3, 3, GL32.GL_INT, 3 * Integer.BYTES, 0);
+		VulkanicAPI.configureVertexAttributeInteger(3, 3, VulkanicAPI.GL_INT, 3 * Integer.BYTES, 0);
 		
-		GL32.glBindBuffer(GL32.GL_ARRAY_BUFFER, boxGroup.instanceSubChunkPosVbo);
-		GL32.glEnableVertexAttribArray(4);
+		VulkanicAPI.glBindBuffer(VulkanicAPI.GL_ARRAY_BUFFER, boxGroup.instanceSubChunkPosVbo);
+		VulkanicAPI.activateVertexAttribute(4);
 		this.vertexAttribDivisor(4, 1);
-		GL32.glVertexAttribPointer(4, 3, GL32.GL_FLOAT, false, 3 * Float.BYTES, 0);
+		VulkanicAPI.configureVertexAttribute(4, 3, VulkanicAPI.GL_FLOAT, false, 3 * Float.BYTES, 0);
 		
-		GL32.glBindBuffer(GL32.GL_ARRAY_BUFFER, boxGroup.instanceMaterialVbo);
-		GL32.glEnableVertexAttribArray(5);
+		VulkanicAPI.glBindBuffer(VulkanicAPI.GL_ARRAY_BUFFER, boxGroup.instanceMaterialVbo);
+		VulkanicAPI.activateVertexAttribute(5);
 		this.vertexAttribDivisor(5, 1);
-		GL32.glVertexAttribIPointer(5, 1, GL32.GL_BYTE, Byte.BYTES, 0);
+		VulkanicAPI.configureVertexAttributeInteger(5, 1, VulkanicAPI.GL_BYTE, Byte.BYTES, 0);
 		
 		
 		// Draw instanced
 		profiler.popPush("render");
 		if (boxGroup.uploadedBoxCount > 0)
 		{
-			GL32.glDrawElementsInstanced(GL32.GL_TRIANGLES, BOX_INDICES.length, GL32.GL_UNSIGNED_INT, 0, boxGroup.uploadedBoxCount);
+			VulkanicAPI.renderIndexedInstanced(VulkanicAPI.GL_TRIANGLES, BOX_INDICES.length, VulkanicAPI.GL_UNSIGNED_INT, 0, boxGroup.uploadedBoxCount);
 		}
 		
 		
 		// Clean up
 		profiler.popPush("cleanup");
 		
-		GL32.glDisableVertexAttribArray(1);
-		GL32.glDisableVertexAttribArray(2);
-		GL32.glDisableVertexAttribArray(3);
-		GL32.glDisableVertexAttribArray(4);
-		GL32.glDisableVertexAttribArray(5);
+		VulkanicAPI.deactivateVertexAttribute(1);
+		VulkanicAPI.deactivateVertexAttribute(2);
+		VulkanicAPI.deactivateVertexAttribute(3);
+		VulkanicAPI.deactivateVertexAttribute(4);
+		VulkanicAPI.deactivateVertexAttribute(5);
 		
 		profiler.pop();
 	}
@@ -572,11 +570,11 @@ public class GenericObjectRenderer implements IDhApiCustomRenderRegister
 	{
 		if (this.vertexAttribDivisorSupported)
 		{
-			GL33.glVertexAttribDivisor(index, divisor);	
+			VulkanicAPI.setVertexAttribDivisor(index, divisor);	
 		}
 		else if(this.instancedArraysSupported)
 		{
-			ARBInstancedArrays.glVertexAttribDivisorARB(index, divisor);
+			VulkanicAPI.setVertexAttribDivisor(index, divisor);
 		}
 		else
 		{
@@ -627,7 +625,7 @@ public class GenericObjectRenderer implements IDhApiCustomRenderRegister
 			Vec3d camPos)
 	{
 		shaderProgram.fillDirectUniformData(renderEventParam, boxGroup, box, camPos);
-		GL32.glDrawElements(GL32.GL_TRIANGLES, BOX_INDICES.length, GL32.GL_UNSIGNED_INT, 0);
+		VulkanicAPI.glDrawElements(VulkanicAPI.GL_TRIANGLES, BOX_INDICES.length, VulkanicAPI.GL_UNSIGNED_INT, 0);
 	}
 	
 	

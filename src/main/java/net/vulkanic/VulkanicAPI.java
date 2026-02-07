@@ -31,6 +31,9 @@ public class VulkanicAPI {
     public static final int GL_COPY_WRITE_BUFFER = 0x8F37;
     public static final int GL_SHADER_STORAGE_BUFFER = 0x90D2;
     
+    // OpenGL Constants - Buffer Usage
+    public static final int GL_STATIC_DRAW = 0x88E4;
+    
     // OpenGL Constants - String Names
     public static final int GL_VENDOR = 0x1F00;
     public static final int GL_RENDERER = 0x1F01;
@@ -41,6 +44,7 @@ public class VulkanicAPI {
     
     // OpenGL Constants - Primitive Types
     public static final int GL_TRIANGLES = 0x0004;
+    public static final int GL_TRIANGLE_FAN = 0x0006;
     public static final int GL_PATCHES = 0x000E;
     
     // OpenGL Constants - Shader/Program Status
@@ -172,6 +176,8 @@ public class VulkanicAPI {
     public static final int GL_BLUE = 0x1905;
     public static final int GL_ALPHA = 0x1906;
     public static final int GL_BYTE = 0x1400;
+    public static final int GL_UNSIGNED_SHORT_4_4_4_4 = 0x8033;
+    public static final int GL_UNSIGNED_INT = 0x1405;
     public static final int GL_R8 = 0x8229;
     
     // OpenGL Constants - Other
@@ -202,6 +208,7 @@ public class VulkanicAPI {
     public static final int GL_UNSIGNED_BYTE = 0x1401;
     public static final int GL_RGBA = 0x1908;
     public static final int GL_RGBA8 = 0x8058;
+    public static final int GL_RGBA16 = 0x805B;
     public static final int GL_RGB = 0x1907;
     
     // OpenGL Constants - Texture Wrap Modes
@@ -602,6 +609,14 @@ public class VulkanicAPI {
     
     public static void activateVertexAttribute(int index) {
         getBackend().activateVertexAttribute(index);
+    }
+    
+    public static void deactivateVertexAttribute(int index) {
+        getBackend().deactivateVertexAttribute(index);
+    }
+    
+    public static void setVertexAttribDivisor(int index, int divisor) {
+        getBackend().setVertexAttribDivisor(index, divisor);
     }
     
     public static String retrieveProgramInfoLog(int program) {

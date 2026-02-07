@@ -130,6 +130,8 @@ public interface GraphicsBackend {
     void configureVertexAttribute(int index, int size, int type, boolean normalized, int stride, long pointer);
     void configureVertexAttributeInteger(int index, int size, int type, int stride, long pointer);
     void activateVertexAttribute(int index);
+    void deactivateVertexAttribute(int index);
+    void setVertexAttribDivisor(int index, int divisor);
     
     // Synchronization
     long createFenceSync(int condition, int flags);
