@@ -133,8 +133,10 @@ public class VulkanicAPI {
     public static final int GL_BLEND = 0x0BE2;
     public static final int GL_FUNC_ADD = 0x8006;
     
-    // OpenGL Constants - Culling and Tests
+    // OpenGL Constants - Culling
     public static final int GL_CULL_FACE = 0x0B44;
+    
+    // OpenGL Constants - Tests
     public static final int GL_SCISSOR_TEST = 0x0C11;
     
     // OpenGL Constants - Texture Parameters
