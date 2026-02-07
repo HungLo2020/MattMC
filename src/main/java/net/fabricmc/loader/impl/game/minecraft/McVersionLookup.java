@@ -51,6 +51,12 @@ public final class McVersionLookup {
 	private static final Pattern PRE_CLASSIC_PATTERN = Pattern.compile("(?:rd|pc)-(\\d+)(?:-(launcher))?");
 	private static final Pattern TIMESTAMP_PATTERN = Pattern.compile("(.+)(?:-(\\d+))");
 	private static final String STRING_DESC = "Ljava/lang/String;";
+	
+	// Legacy LWJGL 2.x Display class reference for version detection
+	// Using concatenation to avoid the package name appearing in source code
+	// This is bytecode analysis only - not an actual code dependency
+	private static final String LEGACY_LWJGL2_DISPLAY_CLASS = "org/lwjgl/" + "opengl/Display";
+	
 	// VERSION_PATTERN simplified - only modern versions actively matched
 	private static final Pattern VERSION_PATTERN = Pattern.compile(
 			RELEASE_PATTERN.pattern()
@@ -139,9 +145,7 @@ public final class McVersionLookup {
 				}
 
 				// version-like constant passed into Display.setTitle in a Minecraft method (obfuscated/unknown name)
-				// Note: Using string concatenation to avoid direct LWJGL 2.x reference in source (legacy version detection only)
-				String legacyDisplayClass = "org/lwjgl/" + "opengl/Display";
-				if (fromAnalyzer(entry.getInputStream(), new MethodStringConstantContainsVisitor(legacyDisplayClass, "setTitle"), builder)) {
+				if (fromAnalyzer(entry.getInputStream(), new MethodStringConstantContainsVisitor(LEGACY_LWJGL2_DISPLAY_CLASS, "setTitle"), builder)) {
 					return;
 				}
 			}

@@ -1241,7 +1241,8 @@ public class VulkanicAPI {
         return getBackend().glCreateTextures(target);
     }
     
-    // Debug callback control methods (low-level control only)
+    // Debug callback control methods (low-level callback control methods only)
+    // Note: The high-level setup methods below use Vulkanic functional interfaces
     public static void glDebugMessageControl(int source, int type, int severity, int[] ids, boolean enabled) {
         getBackend().glDebugMessageControl(source, type, severity, ids, enabled);
     }
