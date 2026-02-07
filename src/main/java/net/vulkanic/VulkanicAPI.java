@@ -1449,4 +1449,90 @@ public class VulkanicAPI {
     public static void glUniform1i(int location, int value) {
         assignUniformInteger(location, value);
     }
+    
+    // GL43+ Vertex Attribute methods
+    
+    /**
+     * Binds a buffer to a vertex buffer bind point (GL43+).
+     */
+    public static void glBindVertexBuffer(int bindingindex, int buffer, long offset, int stride) {
+        getBackend().bindVertexBuffer(bindingindex, buffer, offset, stride);
+    }
+    
+    /**
+     * Specifies the organization of vertex arrays (GL43+).
+     */
+    public static void glVertexAttribFormat(int attribindex, int size, int type, boolean normalized, int relativeoffset) {
+        getBackend().vertexAttribFormat(attribindex, size, type, normalized, relativeoffset);
+    }
+    
+    /**
+     * Specifies the organization of vertex arrays for integer data (GL43+).
+     */
+    public static void glVertexAttribIFormat(int attribindex, int size, int type, int relativeoffset) {
+        getBackend().vertexAttribIFormat(attribindex, size, type, relativeoffset);
+    }
+    
+    /**
+     * Associates a vertex attribute and a vertex buffer binding (GL43+).
+     */
+    public static void glVertexAttribBinding(int attribindex, int bindingindex) {
+        getBackend().vertexAttribBinding(attribindex, bindingindex);
+    }
+    
+    /**
+     * Disables a generic vertex attribute array.
+     */
+    public static void glDisableVertexAttribArray(int index) {
+        deactivateVertexAttribute(index);
+    }
+    
+    /**
+     * Defines an array of generic vertex attribute data with integer data.
+     * Wrapper for configureVertexAttributeInteger.
+     */
+    public static void glVertexAttribIPointer(int index, int size, int type, int stride, long pointer) {
+        configureVertexAttributeInteger(index, size, type, stride, pointer);
+    }
+    
+    // VAO methods
+    
+    /**
+     * Generates vertex array object names.
+     */
+    public static int glGenVertexArrays() {
+        return getBackend().genVertexArrays();
+    }
+    
+    /**
+     * Binds a vertex array object.
+     */
+    public static void glBindVertexArray(int array) {
+        getBackend().bindVertexArray(array);
+    }
+    
+    /**
+     * Deletes vertex array objects.
+     */
+    public static void glDeleteVertexArrays(int array) {
+        getBackend().deleteVertexArrays(array);
+    }
+    
+    // GL.getCapabilities() and GLUtil support
+    
+    /**
+     * Gets the OpenGL capabilities for the current context.
+     * Returns a platform-specific capabilities object.
+     */
+    public static Object getGLCapabilities() {
+        return getBackend().getGLCapabilities();
+    }
+    
+    /**
+     * Sets up debug message callback using GLUtil-style callback.
+     * @param stream The PrintStream to write debug messages to
+     */
+    public static void setupDebugMessageCallback(java.io.PrintStream stream) {
+        getBackend().setupDebugMessageCallback(stream);
+    }
 }

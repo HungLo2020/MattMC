@@ -382,4 +382,19 @@ public interface GraphicsBackend {
     void clearDebugMessageCallbackKHR();
     void clearDebugMessageCallbackARB();
     void clearDebugMessageCallbackAMD();
+    
+    // GL43+ vertex attribute methods
+    void bindVertexBuffer(int bindingindex, int buffer, long offset, int stride);
+    void vertexAttribFormat(int attribindex, int size, int type, boolean normalized, int relativeoffset);
+    void vertexAttribIFormat(int attribindex, int size, int type, int relativeoffset);
+    void vertexAttribBinding(int attribindex, int bindingindex);
+    
+    // VAO methods
+    int genVertexArrays();
+    void bindVertexArray(int array);
+    void deleteVertexArrays(int array);
+    
+    // GL context capabilities
+    Object getGLCapabilities();
+    void setupDebugMessageCallback(java.io.PrintStream stream);
 }

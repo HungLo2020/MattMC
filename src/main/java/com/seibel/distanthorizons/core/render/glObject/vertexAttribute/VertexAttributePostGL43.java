@@ -4,7 +4,7 @@ import com.seibel.distanthorizons.core.config.Config;
 import com.seibel.distanthorizons.core.logging.DhLogger;
 import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
 import com.seibel.distanthorizons.core.render.glObject.GLProxy;
-import org.lwjgl.opengl.GL43;
+import net.vulkanic.VulkanicAPI;
 
 /**
  * In OpenGL 4.3 and later, Vertex Attribute got a make-over.
@@ -50,7 +50,7 @@ public final class VertexAttributePostGL43 extends AbstractVertexAttribute
 	{
 		for (int i = 0; i < this.numberOfBindingPoints; i++)
 		{
-			GL43.glBindVertexBuffer(i, buffer, 0, this.strideSize);
+			VulkanicAPI.glBindVertexBuffer(i, buffer, 0, this.strideSize);
 		}
 	}
 	
@@ -58,7 +58,7 @@ public final class VertexAttributePostGL43 extends AbstractVertexAttribute
 	@Override
 	public void bindBufferToBindingPoint(int buffer, int bindingPoint)
 	{
-		GL43.glBindVertexBuffer(bindingPoint, buffer, 0, this.strideSize);
+		VulkanicAPI.glBindVertexBuffer(bindingPoint, buffer, 0, this.strideSize);
 	}
 	
 	
@@ -73,7 +73,7 @@ public final class VertexAttributePostGL43 extends AbstractVertexAttribute
 	{
 		for (int i = 0; i < this.numberOfBindingPoints; i++)
 		{
-			GL43.glBindVertexBuffer(i, 0, 0, 0);
+			VulkanicAPI.glBindVertexBuffer(i, 0, 0, 0);
 		}
 	}
 	
@@ -81,7 +81,7 @@ public final class VertexAttributePostGL43 extends AbstractVertexAttribute
 	@Override
 	public void unbindBuffersFromBindingPoint(int bindingPoint)
 	{
-		GL43.glBindVertexBuffer(bindingPoint, 0, 0, 0);
+		VulkanicAPI.glBindVertexBuffer(bindingPoint, 0, 0, 0);
 	}
 	
 	
@@ -96,11 +96,11 @@ public final class VertexAttributePostGL43 extends AbstractVertexAttribute
 	{
 		if (attribute.useInteger)
 		{
-			GL43.glVertexAttribIFormat(attributeIndex, attribute.elementCount, attribute.glType, this.strideSize);
+			VulkanicAPI.glVertexAttribIFormat(attributeIndex, attribute.elementCount, attribute.glType, this.strideSize);
 		}
 		else
 		{
-			GL43.glVertexAttribFormat(attributeIndex, attribute.elementCount, attribute.glType,
+			VulkanicAPI.glVertexAttribFormat(attributeIndex, attribute.elementCount, attribute.glType,
 					attribute.normalized, this.strideSize); // Here strideSize is new attrib offset
 		}
 		
@@ -109,8 +109,8 @@ public final class VertexAttributePostGL43 extends AbstractVertexAttribute
 		{
 			this.numberOfBindingPoints = bindingPoint + 1;
 		}
-		GL43.glVertexAttribBinding(attributeIndex, bindingPoint);
-		GL43.glEnableVertexAttribArray(attributeIndex);
+		VulkanicAPI.glVertexAttribBinding(attributeIndex, bindingPoint);
+		VulkanicAPI.glEnableVertexAttribArray(attributeIndex);
 	}
 	
 	

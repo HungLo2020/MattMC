@@ -10,11 +10,8 @@ import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
 import com.seibel.distanthorizons.core.util.objects.GLMessages.*;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftClientWrapper;
 import com.seibel.distanthorizons.coreapi.ModInfo;
+import net.vulkanic.VulkanicAPI;
 import org.lwjgl.glfw.GLFW;
-import org.lwjgl.opengl.GL;
-import org.lwjgl.opengl.GL32;
-import org.lwjgl.opengl.GLCapabilities;
-import org.lwjgl.opengl.GLUtil;
 
 import java.io.PrintStream;
 import java.util.Collections;
@@ -45,7 +42,7 @@ public class GLProxy
 	
 	
 	/** Minecraft's GL capabilities */
-	public final GLCapabilities glCapabilities;
+	public final org.lwjgl.opengl.GLCapabilities glCapabilities;
 	
 	public boolean namedObjectSupported = false; // ~OpenGL 4.5 (UNUSED CURRENTLY)
 	public boolean bufferStorageSupported = false; // ~OpenGL 4.4
@@ -94,7 +91,7 @@ public class GLProxy
 		}
 		
 		LOGGER.info("Creating " + GLProxy.class.getSimpleName() + "... If this is the last message you see there must have been an OpenGL error.");
-		LOGGER.info("Lod Render OpenGL version [" + GL32.glGetString(GL32.GL_VERSION) + "].");
+		LOGGER.info("Lod Render OpenGL version [" + VulkanicAPI.queryStringInfo(VulkanicAPI.GL_VERSION) + "].");
 		
 		
 		
@@ -104,7 +101,7 @@ public class GLProxy
 		//============================//
 		
 		// get Minecraft's capabilities
-		this.glCapabilities = GL.getCapabilities();
+		this.glCapabilities = (org.lwjgl.opengl.GLCapabilities) VulkanicAPI.getGLCapabilities();
 		
 		// crash the game if the GPU doesn't support OpenGL 3.2
 		if (!this.glCapabilities.OpenGL32)
@@ -121,7 +118,7 @@ public class GLProxy
 		
 		if (Config.Client.Advanced.Debugging.OpenGl.overrideVanillaGLLogger.get())
 		{
-			GLUtil.setupDebugMessageCallback(new PrintStream(new GLMessageOutputStream(GLProxy::logMessage, this.vanillaDebugMessageBuilder), true));
+			VulkanicAPI.setupDebugMessageCallback(new PrintStream(new GLMessageOutputStream(GLProxy::logMessage, this.vanillaDebugMessageBuilder), true));
 		}
 		
 		
@@ -151,7 +148,7 @@ public class GLProxy
 		this.instancedArraysSupported = this.glCapabilities.GL_ARB_instanced_arrays;
 		
 		// get the best automatic upload method
-		String vendor = GL32.glGetString(GL32.GL_VENDOR).toUpperCase(); // example return: "NVIDIA CORPORATION"
+		String vendor = VulkanicAPI.queryStringInfo(VulkanicAPI.GL_VENDOR).toUpperCase(); // example return: "NVIDIA CORPORATION"
 		if (EPlatform.get() != EPlatform.MACOS)
 		{
 			if (vendor.contains("NVIDIA") || vendor.contains("GEFORCE"))
@@ -346,7 +343,7 @@ public class GLProxy
 	// helper methods //
 	//================//
 	
-	private String getFailedVersionInfo(GLCapabilities c)
+	private String getFailedVersionInfo(org.lwjgl.opengl.GLCapabilities c)
 	{
 		return "Your OpenGL support:\n" +
 				"openGL version 3.2+: [" + c.OpenGL32 + "] <- REQUIRED\n" +
@@ -357,7 +354,7 @@ public class GLProxy
 				+ " (How you turn that on, I have no clue~)";
 	}
 	
-	private String versionInfoToString(GLCapabilities c)
+	private String versionInfoToString(org.lwjgl.opengl.GLCapabilities c)
 	{
 		return "Your OpenGL support:\n" +
 				"openGL version 3.2+: [" + c.OpenGL32 + "] <- REQUIRED\n" +

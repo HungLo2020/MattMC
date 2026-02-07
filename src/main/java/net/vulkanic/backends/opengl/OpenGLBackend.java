@@ -1435,4 +1435,55 @@ public class OpenGLBackend implements GraphicsBackend {
     public void clearDebugMessageCallbackAMD() {
         org.lwjgl.opengl.AMDDebugOutput.glDebugMessageCallbackAMD(null, 0L);
     }
+    
+    // GL43+ vertex attribute methods
+    
+    @Override
+    public void bindVertexBuffer(int bindingindex, int buffer, long offset, int stride) {
+        org.lwjgl.opengl.GL43C.glBindVertexBuffer(bindingindex, buffer, offset, stride);
+    }
+    
+    @Override
+    public void vertexAttribFormat(int attribindex, int size, int type, boolean normalized, int relativeoffset) {
+        org.lwjgl.opengl.GL43C.glVertexAttribFormat(attribindex, size, type, normalized, relativeoffset);
+    }
+    
+    @Override
+    public void vertexAttribIFormat(int attribindex, int size, int type, int relativeoffset) {
+        org.lwjgl.opengl.GL43C.glVertexAttribIFormat(attribindex, size, type, relativeoffset);
+    }
+    
+    @Override
+    public void vertexAttribBinding(int attribindex, int bindingindex) {
+        org.lwjgl.opengl.GL43C.glVertexAttribBinding(attribindex, bindingindex);
+    }
+    
+    // VAO methods
+    
+    @Override
+    public int genVertexArrays() {
+        return org.lwjgl.opengl.GL30.glGenVertexArrays();
+    }
+    
+    @Override
+    public void bindVertexArray(int array) {
+        org.lwjgl.opengl.GL30.glBindVertexArray(array);
+    }
+    
+    @Override
+    public void deleteVertexArrays(int array) {
+        org.lwjgl.opengl.GL30.glDeleteVertexArrays(array);
+    }
+    
+    // GL context capabilities
+    
+    @Override
+    public Object getGLCapabilities() {
+        return org.lwjgl.opengl.GL.getCapabilities();
+    }
+    
+    @Override
+    public void setupDebugMessageCallback(java.io.PrintStream stream) {
+        org.lwjgl.opengl.GLUtil.setupDebugMessageCallback(stream);
+    }
 }
