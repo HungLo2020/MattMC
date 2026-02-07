@@ -1488,8 +1488,8 @@ public class VulkanicAPI {
     }
     
     /**
-     * Defines an array of generic vertex attribute data with integer data.
-     * Wrapper for configureVertexAttributeInteger.
+     * Defines an array of generic vertex attribute data with integer data (GL20+).
+     * Specifies the data format for integer vertex attributes.
      */
     public static void glVertexAttribIPointer(int index, int size, int type, int stride, long pointer) {
         configureVertexAttributeInteger(index, size, type, stride, pointer);
@@ -1522,7 +1522,10 @@ public class VulkanicAPI {
     
     /**
      * Gets the OpenGL capabilities for the current context.
-     * Returns a platform-specific capabilities object.
+     * Returns a platform-specific capabilities object that should be cast to the appropriate type.
+     * For OpenGL backend, returns org.lwjgl.opengl.GLCapabilities.
+     * 
+     * @return Platform-specific capabilities object (cast to org.lwjgl.opengl.GLCapabilities for OpenGL)
      */
     public static Object getGLCapabilities() {
         return getBackend().getGLCapabilities();

@@ -101,7 +101,7 @@ public final class VertexAttributePostGL43 extends AbstractVertexAttribute
 		else
 		{
 			VulkanicAPI.glVertexAttribFormat(attributeIndex, attribute.elementCount, attribute.glType,
-					attribute.normalized, this.strideSize); // Here strideSize is new attrib offset
+					attribute.normalized, this.strideSize); // strideSize used as relative offset here
 		}
 		
 		this.strideSize += attribute.byteSize;
