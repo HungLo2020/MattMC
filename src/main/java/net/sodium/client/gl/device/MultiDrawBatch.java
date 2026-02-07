@@ -6,8 +6,8 @@ import org.lwjgl.system.Pointer;
 import java.nio.IntBuffer;
 
 /**
- * Provides a fixed-size queue for building a draw-command list usable with
- * {@link org.lwjgl.opengl.GL33C#glMultiDrawElementsBaseVertex(int, IntBuffer, int, PointerBuffer, IntBuffer)}.
+ * Provides a fixed-size queue for building a draw-command list usable with multi-draw operations.
+ * Compatible with glMultiDrawElementsBaseVertex (GL 3.3+).
  */
 public final class MultiDrawBatch {
     public final long pElementPointer;

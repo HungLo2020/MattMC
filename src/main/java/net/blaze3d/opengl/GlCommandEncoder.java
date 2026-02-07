@@ -782,7 +782,7 @@ public class GlCommandEncoder implements CommandEncoder {
 		net.irisshaders.iris.gl.blending.DepthColorStorage.unlockDepthColor();
 		
 		if (net.irisshaders.iris.vertices.ImmediateState.safeToMultiply && !(glRenderPass.pipeline.program() instanceof net.irisshaders.iris.pipeline.programs.ExtendedShader)) {
-			GlStateManager._glBindFramebuffer(org.lwjgl.opengl.GL46C.GL_FRAMEBUFFER, iris$tempFBO);
+			GlStateManager._glBindFramebuffer(VulkanicAPI.GL_FRAMEBUFFER, iris$tempFBO);
 		}
 		
 		iris$lastPass = glRenderPass;

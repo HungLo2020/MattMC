@@ -106,7 +106,7 @@ public class GlTexture extends GpuTexture implements net.irisshaders.iris.mixint
 	// Iris: From MixinGpuTexture - GpuTextureInterface implementation
 	@Override
 	public int iris$getGlId() {
-		this.flushModeChanges(org.lwjgl.opengl.GL46C.GL_TEXTURE_2D);
+		this.flushModeChanges(net.vulkanic.VulkanicAPI.GL_TEXTURE_2D);
 		return this.glId();
 	}
 	
