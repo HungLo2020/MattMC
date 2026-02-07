@@ -27,6 +27,7 @@ public class VulkanicAPI {
     
     // OpenGL Constants - Buffer Targets
     public static final int GL_ARRAY_BUFFER = 0x8892;
+    public static final int GL_ELEMENT_ARRAY_BUFFER = 0x8893;
     public static final int GL_COPY_READ_BUFFER = 0x8F36;
     public static final int GL_COPY_WRITE_BUFFER = 0x8F37;
     public static final int GL_SHADER_STORAGE_BUFFER = 0x90D2;
@@ -1055,8 +1056,36 @@ public class VulkanicAPI {
         getBackend().glBufferData(target, data, usage);
     }
     
+    public static void glBufferData(int target, java.nio.ByteBuffer data, int usage) {
+        getBackend().glBufferData(target, data, usage);
+    }
+    
+    public static void glBufferData(int target, long size, int usage) {
+        getBackend().glBufferData(target, size, usage);
+    }
+    
+    public static void glBufferSubData(int target, long offset, java.nio.ByteBuffer data) {
+        getBackend().glBufferSubData(target, offset, data);
+    }
+    
     public static void glBufferStorage(int target, long size, int flags) {
         getBackend().glBufferStorage(target, size, flags);
+    }
+    
+    public static void glBufferStorage(int target, java.nio.ByteBuffer data, int flags) {
+        getBackend().glBufferStorage(target, data, flags);
+    }
+    
+    public static java.nio.ByteBuffer glMapBufferRange(int target, long offset, long length, int access) {
+        return getBackend().glMapBufferRange(target, offset, length, access);
+    }
+    
+    public static boolean glUnmapBuffer(int target) {
+        return getBackend().glUnmapBuffer(target);
+    }
+    
+    public static boolean glIsBuffer(int buffer) {
+        return getBackend().glIsBuffer(buffer);
     }
     
     public static void glBindBufferBase(int target, int index, int buffer) {
@@ -1207,7 +1236,7 @@ public class VulkanicAPI {
         getBackend().glClearColor(r, g, b, a);
     }
     
-    public static int glGetAttribLocation(int program, String name) {
+    public static int glGetAttribLocation(int program, CharSequence name) {
         return getBackend().glGetAttribLocation(program, name);
     }
     

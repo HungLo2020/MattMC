@@ -9,8 +9,7 @@ import com.seibel.distanthorizons.core.render.glObject.GLProxy;
 import com.seibel.distanthorizons.core.util.LodUtil;
 import com.seibel.distanthorizons.core.util.ThreadUtil;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftGLWrapper;
-import org.lwjgl.opengl.GL32;
-import org.lwjgl.opengl.GL44;
+import net.vulkanic.VulkanicAPI;
 
 import java.lang.ref.PhantomReference;
 import java.lang.ref.Reference;
@@ -68,10 +67,10 @@ public class GLBuffer implements AutoCloseable
 	//=========//
 	
 	// Should be override by subclasses
-	public int getBufferBindingTarget() { return GL32.GL_COPY_READ_BUFFER; }
+	public int getBufferBindingTarget() { return VulkanicAPI.GL_COPY_READ_BUFFER; }
 	
-	public void bind() { GL32.glBindBuffer(this.getBufferBindingTarget(), this.id); }
-	public void unbind() { GL32.glBindBuffer(this.getBufferBindingTarget(), 0); }
+	public void bind() { VulkanicAPI.glBindBuffer(this.getBufferBindingTarget(), this.id); }
+	public void unbind() { VulkanicAPI.glBindBuffer(this.getBufferBindingTarget(), 0); }
 	
 	
 	
@@ -136,7 +135,7 @@ public class GLBuffer implements AutoCloseable
 		{
 			// destroy the buffer if it exists,
 			// the buffer may not exist if the destroy method is called twice
-			if (GL32.glIsBuffer(id))
+			if (VulkanicAPI.glIsBuffer(id))
 			{
 				GLMC.glDeleteBuffers(id);
 				bufferCount.decrementAndGet();
@@ -205,7 +204,7 @@ public class GLBuffer implements AutoCloseable
 		this.destroyAsync();
 		this.create(true);
 		this.bind();
-		GL44.glBufferStorage(this.getBufferBindingTarget(), bb, 0);
+		VulkanicAPI.glBufferStorage(this.getBufferBindingTarget(), bb, 0);
 		this.size = bbSize;
 	}
 	/** Requires the buffer to be bound */
@@ -214,7 +213,7 @@ public class GLBuffer implements AutoCloseable
 		LodUtil.assertTrue(!this.bufferStorage, "Buffer is bufferStorage but its trying to use bufferData upload method!");
 		
 		int bbSize = bb.limit() - bb.position();
-		GL32.glBufferData(this.getBufferBindingTarget(), bb, bufferDataHint);
+		VulkanicAPI.glBufferData(this.getBufferBindingTarget(), bb, bufferDataHint);
 		this.size = bbSize;
 	}
 	/** Requires the buffer to be bound */
@@ -227,10 +226,10 @@ public class GLBuffer implements AutoCloseable
 		{
 			int newSize = (int) (bbSize * BUFFER_EXPANSION_MULTIPLIER);
 			if (newSize > maxExpansionSize) newSize = maxExpansionSize;
-			GL32.glBufferData(this.getBufferBindingTarget(), newSize, bufferDataHint);
+			VulkanicAPI.glBufferData(this.getBufferBindingTarget(), newSize, bufferDataHint);
 			this.size = newSize;
 		}
-		GL32.glBufferSubData(this.getBufferBindingTarget(), 0, bb);
+		VulkanicAPI.glBufferSubData(this.getBufferBindingTarget(), 0, bb);
 	}
 	
 	
@@ -259,17 +258,17 @@ public class GLBuffer implements AutoCloseable
 			{
 				GLMC.glDeleteBuffers(this.id);
 				this.id = GLMC.glGenBuffers();
-				GL32.glBindBuffer(this.getBufferBindingTarget(), this.id);
-				GL32.glBindBuffer(this.getBufferBindingTarget(), this.id);
-				GL44.glBufferStorage(this.getBufferBindingTarget(), newSize, bufferHint);
+				VulkanicAPI.glBindBuffer(this.getBufferBindingTarget(), this.id);
+				VulkanicAPI.glBindBuffer(this.getBufferBindingTarget(), this.id);
+				VulkanicAPI.glBufferStorage(this.getBufferBindingTarget(), newSize, bufferHint);
 			}
 			else
 			{
-				GL32.glBufferData(GL32.GL_ARRAY_BUFFER, newSize, bufferHint);
+				VulkanicAPI.glBufferData(VulkanicAPI.GL_ARRAY_BUFFER, newSize, bufferHint);
 			}
 		}
 		
-		vboBuffer = GL32.glMapBufferRange(GL32.GL_ARRAY_BUFFER, 0, targetSize, mapFlags);
+		vboBuffer = VulkanicAPI.glMapBufferRange(VulkanicAPI.GL_ARRAY_BUFFER, 0, targetSize, mapFlags);
 		this.isMapped = true;
 		return vboBuffer;
 	}
@@ -279,7 +278,7 @@ public class GLBuffer implements AutoCloseable
 	{
 		LodUtil.assertTrue(this.isMapped, "Buffer is not mapped");
 		this.bind();
-		GL32.glUnmapBuffer(this.getBufferBindingTarget());
+		VulkanicAPI.glUnmapBuffer(this.getBufferBindingTarget());
 		this.isMapped = false;
 	}
 	

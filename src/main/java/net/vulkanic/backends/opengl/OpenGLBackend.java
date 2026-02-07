@@ -1022,8 +1022,43 @@ public class OpenGLBackend implements GraphicsBackend {
     }
     
     @Override
+    public void glBufferData(int target, java.nio.ByteBuffer data, int usage) {
+        org.lwjgl.opengl.GL32C.glBufferData(target, data, usage);
+    }
+    
+    @Override
+    public void glBufferData(int target, long size, int usage) {
+        org.lwjgl.opengl.GL32C.glBufferData(target, size, usage);
+    }
+    
+    @Override
+    public void glBufferSubData(int target, long offset, java.nio.ByteBuffer data) {
+        org.lwjgl.opengl.GL32C.glBufferSubData(target, offset, data);
+    }
+    
+    @Override
     public void glBufferStorage(int target, long size, int flags) {
         org.lwjgl.opengl.GL45C.glBufferStorage(target, size, flags);
+    }
+    
+    @Override
+    public void glBufferStorage(int target, java.nio.ByteBuffer data, int flags) {
+        org.lwjgl.opengl.GL44C.glBufferStorage(target, data, flags);
+    }
+    
+    @Override
+    public java.nio.ByteBuffer glMapBufferRange(int target, long offset, long length, int access) {
+        return org.lwjgl.opengl.GL32C.glMapBufferRange(target, offset, length, access);
+    }
+    
+    @Override
+    public boolean glUnmapBuffer(int target) {
+        return org.lwjgl.opengl.GL32C.glUnmapBuffer(target);
+    }
+    
+    @Override
+    public boolean glIsBuffer(int buffer) {
+        return org.lwjgl.opengl.GL32C.glIsBuffer(buffer);
     }
     
     @Override
@@ -1224,7 +1259,7 @@ public class OpenGLBackend implements GraphicsBackend {
     }
     
     @Override
-    public int glGetAttribLocation(int program, String name) {
+    public int glGetAttribLocation(int program, CharSequence name) {
         return org.lwjgl.opengl.GL46C.glGetAttribLocation(program, name);
     }
     

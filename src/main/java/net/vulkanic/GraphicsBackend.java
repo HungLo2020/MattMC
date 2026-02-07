@@ -299,7 +299,14 @@ public interface GraphicsBackend {
     void glReadPixels(int x, int y, int width, int height, int format, int type, float[] pixels);
     void glBufferData(int target, float[] data, int usage);
     void glBufferData(int target, int[] data, int usage);
+    void glBufferData(int target, java.nio.ByteBuffer data, int usage);
+    void glBufferData(int target, long size, int usage);
+    void glBufferSubData(int target, long offset, java.nio.ByteBuffer data);
     void glBufferStorage(int target, long size, int flags);
+    void glBufferStorage(int target, java.nio.ByteBuffer data, int flags);
+    java.nio.ByteBuffer glMapBufferRange(int target, long offset, long length, int access);
+    boolean glUnmapBuffer(int target);
+    boolean glIsBuffer(int buffer);
     void glBindBufferBase(int target, int index, int buffer);
     void glVertexAttrib4f(int index, float v0, float v1, float v2, float v3);
     void glDetachShader(int program, int shader);
@@ -337,7 +344,7 @@ public interface GraphicsBackend {
     void glUniformMatrix3fv(int location, boolean transpose, java.nio.FloatBuffer value);
     void glUniformMatrix3fv(int location, boolean transpose, float[] value);
     void glClearColor(float r, float g, float b, float a);
-    int glGetAttribLocation(int program, String name);
+    int glGetAttribLocation(int program, CharSequence name);
     void glGenerateMipmap(int target);
     void glBlitFramebuffer(int srcX0, int srcY0, int srcX1, int srcY1, int dstX0, int dstY0, int dstX1, int dstY1, int mask, int filter);
     

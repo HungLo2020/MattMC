@@ -1,6 +1,6 @@
 package com.seibel.distanthorizons.core.render.glObject.buffer;
 
-import org.lwjgl.opengl.GL32;
+import net.vulkanic.VulkanicAPI;
 
 /**
  * This is a container for a OpenGL
@@ -17,7 +17,7 @@ public class GLElementBuffer extends GLBuffer
 	 */
 	protected int indicesCount = 0;
 	public int getIndicesCount() { return this.indicesCount; }
-	protected int type = GL32.GL_UNSIGNED_INT;
+	protected int type = VulkanicAPI.GL_UNSIGNED_INT;
 	public int getType() { return type; }
 	
 	public GLElementBuffer(boolean isBufferStorage)
@@ -35,7 +35,7 @@ public class GLElementBuffer extends GLBuffer
 	@Override
 	public int getBufferBindingTarget()
 	{
-		return GL32.GL_ELEMENT_ARRAY_BUFFER;
+		return VulkanicAPI.GL_ELEMENT_ARRAY_BUFFER;
 	}
 	
 }
