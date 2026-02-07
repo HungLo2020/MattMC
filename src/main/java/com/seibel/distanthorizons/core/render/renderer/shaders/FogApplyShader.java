@@ -6,7 +6,7 @@ import com.seibel.distanthorizons.core.render.renderer.FogRenderer;
 import com.seibel.distanthorizons.core.render.renderer.LodRenderer;
 import com.seibel.distanthorizons.core.render.renderer.ScreenQuad;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftGLWrapper;
-import org.lwjgl.opengl.GL32;
+import net.vulkanic.VulkanicAPI;
 
 /**
  * Draws the Fog texture onto DH's FrameBuffer. <br><br>
@@ -58,13 +58,13 @@ public class FogApplyShader extends AbstractShaderRenderer
 	@Override
 	protected void onApplyUniforms(float partialTicks)
 	{
-		GLMC.glActiveTexture(GL32.GL_TEXTURE0);
+		GLMC.glActiveTexture(VulkanicAPI.GL_TEXTURE0);
 		GLMC.glBindTexture(this.fogTexture);
-		GL32.glUniform1i(this.colorTextureUniform, 0);
+		VulkanicAPI.glUniform1i(this.colorTextureUniform, 0);
 		
-		GLMC.glActiveTexture(GL32.GL_TEXTURE1);
+		GLMC.glActiveTexture(VulkanicAPI.GL_TEXTURE1);
 		GLMC.glBindTexture(LodRenderer.INSTANCE.getActiveDepthTextureId());
-		GL32.glUniform1i(this.depthTextureUniform, 1);
+		VulkanicAPI.glUniform1i(this.depthTextureUniform, 1);
 		
 	}
 	
@@ -78,8 +78,8 @@ public class FogApplyShader extends AbstractShaderRenderer
 	protected void onRender()
 	{
 		GLMC.enableBlend();
-		GL32.glBlendEquation(GL32.GL_FUNC_ADD);
-		GLMC.glBlendFuncSeparate(GL32.GL_SRC_ALPHA, GL32.GL_ONE_MINUS_SRC_ALPHA, GL32.GL_ONE, GL32.GL_ONE_MINUS_SRC_ALPHA);
+		VulkanicAPI.glBlendEquation(VulkanicAPI.GL_FUNC_ADD);
+		GLMC.glBlendFuncSeparate(VulkanicAPI.GL_SRC_ALPHA, VulkanicAPI.GL_ONE_MINUS_SRC_ALPHA, VulkanicAPI.GL_ONE, VulkanicAPI.GL_ONE_MINUS_SRC_ALPHA);
 		
 		// Depth testing must be disabled otherwise this application shader won't apply anything.
 		// setting this isn't necessary in vanilla, but some mods may change this, requiring it to be set manually, 
@@ -88,12 +88,12 @@ public class FogApplyShader extends AbstractShaderRenderer
 		
 		
 		// apply the rendered Fog to DH's framebuffer
-		GLMC.glBindFramebuffer(GL32.GL_READ_FRAMEBUFFER, FogShader.INSTANCE.frameBuffer);
-		GLMC.glBindFramebuffer(GL32.GL_DRAW_FRAMEBUFFER, LodRenderer.INSTANCE.getActiveFramebufferId());
+		GLMC.glBindFramebuffer(VulkanicAPI.GL_READ_FRAMEBUFFER, FogShader.INSTANCE.frameBuffer);
+		GLMC.glBindFramebuffer(VulkanicAPI.GL_DRAW_FRAMEBUFFER, LodRenderer.INSTANCE.getActiveFramebufferId());
 		
 		ScreenQuad.INSTANCE.render();
 		
-		GLMC.glBindFramebuffer(GL32.GL_READ_FRAMEBUFFER, 0);
+		GLMC.glBindFramebuffer(VulkanicAPI.GL_READ_FRAMEBUFFER, 0);
 	}
 	
 }

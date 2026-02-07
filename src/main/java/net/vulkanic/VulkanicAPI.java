@@ -60,6 +60,7 @@ public class VulkanicAPI {
     // OpenGL Constants - Texture Targets and Units
     public static final int GL_TEXTURE_2D = 0x0DE1;      // 3553
     public static final int GL_TEXTURE0 = 0x84C0;        // 33984
+    public static final int GL_TEXTURE1 = 0x84C1;        // 33985
     public static final int GL_TEXTURE2 = 0x84C2;        // 33986
     public static final int GL_TEXTURE4 = 0x84C4;        // 33988
     public static final int GL_TEXTURE_BASE_LEVEL = 0x813C;  // 33084
@@ -211,6 +212,7 @@ public class VulkanicAPI {
     public static final int GL_RGBA8 = 0x8058;
     public static final int GL_RGBA16 = 0x805B;
     public static final int GL_RGB = 0x1907;
+    public static final int GL_R16F = 0x822D;
     
     // OpenGL Constants - Texture Wrap Modes
     public static final int GL_REPEAT = 0x2901;
@@ -245,6 +247,7 @@ public class VulkanicAPI {
     // OpenGL Constants - Uniform/Active Types
     public static final int GL_FLOAT = 0x1406;
     public static final int GL_INT = 0x1404;
+    public static final int GL_HALF_FLOAT = 0x140B;
     public static final int GL_BOOL = 0x8B56;
     public static final int GL_FLOAT_VEC2 = 0x8B50;
     public static final int GL_FLOAT_VEC3 = 0x8B51;
