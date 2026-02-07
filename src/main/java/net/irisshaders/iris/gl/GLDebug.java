@@ -332,13 +332,13 @@ public final class GLDebug {
 
 		@Override
 		public void nameObject(int id, int object, String name) {
-			KHRDebug.glObjectLabel(id, object, name);
+			VulkanicAPI.labelDebugObject(id, object, name);
 		}
 
 		@Override
 		public void pushGroup(int id, String name) {
 			if (ENABLE_DEBUG_GROUPS) {
-				KHRDebug.glPushDebugGroup(KHRDebug.GL_DEBUG_SOURCE_APPLICATION, id, name);
+				VulkanicAPI.enterDebugGroup(VulkanicAPI.GL_DEBUG_SOURCE_APPLICATION, id, name);
 				stack.push(name);
 				stackSize += 1;
 			}
@@ -348,7 +348,7 @@ public final class GLDebug {
 		public void popGroup() {
 			if (ENABLE_DEBUG_GROUPS) {
 				if (stackSize != 0) {
-					KHRDebug.glPopDebugGroup();
+					VulkanicAPI.exitDebugGroup();
 					stack.pop();
 					stackSize -= 1;
 				}
