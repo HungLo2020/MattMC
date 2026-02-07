@@ -1,6 +1,7 @@
 package net.irisshaders.iris.compat.dh;
 
 import net.blaze3d.opengl.GlStateManager;
+import net.vulkanic.VulkanicAPI;
 import com.seibel.distanthorizons.api.DhApi;
 import com.seibel.distanthorizons.api.enums.rendering.EDhApiFogDrawMode;
 import com.seibel.distanthorizons.api.enums.rendering.EDhApiRenderPass;
@@ -209,7 +210,7 @@ public class LodRendererEvents {
 					if (ShadowRenderingState.areShadowsCurrentlyBeingRendered()) {
 						event.cancelEvent();
 					} else if (getInstance().shouldOverride) {
-						GlStateManager._clear(VulkanicAPI.GL_DEPTH_BUFFER_BIT);
+						VulkanicAPI.clear(VulkanicAPI.GL_DEPTH_BUFFER_BIT);
 						event.cancelEvent();
 					}
 				}

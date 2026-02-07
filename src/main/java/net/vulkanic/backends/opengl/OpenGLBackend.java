@@ -1373,4 +1373,24 @@ public class OpenGLBackend implements GraphicsBackend {
     public void clearDebugMessageCallbackAMD() {
         org.lwjgl.opengl.AMDDebugOutput.glDebugMessageCallbackAMD(null, 0L);
     }
+    
+    @Override
+    public int getUniformLocation(int programId, String name) {
+        return org.lwjgl.opengl.GL20C.glGetUniformLocation(programId, name);
+    }
+    
+    @Override
+    public void disableCull() {
+        org.lwjgl.opengl.GL11C.glDisable(org.lwjgl.opengl.GL11C.GL_CULL_FACE);
+    }
+    
+    @Override
+    public void activeTexture(int texture) {
+        org.lwjgl.opengl.GL13C.glActiveTexture(texture);
+    }
+    
+    @Override
+    public void texParameteri(int target, int pname, int param) {
+        org.lwjgl.opengl.GL11C.glTexParameteri(target, pname, param);
+    }
 }

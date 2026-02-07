@@ -358,6 +358,16 @@ public interface GraphicsBackend {
     void glDebugMessageCallbackAMD(org.lwjgl.opengl.GLDebugMessageAMDCallback callback, long userParam);
     void glDebugMessageEnableAMD(int category, int severity, int[] ids, boolean enabled);
     
+    // Uniform location query
+    int getUniformLocation(int programId, String name);
+    
+    // Culling operations
+    void disableCull();
+    
+    // Texture operations
+    void activeTexture(int texture);
+    void texParameteri(int target, int pname, int param);
+    
     // High-level debug callback wrapper methods
     void setupDebugMessageCallback(VulkanicAPI.DebugMessageCallback callback);
     void setupDebugMessageCallbackKHR(VulkanicAPI.DebugMessageCallback callback);

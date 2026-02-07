@@ -3,6 +3,7 @@ package net.irisshaders.iris.pipeline.programs;
 import com.google.common.collect.ImmutableSet;
 import net.blaze3d.opengl.GlStateManager;
 import net.blaze3d.opengl.GlTexture;
+import net.vulkanic.VulkanicAPI;
 import net.blaze3d.systems.RenderSystem;
 import net.blaze3d.textures.GpuTextureView;
 import net.sodium.client.gl.device.GLRenderDevice;
@@ -161,7 +162,7 @@ public class SodiumShader implements ChunkShaderInterface {
 
 
 		if (isShadowPass) {
-			GlStateManager._disableCull();
+			VulkanicAPI.disableCull();
 		}
 
 		var textureAtlas = Minecraft.getInstance()
@@ -191,15 +192,15 @@ public class SodiumShader implements ChunkShaderInterface {
 	private void bindTextures(GpuTextureView atlas) {
 		((GlTexture) atlas.texture()).flushModeChanges(VulkanicAPI.GL_TEXTURE_2D);
 		IrisRenderSystem.bindTextureToUnit(VulkanicAPI.GL_TEXTURE_2D, 0, atlas.texture().iris$getGlId());
-		GlStateManager._activeTexture(VulkanicAPI.GL_TEXTURE0);
-		GlStateManager._texParameter(3553, 33084, atlas.baseMipLevel());
-		GlStateManager._texParameter(3553, 33085, atlas.baseMipLevel() + atlas.mipLevels() - 1);
+		VulkanicAPI.activeTexture(VulkanicAPI.GL_TEXTURE0);
+		VulkanicAPI.texParameteri(3553, 33084, atlas.baseMipLevel());
+		VulkanicAPI.texParameteri(3553, 33085, atlas.baseMipLevel() + atlas.mipLevels() - 1);
 		((GlTexture) atlas.texture()).flushModeChanges(VulkanicAPI.GL_TEXTURE_2D);
 
 		GpuTextureView lightmap = Minecraft.getInstance().gameRenderer.lightTexture().getTextureView();
 		((GlTexture) lightmap.texture()).flushModeChanges(VulkanicAPI.GL_TEXTURE_2D);
 		IrisRenderSystem.bindTextureToUnit(VulkanicAPI.GL_TEXTURE_2D, 2, lightmap.texture().iris$getGlId());
-		GlStateManager._activeTexture(VulkanicAPI.GL_TEXTURE0 + IrisSamplers.LIGHTMAP_TEXTURE_UNIT);
+		VulkanicAPI.activeTexture(VulkanicAPI.GL_TEXTURE0 + IrisSamplers.LIGHTMAP_TEXTURE_UNIT);
 	}
 
 	private void applyBlendModes() {

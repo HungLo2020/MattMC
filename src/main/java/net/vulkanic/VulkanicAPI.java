@@ -334,6 +334,22 @@ public class VulkanicAPI {
         getBackend().disableBlend();
     }
     
+    public static int getUniformLocation(int programId, String name) {
+        return getBackend().getUniformLocation(programId, name);
+    }
+    
+    public static void disableCull() {
+        getBackend().disableCull();
+    }
+    
+    public static void activeTexture(int texture) {
+        getBackend().activeTexture(texture);
+    }
+    
+    public static void texParameteri(int target, int pname, int param) {
+        getBackend().texParameteri(target, pname, param);
+    }
+    
     public static void useProgram(int programId) {
         getBackend().useProgram(programId);
     }
