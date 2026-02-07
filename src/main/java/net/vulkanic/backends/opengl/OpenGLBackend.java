@@ -1486,4 +1486,48 @@ public class OpenGLBackend implements GraphicsBackend {
     public void setupDebugMessageCallback(java.io.PrintStream stream) {
         org.lwjgl.opengl.GLUtil.setupDebugMessageCallback(stream);
     }
+    
+    // Capability checking methods
+    
+    @Override
+    public boolean checkOpenGL32Support() {
+        org.lwjgl.opengl.GLCapabilities caps = (org.lwjgl.opengl.GLCapabilities) getGLCapabilities();
+        return caps.OpenGL32;
+    }
+    
+    @Override
+    public boolean checkOpenGL33Support() {
+        org.lwjgl.opengl.GLCapabilities caps = (org.lwjgl.opengl.GLCapabilities) getGLCapabilities();
+        return caps.OpenGL33;
+    }
+    
+    @Override
+    public boolean checkARBInstancedArraysSupport() {
+        org.lwjgl.opengl.GLCapabilities caps = (org.lwjgl.opengl.GLCapabilities) getGLCapabilities();
+        return caps.GL_ARB_instanced_arrays;
+    }
+    
+    @Override
+    public long getNamedBufferDataPointer() {
+        org.lwjgl.opengl.GLCapabilities caps = (org.lwjgl.opengl.GLCapabilities) getGLCapabilities();
+        return caps.glNamedBufferData;
+    }
+    
+    @Override
+    public long getBufferStoragePointer() {
+        org.lwjgl.opengl.GLCapabilities caps = (org.lwjgl.opengl.GLCapabilities) getGLCapabilities();
+        return caps.glBufferStorage;
+    }
+    
+    @Override
+    public long getBindVertexBufferPointer() {
+        org.lwjgl.opengl.GLCapabilities caps = (org.lwjgl.opengl.GLCapabilities) getGLCapabilities();
+        return caps.glBindVertexBuffer;
+    }
+    
+    @Override
+    public long getVertexAttribBindingPointer() {
+        org.lwjgl.opengl.GLCapabilities caps = (org.lwjgl.opengl.GLCapabilities) getGLCapabilities();
+        return caps.glVertexAttribBinding;
+    }
 }

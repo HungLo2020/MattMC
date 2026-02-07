@@ -12,9 +12,8 @@ import com.seibel.distanthorizons.core.config.Config;
 import com.seibel.distanthorizons.core.logging.DhLogger;
 import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
 import com.seibel.distanthorizons.core.render.glObject.GLProxy;
+import net.vulkanic.VulkanicAPI;
 import org.lwjgl.PointerBuffer;
-import org.lwjgl.opengl.GL32;
-import org.lwjgl.opengl.GL32C;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.system.MemoryUtil;
 import org.lwjgl.system.NativeType;
@@ -52,7 +51,7 @@ public class Shader
 	{
 		LOGGER.info("Loading shader at [" + path + "]");
 		// Create an empty shader object
-		this.id = GL32.glCreateShader(type);
+		this.id = VulkanicAPI.constructShaderObject(type);
 		if (this.id == 0)
 		{
 			throw new IllegalArgumentException("Failed to create shader with type ["+type+"].");
@@ -61,12 +60,12 @@ public class Shader
 		StringBuilder source = loadFile(path, absoluteFilePath, new StringBuilder());
 		safeShaderSource(this.id, source);
 		
-		GL32.glCompileShader(this.id);
+		VulkanicAPI.compileShaderSource(this.id);
 		// check if the shader compiled
-		int status = GL32.glGetShaderi(this.id, GL32.GL_COMPILE_STATUS);
-		if (status != GL32.GL_TRUE)
+		int status = VulkanicAPI.queryShaderParameter(this.id, VulkanicAPI.GL_COMPILE_STATUS);
+		if (status != VulkanicAPI.GL_TRUE)
 		{
-			String message = "Shader compiler error. Details: ["+GL32.glGetShaderInfoLog(this.id)+"].";
+			String message = "Shader compiler error. Details: ["+VulkanicAPI.retrieveShaderInfoLog(this.id)+"].";
 			this.free(); // important!
 			throw new RuntimeException(message);
 		}
@@ -83,20 +82,20 @@ public class Shader
 		}
 		
 		// Create an empty shader object
-		this.id = GL32.glCreateShader(type);
+		this.id = VulkanicAPI.constructShaderObject(type);
 		if (this.id == 0)
 		{
 			throw new IllegalArgumentException("Failed to create shader with type ["+type+"] and Source: \n["+sourceString+"].");
 		}
 		
 		safeShaderSource(this.id, sourceString);
-		GL32.glCompileShader(this.id);
+		VulkanicAPI.compileShaderSource(this.id);
 		// check if the shader compiled
-		int status = GL32.glGetShaderi(this.id, GL32.GL_COMPILE_STATUS);
-		if (status != GL32.GL_TRUE)
+		int status = VulkanicAPI.queryShaderParameter(this.id, VulkanicAPI.GL_COMPILE_STATUS);
+		if (status != VulkanicAPI.GL_TRUE)
 		{
 			
-			String message = "Shader compiler error. Details: [" + GL32.glGetShaderInfoLog(this.id) + "]\n";
+			String message = "Shader compiler error. Details: [" + VulkanicAPI.retrieveShaderInfoLog(this.id) + "]\n";
 			message += "Source: \n[" + sourceString + "]";
 			this.free(); // important!
 			throw new RuntimeException(message);
@@ -111,7 +110,7 @@ public class Shader
 	//=========//
 	
 	/**
-	 * Identical in function to {@link GL32C#glShaderSource(int, CharSequence)} but
+	 * Identical in function to glShaderSource but
 	 * passes a null pointer for string length to force the driver to rely on the null
 	 * terminator for string length.  This is a workaround for an apparent flaw with some
 	 * AMD drivers that don't receive or interpret the length correctly, resulting in
@@ -132,7 +131,7 @@ public class Shader
 			final PointerBuffer pointers = stack.mallocPointer(1);
 			pointers.put(sourceBuffer);
 
-			GL32.nglShaderSource(glId, 1, pointers.address0(), 0);
+			VulkanicAPI.uploadShaderSourceNative(glId, 1, pointers.address0(), 0);
 			org.lwjgl.system.APIUtil.apiArrayFree(pointers.address0(), 1);
 		}
 		finally
@@ -141,7 +140,7 @@ public class Shader
 		}
 	}
 	
-	public void free() { GL32.glDeleteShader(this.id); }
+	public void free() { VulkanicAPI.disposeShaderObject(this.id); }
 	
 	public static StringBuilder loadFile(String path, boolean absoluteFilePath, StringBuilder stringBuilder)
 	{

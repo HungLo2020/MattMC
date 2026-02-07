@@ -249,6 +249,8 @@ public class VulkanicAPI {
     // OpenGL Constants - Uniform/Active Types
     public static final int GL_FLOAT = 0x1406;
     public static final int GL_INT = 0x1404;
+    public static final int GL_SHORT = 0x1402;
+    public static final int GL_UNSIGNED_SHORT = 0x1403;
     public static final int GL_HALF_FLOAT = 0x140B;
     public static final int GL_BOOL = 0x8B56;
     public static final int GL_FLOAT_VEC2 = 0x8B50;
@@ -1523,9 +1525,9 @@ public class VulkanicAPI {
     /**
      * Gets the OpenGL capabilities for the current context.
      * Returns a platform-specific capabilities object that should be cast to the appropriate type.
-     * For OpenGL backend, returns org.lwjgl.opengl.GLCapabilities.
+     * For OpenGL backend, returns GLCapabilities from the LWJGL library.
      * 
-     * @return Platform-specific capabilities object (cast to org.lwjgl.opengl.GLCapabilities for OpenGL)
+     * @return Platform-specific capabilities object (cast to GLCapabilities for OpenGL backend)
      */
     public static Object getGLCapabilities() {
         return getBackend().getGLCapabilities();
@@ -1537,5 +1539,74 @@ public class VulkanicAPI {
      */
     public static void setupDebugMessageCallback(java.io.PrintStream stream) {
         getBackend().setupDebugMessageCallback(stream);
+    }
+    
+    // Capability checking methods (to avoid casting GLCapabilities outside backends/opengl)
+    
+    /**
+     * Checks if OpenGL 3.2 is supported.
+     * @return true if OpenGL 3.2 is supported
+     */
+    public static boolean checkOpenGL32Support() {
+        return getBackend().checkOpenGL32Support();
+    }
+    
+    /**
+     * Checks if OpenGL 3.3 is supported.
+     * @return true if OpenGL 3.3 is supported
+     */
+    public static boolean checkOpenGL33Support() {
+        return getBackend().checkOpenGL33Support();
+    }
+    
+    /**
+     * Checks if ARB_instanced_arrays extension is supported.
+     * @return true if ARB_instanced_arrays is supported
+     */
+    public static boolean checkARBInstancedArraysSupport() {
+        return getBackend().checkARBInstancedArraysSupport();
+    }
+    
+    /**
+     * Gets the function pointer for glNamedBufferData.
+     * @return function pointer, or 0 if not available
+     */
+    public static long getNamedBufferDataPointer() {
+        return getBackend().getNamedBufferDataPointer();
+    }
+    
+    /**
+     * Gets the function pointer for glBufferStorage.
+     * @return function pointer, or 0 if not available
+     */
+    public static long getBufferStoragePointer() {
+        return getBackend().getBufferStoragePointer();
+    }
+    
+    /**
+     * Gets the function pointer for glBindVertexBuffer.
+     * @return function pointer, or 0 if not available
+     */
+    public static long getBindVertexBufferPointer() {
+        return getBackend().getBindVertexBufferPointer();
+    }
+    
+    /**
+     * Gets the function pointer for glVertexAttribBinding.
+     * @return function pointer, or 0 if not available
+     */
+    public static long getVertexAttribBindingPointer() {
+        return getBackend().getVertexAttribBindingPointer();
+    }
+    
+    /**
+     * Gets capability information as a formatted string for debugging.
+     * @return formatted capability information
+     */
+    public static String getCapabilityDebugInfo() {
+        return "Your OpenGL support:\n" +
+                "openGL version 3.2+: [" + checkOpenGL32Support() + "] <- REQUIRED\n" +
+                "Vertex Attribute Buffer Binding: [" + (getVertexAttribBindingPointer() != 0) + "] <- optional improvement\n" +
+                "Buffer Storage: [" + (getBufferStoragePointer() != 0) + "] <- optional improvement\n";
     }
 }

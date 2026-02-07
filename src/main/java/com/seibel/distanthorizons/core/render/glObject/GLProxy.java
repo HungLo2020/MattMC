@@ -41,8 +41,8 @@ public class GLProxy
 	private static GLProxy instance = null;
 	
 	
-	/** Minecraft's GL capabilities */
-	public final org.lwjgl.opengl.GLCapabilities glCapabilities;
+	/** Minecraft's GL capabilities (platform-specific, cast to GLCapabilities for OpenGL backend) */
+	public final Object glCapabilities;
 	
 	public boolean namedObjectSupported = false; // ~OpenGL 4.5 (UNUSED CURRENTLY)
 	public boolean bufferStorageSupported = false; // ~OpenGL 4.4
@@ -101,12 +101,15 @@ public class GLProxy
 		//============================//
 		
 		// get Minecraft's capabilities
-		this.glCapabilities = (org.lwjgl.opengl.GLCapabilities) VulkanicAPI.getGLCapabilities();
+		this.glCapabilities = VulkanicAPI.getGLCapabilities();
 		
 		// crash the game if the GPU doesn't support OpenGL 3.2
-		if (!this.glCapabilities.OpenGL32)
+		if (!VulkanicAPI.checkOpenGL32Support())
 		{
-			String supportedVersionInfo = this.getFailedVersionInfo(this.glCapabilities);
+			String supportedVersionInfo = VulkanicAPI.getCapabilityDebugInfo() +
+				"If you noticed that your computer supports higher OpenGL versions" +
+				" but not the required version, try running the game in compatibility mode." +
+				" (How you turn that on, I have no clue~)";
 			
 			// See full requirement at above.
 			String errorMessage = ModInfo.READABLE_NAME + " was initializing " + GLProxy.class.getSimpleName()
@@ -114,7 +117,7 @@ public class GLProxy
 					"Additional info:\n" + supportedVersionInfo;
 			MC.crashMinecraft(errorMessage, new UnsupportedOperationException("Distant Horizon OpenGL requirements not met"));
 		}
-	 	LOGGER.info("minecraftGlCapabilities:\n" + this.versionInfoToString(this.glCapabilities));
+	 	LOGGER.info("minecraftGlCapabilities:\n" + VulkanicAPI.getCapabilityDebugInfo());
 		
 		if (Config.Client.Advanced.Debugging.OpenGl.overrideVanillaGLLogger.get())
 		{
@@ -129,23 +132,23 @@ public class GLProxy
 		
 		// UNUSED currently
 		// Check if we can use the named version of all calls, which is available in GL4.5 or after
-		this.namedObjectSupported = this.glCapabilities.glNamedBufferData != 0L; //Nullptr
+		this.namedObjectSupported = VulkanicAPI.getNamedBufferDataPointer() != 0L; //Nullptr
 		
 		// Check if we can use the Buffer Storage, which is available in GL4.4 or after
-		this.bufferStorageSupported = this.glCapabilities.glBufferStorage != 0L; // Nullptr
+		this.bufferStorageSupported = VulkanicAPI.getBufferStoragePointer() != 0L; // Nullptr
 		if (!this.bufferStorageSupported)
 		{
 			LOGGER.info("This GPU doesn't support Buffer Storage (OpenGL 4.4), falling back to using other methods.");
 		}
 		
 		// Check if we can use the make-over version of Vertex Attribute, which is available in GL4.3 or after
-		this.vertexAttributeBufferBindingSupported = this.glCapabilities.glBindVertexBuffer != 0L; // Nullptr
+		this.vertexAttributeBufferBindingSupported = VulkanicAPI.getBindVertexBufferPointer() != 0L; // Nullptr
 		
 		// used by instanced rendering
-		this.vertexAttribDivisorSupported = this.glCapabilities.OpenGL33;
+		this.vertexAttribDivisorSupported = VulkanicAPI.checkOpenGL33Support();
 		// denotes if ARBInstancedArrays.glVertexAttribDivisorARB() is available or not
 		// can be used as a backup if MC didn't create a GL 3.3+ context
-		this.instancedArraysSupported = this.glCapabilities.GL_ARB_instanced_arrays;
+		this.instancedArraysSupported = VulkanicAPI.checkARBInstancedArraysSupport();
 		
 		// get the best automatic upload method
 		String vendor = VulkanicAPI.queryStringInfo(VulkanicAPI.GL_VENDOR).toUpperCase(); // example return: "NVIDIA CORPORATION"
@@ -342,25 +345,6 @@ public class GLProxy
 	//================//
 	// helper methods //
 	//================//
-	
-	private String getFailedVersionInfo(org.lwjgl.opengl.GLCapabilities c)
-	{
-		return "Your OpenGL support:\n" +
-				"openGL version 3.2+: [" + c.OpenGL32 + "] <- REQUIRED\n" +
-				"Vertex Attribute Buffer Binding: [" + (c.glVertexAttribBinding != 0) + "] <- optional improvement\n" +
-				"Buffer Storage: [" + (c.glBufferStorage != 0) + "] <- optional improvement\n" +
-				"If you noticed that your computer supports higher OpenGL versions"
-				+ " but not the required version, try running the game in compatibility mode."
-				+ " (How you turn that on, I have no clue~)";
-	}
-	
-	private String versionInfoToString(org.lwjgl.opengl.GLCapabilities c)
-	{
-		return "Your OpenGL support:\n" +
-				"openGL version 3.2+: [" + c.OpenGL32 + "] <- REQUIRED\n" +
-				"Vertex Attribute Buffer Binding: [" + (c.glVertexAttribBinding != 0) + "] <- optional improvement\n" +
-				"Buffer Storage: [" + (c.glBufferStorage != 0) + "] <- optional improvement\n";
-	}
 	
 	
 	

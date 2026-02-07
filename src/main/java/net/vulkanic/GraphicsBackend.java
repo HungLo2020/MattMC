@@ -397,4 +397,13 @@ public interface GraphicsBackend {
     // GL context capabilities
     Object getGLCapabilities();
     void setupDebugMessageCallback(java.io.PrintStream stream);
+    
+    // Capability checking methods (to avoid casting GLCapabilities outside backends/opengl)
+    boolean checkOpenGL32Support();
+    boolean checkOpenGL33Support();
+    boolean checkARBInstancedArraysSupport();
+    long getNamedBufferDataPointer();
+    long getBufferStoragePointer();
+    long getBindVertexBufferPointer();
+    long getVertexAttribBindingPointer();
 }
