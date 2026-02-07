@@ -1275,33 +1275,13 @@ public class OpenGLBackend implements GraphicsBackend {
     }
     
     @Override
-    public void glDebugMessageCallback(org.lwjgl.opengl.GLDebugMessageCallback callback, long userParam) {
-        org.lwjgl.opengl.GL43C.glDebugMessageCallback(callback, userParam);
-    }
-    
-    @Override
-    public void glDebugMessageCallbackKHR(org.lwjgl.opengl.GLDebugMessageCallback callback, long userParam) {
-        org.lwjgl.opengl.KHRDebug.glDebugMessageCallback(callback, userParam);
-    }
-    
-    @Override
     public void glDebugMessageControlKHR(int source, int type, int severity, int[] ids, boolean enabled) {
         org.lwjgl.opengl.KHRDebug.glDebugMessageControl(source, type, severity, ids, enabled);
     }
     
     @Override
-    public void glDebugMessageCallbackARB(org.lwjgl.opengl.GLDebugMessageARBCallback callback, long userParam) {
-        org.lwjgl.opengl.ARBDebugOutput.glDebugMessageCallbackARB(callback, userParam);
-    }
-    
-    @Override
     public void glDebugMessageControlARB(int source, int type, int severity, int[] ids, boolean enabled) {
         org.lwjgl.opengl.ARBDebugOutput.glDebugMessageControlARB(source, type, severity, ids, enabled);
-    }
-    
-    @Override
-    public void glDebugMessageCallbackAMD(org.lwjgl.opengl.GLDebugMessageAMDCallback callback, long userParam) {
-        org.lwjgl.opengl.AMDDebugOutput.glDebugMessageCallbackAMD(callback, userParam);
     }
     
     @Override

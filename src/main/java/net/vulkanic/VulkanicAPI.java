@@ -26,6 +26,7 @@ public class VulkanicAPI {
     }
     
     // OpenGL Constants - Buffer Targets
+    public static final int GL_ARRAY_BUFFER = 0x8892;
     public static final int GL_COPY_READ_BUFFER = 0x8F36;
     public static final int GL_COPY_WRITE_BUFFER = 0x8F37;
     public static final int GL_SHADER_STORAGE_BUFFER = 0x90D2;
@@ -1240,33 +1241,17 @@ public class VulkanicAPI {
         return getBackend().glCreateTextures(target);
     }
     
-    // Debug callback wrapper methods
+    // Debug callback control methods (low-level control only)
     public static void glDebugMessageControl(int source, int type, int severity, int[] ids, boolean enabled) {
         getBackend().glDebugMessageControl(source, type, severity, ids, enabled);
-    }
-    
-    public static void glDebugMessageCallback(org.lwjgl.opengl.GLDebugMessageCallback callback, long userParam) {
-        getBackend().glDebugMessageCallback(callback, userParam);
-    }
-    
-    public static void glDebugMessageCallbackKHR(org.lwjgl.opengl.GLDebugMessageCallback callback, long userParam) {
-        getBackend().glDebugMessageCallbackKHR(callback, userParam);
     }
     
     public static void glDebugMessageControlKHR(int source, int type, int severity, int[] ids, boolean enabled) {
         getBackend().glDebugMessageControlKHR(source, type, severity, ids, enabled);
     }
     
-    public static void glDebugMessageCallbackARB(org.lwjgl.opengl.GLDebugMessageARBCallback callback, long userParam) {
-        getBackend().glDebugMessageCallbackARB(callback, userParam);
-    }
-    
     public static void glDebugMessageControlARB(int source, int type, int severity, int[] ids, boolean enabled) {
         getBackend().glDebugMessageControlARB(source, type, severity, ids, enabled);
-    }
-    
-    public static void glDebugMessageCallbackAMD(org.lwjgl.opengl.GLDebugMessageAMDCallback callback, long userParam) {
-        getBackend().glDebugMessageCallbackAMD(callback, userParam);
     }
     
     public static void glDebugMessageEnableAMD(int category, int severity, int[] ids, boolean enabled) {
@@ -1304,5 +1289,96 @@ public class VulkanicAPI {
     
     public static void clearDebugMessageCallbackAMD() {
         getBackend().clearDebugMessageCallbackAMD();
+    }
+    
+    // GL-style wrapper methods for backward compatibility
+    // These delegate to the abstracted methods above
+    
+    /**
+     * Binds a vertex attribute to a specific location in a shader program.
+     * Wrapper for bindAttributeLocation.
+     */
+    public static void glBindAttribLocation(int program, int index, CharSequence name) {
+        bindAttributeLocation(program, index, name);
+    }
+    
+    /**
+     * Configures a vertex attribute pointer.
+     * Wrapper for configureVertexAttribute.
+     */
+    public static void glVertexAttribPointer(int index, int size, int type, boolean normalized, int stride, long pointer) {
+        configureVertexAttribute(index, size, type, normalized, stride, pointer);
+    }
+    
+    /**
+     * Enables a vertex attribute array.
+     * Wrapper for activateVertexAttribute.
+     */
+    public static void glEnableVertexAttribArray(int index) {
+        activateVertexAttribute(index);
+    }
+    
+    /**
+     * Creates a new shader program object.
+     * Wrapper for constructProgramObject.
+     */
+    public static int glCreateProgram() {
+        return constructProgramObject();
+    }
+    
+    /**
+     * Attaches a shader to a program.
+     * Wrapper for attachShaderToProgram.
+     */
+    public static void glAttachShader(int program, int shader) {
+        attachShaderToProgram(program, shader);
+    }
+    
+    /**
+     * Links a program object.
+     * Wrapper for linkProgramBinary.
+     */
+    public static void glLinkProgram(int program) {
+        linkProgramBinary(program);
+    }
+    
+    /**
+     * Returns a parameter from a program object.
+     * Wrapper for queryProgramParameter.
+     */
+    public static int glGetProgrami(int program, int pname) {
+        return queryProgramParameter(program, pname);
+    }
+    
+    /**
+     * Installs a program object as part of current rendering state.
+     * Wrapper for useProgram.
+     */
+    public static void glUseProgram(int program) {
+        useProgram(program);
+    }
+    
+    /**
+     * Deletes a program object.
+     * Wrapper for disposeProgramObject.
+     */
+    public static void glDeleteProgram(int program) {
+        disposeProgramObject(program);
+    }
+    
+    /**
+     * Returns the location of a uniform variable.
+     * Wrapper for locateUniformVariable.
+     */
+    public static int glGetUniformLocation(int program, CharSequence name) {
+        return locateUniformVariable(program, name);
+    }
+    
+    /**
+     * Sets the value of a uniform variable.
+     * Wrapper for assignUniformInteger.
+     */
+    public static void glUniform1i(int location, int value) {
+        assignUniformInteger(location, value);
     }
 }

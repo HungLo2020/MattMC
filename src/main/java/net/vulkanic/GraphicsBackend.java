@@ -348,14 +348,10 @@ public interface GraphicsBackend {
     int glCreateFramebuffers();
     int glCreateTextures(int target);
     
-    // Debug callback methods
+    // Debug callback methods (low-level control methods only)
     void glDebugMessageControl(int source, int type, int severity, int[] ids, boolean enabled);
-    void glDebugMessageCallback(org.lwjgl.opengl.GLDebugMessageCallback callback, long userParam);
-    void glDebugMessageCallbackKHR(org.lwjgl.opengl.GLDebugMessageCallback callback, long userParam);
     void glDebugMessageControlKHR(int source, int type, int severity, int[] ids, boolean enabled);
-    void glDebugMessageCallbackARB(org.lwjgl.opengl.GLDebugMessageARBCallback callback, long userParam);
     void glDebugMessageControlARB(int source, int type, int severity, int[] ids, boolean enabled);
-    void glDebugMessageCallbackAMD(org.lwjgl.opengl.GLDebugMessageAMDCallback callback, long userParam);
     void glDebugMessageEnableAMD(int category, int severity, int[] ids, boolean enabled);
     
     // High-level debug callback wrapper methods

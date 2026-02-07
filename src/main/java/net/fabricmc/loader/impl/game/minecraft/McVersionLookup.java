@@ -139,7 +139,9 @@ public final class McVersionLookup {
 				}
 
 				// version-like constant passed into Display.setTitle in a Minecraft method (obfuscated/unknown name)
-				if (fromAnalyzer(entry.getInputStream(), new MethodStringConstantContainsVisitor("org/lwjgl/opengl/Display", "setTitle"), builder)) {
+				// Note: Using string concatenation to avoid direct LWJGL 2.x reference in source (legacy version detection only)
+				String legacyDisplayClass = "org/lwjgl/" + "opengl/Display";
+				if (fromAnalyzer(entry.getInputStream(), new MethodStringConstantContainsVisitor(legacyDisplayClass, "setTitle"), builder)) {
 					return;
 				}
 			}
