@@ -11,6 +11,7 @@ public interface GraphicsBackend {
     
     void bindTexture(int textureId);
     void bindTexture(int target, int textureId);  // For explicit target binding
+    void generateMipmap(int target);
     void viewport(int x, int y, int width, int height);
     void clear(int mask);
     void enableBlend();

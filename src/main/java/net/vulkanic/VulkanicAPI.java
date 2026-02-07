@@ -295,6 +295,10 @@ public class VulkanicAPI {
         getBackend().bindTexture(target, textureId);
     }
     
+    public static void generateMipmap(int target) {
+        getBackend().generateMipmap(target);
+    }
+    
     public static void viewport(int x, int y, int width, int height) {
         getBackend().viewport(x, y, width, height);
     }

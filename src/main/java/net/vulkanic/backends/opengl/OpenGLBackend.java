@@ -31,6 +31,11 @@ public class OpenGLBackend implements GraphicsBackend {
     }
     
     @Override
+    public void generateMipmap(int target) {
+        GL30.glGenerateMipmap(target);
+    }
+    
+    @Override
     public void viewport(int x, int y, int width, int height) {
         GL11.glViewport(x, y, width, height);
     }
