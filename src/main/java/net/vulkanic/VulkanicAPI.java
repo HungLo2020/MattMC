@@ -569,14 +569,36 @@ public class VulkanicAPI {
         getBackend().disable(cap);
     }
     
-    @Deprecated
-    public static void setDepthTestFunction(int func) {
-        getBackend().setDepthTestFunction(func);
+    /**
+     * Sets the depth test comparison function for the rendering pipeline.
+     * This is a Vulkan-compatible replacement for the deprecated setDepthTestFunction() method.
+     * 
+     * The depth test controls how incoming fragment depth values are compared against
+     * the depth buffer to determine if the fragment should be drawn.
+     * 
+     * In OpenGL: Maps to glDepthFunc()
+     * In Vulkan: Will be part of VkPipelineDepthStencilStateCreateInfo.depthCompareOp
+     * 
+     * @param func The depth comparison function (e.g., GL_LESS, GL_LEQUAL, GL_ALWAYS, etc.)
+     */
+    public static void setPipelineDepthTest(int func) {
+        getBackend().setPipelineDepthTest(func);
     }
     
-    @Deprecated
-    public static void setDepthWriteEnabled(boolean enabled) {
-        getBackend().setDepthWriteEnabled(enabled);
+    /**
+     * Sets whether depth writes are enabled for the rendering pipeline.
+     * This is a Vulkan-compatible replacement for the deprecated setDepthWriteEnabled() method.
+     * 
+     * When enabled, fragment depth values are written to the depth buffer. When disabled,
+     * depth testing can still occur but depth values are not updated.
+     * 
+     * In OpenGL: Maps to glDepthMask()
+     * In Vulkan: Will be part of VkPipelineDepthStencilStateCreateInfo.depthWriteEnable
+     * 
+     * @param enabled True to enable depth writes, false to disable
+     */
+    public static void setPipelineDepthWrite(boolean enabled) {
+        getBackend().setPipelineDepthWrite(enabled);
     }
     
     /**

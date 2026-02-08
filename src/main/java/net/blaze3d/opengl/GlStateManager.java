@@ -79,7 +79,7 @@ public class GlStateManager {
 		RenderSystem.assertOnRenderThread();
 		if (i != DEPTH.func) {
 			DEPTH.func = i;
-			net.vulkanic.VulkanicAPI.setDepthTestFunction(i);
+			net.vulkanic.VulkanicAPI.setPipelineDepthTest(i);
 		}
 	}
 
@@ -93,7 +93,7 @@ public class GlStateManager {
 		
 		if (bl != DEPTH.mask) {
 			DEPTH.mask = bl;
-			net.vulkanic.VulkanicAPI.setDepthWriteEnabled(bl);
+			net.vulkanic.VulkanicAPI.setPipelineDepthWrite(bl);
 		}
 	}
 
