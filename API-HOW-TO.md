@@ -10,14 +10,15 @@
 ## Table of Contents
 
 1. [Overview](#overview)
-2. [The Problem We're Solving](#the-problem-were-solving)
-3. [Migration Paradigm](#migration-paradigm)
-4. [Core Design Principles](#core-design-principles)
-5. [The Six-Step Workflow](#the-six-step-workflow)
-6. [Method Selection Strategy](#method-selection-strategy)
-7. [API Design Guidelines](#api-design-guidelines)
-8. [Special Considerations](#special-considerations)
-9. [Related Documentation](#related-documentation)
+2. [Critical Architectural Constraints](#critical-architectural-constraints)
+3. [The Problem We're Solving](#the-problem-were-solving)
+4. [Migration Paradigm](#migration-paradigm)
+5. [Core Design Principles](#core-design-principles)
+6. [The Six-Step Workflow](#the-six-step-workflow)
+7. [Method Selection Strategy](#method-selection-strategy)
+8. [API Design Guidelines](#api-design-guidelines)
+9. [Special Considerations](#special-considerations)
+10. [Related Documentation](#related-documentation)
 
 ---
 
@@ -35,6 +36,49 @@ Vulkanic is a graphics abstraction layer designed to sit between game/mod code a
 - Backend-agnostic API compatible with both OpenGL and Vulkan
 - Clean separation between frontend API and backend implementations
 - Proper abstractions for command buffers, pipelines, and resource management
+
+---
+
+## Critical Architectural Constraints
+
+**These rules are ABSOLUTE and must NEVER be violated:**
+
+### Rule 1: External Code Can Only Call VulkanicAPI
+**Code outside the `vulkanic/` directory can ONLY call methods from `VulkanicAPI`.**
+
+This means:
+- Game code, mod code, Blaze3D, Sodium, Iris, Distant Horizons - all must use VulkanicAPI
+- Direct imports of `GraphicsBackend` interface from external code are forbidden
+- Direct imports of backend implementations (OpenGLBackend, VulkanBackend) from external code are forbidden
+- The VulkanicAPI facade is the ONLY public interface to the graphics system
+
+### Rule 2: Backends Directory is Strictly Private
+**Nothing outside `vulkanic/` can directly call ANYTHING within the `backends/` directory.**
+
+This means:
+- No direct calls to `OpenGLBackend` from external code
+- No direct calls to `VulkanBackend` (future) from external code
+- No direct imports of classes within `backends/opengl/` or `backends/vulkan/` from external code
+- Backend implementations are internal implementation details, never public APIs
+
+### Rule 3: Backends Cannot Call Each Other
+**Backend implementations are completely isolated from each other.**
+
+This means:
+- OpenGL backend cannot call Vulkan backend
+- Vulkan backend cannot call OpenGL backend
+- Each backend is a self-contained implementation of the GraphicsBackend interface
+- No shared code between backends except through the GraphicsBackend interface contract
+
+### Enforcement
+
+These constraints ensure:
+- **Clean abstraction:** Backends can be swapped, replaced, or extended without affecting external code
+- **Future flexibility:** New backends can be added without changing external code
+- **Testability:** Backends can be tested independently
+- **Clear responsibilities:** Frontend defines "what" to do, backends define "how" to do it
+
+**Violation of these rules breaks the entire architecture.** During migration, ensure all code changes respect these boundaries.
 
 ---
 
@@ -83,7 +127,14 @@ Instead of attempting a "big bang" rewrite, we migrate one deprecated method at 
 
 ## Core Design Principles
 
-All new replacement methods must adhere to these five principles:
+All new replacement methods must adhere to these principles:
+
+### 0. Respect API Boundaries (Critical)
+**Before anything else, ensure architectural constraints are maintained:**
+- All external code must call VulkanicAPI only - never GraphicsBackend or backend implementations
+- Backend implementations (in `backends/` directory) are strictly internal
+- Backends are isolated from each other - no cross-backend calls
+- See [Critical Architectural Constraints](#critical-architectural-constraints) for details
 
 ### 1. Backend Agnostic Design
 - Must work identically with both OpenGL and Vulkan backends
