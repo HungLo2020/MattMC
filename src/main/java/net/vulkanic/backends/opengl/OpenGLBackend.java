@@ -98,6 +98,11 @@ public class OpenGLBackend implements GraphicsBackend {
         GL11.glDisable(GL11.GL_BLEND);
     }
     
+    @Override
+    public void bindShaderProgram(int programId) {
+        GL20.glUseProgram(programId);
+    }
+    
     @Deprecated
     @Override
     public void useProgram(int programId) {

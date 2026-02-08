@@ -195,7 +195,7 @@ public class GlStateManager {
 		net.irisshaders.iris.gl.IrisRenderSystem.onProgramUse();
 		
 		iris$program = i;
-		net.vulkanic.VulkanicAPI.useProgram(i);
+		net.vulkanic.VulkanicAPI.bindShaderProgram(i);
 		
 		// Iris: From MixinGlStateManager_DepthColorOverride - reset tessellation flag
 		net.irisshaders.iris.vertices.ImmediateState.usingTessellation = false;

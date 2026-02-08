@@ -594,6 +594,36 @@ public class VulkanicAPI {
         getBackend().clearAttachments(clearColor, clearDepth);
     }
     
+    /**
+     * Binds a shader program for rendering.
+     * This is a Vulkan-compatible replacement for the deprecated useProgram(int programId) method.
+     * 
+     * In OpenGL: Maps to glUseProgram()
+     * In Vulkan: Will map to vkCmdBindPipeline() with a graphics pipeline containing the shader modules
+     * 
+     * This method explicitly binds a shader program, making it clear which program will be used
+     * for subsequent draw commands. The program should have been previously compiled and linked.
+     * 
+     * Important architectural notes for Vulkan compatibility:
+     * - In Vulkan, shaders are part of a pipeline state object (PSO)
+     * - The pipeline includes shaders, vertex input state, rasterization state, etc.
+     * - This method is an intermediate step - future versions will use full PSO
+     * - For now, it provides a simple 1:1 mapping while maintaining Vulkan compatibility
+     * 
+     * For OpenGL backend:
+     * - Directly calls glUseProgram with the program ID
+     * - Program 0 unbinds the current program
+     * 
+     * Future evolution: This will be part of pipeline state objects:
+     *   PipelineStateObject pso = createPipeline(shaderProgram, ...);
+     *   cmdBindPipeline(commandBuffer, pso);
+     * 
+     * @param programId The shader program ID to bind (0 to unbind)
+     */
+    public static void bindShaderProgram(int programId) {
+        getBackend().bindShaderProgram(programId);
+    }
+    
     @Deprecated
     public static void enableBlend() {
         getBackend().enableBlend();
