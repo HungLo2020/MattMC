@@ -87,9 +87,7 @@ public class MinecraftGLWrapper implements IMinecraftGLWrapper
 	@Override
 	public void glDepthFunc(int func) 
 	{ 
-		// MinecraftGLWrapper bridges to both VulkanicAPI and GlStateManager
-		// for compatibility. This is OpenGL-specific wrapper code.
-		VulkanicAPI.setDepthTestFunction(func);  // Use deprecated method (it's internal)
+		VulkanicAPI.setDepthTestFunction(func);
 		GlStateManager._depthFunc(func); 
 	}
 	
@@ -97,14 +95,14 @@ public class MinecraftGLWrapper implements IMinecraftGLWrapper
 	@Override
 	public void enableDepthMask() 
 	{
-		VulkanicAPI.setDepthWriteEnabled(true);  // Use deprecated method (it's internal)
+		VulkanicAPI.setDepthWriteEnabled(true);
 		GlStateManager._depthMask(true); 
 	}
 	/** Disables depth buffer writing */
 	@Override
 	public void disableDepthMask() 
 	{
-		VulkanicAPI.setDepthWriteEnabled(false);  // Use deprecated method (it's internal)
+		VulkanicAPI.setDepthWriteEnabled(false);
 		GlStateManager._depthMask(false); 
 	}
 	
