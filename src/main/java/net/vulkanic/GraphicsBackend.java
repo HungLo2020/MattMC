@@ -414,4 +414,19 @@ public interface GraphicsBackend {
     long getBufferStoragePointer();
     long getBindVertexBufferPointer();
     long getVertexAttribBindingPointer();
+    
+    // Additional GL query and state methods
+    boolean glIsEnabled(int cap);
+    boolean glIsFramebuffer(int framebuffer);
+    boolean glIsTexture(int texture);
+    boolean glIsVertexArray(int array);
+    boolean glIsProgram(int program);
+    
+    // Additional GL state methods
+    void glBlendEquationSeparate(int modeRGB, int modeAlpha);
+    void glStencilFunc(int func, int ref, int mask);
+    void glCullFace(int mode);
+    
+    // Additional texture methods
+    int glGenTextures();
 }

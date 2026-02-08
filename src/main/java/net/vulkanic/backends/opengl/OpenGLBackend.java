@@ -1570,4 +1570,55 @@ public class OpenGLBackend implements GraphicsBackend {
         org.lwjgl.opengl.GLCapabilities caps = (org.lwjgl.opengl.GLCapabilities) getGLCapabilities();
         return caps.glVertexAttribBinding;
     }
+    
+    // Additional GL query and state methods
+    
+    @Override
+    public boolean glIsEnabled(int cap) {
+        return org.lwjgl.opengl.GL11.glIsEnabled(cap);
+    }
+    
+    @Override
+    public boolean glIsFramebuffer(int framebuffer) {
+        return org.lwjgl.opengl.GL30.glIsFramebuffer(framebuffer);
+    }
+    
+    @Override
+    public boolean glIsTexture(int texture) {
+        return org.lwjgl.opengl.GL11.glIsTexture(texture);
+    }
+    
+    @Override
+    public boolean glIsVertexArray(int array) {
+        return org.lwjgl.opengl.GL30.glIsVertexArray(array);
+    }
+    
+    @Override
+    public boolean glIsProgram(int program) {
+        return org.lwjgl.opengl.GL20.glIsProgram(program);
+    }
+    
+    // Additional GL state methods
+    
+    @Override
+    public void glBlendEquationSeparate(int modeRGB, int modeAlpha) {
+        org.lwjgl.opengl.GL20.glBlendEquationSeparate(modeRGB, modeAlpha);
+    }
+    
+    @Override
+    public void glStencilFunc(int func, int ref, int mask) {
+        org.lwjgl.opengl.GL11.glStencilFunc(func, ref, mask);
+    }
+    
+    @Override
+    public void glCullFace(int mode) {
+        org.lwjgl.opengl.GL11.glCullFace(mode);
+    }
+    
+    // Additional texture methods
+    
+    @Override
+    public int glGenTextures() {
+        return org.lwjgl.opengl.GL11.glGenTextures();
+    }
 }

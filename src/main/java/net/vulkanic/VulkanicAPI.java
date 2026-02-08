@@ -177,6 +177,7 @@ public class VulkanicAPI {
     public static final int GL_READ_FRAMEBUFFER = 0x8CA8;
     public static final int GL_DRAW_FRAMEBUFFER = 0x8CA9;
     public static final int GL_COLOR_ATTACHMENT0 = 0x8CE0;
+    public static final int GL_COLOR_ATTACHMENT1 = 0x8CE1;
     public static final int GL_DEPTH_ATTACHMENT = 0x8D00;
     public static final int GL_DEPTH_STENCIL_ATTACHMENT = 0x821A;
     public static final int GL_MAX_COLOR_ATTACHMENTS = 0x8CDF;
@@ -347,6 +348,107 @@ public class VulkanicAPI {
     
     // OpenGL Constants - Program Query
     public static final int GL_ACTIVE_UNIFORMS = 0x8B86;
+    
+    // OpenGL Constants - GL State Query
+    public static final int GL_CURRENT_PROGRAM = 0x8B8D;
+    public static final int GL_VERTEX_ARRAY_BINDING = 0x85B5;
+    public static final int GL_ARRAY_BUFFER_BINDING = 0x8894;
+    public static final int GL_ELEMENT_ARRAY_BUFFER_BINDING = 0x8895;
+    public static final int GL_ACTIVE_TEXTURE = 0x84E0;
+    public static final int GL_BLEND_EQUATION_RGB = 0x8009;
+    public static final int GL_BLEND_EQUATION_ALPHA = 0x883D;
+    public static final int GL_BLEND_SRC_RGB = 0x80C9;
+    public static final int GL_BLEND_SRC_ALPHA = 0x80CA;
+    public static final int GL_BLEND_DST_RGB = 0x80C8;
+    public static final int GL_BLEND_DST_ALPHA = 0x80CB;
+    public static final int GL_DEPTH_WRITEMASK = 0x0B72;
+    public static final int GL_DEPTH_FUNC = 0x0B74;
+    public static final int GL_STENCIL_TEST = 0x0B90;
+    public static final int GL_STENCIL_FUNC = 0x0B92;
+    public static final int GL_STENCIL_REF = 0x0B97;
+    public static final int GL_STENCIL_VALUE_MASK = 0x0B93;
+    public static final int GL_CULL_FACE_MODE = 0x0B45;
+    public static final int GL_POLYGON_MODE = 0x0B40;
+    
+    // OpenGL Constants - Texture Formats (GL11)
+    public static final int GL_RGB8 = 0x8051;
+    public static final int GL_RGB16 = 0x8054;
+    public static final int GL_R3_G3_B2 = 0x2A10;
+    public static final int GL_RGB5_A1 = 0x8057;
+    public static final int GL_RGB10_A2 = 0x8059;
+    
+    // OpenGL Constants - Texture Formats (GL30)
+    public static final int GL_RG8 = 0x822B;
+    public static final int GL_R16 = 0x822A;
+    public static final int GL_RG16 = 0x822C;
+    public static final int GL_RG16F = 0x822F;
+    public static final int GL_RGB16F = 0x881B;
+    public static final int GL_RGBA16F = 0x881A;
+    public static final int GL_R32F = 0x822E;
+    public static final int GL_RG32F = 0x8230;
+    public static final int GL_RGB32F = 0x8815;
+    public static final int GL_RGBA32F = 0x8814;
+    public static final int GL_R8I = 0x8231;
+    public static final int GL_RG8I = 0x8237;
+    public static final int GL_RGB8I = 0x8D8F;
+    public static final int GL_RGBA8I = 0x8D8E;
+    public static final int GL_R8UI = 0x8232;
+    public static final int GL_RG8UI = 0x8238;
+    public static final int GL_RGB8UI = 0x8D7D;
+    public static final int GL_RGBA8UI = 0x8D7C;
+    public static final int GL_R16I = 0x8233;
+    public static final int GL_RG16I = 0x8239;
+    public static final int GL_RGB16I = 0x8D89;
+    public static final int GL_RGBA16I = 0x8D88;
+    public static final int GL_R16UI = 0x8234;
+    public static final int GL_RG16UI = 0x823A;
+    public static final int GL_RGB16UI = 0x8D77;
+    public static final int GL_RGBA16UI = 0x8D76;
+    public static final int GL_R32I = 0x8235;
+    public static final int GL_RG32I = 0x823B;
+    public static final int GL_RGB32I = 0x8D83;
+    public static final int GL_RGBA32I = 0x8D82;
+    public static final int GL_R32UI = 0x8236;
+    public static final int GL_RG32UI = 0x823C;
+    public static final int GL_RGB32UI = 0x8D71;
+    public static final int GL_RGBA32UI = 0x8D70;
+    public static final int GL_R11F_G11F_B10F = 0x8C3A;
+    public static final int GL_RGB9_E5 = 0x8C3D;
+    
+    // OpenGL Constants - Texture Formats (GL31)
+    public static final int GL_R8_SNORM = 0x8F94;
+    public static final int GL_RG8_SNORM = 0x8F95;
+    public static final int GL_RGB8_SNORM = 0x8F96;
+    public static final int GL_RGBA8_SNORM = 0x8F97;
+    public static final int GL_R16_SNORM = 0x8F98;
+    public static final int GL_RG16_SNORM = 0x8F99;
+    public static final int GL_RGB16_SNORM = 0x8F9A;
+    public static final int GL_RGBA16_SNORM = 0x8F9B;
+    
+    // OpenGL Constants - Depth Formats (GL30)
+    public static final int GL_DEPTH_COMPONENT = 0x1902;
+    public static final int GL_DEPTH_COMPONENT16 = 0x81A5;
+    public static final int GL_DEPTH_COMPONENT24 = 0x81A6;
+    public static final int GL_DEPTH_COMPONENT32 = 0x81A7;
+    public static final int GL_DEPTH_COMPONENT32F = 0x8CAC;
+    public static final int GL_DEPTH_STENCIL = 0x84F9;
+    public static final int GL_DEPTH24_STENCIL8 = 0x88F0;
+    public static final int GL_DEPTH32F_STENCIL8 = 0x8CAD;
+    
+    // OpenGL Constants - Pixel Types (Additional)
+    public static final int GL_UNSIGNED_BYTE_3_3_2 = 0x8032;
+    public static final int GL_UNSIGNED_BYTE_2_3_3_REV = 0x8362;
+    public static final int GL_UNSIGNED_SHORT_5_6_5 = 0x8363;
+    public static final int GL_UNSIGNED_SHORT_5_6_5_REV = 0x8364;
+    public static final int GL_UNSIGNED_SHORT_4_4_4_4_REV = 0x8365;
+    public static final int GL_UNSIGNED_SHORT_5_5_5_1 = 0x8034;
+    public static final int GL_UNSIGNED_SHORT_1_5_5_5_REV = 0x8366;
+    public static final int GL_UNSIGNED_INT_8_8_8_8 = 0x8035;
+    public static final int GL_UNSIGNED_INT_8_8_8_8_REV = 0x8367;
+    public static final int GL_UNSIGNED_INT_10_10_10_2 = 0x8036;
+    public static final int GL_UNSIGNED_INT_2_10_10_10_REV = 0x8368;
+    public static final int GL_UNSIGNED_INT_24_8 = 0x84FA;
+    public static final int GL_FLOAT_32_UNSIGNED_INT_24_8_REV = 0x8DAD;
     
     /**
      * Backend types supported by Vulkanic.
@@ -1710,5 +1812,70 @@ public class VulkanicAPI {
                 "openGL version 3.2+: [" + checkOpenGL32Support() + "] <- REQUIRED\n" +
                 "Vertex Attribute Buffer Binding: [" + (getVertexAttribBindingPointer() != 0) + "] <- optional improvement\n" +
                 "Buffer Storage: [" + (getBufferStoragePointer() != 0) + "] <- optional improvement\n";
+    }
+    
+    // Additional GL query and state methods
+    
+    /**
+     * Tests whether a capability is enabled.
+     */
+    public static boolean glIsEnabled(int cap) {
+        return getBackend().glIsEnabled(cap);
+    }
+    
+    /**
+     * Determines if a name corresponds to a framebuffer object.
+     */
+    public static boolean glIsFramebuffer(int framebuffer) {
+        return getBackend().glIsFramebuffer(framebuffer);
+    }
+    
+    /**
+     * Determines if a name corresponds to a texture.
+     */
+    public static boolean glIsTexture(int texture) {
+        return getBackend().glIsTexture(texture);
+    }
+    
+    /**
+     * Determines if a name corresponds to a vertex array object.
+     */
+    public static boolean glIsVertexArray(int array) {
+        return getBackend().glIsVertexArray(array);
+    }
+    
+    /**
+     * Determines if a name corresponds to a program object.
+     */
+    public static boolean glIsProgram(int program) {
+        return getBackend().glIsProgram(program);
+    }
+    
+    /**
+     * Sets the RGB blend equation and the alpha blend equation separately.
+     */
+    public static void glBlendEquationSeparate(int modeRGB, int modeAlpha) {
+        getBackend().glBlendEquationSeparate(modeRGB, modeAlpha);
+    }
+    
+    /**
+     * Sets the stencil test function.
+     */
+    public static void glStencilFunc(int func, int ref, int mask) {
+        getBackend().glStencilFunc(func, ref, mask);
+    }
+    
+    /**
+     * Specifies whether front- or back-facing polygons can be culled.
+     */
+    public static void glCullFace(int mode) {
+        getBackend().glCullFace(mode);
+    }
+    
+    /**
+     * Generates a single texture name.
+     */
+    public static int glGenTextures() {
+        return getBackend().glGenTextures();
     }
 }
