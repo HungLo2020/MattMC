@@ -820,7 +820,13 @@ public class GlCommandEncoder implements CommandEncoder {
 				
 				GlStateManager._polygonMode(1032, GlConst.toGl(renderPipeline.getPolygonMode()));
 				GlStateManager._depthMask(renderPipeline.isWriteDepth());
-				GlStateManager._colorMask(renderPipeline.isWriteColor(), renderPipeline.isWriteColor(), renderPipeline.isWriteColor(), renderPipeline.isWriteAlpha());
+				// Use per-channel color write mask (Vulkan-compatible)
+				GlStateManager._colorMask(
+					renderPipeline.isWriteRed(), 
+					renderPipeline.isWriteGreen(), 
+					renderPipeline.isWriteBlue(), 
+					renderPipeline.isWriteAlphaChannel()
+				);
 				
 				if (renderPipeline.getDepthBiasConstant() == 0.0F && renderPipeline.getDepthBiasScaleFactor() == 0.0F) {
 					GlStateManager._disablePolygonOffset();
@@ -1021,7 +1027,13 @@ public class GlCommandEncoder implements CommandEncoder {
 
 			GlStateManager._polygonMode(1032, GlConst.toGl(renderPipeline.getPolygonMode()));
 			GlStateManager._depthMask(renderPipeline.isWriteDepth());
-			GlStateManager._colorMask(renderPipeline.isWriteColor(), renderPipeline.isWriteColor(), renderPipeline.isWriteColor(), renderPipeline.isWriteAlpha());
+			// Use per-channel color write mask (Vulkan-compatible)
+			GlStateManager._colorMask(
+				renderPipeline.isWriteRed(), 
+				renderPipeline.isWriteGreen(), 
+				renderPipeline.isWriteBlue(), 
+				renderPipeline.isWriteAlphaChannel()
+			);
 			if (renderPipeline.getDepthBiasConstant() == 0.0F && renderPipeline.getDepthBiasScaleFactor() == 0.0F) {
 				GlStateManager._disablePolygonOffset();
 			} else {
