@@ -59,58 +59,15 @@ public interface GraphicsBackend {
     @Deprecated
     void disable(int cap);
     
-    // Depth operations
+    // Depth operations (deprecated - use RenderPipeline instead)
+    @Deprecated
+    void setDepthTestFunction(int func);
+    @Deprecated
+    void setDepthWriteEnabled(boolean enabled);
     
-    /**
-     * Sets the depth test comparison function for the rendering pipeline.
-     * This is a Vulkan-compatible replacement for the deprecated setDepthTestFunction() method.
-     * 
-     * In OpenGL: Maps to glDepthFunc()
-     * In Vulkan: Will be part of VkPipelineDepthStencilStateCreateInfo.depthCompareOp
-     * 
-     * The depth test function determines how incoming fragment depth values are compared
-     * against the depth buffer. This is pipeline state in Vulkan, not dynamic state.
-     * 
-     * @param func The depth comparison function (e.g., GL_LESS, GL_LEQUAL, etc.)
-     */
-    void setPipelineDepthTest(int func);
-    
-    /**
-     * Sets whether depth writes are enabled for the rendering pipeline.
-     * This is a Vulkan-compatible replacement for the deprecated setDepthWriteEnabled() method.
-     * 
-     * In OpenGL: Maps to glDepthMask()
-     * In Vulkan: Will be part of VkPipelineDepthStencilStateCreateInfo.depthWriteEnable
-     * 
-     * Controls whether fragment depth values are written to the depth buffer.
-     * This is pipeline state in Vulkan, not dynamic state.
-     * 
-     * @param enabled True to enable depth writes, false to disable
-     */
-    void setPipelineDepthWrite(boolean enabled);
-    
-    // Color operations
-    
-    /**
-     * Sets the color write mask for the rendering pipeline.
-     * This is a Vulkan-compatible replacement for the deprecated setColorWriteMask() method.
-     * 
-     * In OpenGL: Maps to glColorMask() (immediate state change)
-     * In Vulkan: Will be part of VkPipelineColorBlendAttachmentState in pipeline creation
-     * 
-     * The color write mask controls which color components are written to the framebuffer.
-     * This is pipeline state in Vulkan, not dynamic state. Currently implemented as immediate
-     * state change for OpenGL compatibility, but will transition to pipeline state objects.
-     * 
-     * Future evolution: This will become part of PipelineStateObject.Builder:
-     *   builder.setColorWriteMask(r, g, b, a)
-     * 
-     * @param r Enable writing to red channel
-     * @param g Enable writing to green channel
-     * @param b Enable writing to blue channel
-     * @param a Enable writing to alpha channel
-     */
-    void setPipelineColorWriteMask(boolean r, boolean g, boolean b, boolean a);
+    // Color operations (deprecated - use RenderPipeline instead)
+    @Deprecated
+    void setColorWriteMask(boolean r, boolean g, boolean b, boolean a);
     
     // Scissor operations
     

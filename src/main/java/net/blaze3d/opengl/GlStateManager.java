@@ -79,7 +79,9 @@ public class GlStateManager {
 		RenderSystem.assertOnRenderThread();
 		if (i != DEPTH.func) {
 			DEPTH.func = i;
-			net.vulkanic.VulkanicAPI.setPipelineDepthTest(i);
+			// GlStateManager is OpenGL-specific state management
+			// Calls GL directly - not through VulkanicAPI abstraction
+			org.lwjgl.opengl.GL11.glDepthFunc(i);
 		}
 	}
 
@@ -93,7 +95,9 @@ public class GlStateManager {
 		
 		if (bl != DEPTH.mask) {
 			DEPTH.mask = bl;
-			net.vulkanic.VulkanicAPI.setPipelineDepthWrite(bl);
+			// GlStateManager is OpenGL-specific state management
+			// Calls GL directly - not through VulkanicAPI abstraction
+			org.lwjgl.opengl.GL11.glDepthMask(bl);
 		}
 	}
 
@@ -526,7 +530,9 @@ public class GlStateManager {
 			COLOR_MASK.green = bl2;
 			COLOR_MASK.blue = bl3;
 			COLOR_MASK.alpha = bl4;
-			net.vulkanic.VulkanicAPI.setPipelineColorWriteMask(bl, bl2, bl3, bl4);
+			// GlStateManager is OpenGL-specific state management
+			// Calls GL directly - not through VulkanicAPI abstraction
+			org.lwjgl.opengl.GL11.glColorMask(bl, bl2, bl3, bl4);
 		}
 	}
 

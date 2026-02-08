@@ -101,41 +101,21 @@ public class OpenGLBackend implements GraphicsBackend {
         GL11.glDisable(cap);
     }
     
-    /**
-     * Sets the depth test comparison function.
-     * This is the Vulkan-compatible implementation for depth test control.
-     * 
-     * OpenGL implementation: Direct mapping to glDepthFunc()
-     * Future Vulkan implementation: Will be part of VkPipelineDepthStencilStateCreateInfo
-     */
+    @Deprecated
     @Override
-    public void setPipelineDepthTest(int func) {
+    public void setDepthTestFunction(int func) {
         GL11.glDepthFunc(func);
     }
     
-    /**
-     * Sets whether depth writes are enabled.
-     * This is the Vulkan-compatible implementation for depth write control.
-     * 
-     * OpenGL implementation: Direct mapping to glDepthMask()
-     * Future Vulkan implementation: Will be part of VkPipelineDepthStencilStateCreateInfo
-     */
+    @Deprecated
     @Override
-    public void setPipelineDepthWrite(boolean enabled) {
+    public void setDepthWriteEnabled(boolean enabled) {
         GL11.glDepthMask(enabled);
     }
     
-    /**
-     * Sets the color write mask for the rendering pipeline.
-     * This is the Vulkan-compatible implementation for color write mask control.
-     * 
-     * OpenGL implementation: Direct mapping to glColorMask()
-     * Future Vulkan implementation: Will be part of VkPipelineColorBlendAttachmentState
-     * 
-     * Note: In OpenGL this is immediate state. In Vulkan it will be pipeline state.
-     */
+    @Deprecated
     @Override
-    public void setPipelineColorWriteMask(boolean r, boolean g, boolean b, boolean a) {
+    public void setColorWriteMask(boolean r, boolean g, boolean b, boolean a) {
         GL11.glColorMask(r, g, b, a);
     }
     
