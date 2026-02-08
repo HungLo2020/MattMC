@@ -497,1070 +497,1333 @@ public class VulkanicAPI {
      * On Windows, this returns the WGL context handle.
      * Returns 0 or NULL if no context is current.
      */
+    @Deprecated
     public static long getGraphicsContext() {
         return getBackend().getGraphicsContext();
     }
     
     // Convenience methods that delegate to the backend
     
+    @Deprecated
     public static void bindTexture(int textureId) {
         getBackend().bindTexture(textureId);
     }
     
+    @Deprecated
     public static void bindTexture(int target, int textureId) {
         getBackend().bindTexture(target, textureId);
     }
     
+    @Deprecated
     public static void generateMipmap(int target) {
         getBackend().generateMipmap(target);
     }
     
+    @Deprecated
     public static void viewport(int x, int y, int width, int height) {
         getBackend().viewport(x, y, width, height);
     }
     
+    @Deprecated
     public static void clear(int mask) {
         getBackend().clear(mask);
     }
     
+    @Deprecated
     public static void enableBlend() {
         getBackend().enableBlend();
     }
     
+    @Deprecated
     public static void disableBlend() {
         getBackend().disableBlend();
     }
     
+    @Deprecated
     public static void useProgram(int programId) {
         getBackend().useProgram(programId);
     }
     
+    @Deprecated
     public static void enable(int cap) {
         getBackend().enable(cap);
     }
     
+    @Deprecated
     public static void disable(int cap) {
         getBackend().disable(cap);
     }
     
+    @Deprecated
     public static void setDepthTestFunction(int func) {
         getBackend().setDepthTestFunction(func);
     }
     
+    @Deprecated
     public static void setDepthWriteEnabled(boolean enabled) {
         getBackend().setDepthWriteEnabled(enabled);
     }
     
+    @Deprecated
     public static void setColorWriteMask(boolean r, boolean g, boolean b, boolean a) {
         getBackend().setColorWriteMask(r, g, b, a);
     }
     
+    @Deprecated
     public static void setScissorBox(int x, int y, int w, int h) {
         getBackend().setScissorBox(x, y, w, h);
     }
     
+    @Deprecated
     public static void setPixelStoreMode(int pname, int value) {
         getBackend().setPixelStoreMode(pname, value);
     }
     
+    @Deprecated
     public static void attachFramebuffer(int target, int fbo) {
         getBackend().attachFramebuffer(target, fbo);
     }
     
+    @Deprecated
     public static void attachTextureToFramebuffer(int target, int attachment, int textarget, int texture, int level) {
         getBackend().attachTextureToFramebuffer(target, attachment, textarget, texture, level);
     }
     
+    @Deprecated
     public static void attachBuffer(int target, int buffer) {
         getBackend().attachBuffer(target, buffer);
     }
     
     // Direct State Access buffer operations
+    @Deprecated
     public static int createBufferDSA() {
         return getBackend().createBufferDSA();
     }
     
+    @Deprecated
     public static void namedBufferDataDSA(int buffer, long size, int usage) {
         getBackend().namedBufferDataDSA(buffer, size, usage);
     }
     
+    @Deprecated
     public static void namedBufferDataDSA(int buffer, java.nio.ByteBuffer data, int usage) {
         getBackend().namedBufferDataDSA(buffer, data, usage);
     }
     
+    @Deprecated
     public static void namedBufferSubDataDSA(int buffer, long offset, java.nio.ByteBuffer data) {
         getBackend().namedBufferSubDataDSA(buffer, offset, data);
     }
     
+    @Deprecated
     public static void namedBufferStorageDSA(int buffer, long size, int flags) {
         getBackend().namedBufferStorageDSA(buffer, size, flags);
     }
     
+    @Deprecated
     public static void namedBufferStorageDSA(int buffer, java.nio.ByteBuffer data, int flags) {
         getBackend().namedBufferStorageDSA(buffer, data, flags);
     }
     
+    @Deprecated
     public static java.nio.ByteBuffer mapNamedBufferRangeDSA(int buffer, long offset, long length, int access) {
         return getBackend().mapNamedBufferRangeDSA(buffer, offset, length, access);
     }
     
+    @Deprecated
     public static void unmapNamedBufferDSA(int buffer) {
         getBackend().unmapNamedBufferDSA(buffer);
     }
     
+    @Deprecated
     public static void flushMappedNamedBufferRangeDSA(int buffer, long offset, long length) {
         getBackend().flushMappedNamedBufferRangeDSA(buffer, offset, length);
     }
     
+    @Deprecated
     public static void copyNamedBufferSubDataDSA(int readBuffer, int writeBuffer, long readOffset, long writeOffset, long size) {
         getBackend().copyNamedBufferSubDataDSA(readBuffer, writeBuffer, readOffset, writeOffset, size);
     }
     
     // Direct State Access framebuffer operations
+    @Deprecated
     public static int createFramebufferDSA() {
         return getBackend().createFramebufferDSA();
     }
     
+    @Deprecated
     public static void namedFramebufferTextureDSA(int framebuffer, int attachment, int texture, int level) {
         getBackend().namedFramebufferTextureDSA(framebuffer, attachment, texture, level);
     }
     
+    @Deprecated
     public static void blitNamedFramebufferDSA(int readFramebuffer, int drawFramebuffer, int srcX0, int srcY0, int srcX1, int srcY1,
                                                 int dstX0, int dstY0, int dstX1, int dstY1, int mask, int filter) {
         getBackend().blitNamedFramebufferDSA(readFramebuffer, drawFramebuffer, srcX0, srcY0, srcX1, srcY1,
                                               dstX0, dstY0, dstX1, dstY1, mask, filter);
     }
     
+    @Deprecated
     public static void activateTextureUnit(int unit) {
         getBackend().activateTextureUnit(unit);
     }
     
+    @Deprecated
     public static void configureTextureParameter(int target, int pname, int param) {
         getBackend().configureTextureParameter(target, pname, param);
     }
     
+    @Deprecated
     public static int createTexture() {
         return getBackend().createTexture();
     }
     
+    @Deprecated
     public static void removeTexture(int texture) {
         getBackend().removeTexture(texture);
     }
     
+    @Deprecated
     public static void configurePolygonMode(int face, int mode) {
         getBackend().configurePolygonMode(face, mode);
     }
     
+    @Deprecated
     public static void configurePolygonOffset(float factor, float units) {
         getBackend().configurePolygonOffset(factor, units);
     }
     
+    @Deprecated
     public static void configureLogicOp(int opcode) {
         getBackend().configureLogicOp(opcode);
     }
     
+    @Deprecated
     public static void drawPrimitiveArrays(int mode, int first, int count) {
         getBackend().drawPrimitiveArrays(mode, first, count);
     }
 
+    @Deprecated
     public static void drawIndexedElements(int mode, int count, int type, long indices) {
         getBackend().drawIndexedElements(mode, count, type, indices);
     }
     
+    @Deprecated
     public static void configureBlendFunc(int srcRgb, int dstRgb, int srcAlpha, int dstAlpha) {
         getBackend().configureBlendFunc(srcRgb, dstRgb, srcAlpha, dstAlpha);
     }
     
+    @Deprecated
     public static int checkForErrors() {
         return getBackend().checkForErrors();
     }
     
+    @Deprecated
     public static void transferTexture2DImage(int tgt, int lvl, int intfmt, int w, int h, int bdr, int fmt, int typ, java.nio.ByteBuffer pix) {
         getBackend().transferTexture2DImage(tgt, lvl, intfmt, w, h, bdr, fmt, typ, pix);
     }
     
+    @Deprecated
     public static void transferTexture2DSubregion(int tgt, int lvl, int xoff, int yoff, int w, int h, int fmt, int typ, long pix) {
         getBackend().transferTexture2DSubregion(tgt, lvl, xoff, yoff, w, h, fmt, typ, pix);
     }
     
+    @Deprecated
     public static void transferTexture2DSubregionBuf(int tgt, int lvl, int xoff, int yoff, int w, int h, int fmt, int typ, java.nio.ByteBuffer pix) {
         getBackend().transferTexture2DSubregionBuf(tgt, lvl, xoff, yoff, w, h, fmt, typ, pix);
     }
     
+    @Deprecated
     public static int allocateBufferObject() {
         return getBackend().allocateBufferObject();
     }
     
+    @Deprecated
     public static void releaseBufferObject(int buf) {
         getBackend().releaseBufferObject(buf);
     }
     
+    @Deprecated
     public static void fillBufferWithData(int tgt, java.nio.ByteBuffer dat, int usg) {
         getBackend().fillBufferWithData(tgt, dat, usg);
     }
     
+    @Deprecated
     public static void fillBufferWithSize(int tgt, long sz, int usg) {
         getBackend().fillBufferWithSize(tgt, sz, usg);
     }
     
+    @Deprecated
     public static void fillBufferSubregion(int tgt, long off, java.nio.ByteBuffer dat) {
         getBackend().fillBufferSubregion(tgt, off, dat);
     }
     
+    @Deprecated
     public static int createVertexArrayObject() {
         return getBackend().createVertexArrayObject();
     }
     
+    @Deprecated
     public static void selectVertexArray(int vao) {
         getBackend().selectVertexArray(vao);
     }
     
+    @Deprecated
     public static java.nio.ByteBuffer mapBufferRegion(int tgt, int off, int len, int acc) {
         return getBackend().mapBufferRegion(tgt, off, len, acc);
     }
     
+    @Deprecated
     public static void unmapBufferData(int tgt) {
         getBackend().unmapBufferData(tgt);
     }
     
+    @Deprecated
     public static int generateFramebufferObject() {
         return getBackend().generateFramebufferObject();
     }
     
+    @Deprecated
     public static void destroyFramebufferObject(int fbo) {
         getBackend().destroyFramebufferObject(fbo);
     }
     
+    @Deprecated
     public static void copyFramebufferRegion(int srcX0, int srcY0, int srcX1, int srcY1, int dstX0, int dstY0, int dstX1, int dstY1, int msk, int flt) {
         getBackend().copyFramebufferRegion(srcX0, srcY0, srcX1, srcY1, dstX0, dstY0, dstX1, dstY1, msk, flt);
     }
     
+    @Deprecated
     public static int constructShaderObject(int shaderType) {
         return getBackend().constructShaderObject(shaderType);
     }
     
+    @Deprecated
     public static void disposeShaderObject(int shader) {
         getBackend().disposeShaderObject(shader);
     }
     
+    @Deprecated
     public static void compileShaderSource(int shader) {
         getBackend().compileShaderSource(shader);
     }
     
+    @Deprecated
     public static int constructProgramObject() {
         return getBackend().constructProgramObject();
     }
     
+    @Deprecated
     public static void disposeProgramObject(int program) {
         getBackend().disposeProgramObject(program);
     }
     
+    @Deprecated
     public static void linkProgramBinary(int program) {
         getBackend().linkProgramBinary(program);
     }
     
+    @Deprecated
     public static void attachShaderToProgram(int program, int shader) {
         getBackend().attachShaderToProgram(program, shader);
     }
     
+    @Deprecated
     public static int queryProgramParameter(int program, int pname) {
         return getBackend().queryProgramParameter(program, pname);
     }
     
+    @Deprecated
     public static int queryShaderParameter(int shader, int pname) {
         return getBackend().queryShaderParameter(shader, pname);
     }
     
+    @Deprecated
     public static void configureVertexAttribute(int index, int size, int type, boolean normalized, int stride, long pointer) {
         getBackend().configureVertexAttribute(index, size, type, normalized, stride, pointer);
     }
     
+    @Deprecated
     public static void configureVertexAttributeInteger(int index, int size, int type, int stride, long pointer) {
         getBackend().configureVertexAttributeInteger(index, size, type, stride, pointer);
     }
     
+    @Deprecated
     public static void activateVertexAttribute(int index) {
         getBackend().activateVertexAttribute(index);
     }
     
+    @Deprecated
     public static void deactivateVertexAttribute(int index) {
         getBackend().deactivateVertexAttribute(index);
     }
     
+    @Deprecated
     public static void setVertexAttribDivisor(int index, int divisor) {
         getBackend().setVertexAttribDivisor(index, divisor);
     }
     
+    @Deprecated
     public static String retrieveProgramInfoLog(int program) {
         return getBackend().retrieveProgramInfoLog(program);
     }
     
+    @Deprecated
     public static String retrieveShaderInfoLog(int shader) {
         return getBackend().retrieveShaderInfoLog(shader);
     }
     
+    @Deprecated
     public static int locateUniformVariable(int program, CharSequence name) {
         return getBackend().locateUniformVariable(program, name);
     }
     
+    @Deprecated
     public static void assignUniformInteger(int location, int value) {
         getBackend().assignUniformInteger(location, value);
     }
     
+    @Deprecated
     public static void bindAttributeLocation(int program, int index, CharSequence name) {
         getBackend().bindAttributeLocation(program, index, name);
     }
     
+    @Deprecated
     public static long createFenceSync(int condition, int flags) {
         return getBackend().createFenceSync(condition, flags);
     }
     
+    @Deprecated
     public static int waitForSync(long sync, int flags, long timeout) {
         return getBackend().waitForSync(sync, flags, timeout);
     }
     
+    @Deprecated
     public static void destroySync(long sync) {
         getBackend().destroySync(sync);
     }
     
+    @Deprecated
     public static void clearTexImage(int texture, int level, int format, int type, int[] data) {
         getBackend().clearTexImage(texture, level, format, type, data);
     }
     
+    @Deprecated
     public static void setMaxShaderCompilerThreads(int count) {
         getBackend().setMaxShaderCompilerThreads(count);
     }
     
+    @Deprecated
     public static GraphicsCapabilities getGraphicsCapabilities() {
         return getBackend().getGraphicsCapabilities();
     }
     
+    @Deprecated
     public static int queryIntegerState(int pname) {
         return getBackend().queryIntegerState(pname);
     }
     
+    @Deprecated
     public static String queryStringInfo(int name) {
         return getBackend().queryStringInfo(name);
     }
     
+    @Deprecated
     public static int pollErrorCode() {
         return getBackend().pollErrorCode();
     }
     
+    @Deprecated
     public static void readFramebufferPixels(int x, int y, int width, int height, int format, int type, long pixels) {
         getBackend().readFramebufferPixels(x, y, width, height, format, type, pixels);
     }
     
+    @Deprecated
     public static int queryTextureLevelParameter(int target, int level, int pname) {
         return getBackend().queryTextureLevelParameter(target, level, pname);
     }
     
+    @Deprecated
     public static void uploadShaderSource(int shader, long pointerBufferAddress, int stringCount, long lengthsPointer) {
         getBackend().uploadShaderSource(shader, pointerBufferAddress, stringCount, lengthsPointer);
     }
     
+    @Deprecated
     public static int locateUniformBlock(int program, String uniformBlockName) {
         return getBackend().locateUniformBlock(program, uniformBlockName);
     }
     
+    @Deprecated
     public static void bindUniformBlock(int program, int uniformBlockIndex, int uniformBlockBinding) {
         getBackend().bindUniformBlock(program, uniformBlockIndex, uniformBlockBinding);
     }
     
+    @Deprecated
     public static String retrieveActiveUniformBlockName(int program, int uniformBlockIndex) {
         return getBackend().retrieveActiveUniformBlockName(program, uniformBlockIndex);
     }
     
+    @Deprecated
     public static int generateQueryObject() {
         return getBackend().generateQueryObject();
     }
     
+    @Deprecated
     public static void initiateQuery(int target, int id) {
         getBackend().initiateQuery(target, id);
     }
     
+    @Deprecated
     public static void concludeQuery(int target) {
         getBackend().concludeQuery(target);
     }
     
+    @Deprecated
     public static void disposeQueryObject(int id) {
         getBackend().disposeQueryObject(id);
     }
     
+    @Deprecated
     public static int retrieveQueryObjectInt(int id, int pname) {
         return getBackend().retrieveQueryObjectInt(id, pname);
     }
     
+    @Deprecated
     public static long retrieveQueryObjectInt64(int id, int pname) {
         return getBackend().retrieveQueryObjectInt64(id, pname);
     }
     
+    @Deprecated
     public static void labelDebugObject(int identifier, int name, String label) {
         getBackend().labelDebugObject(identifier, name, label);
     }
     
+    @Deprecated
     public static void enterDebugGroup(int source, int id, CharSequence message) {
         getBackend().enterDebugGroup(source, id, message);
     }
     
+    @Deprecated
     public static void exitDebugGroup() {
         getBackend().exitDebugGroup();
     }
     
+    @Deprecated
     public static void labelObjectExt(int type, int object, String label) {
         getBackend().labelObjectExt(type, object, label);
     }
     
+    @Deprecated
     public static boolean supportsKhrDebug() {
         return getBackend().supportsKhrDebug();
     }
     
+    @Deprecated
     public static boolean supportsArbDebugOutput() {
         return getBackend().supportsArbDebugOutput();
     }
     
+    @Deprecated
     public static void setupKhrDebugSystem(int verbosityLevel, boolean synchronous, java.util.function.Consumer<String> messageHandler) {
         getBackend().setupKhrDebugSystem(verbosityLevel, synchronous, messageHandler);
     }
     
+    @Deprecated
     public static void setupArbDebugSystem(int verbosityLevel, boolean synchronous, java.util.function.Consumer<String> messageHandler) {
         getBackend().setupArbDebugSystem(verbosityLevel, synchronous, messageHandler);
     }
     
+    @Deprecated
     public static boolean hasBufferStorageExtension() {
         return getBackend().hasBufferStorageExtension();
     }
     
+    @Deprecated
     public static boolean hasVertexAttribBindingExtension() {
         return getBackend().hasVertexAttribBindingExtension();
     }
     
+    @Deprecated
     public static void attachVertexBuffer(int bindingIndex, int buffer, long offset, int stride) {
         getBackend().attachVertexBuffer(bindingIndex, buffer, offset, stride);
     }
     
+    @Deprecated
     public static void specifyVertexAttribFormat(int attribIndex, int size, int type, boolean normalized, int relativeOffset) {
         getBackend().specifyVertexAttribFormat(attribIndex, size, type, normalized, relativeOffset);
     }
     
+    @Deprecated
     public static void specifyVertexAttribIFormat(int attribIndex, int size, int type, int relativeOffset) {
         getBackend().specifyVertexAttribIFormat(attribIndex, size, type, relativeOffset);
     }
     
+    @Deprecated
     public static void associateVertexAttrib(int attribIndex, int bindingIndex) {
         getBackend().associateVertexAttrib(attribIndex, bindingIndex);
     }
     
+    @Deprecated
     public static void setClearDepthValue(double depth) {
         getBackend().setClearDepthValue(depth);
     }
     
+    @Deprecated
     public static void setClearColorValue(float red, float green, float blue, float alpha) {
         getBackend().setClearColorValue(red, green, blue, alpha);
     }
     
+    @Deprecated
     public static void selectDrawBuffer(int mode) {
         getBackend().selectDrawBuffer(mode);
     }
     
+    @Deprecated
     public static void renderIndexedInstancedWithBase(int mode, int count, int type, long indices, int instanceCount, int baseVertex) {
         getBackend().renderIndexedInstancedWithBase(mode, count, type, indices, instanceCount, baseVertex);
     }
     
+    @Deprecated
     public static void renderIndexedWithBase(int mode, int count, int type, long indices, int baseVertex) {
         getBackend().renderIndexedWithBase(mode, count, type, indices, baseVertex);
     }
     
+    @Deprecated
     public static void renderIndexedInstanced(int mode, int count, int type, long indices, int instanceCount) {
         getBackend().renderIndexedInstanced(mode, count, type, indices, instanceCount);
     }
     
+    @Deprecated
     public static void renderArraysInstanced(int mode, int first, int count, int instanceCount) {
         getBackend().renderArraysInstanced(mode, first, count, instanceCount);
     }
     
+    @Deprecated
     public static void attachUniformBufferRange(int target, int index, int buffer, long offset, long size) {
         getBackend().attachUniformBufferRange(target, index, buffer, offset, size);
     }
     
+    @Deprecated
     public static void attachBufferToTexture(int target, int internalFormat, int buffer) {
         getBackend().attachBufferToTexture(target, internalFormat, buffer);
     }
     
+    @Deprecated
     public static void assignUniformFloat(int location, float value) {
         getBackend().assignUniformFloat(location, value);
     }
     
+    @Deprecated
     public static void assignUniformFloat2(int location, float x, float y) {
         getBackend().assignUniformFloat2(location, x, y);
     }
     
+    @Deprecated
     public static void assignUniformFloat2v(int location, float[] value) {
         getBackend().assignUniformFloat2v(location, value);
     }
     
+    @Deprecated
     public static void assignUniformFloat3(int location, float x, float y, float z) {
         getBackend().assignUniformFloat3(location, x, y, z);
     }
     
+    @Deprecated
     public static void assignUniformFloat3v(int location, float[] value) {
         getBackend().assignUniformFloat3v(location, value);
     }
     
+    @Deprecated
     public static void assignUniformFloat4(int location, float x, float y, float z, float w) {
         getBackend().assignUniformFloat4(location, x, y, z, w);
     }
     
+    @Deprecated
     public static void assignUniformFloat4v(int location, float[] value) {
         getBackend().assignUniformFloat4v(location, value);
     }
     
+    @Deprecated
     public static void assignUniformMatrix4f(int location, java.nio.FloatBuffer matrix) {
         getBackend().assignUniformMatrix4f(location, matrix);
     }
     
+    @Deprecated
     public static void bindUniformBufferBase(int bindingPoint, int bufferId) {
         getBackend().bindUniformBufferBase(bindingPoint, bufferId);
     }
     
+    @Deprecated
     public static void bindFragmentDataLocation(int program, int colorNumber, CharSequence name) {
         getBackend().bindFragmentDataLocation(program, colorNumber, name);
     }
     
+    @Deprecated
     public static int querySyncStatus(long sync, int pname, java.nio.IntBuffer length) {
         return getBackend().querySyncStatus(sync, pname, length);
     }
     
+    @Deprecated
     public static GraphicsCapabilities obtainGraphicsCapabilities() {
         return getBackend().obtainGraphicsCapabilities();
     }
     
+    @Deprecated
     public static GraphicsCapabilities initializeGraphicsCapabilities() {
         return getBackend().initializeGraphicsCapabilities();
     }
     
+    @Deprecated
     public static boolean checkFunctionAvailable(String functionName) {
         return getBackend().checkFunctionAvailable(functionName);
     }
     
+    @Deprecated
     public static void copyBufferSubData(int readTarget, int writeTarget, long readOffset, long writeOffset, long size) {
         getBackend().copyBufferSubData(readTarget, writeTarget, readOffset, writeOffset, size);
     }
     
+    @Deprecated
     public static void deleteVertexArray(int vertexArray) {
         getBackend().deleteVertexArray(vertexArray);
     }
     
+    @Deprecated
     public static void flushMappedBufferRange(int target, long offset, long length) {
         getBackend().flushMappedBufferRange(target, offset, length);
     }
     
+    @Deprecated
     public static void createBufferStorage(int target, long size, int flags) {
         getBackend().createBufferStorage(target, size, flags);
     }
     
+    @Deprecated
     public static void createBufferStorage(int target, java.nio.ByteBuffer data, int flags) {
         getBackend().createBufferStorage(target, data, flags);
     }
     
+    @Deprecated
     public static void multiDrawElementsBaseVertex(int mode, long pCount, int type, long pIndices, int drawCount, long pBaseVertex) {
         getBackend().multiDrawElementsBaseVertex(mode, pCount, type, pIndices, drawCount, pBaseVertex);
     }
     
+    @Deprecated
     public static void assignUniformMatrix4fv(int location, boolean transpose, java.nio.FloatBuffer value) {
         getBackend().assignUniformMatrix4fv(location, transpose, value);
     }
     
+    @Deprecated
     public static String queryString(int name) {
         return getBackend().queryString(name);
     }
     
+    @Deprecated
     public static String queryStringIndexed(int name, int index) {
         return getBackend().queryStringIndexed(name, index);
     }
     
+    @Deprecated
     public static void uploadShaderSourceNative(int shader, int count, long strings, long length) {
         getBackend().uploadShaderSourceNative(shader, count, strings, length);
     }
     
+    @Deprecated
     public static void glCopyTexSubImage2D(int target, int level, int xoffset, int yoffset, int x, int y, int width, int height) {
         getBackend().glCopyTexSubImage2D(target, level, xoffset, yoffset, x, y, width, height);
     }
     
     // Debug object labeling (KHRDebug/GL43)
+    @Deprecated
     public static void labelObject(int identifier, int name, String label) {
         getBackend().labelObject(identifier, name, label);
     }
     
     // Debug group push/pop (KHRDebug/GL43)
+    @Deprecated
     public static void pushDebugGroup(int source, int id, String message) {
         getBackend().pushDebugGroup(source, id, message);
     }
     
+    @Deprecated
     public static void popDebugGroup() {
         getBackend().popDebugGroup();
     }
     
     // Additional methods for IrisRenderSystem migration
     
+    @Deprecated
     public static void glGetIntegerv(int pname, int[] params) {
         getBackend().glGetIntegerv(pname, params);
     }
     
+    @Deprecated
     public static void glGetFloatv(int pname, float[] params) {
         getBackend().glGetFloatv(pname, params);
     }
     
+    @Deprecated
     public static void glTexImage1D(int target, int level, int internalformat, int width, int border, int format, int type, java.nio.ByteBuffer pixels) {
         getBackend().glTexImage1D(target, level, internalformat, width, border, format, type, pixels);
     }
     
+    @Deprecated
     public static void glTexImage2D(int target, int level, int internalformat, int width, int height, int border, int format, int type, java.nio.ByteBuffer pixels) {
         getBackend().glTexImage2D(target, level, internalformat, width, height, border, format, type, pixels);
     }
     
+    @Deprecated
     public static void glTexImage3D(int target, int level, int internalformat, int width, int height, int depth, int border, int format, int type, java.nio.ByteBuffer pixels) {
         getBackend().glTexImage3D(target, level, internalformat, width, height, depth, border, format, type, pixels);
     }
     
+    @Deprecated
     public static void glUniformMatrix4fv(int location, boolean transpose, java.nio.FloatBuffer matrix) {
         getBackend().glUniformMatrix4fv(location, transpose, matrix);
     }
     
+    @Deprecated
     public static void glUniformMatrix4fv(int location, boolean transpose, float[] matrix) {
         getBackend().glUniformMatrix4fv(location, transpose, matrix);
     }
     
+    @Deprecated
     public static void glCopyTexImage2D(int target, int level, int internalFormat, int x, int y, int width, int height, int border) {
         getBackend().glCopyTexImage2D(target, level, internalFormat, x, y, width, height, border);
     }
     
+    @Deprecated
     public static void glUniform1f(int location, float v0) {
         getBackend().glUniform1f(location, v0);
     }
     
+    @Deprecated
     public static void glUniform2f(int location, float v0, float v1) {
         getBackend().glUniform2f(location, v0, v1);
     }
     
+    @Deprecated
     public static void glUniform2i(int location, int v0, int v1) {
         getBackend().glUniform2i(location, v0, v1);
     }
     
+    @Deprecated
     public static void glUniform3f(int location, float v0, float v1, float v2) {
         getBackend().glUniform3f(location, v0, v1, v2);
     }
     
+    @Deprecated
     public static void glUniform3i(int location, int v0, int v1, int v2) {
         getBackend().glUniform3i(location, v0, v1, v2);
     }
     
+    @Deprecated
     public static void glUniform4f(int location, float v0, float v1, float v2, float v3) {
         getBackend().glUniform4f(location, v0, v1, v2, v3);
     }
     
+    @Deprecated
     public static void glUniform4i(int location, int v0, int v1, int v2, int v3) {
         getBackend().glUniform4i(location, v0, v1, v2, v3);
     }
     
+    @Deprecated
     public static void glTexParameteriv(int target, int pname, int[] params) {
         getBackend().glTexParameteriv(target, pname, params);
     }
     
+    @Deprecated
     public static void glTexParameteri(int target, int pname, int param) {
         getBackend().glTexParameteri(target, pname, param);
     }
     
+    @Deprecated
     public static void glTexParameterf(int target, int pname, float param) {
         getBackend().glTexParameterf(target, pname, param);
     }
     
+    @Deprecated
     public static String glGetProgramInfoLog(int program) {
         return getBackend().glGetProgramInfoLog(program);
     }
     
+    @Deprecated
     public static String glGetShaderInfoLog(int shader) {
         return getBackend().glGetShaderInfoLog(shader);
     }
     
+    @Deprecated
     public static void glDrawBuffers(int[] buffers) {
         getBackend().glDrawBuffers(buffers);
     }
     
+    @Deprecated
     public static void glReadBuffer(int buffer) {
         getBackend().glReadBuffer(buffer);
     }
     
+    @Deprecated
     public static void glClearBufferfv(int buffer, int drawbuffer, float[] values) {
         getBackend().glClearBufferfv(buffer, drawbuffer, values);
     }
     
+    @Deprecated
     public static void glClearBufferiv(int buffer, int drawbuffer, int[] values) {
         getBackend().glClearBufferiv(buffer, drawbuffer, values);
     }
     
+    @Deprecated
     public static void glClearBufferuiv(int buffer, int drawbuffer, int[] values) {
         getBackend().glClearBufferuiv(buffer, drawbuffer, values);
     }
     
+    @Deprecated
     public static String glGetActiveUniform(int program, int index, int size, java.nio.IntBuffer type, java.nio.IntBuffer name) {
         return getBackend().glGetActiveUniform(program, index, size, type, name);
     }
     
+    @Deprecated
     public static void glReadPixels(int x, int y, int width, int height, int format, int type, float[] pixels) {
         getBackend().glReadPixels(x, y, width, height, format, type, pixels);
     }
     
+    @Deprecated
     public static void glBufferData(int target, float[] data, int usage) {
         getBackend().glBufferData(target, data, usage);
     }
     
+    @Deprecated
     public static void glBufferData(int target, int[] data, int usage) {
         getBackend().glBufferData(target, data, usage);
     }
     
+    @Deprecated
     public static void glBufferData(int target, java.nio.ByteBuffer data, int usage) {
         getBackend().glBufferData(target, data, usage);
     }
     
+    @Deprecated
     public static void glBufferData(int target, long size, int usage) {
         getBackend().glBufferData(target, size, usage);
     }
     
+    @Deprecated
     public static void glBufferSubData(int target, long offset, java.nio.ByteBuffer data) {
         getBackend().glBufferSubData(target, offset, data);
     }
     
+    @Deprecated
     public static void glBufferStorage(int target, long size, int flags) {
         getBackend().glBufferStorage(target, size, flags);
     }
     
+    @Deprecated
     public static void glBufferStorage(int target, java.nio.ByteBuffer data, int flags) {
         getBackend().glBufferStorage(target, data, flags);
     }
     
+    @Deprecated
     public static java.nio.ByteBuffer glMapBufferRange(int target, long offset, long length, int access) {
         return getBackend().glMapBufferRange(target, offset, length, access);
     }
     
+    @Deprecated
     public static boolean glUnmapBuffer(int target) {
         return getBackend().glUnmapBuffer(target);
     }
     
+    @Deprecated
     public static boolean glIsBuffer(int buffer) {
         return getBackend().glIsBuffer(buffer);
     }
     
+    @Deprecated
     public static void glBindBufferBase(int target, int index, int buffer) {
         getBackend().glBindBufferBase(target, index, buffer);
     }
     
+    @Deprecated
     public static void glVertexAttrib4f(int index, float v0, float v1, float v2, float v3) {
         getBackend().glVertexAttrib4f(index, v0, v1, v2, v3);
     }
     
+    @Deprecated
     public static void glDetachShader(int program, int shader) {
         getBackend().glDetachShader(program, shader);
     }
     
+    @Deprecated
     public static void glFramebufferTexture2D(int target, int attachment, int textarget, int texture, int level) {
         getBackend().glFramebufferTexture2D(target, attachment, textarget, texture, level);
     }
     
+    @Deprecated
     public static void glFramebufferTexture(int target, int attachment, int texture, int level) {
         getBackend().glFramebufferTexture(target, attachment, texture, level);
     }
     
+    @Deprecated
     public static int glGetTexParameteri(int target, int pname) {
         return getBackend().glGetTexParameteri(target, pname);
     }
     
+    @Deprecated
     public static void glBindImageTexture(int unit, int texture, int level, boolean layered, int layer, int access, int format) {
         getBackend().glBindImageTexture(unit, texture, level, layered, layer, access, format);
     }
     
+    @Deprecated
     public static int glGetMaxImageUnits() {
         return getBackend().glGetMaxImageUnits();
     }
     
+    @Deprecated
     public static void glGenBuffers(int[] buffers) {
         getBackend().glGenBuffers(buffers);
     }
     
+    @Deprecated
     public static void glClearBufferSubData(int target, int internalformat, long offset, long size, int format, int type, int[] data) {
         getBackend().glClearBufferSubData(target, internalformat, offset, size, format, type, data);
     }
     
+    @Deprecated
     public static void glGetProgramiv(int program, int pname, int[] params) {
         getBackend().glGetProgramiv(program, pname, params);
     }
     
+    @Deprecated
     public static void glDispatchCompute(int workX, int workY, int workZ) {
         getBackend().glDispatchCompute(workX, workY, workZ);
     }
     
+    @Deprecated
     public static void glMemoryBarrier(int barriers) {
         getBackend().glMemoryBarrier(barriers);
     }
     
+    @Deprecated
     public static void glDisablei(int target, int index) {
         getBackend().glDisablei(target, index);
     }
     
+    @Deprecated
     public static void glEnablei(int target, int index) {
         getBackend().glEnablei(target, index);
     }
     
+    @Deprecated
     public static void glBlendFunc(int sfactor, int dfactor) {
         getBackend().glBlendFunc(sfactor, dfactor);
     }
     
+    @Deprecated
     public static void glBlendFuncSeparatei(int buffer, int srcRGB, int dstRGB, int srcAlpha, int dstAlpha) {
         getBackend().glBlendFuncSeparatei(buffer, srcRGB, dstRGB, srcAlpha, dstAlpha);
     }
     
+    @Deprecated
     public static int glGetUniformBlockIndex(int program, String uniformBlockName) {
         return getBackend().glGetUniformBlockIndex(program, uniformBlockName);
     }
     
+    @Deprecated
     public static void glUniformBlockBinding(int program, int uniformBlockIndex, int uniformBlockBinding) {
         getBackend().glUniformBlockBinding(program, uniformBlockIndex, uniformBlockBinding);
     }
     
+    @Deprecated
     public static int glGenSamplers() {
         return getBackend().glGenSamplers();
     }
     
+    @Deprecated
     public static void glDeleteSamplers(int sampler) {
         getBackend().glDeleteSamplers(sampler);
     }
     
+    @Deprecated
     public static void glBindSampler(int unit, int sampler) {
         getBackend().glBindSampler(unit, sampler);
     }
     
+    @Deprecated
     public static void glBindSamplers(int first, int[] samplers) {
         getBackend().glBindSamplers(first, samplers);
     }
     
+    @Deprecated
     public static void glSamplerParameteri(int sampler, int pname, int param) {
         getBackend().glSamplerParameteri(sampler, pname, param);
     }
     
+    @Deprecated
     public static void glSamplerParameterf(int sampler, int pname, float param) {
         getBackend().glSamplerParameterf(sampler, pname, param);
     }
     
+    @Deprecated
     public static void glSamplerParameteriv(int sampler, int pname, int[] params) {
         getBackend().glSamplerParameteriv(sampler, pname, params);
     }
     
+    @Deprecated
     public static int glGetInteger(int pname) {
         return getBackend().glGetInteger(pname);
     }
     
+    @Deprecated
     public static void glDeleteBuffers(int buffer) {
         getBackend().glDeleteBuffers(buffer);
     }
     
+    @Deprecated
     public static void glPolygonMode(int face, int mode) {
         getBackend().glPolygonMode(face, mode);
     }
     
+    @Deprecated
     public static void glViewport(int x, int y, int width, int height) {
         getBackend().glViewport(x, y, width, height);
     }
     
+    @Deprecated
     public static void glDispatchComputeIndirect(long offset) {
         getBackend().glDispatchComputeIndirect(offset);
     }
     
+    @Deprecated
     public static void glBindBuffer(int target, int buffer) {
         getBackend().glBindBuffer(target, buffer);
     }
     
+    @Deprecated
     public static String glGetStringi(int name, int index) {
         return getBackend().glGetStringi(name, index);
     }
     
+    @Deprecated
     public static void glCopyImageSubData(int srcName, int srcTarget, int srcLevel, int srcX, int srcY, int srcZ, int dstName, int dstTarget, int dstLevel, int dstX, int dstY, int dstZ, int width, int height, int depth) {
         getBackend().glCopyImageSubData(srcName, srcTarget, srcLevel, srcX, srcY, srcZ, dstName, dstTarget, dstLevel, dstX, dstY, dstZ, width, height, depth);
     }
     
+    @Deprecated
     public static int glCheckFramebufferStatus(int target) {
         return getBackend().glCheckFramebufferStatus(target);
     }
     
+    @Deprecated
     public static void glUniformMatrix3fv(int location, boolean transpose, java.nio.FloatBuffer value) {
         getBackend().glUniformMatrix3fv(location, transpose, value);
     }
     
+    @Deprecated
     public static void glUniformMatrix3fv(int location, boolean transpose, float[] value) {
         getBackend().glUniformMatrix3fv(location, transpose, value);
     }
     
+    @Deprecated
     public static void glClearColor(float r, float g, float b, float a) {
         getBackend().glClearColor(r, g, b, a);
     }
     
+    @Deprecated
     public static int glGetAttribLocation(int program, CharSequence name) {
         return getBackend().glGetAttribLocation(program, name);
     }
     
+    @Deprecated
     public static void glGenerateMipmap(int target) {
         getBackend().glGenerateMipmap(target);
     }
     
+    @Deprecated
     public static void glBlitFramebuffer(int srcX0, int srcY0, int srcX1, int srcY1, int dstX0, int dstY0, int dstX1, int dstY1, int mask, int filter) {
         getBackend().glBlitFramebuffer(srcX0, srcY0, srcX1, srcY1, dstX0, dstY0, dstX1, dstY1, mask, filter);
     }
     
     // DSA (Direct State Access) methods - ARB versions
     
+    @Deprecated
     public static void glGenerateTextureMipmap(int texture) {
         getBackend().glGenerateTextureMipmap(texture);
     }
     
+    @Deprecated
     public static void glTextureParameteri(int texture, int pname, int param) {
         getBackend().glTextureParameteri(texture, pname, param);
     }
     
+    @Deprecated
     public static void glTextureParameterf(int texture, int pname, float param) {
         getBackend().glTextureParameterf(texture, pname, param);
     }
     
+    @Deprecated
     public static void glTextureParameteriv(int texture, int pname, int[] params) {
         getBackend().glTextureParameteriv(texture, pname, params);
     }
     
+    @Deprecated
     public static void glNamedFramebufferReadBuffer(int framebuffer, int mode) {
         getBackend().glNamedFramebufferReadBuffer(framebuffer, mode);
     }
     
+    @Deprecated
     public static void glNamedFramebufferDrawBuffers(int framebuffer, int[] bufs) {
         getBackend().glNamedFramebufferDrawBuffers(framebuffer, bufs);
     }
     
+    @Deprecated
     public static void glClearNamedFramebufferfv(int framebuffer, int buffer, int drawbuffer, float[] value) {
         getBackend().glClearNamedFramebufferfv(framebuffer, buffer, drawbuffer, value);
     }
     
+    @Deprecated
     public static void glClearNamedFramebufferiv(int framebuffer, int buffer, int drawbuffer, int[] value) {
         getBackend().glClearNamedFramebufferiv(framebuffer, buffer, drawbuffer, value);
     }
     
+    @Deprecated
     public static void glClearNamedFramebufferuiv(int framebuffer, int buffer, int drawbuffer, int[] value) {
         getBackend().glClearNamedFramebufferuiv(framebuffer, buffer, drawbuffer, value);
     }
     
+    @Deprecated
     public static int glGetTextureParameteri(int texture, int pname) {
         return getBackend().glGetTextureParameteri(texture, pname);
     }
     
+    @Deprecated
     public static void glCopyTextureSubImage2D(int texture, int level, int xoffset, int yoffset, int x, int y, int width, int height) {
         getBackend().glCopyTextureSubImage2D(texture, level, xoffset, yoffset, x, y, width, height);
     }
     
+    @Deprecated
     public static void glBindTextureUnit(int unit, int texture) {
         getBackend().glBindTextureUnit(unit, texture);
     }
     
+    @Deprecated
     public static int glCreateBuffers() {
         return getBackend().glCreateBuffers();
     }
     
+    @Deprecated
     public static void glNamedBufferData(int buffer, float[] data, int usage) {
         getBackend().glNamedBufferData(buffer, data, usage);
     }
     
+    @Deprecated
     public static void glBlitNamedFramebuffer(int readFramebuffer, int drawFramebuffer, int srcX0, int srcY0, int srcX1, int srcY1, int dstX0, int dstY0, int dstX1, int dstY1, int mask, int filter) {
         getBackend().glBlitNamedFramebuffer(readFramebuffer, drawFramebuffer, srcX0, srcY0, srcX1, srcY1, dstX0, dstY0, dstX1, dstY1, mask, filter);
     }
     
+    @Deprecated
     public static void glNamedFramebufferTexture(int framebuffer, int attachment, int texture, int level) {
         getBackend().glNamedFramebufferTexture(framebuffer, attachment, texture, level);
     }
     
+    @Deprecated
     public static int glCreateFramebuffers() {
         return getBackend().glCreateFramebuffers();
     }
     
+    @Deprecated
     public static int glGenFramebuffers() {
         return getBackend().generateFramebufferObject();
     }
     
+    @Deprecated
     public static void glDeleteFramebuffers(int framebuffer) {
         getBackend().destroyFramebufferObject(framebuffer);
     }
     
+    @Deprecated
     public static int glCreateTextures(int target) {
         return getBackend().glCreateTextures(target);
     }
     
     // Additional rendering operations
+    @Deprecated
     public static void glDrawElements(int mode, int count, int type, long indices) {
         getBackend().glDrawElements(mode, count, type, indices);
     }
     
+    @Deprecated
     public static void glBlendEquation(int mode) {
         getBackend().glBlendEquation(mode);
     }
     
+    @Deprecated
     public static void glClearDepth(double depth) {
         getBackend().glClearDepth(depth);
     }
     
+    @Deprecated
     public static int glGetFramebufferAttachmentParameteri(int target, int attachment, int pname) {
         return getBackend().glGetFramebufferAttachmentParameteri(target, attachment, pname);
     }
     
     // Debug callback control methods (low-level callback control methods only)
     // Note: The high-level setup methods below use Vulkanic functional interfaces
+    @Deprecated
     public static void glDebugMessageControl(int source, int type, int severity, int[] ids, boolean enabled) {
         getBackend().glDebugMessageControl(source, type, severity, ids, enabled);
     }
     
+    @Deprecated
     public static void glDebugMessageControlKHR(int source, int type, int severity, int[] ids, boolean enabled) {
         getBackend().glDebugMessageControlKHR(source, type, severity, ids, enabled);
     }
     
+    @Deprecated
     public static void glDebugMessageControlARB(int source, int type, int severity, int[] ids, boolean enabled) {
         getBackend().glDebugMessageControlARB(source, type, severity, ids, enabled);
     }
     
+    @Deprecated
     public static void glDebugMessageEnableAMD(int category, int severity, int[] ids, boolean enabled) {
         getBackend().glDebugMessageEnableAMD(category, severity, ids, enabled);
     }
     
     // High-level debug callback wrapper methods that accept functional interfaces
+    @Deprecated
     public static void setupDebugMessageCallback(DebugMessageCallback callback) {
         getBackend().setupDebugMessageCallback(callback);
     }
     
+    @Deprecated
     public static void setupDebugMessageCallbackKHR(DebugMessageCallback callback) {
         getBackend().setupDebugMessageCallbackKHR(callback);
     }
     
+    @Deprecated
     public static void setupDebugMessageCallbackARB(DebugMessageCallbackARB callback) {
         getBackend().setupDebugMessageCallbackARB(callback);
     }
     
+    @Deprecated
     public static void setupDebugMessageCallbackAMD(DebugMessageCallbackAMD callback) {
         getBackend().setupDebugMessageCallbackAMD(callback);
     }
     
+    @Deprecated
     public static void clearDebugMessageCallback() {
         getBackend().clearDebugMessageCallback();
     }
     
+    @Deprecated
     public static void clearDebugMessageCallbackKHR() {
         getBackend().clearDebugMessageCallbackKHR();
     }
     
+    @Deprecated
     public static void clearDebugMessageCallbackARB() {
         getBackend().clearDebugMessageCallbackARB();
     }
     
+    @Deprecated
     public static void clearDebugMessageCallbackAMD() {
         getBackend().clearDebugMessageCallbackAMD();
     }
@@ -1572,6 +1835,7 @@ public class VulkanicAPI {
      * Binds a vertex attribute to a specific location in a shader program.
      * Wrapper for bindAttributeLocation.
      */
+    @Deprecated
     public static void glBindAttribLocation(int program, int index, CharSequence name) {
         bindAttributeLocation(program, index, name);
     }
@@ -1580,6 +1844,7 @@ public class VulkanicAPI {
      * Configures a vertex attribute pointer.
      * Wrapper for configureVertexAttribute.
      */
+    @Deprecated
     public static void glVertexAttribPointer(int index, int size, int type, boolean normalized, int stride, long pointer) {
         configureVertexAttribute(index, size, type, normalized, stride, pointer);
     }
@@ -1588,6 +1853,7 @@ public class VulkanicAPI {
      * Enables a vertex attribute array.
      * Wrapper for activateVertexAttribute.
      */
+    @Deprecated
     public static void glEnableVertexAttribArray(int index) {
         activateVertexAttribute(index);
     }
@@ -1596,6 +1862,7 @@ public class VulkanicAPI {
      * Creates a new shader program object.
      * Wrapper for constructProgramObject.
      */
+    @Deprecated
     public static int glCreateProgram() {
         return constructProgramObject();
     }
@@ -1604,6 +1871,7 @@ public class VulkanicAPI {
      * Attaches a shader to a program.
      * Wrapper for attachShaderToProgram.
      */
+    @Deprecated
     public static void glAttachShader(int program, int shader) {
         attachShaderToProgram(program, shader);
     }
@@ -1612,6 +1880,7 @@ public class VulkanicAPI {
      * Links a program object.
      * Wrapper for linkProgramBinary.
      */
+    @Deprecated
     public static void glLinkProgram(int program) {
         linkProgramBinary(program);
     }
@@ -1620,6 +1889,7 @@ public class VulkanicAPI {
      * Returns a parameter from a program object.
      * Wrapper for queryProgramParameter.
      */
+    @Deprecated
     public static int glGetProgrami(int program, int pname) {
         return queryProgramParameter(program, pname);
     }
@@ -1628,6 +1898,7 @@ public class VulkanicAPI {
      * Installs a program object as part of current rendering state.
      * Wrapper for useProgram.
      */
+    @Deprecated
     public static void glUseProgram(int program) {
         useProgram(program);
     }
@@ -1636,6 +1907,7 @@ public class VulkanicAPI {
      * Deletes a program object.
      * Wrapper for disposeProgramObject.
      */
+    @Deprecated
     public static void glDeleteProgram(int program) {
         disposeProgramObject(program);
     }
@@ -1644,6 +1916,7 @@ public class VulkanicAPI {
      * Returns the location of a uniform variable.
      * Wrapper for locateUniformVariable.
      */
+    @Deprecated
     public static int glGetUniformLocation(int program, CharSequence name) {
         return locateUniformVariable(program, name);
     }
@@ -1652,6 +1925,7 @@ public class VulkanicAPI {
      * Sets the value of a uniform variable.
      * Wrapper for assignUniformInteger.
      */
+    @Deprecated
     public static void glUniform1i(int location, int value) {
         assignUniformInteger(location, value);
     }
@@ -1661,6 +1935,7 @@ public class VulkanicAPI {
     /**
      * Binds a buffer to a vertex buffer bind point (GL43+).
      */
+    @Deprecated
     public static void glBindVertexBuffer(int bindingindex, int buffer, long offset, int stride) {
         getBackend().bindVertexBuffer(bindingindex, buffer, offset, stride);
     }
@@ -1668,6 +1943,7 @@ public class VulkanicAPI {
     /**
      * Specifies the organization of vertex arrays (GL43+).
      */
+    @Deprecated
     public static void glVertexAttribFormat(int attribindex, int size, int type, boolean normalized, int relativeoffset) {
         getBackend().vertexAttribFormat(attribindex, size, type, normalized, relativeoffset);
     }
@@ -1675,6 +1951,7 @@ public class VulkanicAPI {
     /**
      * Specifies the organization of vertex arrays for integer data (GL43+).
      */
+    @Deprecated
     public static void glVertexAttribIFormat(int attribindex, int size, int type, int relativeoffset) {
         getBackend().vertexAttribIFormat(attribindex, size, type, relativeoffset);
     }
@@ -1682,6 +1959,7 @@ public class VulkanicAPI {
     /**
      * Associates a vertex attribute and a vertex buffer binding (GL43+).
      */
+    @Deprecated
     public static void glVertexAttribBinding(int attribindex, int bindingindex) {
         getBackend().vertexAttribBinding(attribindex, bindingindex);
     }
@@ -1689,6 +1967,7 @@ public class VulkanicAPI {
     /**
      * Disables a generic vertex attribute array.
      */
+    @Deprecated
     public static void glDisableVertexAttribArray(int index) {
         deactivateVertexAttribute(index);
     }
@@ -1697,6 +1976,7 @@ public class VulkanicAPI {
      * Defines an array of generic vertex attribute data with integer data (GL20+).
      * Specifies the data format for integer vertex attributes.
      */
+    @Deprecated
     public static void glVertexAttribIPointer(int index, int size, int type, int stride, long pointer) {
         configureVertexAttributeInteger(index, size, type, stride, pointer);
     }
@@ -1706,6 +1986,7 @@ public class VulkanicAPI {
     /**
      * Generates vertex array object names.
      */
+    @Deprecated
     public static int glGenVertexArrays() {
         return getBackend().genVertexArrays();
     }
@@ -1713,6 +1994,7 @@ public class VulkanicAPI {
     /**
      * Binds a vertex array object.
      */
+    @Deprecated
     public static void glBindVertexArray(int array) {
         getBackend().bindVertexArray(array);
     }
@@ -1720,6 +2002,7 @@ public class VulkanicAPI {
     /**
      * Deletes vertex array objects.
      */
+    @Deprecated
     public static void glDeleteVertexArrays(int array) {
         getBackend().deleteVertexArrays(array);
     }
@@ -1733,6 +2016,7 @@ public class VulkanicAPI {
      * 
      * @return Platform-specific capabilities object (cast to GLCapabilities for OpenGL backend)
      */
+    @Deprecated
     public static Object getGLCapabilities() {
         return getBackend().getGLCapabilities();
     }
@@ -1741,6 +2025,7 @@ public class VulkanicAPI {
      * Sets up debug message callback using GLUtil-style callback.
      * @param stream The PrintStream to write debug messages to
      */
+    @Deprecated
     public static void setupDebugMessageCallback(java.io.PrintStream stream) {
         getBackend().setupDebugMessageCallback(stream);
     }
@@ -1751,6 +2036,7 @@ public class VulkanicAPI {
      * Checks if OpenGL 3.2 is supported.
      * @return true if OpenGL 3.2 is supported
      */
+    @Deprecated
     public static boolean checkOpenGL32Support() {
         return getBackend().checkOpenGL32Support();
     }
@@ -1759,6 +2045,7 @@ public class VulkanicAPI {
      * Checks if OpenGL 3.3 is supported.
      * @return true if OpenGL 3.3 is supported
      */
+    @Deprecated
     public static boolean checkOpenGL33Support() {
         return getBackend().checkOpenGL33Support();
     }
@@ -1767,6 +2054,7 @@ public class VulkanicAPI {
      * Checks if ARB_instanced_arrays extension is supported.
      * @return true if ARB_instanced_arrays is supported
      */
+    @Deprecated
     public static boolean checkARBInstancedArraysSupport() {
         return getBackend().checkARBInstancedArraysSupport();
     }
@@ -1775,6 +2063,7 @@ public class VulkanicAPI {
      * Gets the function pointer for glNamedBufferData.
      * @return function pointer, or 0 if not available
      */
+    @Deprecated
     public static long getNamedBufferDataPointer() {
         return getBackend().getNamedBufferDataPointer();
     }
@@ -1783,6 +2072,7 @@ public class VulkanicAPI {
      * Gets the function pointer for glBufferStorage.
      * @return function pointer, or 0 if not available
      */
+    @Deprecated
     public static long getBufferStoragePointer() {
         return getBackend().getBufferStoragePointer();
     }
@@ -1791,6 +2081,7 @@ public class VulkanicAPI {
      * Gets the function pointer for glBindVertexBuffer.
      * @return function pointer, or 0 if not available
      */
+    @Deprecated
     public static long getBindVertexBufferPointer() {
         return getBackend().getBindVertexBufferPointer();
     }
@@ -1799,6 +2090,7 @@ public class VulkanicAPI {
      * Gets the function pointer for glVertexAttribBinding.
      * @return function pointer, or 0 if not available
      */
+    @Deprecated
     public static long getVertexAttribBindingPointer() {
         return getBackend().getVertexAttribBindingPointer();
     }
@@ -1807,6 +2099,7 @@ public class VulkanicAPI {
      * Gets capability information as a formatted string for debugging.
      * @return formatted capability information
      */
+    @Deprecated
     public static String getCapabilityDebugInfo() {
         return "Your OpenGL support:\n" +
                 "openGL version 3.2+: [" + checkOpenGL32Support() + "] <- REQUIRED\n" +
@@ -1819,6 +2112,7 @@ public class VulkanicAPI {
     /**
      * Tests whether a capability is enabled.
      */
+    @Deprecated
     public static boolean glIsEnabled(int cap) {
         return getBackend().glIsEnabled(cap);
     }
@@ -1826,6 +2120,7 @@ public class VulkanicAPI {
     /**
      * Determines if a name corresponds to a framebuffer object.
      */
+    @Deprecated
     public static boolean glIsFramebuffer(int framebuffer) {
         return getBackend().glIsFramebuffer(framebuffer);
     }
@@ -1833,6 +2128,7 @@ public class VulkanicAPI {
     /**
      * Determines if a name corresponds to a texture.
      */
+    @Deprecated
     public static boolean glIsTexture(int texture) {
         return getBackend().glIsTexture(texture);
     }
@@ -1840,6 +2136,7 @@ public class VulkanicAPI {
     /**
      * Determines if a name corresponds to a vertex array object.
      */
+    @Deprecated
     public static boolean glIsVertexArray(int array) {
         return getBackend().glIsVertexArray(array);
     }
@@ -1847,6 +2144,7 @@ public class VulkanicAPI {
     /**
      * Determines if a name corresponds to a program object.
      */
+    @Deprecated
     public static boolean glIsProgram(int program) {
         return getBackend().glIsProgram(program);
     }
@@ -1854,6 +2152,7 @@ public class VulkanicAPI {
     /**
      * Sets the RGB blend equation and the alpha blend equation separately.
      */
+    @Deprecated
     public static void glBlendEquationSeparate(int modeRGB, int modeAlpha) {
         getBackend().glBlendEquationSeparate(modeRGB, modeAlpha);
     }
@@ -1861,6 +2160,7 @@ public class VulkanicAPI {
     /**
      * Sets the stencil test function.
      */
+    @Deprecated
     public static void glStencilFunc(int func, int ref, int mask) {
         getBackend().glStencilFunc(func, ref, mask);
     }
@@ -1868,6 +2168,7 @@ public class VulkanicAPI {
     /**
      * Specifies whether front- or back-facing polygons can be culled.
      */
+    @Deprecated
     public static void glCullFace(int mode) {
         getBackend().glCullFace(mode);
     }
@@ -1875,6 +2176,7 @@ public class VulkanicAPI {
     /**
      * Generates a single texture name.
      */
+    @Deprecated
     public static int glGenTextures() {
         return getBackend().glGenTextures();
     }
@@ -1882,6 +2184,7 @@ public class VulkanicAPI {
     /**
      * Binds a named texture to a texturing target.
      */
+    @Deprecated
     public static void glBindTexture(int target, int texture) {
         getBackend().bindTexture(target, texture);
     }
