@@ -635,11 +635,6 @@ public class VulkanicAPI {
     }
     
     @Deprecated
-    public static void useProgram(int programId) {
-        getBackend().useProgram(programId);
-    }
-    
-    @Deprecated
     public static void enable(int cap) {
         getBackend().enable(cap);
     }
@@ -2006,11 +2001,11 @@ public class VulkanicAPI {
     
     /**
      * Installs a program object as part of current rendering state.
-     * Wrapper for useProgram.
+     * Wrapper for bindShaderProgram.
      */
     @Deprecated
     public static void glUseProgram(int program) {
-        useProgram(program);
+        bindShaderProgram(program);
     }
     
     /**

@@ -133,8 +133,6 @@ public interface GraphicsBackend {
     @Deprecated
     void disableBlend();
     @Deprecated
-    void useProgram(int programId);
-    @Deprecated
     void enable(int cap);
     @Deprecated
     void disable(int cap);
