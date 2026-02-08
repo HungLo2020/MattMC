@@ -34,9 +34,15 @@ public class RenderPipeline {
 	private final boolean cull;
 	private final LogicOp colorLogic;
 	private final Optional<BlendFunction> blendFunction;
+	// Legacy fields for backward compatibility (writeColor means RGB together)
 	private final boolean writeColor;
 	private final boolean writeAlpha;
 	private final boolean writeDepth;
+	// New per-channel color write mask fields (Vulkan-compatible)
+	private final boolean writeRed;
+	private final boolean writeGreen;
+	private final boolean writeBlue;
+	private final boolean writeAlphaChannel; // Renamed to avoid confusion with legacy writeAlpha
 	private final VertexFormat vertexFormat;
 	private final VertexFormat.Mode vertexFormatMode;
 	private final float depthBiasScaleFactor;
@@ -44,6 +50,59 @@ public class RenderPipeline {
 	private final int sortKey;
 	private static int sortKeySeed;
 
+	
+	// New constructor with per-channel color write mask (Vulkan-compatible)
+	protected RenderPipeline(
+		ResourceLocation resourceLocation,
+		ResourceLocation resourceLocation2,
+		ResourceLocation resourceLocation3,
+		ShaderDefines shaderDefines,
+		List<String> list,
+		List<RenderPipeline.UniformDescription> list2,
+		Optional<BlendFunction> optional,
+		DepthTestFunction depthTestFunction,
+		PolygonMode polygonMode,
+		boolean bl,
+		boolean writeR,
+		boolean writeG,
+		boolean writeB,
+		boolean writeA,
+		boolean bl4,
+		LogicOp logicOp,
+		VertexFormat vertexFormat,
+		VertexFormat.Mode mode,
+		float f,
+		float g,
+		int i
+	) {
+		this.location = resourceLocation;
+		this.vertexShader = resourceLocation2;
+		this.fragmentShader = resourceLocation3;
+		this.shaderDefines = shaderDefines;
+		this.samplers = list;
+		this.uniforms = list2;
+		this.depthTestFunction = depthTestFunction;
+		this.polygonMode = polygonMode;
+		this.cull = bl;
+		this.blendFunction = optional;
+		// Per-channel color write mask
+		this.writeRed = writeR;
+		this.writeGreen = writeG;
+		this.writeBlue = writeB;
+		this.writeAlphaChannel = writeA;
+		// Legacy fields - derive from per-channel for backward compatibility
+		this.writeColor = writeR && writeG && writeB;
+		this.writeAlpha = writeA;
+		this.writeDepth = bl4;
+		this.colorLogic = logicOp;
+		this.vertexFormat = vertexFormat;
+		this.vertexFormatMode = mode;
+		this.depthBiasScaleFactor = f;
+		this.depthBiasConstant = g;
+		this.sortKey = i;
+	}
+
+	// Legacy constructor (uses RGB together + separate A)
 	protected RenderPipeline(
 		ResourceLocation resourceLocation,
 		ResourceLocation resourceLocation2,
@@ -75,9 +134,16 @@ public class RenderPipeline {
 		this.polygonMode = polygonMode;
 		this.cull = bl;
 		this.blendFunction = optional;
+		// Legacy fields
 		this.writeColor = bl2;
 		this.writeAlpha = bl3;
 		this.writeDepth = bl4;
+		// New per-channel fields - derive from legacy for backward compatibility
+		// When writeColor is true, all RGB channels are enabled
+		this.writeRed = bl2;
+		this.writeGreen = bl2;
+		this.writeBlue = bl2;
+		this.writeAlphaChannel = bl3;
 		this.colorLogic = logicOp;
 		this.vertexFormat = vertexFormat;
 		this.vertexFormatMode = mode;
@@ -124,6 +190,23 @@ public class RenderPipeline {
 
 	public boolean isWriteAlpha() {
 		return this.writeAlpha;
+	}
+	
+	// New Vulkan-compatible per-channel color write mask getters
+	public boolean isWriteRed() {
+		return this.writeRed;
+	}
+	
+	public boolean isWriteGreen() {
+		return this.writeGreen;
+	}
+	
+	public boolean isWriteBlue() {
+		return this.writeBlue;
+	}
+	
+	public boolean isWriteAlphaChannel() {
+		return this.writeAlphaChannel;
 	}
 
 	public boolean isWriteDepth() {
@@ -209,8 +292,14 @@ public class RenderPipeline {
 		private Optional<DepthTestFunction> depthTestFunction = Optional.empty();
 		private Optional<PolygonMode> polygonMode = Optional.empty();
 		private Optional<Boolean> cull = Optional.empty();
+		// Legacy color write fields (RGB together + alpha separate)
 		private Optional<Boolean> writeColor = Optional.empty();
 		private Optional<Boolean> writeAlpha = Optional.empty();
+		// New per-channel color write mask fields
+		private Optional<Boolean> writeRed = Optional.empty();
+		private Optional<Boolean> writeGreen = Optional.empty();
+		private Optional<Boolean> writeBlue = Optional.empty();
+		private Optional<Boolean> writeAlphaChannel = Optional.empty();
 		private Optional<Boolean> writeDepth = Optional.empty();
 		private Optional<LogicOp> colorLogic = Optional.empty();
 		private Optional<BlendFunction> blendFunction = Optional.empty();
@@ -342,12 +431,44 @@ public class RenderPipeline {
 		public RenderPipeline.Builder withColorWrite(boolean bl) {
 			this.writeColor = Optional.of(bl);
 			this.writeAlpha = Optional.of(bl);
+			// Also set per-channel for consistency
+			this.writeRed = Optional.of(bl);
+			this.writeGreen = Optional.of(bl);
+			this.writeBlue = Optional.of(bl);
+			this.writeAlphaChannel = Optional.of(bl);
 			return this;
 		}
 
 		public RenderPipeline.Builder withColorWrite(boolean bl, boolean bl2) {
 			this.writeColor = Optional.of(bl);
 			this.writeAlpha = Optional.of(bl2);
+			// Also set per-channel for consistency
+			this.writeRed = Optional.of(bl);
+			this.writeGreen = Optional.of(bl);
+			this.writeBlue = Optional.of(bl);
+			this.writeAlphaChannel = Optional.of(bl2);
+			return this;
+		}
+		
+		/**
+		 * Sets per-channel color write mask (Vulkan-compatible).
+		 * This method allows fine-grained control over which color channels are written.
+		 * In Vulkan, this maps to VkPipelineColorBlendAttachmentState.colorWriteMask.
+		 * 
+		 * @param r Enable writing to red channel
+		 * @param g Enable writing to green channel  
+		 * @param b Enable writing to blue channel
+		 * @param a Enable writing to alpha channel
+		 * @return This builder
+		 */
+		public RenderPipeline.Builder withColorWriteMask(boolean r, boolean g, boolean b, boolean a) {
+			this.writeRed = Optional.of(r);
+			this.writeGreen = Optional.of(g);
+			this.writeBlue = Optional.of(b);
+			this.writeAlphaChannel = Optional.of(a);
+			// Also set legacy fields for backward compatibility
+			this.writeColor = Optional.of(r && g && b);
+			this.writeAlpha = Optional.of(a);
 			return this;
 		}
 
@@ -482,27 +603,59 @@ public class RenderPipeline {
 			} else if (this.vertexFormatMode.isEmpty()) {
 				throw new IllegalStateException("Missing vertex mode");
 			} else {
-				return new RenderPipeline(
-					(ResourceLocation)this.location.get(),
-					(ResourceLocation)this.vertexShader.get(),
-					(ResourceLocation)this.fragmentShader.get(),
-					((ShaderDefines.Builder)this.definesBuilder.orElse(ShaderDefines.builder())).build(),
-					List.copyOf((Collection)this.samplers.orElse(new ArrayList())),
-					(List<RenderPipeline.UniformDescription>)this.uniforms.orElse(Collections.emptyList()),
-					this.blendFunction,
-					(DepthTestFunction)this.depthTestFunction.orElse(DepthTestFunction.LEQUAL_DEPTH_TEST),
-					(PolygonMode)this.polygonMode.orElse(PolygonMode.FILL),
-					(Boolean)this.cull.orElse(true),
-					(Boolean)this.writeColor.orElse(true),
-					(Boolean)this.writeAlpha.orElse(true),
-					(Boolean)this.writeDepth.orElse(true),
-					(LogicOp)this.colorLogic.orElse(LogicOp.NONE),
-					(VertexFormat)this.vertexFormat.get(),
-					(VertexFormat.Mode)this.vertexFormatMode.get(),
-					this.depthBiasScaleFactor,
-					this.depthBiasConstant,
-					nextPipelineSortKey++
-				);
+				// Check if per-channel color write mask is specified
+				boolean hasPerChannelMask = this.writeRed.isPresent() || this.writeGreen.isPresent() || 
+				                             this.writeBlue.isPresent() || this.writeAlphaChannel.isPresent();
+				
+				if (hasPerChannelMask) {
+					// Use new constructor with per-channel color write mask
+					return new RenderPipeline(
+						(ResourceLocation)this.location.get(),
+						(ResourceLocation)this.vertexShader.get(),
+						(ResourceLocation)this.fragmentShader.get(),
+						((ShaderDefines.Builder)this.definesBuilder.orElse(ShaderDefines.builder())).build(),
+						List.copyOf((Collection)this.samplers.orElse(new ArrayList())),
+						(List<RenderPipeline.UniformDescription>)this.uniforms.orElse(Collections.emptyList()),
+						this.blendFunction,
+						(DepthTestFunction)this.depthTestFunction.orElse(DepthTestFunction.LEQUAL_DEPTH_TEST),
+						(PolygonMode)this.polygonMode.orElse(PolygonMode.FILL),
+						(Boolean)this.cull.orElse(true),
+						(Boolean)this.writeRed.orElse(true),
+						(Boolean)this.writeGreen.orElse(true),
+						(Boolean)this.writeBlue.orElse(true),
+						(Boolean)this.writeAlphaChannel.orElse(true),
+						(Boolean)this.writeDepth.orElse(true),
+						(LogicOp)this.colorLogic.orElse(LogicOp.NONE),
+						(VertexFormat)this.vertexFormat.get(),
+						(VertexFormat.Mode)this.vertexFormatMode.get(),
+						this.depthBiasScaleFactor,
+						this.depthBiasConstant,
+						nextPipelineSortKey++
+					);
+				} else {
+					// Use legacy constructor for backward compatibility
+					return new RenderPipeline(
+						(ResourceLocation)this.location.get(),
+						(ResourceLocation)this.vertexShader.get(),
+						(ResourceLocation)this.fragmentShader.get(),
+						((ShaderDefines.Builder)this.definesBuilder.orElse(ShaderDefines.builder())).build(),
+						List.copyOf((Collection)this.samplers.orElse(new ArrayList())),
+						(List<RenderPipeline.UniformDescription>)this.uniforms.orElse(Collections.emptyList()),
+						this.blendFunction,
+						(DepthTestFunction)this.depthTestFunction.orElse(DepthTestFunction.LEQUAL_DEPTH_TEST),
+						(PolygonMode)this.polygonMode.orElse(PolygonMode.FILL),
+						(Boolean)this.cull.orElse(true),
+						(Boolean)this.writeColor.orElse(true),
+						(Boolean)this.writeAlpha.orElse(true),
+						(Boolean)this.writeDepth.orElse(true),
+						(LogicOp)this.colorLogic.orElse(LogicOp.NONE),
+						(VertexFormat)this.vertexFormat.get(),
+						(VertexFormat.Mode)this.vertexFormatMode.get(),
+						this.depthBiasScaleFactor,
+						this.depthBiasConstant,
+						nextPipelineSortKey++
+					);
+				}
 			}
 		}
 	}
