@@ -532,7 +532,10 @@ public class GlStateManager {
 
 	public static void _clear(int i) {
 		RenderSystem.assertOnRenderThread();
-		net.vulkanic.VulkanicAPI.clear(i);
+		// Convert OpenGL clear mask to explicit attachment flags
+		boolean clearColor = (i & net.vulkanic.VulkanicAPI.GL_COLOR_BUFFER_BIT) != 0;
+		boolean clearDepth = (i & net.vulkanic.VulkanicAPI.GL_DEPTH_BUFFER_BIT) != 0;
+		net.vulkanic.VulkanicAPI.clearAttachments(clearColor, clearDepth);
 		if (MacosUtil.IS_MACOS) {
 			_getError();
 		}

@@ -282,7 +282,7 @@ public class LodRenderer
 			{
 				// If MC's framebuffer is being used the depth needs to be cleared to prevent rendering on top of MC.
 				// This should only happen when Optifine shaders are being used.
-				VulkanicAPI.clear(VulkanicAPI.GL_DEPTH_BUFFER_BIT);
+				VulkanicAPI.clearAttachments(false, true);
 			}
 			
 			
@@ -455,11 +455,11 @@ public class LodRenderer
 				
 				
 				// don't clear the color texture, that removes the sky 
-				VulkanicAPI.clear(VulkanicAPI.GL_DEPTH_BUFFER_BIT);
+				VulkanicAPI.clearAttachments(false, true);
 			}
 			else if (firstPass)
 			{
-				VulkanicAPI.clear(VulkanicAPI.GL_COLOR_BUFFER_BIT | VulkanicAPI.GL_DEPTH_BUFFER_BIT);
+				VulkanicAPI.clearAttachments(true, true);
 			}
 		}
 		

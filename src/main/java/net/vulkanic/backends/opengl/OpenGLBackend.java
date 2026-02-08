@@ -65,6 +65,20 @@ public class OpenGLBackend implements GraphicsBackend {
         GL11.glViewport(x, y, width, height);
     }
     
+    @Override
+    public void clearAttachments(boolean clearColor, boolean clearDepth) {
+        int mask = 0;
+        if (clearColor) {
+            mask |= GL11.GL_COLOR_BUFFER_BIT;
+        }
+        if (clearDepth) {
+            mask |= GL11.GL_DEPTH_BUFFER_BIT;
+        }
+        if (mask != 0) {
+            GL11.glClear(mask);
+        }
+    }
+    
     @Deprecated
     @Override
     public void clear(int mask) {

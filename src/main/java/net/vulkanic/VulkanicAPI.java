@@ -539,6 +539,35 @@ public class VulkanicAPI {
         getBackend().setDynamicViewport(x, y, width, height);
     }
     
+    /**
+     * Clears framebuffer attachments (color and/or depth buffers).
+     * This is a Vulkan-compatible replacement for the deprecated clear(int mask) method.
+     * 
+     * In OpenGL: Maps to glClear(mask) where mask is constructed from the boolean parameters
+     * In Vulkan: Maps to VkRenderPassBeginInfo.pClearValues and LoadOp::CLEAR
+     * 
+     * This method explicitly specifies which attachments to clear, making it clear to both
+     * the developer and the future Vulkan backend what needs to be cleared.
+     * 
+     * Important architectural notes for Vulkan compatibility:
+     * - In Vulkan, clearing happens at render pass begin time, not as a separate command
+     * - The clear values are specified in VkRenderPassBeginInfo when calling vkCmdBeginRenderPass
+     * - For now, this API allows clearing at any time (OpenGL-style), but callers should
+     *   ideally call this at the start of rendering to a framebuffer to match Vulkan semantics
+     * 
+     * Future evolution: This will be replaced by render pass API where clear values are
+     * specified when beginning a render pass:
+     *   RenderPassBeginInfo.setClearColorValue(r, g, b, a)
+     *   RenderPassBeginInfo.setClearDepthValue(depth)
+     *   cmdBeginRenderPass(commandBuffer, renderPassBeginInfo)
+     * 
+     * @param clearColor If true, clears the color buffer
+     * @param clearDepth If true, clears the depth buffer
+     */
+    public static void clearAttachments(boolean clearColor, boolean clearDepth) {
+        getBackend().clearAttachments(clearColor, clearDepth);
+    }
+    
     @Deprecated
     public static void clear(int mask) {
         getBackend().clear(mask);
