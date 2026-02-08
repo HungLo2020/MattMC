@@ -101,8 +101,9 @@ public class CompressibleGLBufferedImage {
         ByteBuffer outBuffer = MemoryUtil.memByteBuffer(this.texture.getPixels().getPointer(), imageBytes);
         MemoryUtil.memCopy(buffer, outBuffer);
         this.texture.upload();
-        VulkanicAPI.bindTexture(VulkanicAPI.GL_TEXTURE_2D, ((GlTexture) this.texture.getTexture()).glId());
-        VulkanicAPI.generateMipmap(VulkanicAPI.GL_TEXTURE_2D);
+        int textureId = ((GlTexture) this.texture.getTexture()).glId();
+        VulkanicAPI.bindTexture(VulkanicAPI.GL_TEXTURE_2D, textureId);
+        VulkanicAPI.generateTextureMipmaps(textureId);
         this.compress();
     }
 

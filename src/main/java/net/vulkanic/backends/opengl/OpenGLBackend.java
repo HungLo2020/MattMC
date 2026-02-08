@@ -53,6 +53,19 @@ public class OpenGLBackend implements GraphicsBackend {
         GL30.glGenerateMipmap(target);
     }
     
+    @Override
+    public void generateTextureMipmaps(int textureId) {
+        // Save current texture binding to restore it after mipmap generation
+        int previousBinding = GL11.glGetInteger(GL11.GL_TEXTURE_BINDING_2D);
+        
+        // Bind the texture and generate mipmaps
+        GL11.glBindTexture(GL11.GL_TEXTURE_2D, textureId);
+        GL30.glGenerateMipmap(GL11.GL_TEXTURE_2D);
+        
+        // Restore previous binding to avoid affecting OpenGL state
+        GL11.glBindTexture(GL11.GL_TEXTURE_2D, previousBinding);
+    }
+    
     /**
      * Sets the dynamic viewport state.
      * This is the Vulkan-compatible implementation for viewport control.
