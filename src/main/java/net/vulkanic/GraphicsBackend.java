@@ -322,6 +322,7 @@ public interface GraphicsBackend {
     void glMemoryBarrier(int barriers);
     void glDisablei(int target, int index);
     void glEnablei(int target, int index);
+    void glBlendFunc(int sfactor, int dfactor);
     void glBlendFuncSeparatei(int buffer, int srcRGB, int dstRGB, int srcAlpha, int dstAlpha);
     int glGetUniformBlockIndex(int program, String uniformBlockName);
     void glUniformBlockBinding(int program, int uniformBlockIndex, int uniformBlockBinding);

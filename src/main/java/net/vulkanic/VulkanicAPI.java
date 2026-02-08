@@ -191,6 +191,7 @@ public class VulkanicAPI {
     public static final int GL_CULL_FACE = 0x0B44;
     
     // OpenGL Constants - Tests
+    public static final int GL_DEPTH_TEST = 0x0B71;
     public static final int GL_SCISSOR_TEST = 0x0C11;
     
     // OpenGL Constants - Texture Parameters
@@ -1206,6 +1207,10 @@ public class VulkanicAPI {
     
     public static void glEnablei(int target, int index) {
         getBackend().glEnablei(target, index);
+    }
+    
+    public static void glBlendFunc(int sfactor, int dfactor) {
+        getBackend().glBlendFunc(sfactor, dfactor);
     }
     
     public static void glBlendFuncSeparatei(int buffer, int srcRGB, int dstRGB, int srcAlpha, int dstAlpha) {

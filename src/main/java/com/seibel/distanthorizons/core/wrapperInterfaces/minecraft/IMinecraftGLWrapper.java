@@ -1,7 +1,7 @@
 package com.seibel.distanthorizons.core.wrapperInterfaces.minecraft;
 
 import com.seibel.distanthorizons.coreapi.interfaces.dependencyInjection.IBindable;
-import org.lwjgl.opengl.GL32;
+import net.vulkanic.VulkanicAPI;
 
 import java.util.ArrayList;
 import java.util.UUID;
@@ -15,92 +15,91 @@ public interface IMinecraftGLWrapper extends IBindable
 	
 	// scissor //
 	
-	/** @see GL32#GL_SCISSOR_TEST */
+	/** Enables scissor testing */
 	void enableScissorTest();
-	/** @see GL32#GL_SCISSOR_TEST */
+	/** Disables scissor testing */
 	void disableScissorTest();
 	
 	
 	// stencil //
 	
-	///** @see GL32#GL_SCISSOR_TEST */
+	///** Enables scissor testing */
 	//void enableScissorTest() { GlStateManager._enableScissorTest(); }
-	///** @see GL32#GL_SCISSOR_TEST */
+	///** Disables scissor testing */
 	//void disableScissorTest() { GlStateManager._disableScissorTest(); }
 	
 	
 	// depth //
 	
-	/** @see GL32#GL_DEPTH_TEST */
+	/** Enables depth testing */
 	void enableDepthTest();
-	/** @see GL32#GL_DEPTH_TEST */
+	/** Disables depth testing */
 	void disableDepthTest();
 	
-	/** @see GL32#glDepthFunc(int)  */
+	/** Sets depth comparison function */
 	void glDepthFunc(int func);
 	
-	/** @see GL32#glDepthMask(boolean) */
+	/** Enables depth buffer writing */
 	void enableDepthMask();
-	/** @see GL32#glDepthMask(boolean) */
+	/** Disables depth buffer writing */
 	void disableDepthMask();
 	
 	
 	
 	// blending //
 	
-	/** @see GL32#GL_BLEND */
+	/** Enables blending */
 	void enableBlend();
-	/** @see GL32#GL_BLEND */
+	/** Disables blending */
 	void disableBlend();
 	
-	/** @see GL32#glBlendFunc */
+	/** Sets blend function */
 	void glBlendFunc(int sfactor, int dfactor);
-	/** @see GL32#glBlendFuncSeparate */
+	/** Sets separate blend functions for RGB and alpha */
 	void glBlendFuncSeparate(int sfactorRGB, int dfactorRGB, int sfactorAlpha, int dfactorAlpha);
 	
 	
 	// frame buffers //
 	
-	/** @see GL32#glBindFramebuffer */
+	/** Binds a framebuffer */
 	void glBindFramebuffer(int target, int framebuffer);
 	
 	
 	// buffers //
 	
-	/** @see GL32#glGenBuffers() */
+	/** Generates a buffer object */
 	int glGenBuffers();
 	
-	/** @see GL32#glDeleteBuffers(int)  */
+	/** Deletes a buffer object */
 	void glDeleteBuffers(int buffer);
 	
 	
 	
 	// culling //
 	
-	/** @see GL32#GL_CULL_FACE */
+	/** Enables face culling */
 	void enableFaceCulling();
-	/** @see GL32#GL_CULL_FACE */
+	/** Disables face culling */
 	void disableFaceCulling();
 	
 	
 	// textures //
 	
-	/** @see GL32#glGenTextures() */
+	/** Generates a texture object */
 	int glGenTextures();
-	/** @see GL32#glDeleteTextures(int) */
+	/** Deletes a texture object */
 	void glDeleteTextures(int texture);
 	
-	/** @see GL32#glActiveTexture(int) */
+	/** Sets the active texture unit */
 	void glActiveTexture(int textureId);
 	/** 
 	 * Only works for textures bound via this system. <br> 
-	 * Returns the bound {@link GL32#GL_TEXTURE_BINDING_2D} 
+	 * Returns the currently bound 2D texture
 	 */
 	int getActiveTexture();
 	
 	/**
-	 * Always binds to {@link GL32#GL_TEXTURE_2D}
-	 * @see GL32#glBindTexture(int, int)
+	 * Always binds to 2D texture target
 	 */
 	void glBindTexture(int texture);
 	

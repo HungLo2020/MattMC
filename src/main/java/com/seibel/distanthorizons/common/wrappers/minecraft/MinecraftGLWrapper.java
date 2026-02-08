@@ -6,12 +6,12 @@ import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftGLWrapper;
 
 import com.seibel.distanthorizons.core.logging.DhLogger;
-import org.lwjgl.opengl.GL32;
+import net.vulkanic.VulkanicAPI;
 
 
 /**
  * <b>Why does DH often call GL methods twice? </b><br> 
- * Once using the base {@link GL32} function and a second time using
+ * Once using the base GL function and a second time using
  * Minecraft's {@link GlStateManager}?<br><br>
  * 
  * <b>Answer: </b><br>
@@ -42,127 +42,127 @@ public class MinecraftGLWrapper implements IMinecraftGLWrapper
 	
 	// scissor //
 	
-	/** @see GL32#GL_SCISSOR_TEST */
+	/** Enables scissor testing */
 	@Override
 	public void enableScissorTest() 
 	{
-		GL32.glEnable(GL32.GL_SCISSOR_TEST);
+		VulkanicAPI.enable(VulkanicAPI.GL_SCISSOR_TEST);
 		GlStateManager._enableScissorTest(); 
 	}
-	/** @see GL32#GL_SCISSOR_TEST */
+	/** Disables scissor testing */
 	@Override
 	public void disableScissorTest() 
 	{ 
-		GL32.glDisable(GL32.GL_SCISSOR_TEST);
+		VulkanicAPI.disable(VulkanicAPI.GL_SCISSOR_TEST);
 		GlStateManager._disableScissorTest(); 
 	}
 	
 	
 	// stencil //
 //	
-//	/** @see GL32#GL_SCISSOR_TEST */
+//	/** Enables stencil testing */
 //	public void enableScissorTest() { GlStateManager._stencilFunc(); }
-//	/** @see GL32#GL_SCISSOR_TEST */
+//	/** Disables stencil testing */
 //	public void disableScissorTest() { GlStateManager._disableScissorTest(); }
 	
 	
 	// depth //
 	
-	/** @see GL32#GL_DEPTH_TEST */
+	/** Enables depth testing */
 	@Override
 	public void enableDepthTest() 
 	{
-		GL32.glEnable(GL32.GL_DEPTH_TEST);
+		VulkanicAPI.enable(VulkanicAPI.GL_DEPTH_TEST);
 		GlStateManager._enableDepthTest(); 
 	}
-	/** @see GL32#GL_DEPTH_TEST */
+	/** Disables depth testing */
 	@Override
 	public void disableDepthTest() 
 	{
-		GL32.glDisable(GL32.GL_DEPTH_TEST);
+		VulkanicAPI.disable(VulkanicAPI.GL_DEPTH_TEST);
 		GlStateManager._disableDepthTest(); 
 	}
 	
-	/** @see GL32#glDepthFunc(int)  */
+	/** Sets depth comparison function */
 	@Override
 	public void glDepthFunc(int func) 
 	{ 
-		GL32.glDepthFunc(func);
+		VulkanicAPI.setDepthTestFunction(func);
 		GlStateManager._depthFunc(func); 
 	}
 	
-	/** @see GL32#glDepthMask(boolean) */
+	/** Enables depth buffer writing */
 	@Override
 	public void enableDepthMask() 
 	{
-		GL32.glDepthMask(true);
+		VulkanicAPI.setDepthWriteEnabled(true);
 		GlStateManager._depthMask(true); 
 	}
-	/** @see GL32#glDepthMask(boolean) */
+	/** Disables depth buffer writing */
 	@Override
 	public void disableDepthMask() 
 	{
-		GL32.glDepthMask(false);
+		VulkanicAPI.setDepthWriteEnabled(false);
 		GlStateManager._depthMask(false); 
 	}
 	
 	
 	// blending //
 	
-	/** @see GL32#GL_BLEND */
+	/** Enables blending */
 	@Override
 	public void enableBlend() 
 	{
-		GL32.glEnable(GL32.GL_BLEND);
+		VulkanicAPI.enable(VulkanicAPI.GL_BLEND);
 		GlStateManager._enableBlend();
 	}
-	/** @see GL32#GL_BLEND */
+	/** Disables blending */
 	@Override
 	public void disableBlend() 
 	{
-		GL32.glDisable(GL32.GL_BLEND);
+		VulkanicAPI.disable(VulkanicAPI.GL_BLEND);
 		GlStateManager._disableBlend(); 
 	}
 	
-	/** @see GL32#glBlendFunc */
+	/** Sets blend function */
 	@Override
 	public void glBlendFunc(int sfactor, int dfactor) 
 	{
-		GL32.glBlendFunc(sfactor, dfactor);
+		VulkanicAPI.glBlendFunc(sfactor, dfactor);
 		
 	}
-	/** @see GL32#glBlendFuncSeparate */
+	/** Sets separate blend functions for RGB and alpha */
 	@Override
 	public void glBlendFuncSeparate(int sfactorRGB, int dfactorRGB, int sfactorAlpha, int dfactorAlpha) 
 	{
-		GL32.glBlendFuncSeparate(sfactorRGB, dfactorRGB, sfactorAlpha, dfactorAlpha);
+		VulkanicAPI.configureBlendFunc(sfactorRGB, dfactorRGB, sfactorAlpha, dfactorAlpha);
 		GlStateManager._blendFuncSeparate(sfactorRGB, dfactorRGB, sfactorAlpha, dfactorAlpha); 
 	}
 	
 	
 	// frame buffers //
 	
-	/** @see GL32#glBindFramebuffer */
+	/** Binds a framebuffer */
 	@Override
 	public void glBindFramebuffer(int target, int framebuffer) 
 	{
-		GL32.glBindFramebuffer(target, framebuffer);
+		VulkanicAPI.attachFramebuffer(target, framebuffer);
 		GlStateManager._glBindFramebuffer(target, framebuffer); 
 	}
 	
 	
 	// buffers //
 	
-	/** @see GL32#glGenBuffers() */
+	/** Generates a buffer object */
 	@Override
 	public int glGenBuffers()
 	{ return GlStateManager._glGenBuffers(); }
 	
-	/** @see GL32#glDeleteBuffers(int)  */
+	/** Deletes a buffer object */
 	@Override
 	public void glDeleteBuffers(int buffer)
 	{
-		GL32.glDeleteBuffers(buffer);
+		VulkanicAPI.glDeleteBuffers(buffer);
 		
 		// MC's implementation has a bug where it will throw:
 		// GL_INVALID_OPERATION in glBufferData(immutable)
@@ -174,49 +174,48 @@ public class MinecraftGLWrapper implements IMinecraftGLWrapper
 	
 	// culling //
 	
-	/** @see GL32#GL_CULL_FACE */
+	/** Enables face culling */
 	@Override
 	public void enableFaceCulling() 
 	{
-		GL32.glEnable(GL32.GL_CULL_FACE);
+		VulkanicAPI.enable(VulkanicAPI.GL_CULL_FACE);
 		GlStateManager._enableCull(); 
 	}
-	/** @see GL32#GL_CULL_FACE */
+	/** Disables face culling */
 	@Override
 	public void disableFaceCulling() 
 	{
-		GL32.glDisable(GL32.GL_CULL_FACE);
+		VulkanicAPI.disable(VulkanicAPI.GL_CULL_FACE);
 		GlStateManager._disableCull(); 
 	}
 	
 	
 	// textures //
 	
-	/** @see GL32#glGenTextures() */
+	/** Generates a texture object */
 	@Override
 	public int glGenTextures() { return GlStateManager._genTexture(); }
-	/** @see GL32#glDeleteTextures(int) */
+	/** Deletes a texture object */
 	@Override
 	public void glDeleteTextures(int texture) { GlStateManager._deleteTexture(texture); }
 	
-	/** @see GL32#glActiveTexture(int) */
+	/** Sets the active texture unit */
 	@Override
 	public void glActiveTexture(int textureId) 
 	{ 
-		GL32.glActiveTexture(textureId);
+		VulkanicAPI.activateTextureUnit(textureId);
 		GlStateManager._activeTexture(textureId);
 	}
 	@Override
-	public int getActiveTexture() { return GL32.glGetInteger(GL32.GL_TEXTURE_BINDING_2D); }
+	public int getActiveTexture() { return VulkanicAPI.glGetInteger(VulkanicAPI.GL_TEXTURE_BINDING_2D); }
 	
 	/**
-	 * Always binds to {@link GL32#GL_TEXTURE_2D}
-	 * @see GL32#glBindTexture(int, int)
+	 * Always binds to 2D texture target
 	 */
 	@Override
 	public void glBindTexture(int texture) 
 	{
-		GL32.glBindTexture(GL32.GL_TEXTURE_2D, texture);
+		VulkanicAPI.bindTexture(VulkanicAPI.GL_TEXTURE_2D, texture);
 		GlStateManager._bindTexture(texture);
 	}
 	

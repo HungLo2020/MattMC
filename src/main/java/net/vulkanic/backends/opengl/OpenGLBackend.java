@@ -1149,6 +1149,11 @@ public class OpenGLBackend implements GraphicsBackend {
     }
     
     @Override
+    public void glBlendFunc(int sfactor, int dfactor) {
+        GL11.glBlendFunc(sfactor, dfactor);
+    }
+    
+    @Override
     public void glBlendFuncSeparatei(int buffer, int srcRGB, int dstRGB, int srcAlpha, int dstAlpha) {
         org.lwjgl.opengl.ARBDrawBuffersBlend.glBlendFuncSeparateiARB(buffer, srcRGB, dstRGB, srcAlpha, dstAlpha);
     }
