@@ -388,7 +388,7 @@ public class LodRenderer
 		
 		// This is required for MC versions 1.21.5+
 		// due to MC updating the lightmap by changing the viewport size
-		VulkanicAPI.viewport(0, 0, this.textureWidth, this.textureHeight);
+		VulkanicAPI.setDynamicViewport(0, 0, this.textureWidth, this.textureHeight);
 		
 		this.lodRenderProgram.bind();
 		

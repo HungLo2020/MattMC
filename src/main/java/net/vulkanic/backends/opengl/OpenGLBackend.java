@@ -53,9 +53,15 @@ public class OpenGLBackend implements GraphicsBackend {
         GL30.glGenerateMipmap(target);
     }
     
-    @Deprecated
+    /**
+     * Sets the dynamic viewport state.
+     * This is the Vulkan-compatible implementation for viewport control.
+     * 
+     * OpenGL implementation: Direct mapping to glViewport()
+     * Future Vulkan implementation: Will map to vkCmdSetViewport()
+     */
     @Override
-    public void viewport(int x, int y, int width, int height) {
+    public void setDynamicViewport(int x, int y, int width, int height) {
         GL11.glViewport(x, y, width, height);
     }
     

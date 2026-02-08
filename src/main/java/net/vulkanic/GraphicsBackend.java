@@ -24,8 +24,28 @@ public interface GraphicsBackend {
     void bindTexture(int target, int textureId);  // For explicit target binding
     @Deprecated
     void generateMipmap(int target);
-    @Deprecated
-    void viewport(int x, int y, int width, int height);
+    
+    /**
+     * Sets the dynamic viewport state for rendering.
+     * This is a Vulkan-compatible replacement for the deprecated viewport() method.
+     * 
+     * In OpenGL: Maps to glViewport()
+     * In Vulkan: Maps to vkCmdSetViewport() (dynamic state)
+     * 
+     * The viewport defines the transformation from normalized device coordinates to window coordinates.
+     * This is dynamic state that can be changed per-frame or even between draw calls.
+     * 
+     * Future evolution: This method will take a CommandBuffer parameter to support
+     * Vulkan's command buffer recording model:
+     *   void setDynamicViewport(CommandBuffer cmdBuffer, int x, int y, int width, int height)
+     * 
+     * @param x The x coordinate of the viewport's lower-left corner
+     * @param y The y coordinate of the viewport's lower-left corner
+     * @param width The width of the viewport in pixels
+     * @param height The height of the viewport in pixels
+     */
+    void setDynamicViewport(int x, int y, int width, int height);
+    
     @Deprecated
     void clear(int mask);
     @Deprecated

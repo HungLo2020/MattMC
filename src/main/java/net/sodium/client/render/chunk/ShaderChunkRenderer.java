@@ -93,7 +93,7 @@ public abstract class ShaderChunkRenderer implements ChunkRenderer {
 
         // Iris: From MixinShaderChunkRenderer - viewport redirect (skip if in shadow pass)
         if (!net.irisshaders.iris.shadows.ShadowRenderingState.areShadowsCurrentlyBeingRendered()) {
-            VulkanicAPI.viewport(0, 0, target.getColorTexture().getWidth(0), target.getColorTexture().getHeight(0));
+            VulkanicAPI.setDynamicViewport(0, 0, target.getColorTexture().getWidth(0), target.getColorTexture().getHeight(0));
         }
         
         // Iris: From MixinShaderChunkRenderer - framebuffer binding is delayed/redirected

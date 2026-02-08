@@ -510,7 +510,7 @@ public class GlStateManager {
 		iris$viewportWidth = k;
 		iris$viewportHeight = l;
 		
-		net.vulkanic.VulkanicAPI.viewport(i, j, k, l);
+		net.vulkanic.VulkanicAPI.setDynamicViewport(i, j, k, l);
 	}
 
 	public static void _colorMask(boolean bl, boolean bl2, boolean bl3, boolean bl4) {

@@ -519,9 +519,24 @@ public class VulkanicAPI {
         getBackend().generateMipmap(target);
     }
     
-    @Deprecated
-    public static void viewport(int x, int y, int width, int height) {
-        getBackend().viewport(x, y, width, height);
+    /**
+     * Sets the dynamic viewport state for rendering.
+     * This is a Vulkan-compatible replacement for the deprecated viewport() method.
+     * 
+     * The viewport transformation maps from normalized device coordinates [-1, 1] to
+     * window/framebuffer coordinates. This is dynamic state that can be changed
+     * at any point during rendering.
+     * 
+     * In OpenGL: Maps to glViewport()
+     * In Vulkan: Maps to vkCmdSetViewport() (dynamic state in command buffer)
+     * 
+     * @param x The x coordinate of the viewport's lower-left corner
+     * @param y The y coordinate of the viewport's lower-left corner  
+     * @param width The width of the viewport in pixels
+     * @param height The height of the viewport in pixels
+     */
+    public static void setDynamicViewport(int x, int y, int width, int height) {
+        getBackend().setDynamicViewport(x, y, width, height);
     }
     
     @Deprecated
