@@ -2,9 +2,7 @@ package com.seibel.distanthorizons.core.render.glObject.texture;
 
 import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftGLWrapper;
-import org.lwjgl.opengl.GL11C;
-import org.lwjgl.opengl.GL13C;
-import org.lwjgl.opengl.GL43C;
+import net.vulkanic.VulkanicAPI;
 
 import java.nio.ByteBuffer;
 
@@ -16,20 +14,20 @@ public class DHDepthTexture
 	private int id;
 	public DHDepthTexture(int width, int height, EDhDepthBufferFormat format)
 	{
-		this.id = GL43C.glGenTextures();
+		this.id = VulkanicAPI.glGenTextures();
 		
 		this.resize(width, height, format);
 		
-		GL43C.glTexParameteri(GL11C.GL_TEXTURE_2D, GL11C.GL_TEXTURE_MIN_FILTER, GL11C.GL_NEAREST);
-		GL43C.glTexParameteri(GL11C.GL_TEXTURE_2D, GL11C.GL_TEXTURE_MAG_FILTER, GL11C.GL_NEAREST);
-		GL43C.glTexParameteri(GL11C.GL_TEXTURE_2D, GL11C.GL_TEXTURE_WRAP_S, GL13C.GL_CLAMP_TO_EDGE);
-		GL43C.glTexParameteri(GL11C.GL_TEXTURE_2D, GL11C.GL_TEXTURE_WRAP_T, GL13C.GL_CLAMP_TO_EDGE);
+		VulkanicAPI.glTexParameteri(VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_MIN_FILTER, VulkanicAPI.GL_NEAREST);
+		VulkanicAPI.glTexParameteri(VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_MAG_FILTER, VulkanicAPI.GL_NEAREST);
+		VulkanicAPI.glTexParameteri(VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_WRAP_S, VulkanicAPI.GL_CLAMP_TO_EDGE);
+		VulkanicAPI.glTexParameteri(VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_WRAP_T, VulkanicAPI.GL_CLAMP_TO_EDGE);
 		
 		// disable mip-mapping since DH is just going to draw straight to the screen
-		GL43C.glTexParameteri(GL43C.GL_TEXTURE_2D, GL43C.GL_TEXTURE_BASE_LEVEL, 0);
-		GL43C.glTexParameteri(GL43C.GL_TEXTURE_2D, GL43C.GL_TEXTURE_MAX_LEVEL, 0);
+		VulkanicAPI.glTexParameteri(VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_BASE_LEVEL, 0);
+		VulkanicAPI.glTexParameteri(VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_MAX_LEVEL, 0);
 		
-		GL43C.glBindTexture(GL43C.GL_TEXTURE_2D, 0);
+		VulkanicAPI.glBindTexture(VulkanicAPI.GL_TEXTURE_2D, 0);
 	}
 	
 	// For internal use by Iris for copying data. Do not use this in DH.
@@ -37,8 +35,8 @@ public class DHDepthTexture
 	
 	public void resize(int width, int height, EDhDepthBufferFormat format)
 	{
-		GL43C.glBindTexture(GL43C.GL_TEXTURE_2D, this.getTextureId());
-		GL43C.glTexImage2D(GL11C.GL_TEXTURE_2D, 0, format.getGlInternalFormat(), width, height, 0,
+		VulkanicAPI.glBindTexture(VulkanicAPI.GL_TEXTURE_2D, this.getTextureId());
+		VulkanicAPI.glTexImage2D(VulkanicAPI.GL_TEXTURE_2D, 0, format.getGlInternalFormat(), width, height, 0,
 				format.getGlType(), format.getGlFormat(), (ByteBuffer) null);
 	}
 	

@@ -2,10 +2,8 @@ package com.seibel.distanthorizons.core.render.glObject.texture;
 
 import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftGLWrapper;
+import net.vulkanic.VulkanicAPI;
 import org.joml.Vector2i;
-import org.lwjgl.opengl.GL11C;
-import org.lwjgl.opengl.GL13C;
-import org.lwjgl.opengl.GL43C;
 
 import java.nio.ByteBuffer;
 
@@ -43,14 +41,14 @@ public class DhColorTexture
 		this.width = builder.width;
 		this.height = builder.height;
 		
-		this.id = GL43C.glGenTextures();
+		this.id = VulkanicAPI.glGenTextures();
 		
 		boolean isPixelFormatInteger = builder.internalFormat.getPixelFormat().isInteger();
 		this.setupTexture(this.id, builder.width, builder.height, !isPixelFormatInteger); // this binds the texture
 		
 		// Clean up after ourselves
 		// This is strictly defensive to ensure that other buggy code doesn't tamper with our textures
-		GL43C.glBindTexture(GL43C.GL_TEXTURE_2D, 0);
+		VulkanicAPI.glBindTexture(VulkanicAPI.GL_TEXTURE_2D, 0);
 	}
 	
 	
@@ -63,20 +61,20 @@ public class DhColorTexture
 	{
 		this.resizeTexture(id, width, height);
 		
-		GL43C.glTexParameteri(GL11C.GL_TEXTURE_2D, GL11C.GL_TEXTURE_MIN_FILTER, allowsLinear ? GL11C.GL_LINEAR : GL11C.GL_NEAREST);
-		GL43C.glTexParameteri(GL11C.GL_TEXTURE_2D, GL11C.GL_TEXTURE_MAG_FILTER, allowsLinear ? GL11C.GL_LINEAR : GL11C.GL_NEAREST);
-		GL43C.glTexParameteri(GL11C.GL_TEXTURE_2D, GL11C.GL_TEXTURE_WRAP_S, GL13C.GL_CLAMP_TO_EDGE);
-		GL43C.glTexParameteri(GL11C.GL_TEXTURE_2D, GL11C.GL_TEXTURE_WRAP_T, GL13C.GL_CLAMP_TO_EDGE);
+		VulkanicAPI.glTexParameteri(VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_MIN_FILTER, allowsLinear ? VulkanicAPI.GL_LINEAR : VulkanicAPI.GL_NEAREST);
+		VulkanicAPI.glTexParameteri(VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_MAG_FILTER, allowsLinear ? VulkanicAPI.GL_LINEAR : VulkanicAPI.GL_NEAREST);
+		VulkanicAPI.glTexParameteri(VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_WRAP_S, VulkanicAPI.GL_CLAMP_TO_EDGE);
+		VulkanicAPI.glTexParameteri(VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_WRAP_T, VulkanicAPI.GL_CLAMP_TO_EDGE);
 		
 		// disable mip-mapping since DH is just going to draw straight to the screen
-		GL43C.glTexParameteri(GL43C.GL_TEXTURE_2D, GL43C.GL_TEXTURE_BASE_LEVEL, 0);
-		GL43C.glTexParameteri(GL43C.GL_TEXTURE_2D, GL43C.GL_TEXTURE_MAX_LEVEL, 0);
+		VulkanicAPI.glTexParameteri(VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_BASE_LEVEL, 0);
+		VulkanicAPI.glTexParameteri(VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_MAX_LEVEL, 0);
 	}
 	
 	private void resizeTexture(int texture, int width, int height)
 	{
-		GL43C.glBindTexture(GL43C.GL_TEXTURE_2D, texture);
-		GL43C.glTexImage2D(GL11C.GL_TEXTURE_2D, 0, this.internalFormat.getGlFormat(), width, height, 0, this.format.getGlFormat(), this.type.getGlFormat(), NULL_BUFFER);
+		VulkanicAPI.glBindTexture(VulkanicAPI.GL_TEXTURE_2D, texture);
+		VulkanicAPI.glTexImage2D(VulkanicAPI.GL_TEXTURE_2D, 0, this.internalFormat.getGlFormat(), width, height, 0, this.format.getGlFormat(), this.type.getGlFormat(), NULL_BUFFER);
 	}
 	
 	void resize(Vector2i textureScaleOverride) { this.resize(textureScaleOverride.x, textureScaleOverride.y); }
