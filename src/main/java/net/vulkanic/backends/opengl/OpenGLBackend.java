@@ -81,12 +81,6 @@ public class OpenGLBackend implements GraphicsBackend {
     
     @Deprecated
     @Override
-    public void clear(int mask) {
-        GL11.glClear(mask);
-    }
-    
-    @Deprecated
-    @Override
     public void enableBlend() {
         GL11.glEnable(GL11.GL_BLEND);
     }

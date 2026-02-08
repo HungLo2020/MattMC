@@ -74,8 +74,6 @@ public interface GraphicsBackend {
     void clearAttachments(boolean clearColor, boolean clearDepth);
     
     @Deprecated
-    void clear(int mask);
-    @Deprecated
     void enableBlend();
     @Deprecated
     void disableBlend();

@@ -569,11 +569,6 @@ public class VulkanicAPI {
     }
     
     @Deprecated
-    public static void clear(int mask) {
-        getBackend().clear(mask);
-    }
-    
-    @Deprecated
     public static void enableBlend() {
         getBackend().enableBlend();
     }
