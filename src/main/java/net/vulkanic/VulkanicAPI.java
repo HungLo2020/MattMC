@@ -514,11 +514,6 @@ public class VulkanicAPI {
         getBackend().bindTexture(target, textureId);
     }
     
-    @Deprecated
-    public static void generateMipmap(int target) {
-        getBackend().generateMipmap(target);
-    }
-    
     /**
      * Generates mipmaps for a texture.
      * This is a Vulkan-compatible replacement for the deprecated generateMipmap(int target) method.

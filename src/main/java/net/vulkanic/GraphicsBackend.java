@@ -22,8 +22,6 @@ public interface GraphicsBackend {
     void bindTexture(int textureId);
     @Deprecated
     void bindTexture(int target, int textureId);  // For explicit target binding
-    @Deprecated
-    void generateMipmap(int target);
     
     /**
      * Generates mipmaps for a texture.

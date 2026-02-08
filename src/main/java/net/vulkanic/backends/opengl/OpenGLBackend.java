@@ -47,12 +47,6 @@ public class OpenGLBackend implements GraphicsBackend {
         GL11.glBindTexture(target, textureId);
     }
     
-    @Deprecated
-    @Override
-    public void generateMipmap(int target) {
-        GL30.glGenerateMipmap(target);
-    }
-    
     @Override
     public void generateTextureMipmaps(int textureId) {
         // Save current texture binding to restore it after mipmap generation
