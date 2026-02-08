@@ -579,9 +579,26 @@ public class VulkanicAPI {
         getBackend().setDepthWriteEnabled(enabled);
     }
     
-    @Deprecated
-    public static void setColorWriteMask(boolean r, boolean g, boolean b, boolean a) {
-        getBackend().setColorWriteMask(r, g, b, a);
+    /**
+     * Sets the color write mask for the rendering pipeline.
+     * This is a Vulkan-compatible replacement for the deprecated setColorWriteMask() method.
+     * 
+     * The color write mask controls which color components (red, green, blue, alpha) are
+     * written to the framebuffer during rendering. This is pipeline state in Vulkan.
+     * 
+     * In OpenGL: Maps to glColorMask() (immediate state change)
+     * In Vulkan: Will be part of VkPipelineColorBlendAttachmentState (pipeline creation)
+     * 
+     * Future evolution: This will become part of PipelineStateObject creation rather than
+     * a separate method call.
+     * 
+     * @param r Enable writing to red channel
+     * @param g Enable writing to green channel
+     * @param b Enable writing to blue channel
+     * @param a Enable writing to alpha channel
+     */
+    public static void setPipelineColorWriteMask(boolean r, boolean g, boolean b, boolean a) {
+        getBackend().setPipelineColorWriteMask(r, g, b, a);
     }
     
     /**

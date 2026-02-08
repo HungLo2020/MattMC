@@ -526,7 +526,7 @@ public class GlStateManager {
 			COLOR_MASK.green = bl2;
 			COLOR_MASK.blue = bl3;
 			COLOR_MASK.alpha = bl4;
-			net.vulkanic.VulkanicAPI.setColorWriteMask(bl, bl2, bl3, bl4);
+			net.vulkanic.VulkanicAPI.setPipelineColorWriteMask(bl, bl2, bl3, bl4);
 		}
 	}
 
