@@ -1878,4 +1878,11 @@ public class VulkanicAPI {
     public static int glGenTextures() {
         return getBackend().glGenTextures();
     }
+    
+    /**
+     * Binds a named texture to a texturing target.
+     */
+    public static void glBindTexture(int target, int texture) {
+        getBackend().bindTexture(target, texture);
+    }
 }
