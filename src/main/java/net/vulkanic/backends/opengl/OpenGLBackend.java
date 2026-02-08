@@ -119,10 +119,16 @@ public class OpenGLBackend implements GraphicsBackend {
         GL11.glColorMask(r, g, b, a);
     }
     
-    @Deprecated
+    /**
+     * Sets the dynamic scissor rectangle.
+     * This is the Vulkan-compatible implementation for scissor control.
+     * 
+     * OpenGL implementation: Direct mapping to glScissor()
+     * Future Vulkan implementation: Will map to vkCmdSetScissor()
+     */
     @Override
-    public void setScissorBox(int x, int y, int w, int h) {
-        GL20.glScissor(x, y, w, h);
+    public void setDynamicScissor(int x, int y, int width, int height) {
+        GL20.glScissor(x, y, width, height);
     }
     
     @Deprecated

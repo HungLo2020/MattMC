@@ -70,8 +70,27 @@ public interface GraphicsBackend {
     void setColorWriteMask(boolean r, boolean g, boolean b, boolean a);
     
     // Scissor operations
-    @Deprecated
-    void setScissorBox(int x, int y, int w, int h);
+    
+    /**
+     * Sets the dynamic scissor rectangle for rendering.
+     * This is a Vulkan-compatible replacement for the deprecated setScissorBox() method.
+     * 
+     * In OpenGL: Maps to glScissor()
+     * In Vulkan: Maps to vkCmdSetScissor() (dynamic state)
+     * 
+     * The scissor test discards fragments outside the scissor rectangle.
+     * This is dynamic state that can be changed per-frame or even between draw calls.
+     * 
+     * Future evolution: This method will take a CommandBuffer parameter to support
+     * Vulkan's command buffer recording model:
+     *   void setDynamicScissor(CommandBuffer cmdBuffer, int x, int y, int width, int height)
+     * 
+     * @param x The x coordinate of the scissor rectangle's lower-left corner
+     * @param y The y coordinate of the scissor rectangle's lower-left corner
+     * @param width The width of the scissor rectangle in pixels
+     * @param height The height of the scissor rectangle in pixels
+     */
+    void setDynamicScissor(int x, int y, int width, int height);
     
     // Pixel operations
     @Deprecated

@@ -62,7 +62,7 @@ public class GlStateManager {
 
 	public static void _scissorBox(int i, int j, int k, int l) {
 		RenderSystem.assertOnRenderThread();
-		net.vulkanic.VulkanicAPI.setScissorBox(i, j, k, l);
+		net.vulkanic.VulkanicAPI.setDynamicScissor(i, j, k, l);
 	}
 
 	public static void _disableDepthTest() {

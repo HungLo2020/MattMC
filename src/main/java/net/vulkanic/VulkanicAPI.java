@@ -584,9 +584,24 @@ public class VulkanicAPI {
         getBackend().setColorWriteMask(r, g, b, a);
     }
     
-    @Deprecated
-    public static void setScissorBox(int x, int y, int w, int h) {
-        getBackend().setScissorBox(x, y, w, h);
+    /**
+     * Sets the dynamic scissor rectangle for rendering.
+     * This is a Vulkan-compatible replacement for the deprecated setScissorBox() method.
+     * 
+     * The scissor test restricts rendering to a rectangular region of the framebuffer.
+     * Fragments outside the scissor rectangle are discarded. This is dynamic state that
+     * can be changed at any point during rendering.
+     * 
+     * In OpenGL: Maps to glScissor()
+     * In Vulkan: Maps to vkCmdSetScissor() (dynamic state in command buffer)
+     * 
+     * @param x The x coordinate of the scissor rectangle's lower-left corner
+     * @param y The y coordinate of the scissor rectangle's lower-left corner
+     * @param width The width of the scissor rectangle in pixels
+     * @param height The height of the scissor rectangle in pixels
+     */
+    public static void setDynamicScissor(int x, int y, int width, int height) {
+        getBackend().setDynamicScissor(x, y, width, height);
     }
     
     @Deprecated
