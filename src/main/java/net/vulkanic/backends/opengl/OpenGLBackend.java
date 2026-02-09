@@ -148,6 +148,23 @@ public class OpenGLBackend implements GraphicsBackend {
     }
     
     /**
+     * Sets the dynamic blend state.
+     * This is the Vulkan-compatible implementation for blend control.
+     * 
+     * OpenGL implementation: Maps to glEnable/glDisable(GL_BLEND) + glBlendFunc()
+     * Future Vulkan implementation: Will map to vkCmdSetColorBlendEnableEXT() + pipeline blend state
+     */
+    @Override
+    public void setDynamicBlendState(boolean enabled, int srcFactor, int dstFactor) {
+        if (enabled) {
+            GL11.glEnable(GL11.GL_BLEND);
+            GL11.glBlendFunc(srcFactor, dstFactor);
+        } else {
+            GL11.glDisable(GL11.GL_BLEND);
+        }
+    }
+    
+    /**
      * Sets the dynamic scissor rectangle.
      * This is the Vulkan-compatible implementation for scissor control.
      * 

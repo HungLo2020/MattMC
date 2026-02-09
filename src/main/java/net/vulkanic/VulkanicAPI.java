@@ -762,6 +762,55 @@ public class VulkanicAPI {
     }
     
     /**
+     * Sets the dynamic blend state for rendering.
+     * This is a Vulkan-compatible replacement for the deprecated enableBlend(), disableBlend(),
+     * enable(GL_BLEND), and disable(GL_BLEND) methods.
+     * 
+     * Blending controls how the output color from the fragment shader is combined with the color
+     * already in the framebuffer. This is commonly used for transparency, additive effects, and
+     * other compositing operations. This is dynamic state that can be changed per-frame or even
+     * between draw calls.
+     * 
+     * In OpenGL: Maps to glEnable/glDisable(GL_BLEND) + glBlendFunc(srcFactor, dstFactor)
+     * In Vulkan: Maps to VkPipelineColorBlendStateCreateInfo or vkCmdSetColorBlendEnableEXT() (dynamic state)
+     * 
+     * Common blend modes:
+     * - Alpha blending: setDynamicBlendState(true, GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+     * - Additive: setDynamicBlendState(true, GL_ONE, GL_ONE)
+     * - Multiplicative: setDynamicBlendState(true, GL_DST_COLOR, GL_ZERO)
+     * - Disabled: setDynamicBlendState(false, 0, 0) // srcFactor and dstFactor ignored
+     * 
+     * Important architectural notes for Vulkan compatibility:
+     * - In Vulkan, this will be a dynamic state command recorded in command buffers
+     * - This allows changing the blend enable/disable and blend function without creating new pipeline state objects
+     * - Must be called within an active render pass in Vulkan
+     * - For now, this provides a simple 1:1 mapping while maintaining Vulkan compatibility
+     * 
+     * For OpenGL backend:
+     * - Calls glEnable/glDisable(GL_BLEND) based on enabled parameter
+     * - If blending is enabled, calls glBlendFunc(srcFactor, dstFactor)
+     * - Changes take effect immediately for subsequent draw calls
+     * - Part of the global OpenGL state machine
+     * 
+     * Future evolution: This may take a CommandBuffer parameter for Vulkan:
+     *   void setDynamicBlendState(CommandBuffer cmdBuffer, boolean enabled, int srcFactor, int dstFactor)
+     * 
+     * Future evolution: May expand to support separate RGB/Alpha blend functions:
+     *   void setDynamicBlendState(CommandBuffer cmdBuffer, boolean enabled, 
+     *                             int srcColorFactor, int dstColorFactor,
+     *                             int srcAlphaFactor, int dstAlphaFactor)
+     * 
+     * @param enabled Whether to enable blending (true to enable, false to disable)
+     * @param srcFactor The source blend factor (e.g., GL_SRC_ALPHA, GL_ONE, GL_ZERO)
+     *                  This parameter is ignored if enabled is false
+     * @param dstFactor The destination blend factor (e.g., GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ZERO)
+     *                  This parameter is ignored if enabled is false
+     */
+    public static void setDynamicBlendState(boolean enabled, int srcFactor, int dstFactor) {
+        getBackend().setDynamicBlendState(enabled, srcFactor, dstFactor);
+    }
+    
+    /**
      * Sets the dynamic scissor rectangle for rendering.
      * This is a Vulkan-compatible replacement for the deprecated setScissorBox() method.
      * 
