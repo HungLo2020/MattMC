@@ -1,7 +1,7 @@
 package com.seibel.distanthorizons.core.render.glObject.vertexAttribute;
 
 import com.seibel.distanthorizons.core.render.glObject.GLProxy;
-import org.lwjgl.opengl.GL32;
+import net.vulkanic.VulkanicAPI;
 
 /**
  * Base for binding/unbinding Vertex Attribute objects (VAO's).
@@ -23,8 +23,8 @@ public abstract class AbstractVertexAttribute
 	// This will bind AbstractVertexAttribute
 	protected AbstractVertexAttribute()
 	{
-		this.id = GL32.glGenVertexArrays();
-		GL32.glBindVertexArray(this.id);
+		this.id = VulkanicAPI.glGenVertexArrays();
+		VulkanicAPI.glBindVertexArray(this.id);
 	}
 	
 	public static AbstractVertexAttribute create()
@@ -45,11 +45,11 @@ public abstract class AbstractVertexAttribute
 	// binding //
 	//=========//
 	
-	public void bind() { GL32.glBindVertexArray(this.id); }
-	public void unbind() { GL32.glBindVertexArray(0); }
+	public void bind() { VulkanicAPI.glBindVertexArray(this.id); }
+	public void unbind() { VulkanicAPI.glBindVertexArray(0); }
 	
 	/** Always remember to always free your resources! */
-	public void free() { GL32.glDeleteVertexArrays(this.id); }
+	public void free() { VulkanicAPI.glDeleteVertexArrays(this.id); }
 	
 	
 	

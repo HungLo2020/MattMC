@@ -4,7 +4,7 @@ import com.seibel.distanthorizons.api.enums.config.EDhApiGpuUploadMethod;
 import com.seibel.distanthorizons.core.render.glObject.buffer.GLVertexBuffer;
 import com.seibel.distanthorizons.core.render.glObject.vertexAttribute.AbstractVertexAttribute;
 import com.seibel.distanthorizons.core.render.glObject.vertexAttribute.VertexPointer;
-import org.lwjgl.opengl.GL32;
+import net.vulkanic.VulkanicAPI;
 import org.lwjgl.system.MemoryUtil;
 
 import java.nio.ByteBuffer;
@@ -63,7 +63,7 @@ public class ScreenQuad
 		this.va.bind();
 		this.va.bindBufferToAllBindingPoints(this.boxBuffer.getId());
 		
-		GL32.glDrawArrays(GL32.GL_TRIANGLES, 0, 6);
+		VulkanicAPI.drawPrimitiveArrays(VulkanicAPI.GL_TRIANGLES, 0, 6);
 	}
 	
 	private void createBuffer()

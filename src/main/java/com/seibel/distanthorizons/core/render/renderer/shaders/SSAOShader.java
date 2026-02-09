@@ -10,7 +10,7 @@ import com.seibel.distanthorizons.core.util.NumberUtil;
 import com.seibel.distanthorizons.core.util.math.Mat4f;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftGLWrapper;
 import com.seibel.distanthorizons.coreapi.util.MathUtil;
-import org.lwjgl.opengl.GL32;
+import net.vulkanic.VulkanicAPI;
 
 /**
  * Draws the SSAO to a texture. <br><br>
@@ -104,7 +104,7 @@ public class SSAOShader extends AbstractShaderRenderer
 		Number bias = Config.Client.Advanced.Graphics.Ssao.bias.get();
 		this.shader.setUniform(this.uBias, bias.floatValue());
 		
-		GL32.glUniform1i(this.uDepthMap, 0);
+		VulkanicAPI.glUniform1i(this.uDepthMap, 0);
 		
 		float fadeDistanceInBlocks = Config.Client.Advanced.Graphics.Ssao.fadeDistanceInBlocks.get().floatValue();
 		fadeDistanceInBlocks = MathUtil.clamp(0.0f, fadeDistanceInBlocks, Float.MAX_VALUE); // clamp to prevent accidentally setting a negative number
@@ -120,12 +120,12 @@ public class SSAOShader extends AbstractShaderRenderer
 	@Override
 	protected void onRender()
 	{
-		GLMC.glBindFramebuffer(GL32.GL_FRAMEBUFFER, this.frameBuffer);
+		GLMC.glBindFramebuffer(VulkanicAPI.GL_FRAMEBUFFER, this.frameBuffer);
 		GLMC.disableScissorTest();
 		GLMC.disableDepthTest();
 		GLMC.disableBlend();
 		
-		GLMC.glActiveTexture(GL32.GL_TEXTURE0);
+		GLMC.glActiveTexture(VulkanicAPI.GL_TEXTURE0);
 		GLMC.glBindTexture(LodRenderer.INSTANCE.getActiveDepthTextureId());
 		
 		ScreenQuad.INSTANCE.render();

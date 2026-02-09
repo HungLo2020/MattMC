@@ -8,7 +8,7 @@ import com.seibel.distanthorizons.core.render.renderer.LodRenderer;
 import com.seibel.distanthorizons.core.render.renderer.ScreenQuad;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftGLWrapper;
 import com.seibel.distanthorizons.core.logging.DhLogger;
-import org.lwjgl.opengl.GL32;
+import net.vulkanic.VulkanicAPI;
 
 /**
  * Copies {@link LodRenderer}'s currently active color and depth texture to Minecraft's framebuffer. 
@@ -85,26 +85,26 @@ public class DhApplyShader extends AbstractShaderRenderer
 		
 		// old blending logic in case it's ever needed:
 		//GLMC.enableBlend();
-		//GL32.glBlendEquation(GL32.GL_FUNC_ADD);
-		//GLMC.glBlendFunc(GL32.GL_ONE, GL32.GL_ONE_MINUS_SRC_ALPHA);
+		//GL32.glBlendEquation(VulkanicAPI.GL_FUNC_ADD);
+		//GLMC.glBlendFunc(VulkanicAPI.GL_ONE, VulkanicAPI.GL_ONE_MINUS_SRC_ALPHA);
 		
-		GLMC.glActiveTexture(GL32.GL_TEXTURE0);
+		GLMC.glActiveTexture(VulkanicAPI.GL_TEXTURE0);
 		GLMC.glBindTexture(LodRenderer.INSTANCE.getActiveColorTextureId());
-		GL32.glUniform1i(this.gDhColorTextureUniform, 0);
+		VulkanicAPI.glUniform1i(this.gDhColorTextureUniform, 0);
 		
-		GLMC.glActiveTexture(GL32.GL_TEXTURE1);
+		GLMC.glActiveTexture(VulkanicAPI.GL_TEXTURE1);
 		GLMC.glBindTexture(LodRenderer.INSTANCE.getActiveDepthTextureId());
-		GL32.glUniform1i(this.gDepthMapUniform, 1);
+		VulkanicAPI.glUniform1i(this.gDepthMapUniform, 1);
 		
 		// Copy to MC's framebuffer
-		GLMC.glBindFramebuffer(GL32.GL_FRAMEBUFFER, targetFrameBuffer);
+		GLMC.glBindFramebuffer(VulkanicAPI.GL_FRAMEBUFFER, targetFrameBuffer);
 		
 		ScreenQuad.INSTANCE.render();
 		
 		
 		// restore everything, except at this point the MC framebuffer should now be used instead
 		state.restore();
-		GLMC.glBindFramebuffer(GL32.GL_FRAMEBUFFER, targetFrameBuffer);
+		GLMC.glBindFramebuffer(VulkanicAPI.GL_FRAMEBUFFER, targetFrameBuffer);
 		
 	}
 	private void renderToMcTexture()
@@ -140,30 +140,30 @@ public class DhApplyShader extends AbstractShaderRenderer
 		
 		// old blending logic in case it's ever needed:
 		//GLMC.enableBlend();
-		//GL32.glBlendEquation(GL32.GL_FUNC_ADD);
-		//GLMC.glBlendFunc(GL32.GL_ONE, GL32.GL_ONE_MINUS_SRC_ALPHA);
+		//GL32.glBlendEquation(VulkanicAPI.GL_FUNC_ADD);
+		//GLMC.glBlendFunc(VulkanicAPI.GL_ONE, VulkanicAPI.GL_ONE_MINUS_SRC_ALPHA);
 		
-		GLMC.glActiveTexture(GL32.GL_TEXTURE0);
+		GLMC.glActiveTexture(VulkanicAPI.GL_TEXTURE0);
 		GLMC.glBindTexture(LodRenderer.INSTANCE.getActiveColorTextureId());
-		GL32.glUniform1i(this.gDhColorTextureUniform, 0);
+		VulkanicAPI.glUniform1i(this.gDhColorTextureUniform, 0);
 		
-		GLMC.glActiveTexture(GL32.GL_TEXTURE1);
+		GLMC.glActiveTexture(VulkanicAPI.GL_TEXTURE1);
 		GLMC.glBindTexture(LodRenderer.INSTANCE.getActiveDepthTextureId());
-		GL32.glUniform1i(this.gDepthMapUniform, 1);
+		VulkanicAPI.glUniform1i(this.gDepthMapUniform, 1);
 		
 		
 		
-		GL32.glFramebufferTexture(GL32.GL_DRAW_FRAMEBUFFER, GL32.GL_COLOR_ATTACHMENT0, targetColorTextureId, 0);
+		VulkanicAPI.glFramebufferTexture(VulkanicAPI.GL_DRAW_FRAMEBUFFER, VulkanicAPI.GL_COLOR_ATTACHMENT0, targetColorTextureId, 0);
 		
 		// Copy to MC's texture via MC's framebuffer
-		GLMC.glBindFramebuffer(GL32.GL_FRAMEBUFFER, dhFrameBufferId);
+		GLMC.glBindFramebuffer(VulkanicAPI.GL_FRAMEBUFFER, dhFrameBufferId);
 		
 		ScreenQuad.INSTANCE.render();
 		
 		
 		// restore everything, except at this point the MC framebuffer should now be used instead
 		state.restore();
-		GLMC.glBindFramebuffer(GL32.GL_FRAMEBUFFER, mcFrameBufferId);
+		GLMC.glBindFramebuffer(VulkanicAPI.GL_FRAMEBUFFER, mcFrameBufferId);
 		
 	}
 	

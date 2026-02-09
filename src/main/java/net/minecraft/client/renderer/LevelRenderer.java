@@ -471,7 +471,7 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 		net.irisshaders.iris.gl.IrisRenderSystem.backupAndDisableCullingState(this.pipeline.shouldDisableOcclusionCulling());
 		
 		if (net.irisshaders.iris.Iris.shouldActivateWireframe() && this.minecraft.isLocalServer()) {
-			net.irisshaders.iris.gl.IrisRenderSystem.setPolygonMode(org.lwjgl.opengl.GL43C.GL_LINE);
+			net.irisshaders.iris.gl.IrisRenderSystem.setPolygonMode(net.vulkanic.VulkanicAPI.GL_LINE);
 		}
 		
 		// Iris: Begin level render immediate state (from MixinLevelRenderer vertices.immediate)
@@ -627,7 +627,7 @@ public void cullTerrain(Camera camera, Frustum frustum, boolean spectator) { // 
 		net.minecraft.util.profiling.Profiler.get().popPush("iris_final");
 		
 		if (net.irisshaders.iris.Iris.shouldActivateWireframe() && this.minecraft.isLocalServer()) {
-			net.irisshaders.iris.gl.IrisRenderSystem.setPolygonMode(org.lwjgl.opengl.GL43C.GL_FILL);
+			net.irisshaders.iris.gl.IrisRenderSystem.setPolygonMode(net.vulkanic.VulkanicAPI.GL_FILL);
 		}
 		this.pipeline.finalizeLevelRendering();
 		

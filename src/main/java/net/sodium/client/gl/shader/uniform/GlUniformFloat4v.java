@@ -1,6 +1,6 @@
 package net.sodium.client.gl.shader.uniform;
 
-import org.lwjgl.opengl.GL30C;
+import net.vulkanic.VulkanicAPI;
 
 public class GlUniformFloat4v extends GlUniform<float[]> {
     public GlUniformFloat4v(int index) {
@@ -13,10 +13,10 @@ public class GlUniformFloat4v extends GlUniform<float[]> {
             throw new IllegalArgumentException("value.length != 4");
         }
 
-        GL30C.glUniform4fv(this.index, value);
+        VulkanicAPI.assignUniformFloat4v(this.index, value);
     }
 
     public void set(float x, float y, float z, float w) {
-        GL30C.glUniform4f(this.index, x, y, z, w);
+        VulkanicAPI.assignUniformFloat4(this.index, x, y, z, w);
     }
 }

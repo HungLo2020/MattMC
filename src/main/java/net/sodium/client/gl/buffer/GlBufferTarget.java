@@ -1,13 +1,10 @@
 package net.sodium.client.gl.buffer;
 
-import org.lwjgl.opengl.GL20C;
-import org.lwjgl.opengl.GL31C;
-
 public enum GlBufferTarget {
-    ARRAY_BUFFER(GL20C.GL_ARRAY_BUFFER, GL20C.GL_ARRAY_BUFFER_BINDING),
-    ELEMENT_BUFFER(GL20C.GL_ELEMENT_ARRAY_BUFFER, GL20C.GL_ELEMENT_ARRAY_BUFFER_BINDING),
-    COPY_READ_BUFFER(GL31C.GL_COPY_READ_BUFFER, GL31C.GL_COPY_READ_BUFFER),
-    COPY_WRITE_BUFFER(GL31C.GL_COPY_WRITE_BUFFER, GL31C.GL_COPY_WRITE_BUFFER);
+    ARRAY_BUFFER(34962, 34964),
+    ELEMENT_BUFFER(34963, 34965),
+    COPY_READ_BUFFER(36662, 36662),
+    COPY_WRITE_BUFFER(36663, 36663);
 
     public static final GlBufferTarget[] VALUES = GlBufferTarget.values();
     public static final int COUNT = VALUES.length;

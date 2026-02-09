@@ -1,19 +1,17 @@
 package net.irisshaders.iris.gl.shader;
 
-import org.lwjgl.opengl.GL20;
-import org.lwjgl.opengl.GL32C;
-import org.lwjgl.opengl.GL43C;
+import net.vulkanic.VulkanicAPI;
 
 /**
  * An enumeration over the supported OpenGL shader types.
  */
 public enum ShaderType {
-	VERTEX(GL20.GL_VERTEX_SHADER),
-	GEOMETRY(GL32C.GL_GEOMETRY_SHADER),
-	FRAGMENT(GL20.GL_FRAGMENT_SHADER),
-	COMPUTE(GL43C.GL_COMPUTE_SHADER),
-	TESSELATION_CONTROL(GL43C.GL_TESS_CONTROL_SHADER),
-	TESSELATION_EVAL(GL43C.GL_TESS_EVALUATION_SHADER);
+	VERTEX(VulkanicAPI.GL_VERTEX_SHADER),
+	GEOMETRY(VulkanicAPI.GL_GEOMETRY_SHADER),
+	FRAGMENT(VulkanicAPI.GL_FRAGMENT_SHADER),
+	COMPUTE(VulkanicAPI.GL_COMPUTE_SHADER),
+	TESSELATION_CONTROL(VulkanicAPI.GL_TESS_CONTROL_SHADER),
+	TESSELATION_EVAL(VulkanicAPI.GL_TESS_EVALUATION_SHADER);
 
 	public final int id;
 

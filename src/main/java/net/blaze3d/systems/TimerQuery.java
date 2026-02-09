@@ -2,8 +2,7 @@ package net.blaze3d.systems;
 
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
-import org.lwjgl.opengl.ARBTimerQuery;
-import org.lwjgl.opengl.GL32C;
+import net.vulkanic.VulkanicAPI;
 
 @Environment(EnvType.CLIENT)
 public class TimerQuery {
@@ -22,8 +21,8 @@ public class TimerQuery {
 		if (this.nextQueryName != 0) {
 			throw new IllegalStateException("Current profile not ended");
 		} else {
-			this.nextQueryName = GL32C.glGenQueries();
-			GL32C.glBeginQuery(35007, this.nextQueryName);
+			this.nextQueryName = VulkanicAPI.generateQueryObject();
+			VulkanicAPI.initiateQuery(35007, this.nextQueryName);
 		}
 	}
 
@@ -32,7 +31,7 @@ public class TimerQuery {
 		if (this.nextQueryName == 0) {
 			throw new IllegalStateException("endProfile called before beginProfile");
 		} else {
-			GL32C.glEndQuery(35007);
+			VulkanicAPI.concludeQuery(35007);
 			TimerQuery.FrameProfile frameProfile = new TimerQuery.FrameProfile(this.nextQueryName);
 			this.nextQueryName = 0;
 			return frameProfile;
@@ -54,7 +53,7 @@ public class TimerQuery {
 			RenderSystem.assertOnRenderThread();
 			if (this.result == 0L) {
 				this.result = -1L;
-				GL32C.glDeleteQueries(this.queryName);
+				VulkanicAPI.disposeQueryObject(this.queryName);
 			}
 		}
 
@@ -62,9 +61,9 @@ public class TimerQuery {
 			RenderSystem.assertOnRenderThread();
 			if (this.result != 0L) {
 				return true;
-			} else if (1 == GL32C.glGetQueryObjecti(this.queryName, 34919)) {
-				this.result = ARBTimerQuery.glGetQueryObjecti64(this.queryName, 34918);
-				GL32C.glDeleteQueries(this.queryName);
+			} else if (1 == VulkanicAPI.retrieveQueryObjectInt(this.queryName, 34919)) {
+				this.result = VulkanicAPI.retrieveQueryObjectInt64(this.queryName, 34918);
+				VulkanicAPI.disposeQueryObject(this.queryName);
 				return true;
 			} else {
 				return false;
@@ -74,8 +73,8 @@ public class TimerQuery {
 		public long get() {
 			RenderSystem.assertOnRenderThread();
 			if (this.result == 0L) {
-				this.result = ARBTimerQuery.glGetQueryObjecti64(this.queryName, 34918);
-				GL32C.glDeleteQueries(this.queryName);
+				this.result = VulkanicAPI.retrieveQueryObjectInt64(this.queryName, 34918);
+				VulkanicAPI.disposeQueryObject(this.queryName);
 			}
 
 			return this.result;

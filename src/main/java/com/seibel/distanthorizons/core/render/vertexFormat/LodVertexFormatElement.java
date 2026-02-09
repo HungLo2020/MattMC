@@ -1,6 +1,6 @@
 package com.seibel.distanthorizons.core.render.vertexFormat;
 
-import org.lwjgl.opengl.GL32;
+import net.vulkanic.VulkanicAPI;
 
 /**
  * This object is used to build LodVertexFormats.
@@ -61,13 +61,13 @@ public class LodVertexFormatElement
 	
 	public enum DataType
 	{
-		FLOAT(4, "Float", GL32.GL_FLOAT),
-		UBYTE(1, "Unsigned Byte", GL32.GL_UNSIGNED_BYTE),
-		BYTE(1, "Byte", GL32.GL_BYTE),
-		USHORT(2, "Unsigned Short", GL32.GL_UNSIGNED_SHORT),
-		SHORT(2, "Short", GL32.GL_SHORT),
-		UINT(4, "Unsigned Int", GL32.GL_UNSIGNED_INT),
-		INT(4, "Int", GL32.GL_INT);
+		FLOAT(4, "Float", VulkanicAPI.GL_FLOAT),
+		UBYTE(1, "Unsigned Byte", VulkanicAPI.GL_UNSIGNED_BYTE),
+		BYTE(1, "Byte", VulkanicAPI.GL_BYTE),
+		USHORT(2, "Unsigned Short", VulkanicAPI.GL_UNSIGNED_SHORT),
+		SHORT(2, "Short", VulkanicAPI.GL_SHORT),
+		UINT(4, "Unsigned Int", VulkanicAPI.GL_UNSIGNED_INT),
+		INT(4, "Int", VulkanicAPI.GL_INT);
 		
 		private final int size;
 		private final String name;

@@ -4,7 +4,7 @@ import it.unimi.dsi.fastutil.longs.LongArrayFIFOQueue;
 import net.sodium.client.SodiumClientMod;
 import net.minecraft.util.profiling.Profiler;
 import net.minecraft.util.profiling.ProfilerFiller;
-import org.lwjgl.opengl.GL32C;
+import net.vulkanic.VulkanicAPI;
 
 /**
  * Helper class to manage GPU synchronization fences for Sodium.
@@ -40,8 +40,8 @@ public class SodiumGpuSyncHelper {
             // Because we are also waiting on the client for the FenceSync to finish, the flush is effectively treated
             // like a Finish command, where we know that once ClientWaitSync returns, it's likely that everything
             // before it has been completed by the GPU.
-            GL32C.glClientWaitSync(fence, GL32C.GL_SYNC_FLUSH_COMMANDS_BIT, Long.MAX_VALUE);
-            GL32C.glDeleteSync(fence);
+            VulkanicAPI.waitForSync(fence, 1, Long.MAX_VALUE); // GL_SYNC_FLUSH_COMMANDS_BIT = 1
+            VulkanicAPI.destroySync(fence);
         }
 
         profiler.pop();
@@ -51,7 +51,7 @@ public class SodiumGpuSyncHelper {
      * Called at the end of each frame to create a new fence for GPU synchronization.
      */
     public static void afterFrameTick() {
-        long fence = GL32C.glFenceSync(GL32C.GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
+        long fence = VulkanicAPI.createFenceSync(37143, 0); // GL_SYNC_GPU_COMMANDS_COMPLETE = 37143
 
         if (fence == 0) {
             throw new RuntimeException("Failed to create fence object");

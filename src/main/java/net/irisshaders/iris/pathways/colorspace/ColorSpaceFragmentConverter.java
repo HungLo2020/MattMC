@@ -17,10 +17,9 @@ import net.irisshaders.iris.mixinterface.CustomPass;
 import net.irisshaders.iris.pathways.FullScreenQuadRenderer;
 import net.irisshaders.iris.shaderpack.preprocessor.JcppProcessor;
 import net.minecraft.client.Minecraft;
+import net.vulkanic.VulkanicAPI;
 import org.apache.commons.io.IOUtils;
 import org.joml.Matrix4f;
-import org.lwjgl.opengl.GL11C;
-import org.lwjgl.opengl.GL30C;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -88,7 +87,7 @@ public class ColorSpaceFragmentConverter implements ColorSpaceConverter {
 		builder.addDynamicSampler(() -> target.glId(), "readImage");
 
 		swapTexture = GlStateManager._genTexture();
-		IrisRenderSystem.texImage2D(swapTexture, GL30C.GL_TEXTURE_2D, 0, GL30C.GL_RGBA8, width, height, 0, GL30C.GL_RGBA, GL30C.GL_UNSIGNED_BYTE, null);
+		IrisRenderSystem.texImage2D(swapTexture, VulkanicAPI.GL_TEXTURE_2D, 0, VulkanicAPI.GL_RGBA8, width, height, 0, VulkanicAPI.GL_RGBA, VulkanicAPI.GL_UNSIGNED_BYTE, null);
 
 		this.framebuffer = new GlFramebuffer();
 		framebuffer.addColorAttachment(0, swapTexture);
@@ -116,6 +115,6 @@ public class ColorSpaceFragmentConverter implements ColorSpaceConverter {
 		}
 		Program.unbind();
 		framebuffer.bindAsReadBuffer();
-		IrisRenderSystem.copyTexSubImage2D(targetImage.glId(), GL11C.GL_TEXTURE_2D, 0, 0, 0, 0, 0, width, height);
+		IrisRenderSystem.copyTexSubImage2D(targetImage.glId(), VulkanicAPI.GL_TEXTURE_2D, 0, 0, 0, 0, 0, width, height);
 	}
 }

@@ -8,7 +8,7 @@ import com.seibel.distanthorizons.core.util.RenderUtil;
 import com.seibel.distanthorizons.core.util.math.Mat4f;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftGLWrapper;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftRenderWrapper;
-import org.lwjgl.opengl.GL32;
+import net.vulkanic.VulkanicAPI;
 
 public class DhFadeShader extends AbstractShaderRenderer
 {
@@ -121,23 +121,23 @@ public class DhFadeShader extends AbstractShaderRenderer
 		
 		
 		
-		GLMC.glBindFramebuffer(GL32.GL_FRAMEBUFFER, this.frameBuffer);
+		GLMC.glBindFramebuffer(VulkanicAPI.GL_FRAMEBUFFER, this.frameBuffer);
 		GLMC.disableScissorTest();
 		GLMC.disableDepthTest();
 		GLMC.disableBlend();
 		
 		
-		GLMC.glActiveTexture(GL32.GL_TEXTURE0);
+		GLMC.glActiveTexture(VulkanicAPI.GL_TEXTURE0);
 		GLMC.glBindTexture(depthTextureId);
-		GL32.glUniform1i(this.uDhDepthTexture, 0);
+		VulkanicAPI.glUniform1i(this.uDhDepthTexture, 0);
 		
-		GLMC.glActiveTexture(GL32.GL_TEXTURE1);
+		GLMC.glActiveTexture(VulkanicAPI.GL_TEXTURE1);
 		GLMC.glBindTexture(MC_RENDER.getColorTextureId());
-		GL32.glUniform1i(this.uMcColorTexture, 1);
+		VulkanicAPI.glUniform1i(this.uMcColorTexture, 1);
 		
-		GLMC.glActiveTexture(GL32.GL_TEXTURE2);
+		GLMC.glActiveTexture(VulkanicAPI.GL_TEXTURE2);
 		GLMC.glBindTexture(colorTextureId);
-		GL32.glUniform1i(this.uDhColorTexture, 2);
+		VulkanicAPI.glUniform1i(this.uDhColorTexture, 2);
 		
 		
 		ScreenQuad.INSTANCE.render();

@@ -14,9 +14,8 @@ import net.irisshaders.iris.gl.texture.DepthCopyStrategy;
 import net.irisshaders.iris.platform.IrisPlatformHelpers;
 import net.irisshaders.iris.shaderpack.properties.PackDirectives;
 import net.irisshaders.iris.shaderpack.properties.PackRenderTargetDirectives;
+import net.vulkanic.VulkanicAPI;
 import org.joml.Vector2i;
-import org.lwjgl.opengl.GL20C;
-import org.lwjgl.opengl.GL30C;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -229,7 +228,7 @@ public class RenderTargets {
 			translucentDepthDirty = false;
 			GlStateManager._bindTexture(noTranslucents.iris$getGlId());
 			depthSourceFb.bindAsReadBuffer();
-			IrisRenderSystem.copyTexImage2D(GL20C.GL_TEXTURE_2D, 0, currentDepthFormat.getGlInternalFormat(), 0, 0, cachedWidth, cachedHeight, 0);
+			IrisRenderSystem.copyTexImage2D(VulkanicAPI.GL_TEXTURE_2D, 0, currentDepthFormat.getGlInternalFormat(), 0, 0, cachedWidth, cachedHeight, 0);
 		} else {
 			copyStrategy.copy(depthSourceFb, getDepthTexture().iris$getGlId(), noTranslucentsDestFb, noTranslucents.iris$getGlId(),
 				getCurrentWidth(), getCurrentHeight());
@@ -241,7 +240,7 @@ public class RenderTargets {
 			handDepthDirty = false;
 			GlStateManager._bindTexture(noHand.iris$getGlId());
 			depthSourceFb.bindAsReadBuffer();
-			IrisRenderSystem.copyTexImage2D(GL20C.GL_TEXTURE_2D, 0, currentDepthFormat.getGlInternalFormat(), 0, 0, cachedWidth, cachedHeight, 0);
+			IrisRenderSystem.copyTexImage2D(VulkanicAPI.GL_TEXTURE_2D, 0, currentDepthFormat.getGlInternalFormat(), 0, 0, cachedWidth, cachedHeight, 0);
 		} else {
 			copyStrategy.copy(depthSourceFb, getDepthTexture().iris$getGlId(), noHandDestFb, noHand.iris$getGlId(),
 				getCurrentWidth(), getCurrentHeight());
@@ -380,7 +379,7 @@ public class RenderTargets {
 
 
 		int status = framebuffer.getStatus();
-		if (status != GL30C.GL_FRAMEBUFFER_COMPLETE) {
+		if (status != VulkanicAPI.GL_FRAMEBUFFER_COMPLETE) {
 			throw new IllegalStateException("Unexpected error while creating framebuffer: Draw buffers " + Arrays.toString(actualDrawBuffers) + " Status: " + status);
 		}
 

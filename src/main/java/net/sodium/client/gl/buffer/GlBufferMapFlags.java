@@ -1,19 +1,16 @@
 package net.sodium.client.gl.buffer;
 
 import net.sodium.client.gl.util.EnumBit;
-import org.lwjgl.opengl.GL30C;
-import org.lwjgl.opengl.GL33C;
-import org.lwjgl.opengl.GL44C;
 
 public enum GlBufferMapFlags implements EnumBit {
-    READ(GL30C.GL_MAP_READ_BIT),
-    WRITE(GL30C.GL_MAP_WRITE_BIT),
-    PERSISTENT(GL44C.GL_MAP_PERSISTENT_BIT),
-    INVALIDATE_BUFFER(GL30C.GL_MAP_INVALIDATE_BUFFER_BIT),
-    INVALIDATE_RANGE(GL30C.GL_MAP_INVALIDATE_RANGE_BIT),
-    EXPLICIT_FLUSH(GL30C.GL_MAP_FLUSH_EXPLICIT_BIT),
-    COHERENT(GL44C.GL_MAP_COHERENT_BIT),
-    UNSYNCHRONIZED(GL33C.GL_MAP_UNSYNCHRONIZED_BIT);
+    READ(1),
+    WRITE(2),
+    PERSISTENT(64),
+    INVALIDATE_BUFFER(8),
+    INVALIDATE_RANGE(4),
+    EXPLICIT_FLUSH(16),
+    COHERENT(128),
+    UNSYNCHRONIZED(32);
 
     private final int bit;
 

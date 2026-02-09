@@ -2,26 +2,23 @@ package net.irisshaders.iris.gl.texture;
 
 import net.irisshaders.iris.Iris;
 import net.irisshaders.iris.gl.GlVersion;
-import org.lwjgl.opengl.GL11C;
-import org.lwjgl.opengl.GL12C;
-import org.lwjgl.opengl.GL30C;
 
 import java.util.Locale;
 import java.util.Optional;
 
 public enum PixelFormat {
-	RED(1, GL11C.GL_RED, GlVersion.GL_11, false),
-	RG(2, GL30C.GL_RG, GlVersion.GL_30, false),
-	RGB(3, GL11C.GL_RGB, GlVersion.GL_11, false),
-	BGR(3, GL12C.GL_BGR, GlVersion.GL_12, false),
-	RGBA(4, GL11C.GL_RGBA, GlVersion.GL_11, false),
-	BGRA(4, GL12C.GL_BGRA, GlVersion.GL_12, false),
-	RED_INTEGER(1, GL30C.GL_RED_INTEGER, GlVersion.GL_30, true),
-	RG_INTEGER(2, GL30C.GL_RG_INTEGER, GlVersion.GL_30, true),
-	RGB_INTEGER(3, GL30C.GL_RGB_INTEGER, GlVersion.GL_30, true),
-	BGR_INTEGER(3, GL30C.GL_BGR_INTEGER, GlVersion.GL_30, true),
-	RGBA_INTEGER(4, GL30C.GL_RGBA_INTEGER, GlVersion.GL_30, true),
-	BGRA_INTEGER(4, GL30C.GL_BGRA_INTEGER, GlVersion.GL_30, true);
+	RED(1, 0x1903, GlVersion.GL_11, false),       // GL11C.GL_RED
+	RG(2, 0x8227, GlVersion.GL_30, false),        // GL30C.GL_RG
+	RGB(3, 0x1907, GlVersion.GL_11, false),       // GL11C.GL_RGB
+	BGR(3, 0x80E0, GlVersion.GL_12, false),       // GL12C.GL_BGR
+	RGBA(4, 0x1908, GlVersion.GL_11, false),      // GL11C.GL_RGBA
+	BGRA(4, 0x80E1, GlVersion.GL_12, false),      // GL12C.GL_BGRA
+	RED_INTEGER(1, 0x8D94, GlVersion.GL_30, true),    // GL30C.GL_RED_INTEGER
+	RG_INTEGER(2, 0x8228, GlVersion.GL_30, true),     // GL30C.GL_RG_INTEGER
+	RGB_INTEGER(3, 0x8D98, GlVersion.GL_30, true),    // GL30C.GL_RGB_INTEGER
+	BGR_INTEGER(3, 0x8D9A, GlVersion.GL_30, true),    // GL30C.GL_BGR_INTEGER
+	RGBA_INTEGER(4, 0x8D99, GlVersion.GL_30, true),   // GL30C.GL_RGBA_INTEGER
+	BGRA_INTEGER(4, 0x8D9B, GlVersion.GL_30, true);   // GL30C.GL_BGRA_INTEGER
 
 	private final int componentCount;
 	private final int glFormat;

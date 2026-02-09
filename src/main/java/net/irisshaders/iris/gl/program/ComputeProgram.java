@@ -6,10 +6,9 @@ import net.irisshaders.iris.gl.GlResource;
 import net.irisshaders.iris.gl.IrisRenderSystem;
 import net.irisshaders.iris.pipeline.WorldRenderingPipeline;
 import net.irisshaders.iris.shaderpack.FilledIndirectPointer;
+import net.vulkanic.VulkanicAPI;
 import org.joml.Vector2f;
 import org.joml.Vector3i;
-import org.lwjgl.opengl.GL43C;
-import org.lwjgl.opengl.GL46C;
 
 public final class ComputeProgram extends GlResource {
 	private final ProgramUniforms uniforms;
@@ -27,7 +26,7 @@ public final class ComputeProgram extends GlResource {
 		super(program);
 
 		localSize = new int[3];
-		IrisRenderSystem.getProgramiv(program, GL43C.GL_COMPUTE_WORK_GROUP_SIZE, localSize);
+		IrisRenderSystem.getProgramiv(program, VulkanicAPI.GL_COMPUTE_WORK_GROUP_SIZE, localSize);
 		this.uniforms = uniforms;
 		this.samplers = samplers;
 		this.images = images;
@@ -73,11 +72,11 @@ public final class ComputeProgram extends GlResource {
 
 	public void dispatch(float width, float height) {
 		if (!Iris.getPipelineManager().getPipeline().map(WorldRenderingPipeline::allowConcurrentCompute).orElse(false)) {
-			IrisRenderSystem.memoryBarrier(GL43C.GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL43C.GL_TEXTURE_FETCH_BARRIER_BIT | GL43C.GL_SHADER_STORAGE_BARRIER_BIT);
+			IrisRenderSystem.memoryBarrier(VulkanicAPI.GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | VulkanicAPI.GL_TEXTURE_FETCH_BARRIER_BIT | VulkanicAPI.GL_SHADER_STORAGE_BARRIER_BIT);
 		}
 
 		if (indirectPointer != null) {
-			IrisRenderSystem.bindBuffer(GL46C.GL_DISPATCH_INDIRECT_BUFFER, indirectPointer.buffer());
+			IrisRenderSystem.bindBuffer(VulkanicAPI.GL_DISPATCH_INDIRECT_BUFFER, indirectPointer.buffer());
 			IrisRenderSystem.dispatchComputeIndirect(indirectPointer.offset());
 		} else {
 			IrisRenderSystem.dispatchCompute(getWorkGroups(width, height));
