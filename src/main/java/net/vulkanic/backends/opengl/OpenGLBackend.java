@@ -1,6 +1,7 @@
 package net.vulkanic.backends.opengl;
 
 import net.blaze3d.opengl.GlStateManager;
+import net.vulkanic.CommandContext;
 import net.vulkanic.GraphicsBackend;
 import net.vulkanic.GraphicsCapabilities;
 import net.vulkanic.VulkanicAPI;
@@ -54,15 +55,33 @@ public class OpenGLBackend implements GraphicsBackend {
     }
     
     /**
-     * Sets the dynamic viewport state.
+     * Sets the dynamic viewport state with explicit command context.
      * This is the Vulkan-compatible implementation for viewport control.
      * 
-     * OpenGL implementation: Direct mapping to glViewport()
-     * Future Vulkan implementation: Will map to vkCmdSetViewport()
+     * OpenGL implementation: Direct mapping to glViewport() (context is validated but not used)
+     * Vulkan implementation: Will map to vkCmdSetViewport(ctx.getHandle(), ...)
+     * 
+     * @param ctx Command context (must be immediate mode for OpenGL)
      */
     @Override
-    public void setDynamicViewport(int x, int y, int width, int height) {
+    public void setDynamicViewport(CommandContext ctx, int x, int y, int width, int height) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
         GL11.glViewport(x, y, width, height);
+    }
+    
+    /**
+     * Legacy viewport method - delegates to CommandContext variant.
+     * 
+     * @deprecated Use {@link #setDynamicViewport(CommandContext, int, int, int, int)} instead
+     */
+    @Deprecated
+    @Override
+    public void setDynamicViewport(int x, int y, int width, int height) {
+        setDynamicViewport(OpenGLCommandContext.IMMEDIATE, x, y, width, height);
     }
     
     @Deprecated
@@ -120,15 +139,33 @@ public class OpenGLBackend implements GraphicsBackend {
     }
     
     /**
-     * Sets the dynamic scissor rectangle.
+     * Sets the dynamic scissor rectangle with explicit command context.
      * This is the Vulkan-compatible implementation for scissor control.
      * 
-     * OpenGL implementation: Direct mapping to glScissor()
-     * Future Vulkan implementation: Will map to vkCmdSetScissor()
+     * OpenGL implementation: Direct mapping to glScissor() (context is validated but not used)
+     * Vulkan implementation: Will map to vkCmdSetScissor(ctx.getHandle(), ...)
+     * 
+     * @param ctx Command context (must be immediate mode for OpenGL)
      */
     @Override
-    public void setDynamicScissor(int x, int y, int width, int height) {
+    public void setDynamicScissor(CommandContext ctx, int x, int y, int width, int height) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
         GL20.glScissor(x, y, width, height);
+    }
+    
+    /**
+     * Legacy scissor method - delegates to CommandContext variant.
+     * 
+     * @deprecated Use {@link #setDynamicScissor(CommandContext, int, int, int, int)} instead
+     */
+    @Deprecated
+    @Override
+    public void setDynamicScissor(int x, int y, int width, int height) {
+        setDynamicScissor(OpenGLCommandContext.IMMEDIATE, x, y, width, height);
     }
     
     @Deprecated
