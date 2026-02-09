@@ -862,11 +862,6 @@ public class VulkanicAPI {
     }
     
     @Deprecated
-    public static void setPixelStoreMode(int pname, int value) {
-        getBackend().setPixelStoreMode(pname, value);
-    }
-    
-    @Deprecated
     public static void attachFramebuffer(int target, int fbo) {
         getBackend().attachFramebuffer(target, fbo);
     }

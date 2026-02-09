@@ -169,12 +169,6 @@ public class OpenGLBackend implements GraphicsBackend {
     
     @Deprecated
     @Override
-    public void setPixelStoreMode(int pname, int value) {
-        GL11.glPixelStorei(pname, value);
-    }
-    
-    @Deprecated
-    @Override
     public void attachFramebuffer(int target, int fbo) {
         GL30.glBindFramebuffer(target, fbo);
     }

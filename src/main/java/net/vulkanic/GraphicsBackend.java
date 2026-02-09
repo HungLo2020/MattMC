@@ -317,10 +317,6 @@ public interface GraphicsBackend {
      */
     void setTextureDownloadAlignment(int alignment);
     
-    // Pixel operations
-    @Deprecated
-    void setPixelStoreMode(int pname, int value);
-    
     // Framebuffer operations
     @Deprecated
     void attachFramebuffer(int target, int fbo);
