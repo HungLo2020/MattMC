@@ -654,6 +654,39 @@ public class VulkanicAPI {
         getBackend().setDepthWriteEnabled(enabled);
     }
     
+    /**
+     * Sets the dynamic color write mask for rendering.
+     * This is a Vulkan-compatible replacement for the deprecated setColorWriteMask() method.
+     * 
+     * In OpenGL: Maps to glColorMask()
+     * In Vulkan: Maps to vkCmdSetColorWriteMaskEXT() (dynamic state in command buffer)
+     * 
+     * The color write mask controls which color components are written to the framebuffer.
+     * This is dynamic state that can be changed per-frame or even between draw calls.
+     * 
+     * Important architectural notes for Vulkan compatibility:
+     * - In Vulkan, this will be a dynamic state command recorded in command buffers
+     * - This allows changing the write mask without creating new pipeline state objects
+     * - Must be called within an active render pass in Vulkan
+     * - For now, this provides a simple 1:1 mapping while maintaining Vulkan compatibility
+     * 
+     * For OpenGL backend:
+     * - Directly calls glColorMask with the specified parameters
+     * - Changes take effect immediately for subsequent draw calls
+     * - Part of the global OpenGL state machine
+     * 
+     * Future evolution: This may take a CommandBuffer parameter for Vulkan:
+     *   void setDynamicColorWriteMask(CommandBuffer cmdBuffer, boolean r, boolean g, boolean b, boolean a)
+     * 
+     * @param r Whether to write red component (true to enable, false to disable)
+     * @param g Whether to write green component (true to enable, false to disable)
+     * @param b Whether to write blue component (true to enable, false to disable)
+     * @param a Whether to write alpha component (true to enable, false to disable)
+     */
+    public static void setDynamicColorWriteMask(boolean r, boolean g, boolean b, boolean a) {
+        getBackend().setDynamicColorWriteMask(r, g, b, a);
+    }
+    
     @Deprecated
     public static void setColorWriteMask(boolean r, boolean g, boolean b, boolean a) {
         getBackend().setColorWriteMask(r, g, b, a);
