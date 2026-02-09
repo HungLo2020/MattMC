@@ -101,7 +101,7 @@ public class TestRenderer
 		this.va.bindBufferToAllBindingPoints(this.vbo.getId());
 		
 		// Render the square
-		VulkanicAPI.drawPrimitiveArrays(VulkanicAPI.GL_TRIANGLE_FAN, 0, 4);
+		VulkanicAPI.cmdDrawArrays(VulkanicAPI.GL_TRIANGLE_FAN, 0, 4);
 		VulkanicAPI.clearAttachments(false, true);
 	}
 	

@@ -293,6 +293,11 @@ public class OpenGLBackend implements GraphicsBackend {
         GL11.glLogicOp(opcode);
     }
     
+    @Override
+    public void cmdDrawArrays(int mode, int firstVertex, int vertexCount) {
+        GL11.glDrawArrays(mode, firstVertex, vertexCount);
+    }
+    
     @Deprecated
     @Override
     public void drawPrimitiveArrays(int mode, int first, int count) {

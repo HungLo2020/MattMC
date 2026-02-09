@@ -569,7 +569,7 @@ public class GlStateManager {
 
 	public static void _drawArrays(int i, int j, int k) {
 		RenderSystem.assertOnRenderThread();
-		net.vulkanic.VulkanicAPI.drawPrimitiveArrays(i, j, k);
+		net.vulkanic.VulkanicAPI.cmdDrawArrays(i, j, k);
 	}
 
 	public static void _pixelStore(int i, int j) {

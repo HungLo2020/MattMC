@@ -803,6 +803,39 @@ public class VulkanicAPI {
         getBackend().configureLogicOp(opcode);
     }
     
+    /**
+     * Draws primitives using vertex array data.
+     * This is a Vulkan-compatible replacement for the deprecated drawPrimitiveArrays() method.
+     * 
+     * In OpenGL: Maps to glDrawArrays()
+     * In Vulkan: Maps to vkCmdDraw() in a command buffer
+     * 
+     * This method draws primitives using the currently bound vertex array object (VAO) and
+     * shader program. The vertex data is read from the bound vertex buffers starting at the
+     * specified vertex index.
+     * 
+     * Important architectural notes for Vulkan compatibility:
+     * - In Vulkan, this will be recorded as a vkCmdDraw command in a command buffer
+     * - The vertex buffers, index buffers, and pipeline must be bound before calling
+     * - This must be called within an active render pass
+     * - For now, this provides a simple 1:1 mapping while maintaining Vulkan compatibility
+     * 
+     * For OpenGL backend:
+     * - Directly calls glDrawArrays with the specified parameters
+     * - Uses the currently bound VAO and shader program
+     * - Executes immediately
+     * 
+     * Future evolution: This will take a CommandBuffer parameter for Vulkan:
+     *   void cmdDrawArrays(CommandBuffer cmdBuffer, int mode, int firstVertex, int vertexCount)
+     * 
+     * @param mode The primitive topology (e.g., GL_TRIANGLES, GL_TRIANGLE_FAN)
+     * @param firstVertex Index of the first vertex to draw
+     * @param vertexCount Number of vertices to draw
+     */
+    public static void cmdDrawArrays(int mode, int firstVertex, int vertexCount) {
+        getBackend().cmdDrawArrays(mode, firstVertex, vertexCount);
+    }
+    
     @Deprecated
     public static void drawPrimitiveArrays(int mode, int first, int count) {
         getBackend().drawPrimitiveArrays(mode, first, count);
