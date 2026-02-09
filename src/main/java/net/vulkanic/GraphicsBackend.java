@@ -225,6 +225,38 @@ public interface GraphicsBackend {
      */
     void setDynamicColorWriteMask(boolean r, boolean g, boolean b, boolean a);
     
+    /**
+     * Sets the dynamic face culling mode for rendering.
+     * This is a Vulkan-compatible replacement for the deprecated glCullFace() method
+     * and enable/disable(GL_CULL_FACE) methods.
+     * 
+     * In OpenGL: Maps to glEnable/glDisable(GL_CULL_FACE) + glCullFace(mode)
+     * In Vulkan: Maps to VkPipelineRasterizationStateCreateInfo.cullMode or vkCmdSetCullModeEXT() (dynamic state)
+     * 
+     * Face culling discards primitives based on their facing direction relative to the viewer.
+     * This is dynamic state that can be changed per-frame or even between draw calls.
+     * 
+     * Important architectural notes for Vulkan compatibility:
+     * - In Vulkan, this will be a dynamic state command recorded in command buffers
+     * - This allows changing the cull mode without creating new pipeline state objects
+     * - Must be called within an active render pass in Vulkan
+     * - For now, this provides a simple 1:1 mapping while maintaining Vulkan compatibility
+     * 
+     * For OpenGL backend:
+     * - Calls glEnable/glDisable(GL_CULL_FACE) based on enableCulling parameter
+     * - If culling is enabled, calls glCullFace(cullFaceMode)
+     * - Changes take effect immediately for subsequent draw calls
+     * - Part of the global OpenGL state machine
+     * 
+     * Future evolution: This may take a CommandBuffer parameter for Vulkan:
+     *   void setDynamicCullMode(CommandBuffer cmdBuffer, boolean enableCulling, int cullFaceMode)
+     * 
+     * @param enableCulling Whether to enable face culling (true to enable, false to disable)
+     * @param cullFaceMode The faces to cull when enabled (GL_FRONT, GL_BACK, or GL_FRONT_AND_BACK)
+     *                     This parameter is ignored if enableCulling is false
+     */
+    void setDynamicCullMode(boolean enableCulling, int cullFaceMode);
+    
     // Scissor operations
     
     /**

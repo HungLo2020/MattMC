@@ -178,14 +178,16 @@ public class MinecraftGLWrapper implements IMinecraftGLWrapper
 	@Override
 	public void enableFaceCulling() 
 	{
-		VulkanicAPI.enable(VulkanicAPI.GL_CULL_FACE);
+		// Use new Vulkan-compatible API - enable culling with GL_BACK (standard cull mode)
+		VulkanicAPI.setDynamicCullMode(true, VulkanicAPI.GL_BACK);
 		GlStateManager._enableCull(); 
 	}
 	/** Disables face culling */
 	@Override
 	public void disableFaceCulling() 
 	{
-		VulkanicAPI.disable(VulkanicAPI.GL_CULL_FACE);
+		// Use new Vulkan-compatible API - disable culling (cull mode parameter is ignored)
+		VulkanicAPI.setDynamicCullMode(false, VulkanicAPI.GL_BACK);
 		GlStateManager._disableCull(); 
 	}
 	

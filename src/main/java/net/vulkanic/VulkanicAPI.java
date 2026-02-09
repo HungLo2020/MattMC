@@ -739,6 +739,29 @@ public class VulkanicAPI {
     }
     
     /**
+     * Sets the dynamic face culling mode for rendering.
+     * This is a Vulkan-compatible replacement for the deprecated glCullFace() method
+     * and enable/disable(GL_CULL_FACE) methods.
+     * 
+     * Face culling discards primitives based on their facing direction relative to the viewer.
+     * This is dynamic state that can be changed at any point during rendering.
+     * 
+     * In OpenGL: Maps to glEnable/glDisable(GL_CULL_FACE) + glCullFace(mode)
+     * In Vulkan: Maps to vkCmdSetCullModeEXT() (dynamic state in command buffer)
+     * 
+     * Important architectural notes:
+     * - Combines the enable/disable and mode setting into a single call for cleaner API
+     * - When culling is disabled, the cullFaceMode parameter is ignored
+     * - Common modes: GL_BACK (cull back faces), GL_FRONT (cull front faces), GL_FRONT_AND_BACK (cull all)
+     * 
+     * @param enableCulling Whether to enable face culling (true to enable, false to disable)
+     * @param cullFaceMode The faces to cull when enabled (GL_FRONT, GL_BACK, or GL_FRONT_AND_BACK)
+     */
+    public static void setDynamicCullMode(boolean enableCulling, int cullFaceMode) {
+        getBackend().setDynamicCullMode(enableCulling, cullFaceMode);
+    }
+    
+    /**
      * Sets the dynamic scissor rectangle for rendering.
      * This is a Vulkan-compatible replacement for the deprecated setScissorBox() method.
      * 

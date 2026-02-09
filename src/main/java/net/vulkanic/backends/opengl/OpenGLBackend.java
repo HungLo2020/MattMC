@@ -131,6 +131,23 @@ public class OpenGLBackend implements GraphicsBackend {
     }
     
     /**
+     * Sets the dynamic face culling mode.
+     * This is the Vulkan-compatible implementation for face culling control.
+     * 
+     * OpenGL implementation: Maps to glEnable/glDisable(GL_CULL_FACE) + glCullFace()
+     * Future Vulkan implementation: Will map to vkCmdSetCullModeEXT()
+     */
+    @Override
+    public void setDynamicCullMode(boolean enableCulling, int cullFaceMode) {
+        if (enableCulling) {
+            GL11.glEnable(GL11.GL_CULL_FACE);
+            GL11.glCullFace(cullFaceMode);
+        } else {
+            GL11.glDisable(GL11.GL_CULL_FACE);
+        }
+    }
+    
+    /**
      * Sets the dynamic scissor rectangle.
      * This is the Vulkan-compatible implementation for scissor control.
      * 

@@ -225,15 +225,8 @@ public class GLState
 		VulkanicAPI.glStencilFunc(this.stencilFunc, this.stencilRef, this.stencilMask);
 		
 		VulkanicAPI.glViewport(this.view[0], this.view[1], this.view[2], this.view[3]);
-		if (this.cull)
-		{
-			GLMC.enableFaceCulling();
-		}
-		else
-		{
-			GLMC.disableFaceCulling();
-		}
-		VulkanicAPI.glCullFace(this.cullMode);
+		// Set face culling mode - combines enable/disable and cull mode setting
+		VulkanicAPI.setDynamicCullMode(this.cull, this.cullMode);
 		VulkanicAPI.glPolygonMode(VulkanicAPI.GL_FRONT_AND_BACK, this.polyMode);
 	}
 }
