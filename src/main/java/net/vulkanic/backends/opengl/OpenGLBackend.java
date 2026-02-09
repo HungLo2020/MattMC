@@ -120,12 +120,6 @@ public class OpenGLBackend implements GraphicsBackend {
         GL11.glDepthFunc(compareOp);
     }
     
-    @Deprecated
-    @Override
-    public void setDepthTestFunction(int func) {
-        GL11.glDepthFunc(func);
-    }
-    
     @Override
     public void setDynamicDepthWriteMask(boolean enabled) {
         GL11.glDepthMask(enabled);

@@ -675,11 +675,6 @@ public class VulkanicAPI {
         getBackend().setDynamicDepthFunc(compareOp);
     }
     
-    @Deprecated
-    public static void setDepthTestFunction(int func) {
-        getBackend().setDepthTestFunction(func);
-    }
-    
     /**
      * Sets the dynamic depth write mask for rendering.
      * This is a Vulkan-compatible replacement for the deprecated setDepthWriteEnabled() method.

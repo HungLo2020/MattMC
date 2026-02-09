@@ -166,10 +166,6 @@ public interface GraphicsBackend {
      */
     void setDynamicDepthFunc(int compareOp);
     
-    // Depth operations (deprecated - use RenderPipeline instead)
-    @Deprecated
-    void setDepthTestFunction(int func);
-    
     /**
      * Sets the dynamic depth write mask for rendering.
      * This is a Vulkan-compatible replacement for the deprecated setDepthWriteEnabled() method.
