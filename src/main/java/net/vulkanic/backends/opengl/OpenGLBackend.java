@@ -291,6 +291,43 @@ public class OpenGLBackend implements GraphicsBackend {
     }
     
     @Override
+    public int createTexture2D(int width, int height, int internalFormat, int minFilter, int magFilter) {
+        // Save current texture binding to restore it later
+        int previousBinding = GL11.glGetInteger(GL11.GL_TEXTURE_BINDING_2D);
+        
+        // Generate new texture ID
+        int textureId = GL11.glGenTextures();
+        
+        // Bind the new texture
+        GL11.glBindTexture(GL11.GL_TEXTURE_2D, textureId);
+        
+        // Allocate texture storage with specified format and dimensions
+        // Note: We pass null for pixel data to just allocate storage
+        GL11.glTexImage2D(
+            GL11.GL_TEXTURE_2D,  // target
+            0,                    // level (mipmap level 0)
+            internalFormat,       // internal format
+            width,                // width
+            height,               // height
+            0,                    // border (must be 0)
+            GL11.GL_RGBA,         // format (doesn't matter when data is null)
+            GL11.GL_UNSIGNED_BYTE, // type (doesn't matter when data is null)
+            (java.nio.ByteBuffer) null  // pixels (null = just allocate)
+        );
+        
+        // Set minification filter
+        GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MIN_FILTER, minFilter);
+        
+        // Set magnification filter
+        GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MAG_FILTER, magFilter);
+        
+        // Restore previous texture binding
+        GL11.glBindTexture(GL11.GL_TEXTURE_2D, previousBinding);
+        
+        return textureId;
+    }
+    
+    @Override
     public void setDynamicDepthBias(float slopeFactor, float constantFactor) {
         GL11.glPolygonOffset(slopeFactor, constantFactor);
     }

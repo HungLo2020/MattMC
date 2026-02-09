@@ -81,11 +81,13 @@ public class VanillaFadeRenderer
 				this.fadeTexture = -1;
 			}
 			
-			this.fadeTexture = VulkanicAPI.createTexture();
-			GLMC.glBindTexture(this.fadeTexture);
-			VulkanicAPI.glTexImage2D(VulkanicAPI.GL_TEXTURE_2D, 0, VulkanicAPI.GL_RGBA16, width, height, 0, VulkanicAPI.GL_RGBA, VulkanicAPI.GL_UNSIGNED_SHORT_4_4_4_4, (ByteBuffer) null);
-			VulkanicAPI.glTexParameteri(VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_MIN_FILTER, VulkanicAPI.GL_LINEAR);
-			VulkanicAPI.glTexParameteri(VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_MAG_FILTER, VulkanicAPI.GL_LINEAR);
+			// Create texture with explicit parameters using Vulkan-compatible API
+			this.fadeTexture = VulkanicAPI.createTexture2D(
+				width, height,
+				VulkanicAPI.GL_RGBA16,     // internal format
+				VulkanicAPI.GL_LINEAR,     // min filter
+				VulkanicAPI.GL_LINEAR      // mag filter
+			);
 			VulkanicAPI.glFramebufferTexture2D(VulkanicAPI.GL_FRAMEBUFFER, VulkanicAPI.GL_COLOR_ATTACHMENT0, VulkanicAPI.GL_TEXTURE_2D, this.fadeTexture, 0);
 		}
 		else

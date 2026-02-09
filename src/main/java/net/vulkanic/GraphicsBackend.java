@@ -401,6 +401,60 @@ public interface GraphicsBackend {
     void deleteTexture(int textureId);
     
     /**
+     * Creates a 2D texture with explicit parameters.
+     * This is a Vulkan-compatible replacement for the deprecated createTexture() method.
+     * 
+     * In OpenGL: Creates texture with glGenTextures, allocates storage with glTexImage2D, sets filters
+     * In Vulkan: Will create VkImage + VkImageView with explicit format, dimensions, and sampler
+     * 
+     * This method creates a complete 2D texture object with all necessary parameters specified upfront.
+     * Unlike the deprecated createTexture() which only generates a texture ID, this method fully
+     * initializes the texture with size, format, and filtering parameters.
+     * 
+     * Important architectural notes for Vulkan compatibility:
+     * - In Vulkan, textures (images) must be created with explicit format and dimensions
+     * - Memory must be allocated and bound to the image
+     * - Image views provide access to the image data
+     * - Samplers define filtering and addressing modes
+     * - All these parameters are immutable after creation (mostly)
+     * 
+     * For OpenGL backend:
+     * - Generates a new texture ID with glGenTextures
+     * - Binds the texture temporarily
+     * - Allocates storage with glTexImage2D using the specified parameters
+     * - Sets minification and magnification filters
+     * - Unbinds and restores previous texture binding
+     * 
+     * Future evolution: This may return a TextureHandle object instead of int:
+     *   TextureHandle createTexture2D(int width, int height, TextureFormat format, TextureUsage usage)
+     * 
+     * Supported internal formats (subset of common formats):
+     * - GL_RGBA / GL_RGBA8 / GL_RGBA16 - 4-component color
+     * - GL_RGB / GL_RGB8 - 3-component color
+     * - GL_DEPTH_COMPONENT / GL_DEPTH_COMPONENT24 - Depth textures
+     * - GL_DEPTH24_STENCIL8 - Combined depth-stencil
+     * 
+     * Supported filter modes:
+     * - GL_NEAREST - Nearest-neighbor sampling (blocky)
+     * - GL_LINEAR - Bilinear filtering (smooth)
+     * - GL_LINEAR_MIPMAP_LINEAR - Trilinear filtering (requires mipmaps)
+     * 
+     * Best practices:
+     * - Specify the minimum required precision to save GPU memory
+     * - Use GL_LINEAR for smooth rendering, GL_NEAREST for pixel art
+     * - Generate mipmaps after creation using generateTextureMipmaps() if needed
+     * - Call deleteTexture() when the texture is no longer needed
+     * 
+     * @param width The width of the texture in pixels (must be > 0)
+     * @param height The height of the texture in pixels (must be > 0)
+     * @param internalFormat The internal storage format (e.g., GL_RGBA, GL_RGBA16)
+     * @param minFilter The minification filter (e.g., GL_LINEAR, GL_NEAREST)
+     * @param magFilter The magnification filter (e.g., GL_LINEAR, GL_NEAREST)
+     * @return The texture ID that can be used to reference this texture
+     */
+    int createTexture2D(int width, int height, int internalFormat, int minFilter, int magFilter);
+    
+    /**
      * Sets the dynamic depth bias (polygon offset) for rendering.
      * This is a Vulkan-compatible replacement for the deprecated configurePolygonOffset() method.
      * 
