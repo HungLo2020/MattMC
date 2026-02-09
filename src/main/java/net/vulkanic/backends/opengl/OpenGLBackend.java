@@ -115,6 +115,11 @@ public class OpenGLBackend implements GraphicsBackend {
         GL11.glDisable(cap);
     }
     
+    @Override
+    public void setDynamicDepthFunc(int compareOp) {
+        GL11.glDepthFunc(compareOp);
+    }
+    
     @Deprecated
     @Override
     public void setDepthTestFunction(int func) {

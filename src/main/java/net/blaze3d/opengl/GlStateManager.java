@@ -79,7 +79,7 @@ public class GlStateManager {
 		RenderSystem.assertOnRenderThread();
 		if (i != DEPTH.func) {
 			DEPTH.func = i;
-			net.vulkanic.VulkanicAPI.setDepthTestFunction(i);
+			net.vulkanic.VulkanicAPI.setDynamicDepthFunc(i);
 		}
 	}
 

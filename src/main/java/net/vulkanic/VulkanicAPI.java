@@ -644,6 +644,37 @@ public class VulkanicAPI {
         getBackend().disable(cap);
     }
     
+    /**
+     * Sets the dynamic depth comparison function for rendering.
+     * This is a Vulkan-compatible replacement for the deprecated setDepthTestFunction() method.
+     * 
+     * In OpenGL: Maps to glDepthFunc()
+     * In Vulkan: Maps to vkCmdSetDepthCompareOp() (dynamic state in command buffer)
+     * 
+     * The depth comparison function determines how incoming fragment depths are compared
+     * against the depth buffer. Common values include GL_LESS, GL_LEQUAL, GL_EQUAL, etc.
+     * This is dynamic state that can be changed per-frame or even between draw calls.
+     * 
+     * Important architectural notes for Vulkan compatibility:
+     * - In Vulkan, this will be a dynamic state command recorded in command buffers
+     * - This allows changing the depth compare operation without creating new pipeline state objects
+     * - Must be called within an active render pass in Vulkan
+     * - For now, this provides a simple 1:1 mapping while maintaining Vulkan compatibility
+     * 
+     * For OpenGL backend:
+     * - Directly calls glDepthFunc with the specified comparison function
+     * - Changes take effect immediately for subsequent draw calls
+     * - Part of the global OpenGL state machine
+     * 
+     * Future evolution: This may take a CommandBuffer parameter for Vulkan:
+     *   void setDynamicDepthFunc(CommandBuffer cmdBuffer, int compareOp)
+     * 
+     * @param compareOp The depth comparison function (e.g., GL_LESS, GL_LEQUAL, GL_EQUAL, GL_GREATER, GL_GEQUAL, GL_ALWAYS, GL_NEVER)
+     */
+    public static void setDynamicDepthFunc(int compareOp) {
+        getBackend().setDynamicDepthFunc(compareOp);
+    }
+    
     @Deprecated
     public static void setDepthTestFunction(int func) {
         getBackend().setDepthTestFunction(func);
