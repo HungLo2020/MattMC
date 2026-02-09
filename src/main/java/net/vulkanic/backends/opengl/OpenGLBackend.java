@@ -297,6 +297,11 @@ public class OpenGLBackend implements GraphicsBackend {
     public void cmdDrawArrays(int mode, int firstVertex, int vertexCount) {
         GL11.glDrawArrays(mode, firstVertex, vertexCount);
     }
+    
+    @Override
+    public void cmdDrawIndexed(int mode, int indexCount, int indexType, long indicesOffset) {
+        GL11.glDrawElements(mode, indexCount, indexType, indicesOffset);
+    }
 
     @Deprecated
     @Override

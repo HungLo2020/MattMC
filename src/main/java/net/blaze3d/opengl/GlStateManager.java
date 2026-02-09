@@ -564,7 +564,7 @@ public class GlStateManager {
 			mode = VulkanicAPI.GL_PATCHES;
 		}
 		
-		net.vulkanic.VulkanicAPI.drawIndexedElements(mode, j, k, l);
+		net.vulkanic.VulkanicAPI.cmdDrawIndexed(mode, j, k, l);
 	}
 
 	public static void _drawArrays(int i, int j, int k) {

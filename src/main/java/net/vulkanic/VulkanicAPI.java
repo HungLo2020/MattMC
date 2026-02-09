@@ -835,6 +835,40 @@ public class VulkanicAPI {
     public static void cmdDrawArrays(int mode, int firstVertex, int vertexCount) {
         getBackend().cmdDrawArrays(mode, firstVertex, vertexCount);
     }
+    
+    /**
+     * Draws indexed primitives using an index buffer.
+     * This is a Vulkan-compatible replacement for the deprecated drawIndexedElements() method.
+     * 
+     * In OpenGL: Maps to glDrawElements()
+     * In Vulkan: Maps to vkCmdDrawIndexed() in a command buffer
+     * 
+     * This method draws primitives using the currently bound vertex array object (VAO) and
+     * index buffer. The indices are read from the bound element array buffer starting at the
+     * specified offset.
+     * 
+     * Important architectural notes for Vulkan compatibility:
+     * - In Vulkan, this will be recorded as a vkCmdDrawIndexed command in a command buffer
+     * - The vertex buffers, index buffer, and pipeline must be bound before calling
+     * - This must be called within an active render pass
+     * - For now, this provides a simple 1:1 mapping while maintaining Vulkan compatibility
+     * 
+     * For OpenGL backend:
+     * - Directly calls glDrawElements with the specified parameters
+     * - Uses the currently bound VAO, element array buffer, and shader program
+     * - Executes immediately
+     * 
+     * Future evolution: This will take a CommandBuffer parameter for Vulkan:
+     *   void cmdDrawIndexed(CommandBuffer cmdBuffer, int mode, int indexCount, int indexType, long indicesOffset)
+     * 
+     * @param mode The primitive topology (e.g., GL_TRIANGLES, GL_TRIANGLE_FAN)
+     * @param indexCount Number of indices to draw
+     * @param indexType Data type of indices (e.g., GL_UNSIGNED_SHORT, GL_UNSIGNED_INT)
+     * @param indicesOffset Byte offset in the index buffer where indices start
+     */
+    public static void cmdDrawIndexed(int mode, int indexCount, int indexType, long indicesOffset) {
+        getBackend().cmdDrawIndexed(mode, indexCount, indexType, indicesOffset);
+    }
 
     @Deprecated
     public static void drawIndexedElements(int mode, int count, int type, long indices) {
