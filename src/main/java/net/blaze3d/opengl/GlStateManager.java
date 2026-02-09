@@ -423,7 +423,7 @@ public class GlStateManager {
 		RenderSystem.assertOnRenderThread();
 		if (i != COLOR_LOGIC.op) {
 			COLOR_LOGIC.op = i;
-			net.vulkanic.VulkanicAPI.configureLogicOp(i);
+			net.vulkanic.VulkanicAPI.setDynamicLogicOp(i);
 		}
 	}
 

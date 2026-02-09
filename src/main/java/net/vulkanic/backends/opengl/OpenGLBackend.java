@@ -283,6 +283,11 @@ public class OpenGLBackend implements GraphicsBackend {
         GL11.glPolygonOffset(slopeFactor, constantFactor);
     }
     
+    @Override
+    public void setDynamicLogicOp(int logicOp) {
+        GL11.glLogicOp(logicOp);
+    }
+    
     @Deprecated
     @Override
     public void configureLogicOp(int opcode) {

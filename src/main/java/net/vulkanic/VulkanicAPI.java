@@ -903,6 +903,43 @@ public class VulkanicAPI {
         getBackend().setDynamicDepthBias(slopeFactor, constantFactor);
     }
     
+    /**
+     * Sets the dynamic logic operation for framebuffer blending.
+     * This is a Vulkan-compatible replacement for the deprecated configureLogicOp() method.
+     * 
+     * In OpenGL: Maps to glLogicOp(logicOp)
+     * In Vulkan: Set as part of VkPipelineColorBlendStateCreateInfo.logicOp
+     * 
+     * Logic operations perform bitwise operations between source and destination fragments
+     * during blending. This is dynamic state that can be changed per-frame or between draw calls.
+     * 
+     * Important architectural notes for Vulkan compatibility:
+     * - In Vulkan, logic operations are typically part of pipeline state
+     * - However, VK_EXT_extended_dynamic_state3 allows dynamic logic op
+     * - Must be enabled with GL_COLOR_LOGIC_OP (OpenGL) or logicOpEnable (Vulkan)
+     * - For now, this provides a simple 1:1 mapping while maintaining Vulkan compatibility
+     * 
+     * For OpenGL backend:
+     * - Directly calls glLogicOp with the specified operation
+     * - Changes take effect immediately for subsequent draw calls
+     * - Part of the global OpenGL state machine
+     * 
+     * Future evolution: This may take a CommandBuffer parameter for Vulkan:
+     *   void setDynamicLogicOp(CommandBuffer cmdBuffer, int logicOp)
+     * 
+     * Common logic operations:
+     * - GL_COPY / VK_LOGIC_OP_COPY: Source (default)
+     * - GL_AND / VK_LOGIC_OP_AND: Source AND Destination
+     * - GL_OR / VK_LOGIC_OP_OR: Source OR Destination
+     * - GL_XOR / VK_LOGIC_OP_XOR: Source XOR Destination
+     * - GL_INVERT / VK_LOGIC_OP_INVERT: NOT Destination
+     * 
+     * @param logicOp The logic operation to use (e.g., GL_COPY, GL_AND, GL_OR, GL_XOR, GL_INVERT)
+     */
+    public static void setDynamicLogicOp(int logicOp) {
+        getBackend().setDynamicLogicOp(logicOp);
+    }
+    
     @Deprecated
     public static void configureLogicOp(int opcode) {
         getBackend().configureLogicOp(opcode);
