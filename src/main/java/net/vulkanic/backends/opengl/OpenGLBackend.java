@@ -278,6 +278,11 @@ public class OpenGLBackend implements GraphicsBackend {
         GL11.glPolygonMode(face, mode);
     }
     
+    @Override
+    public void setDynamicDepthBias(float slopeFactor, float constantFactor) {
+        GL11.glPolygonOffset(slopeFactor, constantFactor);
+    }
+    
     @Deprecated
     @Override
     public void configurePolygonOffset(float factor, float units) {

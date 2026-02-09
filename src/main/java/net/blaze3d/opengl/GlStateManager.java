@@ -405,7 +405,7 @@ public class GlStateManager {
 		if (f != POLY_OFFSET.factor || g != POLY_OFFSET.units) {
 			POLY_OFFSET.factor = f;
 			POLY_OFFSET.units = g;
-			net.vulkanic.VulkanicAPI.configurePolygonOffset(f, g);
+			net.vulkanic.VulkanicAPI.setDynamicDepthBias(f, g);
 		}
 	}
 

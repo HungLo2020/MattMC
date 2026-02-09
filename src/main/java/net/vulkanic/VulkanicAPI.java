@@ -872,6 +872,37 @@ public class VulkanicAPI {
         getBackend().configurePolygonMode(face, mode);
     }
     
+    /**
+     * Sets the dynamic depth bias (polygon offset) for rendering.
+     * This is a Vulkan-compatible replacement for the deprecated configurePolygonOffset() method.
+     * 
+     * In OpenGL: Maps to glPolygonOffset(slopeFactor, constantFactor)
+     * In Vulkan: Maps to vkCmdSetDepthBias(commandBuffer, constantFactor, 0.0f, slopeFactor)
+     * 
+     * Depth bias adds an offset to depth values to prevent z-fighting and shadow acne.
+     * This is dynamic state that can be changed per-frame or even between draw calls.
+     * 
+     * Important architectural notes for Vulkan compatibility:
+     * - In Vulkan, this will be a dynamic state command recorded in command buffers
+     * - This allows changing the depth bias without creating new pipeline state objects
+     * - Must be called within an active render pass in Vulkan
+     * - For now, this provides a simple 1:1 mapping while maintaining Vulkan compatibility
+     * 
+     * For OpenGL backend:
+     * - Directly calls glPolygonOffset with the specified parameters
+     * - Changes take effect immediately for subsequent draw calls
+     * - Part of the global OpenGL state machine
+     * 
+     * Future evolution: This may take a CommandBuffer parameter for Vulkan:
+     *   void setDynamicDepthBias(CommandBuffer cmdBuffer, float slopeFactor, float constantFactor)
+     * 
+     * @param slopeFactor Scales the maximum depth slope (factor parameter in OpenGL)
+     * @param constantFactor Scales the minimum resolvable depth value (units parameter in OpenGL)
+     */
+    public static void setDynamicDepthBias(float slopeFactor, float constantFactor) {
+        getBackend().setDynamicDepthBias(slopeFactor, constantFactor);
+    }
+    
     @Deprecated
     public static void configurePolygonOffset(float factor, float units) {
         getBackend().configurePolygonOffset(factor, units);
