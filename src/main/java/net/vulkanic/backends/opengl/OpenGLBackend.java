@@ -285,12 +285,6 @@ public class OpenGLBackend implements GraphicsBackend {
     
     @Deprecated
     @Override
-    public void configurePolygonOffset(float factor, float units) {
-        GL11.glPolygonOffset(factor, units);
-    }
-    
-    @Deprecated
-    @Override
     public void configureLogicOp(int opcode) {
         GL11.glLogicOp(opcode);
     }

@@ -335,8 +335,6 @@ public interface GraphicsBackend {
     @Deprecated
     void configurePolygonMode(int face, int mode);
     @Deprecated
-    void configurePolygonOffset(float factor, float units);
-    @Deprecated
     void configureLogicOp(int opcode);
     
     /**

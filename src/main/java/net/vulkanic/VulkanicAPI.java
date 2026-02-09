@@ -904,11 +904,6 @@ public class VulkanicAPI {
     }
     
     @Deprecated
-    public static void configurePolygonOffset(float factor, float units) {
-        getBackend().configurePolygonOffset(factor, units);
-    }
-    
-    @Deprecated
     public static void configureLogicOp(int opcode) {
         getBackend().configureLogicOp(opcode);
     }
