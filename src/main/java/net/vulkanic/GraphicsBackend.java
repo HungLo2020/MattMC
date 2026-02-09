@@ -42,21 +42,6 @@ public interface GraphicsBackend {
      */
     void setDynamicViewport(CommandContext ctx, int x, int y, int width, int height);
     
-    /**
-     * Sets the dynamic viewport state for rendering (legacy immediate-mode variant).
-     * 
-     * @deprecated Use {@link #setDynamicViewport(CommandContext, int, int, int, int)} instead.
-     * This method uses implicit immediate-mode context which is not compatible with
-     * Vulkan's command buffer model. Migrate to the CommandContext variant.
-     * 
-     * @param x The x coordinate of the viewport's lower-left corner
-     * @param y The y coordinate of the viewport's lower-left corner
-     * @param width The width of the viewport in pixels
-     * @param height The height of the viewport in pixels
-     */
-    @Deprecated
-    void setDynamicViewport(int x, int y, int width, int height);
-    
     @Deprecated
     void clear(int mask);
     @Deprecated
@@ -98,21 +83,6 @@ public interface GraphicsBackend {
      * @param height The height of the scissor rectangle in pixels
      */
     void setDynamicScissor(CommandContext ctx, int x, int y, int width, int height);
-    
-    /**
-     * Sets the dynamic scissor rectangle for rendering (legacy immediate-mode variant).
-     * 
-     * @deprecated Use {@link #setDynamicScissor(CommandContext, int, int, int, int)} instead.
-     * This method uses implicit immediate-mode context which is not compatible with
-     * Vulkan's command buffer model. Migrate to the CommandContext variant.
-     * 
-     * @param x The x coordinate of the scissor rectangle's lower-left corner
-     * @param y The y coordinate of the scissor rectangle's lower-left corner
-     * @param width The width of the scissor rectangle in pixels
-     * @param height The height of the scissor rectangle in pixels
-     */
-    @Deprecated
-    void setDynamicScissor(int x, int y, int width, int height);
     
     // Pixel operations
     @Deprecated

@@ -538,23 +538,22 @@ public class VulkanicAPI {
     }
     
     /**
-     * Sets the dynamic viewport state for rendering.
-     * This is a Vulkan-compatible replacement for the deprecated viewport() method.
+     * Sets the dynamic viewport state for rendering with explicit command context.
      * 
-     * The viewport transformation maps from normalized device coordinates [-1, 1] to
-     * window/framebuffer coordinates. This is dynamic state that can be changed
-     * at any point during rendering.
+     * This is the preferred method for setting viewport - it explicitly takes a CommandContext
+     * parameter to support both immediate (OpenGL) and deferred (Vulkan) rendering models.
      * 
      * In OpenGL: Maps to glViewport()
      * In Vulkan: Maps to vkCmdSetViewport() (dynamic state in command buffer)
      * 
+     * @param ctx Command context for recording this command
      * @param x The x coordinate of the viewport's lower-left corner
      * @param y The y coordinate of the viewport's lower-left corner  
      * @param width The width of the viewport in pixels
      * @param height The height of the viewport in pixels
      */
-    public static void setDynamicViewport(int x, int y, int width, int height) {
-        getBackend().setDynamicViewport(x, y, width, height);
+    public static void setDynamicViewport(CommandContext ctx, int x, int y, int width, int height) {
+        getBackend().setDynamicViewport(ctx, x, y, width, height);
     }
     
     @Deprecated
@@ -619,32 +618,6 @@ public class VulkanicAPI {
      */
     public static void setDynamicScissor(CommandContext ctx, int x, int y, int width, int height) {
         getBackend().setDynamicScissor(ctx, x, y, width, height);
-    }
-    
-    /**
-     * Sets the dynamic scissor rectangle for rendering (legacy immediate-mode variant).
-     * 
-     * @deprecated Use {@link #setDynamicScissor(CommandContext, int, int, int, int)} instead.
-     * This method uses implicit immediate-mode context which is not fully compatible with
-     * Vulkan's command buffer model. Migrate to the CommandContext variant.
-     * 
-     * This is a Vulkan-compatible replacement for the deprecated setScissorBox() method.
-     * 
-     * The scissor test restricts rendering to a rectangular region of the framebuffer.
-     * Fragments outside the scissor rectangle are discarded. This is dynamic state that
-     * can be changed at any point during rendering.
-     * 
-     * In OpenGL: Maps to glScissor()
-     * In Vulkan: Maps to vkCmdSetScissor() (dynamic state in command buffer)
-     * 
-     * @param x The x coordinate of the scissor rectangle's lower-left corner
-     * @param y The y coordinate of the scissor rectangle's lower-left corner
-     * @param width The width of the scissor rectangle in pixels
-     * @param height The height of the scissor rectangle in pixels
-     */
-    @Deprecated
-    public static void setDynamicScissor(int x, int y, int width, int height) {
-        getBackend().setDynamicScissor(x, y, width, height);
     }
     
     @Deprecated

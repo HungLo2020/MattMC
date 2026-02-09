@@ -73,17 +73,6 @@ public class OpenGLBackend implements GraphicsBackend {
         GL11.glViewport(x, y, width, height);
     }
     
-    /**
-     * Legacy viewport method - delegates to CommandContext variant.
-     * 
-     * @deprecated Use {@link #setDynamicViewport(CommandContext, int, int, int, int)} instead
-     */
-    @Deprecated
-    @Override
-    public void setDynamicViewport(int x, int y, int width, int height) {
-        setDynamicViewport(OpenGLCommandContext.IMMEDIATE, x, y, width, height);
-    }
-    
     @Deprecated
     @Override
     public void clear(int mask) {
@@ -155,17 +144,6 @@ public class OpenGLBackend implements GraphicsBackend {
         }
         
         GL20.glScissor(x, y, width, height);
-    }
-    
-    /**
-     * Legacy scissor method - delegates to CommandContext variant.
-     * 
-     * @deprecated Use {@link #setDynamicScissor(CommandContext, int, int, int, int)} instead
-     */
-    @Deprecated
-    @Override
-    public void setDynamicScissor(int x, int y, int width, int height) {
-        setDynamicScissor(OpenGLCommandContext.IMMEDIATE, x, y, width, height);
     }
     
     @Deprecated
