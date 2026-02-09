@@ -297,8 +297,6 @@ public interface GraphicsBackend {
     
     // Drawing operations
     @Deprecated
-    void drawIndexedElements(int mode, int count, int type, long indices);
-    @Deprecated
     void configureBlendFunc(int srcRgb, int dstRgb, int srcAlpha, int dstAlpha);
     
     // Error checking

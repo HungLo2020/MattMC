@@ -869,11 +869,6 @@ public class VulkanicAPI {
     public static void cmdDrawIndexed(int mode, int indexCount, int indexType, long indicesOffset) {
         getBackend().cmdDrawIndexed(mode, indexCount, indexType, indicesOffset);
     }
-
-    @Deprecated
-    public static void drawIndexedElements(int mode, int count, int type, long indices) {
-        getBackend().drawIndexedElements(mode, count, type, indices);
-    }
     
     @Deprecated
     public static void configureBlendFunc(int srcRgb, int dstRgb, int srcAlpha, int dstAlpha) {

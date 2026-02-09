@@ -302,12 +302,6 @@ public class OpenGLBackend implements GraphicsBackend {
     public void cmdDrawIndexed(int mode, int indexCount, int indexType, long indicesOffset) {
         GL11.glDrawElements(mode, indexCount, indexType, indicesOffset);
     }
-
-    @Deprecated
-    @Override
-    public void drawIndexedElements(int mode, int count, int type, long indices) {
-        GL11.glDrawElements(mode, count, type, indices);
-    }
     
     @Deprecated
     @Override
