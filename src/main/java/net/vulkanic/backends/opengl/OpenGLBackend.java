@@ -165,6 +165,16 @@ public class OpenGLBackend implements GraphicsBackend {
     }
     
     @Override
+    public void setDynamicScissorTest(boolean enabled, int x, int y, int width, int height) {
+        if (enabled) {
+            GL11.glEnable(GL11.GL_SCISSOR_TEST);
+            GL11.glScissor(x, y, width, height);
+        } else {
+            GL11.glDisable(GL11.GL_SCISSOR_TEST);
+        }
+    }
+    
+    @Override
     public void setTextureUploadAlignment(int alignment) {
         GL11.glPixelStorei(GL11.GL_UNPACK_ALIGNMENT, alignment);
     }

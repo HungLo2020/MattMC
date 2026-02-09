@@ -821,6 +821,42 @@ public class VulkanicAPI {
     }
     
     /**
+     * Sets the dynamic scissor test state for rendering.
+     * This is a Vulkan-compatible replacement for enable/disable(GL_SCISSOR_TEST) + setScissorBox().
+     * 
+     * In OpenGL: Maps to glEnable/glDisable(GL_SCISSOR_TEST) + glScissor()
+     * In Vulkan: Maps to VkPipelineViewportStateCreateInfo or vkCmdSetScissorWithCountEXT() (dynamic state)
+     * 
+     * The scissor test discards fragments outside the scissor rectangle when enabled.
+     * This method combines both enabling/disabling the scissor test and setting the scissor rectangle,
+     * making it suitable for both OpenGL (where these are separate state changes) and Vulkan
+     * (where scissor is part of pipeline state or dynamic state).
+     * 
+     * Important architectural notes for Vulkan compatibility:
+     * - In Vulkan, this will be a dynamic state command recorded in command buffers
+     * - Scissor rectangles are typically part of the viewport state
+     * - Must be called within an active render pass in Vulkan
+     * - For now, this provides a simple 1:1 mapping while maintaining Vulkan compatibility
+     * 
+     * For OpenGL backend:
+     * - Calls glEnable/glDisable(GL_SCISSOR_TEST) based on enabled parameter
+     * - If scissor test is enabled, calls glScissor(x, y, width, height)
+     * - Changes take effect immediately for subsequent draw calls
+     * 
+     * Future evolution: This may take a CommandBuffer parameter for Vulkan:
+     *   setDynamicScissorTest(CommandBuffer cmdBuffer, boolean enabled, int x, int y, int width, int height)
+     * 
+     * @param enabled Whether to enable scissor testing (true to enable, false to disable)
+     * @param x The x coordinate of the scissor rectangle's lower-left corner
+     * @param y The y coordinate of the scissor rectangle's lower-left corner
+     * @param width The width of the scissor rectangle in pixels
+     * @param height The height of the scissor rectangle in pixels
+     */
+    public static void setDynamicScissorTest(boolean enabled, int x, int y, int width, int height) {
+        getBackend().setDynamicScissorTest(enabled, x, y, width, height);
+    }
+    
+    /**
      * Sets the texture upload alignment for subsequent texture upload operations.
      * This is a Vulkan-compatible replacement for setPixelStoreMode(GL_UNPACK_ALIGNMENT, value).
      * 

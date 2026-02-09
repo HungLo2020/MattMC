@@ -62,6 +62,10 @@ public class GlStateManager {
 
 	public static void _scissorBox(int i, int j, int k, int l) {
 		RenderSystem.assertOnRenderThread();
+		SCISSOR.x = i;
+		SCISSOR.y = j;
+		SCISSOR.width = k;
+		SCISSOR.height = l;
 		net.vulkanic.VulkanicAPI.setDynamicScissor(i, j, k, l);
 	}
 
@@ -664,6 +668,9 @@ public class GlStateManager {
 				// Special handling for GL_BLEND (3042) - use Vulkan-compatible API
 				if (this.state == 3042) {
 					net.vulkanic.VulkanicAPI.setDynamicBlendState(bl, BLEND.srcRgb, BLEND.dstRgb);
+				} else if (this.state == 3089) {
+					// Special handling for GL_SCISSOR_TEST (3089) - use Vulkan-compatible API
+					net.vulkanic.VulkanicAPI.setDynamicScissorTest(bl, SCISSOR.x, SCISSOR.y, SCISSOR.width, SCISSOR.height);
 				} else {
 					// Delegate other capabilities to VulkanicAPI
 					if (bl) {
@@ -679,6 +686,9 @@ public class GlStateManager {
 				// Special handling for GL_BLEND (3042) - use Vulkan-compatible API
 				if (this.state == 3042) {
 					net.vulkanic.VulkanicAPI.setDynamicBlendState(bl, BLEND.srcRgb, BLEND.dstRgb);
+				} else if (this.state == 3089) {
+					// Special handling for GL_SCISSOR_TEST (3089) - use Vulkan-compatible API
+					net.vulkanic.VulkanicAPI.setDynamicScissorTest(bl, SCISSOR.x, SCISSOR.y, SCISSOR.width, SCISSOR.height);
 				} else {
 					// Delegate other capabilities to VulkanicAPI
 					if (bl) {
@@ -732,6 +742,10 @@ public class GlStateManager {
 	@Environment(EnvType.CLIENT)
 	static class ScissorState {
 		public final GlStateManager.BooleanState mode = new GlStateManager.BooleanState(3089);
+		public int x = 0;
+		public int y = 0;
+		public int width = 0;
+		public int height = 0;
 	}
 
 	@Environment(EnvType.CLIENT)
