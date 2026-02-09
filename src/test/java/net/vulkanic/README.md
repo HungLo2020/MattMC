@@ -66,7 +66,7 @@ File: net/minecraft/renderer/MyRenderer.java
 
 ================================================================================
 TO FIX: Remove direct OpenGL imports and use the VulkanicAPI instead.
-        See VULKAN-COMPAT.md for migration guidance.
+        See src/main/java/net/vulkanic/README.md for architectural guidance.
 ================================================================================
 ```
 
@@ -137,8 +137,8 @@ If you're working on the OpenGL or Vulkan backends:
 
 ## Related Documentation
 
-- **VULKAN-COMPAT.md** - Comprehensive guide on the Vulkanic abstraction layer and migration strategy
-- **src/main/java/net/vulkanic/README.md** - Vulkanic API documentation
+- **src/main/java/net/vulkanic/README.md** - Vulkanic abstraction layer architecture and design principles
+- **VULKAN-COMPAT.md** - Comprehensive guide on the migration strategy from deprecated API to new abstraction
 
 ## Technical Details
 

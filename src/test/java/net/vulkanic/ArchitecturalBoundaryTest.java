@@ -26,7 +26,7 @@ import static org.junit.jupiter.api.Assertions.fail;
  * This ensures that game code uses the Vulkanic API abstraction layer rather than
  * directly depending on specific graphics APIs (OpenGL or Vulkan).
  * 
- * See VULKAN-COMPAT.md for details on the architectural principles.
+ * See src/main/java/net/vulkanic/README.md for details on the architectural principles.
  */
 public class ArchitecturalBoundaryTest {
     
@@ -153,7 +153,7 @@ public class ArchitecturalBoundaryTest {
         }
         errorMessage.append("================================================================================\n");
         errorMessage.append("TO FIX: Remove direct ").append(backendName).append(" imports and use the VulkanicAPI instead.\n");
-        errorMessage.append("        See VULKAN-COMPAT.md for migration guidance.\n");
+        errorMessage.append("        See src/main/java/net/vulkanic/README.md for architectural guidance.\n");
         errorMessage.append("================================================================================\n");
         
         return errorMessage.toString();
