@@ -13,8 +13,3 @@ plugins {
 }
 
 rootProject.name = 'MattMC'
-
-// Include submodules for Vulkanic API and backends
-include 'vulkanic-api'
-include 'vulkanic-backend-opengl'
-include 'vulkanic-backend-vulkan'

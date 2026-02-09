@@ -1,0 +1,42 @@
+plugins {
+    id 'java-library'
+}
+
+group = 'net.vulkanic.backends'
+version = '1.0.0'
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(25)
+    }
+}
+
+def lwjglVersion = '3.3.3'
+def lwjglNatives = System.getProperty('os.name').toLowerCase().contains('mac') 
+    ? (System.getProperty('os.arch').contains('aarch64') || System.getProperty('os.arch').contains('arm64') ? 'natives-macos-arm64' : 'natives-macos')
+    : System.getProperty('os.name').toLowerCase().contains('win') 
+        ? (System.getProperty('os.arch').contains('64') ? 'natives-windows' : 'natives-windows-x86')
+        : (System.getProperty('os.arch').contains('arm') || System.getProperty('os.arch').contains('aarch64')) 
+            ? 'natives-linux-arm64' 
+            : 'natives-linux'
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    // Depend on the Vulkanic API
+    implementation project(':vulkanic-api')
+    
+    // LWJGL Vulkan - THIS MODULE IS ALLOWED TO USE THIS
+    implementation platform("org.lwjgl:lwjgl-bom:${lwjglVersion}")
+    implementation "org.lwjgl:lwjgl"
+    implementation "org.lwjgl:lwjgl-vulkan"
+    runtimeOnly "org.lwjgl:lwjgl::${lwjglNatives}"
+}
+
+// Enable JPMS module compilation
+tasks.withType(JavaCompile).configureEach {
+    // Don't force module path - let Gradle handle classpath
+    options.compilerArgs += ['-Xlint:all']
+}

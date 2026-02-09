@@ -164,11 +164,18 @@ dependencies {
     
     // ===== CLIENT DEPENDENCIES =====
     
-    // LWJGL - Lightweight Java Game Library (OpenGL, GLFW, OpenAL, etc.)
+    // Vulkanic API and Backends
+    implementation project(':vulkanic-api')
+    runtimeOnly project(':vulkanic-backend-opengl')
+    runtimeOnly project(':vulkanic-backend-vulkan')
+    
+    // LWJGL - Lightweight Java Game Library (GLFW, OpenAL, STB, etc.)
+    // NOTE: lwjgl-opengl and lwjgl-vulkan are NOT included here!
+    // They are only available in the backend modules to enforce abstraction boundaries
     implementation platform("org.lwjgl:lwjgl-bom:${lwjglVersion}")
     implementation 'org.lwjgl:lwjgl'
     implementation 'org.lwjgl:lwjgl-glfw'
-    implementation 'org.lwjgl:lwjgl-opengl'
+    // implementation 'org.lwjgl:lwjgl-opengl' // REMOVED - Only in vulkanic-backend-opengl
     implementation 'org.lwjgl:lwjgl-openal'
     implementation 'org.lwjgl:lwjgl-stb'
     implementation 'org.lwjgl:lwjgl-tinyfd'
@@ -178,7 +185,7 @@ dependencies {
     // LWJGL natives
     runtimeOnly "org.lwjgl:lwjgl::${lwjglNatives}"
     runtimeOnly "org.lwjgl:lwjgl-glfw::${lwjglNatives}"
-    runtimeOnly "org.lwjgl:lwjgl-opengl::${lwjglNatives}"
+    // runtimeOnly "org.lwjgl:lwjgl-opengl::${lwjglNatives}" // REMOVED - Only in vulkanic-backend-opengl
     runtimeOnly "org.lwjgl:lwjgl-openal::${lwjglNatives}"
     runtimeOnly "org.lwjgl:lwjgl-stb::${lwjglNatives}"
     runtimeOnly "org.lwjgl:lwjgl-tinyfd::${lwjglNatives}"

@@ -1,0 +1,26 @@
+plugins {
+    id 'java-library'
+}
+
+group = 'net.vulkanic'
+version = '1.0.0'
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(25)
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+// This module has no external dependencies - only JDK
+dependencies {
+}
+
+// Enable JPMS module compilation
+tasks.withType(JavaCompile).configureEach {
+    // Don't force module path - let Gradle handle classpath
+    options.compilerArgs += ['-Xlint:all']
+}

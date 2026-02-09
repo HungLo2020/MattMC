@@ -1,6 +1,6 @@
 package net.vulkanic;
 
-import net.vulkanic.backends.opengl.OpenGLBackend;
+import java.util.ServiceLoader;
 
 /**
  * Main entry point for the Vulkanic Graphics Abstraction Layer.
@@ -471,13 +471,15 @@ public class VulkanicAPI {
      */
     public static synchronized void initialize(BackendType backendType) {
         if (backend == null) {
-            switch (backendType) {
-                case OPENGL:
-                    backend = new OpenGLBackend();
-                    break;
-                case VULKAN:
-                    throw new UnsupportedOperationException("Vulkan backend not yet implemented");
+            // Use ServiceLoader to find backend implementations
+            ServiceLoader<GraphicsBackendProvider> loader = ServiceLoader.load(GraphicsBackendProvider.class);
+            for (GraphicsBackendProvider provider : loader) {
+                if (provider.getBackendType() == backendType) {
+                    backend = provider.createBackend();
+                    return;
+                }
             }
+            throw new UnsupportedOperationException(backendType + " backend not available. No provider found.");
         }
     }
     
