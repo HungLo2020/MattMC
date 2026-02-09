@@ -142,6 +142,31 @@ public class OpenGLBackend implements GraphicsBackend {
         GL20.glScissor(x, y, width, height);
     }
     
+    @Override
+    public void setTextureUploadAlignment(int alignment) {
+        GL11.glPixelStorei(GL11.GL_UNPACK_ALIGNMENT, alignment);
+    }
+    
+    @Override
+    public void setTextureUploadRowLength(int rowLength) {
+        GL11.glPixelStorei(GL11.GL_UNPACK_ROW_LENGTH, rowLength);
+    }
+    
+    @Override
+    public void setTextureUploadSkipRows(int skipRows) {
+        GL11.glPixelStorei(GL11.GL_UNPACK_SKIP_ROWS, skipRows);
+    }
+    
+    @Override
+    public void setTextureUploadSkipPixels(int skipPixels) {
+        GL11.glPixelStorei(GL11.GL_UNPACK_SKIP_PIXELS, skipPixels);
+    }
+    
+    @Override
+    public void setTextureDownloadAlignment(int alignment) {
+        GL11.glPixelStorei(GL11.GL_PACK_ALIGNMENT, alignment);
+    }
+    
     @Deprecated
     @Override
     public void setPixelStoreMode(int pname, int value) {

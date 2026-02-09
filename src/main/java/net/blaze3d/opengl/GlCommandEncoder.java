@@ -431,10 +431,10 @@ public class GlCommandEncoder implements CommandEncoder {
 					GlStateManager._bindTexture(((GlTexture)gpuTexture).id);
 				}
 
-				GlStateManager._pixelStore(3314, nativeImage.getWidth());
-				GlStateManager._pixelStore(3316, o);
-				GlStateManager._pixelStore(3315, p);
-				GlStateManager._pixelStore(3317, nativeImage.format().components());
+				VulkanicAPI.setTextureUploadRowLength(nativeImage.getWidth());
+				VulkanicAPI.setTextureUploadSkipPixels(o);
+				VulkanicAPI.setTextureUploadSkipRows(p);
+				VulkanicAPI.setTextureUploadAlignment(nativeImage.format().components());
 				GlStateManager._texSubImage2D(q, i, k, l, m, n, GlConst.toGl(nativeImage.format()), 5121, nativeImage.getPointer());
 			}
 		} else {
@@ -483,10 +483,10 @@ public class GlCommandEncoder implements CommandEncoder {
 					GlStateManager._bindTexture(((GlTexture)gpuTexture).id);
 				}
 
-				GlStateManager._pixelStore(3314, m);
-				GlStateManager._pixelStore(3316, 0);
-				GlStateManager._pixelStore(3315, 0);
-				GlStateManager._pixelStore(3317, format.components());
+				VulkanicAPI.setTextureUploadRowLength(m);
+				VulkanicAPI.setTextureUploadSkipPixels(0);
+				VulkanicAPI.setTextureUploadSkipRows(0);
+				VulkanicAPI.setTextureUploadAlignment(format.components());
 				GlStateManager._texSubImage2D(o, i, k, l, m, n, GlConst.toGl(format), 5121, byteBuffer);
 			}
 		} else {
@@ -550,7 +550,7 @@ public class GlCommandEncoder implements CommandEncoder {
 				GlStateManager.clearGlErrors();
 				this.device.directStateAccess().bindFrameBufferTextures(this.readFbo, ((GlTexture)gpuTexture).glId(), 0, j, 36008);
 				GlStateManager._glBindBuffer(35051, ((GlBuffer)gpuBuffer).handle);
-				GlStateManager._pixelStore(3330, m);
+				VulkanicAPI.setTextureDownloadAlignment(m);
 				GlStateManager._readPixels(k, l, m, n, GlConst.toGlExternalId(gpuTexture.getFormat()), GlConst.toGlType(gpuTexture.getFormat()), i);
 				RenderSystem.queueFencedTask(runnable);
 				GlStateManager._glFramebufferTexture2D(36008, 36064, 3553, 0, j);

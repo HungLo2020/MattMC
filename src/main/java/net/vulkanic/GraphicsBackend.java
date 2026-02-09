@@ -248,6 +248,75 @@ public interface GraphicsBackend {
      */
     void setDynamicScissor(int x, int y, int width, int height);
     
+    /**
+     * Sets the texture upload alignment for subsequent texture upload operations.
+     * This is a Vulkan-compatible replacement for setPixelStoreMode(GL_UNPACK_ALIGNMENT, value).
+     * 
+     * In OpenGL: Maps to glPixelStorei(GL_UNPACK_ALIGNMENT, alignment)
+     * In Vulkan: Will be used as parameter in vkCmdCopyBufferToImage and image upload operations
+     * 
+     * Alignment specifies the byte alignment of pixel rows in memory. Common values:
+     * - 1: Tightly packed (no padding)
+     * - 4: Default OpenGL alignment (word-aligned)
+     * - 8: 64-bit aligned
+     * 
+     * This affects how texture data is read from client memory during texture uploads.
+     * In Vulkan, this will be part of the VkBufferImageCopy structure rather than global state.
+     * 
+     * @param alignment The byte alignment (must be 1, 2, 4, or 8)
+     */
+    void setTextureUploadAlignment(int alignment);
+    
+    /**
+     * Sets the row length for texture uploads (in pixels).
+     * This is a Vulkan-compatible replacement for setPixelStoreMode(GL_UNPACK_ROW_LENGTH, rowLength).
+     * 
+     * In OpenGL: Maps to glPixelStorei(GL_UNPACK_ROW_LENGTH, rowLength)
+     * In Vulkan: Will be used to calculate bufferRowLength in VkBufferImageCopy
+     * 
+     * Row length defines the number of pixels in a row of the source data.
+     * If 0, the row length is assumed to be the same as the image width.
+     * 
+     * @param rowLength The row length in pixels (0 for automatic)
+     */
+    void setTextureUploadRowLength(int rowLength);
+    
+    /**
+     * Sets the number of rows to skip before reading pixel data.
+     * This is a Vulkan-compatible replacement for setPixelStoreMode(GL_UNPACK_SKIP_ROWS, skipRows).
+     * 
+     * In OpenGL: Maps to glPixelStorei(GL_UNPACK_SKIP_ROWS, skipRows)
+     * In Vulkan: Will be used to calculate buffer offset in VkBufferImageCopy
+     * 
+     * @param skipRows The number of rows to skip (0 for none)
+     */
+    void setTextureUploadSkipRows(int skipRows);
+    
+    /**
+     * Sets the number of pixels to skip before reading pixel data.
+     * This is a Vulkan-compatible replacement for setPixelStoreMode(GL_UNPACK_SKIP_PIXELS, skipPixels).
+     * 
+     * In OpenGL: Maps to glPixelStorei(GL_UNPACK_SKIP_PIXELS, skipPixels)
+     * In Vulkan: Will be used to calculate buffer offset in VkBufferImageCopy
+     * 
+     * @param skipPixels The number of pixels to skip (0 for none)
+     */
+    void setTextureUploadSkipPixels(int skipPixels);
+    
+    /**
+     * Sets the texture download alignment for subsequent pixel read operations.
+     * This is a Vulkan-compatible replacement for setPixelStoreMode(GL_PACK_ALIGNMENT, value).
+     * 
+     * In OpenGL: Maps to glPixelStorei(GL_PACK_ALIGNMENT, alignment)
+     * In Vulkan: Will be used as parameter in vkCmdCopyImageToBuffer
+     * 
+     * Alignment specifies the byte alignment of pixel rows when reading from the GPU.
+     * Common values: 1 (tightly packed), 4 (default word-aligned), 8 (64-bit aligned)
+     * 
+     * @param alignment The byte alignment (must be 1, 2, 4, or 8)
+     */
+    void setTextureDownloadAlignment(int alignment);
+    
     // Pixel operations
     @Deprecated
     void setPixelStoreMode(int pname, int value);

@@ -758,6 +758,109 @@ public class VulkanicAPI {
         getBackend().setDynamicScissor(x, y, width, height);
     }
     
+    /**
+     * Sets the texture upload alignment for subsequent texture upload operations.
+     * This is a Vulkan-compatible replacement for setPixelStoreMode(GL_UNPACK_ALIGNMENT, value).
+     * 
+     * In OpenGL: Maps to glPixelStorei(GL_UNPACK_ALIGNMENT, alignment)
+     * In Vulkan: Will be used as parameter in vkCmdCopyBufferToImage and image upload operations
+     * 
+     * Alignment specifies the byte alignment of pixel rows in memory. Common values:
+     * - 1: Tightly packed (no padding)
+     * - 4: Default OpenGL alignment (word-aligned)
+     * - 8: 64-bit aligned
+     * 
+     * This affects how texture data is read from client memory during texture uploads.
+     * In Vulkan, this will be part of the VkBufferImageCopy structure rather than global state.
+     * 
+     * Important architectural notes for Vulkan compatibility:
+     * - In OpenGL, this is global state that persists until changed
+     * - In Vulkan, alignment will be specified per-upload operation
+     * - For now, maintains OpenGL semantics while preparing for Vulkan migration
+     * 
+     * Future evolution: This may become a parameter to texture upload functions:
+     *   void uploadTexture2D(CommandBuffer cmd, int texture, ByteBuffer data, UploadParams params)
+     *   where UploadParams includes alignment, rowLength, skip values
+     * 
+     * Best practices:
+     * - Set to 1 for tightly packed texture data
+     * - Set to 4 (default) for most texture uploads
+     * - Reset to 4 after using alignment of 1
+     * 
+     * @param alignment The byte alignment (must be 1, 2, 4, or 8)
+     */
+    public static void setTextureUploadAlignment(int alignment) {
+        getBackend().setTextureUploadAlignment(alignment);
+    }
+    
+    /**
+     * Sets the row length for texture uploads (in pixels).
+     * This is a Vulkan-compatible replacement for setPixelStoreMode(GL_UNPACK_ROW_LENGTH, rowLength).
+     * 
+     * In OpenGL: Maps to glPixelStorei(GL_UNPACK_ROW_LENGTH, rowLength)
+     * In Vulkan: Will be used to calculate bufferRowLength in VkBufferImageCopy
+     * 
+     * Row length defines the number of pixels in a row of the source data.
+     * If 0, the row length is assumed to be the same as the image width.
+     * This is useful when uploading a sub-rectangle from a larger image.
+     * 
+     * @param rowLength The row length in pixels (0 for automatic)
+     */
+    public static void setTextureUploadRowLength(int rowLength) {
+        getBackend().setTextureUploadRowLength(rowLength);
+    }
+    
+    /**
+     * Sets the number of rows to skip before reading pixel data.
+     * This is a Vulkan-compatible replacement for setPixelStoreMode(GL_UNPACK_SKIP_ROWS, skipRows).
+     * 
+     * In OpenGL: Maps to glPixelStorei(GL_UNPACK_SKIP_ROWS, skipRows)
+     * In Vulkan: Will be used to calculate buffer offset in VkBufferImageCopy
+     * 
+     * Used together with skipPixels to specify a sub-rectangle within source data.
+     * 
+     * @param skipRows The number of rows to skip (0 for none)
+     */
+    public static void setTextureUploadSkipRows(int skipRows) {
+        getBackend().setTextureUploadSkipRows(skipRows);
+    }
+    
+    /**
+     * Sets the number of pixels to skip before reading pixel data.
+     * This is a Vulkan-compatible replacement for setPixelStoreMode(GL_UNPACK_SKIP_PIXELS, skipPixels).
+     * 
+     * In OpenGL: Maps to glPixelStorei(GL_UNPACK_SKIP_PIXELS, skipPixels)
+     * In Vulkan: Will be used to calculate buffer offset in VkBufferImageCopy
+     * 
+     * Used together with skipRows to specify a sub-rectangle within source data.
+     * 
+     * @param skipPixels The number of pixels to skip (0 for none)
+     */
+    public static void setTextureUploadSkipPixels(int skipPixels) {
+        getBackend().setTextureUploadSkipPixels(skipPixels);
+    }
+    
+    /**
+     * Sets the texture download alignment for subsequent pixel read operations.
+     * This is a Vulkan-compatible replacement for setPixelStoreMode(GL_PACK_ALIGNMENT, value).
+     * 
+     * In OpenGL: Maps to glPixelStorei(GL_PACK_ALIGNMENT, alignment)
+     * In Vulkan: Will be used as parameter in vkCmdCopyImageToBuffer
+     * 
+     * Alignment specifies the byte alignment of pixel rows when reading from the GPU.
+     * This affects how pixel data is written to client memory during texture downloads.
+     * 
+     * Common values:
+     * - 1: Tightly packed (no padding)
+     * - 4: Default OpenGL alignment (word-aligned)
+     * - 8: 64-bit aligned
+     * 
+     * @param alignment The byte alignment (must be 1, 2, 4, or 8)
+     */
+    public static void setTextureDownloadAlignment(int alignment) {
+        getBackend().setTextureDownloadAlignment(alignment);
+    }
+    
     @Deprecated
     public static void setPixelStoreMode(int pname, int value) {
         getBackend().setPixelStoreMode(pname, value);

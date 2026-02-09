@@ -47,7 +47,7 @@ public class NoiseTexture extends GlResource {
 		TextureUploadHelper.resetTextureUploadState();
 
 		// Since we're using tightly-packed RGB data, we must use an alignment of 1 byte instead of the usual 4 bytes.
-		GlStateManager._pixelStore(VulkanicAPI.GL_UNPACK_ALIGNMENT, 1);
+		VulkanicAPI.setTextureUploadAlignment(1);
 		IrisRenderSystem.texImage2D(texture, VulkanicAPI.GL_TEXTURE_2D, 0, VulkanicAPI.GL_RGB, width, height, 0, VulkanicAPI.GL_RGB, VulkanicAPI.GL_UNSIGNED_BYTE, pixels);
 
 		GlStateManager._bindTexture(0);
