@@ -625,16 +625,6 @@ public class VulkanicAPI {
     }
     
     @Deprecated
-    public static void enableBlend() {
-        getBackend().enableBlend();
-    }
-    
-    @Deprecated
-    public static void disableBlend() {
-        getBackend().disableBlend();
-    }
-    
-    @Deprecated
     public static void enable(int cap) {
         getBackend().enable(cap);
     }

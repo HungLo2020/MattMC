@@ -129,10 +129,6 @@ public interface GraphicsBackend {
     void bindShaderProgram(int programId);
     
     @Deprecated
-    void enableBlend();
-    @Deprecated
-    void disableBlend();
-    @Deprecated
     void enable(int cap);
     @Deprecated
     void disable(int cap);
