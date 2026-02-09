@@ -335,9 +335,6 @@ public interface GraphicsBackend {
      */
     void deleteTexture(int textureId);
     
-    @Deprecated
-    void removeTexture(int texture);
-    
     /**
      * Sets the dynamic depth bias (polygon offset) for rendering.
      * This is a Vulkan-compatible replacement for the deprecated configurePolygonOffset() method.

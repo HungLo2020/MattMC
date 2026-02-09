@@ -899,11 +899,6 @@ public class VulkanicAPI {
         getBackend().deleteTexture(textureId);
     }
     
-    @Deprecated
-    public static void removeTexture(int texture) {
-        getBackend().removeTexture(texture);
-    }
-    
     /**
      * Sets the dynamic polygon rasterization mode.
      * This is a Vulkan-compatible replacement for the deprecated configurePolygonMode() method.
