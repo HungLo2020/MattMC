@@ -867,6 +867,47 @@ public class VulkanicAPI {
         getBackend().removeTexture(texture);
     }
     
+    /**
+     * Sets the dynamic polygon rasterization mode.
+     * This is a Vulkan-compatible replacement for the deprecated configurePolygonMode() method.
+     * 
+     * In OpenGL: Maps to glPolygonMode(cullFace, fillMode)
+     * In Vulkan: Set as part of VkPipelineRasterizationStateCreateInfo.polygonMode, or use vkCmdSetPolygonModeEXT
+     * 
+     * Polygon mode controls how polygons are rasterized (filled, wireframe, or points).
+     * This is dynamic state that can be changed per-frame or between draw calls.
+     * 
+     * Important architectural notes for Vulkan compatibility:
+     * - In Vulkan, polygon mode is typically part of pipeline state
+     * - However, VK_EXT_extended_dynamic_state3 allows dynamic polygon mode
+     * - Must be called within an active render pass in Vulkan
+     * - For now, this provides a simple 1:1 mapping while maintaining Vulkan compatibility
+     * 
+     * For OpenGL backend:
+     * - Directly calls glPolygonMode with the specified parameters
+     * - Changes take effect immediately for subsequent draw calls
+     * - Part of the global OpenGL state machine
+     * 
+     * Future evolution: This may take a CommandBuffer parameter for Vulkan:
+     *   void setDynamicPolygonMode(CommandBuffer cmdBuffer, int cullFace, int fillMode)
+     * 
+     * Common polygon modes:
+     * - GL_FILL / VK_POLYGON_MODE_FILL: Fill the interior of polygons
+     * - GL_LINE / VK_POLYGON_MODE_LINE: Draw polygon edges as line segments
+     * - GL_POINT / VK_POLYGON_MODE_POINT: Draw polygon vertices as points
+     * 
+     * Common cull faces:
+     * - GL_FRONT / VK_CULL_MODE_FRONT_BIT: Apply to front-facing polygons
+     * - GL_BACK / VK_CULL_MODE_BACK_BIT: Apply to back-facing polygons
+     * - GL_FRONT_AND_BACK: Apply to both front and back-facing polygons
+     * 
+     * @param cullFace Which face(s) the polygon mode applies to (GL_FRONT, GL_BACK, GL_FRONT_AND_BACK)
+     * @param fillMode How to rasterize the polygon (GL_FILL, GL_LINE, GL_POINT)
+     */
+    public static void setDynamicPolygonMode(int cullFace, int fillMode) {
+        getBackend().setDynamicPolygonMode(cullFace, fillMode);
+    }
+    
     @Deprecated
     public static void configurePolygonMode(int face, int mode) {
         getBackend().configurePolygonMode(face, mode);

@@ -289,6 +289,11 @@ public class OpenGLBackend implements GraphicsBackend {
     }
     
     @Override
+    public void setDynamicPolygonMode(int cullFace, int fillMode) {
+        GL11.glPolygonMode(cullFace, fillMode);
+    }
+    
+    @Override
     public void cmdDrawArrays(int mode, int firstVertex, int vertexCount) {
         GL11.glDrawArrays(mode, firstVertex, vertexCount);
     }

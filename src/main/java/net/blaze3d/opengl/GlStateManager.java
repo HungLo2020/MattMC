@@ -387,7 +387,7 @@ public class GlStateManager {
 
 	public static void _polygonMode(int i, int j) {
 		RenderSystem.assertOnRenderThread();
-		net.vulkanic.VulkanicAPI.configurePolygonMode(i, j);
+		net.vulkanic.VulkanicAPI.setDynamicPolygonMode(i, j);
 	}
 
 	public static void _enablePolygonOffset() {
