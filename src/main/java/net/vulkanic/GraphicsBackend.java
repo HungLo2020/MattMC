@@ -174,10 +174,6 @@ public interface GraphicsBackend {
      */
     void setDynamicColorWriteMask(boolean r, boolean g, boolean b, boolean a);
     
-    // Color operations (deprecated - use RenderPipeline instead)
-    @Deprecated
-    void setColorWriteMask(boolean r, boolean g, boolean b, boolean a);
-    
     // Scissor operations
     
     /**

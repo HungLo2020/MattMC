@@ -687,11 +687,6 @@ public class VulkanicAPI {
         getBackend().setDynamicColorWriteMask(r, g, b, a);
     }
     
-    @Deprecated
-    public static void setColorWriteMask(boolean r, boolean g, boolean b, boolean a) {
-        getBackend().setColorWriteMask(r, g, b, a);
-    }
-    
     /**
      * Sets the dynamic scissor rectangle for rendering.
      * This is a Vulkan-compatible replacement for the deprecated setScissorBox() method.
