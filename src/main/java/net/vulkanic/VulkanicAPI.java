@@ -679,11 +679,6 @@ public class VulkanicAPI {
         getBackend().setDynamicDepthWriteMask(enabled);
     }
     
-    @Deprecated
-    public static void setDepthWriteEnabled(boolean enabled) {
-        getBackend().setDepthWriteEnabled(enabled);
-    }
-    
     /**
      * Sets the dynamic color write mask for rendering.
      * This is a Vulkan-compatible replacement for the deprecated setColorWriteMask() method.

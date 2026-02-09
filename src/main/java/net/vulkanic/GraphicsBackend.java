@@ -169,9 +169,6 @@ public interface GraphicsBackend {
      */
     void setDynamicDepthWriteMask(boolean enabled);
     
-    @Deprecated
-    void setDepthWriteEnabled(boolean enabled);
-    
     /**
      * Sets the dynamic color write mask for rendering.
      * This is a Vulkan-compatible replacement for the deprecated setColorWriteMask() method.

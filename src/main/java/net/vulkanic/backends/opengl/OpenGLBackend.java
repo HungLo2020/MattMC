@@ -126,12 +126,6 @@ public class OpenGLBackend implements GraphicsBackend {
         GL11.glDepthMask(enabled);
     }
     
-    @Deprecated
-    @Override
-    public void setDepthWriteEnabled(boolean enabled) {
-        GL11.glDepthMask(enabled);
-    }
-    
     @Override
     public void setDynamicColorWriteMask(boolean r, boolean g, boolean b, boolean a) {
         GL11.glColorMask(r, g, b, a);
