@@ -45,76 +45,49 @@ public class ArchitecturalBoundaryTest {
     
     @Test
     public void testOpenGLImportsOnlyInBackend() throws IOException {
-        List<String> violations = new ArrayList<>();
-        
-        // Scan all Java files in src/main/java
-        try (Stream<Path> paths = Files.walk(SRC_MAIN_JAVA)) {
-            List<Path> javaFiles = paths
-                .filter(Files::isRegularFile)
-                .filter(path -> path.toString().endsWith(".java"))
-                .collect(Collectors.toList());
-            
-            for (Path file : javaFiles) {
-                // Skip files in the allowed OpenGL backend directory
-                if (file.startsWith(OPENGL_BACKEND_PATH)) {
-                    continue;
-                }
-                
-                // Read file content
-                String content = Files.readString(file);
-                
-                // Check for OpenGL imports
-                Matcher matcher = OPENGL_IMPORT_PATTERN.matcher(content);
-                if (matcher.find()) {
-                    String relativePath = SRC_MAIN_JAVA.relativize(file).toString();
-                    List<String> illegalImports = new ArrayList<>();
-                    
-                    matcher.reset();
-                    while (matcher.find()) {
-                        illegalImports.add(matcher.group().trim());
-                    }
-                    
-                    violations.add(String.format(
-                        "File: %s\n  Illegal OpenGL imports:\n    %s",
-                        relativePath,
-                        String.join("\n    ", illegalImports)
-                    ));
-                }
-            }
-        }
+        List<String> violations = checkImportViolations(
+            OPENGL_IMPORT_PATTERN,
+            OPENGL_BACKEND_PATH,
+            "OpenGL"
+        );
         
         if (!violations.isEmpty()) {
-            StringBuilder errorMessage = new StringBuilder();
-            errorMessage.append("\n");
-            errorMessage.append("================================================================================\n");
-            errorMessage.append("ARCHITECTURAL BOUNDARY VIOLATION: Illegal OpenGL Imports Detected\n");
-            errorMessage.append("================================================================================\n");
-            errorMessage.append("\n");
-            errorMessage.append("The Vulkanic abstraction layer prohibits direct OpenGL imports outside\n");
-            errorMessage.append("of the designated backend directory.\n");
-            errorMessage.append("\n");
-            errorMessage.append("RULE: Only code in 'src/main/java/net/vulkanic/backends/opengl/'\n");
-            errorMessage.append("      may import org.lwjgl.opengl.* classes.\n");
-            errorMessage.append("\n");
-            errorMessage.append("REASON: Game code must use the Vulkanic API abstraction layer to support\n");
-            errorMessage.append("        multiple graphics backends (OpenGL and Vulkan).\n");
-            errorMessage.append("\n");
-            errorMessage.append("VIOLATIONS FOUND:\n");
-            errorMessage.append("--------------------------------------------------------------------------------\n");
-            for (String violation : violations) {
-                errorMessage.append(violation).append("\n\n");
-            }
-            errorMessage.append("================================================================================\n");
-            errorMessage.append("TO FIX: Remove direct OpenGL imports and use the VulkanicAPI instead.\n");
-            errorMessage.append("        See VULKAN-COMPAT.md for migration guidance.\n");
-            errorMessage.append("================================================================================\n");
-            
-            fail(errorMessage.toString());
+            fail(buildViolationMessage(
+                "OpenGL",
+                "src/main/java/net/vulkanic/backends/opengl/",
+                "org.lwjgl.opengl.*",
+                violations
+            ));
         }
     }
     
     @Test
     public void testVulkanImportsOnlyInBackend() throws IOException {
+        List<String> violations = checkImportViolations(
+            VULKAN_IMPORT_PATTERN,
+            VULKAN_BACKEND_PATH,
+            "Vulkan"
+        );
+        
+        if (!violations.isEmpty()) {
+            fail(buildViolationMessage(
+                "Vulkan",
+                "src/main/java/net/vulkanic/backends/vulkan/",
+                "org.lwjgl.vulkan.*",
+                violations
+            ));
+        }
+    }
+    
+    /**
+     * Scans Java source files for import violations.
+     * 
+     * @param importPattern Regex pattern to match forbidden imports
+     * @param allowedPath Directory path where imports are allowed
+     * @param backendName Name of the backend (for error messages)
+     * @return List of violation messages
+     */
+    private List<String> checkImportViolations(Pattern importPattern, Path allowedPath, String backendName) throws IOException {
         List<String> violations = new ArrayList<>();
         
         // Scan all Java files in src/main/java
@@ -125,62 +98,65 @@ public class ArchitecturalBoundaryTest {
                 .collect(Collectors.toList());
             
             for (Path file : javaFiles) {
-                // Skip files in the allowed Vulkan backend directory
-                if (file.startsWith(VULKAN_BACKEND_PATH)) {
+                // Skip files in the allowed backend directory
+                if (file.startsWith(allowedPath)) {
                     continue;
                 }
                 
-                // Read file content
+                // Read file content and check for violations
                 String content = Files.readString(file);
+                List<String> illegalImports = new ArrayList<>();
                 
-                // Check for Vulkan imports
-                Matcher matcher = VULKAN_IMPORT_PATTERN.matcher(content);
-                if (matcher.find()) {
+                Matcher matcher = importPattern.matcher(content);
+                while (matcher.find()) {
+                    illegalImports.add(matcher.group().trim());
+                }
+                
+                if (!illegalImports.isEmpty()) {
                     String relativePath = SRC_MAIN_JAVA.relativize(file).toString();
-                    List<String> illegalImports = new ArrayList<>();
-                    
-                    matcher.reset();
-                    while (matcher.find()) {
-                        illegalImports.add(matcher.group().trim());
-                    }
-                    
                     violations.add(String.format(
-                        "File: %s\n  Illegal Vulkan imports:\n    %s",
+                        "File: %s\n  Illegal %s imports:\n    %s",
                         relativePath,
+                        backendName,
                         String.join("\n    ", illegalImports)
                     ));
                 }
             }
         }
         
-        if (!violations.isEmpty()) {
-            StringBuilder errorMessage = new StringBuilder();
-            errorMessage.append("\n");
-            errorMessage.append("================================================================================\n");
-            errorMessage.append("ARCHITECTURAL BOUNDARY VIOLATION: Illegal Vulkan Imports Detected\n");
-            errorMessage.append("================================================================================\n");
-            errorMessage.append("\n");
-            errorMessage.append("The Vulkanic abstraction layer prohibits direct Vulkan imports outside\n");
-            errorMessage.append("of the designated backend directory.\n");
-            errorMessage.append("\n");
-            errorMessage.append("RULE: Only code in 'src/main/java/net/vulkanic/backends/vulkan/'\n");
-            errorMessage.append("      may import org.lwjgl.vulkan.* classes.\n");
-            errorMessage.append("\n");
-            errorMessage.append("REASON: Game code must use the Vulkanic API abstraction layer to support\n");
-            errorMessage.append("        multiple graphics backends (OpenGL and Vulkan).\n");
-            errorMessage.append("\n");
-            errorMessage.append("VIOLATIONS FOUND:\n");
-            errorMessage.append("--------------------------------------------------------------------------------\n");
-            for (String violation : violations) {
-                errorMessage.append(violation).append("\n\n");
-            }
-            errorMessage.append("================================================================================\n");
-            errorMessage.append("TO FIX: Remove direct Vulkan imports and use the VulkanicAPI instead.\n");
-            errorMessage.append("        See VULKAN-COMPAT.md for migration guidance.\n");
-            errorMessage.append("================================================================================\n");
-            
-            fail(errorMessage.toString());
+        return violations;
+    }
+    
+    /**
+     * Builds a detailed error message for import violations.
+     */
+    private String buildViolationMessage(String backendName, String allowedPath, String importPackage, List<String> violations) {
+        StringBuilder errorMessage = new StringBuilder();
+        errorMessage.append("\n");
+        errorMessage.append("================================================================================\n");
+        errorMessage.append("ARCHITECTURAL BOUNDARY VIOLATION: Illegal ").append(backendName).append(" Imports Detected\n");
+        errorMessage.append("================================================================================\n");
+        errorMessage.append("\n");
+        errorMessage.append("The Vulkanic abstraction layer prohibits direct ").append(backendName).append(" imports outside\n");
+        errorMessage.append("of the designated backend directory.\n");
+        errorMessage.append("\n");
+        errorMessage.append("RULE: Only code in '").append(allowedPath).append("'\n");
+        errorMessage.append("      may import ").append(importPackage).append(" classes.\n");
+        errorMessage.append("\n");
+        errorMessage.append("REASON: Game code must use the Vulkanic API abstraction layer to support\n");
+        errorMessage.append("        multiple graphics backends (OpenGL and Vulkan).\n");
+        errorMessage.append("\n");
+        errorMessage.append("VIOLATIONS FOUND:\n");
+        errorMessage.append("--------------------------------------------------------------------------------\n");
+        for (String violation : violations) {
+            errorMessage.append(violation).append("\n\n");
         }
+        errorMessage.append("================================================================================\n");
+        errorMessage.append("TO FIX: Remove direct ").append(backendName).append(" imports and use the VulkanicAPI instead.\n");
+        errorMessage.append("        See VULKAN-COMPAT.md for migration guidance.\n");
+        errorMessage.append("================================================================================\n");
+        
+        return errorMessage.toString();
     }
     
     @Test

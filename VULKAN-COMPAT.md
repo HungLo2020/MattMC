@@ -637,6 +637,42 @@ Before removing any deprecated method:
 
 Only after ALL checks pass can the deprecated method be removed.
 
+### Architectural Boundary Enforcement
+
+**AUTOMATED ENFORCEMENT:** The build system now automatically enforces architectural boundaries to ensure game code uses the Vulkanic abstraction layer instead of directly calling OpenGL or Vulkan.
+
+**Enforcement Rules:**
+- ✅ **OpenGL Backend Isolation:** Only code in `src/main/java/net/vulkanic/backends/opengl/` may import `org.lwjgl.opengl.*`
+- ✅ **Vulkan Backend Isolation:** Only code in `src/main/java/net/vulkanic/backends/vulkan/` may import `org.lwjgl.vulkan.*`
+
+**How It Works:**
+- The `ArchitecturalBoundaryTest` runs automatically during every build
+- Scans all Java source files for violations
+- **Build fails immediately** if game code imports OpenGL/Vulkan directly
+- Provides clear error messages with file locations and fix instructions
+
+**Example Violation:**
+```
+================================================================================
+ARCHITECTURAL BOUNDARY VIOLATION: Illegal OpenGL Imports Detected
+================================================================================
+
+File: net/minecraft/renderer/MyRenderer.java
+  Illegal OpenGL imports:
+    import org.lwjgl.opengl.GL11;
+
+TO FIX: Remove direct OpenGL imports and use the VulkanicAPI instead.
+================================================================================
+```
+
+This enforcement ensures that:
+1. Game code remains backend-agnostic
+2. Migration to Vulkan is possible without rewriting game code
+3. Abstraction layer boundaries are never accidentally violated
+4. Developers are guided to use the correct API
+
+**See:** `src/test/java/net/vulkanic/README.md` for complete documentation on architectural enforcement.
+
 ---
 
 ## Legacy API Compatibility Matrix
