@@ -104,7 +104,9 @@ public class GlStateManager {
 			net.irisshaders.iris.gl.blending.BlendModeStorage.deferBlendModeToggle(false);
 			return;
 		}
-		BLEND.mode.disable();
+		BLEND.mode.enabled = false;
+		// Use Vulkan-compatible blend state API
+		net.vulkanic.VulkanicAPI.setDynamicBlendState(false, BLEND.srcRgb, BLEND.dstRgb);
 	}
 
 	public static void _enableBlend() {
@@ -114,7 +116,9 @@ public class GlStateManager {
 			net.irisshaders.iris.gl.blending.BlendModeStorage.deferBlendModeToggle(true);
 			return;
 		}
-		BLEND.mode.enable();
+		BLEND.mode.enabled = true;
+		// Use Vulkan-compatible blend state API
+		net.vulkanic.VulkanicAPI.setDynamicBlendState(true, BLEND.srcRgb, BLEND.dstRgb);
 	}
 
 	public static void _blendFuncSeparate(int i, int j, int k, int l) {
@@ -129,6 +133,9 @@ public class GlStateManager {
 			BLEND.dstRgb = j;
 			BLEND.srcAlpha = k;
 			BLEND.dstAlpha = l;
+			// Use Vulkan-compatible blend state API instead of direct glBlendFuncSeparate
+			// Note: setDynamicBlendState currently only handles RGB factors, not separate alpha
+			// For now, we call the backend directly for separate alpha support
 			glBlendFuncSeparate(i, j, k, l);
 		}
 		
@@ -654,21 +661,31 @@ public class GlStateManager {
 			if (stateUnknown) {
 				this.enabled = bl;
 				stateUnknown = false;
-				// Delegate ALL enable/disable to VulkanicAPI
-				if (bl) {
-					net.vulkanic.VulkanicAPI.enable(this.state);
+				// Special handling for GL_BLEND (3042) - use Vulkan-compatible API
+				if (this.state == 3042) {
+					net.vulkanic.VulkanicAPI.setDynamicBlendState(bl, BLEND.srcRgb, BLEND.dstRgb);
 				} else {
-					net.vulkanic.VulkanicAPI.disable(this.state);
+					// Delegate other capabilities to VulkanicAPI
+					if (bl) {
+						net.vulkanic.VulkanicAPI.enable(this.state);
+					} else {
+						net.vulkanic.VulkanicAPI.disable(this.state);
+					}
 				}
 				return;
 			}
 			if (bl != this.enabled) {
 				this.enabled = bl;
-				// Delegate ALL enable/disable to VulkanicAPI
-				if (bl) {
-					net.vulkanic.VulkanicAPI.enable(this.state);
+				// Special handling for GL_BLEND (3042) - use Vulkan-compatible API
+				if (this.state == 3042) {
+					net.vulkanic.VulkanicAPI.setDynamicBlendState(bl, BLEND.srcRgb, BLEND.dstRgb);
 				} else {
-					net.vulkanic.VulkanicAPI.disable(this.state);
+					// Delegate other capabilities to VulkanicAPI
+					if (bl) {
+						net.vulkanic.VulkanicAPI.enable(this.state);
+					} else {
+						net.vulkanic.VulkanicAPI.disable(this.state);
+					}
 				}
 			}
 		}
