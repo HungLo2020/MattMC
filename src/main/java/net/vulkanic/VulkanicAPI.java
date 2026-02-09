@@ -940,11 +940,6 @@ public class VulkanicAPI {
         getBackend().setDynamicLogicOp(logicOp);
     }
     
-    @Deprecated
-    public static void configureLogicOp(int opcode) {
-        getBackend().configureLogicOp(opcode);
-    }
-    
     /**
      * Draws primitives using vertex array data.
      * This is a Vulkan-compatible replacement for the deprecated drawPrimitiveArrays() method.

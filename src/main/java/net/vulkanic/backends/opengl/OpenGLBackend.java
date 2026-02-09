@@ -288,12 +288,6 @@ public class OpenGLBackend implements GraphicsBackend {
         GL11.glLogicOp(logicOp);
     }
     
-    @Deprecated
-    @Override
-    public void configureLogicOp(int opcode) {
-        GL11.glLogicOp(opcode);
-    }
-    
     @Override
     public void cmdDrawArrays(int mode, int firstVertex, int vertexCount) {
         GL11.glDrawArrays(mode, firstVertex, vertexCount);

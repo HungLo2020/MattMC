@@ -369,8 +369,6 @@ public interface GraphicsBackend {
     // Polygon rendering operations
     @Deprecated
     void configurePolygonMode(int face, int mode);
-    @Deprecated
-    void configureLogicOp(int opcode);
     
     /**
      * Draws primitives using vertex array data.
