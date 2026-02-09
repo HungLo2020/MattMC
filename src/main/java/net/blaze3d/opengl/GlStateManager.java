@@ -93,7 +93,7 @@ public class GlStateManager {
 		
 		if (bl != DEPTH.mask) {
 			DEPTH.mask = bl;
-			net.vulkanic.VulkanicAPI.setDepthWriteEnabled(bl);
+			net.vulkanic.VulkanicAPI.setDynamicDepthWriteMask(bl);
 		}
 	}
 

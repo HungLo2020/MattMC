@@ -649,6 +649,36 @@ public class VulkanicAPI {
         getBackend().setDepthTestFunction(func);
     }
     
+    /**
+     * Sets the dynamic depth write mask for rendering.
+     * This is a Vulkan-compatible replacement for the deprecated setDepthWriteEnabled() method.
+     * 
+     * In OpenGL: Maps to glDepthMask()
+     * In Vulkan: Maps to vkCmdSetDepthWriteEnable() (dynamic state in command buffer)
+     * 
+     * The depth write mask controls whether depth values are written to the depth buffer.
+     * This is dynamic state that can be changed per-frame or even between draw calls.
+     * 
+     * Important architectural notes for Vulkan compatibility:
+     * - In Vulkan, this will be a dynamic state command recorded in command buffers
+     * - This allows changing the depth write enable without creating new pipeline state objects
+     * - Must be called within an active render pass in Vulkan
+     * - For now, this provides a simple 1:1 mapping while maintaining Vulkan compatibility
+     * 
+     * For OpenGL backend:
+     * - Directly calls glDepthMask with the specified parameter
+     * - Changes take effect immediately for subsequent draw calls
+     * - Part of the global OpenGL state machine
+     * 
+     * Future evolution: This may take a CommandBuffer parameter for Vulkan:
+     *   void setDynamicDepthWriteMask(CommandBuffer cmdBuffer, boolean enabled)
+     * 
+     * @param enabled Whether to enable depth writes (true to enable, false to disable)
+     */
+    public static void setDynamicDepthWriteMask(boolean enabled) {
+        getBackend().setDynamicDepthWriteMask(enabled);
+    }
+    
     @Deprecated
     public static void setDepthWriteEnabled(boolean enabled) {
         getBackend().setDepthWriteEnabled(enabled);
