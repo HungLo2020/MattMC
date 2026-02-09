@@ -1,170 +1,94 @@
 # Vulkanic Graphics Abstraction Layer
 
-## Goal
+## ⚠️ This Directory Has Moved
 
-Vulkanic is a graphics abstraction layer that sits between the Minecraft game/mod code and the underlying graphics APIs (OpenGL and Vulkan). The primary objective is to provide a unified frontend API that allows the codebase to be graphics-API-agnostic, enabling future support for Vulkan while maintaining backward compatibility with OpenGL.
+The Vulkanic API and backend implementations have been moved to separate Gradle modules to enforce architectural boundaries:
 
-## Architecture
+- **API**: `vulkanic-api/src/main/java/net/vulkanic/`
+- **OpenGL Backend**: `vulkanic-backend-opengl/src/main/java/net/vulkanic/backends/opengl/`
+- **Vulkan Backend**: `vulkanic-backend-vulkan/src/main/java/net/vulkanic/backends/vulkan/`
 
-### Directory Structure
+## Module Boundary Enforcement
 
+### ✅ What Game Code CAN Do
+
+```java
+import net.vulkanic.VulkanicAPI;
+
+// Initialize with OpenGL backend
+VulkanicAPI.initialize(VulkanicAPI.BackendType.OPENGL);
+
+// Use the abstraction layer
+VulkanicAPI.setDynamicViewport(0, 0, 1920, 1080);
+VulkanicAPI.clear(VulkanicAPI.GL_COLOR_BUFFER_BIT);
 ```
-vulkanic/
-├── README.md (this file)
-├── [Frontend API classes - public interface]
-└── backends/
-    ├── opengl/
-    │   └── [OpenGL-specific implementation]
-    └── vulkan/
-        └── [Vulkan-specific implementation - future]
+
+### ❌ What Game Code CANNOT Do
+
+```java
+// This will cause a COMPILE ERROR:
+import org.lwjgl.opengl.GL11;  // ❌ ERROR: package org.lwjgl.opengl does not exist
+
+// This will also fail:
+import org.lwjgl.vulkan.VK10;  // ❌ ERROR: package org.lwjgl.vulkan does not exist
 ```
 
-### Design Principles
+### Why This Matters
 
-1. **Strict API Boundaries**:
-   - Code outside `vulkanic/` can ONLY access the frontend API in `vulkanic/`
-   - Code outside `vulkanic/` CANNOT access anything within `backends/`
-   - Only backend implementations can call their respective graphics API functions (OpenGL/Vulkan)
+The module system ensures that:
+1. **Game code is decoupled from specific graphics APIs** (OpenGL, Vulkan, etc.)
+2. **Future graphics API changes** (e.g., adding Vulkan support) won't require changes to game code
+3. **Architecture is enforced at compile-time**, not just by convention
+4. **Only backend modules** can import graphics API classes
 
-2. **Frontend Delegation**:
-   - The frontend API delegates to the appropriate backend (OpenGL or Vulkan) based on runtime configuration
-   - Initially, only OpenGL backend will be implemented
-   - Vulkan backend is planned for future implementation
+## Implementation
 
-3. **API Design Philosophy**:
-   - Initial OpenGL calls can be 1:1 mappings even if not directly compatible with future Vulkan implementation
-   - Focus is on establishing the abstraction layer architecture first
-   - Refinement for Vulkan compatibility will occur during Vulkan backend development
+The Vulkanic API uses a **multi-module Gradle architecture** where:
 
-## Implementation Strategy
+1. **Main Module** (game code)
+   - Has `vulkanic-api` as a dependency
+   - Does NOT have `org.lwjgl.opengl` as a dependency
+   - **Cannot** import OpenGL or Vulkan classes
 
-### Phase 1: Blaze3D Integration (Current Focus)
+2. **Backend Modules**
+   - `vulkanic-backend-opengl` is the ONLY module with `org.lwjgl.opengl` dependency
+   - `vulkanic-backend-vulkan` is the ONLY module with `org.lwjgl.vulkan` dependency
+   - Implement `GraphicsBackendProvider` service
 
-Minecraft already has a graphics abstraction layer called Blaze3D (`net.blaze3d`). To minimize code changes:
+3. **Runtime Discovery**
+   - Backends are discovered via Java's ServiceLoader pattern
+   - No compile-time dependency from API to backend implementations
 
-1. **Port Blaze3D functionality** into Vulkanic frontend API
-2. **Redirect Blaze3D calls** to use Vulkanic instead of directly calling OpenGL
-3. This approach minimizes required changes to core Minecraft code
+## Documentation
 
-### Phase 2: Mod Integration
+See [`VULKANIC-MODULE-SYSTEM.md`](../../../VULKANIC-MODULE-SYSTEM.md) in the project root for complete documentation.
 
-Mods like Iris Shaders and Distant Horizons will need to route their graphics calls through Vulkanic:
+## Example: Adding a New Graphics Operation
 
-- **Iris Shaders**: Extensive OpenGL usage for shader-based rendering
-- **Distant Horizons**: Custom rendering for level-of-detail terrain
-- These integrations will be more complex than core Minecraft changes
+### In vulkanic-api module:
+```java
+// Add to GraphicsBackend interface
+void setPolygonMode(int face, int mode);
 
-### Phase 3: Vulkan Backend
+// Add to VulkanicAPI class
+public static void setPolygonMode(int face, int mode) {
+    getBackend().setPolygonMode(face, mode);
+}
+```
 
-Once the abstraction layer is stable with OpenGL:
+### In vulkanic-backend-opengl module:
+```java
+@Override
+public void setPolygonMode(int face, int mode) {
+    // ONLY this module can use GL classes directly
+    GL11.glPolygonMode(face, mode);
+}
+```
 
-1. Implement Vulkan backend in `backends/vulkan/`
-2. Refine frontend API to ensure compatibility with both backends
-3. Add runtime configuration to select backend
+### In game code (main module):
+```java
+// Game code uses the abstraction
+VulkanicAPI.setPolygonMode(VulkanicAPI.GL_FRONT_AND_BACK, VulkanicAPI.GL_LINE);
+```
 
-## OpenGL Call Migration Status
-
-### Current Statistics
-
-**Vulkanic Abstraction Progress: 25%**
-
-**Total OpenGL Methods in GlStateManager**: 55 unique methods
-**Methods Abstracted in Backend**: 14 methods  
-**Remaining Methods**: 41 methods
-
-**OpenGL Calls in GlStateManager**: 55 calls (down from 64 initially)
-**OpenGL Calls in Backend**: 16 calls (all abstracted methods)
-
-### Abstracted Methods (14)
-
-**State Management (4)**
-- enable/disable (generic) - GL11.glEnable/glDisable
-- setDepthTestFunction - GL11.glDepthFunc
-- setDepthWriteEnabled - GL11.glDepthMask
-
-**Rendering (6)**
-- bindTexture - GL11.glBindTexture
-- viewport - GL11.glViewport
-- clear - GL11.glClear
-- setColorWriteMask - GL11.glColorMask
-- setScissorBox - GL20.glScissor
-- setPixelStoreMode - GL11.glPixelStorei
-
-**Shaders (1)**
-- useProgram - GL20.glUseProgram
-
-**Blending (2)**
-- enableBlend/disableBlend - GL11.glEnable/glDisable(GL_BLEND)
-
-**Framebuffers (2)**
-- attachFramebuffer - GL30.glBindFramebuffer
-- attachTextureToFramebuffer - GL30.glFramebufferTexture2D
-
-**Buffers (1)**
-- attachBuffer - GL15.glBindBuffer
-
-### Migration Progress by Component
-
-| Component | Status | Notes |
-|-----------|--------|-------|
-| **GlStateManager → Vulkanic** | 25% | 14/55 methods abstracted |
-| **Blaze3D** | ⏳ In Progress | State management complete |
-| **Sodium** | ⏳ Pending | Awaiting core abstraction |
-| **Iris Shaders** | ⏳ Pending | Awaiting core abstraction |
-| **Distant Horizons** | ⏳ Pending | Awaiting core abstraction |
-
-### Next Priority Methods
-
-Based on usage frequency in rendering pipeline:
-1. Shader operations (create, compile, link, uniforms) - ~12 methods
-2. Buffer operations (gen, delete, data, vertex arrays) - ~10 methods  
-3. Texture operations (gen, delete, image, parameters) - ~7 methods
-4. Drawing/sync operations - ~6 methods
-5. Misc (error, polygon, logic) - ~6 methods
-
-**Target**: 50% completion (27/55 methods) in next iteration
-
-## Development Guidelines
-
-### For Frontend API Development
-
-1. Define interfaces that are backend-agnostic
-2. Use descriptive names that reflect intent, not implementation
-3. Document which Blaze3D methods map to which Vulkanic methods
-4. Ensure thread-safety where applicable
-
-### For Backend Implementation
-
-1. OpenGL backend should implement the frontend interface
-2. Keep OpenGL-specific code isolated in `backends/opengl/`
-3. Use appropriate error handling and validation
-4. Document any OpenGL-specific limitations or behaviors
-
-### For Consumers (Game/Mod Code)
-
-1. Import only from `net.vulkanic.*` (not from `net.vulkanic.backends.*`)
-2. Never directly import `org.lwjgl.opengl.*` after migration
-3. Use Vulkanic API instead of direct OpenGL calls
-4. Report any missing API functionality to extend the frontend
-
-## Next Steps
-
-1. ✅ Create directory structure
-2. ✅ Document architecture and strategy
-3. ⏳ Design frontend API interfaces based on Blaze3D analysis
-4. ⏳ Implement OpenGL backend for core rendering operations
-5. ⏳ Migrate Blaze3D to use Vulkanic
-6. ⏳ Migrate Sodium to use Vulkanic
-7. ⏳ Migrate Iris Shaders to use Vulkanic
-8. ⏳ Add runtime configuration system
-9. ⏳ Begin Vulkan backend development
-
-## References
-
-- **Blaze3D**: `src/main/java/net/blaze3d/` - Minecraft's existing graphics abstraction
-- **LWJGL OpenGL**: `org.lwjgl.opengl.*` - OpenGL bindings being abstracted
-- **Vulkan**: Future target for cross-platform high-performance rendering
-
----
-
-*This abstraction layer is a critical step toward modernizing MattMC's rendering pipeline and enabling future Vulkan support.*
+The game code will never need to change, even when we add Vulkan support!
