@@ -1241,8 +1241,6 @@ public interface GraphicsBackend {
     void glBlendEquationSeparate(int modeRGB, int modeAlpha);
     @Deprecated
     void glStencilFunc(int func, int ref, int mask);
-    @Deprecated
-    void glCullFace(int mode);
     
     // Additional texture methods
     @Deprecated

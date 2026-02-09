@@ -2721,14 +2721,6 @@ public class VulkanicAPI {
     }
     
     /**
-     * Specifies whether front- or back-facing polygons can be culled.
-     */
-    @Deprecated
-    public static void glCullFace(int mode) {
-        getBackend().glCullFace(mode);
-    }
-    
-    /**
      * Generates a single texture name.
      */
     @Deprecated

@@ -1984,12 +1984,6 @@ public class OpenGLBackend implements GraphicsBackend {
         org.lwjgl.opengl.GL11.glStencilFunc(func, ref, mask);
     }
     
-    @Deprecated
-    @Override
-    public void glCullFace(int mode) {
-        org.lwjgl.opengl.GL11.glCullFace(mode);
-    }
-    
     // Additional texture methods
     
     @Deprecated
