@@ -266,6 +266,11 @@ public class OpenGLBackend implements GraphicsBackend {
         return GL11.glGenTextures();
     }
     
+    @Override
+    public void deleteTexture(int textureId) {
+        GL11.glDeleteTextures(textureId);
+    }
+    
     @Deprecated
     @Override
     public void removeTexture(int texture) {

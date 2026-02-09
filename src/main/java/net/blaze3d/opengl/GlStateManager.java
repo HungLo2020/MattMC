@@ -459,7 +459,7 @@ public class GlStateManager {
 
 	public static void _deleteTexture(int i) {
 		RenderSystem.assertOnRenderThread();
-		net.vulkanic.VulkanicAPI.removeTexture(i);
+		net.vulkanic.VulkanicAPI.deleteTexture(i);
 
 		for (GlStateManager.TextureState textureState : TEXTURES) {
 			if (textureState.binding == i) {

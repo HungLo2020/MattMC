@@ -299,6 +299,42 @@ public interface GraphicsBackend {
     void configureTextureParameter(int target, int pname, int param);
     @Deprecated
     int createTexture();
+    
+    /**
+     * Deletes a texture and frees its associated GPU resources.
+     * This is a Vulkan-compatible replacement for the deprecated removeTexture() method.
+     * 
+     * In OpenGL: Maps to glDeleteTextures(textureId)
+     * In Vulkan: Will map to vkDestroyImageView + vkDestroyImage + vkFreeMemory
+     * 
+     * This method destroys a texture object and frees all GPU resources associated with it,
+     * including image memory, image views, and samplers. After calling this method, the
+     * texture ID becomes invalid and must not be used again.
+     * 
+     * Important architectural notes for Vulkan compatibility:
+     * - In Vulkan, texture deletion requires destroying multiple objects in the correct order
+     * - ImageView must be destroyed before the Image
+     * - Image must be destroyed before freeing memory
+     * - Sampler (if separate) must also be destroyed
+     * - For now, this provides a simple 1:1 mapping to glDeleteTextures
+     * 
+     * For OpenGL backend:
+     * - Directly calls glDeleteTextures with the texture ID
+     * - OpenGL automatically handles cleanup of texture state
+     * - Texture ID is immediately available for reuse
+     * 
+     * Future evolution: This may take additional parameters for Vulkan:
+     *   void deleteTexture(int textureId, boolean destroyImageView, boolean destroySampler)
+     * 
+     * Best practices:
+     * - Always delete textures when they are no longer needed to free GPU memory
+     * - Do not delete a texture that is currently bound or in use by pending draw calls
+     * - Texture IDs should not be reused after deletion
+     * 
+     * @param textureId The texture ID to delete (must be a valid texture created by createTexture)
+     */
+    void deleteTexture(int textureId);
+    
     @Deprecated
     void removeTexture(int texture);
     
