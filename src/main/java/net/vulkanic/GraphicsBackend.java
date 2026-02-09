@@ -405,10 +405,6 @@ public interface GraphicsBackend {
      */
     void setDynamicPolygonMode(int cullFace, int fillMode);
     
-    // Polygon rendering operations
-    @Deprecated
-    void configurePolygonMode(int face, int mode);
-    
     /**
      * Draws primitives using vertex array data.
      * This is a Vulkan-compatible replacement for the deprecated drawPrimitiveArrays() method.

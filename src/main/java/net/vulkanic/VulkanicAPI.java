@@ -908,11 +908,6 @@ public class VulkanicAPI {
         getBackend().setDynamicPolygonMode(cullFace, fillMode);
     }
     
-    @Deprecated
-    public static void configurePolygonMode(int face, int mode) {
-        getBackend().configurePolygonMode(face, mode);
-    }
-    
     /**
      * Sets the dynamic depth bias (polygon offset) for rendering.
      * This is a Vulkan-compatible replacement for the deprecated configurePolygonOffset() method.

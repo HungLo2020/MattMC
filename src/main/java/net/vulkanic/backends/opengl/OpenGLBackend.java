@@ -272,12 +272,6 @@ public class OpenGLBackend implements GraphicsBackend {
         GL11.glDeleteTextures(texture);
     }
     
-    @Deprecated
-    @Override
-    public void configurePolygonMode(int face, int mode) {
-        GL11.glPolygonMode(face, mode);
-    }
-    
     @Override
     public void setDynamicDepthBias(float slopeFactor, float constantFactor) {
         GL11.glPolygonOffset(slopeFactor, constantFactor);
