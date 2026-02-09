@@ -498,10 +498,31 @@ public class VulkanicAPI {
      * For OpenGL backend: Returns a singleton immediate-mode context
      * For Vulkan backend: This method would not be used (explicit command buffers instead)
      * 
-     * This is a convenience method for migrating code to use CommandContext parameters
-     * without changing the immediate execution model during the transition period.
+     * <p><b>USAGE GUIDANCE:</b></p>
+     * <ul>
+     * <li><b>Current transitional pattern:</b> Call this for each CommandContext-aware API method.
+     *     This is acceptable during migration since most API methods don't take CommandContext yet.</li>
+     * <li><b>Future Vulkan-compatible pattern:</b> Get the context ONCE at the start of a rendering
+     *     operation and reuse it for multiple API calls. This matches Vulkan's command buffer model:
+     *     <pre>
+     *     // Get context once
+     *     CommandContext ctx = VulkanicAPI.getImmediateContext(); // or beginCommandBuffer() for Vulkan
+     *     
+     *     // Reuse for multiple operations
+     *     VulkanicAPI.setDynamicViewport(ctx, ...);
+     *     VulkanicAPI.setDynamicScissor(ctx, ...);
+     *     VulkanicAPI.bindPipeline(ctx, ...);
+     *     VulkanicAPI.drawIndexed(ctx, ...);
+     *     </pre>
+     * </li>
+     * <li><b>Low-level utilities (GlStateManager):</b> Calling getImmediateContext() internally
+     *     is acceptable since they're OpenGL-specific and called from framework code we don't control.</li>
+     * </ul>
      * 
-     * @return Immediate-mode command context
+     * <p>This is a convenience method for migrating code to use CommandContext parameters
+     * without changing the immediate execution model during the transition period.</p>
+     * 
+     * @return Immediate-mode command context (OpenGL singleton)
      */
     public static CommandContext getImmediateContext() {
         // For now, we only have OpenGL backend, so return OpenGL immediate context
