@@ -835,11 +835,6 @@ public class VulkanicAPI {
     public static void cmdDrawArrays(int mode, int firstVertex, int vertexCount) {
         getBackend().cmdDrawArrays(mode, firstVertex, vertexCount);
     }
-    
-    @Deprecated
-    public static void drawPrimitiveArrays(int mode, int first, int count) {
-        getBackend().drawPrimitiveArrays(mode, first, count);
-    }
 
     @Deprecated
     public static void drawIndexedElements(int mode, int count, int type, long indices) {
