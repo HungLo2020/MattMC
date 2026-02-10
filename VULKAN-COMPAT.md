@@ -2,13 +2,13 @@
 
 **Analysis Date:** 2026-02-08  
 **Migration Strategy Updated:** 2026-02-10  
-**Active Migration Phase:** Phase 10 Complete - Core Rendering & State Methods ✅  
+**Active Migration Phase:** Phase 11 Complete - Vertex Attributes & Matrix Uniforms ✅  
 **Vulkanic API Version:** Initial Implementation (OpenGL-only) - **ALL METHODS NOW DEPRECATED**  
 **Analyzed Components:** VulkanicAPI.java, GraphicsBackend.java, OpenGLBackend.java  
 **Lines of Code Analyzed:** ~4,000 LOC  
 **Deprecated Methods:** 874 methods marked for replacement  
-**Migrated Methods:** 70 methods (8.0% complete)
-**Migrated Call Sites:** 106 call sites in 40 game files ✅ **ALL MIGRATED**
+**Migrated Methods:** 75 methods (8.6% complete)
+**Migrated Call Sites:** 114 call sites in 43 game files ✅ **ALL MIGRATED**
 **Removed Deprecated Methods:** 15 methods
 
 ---
@@ -24,12 +24,12 @@ All 874 methods in the current Vulkanic API have been marked as `@Deprecated` to
 The legacy Vulkanic API is a **thin OpenGL state machine wrapper** with approximately **25-30% compatibility** with Vulkan's architectural principles. While it successfully abstracts OpenGL calls behind an interface, the API design is fundamentally tied to OpenGL's immediate-mode, global-state paradigm, which conflicts with Vulkan's explicit, command-buffer-based architecture.
 
 **Migration Progress:**
-- ✅ **70 methods migrated** to CommandContext-aware API (8.0% of 874 total)
-- ✅ **106 call sites FULLY migrated** across **40 game files** ✅ **100% COMPLETE**
+- ✅ **75 methods migrated** to CommandContext-aware API (8.6% of 874 total)
+- ✅ **114 call sites FULLY migrated** across **43 game files** ✅ **100% COMPLETE**
 - ✅ **ZERO deprecated calls remaining** - all production code uses new API!
 - ✅ **Production code validates CommandContext design** - real usage in action!
 - ✅ **15 deprecated methods REMOVED** - codebase getting cleaner!
-- ⚠️ **804 methods remaining** in deprecated state (to be migrated)
+- ⚠️ **799 methods remaining** in deprecated state (to be migrated)
 - ✅ **All tests passing** (10/10 Vulkanic tests, 100%)
 - ✅ **Zero breaking changes** - fully backward compatible
 
@@ -4905,4 +4905,182 @@ Continue migrating additional methods following the priority order:
 - Vertex attribute pointer configuration methods
 - Query and state management methods
 - Remaining 809 methods (92.6%)
+
+---
+
+## Phase 11: Vertex Attributes & Matrix Uniforms
+
+**Status:** ✅ COMPLETE  
+**Date:** 2026-02-10  
+**Methods Migrated:** 5  
+**Call Sites Migrated:** 8 (all migrated call sites updated)  
+**Total Progress:** 75/874 methods (8.6%)
+
+### Migrated Methods
+
+These methods are essential for vertex data configuration and matrix transformations, with active usage in game code:
+
+#### 1. configureVertexAttributePointer(CommandContext ctx, int index, int size, int type, boolean normalized, int stride, long pointer)
+
+**OpenGL Implementation:**
+```java
+@Override
+public void configureVertexAttributePointer(CommandContext ctx, int index, int size, int type,
+                                           boolean normalized, int stride, long pointer) {
+    if (!ctx.isImmediate()) {
+        throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+    }
+    GL20.glVertexAttribPointer(index, size, type, normalized, stride, pointer);
+}
+```
+
+**Vulkan Equivalent:** VkVertexInputAttributeDescription in VkPipelineVertexInputStateCreateInfo
+
+**Usage:** Configures vertex attribute data format and location for shader input
+
+**Call Sites:** 4 migrated (2 in VertexAttributePreGL43.java, 2 in IrisGenericRenderProgram.java)
+
+**Significance:** Critical for defining how vertex shaders read data from vertex buffers
+
+#### 2. deactivateVertexAttributeArray(CommandContext ctx, int index)
+
+**OpenGL Implementation:**
+```java
+@Override
+public void deactivateVertexAttributeArray(CommandContext ctx, int index) {
+    if (!ctx.isImmediate()) {
+        throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+    }
+    GL20.glDisableVertexAttribArray(index);
+}
+```
+
+**Vulkan Equivalent:** Vertex attributes are part of immutable pipeline state in Vulkan
+
+**Usage:** Disables vertex attribute array (OpenGL-specific concept)
+
+**Call Sites:** 2 migrated (both in VertexAttributePreGL43.java)
+
+**Significance:** Demonstrates abstraction of OpenGL's dynamic attribute enable/disable
+
+#### 3. assignUniformMatrix3(CommandContext ctx, int location, boolean transpose, FloatBuffer value)
+
+**OpenGL Implementation:**
+```java
+@Override
+public void assignUniformMatrix3(CommandContext ctx, int location, boolean transpose, FloatBuffer value) {
+    if (!ctx.isImmediate()) {
+        throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+    }
+    GL20.glUniformMatrix3fv(location, transpose, value);
+}
+```
+
+**Vulkan Equivalent:** vkCmdPushConstants() or descriptor set updates for mat3 uniforms
+
+**Usage:** Sets 3x3 matrix uniform (commonly used for normal transformation matrices)
+
+**Call Sites:** 1 migrated (IrisRenderSystem.java)
+
+**Significance:** Essential for lighting calculations requiring normal matrix transformations
+
+#### 4. assignUniformMatrix3Array(CommandContext ctx, int location, boolean transpose, float[] value)
+
+**OpenGL Implementation:**
+```java
+@Override
+public void assignUniformMatrix3Array(CommandContext ctx, int location, boolean transpose, float[] value) {
+    if (!ctx.isImmediate()) {
+        throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+    }
+    GL20.glUniformMatrix3fv(location, transpose, value);
+}
+```
+
+**Vulkan Equivalent:** vkCmdPushConstants() or descriptor set updates for mat3 uniforms
+
+**Usage:** Sets 3x3 matrix uniform from float array (convenience overload)
+
+**Call Sites:** 1 migrated (IrisRenderSystem.java)
+
+**Significance:** Array variant for easier integration with existing code
+
+#### 5. setBlendEquation(CommandContext ctx, int mode)
+
+**OpenGL Implementation:**
+```java
+@Override
+public void setBlendEquation(CommandContext ctx, int mode) {
+    if (!ctx.isImmediate()) {
+        throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+    }
+    GL20.glBlendEquation(mode);
+}
+```
+
+**Vulkan Equivalent:** VkPipelineColorBlendAttachmentState.blendOp in pipeline creation
+
+**Usage:** Controls how source and destination colors are combined during blending
+
+**Call Sites:** 0 (new method without deprecated equivalent in active use)
+
+**Significance:** Part of blending pipeline state, critical for transparency and effects
+
+### Migration Details
+
+**Files Modified:**
+- GraphicsBackend.java - Added 5 interface methods with full OpenGL/Vulkan documentation
+- OpenGLBackend.java - Added 5 OpenGL implementations with immediate-mode validation
+- VulkanicAPI.java - Added 5 facade methods with comprehensive usage examples
+
+**Game Code Files Updated:**
+- VertexAttributePreGL43.java - 4 call sites (configureVertexAttributePointer x2, deactivateVertexAttributeArray x2)
+- IrisGenericRenderProgram.java - 2 call sites (configureVertexAttributePointer x2)
+- IrisRenderSystem.java - 2 call sites (assignUniformMatrix3, assignUniformMatrix3Array)
+
+**Implementation Pattern:**
+All methods follow the established pattern with immediate-mode context validation, comprehensive JavaDoc, and usage examples.
+
+### Significance
+
+Phase 11 completed essential vertex and shader infrastructure:
+
+1. **Vertex Attribute Configuration:** Proper abstraction for OpenGL's dynamic vs Vulkan's static model
+2. **Matrix Uniforms:** mat3 support complements mat4 for complete matrix uniform coverage
+3. **Blend Equation:** Part of the fixed-function blending pipeline, essential for transparency
+
+**Why This Matters for Vulkan:**
+
+**Vertex Attribute Configuration:**
+- OpenGL: Dynamic per-VAO configuration with glVertexAttribPointer()
+- Vulkan: Immutable VkVertexInputAttributeDescription in pipeline state
+- CommandContext enables both models to coexist
+
+**Matrix Uniforms:**
+- mat3 commonly used for normal transformation (inverse transpose of upper-left 3x3 of model-view matrix)
+- Essential for correct lighting calculations in shaders
+- Complements mat4 support for complete transformation pipeline
+
+**Blend Equation:**
+- OpenGL: Per-context state that can change anytime
+- Vulkan: Immutable pipeline state defined during creation
+- CommandContext abstracts this fundamental difference
+
+### Testing
+
+- ✅ Build: SUCCESS
+- ✅ All 8 call sites migrated and tested
+- ✅ Zero compilation errors
+- ✅ All methods implemented with immediate-mode validation
+- ✅ Comprehensive documentation with usage examples
+
+### Next Steps
+
+Continue migrating additional methods:
+- Additional uniform array methods
+- Vertex attribute binding methods (GL 4.3+)
+- Additional matrix methods (mat2)
+- Query and synchronization methods
+- 799 methods remaining (91.4%)
+
 
