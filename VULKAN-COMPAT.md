@@ -2,13 +2,13 @@
 
 **Analysis Date:** 2026-02-08  
 **Migration Strategy Updated:** 2026-02-10  
-**Active Migration Phase:** Phase 6 Complete - Shader Methods Migrated ✅  
+**Active Migration Phase:** Phase 7 Complete - Shader Linking & Source Upload ✅  
 **Vulkanic API Version:** Initial Implementation (OpenGL-only) - **ALL METHODS NOW DEPRECATED**  
 **Analyzed Components:** VulkanicAPI.java, GraphicsBackend.java, OpenGLBackend.java  
 **Lines of Code Analyzed:** ~4,000 LOC  
 **Deprecated Methods:** 874 methods marked for replacement  
-**Migrated Methods:** 50 methods (5.7% complete)
-**Migrated Call Sites:** 75 call sites in 28 game files ✅ **ALL MIGRATED**
+**Migrated Methods:** 55 methods (6.3% complete)
+**Migrated Call Sites:** 91 call sites in 36 game files ✅ **ALL MIGRATED**
 **Removed Deprecated Methods:** 15 methods
 
 ---
@@ -17,15 +17,15 @@
 
 **MIGRATION STATUS: ACTIVE MIGRATION IN PROGRESS** 🔄
 
-All 874 methods in the current Vulkanic API have been marked as `@Deprecated` to facilitate an **incremental, test-driven migration** to a properly abstracted graphics API that supports both OpenGL and Vulkan backends. We have now begun the active migration phase, with **45 methods successfully migrated** to the new CommandContext-aware API.
+All 874 methods in the current Vulkanic API have been marked as `@Deprecated` to facilitate an **incremental, test-driven migration** to a properly abstracted graphics API that supports both OpenGL and Vulkan backends. We have now begun the active migration phase, with **55 methods successfully migrated** to the new CommandContext-aware API.
 
 ### Current State (Active Migration)
 
 The legacy Vulkanic API is a **thin OpenGL state machine wrapper** with approximately **25-30% compatibility** with Vulkan's architectural principles. While it successfully abstracts OpenGL calls behind an interface, the API design is fundamentally tied to OpenGL's immediate-mode, global-state paradigm, which conflicts with Vulkan's explicit, command-buffer-based architecture.
 
 **Migration Progress:**
-- ✅ **50 methods migrated** to CommandContext-aware API (5.7% of 874 total)
-- ✅ **75 call sites FULLY migrated** across **28 game files** ✅ **100% COMPLETE**
+- ✅ **55 methods migrated** to CommandContext-aware API (6.3% of 874 total)
+- ✅ **91 call sites FULLY migrated** across **36 game files** ✅ **100% COMPLETE**
 - ✅ **ZERO deprecated calls remaining** - all production code uses new API!
 - ✅ **Production code validates CommandContext design** - real usage in action!
 - ✅ **15 deprecated methods REMOVED** - codebase getting cleaner!
@@ -51,12 +51,16 @@ The legacy Vulkanic API is a **thin OpenGL state machine wrapper** with approxim
 15. `disable(ctx, cap)` - Disable capability
 ...
 45. `transferTexture2DImage(ctx, ...)` - Upload 2D texture data
-46. `constructShaderObject(ctx, type)` - Create shader object ⭐ NEW
-47. `disposeShaderObject(ctx, shader)` - Delete shader object ⭐ NEW
-48. `compileShaderSource(ctx, shader)` - Compile shader source ⭐ NEW
-49. `constructProgramObject(ctx)` - Create program object ⭐ NEW
-50. `disposeProgramObject(ctx, program)` - Delete program object ⭐ NEW
-15. `disable(ctx, cap)` - Disable capability
+46. `constructShaderObject(ctx, type)` - Create shader object
+47. `disposeShaderObject(ctx, shader)` - Delete shader object
+48. `compileShaderSource(ctx, shader)` - Compile shader source
+49. `constructProgramObject(ctx)` - Create program object
+50. `disposeProgramObject(ctx, program)` - Delete program object
+51. `uploadShaderSource(ctx, ...)` - Upload shader source ⭐ NEW
+52. `uploadShaderSourceNative(ctx, ...)` - Upload shader source (native) ⭐ NEW
+53. `attachShaderToProgram(ctx, ...)` - Attach shader to program ⭐ NEW
+54. `linkProgramBinary(ctx, program)` - Link program ⭐ NEW
+55. `glDetachShader(ctx, ...)` - Detach shader from program ⭐ NEW
 16. `activateTextureUnit(ctx, unit)` - Activate texture unit
 17. `generateMipmap(ctx, target)` - Generate mipmaps
 18. `bindTexture(ctx, textureId)` - Bind texture (2D default)
@@ -4347,3 +4351,55 @@ public void transferTexture2DImage(CommandContext ctx, int tgt, int lvl, int int
 ```
 
 ---
+
+## Phase 7: Shader Linking & Source Upload Methods
+
+**Date:** 2026-02-10  
+**Status:** ✅ COMPLETE  
+**Methods Migrated:** 5  
+**Call Sites Migrated:** 16 across 8 files  
+
+### Summary
+
+Phase 7 focused on migrating critical shader source upload and program linking methods. These methods are essential for Vulkan compatibility because shader compilation and program linking work fundamentally differently in Vulkan vs OpenGL.
+
+**Methods Migrated:**
+1. `uploadShaderSource(ctx, ...)` - Upload GLSL shader source
+2. `uploadShaderSourceNative(ctx, ...)` - Native version of shader source upload
+3. `attachShaderToProgram(ctx, program, shader)` - Attach compiled shader to program
+4. `linkProgramBinary(ctx, program)` - Link all attached shaders into executable
+5. `glDetachShader(ctx, program, shader)` - Detach shader from program
+
+### Why These Methods Matter for Vulkan
+
+**Shader Source Management:**
+- OpenGL: Upload GLSL source as strings, compile at runtime
+- Vulkan: Load pre-compiled SPIR-V binary modules
+- CommandContext enables backends to handle these fundamental differences
+
+**Linking Model:**
+- OpenGL: Attach shaders → link → separate, sequential operations
+- Vulkan: Pipeline creation is monolithic, includes all shaders and state at once
+- Critical architectural difference requiring proper abstraction
+
+### Files Updated
+
+1. **Shader.java** - 1 call site
+2. **ShaderWorkarounds.java (iris)** - 1 call site
+3. **ShaderWorkarounds.java (sodium)** - 1 call site
+4. **GlStateManager.java** - 2 call sites
+5. **IrisLodRenderProgram.java** - 6 call sites
+6. **IrisRenderSystem.java** - 1 call site
+7. **GlProgram.java (sodium)** - 1 call site
+8. **VulkanicAPI.java** - 3 wrapper methods updated
+
+### Completion Status
+
+- ✅ All 5 methods fully implemented with CommandContext
+- ✅ All 16 call sites migrated
+- ✅ ZERO deprecated calls remaining for these methods
+- ✅ Build successful
+- ✅ All tests passing
+
+---
+
