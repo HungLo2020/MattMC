@@ -134,7 +134,7 @@ public class Shader
 			final PointerBuffer pointers = stack.mallocPointer(1);
 			pointers.put(sourceBuffer);
 
-			VulkanicAPI.uploadShaderSourceNative(glId, 1, pointers.address0(), 0);
+			VulkanicAPI.uploadShaderSourceNative(CTX, glId, 1, pointers.address0(), 0);
 			org.lwjgl.system.APIUtil.apiArrayFree(pointers.address0(), 1);
 		}
 		finally

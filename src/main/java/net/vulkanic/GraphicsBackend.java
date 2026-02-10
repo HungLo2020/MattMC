@@ -788,6 +788,84 @@ public interface GraphicsBackend {
      */
     void disposeProgramObject(CommandContext ctx, int program);
     
+    /**
+     * Uploads GLSL shader source code to a shader object.
+     * 
+     * In OpenGL: Maps to glShaderSource() - uploads source as string
+     * In Vulkan: Will load pre-compiled SPIR-V binary instead
+     * 
+     * This method uses native memory pointers for efficient source upload.
+     * The shader must be created before source can be uploaded.
+     * 
+     * @param ctx Command context (for future Vulkan resource management)
+     * @param shader Shader object ID
+     * @param pointerBufferAddress Native pointer to array of source string pointers
+     * @param stringCount Number of source strings
+     * @param lengthsPointer Native pointer to array of string lengths (or 0 for null-terminated)
+     */
+    void uploadShaderSource(CommandContext ctx, int shader, long pointerBufferAddress, int stringCount, long lengthsPointer);
+    
+    /**
+     * Uploads GLSL shader source code to a shader object (native version).
+     * 
+     * In OpenGL: Maps to nglShaderSource() - native OpenGL call
+     * In Vulkan: Will load pre-compiled SPIR-V binary instead
+     * 
+     * This is a low-level native version for direct memory access.
+     * 
+     * @param ctx Command context (for future Vulkan resource management)
+     * @param shader Shader object ID
+     * @param count Number of source strings
+     * @param strings Native pointer to array of source string pointers
+     * @param length Native pointer to array of string lengths (or 0 for null-terminated)
+     */
+    void uploadShaderSourceNative(CommandContext ctx, int shader, int count, long strings, long length);
+    
+    /**
+     * Attaches a compiled shader object to a program object.
+     * 
+     * In OpenGL: Maps to glAttachShader() - attaches shader for linking
+     * In Vulkan: Will be part of pipeline creation (shaders specified during pipeline creation)
+     * 
+     * Multiple shaders (vertex, fragment, etc.) can be attached to a single program.
+     * The program must be linked after attaching shaders.
+     * 
+     * @param ctx Command context (for future Vulkan pipeline management)
+     * @param program Program object ID
+     * @param shader Compiled shader object ID to attach
+     */
+    void attachShaderToProgram(CommandContext ctx, int program, int shader);
+    
+    /**
+     * Links all attached shaders into an executable program.
+     * 
+     * In OpenGL: Maps to glLinkProgram() - links attached shaders into executable
+     * In Vulkan: Will create graphics/compute pipeline (monolithic operation)
+     * 
+     * Linking combines all attached shader stages into a single executable program.
+     * After linking, the program can be used for rendering. Link status should be
+     * checked to ensure success.
+     * 
+     * @param ctx Command context (for future Vulkan pipeline creation)
+     * @param program Program object ID to link
+     */
+    void linkProgramBinary(CommandContext ctx, int program);
+    
+    /**
+     * Detaches a shader object from a program object.
+     * 
+     * In OpenGL: Maps to glDetachShader() - removes shader from program
+     * In Vulkan: N/A (shaders specified during immutable pipeline creation)
+     * 
+     * Detaching shaders is typically done after linking to free shader objects.
+     * The program retains the linked code even after shaders are detached.
+     * 
+     * @param ctx Command context (for future Vulkan resource management)
+     * @param program Program object ID
+     * @param shader Shader object ID to detach
+     */
+    void glDetachShader(CommandContext ctx, int program, int shader);
+    
     // Pixel operations
     @Deprecated
     void setPixelStoreMode(int pname, int value);

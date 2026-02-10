@@ -250,7 +250,7 @@ public class IrisRenderSystem {
 
 	public static void detachShader(int program, int shader) {
 		RenderSystem.assertOnRenderThread();
-		VulkanicAPI.glDetachShader(program, shader);
+		VulkanicAPI.glDetachShader(CTX, program, shader);
 	}
 
 	public static void framebufferTexture2D(int fb, int fbtarget, int attachment, int target, int texture, int levels) {

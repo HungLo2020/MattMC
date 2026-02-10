@@ -124,7 +124,7 @@ public class GlProgram<T> extends GlObject implements ShaderBindingContext {
          * @return An instantiated shader container as provided by the factory
          */
         public <U> GlProgram<U> link(Function<ShaderBindingContext, U> factory) {
-            VulkanicAPI.linkProgramBinary(this.program);
+            VulkanicAPI.linkProgramBinary(CTX, this.program);
 
             String log = VulkanicAPI.retrieveProgramInfoLog(this.program);
 

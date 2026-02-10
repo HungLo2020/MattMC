@@ -73,30 +73,30 @@ public class IrisLodRenderProgram {
 		this.bufferBlendOverrides = bufferBlendOverrides;
 
 		GlShader vert = new GlShader(ShaderType.VERTEX, name + ".vsh", vertex);
-		VulkanicAPI.attachShaderToProgram(id, vert.getHandle());
+		VulkanicAPI.attachShaderToProgram(CTX, id, vert.getHandle());
 
 		GlShader tessCont = null;
 		if (tessControl != null) {
 			tessCont = new GlShader(ShaderType.TESSELATION_CONTROL, name + ".tcs", tessControl);
-			VulkanicAPI.attachShaderToProgram(id, tessCont.getHandle());
+			VulkanicAPI.attachShaderToProgram(CTX, id, tessCont.getHandle());
 		}
 
 		GlShader tessE = null;
 		if (tessEval != null) {
 			tessE = new GlShader(ShaderType.TESSELATION_EVAL, name + ".tes", tessEval);
-			VulkanicAPI.attachShaderToProgram(id, tessE.getHandle());
+			VulkanicAPI.attachShaderToProgram(CTX, id, tessE.getHandle());
 		}
 
 		GlShader geom = null;
 		if (geometry != null) {
 			geom = new GlShader(ShaderType.GEOMETRY, name + ".gsh", geometry);
-			VulkanicAPI.attachShaderToProgram(id, geom.getHandle());
+			VulkanicAPI.attachShaderToProgram(CTX, id, geom.getHandle());
 		}
 
 		GlShader frag = new GlShader(ShaderType.FRAGMENT, name + ".fsh", fragment);
-		VulkanicAPI.attachShaderToProgram(id, frag.getHandle());
+		VulkanicAPI.attachShaderToProgram(CTX, id, frag.getHandle());
 
-		VulkanicAPI.linkProgramBinary(this.id);
+		VulkanicAPI.linkProgramBinary(CTX, this.id);
 		int status = VulkanicAPI.queryProgramParameter(this.id, VulkanicAPI.GL_LINK_STATUS);
 		if (status != 1) {
 			String message = "Shader link error in Iris DH program! Details: " + VulkanicAPI.retrieveProgramInfoLog(this.id);

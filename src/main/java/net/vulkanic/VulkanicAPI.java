@@ -1697,6 +1697,110 @@ public class VulkanicAPI {
         getBackend().disposeProgramObject(ctx, program);
     }
     
+    /**
+     * Uploads GLSL shader source code to a shader object using CommandContext.
+     * 
+     * <p><b>Usage Example:</b></p>
+     * <pre>{@code
+     * CommandContext ctx = OpenGLCommandContext.IMMEDIATE;
+     * int shaderId = VulkanicAPI.constructShaderObject(ctx, GL_VERTEX_SHADER);
+     * VulkanicAPI.uploadShaderSource(ctx, shaderId, pointerAddress, 1, 0);
+     * VulkanicAPI.compileShaderSource(ctx, shaderId);
+     * }</pre>
+     * 
+     * @param ctx Command context for resource management
+     * @param shader Shader object ID
+     * @param pointerBufferAddress Native pointer to array of source string pointers
+     * @param stringCount Number of source strings
+     * @param lengthsPointer Native pointer to array of string lengths
+     */
+    public static void uploadShaderSource(CommandContext ctx, int shader, long pointerBufferAddress, int stringCount, long lengthsPointer) {
+        getBackend().uploadShaderSource(ctx, shader, pointerBufferAddress, stringCount, lengthsPointer);
+    }
+    
+    /**
+     * Uploads GLSL shader source code to a shader object using CommandContext (native version).
+     * 
+     * <p><b>Usage Example:</b></p>
+     * <pre>{@code
+     * CommandContext ctx = OpenGLCommandContext.IMMEDIATE;
+     * int shaderId = VulkanicAPI.constructShaderObject(ctx, GL_VERTEX_SHADER);
+     * VulkanicAPI.uploadShaderSourceNative(ctx, shaderId, 1, stringsPtr, 0);
+     * VulkanicAPI.compileShaderSource(ctx, shaderId);
+     * }</pre>
+     * 
+     * @param ctx Command context for resource management
+     * @param shader Shader object ID
+     * @param count Number of source strings
+     * @param strings Native pointer to array of source string pointers
+     * @param length Native pointer to array of string lengths
+     */
+    public static void uploadShaderSourceNative(CommandContext ctx, int shader, int count, long strings, long length) {
+        getBackend().uploadShaderSourceNative(ctx, shader, count, strings, length);
+    }
+    
+    /**
+     * Attaches a compiled shader object to a program object using CommandContext.
+     * 
+     * <p><b>Usage Example:</b></p>
+     * <pre>{@code
+     * CommandContext ctx = OpenGLCommandContext.IMMEDIATE;
+     * int programId = VulkanicAPI.constructProgramObject(ctx);
+     * int vertId = // ... create and compile vertex shader
+     * int fragId = // ... create and compile fragment shader
+     * VulkanicAPI.attachShaderToProgram(ctx, programId, vertId);
+     * VulkanicAPI.attachShaderToProgram(ctx, programId, fragId);
+     * VulkanicAPI.linkProgramBinary(ctx, programId);
+     * }</pre>
+     * 
+     * @param ctx Command context for pipeline management
+     * @param program Program object ID
+     * @param shader Compiled shader object ID to attach
+     */
+    public static void attachShaderToProgram(CommandContext ctx, int program, int shader) {
+        getBackend().attachShaderToProgram(ctx, program, shader);
+    }
+    
+    /**
+     * Links all attached shaders into an executable program using CommandContext.
+     * 
+     * <p><b>Usage Example:</b></p>
+     * <pre>{@code
+     * CommandContext ctx = OpenGLCommandContext.IMMEDIATE;
+     * int programId = VulkanicAPI.constructProgramObject(ctx);
+     * // ... attach shaders
+     * VulkanicAPI.linkProgramBinary(ctx, programId);
+     * // Check link status
+     * }</pre>
+     * 
+     * @param ctx Command context for pipeline creation
+     * @param program Program object ID to link
+     */
+    public static void linkProgramBinary(CommandContext ctx, int program) {
+        getBackend().linkProgramBinary(ctx, program);
+    }
+    
+    /**
+     * Detaches a shader object from a program object using CommandContext.
+     * 
+     * <p><b>Usage Example:</b></p>
+     * <pre>{@code
+     * CommandContext ctx = OpenGLCommandContext.IMMEDIATE;
+     * // After linking...
+     * VulkanicAPI.glDetachShader(ctx, programId, vertId);
+     * VulkanicAPI.glDetachShader(ctx, programId, fragId);
+     * VulkanicAPI.disposeShaderObject(ctx, vertId);
+     * VulkanicAPI.disposeShaderObject(ctx, fragId);
+     * }</pre>
+     * 
+     * @param ctx Command context for resource management
+     * @param program Program object ID
+     * @param shader Shader object ID to detach
+     */
+    public static void glDetachShader(CommandContext ctx, int program, int shader) {
+        getBackend().glDetachShader(ctx, program, shader);
+    }
+    
     @Deprecated
     public static void setPixelStoreMode(int pname, int value) {
         getBackend().setPixelStoreMode(pname, value);
@@ -2961,7 +3065,7 @@ public class VulkanicAPI {
      */
     @Deprecated
     public static void glAttachShader(int program, int shader) {
-        attachShaderToProgram(program, shader);
+        attachShaderToProgram(CTX, program, shader);
     }
     
     /**

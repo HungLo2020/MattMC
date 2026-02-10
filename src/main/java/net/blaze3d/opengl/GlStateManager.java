@@ -173,7 +173,7 @@ public class GlStateManager {
 		try (MemoryStack memoryStack = MemoryStack.stackPush()) {
 			PointerBuffer pointerBuffer = memoryStack.mallocPointer(1);
 			pointerBuffer.put(byteBuffer);
-			VulkanicAPI.uploadShaderSource(i, pointerBuffer.address0(), 1, 0L);
+			VulkanicAPI.uploadShaderSource(CTX, i, pointerBuffer.address0(), 1, 0L);
 		} finally {
 			MemoryUtil.memFree(byteBuffer);
 		}
@@ -217,7 +217,7 @@ public class GlStateManager {
 
 	public static void glLinkProgram(int i) {
 		RenderSystem.assertOnRenderThread();
-		net.vulkanic.VulkanicAPI.linkProgramBinary(i);
+		net.vulkanic.VulkanicAPI.linkProgramBinary(CTX, i);
 	}
 
 	public static int _glGetUniformLocation(int programId, CharSequence name) {

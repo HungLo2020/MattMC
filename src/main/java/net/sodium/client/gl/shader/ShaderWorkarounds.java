@@ -2,7 +2,9 @@ package net.sodium.client.gl.shader;
 
 import java.nio.ByteBuffer;
 
+import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.backends.opengl.OpenGLCommandContext;
 import org.lwjgl.PointerBuffer;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.system.MemoryUtil;
@@ -12,6 +14,8 @@ import org.lwjgl.system.MemoryUtil;
  * https://github.com/grondag/canvas/commit/820bf754092ccaf8d0c169620c2ff575722d7d96
  */
 class ShaderWorkarounds {
+	private static final CommandContext CTX = OpenGLCommandContext.IMMEDIATE;
+	
 	/**
 	 * Identical in function to glShaderSource but
 	 * passes a null pointer for string length to force the driver to rely on the null
@@ -27,7 +31,7 @@ class ShaderWorkarounds {
 			final PointerBuffer pointers = stack.mallocPointer(1);
 			pointers.put(sourceBuffer);
 
-			VulkanicAPI.uploadShaderSource(glId, pointers.address0(), 1, 0);
+			VulkanicAPI.uploadShaderSource(CTX, glId, pointers.address0(), 1, 0);
 			org.lwjgl.system.APIUtil.apiArrayFree(pointers.address0(), 1);
 		}
 	}

@@ -1085,6 +1085,71 @@ public class OpenGLBackend implements GraphicsBackend {
         GL20.glDeleteProgram(program);
     }
     
+    /**
+     * Uploads shader source code using CommandContext for Vulkan compatibility.
+     */
+    @Override
+    public void uploadShaderSource(CommandContext ctx, int shader, long pointerBufferAddress, int stringCount, long lengthsPointer) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        org.lwjgl.opengl.GL20C.nglShaderSource(shader, stringCount, pointerBufferAddress, lengthsPointer);
+    }
+    
+    /**
+     * Uploads shader source code (native version) using CommandContext for Vulkan compatibility.
+     */
+    @Override
+    public void uploadShaderSourceNative(CommandContext ctx, int shader, int count, long strings, long length) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        org.lwjgl.opengl.GL20C.nglShaderSource(shader, count, strings, length);
+    }
+    
+    /**
+     * Attaches shader to program using CommandContext for Vulkan compatibility.
+     */
+    @Override
+    public void attachShaderToProgram(CommandContext ctx, int program, int shader) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        GL20.glAttachShader(program, shader);
+    }
+    
+    /**
+     * Links program object using CommandContext for Vulkan compatibility.
+     */
+    @Override
+    public void linkProgramBinary(CommandContext ctx, int program) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        GL20.glLinkProgram(program);
+    }
+    
+    /**
+     * Detaches shader from program using CommandContext for Vulkan compatibility.
+     */
+    @Override
+    public void glDetachShader(CommandContext ctx, int program, int shader) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        org.lwjgl.opengl.GL32C.glDetachShader(program, shader);
+    }
+    
     @Deprecated
     @Override
     public void setPixelStoreMode(int pname, int value) {
