@@ -492,6 +492,76 @@ public interface GraphicsBackend {
      */
     void setClearColorValue(CommandContext ctx, float red, float green, float blue, float alpha);
     
+    /**
+     * Selects which color buffer to draw to.
+     * 
+     * In OpenGL: Maps to glDrawBuffer(mode)
+     * In Vulkan: Specified in render pass creation (VkAttachmentDescription)
+     * 
+     * Specifies which color buffer (or buffers) to render into. Commonly used
+     * to select between front/back buffers or different color attachments.
+     * 
+     * @param ctx Command context for recording this command
+     * @param mode The draw buffer mode (e.g., GL_BACK, GL_FRONT, GL_COLOR_ATTACHMENT0)
+     */
+    void selectDrawBuffer(CommandContext ctx, int mode);
+    
+    /**
+     * Allocates a new buffer object.
+     * 
+     * In OpenGL: Maps to glGenBuffers()
+     * In Vulkan: Maps to vkCreateBuffer()
+     * 
+     * Creates a new GPU buffer object for storing vertex data, index data,
+     * uniform data, or other GPU-accessible data.
+     * 
+     * @param ctx Command context for recording this command
+     * @return The newly created buffer object ID
+     */
+    int allocateBufferObject(CommandContext ctx);
+    
+    /**
+     * Releases a buffer object.
+     * 
+     * In OpenGL: Maps to glDeleteBuffers()
+     * In Vulkan: Maps to vkDestroyBuffer()
+     * 
+     * Frees the GPU memory associated with the buffer object and makes
+     * its ID available for reuse.
+     * 
+     * @param ctx Command context for recording this command
+     * @param buf The buffer object ID to release
+     */
+    void releaseBufferObject(CommandContext ctx, int buf);
+    
+    /**
+     * Creates a new vertex array object (VAO).
+     * 
+     * In OpenGL: Maps to glGenVertexArrays()
+     * In Vulkan: No direct equivalent (state is part of pipeline)
+     * 
+     * Creates a VAO which stores vertex attribute configuration state.
+     * In Vulkan, this state will be baked into the pipeline.
+     * 
+     * @param ctx Command context for recording this command
+     * @return The newly created vertex array object ID
+     */
+    int createVertexArrayObject(CommandContext ctx);
+    
+    /**
+     * Generates a new framebuffer object.
+     * 
+     * In OpenGL: Maps to glGenFramebuffers()
+     * In Vulkan: Maps to vkCreateFramebuffer()
+     * 
+     * Creates a framebuffer object for off-screen rendering or
+     * render-to-texture operations.
+     * 
+     * @param ctx Command context for recording this command
+     * @return The newly created framebuffer object ID
+     */
+    int generateFramebufferObject(CommandContext ctx);
+    
     // Pixel operations
     @Deprecated
     void setPixelStoreMode(int pname, int value);

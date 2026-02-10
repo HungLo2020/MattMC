@@ -1282,6 +1282,116 @@ public class VulkanicAPI {
         getBackend().setClearColorValue(ctx, red, green, blue, alpha);
     }
     
+    /**
+     * Selects which color buffer to draw to.
+     * 
+     * This is a Vulkan-compatible method that requires an explicit CommandContext.
+     * For OpenGL, use getImmediateContext() to get the context.
+     * 
+     * Example usage:
+     * <pre>
+     *     CommandContext ctx = VulkanicAPI.getImmediateContext();
+     *     VulkanicAPI.selectDrawBuffer(ctx, GL_BACK);
+     * </pre>
+     * 
+     * In OpenGL: Maps to glDrawBuffer(mode)
+     * In Vulkan: Specified in render pass creation
+     * 
+     * @param ctx Command context for recording this command
+     * @param mode The draw buffer mode (e.g., GL_BACK, GL_FRONT)
+     */
+    public static void selectDrawBuffer(CommandContext ctx, int mode) {
+        getBackend().selectDrawBuffer(ctx, mode);
+    }
+    
+    /**
+     * Allocates a new buffer object.
+     * 
+     * This is a Vulkan-compatible method that requires an explicit CommandContext.
+     * For OpenGL, use getImmediateContext() to get the context.
+     * 
+     * Example usage:
+     * <pre>
+     *     CommandContext ctx = VulkanicAPI.getImmediateContext();
+     *     int bufferID = VulkanicAPI.allocateBufferObject(ctx);
+     * </pre>
+     * 
+     * In OpenGL: Maps to glGenBuffers()
+     * In Vulkan: Maps to vkCreateBuffer()
+     * 
+     * @param ctx Command context for recording this command
+     * @return The newly created buffer object ID
+     */
+    public static int allocateBufferObject(CommandContext ctx) {
+        return getBackend().allocateBufferObject(ctx);
+    }
+    
+    /**
+     * Releases a buffer object.
+     * 
+     * This is a Vulkan-compatible method that requires an explicit CommandContext.
+     * For OpenGL, use getImmediateContext() to get the context.
+     * 
+     * Example usage:
+     * <pre>
+     *     CommandContext ctx = VulkanicAPI.getImmediateContext();
+     *     VulkanicAPI.releaseBufferObject(ctx, bufferID);
+     * </pre>
+     * 
+     * In OpenGL: Maps to glDeleteBuffers()
+     * In Vulkan: Maps to vkDestroyBuffer()
+     * 
+     * @param ctx Command context for recording this command
+     * @param buf The buffer object ID to release
+     */
+    public static void releaseBufferObject(CommandContext ctx, int buf) {
+        getBackend().releaseBufferObject(ctx, buf);
+    }
+    
+    /**
+     * Creates a new vertex array object (VAO).
+     * 
+     * This is a Vulkan-compatible method that requires an explicit CommandContext.
+     * For OpenGL, use getImmediateContext() to get the context.
+     * 
+     * Example usage:
+     * <pre>
+     *     CommandContext ctx = VulkanicAPI.getImmediateContext();
+     *     int vaoID = VulkanicAPI.createVertexArrayObject(ctx);
+     * </pre>
+     * 
+     * In OpenGL: Maps to glGenVertexArrays()
+     * In Vulkan: No direct equivalent (state is part of pipeline)
+     * 
+     * @param ctx Command context for recording this command
+     * @return The newly created vertex array object ID
+     */
+    public static int createVertexArrayObject(CommandContext ctx) {
+        return getBackend().createVertexArrayObject(ctx);
+    }
+    
+    /**
+     * Generates a new framebuffer object.
+     * 
+     * This is a Vulkan-compatible method that requires an explicit CommandContext.
+     * For OpenGL, use getImmediateContext() to get the context.
+     * 
+     * Example usage:
+     * <pre>
+     *     CommandContext ctx = VulkanicAPI.getImmediateContext();
+     *     int fboID = VulkanicAPI.generateFramebufferObject(ctx);
+     * </pre>
+     * 
+     * In OpenGL: Maps to glGenFramebuffers()
+     * In Vulkan: Maps to vkCreateFramebuffer()
+     * 
+     * @param ctx Command context for recording this command
+     * @return The newly created framebuffer object ID
+     */
+    public static int generateFramebufferObject(CommandContext ctx) {
+        return getBackend().generateFramebufferObject(ctx);
+    }
+    
     @Deprecated
     public static void setPixelStoreMode(int pname, int value) {
         getBackend().setPixelStoreMode(pname, value);

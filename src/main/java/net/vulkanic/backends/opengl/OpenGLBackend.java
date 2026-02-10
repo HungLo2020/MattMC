@@ -734,6 +734,106 @@ public class OpenGLBackend implements GraphicsBackend {
         GL11.glClearColor(red, green, blue, alpha);
     }
     
+    /**
+     * Selects draw buffer with explicit command context.
+     * This is the Vulkan-compatible implementation for draw buffer selection.
+     * 
+     * OpenGL implementation: Direct mapping to glDrawBuffer()
+     * Vulkan implementation: Specified in render pass attachment descriptions
+     * 
+     * @param ctx Command context (must be immediate mode for OpenGL)
+     * @param mode The draw buffer mode
+     */
+    @Override
+    public void selectDrawBuffer(CommandContext ctx, int mode) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        GL11.glDrawBuffer(mode);
+    }
+    
+    /**
+     * Allocates buffer object with explicit command context.
+     * This is the Vulkan-compatible implementation for buffer creation.
+     * 
+     * OpenGL implementation: Direct mapping to glGenBuffers()
+     * Vulkan implementation: Will use vkCreateBuffer()
+     * 
+     * @param ctx Command context (must be immediate mode for OpenGL)
+     * @return The newly created buffer object ID
+     */
+    @Override
+    public int allocateBufferObject(CommandContext ctx) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        return GL15.glGenBuffers();
+    }
+    
+    /**
+     * Releases buffer object with explicit command context.
+     * This is the Vulkan-compatible implementation for buffer deletion.
+     * 
+     * OpenGL implementation: Direct mapping to glDeleteBuffers()
+     * Vulkan implementation: Will use vkDestroyBuffer()
+     * 
+     * @param ctx Command context (must be immediate mode for OpenGL)
+     * @param buf The buffer object ID to release
+     */
+    @Override
+    public void releaseBufferObject(CommandContext ctx, int buf) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        GL15.glDeleteBuffers(buf);
+    }
+    
+    /**
+     * Creates vertex array object with explicit command context.
+     * This is the Vulkan-compatible implementation for VAO creation.
+     * 
+     * OpenGL implementation: Direct mapping to glGenVertexArrays()
+     * Vulkan implementation: State baked into pipeline (no direct equivalent)
+     * 
+     * @param ctx Command context (must be immediate mode for OpenGL)
+     * @return The newly created vertex array object ID
+     */
+    @Override
+    public int createVertexArrayObject(CommandContext ctx) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        return GL30.glGenVertexArrays();
+    }
+    
+    /**
+     * Generates framebuffer object with explicit command context.
+     * This is the Vulkan-compatible implementation for FBO creation.
+     * 
+     * OpenGL implementation: Direct mapping to glGenFramebuffers()
+     * Vulkan implementation: Will use vkCreateFramebuffer()
+     * 
+     * @param ctx Command context (must be immediate mode for OpenGL)
+     * @return The newly created framebuffer object ID
+     */
+    @Override
+    public int generateFramebufferObject(CommandContext ctx) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        return GL30.glGenFramebuffers();
+    }
+    
     @Deprecated
     @Override
     public void setPixelStoreMode(int pname, int value) {

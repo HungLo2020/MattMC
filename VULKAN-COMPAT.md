@@ -7,7 +7,7 @@
 **Analyzed Components:** VulkanicAPI.java, GraphicsBackend.java, OpenGLBackend.java  
 **Lines of Code Analyzed:** ~4,000 LOC  
 **Deprecated Methods:** 874 methods marked for replacement  
-**Migrated Methods:** 30 methods (3.4% complete)
+**Migrated Methods:** 35 methods (4.0% complete)
 
 ---
 
@@ -15,15 +15,15 @@
 
 **MIGRATION STATUS: ACTIVE MIGRATION IN PROGRESS** 🔄
 
-All 874 methods in the current Vulkanic API have been marked as `@Deprecated` to facilitate an **incremental, test-driven migration** to a properly abstracted graphics API that supports both OpenGL and Vulkan backends. We have now begun the active migration phase, with **30 methods successfully migrated** to the new CommandContext-aware API.
+All 874 methods in the current Vulkanic API have been marked as `@Deprecated` to facilitate an **incremental, test-driven migration** to a properly abstracted graphics API that supports both OpenGL and Vulkan backends. We have now begun the active migration phase, with **35 methods successfully migrated** to the new CommandContext-aware API.
 
 ### Current State (Active Migration)
 
 The legacy Vulkanic API is a **thin OpenGL state machine wrapper** with approximately **25-30% compatibility** with Vulkan's architectural principles. While it successfully abstracts OpenGL calls behind an interface, the API design is fundamentally tied to OpenGL's immediate-mode, global-state paradigm, which conflicts with Vulkan's explicit, command-buffer-based architecture.
 
 **Migration Progress:**
-- ✅ **30 methods migrated** to CommandContext-aware API (3.4% of 874 total)
-- ⚠️ **844 methods remaining** in deprecated state
+- ✅ **35 methods migrated** to CommandContext-aware API (4.0% of 874 total)
+- ⚠️ **839 methods remaining** in deprecated state
 - ✅ **All tests passing** (10/10 Vulkanic unit tests)
 - ✅ **Zero breaking changes** - fully backward compatible
 
@@ -58,6 +58,11 @@ The legacy Vulkanic API is a **thin OpenGL state machine wrapper** with approxim
 28. `configureLogicOp(ctx, opcode)` - Set logical operation
 29. `setClearDepthValue(ctx, depth)` - Set depth clear value
 30. `setClearColorValue(ctx, ...)` - Set color clear value
+31. `selectDrawBuffer(ctx, mode)` - Select draw buffer
+32. `allocateBufferObject(ctx)` - Allocate buffer object
+33. `releaseBufferObject(ctx, buf)` - Release buffer object
+34. `createVertexArrayObject(ctx)` - Create vertex array object
+35. `generateFramebufferObject(ctx)` - Generate framebuffer object
 
 ### New Migration Strategy: Incremental Replacement
 
@@ -246,6 +251,11 @@ Track progress using this table (update after each method migration):
 | `configureLogicOp()` | TBD | `configureLogicOp(ctx, opcode)` | 🟢 Completed |
 | `setClearDepthValue()` | TBD | `setClearDepthValue(ctx, depth)` | 🟢 Completed |
 | `setClearColorValue()` | TBD | `setClearColorValue(ctx, ...)` | 🟢 Completed |
+| `selectDrawBuffer()` | TBD | `selectDrawBuffer(ctx, mode)` | 🟢 Completed |
+| `allocateBufferObject()` | TBD | `allocateBufferObject(ctx)` | 🟢 Completed |
+| `releaseBufferObject()` | TBD | `releaseBufferObject(ctx, buf)` | 🟢 Completed |
+| `createVertexArrayObject()` | TBD | `createVertexArrayObject(ctx)` | 🟢 Completed |
+| `generateFramebufferObject()` | TBD | `generateFramebufferObject(ctx)` | 🟢 Completed |
 | ... | ... | ... | ... |
 
 **Legend:**
@@ -3405,6 +3415,260 @@ public void setClearColorValue(CommandContext ctx, float red, float green, float
     currentClearColor.g = green;
     currentClearColor.b = blue;
     currentClearColor.a = alpha;
+}
+```
+
+---
+
+### ✅ Method: `selectDrawBuffer(int mode)` → `selectDrawBuffer(CommandContext ctx, int mode)`
+
+**Migration Date:** 2026-02-10
+
+**Status:** Completed - New method implemented, deprecated method retained for backward compatibility
+
+**What Changed:**
+- Added `CommandContext ctx` parameter for Vulkan compatibility
+- OpenGL implementation validates immediate-mode context and calls `GL11.glDrawBuffer()`
+
+**New API Design:**
+```java
+public static void selectDrawBuffer(CommandContext ctx, int mode) {
+    getBackend().selectDrawBuffer(ctx, mode);
+}
+```
+
+**OpenGL Implementation:**
+```java
+@Override
+public void selectDrawBuffer(CommandContext ctx, int mode) {
+    if (!ctx.isImmediate()) {
+        throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+    }
+    GL11.glDrawBuffer(mode);
+}
+```
+
+**Usage Example:**
+```java
+// Before (deprecated, still works)
+VulkanicAPI.selectDrawBuffer(GL_BACK);
+
+// After (new Vulkan-compatible API)
+CommandContext ctx = VulkanicAPI.getImmediateContext();
+VulkanicAPI.selectDrawBuffer(ctx, GL_BACK);
+```
+
+**Vulkan Implementation (Future):**
+```java
+// Specified in render pass creation
+@Override
+public void selectDrawBuffer(CommandContext ctx, int mode) {
+    // In Vulkan, draw buffer selection is specified in VkAttachmentDescription
+    // during render pass creation, not as a dynamic command
+    // This will be handled in render pass setup
+}
+```
+
+---
+
+### ✅ Method: `allocateBufferObject()` → `allocateBufferObject(CommandContext ctx)`
+
+**Migration Date:** 2026-02-10
+
+**Status:** Completed - New method implemented, deprecated method retained for backward compatibility
+
+**What Changed:**
+- Added `CommandContext ctx` parameter for Vulkan compatibility
+- OpenGL implementation validates immediate-mode context and calls `GL15.glGenBuffers()`
+
+**New API Design:**
+```java
+public static int allocateBufferObject(CommandContext ctx) {
+    return getBackend().allocateBufferObject(ctx);
+}
+```
+
+**OpenGL Implementation:**
+```java
+@Override
+public int allocateBufferObject(CommandContext ctx) {
+    if (!ctx.isImmediate()) {
+        throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+    }
+    return GL15.glGenBuffers();
+}
+```
+
+**Usage Example:**
+```java
+// Before (deprecated, still works)
+int bufferID = VulkanicAPI.allocateBufferObject();
+
+// After (new Vulkan-compatible API)
+CommandContext ctx = VulkanicAPI.getImmediateContext();
+int bufferID = VulkanicAPI.allocateBufferObject(ctx);
+```
+
+**Vulkan Implementation (Future):**
+```java
+// Will use vkCreateBuffer
+@Override
+public int allocateBufferObject(CommandContext ctx) {
+    VkBufferCreateInfo bufferInfo = ...;
+    VkBuffer buffer = vkCreateBuffer(device, bufferInfo);
+    return bufferRegistry.register(buffer);
+}
+```
+
+---
+
+### ✅ Method: `releaseBufferObject(int buf)` → `releaseBufferObject(CommandContext ctx, int buf)`
+
+**Migration Date:** 2026-02-10
+
+**Status:** Completed - New method implemented, deprecated method retained for backward compatibility
+
+**What Changed:**
+- Added `CommandContext ctx` parameter for Vulkan compatibility
+- OpenGL implementation validates immediate-mode context and calls `GL15.glDeleteBuffers()`
+
+**New API Design:**
+```java
+public static void releaseBufferObject(CommandContext ctx, int buf) {
+    getBackend().releaseBufferObject(ctx, buf);
+}
+```
+
+**OpenGL Implementation:**
+```java
+@Override
+public void releaseBufferObject(CommandContext ctx, int buf) {
+    if (!ctx.isImmediate()) {
+        throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+    }
+    GL15.glDeleteBuffers(buf);
+}
+```
+
+**Usage Example:**
+```java
+// Before (deprecated, still works)
+VulkanicAPI.releaseBufferObject(bufferID);
+
+// After (new Vulkan-compatible API)
+CommandContext ctx = VulkanicAPI.getImmediateContext();
+VulkanicAPI.releaseBufferObject(ctx, bufferID);
+```
+
+**Vulkan Implementation (Future):**
+```java
+// Will use vkDestroyBuffer
+@Override
+public void releaseBufferObject(CommandContext ctx, int buf) {
+    VkBuffer buffer = bufferRegistry.getBuffer(buf);
+    queueResourceDestruction(buffer, ctx);
+}
+```
+
+---
+
+### ✅ Method: `createVertexArrayObject()` → `createVertexArrayObject(CommandContext ctx)`
+
+**Migration Date:** 2026-02-10
+
+**Status:** Completed - New method implemented, deprecated method retained for backward compatibility
+
+**What Changed:**
+- Added `CommandContext ctx` parameter for Vulkan compatibility
+- OpenGL implementation validates immediate-mode context and calls `GL30.glGenVertexArrays()`
+
+**New API Design:**
+```java
+public static int createVertexArrayObject(CommandContext ctx) {
+    return getBackend().createVertexArrayObject(ctx);
+}
+```
+
+**OpenGL Implementation:**
+```java
+@Override
+public int createVertexArrayObject(CommandContext ctx) {
+    if (!ctx.isImmediate()) {
+        throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+    }
+    return GL30.glGenVertexArrays();
+}
+```
+
+**Usage Example:**
+```java
+// Before (deprecated, still works)
+int vaoID = VulkanicAPI.createVertexArrayObject();
+
+// After (new Vulkan-compatible API)
+CommandContext ctx = VulkanicAPI.getImmediateContext();
+int vaoID = VulkanicAPI.createVertexArrayObject(ctx);
+```
+
+**Vulkan Implementation (Future):**
+```java
+// No direct equivalent - state is part of pipeline
+@Override
+public int createVertexArrayObject(CommandContext ctx) {
+    // In Vulkan, vertex input state is baked into the pipeline
+    // This will create a vertex input state descriptor
+    return vertexInputStateRegistry.createState();
+}
+```
+
+---
+
+### ✅ Method: `generateFramebufferObject()` → `generateFramebufferObject(CommandContext ctx)`
+
+**Migration Date:** 2026-02-10
+
+**Status:** Completed - New method implemented, deprecated method retained for backward compatibility
+
+**What Changed:**
+- Added `CommandContext ctx` parameter for Vulkan compatibility
+- OpenGL implementation validates immediate-mode context and calls `GL30.glGenFramebuffers()`
+
+**New API Design:**
+```java
+public static int generateFramebufferObject(CommandContext ctx) {
+    return getBackend().generateFramebufferObject(ctx);
+}
+```
+
+**OpenGL Implementation:**
+```java
+@Override
+public int generateFramebufferObject(CommandContext ctx) {
+    if (!ctx.isImmediate()) {
+        throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+    }
+    return GL30.glGenFramebuffers();
+}
+```
+
+**Usage Example:**
+```java
+// Before (deprecated, still works)
+int fboID = VulkanicAPI.generateFramebufferObject();
+
+// After (new Vulkan-compatible API)
+CommandContext ctx = VulkanicAPI.getImmediateContext();
+int fboID = VulkanicAPI.generateFramebufferObject(ctx);
+```
+
+**Vulkan Implementation (Future):**
+```java
+// Will use vkCreateFramebuffer
+@Override
+public int generateFramebufferObject(CommandContext ctx) {
+    VkFramebufferCreateInfo framebufferInfo = ...;
+    VkFramebuffer framebuffer = vkCreateFramebuffer(device, framebufferInfo);
+    return framebufferRegistry.register(framebuffer);
 }
 ```
 
