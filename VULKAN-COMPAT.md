@@ -2,14 +2,14 @@
 
 **Analysis Date:** 2026-02-08  
 **Migration Strategy Updated:** 2026-02-10  
-**Active Migration Phase:** Phase 3 Complete - All Call Sites Migrated ✅  
+**Active Migration Phase:** Phase 5 Complete - Alias Methods Removed ✅  
 **Vulkanic API Version:** Initial Implementation (OpenGL-only) - **ALL METHODS NOW DEPRECATED**  
 **Analyzed Components:** VulkanicAPI.java, GraphicsBackend.java, OpenGLBackend.java  
 **Lines of Code Analyzed:** ~4,000 LOC  
 **Deprecated Methods:** 874 methods marked for replacement  
 **Migrated Methods:** 45 methods (5.1% complete)
-**Migrated Call Sites:** 45 call sites in 17 game files ✅ **ALL MIGRATED**
-**Removed Deprecated Methods:** 5 methods (enableBlend, disableBlend, clear, enable, disable)
+**Migrated Call Sites:** 60 call sites in 23 game files ✅ **ALL MIGRATED**
+**Removed Deprecated Methods:** 10 methods (enableBlend, disableBlend, clear, enable, disable, useProgram, setDepthTestFunction, setDepthWriteEnabled, drawPrimitiveArrays, drawIndexedElements)
 
 ---
 
@@ -25,11 +25,11 @@ The legacy Vulkanic API is a **thin OpenGL state machine wrapper** with approxim
 
 **Migration Progress:**
 - ✅ **45 methods migrated** to CommandContext-aware API (5.1% of 874 total)
-- ✅ **45 call sites FULLY migrated** across **17 game files** ✅ **100% COMPLETE**
+- ✅ **60 call sites FULLY migrated** across **23 game files** ✅ **100% COMPLETE**
 - ✅ **ZERO deprecated calls remaining** - all production code uses new API!
 - ✅ **Production code validates CommandContext design** - real usage in action!
-- ✅ **5 deprecated methods REMOVED** - clean codebase!
-- ⚠️ **829 methods remaining** in deprecated state (to be migrated)
+- ✅ **10 deprecated methods REMOVED** - codebase getting cleaner!
+- ⚠️ **824 methods remaining** in deprecated state (to be migrated)
 - ✅ **All tests passing** (10/10 Vulkanic tests, 100%)
 - ✅ **Zero breaking changes** - fully backward compatible
 
@@ -127,14 +127,19 @@ Instead of building a complete Vulkan backend for the flawed legacy API, we are 
 
 **Result:** ✅ ZERO deprecated calls remaining - all production code uses new CommandContext API!
 
-### Phase 3: Deprecated Method Removal ✅ 5 REMOVED
+### Phase 3: Deprecated Method Removal ✅ 10 REMOVED
 
-**5 methods SUCCESSFULLY REMOVED:**
+**10 methods SUCCESSFULLY REMOVED:**
 1. ✅ `enableBlend()` - **REMOVED** ← Replaced by `enableBlend(CommandContext ctx)`
 2. ✅ `disableBlend()` - **REMOVED** ← Replaced by `disableBlend(CommandContext ctx)`
 3. ✅ `clear(int mask)` - **REMOVED** ← Replaced by `clear(CommandContext ctx, int mask)`
 4. ✅ `enable(int cap)` - **REMOVED** ← Replaced by `enable(CommandContext ctx, int cap)`
 5. ✅ `disable(int cap)` - **REMOVED** ← Replaced by `disable(CommandContext ctx, int cap)`
+6. ✅ `useProgram(int programId)` - **REMOVED** ← Alias for `bindShaderProgram(CommandContext ctx, int programId)`
+7. ✅ `setDepthTestFunction(int func)` - **REMOVED** ← Alias for `setDepthFunc(CommandContext ctx, int func)`
+8. ✅ `setDepthWriteEnabled(boolean enabled)` - **REMOVED** ← Alias for `setDepthWriteMask(CommandContext ctx, boolean enabled)`
+9. ✅ `drawPrimitiveArrays(...)` - **REMOVED** ← Alias for `drawArrays(CommandContext ctx, ...)`
+10. ✅ `drawIndexedElements(...)` - **REMOVED** ← Alias for `drawElements(CommandContext ctx, ...)`
 
 **Note:** The following methods were added directly with CommandContext and never had deprecated versions:
 - `drawArrays`, `drawElements`, `setDepthFunc`, `setBlendFunc`, `bindBuffer`, `setDepthWriteMask`
