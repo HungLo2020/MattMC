@@ -33,6 +33,7 @@ import com.seibel.distanthorizons.core.wrapperInterfaces.modAccessor.IIrisAccess
 import com.seibel.distanthorizons.coreapi.DependencyInjection.ApiEventInjector;
 import com.seibel.distanthorizons.coreapi.DependencyInjection.OverrideInjector;
 import com.seibel.distanthorizons.core.util.math.Vec3f;
+import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
 import org.jetbrains.annotations.Nullable;
 
@@ -388,7 +389,8 @@ public class LodRenderer
 		
 		// This is required for MC versions 1.21.5+
 		// due to MC updating the lightmap by changing the viewport size
-		VulkanicAPI.setDynamicViewport(0, 0, this.textureWidth, this.textureHeight);
+		CommandContext ctx = VulkanicAPI.getImmediateContext();
+		VulkanicAPI.setDynamicViewport(ctx, 0, 0, this.textureWidth, this.textureHeight);
 		
 		this.lodRenderProgram.bind();
 		

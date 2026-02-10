@@ -27,7 +27,6 @@ public interface GraphicsBackend {
     
     /**
      * Sets the dynamic viewport state for rendering.
-     * This is a Vulkan-compatible replacement for the deprecated viewport() method.
      * 
      * In OpenGL: Maps to glViewport()
      * In Vulkan: Maps to vkCmdSetViewport() (dynamic state)
@@ -35,16 +34,13 @@ public interface GraphicsBackend {
      * The viewport defines the transformation from normalized device coordinates to window coordinates.
      * This is dynamic state that can be changed per-frame or even between draw calls.
      * 
-     * Future evolution: This method will take a CommandBuffer parameter to support
-     * Vulkan's command buffer recording model:
-     *   void setDynamicViewport(CommandBuffer cmdBuffer, int x, int y, int width, int height)
-     * 
+     * @param ctx Command context for recording this command
      * @param x The x coordinate of the viewport's lower-left corner
      * @param y The y coordinate of the viewport's lower-left corner
      * @param width The width of the viewport in pixels
      * @param height The height of the viewport in pixels
      */
-    void setDynamicViewport(int x, int y, int width, int height);
+    void setDynamicViewport(CommandContext ctx, int x, int y, int width, int height);
     
     @Deprecated
     void clear(int mask);
@@ -73,7 +69,6 @@ public interface GraphicsBackend {
     
     /**
      * Sets the dynamic scissor rectangle for rendering.
-     * This is a Vulkan-compatible replacement for the deprecated setScissorBox() method.
      * 
      * In OpenGL: Maps to glScissor()
      * In Vulkan: Maps to vkCmdSetScissor() (dynamic state)
@@ -81,16 +76,13 @@ public interface GraphicsBackend {
      * The scissor test discards fragments outside the scissor rectangle.
      * This is dynamic state that can be changed per-frame or even between draw calls.
      * 
-     * Future evolution: This method will take a CommandBuffer parameter to support
-     * Vulkan's command buffer recording model:
-     *   void setDynamicScissor(CommandBuffer cmdBuffer, int x, int y, int width, int height)
-     * 
+     * @param ctx Command context for recording this command
      * @param x The x coordinate of the scissor rectangle's lower-left corner
      * @param y The y coordinate of the scissor rectangle's lower-left corner
      * @param width The width of the scissor rectangle in pixels
      * @param height The height of the scissor rectangle in pixels
      */
-    void setDynamicScissor(int x, int y, int width, int height);
+    void setDynamicScissor(CommandContext ctx, int x, int y, int width, int height);
     
     // Pixel operations
     @Deprecated

@@ -9,6 +9,7 @@ import java.nio.ByteBuffer;
 import java.util.stream.IntStream;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
+import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
 import org.jetbrains.annotations.Nullable;
 import org.lwjgl.PointerBuffer;
@@ -62,7 +63,8 @@ public class GlStateManager {
 
 	public static void _scissorBox(int i, int j, int k, int l) {
 		RenderSystem.assertOnRenderThread();
-		net.vulkanic.VulkanicAPI.setDynamicScissor(i, j, k, l);
+		CommandContext ctx = VulkanicAPI.getImmediateContext();
+		net.vulkanic.VulkanicAPI.setDynamicScissor(ctx, i, j, k, l);
 	}
 
 	public static void _disableDepthTest() {
@@ -510,7 +512,8 @@ public class GlStateManager {
 		iris$viewportWidth = k;
 		iris$viewportHeight = l;
 		
-		net.vulkanic.VulkanicAPI.setDynamicViewport(i, j, k, l);
+		CommandContext ctx = VulkanicAPI.getImmediateContext();
+		net.vulkanic.VulkanicAPI.setDynamicViewport(ctx, i, j, k, l);
 	}
 
 	public static void _colorMask(boolean bl, boolean bl2, boolean bl3, boolean bl4) {

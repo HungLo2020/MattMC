@@ -11,6 +11,7 @@ import com.seibel.distanthorizons.core.render.glObject.vertexAttribute.VertexPoi
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftGLWrapper;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftRenderWrapper;
 
+import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
 
 import java.nio.ByteBuffer;
@@ -86,7 +87,8 @@ public class TestRenderer
 		this.init();
 		
 		GLMC.glBindFramebuffer(VulkanicAPI.GL_FRAMEBUFFER, MC_RENDER.getTargetFramebuffer());
-		VulkanicAPI.setDynamicViewport(0, 0, MC_RENDER.getTargetFramebufferViewportWidth(), MC_RENDER.getTargetFramebufferViewportHeight());
+		CommandContext ctx = VulkanicAPI.getImmediateContext();
+		VulkanicAPI.setDynamicViewport(ctx, 0, 0, MC_RENDER.getTargetFramebufferViewportWidth(), MC_RENDER.getTargetFramebufferViewportHeight());
 		VulkanicAPI.glPolygonMode(VulkanicAPI.GL_FRONT_AND_BACK, VulkanicAPI.GL_FILL);
 		
 		GLMC.disableFaceCulling();

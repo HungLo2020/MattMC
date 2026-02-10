@@ -17,6 +17,7 @@ import net.sodium.client.gl.shader.*;
 import net.sodium.client.util.FogParameters;
 import net.blaze3d.opengl.GlCommandEncoder;
 import net.minecraft.resources.ResourceLocation;
+import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
 import java.util.Map;
 
@@ -93,7 +94,8 @@ public abstract class ShaderChunkRenderer implements ChunkRenderer {
 
         // Iris: From MixinShaderChunkRenderer - viewport redirect (skip if in shadow pass)
         if (!net.irisshaders.iris.shadows.ShadowRenderingState.areShadowsCurrentlyBeingRendered()) {
-            VulkanicAPI.setDynamicViewport(0, 0, target.getColorTexture().getWidth(0), target.getColorTexture().getHeight(0));
+            CommandContext ctx = VulkanicAPI.getImmediateContext();
+            VulkanicAPI.setDynamicViewport(ctx, 0, 0, target.getColorTexture().getWidth(0), target.getColorTexture().getHeight(0));
         }
         
         // Iris: From MixinShaderChunkRenderer - framebuffer binding is delayed/redirected

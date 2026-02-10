@@ -1,6 +1,7 @@
 package net.vulkanic;
 
 import net.vulkanic.backends.opengl.OpenGLBackend;
+import net.vulkanic.backends.opengl.OpenGLCommandContext;
 
 /**
  * Main entry point for the Vulkanic Graphics Abstraction Layer.
@@ -491,6 +492,44 @@ public class VulkanicAPI {
         return backend;
     }
     
+    /**
+     * Gets the immediate-mode command context for OpenGL rendering.
+     * 
+     * For OpenGL backend: Returns a singleton immediate-mode context
+     * For Vulkan backend: This method would not be used (explicit command buffers instead)
+     * 
+     * <p><b>USAGE GUIDANCE:</b></p>
+     * <ul>
+     * <li><b>Current transitional pattern:</b> Call this for each CommandContext-aware API method.
+     *     This is acceptable during migration since most API methods don't take CommandContext yet.</li>
+     * <li><b>Future Vulkan-compatible pattern:</b> Get the context ONCE at the start of a rendering
+     *     operation and reuse it for multiple API calls. This matches Vulkan's command buffer model:
+     *     <pre>
+     *     // Get context once
+     *     CommandContext ctx = VulkanicAPI.getImmediateContext(); // or beginCommandBuffer() for Vulkan
+     *     
+     *     // Reuse for multiple operations
+     *     VulkanicAPI.setDynamicViewport(ctx, ...);
+     *     VulkanicAPI.setDynamicScissor(ctx, ...);
+     *     VulkanicAPI.bindPipeline(ctx, ...);
+     *     VulkanicAPI.drawIndexed(ctx, ...);
+     *     </pre>
+     * </li>
+     * <li><b>Low-level utilities (GlStateManager):</b> Calling getImmediateContext() internally
+     *     is acceptable since they're OpenGL-specific and called from framework code we don't control.</li>
+     * </ul>
+     * 
+     * <p>This is a convenience method for migrating code to use CommandContext parameters
+     * without changing the immediate execution model during the transition period.</p>
+     * 
+     * @return Immediate-mode command context (OpenGL singleton)
+     */
+    public static CommandContext getImmediateContext() {
+        // For now, we only have OpenGL backend, so return OpenGL immediate context
+        // When Vulkan backend is added, this would check backend type
+        return OpenGLCommandContext.IMMEDIATE;
+    }
+    
     // Context operations
     /**
      * Gets the current graphics context (platform-specific).
@@ -520,23 +559,22 @@ public class VulkanicAPI {
     }
     
     /**
-     * Sets the dynamic viewport state for rendering.
-     * This is a Vulkan-compatible replacement for the deprecated viewport() method.
+     * Sets the dynamic viewport state for rendering with explicit command context.
      * 
-     * The viewport transformation maps from normalized device coordinates [-1, 1] to
-     * window/framebuffer coordinates. This is dynamic state that can be changed
-     * at any point during rendering.
+     * This is the preferred method for setting viewport - it explicitly takes a CommandContext
+     * parameter to support both immediate (OpenGL) and deferred (Vulkan) rendering models.
      * 
      * In OpenGL: Maps to glViewport()
      * In Vulkan: Maps to vkCmdSetViewport() (dynamic state in command buffer)
      * 
+     * @param ctx Command context for recording this command
      * @param x The x coordinate of the viewport's lower-left corner
      * @param y The y coordinate of the viewport's lower-left corner  
      * @param width The width of the viewport in pixels
      * @param height The height of the viewport in pixels
      */
-    public static void setDynamicViewport(int x, int y, int width, int height) {
-        getBackend().setDynamicViewport(x, y, width, height);
+    public static void setDynamicViewport(CommandContext ctx, int x, int y, int width, int height) {
+        getBackend().setDynamicViewport(ctx, x, y, width, height);
     }
     
     @Deprecated
@@ -585,23 +623,22 @@ public class VulkanicAPI {
     }
     
     /**
-     * Sets the dynamic scissor rectangle for rendering.
-     * This is a Vulkan-compatible replacement for the deprecated setScissorBox() method.
+     * Sets the dynamic scissor rectangle for rendering with explicit command context.
      * 
-     * The scissor test restricts rendering to a rectangular region of the framebuffer.
-     * Fragments outside the scissor rectangle are discarded. This is dynamic state that
-     * can be changed at any point during rendering.
+     * This is the preferred method for setting scissor - it explicitly takes a CommandContext
+     * parameter to support both immediate (OpenGL) and deferred (Vulkan) rendering models.
      * 
      * In OpenGL: Maps to glScissor()
      * In Vulkan: Maps to vkCmdSetScissor() (dynamic state in command buffer)
      * 
+     * @param ctx Command context for recording this command
      * @param x The x coordinate of the scissor rectangle's lower-left corner
      * @param y The y coordinate of the scissor rectangle's lower-left corner
      * @param width The width of the scissor rectangle in pixels
      * @param height The height of the scissor rectangle in pixels
      */
-    public static void setDynamicScissor(int x, int y, int width, int height) {
-        getBackend().setDynamicScissor(x, y, width, height);
+    public static void setDynamicScissor(CommandContext ctx, int x, int y, int width, int height) {
+        getBackend().setDynamicScissor(ctx, x, y, width, height);
     }
     
     @Deprecated
