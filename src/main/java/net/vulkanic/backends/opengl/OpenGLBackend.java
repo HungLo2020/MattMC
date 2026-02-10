@@ -1337,36 +1337,6 @@ public class OpenGLBackend implements GraphicsBackend {
     
     @Deprecated
     @Override
-    public int constructShaderObject(int shaderType) {
-        return GL20.glCreateShader(shaderType);
-    }
-    
-    @Deprecated
-    @Override
-    public void disposeShaderObject(int shader) {
-        GL20.glDeleteShader(shader);
-    }
-    
-    @Deprecated
-    @Override
-    public void compileShaderSource(int shader) {
-        GL20.glCompileShader(shader);
-    }
-    
-    @Deprecated
-    @Override
-    public int constructProgramObject() {
-        return GL20.glCreateProgram();
-    }
-    
-    @Deprecated
-    @Override
-    public void disposeProgramObject(int program) {
-        GL20.glDeleteProgram(program);
-    }
-    
-    @Deprecated
-    @Override
     public void linkProgramBinary(int program) {
         GL20.glLinkProgram(program);
     }

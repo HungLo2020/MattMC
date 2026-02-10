@@ -9,6 +9,7 @@ import net.vulkanic.backends.opengl.OpenGLCommandContext;
  */
 public class VulkanicAPI {
     private static GraphicsBackend backend;
+    private static final CommandContext CTX = OpenGLCommandContext.IMMEDIATE;
     
     // Functional interfaces for debug callbacks
     @FunctionalInterface
@@ -1906,31 +1907,6 @@ public class VulkanicAPI {
     }
     
     @Deprecated
-    public static int constructShaderObject(int shaderType) {
-        return getBackend().constructShaderObject(shaderType);
-    }
-    
-    @Deprecated
-    public static void disposeShaderObject(int shader) {
-        getBackend().disposeShaderObject(shader);
-    }
-    
-    @Deprecated
-    public static void compileShaderSource(int shader) {
-        getBackend().compileShaderSource(shader);
-    }
-    
-    @Deprecated
-    public static int constructProgramObject() {
-        return getBackend().constructProgramObject();
-    }
-    
-    @Deprecated
-    public static void disposeProgramObject(int program) {
-        getBackend().disposeProgramObject(program);
-    }
-    
-    @Deprecated
     public static void linkProgramBinary(int program) {
         getBackend().linkProgramBinary(program);
     }
@@ -2976,7 +2952,7 @@ public class VulkanicAPI {
      */
     @Deprecated
     public static int glCreateProgram() {
-        return constructProgramObject();
+        return constructProgramObject(CTX);
     }
     
     /**
@@ -3021,7 +2997,7 @@ public class VulkanicAPI {
      */
     @Deprecated
     public static void glDeleteProgram(int program) {
-        disposeProgramObject(program);
+        disposeProgramObject(CTX, program);
     }
     
     /**

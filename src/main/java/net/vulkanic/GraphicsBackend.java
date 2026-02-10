@@ -900,16 +900,6 @@ public interface GraphicsBackend {
     
     // Shader pipeline
     @Deprecated
-    int constructShaderObject(int shaderType);
-    @Deprecated
-    void disposeShaderObject(int shader);
-    @Deprecated
-    void compileShaderSource(int shader);
-    @Deprecated
-    int constructProgramObject();
-    @Deprecated
-    void disposeProgramObject(int program);
-    @Deprecated
     void linkProgramBinary(int program);
     @Deprecated
     void attachShaderToProgram(int program, int shader);

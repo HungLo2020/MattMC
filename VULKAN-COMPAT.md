@@ -2,14 +2,14 @@
 
 **Analysis Date:** 2026-02-08  
 **Migration Strategy Updated:** 2026-02-10  
-**Active Migration Phase:** Phase 5 Complete - Alias Methods Removed ✅  
+**Active Migration Phase:** Phase 6 Complete - Shader Methods Migrated ✅  
 **Vulkanic API Version:** Initial Implementation (OpenGL-only) - **ALL METHODS NOW DEPRECATED**  
 **Analyzed Components:** VulkanicAPI.java, GraphicsBackend.java, OpenGLBackend.java  
 **Lines of Code Analyzed:** ~4,000 LOC  
 **Deprecated Methods:** 874 methods marked for replacement  
-**Migrated Methods:** 45 methods (5.1% complete)
-**Migrated Call Sites:** 60 call sites in 23 game files ✅ **ALL MIGRATED**
-**Removed Deprecated Methods:** 10 methods (enableBlend, disableBlend, clear, enable, disable, useProgram, setDepthTestFunction, setDepthWriteEnabled, drawPrimitiveArrays, drawIndexedElements)
+**Migrated Methods:** 50 methods (5.7% complete)
+**Migrated Call Sites:** 75 call sites in 28 game files ✅ **ALL MIGRATED**
+**Removed Deprecated Methods:** 15 methods
 
 ---
 
@@ -24,12 +24,12 @@ All 874 methods in the current Vulkanic API have been marked as `@Deprecated` to
 The legacy Vulkanic API is a **thin OpenGL state machine wrapper** with approximately **25-30% compatibility** with Vulkan's architectural principles. While it successfully abstracts OpenGL calls behind an interface, the API design is fundamentally tied to OpenGL's immediate-mode, global-state paradigm, which conflicts with Vulkan's explicit, command-buffer-based architecture.
 
 **Migration Progress:**
-- ✅ **45 methods migrated** to CommandContext-aware API (5.1% of 874 total)
-- ✅ **60 call sites FULLY migrated** across **23 game files** ✅ **100% COMPLETE**
+- ✅ **50 methods migrated** to CommandContext-aware API (5.7% of 874 total)
+- ✅ **75 call sites FULLY migrated** across **28 game files** ✅ **100% COMPLETE**
 - ✅ **ZERO deprecated calls remaining** - all production code uses new API!
 - ✅ **Production code validates CommandContext design** - real usage in action!
-- ✅ **10 deprecated methods REMOVED** - codebase getting cleaner!
-- ⚠️ **824 methods remaining** in deprecated state (to be migrated)
+- ✅ **15 deprecated methods REMOVED** - codebase getting cleaner!
+- ⚠️ **819 methods remaining** in deprecated state (to be migrated)
 - ✅ **All tests passing** (10/10 Vulkanic tests, 100%)
 - ✅ **Zero breaking changes** - fully backward compatible
 
@@ -48,6 +48,14 @@ The legacy Vulkanic API is a **thin OpenGL state machine wrapper** with approxim
 12. `enableBlend(ctx)` - Enable blending
 13. `disableBlend(ctx)` - Disable blending
 14. `enable(ctx, cap)` - Enable capability
+15. `disable(ctx, cap)` - Disable capability
+...
+45. `transferTexture2DImage(ctx, ...)` - Upload 2D texture data
+46. `constructShaderObject(ctx, type)` - Create shader object ⭐ NEW
+47. `disposeShaderObject(ctx, shader)` - Delete shader object ⭐ NEW
+48. `compileShaderSource(ctx, shader)` - Compile shader source ⭐ NEW
+49. `constructProgramObject(ctx)` - Create program object ⭐ NEW
+50. `disposeProgramObject(ctx, program)` - Delete program object ⭐ NEW
 15. `disable(ctx, cap)` - Disable capability
 16. `activateTextureUnit(ctx, unit)` - Activate texture unit
 17. `generateMipmap(ctx, target)` - Generate mipmaps
