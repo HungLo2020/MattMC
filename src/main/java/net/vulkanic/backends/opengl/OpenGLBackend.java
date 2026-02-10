@@ -3161,4 +3161,58 @@ public class OpenGLBackend implements GraphicsBackend {
     public int glGenTextures() {
         return org.lwjgl.opengl.GL11.glGenTextures();
     }
+    
+    // ===========================
+    // Phase 12: Shader Query & State Retrieval Methods (CommandContext-aware)
+    // ===========================
+    
+    @Override
+    public int queryProgramParameter(CommandContext ctx, int program, int pname) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        return GL20.glGetProgrami(program, pname);
+    }
+    
+    @Override
+    public String retrieveProgramInfoLog(CommandContext ctx, int program) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        return GL20.glGetProgramInfoLog(program);
+    }
+    
+    @Override
+    public int queryIntegerState(CommandContext ctx, int pname) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        return GL11.glGetInteger(pname);
+    }
+    
+    @Override
+    public void activateShaderProgram(CommandContext ctx, int program) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        GL20.glUseProgram(program);
+    }
+    
+    @Override
+    public void destroyShaderProgram(CommandContext ctx, int program) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        GL20.glDeleteProgram(program);
+    }
 }

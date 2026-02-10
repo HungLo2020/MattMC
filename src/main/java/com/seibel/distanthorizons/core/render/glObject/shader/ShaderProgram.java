@@ -85,23 +85,23 @@ public class ShaderProgram
 		}
 		VulkanicAPI.glLinkProgram(this.id);
 		
-		int status = VulkanicAPI.glGetProgrami(this.id, VulkanicAPI.GL_LINK_STATUS);
+		int status = VulkanicAPI.queryProgramParameter(CTX, this.id, VulkanicAPI.GL_LINK_STATUS);
 		if (status != VulkanicAPI.GL_TRUE)
 		{
-			String message = "Shader Link Error. Details: " + VulkanicAPI.glGetProgramInfoLog(this.id);
+			String message = "Shader Link Error. Details: " + VulkanicAPI.retrieveProgramInfoLog(CTX, this.id);
 			this.free(); // important!
 			throw new RuntimeException(message);
 		}
-		VulkanicAPI.glUseProgram(this.id); // This HAVE to be a direct call to prevent calling the overloaded version
+		VulkanicAPI.activateShaderProgram(CTX, this.id); // This HAVE to be a direct call to prevent calling the overloaded version
 	}
 	
 	
 	
 	
-	public void bind() { VulkanicAPI.glUseProgram(this.id); }
-	public void unbind() { VulkanicAPI.glUseProgram(0); }
+	public void bind() { VulkanicAPI.activateShaderProgram(CTX, this.id); }
+	public void unbind() { VulkanicAPI.activateShaderProgram(CTX, 0); }
 	
-	public void free() { VulkanicAPI.glDeleteProgram(this.id); }
+	public void free() { VulkanicAPI.destroyShaderProgram(CTX, this.id); }
 	
 	
 	

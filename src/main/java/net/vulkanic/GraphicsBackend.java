@@ -1854,4 +1854,139 @@ public interface GraphicsBackend {
     // Additional texture methods
     @Deprecated
     int glGenTextures();
+    
+    // ===========================
+    // Phase 12: Shader Query & State Retrieval Methods (CommandContext-aware)
+    // ===========================
+    
+    /**
+     * Queries shader program parameter.
+     * 
+     * In OpenGL: Maps to glGetProgramiv()
+     * In Vulkan: Maps to pipeline reflection or VkPipeline properties
+     * 
+     * Common parameters:
+     * - GL_LINK_STATUS: Check if program linked successfully
+     * - GL_DELETE_STATUS: Check if program is flagged for deletion
+     * - GL_VALIDATE_STATUS: Check if program validation succeeded
+     * - GL_INFO_LOG_LENGTH: Length of info log
+     * - GL_ATTACHED_SHADERS: Number of attached shaders
+     * - GL_ACTIVE_ATTRIBUTES: Number of active vertex attributes
+     * - GL_ACTIVE_UNIFORMS: Number of active uniform variables
+     * 
+     * @param ctx Command recording context
+     * @param program The shader program ID
+     * @param pname The parameter name to query
+     * @return The queried parameter value
+     * 
+     * Example usage:
+     * <pre>{@code
+     * int linkStatus = backend.queryProgramParameter(CTX, programId, GL_LINK_STATUS);
+     * if (linkStatus == GL_FALSE) {
+     *     String log = backend.retrieveProgramInfoLog(CTX, programId);
+     *     throw new RuntimeException("Link failed: " + log);
+     * }
+     * }</pre>
+     */
+    int queryProgramParameter(CommandContext ctx, int program, int pname);
+    
+    /**
+     * Retrieves the information log for a shader program.
+     * 
+     * In OpenGL: Maps to glGetProgramInfoLog()
+     * In Vulkan: Maps to VkPipeline creation validation messages
+     * 
+     * The info log contains errors and warnings from the linking process, or
+     * validation messages if glValidateProgram was called.
+     * 
+     * @param ctx Command recording context
+     * @param program The shader program ID
+     * @return The program info log as a string
+     * 
+     * Example usage:
+     * <pre>{@code
+     * String log = backend.retrieveProgramInfoLog(CTX, programId);
+     * if (!log.isEmpty()) {
+     *     System.err.println("Program log: " + log);
+     * }
+     * }</pre>
+     */
+    String retrieveProgramInfoLog(CommandContext ctx, int program);
+    
+    /**
+     * Queries an integer state value from the graphics API.
+     * 
+     * In OpenGL: Maps to glGetIntegerv() - queries global state
+     * In Vulkan: Queries specific objects (pipeline, descriptor sets, etc.)
+     * 
+     * This is a general-purpose query method for retrieving various state values.
+     * In Vulkan, this will need to query from appropriate objects rather than global state.
+     * 
+     * Common parameters:
+     * - GL_CURRENT_PROGRAM: Currently bound shader program
+     * - GL_VERTEX_ARRAY_BINDING: Currently bound VAO
+     * - GL_ARRAY_BUFFER_BINDING: Currently bound VBO
+     * - GL_ELEMENT_ARRAY_BUFFER_BINDING: Currently bound EBO
+     * - GL_FRAMEBUFFER_BINDING: Currently bound FBO
+     * - GL_TEXTURE_BINDING_2D: Currently bound 2D texture
+     * - GL_ACTIVE_TEXTURE: Currently active texture unit
+     * 
+     * @param ctx Command recording context
+     * @param pname The parameter name to query
+     * @return The queried integer value
+     * 
+     * Example usage:
+     * <pre>{@code
+     * int currentProgram = backend.queryIntegerState(CTX, GL_CURRENT_PROGRAM);
+     * int boundVAO = backend.queryIntegerState(CTX, GL_VERTEX_ARRAY_BINDING);
+     * }</pre>
+     */
+    int queryIntegerState(CommandContext ctx, int pname);
+    
+    /**
+     * Activates a shader program for use in rendering operations.
+     * 
+     * In OpenGL: Maps to glUseProgram()
+     * In Vulkan: Maps to vkCmdBindPipeline()
+     * 
+     * This makes the shader program active for subsequent draw calls. In Vulkan,
+     * this operation records a pipeline bind command into the command buffer.
+     * 
+     * Note: This is a convenience wrapper around bindShaderProgram(ctx, program).
+     * The bindShaderProgram method should be preferred in new code.
+     * 
+     * @param ctx Command recording context
+     * @param program The shader program ID to activate (0 to unbind)
+     * 
+     * Example usage:
+     * <pre>{@code
+     * backend.activateShaderProgram(CTX, myProgramId);
+     * // Perform draw calls
+     * backend.activateShaderProgram(CTX, 0); // Unbind
+     * }</pre>
+     */
+    void activateShaderProgram(CommandContext ctx, int program);
+    
+    /**
+     * Deletes a shader program and releases its resources.
+     * 
+     * In OpenGL: Maps to glDeleteProgram()
+     * In Vulkan: Maps to vkDestroyPipeline()
+     * 
+     * This marks the program for deletion. If the program is currently in use,
+     * it will be deleted once it's no longer in use. All resources associated
+     * with the program, including linked shader objects, are released.
+     * 
+     * Note: This is a convenience wrapper around disposeProgramObject(ctx, program).
+     * The disposeProgramObject method should be preferred in new code.
+     * 
+     * @param ctx Command recording context
+     * @param program The shader program ID to delete
+     * 
+     * Example usage:
+     * <pre>{@code
+     * backend.destroyShaderProgram(CTX, oldProgramId);
+     * }</pre>
+     */
+    void destroyShaderProgram(CommandContext ctx, int program);
 }

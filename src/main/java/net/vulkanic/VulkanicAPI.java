@@ -3817,4 +3817,101 @@ public class VulkanicAPI {
     public static void glBindTexture(int target, int texture) {
         getBackend().bindTexture(target, texture);
     }
+    
+    // ===========================
+    // Phase 12: Shader Query & State Retrieval Methods (CommandContext-aware)
+    // ===========================
+    
+    /**
+     * Queries a shader program parameter.
+     * 
+     * @param ctx Command recording context
+     * @param program Shader program ID
+     * @param pname Parameter name (e.g., GL_LINK_STATUS, GL_DELETE_STATUS, GL_VALIDATE_STATUS)
+     * @return The queried parameter value
+     * 
+     * Example usage:
+     * <pre>{@code
+     * int linkStatus = VulkanicAPI.queryProgramParameter(CTX, programId, GL_LINK_STATUS);
+     * if (linkStatus == GL_FALSE) {
+     *     String log = VulkanicAPI.retrieveProgramInfoLog(CTX, programId);
+     *     throw new RuntimeException("Link failed: " + log);
+     * }
+     * }</pre>
+     */
+    public static int queryProgramParameter(CommandContext ctx, int program, int pname) {
+        return getBackend().queryProgramParameter(ctx, program, pname);
+    }
+    
+    /**
+     * Retrieves the information log for a shader program.
+     * 
+     * @param ctx Command recording context
+     * @param program Shader program ID
+     * @return The program info log as a string
+     * 
+     * Example usage:
+     * <pre>{@code
+     * String log = VulkanicAPI.retrieveProgramInfoLog(CTX, programId);
+     * if (!log.isEmpty()) {
+     *     System.err.println("Program log: " + log);
+     * }
+     * }</pre>
+     */
+    public static String retrieveProgramInfoLog(CommandContext ctx, int program) {
+        return getBackend().retrieveProgramInfoLog(ctx, program);
+    }
+    
+    /**
+     * Queries an integer state value from the graphics API.
+     * 
+     * @param ctx Command recording context
+     * @param pname Parameter name (e.g., GL_CURRENT_PROGRAM, GL_VERTEX_ARRAY_BINDING)
+     * @return The queried integer value
+     * 
+     * Example usage:
+     * <pre>{@code
+     * int currentProgram = VulkanicAPI.queryIntegerState(CTX, GL_CURRENT_PROGRAM);
+     * int boundVAO = VulkanicAPI.queryIntegerState(CTX, GL_VERTEX_ARRAY_BINDING);
+     * }</pre>
+     */
+    public static int queryIntegerState(CommandContext ctx, int pname) {
+        return getBackend().queryIntegerState(ctx, pname);
+    }
+    
+    /**
+     * Activates a shader program for use in rendering operations.
+     * 
+     * Note: This is a convenience wrapper around bindShaderProgram(ctx, program).
+     * 
+     * @param ctx Command recording context
+     * @param program Shader program ID to activate (0 to unbind)
+     * 
+     * Example usage:
+     * <pre>{@code
+     * VulkanicAPI.activateShaderProgram(CTX, myProgramId);
+     * // Perform draw calls
+     * VulkanicAPI.activateShaderProgram(CTX, 0); // Unbind
+     * }</pre>
+     */
+    public static void activateShaderProgram(CommandContext ctx, int program) {
+        getBackend().activateShaderProgram(ctx, program);
+    }
+    
+    /**
+     * Deletes a shader program and releases its resources.
+     * 
+     * Note: This is a convenience wrapper around disposeProgramObject(ctx, program).
+     * 
+     * @param ctx Command recording context
+     * @param program Shader program ID to delete
+     * 
+     * Example usage:
+     * <pre>{@code
+     * VulkanicAPI.destroyShaderProgram(CTX, oldProgramId);
+     * }</pre>
+     */
+    public static void destroyShaderProgram(CommandContext ctx, int program) {
+        getBackend().destroyShaderProgram(ctx, program);
+    }
 }
