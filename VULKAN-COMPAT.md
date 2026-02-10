@@ -2,13 +2,14 @@
 
 **Analysis Date:** 2026-02-08  
 **Migration Strategy Updated:** 2026-02-10  
-**Active Migration Phase:** Phase 2 - Call Site Migration  
+**Active Migration Phase:** Phase 3 - Deprecated Method Removal & Continued Migration  
 **Vulkanic API Version:** Initial Implementation (OpenGL-only) - **ALL METHODS NOW DEPRECATED**  
 **Analyzed Components:** VulkanicAPI.java, GraphicsBackend.java, OpenGLBackend.java  
 **Lines of Code Analyzed:** ~4,000 LOC  
 **Deprecated Methods:** 874 methods marked for replacement  
 **Migrated Methods:** 45 methods (5.1% complete)
-**Migrated Call Sites:** 19 call sites in 6 game files
+**Migrated Call Sites:** 34 call sites in 12 game files
+**Removed Deprecated Methods:** 2 methods (enableBlend, disableBlend)
 
 ---
 
@@ -116,17 +117,21 @@ Instead of building a complete Vulkan backend for the flawed legacy API, we are 
 11. ✅ `GlDevice.java` - 1 call (bindTexture cube map)
 12. ✅ `GlCommandEncoder.java` - 4 calls (bindTexture various targets)
 
-### Deprecated Methods Ready for Removal
+### Phase 3: Deprecated Method Removal ✅ IN PROGRESS
 
-**8 methods have ZERO remaining deprecated calls:**
-1. ✅ `drawArrays(int mode, int first, int count)` - **Ready to remove**
-2. ✅ `drawElements(int mode, int count, int type, long indices)` - **Ready to remove**
-3. ✅ `enableBlend()` - **Ready to remove**
-4. ✅ `disableBlend()` - **Ready to remove**
-5. ✅ `setDepthFunc(int func)` - **Ready to remove**
-6. ✅ `setBlendFunc(int srcRgb, int dstRgb, int srcAlpha, int dstAlpha)` - **Ready to remove**
-7. ✅ `bindBuffer(int target, int buffer)` - **Ready to remove**
-8. ✅ `setDepthWriteMask(boolean enabled)` - **Ready to remove**
+**2 methods REMOVED (first successful removals!):**
+1. ✅ `enableBlend()` - **REMOVED** ← Replaced by `enableBlend(CommandContext ctx)`
+2. ✅ `disableBlend()` - **REMOVED** ← Replaced by `disableBlend(CommandContext ctx)`
+
+**6 methods have ZERO remaining deprecated calls (ready to remove):**
+3. ✅ `drawArrays(int mode, int first, int count)` - **Ready to remove** (never existed as deprecated)
+4. ✅ `drawElements(int mode, int count, int type, long indices)` - **Ready to remove** (never existed as deprecated)
+5. ✅ `setDepthFunc(int func)` - **Ready to remove** (never existed as deprecated)
+6. ✅ `setBlendFunc(int srcRgb, int dstRgb, int srcAlpha, int dstAlpha)` - **Ready to remove** (never existed as deprecated)
+7. ✅ `bindBuffer(int target, int buffer)` - **Ready to remove** (never existed as deprecated)
+8. ✅ `setDepthWriteMask(boolean enabled)` - **Ready to remove** (never existed as deprecated)
+
+**Note:** Methods 3-8 were added directly with CommandContext parameter and never had deprecated versions in GraphicsBackend/OpenGLBackend (only as deprecated facades in VulkanicAPI which can be removed).
 
 **Pattern Used:**
 ```java
