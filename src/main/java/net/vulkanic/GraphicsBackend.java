@@ -718,6 +718,76 @@ public interface GraphicsBackend {
     void transferTexture2DImage(CommandContext ctx, int tgt, int lvl, int intfmt, int w, int h, 
                                 int bdr, int fmt, int typ, java.nio.ByteBuffer pix);
     
+    /**
+     * Creates a shader object of the specified type.
+     * 
+     * In OpenGL: Maps to glCreateShader()
+     * In Vulkan: Will create VkShaderModule from SPIR-V bytecode
+     * 
+     * Shaders are compiled code that runs on the GPU during different stages of the rendering pipeline.
+     * This method creates a shader object that can be compiled and attached to a program/pipeline.
+     * 
+     * @param ctx Command context (for future Vulkan resource tracking)
+     * @param shaderType Type of shader (e.g., GL_VERTEX_SHADER, GL_FRAGMENT_SHADER)
+     * @return Shader object ID/handle
+     */
+    int constructShaderObject(CommandContext ctx, int shaderType);
+    
+    /**
+     * Deletes a shader object and frees its resources.
+     * 
+     * In OpenGL: Maps to glDeleteShader()
+     * In Vulkan: Maps to vkDestroyShaderModule()
+     * 
+     * Shader objects can be deleted after they've been attached to a program and the program has been linked.
+     * OpenGL reference counts shader objects, so they won't be actually deleted until they're detached.
+     * 
+     * @param ctx Command context (for future Vulkan resource tracking)
+     * @param shader Shader object ID to delete
+     */
+    void disposeShaderObject(CommandContext ctx, int shader);
+    
+    /**
+     * Compiles the shader source code associated with a shader object.
+     * 
+     * In OpenGL: Maps to glCompileShader() - compiles GLSL source at runtime
+     * In Vulkan: No direct equivalent - shaders are pre-compiled to SPIR-V
+     * 
+     * For Vulkan backend, this method will validate SPIR-V bytecode or perform offline compilation.
+     * The CommandContext allows the backend to handle these different compilation models.
+     * 
+     * @param ctx Command context (for future Vulkan compilation pipeline)
+     * @param shader Shader object ID to compile
+     */
+    void compileShaderSource(CommandContext ctx, int shader);
+    
+    /**
+     * Creates a program object for linking shaders together.
+     * 
+     * In OpenGL: Maps to glCreateProgram()
+     * In Vulkan: Will create VkPipeline (much more complex, includes all state)
+     * 
+     * Programs (OpenGL) or Pipelines (Vulkan) represent the complete shader execution environment.
+     * In Vulkan, pipelines are monolithic and include render state, while in OpenGL they're separate.
+     * 
+     * @param ctx Command context (for future Vulkan pipeline creation)
+     * @return Program/Pipeline object ID/handle
+     */
+    int constructProgramObject(CommandContext ctx);
+    
+    /**
+     * Deletes a program object and frees its resources.
+     * 
+     * In OpenGL: Maps to glDeleteProgram()
+     * In Vulkan: Maps to vkDestroyPipeline()
+     * 
+     * Deleting a program/pipeline releases all associated resources including linked shader objects.
+     * 
+     * @param ctx Command context (for future Vulkan resource tracking)
+     * @param program Program/Pipeline object ID to delete
+     */
+    void disposeProgramObject(CommandContext ctx, int program);
+    
     // Pixel operations
     @Deprecated
     void setPixelStoreMode(int pname, int value);

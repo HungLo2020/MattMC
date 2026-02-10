@@ -1614,6 +1614,88 @@ public class VulkanicAPI {
         getBackend().transferTexture2DImage(ctx, tgt, lvl, intfmt, w, h, bdr, fmt, typ, pix);
     }
     
+    /**
+     * Creates a shader object of the specified type (CommandContext-aware).
+     * 
+     * Example usage:
+     * <pre>{@code
+     * CommandContext ctx = OpenGLCommandContext.IMMEDIATE;
+     * int vertexShader = VulkanicAPI.constructShaderObject(ctx, GL_VERTEX_SHADER);
+     * int fragmentShader = VulkanicAPI.constructShaderObject(ctx, GL_FRAGMENT_SHADER);
+     * }</pre>
+     * 
+     * @param ctx Command context for shader creation
+     * @param shaderType Type of shader (e.g., GL_VERTEX_SHADER, GL_FRAGMENT_SHADER)
+     * @return Shader object ID/handle
+     */
+    public static int constructShaderObject(CommandContext ctx, int shaderType) {
+        return getBackend().constructShaderObject(ctx, shaderType);
+    }
+    
+    /**
+     * Deletes a shader object and frees its resources (CommandContext-aware).
+     * 
+     * Example usage:
+     * <pre>{@code
+     * CommandContext ctx = OpenGLCommandContext.IMMEDIATE;
+     * VulkanicAPI.disposeShaderObject(ctx, shaderId);
+     * }</pre>
+     * 
+     * @param ctx Command context for resource tracking
+     * @param shader Shader object ID to delete
+     */
+    public static void disposeShaderObject(CommandContext ctx, int shader) {
+        getBackend().disposeShaderObject(ctx, shader);
+    }
+    
+    /**
+     * Compiles the shader source code (CommandContext-aware).
+     * 
+     * Example usage:
+     * <pre>{@code
+     * CommandContext ctx = OpenGLCommandContext.IMMEDIATE;
+     * VulkanicAPI.compileShaderSource(ctx, shaderId);
+     * }</pre>
+     * 
+     * @param ctx Command context for compilation pipeline
+     * @param shader Shader object ID to compile
+     */
+    public static void compileShaderSource(CommandContext ctx, int shader) {
+        getBackend().compileShaderSource(ctx, shader);
+    }
+    
+    /**
+     * Creates a program object for linking shaders (CommandContext-aware).
+     * 
+     * Example usage:
+     * <pre>{@code
+     * CommandContext ctx = OpenGLCommandContext.IMMEDIATE;
+     * int program = VulkanicAPI.constructProgramObject(ctx);
+     * }</pre>
+     * 
+     * @param ctx Command context for pipeline creation
+     * @return Program/Pipeline object ID/handle
+     */
+    public static int constructProgramObject(CommandContext ctx) {
+        return getBackend().constructProgramObject(ctx);
+    }
+    
+    /**
+     * Deletes a program object and frees its resources (CommandContext-aware).
+     * 
+     * Example usage:
+     * <pre>{@code
+     * CommandContext ctx = OpenGLCommandContext.IMMEDIATE;
+     * VulkanicAPI.disposeProgramObject(ctx, programId);
+     * }</pre>
+     * 
+     * @param ctx Command context for resource tracking
+     * @param program Program/Pipeline object ID to delete
+     */
+    public static void disposeProgramObject(CommandContext ctx, int program) {
+        getBackend().disposeProgramObject(ctx, program);
+    }
+    
     @Deprecated
     public static void setPixelStoreMode(int pname, int value) {
         getBackend().setPixelStoreMode(pname, value);

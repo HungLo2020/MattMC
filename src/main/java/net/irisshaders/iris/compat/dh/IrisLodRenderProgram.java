@@ -64,7 +64,7 @@ public class IrisLodRenderProgram {
 
 	// This will bind  AbstractVertexAttribute
 	private IrisLodRenderProgram(String name, boolean isShadowPass, boolean translucent, BlendModeOverride override, BufferBlendOverride[] bufferBlendOverrides, String vertex, String tessControl, String tessEval, String geometry, String fragment, CustomUniforms customUniforms, IrisRenderingPipeline pipeline) {
-		id = VulkanicAPI.constructProgramObject();
+		id = VulkanicAPI.constructProgramObject(CTX);
 
 		VulkanicAPI.bindAttributeLocation(this.id, 0, "vPosition");
 		VulkanicAPI.bindAttributeLocation(this.id, 1, "iris_color");
@@ -230,7 +230,7 @@ public class IrisLodRenderProgram {
 	}
 
 	public void free() {
-		VulkanicAPI.disposeProgramObject(id);
+		VulkanicAPI.disposeProgramObject(CTX, id);
 	}
 
 	public void fillUniformData(Matrix4fc projection, Matrix4fc modelView, int worldYOffset, float partialTicks) {

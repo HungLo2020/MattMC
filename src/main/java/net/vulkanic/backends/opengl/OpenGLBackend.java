@@ -1015,6 +1015,76 @@ public class OpenGLBackend implements GraphicsBackend {
         GL11.glTexImage2D(tgt, lvl, intfmt, w, h, bdr, fmt, typ, pix);
     }
     
+    /**
+     * Creates a shader object of the specified type.
+     * Uses CommandContext for future Vulkan compatibility.
+     */
+    @Override
+    public int constructShaderObject(CommandContext ctx, int shaderType) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        return GL20.glCreateShader(shaderType);
+    }
+    
+    /**
+     * Deletes a shader object.
+     * Uses CommandContext for future Vulkan compatibility.
+     */
+    @Override
+    public void disposeShaderObject(CommandContext ctx, int shader) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        GL20.glDeleteShader(shader);
+    }
+    
+    /**
+     * Compiles shader source code.
+     * Uses CommandContext for future Vulkan compatibility.
+     */
+    @Override
+    public void compileShaderSource(CommandContext ctx, int shader) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        GL20.glCompileShader(shader);
+    }
+    
+    /**
+     * Creates a program object.
+     * Uses CommandContext for future Vulkan compatibility.
+     */
+    @Override
+    public int constructProgramObject(CommandContext ctx) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        return GL20.glCreateProgram();
+    }
+    
+    /**
+     * Deletes a program object.
+     * Uses CommandContext for future Vulkan compatibility.
+     */
+    @Override
+    public void disposeProgramObject(CommandContext ctx, int program) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        GL20.glDeleteProgram(program);
+    }
+    
     @Deprecated
     @Override
     public void setPixelStoreMode(int pname, int value) {

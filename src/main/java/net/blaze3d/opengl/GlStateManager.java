@@ -154,12 +154,12 @@ public class GlStateManager {
 
 	public static void glDeleteShader(int i) {
 		RenderSystem.assertOnRenderThread();
-		net.vulkanic.VulkanicAPI.disposeShaderObject(i);
+		net.vulkanic.VulkanicAPI.disposeShaderObject(CTX, i);
 	}
 
 	public static int glCreateShader(int i) {
 		RenderSystem.assertOnRenderThread();
-		return net.vulkanic.VulkanicAPI.constructShaderObject(i);
+		return net.vulkanic.VulkanicAPI.constructShaderObject(CTX, i);
 	}
 
 	public static void glShaderSource(int i, String string) {
@@ -181,7 +181,7 @@ public class GlStateManager {
 
 	public static void glCompileShader(int i) {
 		RenderSystem.assertOnRenderThread();
-		net.vulkanic.VulkanicAPI.compileShaderSource(i);
+		net.vulkanic.VulkanicAPI.compileShaderSource(CTX, i);
 	}
 
 	public static int glGetShaderi(int i, int j) {
@@ -207,12 +207,12 @@ public class GlStateManager {
 
 	public static int glCreateProgram() {
 		RenderSystem.assertOnRenderThread();
-		return net.vulkanic.VulkanicAPI.constructProgramObject();
+		return net.vulkanic.VulkanicAPI.constructProgramObject(CTX);
 	}
 
 	public static void glDeleteProgram(int i) {
 		RenderSystem.assertOnRenderThread();
-		net.vulkanic.VulkanicAPI.disposeProgramObject(i);
+		net.vulkanic.VulkanicAPI.disposeProgramObject(CTX, i);
 	}
 
 	public static void glLinkProgram(int i) {
