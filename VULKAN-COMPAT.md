@@ -2,12 +2,13 @@
 
 **Analysis Date:** 2026-02-08  
 **Migration Strategy Updated:** 2026-02-10  
-**Active Migration Phase:** Incremental Method Replacement (Phase 1)  
+**Active Migration Phase:** Phase 2 - Call Site Migration  
 **Vulkanic API Version:** Initial Implementation (OpenGL-only) - **ALL METHODS NOW DEPRECATED**  
 **Analyzed Components:** VulkanicAPI.java, GraphicsBackend.java, OpenGLBackend.java  
 **Lines of Code Analyzed:** ~4,000 LOC  
 **Deprecated Methods:** 874 methods marked for replacement  
 **Migrated Methods:** 45 methods (5.1% complete)
+**Migrated Call Sites:** 19 call sites in 6 game files
 
 ---
 
@@ -23,8 +24,11 @@ The legacy Vulkanic API is a **thin OpenGL state machine wrapper** with approxim
 
 **Migration Progress:**
 - ✅ **45 methods migrated** to CommandContext-aware API (5.1% of 874 total)
+- ✅ **19 call sites migrated** in game code (6 files updated)
+- ✅ **Production code now uses CommandContext API** - real usage in action!
 - ⚠️ **829 methods remaining** in deprecated state
-- ✅ **All tests passing** (10/10 Vulkanic unit tests)
+- ⚠️ **Many call sites remaining** to migrate
+- ✅ **All tests passing** (17/17 tests including new context tests)
 - ✅ **Zero breaking changes** - fully backward compatible
 
 **Migrated Methods (as of 2026-02-10):**
@@ -79,8 +83,8 @@ The legacy Vulkanic API is a **thin OpenGL state machine wrapper** with approxim
 Instead of building a complete Vulkan backend for the flawed legacy API, we are pursuing a **safer, incremental approach**:
 
 1. **✅ COMPLETED:** Mark all existing methods as `@Deprecated`
-2. **🔄 IN PROGRESS:** For each deprecated method, design a new properly abstracted version compatible with BOTH OpenGL AND Vulkan (16/874 complete)
-3. **📋 PLANNED:** Replace all call sites in game code to use new methods
+2. **🔄 IN PROGRESS:** For each deprecated method, design a new properly abstracted version compatible with BOTH OpenGL AND Vulkan (45/874 complete)
+3. **🔄 IN PROGRESS:** Replace call sites in game code to use new methods (19 call sites migrated in 6 files)
 4. **📋 PLANNED:** Once a deprecated method has zero call sites, remove it
 5. **📋 PLANNED:** Only after all methods are migrated, implement actual Vulkan backend
 
@@ -90,6 +94,32 @@ Instead of building a complete Vulkan backend for the flawed legacy API, we are 
 - ✅ Deprecation warnings guide developers away from legacy patterns
 - ✅ Clear separation between legacy (deprecated) and modern (non-deprecated) code
 - ✅ Allows gradual migration without "big bang" refactoring
+- ✅ **NEW:** Real production code now using CommandContext API validates design
+
+### Phase 2 Progress: Call Site Migration
+
+**Migrated Files (19 call sites total):**
+1. ✅ `MinecraftGLWrapper.java` - 8 calls (enable, disable, activateTextureUnit, bindTexture)
+2. ✅ `LodRenderer.java` - 4 calls (clear, disable)
+3. ✅ `TestRenderer.java` - 1 call (clear)
+4. ✅ `GLState.java` - 2 calls (enable, disable stencil test)
+5. ✅ `FogShader.java` - 1 call (clear)
+6. ✅ `GLDebug.java` - 3 calls (enable debug output)
+
+**Pattern Used:**
+```java
+// Import CommandContext and OpenGLCommandContext
+import net.vulkanic.CommandContext;
+import net.vulkanic.backends.opengl.OpenGLCommandContext;
+
+// Create constant for convenience
+private static final CommandContext CTX = OpenGLCommandContext.IMMEDIATE;
+
+// Update calls to use CommandContext
+VulkanicAPI.clear(CTX, mask);      // was: VulkanicAPI.clear(mask)
+VulkanicAPI.enable(CTX, cap);      // was: VulkanicAPI.enable(cap)
+VulkanicAPI.bindTexture(CTX, tex); // was: VulkanicAPI.bindTexture(tex)
+```
 
 ---
 
