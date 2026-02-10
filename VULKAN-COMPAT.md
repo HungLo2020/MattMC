@@ -7,7 +7,7 @@
 **Analyzed Components:** VulkanicAPI.java, GraphicsBackend.java, OpenGLBackend.java  
 **Lines of Code Analyzed:** ~4,000 LOC  
 **Deprecated Methods:** 874 methods marked for replacement  
-**Migrated Methods:** 21 methods (2.4% complete)
+**Migrated Methods:** 25 methods (2.9% complete)
 
 ---
 
@@ -15,15 +15,15 @@
 
 **MIGRATION STATUS: ACTIVE MIGRATION IN PROGRESS** 🔄
 
-All 874 methods in the current Vulkanic API have been marked as `@Deprecated` to facilitate an **incremental, test-driven migration** to a properly abstracted graphics API that supports both OpenGL and Vulkan backends. We have now begun the active migration phase, with **21 methods successfully migrated** to the new CommandContext-aware API.
+All 874 methods in the current Vulkanic API have been marked as `@Deprecated` to facilitate an **incremental, test-driven migration** to a properly abstracted graphics API that supports both OpenGL and Vulkan backends. We have now begun the active migration phase, with **25 methods successfully migrated** to the new CommandContext-aware API.
 
 ### Current State (Active Migration)
 
 The legacy Vulkanic API is a **thin OpenGL state machine wrapper** with approximately **25-30% compatibility** with Vulkan's architectural principles. While it successfully abstracts OpenGL calls behind an interface, the API design is fundamentally tied to OpenGL's immediate-mode, global-state paradigm, which conflicts with Vulkan's explicit, command-buffer-based architecture.
 
 **Migration Progress:**
-- ✅ **21 methods migrated** to CommandContext-aware API (2.4% of 874 total)
-- ⚠️ **853 methods remaining** in deprecated state
+- ✅ **25 methods migrated** to CommandContext-aware API (2.9% of 874 total)
+- ⚠️ **849 methods remaining** in deprecated state
 - ✅ **All tests passing** (10/10 Vulkanic unit tests)
 - ✅ **Zero breaking changes** - fully backward compatible
 
@@ -48,6 +48,11 @@ The legacy Vulkanic API is a **thin OpenGL state machine wrapper** with approxim
 18. `bindTexture(ctx, textureId)` - Bind texture (2D default)
 19. `bindTexture(ctx, target, textureId)` - Bind texture (explicit target)
 20. `setPixelStoreMode(ctx, pname, value)` - Pixel storage mode
+21. `attachFramebuffer(ctx, target, fbo)` - Bind framebuffer
+22. `attachTextureToFramebuffer(ctx, ...)` - Attach texture to framebuffer
+23. `configureTextureParameter(ctx, ...)` - Set texture parameter
+24. `removeTexture(ctx, texture)` - Delete texture
+25. `configurePolygonMode(ctx, ...)` - Set polygon rasterization mode
 21. `attachFramebuffer(ctx, target, fbo)` - Bind framebuffer
 
 ### New Migration Strategy: Incremental Replacement
@@ -228,6 +233,10 @@ Track progress using this table (update after each method migration):
 | `bindTexture(int target, int textureId)` | TBD | `bindTexture(ctx, target, textureId)` | 🟢 Completed |
 | `setPixelStoreMode()` | TBD | `setPixelStoreMode(ctx, ...)` | 🟢 Completed |
 | `attachFramebuffer()` | TBD | `attachFramebuffer(ctx, ...)` | 🟢 Completed |
+| `attachTextureToFramebuffer()` | TBD | `attachTextureToFramebuffer(ctx, ...)` | 🟢 Completed |
+| `configureTextureParameter()` | TBD | `configureTextureParameter(ctx, ...)` | 🟢 Completed |
+| `removeTexture()` | TBD | `removeTexture(ctx, texture)` | 🟢 Completed |
+| `configurePolygonMode()` | TBD | `configurePolygonMode(ctx, ...)` | 🟢 Completed |
 | ... | ... | ... | ... |
 
 **Legend:**
@@ -2900,6 +2909,222 @@ public void attachFramebuffer(CommandContext ctx, int target, int fbo) {
     // Store the FBO for use when beginning the next render pass
     currentFramebuffer = fbo;
     // The actual binding will occur in beginRenderPass()
+}
+```
+
+---
+
+### ✅ Method: `attachTextureToFramebuffer(...)` → `attachTextureToFramebuffer(CommandContext ctx, ...)`
+
+**Migration Date:** 2026-02-10
+
+**Status:** Completed - New method implemented, deprecated method retained for backward compatibility
+
+**What Changed:**
+- Added `CommandContext ctx` parameter for Vulkan compatibility
+- OpenGL implementation validates immediate-mode context and calls `GL30.glFramebufferTexture2D()`
+
+**New API Design:**
+```java
+public static void attachTextureToFramebuffer(CommandContext ctx, int target, int attachment, 
+                                               int textarget, int texture, int level) {
+    getBackend().attachTextureToFramebuffer(ctx, target, attachment, textarget, texture, level);
+}
+```
+
+**OpenGL Implementation:**
+```java
+@Override
+public void attachTextureToFramebuffer(CommandContext ctx, int target, int attachment, 
+                                        int textarget, int texture, int level) {
+    if (!ctx.isImmediate()) {
+        throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+    }
+    GL30.glFramebufferTexture2D(target, attachment, textarget, texture, level);
+}
+```
+
+**Usage Example:**
+```java
+// Before (deprecated, still works)
+VulkanicAPI.attachTextureToFramebuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, 
+                                       GL_TEXTURE_2D, textureId, 0);
+
+// After (new Vulkan-compatible API)
+CommandContext ctx = VulkanicAPI.getImmediateContext();
+VulkanicAPI.attachTextureToFramebuffer(ctx, GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, 
+                                       GL_TEXTURE_2D, textureId, 0);
+```
+
+**Vulkan Implementation (Future):**
+```java
+// Textures are attached during framebuffer creation in Vulkan
+@Override
+public void attachTextureToFramebuffer(CommandContext ctx, int target, int attachment, 
+                                        int textarget, int texture, int level) {
+    // In Vulkan, framebuffer attachments are specified during VkFramebuffer creation
+    // This will need to rebuild the framebuffer with the new attachment
+    rebuildFramebufferWithAttachment(target, attachment, texture, level);
+}
+```
+
+---
+
+### ✅ Method: `configureTextureParameter(...)` → `configureTextureParameter(CommandContext ctx, ...)`
+
+**Migration Date:** 2026-02-10
+
+**Status:** Completed - New method implemented, deprecated method retained for backward compatibility
+
+**What Changed:**
+- Added `CommandContext ctx` parameter for Vulkan compatibility
+- OpenGL implementation validates immediate-mode context and calls `GL11.glTexParameteri()`
+
+**New API Design:**
+```java
+public static void configureTextureParameter(CommandContext ctx, int target, int pname, int param) {
+    getBackend().configureTextureParameter(ctx, target, pname, param);
+}
+```
+
+**OpenGL Implementation:**
+```java
+@Override
+public void configureTextureParameter(CommandContext ctx, int target, int pname, int param) {
+    if (!ctx.isImmediate()) {
+        throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+    }
+    GL11.glTexParameteri(target, pname, param);
+}
+```
+
+**Usage Example:**
+```java
+// Before (deprecated, still works)
+VulkanicAPI.configureTextureParameter(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+
+// After (new Vulkan-compatible API)
+CommandContext ctx = VulkanicAPI.getImmediateContext();
+VulkanicAPI.configureTextureParameter(ctx, GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+```
+
+**Vulkan Implementation (Future):**
+```java
+// Texture parameters are set through sampler objects in Vulkan
+@Override
+public void configureTextureParameter(CommandContext ctx, int target, int pname, int param) {
+    // Map GL texture parameters to Vulkan sampler creation parameters
+    // Update or create sampler with the specified parameters
+    updateSamplerParameter(target, pname, param);
+}
+```
+
+---
+
+### ✅ Method: `removeTexture(int texture)` → `removeTexture(CommandContext ctx, int texture)`
+
+**Migration Date:** 2026-02-10
+
+**Status:** Completed - New method implemented, deprecated method retained for backward compatibility
+
+**What Changed:**
+- Added `CommandContext ctx` parameter for Vulkan compatibility
+- OpenGL implementation validates immediate-mode context and calls `GL11.glDeleteTextures()`
+
+**New API Design:**
+```java
+public static void removeTexture(CommandContext ctx, int texture) {
+    getBackend().removeTexture(ctx, texture);
+}
+```
+
+**OpenGL Implementation:**
+```java
+@Override
+public void removeTexture(CommandContext ctx, int texture) {
+    if (!ctx.isImmediate()) {
+        throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+    }
+    GL11.glDeleteTextures(texture);
+}
+```
+
+**Usage Example:**
+```java
+// Before (deprecated, still works)
+VulkanicAPI.removeTexture(textureId);
+
+// After (new Vulkan-compatible API)
+CommandContext ctx = VulkanicAPI.getImmediateContext();
+VulkanicAPI.removeTexture(ctx, textureId);
+```
+
+**Vulkan Implementation (Future):**
+```java
+// Will use vkDestroyImage and vkDestroyImageView
+@Override
+public void removeTexture(CommandContext ctx, int texture) {
+    // In Vulkan, destroying resources requires the device handle
+    // and proper synchronization to ensure resources aren't in use
+    VkImage image = textureRegistry.getImage(texture);
+    VkImageView imageView = textureRegistry.getImageView(texture);
+    
+    // Queue destruction after current command buffer completes
+    queueResourceDestruction(image, imageView, ctx);
+}
+```
+
+---
+
+### ✅ Method: `configurePolygonMode(int face, int mode)` → `configurePolygonMode(CommandContext ctx, int face, int mode)`
+
+**Migration Date:** 2026-02-10
+
+**Status:** Completed - New method implemented, deprecated method retained for backward compatibility
+
+**What Changed:**
+- Added `CommandContext ctx` parameter for Vulkan compatibility
+- OpenGL implementation validates immediate-mode context and calls `GL11.glPolygonMode()`
+
+**New API Design:**
+```java
+public static void configurePolygonMode(CommandContext ctx, int face, int mode) {
+    getBackend().configurePolygonMode(ctx, face, mode);
+}
+```
+
+**OpenGL Implementation:**
+```java
+@Override
+public void configurePolygonMode(CommandContext ctx, int face, int mode) {
+    if (!ctx.isImmediate()) {
+        throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+    }
+    GL11.glPolygonMode(face, mode);
+}
+```
+
+**Usage Example:**
+```java
+// Before (deprecated, still works)
+VulkanicAPI.configurePolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+
+// After (new Vulkan-compatible API)
+CommandContext ctx = VulkanicAPI.getImmediateContext();
+VulkanicAPI.configurePolygonMode(ctx, GL_FRONT_AND_BACK, GL_LINE);
+```
+
+**Vulkan Implementation (Future):**
+```java
+// Part of pipeline state in Vulkan
+@Override
+public void configurePolygonMode(CommandContext ctx, int face, int mode) {
+    // In Vulkan, polygon mode is set in VkPipelineRasterizationStateCreateInfo
+    // during pipeline creation, not as a dynamic command
+    // This will require switching pipelines or using dynamic state if available
+    
+    VkPolygonMode vkMode = mapGLPolygonModeToVulkan(mode);
+    switchToPipelineWithPolygonMode(vkMode);
 }
 ```
 

@@ -1072,6 +1072,102 @@ public class VulkanicAPI {
         getBackend().attachFramebuffer(ctx, target, fbo);
     }
     
+    /**
+     * Attaches a texture to a framebuffer attachment point.
+     * 
+     * This is a Vulkan-compatible method that requires an explicit CommandContext.
+     * For OpenGL, use getImmediateContext() to get the context.
+     * 
+     * Example usage:
+     * <pre>
+     *     CommandContext ctx = VulkanicAPI.getImmediateContext();
+     *     VulkanicAPI.attachTextureToFramebuffer(ctx, GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, 
+     *                                            GL_TEXTURE_2D, textureId, 0);
+     * </pre>
+     * 
+     * In OpenGL: Maps to glFramebufferTexture2D(target, attachment, textarget, texture, level)
+     * In Vulkan: Textures are attached during framebuffer creation
+     * 
+     * @param ctx Command context for recording this command
+     * @param target The framebuffer target (e.g., GL_FRAMEBUFFER)
+     * @param attachment The attachment point (e.g., GL_COLOR_ATTACHMENT0)
+     * @param textarget The texture target (e.g., GL_TEXTURE_2D)
+     * @param texture The texture ID to attach
+     * @param level The mipmap level to attach
+     */
+    public static void attachTextureToFramebuffer(CommandContext ctx, int target, int attachment, int textarget, int texture, int level) {
+        getBackend().attachTextureToFramebuffer(ctx, target, attachment, textarget, texture, level);
+    }
+    
+    /**
+     * Sets a texture parameter.
+     * 
+     * This is a Vulkan-compatible method that requires an explicit CommandContext.
+     * For OpenGL, use getImmediateContext() to get the context.
+     * 
+     * Example usage:
+     * <pre>
+     *     CommandContext ctx = VulkanicAPI.getImmediateContext();
+     *     VulkanicAPI.configureTextureParameter(ctx, GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+     * </pre>
+     * 
+     * In OpenGL: Maps to glTexParameteri(target, pname, param)
+     * In Vulkan: Texture parameters are set through sampler objects
+     * 
+     * @param ctx Command context for recording this command
+     * @param target The texture target (e.g., GL_TEXTURE_2D)
+     * @param pname The parameter name (e.g., GL_TEXTURE_MIN_FILTER)
+     * @param param The parameter value
+     */
+    public static void configureTextureParameter(CommandContext ctx, int target, int pname, int param) {
+        getBackend().configureTextureParameter(ctx, target, pname, param);
+    }
+    
+    /**
+     * Deletes a texture object.
+     * 
+     * This is a Vulkan-compatible method that requires an explicit CommandContext.
+     * For OpenGL, use getImmediateContext() to get the context.
+     * 
+     * Example usage:
+     * <pre>
+     *     CommandContext ctx = VulkanicAPI.getImmediateContext();
+     *     VulkanicAPI.removeTexture(ctx, textureId);
+     * </pre>
+     * 
+     * In OpenGL: Maps to glDeleteTextures()
+     * In Vulkan: Maps to vkDestroyImage/vkDestroyImageView
+     * 
+     * @param ctx Command context for recording this command
+     * @param texture The texture ID to delete
+     */
+    public static void removeTexture(CommandContext ctx, int texture) {
+        getBackend().removeTexture(ctx, texture);
+    }
+    
+    /**
+     * Sets the polygon rasterization mode.
+     * 
+     * This is a Vulkan-compatible method that requires an explicit CommandContext.
+     * For OpenGL, use getImmediateContext() to get the context.
+     * 
+     * Example usage:
+     * <pre>
+     *     CommandContext ctx = VulkanicAPI.getImmediateContext();
+     *     VulkanicAPI.configurePolygonMode(ctx, GL_FRONT_AND_BACK, GL_LINE);
+     * </pre>
+     * 
+     * In OpenGL: Maps to glPolygonMode(face, mode)
+     * In Vulkan: Part of pipeline state (polygonMode in VkPipelineRasterizationStateCreateInfo)
+     * 
+     * @param ctx Command context for recording this command
+     * @param face Which faces to apply to (e.g., GL_FRONT_AND_BACK)
+     * @param mode The rasterization mode (e.g., GL_FILL, GL_LINE, GL_POINT)
+     */
+    public static void configurePolygonMode(CommandContext ctx, int face, int mode) {
+        getBackend().configurePolygonMode(ctx, face, mode);
+    }
+    
     @Deprecated
     public static void setPixelStoreMode(int pname, int value) {
         getBackend().setPixelStoreMode(pname, value);

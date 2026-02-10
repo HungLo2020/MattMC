@@ -363,6 +363,66 @@ public interface GraphicsBackend {
      */
     void attachFramebuffer(CommandContext ctx, int target, int fbo);
     
+    /**
+     * Attaches a texture to a framebuffer attachment point.
+     * 
+     * In OpenGL: Maps to glFramebufferTexture2D(target, attachment, textarget, texture, level)
+     * In Vulkan: Textures are attached during framebuffer creation
+     * 
+     * Attaches a texture image to a framebuffer attachment point. This is used for 
+     * render-to-texture operations and off-screen rendering.
+     * 
+     * @param ctx Command context for recording this command
+     * @param target The framebuffer target (e.g., GL_FRAMEBUFFER)
+     * @param attachment The attachment point (e.g., GL_COLOR_ATTACHMENT0)
+     * @param textarget The texture target (e.g., GL_TEXTURE_2D)
+     * @param texture The texture ID to attach
+     * @param level The mipmap level to attach
+     */
+    void attachTextureToFramebuffer(CommandContext ctx, int target, int attachment, int textarget, int texture, int level);
+    
+    /**
+     * Sets a texture parameter.
+     * 
+     * In OpenGL: Maps to glTexParameteri(target, pname, param)
+     * In Vulkan: Texture parameters are set through sampler objects
+     * 
+     * Controls texture sampling behavior such as filtering, wrapping, etc.
+     * 
+     * @param ctx Command context for recording this command
+     * @param target The texture target (e.g., GL_TEXTURE_2D)
+     * @param pname The parameter name (e.g., GL_TEXTURE_MIN_FILTER)
+     * @param param The parameter value
+     */
+    void configureTextureParameter(CommandContext ctx, int target, int pname, int param);
+    
+    /**
+     * Deletes a texture object.
+     * 
+     * In OpenGL: Maps to glDeleteTextures()
+     * In Vulkan: Maps to vkDestroyImage/vkDestroyImageView
+     * 
+     * Frees the texture resource and makes its ID available for reuse.
+     * 
+     * @param ctx Command context for recording this command
+     * @param texture The texture ID to delete
+     */
+    void removeTexture(CommandContext ctx, int texture);
+    
+    /**
+     * Sets the polygon rasterization mode.
+     * 
+     * In OpenGL: Maps to glPolygonMode(face, mode)
+     * In Vulkan: Part of pipeline state (polygonMode in VkPipelineRasterizationStateCreateInfo)
+     * 
+     * Controls how polygons are rasterized (filled, lines, or points).
+     * 
+     * @param ctx Command context for recording this command
+     * @param face Which faces to apply to (e.g., GL_FRONT_AND_BACK)
+     * @param mode The rasterization mode (e.g., GL_FILL, GL_LINE, GL_POINT)
+     */
+    void configurePolygonMode(CommandContext ctx, int face, int mode);
+    
     // Pixel operations
     @Deprecated
     void setPixelStoreMode(int pname, int value);

@@ -543,6 +543,93 @@ public class OpenGLBackend implements GraphicsBackend {
         GL30.glBindFramebuffer(target, fbo);
     }
     
+    /**
+     * Attaches a texture to a framebuffer with explicit command context.
+     * This is the Vulkan-compatible implementation for framebuffer texture attachment.
+     * 
+     * OpenGL implementation: Direct mapping to glFramebufferTexture2D()
+     * Vulkan implementation: Textures are attached during framebuffer creation
+     * 
+     * @param ctx Command context (must be immediate mode for OpenGL)
+     * @param target The framebuffer target
+     * @param attachment The attachment point
+     * @param textarget The texture target
+     * @param texture The texture ID
+     * @param level The mipmap level
+     */
+    @Override
+    public void attachTextureToFramebuffer(CommandContext ctx, int target, int attachment, int textarget, int texture, int level) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        GL30.glFramebufferTexture2D(target, attachment, textarget, texture, level);
+    }
+    
+    /**
+     * Configures a texture parameter with explicit command context.
+     * This is the Vulkan-compatible implementation for texture parameter setting.
+     * 
+     * OpenGL implementation: Direct mapping to glTexParameteri()
+     * Vulkan implementation: Texture parameters are set through sampler objects
+     * 
+     * @param ctx Command context (must be immediate mode for OpenGL)
+     * @param target The texture target
+     * @param pname The parameter name
+     * @param param The parameter value
+     */
+    @Override
+    public void configureTextureParameter(CommandContext ctx, int target, int pname, int param) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        GL11.glTexParameteri(target, pname, param);
+    }
+    
+    /**
+     * Removes a texture with explicit command context.
+     * This is the Vulkan-compatible implementation for texture deletion.
+     * 
+     * OpenGL implementation: Direct mapping to glDeleteTextures()
+     * Vulkan implementation: Will use vkDestroyImage/vkDestroyImageView
+     * 
+     * @param ctx Command context (must be immediate mode for OpenGL)
+     * @param texture The texture ID to delete
+     */
+    @Override
+    public void removeTexture(CommandContext ctx, int texture) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        GL11.glDeleteTextures(texture);
+    }
+    
+    /**
+     * Configures polygon mode with explicit command context.
+     * This is the Vulkan-compatible implementation for polygon rasterization mode.
+     * 
+     * OpenGL implementation: Direct mapping to glPolygonMode()
+     * Vulkan implementation: Part of pipeline state
+     * 
+     * @param ctx Command context (must be immediate mode for OpenGL)
+     * @param face Which faces to apply to
+     * @param mode The rasterization mode
+     */
+    @Override
+    public void configurePolygonMode(CommandContext ctx, int face, int mode) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        GL11.glPolygonMode(face, mode);
+    }
+    
     @Deprecated
     @Override
     public void setPixelStoreMode(int pname, int value) {
