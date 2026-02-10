@@ -7,7 +7,7 @@
 **Analyzed Components:** VulkanicAPI.java, GraphicsBackend.java, OpenGLBackend.java  
 **Lines of Code Analyzed:** ~4,000 LOC  
 **Deprecated Methods:** 874 methods marked for replacement  
-**Migrated Methods:** 16 methods (1.8% complete)
+**Migrated Methods:** 21 methods (2.4% complete)
 
 ---
 
@@ -15,15 +15,15 @@
 
 **MIGRATION STATUS: ACTIVE MIGRATION IN PROGRESS** 🔄
 
-All 874 methods in the current Vulkanic API have been marked as `@Deprecated` to facilitate an **incremental, test-driven migration** to a properly abstracted graphics API that supports both OpenGL and Vulkan backends. We have now begun the active migration phase, with **16 methods successfully migrated** to the new CommandContext-aware API.
+All 874 methods in the current Vulkanic API have been marked as `@Deprecated` to facilitate an **incremental, test-driven migration** to a properly abstracted graphics API that supports both OpenGL and Vulkan backends. We have now begun the active migration phase, with **21 methods successfully migrated** to the new CommandContext-aware API.
 
 ### Current State (Active Migration)
 
 The legacy Vulkanic API is a **thin OpenGL state machine wrapper** with approximately **25-30% compatibility** with Vulkan's architectural principles. While it successfully abstracts OpenGL calls behind an interface, the API design is fundamentally tied to OpenGL's immediate-mode, global-state paradigm, which conflicts with Vulkan's explicit, command-buffer-based architecture.
 
 **Migration Progress:**
-- ✅ **16 methods migrated** to CommandContext-aware API (1.8% of 874 total)
-- ⚠️ **858 methods remaining** in deprecated state
+- ✅ **21 methods migrated** to CommandContext-aware API (2.4% of 874 total)
+- ⚠️ **853 methods remaining** in deprecated state
 - ✅ **All tests passing** (10/10 Vulkanic unit tests)
 - ✅ **Zero breaking changes** - fully backward compatible
 
@@ -44,6 +44,11 @@ The legacy Vulkanic API is a **thin OpenGL state machine wrapper** with approxim
 14. `enable(ctx, cap)` - Enable capability
 15. `disable(ctx, cap)` - Disable capability
 16. `activateTextureUnit(ctx, unit)` - Activate texture unit
+17. `generateMipmap(ctx, target)` - Generate mipmaps
+18. `bindTexture(ctx, textureId)` - Bind texture (2D default)
+19. `bindTexture(ctx, target, textureId)` - Bind texture (explicit target)
+20. `setPixelStoreMode(ctx, pname, value)` - Pixel storage mode
+21. `attachFramebuffer(ctx, target, fbo)` - Bind framebuffer
 
 ### New Migration Strategy: Incremental Replacement
 
@@ -218,10 +223,11 @@ Track progress using this table (update after each method migration):
 | `enable(int cap)` | TBD | `enable(ctx, cap)` | 🟢 Completed |
 | `disable(int cap)` | TBD | `disable(ctx, cap)` | 🟢 Completed |
 | `activateTextureUnit()` | TBD | `activateTextureUnit(ctx, ...)` | 🟢 Completed |
-| `bindTexture()` | 2,847 | `bindTextureToDescriptorSet()` | 🔴 Not Started |
-| `activateTextureUnit()` | 1,923 | *(see bindTexture)* | 🔴 Not Started |
-| `enable(int cap)` | 1,456 | `createPipeline()` | 🔴 Not Started |
-| `attachFramebuffer()` | 892 | `beginRenderPass()` | 🔴 Not Started |
+| `generateMipmap()` | TBD | `generateMipmap(ctx, target)` | 🟢 Completed |
+| `bindTexture(int textureId)` | TBD | `bindTexture(ctx, textureId)` | 🟢 Completed |
+| `bindTexture(int target, int textureId)` | TBD | `bindTexture(ctx, target, textureId)` | 🟢 Completed |
+| `setPixelStoreMode()` | TBD | `setPixelStoreMode(ctx, ...)` | 🟢 Completed |
+| `attachFramebuffer()` | TBD | `attachFramebuffer(ctx, ...)` | 🟢 Completed |
 | ... | ... | ... | ... |
 
 **Legend:**
@@ -2624,6 +2630,276 @@ public void activateTextureUnit(CommandContext ctx, int unit) {
     // In Vulkan, we track which descriptor set binding we're working with
     // The actual binding happens through descriptor sets, not active texture units
     currentTextureSlot = unit - GL_TEXTURE0; // Track for compatibility
+}
+```
+
+---
+
+### ✅ Method: `generateMipmap(int target)` → `generateMipmap(CommandContext ctx, int target)`
+
+**Migration Date:** 2026-02-10
+
+**Status:** Completed - New method implemented, deprecated method retained for backward compatibility
+
+**What Changed:**
+- Added `CommandContext ctx` parameter for Vulkan compatibility
+- OpenGL implementation validates immediate-mode context and calls `GL30.glGenerateMipmap(target)`
+
+**New API Design:**
+```java
+public static void generateMipmap(CommandContext ctx, int target) {
+    getBackend().generateMipmap(ctx, target);
+}
+```
+
+**OpenGL Implementation:**
+```java
+@Override
+public void generateMipmap(CommandContext ctx, int target) {
+    if (!ctx.isImmediate()) {
+        throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+    }
+    GL30.glGenerateMipmap(target);
+}
+```
+
+**Usage Example:**
+```java
+// Before (deprecated, still works)
+VulkanicAPI.generateMipmap(GL_TEXTURE_2D);
+
+// After (new Vulkan-compatible API)
+CommandContext ctx = VulkanicAPI.getImmediateContext();
+VulkanicAPI.generateMipmap(ctx, GL_TEXTURE_2D);
+```
+
+**Vulkan Implementation (Future):**
+```java
+// Will use vkCmdBlitImage for mipmap generation
+@Override
+public void generateMipmap(CommandContext ctx, int target) {
+    VkCommandBuffer cmdBuf = (VkCommandBuffer) ctx.getHandle();
+    // Perform a series of vkCmdBlitImage calls to generate mip levels
+    // Each blit downsamples the previous level by half
+}
+```
+
+---
+
+### ✅ Method: `bindTexture(int textureId)` → `bindTexture(CommandContext ctx, int textureId)`
+
+**Migration Date:** 2026-02-10
+
+**Status:** Completed - New method implemented, deprecated method retained for backward compatibility
+
+**What Changed:**
+- Added `CommandContext ctx` parameter for Vulkan compatibility
+- OpenGL implementation validates immediate-mode context and uses GlStateManager for optimization
+- Binds to GL_TEXTURE_2D target by default
+
+**New API Design:**
+```java
+public static void bindTexture(CommandContext ctx, int textureId) {
+    getBackend().bindTexture(ctx, textureId);
+}
+```
+
+**OpenGL Implementation:**
+```java
+@Override
+public void bindTexture(CommandContext ctx, int textureId) {
+    if (!ctx.isImmediate()) {
+        throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+    }
+    int activeTexUnit = GlStateManager.activeTexture;
+    if (textureId != GlStateManager.TEXTURES[activeTexUnit].binding) {
+        GlStateManager.TEXTURES[activeTexUnit].binding = textureId;
+        GL11.glBindTexture(GL11.GL_TEXTURE_2D, textureId);
+    }
+}
+```
+
+**Usage Example:**
+```java
+// Before (deprecated, still works)
+VulkanicAPI.activateTextureUnit(GL_TEXTURE0);
+VulkanicAPI.bindTexture(textureId);
+
+// After (new Vulkan-compatible API)
+CommandContext ctx = VulkanicAPI.getImmediateContext();
+VulkanicAPI.activateTextureUnit(ctx, GL_TEXTURE0);
+VulkanicAPI.bindTexture(ctx, textureId);
+```
+
+**Vulkan Implementation (Future):**
+```java
+// Will bind through descriptor sets
+@Override
+public void bindTexture(CommandContext ctx, int textureId) {
+    // Textures are bound through descriptor sets in Vulkan
+    // This will update the descriptor set at the current binding slot
+    updateDescriptorSetTexture(currentDescriptorSet, currentTextureSlot, textureId);
+}
+```
+
+---
+
+### ✅ Method: `bindTexture(int target, int textureId)` → `bindTexture(CommandContext ctx, int target, int textureId)`
+
+**Migration Date:** 2026-02-10
+
+**Status:** Completed - New method implemented, deprecated method retained for backward compatibility
+
+**What Changed:**
+- Added `CommandContext ctx` parameter for Vulkan compatibility
+- OpenGL implementation validates immediate-mode context and calls `GL11.glBindTexture(target, textureId)`
+- Allows explicit target specification (GL_TEXTURE_2D, GL_TEXTURE_CUBE_MAP, etc.)
+
+**New API Design:**
+```java
+public static void bindTexture(CommandContext ctx, int target, int textureId) {
+    getBackend().bindTexture(ctx, target, textureId);
+}
+```
+
+**OpenGL Implementation:**
+```java
+@Override
+public void bindTexture(CommandContext ctx, int target, int textureId) {
+    if (!ctx.isImmediate()) {
+        throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+    }
+    GL11.glBindTexture(target, textureId);
+}
+```
+
+**Usage Example:**
+```java
+// Before (deprecated, still works)
+VulkanicAPI.bindTexture(GL_TEXTURE_CUBE_MAP, cubemapId);
+
+// After (new Vulkan-compatible API)
+CommandContext ctx = VulkanicAPI.getImmediateContext();
+VulkanicAPI.bindTexture(ctx, GL_TEXTURE_CUBE_MAP, cubemapId);
+```
+
+**Vulkan Implementation (Future):**
+```java
+// Will bind through descriptor sets with target-specific handling
+@Override
+public void bindTexture(CommandContext ctx, int target, int textureId) {
+    // Map GL target to Vulkan image view type
+    VkImageViewType viewType = mapGLTargetToVkViewType(target);
+    updateDescriptorSetTexture(currentDescriptorSet, currentTextureSlot, textureId, viewType);
+}
+```
+
+---
+
+### ✅ Method: `setPixelStoreMode(int pname, int value)` → `setPixelStoreMode(CommandContext ctx, int pname, int value)`
+
+**Migration Date:** 2026-02-10
+
+**Status:** Completed - New method implemented, deprecated method retained for backward compatibility
+
+**What Changed:**
+- Added `CommandContext ctx` parameter for Vulkan compatibility
+- OpenGL implementation validates immediate-mode context and calls `GL11.glPixelStorei(pname, value)`
+
+**New API Design:**
+```java
+public static void setPixelStoreMode(CommandContext ctx, int pname, int value) {
+    getBackend().setPixelStoreMode(ctx, pname, value);
+}
+```
+
+**OpenGL Implementation:**
+```java
+@Override
+public void setPixelStoreMode(CommandContext ctx, int pname, int value) {
+    if (!ctx.isImmediate()) {
+        throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+    }
+    GL11.glPixelStorei(pname, value);
+}
+```
+
+**Usage Example:**
+```java
+// Before (deprecated, still works)
+VulkanicAPI.setPixelStoreMode(GL_UNPACK_ALIGNMENT, 1);
+
+// After (new Vulkan-compatible API)
+CommandContext ctx = VulkanicAPI.getImmediateContext();
+VulkanicAPI.setPixelStoreMode(ctx, GL_UNPACK_ALIGNMENT, 1);
+```
+
+**Vulkan Implementation (Future):**
+```java
+// Will be handled through buffer copy parameters
+@Override
+public void setPixelStoreMode(CommandContext ctx, int pname, int value) {
+    // In Vulkan, pixel packing/unpacking is controlled through VkBufferImageCopy
+    // Store these values for use in subsequent image upload operations
+    if (pname == GL_UNPACK_ALIGNMENT) {
+        currentUnpackAlignment = value;
+    } else if (pname == GL_PACK_ALIGNMENT) {
+        currentPackAlignment = value;
+    }
+    // Other modes will be handled as needed
+}
+```
+
+---
+
+### ✅ Method: `attachFramebuffer(int target, int fbo)` → `attachFramebuffer(CommandContext ctx, int target, int fbo)`
+
+**Migration Date:** 2026-02-10
+
+**Status:** Completed - New method implemented, deprecated method retained for backward compatibility
+
+**What Changed:**
+- Added `CommandContext ctx` parameter for Vulkan compatibility
+- OpenGL implementation validates immediate-mode context and calls `GL30.glBindFramebuffer(target, fbo)`
+
+**New API Design:**
+```java
+public static void attachFramebuffer(CommandContext ctx, int target, int fbo) {
+    getBackend().attachFramebuffer(ctx, target, fbo);
+}
+```
+
+**OpenGL Implementation:**
+```java
+@Override
+public void attachFramebuffer(CommandContext ctx, int target, int fbo) {
+    if (!ctx.isImmediate()) {
+        throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+    }
+    GL30.glBindFramebuffer(target, fbo);
+}
+```
+
+**Usage Example:**
+```java
+// Before (deprecated, still works)
+VulkanicAPI.attachFramebuffer(GL_FRAMEBUFFER, fboId);
+
+// After (new Vulkan-compatible API)
+CommandContext ctx = VulkanicAPI.getImmediateContext();
+VulkanicAPI.attachFramebuffer(ctx, GL_FRAMEBUFFER, fboId);
+```
+
+**Vulkan Implementation (Future):**
+```java
+// Will be handled through render pass begin
+@Override
+public void attachFramebuffer(CommandContext ctx, int target, int fbo) {
+    VkCommandBuffer cmdBuf = (VkCommandBuffer) ctx.getHandle();
+    // Framebuffer binding in Vulkan happens through vkCmdBeginRenderPass
+    // Store the FBO for use when beginning the next render pass
+    currentFramebuffer = fbo;
+    // The actual binding will occur in beginRenderPass()
 }
 ```
 

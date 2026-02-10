@@ -959,6 +959,119 @@ public class VulkanicAPI {
         getBackend().activateTextureUnit(ctx, unit);
     }
     
+    /**
+     * Generates mipmaps for a texture target.
+     * 
+     * This is a Vulkan-compatible method that requires an explicit CommandContext.
+     * For OpenGL, use getImmediateContext() to get the context.
+     * 
+     * Example usage:
+     * <pre>
+     *     CommandContext ctx = VulkanicAPI.getImmediateContext();
+     *     VulkanicAPI.generateMipmap(ctx, GL_TEXTURE_2D);
+     * </pre>
+     * 
+     * In OpenGL: Maps to glGenerateMipmap(target)
+     * In Vulkan: Handled through image layout transitions and vkCmdBlitImage
+     * 
+     * @param ctx Command context for recording this command
+     * @param target The texture target (e.g., GL_TEXTURE_2D)
+     */
+    public static void generateMipmap(CommandContext ctx, int target) {
+        getBackend().generateMipmap(ctx, target);
+    }
+    
+    /**
+     * Binds a texture to the currently active texture unit.
+     * 
+     * This is a Vulkan-compatible method that requires an explicit CommandContext.
+     * For OpenGL, use getImmediateContext() to get the context.
+     * 
+     * Example usage:
+     * <pre>
+     *     CommandContext ctx = VulkanicAPI.getImmediateContext();
+     *     VulkanicAPI.bindTexture(ctx, textureId);
+     * </pre>
+     * 
+     * In OpenGL: Maps to glBindTexture(GL_TEXTURE_2D, textureId)
+     * In Vulkan: Textures are bound through descriptor sets
+     * 
+     * @param ctx Command context for recording this command
+     * @param textureId The texture ID to bind
+     */
+    public static void bindTexture(CommandContext ctx, int textureId) {
+        getBackend().bindTexture(ctx, textureId);
+    }
+    
+    /**
+     * Binds a texture to a specific target on the currently active texture unit.
+     * 
+     * This is a Vulkan-compatible method that requires an explicit CommandContext.
+     * For OpenGL, use getImmediateContext() to get the context.
+     * 
+     * Example usage:
+     * <pre>
+     *     CommandContext ctx = VulkanicAPI.getImmediateContext();
+     *     VulkanicAPI.bindTexture(ctx, GL_TEXTURE_2D, textureId);
+     * </pre>
+     * 
+     * In OpenGL: Maps to glBindTexture(target, textureId)
+     * In Vulkan: Textures are bound through descriptor sets
+     * 
+     * @param ctx Command context for recording this command
+     * @param target The texture target (e.g., GL_TEXTURE_2D)
+     * @param textureId The texture ID to bind
+     */
+    public static void bindTexture(CommandContext ctx, int target, int textureId) {
+        getBackend().bindTexture(ctx, target, textureId);
+    }
+    
+    /**
+     * Sets pixel storage modes for texture upload operations.
+     * 
+     * This is a Vulkan-compatible method that requires an explicit CommandContext.
+     * For OpenGL, use getImmediateContext() to get the context.
+     * 
+     * Example usage:
+     * <pre>
+     *     CommandContext ctx = VulkanicAPI.getImmediateContext();
+     *     VulkanicAPI.setPixelStoreMode(ctx, GL_UNPACK_ALIGNMENT, 1);
+     * </pre>
+     * 
+     * In OpenGL: Maps to glPixelStorei(pname, value)
+     * In Vulkan: Handled through buffer copy parameters
+     * 
+     * @param ctx Command context for recording this command
+     * @param pname The pixel storage parameter name
+     * @param value The value to set
+     */
+    public static void setPixelStoreMode(CommandContext ctx, int pname, int value) {
+        getBackend().setPixelStoreMode(ctx, pname, value);
+    }
+    
+    /**
+     * Binds a framebuffer object to a framebuffer target.
+     * 
+     * This is a Vulkan-compatible method that requires an explicit CommandContext.
+     * For OpenGL, use getImmediateContext() to get the context.
+     * 
+     * Example usage:
+     * <pre>
+     *     CommandContext ctx = VulkanicAPI.getImmediateContext();
+     *     VulkanicAPI.attachFramebuffer(ctx, GL_FRAMEBUFFER, fboId);
+     * </pre>
+     * 
+     * In OpenGL: Maps to glBindFramebuffer(target, fbo)
+     * In Vulkan: Framebuffers are bound through render pass begin
+     * 
+     * @param ctx Command context for recording this command
+     * @param target The framebuffer target
+     * @param fbo The framebuffer object ID to bind (0 for default framebuffer)
+     */
+    public static void attachFramebuffer(CommandContext ctx, int target, int fbo) {
+        getBackend().attachFramebuffer(ctx, target, fbo);
+    }
+    
     @Deprecated
     public static void setPixelStoreMode(int pname, int value) {
         getBackend().setPixelStoreMode(pname, value);

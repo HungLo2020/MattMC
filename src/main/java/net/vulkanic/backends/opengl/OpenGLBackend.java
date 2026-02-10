@@ -436,6 +436,113 @@ public class OpenGLBackend implements GraphicsBackend {
         org.lwjgl.opengl.GL13.glActiveTexture(unit);
     }
     
+    /**
+     * Generates mipmaps with explicit command context.
+     * This is the Vulkan-compatible implementation for mipmap generation.
+     * 
+     * OpenGL implementation: Direct mapping to glGenerateMipmap() (context is validated but not used)
+     * Vulkan implementation: Will use vkCmdBlitImage() for mip chain generation
+     * 
+     * @param ctx Command context (must be immediate mode for OpenGL)
+     * @param target The texture target
+     */
+    @Override
+    public void generateMipmap(CommandContext ctx, int target) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        GL30.glGenerateMipmap(target);
+    }
+    
+    /**
+     * Binds a texture with explicit command context.
+     * This is the Vulkan-compatible implementation for texture binding.
+     * 
+     * OpenGL implementation: Direct mapping to glBindTexture(GL_TEXTURE_2D, textureId)
+     * Vulkan implementation: Will bind through descriptor sets
+     * 
+     * @param ctx Command context (must be immediate mode for OpenGL)
+     * @param textureId The texture ID to bind
+     */
+    @Override
+    public void bindTexture(CommandContext ctx, int textureId) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        int activeTexUnit = GlStateManager.activeTexture;
+        if (textureId != GlStateManager.TEXTURES[activeTexUnit].binding) {
+            GlStateManager.TEXTURES[activeTexUnit].binding = textureId;
+            GL11.glBindTexture(GL11.GL_TEXTURE_2D, textureId);
+        }
+    }
+    
+    /**
+     * Binds a texture to a specific target with explicit command context.
+     * This is the Vulkan-compatible implementation for texture binding.
+     * 
+     * OpenGL implementation: Direct mapping to glBindTexture(target, textureId)
+     * Vulkan implementation: Will bind through descriptor sets
+     * 
+     * @param ctx Command context (must be immediate mode for OpenGL)
+     * @param target The texture target
+     * @param textureId The texture ID to bind
+     */
+    @Override
+    public void bindTexture(CommandContext ctx, int target, int textureId) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        GL11.glBindTexture(target, textureId);
+    }
+    
+    /**
+     * Sets pixel storage mode with explicit command context.
+     * This is the Vulkan-compatible implementation for pixel storage control.
+     * 
+     * OpenGL implementation: Direct mapping to glPixelStorei()
+     * Vulkan implementation: Will be handled through buffer copy parameters
+     * 
+     * @param ctx Command context (must be immediate mode for OpenGL)
+     * @param pname The pixel storage parameter name
+     * @param value The value to set
+     */
+    @Override
+    public void setPixelStoreMode(CommandContext ctx, int pname, int value) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        GL11.glPixelStorei(pname, value);
+    }
+    
+    /**
+     * Attaches a framebuffer with explicit command context.
+     * This is the Vulkan-compatible implementation for framebuffer binding.
+     * 
+     * OpenGL implementation: Direct mapping to glBindFramebuffer()
+     * Vulkan implementation: Will be handled through render pass begin
+     * 
+     * @param ctx Command context (must be immediate mode for OpenGL)
+     * @param target The framebuffer target
+     * @param fbo The framebuffer object ID
+     */
+    @Override
+    public void attachFramebuffer(CommandContext ctx, int target, int fbo) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        GL30.glBindFramebuffer(target, fbo);
+    }
+    
     @Deprecated
     @Override
     public void setPixelStoreMode(int pname, int value) {

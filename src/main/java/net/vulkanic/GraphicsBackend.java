@@ -290,6 +290,79 @@ public interface GraphicsBackend {
      */
     void activateTextureUnit(CommandContext ctx, int unit);
     
+    /**
+     * Generates mipmaps for a texture target.
+     * 
+     * In OpenGL: Maps to glGenerateMipmap(target)
+     * In Vulkan: Handled through image layout transitions and vkCmdBlitImage
+     * 
+     * Automatically generates a complete set of mipmaps for a texture, creating
+     * successively smaller filtered versions of the base level image.
+     * 
+     * @param ctx Command context for recording this command
+     * @param target The texture target (e.g., GL_TEXTURE_2D)
+     */
+    void generateMipmap(CommandContext ctx, int target);
+    
+    /**
+     * Binds a texture to the currently active texture unit.
+     * 
+     * In OpenGL: Maps to glBindTexture(GL_TEXTURE_2D, textureId)
+     * In Vulkan: Textures are bound through descriptor sets
+     * 
+     * Makes a texture object active for subsequent texture operations on the
+     * currently active texture unit.
+     * 
+     * @param ctx Command context for recording this command
+     * @param textureId The texture ID to bind
+     */
+    void bindTexture(CommandContext ctx, int textureId);
+    
+    /**
+     * Binds a texture to a specific target on the currently active texture unit.
+     * 
+     * In OpenGL: Maps to glBindTexture(target, textureId)
+     * In Vulkan: Textures are bound through descriptor sets
+     * 
+     * Makes a texture object active for the specified target (e.g., GL_TEXTURE_2D,
+     * GL_TEXTURE_CUBE_MAP) on the currently active texture unit.
+     * 
+     * @param ctx Command context for recording this command
+     * @param target The texture target (e.g., GL_TEXTURE_2D)
+     * @param textureId The texture ID to bind
+     */
+    void bindTexture(CommandContext ctx, int target, int textureId);
+    
+    /**
+     * Sets pixel storage modes for texture upload operations.
+     * 
+     * In OpenGL: Maps to glPixelStorei(pname, value)
+     * In Vulkan: Handled through buffer copy parameters
+     * 
+     * Controls how pixel data is read from client memory during texture upload.
+     * Common parameters: GL_UNPACK_ALIGNMENT, GL_PACK_ALIGNMENT.
+     * 
+     * @param ctx Command context for recording this command
+     * @param pname The pixel storage parameter name
+     * @param value The value to set
+     */
+    void setPixelStoreMode(CommandContext ctx, int pname, int value);
+    
+    /**
+     * Binds a framebuffer object to a framebuffer target.
+     * 
+     * In OpenGL: Maps to glBindFramebuffer(target, fbo)
+     * In Vulkan: Framebuffers are bound through render pass begin
+     * 
+     * Makes a framebuffer object active for subsequent rendering operations.
+     * Target can be GL_FRAMEBUFFER, GL_READ_FRAMEBUFFER, or GL_DRAW_FRAMEBUFFER.
+     * 
+     * @param ctx Command context for recording this command
+     * @param target The framebuffer target
+     * @param fbo The framebuffer object ID to bind (0 for default framebuffer)
+     */
+    void attachFramebuffer(CommandContext ctx, int target, int fbo);
+    
     // Pixel operations
     @Deprecated
     void setPixelStoreMode(int pname, int value);
