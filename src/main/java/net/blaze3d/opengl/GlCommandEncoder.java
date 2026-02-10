@@ -28,11 +28,14 @@ import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.util.ARGB;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.CommandContext;
+import net.vulkanic.backends.opengl.OpenGLCommandContext;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 
 @Environment(EnvType.CLIENT)
 public class GlCommandEncoder implements CommandEncoder {
+	private static final CommandContext CTX = OpenGLCommandContext.IMMEDIATE;
 	private static final Logger LOGGER = LogUtils.getLogger();
 	private final GlDevice device;
 	private final int readFbo;
@@ -425,7 +428,7 @@ public class GlCommandEncoder implements CommandEncoder {
 				int q;
 				if ((gpuTexture.usage() & 16) != 0) {
 					q = GlConst.CUBEMAP_TARGETS[j % 6];
-					VulkanicAPI.bindTexture(34067, ((GlTexture)gpuTexture).id);
+					VulkanicAPI.bindTexture(CTX, 34067, ((GlTexture)gpuTexture).id);
 				} else {
 					q = 3553;
 					GlStateManager._bindTexture(((GlTexture)gpuTexture).id);
@@ -477,7 +480,7 @@ public class GlCommandEncoder implements CommandEncoder {
 				int o;
 				if ((gpuTexture.usage() & 16) != 0) {
 					o = GlConst.CUBEMAP_TARGETS[j % 6];
-					VulkanicAPI.bindTexture(34067, ((GlTexture)gpuTexture).id);
+					VulkanicAPI.bindTexture(CTX, 34067, ((GlTexture)gpuTexture).id);
 				} else {
 					o = 3553;
 					GlStateManager._bindTexture(((GlTexture)gpuTexture).id);
@@ -932,7 +935,7 @@ public class GlCommandEncoder implements CommandEncoder {
 					}
 
 					GlStateManager._activeTexture(33984 + var42);
-					VulkanicAPI.bindTexture(35882, var44);
+					VulkanicAPI.bindTexture(CTX, 35882, var44);
 					if (bl2) {
 						GpuBufferSlice gpuBufferSlice3 = (GpuBufferSlice)glRenderPass.uniforms.get(string2);
 						VulkanicAPI.attachBufferToTexture(35882, GlConst.toGlInternalId(var43), ((GlBuffer)gpuBufferSlice3.buffer()).handle);
@@ -954,7 +957,7 @@ public class GlCommandEncoder implements CommandEncoder {
 					int o;
 					if ((glTexture.usage() & 16) != 0) {
 						o = 34067;
-						VulkanicAPI.bindTexture(34067, glTexture.id);
+						VulkanicAPI.bindTexture(CTX, 34067, glTexture.id);
 					} else {
 						o = 3553;
 						GlStateManager._bindTexture(glTexture.id);

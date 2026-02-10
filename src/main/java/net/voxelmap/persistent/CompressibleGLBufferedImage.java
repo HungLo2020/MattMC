@@ -17,8 +17,11 @@ import net.minecraft.resources.ResourceLocation;
 import org.apache.logging.log4j.Level;
 import org.lwjgl.system.MemoryUtil;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.CommandContext;
+import net.vulkanic.backends.opengl.OpenGLCommandContext;
 
 public class CompressibleGLBufferedImage {
+    private static final CommandContext CTX = OpenGLCommandContext.IMMEDIATE;
     private static final HashMap<Integer, ByteBuffer> byteBuffers = new HashMap<>(4);
     private static final int DEFAULT_SIZE = 256;
     private static final ByteBuffer defaultSizeBuffer = ByteBuffer.allocateDirect(DEFAULT_SIZE * DEFAULT_SIZE * 4).order(ByteOrder.nativeOrder());
@@ -101,8 +104,8 @@ public class CompressibleGLBufferedImage {
         ByteBuffer outBuffer = MemoryUtil.memByteBuffer(this.texture.getPixels().getPointer(), imageBytes);
         MemoryUtil.memCopy(buffer, outBuffer);
         this.texture.upload();
-        VulkanicAPI.bindTexture(VulkanicAPI.GL_TEXTURE_2D, ((GlTexture) this.texture.getTexture()).glId());
-        VulkanicAPI.generateMipmap(VulkanicAPI.GL_TEXTURE_2D);
+        VulkanicAPI.bindTexture(CTX, VulkanicAPI.GL_TEXTURE_2D, ((GlTexture) this.texture.getTexture()).glId());
+        VulkanicAPI.generateMipmap(CTX, VulkanicAPI.GL_TEXTURE_2D);
         this.compress();
     }
 

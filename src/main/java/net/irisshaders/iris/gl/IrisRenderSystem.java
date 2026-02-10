@@ -12,6 +12,8 @@ import net.irisshaders.iris.gl.texture.TextureType;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.PerspectiveProjectionMatrixBuffer;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.CommandContext;
+import net.vulkanic.backends.opengl.OpenGLCommandContext;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix4f;
 import org.joml.Vector3i;
@@ -25,6 +27,7 @@ import java.nio.IntBuffer;
  * This class is responsible for abstracting calls to OpenGL and asserting that calls are run on the render thread.
  */
 public class IrisRenderSystem {
+	private static final CommandContext CTX = OpenGLCommandContext.IMMEDIATE;
 	private static final int[] emptyArray = new int[SamplerLimits.get().getMaxTextureUnits()];
 	private static GpuBufferSlice backupProjection;
 	private static PerspectiveProjectionMatrixBuffer perspectiveProjectionMatrixBuffer;
@@ -371,12 +374,12 @@ public class IrisRenderSystem {
 		if (glType == VulkanicAPI.GL_TEXTURE_2D) {
 			lastTex = GlStateManager.TEXTURES[GlStateManager.activeTexture].binding;
 		}
-		VulkanicAPI.bindTexture(glType, glId);
+		VulkanicAPI.bindTexture(CTX, glType, glId);
 	}
 
 	public static void restoreTexture() {
 		if (lastTex != -1) {
-			VulkanicAPI.bindTexture(VulkanicAPI.GL_TEXTURE_2D, lastTex);
+			VulkanicAPI.bindTexture(CTX, VulkanicAPI.GL_TEXTURE_2D, lastTex);
 			lastTex = -1;
 		}
 	}
@@ -759,7 +762,7 @@ public class IrisRenderSystem {
 		public void bindTextureToUnit(int target, int unit, int texture) {
 			int activeTexture = GlStateManager.activeTexture;
 			GlStateManager._activeTexture(VulkanicAPI.GL_TEXTURE0 + unit);
-			VulkanicAPI.bindTexture(target, texture);
+			VulkanicAPI.bindTexture(CTX, target, texture);
 			if (target == VulkanicAPI.GL_TEXTURE_2D) {
 				GlStateManager.TEXTURES[unit].binding = texture;
 			}

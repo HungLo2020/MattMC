@@ -480,12 +480,14 @@ public class GlStateManager {
 
 	public static void _bindTexture(int i) {
 		RenderSystem.assertOnRenderThread();
-		net.vulkanic.VulkanicAPI.bindTexture(i);
+		CommandContext ctx = VulkanicAPI.getImmediateContext();
+		net.vulkanic.VulkanicAPI.bindTexture(ctx, i);
 	}
 
 	public static void _texImage2D(int i, int j, int k, int l, int m, int n, int o, int p, @Nullable ByteBuffer byteBuffer) {
 		RenderSystem.assertOnRenderThread();
-		net.vulkanic.VulkanicAPI.transferTexture2DImage(i, j, k, l, m, n, o, p, byteBuffer);
+		CommandContext ctx = VulkanicAPI.getImmediateContext();
+		net.vulkanic.VulkanicAPI.transferTexture2DImage(ctx, i, j, k, l, m, n, o, p, byteBuffer);
 		
 		// Iris: Track texture image data (from MixinGlStateManager texture)
 		net.irisshaders.iris.pbr.TextureInfoCache.INSTANCE.onTexImage2D(i, j, k, l, m, n, o, p, byteBuffer);

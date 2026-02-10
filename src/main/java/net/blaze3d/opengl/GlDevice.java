@@ -122,7 +122,8 @@ public class GlDevice implements GpuDevice {
 
 			int o;
 			if (bl) {
-				net.vulkanic.VulkanicAPI.bindTexture(34067, n); // GL_TEXTURE_CUBE_MAP
+				net.vulkanic.CommandContext ctx = net.vulkanic.VulkanicAPI.getImmediateContext();
+				net.vulkanic.VulkanicAPI.bindTexture(ctx, 34067, n); // GL_TEXTURE_CUBE_MAP
 				o = 34067;
 			} else {
 				GlStateManager._bindTexture(n);
