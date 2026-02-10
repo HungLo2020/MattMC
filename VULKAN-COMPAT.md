@@ -7,7 +7,7 @@
 **Analyzed Components:** VulkanicAPI.java, GraphicsBackend.java, OpenGLBackend.java  
 **Lines of Code Analyzed:** ~4,000 LOC  
 **Deprecated Methods:** 874 methods marked for replacement  
-**Migrated Methods:** 11 methods (1.3% complete)
+**Migrated Methods:** 16 methods (1.8% complete)
 
 ---
 
@@ -15,15 +15,15 @@
 
 **MIGRATION STATUS: ACTIVE MIGRATION IN PROGRESS** 🔄
 
-All 874 methods in the current Vulkanic API have been marked as `@Deprecated` to facilitate an **incremental, test-driven migration** to a properly abstracted graphics API that supports both OpenGL and Vulkan backends. We have now begun the active migration phase, with **11 methods successfully migrated** to the new CommandContext-aware API.
+All 874 methods in the current Vulkanic API have been marked as `@Deprecated` to facilitate an **incremental, test-driven migration** to a properly abstracted graphics API that supports both OpenGL and Vulkan backends. We have now begun the active migration phase, with **16 methods successfully migrated** to the new CommandContext-aware API.
 
 ### Current State (Active Migration)
 
 The legacy Vulkanic API is a **thin OpenGL state machine wrapper** with approximately **25-30% compatibility** with Vulkan's architectural principles. While it successfully abstracts OpenGL calls behind an interface, the API design is fundamentally tied to OpenGL's immediate-mode, global-state paradigm, which conflicts with Vulkan's explicit, command-buffer-based architecture.
 
 **Migration Progress:**
-- ✅ **11 methods migrated** to CommandContext-aware API (1.3% of 874 total)
-- ⚠️ **863 methods remaining** in deprecated state
+- ✅ **16 methods migrated** to CommandContext-aware API (1.8% of 874 total)
+- ⚠️ **858 methods remaining** in deprecated state
 - ✅ **All tests passing** (10/10 Vulkanic unit tests)
 - ✅ **Zero breaking changes** - fully backward compatible
 
@@ -39,13 +39,18 @@ The legacy Vulkanic API is a **thin OpenGL state machine wrapper** with approxim
 9. `setDepthFunc(ctx, ...)` - Depth comparison
 10. `setBlendFunc(ctx, ...)` - Blend function
 11. `bindBuffer(ctx, ...)` - Buffer binding
+12. `enableBlend(ctx)` - Enable blending
+13. `disableBlend(ctx)` - Disable blending
+14. `enable(ctx, cap)` - Enable capability
+15. `disable(ctx, cap)` - Disable capability
+16. `activateTextureUnit(ctx, unit)` - Activate texture unit
 
 ### New Migration Strategy: Incremental Replacement
 
 Instead of building a complete Vulkan backend for the flawed legacy API, we are pursuing a **safer, incremental approach**:
 
 1. **✅ COMPLETED:** Mark all existing methods as `@Deprecated`
-2. **🔄 IN PROGRESS:** For each deprecated method, design a new properly abstracted version compatible with BOTH OpenGL AND Vulkan (11/874 complete)
+2. **🔄 IN PROGRESS:** For each deprecated method, design a new properly abstracted version compatible with BOTH OpenGL AND Vulkan (16/874 complete)
 3. **📋 PLANNED:** Replace all call sites in game code to use new methods
 4. **📋 PLANNED:** Once a deprecated method has zero call sites, remove it
 5. **📋 PLANNED:** Only after all methods are migrated, implement actual Vulkan backend
@@ -208,6 +213,11 @@ Track progress using this table (update after each method migration):
 | `setDepthTestFunction()` | TBD | `setDepthFunc(ctx, ...)` | 🟢 Completed |
 | `configureBlendFunc()` | TBD | `setBlendFunc(ctx, ...)` | 🟢 Completed |
 | `attachBuffer()` | TBD | `bindBuffer(ctx, ...)` | 🟢 Completed |
+| `enableBlend()` | TBD | `enableBlend(ctx)` | 🟢 Completed |
+| `disableBlend()` | TBD | `disableBlend(ctx)` | 🟢 Completed |
+| `enable(int cap)` | TBD | `enable(ctx, cap)` | 🟢 Completed |
+| `disable(int cap)` | TBD | `disable(ctx, cap)` | 🟢 Completed |
+| `activateTextureUnit()` | TBD | `activateTextureUnit(ctx, ...)` | 🟢 Completed |
 | `bindTexture()` | 2,847 | `bindTextureToDescriptorSet()` | 🔴 Not Started |
 | `activateTextureUnit()` | 1,923 | *(see bindTexture)* | 🔴 Not Started |
 | `enable(int cap)` | 1,456 | `createPipeline()` | 🔴 Not Started |
@@ -2328,6 +2338,292 @@ public void bindBuffer(CommandContext ctx, int target, int buffer) {
         // Other buffer types use descriptor sets
         // This will be handled differently in Vulkan
     }
+}
+```
+
+---
+
+### ✅ Method: `enableBlend()` → `enableBlend(CommandContext ctx)`
+
+**Migration Date:** 2026-02-10
+
+**Status:** Completed - New method implemented, deprecated method retained for backward compatibility
+
+**What Changed:**
+- Added `CommandContext ctx` parameter for Vulkan compatibility
+- OpenGL implementation validates immediate-mode context and calls `GL11.glEnable(GL_BLEND)`
+
+**New API Design:**
+```java
+public static void enableBlend(CommandContext ctx) {
+    getBackend().enableBlend(ctx);
+}
+```
+
+**OpenGL Implementation:**
+```java
+@Override
+public void enableBlend(CommandContext ctx) {
+    if (!ctx.isImmediate()) {
+        throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+    }
+    GL11.glEnable(GL11.GL_BLEND);
+}
+```
+
+**Usage Example:**
+```java
+// Before (deprecated, still works)
+VulkanicAPI.enableBlend();
+
+// After (new Vulkan-compatible API)
+CommandContext ctx = VulkanicAPI.getImmediateContext();
+VulkanicAPI.enableBlend(ctx);
+```
+
+**Vulkan Implementation (Future):**
+```java
+// Will be part of pipeline state in VkPipelineColorBlendAttachmentState
+@Override
+public void enableBlend(CommandContext ctx) {
+    // Blending is set during pipeline creation, not as a command
+    // This might require switching pipelines or using dynamic state
+    switchToPipelineWithBlendEnabled();
+}
+```
+
+---
+
+### ✅ Method: `disableBlend()` → `disableBlend(CommandContext ctx)`
+
+**Migration Date:** 2026-02-10
+
+**Status:** Completed - New method implemented, deprecated method retained for backward compatibility
+
+**What Changed:**
+- Added `CommandContext ctx` parameter for Vulkan compatibility
+- OpenGL implementation validates immediate-mode context and calls `GL11.glDisable(GL_BLEND)`
+
+**New API Design:**
+```java
+public static void disableBlend(CommandContext ctx) {
+    getBackend().disableBlend(ctx);
+}
+```
+
+**OpenGL Implementation:**
+```java
+@Override
+public void disableBlend(CommandContext ctx) {
+    if (!ctx.isImmediate()) {
+        throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+    }
+    GL11.glDisable(GL11.GL_BLEND);
+}
+```
+
+**Usage Example:**
+```java
+// Before (deprecated, still works)
+VulkanicAPI.disableBlend();
+
+// After (new Vulkan-compatible API)
+CommandContext ctx = VulkanicAPI.getImmediateContext();
+VulkanicAPI.disableBlend(ctx);
+```
+
+**Vulkan Implementation (Future):**
+```java
+// Will be part of pipeline state in VkPipelineColorBlendAttachmentState
+@Override
+public void disableBlend(CommandContext ctx) {
+    // Blending is set during pipeline creation
+    switchToPipelineWithBlendDisabled();
+}
+```
+
+---
+
+### ✅ Method: `enable(int cap)` → `enable(CommandContext ctx, int cap)`
+
+**Migration Date:** 2026-02-10
+
+**Status:** Completed - New method implemented, deprecated method retained for backward compatibility
+
+**What Changed:**
+- Added `CommandContext ctx` parameter for Vulkan compatibility
+- OpenGL implementation validates immediate-mode context and calls `GL11.glEnable(cap)`
+
+**New API Design:**
+```java
+public static void enable(CommandContext ctx, int cap) {
+    getBackend().enable(ctx, cap);
+}
+```
+
+**OpenGL Implementation:**
+```java
+@Override
+public void enable(CommandContext ctx, int cap) {
+    if (!ctx.isImmediate()) {
+        throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+    }
+    GL11.glEnable(cap);
+}
+```
+
+**Usage Example:**
+```java
+// Before (deprecated, still works)
+VulkanicAPI.enable(GL_DEPTH_TEST);
+VulkanicAPI.enable(GL_CULL_FACE);
+
+// After (new Vulkan-compatible API)
+CommandContext ctx = VulkanicAPI.getImmediateContext();
+VulkanicAPI.enable(ctx, GL_DEPTH_TEST);
+VulkanicAPI.enable(ctx, GL_CULL_FACE);
+```
+
+**Vulkan Implementation (Future):**
+```java
+// Different capabilities map to different Vulkan features
+@Override
+public void enable(CommandContext ctx, int cap) {
+    switch (cap) {
+        case GL_DEPTH_TEST:
+            // Part of pipeline depth-stencil state
+            switchToPipelineWithDepthTestEnabled();
+            break;
+        case GL_CULL_FACE:
+            // Part of pipeline rasterization state
+            switchToPipelineWithCullingEnabled();
+            break;
+        case GL_SCISSOR_TEST:
+            // Dynamic state in Vulkan
+            // Already handled by setDynamicScissor()
+            break;
+        default:
+            // Map other capabilities appropriately
+            break;
+    }
+}
+```
+
+---
+
+### ✅ Method: `disable(int cap)` → `disable(CommandContext ctx, int cap)`
+
+**Migration Date:** 2026-02-10
+
+**Status:** Completed - New method implemented, deprecated method retained for backward compatibility
+
+**What Changed:**
+- Added `CommandContext ctx` parameter for Vulkan compatibility
+- OpenGL implementation validates immediate-mode context and calls `GL11.glDisable(cap)`
+
+**New API Design:**
+```java
+public static void disable(CommandContext ctx, int cap) {
+    getBackend().disable(ctx, cap);
+}
+```
+
+**OpenGL Implementation:**
+```java
+@Override
+public void disable(CommandContext ctx, int cap) {
+    if (!ctx.isImmediate()) {
+        throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+    }
+    GL11.glDisable(cap);
+}
+```
+
+**Usage Example:**
+```java
+// Before (deprecated, still works)
+VulkanicAPI.disable(GL_DEPTH_TEST);
+VulkanicAPI.disable(GL_CULL_FACE);
+
+// After (new Vulkan-compatible API)
+CommandContext ctx = VulkanicAPI.getImmediateContext();
+VulkanicAPI.disable(ctx, GL_DEPTH_TEST);
+VulkanicAPI.disable(ctx, GL_CULL_FACE);
+```
+
+**Vulkan Implementation (Future):**
+```java
+// Different capabilities map to different Vulkan features
+@Override
+public void disable(CommandContext ctx, int cap) {
+    switch (cap) {
+        case GL_DEPTH_TEST:
+            switchToPipelineWithDepthTestDisabled();
+            break;
+        case GL_CULL_FACE:
+            switchToPipelineWithCullingDisabled();
+            break;
+        case GL_SCISSOR_TEST:
+            // Handled through scissor dynamic state
+            break;
+        default:
+            // Map other capabilities appropriately
+            break;
+    }
+}
+```
+
+---
+
+### ✅ Method: `activateTextureUnit(int unit)` → `activateTextureUnit(CommandContext ctx, int unit)`
+
+**Migration Date:** 2026-02-10
+
+**Status:** Completed - New method implemented, deprecated method retained for backward compatibility
+
+**What Changed:**
+- Added `CommandContext ctx` parameter for Vulkan compatibility
+- OpenGL implementation validates immediate-mode context and calls `GL13.glActiveTexture(unit)`
+
+**New API Design:**
+```java
+public static void activateTextureUnit(CommandContext ctx, int unit) {
+    getBackend().activateTextureUnit(ctx, unit);
+}
+```
+
+**OpenGL Implementation:**
+```java
+@Override
+public void activateTextureUnit(CommandContext ctx, int unit) {
+    if (!ctx.isImmediate()) {
+        throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+    }
+    org.lwjgl.opengl.GL13.glActiveTexture(unit);
+}
+```
+
+**Usage Example:**
+```java
+// Before (deprecated, still works)
+VulkanicAPI.activateTextureUnit(VulkanicAPI.GL_TEXTURE0);
+VulkanicAPI.bindTexture(textureId);
+
+// After (new Vulkan-compatible API)
+CommandContext ctx = VulkanicAPI.getImmediateContext();
+VulkanicAPI.activateTextureUnit(ctx, VulkanicAPI.GL_TEXTURE0);
+// Note: In Vulkan, texture units will be abstracted through descriptor sets
+```
+
+**Vulkan Implementation (Future):**
+```java
+// Texture units are handled through descriptor sets in Vulkan
+@Override
+public void activateTextureUnit(CommandContext ctx, int unit) {
+    // This is an OpenGL-specific concept
+    // In Vulkan, we track which descriptor set binding we're working with
+    // The actual binding happens through descriptor sets, not active texture units
+    currentTextureSlot = unit - GL_TEXTURE0; // Track for compatibility
 }
 ```
 

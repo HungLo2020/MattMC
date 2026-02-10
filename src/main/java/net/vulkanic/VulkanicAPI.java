@@ -851,6 +851,114 @@ public class VulkanicAPI {
         getBackend().bindBuffer(ctx, target, buffer);
     }
     
+    /**
+     * Enables blending for rendering operations.
+     * 
+     * This is a Vulkan-compatible method that requires an explicit CommandContext.
+     * For OpenGL, use getImmediateContext() to get the context.
+     * 
+     * Example usage:
+     * <pre>
+     *     CommandContext ctx = VulkanicAPI.getImmediateContext();
+     *     VulkanicAPI.enableBlend(ctx);
+     * </pre>
+     * 
+     * In OpenGL: Maps to glEnable(GL_BLEND)
+     * In Vulkan: Part of pipeline state (blendEnable)
+     * 
+     * @param ctx Command context for recording this command
+     */
+    public static void enableBlend(CommandContext ctx) {
+        getBackend().enableBlend(ctx);
+    }
+    
+    /**
+     * Disables blending for rendering operations.
+     * 
+     * This is a Vulkan-compatible method that requires an explicit CommandContext.
+     * For OpenGL, use getImmediateContext() to get the context.
+     * 
+     * Example usage:
+     * <pre>
+     *     CommandContext ctx = VulkanicAPI.getImmediateContext();
+     *     VulkanicAPI.disableBlend(ctx);
+     * </pre>
+     * 
+     * In OpenGL: Maps to glDisable(GL_BLEND)
+     * In Vulkan: Part of pipeline state (blendEnable)
+     * 
+     * @param ctx Command context for recording this command
+     */
+    public static void disableBlend(CommandContext ctx) {
+        getBackend().disableBlend(ctx);
+    }
+    
+    /**
+     * Enables a generic OpenGL capability.
+     * 
+     * This is a Vulkan-compatible method that requires an explicit CommandContext.
+     * For OpenGL, use getImmediateContext() to get the context.
+     * 
+     * Example usage:
+     * <pre>
+     *     CommandContext ctx = VulkanicAPI.getImmediateContext();
+     *     VulkanicAPI.enable(ctx, GL_DEPTH_TEST);
+     * </pre>
+     * 
+     * In OpenGL: Maps to glEnable(cap)
+     * In Vulkan: Most capabilities map to pipeline state or dynamic state
+     * 
+     * @param ctx Command context for recording this command
+     * @param cap The capability to enable (e.g., GL_DEPTH_TEST, GL_CULL_FACE)
+     */
+    public static void enable(CommandContext ctx, int cap) {
+        getBackend().enable(ctx, cap);
+    }
+    
+    /**
+     * Disables a generic OpenGL capability.
+     * 
+     * This is a Vulkan-compatible method that requires an explicit CommandContext.
+     * For OpenGL, use getImmediateContext() to get the context.
+     * 
+     * Example usage:
+     * <pre>
+     *     CommandContext ctx = VulkanicAPI.getImmediateContext();
+     *     VulkanicAPI.disable(ctx, GL_DEPTH_TEST);
+     * </pre>
+     * 
+     * In OpenGL: Maps to glDisable(cap)
+     * In Vulkan: Most capabilities map to pipeline state or dynamic state
+     * 
+     * @param ctx Command context for recording this command
+     * @param cap The capability to disable (e.g., GL_DEPTH_TEST, GL_CULL_FACE)
+     */
+    public static void disable(CommandContext ctx, int cap) {
+        getBackend().disable(ctx, cap);
+    }
+    
+    /**
+     * Sets the active texture unit for subsequent texture operations.
+     * 
+     * This is a Vulkan-compatible method that requires an explicit CommandContext.
+     * For OpenGL, use getImmediateContext() to get the context.
+     * 
+     * Example usage:
+     * <pre>
+     *     CommandContext ctx = VulkanicAPI.getImmediateContext();
+     *     VulkanicAPI.activateTextureUnit(ctx, GL_TEXTURE0);
+     * </pre>
+     * 
+     * In OpenGL: Maps to glActiveTexture(unit)
+     * In Vulkan: Texture units are abstracted through descriptor sets
+     * 
+     * @param ctx Command context for recording this command
+     * @param unit The texture unit to activate (e.g., GL_TEXTURE0)
+     */
+    public static void activateTextureUnit(CommandContext ctx, int unit) {
+        getBackend().activateTextureUnit(ctx, unit);
+    }
+    
     @Deprecated
     public static void setPixelStoreMode(int pname, int value) {
         getBackend().setPixelStoreMode(pname, value);

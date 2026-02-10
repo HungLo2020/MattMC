@@ -338,6 +338,104 @@ public class OpenGLBackend implements GraphicsBackend {
         GL15.glBindBuffer(target, buffer);
     }
     
+    /**
+     * Enables blending with explicit command context.
+     * This is the Vulkan-compatible implementation for blend control.
+     * 
+     * OpenGL implementation: Direct mapping to glEnable(GL_BLEND) (context is validated but not used)
+     * Vulkan implementation: Will be part of pipeline state creation
+     * 
+     * @param ctx Command context (must be immediate mode for OpenGL)
+     */
+    @Override
+    public void enableBlend(CommandContext ctx) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        GL11.glEnable(GL11.GL_BLEND);
+    }
+    
+    /**
+     * Disables blending with explicit command context.
+     * This is the Vulkan-compatible implementation for blend control.
+     * 
+     * OpenGL implementation: Direct mapping to glDisable(GL_BLEND) (context is validated but not used)
+     * Vulkan implementation: Will be part of pipeline state creation
+     * 
+     * @param ctx Command context (must be immediate mode for OpenGL)
+     */
+    @Override
+    public void disableBlend(CommandContext ctx) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        GL11.glDisable(GL11.GL_BLEND);
+    }
+    
+    /**
+     * Enables a generic capability with explicit command context.
+     * This is the Vulkan-compatible implementation for capability control.
+     * 
+     * OpenGL implementation: Direct mapping to glEnable(cap) (context is validated but not used)
+     * Vulkan implementation: Will map to pipeline state or dynamic state based on capability
+     * 
+     * @param ctx Command context (must be immediate mode for OpenGL)
+     * @param cap The capability to enable
+     */
+    @Override
+    public void enable(CommandContext ctx, int cap) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        GL11.glEnable(cap);
+    }
+    
+    /**
+     * Disables a generic capability with explicit command context.
+     * This is the Vulkan-compatible implementation for capability control.
+     * 
+     * OpenGL implementation: Direct mapping to glDisable(cap) (context is validated but not used)
+     * Vulkan implementation: Will map to pipeline state or dynamic state based on capability
+     * 
+     * @param ctx Command context (must be immediate mode for OpenGL)
+     * @param cap The capability to disable
+     */
+    @Override
+    public void disable(CommandContext ctx, int cap) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        GL11.glDisable(cap);
+    }
+    
+    /**
+     * Activates a texture unit with explicit command context.
+     * This is the Vulkan-compatible implementation for texture unit selection.
+     * 
+     * OpenGL implementation: Direct mapping to glActiveTexture(unit) (context is validated but not used)
+     * Vulkan implementation: Will be abstracted through descriptor sets
+     * 
+     * @param ctx Command context (must be immediate mode for OpenGL)
+     * @param unit The texture unit to activate
+     */
+    @Override
+    public void activateTextureUnit(CommandContext ctx, int unit) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        org.lwjgl.opengl.GL13.glActiveTexture(unit);
+    }
+    
     @Deprecated
     @Override
     public void setPixelStoreMode(int pname, int value) {

@@ -224,6 +224,72 @@ public interface GraphicsBackend {
      */
     void bindBuffer(CommandContext ctx, int target, int buffer);
     
+    /**
+     * Enables blending for rendering operations.
+     * 
+     * In OpenGL: Maps to glEnable(GL_BLEND)
+     * In Vulkan: Part of pipeline state (blendEnable in VkPipelineColorBlendAttachmentState)
+     * 
+     * Controls whether fragment colors are blended with the framebuffer. When enabled,
+     * source and destination colors are combined based on the blend function.
+     * 
+     * @param ctx Command context for recording this command
+     */
+    void enableBlend(CommandContext ctx);
+    
+    /**
+     * Disables blending for rendering operations.
+     * 
+     * In OpenGL: Maps to glDisable(GL_BLEND)
+     * In Vulkan: Part of pipeline state (blendEnable in VkPipelineColorBlendAttachmentState)
+     * 
+     * When disabled, fragment colors directly replace framebuffer colors without blending.
+     * 
+     * @param ctx Command context for recording this command
+     */
+    void disableBlend(CommandContext ctx);
+    
+    /**
+     * Enables a generic OpenGL capability.
+     * 
+     * In OpenGL: Maps to glEnable(cap)
+     * In Vulkan: Most capabilities map to pipeline state or dynamic state
+     * 
+     * Enables various rendering capabilities like depth testing, culling, scissor test, etc.
+     * Common capabilities: GL_DEPTH_TEST, GL_CULL_FACE, GL_SCISSOR_TEST, GL_STENCIL_TEST.
+     * 
+     * @param ctx Command context for recording this command
+     * @param cap The capability to enable (e.g., GL_DEPTH_TEST)
+     */
+    void enable(CommandContext ctx, int cap);
+    
+    /**
+     * Disables a generic OpenGL capability.
+     * 
+     * In OpenGL: Maps to glDisable(cap)
+     * In Vulkan: Most capabilities map to pipeline state or dynamic state
+     * 
+     * Disables various rendering capabilities like depth testing, culling, scissor test, etc.
+     * 
+     * @param ctx Command context for recording this command
+     * @param cap The capability to disable (e.g., GL_DEPTH_TEST)
+     */
+    void disable(CommandContext ctx, int cap);
+    
+    /**
+     * Sets the active texture unit for subsequent texture operations.
+     * 
+     * In OpenGL: Maps to glActiveTexture(unit)
+     * In Vulkan: Texture units are abstracted through descriptor sets
+     * 
+     * Selects which texture unit subsequent texture binding operations will affect.
+     * Texture units are numbered GL_TEXTURE0, GL_TEXTURE1, etc.
+     * 
+     * @param ctx Command context for recording this command
+     * @param unit The texture unit to activate (e.g., GL_TEXTURE0)
+     */
+    void activateTextureUnit(CommandContext ctx, int unit);
+    
     // Pixel operations
     @Deprecated
     void setPixelStoreMode(int pname, int value);
