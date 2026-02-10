@@ -96,15 +96,37 @@ Instead of building a complete Vulkan backend for the flawed legacy API, we are 
 - ✅ Allows gradual migration without "big bang" refactoring
 - ✅ **NEW:** Real production code now using CommandContext API validates design
 
-### Phase 2 Progress: Call Site Migration
+### Phase 2 Progress: Call Site Migration ✅ COMPLETE
 
-**Migrated Files (19 call sites total):**
+**Total: 34 call sites migrated across 12 files**
+
+**Batch 1 - Initial Migration (19 call sites):**
 1. ✅ `MinecraftGLWrapper.java` - 8 calls (enable, disable, activateTextureUnit, bindTexture)
 2. ✅ `LodRenderer.java` - 4 calls (clear, disable)
 3. ✅ `TestRenderer.java` - 1 call (clear)
 4. ✅ `GLState.java` - 2 calls (enable, disable stencil test)
 5. ✅ `FogShader.java` - 1 call (clear)
 6. ✅ `GLDebug.java` - 3 calls (enable debug output)
+
+**Batch 2 - Texture Operations (15 call sites):**
+7. ✅ `CompressibleGLBufferedImage.java` - 2 calls (bindTexture, generateMipmap)
+8. ✅ `DefaultShaderInterface.java` - 3 calls (activateTextureUnit, bindTexture, configureTextureParameter)
+9. ✅ `GlStateManager.java` - 2 calls (bindTexture, transferTexture2DImage)
+10. ✅ `IrisRenderSystem.java` - 3 calls (bindTexture)
+11. ✅ `GlDevice.java` - 1 call (bindTexture cube map)
+12. ✅ `GlCommandEncoder.java` - 4 calls (bindTexture various targets)
+
+### Deprecated Methods Ready for Removal
+
+**8 methods have ZERO remaining deprecated calls:**
+1. ✅ `drawArrays(int mode, int first, int count)` - **Ready to remove**
+2. ✅ `drawElements(int mode, int count, int type, long indices)` - **Ready to remove**
+3. ✅ `enableBlend()` - **Ready to remove**
+4. ✅ `disableBlend()` - **Ready to remove**
+5. ✅ `setDepthFunc(int func)` - **Ready to remove**
+6. ✅ `setBlendFunc(int srcRgb, int dstRgb, int srcAlpha, int dstAlpha)` - **Ready to remove**
+7. ✅ `bindBuffer(int target, int buffer)` - **Ready to remove**
+8. ✅ `setDepthWriteMask(boolean enabled)` - **Ready to remove**
 
 **Pattern Used:**
 ```java
