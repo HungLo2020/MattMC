@@ -4011,4 +4011,87 @@ public class VulkanicAPI {
     public static void destroyShaderProgram(CommandContext ctx, int program) {
         getBackend().destroyShaderProgram(ctx, program);
     }
+    
+    // Phase 14: Additional resource management and state query methods
+    
+    /**
+     * Deletes a vertex array object and releases its resources.
+     * 
+     * @param ctx Command recording context
+     * @param array Vertex array object ID to delete
+     * 
+     * Example usage:
+     * <pre>{@code
+     * VulkanicAPI.deleteVertexArray(CTX, vaoId);
+     * }</pre>
+     */
+    public static void deleteVertexArray(CommandContext ctx, int array) {
+        getBackend().deleteVertexArray(ctx, array);
+    }
+    
+    /**
+     * Queries floating-point state values.
+     * 
+     * @param ctx Command recording context
+     * @param pname Parameter name (e.g., GL_COLOR_CLEAR_VALUE)
+     * @param params Array to receive the queried values
+     * 
+     * Example usage:
+     * <pre>{@code
+     * float[] clearColor = new float[4];
+     * VulkanicAPI.queryFloatState(CTX, GL_COLOR_CLEAR_VALUE, clearColor);
+     * }</pre>
+     */
+    public static void queryFloatState(CommandContext ctx, int pname, float[] params) {
+        getBackend().queryFloatState(ctx, pname, params);
+    }
+    
+    /**
+     * Specifies which color buffer to read from.
+     * 
+     * @param ctx Command recording context
+     * @param mode Color buffer to read from (e.g., GL_COLOR_ATTACHMENT0)
+     * 
+     * Example usage:
+     * <pre>{@code
+     * VulkanicAPI.setReadBuffer(CTX, GL_COLOR_ATTACHMENT0);
+     * }</pre>
+     */
+    public static void setReadBuffer(CommandContext ctx, int mode) {
+        getBackend().setReadBuffer(ctx, mode);
+    }
+    
+    /**
+     * Specifies which color buffers to draw into.
+     * 
+     * @param ctx Command recording context
+     * @param bufs Array of buffer constants
+     * 
+     * Example usage:
+     * <pre>{@code
+     * int[] drawBuffers = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1};
+     * VulkanicAPI.setDrawBuffers(CTX, drawBuffers);
+     * }</pre>
+     */
+    public static void setDrawBuffers(CommandContext ctx, int[] bufs) {
+        getBackend().setDrawBuffers(ctx, bufs);
+    }
+    
+    /**
+     * Creates a fence sync object for GPU-CPU synchronization.
+     * 
+     * @param ctx Command recording context
+     * @param condition Must be GL_SYNC_GPU_COMMANDS_COMPLETE
+     * @param flags Currently unused, must be 0
+     * @return Handle to the sync object (0 on failure)
+     * 
+     * Example usage:
+     * <pre>{@code
+     * long fence = VulkanicAPI.createFenceSync(CTX, GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
+     * // Later: check if fence is signaled
+     * }</pre>
+     */
+    public static long createFenceSync(CommandContext ctx, int condition, int flags) {
+        return getBackend().createFenceSync(ctx, condition, flags);
+    }
 }

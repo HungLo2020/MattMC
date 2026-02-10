@@ -2062,4 +2062,111 @@ public interface GraphicsBackend {
      * }</pre>
      */
     void destroyShaderProgram(CommandContext ctx, int program);
+    
+    // Phase 14: Additional resource management and state query methods
+    
+    /**
+     * Deletes a vertex array object and releases its resources.
+     * 
+     * In OpenGL: Maps to glDeleteVertexArrays()
+     * In Vulkan: No direct equivalent (VAO state is part of pipeline)
+     * 
+     * This frees the vertex array object and makes its ID available for reuse.
+     * In Vulkan, this operation is tracked but doesn't directly map since VAO
+     * state is baked into the pipeline.
+     * 
+     * @param ctx Command recording context
+     * @param array The vertex array object ID to delete
+     * 
+     * Example usage:
+     * <pre>{@code
+     * backend.deleteVertexArray(CTX, vaoId);
+     * }</pre>
+     */
+    void deleteVertexArray(CommandContext ctx, int array);
+    
+    /**
+     * Queries floating-point state values.
+     * 
+     * In OpenGL: Maps to glGetFloatv()
+     * In Vulkan: Query from specific objects (no global state)
+     * 
+     * Retrieves the current value of one or more floating-point state variables.
+     * The params array must be large enough to hold the requested values.
+     * 
+     * @param ctx Command recording context
+     * @param pname The state parameter to query (e.g., GL_COLOR_CLEAR_VALUE)
+     * @param params Array to receive the queried values
+     * 
+     * Example usage:
+     * <pre>{@code
+     * float[] clearColor = new float[4];
+     * backend.queryFloatState(CTX, GL_COLOR_CLEAR_VALUE, clearColor);
+     * }</pre>
+     */
+    void queryFloatState(CommandContext ctx, int pname, float[] params);
+    
+    /**
+     * Specifies which color buffer to read from during framebuffer read operations.
+     * 
+     * In OpenGL: Maps to glReadBuffer()
+     * In Vulkan: Specified in VkFramebufferCreateInfo or renderpass
+     * 
+     * Sets the color buffer source for subsequent pixel read operations like
+     * glReadPixels or glCopyTexImage. Common values include GL_FRONT, GL_BACK,
+     * GL_LEFT, GL_RIGHT, or GL_COLOR_ATTACHMENTi.
+     * 
+     * @param ctx Command recording context
+     * @param mode The color buffer to read from
+     * 
+     * Example usage:
+     * <pre>{@code
+     * backend.setReadBuffer(CTX, GL_COLOR_ATTACHMENT0);
+     * }</pre>
+     */
+    void setReadBuffer(CommandContext ctx, int mode);
+    
+    /**
+     * Specifies which color buffers to draw into.
+     * 
+     * In OpenGL: Maps to glDrawBuffers()
+     * In Vulkan: Specified in VkPipelineColorBlendStateCreateInfo
+     * 
+     * Defines a set of color buffers to be written during fragment shader execution.
+     * This is essential for multiple render target (MRT) rendering. The buffers
+     * array specifies which framebuffer attachments to write to.
+     * 
+     * @param ctx Command recording context
+     * @param bufs Array of buffer constants (e.g., GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1)
+     * 
+     * Example usage:
+     * <pre>{@code
+     * int[] drawBuffers = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1};
+     * backend.setDrawBuffers(CTX, drawBuffers);
+     * }</pre>
+     */
+    void setDrawBuffers(CommandContext ctx, int[] bufs);
+    
+    /**
+     * Creates a fence sync object for GPU-CPU synchronization.
+     * 
+     * In OpenGL: Maps to glFenceSync()
+     * In Vulkan: Maps to vkCreateFence() or vkCreateSemaphore()
+     * 
+     * Creates a fence synchronization object that allows the application to
+     * determine when GPU operations have completed. The fence is signaled when
+     * all prior commands have completed execution.
+     * 
+     * @param ctx Command recording context
+     * @param condition Must be GL_SYNC_GPU_COMMANDS_COMPLETE
+     * @param flags Currently unused, must be 0
+     * @return A handle to the sync object (0 on failure)
+     * 
+     * Example usage:
+     * <pre>{@code
+     * long fence = backend.createFenceSync(CTX, GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
+     * // Later: check if fence is signaled
+     * }</pre>
+     */
+    long createFenceSync(CommandContext ctx, int condition, int flags);
 }

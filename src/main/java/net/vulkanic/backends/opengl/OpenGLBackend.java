@@ -9,6 +9,7 @@ import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL15;
 import org.lwjgl.opengl.GL20;
 import org.lwjgl.opengl.GL30;
+import org.lwjgl.opengl.GL32;
 import java.nio.ByteBuffer;
 import java.nio.FloatBuffer;
 
@@ -3266,5 +3267,57 @@ public class OpenGLBackend implements GraphicsBackend {
         }
         
         GL20.glDeleteProgram(program);
+    }
+    
+    // Phase 14 implementations
+    
+    @Override
+    public void deleteVertexArray(CommandContext ctx, int array) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        GL30.glDeleteVertexArrays(array);
+    }
+    
+    @Override
+    public void queryFloatState(CommandContext ctx, int pname, float[] params) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        GL11.glGetFloatv(pname, params);
+    }
+    
+    @Override
+    public void setReadBuffer(CommandContext ctx, int mode) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        GL11.glReadBuffer(mode);
+    }
+    
+    @Override
+    public void setDrawBuffers(CommandContext ctx, int[] bufs) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        GL20.glDrawBuffers(bufs);
+    }
+    
+    @Override
+    public long createFenceSync(CommandContext ctx, int condition, int flags) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        return GL32.glFenceSync(condition, flags);
     }
 }
