@@ -2,13 +2,13 @@
 
 **Analysis Date:** 2026-02-08  
 **Migration Strategy Updated:** 2026-02-10  
-**Active Migration Phase:** Phase 7 Complete - Shader Linking & Source Upload ✅  
+**Active Migration Phase:** Phase 8 Complete - Shader Uniforms & Attributes ✅  
 **Vulkanic API Version:** Initial Implementation (OpenGL-only) - **ALL METHODS NOW DEPRECATED**  
 **Analyzed Components:** VulkanicAPI.java, GraphicsBackend.java, OpenGLBackend.java  
 **Lines of Code Analyzed:** ~4,000 LOC  
 **Deprecated Methods:** 874 methods marked for replacement  
-**Migrated Methods:** 55 methods (6.3% complete)
-**Migrated Call Sites:** 91 call sites in 36 game files ✅ **ALL MIGRATED**
+**Migrated Methods:** 60 methods (6.9% complete)
+**Migrated Call Sites:** 99 call sites in 37 game files ✅ **ALL MIGRATED**
 **Removed Deprecated Methods:** 15 methods
 
 ---
@@ -24,12 +24,12 @@ All 874 methods in the current Vulkanic API have been marked as `@Deprecated` to
 The legacy Vulkanic API is a **thin OpenGL state machine wrapper** with approximately **25-30% compatibility** with Vulkan's architectural principles. While it successfully abstracts OpenGL calls behind an interface, the API design is fundamentally tied to OpenGL's immediate-mode, global-state paradigm, which conflicts with Vulkan's explicit, command-buffer-based architecture.
 
 **Migration Progress:**
-- ✅ **55 methods migrated** to CommandContext-aware API (6.3% of 874 total)
-- ✅ **91 call sites FULLY migrated** across **36 game files** ✅ **100% COMPLETE**
+- ✅ **60 methods migrated** to CommandContext-aware API (6.9% of 874 total)
+- ✅ **99 call sites FULLY migrated** across **37 game files** ✅ **100% COMPLETE**
 - ✅ **ZERO deprecated calls remaining** - all production code uses new API!
 - ✅ **Production code validates CommandContext design** - real usage in action!
 - ✅ **15 deprecated methods REMOVED** - codebase getting cleaner!
-- ⚠️ **819 methods remaining** in deprecated state (to be migrated)
+- ⚠️ **814 methods remaining** in deprecated state (to be migrated)
 - ✅ **All tests passing** (10/10 Vulkanic tests, 100%)
 - ✅ **Zero breaking changes** - fully backward compatible
 
@@ -4402,4 +4402,164 @@ Phase 7 focused on migrating critical shader source upload and program linking m
 - ✅ All tests passing
 
 ---
+
+
+
+---
+
+## Phase 8: Shader Uniforms & Attributes Methods
+
+**Status:** ✅ COMPLETE  
+**Date:** 2026-02-10  
+**Methods Migrated:** 5  
+**Call Sites Migrated:** 8 (in ShaderProgram.java)  
+**Deprecated Methods Removed:** 0 (to be removed in next cleanup phase)
+
+### Methods Migrated
+
+#### 1. bindAttributeLocation(CommandContext ctx, int program, int index, CharSequence name)
+
+**Purpose:** Binds a vertex attribute variable name to a specific attribute index before linking.
+
+**OpenGL Implementation:**
+```java
+@Override
+public void bindAttributeLocation(CommandContext ctx, int program, int index, CharSequence name) {
+    if (!ctx.isImmediate()) {
+        throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+    }
+    GL20.glBindAttribLocation(program, index, name);
+}
+```
+
+**Why It Matters for Vulkan:**
+- OpenGL: Runtime binding before program linking
+- Vulkan: Compile-time layout specifications in SPIR-V (layout(location=X))
+- CommandContext enables proper abstraction for both models
+
+#### 2. getAttributeLocation(CommandContext ctx, int program, CharSequence name)
+
+**Purpose:** Queries the location of a vertex attribute variable in a linked program.
+
+**OpenGL Implementation:**
+```java
+@Override
+public int getAttributeLocation(CommandContext ctx, int program, CharSequence name) {
+    if (!ctx.isImmediate()) {
+        throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+    }
+    return GL20.glGetAttribLocation(program, name);
+}
+```
+
+**Why It Matters for Vulkan:**
+- OpenGL: Runtime query after linking
+- Vulkan: Reflection or pre-defined attribute locations from SPIR-V
+- Critical for vertex input state configuration
+
+#### 3. locateUniformVariable(CommandContext ctx, int program, CharSequence name)
+
+**Purpose:** Queries the location of a uniform variable in a linked program.
+
+**OpenGL Implementation:**
+```java
+@Override
+public int locateUniformVariable(CommandContext ctx, int program, CharSequence name) {
+    if (!ctx.isImmediate()) {
+        throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+    }
+    return GL20.glGetUniformLocation(program, name);
+}
+```
+
+**Why It Matters for Vulkan:**
+- OpenGL: Runtime query returns uniform location
+- Vulkan: Descriptor sets with bindings, requires reflection or pre-defined layout
+- Fundamental difference in uniform management
+
+#### 4. assignUniformInteger(CommandContext ctx, int location, int value)
+
+**Purpose:** Sets the value of a single integer uniform variable.
+
+**OpenGL Implementation:**
+```java
+@Override
+public void assignUniformInteger(CommandContext ctx, int location, int value) {
+    if (!ctx.isImmediate()) {
+        throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+    }
+    GL20.glUniform1i(location, value);
+}
+```
+
+**Why It Matters for Vulkan:**
+- OpenGL: Immediate uniform update per program
+- Vulkan: Push constants or descriptor set updates
+- CommandContext allows backend to choose appropriate mechanism
+
+#### 5. assignUniformFloat(CommandContext ctx, int location, float value)
+
+**Purpose:** Sets the value of a single float uniform variable.
+
+**OpenGL Implementation:**
+```java
+@Override
+public void assignUniformFloat(CommandContext ctx, int location, float value) {
+    if (!ctx.isImmediate()) {
+        throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+    }
+    GL20.glUniform1f(location, value);
+}
+```
+
+**Why It Matters for Vulkan:**
+- OpenGL: Immediate uniform update
+- Vulkan: Push constants (for small/frequent updates) or descriptor sets (for larger data)
+- Critical abstraction for different uniform update models
+
+### Call Sites Migrated
+
+All call sites in **ShaderProgram.java** (8 calls):
+
+1. `bindAttributeLocation(CTX, this.id, i, attributes[i])` - 1 call
+2. `getAttributeLocation(CTX, id, name)` - 2 calls  
+3. `locateUniformVariable(CTX, id, name)` - 2 calls
+4. `assignUniformInteger(CTX, location, value)` - 2 calls
+5. `assignUniformFloat(CTX, location, value)` - 1 call
+
+**Pattern Used:**
+```java
+// Added to ShaderProgram class
+private static final CommandContext CTX = OpenGLCommandContext.IMMEDIATE;
+
+// All calls now use CTX
+VulkanicAPI.bindAttributeLocation(CTX, this.id, i, attributes[i]);
+int location = VulkanicAPI.locateUniformVariable(CTX, this.id, name);
+VulkanicAPI.assignUniformFloat(CTX, location, value);
+```
+
+### Significance
+
+Phase 8 completed the migration of shader uniform and attribute methods, which are critical for Vulkan compatibility:
+
+1. **Attribute Binding:** OpenGL's runtime binding vs Vulkan's compile-time SPIR-V layouts
+2. **Uniform Management:** OpenGL's immediate updates vs Vulkan's descriptor sets/push constants
+3. **Shader Reflection:** Different mechanisms for querying shader interface in both APIs
+
+These methods form the foundation of shader programming and their migration to CommandContext is essential for supporting Vulkan's descriptor-based uniform system and compile-time vertex attribute layouts.
+
+### Testing
+
+- ✅ All code compiles successfully
+- ✅ Build: SUCCESS  
+- ✅ Zero compilation errors
+- ✅ All call sites migrated to use CommandContext
+- ✅ No deprecated calls remaining for these methods
+
+### Next Steps
+
+Continue migrating additional shader-related methods or move to other critical systems like:
+- Additional uniform methods (vec2, vec3, vec4, matrices)
+- Vertex attribute configuration methods
+- Query and synchronization methods
 
