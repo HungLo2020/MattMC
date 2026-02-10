@@ -81,18 +81,6 @@ public class OpenGLBackend implements GraphicsBackend {
     
     @Deprecated
     @Override
-    public void enableBlend() {
-        GL11.glEnable(GL11.GL_BLEND);
-    }
-    
-    @Deprecated
-    @Override
-    public void disableBlend() {
-        GL11.glDisable(GL11.GL_BLEND);
-    }
-    
-    @Deprecated
-    @Override
     public void useProgram(int programId) {
         GL20.glUseProgram(programId);
     }
