@@ -9,8 +9,7 @@
 **Deprecated Methods:** 874 methods marked for replacement  
 **Migrated Methods:** 45 methods (5.1% complete)
 **Migrated Call Sites:** 45 call sites in 17 game files ✅ **ALL MIGRATED**
-**Removed Deprecated Methods:** 2 methods (enableBlend, disableBlend)
-**Deprecated Methods Ready for Removal:** 9 additional methods (zero remaining calls)
+**Removed Deprecated Methods:** 5 methods (enableBlend, disableBlend, clear, enable, disable)
 
 ---
 
@@ -29,9 +28,9 @@ The legacy Vulkanic API is a **thin OpenGL state machine wrapper** with approxim
 - ✅ **45 call sites FULLY migrated** across **17 game files** ✅ **100% COMPLETE**
 - ✅ **ZERO deprecated calls remaining** - all production code uses new API!
 - ✅ **Production code validates CommandContext design** - real usage in action!
-- ⚠️ **829 methods remaining** in deprecated state
-- ✅ **9 deprecated methods ready for removal** (zero remaining calls)
-- ✅ **All tests passing** (7/7 Vulkanic tests, 100%)
+- ✅ **5 deprecated methods REMOVED** - clean codebase!
+- ⚠️ **829 methods remaining** in deprecated state (to be migrated)
+- ✅ **All tests passing** (10/10 Vulkanic tests, 100%)
 - ✅ **Zero breaking changes** - fully backward compatible
 
 **Migrated Methods (as of 2026-02-10):**
@@ -128,22 +127,19 @@ Instead of building a complete Vulkan backend for the flawed legacy API, we are 
 
 **Result:** ✅ ZERO deprecated calls remaining - all production code uses new CommandContext API!
 
-### Phase 3: Deprecated Method Removal ✅ 2 REMOVED, 9 READY
+### Phase 3: Deprecated Method Removal ✅ 5 REMOVED
 
-**2 methods REMOVED (first successful removals!):**
+**5 methods SUCCESSFULLY REMOVED:**
 1. ✅ `enableBlend()` - **REMOVED** ← Replaced by `enableBlend(CommandContext ctx)`
 2. ✅ `disableBlend()` - **REMOVED** ← Replaced by `disableBlend(CommandContext ctx)`
+3. ✅ `clear(int mask)` - **REMOVED** ← Replaced by `clear(CommandContext ctx, int mask)`
+4. ✅ `enable(int cap)` - **REMOVED** ← Replaced by `enable(CommandContext ctx, int cap)`
+5. ✅ `disable(int cap)` - **REMOVED** ← Replaced by `disable(CommandContext ctx, int cap)`
 
-**9 methods with ZERO remaining calls (ready to remove next):**
-3. ✅ `clear(int mask)` - **Ready to remove**
-4. ✅ `enable(int cap)` - **Ready to remove**
-5. ✅ `disable(int cap)` - **Ready to remove**
-6. ✅ `drawArrays(int mode, int first, int count)` - **Ready to remove**
-7. ✅ `drawElements(int mode, int count, int type, long indices)` - **Ready to remove**
-8. ✅ `setDepthFunc(int func)` - **Ready to remove**
-9. ✅ `setBlendFunc(int srcRgb, int dstRgb, int srcAlpha, int dstAlpha)` - **Ready to remove**
-10. ✅ `bindBuffer(int target, int buffer)` - **Ready to remove**
-11. ✅ `setDepthWriteMask(boolean enabled)` - **Ready to remove**
+**Note:** The following methods were added directly with CommandContext and never had deprecated versions:
+- `drawArrays`, `drawElements`, `setDepthFunc`, `setBlendFunc`, `bindBuffer`, `setDepthWriteMask`
+- These methods only had deprecated *facades* in VulkanicAPI (not in GraphicsBackend/OpenGLBackend)
+- No additional removal needed for these
 
 **Note:** Some of these methods were added directly with CommandContext and never had deprecated versions in GraphicsBackend/OpenGLBackend (only deprecated facades in VulkanicAPI which can be removed).
 
