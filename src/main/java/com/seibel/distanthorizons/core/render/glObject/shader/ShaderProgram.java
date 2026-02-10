@@ -8,7 +8,9 @@ import java.util.List;
 import java.util.function.Supplier;
 
 import com.seibel.distanthorizons.api.objects.math.DhApiVec3i;
+import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.backends.opengl.OpenGLCommandContext;
 import org.lwjgl.system.MemoryStack;
 
 import com.seibel.distanthorizons.core.util.math.Mat4f;
@@ -29,6 +31,9 @@ public class ShaderProgram
 {
 	/** Stores the handle of the program. */
 	public final int id;
+	
+	/** Command context for OpenGL immediate mode operations */
+	private static final CommandContext CTX = OpenGLCommandContext.IMMEDIATE;
 	
 	
 	
@@ -76,7 +81,7 @@ public class ShaderProgram
 		
 		for (int i = 0; i < attributes.length; i++)
 		{
-			VulkanicAPI.glBindAttribLocation(this.id, i, attributes[i]);
+			VulkanicAPI.bindAttributeLocation(CTX, this.id, i, attributes[i]);
 		}
 		VulkanicAPI.glLinkProgram(this.id);
 		
@@ -112,7 +117,7 @@ public class ShaderProgram
 	 */
 	public int getAttributeLocation(CharSequence name)
 	{
-		int i = VulkanicAPI.glGetAttribLocation(id, name);
+		int i = VulkanicAPI.getAttributeLocation(CTX, id, name);
 		if (i == -1) throw new RuntimeException("Attribute name not found: " + name);
 		return i;
 	}
@@ -121,7 +126,7 @@ public class ShaderProgram
 	 * Returns -1 if the attribute doesn't exist or has been optimized out.
 	 */
 	public int tryGetAttributeLocation(CharSequence name)
-	{ return VulkanicAPI.glGetAttribLocation(this.id, name); }
+	{ return VulkanicAPI.getAttributeLocation(CTX, this.id, name); }
 	
 	/**
 	 * WARNING: Slow native call! Cache it if possible!
@@ -134,7 +139,7 @@ public class ShaderProgram
 	 */
 	public int getUniformLocation(CharSequence name) throws RuntimeException
 	{
-		int i = VulkanicAPI.glGetUniformLocation(id, name);
+		int i = VulkanicAPI.locateUniformVariable(CTX, id, name);
 		if (i == -1)
 		{
 			throw new RuntimeException("Uniform name not found: " + name);
@@ -145,20 +150,20 @@ public class ShaderProgram
 	// Same as above but without throwing errors.
 	// Return -1 if uniform doesn't exist or has been optimized out
 	public int tryGetUniformLocation(CharSequence name)
-	{ return VulkanicAPI.glGetUniformLocation(this.id, name); }
+	{ return VulkanicAPI.locateUniformVariable(CTX, this.id, name); }
 	
 	/** Requires a bound ShaderProgram. */
-	public void setUniform(int location, boolean value) { VulkanicAPI.glUniform1i(location, value ? 1 : 0); }
+	public void setUniform(int location, boolean value) { VulkanicAPI.assignUniformInteger(CTX, location, value ? 1 : 0); }
 	/** @see ShaderProgram#setUniform(int, boolean) */
 	public void trySetUniform(int location, boolean value) { if (location != -1) { this.setUniform(location, value); } }
 	
 	/** Requires a bound ShaderProgram. */
-	public void setUniform(int location, int value) { VulkanicAPI.glUniform1i(location, value); }
+	public void setUniform(int location, int value) { VulkanicAPI.assignUniformInteger(CTX, location, value); }
 	/** @see ShaderProgram#setUniform(int, int) */
 	public void trySetUniform(int location, int value) { if (location != -1) { this.setUniform(location, value); } }
 	
 	/** Requires a bound ShaderProgram. */
-	public void setUniform(int location, float value) { VulkanicAPI.glUniform1f(location, value); }
+	public void setUniform(int location, float value) { VulkanicAPI.assignUniformFloat(CTX, location, value); }
 	/** @see ShaderProgram#setUniform(int, float) */
 	public void trySetUniform(int location, float value) { if (location != -1) { this.setUniform(location, value); } }
 	

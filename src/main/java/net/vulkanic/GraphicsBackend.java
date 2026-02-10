@@ -866,6 +866,89 @@ public interface GraphicsBackend {
      */
     void glDetachShader(CommandContext ctx, int program, int shader);
     
+    /**
+     * Binds a vertex attribute variable name to a specific attribute index.
+     * 
+     * In OpenGL: Maps to glBindAttribLocation()
+     * In Vulkan: Attribute locations are specified in SPIR-V shader code via layout(location=X)
+     * 
+     * This must be called before linking the program. In OpenGL, this allows control over
+     * which attribute index corresponds to which shader variable. In Vulkan, this is handled
+     * at compile-time in the SPIR-V shader via layout qualifiers.
+     * 
+     * @param ctx Command context for recording this command
+     * @param program The program object ID
+     * @param index The attribute index to bind to (0-15 typically)
+     * @param name The name of the vertex attribute variable in the shader
+     */
+    void bindAttributeLocation(CommandContext ctx, int program, int index, CharSequence name);
+    
+    /**
+     * Queries the location of a vertex attribute variable in a linked program.
+     * 
+     * In OpenGL: Maps to glGetAttribLocation()
+     * In Vulkan: Attribute locations are defined in SPIR-V, reflection needed
+     * 
+     * Returns the attribute index that was assigned to the named variable during linking.
+     * Must be called after the program has been successfully linked.
+     * 
+     * @param ctx Command context for recording this command
+     * @param program The linked program object ID
+     * @param name The name of the vertex attribute variable to query
+     * @return The attribute location/index, or -1 if not found
+     */
+    int getAttributeLocation(CommandContext ctx, int program, CharSequence name);
+    
+    /**
+     * Queries the location of a uniform variable in a linked program.
+     * 
+     * In OpenGL: Maps to glGetUniformLocation()
+     * In Vulkan: Uniforms are in descriptor sets, requires reflection or pre-defined bindings
+     * 
+     * Returns the uniform location that can be used to update the uniform's value.
+     * Must be called after the program has been successfully linked.
+     * 
+     * @param ctx Command context for recording this command
+     * @param program The linked program object ID
+     * @param name The name of the uniform variable to query
+     * @return The uniform location, or -1 if not found or not active
+     */
+    int locateUniformVariable(CommandContext ctx, int program, CharSequence name);
+    
+    /**
+     * Sets the value of a single integer uniform variable.
+     * 
+     * In OpenGL: Maps to glUniform1i()
+     * In Vulkan: Maps to vkCmdPushConstants() for push constants or descriptor set updates
+     * 
+     * Updates the value of a uniform variable at the specified location. The program
+     * containing this uniform must be bound/active when calling this method.
+     * 
+     * @param ctx Command context for recording this command
+     * @param location The uniform location (from locateUniformVariable)
+     * @param value The integer value to assign to the uniform
+     */
+    void assignUniformInteger(CommandContext ctx, int location, int value);
+    
+    /**
+     * Sets the value of a single float uniform variable.
+     * 
+     * In OpenGL: Maps to glUniform1f()
+     * In Vulkan: Maps to vkCmdPushConstants() for push constants or descriptor set updates
+     * 
+     * Updates the value of a uniform variable at the specified location. The program
+     * containing this uniform must be bound/active when calling this method.
+     * 
+     * @param ctx Command context for recording this command
+     * @param location The uniform location (from locateUniformVariable)
+     * @param value The float value to assign to the uniform
+     */
+    void assignUniformFloat(CommandContext ctx, int location, float value);
+    
+    // ================================================================================
+    // DEPRECATED METHODS - To be replaced with CommandContext-aware versions
+    // ================================================================================
+    
     // Pixel operations
     @Deprecated
     void setPixelStoreMode(int pname, int value);

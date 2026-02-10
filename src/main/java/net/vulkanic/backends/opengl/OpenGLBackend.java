@@ -1150,6 +1150,118 @@ public class OpenGLBackend implements GraphicsBackend {
         org.lwjgl.opengl.GL32C.glDetachShader(program, shader);
     }
     
+    /**
+     * Binds a vertex attribute variable name to a specific attribute index with explicit command context.
+     * This is the Vulkan-compatible implementation for attribute binding.
+     * 
+     * OpenGL implementation: Direct mapping to glBindAttribLocation()
+     * Vulkan implementation: Attribute locations specified in SPIR-V via layout(location=X)
+     * 
+     * @param ctx Command context (must be immediate mode for OpenGL)
+     * @param program The program object ID
+     * @param index The attribute index to bind to
+     * @param name The name of the vertex attribute variable
+     */
+    @Override
+    public void bindAttributeLocation(CommandContext ctx, int program, int index, CharSequence name) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        GL20.glBindAttribLocation(program, index, name);
+    }
+    
+    /**
+     * Queries the location of a vertex attribute variable with explicit command context.
+     * This is the Vulkan-compatible implementation for attribute location queries.
+     * 
+     * OpenGL implementation: Direct mapping to glGetAttribLocation()
+     * Vulkan implementation: Reflection or pre-defined attribute locations
+     * 
+     * @param ctx Command context (must be immediate mode for OpenGL)
+     * @param program The linked program object ID
+     * @param name The name of the vertex attribute variable
+     * @return The attribute location/index, or -1 if not found
+     */
+    @Override
+    public int getAttributeLocation(CommandContext ctx, int program, CharSequence name) {
+        // Validate context is immediate mode for OpenGL)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        return GL20.glGetAttribLocation(program, name);
+    }
+    
+    /**
+     * Queries the location of a uniform variable with explicit command context.
+     * This is the Vulkan-compatible implementation for uniform location queries.
+     * 
+     * OpenGL implementation: Direct mapping to glGetUniformLocation()
+     * Vulkan implementation: Descriptor set bindings or reflection
+     * 
+     * @param ctx Command context (must be immediate mode for OpenGL)
+     * @param program The linked program object ID
+     * @param name The name of the uniform variable
+     * @return The uniform location, or -1 if not found
+     */
+    @Override
+    public int locateUniformVariable(CommandContext ctx, int program, CharSequence name) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        return GL20.glGetUniformLocation(program, name);
+    }
+    
+    /**
+     * Sets a single integer uniform value with explicit command context.
+     * This is the Vulkan-compatible implementation for uniform updates.
+     * 
+     * OpenGL implementation: Direct mapping to glUniform1i()
+     * Vulkan implementation: Push constants or descriptor set updates
+     * 
+     * @param ctx Command context (must be immediate mode for OpenGL)
+     * @param location The uniform location
+     * @param value The integer value to assign
+     */
+    @Override
+    public void assignUniformInteger(CommandContext ctx, int location, int value) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        GL20.glUniform1i(location, value);
+    }
+    
+    /**
+     * Sets a single float uniform value with explicit command context.
+     * This is the Vulkan-compatible implementation for uniform updates.
+     * 
+     * OpenGL implementation: Direct mapping to glUniform1f()
+     * Vulkan implementation: Push constants or descriptor set updates
+     * 
+     * @param ctx Command context (must be immediate mode for OpenGL)
+     * @param location The uniform location
+     * @param value The float value to assign
+     */
+    @Override
+    public void assignUniformFloat(CommandContext ctx, int location, float value) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        GL20.glUniform1f(location, value);
+    }
+    
+    // ================================================================================
+    // DEPRECATED METHODS - OpenGL immediate-mode implementations
+    // ================================================================================
+    
     @Deprecated
     @Override
     public void setPixelStoreMode(int pname, int value) {

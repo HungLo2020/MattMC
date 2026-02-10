@@ -1801,6 +1801,128 @@ public class VulkanicAPI {
         getBackend().glDetachShader(ctx, program, shader);
     }
     
+    /**
+     * Binds a vertex attribute variable name to a specific attribute index.
+     * 
+     * This is a Vulkan-compatible method that requires an explicit CommandContext.
+     * For OpenGL, use getImmediateContext() to get the context.
+     * 
+     * Example usage:
+     * <pre>
+     *     CommandContext ctx = VulkanicAPI.getImmediateContext();
+     *     VulkanicAPI.bindAttributeLocation(ctx, programID, 0, "vertexPosition");
+     * </pre>
+     * 
+     * In OpenGL: Maps to glBindAttribLocation()
+     * In Vulkan: Attribute locations are specified in SPIR-V shader code
+     * 
+     * @param ctx Command context for recording this command
+     * @param program The program object ID
+     * @param index The attribute index to bind to
+     * @param name The name of the vertex attribute variable
+     */
+    public static void bindAttributeLocation(CommandContext ctx, int program, int index, CharSequence name) {
+        getBackend().bindAttributeLocation(ctx, program, index, name);
+    }
+    
+    /**
+     * Queries the location of a vertex attribute variable in a linked program.
+     * 
+     * This is a Vulkan-compatible method that requires an explicit CommandContext.
+     * For OpenGL, use getImmediateContext() to get the context.
+     * 
+     * Example usage:
+     * <pre>
+     *     CommandContext ctx = VulkanicAPI.getImmediateContext();
+     *     int location = VulkanicAPI.getAttributeLocation(ctx, programID, "vertexPosition");
+     * </pre>
+     * 
+     * In OpenGL: Maps to glGetAttribLocation()
+     * In Vulkan: Attribute locations are defined in SPIR-V
+     * 
+     * @param ctx Command context for recording this command
+     * @param program The linked program object ID
+     * @param name The name of the vertex attribute variable
+     * @return The attribute location/index, or -1 if not found
+     */
+    public static int getAttributeLocation(CommandContext ctx, int program, CharSequence name) {
+        return getBackend().getAttributeLocation(ctx, program, name);
+    }
+    
+    /**
+     * Queries the location of a uniform variable in a linked program.
+     * 
+     * This is a Vulkan-compatible method that requires an explicit CommandContext.
+     * For OpenGL, use getImmediateContext() to get the context.
+     * 
+     * Example usage:
+     * <pre>
+     *     CommandContext ctx = VulkanicAPI.getImmediateContext();
+     *     int location = VulkanicAPI.locateUniformVariable(ctx, programID, "modelMatrix");
+     * </pre>
+     * 
+     * In OpenGL: Maps to glGetUniformLocation()
+     * In Vulkan: Uniforms are in descriptor sets
+     * 
+     * @param ctx Command context for recording this command
+     * @param program The linked program object ID
+     * @param name The name of the uniform variable
+     * @return The uniform location, or -1 if not found
+     */
+    public static int locateUniformVariable(CommandContext ctx, int program, CharSequence name) {
+        return getBackend().locateUniformVariable(ctx, program, name);
+    }
+    
+    /**
+     * Sets the value of a single integer uniform variable.
+     * 
+     * This is a Vulkan-compatible method that requires an explicit CommandContext.
+     * For OpenGL, use getImmediateContext() to get the context.
+     * 
+     * Example usage:
+     * <pre>
+     *     CommandContext ctx = VulkanicAPI.getImmediateContext();
+     *     VulkanicAPI.assignUniformInteger(ctx, location, 42);
+     * </pre>
+     * 
+     * In OpenGL: Maps to glUniform1i()
+     * In Vulkan: Push constants or descriptor updates
+     * 
+     * @param ctx Command context for recording this command
+     * @param location The uniform location
+     * @param value The integer value to assign
+     */
+    public static void assignUniformInteger(CommandContext ctx, int location, int value) {
+        getBackend().assignUniformInteger(ctx, location, value);
+    }
+    
+    /**
+     * Sets the value of a single float uniform variable.
+     * 
+     * This is a Vulkan-compatible method that requires an explicit CommandContext.
+     * For OpenGL, use getImmediateContext() to get the context.
+     * 
+     * Example usage:
+     * <pre>
+     *     CommandContext ctx = VulkanicAPI.getImmediateContext();
+     *     VulkanicAPI.assignUniformFloat(ctx, location, 1.5f);
+     * </pre>
+     * 
+     * In OpenGL: Maps to glUniform1f()
+     * In Vulkan: Push constants or descriptor updates
+     * 
+     * @param ctx Command context for recording this command
+     * @param location The uniform location
+     * @param value The float value to assign
+     */
+    public static void assignUniformFloat(CommandContext ctx, int location, float value) {
+        getBackend().assignUniformFloat(ctx, location, value);
+    }
+    
+    // ================================================================================
+    // DEPRECATED METHODS - Legacy API without CommandContext
+    // ================================================================================
+    
     @Deprecated
     public static void setPixelStoreMode(int pname, int value) {
         getBackend().setPixelStoreMode(pname, value);
