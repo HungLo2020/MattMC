@@ -3,6 +3,8 @@ package net.vulkanic;
 import net.vulkanic.backends.opengl.OpenGLBackend;
 import net.vulkanic.backends.opengl.OpenGLCommandContext;
 
+import java.nio.FloatBuffer;
+
 /**
  * Main entry point for the Vulkanic Graphics Abstraction Layer.
  * Provides a unified API for graphics operations that can be backed by different graphics APIs.
@@ -2136,6 +2138,100 @@ public class VulkanicAPI {
      */
     public static void setStaticViewport(CommandContext ctx, int x, int y, int width, int height) {
         getBackend().setStaticViewport(ctx, x, y, width, height);
+    }
+    
+    /**
+     * Configures the data format and location for a vertex attribute.
+     * 
+     * Example usage:
+     * <pre>{@code
+     * CommandContext ctx = OpenGLCommandContext.IMMEDIATE;
+     * configureVertexAttributePointer(ctx, 0, 3, GL_FLOAT, false, 0, 0);  // Position attribute
+     * }</pre>
+     * 
+     * @param ctx Command context for recording this command
+     * @param index The index of the vertex attribute
+     * @param size Number of components (1-4)
+     * @param type Data type (GL_FLOAT, GL_INT, etc.)
+     * @param normalized Whether to normalize fixed-point data
+     * @param stride Byte offset between consecutive attributes
+     * @param pointer Offset of the first component
+     */
+    public static void configureVertexAttributePointer(CommandContext ctx, int index, int size, int type,
+                                                      boolean normalized, int stride, long pointer) {
+        getBackend().configureVertexAttributePointer(ctx, index, size, type, normalized, stride, pointer);
+    }
+    
+    /**
+     * Disables a vertex attribute array.
+     * 
+     * Example usage:
+     * <pre>{@code
+     * CommandContext ctx = OpenGLCommandContext.IMMEDIATE;
+     * deactivateVertexAttributeArray(ctx, 0);  // Disable attribute 0
+     * }</pre>
+     * 
+     * @param ctx Command context for recording this command
+     * @param index The index of the vertex attribute to disable
+     */
+    public static void deactivateVertexAttributeArray(CommandContext ctx, int index) {
+        getBackend().deactivateVertexAttributeArray(ctx, index);
+    }
+    
+    /**
+     * Sets a 3x3 matrix uniform value (mat3).
+     * 
+     * Example usage:
+     * <pre>{@code
+     * CommandContext ctx = OpenGLCommandContext.IMMEDIATE;
+     * FloatBuffer matrix = BufferUtils.createFloatBuffer(9);
+     * // Fill matrix with normal transformation
+     * assignUniformMatrix3(ctx, location, false, matrix);
+     * }</pre>
+     * 
+     * @param ctx Command context for recording this command
+     * @param location Location of the uniform variable
+     * @param transpose Whether to transpose the matrix
+     * @param value FloatBuffer containing 9 floats
+     */
+    public static void assignUniformMatrix3(CommandContext ctx, int location, boolean transpose, FloatBuffer value) {
+        getBackend().assignUniformMatrix3(ctx, location, transpose, value);
+    }
+    
+    /**
+     * Sets a 3x3 matrix uniform value from an array (mat3).
+     * 
+     * Example usage:
+     * <pre>{@code
+     * CommandContext ctx = OpenGLCommandContext.IMMEDIATE;
+     * float[] matrix = new float[9];
+     * // Fill matrix with normal transformation
+     * assignUniformMatrix3Array(ctx, location, false, matrix);
+     * }</pre>
+     * 
+     * @param ctx Command context for recording this command
+     * @param location Location of the uniform variable
+     * @param transpose Whether to transpose the matrix
+     * @param value Float array containing 9 floats
+     */
+    public static void assignUniformMatrix3Array(CommandContext ctx, int location, boolean transpose, float[] value) {
+        getBackend().assignUniformMatrix3Array(ctx, location, transpose, value);
+    }
+    
+    /**
+     * Sets the blend equation for color blending.
+     * 
+     * Example usage:
+     * <pre>{@code
+     * CommandContext ctx = OpenGLCommandContext.IMMEDIATE;
+     * setBlendEquation(ctx, GL_FUNC_ADD);  // Standard additive blending
+     * }</pre>
+     * 
+     * @param ctx Command context for recording this command
+     * @param mode The blend equation mode (GL_FUNC_ADD, GL_FUNC_SUBTRACT, etc.)
+     */
+    public static void setBlendEquation(CommandContext ctx, int mode) {
+        getBackend().setBlendEquation(ctx, mode);
     }
     
     // ================================================================================

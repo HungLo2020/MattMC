@@ -1360,6 +1360,57 @@ public class OpenGLBackend implements GraphicsBackend {
         GL11.glViewport(x, y, width, height);
     }
     
+    @Override
+    public void configureVertexAttributePointer(CommandContext ctx, int index, int size, int type,
+                                               boolean normalized, int stride, long pointer) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        GL20.glVertexAttribPointer(index, size, type, normalized, stride, pointer);
+    }
+    
+    @Override
+    public void deactivateVertexAttributeArray(CommandContext ctx, int index) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        GL20.glDisableVertexAttribArray(index);
+    }
+    
+    @Override
+    public void assignUniformMatrix3(CommandContext ctx, int location, boolean transpose, FloatBuffer value) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        GL20.glUniformMatrix3fv(location, transpose, value);
+    }
+    
+    @Override
+    public void assignUniformMatrix3Array(CommandContext ctx, int location, boolean transpose, float[] value) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        GL20.glUniformMatrix3fv(location, transpose, value);
+    }
+    
+    @Override
+    public void setBlendEquation(CommandContext ctx, int mode) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        GL20.glBlendEquation(mode);
+    }
+    
     // ================================================================================
     // DEPRECATED METHODS - OpenGL immediate-mode implementations
     // ================================================================================

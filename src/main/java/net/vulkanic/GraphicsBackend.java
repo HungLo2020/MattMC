@@ -1123,6 +1123,86 @@ public interface GraphicsBackend {
      */
     void setStaticViewport(CommandContext ctx, int x, int y, int width, int height);
     
+    /**
+     * Configures the data format and location for a vertex attribute.
+     * 
+     * In OpenGL: Maps to glVertexAttribPointer()
+     * In Vulkan: Maps to VkVertexInputAttributeDescription in pipeline state
+     * 
+     * Specifies how vertex shader attributes read data from the currently bound vertex buffer.
+     * This defines the size, type, stride, and offset for a specific vertex attribute.
+     * 
+     * @param ctx Command context for recording this command
+     * @param index The index of the vertex attribute to configure
+     * @param size Number of components per vertex (1, 2, 3, or 4)
+     * @param type Data type of each component (e.g., GL_FLOAT, GL_INT)
+     * @param normalized Whether fixed-point data should be normalized
+     * @param stride Byte offset between consecutive vertex attributes
+     * @param pointer Offset of the first component in the buffer
+     */
+    void configureVertexAttributePointer(CommandContext ctx, int index, int size, int type, 
+                                        boolean normalized, int stride, long pointer);
+    
+    /**
+     * Disables a vertex attribute array.
+     * 
+     * In OpenGL: Maps to glDisableVertexAttribArray()
+     * In Vulkan: Vertex attributes are part of immutable pipeline state
+     * 
+     * Disables the specified vertex attribute array. When disabled, the attribute
+     * will use a constant value instead of reading from a buffer.
+     * 
+     * @param ctx Command context for recording this command
+     * @param index The index of the vertex attribute to disable
+     */
+    void deactivateVertexAttributeArray(CommandContext ctx, int index);
+    
+    /**
+     * Sets a 3x3 matrix uniform value (mat3).
+     * 
+     * In OpenGL: Maps to glUniformMatrix3fv()
+     * In Vulkan: Maps to vkCmdPushConstants() or descriptor set updates
+     * 
+     * Sets a 3x3 matrix uniform variable. Commonly used for normal transformation matrices.
+     * The matrix data must be in column-major order (OpenGL/GLSL standard).
+     * 
+     * @param ctx Command context for recording this command
+     * @param location Location of the uniform variable
+     * @param transpose Whether to transpose the matrix
+     * @param value FloatBuffer containing the matrix data (9 floats)
+     */
+    void assignUniformMatrix3(CommandContext ctx, int location, boolean transpose, FloatBuffer value);
+    
+    /**
+     * Sets a 3x3 matrix uniform value from an array (mat3).
+     * 
+     * In OpenGL: Maps to glUniformMatrix3fv()
+     * In Vulkan: Maps to vkCmdPushConstants() or descriptor set updates
+     * 
+     * Sets a 3x3 matrix uniform variable from a float array. Array variant for convenience.
+     * The matrix data must be in column-major order (OpenGL/GLSL standard).
+     * 
+     * @param ctx Command context for recording this command
+     * @param location Location of the uniform variable
+     * @param transpose Whether to transpose the matrix
+     * @param value Float array containing the matrix data (9 floats)
+     */
+    void assignUniformMatrix3Array(CommandContext ctx, int location, boolean transpose, float[] value);
+    
+    /**
+     * Sets the blend equation for color blending.
+     * 
+     * In OpenGL: Maps to glBlendEquation()
+     * In Vulkan: Maps to VkPipelineColorBlendAttachmentState.blendOp
+     * 
+     * Controls how source and destination colors are combined during blending.
+     * Common modes include GL_FUNC_ADD, GL_FUNC_SUBTRACT, GL_MIN, GL_MAX.
+     * 
+     * @param ctx Command context for recording this command
+     * @param mode The blend equation mode (e.g., GL_FUNC_ADD)
+     */
+    void setBlendEquation(CommandContext ctx, int mode);
+    
     // ================================================================================
     // DEPRECATED METHODS - To be replaced with CommandContext-aware versions
     // ================================================================================

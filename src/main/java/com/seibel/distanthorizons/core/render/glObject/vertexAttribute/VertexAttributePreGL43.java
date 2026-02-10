@@ -111,7 +111,7 @@ public final class VertexAttributePreGL43 extends AbstractVertexAttribute
 			}
 			else
 			{
-				VulkanicAPI.glVertexAttribPointer(bindingPointIndex, pointer.elementCount, pointer.glType,
+				VulkanicAPI.configureVertexAttributePointer(CTX, bindingPointIndex, pointer.elementCount, pointer.glType,
 						pointer.normalized, this.strideSize, this.pointersOffset[bindingPointIndex]);
 			}
 		}
@@ -130,7 +130,7 @@ public final class VertexAttributePreGL43 extends AbstractVertexAttribute
 	{
 		for (int i = 0; i < this.pointers.length; i++)
 		{
-			VulkanicAPI.glDisableVertexAttribArray(i);
+			VulkanicAPI.deactivateVertexAttributeArray(CTX, i);
 		}
 	}
 	
@@ -141,7 +141,7 @@ public final class VertexAttributePreGL43 extends AbstractVertexAttribute
 		int[] bindingPointIndexes = this.bindingPointsToIndex[bindingPoint];
 		for (int bindingPointIndex : bindingPointIndexes)
 		{
-			VulkanicAPI.glDisableVertexAttribArray(bindingPointIndex);
+			VulkanicAPI.deactivateVertexAttributeArray(CTX, bindingPointIndex);
 		}
 	}
 	

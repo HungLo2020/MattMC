@@ -518,12 +518,12 @@ public class IrisRenderSystem {
 
 	public static void uniformMatrix3fv(int index, boolean b, FloatBuffer buf) {
 		RenderSystem.assertOnRenderThread();
-		VulkanicAPI.glUniformMatrix3fv(index, b, buf);
+		VulkanicAPI.assignUniformMatrix3(CTX, index, b, buf);
 	}
 
 	public static void uniformMatrix3fv(int index, boolean b, float[] buf) {
 		RenderSystem.assertOnRenderThread();
-		VulkanicAPI.glUniformMatrix3fv(index, b, buf);
+		VulkanicAPI.assignUniformMatrix3Array(CTX, index, b, buf);
 	}
 
 	public static void clearColor(float v, float v1, float v2, float v3) {

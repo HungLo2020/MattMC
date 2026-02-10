@@ -33,7 +33,9 @@ import net.irisshaders.iris.uniforms.CommonUniforms;
 import net.irisshaders.iris.uniforms.builtin.BuiltinReplacementUniforms;
 import net.irisshaders.iris.uniforms.custom.CustomUniforms;
 import net.minecraft.client.Minecraft;
+import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.backends.opengl.OpenGLCommandContext;
 import org.joml.Matrix3f;
 import org.joml.Matrix4f;
 import org.lwjgl.system.MemoryStack;
@@ -70,6 +72,9 @@ public class IrisGenericRenderProgram implements IDhApiGenericObjectShaderProgra
 	private final int va;
 	private final int uBlockLight;
 	private final int uSkyLight;
+	
+	/** Command context for OpenGL immediate mode operations */
+	private static final CommandContext CTX = OpenGLCommandContext.IMMEDIATE;
 
 	// This will bind  AbstractVertexAttribute
 	private IrisGenericRenderProgram(String name, boolean isShadowPass, boolean translucent, BlendModeOverride override, BufferBlendOverride[] bufferBlendOverrides, String vertex, String tessControl, String tessEval, String geometry, String fragment, CustomUniforms customUniforms, IrisRenderingPipeline pipeline) {
@@ -136,7 +141,7 @@ public class IrisGenericRenderProgram implements IDhApiGenericObjectShaderProgra
 
 		this.va = GlStateManager._glGenVertexArrays();
 		GlStateManager._glBindVertexArray(va);
-		VulkanicAPI.glVertexAttribPointer(0, 3, VulkanicAPI.GL_FLOAT, false, 0, 0);
+		VulkanicAPI.configureVertexAttributePointer(CTX, 0, 3, VulkanicAPI.GL_FLOAT, false, 0, 0);
 		VulkanicAPI.glEnableVertexAttribArray(0);
 
 		projectionUniform = tryGetUniformLocation2("iris_ProjectionMatrix");
@@ -278,7 +283,7 @@ public class IrisGenericRenderProgram implements IDhApiGenericObjectShaderProgra
 	@Override
 	public void bindVertexBuffer(int i) {
 		VulkanicAPI.glBindBuffer(VulkanicAPI.GL_ARRAY_BUFFER, i);
-		VulkanicAPI.glVertexAttribPointer(0, 3, VulkanicAPI.GL_FLOAT, false, 12, 0);
+		VulkanicAPI.configureVertexAttributePointer(CTX, 0, 3, VulkanicAPI.GL_FLOAT, false, 12, 0);
 	}
 
 	@Override
