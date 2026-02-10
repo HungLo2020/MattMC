@@ -42,16 +42,7 @@ public interface GraphicsBackend {
      */
     void setDynamicViewport(CommandContext ctx, int x, int y, int width, int height);
     
-    @Deprecated
-    void useProgram(int programId);
-    
     // Depth operations
-    @Deprecated
-    void setDepthTestFunction(int func);
-    @Deprecated
-    void setDepthWriteEnabled(boolean enabled);
-    
-    // Color operations
     @Deprecated
     void setColorWriteMask(boolean r, boolean g, boolean b, boolean a);
     
@@ -790,10 +781,6 @@ public interface GraphicsBackend {
     void configureLogicOp(int opcode);
     
     // Drawing operations
-    @Deprecated
-    void drawPrimitiveArrays(int mode, int first, int count);
-    @Deprecated
-    void drawIndexedElements(int mode, int count, int type, long indices);
     @Deprecated
     void configureBlendFunc(int srcRgb, int dstRgb, int srcAlpha, int dstAlpha);
     

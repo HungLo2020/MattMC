@@ -75,24 +75,6 @@ public class OpenGLBackend implements GraphicsBackend {
     
     @Deprecated
     @Override
-    public void useProgram(int programId) {
-        GL20.glUseProgram(programId);
-    }
-    
-    @Deprecated
-    @Override
-    public void setDepthTestFunction(int func) {
-        GL11.glDepthFunc(func);
-    }
-    
-    @Deprecated
-    @Override
-    public void setDepthWriteEnabled(boolean enabled) {
-        GL11.glDepthMask(enabled);
-    }
-    
-    @Deprecated
-    @Override
     public void setColorWriteMask(boolean r, boolean g, boolean b, boolean a) {
         GL11.glColorMask(r, g, b, a);
     }
@@ -1179,18 +1161,6 @@ public class OpenGLBackend implements GraphicsBackend {
     @Override
     public void configureLogicOp(int opcode) {
         GL11.glLogicOp(opcode);
-    }
-    
-    @Deprecated
-    @Override
-    public void drawPrimitiveArrays(int mode, int first, int count) {
-        GL11.glDrawArrays(mode, first, count);
-    }
-
-    @Deprecated
-    @Override
-    public void drawIndexedElements(int mode, int count, int type, long indices) {
-        GL11.glDrawElements(mode, count, type, indices);
     }
     
     @Deprecated

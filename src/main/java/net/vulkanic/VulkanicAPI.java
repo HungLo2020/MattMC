@@ -578,21 +578,6 @@ public class VulkanicAPI {
     }
     
     @Deprecated
-    public static void useProgram(int programId) {
-        getBackend().useProgram(programId);
-    }
-    
-    @Deprecated
-    public static void setDepthTestFunction(int func) {
-        getBackend().setDepthTestFunction(func);
-    }
-    
-    @Deprecated
-    public static void setDepthWriteEnabled(boolean enabled) {
-        getBackend().setDepthWriteEnabled(enabled);
-    }
-    
-    @Deprecated
     public static void setColorWriteMask(boolean r, boolean g, boolean b, boolean a) {
         getBackend().setColorWriteMask(r, g, b, a);
     }
@@ -1751,16 +1736,6 @@ public class VulkanicAPI {
     @Deprecated
     public static void configureLogicOp(int opcode) {
         getBackend().configureLogicOp(opcode);
-    }
-    
-    @Deprecated
-    public static void drawPrimitiveArrays(int mode, int first, int count) {
-        getBackend().drawPrimitiveArrays(mode, first, count);
-    }
-
-    @Deprecated
-    public static void drawIndexedElements(int mode, int count, int type, long indices) {
-        getBackend().drawIndexedElements(mode, count, type, indices);
     }
     
     @Deprecated
@@ -2951,11 +2926,11 @@ public class VulkanicAPI {
     
     /**
      * Installs a program object as part of current rendering state.
-     * Wrapper for useProgram.
+     * Wrapper for bindShaderProgram.
      */
     @Deprecated
     public static void glUseProgram(int program) {
-        useProgram(program);
+        bindShaderProgram(OpenGLCommandContext.IMMEDIATE, program);
     }
     
     /**
