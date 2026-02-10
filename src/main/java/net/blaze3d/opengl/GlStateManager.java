@@ -11,6 +11,7 @@ import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.backends.opengl.OpenGLCommandContext;
 import org.jetbrains.annotations.Nullable;
 import org.lwjgl.PointerBuffer;
 import org.lwjgl.system.MemoryStack;
@@ -18,6 +19,7 @@ import org.lwjgl.system.MemoryUtil;
 
 @Environment(EnvType.CLIENT)
 public class GlStateManager {
+	private static final CommandContext CTX = OpenGLCommandContext.IMMEDIATE;
 	private static final Plot PLOT_TEXTURES = TracyClient.createPlot("GPU Textures");
 	private static int numTextures = 0;
 	
@@ -537,7 +539,7 @@ public class GlStateManager {
 
 	public static void _clear(int i) {
 		RenderSystem.assertOnRenderThread();
-		net.vulkanic.VulkanicAPI.clear(i);
+		net.vulkanic.VulkanicAPI.clear(CTX, i);
 		if (MacosUtil.IS_MACOS) {
 			_getError();
 		}
@@ -663,9 +665,9 @@ public class GlStateManager {
 				stateUnknown = false;
 				// Delegate ALL enable/disable to VulkanicAPI
 				if (bl) {
-					net.vulkanic.VulkanicAPI.enable(this.state);
+					net.vulkanic.VulkanicAPI.enable(CTX, this.state);
 				} else {
-					net.vulkanic.VulkanicAPI.disable(this.state);
+					net.vulkanic.VulkanicAPI.disable(CTX, this.state);
 				}
 				return;
 			}
@@ -673,9 +675,9 @@ public class GlStateManager {
 				this.enabled = bl;
 				// Delegate ALL enable/disable to VulkanicAPI
 				if (bl) {
-					net.vulkanic.VulkanicAPI.enable(this.state);
+					net.vulkanic.VulkanicAPI.enable(CTX, this.state);
 				} else {
-					net.vulkanic.VulkanicAPI.disable(this.state);
+					net.vulkanic.VulkanicAPI.disable(CTX, this.state);
 				}
 			}
 		}

@@ -156,7 +156,7 @@ public final class GLDebug {
 		} else if (caps.GL_KHR_debug) {
 			VulkanicAPI.clearDebugMessageCallbackKHR();
 			if (caps.OpenGL30 && (VulkanicAPI.glGetInteger(VulkanicAPI.GL_CONTEXT_FLAGS) & 2) == 0) {
-				VulkanicAPI.disable(VulkanicAPI.GL_DEBUG_OUTPUT);
+				VulkanicAPI.disable(CTX, VulkanicAPI.GL_DEBUG_OUTPUT);
 			}
 			return 1;
 		} else if (caps.GL_ARB_debug_output) {

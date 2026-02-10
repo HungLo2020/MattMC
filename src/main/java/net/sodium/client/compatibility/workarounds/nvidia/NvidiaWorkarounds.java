@@ -11,12 +11,15 @@ import net.sodium.client.platform.windows.WindowsCommandLine;
 import net.sodium.client.platform.windows.WindowsFileVersion;
 import net.sodium.client.platform.windows.api.d3dkmt.D3DKMT;
 import org.jetbrains.annotations.Nullable;
+import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.backends.opengl.OpenGLCommandContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class NvidiaWorkarounds {
     private static final Logger LOGGER = LoggerFactory.getLogger("Sodium-NvidiaWorkarounds");
+    private static final CommandContext CTX = OpenGLCommandContext.IMMEDIATE;
 
     public static boolean isNvidiaGraphicsCardPresent() {
         return GraphicsAdapterProbe.getAdapters()
@@ -128,7 +131,7 @@ public class NvidiaWorkarounds {
         if (capabilities.GL_KHR_debug) {
             LOGGER.info("Enabling GL_DEBUG_OUTPUT_SYNCHRONOUS to force the NVIDIA driver to disable threaded " +
                     "command submission");
-            VulkanicAPI.enable(33346); // GL_DEBUG_OUTPUT_SYNCHRONOUS (KHRDebug.GL_DEBUG_OUTPUT_SYNCHRONOUS)
+            VulkanicAPI.enable(CTX, 33346); // GL_DEBUG_OUTPUT_SYNCHRONOUS (KHRDebug.GL_DEBUG_OUTPUT_SYNCHRONOUS)
         } else {
             LOGGER.error("GL_KHR_debug does not appear to be supported, unable to disable threaded " +
                     "command submission!");

@@ -28,6 +28,8 @@ import net.minecraft.api.Environment;
 import net.minecraft.client.renderer.ShaderDefines;
 import net.minecraft.client.renderer.ShaderManager;
 import net.minecraft.resources.ResourceLocation;
+import net.vulkanic.CommandContext;
+import net.vulkanic.backends.opengl.OpenGLCommandContext;
 import org.apache.commons.lang3.StringUtils;
 import org.jetbrains.annotations.Nullable;
 import org.lwjgl.glfw.GLFW;
@@ -35,6 +37,7 @@ import org.slf4j.Logger;
 
 @Environment(EnvType.CLIENT)
 public class GlDevice implements GpuDevice {
+	private static final CommandContext CTX = OpenGLCommandContext.IMMEDIATE;
 	private static final Logger LOGGER = LogUtils.getLogger();
 	protected static boolean USE_GL_ARB_vertex_attrib_binding = true;
 	protected static boolean USE_GL_KHR_debug = true;
@@ -73,7 +76,7 @@ public class GlDevice implements GpuDevice {
 		this.defaultShaderSource = biFunction;
 		this.encoder = new GlCommandEncoder(this);
 		this.uniformOffsetAlignment = net.vulkanic.VulkanicAPI.queryIntegerState(35380); // GL_UNIFORM_BUFFER_OFFSET_ALIGNMENT
-		net.vulkanic.VulkanicAPI.enable(34895); // GL_PROGRAM_POINT_SIZE
+		net.vulkanic.VulkanicAPI.enable(CTX, 34895); // GL_PROGRAM_POINT_SIZE
 	}
 
 	public GlDebugLabel debugLabels() {
