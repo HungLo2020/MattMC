@@ -28,6 +28,8 @@ import org.joml.Matrix3f;
 import org.joml.Matrix4f;
 import org.joml.Matrix4fc;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.CommandContext;
+import net.vulkanic.backends.opengl.OpenGLCommandContext;
 import org.lwjgl.system.MemoryStack;
 
 import java.nio.FloatBuffer;
@@ -36,6 +38,8 @@ import java.util.List;
 import java.util.Map;
 
 public class IrisLodRenderProgram {
+	private static final CommandContext CTX = OpenGLCommandContext.IMMEDIATE;
+	
 	// Uniforms
 	public final int modelOffsetUniform;
 	public final int worldYOffsetUniform;
@@ -99,7 +103,7 @@ public class IrisLodRenderProgram {
 			this.free();
 			throw new RuntimeException(message);
 		} else {
-			VulkanicAPI.useProgram(this.id);
+			VulkanicAPI.bindShaderProgram(CTX, this.id);
 		}
 
 		vert.destroy();
@@ -210,7 +214,7 @@ public class IrisLodRenderProgram {
 
 	// Override ShaderProgram.bind()
 	public void bind() {
-		VulkanicAPI.useProgram(id);
+		VulkanicAPI.bindShaderProgram(CTX, id);
 		if (blend != null) blend.apply();
 
 		for (BufferBlendOverride override : bufferBlendOverrides) {
@@ -219,7 +223,7 @@ public class IrisLodRenderProgram {
 	}
 
 	public void unbind() {
-		VulkanicAPI.useProgram(0);
+		VulkanicAPI.bindShaderProgram(CTX, 0);
 		ProgramUniforms.clearActiveUniforms();
 		ProgramSamplers.clearActiveSamplers();
 		BlendModeOverride.restore();
@@ -230,7 +234,7 @@ public class IrisLodRenderProgram {
 	}
 
 	public void fillUniformData(Matrix4fc projection, Matrix4fc modelView, int worldYOffset, float partialTicks) {
-		VulkanicAPI.useProgram(id);
+		VulkanicAPI.bindShaderProgram(CTX, id);
 
 		Minecraft.getInstance().gameRenderer.lightTexture().turnOnLightLayer();
 		IrisRenderSystem.bindTextureToUnit(TextureType.TEXTURE_2D.getGlType(), IrisSamplers.LIGHTMAP_TEXTURE_UNIT, RenderSystem.getShaderTexture(2).texture().iris$getGlId());

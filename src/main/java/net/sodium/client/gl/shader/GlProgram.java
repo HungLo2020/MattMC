@@ -6,6 +6,8 @@ import net.sodium.client.gl.shader.uniform.GlUniformBlock;
 import net.sodium.client.render.chunk.shader.ShaderBindingContext;
 import net.minecraft.resources.ResourceLocation;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.CommandContext;
+import net.vulkanic.backends.opengl.OpenGLCommandContext;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.jetbrains.annotations.NotNull;
@@ -18,6 +20,7 @@ import java.util.function.IntFunction;
  */
 public class GlProgram<T> extends GlObject implements ShaderBindingContext {
     private static final Logger LOGGER = LogManager.getLogger(GlProgram.class);
+    private static final CommandContext CTX = OpenGLCommandContext.IMMEDIATE;
 
     private final T shaderInterface;
 
@@ -35,11 +38,11 @@ public class GlProgram<T> extends GlObject implements ShaderBindingContext {
     }
 
     public void bind() {
-        VulkanicAPI.useProgram(this.handle());
+        VulkanicAPI.bindShaderProgram(CTX, this.handle());
     }
 
     public void unbind() {
-        VulkanicAPI.useProgram(0);
+        VulkanicAPI.bindShaderProgram(CTX, 0);
     }
 
     public void delete() {

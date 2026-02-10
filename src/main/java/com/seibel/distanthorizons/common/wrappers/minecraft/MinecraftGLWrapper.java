@@ -90,7 +90,7 @@ public class MinecraftGLWrapper implements IMinecraftGLWrapper
 	@Override
 	public void glDepthFunc(int func) 
 	{ 
-		VulkanicAPI.setDepthTestFunction(func);
+		VulkanicAPI.setDepthFunc(CTX, func);
 		GlStateManager._depthFunc(func); 
 	}
 	
@@ -98,14 +98,14 @@ public class MinecraftGLWrapper implements IMinecraftGLWrapper
 	@Override
 	public void enableDepthMask() 
 	{
-		VulkanicAPI.setDepthWriteEnabled(true);
+		VulkanicAPI.setDepthWriteMask(CTX, true);
 		GlStateManager._depthMask(true); 
 	}
 	/** Disables depth buffer writing */
 	@Override
 	public void disableDepthMask() 
 	{
-		VulkanicAPI.setDepthWriteEnabled(false);
+		VulkanicAPI.setDepthWriteMask(CTX, false);
 		GlStateManager._depthMask(false); 
 	}
 	

@@ -83,7 +83,7 @@ public class GlStateManager {
 		RenderSystem.assertOnRenderThread();
 		if (i != DEPTH.func) {
 			DEPTH.func = i;
-			net.vulkanic.VulkanicAPI.setDepthTestFunction(i);
+			net.vulkanic.VulkanicAPI.setDepthFunc(CTX, i);
 		}
 	}
 
@@ -97,7 +97,7 @@ public class GlStateManager {
 		
 		if (bl != DEPTH.mask) {
 			DEPTH.mask = bl;
-			net.vulkanic.VulkanicAPI.setDepthWriteEnabled(bl);
+			net.vulkanic.VulkanicAPI.setDepthWriteMask(CTX, bl);
 		}
 	}
 
@@ -199,7 +199,7 @@ public class GlStateManager {
 		net.irisshaders.iris.gl.IrisRenderSystem.onProgramUse();
 		
 		iris$program = i;
-		net.vulkanic.VulkanicAPI.useProgram(i);
+		net.vulkanic.VulkanicAPI.bindShaderProgram(CTX, i);
 		
 		// Iris: From MixinGlStateManager_DepthColorOverride - reset tessellation flag
 		net.irisshaders.iris.vertices.ImmediateState.usingTessellation = false;
@@ -568,12 +568,12 @@ public class GlStateManager {
 			mode = VulkanicAPI.GL_PATCHES;
 		}
 		
-		net.vulkanic.VulkanicAPI.drawIndexedElements(mode, j, k, l);
+		net.vulkanic.VulkanicAPI.drawElements(CTX, mode, j, k, l);
 	}
 
 	public static void _drawArrays(int i, int j, int k) {
 		RenderSystem.assertOnRenderThread();
-		net.vulkanic.VulkanicAPI.drawPrimitiveArrays(i, j, k);
+		net.vulkanic.VulkanicAPI.drawArrays(CTX, i, j, k);
 	}
 
 	public static void _pixelStore(int i, int j) {
