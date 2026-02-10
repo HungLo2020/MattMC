@@ -40,7 +40,9 @@ import net.minecraft.server.packs.repository.KnownPack;
 import net.minecraft.server.packs.repository.PackSource;
 import net.minecraft.server.packs.resources.Resource;
 import net.minecraft.server.packs.resources.ResourceProvider;
+import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.backends.opengl.OpenGLCommandContext;
 import org.apache.commons.io.IOUtils;
 
 import java.io.ByteArrayInputStream;
@@ -198,6 +200,8 @@ public class ShaderCreator {
 		}
 	}
 
+	private static final CommandContext CTX = OpenGLCommandContext.IMMEDIATE;
+
 	private static int createShader(String name, ShaderType shaderType, String source) {
 		if (source == null) return -1;
 
@@ -210,7 +214,7 @@ public class ShaderCreator {
 			Iris.logger.warn("Shader compilation log for " + name + ": " + log);
 		}
 
-		int result = GlStateManager.glGetShaderi(shader, VulkanicAPI.GL_COMPILE_STATUS);
+		int result = VulkanicAPI.queryShaderParameter(CTX, shader, VulkanicAPI.GL_COMPILE_STATUS);
 
 		if (result != VulkanicAPI.GL_TRUE) {
 			throw new ShaderCompileException(name, log);

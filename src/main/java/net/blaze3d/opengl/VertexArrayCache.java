@@ -8,7 +8,9 @@ import java.util.Map;
 import java.util.Set;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
+import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.backends.opengl.OpenGLCommandContext;
 import org.jetbrains.annotations.Nullable;
 
 @Environment(EnvType.CLIENT)
@@ -26,6 +28,7 @@ public abstract class VertexArrayCache {
 
 	@Environment(EnvType.CLIENT)
 	static class Emulated extends VertexArrayCache {
+		private static final CommandContext CTX = OpenGLCommandContext.IMMEDIATE;
 		private final Map<VertexFormat, VertexArrayCache.VertexArray> cache = new HashMap();
 		private final GlDebugLabel debugLabels;
 
@@ -38,7 +41,7 @@ public abstract class VertexArrayCache {
 			VertexArrayCache.VertexArray vertexArray = (VertexArrayCache.VertexArray)this.cache.get(vertexFormat);
 			if (vertexArray == null) {
 				int i = GlStateManager._glGenVertexArrays();
-				GlStateManager._glBindVertexArray(i);
+				VulkanicAPI.bindVertexArray(CTX, i);
 				if (glBuffer != null) {
 					GlStateManager._glBindBuffer(34962, glBuffer.handle);
 					setupCombinedAttributes(vertexFormat, true);
@@ -48,7 +51,7 @@ public abstract class VertexArrayCache {
 				this.debugLabels.applyLabel(vertexArray2);
 				this.cache.put(vertexFormat, vertexArray2);
 			} else {
-				GlStateManager._glBindVertexArray(vertexArray.id);
+				VulkanicAPI.bindVertexArray(CTX, vertexArray.id);
 				if (glBuffer != null && vertexArray.lastVertexBuffer != glBuffer) {
 					GlStateManager._glBindBuffer(34962, glBuffer.handle);
 					vertexArray.lastVertexBuffer = glBuffer;
@@ -93,6 +96,7 @@ public abstract class VertexArrayCache {
 
 	@Environment(EnvType.CLIENT)
 	static class Separate extends VertexArrayCache {
+		private static final CommandContext CTX = OpenGLCommandContext.IMMEDIATE;
 		private final Map<VertexFormat, VertexArrayCache.VertexArray> cache = new HashMap();
 		private final GlDebugLabel debugLabels;
 		private final boolean needsMesaWorkaround;
@@ -111,7 +115,7 @@ public abstract class VertexArrayCache {
 		public void bindVertexArray(VertexFormat vertexFormat, @Nullable GlBuffer glBuffer) {
 			VertexArrayCache.VertexArray vertexArray = (VertexArrayCache.VertexArray)this.cache.get(vertexFormat);
 			if (vertexArray != null) {
-				GlStateManager._glBindVertexArray(vertexArray.id);
+				VulkanicAPI.bindVertexArray(CTX, vertexArray.id);
 				if (glBuffer != null && vertexArray.lastVertexBuffer != glBuffer) {
 					if (this.needsMesaWorkaround && vertexArray.lastVertexBuffer != null && vertexArray.lastVertexBuffer.handle == glBuffer.handle) {
 						VulkanicAPI.attachVertexBuffer(0, 0, 0L, 0);
@@ -122,7 +126,7 @@ public abstract class VertexArrayCache {
 				}
 			} else {
 				int i = GlStateManager._glGenVertexArrays();
-				GlStateManager._glBindVertexArray(i);
+				VulkanicAPI.bindVertexArray(CTX, i);
 				if (glBuffer != null) {
 					List<VertexFormatElement> list = vertexFormat.getElements();
 

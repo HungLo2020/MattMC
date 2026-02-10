@@ -390,8 +390,8 @@ public class GlDevice implements GpuDevice {
 			int i = GlStateManager.glCreateShader(GlConst.toGl(shaderCompilationKey.type));
 			GlStateManager.glShaderSource(i, string2);
 			GlStateManager.glCompileShader(i);
-			if (GlStateManager.glGetShaderi(i, 35713) == 0) {
-				String string3 = StringUtils.trim(GlStateManager.glGetShaderInfoLog(i, 32768));
+			if (net.vulkanic.VulkanicAPI.queryShaderParameter(CTX, i, 35713) == 0) {
+				String string3 = StringUtils.trim(net.vulkanic.VulkanicAPI.retrieveShaderInfoLog(CTX, i));
 				LOGGER.error("Couldn't compile {} shader ({}): {}", shaderCompilationKey.type.getName(), shaderCompilationKey.id, string3);
 				return GlShaderModule.INVALID_SHADER;
 			} else {

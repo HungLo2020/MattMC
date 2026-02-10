@@ -140,7 +140,7 @@ public class IrisGenericRenderProgram implements IDhApiGenericObjectShaderProgra
 		images = builder.build();
 
 		this.va = GlStateManager._glGenVertexArrays();
-		GlStateManager._glBindVertexArray(va);
+		VulkanicAPI.bindVertexArray(CTX, va);
 		VulkanicAPI.configureVertexAttributePointer(CTX, 0, 3, VulkanicAPI.GL_FLOAT, false, 0, 0);
 		VulkanicAPI.glEnableVertexAttribArray(0);
 
@@ -242,7 +242,7 @@ public class IrisGenericRenderProgram implements IDhApiGenericObjectShaderProgra
 
 	// Override ShaderProgram.bind()
 	public void bind(DhApiRenderParam renderParam) {
-		GlStateManager._glBindVertexArray(va);
+		VulkanicAPI.bindVertexArray(CTX, va);
 		VulkanicAPI.glUseProgram(id);
 		if (blend != null) blend.apply();
 
@@ -273,7 +273,7 @@ public class IrisGenericRenderProgram implements IDhApiGenericObjectShaderProgra
 	}
 
 	public void unbind() {
-		GlStateManager._glBindVertexArray(0);
+		VulkanicAPI.bindVertexArray(CTX, 0);
 		VulkanicAPI.glUseProgram(0);
 		ProgramUniforms.clearActiveUniforms();
 		ProgramSamplers.clearActiveSamplers();
