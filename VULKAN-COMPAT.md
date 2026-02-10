@@ -1,35 +1,51 @@
 # Vulkan Compatibility Analysis & Incremental Migration Plan
 
 **Analysis Date:** 2026-02-08  
-**Migration Strategy Updated:** 2026-02-08  
+**Migration Strategy Updated:** 2026-02-10  
+**Active Migration Phase:** Incremental Method Replacement (Phase 1)  
 **Vulkanic API Version:** Initial Implementation (OpenGL-only) - **ALL METHODS NOW DEPRECATED**  
 **Analyzed Components:** VulkanicAPI.java, GraphicsBackend.java, OpenGLBackend.java  
 **Lines of Code Analyzed:** ~4,000 LOC  
-**Deprecated Methods:** 874 methods marked for replacement
+**Deprecated Methods:** 874 methods marked for replacement  
+**Migrated Methods:** 11 methods (1.3% complete)
 
 ---
 
 ## Executive Summary
 
-**MIGRATION STATUS: DEPRECATION PHASE COMPLETE** ✅
+**MIGRATION STATUS: ACTIVE MIGRATION IN PROGRESS** 🔄
 
-All 874 methods in the current Vulkanic API have been marked as `@Deprecated` to facilitate an **incremental, test-driven migration** to a properly abstracted graphics API that supports both OpenGL and Vulkan backends. This document now serves as both an analysis of the legacy API's limitations and a comprehensive migration plan.
+All 874 methods in the current Vulkanic API have been marked as `@Deprecated` to facilitate an **incremental, test-driven migration** to a properly abstracted graphics API that supports both OpenGL and Vulkan backends. We have now begun the active migration phase, with **11 methods successfully migrated** to the new CommandContext-aware API.
 
-### Current State (Post-Deprecation)
+### Current State (Active Migration)
 
 The legacy Vulkanic API is a **thin OpenGL state machine wrapper** with approximately **25-30% compatibility** with Vulkan's architectural principles. While it successfully abstracts OpenGL calls behind an interface, the API design is fundamentally tied to OpenGL's immediate-mode, global-state paradigm, which conflicts with Vulkan's explicit, command-buffer-based architecture.
 
-**All methods are now deprecated and marked for replacement:**
-- ⚠️ **VulkanicAPI.java:** 303 deprecated methods (excludes initialize/getBackend infrastructure)
-- ⚠️ **GraphicsBackend.java:** 285 deprecated interface methods
-- ⚠️ **OpenGLBackend.java:** 286 deprecated implementations
+**Migration Progress:**
+- ✅ **11 methods migrated** to CommandContext-aware API (1.3% of 874 total)
+- ⚠️ **863 methods remaining** in deprecated state
+- ✅ **All tests passing** (10/10 Vulkanic unit tests)
+- ✅ **Zero breaking changes** - fully backward compatible
+
+**Migrated Methods (as of 2026-02-10):**
+1. `setDynamicViewport(ctx, ...)` - Viewport control
+2. `setDynamicScissor(ctx, ...)` - Scissor rectangle
+3. `clear(ctx, ...)` - Buffer clearing
+4. `drawArrays(ctx, ...)` - Non-indexed drawing
+5. `drawElements(ctx, ...)` - Indexed drawing
+6. `bindShaderProgram(ctx, ...)` - Shader binding
+7. `setDepthWriteMask(ctx, ...)` - Depth write control
+8. `setColorWriteMask(ctx, ...)` - Color channel masking
+9. `setDepthFunc(ctx, ...)` - Depth comparison
+10. `setBlendFunc(ctx, ...)` - Blend function
+11. `bindBuffer(ctx, ...)` - Buffer binding
 
 ### New Migration Strategy: Incremental Replacement
 
 Instead of building a complete Vulkan backend for the flawed legacy API, we are pursuing a **safer, incremental approach**:
 
 1. **✅ COMPLETED:** Mark all existing methods as `@Deprecated`
-2. **🔄 IN PROGRESS:** For each deprecated method, design a new properly abstracted version compatible with BOTH OpenGL AND Vulkan
+2. **🔄 IN PROGRESS:** For each deprecated method, design a new properly abstracted version compatible with BOTH OpenGL AND Vulkan (11/874 complete)
 3. **📋 PLANNED:** Replace all call sites in game code to use new methods
 4. **📋 PLANNED:** Once a deprecated method has zero call sites, remove it
 5. **📋 PLANNED:** Only after all methods are migrated, implement actual Vulkan backend
