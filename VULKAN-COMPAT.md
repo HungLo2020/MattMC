@@ -2,7 +2,7 @@
 
 **Analysis Date:** 2026-02-08  
 **Migration Strategy Updated:** 2026-02-10  
-**Active Migration Phase:** Phase 8 Complete - Shader Uniforms & Attributes ✅  
+**Active Migration Phase:** Phase 9 Complete - Additional Uniforms & Vertex Attributes ✅  
 **Vulkanic API Version:** Initial Implementation (OpenGL-only) - **ALL METHODS NOW DEPRECATED**  
 **Analyzed Components:** VulkanicAPI.java, GraphicsBackend.java, OpenGLBackend.java  
 **Lines of Code Analyzed:** ~4,000 LOC  
@@ -4562,4 +4562,176 @@ Continue migrating additional shader-related methods or move to other critical s
 - Additional uniform methods (vec2, vec3, vec4, matrices)
 - Vertex attribute configuration methods
 - Query and synchronization methods
+
+
+---
+
+## Phase 9: Additional Uniform & Vertex Attribute Methods
+
+**Status:** ✅ COMPLETE  
+**Date:** 2026-02-10  
+**Methods Migrated:** 5  
+**Call Sites Migrated:** 7 across 3 files  
+**Total Progress:** 65/874 methods (7.4%)
+
+### Migrated Methods
+
+These methods extend the shader programming interface with commonly-used uniform types and vertex attribute configuration:
+
+#### 1. assignUniformFloat3(CommandContext ctx, int location, float x, float y, float z)
+
+**OpenGL Implementation:**
+```java
+@Override
+public void assignUniformFloat3(CommandContext ctx, int location, float x, float y, float z) {
+    if (!ctx.isImmediate()) {
+        throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+    }
+    GL20.glUniform3f(location, x, y, z);
+}
+```
+
+**Vulkan Equivalent:** vkCmdPushConstants() or descriptor set updates for vec3 uniforms
+
+**Usage:** Setting 3-component float vectors (positions, directions, RGB colors)
+
+**Call Sites Migrated:** 1 in ShaderProgram.java
+
+#### 2. assignUniformInteger3(CommandContext ctx, int location, int x, int y, int z)
+
+**OpenGL Implementation:**
+```java
+@Override
+public void assignUniformInteger3(CommandContext ctx, int location, int x, int y, int z) {
+    if (!ctx.isImmediate()) {
+        throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+    }
+    GL20.glUniform3i(location, x, y, z);
+}
+```
+
+**Vulkan Equivalent:** vkCmdPushConstants() or descriptor set updates for ivec3 uniforms
+
+**Usage:** Setting 3-component integer vectors (grid sizes, indices, discrete values)
+
+**Call Sites Migrated:** 1 in ShaderProgram.java
+
+#### 3. assignUniformFloat4(CommandContext ctx, int location, float x, float y, float z, float w)
+
+**OpenGL Implementation:**
+```java
+@Override
+public void assignUniformFloat4(CommandContext ctx, int location, float x, float y, float z, float w) {
+    if (!ctx.isImmediate()) {
+        throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+    }
+    GL20.glUniform4f(location, x, y, z, w);
+}
+```
+
+**Vulkan Equivalent:** vkCmdPushConstants() or descriptor set updates for vec4 uniforms
+
+**Usage:** Setting 4-component float vectors (RGBA colors, quaternions, plane equations)
+
+**Call Sites Migrated:** 1 in ShaderProgram.java
+
+#### 4. assignUniformMatrix4(CommandContext ctx, int location, boolean transpose, java.nio.FloatBuffer value)
+
+**OpenGL Implementation:**
+```java
+@Override
+public void assignUniformMatrix4(CommandContext ctx, int location, boolean transpose, java.nio.FloatBuffer value) {
+    if (!ctx.isImmediate()) {
+        throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+    }
+    GL20.glUniformMatrix4fv(location, transpose, value);
+}
+```
+
+**Vulkan Equivalent:** vkCmdPushConstants() for small matrices or descriptor set updates for larger data
+
+**Usage:** Setting 4x4 transformation matrices (model, view, projection)
+
+**Call Sites Migrated:** 1 in ShaderProgram.java
+
+#### 5. activateVertexAttributeArray(CommandContext ctx, int index)
+
+**OpenGL Implementation:**
+```java
+@Override
+public void activateVertexAttributeArray(CommandContext ctx, int index) {
+    if (!ctx.isImmediate()) {
+        throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+    }
+    GL20.glEnableVertexAttribArray(index);
+}
+```
+
+**Vulkan Equivalent:** Vertex attributes are enabled as part of VkPipelineVertexInputStateCreateInfo
+
+**Usage:** Enabling vertex attribute arrays for rendering
+
+**Call Sites Migrated:** 3 total
+- 2 in VertexAttributePreGL43.java (bindBufferToAllBindingPoints, bindBufferToBindingPoint)
+- 1 in VertexAttributePostGL43.java (attribute configuration)
+
+### Migration Details
+
+**Files Modified:**
+- GraphicsBackend.java - Added 5 interface methods with full documentation
+- OpenGLBackend.java - Added 5 OpenGL implementations
+- VulkanicAPI.java - Added 5 facade methods with usage examples
+
+**Call Sites Updated:**
+1. ShaderProgram.java - 4 uniform calls migrated
+2. VertexAttributePreGL43.java - 2 vertex attribute calls migrated
+3. VertexAttributePostGL43.java - 1 vertex attribute call migrated
+
+**Migration Pattern:**
+```java
+// Before
+VulkanicAPI.glUniform3f(location, x, y, z);
+
+// After
+CommandContext CTX = OpenGLCommandContext.IMMEDIATE;
+VulkanicAPI.assignUniformFloat3(CTX, location, x, y, z);
+```
+
+### Significance
+
+Phase 9 extended the shader programming interface with:
+
+1. **Vector Uniform Support:** Full support for vec3, ivec3, and vec4 uniforms
+2. **Matrix Uniform Support:** Support for mat4 transformations
+3. **Vertex Attribute Configuration:** CommandContext-aware vertex attribute enabling
+
+**Why This Matters for Vulkan:**
+
+**Uniform Type Variations:**
+- OpenGL: Type-specific uniform functions (glUniform3f, glUniform4f, etc.)
+- Vulkan: Uniform data via push constants (for small/frequent updates) or descriptor sets
+- CommandContext allows backend to choose appropriate mechanism based on uniform size and update frequency
+
+**Vertex Attributes:**
+- OpenGL: Dynamic vertex attribute enable/disable per VAO
+- Vulkan: Vertex input state is immutable and part of graphics pipeline
+- CommandContext abstracts these fundamentally different models
+
+These methods complete the core shader interface, providing all commonly-used uniform and vertex attribute operations with proper CommandContext abstraction.
+
+### Testing
+
+- ✅ Build: SUCCESS
+- ✅ All 7 call sites migrated
+- ✅ Zero compilation errors
+- ✅ All methods implemented with immediate-mode validation
+- ✅ Comprehensive documentation with usage examples
+
+### Next Steps
+
+Continue migrating additional methods following the priority order:
+- Additional uniform methods (vec2, mat3, sampler uniforms)
+- Vertex attribute pointer configuration methods
+- Query and state management methods
+- Remaining 809 methods (92.6%)
 
