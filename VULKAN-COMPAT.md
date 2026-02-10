@@ -2,13 +2,13 @@
 
 **Analysis Date:** 2026-02-08  
 **Migration Strategy Updated:** 2026-02-10  
-**Active Migration Phase:** Phase 11 Complete - Vertex Attributes & Matrix Uniforms ✅  
+**Active Migration Phase:** Phase 12 Complete - Shader Query & State Retrieval ✅  
 **Vulkanic API Version:** Initial Implementation (OpenGL-only) - **ALL METHODS NOW DEPRECATED**  
 **Analyzed Components:** VulkanicAPI.java, GraphicsBackend.java, OpenGLBackend.java  
 **Lines of Code Analyzed:** ~4,000 LOC  
 **Deprecated Methods:** 874 methods marked for replacement  
-**Migrated Methods:** 75 methods (8.6% complete)
-**Migrated Call Sites:** 114 call sites in 43 game files ✅ **ALL MIGRATED**
+**Migrated Methods:** 80 methods (9.2% complete)
+**Migrated Call Sites:** 141 call sites in 45 game files ✅ **ALL MIGRATED**
 **Removed Deprecated Methods:** 15 methods
 
 ---
@@ -5083,4 +5083,191 @@ Continue migrating additional methods:
 - Query and synchronization methods
 - 799 methods remaining (91.4%)
 
+
+
+---
+
+## Phase 12: Shader Query & State Retrieval
+
+**Migration Date:** 2026-02-10  
+**Status:** ✅ COMPLETE  
+**Methods Migrated:** 5  
+**Call Sites Updated:** 27 across 2 files
+
+### Migrated Methods
+
+#### 1. queryProgramParameter (was glGetProgrami)
+
+**OpenGL Implementation:**
+```java
+@Override
+public int queryProgramParameter(CommandContext ctx, int program, int pname) {
+    if (!ctx.isImmediate()) {
+        throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+    }
+    return GL20.glGetProgrami(program, pname);
+}
+```
+
+**Vulkan Equivalent:**
+- Pipeline reflection or VkPipeline properties
+- Used for querying link status, attached shaders, active uniforms, etc.
+
+**Call Sites Migrated:** 1 (ShaderProgram.java)
+- glGetProgrami → queryProgramParameter(CTX, this.id, GL_LINK_STATUS)
+
+#### 2. retrieveProgramInfoLog (was glGetProgramInfoLog)
+
+**OpenGL Implementation:**
+```java
+@Override
+public String retrieveProgramInfoLog(CommandContext ctx, int program) {
+    if (!ctx.isImmediate()) {
+        throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+    }
+    return GL20.glGetProgramInfoLog(program);
+}
+```
+
+**Vulkan Equivalent:**
+- VkPipeline creation validation messages
+- Retrieved during pipeline creation if validation layers are enabled
+
+**Call Sites Migrated:** 1 (ShaderProgram.java)
+- glGetProgramInfoLog → retrieveProgramInfoLog(CTX, this.id)
+
+#### 3. queryIntegerState (was glGetInteger)
+
+**OpenGL Implementation:**
+```java
+@Override
+public int queryIntegerState(CommandContext ctx, int pname) {
+    if (!ctx.isImmediate()) {
+        throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+    }
+    return GL11.glGetInteger(pname);
+}
+```
+
+**Vulkan Equivalent:**
+- Query specific objects (pipeline, descriptor sets, etc.) instead of global state
+- No direct equivalent - must track state or query from specific objects
+
+**Call Sites Migrated:** 22 (GLState.java)
+All state capture queries migrated:
+- GL_CURRENT_PROGRAM, GL_VERTEX_ARRAY_BINDING
+- GL_ARRAY_BUFFER_BINDING, GL_ELEMENT_ARRAY_BUFFER_BINDING  
+- GL_FRAMEBUFFER_BINDING, GL_TEXTURE_BINDING_2D
+- GL_ACTIVE_TEXTURE, GL_BLEND_EQUATION_RGB/ALPHA
+- GL_BLEND_SRC/DST_RGB/ALPHA, GL_DEPTH_WRITEMASK
+- GL_DEPTH_FUNC, GL_STENCIL_FUNC/REF/VALUE_MASK
+- GL_CULL_FACE_MODE, GL_POLYGON_MODE
+
+#### 4. activateShaderProgram (was glUseProgram)
+
+**OpenGL Implementation:**
+```java
+@Override
+public void activateShaderProgram(CommandContext ctx, int program) {
+    if (!ctx.isImmediate()) {
+        throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+    }
+    GL20.glUseProgram(program);
+}
+```
+
+**Vulkan Equivalent:**
+- vkCmdBindPipeline() - command buffer operation
+- Part of command recording, not global state change
+
+**Call Sites Migrated:** 3 (ShaderProgram.java)
+- glUseProgram → activateShaderProgram(CTX, this.id) in constructor
+- glUseProgram → activateShaderProgram(CTX, this.id) in bind()
+- glUseProgram → activateShaderProgram(CTX, 0) in unbind()
+
+**Note:** This is a convenience wrapper around bindShaderProgram(ctx, program) for consistency.
+
+#### 5. destroyShaderProgram (was glDeleteProgram)
+
+**OpenGL Implementation:**
+```java
+@Override
+public void destroyShaderProgram(CommandContext ctx, int program) {
+    if (!ctx.isImmediate()) {
+        throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+    }
+    GL20.glDeleteProgram(program);
+}
+```
+
+**Vulkan Equivalent:**
+- vkDestroyPipeline() - explicit pipeline destruction
+- Must ensure pipeline is not in use before destruction
+
+**Call Sites Migrated:** 1 (ShaderProgram.java)
+- glDeleteProgram → destroyShaderProgram(CTX, this.id)
+
+**Note:** This is a convenience wrapper around disposeProgramObject(ctx, program) for consistency.
+
+### Migration Pattern
+
+**Before:**
+```java
+// OpenGL-specific global state query
+int status = VulkanicAPI.glGetProgrami(programId, GL_LINK_STATUS);
+if (status != GL_TRUE) {
+    String log = VulkanicAPI.glGetProgramInfoLog(programId);
+    throw new RuntimeException("Link failed: " + log);
+}
+
+// Global state queries
+int currentProgram = VulkanicAPI.glGetInteger(GL_CURRENT_PROGRAM);
+int boundVAO = VulkanicAPI.glGetInteger(GL_VERTEX_ARRAY_BINDING);
+
+// Program binding
+VulkanicAPI.glUseProgram(programId);
+```
+
+**After:**
+```java
+// CommandContext-aware query
+int status = VulkanicAPI.queryProgramParameter(CTX, programId, GL_LINK_STATUS);
+if (status != GL_TRUE) {
+    String log = VulkanicAPI.retrieveProgramInfoLog(CTX, programId);
+    throw new RuntimeException("Link failed: " + log);
+}
+
+// State queries with context
+int currentProgram = VulkanicAPI.queryIntegerState(CTX, GL_CURRENT_PROGRAM);
+int boundVAO = VulkanicAPI.queryIntegerState(CTX, GL_VERTEX_ARRAY_BINDING);
+
+// Program activation with context
+VulkanicAPI.activateShaderProgram(CTX, programId);
+```
+
+### Significance
+
+Phase 12 successfully migrated shader program query and state retrieval methods, which are critical for:
+
+1. **Shader Program Validation:**
+   - queryProgramParameter: Check link status, validation status
+   - retrieveProgramInfoLog: Debug shader linking errors
+
+2. **State Capture and Debugging:**
+   - queryIntegerState: Capture current OpenGL state
+   - Essential for state management in GLState.java
+
+3. **Program Lifecycle Management:**
+   - activateShaderProgram: Bind programs for rendering
+   - destroyShaderProgram: Clean up program resources
+
+**OpenGL vs Vulkan:**
+- OpenGL: Global state queries with glGetIntegerv
+- Vulkan: Object-specific queries, no global state
+- CommandContext enables proper abstraction for both models
+
+**Impact:**
+- 27 call sites migrated (significant usage in production code)
+- State capture and shader validation now use CommandContext
+- Foundation for Vulkan's object-based state management
 
