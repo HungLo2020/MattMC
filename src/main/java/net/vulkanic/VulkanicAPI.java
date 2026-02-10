@@ -2234,6 +2234,103 @@ public class VulkanicAPI {
         getBackend().setBlendEquation(ctx, mode);
     }
     
+    /**
+     * Queries a shader parameter value.
+     * 
+     * Example usage:
+     * <pre>{@code
+     * int shader = constructShaderObject(CTX, GL_VERTEX_SHADER);
+     * uploadShaderSource(CTX, shader, source, ...);
+     * compileShaderSource(CTX, shader);
+     * int status = queryShaderParameter(CTX, shader, GL_COMPILE_STATUS);
+     * if (status == 0) {
+     *     String log = retrieveShaderInfoLog(CTX, shader);
+     *     System.err.println("Shader compilation failed: " + log);
+     * }
+     * }</pre>
+     * 
+     * @param ctx Command context for recording this command
+     * @param shader The shader object ID
+     * @param pname The parameter to query (e.g., GL_COMPILE_STATUS, GL_SHADER_TYPE)
+     * @return The requested parameter value
+     */
+    public static int queryShaderParameter(CommandContext ctx, int shader, int pname) {
+        return getBackend().queryShaderParameter(ctx, shader, pname);
+    }
+    
+    /**
+     * Retrieves the shader info log.
+     * 
+     * Example usage:
+     * <pre>{@code
+     * if (queryShaderParameter(CTX, shader, GL_COMPILE_STATUS) == 0) {
+     *     String log = retrieveShaderInfoLog(CTX, shader);
+     *     System.err.println("Compilation errors:\n" + log);
+     * }
+     * }</pre>
+     * 
+     * @param ctx Command context for recording this command
+     * @param shader The shader object ID
+     * @return The shader info log string
+     */
+    public static String retrieveShaderInfoLog(CommandContext ctx, int shader) {
+        return getBackend().retrieveShaderInfoLog(ctx, shader);
+    }
+    
+    /**
+     * Binds a vertex array object (VAO).
+     * 
+     * Example usage:
+     * <pre>{@code
+     * int vao = createVertexArrayObject(CTX);
+     * bindVertexArray(CTX, vao);
+     * configureVertexAttributePointer(CTX, 0, 3, GL_FLOAT, false, 0, 0);
+     * activateVertexAttributeArray(CTX, 0);
+     * // ... render ...
+     * bindVertexArray(CTX, 0); // Unbind
+     * }</pre>
+     * 
+     * @param ctx Command context for recording this command
+     * @param array The vertex array object ID to bind (0 to unbind)
+     */
+    public static void bindVertexArray(CommandContext ctx, int array) {
+        getBackend().bindVertexArray(ctx, array);
+    }
+    
+    /**
+     * Creates multiple buffer objects.
+     * 
+     * Example usage:
+     * <pre>{@code
+     * int[] buffers = new int[3];
+     * createBufferObjects(CTX, buffers);
+     * // buffers[0], buffers[1], buffers[2] now contain buffer IDs
+     * }</pre>
+     * 
+     * @param ctx Command context for recording this command
+     * @param buffers Array to receive the generated buffer IDs
+     */
+    public static void createBufferObjects(CommandContext ctx, int[] buffers) {
+        getBackend().createBufferObjects(ctx, buffers);
+    }
+    
+    /**
+     * Creates a single buffer object.
+     * 
+     * Example usage:
+     * <pre>{@code
+     * int buffer = createSingleBufferObject(CTX);
+     * bindBuffer(CTX, GL_ARRAY_BUFFER, buffer);
+     * fillBufferWithData(CTX, GL_ARRAY_BUFFER, data, GL_STATIC_DRAW);
+     * }</pre>
+     * 
+     * @param ctx Command context for recording this command
+     * @return The generated buffer object ID
+     */
+    public static int createSingleBufferObject(CommandContext ctx) {
+        return getBackend().createSingleBufferObject(ctx);
+    }
+    
     // ================================================================================
     // DEPRECATED METHODS - Legacy API without CommandContext
     // ================================================================================

@@ -1411,6 +1411,58 @@ public class OpenGLBackend implements GraphicsBackend {
         GL20.glBlendEquation(mode);
     }
     
+    @Override
+    public int queryShaderParameter(CommandContext ctx, int shader, int pname) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        return GL20.glGetShaderi(shader, pname);
+    }
+    
+    @Override
+    public String retrieveShaderInfoLog(CommandContext ctx, int shader) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        return GL20.glGetShaderInfoLog(shader);
+    }
+    
+    @Override
+    public void bindVertexArray(CommandContext ctx, int array) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        GL30.glBindVertexArray(array);
+    }
+    
+    @Override
+    public void createBufferObjects(CommandContext ctx, int[] buffers) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        for (int i = 0; i < buffers.length; i++) {
+            buffers[i] = GL15.glGenBuffers();
+        }
+    }
+    
+    @Override
+    public int createSingleBufferObject(CommandContext ctx) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        return GL15.glGenBuffers();
+    }
+    
     // ================================================================================
     // DEPRECATED METHODS - OpenGL immediate-mode implementations
     // ================================================================================

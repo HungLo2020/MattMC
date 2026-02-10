@@ -1203,6 +1203,79 @@ public interface GraphicsBackend {
      */
     void setBlendEquation(CommandContext ctx, int mode);
     
+    /**
+     * Queries a shader parameter value.
+     * 
+     * In OpenGL: Maps to glGetShaderiv()
+     * In Vulkan: Shader module reflection or validation layer messages
+     * 
+     * Retrieves shader-specific parameters such as compile status, shader type,
+     * info log length, etc. Commonly used to check GL_COMPILE_STATUS after compilation.
+     * 
+     * @param ctx Command context for recording this command
+     * @param shader The shader object ID
+     * @param pname The parameter to query (e.g., GL_COMPILE_STATUS)
+     * @return The requested parameter value
+     */
+    int queryShaderParameter(CommandContext ctx, int shader, int pname);
+    
+    /**
+     * Retrieves the shader info log.
+     * 
+     * In OpenGL: Maps to glGetShaderInfoLog()
+     * In Vulkan: Shader module creation validation messages
+     * 
+     * Returns the information log for a shader object, which contains compilation
+     * errors, warnings, and other diagnostic information.
+     * 
+     * @param ctx Command context for recording this command
+     * @param shader The shader object ID
+     * @return The shader info log string
+     */
+    String retrieveShaderInfoLog(CommandContext ctx, int shader);
+    
+    /**
+     * Binds a vertex array object (VAO).
+     * 
+     * In OpenGL: Maps to glBindVertexArray()
+     * In Vulkan: No direct equivalent - vertex input state is part of pipeline
+     * 
+     * Binds the specified vertex array object, which encapsulates vertex attribute
+     * configuration and buffer bindings. Binding 0 unbinds any currently bound VAO.
+     * 
+     * @param ctx Command context for recording this command
+     * @param array The vertex array object ID to bind (0 to unbind)
+     */
+    void bindVertexArray(CommandContext ctx, int array);
+    
+    /**
+     * Creates multiple buffer objects.
+     * 
+     * In OpenGL: Maps to glGenBuffers()
+     * In Vulkan: Maps to vkCreateBuffer() called for each buffer
+     * 
+     * Generates buffer object names/IDs. The buffers are created but not initialized
+     * until buffer data is uploaded. In Vulkan, this would also allocate memory.
+     * 
+     * @param ctx Command context for recording this command
+     * @param buffers Array to receive the generated buffer IDs
+     */
+    void createBufferObjects(CommandContext ctx, int[] buffers);
+    
+    /**
+     * Creates a single buffer object.
+     * 
+     * In OpenGL: Maps to glGenBuffers() with n=1
+     * In Vulkan: Maps to vkCreateBuffer() with explicit memory allocation
+     * 
+     * Generates a single buffer object name/ID. The buffer is created but not initialized
+     * until buffer data is uploaded. In Vulkan, this would also allocate and bind memory.
+     * 
+     * @param ctx Command context for recording this command
+     * @return The generated buffer object ID
+     */
+    int createSingleBufferObject(CommandContext ctx);
+    
     // ================================================================================
     // DEPRECATED METHODS - To be replaced with CommandContext-aware versions
     // ================================================================================
