@@ -35,6 +35,7 @@ import com.seibel.distanthorizons.coreapi.DependencyInjection.OverrideInjector;
 import com.seibel.distanthorizons.core.util.math.Vec3f;
 import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.backends.opengl.OpenGLCommandContext;
 import org.jetbrains.annotations.Nullable;
 
 /**
@@ -56,6 +57,7 @@ public class LodRenderer
 	private static final IMinecraftRenderWrapper MC_RENDER = SingletonInjector.INSTANCE.get(IMinecraftRenderWrapper.class);
 	private static final IMinecraftGLWrapper GLMC = SingletonInjector.INSTANCE.get(IMinecraftGLWrapper.class);
 	private static final IIrisAccessor IRIS_ACCESSOR = ModAccessorInjector.INSTANCE.get(IIrisAccessor.class);
+	private static final CommandContext CTX = OpenGLCommandContext.IMMEDIATE;
 	
 	public static final LodRenderer INSTANCE = new LodRenderer();
 	
@@ -283,7 +285,7 @@ public class LodRenderer
 			{
 				// If MC's framebuffer is being used the depth needs to be cleared to prevent rendering on top of MC.
 				// This should only happen when Optifine shaders are being used.
-				VulkanicAPI.clear(VulkanicAPI.GL_DEPTH_BUFFER_BIT);
+				VulkanicAPI.clear(CTX, VulkanicAPI.GL_DEPTH_BUFFER_BIT);
 			}
 			
 			
@@ -380,7 +382,7 @@ public class LodRenderer
 		GLMC.glBlendFunc(VulkanicAPI.GL_SRC_ALPHA, VulkanicAPI.GL_ONE_MINUS_SRC_ALPHA);
 		GLMC.glBlendFuncSeparate(VulkanicAPI.GL_SRC_ALPHA, VulkanicAPI.GL_ONE_MINUS_SRC_ALPHA, VulkanicAPI.GL_ONE, VulkanicAPI.GL_ZERO);
 		
-		VulkanicAPI.disable(VulkanicAPI.GL_SCISSOR_TEST);
+		VulkanicAPI.disable(CTX, VulkanicAPI.GL_SCISSOR_TEST);
 		
 		// Enable depth test and depth mask
 		GLMC.enableDepthTest();
@@ -457,11 +459,11 @@ public class LodRenderer
 				
 				
 				// don't clear the color texture, that removes the sky 
-				VulkanicAPI.clear(VulkanicAPI.GL_DEPTH_BUFFER_BIT);
+				VulkanicAPI.clear(CTX, VulkanicAPI.GL_DEPTH_BUFFER_BIT);
 			}
 			else if (firstPass)
 			{
-				VulkanicAPI.clear(VulkanicAPI.GL_COLOR_BUFFER_BIT | VulkanicAPI.GL_DEPTH_BUFFER_BIT);
+				VulkanicAPI.clear(CTX, VulkanicAPI.GL_COLOR_BUFFER_BIT | VulkanicAPI.GL_DEPTH_BUFFER_BIT);
 			}
 		}
 		

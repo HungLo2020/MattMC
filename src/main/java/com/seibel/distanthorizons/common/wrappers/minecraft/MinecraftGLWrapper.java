@@ -7,6 +7,8 @@ import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftGLW
 
 import com.seibel.distanthorizons.core.logging.DhLogger;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.CommandContext;
+import net.vulkanic.backends.opengl.OpenGLCommandContext;
 
 
 /**
@@ -32,6 +34,7 @@ public class MinecraftGLWrapper implements IMinecraftGLWrapper
 	public static final MinecraftGLWrapper INSTANCE = new MinecraftGLWrapper();
 	
 	private static final DhLogger LOGGER = new DhLoggerBuilder().build();
+	private static final CommandContext CTX = OpenGLCommandContext.IMMEDIATE;
 	
 	
 	
@@ -46,14 +49,14 @@ public class MinecraftGLWrapper implements IMinecraftGLWrapper
 	@Override
 	public void enableScissorTest() 
 	{
-		VulkanicAPI.enable(VulkanicAPI.GL_SCISSOR_TEST);
+		VulkanicAPI.enable(CTX, VulkanicAPI.GL_SCISSOR_TEST);
 		GlStateManager._enableScissorTest(); 
 	}
 	/** Disables scissor testing */
 	@Override
 	public void disableScissorTest() 
 	{ 
-		VulkanicAPI.disable(VulkanicAPI.GL_SCISSOR_TEST);
+		VulkanicAPI.disable(CTX, VulkanicAPI.GL_SCISSOR_TEST);
 		GlStateManager._disableScissorTest(); 
 	}
 	
@@ -72,14 +75,14 @@ public class MinecraftGLWrapper implements IMinecraftGLWrapper
 	@Override
 	public void enableDepthTest() 
 	{
-		VulkanicAPI.enable(VulkanicAPI.GL_DEPTH_TEST);
+		VulkanicAPI.enable(CTX, VulkanicAPI.GL_DEPTH_TEST);
 		GlStateManager._enableDepthTest(); 
 	}
 	/** Disables depth testing */
 	@Override
 	public void disableDepthTest() 
 	{
-		VulkanicAPI.disable(VulkanicAPI.GL_DEPTH_TEST);
+		VulkanicAPI.disable(CTX, VulkanicAPI.GL_DEPTH_TEST);
 		GlStateManager._disableDepthTest(); 
 	}
 	
@@ -113,14 +116,14 @@ public class MinecraftGLWrapper implements IMinecraftGLWrapper
 	@Override
 	public void enableBlend() 
 	{
-		VulkanicAPI.enable(VulkanicAPI.GL_BLEND);
+		VulkanicAPI.enable(CTX, VulkanicAPI.GL_BLEND);
 		GlStateManager._enableBlend();
 	}
 	/** Disables blending */
 	@Override
 	public void disableBlend() 
 	{
-		VulkanicAPI.disable(VulkanicAPI.GL_BLEND);
+		VulkanicAPI.disable(CTX, VulkanicAPI.GL_BLEND);
 		GlStateManager._disableBlend(); 
 	}
 	
@@ -178,14 +181,14 @@ public class MinecraftGLWrapper implements IMinecraftGLWrapper
 	@Override
 	public void enableFaceCulling() 
 	{
-		VulkanicAPI.enable(VulkanicAPI.GL_CULL_FACE);
+		VulkanicAPI.enable(CTX, VulkanicAPI.GL_CULL_FACE);
 		GlStateManager._enableCull(); 
 	}
 	/** Disables face culling */
 	@Override
 	public void disableFaceCulling() 
 	{
-		VulkanicAPI.disable(VulkanicAPI.GL_CULL_FACE);
+		VulkanicAPI.disable(CTX, VulkanicAPI.GL_CULL_FACE);
 		GlStateManager._disableCull(); 
 	}
 	
@@ -203,7 +206,7 @@ public class MinecraftGLWrapper implements IMinecraftGLWrapper
 	@Override
 	public void glActiveTexture(int textureId) 
 	{ 
-		VulkanicAPI.activateTextureUnit(textureId);
+		VulkanicAPI.activateTextureUnit(CTX, textureId);
 		GlStateManager._activeTexture(textureId);
 	}
 	@Override
@@ -215,7 +218,7 @@ public class MinecraftGLWrapper implements IMinecraftGLWrapper
 	@Override
 	public void glBindTexture(int texture) 
 	{
-		VulkanicAPI.bindTexture(VulkanicAPI.GL_TEXTURE_2D, texture);
+		VulkanicAPI.bindTexture(CTX, VulkanicAPI.GL_TEXTURE_2D, texture);
 		GlStateManager._bindTexture(texture);
 	}
 	

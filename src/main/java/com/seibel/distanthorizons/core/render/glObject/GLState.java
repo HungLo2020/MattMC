@@ -2,12 +2,15 @@ package com.seibel.distanthorizons.core.render.glObject;
 
 import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftGLWrapper;
+import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.backends.opengl.OpenGLCommandContext;
 
 // TODO make this Closable or AutoClosable so it can be used with try-resource blocks
 public class GLState
 {
 	private static final IMinecraftGLWrapper GLMC = SingletonInjector.INSTANCE.get(IMinecraftGLWrapper.class);
+	private static final CommandContext CTX = OpenGLCommandContext.IMMEDIATE;
 	
 	
 	private static final int FBO_MAX = 4;
@@ -216,11 +219,11 @@ public class GLState
 		
 		if (this.stencil)
 		{
-			VulkanicAPI.enable(VulkanicAPI.GL_STENCIL_TEST);
+			VulkanicAPI.enable(CTX, VulkanicAPI.GL_STENCIL_TEST);
 		}
 		else
 		{
-			VulkanicAPI.disable(VulkanicAPI.GL_STENCIL_TEST);
+			VulkanicAPI.disable(CTX, VulkanicAPI.GL_STENCIL_TEST);
 		}
 		VulkanicAPI.glStencilFunc(this.stencilFunc, this.stencilRef, this.stencilMask);
 		

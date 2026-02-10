@@ -2,8 +2,10 @@ package net.irisshaders.iris.gl;
 
 import net.irisshaders.iris.Iris;
 import net.irisshaders.iris.platform.IrisPlatformHelpers;
+import net.vulkanic.CommandContext;
 import net.vulkanic.GraphicsCapabilities;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.backends.opengl.OpenGLCommandContext;
 import org.lwjgl.system.APIUtil;
 
 import java.io.PrintStream;
@@ -11,6 +13,7 @@ import java.util.Stack;
 import java.util.function.Consumer;
 
 public final class GLDebug {
+	private static final CommandContext CTX = OpenGLCommandContext.IMMEDIATE;
 	private static DebugState debugState;
 
 	/**
@@ -65,7 +68,7 @@ public final class GLDebug {
 
 	public static int setupDebugMessageCallback(PrintStream stream) {
 		GraphicsCapabilities caps = VulkanicAPI.getGraphicsCapabilities();
-		VulkanicAPI.enable(VulkanicAPI.GL_DEBUG_OUTPUT_SYNCHRONOUS);
+		VulkanicAPI.enable(CTX, VulkanicAPI.GL_DEBUG_OUTPUT_SYNCHRONOUS);
 		if (caps.OpenGL43) {
 			Iris.logger.info("[GL] Using OpenGL 4.3 for error logging.");
 			VulkanicAPI.setupDebugMessageCallback((source, type, id, severity, messageStr) -> {
@@ -83,7 +86,7 @@ public final class GLDebug {
 			VulkanicAPI.glDebugMessageControl(4352, 4352, VulkanicAPI.GL_DEBUG_SEVERITY_NOTIFICATION, (int[]) null, false);
 			if ((VulkanicAPI.glGetInteger(VulkanicAPI.GL_CONTEXT_FLAGS) & 2) == 0) {
 				Iris.logger.warn("[GL] Warning: A non-debug context may not produce any debug output.");
-				VulkanicAPI.enable(VulkanicAPI.GL_DEBUG_OUTPUT);
+				VulkanicAPI.enable(CTX, VulkanicAPI.GL_DEBUG_OUTPUT);
 				return 2;
 			}
 			return 1;
@@ -104,7 +107,7 @@ public final class GLDebug {
 			VulkanicAPI.glDebugMessageControlKHR(4352, 4352, VulkanicAPI.GL_DEBUG_SEVERITY_NOTIFICATION, (int[]) null, false);
 			if (caps.OpenGL30 && (VulkanicAPI.glGetInteger(VulkanicAPI.GL_CONTEXT_FLAGS) & 2) == 0) {
 				Iris.logger.warn("[GL] Warning: A non-debug context may not produce any debug output.");
-				VulkanicAPI.enable(VulkanicAPI.GL_DEBUG_OUTPUT);
+				VulkanicAPI.enable(CTX, VulkanicAPI.GL_DEBUG_OUTPUT);
 				return 2;
 			}
 			return 1;
