@@ -2,12 +2,12 @@
 
 **Analysis Date:** 2026-02-08  
 **Migration Strategy Updated:** 2026-02-10  
-**Active Migration Phase:** Phase 12 Complete - Shader Query & State Retrieval ✅  
+**Active Migration Phase:** Phase 13 Complete - Shader Info & Vertex Arrays ✅  
 **Vulkanic API Version:** Initial Implementation (OpenGL-only) - **ALL METHODS NOW DEPRECATED**  
 **Analyzed Components:** VulkanicAPI.java, GraphicsBackend.java, OpenGLBackend.java  
 **Lines of Code Analyzed:** ~4,000 LOC  
 **Deprecated Methods:** 874 methods marked for replacement  
-**Migrated Methods:** 80 methods (9.2% complete)
+**Migrated Methods:** 85 methods (9.7% complete)
 **Migrated Call Sites:** 141 call sites in 45 game files ✅ **ALL MIGRATED**
 **Removed Deprecated Methods:** 15 methods
 
@@ -5270,4 +5270,168 @@ Phase 12 successfully migrated shader program query and state retrieval methods,
 - 27 call sites migrated (significant usage in production code)
 - State capture and shader validation now use CommandContext
 - Foundation for Vulkan's object-based state management
+
+---
+
+## Phase 13: Shader Info & Vertex Arrays ✅
+
+**Date:** 2026-02-10  
+**Status:** Methods Added - Ready for Call Site Migration  
+**Methods Migrated:** 5 new methods (85 total, 9.7% of 874)  
+**Call Sites:** To be migrated in next phase
+
+### Migrated Methods
+
+1. **queryShaderParameter(CommandContext ctx, int shader, int pname)**
+2. **retrieveShaderInfoLog(CommandContext ctx, int shader)**
+3. **bindVertexArray(CommandContext ctx, int array)**
+4. **createBufferObjects(CommandContext ctx, int[] buffers)**
+5. **createSingleBufferObject(CommandContext ctx)**
+
+### Method Details
+
+#### 1. queryShaderParameter (was glGetShaderi)
+
+**OpenGL Implementation:**
+```java
+@Override
+public int queryShaderParameter(CommandContext ctx, int shader, int pname) {
+    if (!ctx.isImmediate()) {
+        throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+    }
+    return GL20.glGetShaderi(shader, pname);
+}
+```
+
+**Vulkan Equivalent:**
+- Shader module reflection or validation layer messages
+- Status available from VkShaderModule creation result
+
+**Usage:**
+- Query GL_COMPILE_STATUS after shader compilation
+- Query GL_SHADER_TYPE, GL_DELETE_STATUS, GL_INFO_LOG_LENGTH
+- Critical for shader validation workflow
+
+#### 2. retrieveShaderInfoLog (was glGetShaderInfoLog)
+
+**OpenGL Implementation:**
+```java
+@Override
+public String retrieveShaderInfoLog(CommandContext ctx, int shader) {
+    if (!ctx.isImmediate()) {
+        throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+    }
+    return GL20.glGetShaderInfoLog(shader);
+}
+```
+
+**Vulkan Equivalent:**
+- VkShaderModule creation validation messages
+- Provided through validation layers during pipeline creation
+
+**Usage:**
+- Retrieve compilation errors and warnings
+- Essential for debugging shader compilation failures
+
+#### 3. bindVertexArray (was glBindVertexArray)
+
+**OpenGL Implementation:**
+```java
+@Override
+public void bindVertexArray(CommandContext ctx, int array) {
+    if (!ctx.isImmediate()) {
+        throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+    }
+    GL30.glBindVertexArray(array);
+}
+```
+
+**Vulkan Equivalent:**
+- No direct equivalent - vertex input state is part of pipeline
+- VkVertexInputBindingDescription and VkVertexInputAttributeDescription
+- Defined during pipeline creation, not changed dynamically
+
+**Usage:**
+- Bind VAO to encapsulate vertex attribute configuration
+- OpenGL: Global state that can be changed anytime
+- Vulkan: Immutable pipeline state
+
+#### 4. createBufferObjects (was glGenBuffers)
+
+**OpenGL Implementation:**
+```java
+@Override
+public void createBufferObjects(CommandContext ctx, int[] buffers) {
+    if (!ctx.isImmediate()) {
+        throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+    }
+    for (int i = 0; i < buffers.length; i++) {
+        buffers[i] = GL15.glGenBuffers();
+    }
+}
+```
+
+**Vulkan Equivalent:**
+- vkCreateBuffer() called for each buffer
+- Also requires vkAllocateMemory() and vkBindBufferMemory()
+- Explicit memory management
+
+**Usage:**
+- Create multiple buffer objects in one call
+- OpenGL: Just generates IDs, no memory allocation yet
+- Vulkan: Creates buffers AND allocates memory
+
+#### 5. createSingleBufferObject (was glGenBuffers with n=1)
+
+**OpenGL Implementation:**
+```java
+@Override
+public int createSingleBufferObject(CommandContext ctx) {
+    if (!ctx.isImmediate()) {
+        throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+    }
+    return GL15.glGenBuffers();
+}
+```
+
+**Vulkan Equivalent:**
+- vkCreateBuffer() for single buffer
+- Also requires vkAllocateMemory() and vkBindBufferMemory()
+
+**Usage:**
+- Convenience method for creating single buffer
+- Most common use case
+
+### Significance
+
+Phase 13 adds critical infrastructure for:
+
+1. **Shader Validation:**
+   - Query compilation status
+   - Retrieve error logs
+   - Essential for robust shader loading
+
+2. **Vertex Array Management:**
+   - Bind VAOs for vertex configuration
+   - OpenGL: Dynamic state
+   - Vulkan: Pipeline state
+
+3. **Buffer Resource Creation:**
+   - Fundamental for vertex buffers, index buffers, uniform buffers
+   - OpenGL: ID generation
+   - Vulkan: Explicit creation with memory allocation
+
+**OpenGL vs Vulkan:**
+- OpenGL: glGetShaderi, glGetShaderInfoLog for immediate queries
+- Vulkan: Validation layer messages, shader reflection
+- OpenGL: glBindVertexArray for dynamic VAO binding
+- Vulkan: Vertex input state immutably defined in pipeline
+- OpenGL: glGenBuffers generates IDs
+- Vulkan: vkCreateBuffer + memory allocation
+
+**Next Steps:**
+- Migrate call sites for these 5 methods (estimated 30+ call sites)
+- Update game code to use new CommandContext-aware methods
+- Remove deprecated versions once all call sites migrated
+- Continue with additional method migrations
 
