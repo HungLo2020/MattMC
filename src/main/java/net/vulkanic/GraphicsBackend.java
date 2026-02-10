@@ -1028,6 +1028,101 @@ public interface GraphicsBackend {
      */
     void activateVertexAttributeArray(CommandContext ctx, int index);
     
+    /**
+     * Sets a 2-component float vector uniform (vec2).
+     * 
+     * In OpenGL: Maps to glUniform2f()
+     * In Vulkan: Maps to vkCmdPushConstants() or descriptor set updates
+     * 
+     * Used for setting 2D vectors such as UV coordinates, screen positions, 2D directions.
+     * The uniform variable must be of type vec2 in the shader.
+     * 
+     * @param ctx Command context for recording this command
+     * @param location The location of the uniform variable
+     * @param x The first component (x coordinate)
+     * @param y The second component (y coordinate)
+     */
+    void assignUniformFloat2(CommandContext ctx, int location, float x, float y);
+    
+    /**
+     * Sets a 2-component integer vector uniform (ivec2).
+     * 
+     * In OpenGL: Maps to glUniform2i()
+     * In Vulkan: Maps to vkCmdPushConstants() or descriptor set updates
+     * 
+     * Used for setting 2D integer vectors such as grid coordinates, texture indices, 2D discrete values.
+     * The uniform variable must be of type ivec2 in the shader.
+     * 
+     * @param ctx Command context for recording this command
+     * @param location The location of the uniform variable
+     * @param x The first component
+     * @param y The second component
+     */
+    void assignUniformInteger2(CommandContext ctx, int location, int x, int y);
+    
+    /**
+     * Copies a rectangular region from the framebuffer to a texture.
+     * 
+     * In OpenGL: Maps to glCopyTexSubImage2D()
+     * In Vulkan: Maps to vkCmdCopyImage() or render-to-texture approach
+     * 
+     * Copies pixels from the current framebuffer (as specified by glReadBuffer) to a texture image.
+     * This is commonly used for post-processing effects, creating mipmap levels, or updating textures
+     * with rendered content.
+     * 
+     * @param ctx Command context for recording this command
+     * @param target Texture target (e.g., GL_TEXTURE_2D)
+     * @param level Mipmap level of the texture
+     * @param xoffset X offset into the texture image
+     * @param yoffset Y offset into the texture image
+     * @param x X position in the framebuffer to start reading
+     * @param y Y position in the framebuffer to start reading
+     * @param width Width of the region to copy
+     * @param height Height of the region to copy
+     */
+    void copyTexture2DSubImage(CommandContext ctx, int target, int level, int xoffset, int yoffset, 
+                               int x, int y, int width, int height);
+    
+    /**
+     * Reads pixel data from the framebuffer into CPU memory.
+     * 
+     * In OpenGL: Maps to glReadPixels()
+     * In Vulkan: Maps to vkCmdCopyImageToBuffer() followed by staging buffer readback
+     * 
+     * Reads a rectangular region of pixels from the current framebuffer and stores them
+     * in the provided array. This is a CPU synchronization point and should be used sparingly.
+     * Common uses include screenshots, pixel picking, and debugging.
+     * 
+     * @param ctx Command context for recording this command
+     * @param x X position of the first pixel to read
+     * @param y Y position of the first pixel to read
+     * @param width Width of the pixel rectangle
+     * @param height Height of the pixel rectangle
+     * @param format Pixel format (e.g., GL_RGBA, GL_RGB)
+     * @param type Data type of pixels (e.g., GL_FLOAT, GL_UNSIGNED_BYTE)
+     * @param pixels Array to store the pixel data
+     */
+    void readPixelsFromFramebuffer(CommandContext ctx, int x, int y, int width, int height, 
+                                   int format, int type, float[] pixels);
+    
+    /**
+     * Sets the viewport for rendering (static/non-dynamic version).
+     * 
+     * In OpenGL: Maps to glViewport()
+     * In Vulkan: Maps to VkViewport in pipeline state or vkCmdSetViewport (dynamic)
+     * 
+     * Defines the viewport transformation from normalized device coordinates to window coordinates.
+     * This version is intended for pipelines without VK_DYNAMIC_STATE_VIEWPORT. For dynamic viewport
+     * updates during rendering, use setDynamicViewport() instead.
+     * 
+     * @param ctx Command context for recording this command
+     * @param x X coordinate of the lower-left corner of the viewport
+     * @param y Y coordinate of the lower-left corner of the viewport
+     * @param width Width of the viewport
+     * @param height Height of the viewport
+     */
+    void setStaticViewport(CommandContext ctx, int x, int y, int width, int height);
+    
     // ================================================================================
     // DEPRECATED METHODS - To be replaced with CommandContext-aware versions
     // ================================================================================

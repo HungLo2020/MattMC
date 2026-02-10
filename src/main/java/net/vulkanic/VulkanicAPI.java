@@ -2032,6 +2032,112 @@ public class VulkanicAPI {
         getBackend().activateVertexAttributeArray(ctx, index);
     }
     
+    /**
+     * Sets a 2-component float vector uniform (vec2).
+     * 
+     * Example usage:
+     * <pre>
+     * CommandContext ctx = OpenGLCommandContext.IMMEDIATE;
+     * int location = locateUniformVariable(ctx, programId, "uvOffset");
+     * assignUniformFloat2(ctx, location, 0.5f, 0.5f);  // Set UV offset
+     * </pre>
+     * 
+     * @param ctx Command context for recording this command
+     * @param location The location of the uniform variable
+     * @param x The first component (x coordinate)
+     * @param y The second component (y coordinate)
+     */
+    public static void assignUniformFloat2(CommandContext ctx, int location, float x, float y) {
+        getBackend().assignUniformFloat2(ctx, location, x, y);
+    }
+    
+    /**
+     * Sets a 2-component integer vector uniform (ivec2).
+     * 
+     * Example usage:
+     * <pre>
+     * CommandContext ctx = OpenGLCommandContext.IMMEDIATE;
+     * int location = locateUniformVariable(ctx, programId, "gridSize");
+     * assignUniformInteger2(ctx, location, 16, 16);  // Set 16x16 grid
+     * </pre>
+     * 
+     * @param ctx Command context for recording this command
+     * @param location The location of the uniform variable
+     * @param x The first component
+     * @param y The second component
+     */
+    public static void assignUniformInteger2(CommandContext ctx, int location, int x, int y) {
+        getBackend().assignUniformInteger2(ctx, location, x, y);
+    }
+    
+    /**
+     * Copies a rectangular region from the framebuffer to a texture.
+     * 
+     * Example usage:
+     * <pre>
+     * CommandContext ctx = OpenGLCommandContext.IMMEDIATE;
+     * // Copy from framebuffer (0,0) to texture at (0,0), size 256x256
+     * copyTexture2DSubImage(ctx, GL_TEXTURE_2D, 0, 0, 0, 0, 0, 256, 256);
+     * </pre>
+     * 
+     * @param ctx Command context for recording this command
+     * @param target Texture target (e.g., GL_TEXTURE_2D)
+     * @param level Mipmap level
+     * @param xoffset X offset into the texture
+     * @param yoffset Y offset into the texture
+     * @param x X position in the framebuffer
+     * @param y Y position in the framebuffer
+     * @param width Width of the region
+     * @param height Height of the region
+     */
+    public static void copyTexture2DSubImage(CommandContext ctx, int target, int level, int xoffset, int yoffset, 
+                                             int x, int y, int width, int height) {
+        getBackend().copyTexture2DSubImage(ctx, target, level, xoffset, yoffset, x, y, width, height);
+    }
+    
+    /**
+     * Reads pixel data from the framebuffer into CPU memory.
+     * 
+     * Example usage:
+     * <pre>
+     * CommandContext ctx = OpenGLCommandContext.IMMEDIATE;
+     * float[] pixels = new float[width * height * 4];  // RGBA
+     * readPixelsFromFramebuffer(ctx, 0, 0, width, height, GL_RGBA, GL_FLOAT, pixels);
+     * </pre>
+     * 
+     * @param ctx Command context for recording this command
+     * @param x X position of the first pixel
+     * @param y Y position of the first pixel
+     * @param width Width of the pixel rectangle
+     * @param height Height of the pixel rectangle
+     * @param format Pixel format (e.g., GL_RGBA)
+     * @param type Data type (e.g., GL_FLOAT)
+     * @param pixels Array to store the pixel data
+     */
+    public static void readPixelsFromFramebuffer(CommandContext ctx, int x, int y, int width, int height, 
+                                                 int format, int type, float[] pixels) {
+        getBackend().readPixelsFromFramebuffer(ctx, x, y, width, height, format, type, pixels);
+    }
+    
+    /**
+     * Sets the viewport for rendering (static/non-dynamic version).
+     * 
+     * Example usage:
+     * <pre>
+     * CommandContext ctx = OpenGLCommandContext.IMMEDIATE;
+     * setStaticViewport(ctx, 0, 0, 1920, 1080);  // Full HD viewport
+     * </pre>
+     * 
+     * @param ctx Command context for recording this command
+     * @param x X coordinate of the lower-left corner
+     * @param y Y coordinate of the lower-left corner
+     * @param width Width of the viewport
+     * @param height Height of the viewport
+     */
+    public static void setStaticViewport(CommandContext ctx, int x, int y, int width, int height) {
+        getBackend().setStaticViewport(ctx, x, y, width, height);
+    }
+    
     // ================================================================================
     // DEPRECATED METHODS - Legacy API without CommandContext
     // ================================================================================

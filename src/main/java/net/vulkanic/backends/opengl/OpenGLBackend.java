@@ -1308,6 +1308,58 @@ public class OpenGLBackend implements GraphicsBackend {
         GL20.glEnableVertexAttribArray(index);
     }
     
+    @Override
+    public void assignUniformFloat2(CommandContext ctx, int location, float x, float y) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        GL20.glUniform2f(location, x, y);
+    }
+    
+    @Override
+    public void assignUniformInteger2(CommandContext ctx, int location, int x, int y) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        GL20.glUniform2i(location, x, y);
+    }
+    
+    @Override
+    public void copyTexture2DSubImage(CommandContext ctx, int target, int level, int xoffset, int yoffset, 
+                                      int x, int y, int width, int height) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        GL11.glCopyTexSubImage2D(target, level, xoffset, yoffset, x, y, width, height);
+    }
+    
+    @Override
+    public void readPixelsFromFramebuffer(CommandContext ctx, int x, int y, int width, int height, 
+                                          int format, int type, float[] pixels) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        GL11.glReadPixels(x, y, width, height, format, type, pixels);
+    }
+    
+    @Override
+    public void setStaticViewport(CommandContext ctx, int x, int y, int width, int height) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        GL11.glViewport(x, y, width, height);
+    }
+    
     // ================================================================================
     // DEPRECATED METHODS - OpenGL immediate-mode implementations
     // ================================================================================
