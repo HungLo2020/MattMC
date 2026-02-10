@@ -7,7 +7,7 @@
 **Analyzed Components:** VulkanicAPI.java, GraphicsBackend.java, OpenGLBackend.java  
 **Lines of Code Analyzed:** ~4,000 LOC  
 **Deprecated Methods:** 874 methods marked for replacement  
-**Migrated Methods:** 25 methods (2.9% complete)
+**Migrated Methods:** 30 methods (3.4% complete)
 
 ---
 
@@ -15,15 +15,15 @@
 
 **MIGRATION STATUS: ACTIVE MIGRATION IN PROGRESS** 🔄
 
-All 874 methods in the current Vulkanic API have been marked as `@Deprecated` to facilitate an **incremental, test-driven migration** to a properly abstracted graphics API that supports both OpenGL and Vulkan backends. We have now begun the active migration phase, with **25 methods successfully migrated** to the new CommandContext-aware API.
+All 874 methods in the current Vulkanic API have been marked as `@Deprecated` to facilitate an **incremental, test-driven migration** to a properly abstracted graphics API that supports both OpenGL and Vulkan backends. We have now begun the active migration phase, with **30 methods successfully migrated** to the new CommandContext-aware API.
 
 ### Current State (Active Migration)
 
 The legacy Vulkanic API is a **thin OpenGL state machine wrapper** with approximately **25-30% compatibility** with Vulkan's architectural principles. While it successfully abstracts OpenGL calls behind an interface, the API design is fundamentally tied to OpenGL's immediate-mode, global-state paradigm, which conflicts with Vulkan's explicit, command-buffer-based architecture.
 
 **Migration Progress:**
-- ✅ **25 methods migrated** to CommandContext-aware API (2.9% of 874 total)
-- ⚠️ **849 methods remaining** in deprecated state
+- ✅ **30 methods migrated** to CommandContext-aware API (3.4% of 874 total)
+- ⚠️ **844 methods remaining** in deprecated state
 - ✅ **All tests passing** (10/10 Vulkanic unit tests)
 - ✅ **Zero breaking changes** - fully backward compatible
 
@@ -53,7 +53,11 @@ The legacy Vulkanic API is a **thin OpenGL state machine wrapper** with approxim
 23. `configureTextureParameter(ctx, ...)` - Set texture parameter
 24. `removeTexture(ctx, texture)` - Delete texture
 25. `configurePolygonMode(ctx, ...)` - Set polygon rasterization mode
-21. `attachFramebuffer(ctx, target, fbo)` - Bind framebuffer
+26. `createTexture(ctx)` - Create texture
+27. `configurePolygonOffset(ctx, ...)` - Set polygon offset
+28. `configureLogicOp(ctx, opcode)` - Set logical operation
+29. `setClearDepthValue(ctx, depth)` - Set depth clear value
+30. `setClearColorValue(ctx, ...)` - Set color clear value
 
 ### New Migration Strategy: Incremental Replacement
 
@@ -237,6 +241,11 @@ Track progress using this table (update after each method migration):
 | `configureTextureParameter()` | TBD | `configureTextureParameter(ctx, ...)` | 🟢 Completed |
 | `removeTexture()` | TBD | `removeTexture(ctx, texture)` | 🟢 Completed |
 | `configurePolygonMode()` | TBD | `configurePolygonMode(ctx, ...)` | 🟢 Completed |
+| `createTexture()` | TBD | `createTexture(ctx)` | 🟢 Completed |
+| `configurePolygonOffset()` | TBD | `configurePolygonOffset(ctx, ...)` | 🟢 Completed |
+| `configureLogicOp()` | TBD | `configureLogicOp(ctx, opcode)` | 🟢 Completed |
+| `setClearDepthValue()` | TBD | `setClearDepthValue(ctx, depth)` | 🟢 Completed |
+| `setClearColorValue()` | TBD | `setClearColorValue(ctx, ...)` | 🟢 Completed |
 | ... | ... | ... | ... |
 
 **Legend:**
@@ -3125,6 +3134,277 @@ public void configurePolygonMode(CommandContext ctx, int face, int mode) {
     
     VkPolygonMode vkMode = mapGLPolygonModeToVulkan(mode);
     switchToPipelineWithPolygonMode(vkMode);
+}
+```
+
+---
+
+### ✅ Method: `createTexture()` → `createTexture(CommandContext ctx)`
+
+**Migration Date:** 2026-02-10
+
+**Status:** Completed - New method implemented, deprecated method retained for backward compatibility
+
+**What Changed:**
+- Added `CommandContext ctx` parameter for Vulkan compatibility
+- OpenGL implementation validates immediate-mode context and calls `GL11.glGenTextures()`
+
+**New API Design:**
+```java
+public static int createTexture(CommandContext ctx) {
+    return getBackend().createTexture(ctx);
+}
+```
+
+**OpenGL Implementation:**
+```java
+@Override
+public int createTexture(CommandContext ctx) {
+    if (!ctx.isImmediate()) {
+        throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+    }
+    return GL11.glGenTextures();
+}
+```
+
+**Usage Example:**
+```java
+// Before (deprecated, still works)
+int textureId = VulkanicAPI.createTexture();
+
+// After (new Vulkan-compatible API)
+CommandContext ctx = VulkanicAPI.getImmediateContext();
+int textureId = VulkanicAPI.createTexture(ctx);
+```
+
+**Vulkan Implementation (Future):**
+```java
+// Will use vkCreateImage and vkCreateImageView
+@Override
+public int createTexture(CommandContext ctx) {
+    // Create VkImage
+    VkImageCreateInfo imageInfo = ...;
+    VkImage image = vkCreateImage(device, imageInfo);
+    
+    // Create VkImageView
+    VkImageViewCreateInfo viewInfo = ...;
+    VkImageView imageView = vkCreateImageView(device, viewInfo);
+    
+    // Register and return texture ID
+    return textureRegistry.register(image, imageView);
+}
+```
+
+---
+
+### ✅ Method: `configurePolygonOffset(float factor, float units)` → `configurePolygonOffset(CommandContext ctx, float factor, float units)`
+
+**Migration Date:** 2026-02-10
+
+**Status:** Completed - New method implemented, deprecated method retained for backward compatibility
+
+**What Changed:**
+- Added `CommandContext ctx` parameter for Vulkan compatibility
+- OpenGL implementation validates immediate-mode context and calls `GL11.glPolygonOffset()`
+
+**New API Design:**
+```java
+public static void configurePolygonOffset(CommandContext ctx, float factor, float units) {
+    getBackend().configurePolygonOffset(ctx, factor, units);
+}
+```
+
+**OpenGL Implementation:**
+```java
+@Override
+public void configurePolygonOffset(CommandContext ctx, float factor, float units) {
+    if (!ctx.isImmediate()) {
+        throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+    }
+    GL11.glPolygonOffset(factor, units);
+}
+```
+
+**Usage Example:**
+```java
+// Before (deprecated, still works)
+VulkanicAPI.configurePolygonOffset(1.0f, 1.0f);
+
+// After (new Vulkan-compatible API)
+CommandContext ctx = VulkanicAPI.getImmediateContext();
+VulkanicAPI.configurePolygonOffset(ctx, 1.0f, 1.0f);
+```
+
+**Vulkan Implementation (Future):**
+```java
+// Part of pipeline state in Vulkan
+@Override
+public void configurePolygonOffset(CommandContext ctx, float factor, float units) {
+    // In Vulkan, depth bias is set in VkPipelineRasterizationStateCreateInfo
+    // For dynamic control, use vkCmdSetDepthBias if enabled
+    VkCommandBuffer cmdBuf = (VkCommandBuffer) ctx.getHandle();
+    if (supportsDynamicDepthBias) {
+        vkCmdSetDepthBias(cmdBuf, 0.0f, units, factor);
+    } else {
+        switchToPipelineWithDepthBias(factor, units);
+    }
+}
+```
+
+---
+
+### ✅ Method: `configureLogicOp(int opcode)` → `configureLogicOp(CommandContext ctx, int opcode)`
+
+**Migration Date:** 2026-02-10
+
+**Status:** Completed - New method implemented, deprecated method retained for backward compatibility
+
+**What Changed:**
+- Added `CommandContext ctx` parameter for Vulkan compatibility
+- OpenGL implementation validates immediate-mode context and calls `GL11.glLogicOp()`
+
+**New API Design:**
+```java
+public static void configureLogicOp(CommandContext ctx, int opcode) {
+    getBackend().configureLogicOp(ctx, opcode);
+}
+```
+
+**OpenGL Implementation:**
+```java
+@Override
+public void configureLogicOp(CommandContext ctx, int opcode) {
+    if (!ctx.isImmediate()) {
+        throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+    }
+    GL11.glLogicOp(opcode);
+}
+```
+
+**Usage Example:**
+```java
+// Before (deprecated, still works)
+VulkanicAPI.configureLogicOp(GL_XOR);
+
+// After (new Vulkan-compatible API)
+CommandContext ctx = VulkanicAPI.getImmediateContext();
+VulkanicAPI.configureLogicOp(ctx, GL_XOR);
+```
+
+**Vulkan Implementation (Future):**
+```java
+// Part of pipeline state in Vulkan
+@Override
+public void configureLogicOp(CommandContext ctx, int opcode) {
+    // In Vulkan, logical operation is set in VkPipelineColorBlendStateCreateInfo
+    // Requires switching pipelines
+    VkLogicOp vkOp = mapGLLogicOpToVulkan(opcode);
+    switchToPipelineWithLogicOp(vkOp);
+}
+```
+
+---
+
+### ✅ Method: `setClearDepthValue(double depth)` → `setClearDepthValue(CommandContext ctx, double depth)`
+
+**Migration Date:** 2026-02-10
+
+**Status:** Completed - New method implemented, deprecated method retained for backward compatibility
+
+**What Changed:**
+- Added `CommandContext ctx` parameter for Vulkan compatibility
+- OpenGL implementation validates immediate-mode context and calls `GL11.glClearDepth()`
+
+**New API Design:**
+```java
+public static void setClearDepthValue(CommandContext ctx, double depth) {
+    getBackend().setClearDepthValue(ctx, depth);
+}
+```
+
+**OpenGL Implementation:**
+```java
+@Override
+public void setClearDepthValue(CommandContext ctx, double depth) {
+    if (!ctx.isImmediate()) {
+        throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+    }
+    GL11.glClearDepth(depth);
+}
+```
+
+**Usage Example:**
+```java
+// Before (deprecated, still works)
+VulkanicAPI.setClearDepthValue(1.0);
+
+// After (new Vulkan-compatible API)
+CommandContext ctx = VulkanicAPI.getImmediateContext();
+VulkanicAPI.setClearDepthValue(ctx, 1.0);
+```
+
+**Vulkan Implementation (Future):**
+```java
+// Clear values are specified in render pass begin
+@Override
+public void setClearDepthValue(CommandContext ctx, double depth) {
+    // In Vulkan, clear values are specified when beginning a render pass
+    // Store this value for use in the next vkCmdBeginRenderPass call
+    currentClearDepth = depth;
+}
+```
+
+---
+
+### ✅ Method: `setClearColorValue(float r, float g, float b, float a)` → `setClearColorValue(CommandContext ctx, float r, float g, float b, float a)`
+
+**Migration Date:** 2026-02-10
+
+**Status:** Completed - New method implemented, deprecated method retained for backward compatibility
+
+**What Changed:**
+- Added `CommandContext ctx` parameter for Vulkan compatibility
+- OpenGL implementation validates immediate-mode context and calls `GL11.glClearColor()`
+
+**New API Design:**
+```java
+public static void setClearColorValue(CommandContext ctx, float red, float green, float blue, float alpha) {
+    getBackend().setClearColorValue(ctx, red, green, blue, alpha);
+}
+```
+
+**OpenGL Implementation:**
+```java
+@Override
+public void setClearColorValue(CommandContext ctx, float red, float green, float blue, float alpha) {
+    if (!ctx.isImmediate()) {
+        throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+    }
+    GL11.glClearColor(red, green, blue, alpha);
+}
+```
+
+**Usage Example:**
+```java
+// Before (deprecated, still works)
+VulkanicAPI.setClearColorValue(0.0f, 0.0f, 0.0f, 1.0f);
+
+// After (new Vulkan-compatible API)
+CommandContext ctx = VulkanicAPI.getImmediateContext();
+VulkanicAPI.setClearColorValue(ctx, 0.0f, 0.0f, 0.0f, 1.0f);
+```
+
+**Vulkan Implementation (Future):**
+```java
+// Clear values are specified in render pass begin
+@Override
+public void setClearColorValue(CommandContext ctx, float red, float green, float blue, float alpha) {
+    // In Vulkan, clear values are specified when beginning a render pass
+    // Store these values for use in the next vkCmdBeginRenderPass call
+    currentClearColor.r = red;
+    currentClearColor.g = green;
+    currentClearColor.b = blue;
+    currentClearColor.a = alpha;
 }
 ```
 

@@ -1168,6 +1168,120 @@ public class VulkanicAPI {
         getBackend().configurePolygonMode(ctx, face, mode);
     }
     
+    /**
+     * Creates a new texture object.
+     * 
+     * This is a Vulkan-compatible method that requires an explicit CommandContext.
+     * For OpenGL, use getImmediateContext() to get the context.
+     * 
+     * Example usage:
+     * <pre>
+     *     CommandContext ctx = VulkanicAPI.getImmediateContext();
+     *     int textureId = VulkanicAPI.createTexture(ctx);
+     * </pre>
+     * 
+     * In OpenGL: Maps to glGenTextures()
+     * In Vulkan: Maps to vkCreateImage() and vkCreateImageView()
+     * 
+     * @param ctx Command context for recording this command
+     * @return The newly created texture ID
+     */
+    public static int createTexture(CommandContext ctx) {
+        return getBackend().createTexture(ctx);
+    }
+    
+    /**
+     * Sets the polygon offset for depth value calculations.
+     * 
+     * This is a Vulkan-compatible method that requires an explicit CommandContext.
+     * For OpenGL, use getImmediateContext() to get the context.
+     * 
+     * Example usage:
+     * <pre>
+     *     CommandContext ctx = VulkanicAPI.getImmediateContext();
+     *     VulkanicAPI.configurePolygonOffset(ctx, 1.0f, 1.0f);
+     * </pre>
+     * 
+     * In OpenGL: Maps to glPolygonOffset(factor, units)
+     * In Vulkan: Part of pipeline state (depthBias* in VkPipelineRasterizationStateCreateInfo)
+     * 
+     * @param ctx Command context for recording this command
+     * @param factor Scale factor for depth slope
+     * @param units Constant depth offset value
+     */
+    public static void configurePolygonOffset(CommandContext ctx, float factor, float units) {
+        getBackend().configurePolygonOffset(ctx, factor, units);
+    }
+    
+    /**
+     * Sets the logical operation for framebuffer blending.
+     * 
+     * This is a Vulkan-compatible method that requires an explicit CommandContext.
+     * For OpenGL, use getImmediateContext() to get the context.
+     * 
+     * Example usage:
+     * <pre>
+     *     CommandContext ctx = VulkanicAPI.getImmediateContext();
+     *     VulkanicAPI.configureLogicOp(ctx, GL_XOR);
+     * </pre>
+     * 
+     * In OpenGL: Maps to glLogicOp(opcode)
+     * In Vulkan: Part of pipeline state (logicOp in VkPipelineColorBlendStateCreateInfo)
+     * 
+     * @param ctx Command context for recording this command
+     * @param opcode The logical operation code (e.g., GL_COPY, GL_XOR)
+     */
+    public static void configureLogicOp(CommandContext ctx, int opcode) {
+        getBackend().configureLogicOp(ctx, opcode);
+    }
+    
+    /**
+     * Sets the clear value for the depth buffer.
+     * 
+     * This is a Vulkan-compatible method that requires an explicit CommandContext.
+     * For OpenGL, use getImmediateContext() to get the context.
+     * 
+     * Example usage:
+     * <pre>
+     *     CommandContext ctx = VulkanicAPI.getImmediateContext();
+     *     VulkanicAPI.setClearDepthValue(ctx, 1.0);
+     * </pre>
+     * 
+     * In OpenGL: Maps to glClearDepth(depth)
+     * In Vulkan: Clear values are specified in vkCmdBeginRenderPass()
+     * 
+     * @param ctx Command context for recording this command
+     * @param depth The depth clear value (typically 1.0 for far plane)
+     */
+    public static void setClearDepthValue(CommandContext ctx, double depth) {
+        getBackend().setClearDepthValue(ctx, depth);
+    }
+    
+    /**
+     * Sets the clear value for the color buffer.
+     * 
+     * This is a Vulkan-compatible method that requires an explicit CommandContext.
+     * For OpenGL, use getImmediateContext() to get the context.
+     * 
+     * Example usage:
+     * <pre>
+     *     CommandContext ctx = VulkanicAPI.getImmediateContext();
+     *     VulkanicAPI.setClearColorValue(ctx, 0.0f, 0.0f, 0.0f, 1.0f);
+     * </pre>
+     * 
+     * In OpenGL: Maps to glClearColor(r, g, b, a)
+     * In Vulkan: Clear values are specified in vkCmdBeginRenderPass()
+     * 
+     * @param ctx Command context for recording this command
+     * @param red Red component (0.0 to 1.0)
+     * @param green Green component (0.0 to 1.0)
+     * @param blue Blue component (0.0 to 1.0)
+     * @param alpha Alpha component (0.0 to 1.0)
+     */
+    public static void setClearColorValue(CommandContext ctx, float red, float green, float blue, float alpha) {
+        getBackend().setClearColorValue(ctx, red, green, blue, alpha);
+    }
+    
     @Deprecated
     public static void setPixelStoreMode(int pname, int value) {
         getBackend().setPixelStoreMode(pname, value);

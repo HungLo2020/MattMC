@@ -423,6 +423,75 @@ public interface GraphicsBackend {
      */
     void configurePolygonMode(CommandContext ctx, int face, int mode);
     
+    /**
+     * Creates a new texture object.
+     * 
+     * In OpenGL: Maps to glGenTextures()
+     * In Vulkan: Maps to vkCreateImage() and vkCreateImageView()
+     * 
+     * Allocates a new texture ID for subsequent texture operations.
+     * 
+     * @param ctx Command context for recording this command
+     * @return The newly created texture ID
+     */
+    int createTexture(CommandContext ctx);
+    
+    /**
+     * Sets the polygon offset for depth value calculations.
+     * 
+     * In OpenGL: Maps to glPolygonOffset(factor, units)
+     * In Vulkan: Part of pipeline state (depthBias* in VkPipelineRasterizationStateCreateInfo)
+     * 
+     * Controls depth offset to prevent Z-fighting artifacts.
+     * 
+     * @param ctx Command context for recording this command
+     * @param factor Scale factor for depth slope
+     * @param units Constant depth offset value
+     */
+    void configurePolygonOffset(CommandContext ctx, float factor, float units);
+    
+    /**
+     * Sets the logical operation for framebuffer blending.
+     * 
+     * In OpenGL: Maps to glLogicOp(opcode)
+     * In Vulkan: Part of pipeline state (logicOp in VkPipelineColorBlendStateCreateInfo)
+     * 
+     * Defines logical operation for combining fragment and framebuffer values.
+     * 
+     * @param ctx Command context for recording this command
+     * @param opcode The logical operation code (e.g., GL_COPY, GL_XOR)
+     */
+    void configureLogicOp(CommandContext ctx, int opcode);
+    
+    /**
+     * Sets the clear value for the depth buffer.
+     * 
+     * In OpenGL: Maps to glClearDepth(depth)
+     * In Vulkan: Clear values are specified in vkCmdBeginRenderPass()
+     * 
+     * Specifies the depth value used when clearing the depth buffer.
+     * 
+     * @param ctx Command context for recording this command
+     * @param depth The depth clear value (typically 1.0 for far plane)
+     */
+    void setClearDepthValue(CommandContext ctx, double depth);
+    
+    /**
+     * Sets the clear value for the color buffer.
+     * 
+     * In OpenGL: Maps to glClearColor(r, g, b, a)
+     * In Vulkan: Clear values are specified in vkCmdBeginRenderPass()
+     * 
+     * Specifies the RGBA values used when clearing the color buffer.
+     * 
+     * @param ctx Command context for recording this command
+     * @param red Red component (0.0 to 1.0)
+     * @param green Green component (0.0 to 1.0)
+     * @param blue Blue component (0.0 to 1.0)
+     * @param alpha Alpha component (0.0 to 1.0)
+     */
+    void setClearColorValue(CommandContext ctx, float red, float green, float blue, float alpha);
+    
     // Pixel operations
     @Deprecated
     void setPixelStoreMode(int pname, int value);

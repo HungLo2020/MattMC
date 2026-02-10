@@ -630,6 +630,110 @@ public class OpenGLBackend implements GraphicsBackend {
         GL11.glPolygonMode(face, mode);
     }
     
+    /**
+     * Creates a texture with explicit command context.
+     * This is the Vulkan-compatible implementation for texture creation.
+     * 
+     * OpenGL implementation: Direct mapping to glGenTextures()
+     * Vulkan implementation: Will use vkCreateImage() and vkCreateImageView()
+     * 
+     * @param ctx Command context (must be immediate mode for OpenGL)
+     * @return The newly created texture ID
+     */
+    @Override
+    public int createTexture(CommandContext ctx) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        return GL11.glGenTextures();
+    }
+    
+    /**
+     * Configures polygon offset with explicit command context.
+     * This is the Vulkan-compatible implementation for depth offset.
+     * 
+     * OpenGL implementation: Direct mapping to glPolygonOffset()
+     * Vulkan implementation: Part of pipeline state (depthBias)
+     * 
+     * @param ctx Command context (must be immediate mode for OpenGL)
+     * @param factor Scale factor for depth slope
+     * @param units Constant depth offset value
+     */
+    @Override
+    public void configurePolygonOffset(CommandContext ctx, float factor, float units) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        GL11.glPolygonOffset(factor, units);
+    }
+    
+    /**
+     * Configures logical operation with explicit command context.
+     * This is the Vulkan-compatible implementation for logic ops.
+     * 
+     * OpenGL implementation: Direct mapping to glLogicOp()
+     * Vulkan implementation: Part of pipeline state
+     * 
+     * @param ctx Command context (must be immediate mode for OpenGL)
+     * @param opcode The logical operation code
+     */
+    @Override
+    public void configureLogicOp(CommandContext ctx, int opcode) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        GL11.glLogicOp(opcode);
+    }
+    
+    /**
+     * Sets clear depth value with explicit command context.
+     * This is the Vulkan-compatible implementation for depth clear value.
+     * 
+     * OpenGL implementation: Direct mapping to glClearDepth()
+     * Vulkan implementation: Clear values specified in render pass begin
+     * 
+     * @param ctx Command context (must be immediate mode for OpenGL)
+     * @param depth The depth clear value
+     */
+    @Override
+    public void setClearDepthValue(CommandContext ctx, double depth) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        GL11.glClearDepth(depth);
+    }
+    
+    /**
+     * Sets clear color value with explicit command context.
+     * This is the Vulkan-compatible implementation for color clear value.
+     * 
+     * OpenGL implementation: Direct mapping to glClearColor()
+     * Vulkan implementation: Clear values specified in render pass begin
+     * 
+     * @param ctx Command context (must be immediate mode for OpenGL)
+     * @param red Red component
+     * @param green Green component
+     * @param blue Blue component
+     * @param alpha Alpha component
+     */
+    @Override
+    public void setClearColorValue(CommandContext ctx, float red, float green, float blue, float alpha) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        GL11.glClearColor(red, green, blue, alpha);
+    }
+    
     @Deprecated
     @Override
     public void setPixelStoreMode(int pname, int value) {
