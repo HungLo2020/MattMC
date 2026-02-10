@@ -189,6 +189,9 @@ Track progress using this table (update after each method migration):
 | `useProgram()` | TBD | `bindShaderProgram(ctx, ...)` | 🟢 Completed |
 | `setDepthWriteEnabled()` | TBD | `setDepthWriteMask(ctx, ...)` | 🟢 Completed |
 | `setColorWriteMask()` | TBD | `setColorWriteMask(ctx, ...)` | 🟢 Completed |
+| `setDepthTestFunction()` | TBD | `setDepthFunc(ctx, ...)` | 🟢 Completed |
+| `configureBlendFunc()` | TBD | `setBlendFunc(ctx, ...)` | 🟢 Completed |
+| `attachBuffer()` | TBD | `bindBuffer(ctx, ...)` | 🟢 Completed |
 | `bindTexture()` | 2,847 | `bindTextureToDescriptorSet()` | 🔴 Not Started |
 | `activateTextureUnit()` | 1,923 | *(see bindTexture)* | 🔴 Not Started |
 | `enable(int cap)` | 1,456 | `createPipeline()` | 🔴 Not Started |
@@ -2128,6 +2131,186 @@ public void setColorWriteMask(CommandContext ctx, boolean r, boolean g, boolean 
     } else {
         // Fall back to pipeline switching
         switchToPipelineWithColorMask(r, g, b, a);
+    }
+}
+```
+
+---
+
+### ✅ Method: `setDepthTestFunction(int func)` → `setDepthFunc(CommandContext ctx, int func)`
+
+**Migration Date:** 2026-02-10
+
+**Status:** Completed - New method implemented, deprecated method retained for backward compatibility
+
+**What Changed:**
+- Added `CommandContext ctx` parameter for Vulkan compatibility
+- Renamed to `setDepthFunc` for brevity and consistency with standard API naming
+- OpenGL implementation validates immediate-mode context and calls `GL11.glDepthFunc()`
+
+**New API Design:**
+```java
+public static void setDepthFunc(CommandContext ctx, int func) {
+    getBackend().setDepthFunc(ctx, func);
+}
+```
+
+**OpenGL Implementation:**
+```java
+@Override
+public void setDepthFunc(CommandContext ctx, int func) {
+    if (!ctx.isImmediate()) {
+        throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+    }
+    GL11.glDepthFunc(func);
+}
+```
+
+**Usage Example:**
+```java
+// Before (deprecated, still works)
+VulkanicAPI.setDepthTestFunction(GL_LESS);
+
+// After (new Vulkan-compatible API)
+CommandContext ctx = VulkanicAPI.getImmediateContext();
+VulkanicAPI.setDepthFunc(ctx, GL_LESS);
+```
+
+**Vulkan Implementation (Future):**
+```java
+// Will be part of pipeline state in VkPipelineDepthStencilStateCreateInfo
+// For dynamic control, requires VK_EXT_extended_dynamic_state
+@Override
+public void setDepthFunc(CommandContext ctx, int func) {
+    if (supportsExtendedDynamicState) {
+        VkCommandBuffer cmdBuf = (VkCommandBuffer) ctx.getHandle();
+        VkCompareOp compareOp = mapGLCompareOpToVulkan(func);
+        vkCmdSetDepthCompareOpEXT(cmdBuf, compareOp);
+    } else {
+        // Fall back to pipeline switching
+        switchToPipelineWithDepthFunc(func);
+    }
+}
+```
+
+---
+
+### ✅ Method: `configureBlendFunc(int srcRgb, int dstRgb, int srcAlpha, int dstAlpha)` → `setBlendFunc(CommandContext ctx, int srcRgb, int dstRgb, int srcAlpha, int dstAlpha)`
+
+**Migration Date:** 2026-02-10
+
+**Status:** Completed - New method implemented, deprecated method retained for backward compatibility
+
+**What Changed:**
+- Added `CommandContext ctx` parameter for Vulkan compatibility
+- Renamed to `setBlendFunc` for brevity (removed "configure" prefix)
+- OpenGL implementation validates immediate-mode context and calls `GL14.glBlendFuncSeparate()`
+
+**New API Design:**
+```java
+public static void setBlendFunc(CommandContext ctx, int srcRgb, int dstRgb, int srcAlpha, int dstAlpha) {
+    getBackend().setBlendFunc(ctx, srcRgb, dstRgb, srcAlpha, dstAlpha);
+}
+```
+
+**OpenGL Implementation:**
+```java
+@Override
+public void setBlendFunc(CommandContext ctx, int srcRgb, int dstRgb, int srcAlpha, int dstAlpha) {
+    if (!ctx.isImmediate()) {
+        throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+    }
+    org.lwjgl.opengl.GL14.glBlendFuncSeparate(srcRgb, dstRgb, srcAlpha, dstAlpha);
+}
+```
+
+**Usage Example:**
+```java
+// Before (deprecated, still works)
+VulkanicAPI.configureBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ZERO);
+
+// After (new Vulkan-compatible API)
+CommandContext ctx = VulkanicAPI.getImmediateContext();
+VulkanicAPI.setBlendFunc(ctx, GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ZERO);
+```
+
+**Vulkan Implementation (Future):**
+```java
+// Will be part of pipeline state in VkPipelineColorBlendAttachmentState
+// For dynamic control, requires VK_EXT_extended_dynamic_state3
+@Override
+public void setBlendFunc(CommandContext ctx, int srcRgb, int dstRgb, int srcAlpha, int dstAlpha) {
+    if (supportsExtendedDynamicState3) {
+        VkCommandBuffer cmdBuf = (VkCommandBuffer) ctx.getHandle();
+        VkBlendFactor srcColorFactor = mapGLBlendFactorToVulkan(srcRgb);
+        VkBlendFactor dstColorFactor = mapGLBlendFactorToVulkan(dstRgb);
+        VkBlendFactor srcAlphaFactor = mapGLBlendFactorToVulkan(srcAlpha);
+        VkBlendFactor dstAlphaFactor = mapGLBlendFactorToVulkan(dstAlpha);
+        vkCmdSetColorBlendEquationEXT(cmdBuf, 0, 1, ...);
+    } else {
+        // Fall back to pipeline switching
+        switchToPipelineWithBlendFunc(srcRgb, dstRgb, srcAlpha, dstAlpha);
+    }
+}
+```
+
+---
+
+### ✅ Method: `attachBuffer(int target, int buffer)` → `bindBuffer(CommandContext ctx, int target, int buffer)`
+
+**Migration Date:** 2026-02-10
+
+**Status:** Completed - New method implemented, deprecated method retained for backward compatibility
+
+**What Changed:**
+- Added `CommandContext ctx` parameter for Vulkan compatibility
+- Renamed to `bindBuffer` for consistency with standard OpenGL/Vulkan terminology
+- OpenGL implementation validates immediate-mode context and calls `GL15.glBindBuffer()`
+
+**New API Design:**
+```java
+public static void bindBuffer(CommandContext ctx, int target, int buffer) {
+    getBackend().bindBuffer(ctx, target, buffer);
+}
+```
+
+**OpenGL Implementation:**
+```java
+@Override
+public void bindBuffer(CommandContext ctx, int target, int buffer) {
+    if (!ctx.isImmediate()) {
+        throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+    }
+    GL15.glBindBuffer(target, buffer);
+}
+```
+
+**Usage Example:**
+```java
+// Before (deprecated, still works)
+VulkanicAPI.attachBuffer(GL_ARRAY_BUFFER, vertexBufferId);
+
+// After (new Vulkan-compatible API)
+CommandContext ctx = VulkanicAPI.getImmediateContext();
+VulkanicAPI.bindBuffer(ctx, GL_ARRAY_BUFFER, vertexBufferId);
+```
+
+**Vulkan Implementation (Future):**
+```java
+// Will use vkCmdBindVertexBuffers() for vertex buffers or descriptor sets for other buffers
+@Override
+public void bindBuffer(CommandContext ctx, int target, int buffer) {
+    VkCommandBuffer cmdBuf = (VkCommandBuffer) ctx.getHandle();
+    VkBuffer vkBuffer = bufferRegistry.get(buffer);
+    
+    if (target == GL_ARRAY_BUFFER) {
+        VkDeviceSize offsets[] = {0};
+        vkCmdBindVertexBuffers(cmdBuf, 0, 1, vkBuffer, offsets);
+    } else if (target == GL_ELEMENT_ARRAY_BUFFER) {
+        vkCmdBindIndexBuffer(cmdBuf, vkBuffer, 0, VK_INDEX_TYPE_UINT32);
+    } else {
+        // Other buffer types use descriptor sets
+        // This will be handled differently in Vulkan
     }
 }
 ```

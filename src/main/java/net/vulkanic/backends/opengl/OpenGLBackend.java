@@ -274,6 +274,70 @@ public class OpenGLBackend implements GraphicsBackend {
         GL11.glColorMask(r, g, b, a);
     }
     
+    /**
+     * Sets the depth comparison function with explicit command context.
+     * This is the Vulkan-compatible implementation for depth testing.
+     * 
+     * OpenGL implementation: Direct mapping to glDepthFunc() (context is validated but not used)
+     * Vulkan implementation: Will be part of pipeline state creation
+     * 
+     * @param ctx Command context (must be immediate mode for OpenGL)
+     * @param func The depth comparison function
+     */
+    @Override
+    public void setDepthFunc(CommandContext ctx, int func) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        GL11.glDepthFunc(func);
+    }
+    
+    /**
+     * Sets the blend function with explicit command context.
+     * This is the Vulkan-compatible implementation for blending control.
+     * 
+     * OpenGL implementation: Direct mapping to glBlendFuncSeparate() (context is validated but not used)
+     * Vulkan implementation: Will be part of pipeline state creation
+     * 
+     * @param ctx Command context (must be immediate mode for OpenGL)
+     * @param srcRgb Source RGB blend factor
+     * @param dstRgb Destination RGB blend factor
+     * @param srcAlpha Source alpha blend factor
+     * @param dstAlpha Destination alpha blend factor
+     */
+    @Override
+    public void setBlendFunc(CommandContext ctx, int srcRgb, int dstRgb, int srcAlpha, int dstAlpha) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        org.lwjgl.opengl.GL14.glBlendFuncSeparate(srcRgb, dstRgb, srcAlpha, dstAlpha);
+    }
+    
+    /**
+     * Binds a buffer object with explicit command context.
+     * This is the Vulkan-compatible implementation for buffer binding.
+     * 
+     * OpenGL implementation: Direct mapping to glBindBuffer() (context is validated but not used)
+     * Vulkan implementation: Will use vkCmdBindVertexBuffers() or descriptor sets
+     * 
+     * @param ctx Command context (must be immediate mode for OpenGL)
+     * @param target The buffer binding target
+     * @param buffer The buffer object ID
+     */
+    @Override
+    public void bindBuffer(CommandContext ctx, int target, int buffer) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        GL15.glBindBuffer(target, buffer);
+    }
+    
     @Deprecated
     @Override
     public void setPixelStoreMode(int pname, int value) {

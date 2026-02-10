@@ -781,6 +781,76 @@ public class VulkanicAPI {
         getBackend().setColorWriteMask(ctx, r, g, b, a);
     }
     
+    /**
+     * Sets the depth comparison function.
+     * 
+     * This is a Vulkan-compatible method that requires an explicit CommandContext.
+     * For OpenGL, use getImmediateContext() to get the context.
+     * 
+     * Example usage:
+     * <pre>
+     *     CommandContext ctx = VulkanicAPI.getImmediateContext();
+     *     VulkanicAPI.setDepthFunc(ctx, GL_LESS); // Standard depth testing
+     * </pre>
+     * 
+     * In OpenGL: Maps to glDepthFunc()
+     * In Vulkan: Part of pipeline state (depthCompareOp)
+     * 
+     * @param ctx Command context for recording this command
+     * @param func The depth comparison function (e.g., GL_LESS, GL_LEQUAL, GL_ALWAYS)
+     */
+    public static void setDepthFunc(CommandContext ctx, int func) {
+        getBackend().setDepthFunc(ctx, func);
+    }
+    
+    /**
+     * Sets the blend function for color blending.
+     * 
+     * This is a Vulkan-compatible method that requires an explicit CommandContext.
+     * For OpenGL, use getImmediateContext() to get the context.
+     * 
+     * Example usage:
+     * <pre>
+     *     CommandContext ctx = VulkanicAPI.getImmediateContext();
+     *     VulkanicAPI.setBlendFunc(ctx, GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ZERO);
+     * </pre>
+     * 
+     * In OpenGL: Maps to glBlendFuncSeparate()
+     * In Vulkan: Part of pipeline state (VkPipelineColorBlendAttachmentState)
+     * 
+     * @param ctx Command context for recording this command
+     * @param srcRgb Source RGB blend factor (e.g., GL_SRC_ALPHA)
+     * @param dstRgb Destination RGB blend factor (e.g., GL_ONE_MINUS_SRC_ALPHA)
+     * @param srcAlpha Source alpha blend factor
+     * @param dstAlpha Destination alpha blend factor
+     */
+    public static void setBlendFunc(CommandContext ctx, int srcRgb, int dstRgb, int srcAlpha, int dstAlpha) {
+        getBackend().setBlendFunc(ctx, srcRgb, dstRgb, srcAlpha, dstAlpha);
+    }
+    
+    /**
+     * Binds a buffer object to a target binding point.
+     * 
+     * This is a Vulkan-compatible method that requires an explicit CommandContext.
+     * For OpenGL, use getImmediateContext() to get the context.
+     * 
+     * Example usage:
+     * <pre>
+     *     CommandContext ctx = VulkanicAPI.getImmediateContext();
+     *     VulkanicAPI.bindBuffer(ctx, GL_ARRAY_BUFFER, vertexBufferId);
+     * </pre>
+     * 
+     * In OpenGL: Maps to glBindBuffer()
+     * In Vulkan: Buffers are bound via vkCmdBindVertexBuffers() or descriptor sets
+     * 
+     * @param ctx Command context for recording this command
+     * @param target The buffer binding target (e.g., GL_ARRAY_BUFFER, GL_ELEMENT_ARRAY_BUFFER)
+     * @param buffer The buffer object ID to bind
+     */
+    public static void bindBuffer(CommandContext ctx, int target, int buffer) {
+        getBackend().bindBuffer(ctx, target, buffer);
+    }
+    
     @Deprecated
     public static void setPixelStoreMode(int pname, int value) {
         getBackend().setPixelStoreMode(pname, value);

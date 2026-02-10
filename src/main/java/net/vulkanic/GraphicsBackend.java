@@ -177,6 +177,53 @@ public interface GraphicsBackend {
      */
     void setColorWriteMask(CommandContext ctx, boolean r, boolean g, boolean b, boolean a);
     
+    /**
+     * Sets the depth comparison function.
+     * 
+     * In OpenGL: Maps to glDepthFunc()
+     * In Vulkan: Part of pipeline state (depthCompareOp in VkPipelineDepthStencilStateCreateInfo)
+     * 
+     * The depth function determines how incoming fragment depth values are compared
+     * against the depth buffer to determine if the fragment should be discarded.
+     * Common values: LESS, LEQUAL, GREATER, GEQUAL, EQUAL, NOTEQUAL, ALWAYS, NEVER.
+     * 
+     * @param ctx Command context for recording this command
+     * @param func The depth comparison function (e.g., GL_LESS, GL_LEQUAL)
+     */
+    void setDepthFunc(CommandContext ctx, int func);
+    
+    /**
+     * Sets the blend function for color blending.
+     * 
+     * In OpenGL: Maps to glBlendFuncSeparate()
+     * In Vulkan: Part of pipeline state (VkPipelineColorBlendAttachmentState)
+     * 
+     * Controls how source and destination colors are combined during blending.
+     * Allows separate blend functions for RGB and alpha channels.
+     * 
+     * @param ctx Command context for recording this command
+     * @param srcRgb Source RGB blend factor (e.g., GL_SRC_ALPHA)
+     * @param dstRgb Destination RGB blend factor (e.g., GL_ONE_MINUS_SRC_ALPHA)
+     * @param srcAlpha Source alpha blend factor
+     * @param dstAlpha Destination alpha blend factor
+     */
+    void setBlendFunc(CommandContext ctx, int srcRgb, int dstRgb, int srcAlpha, int dstAlpha);
+    
+    /**
+     * Binds a buffer object to a target binding point.
+     * 
+     * In OpenGL: Maps to glBindBuffer()
+     * In Vulkan: Buffers are bound via vkCmdBindVertexBuffers() or descriptor sets
+     * 
+     * Makes a buffer object active for the specified target (e.g., ARRAY_BUFFER, ELEMENT_ARRAY_BUFFER).
+     * Subsequent buffer operations will affect the bound buffer.
+     * 
+     * @param ctx Command context for recording this command
+     * @param target The buffer binding target (e.g., GL_ARRAY_BUFFER)
+     * @param buffer The buffer object ID to bind
+     */
+    void bindBuffer(CommandContext ctx, int target, int buffer);
+    
     // Pixel operations
     @Deprecated
     void setPixelStoreMode(int pname, int value);
