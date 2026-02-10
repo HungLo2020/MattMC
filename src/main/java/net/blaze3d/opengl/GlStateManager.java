@@ -610,7 +610,7 @@ public class GlStateManager {
 
 	public static long _glFenceSync(int i, int j) {
 		RenderSystem.assertOnRenderThread();
-		return net.vulkanic.VulkanicAPI.createFenceSync(i, j);
+		return net.vulkanic.VulkanicAPI.createFenceSync(CTX, i, j);
 	}
 
 	public static int _glClientWaitSync(long l, int i, long m) {

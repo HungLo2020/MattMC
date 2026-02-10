@@ -1,7 +1,9 @@
 package com.seibel.distanthorizons.core.render.glObject.vertexAttribute;
 
 import com.seibel.distanthorizons.core.render.glObject.GLProxy;
+import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.backends.opengl.OpenGLCommandContext;
 
 /**
  * Base for binding/unbinding Vertex Attribute objects (VAO's).
@@ -11,6 +13,7 @@ import net.vulkanic.VulkanicAPI;
  */
 public abstract class AbstractVertexAttribute
 {
+	private static final CommandContext CTX = OpenGLCommandContext.IMMEDIATE;
 	/** Stores the handle of the AbstractVertexAttribute. */
 	public final int id;
 	
@@ -49,7 +52,7 @@ public abstract class AbstractVertexAttribute
 	public void unbind() { VulkanicAPI.glBindVertexArray(0); }
 	
 	/** Always remember to always free your resources! */
-	public void free() { VulkanicAPI.glDeleteVertexArrays(this.id); }
+	public void free() { VulkanicAPI.deleteVertexArray(CTX, this.id); }
 	
 	
 	

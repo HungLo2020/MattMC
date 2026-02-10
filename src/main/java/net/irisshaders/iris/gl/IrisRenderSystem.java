@@ -69,7 +69,7 @@ public class IrisRenderSystem {
 
 	public static void getFloatv(int pname, float[] params) {
 		RenderSystem.assertOnRenderThread();
-		VulkanicAPI.glGetFloatv(pname, params);
+		VulkanicAPI.queryFloatState(CTX, pname, params);
 	}
 
 	public static void generateMipmaps(int texture, int mipmapTarget) {
@@ -717,13 +717,13 @@ public class IrisRenderSystem {
 		@Override
 		public void readBuffer(int framebuffer, int buffer) {
 			GlStateManager._glBindFramebuffer(VulkanicAPI.GL_FRAMEBUFFER, framebuffer);
-			VulkanicAPI.glReadBuffer(buffer);
+			VulkanicAPI.setReadBuffer(CTX, buffer);
 		}
 
 		@Override
 		public void drawBuffers(int framebuffer, int[] buffers) {
 			GlStateManager._glBindFramebuffer(VulkanicAPI.GL_FRAMEBUFFER, framebuffer);
-			VulkanicAPI.glDrawBuffers(buffers);
+			VulkanicAPI.setDrawBuffers(CTX, buffers);
 		}
 
 		@Override

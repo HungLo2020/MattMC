@@ -5,11 +5,14 @@ import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftGLWrapper;
 import it.unimi.dsi.fastutil.ints.Int2IntArrayMap;
 import it.unimi.dsi.fastutil.ints.Int2IntMap;
+import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.backends.opengl.OpenGLCommandContext;
 
 public class DhFramebuffer implements IDhApiFramebuffer
 {
 	private static final IMinecraftGLWrapper GLMC = SingletonInjector.INSTANCE.get(IMinecraftGLWrapper.class);
+	private static final CommandContext CTX = OpenGLCommandContext.IMMEDIATE;
 	
 	private final Int2IntMap attachments;
 	private final int maxDrawBuffers;
@@ -73,7 +76,7 @@ public class DhFramebuffer implements IDhApiFramebuffer
 	public void noDrawBuffers()
 	{
 		this.bind(); 
-		VulkanicAPI.glDrawBuffers(new int[]{VulkanicAPI.GL_NONE});
+		VulkanicAPI.setDrawBuffers(CTX, new int[]{VulkanicAPI.GL_NONE});
 	}
 	
 	public void drawBuffers(int[] buffers)
@@ -97,13 +100,13 @@ public class DhFramebuffer implements IDhApiFramebuffer
 		}
 		
 		this.bind(); 
-		VulkanicAPI.glDrawBuffers(new int[]{VulkanicAPI.GL_NONE});
+		VulkanicAPI.setDrawBuffers(CTX, new int[]{VulkanicAPI.GL_NONE});
 	}
 	
 	public void readBuffer(int buffer)
 	{
 		this.bind();
-		VulkanicAPI.glReadBuffer(VulkanicAPI.GL_COLOR_ATTACHMENT0 + buffer);
+		VulkanicAPI.setReadBuffer(CTX, VulkanicAPI.GL_COLOR_ATTACHMENT0 + buffer);
 	}
 	
 	public int getColorAttachment(int index) { return this.attachments.get(index); }
