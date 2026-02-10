@@ -641,6 +641,77 @@ public class VulkanicAPI {
         getBackend().setDynamicScissor(ctx, x, y, width, height);
     }
     
+    /**
+     * Clears the specified buffers to their clear values.
+     * 
+     * This is a Vulkan-compatible method that requires an explicit CommandContext.
+     * For OpenGL, use getImmediateContext() to get the context.
+     * 
+     * Example usage:
+     * <pre>
+     *     CommandContext ctx = VulkanicAPI.getImmediateContext();
+     *     VulkanicAPI.clear(ctx, GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+     * </pre>
+     * 
+     * In OpenGL: Maps to glClear()
+     * In Vulkan: Maps to vkCmdClearAttachments() or part of vkCmdBeginRenderPass()
+     * 
+     * @param ctx Command context for recording this command
+     * @param mask Bitwise OR of buffer masks (e.g., GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+     */
+    public static void clear(CommandContext ctx, int mask) {
+        getBackend().clear(ctx, mask);
+    }
+    
+    /**
+     * Draws primitives using vertex array data.
+     * 
+     * This is a Vulkan-compatible method that requires an explicit CommandContext.
+     * For OpenGL, use getImmediateContext() to get the context.
+     * 
+     * Example usage:
+     * <pre>
+     *     CommandContext ctx = VulkanicAPI.getImmediateContext();
+     *     VulkanicAPI.drawArrays(ctx, GL_TRIANGLES, 0, vertexCount);
+     * </pre>
+     * 
+     * In OpenGL: Maps to glDrawArrays()
+     * In Vulkan: Maps to vkCmdDraw()
+     * 
+     * @param ctx Command context for recording this command
+     * @param mode Primitive topology (e.g., GL_TRIANGLES, GL_LINES)
+     * @param first Starting vertex index in the vertex buffer
+     * @param count Number of vertices to draw
+     */
+    public static void drawArrays(CommandContext ctx, int mode, int first, int count) {
+        getBackend().drawArrays(ctx, mode, first, count);
+    }
+    
+    /**
+     * Draws indexed primitives using vertex array data and an index buffer.
+     * 
+     * This is a Vulkan-compatible method that requires an explicit CommandContext.
+     * For OpenGL, use getImmediateContext() to get the context.
+     * 
+     * Example usage:
+     * <pre>
+     *     CommandContext ctx = VulkanicAPI.getImmediateContext();
+     *     VulkanicAPI.drawElements(ctx, GL_TRIANGLES, indexCount, GL_UNSIGNED_INT, 0);
+     * </pre>
+     * 
+     * In OpenGL: Maps to glDrawElements()
+     * In Vulkan: Maps to vkCmdDrawIndexed()
+     * 
+     * @param ctx Command context for recording this command
+     * @param mode Primitive topology (e.g., GL_TRIANGLES, GL_LINES)
+     * @param count Number of indices to draw
+     * @param type Data type of indices (e.g., GL_UNSIGNED_INT, GL_UNSIGNED_SHORT)
+     * @param indices Offset in bytes from the start of the index buffer, or pointer to index data
+     */
+    public static void drawElements(CommandContext ctx, int mode, int count, int type, long indices) {
+        getBackend().drawElements(ctx, mode, count, type, indices);
+    }
+    
     @Deprecated
     public static void setPixelStoreMode(int pname, int value) {
         getBackend().setPixelStoreMode(pname, value);

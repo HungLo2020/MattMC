@@ -181,6 +181,11 @@ Track progress using this table (update after each method migration):
 
 | Deprecated Method | Call Sites | New Method | Status |
 |-------------------|------------|------------|--------|
+| `setDynamicViewport()` | N/A | `setDynamicViewport(ctx, ...)` | 🟢 Completed |
+| `setDynamicScissor()` | N/A | `setDynamicScissor(ctx, ...)` | 🟢 Completed |
+| `clear(int mask)` | TBD | `clear(ctx, mask)` | 🟢 Completed |
+| `drawPrimitiveArrays()` | TBD | `drawArrays(ctx, ...)` | 🟢 Completed |
+| `drawIndexedElements()` | TBD | `drawElements(ctx, ...)` | 🟢 Completed |
 | `bindTexture()` | 2,847 | `bindTextureToDescriptorSet()` | 🔴 Not Started |
 | `activateTextureUnit()` | 1,923 | *(see bindTexture)* | 🔴 Not Started |
 | `enable(int cap)` | 1,456 | `createPipeline()` | 🔴 Not Started |
@@ -1791,4 +1796,162 @@ Migration is complete when:
 - **VulkanicAPI Source:** `src/main/java/net/vulkanic/VulkanicAPI.java`
 - **GraphicsBackend Interface:** `src/main/java/net/vulkanic/GraphicsBackend.java`
 - **OpenGL Implementation:** `src/main/java/net/vulkanic/backends/opengl/OpenGLBackend.java`
+
+---
+
+## Completed Migrations (2026-02-10)
+
+### ✅ Method: `clear(int mask)` → `clear(CommandContext ctx, int mask)`
+
+**Migration Date:** 2026-02-10
+
+**Status:** Completed - New method implemented, deprecated method retained for backward compatibility
+
+**What Changed:**
+- Added `CommandContext ctx` parameter to make the method compatible with Vulkan's command buffer model
+- OpenGL implementation validates immediate-mode context and calls `GL11.glClear()`
+- Fully backward compatible - deprecated method still available for existing code
+
+**New API Design:**
+```java
+public static void clear(CommandContext ctx, int mask) {
+    getBackend().clear(ctx, mask);
+}
+```
+
+**OpenGL Implementation:**
+```java
+@Override
+public void clear(CommandContext ctx, int mask) {
+    if (!ctx.isImmediate()) {
+        throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+    }
+    GL11.glClear(mask);
+}
+```
+
+**Usage Example:**
+```java
+// Before (deprecated, still works)
+VulkanicAPI.clear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+// After (new Vulkan-compatible API)
+CommandContext ctx = VulkanicAPI.getImmediateContext();
+VulkanicAPI.clear(ctx, GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+```
+
+**Vulkan Implementation (Future):**
+```java
+// Will use vkCmdClearAttachments or clear values in vkCmdBeginRenderPass
+@Override
+public void clear(CommandContext ctx, int mask) {
+    VkCommandBuffer cmdBuf = (VkCommandBuffer) ctx.getHandle();
+    // Implementation will depend on whether we're inside a render pass
+    // Option 1: vkCmdClearAttachments for in-pass clears
+    // Option 2: Clear values specified in vkCmdBeginRenderPass
+}
+```
+
+---
+
+### ✅ Method: `drawPrimitiveArrays(int mode, int first, int count)` → `drawArrays(CommandContext ctx, int mode, int first, int count)`
+
+**Migration Date:** 2026-02-10
+
+**Status:** Completed - New method implemented, deprecated method retained for backward compatibility
+
+**What Changed:**
+- Added `CommandContext ctx` parameter for Vulkan compatibility
+- Renamed to `drawArrays` for consistency with standard graphics API naming
+- OpenGL implementation validates immediate-mode context and calls `GL11.glDrawArrays()`
+
+**New API Design:**
+```java
+public static void drawArrays(CommandContext ctx, int mode, int first, int count) {
+    getBackend().drawArrays(ctx, mode, first, count);
+}
+```
+
+**OpenGL Implementation:**
+```java
+@Override
+public void drawArrays(CommandContext ctx, int mode, int first, int count) {
+    if (!ctx.isImmediate()) {
+        throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+    }
+    GL11.glDrawArrays(mode, first, count);
+}
+```
+
+**Usage Example:**
+```java
+// Before (deprecated, still works)
+VulkanicAPI.drawPrimitiveArrays(VulkanicAPI.GL_TRIANGLES, 0, vertexCount);
+
+// After (new Vulkan-compatible API)
+CommandContext ctx = VulkanicAPI.getImmediateContext();
+VulkanicAPI.drawArrays(ctx, VulkanicAPI.GL_TRIANGLES, 0, vertexCount);
+```
+
+**Vulkan Implementation (Future):**
+```java
+@Override
+public void drawArrays(CommandContext ctx, int mode, int first, int count) {
+    VkCommandBuffer cmdBuf = (VkCommandBuffer) ctx.getHandle();
+    vkCmdDraw(cmdBuf, count, 1, first, 0);
+}
+```
+
+---
+
+### ✅ Method: `drawIndexedElements(int mode, int count, int type, long indices)` → `drawElements(CommandContext ctx, int mode, int count, int type, long indices)`
+
+**Migration Date:** 2026-02-10
+
+**Status:** Completed - New method implemented, deprecated method retained for backward compatibility
+
+**What Changed:**
+- Added `CommandContext ctx` parameter for Vulkan compatibility
+- Renamed to `drawElements` for consistency with standard graphics API naming
+- OpenGL implementation validates immediate-mode context and calls `GL11.glDrawElements()`
+
+**New API Design:**
+```java
+public static void drawElements(CommandContext ctx, int mode, int count, int type, long indices) {
+    getBackend().drawElements(ctx, mode, count, type, indices);
+}
+```
+
+**OpenGL Implementation:**
+```java
+@Override
+public void drawElements(CommandContext ctx, int mode, int count, int type, long indices) {
+    if (!ctx.isImmediate()) {
+        throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+    }
+    GL11.glDrawElements(mode, count, type, indices);
+}
+```
+
+**Usage Example:**
+```java
+// Before (deprecated, still works)
+VulkanicAPI.drawIndexedElements(VulkanicAPI.GL_TRIANGLES, indexCount, VulkanicAPI.GL_UNSIGNED_INT, 0);
+
+// After (new Vulkan-compatible API)
+CommandContext ctx = VulkanicAPI.getImmediateContext();
+VulkanicAPI.drawElements(ctx, VulkanicAPI.GL_TRIANGLES, indexCount, VulkanicAPI.GL_UNSIGNED_INT, 0);
+```
+
+**Vulkan Implementation (Future):**
+```java
+@Override
+public void drawElements(CommandContext ctx, int mode, int count, int type, long indices) {
+    VkCommandBuffer cmdBuf = (VkCommandBuffer) ctx.getHandle();
+    // indices parameter is ignored in Vulkan - index buffer is pre-bound
+    vkCmdDrawIndexed(cmdBuf, count, 1, 0, 0, 0);
+}
+```
+
+---
 

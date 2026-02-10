@@ -146,6 +146,71 @@ public class OpenGLBackend implements GraphicsBackend {
         GL20.glScissor(x, y, width, height);
     }
     
+    /**
+     * Clears buffers with explicit command context.
+     * This is the Vulkan-compatible implementation for buffer clearing.
+     * 
+     * OpenGL implementation: Direct mapping to glClear() (context is validated but not used)
+     * Vulkan implementation: Will map to vkCmdClearAttachments() or render pass clear
+     * 
+     * @param ctx Command context (must be immediate mode for OpenGL)
+     * @param mask Bitwise OR of buffer masks to clear
+     */
+    @Override
+    public void clear(CommandContext ctx, int mask) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        GL11.glClear(mask);
+    }
+    
+    /**
+     * Draws primitives from vertex arrays with explicit command context.
+     * This is the Vulkan-compatible implementation for non-indexed drawing.
+     * 
+     * OpenGL implementation: Direct mapping to glDrawArrays() (context is validated but not used)
+     * Vulkan implementation: Will map to vkCmdDraw(ctx.getHandle(), count, 1, first, 0)
+     * 
+     * @param ctx Command context (must be immediate mode for OpenGL)
+     * @param mode Primitive topology
+     * @param first Starting vertex index
+     * @param count Number of vertices to draw
+     */
+    @Override
+    public void drawArrays(CommandContext ctx, int mode, int first, int count) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        GL11.glDrawArrays(mode, first, count);
+    }
+    
+    /**
+     * Draws indexed primitives with explicit command context.
+     * This is the Vulkan-compatible implementation for indexed drawing.
+     * 
+     * OpenGL implementation: Direct mapping to glDrawElements() (context is validated but not used)
+     * Vulkan implementation: Will map to vkCmdDrawIndexed(ctx.getHandle(), count, 1, 0, 0, 0)
+     * 
+     * @param ctx Command context (must be immediate mode for OpenGL)
+     * @param mode Primitive topology
+     * @param count Number of indices to draw
+     * @param type Data type of indices
+     * @param indices Offset in bytes from start of index buffer
+     */
+    @Override
+    public void drawElements(CommandContext ctx, int mode, int count, int type, long indices) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        GL11.glDrawElements(mode, count, type, indices);
+    }
+    
     @Deprecated
     @Override
     public void setPixelStoreMode(int pname, int value) {

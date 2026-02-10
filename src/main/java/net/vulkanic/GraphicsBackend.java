@@ -84,6 +84,54 @@ public interface GraphicsBackend {
      */
     void setDynamicScissor(CommandContext ctx, int x, int y, int width, int height);
     
+    /**
+     * Clears the specified buffers to their clear values.
+     * 
+     * In OpenGL: Maps to glClear()
+     * In Vulkan: Maps to vkCmdClearAttachments() or part of vkCmdBeginRenderPass()
+     * 
+     * The mask parameter specifies which buffers should be cleared (color, depth, stencil).
+     * This operation affects the current framebuffer/render target.
+     * 
+     * @param ctx Command context for recording this command
+     * @param mask Bitwise OR of buffer masks (e.g., GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+     */
+    void clear(CommandContext ctx, int mask);
+    
+    /**
+     * Draws primitives using vertex array data.
+     * 
+     * In OpenGL: Maps to glDrawArrays()
+     * In Vulkan: Maps to vkCmdDraw()
+     * 
+     * This command renders primitives from array data without using an index buffer.
+     * The vertex data is read sequentially from the currently bound vertex buffer(s).
+     * 
+     * @param ctx Command context for recording this command
+     * @param mode Primitive topology (e.g., GL_TRIANGLES, GL_LINES)
+     * @param first Starting vertex index in the vertex buffer
+     * @param count Number of vertices to draw
+     */
+    void drawArrays(CommandContext ctx, int mode, int first, int count);
+    
+    /**
+     * Draws indexed primitives using vertex array data and an index buffer.
+     * 
+     * In OpenGL: Maps to glDrawElements()
+     * In Vulkan: Maps to vkCmdDrawIndexed()
+     * 
+     * This command renders primitives using indices from an index buffer to reference
+     * vertices in the vertex buffer(s). More efficient than drawArrays when vertices
+     * are shared between primitives.
+     * 
+     * @param ctx Command context for recording this command
+     * @param mode Primitive topology (e.g., GL_TRIANGLES, GL_LINES)
+     * @param count Number of indices to draw
+     * @param type Data type of indices (e.g., GL_UNSIGNED_INT, GL_UNSIGNED_SHORT)
+     * @param indices Offset in bytes from the start of the index buffer, or pointer to index data
+     */
+    void drawElements(CommandContext ctx, int mode, int count, int type, long indices);
+    
     // Pixel operations
     @Deprecated
     void setPixelStoreMode(int pname, int value);
