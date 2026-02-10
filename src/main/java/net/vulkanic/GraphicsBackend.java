@@ -43,13 +43,7 @@ public interface GraphicsBackend {
     void setDynamicViewport(CommandContext ctx, int x, int y, int width, int height);
     
     @Deprecated
-    void clear(int mask);
-    @Deprecated
     void useProgram(int programId);
-    @Deprecated
-    void enable(int cap);
-    @Deprecated
-    void disable(int cap);
     
     // Depth operations
     @Deprecated

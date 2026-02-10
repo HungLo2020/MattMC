@@ -578,23 +578,8 @@ public class VulkanicAPI {
     }
     
     @Deprecated
-    public static void clear(int mask) {
-        getBackend().clear(mask);
-    }
-    
-    @Deprecated
     public static void useProgram(int programId) {
         getBackend().useProgram(programId);
-    }
-    
-    @Deprecated
-    public static void enable(int cap) {
-        getBackend().enable(cap);
-    }
-    
-    @Deprecated
-    public static void disable(int cap) {
-        getBackend().disable(cap);
     }
     
     @Deprecated

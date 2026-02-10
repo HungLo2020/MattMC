@@ -75,26 +75,8 @@ public class OpenGLBackend implements GraphicsBackend {
     
     @Deprecated
     @Override
-    public void clear(int mask) {
-        GL11.glClear(mask);
-    }
-    
-    @Deprecated
-    @Override
     public void useProgram(int programId) {
         GL20.glUseProgram(programId);
-    }
-    
-    @Deprecated
-    @Override
-    public void enable(int cap) {
-        GL11.glEnable(cap);
-    }
-    
-    @Deprecated
-    @Override
-    public void disable(int cap) {
-        GL11.glDisable(cap);
     }
     
     @Deprecated
