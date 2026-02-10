@@ -562,6 +562,81 @@ public interface GraphicsBackend {
      */
     int generateFramebufferObject(CommandContext ctx);
     
+    /**
+     * Destroys a framebuffer object.
+     * 
+     * In OpenGL: Maps to glDeleteFramebuffers()
+     * In Vulkan: Maps to vkDestroyFramebuffer()
+     * 
+     * Frees the GPU memory associated with the framebuffer object and makes
+     * its ID available for reuse.
+     * 
+     * @param ctx Command context for recording this command
+     * @param fbo The framebuffer object ID to destroy
+     */
+    void destroyFramebufferObject(CommandContext ctx, int fbo);
+    
+    /**
+     * Binds a vertex array object (VAO).
+     * 
+     * In OpenGL: Maps to glBindVertexArray()
+     * In Vulkan: No direct equivalent (state is part of pipeline)
+     * 
+     * Selects which VAO is active for subsequent vertex attribute configuration
+     * and draw calls. In Vulkan, this state is baked into the pipeline.
+     * 
+     * @param ctx Command context for recording this command
+     * @param vao The vertex array object ID to bind
+     */
+    void selectVertexArray(CommandContext ctx, int vao);
+    
+    /**
+     * Fills a buffer with data.
+     * 
+     * In OpenGL: Maps to glBufferData()
+     * In Vulkan: Maps to vkCmdUpdateBuffer() or memory mapping
+     * 
+     * Uploads data from CPU memory to GPU buffer memory. The buffer must
+     * be bound to a target before calling this method.
+     * 
+     * @param ctx Command context for recording this command
+     * @param tgt The buffer binding target (e.g., GL_ARRAY_BUFFER)
+     * @param dat The data to upload
+     * @param usg Usage hint for the buffer (e.g., GL_STATIC_DRAW)
+     */
+    void fillBufferWithData(CommandContext ctx, int tgt, java.nio.ByteBuffer dat, int usg);
+    
+    /**
+     * Allocates buffer storage with a specified size.
+     * 
+     * In OpenGL: Maps to glBufferData() with null data
+     * In Vulkan: Maps to vkCreateBuffer() with appropriate size
+     * 
+     * Allocates GPU buffer memory of the specified size without initializing
+     * the data. The buffer must be bound to a target before calling this method.
+     * 
+     * @param ctx Command context for recording this command
+     * @param tgt The buffer binding target (e.g., GL_ARRAY_BUFFER)
+     * @param sz The size in bytes to allocate
+     * @param usg Usage hint for the buffer (e.g., GL_DYNAMIC_DRAW)
+     */
+    void fillBufferWithSize(CommandContext ctx, int tgt, long sz, int usg);
+    
+    /**
+     * Checks for graphics API errors.
+     * 
+     * In OpenGL: Maps to glGetError()
+     * In Vulkan: Maps to validation layer queries
+     * 
+     * Returns the error code of the last operation, or NO_ERROR if no error occurred.
+     * This is primarily used for debugging and should be avoided in production code
+     * for performance reasons.
+     * 
+     * @param ctx Command context for recording this command
+     * @return The error code, or NO_ERROR (0) if no error occurred
+     */
+    int checkForErrors(CommandContext ctx);
+    
     // Pixel operations
     @Deprecated
     void setPixelStoreMode(int pname, int value);

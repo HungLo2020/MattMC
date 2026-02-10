@@ -834,6 +834,110 @@ public class OpenGLBackend implements GraphicsBackend {
         return GL30.glGenFramebuffers();
     }
     
+    /**
+     * Destroys framebuffer object with explicit command context.
+     * This is the Vulkan-compatible implementation for FBO deletion.
+     * 
+     * OpenGL implementation: Direct mapping to glDeleteFramebuffers()
+     * Vulkan implementation: Will use vkDestroyFramebuffer()
+     * 
+     * @param ctx Command context (must be immediate mode for OpenGL)
+     * @param fbo The framebuffer object ID to destroy
+     */
+    @Override
+    public void destroyFramebufferObject(CommandContext ctx, int fbo) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        GL30.glDeleteFramebuffers(fbo);
+    }
+    
+    /**
+     * Selects vertex array object with explicit command context.
+     * This is the Vulkan-compatible implementation for VAO binding.
+     * 
+     * OpenGL implementation: Direct mapping to glBindVertexArray()
+     * Vulkan implementation: State baked into pipeline (no direct equivalent)
+     * 
+     * @param ctx Command context (must be immediate mode for OpenGL)
+     * @param vao The vertex array object ID to bind
+     */
+    @Override
+    public void selectVertexArray(CommandContext ctx, int vao) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        GL30.glBindVertexArray(vao);
+    }
+    
+    /**
+     * Fills buffer with data with explicit command context.
+     * This is the Vulkan-compatible implementation for buffer data upload.
+     * 
+     * OpenGL implementation: Direct mapping to glBufferData()
+     * Vulkan implementation: Will use vkCmdUpdateBuffer() or memory mapping
+     * 
+     * @param ctx Command context (must be immediate mode for OpenGL)
+     * @param tgt The buffer binding target
+     * @param dat The data to upload
+     * @param usg Usage hint for the buffer
+     */
+    @Override
+    public void fillBufferWithData(CommandContext ctx, int tgt, java.nio.ByteBuffer dat, int usg) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        GL15.glBufferData(tgt, dat, usg);
+    }
+    
+    /**
+     * Allocates buffer storage with explicit command context.
+     * This is the Vulkan-compatible implementation for buffer allocation.
+     * 
+     * OpenGL implementation: Direct mapping to glBufferData() with null data
+     * Vulkan implementation: Will use vkCreateBuffer()
+     * 
+     * @param ctx Command context (must be immediate mode for OpenGL)
+     * @param tgt The buffer binding target
+     * @param sz The size in bytes to allocate
+     * @param usg Usage hint for the buffer
+     */
+    @Override
+    public void fillBufferWithSize(CommandContext ctx, int tgt, long sz, int usg) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        GL15.glBufferData(tgt, sz, usg);
+    }
+    
+    /**
+     * Checks for errors with explicit command context.
+     * This is the Vulkan-compatible implementation for error checking.
+     * 
+     * OpenGL implementation: Direct mapping to glGetError()
+     * Vulkan implementation: Will query validation layers
+     * 
+     * @param ctx Command context (must be immediate mode for OpenGL)
+     * @return The error code, or NO_ERROR (0) if no error occurred
+     */
+    @Override
+    public int checkForErrors(CommandContext ctx) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        return GL11.glGetError();
+    }
+    
     @Deprecated
     @Override
     public void setPixelStoreMode(int pname, int value) {

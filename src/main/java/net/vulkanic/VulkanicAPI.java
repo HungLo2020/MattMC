@@ -1392,6 +1392,124 @@ public class VulkanicAPI {
         return getBackend().generateFramebufferObject(ctx);
     }
     
+    /**
+     * Destroys a framebuffer object.
+     * 
+     * This is a Vulkan-compatible method that requires an explicit CommandContext.
+     * For OpenGL, use getImmediateContext() to get the context.
+     * 
+     * Example usage:
+     * <pre>
+     *     CommandContext ctx = VulkanicAPI.getImmediateContext();
+     *     VulkanicAPI.destroyFramebufferObject(ctx, fboID);
+     * </pre>
+     * 
+     * In OpenGL: Maps to glDeleteFramebuffers()
+     * In Vulkan: Maps to vkDestroyFramebuffer()
+     * 
+     * @param ctx Command context for recording this command
+     * @param fbo The framebuffer object ID to destroy
+     */
+    public static void destroyFramebufferObject(CommandContext ctx, int fbo) {
+        getBackend().destroyFramebufferObject(ctx, fbo);
+    }
+    
+    /**
+     * Binds a vertex array object (VAO).
+     * 
+     * This is a Vulkan-compatible method that requires an explicit CommandContext.
+     * For OpenGL, use getImmediateContext() to get the context.
+     * 
+     * Example usage:
+     * <pre>
+     *     CommandContext ctx = VulkanicAPI.getImmediateContext();
+     *     VulkanicAPI.selectVertexArray(ctx, vaoID);
+     * </pre>
+     * 
+     * In OpenGL: Maps to glBindVertexArray()
+     * In Vulkan: No direct equivalent (state is part of pipeline)
+     * 
+     * @param ctx Command context for recording this command
+     * @param vao The vertex array object ID to bind
+     */
+    public static void selectVertexArray(CommandContext ctx, int vao) {
+        getBackend().selectVertexArray(ctx, vao);
+    }
+    
+    /**
+     * Fills a buffer with data.
+     * 
+     * This is a Vulkan-compatible method that requires an explicit CommandContext.
+     * For OpenGL, use getImmediateContext() to get the context.
+     * 
+     * Example usage:
+     * <pre>
+     *     CommandContext ctx = VulkanicAPI.getImmediateContext();
+     *     ByteBuffer data = ...;
+     *     VulkanicAPI.fillBufferWithData(ctx, GL_ARRAY_BUFFER, data, GL_STATIC_DRAW);
+     * </pre>
+     * 
+     * In OpenGL: Maps to glBufferData()
+     * In Vulkan: Maps to vkCmdUpdateBuffer() or memory mapping
+     * 
+     * @param ctx Command context for recording this command
+     * @param tgt The buffer binding target (e.g., GL_ARRAY_BUFFER)
+     * @param dat The data to upload
+     * @param usg Usage hint for the buffer (e.g., GL_STATIC_DRAW)
+     */
+    public static void fillBufferWithData(CommandContext ctx, int tgt, java.nio.ByteBuffer dat, int usg) {
+        getBackend().fillBufferWithData(ctx, tgt, dat, usg);
+    }
+    
+    /**
+     * Allocates buffer storage with a specified size.
+     * 
+     * This is a Vulkan-compatible method that requires an explicit CommandContext.
+     * For OpenGL, use getImmediateContext() to get the context.
+     * 
+     * Example usage:
+     * <pre>
+     *     CommandContext ctx = VulkanicAPI.getImmediateContext();
+     *     VulkanicAPI.fillBufferWithSize(ctx, GL_ARRAY_BUFFER, 1024, GL_DYNAMIC_DRAW);
+     * </pre>
+     * 
+     * In OpenGL: Maps to glBufferData() with null data
+     * In Vulkan: Maps to vkCreateBuffer() with appropriate size
+     * 
+     * @param ctx Command context for recording this command
+     * @param tgt The buffer binding target (e.g., GL_ARRAY_BUFFER)
+     * @param sz The size in bytes to allocate
+     * @param usg Usage hint for the buffer (e.g., GL_DYNAMIC_DRAW)
+     */
+    public static void fillBufferWithSize(CommandContext ctx, int tgt, long sz, int usg) {
+        getBackend().fillBufferWithSize(ctx, tgt, sz, usg);
+    }
+    
+    /**
+     * Checks for graphics API errors.
+     * 
+     * This is a Vulkan-compatible method that requires an explicit CommandContext.
+     * For OpenGL, use getImmediateContext() to get the context.
+     * 
+     * Example usage:
+     * <pre>
+     *     CommandContext ctx = VulkanicAPI.getImmediateContext();
+     *     int error = VulkanicAPI.checkForErrors(ctx);
+     *     if (error != 0) {
+     *         // Handle error
+     *     }
+     * </pre>
+     * 
+     * In OpenGL: Maps to glGetError()
+     * In Vulkan: Maps to validation layer queries
+     * 
+     * @param ctx Command context for recording this command
+     * @return The error code, or NO_ERROR (0) if no error occurred
+     */
+    public static int checkForErrors(CommandContext ctx) {
+        return getBackend().checkForErrors(ctx);
+    }
+    
     @Deprecated
     public static void setPixelStoreMode(int pname, int value) {
         getBackend().setPixelStoreMode(pname, value);
