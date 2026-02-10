@@ -186,6 +186,9 @@ Track progress using this table (update after each method migration):
 | `clear(int mask)` | TBD | `clear(ctx, mask)` | 🟢 Completed |
 | `drawPrimitiveArrays()` | TBD | `drawArrays(ctx, ...)` | 🟢 Completed |
 | `drawIndexedElements()` | TBD | `drawElements(ctx, ...)` | 🟢 Completed |
+| `useProgram()` | TBD | `bindShaderProgram(ctx, ...)` | 🟢 Completed |
+| `setDepthWriteEnabled()` | TBD | `setDepthWriteMask(ctx, ...)` | 🟢 Completed |
+| `setColorWriteMask()` | TBD | `setColorWriteMask(ctx, ...)` | 🟢 Completed |
 | `bindTexture()` | 2,847 | `bindTextureToDescriptorSet()` | 🔴 Not Started |
 | `activateTextureUnit()` | 1,923 | *(see bindTexture)* | 🔴 Not Started |
 | `enable(int cap)` | 1,456 | `createPipeline()` | 🔴 Not Started |
@@ -1955,3 +1958,178 @@ public void drawElements(CommandContext ctx, int mode, int count, int type, long
 
 ---
 
+
+### ✅ Method: `useProgram(int programId)` → `bindShaderProgram(CommandContext ctx, int programId)`
+
+**Migration Date:** 2026-02-10
+
+**Status:** Completed - New method implemented, deprecated method retained for backward compatibility
+
+**What Changed:**
+- Added `CommandContext ctx` parameter for Vulkan compatibility
+- Renamed to `bindShaderProgram` for semantic clarity
+- OpenGL implementation validates immediate-mode context and calls `GL20.glUseProgram()`
+
+**New API Design:**
+```java
+public static void bindShaderProgram(CommandContext ctx, int programId) {
+    getBackend().bindShaderProgram(ctx, programId);
+}
+```
+
+**OpenGL Implementation:**
+```java
+@Override
+public void bindShaderProgram(CommandContext ctx, int programId) {
+    if (!ctx.isImmediate()) {
+        throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+    }
+    GL20.glUseProgram(programId);
+}
+```
+
+**Usage Example:**
+```java
+// Before (deprecated, still works)
+VulkanicAPI.useProgram(shaderProgramId);
+
+// After (new Vulkan-compatible API)
+CommandContext ctx = VulkanicAPI.getImmediateContext();
+VulkanicAPI.bindShaderProgram(ctx, shaderProgramId);
+```
+
+**Vulkan Implementation (Future):**
+```java
+// Will use vkCmdBindPipeline with pre-compiled pipeline containing shader modules
+@Override
+public void bindShaderProgram(CommandContext ctx, int programId) {
+    VkCommandBuffer cmdBuf = (VkCommandBuffer) ctx.getHandle();
+    // Program ID maps to a pre-created VkPipeline
+    VkPipeline pipeline = pipelineRegistry.get(programId);
+    vkCmdBindPipeline(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+}
+```
+
+---
+
+### ✅ Method: `setDepthWriteEnabled(boolean enabled)` → `setDepthWriteMask(CommandContext ctx, boolean enabled)`
+
+**Migration Date:** 2026-02-10
+
+**Status:** Completed - New method implemented, deprecated method retained for backward compatibility
+
+**What Changed:**
+- Added `CommandContext ctx` parameter for Vulkan compatibility
+- Renamed to `setDepthWriteMask` for consistency with OpenGL/Vulkan terminology
+- OpenGL implementation validates immediate-mode context and calls `GL11.glDepthMask()`
+
+**New API Design:**
+```java
+public static void setDepthWriteMask(CommandContext ctx, boolean enabled) {
+    getBackend().setDepthWriteMask(ctx, enabled);
+}
+```
+
+**OpenGL Implementation:**
+```java
+@Override
+public void setDepthWriteMask(CommandContext ctx, boolean enabled) {
+    if (!ctx.isImmediate()) {
+        throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+    }
+    GL11.glDepthMask(enabled);
+}
+```
+
+**Usage Example:**
+```java
+// Before (deprecated, still works)
+VulkanicAPI.setDepthWriteEnabled(true);
+
+// After (new Vulkan-compatible API)
+CommandContext ctx = VulkanicAPI.getImmediateContext();
+VulkanicAPI.setDepthWriteMask(ctx, true);
+```
+
+**Vulkan Implementation (Future):**
+```java
+// Will be part of pipeline state, not a dynamic command
+// In Vulkan, this is set in VkPipelineDepthStencilStateCreateInfo during pipeline creation
+// For dynamic behavior, would need VK_EXT_extended_dynamic_state3 extension
+@Override
+public void setDepthWriteMask(CommandContext ctx, boolean enabled) {
+    // Note: This might not be supported as dynamic state in all Vulkan implementations
+    // May require pipeline switching instead
+    if (supportsExtendedDynamicState3) {
+        VkCommandBuffer cmdBuf = (VkCommandBuffer) ctx.getHandle();
+        vkCmdSetDepthWriteEnableEXT(cmdBuf, enabled);
+    } else {
+        // Fall back to pipeline switching
+        switchToPipelineWithDepthWrite(enabled);
+    }
+}
+```
+
+---
+
+### ✅ Method: `setColorWriteMask(boolean r, boolean g, boolean b, boolean a)` → `setColorWriteMask(CommandContext ctx, boolean r, boolean g, boolean b, boolean a)`
+
+**Migration Date:** 2026-02-10
+
+**Status:** Completed - New method implemented, deprecated method retained for backward compatibility
+
+**What Changed:**
+- Added `CommandContext ctx` parameter for Vulkan compatibility
+- OpenGL implementation validates immediate-mode context and calls `GL11.glColorMask()`
+- Method signature and name remain consistent for clarity
+
+**New API Design:**
+```java
+public static void setColorWriteMask(CommandContext ctx, boolean r, boolean g, boolean b, boolean a) {
+    getBackend().setColorWriteMask(ctx, r, g, b, a);
+}
+```
+
+**OpenGL Implementation:**
+```java
+@Override
+public void setColorWriteMask(CommandContext ctx, boolean r, boolean g, boolean b, boolean a) {
+    if (!ctx.isImmediate()) {
+        throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+    }
+    GL11.glColorMask(r, g, b, a);
+}
+```
+
+**Usage Example:**
+```java
+// Before (deprecated, still works)
+VulkanicAPI.setColorWriteMask(true, true, true, false); // RGB only, no alpha
+
+// After (new Vulkan-compatible API)
+CommandContext ctx = VulkanicAPI.getImmediateContext();
+VulkanicAPI.setColorWriteMask(ctx, true, true, true, false); // RGB only, no alpha
+```
+
+**Vulkan Implementation (Future):**
+```java
+// Will be part of pipeline state in VkPipelineColorBlendAttachmentState
+// For dynamic behavior, would need VK_EXT_extended_dynamic_state3 extension
+@Override
+public void setColorWriteMask(CommandContext ctx, boolean r, boolean g, boolean b, boolean a) {
+    if (supportsExtendedDynamicState3) {
+        VkCommandBuffer cmdBuf = (VkCommandBuffer) ctx.getHandle();
+        int mask = 0;
+        if (r) mask |= VK_COLOR_COMPONENT_R_BIT;
+        if (g) mask |= VK_COLOR_COMPONENT_G_BIT;
+        if (b) mask |= VK_COLOR_COMPONENT_B_BIT;
+        if (a) mask |= VK_COLOR_COMPONENT_A_BIT;
+        vkCmdSetColorWriteMaskEXT(cmdBuf, 0, 1, mask);
+    } else {
+        // Fall back to pipeline switching
+        switchToPipelineWithColorMask(r, g, b, a);
+    }
+}
+```
+
+---

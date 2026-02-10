@@ -211,6 +211,69 @@ public class OpenGLBackend implements GraphicsBackend {
         GL11.glDrawElements(mode, count, type, indices);
     }
     
+    /**
+     * Binds a shader program with explicit command context.
+     * This is the Vulkan-compatible implementation for shader binding.
+     * 
+     * OpenGL implementation: Direct mapping to glUseProgram() (context is validated but not used)
+     * Vulkan implementation: Will be handled by vkCmdBindPipeline() with pre-compiled pipelines
+     * 
+     * @param ctx Command context (must be immediate mode for OpenGL)
+     * @param programId The shader program ID to bind
+     */
+    @Override
+    public void bindShaderProgram(CommandContext ctx, int programId) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        GL20.glUseProgram(programId);
+    }
+    
+    /**
+     * Sets the depth write mask with explicit command context.
+     * This is the Vulkan-compatible implementation for depth write control.
+     * 
+     * OpenGL implementation: Direct mapping to glDepthMask() (context is validated but not used)
+     * Vulkan implementation: Will be part of pipeline state creation
+     * 
+     * @param ctx Command context (must be immediate mode for OpenGL)
+     * @param enabled true to enable depth writes, false to disable
+     */
+    @Override
+    public void setDepthWriteMask(CommandContext ctx, boolean enabled) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        GL11.glDepthMask(enabled);
+    }
+    
+    /**
+     * Sets the color write mask with explicit command context.
+     * This is the Vulkan-compatible implementation for color write control.
+     * 
+     * OpenGL implementation: Direct mapping to glColorMask() (context is validated but not used)
+     * Vulkan implementation: Will be part of pipeline state creation
+     * 
+     * @param ctx Command context (must be immediate mode for OpenGL)
+     * @param r true to enable red channel writes
+     * @param g true to enable green channel writes
+     * @param b true to enable blue channel writes
+     * @param a true to enable alpha channel writes
+     */
+    @Override
+    public void setColorWriteMask(CommandContext ctx, boolean r, boolean g, boolean b, boolean a) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        GL11.glColorMask(r, g, b, a);
+    }
+    
     @Deprecated
     @Override
     public void setPixelStoreMode(int pname, int value) {

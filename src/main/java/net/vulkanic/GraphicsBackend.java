@@ -132,6 +132,51 @@ public interface GraphicsBackend {
      */
     void drawElements(CommandContext ctx, int mode, int count, int type, long indices);
     
+    /**
+     * Binds a shader program for subsequent rendering operations.
+     * 
+     * In OpenGL: Maps to glUseProgram()
+     * In Vulkan: Shader programs are bound as part of pipeline state, not individually
+     * 
+     * This command makes a shader program active for subsequent draw calls. In Vulkan,
+     * this will be handled by binding a pipeline that was created with the shader modules.
+     * 
+     * @param ctx Command context for recording this command
+     * @param programId The shader program ID to bind
+     */
+    void bindShaderProgram(CommandContext ctx, int programId);
+    
+    /**
+     * Sets the depth write mask (whether depth values are written to the depth buffer).
+     * 
+     * In OpenGL: Maps to glDepthMask()
+     * In Vulkan: Part of pipeline state (depthWriteEnable in VkPipelineDepthStencilStateCreateInfo)
+     * 
+     * Controls whether fragments can update the depth buffer. This is typically disabled
+     * when rendering transparent objects or when doing depth-only rendering passes.
+     * 
+     * @param ctx Command context for recording this command
+     * @param enabled true to enable depth writes, false to disable
+     */
+    void setDepthWriteMask(CommandContext ctx, boolean enabled);
+    
+    /**
+     * Sets the color write mask (which color channels can be written to the framebuffer).
+     * 
+     * In OpenGL: Maps to glColorMask()
+     * In Vulkan: Part of pipeline state (colorWriteMask in VkPipelineColorBlendAttachmentState)
+     * 
+     * Controls which color channels (red, green, blue, alpha) can be written by fragment shaders.
+     * Useful for effects like rendering to specific channels or masking certain outputs.
+     * 
+     * @param ctx Command context for recording this command
+     * @param r true to enable red channel writes
+     * @param g true to enable green channel writes
+     * @param b true to enable blue channel writes
+     * @param a true to enable alpha channel writes
+     */
+    void setColorWriteMask(CommandContext ctx, boolean r, boolean g, boolean b, boolean a);
+    
     // Pixel operations
     @Deprecated
     void setPixelStoreMode(int pname, int value);

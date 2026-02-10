@@ -712,6 +712,75 @@ public class VulkanicAPI {
         getBackend().drawElements(ctx, mode, count, type, indices);
     }
     
+    /**
+     * Binds a shader program for subsequent rendering operations.
+     * 
+     * This is a Vulkan-compatible method that requires an explicit CommandContext.
+     * For OpenGL, use getImmediateContext() to get the context.
+     * 
+     * Example usage:
+     * <pre>
+     *     CommandContext ctx = VulkanicAPI.getImmediateContext();
+     *     VulkanicAPI.bindShaderProgram(ctx, programId);
+     * </pre>
+     * 
+     * In OpenGL: Maps to glUseProgram()
+     * In Vulkan: Handled by vkCmdBindPipeline() with pre-compiled shader modules
+     * 
+     * @param ctx Command context for recording this command
+     * @param programId The shader program ID to bind
+     */
+    public static void bindShaderProgram(CommandContext ctx, int programId) {
+        getBackend().bindShaderProgram(ctx, programId);
+    }
+    
+    /**
+     * Sets the depth write mask (whether depth values are written to the depth buffer).
+     * 
+     * This is a Vulkan-compatible method that requires an explicit CommandContext.
+     * For OpenGL, use getImmediateContext() to get the context.
+     * 
+     * Example usage:
+     * <pre>
+     *     CommandContext ctx = VulkanicAPI.getImmediateContext();
+     *     VulkanicAPI.setDepthWriteMask(ctx, true); // Enable depth writes
+     * </pre>
+     * 
+     * In OpenGL: Maps to glDepthMask()
+     * In Vulkan: Part of pipeline state (depthWriteEnable)
+     * 
+     * @param ctx Command context for recording this command
+     * @param enabled true to enable depth writes, false to disable
+     */
+    public static void setDepthWriteMask(CommandContext ctx, boolean enabled) {
+        getBackend().setDepthWriteMask(ctx, enabled);
+    }
+    
+    /**
+     * Sets the color write mask (which color channels can be written to the framebuffer).
+     * 
+     * This is a Vulkan-compatible method that requires an explicit CommandContext.
+     * For OpenGL, use getImmediateContext() to get the context.
+     * 
+     * Example usage:
+     * <pre>
+     *     CommandContext ctx = VulkanicAPI.getImmediateContext();
+     *     VulkanicAPI.setColorWriteMask(ctx, true, true, true, false); // RGB only
+     * </pre>
+     * 
+     * In OpenGL: Maps to glColorMask()
+     * In Vulkan: Part of pipeline state (colorWriteMask)
+     * 
+     * @param ctx Command context for recording this command
+     * @param r true to enable red channel writes
+     * @param g true to enable green channel writes
+     * @param b true to enable blue channel writes
+     * @param a true to enable alpha channel writes
+     */
+    public static void setColorWriteMask(CommandContext ctx, boolean r, boolean g, boolean b, boolean a) {
+        getBackend().setColorWriteMask(ctx, r, g, b, a);
+    }
+    
     @Deprecated
     public static void setPixelStoreMode(int pname, int value) {
         getBackend().setPixelStoreMode(pname, value);
