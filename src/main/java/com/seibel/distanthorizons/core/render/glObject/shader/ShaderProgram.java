@@ -10,7 +10,6 @@ import java.util.function.Supplier;
 import com.seibel.distanthorizons.api.objects.math.DhApiVec3i;
 import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
-import net.vulkanic.backends.opengl.OpenGLCommandContext;
 import org.lwjgl.system.MemoryStack;
 
 import com.seibel.distanthorizons.core.util.math.Mat4f;
@@ -33,7 +32,7 @@ public class ShaderProgram
 	public final int id;
 	
 	/** Command context for OpenGL immediate mode operations */
-	private static final CommandContext CTX = OpenGLCommandContext.IMMEDIATE;
+	private static final CommandContext CTX = VulkanicAPI.getImmediateContext();
 	
 	
 	

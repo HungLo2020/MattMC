@@ -14,7 +14,6 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.texture.TextureAtlas;
 import net.vulkanic.VulkanicAPI;
 import net.vulkanic.CommandContext;
-import net.vulkanic.backends.opengl.OpenGLCommandContext;
 import org.joml.Matrix4fc;
 
 import java.util.EnumMap;
@@ -24,7 +23,7 @@ import java.util.Map;
  * A forward-rendering shader program for chunks.
  */
 public class DefaultShaderInterface implements ChunkShaderInterface {
-    private static final CommandContext CTX = OpenGLCommandContext.IMMEDIATE;
+    private static final CommandContext CTX = VulkanicAPI.getImmediateContext();
     private final Map<ChunkShaderTextureSlot, GlUniformInt> uniformTextures;
 
     private final GlUniformMatrix4f uniformModelViewMatrix;

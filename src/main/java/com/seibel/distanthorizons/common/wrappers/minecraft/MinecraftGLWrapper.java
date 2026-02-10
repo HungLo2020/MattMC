@@ -8,7 +8,6 @@ import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftGLW
 import com.seibel.distanthorizons.core.logging.DhLogger;
 import net.vulkanic.VulkanicAPI;
 import net.vulkanic.CommandContext;
-import net.vulkanic.backends.opengl.OpenGLCommandContext;
 
 
 /**
@@ -34,7 +33,7 @@ public class MinecraftGLWrapper implements IMinecraftGLWrapper
 	public static final MinecraftGLWrapper INSTANCE = new MinecraftGLWrapper();
 	
 	private static final DhLogger LOGGER = new DhLoggerBuilder().build();
-	private static final CommandContext CTX = OpenGLCommandContext.IMMEDIATE;
+	private static final CommandContext CTX = VulkanicAPI.getImmediateContext();
 	
 	
 	

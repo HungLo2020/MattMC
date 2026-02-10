@@ -14,7 +14,6 @@ import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
 import com.seibel.distanthorizons.core.render.glObject.GLProxy;
 import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
-import net.vulkanic.backends.opengl.OpenGLCommandContext;
 import org.lwjgl.PointerBuffer;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.system.MemoryUtil;
@@ -31,7 +30,7 @@ public class Shader
 			.chatLevelConfig(Config.Common.Logging.logRendererGLEventToChat)
 			.build();
 	
-	private static final CommandContext CTX = OpenGLCommandContext.IMMEDIATE;
+	private static final CommandContext CTX = VulkanicAPI.getImmediateContext();
 	
 	/** OpenGL shader ID */
 	public final int id;

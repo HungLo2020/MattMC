@@ -29,7 +29,6 @@ import org.joml.Matrix4f;
 import org.joml.Matrix4fc;
 import net.vulkanic.VulkanicAPI;
 import net.vulkanic.CommandContext;
-import net.vulkanic.backends.opengl.OpenGLCommandContext;
 import org.lwjgl.system.MemoryStack;
 
 import java.nio.FloatBuffer;
@@ -38,7 +37,7 @@ import java.util.List;
 import java.util.Map;
 
 public class IrisLodRenderProgram {
-	private static final CommandContext CTX = OpenGLCommandContext.IMMEDIATE;
+	private static final CommandContext CTX = VulkanicAPI.getImmediateContext();
 	
 	// Uniforms
 	public final int modelOffsetUniform;

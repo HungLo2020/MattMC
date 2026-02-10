@@ -11,7 +11,6 @@ import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
-import net.vulkanic.backends.opengl.OpenGLCommandContext;
 import org.jetbrains.annotations.Nullable;
 import org.lwjgl.PointerBuffer;
 import org.lwjgl.system.MemoryStack;
@@ -19,7 +18,7 @@ import org.lwjgl.system.MemoryUtil;
 
 @Environment(EnvType.CLIENT)
 public class GlStateManager {
-	private static final CommandContext CTX = OpenGLCommandContext.IMMEDIATE;
+	private static final CommandContext CTX = VulkanicAPI.getImmediateContext();
 	private static final Plot PLOT_TEXTURES = TracyClient.createPlot("GPU Textures");
 	private static int numTextures = 0;
 	

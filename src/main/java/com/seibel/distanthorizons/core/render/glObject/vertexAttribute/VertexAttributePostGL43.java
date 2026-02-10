@@ -6,7 +6,6 @@ import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
 import com.seibel.distanthorizons.core.render.glObject.GLProxy;
 import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
-import net.vulkanic.backends.opengl.OpenGLCommandContext;
 
 /**
  * In OpenGL 4.3 and later, Vertex Attribute got a make-over.
@@ -25,7 +24,7 @@ public final class VertexAttributePostGL43 extends AbstractVertexAttribute
 			.build();
 	
 	/** Command context for OpenGL immediate mode operations */
-	private static final CommandContext CTX = OpenGLCommandContext.IMMEDIATE;
+	private static final CommandContext CTX = VulkanicAPI.getImmediateContext();
 	
 	
 	int numberOfBindingPoints = 0;

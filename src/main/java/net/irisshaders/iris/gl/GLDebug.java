@@ -5,7 +5,6 @@ import net.irisshaders.iris.platform.IrisPlatformHelpers;
 import net.vulkanic.CommandContext;
 import net.vulkanic.GraphicsCapabilities;
 import net.vulkanic.VulkanicAPI;
-import net.vulkanic.backends.opengl.OpenGLCommandContext;
 import org.lwjgl.system.APIUtil;
 
 import java.io.PrintStream;
@@ -13,7 +12,7 @@ import java.util.Stack;
 import java.util.function.Consumer;
 
 public final class GLDebug {
-	private static final CommandContext CTX = OpenGLCommandContext.IMMEDIATE;
+	private static final CommandContext CTX = VulkanicAPI.getImmediateContext();
 	private static DebugState debugState;
 
 	/**

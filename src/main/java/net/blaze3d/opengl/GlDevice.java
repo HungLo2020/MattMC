@@ -29,7 +29,7 @@ import net.minecraft.client.renderer.ShaderDefines;
 import net.minecraft.client.renderer.ShaderManager;
 import net.minecraft.resources.ResourceLocation;
 import net.vulkanic.CommandContext;
-import net.vulkanic.backends.opengl.OpenGLCommandContext;
+import net.vulkanic.VulkanicAPI;
 import org.apache.commons.lang3.StringUtils;
 import org.jetbrains.annotations.Nullable;
 import org.lwjgl.glfw.GLFW;
@@ -37,7 +37,7 @@ import org.slf4j.Logger;
 
 @Environment(EnvType.CLIENT)
 public class GlDevice implements GpuDevice {
-	private static final CommandContext CTX = OpenGLCommandContext.IMMEDIATE;
+	private static final CommandContext CTX = VulkanicAPI.getImmediateContext();
 	private static final Logger LOGGER = LogUtils.getLogger();
 	protected static boolean USE_GL_ARB_vertex_attrib_binding = true;
 	protected static boolean USE_GL_KHR_debug = true;

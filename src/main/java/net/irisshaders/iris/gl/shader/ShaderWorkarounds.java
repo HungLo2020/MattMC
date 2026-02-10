@@ -2,7 +2,6 @@ package net.irisshaders.iris.gl.shader;
 
 import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
-import net.vulkanic.backends.opengl.OpenGLCommandContext;
 import org.lwjgl.PointerBuffer;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.system.MemoryUtil;
@@ -14,7 +13,7 @@ import java.nio.ByteBuffer;
  * <a href="https://github.com/grondag/canvas/commit/820bf754092ccaf8d0c169620c2ff575722d7d96">the following Canvas commit.</a>
  */
 public class ShaderWorkarounds {
-	private static final CommandContext CTX = OpenGLCommandContext.IMMEDIATE;
+	private static final CommandContext CTX = VulkanicAPI.getImmediateContext();
 	
 	/**
 	 * Identical in function to glShaderSource(int, CharSequence) but

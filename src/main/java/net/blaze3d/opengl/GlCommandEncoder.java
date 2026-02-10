@@ -29,13 +29,12 @@ import net.minecraft.api.Environment;
 import net.minecraft.util.ARGB;
 import net.vulkanic.VulkanicAPI;
 import net.vulkanic.CommandContext;
-import net.vulkanic.backends.opengl.OpenGLCommandContext;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 
 @Environment(EnvType.CLIENT)
 public class GlCommandEncoder implements CommandEncoder {
-	private static final CommandContext CTX = OpenGLCommandContext.IMMEDIATE;
+	private static final CommandContext CTX = VulkanicAPI.getImmediateContext();
 	private static final Logger LOGGER = LogUtils.getLogger();
 	private final GlDevice device;
 	private final int readFbo;

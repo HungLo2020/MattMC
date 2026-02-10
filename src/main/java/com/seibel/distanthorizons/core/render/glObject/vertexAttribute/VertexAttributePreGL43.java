@@ -11,7 +11,6 @@ import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
 import com.seibel.distanthorizons.core.render.glObject.GLProxy;
 import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
-import net.vulkanic.backends.opengl.OpenGLCommandContext;
 
 
 public final class VertexAttributePreGL43 extends AbstractVertexAttribute
@@ -22,7 +21,7 @@ public final class VertexAttributePreGL43 extends AbstractVertexAttribute
 			.build();
 	
 	/** Command context for OpenGL immediate mode operations */
-	private static final CommandContext CTX = OpenGLCommandContext.IMMEDIATE;
+	private static final CommandContext CTX = VulkanicAPI.getImmediateContext();
 	
 	
 	// I tried to use raw arrays as much as possible since those lookups

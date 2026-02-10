@@ -6,7 +6,6 @@ import com.seibel.distanthorizons.core.render.glObject.vertexAttribute.AbstractV
 import com.seibel.distanthorizons.core.render.glObject.vertexAttribute.VertexPointer;
 import net.vulkanic.VulkanicAPI;
 import net.vulkanic.CommandContext;
-import net.vulkanic.backends.opengl.OpenGLCommandContext;
 import org.lwjgl.system.MemoryUtil;
 
 import java.nio.ByteBuffer;
@@ -19,7 +18,7 @@ import java.nio.ByteOrder;
 public class ScreenQuad
 {
 	public static ScreenQuad INSTANCE = new ScreenQuad();
-	private static final CommandContext CTX = OpenGLCommandContext.IMMEDIATE;
+	private static final CommandContext CTX = VulkanicAPI.getImmediateContext();
 	
 	private static final float[] box_vertices = {
 			-1, -1,

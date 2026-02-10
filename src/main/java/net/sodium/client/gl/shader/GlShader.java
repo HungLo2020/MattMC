@@ -4,7 +4,6 @@ import net.sodium.client.gl.GlObject;
 import net.minecraft.resources.ResourceLocation;
 import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
-import net.vulkanic.backends.opengl.OpenGLCommandContext;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -15,7 +14,7 @@ import java.util.Arrays;
  */
 public class GlShader extends GlObject {
     private static final Logger LOGGER = LogManager.getLogger(GlShader.class);
-    private static final CommandContext CTX = OpenGLCommandContext.IMMEDIATE;
+    private static final CommandContext CTX = VulkanicAPI.getImmediateContext();
 
     private final ResourceLocation name;
 

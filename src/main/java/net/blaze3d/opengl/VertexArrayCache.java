@@ -10,7 +10,6 @@ import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
-import net.vulkanic.backends.opengl.OpenGLCommandContext;
 import org.jetbrains.annotations.Nullable;
 
 @Environment(EnvType.CLIENT)
@@ -28,7 +27,7 @@ public abstract class VertexArrayCache {
 
 	@Environment(EnvType.CLIENT)
 	static class Emulated extends VertexArrayCache {
-		private static final CommandContext CTX = OpenGLCommandContext.IMMEDIATE;
+		private static final CommandContext CTX = VulkanicAPI.getImmediateContext();
 		private final Map<VertexFormat, VertexArrayCache.VertexArray> cache = new HashMap();
 		private final GlDebugLabel debugLabels;
 
@@ -96,7 +95,7 @@ public abstract class VertexArrayCache {
 
 	@Environment(EnvType.CLIENT)
 	static class Separate extends VertexArrayCache {
-		private static final CommandContext CTX = OpenGLCommandContext.IMMEDIATE;
+		private static final CommandContext CTX = VulkanicAPI.getImmediateContext();
 		private final Map<VertexFormat, VertexArrayCache.VertexArray> cache = new HashMap();
 		private final GlDebugLabel debugLabels;
 		private final boolean needsMesaWorkaround;

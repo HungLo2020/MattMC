@@ -42,6 +42,7 @@ public class ArchitecturalBoundaryTest {
     // Patterns to detect forbidden imports
     private static final Pattern OPENGL_IMPORT_PATTERN = Pattern.compile("^\\s*import\\s+org\\.lwjgl\\.opengl\\.[^;]+;", Pattern.MULTILINE);
     private static final Pattern VULKAN_IMPORT_PATTERN = Pattern.compile("^\\s*import\\s+org\\.lwjgl\\.vulkan\\.[^;]+;", Pattern.MULTILINE);
+    private static final Pattern BACKEND_IMPORT_PATTERN = Pattern.compile("^\\s*import\\s+net\\.vulkanic\\.backends\\.[^;]+;", Pattern.MULTILINE);
     
     @Test
     public void testOpenGLImportsOnlyInBackend() throws IOException {
@@ -76,6 +77,73 @@ public class ArchitecturalBoundaryTest {
                 "org.lwjgl.vulkan.*",
                 violations
             ));
+        }
+    }
+    
+    @Test
+    public void testBackendImportsOnlyInVulkanicPackage() throws IOException {
+        List<String> violations = new ArrayList<>();
+        Path vulkanicPackage = Paths.get(PROJECT_ROOT, "src", "main", "java", "net", "vulkanic");
+        
+        // Scan all Java files in src/main/java EXCEPT net/vulkanic package
+        try (Stream<Path> paths = Files.walk(SRC_MAIN_JAVA)) {
+            List<Path> javaFiles = paths
+                .filter(Files::isRegularFile)
+                .filter(path -> path.toString().endsWith(".java"))
+                .filter(path -> !path.startsWith(vulkanicPackage))  // Exclude vulkanic package
+                .collect(Collectors.toList());
+            
+            for (Path file : javaFiles) {
+                String content = Files.readString(file);
+                List<String> illegalImports = new ArrayList<>();
+                
+                Matcher matcher = BACKEND_IMPORT_PATTERN.matcher(content);
+                while (matcher.find()) {
+                    illegalImports.add(matcher.group().trim());
+                }
+                
+                if (!illegalImports.isEmpty()) {
+                    String relativePath = SRC_MAIN_JAVA.relativize(file).toString();
+                    violations.add(String.format(
+                        "File: %s\n  Illegal backend imports:\n    %s",
+                        relativePath,
+                        String.join("\n    ", illegalImports)
+                    ));
+                }
+            }
+        }
+        
+        if (!violations.isEmpty()) {
+            StringBuilder errorMessage = new StringBuilder();
+            errorMessage.append("\n");
+            errorMessage.append("================================================================================\n");
+            errorMessage.append("CRITICAL ARCHITECTURAL VIOLATION: Backend Package Imports in Game Code\n");
+            errorMessage.append("================================================================================\n");
+            errorMessage.append("\n");
+            errorMessage.append("CODE OUTSIDE net.vulkanic PACKAGE MUST NOT IMPORT FROM net.vulkanic.backends.*\n");
+            errorMessage.append("\n");
+            errorMessage.append("RULE: Only code in 'src/main/java/net/vulkanic/' may import from\n");
+            errorMessage.append("      net.vulkanic.backends.* packages.\n");
+            errorMessage.append("\n");
+            errorMessage.append("REASON: Game/mod code must use ONLY the VulkanicAPI abstraction layer.\n");
+            errorMessage.append("        Direct backend imports bypass the abstraction and make the code\n");
+            errorMessage.append("        impossible to port to Vulkan.\n");
+            errorMessage.append("\n");
+            errorMessage.append("HOW TO FIX:\n");
+            errorMessage.append("  1. Remove: import net.vulkanic.backends.opengl.OpenGLCommandContext;\n");
+            errorMessage.append("  2. Add:    import net.vulkanic.VulkanicAPI;\n");
+            errorMessage.append("  3. Change: OpenGLCommandContext.IMMEDIATE\n");
+            errorMessage.append("     To:     VulkanicAPI.getImmediateContext()\n");
+            errorMessage.append("\n");
+            errorMessage.append("VIOLATIONS FOUND:\n");
+            errorMessage.append("--------------------------------------------------------------------------------\n");
+            for (String violation : violations) {
+                errorMessage.append(violation).append("\n\n");
+            }
+            errorMessage.append("================================================================================\n");
+            errorMessage.append("See src/main/java/net/vulkanic/README.md for architectural principles.\n");
+            errorMessage.append("================================================================================\n");
+            fail(errorMessage.toString());
         }
     }
     

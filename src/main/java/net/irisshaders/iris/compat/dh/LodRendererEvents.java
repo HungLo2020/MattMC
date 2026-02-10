@@ -34,10 +34,9 @@ import org.joml.Matrix4f;
 import org.joml.Matrix4fc;
 import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
-import net.vulkanic.backends.opengl.OpenGLCommandContext;
 
 public class LodRendererEvents {
-	private static final CommandContext CTX = OpenGLCommandContext.IMMEDIATE;
+	private static final CommandContext CTX = VulkanicAPI.getImmediateContext();
 	private static boolean eventHandlersBound = false;
 
 	private static boolean atTranslucent = false;

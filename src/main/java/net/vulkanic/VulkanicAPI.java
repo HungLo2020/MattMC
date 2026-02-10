@@ -13,6 +13,19 @@ public class VulkanicAPI {
     private static GraphicsBackend backend;
     private static final CommandContext CTX = OpenGLCommandContext.IMMEDIATE;
     
+    /**
+     * Gets the immediate-mode command context for the current backend.
+     * 
+     * This is the primary way for game code to obtain a CommandContext for use with
+     * VulkanicAPI methods. Game code should NEVER directly import or instantiate
+     * backend-specific command contexts (e.g., OpenGLCommandContext).
+     * 
+     * @return CommandContext for immediate-mode rendering (OpenGL) or default context (Vulkan)
+     */
+    public static CommandContext getImmediateContext() {
+        return CTX;
+    }
+    
     // Functional interfaces for debug callbacks
     @FunctionalInterface
     public interface DebugMessageCallback {
@@ -527,11 +540,8 @@ public class VulkanicAPI {
      * 
      * @return Immediate-mode command context (OpenGL singleton)
      */
-    public static CommandContext getImmediateContext() {
-        // For now, we only have OpenGL backend, so return OpenGL immediate context
-        // When Vulkan backend is added, this would check backend type
-        return OpenGLCommandContext.IMMEDIATE;
-    }
+    // NOTE: This method is now defined at the top of the class (line 25)
+    // Removed duplicate definition
     
     // Context operations
     /**

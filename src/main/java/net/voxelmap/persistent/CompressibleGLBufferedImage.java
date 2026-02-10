@@ -18,10 +18,9 @@ import org.apache.logging.log4j.Level;
 import org.lwjgl.system.MemoryUtil;
 import net.vulkanic.VulkanicAPI;
 import net.vulkanic.CommandContext;
-import net.vulkanic.backends.opengl.OpenGLCommandContext;
 
 public class CompressibleGLBufferedImage {
-    private static final CommandContext CTX = OpenGLCommandContext.IMMEDIATE;
+    private static final CommandContext CTX = VulkanicAPI.getImmediateContext();
     private static final HashMap<Integer, ByteBuffer> byteBuffers = new HashMap<>(4);
     private static final int DEFAULT_SIZE = 256;
     private static final ByteBuffer defaultSizeBuffer = ByteBuffer.allocateDirect(DEFAULT_SIZE * DEFAULT_SIZE * 4).order(ByteOrder.nativeOrder());
