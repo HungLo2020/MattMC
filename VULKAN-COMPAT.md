@@ -7,7 +7,7 @@
 **Analyzed Components:** VulkanicAPI.java, GraphicsBackend.java, OpenGLBackend.java  
 **Lines of Code Analyzed:** ~4,000 LOC  
 **Deprecated Methods:** 874 methods marked for replacement  
-**Migrated Methods:** 40 methods (4.6% complete)
+**Migrated Methods:** 45 methods (5.1% complete)
 
 ---
 
@@ -15,15 +15,15 @@
 
 **MIGRATION STATUS: ACTIVE MIGRATION IN PROGRESS** 🔄
 
-All 874 methods in the current Vulkanic API have been marked as `@Deprecated` to facilitate an **incremental, test-driven migration** to a properly abstracted graphics API that supports both OpenGL and Vulkan backends. We have now begun the active migration phase, with **40 methods successfully migrated** to the new CommandContext-aware API.
+All 874 methods in the current Vulkanic API have been marked as `@Deprecated` to facilitate an **incremental, test-driven migration** to a properly abstracted graphics API that supports both OpenGL and Vulkan backends. We have now begun the active migration phase, with **45 methods successfully migrated** to the new CommandContext-aware API.
 
 ### Current State (Active Migration)
 
 The legacy Vulkanic API is a **thin OpenGL state machine wrapper** with approximately **25-30% compatibility** with Vulkan's architectural principles. While it successfully abstracts OpenGL calls behind an interface, the API design is fundamentally tied to OpenGL's immediate-mode, global-state paradigm, which conflicts with Vulkan's explicit, command-buffer-based architecture.
 
 **Migration Progress:**
-- ✅ **40 methods migrated** to CommandContext-aware API (4.6% of 874 total)
-- ⚠️ **834 methods remaining** in deprecated state
+- ✅ **45 methods migrated** to CommandContext-aware API (5.1% of 874 total)
+- ⚠️ **829 methods remaining** in deprecated state
 - ✅ **All tests passing** (10/10 Vulkanic unit tests)
 - ✅ **Zero breaking changes** - fully backward compatible
 
@@ -68,6 +68,11 @@ The legacy Vulkanic API is a **thin OpenGL state machine wrapper** with approxim
 38. `fillBufferWithData(ctx, tgt, dat, usg)` - Fill buffer with data
 39. `fillBufferWithSize(ctx, tgt, sz, usg)` - Allocate buffer storage
 40. `checkForErrors(ctx)` - Check for graphics API errors
+41. `fillBufferSubregion(ctx, tgt, off, dat)` - Update buffer subregion
+42. `mapBufferRegion(ctx, tgt, off, len, acc)` - Map buffer memory
+43. `unmapBufferData(ctx, tgt)` - Unmap buffer memory
+44. `copyFramebufferRegion(ctx, ...)` - Copy framebuffer region (blit)
+45. `transferTexture2DImage(ctx, ...)` - Upload 2D texture data
 
 ### New Migration Strategy: Incremental Replacement
 
@@ -266,6 +271,11 @@ Track progress using this table (update after each method migration):
 | `fillBufferWithData()` | TBD | `fillBufferWithData(ctx, tgt, dat, usg)` | 🟢 Completed |
 | `fillBufferWithSize()` | TBD | `fillBufferWithSize(ctx, tgt, sz, usg)` | 🟢 Completed |
 | `checkForErrors()` | TBD | `checkForErrors(ctx)` | 🟢 Completed |
+| `fillBufferSubregion()` | TBD | `fillBufferSubregion(ctx, tgt, off, dat)` | 🟢 Completed |
+| `mapBufferRegion()` | TBD | `mapBufferRegion(ctx, tgt, off, len, acc)` | 🟢 Completed |
+| `unmapBufferData()` | TBD | `unmapBufferData(ctx, tgt)` | 🟢 Completed |
+| `copyFramebufferRegion()` | TBD | `copyFramebufferRegion(ctx, ...)` | 🟢 Completed |
+| `transferTexture2DImage()` | TBD | `transferTexture2DImage(ctx, ...)` | 🟢 Completed |
 | ... | ... | ... | ... |
 
 **Legend:**
@@ -3952,6 +3962,307 @@ public int checkForErrors(CommandContext ctx) {
     // In Vulkan, errors are handled through validation layers
     // This method would check for validation layer messages
     return queryValidationLayerErrors();
+}
+```
+
+---
+
+### ✅ Method: `fillBufferSubregion(int tgt, long off, ByteBuffer dat)` → `fillBufferSubregion(CommandContext ctx, int tgt, long off, ByteBuffer dat)`
+
+**Migration Date:** 2026-02-10
+
+**Status:** Completed - New method implemented, deprecated method retained for backward compatibility
+
+**What Changed:**
+- Added `CommandContext ctx` parameter for Vulkan compatibility
+- OpenGL implementation validates immediate-mode context and calls `GL15.glBufferSubData()`
+
+**New API Design:**
+```java
+public static void fillBufferSubregion(CommandContext ctx, int tgt, long off, ByteBuffer dat) {
+    getBackend().fillBufferSubregion(ctx, tgt, off, dat);
+}
+```
+
+**OpenGL Implementation:**
+```java
+@Override
+public void fillBufferSubregion(CommandContext ctx, int tgt, long off, ByteBuffer dat) {
+    if (!ctx.isImmediate()) {
+        throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+    }
+    GL15.glBufferSubData(tgt, off, dat);
+}
+```
+
+**Usage Example:**
+```java
+// Before (deprecated, still works)
+ByteBuffer updateData = ...;
+VulkanicAPI.fillBufferSubregion(GL_ARRAY_BUFFER, 256, updateData);
+
+// After (new Vulkan-compatible API)
+CommandContext ctx = VulkanicAPI.getImmediateContext();
+ByteBuffer updateData = ...;
+VulkanicAPI.fillBufferSubregion(ctx, GL_ARRAY_BUFFER, 256, updateData);
+```
+
+**Vulkan Implementation (Future):**
+```java
+// Will use vkCmdUpdateBuffer or staging buffer copy
+@Override
+public void fillBufferSubregion(CommandContext ctx, int tgt, long off, ByteBuffer dat) {
+    VkBuffer buffer = getBufferForTarget(tgt);
+    if (dat.remaining() <= 65536) {
+        vkCmdUpdateBuffer((VkCommandBuffer)ctx.getHandle(), buffer, off, dat);
+    } else {
+        uploadViaStagingBuffer(ctx, buffer, off, dat);
+    }
+}
+```
+
+---
+
+### ✅ Method: `mapBufferRegion(int tgt, int off, int len, int acc)` → `mapBufferRegion(CommandContext ctx, int tgt, int off, int len, int acc)`
+
+**Migration Date:** 2026-02-10
+
+**Status:** Completed - New method implemented, deprecated method retained for backward compatibility
+
+**What Changed:**
+- Added `CommandContext ctx` parameter for Vulkan compatibility
+- OpenGL implementation validates immediate-mode context and calls `GL30.glMapBufferRange()`
+
+**New API Design:**
+```java
+public static ByteBuffer mapBufferRegion(CommandContext ctx, int tgt, int off, int len, int acc) {
+    return getBackend().mapBufferRegion(ctx, tgt, off, len, acc);
+}
+```
+
+**OpenGL Implementation:**
+```java
+@Override
+public ByteBuffer mapBufferRegion(CommandContext ctx, int tgt, int off, int len, int acc) {
+    if (!ctx.isImmediate()) {
+        throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+    }
+    return GL30.glMapBufferRange(tgt, off, len, acc);
+}
+```
+
+**Usage Example:**
+```java
+// Before (deprecated, still works)
+ByteBuffer mapped = VulkanicAPI.mapBufferRegion(GL_ARRAY_BUFFER, 0, 1024, GL_MAP_WRITE_BIT);
+// Write to buffer
+VulkanicAPI.unmapBufferData(GL_ARRAY_BUFFER);
+
+// After (new Vulkan-compatible API)
+CommandContext ctx = VulkanicAPI.getImmediateContext();
+ByteBuffer mapped = VulkanicAPI.mapBufferRegion(ctx, GL_ARRAY_BUFFER, 0, 1024, GL_MAP_WRITE_BIT);
+// Write to buffer
+VulkanicAPI.unmapBufferData(ctx, GL_ARRAY_BUFFER);
+```
+
+**Vulkan Implementation (Future):**
+```java
+// Will use vkMapMemory
+@Override
+public ByteBuffer mapBufferRegion(CommandContext ctx, int tgt, int off, int len, int acc) {
+    VkBuffer buffer = getBufferForTarget(tgt);
+    VkDeviceMemory memory = getBufferMemory(buffer);
+    PointerBuffer pData = stack.mallocPointer(1);
+    vkMapMemory(device, memory, off, len, 0, pData);
+    return pData.getByteBuffer(0, len);
+}
+```
+
+---
+
+### ✅ Method: `unmapBufferData(int tgt)` → `unmapBufferData(CommandContext ctx, int tgt)`
+
+**Migration Date:** 2026-02-10
+
+**Status:** Completed - New method implemented, deprecated method retained for backward compatibility
+
+**What Changed:**
+- Added `CommandContext ctx` parameter for Vulkan compatibility
+- OpenGL implementation validates immediate-mode context and calls `GL15.glUnmapBuffer()`
+
+**New API Design:**
+```java
+public static void unmapBufferData(CommandContext ctx, int tgt) {
+    getBackend().unmapBufferData(ctx, tgt);
+}
+```
+
+**OpenGL Implementation:**
+```java
+@Override
+public void unmapBufferData(CommandContext ctx, int tgt) {
+    if (!ctx.isImmediate()) {
+        throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+    }
+    GL15.glUnmapBuffer(tgt);
+}
+```
+
+**Usage Example:**
+```java
+// Before (deprecated, still works)
+ByteBuffer mapped = VulkanicAPI.mapBufferRegion(GL_ARRAY_BUFFER, 0, 1024, GL_MAP_WRITE_BIT);
+// Write to buffer
+VulkanicAPI.unmapBufferData(GL_ARRAY_BUFFER);
+
+// After (new Vulkan-compatible API)
+CommandContext ctx = VulkanicAPI.getImmediateContext();
+ByteBuffer mapped = VulkanicAPI.mapBufferRegion(ctx, GL_ARRAY_BUFFER, 0, 1024, GL_MAP_WRITE_BIT);
+// Write to buffer
+VulkanicAPI.unmapBufferData(ctx, GL_ARRAY_BUFFER);
+```
+
+**Vulkan Implementation (Future):**
+```java
+// Will use vkUnmapMemory
+@Override
+public void unmapBufferData(CommandContext ctx, int tgt) {
+    VkBuffer buffer = getBufferForTarget(tgt);
+    VkDeviceMemory memory = getBufferMemory(buffer);
+    vkUnmapMemory(device, memory);
+}
+```
+
+---
+
+### ✅ Method: `copyFramebufferRegion(...)` → `copyFramebufferRegion(CommandContext ctx, ...)`
+
+**Migration Date:** 2026-02-10
+
+**Status:** Completed - New method implemented, deprecated method retained for backward compatibility
+
+**What Changed:**
+- Added `CommandContext ctx` parameter for Vulkan compatibility
+- OpenGL implementation validates immediate-mode context and calls `GL30.glBlitFramebuffer()`
+
+**New API Design:**
+```java
+public static void copyFramebufferRegion(CommandContext ctx, int srcX0, int srcY0, int srcX1, int srcY1, 
+                                         int dstX0, int dstY0, int dstX1, int dstY1, int msk, int flt) {
+    getBackend().copyFramebufferRegion(ctx, srcX0, srcY0, srcX1, srcY1, dstX0, dstY0, dstX1, dstY1, msk, flt);
+}
+```
+
+**OpenGL Implementation:**
+```java
+@Override
+public void copyFramebufferRegion(CommandContext ctx, int srcX0, int srcY0, int srcX1, int srcY1, 
+                                  int dstX0, int dstY0, int dstX1, int dstY1, int msk, int flt) {
+    if (!ctx.isImmediate()) {
+        throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+    }
+    GL30.glBlitFramebuffer(srcX0, srcY0, srcX1, srcY1, dstX0, dstY0, dstX1, dstY1, msk, flt);
+}
+```
+
+**Usage Example:**
+```java
+// Before (deprecated, still works)
+VulkanicAPI.copyFramebufferRegion(0, 0, 1920, 1080, 0, 0, 1280, 720, GL_COLOR_BUFFER_BIT, GL_LINEAR);
+
+// After (new Vulkan-compatible API)
+CommandContext ctx = VulkanicAPI.getImmediateContext();
+VulkanicAPI.copyFramebufferRegion(ctx, 0, 0, 1920, 1080, 0, 0, 1280, 720, GL_COLOR_BUFFER_BIT, GL_LINEAR);
+```
+
+**Vulkan Implementation (Future):**
+```java
+// Will use vkCmdBlitImage
+@Override
+public void copyFramebufferRegion(CommandContext ctx, int srcX0, int srcY0, int srcX1, int srcY1, 
+                                  int dstX0, int dstY0, int dstX1, int dstY1, int msk, int flt) {
+    VkCommandBuffer cmdBuf = (VkCommandBuffer)ctx.getHandle();
+    VkImageBlit.Buffer blitRegion = VkImageBlit.calloc(1)
+        .srcSubresource(it -> it.aspectMask(VK_IMAGE_ASPECT_COLOR_BIT).layerCount(1))
+        .srcOffsets(0, it -> it.set(srcX0, srcY0, 0))
+        .srcOffsets(1, it -> it.set(srcX1, srcY1, 1))
+        .dstSubresource(it -> it.aspectMask(VK_IMAGE_ASPECT_COLOR_BIT).layerCount(1))
+        .dstOffsets(0, it -> it.set(dstX0, dstY0, 0))
+        .dstOffsets(1, it -> it.set(dstX1, dstY1, 1));
+    
+    vkCmdBlitImage(cmdBuf, srcImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, 
+                   dstImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, blitRegion, translateFilter(flt));
+}
+```
+
+---
+
+### ✅ Method: `transferTexture2DImage(...)` → `transferTexture2DImage(CommandContext ctx, ...)`
+
+**Migration Date:** 2026-02-10
+
+**Status:** Completed - New method implemented, deprecated method retained for backward compatibility
+
+**What Changed:**
+- Added `CommandContext ctx` parameter for Vulkan compatibility
+- OpenGL implementation validates immediate-mode context and calls `GL11.glTexImage2D()`
+
+**New API Design:**
+```java
+public static void transferTexture2DImage(CommandContext ctx, int tgt, int lvl, int intfmt, int w, int h, 
+                                          int bdr, int fmt, int typ, ByteBuffer pix) {
+    getBackend().transferTexture2DImage(ctx, tgt, lvl, intfmt, w, h, bdr, fmt, typ, pix);
+}
+```
+
+**OpenGL Implementation:**
+```java
+@Override
+public void transferTexture2DImage(CommandContext ctx, int tgt, int lvl, int intfmt, int w, int h, 
+                                   int bdr, int fmt, int typ, ByteBuffer pix) {
+    if (!ctx.isImmediate()) {
+        throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+    }
+    GL11.glTexImage2D(tgt, lvl, intfmt, w, h, bdr, fmt, typ, pix);
+}
+```
+
+**Usage Example:**
+```java
+// Before (deprecated, still works)
+ByteBuffer pixels = ...;
+VulkanicAPI.transferTexture2DImage(GL_TEXTURE_2D, 0, GL_RGBA8, 256, 256, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
+
+// After (new Vulkan-compatible API)
+CommandContext ctx = VulkanicAPI.getImmediateContext();
+ByteBuffer pixels = ...;
+VulkanicAPI.transferTexture2DImage(ctx, GL_TEXTURE_2D, 0, GL_RGBA8, 256, 256, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
+```
+
+**Vulkan Implementation (Future):**
+```java
+// Will use vkCmdCopyBufferToImage with staging buffer
+@Override
+public void transferTexture2DImage(CommandContext ctx, int tgt, int lvl, int intfmt, int w, int h, 
+                                   int bdr, int fmt, int typ, ByteBuffer pix) {
+    VkCommandBuffer cmdBuf = (VkCommandBuffer)ctx.getHandle();
+    
+    // Create staging buffer and upload pixel data
+    VkBuffer stagingBuffer = createStagingBuffer(pix);
+    
+    // Copy from staging buffer to image
+    VkBufferImageCopy.Buffer region = VkBufferImageCopy.calloc(1)
+        .bufferOffset(0)
+        .imageSubresource(it -> it
+            .aspectMask(VK_IMAGE_ASPECT_COLOR_BIT)
+            .mipLevel(lvl)
+            .layerCount(1))
+        .imageExtent(it -> it.set(w, h, 1));
+    
+    vkCmdCopyBufferToImage(cmdBuf, stagingBuffer, destImage, 
+                          VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, region);
+    
+    queueStagingBufferDestruction(stagingBuffer);
 }
 ```
 

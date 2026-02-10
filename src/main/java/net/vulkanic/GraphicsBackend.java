@@ -637,6 +637,106 @@ public interface GraphicsBackend {
      */
     int checkForErrors(CommandContext ctx);
     
+    /**
+     * Updates a subset of buffer data.
+     * 
+     * In OpenGL: Maps to glBufferSubData()
+     * In Vulkan: Maps to vkCmdUpdateBuffer() or staging buffer copy
+     * 
+     * Updates a region of an already allocated buffer with new data. The buffer
+     * must be bound to a target before calling this method. This is more efficient
+     * than reallocating the entire buffer when only a portion needs updating.
+     * 
+     * @param ctx Command context for recording this command
+     * @param tgt The buffer binding target (e.g., GL_ARRAY_BUFFER)
+     * @param off Offset in bytes from the start of the buffer
+     * @param dat The data to upload
+     */
+    void fillBufferSubregion(CommandContext ctx, int tgt, long off, java.nio.ByteBuffer dat);
+    
+    /**
+     * Maps a region of buffer memory for CPU access.
+     * 
+     * In OpenGL: Maps to glMapBufferRange()
+     * In Vulkan: Maps to vkMapMemory()
+     * 
+     * Returns a ByteBuffer that provides direct CPU access to GPU buffer memory.
+     * The buffer must be unmapped before it can be used in rendering operations.
+     * This is useful for streaming data or reading back GPU-computed results.
+     * 
+     * @param ctx Command context for recording this command
+     * @param tgt The buffer binding target (e.g., GL_ARRAY_BUFFER)
+     * @param off Offset in bytes from the start of the buffer
+     * @param len Length in bytes of the region to map
+     * @param acc Access flags (e.g., GL_MAP_READ_BIT, GL_MAP_WRITE_BIT)
+     * @return A ByteBuffer providing access to the mapped memory region
+     */
+    java.nio.ByteBuffer mapBufferRegion(CommandContext ctx, int tgt, int off, int len, int acc);
+    
+    /**
+     * Unmaps previously mapped buffer memory.
+     * 
+     * In OpenGL: Maps to glUnmapBuffer()
+     * In Vulkan: Maps to vkUnmapMemory()
+     * 
+     * Releases the CPU mapping of buffer memory, allowing the buffer to be used
+     * in rendering operations again. Must be called after mapBufferRegion() when
+     * done accessing the mapped memory.
+     * 
+     * @param ctx Command context for recording this command
+     * @param tgt The buffer binding target (e.g., GL_ARRAY_BUFFER)
+     */
+    void unmapBufferData(CommandContext ctx, int tgt);
+    
+    /**
+     * Copies a rectangular region from one framebuffer to another (blit operation).
+     * 
+     * In OpenGL: Maps to glBlitFramebuffer()
+     * In Vulkan: Maps to vkCmdBlitImage()
+     * 
+     * Performs a copy (and potentially scaling/filtering) operation from the read
+     * framebuffer to the draw framebuffer. This is commonly used for post-processing
+     * effects, MSAA resolves, and copying render results.
+     * 
+     * @param ctx Command context for recording this command
+     * @param srcX0 Source rectangle minimum X coordinate
+     * @param srcY0 Source rectangle minimum Y coordinate
+     * @param srcX1 Source rectangle maximum X coordinate
+     * @param srcY1 Source rectangle maximum Y coordinate
+     * @param dstX0 Destination rectangle minimum X coordinate
+     * @param dstY0 Destination rectangle minimum Y coordinate
+     * @param dstX1 Destination rectangle maximum X coordinate
+     * @param dstY1 Destination rectangle maximum Y coordinate
+     * @param msk Bit mask indicating which buffers to copy (GL_COLOR_BUFFER_BIT, etc.)
+     * @param flt Filter mode for scaling (GL_NEAREST or GL_LINEAR)
+     */
+    void copyFramebufferRegion(CommandContext ctx, int srcX0, int srcY0, int srcX1, int srcY1, 
+                               int dstX0, int dstY0, int dstX1, int dstY1, int msk, int flt);
+    
+    /**
+     * Uploads 2D texture image data.
+     * 
+     * In OpenGL: Maps to glTexImage2D()
+     * In Vulkan: Maps to vkCmdCopyBufferToImage() with staging buffer
+     * 
+     * Specifies a two-dimensional texture image. This allocates GPU memory for
+     * the texture and uploads the initial pixel data. If the texture has already
+     * been allocated, this reallocates it with the new dimensions/format.
+     * 
+     * @param ctx Command context for recording this command
+     * @param tgt Texture target (e.g., GL_TEXTURE_2D)
+     * @param lvl Mipmap level (0 for base level)
+     * @param intfmt Internal format (e.g., GL_RGBA8)
+     * @param w Width in pixels
+     * @param h Height in pixels
+     * @param bdr Border width (must be 0 in modern OpenGL)
+     * @param fmt Pixel data format (e.g., GL_RGBA)
+     * @param typ Pixel data type (e.g., GL_UNSIGNED_BYTE)
+     * @param pix Buffer containing pixel data, or null to allocate without initializing
+     */
+    void transferTexture2DImage(CommandContext ctx, int tgt, int lvl, int intfmt, int w, int h, 
+                                int bdr, int fmt, int typ, java.nio.ByteBuffer pix);
+    
     // Pixel operations
     @Deprecated
     void setPixelStoreMode(int pname, int value);

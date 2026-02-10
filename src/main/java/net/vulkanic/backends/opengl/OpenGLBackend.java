@@ -938,6 +938,131 @@ public class OpenGLBackend implements GraphicsBackend {
         return GL11.glGetError();
     }
     
+    /**
+     * Updates buffer subregion with explicit command context.
+     * This is the Vulkan-compatible implementation for partial buffer updates.
+     * 
+     * OpenGL implementation: Direct mapping to glBufferSubData()
+     * Vulkan implementation: Will use vkCmdUpdateBuffer() or staging buffer
+     * 
+     * @param ctx Command context (must be immediate mode for OpenGL)
+     * @param tgt The buffer binding target
+     * @param off Offset in bytes
+     * @param dat The data to upload
+     */
+    @Override
+    public void fillBufferSubregion(CommandContext ctx, int tgt, long off, java.nio.ByteBuffer dat) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        GL15.glBufferSubData(tgt, off, dat);
+    }
+    
+    /**
+     * Maps buffer region with explicit command context.
+     * This is the Vulkan-compatible implementation for buffer memory mapping.
+     * 
+     * OpenGL implementation: Direct mapping to glMapBufferRange()
+     * Vulkan implementation: Will use vkMapMemory()
+     * 
+     * @param ctx Command context (must be immediate mode for OpenGL)
+     * @param tgt The buffer binding target
+     * @param off Offset in bytes
+     * @param len Length in bytes
+     * @param acc Access flags
+     * @return ByteBuffer providing access to mapped memory
+     */
+    @Override
+    public java.nio.ByteBuffer mapBufferRegion(CommandContext ctx, int tgt, int off, int len, int acc) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        return GL30.glMapBufferRange(tgt, off, len, acc);
+    }
+    
+    /**
+     * Unmaps buffer with explicit command context.
+     * This is the Vulkan-compatible implementation for buffer unmapping.
+     * 
+     * OpenGL implementation: Direct mapping to glUnmapBuffer()
+     * Vulkan implementation: Will use vkUnmapMemory()
+     * 
+     * @param ctx Command context (must be immediate mode for OpenGL)
+     * @param tgt The buffer binding target
+     */
+    @Override
+    public void unmapBufferData(CommandContext ctx, int tgt) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        GL15.glUnmapBuffer(tgt);
+    }
+    
+    /**
+     * Copies framebuffer region (blit) with explicit command context.
+     * This is the Vulkan-compatible implementation for framebuffer blitting.
+     * 
+     * OpenGL implementation: Direct mapping to glBlitFramebuffer()
+     * Vulkan implementation: Will use vkCmdBlitImage()
+     * 
+     * @param ctx Command context (must be immediate mode for OpenGL)
+     * @param srcX0 Source minimum X
+     * @param srcY0 Source minimum Y
+     * @param srcX1 Source maximum X
+     * @param srcY1 Source maximum Y
+     * @param dstX0 Destination minimum X
+     * @param dstY0 Destination minimum Y
+     * @param dstX1 Destination maximum X
+     * @param dstY1 Destination maximum Y
+     * @param msk Buffer mask
+     * @param flt Filter mode
+     */
+    @Override
+    public void copyFramebufferRegion(CommandContext ctx, int srcX0, int srcY0, int srcX1, int srcY1, 
+                                      int dstX0, int dstY0, int dstX1, int dstY1, int msk, int flt) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        GL30.glBlitFramebuffer(srcX0, srcY0, srcX1, srcY1, dstX0, dstY0, dstX1, dstY1, msk, flt);
+    }
+    
+    /**
+     * Transfers 2D texture image data with explicit command context.
+     * This is the Vulkan-compatible implementation for texture uploads.
+     * 
+     * OpenGL implementation: Direct mapping to glTexImage2D()
+     * Vulkan implementation: Will use vkCmdCopyBufferToImage() with staging buffer
+     * 
+     * @param ctx Command context (must be immediate mode for OpenGL)
+     * @param tgt Texture target
+     * @param lvl Mipmap level
+     * @param intfmt Internal format
+     * @param w Width
+     * @param h Height
+     * @param bdr Border (must be 0)
+     * @param fmt Pixel format
+     * @param typ Pixel type
+     * @param pix Pixel data buffer
+     */
+    @Override
+    public void transferTexture2DImage(CommandContext ctx, int tgt, int lvl, int intfmt, int w, int h, 
+                                       int bdr, int fmt, int typ, java.nio.ByteBuffer pix) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        GL11.glTexImage2D(tgt, lvl, intfmt, w, h, bdr, fmt, typ, pix);
+    }
+    
     @Deprecated
     @Override
     public void setPixelStoreMode(int pname, int value) {

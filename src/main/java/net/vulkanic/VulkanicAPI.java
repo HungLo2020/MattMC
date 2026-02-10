@@ -1510,6 +1510,150 @@ public class VulkanicAPI {
         return getBackend().checkForErrors(ctx);
     }
     
+    /**
+     * Updates a subset of buffer data.
+     * 
+     * This is a Vulkan-compatible method that requires an explicit CommandContext.
+     * For OpenGL, use getImmediateContext() to get the context.
+     * 
+     * Example usage:
+     * <pre>
+     *     CommandContext ctx = VulkanicAPI.getImmediateContext();
+     *     ByteBuffer updateData = ...;
+     *     VulkanicAPI.fillBufferSubregion(ctx, GL_ARRAY_BUFFER, 256, updateData);
+     * </pre>
+     * 
+     * In OpenGL: Maps to glBufferSubData()
+     * In Vulkan: Maps to vkCmdUpdateBuffer() or staging buffer copy
+     * 
+     * @param ctx Command context for recording this command
+     * @param tgt The buffer binding target (e.g., GL_ARRAY_BUFFER)
+     * @param off Offset in bytes from the start of the buffer
+     * @param dat The data to upload
+     */
+    public static void fillBufferSubregion(CommandContext ctx, int tgt, long off, java.nio.ByteBuffer dat) {
+        getBackend().fillBufferSubregion(ctx, tgt, off, dat);
+    }
+    
+    /**
+     * Maps a region of buffer memory for CPU access.
+     * 
+     * This is a Vulkan-compatible method that requires an explicit CommandContext.
+     * For OpenGL, use getImmediateContext() to get the context.
+     * 
+     * Example usage:
+     * <pre>
+     *     CommandContext ctx = VulkanicAPI.getImmediateContext();
+     *     ByteBuffer mapped = VulkanicAPI.mapBufferRegion(ctx, GL_ARRAY_BUFFER, 0, 1024, GL_MAP_WRITE_BIT);
+     *     // Write to mapped buffer
+     *     VulkanicAPI.unmapBufferData(ctx, GL_ARRAY_BUFFER);
+     * </pre>
+     * 
+     * In OpenGL: Maps to glMapBufferRange()
+     * In Vulkan: Maps to vkMapMemory()
+     * 
+     * @param ctx Command context for recording this command
+     * @param tgt The buffer binding target (e.g., GL_ARRAY_BUFFER)
+     * @param off Offset in bytes from the start of the buffer
+     * @param len Length in bytes of the region to map
+     * @param acc Access flags (e.g., GL_MAP_READ_BIT, GL_MAP_WRITE_BIT)
+     * @return A ByteBuffer providing access to the mapped memory region
+     */
+    public static java.nio.ByteBuffer mapBufferRegion(CommandContext ctx, int tgt, int off, int len, int acc) {
+        return getBackend().mapBufferRegion(ctx, tgt, off, len, acc);
+    }
+    
+    /**
+     * Unmaps previously mapped buffer memory.
+     * 
+     * This is a Vulkan-compatible method that requires an explicit CommandContext.
+     * For OpenGL, use getImmediateContext() to get the context.
+     * 
+     * Example usage:
+     * <pre>
+     *     CommandContext ctx = VulkanicAPI.getImmediateContext();
+     *     ByteBuffer mapped = VulkanicAPI.mapBufferRegion(ctx, GL_ARRAY_BUFFER, 0, 1024, GL_MAP_WRITE_BIT);
+     *     // Write to mapped buffer
+     *     VulkanicAPI.unmapBufferData(ctx, GL_ARRAY_BUFFER);
+     * </pre>
+     * 
+     * In OpenGL: Maps to glUnmapBuffer()
+     * In Vulkan: Maps to vkUnmapMemory()
+     * 
+     * @param ctx Command context for recording this command
+     * @param tgt The buffer binding target (e.g., GL_ARRAY_BUFFER)
+     */
+    public static void unmapBufferData(CommandContext ctx, int tgt) {
+        getBackend().unmapBufferData(ctx, tgt);
+    }
+    
+    /**
+     * Copies a rectangular region from one framebuffer to another (blit operation).
+     * 
+     * This is a Vulkan-compatible method that requires an explicit CommandContext.
+     * For OpenGL, use getImmediateContext() to get the context.
+     * 
+     * Example usage:
+     * <pre>
+     *     CommandContext ctx = VulkanicAPI.getImmediateContext();
+     *     // Copy entire framebuffer content with scaling
+     *     VulkanicAPI.copyFramebufferRegion(ctx, 0, 0, 1920, 1080, 0, 0, 1280, 720, 
+     *                                       GL_COLOR_BUFFER_BIT, GL_LINEAR);
+     * </pre>
+     * 
+     * In OpenGL: Maps to glBlitFramebuffer()
+     * In Vulkan: Maps to vkCmdBlitImage()
+     * 
+     * @param ctx Command context for recording this command
+     * @param srcX0 Source rectangle minimum X coordinate
+     * @param srcY0 Source rectangle minimum Y coordinate
+     * @param srcX1 Source rectangle maximum X coordinate
+     * @param srcY1 Source rectangle maximum Y coordinate
+     * @param dstX0 Destination rectangle minimum X coordinate
+     * @param dstY0 Destination rectangle minimum Y coordinate
+     * @param dstX1 Destination rectangle maximum X coordinate
+     * @param dstY1 Destination rectangle maximum Y coordinate
+     * @param msk Bit mask indicating which buffers to copy (GL_COLOR_BUFFER_BIT, etc.)
+     * @param flt Filter mode for scaling (GL_NEAREST or GL_LINEAR)
+     */
+    public static void copyFramebufferRegion(CommandContext ctx, int srcX0, int srcY0, int srcX1, int srcY1, 
+                                             int dstX0, int dstY0, int dstX1, int dstY1, int msk, int flt) {
+        getBackend().copyFramebufferRegion(ctx, srcX0, srcY0, srcX1, srcY1, dstX0, dstY0, dstX1, dstY1, msk, flt);
+    }
+    
+    /**
+     * Uploads 2D texture image data.
+     * 
+     * This is a Vulkan-compatible method that requires an explicit CommandContext.
+     * For OpenGL, use getImmediateContext() to get the context.
+     * 
+     * Example usage:
+     * <pre>
+     *     CommandContext ctx = VulkanicAPI.getImmediateContext();
+     *     ByteBuffer pixels = ...;
+     *     VulkanicAPI.transferTexture2DImage(ctx, GL_TEXTURE_2D, 0, GL_RGBA8, 
+     *                                        256, 256, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
+     * </pre>
+     * 
+     * In OpenGL: Maps to glTexImage2D()
+     * In Vulkan: Maps to vkCmdCopyBufferToImage() with staging buffer
+     * 
+     * @param ctx Command context for recording this command
+     * @param tgt Texture target (e.g., GL_TEXTURE_2D)
+     * @param lvl Mipmap level (0 for base level)
+     * @param intfmt Internal format (e.g., GL_RGBA8)
+     * @param w Width in pixels
+     * @param h Height in pixels
+     * @param bdr Border width (must be 0 in modern OpenGL)
+     * @param fmt Pixel data format (e.g., GL_RGBA)
+     * @param typ Pixel data type (e.g., GL_UNSIGNED_BYTE)
+     * @param pix Buffer containing pixel data, or null to allocate without initializing
+     */
+    public static void transferTexture2DImage(CommandContext ctx, int tgt, int lvl, int intfmt, int w, int h, 
+                                              int bdr, int fmt, int typ, java.nio.ByteBuffer pix) {
+        getBackend().transferTexture2DImage(ctx, tgt, lvl, intfmt, w, h, bdr, fmt, typ, pix);
+    }
+    
     @Deprecated
     public static void setPixelStoreMode(int pname, int value) {
         getBackend().setPixelStoreMode(pname, value);
