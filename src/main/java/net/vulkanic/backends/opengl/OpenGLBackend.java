@@ -1258,6 +1258,56 @@ public class OpenGLBackend implements GraphicsBackend {
         GL20.glUniform1f(location, value);
     }
     
+    @Override
+    public void assignUniformFloat3(CommandContext ctx, int location, float x, float y, float z) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        GL20.glUniform3f(location, x, y, z);
+    }
+    
+    @Override
+    public void assignUniformInteger3(CommandContext ctx, int location, int x, int y, int z) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        GL20.glUniform3i(location, x, y, z);
+    }
+    
+    @Override
+    public void assignUniformFloat4(CommandContext ctx, int location, float x, float y, float z, float w) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        GL20.glUniform4f(location, x, y, z, w);
+    }
+    
+    @Override
+    public void assignUniformMatrix4(CommandContext ctx, int location, boolean transpose, java.nio.FloatBuffer value) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        GL20.glUniformMatrix4fv(location, transpose, value);
+    }
+    
+    @Override
+    public void activateVertexAttributeArray(CommandContext ctx, int index) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        GL20.glEnableVertexAttribArray(index);
+    }
+    
     // ================================================================================
     // DEPRECATED METHODS - OpenGL immediate-mode implementations
     // ================================================================================

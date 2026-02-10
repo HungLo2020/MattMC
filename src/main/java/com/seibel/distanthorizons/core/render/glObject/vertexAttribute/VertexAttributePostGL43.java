@@ -4,7 +4,9 @@ import com.seibel.distanthorizons.core.config.Config;
 import com.seibel.distanthorizons.core.logging.DhLogger;
 import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
 import com.seibel.distanthorizons.core.render.glObject.GLProxy;
+import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.backends.opengl.OpenGLCommandContext;
 
 /**
  * In OpenGL 4.3 and later, Vertex Attribute got a make-over.
@@ -21,6 +23,9 @@ public final class VertexAttributePostGL43 extends AbstractVertexAttribute
 			.fileLevelConfig(Config.Common.Logging.logRendererGLEventToFile)
 			.chatLevelConfig(Config.Common.Logging.logRendererGLEventToChat)
 			.build();
+	
+	/** Command context for OpenGL immediate mode operations */
+	private static final CommandContext CTX = OpenGLCommandContext.IMMEDIATE;
 	
 	
 	int numberOfBindingPoints = 0;
@@ -110,7 +115,7 @@ public final class VertexAttributePostGL43 extends AbstractVertexAttribute
 			this.numberOfBindingPoints = bindingPoint + 1;
 		}
 		VulkanicAPI.glVertexAttribBinding(attributeIndex, bindingPoint);
-		VulkanicAPI.glEnableVertexAttribArray(attributeIndex);
+		VulkanicAPI.activateVertexAttributeArray(CTX, attributeIndex);
 	}
 	
 	

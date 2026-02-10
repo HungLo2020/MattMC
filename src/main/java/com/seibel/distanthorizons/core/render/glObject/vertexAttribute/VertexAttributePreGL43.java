@@ -9,7 +9,9 @@ import com.seibel.distanthorizons.core.config.Config;
 import com.seibel.distanthorizons.core.logging.DhLogger;
 import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
 import com.seibel.distanthorizons.core.render.glObject.GLProxy;
+import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.backends.opengl.OpenGLCommandContext;
 
 
 public final class VertexAttributePreGL43 extends AbstractVertexAttribute
@@ -18,6 +20,9 @@ public final class VertexAttributePreGL43 extends AbstractVertexAttribute
 			.fileLevelConfig(Config.Common.Logging.logRendererGLEventToFile)
 			.chatLevelConfig(Config.Common.Logging.logRendererGLEventToChat)
 			.build();
+	
+	/** Command context for OpenGL immediate mode operations */
+	private static final CommandContext CTX = OpenGLCommandContext.IMMEDIATE;
 	
 	
 	// I tried to use raw arrays as much as possible since those lookups
@@ -56,7 +61,7 @@ public final class VertexAttributePreGL43 extends AbstractVertexAttribute
 	{
 		for (int i = 0; i < this.pointers.length; i++)
 		{
-			VulkanicAPI.glEnableVertexAttribArray(i);
+			VulkanicAPI.activateVertexAttributeArray(CTX, i);
 		}
 		
 		for (int i = 0; i < this.pointers.length; i++)
@@ -88,7 +93,7 @@ public final class VertexAttributePreGL43 extends AbstractVertexAttribute
 		
 		for (int bindingPointIndex : bindingPointIndexes)
 		{
-			VulkanicAPI.glEnableVertexAttribArray(bindingPointIndex);
+			VulkanicAPI.activateVertexAttributeArray(CTX, bindingPointIndex);
 		}
 		
 		for (int bindingPointIndex : bindingPointIndexes)

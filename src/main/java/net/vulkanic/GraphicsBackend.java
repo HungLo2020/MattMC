@@ -945,6 +945,89 @@ public interface GraphicsBackend {
      */
     void assignUniformFloat(CommandContext ctx, int location, float value);
     
+    /**
+     * Sets the value of a 3-component float vector uniform variable.
+     * 
+     * In OpenGL: Maps to glUniform3f()
+     * In Vulkan: Maps to vkCmdPushConstants() for push constants or descriptor set updates
+     * 
+     * Updates the value of a vec3 uniform variable at the specified location. The program
+     * containing this uniform must be bound/active when calling this method.
+     * 
+     * @param ctx Command context for recording this command
+     * @param location The uniform location (from locateUniformVariable)
+     * @param x The x component value
+     * @param y The y component value
+     * @param z The z component value
+     */
+    void assignUniformFloat3(CommandContext ctx, int location, float x, float y, float z);
+    
+    /**
+     * Sets the value of a 3-component integer vector uniform variable.
+     * 
+     * In OpenGL: Maps to glUniform3i()
+     * In Vulkan: Maps to vkCmdPushConstants() for push constants or descriptor set updates
+     * 
+     * Updates the value of an ivec3 uniform variable at the specified location. The program
+     * containing this uniform must be bound/active when calling this method.
+     * 
+     * @param ctx Command context for recording this command
+     * @param location The uniform location (from locateUniformVariable)
+     * @param x The x component value
+     * @param y The y component value
+     * @param z The z component value
+     */
+    void assignUniformInteger3(CommandContext ctx, int location, int x, int y, int z);
+    
+    /**
+     * Sets the value of a 4-component float vector uniform variable.
+     * 
+     * In OpenGL: Maps to glUniform4f()
+     * In Vulkan: Maps to vkCmdPushConstants() for push constants or descriptor set updates
+     * 
+     * Updates the value of a vec4 uniform variable at the specified location. The program
+     * containing this uniform must be bound/active when calling this method.
+     * 
+     * @param ctx Command context for recording this command
+     * @param location The uniform location (from locateUniformVariable)
+     * @param x The x component value
+     * @param y The y component value
+     * @param z The z component value
+     * @param w The w component value
+     */
+    void assignUniformFloat4(CommandContext ctx, int location, float x, float y, float z, float w);
+    
+    /**
+     * Sets the value of a 4x4 matrix uniform variable.
+     * 
+     * In OpenGL: Maps to glUniformMatrix4fv()
+     * In Vulkan: Maps to vkCmdPushConstants() for push constants or descriptor set updates
+     * 
+     * Updates the value of a mat4 uniform variable at the specified location. The program
+     * containing this uniform must be bound/active when calling this method.
+     * 
+     * @param ctx Command context for recording this command
+     * @param location The uniform location (from locateUniformVariable)
+     * @param transpose Whether to transpose the matrix (typically false for column-major)
+     * @param value Buffer containing the 16 float values of the matrix
+     */
+    void assignUniformMatrix4(CommandContext ctx, int location, boolean transpose, java.nio.FloatBuffer value);
+    
+    /**
+     * Enables a vertex attribute array.
+     * 
+     * In OpenGL: Maps to glEnableVertexAttribArray()
+     * In Vulkan: Vertex attributes are enabled as part of pipeline state
+     * 
+     * Enables the generic vertex attribute array specified by index. When enabled,
+     * the values in the vertex attribute array will be accessed and used for rendering
+     * when vertex attribute index is referenced by vertex shader.
+     * 
+     * @param ctx Command context for recording this command
+     * @param index The index of the generic vertex attribute to enable
+     */
+    void activateVertexAttributeArray(CommandContext ctx, int index);
+    
     // ================================================================================
     // DEPRECATED METHODS - To be replaced with CommandContext-aware versions
     // ================================================================================

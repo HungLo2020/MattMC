@@ -168,12 +168,12 @@ public class ShaderProgram
 	public void trySetUniform(int location, float value) { if (location != -1) { this.setUniform(location, value); } }
 	
 	/** Requires a bound ShaderProgram. */
-	public void setUniform(int location, Vec3f value) { VulkanicAPI.glUniform3f(location, value.x, value.y, value.z); }
+	public void setUniform(int location, Vec3f value) { VulkanicAPI.assignUniformFloat3(CTX, location, value.x, value.y, value.z); }
 	/** @see ShaderProgram#setUniform(int, Vec3f) */
 	public void trySetUniform(int location, Vec3f value) { if (location != -1) { this.setUniform(location, value); } }
 	
 	/** Requires a bound ShaderProgram. */
-	public void setUniform(int location, DhApiVec3i value) { VulkanicAPI.glUniform3i(location, value.x, value.y, value.z); }
+	public void setUniform(int location, DhApiVec3i value) { VulkanicAPI.assignUniformInteger3(CTX, location, value.x, value.y, value.z); }
 	/** @see ShaderProgram#setUniform(int, Mat4f) */
 	public void trySetUniform(int location, DhApiVec3i value) { if (location != -1) { this.setUniform(location, value); } }
 	
@@ -184,7 +184,7 @@ public class ShaderProgram
 		{
 			FloatBuffer buffer = stack.mallocFloat(4 * 4);
 			value.store(buffer);
-			VulkanicAPI.glUniformMatrix4fv(location, false, buffer);
+			VulkanicAPI.assignUniformMatrix4(CTX, location, false, buffer);
 		}
 	}
 	/** @see ShaderProgram#setUniform(int, Mat4f) */
@@ -196,7 +196,7 @@ public class ShaderProgram
 	 */
 	public void setUniform(int location, Color value)
 	{
-		VulkanicAPI.glUniform4f(location, 
+		VulkanicAPI.assignUniformFloat4(CTX, location, 
 				value.getRed()   / 256.0f, 
 				value.getGreen() / 256.0f, 
 				value.getBlue()  / 256.0f, 

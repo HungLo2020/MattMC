@@ -1919,6 +1919,119 @@ public class VulkanicAPI {
         getBackend().assignUniformFloat(ctx, location, value);
     }
     
+    /**
+     * Sets the value of a 3-component float vector uniform.
+     * 
+     * Example usage:
+     * <pre>{@code
+     * CommandContext ctx = OpenGLCommandContext.IMMEDIATE;
+     * int location = locateUniformVariable(ctx, program, "lightPosition");
+     * assignUniformFloat3(ctx, location, 1.0f, 2.0f, 3.0f);
+     * }</pre>
+     * 
+     * In OpenGL: Maps to glUniform3f()
+     * In Vulkan: Push constants or descriptor updates
+     * 
+     * @param ctx Command context for recording this command
+     * @param location The uniform location
+     * @param x The x component
+     * @param y The y component
+     * @param z The z component
+     */
+    public static void assignUniformFloat3(CommandContext ctx, int location, float x, float y, float z) {
+        getBackend().assignUniformFloat3(ctx, location, x, y, z);
+    }
+    
+    /**
+     * Sets the value of a 3-component integer vector uniform.
+     * 
+     * Example usage:
+     * <pre>{@code
+     * CommandContext ctx = OpenGLCommandContext.IMMEDIATE;
+     * int location = locateUniformVariable(ctx, program, "gridSize");
+     * assignUniformInteger3(ctx, location, 16, 16, 16);
+     * }</pre>
+     * 
+     * In OpenGL: Maps to glUniform3i()
+     * In Vulkan: Push constants or descriptor updates
+     * 
+     * @param ctx Command context for recording this command
+     * @param location The uniform location
+     * @param x The x component
+     * @param y The y component
+     * @param z The z component
+     */
+    public static void assignUniformInteger3(CommandContext ctx, int location, int x, int y, int z) {
+        getBackend().assignUniformInteger3(ctx, location, x, y, z);
+    }
+    
+    /**
+     * Sets the value of a 4-component float vector uniform.
+     * 
+     * Example usage:
+     * <pre>{@code
+     * CommandContext ctx = OpenGLCommandContext.IMMEDIATE;
+     * int location = locateUniformVariable(ctx, program, "color");
+     * assignUniformFloat4(ctx, location, 1.0f, 0.5f, 0.0f, 1.0f);
+     * }</pre>
+     * 
+     * In OpenGL: Maps to glUniform4f()
+     * In Vulkan: Push constants or descriptor updates
+     * 
+     * @param ctx Command context for recording this command
+     * @param location The uniform location
+     * @param x The x component
+     * @param y The y component
+     * @param z The z component
+     * @param w The w component
+     */
+    public static void assignUniformFloat4(CommandContext ctx, int location, float x, float y, float z, float w) {
+        getBackend().assignUniformFloat4(ctx, location, x, y, z, w);
+    }
+    
+    /**
+     * Sets the value of a 4x4 matrix uniform.
+     * 
+     * Example usage:
+     * <pre>{@code
+     * CommandContext ctx = OpenGLCommandContext.IMMEDIATE;
+     * int location = locateUniformVariable(ctx, program, "projectionMatrix");
+     * FloatBuffer matrixBuffer = ...; // 16 floats
+     * assignUniformMatrix4(ctx, location, false, matrixBuffer);
+     * }</pre>
+     * 
+     * In OpenGL: Maps to glUniformMatrix4fv()
+     * In Vulkan: Push constants or descriptor updates
+     * 
+     * @param ctx Command context for recording this command
+     * @param location The uniform location
+     * @param transpose Whether to transpose the matrix
+     * @param value Buffer containing 16 floats
+     */
+    public static void assignUniformMatrix4(CommandContext ctx, int location, boolean transpose, java.nio.FloatBuffer value) {
+        getBackend().assignUniformMatrix4(ctx, location, transpose, value);
+    }
+    
+    /**
+     * Enables a vertex attribute array.
+     * 
+     * Example usage:
+     * <pre>{@code
+     * CommandContext ctx = OpenGLCommandContext.IMMEDIATE;
+     * activateVertexAttributeArray(ctx, 0);  // Enable position attribute
+     * activateVertexAttributeArray(ctx, 1);  // Enable normal attribute
+     * }</pre>
+     * 
+     * In OpenGL: Maps to glEnableVertexAttribArray()
+     * In Vulkan: Vertex attributes are enabled as part of pipeline state
+     * 
+     * @param ctx Command context for recording this command
+     * @param index The vertex attribute index to enable
+     */
+    public static void activateVertexAttributeArray(CommandContext ctx, int index) {
+        getBackend().activateVertexAttributeArray(ctx, index);
+    }
+    
     // ================================================================================
     // DEPRECATED METHODS - Legacy API without CommandContext
     // ================================================================================
