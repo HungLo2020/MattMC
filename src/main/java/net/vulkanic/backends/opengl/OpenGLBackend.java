@@ -5,6 +5,7 @@ import net.vulkanic.CommandContext;
 import net.vulkanic.GraphicsBackend;
 import net.vulkanic.GraphicsCapabilities;
 import net.vulkanic.VulkanicAPI;
+import org.lwjgl.opengl.GL;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL15;
 import org.lwjgl.opengl.GL20;
@@ -3425,5 +3426,27 @@ public class OpenGLBackend implements GraphicsBackend {
     @Override
     public String getBackendName() {
         return "OpenGL";
+    }
+    
+    // Phase 18: Info query and capability methods with CommandContext
+    
+    @Override
+    public String queryStringInfo(CommandContext ctx, int pname) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        return GL11.glGetString(pname);
+    }
+    
+    @Override
+    public Object getGLCapabilities(CommandContext ctx) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        return GL.getCapabilities();
     }
 }

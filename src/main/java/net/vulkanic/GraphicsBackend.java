@@ -2657,4 +2657,49 @@ public interface GraphicsBackend {
      * }</pre>
      */
     String getBackendName();
+    
+    // Phase 18: Info query and capability methods with CommandContext
+    
+    /**
+     * Query string information from the graphics driver.
+     * 
+     * In OpenGL: Maps to glGetString()
+     * In Vulkan: Maps to querying VkPhysicalDeviceProperties
+     * 
+     * Retrieves string information about the graphics implementation, such as
+     * vendor name, renderer name, version strings, and supported extensions.
+     * 
+     * @param ctx Command context (used for future Vulkan compatibility where queries may be async)
+     * @param pname The name of the string to query (e.g., GL_VERSION, GL_VENDOR, GL_RENDERER)
+     * @return The requested string or null if not available
+     * 
+     * Example usage:
+     * <pre>{@code
+     * String version = backend.queryStringInfo(CTX, GL_VERSION);
+     * String vendor = backend.queryStringInfo(CTX, GL_VENDOR);
+     * System.out.println(vendor + " " + version);
+     * }</pre>
+     */
+    String queryStringInfo(CommandContext ctx, int pname);
+    
+    /**
+     * Get the OpenGL capabilities object.
+     * 
+     * In OpenGL: Returns the LWJGL GLCapabilities object
+     * In Vulkan: Returns equivalent capability information
+     * 
+     * This method provides access to the underlying capabilities object which
+     * contains information about supported extensions and features. This is
+     * primarily used for feature detection and compatibility checks.
+     * 
+     * @param ctx Command context (used for future Vulkan compatibility)
+     * @return The capabilities object (implementation-specific)
+     * 
+     * Example usage:
+     * <pre>{@code
+     * Object caps = backend.getGLCapabilities(CTX);
+     * // Use implementation-specific code to query capabilities
+     * }</pre>
+     */
+    Object getGLCapabilities(CommandContext ctx);
 }

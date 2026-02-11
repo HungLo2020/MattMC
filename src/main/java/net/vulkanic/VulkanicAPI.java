@@ -3097,12 +3097,12 @@ public class VulkanicAPI {
     
     @Deprecated
     public static String retrieveProgramInfoLog(int program) {
-        return getBackend().retrieveProgramInfoLog(program);
+        return retrieveProgramInfoLog(CTX, program);
     }
     
     @Deprecated
     public static String retrieveShaderInfoLog(int shader) {
-        return getBackend().retrieveShaderInfoLog(shader);
+        return retrieveShaderInfoLog(CTX, shader);
     }
     
     @Deprecated
@@ -3157,7 +3157,7 @@ public class VulkanicAPI {
     
     @Deprecated
     public static String queryStringInfo(int name) {
-        return getBackend().queryStringInfo(name);
+        return queryStringInfo(CTX, name);
     }
     
     @Deprecated
@@ -4074,7 +4074,7 @@ public class VulkanicAPI {
      */
     @Deprecated
     public static void glLinkProgram(int program) {
-        linkProgramBinary(program);
+        linkProgramBinary(CTX, program);
     }
     
     /**
@@ -4210,7 +4210,7 @@ public class VulkanicAPI {
      */
     @Deprecated
     public static Object getGLCapabilities() {
-        return getBackend().getGLCapabilities();
+        return getGLCapabilities(CTX);
     }
     
     /**
@@ -4577,5 +4577,56 @@ public class VulkanicAPI {
      */
     public static String getBackendName() {
         return getBackend().getBackendName();
+    }
+    
+    // Phase 18: Info query and capability methods with CommandContext
+    
+    /**
+     * Query string information from the graphics driver (CommandContext-aware).
+     * 
+     * This is a Vulkan-compatible method that requires an explicit CommandContext.
+     * For OpenGL, use getImmediateContext() to get the context.
+     * 
+     * Example usage:
+     * <pre>{@code
+     * CommandContext ctx = VulkanicAPI.getImmediateContext();
+     * String version = VulkanicAPI.queryStringInfo(ctx, GL_VERSION);
+     * String vendor = VulkanicAPI.queryStringInfo(ctx, GL_VENDOR);
+     * String renderer = VulkanicAPI.queryStringInfo(ctx, GL_RENDERER);
+     * System.out.println(vendor + " " + renderer + " " + version);
+     * }</pre>
+     * 
+     * In OpenGL: Maps to glGetString()
+     * In Vulkan: Maps to querying VkPhysicalDeviceProperties
+     * 
+     * @param ctx Command context
+     * @param pname The name of the string to query (e.g., GL_VERSION, GL_VENDOR, GL_RENDERER)
+     * @return The requested string or null if not available
+     */
+    public static String queryStringInfo(CommandContext ctx, int pname) {
+        return getBackend().queryStringInfo(ctx, pname);
+    }
+    
+    /**
+     * Get the OpenGL capabilities object (CommandContext-aware).
+     * 
+     * This is a Vulkan-compatible method that requires an explicit CommandContext.
+     * For OpenGL, use getImmediateContext() to get the context.
+     * 
+     * Example usage:
+     * <pre>{@code
+     * CommandContext ctx = VulkanicAPI.getImmediateContext();
+     * Object caps = VulkanicAPI.getGLCapabilities(ctx);
+     * // Use implementation-specific code to query capabilities
+     * }</pre>
+     * 
+     * In OpenGL: Returns the LWJGL GLCapabilities object
+     * In Vulkan: Returns equivalent capability information
+     * 
+     * @param ctx Command context
+     * @return The capabilities object (implementation-specific)
+     */
+    public static Object getGLCapabilities(CommandContext ctx) {
+        return getBackend().getGLCapabilities(ctx);
     }
 }
