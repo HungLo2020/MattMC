@@ -5,6 +5,7 @@ import net.vulkanic.CommandContext;
 import net.vulkanic.GraphicsBackend;
 import net.vulkanic.GraphicsCapabilities;
 import net.vulkanic.VulkanicAPI;
+import org.lwjgl.opengl.EXTDebugLabel;
 import org.lwjgl.opengl.GL;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL15;
@@ -1657,6 +1658,30 @@ public class OpenGLBackend implements GraphicsBackend {
         return GL31.glGetActiveUniformBlockName(program, uniformBlockIndex);
     }
     
+    @Override
+    public void enterDebugGroup(CommandContext ctx, int source, int id, CharSequence message) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL43.glPushDebugGroup(source, id, message);
+    }
+    
+    @Override
+    public void exitDebugGroup(CommandContext ctx) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL43.glPopDebugGroup();
+    }
+    
+    @Override
+    public void labelObjectExt(CommandContext ctx, int type, int object, String label) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        EXTDebugLabel.glLabelObjectEXT(type, object, label);
+    }
+    
     // ================================================================================
     // DEPRECATED METHODS - OpenGL immediate-mode implementations
     // ================================================================================
@@ -1775,24 +1800,6 @@ public class OpenGLBackend implements GraphicsBackend {
     
     @Deprecated
     @Override
-    public void enterDebugGroup(int source, int id, CharSequence message) {
-        org.lwjgl.opengl.KHRDebug.glPushDebugGroup(source, id, message);
-    }
-    
-    @Deprecated
-    @Override
-    public void exitDebugGroup() {
-        org.lwjgl.opengl.KHRDebug.glPopDebugGroup();
-    }
-    
-    @Deprecated
-    @Override
-    public void labelObjectExt(int type, int object, String label) {
-        org.lwjgl.opengl.EXTDebugLabel.glLabelObjectEXT(type, object, label);
-    }
-    
-    @Deprecated
-    @Override
     public boolean supportsKhrDebug() {
         return org.lwjgl.opengl.GL.getCapabilities().GL_KHR_debug;
     }
@@ -1880,24 +1887,6 @@ public class OpenGLBackend implements GraphicsBackend {
     @Override
     public void specifyVertexAttribIFormat(int attribIndex, int size, int type, int relativeOffset) {
         org.lwjgl.opengl.ARBVertexAttribBinding.glVertexAttribIFormat(attribIndex, size, type, relativeOffset);
-    }
-    
-    @Deprecated
-    @Override
-    public void setClearDepthValue(double depth) {
-        org.lwjgl.opengl.GL11.glClearDepth(depth);
-    }
-    
-    @Deprecated
-    @Override
-    public void setClearColorValue(float red, float green, float blue, float alpha) {
-        org.lwjgl.opengl.GL11.glClearColor(red, green, blue, alpha);
-    }
-    
-    @Deprecated
-    @Override
-    public void selectDrawBuffer(int mode) {
-        org.lwjgl.opengl.GL11.glDrawBuffer(mode);
     }
     
     @Deprecated

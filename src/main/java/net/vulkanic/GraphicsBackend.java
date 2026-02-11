@@ -1641,6 +1641,57 @@ public interface GraphicsBackend {
      */
     String retrieveActiveUniformBlockName(CommandContext ctx, int program, int uniformBlockIndex);
     
+    /**
+     * Enters a debug group for hierarchical debugging.
+     * 
+     * In OpenGL: Maps to glPushDebugGroup() (KHR_debug extension)
+     * In Vulkan: Maps to vkCmdBeginDebugUtilsLabelEXT()
+     * 
+     * Creates a hierarchical debug group that appears in graphics debuggers and
+     * validation layer messages. Debug groups can be nested to create a hierarchy
+     * that reflects the structure of your rendering code. This is essential for
+     * debugging complex multi-pass rendering algorithms.
+     * 
+     * Must be paired with exitDebugGroup().
+     * 
+     * @param ctx Command context for recording this command
+     * @param source Source of the debug message (e.g., GL_DEBUG_SOURCE_APPLICATION)
+     * @param id Numeric identifier for the group
+     * @param message Human-readable description of the debug group
+     */
+    void enterDebugGroup(CommandContext ctx, int source, int id, CharSequence message);
+    
+    /**
+     * Exits the current debug group.
+     * 
+     * In OpenGL: Maps to glPopDebugGroup() (KHR_debug extension)
+     * In Vulkan: Maps to vkCmdEndDebugUtilsLabelEXT()
+     * 
+     * Ends the most recently entered debug group. Must be balanced with
+     * enterDebugGroup() calls. Unbalanced push/pop can cause issues with
+     * debugging tools.
+     * 
+     * @param ctx Command context for recording this command
+     */
+    void exitDebugGroup(CommandContext ctx);
+    
+    /**
+     * Assigns a debug label to a GPU object using EXT_debug_label extension.
+     * 
+     * In OpenGL: Maps to glLabelObjectEXT() (EXT_debug_label extension)
+     * In Vulkan: Maps to vkSetDebugUtilsObjectNameEXT()
+     * 
+     * Similar to labelDebugObject() but uses the older EXT_debug_label extension
+     * instead of KHR_debug. Provided for compatibility with older drivers that
+     * don't support KHR_debug.
+     * 
+     * @param ctx Command context for recording this command
+     * @param type Object type (e.g., GL_BUFFER_OBJECT_EXT, GL_TEXTURE_OBJECT_EXT)
+     * @param object The object ID/handle
+     * @param label The debug name/label string
+     */
+    void labelObjectExt(CommandContext ctx, int type, int object, String label);
+    
     // ================================================================================
     // DEPRECATED METHODS - To be replaced with CommandContext-aware versions
     // ================================================================================
@@ -1714,14 +1765,6 @@ public interface GraphicsBackend {
     // Timer query operations
     
     // Debug label operations (KHR_debug)
-    @Deprecated
-    void enterDebugGroup(int source, int id, CharSequence message);
-    @Deprecated
-    void exitDebugGroup();
-    
-    // Debug label operations (EXT_debug_label)
-    @Deprecated
-    void labelObjectExt(int type, int object, String label);
     
     // Debug system initialization (wraps entire debug setup)
     @Deprecated
@@ -1746,12 +1789,6 @@ public interface GraphicsBackend {
     void specifyVertexAttribIFormat(int attribIndex, int size, int type, int relativeOffset);
     
     // Clear operations
-    @Deprecated
-    void setClearDepthValue(double depth);
-    @Deprecated
-    void setClearColorValue(float red, float green, float blue, float alpha);
-    @Deprecated
-    void selectDrawBuffer(int mode);
     
     // Advanced drawing operations
     @Deprecated

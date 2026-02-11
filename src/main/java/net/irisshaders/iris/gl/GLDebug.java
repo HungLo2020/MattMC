@@ -330,7 +330,7 @@ public final class GLDebug {
 		@Override
 		public void pushGroup(int id, String name) {
 			if (ENABLE_DEBUG_GROUPS) {
-				VulkanicAPI.enterDebugGroup(VulkanicAPI.GL_DEBUG_SOURCE_APPLICATION, id, name);
+				VulkanicAPI.enterDebugGroup(CTX, VulkanicAPI.GL_DEBUG_SOURCE_APPLICATION, id, name);
 				stack.push(name);
 				stackSize += 1;
 			}
@@ -340,7 +340,7 @@ public final class GLDebug {
 		public void popGroup() {
 			if (ENABLE_DEBUG_GROUPS) {
 				if (stackSize != 0) {
-					VulkanicAPI.exitDebugGroup();
+					VulkanicAPI.exitDebugGroup(CTX);
 					stack.pop();
 					stackSize -= 1;
 				}

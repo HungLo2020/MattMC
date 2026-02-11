@@ -2805,6 +2805,80 @@ public class VulkanicAPI {
     }
     
     /**
+     * Enters a debug group for hierarchical debugging.
+     * 
+     * This is a Vulkan-compatible method that requires an explicit CommandContext.
+     * For OpenGL, use getImmediateContext() to get the context.
+     * 
+     * Example usage:
+     * <pre>
+     *     CommandContext ctx = VulkanicAPI.getImmediateContext();
+     *     VulkanicAPI.enterDebugGroup(ctx, GL_DEBUG_SOURCE_APPLICATION, 1, "Render Scene");
+     *     // ... render operations ...
+     *     VulkanicAPI.exitDebugGroup(ctx);
+     * </pre>
+     * 
+     * In OpenGL: Maps to glPushDebugGroup()
+     * In Vulkan: Maps to vkCmdBeginDebugUtilsLabelEXT()
+     * 
+     * @param ctx Command context for recording this command
+     * @param source Source of the debug message
+     * @param id Numeric identifier
+     * @param message Human-readable description
+     */
+    public static void enterDebugGroup(CommandContext ctx, int source, int id, CharSequence message) {
+        getBackend().enterDebugGroup(ctx, source, id, message);
+    }
+    
+    /**
+     * Exits the current debug group.
+     * 
+     * This is a Vulkan-compatible method that requires an explicit CommandContext.
+     * For OpenGL, use getImmediateContext() to get the context.
+     * 
+     * Example usage:
+     * <pre>
+     *     CommandContext ctx = VulkanicAPI.getImmediateContext();
+     *     VulkanicAPI.enterDebugGroup(ctx, GL_DEBUG_SOURCE_APPLICATION, 1, "Render Scene");
+     *     // ... render operations ...
+     *     VulkanicAPI.exitDebugGroup(ctx);
+     * </pre>
+     * 
+     * In OpenGL: Maps to glPopDebugGroup()
+     * In Vulkan: Maps to vkCmdEndDebugUtilsLabelEXT()
+     * 
+     * @param ctx Command context for recording this command
+     */
+    public static void exitDebugGroup(CommandContext ctx) {
+        getBackend().exitDebugGroup(ctx);
+    }
+    
+    /**
+     * Assigns a debug label to a GPU object using EXT_debug_label.
+     * 
+     * This is a Vulkan-compatible method that requires an explicit CommandContext.
+     * For OpenGL, use getImmediateContext() to get the context.
+     * 
+     * Example usage:
+     * <pre>
+     *     CommandContext ctx = VulkanicAPI.getImmediateContext();
+     *     int bufferId = VulkanicAPI.allocateBufferObject(ctx);
+     *     VulkanicAPI.labelObjectExt(ctx, GL_BUFFER_OBJECT_EXT, bufferId, "VertexBuffer");
+     * </pre>
+     * 
+     * In OpenGL: Maps to glLabelObjectEXT()
+     * In Vulkan: Maps to vkSetDebugUtilsObjectNameEXT()
+     * 
+     * @param ctx Command context for recording this command
+     * @param type Object type (e.g., GL_BUFFER_OBJECT_EXT)
+     * @param object The object ID
+     * @param label The debug label string
+     */
+    public static void labelObjectExt(CommandContext ctx, int type, int object, String label) {
+        getBackend().labelObjectExt(ctx, type, object, label);
+    }
+    
+    /**
      * Configures a vertex attribute array with the specified format.
      * 
      * This is a Vulkan-compatible method that requires an explicit CommandContext.
@@ -3451,21 +3525,6 @@ public class VulkanicAPI {
     }
     
     @Deprecated
-    public static void enterDebugGroup(int source, int id, CharSequence message) {
-        getBackend().enterDebugGroup(source, id, message);
-    }
-    
-    @Deprecated
-    public static void exitDebugGroup() {
-        getBackend().exitDebugGroup();
-    }
-    
-    @Deprecated
-    public static void labelObjectExt(int type, int object, String label) {
-        getBackend().labelObjectExt(type, object, label);
-    }
-    
-    @Deprecated
     public static boolean supportsKhrDebug() {
         return getBackend().supportsKhrDebug();
     }
@@ -3503,21 +3562,6 @@ public class VulkanicAPI {
     @Deprecated
     public static void specifyVertexAttribIFormat(int attribIndex, int size, int type, int relativeOffset) {
         getBackend().specifyVertexAttribIFormat(attribIndex, size, type, relativeOffset);
-    }
-    
-    @Deprecated
-    public static void setClearDepthValue(double depth) {
-        getBackend().setClearDepthValue(depth);
-    }
-    
-    @Deprecated
-    public static void setClearColorValue(float red, float green, float blue, float alpha) {
-        getBackend().setClearColorValue(red, green, blue, alpha);
-    }
-    
-    @Deprecated
-    public static void selectDrawBuffer(int mode) {
-        getBackend().selectDrawBuffer(mode);
     }
     
     @Deprecated
