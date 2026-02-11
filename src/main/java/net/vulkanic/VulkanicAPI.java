@@ -1484,6 +1484,107 @@ public class VulkanicAPI {
     }
     
     /**
+     * Binds a buffer object to a buffer binding target.
+     * 
+     * This is a Vulkan-compatible method that requires an explicit CommandContext.
+     * For OpenGL, use getImmediateContext() to get the context.
+     * 
+     * Example usage:
+     * <pre>
+     *     CommandContext ctx = VulkanicAPI.getImmediateContext();
+     *     VulkanicAPI.attachBuffer(ctx, GL_ARRAY_BUFFER, bufferId);
+     * </pre>
+     * 
+     * In OpenGL: Maps to glBindBuffer()
+     * In Vulkan: No direct equivalent - buffer binding is part of descriptor sets
+     * 
+     * @param ctx Command context for recording this command
+     * @param target The buffer binding target (e.g., GL_ARRAY_BUFFER, GL_ELEMENT_ARRAY_BUFFER)
+     * @param buffer The buffer object ID to bind (0 to unbind)
+     */
+    public static void attachBuffer(CommandContext ctx, int target, int buffer) {
+        getBackend().attachBuffer(ctx, target, buffer);
+    }
+    
+    /**
+     * Polls for the last graphics API error code and clears it.
+     * 
+     * This is a Vulkan-compatible method that requires an explicit CommandContext.
+     * For OpenGL, use getImmediateContext() to get the context.
+     * 
+     * Example usage:
+     * <pre>
+     *     CommandContext ctx = VulkanicAPI.getImmediateContext();
+     *     while (VulkanicAPI.pollErrorCode(ctx) != 0) {
+     *         // Drain error queue
+     *     }
+     * </pre>
+     * 
+     * In OpenGL: Maps to glGetError() which pops errors from error stack
+     * In Vulkan: No direct equivalent - uses validation layers instead
+     * 
+     * @param ctx Command context for error checking
+     * @return The error code, or NO_ERROR (0) if no error occurred
+     */
+    public static int pollErrorCode(CommandContext ctx) {
+        return getBackend().pollErrorCode(ctx);
+    }
+    
+    /**
+     * Reads a rectangular region of pixels from the current framebuffer.
+     * 
+     * This is a Vulkan-compatible method that requires an explicit CommandContext.
+     * For OpenGL, use getImmediateContext() to get the context.
+     * 
+     * Example usage:
+     * <pre>
+     *     CommandContext ctx = VulkanicAPI.getImmediateContext();
+     *     long pixelBuffer = ...;  // Native memory address
+     *     VulkanicAPI.readFramebufferPixels(ctx, 0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, pixelBuffer);
+     * </pre>
+     * 
+     * In OpenGL: Maps to glReadPixels()
+     * In Vulkan: Maps to vkCmdCopyImageToBuffer() with staging buffer
+     * 
+     * @param ctx Command context for recording this command
+     * @param x X coordinate of the lower-left corner
+     * @param y Y coordinate of the lower-left corner
+     * @param width Width of the pixel rectangle
+     * @param height Height of the pixel rectangle
+     * @param format Pixel data format (e.g., GL_RGBA)
+     * @param type Pixel data type (e.g., GL_UNSIGNED_BYTE)
+     * @param pixels Memory address to write pixel data to
+     */
+    public static void readFramebufferPixels(CommandContext ctx, int x, int y, int width, int height, int format, int type, long pixels) {
+        getBackend().readFramebufferPixels(ctx, x, y, width, height, format, type, pixels);
+    }
+    
+    /**
+     * Queries a texture level parameter.
+     * 
+     * This is a Vulkan-compatible method that requires an explicit CommandContext.
+     * For OpenGL, use getImmediateContext() to get the context.
+     * 
+     * Example usage:
+     * <pre>
+     *     CommandContext ctx = VulkanicAPI.getImmediateContext();
+     *     int width = VulkanicAPI.queryTextureLevelParameter(ctx, GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH);
+     * </pre>
+     * 
+     * In OpenGL: Maps to glGetTexLevelParameteriv()
+     * In Vulkan: Maps to querying VkImageCreateInfo or image properties
+     * 
+     * @param ctx Command context for state queries
+     * @param target Texture target (e.g., GL_TEXTURE_2D)
+     * @param level Mipmap level to query
+     * @param pname Parameter name to query (e.g., GL_TEXTURE_WIDTH)
+     * @return The queried parameter value
+     */
+    public static int queryTextureLevelParameter(CommandContext ctx, int target, int level, int pname) {
+        return getBackend().queryTextureLevelParameter(ctx, target, level, pname);
+    }
+    
+    /**
      * Updates a subset of buffer data.
      * 
      * This is a Vulkan-compatible method that requires an explicit CommandContext.
@@ -2998,11 +3099,6 @@ public class VulkanicAPI {
         getBackend().attachTextureToFramebuffer(target, attachment, textarget, texture, level);
     }
     
-    @Deprecated
-    public static void attachBuffer(int target, int buffer) {
-        getBackend().attachBuffer(target, buffer);
-    }
-    
     // Direct State Access buffer operations
     @Deprecated
     public static int createBufferDSA() {
@@ -3085,13 +3181,8 @@ public class VulkanicAPI {
     }
     
     @Deprecated
-    public static void fillBufferWithSize(int tgt, long sz, int usg) {
-        getBackend().fillBufferWithSize(tgt, sz, usg);
-    }
-    
-    @Deprecated
     public static void fillBufferSubregion(int tgt, long off, java.nio.ByteBuffer dat) {
-        getBackend().fillBufferSubregion(tgt, off, dat);
+        getBackend().fillBufferSubregion(getImmediateContext(), tgt, off, dat);
     }
     
     
@@ -3128,21 +3219,6 @@ public class VulkanicAPI {
     @Deprecated
     public static GraphicsCapabilities getGraphicsCapabilities() {
         return getBackend().getGraphicsCapabilities();
-    }
-    
-    @Deprecated
-    public static int pollErrorCode() {
-        return getBackend().pollErrorCode();
-    }
-    
-    @Deprecated
-    public static void readFramebufferPixels(int x, int y, int width, int height, int format, int type, long pixels) {
-        getBackend().readFramebufferPixels(x, y, width, height, format, type, pixels);
-    }
-    
-    @Deprecated
-    public static int queryTextureLevelParameter(int target, int level, int pname) {
-        return getBackend().queryTextureLevelParameter(target, level, pname);
     }
     
     @Deprecated

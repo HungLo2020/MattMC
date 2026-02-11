@@ -619,6 +619,72 @@ public interface GraphicsBackend {
     int checkForErrors(CommandContext ctx);
     
     /**
+     * Binds a buffer object to a buffer binding target.
+     * 
+     * In OpenGL: Maps to glBindBuffer()
+     * In Vulkan: No direct equivalent - buffer binding is part of descriptor sets
+     * 
+     * Makes the specified buffer object the current buffer for the given target.
+     * Subsequent buffer operations on that target will affect this buffer.
+     * 
+     * @param ctx Command context for recording this command
+     * @param target The buffer binding target (e.g., GL_ARRAY_BUFFER, GL_ELEMENT_ARRAY_BUFFER)
+     * @param buffer The buffer object ID to bind (0 to unbind)
+     */
+    void attachBuffer(CommandContext ctx, int target, int buffer);
+    
+    /**
+     * Polls for the last graphics API error code and clears it.
+     * 
+     * In OpenGL: Maps to glGetError() which pops errors from error stack
+     * In Vulkan: No direct equivalent - uses validation layers instead
+     * 
+     * Retrieves and removes the next error from the error queue. Returns NO_ERROR
+     * if no errors are queued. This is primarily used for error cleanup/draining.
+     * 
+     * @param ctx Command context for error checking
+     * @return The error code, or NO_ERROR (0) if no error occurred
+     */
+    int pollErrorCode(CommandContext ctx);
+    
+    /**
+     * Reads a rectangular region of pixels from the current framebuffer.
+     * 
+     * In OpenGL: Maps to glReadPixels()
+     * In Vulkan: Maps to vkCmdCopyImageToBuffer() with staging buffer
+     * 
+     * Reads pixel data from the framebuffer into CPU-accessible memory.
+     * This operation may cause a pipeline stall as it requires synchronization.
+     * 
+     * @param ctx Command context for recording this command
+     * @param x X coordinate of the lower-left corner
+     * @param y Y coordinate of the lower-left corner
+     * @param width Width of the pixel rectangle
+     * @param height Height of the pixel rectangle
+     * @param format Pixel data format (e.g., GL_RGBA)
+     * @param type Pixel data type (e.g., GL_UNSIGNED_BYTE)
+     * @param pixels Memory address to write pixel data to
+     */
+    void readFramebufferPixels(CommandContext ctx, int x, int y, int width, int height, int format, int type, long pixels);
+    
+    /**
+     * Queries a texture level parameter.
+     * 
+     * In OpenGL: Maps to glGetTexLevelParameteriv()
+     * In Vulkan: Maps to querying VkImageCreateInfo or image properties
+     * 
+     * Retrieves information about a specific mipmap level of the currently bound texture.
+     * Common queries include width, height, internal format, etc.
+     * 
+     * @param ctx Command context for state queries
+     * @param target Texture target (e.g., GL_TEXTURE_2D)
+     * @param level Mipmap level to query
+     * @param pname Parameter name to query (e.g., GL_TEXTURE_WIDTH)
+     * @return The queried parameter value
+     */
+    int queryTextureLevelParameter(CommandContext ctx, int target, int level, int pname);
+    
+    /**
      * Updates a subset of buffer data.
      * 
      * In OpenGL: Maps to glBufferSubData()
@@ -1428,10 +1494,6 @@ public interface GraphicsBackend {
     @Deprecated
     void attachTextureToFramebuffer(int target, int attachment, int textarget, int texture, int level);
     
-    // Buffer operations  
-    @Deprecated
-    void attachBuffer(int target, int buffer);
-    
     // Direct State Access buffer operations
     @Deprecated
     int createBufferDSA();
@@ -1473,10 +1535,6 @@ public interface GraphicsBackend {
     void transferTexture2DImage(int tgt, int lvl, int intfmt, int w, int h, int bdr, int fmt, int typ, java.nio.ByteBuffer pix);
     
     // GPU buffer lifecycle
-    
-    // GPU buffer lifecycle
-    @Deprecated
-    void fillBufferWithSize(int tgt, long sz, int usg);
     @Deprecated
     void fillBufferSubregion(int tgt, long off, java.nio.ByteBuffer dat);
     
@@ -1499,18 +1557,6 @@ public interface GraphicsBackend {
     // Vertex attributes
     
     // Synchronization
-    
-    // Query operations
-    @Deprecated
-    int pollErrorCode();
-    
-    // Pixel readback
-    @Deprecated
-    void readFramebufferPixels(int x, int y, int width, int height, int format, int type, long pixels);
-    
-    // Texture queries
-    @Deprecated
-    int queryTextureLevelParameter(int target, int level, int pname);
     
     // Shader source (native)
     @Deprecated

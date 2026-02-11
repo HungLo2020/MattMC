@@ -897,6 +897,46 @@ public class OpenGLBackend implements GraphicsBackend {
         return GL11.glGetError();
     }
     
+    @Override
+    public void attachBuffer(CommandContext ctx, int target, int buffer) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        GL15.glBindBuffer(target, buffer);
+    }
+    
+    @Override
+    public int pollErrorCode(CommandContext ctx) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        return GL11.glGetError();
+    }
+    
+    @Override
+    public void readFramebufferPixels(CommandContext ctx, int x, int y, int width, int height, int format, int type, long pixels) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        GL11.glReadPixels(x, y, width, height, format, type, pixels);
+    }
+    
+    @Override
+    public int queryTextureLevelParameter(CommandContext ctx, int target, int level, int pname) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        return GL11.glGetTexLevelParameteri(target, level, pname);
+    }
+    
     /**
      * Updates buffer subregion with explicit command context.
      * This is the Vulkan-compatible implementation for partial buffer updates.
@@ -1544,12 +1584,6 @@ public class OpenGLBackend implements GraphicsBackend {
         GL30.glFramebufferTexture2D(target, attachment, textarget, texture, level);
     }
     
-    @Deprecated
-    @Override
-    public void attachBuffer(int target, int buffer) {
-        GL15.glBindBuffer(target, buffer);
-    }
-    
     // Direct State Access buffer operations
     @Deprecated
     @Override
@@ -1649,12 +1683,6 @@ public class OpenGLBackend implements GraphicsBackend {
     
     @Deprecated
     @Override
-    public void fillBufferWithSize(int tgt, long sz, int usg) {
-        GL15.glBufferData(tgt, sz, usg);
-    }
-    
-    @Deprecated
-    @Override
     public void fillBufferSubregion(int tgt, long off, java.nio.ByteBuffer dat) {
         GL15.glBufferSubData(tgt, off, dat);
     }
@@ -1683,24 +1711,6 @@ public class OpenGLBackend implements GraphicsBackend {
     @Override
     public void linkProgramBinary(int program) {
         GL20.glLinkProgram(program);
-    }
-    
-    @Deprecated
-    @Override
-    public int pollErrorCode() {
-        return GL11.glGetError();
-    }
-    
-    @Deprecated
-    @Override
-    public void readFramebufferPixels(int x, int y, int width, int height, int format, int type, long pixels) {
-        GL11.glReadPixels(x, y, width, height, format, type, pixels);
-    }
-    
-    @Deprecated
-    @Override
-    public int queryTextureLevelParameter(int target, int level, int pname) {
-        return GL11.glGetTexLevelParameteri(target, level, pname);
     }
     
     @Deprecated

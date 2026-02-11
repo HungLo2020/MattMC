@@ -275,7 +275,7 @@ public class GlStateManager {
 
 	public static void _glBindBuffer(int i, int j) {
 		RenderSystem.assertOnRenderThread();
-		net.vulkanic.VulkanicAPI.attachBuffer(i, j);
+		net.vulkanic.VulkanicAPI.attachBuffer(CTX, i, j);
 	}
 
 	public static void _glBindVertexArray(int i) {
@@ -295,7 +295,7 @@ public class GlStateManager {
 
 	public static void _glBufferData(int i, long l, int j) {
 		RenderSystem.assertOnRenderThread();
-		net.vulkanic.VulkanicAPI.fillBufferWithSize(i, l, j);
+		net.vulkanic.VulkanicAPI.fillBufferWithSize(CTX, i, l, j);
 	}
 
 	@Nullable
@@ -450,7 +450,7 @@ public class GlStateManager {
 	}
 
 	public static int _getTexLevelParameter(int i, int j, int k) {
-		return VulkanicAPI.queryTextureLevelParameter(i, j, k);
+		return VulkanicAPI.queryTextureLevelParameter(CTX, i, j, k);
 	}
 
 	public static int _genTexture() {
@@ -585,7 +585,7 @@ public class GlStateManager {
 
 	public static void _readPixels(int i, int j, int k, int l, int m, int n, long o) {
 		RenderSystem.assertOnRenderThread();
-		VulkanicAPI.readFramebufferPixels(i, j, k, l, m, n, o);
+		VulkanicAPI.readFramebufferPixels(CTX, i, j, k, l, m, n, o);
 	}
 
 	public static int _getError() {
@@ -596,7 +596,7 @@ public class GlStateManager {
 	public static void clearGlErrors() {
 		RenderSystem.assertOnRenderThread();
 
-		while (VulkanicAPI.pollErrorCode() != 0) {
+		while (VulkanicAPI.pollErrorCode(CTX) != 0) {
 		}
 	}
 

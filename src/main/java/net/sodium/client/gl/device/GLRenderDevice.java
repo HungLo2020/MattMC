@@ -121,7 +121,7 @@ public class GLRenderDevice implements RenderDevice {
         @Override
         public void bindBuffer(GlBufferTarget target, GlBuffer buffer) {
             if (this.stateTracker.makeBufferActive(target, buffer)) {
-                VulkanicAPI.attachBuffer(target.getTargetParameter(), buffer.handle());
+                VulkanicAPI.attachBuffer(CTX, target.getTargetParameter(), buffer.handle());
             }
         }
 
@@ -137,7 +137,7 @@ public class GLRenderDevice implements RenderDevice {
         public void allocateStorage(GlMutableBuffer buffer, long bufferSize, GlBufferUsage usage) {
             this.bindBuffer(GlBufferTarget.ARRAY_BUFFER, buffer);
 
-            VulkanicAPI.fillBufferWithSize(GlBufferTarget.ARRAY_BUFFER.getTargetParameter(), bufferSize, usage.getId());
+            VulkanicAPI.fillBufferWithSize(CTX, GlBufferTarget.ARRAY_BUFFER.getTargetParameter(), bufferSize, usage.getId());
             buffer.setSize(bufferSize);
         }
 
