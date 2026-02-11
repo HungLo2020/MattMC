@@ -254,7 +254,7 @@ public class GlStateManager {
 
 	public static void _glBindAttribLocation(int i, int j, CharSequence charSequence) {
 		RenderSystem.assertOnRenderThread();
-		net.vulkanic.VulkanicAPI.bindAttributeLocation(i, j, charSequence);
+		net.vulkanic.VulkanicAPI.bindAttributeLocation(CTX, i, j, charSequence);
 	}
 
 	public static void incrementTrackedBuffers() {
@@ -265,7 +265,7 @@ public class GlStateManager {
 	public static int _glGenBuffers() {
 		RenderSystem.assertOnRenderThread();
 		incrementTrackedBuffers();
-		return net.vulkanic.VulkanicAPI.allocateBufferObject();
+		return net.vulkanic.VulkanicAPI.allocateBufferObject(CTX);
 	}
 
 	public static int _glGenVertexArrays() {
@@ -313,7 +313,7 @@ public class GlStateManager {
 		RenderSystem.assertOnRenderThread();
 		numBuffers--;
 		PLOT_BUFFERS.setValue(numBuffers);
-		net.vulkanic.VulkanicAPI.releaseBufferObject(i);
+		net.vulkanic.VulkanicAPI.releaseBufferObject(CTX, i);
 	}
 
 	public static void _glBindFramebuffer(int i, int j) {

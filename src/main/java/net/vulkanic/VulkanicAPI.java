@@ -3112,16 +3112,6 @@ public class VulkanicAPI {
     }
     
     @Deprecated
-    public static int allocateBufferObject() {
-        return getBackend().allocateBufferObject();
-    }
-    
-    @Deprecated
-    public static void releaseBufferObject(int buf) {
-        getBackend().releaseBufferObject(buf);
-    }
-    
-    @Deprecated
     public static void fillBufferWithData(int tgt, java.nio.ByteBuffer dat, int usg) {
         getBackend().fillBufferWithData(tgt, dat, usg);
     }
@@ -3199,11 +3189,6 @@ public class VulkanicAPI {
     @Deprecated
     public static void assignUniformInteger(int location, int value) {
         getBackend().assignUniformInteger(location, value);
-    }
-    
-    @Deprecated
-    public static void bindAttributeLocation(int program, int index, CharSequence name) {
-        getBackend().bindAttributeLocation(program, index, name);
     }
     
     @Deprecated
@@ -4085,7 +4070,7 @@ public class VulkanicAPI {
      */
     @Deprecated
     public static void glBindAttribLocation(int program, int index, CharSequence name) {
-        bindAttributeLocation(program, index, name);
+        bindAttributeLocation(getImmediateContext(), program, index, name);
     }
     
     /**

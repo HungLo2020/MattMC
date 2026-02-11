@@ -141,7 +141,7 @@ public class GlProgram<T> extends GlObject implements ShaderBindingContext {
         }
 
         public Builder bindAttribute(String name, int index) {
-            VulkanicAPI.bindAttributeLocation(this.program, index, name);
+            VulkanicAPI.bindAttributeLocation(CTX, this.program, index, name);
 
             return this;
         }

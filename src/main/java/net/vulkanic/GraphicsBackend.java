@@ -1485,11 +1485,8 @@ public interface GraphicsBackend {
     void transferTexture2DImage(int tgt, int lvl, int intfmt, int w, int h, int bdr, int fmt, int typ, java.nio.ByteBuffer pix);
     
     // GPU buffer lifecycle
-    @Deprecated
-    int allocateBufferObject();
-    @Deprecated
-    void releaseBufferObject(int buf);
-    @Deprecated
+    
+    // GPU buffer lifecycle
     void fillBufferWithData(int tgt, java.nio.ByteBuffer dat, int usg);
     @Deprecated
     void fillBufferWithSize(int tgt, long sz, int usg);
@@ -1529,8 +1526,6 @@ public interface GraphicsBackend {
     int locateUniformVariable(int program, CharSequence name);
     @Deprecated
     void assignUniformInteger(int location, int value);
-    @Deprecated
-    void bindAttributeLocation(int program, int index, CharSequence name);
     
     // Vertex attributes
     

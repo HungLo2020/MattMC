@@ -1679,17 +1679,6 @@ public class OpenGLBackend implements GraphicsBackend {
         GL11.glTexImage2D(tgt, lvl, intfmt, w, h, bdr, fmt, typ, pix);
     }
     
-    @Deprecated
-    @Override
-    public int allocateBufferObject() {
-        return GL15.glGenBuffers();
-    }
-    
-    @Deprecated
-    @Override
-    public void releaseBufferObject(int buf) {
-        GL15.glDeleteBuffers(buf);
-    }
     
     @Deprecated
     @Override
@@ -1785,12 +1774,6 @@ public class OpenGLBackend implements GraphicsBackend {
     @Override
     public void assignUniformInteger(int location, int value) {
         GL20.glUniform1i(location, value);
-    }
-    
-    @Deprecated
-    @Override
-    public void bindAttributeLocation(int program, int index, CharSequence name) {
-        GL20.glBindAttribLocation(program, index, name);
     }
     
     @Deprecated
