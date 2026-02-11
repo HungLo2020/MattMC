@@ -2,13 +2,13 @@
 
 **Analysis Date:** 2026-02-08  
 **Migration Strategy Updated:** 2026-02-11  
-**Active Migration Phase:** Phase 15 Complete - Uniform Operations ✅  
+**Active Migration Phase:** Phase 16 Complete - Buffer & Compute Operations ✅  
 **Vulkanic API Version:** Initial Implementation (OpenGL-only) - **ALL METHODS NOW DEPRECATED**  
 **Analyzed Components:** VulkanicAPI.java, GraphicsBackend.java, OpenGLBackend.java  
 **Lines of Code Analyzed:** ~4,000 LOC  
 **Deprecated Methods:** 874 methods marked for replacement  
-**Migrated Methods:** 99 methods (11.3% complete)
-**Migrated Call Sites:** 179 call sites in 51 game files ✅ **ALL MIGRATED**
+**Migrated Methods:** 105 methods (12.0% complete)
+**Migrated Call Sites:** 209 call sites in 58 game files ✅ **ALL MIGRATED**
 **Removed Deprecated Methods:** 29 methods
 
 ---
@@ -24,12 +24,12 @@ All 874 methods in the current Vulkanic API have been marked as `@Deprecated` to
 The legacy Vulkanic API is a **thin OpenGL state machine wrapper** with approximately **25-30% compatibility** with Vulkan's architectural principles. While it successfully abstracts OpenGL calls behind an interface, the API design is fundamentally tied to OpenGL's immediate-mode, global-state paradigm, which conflicts with Vulkan's explicit, command-buffer-based architecture.
 
 **Migration Progress:**
-- ✅ **99 methods migrated** to CommandContext-aware API (11.3% of 874 total)
-- ✅ **179 call sites FULLY migrated** across **51 game files** ✅ **100% COMPLETE**
+- ✅ **105 methods migrated** to CommandContext-aware API (12.0% of 874 total)
+- ✅ **209 call sites FULLY migrated** across **58 game files** ✅ **100% COMPLETE**
 - ✅ **ZERO deprecated calls remaining** - all production code uses new API!
 - ✅ **Production code validates CommandContext design** - real usage in action!
 - ✅ **29 deprecated methods REMOVED** - codebase getting cleaner!
-- ⚠️ **775 methods remaining** in deprecated state (to be migrated)
+- ⚠️ **769 methods remaining** in deprecated state (to be migrated)
 - ✅ **All tests passing** (18/18 Vulkanic tests, 100%)
 - ✅ **Zero breaking changes** - fully backward compatible
 
@@ -132,14 +132,21 @@ The legacy Vulkanic API is a **thin OpenGL state machine wrapper** with approxim
 84. `deactivateVertexAttribute(ctx, index)` - Disable vertex attribute array
 85. `setVertexAttribDivisor(ctx, index, divisor)` - Set vertex attribute divisor
 86. `deleteVertexArray(ctx, array)` - Delete vertex array object (already existed)
-87. `assignUniformFloat2v(ctx, location, value)` - Set vec2 uniform from array ⭐ NEW
-88. `assignUniformFloat3v(ctx, location, value)` - Set vec3 uniform from array ⭐ NEW
-89. `assignUniformFloat4v(ctx, location, value)` - Set vec4 uniform from array ⭐ NEW
-90. `assignUniformMatrix4f(ctx, location, matrix)` - Set mat4 uniform ⭐ NEW
-91. `assignUniformMatrix4fv(ctx, location, transpose, value)` - Set mat4 uniform with transpose ⭐ NEW
-92. `locateUniformBlock(ctx, program, name)` - Get uniform block index ⭐ NEW
-93. `bindUniformBlock(ctx, program, index, binding)` - Bind uniform block to binding point ⭐ NEW
-94. `attachUniformBufferRange(ctx, target, index, buffer, offset, size)` - Attach uniform buffer range ⭐ NEW
+87. `assignUniformFloat2v(ctx, location, value)` - Set vec2 uniform from array
+88. `assignUniformFloat3v(ctx, location, value)` - Set vec3 uniform from array
+89. `assignUniformFloat4v(ctx, location, value)` - Set vec4 uniform from array
+90. `assignUniformMatrix4f(ctx, location, matrix)` - Set mat4 uniform
+91. `assignUniformMatrix4fv(ctx, location, transpose, value)` - Set mat4 uniform with transpose
+92. `locateUniformBlock(ctx, program, name)` - Get uniform block index
+93. `bindUniformBlock(ctx, program, index, binding)` - Bind uniform block to binding point
+94. `attachUniformBufferRange(ctx, target, index, buffer, offset, size)` - Attach uniform buffer range
+95. `glBufferStorage(ctx, target, size, flags)` - Allocate immutable buffer storage ⭐ NEW
+96. `glBufferStorage(ctx, target, data, flags)` - Allocate buffer storage with data ⭐ NEW
+97. `glMapBufferRange(ctx, target, offset, length, access)` - Map buffer memory for CPU access ⭐ NEW
+98. `glDispatchCompute(ctx, workX, workY, workZ)` - Dispatch compute shader work groups ⭐ NEW
+99. `glFramebufferTexture2D(ctx, target, attachment, textarget, texture, level)` - Attach 2D texture to FBO ⭐ NEW
+100. `glBindImageTexture(ctx, unit, texture, level, layered, layer, access, format)` - Bind image for load/store ⭐ NEW
+101. `glBindSampler(ctx, unit, sampler)` - Bind sampler object to texture unit ⭐ NEW
 
 ### New Migration Strategy: Incremental Replacement
 
