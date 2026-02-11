@@ -1,14 +1,14 @@
 # Vulkan Compatibility Analysis & Incremental Migration Plan
 
 **Analysis Date:** 2026-02-11  
-**Active Migration Phase:** Phase 32 Complete - Uniform Vector Assignments and Instanced Rendering Operations ✅
+**Active Migration Phase:** Phase 34 Complete - Debug System Setup, Capability Checking, and Sync Query Operations ✅
 **Vulkanic API Version:** Initial Implementation (OpenGL-only) - **ALL METHODS NOW DEPRECATED**  
 **Analyzed Components:** VulkanicAPI.java, GraphicsBackend.java, OpenGLBackend.java  
 **Lines of Code Analyzed:** ~4,000 LOC  
 **Deprecated Methods:** 874 methods marked for replacement  
-**Migrated Methods:** 180 methods (20.6% complete) ⭐ **+7 NEW METHODS** 🎉 **20% MILESTONE!**
-**Migrated Call Sites:** 391 call sites in 120 game files ✅ **ALL MIGRATED**
-**Removed Deprecated Methods:** 89 methods ⭐ **+7 REMOVED**
+**Migrated Methods:** 196 methods (22.4% complete) ⭐ **+10 NEW METHODS** 🎉 **22% MILESTONE!**
+**Migrated Call Sites:** 414 call sites in 135 game files ✅ **ALL MIGRATED**
+**Removed Deprecated Methods:** 105 methods ⭐ **+10 REMOVED**
 
 ---
 
@@ -16,13 +16,13 @@
 
 **MIGRATION STATUS: ACTIVE MIGRATION IN PROGRESS** 🔄
 
-All 874 methods in the current Vulkanic API have been marked as `@Deprecated` to facilitate an **incremental, test-driven migration** to a properly abstracted graphics API that supports both OpenGL and Vulkan backends. We have now begun the active migration phase, with **180 methods successfully migrated** to the new CommandContext-aware API.
+All 874 methods in the current Vulkanic API have been marked as `@Deprecated` to facilitate an **incremental, test-driven migration** to a properly abstracted graphics API that supports both OpenGL and Vulkan backends. We have now begun the active migration phase, with **196 methods successfully migrated** to the new CommandContext-aware API.
 
 ### Current State (Active Migration)
-- ✅ **180 methods migrated** to CommandContext-aware API (20.6% of 874 total) ⭐ **+7 NEW** 🎉 **PASSED 20%!**
-- ✅ **391 call sites FULLY migrated** across **120 game files** ✅ **100% COMPLETE**
-- ✅ **89 deprecated methods REMOVED** - codebase getting cleaner! ⭐ **+7 REMOVED**
-- ⚠️ **694 methods remaining** in deprecated state (to be migrated)
+- ✅ **196 methods migrated** to CommandContext-aware API (22.4% of 874 total) ⭐ **+10 NEW** 🎉 **PASSED 22%!**
+- ✅ **414 call sites FULLY migrated** across **135 game files** ✅ **100% COMPLETE**
+- ✅ **105 deprecated methods REMOVED** - codebase getting cleaner! ⭐ **+10 REMOVED**
+- ⚠️ **678 methods remaining** in deprecated state (to be migrated)
 - ✅ **ZERO deprecated calls remaining** - all production code uses new API!
 - ✅ **Production code validates CommandContext design** - real usage in action!
 - ✅ **All tests passing** (18/18 Vulkanic tests, 100%)
@@ -7597,4 +7597,164 @@ Added 6 public static methods with extensive documentation:
 - **BUILD SUCCESSFUL** - zero breaking changes
 
 This phase successfully abstracts advanced buffer management and vertex specification operations that are fundamental to high-performance rendering. The ARB_vertex_attrib_binding extension was specifically designed to match Vulkan's vertex input model, making this migration particularly significant for Vulkan compatibility.
+
+
+---
+
+## Phase 34: Debug System Setup, Capability Checking, and Sync Query Operations ✅
+
+**Date:** 2026-02-11  
+**Migration Focus:** Debug system initialization, extension capability queries, sync status queries, and graphics capabilities management  
+**Methods Migrated:** 10 (all NEW CommandContext versions)  
+**Call Sites Updated:** 16 across 10 game files  
+**Deprecated Methods Removed:** 10 from all 3 layers
+
+### Methods Migrated (10 total, all NEW)
+
+**Debug System Setup (4 methods):**
+1. `supportsKhrDebug(ctx)` - Check for GL_KHR_debug extension support
+2. `supportsArbDebugOutput(ctx)` - Check for GL_ARB_debug_output extension support  
+3. `setupKhrDebugSystem(ctx, verbosity, sync, handler)` - Configure KHR debug callback
+4. `setupArbDebugSystem(ctx, verbosity, sync, handler)` - Configure ARB debug callback
+
+**Extension Capability Checking (2 methods):**
+5. `hasBufferStorageExtension(ctx)` - Check for GL_ARB_buffer_storage
+6. `hasVertexAttribBindingExtension(ctx)` - Check for GL_ARB_vertex_attrib_binding
+
+**Sync Query (1 method):**
+7. `querySyncStatus(ctx, sync, pname, length)` - Query sync object status
+
+**Graphics Capabilities (3 methods):**
+8. `obtainGraphicsCapabilities(ctx)` - Get current graphics capabilities
+9. `initializeGraphicsCapabilities(ctx)` - Initialize graphics capabilities  
+10. `checkFunctionAvailable(ctx, functionName)` - Check if OpenGL function is available
+
+### Call Sites Updated (16 across 10 files)
+
+**Blaze3D:**
+- **GlDebug.java** - 4 calls (supportsKhrDebug, setupKhrDebugSystem, supportsArbDebugOutput, setupArbDebugSystem)
+- **BufferStorage.java** - 1 call (hasBufferStorageExtension)
+- **VertexArrayCache.java** - 1 call (hasVertexAttribBindingExtension)
+- **GlDevice.java** - 1 call (initializeGraphicsCapabilities)
+
+**Iris Shaders:**
+- **IrisRenderSystem.java** - 3 calls (checkFunctionAvailable x2, getGraphicsCapabilities)
+- **DepthCopyStrategy.java** - 2 calls (obtainGraphicsCapabilities, checkFunctionAvailable)
+
+**Sodium:**
+- **GLRenderDevice.java** - 1 call (obtainGraphicsCapabilities)
+- **GlFence.java** - 1 call (querySyncStatus)
+- **NvidiaWorkarounds.java** - 1 call (obtainGraphicsCapabilities)
+- **SodiumGameOptionPages.java** - 1 call (obtainGraphicsCapabilities)
+
+### Implementation Details
+
+**Added to GraphicsBackend.java:**
+- 10 new method signatures with comprehensive JavaDoc
+- Full OpenGL → Vulkan mapping documentation
+- Usage examples for each method
+
+**Implemented in OpenGLBackend.java:**
+- All methods with immediate-mode context validation
+- Using appropriate OpenGL APIs:
+  - GL.getCapabilities() for extension queries
+  - GL.createCapabilities() for initialization
+  - GL32C.glGetSynci() for sync status
+  - Reflection for function availability checks
+
+**Added to VulkanicAPI.java:**
+- 10 new public static methods
+- Comprehensive documentation with code examples
+- Clear explanation of OpenGL vs Vulkan behavior
+
+### Why This Matters for Vulkan
+
+**Debug System Setup:**
+- OpenGL: KHR_debug and ARB_debug_output for debug callbacks
+- Vulkan: VK_EXT_debug_utils for validation layers and debug messengers
+- Critical for development: validation messages, performance warnings, error detection
+- CommandContext enables proper device/instance-level setup in Vulkan
+
+**Extension Capability Checking:**
+- OpenGL: Extension strings and GLCapabilities flags
+- Vulkan: Instance and device extension enumeration
+- hasBufferStorageExtension() → Always true in Vulkan (all buffers immutable)
+- hasVertexAttribBindingExtension() → Always true in Vulkan (native model)
+
+**Sync Status Queries:**
+- OpenGL: glGetSynci() for fence object status (GL_SYNC_STATUS, GL_SYNC_CONDITION)
+- Vulkan: vkGetFenceStatus() for VkFence objects
+- Essential for GPU-CPU synchronization and frame pacing
+- CommandContext enables proper tracking of sync objects
+
+**Graphics Capabilities:**
+- OpenGL: GLCapabilities object with extension/version flags
+- Vulkan: VkPhysicalDeviceProperties, VkPhysicalDeviceFeatures
+- initializeGraphicsCapabilities() maps to vkCreateDevice feature selection
+- obtainGraphicsCapabilities() maps to querying current device properties
+- checkFunctionAvailable() enables runtime feature detection
+
+**Key Differences:**
+- OpenGL: Global state queries, extension strings
+- Vulkan: Explicit device/instance queries, structured feature flags
+- CommandContext enables abstraction of these fundamentally different models
+
+### Testing
+
+✅ **BUILD SUCCESSFUL** - zero compilation errors  
+✅ All 16 call sites updated and verified  
+✅ No deprecated method calls remaining  
+✅ OpenGL backend functioning correctly  
+✅ Debug system setup working (KHR and ARB variants)  
+✅ Extension capability checks functional  
+✅ Sync status queries successful  
+✅ Graphics capabilities initialization/retrieval working  
+✅ Function availability checks operational  
+
+### Files Modified
+
+**Game Code (10 files):**
+- GlDebug.java - Added CTX, updated 4 debug system calls
+- BufferStorage.java - Added CTX, updated hasBufferStorageExtension
+- VertexArrayCache.java - Updated hasVertexAttribBindingExtension (CTX already exists)
+- IrisRenderSystem.java - Updated 3 capability/function checks
+- DepthCopyStrategy.java - Added CTX constant, updated 2 calls
+- GLRenderDevice.java - Updated obtainGraphicsCapabilities
+- GlFence.java - Updated querySyncStatus
+- NvidiaWorkarounds.java - Added CTX, updated obtainGraphicsCapabilities
+- SodiumGameOptionPages.java - Added CTX, updated obtainGraphicsCapabilities
+- GlDevice.java - Updated initializeGraphicsCapabilities
+
+**API Layers (3 files):**
+- GraphicsBackend.java - Added 10 method signatures
+- VulkanicAPI.java - Added 10 public methods with full documentation
+- OpenGLBackend.java - Added 10 implementations
+
+### Deprecated Methods Removed (10 from all 3 layers)
+
+**From GraphicsBackend.java:**
+- `boolean supportsKhrDebug()`
+- `boolean supportsArbDebugOutput()`
+- `void setupKhrDebugSystem(int, boolean, Consumer<String>)`
+- `void setupArbDebugSystem(int, boolean, Consumer<String>)`
+- `boolean hasBufferStorageExtension()`
+- `boolean hasVertexAttribBindingExtension()`
+- `int querySyncStatus(long, int, IntBuffer)`
+- `GraphicsCapabilities obtainGraphicsCapabilities()`
+- `GraphicsCapabilities initializeGraphicsCapabilities()`
+- `boolean checkFunctionAvailable(String)`
+
+**From VulkanicAPI.java and OpenGLBackend.java:**
+- Corresponding implementations for all 10 methods
+
+### Progress Statistics
+
+- **196/874 methods migrated (22.4%)** ⭐ **+10 methods this phase**
+- **414 call sites** updated across **135 game files** ⭐ **+16 call sites**
+- **105 deprecated methods** completely removed ⭐ **+10 methods removed**
+- **10 new CommandContext methods** added this phase
+- **BUILD SUCCESSFUL** - zero breaking changes
+- **Passed 22% milestone!** 🎉
+
+This phase successfully abstracts debug tooling, capability detection, and synchronization queries that are fundamental to both development workflows and runtime feature detection in OpenGL and Vulkan.
 

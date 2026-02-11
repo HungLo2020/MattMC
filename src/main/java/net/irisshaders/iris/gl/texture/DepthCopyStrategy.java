@@ -3,10 +3,13 @@ package net.irisshaders.iris.gl.texture;
 import net.blaze3d.opengl.GlStateManager;
 import net.irisshaders.iris.gl.IrisRenderSystem;
 import net.irisshaders.iris.gl.framebuffer.GlFramebuffer;
+import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
 import org.lwjgl.system.MemoryUtil;
 
 public interface DepthCopyStrategy {
+	CommandContext CTX = VulkanicAPI.getImmediateContext();
+	
 	// GL constants (from GL20C, GL30C, GL43C)
 	int GL_TEXTURE_2D = 0x0DE1;
 	int GL_DEPTH_BUFFER_BIT = 0x00000100;
@@ -20,7 +23,7 @@ public interface DepthCopyStrategy {
 		//
 		// Perhaps calling GL43.isAvailable would be a different option, but we only need one
 		// function, so we just check for that function.
-		if (VulkanicAPI.obtainGraphicsCapabilities().OpenGL43 && VulkanicAPI.checkFunctionAvailable("glCopyImageSubData")) {
+		if (VulkanicAPI.obtainGraphicsCapabilities(CTX).OpenGL43 && VulkanicAPI.checkFunctionAvailable(CTX, "glCopyImageSubData")) {
 			return new Gl43CopyImage();
 		}
 

@@ -14,8 +14,10 @@ import org.jetbrains.annotations.Nullable;
 
 @Environment(EnvType.CLIENT)
 public abstract class VertexArrayCache {
+	private static final CommandContext CTX = VulkanicAPI.getImmediateContext();
+	
 	public static VertexArrayCache create(GlDebugLabel glDebugLabel, Set<String> set) {
-		if (VulkanicAPI.hasVertexAttribBindingExtension() && GlDevice.USE_GL_ARB_vertex_attrib_binding) {
+		if (VulkanicAPI.hasVertexAttribBindingExtension(CTX) && GlDevice.USE_GL_ARB_vertex_attrib_binding) {
 			set.add("GL_ARB_vertex_attrib_binding");
 			return new VertexArrayCache.Separate(glDebugLabel);
 		} else {

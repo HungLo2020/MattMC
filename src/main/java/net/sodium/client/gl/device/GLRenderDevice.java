@@ -55,7 +55,7 @@ public class GLRenderDevice implements RenderDevice {
 
     @Override
     public net.vulkanic.GraphicsCapabilities getCapabilities() {
-        return VulkanicAPI.obtainGraphicsCapabilities();
+        return VulkanicAPI.obtainGraphicsCapabilities(CTX);
     }
 
     @Override

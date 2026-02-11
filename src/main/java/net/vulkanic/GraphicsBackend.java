@@ -2019,6 +2019,128 @@ public interface GraphicsBackend {
     
     // Multi-draw operations
     
+    // Debug system setup (CommandContext versions)
+    /**
+     * Checks if the KHR_debug extension is supported.
+     * 
+     * In OpenGL: Checks for GL_KHR_debug extension
+     * In Vulkan: Checks for VK_EXT_debug_utils instance extension
+     * 
+     * @param ctx Command context for querying capabilities
+     * @return true if KHR debug functionality is available
+     */
+    boolean supportsKhrDebug(CommandContext ctx);
+    
+    /**
+     * Checks if the ARB_debug_output extension is supported.
+     * 
+     * In OpenGL: Checks for GL_ARB_debug_output extension (legacy)
+     * In Vulkan: Not applicable (use VK_EXT_debug_utils instead)
+     * 
+     * @param ctx Command context for querying capabilities
+     * @return true if ARB debug output is available
+     */
+    boolean supportsArbDebugOutput(CommandContext ctx);
+    
+    /**
+     * Sets up the KHR debug system with message filtering and callback.
+     * 
+     * In OpenGL: Configures glDebugMessageCallback and filtering
+     * In Vulkan: Sets up VK_EXT_debug_utils messenger
+     * 
+     * @param ctx Command context for setup operations
+     * @param verbosityLevel Debug message verbosity (0=none, 1=high, 2=high+medium, 3=all)
+     * @param synchronous Whether to make debug callbacks synchronous (slower but more reliable)
+     * @param messageHandler Consumer that receives debug messages as strings
+     */
+    void setupKhrDebugSystem(CommandContext ctx, int verbosityLevel, boolean synchronous, java.util.function.Consumer<String> messageHandler);
+    
+    /**
+     * Sets up the ARB debug output system (legacy debug extension).
+     * 
+     * In OpenGL: Configures glDebugMessageCallbackARB
+     * In Vulkan: Not applicable (use setupKhrDebugSystem instead)
+     * 
+     * @param ctx Command context for setup operations
+     * @param verbosityLevel Debug message verbosity level
+     * @param synchronous Whether to make debug callbacks synchronous
+     * @param messageHandler Consumer that receives debug messages
+     */
+    void setupArbDebugSystem(CommandContext ctx, int verbosityLevel, boolean synchronous, java.util.function.Consumer<String> messageHandler);
+    
+    // Extension capability checking (CommandContext versions)
+    /**
+     * Checks if the buffer storage extension is available.
+     * 
+     * In OpenGL: Checks for GL_ARB_buffer_storage (OpenGL 4.4+)
+     * In Vulkan: Always true (all buffers are immutable by design)
+     * 
+     * @param ctx Command context for querying capabilities
+     * @return true if immutable buffer storage is supported
+     */
+    boolean hasBufferStorageExtension(CommandContext ctx);
+    
+    /**
+     * Checks if the vertex attribute binding extension is available.
+     * 
+     * In OpenGL: Checks for GL_ARB_vertex_attrib_binding (OpenGL 4.3+)
+     * In Vulkan: Always true (Vulkan uses this model by design)
+     * 
+     * @param ctx Command context for querying capabilities
+     * @return true if separate vertex attribute binding is supported
+     */
+    boolean hasVertexAttribBindingExtension(CommandContext ctx);
+    
+    // Sync query operations (CommandContext version)
+    /**
+     * Queries the status or value of a sync object.
+     * 
+     * In OpenGL: Maps to glGetSynci (GL_SYNC_STATUS, GL_SYNC_CONDITION, etc.)
+     * In Vulkan: Maps to vkGetFenceStatus for VkFence objects
+     * 
+     * @param ctx Command context for query operations
+     * @param sync The sync object handle
+     * @param pname Parameter name to query (e.g., GL_SYNC_STATUS)
+     * @param length Buffer to receive the number of values returned
+     * @return The queried value
+     */
+    int querySyncStatus(CommandContext ctx, long sync, int pname, java.nio.IntBuffer length);
+    
+    // Graphics capabilities (CommandContext versions)
+    /**
+     * Obtains the current graphics capabilities object.
+     * 
+     * In OpenGL: Returns cached GL.getCapabilities()
+     * In Vulkan: Returns device/instance extension and feature flags
+     * 
+     * @param ctx Command context for capability queries
+     * @return Graphics capabilities structure with extension/feature flags
+     */
+    GraphicsCapabilities obtainGraphicsCapabilities(CommandContext ctx);
+    
+    /**
+     * Initializes and returns graphics capabilities for the current context.
+     * 
+     * In OpenGL: Creates capabilities with GL.createCapabilities()
+     * In Vulkan: Queries device properties and features
+     * 
+     * @param ctx Command context for initialization
+     * @return Newly initialized graphics capabilities structure
+     */
+    GraphicsCapabilities initializeGraphicsCapabilities(CommandContext ctx);
+    
+    /**
+     * Checks if a specific OpenGL function is available at runtime.
+     * 
+     * In OpenGL: Uses reflection to check GLCapabilities function pointer
+     * In Vulkan: Checks if corresponding Vulkan function is available
+     * 
+     * @param ctx Command context for function availability queries
+     * @param functionName Name of the OpenGL function (e.g., "glDispatchCompute")
+     * @return true if the function is available
+     */
+    boolean checkFunctionAvailable(CommandContext ctx, String functionName);
+    
     // String queries
     @Deprecated
     String queryString(int name);

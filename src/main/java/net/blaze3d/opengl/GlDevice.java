@@ -63,7 +63,7 @@ public class GlDevice implements GpuDevice {
 
 	public GlDevice(long l, int i, boolean bl, BiFunction<ResourceLocation, ShaderType, String> biFunction, boolean bl2) {
 		GLFW.glfwMakeContextCurrent(l);
-		net.vulkanic.GraphicsCapabilities gLCapabilities = net.vulkanic.VulkanicAPI.initializeGraphicsCapabilities();
+		net.vulkanic.GraphicsCapabilities gLCapabilities = net.vulkanic.VulkanicAPI.initializeGraphicsCapabilities(CTX);
 		int j = getMaxSupportedTextureSize();
 		GLFW.glfwSetWindowSizeLimits(l, -1, -1, j, j);
 		GraphicsWorkarounds graphicsWorkarounds = GraphicsWorkarounds.get(this);

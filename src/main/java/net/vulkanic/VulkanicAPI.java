@@ -3837,6 +3837,238 @@ public class VulkanicAPI {
         return getBackend().checkFunctionAvailable(functionName);
     }
     
+    // CommandContext versions of debug and capability methods
+    
+    /**
+     * Checks if the KHR_debug extension is supported.
+     * 
+     * This is a Vulkan-compatible method that requires an explicit CommandContext.
+     * For OpenGL, use getImmediateContext() to get the context.
+     * 
+     * Example usage:
+     * <pre>
+     *     CommandContext ctx = VulkanicAPI.getImmediateContext();
+     *     if (VulkanicAPI.supportsKhrDebug(ctx)) {
+     *         VulkanicAPI.setupKhrDebugSystem(ctx, 3, true, msg -> System.out.println(msg));
+     *     }
+     * </pre>
+     * 
+     * In OpenGL: Checks for GL_KHR_debug extension (OpenGL 4.3+)
+     * In Vulkan: Checks for VK_EXT_debug_utils instance extension
+     * 
+     * @param ctx Command context for querying capabilities
+     * @return true if KHR debug functionality is available
+     */
+    public static boolean supportsKhrDebug(CommandContext ctx) {
+        return getBackend().supportsKhrDebug(ctx);
+    }
+    
+    /**
+     * Checks if the ARB_debug_output extension is supported.
+     * 
+     * This is a Vulkan-compatible method that requires an explicit CommandContext.
+     * For OpenGL, use getImmediateContext() to get the context.
+     * 
+     * In OpenGL: Checks for GL_ARB_debug_output extension (legacy, pre-4.3)
+     * In Vulkan: Not applicable (use VK_EXT_debug_utils instead)
+     * 
+     * @param ctx Command context for querying capabilities
+     * @return true if ARB debug output is available
+     */
+    public static boolean supportsArbDebugOutput(CommandContext ctx) {
+        return getBackend().supportsArbDebugOutput(ctx);
+    }
+    
+    /**
+     * Sets up the KHR debug system with message filtering and callback.
+     * 
+     * This is a Vulkan-compatible method that requires an explicit CommandContext.
+     * For OpenGL, use getImmediateContext() to get the context.
+     * 
+     * Example usage:
+     * <pre>
+     *     CommandContext ctx = VulkanicAPI.getImmediateContext();
+     *     VulkanicAPI.setupKhrDebugSystem(ctx, 2, true, message -> {
+     *         System.err.println("[OpenGL Debug] " + message);
+     *     });
+     * </pre>
+     * 
+     * In OpenGL: Configures glDebugMessageCallback and filtering
+     * In Vulkan: Sets up VK_EXT_debug_utils messenger
+     * 
+     * @param ctx Command context for setup operations
+     * @param verbosityLevel Debug message verbosity (0=none, 1=high, 2=high+medium, 3=all)
+     * @param synchronous Whether to make debug callbacks synchronous (slower but more reliable)
+     * @param messageHandler Consumer that receives debug messages as strings
+     */
+    public static void setupKhrDebugSystem(CommandContext ctx, int verbosityLevel, boolean synchronous, java.util.function.Consumer<String> messageHandler) {
+        getBackend().setupKhrDebugSystem(ctx, verbosityLevel, synchronous, messageHandler);
+    }
+    
+    /**
+     * Sets up the ARB debug output system (legacy debug extension).
+     * 
+     * This is a Vulkan-compatible method that requires an explicit CommandContext.
+     * For OpenGL, use getImmediateContext() to get the context.
+     * 
+     * In OpenGL: Configures glDebugMessageCallbackARB
+     * In Vulkan: Not applicable (use setupKhrDebugSystem instead)
+     * 
+     * @param ctx Command context for setup operations
+     * @param verbosityLevel Debug message verbosity level
+     * @param synchronous Whether to make debug callbacks synchronous
+     * @param messageHandler Consumer that receives debug messages
+     */
+    public static void setupArbDebugSystem(CommandContext ctx, int verbosityLevel, boolean synchronous, java.util.function.Consumer<String> messageHandler) {
+        getBackend().setupArbDebugSystem(ctx, verbosityLevel, synchronous, messageHandler);
+    }
+    
+    /**
+     * Checks if the buffer storage extension is available.
+     * 
+     * This is a Vulkan-compatible method that requires an explicit CommandContext.
+     * For OpenGL, use getImmediateContext() to get the context.
+     * 
+     * Example usage:
+     * <pre>
+     *     CommandContext ctx = VulkanicAPI.getImmediateContext();
+     *     if (VulkanicAPI.hasBufferStorageExtension(ctx)) {
+     *         // Use glBufferStorage for persistent mapped buffers
+     *     }
+     * </pre>
+     * 
+     * In OpenGL: Checks for GL_ARB_buffer_storage (OpenGL 4.4+)
+     * In Vulkan: Always true (all buffers are immutable by design)
+     * 
+     * @param ctx Command context for querying capabilities
+     * @return true if immutable buffer storage is supported
+     */
+    public static boolean hasBufferStorageExtension(CommandContext ctx) {
+        return getBackend().hasBufferStorageExtension(ctx);
+    }
+    
+    /**
+     * Checks if the vertex attribute binding extension is available.
+     * 
+     * This is a Vulkan-compatible method that requires an explicit CommandContext.
+     * For OpenGL, use getImmediateContext() to get the context.
+     * 
+     * Example usage:
+     * <pre>
+     *     CommandContext ctx = VulkanicAPI.getImmediateContext();
+     *     if (VulkanicAPI.hasVertexAttribBindingExtension(ctx)) {
+     *         // Use glVertexAttribFormat + glBindVertexBuffer
+     *     }
+     * </pre>
+     * 
+     * In OpenGL: Checks for GL_ARB_vertex_attrib_binding (OpenGL 4.3+)
+     * In Vulkan: Always true (Vulkan uses this model by design)
+     * 
+     * @param ctx Command context for querying capabilities
+     * @return true if separate vertex attribute binding is supported
+     */
+    public static boolean hasVertexAttribBindingExtension(CommandContext ctx) {
+        return getBackend().hasVertexAttribBindingExtension(ctx);
+    }
+    
+    /**
+     * Queries the status or value of a sync object.
+     * 
+     * This is a Vulkan-compatible method that requires an explicit CommandContext.
+     * For OpenGL, use getImmediateContext() to get the context.
+     * 
+     * Example usage:
+     * <pre>
+     *     CommandContext ctx = VulkanicAPI.getImmediateContext();
+     *     IntBuffer length = BufferUtils.createIntBuffer(1);
+     *     int status = VulkanicAPI.querySyncStatus(ctx, syncId, GL_SYNC_STATUS, length);
+     * </pre>
+     * 
+     * In OpenGL: Maps to glGetSynci (GL_SYNC_STATUS, GL_SYNC_CONDITION, etc.)
+     * In Vulkan: Maps to vkGetFenceStatus for VkFence objects
+     * 
+     * @param ctx Command context for query operations
+     * @param sync The sync object handle
+     * @param pname Parameter name to query (e.g., GL_SYNC_STATUS)
+     * @param length Buffer to receive the number of values returned
+     * @return The queried value
+     */
+    public static int querySyncStatus(CommandContext ctx, long sync, int pname, java.nio.IntBuffer length) {
+        return getBackend().querySyncStatus(ctx, sync, pname, length);
+    }
+    
+    /**
+     * Obtains the current graphics capabilities object.
+     * 
+     * This is a Vulkan-compatible method that requires an explicit CommandContext.
+     * For OpenGL, use getImmediateContext() to get the context.
+     * 
+     * Example usage:
+     * <pre>
+     *     CommandContext ctx = VulkanicAPI.getImmediateContext();
+     *     GraphicsCapabilities caps = VulkanicAPI.obtainGraphicsCapabilities(ctx);
+     *     if (caps.OpenGL43) {
+     *         // Use OpenGL 4.3 features
+     *     }
+     * </pre>
+     * 
+     * In OpenGL: Returns cached GL.getCapabilities()
+     * In Vulkan: Returns device/instance extension and feature flags
+     * 
+     * @param ctx Command context for capability queries
+     * @return Graphics capabilities structure with extension/feature flags
+     */
+    public static GraphicsCapabilities obtainGraphicsCapabilities(CommandContext ctx) {
+        return getBackend().obtainGraphicsCapabilities(ctx);
+    }
+    
+    /**
+     * Initializes and returns graphics capabilities for the current context.
+     * 
+     * This is a Vulkan-compatible method that requires an explicit CommandContext.
+     * For OpenGL, use getImmediateContext() to get the context.
+     * 
+     * Example usage:
+     * <pre>
+     *     CommandContext ctx = VulkanicAPI.getImmediateContext();
+     *     GraphicsCapabilities caps = VulkanicAPI.initializeGraphicsCapabilities(ctx);
+     * </pre>
+     * 
+     * In OpenGL: Creates capabilities with GL.createCapabilities()
+     * In Vulkan: Queries device properties and features
+     * 
+     * @param ctx Command context for initialization
+     * @return Newly initialized graphics capabilities structure
+     */
+    public static GraphicsCapabilities initializeGraphicsCapabilities(CommandContext ctx) {
+        return getBackend().initializeGraphicsCapabilities(ctx);
+    }
+    
+    /**
+     * Checks if a specific OpenGL function is available at runtime.
+     * 
+     * This is a Vulkan-compatible method that requires an explicit CommandContext.
+     * For OpenGL, use getImmediateContext() to get the context.
+     * 
+     * Example usage:
+     * <pre>
+     *     CommandContext ctx = VulkanicAPI.getImmediateContext();
+     *     if (VulkanicAPI.checkFunctionAvailable(ctx, "glDispatchCompute")) {
+     *         // Compute shaders are available
+     *     }
+     * </pre>
+     * 
+     * In OpenGL: Uses reflection to check GLCapabilities function pointer
+     * In Vulkan: Checks if corresponding Vulkan function is available
+     * 
+     * @param ctx Command context for function availability queries
+     * @param functionName Name of the OpenGL function (e.g., "glDispatchCompute")
+     * @return true if the function is available
+     */
+    public static boolean checkFunctionAvailable(CommandContext ctx, String functionName) {
+        return getBackend().checkFunctionAvailable(ctx, functionName);
+    }
+    
     @Deprecated
     public static void copyBufferSubData(int readTarget, int writeTarget, long readOffset, long writeOffset, long size) {
         copyBufferSubData(getImmediateContext(), readTarget, writeTarget, readOffset, writeOffset, size);

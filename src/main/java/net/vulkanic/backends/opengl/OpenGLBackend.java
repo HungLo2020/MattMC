@@ -2021,6 +2021,137 @@ public class OpenGLBackend implements GraphicsBackend {
         }
     }
     
+    // CommandContext versions of debug and capability methods
+    @Override
+    public boolean supportsKhrDebug(CommandContext ctx) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalStateException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        return org.lwjgl.opengl.GL.getCapabilities().GL_KHR_debug;
+    }
+    
+    @Override
+    public boolean supportsArbDebugOutput(CommandContext ctx) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalStateException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        return org.lwjgl.opengl.GL.getCapabilities().GL_ARB_debug_output;
+    }
+    
+    @Override
+    public void setupKhrDebugSystem(CommandContext ctx, int verbosityLevel, boolean synchronous, java.util.function.Consumer<String> messageHandler) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalStateException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        org.lwjgl.opengl.GL11.glEnable(37600); // GL_DEBUG_OUTPUT
+        if (synchronous) {
+            org.lwjgl.opengl.GL11.glEnable(33346); // GL_DEBUG_OUTPUT_SYNCHRONOUS
+        }
+        
+        // Configure message filtering based on verbosity
+        java.util.List<Integer> levels = java.util.Arrays.asList(37190, 37191, 37192, 33387);
+        for (int i = 0; i < levels.size(); i++) {
+            boolean shouldEnable = i < verbosityLevel;
+            org.lwjgl.opengl.KHRDebug.glDebugMessageControl(4352, 4352, levels.get(i), (int[])null, shouldEnable);
+        }
+        
+        // Install callback
+        org.lwjgl.opengl.GLDebugMessageCallback callback = org.lwjgl.opengl.GLDebugMessageCallback.create(
+            (source, type, id, severity, length, message, userParam) -> {
+                String msg = org.lwjgl.opengl.GLDebugMessageCallback.getMessage(length, message);
+                messageHandler.accept(msg);
+            }
+        );
+        org.lwjgl.opengl.KHRDebug.glDebugMessageCallback(
+            net.blaze3d.platform.GLX.make(callback, net.blaze3d.platform.DebugMemoryUntracker::untrack), 
+            0L
+        );
+    }
+    
+    @Override
+    public void setupArbDebugSystem(CommandContext ctx, int verbosityLevel, boolean synchronous, java.util.function.Consumer<String> messageHandler) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalStateException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        if (synchronous) {
+            org.lwjgl.opengl.GL11.glEnable(33346); // GL_DEBUG_OUTPUT_SYNCHRONOUS
+        }
+        
+        // Configure message filtering based on verbosity  
+        java.util.List<Integer> levels = java.util.Arrays.asList(37190, 37191, 37192);
+        for (int i = 0; i < levels.size(); i++) {
+            boolean shouldEnable = i < verbosityLevel;
+            org.lwjgl.opengl.ARBDebugOutput.glDebugMessageControlARB(4352, 4352, levels.get(i), (int[])null, shouldEnable);
+        }
+        
+        // Install callback
+        org.lwjgl.opengl.GLDebugMessageARBCallback callback = org.lwjgl.opengl.GLDebugMessageARBCallback.create(
+            (source, type, id, severity, length, message, userParam) -> {
+                String msg = org.lwjgl.opengl.GLDebugMessageCallback.getMessage(length, message);
+                messageHandler.accept(msg);
+            }
+        );
+        org.lwjgl.opengl.ARBDebugOutput.glDebugMessageCallbackARB(
+            net.blaze3d.platform.GLX.make(callback, net.blaze3d.platform.DebugMemoryUntracker::untrack),
+            0L
+        );
+    }
+    
+    @Override
+    public boolean hasBufferStorageExtension(CommandContext ctx) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalStateException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        return org.lwjgl.opengl.GL.getCapabilities().GL_ARB_buffer_storage;
+    }
+    
+    @Override
+    public boolean hasVertexAttribBindingExtension(CommandContext ctx) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalStateException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        return org.lwjgl.opengl.GL.getCapabilities().GL_ARB_vertex_attrib_binding;
+    }
+    
+    @Override
+    public int querySyncStatus(CommandContext ctx, long sync, int pname, java.nio.IntBuffer length) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalStateException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        return org.lwjgl.opengl.GL32C.glGetSynci(sync, pname, length);
+    }
+    
+    @Override
+    public GraphicsCapabilities obtainGraphicsCapabilities(CommandContext ctx) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalStateException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        return convertCapabilities(org.lwjgl.opengl.GL.getCapabilities());
+    }
+    
+    @Override
+    public GraphicsCapabilities initializeGraphicsCapabilities(CommandContext ctx) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalStateException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        return convertCapabilities(org.lwjgl.opengl.GL.createCapabilities());
+    }
+    
+    @Override
+    public boolean checkFunctionAvailable(CommandContext ctx, String functionName) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalStateException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        org.lwjgl.opengl.GLCapabilities caps = org.lwjgl.opengl.GL.getCapabilities();
+        try {
+            java.lang.reflect.Field field = caps.getClass().getField(functionName);
+            long address = field.getLong(caps);
+            return address != org.lwjgl.system.MemoryUtil.NULL;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+    
     @Deprecated
     @Override
     public void copyBufferSubData(int readTarget, int writeTarget, long readOffset, long writeOffset, long size) {

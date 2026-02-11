@@ -4,6 +4,7 @@ import com.google.common.collect.EvictingQueue;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import net.logging.LogUtils;
+import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
 import java.util.List;
 import java.util.Queue;
@@ -16,6 +17,7 @@ import org.slf4j.Logger;
 @Environment(EnvType.CLIENT)
 public class GlDebug {
 	private static final Logger LOGGER = LogUtils.getLogger();
+	private static final CommandContext CTX = VulkanicAPI.getImmediateContext();
 	private static final int CIRCULAR_LOG_SIZE = 10;
 	private final Queue<GlDebug.LogEntry> MESSAGE_BUFFER = EvictingQueue.create(10);
 	@Nullable
@@ -115,16 +117,16 @@ public class GlDebug {
 		GlDebug debugSystem = new GlDebug();
 		
 		// Try KHR_debug first
-		if (VulkanicAPI.supportsKhrDebug() && GlDevice.USE_GL_KHR_debug) {
+		if (VulkanicAPI.supportsKhrDebug(CTX) && GlDevice.USE_GL_KHR_debug) {
 			extensions.add("GL_KHR_debug");
-			VulkanicAPI.setupKhrDebugSystem(verbosity, sync, debugSystem::handleDebugMessage);
+			VulkanicAPI.setupKhrDebugSystem(CTX, verbosity, sync, debugSystem::handleDebugMessage);
 			return debugSystem;
 		}
 		
 		// Fall back to ARB_debug_output
-		if (VulkanicAPI.supportsArbDebugOutput() && GlDevice.USE_GL_ARB_debug_output) {
+		if (VulkanicAPI.supportsArbDebugOutput(CTX) && GlDevice.USE_GL_ARB_debug_output) {
 			extensions.add("GL_ARB_debug_output");
-			VulkanicAPI.setupArbDebugSystem(verbosity, sync, debugSystem::handleDebugMessage);
+			VulkanicAPI.setupArbDebugSystem(CTX, verbosity, sync, debugSystem::handleDebugMessage);
 			return debugSystem;
 		}
 		

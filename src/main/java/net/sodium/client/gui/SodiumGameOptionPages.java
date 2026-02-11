@@ -24,6 +24,7 @@ import net.minecraft.client.*;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ParticleStatus;
 import net.minecraft.client.PanoramaTheme;
+import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
 
 import java.util.ArrayList;
@@ -32,6 +33,7 @@ import java.util.Optional;
 
 // TODO: Rename in Sodium 0.6
 public class SodiumGameOptionPages {
+    private static final CommandContext CTX = VulkanicAPI.getImmediateContext();
     private static final SodiumOptionsStorage sodiumOpts = new SodiumOptionsStorage();
     private static final MinecraftOptionsStorage vanillaOpts = new MinecraftOptionsStorage();
     private static final Window window = Minecraft.getInstance().getWindow();
@@ -439,7 +441,7 @@ public class SodiumGameOptionPages {
     }
 
     private static boolean supportsNoErrorContext() {
-        var capabilities = VulkanicAPI.obtainGraphicsCapabilities();
+        var capabilities = VulkanicAPI.obtainGraphicsCapabilities(CTX);
         return (capabilities.OpenGL46 || capabilities.GL_KHR_no_error)
                 && !Workarounds.isWorkaroundEnabled(Workarounds.Reference.NO_ERROR_CONTEXT_UNSUPPORTED);
     }

@@ -55,7 +55,7 @@ public class IrisRenderSystem {
 		hasMultibind = VulkanicAPI.getGraphicsCapabilities().OpenGL45 || VulkanicAPI.getGraphicsCapabilities().GL_ARB_multi_bind;
 		perspectiveProjectionMatrixBuffer = new PerspectiveProjectionMatrixBuffer("Iris shadow map projection");
 
-		supportsCompute = VulkanicAPI.checkFunctionAvailable("glDispatchCompute");
+		supportsCompute = VulkanicAPI.checkFunctionAvailable(CTX, "glDispatchCompute");
 		supportsTesselation = VulkanicAPI.getGraphicsCapabilities().GL_ARB_tessellation_shader || VulkanicAPI.getGraphicsCapabilities().OpenGL40;
 
 		samplers = new int[SamplerLimits.get().getMaxTextureUnits()];
@@ -275,7 +275,7 @@ public class IrisRenderSystem {
 	}
 
 	public static boolean supportsImageLoadStore() {
-		return VulkanicAPI.checkFunctionAvailable("glBindImageTexture") || VulkanicAPI.getGraphicsCapabilities().OpenGL42 || ((VulkanicAPI.getGraphicsCapabilities().GL_ARB_shader_image_load_store || VulkanicAPI.getGraphicsCapabilities().GL_EXT_shader_image_load_store) && VulkanicAPI.getGraphicsCapabilities().GL_ARB_buffer_storage);
+		return VulkanicAPI.checkFunctionAvailable(CTX, "glBindImageTexture") || VulkanicAPI.getGraphicsCapabilities().OpenGL42 || ((VulkanicAPI.getGraphicsCapabilities().GL_ARB_shader_image_load_store || VulkanicAPI.getGraphicsCapabilities().GL_EXT_shader_image_load_store) && VulkanicAPI.getGraphicsCapabilities().GL_ARB_buffer_storage);
 	}
 
 	public static void genBuffers(int[] buffers) {

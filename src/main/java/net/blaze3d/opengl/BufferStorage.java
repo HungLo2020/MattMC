@@ -5,14 +5,17 @@ import java.util.Set;
 import java.util.function.Supplier;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
+import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
 import org.jetbrains.annotations.Nullable;
 import org.lwjgl.system.MemoryUtil;
 
 @Environment(EnvType.CLIENT)
 public abstract class BufferStorage {
+	private static final CommandContext CTX = VulkanicAPI.getImmediateContext();
+	
 	public static BufferStorage create(Set<String> set) {
-		if (VulkanicAPI.hasBufferStorageExtension() && GlDevice.USE_GL_ARB_buffer_storage) {
+		if (VulkanicAPI.hasBufferStorageExtension(CTX) && GlDevice.USE_GL_ARB_buffer_storage) {
 			set.add("GL_ARB_buffer_storage");
 			return new BufferStorage.Immutable();
 		} else {
