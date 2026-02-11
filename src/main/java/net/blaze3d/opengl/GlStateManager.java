@@ -270,7 +270,7 @@ public class GlStateManager {
 
 	public static int _glGenVertexArrays() {
 		RenderSystem.assertOnRenderThread();
-		return net.vulkanic.VulkanicAPI.createVertexArrayObject();
+		return net.vulkanic.VulkanicAPI.createVertexArrayObject(CTX);
 	}
 
 	public static void _glBindBuffer(int i, int j) {
@@ -280,7 +280,7 @@ public class GlStateManager {
 
 	public static void _glBindVertexArray(int i) {
 		RenderSystem.assertOnRenderThread();
-		net.vulkanic.VulkanicAPI.selectVertexArray(i);
+		net.vulkanic.VulkanicAPI.selectVertexArray(CTX, i);
 	}
 
 	public static void _glBufferData(int i, ByteBuffer byteBuffer, int j) {
@@ -408,7 +408,7 @@ public class GlStateManager {
 		if (f != POLY_OFFSET.factor || g != POLY_OFFSET.units) {
 			POLY_OFFSET.factor = f;
 			POLY_OFFSET.units = g;
-			net.vulkanic.VulkanicAPI.configurePolygonOffset(f, g);
+			net.vulkanic.VulkanicAPI.configurePolygonOffset(CTX, f, g);
 		}
 	}
 
@@ -440,7 +440,7 @@ public class GlStateManager {
 		
 		if (activeTexture != i - 33984) {
 			activeTexture = i - 33984;
-			net.vulkanic.VulkanicAPI.activateTextureUnit(i);
+			net.vulkanic.VulkanicAPI.activateTextureUnit(CTX, i);
 		}
 	}
 
@@ -580,7 +580,7 @@ public class GlStateManager {
 
 	public static void _pixelStore(int i, int j) {
 		RenderSystem.assertOnRenderThread();
-		net.vulkanic.VulkanicAPI.setPixelStoreMode(i, j);
+		net.vulkanic.VulkanicAPI.setPixelStoreMode(CTX, i, j);
 	}
 
 	public static void _readPixels(int i, int j, int k, int l, int m, int n, long o) {

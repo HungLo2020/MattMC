@@ -2992,10 +2992,6 @@ public class VulkanicAPI {
     // DEPRECATED METHODS - Legacy API without CommandContext
     // ================================================================================
     
-    @Deprecated
-    public static void setPixelStoreMode(int pname, int value) {
-        getBackend().setPixelStoreMode(pname, value);
-    }
     
     @Deprecated
     public static void attachFramebuffer(int target, int fbo) {
@@ -3081,20 +3077,12 @@ public class VulkanicAPI {
                                               dstX0, dstY0, dstX1, dstY1, mask, filter);
     }
     
-    @Deprecated
-    public static void activateTextureUnit(int unit) {
-        getBackend().activateTextureUnit(unit);
-    }
     
     @Deprecated
     public static void configureTextureParameter(int target, int pname, int param) {
         getBackend().configureTextureParameter(target, pname, param);
     }
     
-    @Deprecated
-    public static void configurePolygonOffset(float factor, float units) {
-        getBackend().configurePolygonOffset(factor, units);
-    }
     
     @Deprecated
     public static void transferTexture2DImage(int tgt, int lvl, int intfmt, int w, int h, int bdr, int fmt, int typ, java.nio.ByteBuffer pix) {
@@ -3116,15 +3104,6 @@ public class VulkanicAPI {
         getBackend().fillBufferSubregion(tgt, off, dat);
     }
     
-    @Deprecated
-    public static int createVertexArrayObject() {
-        return getBackend().createVertexArrayObject();
-    }
-    
-    @Deprecated
-    public static void selectVertexArray(int vao) {
-        getBackend().selectVertexArray(vao);
-    }
     
     @Deprecated
     public static java.nio.ByteBuffer mapBufferRegion(int tgt, int off, int len, int acc) {

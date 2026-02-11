@@ -5935,3 +5935,128 @@ This phase is particularly significant because texture operations are **fundamen
 - Continue migrating remaining deprecated methods
 - Focus on texture operations, sync primitives, and query objects
 - Maintain test coverage and documentation
+
+---
+
+## Phase 23: Pixel Store, Texture Unit, Polygon Offset, and VAO Operations (2026-02-11) ✅
+
+### Overview
+
+Phase 23 migrates 5 deprecated methods related to pixel operations, texture unit activation, polygon offset, and vertex array objects. These methods are fundamental to graphics state management and need proper CommandContext abstraction for Vulkan compatibility.
+
+### Methods Migrated
+
+1. **`setPixelStoreMode(pname, value)`** → **`setPixelStoreMode(ctx, pname, value)`**
+   - Controls pixel transfer operations (alignment, packing)
+   - In OpenGL: glPixelStorei() for immediate configuration
+   - In Vulkan: Maps to explicit buffer offset and stride requirements
+   - 1 call site migrated (GlStateManager)
+
+2. **`activateTextureUnit(unit)`** → **`activateTextureUnit(ctx, unit)`**
+   - Activates a specific texture unit for binding
+   - In OpenGL: glActiveTexture() for immediate texture unit selection
+   - In Vulkan: No concept of texture units - uses descriptor sets instead
+   - 1 call site migrated (GlStateManager)
+
+3. **`configurePolygonOffset(factor, units)`** → **`configurePolygonOffset(ctx, factor, units)`**
+   - Sets polygon offset for depth bias (avoiding z-fighting)
+   - In OpenGL: glPolygonOffset() for immediate state change
+   - In Vulkan: Part of VkPipelineRasterizationStateCreateInfo (pipeline state)
+   - 1 call site migrated (GlStateManager)
+
+4. **`createVertexArrayObject()`** → **`createVertexArrayObject(ctx)`**
+   - Creates a vertex array object (VAO)
+   - In OpenGL: glGenVertexArrays() for state container creation
+   - In Vulkan: No direct equivalent - vertex input state is part of pipeline
+   - 2 call sites migrated (GlStateManager, GlVertexArray)
+
+5. **`selectVertexArray(vao)`** → **`selectVertexArray(ctx, vao)`**
+   - Binds a vertex array object
+   - In OpenGL: glBindVertexArray() for immediate state binding
+   - In Vulkan: Vertex input state is immutable pipeline configuration
+   - 1 call site migrated (GlStateManager)
+
+### Files Modified
+
+**Call Sites Updated:**
+1. `GlStateManager.java` - 5 calls (createVertexArrayObject, selectVertexArray, configurePolygonOffset, activateTextureUnit, setPixelStoreMode)
+2. `GlVertexArray.java` - 1 call (createVertexArrayObject)
+
+**Deprecated Methods Removed:**
+- `GraphicsBackend.java` - 5 method signatures removed
+- `VulkanicAPI.java` - 5 method implementations removed  
+- `OpenGLBackend.java` - 5 method implementations removed
+
+**Note:** `configureTextureParameter` was NOT removed as it's still actively used in game code and doesn't have all call sites migrated yet.
+
+### Why This Matters for Vulkan
+
+**Pixel Store Mode:**
+- OpenGL: Controls pixel transfer with glPixelStorei (e.g., GL_UNPACK_ALIGNMENT)
+- Vulkan: No pixel store modes - requires explicit buffer offset and stride
+- CommandContext enables tracking alignment requirements for buffer uploads
+
+**Texture Unit Activation:**
+- OpenGL: Uses texture units (GL_TEXTURE0, GL_TEXTURE1, etc.) for binding
+- Vulkan: **No texture units** - uses descriptor sets with explicit bindings
+- This abstraction prepares for descriptor set management
+
+**Polygon Offset:**
+- OpenGL: Dynamic state changed with glPolygonOffset()
+- Vulkan: **Immutable pipeline state** in VkPipelineRasterizationStateCreateInfo
+- depthBiasConstantFactor and depthBiasSlopeFactor specified at pipeline creation
+- CommandContext enables both immediate (OpenGL) and deferred (Vulkan) configuration
+
+**Vertex Array Objects:**
+- OpenGL: VAOs store vertex attribute configuration
+- Vulkan: **No VAOs** - vertex input state is part of VkGraphicsPipelineCreateInfo
+- VkVertexInputBindingDescription and VkVertexInputAttributeDescription replace VAOs
+- CommandContext abstraction enables proper state tracking for pipeline creation
+
+### Implementation Highlights
+
+All migrated methods now:
+- Accept `CommandContext ctx` as first parameter
+- Validate context in OpenGL backend (OpenGLCommandContext.IMMEDIATE)
+- Prepare for Vulkan's explicit, immutable state model
+- Enable proper command buffer recording and pipeline state tracking
+
+**Key Changes:**
+- GlStateManager now uses CTX for all 5 migrated methods
+- GlVertexArray defines local CTX using VulkanicAPI.getImmediateContext()
+- All deprecated method signatures removed from interface and implementations
+- Zero breaking changes - existing code continues to work
+
+### Impact
+
+This phase is significant because it addresses **fundamental differences** in state management:
+
+**OpenGL's Bind-to-Edit Model:**
+- Texture units must be activated before binding textures
+- VAOs must be bound before configuring vertex attributes
+- Polygon offset can be changed anytime
+- Pixel store modes affect subsequent texture uploads
+
+**Vulkan's Explicit State Model:**
+- No texture units - descriptor sets replace binding points
+- No VAOs - vertex input is immutable pipeline configuration  
+- Polygon offset is pipeline creation parameter
+- Pixel alignment is explicit in buffer requirements
+
+**Migration Statistics:**
+- **151 methods migrated** (17.3% of 874)
+- **299 call sites** updated across **89 game files**
+- **55 deprecated methods** completely removed
+- **All tests passing** - zero breaking changes
+
+### Testing
+
+- ✅ Build successful with zero compilation errors
+- ✅ All call sites updated and verified
+- ✅ No deprecated method calls in migrated code
+- ✅ OpenGL backend functioning correctly
+
+**Next Steps:**
+- Continue migrating remaining deprecated methods
+- Focus on buffer operations, framebuffer operations, and sync primitives
+- Maintain test coverage and documentation

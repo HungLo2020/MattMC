@@ -1423,8 +1423,6 @@ public interface GraphicsBackend {
     // ================================================================================
     
     // Pixel operations
-    @Deprecated
-    void setPixelStoreMode(int pname, int value);
     
     // Framebuffer operations
     @Deprecated
@@ -1468,13 +1466,9 @@ public interface GraphicsBackend {
     
     // Texture unit and parameter operations
     @Deprecated
-    void activateTextureUnit(int unit);
-    @Deprecated
     void configureTextureParameter(int target, int pname, int param);
     
     // Polygon rendering operations
-    @Deprecated
-    void configurePolygonOffset(float factor, float units);
     
     // Texture pixel data transfer
     @Deprecated
@@ -1490,10 +1484,6 @@ public interface GraphicsBackend {
     void fillBufferSubregion(int tgt, long off, java.nio.ByteBuffer dat);
     
     // Vertex array objects
-    @Deprecated
-    int createVertexArrayObject();
-    @Deprecated
-    void selectVertexArray(int vao);
     
     // Buffer memory mapping
     @Deprecated

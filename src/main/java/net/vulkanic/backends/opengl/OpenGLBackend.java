@@ -1537,11 +1537,6 @@ public class OpenGLBackend implements GraphicsBackend {
     // DEPRECATED METHODS - OpenGL immediate-mode implementations
     // ================================================================================
     
-    @Deprecated
-    @Override
-    public void setPixelStoreMode(int pname, int value) {
-        GL11.glPixelStorei(pname, value);
-    }
     
     @Deprecated
     @Override
@@ -1643,11 +1638,6 @@ public class OpenGLBackend implements GraphicsBackend {
                                                                       dstX0, dstY0, dstX1, dstY1, mask, filter);
     }
     
-    @Deprecated
-    @Override
-    public void activateTextureUnit(int unit) {
-        org.lwjgl.opengl.GL13.glActiveTexture(unit);
-    }
     
     @Deprecated
     @Override
@@ -1655,11 +1645,6 @@ public class OpenGLBackend implements GraphicsBackend {
         GL11.glTexParameteri(target, pname, param);
     }
     
-    @Deprecated
-    @Override
-    public void configurePolygonOffset(float factor, float units) {
-        GL11.glPolygonOffset(factor, units);
-    }
     
     @Deprecated
     @Override
@@ -1686,17 +1671,6 @@ public class OpenGLBackend implements GraphicsBackend {
         GL15.glBufferSubData(tgt, off, dat);
     }
     
-    @Deprecated
-    @Override
-    public int createVertexArrayObject() {
-        return GL30.glGenVertexArrays();
-    }
-    
-    @Deprecated
-    @Override
-    public void selectVertexArray(int vao) {
-        GL30.glBindVertexArray(vao);
-    }
     
     @Deprecated
     @Override
