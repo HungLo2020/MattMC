@@ -280,7 +280,7 @@ public class GLBuffer implements AutoCloseable
 	{
 		LodUtil.assertTrue(this.isMapped, "Buffer is not mapped");
 		this.bind();
-		VulkanicAPI.glUnmapBuffer(this.getBufferBindingTarget());
+		VulkanicAPI.unmapBufferData(CTX, this.getBufferBindingTarget());
 		this.isMapped = false;
 	}
 	

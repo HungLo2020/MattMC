@@ -1167,6 +1167,87 @@ public interface GraphicsBackend {
                                    int format, int type, float[] pixels);
     
     /**
+     * Inserts a memory barrier to ensure memory operations complete before subsequent commands.
+     * 
+     * In OpenGL: Maps to glMemoryBarrier()
+     * In Vulkan: Maps to vkCmdPipelineBarrier() with appropriate memory barriers
+     * 
+     * Ensures that memory writes from certain types of operations (e.g., shader writes, texture updates)
+     * are visible to subsequent operations. This is critical for synchronization when using features
+     * like image load/store, atomic operations, or compute shaders.
+     * 
+     * Common barrier bits include:
+     * - GL_SHADER_IMAGE_ACCESS_BARRIER_BIT: For image load/store operations
+     * - GL_SHADER_STORAGE_BARRIER_BIT: For shader storage buffer operations
+     * - GL_FRAMEBUFFER_BARRIER_BIT: For framebuffer operations
+     * - GL_ALL_BARRIER_BITS: All barrier types
+     * 
+     * @param ctx Command context for recording this command
+     * @param barriers Bitfield of barrier types (e.g., GL_SHADER_IMAGE_ACCESS_BARRIER_BIT)
+     */
+    void setMemoryBarrier(CommandContext ctx, int barriers);
+    
+    /**
+     * Clears a floating-point framebuffer attachment.
+     * 
+     * In OpenGL: Maps to glClearBufferfv()
+     * In Vulkan: Maps to vkCmdClearAttachments() or vkCmdClearColorImage()
+     * 
+     * Clears a specific floating-point buffer (color, depth, or stencil) to the specified values.
+     * This is more flexible than glClear() as it allows clearing individual buffers with specific values.
+     * 
+     * Common buffer targets:
+     * - GL_COLOR: Clear a color buffer (drawbuffer specifies which one)
+     * - GL_DEPTH: Clear the depth buffer
+     * 
+     * @param ctx Command context for recording this command
+     * @param buffer The buffer to clear (e.g., GL_COLOR, GL_DEPTH)
+     * @param drawbuffer The draw buffer index (for GL_COLOR, typically 0)
+     * @param values Array of float values to clear with (4 values for color, 1 for depth)
+     */
+    void clearFloatBuffer(CommandContext ctx, int buffer, int drawbuffer, float[] values);
+    
+    /**
+     * Clears an integer framebuffer attachment.
+     * 
+     * In OpenGL: Maps to glClearBufferiv()
+     * In Vulkan: Maps to vkCmdClearAttachments() or vkCmdClearColorImage()
+     * 
+     * Clears a specific integer buffer (color or stencil) to the specified values.
+     * Used for integer color attachments or stencil buffer clearing.
+     * 
+     * Common buffer targets:
+     * - GL_COLOR: Clear an integer color buffer
+     * - GL_STENCIL: Clear the stencil buffer
+     * 
+     * @param ctx Command context for recording this command
+     * @param buffer The buffer to clear (e.g., GL_COLOR, GL_STENCIL)
+     * @param drawbuffer The draw buffer index (for GL_COLOR, typically 0)
+     * @param values Array of integer values to clear with (4 values for color, 1 for stencil)
+     */
+    void clearIntegerBuffer(CommandContext ctx, int buffer, int drawbuffer, int[] values);
+    
+    /**
+     * Configures the data format and location for an integer vertex attribute (no normalization).
+     * 
+     * In OpenGL: Maps to glVertexAttribIPointer()
+     * In Vulkan: Maps to VkVertexInputAttributeDescription in pipeline state
+     * 
+     * Similar to configureVertexAttributePointer but for integer types that should NOT be normalized.
+     * The vertex shader receives the exact integer values, not normalized floats. This is used for
+     * vertex attributes that represent indices, IDs, or other discrete integer values.
+     * 
+     * @param ctx Command context for recording this command
+     * @param index The index of the vertex attribute to configure
+     * @param size Number of components per vertex (1, 2, 3, or 4)
+     * @param type Data type of each component (e.g., GL_INT, GL_UNSIGNED_INT)
+     * @param stride Byte offset between consecutive vertex attributes
+     * @param pointer Offset of the first component in the buffer
+     */
+    void configureVertexAttributeIntegerPointer(CommandContext ctx, int index, int size, int type, 
+                                                int stride, long pointer);
+    
+    /**
      * Sets the viewport for rendering (static/non-dynamic version).
      * 
      * In OpenGL: Maps to glViewport()

@@ -218,7 +218,7 @@ public class IrisRenderSystem {
 
 	public static void readPixels(int x, int y, int width, int height, int format, int type, float[] pixels) {
 		RenderSystem.assertOnRenderThread();
-		VulkanicAPI.glReadPixels(x, y, width, height, format, type, pixels);
+		VulkanicAPI.readPixelsFromFramebuffer(CTX, x, y, width, height, format, type, pixels);
 	}
 
 	public static void bufferData(int target, float[] data, int usage) {
@@ -302,7 +302,7 @@ public class IrisRenderSystem {
 		RenderSystem.assertOnRenderThread();
 
 		if (supportsCompute) {
-			VulkanicAPI.glMemoryBarrier(barriers);
+			VulkanicAPI.setMemoryBarrier(CTX, barriers);
 		}
 	}
 
@@ -728,13 +728,13 @@ public class IrisRenderSystem {
 		@Override
 		public void clearBufferfv(int framebuffer, int buffer, int drawbuffer, float[] values) {
 			GlStateManager._glBindFramebuffer(VulkanicAPI.GL_FRAMEBUFFER, framebuffer);
-			VulkanicAPI.glClearBufferfv(buffer, drawbuffer, values);
+			VulkanicAPI.clearFloatBuffer(CTX, buffer, drawbuffer, values);
 		}
 
 		@Override
 		public void clearBufferiv(int framebuffer, int buffer, int drawbuffer, int[] values) {
 			GlStateManager._glBindFramebuffer(VulkanicAPI.GL_FRAMEBUFFER, framebuffer);
-			VulkanicAPI.glClearBufferiv(buffer, drawbuffer, values);
+			VulkanicAPI.clearIntegerBuffer(CTX, buffer, drawbuffer, values);
 		}
 
 		@Override
@@ -753,7 +753,7 @@ public class IrisRenderSystem {
 		public void copyTexSubImage2D(int destTexture, int target, int i, int i1, int i2, int i3, int i4, int width, int height) {
 			int previous = GlStateManager.TEXTURES[GlStateManager.activeTexture].binding;
 			GlStateManager._bindTexture(destTexture);
-			VulkanicAPI.glCopyTexSubImage2D(target, i, i1, i2, i3, i4, width, height);
+			VulkanicAPI.copyTexture2DSubImage(CTX, target, i, i1, i2, i3, i4, width, height);
 			GlStateManager._bindTexture(previous);
 		}
 

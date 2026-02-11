@@ -1380,6 +1380,47 @@ public class OpenGLBackend implements GraphicsBackend {
     }
     
     @Override
+    public void setMemoryBarrier(CommandContext ctx, int barriers) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        GL42.glMemoryBarrier(barriers);
+    }
+    
+    @Override
+    public void clearFloatBuffer(CommandContext ctx, int buffer, int drawbuffer, float[] values) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        GL30.glClearBufferfv(buffer, drawbuffer, values);
+    }
+    
+    @Override
+    public void clearIntegerBuffer(CommandContext ctx, int buffer, int drawbuffer, int[] values) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        GL30.glClearBufferiv(buffer, drawbuffer, values);
+    }
+    
+    @Override
+    public void configureVertexAttributeIntegerPointer(CommandContext ctx, int index, int size, int type,
+                                                       int stride, long pointer) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        GL30.glVertexAttribIPointer(index, size, type, stride, pointer);
+    }
+    
+    @Override
     public void setStaticViewport(CommandContext ctx, int x, int y, int width, int height) {
         // Validate context is immediate mode (OpenGL requirement)
         if (!ctx.isImmediate()) {

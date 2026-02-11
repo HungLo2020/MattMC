@@ -2198,6 +2198,92 @@ public class VulkanicAPI {
     }
     
     /**
+     * Inserts a memory barrier to ensure memory operations complete before subsequent commands.
+     * 
+     * Example usage:
+     * <pre>{@code
+     * CommandContext ctx = OpenGLCommandContext.IMMEDIATE;
+     * // After image store operations in compute shader
+     * setMemoryBarrier(ctx, GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+     * 
+     * // Or use multiple barriers
+     * setMemoryBarrier(ctx, GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL_SHADER_STORAGE_BARRIER_BIT);
+     * }</pre>
+     * 
+     * @param ctx Command context for recording this command
+     * @param barriers Bitfield of barrier types
+     */
+    public static void setMemoryBarrier(CommandContext ctx, int barriers) {
+        getBackend().setMemoryBarrier(ctx, barriers);
+    }
+    
+    /**
+     * Clears a floating-point framebuffer attachment.
+     * 
+     * Example usage:
+     * <pre>{@code
+     * CommandContext ctx = OpenGLCommandContext.IMMEDIATE;
+     * // Clear color buffer 0 to red
+     * clearFloatBuffer(ctx, GL_COLOR, 0, new float[]{1.0f, 0.0f, 0.0f, 1.0f});
+     * 
+     * // Clear depth buffer to 1.0
+     * clearFloatBuffer(ctx, GL_DEPTH, 0, new float[]{1.0f});
+     * }</pre>
+     * 
+     * @param ctx Command context for recording this command
+     * @param buffer The buffer to clear (GL_COLOR, GL_DEPTH)
+     * @param drawbuffer The draw buffer index (for GL_COLOR)
+     * @param values Array of float values to clear with
+     */
+    public static void clearFloatBuffer(CommandContext ctx, int buffer, int drawbuffer, float[] values) {
+        getBackend().clearFloatBuffer(ctx, buffer, drawbuffer, values);
+    }
+    
+    /**
+     * Clears an integer framebuffer attachment.
+     * 
+     * Example usage:
+     * <pre>{@code
+     * CommandContext ctx = OpenGLCommandContext.IMMEDIATE;
+     * // Clear integer color buffer to specific value
+     * clearIntegerBuffer(ctx, GL_COLOR, 0, new int[]{255, 128, 64, 255});
+     * 
+     * // Clear stencil buffer to 0
+     * clearIntegerBuffer(ctx, GL_STENCIL, 0, new int[]{0});
+     * }</pre>
+     * 
+     * @param ctx Command context for recording this command
+     * @param buffer The buffer to clear (GL_COLOR, GL_STENCIL)
+     * @param drawbuffer The draw buffer index (for GL_COLOR)
+     * @param values Array of integer values to clear with
+     */
+    public static void clearIntegerBuffer(CommandContext ctx, int buffer, int drawbuffer, int[] values) {
+        getBackend().clearIntegerBuffer(ctx, buffer, drawbuffer, values);
+    }
+    
+    /**
+     * Configures the data format and location for an integer vertex attribute (no normalization).
+     * 
+     * Example usage:
+     * <pre>{@code
+     * CommandContext ctx = OpenGLCommandContext.IMMEDIATE;
+     * // Integer attribute for bone indices (no normalization)
+     * configureVertexAttributeIntegerPointer(ctx, 3, 4, GL_UNSIGNED_INT, 32, 12);
+     * }</pre>
+     * 
+     * @param ctx Command context for recording this command
+     * @param index The index of the vertex attribute
+     * @param size Number of components (1-4)
+     * @param type Data type (GL_INT, GL_UNSIGNED_INT, etc.)
+     * @param stride Byte offset between consecutive attributes
+     * @param pointer Offset of the first component
+     */
+    public static void configureVertexAttributeIntegerPointer(CommandContext ctx, int index, int size, int type,
+                                                              int stride, long pointer) {
+        getBackend().configureVertexAttributeIntegerPointer(ctx, index, size, type, stride, pointer);
+    }
+    
+    /**
      * Sets the viewport for rendering (static/non-dynamic version).
      * 
      * Example usage:

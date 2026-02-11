@@ -73,12 +73,12 @@ public final class VertexAttributePreGL43 extends AbstractVertexAttribute
 			
 			if (pointer.useInteger)
 			{
-				VulkanicAPI.glVertexAttribIPointer(i, pointer.elementCount, pointer.glType,
+				VulkanicAPI.configureVertexAttributeIntegerPointer(CTX, i, pointer.elementCount, pointer.glType,
 						this.strideSize, this.pointersOffset[i]);
 			}
 			else
 			{
-				VulkanicAPI.glVertexAttribPointer(i, pointer.elementCount, pointer.glType,
+				VulkanicAPI.configureVertexAttributePointer(CTX, i, pointer.elementCount, pointer.glType,
 					pointer.normalized, this.strideSize, this.pointersOffset[i]);
 			}
 		}
@@ -105,7 +105,7 @@ public final class VertexAttributePreGL43 extends AbstractVertexAttribute
 			
 			if (pointer.useInteger)
 			{
-				VulkanicAPI.glVertexAttribIPointer(bindingPointIndex, pointer.elementCount, pointer.glType,
+				VulkanicAPI.configureVertexAttributeIntegerPointer(CTX, bindingPointIndex, pointer.elementCount, pointer.glType,
 						this.strideSize, this.pointersOffset[bindingPointIndex]);
 			}
 			else

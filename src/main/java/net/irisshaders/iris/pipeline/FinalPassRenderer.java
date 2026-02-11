@@ -49,6 +49,7 @@ import net.irisshaders.iris.uniforms.CommonUniforms;
 import net.irisshaders.iris.uniforms.FrameUpdateNotifier;
 import net.irisshaders.iris.uniforms.custom.CustomUniforms;
 import net.minecraft.client.Minecraft;
+import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
 import org.jetbrains.annotations.Nullable;
 
@@ -59,6 +60,7 @@ import java.util.Set;
 import java.util.function.Supplier;
 
 public class FinalPassRenderer {
+	private static final CommandContext CTX = VulkanicAPI.getImmediateContext();
 	private static final CustomPass STATE = new CustomPass() {
 		@Override
 		public void setupState() {
@@ -301,7 +303,7 @@ public class FinalPassRenderer {
 			swapPass.from.bind();
 
 			GlStateManager._bindTexture(swapPass.targetTexture);
-			VulkanicAPI.glCopyTexSubImage2D(VulkanicAPI.GL_TEXTURE_2D, 0, 0, 0, 0, 0, swapPass.width, swapPass.height);
+			VulkanicAPI.copyTexture2DSubImage(CTX, VulkanicAPI.GL_TEXTURE_2D, 0, 0, 0, 0, 0, swapPass.width, swapPass.height);
 		}
 
 		// Make sure to reset the viewport to how it was before... Otherwise weird issues could occur.
