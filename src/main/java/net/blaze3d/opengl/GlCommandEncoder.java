@@ -937,7 +937,7 @@ public class GlCommandEncoder implements CommandEncoder {
 					VulkanicAPI.bindTexture(CTX, 35882, var44);
 					if (bl2) {
 						GpuBufferSlice gpuBufferSlice3 = (GpuBufferSlice)glRenderPass.uniforms.get(string2);
-						VulkanicAPI.attachBufferToTexture(35882, GlConst.toGlInternalId(var43), ((GlBuffer)gpuBufferSlice3.buffer()).handle);
+						VulkanicAPI.attachBufferToTexture(CTX, 35882, GlConst.toGlInternalId(var43), ((GlBuffer)gpuBufferSlice3.buffer()).handle);
 					}
 					break;
 				case Uniform.Sampler(int glTextureView2, int var51):

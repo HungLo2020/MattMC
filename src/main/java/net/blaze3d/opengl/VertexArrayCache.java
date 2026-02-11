@@ -138,18 +138,18 @@ public abstract class VertexArrayCache {
 							case UV:
 								if (vertexFormatElement.type() == VertexFormatElement.Type.FLOAT) {
 									VulkanicAPI.specifyVertexAttribFormat(
-										j, vertexFormatElement.count(), GlConst.toGl(vertexFormatElement.type()), false, vertexFormat.getOffset(vertexFormatElement)
+										CTX, j, vertexFormatElement.count(), GlConst.toGl(vertexFormatElement.type()), false, vertexFormat.getOffset(vertexFormatElement)
 									);
 								} else {
 									VulkanicAPI.specifyVertexAttribIFormat(
-										j, vertexFormatElement.count(), GlConst.toGl(vertexFormatElement.type()), vertexFormat.getOffset(vertexFormatElement)
+										CTX, j, vertexFormatElement.count(), GlConst.toGl(vertexFormatElement.type()), vertexFormat.getOffset(vertexFormatElement)
 									);
 								}
 								break;
 							case NORMAL:
 							case COLOR:
 								VulkanicAPI.specifyVertexAttribFormat(
-									j, vertexFormatElement.count(), GlConst.toGl(vertexFormatElement.type()), true, vertexFormat.getOffset(vertexFormatElement)
+									CTX, j, vertexFormatElement.count(), GlConst.toGl(vertexFormatElement.type()), true, vertexFormat.getOffset(vertexFormatElement)
 								);
 						}
 

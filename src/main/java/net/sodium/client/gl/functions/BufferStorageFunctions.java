@@ -4,6 +4,7 @@ import net.sodium.client.gl.buffer.GlBufferStorageFlags;
 import net.sodium.client.gl.buffer.GlBufferTarget;
 import net.sodium.client.gl.device.RenderDevice;
 import net.sodium.client.gl.util.EnumBitField;
+import net.vulkanic.CommandContext;
 import net.vulkanic.GraphicsCapabilities;
 import net.vulkanic.VulkanicAPI;
 
@@ -15,15 +16,19 @@ public enum BufferStorageFunctions {
         }
     },
     CORE {
+        private static final CommandContext CTX = VulkanicAPI.getImmediateContext();
+        
         @Override
         public void createBufferStorage(GlBufferTarget target, long length, EnumBitField<GlBufferStorageFlags> flags) {
-            VulkanicAPI.createBufferStorage(target.getTargetParameter(), length, flags.getBitField());
+            VulkanicAPI.createBufferStorage(CTX, target.getTargetParameter(), length, flags.getBitField());
         }
     },
     ARB {
+        private static final CommandContext CTX = VulkanicAPI.getImmediateContext();
+        
         @Override
         public void createBufferStorage(GlBufferTarget target, long length, EnumBitField<GlBufferStorageFlags> flags) {
-            VulkanicAPI.createBufferStorage(target.getTargetParameter(), length, flags.getBitField());
+            VulkanicAPI.createBufferStorage(CTX, target.getTargetParameter(), length, flags.getBitField());
         }
     };
 

@@ -1722,6 +1722,54 @@ public class OpenGLBackend implements GraphicsBackend {
         EXTDebugLabel.glLabelObjectEXT(type, object, label);
     }
     
+    @Override
+    public void multiDrawElementsBaseVertex(CommandContext ctx, int mode, long pCount, int type, long pIndices, int drawCount, long pBaseVertex) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        org.lwjgl.opengl.GL32C.nglMultiDrawElementsBaseVertex(mode, pCount, type, pIndices, drawCount, pBaseVertex);
+    }
+    
+    @Override
+    public void createBufferStorage(CommandContext ctx, int target, long size, int flags) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL44.glBufferStorage(target, size, flags);
+    }
+    
+    @Override
+    public void createBufferStorage(CommandContext ctx, int target, ByteBuffer data, int flags) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL44.glBufferStorage(target, data, flags);
+    }
+    
+    @Override
+    public void specifyVertexAttribFormat(CommandContext ctx, int attribIndex, int size, int type, boolean normalized, int relativeOffset) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL43.glVertexAttribFormat(attribIndex, size, type, normalized, relativeOffset);
+    }
+    
+    @Override
+    public void specifyVertexAttribIFormat(CommandContext ctx, int attribIndex, int size, int type, int relativeOffset) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL43.glVertexAttribIFormat(attribIndex, size, type, relativeOffset);
+    }
+    
+    @Override
+    public void attachBufferToTexture(CommandContext ctx, int target, int internalFormat, int buffer) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL31.glTexBuffer(target, internalFormat, buffer);
+    }
+    
     // ================================================================================
     // DEPRECATED METHODS - OpenGL immediate-mode implementations
     // ================================================================================
@@ -1919,24 +1967,6 @@ public class OpenGLBackend implements GraphicsBackend {
     
     @Deprecated
     @Override
-    public void specifyVertexAttribFormat(int attribIndex, int size, int type, boolean normalized, int relativeOffset) {
-        org.lwjgl.opengl.ARBVertexAttribBinding.glVertexAttribFormat(attribIndex, size, type, normalized, relativeOffset);
-    }
-    
-    @Deprecated
-    @Override
-    public void specifyVertexAttribIFormat(int attribIndex, int size, int type, int relativeOffset) {
-        org.lwjgl.opengl.ARBVertexAttribBinding.glVertexAttribIFormat(attribIndex, size, type, relativeOffset);
-    }
-    
-    @Deprecated
-    @Override
-    public void attachBufferToTexture(int target, int internalFormat, int buffer) {
-        org.lwjgl.opengl.GL31.glTexBuffer(target, internalFormat, buffer);
-    }
-    
-    @Deprecated
-    @Override
     public int querySyncStatus(long sync, int pname, java.nio.IntBuffer length) {
         // glGetSynci returns the sync value and writes to length buffer
         // the number of values returned (should be 1 for single integer queries)
@@ -2007,40 +2037,6 @@ public class OpenGLBackend implements GraphicsBackend {
     @Override
     public void flushMappedBufferRange(int target, long offset, long length) {
         org.lwjgl.opengl.GL30.glFlushMappedBufferRange(target, offset, length);
-    }
-    
-    @Deprecated
-    @Override
-    public void createBufferStorage(int target, long size, int flags) {
-        org.lwjgl.opengl.GLCapabilities capabilities = org.lwjgl.opengl.GL.getCapabilities();
-        
-        if (capabilities.OpenGL44) {
-            org.lwjgl.opengl.GL44C.glBufferStorage(target, size, flags);
-        } else if (capabilities.GL_ARB_buffer_storage) {
-            org.lwjgl.opengl.ARBBufferStorage.glBufferStorage(target, size, flags);
-        } else {
-            throw new UnsupportedOperationException("Buffer storage is not supported");
-        }
-    }
-    
-    @Deprecated
-    @Override
-    public void createBufferStorage(int target, ByteBuffer data, int flags) {
-        org.lwjgl.opengl.GLCapabilities capabilities = org.lwjgl.opengl.GL.getCapabilities();
-        
-        if (capabilities.OpenGL44) {
-            org.lwjgl.opengl.GL44C.glBufferStorage(target, data, flags);
-        } else if (capabilities.GL_ARB_buffer_storage) {
-            org.lwjgl.opengl.ARBBufferStorage.glBufferStorage(target, data, flags);
-        } else {
-            throw new UnsupportedOperationException("Buffer storage is not supported");
-        }
-    }
-    
-    @Deprecated
-    @Override
-    public void multiDrawElementsBaseVertex(int mode, long pCount, int type, long pIndices, int drawCount, long pBaseVertex) {
-        org.lwjgl.opengl.GL32C.nglMultiDrawElementsBaseVertex(mode, pCount, type, pIndices, drawCount, pBaseVertex);
     }
     
     @Deprecated

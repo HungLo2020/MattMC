@@ -1764,6 +1764,141 @@ public interface GraphicsBackend {
      */
     void labelObjectExt(CommandContext ctx, int type, int object, String label);
     
+    /**
+     * Executes multiple indexed draw commands with base vertex offset in a single call.
+     * 
+     * In OpenGL: Maps to glMultiDrawElementsBaseVertex() (OpenGL 3.2+)
+     * In Vulkan: Maps to multiple vkCmdDrawIndexed() calls or indirect drawing
+     * 
+     * Multi-draw commands are one of the most important optimization techniques in modern
+     * graphics APIs. They reduce CPU overhead by batching multiple draw calls into a single
+     * API call, which is especially beneficial when rendering many small meshes or instances.
+     * 
+     * The base vertex offset allows rendering sub-meshes from larger vertex buffers without
+     * rebinding buffers, further reducing overhead.
+     * 
+     * @param ctx Command context for recording this command
+     * @param mode Primitive type (e.g., GL_TRIANGLES, GL_LINES)
+     * @param pCount Pointer to array of element counts for each draw
+     * @param type Index data type (e.g., GL_UNSIGNED_INT)
+     * @param pIndices Pointer to array of index buffer offsets
+     * @param drawCount Number of draws to execute
+     * @param pBaseVertex Pointer to array of base vertex offsets
+     */
+    void multiDrawElementsBaseVertex(CommandContext ctx, int mode, long pCount, int type, long pIndices, int drawCount, long pBaseVertex);
+    
+    /**
+     * Creates immutable buffer storage with specified size and flags.
+     * 
+     * In OpenGL: Maps to glBufferStorage() (OpenGL 4.4+ or ARB_buffer_storage)
+     * In Vulkan: Maps to vkCreateBuffer() with appropriate usage flags
+     * 
+     * Buffer storage creates IMMUTABLE buffer objects, which is perfect for Vulkan's model.
+     * Once created, the storage cannot be reallocated (but can be mapped and written to if
+     * the appropriate flags are set). This enables persistent mapping strategies that are
+     * critical for high-performance rendering.
+     * 
+     * Common flags:
+     * - GL_MAP_READ_BIT: Buffer can be mapped for reading
+     * - GL_MAP_WRITE_BIT: Buffer can be mapped for writing
+     * - GL_MAP_PERSISTENT_BIT: Buffer can stay mapped while GPU uses it
+     * - GL_MAP_COHERENT_BIT: No need to manually flush/invalidate
+     * - GL_DYNAMIC_STORAGE_BIT: Hints frequent CPU updates
+     * - GL_CLIENT_STORAGE_BIT: Prefers client (RAM) storage
+     * 
+     * @param ctx Command context for recording this command
+     * @param target Buffer binding target (e.g., GL_ARRAY_BUFFER)
+     * @param size Size of buffer in bytes
+     * @param flags Bitfield of storage flags
+     */
+    void createBufferStorage(CommandContext ctx, int target, long size, int flags);
+    
+    /**
+     * Creates immutable buffer storage with initial data.
+     * 
+     * In OpenGL: Maps to glBufferStorage() with data (OpenGL 4.4+ or ARB_buffer_storage)
+     * In Vulkan: Maps to vkCreateBuffer() followed by staging buffer copy
+     * 
+     * Similar to the size-only version, but initializes the buffer with data from the
+     * provided ByteBuffer. This is more efficient than creating empty storage and then
+     * uploading data separately.
+     * 
+     * @param ctx Command context for recording this command
+     * @param target Buffer binding target (e.g., GL_ARRAY_BUFFER)
+     * @param data ByteBuffer containing initial data
+     * @param flags Bitfield of storage flags
+     */
+    void createBufferStorage(CommandContext ctx, int target, ByteBuffer data, int flags);
+    
+    /**
+     * Specifies the format and layout of a vertex attribute.
+     * 
+     * In OpenGL: Maps to glVertexAttribFormat() (ARB_vertex_attrib_binding)
+     * In Vulkan: Maps to VkVertexInputAttributeDescription
+     * 
+     * This is part of the modern vertex specification API (ARB_vertex_attrib_binding) that
+     * separates vertex format from buffer binding. This design EXACTLY matches Vulkan's
+     * vertex input model, where:
+     * - Vertex format is immutable pipeline state (VkVertexInputAttributeDescription)
+     * - Buffer binding is dynamic (vkCmdBindVertexBuffers)
+     * 
+     * Unlike the legacy glVertexAttribPointer(), this doesn't bind a buffer - that's done
+     * separately with attachVertexBuffer(). The attribute is associated with a binding
+     * index via associateVertexAttrib().
+     * 
+     * @param ctx Command context for recording this command
+     * @param attribIndex Vertex attribute index (matches shader layout location)
+     * @param size Number of components (1-4)
+     * @param type Component data type (e.g., GL_FLOAT, GL_UNSIGNED_BYTE)
+     * @param normalized Whether to normalize fixed-point data
+     * @param relativeOffset Offset within the vertex structure
+     */
+    void specifyVertexAttribFormat(CommandContext ctx, int attribIndex, int size, int type, boolean normalized, int relativeOffset);
+    
+    /**
+     * Specifies the format and layout of an integer vertex attribute.
+     * 
+     * In OpenGL: Maps to glVertexAttribIFormat() (ARB_vertex_attrib_binding)
+     * In Vulkan: Maps to VkVertexInputAttributeDescription with integer format
+     * 
+     * Similar to specifyVertexAttribFormat(), but for integer attributes that should NOT
+     * be converted to floating-point. This is essential for vertex attributes that carry
+     * indices, IDs, or other discrete values that must remain exact integers in the shader.
+     * 
+     * @param ctx Command context for recording this command
+     * @param attribIndex Vertex attribute index (matches shader layout location)
+     * @param size Number of components (1-4)
+     * @param type Component data type (e.g., GL_INT, GL_UNSIGNED_INT)
+     * @param relativeOffset Offset within the vertex structure
+     */
+    void specifyVertexAttribIFormat(CommandContext ctx, int attribIndex, int size, int type, int relativeOffset);
+    
+    /**
+     * Attaches a buffer object to a texture for use as a texture buffer.
+     * 
+     * In OpenGL: Maps to glTexBuffer() (OpenGL 3.1+)
+     * In Vulkan: Maps to VkBufferView creation for texel buffers
+     * 
+     * Texture buffers (also called buffer textures) provide large 1D array access in shaders.
+     * They're more flexible than uniforms (can be much larger) and more efficient than
+     * texture images for random access to large arrays of data.
+     * 
+     * Common use cases:
+     * - Large lookup tables
+     * - Skinning matrices for skeletal animation
+     * - Per-instance data for GPU-driven rendering
+     * - Particle system parameters
+     * 
+     * In Vulkan, this maps to creating a VkBufferView with texel format, which provides
+     * formatted access to buffer data.
+     * 
+     * @param ctx Command context for recording this command
+     * @param target Texture target (must be GL_TEXTURE_BUFFER)
+     * @param internalFormat Texel format (e.g., GL_RGBA32F, GL_R32I)
+     * @param buffer Buffer object ID to attach
+     */
+    void attachBufferToTexture(CommandContext ctx, int target, int internalFormat, int buffer);
+    
     // ================================================================================
     // DEPRECATED METHODS - To be replaced with CommandContext-aware versions
     // ================================================================================
@@ -1855,16 +1990,10 @@ public interface GraphicsBackend {
     boolean hasVertexAttribBindingExtension();
     
     // ARB vertex attrib binding operations
-    @Deprecated
-    void specifyVertexAttribFormat(int attribIndex, int size, int type, boolean normalized, int relativeOffset);
-    @Deprecated
-    void specifyVertexAttribIFormat(int attribIndex, int size, int type, int relativeOffset);
     
     // Clear operations
     
     // Texture buffer operations
-    @Deprecated
-    void attachBufferToTexture(int target, int internalFormat, int buffer);
     
     // Sync query operations
     @Deprecated
@@ -1887,14 +2016,8 @@ public interface GraphicsBackend {
     void flushMappedBufferRange(int target, long offset, long length);
     
     // Buffer storage operations
-    @Deprecated
-    void createBufferStorage(int target, long size, int flags);
-    @Deprecated
-    void createBufferStorage(int target, ByteBuffer data, int flags);
     
     // Multi-draw operations
-    @Deprecated
-    void multiDrawElementsBaseVertex(int mode, long pCount, int type, long pIndices, int drawCount, long pBaseVertex);
     
     // String queries
     @Deprecated

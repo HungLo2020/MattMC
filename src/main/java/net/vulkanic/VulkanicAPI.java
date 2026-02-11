@@ -3,6 +3,7 @@ package net.vulkanic;
 import net.vulkanic.backends.opengl.OpenGLBackend;
 import net.vulkanic.backends.opengl.OpenGLCommandContext;
 
+import java.nio.ByteBuffer;
 import java.nio.FloatBuffer;
 
 /**
@@ -2983,6 +2984,164 @@ public class VulkanicAPI {
     }
     
     /**
+     * Executes multiple indexed draw commands with base vertex offset in a single call.
+     * 
+     * This is a Vulkan-compatible method that requires an explicit CommandContext.
+     * For OpenGL, use getImmediateContext() to get the context.
+     * 
+     * Example usage:
+     * <pre>
+     *     CommandContext ctx = VulkanicAPI.getImmediateContext();
+     *     VulkanicAPI.multiDrawElementsBaseVertex(ctx, GL_TRIANGLES, countPtr, GL_UNSIGNED_INT, 
+     *                                             indicesPtr, drawCount, baseVertexPtr);
+     * </pre>
+     * 
+     * In OpenGL: Maps to glMultiDrawElementsBaseVertex()
+     * In Vulkan: Maps to multiple vkCmdDrawIndexed() calls or indirect drawing
+     * 
+     * @param ctx Command context for recording this command
+     * @param mode Primitive type (e.g., GL_TRIANGLES)
+     * @param pCount Pointer to array of element counts
+     * @param type Index data type (e.g., GL_UNSIGNED_INT)
+     * @param pIndices Pointer to array of index buffer offsets
+     * @param drawCount Number of draws to execute
+     * @param pBaseVertex Pointer to array of base vertex offsets
+     */
+    public static void multiDrawElementsBaseVertex(CommandContext ctx, int mode, long pCount, int type, long pIndices, int drawCount, long pBaseVertex) {
+        getBackend().multiDrawElementsBaseVertex(ctx, mode, pCount, type, pIndices, drawCount, pBaseVertex);
+    }
+    
+    /**
+     * Creates immutable buffer storage with specified size and flags.
+     * 
+     * This is a Vulkan-compatible method that requires an explicit CommandContext.
+     * For OpenGL, use getImmediateContext() to get the context.
+     * 
+     * Example usage:
+     * <pre>
+     *     CommandContext ctx = VulkanicAPI.getImmediateContext();
+     *     int flags = GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT;
+     *     VulkanicAPI.createBufferStorage(ctx, GL_ARRAY_BUFFER, 1024 * 1024, flags);
+     * </pre>
+     * 
+     * In OpenGL: Maps to glBufferStorage() (OpenGL 4.4+)
+     * In Vulkan: Maps to vkCreateBuffer() with appropriate usage flags
+     * 
+     * @param ctx Command context for recording this command
+     * @param target Buffer binding target (e.g., GL_ARRAY_BUFFER)
+     * @param size Size of buffer in bytes
+     * @param flags Bitfield of storage flags
+     */
+    public static void createBufferStorage(CommandContext ctx, int target, long size, int flags) {
+        getBackend().createBufferStorage(ctx, target, size, flags);
+    }
+    
+    /**
+     * Creates immutable buffer storage with initial data.
+     * 
+     * This is a Vulkan-compatible method that requires an explicit CommandContext.
+     * For OpenGL, use getImmediateContext() to get the context.
+     * 
+     * Example usage:
+     * <pre>
+     *     CommandContext ctx = VulkanicAPI.getImmediateContext();
+     *     ByteBuffer data = ...;
+     *     int flags = GL_DYNAMIC_STORAGE_BIT;
+     *     VulkanicAPI.createBufferStorage(ctx, GL_ARRAY_BUFFER, data, flags);
+     * </pre>
+     * 
+     * In OpenGL: Maps to glBufferStorage() with data (OpenGL 4.4+)
+     * In Vulkan: Maps to vkCreateBuffer() followed by staging buffer copy
+     * 
+     * @param ctx Command context for recording this command
+     * @param target Buffer binding target (e.g., GL_ARRAY_BUFFER)
+     * @param data ByteBuffer containing initial data
+     * @param flags Bitfield of storage flags
+     */
+    public static void createBufferStorage(CommandContext ctx, int target, ByteBuffer data, int flags) {
+        getBackend().createBufferStorage(ctx, target, data, flags);
+    }
+    
+    /**
+     * Specifies the format and layout of a vertex attribute.
+     * 
+     * This is a Vulkan-compatible method that requires an explicit CommandContext.
+     * For OpenGL, use getImmediateContext() to get the context.
+     * 
+     * Example usage:
+     * <pre>
+     *     CommandContext ctx = VulkanicAPI.getImmediateContext();
+     *     VulkanicAPI.specifyVertexAttribFormat(ctx, 0, 3, GL_FLOAT, false, 0);
+     *     VulkanicAPI.associateVertexAttrib(ctx, 0, 0);
+     *     VulkanicAPI.attachVertexBuffer(ctx, 0, bufferId, 0, 12);
+     * </pre>
+     * 
+     * In OpenGL: Maps to glVertexAttribFormat() (ARB_vertex_attrib_binding)
+     * In Vulkan: Maps to VkVertexInputAttributeDescription
+     * 
+     * @param ctx Command context for recording this command
+     * @param attribIndex Vertex attribute index
+     * @param size Number of components (1-4)
+     * @param type Component data type (e.g., GL_FLOAT)
+     * @param normalized Whether to normalize fixed-point data
+     * @param relativeOffset Offset within the vertex structure
+     */
+    public static void specifyVertexAttribFormat(CommandContext ctx, int attribIndex, int size, int type, boolean normalized, int relativeOffset) {
+        getBackend().specifyVertexAttribFormat(ctx, attribIndex, size, type, normalized, relativeOffset);
+    }
+    
+    /**
+     * Specifies the format and layout of an integer vertex attribute.
+     * 
+     * This is a Vulkan-compatible method that requires an explicit CommandContext.
+     * For OpenGL, use getImmediateContext() to get the context.
+     * 
+     * Example usage:
+     * <pre>
+     *     CommandContext ctx = VulkanicAPI.getImmediateContext();
+     *     VulkanicAPI.specifyVertexAttribIFormat(ctx, 1, 4, GL_INT, 12);
+     *     VulkanicAPI.associateVertexAttrib(ctx, 1, 0);
+     * </pre>
+     * 
+     * In OpenGL: Maps to glVertexAttribIFormat() (ARB_vertex_attrib_binding)
+     * In Vulkan: Maps to VkVertexInputAttributeDescription with integer format
+     * 
+     * @param ctx Command context for recording this command
+     * @param attribIndex Vertex attribute index
+     * @param size Number of components (1-4)
+     * @param type Component data type (e.g., GL_INT)
+     * @param relativeOffset Offset within the vertex structure
+     */
+    public static void specifyVertexAttribIFormat(CommandContext ctx, int attribIndex, int size, int type, int relativeOffset) {
+        getBackend().specifyVertexAttribIFormat(ctx, attribIndex, size, type, relativeOffset);
+    }
+    
+    /**
+     * Attaches a buffer object to a texture for use as a texture buffer.
+     * 
+     * This is a Vulkan-compatible method that requires an explicit CommandContext.
+     * For OpenGL, use getImmediateContext() to get the context.
+     * 
+     * Example usage:
+     * <pre>
+     *     CommandContext ctx = VulkanicAPI.getImmediateContext();
+     *     VulkanicAPI.bindTexture(ctx, GL_TEXTURE_BUFFER, textureId);
+     *     VulkanicAPI.attachBufferToTexture(ctx, GL_TEXTURE_BUFFER, GL_RGBA32F, bufferId);
+     * </pre>
+     * 
+     * In OpenGL: Maps to glTexBuffer() (OpenGL 3.1+)
+     * In Vulkan: Maps to VkBufferView creation for texel buffers
+     * 
+     * @param ctx Command context for recording this command
+     * @param target Texture target (must be GL_TEXTURE_BUFFER)
+     * @param internalFormat Texel format (e.g., GL_RGBA32F)
+     * @param buffer Buffer object ID to attach
+     */
+    public static void attachBufferToTexture(CommandContext ctx, int target, int internalFormat, int buffer) {
+        getBackend().attachBufferToTexture(ctx, target, internalFormat, buffer);
+    }
+    
+    /**
      * Configures a vertex attribute array with the specified format.
      * 
      * This is a Vulkan-compatible method that requires an explicit CommandContext.
@@ -3659,21 +3818,6 @@ public class VulkanicAPI {
     }
     
     @Deprecated
-    public static void specifyVertexAttribFormat(int attribIndex, int size, int type, boolean normalized, int relativeOffset) {
-        getBackend().specifyVertexAttribFormat(attribIndex, size, type, normalized, relativeOffset);
-    }
-    
-    @Deprecated
-    public static void specifyVertexAttribIFormat(int attribIndex, int size, int type, int relativeOffset) {
-        getBackend().specifyVertexAttribIFormat(attribIndex, size, type, relativeOffset);
-    }
-    
-    @Deprecated
-    public static void attachBufferToTexture(int target, int internalFormat, int buffer) {
-        getBackend().attachBufferToTexture(target, internalFormat, buffer);
-    }
-    
-    @Deprecated
     public static int querySyncStatus(long sync, int pname, java.nio.IntBuffer length) {
         return getBackend().querySyncStatus(sync, pname, length);
     }
@@ -3706,21 +3850,6 @@ public class VulkanicAPI {
     @Deprecated
     public static void flushMappedBufferRange(int target, long offset, long length) {
         flushMappedBufferRange(getImmediateContext(), target, offset, length);
-    }
-    
-    @Deprecated
-    public static void createBufferStorage(int target, long size, int flags) {
-        getBackend().createBufferStorage(target, size, flags);
-    }
-    
-    @Deprecated
-    public static void createBufferStorage(int target, java.nio.ByteBuffer data, int flags) {
-        getBackend().createBufferStorage(target, data, flags);
-    }
-    
-    @Deprecated
-    public static void multiDrawElementsBaseVertex(int mode, long pCount, int type, long pIndices, int drawCount, long pBaseVertex) {
-        getBackend().multiDrawElementsBaseVertex(mode, pCount, type, pIndices, drawCount, pBaseVertex);
     }
     
     @Deprecated

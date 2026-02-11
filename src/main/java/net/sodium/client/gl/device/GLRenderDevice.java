@@ -299,7 +299,7 @@ public class GLRenderDevice implements RenderDevice {
                 ? VulkanicAPI.GL_PATCHES
                 : primitiveType.getId();
 
-            VulkanicAPI.multiDrawElementsBaseVertex(primitiveId,
+            VulkanicAPI.multiDrawElementsBaseVertex(CTX, primitiveId,
                     batch.pElementCount,
                     indexType.getFormatId(),
                     batch.pElementPointer,
