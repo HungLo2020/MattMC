@@ -1495,18 +1495,10 @@ public interface GraphicsBackend {
     // Shader pipeline
     @Deprecated
     void linkProgramBinary(int program);
-    @Deprecated
-    int locateUniformVariable(int program, CharSequence name);
-    @Deprecated
-    void assignUniformInteger(int location, int value);
     
     // Vertex attributes
     
     // Synchronization
-    @Deprecated
-    long createFenceSync(int condition, int flags);
-    @Deprecated
-    int waitForSync(long sync, int flags, long timeout);
     @Deprecated
     void destroySync(long sync);
     

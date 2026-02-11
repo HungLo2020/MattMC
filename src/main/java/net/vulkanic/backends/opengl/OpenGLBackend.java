@@ -1687,30 +1687,6 @@ public class OpenGLBackend implements GraphicsBackend {
     
     @Deprecated
     @Override
-    public int locateUniformVariable(int program, CharSequence name) {
-        return GL20.glGetUniformLocation(program, name);
-    }
-    
-    @Deprecated
-    @Override
-    public void assignUniformInteger(int location, int value) {
-        GL20.glUniform1i(location, value);
-    }
-    
-    @Deprecated
-    @Override
-    public long createFenceSync(int condition, int flags) {
-        return org.lwjgl.opengl.GL32.glFenceSync(condition, flags);
-    }
-    
-    @Deprecated
-    @Override
-    public int waitForSync(long sync, int flags, long timeout) {
-        return org.lwjgl.opengl.GL32.glClientWaitSync(sync, flags, timeout);
-    }
-    
-    @Deprecated
-    @Override
     public void destroySync(long sync) {
         org.lwjgl.opengl.GL32.glDeleteSync(sync);
     }

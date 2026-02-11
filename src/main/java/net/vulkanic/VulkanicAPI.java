@@ -3116,26 +3116,6 @@ public class VulkanicAPI {
     }
     
     @Deprecated
-    public static int locateUniformVariable(int program, CharSequence name) {
-        return getBackend().locateUniformVariable(program, name);
-    }
-    
-    @Deprecated
-    public static void assignUniformInteger(int location, int value) {
-        getBackend().assignUniformInteger(location, value);
-    }
-    
-    @Deprecated
-    public static long createFenceSync(int condition, int flags) {
-        return getBackend().createFenceSync(condition, flags);
-    }
-    
-    @Deprecated
-    public static int waitForSync(long sync, int flags, long timeout) {
-        return getBackend().waitForSync(sync, flags, timeout);
-    }
-    
-    @Deprecated
     public static void destroySync(long sync) {
         getBackend().destroySync(sync);
     }
@@ -4038,7 +4018,7 @@ public class VulkanicAPI {
      */
     @Deprecated
     public static int glGetUniformLocation(int program, CharSequence name) {
-        return locateUniformVariable(program, name);
+        return locateUniformVariable(CTX, program, name);
     }
     
     /**
@@ -4047,7 +4027,7 @@ public class VulkanicAPI {
      */
     @Deprecated
     public static void glUniform1i(int location, int value) {
-        assignUniformInteger(location, value);
+        assignUniformInteger(CTX, location, value);
     }
     
     // GL43+ Vertex Attribute methods

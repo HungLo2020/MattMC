@@ -617,7 +617,7 @@ public class GlStateManager {
 
 	public static int _glClientWaitSync(long l, int i, long m) {
 		RenderSystem.assertOnRenderThread();
-		return net.vulkanic.VulkanicAPI.waitForSync(l, i, m);
+		return net.vulkanic.VulkanicAPI.waitForSync(CTX, l, i, m);
 	}
 
 	public static void _glDeleteSync(long l) {
