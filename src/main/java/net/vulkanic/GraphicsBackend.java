@@ -1411,16 +1411,6 @@ public interface GraphicsBackend {
     void bindAttributeLocation(int program, int index, CharSequence name);
     
     // Vertex attributes
-    @Deprecated
-    void configureVertexAttribute(int index, int size, int type, boolean normalized, int stride, long pointer);
-    @Deprecated
-    void configureVertexAttributeInteger(int index, int size, int type, int stride, long pointer);
-    @Deprecated
-    void activateVertexAttribute(int index);
-    @Deprecated
-    void deactivateVertexAttribute(int index);
-    @Deprecated
-    void setVertexAttribDivisor(int index, int divisor);
     
     // Synchronization
     @Deprecated

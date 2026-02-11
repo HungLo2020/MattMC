@@ -10,6 +10,7 @@ import org.lwjgl.opengl.GL15;
 import org.lwjgl.opengl.GL20;
 import org.lwjgl.opengl.GL30;
 import org.lwjgl.opengl.GL32;
+import org.lwjgl.opengl.GL33;
 import java.nio.ByteBuffer;
 import java.nio.FloatBuffer;
 
@@ -1740,36 +1741,6 @@ public class OpenGLBackend implements GraphicsBackend {
     @Override
     public int queryShaderParameter(int shader, int pname) {
         return GL20.glGetShaderi(shader, pname);
-    }
-    
-    @Deprecated
-    @Override
-    public void configureVertexAttribute(int index, int size, int type, boolean normalized, int stride, long pointer) {
-        GL20.glVertexAttribPointer(index, size, type, normalized, stride, pointer);
-    }
-    
-    @Deprecated
-    @Override
-    public void configureVertexAttributeInteger(int index, int size, int type, int stride, long pointer) {
-        org.lwjgl.opengl.GL30.glVertexAttribIPointer(index, size, type, stride, pointer);
-    }
-    
-    @Deprecated
-    @Override
-    public void activateVertexAttribute(int index) {
-        GL20.glEnableVertexAttribArray(index);
-    }
-    
-    @Deprecated
-    @Override
-    public void deactivateVertexAttribute(int index) {
-        GL20.glDisableVertexAttribArray(index);
-    }
-    
-    @Deprecated
-    @Override
-    public void setVertexAttribDivisor(int index, int divisor) {
-        org.lwjgl.opengl.GL33.glVertexAttribDivisor(index, divisor);
     }
     
     @Deprecated

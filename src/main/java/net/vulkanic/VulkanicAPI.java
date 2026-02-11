@@ -2461,28 +2461,6 @@ public class VulkanicAPI {
         getBackend().setVertexAttribDivisor(ctx, index, divisor);
     }
     
-    /**
-     * Deletes a vertex array object and releases its resources.
-     * 
-     * This is a Vulkan-compatible method that requires an explicit CommandContext.
-     * For OpenGL, use getImmediateContext() to get the context.
-     * 
-     * Example usage:
-     * <pre>
-     *     CommandContext ctx = VulkanicAPI.getImmediateContext();
-     *     VulkanicAPI.deleteVertexArray(ctx, vaoId);
-     * </pre>
-     * 
-     * In OpenGL: Maps to glDeleteVertexArrays()
-     * In Vulkan: No direct equivalent (VAO state is part of pipeline)
-     * 
-     * @param ctx Command context for recording this command
-     * @param array The vertex array object ID to delete
-     */
-    public static void deleteVertexArray(CommandContext ctx, int array) {
-        getBackend().deleteVertexArray(ctx, array);
-    }
-    
     // ================================================================================
     // DEPRECATED METHODS - Legacy API without CommandContext
     // ================================================================================
@@ -2714,31 +2692,6 @@ public class VulkanicAPI {
     @Deprecated
     public static int queryShaderParameter(int shader, int pname) {
         return getBackend().queryShaderParameter(shader, pname);
-    }
-    
-    @Deprecated
-    public static void configureVertexAttribute(int index, int size, int type, boolean normalized, int stride, long pointer) {
-        getBackend().configureVertexAttribute(index, size, type, normalized, stride, pointer);
-    }
-    
-    @Deprecated
-    public static void configureVertexAttributeInteger(int index, int size, int type, int stride, long pointer) {
-        getBackend().configureVertexAttributeInteger(index, size, type, stride, pointer);
-    }
-    
-    @Deprecated
-    public static void activateVertexAttribute(int index) {
-        getBackend().activateVertexAttribute(index);
-    }
-    
-    @Deprecated
-    public static void deactivateVertexAttribute(int index) {
-        getBackend().deactivateVertexAttribute(index);
-    }
-    
-    @Deprecated
-    public static void setVertexAttribDivisor(int index, int divisor) {
-        getBackend().setVertexAttribDivisor(index, divisor);
     }
     
     @Deprecated
@@ -3724,7 +3677,7 @@ public class VulkanicAPI {
      */
     @Deprecated
     public static void glVertexAttribPointer(int index, int size, int type, boolean normalized, int stride, long pointer) {
-        configureVertexAttribute(index, size, type, normalized, stride, pointer);
+        configureVertexAttribute(CTX, index, size, type, normalized, stride, pointer);
     }
     
     /**
@@ -3733,7 +3686,7 @@ public class VulkanicAPI {
      */
     @Deprecated
     public static void glEnableVertexAttribArray(int index) {
-        activateVertexAttribute(index);
+        activateVertexAttribute(CTX, index);
     }
     
     /**
@@ -3847,7 +3800,7 @@ public class VulkanicAPI {
      */
     @Deprecated
     public static void glDisableVertexAttribArray(int index) {
-        deactivateVertexAttribute(index);
+        deactivateVertexAttribute(CTX, index);
     }
     
     /**
@@ -3856,7 +3809,7 @@ public class VulkanicAPI {
      */
     @Deprecated
     public static void glVertexAttribIPointer(int index, int size, int type, int stride, long pointer) {
-        configureVertexAttributeInteger(index, size, type, stride, pointer);
+        configureVertexAttributeInteger(CTX, index, size, type, stride, pointer);
     }
     
     // VAO methods
