@@ -198,7 +198,9 @@ Instead of building a complete Vulkan backend for the flawed legacy API, we are 
 13. ✅ `activateVertexAttribute(int)` - **REMOVED** ⭐ NEW ← Replaced by `activateVertexAttribute(CommandContext ctx, int)`
 14. ✅ `deactivateVertexAttribute(int)` - **REMOVED** ⭐ NEW ← Replaced by `deactivateVertexAttribute(CommandContext ctx, int)`
 15. ✅ `setVertexAttribDivisor(int, int)` - **REMOVED** ⭐ NEW ← Replaced by `setVertexAttribDivisor(CommandContext ctx, int, int)`
-16-21. ✅ **6 additional methods removed from all three layers** (VulkanicAPI, GraphicsBackend, OpenGLBackend)
+16-21. ✅ **6 additional shader/program methods removed from previous phases**
+
+**Note:** Phase 14 (this PR) removed 5 vertex attribute methods from all three layers (VulkanicAPI, GraphicsBackend, OpenGLBackend). The `deleteVertexArray` method already had a CommandContext version and was not removed in this phase.
 
 **Note:** The following methods were added directly with CommandContext and never had deprecated versions:
 - `drawArrays`, `drawElements`, `setDepthFunc`, `setBlendFunc`, `bindBuffer`, `setDepthWriteMask`
