@@ -762,18 +762,18 @@ public class GlCommandEncoder implements CommandEncoder {
 			if (l > 1) {
 				if (i > 0) {
 					VulkanicAPI.renderIndexedInstancedWithBase(
-						GlConst.toGl(glRenderPipeline.info().getVertexFormatMode()), k, GlConst.toGl(indexType), (long)j * indexType.bytes, l, i
+						CTX, GlConst.toGl(glRenderPipeline.info().getVertexFormatMode()), k, GlConst.toGl(indexType), (long)j * indexType.bytes, l, i
 					);
 				} else {
-					VulkanicAPI.renderIndexedInstanced(GlConst.toGl(glRenderPipeline.info().getVertexFormatMode()), k, GlConst.toGl(indexType), (long)j * indexType.bytes, l);
+					VulkanicAPI.renderIndexedInstanced(CTX, GlConst.toGl(glRenderPipeline.info().getVertexFormatMode()), k, GlConst.toGl(indexType), (long)j * indexType.bytes, l);
 				}
 			} else if (i > 0) {
-				VulkanicAPI.renderIndexedWithBase(GlConst.toGl(glRenderPipeline.info().getVertexFormatMode()), k, GlConst.toGl(indexType), (long)j * indexType.bytes, i);
+				VulkanicAPI.renderIndexedWithBase(CTX, GlConst.toGl(glRenderPipeline.info().getVertexFormatMode()), k, GlConst.toGl(indexType), (long)j * indexType.bytes, i);
 			} else {
 				GlStateManager._drawElements(GlConst.toGl(glRenderPipeline.info().getVertexFormatMode()), k, GlConst.toGl(indexType), (long)j * indexType.bytes);
 			}
 		} else if (l > 1) {
-			VulkanicAPI.renderArraysInstanced(GlConst.toGl(glRenderPipeline.info().getVertexFormatMode()), i, k, l);
+			VulkanicAPI.renderArraysInstanced(CTX, GlConst.toGl(glRenderPipeline.info().getVertexFormatMode()), i, k, l);
 		} else {
 			GlStateManager._drawArrays(GlConst.toGl(glRenderPipeline.info().getVertexFormatMode()), i, k);
 		}

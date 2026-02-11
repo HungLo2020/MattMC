@@ -171,6 +171,46 @@ public class OpenGLBackend implements GraphicsBackend {
         GL11.glDrawElements(mode, count, type, indices);
     }
     
+    @Override
+    public void renderIndexedInstancedWithBase(CommandContext ctx, int mode, int count, int type, long indices, int instanceCount, int baseVertex) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        org.lwjgl.opengl.GL32.glDrawElementsInstancedBaseVertex(mode, count, type, indices, instanceCount, baseVertex);
+    }
+    
+    @Override
+    public void renderIndexedWithBase(CommandContext ctx, int mode, int count, int type, long indices, int baseVertex) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        org.lwjgl.opengl.GL32.glDrawElementsBaseVertex(mode, count, type, indices, baseVertex);
+    }
+    
+    @Override
+    public void renderIndexedInstanced(CommandContext ctx, int mode, int count, int type, long indices, int instanceCount) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        org.lwjgl.opengl.GL31.glDrawElementsInstanced(mode, count, type, indices, instanceCount);
+    }
+    
+    @Override
+    public void renderArraysInstanced(CommandContext ctx, int mode, int first, int count, int instanceCount) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        org.lwjgl.opengl.GL31.glDrawArraysInstanced(mode, first, count, instanceCount);
+    }
+    
     /**
      * Binds a shader program with explicit command context.
      * This is the Vulkan-compatible implementation for shader binding.
@@ -1891,50 +1931,8 @@ public class OpenGLBackend implements GraphicsBackend {
     
     @Deprecated
     @Override
-    public void renderIndexedInstancedWithBase(int mode, int count, int type, long indices, int instanceCount, int baseVertex) {
-        org.lwjgl.opengl.GL32.glDrawElementsInstancedBaseVertex(mode, count, type, indices, instanceCount, baseVertex);
-    }
-    
-    @Deprecated
-    @Override
-    public void renderIndexedWithBase(int mode, int count, int type, long indices, int baseVertex) {
-        org.lwjgl.opengl.GL32.glDrawElementsBaseVertex(mode, count, type, indices, baseVertex);
-    }
-    
-    @Deprecated
-    @Override
-    public void renderIndexedInstanced(int mode, int count, int type, long indices, int instanceCount) {
-        org.lwjgl.opengl.GL31.glDrawElementsInstanced(mode, count, type, indices, instanceCount);
-    }
-    
-    @Deprecated
-    @Override
-    public void renderArraysInstanced(int mode, int first, int count, int instanceCount) {
-        org.lwjgl.opengl.GL31.glDrawArraysInstanced(mode, first, count, instanceCount);
-    }
-    
-    @Deprecated
-    @Override
     public void attachBufferToTexture(int target, int internalFormat, int buffer) {
         org.lwjgl.opengl.GL31.glTexBuffer(target, internalFormat, buffer);
-    }
-    
-    @Deprecated
-    @Override
-    public void assignUniformFloat2(int location, float x, float y) {
-        org.lwjgl.opengl.GL30C.glUniform2f(location, x, y);
-    }
-    
-    @Deprecated
-    @Override
-    public void assignUniformFloat3(int location, float x, float y, float z) {
-        org.lwjgl.opengl.GL30C.glUniform3f(location, x, y, z);
-    }
-    
-    @Deprecated
-    @Override
-    public void assignUniformFloat4(int location, float x, float y, float z, float w) {
-        org.lwjgl.opengl.GL30C.glUniform4f(location, x, y, z, w);
     }
     
     @Deprecated

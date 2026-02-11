@@ -4,6 +4,8 @@ import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
 
 public class GlUniformFloat3v extends GlUniform<float[]> {
+    private static final CommandContext CTX = VulkanicAPI.getImmediateContext();
+    
     public GlUniformFloat3v(int index) {
         super(index);
     }
@@ -14,11 +16,10 @@ public class GlUniformFloat3v extends GlUniform<float[]> {
             throw new IllegalArgumentException("value.length != 3");
         }
 
-        CommandContext ctx = VulkanicAPI.getImmediateContext();
-        VulkanicAPI.assignUniformFloat3v(ctx, this.index, value);
+        VulkanicAPI.assignUniformFloat3v(CTX, this.index, value);
     }
 
     public void set(float x, float y, float z) {
-        VulkanicAPI.assignUniformFloat3(this.index, x, y, z);
+        VulkanicAPI.assignUniformFloat3(CTX, this.index, x, y, z);
     }
 }

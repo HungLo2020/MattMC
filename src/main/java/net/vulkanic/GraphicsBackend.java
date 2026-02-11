@@ -114,6 +114,78 @@ public interface GraphicsBackend {
     void drawElements(CommandContext ctx, int mode, int count, int type, long indices);
     
     /**
+     * Renders indexed geometry with instancing and base vertex offset.
+     * 
+     * In OpenGL: Maps to glDrawElementsInstancedBaseVertex()
+     * In Vulkan: Maps to vkCmdDrawIndexed() with instanceCount and firstVertex parameters
+     * 
+     * Draws multiple instances of indexed primitives with a base vertex offset. This is useful
+     * for rendering multiple copies of the same geometry with different transformations.
+     * 
+     * @param ctx Command context for recording this command
+     * @param mode Primitive type (e.g., GL_TRIANGLES, GL_LINES)
+     * @param count Number of indices to draw
+     * @param type Data type of indices (e.g., GL_UNSIGNED_INT)
+     * @param indices Offset in bytes from the start of the index buffer
+     * @param instanceCount Number of instances to render
+     * @param baseVertex Value added to each index before accessing the vertex buffer
+     */
+    void renderIndexedInstancedWithBase(CommandContext ctx, int mode, int count, int type, long indices, int instanceCount, int baseVertex);
+    
+    /**
+     * Renders indexed geometry with a base vertex offset.
+     * 
+     * In OpenGL: Maps to glDrawElementsBaseVertex()
+     * In Vulkan: Maps to vkCmdDrawIndexed() with firstVertex parameter
+     * 
+     * Draws indexed primitives with a base vertex offset, allowing efficient rendering of
+     * sub-meshes from a larger vertex buffer.
+     * 
+     * @param ctx Command context for recording this command
+     * @param mode Primitive type (e.g., GL_TRIANGLES, GL_LINES)
+     * @param count Number of indices to draw
+     * @param type Data type of indices (e.g., GL_UNSIGNED_INT)
+     * @param indices Offset in bytes from the start of the index buffer
+     * @param baseVertex Value added to each index before accessing the vertex buffer
+     */
+    void renderIndexedWithBase(CommandContext ctx, int mode, int count, int type, long indices, int baseVertex);
+    
+    /**
+     * Renders indexed geometry with instancing.
+     * 
+     * In OpenGL: Maps to glDrawElementsInstanced()
+     * In Vulkan: Maps to vkCmdDrawIndexed() with instanceCount parameter
+     * 
+     * Draws multiple instances of indexed primitives. This is the primary method for
+     * efficient instanced rendering.
+     * 
+     * @param ctx Command context for recording this command
+     * @param mode Primitive type (e.g., GL_TRIANGLES, GL_LINES)
+     * @param count Number of indices to draw
+     * @param type Data type of indices (e.g., GL_UNSIGNED_INT)
+     * @param indices Offset in bytes from the start of the index buffer
+     * @param instanceCount Number of instances to render
+     */
+    void renderIndexedInstanced(CommandContext ctx, int mode, int count, int type, long indices, int instanceCount);
+    
+    /**
+     * Renders non-indexed geometry with instancing.
+     * 
+     * In OpenGL: Maps to glDrawArraysInstanced()
+     * In Vulkan: Maps to vkCmdDraw() with instanceCount parameter
+     * 
+     * Draws multiple instances of non-indexed primitives. Useful for rendering many
+     * copies of simple geometry.
+     * 
+     * @param ctx Command context for recording this command
+     * @param mode Primitive type (e.g., GL_TRIANGLES, GL_LINES)
+     * @param first Starting vertex index in the vertex array
+     * @param count Number of vertices to draw
+     * @param instanceCount Number of instances to render
+     */
+    void renderArraysInstanced(CommandContext ctx, int mode, int first, int count, int instanceCount);
+    
+    /**
      * Binds a shader program for subsequent rendering operations.
      * 
      * In OpenGL: Maps to glUseProgram()
@@ -1790,27 +1862,9 @@ public interface GraphicsBackend {
     
     // Clear operations
     
-    // Advanced drawing operations
-    @Deprecated
-    void renderIndexedInstancedWithBase(int mode, int count, int type, long indices, int instanceCount, int baseVertex);
-    @Deprecated
-    void renderIndexedWithBase(int mode, int count, int type, long indices, int baseVertex);
-    @Deprecated
-    void renderIndexedInstanced(int mode, int count, int type, long indices, int instanceCount);
-    @Deprecated
-    void renderArraysInstanced(int mode, int first, int count, int instanceCount);
-    
     // Texture buffer operations
     @Deprecated
     void attachBufferToTexture(int target, int internalFormat, int buffer);
-    
-    // Uniform operations (additional)
-    @Deprecated
-    void assignUniformFloat2(int location, float x, float y);
-    @Deprecated
-    void assignUniformFloat3(int location, float x, float y, float z);
-    @Deprecated
-    void assignUniformFloat4(int location, float x, float y, float z, float w);
     
     // Sync query operations
     @Deprecated

@@ -686,6 +686,110 @@ public class VulkanicAPI {
     }
     
     /**
+     * Renders indexed geometry with instancing and base vertex offset.
+     * 
+     * This is a Vulkan-compatible method that requires an explicit CommandContext.
+     * For OpenGL, use getImmediateContext() to get the context.
+     * 
+     * Example usage:
+     * <pre>
+     *     CommandContext ctx = VulkanicAPI.getImmediateContext();
+     *     VulkanicAPI.renderIndexedInstancedWithBase(ctx, GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0, 100, 0);
+     * </pre>
+     * 
+     * In OpenGL: Maps to glDrawElementsInstancedBaseVertex()
+     * In Vulkan: Maps to vkCmdDrawIndexed() with instanceCount and firstVertex
+     * 
+     * @param ctx Command context for recording this command
+     * @param mode Primitive type (e.g., GL_TRIANGLES, GL_LINES)
+     * @param count Number of indices to draw
+     * @param type Data type of indices (e.g., GL_UNSIGNED_INT)
+     * @param indices Offset in bytes from the start of the index buffer
+     * @param instanceCount Number of instances to render
+     * @param baseVertex Value added to each index before accessing the vertex buffer
+     */
+    public static void renderIndexedInstancedWithBase(CommandContext ctx, int mode, int count, int type, long indices, int instanceCount, int baseVertex) {
+        getBackend().renderIndexedInstancedWithBase(ctx, mode, count, type, indices, instanceCount, baseVertex);
+    }
+    
+    /**
+     * Renders indexed geometry with a base vertex offset.
+     * 
+     * This is a Vulkan-compatible method that requires an explicit CommandContext.
+     * For OpenGL, use getImmediateContext() to get the context.
+     * 
+     * Example usage:
+     * <pre>
+     *     CommandContext ctx = VulkanicAPI.getImmediateContext();
+     *     VulkanicAPI.renderIndexedWithBase(ctx, GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0, 100);
+     * </pre>
+     * 
+     * In OpenGL: Maps to glDrawElementsBaseVertex()
+     * In Vulkan: Maps to vkCmdDrawIndexed() with firstVertex parameter
+     * 
+     * @param ctx Command context for recording this command
+     * @param mode Primitive type (e.g., GL_TRIANGLES, GL_LINES)
+     * @param count Number of indices to draw
+     * @param type Data type of indices (e.g., GL_UNSIGNED_INT)
+     * @param indices Offset in bytes from the start of the index buffer
+     * @param baseVertex Value added to each index before accessing the vertex buffer
+     */
+    public static void renderIndexedWithBase(CommandContext ctx, int mode, int count, int type, long indices, int baseVertex) {
+        getBackend().renderIndexedWithBase(ctx, mode, count, type, indices, baseVertex);
+    }
+    
+    /**
+     * Renders indexed geometry with instancing.
+     * 
+     * This is a Vulkan-compatible method that requires an explicit CommandContext.
+     * For OpenGL, use getImmediateContext() to get the context.
+     * 
+     * Example usage:
+     * <pre>
+     *     CommandContext ctx = VulkanicAPI.getImmediateContext();
+     *     VulkanicAPI.renderIndexedInstanced(ctx, GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0, 1000);
+     * </pre>
+     * 
+     * In OpenGL: Maps to glDrawElementsInstanced()
+     * In Vulkan: Maps to vkCmdDrawIndexed() with instanceCount parameter
+     * 
+     * @param ctx Command context for recording this command
+     * @param mode Primitive type (e.g., GL_TRIANGLES, GL_LINES)
+     * @param count Number of indices to draw
+     * @param type Data type of indices (e.g., GL_UNSIGNED_INT)
+     * @param indices Offset in bytes from the start of the index buffer
+     * @param instanceCount Number of instances to render
+     */
+    public static void renderIndexedInstanced(CommandContext ctx, int mode, int count, int type, long indices, int instanceCount) {
+        getBackend().renderIndexedInstanced(ctx, mode, count, type, indices, instanceCount);
+    }
+    
+    /**
+     * Renders non-indexed geometry with instancing.
+     * 
+     * This is a Vulkan-compatible method that requires an explicit CommandContext.
+     * For OpenGL, use getImmediateContext() to get the context.
+     * 
+     * Example usage:
+     * <pre>
+     *     CommandContext ctx = VulkanicAPI.getImmediateContext();
+     *     VulkanicAPI.renderArraysInstanced(ctx, GL_TRIANGLES, 0, 3, 100);
+     * </pre>
+     * 
+     * In OpenGL: Maps to glDrawArraysInstanced()
+     * In Vulkan: Maps to vkCmdDraw() with instanceCount parameter
+     * 
+     * @param ctx Command context for recording this command
+     * @param mode Primitive type (e.g., GL_TRIANGLES, GL_LINES)
+     * @param first Starting vertex index in the vertex array
+     * @param count Number of vertices to draw
+     * @param instanceCount Number of instances to render
+     */
+    public static void renderArraysInstanced(CommandContext ctx, int mode, int first, int count, int instanceCount) {
+        getBackend().renderArraysInstanced(ctx, mode, first, count, instanceCount);
+    }
+    
+    /**
      * Binds a shader program for subsequent rendering operations.
      * 
      * This is a Vulkan-compatible method that requires an explicit CommandContext.
@@ -3565,43 +3669,8 @@ public class VulkanicAPI {
     }
     
     @Deprecated
-    public static void renderIndexedInstancedWithBase(int mode, int count, int type, long indices, int instanceCount, int baseVertex) {
-        getBackend().renderIndexedInstancedWithBase(mode, count, type, indices, instanceCount, baseVertex);
-    }
-    
-    @Deprecated
-    public static void renderIndexedWithBase(int mode, int count, int type, long indices, int baseVertex) {
-        getBackend().renderIndexedWithBase(mode, count, type, indices, baseVertex);
-    }
-    
-    @Deprecated
-    public static void renderIndexedInstanced(int mode, int count, int type, long indices, int instanceCount) {
-        getBackend().renderIndexedInstanced(mode, count, type, indices, instanceCount);
-    }
-    
-    @Deprecated
-    public static void renderArraysInstanced(int mode, int first, int count, int instanceCount) {
-        getBackend().renderArraysInstanced(mode, first, count, instanceCount);
-    }
-    
-    @Deprecated
     public static void attachBufferToTexture(int target, int internalFormat, int buffer) {
         getBackend().attachBufferToTexture(target, internalFormat, buffer);
-    }
-    
-    @Deprecated
-    public static void assignUniformFloat2(int location, float x, float y) {
-        getBackend().assignUniformFloat2(location, x, y);
-    }
-    
-    @Deprecated
-    public static void assignUniformFloat3(int location, float x, float y, float z) {
-        getBackend().assignUniformFloat3(location, x, y, z);
-    }
-    
-    @Deprecated
-    public static void assignUniformFloat4(int location, float x, float y, float z, float w) {
-        getBackend().assignUniformFloat4(location, x, y, z, w);
     }
     
     @Deprecated

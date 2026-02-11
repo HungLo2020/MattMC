@@ -550,7 +550,7 @@ public class GenericObjectRenderer implements IDhApiCustomRenderRegister
 		profiler.popPush("render");
 		if (boxGroup.uploadedBoxCount > 0)
 		{
-			VulkanicAPI.renderIndexedInstanced(VulkanicAPI.GL_TRIANGLES, BOX_INDICES.length, VulkanicAPI.GL_UNSIGNED_INT, 0, boxGroup.uploadedBoxCount);
+			VulkanicAPI.renderIndexedInstanced(ctx, VulkanicAPI.GL_TRIANGLES, BOX_INDICES.length, VulkanicAPI.GL_UNSIGNED_INT, 0, boxGroup.uploadedBoxCount);
 		}
 		
 		
