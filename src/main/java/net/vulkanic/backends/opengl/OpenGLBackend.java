@@ -1540,12 +1540,6 @@ public class OpenGLBackend implements GraphicsBackend {
     
     @Deprecated
     @Override
-    public void attachFramebuffer(int target, int fbo) {
-        GL30.glBindFramebuffer(target, fbo);
-    }
-    
-    @Deprecated
-    @Override
     public void attachTextureToFramebuffer(int target, int attachment, int textarget, int texture, int level) {
         GL30.glFramebufferTexture2D(target, attachment, textarget, texture, level);
     }
@@ -1655,12 +1649,6 @@ public class OpenGLBackend implements GraphicsBackend {
     
     @Deprecated
     @Override
-    public void fillBufferWithData(int tgt, java.nio.ByteBuffer dat, int usg) {
-        GL15.glBufferData(tgt, dat, usg);
-    }
-    
-    @Deprecated
-    @Override
     public void fillBufferWithSize(int tgt, long sz, int usg) {
         GL15.glBufferData(tgt, sz, usg);
     }
@@ -1684,17 +1672,6 @@ public class OpenGLBackend implements GraphicsBackend {
         GL15.glUnmapBuffer(tgt);
     }
     
-    @Deprecated
-    @Override
-    public int generateFramebufferObject() {
-        return GL30.glGenFramebuffers();
-    }
-    
-    @Deprecated
-    @Override
-    public void destroyFramebufferObject(int fbo) {
-        GL30.glDeleteFramebuffers(fbo);
-    }
     
     @Deprecated
     @Override
@@ -1706,24 +1683,6 @@ public class OpenGLBackend implements GraphicsBackend {
     @Override
     public void linkProgramBinary(int program) {
         GL20.glLinkProgram(program);
-    }
-    
-    @Deprecated
-    @Override
-    public void attachShaderToProgram(int program, int shader) {
-        GL20.glAttachShader(program, shader);
-    }
-    
-    @Deprecated
-    @Override
-    public String retrieveProgramInfoLog(int program) {
-        return GL20.glGetProgramInfoLog(program);
-    }
-    
-    @Deprecated
-    @Override
-    public String retrieveShaderInfoLog(int shader) {
-        return GL20.glGetShaderInfoLog(shader);
     }
     
     @Deprecated

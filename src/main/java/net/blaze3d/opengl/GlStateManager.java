@@ -148,7 +148,7 @@ public class GlStateManager {
 
 	public static void glAttachShader(int i, int j) {
 		RenderSystem.assertOnRenderThread();
-		net.vulkanic.VulkanicAPI.attachShaderToProgram(i, j);
+		net.vulkanic.VulkanicAPI.attachShaderToProgram(CTX, i, j);
 	}
 
 	public static void glDeleteShader(int i) {
@@ -285,7 +285,7 @@ public class GlStateManager {
 
 	public static void _glBufferData(int i, ByteBuffer byteBuffer, int j) {
 		RenderSystem.assertOnRenderThread();
-		net.vulkanic.VulkanicAPI.fillBufferWithData(i, byteBuffer, j);
+		net.vulkanic.VulkanicAPI.fillBufferWithData(CTX, i, byteBuffer, j);
 	}
 
 	public static void _glBufferSubData(int i, int j, ByteBuffer byteBuffer) {
@@ -318,12 +318,12 @@ public class GlStateManager {
 
 	public static void _glBindFramebuffer(int i, int j) {
 		if ((i == 36008 || i == 36160) && readFbo != j) {
-			net.vulkanic.VulkanicAPI.attachFramebuffer(36008, j);
+			net.vulkanic.VulkanicAPI.attachFramebuffer(CTX, 36008, j);
 			readFbo = j;
 		}
 
 		if ((i == 36009 || i == 36160) && writeFbo != j) {
-			net.vulkanic.VulkanicAPI.attachFramebuffer(36009, j);
+			net.vulkanic.VulkanicAPI.attachFramebuffer(CTX, 36009, j);
 			writeFbo = j;
 		}
 	}
@@ -343,7 +343,7 @@ public class GlStateManager {
 
 	public static void _glDeleteFramebuffers(int i) {
 		RenderSystem.assertOnRenderThread();
-		net.vulkanic.VulkanicAPI.destroyFramebufferObject(i);
+		net.vulkanic.VulkanicAPI.destroyFramebufferObject(CTX, i);
 		if (readFbo == i) {
 			readFbo = 0;
 		}
@@ -355,7 +355,7 @@ public class GlStateManager {
 
 	public static int glGenFramebuffers() {
 		RenderSystem.assertOnRenderThread();
-		return net.vulkanic.VulkanicAPI.generateFramebufferObject();
+		return net.vulkanic.VulkanicAPI.generateFramebufferObject(CTX);
 	}
 
 	public static void _glFramebufferTexture2D(int i, int j, int k, int l, int m) {
@@ -370,12 +370,12 @@ public class GlStateManager {
 
 	public static String glGetShaderInfoLog(int i, int j) {
 		RenderSystem.assertOnRenderThread();
-		return net.vulkanic.VulkanicAPI.retrieveShaderInfoLog(i);
+		return net.vulkanic.VulkanicAPI.retrieveShaderInfoLog(CTX, i);
 	}
 
 	public static String glGetProgramInfoLog(int i, int j) {
 		RenderSystem.assertOnRenderThread();
-		return net.vulkanic.VulkanicAPI.retrieveProgramInfoLog(i);
+		return net.vulkanic.VulkanicAPI.retrieveProgramInfoLog(CTX, i);
 	}
 
 	public static void _enableCull() {

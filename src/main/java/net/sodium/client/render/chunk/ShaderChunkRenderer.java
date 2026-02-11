@@ -117,7 +117,7 @@ public abstract class ShaderChunkRenderer implements ChunkRenderer {
         }
 
         if (program == null) {
-            VulkanicAPI.attachFramebuffer(VulkanicAPI.GL_FRAMEBUFFER, ((GlTexture) target.getColorTexture()).getFbo(((GlDevice) RenderSystem.getDevice()).directStateAccess(), target.getDepthTexture()));
+            VulkanicAPI.attachFramebuffer(VulkanicAPI.getImmediateContext(), VulkanicAPI.GL_FRAMEBUFFER, ((GlTexture) target.getColorTexture()).getFbo(((GlDevice) RenderSystem.getDevice()).directStateAccess(), target.getDepthTexture()));
             program = this.compileProgram(options);
         }
 

@@ -148,7 +148,7 @@ public class MinecraftGLWrapper implements IMinecraftGLWrapper
 	@Override
 	public void glBindFramebuffer(int target, int framebuffer) 
 	{
-		VulkanicAPI.attachFramebuffer(target, framebuffer);
+		VulkanicAPI.attachFramebuffer(CTX, target, framebuffer);
 		GlStateManager._glBindFramebuffer(target, framebuffer); 
 	}
 	

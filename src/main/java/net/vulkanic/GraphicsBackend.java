@@ -1426,8 +1426,6 @@ public interface GraphicsBackend {
     
     // Framebuffer operations
     @Deprecated
-    void attachFramebuffer(int target, int fbo);
-    @Deprecated
     void attachTextureToFramebuffer(int target, int attachment, int textarget, int texture, int level);
     
     // Buffer operations  
@@ -1477,7 +1475,6 @@ public interface GraphicsBackend {
     // GPU buffer lifecycle
     
     // GPU buffer lifecycle
-    void fillBufferWithData(int tgt, java.nio.ByteBuffer dat, int usg);
     @Deprecated
     void fillBufferWithSize(int tgt, long sz, int usg);
     @Deprecated
@@ -1493,21 +1490,11 @@ public interface GraphicsBackend {
     
     // Framebuffer lifecycle
     @Deprecated
-    int generateFramebufferObject();
-    @Deprecated
-    void destroyFramebufferObject(int fbo);
-    @Deprecated
     void copyFramebufferRegion(int srcX0, int srcY0, int srcX1, int srcY1, int dstX0, int dstY0, int dstX1, int dstY1, int msk, int flt);
     
     // Shader pipeline
     @Deprecated
     void linkProgramBinary(int program);
-    @Deprecated
-    void attachShaderToProgram(int program, int shader);
-    @Deprecated
-    String retrieveProgramInfoLog(int program);
-    @Deprecated
-    String retrieveShaderInfoLog(int shader);
     @Deprecated
     int locateUniformVariable(int program, CharSequence name);
     @Deprecated

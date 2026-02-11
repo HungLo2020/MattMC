@@ -65,11 +65,11 @@ public class VanillaFadeRenderer
 	{
 		if (this.fadeFramebuffer != -1)
 		{
-			VulkanicAPI.destroyFramebufferObject(this.fadeFramebuffer);
+			VulkanicAPI.destroyFramebufferObject(CTX, this.fadeFramebuffer);
 			this.fadeFramebuffer = -1;
 		}
 		
-		this.fadeFramebuffer = VulkanicAPI.generateFramebufferObject();
+		this.fadeFramebuffer = VulkanicAPI.generateFramebufferObject(CTX);
 		GLMC.glBindFramebuffer(VulkanicAPI.GL_FRAMEBUFFER, this.fadeFramebuffer);
 		
 		

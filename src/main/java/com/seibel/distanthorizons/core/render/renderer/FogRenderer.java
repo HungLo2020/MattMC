@@ -56,7 +56,7 @@ public class FogRenderer
 	{
 		if (this.fogFramebuffer != -1)
 		{
-			VulkanicAPI.destroyFramebufferObject(this.fogFramebuffer);
+			VulkanicAPI.destroyFramebufferObject(CTX, this.fogFramebuffer);
 			this.fogFramebuffer = -1;
 		}
 		
@@ -66,7 +66,7 @@ public class FogRenderer
 			this.fogTexture = -1;
 		}
 		
-		this.fogFramebuffer = VulkanicAPI.generateFramebufferObject();
+		this.fogFramebuffer = VulkanicAPI.generateFramebufferObject(CTX);
 		GLMC.glBindFramebuffer(VulkanicAPI.GL_FRAMEBUFFER, this.fogFramebuffer);
 		
 		this.fogTexture = GLMC.glGenTextures();

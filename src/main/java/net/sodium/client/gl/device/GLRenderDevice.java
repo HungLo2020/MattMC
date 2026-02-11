@@ -106,7 +106,7 @@ public class GLRenderDevice implements RenderDevice {
         public void uploadData(GlMutableBuffer glBuffer, ByteBuffer byteBuffer, GlBufferUsage usage) {
             this.bindBuffer(GlBufferTarget.ARRAY_BUFFER, glBuffer);
 
-            VulkanicAPI.fillBufferWithData(GlBufferTarget.ARRAY_BUFFER.getTargetParameter(), byteBuffer, usage.getId());
+            VulkanicAPI.fillBufferWithData(CTX, GlBufferTarget.ARRAY_BUFFER.getTargetParameter(), byteBuffer, usage.getId());
             glBuffer.setSize(byteBuffer.remaining());
         }
 

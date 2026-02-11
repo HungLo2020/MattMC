@@ -2994,11 +2994,6 @@ public class VulkanicAPI {
     
     
     @Deprecated
-    public static void attachFramebuffer(int target, int fbo) {
-        getBackend().attachFramebuffer(target, fbo);
-    }
-    
-    @Deprecated
     public static void attachTextureToFramebuffer(int target, int attachment, int textarget, int texture, int level) {
         getBackend().attachTextureToFramebuffer(target, attachment, textarget, texture, level);
     }
@@ -3090,11 +3085,6 @@ public class VulkanicAPI {
     }
     
     @Deprecated
-    public static void fillBufferWithData(int tgt, java.nio.ByteBuffer dat, int usg) {
-        getBackend().fillBufferWithData(tgt, dat, usg);
-    }
-    
-    @Deprecated
     public static void fillBufferWithSize(int tgt, long sz, int usg) {
         getBackend().fillBufferWithSize(tgt, sz, usg);
     }
@@ -3116,16 +3106,6 @@ public class VulkanicAPI {
     }
     
     @Deprecated
-    public static int generateFramebufferObject() {
-        return getBackend().generateFramebufferObject();
-    }
-    
-    @Deprecated
-    public static void destroyFramebufferObject(int fbo) {
-        getBackend().destroyFramebufferObject(fbo);
-    }
-    
-    @Deprecated
     public static void copyFramebufferRegion(int srcX0, int srcY0, int srcX1, int srcY1, int dstX0, int dstY0, int dstX1, int dstY1, int msk, int flt) {
         getBackend().copyFramebufferRegion(srcX0, srcY0, srcX1, srcY1, dstX0, dstY0, dstX1, dstY1, msk, flt);
     }
@@ -3133,21 +3113,6 @@ public class VulkanicAPI {
     @Deprecated
     public static void linkProgramBinary(int program) {
         getBackend().linkProgramBinary(program);
-    }
-    
-    @Deprecated
-    public static void attachShaderToProgram(int program, int shader) {
-        getBackend().attachShaderToProgram(program, shader);
-    }
-    
-    @Deprecated
-    public static String retrieveProgramInfoLog(int program) {
-        return retrieveProgramInfoLog(CTX, program);
-    }
-    
-    @Deprecated
-    public static String retrieveShaderInfoLog(int shader) {
-        return retrieveShaderInfoLog(CTX, shader);
     }
     
     @Deprecated
@@ -3918,12 +3883,12 @@ public class VulkanicAPI {
     
     @Deprecated
     public static int glGenFramebuffers() {
-        return getBackend().generateFramebufferObject();
+        return getBackend().generateFramebufferObject(CTX);
     }
     
     @Deprecated
     public static void glDeleteFramebuffers(int framebuffer) {
-        getBackend().destroyFramebufferObject(framebuffer);
+        getBackend().destroyFramebufferObject(CTX, framebuffer);
     }
     
     @Deprecated

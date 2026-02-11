@@ -25,7 +25,7 @@ public class GlShader extends GlObject {
         ShaderWorkarounds.safeShaderSource(handle, parsedShader.src());
         VulkanicAPI.compileShaderSource(CTX, handle);
 
-        String log = VulkanicAPI.retrieveShaderInfoLog(handle);
+        String log = VulkanicAPI.retrieveShaderInfoLog(CTX, handle);
 
         if (!log.isEmpty()) {
             LOGGER.warn("Shader compilation log for {}: {}", this.name, log);

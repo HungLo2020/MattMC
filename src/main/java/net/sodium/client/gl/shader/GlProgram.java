@@ -108,7 +108,7 @@ public class GlProgram<T> extends GlObject implements ShaderBindingContext {
         }
 
         public Builder attachShader(GlShader shader) {
-            VulkanicAPI.attachShaderToProgram(this.program, shader.handle());
+            VulkanicAPI.attachShaderToProgram(CTX, this.program, shader.handle());
 
             return this;
         }
@@ -125,7 +125,7 @@ public class GlProgram<T> extends GlObject implements ShaderBindingContext {
         public <U> GlProgram<U> link(Function<ShaderBindingContext, U> factory) {
             VulkanicAPI.linkProgramBinary(CTX, this.program);
 
-            String log = VulkanicAPI.retrieveProgramInfoLog(this.program);
+            String log = VulkanicAPI.retrieveProgramInfoLog(CTX, this.program);
 
             if (!log.isEmpty()) {
                 LOGGER.warn("Program link log for " + this.name + ": " + log);
