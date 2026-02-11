@@ -546,17 +546,20 @@ public class GlStateManager {
 
 	public static void _vertexAttribPointer(int i, int j, int k, boolean bl, int l, long m) {
 		RenderSystem.assertOnRenderThread();
-		net.vulkanic.VulkanicAPI.configureVertexAttribute(i, j, k, bl, l, m);
+		net.vulkanic.CommandContext ctx = net.vulkanic.VulkanicAPI.getImmediateContext();
+		net.vulkanic.VulkanicAPI.configureVertexAttribute(ctx, i, j, k, bl, l, m);
 	}
 
 	public static void _vertexAttribIPointer(int i, int j, int k, int l, long m) {
 		RenderSystem.assertOnRenderThread();
-		net.vulkanic.VulkanicAPI.configureVertexAttributeInteger(i, j, k, l, m);
+		net.vulkanic.CommandContext ctx = net.vulkanic.VulkanicAPI.getImmediateContext();
+		net.vulkanic.VulkanicAPI.configureVertexAttributeInteger(ctx, i, j, k, l, m);
 	}
 
 	public static void _enableVertexAttribArray(int i) {
 		RenderSystem.assertOnRenderThread();
-		net.vulkanic.VulkanicAPI.activateVertexAttribute(i);
+		net.vulkanic.CommandContext ctx = net.vulkanic.VulkanicAPI.getImmediateContext();
+		net.vulkanic.VulkanicAPI.activateVertexAttribute(ctx, i);
 	}
 
 	public static void _drawElements(int i, int j, int k, long l) {

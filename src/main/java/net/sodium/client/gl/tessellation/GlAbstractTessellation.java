@@ -19,18 +19,19 @@ public abstract class GlAbstractTessellation implements GlTessellation {
     }
 
     protected void bindAttributes(CommandList commandList) {
+        net.vulkanic.CommandContext ctx = VulkanicAPI.getImmediateContext();
         for (TessellationBinding binding : this.bindings) {
             commandList.bindBuffer(binding.target(), binding.buffer());
 
             for (GlVertexAttributeBinding attrib : binding.attributeBindings()) {
                 if (attrib.isIntType()) {
-                    VulkanicAPI.configureVertexAttributeInteger(attrib.getIndex(), attrib.getCount(), attrib.getFormat(),
+                    VulkanicAPI.configureVertexAttributeInteger(ctx, attrib.getIndex(), attrib.getCount(), attrib.getFormat(),
                             attrib.getStride(), attrib.getPointer());
                 } else {
-                    VulkanicAPI.configureVertexAttribute(attrib.getIndex(), attrib.getCount(), attrib.getFormat(), attrib.isNormalized(),
+                    VulkanicAPI.configureVertexAttribute(ctx, attrib.getIndex(), attrib.getCount(), attrib.getFormat(), attrib.isNormalized(),
                             attrib.getStride(), attrib.getPointer());
                 }
-                VulkanicAPI.activateVertexAttribute(attrib.getIndex());
+                VulkanicAPI.activateVertexAttribute(ctx, attrib.getIndex());
             }
         }
     }

@@ -2086,6 +2086,118 @@ public interface GraphicsBackend {
     void deleteVertexArray(CommandContext ctx, int array);
     
     /**
+     * Configures a vertex attribute array with the specified format.
+     * 
+     * In OpenGL: Maps to glVertexAttribPointer()
+     * In Vulkan: Maps to VkVertexInputAttributeDescription (baked into pipeline)
+     * 
+     * This method specifies the format and location of a vertex attribute array.
+     * The attribute data is read from the currently bound vertex buffer.
+     * In Vulkan, this information is baked into the pipeline state at creation time.
+     * 
+     * @param ctx Command recording context
+     * @param index The index of the vertex attribute to configure
+     * @param size The number of components per vertex attribute (1-4)
+     * @param type The data type of each component (e.g., GL_FLOAT, GL_INT)
+     * @param normalized Whether fixed-point data should be normalized
+     * @param stride Byte offset between consecutive vertex attributes
+     * @param pointer Offset of the first component in the buffer
+     * 
+     * Example usage:
+     * <pre>{@code
+     * // Position attribute: 3 floats at offset 0
+     * backend.configureVertexAttribute(CTX, 0, 3, GL_FLOAT, false, 8 * Float.BYTES, 0);
+     * }</pre>
+     */
+    void configureVertexAttribute(CommandContext ctx, int index, int size, int type, boolean normalized, int stride, long pointer);
+    
+    /**
+     * Configures a vertex attribute array with integer type (no normalization).
+     * 
+     * In OpenGL: Maps to glVertexAttribIPointer()
+     * In Vulkan: Maps to VkVertexInputAttributeDescription (baked into pipeline)
+     * 
+     * This method specifies the format and location of a vertex attribute array
+     * with pure integer types (no floating-point conversion or normalization).
+     * Used for integer vertex attributes that should remain as integers in the shader.
+     * 
+     * @param ctx Command recording context
+     * @param index The index of the vertex attribute to configure
+     * @param size The number of components per vertex attribute (1-4)
+     * @param type The data type of each component (e.g., GL_INT, GL_UNSIGNED_INT)
+     * @param stride Byte offset between consecutive vertex attributes
+     * @param pointer Offset of the first component in the buffer
+     * 
+     * Example usage:
+     * <pre>{@code
+     * // Integer color attribute: 4 ints at offset 12
+     * backend.configureVertexAttributeInteger(CTX, 1, 4, GL_INT, 8 * Integer.BYTES, 12);
+     * }</pre>
+     */
+    void configureVertexAttributeInteger(CommandContext ctx, int index, int size, int type, int stride, long pointer);
+    
+    /**
+     * Enables a vertex attribute array for rendering.
+     * 
+     * In OpenGL: Maps to glEnableVertexAttribArray()
+     * In Vulkan: Vertex input bindings are defined in pipeline state
+     * 
+     * This enables the specified vertex attribute array so it will be used during
+     * rendering. The attribute must be configured with configureVertexAttribute()
+     * before use. In Vulkan, attribute enablement is part of pipeline creation.
+     * 
+     * @param ctx Command recording context
+     * @param index The index of the vertex attribute to enable
+     * 
+     * Example usage:
+     * <pre>{@code
+     * backend.activateVertexAttribute(CTX, 0);  // Enable position attribute
+     * }</pre>
+     */
+    void activateVertexAttribute(CommandContext ctx, int index);
+    
+    /**
+     * Disables a vertex attribute array.
+     * 
+     * In OpenGL: Maps to glDisableVertexAttribArray()
+     * In Vulkan: Vertex input bindings are defined in pipeline state
+     * 
+     * This disables the specified vertex attribute array so it won't be used
+     * during rendering. In Vulkan, attribute enablement is part of pipeline
+     * creation and cannot be changed dynamically.
+     * 
+     * @param ctx Command recording context
+     * @param index The index of the vertex attribute to disable
+     * 
+     * Example usage:
+     * <pre>{@code
+     * backend.deactivateVertexAttribute(CTX, 0);  // Disable position attribute
+     * }</pre>
+     */
+    void deactivateVertexAttribute(CommandContext ctx, int index);
+    
+    /**
+     * Sets the instance divisor for a vertex attribute.
+     * 
+     * In OpenGL: Maps to glVertexAttribDivisor()
+     * In Vulkan: Maps to VkVertexInputBindingDescription.inputRate
+     * 
+     * This specifies the rate at which vertex attributes advance during instanced
+     * rendering. A divisor of 0 means the attribute advances per vertex (default).
+     * A divisor of N means the attribute advances once per N instances.
+     * 
+     * @param ctx Command recording context
+     * @param index The index of the vertex attribute
+     * @param divisor The number of instances that will pass between updates (0 = per-vertex)
+     * 
+     * Example usage:
+     * <pre>{@code
+     * backend.setVertexAttribDivisor(CTX, 3, 1);  // Attribute 3 advances per instance
+     * }</pre>
+     */
+    void setVertexAttribDivisor(CommandContext ctx, int index, int divisor);
+    
+    /**
      * Queries floating-point state values.
      * 
      * In OpenGL: Maps to glGetFloatv()

@@ -94,7 +94,8 @@ public class GLRenderDevice implements RenderDevice {
         @Override
         public void bindVertexArray(GlVertexArray array) {
             if (this.stateTracker.makeVertexArrayActive(array)) {
-                VulkanicAPI.selectVertexArray(array.handle());
+                net.vulkanic.CommandContext ctx = VulkanicAPI.getImmediateContext();
+                VulkanicAPI.selectVertexArray(ctx, array.handle());
             }
         }
 
@@ -124,7 +125,8 @@ public class GLRenderDevice implements RenderDevice {
         @Override
         public void unbindVertexArray() {
             if (this.stateTracker.makeVertexArrayActive(null)) {
-                VulkanicAPI.selectVertexArray(GlVertexArray.NULL_ARRAY_ID);
+                net.vulkanic.CommandContext ctx = VulkanicAPI.getImmediateContext();
+                VulkanicAPI.selectVertexArray(ctx, GlVertexArray.NULL_ARRAY_ID);
             }
         }
 
@@ -157,7 +159,8 @@ public class GLRenderDevice implements RenderDevice {
             int handle = vertexArray.handle();
             vertexArray.invalidateHandle();
 
-            VulkanicAPI.deleteVertexArray(handle);
+            net.vulkanic.CommandContext ctx = VulkanicAPI.getImmediateContext();
+            VulkanicAPI.deleteVertexArray(ctx, handle);
         }
 
         @Override

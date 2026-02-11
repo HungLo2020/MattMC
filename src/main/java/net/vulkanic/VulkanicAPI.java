@@ -2341,6 +2341,148 @@ public class VulkanicAPI {
         return getBackend().createSingleBufferObject(ctx);
     }
     
+    /**
+     * Configures a vertex attribute array with the specified format.
+     * 
+     * This is a Vulkan-compatible method that requires an explicit CommandContext.
+     * For OpenGL, use getImmediateContext() to get the context.
+     * 
+     * Example usage:
+     * <pre>
+     *     CommandContext ctx = VulkanicAPI.getImmediateContext();
+     *     VulkanicAPI.configureVertexAttribute(ctx, 0, 3, GL_FLOAT, false, 12, 0);
+     * </pre>
+     * 
+     * In OpenGL: Maps to glVertexAttribPointer()
+     * In Vulkan: Maps to VkVertexInputAttributeDescription (baked into pipeline)
+     * 
+     * @param ctx Command context for recording this command
+     * @param index The index of the vertex attribute to configure
+     * @param size The number of components per vertex attribute (1-4)
+     * @param type The data type of each component (e.g., GL_FLOAT, GL_INT)
+     * @param normalized Whether fixed-point data should be normalized
+     * @param stride Byte offset between consecutive vertex attributes
+     * @param pointer Offset of the first component in the buffer
+     */
+    public static void configureVertexAttribute(CommandContext ctx, int index, int size, int type, boolean normalized, int stride, long pointer) {
+        getBackend().configureVertexAttribute(ctx, index, size, type, normalized, stride, pointer);
+    }
+    
+    /**
+     * Configures a vertex attribute array with integer type (no normalization).
+     * 
+     * This is a Vulkan-compatible method that requires an explicit CommandContext.
+     * For OpenGL, use getImmediateContext() to get the context.
+     * 
+     * Example usage:
+     * <pre>
+     *     CommandContext ctx = VulkanicAPI.getImmediateContext();
+     *     VulkanicAPI.configureVertexAttributeInteger(ctx, 1, 4, GL_INT, 16, 0);
+     * </pre>
+     * 
+     * In OpenGL: Maps to glVertexAttribIPointer()
+     * In Vulkan: Maps to VkVertexInputAttributeDescription (baked into pipeline)
+     * 
+     * @param ctx Command context for recording this command
+     * @param index The index of the vertex attribute to configure
+     * @param size The number of components per vertex attribute (1-4)
+     * @param type The data type of each component (e.g., GL_INT, GL_UNSIGNED_INT)
+     * @param stride Byte offset between consecutive vertex attributes
+     * @param pointer Offset of the first component in the buffer
+     */
+    public static void configureVertexAttributeInteger(CommandContext ctx, int index, int size, int type, int stride, long pointer) {
+        getBackend().configureVertexAttributeInteger(ctx, index, size, type, stride, pointer);
+    }
+    
+    /**
+     * Enables a vertex attribute array for rendering.
+     * 
+     * This is a Vulkan-compatible method that requires an explicit CommandContext.
+     * For OpenGL, use getImmediateContext() to get the context.
+     * 
+     * Example usage:
+     * <pre>
+     *     CommandContext ctx = VulkanicAPI.getImmediateContext();
+     *     VulkanicAPI.activateVertexAttribute(ctx, 0);
+     * </pre>
+     * 
+     * In OpenGL: Maps to glEnableVertexAttribArray()
+     * In Vulkan: Vertex input bindings are defined in pipeline state
+     * 
+     * @param ctx Command context for recording this command
+     * @param index The index of the vertex attribute to enable
+     */
+    public static void activateVertexAttribute(CommandContext ctx, int index) {
+        getBackend().activateVertexAttribute(ctx, index);
+    }
+    
+    /**
+     * Disables a vertex attribute array.
+     * 
+     * This is a Vulkan-compatible method that requires an explicit CommandContext.
+     * For OpenGL, use getImmediateContext() to get the context.
+     * 
+     * Example usage:
+     * <pre>
+     *     CommandContext ctx = VulkanicAPI.getImmediateContext();
+     *     VulkanicAPI.deactivateVertexAttribute(ctx, 0);
+     * </pre>
+     * 
+     * In OpenGL: Maps to glDisableVertexAttribArray()
+     * In Vulkan: Vertex input bindings are defined in pipeline state
+     * 
+     * @param ctx Command context for recording this command
+     * @param index The index of the vertex attribute to disable
+     */
+    public static void deactivateVertexAttribute(CommandContext ctx, int index) {
+        getBackend().deactivateVertexAttribute(ctx, index);
+    }
+    
+    /**
+     * Sets the instance divisor for a vertex attribute.
+     * 
+     * This is a Vulkan-compatible method that requires an explicit CommandContext.
+     * For OpenGL, use getImmediateContext() to get the context.
+     * 
+     * Example usage:
+     * <pre>
+     *     CommandContext ctx = VulkanicAPI.getImmediateContext();
+     *     VulkanicAPI.setVertexAttribDivisor(ctx, 3, 1);
+     * </pre>
+     * 
+     * In OpenGL: Maps to glVertexAttribDivisor()
+     * In Vulkan: Maps to VkVertexInputBindingDescription.inputRate
+     * 
+     * @param ctx Command context for recording this command
+     * @param index The index of the vertex attribute
+     * @param divisor The number of instances that will pass between updates (0 = per-vertex)
+     */
+    public static void setVertexAttribDivisor(CommandContext ctx, int index, int divisor) {
+        getBackend().setVertexAttribDivisor(ctx, index, divisor);
+    }
+    
+    /**
+     * Deletes a vertex array object and releases its resources.
+     * 
+     * This is a Vulkan-compatible method that requires an explicit CommandContext.
+     * For OpenGL, use getImmediateContext() to get the context.
+     * 
+     * Example usage:
+     * <pre>
+     *     CommandContext ctx = VulkanicAPI.getImmediateContext();
+     *     VulkanicAPI.deleteVertexArray(ctx, vaoId);
+     * </pre>
+     * 
+     * In OpenGL: Maps to glDeleteVertexArrays()
+     * In Vulkan: No direct equivalent (VAO state is part of pipeline)
+     * 
+     * @param ctx Command context for recording this command
+     * @param array The vertex array object ID to delete
+     */
+    public static void deleteVertexArray(CommandContext ctx, int array) {
+        getBackend().deleteVertexArray(ctx, array);
+    }
+    
     // ================================================================================
     // DEPRECATED METHODS - Legacy API without CommandContext
     // ================================================================================

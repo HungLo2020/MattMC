@@ -517,30 +517,32 @@ public class GenericObjectRenderer implements IDhApiCustomRenderRegister
 		// Bind instance data //
 		profiler.popPush("binding");
 		
+		CommandContext ctx = VulkanicAPI.getImmediateContext();
+		
 		VulkanicAPI.glBindBuffer(VulkanicAPI.GL_ARRAY_BUFFER, boxGroup.instanceColorVbo);
-		VulkanicAPI.activateVertexAttribute(1);
-		VulkanicAPI.configureVertexAttribute(1, 4, VulkanicAPI.GL_FLOAT, false, 4 * Float.BYTES, 0);
+		VulkanicAPI.activateVertexAttribute(ctx, 1);
+		VulkanicAPI.configureVertexAttribute(ctx, 1, 4, VulkanicAPI.GL_FLOAT, false, 4 * Float.BYTES, 0);
 		this.vertexAttribDivisor(1, 1);
 		
 		VulkanicAPI.glBindBuffer(VulkanicAPI.GL_ARRAY_BUFFER, boxGroup.instanceScaleVbo);
-		VulkanicAPI.activateVertexAttribute(2);
+		VulkanicAPI.activateVertexAttribute(ctx, 2);
 		this.vertexAttribDivisor(2, 1);
-		VulkanicAPI.configureVertexAttribute(2, 3, VulkanicAPI.GL_FLOAT, false, 3 * Float.BYTES, 0);
+		VulkanicAPI.configureVertexAttribute(ctx, 2, 3, VulkanicAPI.GL_FLOAT, false, 3 * Float.BYTES, 0);
 		
 		VulkanicAPI.glBindBuffer(VulkanicAPI.GL_ARRAY_BUFFER, boxGroup.instanceChunkPosVbo);
-		VulkanicAPI.activateVertexAttribute(3);
+		VulkanicAPI.activateVertexAttribute(ctx, 3);
 		this.vertexAttribDivisor(3, 1);
-		VulkanicAPI.configureVertexAttributeInteger(3, 3, VulkanicAPI.GL_INT, 3 * Integer.BYTES, 0);
+		VulkanicAPI.configureVertexAttributeInteger(ctx, 3, 3, VulkanicAPI.GL_INT, 3 * Integer.BYTES, 0);
 		
 		VulkanicAPI.glBindBuffer(VulkanicAPI.GL_ARRAY_BUFFER, boxGroup.instanceSubChunkPosVbo);
-		VulkanicAPI.activateVertexAttribute(4);
+		VulkanicAPI.activateVertexAttribute(ctx, 4);
 		this.vertexAttribDivisor(4, 1);
-		VulkanicAPI.configureVertexAttribute(4, 3, VulkanicAPI.GL_FLOAT, false, 3 * Float.BYTES, 0);
+		VulkanicAPI.configureVertexAttribute(ctx, 4, 3, VulkanicAPI.GL_FLOAT, false, 3 * Float.BYTES, 0);
 		
 		VulkanicAPI.glBindBuffer(VulkanicAPI.GL_ARRAY_BUFFER, boxGroup.instanceMaterialVbo);
-		VulkanicAPI.activateVertexAttribute(5);
+		VulkanicAPI.activateVertexAttribute(ctx, 5);
 		this.vertexAttribDivisor(5, 1);
-		VulkanicAPI.configureVertexAttributeInteger(5, 1, VulkanicAPI.GL_BYTE, Byte.BYTES, 0);
+		VulkanicAPI.configureVertexAttributeInteger(ctx, 5, 1, VulkanicAPI.GL_BYTE, Byte.BYTES, 0);
 		
 		
 		// Draw instanced
@@ -554,11 +556,11 @@ public class GenericObjectRenderer implements IDhApiCustomRenderRegister
 		// Clean up
 		profiler.popPush("cleanup");
 		
-		VulkanicAPI.deactivateVertexAttribute(1);
-		VulkanicAPI.deactivateVertexAttribute(2);
-		VulkanicAPI.deactivateVertexAttribute(3);
-		VulkanicAPI.deactivateVertexAttribute(4);
-		VulkanicAPI.deactivateVertexAttribute(5);
+		VulkanicAPI.deactivateVertexAttribute(ctx, 1);
+		VulkanicAPI.deactivateVertexAttribute(ctx, 2);
+		VulkanicAPI.deactivateVertexAttribute(ctx, 3);
+		VulkanicAPI.deactivateVertexAttribute(ctx, 4);
+		VulkanicAPI.deactivateVertexAttribute(ctx, 5);
 		
 		profiler.pop();
 	}
@@ -568,13 +570,14 @@ public class GenericObjectRenderer implements IDhApiCustomRenderRegister
 	 */
 	private void vertexAttribDivisor(int index, int divisor)
 	{
+		CommandContext ctx = VulkanicAPI.getImmediateContext();
 		if (this.vertexAttribDivisorSupported)
 		{
-			VulkanicAPI.setVertexAttribDivisor(index, divisor);	
+			VulkanicAPI.setVertexAttribDivisor(ctx, index, divisor);	
 		}
 		else if(this.instancedArraysSupported)
 		{
-			VulkanicAPI.setVertexAttribDivisor(index, divisor);
+			VulkanicAPI.setVertexAttribDivisor(ctx, index, divisor);
 		}
 		else
 		{

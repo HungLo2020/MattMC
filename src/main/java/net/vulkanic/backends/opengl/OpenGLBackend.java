@@ -3282,6 +3282,56 @@ public class OpenGLBackend implements GraphicsBackend {
     }
     
     @Override
+    public void configureVertexAttribute(CommandContext ctx, int index, int size, int type, boolean normalized, int stride, long pointer) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        GL20.glVertexAttribPointer(index, size, type, normalized, stride, pointer);
+    }
+    
+    @Override
+    public void configureVertexAttributeInteger(CommandContext ctx, int index, int size, int type, int stride, long pointer) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        GL30.glVertexAttribIPointer(index, size, type, stride, pointer);
+    }
+    
+    @Override
+    public void activateVertexAttribute(CommandContext ctx, int index) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        GL20.glEnableVertexAttribArray(index);
+    }
+    
+    @Override
+    public void deactivateVertexAttribute(CommandContext ctx, int index) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        GL20.glDisableVertexAttribArray(index);
+    }
+    
+    @Override
+    public void setVertexAttribDivisor(CommandContext ctx, int index, int divisor) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        GL33.glVertexAttribDivisor(index, divisor);
+    }
+    
+    @Override
     public void queryFloatState(CommandContext ctx, int pname, float[] params) {
         // Validate context is immediate mode (OpenGL requirement)
         if (!ctx.isImmediate()) {
