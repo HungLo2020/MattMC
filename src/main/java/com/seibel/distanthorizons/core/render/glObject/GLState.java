@@ -93,24 +93,24 @@ public class GLState
 			this.frameBufferDepthTexture = 0;
 		}
 		
-		this.blend = VulkanicAPI.glIsEnabled(VulkanicAPI.GL_BLEND);
-		this.scissor = VulkanicAPI.glIsEnabled(VulkanicAPI.GL_SCISSOR_TEST);
+		this.blend = VulkanicAPI.glIsEnabled(CTX, VulkanicAPI.GL_BLEND);
+		this.scissor = VulkanicAPI.glIsEnabled(CTX, VulkanicAPI.GL_SCISSOR_TEST);
 		this.blendEqRGB = VulkanicAPI.queryIntegerState(CTX, VulkanicAPI.GL_BLEND_EQUATION_RGB);
 		this.blendEqAlpha = VulkanicAPI.queryIntegerState(CTX, VulkanicAPI.GL_BLEND_EQUATION_ALPHA);
 		this.blendSrcColor = VulkanicAPI.queryIntegerState(CTX, VulkanicAPI.GL_BLEND_SRC_RGB);
 		this.blendSrcAlpha = VulkanicAPI.queryIntegerState(CTX, VulkanicAPI.GL_BLEND_SRC_ALPHA);
 		this.blendDstColor = VulkanicAPI.queryIntegerState(CTX, VulkanicAPI.GL_BLEND_DST_RGB);
 		this.blendDstAlpha = VulkanicAPI.queryIntegerState(CTX, VulkanicAPI.GL_BLEND_DST_ALPHA);
-		this.depth = VulkanicAPI.glIsEnabled(VulkanicAPI.GL_DEPTH_TEST);
+		this.depth = VulkanicAPI.glIsEnabled(CTX, VulkanicAPI.GL_DEPTH_TEST);
 		this.writeToDepthBuffer = VulkanicAPI.queryIntegerState(CTX, VulkanicAPI.GL_DEPTH_WRITEMASK) == VulkanicAPI.GL_TRUE;
 		this.depthFunc = VulkanicAPI.queryIntegerState(CTX, VulkanicAPI.GL_DEPTH_FUNC);
-		this.stencil = VulkanicAPI.glIsEnabled(VulkanicAPI.GL_STENCIL_TEST);
+		this.stencil = VulkanicAPI.glIsEnabled(CTX, VulkanicAPI.GL_STENCIL_TEST);
 		this.stencilFunc = VulkanicAPI.queryIntegerState(CTX, VulkanicAPI.GL_STENCIL_FUNC);
 		this.stencilRef = VulkanicAPI.queryIntegerState(CTX, VulkanicAPI.GL_STENCIL_REF);
 		this.stencilMask = VulkanicAPI.queryIntegerState(CTX, VulkanicAPI.GL_STENCIL_VALUE_MASK);
 		this.view = new int[4];
 		VulkanicAPI.glGetIntegerv(VulkanicAPI.GL_VIEWPORT, this.view);
-		this.cull = VulkanicAPI.glIsEnabled(VulkanicAPI.GL_CULL_FACE);
+		this.cull = VulkanicAPI.glIsEnabled(CTX, VulkanicAPI.GL_CULL_FACE);
 		this.cullMode = VulkanicAPI.queryIntegerState(CTX, VulkanicAPI.GL_CULL_FACE_MODE);
 		this.polyMode = VulkanicAPI.queryIntegerState(CTX, VulkanicAPI.GL_POLYGON_MODE);
 	}
@@ -140,7 +140,7 @@ public class GLState
 		GLMC.glBindFramebuffer(VulkanicAPI.GL_FRAMEBUFFER, 0);
 		boolean frameBufferSet = false;
 		
-		if (this.fbo != 0 && VulkanicAPI.glIsFramebuffer(this.fbo))
+		if (this.fbo != 0 && VulkanicAPI.glIsFramebuffer(CTX, this.fbo))
 		{
 			GLMC.glBindFramebuffer(VulkanicAPI.GL_FRAMEBUFFER, this.fbo);
 			frameBufferSet = true;
@@ -166,19 +166,19 @@ public class GLState
 		}
 		
 		GLMC.glActiveTexture(VulkanicAPI.GL_TEXTURE0);
-		GLMC.glBindTexture(VulkanicAPI.glIsTexture(this.texture0) ? this.texture0 : 0);
+		GLMC.glBindTexture(VulkanicAPI.glIsTexture(CTX, this.texture0) ? this.texture0 : 0);
 		
 		GLMC.glActiveTexture(VulkanicAPI.GL_TEXTURE1);
-		GLMC.glBindTexture(VulkanicAPI.glIsTexture(this.texture1) ? this.texture1 : 0);
+		GLMC.glBindTexture(VulkanicAPI.glIsTexture(CTX, this.texture1) ? this.texture1 : 0);
 		
 		GLMC.glActiveTexture(VulkanicAPI.GL_TEXTURE2);
-		GLMC.glBindTexture(VulkanicAPI.glIsTexture(this.texture2) ? this.texture2 : 0);
+		GLMC.glBindTexture(VulkanicAPI.glIsTexture(CTX, this.texture2) ? this.texture2 : 0);
 		
 		GLMC.glActiveTexture(VulkanicAPI.GL_TEXTURE3);
-		GLMC.glBindTexture(VulkanicAPI.glIsTexture(this.texture3) ? this.texture3 : 0);
+		GLMC.glBindTexture(VulkanicAPI.glIsTexture(CTX, this.texture3) ? this.texture3 : 0);
 		
 		GLMC.glActiveTexture(this.activeTextureNumber);
-		GLMC.glBindTexture(VulkanicAPI.glIsTexture(this.texture2D) ? this.texture2D : 0);
+		GLMC.glBindTexture(VulkanicAPI.glIsTexture(CTX, this.texture2D) ? this.texture2D : 0);
 		
 		// attempting to set textures on the default frame buffer (ID 0) will throw errors
 		if (frameBufferSet)
@@ -188,10 +188,10 @@ public class GLState
 			VulkanicAPI.glFramebufferTexture2D(CTX, VulkanicAPI.GL_FRAMEBUFFER, VulkanicAPI.GL_DEPTH_ATTACHMENT, VulkanicAPI.GL_TEXTURE_2D, this.frameBufferDepthTexture, 0);
 		}
 		
-		VulkanicAPI.glBindVertexArray(VulkanicAPI.glIsVertexArray(this.vao) ? this.vao : 0);
-		VulkanicAPI.glBindBuffer(VulkanicAPI.GL_ARRAY_BUFFER, VulkanicAPI.glIsBuffer(this.vbo) ? this.vbo : 0);
-		VulkanicAPI.glBindBuffer(VulkanicAPI.GL_ELEMENT_ARRAY_BUFFER, VulkanicAPI.glIsBuffer(this.ebo) ? this.ebo: 0);
-		VulkanicAPI.glUseProgram(VulkanicAPI.glIsProgram(this.program) ? this.program : 0);
+		VulkanicAPI.glBindVertexArray(VulkanicAPI.glIsVertexArray(CTX, this.vao) ? this.vao : 0);
+		VulkanicAPI.glBindBuffer(VulkanicAPI.GL_ARRAY_BUFFER, VulkanicAPI.glIsBuffer(CTX, this.vbo) ? this.vbo : 0);
+		VulkanicAPI.glBindBuffer(VulkanicAPI.GL_ELEMENT_ARRAY_BUFFER, VulkanicAPI.glIsBuffer(CTX, this.ebo) ? this.ebo: 0);
+		VulkanicAPI.glUseProgram(VulkanicAPI.glIsProgram(CTX, this.program) ? this.program : 0);
 		
 		if (this.writeToDepthBuffer)
 		{
@@ -203,7 +203,7 @@ public class GLState
 		}
 		
 		GLMC.glBlendFunc(this.blendSrcColor, this.blendDstColor);
-		VulkanicAPI.glBlendEquationSeparate(this.blendEqRGB, this.blendEqAlpha);
+		VulkanicAPI.glBlendEquationSeparate(CTX, this.blendEqRGB, this.blendEqAlpha);
 		GLMC.glBlendFuncSeparate(this.blendSrcColor, this.blendDstColor, this.blendSrcAlpha, this.blendDstAlpha);
 		
 		if (this.depth)
@@ -224,7 +224,7 @@ public class GLState
 		{
 			VulkanicAPI.disable(CTX, VulkanicAPI.GL_STENCIL_TEST);
 		}
-		VulkanicAPI.glStencilFunc(this.stencilFunc, this.stencilRef, this.stencilMask);
+		VulkanicAPI.glStencilFunc(CTX, this.stencilFunc, this.stencilRef, this.stencilMask);
 		
 		VulkanicAPI.glViewport(this.view[0], this.view[1], this.view[2], this.view[3]);
 		if (this.cull)
@@ -235,7 +235,7 @@ public class GLState
 		{
 			GLMC.disableFaceCulling();
 		}
-		VulkanicAPI.glCullFace(this.cullMode);
+		VulkanicAPI.glCullFace(CTX, this.cullMode);
 		VulkanicAPI.glPolygonMode(VulkanicAPI.GL_FRONT_AND_BACK, this.polyMode);
 	}
 }

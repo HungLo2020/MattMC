@@ -2235,8 +2235,6 @@ public interface GraphicsBackend {
     @Deprecated
     java.nio.ByteBuffer glMapBufferRange(int target, long offset, long length, int access);
     @Deprecated
-    boolean glIsBuffer(int buffer);
-    @Deprecated
     void glBindBufferBase(int target, int index, int buffer);
     @Deprecated
     void glVertexAttrib4f(int index, float v0, float v1, float v2, float v3);
@@ -2428,26 +2426,6 @@ public interface GraphicsBackend {
     long getBindVertexBufferPointer();
     @Deprecated
     long getVertexAttribBindingPointer();
-    
-    // Additional GL query and state methods
-    @Deprecated
-    boolean glIsEnabled(int cap);
-    @Deprecated
-    boolean glIsFramebuffer(int framebuffer);
-    @Deprecated
-    boolean glIsTexture(int texture);
-    @Deprecated
-    boolean glIsVertexArray(int array);
-    @Deprecated
-    boolean glIsProgram(int program);
-    
-    // Additional GL state methods
-    @Deprecated
-    void glBlendEquationSeparate(int modeRGB, int modeAlpha);
-    @Deprecated
-    void glStencilFunc(int func, int ref, int mask);
-    @Deprecated
-    void glCullFace(int mode);
     
     // Additional texture methods
     @Deprecated
@@ -3667,4 +3645,159 @@ public interface GraphicsBackend {
      * @param length Length in bytes to flush
      */
     void flushMappedBufferRange(CommandContext ctx, int target, long offset, long length);
+    
+    // ========================================================================
+    // Phase 35: State Query and Blend/Stencil Operations with CommandContext
+    // ========================================================================
+    
+    /**
+     * Tests whether a capability is enabled.
+     * 
+     * In OpenGL: Maps to glIsEnabled()
+     * In Vulkan: No direct equivalent - state is part of pipeline/descriptor sets
+     * 
+     * Queries whether a specific capability is currently enabled in the OpenGL
+     * state machine. In Vulkan, most of these states are part of immutable
+     * pipeline state objects and cannot be queried at runtime.
+     * 
+     * Common capabilities: GL_BLEND, GL_DEPTH_TEST, GL_STENCIL_TEST, GL_CULL_FACE,
+     * GL_SCISSOR_TEST, GL_POLYGON_OFFSET_FILL, etc.
+     * 
+     * @param ctx Command context for state tracking
+     * @param cap The capability to query (e.g., GL_BLEND, GL_DEPTH_TEST)
+     * @return true if the capability is enabled, false otherwise
+     */
+    boolean glIsEnabled(CommandContext ctx, int cap);
+    
+    /**
+     * Tests whether a framebuffer object name is a valid framebuffer.
+     * 
+     * In OpenGL: Maps to glIsFramebuffer()
+     * In Vulkan: No direct equivalent - object validity tracked separately
+     * 
+     * Determines whether a given ID corresponds to an existing framebuffer object.
+     * Returns false if the ID is 0 or does not correspond to a created framebuffer.
+     * 
+     * @param ctx Command context for resource tracking
+     * @param framebuffer The framebuffer object ID to test
+     * @return true if the ID is a valid framebuffer object, false otherwise
+     */
+    boolean glIsFramebuffer(CommandContext ctx, int framebuffer);
+    
+    /**
+     * Tests whether a texture object name is a valid texture.
+     * 
+     * In OpenGL: Maps to glIsTexture()
+     * In Vulkan: No direct equivalent - object validity tracked separately
+     * 
+     * Determines whether a given ID corresponds to an existing texture object.
+     * Returns false if the ID is 0 or does not correspond to a created texture.
+     * 
+     * @param ctx Command context for resource tracking
+     * @param texture The texture object ID to test
+     * @return true if the ID is a valid texture object, false otherwise
+     */
+    boolean glIsTexture(CommandContext ctx, int texture);
+    
+    /**
+     * Tests whether a vertex array object name is a valid VAO.
+     * 
+     * In OpenGL: Maps to glIsVertexArray()
+     * In Vulkan: No VAOs - vertex input state is part of pipeline
+     * 
+     * Determines whether a given ID corresponds to an existing vertex array object.
+     * Returns false if the ID is 0 or does not correspond to a created VAO.
+     * 
+     * @param ctx Command context for resource tracking
+     * @param array The vertex array object ID to test
+     * @return true if the ID is a valid vertex array object, false otherwise
+     */
+    boolean glIsVertexArray(CommandContext ctx, int array);
+    
+    /**
+     * Tests whether a program object name is a valid shader program.
+     * 
+     * In OpenGL: Maps to glIsProgram()
+     * In Vulkan: No direct equivalent - pipelines tracked separately
+     * 
+     * Determines whether a given ID corresponds to an existing shader program object.
+     * Returns false if the ID is 0 or does not correspond to a created program.
+     * 
+     * @param ctx Command context for resource tracking
+     * @param program The shader program object ID to test
+     * @return true if the ID is a valid program object, false otherwise
+     */
+    boolean glIsProgram(CommandContext ctx, int program);
+    
+    /**
+     * Tests whether a buffer object name is a valid buffer.
+     * 
+     * In OpenGL: Maps to glIsBuffer()
+     * In Vulkan: No direct equivalent - buffer validity tracked separately
+     * 
+     * Determines whether a given ID corresponds to an existing buffer object.
+     * Returns false if the ID is 0 or does not correspond to a created buffer.
+     * 
+     * @param ctx Command context for resource tracking
+     * @param buffer The buffer object ID to test
+     * @return true if the ID is a valid buffer object, false otherwise
+     */
+    boolean glIsBuffer(CommandContext ctx, int buffer);
+    
+    /**
+     * Sets the blend equation separately for RGB and alpha components.
+     * 
+     * In OpenGL: Maps to glBlendEquationSeparate()
+     * In Vulkan: Part of VkPipelineColorBlendAttachmentState in pipeline creation
+     * 
+     * Specifies how source and destination colors are combined during blending.
+     * Different equations can be used for RGB and alpha components. This is
+     * dynamic state in OpenGL but must be specified at pipeline creation in Vulkan.
+     * 
+     * Common modes: GL_FUNC_ADD, GL_FUNC_SUBTRACT, GL_FUNC_REVERSE_SUBTRACT,
+     * GL_MIN, GL_MAX
+     * 
+     * @param ctx Command context for recording this command
+     * @param modeRGB Blend equation for RGB components
+     * @param modeAlpha Blend equation for alpha component
+     */
+    void glBlendEquationSeparate(CommandContext ctx, int modeRGB, int modeAlpha);
+    
+    /**
+     * Sets the stencil test function, reference value, and comparison mask.
+     * 
+     * In OpenGL: Maps to glStencilFunc()
+     * In Vulkan: Part of VkPipelineDepthStencilStateCreateInfo in pipeline creation
+     * 
+     * Specifies the stencil test function which determines when the stencil test passes.
+     * The reference value is compared against the stencil buffer value using the
+     * specified function and mask. This is dynamic state in OpenGL but must be
+     * specified at pipeline creation in Vulkan.
+     * 
+     * Common functions: GL_NEVER, GL_LESS, GL_LEQUAL, GL_GREATER, GL_GEQUAL,
+     * GL_EQUAL, GL_NOTEQUAL, GL_ALWAYS
+     * 
+     * @param ctx Command context for recording this command
+     * @param func Stencil comparison function
+     * @param ref Reference value for stencil test (clamped to [0, 2^n-1])
+     * @param mask Mask that is ANDed with both reference and stored stencil value
+     */
+    void glStencilFunc(CommandContext ctx, int func, int ref, int mask);
+    
+    /**
+     * Specifies whether front- and/or back-facing polygons can be culled.
+     * 
+     * In OpenGL: Maps to glCullFace()
+     * In Vulkan: Part of VkPipelineRasterizationStateCreateInfo in pipeline creation
+     * 
+     * Controls which polygon faces are candidates for culling. Face culling must
+     * be enabled with GL_CULL_FACE before this has any effect. This is dynamic
+     * state in OpenGL but must be specified at pipeline creation in Vulkan.
+     * 
+     * Modes: GL_FRONT, GL_BACK, GL_FRONT_AND_BACK
+     * 
+     * @param ctx Command context for recording this command
+     * @param mode The face(s) to cull
+     */
+    void glCullFace(CommandContext ctx, int mode);
 }

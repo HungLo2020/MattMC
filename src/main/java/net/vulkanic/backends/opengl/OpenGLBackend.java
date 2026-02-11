@@ -2411,11 +2411,6 @@ public class OpenGLBackend implements GraphicsBackend {
         return org.lwjgl.opengl.GL32C.glMapBufferRange(target, offset, length, access);
     }
     
-    @Deprecated
-    @Override
-    public boolean glIsBuffer(int buffer) {
-        return org.lwjgl.opengl.GL32C.glIsBuffer(buffer);
-    }
     
     @Deprecated
     @Override
@@ -3002,55 +2997,6 @@ public class OpenGLBackend implements GraphicsBackend {
     
     // Additional GL query and state methods
     
-    @Deprecated
-    @Override
-    public boolean glIsEnabled(int cap) {
-        return org.lwjgl.opengl.GL11.glIsEnabled(cap);
-    }
-    
-    @Deprecated
-    @Override
-    public boolean glIsFramebuffer(int framebuffer) {
-        return org.lwjgl.opengl.GL30.glIsFramebuffer(framebuffer);
-    }
-    
-    @Deprecated
-    @Override
-    public boolean glIsTexture(int texture) {
-        return org.lwjgl.opengl.GL11.glIsTexture(texture);
-    }
-    
-    @Deprecated
-    @Override
-    public boolean glIsVertexArray(int array) {
-        return org.lwjgl.opengl.GL30.glIsVertexArray(array);
-    }
-    
-    @Deprecated
-    @Override
-    public boolean glIsProgram(int program) {
-        return org.lwjgl.opengl.GL20.glIsProgram(program);
-    }
-    
-    // Additional GL state methods
-    
-    @Deprecated
-    @Override
-    public void glBlendEquationSeparate(int modeRGB, int modeAlpha) {
-        org.lwjgl.opengl.GL20.glBlendEquationSeparate(modeRGB, modeAlpha);
-    }
-    
-    @Deprecated
-    @Override
-    public void glStencilFunc(int func, int ref, int mask) {
-        org.lwjgl.opengl.GL11.glStencilFunc(func, ref, mask);
-    }
-    
-    @Deprecated
-    @Override
-    public void glCullFace(int mode) {
-        org.lwjgl.opengl.GL11.glCullFace(mode);
-    }
     
     // Additional texture methods
     
@@ -3639,5 +3585,99 @@ public class OpenGLBackend implements GraphicsBackend {
         }
         
         GL30.glFlushMappedBufferRange(target, offset, length);
+    }
+    
+    // ========================================================================
+    // Phase 35: State Query and Blend/Stencil Operations with CommandContext
+    // ========================================================================
+    
+    @Override
+    public boolean glIsEnabled(CommandContext ctx, int cap) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        return GL11.glIsEnabled(cap);
+    }
+    
+    @Override
+    public boolean glIsFramebuffer(CommandContext ctx, int framebuffer) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        return GL30.glIsFramebuffer(framebuffer);
+    }
+    
+    @Override
+    public boolean glIsTexture(CommandContext ctx, int texture) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        return GL11.glIsTexture(texture);
+    }
+    
+    @Override
+    public boolean glIsVertexArray(CommandContext ctx, int array) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        return GL30.glIsVertexArray(array);
+    }
+    
+    @Override
+    public boolean glIsProgram(CommandContext ctx, int program) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        return GL20.glIsProgram(program);
+    }
+    
+    @Override
+    public boolean glIsBuffer(CommandContext ctx, int buffer) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        return GL15.glIsBuffer(buffer);
+    }
+    
+    @Override
+    public void glBlendEquationSeparate(CommandContext ctx, int modeRGB, int modeAlpha) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        GL20.glBlendEquationSeparate(modeRGB, modeAlpha);
+    }
+    
+    @Override
+    public void glStencilFunc(CommandContext ctx, int func, int ref, int mask) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        GL11.glStencilFunc(func, ref, mask);
+    }
+    
+    @Override
+    public void glCullFace(CommandContext ctx, int mode) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        GL11.glCullFace(mode);
     }
 }

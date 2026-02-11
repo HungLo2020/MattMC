@@ -7758,3 +7758,71 @@ This phase successfully abstracts advanced buffer management and vertex specific
 
 This phase successfully abstracts debug tooling, capability detection, and synchronization queries that are fundamental to both development workflows and runtime feature detection in OpenGL and Vulkan.
 
+
+
+## Phase 35: State Query and Blend/Stencil Operations (2026-02-11) ✅
+
+**Methods Migrated (9 total):**
+1. glIsEnabled(ctx, cap)
+2. glIsFramebuffer(ctx, framebuffer)  
+3. glIsTexture(ctx, texture)
+4. glIsVertexArray(ctx, array)
+5. glIsProgram(ctx, program)
+6. glIsBuffer(ctx, buffer)
+7. glBlendEquationSeparate(ctx, modeRGB, modeAlpha)
+8. glStencilFunc(ctx, func, ref, mask)
+9. glCullFace(ctx, mode)
+
+**Call Sites Updated: 20 across 3 files**
+- GLState.java (DH) - 18 calls (glIsEnabled×5, glIsFramebuffer, glIsTexture×5, glIsVertexArray, glIsBuffer×2, glIsProgram, glBlendEquationSeparate, glStencilFunc, glCullFace)
+- GLBuffer.java (DH) - 1 call (glIsBuffer)
+
+**Files Modified:**
+- GraphicsBackend.java - Added 9 method signatures with comprehensive JavaDoc
+- VulkanicAPI.java - Added 9 public methods with usage examples
+- OpenGLBackend.java - Added 9 implementations using GL11, GL15, GL20, GL30
+
+**Deprecated Methods Removed (9 from all 3 layers):**
+- glIsEnabled(int)
+- glIsFramebuffer(int)
+- glIsTexture(int)
+- glIsVertexArray(int)
+- glIsProgram(int)
+- glIsBuffer(int)
+- glBlendEquationSeparate(int, int)
+- glStencilFunc(int, int, int)
+- glCullFace(int)
+
+**Why This Matters for Vulkan:**
+
+**State Query Methods:**
+OpenGL allows querying many aspects of the graphics state at runtime using glIs* functions. Vulkan has no equivalent global state to query - everything is tracked explicitly through handles and state objects.
+
+- glIsEnabled() → In Vulkan, capabilities are part of immutable pipeline state (VkPipelineColorBlendStateCreateInfo, VkPipelineDepthStencilStateCreateInfo, etc.)
+- glIsFramebuffer/Texture/VertexArray/Program/Buffer() → In Vulkan, object validity is tracked separately; invalid handles cause validation errors
+
+**Blend Equation:**
+- OpenGL: glBlendEquationSeparate() sets dynamic blend state
+- Vulkan: Blend equation is part of VkPipelineColorBlendAttachmentState, specified at pipeline creation time and immutable
+
+**Stencil Function:**
+- OpenGL: glStencilFunc() sets dynamic stencil test state
+- Vulkan: Stencil function is part of VkPipelineDepthStencilStateCreateInfo, part of immutable pipeline
+
+**Face Culling:**
+- OpenGL: glCullFace() sets which faces to cull (front/back/both)
+- Vulkan: Cull mode is part of VkPipelineRasterizationStateCreateInfo at pipeline creation
+
+**CommandContext Enables:**
+- State tracking that can be used to build pipeline state objects
+- Validation that operations happen in correct order
+- Abstraction between OpenGL's mutable state and Vulkan's immutable pipelines
+- Future support for both immediate-mode (OpenGL) and deferred (Vulkan) command recording
+
+**Progress Statistics:**
+- **205/874 methods migrated (23.5%)** 🎉
+- **434 call sites** updated across **137 game files**
+- **114 deprecated methods** completely removed
+- **BUILD SUCCESSFUL** - all tests passing
+
+This phase successfully abstracts state query and pipeline state operations that are fundamental differences between OpenGL's mutable state machine and Vulkan's immutable pipeline architecture.

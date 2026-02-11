@@ -4269,11 +4269,6 @@ public class VulkanicAPI {
     }
     
     @Deprecated
-    public static boolean glIsBuffer(int buffer) {
-        return getBackend().glIsBuffer(buffer);
-    }
-    
-    @Deprecated
     public static void glBindBufferBase(int target, int index, int buffer) {
         getBackend().glBindBufferBase(target, index, buffer);
     }
@@ -4902,70 +4897,6 @@ public class VulkanicAPI {
     }
     
     // Additional GL query and state methods
-    
-    /**
-     * Tests whether a capability is enabled.
-     */
-    @Deprecated
-    public static boolean glIsEnabled(int cap) {
-        return getBackend().glIsEnabled(cap);
-    }
-    
-    /**
-     * Determines if a name corresponds to a framebuffer object.
-     */
-    @Deprecated
-    public static boolean glIsFramebuffer(int framebuffer) {
-        return getBackend().glIsFramebuffer(framebuffer);
-    }
-    
-    /**
-     * Determines if a name corresponds to a texture.
-     */
-    @Deprecated
-    public static boolean glIsTexture(int texture) {
-        return getBackend().glIsTexture(texture);
-    }
-    
-    /**
-     * Determines if a name corresponds to a vertex array object.
-     */
-    @Deprecated
-    public static boolean glIsVertexArray(int array) {
-        return getBackend().glIsVertexArray(array);
-    }
-    
-    /**
-     * Determines if a name corresponds to a program object.
-     */
-    @Deprecated
-    public static boolean glIsProgram(int program) {
-        return getBackend().glIsProgram(program);
-    }
-    
-    /**
-     * Sets the RGB blend equation and the alpha blend equation separately.
-     */
-    @Deprecated
-    public static void glBlendEquationSeparate(int modeRGB, int modeAlpha) {
-        getBackend().glBlendEquationSeparate(modeRGB, modeAlpha);
-    }
-    
-    /**
-     * Sets the stencil test function.
-     */
-    @Deprecated
-    public static void glStencilFunc(int func, int ref, int mask) {
-        getBackend().glStencilFunc(func, ref, mask);
-    }
-    
-    /**
-     * Specifies whether front- or back-facing polygons can be culled.
-     */
-    @Deprecated
-    public static void glCullFace(int mode) {
-        getBackend().glCullFace(mode);
-    }
     
     /**
      * Generates a single texture name.
@@ -5816,5 +5747,204 @@ public class VulkanicAPI {
      */
     public static void flushMappedBufferRange(CommandContext ctx, int target, long offset, long length) {
         getBackend().flushMappedBufferRange(ctx, target, offset, length);
+    }
+    
+    // ========================================================================
+    // Phase 35: State Query and Blend/Stencil Operations with CommandContext
+    // ========================================================================
+    
+    /**
+     * Tests whether a capability is enabled.
+     * 
+     * <p><b>OpenGL:</b> Maps to glIsEnabled()</p>
+     * <p><b>Vulkan:</b> No direct equivalent - state is part of pipeline/descriptor sets</p>
+     * 
+     * <p><b>Example usage:</b>
+     * <pre>{@code
+     * CommandContext ctx = VulkanicAPI.getImmediateContext();
+     * boolean blendEnabled = VulkanicAPI.glIsEnabled(ctx, GL_BLEND);
+     * boolean depthTestEnabled = VulkanicAPI.glIsEnabled(ctx, GL_DEPTH_TEST);
+     * }</pre>
+     * 
+     * @param ctx Command context for state tracking
+     * @param cap The capability to query (e.g., GL_BLEND, GL_DEPTH_TEST)
+     * @return true if the capability is enabled, false otherwise
+     */
+    public static boolean glIsEnabled(CommandContext ctx, int cap) {
+        return getBackend().glIsEnabled(ctx, cap);
+    }
+    
+    /**
+     * Tests whether a framebuffer object name is a valid framebuffer.
+     * 
+     * <p><b>OpenGL:</b> Maps to glIsFramebuffer()</p>
+     * <p><b>Vulkan:</b> No direct equivalent - object validity tracked separately</p>
+     * 
+     * <p><b>Example usage:</b>
+     * <pre>{@code
+     * CommandContext ctx = VulkanicAPI.getImmediateContext();
+     * if (VulkanicAPI.glIsFramebuffer(ctx, fboId)) {
+     *     VulkanicAPI.attachFramebuffer(ctx, GL_FRAMEBUFFER, fboId);
+     * }
+     * }</pre>
+     * 
+     * @param ctx Command context for resource tracking
+     * @param framebuffer The framebuffer object ID to test
+     * @return true if the ID is a valid framebuffer object, false otherwise
+     */
+    public static boolean glIsFramebuffer(CommandContext ctx, int framebuffer) {
+        return getBackend().glIsFramebuffer(ctx, framebuffer);
+    }
+    
+    /**
+     * Tests whether a texture object name is a valid texture.
+     * 
+     * <p><b>OpenGL:</b> Maps to glIsTexture()</p>
+     * <p><b>Vulkan:</b> No direct equivalent - object validity tracked separately</p>
+     * 
+     * <p><b>Example usage:</b>
+     * <pre>{@code
+     * CommandContext ctx = VulkanicAPI.getImmediateContext();
+     * if (VulkanicAPI.glIsTexture(ctx, textureId)) {
+     *     VulkanicAPI.bindTexture(ctx, GL_TEXTURE_2D, textureId);
+     * }
+     * }</pre>
+     * 
+     * @param ctx Command context for resource tracking
+     * @param texture The texture object ID to test
+     * @return true if the ID is a valid texture object, false otherwise
+     */
+    public static boolean glIsTexture(CommandContext ctx, int texture) {
+        return getBackend().glIsTexture(ctx, texture);
+    }
+    
+    /**
+     * Tests whether a vertex array object name is a valid VAO.
+     * 
+     * <p><b>OpenGL:</b> Maps to glIsVertexArray()</p>
+     * <p><b>Vulkan:</b> No VAOs - vertex input state is part of pipeline</p>
+     * 
+     * <p><b>Example usage:</b>
+     * <pre>{@code
+     * CommandContext ctx = VulkanicAPI.getImmediateContext();
+     * if (VulkanicAPI.glIsVertexArray(ctx, vaoId)) {
+     *     VulkanicAPI.selectVertexArray(ctx, vaoId);
+     * }
+     * }</pre>
+     * 
+     * @param ctx Command context for resource tracking
+     * @param array The vertex array object ID to test
+     * @return true if the ID is a valid vertex array object, false otherwise
+     */
+    public static boolean glIsVertexArray(CommandContext ctx, int array) {
+        return getBackend().glIsVertexArray(ctx, array);
+    }
+    
+    /**
+     * Tests whether a program object name is a valid shader program.
+     * 
+     * <p><b>OpenGL:</b> Maps to glIsProgram()</p>
+     * <p><b>Vulkan:</b> No direct equivalent - pipelines tracked separately</p>
+     * 
+     * <p><b>Example usage:</b>
+     * <pre>{@code
+     * CommandContext ctx = VulkanicAPI.getImmediateContext();
+     * if (VulkanicAPI.glIsProgram(ctx, programId)) {
+     *     VulkanicAPI.useShaderProgram(ctx, programId);
+     * }
+     * }</pre>
+     * 
+     * @param ctx Command context for resource tracking
+     * @param program The shader program object ID to test
+     * @return true if the ID is a valid program object, false otherwise
+     */
+    public static boolean glIsProgram(CommandContext ctx, int program) {
+        return getBackend().glIsProgram(ctx, program);
+    }
+    
+    /**
+     * Tests whether a buffer object name is a valid buffer.
+     * 
+     * <p><b>OpenGL:</b> Maps to glIsBuffer()</p>
+     * <p><b>Vulkan:</b> No direct equivalent - buffer validity tracked separately</p>
+     * 
+     * <p><b>Example usage:</b>
+     * <pre>{@code
+     * CommandContext ctx = VulkanicAPI.getImmediateContext();
+     * if (VulkanicAPI.glIsBuffer(ctx, bufferId)) {
+     *     VulkanicAPI.attachBuffer(ctx, GL_ARRAY_BUFFER, bufferId);
+     * }
+     * }</pre>
+     * 
+     * @param ctx Command context for resource tracking
+     * @param buffer The buffer object ID to test
+     * @return true if the ID is a valid buffer object, false otherwise
+     */
+    public static boolean glIsBuffer(CommandContext ctx, int buffer) {
+        return getBackend().glIsBuffer(ctx, buffer);
+    }
+    
+    /**
+     * Sets the blend equation separately for RGB and alpha components.
+     * 
+     * <p><b>OpenGL:</b> Maps to glBlendEquationSeparate()</p>
+     * <p><b>Vulkan:</b> Part of VkPipelineColorBlendAttachmentState in pipeline creation</p>
+     * 
+     * <p><b>Example usage:</b>
+     * <pre>{@code
+     * CommandContext ctx = VulkanicAPI.getImmediateContext();
+     * VulkanicAPI.glBlendEquationSeparate(ctx, GL_FUNC_ADD, GL_FUNC_ADD);
+     * // Or use different equations for RGB and alpha
+     * VulkanicAPI.glBlendEquationSeparate(ctx, GL_MAX, GL_FUNC_ADD);
+     * }</pre>
+     * 
+     * @param ctx Command context for recording this command
+     * @param modeRGB Blend equation for RGB components
+     * @param modeAlpha Blend equation for alpha component
+     */
+    public static void glBlendEquationSeparate(CommandContext ctx, int modeRGB, int modeAlpha) {
+        getBackend().glBlendEquationSeparate(ctx, modeRGB, modeAlpha);
+    }
+    
+    /**
+     * Sets the stencil test function, reference value, and comparison mask.
+     * 
+     * <p><b>OpenGL:</b> Maps to glStencilFunc()</p>
+     * <p><b>Vulkan:</b> Part of VkPipelineDepthStencilStateCreateInfo in pipeline creation</p>
+     * 
+     * <p><b>Example usage:</b>
+     * <pre>{@code
+     * CommandContext ctx = VulkanicAPI.getImmediateContext();
+     * VulkanicAPI.enable(ctx, GL_STENCIL_TEST);
+     * VulkanicAPI.glStencilFunc(ctx, GL_EQUAL, 1, 0xFF);
+     * }</pre>
+     * 
+     * @param ctx Command context for recording this command
+     * @param func Stencil comparison function
+     * @param ref Reference value for stencil test
+     * @param mask Mask that is ANDed with both reference and stored stencil value
+     */
+    public static void glStencilFunc(CommandContext ctx, int func, int ref, int mask) {
+        getBackend().glStencilFunc(ctx, func, ref, mask);
+    }
+    
+    /**
+     * Specifies whether front- and/or back-facing polygons can be culled.
+     * 
+     * <p><b>OpenGL:</b> Maps to glCullFace()</p>
+     * <p><b>Vulkan:</b> Part of VkPipelineRasterizationStateCreateInfo in pipeline creation</p>
+     * 
+     * <p><b>Example usage:</b>
+     * <pre>{@code
+     * CommandContext ctx = VulkanicAPI.getImmediateContext();
+     * VulkanicAPI.enable(ctx, GL_CULL_FACE);
+     * VulkanicAPI.glCullFace(ctx, GL_BACK);  // Cull back faces (common)
+     * }</pre>
+     * 
+     * @param ctx Command context for recording this command
+     * @param mode The face(s) to cull (GL_FRONT, GL_BACK, or GL_FRONT_AND_BACK)
+     */
+    public static void glCullFace(CommandContext ctx, int mode) {
+        getBackend().glCullFace(ctx, mode);
     }
 }
