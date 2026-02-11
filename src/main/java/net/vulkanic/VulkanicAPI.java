@@ -3446,7 +3446,7 @@ public class VulkanicAPI {
     
     @Deprecated
     public static void glGetIntegerv(int pname, int[] params) {
-        getBackend().glGetIntegerv(pname, params);
+        glGetIntegerv(CTX, pname, params);
     }
     
     @Deprecated
@@ -3536,12 +3536,12 @@ public class VulkanicAPI {
     
     @Deprecated
     public static String glGetProgramInfoLog(int program) {
-        return getBackend().glGetProgramInfoLog(program);
+        return glGetProgramInfoLog(CTX, program);
     }
     
     @Deprecated
     public static String glGetShaderInfoLog(int shader) {
-        return getBackend().glGetShaderInfoLog(shader);
+        return glGetShaderInfoLog(CTX, shader);
     }
     
     @Deprecated
@@ -3761,7 +3761,7 @@ public class VulkanicAPI {
     
     @Deprecated
     public static int glGetInteger(int pname) {
-        return getBackend().glGetInteger(pname);
+        return glGetInteger(CTX, pname);
     }
     
     @Deprecated
@@ -3791,7 +3791,7 @@ public class VulkanicAPI {
     
     @Deprecated
     public static String glGetStringi(int name, int index) {
-        return getBackend().glGetStringi(name, index);
+        return glGetStringi(CTX, name, index);
     }
     
     @Deprecated
@@ -4628,5 +4628,116 @@ public class VulkanicAPI {
      */
     public static Object getGLCapabilities(CommandContext ctx) {
         return getBackend().getGLCapabilities(ctx);
+    }
+    
+    /**
+     * Query an integer state value from the graphics driver (CommandContext-aware).
+     * 
+     * Example usage:
+     * <pre>{@code
+     * CommandContext ctx = VulkanicAPI.getImmediateContext();
+     * int maxTextureSize = VulkanicAPI.glGetInteger(ctx, GL_MAX_TEXTURE_SIZE);
+     * int maxDrawBuffers = VulkanicAPI.glGetInteger(ctx, GL_MAX_DRAW_BUFFERS);
+     * }</pre>
+     * 
+     * In OpenGL: Maps to glGetIntegerv() for single value
+     * In Vulkan: Maps to querying device/instance properties
+     * 
+     * @param ctx Command context
+     * @param pname The parameter name to query
+     * @return The queried integer value
+     */
+    public static int glGetInteger(CommandContext ctx, int pname) {
+        return getBackend().glGetInteger(ctx, pname);
+    }
+    
+    /**
+     * Query multiple integer state values (CommandContext-aware).
+     * 
+     * Example usage:
+     * <pre>{@code
+     * CommandContext ctx = VulkanicAPI.getImmediateContext();
+     * int[] viewport = new int[4];
+     * VulkanicAPI.glGetIntegerv(ctx, GL_VIEWPORT, viewport);
+     * }</pre>
+     * 
+     * In OpenGL: Maps to glGetIntegerv()
+     * In Vulkan: Maps to querying device/instance properties
+     * 
+     * @param ctx Command context
+     * @param pname The parameter name to query
+     * @param params Array to receive the values
+     */
+    public static void glGetIntegerv(CommandContext ctx, int pname, int[] params) {
+        getBackend().glGetIntegerv(ctx, pname, params);
+    }
+    
+    /**
+     * Query an indexed string from the graphics driver (CommandContext-aware).
+     * 
+     * Example usage:
+     * <pre>{@code
+     * CommandContext ctx = VulkanicAPI.getImmediateContext();
+     * int numExts = VulkanicAPI.glGetInteger(ctx, GL_NUM_EXTENSIONS);
+     * for (int i = 0; i < numExts; i++) {
+     *     String ext = VulkanicAPI.glGetStringi(ctx, GL_EXTENSIONS, i);
+     *     System.out.println("Extension: " + ext);
+     * }
+     * }</pre>
+     * 
+     * In OpenGL: Maps to glGetStringi()
+     * In Vulkan: Maps to querying extension properties
+     * 
+     * @param ctx Command context
+     * @param pname The parameter name to query
+     * @param index The index of the string to retrieve
+     * @return The indexed string or null if not available
+     */
+    public static String glGetStringi(CommandContext ctx, int pname, int index) {
+        return getBackend().glGetStringi(ctx, pname, index);
+    }
+    
+    /**
+     * Get the program info log (CommandContext-aware).
+     * 
+     * This is a convenience wrapper around retrieveProgramInfoLog.
+     * 
+     * Example usage:
+     * <pre>{@code
+     * CommandContext ctx = VulkanicAPI.getImmediateContext();
+     * String log = VulkanicAPI.glGetProgramInfoLog(ctx, programId);
+     * if (!log.isEmpty()) {
+     *     System.err.println("Program log: " + log);
+     * }
+     * }</pre>
+     * 
+     * @param ctx Command context
+     * @param program Program object ID
+     * @return The program info log string
+     */
+    public static String glGetProgramInfoLog(CommandContext ctx, int program) {
+        return getBackend().glGetProgramInfoLog(ctx, program);
+    }
+    
+    /**
+     * Get the shader info log (CommandContext-aware).
+     * 
+     * This is a convenience wrapper around retrieveShaderInfoLog.
+     * 
+     * Example usage:
+     * <pre>{@code
+     * CommandContext ctx = VulkanicAPI.getImmediateContext();
+     * String log = VulkanicAPI.glGetShaderInfoLog(ctx, shaderId);
+     * if (!log.isEmpty()) {
+     *     System.err.println("Shader log: " + log);
+     * }
+     * }</pre>
+     * 
+     * @param ctx Command context
+     * @param shader Shader object ID
+     * @return The shader info log string
+     */
+    public static String glGetShaderInfoLog(CommandContext ctx, int shader) {
+        return getBackend().glGetShaderInfoLog(ctx, shader);
     }
 }

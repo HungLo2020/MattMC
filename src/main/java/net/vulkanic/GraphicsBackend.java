@@ -2702,4 +2702,89 @@ public interface GraphicsBackend {
      * }</pre>
      */
     Object getGLCapabilities(CommandContext ctx);
+    
+    /**
+     * Query an integer state value from the graphics driver.
+     * 
+     * In OpenGL: Maps to glGetIntegerv() for single value
+     * In Vulkan: Maps to querying device/instance properties
+     * 
+     * Retrieves a single integer value for the specified parameter.
+     * 
+     * @param ctx Command context
+     * @param pname The parameter name to query (e.g., GL_MAX_TEXTURE_SIZE)
+     * @return The queried integer value
+     * 
+     * Example usage:
+     * <pre>{@code
+     * int maxTextureSize = backend.glGetInteger(CTX, GL_MAX_TEXTURE_SIZE);
+     * }</pre>
+     */
+    int glGetInteger(CommandContext ctx, int pname);
+    
+    /**
+     * Query multiple integer state values from the graphics driver.
+     * 
+     * In OpenGL: Maps to glGetIntegerv()
+     * In Vulkan: Maps to querying device/instance properties
+     * 
+     * Retrieves multiple integer values for the specified parameter into an array.
+     * 
+     * @param ctx Command context
+     * @param pname The parameter name to query
+     * @param params Array to receive the values
+     * 
+     * Example usage:
+     * <pre>{@code
+     * int[] viewport = new int[4];
+     * backend.glGetIntegerv(CTX, GL_VIEWPORT, viewport);
+     * }</pre>
+     */
+    void glGetIntegerv(CommandContext ctx, int pname, int[] params);
+    
+    /**
+     * Query an indexed string from the graphics driver.
+     * 
+     * In OpenGL: Maps to glGetStringi()
+     * In Vulkan: Maps to querying extension properties
+     * 
+     * Retrieves a string at a specific index, typically used for querying
+     * extension names or other indexed string arrays.
+     * 
+     * @param ctx Command context
+     * @param pname The parameter name to query (e.g., GL_EXTENSIONS)
+     * @param index The index of the string to retrieve
+     * @return The indexed string or null if not available
+     * 
+     * Example usage:
+     * <pre>{@code
+     * int numExts = backend.glGetInteger(CTX, GL_NUM_EXTENSIONS);
+     * for (int i = 0; i < numExts; i++) {
+     *     String ext = backend.glGetStringi(CTX, GL_EXTENSIONS, i);
+     * }
+     * }</pre>
+     */
+    String glGetStringi(CommandContext ctx, int pname, int index);
+    
+    /**
+     * Get the program info log (convenience wrapper).
+     * 
+     * This is a convenience wrapper around retrieveProgramInfoLog.
+     * 
+     * @param ctx Command context
+     * @param program Program object ID
+     * @return The program info log string
+     */
+    String glGetProgramInfoLog(CommandContext ctx, int program);
+    
+    /**
+     * Get the shader info log (convenience wrapper).
+     * 
+     * This is a convenience wrapper around retrieveShaderInfoLog.
+     * 
+     * @param ctx Command context
+     * @param shader Shader object ID
+     * @return The shader info log string
+     */
+    String glGetShaderInfoLog(CommandContext ctx, int shader);
 }

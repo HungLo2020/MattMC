@@ -3449,4 +3449,44 @@ public class OpenGLBackend implements GraphicsBackend {
         
         return GL.getCapabilities();
     }
+    
+    @Override
+    public int glGetInteger(CommandContext ctx, int pname) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        return GL11.glGetInteger(pname);
+    }
+    
+    @Override
+    public void glGetIntegerv(CommandContext ctx, int pname, int[] params) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        GL11.glGetIntegerv(pname, params);
+    }
+    
+    @Override
+    public String glGetStringi(CommandContext ctx, int pname, int index) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        return GL30.glGetStringi(pname, index);
+    }
+    
+    @Override
+    public String glGetProgramInfoLog(CommandContext ctx, int program) {
+        return retrieveProgramInfoLog(ctx, program);
+    }
+    
+    @Override
+    public String glGetShaderInfoLog(CommandContext ctx, int shader) {
+        return retrieveShaderInfoLog(ctx, shader);
+    }
 }
