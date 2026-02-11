@@ -1696,10 +1696,6 @@ public interface GraphicsBackend {
     @Deprecated
     void uploadShaderSourceNative(int shader, int count, long strings, long length);
     
-    // Texture operations
-    @Deprecated
-    void glCopyTexSubImage2D(int target, int level, int xoffset, int yoffset, int x, int y, int width, int height);
-    
     // Clear texture image (ARB_clear_texture)
     @Deprecated
     void clearTexImage(int texture, int level, int format, int type, int[] data);
@@ -1768,15 +1764,9 @@ public interface GraphicsBackend {
     @Deprecated
     void glReadBuffer(int buffer);
     @Deprecated
-    void glClearBufferfv(int buffer, int drawbuffer, float[] values);
-    @Deprecated
-    void glClearBufferiv(int buffer, int drawbuffer, int[] values);
-    @Deprecated
     void glClearBufferuiv(int buffer, int drawbuffer, int[] values);
     @Deprecated
     String glGetActiveUniform(int program, int index, int size, java.nio.IntBuffer type, java.nio.IntBuffer name);
-    @Deprecated
-    void glReadPixels(int x, int y, int width, int height, int format, int type, float[] pixels);
     @Deprecated
     void glBufferData(int target, float[] data, int usage);
     @Deprecated
@@ -1793,8 +1783,6 @@ public interface GraphicsBackend {
     void glBufferStorage(int target, java.nio.ByteBuffer data, int flags);
     @Deprecated
     java.nio.ByteBuffer glMapBufferRange(int target, long offset, long length, int access);
-    @Deprecated
-    boolean glUnmapBuffer(int target);
     @Deprecated
     boolean glIsBuffer(int buffer);
     @Deprecated
@@ -1821,8 +1809,6 @@ public interface GraphicsBackend {
     void glGetProgramiv(int program, int pname, int[] params);
     @Deprecated
     void glDispatchCompute(int workX, int workY, int workZ);
-    @Deprecated
-    void glMemoryBarrier(int barriers);
     @Deprecated
     void glDisablei(int target, int index);
     @Deprecated

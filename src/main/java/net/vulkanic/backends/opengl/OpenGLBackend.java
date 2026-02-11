@@ -2228,12 +2228,6 @@ public class OpenGLBackend implements GraphicsBackend {
     
     @Deprecated
     @Override
-    public void glCopyTexSubImage2D(int target, int level, int xoffset, int yoffset, int x, int y, int width, int height) {
-        org.lwjgl.opengl.GL11.glCopyTexSubImage2D(target, level, xoffset, yoffset, x, y, width, height);
-    }
-    
-    @Deprecated
-    @Override
     public void clearTexImage(int texture, int level, int format, int type, int[] data) {
         org.lwjgl.opengl.ARBClearTexture.glClearTexImage(texture, level, format, type, data);
     }
@@ -2409,18 +2403,6 @@ public class OpenGLBackend implements GraphicsBackend {
     
     @Deprecated
     @Override
-    public void glClearBufferfv(int buffer, int drawbuffer, float[] values) {
-        org.lwjgl.opengl.GL32C.glClearBufferfv(buffer, drawbuffer, values);
-    }
-    
-    @Deprecated
-    @Override
-    public void glClearBufferiv(int buffer, int drawbuffer, int[] values) {
-        org.lwjgl.opengl.GL32C.glClearBufferiv(buffer, drawbuffer, values);
-    }
-    
-    @Deprecated
-    @Override
     public void glClearBufferuiv(int buffer, int drawbuffer, int[] values) {
         org.lwjgl.opengl.GL32C.glClearBufferuiv(buffer, drawbuffer, values);
     }
@@ -2429,12 +2411,6 @@ public class OpenGLBackend implements GraphicsBackend {
     @Override
     public String glGetActiveUniform(int program, int index, int size, java.nio.IntBuffer type, java.nio.IntBuffer name) {
         return org.lwjgl.opengl.GL32C.glGetActiveUniform(program, index, size, type, name);
-    }
-    
-    @Deprecated
-    @Override
-    public void glReadPixels(int x, int y, int width, int height, int format, int type, float[] pixels) {
-        org.lwjgl.opengl.GL32C.glReadPixels(x, y, width, height, format, type, pixels);
     }
     
     @Deprecated
@@ -2483,12 +2459,6 @@ public class OpenGLBackend implements GraphicsBackend {
     @Override
     public java.nio.ByteBuffer glMapBufferRange(int target, long offset, long length, int access) {
         return org.lwjgl.opengl.GL32C.glMapBufferRange(target, offset, length, access);
-    }
-    
-    @Deprecated
-    @Override
-    public boolean glUnmapBuffer(int target) {
-        return org.lwjgl.opengl.GL32C.glUnmapBuffer(target);
     }
     
     @Deprecated
@@ -2579,12 +2549,6 @@ public class OpenGLBackend implements GraphicsBackend {
     @Override
     public void glDispatchCompute(int workX, int workY, int workZ) {
         org.lwjgl.opengl.GL45C.glDispatchCompute(workX, workY, workZ);
-    }
-    
-    @Deprecated
-    @Override
-    public void glMemoryBarrier(int barriers) {
-        org.lwjgl.opengl.GL45C.glMemoryBarrier(barriers);
     }
     
     @Deprecated

@@ -3506,11 +3506,6 @@ public class VulkanicAPI {
         getBackend().uploadShaderSourceNative(shader, count, strings, length);
     }
     
-    @Deprecated
-    public static void glCopyTexSubImage2D(int target, int level, int xoffset, int yoffset, int x, int y, int width, int height) {
-        getBackend().glCopyTexSubImage2D(target, level, xoffset, yoffset, x, y, width, height);
-    }
-    
     // Debug object labeling (KHRDebug/GL43)
     @Deprecated
     public static void labelObject(int identifier, int name, String label) {
@@ -3641,16 +3636,6 @@ public class VulkanicAPI {
     }
     
     @Deprecated
-    public static void glClearBufferfv(int buffer, int drawbuffer, float[] values) {
-        getBackend().glClearBufferfv(buffer, drawbuffer, values);
-    }
-    
-    @Deprecated
-    public static void glClearBufferiv(int buffer, int drawbuffer, int[] values) {
-        getBackend().glClearBufferiv(buffer, drawbuffer, values);
-    }
-    
-    @Deprecated
     public static void glClearBufferuiv(int buffer, int drawbuffer, int[] values) {
         getBackend().glClearBufferuiv(buffer, drawbuffer, values);
     }
@@ -3658,11 +3643,6 @@ public class VulkanicAPI {
     @Deprecated
     public static String glGetActiveUniform(int program, int index, int size, java.nio.IntBuffer type, java.nio.IntBuffer name) {
         return getBackend().glGetActiveUniform(program, index, size, type, name);
-    }
-    
-    @Deprecated
-    public static void glReadPixels(int x, int y, int width, int height, int format, int type, float[] pixels) {
-        getBackend().glReadPixels(x, y, width, height, format, type, pixels);
     }
     
     @Deprecated
@@ -3703,11 +3683,6 @@ public class VulkanicAPI {
     @Deprecated
     public static java.nio.ByteBuffer glMapBufferRange(int target, long offset, long length, int access) {
         return getBackend().glMapBufferRange(target, offset, length, access);
-    }
-    
-    @Deprecated
-    public static boolean glUnmapBuffer(int target) {
-        return getBackend().glUnmapBuffer(target);
     }
     
     @Deprecated
@@ -3773,11 +3748,6 @@ public class VulkanicAPI {
     @Deprecated
     public static void glDispatchCompute(int workX, int workY, int workZ) {
         getBackend().glDispatchCompute(workX, workY, workZ);
-    }
-    
-    @Deprecated
-    public static void glMemoryBarrier(int barriers) {
-        getBackend().glMemoryBarrier(barriers);
     }
     
     @Deprecated
