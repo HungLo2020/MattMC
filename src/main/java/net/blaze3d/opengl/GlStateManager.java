@@ -607,7 +607,7 @@ public class GlStateManager {
 
 	public static int _getInteger(int i) {
 		RenderSystem.assertOnRenderThread();
-		return VulkanicAPI.queryIntegerState(i);
+		return VulkanicAPI.queryIntegerState(CTX, i);
 	}
 
 	public static long _glFenceSync(int i, int j) {
@@ -622,7 +622,7 @@ public class GlStateManager {
 
 	public static void _glDeleteSync(long l) {
 		RenderSystem.assertOnRenderThread();
-		net.vulkanic.VulkanicAPI.destroySync(l);
+		net.vulkanic.VulkanicAPI.destroySync(CTX, l);
 	}
 
 	@Environment(EnvType.CLIENT)

@@ -6426,3 +6426,96 @@ All other files already had local CTX fields from previous migrations.
 - **BUILD SUCCESSFUL** - zero compilation errors
 - **1 new CommandContext method added** (waitForSync)
 
+
+---
+
+## Phase 27: Synchronization and State Query Operations (Current)
+
+### Overview
+Phase 27 focuses on migrating synchronization primitives and state query operations to use CommandContext. These operations are fundamental to both OpenGL and Vulkan but work very differently between the two APIs.
+
+### Methods Migrated
+
+1. **`destroySync(sync)`** → **`destroySync(ctx, sync)`** ⭐ NEW
+   - Destroys a sync object and frees its resources
+   - In OpenGL: glDeleteSync() destroys fence object
+   - In Vulkan: vkDestroyFence() destroys VkFence
+   - 3 call sites migrated (GlFence, SodiumGpuSyncHelper, GlStateManager)
+   - **NEW CommandContext method added** to GraphicsBackend, VulkanicAPI, and OpenGLBackend
+
+2. **`queryIntegerState(pname)`** → **`queryIntegerState(ctx, pname)`**
+   - Queries integer state from the graphics driver
+   - In OpenGL: glGetInteger() for immediate state queries
+   - In Vulkan: Queries map to VkPhysicalDeviceProperties or VkPhysicalDeviceLimits
+   - 4 call sites migrated (GLRenderDevice, GlDevice, GlStateManager, GlDebugLabel)
+   - CommandContext version already existed
+
+### Files Modified
+
+**Call Sites Updated:**
+1. `GlFence.java` (Sodium) - destroySync call
+2. `SodiumGpuSyncHelper.java` - destroySync call
+3. `GlStateManager.java` (Blaze3D) - destroySync and queryIntegerState calls
+4. `GLRenderDevice.java` (Sodium) - queryIntegerState call
+5. `GlDevice.java` (Blaze3D) - queryIntegerState call
+6. `GlDebugLabel.java` (Blaze3D) - queryIntegerState call, added CTX to Core inner class
+
+**Deprecated Methods Removed:**
+- `GraphicsBackend.java` - 2 method signatures removed (destroySync, queryIntegerState)
+- `VulkanicAPI.java` - 2 method implementations removed
+- `OpenGLBackend.java` - 2 method implementations removed
+
+### Why This Matters for Vulkan
+
+**Fence Synchronization:**
+- **OpenGL Model:**
+  - glFenceSync() creates fence after current GPU commands
+  - glClientWaitSync() blocks CPU until fence signals
+  - glDeleteSync() destroys fence when done
+  - Some implicit synchronization available
+  
+- **Vulkan Model:**
+  - vkCreateFence() creates VkFence object
+  - vkWaitForFences() waits for fence(s) to signal
+  - vkDestroyFence() destroys fence object
+  - **Everything is explicit** - no automatic synchronization
+  - Also uses VkSemaphore for GPU-GPU sync
+  - VkEvent for fine-grained pipeline synchronization
+
+**State Queries:**
+- **OpenGL Model:**
+  - glGetInteger() returns current state values
+  - Can query any state at any time
+  - Some queries may cause pipeline stalls
+  
+- **Vulkan Model:**
+  - Most "state" is immutable in pipelines
+  - Device properties queried via vkGetPhysicalDeviceProperties()
+  - Limits queried via VkPhysicalDeviceLimits
+  - No concept of "current" state since Vulkan has no global state
+
+**CommandContext Enables:**
+- Proper resource lifecycle tracking for fence objects
+- Deferred query execution for Vulkan's async model
+- Thread-safe state queries when using multiple command buffers
+- Explicit device context for all resource operations
+
+### Implementation Details
+
+**New Method Added:**
+- `destroySync(CommandContext ctx, long sync)` added to:
+  - GraphicsBackend interface with comprehensive JavaDoc
+  - OpenGLBackend implementation using GL32.glDeleteSync
+  - VulkanicAPI public API with usage examples
+
+**Local CommandContext Variable Added:**
+- `GlDebugLabel.Core` (inner class) - Added CTX static field
+
+All other files already had local CTX fields from previous migrations.
+
+### Progress
+- **164/874 methods migrated (18.8%)**
+- **358 call sites updated across 115 game files**
+- **73 deprecated methods removed**
+- **BUILD SUCCESSFUL** - zero compilation errors
+- **1 new CommandContext method added** (destroySync)

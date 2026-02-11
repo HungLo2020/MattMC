@@ -78,7 +78,7 @@ public class GLRenderDevice implements RenderDevice {
 
     @Override
     public int getMaxTextureLodBias() {
-        return VulkanicAPI.queryIntegerState(33085); // GL_MAX_TEXTURE_LOD_BIAS
+        return VulkanicAPI.queryIntegerState(CTX, 33085); // GL_MAX_TEXTURE_LOD_BIAS
     }
 
     private void checkDeviceActive() {

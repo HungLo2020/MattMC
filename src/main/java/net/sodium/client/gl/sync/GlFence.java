@@ -44,7 +44,7 @@ public class GlFence {
     }
 
     public void delete() {
-        VulkanicAPI.destroySync(this.id);
+        VulkanicAPI.destroySync(CTX, this.id);
         this.disposed = true;
     }
 

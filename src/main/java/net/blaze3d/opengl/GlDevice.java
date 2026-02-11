@@ -75,7 +75,7 @@ public class GlDevice implements GpuDevice {
 		this.maxSupportedTextureSize = j;
 		this.defaultShaderSource = biFunction;
 		this.encoder = new GlCommandEncoder(this);
-		this.uniformOffsetAlignment = net.vulkanic.VulkanicAPI.queryIntegerState(35380); // GL_UNIFORM_BUFFER_OFFSET_ALIGNMENT
+		this.uniformOffsetAlignment = net.vulkanic.VulkanicAPI.queryIntegerState(CTX, 35380); // GL_UNIFORM_BUFFER_OFFSET_ALIGNMENT
 		net.vulkanic.VulkanicAPI.enable(CTX, 34895); // GL_PROGRAM_POINT_SIZE
 	}
 

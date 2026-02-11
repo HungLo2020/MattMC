@@ -59,7 +59,8 @@ public abstract class GlDebugLabel {
 
 	@Environment(EnvType.CLIENT)
 	static class Core extends GlDebugLabel {
-		private final int maxLabelLength = VulkanicAPI.queryIntegerState(33512);
+		private static final net.vulkanic.CommandContext CTX = VulkanicAPI.getImmediateContext();
+		private final int maxLabelLength = VulkanicAPI.queryIntegerState(CTX, 33512);
 
 		@Override
 		public void applyLabel(GlBuffer glBuffer) {

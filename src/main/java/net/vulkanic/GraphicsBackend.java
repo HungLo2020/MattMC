@@ -1499,12 +1499,8 @@ public interface GraphicsBackend {
     // Vertex attributes
     
     // Synchronization
-    @Deprecated
-    void destroySync(long sync);
     
     // Query operations
-    @Deprecated
-    int queryIntegerState(int pname);
     @Deprecated
     int pollErrorCode();
     
@@ -2681,6 +2677,28 @@ public interface GraphicsBackend {
      * }</pre>
      */
     int waitForSync(CommandContext ctx, long sync, int flags, long timeout);
+    
+    /**
+     * Destroys a sync object and frees its resources.
+     * 
+     * This method deletes a sync object created by createFenceSync and releases all associated resources.
+     * After calling this method, the sync object handle becomes invalid and must not be used.
+     * 
+     * OpenGL: Uses glDeleteSync() to destroy the fence object
+     * Vulkan: Will use vkDestroyFence() to destroy VkFence
+     * 
+     * @param ctx The command context for resource management
+     * @param sync The sync object handle to destroy (from createFenceSync)
+     * 
+     * Example usage:
+     * <pre>{@code
+     * long fence = backend.createFenceSync(CTX, GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
+     * // Use the fence...
+     * backend.waitForSync(CTX, fence, GL_SYNC_FLUSH_COMMANDS_BIT, 1_000_000_000L);
+     * backend.destroySync(CTX, fence);  // Clean up when done
+     * }</pre>
+     */
+    void destroySync(CommandContext ctx, long sync);
     
     /**
      * Gets the name of the graphics backend.

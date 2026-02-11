@@ -3116,11 +3116,6 @@ public class VulkanicAPI {
     }
     
     @Deprecated
-    public static void destroySync(long sync) {
-        getBackend().destroySync(sync);
-    }
-    
-    @Deprecated
     public static void clearTexImage(int texture, int level, int format, int type, int[] data) {
         getBackend().clearTexImage(texture, level, format, type, data);
     }
@@ -3133,11 +3128,6 @@ public class VulkanicAPI {
     @Deprecated
     public static GraphicsCapabilities getGraphicsCapabilities() {
         return getBackend().getGraphicsCapabilities();
-    }
-    
-    @Deprecated
-    public static int queryIntegerState(int pname) {
-        return getBackend().queryIntegerState(pname);
     }
     
     @Deprecated
@@ -4490,6 +4480,31 @@ public class VulkanicAPI {
      */
     public static int waitForSync(CommandContext ctx, long sync, int flags, long timeout) {
         return getBackend().waitForSync(ctx, sync, flags, timeout);
+    }
+    
+    /**
+     * Destroys a sync object and frees its resources (CommandContext-aware, Vulkan-compatible).
+     * 
+     * This method deletes a sync object created by createFenceSync and releases all associated resources.
+     * After calling this method, the sync object handle becomes invalid and must not be used.
+     * 
+     * OpenGL: Uses glDeleteSync() to destroy the fence object
+     * Vulkan: Will use vkDestroyFence() to destroy VkFence
+     * 
+     * @param ctx The command context for resource management
+     * @param sync The sync object handle to destroy (from createFenceSync)
+     * 
+     * Example usage:
+     * <pre>{@code
+     * CommandContext ctx = VulkanicAPI.getImmediateContext();
+     * long fence = VulkanicAPI.createFenceSync(ctx, GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
+     * // Use the fence...
+     * VulkanicAPI.waitForSync(ctx, fence, GL_SYNC_FLUSH_COMMANDS_BIT, 1_000_000_000L);
+     * VulkanicAPI.destroySync(ctx, fence);  // Clean up when done
+     * }</pre>
+     */
+    public static void destroySync(CommandContext ctx, long sync) {
+        getBackend().destroySync(ctx, sync);
     }
     
     /**

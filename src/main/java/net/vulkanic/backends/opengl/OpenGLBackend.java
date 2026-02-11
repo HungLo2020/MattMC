@@ -1687,18 +1687,6 @@ public class OpenGLBackend implements GraphicsBackend {
     
     @Deprecated
     @Override
-    public void destroySync(long sync) {
-        org.lwjgl.opengl.GL32.glDeleteSync(sync);
-    }
-    
-    @Deprecated
-    @Override
-    public int queryIntegerState(int pname) {
-        return GL11.glGetInteger(pname);
-    }
-    
-    @Deprecated
-    @Override
     public int pollErrorCode() {
         return GL11.glGetError();
     }
@@ -3286,6 +3274,16 @@ public class OpenGLBackend implements GraphicsBackend {
         }
         
         return GL32.glClientWaitSync(sync, flags, timeout);
+    }
+    
+    @Override
+    public void destroySync(CommandContext ctx, long sync) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        GL32.glDeleteSync(sync);
     }
     
     @Override
