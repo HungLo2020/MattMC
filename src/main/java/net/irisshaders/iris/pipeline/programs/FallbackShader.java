@@ -102,11 +102,11 @@ public class FallbackShader extends GlProgram implements IrisProgram {
 			float fogDensity = CapturedRenderingState.INSTANCE.getFogDensity();
 
 			if (fogDensity >= 0.0) {
-				VulkanicAPI.assignUniformFloat(FOG_DENSITY, fogDensity);
-				VulkanicAPI.assignUniformInteger(FOG_IS_EXP2, 1);
+				VulkanicAPI.assignUniformFloat(CTX, FOG_DENSITY, fogDensity);
+				VulkanicAPI.assignUniformInteger(CTX, FOG_IS_EXP2, 1);
 			} else {
-				VulkanicAPI.assignUniformFloat(FOG_DENSITY, 0.0f);
-				VulkanicAPI.assignUniformInteger(FOG_IS_EXP2, 0);
+				VulkanicAPI.assignUniformFloat(CTX, FOG_DENSITY, 0.0f);
+				VulkanicAPI.assignUniformInteger(CTX, FOG_IS_EXP2, 0);
 			}
 		}
 

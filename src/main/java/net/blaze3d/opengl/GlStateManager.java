@@ -221,27 +221,27 @@ public class GlStateManager {
 
 	public static int _glGetUniformLocation(int programId, CharSequence name) {
 		RenderSystem.assertOnRenderThread();
-		int location = net.vulkanic.VulkanicAPI.locateUniformVariable(programId, name);
+		int location = net.vulkanic.VulkanicAPI.locateUniformVariable(CTX, programId, name);
 		
 		// Iris: Handle sampler name fallbacks for extended shaders
 		if (location == -1 && name.equals("Sampler0")) {
-			location = net.vulkanic.VulkanicAPI.locateUniformVariable(programId, "tex");
+			location = net.vulkanic.VulkanicAPI.locateUniformVariable(CTX, programId, "tex");
 			
 			if (location == -1) {
-				location = net.vulkanic.VulkanicAPI.locateUniformVariable(programId, "gtexture");
+				location = net.vulkanic.VulkanicAPI.locateUniformVariable(CTX, programId, "gtexture");
 				
 				if (location == -1) {
-					location = net.vulkanic.VulkanicAPI.locateUniformVariable(programId, "texture");
+					location = net.vulkanic.VulkanicAPI.locateUniformVariable(CTX, programId, "texture");
 				}
 			}
 		}
 		
 		if (location == -1 && name.equals("Sampler1")) {
-			location = net.vulkanic.VulkanicAPI.locateUniformVariable(programId, "iris_overlay");
+			location = net.vulkanic.VulkanicAPI.locateUniformVariable(CTX, programId, "iris_overlay");
 		}
 		
 		if (location == -1 && name.equals("Sampler2")) {
-			location = net.vulkanic.VulkanicAPI.locateUniformVariable(programId, "lightmap");
+			location = net.vulkanic.VulkanicAPI.locateUniformVariable(CTX, programId, "lightmap");
 		}
 		
 		return location;
@@ -249,7 +249,7 @@ public class GlStateManager {
 
 	public static void _glUniform1i(int i, int j) {
 		RenderSystem.assertOnRenderThread();
-		net.vulkanic.VulkanicAPI.assignUniformInteger(i, j);
+		net.vulkanic.VulkanicAPI.assignUniformInteger(CTX, i, j);
 	}
 
 	public static void _glBindAttribLocation(int i, int j, CharSequence charSequence) {

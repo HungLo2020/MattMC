@@ -251,7 +251,7 @@ public class GLRenderDevice implements RenderDevice {
 
         @Override
         public GlFence createFence() {
-            return new GlFence(VulkanicAPI.createFenceSync(VulkanicAPI.GL_SYNC_GPU_COMMANDS_COMPLETE, 0));
+            return new GlFence(VulkanicAPI.createFenceSync(CTX, VulkanicAPI.GL_SYNC_GPU_COMMANDS_COMPLETE, 0));
         }
 
         private void checkMapDisposed(GlBufferMapping map) {

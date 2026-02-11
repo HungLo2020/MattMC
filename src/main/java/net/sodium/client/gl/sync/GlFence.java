@@ -1,11 +1,14 @@
 package net.sodium.client.gl.sync;
 
+import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
 import org.lwjgl.system.MemoryStack;
 
 import java.nio.IntBuffer;
 
 public class GlFence {
+    private static final CommandContext CTX = VulkanicAPI.getImmediateContext();
+    
     private final long id;
     private boolean disposed;
 
@@ -37,7 +40,7 @@ public class GlFence {
 
     public void sync(long timeout) {
         this.checkDisposed();
-        VulkanicAPI.waitForSync(this.id, 1, timeout); // GL_SYNC_FLUSH_COMMANDS_BIT
+        VulkanicAPI.waitForSync(CTX, this.id, 1, timeout); // GL_SYNC_FLUSH_COMMANDS_BIT
     }
 
     public void delete() {

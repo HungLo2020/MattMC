@@ -4,6 +4,7 @@ import it.unimi.dsi.fastutil.longs.LongArrayFIFOQueue;
 import net.sodium.client.SodiumClientMod;
 import net.minecraft.util.profiling.Profiler;
 import net.minecraft.util.profiling.ProfilerFiller;
+import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
 
 /**
@@ -11,6 +12,7 @@ import net.vulkanic.VulkanicAPI;
  * Replaces the fence queue that was in MinecraftMixin.
  */
 public class SodiumGpuSyncHelper {
+    private static final CommandContext CTX = VulkanicAPI.getImmediateContext();
     private static final LongArrayFIFOQueue fences = new LongArrayFIFOQueue();
 
     /**
@@ -40,7 +42,7 @@ public class SodiumGpuSyncHelper {
             // Because we are also waiting on the client for the FenceSync to finish, the flush is effectively treated
             // like a Finish command, where we know that once ClientWaitSync returns, it's likely that everything
             // before it has been completed by the GPU.
-            VulkanicAPI.waitForSync(fence, 1, Long.MAX_VALUE); // GL_SYNC_FLUSH_COMMANDS_BIT = 1
+            VulkanicAPI.waitForSync(CTX, fence, 1, Long.MAX_VALUE); // GL_SYNC_FLUSH_COMMANDS_BIT = 1
             VulkanicAPI.destroySync(fence);
         }
 
@@ -51,7 +53,7 @@ public class SodiumGpuSyncHelper {
      * Called at the end of each frame to create a new fence for GPU synchronization.
      */
     public static void afterFrameTick() {
-        long fence = VulkanicAPI.createFenceSync(37143, 0); // GL_SYNC_GPU_COMMANDS_COMPLETE = 37143
+        long fence = VulkanicAPI.createFenceSync(CTX, 37143, 0); // GL_SYNC_GPU_COMMANDS_COMPLETE = 37143
 
         if (fence == 0) {
             throw new RuntimeException("Failed to create fence object");

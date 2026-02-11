@@ -3303,6 +3303,16 @@ public class OpenGLBackend implements GraphicsBackend {
     }
     
     @Override
+    public int waitForSync(CommandContext ctx, long sync, int flags, long timeout) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        return GL32.glClientWaitSync(sync, flags, timeout);
+    }
+    
+    @Override
     public String getBackendName() {
         return "OpenGL";
     }

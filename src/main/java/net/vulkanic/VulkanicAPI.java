@@ -4485,6 +4485,34 @@ public class VulkanicAPI {
     }
     
     /**
+     * Waits for a sync object to become signaled (CommandContext-aware, Vulkan-compatible).
+     * 
+     * This method blocks the client until the sync object becomes signaled or the timeout expires.
+     * Used for GPU-CPU synchronization to ensure GPU operations complete before CPU accesses results.
+     * 
+     * OpenGL: Uses glClientWaitSync() to wait for fence object
+     * Vulkan: Will use vkWaitForFences() or vkGetFenceStatus()
+     * 
+     * @param ctx The command context for synchronization
+     * @param sync The sync object handle (from createFenceSync)
+     * @param flags Flags controlling wait behavior (e.g., GL_SYNC_FLUSH_COMMANDS_BIT = 1)
+     * @param timeout Maximum time to wait in nanoseconds (use Long.MAX_VALUE for infinite wait)
+     * @return Status value (GL_ALREADY_SIGNALED, GL_TIMEOUT_EXPIRED, GL_CONDITION_SATISFIED, or GL_WAIT_FAILED)
+     * 
+     * Example usage:
+     * <pre>{@code
+     * long fence = VulkanicAPI.createFenceSync(CTX, GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
+     * int result = VulkanicAPI.waitForSync(CTX, fence, GL_SYNC_FLUSH_COMMANDS_BIT, 1_000_000_000L);
+     * if (result == GL_CONDITION_SATISFIED) {
+     *     // GPU work is complete, safe to access results
+     * }
+     * }</pre>
+     */
+    public static int waitForSync(CommandContext ctx, long sync, int flags, long timeout) {
+        return getBackend().waitForSync(ctx, sync, flags, timeout);
+    }
+    
+    /**
      * Gets the name of the graphics backend currently in use.
      * 
      * This method returns a human-readable string identifying which graphics API is being used.
