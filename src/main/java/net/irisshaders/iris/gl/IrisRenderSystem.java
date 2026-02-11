@@ -90,7 +90,7 @@ public class IrisRenderSystem {
 	public static void texImage2D(int texture, int target, int level, int internalformat, int width, int height, int border, int format, int type, @Nullable ByteBuffer pixels) {
 		RenderSystem.assertOnRenderThread();
 		IrisRenderSystem.bindTextureForSetup(target, texture);
-		VulkanicAPI.glTexImage2D(target, level, internalformat, width, height, border, format, type, pixels);
+		VulkanicAPI.transferTexture2DImage(CTX, target, level, internalformat, width, height, border, format, type, pixels);
 	}
 
 	public static void texImage3D(int texture, int target, int level, int internalformat, int width, int height, int depth, int border, int format, int type, @Nullable ByteBuffer pixels) {
@@ -695,7 +695,7 @@ public class IrisRenderSystem {
 		@Override
 		public void texParameteri(int texture, int target, int pname, int param) {
 			bindTextureForSetup(target, texture);
-			VulkanicAPI.glTexParameteri(target, pname, param);
+			VulkanicAPI.configureTextureParameter(CTX, target, pname, param);
 			restoreTexture();
 		}
 

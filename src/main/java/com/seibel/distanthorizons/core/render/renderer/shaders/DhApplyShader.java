@@ -8,6 +8,7 @@ import com.seibel.distanthorizons.core.render.renderer.LodRenderer;
 import com.seibel.distanthorizons.core.render.renderer.ScreenQuad;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftGLWrapper;
 import com.seibel.distanthorizons.core.logging.DhLogger;
+import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
 
 /**
@@ -19,6 +20,7 @@ public class DhApplyShader extends AbstractShaderRenderer
 	
 	private static final DhLogger LOGGER = new DhLoggerBuilder().build();
 	private static final IMinecraftGLWrapper GLMC = SingletonInjector.INSTANCE.get(IMinecraftGLWrapper.class);
+	private static final CommandContext CTX = VulkanicAPI.getImmediateContext();
 	
 	
 	// uniforms
@@ -153,7 +155,7 @@ public class DhApplyShader extends AbstractShaderRenderer
 		
 		
 		
-		VulkanicAPI.glFramebufferTexture(VulkanicAPI.GL_DRAW_FRAMEBUFFER, VulkanicAPI.GL_COLOR_ATTACHMENT0, targetColorTextureId, 0);
+		VulkanicAPI.attachTextureToFramebuffer(CTX, VulkanicAPI.GL_DRAW_FRAMEBUFFER, VulkanicAPI.GL_COLOR_ATTACHMENT0, VulkanicAPI.GL_TEXTURE_2D, targetColorTextureId, 0);
 		
 		// Copy to MC's texture via MC's framebuffer
 		GLMC.glBindFramebuffer(VulkanicAPI.GL_FRAMEBUFFER, dhFrameBufferId);

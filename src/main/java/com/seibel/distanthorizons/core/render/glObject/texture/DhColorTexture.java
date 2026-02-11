@@ -2,6 +2,7 @@ package com.seibel.distanthorizons.core.render.glObject.texture;
 
 import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftGLWrapper;
+import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
 import org.joml.Vector2i;
 
@@ -10,6 +11,7 @@ import java.nio.ByteBuffer;
 public class DhColorTexture
 {
 	private static final IMinecraftGLWrapper GLMC = SingletonInjector.INSTANCE.get(IMinecraftGLWrapper.class);
+	private static final CommandContext CTX = VulkanicAPI.getImmediateContext();
 	
 	
 	private final EDhInternalTextureFormat internalFormat;
@@ -61,20 +63,20 @@ public class DhColorTexture
 	{
 		this.resizeTexture(id, width, height);
 		
-		VulkanicAPI.glTexParameteri(VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_MIN_FILTER, allowsLinear ? VulkanicAPI.GL_LINEAR : VulkanicAPI.GL_NEAREST);
-		VulkanicAPI.glTexParameteri(VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_MAG_FILTER, allowsLinear ? VulkanicAPI.GL_LINEAR : VulkanicAPI.GL_NEAREST);
-		VulkanicAPI.glTexParameteri(VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_WRAP_S, VulkanicAPI.GL_CLAMP_TO_EDGE);
-		VulkanicAPI.glTexParameteri(VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_WRAP_T, VulkanicAPI.GL_CLAMP_TO_EDGE);
+		VulkanicAPI.configureTextureParameter(CTX, VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_MIN_FILTER, allowsLinear ? VulkanicAPI.GL_LINEAR : VulkanicAPI.GL_NEAREST);
+		VulkanicAPI.configureTextureParameter(CTX, VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_MAG_FILTER, allowsLinear ? VulkanicAPI.GL_LINEAR : VulkanicAPI.GL_NEAREST);
+		VulkanicAPI.configureTextureParameter(CTX, VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_WRAP_S, VulkanicAPI.GL_CLAMP_TO_EDGE);
+		VulkanicAPI.configureTextureParameter(CTX, VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_WRAP_T, VulkanicAPI.GL_CLAMP_TO_EDGE);
 		
 		// disable mip-mapping since DH is just going to draw straight to the screen
-		VulkanicAPI.glTexParameteri(VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_BASE_LEVEL, 0);
-		VulkanicAPI.glTexParameteri(VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_MAX_LEVEL, 0);
+		VulkanicAPI.configureTextureParameter(CTX, VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_BASE_LEVEL, 0);
+		VulkanicAPI.configureTextureParameter(CTX, VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_MAX_LEVEL, 0);
 	}
 	
 	private void resizeTexture(int texture, int width, int height)
 	{
-		VulkanicAPI.glBindTexture(VulkanicAPI.GL_TEXTURE_2D, texture);
-		VulkanicAPI.glTexImage2D(VulkanicAPI.GL_TEXTURE_2D, 0, this.internalFormat.getGlFormat(), width, height, 0, this.format.getGlFormat(), this.type.getGlFormat(), NULL_BUFFER);
+		VulkanicAPI.bindTexture(CTX, VulkanicAPI.GL_TEXTURE_2D, texture);
+		VulkanicAPI.transferTexture2DImage(CTX, VulkanicAPI.GL_TEXTURE_2D, 0, this.internalFormat.getGlFormat(), width, height, 0, this.format.getGlFormat(), this.type.getGlFormat(), NULL_BUFFER);
 	}
 	
 	void resize(Vector2i textureScaleOverride) { this.resize(textureScaleOverride.x, textureScaleOverride.y); }

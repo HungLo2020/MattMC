@@ -1657,18 +1657,6 @@ public class OpenGLBackend implements GraphicsBackend {
     
     @Deprecated
     @Override
-    public int createTexture() {
-        return GL11.glGenTextures();
-    }
-    
-    @Deprecated
-    @Override
-    public void removeTexture(int texture) {
-        GL11.glDeleteTextures(texture);
-    }
-    
-    @Deprecated
-    @Override
     public void configurePolygonOffset(float factor, float units) {
         GL11.glPolygonOffset(factor, units);
     }
@@ -2272,12 +2260,6 @@ public class OpenGLBackend implements GraphicsBackend {
     
     @Deprecated
     @Override
-    public void glTexImage2D(int target, int level, int internalformat, int width, int height, int border, int format, int type, java.nio.ByteBuffer pixels) {
-        org.lwjgl.opengl.GL32C.glTexImage2D(target, level, internalformat, width, height, border, format, type, pixels);
-    }
-    
-    @Deprecated
-    @Override
     public void glTexImage3D(int target, int level, int internalformat, int width, int height, int depth, int border, int format, int type, java.nio.ByteBuffer pixels) {
         org.lwjgl.opengl.GL30C.glTexImage3D(target, level, internalformat, width, height, depth, border, format, type, pixels);
     }
@@ -2346,12 +2328,6 @@ public class OpenGLBackend implements GraphicsBackend {
     @Override
     public void glTexParameteriv(int target, int pname, int[] params) {
         org.lwjgl.opengl.GL32C.glTexParameteriv(target, pname, params);
-    }
-    
-    @Deprecated
-    @Override
-    public void glTexParameteri(int target, int pname, int param) {
-        org.lwjgl.opengl.GL32C.glTexParameteri(target, pname, param);
     }
     
     @Deprecated
@@ -2472,12 +2448,6 @@ public class OpenGLBackend implements GraphicsBackend {
     @Override
     public void glFramebufferTexture2D(int target, int attachment, int textarget, int texture, int level) {
         org.lwjgl.opengl.GL32C.glFramebufferTexture2D(target, attachment, textarget, texture, level);
-    }
-    
-    @Deprecated
-    @Override
-    public void glFramebufferTexture(int target, int attachment, int texture, int level) {
-        org.lwjgl.opengl.GL32C.glFramebufferTexture(target, attachment, texture, level);
     }
     
     @Deprecated

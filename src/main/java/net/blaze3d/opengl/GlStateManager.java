@@ -457,12 +457,12 @@ public class GlStateManager {
 		RenderSystem.assertOnRenderThread();
 		numTextures++;
 		PLOT_TEXTURES.setValue(numTextures);
-		return net.vulkanic.VulkanicAPI.createTexture();
+		return net.vulkanic.VulkanicAPI.createTexture(CTX);
 	}
 
 	public static void _deleteTexture(int i) {
 		RenderSystem.assertOnRenderThread();
-		net.vulkanic.VulkanicAPI.removeTexture(i);
+		net.vulkanic.VulkanicAPI.removeTexture(CTX, i);
 
 		for (GlStateManager.TextureState textureState : TEXTURES) {
 			if (textureState.binding == i) {

@@ -3092,16 +3092,6 @@ public class VulkanicAPI {
     }
     
     @Deprecated
-    public static int createTexture() {
-        return getBackend().createTexture();
-    }
-    
-    @Deprecated
-    public static void removeTexture(int texture) {
-        getBackend().removeTexture(texture);
-    }
-    
-    @Deprecated
     public static void configurePolygonOffset(float factor, float units) {
         getBackend().configurePolygonOffset(factor, units);
     }
@@ -3526,11 +3516,6 @@ public class VulkanicAPI {
     }
     
     @Deprecated
-    public static void glTexImage2D(int target, int level, int internalformat, int width, int height, int border, int format, int type, java.nio.ByteBuffer pixels) {
-        getBackend().glTexImage2D(target, level, internalformat, width, height, border, format, type, pixels);
-    }
-    
-    @Deprecated
     public static void glTexImage3D(int target, int level, int internalformat, int width, int height, int depth, int border, int format, int type, java.nio.ByteBuffer pixels) {
         getBackend().glTexImage3D(target, level, internalformat, width, height, depth, border, format, type, pixels);
     }
@@ -3588,11 +3573,6 @@ public class VulkanicAPI {
     @Deprecated
     public static void glTexParameteriv(int target, int pname, int[] params) {
         getBackend().glTexParameteriv(target, pname, params);
-    }
-    
-    @Deprecated
-    public static void glTexParameteri(int target, int pname, int param) {
-        getBackend().glTexParameteri(target, pname, param);
     }
     
     @Deprecated
@@ -3693,11 +3673,6 @@ public class VulkanicAPI {
     @Deprecated
     public static void glFramebufferTexture2D(int target, int attachment, int textarget, int texture, int level) {
         getBackend().glFramebufferTexture2D(target, attachment, textarget, texture, level);
-    }
-    
-    @Deprecated
-    public static void glFramebufferTexture(int target, int attachment, int texture, int level) {
-        getBackend().glFramebufferTexture(target, attachment, texture, level);
     }
     
     @Deprecated

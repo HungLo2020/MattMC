@@ -1471,10 +1471,6 @@ public interface GraphicsBackend {
     void activateTextureUnit(int unit);
     @Deprecated
     void configureTextureParameter(int target, int pname, int param);
-    @Deprecated
-    int createTexture();
-    @Deprecated
-    void removeTexture(int texture);
     
     // Polygon rendering operations
     @Deprecated
@@ -1721,8 +1717,6 @@ public interface GraphicsBackend {
     @Deprecated
     void glTexImage1D(int target, int level, int internalformat, int width, int border, int format, int type, java.nio.ByteBuffer pixels);
     @Deprecated
-    void glTexImage2D(int target, int level, int internalformat, int width, int height, int border, int format, int type, java.nio.ByteBuffer pixels);
-    @Deprecated
     void glTexImage3D(int target, int level, int internalformat, int width, int height, int depth, int border, int format, int type, java.nio.ByteBuffer pixels);
     @Deprecated
     void glUniformMatrix4fv(int location, boolean transpose, java.nio.FloatBuffer matrix);
@@ -1746,8 +1740,6 @@ public interface GraphicsBackend {
     void glUniform4i(int location, int v0, int v1, int v2, int v3);
     @Deprecated
     void glTexParameteriv(int target, int pname, int[] params);
-    @Deprecated
-    void glTexParameteri(int target, int pname, int param);
     @Deprecated
     void glTexParameterf(int target, int pname, float param);
     @Deprecated
@@ -1788,8 +1780,6 @@ public interface GraphicsBackend {
     void glDetachShader(int program, int shader);
     @Deprecated
     void glFramebufferTexture2D(int target, int attachment, int textarget, int texture, int level);
-    @Deprecated
-    void glFramebufferTexture(int target, int attachment, int texture, int level);
     @Deprecated
     int glGetTexParameteri(int target, int pname);
     @Deprecated
