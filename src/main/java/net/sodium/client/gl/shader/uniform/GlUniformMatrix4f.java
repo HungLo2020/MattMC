@@ -1,5 +1,6 @@
 package net.sodium.client.gl.shader.uniform;
 
+import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
 import org.joml.Matrix4fc;
 import org.lwjgl.system.MemoryStack;
@@ -17,7 +18,8 @@ public class GlUniformMatrix4f extends GlUniform<Matrix4fc>  {
             FloatBuffer buf = stack.callocFloat(16);
             value.get(buf);
 
-            VulkanicAPI.assignUniformMatrix4f(this.index, buf);
+            CommandContext ctx = VulkanicAPI.getImmediateContext();
+            VulkanicAPI.assignUniformMatrix4f(ctx, this.index, buf);
         }
     }
 }

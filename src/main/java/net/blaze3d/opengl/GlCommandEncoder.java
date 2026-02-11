@@ -708,7 +708,7 @@ public class GlCommandEncoder implements CommandEncoder {
 				if (biConsumer != null) {
 					biConsumer.accept(object, (RenderPass.UniformUploader)(string, gpuBufferSlice) -> {
 						if (glRenderPass.pipeline.program().getUniform(string) instanceof Uniform.Ubo(int i)) {
-							VulkanicAPI.attachUniformBufferRange(35345, i, ((GlBuffer)gpuBufferSlice.buffer()).handle, gpuBufferSlice.offset(), gpuBufferSlice.length());
+							VulkanicAPI.attachUniformBufferRange(CTX, 35345, i, ((GlBuffer)gpuBufferSlice.buffer()).handle, gpuBufferSlice.offset(), gpuBufferSlice.length());
 						}
 					});
 				}
@@ -924,7 +924,7 @@ public class GlCommandEncoder implements CommandEncoder {
 					int var39 = var61;
 					if (bl2) {
 						GpuBufferSlice gpuBufferSlice2 = (GpuBufferSlice)glRenderPass.uniforms.get(string2);
-						VulkanicAPI.attachUniformBufferRange(35345, var39, ((GlBuffer)gpuBufferSlice2.buffer()).handle, gpuBufferSlice2.offset(), gpuBufferSlice2.length());
+						VulkanicAPI.attachUniformBufferRange(CTX, 35345, var39, ((GlBuffer)gpuBufferSlice2.buffer()).handle, gpuBufferSlice2.offset(), gpuBufferSlice2.length());
 					}
 					break;
 				case Uniform.Utb(int var41, int var42, TextureFormat var43, int var59):

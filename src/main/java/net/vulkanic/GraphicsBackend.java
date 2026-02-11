@@ -1442,10 +1442,6 @@ public interface GraphicsBackend {
     
     // Uniform block operations
     @Deprecated
-    int locateUniformBlock(int program, String uniformBlockName);
-    @Deprecated
-    void bindUniformBlock(int program, int uniformBlockIndex, int uniformBlockBinding);
-    @Deprecated
     String retrieveActiveUniformBlockName(int program, int uniformBlockIndex);
     
     // Timer query operations
@@ -1518,10 +1514,6 @@ public interface GraphicsBackend {
     @Deprecated
     void renderArraysInstanced(int mode, int first, int count, int instanceCount);
     
-    // Uniform buffer operations
-    @Deprecated
-    void attachUniformBufferRange(int target, int index, int buffer, long offset, long size);
-    
     // Texture buffer operations
     @Deprecated
     void attachBufferToTexture(int target, int internalFormat, int buffer);
@@ -1532,17 +1524,9 @@ public interface GraphicsBackend {
     @Deprecated
     void assignUniformFloat2(int location, float x, float y);
     @Deprecated
-    void assignUniformFloat2v(int location, float[] value);
-    @Deprecated
     void assignUniformFloat3(int location, float x, float y, float z);
     @Deprecated
-    void assignUniformFloat3v(int location, float[] value);
-    @Deprecated
     void assignUniformFloat4(int location, float x, float y, float z, float w);
-    @Deprecated
-    void assignUniformFloat4v(int location, float[] value);
-    @Deprecated
-    void assignUniformMatrix4f(int location, java.nio.FloatBuffer matrix);
     @Deprecated
     void bindUniformBufferBase(int bindingPoint, int bufferId);
     
@@ -1579,10 +1563,6 @@ public interface GraphicsBackend {
     // Multi-draw operations
     @Deprecated
     void multiDrawElementsBaseVertex(int mode, long pCount, int type, long pIndices, int drawCount, long pBaseVertex);
-    
-    // Uniform matrix operations
-    @Deprecated
-    void assignUniformMatrix4fv(int location, boolean transpose, FloatBuffer value);
     
     // String queries
     @Deprecated
@@ -2186,6 +2166,184 @@ public interface GraphicsBackend {
      * }</pre>
      */
     void setVertexAttribDivisor(CommandContext ctx, int index, int divisor);
+    
+    /**
+     * Sets a vec2 uniform variable from a float array.
+     * 
+     * In OpenGL: Maps to glUniform2fv()
+     * In Vulkan: Maps to updating descriptor sets or push constants
+     * 
+     * This method sets a 2-component floating-point vector uniform variable
+     * in the currently bound shader program. The value array must contain
+     * at least 2 floats.
+     * 
+     * @param ctx Command recording context
+     * @param location The uniform location (from locateUniformVariable)
+     * @param value Array containing at least 2 float values (x, y)
+     * 
+     * Example usage:
+     * <pre>{@code
+     * float[] texSize = {1024.0f, 768.0f};
+     * backend.assignUniformFloat2v(CTX, uniformLoc, texSize);
+     * }</pre>
+     */
+    void assignUniformFloat2v(CommandContext ctx, int location, float[] value);
+    
+    /**
+     * Sets a vec3 uniform variable from a float array.
+     * 
+     * In OpenGL: Maps to glUniform3fv()
+     * In Vulkan: Maps to updating descriptor sets or push constants
+     * 
+     * This method sets a 3-component floating-point vector uniform variable
+     * in the currently bound shader program. The value array must contain
+     * at least 3 floats.
+     * 
+     * @param ctx Command recording context
+     * @param location The uniform location (from locateUniformVariable)
+     * @param value Array containing at least 3 float values (x, y, z)
+     * 
+     * Example usage:
+     * <pre>{@code
+     * float[] color = {1.0f, 0.5f, 0.2f};
+     * backend.assignUniformFloat3v(CTX, uniformLoc, color);
+     * }</pre>
+     */
+    void assignUniformFloat3v(CommandContext ctx, int location, float[] value);
+    
+    /**
+     * Sets a vec4 uniform variable from a float array.
+     * 
+     * In OpenGL: Maps to glUniform4fv()
+     * In Vulkan: Maps to updating descriptor sets or push constants
+     * 
+     * This method sets a 4-component floating-point vector uniform variable
+     * in the currently bound shader program. The value array must contain
+     * at least 4 floats.
+     * 
+     * @param ctx Command recording context
+     * @param location The uniform location (from locateUniformVariable)
+     * @param value Array containing at least 4 float values (x, y, z, w)
+     * 
+     * Example usage:
+     * <pre>{@code
+     * float[] color = {1.0f, 0.5f, 0.2f, 1.0f};
+     * backend.assignUniformFloat4v(CTX, uniformLoc, color);
+     * }</pre>
+     */
+    void assignUniformFloat4v(CommandContext ctx, int location, float[] value);
+    
+    /**
+     * Sets a mat4 uniform variable from a FloatBuffer.
+     * 
+     * In OpenGL: Maps to glUniformMatrix4fv()
+     * In Vulkan: Maps to updating descriptor sets or push constants
+     * 
+     * This method sets a 4x4 matrix uniform variable in the currently bound
+     * shader program. The buffer must contain at least 16 floats.
+     * 
+     * @param ctx Command recording context
+     * @param location The uniform location (from locateUniformVariable)
+     * @param matrix Buffer containing 16 float values in column-major order
+     * 
+     * Example usage:
+     * <pre>{@code
+     * FloatBuffer matrixBuffer = ... // 16 floats
+     * backend.assignUniformMatrix4f(CTX, uniformLoc, matrixBuffer);
+     * }</pre>
+     */
+    void assignUniformMatrix4f(CommandContext ctx, int location, java.nio.FloatBuffer matrix);
+    
+    /**
+     * Sets a mat4 uniform variable with optional transpose.
+     * 
+     * In OpenGL: Maps to glUniformMatrix4fv()
+     * In Vulkan: Maps to updating descriptor sets or push constants
+     * 
+     * This method sets a 4x4 matrix uniform variable in the currently bound
+     * shader program. The transpose parameter allows converting between
+     * row-major and column-major formats.
+     * 
+     * @param ctx Command recording context
+     * @param location The uniform location (from locateUniformVariable)
+     * @param transpose Whether to transpose the matrix
+     * @param value Buffer containing 16 float values
+     * 
+     * Example usage:
+     * <pre>{@code
+     * FloatBuffer matrixBuffer = ... // 16 floats
+     * backend.assignUniformMatrix4fv(CTX, uniformLoc, false, matrixBuffer);
+     * }</pre>
+     */
+    void assignUniformMatrix4fv(CommandContext ctx, int location, boolean transpose, java.nio.FloatBuffer value);
+    
+    /**
+     * Locates a uniform block by name in a shader program.
+     * 
+     * In OpenGL: Maps to glGetUniformBlockIndex()
+     * In Vulkan: Uniform blocks map to descriptor set layouts
+     * 
+     * This method retrieves the index of a named uniform block within a shader
+     * program. The index is used with bindUniformBlock to associate the block
+     * with a binding point.
+     * 
+     * @param ctx Command recording context
+     * @param program The shader program ID
+     * @param uniformBlockName The name of the uniform block in the shader
+     * @return The uniform block index, or -1 if not found
+     * 
+     * Example usage:
+     * <pre>{@code
+     * int blockIndex = backend.locateUniformBlock(CTX, programId, "Matrices");
+     * }</pre>
+     */
+    int locateUniformBlock(CommandContext ctx, int program, String uniformBlockName);
+    
+    /**
+     * Binds a uniform block to a binding point.
+     * 
+     * In OpenGL: Maps to glUniformBlockBinding()
+     * In Vulkan: Maps to descriptor set binding configuration
+     * 
+     * This method associates a uniform block in a shader program with a specific
+     * binding point. The binding point is then used with attachUniformBufferRange
+     * to attach actual buffer data.
+     * 
+     * @param ctx Command recording context
+     * @param program The shader program ID
+     * @param uniformBlockIndex The uniform block index (from locateUniformBlock)
+     * @param uniformBlockBinding The binding point to associate with
+     * 
+     * Example usage:
+     * <pre>{@code
+     * backend.bindUniformBlock(CTX, programId, blockIndex, 0);
+     * }</pre>
+     */
+    void bindUniformBlock(CommandContext ctx, int program, int uniformBlockIndex, int uniformBlockBinding);
+    
+    /**
+     * Attaches a range of a buffer to a uniform buffer binding point.
+     * 
+     * In OpenGL: Maps to glBindBufferRange(GL_UNIFORM_BUFFER, ...)
+     * In Vulkan: Maps to descriptor set updates with buffer info
+     * 
+     * This method binds a portion of a buffer object to a uniform buffer binding
+     * point. This allows sharing buffer data across multiple shader programs and
+     * updating uniform data efficiently.
+     * 
+     * @param ctx Command recording context
+     * @param target The buffer target (GL_UNIFORM_BUFFER)
+     * @param index The binding point index
+     * @param buffer The buffer object ID
+     * @param offset Offset into the buffer in bytes
+     * @param size Size of the buffer range in bytes
+     * 
+     * Example usage:
+     * <pre>{@code
+     * backend.attachUniformBufferRange(CTX, GL_UNIFORM_BUFFER, 0, bufferId, 0, 256);
+     * }</pre>
+     */
+    void attachUniformBufferRange(CommandContext ctx, int target, int index, int buffer, long offset, long size);
     
     /**
      * Queries floating-point state values.

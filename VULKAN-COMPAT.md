@@ -2,14 +2,14 @@
 
 **Analysis Date:** 2026-02-08  
 **Migration Strategy Updated:** 2026-02-11  
-**Active Migration Phase:** Phase 14 Complete - Vertex Attribute Management ✅  
+**Active Migration Phase:** Phase 15 Complete - Uniform Operations ✅  
 **Vulkanic API Version:** Initial Implementation (OpenGL-only) - **ALL METHODS NOW DEPRECATED**  
 **Analyzed Components:** VulkanicAPI.java, GraphicsBackend.java, OpenGLBackend.java  
 **Lines of Code Analyzed:** ~4,000 LOC  
 **Deprecated Methods:** 874 methods marked for replacement  
-**Migrated Methods:** 91 methods (10.4% complete)
-**Migrated Call Sites:** 164 call sites in 47 game files ✅ **ALL MIGRATED**
-**Removed Deprecated Methods:** 21 methods
+**Migrated Methods:** 99 methods (11.3% complete)
+**Migrated Call Sites:** 179 call sites in 51 game files ✅ **ALL MIGRATED**
+**Removed Deprecated Methods:** 29 methods
 
 ---
 
@@ -24,13 +24,13 @@ All 874 methods in the current Vulkanic API have been marked as `@Deprecated` to
 The legacy Vulkanic API is a **thin OpenGL state machine wrapper** with approximately **25-30% compatibility** with Vulkan's architectural principles. While it successfully abstracts OpenGL calls behind an interface, the API design is fundamentally tied to OpenGL's immediate-mode, global-state paradigm, which conflicts with Vulkan's explicit, command-buffer-based architecture.
 
 **Migration Progress:**
-- ✅ **91 methods migrated** to CommandContext-aware API (10.4% of 874 total)
-- ✅ **164 call sites FULLY migrated** across **47 game files** ✅ **100% COMPLETE**
+- ✅ **99 methods migrated** to CommandContext-aware API (11.3% of 874 total)
+- ✅ **179 call sites FULLY migrated** across **51 game files** ✅ **100% COMPLETE**
 - ✅ **ZERO deprecated calls remaining** - all production code uses new API!
 - ✅ **Production code validates CommandContext design** - real usage in action!
-- ✅ **21 deprecated methods REMOVED** - codebase getting cleaner!
-- ⚠️ **783 methods remaining** in deprecated state (to be migrated)
-- ✅ **All tests passing** (10/10 Vulkanic tests, 100%)
+- ✅ **29 deprecated methods REMOVED** - codebase getting cleaner!
+- ⚠️ **775 methods remaining** in deprecated state (to be migrated)
+- ✅ **All tests passing** (18/18 Vulkanic tests, 100%)
 - ✅ **Zero breaking changes** - fully backward compatible
 
 **Migrated Methods (as of 2026-02-11):**
@@ -126,12 +126,20 @@ The legacy Vulkanic API is a **thin OpenGL state machine wrapper** with approxim
 78. `bindVertexArray(ctx, array)` - Bind vertex array object
 79. `createBufferObjects(ctx, buffers)` - Create multiple buffer objects
 80. `createSingleBufferObject(ctx)` - Create single buffer object
-81. `configureVertexAttribute(ctx, ...)` - Configure vertex attribute format ⭐ NEW
-82. `configureVertexAttributeInteger(ctx, ...)` - Configure integer vertex attribute ⭐ NEW
-83. `activateVertexAttribute(ctx, index)` - Enable vertex attribute array ⭐ NEW
-84. `deactivateVertexAttribute(ctx, index)` - Disable vertex attribute array ⭐ NEW
-85. `setVertexAttribDivisor(ctx, index, divisor)` - Set vertex attribute divisor ⭐ NEW
+81. `configureVertexAttribute(ctx, ...)` - Configure vertex attribute format
+82. `configureVertexAttributeInteger(ctx, ...)` - Configure integer vertex attribute
+83. `activateVertexAttribute(ctx, index)` - Enable vertex attribute array
+84. `deactivateVertexAttribute(ctx, index)` - Disable vertex attribute array
+85. `setVertexAttribDivisor(ctx, index, divisor)` - Set vertex attribute divisor
 86. `deleteVertexArray(ctx, array)` - Delete vertex array object (already existed)
+87. `assignUniformFloat2v(ctx, location, value)` - Set vec2 uniform from array ⭐ NEW
+88. `assignUniformFloat3v(ctx, location, value)` - Set vec3 uniform from array ⭐ NEW
+89. `assignUniformFloat4v(ctx, location, value)` - Set vec4 uniform from array ⭐ NEW
+90. `assignUniformMatrix4f(ctx, location, matrix)` - Set mat4 uniform ⭐ NEW
+91. `assignUniformMatrix4fv(ctx, location, transpose, value)` - Set mat4 uniform with transpose ⭐ NEW
+92. `locateUniformBlock(ctx, program, name)` - Get uniform block index ⭐ NEW
+93. `bindUniformBlock(ctx, program, index, binding)` - Bind uniform block to binding point ⭐ NEW
+94. `attachUniformBufferRange(ctx, target, index, buffer, offset, size)` - Attach uniform buffer range ⭐ NEW
 
 ### New Migration Strategy: Incremental Replacement
 
@@ -193,14 +201,22 @@ Instead of building a complete Vulkan backend for the flawed legacy API, we are 
 8. ✅ `setDepthWriteEnabled(boolean enabled)` - **REMOVED** ← Alias for `setDepthWriteMask(CommandContext ctx, boolean enabled)`
 9. ✅ `drawPrimitiveArrays(...)` - **REMOVED** ← Alias for `drawArrays(CommandContext ctx, ...)`
 10. ✅ `drawIndexedElements(...)` - **REMOVED** ← Alias for `drawElements(CommandContext ctx, ...)`
-11. ✅ `configureVertexAttribute(int, ...)` - **REMOVED** ⭐ NEW ← Replaced by `configureVertexAttribute(CommandContext ctx, ...)`
-12. ✅ `configureVertexAttributeInteger(int, ...)` - **REMOVED** ⭐ NEW ← Replaced by `configureVertexAttributeInteger(CommandContext ctx, ...)`
-13. ✅ `activateVertexAttribute(int)` - **REMOVED** ⭐ NEW ← Replaced by `activateVertexAttribute(CommandContext ctx, int)`
-14. ✅ `deactivateVertexAttribute(int)` - **REMOVED** ⭐ NEW ← Replaced by `deactivateVertexAttribute(CommandContext ctx, int)`
-15. ✅ `setVertexAttribDivisor(int, int)` - **REMOVED** ⭐ NEW ← Replaced by `setVertexAttribDivisor(CommandContext ctx, int, int)`
-16-21. ✅ **6 additional shader/program methods removed from previous phases**
+11. ✅ `configureVertexAttribute(int, ...)` - **REMOVED** ← Replaced by `configureVertexAttribute(CommandContext ctx, ...)`
+12. ✅ `configureVertexAttributeInteger(int, ...)` - **REMOVED** ← Replaced by `configureVertexAttributeInteger(CommandContext ctx, ...)`
+13. ✅ `activateVertexAttribute(int)` - **REMOVED** ← Replaced by `activateVertexAttribute(CommandContext ctx, int)`
+14. ✅ `deactivateVertexAttribute(int)` - **REMOVED** ← Replaced by `deactivateVertexAttribute(CommandContext ctx, int)`
+15. ✅ `setVertexAttribDivisor(int, int)` - **REMOVED** ← Replaced by `setVertexAttribDivisor(CommandContext ctx, int, int)`
+16. ✅ `assignUniformFloat2v(int, ...)` - **REMOVED** ⭐ NEW ← Replaced by `assignUniformFloat2v(CommandContext ctx, ...)`
+17. ✅ `assignUniformFloat3v(int, ...)` - **REMOVED** ⭐ NEW ← Replaced by `assignUniformFloat3v(CommandContext ctx, ...)`
+18. ✅ `assignUniformFloat4v(int, ...)` - **REMOVED** ⭐ NEW ← Replaced by `assignUniformFloat4v(CommandContext ctx, ...)`
+19. ✅ `assignUniformMatrix4f(int, ...)` - **REMOVED** ⭐ NEW ← Replaced by `assignUniformMatrix4f(CommandContext ctx, ...)`
+20. ✅ `assignUniformMatrix4fv(int, ...)` - **REMOVED** ⭐ NEW ← Replaced by `assignUniformMatrix4fv(CommandContext ctx, ...)`
+21. ✅ `locateUniformBlock(int, ...)` - **REMOVED** ⭐ NEW ← Replaced by `locateUniformBlock(CommandContext ctx, ...)`
+22. ✅ `bindUniformBlock(int, ...)` - **REMOVED** ⭐ NEW ← Replaced by `bindUniformBlock(CommandContext ctx, ...)`
+23. ✅ `attachUniformBufferRange(int, ...)` - **REMOVED** ⭐ NEW ← Replaced by `attachUniformBufferRange(CommandContext ctx, ...)`
+24-29. ✅ **6 additional shader/program methods removed from previous phases**
 
-**Note:** Phase 14 (this PR) removed 5 vertex attribute methods from all three layers (VulkanicAPI, GraphicsBackend, OpenGLBackend). The `deleteVertexArray` method already had a CommandContext version and was not removed in this phase.
+**Note:** Phase 15 (this PR) removed 8 uniform operation methods from all three layers (VulkanicAPI, GraphicsBackend, OpenGLBackend). These are critical for Vulkan as uniforms map to descriptor sets rather than direct state.
 
 **Note:** The following methods were added directly with CommandContext and never had deprecated versions:
 - `drawArrays`, `drawElements`, `setDepthFunc`, `setBlendFunc`, `bindBuffer`, `setDepthWriteMask`

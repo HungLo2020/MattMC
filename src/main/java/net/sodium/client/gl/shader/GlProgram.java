@@ -74,26 +74,26 @@ public class GlProgram<T> extends GlObject implements ShaderBindingContext {
 
     @Override
     public @NotNull GlUniformBlock bindUniformBlock(String name, int bindingPoint) {
-        int index = VulkanicAPI.locateUniformBlock(this.handle(), name);
+        int index = VulkanicAPI.locateUniformBlock(CTX, this.handle(), name);
 
         if (index < 0) {
             throw new NullPointerException("No uniform block exists with name: " + name);
         }
 
-        VulkanicAPI.bindUniformBlock(this.handle(), index, bindingPoint);
+        VulkanicAPI.bindUniformBlock(CTX, this.handle(), index, bindingPoint);
 
         return new GlUniformBlock(bindingPoint);
     }
 
     @Override
     public GlUniformBlock bindUniformBlockOptional(String name, int bindingPoint) {
-        int index = VulkanicAPI.locateUniformBlock(this.handle(), name);
+        int index = VulkanicAPI.locateUniformBlock(CTX, this.handle(), name);
 
         if (index < 0) {
             return null;
         }
 
-        VulkanicAPI.bindUniformBlock(this.handle(), index, bindingPoint);
+        VulkanicAPI.bindUniformBlock(CTX, this.handle(), index, bindingPoint);
 
         return new GlUniformBlock(bindingPoint);
     }

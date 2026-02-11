@@ -12,6 +12,7 @@ import net.irisshaders.iris.gl.framebuffer.GlFramebuffer;
 import net.irisshaders.iris.mixinterface.ShaderInstanceInterface;
 import net.irisshaders.iris.pipeline.IrisRenderingPipeline;
 import net.irisshaders.iris.uniforms.CapturedRenderingState;
+import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
 
 import java.io.IOException;
@@ -19,6 +20,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class FallbackShader extends GlProgram implements IrisProgram {
+	private static final CommandContext CTX = VulkanicAPI.getImmediateContext();
 	private final IrisRenderingPipeline parent;
 	private final BlendModeOverride blendModeOverride;
 	private final GlFramebuffer writingToBeforeTranslucent;
@@ -81,7 +83,7 @@ public class FallbackShader extends GlProgram implements IrisProgram {
 
 	@Override
 	public int iris$getBlockIndex(int program, CharSequence uniformBlockName) {
-		return VulkanicAPI.locateUniformBlock(program, uniformBlockName.toString());
+		return VulkanicAPI.locateUniformBlock(CTX, program, uniformBlockName.toString());
 	}
 
 	@Override

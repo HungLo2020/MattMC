@@ -1,6 +1,7 @@
 package net.irisshaders.iris.gl.uniform;
 
 import net.irisshaders.iris.gl.state.ValueUpdateNotifier;
+import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
 import org.joml.Matrix4f;
 import org.joml.Matrix4fc;
@@ -46,7 +47,8 @@ public class MatrixUniform extends Uniform {
 			cachedValue.get(buffer);
 			buffer.rewind();
 
-			VulkanicAPI.assignUniformMatrix4fv(location, false, buffer);
+			CommandContext ctx = VulkanicAPI.getImmediateContext();
+			VulkanicAPI.assignUniformMatrix4fv(ctx, location, false, buffer);
 		}
 	}
 }

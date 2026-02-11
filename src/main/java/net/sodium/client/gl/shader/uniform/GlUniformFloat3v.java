@@ -1,5 +1,6 @@
 package net.sodium.client.gl.shader.uniform;
 
+import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
 
 public class GlUniformFloat3v extends GlUniform<float[]> {
@@ -13,7 +14,8 @@ public class GlUniformFloat3v extends GlUniform<float[]> {
             throw new IllegalArgumentException("value.length != 3");
         }
 
-        VulkanicAPI.assignUniformFloat3v(this.index, value);
+        CommandContext ctx = VulkanicAPI.getImmediateContext();
+        VulkanicAPI.assignUniformFloat3v(ctx, this.index, value);
     }
 
     public void set(float x, float y, float z) {

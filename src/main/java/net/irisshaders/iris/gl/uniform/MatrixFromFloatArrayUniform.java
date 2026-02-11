@@ -1,5 +1,6 @@
 package net.irisshaders.iris.gl.uniform;
 
+import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
 import org.lwjgl.BufferUtils;
 
@@ -29,7 +30,8 @@ public class MatrixFromFloatArrayUniform extends Uniform {
 			buffer.put(cachedValue);
 			buffer.rewind();
 
-			VulkanicAPI.assignUniformMatrix4fv(location, false, buffer);
+			CommandContext ctx = VulkanicAPI.getImmediateContext();
+			VulkanicAPI.assignUniformMatrix4fv(ctx, location, false, buffer);
 		}
 	}
 }

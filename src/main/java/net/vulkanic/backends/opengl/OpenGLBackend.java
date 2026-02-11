@@ -9,6 +9,7 @@ import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL15;
 import org.lwjgl.opengl.GL20;
 import org.lwjgl.opengl.GL30;
+import org.lwjgl.opengl.GL31;
 import org.lwjgl.opengl.GL32;
 import org.lwjgl.opengl.GL33;
 import java.nio.ByteBuffer;
@@ -1829,18 +1830,6 @@ public class OpenGLBackend implements GraphicsBackend {
     
     @Deprecated
     @Override
-    public int locateUniformBlock(int program, String uniformBlockName) {
-        return org.lwjgl.opengl.GL31.glGetUniformBlockIndex(program, uniformBlockName);
-    }
-    
-    @Deprecated
-    @Override
-    public void bindUniformBlock(int program, int uniformBlockIndex, int uniformBlockBinding) {
-        org.lwjgl.opengl.GL31.glUniformBlockBinding(program, uniformBlockIndex, uniformBlockBinding);
-    }
-    
-    @Deprecated
-    @Override
     public String retrieveActiveUniformBlockName(int program, int uniformBlockIndex) {
         return org.lwjgl.opengl.GL31.glGetActiveUniformBlockName(program, uniformBlockIndex);
     }
@@ -2052,12 +2041,6 @@ public class OpenGLBackend implements GraphicsBackend {
     
     @Deprecated
     @Override
-    public void attachUniformBufferRange(int target, int index, int buffer, long offset, long size) {
-        org.lwjgl.opengl.GL32.glBindBufferRange(target, index, buffer, offset, size);
-    }
-    
-    @Deprecated
-    @Override
     public void attachBufferToTexture(int target, int internalFormat, int buffer) {
         org.lwjgl.opengl.GL31.glTexBuffer(target, internalFormat, buffer);
     }
@@ -2076,38 +2059,14 @@ public class OpenGLBackend implements GraphicsBackend {
     
     @Deprecated
     @Override
-    public void assignUniformFloat2v(int location, float[] value) {
-        org.lwjgl.opengl.GL30C.glUniform2fv(location, value);
-    }
-    
-    @Deprecated
-    @Override
     public void assignUniformFloat3(int location, float x, float y, float z) {
         org.lwjgl.opengl.GL30C.glUniform3f(location, x, y, z);
     }
     
     @Deprecated
     @Override
-    public void assignUniformFloat3v(int location, float[] value) {
-        org.lwjgl.opengl.GL30C.glUniform3fv(location, value);
-    }
-    
-    @Deprecated
-    @Override
     public void assignUniformFloat4(int location, float x, float y, float z, float w) {
         org.lwjgl.opengl.GL30C.glUniform4f(location, x, y, z, w);
-    }
-    
-    @Deprecated
-    @Override
-    public void assignUniformFloat4v(int location, float[] value) {
-        org.lwjgl.opengl.GL30C.glUniform4fv(location, value);
-    }
-    
-    @Deprecated
-    @Override
-    public void assignUniformMatrix4f(int location, java.nio.FloatBuffer matrix) {
-        org.lwjgl.opengl.GL30C.glUniformMatrix4fv(location, false, matrix);
     }
     
     @Deprecated
@@ -2228,12 +2187,6 @@ public class OpenGLBackend implements GraphicsBackend {
     @Override
     public void multiDrawElementsBaseVertex(int mode, long pCount, int type, long pIndices, int drawCount, long pBaseVertex) {
         org.lwjgl.opengl.GL32C.nglMultiDrawElementsBaseVertex(mode, pCount, type, pIndices, drawCount, pBaseVertex);
-    }
-    
-    @Deprecated
-    @Override
-    public void assignUniformMatrix4fv(int location, boolean transpose, FloatBuffer value) {
-        org.lwjgl.opengl.GL20C.glUniformMatrix4fv(location, transpose, value);
     }
     
     @Deprecated
@@ -3300,6 +3253,86 @@ public class OpenGLBackend implements GraphicsBackend {
         }
         
         GL33.glVertexAttribDivisor(index, divisor);
+    }
+    
+    @Override
+    public void assignUniformFloat2v(CommandContext ctx, int location, float[] value) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        GL20.glUniform2fv(location, value);
+    }
+    
+    @Override
+    public void assignUniformFloat3v(CommandContext ctx, int location, float[] value) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        GL20.glUniform3fv(location, value);
+    }
+    
+    @Override
+    public void assignUniformFloat4v(CommandContext ctx, int location, float[] value) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        GL20.glUniform4fv(location, value);
+    }
+    
+    @Override
+    public void assignUniformMatrix4f(CommandContext ctx, int location, java.nio.FloatBuffer matrix) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        GL20.glUniformMatrix4fv(location, false, matrix);
+    }
+    
+    @Override
+    public void assignUniformMatrix4fv(CommandContext ctx, int location, boolean transpose, java.nio.FloatBuffer value) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        GL20.glUniformMatrix4fv(location, transpose, value);
+    }
+    
+    @Override
+    public int locateUniformBlock(CommandContext ctx, int program, String uniformBlockName) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        return GL31.glGetUniformBlockIndex(program, uniformBlockName);
+    }
+    
+    @Override
+    public void bindUniformBlock(CommandContext ctx, int program, int uniformBlockIndex, int uniformBlockBinding) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        GL31.glUniformBlockBinding(program, uniformBlockIndex, uniformBlockBinding);
+    }
+    
+    @Override
+    public void attachUniformBufferRange(CommandContext ctx, int target, int index, int buffer, long offset, long size) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        GL30.glBindBufferRange(target, index, buffer, offset, size);
     }
     
     @Override

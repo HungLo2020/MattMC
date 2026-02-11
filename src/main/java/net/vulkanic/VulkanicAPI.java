@@ -2461,6 +2461,201 @@ public class VulkanicAPI {
         getBackend().setVertexAttribDivisor(ctx, index, divisor);
     }
     
+    /**
+     * Sets a vec2 uniform variable from a float array.
+     * 
+     * This is a Vulkan-compatible method that requires an explicit CommandContext.
+     * For OpenGL, use getImmediateContext() to get the context.
+     * 
+     * Example usage:
+     * <pre>
+     *     CommandContext ctx = VulkanicAPI.getImmediateContext();
+     *     float[] texSize = {1024.0f, 768.0f};
+     *     VulkanicAPI.assignUniformFloat2v(ctx, uniformLoc, texSize);
+     * </pre>
+     * 
+     * In OpenGL: Maps to glUniform2fv()
+     * In Vulkan: Maps to updating descriptor sets or push constants
+     * 
+     * @param ctx Command context for recording this command
+     * @param location The uniform location (from locateUniformVariable)
+     * @param value Array containing at least 2 float values (x, y)
+     */
+    public static void assignUniformFloat2v(CommandContext ctx, int location, float[] value) {
+        getBackend().assignUniformFloat2v(ctx, location, value);
+    }
+    
+    /**
+     * Sets a vec3 uniform variable from a float array.
+     * 
+     * This is a Vulkan-compatible method that requires an explicit CommandContext.
+     * For OpenGL, use getImmediateContext() to get the context.
+     * 
+     * Example usage:
+     * <pre>
+     *     CommandContext ctx = VulkanicAPI.getImmediateContext();
+     *     float[] color = {1.0f, 0.5f, 0.2f};
+     *     VulkanicAPI.assignUniformFloat3v(ctx, uniformLoc, color);
+     * </pre>
+     * 
+     * In OpenGL: Maps to glUniform3fv()
+     * In Vulkan: Maps to updating descriptor sets or push constants
+     * 
+     * @param ctx Command context for recording this command
+     * @param location The uniform location (from locateUniformVariable)
+     * @param value Array containing at least 3 float values (x, y, z)
+     */
+    public static void assignUniformFloat3v(CommandContext ctx, int location, float[] value) {
+        getBackend().assignUniformFloat3v(ctx, location, value);
+    }
+    
+    /**
+     * Sets a vec4 uniform variable from a float array.
+     * 
+     * This is a Vulkan-compatible method that requires an explicit CommandContext.
+     * For OpenGL, use getImmediateContext() to get the context.
+     * 
+     * Example usage:
+     * <pre>
+     *     CommandContext ctx = VulkanicAPI.getImmediateContext();
+     *     float[] color = {1.0f, 0.5f, 0.2f, 1.0f};
+     *     VulkanicAPI.assignUniformFloat4v(ctx, uniformLoc, color);
+     * </pre>
+     * 
+     * In OpenGL: Maps to glUniform4fv()
+     * In Vulkan: Maps to updating descriptor sets or push constants
+     * 
+     * @param ctx Command context for recording this command
+     * @param location The uniform location (from locateUniformVariable)
+     * @param value Array containing at least 4 float values (x, y, z, w)
+     */
+    public static void assignUniformFloat4v(CommandContext ctx, int location, float[] value) {
+        getBackend().assignUniformFloat4v(ctx, location, value);
+    }
+    
+    /**
+     * Sets a mat4 uniform variable from a FloatBuffer.
+     * 
+     * This is a Vulkan-compatible method that requires an explicit CommandContext.
+     * For OpenGL, use getImmediateContext() to get the context.
+     * 
+     * Example usage:
+     * <pre>
+     *     CommandContext ctx = VulkanicAPI.getImmediateContext();
+     *     FloatBuffer matrixBuffer = ... // 16 floats
+     *     VulkanicAPI.assignUniformMatrix4f(ctx, uniformLoc, matrixBuffer);
+     * </pre>
+     * 
+     * In OpenGL: Maps to glUniformMatrix4fv()
+     * In Vulkan: Maps to updating descriptor sets or push constants
+     * 
+     * @param ctx Command context for recording this command
+     * @param location The uniform location (from locateUniformVariable)
+     * @param matrix Buffer containing 16 float values in column-major order
+     */
+    public static void assignUniformMatrix4f(CommandContext ctx, int location, java.nio.FloatBuffer matrix) {
+        getBackend().assignUniformMatrix4f(ctx, location, matrix);
+    }
+    
+    /**
+     * Sets a mat4 uniform variable with optional transpose.
+     * 
+     * This is a Vulkan-compatible method that requires an explicit CommandContext.
+     * For OpenGL, use getImmediateContext() to get the context.
+     * 
+     * Example usage:
+     * <pre>
+     *     CommandContext ctx = VulkanicAPI.getImmediateContext();
+     *     FloatBuffer matrixBuffer = ... // 16 floats
+     *     VulkanicAPI.assignUniformMatrix4fv(ctx, uniformLoc, false, matrixBuffer);
+     * </pre>
+     * 
+     * In OpenGL: Maps to glUniformMatrix4fv()
+     * In Vulkan: Maps to updating descriptor sets or push constants
+     * 
+     * @param ctx Command context for recording this command
+     * @param location The uniform location (from locateUniformVariable)
+     * @param transpose Whether to transpose the matrix
+     * @param value Buffer containing 16 float values
+     */
+    public static void assignUniformMatrix4fv(CommandContext ctx, int location, boolean transpose, java.nio.FloatBuffer value) {
+        getBackend().assignUniformMatrix4fv(ctx, location, transpose, value);
+    }
+    
+    /**
+     * Locates a uniform block by name in a shader program.
+     * 
+     * This is a Vulkan-compatible method that requires an explicit CommandContext.
+     * For OpenGL, use getImmediateContext() to get the context.
+     * 
+     * Example usage:
+     * <pre>
+     *     CommandContext ctx = VulkanicAPI.getImmediateContext();
+     *     int blockIndex = VulkanicAPI.locateUniformBlock(ctx, programId, "Matrices");
+     * </pre>
+     * 
+     * In OpenGL: Maps to glGetUniformBlockIndex()
+     * In Vulkan: Uniform blocks map to descriptor set layouts
+     * 
+     * @param ctx Command context for recording this command
+     * @param program The shader program ID
+     * @param uniformBlockName The name of the uniform block in the shader
+     * @return The uniform block index, or -1 if not found
+     */
+    public static int locateUniformBlock(CommandContext ctx, int program, String uniformBlockName) {
+        return getBackend().locateUniformBlock(ctx, program, uniformBlockName);
+    }
+    
+    /**
+     * Binds a uniform block to a binding point.
+     * 
+     * This is a Vulkan-compatible method that requires an explicit CommandContext.
+     * For OpenGL, use getImmediateContext() to get the context.
+     * 
+     * Example usage:
+     * <pre>
+     *     CommandContext ctx = VulkanicAPI.getImmediateContext();
+     *     VulkanicAPI.bindUniformBlock(ctx, programId, blockIndex, 0);
+     * </pre>
+     * 
+     * In OpenGL: Maps to glUniformBlockBinding()
+     * In Vulkan: Maps to descriptor set binding configuration
+     * 
+     * @param ctx Command context for recording this command
+     * @param program The shader program ID
+     * @param uniformBlockIndex The uniform block index (from locateUniformBlock)
+     * @param uniformBlockBinding The binding point to associate with
+     */
+    public static void bindUniformBlock(CommandContext ctx, int program, int uniformBlockIndex, int uniformBlockBinding) {
+        getBackend().bindUniformBlock(ctx, program, uniformBlockIndex, uniformBlockBinding);
+    }
+    
+    /**
+     * Attaches a range of a buffer to a uniform buffer binding point.
+     * 
+     * This is a Vulkan-compatible method that requires an explicit CommandContext.
+     * For OpenGL, use getImmediateContext() to get the context.
+     * 
+     * Example usage:
+     * <pre>
+     *     CommandContext ctx = VulkanicAPI.getImmediateContext();
+     *     VulkanicAPI.attachUniformBufferRange(ctx, GL_UNIFORM_BUFFER, 0, bufferId, 0, 256);
+     * </pre>
+     * 
+     * In OpenGL: Maps to glBindBufferRange(GL_UNIFORM_BUFFER, ...)
+     * In Vulkan: Maps to descriptor set updates with buffer info
+     * 
+     * @param ctx Command context for recording this command
+     * @param target The buffer target (GL_UNIFORM_BUFFER)
+     * @param index The binding point index
+     * @param buffer The buffer object ID
+     * @param offset Offset into the buffer in bytes
+     * @param size Size of the buffer range in bytes
+     */
+    public static void attachUniformBufferRange(CommandContext ctx, int target, int index, int buffer, long offset, long size) {
+        getBackend().attachUniformBufferRange(ctx, target, index, buffer, offset, size);
+    }
+    
     // ================================================================================
     // DEPRECATED METHODS - Legacy API without CommandContext
     // ================================================================================
@@ -2780,16 +2975,6 @@ public class VulkanicAPI {
     }
     
     @Deprecated
-    public static int locateUniformBlock(int program, String uniformBlockName) {
-        return getBackend().locateUniformBlock(program, uniformBlockName);
-    }
-    
-    @Deprecated
-    public static void bindUniformBlock(int program, int uniformBlockIndex, int uniformBlockBinding) {
-        getBackend().bindUniformBlock(program, uniformBlockIndex, uniformBlockBinding);
-    }
-    
-    @Deprecated
     public static String retrieveActiveUniformBlockName(int program, int uniformBlockIndex) {
         return getBackend().retrieveActiveUniformBlockName(program, uniformBlockIndex);
     }
@@ -2930,11 +3115,6 @@ public class VulkanicAPI {
     }
     
     @Deprecated
-    public static void attachUniformBufferRange(int target, int index, int buffer, long offset, long size) {
-        getBackend().attachUniformBufferRange(target, index, buffer, offset, size);
-    }
-    
-    @Deprecated
     public static void attachBufferToTexture(int target, int internalFormat, int buffer) {
         getBackend().attachBufferToTexture(target, internalFormat, buffer);
     }
@@ -2950,33 +3130,13 @@ public class VulkanicAPI {
     }
     
     @Deprecated
-    public static void assignUniformFloat2v(int location, float[] value) {
-        getBackend().assignUniformFloat2v(location, value);
-    }
-    
-    @Deprecated
     public static void assignUniformFloat3(int location, float x, float y, float z) {
         getBackend().assignUniformFloat3(location, x, y, z);
     }
     
     @Deprecated
-    public static void assignUniformFloat3v(int location, float[] value) {
-        getBackend().assignUniformFloat3v(location, value);
-    }
-    
-    @Deprecated
     public static void assignUniformFloat4(int location, float x, float y, float z, float w) {
         getBackend().assignUniformFloat4(location, x, y, z, w);
-    }
-    
-    @Deprecated
-    public static void assignUniformFloat4v(int location, float[] value) {
-        getBackend().assignUniformFloat4v(location, value);
-    }
-    
-    @Deprecated
-    public static void assignUniformMatrix4f(int location, java.nio.FloatBuffer matrix) {
-        getBackend().assignUniformMatrix4f(location, matrix);
     }
     
     @Deprecated
@@ -3037,11 +3197,6 @@ public class VulkanicAPI {
     @Deprecated
     public static void multiDrawElementsBaseVertex(int mode, long pCount, int type, long pIndices, int drawCount, long pBaseVertex) {
         getBackend().multiDrawElementsBaseVertex(mode, pCount, type, pIndices, drawCount, pBaseVertex);
-    }
-    
-    @Deprecated
-    public static void assignUniformMatrix4fv(int location, boolean transpose, java.nio.FloatBuffer value) {
-        getBackend().assignUniformMatrix4fv(location, transpose, value);
     }
     
     @Deprecated
