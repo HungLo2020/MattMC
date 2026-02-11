@@ -233,7 +233,7 @@ public class GLRenderDevice implements RenderDevice {
             GlBuffer buffer = map.getBufferObject();
 
             this.bindBuffer(GlBufferTarget.ARRAY_BUFFER, buffer);
-            VulkanicAPI.unmapBufferData(GlBufferTarget.ARRAY_BUFFER.getTargetParameter());
+            VulkanicAPI.unmapBufferData(CTX, GlBufferTarget.ARRAY_BUFFER.getTargetParameter());
 
             buffer.setActiveMapping(null);
             map.dispose();

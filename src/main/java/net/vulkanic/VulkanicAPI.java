@@ -593,7 +593,7 @@ public class VulkanicAPI {
     
     @Deprecated
     public static void setColorWriteMask(boolean r, boolean g, boolean b, boolean a) {
-        getBackend().setColorWriteMask(r, g, b, a);
+        getBackend().setColorWriteMask(CTX, r, g, b, a);
     }
     
     /**
@@ -3759,7 +3759,7 @@ public class VulkanicAPI {
     
     @Deprecated
     public static void unmapBufferData(int tgt) {
-        getBackend().unmapBufferData(tgt);
+        unmapBufferData(CTX, tgt);
     }
     
     @Deprecated
@@ -4400,12 +4400,12 @@ public class VulkanicAPI {
     
     @Deprecated
     public static void glPolygonMode(int face, int mode) {
-        getBackend().glPolygonMode(face, mode);
+        getBackend().configurePolygonMode(CTX, face, mode);
     }
     
     @Deprecated
     public static void glViewport(int x, int y, int width, int height) {
-        getBackend().glViewport(x, y, width, height);
+        getBackend().setDynamicViewport(CTX, x, y, width, height);
     }
     
     @Deprecated

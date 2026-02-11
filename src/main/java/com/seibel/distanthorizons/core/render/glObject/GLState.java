@@ -109,7 +109,7 @@ public class GLState
 		this.stencilRef = VulkanicAPI.queryIntegerState(CTX, VulkanicAPI.GL_STENCIL_REF);
 		this.stencilMask = VulkanicAPI.queryIntegerState(CTX, VulkanicAPI.GL_STENCIL_VALUE_MASK);
 		this.view = new int[4];
-		VulkanicAPI.glGetIntegerv(VulkanicAPI.GL_VIEWPORT, this.view);
+		VulkanicAPI.glGetIntegerv(CTX, VulkanicAPI.GL_VIEWPORT, this.view);
 		this.cull = VulkanicAPI.glIsEnabled(CTX, VulkanicAPI.GL_CULL_FACE);
 		this.cullMode = VulkanicAPI.queryIntegerState(CTX, VulkanicAPI.GL_CULL_FACE_MODE);
 		this.polyMode = VulkanicAPI.queryIntegerState(CTX, VulkanicAPI.GL_POLYGON_MODE);
@@ -226,7 +226,7 @@ public class GLState
 		}
 		VulkanicAPI.glStencilFunc(CTX, this.stencilFunc, this.stencilRef, this.stencilMask);
 		
-		VulkanicAPI.glViewport(this.view[0], this.view[1], this.view[2], this.view[3]);
+		VulkanicAPI.setDynamicViewport(CTX, this.view[0], this.view[1], this.view[2], this.view[3]);
 		if (this.cull)
 		{
 			GLMC.enableFaceCulling();
@@ -236,6 +236,6 @@ public class GLState
 			GLMC.disableFaceCulling();
 		}
 		VulkanicAPI.glCullFace(CTX, this.cullMode);
-		VulkanicAPI.glPolygonMode(VulkanicAPI.GL_FRONT_AND_BACK, this.polyMode);
+		VulkanicAPI.configurePolygonMode(CTX, VulkanicAPI.GL_FRONT_AND_BACK, this.polyMode);
 	}
 }

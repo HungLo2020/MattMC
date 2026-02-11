@@ -42,7 +42,6 @@ public interface GraphicsBackend {
      */
     void setDynamicViewport(CommandContext ctx, int x, int y, int width, int height);
     
-    // Depth operations
     @Deprecated
     void setColorWriteMask(boolean r, boolean g, boolean b, boolean a);
     

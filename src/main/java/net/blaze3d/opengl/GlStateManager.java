@@ -306,7 +306,7 @@ public class GlStateManager {
 
 	public static void _glUnmapBuffer(int i) {
 		RenderSystem.assertOnRenderThread();
-		net.vulkanic.VulkanicAPI.unmapBufferData(i);
+		net.vulkanic.VulkanicAPI.unmapBufferData(CTX, i);
 	}
 
 	public static void _glDeleteBuffers(int i) {
@@ -532,7 +532,7 @@ public class GlStateManager {
 			COLOR_MASK.green = bl2;
 			COLOR_MASK.blue = bl3;
 			COLOR_MASK.alpha = bl4;
-			net.vulkanic.VulkanicAPI.setColorWriteMask(bl, bl2, bl3, bl4);
+			net.vulkanic.VulkanicAPI.setColorWriteMask(CTX, bl, bl2, bl3, bl4);
 		}
 	}
 
