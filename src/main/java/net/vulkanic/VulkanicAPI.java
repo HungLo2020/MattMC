@@ -2561,6 +2561,46 @@ public class VulkanicAPI {
     }
     
     /**
+     * Attaches a vertex buffer to a vertex array binding point.
+     * 
+     * Example usage:
+     * <pre>{@code
+     * // Attach buffer to binding point 0 with stride 32 bytes
+     * attachVertexBuffer(CTX, 0, vertexBufferId, 0L, 32);
+     * // Associate attribute 0 (position) with binding 0
+     * associateVertexAttrib(CTX, 0, 0);
+     * }</pre>
+     * 
+     * @param ctx Command context for recording this command
+     * @param bindingIndex The vertex buffer binding point (0-15 typically)
+     * @param buffer The buffer object ID to attach
+     * @param offset Offset in bytes to the first vertex data
+     * @param stride The byte stride between consecutive vertices
+     */
+    public static void attachVertexBuffer(CommandContext ctx, int bindingIndex, int buffer, long offset, int stride) {
+        getBackend().attachVertexBuffer(ctx, bindingIndex, buffer, offset, stride);
+    }
+    
+    /**
+     * Associates a vertex attribute with a vertex buffer binding point.
+     * 
+     * Example usage:
+     * <pre>{@code
+     * // Attribute 0 (position) comes from binding point 0
+     * associateVertexAttrib(CTX, 0, 0);
+     * // Attribute 1 (texcoord) also comes from binding point 0
+     * associateVertexAttrib(CTX, 1, 0);
+     * }</pre>
+     * 
+     * @param ctx Command context for recording this command
+     * @param attribIndex The vertex attribute index to associate
+     * @param bindingIndex The vertex buffer binding point to associate with
+     */
+    public static void associateVertexAttrib(CommandContext ctx, int attribIndex, int bindingIndex) {
+        getBackend().associateVertexAttrib(ctx, attribIndex, bindingIndex);
+    }
+    
+    /**
      * Creates multiple buffer objects.
      * 
      * Example usage:
@@ -2907,6 +2947,45 @@ public class VulkanicAPI {
      */
     public static void attachUniformBufferRange(CommandContext ctx, int target, int index, int buffer, long offset, long size) {
         getBackend().attachUniformBufferRange(ctx, target, index, buffer, offset, size);
+    }
+    
+    /**
+     * Binds an entire uniform buffer to a binding point.
+     * 
+     * Example usage:
+     * <pre>{@code
+     * // Bind uniform buffer to binding point 0
+     * bindUniformBufferBase(CTX, 0, uniformBufferId);
+     * // Shader can now access: layout(binding=0) uniform MyBlock { ... };
+     * }</pre>
+     * 
+     * @param ctx Command context for recording this command
+     * @param binding The binding point index (matches layout(binding=N) in shaders)
+     * @param bufferId The buffer object ID to bind
+     */
+    public static void bindUniformBufferBase(CommandContext ctx, int binding, int bufferId) {
+        getBackend().bindUniformBufferBase(ctx, binding, bufferId);
+    }
+    
+    /**
+     * Binds a fragment shader output variable to a color number.
+     * 
+     * Must be called before linking the program.
+     * 
+     * Example usage:
+     * <pre>{@code
+     * // Bind fragment output "fragColor" to attachment 0
+     * bindFragmentDataLocation(CTX, programId, 0, "fragColor");
+     * linkProgramBinary(CTX, programId);
+     * }</pre>
+     * 
+     * @param ctx Command context for recording this command
+     * @param program The shader program ID
+     * @param colorNumber The color attachment index (0-7 typically)
+     * @param name The name of the fragment shader output variable
+     */
+    public static void bindFragmentDataLocation(CommandContext ctx, int program, int colorNumber, CharSequence name) {
+        getBackend().bindFragmentDataLocation(ctx, program, colorNumber, name);
     }
     
     /**
@@ -3312,11 +3391,6 @@ public class VulkanicAPI {
     }
     
     @Deprecated
-    public static void attachVertexBuffer(int bindingIndex, int buffer, long offset, int stride) {
-        getBackend().attachVertexBuffer(bindingIndex, buffer, offset, stride);
-    }
-    
-    @Deprecated
     public static void specifyVertexAttribFormat(int attribIndex, int size, int type, boolean normalized, int relativeOffset) {
         getBackend().specifyVertexAttribFormat(attribIndex, size, type, normalized, relativeOffset);
     }
@@ -3324,11 +3398,6 @@ public class VulkanicAPI {
     @Deprecated
     public static void specifyVertexAttribIFormat(int attribIndex, int size, int type, int relativeOffset) {
         getBackend().specifyVertexAttribIFormat(attribIndex, size, type, relativeOffset);
-    }
-    
-    @Deprecated
-    public static void associateVertexAttrib(int attribIndex, int bindingIndex) {
-        getBackend().associateVertexAttrib(attribIndex, bindingIndex);
     }
     
     @Deprecated
@@ -3372,11 +3441,6 @@ public class VulkanicAPI {
     }
     
     @Deprecated
-    public static void assignUniformFloat(int location, float value) {
-        getBackend().assignUniformFloat(location, value);
-    }
-    
-    @Deprecated
     public static void assignUniformFloat2(int location, float x, float y) {
         getBackend().assignUniformFloat2(location, x, y);
     }
@@ -3389,16 +3453,6 @@ public class VulkanicAPI {
     @Deprecated
     public static void assignUniformFloat4(int location, float x, float y, float z, float w) {
         getBackend().assignUniformFloat4(location, x, y, z, w);
-    }
-    
-    @Deprecated
-    public static void bindUniformBufferBase(int bindingPoint, int bufferId) {
-        getBackend().bindUniformBufferBase(bindingPoint, bufferId);
-    }
-    
-    @Deprecated
-    public static void bindFragmentDataLocation(int program, int colorNumber, CharSequence name) {
-        getBackend().bindFragmentDataLocation(program, colorNumber, name);
     }
     
     @Deprecated

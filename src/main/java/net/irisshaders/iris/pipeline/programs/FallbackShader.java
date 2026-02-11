@@ -68,7 +68,7 @@ public class FallbackShader extends GlProgram implements IrisProgram {
 		int ALPHA_TEST_VALUE = GlStateManager._glGetUniformLocation(programId, "AlphaTestValue");
 
 		if (ALPHA_TEST_VALUE > -1) {
-			VulkanicAPI.assignUniformFloat(ALPHA_TEST_VALUE, alphaValue);
+			VulkanicAPI.assignUniformFloat(CTX, ALPHA_TEST_VALUE, alphaValue);
 		}
 	}
 

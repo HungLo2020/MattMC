@@ -1,8 +1,11 @@
 package net.sodium.client.gl.shader.uniform;
 
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.CommandContext;
 
 public class GlUniformFloat extends GlUniform<Float> {
+    private static final CommandContext CTX = VulkanicAPI.getImmediateContext();
+    
     public GlUniformFloat(int index) {
         super(index);
     }
@@ -13,6 +16,6 @@ public class GlUniformFloat extends GlUniform<Float> {
     }
 
     public void setFloat(float value) {
-        VulkanicAPI.assignUniformFloat(this.index, value);
+        VulkanicAPI.assignUniformFloat(CTX, this.index, value);
     }
 }

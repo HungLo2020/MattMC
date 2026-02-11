@@ -1552,6 +1552,26 @@ public class OpenGLBackend implements GraphicsBackend {
     }
     
     @Override
+    public void attachVertexBuffer(CommandContext ctx, int bindingIndex, int buffer, long offset, int stride) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        org.lwjgl.opengl.ARBVertexAttribBinding.glBindVertexBuffer(bindingIndex, buffer, offset, stride);
+    }
+    
+    @Override
+    public void associateVertexAttrib(CommandContext ctx, int attribIndex, int bindingIndex) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        org.lwjgl.opengl.ARBVertexAttribBinding.glVertexAttribBinding(attribIndex, bindingIndex);
+    }
+    
+    @Override
     public void createBufferObjects(CommandContext ctx, int[] buffers) {
         // Validate context is immediate mode (OpenGL requirement)
         if (!ctx.isImmediate()) {
@@ -1866,12 +1886,6 @@ public class OpenGLBackend implements GraphicsBackend {
     
     @Deprecated
     @Override
-    public void attachVertexBuffer(int bindingIndex, int buffer, long offset, int stride) {
-        org.lwjgl.opengl.ARBVertexAttribBinding.glBindVertexBuffer(bindingIndex, buffer, offset, stride);
-    }
-    
-    @Deprecated
-    @Override
     public void specifyVertexAttribFormat(int attribIndex, int size, int type, boolean normalized, int relativeOffset) {
         org.lwjgl.opengl.ARBVertexAttribBinding.glVertexAttribFormat(attribIndex, size, type, normalized, relativeOffset);
     }
@@ -1880,12 +1894,6 @@ public class OpenGLBackend implements GraphicsBackend {
     @Override
     public void specifyVertexAttribIFormat(int attribIndex, int size, int type, int relativeOffset) {
         org.lwjgl.opengl.ARBVertexAttribBinding.glVertexAttribIFormat(attribIndex, size, type, relativeOffset);
-    }
-    
-    @Deprecated
-    @Override
-    public void associateVertexAttrib(int attribIndex, int bindingIndex) {
-        org.lwjgl.opengl.ARBVertexAttribBinding.glVertexAttribBinding(attribIndex, bindingIndex);
     }
     
     @Deprecated
@@ -1938,12 +1946,6 @@ public class OpenGLBackend implements GraphicsBackend {
     
     @Deprecated
     @Override
-    public void assignUniformFloat(int location, float value) {
-        org.lwjgl.opengl.GL30C.glUniform1f(location, value);
-    }
-    
-    @Deprecated
-    @Override
     public void assignUniformFloat2(int location, float x, float y) {
         org.lwjgl.opengl.GL30C.glUniform2f(location, x, y);
     }
@@ -1958,18 +1960,6 @@ public class OpenGLBackend implements GraphicsBackend {
     @Override
     public void assignUniformFloat4(int location, float x, float y, float z, float w) {
         org.lwjgl.opengl.GL30C.glUniform4f(location, x, y, z, w);
-    }
-    
-    @Deprecated
-    @Override
-    public void bindUniformBufferBase(int bindingPoint, int bufferId) {
-        org.lwjgl.opengl.GL32C.glBindBufferBase(org.lwjgl.opengl.GL32C.GL_UNIFORM_BUFFER, bindingPoint, bufferId);
-    }
-    
-    @Deprecated
-    @Override
-    public void bindFragmentDataLocation(int program, int colorNumber, CharSequence name) {
-        org.lwjgl.opengl.GL30C.glBindFragDataLocation(program, colorNumber, name);
     }
     
     @Deprecated
@@ -3164,6 +3154,26 @@ public class OpenGLBackend implements GraphicsBackend {
         }
         
         GL30.glBindBufferRange(target, index, buffer, offset, size);
+    }
+    
+    @Override
+    public void bindUniformBufferBase(CommandContext ctx, int binding, int bufferId) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        GL30.glBindBufferBase(GL31.GL_UNIFORM_BUFFER, binding, bufferId);
+    }
+    
+    @Override
+    public void bindFragmentDataLocation(CommandContext ctx, int program, int colorNumber, CharSequence name) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        GL30.glBindFragDataLocation(program, colorNumber, name);
     }
     
     @Override

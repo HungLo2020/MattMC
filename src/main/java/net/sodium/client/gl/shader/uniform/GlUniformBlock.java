@@ -2,8 +2,10 @@ package net.sodium.client.gl.shader.uniform;
 
 import net.sodium.client.gl.buffer.GlBuffer;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.CommandContext;
 
 public class GlUniformBlock {
+    private static final CommandContext CTX = VulkanicAPI.getImmediateContext();
     private final int binding;
 
     public GlUniformBlock(int uniformBlockBinding) {
@@ -11,6 +13,6 @@ public class GlUniformBlock {
     }
 
     public void bindBuffer(GlBuffer buffer) {
-        VulkanicAPI.bindUniformBufferBase(this.binding, buffer.handle());
+        VulkanicAPI.bindUniformBufferBase(CTX, this.binding, buffer.handle());
     }
 }

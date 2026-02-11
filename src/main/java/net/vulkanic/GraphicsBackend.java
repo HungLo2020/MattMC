@@ -1457,6 +1457,40 @@ public interface GraphicsBackend {
     void bindVertexArray(CommandContext ctx, int array);
     
     /**
+     * Attaches a vertex buffer to a vertex array binding point.
+     * 
+     * In OpenGL: Maps to glBindVertexBuffer() or glVertexArrayVertexBuffer() (DSA)
+     * In Vulkan: Part of VkVertexInputBindingDescription in pipeline creation
+     * 
+     * Associates a buffer object with a vertex buffer binding point. The binding point
+     * is then referenced by vertex attributes via associateVertexAttrib(). This allows
+     * multiple attributes to share the same buffer.
+     * 
+     * @param ctx Command context for recording this command
+     * @param bindingIndex The vertex buffer binding point (0-15 typically)
+     * @param buffer The buffer object ID to attach
+     * @param offset Offset in bytes to the first vertex data
+     * @param stride The byte stride between consecutive vertices
+     */
+    void attachVertexBuffer(CommandContext ctx, int bindingIndex, int buffer, long offset, int stride);
+    
+    /**
+     * Associates a vertex attribute with a vertex buffer binding point.
+     * 
+     * In OpenGL: Maps to glVertexAttribBinding() or glVertexArrayAttribBinding() (DSA)
+     * In Vulkan: Maps to VkVertexInputAttributeDescription.binding field
+     * 
+     * Links a vertex attribute index to a vertex buffer binding point. This allows
+     * decoupling attribute format from buffer binding, enabling buffer swapping
+     * without reconfiguring attributes.
+     * 
+     * @param ctx Command context for recording this command
+     * @param attribIndex The vertex attribute index to associate
+     * @param bindingIndex The vertex buffer binding point to associate with
+     */
+    void associateVertexAttrib(CommandContext ctx, int attribIndex, int bindingIndex);
+    
+    /**
      * Creates multiple buffer objects.
      * 
      * In OpenGL: Maps to glGenBuffers()
@@ -1610,13 +1644,9 @@ public interface GraphicsBackend {
     
     // ARB vertex attrib binding operations
     @Deprecated
-    void attachVertexBuffer(int bindingIndex, int buffer, long offset, int stride);
-    @Deprecated
     void specifyVertexAttribFormat(int attribIndex, int size, int type, boolean normalized, int relativeOffset);
     @Deprecated
     void specifyVertexAttribIFormat(int attribIndex, int size, int type, int relativeOffset);
-    @Deprecated
-    void associateVertexAttrib(int attribIndex, int bindingIndex);
     
     // Clear operations
     @Deprecated
@@ -1642,19 +1672,11 @@ public interface GraphicsBackend {
     
     // Uniform operations (additional)
     @Deprecated
-    void assignUniformFloat(int location, float value);
-    @Deprecated
     void assignUniformFloat2(int location, float x, float y);
     @Deprecated
     void assignUniformFloat3(int location, float x, float y, float z);
     @Deprecated
     void assignUniformFloat4(int location, float x, float y, float z, float w);
-    @Deprecated
-    void bindUniformBufferBase(int bindingPoint, int bufferId);
-    
-    // Program fragment data binding
-    @Deprecated
-    void bindFragmentDataLocation(int program, int colorNumber, CharSequence name);
     
     // Sync query operations
     @Deprecated
@@ -2444,6 +2466,52 @@ public interface GraphicsBackend {
      * }</pre>
      */
     void attachUniformBufferRange(CommandContext ctx, int target, int index, int buffer, long offset, long size);
+    
+    /**
+     * Binds an entire uniform buffer to a binding point.
+     * 
+     * In OpenGL: Maps to glBindBufferBase(GL_UNIFORM_BUFFER, ...)
+     * In Vulkan: Maps to descriptor set updates with entire buffer
+     * 
+     * This method binds an entire buffer object to a uniform buffer binding point.
+     * This is a convenience method for attaching a full buffer without specifying
+     * offset and size. Useful for uniform buffers that are used as a single unit.
+     * 
+     * @param ctx Command recording context
+     * @param binding The binding point index (matches layout(binding=N) in shaders)
+     * @param bufferId The buffer object ID to bind
+     * 
+     * Example usage:
+     * <pre>{@code
+     * backend.bindUniformBufferBase(CTX, 0, uniformBufferId);
+     * // Shader can now access uniform block at binding=0
+     * }</pre>
+     */
+    void bindUniformBufferBase(CommandContext ctx, int binding, int bufferId);
+    
+    /**
+     * Binds a fragment shader output variable to a color number.
+     * 
+     * In OpenGL: Maps to glBindFragDataLocation()
+     * In Vulkan: Determined by layout(location=N) in fragment shader
+     * 
+     * This method must be called before linking the program. It associates a
+     * fragment shader output variable (out vec4 color) with a specific color
+     * attachment index in the framebuffer. In Vulkan, this is specified via
+     * shader layout qualifiers and cannot be changed at runtime.
+     * 
+     * @param ctx Command recording context
+     * @param program The shader program ID
+     * @param colorNumber The color attachment index (0-7 typically)
+     * @param name The name of the fragment shader output variable
+     * 
+     * Example usage:
+     * <pre>{@code
+     * backend.bindFragmentDataLocation(CTX, programId, 0, "fragColor");
+     * backend.linkProgramBinary(CTX, programId);
+     * }</pre>
+     */
+    void bindFragmentDataLocation(CommandContext ctx, int program, int colorNumber, CharSequence name);
     
     /**
      * Queries floating-point state values.

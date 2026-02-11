@@ -117,10 +117,10 @@ public abstract class VertexArrayCache {
 				VulkanicAPI.bindVertexArray(CTX, vertexArray.id);
 				if (glBuffer != null && vertexArray.lastVertexBuffer != glBuffer) {
 					if (this.needsMesaWorkaround && vertexArray.lastVertexBuffer != null && vertexArray.lastVertexBuffer.handle == glBuffer.handle) {
-						VulkanicAPI.attachVertexBuffer(0, 0, 0L, 0);
+						VulkanicAPI.attachVertexBuffer(CTX, 0, 0, 0L, 0);
 					}
 
-					VulkanicAPI.attachVertexBuffer(0, glBuffer.handle, 0L, vertexFormat.getVertexSize());
+					VulkanicAPI.attachVertexBuffer(CTX, 0, glBuffer.handle, 0L, vertexFormat.getVertexSize());
 					vertexArray.lastVertexBuffer = glBuffer;
 				}
 			} else {
@@ -153,12 +153,12 @@ public abstract class VertexArrayCache {
 								);
 						}
 
-						VulkanicAPI.associateVertexAttrib(j, 0);
+						VulkanicAPI.associateVertexAttrib(CTX, j, 0);
 					}
 				}
 
 				if (glBuffer != null) {
-					VulkanicAPI.attachVertexBuffer(0, glBuffer.handle, 0L, vertexFormat.getVertexSize());
+					VulkanicAPI.attachVertexBuffer(CTX, 0, glBuffer.handle, 0L, vertexFormat.getVertexSize());
 				}
 
 				VertexArrayCache.VertexArray vertexArray2 = new VertexArrayCache.VertexArray(i, vertexFormat, glBuffer);
