@@ -2169,4 +2169,23 @@ public interface GraphicsBackend {
      * }</pre>
      */
     long createFenceSync(CommandContext ctx, int condition, int flags);
+    
+    /**
+     * Gets the name of the graphics backend.
+     * 
+     * This method returns a human-readable string identifying which graphics API is being used.
+     * This is useful for displaying in debug screens or for diagnostic purposes.
+     * 
+     * OpenGL: Returns "OpenGL"
+     * Vulkan: Returns "Vulkan" (when implemented)
+     * 
+     * @return The name of the graphics backend as a string
+     * 
+     * Example usage:
+     * <pre>{@code
+     * String backendName = backend.getBackendName();
+     * System.out.println("Using " + backendName + " backend");
+     * }</pre>
+     */
+    String getBackendName();
 }

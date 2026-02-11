@@ -40,6 +40,7 @@ public class DebugScreenEntries {
 	public static final ResourceLocation SIMPLE_PERFORMANCE_IMPACTORS = register("simple_performance_impactors", new DebugEntrySimplePerformanceImpactors());
 	public static final ResourceLocation CHUNK_SECTION_OCTREE = register("chunk_section_octree", new DebugEntryNoop());
 	public static final ResourceLocation CHUNK_SECTION_VISIBILITY = register("chunk_section_visibility", new DebugEntryNoop());
+	public static final ResourceLocation BACKEND_RENDERER = register("backend_renderer", new DebugEntryBackendRenderer());
 	
 	// Iris debug entries
 	public static final ResourceLocation IRIS = register(ResourceLocation.fromNamespaceAndPath("iris", "iris"), new net.irisshaders.iris.gui.debug.IrisDebugEntry());
@@ -66,25 +67,17 @@ public class DebugScreenEntries {
 	}
 
 	static {
-		Map<ResourceLocation, DebugScreenEntryStatus> map = Map.of(
-			THREE_DIMENSIONAL_CROSSHAIR,
-			DebugScreenEntryStatus.IN_F3,
-			GAME_VERSION,
-			DebugScreenEntryStatus.IN_F3,
-			TPS,
-			DebugScreenEntryStatus.IN_F3,
-			FPS,
-			DebugScreenEntryStatus.IN_F3,
-			MEMORY,
-			DebugScreenEntryStatus.IN_F3,
-			SYSTEM_SPECS,
-			DebugScreenEntryStatus.IN_F3,
-			PLAYER_POSITION,
-			DebugScreenEntryStatus.IN_F3,
-			PLAYER_SECTION_POSITION,
-			DebugScreenEntryStatus.IN_F3,
-			SIMPLE_PERFORMANCE_IMPACTORS,
-			DebugScreenEntryStatus.IN_F3
+		Map<ResourceLocation, DebugScreenEntryStatus> map = Map.ofEntries(
+			Map.entry(THREE_DIMENSIONAL_CROSSHAIR, DebugScreenEntryStatus.IN_F3),
+			Map.entry(GAME_VERSION, DebugScreenEntryStatus.IN_F3),
+			Map.entry(TPS, DebugScreenEntryStatus.IN_F3),
+			Map.entry(FPS, DebugScreenEntryStatus.IN_F3),
+			Map.entry(MEMORY, DebugScreenEntryStatus.IN_F3),
+			Map.entry(SYSTEM_SPECS, DebugScreenEntryStatus.IN_F3),
+			Map.entry(PLAYER_POSITION, DebugScreenEntryStatus.IN_F3),
+			Map.entry(PLAYER_SECTION_POSITION, DebugScreenEntryStatus.IN_F3),
+			Map.entry(SIMPLE_PERFORMANCE_IMPACTORS, DebugScreenEntryStatus.IN_F3),
+			Map.entry(BACKEND_RENDERER, DebugScreenEntryStatus.IN_F3)
 		);
 		Map<ResourceLocation, DebugScreenEntryStatus> map2 = Map.of(
 			TPS,

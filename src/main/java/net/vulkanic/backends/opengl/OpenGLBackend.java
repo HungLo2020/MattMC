@@ -3320,4 +3320,9 @@ public class OpenGLBackend implements GraphicsBackend {
         
         return GL32.glFenceSync(condition, flags);
     }
+    
+    @Override
+    public String getBackendName() {
+        return "OpenGL";
+    }
 }

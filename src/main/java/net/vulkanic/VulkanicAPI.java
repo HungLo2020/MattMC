@@ -4104,4 +4104,22 @@ public class VulkanicAPI {
     public static long createFenceSync(CommandContext ctx, int condition, int flags) {
         return getBackend().createFenceSync(ctx, condition, flags);
     }
+    
+    /**
+     * Gets the name of the graphics backend currently in use.
+     * 
+     * This method returns a human-readable string identifying which graphics API is being used.
+     * This is useful for displaying in debug screens or for diagnostic purposes.
+     * 
+     * @return The name of the graphics backend (e.g., "OpenGL", "Vulkan")
+     * 
+     * Example usage:
+     * <pre>{@code
+     * String backendName = VulkanicAPI.getBackendName();
+     * System.out.println("Using " + backendName + " backend");
+     * }</pre>
+     */
+    public static String getBackendName() {
+        return getBackend().getBackendName();
+    }
 }
