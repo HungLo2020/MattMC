@@ -4,6 +4,7 @@ import net.blaze3d.opengl.GlStateManager;
 import net.irisshaders.iris.gl.GLDebug;
 import net.irisshaders.iris.gl.GlResource;
 import net.irisshaders.iris.gl.IrisRenderSystem;
+import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -15,6 +16,7 @@ import java.util.Locale;
  */
 public class GlShader extends GlResource {
 	private static final Logger LOGGER = LogManager.getLogger(GlShader.class);
+	private static final CommandContext CTX = VulkanicAPI.getImmediateContext();
 
 	private final String name;
 
@@ -37,7 +39,7 @@ public class GlShader extends GlResource {
 			LOGGER.warn("Shader compilation log for " + name + ": " + log);
 		}
 
-		int result = VulkanicAPI.queryShaderParameter(handle, VulkanicAPI.GL_COMPILE_STATUS);
+		int result = VulkanicAPI.queryShaderParameter(CTX, handle, VulkanicAPI.GL_COMPILE_STATUS);
 
 		if (result != 1) {  // GL_TRUE
 			throw new ShaderCompileException(name, log);

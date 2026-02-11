@@ -1628,6 +1628,72 @@ public class VulkanicAPI {
     }
     
     /**
+     * Updates a rectangular region of a 2D texture with new pixel data (pointer version).
+     * 
+     * This is a Vulkan-compatible method that requires an explicit CommandContext.
+     * For OpenGL, use getImmediateContext() to get the context.
+     * 
+     * Example usage:
+     * <pre>{@code
+     * CommandContext ctx = VulkanicAPI.getImmediateContext();
+     * // Update 64x64 region at offset (128, 128)
+     * VulkanicAPI.transferTexture2DSubregion(ctx, GL_TEXTURE_2D, 0, 128, 128, 64, 64,
+     *     GL_RGBA, GL_UNSIGNED_BYTE, pixelDataPtr);
+     * }</pre>
+     * 
+     * In OpenGL: Maps to glTexSubImage2D() with pointer
+     * In Vulkan: Maps to vkCmdCopyBufferToImage() with staging buffer
+     * 
+     * @param ctx Command context for recording this command
+     * @param tgt Texture target (e.g., GL_TEXTURE_2D)
+     * @param lvl Mipmap level to update
+     * @param xoff X offset into texture
+     * @param yoff Y offset into texture
+     * @param w Width of region to update
+     * @param h Height of region to update
+     * @param fmt Pixel data format (e.g., GL_RGBA)
+     * @param typ Pixel data type (e.g., GL_UNSIGNED_BYTE)
+     * @param pix Native pointer to pixel data
+     */
+    public static void transferTexture2DSubregion(CommandContext ctx, int tgt, int lvl, int xoff, int yoff, 
+                                                  int w, int h, int fmt, int typ, long pix) {
+        getBackend().transferTexture2DSubregion(ctx, tgt, lvl, xoff, yoff, w, h, fmt, typ, pix);
+    }
+    
+    /**
+     * Updates a rectangular region of a 2D texture with new pixel data (ByteBuffer version).
+     * 
+     * This is a Vulkan-compatible method that requires an explicit CommandContext.
+     * For OpenGL, use getImmediateContext() to get the context.
+     * 
+     * Example usage:
+     * <pre>{@code
+     * CommandContext ctx = VulkanicAPI.getImmediateContext();
+     * ByteBuffer pixelData = ...;
+     * VulkanicAPI.transferTexture2DSubregionBuf(ctx, GL_TEXTURE_2D, 0, 0, 0, width, height,
+     *     GL_RGBA, GL_UNSIGNED_BYTE, pixelData);
+     * }</pre>
+     * 
+     * In OpenGL: Maps to glTexSubImage2D() with ByteBuffer
+     * In Vulkan: Maps to vkCmdCopyBufferToImage() with staging buffer
+     * 
+     * @param ctx Command context for recording this command
+     * @param tgt Texture target (e.g., GL_TEXTURE_2D)
+     * @param lvl Mipmap level to update
+     * @param xoff X offset into texture
+     * @param yoff Y offset into texture
+     * @param w Width of region to update
+     * @param h Height of region to update
+     * @param fmt Pixel data format (e.g., GL_RGBA)
+     * @param typ Pixel data type (e.g., GL_UNSIGNED_BYTE)
+     * @param pix ByteBuffer containing pixel data
+     */
+    public static void transferTexture2DSubregionBuf(CommandContext ctx, int tgt, int lvl, int xoff, int yoff, 
+                                                     int w, int h, int fmt, int typ, java.nio.ByteBuffer pix) {
+        getBackend().transferTexture2DSubregionBuf(ctx, tgt, lvl, xoff, yoff, w, h, fmt, typ, pix);
+    }
+    
+    /**
      * Creates a shader object of the specified type (CommandContext-aware).
      * 
      * Example usage:

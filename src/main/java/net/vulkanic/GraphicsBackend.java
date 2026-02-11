@@ -719,6 +719,67 @@ public interface GraphicsBackend {
                                 int bdr, int fmt, int typ, java.nio.ByteBuffer pix);
     
     /**
+     * Updates a rectangular region of a 2D texture with new pixel data (pointer version).
+     * 
+     * In OpenGL: Maps to glTexSubImage2D() with pointer
+     * In Vulkan: Maps to vkCmdCopyBufferToImage() with staging buffer
+     * 
+     * Allows efficient partial texture updates without reallocating the entire texture.
+     * Useful for streaming textures, updating mipmaps, or dynamic texture modifications.
+     * The pointer version uses native memory for efficient data transfer.
+     * 
+     * @param ctx Command context for recording this command
+     * @param tgt Texture target (e.g., GL_TEXTURE_2D)
+     * @param lvl Mipmap level to update
+     * @param xoff X offset into texture
+     * @param yoff Y offset into texture
+     * @param w Width of region to update
+     * @param h Height of region to update
+     * @param fmt Pixel data format (e.g., GL_RGBA)
+     * @param typ Pixel data type (e.g., GL_UNSIGNED_BYTE)
+     * @param pix Native pointer to pixel data
+     * 
+     * Example usage:
+     * <pre>{@code
+     * // Update 64x64 region at offset (128, 128)
+     * backend.transferTexture2DSubregion(CTX, GL_TEXTURE_2D, 0, 128, 128, 64, 64,
+     *     GL_RGBA, GL_UNSIGNED_BYTE, pixelDataPtr);
+     * }</pre>
+     */
+    void transferTexture2DSubregion(CommandContext ctx, int tgt, int lvl, int xoff, int yoff, 
+                                    int w, int h, int fmt, int typ, long pix);
+    
+    /**
+     * Updates a rectangular region of a 2D texture with new pixel data (ByteBuffer version).
+     * 
+     * In OpenGL: Maps to glTexSubImage2D() with ByteBuffer
+     * In Vulkan: Maps to vkCmdCopyBufferToImage() with staging buffer
+     * 
+     * Allows efficient partial texture updates without reallocating the entire texture.
+     * This variant uses a ByteBuffer for more convenient memory management.
+     * 
+     * @param ctx Command context for recording this command
+     * @param tgt Texture target (e.g., GL_TEXTURE_2D)
+     * @param lvl Mipmap level to update
+     * @param xoff X offset into texture
+     * @param yoff Y offset into texture
+     * @param w Width of region to update
+     * @param h Height of region to update
+     * @param fmt Pixel data format (e.g., GL_RGBA)
+     * @param typ Pixel data type (e.g., GL_UNSIGNED_BYTE)
+     * @param pix ByteBuffer containing pixel data
+     * 
+     * Example usage:
+     * <pre>{@code
+     * ByteBuffer pixelData = ...;
+     * backend.transferTexture2DSubregionBuf(CTX, GL_TEXTURE_2D, 0, 0, 0, width, height,
+     *     GL_RGBA, GL_UNSIGNED_BYTE, pixelData);
+     * }</pre>
+     */
+    void transferTexture2DSubregionBuf(CommandContext ctx, int tgt, int lvl, int xoff, int yoff, 
+                                       int w, int h, int fmt, int typ, java.nio.ByteBuffer pix);
+    
+    /**
      * Creates a shader object of the specified type.
      * 
      * In OpenGL: Maps to glCreateShader()

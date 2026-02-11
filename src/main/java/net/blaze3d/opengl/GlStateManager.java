@@ -143,7 +143,7 @@ public class GlStateManager {
 
 	public static int glGetProgrami(int i, int j) {
 		RenderSystem.assertOnRenderThread();
-		return net.vulkanic.VulkanicAPI.queryProgramParameter(i, j);
+		return net.vulkanic.VulkanicAPI.queryProgramParameter(CTX, i, j);
 	}
 
 	public static void glAttachShader(int i, int j) {
@@ -185,7 +185,7 @@ public class GlStateManager {
 
 	public static int glGetShaderi(int i, int j) {
 		RenderSystem.assertOnRenderThread();
-		return net.vulkanic.VulkanicAPI.queryShaderParameter(i, j);
+		return net.vulkanic.VulkanicAPI.queryShaderParameter(CTX, i, j);
 	}
 
 	public static void _glUseProgram(int i) {
@@ -365,7 +365,7 @@ public class GlStateManager {
 
 	public static void glBlendFuncSeparate(int i, int j, int k, int l) {
 		RenderSystem.assertOnRenderThread();
-		net.vulkanic.VulkanicAPI.configureBlendFunc(i, j, k, l);
+		net.vulkanic.VulkanicAPI.setBlendFunc(CTX, i, j, k, l);
 	}
 
 	public static String glGetShaderInfoLog(int i, int j) {
@@ -390,7 +390,7 @@ public class GlStateManager {
 
 	public static void _polygonMode(int i, int j) {
 		RenderSystem.assertOnRenderThread();
-		net.vulkanic.VulkanicAPI.configurePolygonMode(i, j);
+		net.vulkanic.VulkanicAPI.configurePolygonMode(CTX, i, j);
 	}
 
 	public static void _enablePolygonOffset() {
@@ -426,7 +426,7 @@ public class GlStateManager {
 		RenderSystem.assertOnRenderThread();
 		if (i != COLOR_LOGIC.op) {
 			COLOR_LOGIC.op = i;
-			net.vulkanic.VulkanicAPI.configureLogicOp(i);
+			net.vulkanic.VulkanicAPI.configureLogicOp(CTX, i);
 		}
 	}
 
@@ -496,12 +496,12 @@ public class GlStateManager {
 
 	public static void _texSubImage2D(int i, int j, int k, int l, int m, int n, int o, int p, long q) {
 		RenderSystem.assertOnRenderThread();
-		net.vulkanic.VulkanicAPI.transferTexture2DSubregion(i, j, k, l, m, n, o, p, q);
+		net.vulkanic.VulkanicAPI.transferTexture2DSubregion(CTX, i, j, k, l, m, n, o, p, q);
 	}
 
 	public static void _texSubImage2D(int i, int j, int k, int l, int m, int n, int o, int p, ByteBuffer byteBuffer) {
 		RenderSystem.assertOnRenderThread();
-		net.vulkanic.VulkanicAPI.transferTexture2DSubregionBuf(i, j, k, l, m, n, o, p, byteBuffer);
+		net.vulkanic.VulkanicAPI.transferTexture2DSubregionBuf(CTX, i, j, k, l, m, n, o, p, byteBuffer);
 	}
 
 	public static void _viewport(int i, int j, int k, int l) {
@@ -590,7 +590,7 @@ public class GlStateManager {
 
 	public static int _getError() {
 		RenderSystem.assertOnRenderThread();
-		return net.vulkanic.VulkanicAPI.checkForErrors();
+		return net.vulkanic.VulkanicAPI.checkForErrors(CTX);
 	}
 
 	public static void clearGlErrors() {

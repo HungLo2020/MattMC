@@ -1021,6 +1021,28 @@ public class OpenGLBackend implements GraphicsBackend {
         GL11.glTexImage2D(tgt, lvl, intfmt, w, h, bdr, fmt, typ, pix);
     }
     
+    @Override
+    public void transferTexture2DSubregion(CommandContext ctx, int tgt, int lvl, int xoff, int yoff, 
+                                           int w, int h, int fmt, int typ, long pix) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        GL11.glTexSubImage2D(tgt, lvl, xoff, yoff, w, h, fmt, typ, pix);
+    }
+    
+    @Override
+    public void transferTexture2DSubregionBuf(CommandContext ctx, int tgt, int lvl, int xoff, int yoff, 
+                                              int w, int h, int fmt, int typ, java.nio.ByteBuffer pix) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        GL11.glTexSubImage2D(tgt, lvl, xoff, yoff, w, h, fmt, typ, pix);
+    }
+    
     /**
      * Creates a shader object of the specified type.
      * Uses CommandContext for future Vulkan compatibility.
