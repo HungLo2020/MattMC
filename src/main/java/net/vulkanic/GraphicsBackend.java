@@ -1397,27 +1397,11 @@ public interface GraphicsBackend {
     
     // Polygon rendering operations
     @Deprecated
-    void configurePolygonMode(int face, int mode);
-    @Deprecated
     void configurePolygonOffset(float factor, float units);
-    @Deprecated
-    void configureLogicOp(int opcode);
-    
-    // Drawing operations
-    @Deprecated
-    void configureBlendFunc(int srcRgb, int dstRgb, int srcAlpha, int dstAlpha);
-    
-    // Error checking
-    @Deprecated
-    int checkForErrors();
     
     // Texture pixel data transfer
     @Deprecated
     void transferTexture2DImage(int tgt, int lvl, int intfmt, int w, int h, int bdr, int fmt, int typ, java.nio.ByteBuffer pix);
-    @Deprecated
-    void transferTexture2DSubregion(int tgt, int lvl, int xoff, int yoff, int w, int h, int fmt, int typ, long pix);
-    @Deprecated
-    void transferTexture2DSubregionBuf(int tgt, int lvl, int xoff, int yoff, int w, int h, int fmt, int typ, java.nio.ByteBuffer pix);
     
     // GPU buffer lifecycle
     @Deprecated
@@ -1456,10 +1440,6 @@ public interface GraphicsBackend {
     void linkProgramBinary(int program);
     @Deprecated
     void attachShaderToProgram(int program, int shader);
-    @Deprecated
-    int queryProgramParameter(int program, int pname);
-    @Deprecated
-    int queryShaderParameter(int shader, int pname);
     @Deprecated
     String retrieveProgramInfoLog(int program);
     @Deprecated

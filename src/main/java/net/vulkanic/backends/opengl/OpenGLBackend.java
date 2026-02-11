@@ -1627,50 +1627,14 @@ public class OpenGLBackend implements GraphicsBackend {
     
     @Deprecated
     @Override
-    public void configurePolygonMode(int face, int mode) {
-        GL11.glPolygonMode(face, mode);
-    }
-    
-    @Deprecated
-    @Override
     public void configurePolygonOffset(float factor, float units) {
         GL11.glPolygonOffset(factor, units);
     }
     
     @Deprecated
     @Override
-    public void configureLogicOp(int opcode) {
-        GL11.glLogicOp(opcode);
-    }
-    
-    @Deprecated
-    @Override
-    public void configureBlendFunc(int srcRgb, int dstRgb, int srcAlpha, int dstAlpha) {
-        org.lwjgl.opengl.GL14.glBlendFuncSeparate(srcRgb, dstRgb, srcAlpha, dstAlpha);
-    }
-    
-    @Deprecated
-    @Override
-    public int checkForErrors() {
-        return GL11.glGetError();
-    }
-    
-    @Deprecated
-    @Override
     public void transferTexture2DImage(int tgt, int lvl, int intfmt, int w, int h, int bdr, int fmt, int typ, java.nio.ByteBuffer pix) {
         GL11.glTexImage2D(tgt, lvl, intfmt, w, h, bdr, fmt, typ, pix);
-    }
-    
-    @Deprecated
-    @Override
-    public void transferTexture2DSubregion(int tgt, int lvl, int xoff, int yoff, int w, int h, int fmt, int typ, long pix) {
-        GL11.glTexSubImage2D(tgt, lvl, xoff, yoff, w, h, fmt, typ, pix);
-    }
-    
-    @Deprecated
-    @Override
-    public void transferTexture2DSubregionBuf(int tgt, int lvl, int xoff, int yoff, int w, int h, int fmt, int typ, java.nio.ByteBuffer pix) {
-        GL11.glTexSubImage2D(tgt, lvl, xoff, yoff, w, h, fmt, typ, pix);
     }
     
     @Deprecated
@@ -1755,18 +1719,6 @@ public class OpenGLBackend implements GraphicsBackend {
     @Override
     public void attachShaderToProgram(int program, int shader) {
         GL20.glAttachShader(program, shader);
-    }
-    
-    @Deprecated
-    @Override
-    public int queryProgramParameter(int program, int pname) {
-        return GL20.glGetProgrami(program, pname);
-    }
-    
-    @Deprecated
-    @Override
-    public int queryShaderParameter(int shader, int pname) {
-        return GL20.glGetShaderi(shader, pname);
     }
     
     @Deprecated

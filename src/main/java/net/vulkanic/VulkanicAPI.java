@@ -3016,43 +3016,13 @@ public class VulkanicAPI {
     }
     
     @Deprecated
-    public static void configurePolygonMode(int face, int mode) {
-        getBackend().configurePolygonMode(face, mode);
-    }
-    
-    @Deprecated
     public static void configurePolygonOffset(float factor, float units) {
         getBackend().configurePolygonOffset(factor, units);
     }
     
     @Deprecated
-    public static void configureLogicOp(int opcode) {
-        getBackend().configureLogicOp(opcode);
-    }
-    
-    @Deprecated
-    public static void configureBlendFunc(int srcRgb, int dstRgb, int srcAlpha, int dstAlpha) {
-        getBackend().configureBlendFunc(srcRgb, dstRgb, srcAlpha, dstAlpha);
-    }
-    
-    @Deprecated
-    public static int checkForErrors() {
-        return getBackend().checkForErrors();
-    }
-    
-    @Deprecated
     public static void transferTexture2DImage(int tgt, int lvl, int intfmt, int w, int h, int bdr, int fmt, int typ, java.nio.ByteBuffer pix) {
         getBackend().transferTexture2DImage(tgt, lvl, intfmt, w, h, bdr, fmt, typ, pix);
-    }
-    
-    @Deprecated
-    public static void transferTexture2DSubregion(int tgt, int lvl, int xoff, int yoff, int w, int h, int fmt, int typ, long pix) {
-        getBackend().transferTexture2DSubregion(tgt, lvl, xoff, yoff, w, h, fmt, typ, pix);
-    }
-    
-    @Deprecated
-    public static void transferTexture2DSubregionBuf(int tgt, int lvl, int xoff, int yoff, int w, int h, int fmt, int typ, java.nio.ByteBuffer pix) {
-        getBackend().transferTexture2DSubregionBuf(tgt, lvl, xoff, yoff, w, h, fmt, typ, pix);
     }
     
     @Deprecated
@@ -3123,16 +3093,6 @@ public class VulkanicAPI {
     @Deprecated
     public static void attachShaderToProgram(int program, int shader) {
         getBackend().attachShaderToProgram(program, shader);
-    }
-    
-    @Deprecated
-    public static int queryProgramParameter(int program, int pname) {
-        return getBackend().queryProgramParameter(program, pname);
-    }
-    
-    @Deprecated
-    public static int queryShaderParameter(int shader, int pname) {
-        return getBackend().queryShaderParameter(shader, pname);
     }
     
     @Deprecated
@@ -4123,7 +4083,7 @@ public class VulkanicAPI {
      */
     @Deprecated
     public static int glGetProgrami(int program, int pname) {
-        return queryProgramParameter(program, pname);
+        return queryProgramParameter(OpenGLCommandContext.IMMEDIATE, program, pname);
     }
     
     /**

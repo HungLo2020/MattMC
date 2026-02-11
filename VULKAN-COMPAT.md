@@ -2,14 +2,14 @@
 
 **Analysis Date:** 2026-02-08  
 **Migration Strategy Updated:** 2026-02-11  
-**Active Migration Phase:** Phase 16 Complete - Buffer & Compute Operations ✅  
+**Active Migration Phase:** Phase 17 Complete - State Management & Shader Query Operations ✅  
 **Vulkanic API Version:** Initial Implementation (OpenGL-only) - **ALL METHODS NOW DEPRECATED**  
 **Analyzed Components:** VulkanicAPI.java, GraphicsBackend.java, OpenGLBackend.java  
 **Lines of Code Analyzed:** ~4,000 LOC  
 **Deprecated Methods:** 874 methods marked for replacement  
-**Migrated Methods:** 105 methods (12.0% complete)
-**Migrated Call Sites:** 209 call sites in 58 game files ✅ **ALL MIGRATED**
-**Removed Deprecated Methods:** 29 methods
+**Migrated Methods:** 112 methods (12.8% complete)
+**Migrated Call Sites:** 229 call sites in 66 game files ✅ **ALL MIGRATED**
+**Removed Deprecated Methods:** 37 methods
 
 ---
 
@@ -24,12 +24,12 @@ All 874 methods in the current Vulkanic API have been marked as `@Deprecated` to
 The legacy Vulkanic API is a **thin OpenGL state machine wrapper** with approximately **25-30% compatibility** with Vulkan's architectural principles. While it successfully abstracts OpenGL calls behind an interface, the API design is fundamentally tied to OpenGL's immediate-mode, global-state paradigm, which conflicts with Vulkan's explicit, command-buffer-based architecture.
 
 **Migration Progress:**
-- ✅ **105 methods migrated** to CommandContext-aware API (12.0% of 874 total)
-- ✅ **209 call sites FULLY migrated** across **58 game files** ✅ **100% COMPLETE**
+- ✅ **112 methods migrated** to CommandContext-aware API (12.8% of 874 total)
+- ✅ **229 call sites FULLY migrated** across **66 game files** ✅ **100% COMPLETE**
 - ✅ **ZERO deprecated calls remaining** - all production code uses new API!
 - ✅ **Production code validates CommandContext design** - real usage in action!
-- ✅ **29 deprecated methods REMOVED** - codebase getting cleaner!
-- ⚠️ **769 methods remaining** in deprecated state (to be migrated)
+- ✅ **37 deprecated methods REMOVED** - codebase getting cleaner!
+- ⚠️ **762 methods remaining** in deprecated state (to be migrated)
 - ✅ **All tests passing** (18/18 Vulkanic tests, 100%)
 - ✅ **Zero breaking changes** - fully backward compatible
 
@@ -142,19 +142,26 @@ The legacy Vulkanic API is a **thin OpenGL state machine wrapper** with approxim
 94. `attachUniformBufferRange(ctx, target, index, buffer, offset, size)` - Attach uniform buffer range
 95. `glBufferStorage(ctx, target, size, flags)` - Allocate immutable buffer storage ⭐ NEW
 96. `glBufferStorage(ctx, target, data, flags)` - Allocate buffer storage with data ⭐ NEW
-97. `glMapBufferRange(ctx, target, offset, length, access)` - Map buffer memory for CPU access ⭐ NEW
-98. `glDispatchCompute(ctx, workX, workY, workZ)` - Dispatch compute shader work groups ⭐ NEW
-99. `glFramebufferTexture2D(ctx, target, attachment, textarget, texture, level)` - Attach 2D texture to FBO ⭐ NEW
-100. `glBindImageTexture(ctx, unit, texture, level, layered, layer, access, format)` - Bind image for load/store ⭐ NEW
-101. `glBindSampler(ctx, unit, sampler)` - Bind sampler object to texture unit ⭐ NEW
+97. `glMapBufferRange(ctx, target, offset, length, access)` - Map buffer memory for CPU access
+98. `glDispatchCompute(ctx, workX, workY, workZ)` - Dispatch compute shader work groups
+99. `glFramebufferTexture2D(ctx, target, attachment, textarget, texture, level)` - Attach 2D texture to FBO
+100. `glBindImageTexture(ctx, unit, texture, level, layered, layer, access, format)` - Bind image for load/store
+101. `glBindSampler(ctx, unit, sampler)` - Bind sampler object to texture unit
+102. `configurePolygonMode(ctx, face, mode)` - Set polygon rendering mode (fill/wireframe) ⭐ NEW
+103. `configureLogicOp(ctx, opcode)` - Set logical pixel operation ⭐ NEW
+104. `queryShaderParameter(ctx, shader, pname)` - Query shader compilation status ⭐ NEW
+105. `queryProgramParameter(ctx, program, pname)` - Query program link status ⭐ NEW
+106. `transferTexture2DSubregion(ctx, ...)` - Update texture subregion (pointer version) ⭐ NEW
+107. `transferTexture2DSubregionBuf(ctx, ...)` - Update texture subregion (ByteBuffer version) ⭐ NEW
+108. `checkForErrors(ctx)` - Check GPU error state ⭐ NEW
 
 ### New Migration Strategy: Incremental Replacement
 
 Instead of building a complete Vulkan backend for the flawed legacy API, we are pursuing a **safer, incremental approach**:
 
 1. **✅ COMPLETED:** Mark all existing methods as `@Deprecated`
-2. **🔄 IN PROGRESS:** For each deprecated method, design a new properly abstracted version compatible with BOTH OpenGL AND Vulkan (45/874 complete)
-3. **🔄 IN PROGRESS:** Replace call sites in game code to use new methods (19 call sites migrated in 6 files)
+2. **🔄 IN PROGRESS:** For each deprecated method, design a new properly abstracted version compatible with BOTH OpenGL AND Vulkan (112/874 complete)
+3. **🔄 IN PROGRESS:** Replace call sites in game code to use new methods (229 call sites migrated in 66 files)
 4. **📋 PLANNED:** Once a deprecated method has zero call sites, remove it
 5. **📋 PLANNED:** Only after all methods are migrated, implement actual Vulkan backend
 
@@ -213,17 +220,25 @@ Instead of building a complete Vulkan backend for the flawed legacy API, we are 
 13. ✅ `activateVertexAttribute(int)` - **REMOVED** ← Replaced by `activateVertexAttribute(CommandContext ctx, int)`
 14. ✅ `deactivateVertexAttribute(int)` - **REMOVED** ← Replaced by `deactivateVertexAttribute(CommandContext ctx, int)`
 15. ✅ `setVertexAttribDivisor(int, int)` - **REMOVED** ← Replaced by `setVertexAttribDivisor(CommandContext ctx, int, int)`
-16. ✅ `assignUniformFloat2v(int, ...)` - **REMOVED** ⭐ NEW ← Replaced by `assignUniformFloat2v(CommandContext ctx, ...)`
-17. ✅ `assignUniformFloat3v(int, ...)` - **REMOVED** ⭐ NEW ← Replaced by `assignUniformFloat3v(CommandContext ctx, ...)`
-18. ✅ `assignUniformFloat4v(int, ...)` - **REMOVED** ⭐ NEW ← Replaced by `assignUniformFloat4v(CommandContext ctx, ...)`
-19. ✅ `assignUniformMatrix4f(int, ...)` - **REMOVED** ⭐ NEW ← Replaced by `assignUniformMatrix4f(CommandContext ctx, ...)`
-20. ✅ `assignUniformMatrix4fv(int, ...)` - **REMOVED** ⭐ NEW ← Replaced by `assignUniformMatrix4fv(CommandContext ctx, ...)`
-21. ✅ `locateUniformBlock(int, ...)` - **REMOVED** ⭐ NEW ← Replaced by `locateUniformBlock(CommandContext ctx, ...)`
-22. ✅ `bindUniformBlock(int, ...)` - **REMOVED** ⭐ NEW ← Replaced by `bindUniformBlock(CommandContext ctx, ...)`
-23. ✅ `attachUniformBufferRange(int, ...)` - **REMOVED** ⭐ NEW ← Replaced by `attachUniformBufferRange(CommandContext ctx, ...)`
-24-29. ✅ **6 additional shader/program methods removed from previous phases**
+16. ✅ `assignUniformFloat2v(int, ...)` - **REMOVED** ← Replaced by `assignUniformFloat2v(CommandContext ctx, ...)`
+17. ✅ `assignUniformFloat3v(int, ...)` - **REMOVED** ← Replaced by `assignUniformFloat3v(CommandContext ctx, ...)`
+18. ✅ `assignUniformFloat4v(int, ...)` - **REMOVED** ← Replaced by `assignUniformFloat4v(CommandContext ctx, ...)`
+19. ✅ `assignUniformMatrix4f(int, ...)` - **REMOVED** ← Replaced by `assignUniformMatrix4f(CommandContext ctx, ...)`
+20. ✅ `assignUniformMatrix4fv(int, ...)` - **REMOVED** ← Replaced by `assignUniformMatrix4fv(CommandContext ctx, ...)`
+21. ✅ `locateUniformBlock(int, ...)` - **REMOVED** ← Replaced by `locateUniformBlock(CommandContext ctx, ...)`
+22. ✅ `bindUniformBlock(int, ...)` - **REMOVED** ← Replaced by `bindUniformBlock(CommandContext ctx, ...)`
+23. ✅ `attachUniformBufferRange(int, ...)` - **REMOVED** ← Replaced by `attachUniformBufferRange(CommandContext ctx, ...)`
+24. ✅ `configureBlendFunc(int, ...)` - **REMOVED** ⭐ NEW ← Alias for `setBlendFunc(CommandContext ctx, ...)`
+25. ✅ `configurePolygonMode(int, ...)` - **REMOVED** ⭐ NEW ← Replaced by `configurePolygonMode(CommandContext ctx, ...)`
+26. ✅ `configureLogicOp(int)` - **REMOVED** ⭐ NEW ← Replaced by `configureLogicOp(CommandContext ctx, int)`
+27. ✅ `queryShaderParameter(int, int)` - **REMOVED** ⭐ NEW ← Replaced by `queryShaderParameter(CommandContext ctx, int, int)`
+28. ✅ `queryProgramParameter(int, int)` - **REMOVED** ⭐ NEW ← Replaced by `queryProgramParameter(CommandContext ctx, int, int)`
+29. ✅ `transferTexture2DSubregion(int, ...)` - **REMOVED** ⭐ NEW ← Replaced by `transferTexture2DSubregion(CommandContext ctx, ...)`
+30. ✅ `transferTexture2DSubregionBuf(int, ...)` - **REMOVED** ⭐ NEW ← Replaced by `transferTexture2DSubregionBuf(CommandContext ctx, ...)`
+31. ✅ `checkForErrors()` - **REMOVED** ⭐ NEW ← Replaced by `checkForErrors(CommandContext ctx)`
+32-37. ✅ **6 additional shader/program methods removed from previous phases**
 
-**Note:** Phase 15 (this PR) removed 8 uniform operation methods from all three layers (VulkanicAPI, GraphicsBackend, OpenGLBackend). These are critical for Vulkan as uniforms map to descriptor sets rather than direct state.
+**Note:** Phase 17 (this PR) removed 8 state management and shader query methods from all three layers (VulkanicAPI, GraphicsBackend, OpenGLBackend). These are critical for Vulkan as state must be captured in pipeline objects and shader validation happens at compile time.
 
 **Note:** The following methods were added directly with CommandContext and never had deprecated versions:
 - `drawArrays`, `drawElements`, `setDepthFunc`, `setBlendFunc`, `bindBuffer`, `setDepthWriteMask`
