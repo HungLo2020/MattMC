@@ -2,12 +2,12 @@
 
 **Analysis Date:** 2026-02-08  
 **Migration Strategy Updated:** 2026-02-11  
-**Active Migration Phase:** Phase 17 Complete - State Management & Shader Query Operations ✅  
+**Active Migration Phase:** Phase 18 Complete - Query and Info Methods ✅  
 **Vulkanic API Version:** Initial Implementation (OpenGL-only) - **ALL METHODS NOW DEPRECATED**  
 **Analyzed Components:** VulkanicAPI.java, GraphicsBackend.java, OpenGLBackend.java  
 **Lines of Code Analyzed:** ~4,000 LOC  
 **Deprecated Methods:** 874 methods marked for replacement  
-**Migrated Methods:** 112 methods (12.8% complete)
+**Migrated Methods:** 119 methods (13.6% complete)
 **Migrated Call Sites:** 229 call sites in 66 game files ✅ **ALL MIGRATED**
 **Removed Deprecated Methods:** 37 methods
 
@@ -17,19 +17,19 @@
 
 **MIGRATION STATUS: ACTIVE MIGRATION IN PROGRESS** 🔄
 
-All 874 methods in the current Vulkanic API have been marked as `@Deprecated` to facilitate an **incremental, test-driven migration** to a properly abstracted graphics API that supports both OpenGL and Vulkan backends. We have now begun the active migration phase, with **70 methods successfully migrated** to the new CommandContext-aware API.
+All 874 methods in the current Vulkanic API have been marked as `@Deprecated` to facilitate an **incremental, test-driven migration** to a properly abstracted graphics API that supports both OpenGL and Vulkan backends. We have now begun the active migration phase, with **119 methods successfully migrated** to the new CommandContext-aware API.
 
 ### Current State (Active Migration)
 
 The legacy Vulkanic API is a **thin OpenGL state machine wrapper** with approximately **25-30% compatibility** with Vulkan's architectural principles. While it successfully abstracts OpenGL calls behind an interface, the API design is fundamentally tied to OpenGL's immediate-mode, global-state paradigm, which conflicts with Vulkan's explicit, command-buffer-based architecture.
 
 **Migration Progress:**
-- ✅ **112 methods migrated** to CommandContext-aware API (12.8% of 874 total)
+- ✅ **119 methods migrated** to CommandContext-aware API (13.6% of 874 total)
 - ✅ **229 call sites FULLY migrated** across **66 game files** ✅ **100% COMPLETE**
 - ✅ **ZERO deprecated calls remaining** - all production code uses new API!
 - ✅ **Production code validates CommandContext design** - real usage in action!
 - ✅ **37 deprecated methods REMOVED** - codebase getting cleaner!
-- ⚠️ **762 methods remaining** in deprecated state (to be migrated)
+- ⚠️ **755 methods remaining** in deprecated state (to be migrated)
 - ✅ **All tests passing** (18/18 Vulkanic tests, 100%)
 - ✅ **Zero breaking changes** - fully backward compatible
 
@@ -154,13 +154,20 @@ The legacy Vulkanic API is a **thin OpenGL state machine wrapper** with approxim
 106. `transferTexture2DSubregion(ctx, ...)` - Update texture subregion (pointer version) ⭐ NEW
 107. `transferTexture2DSubregionBuf(ctx, ...)` - Update texture subregion (ByteBuffer version) ⭐ NEW
 108. `checkForErrors(ctx)` - Check GPU error state ⭐ NEW
+109. `queryStringInfo(ctx, pname)` - Query driver string info (e.g., GL_VERSION, GL_VENDOR) ⭐ NEW
+110. `getGLCapabilities(ctx)` - Get OpenGL capabilities object ⭐ NEW
+111. `glGetInteger(ctx, pname)` - Query single integer state value ⭐ NEW
+112. `glGetIntegerv(ctx, pname, params)` - Query multiple integer state values ⭐ NEW
+113. `glGetStringi(ctx, pname, index)` - Query indexed string (e.g., extension names) ⭐ NEW
+114. `glGetProgramInfoLog(ctx, program)` - Get program info log (wrapper) ⭐ NEW
+115. `glGetShaderInfoLog(ctx, shader)` - Get shader info log (wrapper) ⭐ NEW
 
 ### New Migration Strategy: Incremental Replacement
 
 Instead of building a complete Vulkan backend for the flawed legacy API, we are pursuing a **safer, incremental approach**:
 
 1. **✅ COMPLETED:** Mark all existing methods as `@Deprecated`
-2. **🔄 IN PROGRESS:** For each deprecated method, design a new properly abstracted version compatible with BOTH OpenGL AND Vulkan (112/874 complete)
+2. **🔄 IN PROGRESS:** For each deprecated method, design a new properly abstracted version compatible with BOTH OpenGL AND Vulkan (119/874 complete)
 3. **🔄 IN PROGRESS:** Replace call sites in game code to use new methods (229 call sites migrated in 66 files)
 4. **📋 PLANNED:** Once a deprecated method has zero call sites, remove it
 5. **📋 PLANNED:** Only after all methods are migrated, implement actual Vulkan backend
