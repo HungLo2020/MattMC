@@ -3494,4 +3494,172 @@ public class OpenGLBackend implements GraphicsBackend {
     public String glGetShaderInfoLog(CommandContext ctx, int shader) {
         return retrieveShaderInfoLog(ctx, shader);
     }
+    
+    // ========================================================================
+    // DSA Buffer Operations with CommandContext
+    // ========================================================================
+    
+    @Override
+    public int createBufferDSA(CommandContext ctx) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        return org.lwjgl.opengl.ARBDirectStateAccess.glCreateBuffers();
+    }
+    
+    @Override
+    public void namedBufferDataDSA(CommandContext ctx, int buffer, long size, int usage) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        org.lwjgl.opengl.ARBDirectStateAccess.glNamedBufferData(buffer, size, usage);
+    }
+    
+    @Override
+    public void namedBufferDataDSA(CommandContext ctx, int buffer, java.nio.ByteBuffer data, int usage) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        org.lwjgl.opengl.ARBDirectStateAccess.glNamedBufferData(buffer, data, usage);
+    }
+    
+    @Override
+    public void namedBufferSubDataDSA(CommandContext ctx, int buffer, long offset, java.nio.ByteBuffer data) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        org.lwjgl.opengl.ARBDirectStateAccess.glNamedBufferSubData(buffer, offset, data);
+    }
+    
+    @Override
+    public void namedBufferStorageDSA(CommandContext ctx, int buffer, long size, int flags) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        org.lwjgl.opengl.ARBDirectStateAccess.glNamedBufferStorage(buffer, size, flags);
+    }
+    
+    @Override
+    public void namedBufferStorageDSA(CommandContext ctx, int buffer, java.nio.ByteBuffer data, int flags) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        org.lwjgl.opengl.ARBDirectStateAccess.glNamedBufferStorage(buffer, data, flags);
+    }
+    
+    @Override
+    public java.nio.ByteBuffer mapNamedBufferRangeDSA(CommandContext ctx, int buffer, long offset, long length, int access) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        return org.lwjgl.opengl.ARBDirectStateAccess.glMapNamedBufferRange(buffer, offset, length, access);
+    }
+    
+    @Override
+    public void unmapNamedBufferDSA(CommandContext ctx, int buffer) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        org.lwjgl.opengl.ARBDirectStateAccess.glUnmapNamedBuffer(buffer);
+    }
+    
+    @Override
+    public void flushMappedNamedBufferRangeDSA(CommandContext ctx, int buffer, long offset, long length) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        org.lwjgl.opengl.ARBDirectStateAccess.glFlushMappedNamedBufferRange(buffer, offset, length);
+    }
+    
+    @Override
+    public void copyNamedBufferSubDataDSA(CommandContext ctx, int readBuffer, int writeBuffer, long readOffset, long writeOffset, long size) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        org.lwjgl.opengl.ARBDirectStateAccess.glCopyNamedBufferSubData(readBuffer, writeBuffer, readOffset, writeOffset, size);
+    }
+    
+    // ========================================================================
+    // DSA Framebuffer Operations with CommandContext
+    // ========================================================================
+    
+    @Override
+    public int createFramebufferDSA(CommandContext ctx) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        return org.lwjgl.opengl.ARBDirectStateAccess.glCreateFramebuffers();
+    }
+    
+    @Override
+    public void namedFramebufferTextureDSA(CommandContext ctx, int framebuffer, int attachment, int texture, int level) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        org.lwjgl.opengl.ARBDirectStateAccess.glNamedFramebufferTexture(framebuffer, attachment, texture, level);
+    }
+    
+    @Override
+    public void blitNamedFramebufferDSA(CommandContext ctx, int readFramebuffer, int drawFramebuffer, 
+                                        int srcX0, int srcY0, int srcX1, int srcY1,
+                                        int dstX0, int dstY0, int dstX1, int dstY1, 
+                                        int mask, int filter) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        org.lwjgl.opengl.ARBDirectStateAccess.glBlitNamedFramebuffer(readFramebuffer, drawFramebuffer, 
+                                                                       srcX0, srcY0, srcX1, srcY1,
+                                                                       dstX0, dstY0, dstX1, dstY1, 
+                                                                       mask, filter);
+    }
+    
+    // ========================================================================
+    // Non-DSA Buffer Operations with CommandContext
+    // ========================================================================
+    
+    @Override
+    public void copyBufferSubData(CommandContext ctx, int readTarget, int writeTarget, long readOffset, long writeOffset, long size) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        GL31.glCopyBufferSubData(readTarget, writeTarget, readOffset, writeOffset, size);
+    }
+    
+    @Override
+    public void flushMappedBufferRange(CommandContext ctx, int target, long offset, long length) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        GL30.glFlushMappedBufferRange(target, offset, length);
+    }
 }

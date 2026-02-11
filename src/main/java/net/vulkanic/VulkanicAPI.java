@@ -3015,69 +3015,69 @@ public class VulkanicAPI {
     // Direct State Access buffer operations
     @Deprecated
     public static int createBufferDSA() {
-        return getBackend().createBufferDSA();
+        return createBufferDSA(getImmediateContext());
     }
     
     @Deprecated
     public static void namedBufferDataDSA(int buffer, long size, int usage) {
-        getBackend().namedBufferDataDSA(buffer, size, usage);
+        namedBufferDataDSA(getImmediateContext(), buffer, size, usage);
     }
     
     @Deprecated
     public static void namedBufferDataDSA(int buffer, java.nio.ByteBuffer data, int usage) {
-        getBackend().namedBufferDataDSA(buffer, data, usage);
+        namedBufferDataDSA(getImmediateContext(), buffer, data, usage);
     }
     
     @Deprecated
     public static void namedBufferSubDataDSA(int buffer, long offset, java.nio.ByteBuffer data) {
-        getBackend().namedBufferSubDataDSA(buffer, offset, data);
+        namedBufferSubDataDSA(getImmediateContext(), buffer, offset, data);
     }
     
     @Deprecated
     public static void namedBufferStorageDSA(int buffer, long size, int flags) {
-        getBackend().namedBufferStorageDSA(buffer, size, flags);
+        namedBufferStorageDSA(getImmediateContext(), buffer, size, flags);
     }
     
     @Deprecated
     public static void namedBufferStorageDSA(int buffer, java.nio.ByteBuffer data, int flags) {
-        getBackend().namedBufferStorageDSA(buffer, data, flags);
+        namedBufferStorageDSA(getImmediateContext(), buffer, data, flags);
     }
     
     @Deprecated
     public static java.nio.ByteBuffer mapNamedBufferRangeDSA(int buffer, long offset, long length, int access) {
-        return getBackend().mapNamedBufferRangeDSA(buffer, offset, length, access);
+        return mapNamedBufferRangeDSA(getImmediateContext(), buffer, offset, length, access);
     }
     
     @Deprecated
     public static void unmapNamedBufferDSA(int buffer) {
-        getBackend().unmapNamedBufferDSA(buffer);
+        unmapNamedBufferDSA(getImmediateContext(), buffer);
     }
     
     @Deprecated
     public static void flushMappedNamedBufferRangeDSA(int buffer, long offset, long length) {
-        getBackend().flushMappedNamedBufferRangeDSA(buffer, offset, length);
+        flushMappedNamedBufferRangeDSA(getImmediateContext(), buffer, offset, length);
     }
     
     @Deprecated
     public static void copyNamedBufferSubDataDSA(int readBuffer, int writeBuffer, long readOffset, long writeOffset, long size) {
-        getBackend().copyNamedBufferSubDataDSA(readBuffer, writeBuffer, readOffset, writeOffset, size);
+        copyNamedBufferSubDataDSA(getImmediateContext(), readBuffer, writeBuffer, readOffset, writeOffset, size);
     }
     
     // Direct State Access framebuffer operations
     @Deprecated
     public static int createFramebufferDSA() {
-        return getBackend().createFramebufferDSA();
+        return createFramebufferDSA(getImmediateContext());
     }
     
     @Deprecated
     public static void namedFramebufferTextureDSA(int framebuffer, int attachment, int texture, int level) {
-        getBackend().namedFramebufferTextureDSA(framebuffer, attachment, texture, level);
+        namedFramebufferTextureDSA(getImmediateContext(), framebuffer, attachment, texture, level);
     }
     
     @Deprecated
     public static void blitNamedFramebufferDSA(int readFramebuffer, int drawFramebuffer, int srcX0, int srcY0, int srcX1, int srcY1,
                                                 int dstX0, int dstY0, int dstX1, int dstY1, int mask, int filter) {
-        getBackend().blitNamedFramebufferDSA(readFramebuffer, drawFramebuffer, srcX0, srcY0, srcX1, srcY1,
+        blitNamedFramebufferDSA(getImmediateContext(), readFramebuffer, drawFramebuffer, srcX0, srcY0, srcX1, srcY1,
                                               dstX0, dstY0, dstX1, dstY1, mask, filter);
     }
     
@@ -3463,7 +3463,7 @@ public class VulkanicAPI {
     
     @Deprecated
     public static void copyBufferSubData(int readTarget, int writeTarget, long readOffset, long writeOffset, long size) {
-        getBackend().copyBufferSubData(readTarget, writeTarget, readOffset, writeOffset, size);
+        copyBufferSubData(getImmediateContext(), readTarget, writeTarget, readOffset, writeOffset, size);
     }
     
     @Deprecated
@@ -3473,7 +3473,7 @@ public class VulkanicAPI {
     
     @Deprecated
     public static void flushMappedBufferRange(int target, long offset, long length) {
-        getBackend().flushMappedBufferRange(target, offset, length);
+        flushMappedBufferRange(getImmediateContext(), target, offset, length);
     }
     
     @Deprecated
@@ -4795,5 +4795,427 @@ public class VulkanicAPI {
      */
     public static String glGetShaderInfoLog(CommandContext ctx, int shader) {
         return getBackend().glGetShaderInfoLog(ctx, shader);
+    }
+    
+    // ========================================================================
+    // DSA (Direct State Access) Buffer Operations
+    // ========================================================================
+    
+    /**
+     * Create a buffer object using Direct State Access.
+     * 
+     * <p>DSA (Direct State Access) eliminates the bind-to-edit pattern,
+     * which aligns better with Vulkan's explicit object model.</p>
+     * 
+     * <p><b>OpenGL:</b> Maps to glCreateBuffers() (GL 4.5+)</p>
+     * <p><b>Vulkan:</b> Maps to vkCreateBuffer()</p>
+     * 
+     * <p><b>Example usage:</b>
+     * <pre>{@code
+     * CommandContext ctx = VulkanicAPI.getImmediateContext();
+     * int bufferId = VulkanicAPI.createBufferDSA(ctx);
+     * VulkanicAPI.namedBufferStorageDSA(ctx, bufferId, 1024, GL_DYNAMIC_STORAGE_BIT);
+     * }</pre>
+     * 
+     * @param ctx Command context for recording this command
+     * @return The newly created buffer object ID
+     */
+    public static int createBufferDSA(CommandContext ctx) {
+        return getBackend().createBufferDSA(ctx);
+    }
+    
+    /**
+     * Allocate storage for a named buffer object (size only).
+     * 
+     * <p>Allocates mutable buffer storage with undefined data.
+     * This is the DSA equivalent of glBufferData().</p>
+     * 
+     * <p><b>OpenGL:</b> Maps to glNamedBufferData() (GL 4.5+)</p>
+     * <p><b>Vulkan:</b> Maps to vkAllocateMemory() + vkBindBufferMemory()</p>
+     * 
+     * <p><b>Example usage:</b>
+     * <pre>{@code
+     * CommandContext ctx = VulkanicAPI.getImmediateContext();
+     * int bufferId = VulkanicAPI.createBufferDSA(ctx);
+     * VulkanicAPI.namedBufferDataDSA(ctx, bufferId, 4096, GL_DYNAMIC_DRAW);
+     * }</pre>
+     * 
+     * @param ctx Command context for recording this command
+     * @param buffer Buffer object ID
+     * @param size Size in bytes to allocate
+     * @param usage Usage hint (GL_STATIC_DRAW, GL_DYNAMIC_DRAW, etc.)
+     */
+    public static void namedBufferDataDSA(CommandContext ctx, int buffer, long size, int usage) {
+        getBackend().namedBufferDataDSA(ctx, buffer, size, usage);
+    }
+    
+    /**
+     * Allocate and upload data to a named buffer object.
+     * 
+     * <p>Allocates mutable buffer storage and uploads initial data.
+     * This is the DSA equivalent of glBufferData() with data.</p>
+     * 
+     * <p><b>OpenGL:</b> Maps to glNamedBufferData() (GL 4.5+)</p>
+     * <p><b>Vulkan:</b> Maps to vkAllocateMemory() + vkCmdUpdateBuffer()</p>
+     * 
+     * <p><b>Example usage:</b>
+     * <pre>{@code
+     * CommandContext ctx = VulkanicAPI.getImmediateContext();
+     * ByteBuffer vertexData = ... // Your vertex data
+     * int vbo = VulkanicAPI.createBufferDSA(ctx);
+     * VulkanicAPI.namedBufferDataDSA(ctx, vbo, vertexData, GL_STATIC_DRAW);
+     * }</pre>
+     * 
+     * @param ctx Command context for recording this command
+     * @param buffer Buffer object ID
+     * @param data Data to upload
+     * @param usage Usage hint (GL_STATIC_DRAW, GL_DYNAMIC_DRAW, etc.)
+     */
+    public static void namedBufferDataDSA(CommandContext ctx, int buffer, java.nio.ByteBuffer data, int usage) {
+        getBackend().namedBufferDataDSA(ctx, buffer, data, usage);
+    }
+    
+    /**
+     * Update a subregion of a named buffer object.
+     * 
+     * <p>Updates part of an existing buffer's data store.
+     * This is the DSA equivalent of glBufferSubData().</p>
+     * 
+     * <p><b>OpenGL:</b> Maps to glNamedBufferSubData() (GL 4.5+)</p>
+     * <p><b>Vulkan:</b> Maps to vkCmdUpdateBuffer() or staging buffer + vkCmdCopyBuffer()</p>
+     * 
+     * <p><b>Example usage:</b>
+     * <pre>{@code
+     * CommandContext ctx = VulkanicAPI.getImmediateContext();
+     * ByteBuffer updatedData = ... // Your updated data
+     * VulkanicAPI.namedBufferSubDataDSA(ctx, bufferId, 0, updatedData);
+     * }</pre>
+     * 
+     * @param ctx Command context for recording this command
+     * @param buffer Buffer object ID
+     * @param offset Offset in bytes into the buffer
+     * @param data Data to upload
+     */
+    public static void namedBufferSubDataDSA(CommandContext ctx, int buffer, long offset, java.nio.ByteBuffer data) {
+        getBackend().namedBufferSubDataDSA(ctx, buffer, offset, data);
+    }
+    
+    /**
+     * Create immutable storage for a named buffer object (size only).
+     * 
+     * <p>Creates IMMUTABLE buffer storage. This is preferred for Vulkan
+     * compatibility as Vulkan buffers are always immutable.</p>
+     * 
+     * <p><b>OpenGL:</b> Maps to glNamedBufferStorage() (GL 4.5+)</p>
+     * <p><b>Vulkan:</b> Maps to vkCreateBuffer() with appropriate flags</p>
+     * 
+     * <p><b>Example usage:</b>
+     * <pre>{@code
+     * CommandContext ctx = VulkanicAPI.getImmediateContext();
+     * int bufferId = VulkanicAPI.createBufferDSA(ctx);
+     * // Create persistent mapped buffer
+     * VulkanicAPI.namedBufferStorageDSA(ctx, bufferId, 8192, 
+     *     GL_DYNAMIC_STORAGE_BIT | GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT);
+     * }</pre>
+     * 
+     * @param ctx Command context for recording this command
+     * @param buffer Buffer object ID
+     * @param size Size in bytes to allocate
+     * @param flags Storage flags (GL_DYNAMIC_STORAGE_BIT, GL_MAP_READ_BIT, etc.)
+     */
+    public static void namedBufferStorageDSA(CommandContext ctx, int buffer, long size, int flags) {
+        getBackend().namedBufferStorageDSA(ctx, buffer, size, flags);
+    }
+    
+    /**
+     * Create immutable storage and upload data to a named buffer object.
+     * 
+     * <p>Creates IMMUTABLE buffer storage with initial data.
+     * This is the preferred method for static data in Vulkan.</p>
+     * 
+     * <p><b>OpenGL:</b> Maps to glNamedBufferStorage() (GL 4.5+)</p>
+     * <p><b>Vulkan:</b> Maps to vkCreateBuffer() + initial data upload</p>
+     * 
+     * <p><b>Example usage:</b>
+     * <pre>{@code
+     * CommandContext ctx = VulkanicAPI.getImmediateContext();
+     * ByteBuffer staticData = ... // Your static data
+     * int bufferId = VulkanicAPI.createBufferDSA(ctx);
+     * VulkanicAPI.namedBufferStorageDSA(ctx, bufferId, staticData, 0);
+     * }</pre>
+     * 
+     * @param ctx Command context for recording this command
+     * @param buffer Buffer object ID
+     * @param data Initial data to upload
+     * @param flags Storage flags (GL_DYNAMIC_STORAGE_BIT, GL_MAP_WRITE_BIT, etc.)
+     */
+    public static void namedBufferStorageDSA(CommandContext ctx, int buffer, java.nio.ByteBuffer data, int flags) {
+        getBackend().namedBufferStorageDSA(ctx, buffer, data, flags);
+    }
+    
+    /**
+     * Map a range of a named buffer object's data store.
+     * 
+     * <p>Maps buffer memory for direct CPU access.
+     * This is the DSA equivalent of glMapBufferRange().</p>
+     * 
+     * <p><b>OpenGL:</b> Maps to glMapNamedBufferRange() (GL 4.5+)</p>
+     * <p><b>Vulkan:</b> Maps to vkMapMemory()</p>
+     * 
+     * <p><b>Example usage:</b>
+     * <pre>{@code
+     * CommandContext ctx = VulkanicAPI.getImmediateContext();
+     * ByteBuffer mapped = VulkanicAPI.mapNamedBufferRangeDSA(ctx, bufferId, 
+     *     0, 1024, GL_MAP_WRITE_BIT);
+     * if (mapped != null) {
+     *     // Write data to mapped buffer
+     *     mapped.putFloat(1.0f);
+     *     VulkanicAPI.unmapNamedBufferDSA(ctx, bufferId);
+     * }
+     * }</pre>
+     * 
+     * @param ctx Command context for recording this command
+     * @param buffer Buffer object ID
+     * @param offset Offset in bytes into the buffer
+     * @param length Length in bytes to map
+     * @param access Access flags (GL_MAP_READ_BIT, GL_MAP_WRITE_BIT, etc.)
+     * @return ByteBuffer mapped to the buffer's memory, or null on failure
+     */
+    public static java.nio.ByteBuffer mapNamedBufferRangeDSA(CommandContext ctx, int buffer, long offset, long length, int access) {
+        return getBackend().mapNamedBufferRangeDSA(ctx, buffer, offset, length, access);
+    }
+    
+    /**
+     * Unmap a named buffer object's data store.
+     * 
+     * <p>Unmaps a previously mapped buffer.
+     * This is the DSA equivalent of glUnmapBuffer().</p>
+     * 
+     * <p><b>OpenGL:</b> Maps to glUnmapNamedBuffer() (GL 4.5+)</p>
+     * <p><b>Vulkan:</b> Maps to vkUnmapMemory()</p>
+     * 
+     * <p><b>Example usage:</b>
+     * <pre>{@code
+     * CommandContext ctx = VulkanicAPI.getImmediateContext();
+     * ByteBuffer mapped = VulkanicAPI.mapNamedBufferRangeDSA(ctx, bufferId, 0, 1024, GL_MAP_WRITE_BIT);
+     * // ... write to buffer ...
+     * VulkanicAPI.unmapNamedBufferDSA(ctx, bufferId);
+     * }</pre>
+     * 
+     * @param ctx Command context for recording this command
+     * @param buffer Buffer object ID
+     */
+    public static void unmapNamedBufferDSA(CommandContext ctx, int buffer) {
+        getBackend().unmapNamedBufferDSA(ctx, buffer);
+    }
+    
+    /**
+     * Flush modifications to a range of a mapped named buffer.
+     * 
+     * <p>Explicitly flushes modifications when using GL_MAP_FLUSH_EXPLICIT_BIT.
+     * This is the DSA equivalent of glFlushMappedBufferRange().</p>
+     * 
+     * <p><b>OpenGL:</b> Maps to glFlushMappedNamedBufferRange() (GL 4.5+)</p>
+     * <p><b>Vulkan:</b> Maps to vkFlushMappedMemoryRanges()</p>
+     * 
+     * <p><b>Example usage:</b>
+     * <pre>{@code
+     * CommandContext ctx = VulkanicAPI.getImmediateContext();
+     * ByteBuffer mapped = VulkanicAPI.mapNamedBufferRangeDSA(ctx, bufferId, 
+     *     0, 1024, GL_MAP_WRITE_BIT | GL_MAP_FLUSH_EXPLICIT_BIT);
+     * // ... write to buffer ...
+     * VulkanicAPI.flushMappedNamedBufferRangeDSA(ctx, bufferId, 0, 512);
+     * VulkanicAPI.unmapNamedBufferDSA(ctx, bufferId);
+     * }</pre>
+     * 
+     * @param ctx Command context for recording this command
+     * @param buffer Buffer object ID
+     * @param offset Offset in bytes into the mapped region
+     * @param length Length in bytes to flush
+     */
+    public static void flushMappedNamedBufferRangeDSA(CommandContext ctx, int buffer, long offset, long length) {
+        getBackend().flushMappedNamedBufferRangeDSA(ctx, buffer, offset, length);
+    }
+    
+    /**
+     * Copy data between named buffer objects.
+     * 
+     * <p>Copies buffer data without needing to bind them.
+     * This is the DSA equivalent of glCopyBufferSubData().</p>
+     * 
+     * <p><b>OpenGL:</b> Maps to glCopyNamedBufferSubData() (GL 4.5+)</p>
+     * <p><b>Vulkan:</b> Maps to vkCmdCopyBuffer()</p>
+     * 
+     * <p><b>Example usage:</b>
+     * <pre>{@code
+     * CommandContext ctx = VulkanicAPI.getImmediateContext();
+     * VulkanicAPI.copyNamedBufferSubDataDSA(ctx, sourceBuffer, destBuffer, 0, 0, 1024);
+     * }</pre>
+     * 
+     * @param ctx Command context for recording this command
+     * @param readBuffer Source buffer object ID
+     * @param writeBuffer Destination buffer object ID
+     * @param readOffset Offset in bytes into the source buffer
+     * @param writeOffset Offset in bytes into the destination buffer
+     * @param size Number of bytes to copy
+     */
+    public static void copyNamedBufferSubDataDSA(CommandContext ctx, int readBuffer, int writeBuffer, long readOffset, long writeOffset, long size) {
+        getBackend().copyNamedBufferSubDataDSA(ctx, readBuffer, writeBuffer, readOffset, writeOffset, size);
+    }
+    
+    // ========================================================================
+    // DSA (Direct State Access) Framebuffer Operations
+    // ========================================================================
+    
+    /**
+     * Create a framebuffer object using Direct State Access.
+     * 
+     * <p>Creates a framebuffer without needing to bind it first.</p>
+     * 
+     * <p><b>OpenGL:</b> Maps to glCreateFramebuffers() (GL 4.5+)</p>
+     * <p><b>Vulkan:</b> Maps to vkCreateFramebuffer()</p>
+     * 
+     * <p><b>Example usage:</b>
+     * <pre>{@code
+     * CommandContext ctx = VulkanicAPI.getImmediateContext();
+     * int fbo = VulkanicAPI.createFramebufferDSA(ctx);
+     * VulkanicAPI.namedFramebufferTextureDSA(ctx, fbo, GL_COLOR_ATTACHMENT0, texId, 0);
+     * }</pre>
+     * 
+     * @param ctx Command context for recording this command
+     * @return The newly created framebuffer object ID
+     */
+    public static int createFramebufferDSA(CommandContext ctx) {
+        return getBackend().createFramebufferDSA(ctx);
+    }
+    
+    /**
+     * Attach a texture to a named framebuffer object.
+     * 
+     * <p>Attaches a texture to a framebuffer without binding.
+     * This is the DSA equivalent of glFramebufferTexture2D().</p>
+     * 
+     * <p><b>OpenGL:</b> Maps to glNamedFramebufferTexture() (GL 4.5+)</p>
+     * <p><b>Vulkan:</b> Textures are specified during vkCreateFramebuffer()</p>
+     * 
+     * <p><b>Example usage:</b>
+     * <pre>{@code
+     * CommandContext ctx = VulkanicAPI.getImmediateContext();
+     * int fbo = VulkanicAPI.createFramebufferDSA(ctx);
+     * VulkanicAPI.namedFramebufferTextureDSA(ctx, fbo, GL_COLOR_ATTACHMENT0, colorTex, 0);
+     * VulkanicAPI.namedFramebufferTextureDSA(ctx, fbo, GL_DEPTH_ATTACHMENT, depthTex, 0);
+     * }</pre>
+     * 
+     * @param ctx Command context for recording this command
+     * @param framebuffer Framebuffer object ID
+     * @param attachment Attachment point (GL_COLOR_ATTACHMENT0, GL_DEPTH_ATTACHMENT, etc.)
+     * @param texture Texture object ID to attach
+     * @param level Mipmap level of the texture to attach
+     */
+    public static void namedFramebufferTextureDSA(CommandContext ctx, int framebuffer, int attachment, int texture, int level) {
+        getBackend().namedFramebufferTextureDSA(ctx, framebuffer, attachment, texture, level);
+    }
+    
+    /**
+     * Blit (copy) pixels between named framebuffers.
+     * 
+     * <p>Copies a region between framebuffers with optional scaling and filtering.
+     * This is the DSA equivalent of glBlitFramebuffer().</p>
+     * 
+     * <p><b>OpenGL:</b> Maps to glBlitNamedFramebuffer() (GL 4.5+)</p>
+     * <p><b>Vulkan:</b> Maps to vkCmdBlitImage()</p>
+     * 
+     * <p><b>Example usage:</b>
+     * <pre>{@code
+     * CommandContext ctx = VulkanicAPI.getImmediateContext();
+     * VulkanicAPI.blitNamedFramebufferDSA(ctx, srcFbo, dstFbo, 
+     *     0, 0, 800, 600,  // Source region
+     *     0, 0, 1920, 1080, // Destination region (upscaling)
+     *     GL_COLOR_BUFFER_BIT, GL_LINEAR);
+     * }</pre>
+     * 
+     * @param ctx Command context for recording this command
+     * @param readFramebuffer Source framebuffer object ID
+     * @param drawFramebuffer Destination framebuffer object ID
+     * @param srcX0 Source region left X coordinate
+     * @param srcY0 Source region bottom Y coordinate
+     * @param srcX1 Source region right X coordinate
+     * @param srcY1 Source region top Y coordinate
+     * @param dstX0 Destination region left X coordinate
+     * @param dstY0 Destination region bottom Y coordinate
+     * @param dstX1 Destination region right X coordinate
+     * @param dstY1 Destination region top Y coordinate
+     * @param mask Buffer bit mask (GL_COLOR_BUFFER_BIT, GL_DEPTH_BUFFER_BIT, etc.)
+     * @param filter Interpolation filter (GL_NEAREST or GL_LINEAR)
+     */
+    public static void blitNamedFramebufferDSA(CommandContext ctx, int readFramebuffer, int drawFramebuffer, 
+                                               int srcX0, int srcY0, int srcX1, int srcY1,
+                                               int dstX0, int dstY0, int dstX1, int dstY1, 
+                                               int mask, int filter) {
+        getBackend().blitNamedFramebufferDSA(ctx, readFramebuffer, drawFramebuffer, 
+                                              srcX0, srcY0, srcX1, srcY1,
+                                              dstX0, dstY0, dstX1, dstY1, 
+                                              mask, filter);
+    }
+    
+    // ========================================================================
+    // Non-DSA Buffer Operations with CommandContext
+    // ========================================================================
+    
+    /**
+     * Copy data between bound buffer objects.
+     * 
+     * <p>Copies buffer data between buffers bound to specified targets.
+     * For DSA version, use copyNamedBufferSubDataDSA().</p>
+     * 
+     * <p><b>OpenGL:</b> Maps to glCopyBufferSubData()</p>
+     * <p><b>Vulkan:</b> Maps to vkCmdCopyBuffer()</p>
+     * 
+     * <p><b>Example usage:</b>
+     * <pre>{@code
+     * CommandContext ctx = VulkanicAPI.getImmediateContext();
+     * VulkanicAPI.bindBuffer(ctx, GL_COPY_READ_BUFFER, sourceBuffer);
+     * VulkanicAPI.bindBuffer(ctx, GL_COPY_WRITE_BUFFER, destBuffer);
+     * VulkanicAPI.copyBufferSubData(ctx, GL_COPY_READ_BUFFER, GL_COPY_WRITE_BUFFER, 0, 0, 1024);
+     * }</pre>
+     * 
+     * @param ctx Command context for recording this command
+     * @param readTarget Source buffer binding target
+     * @param writeTarget Destination buffer binding target
+     * @param readOffset Offset in bytes into the source buffer
+     * @param writeOffset Offset in bytes into the destination buffer
+     * @param size Number of bytes to copy
+     */
+    public static void copyBufferSubData(CommandContext ctx, int readTarget, int writeTarget, long readOffset, long writeOffset, long size) {
+        getBackend().copyBufferSubData(ctx, readTarget, writeTarget, readOffset, writeOffset, size);
+    }
+    
+    /**
+     * Flush modifications to a range of a mapped buffer.
+     * 
+     * <p>Explicitly flushes modifications for a buffer bound to the specified target.
+     * For DSA version, use flushMappedNamedBufferRangeDSA().</p>
+     * 
+     * <p><b>OpenGL:</b> Maps to glFlushMappedBufferRange()</p>
+     * <p><b>Vulkan:</b> Maps to vkFlushMappedMemoryRanges()</p>
+     * 
+     * <p><b>Example usage:</b>
+     * <pre>{@code
+     * CommandContext ctx = VulkanicAPI.getImmediateContext();
+     * VulkanicAPI.bindBuffer(ctx, GL_ARRAY_BUFFER, bufferId);
+     * ByteBuffer mapped = VulkanicAPI.mapBufferRegion(ctx, GL_ARRAY_BUFFER, 
+     *     0, 1024, GL_MAP_WRITE_BIT | GL_MAP_FLUSH_EXPLICIT_BIT);
+     * // ... write to buffer ...
+     * VulkanicAPI.flushMappedBufferRange(ctx, GL_ARRAY_BUFFER, 0, 512);
+     * VulkanicAPI.unmapBufferData(ctx, GL_ARRAY_BUFFER);
+     * }</pre>
+     * 
+     * @param ctx Command context for recording this command
+     * @param target Buffer binding target
+     * @param offset Offset in bytes into the mapped region
+     * @param length Length in bytes to flush
+     */
+    public static void flushMappedBufferRange(CommandContext ctx, int target, long offset, long length) {
+        getBackend().flushMappedBufferRange(ctx, target, offset, length);
     }
 }

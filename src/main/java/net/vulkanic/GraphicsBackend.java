@@ -2854,4 +2854,276 @@ public interface GraphicsBackend {
      * @return The shader info log string
      */
     String glGetShaderInfoLog(CommandContext ctx, int shader);
+    
+    // ========================================================================
+    // DSA (Direct State Access) Buffer Operations with CommandContext
+    // ========================================================================
+    
+    /**
+     * Create a buffer object using Direct State Access.
+     * 
+     * In OpenGL: Maps to glCreateBuffers() (GL 4.5+) or glGenBuffers()
+     * In Vulkan: Maps to vkCreateBuffer()
+     * 
+     * Creates a new buffer object without needing to bind it first.
+     * DSA eliminates the bind-to-edit pattern, which aligns better with
+     * Vulkan's explicit object model.
+     * 
+     * @param ctx Command context for recording this command
+     * @return The newly created buffer object ID
+     */
+    int createBufferDSA(CommandContext ctx);
+    
+    /**
+     * Allocate storage for a named buffer object (size only).
+     * 
+     * In OpenGL: Maps to glNamedBufferData() (GL 4.5+)
+     * In Vulkan: Maps to vkAllocateMemory() + vkBindBufferMemory()
+     * 
+     * Allocates and initializes buffer storage with undefined data.
+     * This is a mutable storage allocation that can be updated later.
+     * 
+     * @param ctx Command context for recording this command
+     * @param buffer Buffer object ID
+     * @param size Size in bytes to allocate
+     * @param usage Usage hint (GL_STATIC_DRAW, GL_DYNAMIC_DRAW, etc.)
+     */
+    void namedBufferDataDSA(CommandContext ctx, int buffer, long size, int usage);
+    
+    /**
+     * Allocate and upload data to a named buffer object.
+     * 
+     * In OpenGL: Maps to glNamedBufferData() (GL 4.5+)
+     * In Vulkan: Maps to vkAllocateMemory() + vkCmdUpdateBuffer() or staging buffer
+     * 
+     * Allocates buffer storage and uploads initial data. This is a mutable
+     * storage allocation that can be updated later with namedBufferSubDataDSA.
+     * 
+     * @param ctx Command context for recording this command
+     * @param buffer Buffer object ID
+     * @param data Data to upload
+     * @param usage Usage hint (GL_STATIC_DRAW, GL_DYNAMIC_DRAW, etc.)
+     */
+    void namedBufferDataDSA(CommandContext ctx, int buffer, java.nio.ByteBuffer data, int usage);
+    
+    /**
+     * Update a subregion of a named buffer object.
+     * 
+     * In OpenGL: Maps to glNamedBufferSubData() (GL 4.5+)
+     * In Vulkan: Maps to vkCmdUpdateBuffer() or staging buffer + vkCmdCopyBuffer()
+     * 
+     * Updates part of an existing buffer's data store. The buffer must have
+     * been allocated with namedBufferDataDSA or namedBufferStorageDSA first.
+     * 
+     * @param ctx Command context for recording this command
+     * @param buffer Buffer object ID
+     * @param offset Offset in bytes into the buffer
+     * @param data Data to upload
+     */
+    void namedBufferSubDataDSA(CommandContext ctx, int buffer, long offset, java.nio.ByteBuffer data);
+    
+    /**
+     * Create immutable storage for a named buffer object (size only).
+     * 
+     * In OpenGL: Maps to glNamedBufferStorage() (GL 4.5+)
+     * In Vulkan: Maps to vkCreateBuffer() with appropriate flags
+     * 
+     * Creates IMMUTABLE buffer storage with undefined data. Unlike namedBufferDataDSA,
+     * this storage cannot be reallocated, only updated if appropriate flags are set.
+     * This is preferred for Vulkan compatibility as Vulkan buffers are always immutable.
+     * 
+     * @param ctx Command context for recording this command
+     * @param buffer Buffer object ID
+     * @param size Size in bytes to allocate
+     * @param flags Storage flags (GL_DYNAMIC_STORAGE_BIT, GL_MAP_READ_BIT, etc.)
+     */
+    void namedBufferStorageDSA(CommandContext ctx, int buffer, long size, int flags);
+    
+    /**
+     * Create immutable storage and upload data to a named buffer object.
+     * 
+     * In OpenGL: Maps to glNamedBufferStorage() (GL 4.5+)
+     * In Vulkan: Maps to vkCreateBuffer() + initial data upload
+     * 
+     * Creates IMMUTABLE buffer storage with initial data. This storage cannot
+     * be reallocated, only updated if GL_DYNAMIC_STORAGE_BIT is set.
+     * Preferred for Vulkan as it matches Vulkan's immutable buffer model.
+     * 
+     * @param ctx Command context for recording this command
+     * @param buffer Buffer object ID
+     * @param data Initial data to upload
+     * @param flags Storage flags (GL_DYNAMIC_STORAGE_BIT, GL_MAP_WRITE_BIT, etc.)
+     */
+    void namedBufferStorageDSA(CommandContext ctx, int buffer, java.nio.ByteBuffer data, int flags);
+    
+    /**
+     * Map a range of a named buffer object's data store.
+     * 
+     * In OpenGL: Maps to glMapNamedBufferRange() (GL 4.5+)
+     * In Vulkan: Maps to vkMapMemory()
+     * 
+     * Maps a region of buffer memory into client address space for direct CPU access.
+     * The buffer must have been created with appropriate mapping flags.
+     * Must be unmapped with unmapNamedBufferDSA before use in rendering commands.
+     * 
+     * @param ctx Command context for recording this command
+     * @param buffer Buffer object ID
+     * @param offset Offset in bytes into the buffer
+     * @param length Length in bytes to map
+     * @param access Access flags (GL_MAP_READ_BIT, GL_MAP_WRITE_BIT, etc.)
+     * @return ByteBuffer mapped to the buffer's memory, or null on failure
+     */
+    java.nio.ByteBuffer mapNamedBufferRangeDSA(CommandContext ctx, int buffer, long offset, long length, int access);
+    
+    /**
+     * Unmap a named buffer object's data store.
+     * 
+     * In OpenGL: Maps to glUnmapNamedBuffer() (GL 4.5+)
+     * In Vulkan: Maps to vkUnmapMemory()
+     * 
+     * Unmaps a previously mapped buffer. After unmapping, the pointer obtained
+     * from mapNamedBufferRangeDSA is no longer valid. Changes made to mapped
+     * memory become visible to the GPU.
+     * 
+     * @param ctx Command context for recording this command
+     * @param buffer Buffer object ID
+     */
+    void unmapNamedBufferDSA(CommandContext ctx, int buffer);
+    
+    /**
+     * Flush modifications to a range of a mapped named buffer.
+     * 
+     * In OpenGL: Maps to glFlushMappedNamedBufferRange() (GL 4.5+)
+     * In Vulkan: Maps to vkFlushMappedMemoryRanges()
+     * 
+     * Explicitly flushes modifications made to a mapped buffer range,
+     * ensuring they are visible to the GPU. Required when using
+     * GL_MAP_FLUSH_EXPLICIT_BIT during mapping.
+     * 
+     * @param ctx Command context for recording this command
+     * @param buffer Buffer object ID
+     * @param offset Offset in bytes into the mapped region
+     * @param length Length in bytes to flush
+     */
+    void flushMappedNamedBufferRangeDSA(CommandContext ctx, int buffer, long offset, long length);
+    
+    /**
+     * Copy data between named buffer objects.
+     * 
+     * In OpenGL: Maps to glCopyNamedBufferSubData() (GL 4.5+)
+     * In Vulkan: Maps to vkCmdCopyBuffer()
+     * 
+     * Copies a region from one buffer to another without needing to bind them.
+     * Both buffers must be large enough for the operation.
+     * 
+     * @param ctx Command context for recording this command
+     * @param readBuffer Source buffer object ID
+     * @param writeBuffer Destination buffer object ID
+     * @param readOffset Offset in bytes into the source buffer
+     * @param writeOffset Offset in bytes into the destination buffer
+     * @param size Number of bytes to copy
+     */
+    void copyNamedBufferSubDataDSA(CommandContext ctx, int readBuffer, int writeBuffer, long readOffset, long writeOffset, long size);
+    
+    // ========================================================================
+    // DSA (Direct State Access) Framebuffer Operations with CommandContext
+    // ========================================================================
+    
+    /**
+     * Create a framebuffer object using Direct State Access.
+     * 
+     * In OpenGL: Maps to glCreateFramebuffers() (GL 4.5+) or glGenFramebuffers()
+     * In Vulkan: Maps to vkCreateFramebuffer()
+     * 
+     * Creates a new framebuffer object without needing to bind it first.
+     * Framebuffers are used for off-screen rendering and render-to-texture.
+     * 
+     * @param ctx Command context for recording this command
+     * @return The newly created framebuffer object ID
+     */
+    int createFramebufferDSA(CommandContext ctx);
+    
+    /**
+     * Attach a texture to a named framebuffer object.
+     * 
+     * In OpenGL: Maps to glNamedFramebufferTexture() (GL 4.5+)
+     * In Vulkan: Textures are specified during vkCreateFramebuffer()
+     * 
+     * Attaches a texture image to a framebuffer attachment point without
+     * needing to bind the framebuffer first. Used for render-to-texture.
+     * 
+     * @param ctx Command context for recording this command
+     * @param framebuffer Framebuffer object ID
+     * @param attachment Attachment point (GL_COLOR_ATTACHMENT0, GL_DEPTH_ATTACHMENT, etc.)
+     * @param texture Texture object ID to attach
+     * @param level Mipmap level of the texture to attach
+     */
+    void namedFramebufferTextureDSA(CommandContext ctx, int framebuffer, int attachment, int texture, int level);
+    
+    /**
+     * Blit (copy) pixels between named framebuffers.
+     * 
+     * In OpenGL: Maps to glBlitNamedFramebuffer() (GL 4.5+)
+     * In Vulkan: Maps to vkCmdBlitImage()
+     * 
+     * Copies a rectangular region from one framebuffer to another with optional
+     * scaling and filtering. Supports different source and destination sizes.
+     * 
+     * @param ctx Command context for recording this command
+     * @param readFramebuffer Source framebuffer object ID
+     * @param drawFramebuffer Destination framebuffer object ID
+     * @param srcX0 Source region left X coordinate
+     * @param srcY0 Source region bottom Y coordinate
+     * @param srcX1 Source region right X coordinate
+     * @param srcY1 Source region top Y coordinate
+     * @param dstX0 Destination region left X coordinate
+     * @param dstY0 Destination region bottom Y coordinate
+     * @param dstX1 Destination region right X coordinate
+     * @param dstY1 Destination region top Y coordinate
+     * @param mask Buffer bit mask (GL_COLOR_BUFFER_BIT, GL_DEPTH_BUFFER_BIT, etc.)
+     * @param filter Interpolation filter (GL_NEAREST or GL_LINEAR)
+     */
+    void blitNamedFramebufferDSA(CommandContext ctx, int readFramebuffer, int drawFramebuffer, 
+                                  int srcX0, int srcY0, int srcX1, int srcY1,
+                                  int dstX0, int dstY0, int dstX1, int dstY1, 
+                                  int mask, int filter);
+    
+    // ========================================================================
+    // Non-DSA Buffer Operations with CommandContext (for compatibility)
+    // ========================================================================
+    
+    /**
+     * Copy data between bound buffer objects.
+     * 
+     * In OpenGL: Maps to glCopyBufferSubData()
+     * In Vulkan: Maps to vkCmdCopyBuffer()
+     * 
+     * Copies a region from one bound buffer to another. Buffers must be
+     * bound to appropriate targets before calling.
+     * 
+     * @param ctx Command context for recording this command
+     * @param readTarget Source buffer binding target (GL_COPY_READ_BUFFER, etc.)
+     * @param writeTarget Destination buffer binding target (GL_COPY_WRITE_BUFFER, etc.)
+     * @param readOffset Offset in bytes into the source buffer
+     * @param writeOffset Offset in bytes into the destination buffer
+     * @param size Number of bytes to copy
+     */
+    void copyBufferSubData(CommandContext ctx, int readTarget, int writeTarget, long readOffset, long writeOffset, long size);
+    
+    /**
+     * Flush modifications to a range of a mapped buffer.
+     * 
+     * In OpenGL: Maps to glFlushMappedBufferRange()
+     * In Vulkan: Maps to vkFlushMappedMemoryRanges()
+     * 
+     * Explicitly flushes modifications made to a mapped buffer range for
+     * a buffer bound to the specified target. Required when using
+     * GL_MAP_FLUSH_EXPLICIT_BIT during mapping.
+     * 
+     * @param ctx Command context for recording this command
+     * @param target Buffer binding target (GL_ARRAY_BUFFER, etc.)
+     * @param offset Offset in bytes into the mapped region
+     * @param length Length in bytes to flush
+     */
+    void flushMappedBufferRange(CommandContext ctx, int target, long offset, long length);
 }

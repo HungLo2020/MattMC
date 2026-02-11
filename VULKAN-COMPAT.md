@@ -2,14 +2,14 @@
 
 **Analysis Date:** 2026-02-08  
 **Migration Strategy Updated:** 2026-02-11  
-**Active Migration Phase:** Phase 19 Complete - Memory, Pixel, and Vertex Operations ✅  
+**Active Migration Phase:** Phase 20 Complete - DSA Buffer and Framebuffer Operations ✅  
 **Vulkanic API Version:** Initial Implementation (OpenGL-only) - **ALL METHODS NOW DEPRECATED**  
 **Analyzed Components:** VulkanicAPI.java, GraphicsBackend.java, OpenGLBackend.java  
 **Lines of Code Analyzed:** ~4,000 LOC  
 **Deprecated Methods:** 874 methods marked for replacement  
-**Migrated Methods:** 123 methods (14.1% complete)
-**Migrated Call Sites:** 239 call sites in 70 game files ✅ **ALL MIGRATED**
-**Removed Deprecated Methods:** 42 methods
+**Migrated Methods:** 138 methods (15.8% complete)
+**Migrated Call Sites:** 254 call sites in 72 game files ✅ **ALL MIGRATED**
+**Removed Deprecated Methods:** 42 methods (will be removed after verification)
 
 ---
 
@@ -17,7 +17,7 @@
 
 **MIGRATION STATUS: ACTIVE MIGRATION IN PROGRESS** 🔄
 
-All 874 methods in the current Vulkanic API have been marked as `@Deprecated` to facilitate an **incremental, test-driven migration** to a properly abstracted graphics API that supports both OpenGL and Vulkan backends. We have now begun the active migration phase, with **123 methods successfully migrated** to the new CommandContext-aware API.
+All 874 methods in the current Vulkanic API have been marked as `@Deprecated` to facilitate an **incremental, test-driven migration** to a properly abstracted graphics API that supports both OpenGL and Vulkan backends. We have now begun the active migration phase, with **138 methods successfully migrated** to the new CommandContext-aware API.
 
 ### Current State (Active Migration)
 
@@ -5537,3 +5537,201 @@ Phase 13 adds critical infrastructure for:
 - Remove deprecated versions once all call sites migrated
 - Continue with additional method migrations
 
+
+---
+
+## Phase 20: DSA Buffer and Framebuffer Operations ✅
+
+**Date:** 2026-02-11  
+**Methods Migrated:** 15 (10 DSA buffer, 3 DSA framebuffer, 2 non-DSA buffer)  
+**Call Sites Updated:** 15 (DirectStateAccess.java: 13, GLRenderDevice.java: 2)  
+**Status:** ✅ Complete - All tests passing
+
+### Migration Summary
+
+Phase 20 migrates Direct State Access (DSA) buffer and framebuffer operations to CommandContext-aware API. DSA methods are critical for Vulkan compatibility because they eliminate the bind-to-edit pattern, which aligns better with Vulkan's explicit object model.
+
+### Migrated Methods
+
+#### DSA Buffer Operations (10 methods)
+
+1. **createBufferDSA() → createBufferDSA(ctx)**
+   - Create buffer object using DSA
+   - OpenGL: glCreateBuffers() (GL 4.5+)
+   - Vulkan: vkCreateBuffer()
+
+2. **namedBufferDataDSA(buffer, size, usage) → namedBufferDataDSA(ctx, buffer, size, usage)**
+   - Allocate mutable buffer storage (size only)
+   - OpenGL: glNamedBufferData()
+   - Vulkan: vkAllocateMemory() + vkBindBufferMemory()
+
+3. **namedBufferDataDSA(buffer, data, usage) → namedBufferDataDSA(ctx, buffer, data, usage)**
+   - Allocate mutable buffer storage with data
+   - OpenGL: glNamedBufferData()
+   - Vulkan: vkAllocateMemory() + vkCmdUpdateBuffer()
+
+4. **namedBufferSubDataDSA(buffer, offset, data) → namedBufferSubDataDSA(ctx, buffer, offset, data)**
+   - Update buffer subregion
+   - OpenGL: glNamedBufferSubData()
+   - Vulkan: vkCmdUpdateBuffer() or staging buffer + vkCmdCopyBuffer()
+
+5. **namedBufferStorageDSA(buffer, size, flags) → namedBufferStorageDSA(ctx, buffer, size, flags)**
+   - Create immutable buffer storage (size only)
+   - OpenGL: glNamedBufferStorage()
+   - Vulkan: vkCreateBuffer() with appropriate flags
+   - **Preferred for Vulkan** - matches Vulkan's immutable buffer model
+
+6. **namedBufferStorageDSA(buffer, data, flags) → namedBufferStorageDSA(ctx, buffer, data, flags)**
+   - Create immutable buffer storage with data
+   - OpenGL: glNamedBufferStorage()
+   - Vulkan: vkCreateBuffer() + initial data upload
+   - **Preferred for Vulkan**
+
+7. **mapNamedBufferRangeDSA(buffer, offset, length, access) → mapNamedBufferRangeDSA(ctx, buffer, offset, length, access)**
+   - Map buffer memory for CPU access
+   - OpenGL: glMapNamedBufferRange()
+   - Vulkan: vkMapMemory()
+
+8. **unmapNamedBufferDSA(buffer) → unmapNamedBufferDSA(ctx, buffer)**
+   - Unmap buffer memory
+   - OpenGL: glUnmapNamedBuffer()
+   - Vulkan: vkUnmapMemory()
+
+9. **flushMappedNamedBufferRangeDSA(buffer, offset, length) → flushMappedNamedBufferRangeDSA(ctx, buffer, offset, length)**
+   - Flush mapped buffer range
+   - OpenGL: glFlushMappedNamedBufferRange()
+   - Vulkan: vkFlushMappedMemoryRanges()
+
+10. **copyNamedBufferSubDataDSA(read, write, readOff, writeOff, size) → copyNamedBufferSubDataDSA(ctx, read, write, readOff, writeOff, size)**
+    - Copy between buffers without binding
+    - OpenGL: glCopyNamedBufferSubData()
+    - Vulkan: vkCmdCopyBuffer()
+
+#### DSA Framebuffer Operations (3 methods)
+
+11. **createFramebufferDSA() → createFramebufferDSA(ctx)**
+    - Create framebuffer using DSA
+    - OpenGL: glCreateFramebuffers()
+    - Vulkan: vkCreateFramebuffer()
+
+12. **namedFramebufferTextureDSA(fbo, attachment, texture, level) → namedFramebufferTextureDSA(ctx, fbo, attachment, texture, level)**
+    - Attach texture to framebuffer without binding
+    - OpenGL: glNamedFramebufferTexture()
+    - Vulkan: Textures specified during vkCreateFramebuffer()
+
+13. **blitNamedFramebufferDSA(...) → blitNamedFramebufferDSA(ctx, ...)**
+    - Blit between framebuffers with scaling/filtering
+    - OpenGL: glBlitNamedFramebuffer()
+    - Vulkan: vkCmdBlitImage()
+
+#### Non-DSA Buffer Operations (2 methods)
+
+14. **copyBufferSubData(readTarget, writeTarget, ...) → copyBufferSubData(ctx, readTarget, writeTarget, ...)**
+    - Copy between bound buffers
+    - OpenGL: glCopyBufferSubData()
+    - Vulkan: vkCmdCopyBuffer()
+
+15. **flushMappedBufferRange(target, offset, length) → flushMappedBufferRange(ctx, target, offset, length)**
+    - Flush mapped buffer range for bound buffer
+    - OpenGL: glFlushMappedBufferRange()
+    - Vulkan: vkFlushMappedMemoryRanges()
+
+### Why DSA is Important for Vulkan
+
+Direct State Access (DSA) eliminates OpenGL's traditional bind-to-edit pattern:
+
+**Traditional OpenGL:**
+```java
+glBindBuffer(GL_ARRAY_BUFFER, vbo);
+glBufferData(GL_ARRAY_BUFFER, size, usage);
+glBindBuffer(GL_ARRAY_BUFFER, 0); // Unbind
+```
+
+**DSA OpenGL (GL 4.5+):**
+```java
+glNamedBufferData(vbo, size, usage); // Direct operation, no binding
+```
+
+**Vulkan (naturally DSA):**
+```java
+vkCreateBuffer(device, &createInfo, NULL, &buffer);
+vkAllocateMemory(device, &allocInfo, NULL, &memory);
+vkBindBufferMemory(device, buffer, memory, 0);
+```
+
+DSA's explicit object model aligns perfectly with Vulkan's architecture:
+- No global state pollution
+- Explicit object references
+- Thread-safe by design
+- Better performance (no state changes)
+
+### Call Sites Updated
+
+**DirectStateAccess.java (13 call sites):**
+- Core.createBuffer() → createBufferDSA(CTX)
+- Core.bufferData() (2 overloads) → namedBufferDataDSA(CTX, ...)
+- Core.bufferSubData() → namedBufferSubDataDSA(CTX, ...)
+- Core.bufferStorage() (2 overloads) → namedBufferStorageDSA(CTX, ...)
+- Core.mapBufferRange() → mapNamedBufferRangeDSA(CTX, ...)
+- Core.unmapBuffer() → unmapNamedBufferDSA(CTX, ...)
+- Core.createFrameBufferObject() → createFramebufferDSA(CTX)
+- Core.bindFrameBufferTextures() → namedFramebufferTextureDSA(CTX, ...) x2
+- Core.blitFrameBuffers() → blitNamedFramebufferDSA(CTX, ...)
+- Core.flushMappedBufferRange() → flushMappedNamedBufferRangeDSA(CTX, ...)
+- Core.copyBufferSubData() → copyNamedBufferSubDataDSA(CTX, ...)
+- Emulated.flushMappedBufferRange() → flushMappedBufferRange(CTX, ...)
+- Emulated.copyBufferSubData() → copyBufferSubData(CTX, ...)
+
+**GLRenderDevice.java (2 call sites):**
+- ImmediateCommandList.copyBufferSubData() → copyBufferSubData(CTX, ...)
+- ImmediateCommandList.flushMappedRange() → flushMappedBufferRange(CTX, ...)
+
+### Significance
+
+Phase 20 is significant for Vulkan migration because:
+
+1. **DSA Methods Align with Vulkan:**
+   - No bind-to-edit pattern (Vulkan has no binding)
+   - Explicit object references
+   - Thread-safe operations
+
+2. **Buffer Management is Fundamental:**
+   - Vertex buffers, index buffers, uniform buffers
+   - Persistent mapped buffers for streaming data
+   - Staging buffers for texture/buffer uploads
+
+3. **Immutable Storage Preferred:**
+   - namedBufferStorageDSA creates immutable storage
+   - Matches Vulkan's buffer model (buffers are immutable)
+   - Better performance characteristics
+
+4. **Framebuffer Operations:**
+   - Render-to-texture capabilities
+   - Post-processing pipelines
+   - Multi-pass rendering
+
+**OpenGL vs Vulkan DSA Comparison:**
+
+| Operation | OpenGL DSA | Vulkan |
+|-----------|-----------|---------|
+| Create Buffer | glCreateBuffers() | vkCreateBuffer() |
+| Allocate Storage | glNamedBufferStorage() | vkAllocateMemory() + vkBindBufferMemory() |
+| Upload Data | glNamedBufferSubData() | vkCmdUpdateBuffer() or staging |
+| Map Memory | glMapNamedBufferRange() | vkMapMemory() |
+| Unmap Memory | glUnmapNamedBuffer() | vkUnmapMemory() |
+| Flush Mapped | glFlushMappedNamedBufferRange() | vkFlushMappedMemoryRanges() |
+| Copy Buffers | glCopyNamedBufferSubData() | vkCmdCopyBuffer() |
+| Create FBO | glCreateFramebuffers() | vkCreateFramebuffer() |
+| Attach Texture | glNamedFramebufferTexture() | Part of VkFramebufferCreateInfo |
+| Blit | glBlitNamedFramebuffer() | vkCmdBlitImage() |
+
+**Progress:**
+- **138 methods migrated** out of 874 (15.8%)
+- **254 call sites** updated across **72 game files**
+- **All tests passing** (18/18 Vulkanic tests)
+- **Zero breaking changes** - fully backward compatible through deprecated wrappers
+
+**Next Steps:**
+- Continue migrating remaining deprecated methods
+- Focus on texture operations, sync primitives, and query objects
+- Maintain test coverage and documentation

@@ -10,10 +10,13 @@ import net.sodium.client.gl.sync.GlFence;
 import net.sodium.client.gl.tessellation.*;
 import net.sodium.client.gl.tessellation.*;
 import net.sodium.client.gl.util.EnumBitField;
+import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
 import java.nio.ByteBuffer;
 
 public class GLRenderDevice implements RenderDevice {
+    private static final CommandContext CTX = VulkanicAPI.getImmediateContext();
+    
     private final GlStateTracker stateTracker = new GlStateTracker();
     private final CommandList commandList = new ImmediateCommandList(this.stateTracker);
     private final DrawCommandList drawCommandList = new ImmediateDrawCommandList();
@@ -112,7 +115,7 @@ public class GLRenderDevice implements RenderDevice {
             this.bindBuffer(GlBufferTarget.COPY_READ_BUFFER, src);
             this.bindBuffer(GlBufferTarget.COPY_WRITE_BUFFER, dst);
 
-            VulkanicAPI.copyBufferSubData(VulkanicAPI.GL_COPY_READ_BUFFER, VulkanicAPI.GL_COPY_WRITE_BUFFER, readOffset, writeOffset, bytes);
+            VulkanicAPI.copyBufferSubData(CTX, VulkanicAPI.GL_COPY_READ_BUFFER, VulkanicAPI.GL_COPY_WRITE_BUFFER, readOffset, writeOffset, bytes);
         }
 
         @Override
@@ -243,7 +246,7 @@ public class GLRenderDevice implements RenderDevice {
             GlBuffer buffer = map.getBufferObject();
 
             this.bindBuffer(GlBufferTarget.COPY_READ_BUFFER, buffer);
-            VulkanicAPI.flushMappedBufferRange(GlBufferTarget.COPY_READ_BUFFER.getTargetParameter(), offset, length);
+            VulkanicAPI.flushMappedBufferRange(CTX, GlBufferTarget.COPY_READ_BUFFER.getTargetParameter(), offset, length);
         }
 
         @Override
