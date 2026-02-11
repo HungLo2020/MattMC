@@ -10,6 +10,7 @@ import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
 import com.seibel.distanthorizons.core.util.objects.GLMessages.*;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftClientWrapper;
 import com.seibel.distanthorizons.coreapi.ModInfo;
+import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
 import org.lwjgl.glfw.GLFW;
 
@@ -26,6 +27,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 public class GLProxy
 {
 	private static final IMinecraftClientWrapper MC = SingletonInjector.INSTANCE.get(IMinecraftClientWrapper.class);
+	private static final CommandContext CTX = VulkanicAPI.getImmediateContext();
 	
 	public static final DhLogger LOGGER = new DhLoggerBuilder()
 			.fileLevelConfig(Config.Common.Logging.logRendererGLEventToFile)
@@ -91,7 +93,7 @@ public class GLProxy
 		}
 		
 		LOGGER.info("Creating " + GLProxy.class.getSimpleName() + "... If this is the last message you see there must have been an OpenGL error.");
-		LOGGER.info("Lod Render OpenGL version [" + VulkanicAPI.queryStringInfo(VulkanicAPI.GL_VERSION) + "].");
+		LOGGER.info("Lod Render OpenGL version [" + VulkanicAPI.queryStringInfo(CTX, VulkanicAPI.GL_VERSION) + "].");
 		
 		
 		
@@ -101,7 +103,7 @@ public class GLProxy
 		//============================//
 		
 		// get Minecraft's capabilities
-		this.glCapabilities = VulkanicAPI.getGLCapabilities();
+		this.glCapabilities = VulkanicAPI.getGLCapabilities(CTX);
 		
 		// crash the game if the GPU doesn't support OpenGL 3.2
 		if (!VulkanicAPI.checkOpenGL32Support())
@@ -151,7 +153,7 @@ public class GLProxy
 		this.instancedArraysSupported = VulkanicAPI.checkARBInstancedArraysSupport();
 		
 		// get the best automatic upload method
-		String vendor = VulkanicAPI.queryStringInfo(VulkanicAPI.GL_VENDOR).toUpperCase(); // example return: "NVIDIA CORPORATION"
+		String vendor = VulkanicAPI.queryStringInfo(CTX, VulkanicAPI.GL_VENDOR).toUpperCase(); // example return: "NVIDIA CORPORATION"
 		if (EPlatform.get() != EPlatform.MACOS)
 		{
 			if (vendor.contains("NVIDIA") || vendor.contains("GEFORCE"))

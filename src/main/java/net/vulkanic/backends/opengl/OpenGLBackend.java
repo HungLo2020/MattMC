@@ -1723,12 +1723,6 @@ public class OpenGLBackend implements GraphicsBackend {
     
     @Deprecated
     @Override
-    public String queryStringInfo(int name) {
-        return GL11.glGetString(name);
-    }
-    
-    @Deprecated
-    @Override
     public int pollErrorCode() {
         return GL11.glGetError();
     }
@@ -2887,12 +2881,6 @@ public class OpenGLBackend implements GraphicsBackend {
     
     @Deprecated
     @Override
-    public Object getGLCapabilities() {
-        return org.lwjgl.opengl.GL.getCapabilities();
-    }
-    
-    @Deprecated
-    @Override
     public void setupDebugMessageCallback(java.io.PrintStream stream) {
         org.lwjgl.opengl.GLUtil.setupDebugMessageCallback(stream);
     }
@@ -2902,49 +2890,49 @@ public class OpenGLBackend implements GraphicsBackend {
     @Deprecated
     @Override
     public boolean checkOpenGL32Support() {
-        org.lwjgl.opengl.GLCapabilities caps = (org.lwjgl.opengl.GLCapabilities) getGLCapabilities();
+        org.lwjgl.opengl.GLCapabilities caps = (org.lwjgl.opengl.GLCapabilities) getGLCapabilities(OpenGLCommandContext.IMMEDIATE);
         return caps.OpenGL32;
     }
     
     @Deprecated
     @Override
     public boolean checkOpenGL33Support() {
-        org.lwjgl.opengl.GLCapabilities caps = (org.lwjgl.opengl.GLCapabilities) getGLCapabilities();
+        org.lwjgl.opengl.GLCapabilities caps = (org.lwjgl.opengl.GLCapabilities) getGLCapabilities(OpenGLCommandContext.IMMEDIATE);
         return caps.OpenGL33;
     }
     
     @Deprecated
     @Override
     public boolean checkARBInstancedArraysSupport() {
-        org.lwjgl.opengl.GLCapabilities caps = (org.lwjgl.opengl.GLCapabilities) getGLCapabilities();
+        org.lwjgl.opengl.GLCapabilities caps = (org.lwjgl.opengl.GLCapabilities) getGLCapabilities(OpenGLCommandContext.IMMEDIATE);
         return caps.GL_ARB_instanced_arrays;
     }
     
     @Deprecated
     @Override
     public long getNamedBufferDataPointer() {
-        org.lwjgl.opengl.GLCapabilities caps = (org.lwjgl.opengl.GLCapabilities) getGLCapabilities();
+        org.lwjgl.opengl.GLCapabilities caps = (org.lwjgl.opengl.GLCapabilities) getGLCapabilities(OpenGLCommandContext.IMMEDIATE);
         return caps.glNamedBufferData;
     }
     
     @Deprecated
     @Override
     public long getBufferStoragePointer() {
-        org.lwjgl.opengl.GLCapabilities caps = (org.lwjgl.opengl.GLCapabilities) getGLCapabilities();
+        org.lwjgl.opengl.GLCapabilities caps = (org.lwjgl.opengl.GLCapabilities) getGLCapabilities(OpenGLCommandContext.IMMEDIATE);
         return caps.glBufferStorage;
     }
     
     @Deprecated
     @Override
     public long getBindVertexBufferPointer() {
-        org.lwjgl.opengl.GLCapabilities caps = (org.lwjgl.opengl.GLCapabilities) getGLCapabilities();
+        org.lwjgl.opengl.GLCapabilities caps = (org.lwjgl.opengl.GLCapabilities) getGLCapabilities(OpenGLCommandContext.IMMEDIATE);
         return caps.glBindVertexBuffer;
     }
     
     @Deprecated
     @Override
     public long getVertexAttribBindingPointer() {
-        org.lwjgl.opengl.GLCapabilities caps = (org.lwjgl.opengl.GLCapabilities) getGLCapabilities();
+        org.lwjgl.opengl.GLCapabilities caps = (org.lwjgl.opengl.GLCapabilities) getGLCapabilities(OpenGLCommandContext.IMMEDIATE);
         return caps.glVertexAttribBinding;
     }
     

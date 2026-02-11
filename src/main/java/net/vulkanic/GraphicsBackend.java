@@ -1514,8 +1514,6 @@ public interface GraphicsBackend {
     @Deprecated
     int queryIntegerState(int pname);
     @Deprecated
-    String queryStringInfo(int name);
-    @Deprecated
     int pollErrorCode();
     
     // Pixel readback
@@ -1923,8 +1921,6 @@ public interface GraphicsBackend {
     void deleteVertexArrays(int array);
     
     // GL context capabilities
-    @Deprecated
-    Object getGLCapabilities();
     @Deprecated
     void setupDebugMessageCallback(java.io.PrintStream stream);
     

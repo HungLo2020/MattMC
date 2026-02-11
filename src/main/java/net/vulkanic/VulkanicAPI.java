@@ -3161,11 +3161,6 @@ public class VulkanicAPI {
     }
     
     @Deprecated
-    public static String queryStringInfo(int name) {
-        return queryStringInfo(CTX, name);
-    }
-    
-    @Deprecated
     public static int pollErrorCode() {
         return getBackend().pollErrorCode();
     }
@@ -4011,33 +4006,6 @@ public class VulkanicAPI {
     }
     
     /**
-     * Creates a new shader program object.
-     * Wrapper for constructProgramObject.
-     */
-    @Deprecated
-    public static int glCreateProgram() {
-        return constructProgramObject(CTX);
-    }
-    
-    /**
-     * Attaches a shader to a program.
-     * Wrapper for attachShaderToProgram.
-     */
-    @Deprecated
-    public static void glAttachShader(int program, int shader) {
-        attachShaderToProgram(CTX, program, shader);
-    }
-    
-    /**
-     * Links a program object.
-     * Wrapper for linkProgramBinary.
-     */
-    @Deprecated
-    public static void glLinkProgram(int program) {
-        linkProgramBinary(CTX, program);
-    }
-    
-    /**
      * Returns a parameter from a program object.
      * Wrapper for queryProgramParameter.
      */
@@ -4168,11 +4136,6 @@ public class VulkanicAPI {
      * 
      * @return Platform-specific capabilities object (cast to GLCapabilities for OpenGL backend)
      */
-    @Deprecated
-    public static Object getGLCapabilities() {
-        return getGLCapabilities(CTX);
-    }
-    
     /**
      * Sets up debug message callback using GLUtil-style callback.
      * @param stream The PrintStream to write debug messages to

@@ -77,37 +77,37 @@ public class IrisGenericRenderProgram implements IDhApiGenericObjectShaderProgra
 
 	// This will bind  AbstractVertexAttribute
 	private IrisGenericRenderProgram(String name, boolean isShadowPass, boolean translucent, BlendModeOverride override, BufferBlendOverride[] bufferBlendOverrides, String vertex, String tessControl, String tessEval, String geometry, String fragment, CustomUniforms customUniforms, IrisRenderingPipeline pipeline) {
-		id = VulkanicAPI.glCreateProgram();
+		id = VulkanicAPI.constructProgramObject(CTX);
 
 		VulkanicAPI.glBindAttribLocation(this.id, 0, "vPosition");
 
 		this.bufferBlendOverrides = bufferBlendOverrides;
 
 		GlShader vert = new GlShader(ShaderType.VERTEX, name + ".vsh", vertex);
-		VulkanicAPI.glAttachShader(id, vert.getHandle());
+		VulkanicAPI.attachShaderToProgram(CTX, id, vert.getHandle());
 
 		GlShader tessCont = null;
 		if (tessControl != null) {
 			tessCont = new GlShader(ShaderType.TESSELATION_CONTROL, name + ".tcs", tessControl);
-			VulkanicAPI.glAttachShader(id, tessCont.getHandle());
+			VulkanicAPI.attachShaderToProgram(CTX, id, tessCont.getHandle());
 		}
 
 		GlShader tessE = null;
 		if (tessEval != null) {
 			tessE = new GlShader(ShaderType.TESSELATION_EVAL, name + ".tes", tessEval);
-			VulkanicAPI.glAttachShader(id, tessE.getHandle());
+			VulkanicAPI.attachShaderToProgram(CTX, id, tessE.getHandle());
 		}
 
 		GlShader geom = null;
 		if (geometry != null) {
 			geom = new GlShader(ShaderType.GEOMETRY, name + ".gsh", geometry);
-			VulkanicAPI.glAttachShader(id, geom.getHandle());
+			VulkanicAPI.attachShaderToProgram(CTX, id, geom.getHandle());
 		}
 
 		GlShader frag = new GlShader(ShaderType.FRAGMENT, name + ".fsh", fragment);
-		VulkanicAPI.glAttachShader(id, frag.getHandle());
+		VulkanicAPI.attachShaderToProgram(CTX, id, frag.getHandle());
 
-		VulkanicAPI.glLinkProgram(this.id);
+		VulkanicAPI.linkProgramBinary(CTX, this.id);
 		int status = VulkanicAPI.glGetProgrami(this.id, VulkanicAPI.GL_LINK_STATUS);
 		if (status != VulkanicAPI.GL_TRUE) {
 			String message = "Shader link error in Iris DH program! Details: " + VulkanicAPI.glGetProgramInfoLog(this.id);

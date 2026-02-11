@@ -602,7 +602,7 @@ public class GlStateManager {
 
 	public static String _getString(int i) {
 		RenderSystem.assertOnRenderThread();
-		return VulkanicAPI.queryStringInfo(i);
+		return VulkanicAPI.queryStringInfo(CTX, i);
 	}
 
 	public static int _getInteger(int i) {

@@ -62,19 +62,19 @@ public class ShaderProgram
 	
 	public ShaderProgram(List<Supplier<String>> vertSupplierList, List<Supplier<String>> fragSupplierList, String[] attributes)
 	{
-		this.id = VulkanicAPI.glCreateProgram();
+		this.id = VulkanicAPI.constructProgramObject(CTX);
 		
 		for (Supplier<String> vertSupplier : vertSupplierList)
 		{
 			Shader vertShader = new Shader(VulkanicAPI.GL_VERTEX_SHADER, vertSupplier.get());
-			VulkanicAPI.glAttachShader(this.id, vertShader.id);
+			VulkanicAPI.attachShaderToProgram(CTX, this.id, vertShader.id);
 			vertShader.free(); // important!
 		}
 		
 		for (Supplier<String> fragSupplier : fragSupplierList)
 		{
 			Shader fragShader = new Shader(VulkanicAPI.GL_FRAGMENT_SHADER, fragSupplier.get());
-			VulkanicAPI.glAttachShader(this.id, fragShader.id);
+			VulkanicAPI.attachShaderToProgram(CTX, this.id, fragShader.id);
 			fragShader.free(); // important!
 		}
 		
@@ -82,7 +82,7 @@ public class ShaderProgram
 		{
 			VulkanicAPI.bindAttributeLocation(CTX, this.id, i, attributes[i]);
 		}
-		VulkanicAPI.glLinkProgram(this.id);
+		VulkanicAPI.linkProgramBinary(CTX, this.id);
 		
 		int status = VulkanicAPI.queryProgramParameter(CTX, this.id, VulkanicAPI.GL_LINK_STATUS);
 		if (status != VulkanicAPI.GL_TRUE)
