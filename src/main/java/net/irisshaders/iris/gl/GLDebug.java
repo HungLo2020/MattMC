@@ -324,7 +324,7 @@ public final class GLDebug {
 
 		@Override
 		public void nameObject(int id, int object, String name) {
-			VulkanicAPI.labelDebugObject(id, object, name);
+			VulkanicAPI.labelDebugObject(CTX, id, object, name);
 		}
 
 		@Override

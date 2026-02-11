@@ -2635,6 +2635,176 @@ public class VulkanicAPI {
     }
     
     /**
+     * Generates a single query object for GPU performance monitoring.
+     * 
+     * This is a Vulkan-compatible method that requires an explicit CommandContext.
+     * For OpenGL, use getImmediateContext() to get the context.
+     * 
+     * Example usage:
+     * <pre>
+     *     CommandContext ctx = VulkanicAPI.getImmediateContext();
+     *     int queryId = VulkanicAPI.generateQueryObject(ctx);
+     *     VulkanicAPI.initiateQuery(ctx, GL_TIME_ELAPSED, queryId);
+     *     // ... render operations ...
+     *     VulkanicAPI.concludeQuery(ctx, GL_TIME_ELAPSED);
+     *     long elapsed = VulkanicAPI.retrieveQueryObjectInt64(ctx, queryId, GL_QUERY_RESULT);
+     *     VulkanicAPI.disposeQueryObject(ctx, queryId);
+     * </pre>
+     * 
+     * In OpenGL: Maps to glGenQueries()
+     * In Vulkan: Maps to VkQueryPool creation
+     * 
+     * @param ctx Command context for recording this command
+     * @return The generated query object ID
+     */
+    public static int generateQueryObject(CommandContext ctx) {
+        return getBackend().generateQueryObject(ctx);
+    }
+    
+    /**
+     * Begins a query operation for performance monitoring.
+     * 
+     * This is a Vulkan-compatible method that requires an explicit CommandContext.
+     * For OpenGL, use getImmediateContext() to get the context.
+     * 
+     * In OpenGL: Maps to glBeginQuery()
+     * In Vulkan: Maps to vkCmdBeginQuery()
+     * 
+     * @param ctx Command context for recording this command
+     * @param target The query target type (e.g., GL_TIME_ELAPSED)
+     * @param id The query object ID to begin
+     */
+    public static void initiateQuery(CommandContext ctx, int target, int id) {
+        getBackend().initiateQuery(ctx, target, id);
+    }
+    
+    /**
+     * Ends a query operation.
+     * 
+     * This is a Vulkan-compatible method that requires an explicit CommandContext.
+     * For OpenGL, use getImmediateContext() to get the context.
+     * 
+     * In OpenGL: Maps to glEndQuery()
+     * In Vulkan: Maps to vkCmdEndQuery()
+     * 
+     * @param ctx Command context for recording this command
+     * @param target The query target type (must match the target used in beginQuery)
+     */
+    public static void concludeQuery(CommandContext ctx, int target) {
+        getBackend().concludeQuery(ctx, target);
+    }
+    
+    /**
+     * Deletes a query object and frees its resources.
+     * 
+     * This is a Vulkan-compatible method that requires an explicit CommandContext.
+     * For OpenGL, use getImmediateContext() to get the context.
+     * 
+     * In OpenGL: Maps to glDeleteQueries()
+     * In Vulkan: Maps to vkDestroyQueryPool()
+     * 
+     * @param ctx Command context for recording this command
+     * @param id The query object ID to delete
+     */
+    public static void disposeQueryObject(CommandContext ctx, int id) {
+        getBackend().disposeQueryObject(ctx, id);
+    }
+    
+    /**
+     * Retrieves an integer query result.
+     * 
+     * This is a Vulkan-compatible method that requires an explicit CommandContext.
+     * For OpenGL, use getImmediateContext() to get the context.
+     * 
+     * In OpenGL: Maps to glGetQueryObjectiv()
+     * In Vulkan: Maps to vkGetQueryPoolResults() with 32-bit result
+     * 
+     * @param ctx Command context for recording this command
+     * @param id The query object ID
+     * @param pname The parameter to query (e.g., GL_QUERY_RESULT, GL_QUERY_RESULT_AVAILABLE)
+     * @return The query result value
+     */
+    public static int retrieveQueryObjectInt(CommandContext ctx, int id, int pname) {
+        return getBackend().retrieveQueryObjectInt(ctx, id, pname);
+    }
+    
+    /**
+     * Retrieves a 64-bit integer query result.
+     * 
+     * This is a Vulkan-compatible method that requires an explicit CommandContext.
+     * For OpenGL, use getImmediateContext() to get the context.
+     * 
+     * Example usage:
+     * <pre>
+     *     long elapsed = VulkanicAPI.retrieveQueryObjectInt64(ctx, queryId, GL_QUERY_RESULT);
+     * </pre>
+     * 
+     * In OpenGL: Maps to glGetQueryObjecti64v()
+     * In Vulkan: Maps to vkGetQueryPoolResults() with 64-bit result
+     * 
+     * @param ctx Command context for recording this command
+     * @param id The query object ID
+     * @param pname The parameter to query (e.g., GL_QUERY_RESULT)
+     * @return The query result value as a 64-bit integer
+     */
+    public static long retrieveQueryObjectInt64(CommandContext ctx, int id, int pname) {
+        return getBackend().retrieveQueryObjectInt64(ctx, id, pname);
+    }
+    
+    /**
+     * Assigns a debug label to a GPU object for debugging tools.
+     * 
+     * This is a Vulkan-compatible method that requires an explicit CommandContext.
+     * For OpenGL, use getImmediateContext() to get the context.
+     * 
+     * Example usage:
+     * <pre>
+     *     CommandContext ctx = VulkanicAPI.getImmediateContext();
+     *     VulkanicAPI.labelDebugObject(ctx, GL_BUFFER, bufferId, "Vertex Data Buffer");
+     *     VulkanicAPI.labelDebugObject(ctx, GL_TEXTURE, textureId, "Diffuse Texture");
+     * </pre>
+     * 
+     * In OpenGL: Maps to glObjectLabel() (KHR_debug)
+     * In Vulkan: Maps to vkSetDebugUtilsObjectNameEXT()
+     * 
+     * @param ctx Command context for recording this command
+     * @param identifier Object type identifier (e.g., GL_BUFFER, GL_TEXTURE)
+     * @param name The object ID/handle
+     * @param label The debug name/label string
+     */
+    public static void labelDebugObject(CommandContext ctx, int identifier, int name, String label) {
+        getBackend().labelDebugObject(ctx, identifier, name, label);
+    }
+    
+    /**
+     * Retrieves the name of a uniform block by index.
+     * 
+     * This is a Vulkan-compatible method that requires an explicit CommandContext.
+     * For OpenGL, use getImmediateContext() to get the context.
+     * 
+     * Example usage:
+     * <pre>
+     *     CommandContext ctx = VulkanicAPI.getImmediateContext();
+     *     int blockCount = VulkanicAPI.queryProgramParameter(ctx, programId, GL_ACTIVE_UNIFORM_BLOCKS);
+     *     for (int i = 0; i < blockCount; i++) {
+     *         String blockName = VulkanicAPI.retrieveActiveUniformBlockName(ctx, programId, i);
+     *         System.out.println("Uniform block: " + blockName);
+     *     }
+     * </pre>
+     * 
+     * In OpenGL: Maps to glGetActiveUniformBlockName()
+     * In Vulkan: Uniform blocks map to descriptor set bindings
+     * 
+     * @param ctx Command context for recording this command
+     * @param program The shader program ID
+     * @param uniformBlockIndex The index of the uniform block
+     * @return The name of the uniform block
+     */
+    public static String retrieveActiveUniformBlockName(CommandContext ctx, int program, int uniformBlockIndex) {
+        return getBackend().retrieveActiveUniformBlockName(ctx, program, uniformBlockIndex);
+    }
+    
+    /**
      * Configures a vertex attribute array with the specified format.
      * 
      * This is a Vulkan-compatible method that requires an explicit CommandContext.
@@ -3173,11 +3343,6 @@ public class VulkanicAPI {
     // ================================================================================
     
     
-    @Deprecated
-    public static void attachTextureToFramebuffer(int target, int attachment, int textarget, int texture, int level) {
-        getBackend().attachTextureToFramebuffer(target, attachment, textarget, texture, level);
-    }
-    
     // Direct State Access buffer operations
     @Deprecated
     public static int createBufferDSA() {
@@ -3248,36 +3413,16 @@ public class VulkanicAPI {
     }
     
     
-    @Deprecated
-    public static void configureTextureParameter(int target, int pname, int param) {
-        getBackend().configureTextureParameter(target, pname, param);
-    }
-    
     
     @Deprecated
     public static void transferTexture2DImage(int tgt, int lvl, int intfmt, int w, int h, int bdr, int fmt, int typ, java.nio.ByteBuffer pix) {
         getBackend().transferTexture2DImage(tgt, lvl, intfmt, w, h, bdr, fmt, typ, pix);
     }
     
-    @Deprecated
-    public static void fillBufferSubregion(int tgt, long off, java.nio.ByteBuffer dat) {
-        getBackend().fillBufferSubregion(getImmediateContext(), tgt, off, dat);
-    }
-    
-    
-    @Deprecated
-    public static java.nio.ByteBuffer mapBufferRegion(int tgt, int off, int len, int acc) {
-        return getBackend().mapBufferRegion(tgt, off, len, acc);
-    }
     
     @Deprecated
     public static void unmapBufferData(int tgt) {
         getBackend().unmapBufferData(tgt);
-    }
-    
-    @Deprecated
-    public static void copyFramebufferRegion(int srcX0, int srcY0, int srcX1, int srcY1, int dstX0, int dstY0, int dstX1, int dstY1, int msk, int flt) {
-        getBackend().copyFramebufferRegion(srcX0, srcY0, srcX1, srcY1, dstX0, dstY0, dstX1, dstY1, msk, flt);
     }
     
     @Deprecated
@@ -3303,46 +3448,6 @@ public class VulkanicAPI {
     @Deprecated
     public static void uploadShaderSource(int shader, long pointerBufferAddress, int stringCount, long lengthsPointer) {
         getBackend().uploadShaderSource(shader, pointerBufferAddress, stringCount, lengthsPointer);
-    }
-    
-    @Deprecated
-    public static String retrieveActiveUniformBlockName(int program, int uniformBlockIndex) {
-        return getBackend().retrieveActiveUniformBlockName(program, uniformBlockIndex);
-    }
-    
-    @Deprecated
-    public static int generateQueryObject() {
-        return getBackend().generateQueryObject();
-    }
-    
-    @Deprecated
-    public static void initiateQuery(int target, int id) {
-        getBackend().initiateQuery(target, id);
-    }
-    
-    @Deprecated
-    public static void concludeQuery(int target) {
-        getBackend().concludeQuery(target);
-    }
-    
-    @Deprecated
-    public static void disposeQueryObject(int id) {
-        getBackend().disposeQueryObject(id);
-    }
-    
-    @Deprecated
-    public static int retrieveQueryObjectInt(int id, int pname) {
-        return getBackend().retrieveQueryObjectInt(id, pname);
-    }
-    
-    @Deprecated
-    public static long retrieveQueryObjectInt64(int id, int pname) {
-        return getBackend().retrieveQueryObjectInt64(id, pname);
-    }
-    
-    @Deprecated
-    public static void labelDebugObject(int identifier, int name, String label) {
-        getBackend().labelDebugObject(identifier, name, label);
     }
     
     @Deprecated

@@ -1518,6 +1518,129 @@ public interface GraphicsBackend {
      */
     int createSingleBufferObject(CommandContext ctx);
     
+    /**
+     * Generates a single query object for performance monitoring.
+     * 
+     * In OpenGL: Maps to glGenQueries() with n=1
+     * In Vulkan: Maps to VkQueryPool creation
+     * 
+     * Creates a query object that can be used to measure GPU performance metrics
+     * such as elapsed time, primitive count, or occlusion results.
+     * 
+     * @param ctx Command context for recording this command
+     * @return The generated query object ID
+     */
+    int generateQueryObject(CommandContext ctx);
+    
+    /**
+     * Begins a query operation.
+     * 
+     * In OpenGL: Maps to glBeginQuery()
+     * In Vulkan: Maps to vkCmdBeginQuery()
+     * 
+     * Starts recording query results. Common targets include GL_TIME_ELAPSED,
+     * GL_SAMPLES_PASSED, and GL_PRIMITIVES_GENERATED.
+     * 
+     * @param ctx Command context for recording this command
+     * @param target The query target type (e.g., GL_TIME_ELAPSED)
+     * @param id The query object ID to begin
+     */
+    void initiateQuery(CommandContext ctx, int target, int id);
+    
+    /**
+     * Ends a query operation.
+     * 
+     * In OpenGL: Maps to glEndQuery()
+     * In Vulkan: Maps to vkCmdEndQuery()
+     * 
+     * Stops recording query results. Results can be retrieved after the GPU
+     * completes the work between begin and end.
+     * 
+     * @param ctx Command context for recording this command
+     * @param target The query target type (must match the target used in beginQuery)
+     */
+    void concludeQuery(CommandContext ctx, int target);
+    
+    /**
+     * Deletes a query object.
+     * 
+     * In OpenGL: Maps to glDeleteQueries()
+     * In Vulkan: Maps to vkDestroyQueryPool()
+     * 
+     * Destroys a query object and frees its resources. Should be called when
+     * the query is no longer needed.
+     * 
+     * @param ctx Command context for recording this command
+     * @param id The query object ID to delete
+     */
+    void disposeQueryObject(CommandContext ctx, int id);
+    
+    /**
+     * Retrieves an integer query result.
+     * 
+     * In OpenGL: Maps to glGetQueryObjectiv()
+     * In Vulkan: Maps to vkGetQueryPoolResults() with 32-bit result
+     * 
+     * Gets the result of a query as a 32-bit integer. Common parameters include
+     * GL_QUERY_RESULT (the actual result) and GL_QUERY_RESULT_AVAILABLE (whether
+     * the result is ready).
+     * 
+     * @param ctx Command context for recording this command
+     * @param id The query object ID
+     * @param pname The parameter to query (e.g., GL_QUERY_RESULT)
+     * @return The query result value
+     */
+    int retrieveQueryObjectInt(CommandContext ctx, int id, int pname);
+    
+    /**
+     * Retrieves a 64-bit integer query result.
+     * 
+     * In OpenGL: Maps to glGetQueryObjecti64v()
+     * In Vulkan: Maps to vkGetQueryPoolResults() with 64-bit result
+     * 
+     * Gets the result of a query as a 64-bit integer. Essential for timing queries
+     * which can exceed 32-bit range (timestamps are in nanoseconds).
+     * 
+     * @param ctx Command context for recording this command
+     * @param id The query object ID
+     * @param pname The parameter to query (e.g., GL_QUERY_RESULT)
+     * @return The query result value as a 64-bit integer
+     */
+    long retrieveQueryObjectInt64(CommandContext ctx, int id, int pname);
+    
+    /**
+     * Assigns a debug label to a GPU object for debugging.
+     * 
+     * In OpenGL: Maps to glObjectLabel() (KHR_debug extension)
+     * In Vulkan: Maps to vkSetDebugUtilsObjectNameEXT()
+     * 
+     * Assigns a human-readable name to a GPU object (buffer, texture, shader, etc.)
+     * which appears in graphics debuggers and validation layer messages. This is
+     * invaluable for debugging complex rendering issues.
+     * 
+     * @param ctx Command context for recording this command
+     * @param identifier Object type identifier (e.g., GL_BUFFER, GL_TEXTURE)
+     * @param name The object ID/handle
+     * @param label The debug name/label string
+     */
+    void labelDebugObject(CommandContext ctx, int identifier, int name, String label);
+    
+    /**
+     * Retrieves the name of a uniform block by index.
+     * 
+     * In OpenGL: Maps to glGetActiveUniformBlockName()
+     * In Vulkan: Uniform blocks map to descriptor set bindings (queried from reflection)
+     * 
+     * Gets the name of a uniform block at the specified index within a shader program.
+     * This is used to enumerate all uniform blocks and bind them to binding points.
+     * 
+     * @param ctx Command context for recording this command
+     * @param program The shader program ID
+     * @param uniformBlockIndex The index of the uniform block (0 to count-1)
+     * @return The name of the uniform block
+     */
+    String retrieveActiveUniformBlockName(CommandContext ctx, int program, int uniformBlockIndex);
+    
     // ================================================================================
     // DEPRECATED METHODS - To be replaced with CommandContext-aware versions
     // ================================================================================
@@ -1525,8 +1648,6 @@ public interface GraphicsBackend {
     // Pixel operations
     
     // Framebuffer operations
-    @Deprecated
-    void attachTextureToFramebuffer(int target, int attachment, int textarget, int texture, int level);
     
     // Direct State Access buffer operations
     @Deprecated
@@ -1559,8 +1680,6 @@ public interface GraphicsBackend {
                                   int dstX0, int dstY0, int dstX1, int dstY1, int mask, int filter);
     
     // Texture unit and parameter operations
-    @Deprecated
-    void configureTextureParameter(int target, int pname, int param);
     
     // Polygon rendering operations
     
@@ -1569,20 +1688,14 @@ public interface GraphicsBackend {
     void transferTexture2DImage(int tgt, int lvl, int intfmt, int w, int h, int bdr, int fmt, int typ, java.nio.ByteBuffer pix);
     
     // GPU buffer lifecycle
-    @Deprecated
-    void fillBufferSubregion(int tgt, long off, java.nio.ByteBuffer dat);
     
     // Vertex array objects
     
     // Buffer memory mapping
     @Deprecated
-    java.nio.ByteBuffer mapBufferRegion(int tgt, int off, int len, int acc);
-    @Deprecated
     void unmapBufferData(int tgt);
     
     // Framebuffer lifecycle
-    @Deprecated
-    void copyFramebufferRegion(int srcX0, int srcY0, int srcX1, int srcY1, int dstX0, int dstY0, int dstX1, int dstY1, int msk, int flt);
     
     // Shader pipeline
     @Deprecated
@@ -1597,26 +1710,10 @@ public interface GraphicsBackend {
     void uploadShaderSource(int shader, long pointerBufferAddress, int stringCount, long lengthsPointer);
     
     // Uniform block operations
-    @Deprecated
-    String retrieveActiveUniformBlockName(int program, int uniformBlockIndex);
     
     // Timer query operations
-    @Deprecated
-    int generateQueryObject();
-    @Deprecated
-    void initiateQuery(int target, int id);
-    @Deprecated
-    void concludeQuery(int target);
-    @Deprecated
-    void disposeQueryObject(int id);
-    @Deprecated
-    int retrieveQueryObjectInt(int id, int pname);
-    @Deprecated
-    long retrieveQueryObjectInt64(int id, int pname);
     
     // Debug label operations (KHR_debug)
-    @Deprecated
-    void labelDebugObject(int identifier, int name, String label);
     @Deprecated
     void enterDebugGroup(int source, int id, CharSequence message);
     @Deprecated

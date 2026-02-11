@@ -290,7 +290,7 @@ public class GlStateManager {
 
 	public static void _glBufferSubData(int i, int j, ByteBuffer byteBuffer) {
 		RenderSystem.assertOnRenderThread();
-		net.vulkanic.VulkanicAPI.fillBufferSubregion(i, (long)j, byteBuffer);
+		net.vulkanic.VulkanicAPI.fillBufferSubregion(CTX, i, (long)j, byteBuffer);
 	}
 
 	public static void _glBufferData(int i, long l, int j) {
@@ -301,7 +301,7 @@ public class GlStateManager {
 	@Nullable
 	public static ByteBuffer _glMapBufferRange(int i, int j, int k, int l) {
 		RenderSystem.assertOnRenderThread();
-		return net.vulkanic.VulkanicAPI.mapBufferRegion(i, j, k, l);
+		return net.vulkanic.VulkanicAPI.mapBufferRegion(CTX, i, j, k, l);
 	}
 
 	public static void _glUnmapBuffer(int i) {
@@ -338,7 +338,7 @@ public class GlStateManager {
 
 	public static void _glBlitFrameBuffer(int i, int j, int k, int l, int m, int n, int o, int p, int q, int r) {
 		RenderSystem.assertOnRenderThread();
-		net.vulkanic.VulkanicAPI.copyFramebufferRegion(i, j, k, l, m, n, o, p, q, r);
+		net.vulkanic.VulkanicAPI.copyFramebufferRegion(CTX, i, j, k, l, m, n, o, p, q, r);
 	}
 
 	public static void _glDeleteFramebuffers(int i) {
@@ -360,7 +360,7 @@ public class GlStateManager {
 
 	public static void _glFramebufferTexture2D(int i, int j, int k, int l, int m) {
 		RenderSystem.assertOnRenderThread();
-		net.vulkanic.VulkanicAPI.attachTextureToFramebuffer(i, j, k, l, m);
+		net.vulkanic.VulkanicAPI.attachTextureToFramebuffer(CTX, i, j, k, l, m);
 	}
 
 	public static void glBlendFuncSeparate(int i, int j, int k, int l) {
@@ -446,7 +446,7 @@ public class GlStateManager {
 
 	public static void _texParameter(int i, int j, int k) {
 		RenderSystem.assertOnRenderThread();
-		net.vulkanic.VulkanicAPI.configureTextureParameter(i, j, k);
+		net.vulkanic.VulkanicAPI.configureTextureParameter(CTX, i, j, k);
 	}
 
 	public static int _getTexLevelParameter(int i, int j, int k) {

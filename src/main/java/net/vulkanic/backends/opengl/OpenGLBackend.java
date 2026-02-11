@@ -1593,16 +1593,75 @@ public class OpenGLBackend implements GraphicsBackend {
         return GL15.glGenBuffers();
     }
     
+    @Override
+    public int generateQueryObject(CommandContext ctx) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        return GL15.glGenQueries();
+    }
+    
+    @Override
+    public void initiateQuery(CommandContext ctx, int target, int id) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL15.glBeginQuery(target, id);
+    }
+    
+    @Override
+    public void concludeQuery(CommandContext ctx, int target) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL15.glEndQuery(target);
+    }
+    
+    @Override
+    public void disposeQueryObject(CommandContext ctx, int id) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL15.glDeleteQueries(id);
+    }
+    
+    @Override
+    public int retrieveQueryObjectInt(CommandContext ctx, int id, int pname) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        return GL15.glGetQueryObjecti(id, pname);
+    }
+    
+    @Override
+    public long retrieveQueryObjectInt64(CommandContext ctx, int id, int pname) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        return GL33.glGetQueryObjecti64(id, pname);
+    }
+    
+    @Override
+    public void labelDebugObject(CommandContext ctx, int identifier, int name, String label) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        GL43.glObjectLabel(identifier, name, label);
+    }
+    
+    @Override
+    public String retrieveActiveUniformBlockName(CommandContext ctx, int program, int uniformBlockIndex) {
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        return GL31.glGetActiveUniformBlockName(program, uniformBlockIndex);
+    }
+    
     // ================================================================================
     // DEPRECATED METHODS - OpenGL immediate-mode implementations
     // ================================================================================
     
     
-    @Deprecated
-    @Override
-    public void attachTextureToFramebuffer(int target, int attachment, int textarget, int texture, int level) {
-        GL30.glFramebufferTexture2D(target, attachment, textarget, texture, level);
-    }
     
     // Direct State Access buffer operations
     @Deprecated
@@ -1687,12 +1746,6 @@ public class OpenGLBackend implements GraphicsBackend {
     }
     
     
-    @Deprecated
-    @Override
-    public void configureTextureParameter(int target, int pname, int param) {
-        GL11.glTexParameteri(target, pname, param);
-    }
-    
     
     @Deprecated
     @Override
@@ -1703,29 +1756,10 @@ public class OpenGLBackend implements GraphicsBackend {
     
     @Deprecated
     @Override
-    public void fillBufferSubregion(int tgt, long off, java.nio.ByteBuffer dat) {
-        GL15.glBufferSubData(tgt, off, dat);
-    }
-    
-    
-    @Deprecated
-    @Override
-    public java.nio.ByteBuffer mapBufferRegion(int tgt, int off, int len, int acc) {
-        return GL30.glMapBufferRange(tgt, off, len, acc);
-    }
-    
-    @Deprecated
-    @Override
     public void unmapBufferData(int tgt) {
         GL15.glUnmapBuffer(tgt);
     }
     
-    
-    @Deprecated
-    @Override
-    public void copyFramebufferRegion(int srcX0, int srcY0, int srcX1, int srcY1, int dstX0, int dstY0, int dstX1, int dstY1, int msk, int flt) {
-        GL30.glBlitFramebuffer(srcX0, srcY0, srcX1, srcY1, dstX0, dstY0, dstX1, dstY1, msk, flt);
-    }
     
     @Deprecated
     @Override
@@ -1737,54 +1771,6 @@ public class OpenGLBackend implements GraphicsBackend {
     @Override
     public void uploadShaderSource(int shader, long pointerBufferAddress, int stringCount, long lengthsPointer) {
         org.lwjgl.opengl.GL20C.nglShaderSource(shader, stringCount, pointerBufferAddress, lengthsPointer);
-    }
-    
-    @Deprecated
-    @Override
-    public String retrieveActiveUniformBlockName(int program, int uniformBlockIndex) {
-        return org.lwjgl.opengl.GL31.glGetActiveUniformBlockName(program, uniformBlockIndex);
-    }
-    
-    @Deprecated
-    @Override
-    public int generateQueryObject() {
-        return org.lwjgl.opengl.GL32C.glGenQueries();
-    }
-    
-    @Deprecated
-    @Override
-    public void initiateQuery(int target, int id) {
-        org.lwjgl.opengl.GL32C.glBeginQuery(target, id);
-    }
-    
-    @Deprecated
-    @Override
-    public void concludeQuery(int target) {
-        org.lwjgl.opengl.GL32C.glEndQuery(target);
-    }
-    
-    @Deprecated
-    @Override
-    public void disposeQueryObject(int id) {
-        org.lwjgl.opengl.GL32C.glDeleteQueries(id);
-    }
-    
-    @Deprecated
-    @Override
-    public int retrieveQueryObjectInt(int id, int pname) {
-        return org.lwjgl.opengl.GL32C.glGetQueryObjecti(id, pname);
-    }
-    
-    @Deprecated
-    @Override
-    public long retrieveQueryObjectInt64(int id, int pname) {
-        return org.lwjgl.opengl.ARBTimerQuery.glGetQueryObjecti64(id, pname);
-    }
-    
-    @Deprecated
-    @Override
-    public void labelDebugObject(int identifier, int name, String label) {
-        org.lwjgl.opengl.KHRDebug.glObjectLabel(identifier, name, label);
     }
     
     @Deprecated

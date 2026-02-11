@@ -66,28 +66,28 @@ public abstract class GlDebugLabel {
 		public void applyLabel(GlBuffer glBuffer) {
 			Supplier<String> supplier = glBuffer.label;
 			if (supplier != null) {
-				VulkanicAPI.labelDebugObject(33504, glBuffer.handle, StringUtil.truncateStringIfNecessary((String)supplier.get(), this.maxLabelLength, true));
+				VulkanicAPI.labelDebugObject(CTX, 33504, glBuffer.handle, StringUtil.truncateStringIfNecessary((String)supplier.get(), this.maxLabelLength, true));
 			}
 		}
 
 		@Override
 		public void applyLabel(GlTexture glTexture) {
-			VulkanicAPI.labelDebugObject(5890, glTexture.id, StringUtil.truncateStringIfNecessary(glTexture.getLabel(), this.maxLabelLength, true));
+			VulkanicAPI.labelDebugObject(CTX, 5890, glTexture.id, StringUtil.truncateStringIfNecessary(glTexture.getLabel(), this.maxLabelLength, true));
 		}
 
 		@Override
 		public void applyLabel(GlShaderModule glShaderModule) {
-			VulkanicAPI.labelDebugObject(33505, glShaderModule.getShaderId(), StringUtil.truncateStringIfNecessary(glShaderModule.getDebugLabel(), this.maxLabelLength, true));
+			VulkanicAPI.labelDebugObject(CTX, 33505, glShaderModule.getShaderId(), StringUtil.truncateStringIfNecessary(glShaderModule.getDebugLabel(), this.maxLabelLength, true));
 		}
 
 		@Override
 		public void applyLabel(GlProgram glProgram) {
-			VulkanicAPI.labelDebugObject(33506, glProgram.getProgramId(), StringUtil.truncateStringIfNecessary(glProgram.getDebugLabel(), this.maxLabelLength, true));
+			VulkanicAPI.labelDebugObject(CTX, 33506, glProgram.getProgramId(), StringUtil.truncateStringIfNecessary(glProgram.getDebugLabel(), this.maxLabelLength, true));
 		}
 
 		@Override
 		public void applyLabel(VertexArrayCache.VertexArray vertexArray) {
-			VulkanicAPI.labelDebugObject(32884, vertexArray.id, StringUtil.truncateStringIfNecessary(vertexArray.format.toString(), this.maxLabelLength, true));
+			VulkanicAPI.labelDebugObject(CTX, 32884, vertexArray.id, StringUtil.truncateStringIfNecessary(vertexArray.format.toString(), this.maxLabelLength, true));
 		}
 
 		@Override
