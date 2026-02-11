@@ -11,6 +11,7 @@ import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftCli
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftGLWrapper;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftRenderWrapper;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IProfilerWrapper;
+import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
 
 import java.nio.ByteBuffer;
@@ -26,6 +27,7 @@ public class DhFadeRenderer
 	
 	public static DhFadeRenderer INSTANCE = new DhFadeRenderer();
 	private static final DhLogger LOGGER = new DhLoggerBuilder().build();
+	private static final CommandContext CTX = VulkanicAPI.getImmediateContext();
 	
 	private static final IMinecraftClientWrapper MC_CLIENT = SingletonInjector.INSTANCE.get(IMinecraftClientWrapper.class);
 	private static final IMinecraftRenderWrapper MC_RENDER = SingletonInjector.INSTANCE.get(IMinecraftRenderWrapper.class);
@@ -87,7 +89,7 @@ public class DhFadeRenderer
 			VulkanicAPI.glTexParameteri(VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_MAX_LEVEL, 0);
 		}
 		
-		VulkanicAPI.glFramebufferTexture2D(VulkanicAPI.GL_FRAMEBUFFER, VulkanicAPI.GL_COLOR_ATTACHMENT0, VulkanicAPI.GL_TEXTURE_2D, this.fadeTexture, 0);
+		VulkanicAPI.glFramebufferTexture2D(CTX, VulkanicAPI.GL_FRAMEBUFFER, VulkanicAPI.GL_COLOR_ATTACHMENT0, VulkanicAPI.GL_TEXTURE_2D, this.fadeTexture, 0);
 		
 	}
 	

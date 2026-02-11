@@ -8,6 +8,7 @@ import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftGLW
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftRenderWrapper;
 import com.seibel.distanthorizons.core.util.math.Mat4f;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.CommandContext;
 
 import java.nio.ByteBuffer;
 
@@ -20,6 +21,7 @@ import java.nio.ByteBuffer;
 public class SSAORenderer
 {
 	public static SSAORenderer INSTANCE = new SSAORenderer();
+	private static final CommandContext CTX = VulkanicAPI.getImmediateContext();
 	
 	private static final IMinecraftRenderWrapper MC_RENDER = SingletonInjector.INSTANCE.get(IMinecraftRenderWrapper.class);
 	private static final IMinecraftGLWrapper GLMC = SingletonInjector.INSTANCE.get(IMinecraftGLWrapper.class);
@@ -79,7 +81,7 @@ public class SSAORenderer
 			VulkanicAPI.glTexParameteri(VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_MAX_LEVEL, 0);
 		}
 		
-		VulkanicAPI.glFramebufferTexture2D(VulkanicAPI.GL_FRAMEBUFFER, VulkanicAPI.GL_COLOR_ATTACHMENT0, VulkanicAPI.GL_TEXTURE_2D, this.ssaoTexture, 0);
+		VulkanicAPI.glFramebufferTexture2D(CTX, VulkanicAPI.GL_FRAMEBUFFER, VulkanicAPI.GL_COLOR_ATTACHMENT0, VulkanicAPI.GL_TEXTURE_2D, this.ssaoTexture, 0);
 	}
 	
 	

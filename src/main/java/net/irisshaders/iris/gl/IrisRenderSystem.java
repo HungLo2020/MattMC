@@ -234,7 +234,7 @@ public class IrisRenderSystem {
 	public static void bufferStorage(int target, long size, int flags) {
 		RenderSystem.assertOnRenderThread();
 		// The ARB version is identical to GL44 and redirects, so this should work on ARB as well.
-		VulkanicAPI.glBufferStorage(target, size, flags);
+		VulkanicAPI.glBufferStorage(CTX, target, size, flags);
 	}
 
 	public static void bindBufferBase(int target, Integer index, int buffer) {
@@ -263,7 +263,7 @@ public class IrisRenderSystem {
 
 	public static void bindImageTexture(int unit, int texture, int level, boolean layered, int layer, int access, int format) {
 		RenderSystem.assertOnRenderThread();
-		VulkanicAPI.glBindImageTexture(unit, texture, level, layered, layer, access, format);
+		VulkanicAPI.glBindImageTexture(CTX, unit, texture, level, layered, layer, access, format);
 	}
 
 	public static int getMaxImageUnits() {
@@ -291,11 +291,11 @@ public class IrisRenderSystem {
 	}
 
 	public static void dispatchCompute(int workX, int workY, int workZ) {
-		VulkanicAPI.glDispatchCompute(workX, workY, workZ);
+		VulkanicAPI.glDispatchCompute(CTX, workX, workY, workZ);
 	}
 
 	public static void dispatchCompute(Vector3i workGroups) {
-		VulkanicAPI.glDispatchCompute(workGroups.x, workGroups.y, workGroups.z);
+		VulkanicAPI.glDispatchCompute(CTX, workGroups.x, workGroups.y, workGroups.z);
 	}
 
 	public static void memoryBarrier(int barriers) {
@@ -404,7 +404,7 @@ public class IrisRenderSystem {
 			return;
 		}
 
-		VulkanicAPI.glBindSampler(unit, sampler);
+		VulkanicAPI.glBindSampler(CTX, unit, sampler);
 
 		samplers[unit] = sampler;
 	}
@@ -414,7 +414,7 @@ public class IrisRenderSystem {
 		for (int i = 0; i < samplers.length; i++) {
 			if (samplers[i] != 0) {
 				usedASampler = true;
-				if (!hasMultibind) VulkanicAPI.glBindSampler(i, 0);
+				if (!hasMultibind) VulkanicAPI.glBindSampler(CTX, i, 0);
 				samplers[i] = 0;
 			}
 		}
@@ -788,7 +788,7 @@ public class IrisRenderSystem {
 		@Override
 		public void framebufferTexture2D(int fb, int fbtarget, int attachment, int target, int texture, int levels) {
 			GlStateManager._glBindFramebuffer(fbtarget, fb);
-			VulkanicAPI.glFramebufferTexture2D(fbtarget, attachment, target, texture, levels);
+			VulkanicAPI.glFramebufferTexture2D(CTX, fbtarget, attachment, target, texture, levels);
 		}
 
 		@Override

@@ -14,6 +14,7 @@ import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IProfilerWrap
 import com.seibel.distanthorizons.core.wrapperInterfaces.world.IClientLevelWrapper;
 import com.seibel.distanthorizons.core.logging.DhLogger;
 import net.vulkanic.VulkanicAPI;
+import net.vulkanic.CommandContext;
 
 import java.nio.ByteBuffer;
 
@@ -26,6 +27,7 @@ import java.nio.ByteBuffer;
 public class VanillaFadeRenderer
 {
 	public static VanillaFadeRenderer INSTANCE = new VanillaFadeRenderer();
+	private static final CommandContext CTX = VulkanicAPI.getImmediateContext();
 	
 	private static final DhLogger LOGGER = new DhLoggerBuilder().build();
 	
@@ -86,11 +88,11 @@ public class VanillaFadeRenderer
 			VulkanicAPI.glTexImage2D(VulkanicAPI.GL_TEXTURE_2D, 0, VulkanicAPI.GL_RGBA16, width, height, 0, VulkanicAPI.GL_RGBA, VulkanicAPI.GL_UNSIGNED_SHORT_4_4_4_4, (ByteBuffer) null);
 			VulkanicAPI.glTexParameteri(VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_MIN_FILTER, VulkanicAPI.GL_LINEAR);
 			VulkanicAPI.glTexParameteri(VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_MAG_FILTER, VulkanicAPI.GL_LINEAR);
-			VulkanicAPI.glFramebufferTexture2D(VulkanicAPI.GL_FRAMEBUFFER, VulkanicAPI.GL_COLOR_ATTACHMENT0, VulkanicAPI.GL_TEXTURE_2D, this.fadeTexture, 0);
+			VulkanicAPI.glFramebufferTexture2D(CTX, VulkanicAPI.GL_FRAMEBUFFER, VulkanicAPI.GL_COLOR_ATTACHMENT0, VulkanicAPI.GL_TEXTURE_2D, this.fadeTexture, 0);
 		}
 		else
 		{
-			VulkanicAPI.glFramebufferTexture2D(VulkanicAPI.GL_FRAMEBUFFER, VulkanicAPI.GL_COLOR_ATTACHMENT0, VulkanicAPI.GL_TEXTURE_2D, MC_RENDER.getColorTextureId(), 0);
+			VulkanicAPI.glFramebufferTexture2D(CTX, VulkanicAPI.GL_FRAMEBUFFER, VulkanicAPI.GL_COLOR_ATTACHMENT0, VulkanicAPI.GL_TEXTURE_2D, MC_RENDER.getColorTextureId(), 0);
 		}
 	}
 	

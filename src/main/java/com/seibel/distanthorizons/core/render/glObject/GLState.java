@@ -183,9 +183,9 @@ public class GLState
 		// attempting to set textures on the default frame buffer (ID 0) will throw errors
 		if (frameBufferSet)
 		{
-			VulkanicAPI.glFramebufferTexture2D(VulkanicAPI.GL_FRAMEBUFFER, VulkanicAPI.GL_COLOR_ATTACHMENT0, VulkanicAPI.GL_TEXTURE_2D, this.frameBufferTexture0, 0);
-			VulkanicAPI.glFramebufferTexture2D(VulkanicAPI.GL_FRAMEBUFFER, VulkanicAPI.GL_COLOR_ATTACHMENT1, VulkanicAPI.GL_TEXTURE_2D, this.frameBufferTexture1, 0);
-			VulkanicAPI.glFramebufferTexture2D(VulkanicAPI.GL_FRAMEBUFFER, VulkanicAPI.GL_DEPTH_ATTACHMENT, VulkanicAPI.GL_TEXTURE_2D, this.frameBufferDepthTexture, 0);
+			VulkanicAPI.glFramebufferTexture2D(CTX, VulkanicAPI.GL_FRAMEBUFFER, VulkanicAPI.GL_COLOR_ATTACHMENT0, VulkanicAPI.GL_TEXTURE_2D, this.frameBufferTexture0, 0);
+			VulkanicAPI.glFramebufferTexture2D(CTX, VulkanicAPI.GL_FRAMEBUFFER, VulkanicAPI.GL_COLOR_ATTACHMENT1, VulkanicAPI.GL_TEXTURE_2D, this.frameBufferTexture1, 0);
+			VulkanicAPI.glFramebufferTexture2D(CTX, VulkanicAPI.GL_FRAMEBUFFER, VulkanicAPI.GL_DEPTH_ATTACHMENT, VulkanicAPI.GL_TEXTURE_2D, this.frameBufferDepthTexture, 0);
 		}
 		
 		VulkanicAPI.glBindVertexArray(VulkanicAPI.glIsVertexArray(this.vao) ? this.vao : 0);

@@ -2408,6 +2408,174 @@ public interface GraphicsBackend {
     void setDrawBuffers(CommandContext ctx, int[] bufs);
     
     /**
+     * Allocates immutable buffer storage with specific usage flags.
+     * 
+     * In OpenGL: Maps to glBufferStorage()
+     * In Vulkan: Maps to vkCreateBuffer() with appropriate usage flags
+     * 
+     * Creates immutable buffer storage that cannot be reallocated. This is more
+     * efficient than glBufferData as it allows the driver to optimize memory layout.
+     * Essential for persistent mapped buffers in both OpenGL and Vulkan.
+     * 
+     * @param ctx Command recording context
+     * @param target Buffer binding target (e.g., GL_ARRAY_BUFFER)
+     * @param size Size of the buffer in bytes
+     * @param flags Storage flags (e.g., GL_MAP_PERSISTENT_BIT | GL_MAP_WRITE_BIT)
+     * 
+     * Example usage:
+     * <pre>{@code
+     * backend.glBufferStorage(CTX, GL_ARRAY_BUFFER, 1024 * 1024, 
+     *     GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT | GL_MAP_WRITE_BIT);
+     * }</pre>
+     */
+    void glBufferStorage(CommandContext ctx, int target, long size, int flags);
+    
+    /**
+     * Allocates immutable buffer storage with initial data.
+     * 
+     * In OpenGL: Maps to glBufferStorage()
+     * In Vulkan: Maps to vkCreateBuffer() followed by vkCmdCopyBuffer()
+     * 
+     * Creates immutable buffer storage and initializes it with data from the
+     * provided ByteBuffer. This is the preferred way to create static buffers
+     * as it enables driver optimizations.
+     * 
+     * @param ctx Command recording context
+     * @param target Buffer binding target (e.g., GL_ARRAY_BUFFER)
+     * @param data ByteBuffer containing initial data
+     * @param flags Storage flags (e.g., GL_DYNAMIC_STORAGE_BIT)
+     * 
+     * Example usage:
+     * <pre>{@code
+     * ByteBuffer vertexData = ...;
+     * backend.glBufferStorage(CTX, GL_ARRAY_BUFFER, vertexData, 0);
+     * }</pre>
+     */
+    void glBufferStorage(CommandContext ctx, int target, java.nio.ByteBuffer data, int flags);
+    
+    /**
+     * Maps a range of buffer memory for CPU access.
+     * 
+     * In OpenGL: Maps to glMapBufferRange()
+     * In Vulkan: Maps to vkMapMemory()
+     * 
+     * Maps a portion of buffer storage to CPU-accessible memory. This allows
+     * direct memory access for efficient data transfers. The access parameter
+     * specifies read/write permissions and coherency requirements.
+     * 
+     * @param ctx Command recording context
+     * @param target Buffer binding target (e.g., GL_ARRAY_BUFFER)
+     * @param offset Offset into the buffer in bytes
+     * @param length Length of the range to map in bytes
+     * @param access Access flags (e.g., GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT)
+     * @return ByteBuffer representing the mapped memory region
+     * 
+     * Example usage:
+     * <pre>{@code
+     * ByteBuffer mapped = backend.glMapBufferRange(CTX, GL_ARRAY_BUFFER, 0, 1024, 
+     *     GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_BUFFER_BIT);
+     * mapped.putFloat(1.0f);
+     * }</pre>
+     */
+    java.nio.ByteBuffer glMapBufferRange(CommandContext ctx, int target, long offset, long length, int access);
+    
+    /**
+     * Dispatches compute shader work groups.
+     * 
+     * In OpenGL: Maps to glDispatchCompute()
+     * In Vulkan: Maps to vkCmdDispatch()
+     * 
+     * Executes a compute shader with the specified number of work groups in each
+     * dimension. The total number of shader invocations is workX * workY * workZ
+     * times the local work group size defined in the shader.
+     * 
+     * @param ctx Command recording context
+     * @param workX Number of work groups in X dimension
+     * @param workY Number of work groups in Y dimension
+     * @param workZ Number of work groups in Z dimension
+     * 
+     * Example usage:
+     * <pre>{@code
+     * // Dispatch 16x16x1 work groups
+     * backend.glDispatchCompute(CTX, 16, 16, 1);
+     * }</pre>
+     */
+    void glDispatchCompute(CommandContext ctx, int workX, int workY, int workZ);
+    
+    /**
+     * Attaches a 2D texture to a framebuffer attachment point.
+     * 
+     * In OpenGL: Maps to glFramebufferTexture2D()
+     * In Vulkan: Specified in VkFramebufferCreateInfo during framebuffer creation
+     * 
+     * Binds a 2D texture or a face of a cubemap texture to a framebuffer attachment.
+     * This is essential for render-to-texture operations like shadow mapping,
+     * post-processing, and deferred rendering.
+     * 
+     * @param ctx Command recording context
+     * @param target Framebuffer target (e.g., GL_FRAMEBUFFER)
+     * @param attachment Attachment point (e.g., GL_COLOR_ATTACHMENT0, GL_DEPTH_ATTACHMENT)
+     * @param textarget Texture target (e.g., GL_TEXTURE_2D, GL_TEXTURE_CUBE_MAP_POSITIVE_X)
+     * @param texture Texture object ID
+     * @param level Mipmap level to attach
+     * 
+     * Example usage:
+     * <pre>{@code
+     * backend.glFramebufferTexture2D(CTX, GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
+     *     GL_TEXTURE_2D, colorTexture, 0);
+     * }</pre>
+     */
+    void glFramebufferTexture2D(CommandContext ctx, int target, int attachment, int textarget, int texture, int level);
+    
+    /**
+     * Binds a texture to an image unit for shader image load/store operations.
+     * 
+     * In OpenGL: Maps to glBindImageTexture()
+     * In Vulkan: Maps to descriptor set updates with VK_DESCRIPTOR_TYPE_STORAGE_IMAGE
+     * 
+     * Binds a texture to an image unit for use in compute shaders or fragment shaders
+     * with imageLoad/imageStore operations. This enables read-write access to textures
+     * from shaders, essential for techniques like image-based lighting and compute-based
+     * post-processing.
+     * 
+     * @param ctx Command recording context
+     * @param unit Image unit index
+     * @param texture Texture object ID
+     * @param level Mipmap level
+     * @param layered Whether to bind the entire texture array
+     * @param layer Specific layer to bind (if not layered)
+     * @param access Access mode (e.g., GL_READ_ONLY, GL_WRITE_ONLY, GL_READ_WRITE)
+     * @param format Internal format (e.g., GL_RGBA8)
+     * 
+     * Example usage:
+     * <pre>{@code
+     * backend.glBindImageTexture(CTX, 0, texture, 0, false, 0, GL_WRITE_ONLY, GL_RGBA8);
+     * }</pre>
+     */
+    void glBindImageTexture(CommandContext ctx, int unit, int texture, int level, boolean layered, int layer, int access, int format);
+    
+    /**
+     * Binds a sampler object to a texture unit.
+     * 
+     * In OpenGL: Maps to glBindSampler()
+     * In Vulkan: Samplers are specified in descriptor set layouts
+     * 
+     * Binds a sampler object that controls texture sampling parameters (filtering,
+     * wrapping, LOD, etc.) to a specific texture unit. This allows separating
+     * texture data from sampling state, which is required in Vulkan.
+     * 
+     * @param ctx Command recording context
+     * @param unit Texture unit index
+     * @param sampler Sampler object ID (0 to unbind)
+     * 
+     * Example usage:
+     * <pre>{@code
+     * backend.glBindSampler(CTX, 0, samplerObject);
+     * }</pre>
+     */
+    void glBindSampler(CommandContext ctx, int unit, int sampler);
+    
+    /**
      * Creates a fence sync object for GPU-CPU synchronization.
      * 
      * In OpenGL: Maps to glFenceSync()

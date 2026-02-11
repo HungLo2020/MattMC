@@ -12,6 +12,9 @@ import org.lwjgl.opengl.GL30;
 import org.lwjgl.opengl.GL31;
 import org.lwjgl.opengl.GL32;
 import org.lwjgl.opengl.GL33;
+import org.lwjgl.opengl.GL42;
+import org.lwjgl.opengl.GL43;
+import org.lwjgl.opengl.GL44;
 import java.nio.ByteBuffer;
 import java.nio.FloatBuffer;
 
@@ -3363,6 +3366,76 @@ public class OpenGLBackend implements GraphicsBackend {
         }
         
         GL20.glDrawBuffers(bufs);
+    }
+    
+    @Override
+    public void glBufferStorage(CommandContext ctx, int target, long size, int flags) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        org.lwjgl.opengl.GL44.glBufferStorage(target, size, flags);
+    }
+    
+    @Override
+    public void glBufferStorage(CommandContext ctx, int target, java.nio.ByteBuffer data, int flags) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        org.lwjgl.opengl.GL44.glBufferStorage(target, data, flags);
+    }
+    
+    @Override
+    public java.nio.ByteBuffer glMapBufferRange(CommandContext ctx, int target, long offset, long length, int access) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        return GL30.glMapBufferRange(target, offset, length, access);
+    }
+    
+    @Override
+    public void glDispatchCompute(CommandContext ctx, int workX, int workY, int workZ) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        org.lwjgl.opengl.GL43.glDispatchCompute(workX, workY, workZ);
+    }
+    
+    @Override
+    public void glFramebufferTexture2D(CommandContext ctx, int target, int attachment, int textarget, int texture, int level) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        GL30.glFramebufferTexture2D(target, attachment, textarget, texture, level);
+    }
+    
+    @Override
+    public void glBindImageTexture(CommandContext ctx, int unit, int texture, int level, boolean layered, int layer, int access, int format) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        org.lwjgl.opengl.GL42.glBindImageTexture(unit, texture, level, layered, layer, access, format);
+    }
+    
+    @Override
+    public void glBindSampler(CommandContext ctx, int unit, int sampler) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalArgumentException("OpenGL backend requires immediate-mode CommandContext");
+        }
+        
+        org.lwjgl.opengl.GL33.glBindSampler(unit, sampler);
     }
     
     @Override

@@ -9,6 +9,7 @@ import com.seibel.distanthorizons.core.render.glObject.GLProxy;
 import com.seibel.distanthorizons.core.util.LodUtil;
 import com.seibel.distanthorizons.core.util.ThreadUtil;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftGLWrapper;
+import net.vulkanic.CommandContext;
 import net.vulkanic.VulkanicAPI;
 
 import java.lang.ref.PhantomReference;
@@ -27,6 +28,7 @@ public class GLBuffer implements AutoCloseable
 			.build();
 	
 	private static final IMinecraftGLWrapper GLMC = SingletonInjector.INSTANCE.get(IMinecraftGLWrapper.class);
+	private static final CommandContext CTX = VulkanicAPI.getImmediateContext();
 	
 	
 	public static final double BUFFER_EXPANSION_MULTIPLIER = 1.3;
@@ -204,7 +206,7 @@ public class GLBuffer implements AutoCloseable
 		this.destroyAsync();
 		this.create(true);
 		this.bind();
-		VulkanicAPI.glBufferStorage(this.getBufferBindingTarget(), bb, 0);
+		VulkanicAPI.glBufferStorage(CTX, this.getBufferBindingTarget(), bb, 0);
 		this.size = bbSize;
 	}
 	/** Requires the buffer to be bound */
@@ -260,7 +262,7 @@ public class GLBuffer implements AutoCloseable
 				this.id = GLMC.glGenBuffers();
 				VulkanicAPI.glBindBuffer(this.getBufferBindingTarget(), this.id);
 				VulkanicAPI.glBindBuffer(this.getBufferBindingTarget(), this.id);
-				VulkanicAPI.glBufferStorage(this.getBufferBindingTarget(), newSize, bufferHint);
+				VulkanicAPI.glBufferStorage(CTX, this.getBufferBindingTarget(), newSize, bufferHint);
 			}
 			else
 			{
@@ -268,7 +270,7 @@ public class GLBuffer implements AutoCloseable
 			}
 		}
 		
-		vboBuffer = VulkanicAPI.glMapBufferRange(VulkanicAPI.GL_ARRAY_BUFFER, 0, targetSize, mapFlags);
+		vboBuffer = VulkanicAPI.glMapBufferRange(CTX, VulkanicAPI.GL_ARRAY_BUFFER, 0, targetSize, mapFlags);
 		this.isMapped = true;
 		return vboBuffer;
 	}

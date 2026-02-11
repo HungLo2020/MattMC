@@ -2656,6 +2656,186 @@ public class VulkanicAPI {
         getBackend().attachUniformBufferRange(ctx, target, index, buffer, offset, size);
     }
     
+    /**
+     * Allocates immutable buffer storage with specific usage flags.
+     * 
+     * This is a Vulkan-compatible method that requires an explicit CommandContext.
+     * For OpenGL, use getImmediateContext() to get the context.
+     * 
+     * Example usage:
+     * <pre>
+     *     CommandContext ctx = VulkanicAPI.getImmediateContext();
+     *     VulkanicAPI.glBufferStorage(ctx, GL_ARRAY_BUFFER, 1024 * 1024, 
+     *         GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT | GL_MAP_WRITE_BIT);
+     * </pre>
+     * 
+     * In OpenGL: Maps to glBufferStorage()
+     * In Vulkan: Maps to vkCreateBuffer() with appropriate usage flags
+     * 
+     * @param ctx Command context for recording this command
+     * @param target Buffer binding target (e.g., GL_ARRAY_BUFFER)
+     * @param size Size of the buffer in bytes
+     * @param flags Storage flags (e.g., GL_MAP_PERSISTENT_BIT | GL_MAP_WRITE_BIT)
+     */
+    public static void glBufferStorage(CommandContext ctx, int target, long size, int flags) {
+        getBackend().glBufferStorage(ctx, target, size, flags);
+    }
+    
+    /**
+     * Allocates immutable buffer storage with initial data.
+     * 
+     * This is a Vulkan-compatible method that requires an explicit CommandContext.
+     * For OpenGL, use getImmediateContext() to get the context.
+     * 
+     * Example usage:
+     * <pre>
+     *     CommandContext ctx = VulkanicAPI.getImmediateContext();
+     *     ByteBuffer vertexData = ...;
+     *     VulkanicAPI.glBufferStorage(ctx, GL_ARRAY_BUFFER, vertexData, 0);
+     * </pre>
+     * 
+     * In OpenGL: Maps to glBufferStorage()
+     * In Vulkan: Maps to vkCreateBuffer() followed by vkCmdCopyBuffer()
+     * 
+     * @param ctx Command context for recording this command
+     * @param target Buffer binding target (e.g., GL_ARRAY_BUFFER)
+     * @param data ByteBuffer containing initial data
+     * @param flags Storage flags (e.g., GL_DYNAMIC_STORAGE_BIT)
+     */
+    public static void glBufferStorage(CommandContext ctx, int target, java.nio.ByteBuffer data, int flags) {
+        getBackend().glBufferStorage(ctx, target, data, flags);
+    }
+    
+    /**
+     * Maps a range of buffer memory for CPU access.
+     * 
+     * This is a Vulkan-compatible method that requires an explicit CommandContext.
+     * For OpenGL, use getImmediateContext() to get the context.
+     * 
+     * Example usage:
+     * <pre>
+     *     CommandContext ctx = VulkanicAPI.getImmediateContext();
+     *     ByteBuffer mapped = VulkanicAPI.glMapBufferRange(ctx, GL_ARRAY_BUFFER, 0, 1024, 
+     *         GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_BUFFER_BIT);
+     *     mapped.putFloat(1.0f);
+     * </pre>
+     * 
+     * In OpenGL: Maps to glMapBufferRange()
+     * In Vulkan: Maps to vkMapMemory()
+     * 
+     * @param ctx Command context for recording this command
+     * @param target Buffer binding target (e.g., GL_ARRAY_BUFFER)
+     * @param offset Offset into the buffer in bytes
+     * @param length Length of the range to map in bytes
+     * @param access Access flags (e.g., GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT)
+     * @return ByteBuffer representing the mapped memory region
+     */
+    public static java.nio.ByteBuffer glMapBufferRange(CommandContext ctx, int target, long offset, long length, int access) {
+        return getBackend().glMapBufferRange(ctx, target, offset, length, access);
+    }
+    
+    /**
+     * Dispatches compute shader work groups.
+     * 
+     * This is a Vulkan-compatible method that requires an explicit CommandContext.
+     * For OpenGL, use getImmediateContext() to get the context.
+     * 
+     * Example usage:
+     * <pre>
+     *     CommandContext ctx = VulkanicAPI.getImmediateContext();
+     *     VulkanicAPI.glDispatchCompute(ctx, 16, 16, 1);
+     * </pre>
+     * 
+     * In OpenGL: Maps to glDispatchCompute()
+     * In Vulkan: Maps to vkCmdDispatch()
+     * 
+     * @param ctx Command context for recording this command
+     * @param workX Number of work groups in X dimension
+     * @param workY Number of work groups in Y dimension
+     * @param workZ Number of work groups in Z dimension
+     */
+    public static void glDispatchCompute(CommandContext ctx, int workX, int workY, int workZ) {
+        getBackend().glDispatchCompute(ctx, workX, workY, workZ);
+    }
+    
+    /**
+     * Attaches a 2D texture to a framebuffer attachment point.
+     * 
+     * This is a Vulkan-compatible method that requires an explicit CommandContext.
+     * For OpenGL, use getImmediateContext() to get the context.
+     * 
+     * Example usage:
+     * <pre>
+     *     CommandContext ctx = VulkanicAPI.getImmediateContext();
+     *     VulkanicAPI.glFramebufferTexture2D(ctx, GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
+     *         GL_TEXTURE_2D, colorTexture, 0);
+     * </pre>
+     * 
+     * In OpenGL: Maps to glFramebufferTexture2D()
+     * In Vulkan: Specified in VkFramebufferCreateInfo during framebuffer creation
+     * 
+     * @param ctx Command context for recording this command
+     * @param target Framebuffer target (e.g., GL_FRAMEBUFFER)
+     * @param attachment Attachment point (e.g., GL_COLOR_ATTACHMENT0, GL_DEPTH_ATTACHMENT)
+     * @param textarget Texture target (e.g., GL_TEXTURE_2D, GL_TEXTURE_CUBE_MAP_POSITIVE_X)
+     * @param texture Texture object ID
+     * @param level Mipmap level to attach
+     */
+    public static void glFramebufferTexture2D(CommandContext ctx, int target, int attachment, int textarget, int texture, int level) {
+        getBackend().glFramebufferTexture2D(ctx, target, attachment, textarget, texture, level);
+    }
+    
+    /**
+     * Binds a texture to an image unit for shader image load/store operations.
+     * 
+     * This is a Vulkan-compatible method that requires an explicit CommandContext.
+     * For OpenGL, use getImmediateContext() to get the context.
+     * 
+     * Example usage:
+     * <pre>
+     *     CommandContext ctx = VulkanicAPI.getImmediateContext();
+     *     VulkanicAPI.glBindImageTexture(ctx, 0, texture, 0, false, 0, GL_WRITE_ONLY, GL_RGBA8);
+     * </pre>
+     * 
+     * In OpenGL: Maps to glBindImageTexture()
+     * In Vulkan: Maps to descriptor set updates with VK_DESCRIPTOR_TYPE_STORAGE_IMAGE
+     * 
+     * @param ctx Command context for recording this command
+     * @param unit Image unit index
+     * @param texture Texture object ID
+     * @param level Mipmap level
+     * @param layered Whether to bind the entire texture array
+     * @param layer Specific layer to bind (if not layered)
+     * @param access Access mode (e.g., GL_READ_ONLY, GL_WRITE_ONLY, GL_READ_WRITE)
+     * @param format Internal format (e.g., GL_RGBA8)
+     */
+    public static void glBindImageTexture(CommandContext ctx, int unit, int texture, int level, boolean layered, int layer, int access, int format) {
+        getBackend().glBindImageTexture(ctx, unit, texture, level, layered, layer, access, format);
+    }
+    
+    /**
+     * Binds a sampler object to a texture unit.
+     * 
+     * This is a Vulkan-compatible method that requires an explicit CommandContext.
+     * For OpenGL, use getImmediateContext() to get the context.
+     * 
+     * Example usage:
+     * <pre>
+     *     CommandContext ctx = VulkanicAPI.getImmediateContext();
+     *     VulkanicAPI.glBindSampler(ctx, 0, samplerObject);
+     * </pre>
+     * 
+     * In OpenGL: Maps to glBindSampler()
+     * In Vulkan: Samplers are specified in descriptor set layouts
+     * 
+     * @param ctx Command context for recording this command
+     * @param unit Texture unit index
+     * @param sampler Sampler object ID (0 to unbind)
+     */
+    public static void glBindSampler(CommandContext ctx, int unit, int sampler) {
+        getBackend().glBindSampler(ctx, unit, sampler);
+    }
+    
     // ================================================================================
     // DEPRECATED METHODS - Legacy API without CommandContext
     // ================================================================================
