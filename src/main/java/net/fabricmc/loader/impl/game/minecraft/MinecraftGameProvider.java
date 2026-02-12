@@ -28,9 +28,6 @@ import net.fabricmc.loader.impl.FormattedException;
 import net.fabricmc.loader.impl.game.GameProvider;
 import net.fabricmc.loader.impl.game.GameProviderHelper;
 import net.fabricmc.loader.impl.game.LibClassifier;
-import net.fabricmc.loader.impl.game.minecraft.patch.BrandingPatch;
-import net.fabricmc.loader.impl.game.minecraft.patch.EntrypointPatch;
-import net.fabricmc.loader.impl.game.minecraft.patch.TinyFDPatch;
 import net.fabricmc.loader.impl.game.patch.GameTransformer;
 import net.fabricmc.loader.impl.launch.FabricLauncher;
 import net.fabricmc.loader.impl.launch.MappingConfiguration;
@@ -72,10 +69,8 @@ public class MinecraftGameProvider implements GameProvider {
 	private McVersion versionData;
 	private boolean hasModLoader = false;
 
-	private final GameTransformer transformer = new GameTransformer(
-			new EntrypointPatch(this),
-			new BrandingPatch(),
-			new TinyFDPatch());
+	// GameTransformer simplified - no patches needed for integrated mod approach
+	private final GameTransformer transformer = new GameTransformer();
 
 	@Override
 	public String getGameId() {

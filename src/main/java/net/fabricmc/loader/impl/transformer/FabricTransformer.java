@@ -1,58 +1,18 @@
 package net.fabricmc.loader.impl.transformer;
 
-import java.util.Set;
-
-import org.objectweb.asm.ClassReader;
-import org.objectweb.asm.ClassVisitor;
-import org.objectweb.asm.ClassWriter;
-
 import net.fabricmc.api.EnvType;
-import net.fabricmc.loader.impl.FabricLoaderImpl;
-import net.fabricmc.loader.impl.game.GameProvider.BuiltinTransform;
-import net.fabricmc.loader.impl.launch.FabricLauncherBase;
 
+/**
+ * Simplified transformer for integrated mod approach.
+ * No transformation needed - all code is compiled together with correct access modifiers
+ * and namespace mappings.
+ */
 public final class FabricTransformer {
 	public static byte[] transform(boolean isDevelopment, EnvType envType, String name, byte[] bytes) {
-		Set<BuiltinTransform> transforms = FabricLoaderImpl.INSTANCE.getGameProvider().getBuiltinTransforms(name);
-		boolean transformAccess = transforms.contains(BuiltinTransform.WIDEN_ALL_PACKAGE_ACCESS) && FabricLauncherBase.getLauncher().getMappingConfiguration().requiresPackageAccessHack();
-		boolean environmentStrip = transforms.contains(BuiltinTransform.STRIP_ENVIRONMENT);
-		// NOTE: applyClassTweaker removed - access modifications already applied in source
-
-		if (!transformAccess && !environmentStrip) {
-			return bytes;
-		}
-
-		ClassReader classReader = new ClassReader(bytes);
-		ClassWriter classWriter = new ClassWriter(classReader, 0);
-		ClassVisitor visitor = classWriter;
-		int visitorCount = 0;
-
-		// NOTE: Class tweaker application removed - access modifications already applied in source
-
-		if (transformAccess) {
-			visitor = new PackageAccessFixer(FabricLoaderImpl.ASM_VERSION, visitor);
-			visitorCount++;
-		}
-
-		if (environmentStrip) {
-			EnvironmentStrippingData stripData = new EnvironmentStrippingData(FabricLoaderImpl.ASM_VERSION, envType.toString());
-			classReader.accept(stripData, ClassReader.SKIP_CODE | ClassReader.SKIP_FRAMES);
-
-			if (stripData.stripEntireClass()) {
-				throw new RuntimeException("Cannot load class " + name + " in environment type " + envType);
-			}
-
-			if (!stripData.isEmpty()) {
-				visitor = new ClassStripper(FabricLoaderImpl.ASM_VERSION, visitor, stripData.getStripInterfaces(), stripData.getStripFields(), stripData.getStripMethods());
-				visitorCount++;
-			}
-		}
-
-		if (visitorCount <= 0) {
-			return bytes;
-		}
-
-		classReader.accept(visitor, 0);
-		return classWriter.toByteArray();
+		// No transformation needed for integrated mod approach
+		// - Access modifiers already correct (no package access hack needed)
+		// - Environment stripping not needed (compilation handles this)
+		// - No mixins to apply (using hook system instead)
+		return bytes;
 	}
 }

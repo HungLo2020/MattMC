@@ -1,50 +1,22 @@
 package net.fabricmc.loader.impl.metadata;
 
 import java.util.Collection;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.Collections;
 
-import net.fabricmc.loader.api.Version;
-import net.fabricmc.loader.api.VersionParsingException;
-import net.fabricmc.loader.impl.util.SystemProperties;
-import net.fabricmc.loader.impl.util.version.VersionParser;
-
+/**
+ * Simplified version overrides for integrated mod approach.
+ * No version conflicts in single integrated mod - overrides not needed.
+ */
 public final class VersionOverrides {
-	private final Map<String, Version> replacements = new HashMap<>();
-
 	public VersionOverrides() {
-		String property = System.getProperty(SystemProperties.DEBUG_REPLACE_VERSION);
-		if (property == null) return;
-
-		for (String entry : property.split(",")) {
-			int pos = entry.indexOf(":");
-			if (pos <= 0 || pos >= entry.length() - 1) throw new RuntimeException("invalid version replacement entry: "+entry);
-
-			String id = entry.substring(0, pos);
-			String rawVersion = entry.substring(pos + 1);
-			Version version;
-
-			try {
-				version = VersionParser.parse(rawVersion, false);
-			} catch (VersionParsingException e) {
-				throw new RuntimeException(String.format("Invalid replacement version for mod %s: %s", id, rawVersion), e);
-			}
-
-			replacements.put(id, version);
-		}
+		// No-op - single integrated mod has no version conflicts to override
 	}
 
 	public void apply(LoaderModMetadata metadata) {
-		if (replacements.isEmpty()) return;
-
-		Version replacement = replacements.get(metadata.getId());
-
-		if (replacement != null) {
-			metadata.setVersion(replacement);
-		}
+		// No-op - no overrides to apply
 	}
 
 	public Collection<String> getAffectedModIds() {
-		return replacements.keySet();
+		return Collections.emptySet();
 	}
 }
