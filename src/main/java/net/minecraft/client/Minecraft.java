@@ -708,6 +708,10 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 		} catch (Exception e) {
 			LOGGER.error("Failed to initialize VoxelMap", e);
 		}
+		
+		// Fabric Loader: Initialize client mod entrypoints
+		// This calls onInitializeClient() for all client mods (Sodium, DistantHorizons, etc.)
+		net.fabricmc.loader.impl.game.minecraft.Hooks.startClient(gameDirectory, this);
 	}
 
 	public boolean hasShiftDown() {
