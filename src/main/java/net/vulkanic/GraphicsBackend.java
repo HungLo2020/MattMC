@@ -9,6 +9,36 @@ import java.nio.FloatBuffer;
  */
 public interface GraphicsBackend {
     
+    // ===== VULKAN-NATIVE API (Non-deprecated) =====
+    // These methods are designed from Vulkan's perspective and will work efficiently with both backends.
+    
+    /**
+     * Clears render targets with specified clear values.
+     * 
+     * VULKAN PERSPECTIVE:
+     * In Vulkan, clearing is part of render pass load operations. When beginning a render pass,
+     * you specify VkClearValue for each attachment. Attachments with LOAD_OP_CLEAR are automatically
+     * cleared to these values. This is more efficient than explicit clear commands.
+     * 
+     * OPENGL TRANSLATION:
+     * The OpenGL backend translates this to glClearColor()/glClearDepth() followed by glClear().
+     * The state is cached to avoid redundant calls.
+     * 
+     * DESIGN RATIONALE:
+     * This API models Vulkan's approach where clear values are specified upfront, not as separate
+     * state-setting operations. This is more efficient and maps 1:1 to Vulkan render passes.
+     * 
+     * @param ctx Command context - in Vulkan this would be part of VkRenderPassBeginInfo,
+     *            in OpenGL it's the immediate context
+     * @param clearColor Clear color (R,G,B,A) for color attachments. Use null to skip color clear.
+     * @param clearDepth Clear value for depth attachment. Use null to skip depth clear.
+     * @param clearStencil Clear value for stencil attachment. Use null to skip stencil clear.
+     */
+    void clearRenderTarget(CommandContext ctx, float[] clearColor, Double clearDepth, Integer clearStencil);
+    
+    // ===== DEPRECATED OPENGL-STYLE API =====
+    // These methods are OpenGL-centric and will be replaced with Vulkan-native equivalents.
+    
     // Context operations
     /**
      * Gets the current graphics context (platform-specific).

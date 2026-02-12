@@ -444,11 +444,12 @@ public class LodRenderer
 		boolean clearTextures = !ApiEventInjector.INSTANCE.fireAllEvents(DhApiBeforeTextureClearEvent.class, renderEventParam);
 		if (clearTextures)
 		{
-			VulkanicAPI.glClearDepth(1.0);
-			
+			// NEW VULKAN-NATIVE API: Specify clear values together (maps to Vulkan render pass load ops)
 			float[] clearColorValues = new float[4];
 			VulkanicAPI.queryFloatState(CTX, VulkanicAPI.GL_COLOR_CLEAR_VALUE, clearColorValues);
-			VulkanicAPI.glClearColor(clearColorValues[0], clearColorValues[1], clearColorValues[2], 1.0f);
+			clearColorValues[3] = 1.0f;  // Override alpha to 1.0
+			
+			VulkanicAPI.clearRenderTarget(clearColorValues, 1.0, null);
 			
 			if (this.usingMcFramebuffer && framebufferOverride == null)
 			{

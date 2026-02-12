@@ -251,11 +251,12 @@ public class FogShader extends AbstractShaderRenderer
 		if (MC_RENDER.runningLegacyOpenGL())
 		{
 			// in another part of the DH code we set the fog color to opaque, here it needs to be transparent
+			// NEW VULKAN-NATIVE API: Specify clear values together (maps to Vulkan render pass load ops)
 			float[] clearColorValues = new float[4];
 			VulkanicAPI.queryFloatState(CTX, VulkanicAPI.GL_COLOR_CLEAR_VALUE, clearColorValues);
-			VulkanicAPI.glClearColor(clearColorValues[0], clearColorValues[1], clearColorValues[2], 0.0f);
+			clearColorValues[3] = 0.0f;  // Override alpha to 0.0
 			
-			VulkanicAPI.clear(CTX, VulkanicAPI.GL_COLOR_BUFFER_BIT | VulkanicAPI.GL_DEPTH_BUFFER_BIT);
+			VulkanicAPI.clearRenderTarget(clearColorValues, 1.0, null);  // Clear color and depth
 		}
 		
 		

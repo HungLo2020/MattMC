@@ -14,6 +14,36 @@ public class VulkanicAPI {
     private static GraphicsBackend backend;
     private static final CommandContext CTX = OpenGLCommandContext.IMMEDIATE;
     
+    // ===== VULKAN-NATIVE PUBLIC API =====
+    // These methods are designed from Vulkan's perspective and work efficiently with all backends.
+    
+    /**
+     * Clears render targets with specified values.
+     * 
+     * This is a Vulkan-native API that models render pass load operations.
+     * Much simpler than the old OpenGL approach of glClearColor() + glClearDepth() + glClear().
+     * 
+     * Example usage:
+     * <pre>{@code
+     * // Clear color to black and depth to 1.0
+     * VulkanicAPI.clearRenderTarget(
+     *     new float[]{0.0f, 0.0f, 0.0f, 1.0f},  // RGBA
+     *     1.0,                                   // depth
+     *     null                                   // no stencil clear
+     * );
+     * }</pre>
+     * 
+     * @param clearColor RGBA color to clear (null to skip color clear)
+     * @param clearDepth Depth value to clear (null to skip depth clear)
+     * @param clearStencil Stencil value to clear (null to skip stencil clear)
+     */
+    public static void clearRenderTarget(float[] clearColor, Double clearDepth, Integer clearStencil) {
+        backend.clearRenderTarget(CTX, clearColor, clearDepth, clearStencil);
+    }
+    
+    // ===== DEPRECATED OPENGL-STYLE API =====
+    // These methods are being replaced with Vulkan-native equivalents.
+    
     /**
      * Gets the immediate-mode command context for the current backend.
      * 

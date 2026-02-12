@@ -26,6 +26,46 @@ import java.nio.FloatBuffer;
  */
 public class OpenGLBackend implements GraphicsBackend {
     
+    // ===== VULKAN-NATIVE API IMPLEMENTATIONS =====
+    
+    @Override
+    public void clearRenderTarget(CommandContext ctx, float[] clearColor, Double clearDepth, Integer clearStencil) {
+        // Validate context is immediate mode (OpenGL requirement)
+        if (!ctx.isImmediate()) {
+            throw new IllegalStateException("OpenGL backend requires immediate mode context for clear operations");
+        }
+        
+        int clearMask = 0;
+        
+        // Set color clear value and mask
+        if (clearColor != null) {
+            if (clearColor.length != 4) {
+                throw new IllegalArgumentException("clearColor must have 4 components (R,G,B,A)");
+            }
+            GL11.glClearColor(clearColor[0], clearColor[1], clearColor[2], clearColor[3]);
+            clearMask |= GL11.GL_COLOR_BUFFER_BIT;
+        }
+        
+        // Set depth clear value and mask
+        if (clearDepth != null) {
+            GL11.glClearDepth(clearDepth);
+            clearMask |= GL11.GL_DEPTH_BUFFER_BIT;
+        }
+        
+        // Set stencil clear value and mask
+        if (clearStencil != null) {
+            GL11.glClearStencil(clearStencil);
+            clearMask |= GL11.GL_STENCIL_BUFFER_BIT;
+        }
+        
+        // Execute the clear if any mask bits are set
+        if (clearMask != 0) {
+            GL11.glClear(clearMask);
+        }
+    }
+    
+    // ===== DEPRECATED OPENGL-STYLE API =====
+    
     @Deprecated
     @Override
     public long getGraphicsContext() {
