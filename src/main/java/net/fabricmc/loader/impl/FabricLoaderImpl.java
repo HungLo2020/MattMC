@@ -3,11 +3,11 @@ package net.fabricmc.loader.impl;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -24,7 +24,14 @@ import net.fabricmc.loader.api.LanguageAdapter;
 import net.fabricmc.loader.api.MappingResolver;
 import net.fabricmc.loader.api.ModContainer;
 import net.fabricmc.loader.api.ObjectShare;
+import net.fabricmc.loader.api.Version;
+import net.fabricmc.loader.api.VersionParsingException;
 import net.fabricmc.loader.api.entrypoint.EntrypointContainer;
+import net.fabricmc.loader.api.metadata.ContactInformation;
+import net.fabricmc.loader.api.metadata.CustomValue;
+import net.fabricmc.loader.api.metadata.ModDependency;
+import net.fabricmc.loader.api.metadata.ModEnvironment;
+import net.fabricmc.loader.api.metadata.Person;
 import net.fabricmc.loader.impl.discovery.ModCandidateImpl;
 import net.fabricmc.loader.impl.discovery.ModResolutionException;
 import net.fabricmc.loader.impl.entrypoint.EntrypointStorage;
@@ -32,18 +39,17 @@ import net.fabricmc.loader.impl.game.GameProvider;
 import net.fabricmc.loader.impl.launch.FabricLauncherBase;
 import net.fabricmc.loader.impl.launch.MappingConfiguration;
 import net.fabricmc.loader.impl.launch.knot.Knot;
-import net.fabricmc.loader.impl.metadata.DependencyOverrides;
+import net.fabricmc.loader.impl.metadata.AbstractModMetadata;
 import net.fabricmc.loader.impl.metadata.EntrypointMetadata;
 import net.fabricmc.loader.impl.metadata.LoaderModMetadata;
-import net.fabricmc.loader.impl.metadata.ModMetadataParser;
-import net.fabricmc.loader.impl.metadata.ParseMetadataException;
-import net.fabricmc.loader.impl.metadata.VersionOverrides;
+import net.fabricmc.loader.impl.metadata.NestedJarEntry;
 import net.fabricmc.loader.impl.util.DefaultLanguageAdapter;
 import net.fabricmc.loader.impl.util.ExceptionUtil;
 import net.fabricmc.loader.impl.util.LoaderUtil;
 import net.fabricmc.loader.impl.util.SystemProperties;
 import net.fabricmc.loader.impl.util.log.Log;
 import net.fabricmc.loader.impl.util.log.LogCategory;
+import net.fabricmc.loader.impl.util.version.VersionParser;
 
 @SuppressWarnings("deprecation")
 public final class FabricLoaderImpl extends net.fabricmc.loader.FabricLoader {
@@ -180,43 +186,101 @@ public final class FabricLoaderImpl extends net.fabricmc.loader.FabricLoader {
 	}
 
 	private void setup() throws ModResolutionException {
-		// SIMPLIFIED SETUP - No discovery, no resolution, just load the single integrated mod
+		// SIMPLIFIED SETUP - Hardcoded metadata, no JSON parsing
 		// The integrated mod (mattmc) is compiled into the JAR with all "mods" as part of the codebase
 		
-		Log.info(LogCategory.GENERAL, "Loading integrated mod (simplified loader)");
+		Log.info(LogCategory.GENERAL, "Loading integrated mod (hardcoded metadata)");
 		
-		try {
-			// Load fabric.mod.json from resources
-			InputStream modJsonStream = FabricLoaderImpl.class.getClassLoader().getResourceAsStream("fabric.mod.json");
-			if (modJsonStream == null) {
-				throw new ModResolutionException("fabric.mod.json not found in resources");
+		// Create hardcoded metadata inline - no JSON file or parsing needed
+		LoaderModMetadata metadata = new LoaderModMetadata() {
+			private final String id = "mattmc";
+			private final String name = "MattMC";
+			private final String description = "Minecraft 1.21.10 with integrated Fabric Loader, Sodium, Iris, and Distant Horizons";
+			private final Version version;
+			private final List<String> provides = Arrays.asList("fabricloader", "sodium", "iris", "distanthorizons", "lod", "voxelmap");
+			private final Map<String, List<EntrypointMetadata>> entrypoints;
+			
+			{
+				try {
+					version = VersionParser.parse("1.21.10", false);
+				} catch (VersionParsingException e) {
+					throw new RuntimeException(e);
+				}
+				
+				// Setup entrypoints with inline implementations
+				Map<String, List<EntrypointMetadata>> eps = new HashMap<>();
+				
+				// Client entrypoints
+				List<EntrypointMetadata> clientEps = new ArrayList<>();
+				clientEps.add(new EntrypointMetadata() {
+					public String getAdapter() { return "default"; }
+					public String getValue() { return "net.sodium.fabric.SodiumFabricMod"; }
+				});
+				clientEps.add(new EntrypointMetadata() {
+					public String getAdapter() { return "default"; }
+					public String getValue() { return "com.seibel.distanthorizons.fabric.FabricMain"; }
+				});
+				eps.put("client", clientEps);
+				
+				// Server entrypoints
+				List<EntrypointMetadata> serverEps = new ArrayList<>();
+				serverEps.add(new EntrypointMetadata() {
+					public String getAdapter() { return "default"; }
+					public String getValue() { return "com.seibel.distanthorizons.fabric.FabricMain"; }
+				});
+				eps.put("server", serverEps);
+				
+				// PreLaunch entrypoints
+				List<EntrypointMetadata> preLaunchEps = new ArrayList<>();
+				preLaunchEps.add(new EntrypointMetadata() {
+					public String getAdapter() { return "default"; }
+					public String getValue() { return "net.sodium.fabric.SodiumPreLaunch"; }
+				});
+				eps.put("preLaunch", preLaunchEps);
+				
+				entrypoints = Collections.unmodifiableMap(eps);
 			}
 			
-			// Parse metadata without version/dependency overrides (not needed for single integrated mod)
-			VersionOverrides versionOverrides = new VersionOverrides();
-			DependencyOverrides depOverrides = new DependencyOverrides(configDir);
-			
-			LoaderModMetadata metadata = ModMetadataParser.parseMetadata(
-				modJsonStream, 
-				"<classpath>", 
-				Collections.emptyList(),
-				versionOverrides,
-				depOverrides,
-				isDevelopmentEnvironment()
-			);
-			
-			// Create a simple mod candidate directly from the classpath
-			// No need for complex discovery - we know the mod is right here
-			ModCandidateImpl candidate = createIntegratedModCandidate(metadata);
-			
-			// Add the single integrated mod
-			addMod(candidate);
-			
-			Log.info(LogCategory.GENERAL, "Loaded integrated mod: %s v%s", metadata.getId(), metadata.getVersion());
-			
-		} catch (ParseMetadataException e) {
-			throw new ModResolutionException("Failed to parse integrated mod metadata", e);
-		}
+			public int getSchemaVersion() { return 1; }
+			public String getType() { return "fabric"; }
+			public String getId() { return id; }
+			public Collection<String> getProvides() { return provides; }
+			public Version getVersion() { return version; }
+			public ModEnvironment getEnvironment() { return ModEnvironment.UNIVERSAL; }
+			public String getName() { return name; }
+			public String getDescription() { return description; }
+			public Collection<Person> getAuthors() { return Collections.emptyList(); }
+			public Collection<Person> getContributors() { return Collections.emptyList(); }
+			public ContactInformation getContact() { return ContactInformation.EMPTY; }
+			public Collection<String> getLicense() { return Collections.emptyList(); }
+			public Optional<String> getIconPath(int size) { return Optional.empty(); }
+			public Collection<ModDependency> getDependencies() { return Collections.emptyList(); }
+			public boolean containsCustomValue(String key) { return false; }
+			public boolean containsCustomElement(String key) { return false; }
+			public CustomValue getCustomValue(String key) { return null; }
+			public Map<String, CustomValue> getCustomValues() { return Collections.emptyMap(); }
+			public Map<String, String> getLanguageAdapterDefinitions() { return Collections.emptyMap(); }
+			public Collection<NestedJarEntry> getJars() { return Collections.emptyList(); }
+			public Collection<String> getMixinConfigs(EnvType type) { return Collections.emptyList(); }
+			public boolean loadsInEnvironment(EnvType type) { return true; }
+			public Collection<String> getOldInitializers() { return Collections.emptyList(); }
+			public List<EntrypointMetadata> getEntrypoints(String type) { 
+				List<EntrypointMetadata> list = entrypoints.get(type);
+				return list != null ? list : Collections.emptyList();
+			}
+			public Collection<String> getEntrypointKeys() { return entrypoints.keySet(); }
+			public void emitFormatWarnings() { }
+			public void setVersion(Version version) { }
+			public void setDependencies(Collection<ModDependency> dependencies) { }
+		};
+		
+		// Create a simple mod candidate directly from the classpath
+		ModCandidateImpl candidate = createIntegratedModCandidate(metadata);
+		
+		// Add the single integrated mod
+		addMod(candidate);
+		
+		Log.info(LogCategory.GENERAL, "Loaded integrated mod: %s v%s", metadata.getId(), metadata.getVersion());
 	}
 	
 	private ModCandidateImpl createIntegratedModCandidate(LoaderModMetadata metadata) {
