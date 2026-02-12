@@ -1,0 +1,292 @@
+# Gradle Version Catalog
+# This file centralizes all dependency versions for the MattMC project.
+# Instead of hardcoding versions in build.gradle, we define them once here.
+#
+# Benefits:
+# 1. Single source of truth - update a version in ONE place
+# 2. Type-safe references - IDE autocomplete for dependencies
+# 3. Reusable bundles - group related dependencies together
+# 4. Easy bulk updates - see all versions at a glance
+# 5. Shared across modules - when you split into multi-module project
+#
+# Syntax:
+# [versions]       - Define version numbers
+# [libraries]      - Define individual dependencies
+# [bundles]        - Group related dependencies together
+# [plugins]        - Define Gradle plugins
+
+# ============================================================================
+# VERSION NUMBERS
+# ============================================================================
+# Define all version numbers here - they can be referenced by libraries below
+
+[versions]
+# Project versions
+minecraft = "1.21.10"
+java = "25"
+
+# LWJGL - Lightweight Java Game Library
+lwjgl = "3.3.3"
+
+# Mojang libraries
+brigadier = "1.3.10"
+datafixerupper = "8.0.16"
+jtracy = "1.0.29"
+
+# Google libraries
+guava = "32.1.2-jre"
+gson = "2.11.0"
+
+# Apache Commons
+commons-lang3 = "3.14.0"
+commons-io = "2.15.1"
+commons-compress = "1.26.0"
+httpclient = "4.5.14"
+httpcore = "4.4.16"
+
+# Logging
+slf4j = "2.0.9"
+log4j = "2.22.1"
+
+# Networking
+netty = "4.1.97.Final"
+
+# Core libraries
+fastutil = "8.5.12"
+jna = "5.14.0"
+joml = "1.10.5"
+jopt-simple = "5.0.4"
+msal4j = "1.14.3"
+jetbrains-annotations = "24.1.0"
+oshi = "6.4.10"
+icu4j = "74.2"
+java-objc-bridge = "1.2"
+jorbis = "0.0.17"
+
+# ASM - bytecode manipulation (Fabric Loader requirement)
+asm = "9.9"
+
+# Fabric Loader
+mapping-io = "0.7.1"
+sat4j = "2.3.6"
+
+# Iris Shaders dependencies
+jcpp = "1.4.14"
+antlr4 = "4.13.1"
+glsl-transformer = "3.0.0-pre3"
+
+# Distant Horizons dependencies
+zstd-jni = "1.5.7-6"
+lz4-java = "1.8.0"
+xz = "1.9"
+sqlite-jdbc = "3.47.2.0"
+night-config = "3.6.6"
+
+# Testing frameworks
+junit = "5.10.1"
+assertj = "3.25.1"
+mockito = "5.8.0"
+jmh = "1.37"
+awaitility = "4.2.0"
+
+# ============================================================================
+# LIBRARY DEFINITIONS
+# ============================================================================
+# Define each dependency with its group, artifact, and version reference
+
+[libraries]
+# Mojang libraries
+mojang-brigadier = { module = "com.mojang:brigadier", version.ref = "brigadier" }
+mojang-datafixerupper = { module = "com.mojang:datafixerupper", version.ref = "datafixerupper" }
+mojang-jtracy = { module = "com.mojang:jtracy", version.ref = "jtracy" }
+
+# Google libraries
+google-guava = { module = "com.google.guava:guava", version.ref = "guava" }
+google-gson = { module = "com.google.code.gson:gson", version.ref = "gson" }
+
+# Apache Commons
+apache-commons-lang3 = { module = "org.apache.commons:commons-lang3", version.ref = "commons-lang3" }
+apache-commons-io = { module = "commons-io:commons-io", version.ref = "commons-io" }
+apache-commons-compress = { module = "org.apache.commons:commons-compress", version.ref = "commons-compress" }
+apache-httpclient = { module = "org.apache.httpcomponents:httpclient", version.ref = "httpclient" }
+apache-httpcore = { module = "org.apache.httpcomponents:httpcore", version.ref = "httpcore" }
+
+# Logging
+slf4j-api = { module = "org.slf4j:slf4j-api", version.ref = "slf4j" }
+log4j-slf4j2-impl = { module = "org.apache.logging.log4j:log4j-slf4j2-impl", version.ref = "log4j" }
+log4j-core = { module = "org.apache.logging.log4j:log4j-core", version.ref = "log4j" }
+log4j-api = { module = "org.apache.logging.log4j:log4j-api", version.ref = "log4j" }
+
+# Networking
+netty-all = { module = "io.netty:netty-all", version.ref = "netty" }
+
+# Core libraries
+fastutil = { module = "it.unimi.dsi:fastutil", version.ref = "fastutil" }
+jna = { module = "net.java.dev.jna:jna", version.ref = "jna" }
+jna-platform = { module = "net.java.dev.jna:jna-platform", version.ref = "jna" }
+joml = { module = "org.joml:joml", version.ref = "joml" }
+jopt-simple = { module = "net.sf.jopt-simple:jopt-simple", version.ref = "jopt-simple" }
+msal4j = { module = "com.microsoft.azure:msal4j", version.ref = "msal4j" }
+jetbrains-annotations = { module = "org.jetbrains:annotations", version.ref = "jetbrains-annotations" }
+oshi-core = { module = "com.github.oshi:oshi-core", version.ref = "oshi" }
+icu4j = { module = "com.ibm.icu:icu4j", version.ref = "icu4j" }
+java-objc-bridge = { module = "ca.weblite:java-objc-bridge", version.ref = "java-objc-bridge" }
+jorbis = { module = "org.jcraft:jorbis", version.ref = "jorbis" }
+
+# LWJGL - Core modules
+lwjgl-bom = { module = "org.lwjgl:lwjgl-bom", version.ref = "lwjgl" }
+lwjgl = { module = "org.lwjgl:lwjgl" }
+lwjgl-glfw = { module = "org.lwjgl:lwjgl-glfw" }
+lwjgl-opengl = { module = "org.lwjgl:lwjgl-opengl" }
+lwjgl-openal = { module = "org.lwjgl:lwjgl-openal" }
+lwjgl-stb = { module = "org.lwjgl:lwjgl-stb" }
+lwjgl-tinyfd = { module = "org.lwjgl:lwjgl-tinyfd" }
+lwjgl-freetype = { module = "org.lwjgl:lwjgl-freetype" }
+lwjgl-jemalloc = { module = "org.lwjgl:lwjgl-jemalloc" }
+lwjgl-jawt = { module = "org.lwjgl:lwjgl-jawt", version.ref = "lwjgl" }
+
+# ASM - bytecode manipulation
+asm = { module = "org.ow2.asm:asm", version.ref = "asm" }
+asm-analysis = { module = "org.ow2.asm:asm-analysis", version.ref = "asm" }
+asm-commons = { module = "org.ow2.asm:asm-commons", version.ref = "asm" }
+asm-tree = { module = "org.ow2.asm:asm-tree", version.ref = "asm" }
+asm-util = { module = "org.ow2.asm:asm-util", version.ref = "asm" }
+
+# Fabric Loader
+fabricmc-mapping-io = { module = "net.fabricmc:mapping-io", version.ref = "mapping-io" }
+sat4j-core = { module = "org.ow2.sat4j:org.ow2.sat4j.core", version.ref = "sat4j" }
+sat4j-pb = { module = "org.ow2.sat4j:org.ow2.sat4j.pb", version.ref = "sat4j" }
+
+# Iris Shaders
+anarres-jcpp = { module = "org.anarres:jcpp", version.ref = "jcpp" }
+antlr4-runtime = { module = "org.antlr:antlr4-runtime", version.ref = "antlr4" }
+glsl-transformer = { module = "io.github.douira:glsl-transformer", version.ref = "glsl-transformer" }
+
+# Distant Horizons
+zstd-jni = { module = "com.github.luben:zstd-jni", version.ref = "zstd-jni" }
+lz4-java = { module = "org.lz4:lz4-java", version.ref = "lz4-java" }
+xz = { module = "org.tukaani:xz", version.ref = "xz" }
+sqlite-jdbc = { module = "org.xerial:sqlite-jdbc", version.ref = "sqlite-jdbc" }
+night-config-toml = { module = "com.electronwill.night-config:toml", version.ref = "night-config" }
+night-config-json = { module = "com.electronwill.night-config:json", version.ref = "night-config" }
+
+# Testing - JUnit 5
+junit-api = { module = "org.junit.jupiter:junit-jupiter-api", version.ref = "junit" }
+junit-params = { module = "org.junit.jupiter:junit-jupiter-params", version.ref = "junit" }
+junit-engine = { module = "org.junit.jupiter:junit-jupiter-engine", version.ref = "junit" }
+junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher", version.ref = "junit" }
+
+# Testing - AssertJ
+assertj-core = { module = "org.assertj:assertj-core", version.ref = "assertj" }
+
+# Testing - Mockito
+mockito-core = { module = "org.mockito:mockito-core", version.ref = "mockito" }
+mockito-junit-jupiter = { module = "org.mockito:mockito-junit-jupiter", version.ref = "mockito" }
+
+# Testing - JMH
+jmh-core = { module = "org.openjdk.jmh:jmh-core", version.ref = "jmh" }
+jmh-generator-annprocess = { module = "org.openjdk.jmh:jmh-generator-annprocess", version.ref = "jmh" }
+
+# Testing - Awaitility
+awaitility = { module = "org.awaitility:awaitility", version.ref = "awaitility" }
+
+# ============================================================================
+# DEPENDENCY BUNDLES
+# ============================================================================
+# Group related dependencies together for easy inclusion
+
+[bundles]
+# LWJGL core modules (all modules used in the project)
+lwjgl = [
+    "lwjgl",
+    "lwjgl-glfw",
+    "lwjgl-opengl",
+    "lwjgl-openal",
+    "lwjgl-stb",
+    "lwjgl-tinyfd",
+    "lwjgl-freetype",
+    "lwjgl-jemalloc",
+]
+
+# Apache Commons libraries
+apache-commons = [
+    "apache-commons-lang3",
+    "apache-commons-io",
+    "apache-commons-compress",
+    "apache-httpclient",
+    "apache-httpcore",
+]
+
+# Logging stack (SLF4J + Log4j)
+logging = [
+    "slf4j-api",
+    "log4j-slf4j2-impl",
+    "log4j-core",
+    "log4j-api",
+]
+
+# ASM bytecode manipulation (all modules)
+asm = [
+    "asm",
+    "asm-analysis",
+    "asm-commons",
+    "asm-tree",
+    "asm-util",
+]
+
+# Fabric Loader dependencies
+fabric = [
+    "fabricmc-mapping-io",
+    "sat4j-core",
+    "sat4j-pb",
+]
+
+# Iris Shaders dependencies
+iris = [
+    "anarres-jcpp",
+    "antlr4-runtime",
+    "glsl-transformer",
+]
+
+# Distant Horizons dependencies
+distant-horizons = [
+    "lwjgl-jawt",
+    "zstd-jni",
+    "lz4-java",
+    "xz",
+    "sqlite-jdbc",
+    "night-config-toml",
+    "night-config-json",
+]
+
+# JUnit 5 testing framework
+junit = [
+    "junit-api",
+    "junit-params",
+]
+
+# Complete testing stack
+testing = [
+    "junit-api",
+    "junit-params",
+    "assertj-core",
+    "mockito-core",
+    "mockito-junit-jupiter",
+    "awaitility",
+]
+
+# JNA libraries
+jna = [
+    "jna",
+    "jna-platform",
+]
+
+# ============================================================================
+# GRADLE PLUGINS
+# ============================================================================
+# Define Gradle plugins used in the build (currently just core plugins)
+
+[plugins]
+# Note: Core plugins (java, application) don't need to be defined here
+# This section is for third-party plugins, which you can add later:
+# Example: checkstyle = { id = "checkstyle", version = "10.12.5" }
