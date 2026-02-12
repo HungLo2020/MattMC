@@ -1,13 +1,10 @@
 package net.sodium.client.gl.tessellation;
 
-import org.lwjgl.opengl.GL20C;
-import org.lwjgl.opengl.GL40C;
-
 public enum GlPrimitiveType {
-    POINTS(GL20C.GL_POINTS),
-    LINES(GL20C.GL_LINES),
-    TRIANGLES(GL20C.GL_TRIANGLES),
-    PATCHES(GL40C.GL_PATCHES);
+    POINTS(0),
+    LINES(1),
+    TRIANGLES(4),
+    PATCHES(14);
 
     private final int id;
 

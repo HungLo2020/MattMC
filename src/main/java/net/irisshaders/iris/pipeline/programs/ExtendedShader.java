@@ -36,10 +36,7 @@ import net.irisshaders.iris.vertices.ImmediateState;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix3f;
 import org.joml.Matrix4f;
-import org.lwjgl.opengl.ARBTextureSwizzle;
-import org.lwjgl.opengl.GL30C;
-import org.lwjgl.opengl.GL43C;
-import org.lwjgl.opengl.GL46C;
+import net.vulkanic.VulkanicAPI;
 import org.slf4j.Logger;
 
 import java.io.IOException;
@@ -94,7 +91,7 @@ public class ExtendedShader extends GlProgram implements IrisProgram {
 
 		this.pipeline = parent;
 
-		GLDebug.nameObject(GL43C.GL_PROGRAM, programId, string);
+		GLDebug.nameObject(VulkanicAPI.GL_PROGRAM, programId, string);
 
 		((ShaderInstanceInterface) this).setShouldSkip(SkipList.NONE);
 
@@ -173,7 +170,7 @@ public class ExtendedShader extends GlProgram implements IrisProgram {
 		DepthColorStorage.unlockDepthColor();
 
 		if (!hasUV) {
-			IrisRenderSystem.bindTextureToUnit(GL46C.GL_TEXTURE_2D, 0, pipeline.getWhitePixel().getTexture().iris$getGlId());
+			IrisRenderSystem.bindTextureToUnit(VulkanicAPI.GL_TEXTURE_2D, 0, pipeline.getWhitePixel().getTexture().iris$getGlId());
 		}
 
 		CapturedRenderingState.INSTANCE.setCurrentAlphaTest(alphaTest);
@@ -197,8 +194,8 @@ public class ExtendedShader extends GlProgram implements IrisProgram {
 
 		if (intensitySwizzle) {
 			IrisRenderSystem.addUnswizzle(RenderSystem.getShaderTexture(0).texture().iris$getGlId());
-			IrisRenderSystem.texParameteriv(RenderSystem.getShaderTexture(0).texture().iris$getGlId(), TextureType.TEXTURE_2D.getGlType(), ARBTextureSwizzle.GL_TEXTURE_SWIZZLE_RGBA,
-				new int[]{GL30C.GL_RED, GL30C.GL_RED, GL30C.GL_RED, GL30C.GL_RED});
+			IrisRenderSystem.texParameteriv(RenderSystem.getShaderTexture(0).texture().iris$getGlId(), TextureType.TEXTURE_2D.getGlType(), VulkanicAPI.GL_TEXTURE_SWIZZLE_RGBA,
+				new int[]{VulkanicAPI.GL_RED, VulkanicAPI.GL_RED, VulkanicAPI.GL_RED, VulkanicAPI.GL_RED});
 		}
 
 		ImmediateState.usingTessellation = usesTessellation;
@@ -239,7 +236,7 @@ public class ExtendedShader extends GlProgram implements IrisProgram {
 
 	@Override
 	public int iris$getBlockIndex(int program, CharSequence uniformBlockName) {
-		return GL46C.glGetUniformBlockIndex(program, "iris_" + uniformBlockName);
+		return VulkanicAPI.glGetUniformBlockIndex(program, "iris_" + uniformBlockName);
 	}
 
 	@Override

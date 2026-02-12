@@ -10,6 +10,7 @@ import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
 import it.unimi.dsi.fastutil.ints.IntIterator;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
+import net.vulkanic.VulkanicAPI;
 import org.jetbrains.annotations.Nullable;
 
 @Environment(EnvType.CLIENT)
@@ -106,7 +107,7 @@ public class GlTexture extends GpuTexture implements net.irisshaders.iris.mixint
 	// Iris: From MixinGpuTexture - GpuTextureInterface implementation
 	@Override
 	public int iris$getGlId() {
-		this.flushModeChanges(org.lwjgl.opengl.GL46C.GL_TEXTURE_2D);
+		this.flushModeChanges(VulkanicAPI.GL_TEXTURE_2D);
 		return this.glId();
 	}
 	

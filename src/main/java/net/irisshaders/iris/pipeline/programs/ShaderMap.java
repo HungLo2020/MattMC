@@ -3,7 +3,7 @@ package net.irisshaders.iris.pipeline.programs;
 import net.blaze3d.opengl.GlProgram;
 import net.blaze3d.opengl.GlStateManager;
 import net.irisshaders.iris.gl.shader.ShaderCompileException;
-import org.lwjgl.opengl.GL46C;
+import net.vulkanic.VulkanicAPI;
 
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -40,7 +40,7 @@ public class ShaderMap {
 		int i = shader.id().program();
 
 		int j = GlStateManager.glGetProgrami(i, 35714);
-		if (j == GL46C.GL_FALSE) {
+		if (j == VulkanicAPI.GL_FALSE) {
 			String string = GlStateManager.glGetProgramInfoLog(i, 32768);
 			throw new ShaderCompileException(
 				key.name(), string

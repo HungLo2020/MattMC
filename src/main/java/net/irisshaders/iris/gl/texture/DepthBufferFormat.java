@@ -1,8 +1,6 @@
 package net.irisshaders.iris.gl.texture;
 
 import org.jetbrains.annotations.Nullable;
-import org.lwjgl.opengl.GL30C;
-import org.lwjgl.opengl.GL43C;
 
 import java.util.Objects;
 
@@ -16,6 +14,21 @@ public enum DepthBufferFormat {
 	DEPTH24_STENCIL8(true),
 	DEPTH32F_STENCIL8(true);
 
+	// GL constants for depth buffer formats (from GL30C, GL43C)
+	private static final int GL_DEPTH_COMPONENT = 0x1902;
+	private static final int GL_DEPTH_COMPONENT16 = 0x81A5;
+	private static final int GL_DEPTH_COMPONENT24 = 0x81A6;
+	private static final int GL_DEPTH_COMPONENT32 = 0x81A7;
+	private static final int GL_DEPTH_COMPONENT32F = 0x8CAC;
+	private static final int GL_DEPTH_STENCIL = 0x84F9;
+	private static final int GL_DEPTH24_STENCIL8 = 0x88F0;
+	private static final int GL_DEPTH32F_STENCIL8 = 0x8CAD;
+	private static final int GL_UNSIGNED_SHORT = 0x1403;
+	private static final int GL_UNSIGNED_INT = 0x1405;
+	private static final int GL_FLOAT = 0x1406;
+	private static final int GL_UNSIGNED_INT_24_8 = 0x84FA;
+	private static final int GL_FLOAT_32_UNSIGNED_INT_24_8_REV = 0x8DAD;
+
 	private final boolean combinedStencil;
 
 	DepthBufferFormat(boolean combinedStencil) {
@@ -25,14 +38,14 @@ public enum DepthBufferFormat {
 	@Nullable
 	public static DepthBufferFormat fromGlEnum(int glenum) {
 		return switch (glenum) {
-			case GL30C.GL_DEPTH_COMPONENT -> DepthBufferFormat.DEPTH;
-			case GL30C.GL_DEPTH_COMPONENT16 -> DepthBufferFormat.DEPTH16;
-			case GL30C.GL_DEPTH_COMPONENT24 -> DepthBufferFormat.DEPTH24;
-			case GL30C.GL_DEPTH_COMPONENT32 -> DepthBufferFormat.DEPTH32;
-			case GL30C.GL_DEPTH_COMPONENT32F -> DepthBufferFormat.DEPTH32F;
-			case GL30C.GL_DEPTH_STENCIL -> DepthBufferFormat.DEPTH_STENCIL;
-			case GL30C.GL_DEPTH24_STENCIL8 -> DepthBufferFormat.DEPTH24_STENCIL8;
-			case GL30C.GL_DEPTH32F_STENCIL8 -> DepthBufferFormat.DEPTH32F_STENCIL8;
+			case GL_DEPTH_COMPONENT -> DepthBufferFormat.DEPTH;
+			case GL_DEPTH_COMPONENT16 -> DepthBufferFormat.DEPTH16;
+			case GL_DEPTH_COMPONENT24 -> DepthBufferFormat.DEPTH24;
+			case GL_DEPTH_COMPONENT32 -> DepthBufferFormat.DEPTH32;
+			case GL_DEPTH_COMPONENT32F -> DepthBufferFormat.DEPTH32F;
+			case GL_DEPTH_STENCIL -> DepthBufferFormat.DEPTH_STENCIL;
+			case GL_DEPTH24_STENCIL8 -> DepthBufferFormat.DEPTH24_STENCIL8;
+			case GL_DEPTH32F_STENCIL8 -> DepthBufferFormat.DEPTH32F_STENCIL8;
 			default -> null;
 		};
 	}
@@ -45,29 +58,29 @@ public enum DepthBufferFormat {
 
 	public int getGlInternalFormat() {
 		return switch (this) {
-			case DEPTH -> GL30C.GL_DEPTH_COMPONENT;
-			case DEPTH16 -> GL30C.GL_DEPTH_COMPONENT16;
-			case DEPTH24 -> GL30C.GL_DEPTH_COMPONENT24;
-			case DEPTH32 -> GL30C.GL_DEPTH_COMPONENT32;
-			case DEPTH32F -> GL30C.GL_DEPTH_COMPONENT32F;
-			case DEPTH_STENCIL -> GL30C.GL_DEPTH_STENCIL;
-			case DEPTH24_STENCIL8 -> GL30C.GL_DEPTH24_STENCIL8;
-			case DEPTH32F_STENCIL8 -> GL30C.GL_DEPTH32F_STENCIL8;
+			case DEPTH -> GL_DEPTH_COMPONENT;
+			case DEPTH16 -> GL_DEPTH_COMPONENT16;
+			case DEPTH24 -> GL_DEPTH_COMPONENT24;
+			case DEPTH32 -> GL_DEPTH_COMPONENT32;
+			case DEPTH32F -> GL_DEPTH_COMPONENT32F;
+			case DEPTH_STENCIL -> GL_DEPTH_STENCIL;
+			case DEPTH24_STENCIL8 -> GL_DEPTH24_STENCIL8;
+			case DEPTH32F_STENCIL8 -> GL_DEPTH32F_STENCIL8;
 		};
 
 	}
 
 	public int getGlType() {
-		return isCombinedStencil() ? GL30C.GL_DEPTH_STENCIL : GL30C.GL_DEPTH_COMPONENT;
+		return isCombinedStencil() ? GL_DEPTH_STENCIL : GL_DEPTH_COMPONENT;
 	}
 
 	public int getGlFormat() {
 		return switch (this) {
-			case DEPTH, DEPTH16 -> GL43C.GL_UNSIGNED_SHORT;
-			case DEPTH24, DEPTH32 -> GL43C.GL_UNSIGNED_INT;
-			case DEPTH32F -> GL30C.GL_FLOAT;
-			case DEPTH_STENCIL, DEPTH24_STENCIL8 -> GL30C.GL_UNSIGNED_INT_24_8;
-			case DEPTH32F_STENCIL8 -> GL30C.GL_FLOAT_32_UNSIGNED_INT_24_8_REV;
+			case DEPTH, DEPTH16 -> GL_UNSIGNED_SHORT;
+			case DEPTH24, DEPTH32 -> GL_UNSIGNED_INT;
+			case DEPTH32F -> GL_FLOAT;
+			case DEPTH_STENCIL, DEPTH24_STENCIL8 -> GL_UNSIGNED_INT_24_8;
+			case DEPTH32F_STENCIL8 -> GL_FLOAT_32_UNSIGNED_INT_24_8_REV;
 		};
 
 	}

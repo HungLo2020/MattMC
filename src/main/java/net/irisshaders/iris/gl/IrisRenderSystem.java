@@ -11,22 +11,10 @@ import net.irisshaders.iris.gl.sampler.SamplerLimits;
 import net.irisshaders.iris.gl.texture.TextureType;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.PerspectiveProjectionMatrixBuffer;
+import net.vulkanic.VulkanicAPI;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix4f;
 import org.joml.Vector3i;
-import org.lwjgl.opengl.ARBDirectStateAccess;
-import org.lwjgl.opengl.ARBDrawBuffersBlend;
-import org.lwjgl.opengl.ARBTextureSwizzle;
-import org.lwjgl.opengl.EXTShaderImageLoadStore;
-import org.lwjgl.opengl.GL;
-import org.lwjgl.opengl.GL30C;
-import org.lwjgl.opengl.GL32C;
-import org.lwjgl.opengl.GL33C;
-import org.lwjgl.opengl.GL42C;
-import org.lwjgl.opengl.GL43C;
-import org.lwjgl.opengl.GL45C;
-import org.lwjgl.opengl.GL46C;
-import org.lwjgl.opengl.NVXGPUMemoryInfo;
 import org.lwjgl.system.MemoryUtil;
 
 import java.nio.ByteBuffer;
@@ -45,16 +33,16 @@ public class IrisRenderSystem {
 	private static boolean hasMultibind;
 	private static boolean supportsCompute;
 	private static boolean supportsTesselation;
-	private static int polygonMode = GL43C.GL_FILL;
-	private static int backupPolygonMode = GL43C.GL_FILL;
+	private static int polygonMode = VulkanicAPI.GL_FILL;
+	private static int backupPolygonMode = VulkanicAPI.GL_FILL;
 	private static int[] samplers;
 	private static final IntList textureToUnswizzle = new IntArrayList();
 
 	public static void initRenderer() {
-		if (GL.getCapabilities().OpenGL45) {
+		if (VulkanicAPI.getGraphicsCapabilities().OpenGL45) {
 			dsaState = new DSACore();
 			Iris.logger.info("OpenGL 4.5 detected, enabling DSA.");
-		} else if (GL.getCapabilities().GL_ARB_direct_state_access) {
+		} else if (VulkanicAPI.getGraphicsCapabilities().GL_ARB_direct_state_access) {
 			dsaState = new DSAARB();
 			Iris.logger.info("ARB_direct_state_access detected, enabling DSA.");
 		} else {
@@ -62,23 +50,23 @@ public class IrisRenderSystem {
 			Iris.logger.info("DSA support not detected.");
 		}
 
-		hasMultibind = GL.getCapabilities().OpenGL45 || GL.getCapabilities().GL_ARB_multi_bind;
+		hasMultibind = VulkanicAPI.getGraphicsCapabilities().OpenGL45 || VulkanicAPI.getGraphicsCapabilities().GL_ARB_multi_bind;
 		perspectiveProjectionMatrixBuffer = new PerspectiveProjectionMatrixBuffer("Iris shadow map projection");
 
-		supportsCompute = GL.getCapabilities().glDispatchCompute != MemoryUtil.NULL;
-		supportsTesselation = GL.getCapabilities().GL_ARB_tessellation_shader || GL.getCapabilities().OpenGL40;
+		supportsCompute = VulkanicAPI.checkFunctionAvailable("glDispatchCompute");
+		supportsTesselation = VulkanicAPI.getGraphicsCapabilities().GL_ARB_tessellation_shader || VulkanicAPI.getGraphicsCapabilities().OpenGL40;
 
 		samplers = new int[SamplerLimits.get().getMaxTextureUnits()];
 	}
 
 	public static void getIntegerv(int pname, int[] params) {
 		RenderSystem.assertOnRenderThread();
-		GL32C.glGetIntegerv(pname, params);
+		VulkanicAPI.glGetIntegerv(pname, params);
 	}
 
 	public static void getFloatv(int pname, float[] params) {
 		RenderSystem.assertOnRenderThread();
-		GL32C.glGetFloatv(pname, params);
+		VulkanicAPI.glGetFloatv(pname, params);
 	}
 
 	public static void generateMipmaps(int texture, int mipmapTarget) {
@@ -88,75 +76,75 @@ public class IrisRenderSystem {
 
 	public static void bindAttributeLocation(int program, int index, CharSequence name) {
 		RenderSystem.assertOnRenderThread();
-		GL32C.glBindAttribLocation(program, index, name);
+		VulkanicAPI.bindAttributeLocation(program, index, name);
 	}
 
 	public static void texImage1D(int texture, int target, int level, int internalformat, int width, int border, int format, int type, @Nullable ByteBuffer pixels) {
 		RenderSystem.assertOnRenderThread();
 		IrisRenderSystem.bindTextureForSetup(target, texture);
-		GL30C.glTexImage1D(target, level, internalformat, width, border, format, type, pixels);
+		VulkanicAPI.glTexImage1D(target, level, internalformat, width, border, format, type, pixels);
 	}
 
 	public static void texImage2D(int texture, int target, int level, int internalformat, int width, int height, int border, int format, int type, @Nullable ByteBuffer pixels) {
 		RenderSystem.assertOnRenderThread();
 		IrisRenderSystem.bindTextureForSetup(target, texture);
-		GL32C.glTexImage2D(target, level, internalformat, width, height, border, format, type, pixels);
+		VulkanicAPI.glTexImage2D(target, level, internalformat, width, height, border, format, type, pixels);
 	}
 
 	public static void texImage3D(int texture, int target, int level, int internalformat, int width, int height, int depth, int border, int format, int type, @Nullable ByteBuffer pixels) {
 		RenderSystem.assertOnRenderThread();
 		IrisRenderSystem.bindTextureForSetup(target, texture);
-		GL30C.glTexImage3D(target, level, internalformat, width, height, depth, border, format, type, pixels);
+		VulkanicAPI.glTexImage3D(target, level, internalformat, width, height, depth, border, format, type, pixels);
 	}
 
 	public static void uniformMatrix4fv(int location, boolean transpose, FloatBuffer matrix) {
 		RenderSystem.assertOnRenderThread();
-		GL32C.glUniformMatrix4fv(location, transpose, matrix);
+		VulkanicAPI.glUniformMatrix4fv(location, transpose, matrix);
 	}
 
 	public static void uniformMatrix4fv(int location, boolean transpose, float[] matrix) {
 		RenderSystem.assertOnRenderThread();
-		GL32C.glUniformMatrix4fv(location, transpose, matrix);
+		VulkanicAPI.glUniformMatrix4fv(location, transpose, matrix);
 	}
 
 	public static void copyTexImage2D(int target, int level, int internalFormat, int x, int y, int width, int height, int border) {
 		RenderSystem.assertOnRenderThread();
-		GL32C.glCopyTexImage2D(target, level, internalFormat, x, y, width, height, border);
+		VulkanicAPI.glCopyTexImage2D(target, level, internalFormat, x, y, width, height, border);
 	}
 
 	public static void uniform1f(int location, float v0) {
 		RenderSystem.assertOnRenderThread();
-		GL32C.glUniform1f(location, v0);
+		VulkanicAPI.glUniform1f(location, v0);
 	}
 
 	public static void uniform2f(int location, float v0, float v1) {
 		RenderSystem.assertOnRenderThread();
-		GL32C.glUniform2f(location, v0, v1);
+		VulkanicAPI.glUniform2f(location, v0, v1);
 	}
 
 	public static void uniform2i(int location, int v0, int v1) {
 		RenderSystem.assertOnRenderThread();
-		GL32C.glUniform2i(location, v0, v1);
+		VulkanicAPI.glUniform2i(location, v0, v1);
 	}
 
 	public static void uniform3f(int location, float v0, float v1, float v2) {
 		RenderSystem.assertOnRenderThread();
-		GL32C.glUniform3f(location, v0, v1, v2);
+		VulkanicAPI.glUniform3f(location, v0, v1, v2);
 	}
 
 	public static void uniform3i(int location, int v0, int v1, int v2) {
 		RenderSystem.assertOnRenderThread();
-		GL32C.glUniform3i(location, v0, v1, v2);
+		VulkanicAPI.glUniform3i(location, v0, v1, v2);
 	}
 
 	public static void uniform4f(int location, float v0, float v1, float v2, float v3) {
 		RenderSystem.assertOnRenderThread();
-		GL32C.glUniform4f(location, v0, v1, v2, v3);
+		VulkanicAPI.glUniform4f(location, v0, v1, v2, v3);
 	}
 
 	public static void uniform4i(int location, int v0, int v1, int v2, int v3) {
 		RenderSystem.assertOnRenderThread();
-		GL32C.glUniform4i(location, v0, v1, v2, v3);
+		VulkanicAPI.glUniform4i(location, v0, v1, v2, v3);
 	}
 
 	public static void texParameteriv(int texture, int target, int pname, int[] params) {
@@ -169,7 +157,7 @@ public class IrisRenderSystem {
 	 */
 	public static void texParameterivDirect(int target, int pname, int[] params) {
 		RenderSystem.assertOnRenderThread();
-		GL32C.glTexParameteriv(target, pname, params);
+		VulkanicAPI.glTexParameteriv(target, pname, params);
 	}
 
 	public static void copyTexSubImage2D(int destTexture, int target, int i, int i1, int i2, int i3, int i4, int width, int height) {
@@ -188,12 +176,12 @@ public class IrisRenderSystem {
 
 	public static String getProgramInfoLog(int program) {
 		RenderSystem.assertOnRenderThread();
-		return GL32C.glGetProgramInfoLog(program);
+		return VulkanicAPI.glGetProgramInfoLog(program);
 	}
 
 	public static String getShaderInfoLog(int shader) {
 		RenderSystem.assertOnRenderThread();
-		return GL32C.glGetShaderInfoLog(shader);
+		return VulkanicAPI.glGetShaderInfoLog(shader);
 	}
 
 	public static void drawBuffers(int framebuffer, int[] buffers) {
@@ -223,17 +211,17 @@ public class IrisRenderSystem {
 
 	public static String getActiveUniform(int program, int index, int size, IntBuffer type, IntBuffer name) {
 		RenderSystem.assertOnRenderThread();
-		return GL32C.glGetActiveUniform(program, index, size, type, name);
+		return VulkanicAPI.glGetActiveUniform(program, index, size, type, name);
 	}
 
 	public static void readPixels(int x, int y, int width, int height, int format, int type, float[] pixels) {
 		RenderSystem.assertOnRenderThread();
-		GL32C.glReadPixels(x, y, width, height, format, type, pixels);
+		VulkanicAPI.glReadPixels(x, y, width, height, format, type, pixels);
 	}
 
 	public static void bufferData(int target, float[] data, int usage) {
 		RenderSystem.assertOnRenderThread();
-		GL32C.glBufferData(target, data, usage);
+		VulkanicAPI.glBufferData(target, data, usage);
 	}
 
 	public static int bufferStorage(int target, float[] data, int usage) {
@@ -244,22 +232,22 @@ public class IrisRenderSystem {
 	public static void bufferStorage(int target, long size, int flags) {
 		RenderSystem.assertOnRenderThread();
 		// The ARB version is identical to GL44 and redirects, so this should work on ARB as well.
-		GL45C.glBufferStorage(target, size, flags);
+		VulkanicAPI.glBufferStorage(target, size, flags);
 	}
 
 	public static void bindBufferBase(int target, Integer index, int buffer) {
 		RenderSystem.assertOnRenderThread();
-		GL43C.glBindBufferBase(target, index, buffer);
+		VulkanicAPI.glBindBufferBase(target, index, buffer);
 	}
 
 	public static void vertexAttrib4f(int index, float v0, float v1, float v2, float v3) {
 		RenderSystem.assertOnRenderThread();
-		GL32C.glVertexAttrib4f(index, v0, v1, v2, v3);
+		VulkanicAPI.glVertexAttrib4f(index, v0, v1, v2, v3);
 	}
 
 	public static void detachShader(int program, int shader) {
 		RenderSystem.assertOnRenderThread();
-		GL32C.glDetachShader(program, shader);
+		VulkanicAPI.glDetachShader(program, shader);
 	}
 
 	public static void framebufferTexture2D(int fb, int fbtarget, int attachment, int target, int texture, int levels) {
@@ -273,78 +261,68 @@ public class IrisRenderSystem {
 
 	public static void bindImageTexture(int unit, int texture, int level, boolean layered, int layer, int access, int format) {
 		RenderSystem.assertOnRenderThread();
-		if (GL.getCapabilities().OpenGL42 || GL.getCapabilities().GL_ARB_shader_image_load_store) {
-			GL42C.glBindImageTexture(unit, texture, level, layered, layer, access, format);
-		} else {
-			EXTShaderImageLoadStore.glBindImageTextureEXT(unit, texture, level, layered, layer, access, format);
-		}
+		VulkanicAPI.glBindImageTexture(unit, texture, level, layered, layer, access, format);
 	}
 
 	public static int getMaxImageUnits() {
-		if (GL.getCapabilities().OpenGL42 || GL.getCapabilities().GL_ARB_shader_image_load_store) {
-			return GlStateManager._getInteger(GL42C.GL_MAX_IMAGE_UNITS);
-		} else if (GL.getCapabilities().GL_EXT_shader_image_load_store) {
-			return GlStateManager._getInteger(EXTShaderImageLoadStore.GL_MAX_IMAGE_UNITS_EXT);
-		} else {
-			return 0;
-		}
+		return VulkanicAPI.glGetMaxImageUnits();
 	}
 
 	public static boolean supportsSSBO() {
-		return GL.getCapabilities().OpenGL44 || (GL.getCapabilities().GL_ARB_shader_storage_buffer_object && GL.getCapabilities().GL_ARB_buffer_storage);
+		return VulkanicAPI.getGraphicsCapabilities().OpenGL44 || (VulkanicAPI.getGraphicsCapabilities().GL_ARB_shader_storage_buffer_object && VulkanicAPI.getGraphicsCapabilities().GL_ARB_buffer_storage);
 	}
 
 	public static boolean supportsImageLoadStore() {
-		return GL.getCapabilities().glBindImageTexture != 0L || GL.getCapabilities().OpenGL42 || ((GL.getCapabilities().GL_ARB_shader_image_load_store || GL.getCapabilities().GL_EXT_shader_image_load_store) && GL.getCapabilities().GL_ARB_buffer_storage);
+		return VulkanicAPI.checkFunctionAvailable("glBindImageTexture") || VulkanicAPI.getGraphicsCapabilities().OpenGL42 || ((VulkanicAPI.getGraphicsCapabilities().GL_ARB_shader_image_load_store || VulkanicAPI.getGraphicsCapabilities().GL_EXT_shader_image_load_store) && VulkanicAPI.getGraphicsCapabilities().GL_ARB_buffer_storage);
 	}
 
 	public static void genBuffers(int[] buffers) {
-		GL43C.glGenBuffers(buffers);
+		VulkanicAPI.glGenBuffers(buffers);
 	}
 
 	public static void clearBufferSubData(int glShaderStorageBuffer, int glR8, long offset, long size, int glRed, int glByte, int[] ints) {
-		GL43C.glClearBufferSubData(glShaderStorageBuffer, glR8, offset, size, glRed, glByte, ints);
+		VulkanicAPI.glClearBufferSubData(glShaderStorageBuffer, glR8, offset, size, glRed, glByte, ints);
 	}
 
 	public static void getProgramiv(int program, int value, int[] storage) {
-		GL32C.glGetProgramiv(program, value, storage);
+		VulkanicAPI.glGetProgramiv(program, value, storage);
 	}
 
 	public static void dispatchCompute(int workX, int workY, int workZ) {
-		GL45C.glDispatchCompute(workX, workY, workZ);
+		VulkanicAPI.glDispatchCompute(workX, workY, workZ);
 	}
 
 	public static void dispatchCompute(Vector3i workGroups) {
-		GL45C.glDispatchCompute(workGroups.x, workGroups.y, workGroups.z);
+		VulkanicAPI.glDispatchCompute(workGroups.x, workGroups.y, workGroups.z);
 	}
 
 	public static void memoryBarrier(int barriers) {
 		RenderSystem.assertOnRenderThread();
 
 		if (supportsCompute) {
-			GL45C.glMemoryBarrier(barriers);
+			VulkanicAPI.glMemoryBarrier(barriers);
 		}
 	}
 
 	public static boolean supportsBufferBlending() {
-		return GL.getCapabilities().GL_ARB_draw_buffers_blend || GL.getCapabilities().OpenGL40;
+		return VulkanicAPI.getGraphicsCapabilities().GL_ARB_draw_buffers_blend || VulkanicAPI.getGraphicsCapabilities().OpenGL40;
 	}
 
 	public static void disableBufferBlend(int buffer) {
 		RenderSystem.assertOnRenderThread();
-		GL32C.glDisablei(GL32C.GL_BLEND, buffer);
+		VulkanicAPI.glDisablei(VulkanicAPI.GL_BLEND, buffer);
 		((BooleanStateExtended) GlStateManager.BLEND.mode).setUnknownState();
 	}
 
 	public static void enableBufferBlend(int buffer) {
 		RenderSystem.assertOnRenderThread();
-		GL32C.glEnablei(GL32C.GL_BLEND, buffer);
+		VulkanicAPI.glEnablei(VulkanicAPI.GL_BLEND, buffer);
 		((BooleanStateExtended) GlStateManager.BLEND.mode).setUnknownState();
 	}
 
 	public static void blendFuncSeparatei(int buffer, int srcRGB, int dstRGB, int srcAlpha, int dstAlpha) {
 		RenderSystem.assertOnRenderThread();
-		ARBDrawBuffersBlend.glBlendFuncSeparateiARB(buffer, srcRGB, dstRGB, srcAlpha, dstAlpha);
+		VulkanicAPI.glBlendFuncSeparatei(buffer, srcRGB, dstRGB, srcAlpha, dstAlpha);
 	}
 
 	// These functions are deprecated and unavailable in the core profile.
@@ -355,12 +333,12 @@ public class IrisRenderSystem {
 
 	public static int getUniformBlockIndex(int program, String uniformBlockName) {
 		RenderSystem.assertOnRenderThread();
-		return GL32C.glGetUniformBlockIndex(program, uniformBlockName);
+		return VulkanicAPI.glGetUniformBlockIndex(program, uniformBlockName);
 	}
 
 	public static void uniformBlockBinding(int program, int uniformBlockIndex, int uniformBlockBinding) {
 		RenderSystem.assertOnRenderThread();
-		GL32C.glUniformBlockBinding(program, uniformBlockIndex, uniformBlockBinding);
+		VulkanicAPI.glUniformBlockBinding(program, uniformBlockIndex, uniformBlockBinding);
 	}
 
 	public static void setShadowProjection(Matrix4f shadowProjection) {
@@ -390,15 +368,15 @@ public class IrisRenderSystem {
 	private static int lastTex = -1;
 
 	public static void bindTextureForSetup(int glType, int glId) {
-		if (glType == GL46C.GL_TEXTURE_2D) {
+		if (glType == VulkanicAPI.GL_TEXTURE_2D) {
 			lastTex = GlStateManager.TEXTURES[GlStateManager.activeTexture].binding;
 		}
-		GL30C.glBindTexture(glType, glId);
+		VulkanicAPI.bindTexture(glType, glId);
 	}
 
 	public static void restoreTexture() {
 		if (lastTex != -1) {
-			GL30C.glBindTexture(GL46C.GL_TEXTURE_2D, lastTex);
+			VulkanicAPI.bindTexture(VulkanicAPI.GL_TEXTURE_2D, lastTex);
 			lastTex = -1;
 		}
 	}
@@ -412,11 +390,11 @@ public class IrisRenderSystem {
 	}
 
 	public static int genSampler() {
-		return GL33C.glGenSamplers();
+		return VulkanicAPI.glGenSamplers();
 	}
 
 	public static void destroySampler(int glId) {
-		GL33C.glDeleteSamplers(glId);
+		VulkanicAPI.glDeleteSamplers(glId);
 	}
 
 	public static void bindSamplerToUnit(int unit, int sampler) {
@@ -424,7 +402,7 @@ public class IrisRenderSystem {
 			return;
 		}
 
-		GL33C.glBindSampler(unit, sampler);
+		VulkanicAPI.glBindSampler(unit, sampler);
 
 		samplers[unit] = sampler;
 	}
@@ -434,31 +412,31 @@ public class IrisRenderSystem {
 		for (int i = 0; i < samplers.length; i++) {
 			if (samplers[i] != 0) {
 				usedASampler = true;
-				if (!hasMultibind) GL33C.glBindSampler(i, 0);
+				if (!hasMultibind) VulkanicAPI.glBindSampler(i, 0);
 				samplers[i] = 0;
 			}
 		}
 		if (usedASampler && hasMultibind) {
-			GL45C.glBindSamplers(0, emptyArray);
+			VulkanicAPI.glBindSamplers(0, emptyArray);
 		}
 	}
 
 
 	public static void samplerParameteri(int sampler, int pname, int param) {
-		GL33C.glSamplerParameteri(sampler, pname, param);
+		VulkanicAPI.glSamplerParameteri(sampler, pname, param);
 	}
 
 	public static void samplerParameterf(int sampler, int pname, float param) {
-		GL33C.glSamplerParameterf(sampler, pname, param);
+		VulkanicAPI.glSamplerParameterf(sampler, pname, param);
 	}
 
 	public static void samplerParameteriv(int sampler, int pname, int[] params) {
-		GL33C.glSamplerParameteriv(sampler, pname, params);
+		VulkanicAPI.glSamplerParameteriv(sampler, pname, params);
 	}
 
 	public static long getVRAM() {
-		if (GL.getCapabilities().GL_NVX_gpu_memory_info) {
-			return GL32C.glGetInteger(NVXGPUMemoryInfo.GL_GPU_MEMORY_INFO_CURRENT_AVAILABLE_VIDMEM_NVX) * 1024L;
+		if (VulkanicAPI.getGraphicsCapabilities().GL_NVX_gpu_memory_info) {
+			return VulkanicAPI.glGetInteger(VulkanicAPI.GL_GPU_MEMORY_INFO_CURRENT_AVAILABLE_VIDMEM_NVX) * 1024L;
 		} else {
 			return 4294967296L;
 		}
@@ -466,32 +444,32 @@ public class IrisRenderSystem {
 
 	public static void deleteBuffers(int glId) {
 		RenderSystem.assertOnRenderThread();
-		GL43C.glDeleteBuffers(glId);
+		VulkanicAPI.glDeleteBuffers(glId);
 	}
 
 	public static void setPolygonMode(int mode) {
 		if (mode != polygonMode) {
 			polygonMode = mode;
-			GL43C.glPolygonMode(GL43C.GL_FRONT_AND_BACK, mode);
+			VulkanicAPI.glPolygonMode(VulkanicAPI.GL_FRONT_AND_BACK, mode);
 		}
 	}
 
 	public static void overridePolygonMode() {
 		backupPolygonMode = polygonMode;
-		setPolygonMode(GL43C.GL_FILL);
+		setPolygonMode(VulkanicAPI.GL_FILL);
 	}
 
 	public static void restorePolygonMode() {
 		setPolygonMode(backupPolygonMode);
-		backupPolygonMode = GL43C.GL_FILL;
+		backupPolygonMode = VulkanicAPI.GL_FILL;
 	}
 
 	public static void dispatchComputeIndirect(long offset) {
-		GL43C.glDispatchComputeIndirect(offset);
+		VulkanicAPI.glDispatchComputeIndirect(offset);
 	}
 
 	public static void bindBuffer(int target, int buffer) {
-		GL46C.glBindBuffer(target, buffer);
+		VulkanicAPI.glBindBuffer(target, buffer);
 	}
 
 	public static int createBuffers() {
@@ -499,11 +477,11 @@ public class IrisRenderSystem {
 	}
 
 	public static String getStringi(int glEnum, int index) {
-		return GL46C.glGetStringi(glEnum, index);
+		return VulkanicAPI.glGetStringi(glEnum, index);
 	}
 
 	public static void copyImageSubData(int sourceTexture, int target, int mip, int srcX, int srcY, int srcZ, int destTexture, int dstTarget, int dstMip, int dstX, int dstY, int dstZ, int width, int height, int depth) {
-		GL46C.glCopyImageSubData(sourceTexture, target, mip, srcX, srcY, srcZ, destTexture, dstTarget, dstMip, dstX, dstY, dstZ, width, height, depth);
+		VulkanicAPI.glCopyImageSubData(sourceTexture, target, mip, srcX, srcY, srcZ, destTexture, dstTarget, dstMip, dstX, dstY, dstZ, width, height, depth);
   }
 
 
@@ -521,8 +499,8 @@ public class IrisRenderSystem {
 
 	public static void onProgramUse() {
 		for (int i = 0; i < textureToUnswizzle.size(); i++) {
-			texParameteriv(textureToUnswizzle.getInt(i), TextureType.TEXTURE_2D.getGlType(), ARBTextureSwizzle.GL_TEXTURE_SWIZZLE_RGBA,
-				new int[]{GL30C.GL_RED, GL30C.GL_GREEN, GL30C.GL_BLUE, GL30C.GL_ALPHA});
+			texParameteriv(textureToUnswizzle.getInt(i), TextureType.TEXTURE_2D.getGlType(), VulkanicAPI.GL_TEXTURE_SWIZZLE_RGBA,
+				new int[]{VulkanicAPI.GL_RED, VulkanicAPI.GL_GREEN, VulkanicAPI.GL_BLUE, VulkanicAPI.GL_ALPHA});
 		}
 		textureToUnswizzle.clear();
 	}
@@ -532,26 +510,26 @@ public class IrisRenderSystem {
 	}
 
 	public static int checkFramebufferStatus(int glFramebuffer) {
-		return GL46C.glCheckFramebufferStatus(glFramebuffer);
+		return VulkanicAPI.glCheckFramebufferStatus(glFramebuffer);
 	}
 
 	public static void uniformMatrix3fv(int index, boolean b, FloatBuffer buf) {
 		RenderSystem.assertOnRenderThread();
-		GL46C.glUniformMatrix3fv(index, b, buf);
+		VulkanicAPI.glUniformMatrix3fv(index, b, buf);
 	}
 
 	public static void uniformMatrix3fv(int index, boolean b, float[] buf) {
 		RenderSystem.assertOnRenderThread();
-		GL46C.glUniformMatrix3fv(index, b, buf);
+		VulkanicAPI.glUniformMatrix3fv(index, b, buf);
 	}
 
 	public static void clearColor(float v, float v1, float v2, float v3) {
 		RenderSystem.assertOnRenderThread();
-		GL46C.glClearColor(v, v1, v2, v3);
+		VulkanicAPI.glClearColor(v, v1, v2, v3);
 	}
 
 	public static int getAttribLocation(int handle, String irisNormal) {
-		return GL46C.glGetAttribLocation(handle, irisNormal);
+		return VulkanicAPI.glGetAttribLocation(handle, irisNormal);
 	}
 
 	public interface DSAAccess {
@@ -600,106 +578,106 @@ public class IrisRenderSystem {
 
 		@Override
 		public void generateMipmaps(int texture, int target) {
-			ARBDirectStateAccess.glGenerateTextureMipmap(texture);
+			VulkanicAPI.glGenerateTextureMipmap(texture);
 		}
 
 		@Override
 		public void texParameteri(int texture, int target, int pname, int param) {
-			ARBDirectStateAccess.glTextureParameteri(texture, pname, param);
+			VulkanicAPI.glTextureParameteri(texture, pname, param);
 		}
 
 		@Override
 		public void texParameterf(int texture, int target, int pname, float param) {
-			ARBDirectStateAccess.glTextureParameterf(texture, pname, param);
+			VulkanicAPI.glTextureParameterf(texture, pname, param);
 		}
 
 		@Override
 		public void texParameteriv(int texture, int target, int pname, int[] params) {
-			ARBDirectStateAccess.glTextureParameteriv(texture, pname, params);
+			VulkanicAPI.glTextureParameteriv(texture, pname, params);
 		}
 
 
 		@Override
 		public void readBuffer(int framebuffer, int buffer) {
-			ARBDirectStateAccess.glNamedFramebufferReadBuffer(framebuffer, buffer);
+			VulkanicAPI.glNamedFramebufferReadBuffer(framebuffer, buffer);
 		}
 
 		@Override
 		public void drawBuffers(int framebuffer, int[] buffers) {
-			ARBDirectStateAccess.glNamedFramebufferDrawBuffers(framebuffer, buffers);
+			VulkanicAPI.glNamedFramebufferDrawBuffers(framebuffer, buffers);
 		}
 
 		@Override
 		public void clearBufferfv(int framebuffer, int buffer, int drawbuffer, float[] values) {
-			ARBDirectStateAccess.glClearNamedFramebufferfv(framebuffer, buffer, drawbuffer, values);
+			VulkanicAPI.glClearNamedFramebufferfv(framebuffer, buffer, drawbuffer, values);
 		}
 
 		@Override
 		public void clearBufferiv(int framebuffer, int buffer, int drawbuffer, int[] values) {
-			ARBDirectStateAccess.glClearNamedFramebufferiv(framebuffer, buffer, drawbuffer, values);
+			VulkanicAPI.glClearNamedFramebufferiv(framebuffer, buffer, drawbuffer, values);
 		}
 
 		@Override
 		public void clearBufferuiv(int framebuffer, int buffer, int drawbuffer, int[] values) {
-			ARBDirectStateAccess.glClearNamedFramebufferuiv(framebuffer, buffer, drawbuffer, values);
+			VulkanicAPI.glClearNamedFramebufferuiv(framebuffer, buffer, drawbuffer, values);
 		}
 
 		@Override
 		public int getTexParameteri(int texture, int target, int pname) {
-			return ARBDirectStateAccess.glGetTextureParameteri(texture, pname);
+			return VulkanicAPI.glGetTextureParameteri(texture, pname);
 		}
 
 		@Override
 		public void copyTexSubImage2D(int destTexture, int target, int i, int i1, int i2, int i3, int i4, int width, int height) {
-			ARBDirectStateAccess.glCopyTextureSubImage2D(destTexture, i, i1, i2, i3, i4, width, height);
+			VulkanicAPI.glCopyTextureSubImage2D(destTexture, i, i1, i2, i3, i4, width, height);
 		}
 
 		@Override
 		public void bindTextureToUnit(int target, int unit, int texture) {
-			if (target == GL46C.GL_TEXTURE_2D) {
+			if (target == VulkanicAPI.GL_TEXTURE_2D) {
 				if (GlStateManager.TEXTURES[unit].binding == texture) {
 					return;
 				}
 
-				ARBDirectStateAccess.glBindTextureUnit(unit, texture);
+				VulkanicAPI.glBindTextureUnit(unit, texture);
 
 				// Manually fix GLStateManager bindings...
 				GlStateManager.TEXTURES[unit].binding = texture;
 			} else {
-				ARBDirectStateAccess.glBindTextureUnit(unit, texture);
+				VulkanicAPI.glBindTextureUnit(unit, texture);
 			}
 		}
 
 		@Override
 		public int bufferStorage(int target, float[] data, int usage) {
-			int buffer = GL45C.glCreateBuffers();
-			GL45C.glNamedBufferData(buffer, data, usage);
+			int buffer = VulkanicAPI.glCreateBuffers();
+			VulkanicAPI.glNamedBufferData(buffer, data, usage);
 			return buffer;
 		}
 
 		@Override
 		public int createBuffers() {
-			return ARBDirectStateAccess.glCreateBuffers();
+			return VulkanicAPI.glCreateBuffers();
 		}
 
 		@Override
 		public void blitFramebuffer(int source, int dest, int offsetX, int offsetY, int width, int height, int offsetX2, int offsetY2, int width2, int height2, int bufferChoice, int filter) {
-			ARBDirectStateAccess.glBlitNamedFramebuffer(source, dest, offsetX, offsetY, width, height, offsetX2, offsetY2, width2, height2, bufferChoice, filter);
+			VulkanicAPI.glBlitNamedFramebuffer(source, dest, offsetX, offsetY, width, height, offsetX2, offsetY2, width2, height2, bufferChoice, filter);
 		}
 
 		@Override
 		public void framebufferTexture2D(int fb, int fbtarget, int attachment, int target, int texture, int levels) {
-			ARBDirectStateAccess.glNamedFramebufferTexture(fb, attachment, texture, levels);
+			VulkanicAPI.glNamedFramebufferTexture(fb, attachment, texture, levels);
 		}
 
 		@Override
 		public int createFramebuffer() {
-			return ARBDirectStateAccess.glCreateFramebuffers();
+			return VulkanicAPI.glCreateFramebuffers();
 		}
 
 		@Override
 		public int createTexture(int target) {
-			return ARBDirectStateAccess.glCreateTextures(target);
+			return VulkanicAPI.glCreateTextures(target);
 		}
 	}
 
@@ -708,84 +686,84 @@ public class IrisRenderSystem {
 		public void generateMipmaps(int texture, int target) {
 			int previous = GlStateManager.TEXTURES[GlStateManager.activeTexture].binding;
 			GlStateManager._bindTexture(texture);
-			GL32C.glGenerateMipmap(target);
+			VulkanicAPI.glGenerateMipmap(target);
 			GlStateManager._bindTexture(previous);
 		}
 
 		@Override
 		public void texParameteri(int texture, int target, int pname, int param) {
 			bindTextureForSetup(target, texture);
-			GL32C.glTexParameteri(target, pname, param);
+			VulkanicAPI.glTexParameteri(target, pname, param);
 			restoreTexture();
 		}
 
 		@Override
 		public void texParameterf(int texture, int target, int pname, float param) {
 			bindTextureForSetup(target, texture);
-			GL32C.glTexParameterf(target, pname, param);
+			VulkanicAPI.glTexParameterf(target, pname, param);
 			restoreTexture();
 		}
 
 		@Override
 		public void texParameteriv(int texture, int target, int pname, int[] params) {
 			bindTextureForSetup(target, texture);
-			GL32C.glTexParameteriv(target, pname, params);
+			VulkanicAPI.glTexParameteriv(target, pname, params);
 			restoreTexture();
 		}
 
 		@Override
 		public void readBuffer(int framebuffer, int buffer) {
-			GlStateManager._glBindFramebuffer(GL32C.GL_FRAMEBUFFER, framebuffer);
-			GL32C.glReadBuffer(buffer);
+			GlStateManager._glBindFramebuffer(VulkanicAPI.GL_FRAMEBUFFER, framebuffer);
+			VulkanicAPI.glReadBuffer(buffer);
 		}
 
 		@Override
 		public void drawBuffers(int framebuffer, int[] buffers) {
-			GlStateManager._glBindFramebuffer(GL32C.GL_FRAMEBUFFER, framebuffer);
-			GL32C.glDrawBuffers(buffers);
+			GlStateManager._glBindFramebuffer(VulkanicAPI.GL_FRAMEBUFFER, framebuffer);
+			VulkanicAPI.glDrawBuffers(buffers);
 		}
 
 		@Override
 		public void clearBufferfv(int framebuffer, int buffer, int drawbuffer, float[] values) {
-			GlStateManager._glBindFramebuffer(GL32C.GL_FRAMEBUFFER, framebuffer);
-			GL32C.glClearBufferfv(buffer, drawbuffer, values);
+			GlStateManager._glBindFramebuffer(VulkanicAPI.GL_FRAMEBUFFER, framebuffer);
+			VulkanicAPI.glClearBufferfv(buffer, drawbuffer, values);
 		}
 
 		@Override
 		public void clearBufferiv(int framebuffer, int buffer, int drawbuffer, int[] values) {
-			GlStateManager._glBindFramebuffer(GL32C.GL_FRAMEBUFFER, framebuffer);
-			GL32C.glClearBufferiv(buffer, drawbuffer, values);
+			GlStateManager._glBindFramebuffer(VulkanicAPI.GL_FRAMEBUFFER, framebuffer);
+			VulkanicAPI.glClearBufferiv(buffer, drawbuffer, values);
 		}
 
 		@Override
 		public void clearBufferuiv(int framebuffer, int buffer, int drawbuffer, int[] values) {
-			GlStateManager._glBindFramebuffer(GL32C.GL_FRAMEBUFFER, framebuffer);
-			GL32C.glClearBufferuiv(buffer, drawbuffer, values);
+			GlStateManager._glBindFramebuffer(VulkanicAPI.GL_FRAMEBUFFER, framebuffer);
+			VulkanicAPI.glClearBufferuiv(buffer, drawbuffer, values);
 		}
 
 		@Override
 		public int getTexParameteri(int texture, int target, int pname) {
 			bindTextureForSetup(target, texture);
-			return GL32C.glGetTexParameteri(target, pname);
+			return VulkanicAPI.glGetTexParameteri(target, pname);
 		}
 
 		@Override
 		public void copyTexSubImage2D(int destTexture, int target, int i, int i1, int i2, int i3, int i4, int width, int height) {
 			int previous = GlStateManager.TEXTURES[GlStateManager.activeTexture].binding;
 			GlStateManager._bindTexture(destTexture);
-			GL32C.glCopyTexSubImage2D(target, i, i1, i2, i3, i4, width, height);
+			VulkanicAPI.glCopyTexSubImage2D(target, i, i1, i2, i3, i4, width, height);
 			GlStateManager._bindTexture(previous);
 		}
 
 		@Override
 		public void bindTextureToUnit(int target, int unit, int texture) {
 			int activeTexture = GlStateManager.activeTexture;
-			GlStateManager._activeTexture(GL30C.GL_TEXTURE0 + unit);
-			GL46C.glBindTexture(target, texture);
-			if (target == GL46C.GL_TEXTURE_2D) {
+			GlStateManager._activeTexture(VulkanicAPI.GL_TEXTURE0 + unit);
+			VulkanicAPI.bindTexture(target, texture);
+			if (target == VulkanicAPI.GL_TEXTURE_2D) {
 				GlStateManager.TEXTURES[unit].binding = texture;
 			}
-			GlStateManager._activeTexture(GL30C.GL_TEXTURE0 + activeTexture);
+			GlStateManager._activeTexture(VulkanicAPI.GL_TEXTURE0 + activeTexture);
 		}
 
 		@Override
@@ -800,21 +778,21 @@ public class IrisRenderSystem {
 
 		@Override
 		public void blitFramebuffer(int source, int dest, int offsetX, int offsetY, int width, int height, int offsetX2, int offsetY2, int width2, int height2, int bufferChoice, int filter) {
-			GlStateManager._glBindFramebuffer(GL32C.GL_READ_FRAMEBUFFER, source);
-			GlStateManager._glBindFramebuffer(GL32C.GL_DRAW_FRAMEBUFFER, dest);
-			GL32C.glBlitFramebuffer(offsetX, offsetY, width, height, offsetX2, offsetY2, width2, height2, bufferChoice, filter);
+			GlStateManager._glBindFramebuffer(VulkanicAPI.GL_READ_FRAMEBUFFER, source);
+			GlStateManager._glBindFramebuffer(VulkanicAPI.GL_DRAW_FRAMEBUFFER, dest);
+			VulkanicAPI.glBlitFramebuffer(offsetX, offsetY, width, height, offsetX2, offsetY2, width2, height2, bufferChoice, filter);
 		}
 
 		@Override
 		public void framebufferTexture2D(int fb, int fbtarget, int attachment, int target, int texture, int levels) {
 			GlStateManager._glBindFramebuffer(fbtarget, fb);
-			GL32C.glFramebufferTexture2D(fbtarget, attachment, target, texture, levels);
+			VulkanicAPI.glFramebufferTexture2D(fbtarget, attachment, target, texture, levels);
 		}
 
 		@Override
 		public int createFramebuffer() {
 			int framebuffer = GlStateManager.glGenFramebuffers();
-			GlStateManager._glBindFramebuffer(GL32C.GL_FRAMEBUFFER, framebuffer);
+			GlStateManager._glBindFramebuffer(VulkanicAPI.GL_FRAMEBUFFER, framebuffer);
 			return framebuffer;
 		}
 

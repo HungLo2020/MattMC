@@ -6,7 +6,7 @@ import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
 import com.seibel.distanthorizons.core.render.glObject.GLEnums;
 import com.seibel.distanthorizons.core.render.glObject.GLProxy;
 import com.seibel.distanthorizons.core.logging.DhLogger;
-import org.lwjgl.opengl.GL32;
+import net.vulkanic.VulkanicAPI;
 import org.lwjgl.system.MemoryUtil;
 
 import java.lang.invoke.MethodHandles;
@@ -93,13 +93,13 @@ public class QuadElementBuffer extends GLElementBuffer
 	{
 		switch (type)
 		{
-			case GL32.GL_UNSIGNED_BYTE:
+			case VulkanicAPI.GL_UNSIGNED_BYTE:
 				buildBufferByte(quadCount, buffer);
 				break;
-			case GL32.GL_UNSIGNED_SHORT:
+			case VulkanicAPI.GL_UNSIGNED_SHORT:
 				buildBufferShort(quadCount, buffer);
 				break;
-			case GL32.GL_UNSIGNED_INT:
+			case VulkanicAPI.GL_UNSIGNED_INT:
 				buildBufferInt(quadCount, buffer);
 				break;
 			default:
@@ -124,15 +124,15 @@ public class QuadElementBuffer extends GLElementBuffer
 		
 		if (vertexCount < 255)
 		{ // Reserve 1 for the reset index
-			this.type = GL32.GL_UNSIGNED_BYTE;
+			this.type = VulkanicAPI.GL_UNSIGNED_BYTE;
 		}
 		else if (vertexCount < 65535)
 		{  // Reserve 1 for the reset index
-			this.type = GL32.GL_UNSIGNED_SHORT;
+			this.type = VulkanicAPI.GL_UNSIGNED_SHORT;
 		}
 		else
 		{
-			this.type = GL32.GL_UNSIGNED_INT;
+			this.type = VulkanicAPI.GL_UNSIGNED_INT;
 		}
 		//LOGGER.info("Quad IBO Resizing from [" + getCapacity() + "] to [" + quadCount + "]" + " with type: [" + GLEnums.getString(this.type) + "].");
 		
@@ -143,7 +143,7 @@ public class QuadElementBuffer extends GLElementBuffer
 			
 			this.bind();
 			super.uploadBuffer(buffer, EDhApiGpuUploadMethod.DATA,
-					this.indicesCount * GLEnums.getTypeSize(this.type), GL32.GL_STATIC_DRAW);
+					this.indicesCount * GLEnums.getTypeSize(this.type), VulkanicAPI.GL_STATIC_DRAW);
 		}
 		else
 		{

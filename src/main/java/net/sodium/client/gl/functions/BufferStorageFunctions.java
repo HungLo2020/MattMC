@@ -4,9 +4,8 @@ import net.sodium.client.gl.buffer.GlBufferStorageFlags;
 import net.sodium.client.gl.buffer.GlBufferTarget;
 import net.sodium.client.gl.device.RenderDevice;
 import net.sodium.client.gl.util.EnumBitField;
-import org.lwjgl.opengl.ARBBufferStorage;
-import org.lwjgl.opengl.GL44C;
-import org.lwjgl.opengl.GLCapabilities;
+import net.vulkanic.GraphicsCapabilities;
+import net.vulkanic.VulkanicAPI;
 
 public enum BufferStorageFunctions {
     NONE {
@@ -18,18 +17,18 @@ public enum BufferStorageFunctions {
     CORE {
         @Override
         public void createBufferStorage(GlBufferTarget target, long length, EnumBitField<GlBufferStorageFlags> flags) {
-            GL44C.glBufferStorage(target.getTargetParameter(), length, flags.getBitField());
+            VulkanicAPI.createBufferStorage(target.getTargetParameter(), length, flags.getBitField());
         }
     },
     ARB {
         @Override
         public void createBufferStorage(GlBufferTarget target, long length, EnumBitField<GlBufferStorageFlags> flags) {
-            ARBBufferStorage.glBufferStorage(target.getTargetParameter(), length, flags.getBitField());
+            VulkanicAPI.createBufferStorage(target.getTargetParameter(), length, flags.getBitField());
         }
     };
 
     public static BufferStorageFunctions pickBest(RenderDevice device) {
-        GLCapabilities capabilities = device.getCapabilities();
+        GraphicsCapabilities capabilities = device.getCapabilities();
 
         if (capabilities.OpenGL44) {
             return CORE;

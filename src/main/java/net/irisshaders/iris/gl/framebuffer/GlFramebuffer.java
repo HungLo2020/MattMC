@@ -7,7 +7,7 @@ import it.unimi.dsi.fastutil.ints.Int2IntArrayMap;
 import it.unimi.dsi.fastutil.ints.Int2IntMap;
 import net.irisshaders.iris.gl.GlResource;
 import net.irisshaders.iris.gl.IrisRenderSystem;
-import org.lwjgl.opengl.GL30C;
+import net.vulkanic.VulkanicAPI;
 
 public class GlFramebuffer extends GlResource {
 	private final Int2IntMap attachments;
@@ -19,8 +19,8 @@ public class GlFramebuffer extends GlResource {
 		super(IrisRenderSystem.createFramebuffer());
 
 		this.attachments = new Int2IntArrayMap();
-		this.maxDrawBuffers = GlStateManager._getInteger(GL30C.GL_MAX_DRAW_BUFFERS);
-		this.maxColorAttachments = GlStateManager._getInteger(GL30C.GL_MAX_COLOR_ATTACHMENTS);
+		this.maxDrawBuffers = GlStateManager._getInteger(VulkanicAPI.GL_MAX_DRAW_BUFFERS);
+		this.maxColorAttachments = GlStateManager._getInteger(VulkanicAPI.GL_MAX_COLOR_ATTACHMENTS);
 		this.hasDepthAttachment = false;
 	}
 
@@ -29,9 +29,9 @@ public class GlFramebuffer extends GlResource {
 
 		// TODO: NeoForge 1.21.5
 		//if (texture.getFormat().hasStencilAspect()) {
-		//	IrisRenderSystem.framebufferTexture2D(fb, GL30C.GL_FRAMEBUFFER, GL30C.GL_DEPTH_STENCIL_ATTACHMENT, GL30C.GL_TEXTURE_2D, texture, 0);
+		//	IrisRenderSystem.framebufferTexture2D(fb, VulkanicAPI.GL_FRAMEBUFFER, VulkanicAPI.GL_DEPTH_STENCIL_ATTACHMENT, VulkanicAPI.GL_TEXTURE_2D, texture, 0);
 		//} else {
-			IrisRenderSystem.framebufferTexture2D(fb, GL30C.GL_FRAMEBUFFER, GL30C.GL_DEPTH_ATTACHMENT, GL30C.GL_TEXTURE_2D, ((GlTexture) texture).glId(), 0);
+			IrisRenderSystem.framebufferTexture2D(fb, VulkanicAPI.GL_FRAMEBUFFER, VulkanicAPI.GL_DEPTH_ATTACHMENT, VulkanicAPI.GL_TEXTURE_2D, ((GlTexture) texture).glId(), 0);
 		//}
 
 		this.hasDepthAttachment = true;
@@ -40,7 +40,7 @@ public class GlFramebuffer extends GlResource {
 	public void addDepthAttachmentBypass(int texture) {
 		int fb = getGlId();
 
-		IrisRenderSystem.framebufferTexture2D(fb, GL30C.GL_FRAMEBUFFER, GL30C.GL_DEPTH_ATTACHMENT, GL30C.GL_TEXTURE_2D, texture, 0);
+		IrisRenderSystem.framebufferTexture2D(fb, VulkanicAPI.GL_FRAMEBUFFER, VulkanicAPI.GL_DEPTH_ATTACHMENT, VulkanicAPI.GL_TEXTURE_2D, texture, 0);
 
 		this.hasDepthAttachment = true;
 	}
@@ -48,12 +48,12 @@ public class GlFramebuffer extends GlResource {
 	public void addColorAttachment(int index, int texture) {
 		int fb = getGlId();
 
-		IrisRenderSystem.framebufferTexture2D(fb, GL30C.GL_FRAMEBUFFER, GL30C.GL_COLOR_ATTACHMENT0 + index, GL30C.GL_TEXTURE_2D, texture, 0);
+		IrisRenderSystem.framebufferTexture2D(fb, VulkanicAPI.GL_FRAMEBUFFER, VulkanicAPI.GL_COLOR_ATTACHMENT0 + index, VulkanicAPI.GL_TEXTURE_2D, texture, 0);
 		attachments.put(index, texture);
 	}
 
 	public void noDrawBuffers() {
-		IrisRenderSystem.drawBuffers(getGlId(), new int[]{GL30C.GL_NONE});
+		IrisRenderSystem.drawBuffers(getGlId(), new int[]{VulkanicAPI.GL_NONE});
 	}
 
 	public void drawBuffers(int[] buffers) {
@@ -69,14 +69,14 @@ public class GlFramebuffer extends GlResource {
 				throw new IllegalArgumentException("Only " + maxColorAttachments + " color attachments are supported on this GPU, but an attempt was made to write to a color attachment with index " + buffer);
 			}
 
-			glBuffers[index++] = GL30C.GL_COLOR_ATTACHMENT0 + buffer;
+			glBuffers[index++] = VulkanicAPI.GL_COLOR_ATTACHMENT0 + buffer;
 		}
 
 		IrisRenderSystem.drawBuffers(getGlId(), glBuffers);
 	}
 
 	public void readBuffer(int buffer) {
-		IrisRenderSystem.readBuffer(getGlId(), GL30C.GL_COLOR_ATTACHMENT0 + buffer);
+		IrisRenderSystem.readBuffer(getGlId(), VulkanicAPI.GL_COLOR_ATTACHMENT0 + buffer);
 	}
 
 	public int getColorAttachment(int index) {
@@ -88,15 +88,15 @@ public class GlFramebuffer extends GlResource {
 	}
 
 	public void bind() {
-		GlStateManager._glBindFramebuffer(GL30C.GL_FRAMEBUFFER, getGlId());
+		GlStateManager._glBindFramebuffer(VulkanicAPI.GL_FRAMEBUFFER, getGlId());
 	}
 
 	public void bindAsReadBuffer() {
-		GlStateManager._glBindFramebuffer(GL30C.GL_READ_FRAMEBUFFER, getGlId());
+		GlStateManager._glBindFramebuffer(VulkanicAPI.GL_READ_FRAMEBUFFER, getGlId());
 	}
 
 	public void bindAsDrawBuffer() {
-		GlStateManager._glBindFramebuffer(GL30C.GL_DRAW_FRAMEBUFFER, getGlId());
+		GlStateManager._glBindFramebuffer(VulkanicAPI.GL_DRAW_FRAMEBUFFER, getGlId());
 	}
 
 	protected void destroyInternal() {
@@ -106,7 +106,7 @@ public class GlFramebuffer extends GlResource {
 	public int getStatus() {
 		bind();
 
-		return IrisRenderSystem.checkFramebufferStatus(GL30C.GL_FRAMEBUFFER);
+		return IrisRenderSystem.checkFramebufferStatus(VulkanicAPI.GL_FRAMEBUFFER);
 	}
 
 	public int getId() {

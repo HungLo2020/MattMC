@@ -10,7 +10,6 @@ import com.seibel.distanthorizons.core.render.renderer.LodRenderer;
 import com.seibel.distanthorizons.core.util.RenderUtil;
 import com.seibel.distanthorizons.core.world.AbstractDhWorld;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftRenderWrapper;
-import org.lwjgl.opengl.GL32;
 
 /**
  * Used to interact with Distant Horizons' rendering systems.

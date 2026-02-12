@@ -31,9 +31,6 @@ import net.minecraft.resources.ResourceLocation;
 import org.apache.commons.lang3.StringUtils;
 import org.jetbrains.annotations.Nullable;
 import org.lwjgl.glfw.GLFW;
-import org.lwjgl.opengl.GL;
-import org.lwjgl.opengl.GL11;
-import org.lwjgl.opengl.GLCapabilities;
 import org.slf4j.Logger;
 
 @Environment(EnvType.CLIENT)
@@ -63,20 +60,20 @@ public class GlDevice implements GpuDevice {
 
 	public GlDevice(long l, int i, boolean bl, BiFunction<ResourceLocation, ShaderType, String> biFunction, boolean bl2) {
 		GLFW.glfwMakeContextCurrent(l);
-		GLCapabilities gLCapabilities = GL.createCapabilities();
+		net.vulkanic.GraphicsCapabilities gLCapabilities = net.vulkanic.VulkanicAPI.initializeGraphicsCapabilities();
 		int j = getMaxSupportedTextureSize();
 		GLFW.glfwSetWindowSizeLimits(l, -1, -1, j, j);
 		GraphicsWorkarounds graphicsWorkarounds = GraphicsWorkarounds.get(this);
 		this.debugLog = GlDebug.enableDebugCallback(i, bl, this.enabledExtensions);
 		this.debugLabels = GlDebugLabel.create(gLCapabilities, bl2, this.enabledExtensions);
-		this.vertexArrayCache = VertexArrayCache.create(gLCapabilities, this.debugLabels, this.enabledExtensions);
-		this.bufferStorage = BufferStorage.create(gLCapabilities, this.enabledExtensions);
+		this.vertexArrayCache = VertexArrayCache.create(this.debugLabels, this.enabledExtensions);
+		this.bufferStorage = BufferStorage.create(this.enabledExtensions);
 		this.directStateAccess = DirectStateAccess.create(gLCapabilities, this.enabledExtensions, graphicsWorkarounds);
 		this.maxSupportedTextureSize = j;
 		this.defaultShaderSource = biFunction;
 		this.encoder = new GlCommandEncoder(this);
-		this.uniformOffsetAlignment = GL11.glGetInteger(35380);
-		GL11.glEnable(34895);
+		this.uniformOffsetAlignment = net.vulkanic.VulkanicAPI.queryIntegerState(35380); // GL_UNIFORM_BUFFER_OFFSET_ALIGNMENT
+		net.vulkanic.VulkanicAPI.enable(34895); // GL_PROGRAM_POINT_SIZE
 	}
 
 	public GlDebugLabel debugLabels() {
@@ -125,7 +122,7 @@ public class GlDevice implements GpuDevice {
 
 			int o;
 			if (bl) {
-				GL11.glBindTexture(34067, n);
+				net.vulkanic.VulkanicAPI.bindTexture(34067, n); // GL_TEXTURE_CUBE_MAP
 				o = 34067;
 			} else {
 				GlStateManager._bindTexture(n);

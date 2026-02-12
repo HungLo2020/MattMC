@@ -6,10 +6,8 @@ import net.irisshaders.iris.gl.IrisRenderSystem;
 import net.irisshaders.iris.gl.texture.InternalTextureFormat;
 import net.irisshaders.iris.gl.texture.PixelFormat;
 import net.irisshaders.iris.gl.texture.PixelType;
+import net.vulkanic.VulkanicAPI;
 import org.joml.Vector2i;
-import org.lwjgl.opengl.GL11C;
-import org.lwjgl.opengl.GL13C;
-import org.lwjgl.opengl.GL43C;
 
 import java.nio.ByteBuffer;
 
@@ -56,17 +54,17 @@ public class RenderTarget {
 	private void setupTexture(int texture, int width, int height, boolean allowsLinear, boolean alt) {
 		resizeTexture(texture, width, height, alt);
 
-		IrisRenderSystem.texParameteri(texture, GL11C.GL_TEXTURE_2D, GL11C.GL_TEXTURE_MIN_FILTER, allowsLinear ? GL11C.GL_LINEAR : GL11C.GL_NEAREST);
-		IrisRenderSystem.texParameteri(texture, GL11C.GL_TEXTURE_2D, GL11C.GL_TEXTURE_MAG_FILTER, allowsLinear ? GL11C.GL_LINEAR : GL11C.GL_NEAREST);
-		IrisRenderSystem.texParameteri(texture, GL11C.GL_TEXTURE_2D, GL11C.GL_TEXTURE_WRAP_S, GL13C.GL_CLAMP_TO_EDGE);
-		IrisRenderSystem.texParameteri(texture, GL11C.GL_TEXTURE_2D, GL11C.GL_TEXTURE_WRAP_T, GL13C.GL_CLAMP_TO_EDGE);
+		IrisRenderSystem.texParameteri(texture, VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_MIN_FILTER, allowsLinear ? VulkanicAPI.GL_LINEAR : VulkanicAPI.GL_NEAREST);
+		IrisRenderSystem.texParameteri(texture, VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_MAG_FILTER, allowsLinear ? VulkanicAPI.GL_LINEAR : VulkanicAPI.GL_NEAREST);
+		IrisRenderSystem.texParameteri(texture, VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_WRAP_S, VulkanicAPI.GL_CLAMP_TO_EDGE);
+		IrisRenderSystem.texParameteri(texture, VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_WRAP_T, VulkanicAPI.GL_CLAMP_TO_EDGE);
 	}
 
 	private void resizeTexture(int texture, int width, int height, boolean alt) {
-		IrisRenderSystem.texImage2D(texture, GL11C.GL_TEXTURE_2D, 0, internalFormat.getGlFormat(), width, height, 0, format.getGlFormat(), type.getGlFormat(), NULL_BUFFER);
+		IrisRenderSystem.texImage2D(texture, VulkanicAPI.GL_TEXTURE_2D, 0, internalFormat.getGlFormat(), width, height, 0, format.getGlFormat(), type.getGlFormat(), NULL_BUFFER);
 
 		if (name != null) {
-			GLDebug.nameObject(GL43C.GL_TEXTURE, texture, name + " " + (alt ? "alt" : "main"));
+			GLDebug.nameObject(VulkanicAPI.GL_TEXTURE, texture, name + " " + (alt ? "alt" : "main"));
 		}
 	}
 

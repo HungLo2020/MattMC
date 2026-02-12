@@ -7,8 +7,7 @@ import com.seibel.distanthorizons.core.render.renderer.shaders.FogShader;
 import com.seibel.distanthorizons.core.util.math.Mat4f;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftGLWrapper;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftRenderWrapper;
-import org.lwjgl.opengl.GL32;
-import org.lwjgl.opengl.GL43C;
+import net.vulkanic.VulkanicAPI;
 
 import java.nio.ByteBuffer;
 
@@ -55,7 +54,7 @@ public class FogRenderer
 	{
 		if (this.fogFramebuffer != -1)
 		{
-			GL32.glDeleteFramebuffers(this.fogFramebuffer);
+			VulkanicAPI.destroyFramebufferObject(this.fogFramebuffer);
 			this.fogFramebuffer = -1;
 		}
 		
@@ -65,20 +64,20 @@ public class FogRenderer
 			this.fogTexture = -1;
 		}
 		
-		this.fogFramebuffer = GL32.glGenFramebuffers();
-		GLMC.glBindFramebuffer(GL32.GL_FRAMEBUFFER, this.fogFramebuffer);
+		this.fogFramebuffer = VulkanicAPI.generateFramebufferObject();
+		GLMC.glBindFramebuffer(VulkanicAPI.GL_FRAMEBUFFER, this.fogFramebuffer);
 		
 		this.fogTexture = GLMC.glGenTextures();
 		{
 			GLMC.glBindTexture(this.fogTexture);
-			GL32.glTexImage2D(GL32.GL_TEXTURE_2D, 0, GL32.GL_RGBA16, width, height, 0, GL32.GL_RGBA, GL32.GL_UNSIGNED_SHORT_4_4_4_4, (ByteBuffer) null);
-			GL32.glTexParameteri(GL32.GL_TEXTURE_2D, GL32.GL_TEXTURE_MIN_FILTER, GL32.GL_LINEAR);
-			GL32.glTexParameteri(GL32.GL_TEXTURE_2D, GL32.GL_TEXTURE_MAG_FILTER, GL32.GL_LINEAR);
-			GL32.glFramebufferTexture2D(GL32.GL_FRAMEBUFFER, GL32.GL_COLOR_ATTACHMENT0, GL32.GL_TEXTURE_2D, this.fogTexture, 0);
+			VulkanicAPI.glTexImage2D(VulkanicAPI.GL_TEXTURE_2D, 0, VulkanicAPI.GL_RGBA16, width, height, 0, VulkanicAPI.GL_RGBA, VulkanicAPI.GL_UNSIGNED_SHORT_4_4_4_4, (ByteBuffer) null);
+			VulkanicAPI.glTexParameteri(VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_MIN_FILTER, VulkanicAPI.GL_LINEAR);
+			VulkanicAPI.glTexParameteri(VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_MAG_FILTER, VulkanicAPI.GL_LINEAR);
+			VulkanicAPI.glFramebufferTexture2D(VulkanicAPI.GL_FRAMEBUFFER, VulkanicAPI.GL_COLOR_ATTACHMENT0, VulkanicAPI.GL_TEXTURE_2D, this.fogTexture, 0);
 			
 			// disable mip-mapping since DH is just going to draw straight to the screen
-			GL43C.glTexParameteri(GL43C.GL_TEXTURE_2D, GL43C.GL_TEXTURE_BASE_LEVEL, 0);
-			GL43C.glTexParameteri(GL43C.GL_TEXTURE_2D, GL43C.GL_TEXTURE_MAX_LEVEL, 0);
+			VulkanicAPI.glTexParameteri(VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_BASE_LEVEL, 0);
+			VulkanicAPI.glTexParameteri(VulkanicAPI.GL_TEXTURE_2D, VulkanicAPI.GL_TEXTURE_MAX_LEVEL, 0);
 		}
 	}
 	

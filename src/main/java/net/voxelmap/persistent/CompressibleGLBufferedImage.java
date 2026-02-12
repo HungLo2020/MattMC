@@ -15,9 +15,8 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.texture.DynamicTexture;
 import net.minecraft.resources.ResourceLocation;
 import org.apache.logging.log4j.Level;
-import org.lwjgl.opengl.GL11;
-import org.lwjgl.opengl.GL30;
 import org.lwjgl.system.MemoryUtil;
+import net.vulkanic.VulkanicAPI;
 
 public class CompressibleGLBufferedImage {
     private static final HashMap<Integer, ByteBuffer> byteBuffers = new HashMap<>(4);
@@ -102,8 +101,8 @@ public class CompressibleGLBufferedImage {
         ByteBuffer outBuffer = MemoryUtil.memByteBuffer(this.texture.getPixels().getPointer(), imageBytes);
         MemoryUtil.memCopy(buffer, outBuffer);
         this.texture.upload();
-        GL11.glBindTexture(GL11.GL_TEXTURE_2D, ((GlTexture) this.texture.getTexture()).glId());
-        GL30.glGenerateMipmap(GL11.GL_TEXTURE_2D);
+        VulkanicAPI.bindTexture(VulkanicAPI.GL_TEXTURE_2D, ((GlTexture) this.texture.getTexture()).glId());
+        VulkanicAPI.generateMipmap(VulkanicAPI.GL_TEXTURE_2D);
         this.compress();
     }
 

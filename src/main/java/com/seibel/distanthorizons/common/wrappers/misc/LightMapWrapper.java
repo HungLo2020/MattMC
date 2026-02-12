@@ -6,7 +6,7 @@ import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftGLWrapper;
 import com.seibel.distanthorizons.core.wrapperInterfaces.misc.ILightMapWrapper;
 import com.seibel.distanthorizons.core.logging.DhLogger;
-import org.lwjgl.opengl.GL32;
+import net.vulkanic.VulkanicAPI;
 
 public class LightMapWrapper implements ILightMapWrapper
 {
@@ -53,7 +53,7 @@ public class LightMapWrapper implements ILightMapWrapper
 	@Override
 	public void bind()
 	{
-		GLMC.glActiveTexture(GL32.GL_TEXTURE0);
+		GLMC.glActiveTexture(VulkanicAPI.GL_TEXTURE0);
 		GLMC.glBindTexture(this.textureId);
 	}
 	

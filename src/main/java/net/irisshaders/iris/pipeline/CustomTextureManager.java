@@ -27,8 +27,8 @@ import net.minecraft.client.renderer.texture.MissingTextureAtlasSprite;
 import net.minecraft.client.renderer.texture.TextureAtlas;
 import net.minecraft.client.renderer.texture.TextureManager;
 import net.minecraft.resources.ResourceLocation;
+import net.vulkanic.VulkanicAPI;
 import org.apache.commons.io.FilenameUtils;
-import org.lwjgl.opengl.GL46C;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -150,7 +150,7 @@ public class CustomTextureManager {
 						int tex = GlStateManager.activeTexture;
 						int binding = GlStateManager.TEXTURES[tex].binding;
 						texture.setFilter(false, Minecraft.getInstance().options.mipmapLevels().get() > 0);
-						GlStateManager._activeTexture(GL46C.GL_TEXTURE0 + tex);
+						GlStateManager._activeTexture(VulkanicAPI.GL_TEXTURE0 + tex);
 						GlStateManager._bindTexture(binding);
 					}
 					return texture != null ? texture.getTexture().iris$getGlId() : textureManager.getTexture(MissingTextureAtlasSprite.getLocation()).getTexture().iris$getGlId();
@@ -167,7 +167,7 @@ public class CustomTextureManager {
 							int tex = GlStateManager.activeTexture;
 							int binding = GlStateManager.TEXTURES[tex].binding;
 							texture.setFilter(false, Minecraft.getInstance().options.mipmapLevels().get() > 0);
-							GlStateManager._activeTexture(GL46C.GL_TEXTURE0 + tex);
+							GlStateManager._activeTexture(VulkanicAPI.GL_TEXTURE0 + tex);
 							GlStateManager._bindTexture(binding);
 						}
 						int id = texture.getTexture().iris$getGlId();

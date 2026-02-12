@@ -40,9 +40,8 @@ import net.minecraft.server.packs.repository.KnownPack;
 import net.minecraft.server.packs.repository.PackSource;
 import net.minecraft.server.packs.resources.Resource;
 import net.minecraft.server.packs.resources.ResourceProvider;
+import net.vulkanic.VulkanicAPI;
 import org.apache.commons.io.IOUtils;
-import org.lwjgl.opengl.GL20C;
-import org.lwjgl.opengl.KHRDebug;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -211,9 +210,9 @@ public class ShaderCreator {
 			Iris.logger.warn("Shader compilation log for " + name + ": " + log);
 		}
 
-		int result = GlStateManager.glGetShaderi(shader, GL20C.GL_COMPILE_STATUS);
+		int result = GlStateManager.glGetShaderi(shader, VulkanicAPI.GL_COMPILE_STATUS);
 
-		if (result != GL20C.GL_TRUE) {
+		if (result != VulkanicAPI.GL_TRUE) {
 			throw new ShaderCompileException(name, log);
 		}
 
@@ -243,7 +242,7 @@ public class ShaderCreator {
 		// TODO 24w34a FALLBACK
 		return new ShaderSupplier(shaderKey, id, () -> {
 			try {
-				GLDebug.nameObject(KHRDebug.GL_PROGRAM, id.program(), name + "_fallback");
+				GLDebug.nameObject(VulkanicAPI.GL_PROGRAM, id.program(), name + "_fallback");
 
 				// TODO 1.21.5 (oh no)
 				return new FallbackShader(id.getFinally(), RenderPipelines.ENTITY_CUTOUT, name, vertexFormat, writingToBeforeTranslucent,

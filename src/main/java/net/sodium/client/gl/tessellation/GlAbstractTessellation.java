@@ -2,8 +2,7 @@ package net.sodium.client.gl.tessellation;
 
 import net.sodium.client.gl.attribute.GlVertexAttributeBinding;
 import net.sodium.client.gl.device.CommandList;
-import org.lwjgl.opengl.GL20C;
-import org.lwjgl.opengl.GL30C;
+import net.vulkanic.VulkanicAPI;
 
 public abstract class GlAbstractTessellation implements GlTessellation {
     protected final GlPrimitiveType primitiveType;
@@ -25,13 +24,13 @@ public abstract class GlAbstractTessellation implements GlTessellation {
 
             for (GlVertexAttributeBinding attrib : binding.attributeBindings()) {
                 if (attrib.isIntType()) {
-                    GL30C.glVertexAttribIPointer(attrib.getIndex(), attrib.getCount(), attrib.getFormat(),
+                    VulkanicAPI.configureVertexAttributeInteger(attrib.getIndex(), attrib.getCount(), attrib.getFormat(),
                             attrib.getStride(), attrib.getPointer());
                 } else {
-                    GL20C.glVertexAttribPointer(attrib.getIndex(), attrib.getCount(), attrib.getFormat(), attrib.isNormalized(),
+                    VulkanicAPI.configureVertexAttribute(attrib.getIndex(), attrib.getCount(), attrib.getFormat(), attrib.isNormalized(),
                             attrib.getStride(), attrib.getPointer());
                 }
-                GL20C.glEnableVertexAttribArray(attrib.getIndex());
+                VulkanicAPI.activateVertexAttribute(attrib.getIndex());
             }
         }
     }

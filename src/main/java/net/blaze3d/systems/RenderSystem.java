@@ -175,7 +175,7 @@ public class RenderSystem {
 		
 		// Sodium: Check for context replacement (from RenderSystemMixin)
 		if (wglPrevContext != MemoryUtil.NULL) {
-			var context = org.lwjgl.opengl.WGL.wglGetCurrentContext();
+			var context = net.vulkanic.VulkanicAPI.getGraphicsContext();
 
 			if (wglPrevContext != context) {
 				// Something has decided to replace the OpenGL context, which is not a good sign
@@ -275,7 +275,7 @@ public class RenderSystem {
 
 		// Capture the current WGL context so that we can detect it being replaced later.
 		if (Util.getPlatform() == Util.OS.WINDOWS) {
-			wglPrevContext = org.lwjgl.opengl.WGL.wglGetCurrentContext();
+			wglPrevContext = net.vulkanic.VulkanicAPI.getGraphicsContext();
 		} else {
 			wglPrevContext = MemoryUtil.NULL;
 		}

@@ -11,7 +11,8 @@ import com.seibel.distanthorizons.core.render.glObject.vertexAttribute.VertexPoi
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftGLWrapper;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftRenderWrapper;
 
-import org.lwjgl.opengl.GL32;
+import net.vulkanic.CommandContext;
+import net.vulkanic.VulkanicAPI;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -85,9 +86,10 @@ public class TestRenderer
 		// TODO fix for MC 1.21.5+
 		this.init();
 		
-		GLMC.glBindFramebuffer(GL32.GL_FRAMEBUFFER, MC_RENDER.getTargetFramebuffer());
-		GL32.glViewport(0, 0, MC_RENDER.getTargetFramebufferViewportWidth(), MC_RENDER.getTargetFramebufferViewportHeight());
-		GL32.glPolygonMode(GL32.GL_FRONT_AND_BACK, GL32.GL_FILL);
+		GLMC.glBindFramebuffer(VulkanicAPI.GL_FRAMEBUFFER, MC_RENDER.getTargetFramebuffer());
+		CommandContext ctx = VulkanicAPI.getImmediateContext();
+		VulkanicAPI.setDynamicViewport(ctx, 0, 0, MC_RENDER.getTargetFramebufferViewportWidth(), MC_RENDER.getTargetFramebufferViewportHeight());
+		VulkanicAPI.glPolygonMode(VulkanicAPI.GL_FRONT_AND_BACK, VulkanicAPI.GL_FILL);
 		
 		GLMC.disableFaceCulling();
 		GLMC.disableDepthTest();
@@ -101,8 +103,8 @@ public class TestRenderer
 		this.va.bindBufferToAllBindingPoints(this.vbo.getId());
 		
 		// Render the square
-		GL32.glDrawArrays(GL32.GL_TRIANGLE_FAN, 0, 4);
-		GL32.glClear(GL32.GL_DEPTH_BUFFER_BIT);
+		VulkanicAPI.drawPrimitiveArrays(VulkanicAPI.GL_TRIANGLE_FAN, 0, 4);
+		VulkanicAPI.clear(VulkanicAPI.GL_DEPTH_BUFFER_BIT);
 	}
 	
 	

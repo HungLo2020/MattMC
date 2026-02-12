@@ -1,7 +1,7 @@
 package net.sodium.client.gl.shader.uniform;
 
 import net.sodium.client.gl.buffer.GlBuffer;
-import org.lwjgl.opengl.GL32C;
+import net.vulkanic.VulkanicAPI;
 
 public class GlUniformBlock {
     private final int binding;
@@ -11,6 +11,6 @@ public class GlUniformBlock {
     }
 
     public void bindBuffer(GlBuffer buffer) {
-        GL32C.glBindBufferBase(GL32C.GL_UNIFORM_BUFFER, this.binding, buffer.handle());
+        VulkanicAPI.bindUniformBufferBase(this.binding, buffer.handle());
     }
 }

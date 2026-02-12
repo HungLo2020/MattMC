@@ -1,16 +1,16 @@
 package net.irisshaders.iris.gl.texture;
 
 import net.irisshaders.iris.gl.IrisRenderSystem;
-import org.lwjgl.opengl.GL30C;
+import net.vulkanic.VulkanicAPI;
 
 import java.nio.ByteBuffer;
 import java.util.Optional;
 
 public enum TextureType {
-	TEXTURE_1D(GL30C.GL_TEXTURE_1D),
-	TEXTURE_2D(GL30C.GL_TEXTURE_2D),
-	TEXTURE_3D(GL30C.GL_TEXTURE_3D),
-	TEXTURE_RECTANGLE(GL30C.GL_TEXTURE_3D);
+	TEXTURE_1D(VulkanicAPI.GL_TEXTURE_1D),
+	TEXTURE_2D(VulkanicAPI.GL_TEXTURE_2D),
+	TEXTURE_3D(VulkanicAPI.GL_TEXTURE_3D),
+	TEXTURE_RECTANGLE(VulkanicAPI.GL_TEXTURE_3D);
 
 	private final int glType;
 

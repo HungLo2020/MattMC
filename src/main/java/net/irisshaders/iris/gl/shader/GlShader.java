@@ -4,10 +4,9 @@ import net.blaze3d.opengl.GlStateManager;
 import net.irisshaders.iris.gl.GLDebug;
 import net.irisshaders.iris.gl.GlResource;
 import net.irisshaders.iris.gl.IrisRenderSystem;
+import net.vulkanic.VulkanicAPI;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.lwjgl.opengl.GL20C;
-import org.lwjgl.opengl.KHRDebug;
 
 import java.util.Locale;
 
@@ -30,7 +29,7 @@ public class GlShader extends GlResource {
 		ShaderWorkarounds.safeShaderSource(handle, src);
 		GlStateManager.glCompileShader(handle);
 
-		GLDebug.nameObject(KHRDebug.GL_SHADER, handle, name + "(" + type.name().toLowerCase(Locale.ROOT) + ")");
+		GLDebug.nameObject(VulkanicAPI.GL_SHADER, handle, name + "(" + type.name().toLowerCase(Locale.ROOT) + ")");
 
 		String log = IrisRenderSystem.getShaderInfoLog(handle);
 
@@ -38,9 +37,9 @@ public class GlShader extends GlResource {
 			LOGGER.warn("Shader compilation log for " + name + ": " + log);
 		}
 
-		int result = GlStateManager.glGetShaderi(handle, GL20C.GL_COMPILE_STATUS);
+		int result = VulkanicAPI.queryShaderParameter(handle, VulkanicAPI.GL_COMPILE_STATUS);
 
-		if (result != GL20C.GL_TRUE) {
+		if (result != 1) {  // GL_TRUE
 			throw new ShaderCompileException(name, log);
 		}
 

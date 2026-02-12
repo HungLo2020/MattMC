@@ -3,7 +3,7 @@ package com.seibel.distanthorizons.core.render.renderer.shaders;
 import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
 import com.seibel.distanthorizons.core.render.glObject.shader.ShaderProgram;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftRenderWrapper;
-import org.lwjgl.opengl.GL32;
+import net.vulkanic.VulkanicAPI;
 
 public abstract class AbstractShaderRenderer
 {
@@ -35,7 +35,7 @@ public abstract class AbstractShaderRenderer
 		
 		int width = MC_RENDER.getTargetFramebufferViewportWidth();
 		int height = MC_RENDER.getTargetFramebufferViewportHeight();
-		GL32.glViewport(0, 0, width, height);
+		VulkanicAPI.glViewport(0, 0, width, height);
 		
 		this.onRender();
 		

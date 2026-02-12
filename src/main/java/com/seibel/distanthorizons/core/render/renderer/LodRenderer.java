@@ -33,8 +33,9 @@ import com.seibel.distanthorizons.core.wrapperInterfaces.modAccessor.IIrisAccess
 import com.seibel.distanthorizons.coreapi.DependencyInjection.ApiEventInjector;
 import com.seibel.distanthorizons.coreapi.DependencyInjection.OverrideInjector;
 import com.seibel.distanthorizons.core.util.math.Vec3f;
+import net.vulkanic.CommandContext;
+import net.vulkanic.VulkanicAPI;
 import org.jetbrains.annotations.Nullable;
-import org.lwjgl.opengl.GL32;
 
 /**
  * This is where all the magic happens. <br>
@@ -282,7 +283,7 @@ public class LodRenderer
 			{
 				// If MC's framebuffer is being used the depth needs to be cleared to prevent rendering on top of MC.
 				// This should only happen when Optifine shaders are being used.
-				GL32.glClear(GL32.GL_DEPTH_BUFFER_BIT);
+				VulkanicAPI.clear(VulkanicAPI.GL_DEPTH_BUFFER_BIT);
 			}
 			
 			
@@ -373,22 +374,23 @@ public class LodRenderer
 		//==========//
 		
 		// by default draw everything as triangles
-		GL32.glPolygonMode(GL32.GL_FRONT_AND_BACK, GL32.GL_FILL);
+		VulkanicAPI.glPolygonMode(VulkanicAPI.GL_FRONT_AND_BACK, VulkanicAPI.GL_FILL);
 		GLMC.enableFaceCulling();
 		
-		GLMC.glBlendFunc(GL32.GL_SRC_ALPHA, GL32.GL_ONE_MINUS_SRC_ALPHA);
-		GLMC.glBlendFuncSeparate(GL32.GL_SRC_ALPHA, GL32.GL_ONE_MINUS_SRC_ALPHA, GL32.GL_ONE, GL32.GL_ZERO);
+		GLMC.glBlendFunc(VulkanicAPI.GL_SRC_ALPHA, VulkanicAPI.GL_ONE_MINUS_SRC_ALPHA);
+		GLMC.glBlendFuncSeparate(VulkanicAPI.GL_SRC_ALPHA, VulkanicAPI.GL_ONE_MINUS_SRC_ALPHA, VulkanicAPI.GL_ONE, VulkanicAPI.GL_ZERO);
 		
-		GL32.glDisable(GL32.GL_SCISSOR_TEST);
+		VulkanicAPI.disable(VulkanicAPI.GL_SCISSOR_TEST);
 		
 		// Enable depth test and depth mask
 		GLMC.enableDepthTest();
-		GLMC.glDepthFunc(GL32.GL_LESS);
+		GLMC.glDepthFunc(VulkanicAPI.GL_LESS);
 		GLMC.enableDepthMask();
 		
 		// This is required for MC versions 1.21.5+
 		// due to MC updating the lightmap by changing the viewport size
-		GL32.glViewport(0, 0, this.textureWidth, this.textureHeight);
+		CommandContext ctx = VulkanicAPI.getImmediateContext();
+		VulkanicAPI.setDynamicViewport(ctx, 0, 0, this.textureWidth, this.textureHeight);
 		
 		this.lodRenderProgram.bind();
 		
@@ -433,7 +435,7 @@ public class LodRenderer
 		else
 		{
 			// get MC's color texture 
-			this.activeColorTextureId = GL32.glGetFramebufferAttachmentParameteri(GL32.GL_FRAMEBUFFER, GL32.GL_COLOR_ATTACHMENT0, GL32.GL_FRAMEBUFFER_ATTACHMENT_OBJECT_NAME);
+			this.activeColorTextureId = VulkanicAPI.glGetFramebufferAttachmentParameteri(VulkanicAPI.GL_FRAMEBUFFER, VulkanicAPI.GL_COLOR_ATTACHMENT0, VulkanicAPI.GL_FRAMEBUFFER_ATTACHMENT_OBJECT_NAME);
 		}
 		
 		
@@ -441,11 +443,11 @@ public class LodRenderer
 		boolean clearTextures = !ApiEventInjector.INSTANCE.fireAllEvents(DhApiBeforeTextureClearEvent.class, renderEventParam);
 		if (clearTextures)
 		{
-			GL32.glClearDepth(1.0);
+			VulkanicAPI.glClearDepth(1.0);
 			
 			float[] clearColorValues = new float[4];
-			GL32.glGetFloatv(GL32.GL_COLOR_CLEAR_VALUE, clearColorValues);
-			GL32.glClearColor(clearColorValues[0], clearColorValues[1], clearColorValues[2], 1.0f);
+			VulkanicAPI.glGetFloatv(VulkanicAPI.GL_COLOR_CLEAR_VALUE, clearColorValues);
+			VulkanicAPI.glClearColor(clearColorValues[0], clearColorValues[1], clearColorValues[2], 1.0f);
 			
 			if (this.usingMcFramebuffer && framebufferOverride == null)
 			{
@@ -455,11 +457,11 @@ public class LodRenderer
 				
 				
 				// don't clear the color texture, that removes the sky 
-				GL32.glClear(GL32.GL_DEPTH_BUFFER_BIT);
+				VulkanicAPI.clear(VulkanicAPI.GL_DEPTH_BUFFER_BIT);
 			}
 			else if (firstPass)
 			{
-				GL32.glClear(GL32.GL_COLOR_BUFFER_BIT | GL32.GL_DEPTH_BUFFER_BIT);
+				VulkanicAPI.clear(VulkanicAPI.GL_COLOR_BUFFER_BIT | VulkanicAPI.GL_DEPTH_BUFFER_BIT);
 			}
 		}
 		
@@ -494,7 +496,7 @@ public class LodRenderer
 		// create and bind the necessary textures
 		this.createAndBindTextures();
 		
-		if(this.framebuffer.getStatus() != GL32.GL_FRAMEBUFFER_COMPLETE)
+		if(this.framebuffer.getStatus() != VulkanicAPI.GL_FRAMEBUFFER_COMPLETE)
 		{
 			// This generally means something wasn't bound, IE missing either the color or depth texture
 			LOGGER.warn("Framebuffer ["+this.framebuffer.getId()+"] isn't complete.");
@@ -576,12 +578,12 @@ public class LodRenderer
 		boolean renderWireframe = Config.Client.Advanced.Debugging.renderWireframe.get();
 		if (renderWireframe)
 		{
-			GL32.glPolygonMode(GL32.GL_FRONT_AND_BACK, GL32.GL_LINE);
+			VulkanicAPI.glPolygonMode(VulkanicAPI.GL_FRONT_AND_BACK, VulkanicAPI.GL_LINE);
 			GLMC.disableFaceCulling();
 		}
 		else
 		{
-			GL32.glPolygonMode(GL32.GL_FRONT_AND_BACK, GL32.GL_FILL);
+			VulkanicAPI.glPolygonMode(VulkanicAPI.GL_FRONT_AND_BACK, VulkanicAPI.GL_FILL);
 			GLMC.enableFaceCulling();
 		}
 		
@@ -589,8 +591,8 @@ public class LodRenderer
 		{
 			GLMC.enableBlend();
 			GLMC.enableDepthTest();
-			GL32.glBlendEquation(GL32.GL_FUNC_ADD);
-			GLMC.glBlendFuncSeparate(GL32.GL_SRC_ALPHA, GL32.GL_ONE_MINUS_SRC_ALPHA, GL32.GL_ONE, GL32.GL_ONE_MINUS_SRC_ALPHA);
+			VulkanicAPI.glBlendEquation(VulkanicAPI.GL_FUNC_ADD);
+			GLMC.glBlendFuncSeparate(VulkanicAPI.GL_SRC_ALPHA, VulkanicAPI.GL_ONE_MINUS_SRC_ALPHA, VulkanicAPI.GL_ONE, VulkanicAPI.GL_ONE_MINUS_SRC_ALPHA);
 		}
 		else
 		{
@@ -640,8 +642,8 @@ public class LodRenderer
 					
 					vbo.bind();
 					shaderProgram.bindVertexBuffer(vbo.getId());
-					GL32.glDrawElements(
-							GL32.GL_TRIANGLES,
+					VulkanicAPI.glDrawElements(
+							VulkanicAPI.GL_TRIANGLES,
 							(vbo.getVertexCount() / 4) * 6, // TODO what does the 4 and 6 here represent?
 							this.quadIBO.getType(), 0);
 					vbo.unbind();
@@ -658,7 +660,7 @@ public class LodRenderer
 		if (renderWireframe)
 		{
 			// default back to GL_FILL since all other rendering uses it 
-			GL32.glPolygonMode(GL32.GL_FRONT_AND_BACK, GL32.GL_FILL);
+			VulkanicAPI.glPolygonMode(VulkanicAPI.GL_FRONT_AND_BACK, VulkanicAPI.GL_FILL);
 			GLMC.enableFaceCulling();
 		}
 		
