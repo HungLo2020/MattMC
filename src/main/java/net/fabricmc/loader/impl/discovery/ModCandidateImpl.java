@@ -54,7 +54,7 @@ public final class ModCandidateImpl implements DomainObject.Mod {
 		return new ModCandidateImpl(mod.paths, null, -1, metadata, false, Collections.emptyList());
 	}
 
-	static ModCandidateImpl createPlain(List<Path> paths, LoaderModMetadata metadata, boolean requiresRemap, Collection<ModCandidateImpl> nestedMods) {
+	public static ModCandidateImpl createPlain(List<Path> paths, LoaderModMetadata metadata, boolean requiresRemap, Collection<ModCandidateImpl> nestedMods) {
 		return new ModCandidateImpl(paths, null, -1, metadata, requiresRemap, nestedMods);
 	}
 

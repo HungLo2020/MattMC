@@ -3,6 +3,7 @@ package net.fabricmc.loader.impl;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -28,12 +29,8 @@ import net.fabricmc.loader.api.MappingResolver;
 import net.fabricmc.loader.api.ModContainer;
 import net.fabricmc.loader.api.ObjectShare;
 import net.fabricmc.loader.api.entrypoint.EntrypointContainer;
-import net.fabricmc.loader.impl.discovery.ArgumentModCandidateFinder;
-import net.fabricmc.loader.impl.discovery.ClasspathModCandidateFinder;
 import net.fabricmc.loader.impl.discovery.ModCandidateImpl;
-import net.fabricmc.loader.impl.discovery.ModDiscoverer;
 import net.fabricmc.loader.impl.discovery.ModResolutionException;
-import net.fabricmc.loader.impl.discovery.ModResolver;
 import net.fabricmc.loader.impl.entrypoint.EntrypointStorage;
 import net.fabricmc.loader.impl.game.GameProvider;
 import net.fabricmc.loader.impl.launch.FabricLauncherBase;
@@ -42,6 +39,8 @@ import net.fabricmc.loader.impl.launch.knot.Knot;
 import net.fabricmc.loader.impl.metadata.DependencyOverrides;
 import net.fabricmc.loader.impl.metadata.EntrypointMetadata;
 import net.fabricmc.loader.impl.metadata.LoaderModMetadata;
+import net.fabricmc.loader.impl.metadata.ModMetadataParser;
+import net.fabricmc.loader.impl.metadata.ParseMetadataException;
 import net.fabricmc.loader.impl.metadata.VersionOverrides;
 import net.fabricmc.loader.impl.util.DefaultLanguageAdapter;
 import net.fabricmc.loader.impl.util.ExceptionUtil;
@@ -186,79 +185,62 @@ public final class FabricLoaderImpl extends net.fabricmc.loader.FabricLoader {
 	}
 
 	private void setup() throws ModResolutionException {
-		boolean remapRegularMods = isDevelopmentEnvironment();
-		VersionOverrides versionOverrides = new VersionOverrides();
-		DependencyOverrides depOverrides = new DependencyOverrides(configDir);
-
-		// discover mods
-
-		ModDiscoverer discoverer = new ModDiscoverer(versionOverrides, depOverrides);
-		discoverer.addCandidateFinder(new ClasspathModCandidateFinder());
-		discoverer.addCandidateFinder(new ArgumentModCandidateFinder(remapRegularMods));
-
-		Map<String, Set<ModCandidateImpl>> envDisabledMods = new HashMap<>();
-		modCandidates = discoverer.discoverMods(this, envDisabledMods);
-
-		// dump version and dependency overrides info
-
-		if (!versionOverrides.getAffectedModIds().isEmpty()) {
-			Log.info(LogCategory.GENERAL, "Versions overridden for %s", String.join(", ", versionOverrides.getAffectedModIds()));
-		}
-
-		if (!depOverrides.getAffectedModIds().isEmpty()) {
-			Log.info(LogCategory.GENERAL, "Dependencies overridden for %s", String.join(", ", depOverrides.getAffectedModIds()));
-		}
-
-		// resolve mods
-
-		modCandidates = ModResolver.resolve(modCandidates, getEnvironmentType(), envDisabledMods);
-
-		dumpModList(modCandidates);
-		dumpNonFabricMods(discoverer.getNonFabricMods());
-
-		Path cacheDir = gameDir.resolve(CACHE_DIR_NAME);
-		Path outputdir = cacheDir.resolve(PROCESSED_MODS_DIR_NAME);
-
-		// Note: Runtime mod remapping removed - unified build approach means all code
-		// uses consistent mappings at compile time, making runtime remapping unnecessary
-
-		// shuffle mods in-dev to reduce the risk of false order reliance, apply late load requests
-
-		if (isDevelopmentEnvironment() && !SystemProperties.isSet(SystemProperties.DEBUG_DISABLE_MOD_SHUFFLE)) {
-			Collections.shuffle(modCandidates);
-		}
-
-		String modsToLoadLate = System.getProperty(SystemProperties.DEBUG_LOAD_LATE);
-
-		if (modsToLoadLate != null) {
-			for (String modId : modsToLoadLate.split(",")) {
-				for (Iterator<ModCandidateImpl> it = modCandidates.iterator(); it.hasNext(); ) {
-					ModCandidateImpl mod = it.next();
-
-					if (mod.getId().equals(modId)) {
-						it.remove();
-						modCandidates.add(mod);
-						break;
-					}
-				}
+		// SIMPLIFIED SETUP - No discovery, no resolution, just load the single integrated mod
+		// The integrated mod (mattmc) is compiled into the JAR with all "mods" as part of the codebase
+		
+		Log.info(LogCategory.GENERAL, "Loading integrated mod (simplified loader)");
+		
+		try {
+			// Load fabric.mod.json from resources
+			InputStream modJsonStream = FabricLoaderImpl.class.getClassLoader().getResourceAsStream("fabric.mod.json");
+			if (modJsonStream == null) {
+				throw new ModResolutionException("fabric.mod.json not found in resources");
 			}
+			
+			// Parse metadata without version/dependency overrides (not needed for single integrated mod)
+			VersionOverrides versionOverrides = new VersionOverrides();
+			DependencyOverrides depOverrides = new DependencyOverrides(configDir);
+			
+			LoaderModMetadata metadata = ModMetadataParser.parseMetadata(
+				modJsonStream, 
+				"<classpath>", 
+				Collections.emptyList(),
+				versionOverrides,
+				depOverrides,
+				isDevelopmentEnvironment()
+			);
+			
+			// Create a simple mod candidate directly from the classpath
+			// No need for complex discovery - we know the mod is right here
+			ModCandidateImpl candidate = createIntegratedModCandidate(metadata);
+			
+			// Add the single integrated mod
+			addMod(candidate);
+			
+			Log.info(LogCategory.GENERAL, "Loaded integrated mod: %s v%s", metadata.getId(), metadata.getVersion());
+			
+		} catch (ParseMetadataException e) {
+			throw new ModResolutionException("Failed to parse integrated mod metadata", e);
 		}
-
-		// add mods
-
-		for (ModCandidateImpl mod : modCandidates) {
-			if (!mod.hasPath() && !mod.isBuiltin()) {
-				try {
-					mod.setPaths(Collections.singletonList(mod.copyToDir(outputdir, false)));
-				} catch (IOException e) {
-					throw new RuntimeException("Error extracting mod "+mod, e);
-				}
-			}
-
-			addMod(mod);
-		}
-
+		
 		modCandidates = null;
+	}
+	
+	private ModCandidateImpl createIntegratedModCandidate(LoaderModMetadata metadata) {
+		// Create a mod candidate from the current classpath
+		// Since everything is compiled together, we use the classpath root as the "path"
+		// This allows the mod container to work correctly
+		
+		// Use the createPlain factory method - this is for regular mods on the classpath
+		List<Path> paths = Collections.singletonList(Paths.get(".")); // Placeholder path
+		Collection<ModCandidateImpl> nestedMods = Collections.emptyList(); // No nested mods
+		
+		return ModCandidateImpl.createPlain(
+			paths,
+			metadata,
+			false, // requiresRemap - everything is already in correct namespace
+			nestedMods
+		);
 	}
 
 	@VisibleForTesting
