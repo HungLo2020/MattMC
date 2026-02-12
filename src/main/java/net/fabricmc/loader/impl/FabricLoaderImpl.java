@@ -281,6 +281,8 @@ public final class FabricLoaderImpl extends net.fabricmc.loader.FabricLoader {
 		addMod(candidate);
 		
 		Log.info(LogCategory.GENERAL, "Loaded integrated mod: %s v%s", metadata.getId(), metadata.getVersion());
+		Log.info(LogCategory.GENERAL, "Mod provides: %s", metadata.getProvides());
+		Log.info(LogCategory.GENERAL, "Entrypoint keys: %s", metadata.getEntrypointKeys());
 	}
 	
 	private ModCandidateImpl createIntegratedModCandidate(LoaderModMetadata metadata) {
@@ -339,6 +341,7 @@ public final class FabricLoaderImpl extends net.fabricmc.loader.FabricLoader {
 			return;
 		}
 
+		Log.info(LogCategory.ENTRYPOINT, "Invoking entrypoint '%s'", key);
 		RuntimeException exception = null;
 		Collection<EntrypointContainer<T>> entrypoints = FabricLoaderImpl.INSTANCE.getEntrypointContainers(key, type);
 
@@ -346,8 +349,13 @@ public final class FabricLoaderImpl extends net.fabricmc.loader.FabricLoader {
 
 		for (EntrypointContainer<T> container : entrypoints) {
 			try {
+				Log.info(LogCategory.ENTRYPOINT, "Calling entrypoint '%s' from mod '%s'", 
+					container.getDefinition(), container.getProvider().getMetadata().getId());
 				invoker.accept(container.getEntrypoint());
+				Log.info(LogCategory.ENTRYPOINT, "Successfully called entrypoint '%s'", container.getDefinition());
 			} catch (Throwable t) {
+				Log.error(LogCategory.ENTRYPOINT, "Error invoking entrypoint '%s': %s", container.getDefinition(), t.toString());
+				t.printStackTrace();
 				exception = ExceptionUtil.gatherExceptions(t,
 						exception,
 						exc -> new RuntimeException(String.format("Could not execute entrypoint stage '%s' due to errors, provided by '%s' at '%s'!",
