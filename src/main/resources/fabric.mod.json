@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "id": "mattmc",
+  "name": "MattMC",
+  "version": "1.21.10",
+  "description": "Minecraft 1.21.10 with integrated Fabric Loader, Sodium, Iris, and Distant Horizons",
+  "environment": "*",
+  "contact": {
+    "homepage": "https://github.com/HungLo2020/MattMC",
+    "sources": "https://github.com/HungLo2020/MattMC"
+  },
+  "license": "Mixed (Apache-2.0, LGPL-3.0, Polyform-Shield-1.0.0)",
+  "icon": "iris-logo.png",
+  "authors": [
+    "HungLo2020",
+    "FabricMC",
+    "CaffeineMC",
+    "IrisShaders",
+    "James Seibel"
+  ],
+  "entrypoints": {
+    "client": [
+      "net.sodium.fabric.SodiumFabricMod",
+      "com.seibel.distanthorizons.fabric.FabricMain"
+    ],
+    "server": [
+      "com.seibel.distanthorizons.fabric.FabricMain"
+    ],
+    "preLaunch": [
+      "net.sodium.fabric.SodiumPreLaunch"
+    ]
+  },
+  "provides": [
+    "fabricloader",
+    "sodium",
+    "iris",
+    "distanthorizons",
+    "lod",
+    "voxelmap"
+  ],
+
+  "depends": {
+    "minecraft": "1.21.10",
+    "java": ">=21"
+  },
+  "custom": {
+    "fabric-renderer-api-v1:contains_renderer": true
+  }
+}
