@@ -147,9 +147,6 @@ dependencies {
     // JetBrains annotations
     implementation 'org.jetbrains:annotations:24.1.0'
     
-    // LZMA SDK for compression
-    implementation 'org.lz4:lz4-java:1.8.0'
-    
     // OSHI for system info
     implementation 'com.github.oshi:oshi-core:6.4.10'
     

@@ -22,9 +22,10 @@ import static org.junit.jupiter.api.Assertions.fail;
  * This test enforces the Vulkanic abstraction layer principle:
  * - Only code in src/main/java/net/vulkanic/backends/opengl/ can import org.lwjgl.opengl.*
  * - Only code in src/main/java/net/vulkanic/backends/vulkan/ can import org.lwjgl.vulkan.*
+ * - Only code in src/main/java/net/vulkanic/ can import net.vulkanic.backends.* classes
  * 
  * This ensures that game code uses the Vulkanic API abstraction layer rather than
- * directly depending on specific graphics APIs (OpenGL or Vulkan).
+ * directly depending on specific graphics APIs (OpenGL or Vulkan) or backend implementations.
  * 
  * See src/main/java/net/vulkanic/README.md for details on the architectural principles.
  */
@@ -32,6 +33,9 @@ public class ArchitecturalBoundaryTest {
     
     private static final String PROJECT_ROOT = System.getProperty("user.dir");
     private static final Path SRC_MAIN_JAVA = Paths.get(PROJECT_ROOT, "src", "main", "java");
+    
+    // Vulkanic package root - only code inside this directory can access backends
+    private static final Path VULKANIC_PATH = Paths.get(PROJECT_ROOT, "src", "main", "java", "net", "vulkanic");
     
     // Allowed paths for OpenGL imports
     private static final Path OPENGL_BACKEND_PATH = Paths.get(PROJECT_ROOT, "src", "main", "java", "net", "vulkanic", "backends", "opengl");
@@ -42,6 +46,7 @@ public class ArchitecturalBoundaryTest {
     // Patterns to detect forbidden imports
     private static final Pattern OPENGL_IMPORT_PATTERN = Pattern.compile("^\\s*import\\s+org\\.lwjgl\\.opengl\\.[^;]+;", Pattern.MULTILINE);
     private static final Pattern VULKAN_IMPORT_PATTERN = Pattern.compile("^\\s*import\\s+org\\.lwjgl\\.vulkan\\.[^;]+;", Pattern.MULTILINE);
+    private static final Pattern BACKEND_IMPORT_PATTERN = Pattern.compile("^\\s*import\\s+net\\.vulkanic\\.backends\\.[^;]+;", Pattern.MULTILINE);
     
     @Test
     public void testOpenGLImportsOnlyInBackend() throws IOException {
@@ -76,6 +81,19 @@ public class ArchitecturalBoundaryTest {
                 "org.lwjgl.vulkan.*",
                 violations
             ));
+        }
+    }
+    
+    @Test
+    public void testBackendImportsOnlyFromVulkanicPackage() throws IOException {
+        List<String> violations = checkImportViolations(
+            BACKEND_IMPORT_PATTERN,
+            VULKANIC_PATH,
+            "Backend"
+        );
+        
+        if (!violations.isEmpty()) {
+            fail(buildBackendViolationMessage(violations));
         }
     }
     
@@ -153,6 +171,40 @@ public class ArchitecturalBoundaryTest {
         }
         errorMessage.append("================================================================================\n");
         errorMessage.append("TO FIX: Remove direct ").append(backendName).append(" imports and use the VulkanicAPI instead.\n");
+        errorMessage.append("        See src/main/java/net/vulkanic/README.md for architectural guidance.\n");
+        errorMessage.append("================================================================================\n");
+        
+        return errorMessage.toString();
+    }
+    
+    /**
+     * Builds a detailed error message for backend import violations.
+     */
+    private String buildBackendViolationMessage(List<String> violations) {
+        StringBuilder errorMessage = new StringBuilder();
+        errorMessage.append("\n");
+        errorMessage.append("================================================================================\n");
+        errorMessage.append("ARCHITECTURAL BOUNDARY VIOLATION: Illegal Backend Imports Detected\n");
+        errorMessage.append("================================================================================\n");
+        errorMessage.append("\n");
+        errorMessage.append("The Vulkanic abstraction layer prohibits code outside of net.vulkanic package\n");
+        errorMessage.append("from directly importing backend implementation classes.\n");
+        errorMessage.append("\n");
+        errorMessage.append("RULE: Only code in 'src/main/java/net/vulkanic/'\n");
+        errorMessage.append("      may import net.vulkanic.backends.* classes.\n");
+        errorMessage.append("\n");
+        errorMessage.append("REASON: Game and mod code must use the Vulkanic frontend API (VulkanicAPI,\n");
+        errorMessage.append("        GraphicsBackend, CommandContext) instead of directly accessing backend\n");
+        errorMessage.append("        implementations. This ensures the abstraction layer works properly and\n");
+        errorMessage.append("        allows switching between OpenGL and Vulkan backends.\n");
+        errorMessage.append("\n");
+        errorMessage.append("VIOLATIONS FOUND:\n");
+        errorMessage.append("--------------------------------------------------------------------------------\n");
+        for (String violation : violations) {
+            errorMessage.append(violation).append("\n\n");
+        }
+        errorMessage.append("================================================================================\n");
+        errorMessage.append("TO FIX: Remove direct backend imports and use the VulkanicAPI frontend instead.\n");
         errorMessage.append("        See src/main/java/net/vulkanic/README.md for architectural guidance.\n");
         errorMessage.append("================================================================================\n");
         
