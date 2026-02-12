@@ -60,7 +60,6 @@ public final class FabricLoaderImpl extends net.fabricmc.loader.FabricLoader {
 	private static final String TMP_DIR_NAME = "tmp"; // relative to cache dir
 
 	protected final Map<String, ModContainerImpl> modMap = new HashMap<>();
-	private List<ModCandidateImpl> modCandidates;
 	protected List<ModContainerImpl> mods = new ArrayList<>();
 
 	private final Map<String, LanguageAdapter> adapterMap = new HashMap<>();
@@ -218,8 +217,6 @@ public final class FabricLoaderImpl extends net.fabricmc.loader.FabricLoader {
 		} catch (ParseMetadataException e) {
 			throw new ModResolutionException("Failed to parse integrated mod metadata", e);
 		}
-		
-		modCandidates = null;
 	}
 	
 	private ModCandidateImpl createIntegratedModCandidate(LoaderModMetadata metadata) {
@@ -318,15 +315,7 @@ public final class FabricLoaderImpl extends net.fabricmc.loader.FabricLoader {
 		return objectShare;
 	}
 
-	public ModCandidateImpl getModCandidate(String id) {
-		if (modCandidates == null) return null;
-
-		for (ModCandidateImpl mod : modCandidates) {
-			if (mod.getId().equals(id)) return mod;
-		}
-
-		return null;
-	}
+	// getModCandidate() removed - modCandidates field no longer used
 
 	@Override
 	public Optional<net.fabricmc.loader.api.ModContainer> getModContainer(String id) {

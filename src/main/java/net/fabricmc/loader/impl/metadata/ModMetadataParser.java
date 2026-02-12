@@ -124,7 +124,8 @@ public final class ModMetadataParser {
 		case 1:
 			return V1ModMetadataParser.parse(reader);
 		case 0:
-			return V0ModMetadataParser.parse(reader);
+			// V0 format removed - integrated mod uses V1 format exclusively
+			throw new ParseMetadataException("Schema version 0 is no longer supported. Please use schema version 1.");
 		default:
 			if (schemaVersion > 0) {
 				throw new ParseMetadataException(String.format("This version of fabric-loader doesn't support the newer schema version of \"%s\""
